@@ -39,3 +39,15 @@ yarn-error.log*
 # typescript
 *.tsbuildinfo
 next-env.d.ts
+
+# claude code local settings
+/.claude/
+
+# workshop content (private — local only, never commit or deploy)
+/DOCS/
+/ARCHIVE/
+/IU MEETING/
+/PITCH/
+/RESEARCH/
+/handoffs/
+/otto_mockups/

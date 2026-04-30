@@ -1,0 +1,2073 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Vibe Feed — Layout B</title>
+<link href="https://fonts.googleapis.com/css2?family=Fraunces:ital,wght@0,400;0,700;0,900;1,400&family=DM+Sans:wght@300;400;500;600&display=swap" rel="stylesheet">
+<script src="/html/_persistence.js"></script>
+<script src="/html/_otto.js" defer></script>
+<style>
+:root{--cream:#FAF7F2;--charcoal:#1C1C1E;--soft:#2D2D2D;--muted:#8A8580;--accent:#FF5C35;--green:#2ECC71;--lavender:#C8B8FF;--gold:#F5C842;--border:rgba(28,28,30,.08);--shadow:0 4px 24px rgba(0,0,0,.06);--shadow-lg:0 12px 48px rgba(0,0,0,.1);}
+*{margin:0;padding:0;box-sizing:border-box;}
+html,body{height:100%;}
+body{font-family:'DM Sans',sans-serif;background:var(--cream);color:var(--charcoal);cursor:none;overflow-x:hidden;}
+.cursor{width:8px;height:8px;background:var(--accent);border-radius:50%;position:fixed;top:0;left:0;pointer-events:none;z-index:2147483647;will-change:transform;transition:width .15s,height .15s,background .15s;}
+.cursor-ring{width:28px;height:28px;border:1.5px solid var(--accent);border-radius:50%;position:fixed;top:0;left:0;pointer-events:none;z-index:2147483646;will-change:transform;opacity:.45;transition:width .2s,height .2s,opacity .2s;}
+.cursor.hover{width:6px;height:6px;background:var(--charcoal);}
+.cursor-ring.hover{width:44px;height:44px;opacity:.2;border-color:var(--charcoal);}
+
+/* ── Four-column shell ── */
+.shell{display:grid;grid-template-columns:200px 1fr 320px;min-height:100vh;}
+
+/* Left nav */
+.left-nav{padding:20px 14px;border-right:1px solid var(--border);position:sticky;top:0;height:100vh;overflow-y:auto;scrollbar-width:thin;scrollbar-color:var(--border) transparent;display:flex;flex-direction:column;}
+.left-nav::-webkit-scrollbar{width:3px;}
+.left-nav::-webkit-scrollbar-thumb{background:var(--border);border-radius:3px;}
+.nav-logo{font-family:'Fraunces',serif;font-size:22px;font-weight:900;color:var(--charcoal);letter-spacing:-1px;display:block;margin-bottom:24px;text-decoration:none;}
+.nav-logo span{color:var(--accent);}
+.nav-item{display:flex;align-items:center;gap:10px;padding:10px 12px;border-radius:12px;font-size:14px;font-weight:500;color:var(--muted);cursor:none;text-decoration:none;transition:all .15s;border:none;background:none;width:100%;text-align:left;margin-bottom:2px;}
+.nav-item:hover{background:white;color:var(--charcoal);}
+.nav-item.active{background:white;color:var(--charcoal);font-weight:600;box-shadow:var(--shadow);}
+.nav-divider{height:1px;background:var(--border);margin:12px 0;}
+.mini-avatar{width:34px;height:34px;border-radius:10px;background:var(--charcoal);display:flex;align-items:center;justify-content:center;font-family:'Fraunces',serif;font-size:12px;font-weight:700;color:white;flex-shrink:0;}
+.post-btn{width:100%;margin-top:14px;padding:12px;border-radius:12px;background:var(--accent);color:white;font-family:'DM Sans',sans-serif;font-size:14px;font-weight:700;border:none;cursor:none;transition:all .2s;}
+.post-btn:hover{background:#ff7055;}
+
+/* ── CENTER: posts feed + tabs ── */
+.center-feed{border-right:1px solid var(--border);min-height:100vh;}
+.feed-header{padding:0 20px;border-bottom:1px solid var(--border);position:sticky;top:0;background:rgba(250,247,242,.92);backdrop-filter:blur(14px);z-index:50;display:flex;}
+.feed-tab{font-family:'DM Sans',sans-serif;font-size:14px;font-weight:600;color:var(--muted);padding:16px 18px;border:none;background:none;cursor:none;position:relative;transition:color .18s;}
+.feed-tab::after{content:'';position:absolute;bottom:-1px;left:0;right:0;height:2px;background:var(--accent);border-radius:2px 2px 0 0;transform:scaleX(0);transition:transform .2s;}
+.feed-tab.active{color:var(--charcoal);}
+.feed-tab.active::after{transform:scaleX(1);}
+
+/* Composer */
+.composer{padding:16px 20px;border-bottom:1px solid var(--border);}
+.comp-row{display:flex;gap:12px;align-items:flex-start;}
+.comp-av{width:40px;height:40px;border-radius:12px;background:var(--charcoal);display:flex;align-items:center;justify-content:center;font-family:'Fraunces',serif;font-size:14px;font-weight:700;color:white;flex-shrink:0;}
+.comp-right{flex:1;}
+.comp-input{width:100%;padding:12px 16px;border-radius:14px;border:1.5px solid var(--border);background:var(--cream);font-family:'DM Sans',sans-serif;font-size:14px;color:var(--charcoal);resize:none;outline:none;min-height:48px;transition:border-color .18s,min-height .25s;cursor:text;line-height:1.5;}
+.comp-input::placeholder{color:var(--muted);}
+.comp-input:focus{border-color:rgba(28,28,30,.2);min-height:100px;background:white;}
+.comp-footer{display:flex;align-items:center;justify-content:space-between;margin-top:10px;}
+.comp-options{display:flex;gap:6px;}
+.comp-opt{font-size:12px;font-weight:600;color:var(--muted);background:var(--cream);border:none;padding:6px 12px;border-radius:100px;cursor:none;transition:all .15s;}
+.comp-opt:hover{background:var(--border);color:var(--charcoal);}
+.comp-submit{font-family:'DM Sans',sans-serif;font-size:13px;font-weight:700;background:var(--charcoal);color:white;border:none;padding:9px 22px;border-radius:100px;cursor:none;transition:all .2s;}
+.comp-submit:hover{background:var(--accent);}
+
+/* Match banner */
+.match-bar{margin:12px 20px;background:white;border:1px solid var(--border);border-radius:14px;padding:12px 16px;display:flex;align-items:center;gap:12px;}
+.match-bar-icon{width:32px;height:32px;border-radius:9px;background:var(--accent);display:flex;align-items:center;justify-content:center;flex-shrink:0;}
+.match-bar-text h4{font-size:12px;font-weight:700;margin-bottom:1px;}
+.match-bar-text p{font-size:11px;color:var(--muted);line-height:1.4;}
+
+/* Feed empty state (fresh-onboarded users with no network yet) */
+.feed-empty{display:none;flex-direction:column;align-items:center;justify-content:center;padding:72px 32px 60px;text-align:center;}
+.feed-empty.visible{display:flex;}
+.feed-empty-icon{width:72px;height:72px;border-radius:20px;background:white;border:0.5px solid var(--border);display:flex;align-items:center;justify-content:center;font-size:32px;margin-bottom:22px;box-shadow:var(--shadow);}
+.feed-empty h3{font-family:'Fraunces',serif;font-size:26px;font-weight:900;color:var(--charcoal);letter-spacing:-.6px;margin-bottom:12px;}
+.feed-empty p{font-size:14px;color:var(--muted);line-height:1.65;max-width:380px;margin-bottom:22px;}
+.feed-empty p strong{color:var(--charcoal);font-weight:600;}
+.feed-empty-cta{display:inline-flex;align-items:center;gap:6px;padding:12px 22px;background:var(--charcoal);color:white;border:none;border-radius:100px;font-family:'DM Sans',sans-serif;font-size:13px;font-weight:600;cursor:none;text-decoration:none;transition:all .15s;}
+.feed-empty-cta:hover{background:var(--accent);}
+.feed-empty-foot{font-size:11.5px;color:var(--muted);margin-top:16px;line-height:1.55;font-style:italic;max-width:340px;}
+
+/* Post card */
+.post-card{padding:20px;border-bottom:1px solid var(--border);transition:background .15s;}
+.post-card:hover{background:rgba(28,28,30,.015);}
+.pc2-header{display:flex;align-items:flex-start;gap:12px;margin-bottom:12px;}
+.pc2-avatar{width:44px;height:44px;border-radius:13px;display:flex;align-items:center;justify-content:center;font-family:'Fraunces',serif;font-size:15px;font-weight:700;color:white;flex-shrink:0;text-decoration:none;}
+.pc2-meta h4{font-size:14px;font-weight:700;color:var(--charcoal);}
+.pc2-meta p{font-size:12px;color:var(--muted);margin-top:1px;}
+.pc2-match{margin-left:auto;display:inline-flex;align-items:center;gap:4px;background:#FFF0EC;color:var(--accent);font-size:10px;font-weight:700;padding:3px 9px;border-radius:100px;white-space:nowrap;flex-shrink:0;}
+.pc2-body{font-size:15px;line-height:1.75;color:var(--soft);margin-bottom:14px;}
+.pc2-body strong{color:var(--charcoal);}
+.pc2-tags{display:flex;gap:6px;flex-wrap:wrap;margin-bottom:14px;}
+.pc2-tag{font-size:11px;font-weight:700;padding:4px 10px;border-radius:100px;background:#F5F4F0;color:var(--muted);}
+.pc2-bar{display:flex;align-items:center;justify-content:space-between;padding-top:12px;border-top:1px solid var(--border);}
+.pc2-chips{display:flex;gap:6px;}
+.pc2-chip{display:inline-flex;align-items:center;gap:5px;background:var(--cream);padding:6px 12px;border-radius:100px;font-size:12px;font-weight:600;cursor:none;border:1px solid transparent;transition:all .15s;}
+.pc2-chip:hover{border-color:var(--border);background:white;}
+.pc2-chip.comment-btn{cursor:none;}
+.pc2-save{font-size:13px;font-weight:700;color:var(--muted);background:none;border:none;cursor:none;transition:color .15s;}
+.pc2-save:hover{color:var(--charcoal);}
+
+/* ── RIGHT: Vibes strip + suggestions ── */
+.right-col{padding:0;position:sticky;top:0;height:100vh;overflow-y:auto;scrollbar-width:none;}
+.right-col::-webkit-scrollbar{display:none;}
+.vibes-strip-header{padding:16px 16px 10px;font-family:'Fraunces',serif;font-size:15px;font-weight:700;letter-spacing:-.2px;border-bottom:1px solid var(--border);}
+.vibes-strip{display:flex;flex-direction:column;gap:0;border-bottom:1px solid var(--border);}
+.vibe-strip-item{display:flex;align-items:center;gap:12px;padding:12px 16px;border-bottom:1px solid var(--border);cursor:none;transition:background .15s;}
+.vibe-strip-item:last-child{border-bottom:none;}
+.vibe-strip-item:hover{background:rgba(28,28,30,.025);}
+.vibe-thumb-sm{width:52px;height:72px;border-radius:10px;overflow:hidden;position:relative;flex-shrink:0;}
+.vibe-thumb-sm-bg{position:absolute;inset:0;}
+.vibe-thumb-sm-play{position:absolute;inset:0;display:flex;align-items:center;justify-content:center;font-size:14px;color:white;opacity:0;transition:opacity .15s;background:rgba(0,0,0,.2);}
+.vibe-strip-item:hover .vibe-thumb-sm-play{opacity:1;}
+.vibe-strip-info h4{font-size:12px;font-weight:700;color:var(--charcoal);line-height:1.3;margin-bottom:3px;}.vibe-comment-hint{display:flex;align-items:center;gap:4px;font-size:11px;color:var(--muted);font-weight:600;margin-top:4px;transition:color .15s;}.vibe-strip-item:hover .vibe-comment-hint{color:var(--accent);}
+.vibe-strip-info p{font-size:11px;color:var(--muted);}
+
+/* Suggestions widget */
+.suggestions-widget{padding:16px;border-bottom:1px solid var(--border);}
+.widget-title{font-family:'Fraunces',serif;font-size:14px;font-weight:700;margin-bottom:12px;letter-spacing:-.2px;}
+.suggest-item{display:flex;align-items:center;gap:10px;padding:14px 0;border-bottom:1px solid var(--border);}
+.suggest-item:last-child{border-bottom:none;}
+.suggest-av{width:34px;height:34px;border-radius:10px;display:flex;align-items:center;justify-content:center;font-family:'Fraunces',serif;font-size:12px;font-weight:700;color:white;flex-shrink:0;}
+.suggest-name{font-size:12px;font-weight:700;}
+.suggest-role{font-size:10px;color:var(--muted);}
+.suggest-reason{font-size:10px;color:var(--accent);font-weight:700;}
+.suggest-follow{margin-left:auto;font-size:10px;font-weight:700;background:none;border:1.5px solid var(--border);color:var(--charcoal);padding:4px 10px;border-radius:100px;cursor:none;transition:all .15s;white-space:nowrap;flex-shrink:0;}
+.suggest-follow:hover{background:var(--charcoal);color:white;border-color:var(--charcoal);}
+
+/* Trending */
+.trending-widget{padding:16px;}
+.trend-item{display:flex;align-items:center;justify-content:space-between;padding:14px 0;border-bottom:1px solid var(--border);cursor:none;}
+.trend-item:last-child{border-bottom:none;}
+.trend-tag{font-size:13px;font-weight:600;color:var(--charcoal);transition:color .15s;}
+.trend-item:hover .trend-tag{color:var(--accent);}
+.trend-count{font-size:11px;color:var(--muted);}
+
+/* ── COMMENT MODAL ── */
+.modal-overlay{position:fixed;inset:0;z-index:500;display:flex;align-items:center;justify-content:center;pointer-events:none;opacity:0;transition:opacity .25s;}
+.modal-overlay.open{opacity:1;pointer-events:all;}
+.modal-backdrop{position:absolute;inset:0;background:rgba(0,0,0,.48);}
+.comment-modal{position:relative;width:min(940px, calc(100vw - 48px));max-width:100%;max-height:88vh;background:white;border-radius:28px;display:flex;flex-direction:column;transform:translateY(18px) scale(.98);transition:transform .3s cubic-bezier(.22,1,.36,1);box-shadow:0 18px 80px rgba(0,0,0,.22);}
+.modal-overlay.open .comment-modal{transform:translateY(0) scale(1);}
+
+.cm-header{padding:22px 28px 16px;border-bottom:1px solid var(--border);display:flex;align-items:center;justify-content:space-between;flex-shrink:0;}
+.cm-title{font-family:'Fraunces',serif;font-size:18px;font-weight:800;letter-spacing:-.3px;}
+.cm-close{width:30px;height:30px;border-radius:50%;background:var(--cream);border:none;cursor:none;display:flex;align-items:center;justify-content:center;font-size:16px;color:var(--muted);transition:all .15s;}
+.cm-close:hover{background:var(--border);color:var(--charcoal);}
+
+/* Original post preview */
+.cm-post-preview{padding:22px 30px;background:linear-gradient(180deg,#FFF8F4 0%, #FAFAF8 100%);border-bottom:2px solid var(--border);flex-shrink:0;}
+.cm-post-author{display:flex;align-items:center;gap:10px;margin-bottom:8px;}
+.cm-post-av{width:38px;height:38px;border-radius:12px;display:flex;align-items:center;justify-content:center;font-family:'Fraunces',serif;font-size:12px;font-weight:700;color:white;flex-shrink:0;}
+.cm-post-name{font-size:14px;font-weight:800;}
+.cm-post-time{font-size:12px;color:var(--muted);}
+.cm-post-body{font-size:15px;line-height:1.78;color:var(--soft);}
+
+/* Sort bar */
+.cm-sort{padding:12px 28px;display:flex;align-items:center;gap:8px;border-bottom:1px solid var(--border);flex-shrink:0;}
+.cm-sort-label{font-size:10px;color:var(--muted);font-weight:700;text-transform:uppercase;letter-spacing:.5px;}
+.cm-sort-btn{font-size:11px;font-weight:700;padding:5px 12px;border-radius:100px;border:1.5px solid var(--border);background:transparent;cursor:none;color:var(--muted);transition:all .15s;}
+.cm-sort-btn.active{background:var(--charcoal);color:white;border-color:var(--charcoal);}
+.cm-sort-btn:hover:not(.active){color:var(--charcoal);background:var(--cream);}
+
+/* Comments list — clean rows */
+.cm-comments{flex:1;overflow-y:auto;padding:0;display:flex;flex-direction:column;scrollbar-width:thin;scrollbar-color:var(--border) transparent;}
+.comment-item{display:flex;gap:11px;padding:18px 30px;border-bottom:1px solid var(--border);transition:background .12s;}
+.comment-item:hover{background:#FAFAF8;}
+.comment-av{width:38px;height:38px;border-radius:12px;display:flex;align-items:center;justify-content:center;font-family:'Fraunces',serif;font-size:12px;font-weight:700;color:white;flex-shrink:0;}
+.comment-body-col{flex:1;min-width:0;}
+.comment-name-row{display:flex;align-items:baseline;gap:7px;margin-bottom:3px;flex-wrap:wrap;}
+.comment-author{font-size:14px;font-weight:700;color:var(--charcoal);}
+.comment-role{font-size:11px;color:var(--muted);font-weight:600;}
+.comment-time{font-size:10px;color:var(--muted);margin-left:auto;}
+.comment-text{font-size:15px;line-height:1.7;color:var(--soft);}
+.comment-text strong{color:var(--charcoal);}
+.comment-actions{display:flex;align-items:center;gap:12px;margin-top:8px;}
+/* Heart button — custom SVG, no emoji */
+.comment-action{font-size:13px;font-weight:700;color:var(--muted);background:none;border:none;cursor:none;transition:color .15s;display:flex;align-items:center;gap:5px;padding:0;}
+.comment-action:hover{color:var(--charcoal);}
+.comment-action.liked{color:var(--accent);}
+.comment-action.liked .heart-path{fill:currentColor;}
+.comment-reply-btn{font-size:13px;font-weight:700;color:var(--muted);background:none;border:none;cursor:none;transition:color .15s;}
+.comment-reply-btn:hover{color:var(--accent);}
+/* Inline reply form */
+.reply-form{display:none;margin-top:10px;padding-left:0;border-left:2px solid var(--accent);padding-left:14px;}
+.reply-form.open{display:flex;flex-direction:column;gap:7px;}
+.reply-form-input{width:100%;padding:8px 12px;border-radius:10px;border:1.5px solid var(--border);background:var(--cream);font-family:'DM Sans',sans-serif;font-size:13px;color:var(--charcoal);resize:none;outline:none;cursor:text;line-height:1.5;transition:border-color .18s;}
+.reply-form-input::placeholder{color:var(--muted);}
+.reply-form-input:focus{border-color:rgba(255,92,53,.35);background:white;}
+.reply-form-btns{display:flex;gap:7px;justify-content:flex-end;}
+.reply-form-cancel{font-size:12px;font-weight:600;background:var(--cream);border:none;color:var(--muted);padding:5px 14px;border-radius:100px;cursor:none;transition:background .15s;}
+.reply-form-cancel:hover{background:var(--border);}
+.reply-form-send{font-family:'DM Sans',sans-serif;font-size:12px;font-weight:700;background:var(--accent);color:white;border:none;padding:5px 16px;border-radius:100px;cursor:none;transition:background .2s;}
+.reply-form-send:hover{background:#ff7055;}
+/* Replies — indented */
+.comment-replies{margin:10px 0 0 43px;border-left:2px solid var(--border);padding-left:12px;}
+.reply-item{display:flex;gap:8px;padding:14px 0;border-bottom:1px solid var(--border);}
+.reply-item:last-child{border:none;padding-bottom:0;}
+.reply-av{width:30px;height:30px;border-radius:9px;display:flex;align-items:center;justify-content:center;font-family:'Fraunces',serif;font-size:10px;font-weight:700;color:white;flex-shrink:0;}
+.reply-col{flex:1;}
+.reply-name-row{display:flex;align-items:baseline;gap:6px;margin-bottom:2px;}
+.reply-name{font-size:12px;font-weight:700;}
+.reply-time{font-size:10px;color:var(--muted);margin-left:auto;}
+.reply-text{font-size:13px;line-height:1.55;color:var(--soft);}
+.reply-foot{display:flex;gap:6px;margin-top:5px;}
+.reply-like-btn{display:flex;align-items:center;gap:4px;font-size:11px;font-weight:700;color:var(--muted);background:none;border:none;cursor:none;transition:color .15s;}
+.reply-like-btn:hover,.reply-like-btn.liked{color:var(--accent);}
+.reply-like-btn.liked .heart-path{fill:currentColor;}
+
+/* Comment composer at bottom */
+.cm-composer{padding:16px 28px 20px;border-top:1px solid var(--border);flex-shrink:0;display:flex;gap:12px;align-items:flex-end;}
+.cm-comp-av{width:40px;height:40px;border-radius:12px;background:var(--charcoal);display:flex;align-items:center;justify-content:center;font-family:'Fraunces',serif;font-size:12px;font-weight:700;color:white;flex-shrink:0;}
+.cm-comp-right{flex:1;}
+.cm-comp-input{width:100%;padding:12px 16px;border-radius:20px;border:1.5px solid var(--border);background:var(--cream);font-family:'DM Sans',sans-serif;font-size:14px;color:var(--charcoal);resize:none;outline:none;min-height:46px;max-height:140px;line-height:1.55;cursor:text;transition:border-color .18s,background .18s;}
+.cm-comp-input::placeholder{color:var(--muted);}
+.cm-comp-input:focus{border-color:rgba(255,92,53,.3);background:white;}
+.cm-comp-send{width:40px;height:40px;background:var(--accent);border:none;border-radius:50%;color:white;cursor:none;display:flex;align-items:center;justify-content:center;flex-shrink:0;transition:background .15s,transform .12s;}
+.cm-comp-send:hover{background:#ff7055;}
+.cm-comp-send:active{transform:scale(.92);}
+
+/* ════ CALENDAR WIDGET ════ */
+/* Lives in the left nav (200px wide) — compact sizing */
+.cal-widget {
+  padding: 10px 10px 12px;
+  background: none;
+  flex-shrink: 0;
+}
+.cal-header {
+  display: flex; align-items: center; justify-content: space-between;
+  margin-bottom: 10px;
+}
+.cal-title-row {
+  display: flex; align-items: center; gap: 6px;
+}
+.cal-title {
+  font-family: 'Fraunces', serif;
+  font-size: 12px; font-weight: 700; letter-spacing: -.1px;
+  color: var(--charcoal);
+}
+.cal-month-nav {
+  display: flex; align-items: center; justify-content: space-between;
+  margin-bottom: 8px;
+}
+.cal-nav-btn {
+  width: 20px; height: 20px; border-radius: 6px;
+  background: none; border: none; cursor: none;
+  color: var(--muted); display: flex; align-items: center; justify-content: center;
+  transition: all .15s; font-size: 13px; flex-shrink: 0;
+}
+.cal-nav-btn:hover { background: white; color: var(--charcoal); }
+.cal-month-label {
+  font-size: 11px; font-weight: 700; color: var(--charcoal);
+  text-align: center; flex: 1;
+}
+.cal-toggle {
+  font-size: 10px; font-weight: 700; color: var(--muted);
+  background: none; border: none; cursor: none;
+  transition: color .15s;
+}
+.cal-toggle:hover { color: var(--accent); }
+.cal-grid {
+  display: grid; grid-template-columns: repeat(7, 1fr); gap: 1px;
+}
+.cal-day-name {
+  font-size: 8px; font-weight: 800; color: var(--muted);
+  text-align: center; padding: 2px 0; text-transform: uppercase; letter-spacing: .3px;
+}
+.cal-day {
+  aspect-ratio: 1; border-radius: 6px; display: flex; flex-direction: column;
+  align-items: center; justify-content: center; font-size: 10px; font-weight: 600;
+  color: var(--charcoal); cursor: none; transition: all .15s; position: relative;
+}
+.cal-day:hover { background: white; }
+.cal-day.other-month { color: var(--muted); opacity: .35; }
+.cal-day.today {
+  background: var(--charcoal); color: white; font-weight: 800;
+}
+.cal-day.today:hover { background: var(--soft); }
+.cal-day.has-event::after {
+  content: '';
+  width: 4px; height: 4px; border-radius: 50%;
+  background: var(--accent);
+  position: absolute; bottom: 2px;
+}
+.cal-day.today.has-event::after { background: white; }
+.cal-day.selected { background: var(--accent); color: white; }
+.cal-day.selected:hover { background: #ff7055; }
+.cal-day.selected.has-event::after { background: white; }
+
+/* Event list panel — slides open below grid */
+.cal-events-panel {
+  margin-top: 8px; display: none;
+  border-top: 1px solid var(--border); padding-top: 8px;
+}
+.cal-events-panel.open { display: block; }
+.cal-events-panel-title {
+  font-size: 10px; font-weight: 800; color: var(--muted);
+  text-transform: uppercase; letter-spacing: .5px; margin-bottom: 6px;
+}
+.cal-event-item {
+  display: flex; align-items: center; gap: 6px;
+  padding: 6px 7px; border-radius: 8px;
+  background: white; margin-bottom: 4px;
+  transition: background .13s; cursor: none;
+  border: 1px solid var(--border);
+}
+.cal-event-item:hover { background: var(--cream); }
+.cal-event-dot {
+  width: 7px; height: 7px; border-radius: 50%; flex-shrink: 0;
+}
+.cal-event-info { flex: 1; min-width: 0; }
+.cal-event-name {
+  font-size: 10px; font-weight: 700; color: var(--charcoal);
+  white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
+}
+.cal-event-time { font-size: 9px; color: var(--muted); }
+.cal-empty {
+  font-size: 11px; color: var(--muted); text-align: center;
+  padding: 10px 0; font-style: italic;
+}
+.cal-event-count-badge {
+  font-size: 9px; font-weight: 800; background: var(--accent);
+  color: white; padding: 1px 6px; border-radius: 100px; margin-left: 3px;
+}
+
+/* ════ CALENDAR FULL MODAL ════ */
+.cal-modal-backdrop {
+  display: none; position: fixed; inset: 0; z-index: 800;
+  background: rgba(0,0,0,.52);
+  align-items: center; justify-content: center;
+}
+.cal-modal-backdrop.open { display: flex; }
+.cal-modal {
+  background: white; border-radius: 24px;
+  width: min(860px, calc(100vw - 32px));
+  max-height: calc(100vh - 48px);
+  display: flex; flex-direction: column;
+  box-shadow: 0 24px 80px rgba(0,0,0,.18);
+  overflow: hidden;
+  animation: calModalIn .25s cubic-bezier(.34,1.4,.64,1);
+}
+@keyframes calModalIn { from{opacity:0;transform:scale(.95)} to{opacity:1;transform:scale(1)} }
+.cal-modal-header {
+  display: grid;
+  grid-template-columns: 1fr auto 1fr;
+  align-items: center;
+  padding: 18px 24px 16px;
+  border-bottom: 1px solid var(--border);
+  flex-shrink: 0;
+}
+.cal-modal-title {
+  font-family: 'Fraunces', serif;
+  font-size: 20px; font-weight: 900; letter-spacing: -.4px;
+  justify-self: start;
+}
+.cal-modal-month-nav {
+  display: flex; align-items: center; gap: 8px;
+  justify-self: center;
+}
+.cal-modal-header-actions {
+  display: flex; align-items: center; gap: 8px;
+  justify-self: end;
+}
+.cal-modal-nav-btn {
+  width: 32px; height: 32px; border-radius: 10px;
+  background: var(--cream); border: none; cursor: none;
+  color: var(--charcoal); display: flex; align-items: center; justify-content: center;
+  font-size: 16px; transition: all .15s;
+}
+.cal-modal-nav-btn:hover { background: var(--charcoal); color: white; }
+.cal-modal-month-label {
+  font-size: 15px; font-weight: 700; color: var(--charcoal);
+  min-width: 140px; text-align: center;
+}
+.cal-modal-add-btn {
+  display: flex; align-items: center; gap: 6px;
+  background: var(--accent); color: white;
+  font-family: 'DM Sans', sans-serif; font-size: 13px; font-weight: 700;
+  border: none; padding: 9px 18px; border-radius: 100px; cursor: none;
+  transition: all .2s;
+}
+.cal-modal-add-btn:hover { background: #ff7055; transform: translateY(-1px); }
+.cal-modal-close {
+  width: 32px; height: 32px; border-radius: 10px;
+  background: var(--cream); border: none; cursor: none;
+  font-size: 18px; color: var(--muted); display: flex; align-items: center; justify-content: center;
+  transition: all .15s;
+}
+.cal-modal-close:hover { background: var(--charcoal); color: white; }
+
+/* Modal body: big grid on left, event list on right */
+.cal-modal-body {
+  display: grid; grid-template-columns: 1fr 280px;
+  flex: 1; overflow: hidden;
+}
+.cal-modal-grid-wrap {
+  padding: 20px 24px; overflow-y: auto;
+}
+.cal-modal-day-names {
+  display: grid; grid-template-columns: repeat(7, 1fr);
+  margin-bottom: 6px;
+}
+.cal-modal-day-name {
+  font-size: 11px; font-weight: 800; color: var(--muted);
+  text-align: center; padding: 4px 0;
+  text-transform: uppercase; letter-spacing: .4px;
+}
+.cal-modal-grid {
+  display: grid; grid-template-columns: repeat(7, 1fr);
+  grid-auto-rows: 1fr;
+  gap: 4px;
+}
+.cal-modal-day {
+  aspect-ratio: 1; border-radius: 12px;
+  border: 1px solid var(--border);
+  padding: 6px; cursor: none;
+  transition: all .15s; position: relative;
+  display: flex; flex-direction: column; gap: 3px;
+  background: white;
+  overflow: hidden;
+}
+.cal-modal-day:hover { border-color: rgba(28,28,30,.2); background: var(--cream); }
+.cal-modal-day.other-month { opacity: .35; }
+.cal-modal-day.today { border-color: var(--charcoal); border-width: 2px; }
+.cal-modal-day.selected { border-color: var(--accent); border-width: 2px; background: #FFF8F6; }
+.cal-modal-day-num {
+  font-size: 13px; font-weight: 700; color: var(--charcoal);
+  width: 26px; height: 26px; border-radius: 8px;
+  display: flex; align-items: center; justify-content: center;
+  flex-shrink: 0;
+}
+.cal-modal-day.today .cal-modal-day-num {
+  background: var(--charcoal); color: white;
+}
+.cal-modal-day.selected .cal-modal-day-num {
+  background: var(--accent); color: white;
+}
+.cal-modal-event-pill {
+  font-size: 10px; font-weight: 700;
+  padding: 2px 6px; border-radius: 5px;
+  white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
+  color: white; cursor: none;
+}
+
+/* Right panel */
+.cal-modal-sidebar {
+  border-left: 1px solid var(--border);
+  display: flex; flex-direction: column;
+  overflow: hidden;
+}
+.cal-modal-sidebar-hdr {
+  padding: 16px 18px 12px;
+  border-bottom: 1px solid var(--border);
+  font-family: 'Fraunces', serif;
+  font-size: 15px; font-weight: 700; letter-spacing: -.2px;
+  flex-shrink: 0;
+}
+.cal-modal-sidebar-hdr span {
+  font-size: 12px; font-weight: 500; color: var(--muted);
+  font-family: 'DM Sans', sans-serif;
+  display: block; margin-top: 2px;
+}
+.cal-modal-events-list {
+  flex: 1; overflow-y: auto; padding: 12px;
+}
+.cal-modal-event-card {
+  display: flex; gap: 10px; padding: 10px 12px;
+  border-radius: 12px; border: 1px solid var(--border);
+  margin-bottom: 8px; transition: all .15s; cursor: none;
+  background: white;
+}
+.cal-modal-event-card:hover { border-color: rgba(28,28,30,.18); box-shadow: 0 2px 8px rgba(0,0,0,.06); }
+.cal-modal-event-bar {
+  width: 4px; border-radius: 100px; flex-shrink: 0; align-self: stretch;
+}
+.cal-modal-event-body { flex: 1; min-width: 0; }
+.cal-modal-event-name { font-size: 13px; font-weight: 700; margin-bottom: 3px; }
+.cal-modal-event-meta { font-size: 11px; color: var(--muted); line-height: 1.6; }
+.cal-modal-event-del {
+  background: none; border: none; cursor: none;
+  color: var(--muted); font-size: 16px; padding: 0 2px;
+  transition: color .15s; align-self: flex-start;
+}
+.cal-modal-event-del:hover { color: var(--accent); }
+.cal-modal-no-events {
+  text-align: center; padding: 32px 16px;
+  color: var(--muted); font-size: 13px; line-height: 1.6;
+}
+
+/* ── CREATE EVENT FORM ── */
+.create-event-modal {
+  display: none; position: fixed; inset: 0; z-index: 900;
+  background: rgba(0,0,0,.52);
+  align-items: center; justify-content: center;
+}
+.create-event-modal.open { display: flex; }
+.create-event-box {
+  background: white; border-radius: 20px;
+  width: min(480px, calc(100vw - 32px));
+  box-shadow: 0 24px 80px rgba(0,0,0,.2);
+  animation: calModalIn .22s cubic-bezier(.34,1.4,.64,1);
+  overflow: hidden;
+}
+.create-event-hdr {
+  display: flex; align-items: center; justify-content: space-between;
+  padding: 20px 22px 16px;
+  border-bottom: 1px solid var(--border);
+}
+.create-event-hdr h3 {
+  font-family: 'Fraunces', serif;
+  font-size: 18px; font-weight: 900; letter-spacing: -.3px;
+}
+.create-event-body { padding: 20px 22px; display: flex; flex-direction: column; gap: 14px; }
+.form-field { display: flex; flex-direction: column; gap: 5px; }
+.form-label {
+  font-size: 11px; font-weight: 800; color: var(--muted);
+  text-transform: uppercase; letter-spacing: .5px;
+}
+.form-input {
+  width: 100%; padding: 10px 14px; border-radius: 12px;
+  border: 1.5px solid var(--border); background: var(--cream);
+  font-family: 'DM Sans', sans-serif; font-size: 14px;
+  color: var(--charcoal); outline: none; transition: border-color .18s;
+  cursor: text;
+}
+.form-input:focus { border-color: rgba(28,28,30,.25); background: white; }
+.form-row { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; }
+.color-picker-row { display: flex; gap: 8px; flex-wrap: wrap; }
+.color-swatch {
+  width: 26px; height: 26px; border-radius: 8px; cursor: none;
+  border: 2px solid transparent; transition: all .15s;
+  flex-shrink: 0;
+}
+.color-swatch.active { border-color: var(--charcoal); transform: scale(1.15); }
+.create-event-footer {
+  padding: 14px 22px 20px;
+  display: flex; gap: 10px; justify-content: flex-end;
+}
+.btn-cancel {
+  font-family: 'DM Sans', sans-serif; font-size: 13px; font-weight: 700;
+  background: var(--cream); color: var(--muted); border: none;
+  padding: 10px 20px; border-radius: 100px; cursor: none; transition: all .15s;
+}
+.btn-cancel:hover { background: var(--border); }
+.btn-save-event {
+  font-family: 'DM Sans', sans-serif; font-size: 13px; font-weight: 700;
+  background: var(--accent); color: white; border: none;
+  padding: 10px 24px; border-radius: 100px; cursor: none; transition: all .2s;
+}
+.btn-save-event:hover { background: #ff7055; }
+
+/* ══ VIBE OF THE DAY ═══════════════════════════════════════════════ */
+.votd-wrap {
+  border-bottom: 1px solid var(--border);
+  background: white;
+}
+.votd-label-bar {
+  display: flex; align-items: center; gap: 8px;
+  padding: 14px 20px 10px;
+}
+.votd-badge {
+  display: flex; align-items: center; gap: 6px;
+  background: #1C1C1E; color: white;
+  font-size: 10px; font-weight: 800; letter-spacing: 1.5px;
+  text-transform: uppercase; padding: 4px 10px 4px 6px;
+  border-radius: 100px;
+}
+.votd-badge-dot {
+  width: 18px; height: 18px; border-radius: 50%;
+  background: var(--accent); display: flex;
+  align-items: center; justify-content: center; flex-shrink: 0;
+}
+.votd-subtitle {
+  font-size: 11px; color: var(--muted); font-weight: 500;
+}
+
+/* The card */
+.votd-card {
+  margin: 0 16px 16px;
+  border-radius: 18px;
+  overflow: hidden;
+  position: relative;
+  cursor: none;
+  transition: transform .2s, box-shadow .2s;
+}
+.votd-card:hover {
+  transform: translateY(-2px);
+  box-shadow: 0 16px 48px rgba(0,0,0,.14);
+}
+
+/* Cinematic background — gradient + fake thumbnail */
+.votd-bg {
+  height: 190px;
+  background: linear-gradient(135deg, #1A0A2E 0%, #2D1B4E 40%, #0F2A4A 100%);
+  position: relative;
+  display: flex; align-items: center; justify-content: center;
+  overflow: hidden;
+}
+.votd-bg::before {
+  content: '';
+  position: absolute; inset: 0;
+  background: radial-gradient(ellipse at 30% 50%, rgba(255,92,53,.18) 0%, transparent 60%),
+              radial-gradient(ellipse at 80% 20%, rgba(200,184,255,.12) 0%, transparent 50%);
+}
+/* Abstract waveform decoration */
+.votd-wave {
+  position: absolute; bottom: 0; left: 0; right: 0; height: 50px;
+  display: flex; align-items: flex-end; gap: 3px; padding: 0 20px;
+  opacity: .35;
+}
+.votd-wave-bar {
+  flex: 1; border-radius: 2px 2px 0 0;
+  background: white;
+  transition: height .3s;
+}
+
+/* Play button */
+.votd-play {
+  width: 56px; height: 56px; border-radius: 50%;
+  background: rgba(255,255,255,.95);
+  display: flex; align-items: center; justify-content: center;
+  box-shadow: 0 8px 24px rgba(0,0,0,.3);
+  position: relative; z-index: 2;
+  transition: transform .2s, background .2s;
+}
+.votd-card:hover .votd-play {
+  transform: scale(1.08);
+  background: white;
+}
+.votd-play svg { margin-left: 3px; }
+
+/* Duration badge */
+.votd-duration {
+  position: absolute; top: 12px; right: 12px; z-index: 2;
+  background: rgba(0,0,0,.55); color: white;
+  font-size: 11px; font-weight: 700; letter-spacing: .3px;
+  padding: 3px 8px; border-radius: 6px;
+  backdrop-filter: blur(4px);
+}
+
+/* Rank badge */
+.votd-rank {
+  position: absolute; top: 12px; left: 12px; z-index: 2;
+  display: flex; align-items: center; gap: 5px;
+  background: rgba(255,92,53,.9); color: white;
+  font-size: 10px; font-weight: 800; letter-spacing: 1px; text-transform: uppercase;
+  padding: 4px 10px; border-radius: 100px;
+  backdrop-filter: blur(4px);
+}
+
+/* Bottom info panel */
+.votd-info {
+  background: white; padding: 14px 16px 16px;
+}
+.votd-author-row {
+  display: flex; align-items: center; gap: 10px; margin-bottom: 8px;
+}
+.votd-av {
+  width: 32px; height: 32px; border-radius: 9px;
+  background: #2D1B4E; display: flex; align-items: center; justify-content: center;
+  font-family: 'Fraunces', serif; font-size: 11px; font-weight: 700; color: white;
+  flex-shrink: 0;
+}
+.votd-author-meta { flex: 1; }
+.votd-author-name {
+  font-size: 13px; font-weight: 700; color: var(--charcoal); line-height: 1.2;
+}
+.votd-author-role { font-size: 11px; color: var(--muted); }
+
+.votd-title {
+  font-family: 'Fraunces', serif;
+  font-size: 15px; font-weight: 700; letter-spacing: -.2px;
+  color: var(--charcoal); line-height: 1.4; margin-bottom: 10px;
+}
+
+.votd-stats {
+  display: flex; align-items: center; gap: 14px;
+}
+.votd-stat {
+  display: flex; align-items: center; gap: 5px;
+  font-size: 12px; font-weight: 600; color: var(--muted);
+}
+.votd-stat svg { flex-shrink: 0; }
+.votd-stat.hot { color: var(--accent); }
+
+/* React bar */
+.votd-react-bar {
+  display: flex; gap: 6px; margin-top: 12px; padding-top: 12px;
+  border-top: 1px solid var(--border);
+}
+.votd-react-btn {
+  display: flex; align-items: center; gap: 5px;
+  background: var(--cream); border: 1px solid var(--border);
+  border-radius: 100px; padding: 5px 12px;
+  font-size: 12px; font-weight: 600; color: var(--muted);
+  cursor: none; transition: all .15s; border-style: solid;
+}
+.votd-react-btn:hover { border-color: var(--accent); color: var(--accent); background: #FFF5F2; }
+.votd-react-btn.active { border-color: var(--accent); color: var(--accent); background: #FFF5F2; }
+.votd-comment-btn {
+  margin-left: auto; display: flex; align-items: center; gap: 6px;
+  background: none; border: none; font-size: 12px; font-weight: 600;
+  color: var(--muted); cursor: none; transition: color .15s; padding: 5px 4px;
+}
+.votd-comment-btn:hover { color: var(--charcoal); }
+
+/* ══ SEARCH ════════════════════════════════════════════════════════════ */
+.search-wrap {
+  position: relative; display: flex; align-items: center;
+  margin-left: auto; padding: 10px 0;
+}
+.search-bar {
+  display: flex; align-items: center; gap: 8px;
+  background: var(--cream); border: 1.5px solid var(--border);
+  border-radius: 100px; padding: 7px 14px;
+  width: 240px; transition: width .25s, border-color .2s, background .2s;
+  cursor: text;
+}
+.search-bar:focus-within {
+  width: 380px; border-color: rgba(28,28,30,.2);
+  background: white; box-shadow: 0 4px 20px rgba(0,0,0,.08);
+}
+.search-bar svg { flex-shrink: 0; color: var(--muted); transition: color .15s; }
+.search-bar:focus-within svg { color: var(--charcoal); }
+.search-input {
+  border: none; background: none; outline: none;
+  font-family: 'DM Sans', sans-serif; font-size: 13px;
+  color: var(--charcoal); width: 100%; cursor: text;
+}
+.search-input::placeholder { color: var(--muted); }
+.search-dropdown {
+  position: absolute; top: calc(100% + 4px); right: 0;
+  width: 360px; background: white;
+  border: 1px solid var(--border); border-radius: 16px;
+  box-shadow: 0 8px 32px rgba(0,0,0,.12), 0 2px 8px rgba(0,0,0,.06);
+  overflow: hidden; display: none; z-index: 200;
+}
+.search-dropdown.open { display: block; }
+.search-section-label {
+  font-size: 10px; font-weight: 800; text-transform: uppercase;
+  letter-spacing: 1.5px; color: var(--muted); padding: 12px 16px 6px;
+}
+.search-result {
+  display: flex; align-items: center; gap: 10px;
+  padding: 9px 16px; cursor: none; transition: background .12s;
+}
+.search-result:hover { background: var(--cream); }
+.sr-av {
+  width: 36px; height: 36px; border-radius: 11px; flex-shrink: 0;
+  display: flex; align-items: center; justify-content: center;
+  font-family: 'Fraunces', serif; font-size: 12px; font-weight: 700; color: white;
+}
+.sr-info { flex: 1; min-width: 0; }
+.sr-name { font-size: 13px; font-weight: 700; color: var(--charcoal); }
+.sr-role { font-size: 11px; color: var(--muted); margin-top: 1px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.sr-action {
+  font-size: 11px; font-weight: 700; color: var(--accent);
+  background: #FFF5F2; border: 1px solid rgba(255,92,53,.2);
+  border-radius: 100px; padding: 3px 10px; flex-shrink: 0; cursor: none; transition: all .15s;
+}
+.sr-action:hover { background: var(--accent); color: white; }
+.search-empty { padding: 20px 16px; text-align: center; font-size: 13px; color: var(--muted); }
+.search-footer {
+  border-top: 1px solid var(--border); padding: 10px 16px;
+  font-size: 12px; font-weight: 600; color: var(--accent); cursor: none; transition: background .12s;
+}
+.search-footer:hover { background: var(--cream); }
+*,*::before,*::after{cursor:none!important;}
+.cursor,.cursor-ring{cursor:none!important;}
+input,textarea,[contenteditable="true"]{cursor:text!important;}
+</style>
+</head>
+<body>
+<div class="cursor" id="cursor"></div>
+<div class="cursor-ring" id="cursorRing"></div>
+
+<!-- ── COMMENT MODAL ── -->
+<div class="modal-overlay" id="commentModal">
+  <div class="modal-backdrop" onclick="closeComments()"></div>
+  <div class="comment-modal">
+    <div class="cm-header">
+      <div class="cm-title" id="cmTitle">Comments</div>
+      <button class="cm-close" onclick="closeComments()">✕</button>
+    </div>
+    <!-- original post preview -->
+    <div class="cm-post-preview" id="cmPostPreview"></div>
+    <!-- sort -->
+    <div class="cm-sort">
+      <span class="cm-sort-label">Sort by</span>
+      <button class="cm-sort-btn active" onclick="sortComments(this,'top')">Top</button>
+      <button class="cm-sort-btn" onclick="sortComments(this,'recent')">Recent</button>
+    </div>
+    <!-- list -->
+    <div class="cm-comments" id="cmCommentsList"></div>
+    <!-- composer -->
+    <div class="cm-composer">
+      <div class="cm-comp-av">MC</div>
+      <div class="cm-comp-right">
+        <textarea class="cm-comp-input" id="cmCompInput" placeholder="Add a comment…" rows="1"
+          oninput="this.style.height='auto';this.style.height=Math.min(this.scrollHeight,120)+'px'"
+          onkeydown="if(event.key==='Enter'&&!event.shiftKey){event.preventDefault();submitComment();}"></textarea>
+      </div>
+      <button class="cm-comp-send" onclick="submitComment()" title="Post comment">
+        <svg width="16" height="16" viewBox="0 0 16 16" fill="none"><path d="M2 8L14 2L8 14L7 9L2 8Z" fill="white" stroke="white" stroke-width=".5" stroke-linejoin="round"/></svg>
+      </button>
+    </div>
+  </div>
+</div>
+
+<div class="shell">
+
+  <!-- ══ FULL CALENDAR MODAL ══ -->
+  <div class="cal-modal-backdrop" id="calModalBackdrop" onclick="if(event.target===this)closeCalModal()">
+    <div class="cal-modal">
+      <div class="cal-modal-header">
+        <div class="cal-modal-title">My Calendar</div>
+        <div class="cal-modal-month-nav">
+          <button class="cal-modal-nav-btn" onclick="modalChangeMonth(-1)">&#8249;</button>
+          <span class="cal-modal-month-label" id="modalMonthLabel"></span>
+          <button class="cal-modal-nav-btn" onclick="modalChangeMonth(1)">&#8250;</button>
+        </div>
+        <div class="cal-modal-header-actions">
+          <button class="cal-modal-add-btn" onclick="openCreateEvent()">
+            <svg width="13" height="13" viewBox="0 0 13 13" fill="none"><path d="M6.5 1v11M1 6.5h11" stroke="white" stroke-width="1.8" stroke-linecap="round"/></svg>
+            New Event
+          </button>
+          <button class="cal-modal-close" onclick="closeCalModal()">&#215;</button>
+        </div>
+      </div>
+      <div class="cal-modal-body">
+        <div class="cal-modal-grid-wrap">
+          <div class="cal-modal-day-names" id="modalDayNames"></div>
+          <div class="cal-modal-grid" id="modalCalGrid"></div>
+        </div>
+        <div class="cal-modal-sidebar">
+          <div class="cal-modal-sidebar-hdr">
+            Events
+            <span id="modalSidebarDate">Click a day to see events</span>
+          </div>
+          <div class="cal-modal-events-list" id="modalEventsList">
+            <div class="cal-modal-no-events">
+              <svg width="36" height="36" viewBox="0 0 36 36" fill="none" style="margin:0 auto 10px;display:block;opacity:.3"><rect x="3" y="6" width="30" height="27" rx="6" stroke="currentColor" stroke-width="2" fill="none"/><path d="M3 14h30" stroke="currentColor" stroke-width="2" stroke-linecap="round"/><path d="M11 3v6M25 3v6" stroke="currentColor" stroke-width="2" stroke-linecap="round"/></svg>
+              Select a day to see<br>or add events
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- ══ CREATE EVENT MODAL ══ -->
+  <div class="create-event-modal" id="createEventModal" onclick="if(event.target===this)closeCreateEvent()">
+    <div class="create-event-box">
+      <div class="create-event-hdr">
+        <h3>New Event</h3>
+        <button class="cal-modal-close" onclick="closeCreateEvent()">&#215;</button>
+      </div>
+      <div class="create-event-body">
+        <div class="form-field">
+          <label class="form-label">Event name</label>
+          <input class="form-input" id="evtName" type="text" placeholder="e.g. Goldman Sachs Info Session">
+        </div>
+        <div class="form-row">
+          <div class="form-field">
+            <label class="form-label">Date</label>
+            <input class="form-input" id="evtDate" type="date">
+          </div>
+          <div class="form-field">
+            <label class="form-label">Time</label>
+            <input class="form-input" id="evtTime" type="time">
+          </div>
+        </div>
+        <div class="form-field">
+          <label class="form-label">Location</label>
+          <input class="form-input" id="evtLocation" type="text" placeholder="e.g. Kelley School of Business 100">
+        </div>
+        <div class="form-field">
+          <label class="form-label">Notes</label>
+          <input class="form-input" id="evtNotes" type="text" placeholder="e.g. Bring resume, business casual">
+        </div>
+        <div class="form-field">
+          <label class="form-label">Color</label>
+          <div class="color-picker-row" id="colorPickerRow">
+            <div class="color-swatch active" style="background:#FF5C35" data-color="#FF5C35" onclick="pickColor(this)"></div>
+            <div class="color-swatch" style="background:#2563EB" data-color="#2563EB" onclick="pickColor(this)"></div>
+            <div class="color-swatch" style="background:#1A9E5B" data-color="#1A9E5B" onclick="pickColor(this)"></div>
+            <div class="color-swatch" style="background:#7C5CFC" data-color="#7C5CFC" onclick="pickColor(this)"></div>
+            <div class="color-swatch" style="background:#B07800" data-color="#B07800" onclick="pickColor(this)"></div>
+            <div class="color-swatch" style="background:#CC0000" data-color="#CC0000" onclick="pickColor(this)"></div>
+            <div class="color-swatch" style="background:#1C1C1E" data-color="#1C1C1E" onclick="pickColor(this)"></div>
+          </div>
+        </div>
+      </div>
+      <div class="create-event-footer">
+        <button class="btn-cancel" onclick="closeCreateEvent()">Cancel</button>
+        <button class="btn-save-event" onclick="saveNewEvent()">Save Event</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- LEFT NAV -->
+  <aside class="left-nav">
+    <a href="/html/feed.html" class="nav-logo">vibe<span>.</span></a>
+    <nav>
+      <a href="/html/feed.html" class="nav-item active">
+        <svg width="16" height="16" viewBox="0 0 16 16" fill="none"><rect x="1" y="1" width="6" height="6" rx="2" fill="currentColor"/><rect x="9" y="1" width="6" height="6" rx="2" fill="currentColor"/><rect x="1" y="9" width="6" height="6" rx="2" fill="currentColor"/><rect x="9" y="9" width="6" height="6" rx="2" fill="currentColor"/></svg>
+        Feed
+      </a>
+      <a href="/html/network.html" class="nav-item">
+        <svg width="16" height="16" viewBox="0 0 16 16" fill="none"><circle cx="8" cy="4" r="2.5" stroke="currentColor" stroke-width="1.4"/><circle cx="2.5" cy="12" r="2" stroke="currentColor" stroke-width="1.4"/><circle cx="13.5" cy="12" r="2" stroke="currentColor" stroke-width="1.4"/><path d="M5.5 4.5L2.5 10M10.5 4.5L13.5 10M5.8 12h4.4" stroke="currentColor" stroke-width="1.3" stroke-linecap="round"/></svg>
+        Network
+      </a>
+      <a href="/html/campus.html" class="nav-item">
+        <svg width="16" height="16" viewBox="0 0 16 16" fill="none"><path d="M8 1L15 5V7H1V5L8 1Z" stroke="currentColor" stroke-width="1.4" fill="none" stroke-linejoin="round"/><rect x="2" y="7" width="2.5" height="6" stroke="currentColor" stroke-width="1.3" fill="none"/><rect x="6.75" y="7" width="2.5" height="6" stroke="currentColor" stroke-width="1.3" fill="none"/><rect x="11.5" y="7" width="2.5" height="6" stroke="currentColor" stroke-width="1.3" fill="none"/><path d="M1 13h14" stroke="currentColor" stroke-width="1.4" stroke-linecap="round"/></svg>
+        Campus
+      </a>
+      <a href="/html/opportunities.html" class="nav-item">
+        <svg width="16" height="16" viewBox="0 0 16 16" fill="none"><rect x="1" y="5" width="14" height="10" rx="2" stroke="currentColor" stroke-width="1.4" fill="none"/><path d="M5 5V4a3 3 0 0 1 6 0v1" stroke="currentColor" stroke-width="1.4" fill="none" stroke-linecap="round"/><path d="M1 9h14" stroke="currentColor" stroke-width="1.4" stroke-linecap="round"/></svg>
+        Opportunities
+      </a>
+      <a href="/html/messages.html" class="nav-item">
+        <svg width="16" height="16" viewBox="0 0 16 16" fill="none"><path d="M1 2.5A1.5 1.5 0 012.5 1h11A1.5 1.5 0 0115 2.5v8A1.5 1.5 0 0113.5 12H5L1 15V2.5z" stroke="currentColor" stroke-width="1.4" fill="none" stroke-linejoin="round"/></svg>
+        Messages
+      </a>
+      <a href="/html/otto.html" class="nav-item">
+        <span style="display:inline-flex;width:16px;height:16px;align-items:center;justify-content:center;"><span style="width:8px;height:8px;border-radius:50%;background:var(--accent);box-shadow:0 0 6px var(--accent);"></span></span>
+        otto
+      </a>
+    </nav>
+    <div class="nav-divider"></div>
+    <a href="/html/profile.html" class="nav-item">
+      <div class="mini-avatar">MC</div>
+      <div><div style="font-size:13px;font-weight:600;color:var(--charcoal)">Maya Chen</div><div style="font-size:11px;color:var(--muted)">Product Designer</div></div>
+    </a>
+
+    <!-- ══ CALENDAR WIDGET — lives right below profile ══ -->
+    <div class="cal-widget" id="calWidget">
+      <div class="cal-header">
+        <button class="cal-title-row" onclick="openCalModal()" style="background:none;border:none;cursor:none;display:flex;align-items:center;gap:6px;padding:0;transition:opacity .15s" onmouseover="this.style.opacity='.7'" onmouseout="this.style.opacity='1'">
+          <svg width="12" height="12" viewBox="0 0 14 14" fill="none">
+            <rect x="1" y="2" width="12" height="11" rx="2.5" stroke="currentColor" stroke-width="1.3" fill="none"/>
+            <path d="M1 6h12" stroke="currentColor" stroke-width="1.3" stroke-linecap="round"/>
+            <path d="M4 1v2M10 1v2" stroke="currentColor" stroke-width="1.3" stroke-linecap="round"/>
+          </svg>
+          <span class="cal-title">My Calendar</span>
+          <span class="cal-event-count-badge" id="calEventCount">0</span>
+        </button>
+        <button class="cal-toggle" onclick="toggleCalView()" id="calToggleBtn">&#8964;</button>
+      </div>
+      <div id="calBody">
+        <div class="cal-month-nav">
+          <button class="cal-nav-btn" onclick="changeMonth(-1)">&#8249;</button>
+          <span class="cal-month-label" id="calMonthLabel"></span>
+          <button class="cal-nav-btn" onclick="changeMonth(1)">&#8250;</button>
+        </div>
+        <div class="cal-grid" id="calGrid"></div>
+        <div class="cal-events-panel" id="calEventsPanel">
+          <div class="cal-events-panel-title" id="calPanelTitle">Events</div>
+          <div id="calEventsList"></div>
+        </div>
+      </div>
+    </div>
+
+    <div style="margin-top:auto;padding-top:10px;">
+      <button class="post-btn" onclick="document.querySelector('.comp-input').focus()">+ Post</button>
+    </div>
+  </aside>
+
+  <!-- CENTER: Posts feed -->
+  <main class="center-feed">
+    <div class="feed-header">
+      <button class="feed-tab active">For You</button>
+      <button class="feed-tab">Following</button>
+      <button class="feed-tab">Trending</button>
+      <button class="feed-tab">Vibes</button>
+      <div class="search-wrap" id="feedSearchWrap">
+        <div class="search-bar">
+          <svg width="14" height="14" viewBox="0 0 14 14" fill="none">
+            <circle cx="6" cy="6" r="4.5" stroke="currentColor" stroke-width="1.5"/>
+            <path d="M10 10l2.5 2.5" stroke="currentColor" stroke-width="1.5" stroke-linecap="round"/>
+          </svg>
+          <input class="search-input" id="feedSearchInput"
+            placeholder="Search people, companies&#8230;"
+            oninput="runSearch(this.value)"
+            onfocus="openSearch()"
+            onblur="setTimeout(function(){closeSearch()},180)">
+        </div>
+        <div class="search-dropdown" id="feedSearchDropdown"></div>
+      </div>
+    </div>
+
+    <!-- ════ VIBE OF THE DAY ════ -->
+    <div class="votd-wrap" id="votdWrap">
+      <div class="votd-label-bar">
+        <div class="votd-badge">
+          <div class="votd-badge-dot">
+            <svg width="8" height="10" viewBox="0 0 8 10" fill="none">
+              <path d="M1 1.5L7 5L1 8.5V1.5Z" fill="white"/>
+            </svg>
+          </div>
+          Vibe of the Day
+        </div>
+        <div class="votd-subtitle">Most interacted Vibe in the last 24h</div>
+      </div>
+
+      <div class="votd-card" onclick="openComments('v3')">
+        <!-- Cinematic thumbnail -->
+        <div class="votd-bg">
+          <div class="votd-rank">
+            <svg width="9" height="9" viewBox="0 0 9 9" fill="none"><path d="M4.5 1L5.5 3.5H8L5.5 5L6.5 7.5L4.5 6L2.5 7.5L3.5 5L1 3.5H3.5L4.5 1Z" fill="white"/></svg>
+            #1 Today
+          </div>
+          <div class="votd-duration">1:18</div>
+
+          <!-- Waveform decoration -->
+          <div class="votd-wave" id="votdWave"></div>
+
+          <div class="votd-play">
+            <svg width="22" height="22" viewBox="0 0 22 22" fill="none">
+              <path d="M7 4.5L18 11L7 17.5V4.5Z" fill="#FF5C35"/>
+            </svg>
+          </div>
+        </div>
+
+        <!-- Info panel -->
+        <div class="votd-info">
+          <div class="votd-author-row">
+            <div class="votd-av">LM</div>
+            <div class="votd-author-meta">
+              <div class="votd-author-name">Luca Moretti</div>
+              <div class="votd-author-role">Product Lead · Fintech</div>
+            </div>
+          </div>
+
+          <div class="votd-title">Web Summit Lisbon — what I said and what happened</div>
+
+          <div class="votd-stats">
+            <div class="votd-stat hot">
+              <svg width="13" height="13" viewBox="0 0 13 13" fill="none">
+                <path d="M6.5 1.5C4 3 3 5 4 7c.5 1 1.5 1.5 2 1C5.5 10.5 3 11 2 10.5c1 1.5 3 2.5 4.5 2.5 2.5 0 4.5-2 4.5-4.5 0-1.5-.5-2.8-1.5-3.8C9 5.5 8.5 7 7.5 7.5 7.5 5 8 3 9 1.5 7.5.5 6.5 1.5 6.5 1.5z" fill="currentColor"/>
+              </svg>
+              8.7k views
+            </div>
+            <div class="votd-stat">
+              <svg width="13" height="13" viewBox="0 0 13 13" fill="none"><path d="M1 1.5A.5.5 0 011.5 1h10a.5.5 0 01.5.5v7a.5.5 0 01-.5.5H4.5L1 12V1.5z" stroke="currentColor" stroke-width="1.3" fill="none" stroke-linejoin="round"/></svg>
+              1 comment
+            </div>
+            <div class="votd-stat">
+              <svg width="13" height="13" viewBox="0 0 13 13" fill="none"><path d="M1 5h11M1 9h7" stroke="currentColor" stroke-width="1.3" stroke-linecap="round"/></svg>
+              247 reactions
+            </div>
+          </div>
+
+          <div class="votd-react-bar">
+            <button class="votd-react-btn" onclick="votdReact(event,'fire')" id="votd-fire">
+              <svg width="13" height="13" viewBox="0 0 13 13" fill="none"><path d="M6.5 1.5C4 3 3 5 4 7c.5 1 1.5 1.5 2 1C5.5 10.5 3 11 2 10.5c1 1.5 3 2.5 4.5 2.5 2.5 0 4.5-2 4.5-4.5 0-1.5-.5-2.8-1.5-3.8C9 5.5 8.5 7 7.5 7.5 7.5 5 8 3 9 1.5 7.5.5 6.5 1.5 6.5 1.5z" fill="currentColor"/></svg>
+              <span id="votd-fire-count">247</span>
+            </button>
+            <button class="votd-react-btn" onclick="votdReact(event,'brain')" id="votd-brain">
+              <svg width="13" height="13" viewBox="0 0 13 13" fill="none"><ellipse cx="6.5" cy="6" rx="5" ry="4.5" stroke="currentColor" stroke-width="1.3" fill="none"/><path d="M6.5 2.5v3l2 1.5" stroke="currentColor" stroke-width="1.2" stroke-linecap="round"/></svg>
+              <span id="votd-brain-count">89</span>
+            </button>
+            <button class="votd-react-btn" onclick="votdReact(event,'clap')" id="votd-clap">
+              <svg width="13" height="13" viewBox="0 0 13 13" fill="none"><path d="M5 2L4 4.5M7.5 1.5L6.5 4M3 5.5l-.5 1.5C2 9 3.5 11 6.5 11s5-2 5-4.5c0-1-.5-1.5-1-1.5L6 3 5 5" stroke="currentColor" stroke-width="1.3" stroke-linecap="round" stroke-linejoin="round" fill="none"/></svg>
+              <span id="votd-clap-count">134</span>
+            </button>
+            <button class="votd-comment-btn" onclick="openComments('v3')">
+              <svg width="13" height="13" viewBox="0 0 13 13" fill="none"><path d="M1 1.5A.5.5 0 011.5 1h10a.5.5 0 01.5.5v7a.5.5 0 01-.5.5H4.5L1 12V1.5z" stroke="currentColor" stroke-width="1.3" fill="none" stroke-linejoin="round"/></svg>
+              Comment
+            </button>
+          </div>
+        </div>
+      </div>
+    </div>
+    <!-- ════ /VIBE OF THE DAY ════ -->
+
+    <div class="composer">
+      <div class="comp-row">
+        <div class="comp-av">MC</div>
+        <div class="comp-right">
+          <textarea class="comp-input" id="compInputB" placeholder="What are you working on? Share a thought, project update, or professional insight…" oninput="this.style.height='auto';this.style.height=Math.min(this.scrollHeight,200)+'px'"></textarea>
+          <div class="comp-footer">
+            <div class="comp-options">
+              <button class="comp-opt">Media</button>
+              <button class="comp-opt">Tags</button>
+              <button class="comp-opt">Post as Vibe</button>
+            </div>
+            <button class="comp-submit" onclick="submitPostB()">Publish</button>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <div class="match-bar">
+      <div class="match-bar-icon">
+        <svg width="16" height="16" viewBox="0 0 16 16" fill="none"><path d="M8 1L10 5.5H15L11 8.5L12.5 13L8 10.5L3.5 13L5 8.5L1 5.5H6L8 1Z" fill="white" stroke="white" stroke-width="0.5" stroke-linejoin="round"/></svg>
+      </div>
+      <div class="match-bar-text">
+        <h4>Ranked by match — not recency</h4>
+        <p>Posts ranked by overlap with your skills, field, and current projects.</p>
+      </div>
+    </div>
+
+    <div id="postFeedB">
+
+      <!-- Empty state (fresh-onboarded users — no network posts yet) -->
+      <div class="feed-empty" id="feedEmpty">
+        <div class="feed-empty-icon">📡</div>
+        <h3>Your feed is quiet</h3>
+        <p>Connect with people from <strong>your school, field, or interests</strong>, and their posts will land here. Anything you publish above shows up too.</p>
+        <a href="/html/network.html" class="feed-empty-cta">Find people →</a>
+        <div class="feed-empty-foot">"the easiest way to bootstrap a feed is to find five people who think like you. then five who challenge you." — otto</div>
+      </div>
+
+      <div class="post-card" data-post-id="1">
+        <div class="pc2-header">
+          <div class="pc2-avatar" style="background:#2D1B4E">KA</div>
+          <div class="pc2-meta"><h4>Kwame Asante</h4><p>AI Founder · 2h ago</p></div>
+          <div class="pc2-match"><span style="width:5px;height:5px;border-radius:50%;background:currentColor;display:inline-block;margin-right:2px"></span>AI · Founders</div>
+        </div>
+        <div class="pc2-body"><strong>The best hire I ever made had no relevant experience.</strong> What they had was a 90-second video explaining how they'd redesigned their college's registration system for fun. The résumé told me nothing. The Vibe told me everything.</div>
+        <div class="pc2-tags"><span class="pc2-tag">#Hiring</span><span class="pc2-tag">#BuildInPublic</span><span class="pc2-tag">#AI</span></div>
+        <div class="pc2-bar">
+          <div class="pc2-chips">
+            <span class="pc2-chip reaction-chip" data-emoji="🔥" data-count="2400">🔥 2.4k</span>
+            <span class="pc2-chip reaction-chip" data-emoji="🤯" data-count="481">🤯 481</span>
+            <span class="pc2-chip comment-btn" onclick="openComments('1')"><svg width="13" height="13" viewBox="0 0 13 13" fill="none" style="flex-shrink:0"><path d="M1 1.5A.5.5 0 011.5 1h10a.5.5 0 01.5.5v7a.5.5 0 01-.5.5H4.5L1 12V1.5z" stroke="currentColor" stroke-width="1.2" fill="none" stroke-linejoin="round"/></svg> 62</span>
+          </div>
+          <button class="pc2-save">Save</button>
+        </div>
+      </div>
+
+      <div class="post-card" data-post-id="2">
+        <div class="pc2-header">
+          <div class="pc2-avatar" style="background:#3B1A00">PS</div>
+          <div class="pc2-meta"><h4>Priya Sinha</h4><p>Growth Lead · 5h ago</p></div>
+          <div class="pc2-match"><span style="width:5px;height:5px;border-radius:50%;background:currentColor;display:inline-block;margin-right:2px"></span>Growth · Career</div>
+        </div>
+        <div class="pc2-body">Clear thinking matters more than the right buzzwords. The best interviews feel like a real conversation — not a performance. If you're preparing for one: practice explaining your work to someone who knows nothing about it.</div>
+        <div class="pc2-tags"><span class="pc2-tag">#Hiring</span><span class="pc2-tag">#UX</span><span class="pc2-tag">#Career</span></div>
+        <div class="pc2-bar">
+          <div class="pc2-chips">
+            <span class="pc2-chip reaction-chip" data-emoji="💡" data-count="891">💡 891</span>
+            <span class="pc2-chip reaction-chip" data-emoji="🫶" data-count="128">🫶 128</span>
+            <span class="pc2-chip comment-btn" onclick="openComments('2')"><svg width="13" height="13" viewBox="0 0 13 13" fill="none" style="flex-shrink:0"><path d="M1 1.5A.5.5 0 011.5 1h10a.5.5 0 01.5.5v7a.5.5 0 01-.5.5H4.5L1 12V1.5z" stroke="currentColor" stroke-width="1.2" fill="none" stroke-linejoin="round"/></svg> 34</span>
+          </div>
+          <button class="pc2-save">Save</button>
+        </div>
+      </div>
+
+      <div class="post-card" data-post-id="3">
+        <div class="pc2-header">
+          <div class="pc2-avatar" style="background:#2a2800">LM</div>
+          <div class="pc2-meta"><h4>Luca Moretti</h4><p>Full-stack Dev · 1d ago</p></div>
+          <div class="pc2-match"><span style="width:5px;height:5px;border-radius:50%;background:currentColor;display:inline-block;margin-right:2px"></span>Remote · Tech</div>
+        </div>
+        <div class="pc2-body">Two years working remotely from a new city each month. People always ask if it gets lonely. I've had more meaningful conversations with strangers in cafés than I ever did in an open-plan office.</div>
+        <div class="pc2-tags"><span class="pc2-tag">#RemoteWork</span><span class="pc2-tag">#FutureOfWork</span></div>
+        <div class="pc2-bar">
+          <div class="pc2-chips">
+            <span class="pc2-chip reaction-chip" data-emoji="💡" data-count="671">💡 671</span>
+            <span class="pc2-chip reaction-chip" data-emoji="🫶" data-count="445">🫶 445</span>
+            <span class="pc2-chip comment-btn" onclick="openComments('3')"><svg width="13" height="13" viewBox="0 0 13 13" fill="none" style="flex-shrink:0"><path d="M1 1.5A.5.5 0 011.5 1h10a.5.5 0 01.5.5v7a.5.5 0 01-.5.5H4.5L1 12V1.5z" stroke="currentColor" stroke-width="1.2" fill="none" stroke-linejoin="round"/></svg> 21</span>
+          </div>
+          <button class="pc2-save">Save</button>
+        </div>
+      </div>
+
+      <div class="post-card" data-post-id="4">
+        <div class="pc2-header">
+          <div class="pc2-avatar" style="background:#1A1A00">ZW</div>
+          <div class="pc2-meta"><h4>Zara Williams</h4><p>COO · 2d ago</p></div>
+          <div class="pc2-match"><span style="width:5px;height:5px;border-radius:50%;background:currentColor;display:inline-block;margin-right:2px"></span>Ops · Events</div>
+        </div>
+        <div class="pc2-body"><strong>"Open to work" should explain what you actually want,</strong> not just that you're available. What role? What stage? What type of team? What location? Better signal = better outcomes. Stop being vague on purpose.</div>
+        <div class="pc2-tags"><span class="pc2-tag">#OpenToWork</span><span class="pc2-tag">#JobSearch</span><span class="pc2-tag">#Career</span></div>
+        <div class="pc2-bar">
+          <div class="pc2-chips">
+            <span class="pc2-chip reaction-chip" data-emoji="🔥" data-count="1100">🔥 1.1k</span>
+            <span class="pc2-chip reaction-chip" data-emoji="💡" data-count="388">💡 388</span>
+            <span class="pc2-chip comment-btn" onclick="openComments('4')"><svg width="13" height="13" viewBox="0 0 13 13" fill="none" style="flex-shrink:0"><path d="M1 1.5A.5.5 0 011.5 1h10a.5.5 0 01.5.5v7a.5.5 0 01-.5.5H4.5L1 12V1.5z" stroke="currentColor" stroke-width="1.2" fill="none" stroke-linejoin="round"/></svg> 47</span>
+          </div>
+          <button class="pc2-save">Save</button>
+        </div>
+      </div>
+
+    </div>
+  </main>
+
+  <!-- RIGHT: Vibes strip + suggestions -->
+  <aside class="right-col">
+    <div class="vibes-strip-header">Trending Vibes</div>
+    <div class="vibes-strip">
+      <div class="vibe-strip-item" onclick="openComments('v1')">
+        <div class="vibe-thumb-sm"><div class="vibe-thumb-sm-bg" style="background:linear-gradient(135deg,#1a0533,#2d1b4e)"></div><div class="vibe-thumb-sm-play">&#9654;</div></div>
+        <div class="vibe-strip-info"><h4>How I built a profitable micro-SaaS in 72 hours</h4><p>Kwame Asante · 6.1k views · 1:02</p><div class="vibe-comment-hint"><svg width="11" height="11" viewBox="0 0 13 13" fill="none" style="flex-shrink:0"><path d="M1 1.5A.5.5 0 011.5 1h10a.5.5 0 01.5.5v7a.5.5 0 01-.5.5H4.5L1 12V1.5z" stroke="currentColor" stroke-width="1.3" fill="none" stroke-linejoin="round"/></svg> 3 comments</div></div>
+      </div>
+      <div class="vibe-strip-item" onclick="openComments('v2')">
+        <div class="vibe-thumb-sm"><div class="vibe-thumb-sm-bg" style="background:linear-gradient(135deg,#001a2c,#0a2a3e)"></div><div class="vibe-thumb-sm-play">&#9654;</div></div>
+        <div class="vibe-strip-info"><h4>Onboarding redesign: retention up 23% in one weekend</h4><p>Maya Chen · 2.1k views · 1:02</p><div class="vibe-comment-hint"><svg width="11" height="11" viewBox="0 0 13 13" fill="none" style="flex-shrink:0"><path d="M1 1.5A.5.5 0 011.5 1h10a.5.5 0 01.5.5v7a.5.5 0 01-.5.5H4.5L1 12V1.5z" stroke="currentColor" stroke-width="1.3" fill="none" stroke-linejoin="round"/></svg> 2 comments</div></div>
+      </div>
+      <div class="vibe-strip-item" onclick="openComments('v3')">
+        <div class="vibe-thumb-sm"><div class="vibe-thumb-sm-bg" style="background:linear-gradient(135deg,#1a1a00,#2a2800)"></div><div class="vibe-thumb-sm-play">&#9654;</div></div>
+        <div class="vibe-strip-info"><h4>Web Summit Lisbon — what I said and what happened</h4><p>Luca Moretti · 8.7k views · 1:18</p><div class="vibe-comment-hint"><svg width="11" height="11" viewBox="0 0 13 13" fill="none" style="flex-shrink:0"><path d="M1 1.5A.5.5 0 011.5 1h10a.5.5 0 01.5.5v7a.5.5 0 01-.5.5H4.5L1 12V1.5z" stroke="currentColor" stroke-width="1.3" fill="none" stroke-linejoin="round"/></svg> 1 comment</div></div>
+      </div>
+      <div class="vibe-strip-item" onclick="openComments('v4')">
+        <div class="vibe-thumb-sm"><div class="vibe-thumb-sm-bg" style="background:linear-gradient(135deg,#1a0008,#2a000f)"></div><div class="vibe-thumb-sm-play">&#9654;</div></div>
+        <div class="vibe-strip-info"><h4>My 60-second pitch that landed 3 job offers</h4><p>Priya Sinha · 1.4k views · 0:55</p><div class="vibe-comment-hint"><svg width="11" height="11" viewBox="0 0 13 13" fill="none" style="flex-shrink:0"><path d="M1 1.5A.5.5 0 011.5 1h10a.5.5 0 01.5.5v7a.5.5 0 01-.5.5H4.5L1 12V1.5z" stroke="currentColor" stroke-width="1.3" fill="none" stroke-linejoin="round"/></svg> 2 comments</div></div>
+      </div>
+      <div class="vibe-strip-item" onclick="openComments('v5')">
+        <div class="vibe-thumb-sm"><div class="vibe-thumb-sm-bg" style="background:linear-gradient(135deg,#001a1a,#002828)"></div><div class="vibe-thumb-sm-play">&#9654;</div></div>
+        <div class="vibe-strip-info"><h4>200-person hackathon on $0 — the full breakdown</h4><p>Zara Williams · 983 views · 1:14</p><div class="vibe-comment-hint"><svg width="11" height="11" viewBox="0 0 13 13" fill="none" style="flex-shrink:0"><path d="M1 1.5A.5.5 0 011.5 1h10a.5.5 0 01.5.5v7a.5.5 0 01-.5.5H4.5L1 12V1.5z" stroke="currentColor" stroke-width="1.3" fill="none" stroke-linejoin="round"/></svg> 2 comments</div></div>
+      </div>
+    </div>
+
+    <div class="suggestions-widget">
+      <div class="widget-title">People to follow</div>
+      <div class="suggest-item">
+        <div class="suggest-av" style="background:#2D1B4E">KA</div>
+        <div><div class="suggest-name">Kwame Asante</div><div class="suggest-role">AI Founder</div><div class="suggest-reason">Matched: AI, Founders</div></div>
+        <button class="suggest-follow">Follow</button>
+      </div>
+      <div class="suggest-item">
+        <div class="suggest-av" style="background:#3B1A00">PS</div>
+        <div><div class="suggest-name">Priya Sinha</div><div class="suggest-role">Growth Lead</div><div class="suggest-reason">Matched: Growth, Career</div></div>
+        <button class="suggest-follow">Follow</button>
+      </div>
+      <div class="suggest-item">
+        <div class="suggest-av" style="background:#1A1A00">ZW</div>
+        <div><div class="suggest-name">Zara Williams</div><div class="suggest-role">COO · Ops</div><div class="suggest-reason">Matched: Strategy, Events</div></div>
+        <button class="suggest-follow">Follow</button>
+      </div>
+    </div>
+
+    <div class="trending-widget">
+      <div class="widget-title">Trending topics</div>
+      <div class="trend-item"><span class="trend-tag">#BuildInPublic</span><span class="trend-count">2.4k posts</span></div>
+      <div class="trend-item"><span class="trend-tag">#OpenToWork</span><span class="trend-count">1.8k posts</span></div>
+      <div class="trend-item"><span class="trend-tag">#Shipped</span><span class="trend-count">1.2k posts</span></div>
+      <div class="trend-item"><span class="trend-tag">#AIFounders</span><span class="trend-count">891 posts</span></div>
+      <div class="trend-item"><span class="trend-tag">#RemoteWork</span><span class="trend-count">671 posts</span></div>
+    </div>
+  </aside>
+
+</div>
+
+<script>
+// ── Cursor ──
+// Elements exist in DOM now (they're above this script tag)
+const cur = document.getElementById('cursor');
+const ring = document.getElementById('cursorRing');
+let mx=window.innerWidth/2,my=window.innerHeight/2,rx=window.innerWidth/2,ry=window.innerHeight/2;
+
+document.addEventListener('mousemove', e => {
+  mx = e.clientX; my = e.clientY;
+  cur.style.transform = `translate(${mx - 4}px, ${my - 4}px)`;
+}, { passive: true });
+
+(function tick() {
+  rx += (mx - rx - 14) * 0.28;
+  ry += (my - ry - 14) * 0.28;
+  ring.style.transform = `translate(${Math.round(rx)}px, ${Math.round(ry)}px)`;
+  requestAnimationFrame(tick);
+})();
+
+document.addEventListener('mousedown', () => cur.classList.add('clicking'));
+document.addEventListener('mouseup',   () => cur.classList.remove('clicking'));
+
+// Event delegation — handles dynamically added elements too
+document.addEventListener('mouseover', e => {
+  if (e.target.closest('a, button, .nav-item, .post-card, .vibe-strip-item, .suggest-item, .trend-item, .pc2-chip, .comment-item, .reply-item')) {
+    cur.classList.add('hover'); ring.classList.add('hover');
+  }
+});
+document.addEventListener('mouseout', e => {
+  if (e.target.closest('a, button, .nav-item, .post-card, .vibe-strip-item, .suggest-item, .trend-item, .pc2-chip, .comment-item, .reply-item')) {
+    cur.classList.remove('hover'); ring.classList.remove('hover');
+  }
+});
+
+// ── Feed tabs ──
+document.querySelectorAll('.feed-tab').forEach(btn => {
+  btn.onclick = () => {
+    document.querySelectorAll('.feed-tab').forEach(b => b.classList.remove('active'));
+    btn.classList.add('active');
+  };
+});
+
+// ── Follow toggle ──
+document.querySelectorAll('.suggest-follow').forEach(btn => {
+  btn.onclick = () => {
+    const f = btn.textContent === 'Following';
+    btn.textContent = f ? 'Follow' : 'Following';
+    btn.style.background = f ? '' : 'var(--charcoal)';
+    btn.style.color      = f ? '' : 'white';
+    btn.style.borderColor = f ? '' : 'var(--charcoal)';
+  };
+});
+
+// ── Reaction chips ──
+document.querySelectorAll('.reaction-chip').forEach(chip => {
+  chip.onclick = () => {
+    const active = chip.classList.toggle('reacted');
+    const emoji  = chip.dataset.emoji;
+    let count = parseInt(chip.dataset.count) + (active ? 1 : -1);
+    chip.dataset.count = count;
+    chip.textContent = emoji + ' ' + (count >= 1000 ? (count / 1000).toFixed(1) + 'k' : count);
+    chip.style.background   = active ? '#FFF0EC' : '';
+    chip.style.color        = active ? 'var(--accent)' : '';
+    chip.style.borderColor  = active ? 'rgba(255,92,53,.2)' : '';
+  };
+});
+
+// ── Post composer ──
+function submitPostB() {
+  const v = document.getElementById('compInputB').value.trim();
+  if (!v) return;
+  const feed = document.getElementById('postFeedB');
+  const id   = 'new-' + Date.now();
+  const d    = document.createElement('div');
+  d.className = 'post-card';
+  d.dataset.postId = id;
+  d.innerHTML = `
+    <div class="pc2-header">
+      <div class="pc2-avatar" style="background:var(--charcoal)">MC</div>
+      <div class="pc2-meta"><h4>Maya Chen</h4><p>Just now</p></div>
+    </div>
+    <div class="pc2-body">${v}</div>
+    <div class="pc2-bar">
+      <div class="pc2-chips">
+        <span class="pc2-chip reaction-chip" data-emoji="🔥" data-count="0">🔥 0</span>
+        <span class="pc2-chip reaction-chip" data-emoji="💡" data-count="0">💡 0</span>
+        <button class="pc2-chip comment-btn" onclick="openComments('${id}')">
+          <svg width="13" height="13" viewBox="0 0 13 13" fill="none" style="flex-shrink:0">
+            <path d="M1 1.5A.5.5 0 011.5 1h10a.5.5 0 01.5.5v7a.5.5 0 01-.5.5H4.5L1 12V1.5z"
+                  stroke="currentColor" stroke-width="1.2" fill="none" stroke-linejoin="round"/>
+          </svg> 0
+        </button>
+      </div>
+      <button class="pc2-save">Save</button>
+    </div>`;
+  // Wire up reaction chips on the new card
+  d.querySelectorAll('.reaction-chip').forEach(chip => {
+    chip.onclick = () => {
+      const active = chip.classList.toggle('reacted');
+      const emoji  = chip.dataset.emoji;
+      let count = parseInt(chip.dataset.count) + (active ? 1 : -1);
+      chip.dataset.count = count;
+      chip.textContent = emoji + ' ' + count;
+      chip.style.background = active ? '#FFF0EC' : '';
+      chip.style.color      = active ? 'var(--accent)' : '';
+    };
+  });
+  feed.insertBefore(d, feed.firstChild);
+  document.getElementById('compInputB').value = '';
+  document.getElementById('compInputB').style.height = '';
+  hideFeedEmptyState();
+  // Hand off to Otto's post-publish flow (mockup 06)
+  window.otto?.publishFlow?.(d, v);
+}
+
+// ════════════════════════════════════════════
+//  COMMENT SYSTEM
+// ════════════════════════════════════════════
+
+// Post & Vibe metadata (for the preview inside the modal)
+const postMeta = {
+  '1': { type:'post', author:'Kwame Asante', av:'KA', color:'#2D1B4E', time:'2h ago',
+         body:'The best hire I ever made had no relevant experience. What they had was a 90-second video explaining how they\'d redesigned their college\'s registration system for fun. The résumé told me nothing. The Vibe told me everything.' },
+  '2': { type:'post', author:'Priya Sinha', av:'PS', color:'#3B1A00', time:'5h ago',
+         body:'Clear thinking matters more than the right buzzwords. The best interviews feel like a real conversation — not a performance.' },
+  '3': { type:'post', author:'Luca Moretti', av:'LM', color:'#2a2800', time:'1d ago',
+         body:'Two years working remotely from a new city each month. I\'ve had more meaningful conversations with strangers in cafés than I ever did in an open-plan office.' },
+  '4': { type:'post', author:'Zara Williams', av:'ZW', color:'#1A1A00', time:'2d ago',
+         body:'"Open to work" should explain what you actually want, not just that you\'re available.' },
+  'v1': { type:'vibe', author:'Kwame Asante', av:'KA', color:'#2D1B4E', time:'6.1k views · 1:02',
+           bg:'linear-gradient(135deg,#1a0533,#2d1b4e)',
+           body:'How I built a profitable micro-SaaS in 72 hours — from idea to first paying customer.' },
+  'v2': { type:'vibe', author:'Maya Chen', av:'MC', color:'#1C1C1E', time:'2.1k views · 1:02',
+           bg:'linear-gradient(135deg,#001a2c,#0a2a3e)',
+           body:'Onboarding redesign: retention up 23% in one weekend. Here\'s exactly what I changed.' },
+  'v3': { type:'vibe', author:'Luca Moretti', av:'LM', color:'#2a2800', time:'8.7k views · 1:18',
+           bg:'linear-gradient(135deg,#1a1a00,#2a2800)',
+           body:'Web Summit Lisbon — what I said and what actually happened in the room.' },
+  'v4': { type:'vibe', author:'Priya Sinha', av:'PS', color:'#3B1A00', time:'1.4k views · 0:55',
+           bg:'linear-gradient(135deg,#1a0008,#2a000f)',
+           body:'My 60-second pitch that got me 3 job offers. Here\'s the exact framework.' },
+  'v5': { type:'vibe', author:'Zara Williams', av:'ZW', color:'#1A1A00', time:'983 views · 1:14',
+           bg:'linear-gradient(135deg,#001a1a,#002828)',
+           body:'Ran a 200-person hackathon on a $0 budget — here\'s the full breakdown.' },
+};
+
+// Comment threads
+const commentsDB = {
+  '1': [
+    { id:'c1', av:'PS', color:'#3B1A00', author:'Priya Sinha', role:'Growth Lead', time:'1h ago',
+      text:'This is exactly why I record 30-second walkthroughs of every project. Résumés are dead — show your work.', likes:48, _liked:false,
+      replies:[{ av:'KA', color:'#2D1B4E', author:'Kwame Asante', text:'Exactly. Takes 5 minutes. No excuse not to.', time:'58m ago', likes:12, _liked:false }] },
+    { id:'c2', av:'LM', color:'#2a2800', author:'Luca Moretti', role:'Full-stack Dev', time:'1h ago',
+      text:'Hired someone from a bootcamp because their demo showed real problem-solving instincts. Two years in, still my best eng.', likes:31, _liked:false, replies:[] },
+    { id:'c3', av:'ZW', color:'#1A1A00', author:'Zara Williams', role:'COO', time:'2h ago',
+      text:'Counterpoint: video skills ≠ job skills. But a Vibe does show how you think, which is what matters most.', likes:19, _liked:false,
+      replies:[{ av:'PS', color:'#3B1A00', author:'Priya Sinha', text:'Fair — it\'s one signal among many, not a replacement for everything.', time:'1h ago', likes:7, _liked:false }] },
+  ],
+  '2': [
+    { id:'c4', av:'ZW', color:'#1A1A00', author:'Zara Williams', role:'COO', time:'3h ago',
+      text:'Saving and sharing with my whole team before next week\'s interviews. The "explain it to someone who knows nothing" drill is so underused.', likes:22, _liked:false, replies:[] },
+    { id:'c5', av:'LM', color:'#2a2800', author:'Luca Moretti', role:'Dev', time:'4h ago',
+      text:'I train by recording myself explaining things, then watching it back. Painful but effective.', likes:17, _liked:false, replies:[] },
+  ],
+  '3': [
+    { id:'c6', av:'KA', color:'#2D1B4E', author:'Kwame Asante', role:'Founder', time:'20h ago',
+      text:'Been doing this for 18 months. Co-working spaces completely blow open-plan out of the water for meaningful conversation.', likes:14, _liked:false, replies:[] },
+    { id:'c7', av:'PS', color:'#3B1A00', author:'Priya Sinha', role:'Growth', time:'22h ago',
+      text:'Which city was your favorite so far?', likes:8, _liked:false,
+      replies:[{ av:'LM', color:'#2a2800', author:'Luca Moretti', text:'Tbilisi. Cheap, fast internet, amazing food, and everyone is building something.', time:'21h ago', likes:22, _liked:false }] },
+  ],
+  '4': [
+    { id:'c8', av:'KA', color:'#2D1B4E', author:'Kwame Asante', role:'Founder', time:'1d ago',
+      text:'The number of "open to work" bios that just say "open to opportunities!" is staggering. This post should be required reading.', likes:55, _liked:false, replies:[] },
+    { id:'c9', av:'PS', color:'#3B1A00', author:'Priya Sinha', role:'Growth Lead', time:'1d ago',
+      text:'Updating my bio right now. Three things I actually want: startup, growth-stage, remote-friendly. Done.', likes:32, _liked:false, replies:[] },
+    { id:'c10', av:'LM', color:'#2a2800', author:'Luca Moretti', role:'Dev', time:'2d ago',
+      text:'Good signal from both sides — when candidates are specific it saves everyone time.', likes:21, _liked:false, replies:[] },
+  ],
+  'v1': [
+    { id:'vc1', av:'MC', color:'#1C1C1E', author:'Maya Chen', role:'Product Designer', time:'5h ago',
+      text:'The validation-before-building section is insane. How much of that 48 hours was actually customer research?', likes:34, _liked:false,
+      replies:[{ av:'KA', color:'#2D1B4E', author:'Kwame Asante', text:'About 6 hours of talking to users on day one. Everything else was building.', time:'4h ago', likes:8, _liked:false }] },
+    { id:'vc2', av:'PS', color:'#3B1A00', author:'Priya Sinha', role:'Growth Lead', time:'6h ago',
+      text:'Watched this twice. The pricing psychology section alone is worth the 62 seconds.', likes:22, _liked:false, replies:[] },
+    { id:'vc3', av:'ZW', color:'#1A1A00', author:'Zara Williams', role:'COO', time:'8h ago',
+      text:'What was churn like in the first 30 days? That\'s always where micro-SaaS falls apart.', likes:11, _liked:false, replies:[] },
+  ],
+  'v2': [
+    { id:'vc4', av:'KA', color:'#2D1B4E', author:'Kwame Asante', role:'Founder', time:'1h ago',
+      text:'The "what are you here to do" question replacing the intro step is such a clean move. Stealing this for our onboarding next sprint.', likes:41, _liked:false, replies:[] },
+    { id:'vc5', av:'LM', color:'#2a2800', author:'Luca Moretti', role:'Dev', time:'2h ago',
+      text:'23% in a weekend is wild. Did you A/B test or just ship cold?', likes:18, _liked:false,
+      replies:[{ av:'MC', color:'#1C1C1E', author:'Maya Chen', text:'Shipped cold. Small enough user base that the delta was clear within 48 hours.', time:'1h ago', likes:5, _liked:false }] },
+  ],
+  'v3': [
+    { id:'vc6', av:'PS', color:'#3B1A00', author:'Priya Sinha', role:'Growth Lead', time:'1d ago',
+      text:'The audience reaction you describe at 1:02 is the most relatable thing. What question surprised you most?', likes:29, _liked:false,
+      replies:[{ av:'LM', color:'#2a2800', author:'Luca Moretti', text:'"Do you actually think this works long-term or are you just an extrovert who can tolerate discomfort?" Still thinking about that one.', time:'23h ago', likes:15, _liked:false }] },
+  ],
+  'v4': [
+    { id:'vc7', av:'ZW', color:'#1A1A00', author:'Zara Williams', role:'COO', time:'12h ago',
+      text:'Used this framework at a networking event last Thursday. Got follow-ups from two people before I got home.', likes:67, _liked:false, replies:[] },
+    { id:'vc8', av:'KA', color:'#2D1B4E', author:'Kwame Asante', role:'Founder', time:'14h ago',
+      text:'The "one thing people wouldn\'t expect" ending is the move. It\'s the only part anyone remembers.', likes:45, _liked:false, replies:[] },
+  ],
+  'v5': [
+    { id:'vc9', av:'LM', color:'#2a2800', author:'Luca Moretti', role:'Dev', time:'3d ago',
+      text:'How did you get 200 people without a budget? What channel actually drove registration?', likes:38, _liked:false,
+      replies:[{ av:'ZW', color:'#1A1A00', author:'Zara Williams', text:'LinkedIn + three Slack communities. Co-hosted with two organizers who each had their own audiences.', time:'3d ago', likes:19, _liked:false }] },
+    { id:'vc10', av:'PS', color:'#3B1A00', author:'Priya Sinha', role:'Growth Lead', time:'3d ago',
+      text:'This is the blueprint. Saving for the event I\'m running in March.', likes:24, _liked:false, replies:[] },
+  ],
+};
+
+let activePostId = null;
+
+// ── Heart SVG helper (no emoji) ──
+function heartSVG(filled) {
+  return `<svg width="13" height="12" viewBox="0 0 13 12" fill="${filled ? 'currentColor' : 'none'}"
+    stroke="currentColor" stroke-width="1.4" stroke-linecap="round" stroke-linejoin="round">
+    <path d="M6.5 10.5C6.5 10.5 1 7 1 3.5A2.5 2.5 0 016.5 2.5 2.5 2.5 0 0112 3.5C12 7 6.5 10.5 6.5 10.5z"/>
+  </svg>`;
+}
+
+// ── Comment icon SVG helper ──
+function commentSVG() {
+  return `<svg width="13" height="13" viewBox="0 0 13 13" fill="none" style="flex-shrink:0">
+    <path d="M1 1.5A.5.5 0 011.5 1h10a.5.5 0 01.5.5v7a.5.5 0 01-.5.5H4.5L1 12V1.5z"
+          stroke="currentColor" stroke-width="1.2" fill="none" stroke-linejoin="round"/>
+  </svg>`;
+}
+
+// ── Open comments ──
+function openComments(postId) {
+  activePostId = postId;
+  const modal    = document.getElementById('commentModal');
+  const meta     = postMeta[postId];
+  const comments = commentsDB[postId] || [];
+
+  // Header count
+  document.getElementById('cmTitle').textContent = `Comments · ${comments.length}`;
+
+  // Post / Vibe preview
+  const preview = document.getElementById('cmPostPreview');
+  if (meta) {
+    if (meta.type === 'vibe') {
+      preview.innerHTML = `
+        <div style="display:flex;gap:12px;align-items:center">
+          <div style="width:44px;height:60px;border-radius:10px;background:${meta.bg};flex-shrink:0;
+                      position:relative;display:flex;align-items:center;justify-content:center">
+            <div style="width:20px;height:20px;border-radius:50%;background:rgba(255,255,255,.25);
+                        border:1.5px solid rgba(255,255,255,.5);display:flex;align-items:center;
+                        justify-content:center;font-size:8px;color:white">&#9654;</div>
+          </div>
+          <div style="flex:1;min-width:0">
+            <div style="display:flex;align-items:center;gap:8px;margin-bottom:6px">
+              <div style="width:26px;height:26px;border-radius:8px;background:${meta.color};
+                          display:flex;align-items:center;justify-content:center;
+                          font-family:'Fraunces',serif;font-size:9px;font-weight:700;color:white">${meta.av}</div>
+              <div>
+                <div style="font-size:13px;font-weight:700">${meta.author}</div>
+                <div style="font-size:11px;color:var(--muted)">${meta.time}</div>
+              </div>
+            </div>
+            <div style="font-size:13px;line-height:1.6;color:var(--soft);font-style:italic">${meta.body}</div>
+          </div>
+        </div>`;
+    } else {
+      preview.innerHTML = `
+        <div class="cm-post-author">
+          <div class="cm-post-av" style="background:${meta.color}">${meta.av}</div>
+          <div><div class="cm-post-name">${meta.author}</div><div class="cm-post-time">${meta.time}</div></div>
+        </div>
+        <div class="cm-post-body">${meta.body}</div>`;
+    }
+  } else {
+    preview.innerHTML = '';
+  }
+
+  renderComments(comments);
+  modal.classList.add('open');
+  document.body.style.overflow = 'hidden';
+  setTimeout(() => document.getElementById('cmCompInput').focus(), 350);
+}
+
+// ── Render comments ──
+function renderComments(comments) {
+  const list = document.getElementById('cmCommentsList');
+  if (!comments || comments.length === 0) {
+    list.innerHTML = '<div style="text-align:center;padding:52px 20px;color:var(--muted);font-size:14px">No comments yet — be the first.</div>';
+    return;
+  }
+
+  list.innerHTML = comments.map(c => `
+    <div class="comment-item" id="ci-${c.id}">
+      <div class="comment-av" style="background:${c.color}">${c.av}</div>
+      <div class="comment-body-col">
+        <div class="comment-name-row">
+          <span class="comment-author">${c.author}</span>
+          ${c.role ? `<span class="comment-role">${c.role}</span>` : ''}
+          <span class="comment-time">${c.time}</span>
+        </div>
+        <div class="comment-text">${c.text}</div>
+        <div class="comment-actions">
+          <button class="comment-action ${c._liked ? 'liked' : ''}"
+                  onclick="likeComment(this,'${c.id}',${c.likes})">
+            ${heartSVG(c._liked)} ${c.likes}
+          </button>
+          <button class="comment-reply-btn"
+                  onclick="toggleReplyForm('${c.id}','${c.author}')">Reply</button>
+        </div>
+
+        ${c.replies && c.replies.length ? `
+        <div class="comment-replies" id="replies-${c.id}">
+          ${c.replies.map((r, ri) => `
+          <div class="reply-item" id="ri-${c.id}-${ri}">
+            <div class="reply-av" style="background:${r.color}">${r.av}</div>
+            <div class="reply-col">
+              <div class="reply-name-row">
+                <span class="reply-name">${r.author}</span>
+                <span class="reply-time">${r.time || ''}</span>
+              </div>
+              <div class="reply-text">${r.text}</div>
+              <div class="reply-foot">
+                <button class="reply-like-btn ${r._liked ? 'liked' : ''}"
+                        onclick="likeReply(this,'${c.id}',${ri},${r.likes})">
+                  ${heartSVG(r._liked)} ${r.likes}
+                </button>
+                <button class="reply-like-btn"
+                        style="margin-left:6px"
+                        onclick="toggleReplyForm('${c.id}','${r.author}')">Reply</button>
+              </div>
+            </div>
+          </div>`).join('')}
+        </div>` :
+        `<div class="comment-replies" id="replies-${c.id}" style="display:none"></div>`}
+
+        <div class="reply-form" id="rf-${c.id}">
+          <textarea class="reply-form-input"
+                    placeholder="Reply to ${c.author}…"
+                    rows="1"
+                    oninput="this.style.height='auto';this.style.height=Math.min(this.scrollHeight,80)+'px'"></textarea>
+          <div class="reply-form-btns">
+            <button class="reply-form-cancel" onclick="closeReplyForm('${c.id}')">Cancel</button>
+            <button class="reply-form-send"   onclick="submitReply('${c.id}','${c.author}','${c.color}','${c.av}')">Reply</button>
+          </div>
+        </div>
+      </div>
+    </div>`).join('');
+}
+
+// ── Toggle reply form ──
+function toggleReplyForm(commentId, authorName) {
+  // Close any other open forms first
+  document.querySelectorAll('.reply-form.open').forEach(f => {
+    if (f.id !== 'rf-' + commentId) f.classList.remove('open');
+  });
+  const rf = document.getElementById('rf-' + commentId);
+  if (!rf) return;
+  rf.classList.toggle('open');
+  if (rf.classList.contains('open')) {
+    const ta = rf.querySelector('textarea');
+    ta.focus();
+    // If replying to a reply, pre-fill the @mention
+    if (authorName) ta.placeholder = 'Reply to ' + authorName + '…';
+  }
+}
+
+function closeReplyForm(commentId) {
+  const rf = document.getElementById('rf-' + commentId);
+  if (rf) rf.classList.remove('open');
+}
+
+// ── Submit a new reply ──
+function submitReply(commentId) {
+  const rf    = document.getElementById('rf-' + commentId);
+  const input = rf.querySelector('textarea');
+  const text  = input.value.trim();
+  if (!text) return;
+
+  // Add to data store
+  const db = commentsDB[activePostId];
+  if (db) {
+    const c = db.find(x => x.id === commentId);
+    if (c) {
+      c.replies = c.replies || [];
+      c.replies.push({ author:'Maya Chen', av:'MC', color:'#1C1C1E', text, time:'Just now', likes:0, _liked:false });
+    }
+  }
+
+  // Show replies container
+  const repliesEl = document.getElementById('replies-' + commentId);
+  repliesEl.style.display = '';
+
+  // Append the new reply to the DOM
+  const idx = (db ? (db.find(x => x.id === commentId)?.replies.length || 1) - 1 : 0);
+  const r = document.createElement('div');
+  r.className = 'reply-item';
+  r.innerHTML = `
+    <div class="reply-av" style="background:var(--charcoal)">MC</div>
+    <div class="reply-col">
+      <div class="reply-name-row">
+        <span class="reply-name">Maya Chen</span>
+        <span class="reply-time">Just now</span>
+      </div>
+      <div class="reply-text">${text}</div>
+      <div class="reply-foot">
+        <button class="reply-like-btn" onclick="toggleReplyLike(this)">${heartSVG(false)} 0</button>
+        <button class="reply-like-btn" style="margin-left:6px"
+                onclick="toggleReplyForm('${commentId}','Maya Chen')">Reply</button>
+      </div>
+    </div>`;
+  repliesEl.appendChild(r);
+
+  input.value = '';
+  input.style.height = '';
+  rf.classList.remove('open');
+}
+
+// ── Like a comment ──
+function likeComment(btn, id, current) {
+  const liked = btn.classList.toggle('liked');
+  const count = current + (liked ? 1 : -1);
+  btn.innerHTML = heartSVG(liked) + ' ' + count;
+  if (commentsDB[activePostId]) {
+    const c = commentsDB[activePostId].find(x => x.id === id);
+    if (c) { c.likes = count; c._liked = liked; }
+  }
+}
+
+// ── Like a reply ──
+function likeReply(btn, commentId, replyIdx, current) {
+  const liked = btn.classList.toggle('liked');
+  const count = current + (liked ? 1 : -1);
+  btn.innerHTML = heartSVG(liked) + ' ' + count;
+  if (commentsDB[activePostId]) {
+    const c = commentsDB[activePostId].find(x => x.id === commentId);
+    if (c && c.replies[replyIdx]) {
+      c.replies[replyIdx].likes  = count;
+      c.replies[replyIdx]._liked = liked;
+    }
+  }
+}
+
+// ── Like button on a dynamically added reply (no index) ──
+function toggleReplyLike(btn) {
+  const liked = btn.classList.toggle('liked');
+  const parts = btn.innerHTML.replace(/<[^>]+>/g, '').trim();
+  const n     = parseInt(parts) || 0;
+  btn.innerHTML = heartSVG(liked) + ' ' + (liked ? n + 1 : n - 1);
+}
+
+// ── Sort comments ──
+function sortComments(btn, mode) {
+  document.querySelectorAll('.cm-sort-btn').forEach(b => b.classList.remove('active'));
+  btn.classList.add('active');
+  if (!commentsDB[activePostId]) return;
+  const sorted = [...commentsDB[activePostId]];
+  if (mode === 'top') sorted.sort((a, b) => b.likes - a.likes);
+  else sorted.sort((a, b) => a.id.localeCompare(b.id));
+  renderComments(sorted);
+}
+
+// ── Submit a new top-level comment ──
+function submitComment() {
+  const input = document.getElementById('cmCompInput');
+  const text  = input.value.trim();
+  if (!text) return;
+
+  if (!commentsDB[activePostId]) commentsDB[activePostId] = [];
+  const newComment = {
+    id: 'c-new-' + Date.now(),
+    av:'MC', color:'#1C1C1E',
+    author:'Maya Chen', role:'Product Designer',
+    text, likes:0, _liked:false, time:'Just now', replies:[]
+  };
+  commentsDB[activePostId].unshift(newComment);
+
+  // Update count in header
+  document.getElementById('cmTitle').textContent = `Comments · ${commentsDB[activePostId].length}`;
+
+  // Update count chip in the feed card
+  const card = document.querySelector(`[data-post-id="${activePostId}"]`);
+  if (card) {
+    const chip = card.querySelector('.comment-btn');
+    if (chip) chip.innerHTML = commentSVG() + ' ' + commentsDB[activePostId].length;
+  }
+
+  renderComments(commentsDB[activePostId]);
+  input.value = '';
+  input.style.height = '';
+  document.getElementById('cmCommentsList').scrollTop = 0;
+}
+
+// ── Close modal ──
+function closeComments() {
+  document.getElementById('commentModal').classList.remove('open');
+  document.body.style.overflow = '';
+  activePostId = null;
+}
+
+document.addEventListener('keydown', e => { if (e.key === 'Escape') closeComments(); });
+
+// ════════════════════════════════════════════════
+//  CALENDAR SYSTEM
+// ════════════════════════════════════════════════
+const calendarEvents = {};
+(function seedEvents() {
+  const now = new Date(), y = now.getFullYear(), m = now.getMonth();
+  [
+    [new Date(y,m,now.getDate()+2),  'IU Spring Career Fair',     '10:00','IMU Alumni Hall',              'Bring resume, business casual','#1A9E5B'],
+    [new Date(y,m,now.getDate()+5),  'Goldman Sachs Info Session', '17:30','Kelley School of Business 100','',                            '#2563EB'],
+    [new Date(y,m,now.getDate()+8),  'Weekly Design Critique',     '19:00','Luddy Hall 1106',              'Bring a prototype or sketch',  '#7C5CFC'],
+    [new Date(y,m,now.getDate()+14), 'IU Hackathon 2025',          '09:00','Assembly Hall',               '$10k prizes',                  '#FF5C35'],
+  ].forEach(([d,n,t,l,o,c]) => _storeEvent(d,n,t,l,o,c));
+})();
+function _storeEvent(dateObj,name,time,location,notes,color){
+  color=color||'#FF5C35';
+  const key=dateKey(dateObj);
+  if(!calendarEvents[key])calendarEvents[key]=[];
+  if(!calendarEvents[key].find(e=>e.name===name))
+    calendarEvents[key].push({name,time:time||'',location:location||'',notes:notes||'',color});
+}
+function addCalEvent(dateObj,name,time,color,location,notes){
+  _storeEvent(dateObj,name,time||'',location||'',notes||'',color||'#FF5C35');
+  updateEventCountBadge(); renderCalendar();
+  if(modalOpen){renderModalGrid();renderModalSidebar();}
+}
+function dateKey(d){return d.getFullYear()+'-'+String(d.getMonth()+1).padStart(2,'0')+'-'+String(d.getDate()).padStart(2,'0');}
+function fmtTime(t){if(!t)return'All day';const[h,m]=t.split(':').map(Number);return`${h%12||12}:${String(m).padStart(2,'0')}${h>=12?'pm':'am'}`;}
+function updateEventCountBadge(){
+  const total=Object.values(calendarEvents).reduce((s,a)=>s+a.length,0);
+  const b=document.getElementById('calEventCount');if(b)b.textContent=total;
+}
+let calYear=new Date().getFullYear(),calMonth=new Date().getMonth(),calSelectedKey=null,calVisible=true;
+const MONTHS=['January','February','March','April','May','June','July','August','September','October','November','December'];
+const DAYS=['Su','Mo','Tu','We','Th','Fr','Sa'];
+function renderCalendar(){
+  const label=document.getElementById('calMonthLabel'),grid=document.getElementById('calGrid');
+  if(!label||!grid)return;
+  label.textContent=MONTHS[calMonth].slice(0,3)+' '+calYear;
+  const today=new Date(),firstDay=new Date(calYear,calMonth,1).getDay(),
+        dim=new Date(calYear,calMonth+1,0).getDate(),dip=new Date(calYear,calMonth,0).getDate();
+  let h=DAYS.map(d=>`<div class="cal-day-name">${d}</div>`).join('');
+  for(let i=firstDay-1;i>=0;i--){const d=dip-i,key=dateKey(new Date(calYear,calMonth-1,d));h+=`<div class="cal-day other-month${calendarEvents[key]?.length?' has-event':''}" onclick="miniSelectDay(${calYear},${calMonth-1},${d})">${d}</div>`;}
+  for(let d=1;d<=dim;d++){const key=dateKey(new Date(calYear,calMonth,d));const it=today.getFullYear()===calYear&&today.getMonth()===calMonth&&today.getDate()===d;const he=!!calendarEvents[key]?.length;const is=key===calSelectedKey;h+=`<div class="cal-day${it?' today':''}${he?' has-event':''}${is?' selected':''}" onclick="miniSelectDay(${calYear},${calMonth},${d})">${d}</div>`;}
+  const filled=firstDay+dim,tot=Math.ceil(filled/7)*7;
+  for(let d=1;d<=tot-filled;d++){const key=dateKey(new Date(calYear,calMonth+1,d));h+=`<div class="cal-day other-month${calendarEvents[key]?.length?' has-event':''}" onclick="miniSelectDay(${calYear},${calMonth+1},${d})">${d}</div>`;}
+  grid.innerHTML=h;
+}
+function miniSelectDay(year,month,day){
+  const key=dateKey(new Date(year,month,day));
+  if(calSelectedKey===key){calSelectedKey=null;document.getElementById('calEventsPanel').classList.remove('open');renderCalendar();return;}
+  calSelectedKey=key;renderCalendar();
+  const evts=calendarEvents[key]||[],panel=document.getElementById('calEventsPanel'),
+        list=document.getElementById('calEventsList'),title=document.getElementById('calPanelTitle');
+  title.textContent=new Date(year,month,day).toLocaleDateString('en-US',{weekday:'short',month:'short',day:'numeric'});
+  if(!evts.length){list.innerHTML=`<div class="cal-empty">No events &mdash; <button onclick="openCreateEventForKey('${key}')" style="background:none;border:none;color:var(--accent);cursor:none;font-size:11px;font-weight:700;padding:0">+ Add</button></div>`;}
+  else{list.innerHTML=evts.map(e=>`<div class="cal-event-item"><div class="cal-event-dot" style="background:${e.color}"></div><div class="cal-event-info"><div class="cal-event-name">${e.name}</div><div class="cal-event-time">${fmtTime(e.time)}${e.location?' &middot; '+e.location:''}</div></div><button onclick="removeCalEvent('${key}','${e.name}')" style="background:none;border:none;color:var(--muted);cursor:none;font-size:14px;padding:2px 4px;border-radius:5px;transition:color .15s" onmouseover="this.style.color='var(--accent)'" onmouseout="this.style.color='var(--muted)'">&times;</button></div>`).join('');}
+  panel.classList.add('open');
+}
+function removeCalEvent(key,name){
+  if(!calendarEvents[key])return;
+  calendarEvents[key]=calendarEvents[key].filter(e=>e.name!==name);
+  if(!calendarEvents[key].length)delete calendarEvents[key];
+  updateEventCountBadge();
+  const p=key.split('-').map(Number);
+  miniSelectDay(p[0],p[1]-1,p[2]);
+  if(modalOpen){renderModalGrid();renderModalSidebar();}
+  if(typeof _calSave==='function')_calSave();
+}
+function changeMonth(dir){calMonth+=dir;if(calMonth>11){calMonth=0;calYear++;}if(calMonth<0){calMonth=11;calYear--;}calSelectedKey=null;document.getElementById('calEventsPanel').classList.remove('open');renderCalendar();}
+function toggleCalView(){calVisible=!calVisible;document.getElementById('calBody').style.display=calVisible?'':'none';document.getElementById('calToggleBtn').innerHTML=calVisible?'&#8964;':'&#8965;';}
+
+// FULL MODAL
+let modalOpen=false,modalYear=new Date().getFullYear(),modalMonth=new Date().getMonth(),modalSelectedKey=null;
+function openCalModal(){
+  modalOpen=true;modalYear=calYear;modalMonth=calMonth;modalSelectedKey=calSelectedKey;
+  document.getElementById('calModalBackdrop').classList.add('open');
+  document.body.style.overflow='hidden';
+  renderModalGrid();renderModalSidebar();
+}
+function closeCalModal(){modalOpen=false;document.getElementById('calModalBackdrop').classList.remove('open');document.body.style.overflow='';}
+function modalChangeMonth(dir){modalMonth+=dir;if(modalMonth>11){modalMonth=0;modalYear++;}if(modalMonth<0){modalMonth=11;modalYear--;}modalSelectedKey=null;renderModalGrid();renderModalSidebar();}
+function renderModalGrid(){
+  const label=document.getElementById('modalMonthLabel'),grid=document.getElementById('modalCalGrid'),names=document.getElementById('modalDayNames');
+  if(!label||!grid)return;
+  label.textContent=MONTHS[modalMonth]+' '+modalYear;
+  names.innerHTML=DAYS.map(d=>`<div class="cal-modal-day-name">${d}</div>`).join('');
+  const today=new Date(),firstDay=new Date(modalYear,modalMonth,1).getDay(),
+        dim=new Date(modalYear,modalMonth+1,0).getDate(),dip=new Date(modalYear,modalMonth,0).getDate();
+  let h='';
+  for(let i=firstDay-1;i>=0;i--){const d=dip-i,key=dateKey(new Date(modalYear,modalMonth-1,d)),evts=calendarEvents[key]||[];h+=`<div class="cal-modal-day other-month" onclick="modalSelectDay(${modalYear},${modalMonth-1},${d})"><div class="cal-modal-day-num">${d}</div>${evts.slice(0,2).map(e=>`<div class="cal-modal-event-pill" style="background:${e.color}">${e.name}</div>`).join('')}</div>`;}
+  for(let d=1;d<=dim;d++){const key=dateKey(new Date(modalYear,modalMonth,d));const evts=calendarEvents[key]||[];const it=today.getFullYear()===modalYear&&today.getMonth()===modalMonth&&today.getDate()===d;const is=key===modalSelectedKey;const extras=evts.length>2?`<div style="font-size:9px;color:var(--muted);font-weight:700">+${evts.length-2} more</div>`:'';h+=`<div class="cal-modal-day${it?' today':''}${is?' selected':''}" onclick="modalSelectDay(${modalYear},${modalMonth},${d})"><div class="cal-modal-day-num">${d}</div>${evts.slice(0,2).map(e=>`<div class="cal-modal-event-pill" style="background:${e.color}">${e.name}</div>`).join('')}${extras}</div>`;}
+  const filled=firstDay+dim,tot=Math.ceil(filled/7)*7;
+  for(let d=1;d<=tot-filled;d++){const key=dateKey(new Date(modalYear,modalMonth+1,d));const evts=calendarEvents[key]||[];h+=`<div class="cal-modal-day other-month" onclick="modalSelectDay(${modalYear},${modalMonth+1},${d})"><div class="cal-modal-day-num">${d}</div>${evts.slice(0,2).map(e=>`<div class="cal-modal-event-pill" style="background:${e.color}">${e.name}</div>`).join('')}</div>`;}
+  grid.innerHTML=h;
+}
+function modalSelectDay(year,month,day){modalSelectedKey=dateKey(new Date(year,month,day));renderModalGrid();renderModalSidebar();}
+function renderModalSidebar(){
+  const listEl=document.getElementById('modalEventsList'),dateEl=document.getElementById('modalSidebarDate');
+  if(!listEl)return;
+  const noEvtHTML=`<div class="cal-modal-no-events"><svg width="36" height="36" viewBox="0 0 36 36" fill="none" style="margin:0 auto 10px;display:block;opacity:.3"><rect x="3" y="6" width="30" height="27" rx="6" stroke="currentColor" stroke-width="2" fill="none"/><path d="M3 14h30" stroke="currentColor" stroke-width="2" stroke-linecap="round"/><path d="M11 3v6M25 3v6" stroke="currentColor" stroke-width="2" stroke-linecap="round"/></svg>`;
+  if(!modalSelectedKey){dateEl.textContent='Click a day to see events';listEl.innerHTML=noEvtHTML+'Select a day to see<br>or add events</div>';return;}
+  const p=modalSelectedKey.split('-').map(Number),dateObj=new Date(p[0],p[1]-1,p[2]);
+  dateEl.textContent=dateObj.toLocaleDateString('en-US',{weekday:'long',month:'long',day:'numeric'});
+  const evts=calendarEvents[modalSelectedKey]||[];
+  if(!evts.length){listEl.innerHTML=noEvtHTML+`No events yet<br><button onclick="openCreateEventForKey('${modalSelectedKey}')" style="background:none;border:none;color:var(--accent);cursor:none;font-size:13px;font-weight:700;margin-top:8px;padding:0">+ Add an event</button></div>`;}
+  else{listEl.innerHTML=evts.map(e=>`<div class="cal-modal-event-card"><div class="cal-modal-event-bar" style="background:${e.color}"></div><div class="cal-modal-event-body"><div class="cal-modal-event-name">${e.name}</div><div class="cal-modal-event-meta">${e.time?fmtTime(e.time)+'<br>':''}${e.location?'&#128205; '+e.location+'<br>':''}${e.notes?'&#128221; '+e.notes:''}</div></div><button class="cal-modal-event-del" onclick="removeCalEvent('${modalSelectedKey}','${e.name}')">&times;</button></div>`).join('')+`<button onclick="openCreateEventForKey('${modalSelectedKey}')" style="width:100%;margin-top:8px;padding:10px;border-radius:12px;border:1.5px dashed var(--border);background:none;color:var(--muted);font-family:'DM Sans',sans-serif;font-size:12px;font-weight:700;cursor:none;transition:all .15s" onmouseover="this.style.borderColor='var(--accent)';this.style.color='var(--accent)'" onmouseout="this.style.borderColor='var(--border)';this.style.color='var(--muted)'">+ Add another event</button>`;}
+}
+
+// CREATE EVENT
+let selectedEventColor='#FF5C35',prefillDateKey=null;
+function openCreateEvent(){prefillDateKey=modalSelectedKey;_openCreateForm();}
+function openCreateEventForKey(key){prefillDateKey=key;_openCreateForm();}
+function _openCreateForm(){
+  document.getElementById('evtDate').value=prefillDateKey||dateKey(new Date());
+  document.getElementById('evtName').value='';document.getElementById('evtTime').value='';
+  document.getElementById('evtLocation').value='';document.getElementById('evtNotes').value='';
+  selectedEventColor='#FF5C35';
+  document.querySelectorAll('.color-swatch').forEach(s=>s.classList.toggle('active',s.dataset.color===selectedEventColor));
+  document.getElementById('createEventModal').classList.add('open');
+  setTimeout(()=>document.getElementById('evtName').focus(),80);
+}
+function closeCreateEvent(){document.getElementById('createEventModal').classList.remove('open');}
+function pickColor(el){selectedEventColor=el.dataset.color;document.querySelectorAll('.color-swatch').forEach(s=>s.classList.remove('active'));el.classList.add('active');}
+function saveNewEvent(){
+  const name=document.getElementById('evtName').value.trim();
+  const dateStr=document.getElementById('evtDate').value;
+  const time=document.getElementById('evtTime').value;
+  const location=document.getElementById('evtLocation').value.trim();
+  const notes=document.getElementById('evtNotes').value.trim();
+  if(!name){document.getElementById('evtName').focus();return;}
+  if(!dateStr){document.getElementById('evtDate').focus();return;}
+  const p=dateStr.split('-').map(Number),dateObj=new Date(p[0],p[1]-1,p[2]);
+  addCalEvent(dateObj,name,time,selectedEventColor,location,notes);
+  _calSave();
+  if(modalOpen){modalSelectedKey=dateKey(dateObj);modalYear=p[0];modalMonth=p[1]-1;renderModalGrid();renderModalSidebar();}
+  calSelectedKey=dateKey(dateObj);calYear=p[0];calMonth=p[1]-1;
+  miniSelectDay(p[0],p[1]-1,p[2]);
+  closeCreateEvent();
+  showFeedToast('Event saved: '+name);
+}
+document.addEventListener('keydown',e=>{if(e.key==='Escape'){closeCreateEvent();closeCalModal();}});
+renderCalendar();updateEventCountBadge();
+
+
+// ══ VIBE OF THE DAY ══
+// Animated waveform bars
+(function buildWave() {
+  const wave = document.getElementById('votdWave');
+  if (!wave) return;
+  const heights = [20,35,55,40,70,50,38,62,48,75,55,42,68,52,35,60,45,72,58,40,65,50,38,55,42,70,48,62,35,58];
+  heights.forEach(h => {
+    const bar = document.createElement('div');
+    bar.className = 'votd-wave-bar';
+    bar.style.height = h + '%';
+    wave.appendChild(bar);
+  });
+  // Animate
+  let frame = 0;
+  setInterval(() => {
+    frame++;
+    wave.querySelectorAll('.votd-wave-bar').forEach((b, i) => {
+      const h = heights[i] + Math.sin((frame + i * 2.5) * .25) * 18;
+      b.style.height = Math.max(8, h) + '%';
+    });
+  }, 80);
+})();
+
+// React button toggle
+const votdCounts = { fire: 247, brain: 89, clap: 134 };
+const votdActive = {};
+function votdReact(e, type) {
+  e.stopPropagation();
+  const btn   = document.getElementById('votd-' + type);
+  const count = document.getElementById('votd-' + type + '-count');
+  if (votdActive[type]) {
+    votdActive[type] = false;
+    votdCounts[type]--;
+    btn.classList.remove('active');
+  } else {
+    votdActive[type] = true;
+    votdCounts[type]++;
+    btn.classList.add('active');
+  }
+  count.textContent = votdCounts[type];
+}
+
+
+// ══ SEARCH ═══════════════════════════════════════════════════════════════
+var SEARCH_DATA = [
+  {type:'person',  name:'Kwame Asante',    role:'AI Founder · Senior',        av:'KA', col:'#2D1B4E', rel:'connected'},
+  {type:'person',  name:'Maya Chen',       role:'Product Designer · Junior',   av:'MC', col:'#1C1C1E', rel:'connected'},
+  {type:'person',  name:'Priya Sinha',     role:'Informatics · IU',            av:'PS', col:'#4E1B2D', rel:'mutual'},
+  {type:'person',  name:'Zara Williams',   role:'CS · IU Senior',              av:'ZW', col:'#1B4E2D', rel:'mutual'},
+  {type:'person',  name:'Luca Moretti',    role:'Product Lead · Fintech',      av:'LM', col:'#1A3D5C', rel:'mutual'},
+  {type:'person',  name:'Jordan Lee',      role:'Finance · Business',          av:'JL', col:'#1A4D7C', rel:'connected'},
+  {type:'person',  name:'Raj Menon',       role:'AI Research · Senior',        av:'RM', col:'#2D4E1B', rel:'connected'},
+  {type:'person',  name:'Sofia Reyes',     role:'Management · Senior',         av:'SR', col:'#5D1A8B', rel:'mutual'},
+  {type:'person',  name:'Nina Okonkwo',    role:'Finance · IU Alumni',         av:'NO', col:'#1A7C7C', rel:'connected'},
+  {type:'person',  name:'Omar Hassan',     role:'Data Science · Sophomore',    av:'OH', col:'#2D4A8C', rel:'none'},
+  {type:'person',  name:'Jasmine Cole',    role:'Journalism · Media School',   av:'JC', col:'#7C1A5C', rel:'mutual'},
+  {type:'company', name:'Notion',          role:'Product & Design roles',      av:'N',  col:'#1C1C1E'},
+  {type:'company', name:'Stripe',          role:'Engineering internships',     av:'S',  col:'#6772E5'},
+  {type:'company', name:'Goldman Sachs',   role:'Summer Analyst program',      av:'GS', col:'#1A3E5C'},
+  {type:'company', name:'Deloitte',        role:'Consulting · Tech',           av:'D',  col:'#86BC25'},
+  {type:'company', name:'Amazon',          role:'SDE & PM internships',        av:'A',  col:'#FF9900'},
+  {type:'company', name:'Anthropic',       role:'AI Safety & Research',        av:'',   col:'#D4A853'},
+];
+
+function runSearch(q) {
+  var dd = document.getElementById('feedSearchDropdown');
+  if (!q.trim()) { dd.innerHTML = renderSearchDefault(); return; }
+  var lower = q.toLowerCase();
+  var results = SEARCH_DATA.filter(function(r) {
+    return r.name.toLowerCase().indexOf(lower) >= 0 || r.role.toLowerCase().indexOf(lower) >= 0;
+  }).slice(0, 8);
+  dd.innerHTML = results.length
+    ? renderSearchResults(results)
+    : '<div class="search-empty">No results for “' + q + '”</div>';
+}
+
+function renderSearchDefault() {
+  var people    = SEARCH_DATA.filter(function(r){ return r.type==='person'; }).slice(0,4);
+  var companies = SEARCH_DATA.filter(function(r){ return r.type==='company'; }).slice(0,3);
+  return '<div class="search-section-label">Suggested people</div>'
+    + people.map(renderSR).join('')
+    + '<div class="search-section-label">Companies hiring</div>'
+    + companies.map(renderSR).join('')
+    + '<div class="search-footer">Search all people and companies →</div>';
+}
+
+function renderSearchResults(results) {
+  var people    = results.filter(function(r){ return r.type==='person'; });
+  var companies = results.filter(function(r){ return r.type==='company'; });
+  var out = '';
+  if (people.length)    out += '<div class="search-section-label">People</div>'    + people.map(renderSR).join('');
+  if (companies.length) out += '<div class="search-section-label">Companies</div>' + companies.map(renderSR).join('');
+  return out + '<div class="search-footer">See all results →</div>';
+}
+
+function renderSR(r) {
+  var action = r.type==='person'
+    ? (r.rel==='connected' ? 'Message' : 'Connect')
+    : 'Follow';
+  var radius = r.type==='company' ? '8px' : '11px';
+  return '<div class="search-result">'
+    + '<div class="sr-av" style="background:' + r.col + ';border-radius:' + radius + '">' + (r.av||r.name.charAt(0)) + '</div>'
+    + '<div class="sr-info"><div class="sr-name">' + r.name + '</div><div class="sr-role">' + r.role + '</div></div>'
+    + '<button class="sr-action">' + action + '</button>'
+    + '</div>';
+}
+
+function openSearch() {
+  var dd = document.getElementById('feedSearchDropdown');
+  dd.innerHTML = renderSearchDefault();
+  dd.classList.add('open');
+}
+function closeSearch() {
+  var dd = document.getElementById('feedSearchDropdown');
+  if (dd) dd.classList.remove('open');
+}
+// ══ END SEARCH ═══════════════════════════════════════════════════════════
+
+
+// ══ CALENDAR SYNC (localStorage) ════════════════════════════════════════
+const CAL_KEY = 'vibe_cal_events_v1';
+
+function _calSave() {
+  try {
+    // Serialize calendarEvents — convert to plain object without Date keys
+    localStorage.setItem(CAL_KEY, JSON.stringify(calendarEvents));
+  } catch(e) {}
+}
+
+function _calLoad() {
+  try {
+    const raw = localStorage.getItem(CAL_KEY);
+    if (!raw) return;
+    const saved = JSON.parse(raw);
+    Object.keys(saved).forEach(k => {
+      calendarEvents[k] = saved[k];
+    });
+  } catch(e) {}
+}
+
+// Load on startup
+document.addEventListener('DOMContentLoaded', function() {
+  _calLoad();
+  renderCalendar();
+  if (typeof updateEventCountBadge === 'function') updateEventCountBadge();
+});
+// ══ END CALENDAR SYNC ════════════════════════════════════════════════════
+
+// ══ FEED PAGE INIT (uses shared _persistence.js) ═════════════════════════
+// No user → bounce to landing (feed assumes onboarded user).
+// Demo user → show floating "Demo mode · Exit" pill (top-right).
+// Fresh-onboarded user → wipe Maya's hardcoded network posts + Vibe of the
+// Day, show the feed empty state. Composer stays so they can publish.
+(function initFeedPage(){
+  const user = vibeInit();
+  if (!user) {
+    window.location.href = '/html/landing.html';
+    return;
+  }
+  if (user._isDemo) vibeShowDemoPill();
+  if (user._onboarded && !user._isDemo) {
+    document.getElementById('votdWrap')?.style.setProperty('display', 'none');
+    document.querySelector('.match-bar')?.style.setProperty('display', 'none');
+    const feed = document.getElementById('postFeedB');
+    const empty = document.getElementById('feedEmpty');
+    if (feed && empty) {
+      // Hide every hardcoded post-card; keep the empty-state element visible.
+      feed.querySelectorAll('.post-card').forEach(c => c.style.display = 'none');
+      empty.classList.add('visible');
+    }
+  }
+})();
+
+// Hide the empty state once the user publishes their first post (called from
+// submitPostB after the new card is inserted). No-op if it isn't shown.
+function hideFeedEmptyState() {
+  const empty = document.getElementById('feedEmpty');
+  if (empty) empty.classList.remove('visible');
+}
+// ══ END FEED INIT ════════════════════════════════════════════════════════
+</script>
+</body>
+</html>

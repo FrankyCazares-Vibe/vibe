@@ -1,0 +1,1111 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Vibe — Network</title>
+<link href="https://fonts.googleapis.com/css2?family=Fraunces:ital,wght@0,400;0,700;0,900;1,400&family=DM+Sans:wght@300;400;500;600&display=swap" rel="stylesheet">
+<script src="/html/_persistence.js"></script>
+<script src="/html/_mockUsers.js"></script>
+<script src="/html/_otto.js" defer></script>
+<style>
+:root{--cream:#FAF7F2;--charcoal:#1C1C1E;--soft:#2D2D2D;--muted:#8A8580;--accent:#FF5C35;--green:#2ECC71;--border:rgba(28,28,30,.08);--shadow:0 4px 24px rgba(0,0,0,.06);--shadow-lg:0 12px 48px rgba(0,0,0,.1);--campus:#4A6CF7;--campus-light:#EEF2FF;}
+*{margin:0;padding:0;box-sizing:border-box;}
+html,body{height:100%;}
+body{font-family:'DM Sans',sans-serif;background:var(--cream);color:var(--charcoal);cursor:none;overflow-x:hidden;}
+.cursor{width:8px;height:8px;background:var(--accent);border-radius:50%;position:fixed;top:0;left:0;pointer-events:none;z-index:2147483647;will-change:transform;transition:width .15s,height .15s,background .15s;}
+.cursor-ring{width:28px;height:28px;border:1.5px solid var(--accent);border-radius:50%;position:fixed;top:0;left:0;pointer-events:none;z-index:2147483646;will-change:transform;opacity:.45;transition:width .2s,height .2s,opacity .2s;}
+.cursor.hover{width:6px;height:6px;background:var(--charcoal);}
+.cursor-ring.hover{width:44px;height:44px;opacity:.2;border-color:var(--charcoal);}
+.shell{display:grid;grid-template-columns:200px 1fr;min-height:100vh;}
+.left-nav{padding:20px 14px;border-right:1px solid var(--border);position:sticky;top:0;height:100vh;overflow-y:auto;scrollbar-width:none;display:flex;flex-direction:column;}
+.left-nav::-webkit-scrollbar{display:none;}
+.nav-logo{font-family:'Fraunces',serif;font-size:22px;font-weight:900;color:var(--charcoal);letter-spacing:-1px;display:block;margin-bottom:24px;text-decoration:none;}
+.nav-logo span{color:var(--accent);}
+.nav-item{display:flex;align-items:center;gap:10px;padding:10px 12px;border-radius:12px;font-size:14px;font-weight:500;color:var(--muted);cursor:none;text-decoration:none;transition:all .15s;border:none;background:none;width:100%;text-align:left;margin-bottom:2px;}
+.nav-item:hover{background:white;color:var(--charcoal);}
+.nav-item.active{background:white;color:var(--charcoal);font-weight:600;box-shadow:var(--shadow);}
+.nav-divider{height:1px;background:var(--border);margin:12px 0;}
+.mini-av{width:34px;height:34px;border-radius:10px;background:var(--charcoal);display:flex;align-items:center;justify-content:center;font-family:'Fraunces',serif;font-size:12px;font-weight:700;color:white;flex-shrink:0;}
+.main{display:grid;grid-template-columns:1fr 300px;min-height:100vh;}
+.center{border-right:1px solid var(--border);}
+.right{padding:24px 18px;}
+.top-tabs{display:flex;border-bottom:2px solid var(--border);background:rgba(250,247,242,.96);position:sticky;top:0;z-index:50;}
+.top-tab{font-size:14px;font-weight:700;color:var(--muted);padding:16px 24px;border:none;background:none;cursor:none;position:relative;transition:color .15s;}
+.top-tab::after{content:'';position:absolute;bottom:-2px;left:0;right:0;height:2px;border-radius:2px;transform:scaleX(0);transition:transform .2s;}
+.top-tab.active{color:var(--charcoal);}
+.top-tab.pro.active::after{background:var(--accent);transform:scaleX(1);}
+.top-tab.campus.active::after{background:var(--campus);transform:scaleX(1);}
+.tab-pane{display:none;}.tab-pane.active{display:block;}
+.stats-strip{display:grid;grid-template-columns:repeat(3,1fr);margin:20px 24px 0;background:white;border:1px solid var(--border);border-radius:16px;overflow:hidden;box-shadow:var(--shadow);}
+.stat-cell{padding:14px 0;text-align:center;border-right:1px solid var(--border);cursor:none;transition:background .13s;}
+.stat-cell:last-child{border-right:none;}.stat-cell:hover{background:var(--cream);}
+.stat-n{font-family:'Fraunces',serif;font-size:22px;font-weight:900;letter-spacing:-.5px;}
+.stat-l{font-size:10px;font-weight:700;color:var(--muted);text-transform:uppercase;letter-spacing:.5px;margin-top:2px;}
+.pending{margin:16px 24px 0;background:#FFF8F6;border:1px solid rgba(255,92,53,.15);border-radius:14px;padding:13px 16px;display:flex;align-items:center;gap:12px;}
+.pdot{width:26px;height:26px;border-radius:50%;background:var(--accent);color:white;font-size:12px;font-weight:800;display:flex;align-items:center;justify-content:center;flex-shrink:0;}
+.pdtext h4{font-size:13px;font-weight:700;}.pdtext p{font-size:12px;color:var(--muted);}
+.sub-tabs{display:flex;border-bottom:1px solid var(--border);padding:0 24px;margin-top:16px;}
+.pane-desc{font-size:12px;color:var(--muted);line-height:1.55;padding:14px 24px 4px;font-family:'DM Sans',sans-serif;}
+.sub-tab{font-size:13px;font-weight:600;color:var(--muted);padding:10px 16px;border:none;background:none;cursor:none;position:relative;transition:color .15s;}
+.sub-tab::after{content:'';position:absolute;bottom:-1px;left:0;right:0;height:2px;background:var(--accent);border-radius:2px;transform:scaleX(0);transition:transform .2s;}
+.sub-tab.active{color:var(--charcoal);}.sub-tab.active::after{transform:scaleX(1);}
+.tbadge{display:inline-block;margin-left:5px;font-size:10px;font-weight:700;background:var(--cream);color:var(--muted);padding:1px 6px;border-radius:100px;}
+.nsearch{display:flex;align-items:center;gap:10px;background:white;border:1.5px solid var(--border);border-radius:12px;padding:9px 14px;margin:14px 24px;transition:border-color .18s;}
+.nsearch:focus-within{border-color:rgba(28,28,30,.2);}
+.nsearch input{border:none;background:none;font-family:'DM Sans',sans-serif;font-size:13px;color:var(--charcoal);outline:none;flex:1;cursor:text;}
+.nsearch input::placeholder{color:var(--muted);}
+.pcard{display:flex;align-items:center;gap:12px;padding:13px 24px;border-bottom:1px solid var(--border);transition:background .13s;}
+.pcard:hover{background:rgba(28,28,30,.018);}
+.pav{width:44px;height:44px;border-radius:14px;display:flex;align-items:center;justify-content:center;font-family:'Fraunces',serif;font-size:15px;font-weight:700;color:white;flex-shrink:0;position:relative;}
+.odot{position:absolute;bottom:2px;right:2px;width:9px;height:9px;border-radius:50%;background:var(--green);border:2px solid white;}
+.pinfo{flex:1;min-width:0;}.pname{font-size:13px;font-weight:700;margin-bottom:2px;}
+.prole{font-size:12px;color:var(--muted);white-space:nowrap;overflow:hidden;text-overflow:ellipsis;}
+.pmeta{display:flex;gap:6px;margin-top:4px;}
+.chip{font-size:10px;font-weight:600;padding:2px 8px;border-radius:100px;}
+.chip-m{background:var(--cream);color:var(--muted);}.chip-w{background:#F0EDFF;color:#7C5CFC;}
+.pbtns{display:flex;gap:7px;flex-shrink:0;}
+.btn{font-family:'DM Sans',sans-serif;font-size:12px;font-weight:700;padding:7px 14px;border-radius:100px;border:none;cursor:none;transition:all .2s;white-space:nowrap;}
+.btn-o{background:none;border:1.5px solid var(--border);color:var(--charcoal);}.btn-o:hover{border-color:var(--charcoal);}
+.btn-d{background:var(--charcoal);color:white;}.btn-d:hover{background:var(--soft);}
+.btn-f{background:#FFF0EC;color:var(--accent);border:1.5px solid rgba(255,92,53,.25);}
+.btn-c{background:var(--cream);color:var(--soft);border:1.5px solid var(--border);}
+.btn-p{background:var(--cream);color:var(--muted);border:1.5px solid var(--border);opacity:.65;pointer-events:none;}
+.btn-ca{background:var(--campus);color:white;}.btn-ca:hover{background:#3a5ce6;}
+/* Campus */
+.camp-hdr{padding:20px 24px;border-bottom:1px solid var(--border);}
+.camp-school{display:flex;align-items:center;gap:12px;margin-bottom:14px;}
+.camp-logo{width:46px;height:46px;border-radius:14px;background:var(--campus);display:flex;align-items:center;justify-content:center;font-family:'Fraunces',serif;font-size:17px;font-weight:900;color:white;flex-shrink:0;}
+.camp-name{font-family:'Fraunces',serif;font-size:17px;font-weight:800;letter-spacing:-.3px;}
+.camp-sub{font-size:12px;color:var(--muted);}
+.camp-badge{display:inline-flex;align-items:center;gap:4px;background:var(--campus-light);color:var(--campus);font-size:10px;font-weight:700;padding:3px 8px;border-radius:100px;margin-left:6px;}
+.strip{display:flex;gap:11px;overflow-x:auto;padding-bottom:4px;scrollbar-width:none;}
+.strip::-webkit-scrollbar{display:none;}
+.sperson{display:flex;flex-direction:column;align-items:center;gap:5px;flex-shrink:0;width:68px;cursor:none;}
+.sav{width:50px;height:50px;border-radius:14px;display:flex;align-items:center;justify-content:center;font-family:'Fraunces',serif;font-size:15px;font-weight:700;color:white;}
+.sname{font-size:10px;font-weight:600;text-align:center;color:var(--charcoal);line-height:1.3;}
+.smajor{font-size:9px;color:var(--muted);text-align:center;}
+.scbtn{font-size:9px;font-weight:700;background:var(--campus-light);color:var(--campus);border:none;padding:3px 8px;border-radius:100px;cursor:none;transition:all .15s;}
+.scbtn:hover{background:var(--campus);color:white;}
+.camp-comp{padding:16px 24px;border-bottom:1px solid var(--border);}
+.comp-row{display:flex;gap:10px;}
+.cav{width:36px;height:36px;border-radius:11px;background:var(--charcoal);display:flex;align-items:center;justify-content:center;font-family:'Fraunces',serif;font-size:13px;font-weight:700;color:white;flex-shrink:0;}
+.cinput{width:100%;padding:10px 14px;border-radius:14px;border:1.5px solid var(--border);background:var(--cream);font-family:'DM Sans',sans-serif;font-size:14px;color:var(--charcoal);resize:none;outline:none;min-height:44px;transition:border-color .18s,min-height .25s;cursor:text;line-height:1.5;}
+.cinput::placeholder{color:var(--muted);}
+.cinput:focus{border-color:rgba(74,108,247,.3);min-height:80px;background:white;}
+.cfooter{display:flex;align-items:center;justify-content:space-between;margin-top:8px;}
+.ctags{display:flex;gap:5px;}
+.ctag{font-size:11px;font-weight:700;color:var(--campus);background:var(--campus-light);border:none;padding:4px 10px;border-radius:100px;cursor:none;transition:all .15s;}
+.ctag:hover,.ctag.on{background:var(--campus);color:white;}
+.csub{font-family:'DM Sans',sans-serif;font-size:13px;font-weight:700;background:var(--campus);color:white;border:none;padding:9px 20px;border-radius:100px;cursor:none;transition:all .2s;}
+.csub:hover{background:#3a5ce6;}
+.cpost{padding:18px 24px;border-bottom:1px solid var(--border);transition:background .13s;}
+.cpost:hover{background:rgba(74,108,247,.018);}
+.cph{display:flex;gap:10px;margin-bottom:10px;}
+.cpav{width:36px;height:36px;border-radius:10px;display:flex;align-items:center;justify-content:center;font-family:'Fraunces',serif;font-size:12px;font-weight:700;color:white;flex-shrink:0;}
+.cpmeta h4{font-size:13px;font-weight:700;}.cpmeta p{font-size:11px;color:var(--muted);}
+.cpbadge{display:inline-flex;font-size:10px;font-weight:700;padding:2px 7px;border-radius:100px;margin-left:5px;}
+.b-ann{background:#FFF8E6;color:#B07800;}.b-evt{background:var(--campus-light);color:var(--campus);}
+.b-org{background:#F0FFF4;color:#1A9E5B;}.b-car{background:#FFF0EC;color:var(--accent);}
+.cpbody{font-size:14px;line-height:1.7;color:var(--soft);margin-bottom:10px;}
+.cpbody strong{color:var(--charcoal);}
+.cpevent{background:var(--campus-light);border:1px solid rgba(74,108,247,.18);border-radius:12px;padding:12px;margin-bottom:10px;}
+.cpevent h4{font-size:13px;font-weight:700;color:var(--campus);margin-bottom:3px;}
+.cpevent p{font-size:12px;color:var(--soft);line-height:1.6;}
+.cptags{display:flex;gap:5px;flex-wrap:wrap;margin-bottom:10px;}
+.cptag{font-size:10px;font-weight:700;padding:2px 8px;border-radius:100px;background:var(--campus-light);color:var(--campus);}
+.cpbar{display:flex;align-items:center;gap:7px;padding-top:10px;border-top:1px solid var(--border);}
+.cpchip{display:inline-flex;align-items:center;gap:3px;background:var(--cream);padding:5px 10px;border-radius:100px;font-size:12px;font-weight:600;cursor:none;border:1px solid transparent;transition:all .15s;}
+.cpchip:hover{background:white;border-color:var(--border);}
+.rsvpbtn{margin-left:auto;font-family:'DM Sans',sans-serif;font-size:12px;font-weight:700;background:var(--campus);color:white;border:none;padding:6px 14px;border-radius:100px;cursor:none;transition:all .2s;}
+.rsvpbtn:hover{background:#3a5ce6;}.rsvpbtn.done{background:#1A9E5B;}
+.widget{background:white;border:1px solid var(--border);border-radius:18px;padding:16px;margin-bottom:14px;box-shadow:var(--shadow);}
+.wtitle{font-family:'Fraunces',serif;font-size:14px;font-weight:800;letter-spacing:-.2px;margin-bottom:12px;}
+.sitem{display:flex;align-items:center;gap:10px;padding:8px 0;border-bottom:1px solid var(--border);}
+.sitem:last-of-type{border:none;}
+.sav2{width:36px;height:36px;border-radius:11px;display:flex;align-items:center;justify-content:center;font-family:'Fraunces',serif;font-size:12px;font-weight:700;color:white;flex-shrink:0;}
+.sinfo{flex:1;min-width:0;}.sname{font-size:13px;font-weight:700;}
+.srole{font-size:11px;color:var(--muted);white-space:nowrap;overflow:hidden;text-overflow:ellipsis;max-width:120px;}
+.sbtn{font-size:11px;font-weight:700;background:none;border:1.5px solid var(--border);color:var(--charcoal);padding:4px 10px;border-radius:100px;cursor:none;transition:all .15s;flex-shrink:0;}
+.sbtn:hover{border-color:var(--charcoal);}
+.stbanner{background:linear-gradient(135deg,#EEF2FF,#F0EDFF);border:1px solid rgba(74,108,247,.2);border-radius:16px;padding:14px;margin-bottom:14px;}
+.stbanner h4{font-family:'Fraunces',serif;font-size:13px;font-weight:800;color:var(--campus);margin-bottom:4px;}
+.stbanner p{font-size:12px;color:var(--soft);line-height:1.55;margin-bottom:8px;}
+.stbtn{font-family:'DM Sans',sans-serif;font-size:12px;font-weight:700;background:var(--campus);color:white;border:none;padding:8px 16px;border-radius:100px;cursor:none;transition:all .2s;width:100%;}
+.stbtn:hover{background:#3a5ce6;}
+#nt{position:fixed;bottom:28px;left:50%;transform:translateX(-50%) translateY(20px);background:var(--charcoal);color:white;font-size:13px;font-weight:600;padding:11px 22px;border-radius:100px;box-shadow:0 8px 28px rgba(0,0,0,.2);opacity:0;transition:all .3s;z-index:9000;pointer-events:none;white-space:nowrap;}
+
+
+/* ════ CALENDAR WIDGET ════ */
+/* Lives in the left nav (200px wide) — compact sizing */
+.cal-widget {
+  padding: 10px 10px 12px;
+  background: none;
+  flex-shrink: 0;
+}
+.cal-header {
+  display: flex; align-items: center; justify-content: space-between;
+  margin-bottom: 10px;
+}
+.cal-title-row {
+  display: flex; align-items: center; gap: 6px;
+}
+.cal-title {
+  font-family: 'Fraunces', serif;
+  font-size: 12px; font-weight: 700; letter-spacing: -.1px;
+  color: var(--charcoal);
+}
+.cal-month-nav {
+  display: flex; align-items: center; justify-content: space-between;
+  margin-bottom: 8px;
+}
+.cal-nav-btn {
+  width: 20px; height: 20px; border-radius: 6px;
+  background: none; border: none; cursor: none;
+  color: var(--muted); display: flex; align-items: center; justify-content: center;
+  transition: all .15s; font-size: 13px; flex-shrink: 0;
+}
+.cal-nav-btn:hover { background: white; color: var(--charcoal); }
+.cal-month-label {
+  font-size: 11px; font-weight: 700; color: var(--charcoal);
+  text-align: center; flex: 1;
+}
+.cal-toggle {
+  font-size: 10px; font-weight: 700; color: var(--muted);
+  background: none; border: none; cursor: none;
+  transition: color .15s;
+}
+.cal-toggle:hover { color: var(--accent); }
+.cal-grid {
+  display: grid; grid-template-columns: repeat(7, 1fr); gap: 1px;
+}
+.cal-day-name {
+  font-size: 8px; font-weight: 800; color: var(--muted);
+  text-align: center; padding: 2px 0; text-transform: uppercase; letter-spacing: .3px;
+}
+.cal-day {
+  aspect-ratio: 1; border-radius: 6px; display: flex; flex-direction: column;
+  align-items: center; justify-content: center; font-size: 10px; font-weight: 600;
+  color: var(--charcoal); cursor: none; transition: all .15s; position: relative;
+}
+.cal-day:hover { background: white; }
+.cal-day.other-month { color: var(--muted); opacity: .35; }
+.cal-day.today {
+  background: var(--charcoal); color: white; font-weight: 800;
+}
+.cal-day.today:hover { background: var(--soft); }
+.cal-day.has-event::after {
+  content: '';
+  width: 4px; height: 4px; border-radius: 50%;
+  background: var(--accent);
+  position: absolute; bottom: 2px;
+}
+.cal-day.today.has-event::after { background: white; }
+.cal-day.selected { background: var(--accent); color: white; }
+.cal-day.selected:hover { background: #ff7055; }
+.cal-day.selected.has-event::after { background: white; }
+
+/* Event list panel — slides open below grid */
+.cal-events-panel {
+  margin-top: 8px; display: none;
+  border-top: 1px solid var(--border); padding-top: 8px;
+}
+.cal-events-panel.open { display: block; }
+.cal-events-panel-title {
+  font-size: 10px; font-weight: 800; color: var(--muted);
+  text-transform: uppercase; letter-spacing: .5px; margin-bottom: 6px;
+}
+.cal-event-item {
+  display: flex; align-items: center; gap: 6px;
+  padding: 6px 7px; border-radius: 8px;
+  background: white; margin-bottom: 4px;
+  transition: background .13s; cursor: none;
+  border: 1px solid var(--border);
+}
+.cal-event-item:hover { background: var(--cream); }
+.cal-event-dot {
+  width: 7px; height: 7px; border-radius: 50%; flex-shrink: 0;
+}
+.cal-event-info { flex: 1; min-width: 0; }
+.cal-event-name {
+  font-size: 10px; font-weight: 700; color: var(--charcoal);
+  white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
+}
+.cal-event-time { font-size: 9px; color: var(--muted); }
+.cal-empty {
+  font-size: 11px; color: var(--muted); text-align: center;
+  padding: 10px 0; font-style: italic;
+}
+.cal-event-count-badge {
+  font-size: 9px; font-weight: 800; background: var(--accent);
+  color: white; padding: 1px 6px; border-radius: 100px; margin-left: 3px;
+}
+
+/* ════ CALENDAR FULL MODAL ════ */
+.cal-modal-backdrop {
+  display: none; position: fixed; inset: 0; z-index: 800;
+  background: rgba(0,0,0,.52);
+  align-items: center; justify-content: center;
+}
+.cal-modal-backdrop.open { display: flex; }
+.cal-modal {
+  background: white; border-radius: 24px;
+  width: min(860px, calc(100vw - 32px));
+  max-height: calc(100vh - 48px);
+  display: flex; flex-direction: column;
+  box-shadow: 0 24px 80px rgba(0,0,0,.18);
+  overflow: hidden;
+  animation: calModalIn .25s cubic-bezier(.34,1.4,.64,1);
+}
+@keyframes calModalIn { from{opacity:0;transform:scale(.95)} to{opacity:1;transform:scale(1)} }
+.cal-modal-header {
+  display: grid;
+  grid-template-columns: 1fr auto 1fr;
+  align-items: center;
+  padding: 18px 24px 16px;
+  border-bottom: 1px solid var(--border);
+  flex-shrink: 0;
+}
+.cal-modal-title {
+  font-family: 'Fraunces', serif;
+  font-size: 20px; font-weight: 900; letter-spacing: -.4px;
+  justify-self: start;
+}
+.cal-modal-month-nav {
+  display: flex; align-items: center; gap: 8px;
+  justify-self: center;
+}
+.cal-modal-header-actions {
+  display: flex; align-items: center; gap: 8px;
+  justify-self: end;
+}
+.cal-modal-nav-btn {
+  width: 32px; height: 32px; border-radius: 10px;
+  background: var(--cream); border: none; cursor: none;
+  color: var(--charcoal); display: flex; align-items: center; justify-content: center;
+  font-size: 16px; transition: all .15s;
+}
+.cal-modal-nav-btn:hover { background: var(--charcoal); color: white; }
+.cal-modal-month-label {
+  font-size: 15px; font-weight: 700; color: var(--charcoal);
+  min-width: 140px; text-align: center;
+}
+.cal-modal-add-btn {
+  display: flex; align-items: center; gap: 6px;
+  background: var(--accent); color: white;
+  font-family: 'DM Sans', sans-serif; font-size: 13px; font-weight: 700;
+  border: none; padding: 9px 18px; border-radius: 100px; cursor: none;
+  transition: all .2s;
+}
+.cal-modal-add-btn:hover { background: #ff7055; transform: translateY(-1px); }
+.cal-modal-close {
+  width: 32px; height: 32px; border-radius: 10px;
+  background: var(--cream); border: none; cursor: none;
+  font-size: 18px; color: var(--muted); display: flex; align-items: center; justify-content: center;
+  transition: all .15s;
+}
+.cal-modal-close:hover { background: var(--charcoal); color: white; }
+
+/* Modal body: big grid on left, event list on right */
+.cal-modal-body {
+  display: grid; grid-template-columns: 1fr 280px;
+  flex: 1; overflow: hidden;
+}
+.cal-modal-grid-wrap {
+  padding: 20px 24px; overflow-y: auto;
+}
+.cal-modal-day-names {
+  display: grid; grid-template-columns: repeat(7, 1fr);
+  margin-bottom: 6px;
+}
+.cal-modal-day-name {
+  font-size: 11px; font-weight: 800; color: var(--muted);
+  text-align: center; padding: 4px 0;
+  text-transform: uppercase; letter-spacing: .4px;
+}
+.cal-modal-grid {
+  display: grid; grid-template-columns: repeat(7, 1fr);
+  grid-auto-rows: 1fr;
+  gap: 4px;
+}
+.cal-modal-day {
+  aspect-ratio: 1; border-radius: 12px;
+  border: 1px solid var(--border);
+  padding: 6px; cursor: none;
+  transition: all .15s; position: relative;
+  display: flex; flex-direction: column; gap: 3px;
+  background: white;
+  overflow: hidden;
+}
+.cal-modal-day:hover { border-color: rgba(28,28,30,.2); background: var(--cream); }
+.cal-modal-day.other-month { opacity: .35; }
+.cal-modal-day.today { border-color: var(--charcoal); border-width: 2px; }
+.cal-modal-day.selected { border-color: var(--accent); border-width: 2px; background: #FFF8F6; }
+.cal-modal-day-num {
+  font-size: 13px; font-weight: 700; color: var(--charcoal);
+  width: 26px; height: 26px; border-radius: 8px;
+  display: flex; align-items: center; justify-content: center;
+  flex-shrink: 0;
+}
+.cal-modal-day.today .cal-modal-day-num {
+  background: var(--charcoal); color: white;
+}
+.cal-modal-day.selected .cal-modal-day-num {
+  background: var(--accent); color: white;
+}
+.cal-modal-event-pill {
+  font-size: 10px; font-weight: 700;
+  padding: 2px 6px; border-radius: 5px;
+  white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
+  color: white; cursor: none;
+}
+
+/* Right panel */
+.cal-modal-sidebar {
+  border-left: 1px solid var(--border);
+  display: flex; flex-direction: column;
+  overflow: hidden;
+}
+.cal-modal-sidebar-hdr {
+  padding: 16px 18px 12px;
+  border-bottom: 1px solid var(--border);
+  font-family: 'Fraunces', serif;
+  font-size: 15px; font-weight: 700; letter-spacing: -.2px;
+  flex-shrink: 0;
+}
+.cal-modal-sidebar-hdr span {
+  font-size: 12px; font-weight: 500; color: var(--muted);
+  font-family: 'DM Sans', sans-serif;
+  display: block; margin-top: 2px;
+}
+.cal-modal-events-list {
+  flex: 1; overflow-y: auto; padding: 12px;
+}
+.cal-modal-event-card {
+  display: flex; gap: 10px; padding: 10px 12px;
+  border-radius: 12px; border: 1px solid var(--border);
+  margin-bottom: 8px; transition: all .15s; cursor: none;
+  background: white;
+}
+.cal-modal-event-card:hover { border-color: rgba(28,28,30,.18); box-shadow: 0 2px 8px rgba(0,0,0,.06); }
+.cal-modal-event-bar {
+  width: 4px; border-radius: 100px; flex-shrink: 0; align-self: stretch;
+}
+.cal-modal-event-body { flex: 1; min-width: 0; }
+.cal-modal-event-name { font-size: 13px; font-weight: 700; margin-bottom: 3px; }
+.cal-modal-event-meta { font-size: 11px; color: var(--muted); line-height: 1.6; }
+.cal-modal-event-del {
+  background: none; border: none; cursor: none;
+  color: var(--muted); font-size: 16px; padding: 0 2px;
+  transition: color .15s; align-self: flex-start;
+}
+.cal-modal-event-del:hover { color: var(--accent); }
+.cal-modal-no-events {
+  text-align: center; padding: 32px 16px;
+  color: var(--muted); font-size: 13px; line-height: 1.6;
+}
+
+/* ── CREATE EVENT FORM ── */
+.create-event-modal {
+  display: none; position: fixed; inset: 0; z-index: 900;
+  background: rgba(0,0,0,.52);
+  align-items: center; justify-content: center;
+}
+.create-event-modal.open { display: flex; }
+.create-event-box {
+  background: white; border-radius: 20px;
+  width: min(480px, calc(100vw - 32px));
+  box-shadow: 0 24px 80px rgba(0,0,0,.2);
+  animation: calModalIn .22s cubic-bezier(.34,1.4,.64,1);
+  overflow: hidden;
+}
+.create-event-hdr {
+  display: flex; align-items: center; justify-content: space-between;
+  padding: 20px 22px 16px;
+  border-bottom: 1px solid var(--border);
+}
+.create-event-hdr h3 {
+  font-family: 'Fraunces', serif;
+  font-size: 18px; font-weight: 900; letter-spacing: -.3px;
+}
+.create-event-body { padding: 20px 22px; display: flex; flex-direction: column; gap: 14px; }
+.form-field { display: flex; flex-direction: column; gap: 5px; }
+.form-label {
+  font-size: 11px; font-weight: 800; color: var(--muted);
+  text-transform: uppercase; letter-spacing: .5px;
+}
+.form-input {
+  width: 100%; padding: 10px 14px; border-radius: 12px;
+  border: 1.5px solid var(--border); background: var(--cream);
+  font-family: 'DM Sans', sans-serif; font-size: 14px;
+  color: var(--charcoal); outline: none; transition: border-color .18s;
+  cursor: text;
+}
+.form-input:focus { border-color: rgba(28,28,30,.25); background: white; }
+.form-row { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; }
+.color-picker-row { display: flex; gap: 8px; flex-wrap: wrap; }
+.color-swatch {
+  width: 26px; height: 26px; border-radius: 8px; cursor: none;
+  border: 2px solid transparent; transition: all .15s;
+  flex-shrink: 0;
+}
+.color-swatch.active { border-color: var(--charcoal); transform: scale(1.15); }
+.create-event-footer {
+  padding: 14px 22px 20px;
+  display: flex; gap: 10px; justify-content: flex-end;
+}
+.btn-cancel {
+  font-family: 'DM Sans', sans-serif; font-size: 13px; font-weight: 700;
+  background: var(--cream); color: var(--muted); border: none;
+  padding: 10px 20px; border-radius: 100px; cursor: none; transition: all .15s;
+}
+.btn-cancel:hover { background: var(--border); }
+.btn-save-event {
+  font-family: 'DM Sans', sans-serif; font-size: 13px; font-weight: 700;
+  background: var(--accent); color: white; border: none;
+  padding: 10px 24px; border-radius: 100px; cursor: none; transition: all .2s;
+}
+.btn-save-event:hover { background: #ff7055; }
+
+/* ══ VIBE OF THE DAY ═══════════════════════════════════════════════ */
+.votd-wrap {
+  border-bottom: 1px solid var(--border);
+  background: white;
+}
+.votd-label-bar {
+  display: flex; align-items: center; gap: 8px;
+  padding: 14px 20px 10px;
+}
+.votd-badge {
+  display: flex; align-items: center; gap: 6px;
+  background: #1C1C1E; color: white;
+  font-size: 10px; font-weight: 800; letter-spacing: 1.5px;
+  text-transform: uppercase; padding: 4px 10px 4px 6px;
+  border-radius: 100px;
+}
+.votd-badge-dot {
+  width: 18px; height: 18px; border-radius: 50%;
+  background: var(--accent); display: flex;
+  align-items: center; justify-content: center; flex-shrink: 0;
+}
+.votd-subtitle {
+  font-size: 11px; color: var(--muted); font-weight: 500;
+}
+
+/* The card */
+.votd-card {
+  margin: 0 16px 16px;
+  border-radius: 18px;
+  overflow: hidden;
+  position: relative;
+  cursor: none;
+  transition: transform .2s, box-shadow .2s;
+}
+.votd-card:hover {
+  transform: translateY(-2px);
+  box-shadow: 0 16px 48px rgba(0,0,0,.14);
+}
+
+/* Cinematic background — gradient + fake thumbnail */
+.votd-bg {
+  height: 190px;
+  background: linear-gradient(135deg, #1A0A2E 0%, #2D1B4E 40%, #0F2A4A 100%);
+  position: relative;
+  display: flex; align-items: center; justify-content: center;
+  overflow: hidden;
+}
+.votd-bg::before {
+  content: '';
+  position: absolute; inset: 0;
+  background: radial-gradient(ellipse at 30% 50%, rgba(255,92,53,.18) 0%, transparent 60%),
+              radial-gradient(ellipse at 80% 20%, rgba(200,184,255,.12) 0%, transparent 50%);
+}
+/* Abstract waveform decoration */
+.votd-wave {
+  position: absolute; bottom: 0; left: 0; right: 0; height: 50px;
+  display: flex; align-items: flex-end; gap: 3px; padding: 0 20px;
+  opacity: .35;
+}
+.votd-wave-bar {
+  flex: 1; border-radius: 2px 2px 0 0;
+  background: white;
+  transition: height .3s;
+}
+
+/* Play button */
+.votd-play {
+  width: 56px; height: 56px; border-radius: 50%;
+  background: rgba(255,255,255,.95);
+  display: flex; align-items: center; justify-content: center;
+  box-shadow: 0 8px 24px rgba(0,0,0,.3);
+  position: relative; z-index: 2;
+  transition: transform .2s, background .2s;
+}
+.votd-card:hover .votd-play {
+  transform: scale(1.08);
+  background: white;
+}
+.votd-play svg { margin-left: 3px; }
+
+/* Duration badge */
+.votd-duration {
+  position: absolute; top: 12px; right: 12px; z-index: 2;
+  background: rgba(0,0,0,.55); color: white;
+  font-size: 11px; font-weight: 700; letter-spacing: .3px;
+  padding: 3px 8px; border-radius: 6px;
+  backdrop-filter: blur(4px);
+}
+
+/* Rank badge */
+.votd-rank {
+  position: absolute; top: 12px; left: 12px; z-index: 2;
+  display: flex; align-items: center; gap: 5px;
+  background: rgba(255,92,53,.9); color: white;
+  font-size: 10px; font-weight: 800; letter-spacing: 1px; text-transform: uppercase;
+  padding: 4px 10px; border-radius: 100px;
+  backdrop-filter: blur(4px);
+}
+
+/* Bottom info panel */
+.votd-info {
+  background: white; padding: 14px 16px 16px;
+}
+.votd-author-row {
+  display: flex; align-items: center; gap: 10px; margin-bottom: 8px;
+}
+.votd-av {
+  width: 32px; height: 32px; border-radius: 9px;
+  background: #2D1B4E; display: flex; align-items: center; justify-content: center;
+  font-family: 'Fraunces', serif; font-size: 11px; font-weight: 700; color: white;
+  flex-shrink: 0;
+}
+.votd-author-meta { flex: 1; }
+.votd-author-name {
+  font-size: 13px; font-weight: 700; color: var(--charcoal); line-height: 1.2;
+}
+.votd-author-role { font-size: 11px; color: var(--muted); }
+
+.votd-title {
+  font-family: 'Fraunces', serif;
+  font-size: 15px; font-weight: 700; letter-spacing: -.2px;
+  color: var(--charcoal); line-height: 1.4; margin-bottom: 10px;
+}
+
+.votd-stats {
+  display: flex; align-items: center; gap: 14px;
+}
+.votd-stat {
+  display: flex; align-items: center; gap: 5px;
+  font-size: 12px; font-weight: 600; color: var(--muted);
+}
+.votd-stat svg { flex-shrink: 0; }
+.votd-stat.hot { color: var(--accent); }
+
+/* React bar */
+.votd-react-bar {
+  display: flex; gap: 6px; margin-top: 12px; padding-top: 12px;
+  border-top: 1px solid var(--border);
+}
+.votd-react-btn {
+  display: flex; align-items: center; gap: 5px;
+  background: var(--cream); border: 1px solid var(--border);
+  border-radius: 100px; padding: 5px 12px;
+  font-size: 12px; font-weight: 600; color: var(--muted);
+  cursor: none; transition: all .15s; border-style: solid;
+}
+.votd-react-btn:hover { border-color: var(--accent); color: var(--accent); background: #FFF5F2; }
+.votd-react-btn.active { border-color: var(--accent); color: var(--accent); background: #FFF5F2; }
+.votd-comment-btn {
+  margin-left: auto; display: flex; align-items: center; gap: 6px;
+  background: none; border: none; font-size: 12px; font-weight: 600;
+  color: var(--muted); cursor: none; transition: color .15s; padding: 5px 4px;
+}
+.votd-comment-btn:hover { color: var(--charcoal); }
+
+
+*,*::before,*::after{cursor:none!important;}
+.cursor,.cursor-ring{cursor:none!important;}
+input,textarea,[contenteditable="true"]{cursor:text!important;}
+</style>
+</head>
+<body>
+<div class="cursor" id="cursor"></div>
+<div class="cursor-ring" id="cursorRing"></div>
+<div class="shell">
+  <aside class="left-nav">
+    <a href="/html/feed.html" class="nav-logo">vibe<span>.</span></a>
+    <nav>
+      <a href="/html/feed.html" class="nav-item">
+        <svg width="16" height="16" viewBox="0 0 16 16" fill="none"><rect x="1" y="1" width="6" height="6" rx="2" fill="currentColor"/><rect x="9" y="1" width="6" height="6" rx="2" fill="currentColor"/><rect x="1" y="9" width="6" height="6" rx="2" fill="currentColor"/><rect x="9" y="9" width="6" height="6" rx="2" fill="currentColor"/></svg>
+        Feed
+      </a>
+      <a href="/html/network.html" class="nav-item active">
+        <svg width="16" height="16" viewBox="0 0 16 16" fill="none"><circle cx="8" cy="4" r="2.5" stroke="currentColor" stroke-width="1.4"/><circle cx="2.5" cy="12" r="2" stroke="currentColor" stroke-width="1.4"/><circle cx="13.5" cy="12" r="2" stroke="currentColor" stroke-width="1.4"/><path d="M5.5 4.5L2.5 10M10.5 4.5L13.5 10M5.8 12h4.4" stroke="currentColor" stroke-width="1.3" stroke-linecap="round"/></svg>
+        Network
+      </a>
+      <a href="/html/campus.html" class="nav-item">
+        <svg width="16" height="16" viewBox="0 0 16 16" fill="none"><path d="M8 1L15 5V7H1V5L8 1Z" stroke="currentColor" stroke-width="1.4" fill="none" stroke-linejoin="round"/><rect x="2" y="7" width="2.5" height="6" stroke="currentColor" stroke-width="1.3" fill="none"/><rect x="6.75" y="7" width="2.5" height="6" stroke="currentColor" stroke-width="1.3" fill="none"/><rect x="11.5" y="7" width="2.5" height="6" stroke="currentColor" stroke-width="1.3" fill="none"/><path d="M1 13h14" stroke="currentColor" stroke-width="1.4" stroke-linecap="round"/></svg>
+        Campus
+      </a>
+      <a href="/html/opportunities.html" class="nav-item">
+        <svg width="16" height="16" viewBox="0 0 16 16" fill="none"><rect x="1" y="5" width="14" height="10" rx="2" stroke="currentColor" stroke-width="1.4" fill="none"/><path d="M5 5V4a3 3 0 0 1 6 0v1" stroke="currentColor" stroke-width="1.4" fill="none" stroke-linecap="round"/><path d="M1 9h14" stroke="currentColor" stroke-width="1.4" stroke-linecap="round"/></svg>
+        Opportunities
+      </a>
+      <a href="/html/messages.html" class="nav-item">
+        <svg width="16" height="16" viewBox="0 0 16 16" fill="none"><path d="M1 2.5A1.5 1.5 0 012.5 1h11A1.5 1.5 0 0115 2.5v8A1.5 1.5 0 0113.5 12H5L1 15V2.5z" stroke="currentColor" stroke-width="1.4" fill="none" stroke-linejoin="round"/></svg>
+        Messages
+      </a>
+      <a href="/html/otto.html" class="nav-item">
+        <span style="display:inline-flex;width:16px;height:16px;align-items:center;justify-content:center;"><span style="width:8px;height:8px;border-radius:50%;background:var(--accent);box-shadow:0 0 6px var(--accent);"></span></span>
+        otto
+      </a>
+    </nav>
+    <div class="nav-divider"></div>
+    <a href="/html/profile.html" class="nav-item"><div class="mini-av">MC</div><div><div style="font-size:13px;font-weight:600;color:var(--charcoal)">Maya Chen</div><div style="font-size:11px;color:var(--muted)">Product Designer</div></div></a>
+  
+    
+  
+    <div class="cal-widget" id="calWidget">
+      <div class="cal-header">
+        <button class="cal-title-row" onclick="openCalModal()" style="background:none;border:none;cursor:none;display:flex;align-items:center;gap:6px;padding:0;transition:opacity .15s" onmouseover="this.style.opacity='.7'" onmouseout="this.style.opacity='1'">
+          <svg width="12" height="12" viewBox="0 0 14 14" fill="none">
+            <rect x="1" y="2" width="12" height="11" rx="2.5" stroke="currentColor" stroke-width="1.3" fill="none"/>
+            <path d="M1 6h12" stroke="currentColor" stroke-width="1.3" stroke-linecap="round"/>
+            <path d="M4 1v2M10 1v2" stroke="currentColor" stroke-width="1.3" stroke-linecap="round"/>
+          </svg>
+          <span class="cal-title">My Calendar</span>
+          <span class="cal-event-count-badge" id="calEventCount">0</span>
+        </button>
+        <button class="cal-toggle" onclick="toggleCalView()" id="calToggleBtn">&#8964;</button>
+      </div>
+      <div id="calBody">
+        <div class="cal-month-nav">
+          <button class="cal-nav-btn" onclick="changeMonth(-1)">&#8249;</button>
+          <span class="cal-month-label" id="calMonthLabel"></span>
+          <button class="cal-nav-btn" onclick="changeMonth(1)">&#8250;</button>
+        </div>
+        <div class="cal-grid" id="calGrid"></div>
+        <div class="cal-events-panel" id="calEventsPanel">
+          <div class="cal-events-panel-title" id="calPanelTitle">Events</div>
+          <div id="calEventsList"></div>
+        </div>
+      </div>
+    </div>
+  </aside>
+  <div class="main">
+    <div class="center">
+      <div class="top-tabs">
+        <button class="top-tab pro active" id="ttab-pro" onclick="switchMode('pro')">Professional</button>
+        <button class="top-tab campus" id="ttab-campus" onclick="switchMode('campus')">Campus <span style="font-size:10px;font-weight:800;background:var(--campus);color:white;padding:2px 7px;border-radius:100px;margin-left:4px">IU</span></button>
+      </div>
+      <div class="tab-pane active" id="pane-pro">
+        <div class="stats-strip">
+          <div class="stat-cell" onclick="switchSub('connections')"><div class="stat-n">847</div><div class="stat-l">Connections</div></div>
+          <div class="stat-cell" onclick="switchSub('following')"><div class="stat-n">124</div><div class="stat-l">Following</div></div>
+          <div class="stat-cell" onclick="switchSub('followers')"><div class="stat-n">1.2k</div><div class="stat-l">Followers</div></div>
+        </div>
+        <div class="pending" id="pendingBanner">
+          <div class="pdot">3</div>
+          <div class="pdtext"><h4>Connection requests</h4><p>3 people want to connect with you</p></div>
+          <button class="btn btn-d" style="margin-left:auto" onclick="expandReqs()">Review</button>
+        </div>
+        <div id="reqsExpanded" style="display:none;padding:0 24px 12px;"></div>
+        <div class="sub-tabs">
+          <button class="sub-tab active" id="stab-connections" onclick="switchSub('connections')">Connections <span class="tbadge">847</span></button>
+          <button class="sub-tab" id="stab-following" onclick="switchSub('following')">Following <span class="tbadge">124</span></button>
+          <button class="sub-tab" id="stab-followers" onclick="switchSub('followers')">Followers <span class="tbadge">1.2k</span></button>
+        </div>
+        <div class="nsearch"><svg width="14" height="14" viewBox="0 0 14 14" fill="none"><circle cx="6" cy="6" r="4.5" stroke="#8A8580" stroke-width="1.3"/><path d="M10 10l2.5 2.5" stroke="#8A8580" stroke-width="1.3" stroke-linecap="round"/></svg><input type="text" placeholder="Search your network..." oninput="filterCards(this.value)"></div>
+        <div class="tab-pane active" id="pane-connections">
+          <div class="pane-desc">Mutual connections — they accepted your request, and DMs are open both ways.</div>
+          <div id="conn-list"></div>
+        </div>
+        <div class="tab-pane" id="pane-following">
+          <div class="pane-desc">People you've sent a connect request to. They'll move to Connections if they accept; until then they only see your posts.</div>
+          <div id="fol-list"></div>
+        </div>
+        <div class="tab-pane" id="pane-followers">
+          <div class="pane-desc">Everyone who can see your posts — your connections, plus people who requested to connect with you that you haven't accepted yet.</div>
+          <div id="folr-list"></div>
+        </div>
+      </div>
+      <div class="tab-pane" id="pane-campus">
+        <div class="camp-hdr">
+          <div class="camp-school">
+            <div class="camp-logo">IU</div>
+            <div>
+              <div style="display:flex;align-items:center"><div class="camp-name">Indiana University</div><span class="camp-badge"><svg width="9" height="9" viewBox="0 0 9 9" fill="none"><path d="M1.5 4.5L3.5 6.5L7.5 2.5" stroke="currentColor" stroke-width="1.4" stroke-linecap="round" stroke-linejoin="round"/></svg>Verified student</span></div>
+              <div class="camp-sub">Bloomington, IN &middot; 45,000 students &middot; 2,847 on Vibe</div>
+            </div>
+          </div>
+          <div style="font-size:11px;font-weight:700;color:var(--muted);text-transform:uppercase;letter-spacing:.5px;margin-bottom:8px">IU students on Vibe</div>
+          <div class="strip" id="studentStrip"></div>
+        </div>
+        <div class="camp-comp">
+          <div class="comp-row">
+            <div class="cav">MC</div>
+            <div style="flex:1">
+              <textarea class="cinput" id="campInput" placeholder="Post for your campus &#8212; announcements, events, career opps, club callouts..." rows="1" oninput="this.style.height='auto';this.style.height=Math.min(this.scrollHeight,150)+'px'"></textarea>
+              <div class="cfooter">
+                <div class="ctags">
+                  <button class="ctag" onclick="tagPost(this,'announcement')">Announcement</button>
+                  <button class="ctag" onclick="tagPost(this,'event')">Event</button>
+                  <button class="ctag" onclick="tagPost(this,'career')">Career</button>
+                  <button class="ctag" onclick="tagPost(this,'org')">Org / Club</button>
+                </div>
+                <button class="csub" onclick="submitCampus()">Post to Campus</button>
+              </div>
+            </div>
+          </div>
+        </div>
+        <div id="campFeed"></div>
+      </div>
+    </div>
+    <aside class="right">
+      <div class="stbanner">
+        <h4>Student mode active</h4>
+        <p>Verified as an IU student. Your campus network is unlocked &#8212; classmates, clubs, school announcements, and career fairs all in one place.</p>
+        <button class="stbtn" onclick="toast('Verified: iumail.iu.edu ✓')">Verified: iumail.iu.edu</button>
+      </div>
+      <div class="widget"><div class="wtitle">People you may know</div><div id="suggList"></div><button style="font-size:12px;font-weight:700;color:var(--accent);background:none;border:none;cursor:none;margin-top:8px" onclick="toast('Loading more...')">See more &#8594;</button></div>
+      <div class="widget"><div class="wtitle">Campus organizations</div><div id="orgList"></div><button style="font-size:12px;font-weight:700;color:var(--campus);background:none;border:none;cursor:none;margin-top:8px" onclick="toast('Browse all IU orgs')">Browse all IU orgs &#8594;</button></div>
+    </aside>
+  </div>
+</div>
+<div id="nt"></div>
+<script>
+const cur=document.getElementById('cursor'),ring=document.getElementById('cursorRing');
+let mx=window.innerWidth/2,my=window.innerHeight/2,rx=window.innerWidth/2,ry=window.innerHeight/2;
+document.addEventListener('mousemove',e=>{mx=e.clientX;my=e.clientY;cur.style.transform=`translate(${mx-4}px,${my-4}px)`;},{passive:true});
+(function tick(){rx+=(mx-rx-14)*.28;ry+=(my-ry-14)*.28;ring.style.transform=`translate(${Math.round(rx)}px,${Math.round(ry)}px)`;requestAnimationFrame(tick);})();
+document.addEventListener('mousedown',()=>cur.classList.add('clicking'));
+document.addEventListener('mouseup',()=>cur.classList.remove('clicking'));
+const HS='a,button,.nav-item,.pcard,.stat-cell,.sub-tab,.top-tab,.sitem,.sperson,.cpost,.cpchip';
+document.addEventListener('mouseover',e=>{if(e.target.closest(HS)){cur.classList.add('hover');ring.classList.add('hover');}});
+document.addEventListener('mouseout', e=>{if(e.target.closest(HS)){cur.classList.remove('hover');ring.classList.remove('hover');}});
+
+const conns=[
+  {id:'ka',av:'KA',bg:'#2D1B4E',name:'Kwame Asante', role:'AI Founder · Lagos → SF',      m:28,on:true, why:'Same field'},
+  {id:'ps',av:'PS',bg:'#3B1A00',name:'Priya Sinha',  role:'Growth Lead · Ex-Spotify',      m:14,on:false,why:'Mutual connections'},
+  {id:'lm',av:'LM',bg:'#2a2800',name:'Luca Moretti', role:'Full-stack Dev · Remote-first', m:9, on:true, why:'Similar activity'},
+  {id:'zw',av:'ZW',bg:'#1A1A00',name:'Zara Williams',role:'COO · Seed-stage Ops',          m:6, on:false,why:'Same field'},
+  {id:'jr',av:'JR',bg:'#1A3A5C',name:'Jamie Reid',   role:'Eng Recruiter · Stripe',        m:3, on:false,why:'Mutual connections'},
+  {id:'ao',av:'AO',bg:'#2D1A00',name:'Aisha Okafor', role:'UX Researcher · Google',        m:11,on:true, why:'Same field'},
+];
+const fols=[
+  {id:'ka',av:'KA',bg:'#2D1B4E',name:'Kwame Asante', role:'AI Founder · Lagos → SF'},
+  {id:'dn',av:'DN',bg:'#1A001A',name:'Diana Nguyen',  role:'Design Lead · Airbnb'},
+  {id:'bs',av:'BS',bg:'#001A0A',name:'Ben Sutherland',role:'Indie Hacker · Build in public'},
+  {id:'rk',av:'RK',bg:'#1A1A3A',name:'Riya Kapoor',  role:'PM · Figma'},
+];
+const folrs=[
+  {id:'ps',av:'PS',bg:'#3B1A00',name:'Priya Sinha',   role:'Growth Lead',             c:true},
+  {id:'sc',av:'SC',bg:'#001A2A',name:'Sara Coletti',  role:'Head of Design · Canva',c:false},
+  {id:'yw',av:'YW',bg:'#1A2A00',name:'Yuki Watanabe', role:'UX Engineer · Vercel',  c:false},
+  {id:'nm',av:'NM',bg:'#2A1A00',name:'Nadia Martinez',role:'Founder · YC W24',      c:false},
+];
+const preqs=[
+  {av:'SC',bg:'#001A2A',name:'Sara Coletti',  role:'Head of Design · Canva',m:4},
+  {av:'YW',bg:'#1A2A00',name:'Yuki Watanabe', role:'UX Engineer · Vercel',  m:2},
+  {av:'NM',bg:'#2A1A00',name:'Nadia Martinez',role:'Founder · YC W24',      m:7},
+];
+const studs=[
+  {av:'JT',bg:'#1A3A2A',name:'Jordan T.',major:'CS · Junior'},
+  {av:'AR',bg:'#2A1A3A',name:'Amara R.', major:'Design · Soph'},
+  {av:'CM',bg:'#1A2A3A',name:'Carlos M.',major:'Biz · Senior'},
+  {av:'LP',bg:'#3A2A1A',name:'Lei P.',   major:'CS · Senior'},
+  {av:'SK',bg:'#1A1A3A',name:'Sofia K.', major:'InfoSci · Jr'},
+  {av:'DW',bg:'#2A3A1A',name:'Darius W.',major:'Econ · Soph'},
+];
+const orgs=[
+  {av:'CS',bg:'#1A3A5C',name:'IU CS Club',         sub:'700 members'},
+  {av:'DE',bg:'#2A1A4A',name:'Design @ IU',         sub:'312 members'},
+  {av:'VC',bg:'#1A4A2A',name:'IU Venture Club',     sub:'540 members'},
+  {av:'BL',bg:'#4A2A1A',name:'Black Students Union',sub:'890 members'},
+];
+const suggs=[
+  {id:'ao',av:'AO',bg:'#2D1A00',name:'Aisha Okafor', role:'UX Researcher · Google',  why:'Same field'},
+  {id:'yw',av:'YW',bg:'#1A2A00',name:'Yuki Watanabe',role:'UX Engineer · Vercel',   why:'4 mutual'},
+  {id:'ml',av:'ML',bg:'#001A2C',name:'Marco López',role:'PM · Notion',           why:'Similar activity'},
+];
+const cposts=[
+  {av:'CS',bg:'#1A3A5C',auth:'IU Computer Science Club',sub:'@iucsclub · 2h ago',badge:'b-org',bt:'Org',
+   body:'Applications are <strong>now open</strong> for our 2025 Spring Hackathon — $10k in prizes, mentors from Google, Stripe, and Meta.',
+   evt:{t:'IU Spring Hackathon 2025',m:'Sat March 15 · 9am–9pm · Assembly Hall<br>$10,000 prizes · 12 competing teams'},
+   tags:['#Hackathon','#CS'],r:['&#128293; 142','&#128161; 88'],rsvp:true,id:'cp1'},
+  {av:'CA',bg:'#4A3A1A',auth:'IU Career Services',sub:'@iucareers · 1d ago',badge:'b-car',bt:'Career',
+   body:'<strong>Spring Career Fair is 3 weeks away.</strong> 120+ employers including Goldman Sachs, Amazon, Deloitte, and 40+ startups looking for IU grads.',
+   evt:{t:'IU Spring Career Fair',m:'Wed March 5 · 10am–4pm · IMU Alumni Hall<br>120+ employers · 1-on-1 interview slots'},
+   tags:['#CareerFair','#Jobs'],r:['&#128188; 284','&#128293; 196'],rsvp:true,id:'cp2'},
+  {av:'MC',bg:'#1C1C1E',auth:'Maya Chen',sub:'Product Design · Junior · 3d ago',badge:'b-ann',bt:'Post',
+   body:"Looking for 2 people to join a startup project for the Venture Club pitch. Building a peer tutoring platform — I'm on design, need a dev and someone for go-to-market. DM if interested.",
+   evt:null,tags:['#StartupIU','#VentureClub'],r:['&#129334; 34','&#128161; 21'],rsvp:false,id:'cp3'},
+  {av:'DE',bg:'#2A1A4A',auth:'Design @ IU',sub:'@designiu · 4d ago',badge:'b-org',bt:'Org',
+   body:"This week's critique theme: <strong>wayfinding systems on campus.</strong> Bring a prototype, sketch, or ideas. All design disciplines welcome.",
+   evt:{t:'Weekly Critique Night',m:'Thursday 7pm · Luddy Hall 1106<br>Bring work or just come watch'},
+   tags:['#DesignIU','#Critique'],r:['&#127912; 67','&#128161; 44'],rsvp:false,id:'cp4'},
+];
+
+// Click anywhere on a person card (outside its action buttons) to open
+// their profile. Only navigates if a mock user exists for the slug — keeps
+// the demo from leading to broken empty profiles.
+function navMockProfile(e, slug) {
+  if (e && e.target && e.target.closest('button,a')) return;
+  if (window.VIBE_MOCK_USERS && window.VIBE_MOCK_USERS[slug]) {
+    window.location.href = `/html/profile.html?user=${slug}`;
+  } else if (typeof toast === 'function') {
+    toast('Profile not in this demo yet');
+  }
+}
+
+function rConns(d){return d.map(p=>`<div class="pcard" data-name="${p.name.toLowerCase()}" onclick="navMockProfile(event,'${p.id}')"><div class="pav" style="background:${p.bg}">${p.av}${p.on?'<div class="odot"></div>':''}</div><div class="pinfo"><div class="pname">${p.name}</div><div class="prole">${p.role}</div><div class="pmeta"><span class="chip chip-m">${p.m} mutual</span><span class="chip chip-w">${p.why}</span></div></div><div class="pbtns"><button class="btn btn-o" onclick="event.stopPropagation();toast('Opening chat...'),setTimeout(()=>location.href='messages.html',700)">Message</button><button class="btn btn-c" onclick="event.stopPropagation()">Connected</button></div></div>`).join('');}
+function rFols(d){return d.map(p=>`<div class="pcard" data-name="${p.name.toLowerCase()}" onclick="navMockProfile(event,'${p.id}')"><div class="pav" style="background:${p.bg}">${p.av}</div><div class="pinfo"><div class="pname">${p.name}</div><div class="prole">${p.role}</div></div><div class="pbtns"><button class="btn btn-f" onclick="event.stopPropagation();unfol('${p.id}','${p.name}',this)">Following</button></div></div>`).join('');}
+function rFolrs(d){return d.map(p=>`<div class="pcard" data-name="${p.name.toLowerCase()}" onclick="navMockProfile(event,'${p.id}')"><div class="pav" style="background:${p.bg}">${p.av}</div><div class="pinfo"><div class="pname">${p.name}</div><div class="prole">${p.role}</div></div><div class="pbtns">${p.c?'<button class="btn btn-c" onclick="event.stopPropagation()">Connected</button>':`<button class="btn btn-o" onclick="event.stopPropagation();followBk('${p.id}','${p.name}',this)">Follow back</button><button class="btn btn-d" onclick="event.stopPropagation();conn('${p.id}','${p.name}',this)">Connect</button>`}</div></div>`).join('');}
+function rSuggs(d){return d.map(p=>`<div class="sitem" onclick="navMockProfile(event,'${p.id}')" style="cursor:none;"><div class="sav2" style="background:${p.bg}">${p.av}</div><div class="sinfo"><div class="sname">${p.name}</div><div class="srole">${p.role}</div></div><button class="sbtn" id="sg-${p.id}" onclick="event.stopPropagation();suggConn('${p.id}','${p.name}',this)">Connect</button></div>`).join('');}
+function rOrgs(d){return d.map(o=>`<div class="sitem"><div class="sav2" style="background:${o.bg};border-radius:9px">${o.av}</div><div class="sinfo"><div class="sname">${o.name}</div><div class="srole">${o.sub}</div></div><button class="sbtn" onclick="toast('Following ${o.name}')">Follow</button></div>`).join('');}
+function rStuds(d){return d.map(s=>`<div class="sperson"><div class="sav" style="background:${s.bg}">${s.av}</div><div class="sname">${s.name}</div><div class="smajor">${s.major}</div><button class="scbtn" onclick="toast('Request sent to ${s.name}')">Connect</button></div>`).join('');}
+function rCposts(d){return d.map(p=>`<div class="cpost"><div class="cph"><div class="cpav" style="background:${p.bg}">${p.av}</div><div class="cpmeta"><h4>${p.auth}<span class="cpbadge ${p.badge}">${p.bt}</span></h4><p>${p.sub}</p></div></div><div class="cpbody">${p.body}</div>${p.evt?`<div class="cpevent"><h4>${p.evt.t}</h4><p>${p.evt.m}</p></div>`:''}<div class="cptags">${p.tags.map(t=>`<span class="cptag">${t}</span>`).join('')}</div><div class="cpbar">${p.r.map(r=>`<span class="cpchip">${r}</span>`).join('')}<span class="cpchip">&#128172; ${3+Math.floor(Math.random()*18)}</span>${p.rsvp?`<button class="rsvpbtn" id="r-${p.id}" onclick="rsvp('${p.id}',this)">RSVP</button>`:''}</div></div>`).join('');}
+
+function unfol(id,n,btn){const f=btn.classList.contains('btn-f');btn.className=f?'btn btn-o':'btn btn-f';btn.textContent=f?'Follow':'Following';toast(f?'Unfollowed '+n:'Following '+n);}
+function followBk(id,n,btn){btn.className='btn btn-f';btn.textContent='Following';btn.onclick=()=>unfol(id,n,btn);toast('Following '+n);}
+function conn(id,n,btn){btn.className='btn btn-p';btn.textContent='Pending...';btn.disabled=true;toast('Request sent to '+n);}
+function suggConn(id,n,btn){btn.textContent='Pending...';btn.disabled=true;btn.style.opacity='.6';toast('Request sent to '+n);}
+
+function expandReqs(){
+  const el=document.getElementById('reqsExpanded');
+  if(el.style.display!=='none'){el.style.display='none';return;}
+  el.style.display='block';
+  el.innerHTML=preqs.map((p,i)=>`<div id="pr-${i}" style="display:flex;align-items:center;gap:11px;padding:11px;background:white;border-radius:12px;border:1px solid var(--border);margin-bottom:7px;margin-top:${i===0?'12px':'0'}"><div style="width:40px;height:40px;border-radius:12px;background:${p.bg};display:flex;align-items:center;justify-content:center;font-family:'Fraunces',serif;font-size:13px;font-weight:700;color:white;flex-shrink:0">${p.av}</div><div style="flex:1"><div style="font-size:13px;font-weight:700">${p.name}</div><div style="font-size:11px;color:var(--muted)">${p.role}</div><div style="font-size:10px;font-weight:600;background:var(--cream);color:var(--muted);display:inline-block;padding:2px 7px;border-radius:100px;margin-top:2px">${p.m} mutual</div></div><div style="display:flex;gap:6px"><button class="btn btn-d" onclick="accReq(${i})">Accept</button><button class="btn btn-o" onclick="decReq(${i})">Decline</button></div></div>`).join('')+`<button class="btn btn-o" style="width:100%;margin-top:4px" onclick="document.getElementById('reqsExpanded').style.display='none'">Done</button>`;
+}
+function accReq(i){const el=document.getElementById('pr-'+i);el.style.opacity='0';el.style.transition='opacity .3s';setTimeout(()=>el.remove(),300);toast('Connected with '+preqs[i].name);}
+function decReq(i){const el=document.getElementById('pr-'+i);el.style.opacity='0';el.style.transition='opacity .3s';setTimeout(()=>el.remove(),300);toast('Request declined');}
+
+let activeTag='';
+function tagPost(btn,tag){activeTag=activeTag===tag?'':tag;document.querySelectorAll('.ctag').forEach(b=>{b.classList.toggle('on',b===btn&&!!activeTag);});}
+function submitCampus(){
+  const inp=document.getElementById('campInput');const txt=inp.value.trim();if(!txt)return;
+  const d=document.createElement('div');d.className='cpost';
+  const bmap={announcement:'b-ann',event:'b-evt',career:'b-car',org:'b-org'};
+  const badge=activeTag?bmap[activeTag]:'b-ann';const bt=activeTag||'Post';
+  d.innerHTML=`<div class="cph"><div class="cpav" style="background:var(--charcoal)">MC</div><div class="cpmeta"><h4>Maya Chen <span class="cpbadge ${badge}">${bt}</span></h4><p>Product Design &middot; Junior &middot; Just now</p></div></div><div class="cpbody">${txt}</div><div class="cpbar"><span class="cpchip">&#129334; 0</span><span class="cpchip">&#128161; 0</span><span class="cpchip">&#128172; 0</span></div>`;
+  document.getElementById('campFeed').insertBefore(d,document.getElementById('campFeed').firstChild);
+  inp.value='';inp.style.height='';activeTag='';document.querySelectorAll('.ctag').forEach(b=>b.classList.remove('on'));
+  toast('Posted to IU campus feed');
+}
+function rsvp(id,btn){btn.classList.add('done');btn.textContent='Going ✓';toast('RSVP confirmed!');}
+
+function switchMode(m){['pro','campus'].forEach(n=>{document.getElementById('ttab-'+n).classList.toggle('active',n===m);document.getElementById('pane-'+n).classList.toggle('active',n===m);});}
+function switchSub(t){['connections','following','followers'].forEach(n=>{document.getElementById('stab-'+n).classList.toggle('active',n===t);document.getElementById('pane-'+n).classList.toggle('active',n===t);});}
+function filterCards(q){document.querySelectorAll('.pcard').forEach(c=>{c.style.display=(c.dataset.name||'').includes(q.toLowerCase())?'':'none';});}
+
+function toast(msg){const t=document.getElementById('nt');t.textContent=msg;t.style.opacity='1';t.style.transform='translateX(-50%) translateY(0)';clearTimeout(t._t);t._t=setTimeout(()=>{t.style.opacity='0';t.style.transform='translateX(-50%) translateY(20px)';},2400);}
+
+document.getElementById('conn-list').innerHTML=rConns(conns);
+document.getElementById('fol-list').innerHTML=rFols(fols);
+document.getElementById('folr-list').innerHTML=rFolrs(folrs);
+document.getElementById('suggList').innerHTML=rSuggs(suggs);
+document.getElementById('orgList').innerHTML=rOrgs(orgs);
+document.getElementById('studentStrip').innerHTML=rStuds(studs);
+document.getElementById('campFeed').innerHTML=rCposts(cposts);
+
+
+
+const calendarEvents = {};
+(function seedEvents() {
+  const now = new Date(), y = now.getFullYear(), m = now.getMonth();
+  [
+    [new Date(y,m,now.getDate()+2),  'IU Spring Career Fair',     '10:00','IMU Alumni Hall',              'Bring resume, business casual','#1A9E5B'],
+    [new Date(y,m,now.getDate()+5),  'Goldman Sachs Info Session', '17:30','Kelley School of Business 100','',                            '#2563EB'],
+    [new Date(y,m,now.getDate()+8),  'Weekly Design Critique',     '19:00','Luddy Hall 1106',              'Bring a prototype or sketch',  '#7C5CFC'],
+    [new Date(y,m,now.getDate()+14), 'IU Hackathon 2025',          '09:00','Assembly Hall',               '$10k prizes',                  '#FF5C35'],
+  ].forEach(([d,n,t,l,o,c]) => _storeEvent(d,n,t,l,o,c));
+})();
+function _storeEvent(dateObj,name,time,location,notes,color){
+  color=color||'#FF5C35';
+  const key=dateKey(dateObj);
+  if(!calendarEvents[key])calendarEvents[key]=[];
+  if(!calendarEvents[key].find(e=>e.name===name))
+    calendarEvents[key].push({name,time:time||'',location:location||'',notes:notes||'',color});
+}
+function addCalEvent(dateObj,name,time,color,location,notes){
+  _storeEvent(dateObj,name,time||'',location||'',notes||'',color||'#FF5C35');
+  updateEventCountBadge(); renderCalendar();
+  if(modalOpen){renderModalGrid();renderModalSidebar();}
+}
+function dateKey(d){return d.getFullYear()+'-'+String(d.getMonth()+1).padStart(2,'0')+'-'+String(d.getDate()).padStart(2,'0');}
+function fmtTime(t){if(!t)return'All day';const[h,m]=t.split(':').map(Number);return`${h%12||12}:${String(m).padStart(2,'0')}${h>=12?'pm':'am'}`;}
+function updateEventCountBadge(){
+  const total=Object.values(calendarEvents).reduce((s,a)=>s+a.length,0);
+  const b=document.getElementById('calEventCount');if(b)b.textContent=total;
+}
+let calYear=new Date().getFullYear(),calMonth=new Date().getMonth(),calSelectedKey=null,calVisible=true;
+const MONTHS=['January','February','March','April','May','June','July','August','September','October','November','December'];
+const DAYS=['Su','Mo','Tu','We','Th','Fr','Sa'];
+function renderCalendar(){
+  const label=document.getElementById('calMonthLabel'),grid=document.getElementById('calGrid');
+  if(!label||!grid)return;
+  label.textContent=MONTHS[calMonth].slice(0,3)+' '+calYear;
+  const today=new Date(),firstDay=new Date(calYear,calMonth,1).getDay(),
+        dim=new Date(calYear,calMonth+1,0).getDate(),dip=new Date(calYear,calMonth,0).getDate();
+  let h=DAYS.map(d=>`<div class="cal-day-name">${d}</div>`).join('');
+  for(let i=firstDay-1;i>=0;i--){const d=dip-i,key=dateKey(new Date(calYear,calMonth-1,d));h+=`<div class="cal-day other-month${calendarEvents[key]?.length?' has-event':''}" onclick="miniSelectDay(${calYear},${calMonth-1},${d})">${d}</div>`;}
+  for(let d=1;d<=dim;d++){const key=dateKey(new Date(calYear,calMonth,d));const it=today.getFullYear()===calYear&&today.getMonth()===calMonth&&today.getDate()===d;const he=!!calendarEvents[key]?.length;const is=key===calSelectedKey;h+=`<div class="cal-day${it?' today':''}${he?' has-event':''}${is?' selected':''}" onclick="miniSelectDay(${calYear},${calMonth},${d})">${d}</div>`;}
+  const filled=firstDay+dim,tot=Math.ceil(filled/7)*7;
+  for(let d=1;d<=tot-filled;d++){const key=dateKey(new Date(calYear,calMonth+1,d));h+=`<div class="cal-day other-month${calendarEvents[key]?.length?' has-event':''}" onclick="miniSelectDay(${calYear},${calMonth+1},${d})">${d}</div>`;}
+  grid.innerHTML=h;
+}
+function miniSelectDay(year,month,day){
+  const key=dateKey(new Date(year,month,day));
+  if(calSelectedKey===key){calSelectedKey=null;document.getElementById('calEventsPanel').classList.remove('open');renderCalendar();return;}
+  calSelectedKey=key;renderCalendar();
+  const evts=calendarEvents[key]||[],panel=document.getElementById('calEventsPanel'),
+        list=document.getElementById('calEventsList'),title=document.getElementById('calPanelTitle');
+  title.textContent=new Date(year,month,day).toLocaleDateString('en-US',{weekday:'short',month:'short',day:'numeric'});
+  if(!evts.length){list.innerHTML=`<div class="cal-empty">No events &mdash; <button onclick="openCreateEventForKey('${key}')" style="background:none;border:none;color:var(--accent);cursor:none;font-size:11px;font-weight:700;padding:0">+ Add</button></div>`;}
+  else{list.innerHTML=evts.map(e=>`<div class="cal-event-item"><div class="cal-event-dot" style="background:${e.color}"></div><div class="cal-event-info"><div class="cal-event-name">${e.name}</div><div class="cal-event-time">${fmtTime(e.time)}${e.location?' &middot; '+e.location:''}</div></div><button onclick="removeCalEvent('${key}','${e.name}')" style="background:none;border:none;color:var(--muted);cursor:none;font-size:14px;padding:2px 4px;border-radius:5px;transition:color .15s" onmouseover="this.style.color='var(--accent)'" onmouseout="this.style.color='var(--muted)'">&times;</button></div>`).join('');}
+  panel.classList.add('open');
+}
+function removeCalEvent(key,name){
+  if(!calendarEvents[key])return;
+  calendarEvents[key]=calendarEvents[key].filter(e=>e.name!==name);
+  if(!calendarEvents[key].length)delete calendarEvents[key];
+  updateEventCountBadge();
+  const p=key.split('-').map(Number);
+  miniSelectDay(p[0],p[1]-1,p[2]);
+  if(modalOpen){renderModalGrid();renderModalSidebar();}
+  if(typeof _calSave==='function')_calSave();
+}
+function changeMonth(dir){calMonth+=dir;if(calMonth>11){calMonth=0;calYear++;}if(calMonth<0){calMonth=11;calYear--;}calSelectedKey=null;document.getElementById('calEventsPanel').classList.remove('open');renderCalendar();}
+function toggleCalView(){calVisible=!calVisible;document.getElementById('calBody').style.display=calVisible?'':'none';document.getElementById('calToggleBtn').innerHTML=calVisible?'&#8964;':'&#8965;';}
+
+// FULL MODAL
+let modalOpen=false,modalYear=new Date().getFullYear(),modalMonth=new Date().getMonth(),modalSelectedKey=null;
+function openCalModal(){
+  modalOpen=true;modalYear=calYear;modalMonth=calMonth;modalSelectedKey=calSelectedKey;
+  document.getElementById('calModalBackdrop').classList.add('open');
+  document.body.style.overflow='hidden';
+  renderModalGrid();renderModalSidebar();
+}
+function closeCalModal(){modalOpen=false;document.getElementById('calModalBackdrop').classList.remove('open');document.body.style.overflow='';}
+function modalChangeMonth(dir){modalMonth+=dir;if(modalMonth>11){modalMonth=0;modalYear++;}if(modalMonth<0){modalMonth=11;modalYear--;}modalSelectedKey=null;renderModalGrid();renderModalSidebar();}
+function renderModalGrid(){
+  const label=document.getElementById('modalMonthLabel'),grid=document.getElementById('modalCalGrid'),names=document.getElementById('modalDayNames');
+  if(!label||!grid)return;
+  label.textContent=MONTHS[modalMonth]+' '+modalYear;
+  names.innerHTML=DAYS.map(d=>`<div class="cal-modal-day-name">${d}</div>`).join('');
+  const today=new Date(),firstDay=new Date(modalYear,modalMonth,1).getDay(),
+        dim=new Date(modalYear,modalMonth+1,0).getDate(),dip=new Date(modalYear,modalMonth,0).getDate();
+  let h='';
+  for(let i=firstDay-1;i>=0;i--){const d=dip-i,key=dateKey(new Date(modalYear,modalMonth-1,d)),evts=calendarEvents[key]||[];h+=`<div class="cal-modal-day other-month" onclick="modalSelectDay(${modalYear},${modalMonth-1},${d})"><div class="cal-modal-day-num">${d}</div>${evts.slice(0,2).map(e=>`<div class="cal-modal-event-pill" style="background:${e.color}">${e.name}</div>`).join('')}</div>`;}
+  for(let d=1;d<=dim;d++){const key=dateKey(new Date(modalYear,modalMonth,d));const evts=calendarEvents[key]||[];const it=today.getFullYear()===modalYear&&today.getMonth()===modalMonth&&today.getDate()===d;const is=key===modalSelectedKey;const extras=evts.length>2?`<div style="font-size:9px;color:var(--muted);font-weight:700">+${evts.length-2} more</div>`:'';h+=`<div class="cal-modal-day${it?' today':''}${is?' selected':''}" onclick="modalSelectDay(${modalYear},${modalMonth},${d})"><div class="cal-modal-day-num">${d}</div>${evts.slice(0,2).map(e=>`<div class="cal-modal-event-pill" style="background:${e.color}">${e.name}</div>`).join('')}${extras}</div>`;}
+  const filled=firstDay+dim,tot=Math.ceil(filled/7)*7;
+  for(let d=1;d<=tot-filled;d++){const key=dateKey(new Date(modalYear,modalMonth+1,d));const evts=calendarEvents[key]||[];h+=`<div class="cal-modal-day other-month" onclick="modalSelectDay(${modalYear},${modalMonth+1},${d})"><div class="cal-modal-day-num">${d}</div>${evts.slice(0,2).map(e=>`<div class="cal-modal-event-pill" style="background:${e.color}">${e.name}</div>`).join('')}</div>`;}
+  grid.innerHTML=h;
+}
+function modalSelectDay(year,month,day){modalSelectedKey=dateKey(new Date(year,month,day));renderModalGrid();renderModalSidebar();}
+function renderModalSidebar(){
+  const listEl=document.getElementById('modalEventsList'),dateEl=document.getElementById('modalSidebarDate');
+  if(!listEl)return;
+  const noEvtHTML=`<div class="cal-modal-no-events"><svg width="36" height="36" viewBox="0 0 36 36" fill="none" style="margin:0 auto 10px;display:block;opacity:.3"><rect x="3" y="6" width="30" height="27" rx="6" stroke="currentColor" stroke-width="2" fill="none"/><path d="M3 14h30" stroke="currentColor" stroke-width="2" stroke-linecap="round"/><path d="M11 3v6M25 3v6" stroke="currentColor" stroke-width="2" stroke-linecap="round"/></svg>`;
+  if(!modalSelectedKey){dateEl.textContent='Click a day to see events';listEl.innerHTML=noEvtHTML+'Select a day to see<br>or add events</div>';return;}
+  const p=modalSelectedKey.split('-').map(Number),dateObj=new Date(p[0],p[1]-1,p[2]);
+  dateEl.textContent=dateObj.toLocaleDateString('en-US',{weekday:'long',month:'long',day:'numeric'});
+  const evts=calendarEvents[modalSelectedKey]||[];
+  if(!evts.length){listEl.innerHTML=noEvtHTML+`No events yet<br><button onclick="openCreateEventForKey('${modalSelectedKey}')" style="background:none;border:none;color:var(--accent);cursor:none;font-size:13px;font-weight:700;margin-top:8px;padding:0">+ Add an event</button></div>`;}
+  else{listEl.innerHTML=evts.map(e=>`<div class="cal-modal-event-card"><div class="cal-modal-event-bar" style="background:${e.color}"></div><div class="cal-modal-event-body"><div class="cal-modal-event-name">${e.name}</div><div class="cal-modal-event-meta">${e.time?fmtTime(e.time)+'<br>':''}${e.location?'&#128205; '+e.location+'<br>':''}${e.notes?'&#128221; '+e.notes:''}</div></div><button class="cal-modal-event-del" onclick="removeCalEvent('${modalSelectedKey}','${e.name}')">&times;</button></div>`).join('')+`<button onclick="openCreateEventForKey('${modalSelectedKey}')" style="width:100%;margin-top:8px;padding:10px;border-radius:12px;border:1.5px dashed var(--border);background:none;color:var(--muted);font-family:'DM Sans',sans-serif;font-size:12px;font-weight:700;cursor:none;transition:all .15s" onmouseover="this.style.borderColor='var(--accent)';this.style.color='var(--accent)'" onmouseout="this.style.borderColor='var(--border)';this.style.color='var(--muted)'">+ Add another event</button>`;}
+}
+
+// CREATE EVENT
+let selectedEventColor='#FF5C35',prefillDateKey=null;
+function openCreateEvent(){prefillDateKey=modalSelectedKey;_openCreateForm();}
+function openCreateEventForKey(key){prefillDateKey=key;_openCreateForm();}
+function _openCreateForm(){
+  document.getElementById('evtDate').value=prefillDateKey||dateKey(new Date());
+  document.getElementById('evtName').value='';document.getElementById('evtTime').value='';
+  document.getElementById('evtLocation').value='';document.getElementById('evtNotes').value='';
+  selectedEventColor='#FF5C35';
+  document.querySelectorAll('.color-swatch').forEach(s=>s.classList.toggle('active',s.dataset.color===selectedEventColor));
+  document.getElementById('createEventModal').classList.add('open');
+  setTimeout(()=>document.getElementById('evtName').focus(),80);
+}
+function closeCreateEvent(){document.getElementById('createEventModal').classList.remove('open');}
+function pickColor(el){selectedEventColor=el.dataset.color;document.querySelectorAll('.color-swatch').forEach(s=>s.classList.remove('active'));el.classList.add('active');}
+function saveNewEvent(){
+  const name=document.getElementById('evtName').value.trim();
+  const dateStr=document.getElementById('evtDate').value;
+  const time=document.getElementById('evtTime').value;
+  const location=document.getElementById('evtLocation').value.trim();
+  const notes=document.getElementById('evtNotes').value.trim();
+  if(!name){document.getElementById('evtName').focus();return;}
+  if(!dateStr){document.getElementById('evtDate').focus();return;}
+  const p=dateStr.split('-').map(Number),dateObj=new Date(p[0],p[1]-1,p[2]);
+  addCalEvent(dateObj,name,time,selectedEventColor,location,notes);
+  if(modalOpen){modalSelectedKey=dateKey(dateObj);modalYear=p[0];modalMonth=p[1]-1;renderModalGrid();renderModalSidebar();}
+  calSelectedKey=dateKey(dateObj);calYear=p[0];calMonth=p[1]-1;
+  miniSelectDay(p[0],p[1]-1,p[2]);
+  closeCreateEvent();
+  showFeedToast('Event saved: '+name);
+}
+
+// ══ CALENDAR SYNC ════════════════════════════════════════════════════════
+const CAL_KEY = 'vibe_cal_events_v1';
+function _calSave(){try{localStorage.setItem(CAL_KEY,JSON.stringify(calendarEvents));}catch(e){}}
+function _calLoad(){try{const r=localStorage.getItem(CAL_KEY);if(!r)return;Object.assign(calendarEvents,JSON.parse(r));}catch(e){}}
+document.addEventListener('DOMContentLoaded',function(){
+  _calLoad();
+  if(typeof renderCalendar==='function')renderCalendar();
+  if(typeof updateEventCountBadge==='function')updateEventCountBadge();
+});
+// ══ END CALENDAR SYNC ════════════════════════════════════════════════════
+
+// ══ NETWORK PAGE INIT (uses shared _persistence.js) ══════════════════════
+(function initNetworkPage(){
+  const user = vibeInit();
+  if (!user) { window.location.href = '/html/landing.html'; return; }
+  if (user._isDemo) vibeShowDemoPill();
+})();
+// ══ END NETWORK INIT ═════════════════════════════════════════════════════
+
+</script>
+
+<!-- ══ FULL CALENDAR MODAL ══ -->
+  <div class="cal-modal-backdrop" id="calModalBackdrop" onclick="if(event.target===this)closeCalModal()">
+    <div class="cal-modal">
+      <div class="cal-modal-header">
+        <div class="cal-modal-title">My Calendar</div>
+        <div class="cal-modal-month-nav">
+          <button class="cal-modal-nav-btn" onclick="modalChangeMonth(-1)">&#8249;</button>
+          <span class="cal-modal-month-label" id="modalMonthLabel"></span>
+          <button class="cal-modal-nav-btn" onclick="modalChangeMonth(1)">&#8250;</button>
+        </div>
+        <div class="cal-modal-header-actions">
+          <button class="cal-modal-add-btn" onclick="openCreateEvent()">
+            <svg width="13" height="13" viewBox="0 0 13 13" fill="none"><path d="M6.5 1v11M1 6.5h11" stroke="white" stroke-width="1.8" stroke-linecap="round"/></svg>
+            New Event
+          </button>
+          <button class="cal-modal-close" onclick="closeCalModal()">&#215;</button>
+        </div>
+      </div>
+      <div class="cal-modal-body">
+        <div class="cal-modal-grid-wrap">
+          <div class="cal-modal-day-names" id="modalDayNames"></div>
+          <div class="cal-modal-grid" id="modalCalGrid"></div>
+        </div>
+        <div class="cal-modal-sidebar">
+          <div class="cal-modal-sidebar-hdr">
+            Events
+            <span id="modalSidebarDate">Click a day to see events</span>
+          </div>
+          <div class="cal-modal-events-list" id="modalEventsList">
+            <div class="cal-modal-no-events">
+              <svg width="36" height="36" viewBox="0 0 36 36" fill="none" style="margin:0 auto 10px;display:block;opacity:.3"><rect x="3" y="6" width="30" height="27" rx="6" stroke="currentColor" stroke-width="2" fill="none"/><path d="M3 14h30" stroke="currentColor" stroke-width="2" stroke-linecap="round"/><path d="M11 3v6M25 3v6" stroke="currentColor" stroke-width="2" stroke-linecap="round"/></svg>
+              Select a day to see<br>or add events
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+</body>
+</html>

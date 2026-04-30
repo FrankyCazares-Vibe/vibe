@@ -1,0 +1,1428 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Opportunities — Vibe</title>
+<link href="https://fonts.googleapis.com/css2?family=Fraunces:ital,wght@0,400;0,700;0,900;1,400&family=DM+Sans:wght@300;400;500;600&display=swap" rel="stylesheet">
+<script src="/html/_persistence.js"></script>
+<script src="/html/_otto.js" defer></script>
+<style>
+:root{--cream:#FAF7F2;--charcoal:#1C1C1E;--soft:#2D2D2D;--muted:#8A8580;--accent:#FF5C35;--green:#2ECC71;--lavender:#C8B8FF;--gold:#F5C842;--border:rgba(28,28,30,.08);--shadow:0 4px 24px rgba(0,0,0,.06);--shadow-lg:0 12px 48px rgba(0,0,0,.1);}
+*{margin:0;padding:0;box-sizing:border-box;}
+html,body{height:100%;}
+body{font-family:'DM Sans',sans-serif;background:var(--cream);color:var(--charcoal);cursor:none;overflow-x:hidden;}
+.cursor{width:8px;height:8px;background:var(--accent);border-radius:50%;position:fixed;top:0;left:0;pointer-events:none;z-index:9999;will-change:transform;}
+.cursor-ring{width:28px;height:28px;border:1.5px solid var(--accent);border-radius:50%;position:fixed;top:0;left:0;pointer-events:none;z-index:9998;will-change:transform;opacity:.45;transition:width .2s,height .2s,opacity .2s;}
+.cursor.hover{width:6px;height:6px;background:var(--charcoal);}
+.cursor-ring.hover{width:44px;height:44px;opacity:.2;border-color:var(--charcoal);}
+
+/* Shell */
+.shell{display:grid;grid-template-columns:200px 1fr 340px;min-height:100vh;}
+
+/* Left nav */
+.left-nav{padding:20px 14px;border-right:1px solid var(--border);position:sticky;top:0;height:100vh;overflow-y:auto;scrollbar-width:none;}
+.left-nav::-webkit-scrollbar{display:none;}
+.nav-logo{font-family:'Fraunces',serif;font-size:22px;font-weight:900;color:var(--charcoal);letter-spacing:-1px;display:block;margin-bottom:24px;text-decoration:none;}
+.nav-logo span{color:var(--accent);}
+.nav-item{display:flex;align-items:center;gap:10px;padding:10px 12px;border-radius:12px;font-size:14px;font-weight:500;color:var(--muted);cursor:none;text-decoration:none;transition:all .15s;border:none;background:none;width:100%;text-align:left;margin-bottom:2px;}
+.nav-item:hover{background:white;color:var(--charcoal);}
+.nav-item.active{background:white;color:var(--charcoal);font-weight:600;box-shadow:var(--shadow);}
+.nav-divider{height:1px;background:var(--border);margin:12px 0;}
+.mini-avatar{width:34px;height:34px;border-radius:10px;background:var(--charcoal);display:flex;align-items:center;justify-content:center;font-family:'Fraunces',serif;font-size:12px;font-weight:700;color:white;flex-shrink:0;}
+
+/* Center */
+.center{min-height:100vh;border-right:1px solid var(--border);}
+.opp-header{padding:0 20px;position:sticky;top:0;background:rgba(250,247,242,.94);backdrop-filter:blur(14px);z-index:50;border-bottom:1px solid var(--border);}
+.opp-header-top{display:flex;align-items:center;justify-content:space-between;padding:16px 0 12px;}
+.opp-title{font-family:'Fraunces',serif;font-size:22px;font-weight:900;letter-spacing:-.5px;}
+.post-opp-btn{font-family:'DM Sans',sans-serif;font-size:13px;font-weight:700;background:var(--accent);color:white;border:none;padding:9px 18px;border-radius:100px;cursor:none;transition:all .2s;}
+.post-opp-btn:hover{background:#ff7055;}
+
+/* Filter bar */
+.filter-bar{display:flex;gap:6px;padding-bottom:14px;overflow-x:auto;scrollbar-width:none;}
+.filter-bar::-webkit-scrollbar{display:none;}
+.filter-pill{font-size:12px;font-weight:600;padding:7px 14px;border-radius:100px;border:1.5px solid var(--border);background:white;color:var(--muted);cursor:none;transition:all .15s;white-space:nowrap;flex-shrink:0;}
+.filter-pill:hover{border-color:rgba(28,28,30,.2);color:var(--charcoal);}
+.filter-pill.active{background:var(--charcoal);color:white;border-color:var(--charcoal);}
+
+/* Search bar */
+.search-row{display:flex;gap:10px;padding:14px 20px;border-bottom:1px solid var(--border);}
+.search-input-wrap{flex:1;position:relative;}
+.search-icon{position:absolute;left:14px;top:50%;transform:translateY(-50%);color:var(--muted);font-size:14px;pointer-events:none;}
+.search-input{width:100%;padding:11px 14px 11px 40px;border-radius:14px;border:1.5px solid var(--border);background:white;font-family:'DM Sans',sans-serif;font-size:14px;color:var(--charcoal);outline:none;cursor:text;transition:border-color .18s;}
+.search-input::placeholder{color:var(--muted);}
+.search-input:focus{border-color:rgba(28,28,30,.2);}
+.location-input{padding:11px 14px;border-radius:14px;border:1.5px solid var(--border);background:white;font-family:'DM Sans',sans-serif;font-size:14px;color:var(--charcoal);outline:none;cursor:text;width:160px;transition:border-color .18s;}
+.location-input::placeholder{color:var(--muted);}
+.location-input:focus{border-color:rgba(28,28,30,.2);}
+
+/* Match banner */
+.match-banner{margin:14px 20px;background:white;border:1px solid var(--border);border-radius:14px;padding:12px 16px;display:flex;align-items:center;gap:12px;}
+.match-banner-icon{width:32px;height:32px;border-radius:9px;background:var(--accent);display:flex;align-items:center;justify-content:center;flex-shrink:0;font-size:14px;}
+.match-banner h4{font-size:12px;font-weight:700;margin-bottom:1px;}
+.match-banner p{font-size:11px;color:var(--muted);}
+
+/* Empty state (fresh-onboarded users) */
+.opp-empty{display:none;flex-direction:column;align-items:center;justify-content:center;padding:80px 32px 60px;text-align:center;}
+.opp-empty.visible{display:flex;}
+.opp-empty-icon{width:72px;height:72px;border-radius:20px;background:white;border:0.5px solid var(--border);display:flex;align-items:center;justify-content:center;font-size:32px;margin-bottom:22px;box-shadow:var(--shadow);}
+.opp-empty h3{font-family:'Fraunces',serif;font-size:26px;font-weight:900;color:var(--charcoal);letter-spacing:-.6px;margin-bottom:12px;}
+.opp-empty p{font-size:14px;color:var(--muted);line-height:1.65;max-width:380px;margin-bottom:22px;}
+.opp-empty p strong{color:var(--charcoal);font-weight:600;}
+.opp-empty-cta{display:inline-flex;align-items:center;gap:6px;padding:12px 22px;background:var(--charcoal);color:white;border:none;border-radius:100px;font-family:'DM Sans',sans-serif;font-size:13px;font-weight:600;cursor:none;text-decoration:none;transition:all .15s;}
+.opp-empty-cta:hover{background:var(--accent);}
+.opp-empty-foot{font-size:11.5px;color:var(--muted);margin-top:16px;line-height:1.55;font-style:italic;max-width:340px;}
+
+/* Opportunity card */
+.opp-list{padding:0 20px 60px;}
+.opp-card{background:white;border:1px solid var(--border);border-radius:18px;padding:20px;margin-bottom:14px;cursor:none;transition:all .2s;position:relative;}
+.opp-card:hover{box-shadow:var(--shadow-lg);border-color:rgba(28,28,30,.12);transform:translateY(-1px);}
+.opp-card.active-card{border-color:var(--accent);box-shadow:0 0 0 2px rgba(255,92,53,.1),var(--shadow-lg);}
+.opp-card-top{display:flex;align-items:flex-start;gap:14px;margin-bottom:12px;}
+.opp-logo{width:48px;height:48px;border-radius:12px;display:flex;align-items:center;justify-content:center;font-family:'Fraunces',serif;font-size:14px;font-weight:900;color:white;flex-shrink:0;}
+.opp-card-info h3{font-size:15px;font-weight:700;color:var(--charcoal);margin-bottom:2px;}
+.opp-card-info .company{font-size:13px;font-weight:600;color:var(--soft);margin-bottom:3px;}
+.opp-card-info .meta-row{display:flex;align-items:center;gap:8px;flex-wrap:wrap;}
+.opp-meta-pill{font-size:10px;font-weight:700;padding:3px 8px;border-radius:100px;display:inline-flex;align-items:center;gap:4px;}
+.opp-meta-pill.type-internship{background:#EAF7FF;color:#0077CC;}
+.opp-meta-pill.type-full{background:#EAFFF5;color:#1A9E5B;}
+.opp-meta-pill.type-part{background:#FFF9E0;color:#B8920A;}
+.opp-meta-pill.type-contract{background:#F0EDFF;color:#7C5CFC;}
+.opp-meta-pill.loc{background:#F5F4F0;color:var(--muted);}
+.opp-meta-pill.pay{background:#FFF0EC;color:var(--accent);}
+.opp-match-tag{margin-left:auto;display:inline-flex;align-items:center;gap:4px;background:#FFF0EC;color:var(--accent);font-size:10px;font-weight:700;padding:3px 9px;border-radius:100px;white-space:nowrap;flex-shrink:0;}
+.opp-desc{font-size:13px;line-height:1.7;color:var(--soft);margin-bottom:12px;}
+.opp-skills{display:flex;gap:6px;flex-wrap:wrap;margin-bottom:14px;}
+.opp-skill{font-size:11px;font-weight:700;padding:4px 10px;border-radius:100px;background:#F5F4F0;color:var(--muted);}
+.opp-skill.match{background:#FFF0EC;color:var(--accent);}
+.opp-footer{display:flex;align-items:center;justify-content:space-between;padding-top:12px;border-top:1px solid var(--border);}
+.opp-poster{display:flex;align-items:center;gap:8px;}
+.opp-poster-av{width:26px;height:26px;border-radius:8px;display:flex;align-items:center;justify-content:center;font-family:'Fraunces',serif;font-size:9px;font-weight:700;color:white;flex-shrink:0;}
+.opp-poster-info{font-size:11px;color:var(--muted);}
+.opp-poster-name{font-weight:700;color:var(--soft);}
+.opp-actions{display:flex;gap:8px;}
+.opp-save{width:34px;height:34px;border-radius:50%;border:1.5px solid var(--border);background:white;display:flex;align-items:center;justify-content:center;font-size:14px;cursor:none;transition:all .15s;}
+.opp-save:hover{border-color:var(--accent);background:#FFF0EC;}
+.opp-save.saved{background:#FFF0EC;border-color:var(--accent);}
+.opp-apply{font-family:'DM Sans',sans-serif;font-size:13px;font-weight:700;background:var(--charcoal);color:white;border:none;padding:9px 20px;border-radius:100px;cursor:none;transition:all .2s;}
+.opp-apply:hover{background:var(--accent);}
+.opp-apply.applied{background:#EAFFF5;color:#1A9E5B;border:1.5px solid #A8EDD0;}
+.opp-apply.applied:hover{background:#d4f7e8;}
+
+/* ── Detail panel (right col) ── */
+.detail-panel{position:sticky;top:0;height:100vh;overflow-y:auto;scrollbar-width:thin;scrollbar-color:var(--border) transparent;}
+.dp-empty{display:flex;flex-direction:column;align-items:center;justify-content:center;height:100%;padding:40px;text-align:center;color:var(--muted);}
+.dp-empty-icon{font-size:40px;margin-bottom:16px;opacity:.4;}
+.dp-empty-text{font-size:14px;line-height:1.6;}
+.dp-content{display:none;padding:24px;}
+.dp-content.visible{display:block;}
+.dp-logo{width:64px;height:64px;border-radius:16px;display:flex;align-items:center;justify-content:center;font-family:'Fraunces',serif;font-size:18px;font-weight:900;color:white;margin-bottom:16px;}
+.dp-title{font-family:'Fraunces',serif;font-size:20px;font-weight:900;letter-spacing:-.4px;margin-bottom:4px;}
+.dp-company{font-size:15px;font-weight:600;color:var(--soft);margin-bottom:14px;}
+.dp-pills{display:flex;gap:6px;flex-wrap:wrap;margin-bottom:18px;}
+.dp-actions{display:flex;gap:10px;margin-bottom:24px;}
+.dp-apply{flex:1;font-family:'DM Sans',sans-serif;font-size:14px;font-weight:700;background:var(--accent);color:white;border:none;padding:13px;border-radius:14px;cursor:none;transition:all .2s;}
+.dp-apply:hover{background:#ff7055;}
+.dp-apply.applied{background:#EAFFF5;color:#1A9E5B;border:2px solid #A8EDD0;}
+.dp-save{width:46px;height:46px;border-radius:14px;border:1.5px solid var(--border);background:white;display:flex;align-items:center;justify-content:center;font-size:18px;cursor:none;transition:all .15s;flex-shrink:0;}
+.dp-save:hover{border-color:var(--accent);background:#FFF0EC;}
+.dp-save.saved{background:#FFF0EC;border-color:var(--accent);}
+.dp-section{margin-bottom:20px;}
+.dp-section-title{font-size:11px;font-weight:700;letter-spacing:1.2px;text-transform:uppercase;color:var(--muted);margin-bottom:10px;}
+.dp-body{font-size:14px;line-height:1.75;color:var(--soft);}
+.dp-body p{margin-bottom:10px;}
+.dp-divider{height:1px;background:var(--border);margin:20px 0;}
+.dp-recruiter{display:flex;align-items:center;gap:12px;background:var(--cream);border-radius:14px;padding:14px;}
+.dp-rec-av{width:40px;height:40px;border-radius:12px;display:flex;align-items:center;justify-content:center;font-family:'Fraunces',serif;font-size:13px;font-weight:700;color:white;flex-shrink:0;}
+.dp-rec-name{font-size:13px;font-weight:700;}
+.dp-rec-title{font-size:11px;color:var(--muted);}
+.dp-rec-vibe{font-size:10px;font-weight:700;color:var(--accent);margin-top:2px;}
+.dp-view-vibe{margin-left:auto;font-size:11px;font-weight:700;padding:6px 12px;border-radius:100px;border:1.5px solid var(--border);background:white;cursor:none;color:var(--charcoal);transition:all .15s;white-space:nowrap;}
+.dp-view-vibe:hover{background:var(--charcoal);color:white;border-color:var(--charcoal);}
+
+/* Posted badge */
+.new-badge{position:absolute;top:16px;right:16px;font-size:10px;font-weight:700;background:var(--green);color:white;padding:3px 8px;border-radius:100px;}
+
+/* Section divider in list */
+.list-section-label{font-size:11px;font-weight:700;letter-spacing:1.2px;text-transform:uppercase;color:var(--muted);padding:18px 0 10px;}
+
+/* Recruiter mode notice */
+.recruiter-notice{background:var(--charcoal);border-radius:14px;padding:14px 16px;margin-bottom:20px;display:flex;align-items:center;gap:12px;}
+.recruiter-notice-text{font-size:12px;color:rgba(255,255,255,.6);line-height:1.5;}
+.recruiter-notice-text strong{color:white;}
+.switch-mode-btn{margin-left:auto;font-size:11px;font-weight:700;padding:7px 14px;border-radius:100px;background:rgba(255,255,255,.1);border:none;color:white;cursor:none;white-space:nowrap;transition:background .15s;flex-shrink:0;}
+.switch-mode-btn:hover{background:rgba(255,255,255,.18);}
+
+/* Post opportunity modal */
+.post-modal-overlay{position:fixed;inset:0;z-index:500;display:flex;align-items:center;justify-content:center;pointer-events:none;opacity:0;transition:opacity .25s;}
+.post-modal-overlay.open{opacity:1;pointer-events:all;}
+.post-modal-backdrop{position:absolute;inset:0;background:rgba(0,0,0,.45);backdrop-filter:blur(4px);}
+.post-modal{position:relative;width:560px;max-width:95vw;max-height:90vh;overflow-y:auto;background:white;border-radius:24px;padding:32px;box-shadow:var(--shadow-lg);transform:scale(.96) translateY(16px);transition:transform .3s cubic-bezier(.22,1,.36,1);}
+.post-modal-overlay.open .post-modal{transform:scale(1) translateY(0);}
+.pm-title{font-family:'Fraunces',serif;font-size:22px;font-weight:900;letter-spacing:-.4px;margin-bottom:24px;}
+.pm-field{margin-bottom:16px;}
+.pm-label{font-size:11px;font-weight:700;letter-spacing:1px;text-transform:uppercase;color:var(--muted);margin-bottom:6px;display:block;}
+.pm-input{width:100%;padding:11px 14px;border-radius:12px;border:1.5px solid var(--border);background:var(--cream);font-family:'DM Sans',sans-serif;font-size:14px;color:var(--charcoal);outline:none;cursor:text;transition:border-color .18s;}
+.pm-input:focus{border-color:rgba(28,28,30,.2);background:white;}
+.pm-input::placeholder{color:var(--muted);}
+.pm-textarea{width:100%;padding:11px 14px;border-radius:12px;border:1.5px solid var(--border);background:var(--cream);font-family:'DM Sans',sans-serif;font-size:14px;color:var(--charcoal);outline:none;cursor:text;transition:border-color .18s;resize:none;min-height:100px;line-height:1.6;}
+.pm-textarea:focus{border-color:rgba(28,28,30,.2);background:white;}
+.pm-row{display:grid;grid-template-columns:1fr 1fr;gap:12px;}
+.pm-type-row{display:flex;gap:8px;flex-wrap:wrap;}
+.pm-type-btn{font-size:12px;font-weight:700;padding:7px 14px;border-radius:100px;border:1.5px solid var(--border);background:white;color:var(--muted);cursor:none;transition:all .15s;}
+.pm-type-btn:hover{border-color:var(--charcoal);color:var(--charcoal);}
+.pm-type-btn.selected{background:var(--charcoal);color:white;border-color:var(--charcoal);}
+.pm-footer{display:flex;gap:10px;margin-top:24px;justify-content:flex-end;}
+.pm-cancel{font-family:'DM Sans',sans-serif;font-size:13px;font-weight:700;padding:11px 22px;border-radius:100px;border:1.5px solid var(--border);background:white;color:var(--muted);cursor:none;transition:all .15s;}
+.pm-cancel:hover{border-color:var(--charcoal);color:var(--charcoal);}
+.pm-submit{font-family:'DM Sans',sans-serif;font-size:13px;font-weight:700;background:var(--accent);color:white;border:none;padding:11px 28px;border-radius:100px;cursor:none;transition:all .2s;}
+.pm-submit:hover{background:#ff7055;}
+
+
+/* ════ CALENDAR WIDGET ════ */
+/* Lives in the left nav (200px wide) — compact sizing */
+.cal-widget {
+  padding: 10px 10px 12px;
+  background: none;
+  flex-shrink: 0;
+}
+.cal-header {
+  display: flex; align-items: center; justify-content: space-between;
+  margin-bottom: 10px;
+}
+.cal-title-row {
+  display: flex; align-items: center; gap: 6px;
+}
+.cal-title {
+  font-family: 'Fraunces', serif;
+  font-size: 12px; font-weight: 700; letter-spacing: -.1px;
+  color: var(--charcoal);
+}
+.cal-month-nav {
+  display: flex; align-items: center; justify-content: space-between;
+  margin-bottom: 8px;
+}
+.cal-nav-btn {
+  width: 20px; height: 20px; border-radius: 6px;
+  background: none; border: none; cursor: none;
+  color: var(--muted); display: flex; align-items: center; justify-content: center;
+  transition: all .15s; font-size: 13px; flex-shrink: 0;
+}
+.cal-nav-btn:hover { background: white; color: var(--charcoal); }
+.cal-month-label {
+  font-size: 11px; font-weight: 700; color: var(--charcoal);
+  text-align: center; flex: 1;
+}
+.cal-toggle {
+  font-size: 10px; font-weight: 700; color: var(--muted);
+  background: none; border: none; cursor: none;
+  transition: color .15s;
+}
+.cal-toggle:hover { color: var(--accent); }
+.cal-grid {
+  display: grid; grid-template-columns: repeat(7, 1fr); gap: 1px;
+}
+.cal-day-name {
+  font-size: 8px; font-weight: 800; color: var(--muted);
+  text-align: center; padding: 2px 0; text-transform: uppercase; letter-spacing: .3px;
+}
+.cal-day {
+  aspect-ratio: 1; border-radius: 6px; display: flex; flex-direction: column;
+  align-items: center; justify-content: center; font-size: 10px; font-weight: 600;
+  color: var(--charcoal); cursor: none; transition: all .15s; position: relative;
+}
+.cal-day:hover { background: white; }
+.cal-day.other-month { color: var(--muted); opacity: .35; }
+.cal-day.today {
+  background: var(--charcoal); color: white; font-weight: 800;
+}
+.cal-day.today:hover { background: var(--soft); }
+.cal-day.has-event::after {
+  content: '';
+  width: 4px; height: 4px; border-radius: 50%;
+  background: var(--accent);
+  position: absolute; bottom: 2px;
+}
+.cal-day.today.has-event::after { background: white; }
+.cal-day.selected { background: var(--accent); color: white; }
+.cal-day.selected:hover { background: #ff7055; }
+.cal-day.selected.has-event::after { background: white; }
+
+/* Event list panel — slides open below grid */
+.cal-events-panel {
+  margin-top: 8px; display: none;
+  border-top: 1px solid var(--border); padding-top: 8px;
+}
+.cal-events-panel.open { display: block; }
+.cal-events-panel-title {
+  font-size: 10px; font-weight: 800; color: var(--muted);
+  text-transform: uppercase; letter-spacing: .5px; margin-bottom: 6px;
+}
+.cal-event-item {
+  display: flex; align-items: center; gap: 6px;
+  padding: 6px 7px; border-radius: 8px;
+  background: white; margin-bottom: 4px;
+  transition: background .13s; cursor: none;
+  border: 1px solid var(--border);
+}
+.cal-event-item:hover { background: var(--cream); }
+.cal-event-dot {
+  width: 7px; height: 7px; border-radius: 50%; flex-shrink: 0;
+}
+.cal-event-info { flex: 1; min-width: 0; }
+.cal-event-name {
+  font-size: 10px; font-weight: 700; color: var(--charcoal);
+  white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
+}
+.cal-event-time { font-size: 9px; color: var(--muted); }
+.cal-empty {
+  font-size: 11px; color: var(--muted); text-align: center;
+  padding: 10px 0; font-style: italic;
+}
+.cal-event-count-badge {
+  font-size: 9px; font-weight: 800; background: var(--accent);
+  color: white; padding: 1px 6px; border-radius: 100px; margin-left: 3px;
+}
+
+/* ════ CALENDAR FULL MODAL ════ */
+.cal-modal-backdrop {
+  display: none; position: fixed; inset: 0; z-index: 800;
+  background: rgba(0,0,0,.52);
+  align-items: center; justify-content: center;
+}
+.cal-modal-backdrop.open { display: flex; }
+.cal-modal {
+  background: white; border-radius: 24px;
+  width: min(860px, calc(100vw - 32px));
+  max-height: calc(100vh - 48px);
+  display: flex; flex-direction: column;
+  box-shadow: 0 24px 80px rgba(0,0,0,.18);
+  overflow: hidden;
+  animation: calModalIn .25s cubic-bezier(.34,1.4,.64,1);
+}
+@keyframes calModalIn { from{opacity:0;transform:scale(.95)} to{opacity:1;transform:scale(1)} }
+.cal-modal-header {
+  display: grid;
+  grid-template-columns: 1fr auto 1fr;
+  align-items: center;
+  padding: 18px 24px 16px;
+  border-bottom: 1px solid var(--border);
+  flex-shrink: 0;
+}
+.cal-modal-title {
+  font-family: 'Fraunces', serif;
+  font-size: 20px; font-weight: 900; letter-spacing: -.4px;
+  justify-self: start;
+}
+.cal-modal-month-nav {
+  display: flex; align-items: center; gap: 8px;
+  justify-self: center;
+}
+.cal-modal-header-actions {
+  display: flex; align-items: center; gap: 8px;
+  justify-self: end;
+}
+.cal-modal-nav-btn {
+  width: 32px; height: 32px; border-radius: 10px;
+  background: var(--cream); border: none; cursor: none;
+  color: var(--charcoal); display: flex; align-items: center; justify-content: center;
+  font-size: 16px; transition: all .15s;
+}
+.cal-modal-nav-btn:hover { background: var(--charcoal); color: white; }
+.cal-modal-month-label {
+  font-size: 15px; font-weight: 700; color: var(--charcoal);
+  min-width: 140px; text-align: center;
+}
+.cal-modal-add-btn {
+  display: flex; align-items: center; gap: 6px;
+  background: var(--accent); color: white;
+  font-family: 'DM Sans', sans-serif; font-size: 13px; font-weight: 700;
+  border: none; padding: 9px 18px; border-radius: 100px; cursor: none;
+  transition: all .2s;
+}
+.cal-modal-add-btn:hover { background: #ff7055; transform: translateY(-1px); }
+.cal-modal-close {
+  width: 32px; height: 32px; border-radius: 10px;
+  background: var(--cream); border: none; cursor: none;
+  font-size: 18px; color: var(--muted); display: flex; align-items: center; justify-content: center;
+  transition: all .15s;
+}
+.cal-modal-close:hover { background: var(--charcoal); color: white; }
+
+/* Modal body: big grid on left, event list on right */
+.cal-modal-body {
+  display: grid; grid-template-columns: 1fr 280px;
+  flex: 1; overflow: hidden;
+}
+.cal-modal-grid-wrap {
+  padding: 20px 24px; overflow-y: auto;
+}
+.cal-modal-day-names {
+  display: grid; grid-template-columns: repeat(7, 1fr);
+  margin-bottom: 6px;
+}
+.cal-modal-day-name {
+  font-size: 11px; font-weight: 800; color: var(--muted);
+  text-align: center; padding: 4px 0;
+  text-transform: uppercase; letter-spacing: .4px;
+}
+.cal-modal-grid {
+  display: grid; grid-template-columns: repeat(7, 1fr);
+  grid-auto-rows: 1fr;
+  gap: 4px;
+}
+.cal-modal-day {
+  aspect-ratio: 1; border-radius: 12px;
+  border: 1px solid var(--border);
+  padding: 6px; cursor: none;
+  transition: all .15s; position: relative;
+  display: flex; flex-direction: column; gap: 3px;
+  background: white;
+  overflow: hidden;
+}
+.cal-modal-day:hover { border-color: rgba(28,28,30,.2); background: var(--cream); }
+.cal-modal-day.other-month { opacity: .35; }
+.cal-modal-day.today { border-color: var(--charcoal); border-width: 2px; }
+.cal-modal-day.selected { border-color: var(--accent); border-width: 2px; background: #FFF8F6; }
+.cal-modal-day-num {
+  font-size: 13px; font-weight: 700; color: var(--charcoal);
+  width: 26px; height: 26px; border-radius: 8px;
+  display: flex; align-items: center; justify-content: center;
+  flex-shrink: 0;
+}
+.cal-modal-day.today .cal-modal-day-num {
+  background: var(--charcoal); color: white;
+}
+.cal-modal-day.selected .cal-modal-day-num {
+  background: var(--accent); color: white;
+}
+.cal-modal-event-pill {
+  font-size: 10px; font-weight: 700;
+  padding: 2px 6px; border-radius: 5px;
+  white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
+  color: white; cursor: none;
+}
+
+/* Right panel */
+.cal-modal-sidebar {
+  border-left: 1px solid var(--border);
+  display: flex; flex-direction: column;
+  overflow: hidden;
+}
+.cal-modal-sidebar-hdr {
+  padding: 16px 18px 12px;
+  border-bottom: 1px solid var(--border);
+  font-family: 'Fraunces', serif;
+  font-size: 15px; font-weight: 700; letter-spacing: -.2px;
+  flex-shrink: 0;
+}
+.cal-modal-sidebar-hdr span {
+  font-size: 12px; font-weight: 500; color: var(--muted);
+  font-family: 'DM Sans', sans-serif;
+  display: block; margin-top: 2px;
+}
+.cal-modal-events-list {
+  flex: 1; overflow-y: auto; padding: 12px;
+}
+.cal-modal-event-card {
+  display: flex; gap: 10px; padding: 10px 12px;
+  border-radius: 12px; border: 1px solid var(--border);
+  margin-bottom: 8px; transition: all .15s; cursor: none;
+  background: white;
+}
+.cal-modal-event-card:hover { border-color: rgba(28,28,30,.18); box-shadow: 0 2px 8px rgba(0,0,0,.06); }
+.cal-modal-event-bar {
+  width: 4px; border-radius: 100px; flex-shrink: 0; align-self: stretch;
+}
+.cal-modal-event-body { flex: 1; min-width: 0; }
+.cal-modal-event-name { font-size: 13px; font-weight: 700; margin-bottom: 3px; }
+.cal-modal-event-meta { font-size: 11px; color: var(--muted); line-height: 1.6; }
+.cal-modal-event-del {
+  background: none; border: none; cursor: none;
+  color: var(--muted); font-size: 16px; padding: 0 2px;
+  transition: color .15s; align-self: flex-start;
+}
+.cal-modal-event-del:hover { color: var(--accent); }
+.cal-modal-no-events {
+  text-align: center; padding: 32px 16px;
+  color: var(--muted); font-size: 13px; line-height: 1.6;
+}
+
+/* ── CREATE EVENT FORM ── */
+.create-event-modal {
+  display: none; position: fixed; inset: 0; z-index: 900;
+  background: rgba(0,0,0,.52);
+  align-items: center; justify-content: center;
+}
+.create-event-modal.open { display: flex; }
+.create-event-box {
+  background: white; border-radius: 20px;
+  width: min(480px, calc(100vw - 32px));
+  box-shadow: 0 24px 80px rgba(0,0,0,.2);
+  animation: calModalIn .22s cubic-bezier(.34,1.4,.64,1);
+  overflow: hidden;
+}
+.create-event-hdr {
+  display: flex; align-items: center; justify-content: space-between;
+  padding: 20px 22px 16px;
+  border-bottom: 1px solid var(--border);
+}
+.create-event-hdr h3 {
+  font-family: 'Fraunces', serif;
+  font-size: 18px; font-weight: 900; letter-spacing: -.3px;
+}
+.create-event-body { padding: 20px 22px; display: flex; flex-direction: column; gap: 14px; }
+.form-field { display: flex; flex-direction: column; gap: 5px; }
+.form-label {
+  font-size: 11px; font-weight: 800; color: var(--muted);
+  text-transform: uppercase; letter-spacing: .5px;
+}
+.form-input {
+  width: 100%; padding: 10px 14px; border-radius: 12px;
+  border: 1.5px solid var(--border); background: var(--cream);
+  font-family: 'DM Sans', sans-serif; font-size: 14px;
+  color: var(--charcoal); outline: none; transition: border-color .18s;
+  cursor: text;
+}
+.form-input:focus { border-color: rgba(28,28,30,.25); background: white; }
+.form-row { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; }
+.color-picker-row { display: flex; gap: 8px; flex-wrap: wrap; }
+.color-swatch {
+  width: 26px; height: 26px; border-radius: 8px; cursor: none;
+  border: 2px solid transparent; transition: all .15s;
+  flex-shrink: 0;
+}
+.color-swatch.active { border-color: var(--charcoal); transform: scale(1.15); }
+.create-event-footer {
+  padding: 14px 22px 20px;
+  display: flex; gap: 10px; justify-content: flex-end;
+}
+.btn-cancel {
+  font-family: 'DM Sans', sans-serif; font-size: 13px; font-weight: 700;
+  background: var(--cream); color: var(--muted); border: none;
+  padding: 10px 20px; border-radius: 100px; cursor: none; transition: all .15s;
+}
+.btn-cancel:hover { background: var(--border); }
+.btn-save-event {
+  font-family: 'DM Sans', sans-serif; font-size: 13px; font-weight: 700;
+  background: var(--accent); color: white; border: none;
+  padding: 10px 24px; border-radius: 100px; cursor: none; transition: all .2s;
+}
+.btn-save-event:hover { background: #ff7055; }
+
+/* ══ VIBE OF THE DAY ═══════════════════════════════════════════════ */
+.votd-wrap {
+  border-bottom: 1px solid var(--border);
+  background: white;
+}
+.votd-label-bar {
+  display: flex; align-items: center; gap: 8px;
+  padding: 14px 20px 10px;
+}
+.votd-badge {
+  display: flex; align-items: center; gap: 6px;
+  background: #1C1C1E; color: white;
+  font-size: 10px; font-weight: 800; letter-spacing: 1.5px;
+  text-transform: uppercase; padding: 4px 10px 4px 6px;
+  border-radius: 100px;
+}
+.votd-badge-dot {
+  width: 18px; height: 18px; border-radius: 50%;
+  background: var(--accent); display: flex;
+  align-items: center; justify-content: center; flex-shrink: 0;
+}
+.votd-subtitle {
+  font-size: 11px; color: var(--muted); font-weight: 500;
+}
+
+/* The card */
+.votd-card {
+  margin: 0 16px 16px;
+  border-radius: 18px;
+  overflow: hidden;
+  position: relative;
+  cursor: none;
+  transition: transform .2s, box-shadow .2s;
+}
+.votd-card:hover {
+  transform: translateY(-2px);
+  box-shadow: 0 16px 48px rgba(0,0,0,.14);
+}
+
+/* Cinematic background — gradient + fake thumbnail */
+.votd-bg {
+  height: 190px;
+  background: linear-gradient(135deg, #1A0A2E 0%, #2D1B4E 40%, #0F2A4A 100%);
+  position: relative;
+  display: flex; align-items: center; justify-content: center;
+  overflow: hidden;
+}
+.votd-bg::before {
+  content: '';
+  position: absolute; inset: 0;
+  background: radial-gradient(ellipse at 30% 50%, rgba(255,92,53,.18) 0%, transparent 60%),
+              radial-gradient(ellipse at 80% 20%, rgba(200,184,255,.12) 0%, transparent 50%);
+}
+/* Abstract waveform decoration */
+.votd-wave {
+  position: absolute; bottom: 0; left: 0; right: 0; height: 50px;
+  display: flex; align-items: flex-end; gap: 3px; padding: 0 20px;
+  opacity: .35;
+}
+.votd-wave-bar {
+  flex: 1; border-radius: 2px 2px 0 0;
+  background: white;
+  transition: height .3s;
+}
+
+/* Play button */
+.votd-play {
+  width: 56px; height: 56px; border-radius: 50%;
+  background: rgba(255,255,255,.95);
+  display: flex; align-items: center; justify-content: center;
+  box-shadow: 0 8px 24px rgba(0,0,0,.3);
+  position: relative; z-index: 2;
+  transition: transform .2s, background .2s;
+}
+.votd-card:hover .votd-play {
+  transform: scale(1.08);
+  background: white;
+}
+.votd-play svg { margin-left: 3px; }
+
+/* Duration badge */
+.votd-duration {
+  position: absolute; top: 12px; right: 12px; z-index: 2;
+  background: rgba(0,0,0,.55); color: white;
+  font-size: 11px; font-weight: 700; letter-spacing: .3px;
+  padding: 3px 8px; border-radius: 6px;
+  backdrop-filter: blur(4px);
+}
+
+/* Rank badge */
+.votd-rank {
+  position: absolute; top: 12px; left: 12px; z-index: 2;
+  display: flex; align-items: center; gap: 5px;
+  background: rgba(255,92,53,.9); color: white;
+  font-size: 10px; font-weight: 800; letter-spacing: 1px; text-transform: uppercase;
+  padding: 4px 10px; border-radius: 100px;
+  backdrop-filter: blur(4px);
+}
+
+/* Bottom info panel */
+.votd-info {
+  background: white; padding: 14px 16px 16px;
+}
+.votd-author-row {
+  display: flex; align-items: center; gap: 10px; margin-bottom: 8px;
+}
+.votd-av {
+  width: 32px; height: 32px; border-radius: 9px;
+  background: #2D1B4E; display: flex; align-items: center; justify-content: center;
+  font-family: 'Fraunces', serif; font-size: 11px; font-weight: 700; color: white;
+  flex-shrink: 0;
+}
+.votd-author-meta { flex: 1; }
+.votd-author-name {
+  font-size: 13px; font-weight: 700; color: var(--charcoal); line-height: 1.2;
+}
+.votd-author-role { font-size: 11px; color: var(--muted); }
+
+.votd-title {
+  font-family: 'Fraunces', serif;
+  font-size: 15px; font-weight: 700; letter-spacing: -.2px;
+  color: var(--charcoal); line-height: 1.4; margin-bottom: 10px;
+}
+
+.votd-stats {
+  display: flex; align-items: center; gap: 14px;
+}
+.votd-stat {
+  display: flex; align-items: center; gap: 5px;
+  font-size: 12px; font-weight: 600; color: var(--muted);
+}
+.votd-stat svg { flex-shrink: 0; }
+.votd-stat.hot { color: var(--accent); }
+
+/* React bar */
+.votd-react-bar {
+  display: flex; gap: 6px; margin-top: 12px; padding-top: 12px;
+  border-top: 1px solid var(--border);
+}
+.votd-react-btn {
+  display: flex; align-items: center; gap: 5px;
+  background: var(--cream); border: 1px solid var(--border);
+  border-radius: 100px; padding: 5px 12px;
+  font-size: 12px; font-weight: 600; color: var(--muted);
+  cursor: none; transition: all .15s; border-style: solid;
+}
+.votd-react-btn:hover { border-color: var(--accent); color: var(--accent); background: #FFF5F2; }
+.votd-react-btn.active { border-color: var(--accent); color: var(--accent); background: #FFF5F2; }
+.votd-comment-btn {
+  margin-left: auto; display: flex; align-items: center; gap: 6px;
+  background: none; border: none; font-size: 12px; font-weight: 600;
+  color: var(--muted); cursor: none; transition: color .15s; padding: 5px 4px;
+}
+.votd-comment-btn:hover { color: var(--charcoal); }
+
+
+*,*::before,*::after{cursor:none!important;}
+.cursor,.cursor-ring{cursor:none!important;}
+input,textarea,[contenteditable="true"]{cursor:text!important;}
+</style>
+</head>
+<body>
+<div class="cursor" id="cursor"></div>
+<div class="cursor-ring" id="cursorRing"></div>
+
+<!-- Post Opportunity Modal -->
+<div class="post-modal-overlay" id="postModal">
+  <div class="post-modal-backdrop" onclick="closePostModal()"></div>
+  <div class="post-modal">
+    <div class="pm-title">Post an Opportunity</div>
+    <div class="pm-field">
+      <label class="pm-label">Role / Position Title</label>
+      <input class="pm-input" placeholder="e.g. Product Design Intern" />
+    </div>
+    <div class="pm-row">
+      <div class="pm-field">
+        <label class="pm-label">Company</label>
+        <input class="pm-input" placeholder="Your company name" />
+      </div>
+      <div class="pm-field">
+        <label class="pm-label">Location</label>
+        <input class="pm-input" placeholder="Remote / City, State" />
+      </div>
+    </div>
+    <div class="pm-field">
+      <label class="pm-label">Opportunity Type</label>
+      <div class="pm-type-row">
+        <button class="pm-type-btn selected" onclick="selectType(this)">Internship</button>
+        <button class="pm-type-btn" onclick="selectType(this)">Full-time</button>
+        <button class="pm-type-btn" onclick="selectType(this)">Part-time</button>
+        <button class="pm-type-btn" onclick="selectType(this)">Contract</button>
+        <button class="pm-type-btn" onclick="selectType(this)">Co-op</button>
+      </div>
+    </div>
+    <div class="pm-row">
+      <div class="pm-field">
+        <label class="pm-label">Pay / Stipend</label>
+        <input class="pm-input" placeholder="e.g. $22/hr or $5k stipend" />
+      </div>
+      <div class="pm-field">
+        <label class="pm-label">Duration / Start</label>
+        <input class="pm-input" placeholder="e.g. Summer 2025, 10 weeks" />
+      </div>
+    </div>
+    <div class="pm-field">
+      <label class="pm-label">Description</label>
+      <textarea class="pm-textarea" placeholder="What will this person work on? What are you looking for? Be specific."></textarea>
+    </div>
+    <div class="pm-field">
+      <label class="pm-label">Skills / Tags</label>
+      <input class="pm-input" placeholder="Figma, React, Python, SQL — comma separated" />
+    </div>
+    <div class="pm-footer">
+      <button class="pm-cancel" onclick="closePostModal()">Cancel</button>
+      <button class="pm-submit" onclick="closePostModal()">Post Opportunity</button>
+    </div>
+  </div>
+</div>
+
+<div class="shell">
+
+  <!-- LEFT NAV -->
+  <aside class="left-nav">
+    <a href="#" class="nav-logo">vibe<span>.</span></a>
+    <nav>
+      <a href="/html/feed.html" class="nav-item">
+        <svg width="16" height="16" viewBox="0 0 16 16" fill="none"><rect x="1" y="1" width="6" height="6" rx="2" fill="currentColor"/><rect x="9" y="1" width="6" height="6" rx="2" fill="currentColor"/><rect x="1" y="9" width="6" height="6" rx="2" fill="currentColor"/><rect x="9" y="9" width="6" height="6" rx="2" fill="currentColor"/></svg>
+        Feed
+      </a>
+      <a href="/html/network.html" class="nav-item">
+        <svg width="16" height="16" viewBox="0 0 16 16" fill="none"><circle cx="8" cy="4" r="2.5" stroke="currentColor" stroke-width="1.4"/><circle cx="2.5" cy="12" r="2" stroke="currentColor" stroke-width="1.4"/><circle cx="13.5" cy="12" r="2" stroke="currentColor" stroke-width="1.4"/><path d="M5.5 4.5L2.5 10M10.5 4.5L13.5 10M5.8 12h4.4" stroke="currentColor" stroke-width="1.3" stroke-linecap="round"/></svg>
+        Network
+      </a>
+      <a href="/html/campus.html" class="nav-item">
+        <svg width="16" height="16" viewBox="0 0 16 16" fill="none"><path d="M8 1L15 5V7H1V5L8 1Z" stroke="currentColor" stroke-width="1.4" fill="none" stroke-linejoin="round"/><rect x="2" y="7" width="2.5" height="6" stroke="currentColor" stroke-width="1.3" fill="none"/><rect x="6.75" y="7" width="2.5" height="6" stroke="currentColor" stroke-width="1.3" fill="none"/><rect x="11.5" y="7" width="2.5" height="6" stroke="currentColor" stroke-width="1.3" fill="none"/><path d="M1 13h14" stroke="currentColor" stroke-width="1.4" stroke-linecap="round"/></svg>
+        Campus
+      </a>
+      <a href="/html/opportunities.html" class="nav-item active">
+        <svg width="16" height="16" viewBox="0 0 16 16" fill="none"><rect x="1" y="5" width="14" height="10" rx="2" stroke="currentColor" stroke-width="1.4" fill="none"/><path d="M5 5V4a3 3 0 0 1 6 0v1" stroke="currentColor" stroke-width="1.4" fill="none" stroke-linecap="round"/><path d="M1 9h14" stroke="currentColor" stroke-width="1.4" stroke-linecap="round"/></svg>
+        Opportunities
+      </a>
+      <a href="/html/messages.html" class="nav-item">
+        <svg width="16" height="16" viewBox="0 0 16 16" fill="none"><path d="M1 2.5A1.5 1.5 0 012.5 1h11A1.5 1.5 0 0115 2.5v8A1.5 1.5 0 0113.5 12H5L1 15V2.5z" stroke="currentColor" stroke-width="1.4" fill="none" stroke-linejoin="round"/></svg>
+        Messages
+      </a>
+      <a href="/html/otto.html" class="nav-item">
+        <span style="display:inline-flex;width:16px;height:16px;align-items:center;justify-content:center;"><span style="width:8px;height:8px;border-radius:50%;background:var(--accent);box-shadow:0 0 6px var(--accent);"></span></span>
+        otto
+      </a>
+    </nav>
+    <div class="nav-divider"></div>
+    <a href="/html/profile.html" class="nav-item">
+      <div class="mini-avatar">MC</div>
+      <div><div style="font-size:13px;font-weight:600;color:var(--charcoal)">Maya Chen</div><div style="font-size:11px;color:var(--muted)">Product Designer</div></div>
+    </a>
+  
+    
+  
+    <div class="cal-widget" id="calWidget">
+      <div class="cal-header">
+        <button class="cal-title-row" onclick="openCalModal()" style="background:none;border:none;cursor:none;display:flex;align-items:center;gap:6px;padding:0;transition:opacity .15s" onmouseover="this.style.opacity='.7'" onmouseout="this.style.opacity='1'">
+          <svg width="12" height="12" viewBox="0 0 14 14" fill="none">
+            <rect x="1" y="2" width="12" height="11" rx="2.5" stroke="currentColor" stroke-width="1.3" fill="none"/>
+            <path d="M1 6h12" stroke="currentColor" stroke-width="1.3" stroke-linecap="round"/>
+            <path d="M4 1v2M10 1v2" stroke="currentColor" stroke-width="1.3" stroke-linecap="round"/>
+          </svg>
+          <span class="cal-title">My Calendar</span>
+          <span class="cal-event-count-badge" id="calEventCount">0</span>
+        </button>
+        <button class="cal-toggle" onclick="toggleCalView()" id="calToggleBtn">&#8964;</button>
+      </div>
+      <div id="calBody">
+        <div class="cal-month-nav">
+          <button class="cal-nav-btn" onclick="changeMonth(-1)">&#8249;</button>
+          <span class="cal-month-label" id="calMonthLabel"></span>
+          <button class="cal-nav-btn" onclick="changeMonth(1)">&#8250;</button>
+        </div>
+        <div class="cal-grid" id="calGrid"></div>
+        <div class="cal-events-panel" id="calEventsPanel">
+          <div class="cal-events-panel-title" id="calPanelTitle">Events</div>
+          <div id="calEventsList"></div>
+        </div>
+      </div>
+    </div>
+  </aside>
+
+  <!-- CENTER -->
+  <main class="center">
+    <div class="opp-header">
+      <div class="opp-header-top">
+        <div class="opp-title">Opportunities</div>
+        <button class="post-opp-btn" onclick="openPostModal()">+ Post Opportunity</button>
+      </div>
+      <div class="filter-bar">
+        <button class="filter-pill active" onclick="filterOpp(this,'all')">All</button>
+        <button class="filter-pill" onclick="filterOpp(this,'internship')">Internships</button>
+        <button class="filter-pill" onclick="filterOpp(this,'full-time')">Full-time</button>
+        <button class="filter-pill" onclick="filterOpp(this,'part-time')">Part-time</button>
+        <button class="filter-pill" onclick="filterOpp(this,'contract')">Contract</button>
+        <button class="filter-pill" onclick="filterOpp(this,'remote')">Remote</button>
+        <button class="filter-pill" onclick="filterOpp(this,'matched')">✦ Matched for you</button>
+      </div>
+    </div>
+
+    <div class="search-row">
+      <div class="search-input-wrap">
+        <span class="search-icon">⌕</span>
+        <input class="search-input" placeholder="Search role, company, or skill…" />
+      </div>
+      <input class="location-input" placeholder="📍 Location" />
+    </div>
+
+    <div class="opp-list" id="oppList">
+      <!-- Empty state (fresh-onboarded users) -->
+      <div class="opp-empty" id="oppEmpty">
+        <div class="opp-empty-icon">💼</div>
+        <h3>No opportunities yet</h3>
+        <p>Add a few <strong>skills</strong> to your profile and Otto will surface roles tagged for them — internships, full-time, contract, all matched to fit.</p>
+        <a href="/html/profile.html" class="opp-empty-cta">Edit your profile →</a>
+        <div class="opp-empty-foot">"the more otto knows about how you work, the better i can match you to roles." — otto</div>
+      </div>
+
+      <div class="match-banner">
+        <div class="match-banner-icon">✦</div>
+        <div>
+          <h4>Matched to your profile — ranked by fit</h4>
+          <p>Based on your skills, Vibes, and experience. Update your profile to improve matches.</p>
+        </div>
+      </div>
+
+      <!-- Recruiter mode notice -->
+      <div class="recruiter-notice">
+        <div class="recruiter-notice-text"><strong>Viewing as a candidate.</strong> Recruiters see applicant Vibes and profiles side-by-side. Switch modes to post and manage opportunities.</div>
+        <button class="switch-mode-btn" onclick="this.textContent=this.textContent==='Switch to Recruiter'?'Back to Candidate':'Switch to Recruiter'">Switch to Recruiter</button>
+      </div>
+
+      <div class="list-section-label">Matched for you · 4 new</div>
+
+      <!-- Card 1 -->
+      <div class="opp-card" id="opp-1" onclick="showDetail('1')">
+        <div class="new-badge">NEW</div>
+        <div class="opp-card-top">
+          <div class="opp-logo" style="background:#1A0533">LA</div>
+          <div class="opp-card-info">
+            <h3>Product Design Intern</h3>
+            <div class="company">Layerwise AI</div>
+            <div class="meta-row">
+              <span class="opp-meta-pill type-internship">Internship</span>
+              <span class="opp-meta-pill loc">📍 Remote · US</span>
+              <span class="opp-meta-pill pay">$26/hr</span>
+            </div>
+          </div>
+          <div class="opp-match-tag">✦ 94% match</div>
+        </div>
+        <div class="opp-desc">You'll own end-to-end design on our core onboarding flow — from research to shipped pixels. We care about clear thinking, not years of experience. A Vibe showing how you approach a design problem > a polished portfolio.</div>
+        <div class="opp-skills">
+          <span class="opp-skill match">Figma</span>
+          <span class="opp-skill match">UX Research</span>
+          <span class="opp-skill match">Prototyping</span>
+          <span class="opp-skill">SQL</span>
+          <span class="opp-skill">Design Systems</span>
+        </div>
+        <div class="opp-footer">
+          <div class="opp-poster">
+            <div class="opp-poster-av" style="background:#2D1B4E">KA</div>
+            <div class="opp-poster-info"><span class="opp-poster-name">Kwame Asante</span> · Posted 3h ago · 12 applicants</div>
+          </div>
+          <div class="opp-actions">
+            <button class="opp-save" onclick="event.stopPropagation();toggleSave(this)" title="Save">🔖</button>
+            <button class="opp-apply" onclick="event.stopPropagation();applyNow(this)">Apply with Vibe</button>
+          </div>
+        </div>
+      </div>
+
+      <!-- Card 2 -->
+      <div class="opp-card" id="opp-2" onclick="showDetail('2')">
+        <div class="opp-card-top">
+          <div class="opp-logo" style="background:#001a2c">NC</div>
+          <div class="opp-card-info">
+            <h3>Growth & Content Intern</h3>
+            <div class="company">Nova Capital Partners</div>
+            <div class="meta-row">
+              <span class="opp-meta-pill type-internship">Internship</span>
+              <span class="opp-meta-pill loc">📍 NYC · Hybrid</span>
+              <span class="opp-meta-pill pay">$5k stipend</span>
+            </div>
+          </div>
+          <div class="opp-match-tag">✦ 87% match</div>
+        </div>
+        <div class="opp-desc">We're a seed-stage VC looking for a content intern to build our social presence and help founders with their storytelling. You'll work directly with partners on deal memos and portfolio spotlights.</div>
+        <div class="opp-skills">
+          <span class="opp-skill match">Content Strategy</span>
+          <span class="opp-skill match">Writing</span>
+          <span class="opp-skill">Venture Capital</span>
+          <span class="opp-skill">Analytics</span>
+        </div>
+        <div class="opp-footer">
+          <div class="opp-poster">
+            <div class="opp-poster-av" style="background:#3B1A00">PS</div>
+            <div class="opp-poster-info"><span class="opp-poster-name">Priya Sinha</span> · Posted 1d ago · 28 applicants</div>
+          </div>
+          <div class="opp-actions">
+            <button class="opp-save" onclick="event.stopPropagation();toggleSave(this)" title="Save">🔖</button>
+            <button class="opp-apply" onclick="event.stopPropagation();applyNow(this)">Apply with Vibe</button>
+          </div>
+        </div>
+      </div>
+
+      <!-- Card 3 -->
+      <div class="opp-card" id="opp-3" onclick="showDetail('3')">
+        <div class="opp-card-top">
+          <div class="opp-logo" style="background:#002828">ST</div>
+          <div class="opp-card-info">
+            <h3>Full-Stack Developer</h3>
+            <div class="company">Stackform</div>
+            <div class="meta-row">
+              <span class="opp-meta-pill type-full">Full-time</span>
+              <span class="opp-meta-pill loc">📍 Fully Remote</span>
+              <span class="opp-meta-pill pay">$95–120k</span>
+            </div>
+          </div>
+          <div class="opp-match-tag">✦ 81% match</div>
+        </div>
+        <div class="opp-desc">Small team. Big product surface. We're looking for a generalist engineer who can build features from backend to UI. More weight given to what you've shipped than where you went to school.</div>
+        <div class="opp-skills">
+          <span class="opp-skill">React</span>
+          <span class="opp-skill">Node.js</span>
+          <span class="opp-skill">PostgreSQL</span>
+          <span class="opp-skill">TypeScript</span>
+        </div>
+        <div class="opp-footer">
+          <div class="opp-poster">
+            <div class="opp-poster-av" style="background:#1A1A00">ZW</div>
+            <div class="opp-poster-info"><span class="opp-poster-name">Zara Williams</span> · Posted 2d ago · 67 applicants</div>
+          </div>
+          <div class="opp-actions">
+            <button class="opp-save" onclick="event.stopPropagation();toggleSave(this)" title="Save">🔖</button>
+            <button class="opp-apply" onclick="event.stopPropagation();applyNow(this)">Apply with Vibe</button>
+          </div>
+        </div>
+      </div>
+
+      <!-- Card 4 -->
+      <div class="opp-card" id="opp-4" onclick="showDetail('4')">
+        <div class="opp-card-top">
+          <div class="opp-logo" style="background:#1A0008">MK</div>
+          <div class="opp-card-info">
+            <h3>Marketing Co-op</h3>
+            <div class="company">Meridian Labs</div>
+            <div class="meta-row">
+              <span class="opp-meta-pill type-part">Part-time</span>
+              <span class="opp-meta-pill loc">📍 Indianapolis, IN</span>
+              <span class="opp-meta-pill pay">$18/hr</span>
+            </div>
+          </div>
+          <div class="opp-match-tag">✦ 74% match</div>
+        </div>
+        <div class="opp-desc">6-month co-op supporting our brand marketing team. You'll own weekly newsletters, social scheduling, and event logistics. Great for someone balancing school and wanting real marketing reps.</div>
+        <div class="opp-skills">
+          <span class="opp-skill">Social Media</span>
+          <span class="opp-skill">Email Marketing</span>
+          <span class="opp-skill">Canva</span>
+          <span class="opp-skill match">Writing</span>
+        </div>
+        <div class="opp-footer">
+          <div class="opp-poster">
+            <div class="opp-poster-av" style="background:#2a2800">LM</div>
+            <div class="opp-poster-info"><span class="opp-poster-name">Luca Moretti</span> · Posted 3d ago · 19 applicants</div>
+          </div>
+          <div class="opp-actions">
+            <button class="opp-save" onclick="event.stopPropagation();toggleSave(this)" title="Save">🔖</button>
+            <button class="opp-apply" onclick="event.stopPropagation();applyNow(this)">Apply with Vibe</button>
+          </div>
+        </div>
+      </div>
+
+      <div class="list-section-label" style="margin-top:6px;">More opportunities</div>
+
+      <!-- Card 5 -->
+      <div class="opp-card" id="opp-5" onclick="showDetail('5')">
+        <div class="opp-card-top">
+          <div class="opp-logo" style="background:#0a2a3e">OP</div>
+          <div class="opp-card-info">
+            <h3>Operations Analyst Intern</h3>
+            <div class="company">Oriole Partners</div>
+            <div class="meta-row">
+              <span class="opp-meta-pill type-internship">Internship</span>
+              <span class="opp-meta-pill loc">📍 Chicago, IL · Hybrid</span>
+              <span class="opp-meta-pill pay">$20/hr</span>
+            </div>
+          </div>
+        </div>
+        <div class="opp-desc">Summer internship on our ops team. You'll build dashboards, streamline vendor workflows, and present findings to leadership. Strong analytical skills required.</div>
+        <div class="opp-skills">
+          <span class="opp-skill">Excel</span>
+          <span class="opp-skill">SQL</span>
+          <span class="opp-skill">Process Improvement</span>
+        </div>
+        <div class="opp-footer">
+          <div class="opp-poster">
+            <div class="opp-poster-av" style="background:#1A1A00">ZW</div>
+            <div class="opp-poster-info"><span class="opp-poster-name">Zara Williams</span> · Posted 5d ago · 43 applicants</div>
+          </div>
+          <div class="opp-actions">
+            <button class="opp-save" onclick="event.stopPropagation();toggleSave(this)" title="Save">🔖</button>
+            <button class="opp-apply" onclick="event.stopPropagation();applyNow(this)">Apply with Vibe</button>
+          </div>
+        </div>
+      </div>
+
+    </div>
+  </main>
+
+  <!-- RIGHT: Detail panel -->
+  <aside class="detail-panel" id="detailPanel">
+    <div class="dp-empty" id="dpEmpty">
+      <div class="dp-empty-icon">💼</div>
+      <div class="dp-empty-text">Click on an opportunity to see the full details here.</div>
+    </div>
+    <div class="dp-content" id="dpContent"></div>
+  </aside>
+
+</div>
+
+<script>
+// ── Cursor ──
+const cur=document.getElementById('cursor'),ring=document.getElementById('cursorRing');
+let mx=window.innerWidth/2,my=window.innerHeight/2,rx=window.innerWidth/2,ry=window.innerHeight/2;
+document.addEventListener('mousemove',e=>{mx=e.clientX;my=e.clientY;cur.style.transform=`translate(${mx-4}px,${my-4}px)`;},{passive:true});
+(function tick(){rx+=(mx-rx-14)*.28;ry+=(my-ry-14)*.28;ring.style.transform=`translate(${Math.round(rx)}px,${Math.round(ry)}px)`;requestAnimationFrame(tick);})();
+document.querySelectorAll('a,button,.nav-item,.opp-card,.filter-pill').forEach(el=>{
+  el.addEventListener('mouseenter',()=>{cur.classList.add('hover');ring.classList.add('hover');});
+  el.addEventListener('mouseleave',()=>{cur.classList.remove('hover');ring.classList.remove('hover');});
+});
+
+// ── Filter pills ──
+function filterOpp(btn, type) {
+  document.querySelectorAll('.filter-pill').forEach(b=>b.classList.remove('active'));
+  btn.classList.add('active');
+}
+
+// ── Save toggle ──
+function toggleSave(btn) {
+  btn.classList.toggle('saved');
+  btn.textContent = btn.classList.contains('saved') ? '🔖' : '🔖';
+  btn.style.background = btn.classList.contains('saved') ? '#FFF0EC' : '';
+}
+
+// ── Apply ──
+function applyNow(btn) {
+  const applied = btn.classList.toggle('applied');
+  btn.textContent = applied ? '✓ Applied' : 'Apply with Vibe';
+  // Also update detail panel button
+  const dpApply = document.querySelector('.dp-apply');
+  if (dpApply) { dpApply.classList.toggle('applied', applied); dpApply.textContent = applied ? '✓ Applied' : 'Apply with Vibe'; }
+}
+
+// ── Detail panel data ──
+const details = {
+  '1': {
+    logoColor:'#1A0533', logoText:'LA', title:'Product Design Intern', company:'Layerwise AI',
+    type:'Internship', loc:'Remote · US', pay:'$26/hr', match:'94% match',
+    recruiterAv:'KA', recruiterColor:'#2D1B4E', recruiterName:'Kwame Asante', recruiterTitle:'CEO · Layerwise AI', recruiterVibe:'Vibe: "Why I build AI tools for designers"',
+    pills:['Internship','Remote · US','$26/hr','Summer 2025 · 12 weeks'],
+    body:`<p>You'll own end-to-end design on our core onboarding flow — from user research sessions to shipped pixels. We're a 6-person team building AI-native design tooling, and this role has real impact from day one.</p>
+    <p>What you'll do: lead usability studies with 10+ users, design and prototype three major onboarding improvements, present findings in our weekly product review, and ship at least one feature before your internship ends.</p>
+    <p>What we care about: clear thinking, how you articulate your design decisions, and that you've actually shipped something — even if it's a side project. A 90-second Vibe explaining your process gets more weight than a polished deck.</p>`,
+    skills:['Figma','UX Research','Prototyping','Design Systems','SQL'],
+    matchedSkills:['Figma','UX Research','Prototyping'],
+    postedBy:'Kwame Asante · 3h ago · 12 applicants',
+  },
+  '2': {
+    logoColor:'#001a2c', logoText:'NC', title:'Growth & Content Intern', company:'Nova Capital Partners',
+    type:'Internship', loc:'NYC · Hybrid', pay:'$5k stipend', match:'87% match',
+    recruiterAv:'PS', recruiterColor:'#3B1A00', recruiterName:'Priya Sinha', recruiterTitle:'Partner · Nova Capital', recruiterVibe:'Vibe: "How I evaluate early-stage startups"',
+    pills:['Internship','NYC · Hybrid','$5k stipend','Summer 2025 · 10 weeks'],
+    body:`<p>Nova Capital is a seed-stage fund with 40+ portfolio companies. We're looking for a content intern to help us build the fund's voice online and help our portfolio founders tell better stories.</p>
+    <p>You'll write weekly newsletters, create LinkedIn content for our managing partners, help founders prep for press interviews, and document deal flow patterns in a public-facing insights report.</p>
+    <p>This is a rare opportunity to sit inside a VC and understand how the sausage is made — deal sourcing, founder vetting, board prep. You'll leave with a portfolio of real published work and a network of founders.</p>`,
+    skills:['Content Strategy','Writing','Venture Capital','Analytics','LinkedIn'],
+    matchedSkills:['Content Strategy','Writing'],
+    postedBy:'Priya Sinha · 1d ago · 28 applicants',
+  },
+  '3': {
+    logoColor:'#002828', logoText:'ST', title:'Full-Stack Developer', company:'Stackform',
+    type:'Full-time', loc:'Fully Remote', pay:'$95–120k', match:'81% match',
+    recruiterAv:'ZW', recruiterColor:'#1A1A00', recruiterName:'Zara Williams', recruiterTitle:'COO · Stackform', recruiterVibe:'Vibe: "Building a remote-first culture that actually works"',
+    pills:['Full-time','Fully Remote','$95–120k','Start ASAP'],
+    body:`<p>Stackform is a workflow automation platform for operations teams. We're 14 people, profitable, and growing 3x YoY. We're not looking for a specialist — we want a generalist who can move fast across the stack.</p>
+    <p>You'll build new features from database schema to UI, participate in architecture decisions, own entire product areas, and work directly with our two co-founders. No meetings before 10am, ever.</p>
+    <p>We care more about what you've shipped than your pedigree. Show us a project, a GitHub, a Vibe walking through a bug you fixed — anything that shows you can build.</p>`,
+    skills:['React','Node.js','PostgreSQL','TypeScript','REST APIs'],
+    matchedSkills:[],
+    postedBy:'Zara Williams · 2d ago · 67 applicants',
+  },
+  '4': {
+    logoColor:'#1A0008', logoText:'MK', title:'Marketing Co-op', company:'Meridian Labs',
+    type:'Part-time', loc:'Indianapolis, IN', pay:'$18/hr', match:'74% match',
+    recruiterAv:'LM', recruiterColor:'#2a2800', recruiterName:'Luca Moretti', recruiterTitle:'Head of Marketing · Meridian Labs', recruiterVibe:'Vibe: "Year one at a startup — what actually surprised me"',
+    pills:['Part-time','Indianapolis, IN','$18/hr','6 months · Jan 2025'],
+    body:`<p>Meridian Labs builds health analytics software for mid-size hospital systems. Our marketing team is two people — you'd be the third. This is a co-op designed for students who want real reps, not busy work.</p>
+    <p>You'll own: weekly email newsletter to 12k subscribers, social media scheduling and community management, logistics and comms for two industry events, and one brand campaign from brief to launch.</p>
+    <p>We're based in Indianapolis and this role is in-office 2–3 days per week. Flexible around class schedules for the right candidate.</p>`,
+    skills:['Email Marketing','Social Media','Canva','Writing','Event Logistics'],
+    matchedSkills:['Writing'],
+    postedBy:'Luca Moretti · 3d ago · 19 applicants',
+  },
+  '5': {
+    logoColor:'#0a2a3e', logoText:'OP', title:'Operations Analyst Intern', company:'Oriole Partners',
+    type:'Internship', loc:'Chicago, IL · Hybrid', pay:'$20/hr', match:null,
+    recruiterAv:'ZW', recruiterColor:'#1A1A00', recruiterName:'Zara Williams', recruiterTitle:'COO · Oriole Partners', recruiterVibe:'Vibe: "Operations as a competitive advantage"',
+    pills:['Internship','Chicago, IL · Hybrid','$20/hr','Summer 2025 · 10 weeks'],
+    body:`<p>Oriole Partners is a $400M private equity firm with portfolio companies across logistics, retail, and healthcare. Our ops team of 8 drives value creation across 12 portfolio companies.</p>
+    <p>You'll build and maintain dashboards tracking KPIs across portfolios, streamline vendor onboarding workflows, and present your analysis to senior leadership at the end of the summer.</p>
+    <p>Strong Excel and SQL skills required. Prior finance or ops coursework helpful but not required.</p>`,
+    skills:['Excel','SQL','Process Improvement','Data Analysis','PowerPoint'],
+    matchedSkills:[],
+    postedBy:'Zara Williams · 5d ago · 43 applicants',
+  }
+};
+
+let activeDetail = null;
+
+function showDetail(id) {
+  // Deselect previous
+  document.querySelectorAll('.opp-card').forEach(c=>c.classList.remove('active-card'));
+  document.getElementById('opp-'+id).classList.add('active-card');
+
+  const d = details[id];
+  if (!d) return;
+  activeDetail = id;
+
+  document.getElementById('dpEmpty').style.display = 'none';
+  const content = document.getElementById('dpContent');
+  content.classList.add('visible');
+
+  const typeClass = {'Internship':'type-internship','Full-time':'type-full','Part-time':'type-part','Contract':'type-contract','Co-op':'type-internship'}[d.type]||'type-internship';
+
+  content.innerHTML = `
+    <div class="dp-logo" style="background:${d.logoColor}">${d.logoText}</div>
+    <div class="dp-title">${d.title}</div>
+    <div class="dp-company">${d.company}</div>
+    <div class="dp-pills">
+      <span class="opp-meta-pill ${typeClass}">${d.type}</span>
+      <span class="opp-meta-pill loc">📍 ${d.loc}</span>
+      <span class="opp-meta-pill pay">${d.pay}</span>
+      ${d.match ? `<span class="opp-match-tag">✦ ${d.match}</span>` : ''}
+    </div>
+    <div class="dp-actions">
+      <button class="dp-apply" onclick="dpApply(this)">Apply with Vibe</button>
+      <button class="dp-save" onclick="this.classList.toggle('saved');this.textContent=this.classList.contains('saved')?'🔖':'🔖'">🔖</button>
+    </div>
+    <div class="dp-section">
+      <div class="dp-section-title">About the role</div>
+      <div class="dp-body">${d.body}</div>
+    </div>
+    <div class="dp-section">
+      <div class="dp-section-title">Skills</div>
+      <div class="opp-skills" style="margin-bottom:0">
+        ${d.skills.map(s=>`<span class="opp-skill ${d.matchedSkills.includes(s)?'match':''}">${s}</span>`).join('')}
+      </div>
+    </div>
+    <div class="dp-divider"></div>
+    <div class="dp-section">
+      <div class="dp-section-title">Posted by</div>
+      <div class="dp-recruiter">
+        <div class="dp-rec-av" style="background:${d.recruiterColor}">${d.recruiterAv}</div>
+        <div>
+          <div class="dp-rec-name">${d.recruiterName}</div>
+          <div class="dp-rec-title">${d.recruiterTitle}</div>
+          <div class="dp-rec-vibe">${d.recruiterVibe}</div>
+        </div>
+        <button class="dp-view-vibe">View Vibe →</button>
+      </div>
+    </div>
+    <div class="dp-section">
+      <div class="dp-section-title">Details</div>
+      <div class="dp-body"><strong>Posted by:</strong> ${d.postedBy}</div>
+    </div>`;
+};
+
+function dpApply(btn) {
+  const applied = btn.classList.toggle('applied');
+  btn.textContent = applied ? '✓ Applied' : 'Apply with Vibe';
+  // update card button
+  const card = document.querySelector('#opp-'+activeDetail+' .opp-apply');
+  if (card) { card.classList.toggle('applied', applied); card.textContent = applied ? '✓ Applied' : 'Apply with Vibe'; }
+}
+
+function openPostModal() { document.getElementById('postModal').classList.add('open'); }
+function closePostModal() { document.getElementById('postModal').classList.remove('open'); }
+
+function selectType(btn) {
+  document.querySelectorAll('.pm-type-btn').forEach(b=>b.classList.remove('selected'));
+  btn.classList.add('selected');
+}
+
+document.addEventListener('keydown', e=>{ if(e.key==='Escape') closePostModal(); });
+
+
+
+const calendarEvents = {};
+(function seedEvents() {
+  const now = new Date(), y = now.getFullYear(), m = now.getMonth();
+  [
+    [new Date(y,m,now.getDate()+2),  'IU Spring Career Fair',     '10:00','IMU Alumni Hall',              'Bring resume, business casual','#1A9E5B'],
+    [new Date(y,m,now.getDate()+5),  'Goldman Sachs Info Session', '17:30','Kelley School of Business 100','',                            '#2563EB'],
+    [new Date(y,m,now.getDate()+8),  'Weekly Design Critique',     '19:00','Luddy Hall 1106',              'Bring a prototype or sketch',  '#7C5CFC'],
+    [new Date(y,m,now.getDate()+14), 'IU Hackathon 2025',          '09:00','Assembly Hall',               '$10k prizes',                  '#FF5C35'],
+  ].forEach(([d,n,t,l,o,c]) => _storeEvent(d,n,t,l,o,c));
+})();
+function _storeEvent(dateObj,name,time,location,notes,color){
+  color=color||'#FF5C35';
+  const key=dateKey(dateObj);
+  if(!calendarEvents[key])calendarEvents[key]=[];
+  if(!calendarEvents[key].find(e=>e.name===name))
+    calendarEvents[key].push({name,time:time||'',location:location||'',notes:notes||'',color});
+}
+function addCalEvent(dateObj,name,time,color,location,notes){
+  _storeEvent(dateObj,name,time||'',location||'',notes||'',color||'#FF5C35');
+  updateEventCountBadge(); renderCalendar();
+  if(modalOpen){renderModalGrid();renderModalSidebar();}
+}
+function dateKey(d){return d.getFullYear()+'-'+String(d.getMonth()+1).padStart(2,'0')+'-'+String(d.getDate()).padStart(2,'0');}
+function fmtTime(t){if(!t)return'All day';const[h,m]=t.split(':').map(Number);return`${h%12||12}:${String(m).padStart(2,'0')}${h>=12?'pm':'am'}`;}
+function updateEventCountBadge(){
+  const total=Object.values(calendarEvents).reduce((s,a)=>s+a.length,0);
+  const b=document.getElementById('calEventCount');if(b)b.textContent=total;
+}
+let calYear=new Date().getFullYear(),calMonth=new Date().getMonth(),calSelectedKey=null,calVisible=true;
+const MONTHS=['January','February','March','April','May','June','July','August','September','October','November','December'];
+const DAYS=['Su','Mo','Tu','We','Th','Fr','Sa'];
+function renderCalendar(){
+  const label=document.getElementById('calMonthLabel'),grid=document.getElementById('calGrid');
+  if(!label||!grid)return;
+  label.textContent=MONTHS[calMonth].slice(0,3)+' '+calYear;
+  const today=new Date(),firstDay=new Date(calYear,calMonth,1).getDay(),
+        dim=new Date(calYear,calMonth+1,0).getDate(),dip=new Date(calYear,calMonth,0).getDate();
+  let h=DAYS.map(d=>`<div class="cal-day-name">${d}</div>`).join('');
+  for(let i=firstDay-1;i>=0;i--){const d=dip-i,key=dateKey(new Date(calYear,calMonth-1,d));h+=`<div class="cal-day other-month${calendarEvents[key]?.length?' has-event':''}" onclick="miniSelectDay(${calYear},${calMonth-1},${d})">${d}</div>`;}
+  for(let d=1;d<=dim;d++){const key=dateKey(new Date(calYear,calMonth,d));const it=today.getFullYear()===calYear&&today.getMonth()===calMonth&&today.getDate()===d;const he=!!calendarEvents[key]?.length;const is=key===calSelectedKey;h+=`<div class="cal-day${it?' today':''}${he?' has-event':''}${is?' selected':''}" onclick="miniSelectDay(${calYear},${calMonth},${d})">${d}</div>`;}
+  const filled=firstDay+dim,tot=Math.ceil(filled/7)*7;
+  for(let d=1;d<=tot-filled;d++){const key=dateKey(new Date(calYear,calMonth+1,d));h+=`<div class="cal-day other-month${calendarEvents[key]?.length?' has-event':''}" onclick="miniSelectDay(${calYear},${calMonth+1},${d})">${d}</div>`;}
+  grid.innerHTML=h;
+}
+function miniSelectDay(year,month,day){
+  const key=dateKey(new Date(year,month,day));
+  if(calSelectedKey===key){calSelectedKey=null;document.getElementById('calEventsPanel').classList.remove('open');renderCalendar();return;}
+  calSelectedKey=key;renderCalendar();
+  const evts=calendarEvents[key]||[],panel=document.getElementById('calEventsPanel'),
+        list=document.getElementById('calEventsList'),title=document.getElementById('calPanelTitle');
+  title.textContent=new Date(year,month,day).toLocaleDateString('en-US',{weekday:'short',month:'short',day:'numeric'});
+  if(!evts.length){list.innerHTML=`<div class="cal-empty">No events &mdash; <button onclick="openCreateEventForKey('${key}')" style="background:none;border:none;color:var(--accent);cursor:none;font-size:11px;font-weight:700;padding:0">+ Add</button></div>`;}
+  else{list.innerHTML=evts.map(e=>`<div class="cal-event-item"><div class="cal-event-dot" style="background:${e.color}"></div><div class="cal-event-info"><div class="cal-event-name">${e.name}</div><div class="cal-event-time">${fmtTime(e.time)}${e.location?' &middot; '+e.location:''}</div></div><button onclick="removeCalEvent('${key}','${e.name}')" style="background:none;border:none;color:var(--muted);cursor:none;font-size:14px;padding:2px 4px;border-radius:5px;transition:color .15s" onmouseover="this.style.color='var(--accent)'" onmouseout="this.style.color='var(--muted)'">&times;</button></div>`).join('');}
+  panel.classList.add('open');
+}
+function removeCalEvent(key,name){
+  if(!calendarEvents[key])return;
+  calendarEvents[key]=calendarEvents[key].filter(e=>e.name!==name);
+  if(!calendarEvents[key].length)delete calendarEvents[key];
+  updateEventCountBadge();
+  const p=key.split('-').map(Number);
+  miniSelectDay(p[0],p[1]-1,p[2]);
+  if(modalOpen){renderModalGrid();renderModalSidebar();}
+  if(typeof _calSave==='function')_calSave();
+}
+function changeMonth(dir){calMonth+=dir;if(calMonth>11){calMonth=0;calYear++;}if(calMonth<0){calMonth=11;calYear--;}calSelectedKey=null;document.getElementById('calEventsPanel').classList.remove('open');renderCalendar();}
+function toggleCalView(){calVisible=!calVisible;document.getElementById('calBody').style.display=calVisible?'':'none';document.getElementById('calToggleBtn').innerHTML=calVisible?'&#8964;':'&#8965;';}
+
+// FULL MODAL
+let modalOpen=false,modalYear=new Date().getFullYear(),modalMonth=new Date().getMonth(),modalSelectedKey=null;
+function openCalModal(){
+  modalOpen=true;modalYear=calYear;modalMonth=calMonth;modalSelectedKey=calSelectedKey;
+  document.getElementById('calModalBackdrop').classList.add('open');
+  document.body.style.overflow='hidden';
+  renderModalGrid();renderModalSidebar();
+}
+function closeCalModal(){modalOpen=false;document.getElementById('calModalBackdrop').classList.remove('open');document.body.style.overflow='';}
+function modalChangeMonth(dir){modalMonth+=dir;if(modalMonth>11){modalMonth=0;modalYear++;}if(modalMonth<0){modalMonth=11;modalYear--;}modalSelectedKey=null;renderModalGrid();renderModalSidebar();}
+function renderModalGrid(){
+  const label=document.getElementById('modalMonthLabel'),grid=document.getElementById('modalCalGrid'),names=document.getElementById('modalDayNames');
+  if(!label||!grid)return;
+  label.textContent=MONTHS[modalMonth]+' '+modalYear;
+  names.innerHTML=DAYS.map(d=>`<div class="cal-modal-day-name">${d}</div>`).join('');
+  const today=new Date(),firstDay=new Date(modalYear,modalMonth,1).getDay(),
+        dim=new Date(modalYear,modalMonth+1,0).getDate(),dip=new Date(modalYear,modalMonth,0).getDate();
+  let h='';
+  for(let i=firstDay-1;i>=0;i--){const d=dip-i,key=dateKey(new Date(modalYear,modalMonth-1,d)),evts=calendarEvents[key]||[];h+=`<div class="cal-modal-day other-month" onclick="modalSelectDay(${modalYear},${modalMonth-1},${d})"><div class="cal-modal-day-num">${d}</div>${evts.slice(0,2).map(e=>`<div class="cal-modal-event-pill" style="background:${e.color}">${e.name}</div>`).join('')}</div>`;}
+  for(let d=1;d<=dim;d++){const key=dateKey(new Date(modalYear,modalMonth,d));const evts=calendarEvents[key]||[];const it=today.getFullYear()===modalYear&&today.getMonth()===modalMonth&&today.getDate()===d;const is=key===modalSelectedKey;const extras=evts.length>2?`<div style="font-size:9px;color:var(--muted);font-weight:700">+${evts.length-2} more</div>`:'';h+=`<div class="cal-modal-day${it?' today':''}${is?' selected':''}" onclick="modalSelectDay(${modalYear},${modalMonth},${d})"><div class="cal-modal-day-num">${d}</div>${evts.slice(0,2).map(e=>`<div class="cal-modal-event-pill" style="background:${e.color}">${e.name}</div>`).join('')}${extras}</div>`;}
+  const filled=firstDay+dim,tot=Math.ceil(filled/7)*7;
+  for(let d=1;d<=tot-filled;d++){const key=dateKey(new Date(modalYear,modalMonth+1,d));const evts=calendarEvents[key]||[];h+=`<div class="cal-modal-day other-month" onclick="modalSelectDay(${modalYear},${modalMonth+1},${d})"><div class="cal-modal-day-num">${d}</div>${evts.slice(0,2).map(e=>`<div class="cal-modal-event-pill" style="background:${e.color}">${e.name}</div>`).join('')}</div>`;}
+  grid.innerHTML=h;
+}
+function modalSelectDay(year,month,day){modalSelectedKey=dateKey(new Date(year,month,day));renderModalGrid();renderModalSidebar();}
+function renderModalSidebar(){
+  const listEl=document.getElementById('modalEventsList'),dateEl=document.getElementById('modalSidebarDate');
+  if(!listEl)return;
+  const noEvtHTML=`<div class="cal-modal-no-events"><svg width="36" height="36" viewBox="0 0 36 36" fill="none" style="margin:0 auto 10px;display:block;opacity:.3"><rect x="3" y="6" width="30" height="27" rx="6" stroke="currentColor" stroke-width="2" fill="none"/><path d="M3 14h30" stroke="currentColor" stroke-width="2" stroke-linecap="round"/><path d="M11 3v6M25 3v6" stroke="currentColor" stroke-width="2" stroke-linecap="round"/></svg>`;
+  if(!modalSelectedKey){dateEl.textContent='Click a day to see events';listEl.innerHTML=noEvtHTML+'Select a day to see<br>or add events</div>';return;}
+  const p=modalSelectedKey.split('-').map(Number),dateObj=new Date(p[0],p[1]-1,p[2]);
+  dateEl.textContent=dateObj.toLocaleDateString('en-US',{weekday:'long',month:'long',day:'numeric'});
+  const evts=calendarEvents[modalSelectedKey]||[];
+  if(!evts.length){listEl.innerHTML=noEvtHTML+`No events yet<br><button onclick="openCreateEventForKey('${modalSelectedKey}')" style="background:none;border:none;color:var(--accent);cursor:none;font-size:13px;font-weight:700;margin-top:8px;padding:0">+ Add an event</button></div>`;}
+  else{listEl.innerHTML=evts.map(e=>`<div class="cal-modal-event-card"><div class="cal-modal-event-bar" style="background:${e.color}"></div><div class="cal-modal-event-body"><div class="cal-modal-event-name">${e.name}</div><div class="cal-modal-event-meta">${e.time?fmtTime(e.time)+'<br>':''}${e.location?'&#128205; '+e.location+'<br>':''}${e.notes?'&#128221; '+e.notes:''}</div></div><button class="cal-modal-event-del" onclick="removeCalEvent('${modalSelectedKey}','${e.name}')">&times;</button></div>`).join('')+`<button onclick="openCreateEventForKey('${modalSelectedKey}')" style="width:100%;margin-top:8px;padding:10px;border-radius:12px;border:1.5px dashed var(--border);background:none;color:var(--muted);font-family:'DM Sans',sans-serif;font-size:12px;font-weight:700;cursor:none;transition:all .15s" onmouseover="this.style.borderColor='var(--accent)';this.style.color='var(--accent)'" onmouseout="this.style.borderColor='var(--border)';this.style.color='var(--muted)'">+ Add another event</button>`;}
+}
+
+// CREATE EVENT
+let selectedEventColor='#FF5C35',prefillDateKey=null;
+function openCreateEvent(){prefillDateKey=modalSelectedKey;_openCreateForm();}
+function openCreateEventForKey(key){prefillDateKey=key;_openCreateForm();}
+function _openCreateForm(){
+  document.getElementById('evtDate').value=prefillDateKey||dateKey(new Date());
+  document.getElementById('evtName').value='';document.getElementById('evtTime').value='';
+  document.getElementById('evtLocation').value='';document.getElementById('evtNotes').value='';
+  selectedEventColor='#FF5C35';
+  document.querySelectorAll('.color-swatch').forEach(s=>s.classList.toggle('active',s.dataset.color===selectedEventColor));
+  document.getElementById('createEventModal').classList.add('open');
+  setTimeout(()=>document.getElementById('evtName').focus(),80);
+}
+function closeCreateEvent(){document.getElementById('createEventModal').classList.remove('open');}
+function pickColor(el){selectedEventColor=el.dataset.color;document.querySelectorAll('.color-swatch').forEach(s=>s.classList.remove('active'));el.classList.add('active');}
+function saveNewEvent(){
+  const name=document.getElementById('evtName').value.trim();
+  const dateStr=document.getElementById('evtDate').value;
+  const time=document.getElementById('evtTime').value;
+  const location=document.getElementById('evtLocation').value.trim();
+  const notes=document.getElementById('evtNotes').value.trim();
+  if(!name){document.getElementById('evtName').focus();return;}
+  if(!dateStr){document.getElementById('evtDate').focus();return;}
+  const p=dateStr.split('-').map(Number),dateObj=new Date(p[0],p[1]-1,p[2]);
+  addCalEvent(dateObj,name,time,selectedEventColor,location,notes);
+  if(modalOpen){modalSelectedKey=dateKey(dateObj);modalYear=p[0];modalMonth=p[1]-1;renderModalGrid();renderModalSidebar();}
+  calSelectedKey=dateKey(dateObj);calYear=p[0];calMonth=p[1]-1;
+  miniSelectDay(p[0],p[1]-1,p[2]);
+  closeCreateEvent();
+  showFeedToast('Event saved: '+name);
+}
+
+// ══ CALENDAR SYNC ════════════════════════════════════════════════════════
+const CAL_KEY = 'vibe_cal_events_v1';
+function _calSave(){try{localStorage.setItem(CAL_KEY,JSON.stringify(calendarEvents));}catch(e){}}
+function _calLoad(){try{const r=localStorage.getItem(CAL_KEY);if(!r)return;Object.assign(calendarEvents,JSON.parse(r));}catch(e){}}
+document.addEventListener('DOMContentLoaded',function(){
+  _calLoad();
+  if(typeof renderCalendar==='function')renderCalendar();
+  if(typeof updateEventCountBadge==='function')updateEventCountBadge();
+});
+// ══ END CALENDAR SYNC ════════════════════════════════════════════════════
+
+// ══ OPPORTUNITIES PAGE INIT (uses shared _persistence.js) ════════════════
+(function initOpportunitiesPage(){
+  const user = vibeInit();
+  if (!user) { window.location.href = '/html/landing.html'; return; }
+  if (user._isDemo) vibeShowDemoPill();
+  // Fresh-onboarded users get the empty state — no demo job cards.
+  if (user._onboarded && !user._isDemo) {
+    const list = document.getElementById('oppList');
+    const empty = document.getElementById('oppEmpty');
+    if (list && empty) {
+      // Hide every direct child except the empty-state element
+      Array.from(list.children).forEach(child => {
+        if (child !== empty) child.style.display = 'none';
+      });
+      // Hide secondary chrome that doesn't make sense without listings
+      document.querySelector('.search-row')?.style.setProperty('display', 'none');
+      document.querySelector('.filter-bar')?.style.setProperty('display', 'none');
+      empty.classList.add('visible');
+    }
+  }
+})();
+// ══ END OPPORTUNITIES INIT ═══════════════════════════════════════════════
+
+</script>
+
+<!-- ══ FULL CALENDAR MODAL ══ -->
+  <div class="cal-modal-backdrop" id="calModalBackdrop" onclick="if(event.target===this)closeCalModal()">
+    <div class="cal-modal">
+      <div class="cal-modal-header">
+        <div class="cal-modal-title">My Calendar</div>
+        <div class="cal-modal-month-nav">
+          <button class="cal-modal-nav-btn" onclick="modalChangeMonth(-1)">&#8249;</button>
+          <span class="cal-modal-month-label" id="modalMonthLabel"></span>
+          <button class="cal-modal-nav-btn" onclick="modalChangeMonth(1)">&#8250;</button>
+        </div>
+        <div class="cal-modal-header-actions">
+          <button class="cal-modal-add-btn" onclick="openCreateEvent()">
+            <svg width="13" height="13" viewBox="0 0 13 13" fill="none"><path d="M6.5 1v11M1 6.5h11" stroke="white" stroke-width="1.8" stroke-linecap="round"/></svg>
+            New Event
+          </button>
+          <button class="cal-modal-close" onclick="closeCalModal()">&#215;</button>
+        </div>
+      </div>
+      <div class="cal-modal-body">
+        <div class="cal-modal-grid-wrap">
+          <div class="cal-modal-day-names" id="modalDayNames"></div>
+          <div class="cal-modal-grid" id="modalCalGrid"></div>
+        </div>
+        <div class="cal-modal-sidebar">
+          <div class="cal-modal-sidebar-hdr">
+            Events
+            <span id="modalSidebarDate">Click a day to see events</span>
+          </div>
+          <div class="cal-modal-events-list" id="modalEventsList">
+            <div class="cal-modal-no-events">
+              <svg width="36" height="36" viewBox="0 0 36 36" fill="none" style="margin:0 auto 10px;display:block;opacity:.3"><rect x="3" y="6" width="30" height="27" rx="6" stroke="currentColor" stroke-width="2" fill="none"/><path d="M3 14h30" stroke="currentColor" stroke-width="2" stroke-linecap="round"/><path d="M11 3v6M25 3v6" stroke="currentColor" stroke-width="2" stroke-linecap="round"/></svg>
+              Select a day to see<br>or add events
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+</body>
+</html>

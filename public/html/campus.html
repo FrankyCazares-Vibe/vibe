@@ -1,0 +1,2236 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Vibe Campus &mdash; Indiana University</title>
+<link href="https://fonts.googleapis.com/css2?family=Fraunces:ital,wght@0,400;0,700;0,900;1,400&family=DM+Sans:wght@300;400;500;600&display=swap" rel="stylesheet">
+<script src="/html/_persistence.js"></script>
+<script src="/html/_studentVerify.js"></script>
+<script src="/html/_otto.js" defer></script>
+<style>
+:root{
+  --cream:#FAF7F2;--charcoal:#1C1C1E;--soft:#2D2D2D;--muted:#8A8580;
+  --accent:#FF5C35;--green:#2ECC71;--border:rgba(28,28,30,.08);
+  --shadow:0 4px 24px rgba(0,0,0,.06);--shadow-lg:0 12px 48px rgba(0,0,0,.1);
+  --iu:#990000;--iu-light:#FFF0F0;--iu-mid:#CC0000;
+  --blue:#2563EB;--blue-light:#EFF6FF;
+  --gold:#B8860B;--gold-light:#FFFBEB;
+}
+*{margin:0;padding:0;box-sizing:border-box;}
+html,body{height:100%;}
+body{font-family:'DM Sans',sans-serif;background:var(--cream);color:var(--charcoal);cursor:none;overflow-x:hidden;}
+
+/* Cursor */
+.cursor{width:8px;height:8px;background:var(--accent);border-radius:50%;position:fixed;top:0;left:0;pointer-events:none;z-index:2147483647;will-change:transform;transition:width .15s,height .15s,background .15s;}
+.cursor-ring{width:28px;height:28px;border:1.5px solid var(--accent);border-radius:50%;position:fixed;top:0;left:0;pointer-events:none;z-index:2147483646;will-change:transform;opacity:.45;transition:width .2s,height .2s,opacity .2s;}
+.cursor.hover{width:6px;height:6px;background:var(--charcoal);}
+.cursor-ring.hover{width:44px;height:44px;opacity:.2;border-color:var(--charcoal);}
+
+/* Shell */
+.shell{display:grid;grid-template-columns:200px 1fr 300px;min-height:100vh;}
+
+/* Left nav */
+.left-nav{padding:20px 14px;border-right:1px solid var(--border);position:sticky;top:0;height:100vh;overflow-y:auto;scrollbar-width:none;display:flex;flex-direction:column;}
+.left-nav::-webkit-scrollbar{display:none;}
+.nav-logo{font-family:'Fraunces',serif;font-size:22px;font-weight:900;color:var(--charcoal);letter-spacing:-1px;display:block;margin-bottom:24px;text-decoration:none;}
+.nav-logo span{color:var(--accent);}
+.nav-item{display:flex;align-items:center;gap:10px;padding:10px 12px;border-radius:12px;font-size:14px;font-weight:500;color:var(--muted);cursor:none;text-decoration:none;transition:all .15s;border:none;background:none;width:100%;text-align:left;margin-bottom:2px;}
+.nav-item:hover{background:white;color:var(--charcoal);}
+.nav-item.active{background:white;color:var(--charcoal);font-weight:600;box-shadow:var(--shadow);}
+.nav-divider{height:1px;background:var(--border);margin:12px 0;}
+.mini-av{width:34px;height:34px;border-radius:10px;background:var(--charcoal);display:flex;align-items:center;justify-content:center;font-family:'Fraunces',serif;font-size:12px;font-weight:700;color:white;flex-shrink:0;}
+
+/* Center column */
+.center{border-right:1px solid var(--border);min-height:100vh;}
+
+/* Campus header bar */
+.campus-bar{background:linear-gradient(135deg,var(--iu) 0%,#6B0000 100%);padding:20px 24px;display:flex;align-items:center;gap:14px;}
+.campus-logo-block{width:52px;height:52px;border-radius:14px;background:white;display:flex;align-items:center;justify-content:center;flex-shrink:0;font-family:'Fraunces',serif;font-size:20px;font-weight:900;color:var(--iu);}
+.campus-bar-info h2{font-family:'Fraunces',serif;font-size:20px;font-weight:900;color:white;letter-spacing:-.3px;}
+.campus-bar-info p{font-size:12px;color:rgba(255,255,255,.65);margin-top:2px;}
+.campus-bar-badge{display:inline-flex;align-items:center;gap:5px;background:rgba(255,255,255,.15);border:1px solid rgba(255,255,255,.25);color:white;font-size:11px;font-weight:700;padding:4px 10px;border-radius:100px;margin-left:auto;backdrop-filter:blur(8px);}
+.campus-bar-badge svg{width:10px;height:10px;}
+
+/* Section tabs */
+.section-tabs{display:flex;border-bottom:1px solid var(--border);background:white;position:sticky;top:0;z-index:50;}
+.section-tab{font-size:13px;font-weight:600;color:var(--muted);padding:14px 18px;border:none;background:none;cursor:none;position:relative;transition:color .15s;white-space:nowrap;}
+.section-tab::after{content:'';position:absolute;bottom:-1px;left:0;right:0;height:2px;border-radius:2px;transform:scaleX(0);transition:transform .2s;}
+.section-tab.active{color:var(--charcoal);}
+.section-tab.active::after{background:var(--iu);transform:scaleX(1);}
+.tab-count{display:inline-block;margin-left:5px;font-size:10px;font-weight:700;background:var(--cream);color:var(--muted);padding:1px 6px;border-radius:100px;}
+.section-tab.active .tab-count{background:var(--iu-light);color:var(--iu);}
+
+/* Tab panes */
+.tab-pane{display:none;}.tab-pane.active{display:block;}
+
+/* ── FEED SECTION ── */
+/* Post composer */
+.composer-wrap{padding:16px 24px;border-bottom:1px solid var(--border);background:white;}
+.comp-inner{display:flex;gap:10px;}
+.comp-av{width:38px;height:38px;border-radius:12px;background:var(--charcoal);display:flex;align-items:center;justify-content:center;font-family:'Fraunces',serif;font-size:13px;font-weight:700;color:white;flex-shrink:0;}
+.comp-field{flex:1;}
+.comp-input{width:100%;padding:11px 14px;border-radius:14px;border:1.5px solid var(--border);background:var(--cream);font-family:'DM Sans',sans-serif;font-size:14px;color:var(--charcoal);resize:none;outline:none;min-height:44px;transition:border-color .18s,min-height .25s;cursor:text;line-height:1.5;}
+.comp-input::placeholder{color:var(--muted);}
+.comp-input:focus{border-color:rgba(153,0,0,.3);min-height:90px;background:white;}
+.comp-footer{display:flex;align-items:center;justify-content:space-between;margin-top:9px;}
+.comp-type-btns{display:flex;gap:5px;}
+.comp-type-btn{font-size:11px;font-weight:700;padding:5px 11px;border-radius:100px;border:none;cursor:none;transition:all .15s;}
+.comp-type-btn.neutral{color:var(--muted);background:var(--cream);}
+.comp-type-btn.neutral:hover{background:var(--border);}
+.comp-type-btn.ann{color:#B07800;background:var(--gold-light);}
+.comp-type-btn.evt{color:var(--blue);background:var(--blue-light);}
+.comp-type-btn.job{color:#1A9E5B;background:#F0FFF4;}
+.comp-type-btn.club{color:var(--iu);background:var(--iu-light);}
+.comp-type-btn.on{outline:2px solid currentColor;outline-offset:1px;}
+.comp-submit{font-family:'DM Sans',sans-serif;font-size:13px;font-weight:700;background:var(--iu);color:white;border:none;padding:9px 22px;border-radius:100px;cursor:none;transition:all .2s;}
+.comp-submit:hover{background:var(--iu-mid);}
+
+/* Post card */
+.post{border-bottom:1px solid var(--border);padding:18px 24px;transition:background .13s;}
+.post:hover{background:rgba(153,0,0,.013);}
+.post-header{display:flex;align-items:flex-start;gap:10px;margin-bottom:10px;}
+.post-av{width:40px;height:40px;border-radius:13px;display:flex;align-items:center;justify-content:center;font-family:'Fraunces',serif;font-size:13px;font-weight:700;color:white;flex-shrink:0;}
+.post-meta h4{font-size:13px;font-weight:700;}
+.post-meta p{font-size:11px;color:var(--muted);}
+.post-type-badge{display:inline-flex;align-items:center;gap:3px;font-size:10px;font-weight:700;padding:2px 8px;border-radius:100px;margin-left:6px;}
+.b-ann{background:var(--gold-light);color:var(--gold);}
+.b-evt{background:var(--blue-light);color:var(--blue);}
+.b-job{background:#F0FFF4;color:#1A9E5B;}
+.b-club{background:var(--iu-light);color:var(--iu);}
+.b-chat{background:#F0EDFF;color:#7C5CFC;}
+.post-body{font-size:14px;line-height:1.75;color:var(--soft);margin-bottom:10px;}
+.post-body strong{color:var(--charcoal);}
+
+/* Event card inside post */
+.event-card{background:var(--blue-light);border:1px solid rgba(37,99,235,.15);border-radius:14px;padding:14px;margin-bottom:12px;}
+.event-card h4{font-size:13px;font-weight:700;color:var(--blue);margin-bottom:6px;}
+.event-meta{display:flex;flex-direction:column;gap:3px;}
+.event-meta-row{display:flex;align-items:center;gap:6px;font-size:12px;color:var(--soft);}
+.event-meta-row svg{flex-shrink:0;color:var(--muted);}
+
+/* Job card inside post */
+.job-card{background:#F0FFF4;border:1px solid rgba(26,158,91,.15);border-radius:14px;padding:14px;margin-bottom:12px;}
+.job-card h4{font-size:13px;font-weight:700;color:#1A9E5B;margin-bottom:4px;}
+.job-card-meta{font-size:12px;color:var(--soft);line-height:1.6;}
+.job-card-tags{display:flex;gap:5px;flex-wrap:wrap;margin-top:8px;}
+.job-tag{font-size:10px;font-weight:700;padding:3px 8px;border-radius:100px;background:rgba(26,158,91,.1);color:#1A9E5B;}
+
+.post-tags{display:flex;gap:5px;flex-wrap:wrap;margin-bottom:10px;}
+.post-tag{font-size:10px;font-weight:700;padding:3px 9px;border-radius:100px;background:var(--iu-light);color:var(--iu);}
+.post-bar{display:flex;align-items:center;gap:8px;padding-top:10px;border-top:1px solid var(--border);}
+.post-chip{display:inline-flex;align-items:center;gap:4px;background:var(--cream);padding:6px 12px;border-radius:100px;font-size:12px;font-weight:600;cursor:none;border:1px solid transparent;transition:all .15s;}
+.post-chip:hover{background:white;border-color:var(--border);}
+.post-chip.reacted{background:var(--iu-light);color:var(--iu);border-color:rgba(153,0,0,.2);}
+.rsvp-btn{margin-left:auto;font-family:'DM Sans',sans-serif;font-size:12px;font-weight:700;background:var(--blue);color:white;border:none;padding:7px 16px;border-radius:100px;cursor:none;transition:all .2s;}
+.rsvp-btn:hover{background:#1d4ed8;}
+.rsvp-btn.done{background:#1A9E5B;}
+.apply-btn{margin-left:auto;font-family:'DM Sans',sans-serif;font-size:12px;font-weight:700;background:#1A9E5B;color:white;border:none;padding:7px 16px;border-radius:100px;cursor:none;transition:all .2s;}
+.apply-btn:hover{background:#158a4e;}
+
+/* ── JOBS SECTION ── */
+.jobs-filter{padding:14px 24px;border-bottom:1px solid var(--border);display:flex;gap:8px;flex-wrap:wrap;background:white;position:sticky;top:44px;z-index:40;}
+.filter-chip{font-size:12px;font-weight:600;padding:6px 14px;border-radius:100px;border:1.5px solid var(--border);background:transparent;color:var(--muted);cursor:none;transition:all .15s;}
+.filter-chip:hover{border-color:var(--charcoal);color:var(--charcoal);}
+.filter-chip.on{background:var(--charcoal);color:white;border-color:var(--charcoal);}
+.search-bar{display:flex;align-items:center;gap:8px;background:white;border:1.5px solid var(--border);border-radius:12px;padding:9px 14px;margin:14px 24px;transition:border-color .18s;}
+.search-bar:focus-within{border-color:rgba(28,28,30,.2);}
+.search-bar input{border:none;background:none;font-family:'DM Sans',sans-serif;font-size:13px;color:var(--charcoal);outline:none;flex:1;cursor:text;}
+.search-bar input::placeholder{color:var(--muted);}
+.job-listing{display:flex;align-items:flex-start;gap:14px;padding:16px 24px;border-bottom:1px solid var(--border);transition:background .13s;cursor:none;}
+.job-listing:hover{background:rgba(26,158,91,.018);}
+.job-logo{width:48px;height:48px;border-radius:14px;background:var(--cream);border:1px solid var(--border);display:flex;align-items:center;justify-content:center;font-family:'Fraunces',serif;font-size:14px;font-weight:900;color:var(--charcoal);flex-shrink:0;}
+.job-info{flex:1;}
+.job-title{font-size:14px;font-weight:700;margin-bottom:2px;}
+.job-company{font-size:13px;color:var(--soft);margin-bottom:4px;}
+.job-meta{font-size:11px;color:var(--muted);display:flex;gap:10px;flex-wrap:wrap;margin-bottom:8px;}
+.job-chips{display:flex;gap:5px;flex-wrap:wrap;}
+.job-chip{font-size:10px;font-weight:700;padding:3px 8px;border-radius:100px;}
+.jc-type{background:#F0FFF4;color:#1A9E5B;}
+.jc-loc{background:var(--blue-light);color:var(--blue);}
+.jc-pay{background:var(--gold-light);color:var(--gold);}
+.jc-new{background:var(--iu-light);color:var(--iu);}
+.job-actions{display:flex;flex-direction:column;gap:6px;flex-shrink:0;}
+.btn-apply{font-family:'DM Sans',sans-serif;font-size:12px;font-weight:700;background:#1A9E5B;color:white;border:none;padding:8px 18px;border-radius:100px;cursor:none;transition:all .2s;white-space:nowrap;}
+.btn-apply:hover{background:#158a4e;}
+.btn-save{font-family:'DM Sans',sans-serif;font-size:12px;font-weight:700;background:none;border:1.5px solid var(--border);color:var(--muted);padding:7px 18px;border-radius:100px;cursor:none;transition:all .15s;}
+.btn-save:hover{border-color:var(--charcoal);color:var(--charcoal);}
+
+/* ── EVENTS SECTION ── */
+.event-listing{display:flex;gap:14px;padding:16px 24px;border-bottom:1px solid var(--border);transition:background .13s;}
+.event-listing:hover{background:rgba(37,99,235,.018);}
+.event-date-block{width:52px;flex-shrink:0;text-align:center;}
+.event-month{font-size:10px;font-weight:800;text-transform:uppercase;letter-spacing:.5px;color:var(--iu);background:var(--iu-light);border-radius:6px 6px 0 0;padding:3px 0;}
+.event-day{font-family:'Fraunces',serif;font-size:22px;font-weight:900;color:var(--charcoal);background:white;border:1px solid var(--border);border-top:none;border-radius:0 0 6px 6px;padding:2px 0;}
+.event-info{flex:1;}
+.event-title{font-size:14px;font-weight:700;margin-bottom:3px;}
+.event-host{font-size:12px;color:var(--muted);margin-bottom:6px;}
+.event-details{display:flex;gap:12px;flex-wrap:wrap;margin-bottom:8px;}
+.event-detail{display:flex;align-items:center;gap:4px;font-size:12px;color:var(--soft);}
+.event-detail svg{color:var(--muted);}
+.event-tags2{display:flex;gap:5px;flex-wrap:wrap;}
+.event-tag2{font-size:10px;font-weight:700;padding:2px 8px;border-radius:100px;background:var(--blue-light);color:var(--blue);}
+.event-rsvp{display:flex;flex-direction:column;gap:6px;align-items:flex-end;flex-shrink:0;}
+.rsvp-count{font-size:11px;color:var(--muted);text-align:right;}
+
+/* ── ORGS SECTION ── */
+.org-card{display:flex;align-items:center;gap:14px;padding:16px 24px;border-bottom:1px solid var(--border);transition:background .13s;}
+.org-card:hover{background:rgba(153,0,0,.018);}
+.org-logo{width:50px;height:50px;border-radius:14px;display:flex;align-items:center;justify-content:center;font-family:'Fraunces',serif;font-size:16px;font-weight:700;color:white;flex-shrink:0;}
+.org-info{flex:1;}
+.org-name{font-size:14px;font-weight:700;margin-bottom:2px;}
+.org-desc{font-size:12px;color:var(--muted);line-height:1.5;margin-bottom:5px;}
+.org-meta{display:flex;gap:10px;}
+.org-meta-item{font-size:11px;color:var(--muted);}
+.org-btns{display:flex;gap:7px;flex-shrink:0;}
+.btn-join{font-family:'DM Sans',sans-serif;font-size:12px;font-weight:700;background:var(--iu);color:white;border:none;padding:8px 18px;border-radius:100px;cursor:none;transition:all .2s;}
+.btn-join:hover{background:var(--iu-mid);}
+.btn-follow-org{font-family:'DM Sans',sans-serif;font-size:12px;font-weight:700;background:none;border:1.5px solid var(--border);color:var(--muted);padding:7px 18px;border-radius:100px;cursor:none;transition:all .15s;}
+.btn-follow-org:hover{border-color:var(--charcoal);color:var(--charcoal);}
+
+/* ── CHAT SECTION ── */
+.chat-shell{display:grid;grid-template-columns:220px 1fr;height:calc(100vh - 110px);}
+.chat-list{border-right:1px solid var(--border);overflow-y:auto;scrollbar-width:none;}
+.chat-list::-webkit-scrollbar{display:none;}
+.chat-list-hdr{padding:12px 16px;border-bottom:1px solid var(--border);font-size:12px;font-weight:800;color:var(--muted);text-transform:uppercase;letter-spacing:.5px;}
+.chat-room{display:flex;align-items:center;gap:10px;padding:12px 16px;border-bottom:1px solid var(--border);cursor:none;transition:background .13s;}
+.chat-room:hover{background:var(--cream);}
+.chat-room.active{background:var(--iu-light);}
+.chat-room-icon{width:36px;height:36px;border-radius:11px;display:flex;align-items:center;justify-content:center;font-size:14px;flex-shrink:0;}
+.chat-room-info{flex:1;min-width:0;}
+.chat-room-name{font-size:13px;font-weight:700;margin-bottom:1px;}
+.chat-room-prev{font-size:11px;color:var(--muted);white-space:nowrap;overflow:hidden;text-overflow:ellipsis;}
+.chat-room-badge{background:var(--iu);color:white;font-size:10px;font-weight:800;min-width:18px;height:18px;border-radius:9px;display:flex;align-items:center;justify-content:center;flex-shrink:0;padding:0 4px;}
+.chat-main{display:flex;flex-direction:column;}
+.chat-hdr{padding:14px 20px;border-bottom:1px solid var(--border);display:flex;align-items:center;gap:10px;background:white;}
+.chat-hdr-icon{width:36px;height:36px;border-radius:11px;display:flex;align-items:center;justify-content:center;font-size:16px;flex-shrink:0;}
+.chat-hdr-name{font-size:14px;font-weight:700;}
+.chat-hdr-sub{font-size:11px;color:var(--muted);}
+.chat-msgs{flex:1;overflow-y:auto;padding:16px 20px;display:flex;flex-direction:column;gap:12px;scrollbar-width:thin;}
+.msg-group{display:flex;gap:8px;}
+.msg-group.mine{flex-direction:row-reverse;}
+.msg-av-sm{width:28px;height:28px;border-radius:9px;display:flex;align-items:center;justify-content:center;font-family:'Fraunces',serif;font-size:10px;font-weight:700;color:white;flex-shrink:0;}
+.msg-col{flex:1;display:flex;flex-direction:column;gap:2px;max-width:70%;}
+.msg-group.mine .msg-col{align-items:flex-end;}
+.msg-sender{font-size:10px;font-weight:700;color:var(--muted);margin-bottom:2px;}
+.msg-bubble{padding:8px 12px;border-radius:14px;font-size:13px;line-height:1.55;max-width:100%;}
+.msg-group:not(.mine) .msg-bubble{background:white;border:1px solid var(--border);border-bottom-left-radius:4px;color:var(--charcoal);}
+.msg-group.mine .msg-bubble{background:var(--charcoal);color:white;border-bottom-right-radius:4px;}
+.msg-time{font-size:10px;color:var(--muted);margin-top:2px;}
+.date-sep{text-align:center;font-size:10px;font-weight:700;color:var(--muted);text-transform:uppercase;letter-spacing:.5px;margin:6px 0;}
+.chat-compose{padding:12px 20px;border-top:1px solid var(--border);background:white;}
+.chat-compose-inner{display:flex;align-items:center;gap:8px;background:var(--cream);border:1.5px solid var(--border);border-radius:16px;padding:7px 12px;transition:border-color .18s;}
+.chat-compose-inner:focus-within{border-color:rgba(153,0,0,.3);background:white;}
+.chat-input{flex:1;border:none;background:none;font-family:'DM Sans',sans-serif;font-size:14px;color:var(--charcoal);outline:none;cursor:text;}
+.chat-input::placeholder{color:var(--muted);}
+.chat-send{width:32px;height:32px;border-radius:50%;background:var(--iu);border:none;cursor:none;display:flex;align-items:center;justify-content:center;transition:all .2s;}
+.chat-send:hover{background:var(--iu-mid);transform:scale(1.08);}
+
+/* Right column */
+.right{padding:20px 18px;border-left:0;}
+.widget{background:white;border:1px solid var(--border);border-radius:18px;padding:16px;margin-bottom:14px;box-shadow:var(--shadow);}
+.widget-title{font-family:'Fraunces',serif;font-size:14px;font-weight:800;letter-spacing:-.2px;margin-bottom:12px;}
+.deadline-item{display:flex;align-items:center;gap:10px;padding:8px 0;border-bottom:1px solid var(--border);}
+.deadline-item:last-of-type{border:none;}
+.deadline-dot{width:8px;height:8px;border-radius:50%;flex-shrink:0;}
+.deadline-info{flex:1;}
+.deadline-title{font-size:12px;font-weight:700;}
+.deadline-sub{font-size:11px;color:var(--muted);}
+.deadline-time{font-size:10px;font-weight:700;padding:2px 8px;border-radius:100px;white-space:nowrap;}
+.dt-urgent{background:#FFF0F0;color:var(--iu);}
+.dt-soon{background:var(--gold-light);color:var(--gold);}
+.dt-ok{background:#F0FFF4;color:#1A9E5B;}
+.suggest-person{display:flex;align-items:center;gap:10px;padding:8px 0;border-bottom:1px solid var(--border);}
+.suggest-person:last-of-type{border:none;}
+.sug-av{width:36px;height:36px;border-radius:11px;display:flex;align-items:center;justify-content:center;font-family:'Fraunces',serif;font-size:12px;font-weight:700;color:white;flex-shrink:0;}
+.sug-info{flex:1;min-width:0;}
+.sug-name{font-size:12px;font-weight:700;}
+.sug-role{font-size:11px;color:var(--muted);white-space:nowrap;overflow:hidden;text-overflow:ellipsis;max-width:110px;}
+.sug-btn{font-size:11px;font-weight:700;background:none;border:1.5px solid var(--border);color:var(--charcoal);padding:4px 10px;border-radius:100px;cursor:none;transition:all .15s;flex-shrink:0;}
+.sug-btn:hover{border-color:var(--iu);color:var(--iu);}
+.verified-banner{background:linear-gradient(135deg,var(--iu-light),#FFF0E6);border:1px solid rgba(153,0,0,.15);border-radius:14px;padding:14px;margin-bottom:14px;}
+.verified-banner h4{font-family:'Fraunces',serif;font-size:13px;font-weight:800;color:var(--iu);margin-bottom:4px;}
+.verified-banner p{font-size:12px;color:var(--soft);line-height:1.55;}
+
+/* ── STUDENT VERIFICATION GATE ─────────────────────────────────────────── */
+@keyframes cgFadeIn { from { opacity: 0; transform: translateY(10px); } to { opacity: 1; transform: translateY(0); } }
+.campus-gate {
+  grid-column: 2 / -1;
+  display: none;
+  flex-direction: column; align-items: center; justify-content: center;
+  padding: 60px 40px; min-height: 100vh;
+  animation: cgFadeIn .35s cubic-bezier(.2,.8,.2,1);
+}
+.campus-gate.visible { display: flex; }
+.cg-card {
+  background: white; border-radius: 22px;
+  border: 0.5px solid var(--border); box-shadow: var(--shadow-lg);
+  max-width: 540px; width: 100%; padding: 44px 40px;
+  text-align: center; position: relative; overflow: hidden;
+}
+.cg-card::before {
+  content: ''; position: absolute; top: -100px; right: -100px;
+  width: 280px; height: 280px; border-radius: 50%;
+  background: radial-gradient(circle, rgba(153,0,0,.06) 0%, transparent 70%);
+  pointer-events: none;
+}
+.cg-card::after {
+  content: ''; position: absolute; bottom: -80px; left: -80px;
+  width: 220px; height: 220px; border-radius: 50%;
+  background: radial-gradient(circle, rgba(255,92,53,.06) 0%, transparent 70%);
+  pointer-events: none;
+}
+.cg-icon-wrap {
+  width: 72px; height: 72px; border-radius: 20px;
+  background: linear-gradient(135deg, var(--iu-light), #FFF0E6);
+  display: flex; align-items: center; justify-content: center;
+  margin: 0 auto 22px; font-size: 32px;
+  position: relative; z-index: 1;
+}
+.cg-card h2 {
+  font-family: 'Fraunces', serif; font-size: 30px; font-weight: 900;
+  color: var(--charcoal); letter-spacing: -.8px;
+  margin-bottom: 14px; position: relative; z-index: 1;
+}
+.cg-sub {
+  font-size: 15px; color: var(--soft); line-height: 1.65;
+  max-width: 420px; margin: 0 auto 26px;
+  position: relative; z-index: 1;
+}
+.cg-sub strong { color: var(--charcoal); font-weight: 600; }
+.cg-features {
+  display: grid; grid-template-columns: repeat(2, 1fr); gap: 12px;
+  margin-bottom: 28px; text-align: left;
+  position: relative; z-index: 1;
+}
+.cg-feature {
+  background: var(--cream); border-radius: 12px; padding: 12px 14px;
+  border: 0.5px solid var(--border);
+}
+.cg-feature-icon {
+  font-size: 18px; margin-bottom: 6px;
+}
+.cg-feature-name {
+  font-size: 12.5px; font-weight: 700; color: var(--charcoal);
+  margin-bottom: 2px;
+}
+.cg-feature-desc {
+  font-size: 11px; color: var(--muted); line-height: 1.5;
+}
+.cg-cta {
+  display: inline-flex; align-items: center; gap: 8px;
+  padding: 14px 28px; background: var(--iu); color: white;
+  border: none; border-radius: 100px;
+  font-family: 'DM Sans', sans-serif; font-size: 14px; font-weight: 600;
+  cursor: none; transition: all .15s;
+  position: relative; z-index: 1;
+}
+.cg-cta:hover { background: var(--iu-mid); transform: translateY(-1px); }
+.cg-foot {
+  font-size: 11.5px; color: var(--muted); margin-top: 18px;
+  line-height: 1.55; position: relative; z-index: 1;
+}
+.cg-foot a { color: var(--accent); text-decoration: none; }
+
+/* Toast */
+#ct{position:fixed;bottom:28px;left:50%;transform:translateX(-50%) translateY(20px);background:var(--charcoal);color:white;font-size:13px;font-weight:600;padding:11px 22px;border-radius:100px;box-shadow:0 8px 28px rgba(0,0,0,.2);opacity:0;transition:all .3s;z-index:9000;pointer-events:none;white-space:nowrap;}
+
+/* ══ CAMPUS MAP ══════════════════════════════════════════════════════ */
+#pane-map { height:calc(100vh - 120px); display:none; flex-direction:column; overflow:hidden; }
+#pane-map.active { display:flex; }
+
+/* Toolbar */
+.map-toolbar {
+  display:flex; align-items:center; gap:8px; padding:10px 16px;
+  background:#0C0C14; border-bottom:1px solid rgba(255,255,255,.06);
+  flex-shrink:0; flex-wrap:wrap; z-index:10;
+}
+.map-toolbar-title {
+  font-family:'Fraunces',serif; font-size:15px; font-weight:700;
+  letter-spacing:-.2px; color:white; margin-right:4px;
+}
+.map-filter-chip {
+  display:flex; align-items:center; gap:5px;
+  background:rgba(255,255,255,.06); border:1px solid rgba(255,255,255,.09);
+  border-radius:100px; padding:5px 14px; font-size:12px; font-weight:600;
+  color:rgba(255,255,255,.42); cursor:none; transition:all .18s;
+}
+.map-filter-chip:hover:not(.active) { background:rgba(255,255,255,.11); color:rgba(255,255,255,.8); }
+.map-filter-chip.active { background:var(--accent); border-color:var(--accent); color:white; box-shadow:0 0 16px rgba(255,92,53,.4); }
+.map-legend { display:flex; align-items:center; gap:14px; margin-left:auto; flex-shrink:0; }
+.map-legend-item { display:flex; align-items:center; gap:6px; font-size:11px; font-weight:600; color:rgba(255,255,255,.35); }
+.map-legend-dot { width:10px; height:10px; border-radius:50%; border:2.5px solid; flex-shrink:0; }
+
+/* Scene — dark galaxy background */
+.map-scene {
+  flex:1; position:relative; overflow:auto; cursor:none;
+  background:#07070F;
+}
+
+/* The scrollable field — larger than viewport so zones don't crowd */
+.map-field {
+  position:relative;
+  width:1400px; height:900px;
+  margin:20px auto;
+  transform-origin:0 0;
+}
+
+/* Zone card — the key new element */
+.zone-card {
+  position:absolute;
+  border-radius:24px;
+  border:1px solid;
+  backdrop-filter:blur(12px);
+  padding:0;
+  overflow:hidden;
+  transition:border-color .2s, box-shadow .2s;
+}
+.zone-card:hover { box-shadow:0 0 40px rgba(255,255,255,.04); }
+
+/* Zone card header strip */
+.zone-card-header {
+  padding:12px 16px 10px;
+  display:flex; align-items:center; gap:8px;
+  border-bottom:1px solid rgba(255,255,255,.06);
+}
+.zone-card-icon {
+  width:28px; height:28px; border-radius:8px;
+  display:flex; align-items:center; justify-content:center;
+  font-size:13px; flex-shrink:0;
+}
+.zone-card-name {
+  font-family:'Fraunces',serif; font-size:13px; font-weight:700;
+  letter-spacing:-.1px; color:white;
+}
+.zone-card-count {
+  margin-left:auto; font-size:10px; font-weight:700;
+  color:rgba(255,255,255,.35); background:rgba(255,255,255,.07);
+  padding:2px 8px; border-radius:100px;
+}
+
+/* Nodes area inside card */
+.zone-nodes {
+  position:relative; width:100%; flex:1;
+}
+
+/* Node bubble */
+.map-node {
+  position:absolute; transform:translate(-50%,-50%);
+  border-radius:50%; display:flex; align-items:center; justify-content:center;
+  font-family:'Fraunces',serif; font-weight:700; color:white;
+  cursor:none; transition:transform .2s, box-shadow .2s; z-index:2;
+  user-select:none;
+}
+.map-node:hover { transform:translate(-50%,-50%) scale(1.22); z-index:10; }
+.map-node-label {
+  position:absolute; top:calc(100% + 6px); left:50%; transform:translateX(-50%);
+  font-family:'DM Sans',sans-serif; font-size:9px; font-weight:700;
+  color:rgba(255,255,255,.5); white-space:nowrap; pointer-events:none;
+  letter-spacing:.2px; opacity:0; transition:opacity .15s;
+}
+.map-node:hover .map-node-label { opacity:1; }
+
+/* Popup */
+.map-popup {
+  position:fixed; z-index:9999; width:236px;
+  background:rgba(14,14,22,.96);
+  border:1px solid rgba(255,255,255,.13);
+  border-radius:20px;
+  box-shadow:0 0 0 1px rgba(255,255,255,.04) inset,
+             0 28px 56px rgba(0,0,0,.8),
+             0 4px 16px rgba(0,0,0,.5);
+  padding:20px 16px 16px; pointer-events:all;
+  animation:glassPopIn .2s cubic-bezier(.34,1.56,.64,1);
+}
+.map-popup::before {
+  content:''; position:absolute; inset:0; border-radius:20px;
+  background:linear-gradient(135deg,rgba(255,255,255,.06) 0%,transparent 55%);
+  pointer-events:none;
+}
+@keyframes glassPopIn {
+  from { opacity:0; transform:scale(.88) translateY(8px); }
+  to   { opacity:1; transform:scale(1) translateY(0); }
+}
+.map-popup-av-wrap { position:relative; width:52px; margin:0 auto 10px; }
+.map-popup-av {
+  width:52px; height:52px; border-radius:15px;
+  display:flex; align-items:center; justify-content:center;
+  font-family:'Fraunces',serif; font-size:18px; font-weight:700; color:white;
+}
+.map-popup-av-ring { position:absolute; inset:-3px; border-radius:18px; border:2px solid; }
+.map-popup-name { font-size:14px; font-weight:700; text-align:center; color:white; margin-bottom:2px; }
+.map-popup-role { font-size:11px; color:rgba(255,255,255,.42); text-align:center; margin-bottom:10px; line-height:1.4; }
+.map-popup-badge {
+  display:flex; align-items:center; justify-content:center; gap:5px;
+  margin:0 auto 12px; font-size:11px; font-weight:700;
+  padding:4px 12px; border-radius:100px;
+}
+.map-popup-btns { display:flex; gap:6px; }
+.map-popup-btn {
+  flex:1; padding:9px; border-radius:10px; font-size:12px;
+  font-weight:700; cursor:none; border:none; transition:all .15s; text-align:center;
+}
+.map-popup-btn.primary { background:var(--accent); color:white; }
+.map-popup-btn.primary:hover { background:#ff7055; }
+.map-popup-btn.ghost { background:rgba(255,255,255,.08); color:rgba(255,255,255,.8); border:1px solid rgba(255,255,255,.1); }
+.map-popup-btn.ghost:hover { background:rgba(255,255,255,.14); color:white; }
+
+/* Zoom controls */
+.map-zoom-controls { position:absolute; bottom:16px; right:16px; z-index:50; display:flex; flex-direction:column; gap:6px; }
+.map-zoom-btn {
+  width:34px; height:34px; border-radius:10px;
+  background:rgba(255,255,255,.08); border:1px solid rgba(255,255,255,.1);
+  color:rgba(255,255,255,.65); font-size:18px; display:flex;
+  align-items:center; justify-content:center; cursor:none; transition:all .15s;
+}
+.map-zoom-btn:hover { background:rgba(255,255,255,.15); color:white; }
+
+
+/* ══ CAMPUS SEARCH ══════════════════════════════════════════════════ */
+.campus-search-wrap {
+  position: relative; display: flex; align-items: center; margin-left: auto;
+}
+.campus-search-bar {
+  display: flex; align-items: center; gap: 8px;
+  background: rgba(255,255,255,.12); border: 1.5px solid rgba(255,255,255,.2);
+  border-radius: 100px; padding: 7px 14px;
+  width: 230px; transition: width .25s, background .2s, border-color .2s;
+  cursor: text;
+}
+.campus-search-bar:focus-within {
+  width: 360px; background: rgba(255,255,255,.18);
+  border-color: rgba(255,255,255,.4);
+}
+.campus-search-bar svg { flex-shrink: 0; color: rgba(255,255,255,.6); }
+.campus-search-bar:focus-within svg { color: white; }
+.campus-search-input {
+  border: none; background: none; outline: none;
+  font-family: 'DM Sans', sans-serif; font-size: 13px;
+  color: white; width: 100%; cursor: text;
+}
+.campus-search-input::placeholder { color: rgba(255,255,255,.5); }
+.campus-search-dropdown {
+  position: absolute; top: calc(100% + 8px); right: 0;
+  width: 320px; background: white;
+  border: 1px solid var(--border); border-radius: 16px;
+  box-shadow: 0 8px 32px rgba(0,0,0,.18);
+  overflow: hidden; display: none; z-index: 200;
+}
+.campus-search-dropdown.open { display: block; }
+
+/* Search result shared styles (used by campus search dropdown) */
+.search-section-label{font-size:10px;font-weight:800;text-transform:uppercase;letter-spacing:1.5px;color:var(--muted);padding:12px 16px 6px;}
+.search-result{display:flex;align-items:center;gap:10px;padding:8px 16px;cursor:none;transition:background .12s;}
+.search-result:hover{background:var(--cream);}
+.sr-av{width:36px;height:36px;border-radius:11px;flex-shrink:0;display:flex;align-items:center;justify-content:center;font-family:'Fraunces',serif;font-size:12px;font-weight:700;color:white;}
+.sr-info{flex:1;min-width:0;}
+.sr-name{font-size:13px;font-weight:700;color:var(--charcoal);}
+.sr-role{font-size:11px;color:var(--muted);margin-top:1px;}
+.sr-action{font-size:11px;font-weight:700;color:var(--accent);background:#FFF5F2;border:1px solid rgba(255,92,53,.2);border-radius:100px;padding:3px 10px;flex-shrink:0;cursor:none;transition:all .15s;}
+.sr-action:hover{background:var(--accent);color:white;}
+.search-empty{padding:20px 16px;text-align:center;font-size:13px;color:var(--muted);}
+.search-footer{border-top:1px solid var(--border);padding:10px 16px;font-size:12px;font-weight:600;color:var(--accent);cursor:none;}
+.search-footer:hover{background:var(--cream);}
+
+
+/* ════ CALENDAR WIDGET ════ */
+/* Lives in the left nav (200px wide) — compact sizing */
+.cal-widget {
+  padding: 10px 10px 12px;
+  background: none;
+  flex-shrink: 0;
+}
+.cal-header {
+  display: flex; align-items: center; justify-content: space-between;
+  margin-bottom: 10px;
+}
+.cal-title-row {
+  display: flex; align-items: center; gap: 6px;
+}
+.cal-title {
+  font-family: 'Fraunces', serif;
+  font-size: 12px; font-weight: 700; letter-spacing: -.1px;
+  color: var(--charcoal);
+}
+.cal-month-nav {
+  display: flex; align-items: center; justify-content: space-between;
+  margin-bottom: 8px;
+}
+.cal-nav-btn {
+  width: 20px; height: 20px; border-radius: 6px;
+  background: none; border: none; cursor: none;
+  color: var(--muted); display: flex; align-items: center; justify-content: center;
+  transition: all .15s; font-size: 13px; flex-shrink: 0;
+}
+.cal-nav-btn:hover { background: white; color: var(--charcoal); }
+.cal-month-label {
+  font-size: 11px; font-weight: 700; color: var(--charcoal);
+  text-align: center; flex: 1;
+}
+.cal-toggle {
+  font-size: 10px; font-weight: 700; color: var(--muted);
+  background: none; border: none; cursor: none;
+  transition: color .15s;
+}
+.cal-toggle:hover { color: var(--accent); }
+.cal-grid {
+  display: grid; grid-template-columns: repeat(7, 1fr); gap: 1px;
+}
+.cal-day-name {
+  font-size: 8px; font-weight: 800; color: var(--muted);
+  text-align: center; padding: 2px 0; text-transform: uppercase; letter-spacing: .3px;
+}
+.cal-day {
+  aspect-ratio: 1; border-radius: 6px; display: flex; flex-direction: column;
+  align-items: center; justify-content: center; font-size: 10px; font-weight: 600;
+  color: var(--charcoal); cursor: none; transition: all .15s; position: relative;
+}
+.cal-day:hover { background: white; }
+.cal-day.other-month { color: var(--muted); opacity: .35; }
+.cal-day.today {
+  background: var(--charcoal); color: white; font-weight: 800;
+}
+.cal-day.today:hover { background: var(--soft); }
+.cal-day.has-event::after {
+  content: '';
+  width: 4px; height: 4px; border-radius: 50%;
+  background: var(--accent);
+  position: absolute; bottom: 2px;
+}
+.cal-day.today.has-event::after { background: white; }
+.cal-day.selected { background: var(--accent); color: white; }
+.cal-day.selected:hover { background: #ff7055; }
+.cal-day.selected.has-event::after { background: white; }
+
+/* Event list panel — slides open below grid */
+.cal-events-panel {
+  margin-top: 8px; display: none;
+  border-top: 1px solid var(--border); padding-top: 8px;
+}
+.cal-events-panel.open { display: block; }
+.cal-events-panel-title {
+  font-size: 10px; font-weight: 800; color: var(--muted);
+  text-transform: uppercase; letter-spacing: .5px; margin-bottom: 6px;
+}
+.cal-event-item {
+  display: flex; align-items: center; gap: 6px;
+  padding: 6px 7px; border-radius: 8px;
+  background: white; margin-bottom: 4px;
+  transition: background .13s; cursor: none;
+  border: 1px solid var(--border);
+}
+.cal-event-item:hover { background: var(--cream); }
+.cal-event-dot {
+  width: 7px; height: 7px; border-radius: 50%; flex-shrink: 0;
+}
+.cal-event-info { flex: 1; min-width: 0; }
+.cal-event-name {
+  font-size: 10px; font-weight: 700; color: var(--charcoal);
+  white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
+}
+.cal-event-time { font-size: 9px; color: var(--muted); }
+.cal-empty {
+  font-size: 11px; color: var(--muted); text-align: center;
+  padding: 10px 0; font-style: italic;
+}
+.cal-event-count-badge {
+  font-size: 9px; font-weight: 800; background: var(--accent);
+  color: white; padding: 1px 6px; border-radius: 100px; margin-left: 3px;
+}
+
+/* ════ CALENDAR FULL MODAL ════ */
+.cal-modal-backdrop {
+  display: none; position: fixed; inset: 0; z-index: 800;
+  background: rgba(0,0,0,.52);
+  align-items: center; justify-content: center;
+}
+.cal-modal-backdrop.open { display: flex; }
+.cal-modal {
+  background: white; border-radius: 24px;
+  width: min(860px, calc(100vw - 32px));
+  max-height: calc(100vh - 48px);
+  display: flex; flex-direction: column;
+  box-shadow: 0 24px 80px rgba(0,0,0,.18);
+  overflow: hidden;
+  animation: calModalIn .25s cubic-bezier(.34,1.4,.64,1);
+}
+@keyframes calModalIn { from{opacity:0;transform:scale(.95)} to{opacity:1;transform:scale(1)} }
+.cal-modal-header {
+  display: grid;
+  grid-template-columns: 1fr auto 1fr;
+  align-items: center;
+  padding: 18px 24px 16px;
+  border-bottom: 1px solid var(--border);
+  flex-shrink: 0;
+}
+.cal-modal-title {
+  font-family: 'Fraunces', serif;
+  font-size: 20px; font-weight: 900; letter-spacing: -.4px;
+  justify-self: start;
+}
+.cal-modal-month-nav {
+  display: flex; align-items: center; gap: 8px;
+  justify-self: center;
+}
+.cal-modal-header-actions {
+  display: flex; align-items: center; gap: 8px;
+  justify-self: end;
+}
+.cal-modal-nav-btn {
+  width: 32px; height: 32px; border-radius: 10px;
+  background: var(--cream); border: none; cursor: none;
+  color: var(--charcoal); display: flex; align-items: center; justify-content: center;
+  font-size: 16px; transition: all .15s;
+}
+.cal-modal-nav-btn:hover { background: var(--charcoal); color: white; }
+.cal-modal-month-label {
+  font-size: 15px; font-weight: 700; color: var(--charcoal);
+  min-width: 140px; text-align: center;
+}
+.cal-modal-add-btn {
+  display: flex; align-items: center; gap: 6px;
+  background: var(--accent); color: white;
+  font-family: 'DM Sans', sans-serif; font-size: 13px; font-weight: 700;
+  border: none; padding: 9px 18px; border-radius: 100px; cursor: none;
+  transition: all .2s;
+}
+.cal-modal-add-btn:hover { background: #ff7055; transform: translateY(-1px); }
+.cal-modal-close {
+  width: 32px; height: 32px; border-radius: 10px;
+  background: var(--cream); border: none; cursor: none;
+  font-size: 18px; color: var(--muted); display: flex; align-items: center; justify-content: center;
+  transition: all .15s;
+}
+.cal-modal-close:hover { background: var(--charcoal); color: white; }
+
+/* Modal body: big grid on left, event list on right */
+.cal-modal-body {
+  display: grid; grid-template-columns: 1fr 280px;
+  flex: 1; overflow: hidden;
+}
+.cal-modal-grid-wrap {
+  padding: 20px 24px; overflow-y: auto;
+}
+.cal-modal-day-names {
+  display: grid; grid-template-columns: repeat(7, 1fr);
+  margin-bottom: 6px;
+}
+.cal-modal-day-name {
+  font-size: 11px; font-weight: 800; color: var(--muted);
+  text-align: center; padding: 4px 0;
+  text-transform: uppercase; letter-spacing: .4px;
+}
+.cal-modal-grid {
+  display: grid; grid-template-columns: repeat(7, 1fr);
+  grid-auto-rows: 1fr;
+  gap: 4px;
+}
+.cal-modal-day {
+  aspect-ratio: 1; border-radius: 12px;
+  border: 1px solid var(--border);
+  padding: 6px; cursor: none;
+  transition: all .15s; position: relative;
+  display: flex; flex-direction: column; gap: 3px;
+  background: white;
+  overflow: hidden;
+}
+.cal-modal-day:hover { border-color: rgba(28,28,30,.2); background: var(--cream); }
+.cal-modal-day.other-month { opacity: .35; }
+.cal-modal-day.today { border-color: var(--charcoal); border-width: 2px; }
+.cal-modal-day.selected { border-color: var(--accent); border-width: 2px; background: #FFF8F6; }
+.cal-modal-day-num {
+  font-size: 13px; font-weight: 700; color: var(--charcoal);
+  width: 26px; height: 26px; border-radius: 8px;
+  display: flex; align-items: center; justify-content: center;
+  flex-shrink: 0;
+}
+.cal-modal-day.today .cal-modal-day-num {
+  background: var(--charcoal); color: white;
+}
+.cal-modal-day.selected .cal-modal-day-num {
+  background: var(--accent); color: white;
+}
+.cal-modal-event-pill {
+  font-size: 10px; font-weight: 700;
+  padding: 2px 6px; border-radius: 5px;
+  white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
+  color: white; cursor: none;
+}
+
+/* Right panel */
+.cal-modal-sidebar {
+  border-left: 1px solid var(--border);
+  display: flex; flex-direction: column;
+  overflow: hidden;
+}
+.cal-modal-sidebar-hdr {
+  padding: 16px 18px 12px;
+  border-bottom: 1px solid var(--border);
+  font-family: 'Fraunces', serif;
+  font-size: 15px; font-weight: 700; letter-spacing: -.2px;
+  flex-shrink: 0;
+}
+.cal-modal-sidebar-hdr span {
+  font-size: 12px; font-weight: 500; color: var(--muted);
+  font-family: 'DM Sans', sans-serif;
+  display: block; margin-top: 2px;
+}
+.cal-modal-events-list {
+  flex: 1; overflow-y: auto; padding: 12px;
+}
+.cal-modal-event-card {
+  display: flex; gap: 10px; padding: 10px 12px;
+  border-radius: 12px; border: 1px solid var(--border);
+  margin-bottom: 8px; transition: all .15s; cursor: none;
+  background: white;
+}
+.cal-modal-event-card:hover { border-color: rgba(28,28,30,.18); box-shadow: 0 2px 8px rgba(0,0,0,.06); }
+.cal-modal-event-bar {
+  width: 4px; border-radius: 100px; flex-shrink: 0; align-self: stretch;
+}
+.cal-modal-event-body { flex: 1; min-width: 0; }
+.cal-modal-event-name { font-size: 13px; font-weight: 700; margin-bottom: 3px; }
+.cal-modal-event-meta { font-size: 11px; color: var(--muted); line-height: 1.6; }
+.cal-modal-event-del {
+  background: none; border: none; cursor: none;
+  color: var(--muted); font-size: 16px; padding: 0 2px;
+  transition: color .15s; align-self: flex-start;
+}
+.cal-modal-event-del:hover { color: var(--accent); }
+.cal-modal-no-events {
+  text-align: center; padding: 32px 16px;
+  color: var(--muted); font-size: 13px; line-height: 1.6;
+}
+
+/* ── CREATE EVENT FORM ── */
+.create-event-modal {
+  display: none; position: fixed; inset: 0; z-index: 900;
+  background: rgba(0,0,0,.52);
+  align-items: center; justify-content: center;
+}
+.create-event-modal.open { display: flex; }
+.create-event-box {
+  background: white; border-radius: 20px;
+  width: min(480px, calc(100vw - 32px));
+  box-shadow: 0 24px 80px rgba(0,0,0,.2);
+  animation: calModalIn .22s cubic-bezier(.34,1.4,.64,1);
+  overflow: hidden;
+}
+.create-event-hdr {
+  display: flex; align-items: center; justify-content: space-between;
+  padding: 20px 22px 16px;
+  border-bottom: 1px solid var(--border);
+}
+.create-event-hdr h3 {
+  font-family: 'Fraunces', serif;
+  font-size: 18px; font-weight: 900; letter-spacing: -.3px;
+}
+.create-event-body { padding: 20px 22px; display: flex; flex-direction: column; gap: 14px; }
+.form-field { display: flex; flex-direction: column; gap: 5px; }
+.form-label {
+  font-size: 11px; font-weight: 800; color: var(--muted);
+  text-transform: uppercase; letter-spacing: .5px;
+}
+.form-input {
+  width: 100%; padding: 10px 14px; border-radius: 12px;
+  border: 1.5px solid var(--border); background: var(--cream);
+  font-family: 'DM Sans', sans-serif; font-size: 14px;
+  color: var(--charcoal); outline: none; transition: border-color .18s;
+  cursor: text;
+}
+.form-input:focus { border-color: rgba(28,28,30,.25); background: white; }
+.form-row { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; }
+.color-picker-row { display: flex; gap: 8px; flex-wrap: wrap; }
+.color-swatch {
+  width: 26px; height: 26px; border-radius: 8px; cursor: none;
+  border: 2px solid transparent; transition: all .15s;
+  flex-shrink: 0;
+}
+.color-swatch.active { border-color: var(--charcoal); transform: scale(1.15); }
+.create-event-footer {
+  padding: 14px 22px 20px;
+  display: flex; gap: 10px; justify-content: flex-end;
+}
+.btn-cancel {
+  font-family: 'DM Sans', sans-serif; font-size: 13px; font-weight: 700;
+  background: var(--cream); color: var(--muted); border: none;
+  padding: 10px 20px; border-radius: 100px; cursor: none; transition: all .15s;
+}
+.btn-cancel:hover { background: var(--border); }
+.btn-save-event {
+  font-family: 'DM Sans', sans-serif; font-size: 13px; font-weight: 700;
+  background: var(--accent); color: white; border: none;
+  padding: 10px 24px; border-radius: 100px; cursor: none; transition: all .2s;
+}
+.btn-save-event:hover { background: #ff7055; }
+
+/* ══ VIBE OF THE DAY ═══════════════════════════════════════════════ */
+.votd-wrap {
+  border-bottom: 1px solid var(--border);
+  background: white;
+}
+.votd-label-bar {
+  display: flex; align-items: center; gap: 8px;
+  padding: 14px 20px 10px;
+}
+.votd-badge {
+  display: flex; align-items: center; gap: 6px;
+  background: #1C1C1E; color: white;
+  font-size: 10px; font-weight: 800; letter-spacing: 1.5px;
+  text-transform: uppercase; padding: 4px 10px 4px 6px;
+  border-radius: 100px;
+}
+.votd-badge-dot {
+  width: 18px; height: 18px; border-radius: 50%;
+  background: var(--accent); display: flex;
+  align-items: center; justify-content: center; flex-shrink: 0;
+}
+.votd-subtitle {
+  font-size: 11px; color: var(--muted); font-weight: 500;
+}
+
+/* The card */
+.votd-card {
+  margin: 0 16px 16px;
+  border-radius: 18px;
+  overflow: hidden;
+  position: relative;
+  cursor: none;
+  transition: transform .2s, box-shadow .2s;
+}
+.votd-card:hover {
+  transform: translateY(-2px);
+  box-shadow: 0 16px 48px rgba(0,0,0,.14);
+}
+
+/* Cinematic background — gradient + fake thumbnail */
+.votd-bg {
+  height: 190px;
+  background: linear-gradient(135deg, #1A0A2E 0%, #2D1B4E 40%, #0F2A4A 100%);
+  position: relative;
+  display: flex; align-items: center; justify-content: center;
+  overflow: hidden;
+}
+.votd-bg::before {
+  content: '';
+  position: absolute; inset: 0;
+  background: radial-gradient(ellipse at 30% 50%, rgba(255,92,53,.18) 0%, transparent 60%),
+              radial-gradient(ellipse at 80% 20%, rgba(200,184,255,.12) 0%, transparent 50%);
+}
+/* Abstract waveform decoration */
+.votd-wave {
+  position: absolute; bottom: 0; left: 0; right: 0; height: 50px;
+  display: flex; align-items: flex-end; gap: 3px; padding: 0 20px;
+  opacity: .35;
+}
+.votd-wave-bar {
+  flex: 1; border-radius: 2px 2px 0 0;
+  background: white;
+  transition: height .3s;
+}
+
+/* Play button */
+.votd-play {
+  width: 56px; height: 56px; border-radius: 50%;
+  background: rgba(255,255,255,.95);
+  display: flex; align-items: center; justify-content: center;
+  box-shadow: 0 8px 24px rgba(0,0,0,.3);
+  position: relative; z-index: 2;
+  transition: transform .2s, background .2s;
+}
+.votd-card:hover .votd-play {
+  transform: scale(1.08);
+  background: white;
+}
+.votd-play svg { margin-left: 3px; }
+
+/* Duration badge */
+.votd-duration {
+  position: absolute; top: 12px; right: 12px; z-index: 2;
+  background: rgba(0,0,0,.55); color: white;
+  font-size: 11px; font-weight: 700; letter-spacing: .3px;
+  padding: 3px 8px; border-radius: 6px;
+  backdrop-filter: blur(4px);
+}
+
+/* Rank badge */
+.votd-rank {
+  position: absolute; top: 12px; left: 12px; z-index: 2;
+  display: flex; align-items: center; gap: 5px;
+  background: rgba(255,92,53,.9); color: white;
+  font-size: 10px; font-weight: 800; letter-spacing: 1px; text-transform: uppercase;
+  padding: 4px 10px; border-radius: 100px;
+  backdrop-filter: blur(4px);
+}
+
+/* Bottom info panel */
+.votd-info {
+  background: white; padding: 14px 16px 16px;
+}
+.votd-author-row {
+  display: flex; align-items: center; gap: 10px; margin-bottom: 8px;
+}
+.votd-av {
+  width: 32px; height: 32px; border-radius: 9px;
+  background: #2D1B4E; display: flex; align-items: center; justify-content: center;
+  font-family: 'Fraunces', serif; font-size: 11px; font-weight: 700; color: white;
+  flex-shrink: 0;
+}
+.votd-author-meta { flex: 1; }
+.votd-author-name {
+  font-size: 13px; font-weight: 700; color: var(--charcoal); line-height: 1.2;
+}
+.votd-author-role { font-size: 11px; color: var(--muted); }
+
+.votd-title {
+  font-family: 'Fraunces', serif;
+  font-size: 15px; font-weight: 700; letter-spacing: -.2px;
+  color: var(--charcoal); line-height: 1.4; margin-bottom: 10px;
+}
+
+.votd-stats {
+  display: flex; align-items: center; gap: 14px;
+}
+.votd-stat {
+  display: flex; align-items: center; gap: 5px;
+  font-size: 12px; font-weight: 600; color: var(--muted);
+}
+.votd-stat svg { flex-shrink: 0; }
+.votd-stat.hot { color: var(--accent); }
+
+/* React bar */
+.votd-react-bar {
+  display: flex; gap: 6px; margin-top: 12px; padding-top: 12px;
+  border-top: 1px solid var(--border);
+}
+.votd-react-btn {
+  display: flex; align-items: center; gap: 5px;
+  background: var(--cream); border: 1px solid var(--border);
+  border-radius: 100px; padding: 5px 12px;
+  font-size: 12px; font-weight: 600; color: var(--muted);
+  cursor: none; transition: all .15s; border-style: solid;
+}
+.votd-react-btn:hover { border-color: var(--accent); color: var(--accent); background: #FFF5F2; }
+.votd-react-btn.active { border-color: var(--accent); color: var(--accent); background: #FFF5F2; }
+.votd-comment-btn {
+  margin-left: auto; display: flex; align-items: center; gap: 6px;
+  background: none; border: none; font-size: 12px; font-weight: 600;
+  color: var(--muted); cursor: none; transition: color .15s; padding: 5px 4px;
+}
+.votd-comment-btn:hover { color: var(--charcoal); }
+
+
+*,*::before,*::after{cursor:none!important;}
+.cursor,.cursor-ring{cursor:none!important;}
+input,textarea,[contenteditable="true"]{cursor:text!important;}
+</style>
+</head>
+<body>
+<div class="cursor" id="cursor"></div>
+<div class="cursor-ring" id="cursorRing"></div>
+
+<div class="shell">
+
+  <!-- LEFT NAV -->
+  <aside class="left-nav">
+    <a href="/html/feed.html" class="nav-logo">vibe<span>.</span></a>
+    <nav>
+      <a href="/html/feed.html" class="nav-item">
+        <svg width="16" height="16" viewBox="0 0 16 16" fill="none"><rect x="1" y="1" width="6" height="6" rx="2" fill="currentColor"/><rect x="9" y="1" width="6" height="6" rx="2" fill="currentColor"/><rect x="1" y="9" width="6" height="6" rx="2" fill="currentColor"/><rect x="9" y="9" width="6" height="6" rx="2" fill="currentColor"/></svg>
+        Feed
+      </a>
+      <a href="/html/network.html" class="nav-item">
+        <svg width="16" height="16" viewBox="0 0 16 16" fill="none"><circle cx="8" cy="4" r="2.5" stroke="currentColor" stroke-width="1.4"/><circle cx="2.5" cy="12" r="2" stroke="currentColor" stroke-width="1.4"/><circle cx="13.5" cy="12" r="2" stroke="currentColor" stroke-width="1.4"/><path d="M5.5 4.5L2.5 10M10.5 4.5L13.5 10M5.8 12h4.4" stroke="currentColor" stroke-width="1.3" stroke-linecap="round"/></svg>
+        Network
+      </a>
+      <a href="/html/campus.html" class="nav-item active">
+        <svg width="16" height="16" viewBox="0 0 16 16" fill="none"><path d="M8 1L15 5V7H1V5L8 1Z" stroke="currentColor" stroke-width="1.4" fill="none" stroke-linejoin="round"/><rect x="2" y="7" width="2.5" height="6" stroke="currentColor" stroke-width="1.3" fill="none"/><rect x="6.75" y="7" width="2.5" height="6" stroke="currentColor" stroke-width="1.3" fill="none"/><rect x="11.5" y="7" width="2.5" height="6" stroke="currentColor" stroke-width="1.3" fill="none"/><path d="M1 13h14" stroke="currentColor" stroke-width="1.4" stroke-linecap="round"/></svg>
+        Campus
+      </a>
+      <a href="/html/opportunities.html" class="nav-item">
+        <svg width="16" height="16" viewBox="0 0 16 16" fill="none"><rect x="1" y="5" width="14" height="10" rx="2" stroke="currentColor" stroke-width="1.4" fill="none"/><path d="M5 5V4a3 3 0 0 1 6 0v1" stroke="currentColor" stroke-width="1.4" fill="none" stroke-linecap="round"/><path d="M1 9h14" stroke="currentColor" stroke-width="1.4" stroke-linecap="round"/></svg>
+        Opportunities
+      </a>
+      <a href="/html/messages.html" class="nav-item">
+        <svg width="16" height="16" viewBox="0 0 16 16" fill="none"><path d="M1 2.5A1.5 1.5 0 012.5 1h11A1.5 1.5 0 0115 2.5v8A1.5 1.5 0 0113.5 12H5L1 15V2.5z" stroke="currentColor" stroke-width="1.4" fill="none" stroke-linejoin="round"/></svg>
+        Messages
+      </a>
+      <a href="/html/otto.html" class="nav-item">
+        <span style="display:inline-flex;width:16px;height:16px;align-items:center;justify-content:center;"><span style="width:8px;height:8px;border-radius:50%;background:var(--accent);box-shadow:0 0 6px var(--accent);"></span></span>
+        otto
+      </a>
+    </nav>
+    <div class="nav-divider"></div>
+    <a href="/html/profile.html" class="nav-item">
+      <div class="mini-av">MC</div>
+      <div><div style="font-size:13px;font-weight:600;color:var(--charcoal)">Maya Chen</div><div style="font-size:11px;color:var(--muted)">Product Designer</div></div>
+    </a>
+  
+    
+  
+    <div class="cal-widget" id="calWidget">
+      <div class="cal-header">
+        <button class="cal-title-row" onclick="openCalModal()" style="background:none;border:none;cursor:none;display:flex;align-items:center;gap:6px;padding:0;transition:opacity .15s" onmouseover="this.style.opacity='.7'" onmouseout="this.style.opacity='1'">
+          <svg width="12" height="12" viewBox="0 0 14 14" fill="none">
+            <rect x="1" y="2" width="12" height="11" rx="2.5" stroke="currentColor" stroke-width="1.3" fill="none"/>
+            <path d="M1 6h12" stroke="currentColor" stroke-width="1.3" stroke-linecap="round"/>
+            <path d="M4 1v2M10 1v2" stroke="currentColor" stroke-width="1.3" stroke-linecap="round"/>
+          </svg>
+          <span class="cal-title">My Calendar</span>
+          <span class="cal-event-count-badge" id="calEventCount">0</span>
+        </button>
+        <button class="cal-toggle" onclick="toggleCalView()" id="calToggleBtn">&#8964;</button>
+      </div>
+      <div id="calBody">
+        <div class="cal-month-nav">
+          <button class="cal-nav-btn" onclick="changeMonth(-1)">&#8249;</button>
+          <span class="cal-month-label" id="calMonthLabel"></span>
+          <button class="cal-nav-btn" onclick="changeMonth(1)">&#8250;</button>
+        </div>
+        <div class="cal-grid" id="calGrid"></div>
+        <div class="cal-events-panel" id="calEventsPanel">
+          <div class="cal-events-panel-title" id="calPanelTitle">Events</div>
+          <div id="calEventsList"></div>
+        </div>
+      </div>
+    </div>
+  </aside>
+
+  <!-- CENTER -->
+  <div class="center">
+
+    <!-- Campus header -->
+    <div class="campus-bar">
+      <div class="campus-logo-block">IU</div>
+      <div class="campus-bar-info">
+        <h2>Indiana University</h2>
+        <p>Bloomington, IN &middot; 45,000 students &middot; 2,847 on Vibe</p>
+      </div>
+      <div class="campus-search-wrap" id="campusSearchWrap">
+        <div class="campus-search-bar">
+          <svg width="14" height="14" viewBox="0 0 14 14" fill="none">
+            <circle cx="6" cy="6" r="4.5" stroke="currentColor" stroke-width="1.5"/>
+            <path d="M10 10l2.5 2.5" stroke="currentColor" stroke-width="1.5" stroke-linecap="round"/>
+          </svg>
+          <input class="campus-search-input" id="campusSearchInput"
+            placeholder="Search students, orgs…"
+            oninput="runCampusSearch(this.value)"
+            onfocus="openCampusSearch()"
+            onblur="setTimeout(function(){closeCampusSearch()},180)">
+        </div>
+        <div class="campus-search-dropdown" id="campusSearchDropdown"></div>
+      </div>
+
+    </div>
+
+    <!-- Section tabs -->
+    <div class="section-tabs">
+      <button class="section-tab active" id="stab-feed"   onclick="switchSection('feed')">Feed <span class="tab-count" id="tc-feed">24</span></button>
+      <button class="section-tab"         id="stab-jobs"   onclick="switchSection('jobs')">Jobs &amp; Internships <span class="tab-count" id="tc-jobs">38</span></button>
+      <button class="section-tab"         id="stab-events" onclick="switchSection('events')">Events <span class="tab-count" id="tc-events">12</span></button>
+      <button class="section-tab"         id="stab-orgs"   onclick="switchSection('orgs')">Organizations <span class="tab-count" id="tc-orgs">94</span></button>
+      <button class="section-tab"         id="stab-chat"   onclick="switchSection('chat')">Chat <span class="tab-count" id="tc-chat" style="background:var(--iu-light);color:var(--iu)">5</span></button>
+      <button class="section-tab"         id="stab-map"    onclick="switchSection('map')">Campus Map <span class="tab-count" id="tc-map">247</span></button>
+    </div>
+
+    <!-- ═══════════ FEED ═══════════ -->
+    <div class="tab-pane active" id="pane-feed">
+
+      <!-- Composer -->
+      <div class="composer-wrap">
+        <div class="comp-inner">
+          <div class="comp-av">MC</div>
+          <div class="comp-field">
+            <textarea class="comp-input" id="campusPostInput" placeholder="Share something with the IU community&#8202;&#8202;" rows="1" oninput="this.style.height='auto';this.style.height=Math.min(this.scrollHeight,160)+'px'"></textarea>
+            <div class="comp-footer">
+              <div class="comp-type-btns">
+                <button class="comp-type-btn neutral" onclick="setPostType(this,'')">Post</button>
+                <button class="comp-type-btn ann" onclick="setPostType(this,'ann')">Announcement</button>
+                <button class="comp-type-btn evt" onclick="setPostType(this,'evt')">Event</button>
+                <button class="comp-type-btn job" onclick="setPostType(this,'job')">Opportunity</button>
+                <button class="comp-type-btn club" onclick="setPostType(this,'club')">Club callout</button>
+              </div>
+              <button class="comp-submit" onclick="submitCampusPost()">Post</button>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <!-- Posts -->
+      <div id="campus-feed"></div>
+    </div>
+
+    <!-- ═══════════ JOBS ═══════════ -->
+    <div class="tab-pane" id="pane-jobs">
+      <div class="jobs-filter">
+        <button class="filter-chip on" onclick="toggleFilter(this)">All</button>
+        <button class="filter-chip" onclick="toggleFilter(this)">Internships</button>
+        <button class="filter-chip" onclick="toggleFilter(this)">Full-time</button>
+        <button class="filter-chip" onclick="toggleFilter(this)">Part-time</button>
+        <button class="filter-chip" onclick="toggleFilter(this)">Remote</button>
+        <button class="filter-chip" onclick="toggleFilter(this)">On-campus</button>
+        <button class="filter-chip" onclick="toggleFilter(this)">New this week</button>
+      </div>
+      <div class="search-bar">
+        <svg width="15" height="15" viewBox="0 0 15 15" fill="none"><circle cx="6.5" cy="6.5" r="4.5" stroke="#8A8580" stroke-width="1.3"/><path d="M10 10l2.5 2.5" stroke="#8A8580" stroke-width="1.3" stroke-linecap="round"/></svg>
+        <input type="text" placeholder="Search jobs, companies, keywords&#8230;">
+      </div>
+      <div id="jobs-list"></div>
+    </div>
+
+    <!-- ═══════════ EVENTS ═══════════ -->
+    <div class="tab-pane" id="pane-events">
+      <div class="jobs-filter">
+        <button class="filter-chip on" onclick="toggleFilter(this)">All</button>
+        <button class="filter-chip" onclick="toggleFilter(this)">This week</button>
+        <button class="filter-chip" onclick="toggleFilter(this)">Career</button>
+        <button class="filter-chip" onclick="toggleFilter(this)">Social</button>
+        <button class="filter-chip" onclick="toggleFilter(this)">Academic</button>
+        <button class="filter-chip" onclick="toggleFilter(this)">Workshops</button>
+      </div>
+      <div id="events-list"></div>
+    </div>
+
+    <!-- ═══════════ ORGS ═══════════ -->
+    <div class="tab-pane" id="pane-orgs">
+      <div class="jobs-filter">
+        <button class="filter-chip on" onclick="toggleFilter(this)">All</button>
+        <button class="filter-chip" onclick="toggleFilter(this)">Academic</button>
+        <button class="filter-chip" onclick="toggleFilter(this)">Cultural</button>
+        <button class="filter-chip" onclick="toggleFilter(this)">Professional</button>
+        <button class="filter-chip" onclick="toggleFilter(this)">Social</button>
+        <button class="filter-chip" onclick="toggleFilter(this)">Service</button>
+      </div>
+      <div class="search-bar">
+        <svg width="15" height="15" viewBox="0 0 15 15" fill="none"><circle cx="6.5" cy="6.5" r="4.5" stroke="#8A8580" stroke-width="1.3"/><path d="M10 10l2.5 2.5" stroke="#8A8580" stroke-width="1.3" stroke-linecap="round"/></svg>
+        <input type="text" placeholder="Search organizations&#8230;">
+      </div>
+      <div id="orgs-list"></div>
+    </div>
+
+    <!-- ═══════════ CHAT ═══════════ -->
+    <div class="tab-pane" id="pane-chat">
+      <div class="chat-shell">
+        <div class="chat-list">
+          <div class="chat-list-hdr">Channels</div>
+          <div id="chat-rooms"></div>
+        </div>
+        <div class="chat-main">
+          <div class="chat-hdr" id="chat-hdr">
+            <div class="chat-hdr-icon" id="chat-hdr-icon">&#128187;</div>
+            <div><div class="chat-hdr-name" id="chat-hdr-name">Select a channel</div><div class="chat-hdr-sub" id="chat-hdr-sub"></div></div>
+          </div>
+          <div class="chat-msgs" id="chat-msgs"></div>
+          <div class="chat-compose">
+            <div class="chat-compose-inner">
+              <input type="text" class="chat-input" id="chat-input" placeholder="Message the channel&#8230;" onkeydown="if(event.key==='Enter')sendChatMsg()">
+              <button class="chat-send" onclick="sendChatMsg()">
+                <svg width="14" height="14" viewBox="0 0 14 14" fill="none"><path d="M13 1L1 6l5 2 2 5 5-12z" fill="white" stroke="white" stroke-width=".3" stroke-linejoin="round"/></svg>
+              </button>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+
+
+    <!-- MAP PANE -->
+    <div class="tab-pane" id="pane-map">
+      <div class="map-toolbar">
+        <span class="map-toolbar-title">Campus Network</span>
+        <button class="map-filter-chip active" id="mf-all"      onclick="setMapFilter('all',this)">Everyone</button>
+        <button class="map-filter-chip"        id="mf-business" onclick="setMapFilter('business',this)">Business</button>
+        <button class="map-filter-chip"        id="mf-luddy"    onclick="setMapFilter('luddy',this)">Luddy</button>
+        <button class="map-filter-chip"        id="mf-arts"     onclick="setMapFilter('arts',this)">Arts &amp; Sci</button>
+        <button class="map-filter-chip"        id="mf-media"    onclick="setMapFilter('media',this)">Media</button>
+        <button class="map-filter-chip"        id="mf-law"      onclick="setMapFilter('law',this)">Law</button>
+        <div class="map-legend">
+          <div class="map-legend-item"><div class="map-legend-dot" style="border-color:#2ECC71"></div>Connected</div>
+          <div class="map-legend-item"><div class="map-legend-dot" style="border-color:#F5C842"></div>Mutual</div>
+          <div class="map-legend-item"><div class="map-legend-dot" style="border-color:rgba(255,255,255,.25)"></div>On campus</div>
+        </div>
+      </div>
+      <div class="map-scene" id="mapScene">
+        <div class="map-field" id="mapField"></div>
+        <div id="mapPopup" style="display:none" class="map-popup"></div>
+        <div class="map-zoom-controls">
+          <button class="map-zoom-btn" onclick="zoomMap(1.15)">+</button>
+          <button class="map-zoom-btn" onclick="zoomMap(0.87)">&#8722;</button>
+        </div>
+      </div>
+    </div>
+
+  </div><!-- /center -->
+
+  <!-- ── STUDENT VERIFICATION GATE (shown when not verified) ── -->
+  <div class="campus-gate" id="campusGate">
+    <div class="cg-card">
+      <div class="cg-icon-wrap">🎓</div>
+      <h2>Campus is for verified students</h2>
+      <p class="cg-sub">Vibe's Campus tab is built for current college students. Verify your <strong>.edu email</strong> to unlock your school's events, jobs, clubs, and people — all in one place.</p>
+
+      <div class="cg-features">
+        <div class="cg-feature">
+          <div class="cg-feature-icon">📅</div>
+          <div class="cg-feature-name">Events &amp; deadlines</div>
+          <div class="cg-feature-desc">Career fairs, hackathons, club meetings on your campus.</div>
+        </div>
+        <div class="cg-feature">
+          <div class="cg-feature-icon">💼</div>
+          <div class="cg-feature-name">Jobs &amp; internships</div>
+          <div class="cg-feature-desc">Roles tagged for your school and your year.</div>
+        </div>
+        <div class="cg-feature">
+          <div class="cg-feature-icon">🤝</div>
+          <div class="cg-feature-name">Your classmates</div>
+          <div class="cg-feature-desc">Connect with verified students at your school.</div>
+        </div>
+        <div class="cg-feature">
+          <div class="cg-feature-icon">💬</div>
+          <div class="cg-feature-name">Campus chat</div>
+          <div class="cg-feature-desc">Live channels for clubs, classes, and projects.</div>
+        </div>
+      </div>
+
+      <button class="cg-cta" onclick="window.studentVerify.open()">
+        <span>🎓</span> Verify with your .edu email
+      </button>
+      <div class="cg-foot">Not a student? <a href="/html/feed.html">Back to your feed →</a></div>
+    </div>
+  </div>
+
+  <!-- RIGHT COLUMN -->
+  <aside class="right">
+
+    <div class="widget">
+      <div class="widget-title">Upcoming deadlines</div>
+      <div class="deadline-item">
+        <div class="deadline-dot" style="background:var(--iu)"></div>
+        <div class="deadline-info">
+          <div class="deadline-title">Goldman Sachs &mdash; Summer Analyst</div>
+          <div class="deadline-sub">Finance &middot; New York</div>
+        </div>
+        <span class="deadline-time dt-urgent">2 days</span>
+      </div>
+      <div class="deadline-item">
+        <div class="deadline-dot" style="background:var(--gold)"></div>
+        <div class="deadline-info">
+          <div class="deadline-title">Deloitte &mdash; Tech Consulting</div>
+          <div class="deadline-sub">Consulting &middot; Chicago</div>
+        </div>
+        <span class="deadline-time dt-soon">5 days</span>
+      </div>
+      <div class="deadline-item">
+        <div class="deadline-dot" style="background:#1A9E5B"></div>
+        <div class="deadline-info">
+          <div class="deadline-title">Stripe &mdash; Design Internship</div>
+          <div class="deadline-sub">Design &middot; Remote</div>
+        </div>
+        <span class="deadline-time dt-ok">3 weeks</span>
+      </div>
+      <div class="deadline-item">
+        <div class="deadline-dot" style="background:var(--blue)"></div>
+        <div class="deadline-info">
+          <div class="deadline-title">IU Spring Career Fair</div>
+          <div class="deadline-sub">Register before Feb 28</div>
+        </div>
+        <span class="deadline-time dt-soon">8 days</span>
+      </div>
+    </div>
+
+    <div class="widget">
+      <div class="widget-title">IU students to connect</div>
+      <div id="campus-suggest"></div>
+      <button style="font-size:12px;font-weight:700;color:var(--iu);background:none;border:none;cursor:none;margin-top:8px;transition:opacity .15s" onmouseover="this.style.opacity='.7'" onmouseout="this.style.opacity='1'" onclick="toast('Loading more students\u2026')">See more &#8594;</button>
+    </div>
+
+    <div class="widget">
+      <div class="widget-title">Trending on campus</div>
+      <div style="display:flex;flex-direction:column;gap:8px">
+        <div style="display:flex;justify-content:space-between;font-size:12px"><span style="font-weight:700;color:var(--iu)">#IUHackathon</span><span style="color:var(--muted)">284 posts</span></div>
+        <div style="display:flex;justify-content:space-between;font-size:12px"><span style="font-weight:700;color:var(--iu)">#CareerFair2025</span><span style="color:var(--muted)">196 posts</span></div>
+        <div style="display:flex;justify-content:space-between;font-size:12px"><span style="font-weight:700;color:var(--iu)">#LuddySchool</span><span style="color:var(--muted)">142 posts</span></div>
+        <div style="display:flex;justify-content:space-between;font-size:12px"><span style="font-weight:700;color:var(--iu)">#StartupIU</span><span style="color:var(--muted)">98 posts</span></div>
+        <div style="display:flex;justify-content:space-between;font-size:12px"><span style="font-weight:700;color:var(--iu)">#HoosierNetwork</span><span style="color:var(--muted)">74 posts</span></div>
+      </div>
+    </div>
+
+  </aside>
+</div>
+
+<div id="ct"></div>
+
+<script>
+// ── Cursor ──
+const cur=document.getElementById('cursor'),ring=document.getElementById('cursorRing');
+let mx=window.innerWidth/2,my=window.innerHeight/2,rx=window.innerWidth/2,ry=window.innerHeight/2;
+document.addEventListener('mousemove',e=>{mx=e.clientX;my=e.clientY;cur.style.transform=`translate(${mx-4}px,${my-4}px)`;},{passive:true});
+(function tick(){rx+=(mx-rx-14)*.28;ry+=(my-ry-14)*.28;ring.style.transform=`translate(${Math.round(rx)}px,${Math.round(ry)}px)`;requestAnimationFrame(tick);})();
+document.addEventListener('mousedown',()=>cur.classList.add('clicking'));
+document.addEventListener('mouseup',()=>cur.classList.remove('clicking'));
+const HS='a,button,.nav-item,.post,.job-listing,.event-listing,.org-card,.chat-room,.post-chip,.filter-chip,.section-tab,.comp-type-btn,.deadline-item,.suggest-person';
+document.addEventListener('mouseover',e=>{if(e.target.closest(HS)){cur.classList.add('hover');ring.classList.add('hover');}});
+document.addEventListener('mouseout', e=>{if(e.target.closest(HS)){cur.classList.remove('hover');ring.classList.remove('hover');}});
+
+// ── Data ──
+const feedPosts = [
+  { id:'p1', av:'CS', bg:'#1A3A5C', auth:'IU Computer Science Club', role:'@iucsclub', type:'club', badge:'b-club', bt:'Club',
+    body:'Applications for our <strong>2025 Spring Hackathon</strong> are officially open. $10,000 in prizes, mentors from Google, Stripe, and Meta. Any major can apply \u2014 we need designers, PMs, marketers, not just engineers.',
+    event:{title:'IU Spring Hackathon 2025',date:'Sat March 15',time:'9am\u20139pm',loc:'Assembly Hall',detail:'120 participants \u00b7 $10k prizes'},
+    tags:['#Hackathon','#IUHackathon','#CS'], r:['&#128293; 142','&#128161; 88'], rsvp:true, id:'p1' },
+  { id:'p2', av:'CA', bg:'#4A3A1A', auth:'IU Career Services', role:'@iucareers', type:'job', badge:'b-job', bt:'Career',
+    body:'<strong>Spring Career Fair is 3 weeks away.</strong> 120+ employers coming to campus including Goldman Sachs, Amazon, Deloitte, and 40+ startups specifically recruiting IU students.\n\nRegister early \u2014 1-on-1 pre-interview slots are limited.',
+    event:{title:'IU Spring Career Fair',date:'Wed March 5',time:'10am\u20134pm',loc:'IMU Alumni Hall',detail:'120+ employers \u00b7 Pre-interview slots available'},
+    tags:['#CareerFair2025','#Jobs','#Networking'], r:['&#128188; 284','&#128293; 196'], rsvp:true, id:'p2' },
+  { id:'p3', av:'MC', bg:'#1C1C1E', auth:'Maya Chen', role:'Product Design \u00b7 Junior', type:'', badge:'b-chat', bt:'Post',
+    body:'Looking for 2 people to join a startup project for the Venture Club pitch competition in April.\n\nWe\u2019re building a peer tutoring platform. I\u2019m doing product design \u2014 need one developer (React/Node) and one person who can own go-to-market.\n\nDM me or drop a comment.',
+    tags:['#StartupIU','#VentureClub','#FindACofounder'], r:['&#129334; 34','&#128161; 21'], rsvp:false, id:'p3' },
+  { id:'p4', av:'DE', bg:'#2A1A4A', auth:'Design @ IU', role:'@designiu \u00b7 4d ago', type:'club', badge:'b-club', bt:'Club',
+    body:'<strong>Critique night this Thursday:</strong> wayfinding systems on campus. Bring a prototype, sketch, or even just a napkin drawing. All majors and disciplines welcome.',
+    event:{title:'Weekly Critique Night',date:'Thu Feb 20',time:'7:00pm',loc:'Luddy Hall Room 1106',detail:'Open to all majors'},
+    tags:['#DesignIU','#Critique','#UX'], r:['&#127912; 67','&#128161; 44'], rsvp:false, id:'p4' },
+  { id:'p5', av:'JT', bg:'#1A3A2A', auth:'Jordan Thompson', role:'CS \u00b7 Senior \u00b7 2h ago', type:'ann', badge:'b-ann', bt:'Announcement',
+    body:'The IU Tech Interview Prep Group meets every Tuesday at 7pm in Ballantine 008. We\u2019ve had 12 people land offers at Google, Amazon, and Meta in the last semester. If you\u2019re recruiting this cycle, come through.',
+    tags:['#TechRecruiting','#LeetCode','#IU'], r:['&#128161; 91','&#129334; 56'], rsvp:false, id:'p5' },
+];
+
+const jobs = [
+  { logo:'GS', company:'Goldman Sachs', title:'Summer Analyst \u2014 Technology', type:'Internship', loc:'New York, NY', pay:'$120k equiv.', deadline:'Feb 28', isNew:true,
+    tags:['Finance tech','Full stack','Python'], desc:'Build and maintain trading infrastructure. IU applicants strongly encouraged.' },
+  { logo:'ST', company:'Stripe', title:'Product Design Intern', type:'Internship', loc:'Remote', pay:'$55/hr', deadline:'March 14', isNew:true,
+    tags:['Figma','Design systems','Prototyping'], desc:'Work directly with the design systems team. Previous internship preferred but not required.' },
+  { logo:'AM', company:'Amazon', title:'SDE Internship (Summer)', type:'Internship', loc:'Seattle, WA', pay:'$8,400/mo', deadline:'March 1', isNew:false,
+    tags:['Java','AWS','Distributed systems'], desc:'Software engineering internship on AWS infrastructure teams.' },
+  { logo:'DL', company:'Deloitte', title:'Technology Consulting Analyst', type:'Full-time', loc:'Chicago, IL', pay:'$85,000', deadline:'March 5', isNew:true,
+    tags:['Consulting','Cloud','Strategy'], desc:'Full-time analyst role on digital transformation engagements. IU OCR role.' },
+  { logo:'LU', company:'Luddy School Research', title:'Undergrad Research Assistant', type:'On-campus', loc:'Bloomington, IN', pay:'$15/hr', deadline:'Rolling', isNew:false,
+    tags:['HCI','Research','UX'], desc:'Assist faculty with HCI research on accessibility and inclusive design. 10hrs/week.' },
+  { logo:'NC', company:'Notion', title:'Intern \u2014 Product Management', type:'Internship', loc:'Remote', pay:'$50/hr', deadline:'March 20', isNew:true,
+    tags:['Product','Roadmapping','Figma'], desc:'PM internship working on core editor features. Strong writing and analytical skills required.' },
+];
+
+const events = [
+  { month:'FEB', day:'20', title:'Weekly Design Critique Night', host:'Design @ IU', time:'7:00 PM \u2013 9:00 PM', loc:'Luddy Hall 1106', tags:['Design','Open to all'], rsvp:47 },
+  { month:'FEB', day:'25', title:'Goldman Sachs Info Session', host:'IU Career Services', time:'5:30 PM \u2013 7:00 PM', loc:'Kelley School of Business 100', tags:['Finance','Recruiting'], rsvp:284 },
+  { month:'MAR', day:'5',  title:'IU Spring Career Fair', host:'IU Career Services', time:'10:00 AM \u2013 4:00 PM', loc:'IMU Alumni Hall', tags:['Career Fair','All majors'], rsvp:1840 },
+  { month:'MAR', day:'8',  title:'Startup Pitch Workshop', host:'IU Venture Club', time:'3:00 PM \u2013 5:00 PM', loc:'Kelley School 230', tags:['Entrepreneurship','Pitching'], rsvp:62 },
+  { month:'MAR', day:'15', title:'IU Spring Hackathon 2025', host:'IU CS Club', time:'9:00 AM \u2013 9:00 PM', loc:'Assembly Hall', tags:['Hackathon','All majors','$10k prizes'], rsvp:118 },
+  { month:'MAR', day:'19', title:'ML Paper Reading Group', host:'IU AI Society', time:'6:00 PM \u2013 7:30 PM', loc:'Luddy Hall 0001 (The Commons)', tags:['ML','Research','CS'], rsvp:33 },
+];
+
+const orgs = [
+  { av:'CS', bg:'#1A3A5C', name:'IU Computer Science Club', cat:'Academic / Tech', desc:'Weekly meetups, hackathons, and interview prep. Home of IU\u2019s competitive programming team.', members:700, posts:48 },
+  { av:'DE', bg:'#2A1A4A', name:'Design @ IU', cat:'Professional', desc:'For designers of all kinds \u2014 UX, graphic, fashion, architecture. Weekly critiques and industry panels.', members:312, posts:24 },
+  { av:'VC', bg:'#1A4A2A', name:'IU Venture Club', cat:'Entrepreneurship', desc:'Build, pitch, and grow. Annual $50k pitch competition open to all IU students.', members:540, posts:31 },
+  { av:'BS', bg:'#4A2A1A', name:'National Society of Black Engineers', cat:'Cultural / Professional', desc:'Supporting Black engineers from IU campus to career.', members:280, posts:19 },
+  { av:'WI', bg:'#2A2A4A', name:'Women in Computing', cat:'Professional', desc:'Community, mentorship, and industry connections for women in CS and related fields.', members:420, posts:36 },
+  { av:'AI', bg:'#1A4A4A', name:'IU AI Society', cat:'Academic', desc:'Reading groups, workshops, and projects around machine learning and AI research.', members:190, posts:14 },
+  { av:'SM', bg:'#4A1A2A', name:'IU Social Media Club', cat:'Professional', desc:'Marketing, content strategy, and brand building. Home of student-run brand partnerships.', members:335, posts:27 },
+  { av:'MU', bg:'#3A2A1A', name:'IU Muslim Student Association', cat:'Cultural / Service', desc:'A welcoming community for Muslim students and those interested in Islamic culture.', members:410, posts:22 },
+];
+
+const chatRooms = [
+  { id:'general',    icon:'&#127963;', name:'#general',         sub:'2,847 members',   badge:0, msgs:[
+    {av:'JT',bg:'#1A3A2A',name:'Jordan T.',text:'Anyone going to the career fair next week? Want to carpool from Collins',mine:false},
+    {av:'AR',bg:'#2A1A3A',name:'Amara R.', text:'Yes! I\u2019ll be there. Also if anyone wants to do mock interviews beforehand DM me',mine:false},
+    {av:'MC',bg:'#1C1C1E',name:'Maya Chen',text:'I can do mock interviews Saturday morning if people want',mine:true},
+    {av:'CM',bg:'#1A2A3A',name:'Carlos M.',text:'&#128293; that would be great Maya',mine:false},
+  ]},
+  { id:'cs',         icon:'&#128187;', name:'#cs-majors',       sub:'700 members',     badge:3, msgs:[
+    {av:'SK',bg:'#1A1A3A',name:'Sofia K.', text:'Is anyone else struggling with P222 assignment 4? The recursion part is rough',mine:false},
+    {av:'DW',bg:'#2A3A1A',name:'Darius W.',text:'Yeah same. Prof office hours tomorrow at 2pm though',mine:false},
+    {av:'MC',bg:'#1C1C1E',name:'Maya Chen',text:'Heads up \u2014 there\u2019s a typo in the spec on line 47, the expected output should be [1,3,5] not [1,2,5]',mine:true},
+    {av:'SK',bg:'#1A1A3A',name:'Sofia K.', text:'oh my god thank you I was going CRAZY',mine:false},
+  ]},
+  { id:'design',     icon:'&#127912;', name:'#design',          sub:'312 members',     badge:0, msgs:[
+    {av:'AR',bg:'#2A1A3A',name:'Amara R.', text:'Has anyone used the new Figma variables beta? Trying to set up semantic tokens',mine:false},
+    {av:'MC',bg:'#1C1C1E',name:'Maya Chen',text:'Yes! Game changer for design systems. Happy to share our token structure if helpful',mine:true},
+    {av:'AR',bg:'#2A1A3A',name:'Amara R.', text:'that would be amazing, DM me?',mine:false},
+  ]},
+  { id:'jobs',       icon:'&#128188;', name:'#job-postings',    sub:'1,240 members',   badge:5, msgs:[
+    {av:'CA',bg:'#4A3A1A',name:'Career Svcs',text:'&#128680; Stripe design internship deadline is March 14 \u2014 apply before it closes',mine:false},
+    {av:'JT',bg:'#1A3A2A',name:'Jordan T.', text:'Anyone have a referral for Amazon SDE? Willing to trade for Goldman referral',mine:false},
+    {av:'DW',bg:'#2A3A1A',name:'Darius W.',text:'Notionhiring PM interns, remote, $50/hr \u2014 just posted above',mine:false},
+    {av:'MC',bg:'#1C1C1E',name:'Maya Chen',text:'Stripe design intern here from last summer \u2014 happy to do a coffee chat if you\u2019re applying',mine:true},
+  ]},
+  { id:'housing',    icon:'&#127968;', name:'#housing-roommates',sub:'890 members',    badge:0, msgs:[
+    {av:'LP',bg:'#3A2A1A',name:'Lei P.',   text:'Looking for a roommate for Forest Quad next year, $650/mo all in. DM if interested',mine:false},
+    {av:'CM',bg:'#1A2A3A',name:'Carlos M.',text:'Anyone know if Eigenmann is worth it for sophomore year?',mine:false},
+    {av:'DW',bg:'#2A3A1A',name:'Darius W.',text:'Lived there, great location terrible wifi lol',mine:false},
+  ]},
+];
+
+const campusSuggest = [
+  {av:'JT',bg:'#1A3A2A',name:'Jordan Thompson',role:'CS \u00b7 Senior'},
+  {av:'AR',bg:'#2A1A3A',name:'Amara Roberts',  role:'Design \u00b7 Junior'},
+  {av:'SK',bg:'#1A1A3A',name:'Sofia Kim',       role:'InfoSci \u00b7 Junior'},
+  {av:'LP',bg:'#3A2A1A',name:'Lei Park',        role:'CS \u00b7 Senior'},
+];
+
+// ── Render feed ──
+function renderFeed(posts) {
+  document.getElementById('campus-feed').innerHTML = posts.map(p => `
+    <div class="post">
+      <div class="post-header">
+        <div class="post-av" style="background:${p.bg}">${p.av}</div>
+        <div class="post-meta">
+          <h4>${p.auth} <span class="post-type-badge ${p.badge}">${p.bt}</span></h4>
+          <p>${p.role}</p>
+        </div>
+      </div>
+      <div class="post-body">${p.body.replace(/\n/g,'<br>')}</div>
+      ${p.event ? `<div class="event-card">
+        <h4>${p.event.title}</h4>
+        <div class="event-meta">
+          <div class="event-meta-row"><svg width="12" height="12" viewBox="0 0 12 12" fill="none"><rect x="1" y="2" width="10" height="9" rx="2" stroke="currentColor" stroke-width="1.2" fill="none"/><path d="M1 5h10M4 1v2M8 1v2" stroke="currentColor" stroke-width="1.2" stroke-linecap="round"/></svg>${p.event.date} &middot; ${p.event.time}</div>
+          <div class="event-meta-row"><svg width="12" height="12" viewBox="0 0 12 12" fill="none"><path d="M6 1C3.79 1 2 2.79 2 5c0 3 4 6 4 6s4-3 4-6c0-2.21-1.79-4-4-4z" stroke="currentColor" stroke-width="1.2" fill="none"/><circle cx="6" cy="5" r="1.2" fill="currentColor"/></svg>${p.event.loc}</div>
+          <div class="event-meta-row" style="color:var(--blue)">${p.event.detail}</div>
+        </div>
+      </div>` : ''}
+      <div class="post-tags">${p.tags.map(t=>`<span class="post-tag">${t}</span>`).join('')}</div>
+      <div class="post-bar">
+        ${p.r.map(r=>`<button class="post-chip" onclick="this.classList.toggle('reacted')">${r}</button>`).join('')}
+        <button class="post-chip" onclick="toast('Comment added')">&#128172; Comment</button>
+        ${p.rsvp ? `<button class="rsvp-btn" id="rsvp-${p.id}" onclick="rsvpPost('${p.id}',this)">RSVP</button>` : ''}
+      </div>
+    </div>`).join('');
+}
+
+// ── Render jobs ──
+function renderJobs(jobs) {
+  document.getElementById('jobs-list').innerHTML = jobs.map(j => `
+    <div class="job-listing">
+      <div class="job-logo">${j.logo}</div>
+      <div class="job-info">
+        <div class="job-title">${j.title}</div>
+        <div class="job-company">${j.company}</div>
+        <div class="job-meta">
+          <span>${j.loc}</span><span>${j.pay}</span><span>Deadline: ${j.deadline}</span>
+        </div>
+        <div class="job-chips">
+          <span class="job-chip jc-type">${j.type}</span>
+          <span class="job-chip jc-loc">${j.loc.includes('Remote') ? 'Remote' : 'On-site'}</span>
+          <span class="job-chip jc-pay">${j.pay}</span>
+          ${j.isNew ? '<span class="job-chip jc-new">New</span>' : ''}
+        </div>
+        <div style="font-size:12px;color:var(--muted);margin-top:6px;line-height:1.5">${j.desc}</div>
+      </div>
+      <div class="job-actions">
+        <button class="btn-apply" onclick="toast('Application started for ' + '${j.title}')">Apply</button>
+        <button class="btn-save" onclick="this.textContent=this.textContent==='Save'?'Saved ✓':'Save';this.style.color=this.textContent==='Saved ✓'?'var(--iu)':'';this.style.borderColor=this.textContent==='Saved ✓'?'var(--iu)':''">Save</button>
+      </div>
+    </div>`).join('');
+}
+
+// ── Render events ──
+function renderEvents(events) {
+  document.getElementById('events-list').innerHTML = events.map(e => `
+    <div class="event-listing">
+      <div class="event-date-block">
+        <div class="event-month">${e.month}</div>
+        <div class="event-day">${e.day}</div>
+      </div>
+      <div class="event-info">
+        <div class="event-title">${e.title}</div>
+        <div class="event-host">${e.host}</div>
+        <div class="event-details">
+          <div class="event-detail"><svg width="12" height="12" viewBox="0 0 12 12" fill="none"><circle cx="6" cy="6" r="4.5" stroke="currentColor" stroke-width="1.2"/><path d="M6 3.5V6l2 1.5" stroke="currentColor" stroke-width="1.2" stroke-linecap="round"/></svg>${e.time}</div>
+          <div class="event-detail"><svg width="12" height="12" viewBox="0 0 12 12" fill="none"><path d="M6 1C3.79 1 2 2.79 2 5c0 3 4 6 4 6s4-3 4-6c0-2.21-1.79-4-4-4z" stroke="currentColor" stroke-width="1.2" fill="none"/><circle cx="6" cy="5" r="1.2" fill="currentColor"/></svg>${e.loc}</div>
+        </div>
+        <div class="event-tags2">${e.tags.map(t=>`<span class="event-tag2">${t}</span>`).join('')}</div>
+      </div>
+      <div class="event-rsvp">
+        <button class="rsvp-btn" onclick="this.classList.add('done');this.textContent='Going \u2713';toast('RSVP confirmed!')">RSVP</button>
+        <div class="rsvp-count">${e.rsvp} going</div>
+      </div>
+    </div>`).join('');
+}
+
+// ── Render orgs ──
+function renderOrgs(orgs) {
+  document.getElementById('orgs-list').innerHTML = orgs.map(o => `
+    <div class="org-card">
+      <div class="org-logo" style="background:${o.bg}">${o.av}</div>
+      <div class="org-info">
+        <div class="org-name">${o.name}</div>
+        <div class="org-desc">${o.desc}</div>
+        <div class="org-meta">
+          <span class="org-meta-item">${o.members} members</span>
+          <span class="org-meta-item">${o.posts} posts/month</span>
+          <span class="org-meta-item">${o.cat}</span>
+        </div>
+      </div>
+      <div class="org-btns">
+        <button class="btn-join" onclick="this.textContent=this.textContent==='Join'?'Joined \u2713':'Join';this.style.background=this.textContent==='Joined \u2713'?'#1A9E5B':''">Join</button>
+        <button class="btn-follow-org" onclick="this.textContent=this.textContent==='Follow'?'Following':'Follow'">Follow</button>
+      </div>
+    </div>`).join('');
+}
+
+// ── Render chat ──
+let activeRoom = 'general';
+function renderChatRooms() {
+  document.getElementById('chat-rooms').innerHTML = chatRooms.map(r => `
+    <div class="chat-room ${r.id===activeRoom?'active':''}" onclick="switchRoom('${r.id}')">
+      <div class="chat-room-icon">${r.icon}</div>
+      <div class="chat-room-info">
+        <div class="chat-room-name">${r.name}</div>
+        <div class="chat-room-prev">${r.sub}</div>
+      </div>
+      ${r.badge ? `<div class="chat-room-badge">${r.badge}</div>` : ''}
+    </div>`).join('');
+}
+
+function switchRoom(id) {
+  activeRoom = id;
+  const room = chatRooms.find(r=>r.id===id);
+  if (!room) return;
+  document.getElementById('chat-hdr-icon').innerHTML = room.icon;
+  document.getElementById('chat-hdr-name').textContent = room.name;
+  document.getElementById('chat-hdr-sub').textContent = room.sub;
+  room.badge = 0;  // clear badge
+  renderChatRooms();
+  renderMessages(room.msgs);
+}
+
+function renderMessages(msgs) {
+  const area = document.getElementById('chat-msgs');
+  area.innerHTML = '<div class="date-sep">Today</div>' + msgs.map(m => `
+    <div class="msg-group ${m.mine?'mine':''}">
+      ${!m.mine ? `<div class="msg-av-sm" style="background:${m.bg}">${m.av}</div>` : ''}
+      <div class="msg-col">
+        ${!m.mine ? `<div class="msg-sender">${m.name}</div>` : ''}
+        <div class="msg-bubble">${m.text}</div>
+        <div class="msg-time">Just now</div>
+      </div>
+    </div>`).join('');
+  area.scrollTop = area.scrollHeight;
+}
+
+function sendChatMsg() {
+  const input = document.getElementById('chat-input');
+  const text = input.value.trim();
+  if (!text) return;
+  const room = chatRooms.find(r=>r.id===activeRoom);
+  if (!room) return;
+  room.msgs.push({av:'MC',bg:'#1C1C1E',name:'Maya Chen',text,mine:true});
+  renderMessages(room.msgs);
+  input.value = '';
+}
+
+// ── Render campus suggest ──
+function renderCampusSuggest() {
+  document.getElementById('campus-suggest').innerHTML = campusSuggest.map(p => `
+    <div class="suggest-person">
+      <div class="sug-av" style="background:${p.bg}">${p.av}</div>
+      <div class="sug-info"><div class="sug-name">${p.name}</div><div class="sug-role">${p.role}</div></div>
+      <button class="sug-btn" onclick="this.textContent='Sent \u2713';this.disabled=true;this.style.opacity='.6'">Connect</button>
+    </div>`).join('');
+}
+
+// ── Section switching ──
+function switchSection(sec) {
+  ['feed','jobs','events','orgs','chat','map'].forEach(s => {
+    document.getElementById('stab-'+s).classList.toggle('active', s===sec);
+    document.getElementById('pane-'+s).classList.toggle('active', s===sec);
+  });
+  if (sec === 'chat') { renderChatRooms(); switchRoom(activeRoom); }
+  if (sec === 'map')  { setTimeout(initMap, 0); }
+}
+
+// ── Post type selector ──
+let activePostType = '';
+function setPostType(btn, type) {
+  activePostType = activePostType === type ? '' : type;
+  document.querySelectorAll('.comp-type-btn').forEach(b => b.classList.remove('on'));
+  if (activePostType) btn.classList.add('on');
+}
+
+// ── Submit campus post ──
+function submitCampusPost() {
+  const input = document.getElementById('campusPostInput');
+  const text = input.value.trim();
+  if (!text) return;
+  const types = {ann:{badge:'b-ann',bt:'Announcement'},evt:{badge:'b-evt',bt:'Event'},job:{badge:'b-job',bt:'Opportunity'},club:{badge:'b-club',bt:'Club'},'':{badge:'b-chat',bt:'Post'}};
+  const t = types[activePostType] || types[''];
+  const newPost = {av:'MC',bg:'#1C1C1E',auth:'Maya Chen',role:'Product Design \u00b7 Junior',type:activePostType,badge:t.badge,bt:t.bt,
+    body:text,tags:[],r:['&#129334; 0','&#128161; 0'],rsvp:false,id:'new-'+Date.now()};
+  feedPosts.unshift(newPost);
+  renderFeed(feedPosts);
+  input.value=''; input.style.height='';
+  activePostType='';
+  document.querySelectorAll('.comp-type-btn').forEach(b=>b.classList.remove('on'));
+  toast('Posted to IU campus feed');
+}
+
+// ── RSVP ──
+function rsvpPost(id, btn) { btn.classList.add('done'); btn.textContent='Going \u2713'; toast('RSVP confirmed!'); }
+
+// ── Filter chips ──
+function toggleFilter(btn) {
+  btn.classList.toggle('on');
+  toast('Filter applied');
+}
+
+// ── Toast ──
+function toast(msg) {
+  const t=document.getElementById('ct');
+  t.textContent=msg; t.style.opacity='1'; t.style.transform='translateX(-50%) translateY(0)';
+  clearTimeout(t._t);
+  t._t=setTimeout(()=>{t.style.opacity='0';t.style.transform='translateX(-50%) translateY(20px)';},2400);
+}
+
+// ── Init ──
+renderFeed(feedPosts);
+renderJobs(jobs);
+renderEvents(events);
+renderOrgs(orgs);
+renderCampusSuggest();
+// Pre-load chat so first click is fast
+renderChatRooms();
+
+// ══ CAMPUS MAP ══════════════════════════════════════════════════════════
+const PEOPLE = [
+  {id:'p1', name:'Jordan Lee',      ini:'JL', col:'#1A6DB5', zone:'business', major:'Finance',          year:'Junior',    rel:'connected', mut:8 },
+  {id:'p2', name:'Aisha Patel',     ini:'AP', col:'#C4541A', zone:'business', major:'Marketing',        year:'Senior',    rel:'mutual',    mut:5 },
+  {id:'p3', name:'Marcus Webb',     ini:'MW', col:'#1A9E6A', zone:'business', major:'Accounting',       year:'Sophomore', rel:'none',      mut:2 },
+  {id:'p4', name:'Sofia Reyes',     ini:'SR', col:'#7B2FBE', zone:'business', major:'Management',       year:'Senior',    rel:'mutual',    mut:7 },
+  {id:'p5', name:'Tyler Brooks',    ini:'TB', col:'#BE2F2F', zone:'business', major:'Entrepreneurship', year:'Junior',    rel:'none',      mut:1 },
+  {id:'p6', name:'Nina Okonkwo',    ini:'NO', col:'#1A9E9E', zone:'business', major:'Finance',          year:'Senior',    rel:'connected', mut:12},
+  {id:'p7', name:'Dev Kapoor',      ini:'DK', col:'#7B8C1A', zone:'business', major:'Economics',        year:'Freshman',  rel:'none',      mut:0 },
+  {id:'p8', name:'Rachel Stone',    ini:'RS', col:'#B5841A', zone:'business', major:'Marketing',        year:'Junior',    rel:'mutual',    mut:4 },
+  {id:'p9', name:'Kwame Asante',    ini:'KA', col:'#4A2D8C', zone:'luddy',    major:'CS',               year:'Senior',    rel:'connected', mut:15},
+  {id:'p10',name:'Priya Sinha',     ini:'PS', col:'#8C2D4A', zone:'luddy',    major:'Informatics',      year:'Junior',    rel:'mutual',    mut:9 },
+  {id:'p11',name:'Zara Williams',   ini:'ZW', col:'#2D8C4A', zone:'luddy',    major:'CS',               year:'Senior',    rel:'mutual',    mut:6 },
+  {id:'p12',name:'Omar Hassan',     ini:'OH', col:'#2D4A8C', zone:'luddy',    major:'Data Science',     year:'Sophomore', rel:'none',      mut:3 },
+  {id:'p13',name:'Emma Fischer',    ini:'EF', col:'#8C6A2D', zone:'luddy',    major:'Cybersecurity',    year:'Junior',    rel:'none',      mut:1 },
+  {id:'p14',name:'Raj Menon',       ini:'RM', col:'#4A8C2D', zone:'luddy',    major:'AI',               year:'Senior',    rel:'connected', mut:11},
+  {id:'p15',name:'Lena Park',       ini:'LP', col:'#8C2D6A', zone:'luddy',    major:'CS',               year:'Freshman',  rel:'none',      mut:0 },
+  {id:'p16',name:'Noah Kim',        ini:'NK', col:'#2D8C8C', zone:'luddy',    major:'Informatics',      year:'Junior',    rel:'mutual',    mut:5 },
+  {id:'p17',name:'Maya Chen',       ini:'MC', col:'#444444', zone:'arts',     major:'Psychology',       year:'Senior',    rel:'connected', mut:18},
+  {id:'p18',name:'Luca Moretti',    ini:'LM', col:'#1A5C8C', zone:'arts',     major:'Philosophy',       year:'Junior',    rel:'mutual',    mut:7 },
+  {id:'p19',name:'Fatima Al-Zahra', ini:'FA', col:'#8C1A5C', zone:'arts',     major:'Biology',          year:'Senior',    rel:'none',      mut:3 },
+  {id:'p20',name:'Sam Torres',      ini:'ST', col:'#5C8C1A', zone:'arts',     major:'Political Sci',    year:'Sophomore', rel:'mutual',    mut:6 },
+  {id:'p21',name:'Iris Nakamura',   ini:'IN', col:'#8C5C1A', zone:'arts',     major:'Chemistry',        year:'Junior',    rel:'none',      mut:2 },
+  {id:'p22',name:'Ben Okafor',      ini:'BO', col:'#1A8C8C', zone:'arts',     major:'History',          year:'Senior',    rel:'none',      mut:1 },
+  {id:'p23',name:'Jasmine Cole',    ini:'JC', col:'#B51A8C', zone:'media',    major:'Journalism',       year:'Junior',    rel:'mutual',    mut:5 },
+  {id:'p24',name:'Andre Silva',     ini:'AS', col:'#8CB51A', zone:'media',    major:'Film',             year:'Senior',    rel:'none',      mut:2 },
+  {id:'p25',name:'Mia Johnson',     ini:'MJ', col:'#1A8CB5', zone:'media',    major:'Advertising',      year:'Sophomore', rel:'connected', mut:9 },
+  {id:'p26',name:'Evan Ross',       ini:'ER', col:'#B58C1A', zone:'media',    major:'Journalism',       year:'Junior',    rel:'none',      mut:0 },
+  {id:'p27',name:'Diana Cruz',      ini:'DC', col:'#5C1AB5', zone:'law',      major:'Law',              year:'2L',        rel:'mutual',    mut:4 },
+  {id:'p28',name:'James Morton',    ini:'JM', col:'#B55C5C', zone:'law',      major:'Law',              year:'3L',        rel:'none',      mut:1 },
+  {id:'p29',name:'Aaliyah Grant',   ini:'AG', col:'#1AB55C', zone:'law',      major:'Law',              year:'1L',        rel:'none',      mut:0 },
+];
+
+const ZLAYOUT = {
+  business:{cx:28,cy:38,glow:'rgba(37,99,235,.5)',  lbl:'Business'  },
+  luddy:   {cx:70,cy:28,glow:'rgba(124,58,237,.5)', lbl:'Luddy'     },
+  arts:    {cx:28,cy:70,glow:'rgba(5,150,105,.5)',  lbl:'Arts & Sci'},
+  media:   {cx:72,cy:70,glow:'rgba(239,68,68,.5)',  lbl:'Media'     },
+  law:     {cx:50,cy:50,glow:'rgba(245,158,11,.5)', lbl:'Law'       },
+};
+
+let mapFilter = 'all';
+let mapScale = 1, mapTx = 0, mapTy = 0;
+let mapDrag = false, mapDx, mapDy, mapDtx, mapDty;
+let mapInited = false;
+
+function initMap() {
+  if (!mapInited) {
+    mapInited = true;
+    var sc = document.getElementById('mapScene');
+    // Drag-to-scroll (uses native scroll since map-scene is overflow:auto)
+    sc.addEventListener('mousedown', function(e) {
+      if (e.target.closest('.map-node') || e.target.closest('.map-popup')) return;
+      mapDrag = true; mapDx = e.clientX; mapDy = e.clientY;
+      mapDtx = sc.scrollLeft; mapDty = sc.scrollTop;
+      sc.style.cursor = 'grabbing';
+    });
+    window.addEventListener('mousemove', function(e) {
+      if (!mapDrag) return;
+      sc.scrollLeft = mapDtx - (e.clientX - mapDx);
+      sc.scrollTop  = mapDty - (e.clientY - mapDy);
+    });
+    window.addEventListener('mouseup', function() { mapDrag = false; sc.style.cursor = ''; });
+    sc.addEventListener('click', function(e) {
+      if (!e.target.closest('.map-node') && !e.target.closest('.map-popup')) {
+        document.getElementById('mapPopup').style.display = 'none';
+      }
+    });
+  }
+  renderMapNodes();
+}
+
+// Zone card positions in the 1400×900 field (px, top-left corner of each card)
+var ZONE_CARDS = {
+  business: { x:30,  y:30,  w:390, h:380, border:'rgba(37,99,235,.3)',  bg:'rgba(37,99,235,.06)',  accent:'#3B82F6', icon:'📊', label:'Business'   },
+  luddy:    { x:450, y:30,  w:390, h:380, border:'rgba(124,58,237,.3)', bg:'rgba(124,58,237,.06)', accent:'#8B5CF6', icon:'💻', label:'Luddy (CS)'  },
+  arts:     { x:30,  y:440, w:390, h:360, border:'rgba(5,150,105,.3)',  bg:'rgba(5,150,105,.06)',  accent:'#10B981', icon:'🎨', label:'Arts & Sci'  },
+  media:    { x:450, y:440, w:390, h:360, border:'rgba(239,68,68,.3)',  bg:'rgba(239,68,68,.06)',  accent:'#EF4444', icon:'🎬', label:'Media School'},
+  law:      { x:870, y:30,  w:350, h:770, border:'rgba(245,158,11,.3)', bg:'rgba(245,158,11,.06)', accent:'#F59E0B', icon:'⚖️', label:'Law School'  },
+};
+
+// Single zone card positions (used when filter is active)
+var ZONE_SINGLE = { x:50, y:30, w:860, h:760 };
+
+function renderMapNodes() {
+  var field = document.getElementById('mapField');
+  if (!field) return;
+  field.innerHTML = '';
+  mapScale = 1; mapTx = 0; mapTy = 0;
+  field.style.transform = 'scale(1)';
+  var sc = document.getElementById('mapScene');
+  if (sc) { sc.scrollLeft = 0; sc.scrollTop = 0; }
+
+  var people = mapFilter === 'all' ? PEOPLE : PEOPLE.filter(function(p){ return p.zone === mapFilter; });
+  var byZone = {};
+  people.forEach(function(p) { if (!byZone[p.zone]) byZone[p.zone] = []; byZone[p.zone].push(p); });
+
+  Object.keys(byZone).forEach(function(zone) {
+    var group = byZone[zone];
+    var zc = mapFilter === 'all' ? ZONE_CARDS[zone] : Object.assign({}, ZONE_CARDS[zone], ZONE_SINGLE);
+    if (!zc) return;
+
+    // ── Zone card container ──
+    var card = document.createElement('div');
+    card.className = 'zone-card';
+    card.style.cssText = 'left:'+zc.x+'px;top:'+zc.y+'px;width:'+zc.w+'px;height:'+zc.h+'px;'
+      +'border-color:'+zc.border+';background:'+zc.bg+';';
+    field.appendChild(card);
+
+    // ── Card header ──
+    var hdr = document.createElement('div');
+    hdr.className = 'zone-card-header';
+    hdr.style.borderBottomColor = zc.border;
+
+    var iconEl = document.createElement('div');
+    iconEl.className = 'zone-card-icon';
+    iconEl.style.background = zc.bg.replace('.06', '.18');
+    iconEl.textContent = zc.icon;
+
+    var nameEl = document.createElement('div');
+    nameEl.className = 'zone-card-name';
+    nameEl.textContent = zc.label;
+
+    var countEl = document.createElement('div');
+    countEl.className = 'zone-card-count';
+    countEl.textContent = group.length + ' students';
+
+    // Accent bar on left edge
+    var accent = document.createElement('div');
+    accent.style.cssText = 'position:absolute;left:0;top:0;bottom:0;width:3px;background:'+zc.accent+';border-radius:24px 0 0 24px;opacity:.7;';
+    card.appendChild(accent);
+
+    hdr.appendChild(iconEl);
+    hdr.appendChild(nameEl);
+    hdr.appendChild(countEl);
+    card.appendChild(hdr);
+
+    // ── Nodes area ──
+    var nodesArea = document.createElement('div');
+    nodesArea.style.cssText = 'position:relative;width:100%;height:'+(zc.h - 52)+'px;';
+    card.appendChild(nodesArea);
+
+    // Place nodes in a tidy grid/scatter inside the card
+    var cols = Math.ceil(Math.sqrt(group.length * 1.6));
+    var rows = Math.ceil(group.length / cols);
+    var padX = 48, padY = 36;
+    var cellW = (zc.w - padX*2) / Math.max(cols, 1);
+    var cellH = ((zc.h - 52) - padY*2) / Math.max(rows, 1);
+
+    group.forEach(function(p, i) {
+      var col = i % cols;
+      var row = Math.floor(i / cols);
+      // Center within cell + small jitter
+      var jx = (Math.random() - 0.5) * cellW * 0.3;
+      var jy = (Math.random() - 0.5) * cellH * 0.35;
+      var xPx = padX + col * cellW + cellW/2 + jx;
+      var yPx = padY + row * cellH + cellH/2 + jy;
+
+      var size = p.rel === 'connected' ? 46 : p.rel === 'mutual' ? 40 : 34;
+      var glow = p.rel === 'connected'
+        ? '0 0 0 2.5px #2ECC71,0 0 16px rgba(46,204,113,.55),0 3px 10px rgba(0,0,0,.5)'
+        : p.rel === 'mutual'
+        ? '0 0 0 2.5px #F5C842,0 0 16px rgba(245,200,66,.45),0 3px 10px rgba(0,0,0,.5)'
+        : '0 0 0 1.5px rgba(255,255,255,.15),0 3px 10px rgba(0,0,0,.4)';
+
+      var nd = document.createElement('div');
+      nd.className = 'map-node';
+      nd.style.cssText = 'left:'+xPx+'px;top:'+yPx+'px;'
+        +'width:'+size+'px;height:'+size+'px;'
+        +'background:'+p.col+';font-size:'+Math.round(size*.33)+'px;'
+        +'box-shadow:'+glow+';';
+
+      // Glass sheen
+      var sh = document.createElement('div');
+      sh.style.cssText = 'position:absolute;inset:0;border-radius:50%;pointer-events:none;'
+        +'background:linear-gradient(135deg,rgba(255,255,255,.26) 0%,transparent 55%);';
+      nd.appendChild(sh);
+
+      // Initials
+      nd.appendChild(document.createTextNode(p.ini));
+
+      // Name label on hover
+      var lbl = document.createElement('div');
+      lbl.className = 'map-node-label';
+      lbl.textContent = p.name.split(' ')[0];
+      nd.appendChild(lbl);
+
+      nd.addEventListener('mouseenter', function(){ nd.style.transform='translate(-50%,-50%) scale(1.22)'; nd.style.zIndex=10; });
+      nd.addEventListener('mouseleave', function(){ nd.style.transform='translate(-50%,-50%) scale(1)';   nd.style.zIndex=2;  });
+      nd.addEventListener('click', function(e) { e.stopPropagation(); showMapPopup(p, e.clientX, e.clientY); });
+
+      nodesArea.appendChild(nd);
+    });
+  });
+}
+
+function showMapPopup(p, sx, sy) {
+  var popup = document.getElementById('mapPopup');
+  var ring  = p.rel === 'connected' ? '#2ECC71' : p.rel === 'mutual' ? '#F5C842' : 'rgba(255,255,255,.25)';
+  var badge = p.rel === 'connected'
+    ? '<div style="display:flex;align-items:center;justify-content:center;gap:5px;margin:0 auto 12px;font-size:11px;font-weight:700;padding:4px 12px;border-radius:100px;background:rgba(46,204,113,.15);color:#2ECC71;border:1px solid rgba(46,204,113,.3);">&#10003; Connected</div>'
+    : p.rel === 'mutual'
+    ? '<div style="display:flex;align-items:center;justify-content:center;gap:5px;margin:0 auto 12px;font-size:11px;font-weight:700;padding:4px 12px;border-radius:100px;background:rgba(245,200,66,.12);color:#F5C842;border:1px solid rgba(245,200,66,.3);">&#9679; '+p.mut+' mutual connections</div>'
+    : '<div style="display:flex;align-items:center;justify-content:center;gap:5px;margin:0 auto 12px;font-size:11px;font-weight:700;padding:4px 12px;border-radius:100px;background:rgba(255,255,255,.07);color:rgba(255,255,255,.38);border:1px solid rgba(255,255,255,.1);">Not yet connected</div>';
+
+  popup.innerHTML = '<button style="position:absolute;top:10px;right:12px;background:rgba(255,255,255,.1);border:1px solid rgba(255,255,255,.12);border-radius:50%;width:22px;height:22px;display:flex;align-items:center;justify-content:center;font-size:14px;color:rgba(255,255,255,.6);cursor:none;" onclick="document.getElementById(&quot;mapPopup&quot;).style.display=&quot;none&quot;">&#215;</button>'
+    +'<div style="position:relative;width:54px;margin:0 auto 12px;">'
+    +'<div style="width:54px;height:54px;border-radius:16px;display:flex;align-items:center;justify-content:center;font-family:Fraunces,serif;font-size:19px;font-weight:700;color:white;background:'+p.col+'">'+p.ini+'</div>'
+    +'<div style="position:absolute;inset:-4px;border-radius:20px;border:2px solid '+ring+';box-shadow:0 0 12px '+ring+'55;"></div>'
+    +'</div>'
+    +'<div style="font-size:14px;font-weight:700;text-align:center;color:white;margin-bottom:2px;">'+p.name+'</div>'
+    +'<div style="font-size:11px;color:rgba(255,255,255,.45);text-align:center;margin-bottom:10px;">'+p.major+' &middot; '+p.year+'</div>'
+    +badge
+    +'<div style="display:flex;gap:6px;">'
+    +'<button style="flex:1;padding:9px;border-radius:11px;font-size:12px;font-weight:700;cursor:none;background:rgba(255,255,255,.08);color:rgba(255,255,255,.8);border:1px solid rgba(255,255,255,.12);">View Profile</button>'
+    +'<button style="flex:1;padding:9px;border-radius:11px;font-size:12px;font-weight:700;cursor:none;border:none;background:var(--accent);color:white;">'+(p.rel==='connected'?'Message':'Connect')+'</button>'
+    +'</div>';
+
+  // position:fixed, so use viewport coords directly
+  var l = sx + 14;
+  var t = sy - 300;
+  if (l + 246 > window.innerWidth  - 8) l = sx - 250;
+  if (t < 8) t = sy + 14;
+  if (t + 300 > window.innerHeight - 8) t = window.innerHeight - 310;
+  popup.style.left = l+'px';
+  popup.style.top  = t+'px';
+  popup.style.display = 'block';
+}
+
+function zoomMap(f) {
+  var field = document.getElementById('mapField');
+  var ns = Math.min(2.5, Math.max(0.6, mapScale * f));
+  mapScale = ns;
+  field.style.transform = 'scale('+ns+')';
+  field.style.transformOrigin = 'top left';
+}
+
+function setMapFilter(zone, btn) {
+  mapFilter = zone;
+  document.querySelectorAll('.map-filter-chip').forEach(function(b){ b.classList.remove('active'); });
+  btn.classList.add('active');
+  document.getElementById('mapPopup').style.display = 'none';
+  renderMapNodes();
+}
+// ══ END CAMPUS MAP ═══════════════════════════════════════════════════════════════
+
+
+// ══ CAMPUS SEARCH ════════════════════════════════════════════════════════
+var CAMPUS_PEOPLE = [
+  {type:'student', name:'Kwame Asante',    role:'CS · Senior',               av:'KA', col:'#2D1B4E'},
+  {type:'student', name:'Priya Sinha',     role:'Informatics · Junior',      av:'PS', col:'#4E1B2D'},
+  {type:'student', name:'Zara Williams',   role:'CS · Senior',               av:'ZW', col:'#1B4E2D'},
+  {type:'student', name:'Jordan Lee',      role:'Finance · Junior',          av:'JL', col:'#1A4D7C'},
+  {type:'student', name:'Sofia Reyes',     role:'Management · Senior',       av:'SR', col:'#5D1A8B'},
+  {type:'student', name:'Omar Hassan',     role:'Data Science · Sophomore',  av:'OH', col:'#2D4A8C'},
+  {type:'student', name:'Jasmine Cole',    role:'Journalism · Junior',       av:'JC', col:'#7C1A5C'},
+  {type:'student', name:'Noah Kim',        role:'Informatics · Junior',      av:'NK', col:'#2D8C8C'},
+  {type:'student', name:'Diana Cruz',      role:'Law · 2L',                  av:'DC', col:'#3D1A7C'},
+  {type:'student', name:'Raj Menon',       role:'AI · Senior',               av:'RM', col:'#2D4E1B'},
+  {type:'org',     name:'CS Club',         role:'Technology · 340 members',  av:'CS', col:'#2563EB'},
+  {type:'org',     name:'Design @ IU',     role:'Design · 215 members',      av:'D',  col:'#FF5C35'},
+  {type:'org',     name:'Venture Club',    role:'Entrepreneurship · 180 members', av:'V', col:'#7C3AED'},
+  {type:'org',     name:'NSBE',            role:'Engineering · 290 members', av:'N',  col:'#1A7C4D'},
+  {type:'org',     name:'AI Society',      role:'Research · 160 members',    av:'AI', col:'#0C1C4A'},
+  {type:'org',     name:'Women in Computing', role:'Community · 125 members',av:'WC', col:'#BE185D'},
+];
+
+function runCampusSearch(q) {
+  var dd = document.getElementById('campusSearchDropdown');
+  if (!q.trim()) { dd.innerHTML = renderCampusDefault(); return; }
+  var lower = q.toLowerCase();
+  var results = CAMPUS_PEOPLE.filter(function(r) {
+    return r.name.toLowerCase().indexOf(lower) >= 0 || r.role.toLowerCase().indexOf(lower) >= 0;
+  }).slice(0, 8);
+  dd.innerHTML = results.length ? renderCampusResults(results) : '<div class="search-empty">No results for "' + q + '"</div>';
+}
+
+function renderCampusDefault() {
+  var students = CAMPUS_PEOPLE.filter(function(r){ return r.type==='student'; }).slice(0,4);
+  var orgs     = CAMPUS_PEOPLE.filter(function(r){ return r.type==='org'; }).slice(0,3);
+  return '<div class="search-section-label">Students near you</div>'
+    + students.map(renderCampusSR).join('')
+    + '<div class="search-section-label">Organizations</div>'
+    + orgs.map(renderCampusSR).join('')
+    + '<div class="search-footer">Browse all IU students and orgs</div>';
+}
+
+function renderCampusResults(results) {
+  var students = results.filter(function(r){ return r.type==='student'; });
+  var orgs     = results.filter(function(r){ return r.type==='org'; });
+  var out = '';
+  if (students.length) out += '<div class="search-section-label">Students</div>' + students.map(renderCampusSR).join('');
+  if (orgs.length)     out += '<div class="search-section-label">Organizations</div>' + orgs.map(renderCampusSR).join('');
+  out += '<div class="search-footer">See all results</div>';
+  return out;
+}
+
+function renderCampusSR(r) {
+  var action = r.type === 'student' ? 'Connect' : 'Join';
+  return '<div class="search-result">'
+    + '<div class="sr-av" style="background:'+r.col+';border-radius:'+(r.type==='org'?'8px':'11px')+'">'+r.av+'</div>'
+    + '<div class="sr-info"><div class="sr-name">'+r.name+'</div><div class="sr-role">'+r.role+'</div></div>'
+    + '<button class="sr-action">'+action+'</button>'
+    + '</div>';
+}
+
+function openCampusSearch() {
+  var dd = document.getElementById('campusSearchDropdown');
+  dd.innerHTML = renderCampusDefault();
+  dd.classList.add('open');
+}
+function closeCampusSearch() {
+  document.getElementById('campusSearchDropdown').classList.remove('open');
+}
+// ══ END CAMPUS SEARCH ════════════════════════════════════════════════════
+
+
+
+
+const calendarEvents = {};
+(function seedEvents() {
+  const now = new Date(), y = now.getFullYear(), m = now.getMonth();
+  [
+    [new Date(y,m,now.getDate()+2),  'IU Spring Career Fair',     '10:00','IMU Alumni Hall',              'Bring resume, business casual','#1A9E5B'],
+    [new Date(y,m,now.getDate()+5),  'Goldman Sachs Info Session', '17:30','Kelley School of Business 100','',                            '#2563EB'],
+    [new Date(y,m,now.getDate()+8),  'Weekly Design Critique',     '19:00','Luddy Hall 1106',              'Bring a prototype or sketch',  '#7C5CFC'],
+    [new Date(y,m,now.getDate()+14), 'IU Hackathon 2025',          '09:00','Assembly Hall',               '$10k prizes',                  '#FF5C35'],
+  ].forEach(([d,n,t,l,o,c]) => _storeEvent(d,n,t,l,o,c));
+})();
+function _storeEvent(dateObj,name,time,location,notes,color){
+  color=color||'#FF5C35';
+  const key=dateKey(dateObj);
+  if(!calendarEvents[key])calendarEvents[key]=[];
+  if(!calendarEvents[key].find(e=>e.name===name))
+    calendarEvents[key].push({name,time:time||'',location:location||'',notes:notes||'',color});
+}
+function addCalEvent(dateObj,name,time,color,location,notes){
+  _storeEvent(dateObj,name,time||'',location||'',notes||'',color||'#FF5C35');
+  updateEventCountBadge(); renderCalendar();
+  if(modalOpen){renderModalGrid();renderModalSidebar();}
+}
+function dateKey(d){return d.getFullYear()+'-'+String(d.getMonth()+1).padStart(2,'0')+'-'+String(d.getDate()).padStart(2,'0');}
+function fmtTime(t){if(!t)return'All day';const[h,m]=t.split(':').map(Number);return`${h%12||12}:${String(m).padStart(2,'0')}${h>=12?'pm':'am'}`;}
+function updateEventCountBadge(){
+  const total=Object.values(calendarEvents).reduce((s,a)=>s+a.length,0);
+  const b=document.getElementById('calEventCount');if(b)b.textContent=total;
+}
+let calYear=new Date().getFullYear(),calMonth=new Date().getMonth(),calSelectedKey=null,calVisible=true;
+const MONTHS=['January','February','March','April','May','June','July','August','September','October','November','December'];
+const DAYS=['Su','Mo','Tu','We','Th','Fr','Sa'];
+function renderCalendar(){
+  const label=document.getElementById('calMonthLabel'),grid=document.getElementById('calGrid');
+  if(!label||!grid)return;
+  label.textContent=MONTHS[calMonth].slice(0,3)+' '+calYear;
+  const today=new Date(),firstDay=new Date(calYear,calMonth,1).getDay(),
+        dim=new Date(calYear,calMonth+1,0).getDate(),dip=new Date(calYear,calMonth,0).getDate();
+  let h=DAYS.map(d=>`<div class="cal-day-name">${d}</div>`).join('');
+  for(let i=firstDay-1;i>=0;i--){const d=dip-i,key=dateKey(new Date(calYear,calMonth-1,d));h+=`<div class="cal-day other-month${calendarEvents[key]?.length?' has-event':''}" onclick="miniSelectDay(${calYear},${calMonth-1},${d})">${d}</div>`;}
+  for(let d=1;d<=dim;d++){const key=dateKey(new Date(calYear,calMonth,d));const it=today.getFullYear()===calYear&&today.getMonth()===calMonth&&today.getDate()===d;const he=!!calendarEvents[key]?.length;const is=key===calSelectedKey;h+=`<div class="cal-day${it?' today':''}${he?' has-event':''}${is?' selected':''}" onclick="miniSelectDay(${calYear},${calMonth},${d})">${d}</div>`;}
+  const filled=firstDay+dim,tot=Math.ceil(filled/7)*7;
+  for(let d=1;d<=tot-filled;d++){const key=dateKey(new Date(calYear,calMonth+1,d));h+=`<div class="cal-day other-month${calendarEvents[key]?.length?' has-event':''}" onclick="miniSelectDay(${calYear},${calMonth+1},${d})">${d}</div>`;}
+  grid.innerHTML=h;
+}
+function miniSelectDay(year,month,day){
+  const key=dateKey(new Date(year,month,day));
+  if(calSelectedKey===key){calSelectedKey=null;document.getElementById('calEventsPanel').classList.remove('open');renderCalendar();return;}
+  calSelectedKey=key;renderCalendar();
+  const evts=calendarEvents[key]||[],panel=document.getElementById('calEventsPanel'),
+        list=document.getElementById('calEventsList'),title=document.getElementById('calPanelTitle');
+  title.textContent=new Date(year,month,day).toLocaleDateString('en-US',{weekday:'short',month:'short',day:'numeric'});
+  if(!evts.length){list.innerHTML=`<div class="cal-empty">No events &mdash; <button onclick="openCreateEventForKey('${key}')" style="background:none;border:none;color:var(--accent);cursor:none;font-size:11px;font-weight:700;padding:0">+ Add</button></div>`;}
+  else{list.innerHTML=evts.map(e=>`<div class="cal-event-item"><div class="cal-event-dot" style="background:${e.color}"></div><div class="cal-event-info"><div class="cal-event-name">${e.name}</div><div class="cal-event-time">${fmtTime(e.time)}${e.location?' &middot; '+e.location:''}</div></div><button onclick="removeCalEvent('${key}','${e.name}')" style="background:none;border:none;color:var(--muted);cursor:none;font-size:14px;padding:2px 4px;border-radius:5px;transition:color .15s" onmouseover="this.style.color='var(--accent)'" onmouseout="this.style.color='var(--muted)'">&times;</button></div>`).join('');}
+  panel.classList.add('open');
+}
+function removeCalEvent(key,name){
+  if(!calendarEvents[key])return;
+  calendarEvents[key]=calendarEvents[key].filter(e=>e.name!==name);
+  if(!calendarEvents[key].length)delete calendarEvents[key];
+  updateEventCountBadge();
+  const p=key.split('-').map(Number);
+  miniSelectDay(p[0],p[1]-1,p[2]);
+  if(modalOpen){renderModalGrid();renderModalSidebar();}
+  if(typeof _calSave==='function')_calSave();
+}
+function changeMonth(dir){calMonth+=dir;if(calMonth>11){calMonth=0;calYear++;}if(calMonth<0){calMonth=11;calYear--;}calSelectedKey=null;document.getElementById('calEventsPanel').classList.remove('open');renderCalendar();}
+function toggleCalView(){calVisible=!calVisible;document.getElementById('calBody').style.display=calVisible?'':'none';document.getElementById('calToggleBtn').innerHTML=calVisible?'&#8964;':'&#8965;';}
+
+// FULL MODAL
+let modalOpen=false,modalYear=new Date().getFullYear(),modalMonth=new Date().getMonth(),modalSelectedKey=null;
+function openCalModal(){
+  modalOpen=true;modalYear=calYear;modalMonth=calMonth;modalSelectedKey=calSelectedKey;
+  document.getElementById('calModalBackdrop').classList.add('open');
+  document.body.style.overflow='hidden';
+  renderModalGrid();renderModalSidebar();
+}
+function closeCalModal(){modalOpen=false;document.getElementById('calModalBackdrop').classList.remove('open');document.body.style.overflow='';}
+function modalChangeMonth(dir){modalMonth+=dir;if(modalMonth>11){modalMonth=0;modalYear++;}if(modalMonth<0){modalMonth=11;modalYear--;}modalSelectedKey=null;renderModalGrid();renderModalSidebar();}
+function renderModalGrid(){
+  const label=document.getElementById('modalMonthLabel'),grid=document.getElementById('modalCalGrid'),names=document.getElementById('modalDayNames');
+  if(!label||!grid)return;
+  label.textContent=MONTHS[modalMonth]+' '+modalYear;
+  names.innerHTML=DAYS.map(d=>`<div class="cal-modal-day-name">${d}</div>`).join('');
+  const today=new Date(),firstDay=new Date(modalYear,modalMonth,1).getDay(),
+        dim=new Date(modalYear,modalMonth+1,0).getDate(),dip=new Date(modalYear,modalMonth,0).getDate();
+  let h='';
+  for(let i=firstDay-1;i>=0;i--){const d=dip-i,key=dateKey(new Date(modalYear,modalMonth-1,d)),evts=calendarEvents[key]||[];h+=`<div class="cal-modal-day other-month" onclick="modalSelectDay(${modalYear},${modalMonth-1},${d})"><div class="cal-modal-day-num">${d}</div>${evts.slice(0,2).map(e=>`<div class="cal-modal-event-pill" style="background:${e.color}">${e.name}</div>`).join('')}</div>`;}
+  for(let d=1;d<=dim;d++){const key=dateKey(new Date(modalYear,modalMonth,d));const evts=calendarEvents[key]||[];const it=today.getFullYear()===modalYear&&today.getMonth()===modalMonth&&today.getDate()===d;const is=key===modalSelectedKey;const extras=evts.length>2?`<div style="font-size:9px;color:var(--muted);font-weight:700">+${evts.length-2} more</div>`:'';h+=`<div class="cal-modal-day${it?' today':''}${is?' selected':''}" onclick="modalSelectDay(${modalYear},${modalMonth},${d})"><div class="cal-modal-day-num">${d}</div>${evts.slice(0,2).map(e=>`<div class="cal-modal-event-pill" style="background:${e.color}">${e.name}</div>`).join('')}${extras}</div>`;}
+  const filled=firstDay+dim,tot=Math.ceil(filled/7)*7;
+  for(let d=1;d<=tot-filled;d++){const key=dateKey(new Date(modalYear,modalMonth+1,d));const evts=calendarEvents[key]||[];h+=`<div class="cal-modal-day other-month" onclick="modalSelectDay(${modalYear},${modalMonth+1},${d})"><div class="cal-modal-day-num">${d}</div>${evts.slice(0,2).map(e=>`<div class="cal-modal-event-pill" style="background:${e.color}">${e.name}</div>`).join('')}</div>`;}
+  grid.innerHTML=h;
+}
+function modalSelectDay(year,month,day){modalSelectedKey=dateKey(new Date(year,month,day));renderModalGrid();renderModalSidebar();}
+function renderModalSidebar(){
+  const listEl=document.getElementById('modalEventsList'),dateEl=document.getElementById('modalSidebarDate');
+  if(!listEl)return;
+  const noEvtHTML=`<div class="cal-modal-no-events"><svg width="36" height="36" viewBox="0 0 36 36" fill="none" style="margin:0 auto 10px;display:block;opacity:.3"><rect x="3" y="6" width="30" height="27" rx="6" stroke="currentColor" stroke-width="2" fill="none"/><path d="M3 14h30" stroke="currentColor" stroke-width="2" stroke-linecap="round"/><path d="M11 3v6M25 3v6" stroke="currentColor" stroke-width="2" stroke-linecap="round"/></svg>`;
+  if(!modalSelectedKey){dateEl.textContent='Click a day to see events';listEl.innerHTML=noEvtHTML+'Select a day to see<br>or add events</div>';return;}
+  const p=modalSelectedKey.split('-').map(Number),dateObj=new Date(p[0],p[1]-1,p[2]);
+  dateEl.textContent=dateObj.toLocaleDateString('en-US',{weekday:'long',month:'long',day:'numeric'});
+  const evts=calendarEvents[modalSelectedKey]||[];
+  if(!evts.length){listEl.innerHTML=noEvtHTML+`No events yet<br><button onclick="openCreateEventForKey('${modalSelectedKey}')" style="background:none;border:none;color:var(--accent);cursor:none;font-size:13px;font-weight:700;margin-top:8px;padding:0">+ Add an event</button></div>`;}
+  else{listEl.innerHTML=evts.map(e=>`<div class="cal-modal-event-card"><div class="cal-modal-event-bar" style="background:${e.color}"></div><div class="cal-modal-event-body"><div class="cal-modal-event-name">${e.name}</div><div class="cal-modal-event-meta">${e.time?fmtTime(e.time)+'<br>':''}${e.location?'&#128205; '+e.location+'<br>':''}${e.notes?'&#128221; '+e.notes:''}</div></div><button class="cal-modal-event-del" onclick="removeCalEvent('${modalSelectedKey}','${e.name}')">&times;</button></div>`).join('')+`<button onclick="openCreateEventForKey('${modalSelectedKey}')" style="width:100%;margin-top:8px;padding:10px;border-radius:12px;border:1.5px dashed var(--border);background:none;color:var(--muted);font-family:'DM Sans',sans-serif;font-size:12px;font-weight:700;cursor:none;transition:all .15s" onmouseover="this.style.borderColor='var(--accent)';this.style.color='var(--accent)'" onmouseout="this.style.borderColor='var(--border)';this.style.color='var(--muted)'">+ Add another event</button>`;}
+}
+
+// CREATE EVENT
+let selectedEventColor='#FF5C35',prefillDateKey=null;
+function openCreateEvent(){prefillDateKey=modalSelectedKey;_openCreateForm();}
+function openCreateEventForKey(key){prefillDateKey=key;_openCreateForm();}
+function _openCreateForm(){
+  document.getElementById('evtDate').value=prefillDateKey||dateKey(new Date());
+  document.getElementById('evtName').value='';document.getElementById('evtTime').value='';
+  document.getElementById('evtLocation').value='';document.getElementById('evtNotes').value='';
+  selectedEventColor='#FF5C35';
+  document.querySelectorAll('.color-swatch').forEach(s=>s.classList.toggle('active',s.dataset.color===selectedEventColor));
+  document.getElementById('createEventModal').classList.add('open');
+  setTimeout(()=>document.getElementById('evtName').focus(),80);
+}
+function closeCreateEvent(){document.getElementById('createEventModal').classList.remove('open');}
+function pickColor(el){selectedEventColor=el.dataset.color;document.querySelectorAll('.color-swatch').forEach(s=>s.classList.remove('active'));el.classList.add('active');}
+function saveNewEvent(){
+  const name=document.getElementById('evtName').value.trim();
+  const dateStr=document.getElementById('evtDate').value;
+  const time=document.getElementById('evtTime').value;
+  const location=document.getElementById('evtLocation').value.trim();
+  const notes=document.getElementById('evtNotes').value.trim();
+  if(!name){document.getElementById('evtName').focus();return;}
+  if(!dateStr){document.getElementById('evtDate').focus();return;}
+  const p=dateStr.split('-').map(Number),dateObj=new Date(p[0],p[1]-1,p[2]);
+  addCalEvent(dateObj,name,time,selectedEventColor,location,notes);
+  if(modalOpen){modalSelectedKey=dateKey(dateObj);modalYear=p[0];modalMonth=p[1]-1;renderModalGrid();renderModalSidebar();}
+  calSelectedKey=dateKey(dateObj);calYear=p[0];calMonth=p[1]-1;
+  miniSelectDay(p[0],p[1]-1,p[2]);
+  closeCreateEvent();
+  showFeedToast('Event saved: '+name);
+}
+
+// ══ CALENDAR SYNC ════════════════════════════════════════════════════════
+const CAL_KEY = 'vibe_cal_events_v1';
+function _calSave(){try{localStorage.setItem(CAL_KEY,JSON.stringify(calendarEvents));}catch(e){}}
+function _calLoad(){try{const r=localStorage.getItem(CAL_KEY);if(!r)return;Object.assign(calendarEvents,JSON.parse(r));}catch(e){}}
+document.addEventListener('DOMContentLoaded',function(){
+  _calLoad();
+  if(typeof renderCalendar==='function')renderCalendar();
+  if(typeof updateEventCountBadge==='function')updateEventCountBadge();
+});
+// ══ END CALENDAR SYNC ════════════════════════════════════════════════════
+
+// ══ CAMPUS PAGE INIT (uses shared _persistence.js) ═══════════════════════
+(function initCampusPage(){
+  const user = vibeInit();
+  if (!user) { window.location.href = '/html/landing.html'; return; }
+  if (user._isDemo) vibeShowDemoPill();
+  applyVerificationGate();
+})();
+
+// Toggles between the campus content and the verification gate based on
+// the user's studentVerification status. Listens for the verified event so
+// the page flips live after the modal completes.
+function applyVerificationGate() {
+  const gate    = document.getElementById('campusGate');
+  const center  = document.querySelector('.center');
+  const rightCol = document.querySelector('.right');
+  const verified = window.studentVerify?.isVerified?.();
+  if (verified) {
+    gate.classList.remove('visible');
+    if (center) center.style.display = '';
+    if (rightCol) rightCol.style.display = '';
+    // If a school is set, surface it in the campus header
+    const school = window.studentVerify?.getSchool?.();
+    if (school) {
+      const headerName = document.querySelector('.campus-bar-info h2');
+      if (headerName) headerName.textContent = school;
+    }
+  } else {
+    gate.classList.add('visible');
+    if (center) center.style.display = 'none';
+    if (rightCol) rightCol.style.display = 'none';
+  }
+}
+document.addEventListener('vibeStudentVerified', applyVerificationGate);
+// ══ END CAMPUS INIT ══════════════════════════════════════════════════════
+
+</script>
+
+<!-- ══ FULL CALENDAR MODAL ══ -->
+  <div class="cal-modal-backdrop" id="calModalBackdrop" onclick="if(event.target===this)closeCalModal()">
+    <div class="cal-modal">
+      <div class="cal-modal-header">
+        <div class="cal-modal-title">My Calendar</div>
+        <div class="cal-modal-month-nav">
+          <button class="cal-modal-nav-btn" onclick="modalChangeMonth(-1)">&#8249;</button>
+          <span class="cal-modal-month-label" id="modalMonthLabel"></span>
+          <button class="cal-modal-nav-btn" onclick="modalChangeMonth(1)">&#8250;</button>
+        </div>
+        <div class="cal-modal-header-actions">
+          <button class="cal-modal-add-btn" onclick="openCreateEvent()">
+            <svg width="13" height="13" viewBox="0 0 13 13" fill="none"><path d="M6.5 1v11M1 6.5h11" stroke="white" stroke-width="1.8" stroke-linecap="round"/></svg>
+            New Event
+          </button>
+          <button class="cal-modal-close" onclick="closeCalModal()">&#215;</button>
+        </div>
+      </div>
+      <div class="cal-modal-body">
+        <div class="cal-modal-grid-wrap">
+          <div class="cal-modal-day-names" id="modalDayNames"></div>
+          <div class="cal-modal-grid" id="modalCalGrid"></div>
+        </div>
+        <div class="cal-modal-sidebar">
+          <div class="cal-modal-sidebar-hdr">
+            Events
+            <span id="modalSidebarDate">Click a day to see events</span>
+          </div>
+          <div class="cal-modal-events-list" id="modalEventsList">
+            <div class="cal-modal-no-events">
+              <svg width="36" height="36" viewBox="0 0 36 36" fill="none" style="margin:0 auto 10px;display:block;opacity:.3"><rect x="3" y="6" width="30" height="27" rx="6" stroke="currentColor" stroke-width="2" fill="none"/><path d="M3 14h30" stroke="currentColor" stroke-width="2" stroke-linecap="round"/><path d="M11 3v6M25 3v6" stroke="currentColor" stroke-width="2" stroke-linecap="round"/></svg>
+              Select a day to see<br>or add events
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+</body>
+</html>

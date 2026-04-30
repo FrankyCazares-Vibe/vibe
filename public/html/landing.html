@@ -1,0 +1,258 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>vibe — start</title>
+<link href="https://fonts.googleapis.com/css2?family=Fraunces:ital,wght@0,400;0,700;0,900;1,400;1,700&family=DM+Sans:wght@300;400;500;600;700&display=swap" rel="stylesheet">
+<script src="/html/_persistence.js"></script>
+<style>
+:root {
+  --cream:    #FAF7F2;
+  --charcoal: #1C1C1E;
+  --soft:     #2D2D2D;
+  --muted:    #8A8580;
+  --accent:   #FF5C35;
+  --border:   rgba(28,28,30,.08);
+}
+
+*,*::before,*::after { margin:0; padding:0; box-sizing:border-box; }
+html,body { height:100%; }
+body {
+  font-family: 'DM Sans', sans-serif;
+  background: var(--cream);
+  color: var(--charcoal);
+  cursor: none;
+  overflow: hidden;
+}
+a, button { cursor: none; }
+
+/* Custom cursor */
+#cursor, #cursorRing {
+  position: fixed; pointer-events: none;
+  z-index: 2147483647; top: 0; left: 0;
+}
+#cursor {
+  width: 8px; height: 8px; border-radius: 50%;
+  background: var(--accent);
+  transition: transform .08s ease-out;
+}
+#cursor.clicking { transform: scale(.6) !important; }
+#cursorRing {
+  width: 28px; height: 28px; border-radius: 50%;
+  border: 1px solid rgba(255,92,53,.35);
+  transition: border-color .15s, transform .12s ease-out;
+}
+#cursor.hover { background: white; box-shadow: 0 0 12px rgba(255,92,53,.6); }
+#cursorRing.hover { border-color: var(--accent); transform-origin: center; }
+
+/* Layout */
+.page {
+  height: 100vh;
+  display: grid;
+  grid-template-rows: auto 1fr auto;
+  padding: 28px 40px;
+}
+
+header { display: flex; align-items: center; justify-content: space-between; }
+.logo {
+  font-family: 'Fraunces', serif;
+  font-size: 24px; font-weight: 900;
+  letter-spacing: -.5px;
+}
+.logo span { color: var(--accent); }
+.header-right {
+  font-size: 11px; font-weight: 700;
+  letter-spacing: 1.5px; text-transform: uppercase;
+  color: var(--muted);
+}
+
+/* Hero */
+main {
+  display: flex; flex-direction: column;
+  align-items: center; justify-content: center;
+  text-align: center; padding: 0 24px;
+}
+.eyebrow {
+  display: inline-flex; align-items: center; gap: 10px;
+  font-size: 11px; font-weight: 700;
+  letter-spacing: 1.8px; text-transform: uppercase;
+  color: var(--accent); margin-bottom: 28px;
+}
+.eyebrow::before, .eyebrow::after {
+  content:''; width: 22px; height: 1px; background: var(--accent);
+}
+h1 {
+  font-family: 'Fraunces', serif;
+  font-size: clamp(48px, 7vw, 88px);
+  font-weight: 900; line-height: .98;
+  letter-spacing: -3px;
+  max-width: 900px; margin-bottom: 24px;
+}
+h1 em { font-style: italic; color: var(--accent); }
+.sub {
+  font-family: 'Fraunces', serif; font-style: italic;
+  font-size: 19px; color: var(--muted);
+  margin-bottom: 48px; max-width: 540px; line-height: 1.5;
+}
+
+/* CTAs */
+.cta-row {
+  display: flex; gap: 14px; flex-wrap: wrap; justify-content: center;
+  margin-bottom: 36px;
+}
+.cta {
+  font-family: 'DM Sans', sans-serif;
+  font-size: 14px; font-weight: 600;
+  padding: 16px 30px; border-radius: 100px;
+  border: 1px solid; transition: all .18s;
+  display: inline-flex; align-items: center; gap: 10px;
+}
+.cta-primary {
+  background: var(--charcoal); color: white; border-color: var(--charcoal);
+}
+.cta-primary:hover {
+  background: var(--accent); border-color: var(--accent);
+  transform: translateY(-1px);
+}
+.cta-secondary {
+  background: white; color: var(--charcoal); border-color: var(--border);
+}
+.cta-secondary:hover { border-color: var(--charcoal); transform: translateY(-1px); }
+.cta-arrow {
+  width: 14px; height: 14px;
+  display: inline-flex; align-items: center; justify-content: center;
+}
+.footnote {
+  font-size: 12px; color: var(--muted);
+  max-width: 480px; line-height: 1.6;
+}
+.footnote code {
+  background: rgba(28,28,30,.06);
+  padding: 2px 6px; border-radius: 4px;
+  font-family: ui-monospace, Monaco, monospace; font-size: 11px;
+}
+
+/* Otto idle orb (bottom right) */
+.otto-corner {
+  position: fixed; bottom: 28px; right: 32px;
+  display: flex; align-items: center; gap: 10px;
+  font-family: 'Fraunces', serif; font-style: italic;
+  font-size: 13px; color: var(--muted);
+}
+.otto-orb {
+  position: relative; width: 18px; height: 18px;
+  display: flex; align-items: center; justify-content: center;
+}
+.otto-orb-core {
+  width: 8px; height: 8px; border-radius: 50%;
+  background: var(--accent);
+  box-shadow: 0 0 10px rgba(255,92,53,.6);
+  animation: ottoBreathe 2.6s ease-in-out infinite;
+}
+.otto-orb-ring {
+  position: absolute; inset: 0; border-radius: 50%;
+  border: 1px solid rgba(255,92,53,.4);
+  animation: ottoRing 2.6s ease-out infinite;
+}
+@keyframes ottoBreathe {
+  0%,100% { transform: scale(1); opacity: 1; }
+  50% { transform: scale(1.18); opacity: .85; }
+}
+@keyframes ottoRing {
+  0% { transform: scale(.6); opacity: .8; }
+  100% { transform: scale(1.8); opacity: 0; }
+}
+
+footer {
+  display: flex; justify-content: space-between; align-items: center;
+  font-size: 11px; color: var(--muted);
+}
+</style>
+</head>
+<body>
+
+<div id="cursor"></div>
+<div id="cursorRing"></div>
+
+<div class="page">
+
+  <header>
+    <span class="logo">vibe<span>.</span></span>
+    <span class="header-right">Prototype</span>
+  </header>
+
+  <main>
+    <div class="eyebrow">Welcome</div>
+    <h1>The network where your <em>AI agent</em> lives.</h1>
+    <p class="sub">Your campus, your career, one profile.</p>
+
+    <div class="cta-row">
+      <button class="cta cta-primary" onclick="enterDemo()">
+        View demo site
+        <span class="cta-arrow">→</span>
+      </button>
+      <button class="cta cta-secondary" onclick="enterCreate()">
+        Create your profile
+      </button>
+    </div>
+
+    <p class="footnote">Demo seeds Maya Chen across all pages. Create your profile starts the 6-step Otto onboarding — about 3 minutes, ends with a real first draft in your voice.</p>
+  </main>
+
+  <div class="otto-corner">
+    <div class="otto-orb">
+      <span class="otto-orb-ring"></span>
+      <span class="otto-orb-core"></span>
+    </div>
+    <span>otto · idle</span>
+  </div>
+
+  <footer>
+    <span>vibe · prototype</span>
+    <span>early access</span>
+  </footer>
+
+</div>
+
+<script>
+// Custom cursor
+(function(){
+  const cur  = document.getElementById('cursor');
+  const ring = document.getElementById('cursorRing');
+  let mx = window.innerWidth/2, my = window.innerHeight/2, rx = mx, ry = my;
+  window.cur = cur; window.ring = ring;
+  document.addEventListener('mousemove', e => {
+    mx = e.clientX; my = e.clientY;
+    cur.style.transform = `translate(${mx-4}px,${my-4}px)`;
+  }, { passive: true });
+  (function tick(){
+    rx += (mx - rx - 14) * .28;
+    ry += (my - ry - 14) * .28;
+    ring.style.transform = `translate(${Math.round(rx)}px,${Math.round(ry)}px)`;
+    requestAnimationFrame(tick);
+  })();
+  document.addEventListener('mousedown', () => cur.classList.add('clicking'));
+  document.addEventListener('mouseup',   () => cur.classList.remove('clicking'));
+  const HOVER_SEL = 'a, button';
+  document.addEventListener('mouseover', e => {
+    if (e.target.closest(HOVER_SEL)) { cur.classList.add('hover'); ring.classList.add('hover'); }
+  });
+  document.addEventListener('mouseout', e => {
+    if (e.target.closest(HOVER_SEL)) { cur.classList.remove('hover'); ring.classList.remove('hover'); }
+  });
+})();
+
+// CTA handlers — use shared persistence layer
+function enterDemo() {
+  seedDemoData();
+  window.location.href = '/html/feed.html';
+}
+function enterCreate() {
+  // Onboarding is the canonical "create your profile" entry point.
+  // It produces a real (non-demo) user object on completion and routes to Otto.
+  window.location.href = '/html/onboarding.html';
+}
+</script>
+</body>
+</html>

@@ -1,0 +1,775 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Meet Otto — Vibe</title>
+<link href="https://fonts.googleapis.com/css2?family=Fraunces:ital,wght@0,400;0,700;0,900;1,400;1,700&family=DM+Sans:wght@300;400;500;600;700&display=swap" rel="stylesheet">
+<script src="/html/_persistence.js"></script>
+<style>
+:root { --cream:#FAF7F2; --charcoal:#1C1C1E; --accent:#FF5C35; --purple:#7C5CFC; --lavender:#C8B8FF; --green:#1A9E5B; }
+* { margin: 0; padding: 0; box-sizing: border-box; }
+html, body { height: 100%; }
+body {
+  font-family: 'DM Sans', sans-serif;
+  background: var(--charcoal); color: white;
+  cursor: none; overflow-x: hidden; min-height: 100vh;
+}
+
+/* Custom cursor (matches the rest of vibe) */
+.cursor { width:8px;height:8px;background:var(--accent);border-radius:50%;position:fixed;top:0;left:0;pointer-events:none;z-index:2147483647;will-change:transform;transition:width .15s,height .15s,background .15s; }
+.cursor-ring { width:28px;height:28px;border:1.5px solid var(--accent);border-radius:50%;position:fixed;top:0;left:0;pointer-events:none;z-index:2147483646;will-change:transform;opacity:.45;transition:width .2s,height .2s,opacity .2s; }
+.cursor.hover { width:6px;height:6px;background:white; }
+.cursor-ring.hover { width:44px;height:44px;opacity:.4;border-color:white; }
+*,*::before,*::after { cursor:none!important; }
+input, textarea, [contenteditable="true"] { cursor:text!important; }
+
+/* Frame */
+.onb-shell { position: relative; min-height: 100vh; display: flex; align-items: center; justify-content: center; padding: 40px 20px; overflow: hidden; }
+.onb-bg-1 { position: absolute; top: -200px; right: -200px; width: 700px; height: 700px; border-radius: 50%; background: radial-gradient(circle, rgba(255,92,53,.16) 0%, transparent 70%); pointer-events: none; }
+.onb-bg-2 { position: absolute; bottom: -150px; left: 10%; width: 540px; height: 540px; border-radius: 50%; background: radial-gradient(circle, rgba(124,92,252,.13) 0%, transparent 70%); pointer-events: none; transition: all .8s ease; }
+.onb-bg-1.purple { background: radial-gradient(circle, rgba(124,92,252,.16) 0%, transparent 70%); }
+
+/* Top bar */
+.onb-top { position: fixed; top: 22px; left: 24px; right: 24px; display: flex; align-items: center; justify-content: space-between; z-index: 10; }
+.onb-logo { font-family: 'Fraunces', serif; font-size: 22px; font-weight: 900; color: white; letter-spacing: -1px; text-decoration: none; }
+.onb-logo span { color: var(--accent); }
+.onb-skip {
+  font-family: 'DM Sans', sans-serif; font-size: 12px; font-weight: 500;
+  color: rgba(255,255,255,.45); background: none; border: none;
+  padding: 8px 12px; transition: color .15s; cursor: none;
+}
+.onb-skip:hover { color: white; }
+.onb-skip[disabled] { display: none; }
+
+/* Progress dots */
+.progress-dots {
+  position: fixed; top: 22px; left: 50%; transform: translateX(-50%);
+  display: flex; gap: 9px; align-items: center; z-index: 10;
+  padding: 8px 16px; background: rgba(0,0,0,.25); border: 0.5px solid rgba(255,255,255,.06);
+  border-radius: 100px; backdrop-filter: blur(10px);
+}
+.dot { width: 6px; height: 6px; border-radius: 50%; background: rgba(255,255,255,.15); transition: all .35s; }
+.dot.done { background: var(--accent); box-shadow: 0 0 6px rgba(255,92,53,.4); }
+.dot.now { background: var(--accent); transform: scale(1.5); box-shadow: 0 0 8px var(--accent); }
+.progress-text { font-size: 10px; color: rgba(255,255,255,.5); margin-left: 8px; letter-spacing: .3px; font-weight: 500; }
+
+/* Step container */
+.onb-step {
+  display: none; flex-direction: column; align-items: center; justify-content: center;
+  text-align: center; max-width: 600px; width: 100%; position: relative; z-index: 1;
+  padding: 70px 20px 40px;
+  animation: stepIn .42s cubic-bezier(.2,.8,.2,1);
+}
+.onb-step.active { display: flex; }
+@keyframes stepIn { from { opacity: 0; transform: translateY(14px); } to { opacity: 1; transform: translateY(0); } }
+
+/* Otto orb sizes */
+@keyframes pulse-core { 0%,100% { transform: scale(1); opacity: .9; } 50% { transform: scale(1.15); opacity: 1; } }
+@keyframes pulse-core-big { 0%,100% { transform: scale(1); opacity: .9; } 50% { transform: scale(1.2); opacity: 1; } }
+@keyframes spin-slow { from { transform: rotate(0deg); } to { transform: rotate(360deg); } }
+@keyframes spin-med { from { transform: rotate(0deg); } to { transform: rotate(360deg); } }
+@keyframes ring-breathe { 0%,100% { transform: scale(1); opacity: .25; } 50% { transform: scale(1.4); opacity: 0; } }
+@keyframes ring-breathe-big { 0%,100% { transform: scale(1); opacity: .35; } 50% { transform: scale(1.5); opacity: 0; } }
+
+.otto-big, .otto-mid, .otto-sm { position: relative; display: flex; align-items: center; justify-content: center; flex-shrink: 0; }
+.otto-big { width: 180px; height: 180px; margin-bottom: 32px; }
+.otto-mid { width: 110px; height: 110px; margin-bottom: 26px; }
+.otto-sm  { width: 76px; height: 76px;  margin-bottom: 22px; }
+
+.otto-big .pulse-1 { position: absolute; inset: 40px; border-radius: 50%; border: 1px solid var(--accent); animation: ring-breathe-big 2.8s ease-out infinite; }
+.otto-big .pulse-2 { position: absolute; inset: 40px; border-radius: 50%; border: 1px solid var(--purple); animation: ring-breathe-big 3.4s ease-out 1.4s infinite; }
+.otto-big .orbit-out { position: absolute; inset: 24px; border-radius: 50%; border: 0.5px solid rgba(255,92,53,.3); animation: spin-slow 8s linear infinite; }
+.otto-big .orbit-out .d1 { position: absolute; top: 0; left: 50%; transform: translateX(-50%); width: 5px; height: 5px; border-radius: 50%; background: var(--accent); box-shadow: 0 0 8px var(--accent); }
+.otto-big .orbit-out .d2 { position: absolute; bottom: 0; left: 50%; transform: translateX(-50%); width: 4px; height: 4px; border-radius: 50%; background: var(--purple); }
+.otto-big .orbit-mid { position: absolute; inset: 50px; border-radius: 50%; border: 0.5px solid rgba(124,92,252,.4); animation: spin-med 4.5s linear infinite reverse; }
+.otto-big .orbit-mid .d { position: absolute; top: 0; left: 50%; transform: translateX(-50%); width: 4px; height: 4px; border-radius: 50%; background: var(--lavender); }
+.otto-big .core { width: 18px; height: 18px; border-radius: 50%; background: var(--accent); box-shadow: 0 0 22px var(--accent), 0 0 40px rgba(124,92,252,.5); animation: pulse-core-big 2.4s ease-in-out infinite; }
+
+.otto-mid .pulse-1 { position: absolute; inset: 26px; border-radius: 50%; border: 1px solid var(--accent); animation: ring-breathe 2.8s ease-out infinite; }
+.otto-mid .pulse-2 { position: absolute; inset: 26px; border-radius: 50%; border: 1px solid var(--purple); animation: ring-breathe 3.4s ease-out .7s infinite; }
+.otto-mid .orbit-out { position: absolute; inset: 14px; border-radius: 50%; border: 0.5px solid rgba(255,92,53,.3); animation: spin-slow 8s linear infinite; }
+.otto-mid .orbit-out .d { position: absolute; top: 0; left: 50%; transform: translateX(-50%); width: 4px; height: 4px; border-radius: 50%; background: var(--accent); }
+.otto-mid .core { width: 12px; height: 12px; border-radius: 50%; background: var(--accent); box-shadow: 0 0 14px var(--accent); animation: pulse-core 2.4s ease-in-out infinite; }
+
+.otto-sm .pulse-1 { position: absolute; inset: 18px; border-radius: 50%; border: 1px solid var(--accent); animation: ring-breathe 2.8s ease-out infinite; }
+.otto-sm .pulse-2 { position: absolute; inset: 18px; border-radius: 50%; border: 1px solid var(--purple); animation: ring-breathe 3.4s ease-out .7s infinite; }
+.otto-sm .orbit-out { position: absolute; inset: 8px; border-radius: 50%; border: 0.5px solid rgba(255,92,53,.3); animation: spin-slow 8s linear infinite; }
+.otto-sm .orbit-out .d { position: absolute; top: 0; left: 50%; transform: translateX(-50%); width: 3px; height: 3px; border-radius: 50%; background: var(--accent); }
+.otto-sm .core { width: 11px; height: 11px; border-radius: 50%; background: var(--accent); box-shadow: 0 0 12px var(--accent); animation: pulse-core 2.4s ease-in-out infinite; }
+
+/* Type */
+.h1 { font-family: 'Fraunces', serif; font-size: 40px; font-weight: 900; color: white; letter-spacing: -1.5px; line-height: 1.1; margin-bottom: 18px; }
+.h1 em { color: var(--accent); font-style: italic; }
+.h2 { font-family: 'Fraunces', serif; font-size: 30px; font-weight: 900; color: white; letter-spacing: -1px; line-height: 1.15; margin-bottom: 12px; }
+.intro { font-family: 'Fraunces', serif; font-style: italic; font-size: 17px; line-height: 1.6; color: rgba(255,255,255,.78); max-width: 480px; margin-bottom: 36px; }
+.sub-intro { font-family: 'Fraunces', serif; font-style: italic; font-size: 14px; color: rgba(255,255,255,.55); margin-bottom: 28px; max-width: 480px; line-height: 1.55; }
+
+/* CTAs */
+.cta-row { display: flex; gap: 10px; align-items: center; }
+.btn-coral {
+  font-family: 'DM Sans', sans-serif; font-size: 13px; font-weight: 600;
+  padding: 13px 28px; background: var(--accent); color: white;
+  border: none; border-radius: 100px; cursor: none;
+  box-shadow: 0 6px 20px rgba(255,92,53,.32);
+  transition: all .18s; letter-spacing: .2px;
+}
+.btn-coral:hover { background: #ff7055; transform: translateY(-1px); box-shadow: 0 8px 24px rgba(255,92,53,.42); }
+.btn-coral:disabled { background: rgba(255,92,53,.3); box-shadow: none; cursor: not-allowed; }
+.btn-skip-step {
+  font-family: 'DM Sans', sans-serif; font-size: 13px; font-weight: 500;
+  padding: 13px 22px; color: rgba(255,255,255,.55); background: none; border: none;
+  border-radius: 100px; cursor: none; transition: color .15s;
+}
+.btn-skip-step:hover { color: white; }
+.note { font-size: 11px; color: rgba(255,255,255,.4); margin-top: 22px; letter-spacing: .2px; }
+.note.italic { font-style: italic; }
+
+/* Step 2 — name input */
+.name-input-wrap {
+  background: rgba(255,255,255,.05); border: 0.5px solid var(--accent);
+  border-radius: 14px; padding: 16px 22px; min-width: 340px;
+  display: flex; align-items: center; gap: 8px;
+  box-shadow: 0 0 0 4px rgba(255,92,53,.08);
+}
+.name-input {
+  font-family: 'Fraunces', serif; font-size: 24px; font-weight: 700;
+  color: white; background: none; border: none; outline: none;
+  letter-spacing: -.5px; min-width: 0; flex: 1; text-align: center;
+}
+.name-input::placeholder { color: rgba(255,255,255,.3); }
+.suggest-chips { display: flex; gap: 8px; margin-top: 18px; flex-wrap: wrap; justify-content: center; max-width: 460px; }
+.suggest-chip {
+  font-size: 11px; padding: 7px 14px; background: rgba(255,255,255,.05);
+  color: rgba(255,255,255,.65); border: 0.5px solid rgba(255,255,255,.1);
+  border-radius: 100px; cursor: none; transition: all .15s;
+  font-family: 'DM Sans', sans-serif; font-weight: 500;
+}
+.suggest-chip:hover { background: rgba(255,255,255,.1); border-color: rgba(255,255,255,.25); color: white; }
+
+/* Step 3 — platform grid */
+.platform-grid {
+  display: grid; grid-template-columns: repeat(2, 1fr); gap: 10px;
+  width: 100%; max-width: 480px; margin-bottom: 26px;
+}
+.platform-card {
+  background: rgba(255,255,255,.04); border: 0.5px solid rgba(255,255,255,.1);
+  border-radius: 12px; padding: 14px 16px;
+  display: flex; align-items: center; gap: 12px; cursor: none;
+  transition: all .15s; text-align: left;
+}
+.platform-card:hover { background: rgba(255,255,255,.07); border-color: rgba(255,255,255,.2); }
+.platform-card.selected { background: rgba(255,92,53,.12); border-color: var(--accent); box-shadow: 0 0 0 3px rgba(255,92,53,.08); }
+.platform-card.skip { border-style: dashed; }
+.platform-icon { width: 32px; height: 32px; border-radius: 8px; display: flex; align-items: center; justify-content: center; flex-shrink: 0; color: white; font-family: 'Fraunces', serif; font-weight: 900; font-size: 14px; }
+.platform-info { flex: 1; min-width: 0; }
+.platform-name { font-size: 13px; color: white; font-weight: 600; }
+.platform-name.skip { color: rgba(255,255,255,.65); }
+.platform-hint { font-size: 10.5px; color: rgba(255,255,255,.55); margin-top: 2px; }
+.platform-check { opacity: 0; transition: opacity .15s; }
+.platform-card.selected .platform-check { opacity: 1; }
+
+/* Step 4 — voice samples */
+.samples-stack { display: flex; flex-direction: column; gap: 10px; width: 100%; max-width: 540px; margin-bottom: 22px; }
+.sample-slot { background: rgba(255,92,53,.05); border: 0.5px solid rgba(255,92,53,.25); border-radius: 12px; padding: 13px 16px; transition: all .15s; }
+.sample-slot.empty { background: rgba(255,255,255,.03); border-style: dashed; border-color: rgba(255,255,255,.15); }
+.sample-slot.has-content { border-color: var(--accent); background: rgba(255,92,53,.07); }
+.sample-meta { display: flex; align-items: center; gap: 8px; margin-bottom: 8px; }
+.sample-num { width: 18px; height: 18px; border-radius: 50%; background: rgba(255,92,53,.2); display: flex; align-items: center; justify-content: center; font-size: 10px; color: var(--accent); font-weight: 700; flex-shrink: 0; }
+.sample-num.empty { background: rgba(255,255,255,.06); color: rgba(255,255,255,.4); }
+.sample-label { font-size: 10px; color: rgba(255,255,255,.55); letter-spacing: .5px; text-transform: uppercase; font-weight: 500; }
+.sample-label.muted { color: rgba(255,255,255,.4); }
+.sample-saved { margin-left: auto; font-size: 10px; color: var(--green); font-weight: 600; }
+.sample-textarea {
+  width: 100%; background: none; border: none; outline: none;
+  font-family: 'DM Sans', sans-serif; font-size: 13px; line-height: 1.6;
+  color: white; resize: none; min-height: 22px; max-height: 200px;
+  overflow-y: auto;
+}
+.sample-textarea::placeholder { color: rgba(255,255,255,.32); font-style: italic; }
+.otto-note { background: rgba(255,92,53,.04); border-left: 1.5px solid var(--accent); border-radius: 0 8px 8px 0; padding: 11px 14px; max-width: 540px; width: 100%; margin-bottom: 22px; text-align: left; }
+.otto-note-text { font-family: 'Fraunces', serif; font-style: italic; font-size: 12px; line-height: 1.55; color: rgba(255,255,255,.78); }
+
+/* Step 5 — leash */
+.leash-cards { display: flex; flex-direction: column; gap: 10px; width: 100%; max-width: 480px; margin-bottom: 24px; }
+.leash-card {
+  background: rgba(255,255,255,.04); border: 0.5px solid rgba(255,255,255,.1);
+  border-radius: 14px; padding: 18px 20px; cursor: none;
+  display: flex; gap: 14px; align-items: flex-start; text-align: left;
+  transition: all .15s;
+}
+.leash-card:hover { background: rgba(255,255,255,.06); border-color: rgba(255,255,255,.2); }
+.leash-card.selected { background: rgba(255,92,53,.12); border-color: var(--accent); box-shadow: 0 0 0 3px rgba(255,92,53,.08); }
+.leash-card svg { opacity: 0; transition: opacity .15s; flex-shrink: 0; margin-top: 3px; }
+.leash-card.selected svg { opacity: 1; }
+.leash-card-body { flex: 1; }
+.leash-name-row { display: flex; align-items: center; gap: 8px; }
+.leash-name { font-family: 'Fraunces', serif; font-size: 16px; font-weight: 800; color: rgba(255,255,255,.85); letter-spacing: -.2px; }
+.leash-card.selected .leash-name { color: white; }
+.leash-tag { font-size: 9px; padding: 3px 8px; background: rgba(255,255,255,.1); color: white; border-radius: 100px; font-weight: 700; letter-spacing: .5px; }
+.leash-desc { font-size: 12px; color: rgba(255,255,255,.55); margin-top: 5px; line-height: 1.55; }
+.leash-card.selected .leash-desc { color: rgba(255,255,255,.75); }
+
+/* Step 6 — final draft */
+.draft-final {
+  background: rgba(255,92,53,.06); border: 0.5px solid rgba(255,92,53,.4);
+  border-radius: 16px; padding: 20px 22px; max-width: 540px; width: 100%;
+  box-shadow: 0 0 0 5px rgba(255,92,53,.06);
+  margin-bottom: 18px; text-align: left;
+}
+.draft-final-meta { display: flex; align-items: center; gap: 8px; margin-bottom: 14px; flex-wrap: wrap; }
+.draft-final-square { width: 14px; height: 14px; border-radius: 4px; background: #0A66C2; }
+.draft-final-label { font-size: 10px; font-weight: 700; color: rgba(255,255,255,.7); letter-spacing: .5px; }
+.draft-final-tag { margin-left: auto; font-size: 9px; padding: 3px 9px; background: rgba(124,92,252,.18); color: var(--lavender); border-radius: 100px; font-weight: 600; letter-spacing: .5px; }
+.draft-final-text { font-family: 'DM Sans', sans-serif; font-size: 14px; line-height: 1.7; color: rgba(255,255,255,.92); }
+.draft-final-notes { display: flex; align-items: center; gap: 8px; margin-top: 16px; padding-top: 14px; border-top: 0.5px solid rgba(255,255,255,.06); flex-wrap: wrap; }
+.draft-final-notes-label { font-size: 10.5px; color: rgba(255,255,255,.5); font-style: italic; font-family: 'Fraunces', serif; }
+.draft-final-notes-text { font-size: 10.5px; color: rgba(255,255,255,.72); }
+.remix-row { display: flex; gap: 8px; margin-bottom: 18px; flex-wrap: wrap; justify-content: center; }
+.remix-chip {
+  font-size: 11px; padding: 7px 14px; background: rgba(255,255,255,.05);
+  border: 0.5px solid rgba(255,255,255,.15); color: white;
+  border-radius: 100px; cursor: none; font-family: 'DM Sans', sans-serif;
+  font-weight: 500; transition: all .15s;
+}
+.remix-chip:hover { background: rgba(255,255,255,.1); border-color: rgba(255,255,255,.3); }
+.remix-chip:disabled { opacity: .4; cursor: not-allowed; }
+
+/* Confirm dialog (close button on top) */
+.confirm-overlay {
+  display: none; position: fixed; inset: 0; z-index: 200;
+  background: rgba(0,0,0,.55); backdrop-filter: blur(4px);
+  align-items: center; justify-content: center;
+}
+.confirm-overlay.open { display: flex; }
+.confirm-card {
+  background: #1f1f22; border: 0.5px solid rgba(255,255,255,.1);
+  border-radius: 16px; padding: 24px 28px; max-width: 360px; text-align: center;
+  box-shadow: 0 24px 64px rgba(0,0,0,.5);
+}
+.confirm-title { font-family: 'Fraunces', serif; font-size: 20px; font-weight: 800; color: white; letter-spacing: -.4px; margin-bottom: 8px; }
+.confirm-body { font-size: 13px; color: rgba(255,255,255,.65); line-height: 1.55; margin-bottom: 18px; }
+.confirm-row { display: flex; gap: 8px; justify-content: center; }
+
+/* Responsive */
+@media (max-width: 540px) {
+  .h1 { font-size: 30px; }
+  .h2 { font-size: 24px; }
+  .platform-grid { grid-template-columns: 1fr; }
+  .name-input-wrap { min-width: 0; width: 100%; max-width: 320px; }
+  .progress-dots { padding: 6px 12px; }
+  .progress-text { display: none; }
+}
+</style>
+</head>
+<body>
+
+<div class="cursor" id="cursor"></div>
+<div class="cursor-ring" id="cursorRing"></div>
+
+<header class="onb-top">
+  <a href="/html/landing.html" class="onb-logo">vibe<span>.</span></a>
+  <button class="onb-skip" id="onbSkip" onclick="confirmSkip()">Skip onboarding</button>
+</header>
+
+<div class="progress-dots" id="progressDots">
+  <div class="dot now"></div>
+  <div class="dot"></div>
+  <div class="dot"></div>
+  <div class="dot"></div>
+  <div class="dot"></div>
+  <div class="dot"></div>
+  <span class="progress-text" id="progressText">1 of 6</span>
+</div>
+
+<main class="onb-shell">
+  <div class="onb-bg-1" id="onbBg1"></div>
+  <div class="onb-bg-2"></div>
+
+  <!-- ─────────── STEP 1 — Hello ─────────── -->
+  <section class="onb-step active" data-step="1">
+    <div class="otto-big">
+      <div class="pulse-1"></div>
+      <div class="pulse-2"></div>
+      <div class="orbit-out"><div class="d1"></div><div class="d2"></div></div>
+      <div class="orbit-mid"><div class="d"></div></div>
+      <div class="core"></div>
+    </div>
+    <div class="h1">i'm <em>otto</em>.</div>
+    <div class="intro">"think of me as your marketing intern. you write the post, i make sure it lands everywhere it needs to — with the right voice for each place."</div>
+    <div class="cta-row">
+      <button class="btn-coral" onclick="goToStep(2)">Let's go &rarr;</button>
+      <button class="btn-skip-step" onclick="confirmSkip()">Maybe later</button>
+    </div>
+    <div class="note">takes about 3 minutes</div>
+  </section>
+
+  <!-- ─────────── STEP 2 — Name me ─────────── -->
+  <section class="onb-step" data-step="2">
+    <div class="otto-mid">
+      <div class="pulse-1"></div>
+      <div class="pulse-2"></div>
+      <div class="orbit-out"><div class="d"></div></div>
+      <div class="core"></div>
+    </div>
+    <div class="h2">what should i go by?</div>
+    <div class="sub-intro">"otto's the default. swap me to whatever you like."</div>
+    <div class="name-input-wrap">
+      <input type="text" id="ottoName" class="name-input" value="otto" maxlength="24" autocomplete="off" spellcheck="false" onkeydown="if(event.key==='Enter') goToStep(3);">
+    </div>
+    <div class="suggest-chips">
+      <button class="suggest-chip" onclick="setName('pico')">try: pico</button>
+      <button class="suggest-chip" onclick="setName('mox')">mox</button>
+      <button class="suggest-chip" onclick="setName('echo')">echo</button>
+      <button class="suggest-chip" onclick="setName('nimo')">nimo</button>
+      <button class="suggest-chip" onclick="setName('ember')">ember</button>
+    </div>
+    <div class="cta-row" style="margin-top: 36px;">
+      <button class="btn-coral" onclick="goToStep(3)">Continue &rarr;</button>
+      <button class="btn-skip-step" onclick="goToStep(3)">Skip</button>
+    </div>
+  </section>
+
+  <!-- ─────────── STEP 3 — Connect a platform ─────────── -->
+  <section class="onb-step" data-step="3">
+    <div class="otto-sm">
+      <div class="pulse-1"></div>
+      <div class="orbit-out"><div class="d"></div></div>
+      <div class="core"></div>
+    </div>
+    <div class="h2">where do you post most?</div>
+    <div class="sub-intro">"pick one to start. you can connect more later. i'll learn how each one works for you."</div>
+
+    <div class="platform-grid" id="platformGrid">
+      <button class="platform-card selected" data-platform="LinkedIn">
+        <div class="platform-icon" style="background: #0A66C2;">in</div>
+        <div class="platform-info">
+          <div class="platform-name">LinkedIn</div>
+          <div class="platform-hint">most students start here</div>
+        </div>
+        <svg class="platform-check" width="14" height="14" viewBox="0 0 16 16" fill="none"><path d="M3 8 L7 12 L13 4" stroke="#FF5C35" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"/></svg>
+      </button>
+      <button class="platform-card" data-platform="Instagram">
+        <div class="platform-icon" style="background: linear-gradient(135deg, #E1306C, #C13584);">
+          <svg width="16" height="16" viewBox="0 0 24 24" fill="none"><rect x="3" y="3" width="18" height="18" rx="5" stroke="white" stroke-width="2"/><circle cx="12" cy="12" r="4" stroke="white" stroke-width="2"/><circle cx="17" cy="7" r="1.2" fill="white"/></svg>
+        </div>
+        <div class="platform-info">
+          <div class="platform-name">Instagram</div>
+          <div class="platform-hint">need a business account</div>
+        </div>
+        <svg class="platform-check" width="14" height="14" viewBox="0 0 16 16" fill="none"><path d="M3 8 L7 12 L13 4" stroke="#FF5C35" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"/></svg>
+      </button>
+      <button class="platform-card" data-platform="TikTok">
+        <div class="platform-icon" style="background: #1C1C1E; border: 0.5px solid rgba(255,255,255,.2);">d</div>
+        <div class="platform-info">
+          <div class="platform-name">TikTok</div>
+          <div class="platform-hint">best for vibes</div>
+        </div>
+        <svg class="platform-check" width="14" height="14" viewBox="0 0 16 16" fill="none"><path d="M3 8 L7 12 L13 4" stroke="#FF5C35" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"/></svg>
+      </button>
+      <button class="platform-card" data-platform="YouTube">
+        <div class="platform-icon" style="background: #FF0000;">
+          <svg width="16" height="12" viewBox="0 0 24 18" fill="white"><path d="M23.5 2.8a3 3 0 0 0-2.1-2.1C19.5 0 12 0 12 0S4.5 0 2.6.7A3 3 0 0 0 .5 2.8C0 4.7 0 9 0 9s0 4.3.5 6.2a3 3 0 0 0 2.1 2.1C4.5 18 12 18 12 18s7.5 0 9.4-.7a3 3 0 0 0 2.1-2.1c.5-1.9.5-6.2.5-6.2s0-4.3-.5-6.2zM9.6 12.9V5.1L15.8 9z"/></svg>
+        </div>
+        <div class="platform-info">
+          <div class="platform-name">YouTube Shorts</div>
+          <div class="platform-hint">best analytics</div>
+        </div>
+        <svg class="platform-check" width="14" height="14" viewBox="0 0 16 16" fill="none"><path d="M3 8 L7 12 L13 4" stroke="#FF5C35" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"/></svg>
+      </button>
+      <button class="platform-card" data-platform="X">
+        <div class="platform-icon" style="background: #000;">&#120143;</div>
+        <div class="platform-info">
+          <div class="platform-name">X</div>
+          <div class="platform-hint">limited data, fast posting</div>
+        </div>
+        <svg class="platform-check" width="14" height="14" viewBox="0 0 16 16" fill="none"><path d="M3 8 L7 12 L13 4" stroke="#FF5C35" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"/></svg>
+      </button>
+      <button class="platform-card skip" data-platform="">
+        <div class="platform-icon" style="background: rgba(255,255,255,.05); color: rgba(255,255,255,.5); font-size: 22px; font-weight: 300;">+</div>
+        <div class="platform-info">
+          <div class="platform-name skip">Skip for now</div>
+          <div class="platform-hint">connect later</div>
+        </div>
+      </button>
+    </div>
+
+    <button class="btn-coral" id="connectBtn" onclick="goToStep(4)">Connect LinkedIn &rarr;</button>
+  </section>
+
+  <!-- ─────────── STEP 4 — Voice samples ─────────── -->
+  <section class="onb-step" data-step="4">
+    <div class="otto-sm" style="width: 64px; height: 64px;">
+      <div class="pulse-1" style="inset: 14px;"></div>
+      <div class="orbit-out" style="inset: 6px;"><div class="d"></div></div>
+      <div class="core" style="width: 10px; height: 10px;"></div>
+    </div>
+    <div class="h2">teach me your voice</div>
+    <div class="sub-intro">"paste 1-3 posts that sound like you at your best. i'll learn the rhythm — how you open, how you joke, how you sign off."</div>
+
+    <div class="samples-stack" id="samplesStack">
+      <div class="sample-slot empty" data-slot="0">
+        <div class="sample-meta">
+          <div class="sample-num empty">1</div>
+          <span class="sample-label">sample post</span>
+          <span class="sample-saved" style="display:none;">&#10003; saved</span>
+        </div>
+        <textarea class="sample-textarea" rows="1" placeholder="paste a post you're proud of" oninput="onSampleInput(this, 0)"></textarea>
+      </div>
+      <div class="sample-slot empty" data-slot="1">
+        <div class="sample-meta">
+          <div class="sample-num empty">2</div>
+          <span class="sample-label muted">sample post</span>
+          <span class="sample-saved" style="display:none;">&#10003; saved</span>
+        </div>
+        <textarea class="sample-textarea" rows="1" placeholder="paste another (the more variety, the better)" oninput="onSampleInput(this, 1)"></textarea>
+      </div>
+      <div class="sample-slot empty" data-slot="2">
+        <div class="sample-meta">
+          <div class="sample-num empty">3</div>
+          <span class="sample-label muted">paste another (optional)</span>
+          <span class="sample-saved" style="display:none;">&#10003; saved</span>
+        </div>
+        <textarea class="sample-textarea" rows="1" placeholder="one more if you have it" oninput="onSampleInput(this, 2)"></textarea>
+      </div>
+    </div>
+
+    <div class="otto-note">
+      <div class="otto-note-text"><span id="ottoNotePrefix">otto</span> says: "two is enough to start. i'll keep learning every time you post."</div>
+    </div>
+
+    <div class="cta-row">
+      <button class="btn-coral" id="trainBtn" onclick="goToStep(5)" disabled>Train me &rarr;</button>
+      <button class="btn-skip-step" onclick="goToStep(5)">Skip for now</button>
+    </div>
+  </section>
+
+  <!-- ─────────── STEP 5 — Leash ─────────── -->
+  <section class="onb-step" data-step="5">
+    <div class="otto-sm" style="width: 64px; height: 64px;">
+      <div class="pulse-1" style="inset: 14px;"></div>
+      <div class="orbit-out" style="inset: 6px;"><div class="d"></div></div>
+      <div class="core" style="width: 10px; height: 10px;"></div>
+    </div>
+    <div class="h2">how much rope do i get?</div>
+    <div class="sub-intro">"start cautious, change anytime. most people graduate to full auto in a couple weeks."</div>
+
+    <div class="leash-cards" id="leashCards">
+      <button class="leash-card selected" data-leash="ask">
+        <svg width="18" height="18" viewBox="0 0 16 16" fill="none"><path d="M3 8 L7 12 L13 4" stroke="#FF5C35" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"/></svg>
+        <div class="leash-card-body">
+          <div class="leash-name-row">
+            <div class="leash-name">Ask first</div>
+            <span class="leash-tag">RECOMMENDED</span>
+          </div>
+          <div class="leash-desc">i'll draft everything and wait for your approval. nothing posts without you saying yes.</div>
+        </div>
+      </button>
+      <button class="leash-card" data-leash="sometimes">
+        <svg width="18" height="18" viewBox="0 0 16 16" fill="none"><path d="M3 8 L7 12 L13 4" stroke="#FF5C35" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"/></svg>
+        <div class="leash-card-body">
+          <div class="leash-name-row">
+            <div class="leash-name">Ask sometimes</div>
+          </div>
+          <div class="leash-desc">i'll auto-post to platforms i know are working for you, ask for the rest.</div>
+        </div>
+      </button>
+      <button class="leash-card" data-leash="auto">
+        <svg width="18" height="18" viewBox="0 0 16 16" fill="none"><path d="M3 8 L7 12 L13 4" stroke="#FF5C35" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"/></svg>
+        <div class="leash-card-body">
+          <div class="leash-name-row">
+            <div class="leash-name">Full auto</div>
+          </div>
+          <div class="leash-desc">i post everything within your rules and send a daily summary. for the brave.</div>
+        </div>
+      </button>
+    </div>
+
+    <div class="cta-row" style="margin-top: 8px;">
+      <button class="btn-coral" onclick="goToStep(6)">Continue &rarr;</button>
+    </div>
+  </section>
+
+  <!-- ─────────── STEP 6 — Aha moment ─────────── -->
+  <section class="onb-step" data-step="6">
+    <div class="otto-sm" style="width: 86px; height: 86px;">
+      <div class="pulse-1" style="inset: 20px;"></div>
+      <div class="pulse-2" style="inset: 20px;"></div>
+      <div class="orbit-out" style="inset: 10px;"><div class="d"></div></div>
+      <div class="core" style="width: 13px; height: 13px;"></div>
+    </div>
+    <div class="h2">here's what i'd write for you</div>
+    <div class="sub-intro" style="font-size: 13.5px;">"based on your voice samples — for a hypothetical post about finishing a side project"</div>
+
+    <div class="draft-final" id="draftFinal">
+      <div class="draft-final-meta">
+        <div class="draft-final-square" id="draftPlatformSquare"></div>
+        <span class="draft-final-label" id="draftPlatformLabel">LINKEDIN DRAFT</span>
+        <span class="draft-final-tag">TRAINED ON YOUR VOICE</span>
+      </div>
+      <div class="draft-final-text" id="draftText">spent the last week chipping at one specific piece of a side project. shipped it tonight.<br><br>the gap between knowing how to do something and actually doing it is wider than tutorials make it look. that's where the real work lives.</div>
+      <div class="draft-final-notes">
+        <span class="draft-final-notes-label" id="draftNotesLabel">otto's notes:</span>
+        <span class="draft-final-notes-text" id="draftNotesText">lowercase opening &middot; short sentences &middot; meta-observation close</span>
+      </div>
+    </div>
+
+    <div class="remix-row">
+      <button class="remix-chip" onclick="remixDraft('again')">&#8635; try again</button>
+      <button class="remix-chip" onclick="remixDraft('punchier')">make it punchier</button>
+      <button class="remix-chip" onclick="remixDraft('warmer')">make it warmer</button>
+    </div>
+
+    <button class="btn-coral" onclick="completeOnboarding()">let's set up your profile &rarr;</button>
+    <div class="note italic" style="margin-top: 14px;">you can change anything later</div>
+  </section>
+
+</main>
+
+<!-- Skip-confirm dialog -->
+<div class="confirm-overlay" id="skipOverlay">
+  <div class="confirm-card">
+    <div class="confirm-title">Skip onboarding?</div>
+    <div class="confirm-body">You can always come back. Otto won't have your voice yet, but you'll still see the app.</div>
+    <div class="confirm-row">
+      <button class="btn-coral" onclick="closeSkipConfirm()">Keep going</button>
+      <button class="btn-skip-step" onclick="bailOnboarding()">Skip anyway</button>
+    </div>
+  </div>
+</div>
+
+<script>
+// ── State ─────────────────────────────────────────────────────────────────
+const state = {
+  step: 1,
+  ottoName: 'otto',
+  platform: 'LinkedIn',
+  voiceSamples: ['', '', ''],
+  leash: 'ask',
+};
+
+const TOTAL_STEPS = 6;
+
+// ── Cursor (matches the rest of vibe) ─────────────────────────────────────
+const cur = document.getElementById('cursor');
+const ring = document.getElementById('cursorRing');
+let mx = 0, my = 0, rx = 0, ry = 0;
+document.addEventListener('mousemove', e => { mx = e.clientX; my = e.clientY; cur.style.transform = `translate(${mx-4}px, ${my-4}px)`; });
+function animateRing() { rx += (mx - rx) * .18; ry += (my - ry) * .18; ring.style.transform = `translate(${rx-14}px, ${ry-14}px)`; requestAnimationFrame(animateRing); }
+animateRing();
+function bindCursorHover() {
+  document.querySelectorAll('button, a, input, .platform-card, .leash-card, .suggest-chip, .remix-chip, .sample-slot').forEach(el => {
+    if (el.dataset.cursorBound) return;
+    el.dataset.cursorBound = '1';
+    el.addEventListener('mouseenter', () => { cur.classList.add('hover'); ring.classList.add('hover'); });
+    el.addEventListener('mouseleave', () => { cur.classList.remove('hover'); ring.classList.remove('hover'); });
+  });
+}
+bindCursorHover();
+
+// ── Step navigation ───────────────────────────────────────────────────────
+function goToStep(n) {
+  if (n < 1 || n > TOTAL_STEPS) return;
+
+  // Capture state before leaving the current step
+  if (state.step === 2) {
+    const v = document.getElementById('ottoName').value.trim();
+    state.ottoName = v || 'otto';
+    document.getElementById('ottoNotePrefix').textContent = state.ottoName;
+    document.getElementById('draftNotesLabel').textContent = state.ottoName + "'s notes:";
+  }
+
+  state.step = n;
+
+  document.querySelectorAll('.onb-step').forEach(el => {
+    el.classList.toggle('active', Number(el.dataset.step) === n);
+  });
+
+  // Re-trigger entry animation
+  const cur = document.querySelector('.onb-step.active');
+  if (cur) { cur.style.animation = 'none'; cur.offsetHeight; cur.style.animation = ''; }
+
+  updateProgress();
+  bindCursorHover();
+  window.scrollTo({ top: 0, behavior: 'smooth' });
+
+  // Skip button visible only on steps 1-4
+  document.getElementById('onbSkip').disabled = (n >= 5);
+
+  // Step 5 swaps the BG to purple-leaning (matches mockup)
+  document.getElementById('onbBg1').classList.toggle('purple', n === 5);
+
+  // When entering step 6, regenerate the draft preview from collected state
+  if (n === 6) renderDraft();
+  // Auto-focus the name input on entry
+  if (n === 2) setTimeout(() => { const i = document.getElementById('ottoName'); i.focus(); i.select(); }, 250);
+}
+
+function updateProgress() {
+  const dots = document.querySelectorAll('#progressDots .dot');
+  dots.forEach((d, i) => {
+    d.classList.remove('done', 'now');
+    if (i + 1 < state.step) d.classList.add('done');
+    else if (i + 1 === state.step) d.classList.add('now');
+  });
+  document.getElementById('progressText').textContent = state.step + ' of ' + TOTAL_STEPS;
+}
+
+// ── Step 2 — Name suggestions ─────────────────────────────────────────────
+function setName(name) {
+  document.getElementById('ottoName').value = name;
+  state.ottoName = name;
+  document.getElementById('ottoName').focus();
+}
+
+// ── Step 3 — Platform selection ───────────────────────────────────────────
+document.getElementById('platformGrid').addEventListener('click', e => {
+  const card = e.target.closest('.platform-card');
+  if (!card) return;
+  document.querySelectorAll('.platform-card').forEach(c => c.classList.remove('selected'));
+  card.classList.add('selected');
+  state.platform = card.dataset.platform || '';
+  const btn = document.getElementById('connectBtn');
+  if (state.platform) {
+    btn.textContent = 'Connect ' + state.platform + ' →';
+  } else {
+    btn.textContent = 'Continue →';
+  }
+});
+
+// ── Step 4 — Voice samples ────────────────────────────────────────────────
+function onSampleInput(textarea, idx) {
+  // Auto-grow
+  textarea.style.height = 'auto';
+  textarea.style.height = Math.min(textarea.scrollHeight, 200) + 'px';
+
+  const v = textarea.value.trim();
+  state.voiceSamples[idx] = v;
+
+  const slot = textarea.closest('.sample-slot');
+  const numEl = slot.querySelector('.sample-num');
+  const labelEl = slot.querySelector('.sample-label');
+  const savedEl = slot.querySelector('.sample-saved');
+
+  if (v.length > 10) {
+    slot.classList.remove('empty');
+    slot.classList.add('has-content');
+    numEl.classList.remove('empty');
+    labelEl.classList.remove('muted');
+    savedEl.style.display = '';
+  } else {
+    slot.classList.add('empty');
+    slot.classList.remove('has-content');
+    numEl.classList.add('empty');
+    if (idx > 0) labelEl.classList.add('muted');
+    savedEl.style.display = 'none';
+  }
+
+  // Enable Train button if at least one sample has real content
+  const filled = state.voiceSamples.filter(s => s.length > 10).length;
+  document.getElementById('trainBtn').disabled = (filled === 0);
+}
+
+// ── Step 5 — Leash selection ──────────────────────────────────────────────
+document.getElementById('leashCards').addEventListener('click', e => {
+  const card = e.target.closest('.leash-card');
+  if (!card) return;
+  document.querySelectorAll('.leash-card').forEach(c => c.classList.remove('selected'));
+  card.classList.add('selected');
+  state.leash = card.dataset.leash;
+});
+
+// ── Step 6 — Draft preview + remix ────────────────────────────────────────
+const PLATFORM_COLORS = {
+  LinkedIn: '#0A66C2',
+  Instagram: 'linear-gradient(135deg, #E1306C, #C13584)',
+  TikTok: 'linear-gradient(135deg, #25F4EE, #FE2C55)',
+  YouTube: '#FF0000',
+  X: '#000',
+};
+
+const DRAFT_VARIANTS = {
+  default: {
+    text: "spent the last week chipping at one specific piece of a side project. shipped it tonight.<br><br>the gap between knowing how to do something and actually doing it is wider than tutorials make it look. that's where the real work lives.",
+    notes: "lowercase opening · short sentences · meta-observation close"
+  },
+  again: {
+    text: "i've been working on a small thing for a few weeks. it's done now.<br><br>still surprised every time how different building something is from learning how to build it. the messy middle is where most of the work happens.",
+    notes: "casual lead-in · two-beat structure · honest framing"
+  },
+  punchier: {
+    text: "shipped a side project tonight.<br><br>tutorials make it look easy. the actual building is mostly figuring out what tutorials skip.",
+    notes: "tighter · more declarative · earned punchline"
+  },
+  warmer: {
+    text: "shipped a small thing tonight that took longer than i thought it would. honestly proud of it.<br><br>the part nobody mentions about side projects is how much you learn from the boring middle. the parts that don't end up on twitter.",
+    notes: "warmer opening · personal note · soft close"
+  },
+};
+
+function renderDraft() {
+  const sq = document.getElementById('draftPlatformSquare');
+  const label = document.getElementById('draftPlatformLabel');
+  const platform = state.platform || 'LinkedIn';
+  sq.style.background = PLATFORM_COLORS[platform] || PLATFORM_COLORS.LinkedIn;
+  label.textContent = platform.toUpperCase() + ' DRAFT';
+
+  const v = DRAFT_VARIANTS.default;
+  document.getElementById('draftText').innerHTML = v.text;
+  document.getElementById('draftNotesText').textContent = v.notes;
+}
+
+function remixDraft(kind) {
+  const v = DRAFT_VARIANTS[kind] || DRAFT_VARIANTS.default;
+  const draft = document.getElementById('draftFinal');
+  draft.style.opacity = '.4';
+  setTimeout(() => {
+    document.getElementById('draftText').innerHTML = v.text;
+    document.getElementById('draftNotesText').textContent = v.notes;
+    draft.style.opacity = '1';
+  }, 180);
+}
+
+// ── Skip flow ─────────────────────────────────────────────────────────────
+function confirmSkip() { document.getElementById('skipOverlay').classList.add('open'); }
+function closeSkipConfirm() { document.getElementById('skipOverlay').classList.remove('open'); }
+function bailOnboarding() { window.location.href = '/html/landing.html'; }
+
+document.addEventListener('keydown', e => {
+  if (e.key === 'Escape' && document.getElementById('skipOverlay').classList.contains('open')) closeSkipConfirm();
+});
+
+// ── Completion ────────────────────────────────────────────────────────────
+function completeOnboarding() {
+  // Build the user object — minimal sparse user, NOT a demo seed.
+  // Profile is empty by design; user fills it in via profile.html edit mode.
+  const user = {
+    name: '',
+    tagline: '',
+    headline: '',
+    location: '',
+    vibeTags: [],
+    _isDemo: false,
+    _onboarded: true,
+  };
+
+  // Otto config gets its own key — schema grows here as features land.
+  const ottoConfig = {
+    name: state.ottoName,
+    platforms: state.platform ? [state.platform] : [],
+    voiceSamples: state.voiceSamples.filter(s => s.length > 10),
+    leash: state.leash,
+    setupAt: new Date().toISOString(),
+  };
+
+  vibeSave('vibe_user_v1', user);
+  vibeSave('vibe_otto_v1', ottoConfig);
+
+  // Land on the profile page so the user can fill it in next.
+  // The profile detects (_onboarded && !name) and auto-enters edit mode.
+  window.location.href = '/html/profile.html';
+}
+</script>
+
+</body>
+</html>

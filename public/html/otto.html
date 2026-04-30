@@ -1,0 +1,2141 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Otto — Vibe</title>
+<link href="https://fonts.googleapis.com/css2?family=Fraunces:ital,wght@0,400;0,700;0,900;1,400&family=DM+Sans:wght@300;400;500;600;700&display=swap" rel="stylesheet">
+<script src="/html/_persistence.js"></script>
+<style>
+:root{--cream:#FAF7F2;--charcoal:#1C1C1E;--soft:#2D2D2D;--muted:#8A8580;--accent:#FF5C35;--green:#2ECC71;--lavender:#C8B8FF;--purple:#7C5CFC;--gold:#F5C842;--border:rgba(28,28,30,.08);--shadow:0 4px 24px rgba(0,0,0,.06);--shadow-lg:0 12px 48px rgba(0,0,0,.1);}
+*{margin:0;padding:0;box-sizing:border-box;}
+html,body{height:100%;}
+body{font-family:'DM Sans',sans-serif;background:var(--cream);color:var(--charcoal);cursor:none;overflow-x:hidden;}
+.cursor{width:8px;height:8px;background:var(--accent);border-radius:50%;position:fixed;top:0;left:0;pointer-events:none;z-index:2147483647;will-change:transform;transition:width .15s,height .15s,background .15s;}
+.cursor-ring{width:28px;height:28px;border:1.5px solid var(--accent);border-radius:50%;position:fixed;top:0;left:0;pointer-events:none;z-index:2147483646;will-change:transform;opacity:.45;transition:width .2s,height .2s,opacity .2s;}
+.cursor.hover{width:6px;height:6px;background:var(--charcoal);}
+.cursor-ring.hover{width:44px;height:44px;opacity:.2;border-color:var(--charcoal);}
+*,*::before,*::after{cursor:none!important;}
+.cursor,.cursor-ring{cursor:none!important;}
+input,textarea,[contenteditable="true"]{cursor:text!important;}
+
+/* ── Two-column shell (Otto has no right rail) ── */
+.shell{display:grid;grid-template-columns:200px 1fr;min-height:100vh;}
+
+/* Left nav (matches feed/network/etc.) */
+.left-nav{padding:20px 14px;border-right:1px solid var(--border);position:sticky;top:0;height:100vh;overflow-y:auto;scrollbar-width:thin;scrollbar-color:var(--border) transparent;display:flex;flex-direction:column;}
+.left-nav::-webkit-scrollbar{width:3px;}
+.left-nav::-webkit-scrollbar-thumb{background:var(--border);border-radius:3px;}
+.nav-logo{font-family:'Fraunces',serif;font-size:22px;font-weight:900;color:var(--charcoal);letter-spacing:-1px;display:block;margin-bottom:24px;text-decoration:none;}
+.nav-logo span{color:var(--accent);}
+.nav-item{display:flex;align-items:center;gap:10px;padding:10px 12px;border-radius:12px;font-size:14px;font-weight:500;color:var(--muted);cursor:none;text-decoration:none;transition:all .15s;border:none;background:none;width:100%;text-align:left;margin-bottom:2px;}
+.nav-item:hover{background:white;color:var(--charcoal);}
+.nav-item.active{background:white;color:var(--charcoal);font-weight:600;box-shadow:var(--shadow);}
+.nav-item .nav-badge{margin-left:auto;font-size:10px;padding:2px 7px;background:var(--accent);color:white;border-radius:100px;font-weight:600;letter-spacing:.2px;}
+.nav-divider{height:1px;background:var(--border);margin:12px 0;}
+.mini-avatar{width:34px;height:34px;border-radius:10px;background:var(--charcoal);display:flex;align-items:center;justify-content:center;font-family:'Fraunces',serif;font-size:12px;font-weight:700;color:white;flex-shrink:0;}
+
+/* ── Otto-specific: animations for the big-otto orb ── */
+@keyframes pulse-core { 0%,100% { transform: scale(1); opacity: .9; } 50% { transform: scale(1.15); opacity: 1; } }
+@keyframes spin-slow { from { transform: rotate(0deg); } to { transform: rotate(360deg); } }
+@keyframes spin-rev-med { from { transform: rotate(360deg); } to { transform: rotate(0deg); } }
+@keyframes ring-breathe { 0%,100% { transform: scale(1); opacity: .25; } 50% { transform: scale(1.4); opacity: 0; } }
+@keyframes pulse-tiny { 0%,100% { opacity: .7; } 50% { opacity: 1; } }
+.core-anim { animation: pulse-core 2.4s ease-in-out infinite; }
+.orbit-anim { animation: spin-slow 8s linear infinite; }
+.orbit-fast-anim { animation: spin-rev-med 5s linear infinite; }
+.pulse-o-anim { animation: ring-breathe 2.8s ease-out infinite; }
+.pulse-p-anim { animation: ring-breathe 3.4s ease-out infinite; animation-delay: .7s; }
+.tiny-anim { animation: pulse-tiny 2s ease-in-out infinite; }
+
+/* ── Otto main column ── */
+.otto-main{min-height:100vh;}
+
+/* HERO (dark) */
+.hero { background: var(--charcoal); padding: 32px 36px 28px; position: relative; overflow: hidden; }
+.hero-bg-1 { position: absolute; top: -60px; right: -60px; width: 300px; height: 300px; border-radius: 50%; background: radial-gradient(circle, rgba(255,92,53,.18) 0%, transparent 70%); pointer-events: none; }
+.hero-bg-2 { position: absolute; bottom: -40px; left: 28%; width: 220px; height: 220px; border-radius: 50%; background: radial-gradient(circle, rgba(124,92,252,.15) 0%, transparent 70%); pointer-events: none; }
+.hero-row { display: flex; align-items: center; gap: 28px; position: relative; z-index: 1; max-width: 1200px; }
+
+.big-otto { position: relative; width: 120px; height: 120px; display: flex; align-items: center; justify-content: center; flex-shrink: 0; }
+.big-otto .pulse-o-rel { position: absolute; inset: 30px; border-radius: 50%; border: 1px solid var(--accent); }
+.big-otto .pulse-p-rel { position: absolute; inset: 30px; border-radius: 50%; border: 1px solid var(--purple); }
+.big-otto .orbit-rel { position: absolute; inset: 14px; border-radius: 50%; border: 0.5px solid rgba(255,92,53,.3); }
+.big-otto .orbit-rel .dot1 { position: absolute; top: 0; left: 50%; transform: translateX(-50%); width: 4px; height: 4px; border-radius: 50%; background: var(--accent); box-shadow: 0 0 6px var(--accent); }
+.big-otto .orbit-rel .dot2 { position: absolute; bottom: 0; left: 50%; transform: translateX(-50%); width: 3px; height: 3px; border-radius: 50%; background: var(--purple); }
+.big-otto .orbit-fast-rel { position: absolute; inset: 32px; border-radius: 50%; border: 0.5px solid rgba(124,92,252,.4); }
+.big-otto .orbit-fast-rel .dot { position: absolute; top: 0; left: 50%; transform: translateX(-50%); width: 3px; height: 3px; border-radius: 50%; background: var(--lavender); }
+.big-otto .core-rel { width: 14px; height: 14px; border-radius: 50%; background: var(--accent); box-shadow: 0 0 16px var(--accent), 0 0 28px rgba(124,92,252,.4); }
+
+.hero-text { flex: 1; min-width: 0; }
+.hero-name-row { display: flex; align-items: center; gap: 10px; margin-bottom: 10px; flex-wrap: wrap; }
+.hero-name { font-family: 'Fraunces', serif; font-size: 32px; font-weight: 900; color: white; letter-spacing: -1.5px; line-height: 1; }
+.hero-tag { font-size: 10px; padding: 3px 9px; background: rgba(255,92,53,.15); color: #FF8B6B; border-radius: 100px; letter-spacing: .5px; text-transform: uppercase; font-weight: 600; }
+.hero-tag-pro { font-size: 10px; padding: 3px 9px; background: rgba(124,92,252,.15); color: var(--lavender); border-radius: 100px; letter-spacing: .5px; text-transform: uppercase; font-weight: 600; }
+.hero-quote { font-family: 'Fraunces', serif; font-style: italic; font-size: 16px; line-height: 1.55; color: rgba(255,255,255,.78); max-width: 520px; }
+
+.kpi-row { display: flex; gap: 20px; flex-shrink: 0; }
+.kpi { text-align: center; }
+.kpi-num { font-family: 'Fraunces', serif; font-size: 30px; font-weight: 900; color: white; letter-spacing: -1px; line-height: 1; }
+.kpi-num.coral { color: var(--accent); }
+.kpi-num.purple { color: var(--lavender); }
+.kpi-label { font-size: 10px; color: rgba(255,255,255,.42); letter-spacing: .8px; text-transform: uppercase; margin-top: 5px; font-weight: 500; }
+
+/* SUBTAB BAR */
+.subtab-bar { background: var(--charcoal); border-top: 0.5px solid rgba(255,255,255,.06); padding: 0 36px; position: sticky; top: 0; z-index: 40; }
+.subtab-row { display: flex; gap: 6px; }
+.subtab { font-size: 13px; color: rgba(255,255,255,.45); padding: 14px 18px; letter-spacing: .2px; cursor: none; background: none; border: none; font-family: 'DM Sans', sans-serif; font-weight: 500; transition: color .15s; }
+.subtab:hover { color: rgba(255,255,255,.75); }
+.subtab.active { color: white; border-bottom: 2px solid var(--accent); font-weight: 600; }
+
+/* BODY GRID */
+.body-grid { padding: 28px 36px 40px; display: grid; grid-template-columns: 1.55fr 1fr; gap: 24px; max-width: 1280px; }
+.col { display: flex; flex-direction: column; gap: 24px; }
+.section-eyebrow { font-size: 11px; font-weight: 600; letter-spacing: 1.5px; text-transform: uppercase; color: var(--accent); }
+.section-meta { font-size: 12px; color: var(--muted); }
+.section-link { font-size: 12px; color: var(--muted); margin-left: auto; cursor: none; transition: color .15s; }
+.section-link:hover { color: var(--accent); }
+.card-white { background: white; border-radius: 14px; border: 0.5px solid var(--border); padding: 16px 18px; box-shadow: var(--shadow); }
+.card-dark { background: var(--charcoal); border-radius: 14px; padding: 16px 18px; color: white; }
+
+/* DRAFTS */
+.draft-card { margin-bottom: 10px; padding: 16px 18px; background: white; border-radius: 14px; border: 0.5px solid var(--border); box-shadow: var(--shadow); }
+.draft-card:last-child { margin-bottom: 0; }
+.draft-meta { display: flex; align-items: center; gap: 8px; margin-bottom: 12px; flex-wrap: wrap; }
+.draft-from { font-size: 11px; color: var(--muted); }
+.draft-from-name { font-size: 11px; color: var(--charcoal); font-weight: 600; }
+.draft-grid { display: grid; gap: 10px; }
+.draft-grid.three { grid-template-columns: 1fr 1fr 1fr; }
+.draft-grid.two { grid-template-columns: 1fr 1fr; }
+.draft-platform { border: 0.5px solid rgba(28,28,30,.1); border-radius: 10px; padding: 11px; background: var(--cream); }
+.dp-meta { display: flex; align-items: center; gap: 6px; margin-bottom: 7px; }
+.dp-square { width: 11px; height: 11px; border-radius: 3px; }
+.dp-label { font-size: 9px; font-weight: 700; color: var(--charcoal); letter-spacing: .6px; }
+.dp-text { font-size: 11px; line-height: 1.55; color: var(--soft); }
+.draft-actions { display: flex; gap: 8px; margin-top: 14px; }
+.btn-primary { font-size: 11px; padding: 7px 16px; background: var(--charcoal); color: white; border-radius: 100px; font-weight: 600; cursor: none; border: none; font-family: 'DM Sans', sans-serif; transition: all .15s; }
+.btn-primary:hover { background: var(--accent); }
+.btn-outline { font-size: 11px; padding: 7px 16px; border: 0.5px solid rgba(28,28,30,.18); color: var(--charcoal); background: white; border-radius: 100px; cursor: none; font-family: 'DM Sans', sans-serif; font-weight: 500; transition: all .15s; }
+.btn-outline:hover { border-color: var(--charcoal); }
+.btn-ghost { font-size: 11px; padding: 7px 16px; color: var(--muted); border-radius: 100px; cursor: none; background: none; border: none; font-family: 'DM Sans', sans-serif; transition: color .15s; }
+.btn-ghost:hover { color: var(--charcoal); }
+
+/* INBOX */
+.inbox-item { display: flex; gap: 12px; padding: 12px 0; border-bottom: 0.5px solid var(--border); align-items: flex-start; }
+.inbox-item:last-child { border-bottom: none; }
+.inbox-item:first-child { padding-top: 4px; }
+.inbox-icon { width: 30px; height: 30px; border-radius: 50%; display: flex; align-items: center; justify-content: center; color: white; font-size: 12px; font-weight: 700; flex-shrink: 0; font-family: 'Fraunces', serif; }
+.inbox-text { flex: 1; min-width: 0; }
+.inbox-text-main { font-size: 12px; color: var(--charcoal); line-height: 1.5; }
+.inbox-text-otto { font-size: 10.5px; color: var(--muted); margin-top: 3px; font-style: italic; }
+.inbox-cta { font-size: 10px; padding: 5px 12px; background: var(--accent); color: white; border-radius: 100px; font-weight: 600; align-self: center; cursor: none; border: none; transition: background .15s; }
+.inbox-cta:hover { background: #ff7055; }
+.inbox-cta-outline { font-size: 10px; padding: 5px 12px; border: 0.5px solid rgba(28,28,30,.18); color: var(--charcoal); background: none; border-radius: 100px; align-self: center; cursor: none; transition: all .15s; font-family: 'DM Sans', sans-serif; font-weight: 500; }
+.inbox-cta-outline:hover { border-color: var(--charcoal); }
+
+/* ACTIVITY */
+.activity-item { display: flex; gap: 12px; padding: 13px 0; border-bottom: 0.5px solid var(--border); align-items: flex-start; }
+.activity-item:last-child { border-bottom: none; }
+.activity-dot { width: 6px; height: 6px; border-radius: 50%; margin-top: 6px; flex-shrink: 0; }
+.activity-text { flex: 1; font-size: 12px; color: var(--charcoal); line-height: 1.55; }
+.activity-time { font-size: 10.5px; color: var(--muted); margin-top: 3px; }
+
+/* METRICS */
+.metric-bar-row { display: flex; align-items: flex-end; gap: 9px; height: 78px; padding: 6px 0 8px; }
+.metric-bar { flex: 1; border-radius: 4px 4px 0 0; transition: opacity .15s; }
+.metric-bar:hover { opacity: 1 !important; }
+.metric-bar-axis { display: flex; justify-content: space-between; font-size: 10px; color: var(--muted); padding-top: 8px; border-top: 0.5px solid var(--border); font-weight: 500; }
+
+/* INSIGHTS */
+.insight-item { display: flex; gap: 12px; align-items: flex-start; }
+.insight-icon { font-size: 15px; line-height: 1.4; flex-shrink: 0; }
+.insight-text { font-size: 12.5px; line-height: 1.55; color: rgba(255,255,255,.85); }
+
+/* PERFORMANCE */
+.perf-row { display: flex; align-items: center; gap: 12px; padding: 12px 0; border-bottom: 0.5px solid var(--border); }
+.perf-row:last-child { border-bottom: none; }
+.perf-row:first-child { padding-top: 4px; }
+.perf-tile { width: 20px; height: 20px; border-radius: 5px; flex-shrink: 0; }
+.perf-name { font-size: 12.5px; font-weight: 600; color: var(--charcoal); }
+.perf-sub { font-size: 10.5px; color: var(--muted); margin-top: 1px; }
+.perf-num { font-family: 'Fraunces', serif; font-size: 19px; font-weight: 700; color: var(--charcoal); letter-spacing: -.5px; }
+
+/* SLIDERS (voice) */
+.slider-track { height: 5px; background: rgba(28,28,30,.08); border-radius: 100px; position: relative; margin-top: 6px; }
+.slider-fill { position: absolute; left: 0; top: 0; height: 100%; background: var(--accent); border-radius: 100px; opacity: .25; }
+.slider-thumb { position: absolute; top: -3px; width: 11px; height: 11px; border-radius: 50%; background: var(--accent); box-shadow: 0 0 8px rgba(255,92,53,.5); }
+.slider-row { margin-bottom: 16px; }
+.slider-row:last-child { margin-bottom: 0; }
+.slider-labels { display: flex; justify-content: space-between; font-size: 10.5px; color: var(--muted); font-weight: 500; }
+
+/* LEASH */
+.leash-row { display: flex; gap: 8px; }
+.leash-opt { flex: 1; padding: 9px 6px; background: rgba(255,255,255,.05); border-radius: 10px; text-align: center; font-size: 11px; color: rgba(255,255,255,.6); cursor: none; transition: all .15s; border: 0.5px solid transparent; }
+.leash-opt:hover { background: rgba(255,255,255,.1); color: rgba(255,255,255,.85); }
+.leash-opt.active { background: rgba(255,92,53,.18); border-color: var(--accent); color: white; font-weight: 600; }
+
+/* ── SUB-TAB FULL PANELS (Metrics / Insights / Customize / Platforms) ── */
+.tab-body { padding: 28px 36px 48px; max-width: 1280px; }
+.tab-body-grid { display: grid; grid-template-columns: 1.55fr 1fr; gap: 24px; }
+.tab-body-grid .col { display: flex; flex-direction: column; gap: 24px; }
+.tab-body-stack { padding: 28px 36px 48px; max-width: 1100px; }
+.tab-body-head { display: flex; align-items: center; justify-content: space-between; margin-bottom: 22px; flex-wrap: wrap; gap: 14px; }
+.tab-body-intro { font-size: 13px; color: var(--muted); line-height: 1.55; max-width: 560px; }
+
+/* Range toggle */
+.range-toggle { display: inline-flex; gap: 4px; padding: 4px; background: white; border-radius: 100px; border: 0.5px solid var(--border); }
+.range-opt { font-size: 11px; padding: 7px 14px; border-radius: 100px; color: var(--muted); background: none; border: none; cursor: none; font-family: 'DM Sans', sans-serif; font-weight: 500; transition: all .15s; }
+.range-opt:hover { color: var(--charcoal); }
+.range-opt.active { background: var(--charcoal); color: white; font-weight: 600; }
+
+/* KPI strip */
+.kpi-strip { display: grid; grid-template-columns: repeat(4, 1fr); gap: 12px; margin-bottom: 24px; }
+.kpi-tile { background: white; border-radius: 14px; border: 0.5px solid var(--border); padding: 16px 18px; box-shadow: var(--shadow); }
+.kpi-tile-label { font-size: 10px; font-weight: 600; letter-spacing: 1.2px; text-transform: uppercase; color: var(--muted); margin-bottom: 8px; }
+.kpi-tile-num { font-family: 'Fraunces', serif; font-size: 30px; font-weight: 900; color: var(--charcoal); letter-spacing: -1px; line-height: 1; }
+.kpi-tile-delta { font-size: 11px; margin-top: 8px; color: var(--green); font-weight: 600; }
+.kpi-tile-delta.down { color: var(--accent); }
+.kpi-tile-delta.flat { color: var(--muted); }
+.kpi-tile-sub { font-size: 11px; color: var(--muted); margin-top: 4px; line-height: 1.5; }
+
+/* Tall bar chart */
+.bar-chart-tall { display: flex; align-items: flex-end; gap: 4px; height: 160px; padding: 6px 0 10px; }
+.bar-chart-tall .metric-bar { flex: 1; border-radius: 3px 3px 0 0; min-width: 5px; }
+.bar-chart-axis-wide { display: flex; justify-content: space-between; font-size: 9.5px; color: var(--muted); padding-top: 8px; border-top: 0.5px solid var(--border); font-weight: 500; }
+.bar-chart-axis-wide span { flex: 1; text-align: center; }
+
+/* Audience rows */
+.aud-row { display: flex; align-items: center; gap: 10px; padding: 10px 0; border-bottom: 0.5px solid var(--border); }
+.aud-row:last-child { border-bottom: none; }
+.aud-row:first-child { padding-top: 4px; }
+.aud-name { font-size: 12px; color: var(--charcoal); width: 110px; flex-shrink: 0; font-weight: 500; }
+.aud-bar-wrap { flex: 1; height: 6px; background: rgba(28,28,30,.06); border-radius: 100px; overflow: hidden; }
+.aud-bar { height: 100%; background: var(--accent); border-radius: 100px; }
+.aud-bar.purple { background: var(--purple); }
+.aud-bar.lav { background: var(--lavender); }
+.aud-pct { font-size: 11px; font-weight: 600; color: var(--charcoal); width: 36px; text-align: right; }
+
+/* Top posts */
+.top-post-row { display: flex; gap: 14px; padding: 14px 0; border-bottom: 0.5px solid var(--border); align-items: flex-start; }
+.top-post-row:last-child { border-bottom: none; }
+.top-post-row:first-child { padding-top: 4px; }
+.top-post-rank { font-family: 'Fraunces', serif; font-size: 22px; font-weight: 900; color: var(--muted); width: 24px; flex-shrink: 0; line-height: 1; }
+.top-post-text { flex: 1; min-width: 0; }
+.top-post-quote { font-size: 12.5px; color: var(--charcoal); line-height: 1.55; }
+.top-post-meta { font-size: 10.5px; color: var(--muted); margin-top: 4px; display: flex; gap: 10px; flex-wrap: wrap; }
+.top-post-num { font-family: 'Fraunces', serif; font-size: 17px; font-weight: 700; color: var(--charcoal); align-self: center; flex-shrink: 0; letter-spacing: -.5px; }
+
+/* Pattern cards (insights) */
+.pattern-card { background: white; border-radius: 14px; border: 0.5px solid var(--border); padding: 14px 16px; box-shadow: var(--shadow); }
+.pattern-eyebrow { font-size: 10px; font-weight: 700; letter-spacing: 1.2px; text-transform: uppercase; margin-bottom: 8px; display: flex; align-items: center; gap: 6px; }
+.pattern-eyebrow.up { color: var(--green); }
+.pattern-eyebrow.flat { color: var(--muted); }
+.pattern-eyebrow.note { color: var(--purple); }
+.pattern-eyebrow.down { color: var(--accent); }
+.pattern-text { font-size: 13px; line-height: 1.55; color: var(--charcoal); }
+.pattern-text strong { font-weight: 700; }
+.pattern-otto { font-size: 11px; color: var(--muted); font-style: italic; margin-top: 8px; line-height: 1.5; }
+
+/* Big otto narrative card */
+.otto-narrative { background: var(--charcoal); border-radius: 18px; padding: 24px 26px; margin-bottom: 24px; position: relative; overflow: hidden; }
+.otto-narrative::before { content: ''; position: absolute; top: -40px; right: -40px; width: 220px; height: 220px; border-radius: 50%; background: radial-gradient(circle, rgba(124,92,252,.20) 0%, transparent 70%); pointer-events: none; }
+.otto-narrative::after { content: ''; position: absolute; bottom: -30px; left: 30%; width: 160px; height: 160px; border-radius: 50%; background: radial-gradient(circle, rgba(255,92,53,.14) 0%, transparent 70%); pointer-events: none; }
+.otto-narrative-eyebrow { font-size: 10px; font-weight: 700; letter-spacing: 1.5px; text-transform: uppercase; color: var(--lavender); margin-bottom: 10px; position: relative; z-index: 1; }
+.otto-narrative-quote { font-family: 'Fraunces', serif; font-size: 19px; line-height: 1.55; color: white; font-style: italic; max-width: 760px; position: relative; z-index: 1; }
+.otto-narrative-quote em { color: var(--accent); font-style: italic; }
+.otto-narrative-foot { font-size: 11px; color: rgba(255,255,255,.55); margin-top: 14px; position: relative; z-index: 1; letter-spacing: .3px; }
+
+/* Recommendation cards */
+.reco-card { background: white; border-radius: 14px; border: 0.5px solid var(--border); padding: 14px 16px; box-shadow: var(--shadow); display: flex; gap: 14px; align-items: flex-start; }
+.reco-icon { width: 32px; height: 32px; border-radius: 10px; background: rgba(255,92,53,.12); color: var(--accent); display: flex; align-items: center; justify-content: center; font-size: 14px; font-weight: 700; font-family: 'Fraunces', serif; flex-shrink: 0; }
+.reco-icon.purple { background: rgba(124,92,252,.12); color: var(--purple); }
+.reco-icon.dark { background: rgba(28,28,30,.08); color: var(--charcoal); }
+.reco-text { flex: 1; min-width: 0; }
+.reco-title { font-size: 12.5px; font-weight: 700; color: var(--charcoal); line-height: 1.4; }
+.reco-sub { font-size: 11.5px; color: var(--muted); margin-top: 4px; line-height: 1.5; }
+.reco-action { align-self: center; flex-shrink: 0; }
+
+/* Customize — voice samples */
+.voice-sample { background: var(--cream); border-radius: 10px; padding: 11px 13px; margin-bottom: 8px; border: 0.5px solid var(--border); }
+.voice-sample:last-child { margin-bottom: 0; }
+.voice-sample-text { font-size: 12px; line-height: 1.55; color: var(--soft); }
+.voice-sample-meta { font-size: 10px; color: var(--muted); margin-top: 6px; letter-spacing: .3px; }
+
+/* Chip list */
+.chip-list { display: flex; flex-wrap: wrap; gap: 8px; margin-top: 6px; }
+.chip { display: inline-flex; align-items: center; gap: 8px; padding: 6px 8px 6px 12px; background: var(--cream); border: 0.5px solid var(--border); border-radius: 100px; font-size: 11.5px; color: var(--charcoal); font-weight: 500; }
+.chip-x { width: 16px; height: 16px; border-radius: 50%; background: rgba(28,28,30,.08); color: var(--muted); font-size: 11px; line-height: 1; display: flex; align-items: center; justify-content: center; cursor: none; border: none; padding: 0; font-family: 'DM Sans', sans-serif; }
+.chip-x:hover { background: var(--accent); color: white; }
+.chip-add { padding: 7px 12px; background: white; border: 0.5px dashed rgba(28,28,30,.25); border-radius: 100px; font-size: 11.5px; color: var(--muted); cursor: none; font-family: 'DM Sans', sans-serif; }
+.chip-add:hover { border-color: var(--charcoal); color: var(--charcoal); }
+
+/* Posting windows */
+.win-row-label { font-size: 11px; color: var(--muted); margin-bottom: 8px; font-weight: 500; letter-spacing: .3px; }
+.win-days { display: flex; gap: 6px; margin-bottom: 18px; }
+.win-day { flex: 1; padding: 8px 4px; border-radius: 8px; background: var(--cream); border: 0.5px solid var(--border); text-align: center; font-size: 10.5px; font-weight: 600; color: var(--muted); cursor: none; transition: all .15s; font-family: 'DM Sans', sans-serif; letter-spacing: .3px; }
+.win-day:hover { color: var(--charcoal); border-color: rgba(28,28,30,.2); }
+.win-day.active { background: rgba(255,92,53,.15); border-color: var(--accent); color: var(--accent); }
+.win-times { display: grid; grid-template-columns: repeat(12, 1fr); gap: 3px; }
+.win-slot { aspect-ratio: 1; border-radius: 4px; background: rgba(28,28,30,.06); cursor: none; transition: background .15s; border: none; padding: 0; }
+.win-slot:hover { background: rgba(28,28,30,.14); }
+.win-slot.active { background: var(--accent); }
+.win-slot.active:hover { background: #ff7055; }
+.win-times-axis { display: flex; justify-content: space-between; font-size: 9px; color: var(--muted); margin-top: 6px; padding: 0 1px; }
+
+/* Toggle switch */
+.toggle { width: 36px; height: 20px; border-radius: 100px; background: rgba(28,28,30,.15); position: relative; cursor: none; transition: background .15s; flex-shrink: 0; border: none; padding: 0; }
+.toggle::after { content: ''; position: absolute; top: 2px; left: 2px; width: 16px; height: 16px; border-radius: 50%; background: white; box-shadow: 0 1px 3px rgba(0,0,0,.2); transition: transform .15s; }
+.toggle.on { background: var(--accent); }
+.toggle.on::after { transform: translateX(16px); }
+.toggle.dark { background: rgba(255,255,255,.15); }
+.toggle.dark.on { background: var(--accent); }
+
+/* Setting row */
+.setting-row { display: flex; align-items: center; gap: 12px; padding: 12px 0; border-bottom: 0.5px solid var(--border); }
+.setting-row:last-child { border-bottom: none; }
+.setting-row:first-child { padding-top: 4px; }
+.setting-row.dark { border-color: rgba(255,255,255,.08); }
+.setting-text { flex: 1; }
+.setting-name { font-size: 12.5px; color: var(--charcoal); font-weight: 600; }
+.setting-name.light { color: white; }
+.setting-sub { font-size: 11px; color: var(--muted); margin-top: 3px; line-height: 1.5; }
+.setting-sub.light { color: rgba(255,255,255,.5); }
+
+/* Persona inputs */
+.persona-row { margin-bottom: 14px; }
+.persona-row:last-child { margin-bottom: 0; }
+.persona-label { font-size: 11px; color: rgba(255,255,255,.55); font-weight: 500; letter-spacing: .3px; }
+.persona-input { width: 100%; padding: 9px 12px; border: 0.5px solid rgba(255,255,255,.12); border-radius: 10px; background: rgba(255,255,255,.05); font-family: 'DM Sans', sans-serif; font-size: 12.5px; color: white; margin-top: 6px; }
+.persona-input:focus { outline: none; border-color: var(--accent); background: rgba(255,255,255,.08); }
+.persona-input::placeholder { color: rgba(255,255,255,.3); }
+
+/* Platforms — connected cards */
+.plat-card { background: white; border-radius: 14px; border: 0.5px solid var(--border); padding: 18px 20px; box-shadow: var(--shadow); margin-bottom: 14px; }
+.plat-card:last-child { margin-bottom: 0; }
+.plat-head { display: flex; align-items: center; gap: 14px; }
+.plat-tile { width: 40px; height: 40px; border-radius: 10px; flex-shrink: 0; display: flex; align-items: center; justify-content: center; color: white; font-size: 16px; font-weight: 700; font-family: 'Fraunces', serif; }
+.plat-name-row { flex: 1; min-width: 0; }
+.plat-name { font-size: 14.5px; font-weight: 700; color: var(--charcoal); letter-spacing: -.2px; }
+.plat-handle { font-size: 11.5px; color: var(--muted); margin-top: 2px; }
+.plat-status-pill { font-size: 9.5px; padding: 3px 9px; background: rgba(46,204,113,.12); color: #1f8f4f; border-radius: 100px; letter-spacing: .5px; text-transform: uppercase; font-weight: 700; }
+.plat-status-pill.warn { background: rgba(245,200,66,.18); color: #b88a05; }
+.plat-stats { display: flex; gap: 18px; padding: 14px 0; border-top: 0.5px solid var(--border); margin-top: 14px; }
+.plat-stat { flex: 1; }
+.plat-stat-num { font-family: 'Fraunces', serif; font-size: 20px; font-weight: 700; color: var(--charcoal); letter-spacing: -.5px; }
+.plat-stat-label { font-size: 10px; color: var(--muted); margin-top: 2px; letter-spacing: .4px; text-transform: uppercase; font-weight: 600; }
+.plat-otto { font-size: 11.5px; color: var(--muted); font-style: italic; line-height: 1.55; padding-top: 12px; border-top: 0.5px solid var(--border); }
+.plat-otto strong { color: var(--charcoal); font-weight: 600; font-style: normal; }
+
+/* Available platforms grid */
+.avail-grid { display: grid; grid-template-columns: repeat(2, 1fr); gap: 10px; }
+.avail-card { background: white; border-radius: 12px; border: 0.5px solid var(--border); padding: 14px; display: flex; align-items: center; gap: 12px; }
+.avail-tile { width: 32px; height: 32px; border-radius: 9px; flex-shrink: 0; display: flex; align-items: center; justify-content: center; color: white; font-size: 13px; font-weight: 700; font-family: 'Fraunces', serif; }
+.avail-text { flex: 1; min-width: 0; }
+.avail-name { font-size: 12.5px; font-weight: 700; color: var(--charcoal); }
+.avail-otto { font-size: 10.5px; color: var(--muted); margin-top: 2px; line-height: 1.5; font-style: italic; }
+.avail-connect { font-size: 11px; padding: 6px 14px; border: 0.5px solid rgba(28,28,30,.18); color: var(--charcoal); background: white; border-radius: 100px; cursor: none; font-family: 'DM Sans', sans-serif; font-weight: 500; }
+.avail-connect:hover { border-color: var(--charcoal); }
+
+/* Predictions list (dark) */
+.pred-list { display: flex; flex-direction: column; gap: 14px; }
+.pred-item { display: flex; gap: 12px; align-items: flex-start; }
+.pred-icon { font-family: 'Fraunces', serif; font-size: 18px; font-weight: 700; color: var(--lavender); width: 22px; flex-shrink: 0; line-height: 1.3; }
+.pred-text { font-size: 12.5px; color: rgba(255,255,255,.85); line-height: 1.55; }
+.pred-text strong { color: white; }
+
+@media (max-width: 980px) {
+  .tab-body-grid { grid-template-columns: 1fr; }
+  .kpi-strip { grid-template-columns: repeat(2, 1fr); }
+  .avail-grid { grid-template-columns: 1fr; }
+  .win-times { grid-template-columns: repeat(8, 1fr); }
+}
+
+/* COMING SOON placeholder (kept for any future deferred panel) */
+.coming-soon { padding: 80px 36px; text-align: center; color: var(--muted); }
+.coming-soon h3 { font-family: 'Fraunces', serif; font-size: 26px; color: var(--charcoal); font-weight: 900; letter-spacing: -.5px; margin-bottom: 8px; }
+.coming-soon p { font-size: 14px; line-height: 1.6; max-width: 440px; margin: 0 auto; }
+
+/* RESPONSIVE: collapse to single column on narrow viewports */
+@media (max-width: 980px) {
+  .body-grid { grid-template-columns: 1fr; }
+  .hero-row { flex-direction: column; align-items: flex-start; gap: 18px; }
+  .kpi-row { width: 100%; justify-content: flex-start; }
+}
+
+/* ════ CALENDAR WIDGET ════ (ported from feed.html) */
+/* Lives in the left nav (200px wide) — compact sizing */
+.cal-widget {
+  padding: 10px 10px 12px;
+  background: none;
+  flex-shrink: 0;
+}
+.cal-header {
+  display: flex; align-items: center; justify-content: space-between;
+  margin-bottom: 10px;
+}
+.cal-title-row {
+  display: flex; align-items: center; gap: 6px;
+}
+.cal-title {
+  font-family: 'Fraunces', serif;
+  font-size: 12px; font-weight: 700; letter-spacing: -.1px;
+  color: var(--charcoal);
+}
+.cal-month-nav {
+  display: flex; align-items: center; justify-content: space-between;
+  margin-bottom: 8px;
+}
+.cal-nav-btn {
+  width: 20px; height: 20px; border-radius: 6px;
+  background: none; border: none; cursor: none;
+  color: var(--muted); display: flex; align-items: center; justify-content: center;
+  transition: all .15s; font-size: 13px; flex-shrink: 0;
+}
+.cal-nav-btn:hover { background: white; color: var(--charcoal); }
+.cal-month-label {
+  font-size: 11px; font-weight: 700; color: var(--charcoal);
+  text-align: center; flex: 1;
+}
+.cal-toggle {
+  font-size: 10px; font-weight: 700; color: var(--muted);
+  background: none; border: none; cursor: none;
+  transition: color .15s;
+}
+.cal-toggle:hover { color: var(--accent); }
+.cal-grid {
+  display: grid; grid-template-columns: repeat(7, 1fr); gap: 1px;
+}
+.cal-day-name {
+  font-size: 8px; font-weight: 800; color: var(--muted);
+  text-align: center; padding: 2px 0; text-transform: uppercase; letter-spacing: .3px;
+}
+.cal-day {
+  aspect-ratio: 1; border-radius: 6px; display: flex; flex-direction: column;
+  align-items: center; justify-content: center; font-size: 10px; font-weight: 600;
+  color: var(--charcoal); cursor: none; transition: all .15s; position: relative;
+}
+.cal-day:hover { background: white; }
+.cal-day.other-month { color: var(--muted); opacity: .35; }
+.cal-day.today {
+  background: var(--charcoal); color: white; font-weight: 800;
+}
+.cal-day.today:hover { background: var(--soft); }
+.cal-day.has-event::after {
+  content: '';
+  width: 4px; height: 4px; border-radius: 50%;
+  background: var(--accent);
+  position: absolute; bottom: 2px;
+}
+.cal-day.today.has-event::after { background: white; }
+.cal-day.selected { background: var(--accent); color: white; }
+.cal-day.selected:hover { background: #ff7055; }
+.cal-day.selected.has-event::after { background: white; }
+
+.cal-events-panel {
+  margin-top: 8px; display: none;
+  border-top: 1px solid var(--border); padding-top: 8px;
+}
+.cal-events-panel.open { display: block; }
+.cal-events-panel-title {
+  font-size: 10px; font-weight: 800; color: var(--muted);
+  text-transform: uppercase; letter-spacing: .5px; margin-bottom: 6px;
+}
+.cal-event-item {
+  display: flex; align-items: center; gap: 6px;
+  padding: 6px 7px; border-radius: 8px;
+  background: white; margin-bottom: 4px;
+  transition: background .13s; cursor: none;
+  border: 1px solid var(--border);
+}
+.cal-event-item:hover { background: var(--cream); }
+.cal-event-dot {
+  width: 7px; height: 7px; border-radius: 50%; flex-shrink: 0;
+}
+.cal-event-info { flex: 1; min-width: 0; }
+.cal-event-name {
+  font-size: 10px; font-weight: 700; color: var(--charcoal);
+  white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
+}
+.cal-event-time { font-size: 9px; color: var(--muted); }
+.cal-empty {
+  font-size: 11px; color: var(--muted); text-align: center;
+  padding: 10px 0; font-style: italic;
+}
+.cal-event-count-badge {
+  font-size: 9px; font-weight: 800; background: var(--accent);
+  color: white; padding: 1px 6px; border-radius: 100px; margin-left: 3px;
+}
+
+/* ════ CALENDAR FULL MODAL ════ */
+.cal-modal-backdrop {
+  display: none; position: fixed; inset: 0; z-index: 800;
+  background: rgba(0,0,0,.52);
+  align-items: center; justify-content: center;
+}
+.cal-modal-backdrop.open { display: flex; }
+.cal-modal {
+  background: white; border-radius: 24px;
+  width: min(860px, calc(100vw - 32px));
+  max-height: calc(100vh - 48px);
+  display: flex; flex-direction: column;
+  box-shadow: 0 24px 80px rgba(0,0,0,.18);
+  overflow: hidden;
+  animation: calModalIn .25s cubic-bezier(.34,1.4,.64,1);
+}
+@keyframes calModalIn { from{opacity:0;transform:scale(.95)} to{opacity:1;transform:scale(1)} }
+.cal-modal-header {
+  display: grid;
+  grid-template-columns: 1fr auto 1fr;
+  align-items: center;
+  padding: 18px 24px 16px;
+  border-bottom: 1px solid var(--border);
+  flex-shrink: 0;
+}
+.cal-modal-title {
+  font-family: 'Fraunces', serif;
+  font-size: 20px; font-weight: 900; letter-spacing: -.4px;
+  justify-self: start;
+}
+.cal-modal-month-nav {
+  display: flex; align-items: center; gap: 8px;
+  justify-self: center;
+}
+.cal-modal-header-actions {
+  display: flex; align-items: center; gap: 8px;
+  justify-self: end;
+}
+.cal-modal-nav-btn {
+  width: 32px; height: 32px; border-radius: 10px;
+  background: var(--cream); border: none; cursor: none;
+  color: var(--charcoal); display: flex; align-items: center; justify-content: center;
+  font-size: 16px; transition: all .15s;
+}
+.cal-modal-nav-btn:hover { background: var(--charcoal); color: white; }
+.cal-modal-month-label {
+  font-size: 15px; font-weight: 700; color: var(--charcoal);
+  min-width: 140px; text-align: center;
+}
+.cal-modal-add-btn {
+  display: flex; align-items: center; gap: 6px;
+  background: var(--accent); color: white;
+  font-family: 'DM Sans', sans-serif; font-size: 13px; font-weight: 700;
+  border: none; padding: 9px 18px; border-radius: 100px; cursor: none;
+  transition: all .2s;
+}
+.cal-modal-add-btn:hover { background: #ff7055; transform: translateY(-1px); }
+.cal-modal-close {
+  width: 32px; height: 32px; border-radius: 10px;
+  background: var(--cream); border: none; cursor: none;
+  font-size: 18px; color: var(--muted); display: flex; align-items: center; justify-content: center;
+  transition: all .15s;
+}
+.cal-modal-close:hover { background: var(--charcoal); color: white; }
+
+.cal-modal-body {
+  display: grid; grid-template-columns: 1fr 280px;
+  flex: 1; overflow: hidden;
+}
+.cal-modal-grid-wrap {
+  padding: 20px 24px; overflow-y: auto;
+}
+.cal-modal-day-names {
+  display: grid; grid-template-columns: repeat(7, 1fr);
+  margin-bottom: 6px;
+}
+.cal-modal-day-name {
+  font-size: 11px; font-weight: 800; color: var(--muted);
+  text-align: center; padding: 4px 0;
+  text-transform: uppercase; letter-spacing: .4px;
+}
+.cal-modal-grid {
+  display: grid; grid-template-columns: repeat(7, 1fr);
+  grid-auto-rows: 1fr;
+  gap: 4px;
+}
+.cal-modal-day {
+  aspect-ratio: 1; border-radius: 12px;
+  border: 1px solid var(--border);
+  padding: 6px; cursor: none;
+  transition: all .15s; position: relative;
+  display: flex; flex-direction: column; gap: 3px;
+  background: white;
+  overflow: hidden;
+}
+.cal-modal-day:hover { border-color: rgba(28,28,30,.2); background: var(--cream); }
+.cal-modal-day.other-month { opacity: .35; }
+.cal-modal-day.today { border-color: var(--charcoal); border-width: 2px; }
+.cal-modal-day.selected { border-color: var(--accent); border-width: 2px; background: #FFF8F6; }
+.cal-modal-day-num {
+  font-size: 13px; font-weight: 700; color: var(--charcoal);
+  width: 26px; height: 26px; border-radius: 8px;
+  display: flex; align-items: center; justify-content: center;
+  flex-shrink: 0;
+}
+.cal-modal-day.today .cal-modal-day-num {
+  background: var(--charcoal); color: white;
+}
+.cal-modal-day.selected .cal-modal-day-num {
+  background: var(--accent); color: white;
+}
+.cal-modal-event-pill {
+  font-size: 10px; font-weight: 700;
+  padding: 2px 6px; border-radius: 5px;
+  white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
+  color: white; cursor: none;
+}
+
+.cal-modal-sidebar {
+  border-left: 1px solid var(--border);
+  display: flex; flex-direction: column;
+  overflow: hidden;
+}
+.cal-modal-sidebar-hdr {
+  padding: 16px 18px 12px;
+  border-bottom: 1px solid var(--border);
+  font-family: 'Fraunces', serif;
+  font-size: 15px; font-weight: 700; letter-spacing: -.2px;
+  flex-shrink: 0;
+}
+.cal-modal-sidebar-hdr span {
+  font-size: 12px; font-weight: 500; color: var(--muted);
+  font-family: 'DM Sans', sans-serif;
+  display: block; margin-top: 2px;
+}
+.cal-modal-events-list {
+  flex: 1; overflow-y: auto; padding: 12px;
+}
+.cal-modal-event-card {
+  display: flex; gap: 10px; padding: 10px 12px;
+  border-radius: 12px; border: 1px solid var(--border);
+  margin-bottom: 8px; transition: all .15s; cursor: none;
+  background: white;
+}
+.cal-modal-event-card:hover { border-color: rgba(28,28,30,.18); box-shadow: 0 2px 8px rgba(0,0,0,.06); }
+.cal-modal-event-bar {
+  width: 4px; border-radius: 100px; flex-shrink: 0; align-self: stretch;
+}
+.cal-modal-event-body { flex: 1; min-width: 0; }
+.cal-modal-event-name { font-size: 13px; font-weight: 700; margin-bottom: 3px; }
+.cal-modal-event-meta { font-size: 11px; color: var(--muted); line-height: 1.6; }
+.cal-modal-event-del {
+  background: none; border: none; cursor: none;
+  color: var(--muted); font-size: 16px; padding: 0 2px;
+  transition: color .15s; align-self: flex-start;
+}
+.cal-modal-event-del:hover { color: var(--accent); }
+.cal-modal-no-events {
+  text-align: center; padding: 32px 16px;
+  color: var(--muted); font-size: 13px; line-height: 1.6;
+}
+
+/* ── CREATE EVENT FORM ── */
+.create-event-modal {
+  display: none; position: fixed; inset: 0; z-index: 900;
+  background: rgba(0,0,0,.52);
+  align-items: center; justify-content: center;
+}
+.create-event-modal.open { display: flex; }
+.create-event-box {
+  background: white; border-radius: 20px;
+  width: min(480px, calc(100vw - 32px));
+  box-shadow: 0 24px 80px rgba(0,0,0,.2);
+  animation: calModalIn .22s cubic-bezier(.34,1.4,.64,1);
+  overflow: hidden;
+}
+.create-event-hdr {
+  display: flex; align-items: center; justify-content: space-between;
+  padding: 20px 22px 16px;
+  border-bottom: 1px solid var(--border);
+}
+.create-event-hdr h3 {
+  font-family: 'Fraunces', serif;
+  font-size: 18px; font-weight: 900; letter-spacing: -.3px;
+}
+.create-event-body { padding: 20px 22px; display: flex; flex-direction: column; gap: 14px; }
+.form-field { display: flex; flex-direction: column; gap: 5px; }
+.form-label {
+  font-size: 11px; font-weight: 800; color: var(--muted);
+  text-transform: uppercase; letter-spacing: .5px;
+}
+.form-input {
+  width: 100%; padding: 10px 14px; border-radius: 12px;
+  border: 1.5px solid var(--border); background: var(--cream);
+  font-family: 'DM Sans', sans-serif; font-size: 14px;
+  color: var(--charcoal); outline: none; transition: border-color .18s;
+  cursor: text;
+}
+.form-input:focus { border-color: rgba(28,28,30,.25); background: white; }
+.form-row { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; }
+.color-picker-row { display: flex; gap: 8px; flex-wrap: wrap; }
+.color-swatch {
+  width: 26px; height: 26px; border-radius: 8px; cursor: none;
+  border: 2px solid transparent; transition: all .15s;
+  flex-shrink: 0;
+}
+.color-swatch.active { border-color: var(--charcoal); transform: scale(1.15); }
+.create-event-footer {
+  padding: 14px 22px 20px;
+  display: flex; gap: 10px; justify-content: flex-end;
+}
+.btn-cancel {
+  font-family: 'DM Sans', sans-serif; font-size: 13px; font-weight: 700;
+  background: var(--cream); color: var(--muted); border: none;
+  padding: 10px 20px; border-radius: 100px; cursor: none; transition: all .15s;
+}
+.btn-cancel:hover { background: var(--border); }
+.btn-save-event {
+  font-family: 'DM Sans', sans-serif; font-size: 13px; font-weight: 700;
+  background: var(--accent); color: white; border: none;
+  padding: 10px 24px; border-radius: 100px; cursor: none; transition: all .2s;
+}
+.btn-save-event:hover { background: #ff7055; }
+</style>
+</head>
+<body>
+
+<div class="cursor" id="cursor"></div>
+<div class="cursor-ring" id="cursorRing"></div>
+
+<div class="shell">
+
+  <!-- LEFT NAV (matches feed/network/etc.) -->
+  <aside class="left-nav">
+    <a href="/html/feed.html" class="nav-logo">vibe<span>.</span></a>
+    <nav>
+      <a href="/html/feed.html" class="nav-item">
+        <svg width="16" height="16" viewBox="0 0 16 16" fill="none"><rect x="1" y="1" width="6" height="6" rx="2" fill="currentColor"/><rect x="9" y="1" width="6" height="6" rx="2" fill="currentColor"/><rect x="1" y="9" width="6" height="6" rx="2" fill="currentColor"/><rect x="9" y="9" width="6" height="6" rx="2" fill="currentColor"/></svg>
+        Feed
+      </a>
+      <a href="/html/network.html" class="nav-item">
+        <svg width="16" height="16" viewBox="0 0 16 16" fill="none"><circle cx="8" cy="4" r="2.5" stroke="currentColor" stroke-width="1.4"/><circle cx="2.5" cy="12" r="2" stroke="currentColor" stroke-width="1.4"/><circle cx="13.5" cy="12" r="2" stroke="currentColor" stroke-width="1.4"/><path d="M5.5 4.5L2.5 10M10.5 4.5L13.5 10M5.8 12h4.4" stroke="currentColor" stroke-width="1.3" stroke-linecap="round"/></svg>
+        Network
+      </a>
+      <a href="/html/campus.html" class="nav-item">
+        <svg width="16" height="16" viewBox="0 0 16 16" fill="none"><path d="M8 1L15 5V7H1V5L8 1Z" stroke="currentColor" stroke-width="1.4" fill="none" stroke-linejoin="round"/><rect x="2" y="7" width="2.5" height="6" stroke="currentColor" stroke-width="1.3" fill="none"/><rect x="6.75" y="7" width="2.5" height="6" stroke="currentColor" stroke-width="1.3" fill="none"/><rect x="11.5" y="7" width="2.5" height="6" stroke="currentColor" stroke-width="1.3" fill="none"/><path d="M1 13h14" stroke="currentColor" stroke-width="1.4" stroke-linecap="round"/></svg>
+        Campus
+      </a>
+      <a href="/html/opportunities.html" class="nav-item">
+        <svg width="16" height="16" viewBox="0 0 16 16" fill="none"><rect x="1" y="5" width="14" height="10" rx="2" stroke="currentColor" stroke-width="1.4" fill="none"/><path d="M5 5V4a3 3 0 0 1 6 0v1" stroke="currentColor" stroke-width="1.4" fill="none" stroke-linecap="round"/><path d="M1 9h14" stroke="currentColor" stroke-width="1.4" stroke-linecap="round"/></svg>
+        Opportunities
+      </a>
+      <a href="/html/messages.html" class="nav-item">
+        <svg width="16" height="16" viewBox="0 0 16 16" fill="none"><path d="M1 2.5A1.5 1.5 0 012.5 1h11A1.5 1.5 0 0115 2.5v8A1.5 1.5 0 0113.5 12H5L1 15V2.5z" stroke="currentColor" stroke-width="1.4" fill="none" stroke-linejoin="round"/></svg>
+        Messages
+      </a>
+      <a href="/html/otto.html" class="nav-item active">
+        <span class="tiny-anim" style="display:inline-block;width:8px;height:8px;border-radius:50%;background:var(--accent);box-shadow:0 0 6px var(--accent);"></span>
+        otto
+        <span class="nav-badge">2</span>
+      </a>
+    </nav>
+    <div class="nav-divider"></div>
+    <a href="/html/profile.html" class="nav-item">
+      <div class="mini-avatar" id="navMiniAvatar">MC</div>
+      <div><div style="font-size:13px;font-weight:600;color:var(--charcoal)" id="navUserName">Maya Chen</div><div style="font-size:11px;color:var(--muted)" id="navUserTitle">Product Designer</div></div>
+    </a>
+
+    <!-- ══ CALENDAR WIDGET — lives right below profile ══ -->
+    <div class="cal-widget" id="calWidget">
+      <div class="cal-header">
+        <button class="cal-title-row" onclick="openCalModal()" style="background:none;border:none;cursor:none;display:flex;align-items:center;gap:6px;padding:0;transition:opacity .15s" onmouseover="this.style.opacity='.7'" onmouseout="this.style.opacity='1'">
+          <svg width="12" height="12" viewBox="0 0 14 14" fill="none">
+            <rect x="1" y="2" width="12" height="11" rx="2.5" stroke="currentColor" stroke-width="1.3" fill="none"/>
+            <path d="M1 6h12" stroke="currentColor" stroke-width="1.3" stroke-linecap="round"/>
+            <path d="M4 1v2M10 1v2" stroke="currentColor" stroke-width="1.3" stroke-linecap="round"/>
+          </svg>
+          <span class="cal-title">My Calendar</span>
+          <span class="cal-event-count-badge" id="calEventCount">0</span>
+        </button>
+        <button class="cal-toggle" onclick="toggleCalView()" id="calToggleBtn">&#8964;</button>
+      </div>
+      <div id="calBody">
+        <div class="cal-month-nav">
+          <button class="cal-nav-btn" onclick="changeMonth(-1)">&#8249;</button>
+          <span class="cal-month-label" id="calMonthLabel"></span>
+          <button class="cal-nav-btn" onclick="changeMonth(1)">&#8250;</button>
+        </div>
+        <div class="cal-grid" id="calGrid"></div>
+        <div class="cal-events-panel" id="calEventsPanel">
+          <div class="cal-events-panel-title" id="calPanelTitle">Events</div>
+          <div id="calEventsList"></div>
+        </div>
+      </div>
+    </div>
+  </aside>
+
+  <!-- OTTO MAIN -->
+  <main class="otto-main">
+
+    <!-- HERO -->
+    <section class="hero">
+      <div class="hero-bg-1"></div>
+      <div class="hero-bg-2"></div>
+      <div class="hero-row">
+
+        <div class="big-otto">
+          <div class="pulse-o-anim pulse-o-rel"></div>
+          <div class="pulse-p-anim pulse-p-rel"></div>
+          <div class="orbit-anim orbit-rel">
+            <div class="dot1"></div>
+            <div class="dot2"></div>
+          </div>
+          <div class="orbit-fast-anim orbit-fast-rel">
+            <div class="dot"></div>
+          </div>
+          <div class="core-anim core-rel"></div>
+        </div>
+
+        <div class="hero-text">
+          <div class="hero-name-row">
+            <div class="hero-name">otto</div>
+            <span class="hero-tag">active · 4 platforms</span>
+            <span class="hero-tag-pro">pro</span>
+          </div>
+          <div class="hero-quote" id="ottoQuote">"you posted 3 things this week. i sent them to 4 platforms. 412 views total. linkedin's pulling its weight, x not so much."</div>
+        </div>
+
+        <div class="kpi-row">
+          <div class="kpi"><div class="kpi-num">412</div><div class="kpi-label">views</div></div>
+          <div class="kpi"><div class="kpi-num coral">2</div><div class="kpi-label">drafts</div></div>
+          <div class="kpi"><div class="kpi-num purple">+3</div><div class="kpi-label">recruiters</div></div>
+        </div>
+      </div>
+    </section>
+
+    <!-- SUBTAB BAR -->
+    <div class="subtab-bar">
+      <div class="subtab-row">
+        <button class="subtab active" data-tab="today" onclick="switchTab('today')">Today</button>
+        <button class="subtab" data-tab="metrics" onclick="switchTab('metrics')">Metrics</button>
+        <button class="subtab" data-tab="insights" onclick="switchTab('insights')">Insights</button>
+        <button class="subtab" data-tab="customize" onclick="switchTab('customize')">Customize</button>
+        <button class="subtab" data-tab="platforms" onclick="switchTab('platforms')">Platforms</button>
+      </div>
+    </div>
+
+    <!-- TODAY VIEW -->
+    <div id="tab-today" class="tab-panel">
+      <div class="body-grid">
+
+        <!-- LEFT COLUMN -->
+        <div class="col">
+
+          <!-- DRAFTS -->
+          <div>
+            <div style="display:flex;align-items:baseline;gap:10px;margin-bottom:14px;">
+              <span class="section-eyebrow">drafts</span>
+              <span class="section-meta">2 waiting for your call</span>
+            </div>
+
+            <div class="draft-card">
+              <div class="draft-meta">
+                <span class="draft-from">from your post →</span>
+                <span class="draft-from-name">"Met with the IU Director..."</span>
+              </div>
+              <div class="draft-grid three">
+                <div class="draft-platform">
+                  <div class="dp-meta"><div class="dp-square" style="background:#0A66C2;"></div><span class="dp-label">LINKEDIN</span></div>
+                  <div class="dp-text">A meeting with IU's Director of Entrepreneurship completely reframed how I think about Vibe's Campus tab...</div>
+                </div>
+                <div class="draft-platform">
+                  <div class="dp-meta"><div class="dp-square" style="background:linear-gradient(135deg,#E1306C,#C13584);"></div><span class="dp-label">INSTAGRAM</span></div>
+                  <div class="dp-text">Big meeting today reframed everything I thought I knew about Vibe. wild day.</div>
+                </div>
+                <div class="draft-platform">
+                  <div class="dp-meta"><div class="dp-square" style="background:#000;"></div><span class="dp-label">X</span></div>
+                  <div class="dp-text">just had a meeting that broke and rebuilt half my product thesis. love it when that happens.</div>
+                </div>
+              </div>
+              <div class="draft-actions">
+                <button class="btn-primary">Approve all</button>
+                <button class="btn-outline">Edit</button>
+                <button class="btn-ghost">Skip</button>
+              </div>
+            </div>
+
+            <div class="draft-card">
+              <div class="draft-meta">
+                <span class="draft-from">from your vibe →</span>
+                <span class="draft-from-name">"shipping my side project"</span>
+              </div>
+              <div class="draft-grid two">
+                <div class="draft-platform">
+                  <div class="dp-meta"><div class="dp-square" style="background:linear-gradient(135deg,#E1306C,#C13584);"></div><span class="dp-label">INSTAGRAM REEL</span></div>
+                  <div class="dp-text">cropped to 9:16 · caption: "shipping a project ≠ finishing it"</div>
+                </div>
+                <div class="draft-platform">
+                  <div class="dp-meta"><div class="dp-square" style="background:linear-gradient(135deg,#25F4EE,#FE2C55);"></div><span class="dp-label">TIKTOK</span></div>
+                  <div class="dp-text">cropped + auto-captions · added 3 trending audio suggestions</div>
+                </div>
+              </div>
+              <div class="draft-actions">
+                <button class="btn-primary">Approve all</button>
+                <button class="btn-outline">Edit</button>
+                <button class="btn-ghost">Skip</button>
+              </div>
+            </div>
+          </div>
+
+          <!-- INBOX -->
+          <div>
+            <div style="display:flex;align-items:baseline;gap:10px;margin-bottom:14px;">
+              <span class="section-eyebrow">otto's inbox</span>
+              <span class="section-meta">things otto thinks you should see</span>
+            </div>
+            <div class="card-white">
+              <div class="inbox-item">
+                <div class="inbox-icon" style="background:linear-gradient(135deg,#635BFF,#5851DF);">S</div>
+                <div class="inbox-text">
+                  <div class="inbox-text-main"><strong>Recruiter from Stripe</strong> viewed your profile. spent 4 minutes on your Vibes.</div>
+                  <div class="inbox-text-otto">otto says: "this is a real signal. consider DMing them."</div>
+                </div>
+                <button class="inbox-cta">Reply →</button>
+              </div>
+              <div class="inbox-item">
+                <div class="inbox-icon" style="background:linear-gradient(135deg,#FF5C35,#C13584);">M</div>
+                <div class="inbox-text">
+                  <div class="inbox-text-main">Maya R. just connected. <strong>3rd CS junior this week</strong> — your network in CS is growing fast.</div>
+                  <div class="inbox-text-otto">otto says: "your CS audience is your strongest. lean in."</div>
+                </div>
+              </div>
+              <div class="inbox-item">
+                <div class="inbox-icon" style="background:var(--charcoal);">×</div>
+                <div class="inbox-text">
+                  <div class="inbox-text-main">2 missed opportunities — applied late to a Goldman internship and a Stripe NWE referral.</div>
+                  <div class="inbox-text-otto">otto says: "want me to flag matching listings the moment they post?"</div>
+                </div>
+                <button class="inbox-cta-outline">Yes</button>
+              </div>
+            </div>
+          </div>
+
+          <!-- ACTIVITY -->
+          <div>
+            <div style="display:flex;align-items:baseline;gap:10px;margin-bottom:14px;">
+              <span class="section-eyebrow">activity</span>
+              <span class="section-meta">otto's recent moves</span>
+            </div>
+            <div class="card-white" style="padding:4px 18px;">
+              <div class="activity-item">
+                <div class="activity-dot" style="background:var(--accent);"></div>
+                <div class="activity-text">posted "After a semester of learning Next.js..." to <strong>LinkedIn</strong><div class="activity-time">2 hours ago · 124 views since</div></div>
+              </div>
+              <div class="activity-item">
+                <div class="activity-dot" style="background:var(--accent);"></div>
+                <div class="activity-text">drafted 3 versions of "Met with the IU Director..." waiting for your call<div class="activity-time">5 hours ago</div></div>
+              </div>
+              <div class="activity-item">
+                <div class="activity-dot" style="background:var(--muted);"></div>
+                <div class="activity-text">skipped <strong>X</strong> for your "honest random thought" post — caption didn't translate<div class="activity-time">yesterday</div></div>
+              </div>
+              <div class="activity-item">
+                <div class="activity-dot" style="background:var(--accent);"></div>
+                <div class="activity-text">your tuesday vibe hit <strong>240 views</strong> on Instagram. solid.<div class="activity-time">2 days ago</div></div>
+              </div>
+            </div>
+          </div>
+
+        </div>
+
+        <!-- RIGHT COLUMN -->
+        <div class="col">
+
+          <!-- METRICS PREVIEW -->
+          <div>
+            <div style="display:flex;align-items:baseline;gap:10px;margin-bottom:14px;">
+              <span class="section-eyebrow">metrics · 7d snapshot</span>
+              <span class="section-link" onclick="switchTab('metrics')">full →</span>
+            </div>
+            <div class="card-white">
+              <div class="metric-bar-row">
+                <div class="metric-bar" style="height:28%;background:var(--accent);opacity:.85;"></div>
+                <div class="metric-bar" style="height:52%;background:var(--accent);"></div>
+                <div class="metric-bar" style="height:38%;background:var(--accent);opacity:.85;"></div>
+                <div class="metric-bar" style="height:70%;background:var(--purple);"></div>
+                <div class="metric-bar" style="height:45%;background:var(--accent);opacity:.85;"></div>
+                <div class="metric-bar" style="height:88%;background:var(--purple);"></div>
+                <div class="metric-bar" style="height:100%;background:var(--purple);"></div>
+              </div>
+              <div class="metric-bar-axis">
+                <span>Mon</span><span>Tue</span><span>Wed</span><span>Thu</span><span>Fri</span><span>Sat</span><span>Sun</span>
+              </div>
+              <div style="margin-top:12px;font-size:12px;color:var(--charcoal);line-height:1.55;"><strong>+47%</strong> views vs last week. profile views <strong>+12</strong>, mostly from CS roles.</div>
+            </div>
+          </div>
+
+          <!-- INSIGHTS -->
+          <div>
+            <div style="display:flex;align-items:baseline;gap:10px;margin-bottom:14px;">
+              <span class="section-eyebrow">otto's read</span>
+              <span class="section-link" onclick="switchTab('insights')">all insights →</span>
+            </div>
+            <div class="card-dark" style="display:flex;flex-direction:column;gap:12px;">
+              <div class="insight-item">
+                <div class="insight-icon" style="color:var(--accent);">↗</div>
+                <div class="insight-text">your <strong>Wednesday posts</strong> consistently outperform. consider a posting cadence.</div>
+              </div>
+              <div class="insight-item">
+                <div class="insight-icon" style="color:var(--lavender);">●</div>
+                <div class="insight-text">you're in the <strong>top 18%</strong> of CS students at IU by engagement.</div>
+              </div>
+              <div class="insight-item">
+                <div class="insight-icon" style="color:var(--accent);">→</div>
+                <div class="insight-text">posts about <strong>building things</strong> outperform thought-pieces 3:1 for you.</div>
+              </div>
+            </div>
+          </div>
+
+          <!-- PERFORMANCE -->
+          <div>
+            <div style="display:flex;align-items:baseline;gap:10px;margin-bottom:14px;">
+              <span class="section-eyebrow">performance · 7d</span>
+            </div>
+            <div class="card-white">
+              <div class="perf-row">
+                <div class="perf-tile" style="background:#0A66C2;"></div>
+                <div style="flex:1;"><div class="perf-name">LinkedIn</div><div class="perf-sub">3 posts · best per-post</div></div>
+                <div class="perf-num">218</div>
+              </div>
+              <div class="perf-row">
+                <div class="perf-tile" style="background:linear-gradient(135deg,#E1306C,#C13584);"></div>
+                <div style="flex:1;"><div class="perf-name">Instagram</div><div class="perf-sub">3 posts · vibes do best</div></div>
+                <div class="perf-num">132</div>
+              </div>
+              <div class="perf-row">
+                <div class="perf-tile" style="background:linear-gradient(135deg,#25F4EE,#FE2C55);"></div>
+                <div style="flex:1;"><div class="perf-name">TikTok</div><div class="perf-sub">1 post · just started</div></div>
+                <div class="perf-num">48</div>
+              </div>
+              <div class="perf-row">
+                <div class="perf-tile" style="background:#000;"></div>
+                <div style="flex:1;"><div class="perf-name">X</div><div class="perf-sub" style="font-style:italic;">otto: "this isn't your audience"</div></div>
+                <div class="perf-num" style="color:var(--muted);">14</div>
+              </div>
+            </div>
+          </div>
+
+          <!-- VOICE -->
+          <div>
+            <div style="display:flex;align-items:baseline;gap:10px;margin-bottom:14px;">
+              <span class="section-eyebrow">otto's voice</span>
+              <span class="section-link" onclick="switchTab('customize')">customize →</span>
+            </div>
+            <div class="card-white">
+              <div style="font-size:11px;color:var(--muted);margin-bottom:14px;">trained on <strong style="color:var(--charcoal)">5 of your posts</strong></div>
+              <div class="slider-row">
+                <div class="slider-labels"><span>casual</span><span>formal</span></div>
+                <div class="slider-track"><div class="slider-fill" style="width:35%;"></div><div class="slider-thumb" style="left:calc(35% - 5px);"></div></div>
+              </div>
+              <div class="slider-row">
+                <div class="slider-labels"><span>concise</span><span>thorough</span></div>
+                <div class="slider-track"><div class="slider-fill" style="width:55%;"></div><div class="slider-thumb" style="left:calc(55% - 5px);"></div></div>
+              </div>
+              <div class="slider-row">
+                <div class="slider-labels"><span>earnest</span><span>witty</span></div>
+                <div class="slider-track"><div class="slider-fill" style="width:70%;"></div><div class="slider-thumb" style="left:calc(70% - 5px);"></div></div>
+              </div>
+            </div>
+          </div>
+
+          <!-- LEASH -->
+          <div>
+            <div style="display:flex;align-items:baseline;gap:10px;margin-bottom:14px;">
+              <span class="section-eyebrow">otto's leash</span>
+            </div>
+            <div class="card-dark">
+              <div style="font-size:11px;color:rgba(255,255,255,.5);margin-bottom:12px;">how much can otto do without asking?</div>
+              <div class="leash-row">
+                <div class="leash-opt" data-leash="ask">Ask first</div>
+                <div class="leash-opt active" data-leash="sometimes">Ask sometimes</div>
+                <div class="leash-opt" data-leash="auto">Full auto</div>
+              </div>
+              <div style="font-size:10.5px;color:rgba(255,255,255,.45);margin-top:12px;line-height:1.55;font-style:italic;" id="leashDesc">otto will post automatically to platforms with strong performance, ask for the rest.</div>
+            </div>
+          </div>
+
+        </div>
+      </div>
+    </div>
+
+    <!-- ════ METRICS ════════════════════════════════════════════════════ -->
+    <div id="tab-metrics" class="tab-panel" style="display:none;">
+      <div class="tab-body">
+
+        <div class="tab-body-head">
+          <div>
+            <div class="section-eyebrow" style="margin-bottom:6px;">your metrics</div>
+            <div class="tab-body-intro">Otto's tracking everything across your platforms. Pull any window, drill into the wins, see what's actually working.</div>
+          </div>
+          <div class="range-toggle">
+            <button class="range-opt" data-range="7">7 days</button>
+            <button class="range-opt active" data-range="28">28 days</button>
+            <button class="range-opt" data-range="90">this quarter</button>
+          </div>
+        </div>
+
+        <!-- KPI strip -->
+        <div class="kpi-strip">
+          <div class="kpi-tile">
+            <div class="kpi-tile-label">Total views</div>
+            <div class="kpi-tile-num">4,217</div>
+            <div class="kpi-tile-delta">↑ 47% vs prior 28d</div>
+          </div>
+          <div class="kpi-tile">
+            <div class="kpi-tile-label">Profile views</div>
+            <div class="kpi-tile-num">142</div>
+            <div class="kpi-tile-delta">↑ 12 new</div>
+            <div class="kpi-tile-sub">9 from CS recruiter roles</div>
+          </div>
+          <div class="kpi-tile">
+            <div class="kpi-tile-label">Engagement rate</div>
+            <div class="kpi-tile-num">8.2%</div>
+            <div class="kpi-tile-delta">↑ 2.1pp</div>
+            <div class="kpi-tile-sub">above your baseline</div>
+          </div>
+          <div class="kpi-tile">
+            <div class="kpi-tile-label">Followers gained</div>
+            <div class="kpi-tile-num">+84</div>
+            <div class="kpi-tile-delta">↑ 23%</div>
+            <div class="kpi-tile-sub">fastest 4 weeks yet</div>
+          </div>
+        </div>
+
+        <div class="tab-body-grid">
+          <!-- LEFT -->
+          <div class="col">
+
+            <!-- Engagement chart -->
+            <div>
+              <div style="display:flex;align-items:baseline;gap:10px;margin-bottom:14px;">
+                <span class="section-eyebrow">engagement · 28 days</span>
+                <span class="section-meta">daily views across all platforms</span>
+              </div>
+              <div class="card-white">
+                <div class="bar-chart-tall">
+                  <div class="metric-bar" style="height:18%;background:var(--accent);opacity:.55;"></div>
+                  <div class="metric-bar" style="height:24%;background:var(--accent);opacity:.55;"></div>
+                  <div class="metric-bar" style="height:42%;background:var(--accent);opacity:.7;"></div>
+                  <div class="metric-bar" style="height:62%;background:var(--purple);"></div>
+                  <div class="metric-bar" style="height:38%;background:var(--accent);opacity:.7;"></div>
+                  <div class="metric-bar" style="height:20%;background:var(--accent);opacity:.55;"></div>
+                  <div class="metric-bar" style="height:14%;background:var(--accent);opacity:.45;"></div>
+                  <div class="metric-bar" style="height:32%;background:var(--accent);opacity:.65;"></div>
+                  <div class="metric-bar" style="height:48%;background:var(--accent);opacity:.75;"></div>
+                  <div class="metric-bar" style="height:55%;background:var(--accent);opacity:.8;"></div>
+                  <div class="metric-bar" style="height:78%;background:var(--purple);"></div>
+                  <div class="metric-bar" style="height:42%;background:var(--accent);opacity:.7;"></div>
+                  <div class="metric-bar" style="height:28%;background:var(--accent);opacity:.6;"></div>
+                  <div class="metric-bar" style="height:18%;background:var(--accent);opacity:.5;"></div>
+                  <div class="metric-bar" style="height:35%;background:var(--accent);opacity:.65;"></div>
+                  <div class="metric-bar" style="height:52%;background:var(--accent);opacity:.78;"></div>
+                  <div class="metric-bar" style="height:66%;background:var(--accent);opacity:.85;"></div>
+                  <div class="metric-bar" style="height:88%;background:var(--purple);"></div>
+                  <div class="metric-bar" style="height:50%;background:var(--accent);opacity:.75;"></div>
+                  <div class="metric-bar" style="height:30%;background:var(--accent);opacity:.6;"></div>
+                  <div class="metric-bar" style="height:22%;background:var(--accent);opacity:.55;"></div>
+                  <div class="metric-bar" style="height:48%;background:var(--accent);opacity:.75;"></div>
+                  <div class="metric-bar" style="height:62%;background:var(--accent);opacity:.85;"></div>
+                  <div class="metric-bar" style="height:74%;background:var(--accent);opacity:.9;"></div>
+                  <div class="metric-bar" style="height:100%;background:var(--purple);"></div>
+                  <div class="metric-bar" style="height:58%;background:var(--accent);opacity:.8;"></div>
+                  <div class="metric-bar" style="height:36%;background:var(--accent);opacity:.65;"></div>
+                  <div class="metric-bar" style="height:26%;background:var(--accent);opacity:.6;"></div>
+                </div>
+                <div class="bar-chart-axis-wide">
+                  <span>Apr 1</span><span>Apr 8</span><span>Apr 15</span><span>Apr 22</span><span>Apr 28</span>
+                </div>
+                <div style="margin-top:14px;font-size:12px;color:var(--charcoal);line-height:1.55;"><strong>Wednesdays</strong> (purple) outperform your weekday average by <strong>2.4×</strong>. Weekend posts trail by ~60%.</div>
+              </div>
+            </div>
+
+            <!-- Top performing posts -->
+            <div>
+              <div style="display:flex;align-items:baseline;gap:10px;margin-bottom:14px;">
+                <span class="section-eyebrow">top performing · 28 days</span>
+                <span class="section-meta">your hits, ranked by reach</span>
+              </div>
+              <div class="card-white">
+                <div class="top-post-row">
+                  <div class="top-post-rank">1</div>
+                  <div class="top-post-text">
+                    <div class="top-post-quote">"Met with the IU Director of Entrepreneurship today and the whole campus tab thesis got rewritten in real time…"</div>
+                    <div class="top-post-meta"><span>LinkedIn</span><span>·</span><span>Apr 24, Wed 10:14am</span><span>·</span><span>14.2% engagement</span></div>
+                  </div>
+                  <div class="top-post-num">812</div>
+                </div>
+                <div class="top-post-row">
+                  <div class="top-post-rank">2</div>
+                  <div class="top-post-text">
+                    <div class="top-post-quote">"shipping ≠ finishing — three months in and Vibe still feels half-built. that's fine."</div>
+                    <div class="top-post-meta"><span>Instagram</span><span>·</span><span>Apr 17, Wed 11:02am</span><span>·</span><span>11.8% engagement</span></div>
+                  </div>
+                  <div class="top-post-num">486</div>
+                </div>
+                <div class="top-post-row">
+                  <div class="top-post-rank">3</div>
+                  <div class="top-post-text">
+                    <div class="top-post-quote">"After a semester of Next.js I'm finally comfortable saying I'm a frontend dev. didn't think I'd get here."</div>
+                    <div class="top-post-meta"><span>LinkedIn</span><span>·</span><span>Apr 22, Mon 9:48am</span><span>·</span><span>9.4% engagement</span></div>
+                  </div>
+                  <div class="top-post-num">324</div>
+                </div>
+                <div class="top-post-row">
+                  <div class="top-post-rank">4</div>
+                  <div class="top-post-text">
+                    <div class="top-post-quote">Vibe — "the thing I'm building lately" walkthrough</div>
+                    <div class="top-post-meta"><span>Instagram Reel</span><span>·</span><span>Apr 10, Wed 10:30am</span><span>·</span><span>7.1% engagement</span></div>
+                  </div>
+                  <div class="top-post-num">240</div>
+                </div>
+                <div class="top-post-row">
+                  <div class="top-post-rank">5</div>
+                  <div class="top-post-text">
+                    <div class="top-post-quote">"honest random thought: every great college product starts as a class project that wouldn't die."</div>
+                    <div class="top-post-meta"><span>LinkedIn</span><span>·</span><span>Apr 3, Wed 10:22am</span><span>·</span><span>6.3% engagement</span></div>
+                  </div>
+                  <div class="top-post-num">186</div>
+                </div>
+              </div>
+            </div>
+
+          </div>
+
+          <!-- RIGHT -->
+          <div class="col">
+
+            <!-- Per-platform -->
+            <div>
+              <div style="display:flex;align-items:baseline;gap:10px;margin-bottom:14px;">
+                <span class="section-eyebrow">per platform</span>
+                <span class="section-meta">avg views per post</span>
+              </div>
+              <div class="card-white">
+                <div class="perf-row">
+                  <div class="perf-tile" style="background:#0A66C2;"></div>
+                  <div style="flex:1;"><div class="perf-name">LinkedIn</div><div class="perf-sub">12 posts · ↑ 32% vs prior</div></div>
+                  <div class="perf-num">218</div>
+                </div>
+                <div class="perf-row">
+                  <div class="perf-tile" style="background:linear-gradient(135deg,#E1306C,#C13584);"></div>
+                  <div style="flex:1;"><div class="perf-name">Instagram</div><div class="perf-sub">9 posts · ↑ 18% vs prior</div></div>
+                  <div class="perf-num">132</div>
+                </div>
+                <div class="perf-row">
+                  <div class="perf-tile" style="background:linear-gradient(135deg,#25F4EE,#FE2C55);"></div>
+                  <div style="flex:1;"><div class="perf-name">TikTok</div><div class="perf-sub">4 posts · still calibrating</div></div>
+                  <div class="perf-num">48</div>
+                </div>
+                <div class="perf-row">
+                  <div class="perf-tile" style="background:#000;"></div>
+                  <div style="flex:1;"><div class="perf-name">X</div><div class="perf-sub" style="font-style:italic;">otto: "this isn't your audience"</div></div>
+                  <div class="perf-num" style="color:var(--muted);">14</div>
+                </div>
+              </div>
+            </div>
+
+            <!-- Audience composition -->
+            <div>
+              <div style="display:flex;align-items:baseline;gap:10px;margin-bottom:14px;">
+                <span class="section-eyebrow">audience · who's watching</span>
+                <span class="section-meta">by industry</span>
+              </div>
+              <div class="card-white">
+                <div class="aud-row"><div class="aud-name">Software</div><div class="aud-bar-wrap"><div class="aud-bar" style="width:68%;"></div></div><div class="aud-pct">68%</div></div>
+                <div class="aud-row"><div class="aud-name">Design</div><div class="aud-bar-wrap"><div class="aud-bar purple" style="width:14%;"></div></div><div class="aud-pct">14%</div></div>
+                <div class="aud-row"><div class="aud-name">Founders</div><div class="aud-bar-wrap"><div class="aud-bar" style="width:9%;"></div></div><div class="aud-pct">9%</div></div>
+                <div class="aud-row"><div class="aud-name">Finance</div><div class="aud-bar-wrap"><div class="aud-bar lav" style="width:5%;"></div></div><div class="aud-pct">5%</div></div>
+                <div class="aud-row"><div class="aud-name">Other</div><div class="aud-bar-wrap"><div class="aud-bar" style="width:4%;background:var(--muted);"></div></div><div class="aud-pct">4%</div></div>
+              </div>
+            </div>
+
+            <!-- Content type -->
+            <div>
+              <div style="display:flex;align-items:baseline;gap:10px;margin-bottom:14px;">
+                <span class="section-eyebrow">content type</span>
+                <span class="section-meta">what works for you</span>
+              </div>
+              <div class="card-white">
+                <div class="aud-row"><div class="aud-name">Posts</div><div class="aud-bar-wrap"><div class="aud-bar" style="width:78%;"></div></div><div class="aud-pct">218</div></div>
+                <div class="aud-row"><div class="aud-name">Vibes</div><div class="aud-bar-wrap"><div class="aud-bar purple" style="width:42%;"></div></div><div class="aud-pct">96</div></div>
+                <div class="aud-row"><div class="aud-name">Reels</div><div class="aud-bar-wrap"><div class="aud-bar lav" style="width:34%;"></div></div><div class="aud-pct">74</div></div>
+                <div style="margin-top:14px;font-size:11.5px;color:var(--muted);font-style:italic;line-height:1.55;">otto: "your written posts are the engine right now. vibes are climbing fast on Instagram — worth doubling up."</div>
+              </div>
+            </div>
+
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- ════ INSIGHTS ═══════════════════════════════════════════════════ -->
+    <div id="tab-insights" class="tab-panel" style="display:none;">
+      <div class="tab-body">
+
+        <!-- Otto's read of the month -->
+        <div class="otto-narrative">
+          <div class="otto-narrative-eyebrow">otto's read · this month</div>
+          <div class="otto-narrative-quote">the pattern is unmistakable — your <em>Wednesday building-in-public posts</em> are doing the heaviest lifting. they're driving 64% of profile views and almost every one of your CS recruiter visits. i'd lean into this rhythm hard, even if you only land one good observation per week.</div>
+          <div class="otto-narrative-foot">based on 28 days · 25 posts · 4 platforms</div>
+        </div>
+
+        <div class="tab-body-grid">
+
+          <!-- LEFT: Patterns -->
+          <div class="col">
+            <div>
+              <div style="display:flex;align-items:baseline;gap:10px;margin-bottom:14px;">
+                <span class="section-eyebrow">patterns otto sees</span>
+                <span class="section-meta">things to keep doing (or stop)</span>
+              </div>
+              <div class="col" style="gap:10px;">
+
+                <div class="pattern-card">
+                  <div class="pattern-eyebrow up">↗ what's working · cadence</div>
+                  <div class="pattern-text">Your <strong>Wednesday 10am posts</strong> outperform your weekday average by <strong>2.4×</strong>. The audience is showing up at that hour now — they're trained on you.</div>
+                  <div class="pattern-otto">otto: "if you only do one post a week, do this one."</div>
+                </div>
+
+                <div class="pattern-card">
+                  <div class="pattern-eyebrow up">↗ what's working · voice</div>
+                  <div class="pattern-text">Posts with <strong>building-in-public language</strong> ("shipping," "rewrote," "got it wrong") engage 3:1 vs thought-pieces. CS audience reads you as a peer, not a thinker.</div>
+                  <div class="pattern-otto">otto: "this is your lane. the philosophical posts are losing you reach."</div>
+                </div>
+
+                <div class="pattern-card">
+                  <div class="pattern-eyebrow note">● worth noting · timing</div>
+                  <div class="pattern-text">Posts published <strong>9–11am EST</strong> get 3× the reach of evening posts. You skew morning-poster naturally — keep it.</div>
+                  <div class="pattern-otto">otto: "i can lock the slot in if you want."</div>
+                </div>
+
+                <div class="pattern-card">
+                  <div class="pattern-eyebrow up">↗ what's working · vibes on IG</div>
+                  <div class="pattern-text"><strong>Vibes posted to Instagram</strong> are climbing 18% week-over-week. Your "shipping a side project" vibe was the breakout — saved 41 times.</div>
+                  <div class="pattern-otto">otto: "Instagram is becoming your second LinkedIn — but for the design crowd."</div>
+                </div>
+
+                <div class="pattern-card">
+                  <div class="pattern-eyebrow flat">— flat · X performance</div>
+                  <div class="pattern-text"><strong>X is averaging 14 views per post</strong> across 8 attempts. The audience isn't there for you, and the algorithm reads you as a low-engagement account.</div>
+                  <div class="pattern-otto">otto: "honest read — pause it. i can revive when something starts working elsewhere."</div>
+                </div>
+
+                <div class="pattern-card">
+                  <div class="pattern-eyebrow note">● worth noting · profile depth</div>
+                  <div class="pattern-text">Recruiters who view your profile spend an average of <strong>3m 42s</strong> — most of that on your <strong>Vibes grid</strong>, not your work history.</div>
+                  <div class="pattern-otto">otto: "your vibes are the resume that's actually working. surface them higher."</div>
+                </div>
+
+              </div>
+            </div>
+          </div>
+
+          <!-- RIGHT: Predictions + Recommendations -->
+          <div class="col">
+
+            <!-- Predictions -->
+            <div>
+              <div style="display:flex;align-items:baseline;gap:10px;margin-bottom:14px;">
+                <span class="section-eyebrow">otto's forecast</span>
+                <span class="section-meta">if you keep doing what you're doing</span>
+              </div>
+              <div class="card-dark">
+                <div class="pred-list">
+                  <div class="pred-item">
+                    <div class="pred-icon">→</div>
+                    <div class="pred-text">Expect roughly <strong>3 inbound recruiter DMs by mid-May</strong> at this profile-view rate.</div>
+                  </div>
+                  <div class="pred-item">
+                    <div class="pred-icon">↗</div>
+                    <div class="pred-text">Your follower curve points to <strong>~340 by May 20</strong>. Most growth from CS connections-of-connections.</div>
+                  </div>
+                  <div class="pred-item">
+                    <div class="pred-icon">+</div>
+                    <div class="pred-text">A <strong>single Goldman or Stripe-tagged post</strong> would 4× your reach — those communities haven't seen you yet.</div>
+                  </div>
+                  <div class="pred-item">
+                    <div class="pred-icon">!</div>
+                    <div class="pred-text">If you skip <strong>2 Wednesdays in a row</strong>, your engagement drops 35% the following week — the slot's habit-driven.</div>
+                  </div>
+                </div>
+              </div>
+            </div>
+
+            <!-- Recommendations -->
+            <div>
+              <div style="display:flex;align-items:baseline;gap:10px;margin-bottom:14px;">
+                <span class="section-eyebrow">otto recommends</span>
+                <span class="section-meta">three concrete moves</span>
+              </div>
+              <div class="col" style="gap:10px;">
+
+                <div class="reco-card">
+                  <div class="reco-icon">⏰</div>
+                  <div class="reco-text">
+                    <div class="reco-title">Lock Wednesday 10am as your weekly anchor</div>
+                    <div class="reco-sub">I'll send you a Tuesday-night nudge with three draft starts.</div>
+                  </div>
+                  <div class="reco-action"><button class="btn-primary">Add to schedule</button></div>
+                </div>
+
+                <div class="reco-card">
+                  <div class="reco-icon dark">×</div>
+                  <div class="reco-text">
+                    <div class="reco-title">Pause X for 30 days</div>
+                    <div class="reco-sub">Reclaim the energy for IG and LinkedIn where you're already winning.</div>
+                  </div>
+                  <div class="reco-action"><button class="btn-outline">Pause platform</button></div>
+                </div>
+
+                <div class="reco-card">
+                  <div class="reco-icon purple">@</div>
+                  <div class="reco-text">
+                    <div class="reco-title">Reach out to 3 recent recruiter views</div>
+                    <div class="reco-sub">Stripe, Linear, and a Goldman analyst have all viewed twice in the past week.</div>
+                  </div>
+                  <div class="reco-action"><button class="btn-primary">See list</button></div>
+                </div>
+
+              </div>
+            </div>
+
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- ════ CUSTOMIZE ══════════════════════════════════════════════════ -->
+    <div id="tab-customize" class="tab-panel" style="display:none;">
+      <div class="tab-body">
+
+        <div class="tab-body-head">
+          <div>
+            <div class="section-eyebrow" style="margin-bottom:6px;">tune otto</div>
+            <div class="tab-body-intro">Train Otto's voice, set the topics that are off limits, choose when (and where) Otto can post on your behalf.</div>
+          </div>
+        </div>
+
+        <div class="tab-body-grid">
+
+          <!-- LEFT -->
+          <div class="col">
+
+            <!-- Voice training -->
+            <div>
+              <div style="display:flex;align-items:baseline;gap:10px;margin-bottom:14px;">
+                <span class="section-eyebrow">otto's voice training</span>
+                <span class="section-meta">12 of your posts so far</span>
+              </div>
+              <div class="card-white">
+                <div style="font-size:11.5px;color:var(--muted);margin-bottom:12px;line-height:1.55;">These are the posts Otto learned your voice from. The more you add, the closer the drafts get.</div>
+                <div class="voice-sample">
+                  <div class="voice-sample-text">"shipping ≠ finishing — three months in and Vibe still feels half-built. that's fine."</div>
+                  <div class="voice-sample-meta">INSTAGRAM · APR 17 · 486 VIEWS</div>
+                </div>
+                <div class="voice-sample">
+                  <div class="voice-sample-text">"Met with the IU Director of Entrepreneurship today and the whole campus tab thesis got rewritten in real time…"</div>
+                  <div class="voice-sample-meta">LINKEDIN · APR 24 · 812 VIEWS</div>
+                </div>
+                <div class="voice-sample">
+                  <div class="voice-sample-text">"honest random thought: every great college product starts as a class project that wouldn't die."</div>
+                  <div class="voice-sample-meta">LINKEDIN · APR 3 · 186 VIEWS</div>
+                </div>
+                <div style="display:flex;gap:8px;margin-top:14px;">
+                  <button class="btn-primary">Add 5 more posts</button>
+                  <button class="btn-outline">Retrain otto</button>
+                </div>
+              </div>
+            </div>
+
+            <!-- Tone sliders -->
+            <div>
+              <div style="display:flex;align-items:baseline;gap:10px;margin-bottom:14px;">
+                <span class="section-eyebrow">otto's tone</span>
+                <span class="section-meta">how you want drafts to sound</span>
+              </div>
+              <div class="card-white">
+                <div class="slider-row">
+                  <div class="slider-labels"><span>casual</span><span>formal</span></div>
+                  <div class="slider-track"><div class="slider-fill" style="width:35%;"></div><div class="slider-thumb" style="left:calc(35% - 5px);"></div></div>
+                </div>
+                <div class="slider-row">
+                  <div class="slider-labels"><span>concise</span><span>thorough</span></div>
+                  <div class="slider-track"><div class="slider-fill" style="width:55%;"></div><div class="slider-thumb" style="left:calc(55% - 5px);"></div></div>
+                </div>
+                <div class="slider-row">
+                  <div class="slider-labels"><span>earnest</span><span>witty</span></div>
+                  <div class="slider-track"><div class="slider-fill" style="width:70%;"></div><div class="slider-thumb" style="left:calc(70% - 5px);"></div></div>
+                </div>
+                <div class="slider-row">
+                  <div class="slider-labels"><span>playful</span><span>serious</span></div>
+                  <div class="slider-track"><div class="slider-fill" style="width:42%;"></div><div class="slider-thumb" style="left:calc(42% - 5px);"></div></div>
+                </div>
+                <div class="slider-row">
+                  <div class="slider-labels"><span>technical</span><span>accessible</span></div>
+                  <div class="slider-track"><div class="slider-fill" style="width:62%;"></div><div class="slider-thumb" style="left:calc(62% - 5px);"></div></div>
+                </div>
+                <div style="margin-top:18px;font-size:11.5px;color:var(--muted);font-style:italic;line-height:1.55;">otto: "your settings match how your top posts already sound. you're calibrated."</div>
+              </div>
+            </div>
+
+          </div>
+
+          <!-- RIGHT -->
+          <div class="col">
+
+            <!-- Posting windows -->
+            <div>
+              <div style="display:flex;align-items:baseline;gap:10px;margin-bottom:14px;">
+                <span class="section-eyebrow">posting windows</span>
+                <span class="section-meta">when otto can post for you</span>
+              </div>
+              <div class="card-white">
+                <div class="win-row-label">DAYS OF THE WEEK</div>
+                <div class="win-days">
+                  <button class="win-day">S</button>
+                  <button class="win-day active">M</button>
+                  <button class="win-day active">T</button>
+                  <button class="win-day active">W</button>
+                  <button class="win-day active">T</button>
+                  <button class="win-day active">F</button>
+                  <button class="win-day">S</button>
+                </div>
+                <div class="win-row-label">TIME OF DAY (EST)</div>
+                <div class="win-times">
+                  <button class="win-slot"></button><button class="win-slot"></button><button class="win-slot"></button><button class="win-slot"></button>
+                  <button class="win-slot"></button><button class="win-slot"></button><button class="win-slot"></button><button class="win-slot"></button>
+                  <button class="win-slot active"></button><button class="win-slot active"></button><button class="win-slot active"></button>
+                  <button class="win-slot"></button>
+                  <button class="win-slot"></button><button class="win-slot active"></button><button class="win-slot active"></button>
+                  <button class="win-slot"></button><button class="win-slot"></button><button class="win-slot"></button>
+                  <button class="win-slot"></button><button class="win-slot"></button><button class="win-slot active"></button>
+                  <button class="win-slot"></button><button class="win-slot"></button><button class="win-slot"></button>
+                </div>
+                <div class="win-times-axis">
+                  <span>12a</span><span>4a</span><span>8a</span><span>12p</span><span>4p</span><span>8p</span><span>12a</span>
+                </div>
+                <div style="margin-top:14px;font-size:11.5px;color:var(--muted);font-style:italic;line-height:1.55;">otto will avoid all other windows unless you approve manually.</div>
+              </div>
+            </div>
+
+            <!-- Off-limit topics -->
+            <div>
+              <div style="display:flex;align-items:baseline;gap:10px;margin-bottom:14px;">
+                <span class="section-eyebrow">off-limit topics</span>
+                <span class="section-meta">otto will never draft about these</span>
+              </div>
+              <div class="card-white">
+                <div class="chip-list">
+                  <span class="chip">Politics <button class="chip-x">×</button></span>
+                  <span class="chip">Religion <button class="chip-x">×</button></span>
+                  <span class="chip">Family <button class="chip-x">×</button></span>
+                  <span class="chip">Friends by name <button class="chip-x">×</button></span>
+                  <span class="chip">Specific salaries <button class="chip-x">×</button></span>
+                  <span class="chip">Employer details <button class="chip-x">×</button></span>
+                  <button class="chip-add">+ Add topic</button>
+                </div>
+              </div>
+            </div>
+
+            <!-- Otto's persona -->
+            <div>
+              <div style="display:flex;align-items:baseline;gap:10px;margin-bottom:14px;">
+                <span class="section-eyebrow">otto's persona</span>
+                <span class="section-meta">how otto talks to you</span>
+              </div>
+              <div class="card-dark">
+                <div class="persona-row">
+                  <div class="persona-label">WHAT OTTO CALLS YOU</div>
+                  <input class="persona-input" type="text" value="Maya">
+                </div>
+                <div class="persona-row">
+                  <div class="persona-label">HOW OTTO SIGNS OFF</div>
+                  <input class="persona-input" type="text" value="— otto" placeholder="e.g. — otto, your AI">
+                </div>
+                <div style="padding-top:6px;">
+                  <div class="setting-row dark">
+                    <div class="setting-text">
+                      <div class="setting-name light">Otto can DM on your behalf</div>
+                      <div class="setting-sub light">Replies stay in draft until you approve.</div>
+                    </div>
+                    <button class="toggle dark"></button>
+                  </div>
+                  <div class="setting-row dark">
+                    <div class="setting-text">
+                      <div class="setting-name light">Email me a weekly digest</div>
+                      <div class="setting-sub light">Sundays, 7pm EST. Skip on quiet weeks.</div>
+                    </div>
+                    <button class="toggle dark on"></button>
+                  </div>
+                  <div class="setting-row dark">
+                    <div class="setting-text">
+                      <div class="setting-name light">Show otto's reasoning on every draft</div>
+                      <div class="setting-sub light">Adds a "why I wrote it this way" line to drafts.</div>
+                    </div>
+                    <button class="toggle dark on"></button>
+                  </div>
+                </div>
+              </div>
+            </div>
+
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- ════ PLATFORMS ══════════════════════════════════════════════════ -->
+    <div id="tab-platforms" class="tab-panel" style="display:none;">
+      <div class="tab-body">
+
+        <div class="tab-body-head">
+          <div>
+            <div class="section-eyebrow" style="margin-bottom:6px;">your platforms</div>
+            <div class="tab-body-intro">Otto cross-posts the same content tuned for each surface. Connect, disconnect, or change posting rules anytime.</div>
+          </div>
+        </div>
+
+        <div class="tab-body-grid">
+
+          <!-- LEFT: Connected -->
+          <div class="col">
+            <div>
+              <div style="display:flex;align-items:baseline;gap:10px;margin-bottom:14px;">
+                <span class="section-eyebrow">connected · 4</span>
+                <span class="section-meta">otto is posting here</span>
+              </div>
+
+              <!-- LinkedIn -->
+              <div class="plat-card">
+                <div class="plat-head">
+                  <div class="plat-tile" style="background:#0A66C2;">in</div>
+                  <div class="plat-name-row">
+                    <div class="plat-name">LinkedIn</div>
+                    <div class="plat-handle">@maya-chen · synced 2h ago</div>
+                  </div>
+                  <span class="plat-status-pill">Active</span>
+                  <button class="toggle on" style="margin-left:8px;"></button>
+                </div>
+                <div class="plat-stats">
+                  <div class="plat-stat"><div class="plat-stat-num">47</div><div class="plat-stat-label">posts</div></div>
+                  <div class="plat-stat"><div class="plat-stat-num">218</div><div class="plat-stat-label">avg views</div></div>
+                  <div class="plat-stat"><div class="plat-stat-num">+84</div><div class="plat-stat-label">followers · 28d</div></div>
+                </div>
+                <div class="plat-otto"><strong>otto says</strong> — your #1 platform. CS recruiters are showing up. keep the Wednesday cadence and i'll keep the drafts coming.</div>
+                <div style="display:flex;gap:8px;margin-top:14px;">
+                  <button class="btn-outline">Per-platform settings</button>
+                  <button class="btn-ghost">Disconnect</button>
+                </div>
+              </div>
+
+              <!-- Instagram -->
+              <div class="plat-card">
+                <div class="plat-head">
+                  <div class="plat-tile" style="background:linear-gradient(135deg,#E1306C,#C13584);">ig</div>
+                  <div class="plat-name-row">
+                    <div class="plat-name">Instagram</div>
+                    <div class="plat-handle">@mayadot · synced 4h ago</div>
+                  </div>
+                  <span class="plat-status-pill">Active</span>
+                  <button class="toggle on" style="margin-left:8px;"></button>
+                </div>
+                <div class="plat-stats">
+                  <div class="plat-stat"><div class="plat-stat-num">29</div><div class="plat-stat-label">posts</div></div>
+                  <div class="plat-stat"><div class="plat-stat-num">132</div><div class="plat-stat-label">avg views</div></div>
+                  <div class="plat-stat"><div class="plat-stat-num">+41</div><div class="plat-stat-label">followers · 28d</div></div>
+                </div>
+                <div class="plat-otto"><strong>otto says</strong> — your vibes do best here. consider keeping written posts off this surface and leaning into the visual side.</div>
+                <div style="display:flex;gap:8px;margin-top:14px;">
+                  <button class="btn-outline">Per-platform settings</button>
+                  <button class="btn-ghost">Disconnect</button>
+                </div>
+              </div>
+
+              <!-- TikTok -->
+              <div class="plat-card">
+                <div class="plat-head">
+                  <div class="plat-tile" style="background:linear-gradient(135deg,#25F4EE,#FE2C55);">tt</div>
+                  <div class="plat-name-row">
+                    <div class="plat-name">TikTok</div>
+                    <div class="plat-handle">@maya.builds · synced 1d ago</div>
+                  </div>
+                  <span class="plat-status-pill warn">Calibrating</span>
+                  <button class="toggle on" style="margin-left:8px;"></button>
+                </div>
+                <div class="plat-stats">
+                  <div class="plat-stat"><div class="plat-stat-num">4</div><div class="plat-stat-label">posts</div></div>
+                  <div class="plat-stat"><div class="plat-stat-num">48</div><div class="plat-stat-label">avg views</div></div>
+                  <div class="plat-stat"><div class="plat-stat-num">+9</div><div class="plat-stat-label">followers · 28d</div></div>
+                </div>
+                <div class="plat-otto"><strong>otto says</strong> — still calibrating. need 4 more posts before i can find your voice here. the early signal is fine.</div>
+                <div style="display:flex;gap:8px;margin-top:14px;">
+                  <button class="btn-outline">Per-platform settings</button>
+                  <button class="btn-ghost">Disconnect</button>
+                </div>
+              </div>
+
+              <!-- X -->
+              <div class="plat-card">
+                <div class="plat-head">
+                  <div class="plat-tile" style="background:#000;">𝕏</div>
+                  <div class="plat-name-row">
+                    <div class="plat-name">X (Twitter)</div>
+                    <div class="plat-handle">@mayachen · synced yesterday</div>
+                  </div>
+                  <span class="plat-status-pill warn">Underperforming</span>
+                  <button class="toggle on" style="margin-left:8px;"></button>
+                </div>
+                <div class="plat-stats">
+                  <div class="plat-stat"><div class="plat-stat-num">8</div><div class="plat-stat-label">posts</div></div>
+                  <div class="plat-stat"><div class="plat-stat-num">14</div><div class="plat-stat-label">avg views</div></div>
+                  <div class="plat-stat"><div class="plat-stat-num">+2</div><div class="plat-stat-label">followers · 28d</div></div>
+                </div>
+                <div class="plat-otto"><strong>otto says</strong> — honest read: this isn't your audience. consider pausing for 30 days and putting that energy into LinkedIn.</div>
+                <div style="display:flex;gap:8px;margin-top:14px;">
+                  <button class="btn-primary">Pause for 30 days</button>
+                  <button class="btn-outline">Per-platform settings</button>
+                </div>
+              </div>
+
+            </div>
+          </div>
+
+          <!-- RIGHT: Available + Cross-post rules -->
+          <div class="col">
+
+            <div>
+              <div style="display:flex;align-items:baseline;gap:10px;margin-bottom:14px;">
+                <span class="section-eyebrow">available · 5</span>
+                <span class="section-meta">otto could expand here</span>
+              </div>
+              <div class="avail-grid">
+                <div class="avail-card">
+                  <div class="avail-tile" style="background:#FF0000;">▶</div>
+                  <div class="avail-text">
+                    <div class="avail-name">YouTube</div>
+                    <div class="avail-otto">long-form for tutorials</div>
+                  </div>
+                  <button class="avail-connect">Connect</button>
+                </div>
+                <div class="avail-card">
+                  <div class="avail-tile" style="background:#FF6719;">S</div>
+                  <div class="avail-text">
+                    <div class="avail-name">Substack</div>
+                    <div class="avail-otto">great fit for your IU musings</div>
+                  </div>
+                  <button class="avail-connect">Connect</button>
+                </div>
+                <div class="avail-card">
+                  <div class="avail-tile" style="background:linear-gradient(135deg,#000,#444);">@</div>
+                  <div class="avail-text">
+                    <div class="avail-name">Threads</div>
+                    <div class="avail-otto">repurpose your X drafts</div>
+                  </div>
+                  <button class="avail-connect">Connect</button>
+                </div>
+                <div class="avail-card">
+                  <div class="avail-tile" style="background:#1185FE;">B</div>
+                  <div class="avail-text">
+                    <div class="avail-name">Bluesky</div>
+                    <div class="avail-otto">growing dev community</div>
+                  </div>
+                  <button class="avail-connect">Connect</button>
+                </div>
+                <div class="avail-card">
+                  <div class="avail-tile" style="background:#000;">M</div>
+                  <div class="avail-text">
+                    <div class="avail-name">Medium</div>
+                    <div class="avail-otto">repost your LinkedIn longreads</div>
+                  </div>
+                  <button class="avail-connect">Connect</button>
+                </div>
+              </div>
+            </div>
+
+            <!-- Cross-post rules -->
+            <div>
+              <div style="display:flex;align-items:baseline;gap:10px;margin-bottom:14px;">
+                <span class="section-eyebrow">cross-post rules</span>
+              </div>
+              <div class="card-white">
+                <div class="setting-row">
+                  <div class="setting-text">
+                    <div class="setting-name">Auto-translate written posts → vibes</div>
+                    <div class="setting-sub">When you publish text, otto will draft a matching vibe for Instagram.</div>
+                  </div>
+                  <button class="toggle on"></button>
+                </div>
+                <div class="setting-row">
+                  <div class="setting-text">
+                    <div class="setting-name">Strip hashtags on LinkedIn</div>
+                    <div class="setting-sub">Your LinkedIn audience reads them as low-effort.</div>
+                  </div>
+                  <button class="toggle on"></button>
+                </div>
+                <div class="setting-row">
+                  <div class="setting-text">
+                    <div class="setting-name">Reuse high-performers after 60 days</div>
+                    <div class="setting-sub">Otto will resurface your top 3 posts as fresh content next quarter.</div>
+                  </div>
+                  <button class="toggle"></button>
+                </div>
+                <div class="setting-row">
+                  <div class="setting-text">
+                    <div class="setting-name">Skip cross-posting on weekends</div>
+                    <div class="setting-sub">Engagement drops 60% Sat–Sun for your audience.</div>
+                  </div>
+                  <button class="toggle on"></button>
+                </div>
+              </div>
+            </div>
+
+          </div>
+        </div>
+      </div>
+    </div>
+
+  </main>
+
+</div>
+
+<script>
+// ── Custom cursor (matches other pages) ───────────────────────────────────
+const cur = document.getElementById('cursor');
+const ring = document.getElementById('cursorRing');
+let mx = 0, my = 0, rx = 0, ry = 0;
+document.addEventListener('mousemove', e => { mx = e.clientX; my = e.clientY; cur.style.transform = `translate(${mx-4}px, ${my-4}px)`; });
+function animateRing() { rx += (mx - rx) * .18; ry += (my - ry) * .18; ring.style.transform = `translate(${rx-14}px, ${ry-14}px)`; requestAnimationFrame(animateRing); }
+animateRing();
+document.querySelectorAll('a, button, .nav-item, .leash-opt, .draft-platform, .subtab').forEach(el => {
+  el.addEventListener('mouseenter', () => { cur.classList.add('hover'); ring.classList.add('hover'); });
+  el.addEventListener('mouseleave', () => { cur.classList.remove('hover'); ring.classList.remove('hover'); });
+});
+
+// ── Sub-tab switching ─────────────────────────────────────────────────────
+function switchTab(name) {
+  document.querySelectorAll('.subtab').forEach(b => b.classList.toggle('active', b.dataset.tab === name));
+  document.querySelectorAll('.tab-panel').forEach(p => p.style.display = (p.id === 'tab-' + name) ? '' : 'none');
+  window.scrollTo({ top: 0, behavior: 'smooth' });
+}
+
+// ── Leash toggle (visual only for v1) ─────────────────────────────────────
+const leashCopy = {
+  ask: 'otto will draft everything and wait for your approval before posting anywhere.',
+  sometimes: 'otto will post automatically to platforms with strong performance, ask for the rest.',
+  auto: 'otto runs everything end-to-end. you can review and reverse anything from the activity log.'
+};
+document.querySelectorAll('.leash-opt').forEach(opt => {
+  opt.addEventListener('click', () => {
+    document.querySelectorAll('.leash-opt').forEach(o => o.classList.remove('active'));
+    opt.classList.add('active');
+    document.getElementById('leashDesc').textContent = leashCopy[opt.dataset.leash];
+  });
+});
+
+// ── Sub-tab interactive bits (visual-only for v1) ─────────────────────────
+// Toggle switches
+document.querySelectorAll('.toggle').forEach(t => {
+  t.addEventListener('click', () => t.classList.toggle('on'));
+});
+// Range pills (Metrics)
+document.querySelectorAll('.range-toggle').forEach(group => {
+  group.querySelectorAll('.range-opt').forEach(opt => {
+    opt.addEventListener('click', () => {
+      group.querySelectorAll('.range-opt').forEach(o => o.classList.remove('active'));
+      opt.classList.add('active');
+    });
+  });
+});
+// Day-of-week + time-slot buttons (Customize)
+document.querySelectorAll('.win-day, .win-slot').forEach(b => {
+  b.addEventListener('click', () => b.classList.toggle('active'));
+});
+// Chip removal
+document.addEventListener('click', e => {
+  if (e.target.classList && e.target.classList.contains('chip-x')) {
+    e.target.closest('.chip')?.remove();
+  }
+});
+// Add chip prompt
+document.querySelectorAll('.chip-add').forEach(btn => {
+  btn.addEventListener('click', () => {
+    const v = prompt('Add an off-limit topic:');
+    if (!v) return;
+    const chip = document.createElement('span');
+    chip.className = 'chip';
+    chip.innerHTML = v.replace(/[<>]/g, '') + ' <button class="chip-x">×</button>';
+    btn.parentNode.insertBefore(chip, btn);
+  });
+});
+// Cursor hover for newly-added interactive elements
+document.querySelectorAll('.range-opt, .toggle, .win-day, .win-slot, .chip-x, .chip-add, .avail-connect').forEach(el => {
+  el.addEventListener('mouseenter', () => { cur.classList.add('hover'); ring.classList.add('hover'); });
+  el.addEventListener('mouseleave', () => { cur.classList.remove('hover'); ring.classList.remove('hover'); });
+});
+
+// ── OTTO PAGE INIT (uses shared _persistence.js) ──────────────────────────
+// No user → bounce to landing. Demo user → swap nav identity + show pill.
+(function initOttoPage(){
+  const user = vibeInit();
+  if (!user) {
+    window.location.href = '/html/landing.html';
+    return;
+  }
+  // Mirror the user's name + avatar initials into the sidebar profile chip.
+  const initials = (user.name || 'MC').split(/\s+/).map(s => s[0]).join('').slice(0,2).toUpperCase();
+  document.getElementById('navMiniAvatar').textContent = initials;
+  document.getElementById('navUserName').textContent = user.name || 'Maya Chen';
+  if (user.headline) document.getElementById('navUserTitle').textContent = user.headline.split('·')[0].trim();
+  if (user._isDemo) vibeShowDemoPill();
+})();
+</script>
+
+<!-- ══ CALENDAR FULL MODAL ══════════════════════════════════════════════ -->
+<div class="cal-modal-backdrop" id="calModalBackdrop" onclick="if(event.target===this)closeCalModal()">
+  <div class="cal-modal">
+    <div class="cal-modal-header">
+      <div class="cal-modal-title">My Calendar</div>
+      <div class="cal-modal-month-nav">
+        <button class="cal-modal-nav-btn" onclick="modalChangeMonth(-1)">&#8249;</button>
+        <span class="cal-modal-month-label" id="modalMonthLabel"></span>
+        <button class="cal-modal-nav-btn" onclick="modalChangeMonth(1)">&#8250;</button>
+      </div>
+      <div class="cal-modal-header-actions">
+        <button class="cal-modal-add-btn" onclick="openCreateEvent()">
+          <svg width="13" height="13" viewBox="0 0 13 13" fill="none"><path d="M6.5 1v11M1 6.5h11" stroke="white" stroke-width="1.8" stroke-linecap="round"/></svg>
+          New Event
+        </button>
+        <button class="cal-modal-close" onclick="closeCalModal()">&#215;</button>
+      </div>
+    </div>
+    <div class="cal-modal-body">
+      <div class="cal-modal-grid-wrap">
+        <div class="cal-modal-day-names" id="modalDayNames"></div>
+        <div class="cal-modal-grid" id="modalCalGrid"></div>
+      </div>
+      <div class="cal-modal-sidebar">
+        <div class="cal-modal-sidebar-hdr">
+          Events
+          <span id="modalSidebarDate">Click a day to see events</span>
+        </div>
+        <div class="cal-modal-events-list" id="modalEventsList">
+          <div class="cal-modal-no-events">
+            <svg width="36" height="36" viewBox="0 0 36 36" fill="none" style="margin:0 auto 10px;display:block;opacity:.3"><rect x="3" y="6" width="30" height="27" rx="6" stroke="currentColor" stroke-width="2" fill="none"/><path d="M3 14h30" stroke="currentColor" stroke-width="2" stroke-linecap="round"/><path d="M11 3v6M25 3v6" stroke="currentColor" stroke-width="2" stroke-linecap="round"/></svg>
+            Select a day to see<br>or add events
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- ══ CREATE EVENT MODAL ══ -->
+<div class="create-event-modal" id="createEventModal" onclick="if(event.target===this)closeCreateEvent()">
+  <div class="create-event-box">
+    <div class="create-event-hdr">
+      <h3>New Event</h3>
+      <button class="cal-modal-close" onclick="closeCreateEvent()">&#215;</button>
+    </div>
+    <div class="create-event-body">
+      <div class="form-field">
+        <label class="form-label">Event name</label>
+        <input class="form-input" id="evtName" type="text" placeholder="e.g. Goldman Sachs Info Session">
+      </div>
+      <div class="form-row">
+        <div class="form-field">
+          <label class="form-label">Date</label>
+          <input class="form-input" id="evtDate" type="date">
+        </div>
+        <div class="form-field">
+          <label class="form-label">Time</label>
+          <input class="form-input" id="evtTime" type="time">
+        </div>
+      </div>
+      <div class="form-field">
+        <label class="form-label">Location</label>
+        <input class="form-input" id="evtLocation" type="text" placeholder="e.g. Kelley School of Business 100">
+      </div>
+      <div class="form-field">
+        <label class="form-label">Notes</label>
+        <input class="form-input" id="evtNotes" type="text" placeholder="e.g. Bring resume, business casual">
+      </div>
+      <div class="form-field">
+        <label class="form-label">Color</label>
+        <div class="color-picker-row" id="colorPickerRow">
+          <div class="color-swatch active" style="background:#FF5C35" data-color="#FF5C35" onclick="pickColor(this)"></div>
+          <div class="color-swatch" style="background:#2563EB" data-color="#2563EB" onclick="pickColor(this)"></div>
+          <div class="color-swatch" style="background:#1A9E5B" data-color="#1A9E5B" onclick="pickColor(this)"></div>
+          <div class="color-swatch" style="background:#7C5CFC" data-color="#7C5CFC" onclick="pickColor(this)"></div>
+          <div class="color-swatch" style="background:#B07800" data-color="#B07800" onclick="pickColor(this)"></div>
+          <div class="color-swatch" style="background:#CC0000" data-color="#CC0000" onclick="pickColor(this)"></div>
+          <div class="color-swatch" style="background:#1C1C1E" data-color="#1C1C1E" onclick="pickColor(this)"></div>
+        </div>
+      </div>
+    </div>
+    <div class="create-event-footer">
+      <button class="btn-cancel" onclick="closeCreateEvent()">Cancel</button>
+      <button class="btn-save-event" onclick="saveNewEvent()">Save Event</button>
+    </div>
+  </div>
+</div>
+
+<!-- ══ CALENDAR JS (ported from feed.html) ══════════════════════════════ -->
+<script>
+const calendarEvents = {};
+(function seedEvents() {
+  const now = new Date(), y = now.getFullYear(), m = now.getMonth();
+  [
+    [new Date(y,m,now.getDate()+2),  'IU Spring Career Fair',     '10:00','IMU Alumni Hall',              'Bring resume, business casual','#1A9E5B'],
+    [new Date(y,m,now.getDate()+5),  'Goldman Sachs Info Session', '17:30','Kelley School of Business 100','',                            '#2563EB'],
+    [new Date(y,m,now.getDate()+8),  'Weekly Design Critique',     '19:00','Luddy Hall 1106',              'Bring a prototype or sketch',  '#7C5CFC'],
+    [new Date(y,m,now.getDate()+14), 'IU Hackathon 2025',          '09:00','Assembly Hall',               '$10k prizes',                  '#FF5C35'],
+  ].forEach(([d,n,t,l,o,c]) => _storeEvent(d,n,t,l,o,c));
+})();
+function _storeEvent(dateObj,name,time,location,notes,color){
+  color=color||'#FF5C35';
+  const key=dateKey(dateObj);
+  if(!calendarEvents[key])calendarEvents[key]=[];
+  if(!calendarEvents[key].find(e=>e.name===name))
+    calendarEvents[key].push({name,time:time||'',location:location||'',notes:notes||'',color});
+}
+function addCalEvent(dateObj,name,time,color,location,notes){
+  _storeEvent(dateObj,name,time||'',location||'',notes||'',color||'#FF5C35');
+  updateEventCountBadge(); renderCalendar();
+  if(modalOpen){renderModalGrid();renderModalSidebar();}
+}
+function dateKey(d){return d.getFullYear()+'-'+String(d.getMonth()+1).padStart(2,'0')+'-'+String(d.getDate()).padStart(2,'0');}
+function fmtTime(t){if(!t)return'All day';const[h,m]=t.split(':').map(Number);return`${h%12||12}:${String(m).padStart(2,'0')}${h>=12?'pm':'am'}`;}
+function updateEventCountBadge(){
+  const total=Object.values(calendarEvents).reduce((s,a)=>s+a.length,0);
+  const b=document.getElementById('calEventCount');if(b)b.textContent=total;
+}
+let calYear=new Date().getFullYear(),calMonth=new Date().getMonth(),calSelectedKey=null,calVisible=true;
+const MONTHS=['January','February','March','April','May','June','July','August','September','October','November','December'];
+const DAYS=['Su','Mo','Tu','We','Th','Fr','Sa'];
+function renderCalendar(){
+  const label=document.getElementById('calMonthLabel'),grid=document.getElementById('calGrid');
+  if(!label||!grid)return;
+  label.textContent=MONTHS[calMonth].slice(0,3)+' '+calYear;
+  const today=new Date(),firstDay=new Date(calYear,calMonth,1).getDay(),
+        dim=new Date(calYear,calMonth+1,0).getDate(),dip=new Date(calYear,calMonth,0).getDate();
+  let h=DAYS.map(d=>`<div class="cal-day-name">${d}</div>`).join('');
+  for(let i=firstDay-1;i>=0;i--){const d=dip-i,key=dateKey(new Date(calYear,calMonth-1,d));h+=`<div class="cal-day other-month${calendarEvents[key]?.length?' has-event':''}" onclick="miniSelectDay(${calYear},${calMonth-1},${d})">${d}</div>`;}
+  for(let d=1;d<=dim;d++){const key=dateKey(new Date(calYear,calMonth,d));const it=today.getFullYear()===calYear&&today.getMonth()===calMonth&&today.getDate()===d;const he=!!calendarEvents[key]?.length;const is=key===calSelectedKey;h+=`<div class="cal-day${it?' today':''}${he?' has-event':''}${is?' selected':''}" onclick="miniSelectDay(${calYear},${calMonth},${d})">${d}</div>`;}
+  const filled=firstDay+dim,tot=Math.ceil(filled/7)*7;
+  for(let d=1;d<=tot-filled;d++){const key=dateKey(new Date(calYear,calMonth+1,d));h+=`<div class="cal-day other-month${calendarEvents[key]?.length?' has-event':''}" onclick="miniSelectDay(${calYear},${calMonth+1},${d})">${d}</div>`;}
+  grid.innerHTML=h;
+}
+function miniSelectDay(year,month,day){
+  const key=dateKey(new Date(year,month,day));
+  if(calSelectedKey===key){calSelectedKey=null;document.getElementById('calEventsPanel').classList.remove('open');renderCalendar();return;}
+  calSelectedKey=key;renderCalendar();
+  const evts=calendarEvents[key]||[],panel=document.getElementById('calEventsPanel'),
+        list=document.getElementById('calEventsList'),title=document.getElementById('calPanelTitle');
+  title.textContent=new Date(year,month,day).toLocaleDateString('en-US',{weekday:'short',month:'short',day:'numeric'});
+  if(!evts.length){list.innerHTML=`<div class="cal-empty">No events &mdash; <button onclick="openCreateEventForKey('${key}')" style="background:none;border:none;color:var(--accent);cursor:none;font-size:11px;font-weight:700;padding:0">+ Add</button></div>`;}
+  else{list.innerHTML=evts.map(e=>`<div class="cal-event-item"><div class="cal-event-dot" style="background:${e.color}"></div><div class="cal-event-info"><div class="cal-event-name">${e.name}</div><div class="cal-event-time">${fmtTime(e.time)}${e.location?' &middot; '+e.location:''}</div></div><button onclick="removeCalEvent('${key}','${e.name}')" style="background:none;border:none;color:var(--muted);cursor:none;font-size:14px;padding:2px 4px;border-radius:5px;transition:color .15s" onmouseover="this.style.color='var(--accent)'" onmouseout="this.style.color='var(--muted)'">&times;</button></div>`).join('');}
+  panel.classList.add('open');
+}
+function removeCalEvent(key,name){
+  if(!calendarEvents[key])return;
+  calendarEvents[key]=calendarEvents[key].filter(e=>e.name!==name);
+  if(!calendarEvents[key].length)delete calendarEvents[key];
+  updateEventCountBadge();
+  const p=key.split('-').map(Number);
+  miniSelectDay(p[0],p[1]-1,p[2]);
+  if(modalOpen){renderModalGrid();renderModalSidebar();}
+  _calSave();
+}
+function changeMonth(dir){calMonth+=dir;if(calMonth>11){calMonth=0;calYear++;}if(calMonth<0){calMonth=11;calYear--;}calSelectedKey=null;document.getElementById('calEventsPanel').classList.remove('open');renderCalendar();}
+function toggleCalView(){calVisible=!calVisible;document.getElementById('calBody').style.display=calVisible?'':'none';document.getElementById('calToggleBtn').innerHTML=calVisible?'&#8964;':'&#8965;';}
+
+// FULL MODAL
+let modalOpen=false,modalYear=new Date().getFullYear(),modalMonth=new Date().getMonth(),modalSelectedKey=null;
+function openCalModal(){
+  modalOpen=true;modalYear=calYear;modalMonth=calMonth;modalSelectedKey=calSelectedKey;
+  document.getElementById('calModalBackdrop').classList.add('open');
+  document.body.style.overflow='hidden';
+  renderModalGrid();renderModalSidebar();
+}
+function closeCalModal(){modalOpen=false;document.getElementById('calModalBackdrop').classList.remove('open');document.body.style.overflow='';}
+function modalChangeMonth(dir){modalMonth+=dir;if(modalMonth>11){modalMonth=0;modalYear++;}if(modalMonth<0){modalMonth=11;modalYear--;}modalSelectedKey=null;renderModalGrid();renderModalSidebar();}
+function renderModalGrid(){
+  const label=document.getElementById('modalMonthLabel'),grid=document.getElementById('modalCalGrid'),names=document.getElementById('modalDayNames');
+  if(!label||!grid)return;
+  label.textContent=MONTHS[modalMonth]+' '+modalYear;
+  names.innerHTML=DAYS.map(d=>`<div class="cal-modal-day-name">${d}</div>`).join('');
+  const today=new Date(),firstDay=new Date(modalYear,modalMonth,1).getDay(),
+        dim=new Date(modalYear,modalMonth+1,0).getDate(),dip=new Date(modalYear,modalMonth,0).getDate();
+  let h='';
+  for(let i=firstDay-1;i>=0;i--){const d=dip-i,key=dateKey(new Date(modalYear,modalMonth-1,d)),evts=calendarEvents[key]||[];h+=`<div class="cal-modal-day other-month" onclick="modalSelectDay(${modalYear},${modalMonth-1},${d})"><div class="cal-modal-day-num">${d}</div>${evts.slice(0,2).map(e=>`<div class="cal-modal-event-pill" style="background:${e.color}">${e.name}</div>`).join('')}</div>`;}
+  for(let d=1;d<=dim;d++){const key=dateKey(new Date(modalYear,modalMonth,d));const evts=calendarEvents[key]||[];const it=today.getFullYear()===modalYear&&today.getMonth()===modalMonth&&today.getDate()===d;const is=key===modalSelectedKey;const extras=evts.length>2?`<div style="font-size:9px;color:var(--muted);font-weight:700">+${evts.length-2} more</div>`:'';h+=`<div class="cal-modal-day${it?' today':''}${is?' selected':''}" onclick="modalSelectDay(${modalYear},${modalMonth},${d})"><div class="cal-modal-day-num">${d}</div>${evts.slice(0,2).map(e=>`<div class="cal-modal-event-pill" style="background:${e.color}">${e.name}</div>`).join('')}${extras}</div>`;}
+  const filled=firstDay+dim,tot=Math.ceil(filled/7)*7;
+  for(let d=1;d<=tot-filled;d++){const key=dateKey(new Date(modalYear,modalMonth+1,d));const evts=calendarEvents[key]||[];h+=`<div class="cal-modal-day other-month" onclick="modalSelectDay(${modalYear},${modalMonth+1},${d})"><div class="cal-modal-day-num">${d}</div>${evts.slice(0,2).map(e=>`<div class="cal-modal-event-pill" style="background:${e.color}">${e.name}</div>`).join('')}</div>`;}
+  grid.innerHTML=h;
+}
+function modalSelectDay(year,month,day){modalSelectedKey=dateKey(new Date(year,month,day));renderModalGrid();renderModalSidebar();}
+function renderModalSidebar(){
+  const listEl=document.getElementById('modalEventsList'),dateEl=document.getElementById('modalSidebarDate');
+  if(!listEl)return;
+  const noEvtHTML=`<div class="cal-modal-no-events"><svg width="36" height="36" viewBox="0 0 36 36" fill="none" style="margin:0 auto 10px;display:block;opacity:.3"><rect x="3" y="6" width="30" height="27" rx="6" stroke="currentColor" stroke-width="2" fill="none"/><path d="M3 14h30" stroke="currentColor" stroke-width="2" stroke-linecap="round"/><path d="M11 3v6M25 3v6" stroke="currentColor" stroke-width="2" stroke-linecap="round"/></svg>`;
+  if(!modalSelectedKey){dateEl.textContent='Click a day to see events';listEl.innerHTML=noEvtHTML+'Select a day to see<br>or add events</div>';return;}
+  const p=modalSelectedKey.split('-').map(Number),dateObj=new Date(p[0],p[1]-1,p[2]);
+  dateEl.textContent=dateObj.toLocaleDateString('en-US',{weekday:'long',month:'long',day:'numeric'});
+  const evts=calendarEvents[modalSelectedKey]||[];
+  if(!evts.length){listEl.innerHTML=noEvtHTML+`No events yet<br><button onclick="openCreateEventForKey('${modalSelectedKey}')" style="background:none;border:none;color:var(--accent);cursor:none;font-size:13px;font-weight:700;margin-top:8px;padding:0">+ Add an event</button></div>`;}
+  else{listEl.innerHTML=evts.map(e=>`<div class="cal-modal-event-card"><div class="cal-modal-event-bar" style="background:${e.color}"></div><div class="cal-modal-event-body"><div class="cal-modal-event-name">${e.name}</div><div class="cal-modal-event-meta">${e.time?fmtTime(e.time)+'<br>':''}${e.location?'&#128205; '+e.location+'<br>':''}${e.notes?'&#128221; '+e.notes:''}</div></div><button class="cal-modal-event-del" onclick="removeCalEvent('${modalSelectedKey}','${e.name}')">&times;</button></div>`).join('')+`<button onclick="openCreateEventForKey('${modalSelectedKey}')" style="width:100%;margin-top:8px;padding:10px;border-radius:12px;border:1.5px dashed var(--border);background:none;color:var(--muted);font-family:'DM Sans',sans-serif;font-size:12px;font-weight:700;cursor:none;transition:all .15s" onmouseover="this.style.borderColor='var(--accent)';this.style.color='var(--accent)'" onmouseout="this.style.borderColor='var(--border)';this.style.color='var(--muted)'">+ Add another event</button>`;}
+}
+
+// CREATE EVENT
+let selectedEventColor='#FF5C35',prefillDateKey=null;
+function openCreateEvent(){prefillDateKey=modalSelectedKey;_openCreateForm();}
+function openCreateEventForKey(key){prefillDateKey=key;_openCreateForm();}
+function _openCreateForm(){
+  document.getElementById('evtDate').value=prefillDateKey||dateKey(new Date());
+  document.getElementById('evtName').value='';document.getElementById('evtTime').value='';
+  document.getElementById('evtLocation').value='';document.getElementById('evtNotes').value='';
+  selectedEventColor='#FF5C35';
+  document.querySelectorAll('.color-swatch').forEach(s=>s.classList.toggle('active',s.dataset.color===selectedEventColor));
+  document.getElementById('createEventModal').classList.add('open');
+  setTimeout(()=>document.getElementById('evtName').focus(),80);
+}
+function closeCreateEvent(){document.getElementById('createEventModal').classList.remove('open');}
+function pickColor(el){selectedEventColor=el.dataset.color;document.querySelectorAll('.color-swatch').forEach(s=>s.classList.remove('active'));el.classList.add('active');}
+function saveNewEvent(){
+  const name=document.getElementById('evtName').value.trim();
+  const dateStr=document.getElementById('evtDate').value;
+  const time=document.getElementById('evtTime').value;
+  const location=document.getElementById('evtLocation').value.trim();
+  const notes=document.getElementById('evtNotes').value.trim();
+  if(!name){document.getElementById('evtName').focus();return;}
+  if(!dateStr){document.getElementById('evtDate').focus();return;}
+  const p=dateStr.split('-').map(Number),dateObj=new Date(p[0],p[1]-1,p[2]);
+  addCalEvent(dateObj,name,time,selectedEventColor,location,notes);
+  _calSave();
+  if(modalOpen){modalSelectedKey=dateKey(dateObj);modalYear=p[0];modalMonth=p[1]-1;renderModalGrid();renderModalSidebar();}
+  calSelectedKey=dateKey(dateObj);calYear=p[0];calMonth=p[1]-1;
+  miniSelectDay(p[0],p[1]-1,p[2]);
+  closeCreateEvent();
+}
+document.addEventListener('keydown',e=>{if(e.key==='Escape'){closeCreateEvent();closeCalModal();}});
+
+// ── Calendar localStorage sync ─────────────────────────────────────────
+const CAL_KEY = 'vibe_cal_events_v1';
+function _calSave() {
+  try { localStorage.setItem(CAL_KEY, JSON.stringify(calendarEvents)); } catch(e) {}
+}
+function _calLoad() {
+  try {
+    const raw = localStorage.getItem(CAL_KEY);
+    if (!raw) return;
+    const saved = JSON.parse(raw);
+    Object.keys(saved).forEach(k => { calendarEvents[k] = saved[k]; });
+  } catch(e) {}
+}
+document.addEventListener('DOMContentLoaded', function() {
+  _calLoad();
+  renderCalendar();
+  updateEventCountBadge();
+});
+</script>
+
+</body>
+</html>

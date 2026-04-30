@@ -1,0 +1,1692 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Vibe — Product Journal</title>
+<link href="https://fonts.googleapis.com/css2?family=Fraunces:ital,wght@0,300;0,400;0,700;0,900;1,300;1,400;1,700&family=DM+Sans:ital,wght@0,300;0,400;0,500;0,600;1,400&display=swap" rel="stylesheet">
+<style>
+:root {
+  --cream: #FAF7F2;
+  --warm: #FFFDF9;
+  --charcoal: #1C1C1E;
+  --soft: #2D2D2D;
+  --muted: #8A8580;
+  --accent: #FF5C35;
+  --lavender: #C8B8FF;
+  --gold: #F5C842;
+  --mint: #2ECC71;
+  --sky: #B8E4FF;
+  --border: rgba(28,28,30,0.08);
+  --shadow: 0 4px 24px rgba(0,0,0,0.06);
+  --shadow-lg: 0 16px 48px rgba(0,0,0,0.10);
+}
+
+*, *::before, *::after { margin:0; padding:0; box-sizing:border-box; }
+html { scroll-behavior: smooth; }
+
+body {
+  font-family: 'DM Sans', sans-serif;
+  background: var(--cream);
+  color: var(--charcoal);
+  min-height: 100vh;
+  overflow-x: hidden;
+}
+
+/* ── SIDEBAR NAV ─────────────────────────────── */
+.sidebar {
+  position: fixed; top: 0; left: 0; bottom: 0;
+  width: 260px;
+  background: var(--charcoal);
+  display: flex; flex-direction: column;
+  z-index: 100;
+  overflow-y: auto;
+  scrollbar-width: none;
+}
+.sidebar::-webkit-scrollbar { display: none; }
+
+.sidebar-logo {
+  padding: 32px 28px 24px;
+  border-bottom: 1px solid rgba(255,255,255,.06);
+}
+.sidebar-logo-text {
+  font-family: 'Fraunces', serif;
+  font-size: 28px; font-weight: 900;
+  color: white; letter-spacing: -1px;
+  display: block;
+}
+.sidebar-logo-text span { color: var(--accent); }
+.sidebar-subtitle {
+  font-size: 11px; font-weight: 600;
+  color: rgba(255,255,255,.35);
+  letter-spacing: 1.5px; text-transform: uppercase;
+  margin-top: 4px; display: block;
+}
+
+.sidebar-version {
+  margin: 16px 20px;
+  background: rgba(255,92,53,.15);
+  border: 1px solid rgba(255,92,53,.25);
+  border-radius: 10px;
+  padding: 10px 14px;
+  font-size: 12px;
+}
+.sidebar-version .ver-label { color: var(--accent); font-weight: 700; }
+.sidebar-version .ver-date { color: rgba(255,255,255,.4); font-size: 11px; margin-top: 2px; }
+
+.sidebar-section-label {
+  font-size: 10px; font-weight: 700; letter-spacing: 1.5px;
+  text-transform: uppercase; color: rgba(255,255,255,.25);
+  padding: 20px 28px 8px;
+}
+
+.nav-item {
+  display: flex; align-items: center; gap: 10px;
+  padding: 10px 20px 10px 28px;
+  font-size: 13px; font-weight: 500;
+  color: rgba(255,255,255,.5);
+  text-decoration: none; border-radius: 0;
+  transition: all .18s;
+  cursor: pointer; border: none; background: none;
+  width: 100%; text-align: left;
+  position: relative;
+}
+.nav-item::before {
+  content: '';
+  position: absolute; left: 0; top: 50%;
+  transform: translateY(-50%);
+  width: 3px; height: 0;
+  background: var(--accent); border-radius: 0 3px 3px 0;
+  transition: height .2s;
+}
+.nav-item:hover { color: rgba(255,255,255,.85); background: rgba(255,255,255,.04); }
+.nav-item.active { color: white; background: rgba(255,255,255,.07); }
+.nav-item.active::before { height: 24px; }
+.nav-item .nav-icon { font-size: 14px; width: 18px; text-align: center; flex-shrink: 0; }
+.nav-item .nav-badge {
+  margin-left: auto; font-size: 10px; font-weight: 700;
+  background: var(--accent); color: white;
+  padding: 2px 7px; border-radius: 100px;
+}
+
+.sidebar-footer {
+  margin-top: auto;
+  padding: 20px 28px;
+  border-top: 1px solid rgba(255,255,255,.06);
+  font-size: 11px; color: rgba(255,255,255,.25);
+  line-height: 1.6;
+}
+.sync-dot {
+  display: inline-block; width: 6px; height: 6px;
+  border-radius: 50%; background: var(--mint);
+  margin-right: 5px; vertical-align: middle;
+  animation: pulse 2.5s infinite;
+}
+@keyframes pulse { 0%,100%{opacity:1;transform:scale(1)} 50%{opacity:.4;transform:scale(1.4)} }
+
+/* ── MAIN CONTENT ────────────────────────────── */
+.main {
+  margin-left: 260px;
+  min-height: 100vh;
+}
+
+/* Hero / cover */
+.journal-hero {
+  background: var(--charcoal);
+  padding: 72px 64px 56px;
+  position: relative;
+  overflow: hidden;
+}
+.journal-hero::before {
+  content: '';
+  position: absolute; top: -80px; right: -80px;
+  width: 400px; height: 400px;
+  background: radial-gradient(circle, rgba(255,92,53,.18) 0%, transparent 70%);
+  pointer-events: none;
+}
+.journal-hero::after {
+  content: '';
+  position: absolute; bottom: -60px; left: 30%;
+  width: 300px; height: 300px;
+  background: radial-gradient(circle, rgba(200,184,255,.12) 0%, transparent 70%);
+  pointer-events: none;
+}
+.hero-tag {
+  display: inline-flex; align-items: center; gap: 8px;
+  font-size: 11px; font-weight: 700; letter-spacing: 1.5px;
+  text-transform: uppercase; color: var(--accent);
+  margin-bottom: 20px;
+}
+.hero-tag-line { width: 24px; height: 1px; background: var(--accent); }
+.hero-title {
+  font-family: 'Fraunces', serif;
+  font-size: clamp(48px, 6vw, 80px);
+  font-weight: 900; line-height: .95;
+  letter-spacing: -3px; color: white;
+  margin-bottom: 20px;
+}
+.hero-title em { font-style: italic; color: var(--accent); }
+.hero-desc {
+  font-size: 15px; color: rgba(255,255,255,.45);
+  max-width: 480px; line-height: 1.7;
+  margin-bottom: 32px;
+}
+.hero-meta {
+  display: flex; gap: 24px; flex-wrap: wrap;
+}
+.hero-meta-item {
+  display: flex; flex-direction: column; gap: 3px;
+}
+.hero-meta-label {
+  font-size: 10px; font-weight: 700; letter-spacing: 1px;
+  text-transform: uppercase; color: rgba(255,255,255,.3);
+}
+.hero-meta-val {
+  font-size: 14px; font-weight: 600; color: white;
+}
+
+/* Content area */
+.content-area {
+  padding: 0 64px 80px;
+}
+
+/* Section */
+.section {
+  display: none;
+  animation: fadeSection .35s ease both;
+}
+.section.active { display: block; }
+@keyframes fadeSection {
+  from { opacity:0; transform: translateY(12px); }
+  to   { opacity:1; transform: none; }
+}
+
+.section-header {
+  padding: 52px 0 32px;
+  border-bottom: 1px solid var(--border);
+  margin-bottom: 36px;
+}
+.section-eyebrow {
+  font-size: 11px; font-weight: 700; letter-spacing: 2px;
+  text-transform: uppercase; color: var(--accent);
+  margin-bottom: 10px;
+}
+.section-title {
+  font-family: 'Fraunces', serif;
+  font-size: clamp(32px, 4vw, 48px);
+  font-weight: 900; letter-spacing: -2px;
+  line-height: 1; color: var(--charcoal);
+}
+.section-title em { font-style: italic; }
+
+/* Cards */
+.card {
+  background: white; border-radius: 20px;
+  border: 1px solid var(--border);
+  box-shadow: var(--shadow);
+  padding: 28px 32px;
+  margin-bottom: 20px;
+  transition: box-shadow .2s;
+}
+.card:hover { box-shadow: var(--shadow-lg); }
+.card-label {
+  font-size: 10px; font-weight: 700; letter-spacing: 1.5px;
+  text-transform: uppercase; color: var(--muted);
+  margin-bottom: 8px;
+}
+.card-title {
+  font-family: 'Fraunces', serif;
+  font-size: 20px; font-weight: 700;
+  letter-spacing: -.4px; margin-bottom: 10px;
+}
+.card-body {
+  font-size: 14px; line-height: 1.8; color: #3d3d3a;
+}
+
+/* Pull quote */
+.pull-quote {
+  border-left: 4px solid var(--accent);
+  padding: 20px 28px;
+  margin: 28px 0;
+  background: rgba(255,92,53,.03);
+  border-radius: 0 12px 12px 0;
+}
+.pull-quote p {
+  font-family: 'Fraunces', serif;
+  font-style: italic; font-size: 20px;
+  line-height: 1.5; color: var(--charcoal);
+}
+.pull-quote.lavender { border-color: var(--lavender); background: rgba(200,184,255,.06); }
+.pull-quote.gold { border-color: var(--gold); background: rgba(245,200,66,.06); }
+
+/* Callout box */
+.callout {
+  border-radius: 16px; padding: 22px 26px;
+  margin: 24px 0;
+}
+.callout.coral { background: #FFF0EC; }
+.callout.purple { background: #F0EDFF; }
+.callout.mint { background: #EAFFF5; }
+.callout.gold { background: #FFF9E0; }
+.callout.dark { background: var(--charcoal); }
+.callout-label {
+  font-size: 10px; font-weight: 700; letter-spacing: 1.5px;
+  text-transform: uppercase; margin-bottom: 8px;
+}
+.callout.coral .callout-label { color: var(--accent); }
+.callout.purple .callout-label { color: #7C5CFC; }
+.callout.mint .callout-label { color: #1A9E5B; }
+.callout.gold .callout-label { color: #B8920A; }
+.callout.dark .callout-label { color: var(--lavender); }
+.callout-body { font-size: 14px; line-height: 1.7; color: var(--charcoal); }
+.callout.dark .callout-body { color: rgba(255,255,255,.7); }
+
+/* Tables */
+.journal-table {
+  width: 100%; border-collapse: collapse;
+  margin: 20px 0; font-size: 13px;
+  border-radius: 14px; overflow: hidden;
+  border: 1px solid var(--border);
+}
+.journal-table thead tr { background: var(--charcoal); }
+.journal-table thead th {
+  padding: 12px 16px; text-align: left;
+  font-size: 11px; font-weight: 700;
+  letter-spacing: .8px; text-transform: uppercase;
+  color: rgba(255,255,255,.6);
+}
+.journal-table tbody tr { border-bottom: 1px solid var(--border); }
+.journal-table tbody tr:last-child { border-bottom: none; }
+.journal-table tbody tr:nth-child(even) { background: #FAFAF8; }
+.journal-table td {
+  padding: 12px 16px; vertical-align: top;
+  line-height: 1.6; color: var(--soft);
+}
+.journal-table td:first-child { font-weight: 600; color: var(--charcoal); white-space: nowrap; }
+
+/* Version history table */
+.version-row td:first-child { color: var(--accent); font-family: 'DM Sans', sans-serif; }
+.version-row.current { background: rgba(255,92,53,.04) !important; }
+.version-row.current td:first-child::after {
+  content: ' ← current';
+  font-size: 10px; font-weight: 700;
+  color: var(--accent); opacity: .7;
+}
+
+/* Bullet list */
+.journal-list {
+  list-style: none; margin: 12px 0;
+  display: flex; flex-direction: column; gap: 8px;
+}
+.journal-list li {
+  display: flex; gap: 12px;
+  font-size: 14px; line-height: 1.7; color: #3d3d3a;
+  padding: 10px 14px; background: var(--cream);
+  border-radius: 10px;
+}
+.journal-list li::before {
+  content: '–';
+  color: var(--accent); font-weight: 700;
+  flex-shrink: 0; margin-top: 1px;
+}
+
+/* Priority badge */
+.priority {
+  display: inline-block; font-size: 10px; font-weight: 700;
+  padding: 2px 8px; border-radius: 100px;
+  letter-spacing: .5px; text-transform: uppercase;
+}
+.priority.high { background: #FFF0EC; color: var(--accent); }
+.priority.medium { background: #F0EDFF; color: #7C5CFC; }
+.priority.low { background: var(--cream); color: var(--muted); }
+
+/* Session card */
+.session-card {
+  border-radius: 20px; overflow: hidden;
+  border: 1px solid var(--border);
+  margin-bottom: 20px;
+  box-shadow: var(--shadow);
+}
+.session-card-header {
+  background: var(--charcoal);
+  padding: 20px 28px;
+  display: flex; align-items: center; gap: 16px;
+}
+.session-number {
+  width: 36px; height: 36px; border-radius: 10px;
+  background: var(--accent); color: white;
+  display: flex; align-items: center; justify-content: center;
+  font-size: 14px; font-weight: 800; flex-shrink: 0;
+}
+.session-header-text h3 {
+  font-family: 'Fraunces', serif;
+  font-size: 17px; font-weight: 700; color: white;
+  letter-spacing: -.3px;
+}
+.session-header-text p { font-size: 12px; color: rgba(255,255,255,.4); margin-top: 2px; }
+.session-version-chip {
+  margin-left: auto; font-size: 11px; font-weight: 700;
+  background: rgba(255,255,255,.1); color: rgba(255,255,255,.7);
+  padding: 4px 10px; border-radius: 100px; flex-shrink: 0;
+}
+.session-card-body { background: white; padding: 24px 28px; }
+.session-change {
+  display: flex; gap: 12px; padding: 10px 0;
+  border-bottom: 1px solid var(--border);
+  font-size: 13px;
+}
+.session-change:last-child { border-bottom: none; padding-bottom: 0; }
+.session-change-icon {
+  flex-shrink: 0;
+  margin-top: 8px;
+  width: 6px; height: 6px;
+  border-radius: 50%;
+  background: var(--accent);
+  font-size: 0; /* hide the text content */
+  color: transparent;
+  align-self: flex-start;
+}
+.session-change-text { line-height: 1.6; color: var(--soft); }
+.session-change-text strong { color: var(--charcoal); }
+
+/* Sync status bar */
+.sync-bar {
+  background: white;
+  border-bottom: 1px solid var(--border);
+  padding: 12px 64px;
+  display: flex; align-items: center; gap: 12px;
+  font-size: 12px; color: var(--muted);
+  position: sticky; top: 0; z-index: 50;
+  background: rgba(255,253,249,.97);
+}
+.sync-bar strong { color: var(--charcoal); }
+.sync-pill {
+  display: inline-flex; align-items: center; gap: 5px;
+  background: #EAFFF5; border: 1px solid #A8EDD0;
+  color: #1A9E5B; font-size: 11px; font-weight: 700;
+  padding: 3px 10px; border-radius: 100px;
+}
+.sync-pill-dot { width: 6px; height: 6px; border-radius: 50%; background: var(--mint); animation: pulse 2s infinite; }
+
+/* Responsive */
+@media (max-width: 900px) {
+  .sidebar { width: 220px; }
+  .main { margin-left: 220px; }
+  .journal-hero, .content-area { padding-left: 36px; padding-right: 36px; }
+  .sync-bar { padding-left: 36px; }
+}
+@media (max-width: 680px) {
+  .sidebar { transform: translateX(-100%); transition: transform .3s; }
+  .sidebar.open { transform: none; }
+  .main { margin-left: 0; }
+  .journal-hero, .content-area { padding-left: 20px; padding-right: 20px; }
+  .sync-bar { padding-left: 20px; }
+}
+</style>
+</head>
+<body>
+
+<!-- SIDEBAR -->
+<aside class="sidebar" id="sidebar">
+  <div class="sidebar-logo">
+    <span class="sidebar-logo-text">vibe<span>.</span></span>
+    <span class="sidebar-subtitle">Product Journal</span>
+  </div>
+
+  <div class="sidebar-version">
+    <div class="ver-label" id="sidebarVersion">v2.0 — Session 11</div>
+    <div class="ver-date" id="sidebarDate">Loading...</div>
+  </div>
+
+  <div class="sidebar-section-label">Overview</div>
+  <button class="nav-item active" onclick="showSection('summary', this)">
+    <span class="nav-icon">§</span> Executive Summary
+  </button>
+  <button class="nav-item" onclick="showSection('versions', this)">
+    <span class="nav-icon">◷</span> Version History
+  </button>
+
+  <div class="sidebar-section-label">Product</div>
+  <button class="nav-item" onclick="showSection('vision', this)">
+    <span class="nav-icon">◇</span> Vision &amp; Positioning
+  </button>
+  <button class="nav-item" onclick="showSection('features', this)">
+    <span class="nav-icon">◧</span> Feature Breakdown
+  </button>
+  <button class="nav-item" onclick="showSection('otto', this)" style="background:rgba(255,92,53,.08);">
+    <span class="nav-icon" style="color:var(--accent);">●</span> Otto — Flagship <span class="nav-badge" style="background:var(--lavender); color:#3C3489;">NEW</span>
+  </button>
+  <button class="nav-item" onclick="showSection('sessions', this)">
+    <span class="nav-icon">◰</span> Session Log <span class="nav-badge" id="sessionBadge">7</span>
+  </button>
+
+  <div class="sidebar-section-label">Strategy</div>
+  <button class="nav-item" onclick="showSection('strategy', this)">
+    <span class="nav-icon">◆</span> Strategy
+  </button>
+  <button class="nav-item" onclick="showSection('design', this)">
+    <span class="nav-icon">◐</span> Design Language
+  </button>
+  <button class="nav-item" onclick="showSection('next', this)">
+    <span class="nav-icon">→</span> Next Steps
+  </button>
+
+  <button class="nav-item" onclick="showSection('iu', this)">
+    <span class="nav-icon">◫</span> IU Meeting
+  </button>
+
+  <div class="sidebar-section-label">Companion</div>
+  <a class="nav-item" href="/the-map" style="text-decoration:none;">
+    <span class="nav-icon">⌖</span> The Map
+  </a>
+
+  <div class="sidebar-footer">
+    <span class="sync-dot"></span>
+    Auto-synced with session<br>
+    Updates persist in your browser
+  </div>
+</aside>
+
+<!-- MAIN -->
+<main class="main">
+
+  <!-- Hero -->
+  <div class="journal-hero">
+    <div class="hero-tag"><span class="hero-tag-line"></span> Product Document</div>
+    <h1 class="hero-title">Vibe.<br><em>Journal.</em></h1>
+    <p class="hero-desc">The living record of every decision, strategy, and design direction behind Vibe — updated automatically as we build.</p>
+    <div class="hero-meta">
+      <div class="hero-meta-item">
+        <span class="hero-meta-label">Version</span>
+        <span class="hero-meta-val" id="heroVersion">v2.0</span>
+      </div>
+      <div class="hero-meta-item">
+        <span class="hero-meta-label">Sessions</span>
+        <span class="hero-meta-val" id="heroSessions">11</span>
+      </div>
+      <div class="hero-meta-item">
+        <span class="hero-meta-label">Last updated</span>
+        <span class="hero-meta-val" id="heroDate">—</span>
+      </div>
+      <div class="hero-meta-item">
+        <span class="hero-meta-label">Status</span>
+        <span class="hero-meta-val" style="color:var(--mint)">● Live</span>
+      </div>
+    </div>
+  </div>
+
+  <!-- Sync bar -->
+  <div class="sync-bar">
+    <span class="sync-pill"><span class="sync-pill-dot"></span>Synced</span>
+    <span>Last updated: <strong id="syncDate">—</strong></span>
+    <span style="margin-left:auto;color:var(--muted)">Changes from Claude conversations persist here automatically</span>
+  </div>
+
+  <!-- Content -->
+  <div class="content-area">
+
+    <!-- EXECUTIVE SUMMARY -->
+    <div class="section active" id="sec-summary">
+      <div class="section-header">
+        <div class="section-eyebrow">Executive Summary</div>
+        <h2 class="section-title">The <em>Opportunity</em></h2>
+      </div>
+
+      <div class="card">
+        <div class="card-body" style="font-size: 16px; line-height: 1.7;">LinkedIn has a monopoly on professional networking — not because it is the best product, but because there is no serious alternative. Vibe is what comes next: a professional network built on personality, short-form video, campus identity, and a personal AI agent that helps every user manage their professional presence across the internet. As of v3.3 the positioning has evolved from "warm professional network" to <strong>the network where your AI agent lives</strong>.</div>
+      </div>
+
+      <div class="pull-quote">
+        <p>"Don't make Vibe more professional. Make it unmistakably useful to professionals."</p>
+      </div>
+
+      <div class="callout coral">
+        <div class="callout-label">Core thesis</div>
+        <div class="callout-body">Recruiters do not hate personality. They hate wading through personality to find the signal they need: can this person do the job, are they worth working with, and would they fit here? LinkedIn answers the first question only. Vibe answers all three — and Otto handles the busywork around all three so users can focus on the work itself.</div>
+      </div>
+
+      <div class="callout coral">
+        <div class="callout-label">The defensibility argument</div>
+        <div class="callout-body">A feed, comments, profiles, DMs — LinkedIn could clone Vibe's UI in a quarter. They cannot easily clone Otto. Otto requires per-user voice training (real LLM cost), cross-platform OAuth into competing networks (zero incentive for LinkedIn), and a willingness to ship a character with opinions and autonomy. That last one is a cultural problem LinkedIn cannot solve.</div>
+      </div>
+
+      <div class="card">
+        <div class="card-label">Where Vibe sits</div>
+        <table class="journal-table">
+          <thead><tr><th>Platform</th><th>Positioning</th></tr></thead>
+          <tbody>
+            <tr><td>LinkedIn</td><td>Formal + skills-led. The incumbent. Functional but impersonal.</td></tr>
+            <tr><td>Instagram</td><td>Casual + personality-led. Great for persona, zero professional utility.</td></tr>
+            <tr><td>TikTok</td><td>Casual + content-led. Enormous reach, no professional signal.</td></tr>
+            <tr><td>Handshake</td><td>Functional + job-led. Solves campus careers, nothing else.</td></tr>
+            <tr><td>Portfolio sites</td><td>Formal + personality. Static, no discovery, no network effect.</td></tr>
+            <tr><td style="color: var(--accent);"><strong>Vibe</strong></td><td><strong>Warm professional, with the AI agent that LinkedIn cannot copy.</strong></td></tr>
+          </tbody>
+        </table>
+      </div>
+
+      <div class="card">
+        <div class="card-label">Where the prototype is</div>
+        <div class="card-body">Six fully-built pages (Feed, Profile, Network, Campus, Opportunities, Messages) plus a synced calendar plus full Otto design across mockups. 21 sessions logged. Built and iterated with real user research informing key product decisions. Backend, .edu verification, and live API integrations are the next phase.</div>
+      </div>
+    </div>
+
+    <!-- VERSION HISTORY -->
+    <div class="section" id="sec-versions">
+      <div class="section-header">
+        <div class="section-eyebrow">Document History</div>
+        <h2 class="section-title">Version <em>History</em></h2>
+      </div>
+      <div class="card">
+        <div class="card-body" style="margin-bottom:16px">Every row below is a session. This table updates automatically each time we build together.</div>
+        <table class="journal-table" id="versionTable">
+          <thead><tr><th>Version</th><th>Summary</th></tr></thead>
+          <tbody id="versionBody">
+            <!-- injected by JS from storage -->
+          </tbody>
+        </table>
+      </div>
+    </div>
+
+    <!-- VISION -->
+    <div class="section" id="sec-vision">
+      <div class="section-header">
+        <div class="section-eyebrow">Product Vision</div>
+        <h2 class="section-title">What <em>Vibe</em> Is</h2>
+      </div>
+
+      <div class="card">
+        <div class="card-body" style="font-size: 16px; line-height: 1.7;">Vibe started as "the warm professional network" — a place to show how you think and work, not how your résumé reads. As of v3.3 it's something bigger: <strong>a professional operating system with a social network attached.</strong> Profile, feed, campus hub, network, opportunities, messages, calendar, and now a personal AI agent named Otto. One verified identity that follows the user from campus to career.</div>
+      </div>
+
+      <div class="pull-quote lavender">
+        <p>"Your campus, your career, one profile."</p>
+      </div>
+
+      <div class="card">
+        <div class="card-label">Five pillars</div>
+        <ul class="journal-list">
+          <li><strong>Profile as portrait</strong> — personality-first, with personality and recruiter modes side-by-side. Not a formatted résumé.</li>
+          <li><strong>Vibes — short-form professional video</strong> — 60-second pitches with TikTok-style scroll. The elevator-speech you can rewatch.</li>
+          <li><strong>Campus hub</strong> — feed, jobs, events, organizations, chat — all in one verified university space. Vibe's answer to the Handshake/GroupMe/Discord fragmentation problem.</li>
+          <li><strong>Otto — the AI marketing agent</strong> — every user gets one. Cross-posts to other platforms, watches profile views, drafts replies, surfaces patterns. The defensible moat.</li>
+          <li><strong>Calendar that absorbs everything</strong> — RSVPs, interviews, posts, deadlines. Synced across pages. Eventually exportable.</li>
+        </ul>
+      </div>
+
+      <div class="card">
+        <div class="card-label">Who Vibe is for</div>
+        <div class="card-body">Gen Z and Millennial students and early-career professionals first. Recruiters, campus organizations, and university programs second. The product is built around the candidate experience but designed to be usable — even loved — by the recruiter on the other side of the screen.</div>
+      </div>
+
+      <div class="card">
+        <div class="card-label">The thesis in one sentence</div>
+        <div class="card-body" style="font-family: 'Fraunces', serif; font-style: italic; font-size: 18px; line-height: 1.6;">"LinkedIn was built for 40-year-olds with 20 years of experience. Vibe is built for the 14 years before that — with the AI agent that LinkedIn cannot copy."</div>
+      </div>
+
+      <div class="callout coral">
+        <div class="callout-label">Design philosophy</div>
+        <div class="callout-body">Deliberately casual in tone but serious in intent. A hiring manager should find everything they need to make a decision in under a minute. A candidate should feel like they are showing up as a full person, not a formatted résumé. The visual identity does strategic work — the design has to read "serious tool" before the personality content gets the chance to read "human."</div>
+      </div>
+    </div>
+
+    <!-- FEATURES -->
+    <div class="section" id="sec-features">
+      <div class="section-header">
+        <div class="section-eyebrow">Feature Breakdown</div>
+        <h2 class="section-title">Everything <em>Vibe</em> Does</h2>
+      </div>
+
+      <div class="card">
+        <div class="card-body" style="font-size: 15px; line-height: 1.7;">Vibe is six pages plus a calendar plus an AI agent. Six pages share the same left nav (Feed, Network, Campus, Opportunities, Messages) — Profile uses a different layout with a horizontal top nav. Otto sits as a corner ring on every page and gets its own top-level Agent tab. Calendar lives in the left nav of every page and syncs across all of them via localStorage.</div>
+      </div>
+
+      <div class="callout coral">
+        <div class="callout-label">Otto is a flagship feature with its own section</div>
+        <div class="callout-body">The full Otto write-up has its own page in this journal — <strong>Otto — Flagship</strong> in the left nav. The summary in this Features list is just the short version.</div>
+      </div>
+
+      <!-- 01 PROFILE -->
+      <div class="card">
+        <div class="card-label">01 — Profile</div>
+        <div class="card-title">Personality-first profile, recruiter-ready</div>
+        <div class="card-body">A full profile page with a horizontal top nav (different from the rest of the app, intentional). Gradient hero, large avatar, inline-editable everything. Tagline, vibe tags, Currently Into sidebar, posts feed (filterable Top/Recent), Vibes thumbnail grid, work experience cards, sticky section subnav with scroll-spy, skills quick-view row.</div>
+        <div class="card-body" style="margin-top: 12px;"><strong>Connection stats row</strong> shows connections, mutual count (opens a modal listing shared connections), and followers. <strong>Edit mode</strong> uses contenteditable + a floating B/I/U/Clear toolbar. Avatar and banner support photo upload + gradient picker.</div>
+        <div class="callout purple" style="margin-top: 16px;">
+          <div class="callout-label">Recruiter Mode</div>
+          <div class="callout-body">A toggle surfaces a dark Recruiter Snapshot card: role, seniority, location, availability, preferred work type, top skills. Personality sections dim to 35% opacity so professional signal reads first. The same profile, two different views — no separate "résumé page" needed.</div>
+        </div>
+        <div class="callout coral" style="margin-top: 12px;">
+          <div class="callout-label">Otto on profile (new in v3.3)</div>
+          <div class="callout-body">A dark Otto status card sits under the hero showing connected platforms and drafts waiting. Per-post badges flag Otto's involvement on each post — <em>orange</em> if syndicated, <em>purple</em> if Otto drafted versions waiting for review, <em>gray</em> for Vibe-only.</div>
+        </div>
+      </div>
+
+      <!-- 02 FEED -->
+      <div class="card">
+        <div class="card-label">02 — Feed</div>
+        <div class="card-title">Editorial center column with Vibes strip sidebar</div>
+        <div class="card-body">Layout B was selected after weighing options — text posts as the editorial center column, Vibes thumbnails in a right sidebar strip. The feed includes the Voice of the Day (VOTD) prompt at the top, post composer, search, and post cards with reaction system, threaded comments, and per-post Otto badges. Featured posts get a warm coral tint. Hover lifts the card with a subtle coral border.</div>
+      </div>
+
+      <!-- 03 VIBES -->
+      <div class="card">
+        <div class="card-label">03 — Vibes</div>
+        <div class="card-title">Short-form professional video</div>
+        <div class="card-body">TikTok-style full-screen vertical scroll, snap-to-card. Three tabs: For You, Following, Trending. Curated by professional signal (skills overlap, mutuals, field, recency) rather than raw engagement. Each Vibe is up to 60 seconds — long enough for a real elevator pitch, short enough to rewatch.</div>
+        <div class="callout mint" style="margin-top: 16px;">
+          <div class="callout-label">Reaction system (no likes, no shares, no vanity metrics)</div>
+          <div class="callout-body">Five reactions, each with its own glow color and burst animation. Fire (excellent), Mind-blown (surprised me), Lightbulb (insightful), Heart hands (appreciate this), Bookmark (saving this). The reaction tells the recruiter what the community values about a candidate, not just whether people clicked.</div>
+        </div>
+      </div>
+
+      <!-- 04 COMMENTS -->
+      <div class="card">
+        <div class="card-label">04 — Comments</div>
+        <div class="card-title">Threaded comments with replies</div>
+        <div class="card-body">Clicking the comment icon on any post opens a slide-up modal with the original post preview, threaded comments, nested replies (one level deep — keeps it readable), sort by Top or Recent, like individual comments, inline composer. Posting updates the count live without refresh. Reply click pre-fills the @mention. Custom SVG icons throughout — no emoji.</div>
+      </div>
+
+      <!-- 05 OPPORTUNITIES -->
+      <div class="card">
+        <div class="card-label">05 — Opportunities</div>
+        <div class="card-title">Jobs and internships board</div>
+        <div class="card-body">Three-column layout: filter bar and nav on the left, opportunity cards with match percentage in the center, full detail panel on the right. Each listing shows role, type, pay, location, match percent, and the recruiter's profile + a Vibe preview. "Apply with Vibe" CTA replaces generic apply buttons — your application <em>is</em> your Vibe.</div>
+        <div class="callout coral" style="margin-top: 16px;">
+          <div class="callout-label">Recruiter Mode</div>
+          <div class="callout-body">Recruiters switch to a posting view, fill out the Post Opportunity modal (role, type, pay, duration, description, required skills), and see applicant Vibes and profiles side-by-side. This is Vibe's core monetisation surface for the recruiter side — paid seats to post and see applicants.</div>
+        </div>
+      </div>
+
+      <!-- 06 MESSAGES -->
+      <div class="card">
+        <div class="card-label">06 — Messages</div>
+        <div class="card-title">Direct messaging with a request queue</div>
+        <div class="card-body">Three-column layout: thread list with unread badges, message thread view with bubbles and timestamps, search at the top. Non-connected users land in a separate message request queue — preview the message, then Accept or Decline before they enter the inbox. Vibes can be shared inline as preview cards. Typing indicator shows animated dots when the other person is composing.</div>
+      </div>
+
+      <!-- 07 NETWORK -->
+      <div class="card">
+        <div class="card-label">07 — Network</div>
+        <div class="card-title">Connections, Following, Followers in one view</div>
+        <div class="card-body">Three sub-tabs covering the full relationship graph. Each card shows avatar, name, role, mutual connection count, and a "why you're seeing this" badge. Pending connection requests expand inline with Accept and Decline buttons. Live search filters instantly across all three tabs.</div>
+        <div class="card-body" style="margin-top: 12px;"><strong>The relationship model:</strong> Follow is one-way for content discovery. Connect is mutual and requires acceptance. Four button states across the app — none, following, pending, connected — with automatic label and style updates. Owner-mode hides the buttons on your own profile.</div>
+      </div>
+
+      <!-- 08 CAMPUS -->
+      <div class="card">
+        <div class="card-label">08 — Campus</div>
+        <div class="card-title">A full university platform — not just a tab</div>
+        <div class="card-body">Vibe's answer to the Handshake / GroupMe / Discord fragmentation problem. Five complete sections in a single page, all branded for Indiana University with the verified-student badge gating access:</div>
+        <ul class="journal-list" style="margin-top: 12px;">
+          <li><strong>Feed</strong> — Campus posts with type tags (Announcement, Event, Career, Club callout). RSVP buttons inline.</li>
+          <li><strong>Jobs and Internships</strong> — Filter by type, remote, on-campus. Real seeded listings: Goldman Sachs, Stripe, Amazon, Deloitte, Luddy Research, Notion.</li>
+          <li><strong>Events</strong> — Date-block layout, six seeded events, RSVP with attendee counts.</li>
+          <li><strong>Organizations</strong> — Eight IU orgs with Join and Follow controls: CS Club, Design @ IU, Venture Club, NSBE, Women in Computing, AI Society, Social Media Club, MSA.</li>
+          <li><strong>Chat</strong> — Five live channels with pre-seeded conversations: general, cs-majors, design, job-postings, housing-roommates.</li>
+        </ul>
+      </div>
+
+      <!-- 09 CALENDAR -->
+      <div class="card">
+        <div class="card-label">09 — Calendar</div>
+        <div class="card-title">Integrated event tracking across the whole app</div>
+        <div class="card-body">Two surfaces working together. A <strong>mini calendar widget</strong> in the left nav of every page (except profile, which puts it in the top nav as an icon) — always visible, orange dots flag days with events. Click "My Calendar" to open the <strong>full-screen modal</strong> — month grid with event pills on day cells, right sidebar for event details, prev/next month nav.</div>
+        <div class="card-body" style="margin-top: 12px;"><strong>Create events</strong> with name, date, time, location, notes, and a 7-color picker. Equal-size day boxes (aspect-ratio:1 + grid-auto-rows:1fr — important detail). Delete events sync across mini and full views. State persists in localStorage under <code>vibe_cal_events_v1</code>. Designed to absorb RSVPs from the Campus page automatically (sync TBD).</div>
+      </div>
+
+      <!-- 10 OTTO (SHORT) -->
+      <div class="card" style="border-color: rgba(255,92,53,.3); box-shadow: 0 0 0 4px rgba(255,92,53,.04), var(--shadow);">
+        <div class="card-label" style="color: var(--accent);">10 — Otto (flagship)</div>
+        <div class="card-title">Personal AI marketing agent</div>
+        <div class="card-body">Otto is built into Vibe and given to every user. Cross-posts content to the user's other platforms (LinkedIn, Instagram, X, TikTok, YouTube Shorts) with platform-adapted tone. Watches profile views. Drafts replies to recruiters. Surfaces patterns. Trained on the user's own posts so the voice stays theirs. Lives as a corner ring on every page and a top-level Agent tab with five sub-tabs (Today, Metrics, Insights, Customize, Platforms).</div>
+        <div class="card-body" style="margin-top: 12px;"><strong>Strategic role:</strong> Vibe's defensible moat. Other social networks can copy a feed or DMs. They cannot copy "an AI agent that knows your voice, manages five platforms, and shows you who's looking at you." For the full design, voice rules, API constraints, monetization scaffold, and build scope, see the <strong>Otto — Flagship</strong> section in the left nav.</div>
+      </div>
+
+      <!-- 11 EVERYTHING UNDER THE HOOD -->
+      <div class="card">
+        <div class="card-label">Underneath all of it</div>
+        <div class="card-title">Cross-cutting systems</div>
+        <ul class="journal-list">
+          <li><strong>Custom cursor</strong> — orange dot (instant, zero lerp) plus trailing ring (lerp 0.28). Real Mac cursor hidden via cursor:none on every element.</li>
+          <li><strong>Design tokens</strong> — six CSS variables (cream, charcoal, muted, accent, border, shadow) used consistently across all six pages.</li>
+          <li><strong>No-emoji policy</strong> — custom SVG icons throughout the UI. Emoji are permitted inside post body content because that's user-generated, but the chrome is clean.</li>
+          <li><strong>Mock data, seeded</strong> — every page is fully populated with realistic seeded content. No empty states yet (next session).</li>
+          <li><strong>localStorage persistence</strong> — calendar events, journal data, Otto state. Backend is out of scope for the prototype phase.</li>
+          <li><strong>Hosted in Next.js 16.2.4</strong> — six HTML files served from <code>~/vibe/public/html/</code> at <code>localhost:3000/html/&lt;page&gt;.html</code>. The HTML files are the product.</li>
+        </ul>
+      </div>
+
+    </div>
+
+    <!-- ============ OTTO ============ -->
+    <div class="section" id="sec-otto">
+      <div class="section-header">
+        <div class="section-eyebrow" style="color: var(--accent);">● Flagship Feature · Session 21</div>
+        <h2 class="section-title">Otto — Your <em>Marketing Agent</em></h2>
+      </div>
+
+      <div class="card">
+        <div class="card-body" style="font-size: 16px; line-height: 1.7;">Otto is a personal AI marketing agent built into Vibe. The thesis: a student's life is hard enough — managing five social platforms shouldn't be one of the things they have to do. Otto cross-posts your content with platform-adapted tone, watches who views your profile, drafts replies to recruiters, and surfaces patterns you wouldn't catch on your own. It's framed as a character — quiet, confident, opinionated — not as a feature. <strong>This is the biggest strategic shift in Vibe since the warm-professional positioning.</strong></div>
+      </div>
+
+      <div class="pull-quote">
+        <p>"think of me as your marketing intern. you write the post, i make sure it lands everywhere it needs to — with the right voice for each place."</p>
+      </div>
+
+      <div class="callout coral">
+        <div class="callout-label">Strategic positioning shift</div>
+        <div class="callout-body">Vibe was "the warm professional network." With Otto, Vibe becomes "the network where your AI agent lives." Otto reframes Vibe from <em>social platform</em> to <em>professional operating system, with a social network attached</em>. That's a much bigger story for users, recruiters, and investors. Otto also creates Vibe's defensible moat — LinkedIn can copy a feed, comments, DMs. They cannot easily copy "an AI agent that knows your voice, manages 5 platforms, and learns who's looking at you."</div>
+      </div>
+
+      <!-- ─── 01 OTTO'S CHARACTER ─── -->
+      <div class="card">
+        <div class="card-label">01 — Otto's character</div>
+        <div class="card-title">Jarvis lane, not Wall-E lane</div>
+        <div class="card-body">Otto leans <strong>nonchalant cool</strong> — sleek, confident, dry — over <strong>cute helper bot</strong>. Decided after weighing both: cute reads too soft for recruiters and ages young; Jarvis ages with the user and reinforces "this is a serious tool that just happens to be friendly." Otto has no face, no body — personality lives entirely in <em>motion</em> and <em>copy</em>.</div>
+        <div class="callout dark" style="margin-top:16px">
+          <div class="callout-label">Voice rules</div>
+          <div class="callout-body">Short — almost always one sentence. Slightly dry. Honest about its own limits ("the X version isn't great, I'd skip it"). Has opinions ("post this one tomorrow morning, not now"). Never uses exclamation points. Never says "Sure!" or "Happy to help!" Lowercase-leaning, but not all lowercase. Speaks in italic Fraunces in the UI to differentiate from system text.</div>
+        </div>
+      </div>
+
+      <!-- ─── 02 VISUAL LANGUAGE ─── -->
+      <div class="card">
+        <div class="card-label">02 — Visual language</div>
+        <div class="card-title">Glowing core, orbiting nodes, dual accents</div>
+        <div class="card-body">Otto is a small floating element — coral core surrounded by orbiting nodes and breathing rings. Four canonical states: <strong>Idle</strong> (slow breathing rings + one orbital node), <strong>Thinking</strong> (two counter-rotating orbits with multiple nodes, fast core pulse), <strong>Briefing</strong> (vertical sound bars in alternating coral/purple, like an EQ), <strong>Alert</strong> (bright pulse with a count chip). Primary color is coral (#FF5C35); secondary accent is deep purple (#7C5CFC) for depth on rings, secondary nodes, and certain UI signals.</div>
+      </div>
+
+      <!-- ─── 03 SURFACES ─── -->
+      <div class="card">
+        <div class="card-label">03 — Where Otto lives</div>
+        <div class="card-title">Hybrid: corner ring + dedicated tab</div>
+        <table class="journal-table">
+          <thead><tr><th>Surface</th><th>Behavior</th></tr></thead>
+          <tbody>
+            <tr><td>Corner ring</td><td>Fixed bottom-right on every page (except where it would conflict). Always visible, idle when nothing's happening.</td></tr>
+            <tr><td>Slide-out panel</td><td>Right-side drawer that opens from the corner ring. Shows current drafts, briefings, and the activity log.</td></tr>
+            <tr><td>Dedicated Agent tab</td><td>Full top-level page in the left nav. Otto's command center — 5 sub-tabs covering everything.</td></tr>
+            <tr><td>Profile status card</td><td>Dark surface card under the profile hero. Shows Otto status + connected platforms + draft count + "Review →" CTA.</td></tr>
+            <tr><td>Per-post badges</td><td>Every post on profile shows whether Otto syndicated it (orange "otto · N platforms") or drafted versions waiting (purple "otto drafted · review") or chose Vibe-only (gray).</td></tr>
+            <tr><td>Post-publish flow</td><td>Right after you publish on Vibe, Otto slides in with a small ask ("want me to send this to your other 3 platforms?"). Two clean choices, no nag if you decline.</td></tr>
+          </tbody>
+        </table>
+      </div>
+
+      <!-- ─── 04 THE AGENT TAB ─── -->
+      <div class="card">
+        <div class="card-label">04 — The Agent tab</div>
+        <div class="card-title">Five sub-tabs forming Otto's command center</div>
+
+        <div class="callout coral">
+          <div class="callout-label">Today</div>
+          <div class="callout-body"><strong>The default action view.</strong> Hero with Otto + briefing quote + 3 KPIs (views, drafts ready, recruiters). Drafts queue (per-platform versions side-by-side with Approve/Edit/Skip). Otto's Inbox (recruiter signals, network observations, missed opportunities — each with an "otto says:" italic interpretation). Activity log. Plus inline previews of Metrics, Insights, Customize, Platforms.</div>
+        </div>
+
+        <div class="callout coral" style="margin-top: 12px;">
+          <div class="callout-label">Metrics</div>
+          <div class="callout-body"><strong>Vibe-first, honest about API gaps.</strong> KPI row with data-quality notes ("first-party · full detail" vs "est · linkedin not included"). <strong>Vibe Recruiter Intel</strong> as the hero section — full names, time-on-profile, what they watched, "Reply →" CTAs. The LinkedIn Premium-killer feature, possible because it's first-party data on Vibe. Cross-platform table shows what Otto can actually verify (full data: Vibe/TikTok/YouTube/Instagram-Business · partial: X · delivery only: LinkedIn). Otto annotation under the table explains <em>why</em> the gaps exist — turning the limitation into transparency.</div>
+        </div>
+
+        <div class="callout coral" style="margin-top: 12px;">
+          <div class="callout-label">Insights</div>
+          <div class="callout-body"><strong>Otto as strategist, not dashboard.</strong> Sections: Otto's Brief (3-paragraph weekly read in italic Fraunces, with action CTAs); What's working / What's not (concrete patterns with multiplier deltas); Best time to post (heatmap with Otto's interpretation); Recruiter signal strength (HOT/WARM/COOL ranking with verdicts); Peer comparison (top X% of CS students at IU). Every section has an "otto says:" interpretive line.</div>
+        </div>
+
+        <div class="callout coral" style="margin-top: 12px;">
+          <div class="callout-label">Customize</div>
+          <div class="callout-body"><strong>Where Otto becomes yours.</strong> Voice training (4 sliders + voice preview, trained on user's real posts — PRO feature). Per-platform tone shifters. Personality (name, accent color, persona, check-in frequency). Brand guardrails (never-use words, off-limits topics, content rule toggles). Posting schedule (24hr range slider + active days + max posts per day). Otto's leash (3-step autonomy: Ask first / Ask sometimes / Full auto).</div>
+        </div>
+
+        <div class="callout coral" style="margin-top: 12px;">
+          <div class="callout-label">Platforms</div>
+          <div class="callout-body"><strong>Honest connection manager.</strong> Each connected platform gets a full card with capability badge ("limited" / "business · full data" / "basic data"), a checked/X list of what Otto can actually do, and Otto's note interpreting what to do about it. Coming-soon section with vote-to-prioritize for Medium, Threads, Bluesky, Substack, Reddit. Privacy footer with one-click "Disconnect everything" — trust signal as a feature.</div>
+        </div>
+      </div>
+
+      <!-- ─── 05 ONBOARDING ─── -->
+      <div class="card">
+        <div class="card-label">05 — Onboarding</div>
+        <div class="card-title">6 steps · ~3 minutes · ends with an aha moment</div>
+        <ul class="journal-list">
+          <li><strong>Step 1 — Hello.</strong> Big Otto fills the screen. Italic intro: "think of me as your marketing intern." Two CTAs: Let's go / Maybe later.</li>
+          <li><strong>Step 2 — Name me.</strong> Default is "otto" with suggestion chips (pico, mox, echo, nimo, ember). 5-second personalization moment that creates ownership.</li>
+          <li><strong>Step 3 — Connect a platform.</strong> Pick one. Tiles have helper notes ("most students start here," "best analytics"). Skip option preserved.</li>
+          <li><strong>Step 4 — Teach me your voice.</strong> Three sample slots, two pre-filled from the user's actual Vibe posts (zero friction since Vibe owns the data). Otto: "two is enough to start. i'll keep learning every time you post."</li>
+          <li><strong>Step 5 — Set my leash.</strong> Three radio cards: Ask first (recommended) / Ask sometimes / Full auto (for the brave).</li>
+          <li><strong>Step 6 — The aha moment.</strong> Otto generates a real LinkedIn draft from the user's voice samples. Otto's notes underneath call out what it observed ("lowercase opening · short sentences · meta-observation close"). CTA: "i'm ready, take me to my agent →"</li>
+        </ul>
+        <div class="callout gold" style="margin-top: 16px;">
+          <div class="callout-label">Why this works</div>
+          <div class="callout-body">Steps 1-3 are emotional/personal (no data input), so user investment grows before any work is asked. Step 4 leverages Vibe's data advantage — we already have the user's posts, so we can pre-fill samples. Step 6 is the marketable moment users will tell friends about: "their AI made a post that actually sounded like me."</div>
+        </div>
+      </div>
+
+      <!-- ─── 06 POST-PUBLISH FLOW ─── -->
+      <div class="card">
+        <div class="card-label">06 — Post-publish flow</div>
+        <div class="card-title">5 frames · ~12 seconds · zero nag</div>
+        <ul class="journal-list">
+          <li><strong>t+0s — Post lands.</strong> Coral border + glow + "POSTED" badge on the new post. Otto stays quiet — user gets to enjoy the win first.</li>
+          <li><strong>t+1.5s — Otto asks.</strong> Small dark bubble slides up from the corner ring with a pointer arrow. "want me to send this to your other 3 platforms?" Two buttons: Yes draft them / Skip. Platform mini-icons preview what Otto would do.</li>
+          <li><strong>t+3s — Thinking state.</strong> Panel slides in (280px). Otto's thinking animation. Per-platform progress (LinkedIn ✓, Instagram drafting, X queued).</li>
+          <li><strong>t+6s — Drafts ready.</strong> Full panel (320px). Briefing line at top. Three drafts with the recommended one highlighted as "PICK." X dimmed with "i'd skip" suggestion. Approve all 2 → CTA at bottom.</li>
+          <li><strong>t+12s — Confirmation.</strong> Panel collapses. Original post now shows "otto · 2 platforms" badge. Small toast: "shipped to LinkedIn & Instagram. I'll watch how they do."</li>
+        </ul>
+      </div>
+
+      <!-- ─── 07 API REALITY ─── -->
+      <div class="card">
+        <div class="card-label">07 — API reality (constraint doc)</div>
+        <div class="card-title">What Otto can actually do per platform</div>
+        <table class="journal-table">
+          <thead><tr><th>Platform</th><th>Posting</th><th>Analytics</th><th>Notes</th></tr></thead>
+          <tbody>
+            <tr><td>Vibe</td><td>Full</td><td>Full first-party</td><td>The recruiter intel goldmine. Everything possible because we own it.</td></tr>
+            <tr><td>TikTok</td><td>Full</td><td>Full</td><td>Most permissive video platform. Views, completion rate, demographics.</td></tr>
+            <tr><td>YouTube Shorts</td><td>Full</td><td>Full</td><td>Best analytics API of the lot. Generous quota.</td></tr>
+            <tr><td>Instagram</td><td>Full</td><td>Full (Business only)</td><td>Requires user converts to Business account. Many will.</td></tr>
+            <tr><td>X</td><td>Yes (rate-limited free)</td><td>Basic counts</td><td>Detailed analytics behind $100/mo Basic tier. Otto suggests skipping for most users.</td></tr>
+            <tr><td>LinkedIn</td><td>Yes (OAuth approved)</td><td>None</td><td>API does not expose post views or profile views to anyone. Otto can post and confirm delivery — that's all. Honesty becomes the brand.</td></tr>
+          </tbody>
+        </table>
+        <div class="callout coral" style="margin-top: 16px;">
+          <div class="callout-label">The strategic pivot</div>
+          <div class="callout-body">"Recruiter views" was originally going to scrape across LinkedIn — not feasible. Pivoted to <strong>Vibe Recruiter Intel</strong>: Otto shows you who looked at your profile <em>on Vibe</em>, with full names, time-on-profile, and what they watched. This is a LinkedIn Premium-killer for free, because it's first-party data Vibe owns. LinkedIn cannot match this without restructuring their entire product.</div>
+        </div>
+      </div>
+
+      <!-- ─── 08 MONETIZATION ─── -->
+      <div class="card">
+        <div class="card-label">08 — Monetization (preliminary)</div>
+        <div class="card-title">Otto Free / Otto Pro / Otto Recruit / Otto Enterprise</div>
+        <table class="journal-table">
+          <thead><tr><th>Tier</th><th>Price</th><th>What's included</th></tr></thead>
+          <tbody>
+            <tr><td>Otto Free</td><td>$0</td><td>1 platform connection · Otto drafts everything (no auto-post) · Basic activity log · 7-day metrics · Default Otto voice (not trained)</td></tr>
+            <tr><td>Otto Pro · students</td><td>~$8-12/mo</td><td>Unlimited platform connections · Auto-post with autonomy controls · Full metrics including Recruiter Intel · Voice training on user's posts · Otto Insights (brief, patterns, peer comparison) · Otto customization (name, color, voice tone)</td></tr>
+            <tr><td>Otto Pro · professionals</td><td>~$20/mo</td><td>Same as student Pro tier</td></tr>
+            <tr><td>Otto Recruit</td><td>~$50+/mo</td><td>Otto helps recruiters draft outreach · Tracks response rates per template · Auto-classifies inbound applicants · Calendar coordination for interviews · Separate product, separate audience</td></tr>
+            <tr><td>Otto Enterprise (campus)</td><td>institutional</td><td>IU buys Otto for all entrepreneurship students · Branded Otto ("the Luddy Agent") · Org-level analytics for career services · Long-term institutional sale</td></tr>
+          </tbody>
+        </table>
+        <div class="callout dark" style="margin-top: 16px;">
+          <div class="callout-label">Paywall philosophy</div>
+          <div class="callout-body">Most metrics that compete with LinkedIn Premium go into Pro. The killer free-tier feature is Vibe Recruiter Intel itself (not LinkedIn views) — first-party data that costs LinkedIn nothing for us to expose. The Pro paywall is justified by voice training (real LLM cost), full insights, and full autonomy. Paywalls always delivered in Otto's voice, never as corporate CTAs ("i know who they are. wanna meet them?" instead of "Upgrade to see who viewed your profile").</div>
+        </div>
+      </div>
+
+      <!-- ─── 09 BRAND PRINCIPLES ─── -->
+      <div class="card">
+        <div class="card-label">09 — Brand principles for Otto</div>
+        <ul class="journal-list">
+          <li><strong>Otto has opinions, not just data.</strong> Every analytics surface includes Otto interpreting what the numbers mean and what to do about them.</li>
+          <li><strong>Honest about gaps.</strong> When an API doesn't expose data, Otto says so. Transparency becomes the brand.</li>
+          <li><strong>Respects "no."</strong> Otto never re-asks after a Skip. Never sends nudge notifications. Never escalates.</li>
+          <li><strong>Earns trust gradually.</strong> Default autonomy is "Ask first." Users graduate to "Full auto" over weeks as Otto proves itself.</li>
+          <li><strong>Lives in italic Fraunces.</strong> Otto's voice is always italicized + serif in the UI — visually distinct from system text.</li>
+          <li><strong>Coral is action, purple is intelligence.</strong> Two-color accent system reinforces "Otto is alive and thinking."</li>
+          <li><strong>Never "Sure!" or "Happy to help!"</strong> No AI-assistant boilerplate. Otto sounds like a person.</li>
+        </ul>
+      </div>
+
+      <!-- ─── 10 BUILD SCOPE ─── -->
+      <div class="card">
+        <div class="card-label">10 — Build scope</div>
+        <div class="card-title">What it takes to ship Otto v1</div>
+        <ul class="journal-list">
+          <li><strong>New top-level Agent tab</strong> with 5 sub-tabs (Today, Metrics, Insights, Customize, Platforms)</li>
+          <li><strong>Persistent corner ring</strong> on every existing page with idle/thinking/briefing/alert states</li>
+          <li><strong>Slide-out panel</strong> that opens from the corner ring, shared across pages</li>
+          <li><strong>Onboarding flow</strong> — 6 steps that interrupt sign-up</li>
+          <li><strong>Post-publish flow</strong> — hooks into existing post composer</li>
+          <li><strong>Profile page additions</strong> — Otto status card under hero, per-post Otto badges</li>
+          <li><strong>Empty states</strong> for every page — Otto provides the next-action invitation</li>
+          <li><strong>Backend</strong> — voice training pipeline, platform OAuth flows, posting queue, metrics ingestion</li>
+        </ul>
+        <div class="callout gold" style="margin-top: 16px;">
+          <div class="callout-label">Realistic estimate</div>
+          <div class="callout-body">4-6 build sessions minimum for a working prototype. Front-end mockups can ship faster (probably 2-3 sessions). Real backend with OAuth flows and platform integrations is a separate, larger phase. Recommend: build the front-end mockup with seeded data first, validate the experience, then layer real APIs platform-by-platform.</div>
+        </div>
+      </div>
+
+    </div>
+    <!-- ============ END OTTO ============ -->
+    <div class="section" id="sec-sessions">
+      <div class="section-header">
+        <div class="section-eyebrow">Build History</div>
+        <h2 class="section-title">Session <em>Log</em></h2>
+      </div>
+      <div id="sessionLog">
+        <!-- injected by JS -->
+      </div>
+    </div>
+
+    <!-- STRATEGY -->
+    <div class="section" id="sec-strategy">
+      <div class="section-header">
+        <div class="section-eyebrow">Strategic Direction</div>
+        <h2 class="section-title">How Vibe <em>Wins</em></h2>
+      </div>
+
+      <div class="card">
+        <div class="card-body" style="font-size: 16px; line-height: 1.7;">Vibe's strategy has three audiences, three problems, and one defensible moat. The audiences are <strong>students</strong>, <strong>recruiters</strong>, and eventually <strong>universities</strong>. The problems are different for each. The moat — the thing that makes Vibe hard to copy — is Otto.</div>
+      </div>
+
+      <div class="pull-quote">
+        <p>"Don't make Vibe more professional. Make it unmistakably useful to professionals."</p>
+      </div>
+
+      <!-- RECRUITER STRATEGY -->
+      <div class="card">
+        <div class="card-label">For recruiters</div>
+        <div class="card-title">The buyer is older. The product is for someone younger.</div>
+        <div class="card-body">The most important tension in Vibe's design: the app is built for candidates (Gen Z and Millennials), but recruiters and hiring managers are often older and tend to skew toward formality. Solving for both is the design challenge — not picking one.</div>
+        <div class="card-body" style="margin-top: 12px;"><strong>Recruiter value proposition:</strong></div>
+        <ul class="journal-list">
+          <li><strong>Vibes</strong> let recruiters assess communication style, energy, and clarity of thought before any interview is scheduled.</li>
+          <li><strong>Reactions</strong> show what the community values in a candidate — not raw follower counts or pay-to-play visibility.</li>
+          <li><strong>Recruiter Mode</strong> gives a clean professional snapshot without forcing the recruiter to navigate a personality-first interface.</li>
+          <li><strong>Zero spam model</strong> — candidates control who can reach them via the message request queue, so recruiter outreach is higher quality on both ends.</li>
+          <li><strong>Otto Recruit</strong> (planned tier) — recruiters get their own Otto for outreach drafting, applicant classification, and interview coordination.</li>
+        </ul>
+      </div>
+
+      <!-- LANGUAGE SHIFT -->
+      <div class="card">
+        <div class="card-label">Language shift</div>
+        <div class="card-title">Words matter. These are the ones we use.</div>
+        <div class="card-body" style="margin-bottom: 8px;">Casual phrasing reads as "fun, not for work." Formal phrasing reads as "LinkedIn, but worse." The middle path — <em>warm professional</em> — has its own vocabulary.</div>
+        <table class="journal-table">
+          <thead><tr><th>Instead of</th><th>Say</th></tr></thead>
+          <tbody>
+            <tr><td>Show your personality</td><td>Show how you think and work</td></tr>
+            <tr><td>Be yourself online</td><td>Show up as a full professional</td></tr>
+            <tr><td>Casual by design</td><td>Human by design</td></tr>
+            <tr><td>No LinkedIn vibes</td><td>Everything LinkedIn misses</td></tr>
+            <tr><td>Gen Z network</td><td>The network that actually shows who you are</td></tr>
+            <tr><td>AI assistant</td><td>Your marketing agent</td></tr>
+            <tr><td>Cross-posting tool</td><td>One profile, every platform</td></tr>
+          </tbody>
+        </table>
+      </div>
+
+      <!-- STUDENT STRATEGY -->
+      <div class="card">
+        <div class="card-label">For students</div>
+        <div class="card-title">Five tools become one</div>
+        <div class="card-body">Students currently juggle <strong>LinkedIn</strong> for the professional layer, <strong>Handshake</strong> for jobs, <strong>Canvas</strong> for academics, <strong>GroupMe</strong> or <strong>Discord</strong> for org chat, and <strong>Instagram</strong> for everything else. None of these connect. Each one is a checkbox, not a real tool. Vibe consolidates the professional + campus + social-identity layers into a single verified profile that follows the user from undergrad into early career.</div>
+        <div class="card-body" style="margin-top: 12px;"><strong>The wedge:</strong> the Campus tab. Once a university adopts Vibe officially (career services, an entrepreneurship program, a department), every student in that program becomes a verified user with a built-in network on day one. Otto then handles the cross-post problem so they're not also juggling LinkedIn and Instagram and TikTok separately.</div>
+      </div>
+
+      <!-- DEFENSIBILITY / OTTO -->
+      <div class="card" style="border-color: rgba(255,92,53,.3); box-shadow: 0 0 0 4px rgba(255,92,53,.04), var(--shadow);">
+        <div class="card-label" style="color: var(--accent);">The moat — Otto</div>
+        <div class="card-title">What LinkedIn cannot copy</div>
+        <div class="card-body">A feed, comments, DMs, a profile page — LinkedIn already has all of these. They could rebuild Vibe's UI in a quarter if they wanted to. They cannot easily build Otto. Otto requires:</div>
+        <ul class="journal-list" style="margin-top: 12px;">
+          <li><strong>An LLM trained per-user on that user's voice.</strong> LinkedIn would have to either pay this LLM cost for half a billion users or charge for it (which would surface their pricing power problem).</li>
+          <li><strong>Cross-platform OAuth integrations.</strong> LinkedIn has no incentive to help users post to Instagram or X — those are competitors.</li>
+          <li><strong>First-party recruiter intel.</strong> Otto's killer feature on Vibe is showing the user <em>who looked at their profile, for how long, and what they watched</em>. LinkedIn could build this but would have to dismantle their Premium paywall to do it.</li>
+          <li><strong>A character, not a feature.</strong> Otto has a voice, opinions, autonomy controls, a personality. LinkedIn's cultural identity will not let them ship something this distinctive.</li>
+        </ul>
+        <div class="card-body" style="margin-top: 14px;">For the full Otto spec — voice rules, API constraints, monetization scaffold, build scope — see the <strong>Otto — Flagship</strong> section.</div>
+      </div>
+
+      <!-- POSITIONING -->
+      <div class="card">
+        <div class="card-label">Where Vibe sits</div>
+        <div class="card-title">Warm professional, with an AI agent</div>
+        <table class="journal-table">
+          <thead><tr><th>Platform</th><th>Positioning</th></tr></thead>
+          <tbody>
+            <tr><td>LinkedIn</td><td>Formal + skills-led. The incumbent. Functional but impersonal. Built for the 40-year-old with 20 years of experience.</td></tr>
+            <tr><td>Instagram</td><td>Casual + personality-led. Great for persona, zero professional utility, recruiters won't trust it as a hiring signal.</td></tr>
+            <tr><td>TikTok</td><td>Casual + content-led. Enormous reach, no professional signal, no campus structure.</td></tr>
+            <tr><td>Handshake</td><td>Functional + job-led. Solves the campus career-services problem only — nothing for identity or network.</td></tr>
+            <tr><td>Portfolio sites</td><td>Formal + personality. Static, no discovery, no network effect.</td></tr>
+            <tr><td style="color: var(--accent);"><strong>Vibe</strong></td><td><strong>Warm professional, with the AI agent that LinkedIn cannot copy.</strong> Formal enough for recruiters, human enough to matter, intelligent enough to do the work.</td></tr>
+          </tbody>
+        </table>
+      </div>
+
+    </div>
+
+    <!-- DESIGN -->
+    <div class="section" id="sec-design">
+      <div class="section-header">
+        <div class="section-eyebrow">Design Language</div>
+        <h2 class="section-title">Visual &amp; UX <em>Direction</em></h2>
+      </div>
+
+      <div class="card">
+        <div class="card-body" style="font-size: 15px; line-height: 1.7;">Vibe's visual identity is doing strategic work. Every color, font weight, and animation timing is calibrated so a recruiter lands on a profile and immediately reads "this is a serious, well-made product" before they read any of the personality content. Personality lives in the words, the photos, and Otto. The chrome stays calm.</div>
+      </div>
+
+      <div class="callout gold">
+        <div class="callout-label">The core principle</div>
+        <div class="callout-body">When a 45-year-old hiring manager lands on a Vibe profile, the design has to read "serious tool" within half a second. Personality should come through the content and copy — never through the UI being visually chaotic. This is the rule everything else follows from.</div>
+      </div>
+
+      <!-- TYPOGRAPHY -->
+      <div class="card">
+        <div class="card-label">Typography</div>
+        <div class="card-title">Fraunces + DM Sans</div>
+        <div class="card-body"><strong>Fraunces</strong> (serif, display) paired with <strong>DM Sans</strong> (geometric sans). The pairing reads "editorial intelligence" — quality magazine meets modern startup — without going informal. Fraunces uses weights 400 / 700 / 900. DM Sans uses 300 through 700.</div>
+        <div class="card-body" style="margin-top: 12px;"><strong>Hierarchy:</strong></div>
+        <ul class="journal-list">
+          <li><strong>Page titles and section headers</strong> — Fraunces 900, letter-spacing -1px to -2px depending on size. Italic for emphasis (em tags) instead of bold.</li>
+          <li><strong>Card titles and component headers</strong> — Fraunces 700, smaller letter-spacing.</li>
+          <li><strong>Body copy</strong> — DM Sans 400 at 13-15px, line-height 1.6-1.7.</li>
+          <li><strong>Labels and eyebrows</strong> — DM Sans 500-700 at 10-11px, letter-spacing 1.5px, uppercase.</li>
+          <li><strong>Otto's voice</strong> — italic Fraunces, always. Visually distinct from system text and from the user's own writing.</li>
+        </ul>
+      </div>
+
+      <!-- COLOR -->
+      <div class="card">
+        <div class="card-label">Color palette</div>
+        <div class="card-title">Two-accent system as of v3.3</div>
+        <table class="journal-table">
+          <thead><tr><th>Color</th><th>Role</th></tr></thead>
+          <tbody>
+            <tr><td style="color: #FF5C35;">Coral · #FF5C35</td><td>Primary accent — energy, action, personality. Used everywhere Vibe wants to feel alive.</td></tr>
+            <tr><td style="color: #7C5CFC;">Deep purple · #7C5CFC</td><td>Secondary accent — intelligence, depth. Reserved for Otto signals: thinking states, drafted content waiting for review, AI-generated text.</td></tr>
+            <tr><td>Charcoal · #1C1C1E</td><td>Foundation — serious, grounded. Sidebar, top nav, dark cards. The "professional" half of warm professional.</td></tr>
+            <tr><td style="color: #8A8580;">Muted · #8A8580</td><td>Secondary text. Stays out of the way.</td></tr>
+            <tr><td>Cream · #FAF7F2</td><td>Background — warm, human. Not clinical white. The reason Vibe doesn't feel like a SaaS dashboard.</td></tr>
+            <tr><td style="color: #C8B8FF;">Lavender · #C8B8FF</td><td>Accent variant — light purple for badges, decorative elements, soft callouts.</td></tr>
+            <tr><td style="color: #B8920A;">Gold · #F5C842</td><td>Highlight — premium, optimistic. Used sparingly for callouts and pull-quotes.</td></tr>
+            <tr><td style="color: #1A9E5B;">Mint · #2ECC71</td><td>Success state — confirmations, positive deltas, "saved" indicators.</td></tr>
+          </tbody>
+        </table>
+        <div class="card-body" style="margin-top: 14px;"><strong>The dual-accent rule:</strong> coral signals action — the user can do something, or has done something. Purple signals intelligence — Otto is thinking, drafting, or surfacing something. The two appear together on Otto's surfaces. They never appear together as a gradient outside Otto contexts.</div>
+      </div>
+
+      <!-- ICONOGRAPHY -->
+      <div class="card">
+        <div class="card-label">Iconography</div>
+        <div class="card-title">No emoji in the chrome — ever</div>
+        <div class="card-body">Custom SVG icons throughout the UI. The no-emoji policy is non-negotiable for the visual chrome — buttons, nav, badges, callouts, section headers. The justification is strategic, not aesthetic: emoji read as "consumer app" and undercut the recruiter-facing serious tool we need Vibe to feel like.</div>
+        <div class="card-body" style="margin-top: 12px;"><strong>The exception:</strong> emoji are permitted inside <em>user-generated content</em> — post bodies, comments, message bubbles, profile bios. That's the user being themselves, not the product chrome.</div>
+      </div>
+
+      <!-- INTERACTION -->
+      <div class="card">
+        <div class="card-label">Interaction design</div>
+        <div class="card-title">Snappy, crafted, never bouncy</div>
+        <ul class="journal-list">
+          <li><strong>Custom cursor</strong> — orange dot (instant, zero lerp) + trailing ring (lerp 0.28). Real Mac cursor hidden via cursor:none on every element. Cursor must use event delegation for hover state — static querySelectorAll patterns freeze on dynamic content.</li>
+          <li><strong>Avatar hover</strong> — scale 1.06 even outside edit mode. Reinforces personality-first brand at the smallest scale.</li>
+          <li><strong>Card lift</strong> — posts translate up 2px with deeper shadow on hover. Subtle.</li>
+          <li><strong>Sticky subnav</strong> — IntersectionObserver scroll-spy highlights the active section automatically. Used on the profile page.</li>
+          <li><strong>Reaction burst</strong> — springy scale animation on click, per-reaction glow color matching the icon family.</li>
+          <li><strong>Edit mode</strong> — inline contenteditable + floating toolbar (B / I / U / Clear). Auto-save toast appears 1.8s after the last keystroke.</li>
+          <li><strong>Modals slide up from the bottom</strong> — comments, event creation, opportunity detail. 280ms ease-out.</li>
+        </ul>
+      </div>
+
+      <!-- OTTO MOTION -->
+      <div class="card" style="border-color: rgba(255,92,53,.3); box-shadow: 0 0 0 4px rgba(255,92,53,.04), var(--shadow);">
+        <div class="card-label" style="color: var(--accent);">Otto motion language</div>
+        <div class="card-title">Personality lives in animation</div>
+        <div class="card-body">Otto has no face and no body. Its entire personality is conveyed through four animation states. The motion design has to do everything that a face would do.</div>
+        <ul class="journal-list" style="margin-top: 12px;">
+          <li><strong>Idle</strong> — slow breathing rings (2.8s ease-out infinite), one orbital node spinning (8s linear). Calm. The default 95% of the time.</li>
+          <li><strong>Thinking</strong> — two counter-rotating orbits, multiple nodes, faster core pulse (1.6s). Visibly busy. Used during draft generation.</li>
+          <li><strong>Briefing</strong> — vertical sound bars in alternating coral and purple, EQ-style. Otto is "speaking" with a long-form update.</li>
+          <li><strong>Alert</strong> — bright pulse with a count chip. Something needs review. Never blinks, never escalates.</li>
+        </ul>
+        <div class="card-body" style="margin-top: 14px;"><strong>The core ratios:</strong> orbits at 8s linear (slow), 4.5s linear (medium), 3.2s reverse (fast). Breathing rings at 2.8-3.4s ease-out. Core pulse at 2.4s ease-in-out. These specific numbers matter — together they create Otto's "breathing" rhythm.</div>
+      </div>
+
+    </div>
+
+    <!-- NEXT STEPS -->
+    <div class="section" id="sec-next">
+      <div class="section-header">
+        <div class="section-eyebrow">Roadmap</div>
+        <h2 class="section-title">Next <em>Steps</em></h2>
+      </div>
+
+      <div class="card">
+        <div class="card-body" style="font-size: 15px; line-height: 1.7;">The path from where Vibe is now to a buildable, launchable product. Empty states first because new-user experience is currently broken (every page seeds with mock data). Then the Otto front-end build using the mockups. Then real backend integrations.</div>
+      </div>
+
+      <div class="card">
+        <div class="card-label">Immediate priorities</div>
+        <table class="journal-table">
+          <thead><tr><th>Priority</th><th>Action</th></tr></thead>
+          <tbody>
+            <tr><td><span class="priority high">High</span></td><td><strong>Empty states across all pages</strong> — feed, profile, network, campus, opportunities, messages, agent. New users need Otto-led invitations, not zeroes.</td></tr>
+            <tr><td><span class="priority high">High</span></td><td><strong>Otto v1 build — front-end with seeded data.</strong> Agent tab (5 sub-tabs), corner ring, slide-out panel, post-publish flow. 2-3 sessions of focused work using the mockup files as reference.</td></tr>
+            <tr><td><span class="priority high">High</span></td><td><strong>Otto onboarding flow</strong> — 6-step interruption to sign-up. Hooks into voice training and platform OAuth.</td></tr>
+            <tr><td><span class="priority high">High</span></td><td><strong>Profile additions for Otto</strong> — status card under hero, per-post Otto badges (orange / purple / gray).</td></tr>
+            <tr><td><span class="priority high">High</span></td><td><strong>Student .edu verification flow</strong> — email confirms student status, badge unlocks campus tab and appears on profile.</td></tr>
+            <tr><td><span class="priority medium">Medium</span></td><td><strong>Otto v2 — backend.</strong> Voice training pipeline, platform OAuth (LinkedIn, Instagram Business, TikTok, YouTube), posting queue, metrics ingestion. Separate larger phase.</td></tr>
+            <tr><td><span class="priority medium">Medium</span></td><td><strong>Calendar and campus RSVP sync</strong> — RSVP on campus events auto-adds to calendar with date / time / location.</td></tr>
+            <tr><td><span class="priority medium">Medium</span></td><td><strong>Notifications</strong> — connection requests, RSVP reminders 24h before events, new org posts, Otto inbox alerts.</td></tr>
+            <tr><td><span class="priority medium">Medium</span></td><td><strong>For You algorithm</strong> — ranking signals: skills overlap, mutuals, same field, campus proximity, recent activity.</td></tr>
+            <tr><td><span class="priority medium">Medium</span></td><td><strong>Calendar agenda view</strong> — toggle between month grid and chronological upcoming list.</td></tr>
+            <tr><td><span class="priority medium">Medium</span></td><td><strong>Mobile layout refinements</strong> — campus, chat, calendar, and Otto on mobile.</td></tr>
+            <tr><td><span class="priority low">Low</span></td><td><strong>Otto Recruit</strong> — separate product for the recruiter side. Outreach drafting, applicant classification, calendar coordination.</td></tr>
+            <tr><td><span class="priority low">Low</span></td><td><strong>Company and org profiles</strong> — recruiters, campus orgs, departments post jobs and announce events.</td></tr>
+            <tr><td><span class="priority low">Low</span></td><td><strong>Export to .ics</strong> — calendar events downloadable to Google Calendar, Apple Calendar, Outlook.</td></tr>
+            <tr><td><span class="priority low">Low</span></td><td><strong>Landing page rewrite</strong> — lead with Otto: "the network where your AI agent lives." Replace warm-professional-only positioning.</td></tr>
+          </tbody>
+        </table>
+      </div>
+
+      <div class="card">
+        <div class="card-label">Open questions still on the table</div>
+        <ul class="journal-list">
+          <li><strong>Onboarding pacing.</strong> Otto's onboarding is 6 steps — what about the rest of Vibe? Do new users go through profile creation, then Otto, then a Vibes prompt? Or is Otto the first thing they see?</li>
+          <li><strong>Cold start for the For You feed.</strong> A new user with no connections, no history, no Vibes posted — what does their feed look like? Campus content? Top performers in their field?</li>
+          <li><strong>Vibes content guardrails.</strong> What stops Vibes from becoming generic TikTok content? Do we curate at upload? Use Otto to flag off-brand posts before they go live?</li>
+          <li><strong>Monetisation mix.</strong> Otto Pro tiers are scaffolded. Open: premium recruiter seats vs per-post fees vs promoted Opportunities listings. Probably some combination.</li>
+          <li><strong>Go-to-market vertical.</strong> Launch at IU only first? Expand to other Big Ten schools? Target a specific industry vertical (CS / design / business) before going broader?</li>
+          <li><strong>Otto trust threshold.</strong> When does Otto graduate from "Ask first" to "Full auto" by default? After how many user approvals? Is it user-controlled or learned?</li>
+        </ul>
+      </div>
+
+      <div class="card">
+        <div class="card-label">Recently resolved</div>
+        <ul class="journal-list">
+          <li><strong>Feed layout</strong> — Layout B (posts center, Vibes sidebar strip).</li>
+          <li><strong>DM system</strong> — Built. Three-column layout, request queue for non-connected users, inline Vibe previews, typing indicator.</li>
+          <li><strong>Comment depth</strong> — One level of nested replies. Keeps it readable, prevents Reddit-style threading.</li>
+          <li><strong>Opportunities tab</strong> — Built. Three-column layout, match percentage, recruiter mode, Apply with Vibe.</li>
+          <li><strong>Connection vs Follow</strong> — Hybrid model. Follow is one-way for content. Connect is mutual. Four-state machine across the app.</li>
+          <li><strong>Otto's positioning</strong> — Jarvis lane (sleek, dry, opinionated), not Wall-E lane (cute helper bot).</li>
+          <li><strong>Otto's metrics scope</strong> — Pivoted from "scrape LinkedIn views" (impossible) to Vibe Recruiter Intel (first-party data we own).</li>
+        </ul>
+      </div>
+
+    </div>
+
+
+    <!-- IU MEETING -->
+    <div class="section" id="sec-iu">
+      <div class="section-header">
+        <div class="section-eyebrow">Indiana University — Director of Entrepreneurship</div>
+        <h2 class="section-title">Meeting <em>Questions</em></h2>
+      </div>
+
+      <div class="card">
+        <div class="card-body">Prepared for a meeting with the Director of the Entrepreneurship Program at Indiana University. Goal: gather expert feedback on Vibe&#8217;s university strategy, validate the student-to-professional pipeline thesis, and understand what IU&#8217;s entrepreneurship community actually needs from a platform like this.</div>
+      </div>
+
+      <div class="pull-quote lavender">
+        <p>&#8220;No platform combines verified student identity + professional profile + campus job board + org discovery + live chat + calendar &#8212; all in one place.&#8221;</p>
+      </div>
+
+      <div class="card">
+        <div class="card-label">Section 1 &#8212; Validating the Problem</div>
+        <div class="card-title">Is the gap we&#8217;re solving real?</div>
+        <ul class="journal-list">
+          <li>When students are job-hunting or building their professional identity, what tools are they actually using &#8212; and where do those tools fall short?</li>
+          <li>LinkedIn is the default for professional networking. In your experience, do IU students actually use it effectively, or does it feel like a box they check?</li>
+          <li>What&#8217;s the biggest missed connection you see &#8212; students who could be finding opportunities, mentors, or collaborators but aren&#8217;t because the platform just isn&#8217;t built for them?</li>
+          <li>Is there a moment in a student&#8217;s IU experience where they feel most lost in terms of professional development? What triggers that?</li>
+          <li>How do students currently find out about campus career events, club callouts, and internship opportunities &#8212; and how fragmented is that process?</li>
+        </ul>
+      </div>
+
+      <div class="card">
+        <div class="card-label">Section 2 &#8212; The Campus Feature</div>
+        <div class="card-title">Is our IU hub the right answer?</div>
+        <ul class="journal-list">
+          <li>Vibe has a Campus tab: a university-specific feed where students, clubs, and departments post announcements, events, opportunities, and callouts &#8212; all in one authenticated space. Does that solve a real pain point, or does something like that already exist?</li>
+          <li>From the entrepreneurship program&#8217;s perspective &#8212; how do you currently reach students when you have announcements, competitions, or mentorship opportunities? What&#8217;s the friction?</li>
+          <li>Would your program post on a platform like this? What would make you trust it enough to use it officially?</li>
+          <li>Handshake exists for career services. Canvas for academics. Discord and GroupMe for informal chat. Do students actually want one unified place, or is the fragmentation fine because each tool has a clear purpose?</li>
+          <li>If Vibe&#8217;s Campus tab existed right now &#8212; what&#8217;s the first thing you&#8217;d want to see posted on it from the entrepreneurship program?</li>
+        </ul>
+      </div>
+
+      <div class="card">
+        <div class="card-label">Section 3 &#8212; Student Identity and Verification</div>
+        <div class="card-title">How does being a verified student change things?</div>
+        <ul class="journal-list">
+          <li>We&#8217;re planning a .edu email verification flow &#8212; sign up with personal email, verify student status with IU email. The badge unlocks the Campus tab and appears on profile. Does that feel right, or would students find the friction annoying?</li>
+          <li>How important is it to students that their professional profile is tied to a verified institution? Does &#8220;IU Verified&#8221; carry weight when talking to employers?</li>
+          <li>There&#8217;s a tension between a professional profile that follows you after graduation versus a campus identity tied to enrollment. How do you think about that transition?</li>
+          <li>Are there students who would specifically not want their professional network mixed with their campus social life?</li>
+        </ul>
+      </div>
+
+      <div class="card">
+        <div class="card-label">Section 4 &#8212; Entrepreneurship and Startups</div>
+        <div class="card-title">Does Vibe help student founders?</div>
+        <ul class="journal-list">
+          <li>Student founders often need three things quickly: co-founders, early users, and feedback. How do IU student founders find those three things today &#8212; and where do they fail?</li>
+          <li>Vibe has a &#8220;find a co-founder&#8221; style post on the Campus feed &#8212; post what you&#8217;re building, what role you need, and people connect directly. Does that have real utility?</li>
+          <li>The Venture Club pitch competition is seeded as an example in our prototype. Events like that &#8212; is there a platform problem? Do students miss out because they don&#8217;t hear in time?</li>
+          <li>We have a short-form video feature called Vibes &#8212; 60 seconds, professional context. &#8220;Here&#8217;s the problem I&#8217;m solving and why it matters.&#8221; Would that resonate with student founders and investors?</li>
+          <li>If a student wanted to show a potential co-founder or investor that they&#8217;re serious &#8212; not just with a pitch deck but with how they think and communicate &#8212; what would that look like to you?</li>
+        </ul>
+      </div>
+
+      <div class="card">
+        <div class="card-label">Section 5 &#8212; Go-to-Market and Growth</div>
+        <div class="card-title">How do we actually get traction at IU?</div>
+        <ul class="journal-list">
+          <li>If we launched Vibe at IU specifically &#8212; targeting entrepreneurship and Luddy School communities first &#8212; what would be the most credible way to introduce it? What makes students actually sign up?</li>
+          <li>Is there a class, club, or event where Vibe could naturally slot in as a tool &#8212; rather than asking students to adopt it cold?</li>
+          <li>What would it take for IU&#8217;s career services or entrepreneurship office to officially endorse or promote a platform like this?</li>
+          <li>Are there student organizations at IU currently underserved by existing tools &#8212; clubs that struggle to recruit members, communicate, or get event visibility?</li>
+          <li>We&#8217;ve heard from one student (Purdue, cybersecurity) that LinkedIn&#8217;s algorithm is broken &#8212; too much noise, not enough signal from people she actually interacts with. Is that a common complaint from IU students?</li>
+        </ul>
+      </div>
+
+      <div class="card">
+        <div class="card-label">Section 6 &#8212; Big Picture and Pushback</div>
+        <div class="card-title">What are we missing or getting wrong?</div>
+        <ul class="journal-list">
+          <li>What&#8217;s your instinctive concern about a platform like Vibe? What would have to be true for it to fail?</li>
+          <li>LinkedIn has tried to make its product more human and less corporate for years and hasn&#8217;t succeeded. What makes you believe &#8212; or not &#8212; that a new platform can crack that?</li>
+          <li>Is there a student community at IU that would be the perfect early adopter &#8212; and one that definitely wouldn&#8217;t touch it?</li>
+          <li>If you were advising us as a founding team &#8212; what&#8217;s the one thing to get right in year one that most startups in this space get wrong?</li>
+          <li>We&#8217;re positioning this as &#8220;LinkedIn for people who exist outside of their resume.&#8221; Does that framing resonate with how you think about student professional development?</li>
+        </ul>
+      </div>
+
+      <div class="callout coral">
+        <div class="callout-label">Things to bring / show</div>
+        <div class="callout-body">The working prototype: feed-b.html, campus.html, profile, opportunities. Show the Campus tab live &#8212; IU branding, verified student badge, real company listings, chat channels, RSVP events. Show the calendar. Show how a post flows from the campus feed into a student&#8217;s professional profile. Make it feel real.</div>
+      </div>
+
+    </div>
+
+  </div><!-- /content-area -->
+</main>
+
+<script>
+// ── DATA STORE ────────────────────────────────────────────────────
+// This is the canonical data object. When Claude updates the journal,
+// it updates this object and saves it to localStorage.
+const STORAGE_KEY = 'vibe_journal_data';
+
+const DEFAULT_DATA = {
+  version: 'v3.6',
+  sessionCount: 24,
+  lastUpdated: new Date().toLocaleDateString('en-US', {year:'numeric',month:'long',day:'numeric'}),
+  versions: [
+    { ver: 'v1.0', label: 'Session 1',     summary: 'Initial concept. App name (Vibe), warm professional positioning, profile design, Vibes short-form feed, reaction system, landing page.' },
+    { ver: 'v1.1', label: 'Session 2',     summary: 'Cursor redesign: instant dot + snappy ring at lerp 0.28.' },
+    { ver: 'v1.2', label: 'Session 3',     summary: 'Vibes tab renamed from Pitches. Full-screen TikTok-style scroll. Per-emoji glow colors and burst animation.' },
+    { ver: 'v1.3', label: 'Session 4',     summary: 'Recruiter strategy formalised. Warm professional positioning defined. Language shift framework documented.' },
+    { ver: 'v1.4', label: 'Session 5',     summary: 'Core profile page built. Inline edit mode, floating toolbar, auto-save, Recruiter View toggle.' },
+    { ver: 'v1.5', label: 'Session 6',     summary: 'Image uploads: avatar photo/emoji tabs, banner drag-drop + gradient picker. Skill add modal.' },
+    { ver: 'v1.6', label: 'Session 7',     summary: 'Sticky subnav with scroll-spy, larger avatar, Posts feed on profile, Currently Into sidebar, skills quick-view row.' },
+    { ver: 'v1.9', label: 'Session 10',    summary: "First user research session. Sarah O'Farril-Gonzalez (Purdue, Cybersecurity) interviewed. Draft mode and raw-first Vibes positioning identified." },
+    { ver: 'v2.0', label: 'Session 11',    summary: 'Feed Layout B chosen (posts center, Vibes sidebar). Comment section built. Opportunities tab launched.' },
+    { ver: 'v2.1', label: 'Session 12',    summary: 'Messages/DM system: thread list, message requests, Vibe sharing inline, typing indicator.' },
+    { ver: 'v2.2', label: 'Session 13',    summary: 'Mobile layout mockup: 3 phone frames (feed, profile, Vibes full-screen), bottom tab bar.' },
+    { ver: 'v2.3', label: 'Session 14',    summary: 'Profile bug fixes: cursor freeze fixed (event delegation), backdrop-filter removed, z-index raised to max, stray div removed.' },
+    { ver: 'v2.5', label: 'Session 15',    summary: 'Connection/Follow system: 4-state machine, stats row, mutuals modal, owner-mode detection. Network page built.' },
+    { ver: 'v2.8', label: 'Session 16',    summary: 'Campus page: 5 sections (Feed, Jobs, Events, Orgs, Chat). IU branding, verified badge, live chat channels.' },
+    { ver: 'v3.0', label: 'Sessions 17-18', summary: 'Full calendar: mini widget in left nav, full modal with event pills, create-event form, equal-size cells, 7-color picker.' },
+    { ver: 'v3.2', label: 'Sessions 19-20', summary: 'Calendar header layout fixed. IU Director meeting questions added. Comprehensive feature report. Journal rebuilt cleanly.' },
+    { ver: 'v3.3', label: 'Session 21',     summary: 'Otto introduced as flagship feature. AI marketing agent with full Agent tab (5 sub-tabs), corner ring across all pages, post-publish flow, 6-step onboarding. Strategic shift: Vibe becomes the network where your AI agent lives.' },
+    { ver: 'v3.4', label: 'Session 22',     summary: 'Standalone Otto mockup files built (8 HTML reference files with live animations). Journal sections fully refreshed: Vision, Features, Strategy, Design Language all rewritten to reflect everything since v2.x with Otto folded throughout.' },
+    { ver: 'v3.5', label: 'Session 23',     summary: 'Persistence layer (vibe_*_v1 keys + shared _persistence.js). Landing page now the entry point with View demo / Create profile CTAs. Empty states across all pages — profile shows full Otto invitation in-page; other pages gate to landing. Demo mode is honest now.' },
+    { ver: 'v3.6', label: 'Session 24',     summary: 'The Otto session. Seventh page (otto.html) shipped, Otto everywhere via corner ring + slide-out, profile got the dark Otto status hero and per-post badges, the 6-step onboarding flow is live, and the entire profile is now persistable end-to-end (bio, tags, skills, work, currently-on, avatar, resume, cover banner). Calendar moved onto Otto and finally persists deletes across pages.', current: true },
+  ],
+  sessions: [
+    {
+      num: 1, ver: 'v1.0', title: 'Founding the Concept', date: 'Session 1',
+      changes: [
+        { icon: 'target', text: '<strong>App named Vibe</strong> — warm, simple, brand-flexible' },
+        { icon: 'grid', text: '<strong>Positioning defined:</strong> warm professional — personality-first but career-useful' },
+        { icon: 'monitor', text: '<strong>Landing page built</strong> with hero, profile cards, features grid' },
+        { icon: 'palette', text: '<strong>Design system:</strong> Fraunces + DM Sans, coral #FF5C35, cream #FAF7F2' },
+        { icon: 'zap', text: '<strong>Vibes tab</strong> with TikTok-style full-screen scroll, For You / Following / Trending' },
+        { icon: 'fire', text: '<strong>Emoji reaction system:</strong> no likes, no shares, no vanity metrics' },
+      ]
+    },
+    {
+      num: 2, ver: 'v1.1', title: 'Cursor Redesign', date: 'Session 2',
+      changes: [
+        { icon: 'mouse', text: '<strong>Cursor lerp fixed</strong> from 0.12 to 0.28 — snappy trailing ring, instant dot' },
+        { icon: 'zap', text: '<strong>Dot is now instant</strong> — zero lerp, raw mouse coordinates' },
+        { icon: 'target', text: '<strong>Click feedback</strong> — dot shrinks on mousedown' },
+      ]
+    },
+    {
+      num: 3, ver: 'v1.2', title: 'Vibes Tab and Reactions', date: 'Session 3',
+      changes: [
+        { icon: 'star', text: '<strong>Tab renamed</strong> Pitches to Vibes' },
+        { icon: 'phone', text: '<strong>Full-screen vertical scroll</strong> confirmed as format' },
+        { icon: 'palette', text: '<strong>Per-emoji glow colors</strong> when active: orange, purple, gold, pink, blue' },
+        { icon: 'zap', text: '<strong>Burst animation</strong> — springy scale-up on reaction' },
+      ]
+    },
+    {
+      num: 4, ver: 'v1.3', title: 'Recruiter Strategy', date: 'Session 4',
+      changes: [
+        { icon: 'compass', text: '<strong>Warm professional positioning</strong> formalised' },
+        { icon: 'chat', text: '<strong>Language shift framework</strong> — "show how you think and work"' },
+        { icon: 'briefcase', text: '<strong>Recruiter value proposition</strong> defined' },
+        { icon: 'chart', text: '<strong>4-quadrant positioning diagram</strong> built' },
+      ]
+    },
+    {
+      num: 5, ver: 'v1.4', title: 'Core Profile Page', date: 'Session 5',
+      changes: [
+        { icon: 'edit', text: '<strong>Inline edit mode</strong> — contenteditable, floating toolbar (B/I/U/Clear)' },
+        { icon: 'save', text: '<strong>Auto-save toast</strong> — saves 1.8s after last keystroke' },
+        { icon: 'briefcase', text: '<strong>Recruiter View toggle</strong> — dark snapshot card, personality dims to 35%' },
+        { icon: 'tag', text: '<strong>Vibe tags</strong> — add/remove with color picker' },
+        { icon: 'list', text: '<strong>Experience cards</strong> — emoji icon, modal add flow, inline delete' },
+      ]
+    },
+    {
+      num: 6, ver: 'v1.5', title: 'Image Uploads', date: 'Session 6',
+      changes: [
+        { icon: 'camera', text: '<strong>Avatar photo upload</strong> — two tabs (Emoji / Photo), preview strip' },
+        { icon: 'image', text: '<strong>Banner upload</strong> — drag-and-drop modal, photo preview' },
+        { icon: 'rainbow', text: '<strong>8 gradient swatches</strong> for banner' },
+        { icon: 'grad', text: '<strong>Skill add modal</strong> — replaces browser prompt(), quick-suggestion pills' },
+      ]
+    },
+    {
+      num: 7, ver: 'v1.6', title: 'Profile Iteration', date: 'Session 7',
+      changes: [
+        { icon: 'pin', text: '<strong>Sticky section subnav</strong> with IntersectionObserver scroll-spy' },
+        { icon: 'user', text: '<strong>Larger avatar</strong> — 104 to 140px, stronger shadow, hover scale 1.06' },
+        { icon: 'doc', text: '<strong>Posts feed on profile</strong> — filterable Top/Recent' },
+        { icon: 'zap', text: '<strong>Skills quick-view row</strong> — top 3 skills as coloured pills' },
+      ]
+    },
+    {
+      num: 10, ver: 'v1.9', title: 'User Research Session', date: 'Session 10',
+      changes: [
+        { icon: 'user', text: "<strong>First user interview</strong> — Sarah O'Farril-Gonzalez, Purdue, Cybersecurity" },
+        { icon: 'chart', text: '<strong>Algorithm is the #1 pain point</strong> — too many weak-connection posts, not enough from people she interacts with' },
+        { icon: 'edit', text: '<strong>Draft mode identified</strong> as key missing feature' },
+        { icon: 'phone', text: '<strong>What she would say in her Vibe:</strong> educational background, career interests, leadership, one fun fact' },
+      ]
+    },
+    {
+      num: 11, ver: 'v2.0', title: 'Feed Decision + Comments + Opportunities', date: 'Session 11',
+      changes: [
+        { icon: 'check', text: '<strong>Feed Layout B selected</strong> — posts center, Vibes sidebar strip' },
+        { icon: 'chat', text: '<strong>Comment section built</strong> — slide-up modal, threads, replies, sort, like, compose' },
+        { icon: 'briefcase', text: '<strong>Opportunities tab launched</strong> — three-column layout, match %, Apply with Vibe' },
+      ]
+    },
+    {
+      num: 12, ver: 'v2.1', title: 'Messages and DM System', date: 'Session 12',
+      changes: [
+        { icon: 'chat', text: '<strong>Full DM system</strong> — thread list, unread badges, message bubbles, timestamps' },
+        { icon: 'inbox', text: '<strong>Message requests</strong> — non-connected users queue with Accept/Decline' },
+        { icon: 'video', text: '<strong>Vibe sharing in DMs</strong> — inline preview card' },
+        { icon: 'dots', text: '<strong>Typing indicator</strong> — animated dots when composing' },
+      ]
+    },
+    {
+      num: 13, ver: 'v2.2', title: 'Mobile Layout Mockup', date: 'Session 13',
+      changes: [
+        { icon: 'phone', text: '<strong>mobile.html built</strong> — three phone frames: feed, profile, Vibes full-screen' },
+        { icon: 'nav', text: '<strong>Bottom tab bar</strong> — native-style navigation' },
+        { icon: 'ruler', text: '<strong>390px frames</strong> — pixel-accurate iPhone width' },
+      ]
+    },
+    {
+      num: 14, ver: 'v2.3', title: 'Profile Bug Fixes', date: 'Session 14',
+      changes: [
+        { icon: 'mouse', text: '<strong>Cursor freeze fixed</strong> — event delegation via closest() replaces broken static querySelectorAll pattern' },
+        { icon: 'x', text: '<strong>backdrop-filter removed</strong> from modal overlay — was trapping cursor in GPU compositing layer' },
+        { icon: 'fix', text: '<strong>Stray div removed</strong> — orphan at line 1935 mis-parenting Edit/Viewer/Recruiter buttons' },
+        { icon: 'zap', text: '<strong>Cursor z-index raised</strong> to 2,147,483,647 (max safe integer)' },
+      ]
+    },
+    {
+      num: 15, ver: 'v2.5', title: 'Connection and Follow System', date: 'Session 15',
+      changes: [
+        { icon: 'link', text: '<strong>4-state connection machine</strong> — none to following to pending to connected' },
+        { icon: 'chart', text: '<strong>Stats row on profile</strong> — connections, mutual (opens modal), followers' },
+        { icon: 'users', text: '<strong>Mutuals modal</strong> — shared connections with Message links' },
+        { icon: 'globe', text: '<strong>Network page</strong> — three sub-tabs, pending request review, live search' },
+        { icon: 'user', text: '<strong>Owner-mode detection</strong> — Follow/Connect hidden on own profile' },
+      ]
+    },
+    {
+      num: 16, ver: 'v2.8', title: 'Campus Page — Full University Hub', date: 'Session 16',
+      changes: [
+        { icon: 'building', text: '<strong>Campus page built</strong> — 5 complete sections in one page' },
+        { icon: 'news', text: '<strong>Campus Feed</strong> — 4 type tags, seeded posts, RSVP buttons' },
+        { icon: 'briefcase', text: '<strong>Jobs and Internships</strong> — 6 real listings, filter chips, search bar' },
+        { icon: 'calendar', text: '<strong>Events</strong> — date-block layout, 6 seeded events, RSVP + attendee counts' },
+        { icon: 'group', text: '<strong>Organizations</strong> — 8 IU orgs with Join/Follow' },
+        { icon: 'chat', text: '<strong>Chat</strong> — 5 live channels, pre-seeded conversations, live send' },
+      ]
+    },
+    {
+      num: 17, ver: 'v3.0', title: 'Calendar System', date: 'Sessions 17-18',
+      changes: [
+        { icon: 'calendar', text: '<strong>Mini calendar in left nav</strong> — below profile, orange dots on event days' },
+        { icon: 'modal', text: '<strong>Full calendar modal</strong> — event pills on grid, right sidebar for event detail' },
+        { icon: 'square', text: '<strong>Equal-size day boxes</strong> — aspect-ratio:1 + grid-auto-rows:1fr' },
+        { icon: 'plus', text: '<strong>Create event form</strong> — name, date, time, location, notes, 7-color picker' },
+        { icon: 'x', text: '<strong>Delete events</strong> — syncs across mini panel and full modal sidebar' },
+      ]
+    },
+    {
+      num: 20, ver: 'v3.2', title: 'IU Director Meeting Prep + Journal Rebuild', date: 'Session 20',
+      changes: [
+        { icon: 'school', text: '<strong>IU Meeting section added</strong> — 25 questions across 6 categories for the Director of Entrepreneurship' },
+        { icon: 'doc', text: '<strong>Feature report expanded</strong> — all 10 features documented including Campus, Network, Calendar, Messages' },
+        { icon: 'check', text: '<strong>Journal rebuilt cleanly</strong> — no accumulated patch debt, all nav buttons work, v3.2' },
+      ]
+    },
+    {
+      num: 21, ver: 'v3.3', title: 'Otto — flagship AI marketing agent designed', date: 'Session 21',
+      changes: [
+        { icon: '●', text: '<strong>Otto concept locked.</strong> Personal AI marketing agent built into Vibe. Cross-posts content with platform-adapted tone, watches profile views, drafts replies, surfaces patterns. Framed as a character — Jarvis lane, not Wall-E lane.' },
+        { icon: '◐', text: '<strong>Visual language designed.</strong> Coral core + orbiting nodes + breathing rings. Four canonical states: idle, thinking, briefing (sound bars), alert. Dual-color accent system: coral (action) + deep purple (intelligence).' },
+        { icon: '▣', text: '<strong>Agent tab built across 5 sub-tabs.</strong> Today (drafts queue + Inbox + activity), Metrics (Vibe Recruiter Intel as hero, honest API gaps), Insights (Otto as strategist with brief, patterns, heatmap, peer comparison), Customize (voice training + per-platform tone + brand guardrails + leash), Platforms (honest connection manager + coming-soon voting).' },
+        { icon: '↑', text: '<strong>Profile page updated.</strong> Otto status card under hero. Per-post Otto badges (orange = syndicated, purple = drafted, gray = vibe-only).' },
+        { icon: '→', text: '<strong>Post-publish flow storyboarded.</strong> 5 frames, ~12 seconds, zero nag. Otto asks once, drafts in real-time, confirms with the post-card badge.' },
+        { icon: '✦', text: '<strong>Onboarding flow storyboarded.</strong> 6 steps in ~3 minutes. Hello → Name me → Connect a platform → Teach me your voice → Set my leash → The aha moment (Otto generates a real draft from voice samples).' },
+        { icon: '!', text: '<strong>API reality documented.</strong> Pivoted from "scrape LinkedIn views" (impossible) to <strong>Vibe Recruiter Intel</strong> — first-party data on Vibe profile views. LinkedIn Premium killer feature, completely defensible because Vibe owns the data.' },
+        { icon: '$', text: '<strong>Monetization scaffolded.</strong> Otto Free / Otto Pro ($8-12 student, $20 pro) / Otto Recruit ($50+) / Otto Enterprise (campus deals). Voice training is the key Pro paywall — real LLM cost per user.' },
+        { icon: '◆', text: '<strong>Strategic positioning shift.</strong> Vibe goes from "warm professional network" to "the network where your AI agent lives." Otto is the defensible moat.' },
+      ]
+    },
+    {
+      num: 22, ver: 'v3.4', title: 'Otto mockups + journal refresh', date: 'Session 22',
+      changes: [
+        { icon: '◇', text: '<strong>Otto mockup folder built.</strong> 8 standalone HTML reference files with live CSS animations: index page, four-states viewer, idle corner, slide-out panel, profile page, full Agent tab (Today view), 5-frame post-publish storyboard, 6-step onboarding storyboard. All open in any browser, animations preserved.' },
+        { icon: '◈', text: '<strong>Executive Summary refreshed.</strong> Now leads with the Otto positioning shift and the defensibility argument. New "where the prototype is" callout.' },
+        { icon: '◐', text: '<strong>Vision section refreshed.</strong> Three pillars expanded to five (added Campus, Otto, Calendar). New thesis statement, who-it-is-for callout, philosophy moved to coral callout.' },
+        { icon: '▣', text: '<strong>Features section fully rewritten.</strong> Old "Three Pillars" title replaced. All 10 features rewritten to reflect current state. Otto folded in as feature #10. New "Underneath all of it" card covers cross-cutting systems (cursor, tokens, no-emoji policy, mock data, Next.js setup).' },
+        { icon: '◇', text: '<strong>Strategy section restructured.</strong> Now organized by audience (recruiters / students / universities) with the moat argument as a dedicated card. Language shift table expanded with Otto-related entries. New positioning table shows Vibe vs LinkedIn, Instagram, TikTok, Handshake, portfolio sites.' },
+        { icon: '◈', text: '<strong>Design Language fully expanded.</strong> Typography hierarchy spelled out. Color palette grew to 8 colors with the dual-accent rule (coral = action, purple = intelligence). New Iconography card explaining the no-emoji-in-chrome policy. New Otto Motion card with the four-states timing specs.' },
+        { icon: '·', text: '<strong>Emoji removed from chrome throughout.</strong> Reaction system, comments description, all nav buttons. Emoji now only appear in user-generated content per design system.' },
+      ]
+    },
+    {
+      num: 23, ver: 'v3.5', title: 'Persistence layer + landing page', date: 'Session 23 — 2026-04-28',
+      changes: [
+        { icon: '◇', text: '<strong>Multi-key persistence layer.</strong> vibe_*_v1 localStorage keys mirror how real platforms scope data per resource. Shared _persistence.js holds the helpers (vibeLoad/Save/Clear, vibeInit, seedDemoData, exitDemoMode). Schema grows incrementally as each page adopts it.' },
+        { icon: '◈', text: '<strong>Landing page is now the entry point.</strong> Hero with two CTAs: View demo site (seeds Maya across all keys, lands on feed) and Create your profile (routes to onboarding via the empty profile state). Otto idle orb in the corner reinforces the positioning.' },
+        { icon: '◐', text: '<strong>Pre-auth gate.</strong> Every non-profile page redirects to landing when no user exists. Profile is the only page that exists pre-onboarding because that is where you create yourself.' },
+        { icon: '▣', text: '<strong>Empty states across six pages.</strong> Profile shows the full Otto invitation in-page (your profile is empty, lets fix that). Feed, network, campus, opportunities, messages bounce to landing.' },
+        { icon: '◇', text: '<strong>Demo mode is honest.</strong> Floating Demo mode · Exit pill on every non-profile page. Inline Exit demo profile button replaces Share profile on the profile page when in demo. Both wipe seed data and return to landing.' },
+        { icon: '·', text: '<strong>ACTIVE/ rule broadened.</strong> Was HTML-only; now runtime assets only (HTML and JS). sync.command updated to copy both extensions. _persistence.js mirrors there too.' },
+      ]
+    },
+    {
+      num: 24, ver: 'v3.6', title: 'Otto v1 + onboarding + profile persistence', date: 'Session 24 — 2026-04-28',
+      changes: [
+        { icon: '◆', text: '<strong>Otto is in the prototype.</strong> A new seventh page (otto.html) sitting in the same cream shell as the rest of the app, with its own visual identity: a dark hero with the animated orb (orbiting rings, pulsing coral core, drifting purple satellite), the briefing quote, three KPIs. The mockup translated into a real, navigable page. Today view fully built — drafts queue, Otto\'s Inbox, activity log on the left; 7-day metrics, insights, per-platform performance, voice sliders, and a clickable leash on the right. Five sub-tabs in the bar (Today live, Metrics / Insights / Customize / Platforms as placeholders for v2).' },
+        { icon: '◈', text: '<strong>Otto, everywhere.</strong> Shared _otto.js injects a pulsing corner ring (bottom-right) and a dark slide-out panel into every non-Otto page. Click the ring → backdrop dims, panel slides in from the right with the briefing quote, three drafts (one PICK, one neutral, one "i\'d skip"), recent activity, and a footer link to the full command center. Esc or click-outside closes. Self-suppresses on otto.html and landing. Otto link added to every page\'s left nav.' },
+        { icon: '◐', text: '<strong>Otto on the profile page.</strong> The dark Otto status hero from mockup 04 sits between the identity block and the section subnav: mini orb, "active" tag, status line ("syndicated 4 posts this week · 2 drafts waiting for you"), four platform tiles, coral Review CTA. Per-post Otto badges on each post — orange "otto · N platforms" with a glowing dot, purple "otto drafted · review", gray "vibe only" — plus a per-platform stats row on the syndicated post. Auto-hides in recruiter view; Otto is the user\'s tool, not a recruiter-facing surface.' },
+        { icon: '▣', text: '<strong>Onboarding flow shipped.</strong> A new onboarding.html page — the 6-step Otto introduction from mockup 07. Step 1: Otto introduces itself with the big animated orb. Step 2: name Otto (default "otto", suggestions: pico, mox, echo, nimo, ember). Step 3: connect a platform (LinkedIn pre-selected, six options). Step 4: paste 1–3 voice samples in auto-growing textareas, gated "Train me →" button. Step 5: pick the leash (Ask first / Ask sometimes / Full auto). Step 6: the aha moment — Otto generates a draft in the user\'s voice with three remix variants (try again / punchier / warmer). Skip preserved through step 4 with a confirm dialog; gone after. Landing\'s "Create your profile" CTA and the empty-profile "Start with otto" button now both route here.' },
+        { icon: '◇', text: '<strong>Onboarding lands you on profile.</strong> Final CTA reads "let\'s set up your profile →" — saves a sparse user object (_isDemo: false, _onboarded: true) plus the Otto config (name, platforms, voiceSamples, leash) under a new vibe_otto_v1 key. Profile detects fresh-onboarded users (_onboarded && !name), wipes Maya\'s demo content, auto-enters edit mode, and floats a welcome banner: "click any field to edit. otto\'s already set up and watching."' },
+        { icon: '◆', text: '<strong>Profile is fully persistable.</strong> Every editable surface now writes to vibe_user_v1 on change and re-hydrates on load: identity (name, tagline, location, headline, website), bio, vibe tags (with their colors), skills, currently-working-on items, work experience (title / company / dates / location / description / logo), avatar, resume / portfolio uploads, cover banner (photo or gradient). Uploaded images are base64-encoded into data URLs so they survive a page reload. One snapshot function (saveProfileToStorage) handles every section; renderUserSections injects them back on load. Edit anything, navigate away, come back — it\'s all there.' },
+        { icon: '◐', text: '<strong>Identity flows everywhere.</strong> A new vibeHydrateSidebar() in _persistence.js auto-runs on every page (DOMContentLoaded). The sidebar profile chip\'s avatar, name, and headline pull from vibe_user_v1 — your photo, your initials, your role across feed / network / campus / opportunities / messages. Emoji avatars removed in favor of photo-or-initials; the picker simplified to one tab. Pre-paint guards on _persistence.js + profile.html eliminate the flash-of-Maya that used to peek through during page transitions.' },
+        { icon: '▣', text: '<strong>Calendar is now on Otto, and deletions persist.</strong> Ported the full calendar widget from feed (mini month view in the sidebar, full modal, create-event form) to otto.html. Same vibe_cal_events_v1 storage key as everywhere else. Fixed a latent bug across all six calendar-bearing pages: removeCalEvent never wrote back to localStorage, so deleted events came back on reload. Now they stay deleted everywhere. Profile\'s create-event modal was missing entirely — added it, fixed a z-index that buried it behind the calendar, and patched a saveNewEvent crash that prevented the modal from closing.' },
+        { icon: '◇', text: '<strong>Way back to landing.</strong> Replaced the "Share profile" pill in profile\'s top nav with an Exit button — clears localStorage and routes back to landing. Demo Maya\'s version reads "Exit demo"; an onboarded user\'s reads "Exit". One-click reset for any state.' },
+        { icon: '·', text: '<strong>What\'s next:</strong> wire the remaining profile sections (posts, vibes grid, professional snapshot, at-a-glance stats, connection counts) to persistence using the same saveProfileToStorage pattern. Then the Connect button + viewer-mode for browsing other people\'s profiles. After that: Otto\'s four placeholder sub-tabs, the post-publish flow, profile-side Otto integrations beyond the badges already shipped.' },
+      ]
+    },
+    {
+      num: 25, ver: 'v3.7', title: 'Profile is fully storable + you can browse other people', date: 'Session 25 — 2026-04-28',
+      changes: [
+        { icon: '◆', text: '<strong>The whole profile now persists.</strong> Every section that was still hardcoded — posts, vibes, professional snapshot, at-a-glance stats, connection counts, pinned item — now writes to localStorage on change and re-hydrates on load. Posts and vibes get their own keys (vibe_posts_v1, vibe_vibes_v1) since they\'re list resources; snapshot, glance, counts, and pinnedId fold into vibe_user_v1 since they describe the user. Edit anything, navigate away, come back — it\'s all there. Same pattern as Session 24: capture from DOM in save, rebuild DOM from data in render, hook into add / remove / publish handlers.' },
+        { icon: '◈', text: '<strong>Pin works on every post and vibe.</strong> The old pin only knew about four hardcoded items — newly-published posts couldn\'t be pinned at all, and most vibes had no pin button. Rewrote pinFromProfile to read from the live DOM (post body, tags, reactions, vibe gradient, title, views) plus the current user\'s identity. Every post and every vibe now gets a Pin button in edit mode. The pinned card shows the owner\'s actual avatar (photo or initials) instead of always "MC". Pinned id persists to vibe_user_v1.pinnedId and restores on reload.' },
+        { icon: '◐', text: '<strong>You can browse other people\'s profiles.</strong> A new shared file (_mockUsers.js) holds five full mock profiles — Kwame Asante, Priya Sinha, Luca Moretti, Aisha Okafor, Diana Nguyen. Each mirrors the vibe_user_v1 shape (identity, bio, work, skills, snapshot, glance, counts) plus inline posts and vibes arrays. Profile.html reads ?user=&lt;slug&gt; from the URL — when present, the page loads that mock user instead of your own, applies viewer-mode automatically, and the existing render path hydrates everything. No special-casing for visitor profiles. Each mock has 1–3 posts and 2–3 vibes that feel like a real person\'s profile.' },
+        { icon: '▣', text: '<strong>Viewer-mode hides the owner\'s tools.</strong> When you\'re visiting someone\'s profile, the Edit button, the composer, the delete and pin chrome, the Otto status hero, the per-post Otto badges, and even the floating Otto sidebar widget all disappear — Otto belongs to the owner. The Connect button (top right) shows up only on visitor view, with the viewed person\'s name in toasts and state. A small dark pill floats at the top: "Viewing Kwame Asante · Back to your profile" so you always have a way home. The profile.html top-nav Exit button hides too.' },
+        { icon: '◇', text: '<strong>Connect / Follow state persists per person.</strong> A new vibe_relationships_v1 key stores a map of slug → state (\'connected\', \'pending\', \'following\'). Click Connect on Kwame, leave, come back days later: still pending. Send the soft-follow: still following. Existing setVibeRelState handles the UI; the new loadRelationship and saveRelationship hooks make it durable. Save functions on profile have hard guards — they can\'t fire while you\'re viewing someone else\'s profile, even from the console. Visitor data can\'t accidentally clobber owner data.' },
+        { icon: '◈', text: '<strong>Network cards now navigate.</strong> Clicking anywhere on a person card in network.html opens their profile — except on the Message / Connect / Following buttons, which still work as before. The five mocks (ka, ps, lm, ao, dn) load into full viewer-mode profiles. The other names without a mock yet show a friendly toast ("Profile not in this demo yet") so the click feels acknowledged. People-also-viewed cards on profile got the same treatment.' },
+        { icon: '◐', text: '<strong>Network tab now explains itself.</strong> Each sub-tab (Connections / Following / Followers) gets a one-line description that names the relationship: Connections are mutual ("they accepted, DMs are open"), Following is one-way ("you sent a request, waiting for them"), Followers is everyone who sees your posts ("connections plus people you haven\'t accepted yet"). Removes the LinkedIn-vs-Instagram-vs-Twitter ambiguity that follows users between platforms.' },
+        { icon: '·',  text: '<strong>Polish:</strong> The "vibe only" pill no longer slides under the Pin button when you enter edit mode (added padding to clear the absolutely-positioned chrome). The Relevant Skills strip got a clean id-based hide for onboarded users; the real wire-up is queued for the viewer-mode polish pass, where it\'ll likely derive from the snapshot\'s "Top skills" row.' },
+        { icon: '·',  text: '<strong>What\'s next:</strong> Otto\'s four placeholder sub-tabs (Metrics, Insights, Customize, Platforms). The Otto post-publish flow from mockup 06 — feed composer → drafts → review → approve. The .edu student verification flow. Inner empty states across feed / campus / opportunities. And filling in the rest of the network roster with mock profiles so every card opens to something real.' },
+      ]
+    },
+    {
+      num: 26, ver: 'v3.8', title: 'Otto sub-tabs + post-publish flow + .edu verification + empty states', date: 'Session 26 — 2026-04-28',
+      changes: [
+        { icon: '◆', text: '<strong>Otto\'s four placeholder sub-tabs are real.</strong> Metrics, Insights, Customize, and Platforms — built out in the same visual language as Today. Metrics has a 28-day daily bar chart highlighting Wednesdays in purple, four KPI tiles with deltas (views / profile views / engagement rate / followers), top-five performing posts ranked, per-platform breakdown with growth %, audience composition by industry, content-type comparison. Insights opens with Otto\'s monthly read in a big dark italic card, six pattern cards (cadence / voice / timing / vibes-on-IG / X-flat / profile-depth), four forecast predictions in a dark card, three actionable recommendations with action buttons. Customize has the full voice training panel (three sample posts + retrain / add buttons), five tone sliders, posting-windows with day-of-week chips + 24-slot time grid, off-limit topic chips with add/remove, and Otto\'s persona on a dark card with name / sign-off inputs and three toggle settings. Platforms shows the four connected accounts as cards with status pills, post counts, Otto\'s honest read per platform; five available platforms with Connect; four cross-post rule toggles. Range pills, toggles, day buttons, time slots, chip remove/add — all interactive.' },
+
+        { icon: '◈', text: '<strong>The Otto post-publish flow is live.</strong> Mockup 06\'s 5-frame storyboard, end-to-end from feed.html. Publish a post: the new card gets a coral border + "POSTED" badge for a 1.5s beat. Otto\'s bubble pops above the corner ring — "want me to send this to your other 3 platforms?" with [Yes, draft them] / [Skip]. On yes: a dark side panel slides in, Otto in "thinking..." state, platforms light up one-by-one (LinkedIn → Instagram → X), each going queued → drafting → ready. Panel morphs to the drafts view: Otto\'s briefing at top, LinkedIn (PICK badge), Instagram, and X (greyed "i\'d skip"). Per-draft Approve / Edit (textarea swap, Cmd+Enter to commit), footer "Approve all 2 →" / "Skip all". On approve: panel collapses, the post card gets a small "otto · 2 platforms" badge in its header, green toast slides in: "shipped to LinkedIn & Instagram. I\'ll watch how they do." Variants generated client-side from the user\'s actual post text — LinkedIn keeps it as-is, Instagram lowercases and adds a casual outro, X gets a short version with a question.' },
+
+        { icon: '◐', text: '<strong>The standard Otto side panel learns from your last post.</strong> The slide-out panel that opens from the corner ring used to show three hardcoded drafts about Maya\'s Next.js post — even if you\'d just published something completely different. Now it persists your most recent post text (vibe_otto_lastpost_v1) on every publish and rebuilds the briefing + draft cards from it on every panel open. Before you\'ve posted anything: a friendly "haven\'t seen a post yet — when you publish something, your platform drafts will live here." After you post: the briefing names your real text and the three drafts (LinkedIn / Instagram / X) reflect it. The standard panel and the post-publish flow share the same variant generator, so the side panel mirrors exactly what you\'d see right after publishing.' },
+
+        { icon: '▣', text: '<strong>Student .edu verification flow shipped.</strong> A new shared file (_studentVerify.js) holds a 3-state modal — enter .edu email → "we sent a link, click the demo button" → "you\'re verified." Validates the .edu domain via regex, derives the school name from a 24-school lookup (iu.edu → Indiana University, mit.edu → MIT, berkeley.edu → UC Berkeley, etc.) with a clean fallback for unknown domains. Verification persists to vibe_user_v1.studentVerification = { status, email, school, ts }. A custom event (vibeStudentVerified) fires on success so any listening page refreshes its UI live. Esc / backdrop click / × close the modal from any state.' },
+
+        { icon: '◇', text: '<strong>Campus tab now gates on verification.</strong> Unverified users hitting campus.html see a centered card instead of the IU content: "Campus is for verified students" with four feature tiles (events & deadlines, jobs & internships, your classmates, campus chat) and an IU-red Verify with your .edu email CTA. The whole .center + .right column hides; the gate spans both. Once verified, the page reloads and the normal campus content shows — and the campus header swaps "Indiana University" for the user\'s actual derived school. Profile gets a coral 🎓 Student · {school} badge next to the name when verified, or a small dashed "+ Verify your student status" pill when unverified (own profile only — never on visitor view).' },
+
+        { icon: '◆', text: '<strong>Empty states for fresh-onboarded users.</strong> Three pages now branch on user._onboarded && !user._isDemo. Feed hides Vibe of the Day + the four hardcoded network posts (Kwame / Priya / Luca / Zara) + the "ranked by match" banner, shows "📡 Your feed is quiet" with a Find people CTA and an Otto microcopy footer; the empty state hides automatically once the user publishes their first post via the composer. Opportunities hides the search bar + filter pills + every job card, shows "💼 No opportunities yet" with an Edit your profile CTA. Messages hides the message-requests banner + tabs + five hardcoded threads, shows "💬 No conversations yet" in the left column with a Find people CTA; the right column copy softens to "Pick someone to message" and the now-broken "Open a conversation" button is removed. Demo Maya keeps every hardcoded item — the trigger is fresh-onboarded only. Campus skipped because its verification gate already handles the empty case.' },
+
+        { icon: '·', text: '<strong>What\'s next:</strong> Connect-side polish — replace the demo 3-second auto-accept with a real pending-request state and the other person\'s incoming view. Per-school campus content so verified non-IU students see something for their school. Backend phase: real OAuth and posting for Otto, real .edu email confirmation, the For You ranking algorithm. The mock-roster fill is dropped — five mocks is enough demo coverage; the effort is better spent on backend work.' },
+      ]
+    },
+  ],
+  nextSteps: [
+    { priority: 'high',   text: '<strong>Connect-side polish</strong> — the demo auto-accepts a Connect after 3 seconds. Wire to a real "pending requests" state with the other person\'s incoming view (accept / decline) and a notification when accepted.' },
+    { priority: 'high',   text: '<strong>Per-school campus content</strong> — verified non-IU students currently still see IU\'s feed / jobs / events. Either show a "your school doesn\'t have campus content yet — be the first" empty state, or seed a few additional mock schools alongside IU.' },
+    { priority: 'medium', text: '<strong>Otto v2 — backend</strong> — voice training pipeline, platform OAuth (LinkedIn, Instagram Business, TikTok, YouTube, X), posting queue, real metrics ingestion. Plus the platform-strategy notes on account authorization (otto_platform_strategy.md). Separate larger phase.' },
+    { priority: 'medium', text: '<strong>Real .edu verification</strong> — replace the demo "I clicked the link" button with an actual one-time-link email send + click confirmation. Pair with handling for edge cases (alumni domains, .edu but not student, faculty, etc.).' },
+    { priority: 'medium', text: '<strong>For You algorithm</strong> — the "94% match" / "Matched for you" / "Ranked by match" labels are hardcoded text right now. Real ranking signals: skills overlap, mutuals, same field, campus proximity, recent activity. Backend territory.' },
+    { priority: 'medium', text: '<strong>Viewer-mode polish pass</strong> — wire the Relevant Skills strip on profile (currently hidden for onboarded users) to derive from snapshot.topSkills, plus a sweep for any remaining owner-only chrome that leaks into visitor view.' },
+    { priority: 'medium', text: '<strong>Calendar and campus RSVP sync</strong> — RSVP on campus events auto-adds to calendar with date/time/location.' },
+    { priority: 'medium', text: '<strong>Notifications</strong> — connection requests, RSVP reminders 24h before events, new org posts, Otto inbox alerts.' },
+    { priority: 'medium', text: '<strong>Agenda list view</strong> — toggle between month grid and chronological upcoming events in calendar.' },
+    { priority: 'medium', text: '<strong>Mobile layout refinements</strong> — campus, chat, calendar, and Otto on mobile.' },
+    { priority: 'low',    text: '<strong>Otto Recruit — separate product</strong> — recruiter-side Otto for outreach drafting, applicant classification, calendar coordination.' },
+    { priority: 'low',    text: '<strong>Company and org profiles</strong> — recruiters, campus orgs, departments post jobs and announce events.' },
+    { priority: 'low',    text: '<strong>Export to .ics</strong> — calendar events downloadable to Google Calendar, Apple Calendar, Outlook.' },
+    { priority: 'low',    text: '<strong>Landing page rewrite</strong> — lead with Otto: "the network where your AI agent lives." Replace warm-professional-only positioning.' },
+  ],
+}
+
+// ── STORAGE ────────────────────────────────────────────────────────
+function loadData() {
+  try {
+    const stored = localStorage.getItem(STORAGE_KEY);
+    if (stored) {
+      const parsed = JSON.parse(stored);
+      // Merge: keep stored data but fill any missing keys from default
+      return { ...DEFAULT_DATA, ...parsed };
+    }
+  } catch(e) {}
+  return DEFAULT_DATA;
+}
+
+function saveData(data) {
+  try {
+    localStorage.setItem(STORAGE_KEY, JSON.stringify(data));
+  } catch(e) {}
+}
+
+// On first load, always write the latest default data so it reflects current session
+const journalData = DEFAULT_DATA;
+saveData(journalData);
+
+// ── RENDER ────────────────────────────────────────────────────────
+function render(data) {
+  // Update header/meta
+  document.getElementById('heroVersion').textContent = data.version;
+  document.getElementById('heroSessions').textContent = data.sessionCount;
+  document.getElementById('heroDate').textContent = data.lastUpdated;
+  document.getElementById('sidebarVersion').textContent = `${data.version} — Session ${data.sessionCount}`;
+  document.getElementById('sidebarDate').textContent = data.lastUpdated;
+  document.getElementById('syncDate').textContent = data.lastUpdated;
+  document.getElementById('sessionBadge').textContent = data.sessionCount;
+
+  // Version table
+  const vb = document.getElementById('versionBody');
+  vb.innerHTML = '';
+  data.versions.forEach(v => {
+    const tr = document.createElement('tr');
+    tr.className = 'version-row' + (v.current ? ' current' : '');
+    tr.innerHTML = `<td>${v.ver} — ${v.label}</td><td>${v.summary}</td>`;
+    vb.appendChild(tr);
+  });
+
+  // Session log
+  const sl = document.getElementById('sessionLog');
+  sl.innerHTML = '';
+  [...data.sessions].reverse().forEach(s => {
+    const div = document.createElement('div');
+    div.className = 'session-card';
+    div.innerHTML = `
+      <div class="session-card-header">
+        <div class="session-number">${s.num}</div>
+        <div class="session-header-text">
+          <h3>${s.title}</h3>
+          <p>${s.date}</p>
+        </div>
+        <span class="session-version-chip">${s.ver}</span>
+      </div>
+      <div class="session-card-body">
+        ${s.changes.map(c=>`
+          <div class="session-change">
+            <span class="session-change-icon">${c.icon}</span>
+            <span class="session-change-text">${c.text}</span>
+          </div>
+        `).join('')}
+      </div>`;
+    sl.appendChild(div);
+  });
+}
+
+render(journalData);
+
+// ── NAV ───────────────────────────────────────────────────────────
+function showSection(id, btn) {
+  document.querySelectorAll('.section').forEach(s => s.classList.remove('active'));
+  document.querySelectorAll('.nav-item').forEach(b => b.classList.remove('active'));
+  document.getElementById('sec-' + id).classList.add('active');
+  btn.classList.add('active');
+  // Scroll to top of content
+  document.querySelector('.sync-bar').scrollIntoView({ behavior: 'smooth', block: 'start' });
+}
+
+// ── EXPOSE UPDATE API ─────────────────────────────────────────────
+// Claude calls window.vibeJournal.update(patch) to update the journal.
+// patch can contain: version, sessionCount, lastUpdated, newVersion{}, newSession{}
+window.vibeJournal = {
+  update(patch) {
+    const data = loadData();
+    if (patch.version)      data.version = patch.version;
+    if (patch.sessionCount) data.sessionCount = patch.sessionCount;
+    if (patch.lastUpdated)  data.lastUpdated = patch.lastUpdated;
+    if (patch.newVersion)   data.versions.push(patch.newVersion);
+    if (patch.newSession)   data.sessions.push(patch.newSession);
+    if (patch.nextSteps)    data.nextSteps = patch.nextSteps;
+    saveData(data);
+    render(data);
+    return 'Journal updated to ' + data.version;
+  },
+  getData() { return loadData(); },
+  reset() { localStorage.removeItem(STORAGE_KEY); location.reload(); }
+};
+</script>
+</body>
+</html>
