@@ -1,0 +1,107 @@
+import {
+  GetObjectCommand,
+  HeadBucketCommand,
+  PutObjectCommand,
+  S3Client,
+} from "@aws-sdk/client-s3";
+import { getSignedUrl } from "@aws-sdk/s3-request-presigner";
+
+/** DB stores keys like `clips/abc123.mp4`, never public URLs (PHASE_1 storage rules). */
+export const CLIP_KEY_PREFIX = "clips/";
+
+const DEFAULT_SIGN_EXPIRES_SEC = 300;
+
+function requireEnv(name: string): string {
+  const value = process.env[name]?.trim();
+  if (!value) {
+    throw new Error(`Missing required env var: ${name}`);
+  }
+  return value;
+}
+
+let cachedClient: S3Client | undefined;
+
+/** S3-compatible client pointed at Cloudflare R2. Server-only — keys never touch the browser bundle. */
+export function getR2S3Client(): S3Client {
+  if (cachedClient) {
+    return cachedClient;
+  }
+  const accountId = requireEnv("R2_ACCOUNT_ID");
+  const accessKeyId = requireEnv("R2_ACCESS_KEY_ID");
+  const secretAccessKey = requireEnv("R2_SECRET_ACCESS_KEY");
+
+  cachedClient = new S3Client({
+    region: "auto",
+    endpoint: `https://${accountId}.r2.cloudflarestorage.com`,
+    credentials: { accessKeyId, secretAccessKey },
+    forcePathStyle: true,
+  });
+  return cachedClient;
+}
+
+export function isR2Configured(): boolean {
+  return Boolean(
+    process.env.R2_ACCOUNT_ID?.trim() &&
+      process.env.R2_ACCESS_KEY_ID?.trim() &&
+      process.env.R2_SECRET_ACCESS_KEY?.trim() &&
+      process.env.R2_BUCKET_NAME?.trim(),
+  );
+}
+
+function assertClipObjectKey(objectKey: string): void {
+  const key = objectKey.trim();
+  if (!key || key.includes("://")) {
+    throw new Error(
+      "Clip storage keys must be object keys (e.g. clips/id.mp4), not URLs",
+    );
+  }
+  if (!key.startsWith(CLIP_KEY_PREFIX)) {
+    throw new Error(`Clip object keys must start with "${CLIP_KEY_PREFIX}"`);
+  }
+}
+
+/** Short-lived signed PUT for uploading a Clip. Caller must enforce auth + max size before issuing URL (P1-017+). */
+export async function signClipPutUrl(
+  objectKey: string,
+  options?: { contentType?: string; expiresInSec?: number },
+): Promise<string> {
+  assertClipObjectKey(objectKey);
+  const bucket = requireEnv("R2_BUCKET_NAME");
+  const client = getR2S3Client();
+  const cmd = new PutObjectCommand({
+    Bucket: bucket,
+    Key: objectKey,
+    ContentType: options?.contentType ?? "video/mp4",
+  });
+  return getSignedUrl(client, cmd, {
+    expiresIn: options?.expiresInSec ?? DEFAULT_SIGN_EXPIRES_SEC,
+  });
+}
+
+/** Short-lived signed GET after permission checks (Supabase session + post visibility in later tickets). */
+export async function signClipGetUrl(
+  objectKey: string,
+  expiresInSec?: number,
+): Promise<string> {
+  assertClipObjectKey(objectKey);
+  const bucket = requireEnv("R2_BUCKET_NAME");
+  const client = getR2S3Client();
+  const cmd = new GetObjectCommand({ Bucket: bucket, Key: objectKey });
+  return getSignedUrl(client, cmd, {
+    expiresIn: expiresInSec ?? DEFAULT_SIGN_EXPIRES_SEC,
+  });
+}
+
+export async function probeR2Bucket(): Promise<
+  { ok: true } | { ok: false; message: string }
+> {
+  try {
+    const bucket = requireEnv("R2_BUCKET_NAME");
+    const client = getR2S3Client();
+    await client.send(new HeadBucketCommand({ Bucket: bucket }));
+    return { ok: true };
+  } catch (err) {
+    const message = err instanceof Error ? err.message : String(err);
+    return { ok: false, message };
+  }
+}
