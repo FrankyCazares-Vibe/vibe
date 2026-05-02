@@ -4,8 +4,8 @@ import Link from "next/link";
 import { useRouter, useSearchParams } from "next/navigation";
 import { Suspense, useState } from "react";
 
+import { getPostLoginDestination } from "@/lib/auth/post-login";
 import { getSupabaseBrowserClient } from "@/lib/supabase/browser";
-import { DEFAULT_POST_LOGIN_PATH } from "@/lib/auth/email-confirm-redirect";
 
 function LoginForm() {
   const router = useRouter();
@@ -31,12 +31,11 @@ function LoginForm() {
       setError(signErr.message);
       return;
     }
-    const next = searchParams.get("next");
-    router.push(
-      next?.startsWith("/") && !next.startsWith("//")
-        ? next
-        : DEFAULT_POST_LOGIN_PATH,
+    const dest = await getPostLoginDestination(
+      supabase,
+      searchParams.get("next"),
     );
+    router.push(dest);
     router.refresh();
   }
 

@@ -37,12 +37,12 @@ export default function SignupPage() {
       return;
     }
     if (data.session) {
-      router.push("/auth/school-email");
+      router.push("/onboarding");
       router.refresh();
       return;
     }
     setMessage(
-      "Check this inbox for a confirmation link. After you click it, you’ll land on school email — your login email is done; next is a separate .edu verification.",
+      "Check this inbox for a confirmation link. After you click it, you’ll meet Otto to set up your profile — then we’ll ask for your school email to unlock campus.",
     );
   }
 
@@ -76,9 +76,9 @@ export default function SignupPage() {
       >
         <strong style={{ color: "#1C1C1E" }}>Two different emails:</strong> this
         page is your <strong>login email</strong> (any address you can use for
-        sign-in and account confirmations). After you’re in, we’ll ask for a
-        separate <strong>.edu school email</strong> to unlock campus — that
-        sends a second verification message.
+        sign-in). After you confirm it, <strong>Otto</strong> walks you through
+        your profile. Then we’ll ask for a separate <strong>.edu school
+        email</strong> to unlock campus (second verification).
       </p>
 
       <form

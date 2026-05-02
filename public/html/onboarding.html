@@ -1,5 +1,5 @@
 <!DOCTYPE html>
-<!-- Prototype: open /html/onboarding.html?legacy=1 — default requests redirect to /auth/signup in middleware. -->
+<!-- Otto onboarding (static). Open via /onboarding from the Next app so query params are preserved. -->
 <html lang="en">
 <head>
 <meta charset="UTF-8">
@@ -741,7 +741,7 @@ document.addEventListener('keydown', e => {
 });
 
 // ── Completion ────────────────────────────────────────────────────────────
-function completeOnboarding() {
+async function completeOnboarding() {
   // Build the user object — minimal sparse user, NOT a demo seed.
   // Profile is empty by design; user fills it in via profile.html edit mode.
   const user = {
@@ -766,9 +766,22 @@ function completeOnboarding() {
   vibeSave('vibe_user_v1', user);
   vibeSave('vibe_otto_v1', ottoConfig);
 
-  // Land on the profile page so the user can fill it in next.
-  // The profile detects (_onboarded && !name) and auto-enters edit mode.
-  window.location.href = '/html/profile.html';
+  try {
+    const r = await fetch('/api/me/onboarding-complete', {
+      method: 'POST',
+      credentials: 'same-origin',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ otto_answers: ottoConfig }),
+    });
+    const j = await r.json();
+    if (j.ok && typeof j.next === 'string' && j.next.startsWith('/')) {
+      window.location.href = j.next;
+      return;
+    }
+  } catch (e) { /* no session or offline — fall through */ }
+
+  // Logged-out browser (e.g. some in-app webviews): still leave onboarding.
+  window.location.href = '/campus';
 }
 </script>
 

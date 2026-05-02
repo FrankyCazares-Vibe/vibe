@@ -1,16 +1,16 @@
 /**
  * Redirect target after Supabase email confirmation (`exchangeCodeForSession`).
+ * New signups go straight to Otto (Next bridge → static onboarding).
  * `next` must be a same-origin path (see auth callback route).
  */
-export const POST_EMAIL_CONFIRM_PATH = "/auth/school-email?account_verified=1";
+export const POST_EMAIL_CONFIRM_PATH = "/onboarding?account_verified=1";
 
 /**
- * Next.js bridge: checks session, then full-navigates to static Otto UI (avoids App Router / Link
- * treating `/html/*.html` like an app route and leaving users on the wrong screen).
+ * Default post-auth path when not using `getPostLoginDestination`.
  */
-export const DEFAULT_POST_LOGIN_PATH = "/onboarding";
+export const DEFAULT_POST_LOGIN_PATH = "/campus";
 
-/** Static Otto onboarding (middleware requires session unless ?legacy=1). */
+/** Static Otto HTML — load through `/onboarding` so query params are preserved. */
 export const ONBOARDING_STATIC_PATH = "/html/onboarding.html";
 
 /** Build `emailRedirectTo` for signUp / invite flows. Must be listed in Supabase → Auth → Redirect URLs. */

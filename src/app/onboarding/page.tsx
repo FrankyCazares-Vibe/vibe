@@ -1,32 +1,24 @@
 "use client";
 
 import { Suspense, useEffect } from "react";
-import { useRouter, useSearchParams } from "next/navigation";
+import { useSearchParams } from "next/navigation";
 
 import { ONBOARDING_STATIC_PATH } from "@/lib/auth/email-confirm-redirect";
-import { getSupabaseBrowserClient } from "@/lib/supabase/browser";
 
+/**
+ * Full navigation to static Otto onboarding. No auth check here: school-verification
+ * links are often opened in email in-app browsers where Supabase cookies never
+ * attach, which was sending people to login/sign-up by mistake.
+ */
 function OnboardingBridgeInner() {
-  const router = useRouter();
   const searchParams = useSearchParams();
 
   useEffect(() => {
-    const supabase = getSupabaseBrowserClient();
-    void supabase.auth.getUser().then(({ data: { user } }) => {
-      if (!user) {
-        const q = searchParams.toString();
-        const onboardingNext = q ? `/onboarding?${q}` : "/onboarding";
-        router.replace(
-          `/auth/login?next=${encodeURIComponent(onboardingNext)}`,
-        );
-        return;
-      }
-      const q = searchParams.toString();
-      window.location.href = q
-        ? `${ONBOARDING_STATIC_PATH}?${q}`
-        : ONBOARDING_STATIC_PATH;
-    });
-  }, [router, searchParams]);
+    const q = searchParams.toString();
+    window.location.replace(
+      q ? `${ONBOARDING_STATIC_PATH}?${q}` : ONBOARDING_STATIC_PATH,
+    );
+  }, [searchParams]);
 
   return (
     <p style={{ textAlign: "center", marginTop: 48, color: "#8A8580" }}>
