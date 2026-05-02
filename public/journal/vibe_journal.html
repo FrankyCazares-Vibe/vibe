@@ -434,7 +434,7 @@ body {
   </div>
 
   <div class="sidebar-version">
-    <div class="ver-label" id="sidebarVersion">v2.0 — Session 11</div>
+    <div class="ver-label" id="sidebarVersion">v4.1 — Session 29</div>
     <div class="ver-date" id="sidebarDate">Loading...</div>
   </div>
 
@@ -457,7 +457,7 @@ body {
     <span class="nav-icon" style="color:var(--accent);">●</span> Otto — Flagship <span class="nav-badge" style="background:var(--lavender); color:#3C3489;">NEW</span>
   </button>
   <button class="nav-item" onclick="showSection('sessions', this)">
-    <span class="nav-icon">◰</span> Session Log <span class="nav-badge" id="sessionBadge">7</span>
+    <span class="nav-icon">◰</span> Session Log <span class="nav-badge" id="sessionBadge">29</span>
   </button>
 
   <div class="sidebar-section-label">Strategy</div>
@@ -498,11 +498,11 @@ body {
     <div class="hero-meta">
       <div class="hero-meta-item">
         <span class="hero-meta-label">Version</span>
-        <span class="hero-meta-val" id="heroVersion">v2.0</span>
+        <span class="hero-meta-val" id="heroVersion">v4.1</span>
       </div>
       <div class="hero-meta-item">
         <span class="hero-meta-label">Sessions</span>
-        <span class="hero-meta-val" id="heroSessions">11</span>
+        <span class="hero-meta-val" id="heroSessions">29</span>
       </div>
       <div class="hero-meta-item">
         <span class="hero-meta-label">Last updated</span>
@@ -567,7 +567,7 @@ body {
 
       <div class="card">
         <div class="card-label">Where the prototype is</div>
-        <div class="card-body">Six fully-built pages (Feed, Profile, Network, Campus, Opportunities, Messages) plus a synced calendar plus full Otto design across mockups. 21 sessions logged. Built and iterated with real user research informing key product decisions. Backend, .edu verification, and live API integrations are the next phase.</div>
+        <div class="card-body">Six fully-built pages (Feed, Profile, Network, Campus, Opportunities, Messages) plus a synced calendar plus full Otto design across mockups. Phase 1 Stage 1 (foundation) is complete in Next.js: <strong>Supabase</strong> client + DB schema with RLS, <strong>Cloudflare R2</strong> (Clips, signed URLs), <strong>Resend</strong>, and <strong>Sentry</strong> — each with production health routes. Next gate is <strong>P1-006 auth</strong> (sessions, password reset, .edu verification backed by the DB) per <code>DOCS/PHASE_1.md</code>. Outreach-ready demo URL on Vercel.</div>
       </div>
     </div>
 
@@ -1309,9 +1309,9 @@ body {
 const STORAGE_KEY = 'vibe_journal_data';
 
 const DEFAULT_DATA = {
-  version: 'v3.9',
-  sessionCount: 27,
-  lastUpdated: new Date().toLocaleDateString('en-US', {year:'numeric',month:'long',day:'numeric'}),
+  version: 'v4.1',
+  sessionCount: 29,
+  lastUpdated: 'April 30, 2026',
   versions: [
     { ver: 'v1.0', label: 'Session 1',     summary: 'Initial concept. App name (Vibe), warm professional positioning, profile design, Vibes short-form feed, reaction system, landing page.' },
     { ver: 'v1.1', label: 'Session 2',     summary: 'Cursor redesign: instant dot + snappy ring at lerp 0.28.' },
@@ -1332,7 +1332,10 @@ const DEFAULT_DATA = {
     { ver: 'v3.3', label: 'Session 21',     summary: 'Otto introduced as flagship feature. AI marketing agent with full Agent tab (5 sub-tabs), corner ring across all pages, post-publish flow, 6-step onboarding. Strategic shift: Vibe becomes the network where your AI agent lives.' },
     { ver: 'v3.4', label: 'Session 22',     summary: 'Standalone Otto mockup files built (8 HTML reference files with live animations). Journal sections fully refreshed: Vision, Features, Strategy, Design Language all rewritten to reflect everything since v2.x with Otto folded throughout.' },
     { ver: 'v3.5', label: 'Session 23',     summary: 'Persistence layer (vibe_*_v1 keys + shared _persistence.js). Landing page now the entry point with View demo / Create profile CTAs. Empty states across all pages — profile shows full Otto invitation in-page; other pages gate to landing. Demo mode is honest now.' },
-    { ver: 'v3.6', label: 'Session 24',     summary: 'The Otto session. Seventh page (otto.html) shipped, Otto everywhere via corner ring + slide-out, profile got the dark Otto status hero and per-post badges, the 6-step onboarding flow is live, and the entire profile is now persistable end-to-end (bio, tags, skills, work, currently-on, avatar, resume, cover banner). Calendar moved onto Otto and finally persists deletes across pages.', current: true },
+    { ver: 'v3.6', label: 'Session 24',     summary: 'The Otto session. Seventh page (otto.html) shipped, Otto everywhere via corner ring + slide-out, profile got the dark Otto status hero and per-post badges, the 6-step onboarding flow is live, and the entire profile is now persistable end-to-end (bio, tags, skills, work, currently-on, avatar, resume, cover banner). Calendar moved onto Otto and finally persists deletes across pages.' },
+    { ver: 'v3.9', label: 'Session 27',     summary: 'GitHub + Vercel auto-deploy, Phase 1 spec finalized (37 tickets / 10 stages), Otto v1 scope tightened (onboarder + reminders), Clips naming, backend stack locked (Supabase + R2 + Resend + Sentry).' },
+    { ver: 'v4.0', label: 'Session 28',     summary: 'Phase 1 build started: P1-001 Supabase (client + /api/health/supabase) and P1-002 Cloudflare R2 (presigned Clip URLs + /api/health/r2). Franky wired dashboards; prod health checks green. Vercel Hobby unblock: git author email aligned with GitHub (Gmail).' },
+    { ver: 'v4.1', label: 'Session 29',     summary: 'Phase 1 Stage 1 closed out: P1-003 Resend (+ send-only key health probe), P1-004 Sentry App Router, P1-005 Postgres schema + RLS + auth.users→public.users trigger applied in Supabase. Session handoff for P1-006 auth written.', current: true },
   ],
   sessions: [
     {
@@ -1579,8 +1582,31 @@ const DEFAULT_DATA = {
         { icon: '·', text: '<strong>What\'s next:</strong> James and Rylan begin outreach to clubs and orgs (Data Science, CS, AZTES, USG, Chess Club, BSML, cultural orgs, housing — Brey first) using the live demo URL. Phase 1 build kicks off in Cursor with the Claude extension — Stage 1 is the foundation work (P1-001 through P1-008): Supabase + R2 + Resend + Sentry setup, schema, auth with password reset, localStorage→Supabase migration, URL polish. Each ticket gets its own commit so the master spreadsheet tracks one row at a time and each push triggers an isolated Vercel deploy.' },
       ]
     },
+    {
+      num: 28, ver: 'v4.0', title: 'Phase 1 foundation · Supabase + R2 wired · Prod health green', date: 'Session 28 — 2026-04-30',
+      changes: [
+        { icon: '◇', text: '<strong>P1-001 shipped — Supabase connection.</strong> Added <code>@supabase/supabase-js</code>, <code>src/lib/supabase.ts</code> (<code>createSupabaseClient</code>), and <code>GET /api/health/supabase</code> (GoTrue health check). Template vars in <code>.env.example</code>; real secrets in <code>.env.local</code> + Vercel. Franky created the Supabase project with automatic RLS on new tables.' },
+        { icon: '▣', text: '<strong>P1-002 shipped — Cloudflare R2 for Clips.</strong> Added AWS SDK S3-compatible client targeting R2, <code>src/lib/r2.ts</code> with <code>signClipPutUrl</code> / <code>signClipGetUrl</code> (5-minute presigned URLs; DB stores keys under <code>clips/</code> only — never public R2 URLs). <code>GET /api/health/r2</code> runs HeadBucket. Bucket <code>vibe-clips</code>; Account API token with Object Read & Write.' },
+        { icon: '◈', text: '<strong>Production verified.</strong> Both health routes return <code>{"ok":true}</code> on <code>vibe-mocha-iota.vercel.app</code> once env vars are set. Local dev picks up <code>.env.local</code> after restart.' },
+        { icon: '◐', text: '<strong>Vercel Hobby deploy unblock.</strong> Git pushes triggered &quot;Blocked&quot; — commit author lacked contributing access. IU email could not be added to GitHub (already in use on another account). Fixed by setting <code>git config user.email</code> to verified Gmail and <code>git commit --amend --reset-author</code> + <code>git push --force-with-lease</code>; deploys now attribute <strong>FrankyCazares-Vibe</strong> and run Ready.' },
+        { icon: '◆', text: '<strong>Security hygiene reminder.</strong> <code>NEXT_PUBLIC_SUPABASE_ANON_KEY</code> must be the <strong>anon</strong> public key only — never <strong>service_role</strong> in any public env. Rotate in Supabase if the wrong key was ever exposed.' },
+        { icon: '·', text: '<strong>What\'s next:</strong> P1-003 Resend, P1-004 Sentry, then P1-005 schema and downstream tickets per Phase 1 Stage 1. Handoff written locally at <code>handoffs/2026-04-30-session-28-phase1-supabase-r2-vercel.md</code> (workshop backup).' },
+      ]
+    },
+    {
+      num: 29, ver: 'v4.1', title: 'Phase 1 Stage 1 complete · Resend + Sentry + schema · Handoff for auth', date: 'Session 29 — 2026-04-30',
+      changes: [
+        { icon: '◇', text: '<strong>P1-003 shipped — Resend.</strong> <code>src/lib/resend.ts</code> with API probe via domains list; keys restricted to &quot;sending only&quot; still pass health when Resend returns the expected scope message. <code>GET /api/health/resend</code> on prod/local. <code>RESEND_API_KEY</code> in <code>.env.example</code>. Lesson learned: routes must be pushed — local-only files 404 on Vercel until committed.' },
+        { icon: '▣', text: '<strong>P1-004 shipped — Sentry.</strong> <code>@sentry/nextjs</code>, <code>withSentryConfig</code> on <code>next.config.ts</code>, instrumentation files, <code>global-error.tsx</code>, <code>GET /api/health/sentry</code> when <code>NEXT_PUBLIC_SENTRY_DSN</code> is set. Manual integration — no wizard re-run needed.' },
+        { icon: '◈', text: '<strong>P1-005 shipped — database layer.</strong> Migration <code>supabase/migrations/20260430190000_phase1_initial_schema.sql</code> on <code>main</code>: tables for users (FK to <code>auth.users</code>), posts, connections, bookmarks, orgs, channels, messages, events, RSVPs, reminders, indexes, RLS policies, <code>handle_new_user</code> trigger. Applied in Supabase SQL Editor; re-running the full script errors if tables already exist — verify with <code>pg_tables</code> instead.' },
+        { icon: '◐', text: '<strong>Health matrix.</strong> Four smoke routes live on prod when env is set: <code>/api/health/supabase</code>, <code>/api/health/r2</code>, <code>/api/health/resend</code>, <code>/api/health/sentry</code>.' },
+        { icon: '◆', text: '<strong>Cold-start handoff for next build thread.</strong> <code>handoffs/2026-04-30-session-29-phase1-stage1-handoff-p1-006.md</code> — brief for implementing <strong>P1-006</strong> (signup, login, .edu verification, password reset, sessions) against <code>DOCS/PHASE_1.md</code> and Next.js 16 patterns per <code>AGENTS.md</code>.' },
+        { icon: '·', text: '<strong>What\'s next:</strong> <strong>P1-006 Auth</strong> — wire Supabase Auth into the Next.js app, align transactional email with Resend, persist school verification to <code>public.users</code>, then Stage 1 remainder per spec (e.g. P1-007 localStorage migration, P1-008 URL polish).' },
+      ]
+    },
   ],
   nextSteps: [
+    { priority: 'high',   text: '<strong>Phase 1 — P1-006 Auth</strong> — Supabase Auth in Next.js 16, .edu verification backed by DB + email, password reset, session handling. Start from <code>handoffs/2026-04-30-session-29-phase1-stage1-handoff-p1-006.md</code>.' },
     { priority: 'high',   text: '<strong>Connect-side polish</strong> — the demo auto-accepts a Connect after 3 seconds. Wire to a real "pending requests" state with the other person\'s incoming view (accept / decline) and a notification when accepted.' },
     { priority: 'high',   text: '<strong>Per-school campus content</strong> — verified non-IU students currently still see IU\'s feed / jobs / events. Either show a "your school doesn\'t have campus content yet — be the first" empty state, or seed a few additional mock schools alongside IU.' },
     { priority: 'medium', text: '<strong>Otto v2 — backend</strong> — voice training pipeline, platform OAuth (LinkedIn, Instagram Business, TikTok, YouTube, X), posting queue, real metrics ingestion. Plus the platform-strategy notes on account authorization (otto_platform_strategy.md). Separate larger phase.' },
