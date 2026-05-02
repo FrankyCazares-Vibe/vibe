@@ -31,13 +31,53 @@ export default function SchoolEmailPage() {
 
   useEffect(() => {
     const supabase = getSupabaseBrowserClient();
-    void supabase.auth.getUser().then(({ data: { user } }) => {
-      if (!user) {
-        router.replace("/auth/login?next=/auth/school-email");
-        return;
+    let cancelled = false;
+    let timeoutId: number | undefined;
+    let unsub: (() => void) | undefined;
+
+    void (async () => {
+      for (let i = 0; i < 20; i++) {
+        const {
+          data: { user },
+        } = await supabase.auth.getUser();
+        if (cancelled) return;
+        if (user) {
+          setAuthChecked(true);
+          return;
+        }
+        await new Promise((r) => setTimeout(r, 75));
       }
-      setAuthChecked(true);
-    });
+
+      if (cancelled) return;
+
+      const {
+        data: { subscription },
+      } = supabase.auth.onAuthStateChange((_evt, session) => {
+        if (cancelled) return;
+        if (session?.user) {
+          setAuthChecked(true);
+          subscription.unsubscribe();
+          if (timeoutId !== undefined) clearTimeout(timeoutId);
+        }
+      });
+      unsub = () => subscription.unsubscribe();
+
+      timeoutId = window.setTimeout(() => {
+        if (cancelled) return;
+        subscription.unsubscribe();
+        void supabase.auth.getUser().then(({ data: { user: u2 } }) => {
+          if (cancelled) return;
+          if (u2) setAuthChecked(true);
+          else router.replace("/auth/login?next=/auth/school-email");
+        });
+      }, 4000);
+    })();
+
+    return () => {
+      cancelled = true;
+      if (timeoutId !== undefined) clearTimeout(timeoutId);
+      unsub?.();
+    };
   }, [router]);
 
   async function onSubmit(e: React.FormEvent) {
