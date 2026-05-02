@@ -224,3 +224,59 @@
   --sidebar-border: oklch(1 0 0 / 10%);
   --sidebar-ring: oklch(0.556 0 0);
 }
+
+/* —— Marketing home (/) — custom cursor + Otto corner (namespaced) —— */
+@keyframes vibe-home-otto-breathe {
+  0%,
+  100% {
+    transform: scale(1);
+    opacity: 1;
+  }
+  50% {
+    transform: scale(1.18);
+    opacity: 0.85;
+  }
+}
+@keyframes vibe-home-otto-ring {
+  0% {
+    transform: scale(0.6);
+    opacity: 0.8;
+  }
+  100% {
+    transform: scale(1.8);
+    opacity: 0;
+  }
+}
+.vibe-home-cursor {
+  position: fixed;
+  pointer-events: none;
+  z-index: 2147483647;
+  top: 0;
+  left: 0;
+}
+.vibe-home-cursor--core {
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+  background: #ff5c35;
+  transition: transform 0.08s ease-out;
+}
+.vibe-home-cursor--core.clicking {
+  transform: scale(0.6) !important;
+}
+.vibe-home-cursor--core.hover {
+  background: white;
+  box-shadow: 0 0 12px rgba(255, 92, 53, 0.6);
+}
+.vibe-home-cursor--ring {
+  width: 28px;
+  height: 28px;
+  border-radius: 50%;
+  border: 1px solid rgba(255, 92, 53, 0.35);
+  transition:
+    border-color 0.15s,
+    transform 0.12s ease-out;
+}
+.vibe-home-cursor--ring.hover {
+  border-color: #ff5c35;
+}

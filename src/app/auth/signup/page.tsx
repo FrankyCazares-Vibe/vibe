@@ -4,6 +4,7 @@ import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { useState } from "react";
 
+import { getAuthEmailCallbackUrl } from "@/lib/auth/email-confirm-redirect";
 import { getSupabaseBrowserClient } from "@/lib/supabase/browser";
 
 export default function SignupPage() {
@@ -20,13 +21,14 @@ export default function SignupPage() {
     setMessage(null);
     setLoading(true);
     const supabase = getSupabaseBrowserClient();
-    const origin =
-      typeof window !== "undefined" ? window.location.origin : "";
+    const siteOrigin =
+      process.env.NEXT_PUBLIC_SITE_URL?.replace(/\/$/, "") ||
+      (typeof window !== "undefined" ? window.location.origin : "");
     const { data, error: signErr } = await supabase.auth.signUp({
       email: email.trim(),
       password,
       options: {
-        emailRedirectTo: `${origin}/auth/callback`,
+        emailRedirectTo: getAuthEmailCallbackUrl(siteOrigin),
       },
     });
     setLoading(false);
@@ -35,12 +37,12 @@ export default function SignupPage() {
       return;
     }
     if (data.session) {
-      router.push("/");
+      router.push("/auth/school-email");
       router.refresh();
       return;
     }
     setMessage(
-      "Check your email to confirm your account before signing in. After confirming, add your .edu under School email.",
+      "Check this inbox for a confirmation link. After you click it, you’ll land on school email — your login email is done; next is a separate .edu verification.",
     );
   }
 
@@ -57,8 +59,26 @@ export default function SignupPage() {
       >
         Sign up
       </h1>
-      <p style={{ color: "#8A8580", marginBottom: 24 }}>
+      <p style={{ color: "#8A8580", marginBottom: 16 }}>
         Create your <span style={{ color: "#FF5C35" }}>vibe.</span> account
+      </p>
+      <p
+        style={{
+          fontSize: 14,
+          lineHeight: 1.55,
+          color: "#5C5853",
+          marginBottom: 24,
+          padding: "14px 16px",
+          background: "rgba(28,28,30,.04)",
+          borderRadius: 10,
+          border: "1px solid #E4E0D8",
+        }}
+      >
+        <strong style={{ color: "#1C1C1E" }}>Two different emails:</strong> this
+        page is your <strong>login email</strong> (any address you can use for
+        sign-in and account confirmations). After you’re in, we’ll ask for a
+        separate <strong>.edu school email</strong> to unlock campus — that
+        sends a second verification message.
       </p>
 
       <form
@@ -66,7 +86,12 @@ export default function SignupPage() {
         style={{ display: "flex", flexDirection: "column", gap: 16 }}
       >
         <label style={{ display: "flex", flexDirection: "column", gap: 6 }}>
-          <span style={{ fontSize: 14, color: "#1C1C1E" }}>Email</span>
+          <span style={{ fontSize: 14, color: "#1C1C1E" }}>
+            Login email{" "}
+            <span style={{ color: "#8A8580", fontWeight: 400 }}>
+              (sign-in & account mail)
+            </span>
+          </span>
           <input
             type="email"
             autoComplete="email"

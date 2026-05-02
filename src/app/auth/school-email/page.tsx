@@ -13,6 +13,21 @@ export default function SchoolEmailPage() {
   const [message, setMessage] = useState<string | null>(null);
   const [loading, setLoading] = useState(false);
   const [authChecked, setAuthChecked] = useState(false);
+  const [justVerifiedAccount, setJustVerifiedAccount] = useState(false);
+
+  useEffect(() => {
+    const params = new URLSearchParams(window.location.search);
+    if (params.get("account_verified") === "1") {
+      setJustVerifiedAccount(true);
+      params.delete("account_verified");
+      const qs = params.toString();
+      window.history.replaceState(
+        {},
+        "",
+        `${window.location.pathname}${qs ? `?${qs}` : ""}`,
+      );
+    }
+  }, []);
 
   useEffect(() => {
     const supabase = getSupabaseBrowserClient();
@@ -63,6 +78,24 @@ export default function SchoolEmailPage() {
 
   return (
     <div style={{ maxWidth: 400, margin: "0 auto", paddingTop: 48 }}>
+      {justVerifiedAccount ? (
+        <p
+          style={{
+            fontSize: 14,
+            lineHeight: 1.5,
+            color: "#1C5C2E",
+            background: "rgba(46, 125, 50, 0.1)",
+            border: "1px solid rgba(46, 125, 50, 0.35)",
+            borderRadius: 10,
+            padding: "14px 16px",
+            marginBottom: 20,
+          }}
+        >
+          <strong>You’re confirmed.</strong> Your login email is set. This next
+          step is <strong>different</strong>: add a <strong>.edu</strong> address
+          so we can verify you’re on campus — we’ll email that address separately.
+        </p>
+      ) : null}
       <h1
         style={{
           fontFamily: "Fraunces, serif",
@@ -74,8 +107,25 @@ export default function SchoolEmailPage() {
       >
         School email
       </h1>
-      <p style={{ color: "#8A8580", marginBottom: 24 }}>
+      <p style={{ color: "#8A8580", marginBottom: 16 }}>
         Verify a <strong>.edu</strong> address so we know you’re on campus.
+      </p>
+      <p
+        style={{
+          fontSize: 14,
+          lineHeight: 1.55,
+          color: "#5C5853",
+          marginBottom: 24,
+          padding: "14px 16px",
+          background: "rgba(28,28,30,.04)",
+          borderRadius: 10,
+          border: "1px solid #E4E0D8",
+        }}
+      >
+        This is <strong>not</strong> the same as your login email unless you
+        sign up with your school address. Use the inbox for the{" "}
+        <strong>.edu</strong> you enter here — that’s where the campus
+        verification link goes.
       </p>
 
       <form
@@ -83,7 +133,9 @@ export default function SchoolEmailPage() {
         style={{ display: "flex", flexDirection: "column", gap: 16 }}
       >
         <label style={{ display: "flex", flexDirection: "column", gap: 6 }}>
-          <span style={{ fontSize: 14, color: "#1C1C1E" }}>.edu email</span>
+          <span style={{ fontSize: 14, color: "#1C1C1E" }}>
+            Campus / school email <span style={{ color: "#8A8580" }}>(.edu)</span>
+          </span>
           <input
             type="email"
             autoComplete="email"

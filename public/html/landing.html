@@ -107,6 +107,9 @@ h1 em { font-style: italic; color: var(--accent); }
   padding: 16px 30px; border-radius: 100px;
   border: 1px solid; transition: all .18s;
   display: inline-flex; align-items: center; gap: 10px;
+  text-decoration: none;
+  color: inherit;
+  cursor: pointer;
 }
 .cta-primary {
   background: var(--charcoal); color: white; border-color: var(--charcoal);
@@ -192,12 +195,12 @@ footer {
         View demo site
         <span class="cta-arrow">→</span>
       </button>
-      <button class="cta cta-secondary" onclick="enterCreate()">
+      <a class="cta cta-secondary" href="/auth/signup" role="button">
         Create your profile
-      </button>
+      </a>
     </div>
 
-    <p class="footnote">Demo seeds Maya Chen across all pages. Create your profile signs you up first; after that, onboarding (Otto) fills in your draft profile.</p>
+    <p class="footnote"><strong>View demo site</strong> loads the prototype. <strong>Create your profile</strong> goes to <strong>sign up</strong> (your login email). Confirm that inbox first; then you’ll add your <strong>.edu</strong> school email — a second verification.</p>
   </main>
 
   <div class="otto-corner">
@@ -247,10 +250,6 @@ footer {
 function enterDemo() {
   seedDemoData();
   window.location.href = '/html/feed.html';
-}
-function enterCreate() {
-  // Real accounts: Supabase auth first (P1-006), then onboarding can run post-login (P1-009).
-  window.location.href = '/auth/signup';
 }
 </script>
 </body>

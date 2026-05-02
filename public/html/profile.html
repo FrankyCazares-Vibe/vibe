@@ -2284,6 +2284,10 @@ body.empty-profile-mode #profileEmpty { display: flex !important; }
 }
 .empty-primary {
   background: var(--charcoal); color: white; border-color: var(--charcoal);
+  text-decoration: none;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
 }
 .empty-primary:not([disabled]):hover {
   background: var(--accent); border-color: var(--accent);
@@ -2401,7 +2405,7 @@ body.empty-profile-mode #profileEmpty { display: flex !important; }
   <h1 class="empty-title">your profile is <em>empty.</em><br>let's fix that.</h1>
   <p class="empty-otto-line">"three minutes, six questions. you'll walk out with a profile that actually shows who you are. ready when you are."</p>
   <div class="empty-actions">
-    <button class="empty-primary" onclick="window.location.href='/html/onboarding.html'">Start with otto</button>
+      <a class="empty-primary" href="/auth/signup">Create your account</a>
     <button class="empty-secondary" onclick="seedDemoData(); location.reload();">Load demo profile</button>
   </div>
   <p class="empty-footnote">Or append <code>?demo=1</code> to the URL to load demo data. <code>?clear=1</code> to reset.</p>

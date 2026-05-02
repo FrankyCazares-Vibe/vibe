@@ -14,6 +14,8 @@ function LoginForm() {
   const [error, setError] = useState<string | null>(null);
   const [loading, setLoading] = useState(false);
 
+  const urlError = searchParams.get("error");
+
   async function onSubmit(e: React.FormEvent) {
     e.preventDefault();
     setError(null);
@@ -79,6 +81,12 @@ function LoginForm() {
         </label>
         {error ? (
           <p style={{ color: "#B42318", fontSize: 14, margin: 0 }}>{error}</p>
+        ) : null}
+        {urlError === "auth_callback" ? (
+          <p style={{ color: "#B42318", fontSize: 14, margin: 0 }}>
+            That confirmation link is invalid or expired. Sign in if you
+            already confirmed your email, or sign up again.
+          </p>
         ) : null}
         <button
           type="submit"
