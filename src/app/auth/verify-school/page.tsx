@@ -4,6 +4,8 @@ import Link from "next/link";
 import { useSearchParams } from "next/navigation";
 import { Suspense, useEffect, useRef, useState } from "react";
 
+import { DEFAULT_POST_LOGIN_PATH } from "@/lib/auth/email-confirm-redirect";
+
 function VerifySchoolInner() {
   const searchParams = useSearchParams();
   const token = searchParams.get("token");
@@ -74,7 +76,10 @@ function VerifySchoolInner() {
       </h1>
       <p style={{ color: "#8A8580", marginBottom: 24 }}>{message}</p>
       {status === "ok" ? (
-        <Link href="/auth/school-email" style={linkStyle}>
+        <Link
+          href={`${DEFAULT_POST_LOGIN_PATH}?school_verified=1`}
+          style={linkStyle}
+        >
           Back to account
         </Link>
       ) : (
