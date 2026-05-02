@@ -197,7 +197,7 @@ footer {
       </button>
     </div>
 
-    <p class="footnote">Demo seeds Maya Chen across all pages. Create your profile starts the 6-step Otto onboarding — about 3 minutes, ends with a real first draft in your voice.</p>
+    <p class="footnote">Demo seeds Maya Chen across all pages. Create your profile signs you up first; after that, onboarding (Otto) fills in your draft profile.</p>
   </main>
 
   <div class="otto-corner">
@@ -249,9 +249,8 @@ function enterDemo() {
   window.location.href = '/html/feed.html';
 }
 function enterCreate() {
-  // Onboarding is the canonical "create your profile" entry point.
-  // It produces a real (non-demo) user object on completion and routes to Otto.
-  window.location.href = '/html/onboarding.html';
+  // Real accounts: Supabase auth first (P1-006), then onboarding can run post-login (P1-009).
+  window.location.href = '/auth/signup';
 }
 </script>
 </body>
