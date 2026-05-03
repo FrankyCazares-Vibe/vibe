@@ -75,7 +75,7 @@ function VerifySchoolInner() {
       <p style={{ color: "#8A8580", marginBottom: 24 }}>{message}</p>
       {status === "ok" ? (
         <Link
-          href="/campus?school_verified=1"
+          href="/profile?school_verified=1"
           style={linkStyle}
         >
           Back to account

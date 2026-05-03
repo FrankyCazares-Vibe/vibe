@@ -5,6 +5,7 @@ import { useRouter, useSearchParams } from "next/navigation";
 import { Suspense, useState } from "react";
 
 import { getPostLoginDestination } from "@/lib/auth/post-login";
+import { sanitizeLoginNextParam } from "@/lib/auth/login-next";
 import { getSupabaseBrowserClient } from "@/lib/supabase/browser";
 
 function LoginForm() {
@@ -33,7 +34,7 @@ function LoginForm() {
     }
     const dest = await getPostLoginDestination(
       supabase,
-      searchParams.get("next"),
+      sanitizeLoginNextParam(searchParams.get("next")),
     );
     router.push(dest);
     router.refresh();

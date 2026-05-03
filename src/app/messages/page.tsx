@@ -1,5 +1,6 @@
 import Link from "next/link";
 
+import { enforceCampusAccess } from "@/lib/auth/campus-access";
 import { CampusAppShell } from "@/components/campus-app-shell";
 
 export const metadata = {
@@ -7,7 +8,8 @@ export const metadata = {
   description: "DMs and channels",
 };
 
-export default function MessagesPage() {
+export default async function MessagesPage() {
+  await enforceCampusAccess("/messages");
   return (
     <CampusAppShell>
       <main

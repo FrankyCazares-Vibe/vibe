@@ -1,53 +1,20 @@
-import Link from "next/link";
+import { enforceCampusAccess } from "@/lib/auth/campus-access";
 
-import { CampusAppShell } from "@/components/campus-app-shell";
+import { ProfileMain } from "./profile-main";
 
 export const metadata = {
   title: "Profile · Vibe",
   description: "Your profile",
 };
 
-export default function ProfilePage() {
+export default async function ProfilePage({
+  searchParams,
+}: {
+  searchParams: Promise<{ school_verified?: string }>;
+}) {
+  await enforceCampusAccess("/profile");
+  const sp = await searchParams;
   return (
-    <CampusAppShell>
-      <main
-        style={{
-          borderRight: "1px solid rgba(28,28,30,0.08)",
-          padding: "32px 28px",
-          background: "#FAF7F2",
-        }}
-      >
-        <h1
-          style={{
-            fontFamily: "Fraunces, serif",
-            fontSize: 32,
-            fontWeight: 900,
-            color: "#1C1C1E",
-            marginBottom: 12,
-          }}
-        >
-          Profile
-        </h1>
-        <p
-          style={{
-            fontFamily: "DM Sans, sans-serif",
-            color: "#8A8580",
-            maxWidth: 480,
-            lineHeight: 1.6,
-          }}
-        >
-          Profile grid and edit flow are next. Nothing to show yet for new
-          accounts.
-        </p>
-        <p style={{ marginTop: 24 }}>
-          <Link
-            href="/campus"
-            style={{ color: "#FF5C35", fontWeight: 600, fontSize: 15 }}
-          >
-            ← Campus home
-          </Link>
-        </p>
-      </main>
-    </CampusAppShell>
+    <ProfileMain showSchoolVerifiedBanner={sp.school_verified === "1"} />
   );
 }

@@ -138,7 +138,7 @@ export default function LeftNav() {
       }}
     >
       <Link
-        href="/campus"
+        href="/profile"
         style={{
           fontFamily: "Fraunces, serif",
           fontSize: "22px",
@@ -155,7 +155,10 @@ export default function LeftNav() {
 
       <nav style={{ display: "flex", flexDirection: "column", gap: "2px" }}>
         {navItems.map((item) => {
-          const isActive = pathname === item.href;
+          const isActive =
+            pathname === item.href ||
+            (item.href !== "/" &&
+              pathname.startsWith(`${item.href}/`));
           return (
             <Link
               key={item.href}

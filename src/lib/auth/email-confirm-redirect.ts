@@ -6,9 +6,9 @@
 export const POST_EMAIL_CONFIRM_PATH = "/onboarding?account_verified=1";
 
 /**
- * Default post-auth path when not using `getPostLoginDestination`.
+ * Default “you’re in” route after Otto + school verification (login, onboarding-complete, etc.).
  */
-export const DEFAULT_POST_LOGIN_PATH = "/campus";
+export const DEFAULT_POST_LOGIN_PATH = "/profile";
 
 /** Static Otto HTML — load through `/onboarding` so query params are preserved. */
 export const ONBOARDING_STATIC_PATH = "/html/onboarding.html";

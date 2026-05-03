@@ -1,5 +1,6 @@
 import { NextResponse } from "next/server";
 
+import { DEFAULT_POST_LOGIN_PATH } from "@/lib/auth/email-confirm-redirect";
 import { createSupabaseServerClient } from "@/lib/supabase/server";
 
 type Body = { otto_answers?: unknown };
@@ -59,6 +60,6 @@ export async function POST(req: Request) {
   const schoolVerified = row?.school_verified === true;
   return NextResponse.json({
     ok: true,
-    next: schoolVerified ? "/campus" : "/auth/school-email",
+    next: schoolVerified ? DEFAULT_POST_LOGIN_PATH : "/auth/school-email",
   });
 }

@@ -1,3 +1,5 @@
+import { enforceCampusAccess } from "@/lib/auth/campus-access";
+
 import { CampusHome } from "./campus-home";
 
 export const metadata = {
@@ -10,6 +12,7 @@ export default async function CampusPage({
 }: {
   searchParams: Promise<{ school_verified?: string }>;
 }) {
+  await enforceCampusAccess("/campus");
   const sp = await searchParams;
   return <CampusHome showSchoolVerifiedBanner={sp.school_verified === "1"} />;
 }

@@ -778,10 +778,11 @@ async function completeOnboarding() {
       window.location.href = j.next;
       return;
     }
-  } catch (e) { /* no session or offline — fall through */ }
+  } catch (e) { /* network error — fall through */ }
 
-  // Logged-out browser (e.g. some in-app webviews): still leave onboarding.
-  window.location.href = '/campus';
+  // No session (in-app mail browsers often drop cookies): don’t send users to
+  // campus with an empty server profile — log in so /api/me/onboarding-complete can run.
+  window.location.href = '/auth/login?next=' + encodeURIComponent('/onboarding');
 }
 </script>
 

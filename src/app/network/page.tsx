@@ -1,5 +1,6 @@
 import Link from "next/link";
 
+import { enforceCampusAccess } from "@/lib/auth/campus-access";
 import { CampusAppShell } from "@/components/campus-app-shell";
 
 export const metadata = {
@@ -7,7 +8,8 @@ export const metadata = {
   description: "Followers, following, and connections",
 };
 
-export default function NetworkPage() {
+export default async function NetworkPage() {
+  await enforceCampusAccess("/network");
   return (
     <CampusAppShell>
       <main

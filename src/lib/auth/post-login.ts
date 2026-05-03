@@ -1,13 +1,16 @@
 import type { SupabaseClient } from "@supabase/supabase-js";
 
-function ottoOnboardingComplete(otto: unknown): boolean {
+import { DEFAULT_POST_LOGIN_PATH } from "@/lib/auth/email-confirm-redirect";
+
+/** True when `public.users.otto_answers` has been saved after Otto onboarding. */
+export function isOttoOnboardingComplete(otto: unknown): boolean {
   if (!otto || typeof otto !== "object" || Array.isArray(otto)) return false;
   return Object.keys(otto as Record<string, unknown>).length > 0;
 }
 
 /**
  * Where to send someone after a successful password login (or when no explicit `next`).
- * Order: finish Otto → add school email if needed → campus home.
+ * Order: finish Otto → add school email if needed → profile home.
  */
 export async function getPostLoginDestination(
   supabase: SupabaseClient,
@@ -32,11 +35,11 @@ export async function getPostLoginDestination(
     .eq("id", user.id)
     .maybeSingle();
 
-  if (!ottoOnboardingComplete(row?.otto_answers)) {
+  if (!isOttoOnboardingComplete(row?.otto_answers)) {
     return "/onboarding";
   }
   if (!row?.school_verified) {
     return "/auth/school-email";
   }
-  return "/campus";
+  return DEFAULT_POST_LOGIN_PATH;
 }

@@ -1,5 +1,6 @@
 import Link from "next/link";
 
+import { enforceCampusAccess } from "@/lib/auth/campus-access";
 import { CampusAppShell } from "@/components/campus-app-shell";
 
 export const metadata = {
@@ -7,7 +8,8 @@ export const metadata = {
   description: "Posts from people and orgs you follow",
 };
 
-export default function FeedPage() {
+export default async function FeedPage() {
+  await enforceCampusAccess("/feed");
   return (
     <CampusAppShell>
       <main
