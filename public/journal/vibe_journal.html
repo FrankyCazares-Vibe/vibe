@@ -434,7 +434,7 @@ body {
   </div>
 
   <div class="sidebar-version">
-    <div class="ver-label" id="sidebarVersion">v4.1 — Session 29</div>
+    <div class="ver-label" id="sidebarVersion">v4.2 — Session 30</div>
     <div class="ver-date" id="sidebarDate">Loading...</div>
   </div>
 
@@ -457,7 +457,7 @@ body {
     <span class="nav-icon" style="color:var(--accent);">●</span> Otto — Flagship <span class="nav-badge" style="background:var(--lavender); color:#3C3489;">NEW</span>
   </button>
   <button class="nav-item" onclick="showSection('sessions', this)">
-    <span class="nav-icon">◰</span> Session Log <span class="nav-badge" id="sessionBadge">29</span>
+    <span class="nav-icon">◰</span> Session Log <span class="nav-badge" id="sessionBadge">30</span>
   </button>
 
   <div class="sidebar-section-label">Strategy</div>
@@ -498,11 +498,11 @@ body {
     <div class="hero-meta">
       <div class="hero-meta-item">
         <span class="hero-meta-label">Version</span>
-        <span class="hero-meta-val" id="heroVersion">v4.1</span>
+        <span class="hero-meta-val" id="heroVersion">v4.2</span>
       </div>
       <div class="hero-meta-item">
         <span class="hero-meta-label">Sessions</span>
-        <span class="hero-meta-val" id="heroSessions">29</span>
+        <span class="hero-meta-val" id="heroSessions">30</span>
       </div>
       <div class="hero-meta-item">
         <span class="hero-meta-label">Last updated</span>
@@ -567,7 +567,7 @@ body {
 
       <div class="card">
         <div class="card-label">Where the prototype is</div>
-        <div class="card-body">Six fully-built pages (Feed, Profile, Network, Campus, Opportunities, Messages) plus a synced calendar plus full Otto design across mockups. Phase 1 Stage 1 (foundation) is complete in Next.js: <strong>Supabase</strong> client + DB schema with RLS, <strong>Cloudflare R2</strong> (Clips, signed URLs), <strong>Resend</strong>, and <strong>Sentry</strong> — each with production health routes. Next gate is <strong>P1-006 auth</strong> (sessions, password reset, .edu verification backed by the DB) per <code>DOCS/PHASE_1.md</code>. Outreach-ready demo URL on Vercel.</div>
+        <div class="card-body">Six fully-built HTML prototype pages plus full Otto mockups. In Next.js, Phase 1 foundation is live: <strong>Supabase</strong> (schema + RLS), <strong>R2</strong>, <strong>Resend</strong>, <strong>Sentry</strong>, and <strong>end-to-end auth routing</strong>: signup → email confirm → static Otto onboarding → API persistence → default land on <code>/profile</code>, with server gates on campus/feed/network/messages so users cannot skip Otto or school verification. <code>/profile</code> in the app is still a <strong>stub</strong> until <strong>P1-007</strong>. Spec: <code>DOCS/PHASE_1.md</code>. Production on Vercel.</div>
       </div>
     </div>
 
@@ -1193,6 +1193,7 @@ body {
       <div class="card">
         <div class="card-label">Recently resolved</div>
         <ul class="journal-list">
+          <li><strong>End-to-end auth routing (Session 30)</strong> — signup → confirm → Otto → API → /profile by default; server gates on campus/feed/profile/network/messages; login <code>next</code> sanitization.</li>
           <li><strong>Feed layout</strong> — Layout B (posts center, Vibes sidebar strip).</li>
           <li><strong>DM system</strong> — Built. Three-column layout, request queue for non-connected users, inline Vibe previews, typing indicator.</li>
           <li><strong>Comment depth</strong> — One level of nested replies. Keeps it readable, prevents Reddit-style threading.</li>
@@ -1309,9 +1310,9 @@ body {
 const STORAGE_KEY = 'vibe_journal_data';
 
 const DEFAULT_DATA = {
-  version: 'v4.1',
-  sessionCount: 29,
-  lastUpdated: 'April 30, 2026',
+  version: 'v4.2',
+  sessionCount: 30,
+  lastUpdated: 'May 1, 2026',
   versions: [
     { ver: 'v1.0', label: 'Session 1',     summary: 'Initial concept. App name (Vibe), warm professional positioning, profile design, Vibes short-form feed, reaction system, landing page.' },
     { ver: 'v1.1', label: 'Session 2',     summary: 'Cursor redesign: instant dot + snappy ring at lerp 0.28.' },
@@ -1335,7 +1336,8 @@ const DEFAULT_DATA = {
     { ver: 'v3.6', label: 'Session 24',     summary: 'The Otto session. Seventh page (otto.html) shipped, Otto everywhere via corner ring + slide-out, profile got the dark Otto status hero and per-post badges, the 6-step onboarding flow is live, and the entire profile is now persistable end-to-end (bio, tags, skills, work, currently-on, avatar, resume, cover banner). Calendar moved onto Otto and finally persists deletes across pages.' },
     { ver: 'v3.9', label: 'Session 27',     summary: 'GitHub + Vercel auto-deploy, Phase 1 spec finalized (37 tickets / 10 stages), Otto v1 scope tightened (onboarder + reminders), Clips naming, backend stack locked (Supabase + R2 + Resend + Sentry).' },
     { ver: 'v4.0', label: 'Session 28',     summary: 'Phase 1 build started: P1-001 Supabase (client + /api/health/supabase) and P1-002 Cloudflare R2 (presigned Clip URLs + /api/health/r2). Franky wired dashboards; prod health checks green. Vercel Hobby unblock: git author email aligned with GitHub (Gmail).' },
-    { ver: 'v4.1', label: 'Session 29',     summary: 'Phase 1 Stage 1 closed out: P1-003 Resend (+ send-only key health probe), P1-004 Sentry App Router, P1-005 Postgres schema + RLS + auth.users→public.users trigger applied in Supabase. Session handoff for P1-006 auth written.', current: true },
+    { ver: 'v4.1', label: 'Session 29',     summary: 'Phase 1 Stage 1 closed out: P1-003 Resend (+ send-only key health probe), P1-004 Sentry App Router, P1-005 Postgres schema + RLS + auth.users→public.users trigger applied in Supabase. Session handoff for P1-006 auth written.' },
+    { ver: 'v4.2', label: 'Session 30',     summary: 'P1-006 auth flow hardened: post-login routing lands on /profile, Otto completion + school verification enforced on gated routes, login ?next= sanitization (no /feed or /campus bypass), onboarding bridge and onboarding-complete API aligned with static HTML. Handoff for P1-007 profile work.', current: true },
   ],
   sessions: [
     {
@@ -1604,9 +1606,20 @@ const DEFAULT_DATA = {
         { icon: '·', text: '<strong>What\'s next:</strong> <strong>P1-006 Auth</strong> — wire Supabase Auth into the Next.js app, align transactional email with Resend, persist school verification to <code>public.users</code>, then Stage 1 remainder per spec (e.g. P1-007 localStorage migration, P1-008 URL polish).' },
       ]
     },
+    {
+      num: 30, ver: 'v4.2', title: 'Auth + onboarding routing — land on profile, gates on campus', date: 'Session 30 — 2026-05-01',
+      changes: [
+        { icon: '◇', text: '<strong>Default post-auth destination is /profile.</strong> <code>DEFAULT_POST_LOGIN_PATH</code> in email-confirm + post-login helpers; returning users with a complete session skip Otto/school detours when appropriate.' },
+        { icon: '▣', text: '<strong>Server gates on product routes.</strong> <code>enforceCampusAccess</code> on campus, feed, profile, network, messages: require persisted <code>otto_answers</code> and <code>school_verified</code> before shell access. Unauthenticated visitors go to <code>/auth/login</code> without a poisonous <code>?next=</code> that used to cause feed loops.' },
+        { icon: '◈', text: '<strong>Login <code>next</code> sanitization.</strong> <code>sanitizeLoginNextParam</code> ignores <code>/feed</code> and <code>/campus</code> so smart routing (Otto → school email → profile) always wins over stale deep links.' },
+        { icon: '◐', text: '<strong>Otto static onboarding wired to API.</strong> <code>public/html/onboarding.html</code> calls <code>POST /api/me/onboarding-complete</code>; on failure, send users to login with <code>next=/onboarding</code> (not straight to campus). API returns <code>next</code>: verified school → profile, else school-email step.' },
+        { icon: '◇', text: '<strong>UX polish.</strong> Left nav logo → <code>/profile</code>; verify-school &quot;Back&quot; → profile with success hint; profile shows school-verified banner when applicable. Empty profile grid remains intentional until P1-007.' },
+        { icon: '·', text: '<strong>What\'s next:</strong> <strong>P1-007</strong> — real profile page data from Supabase (replace stub). Then P1-008 URL polish and remaining Phase 1 tickets per <code>DOCS/PHASE_1.md</code>. Handoff: <code>handoffs/2026-05-01-session-30-auth-onboarding-routing.md</code>.' },
+      ]
+    },
   ],
   nextSteps: [
-    { priority: 'high',   text: '<strong>Phase 1 — P1-006 Auth</strong> — Supabase Auth in Next.js 16, .edu verification backed by DB + email, password reset, session handling. Start from <code>handoffs/2026-04-30-session-29-phase1-stage1-handoff-p1-006.md</code>.' },
+    { priority: 'high',   text: '<strong>Phase 1 — P1-007 Profile</strong> — Supabase-backed profile UI (reads/writes to <code>public.users</code> and related tables); replace the Next.js <code>/profile</code> stub. Align with static prototype richness where scope allows.' },
     { priority: 'high',   text: '<strong>Connect-side polish</strong> — the demo auto-accepts a Connect after 3 seconds. Wire to a real "pending requests" state with the other person\'s incoming view (accept / decline) and a notification when accepted.' },
     { priority: 'high',   text: '<strong>Per-school campus content</strong> — verified non-IU students currently still see IU\'s feed / jobs / events. Either show a "your school doesn\'t have campus content yet — be the first" empty state, or seed a few additional mock schools alongside IU.' },
     { priority: 'medium', text: '<strong>Otto v2 — backend</strong> — voice training pipeline, platform OAuth (LinkedIn, Instagram Business, TikTok, YouTube, X), posting queue, real metrics ingestion. Plus the platform-strategy notes on account authorization (otto_platform_strategy.md). Separate larger phase.' },
