@@ -35,7 +35,8 @@ export async function GET(req: Request, ctx: RouteContext) {
     .from("post_comments")
     .select(
       "id,post_id,user_id,content,created_at," +
-        "author:users!inner(id,name,handle,avatar_url)",
+        // Explicit FK name disambiguates the post_comments→users embed.
+        "author:users!post_comments_user_id_fkey!inner(id,name,handle,avatar_url)",
     )
     .eq("post_id", id)
     .order("created_at", { ascending: true })
@@ -88,7 +89,8 @@ export async function POST(req: Request, ctx: RouteContext) {
     .insert({ post_id: id, user_id: user.id, content })
     .select(
       "id,post_id,user_id,content,created_at," +
-        "author:users!inner(id,name,handle,avatar_url)",
+        // Explicit FK name disambiguates the post_comments→users embed.
+        "author:users!post_comments_user_id_fkey!inner(id,name,handle,avatar_url)",
     )
     .single();
 

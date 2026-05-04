@@ -43,15 +43,19 @@ export async function GET(req: Request) {
 
   const school = (me?.school ?? "").trim();
 
-  // `!inner` upgrades the embedded author from a LEFT to an INNER JOIN, so
-  // `eq("author.school", school)` actually filters posts (rather than just
-  // null-ing out the embedded row). Falls back to viewer-only when school
-  // is empty so the dev flow doesn't serve a blank page mid-onboarding.
+  // Name the FK constraint explicitly (`posts_user_id_fkey`) — the
+  // implicit `users!inner(...)` form ambiguates in PostgREST when more
+  // than one relationship path exists between posts and users in the
+  // relationship graph (the public.users.id ← auth.users.id link counts).
+  // The `!inner` modifier upgrades the LEFT JOIN to an INNER JOIN so
+  // `eq("author.school", school)` actually filters posts. Falls back to
+  // viewer-only when school is empty so the dev flow doesn't serve a
+  // blank page mid-onboarding.
   let query = supabase
     .from("posts")
     .select(
       "id,user_id,type,content,tags,media_url,media_thumbnail_url,created_at," +
-        "author:users!inner(id,name,handle,school,major,year,avatar_url)",
+        "author:users!posts_user_id_fkey!inner(id,name,handle,school,major,year,avatar_url)",
     )
     .eq("type", "post")
     .order("created_at", { ascending: false })
