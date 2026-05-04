@@ -1,6 +1,7 @@
 import { type NextRequest, NextResponse } from "next/server";
 
 import { updateSession } from "@/lib/supabase/middleware";
+import { isGlobalFeedSurfaceEnabled } from "@/lib/feature-flags";
 
 /** Static prototype only — no matching App Router page. */
 const STATIC_ONLY_HTML: Record<string, string> = {
@@ -23,6 +24,7 @@ const LEGACY_HTML_TO_CLEAN: Record<string, string> = {
   "/html/messages.html": "/messages",
   "/html/opportunities.html": "/opportunities",
   "/html/otto.html": "/otto",
+  "/html/landing.html": "/",
 };
 
 function forwardCookies(from: NextResponse, to: NextResponse) {
@@ -78,6 +80,14 @@ export async function middleware(request: NextRequest) {
       pathname +
       (searchParams.toString() ? `?${searchParams.toString()}` : "");
     dest.searchParams.set("next", next);
+    const redir = NextResponse.redirect(dest);
+    return forwardCookies(sessionResponse, redir);
+  }
+
+  // Signed-in users hitting `/feed` while the global feed flag is off get the campus
+  // page directly — avoids a React mount + client redirect roundtrip.
+  if (pathname === "/feed" && user && !isGlobalFeedSurfaceEnabled()) {
+    const dest = new URL("/campus", request.url);
     const redir = NextResponse.redirect(dest);
     return forwardCookies(sessionResponse, redir);
   }

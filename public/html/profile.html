@@ -1264,38 +1264,103 @@ body.recruiter-mode .recruiter-card .rec-stat-row:last-child { border-bottom:non
 .content-pane { display:none; }
 .content-pane.active { display:block; }
 
-/* ── Vibes grid (tabbed view) ── */
+/* ── Clips grid (IG-style tabbed view, P1-011) ── */
 .vibes-tab-grid {
   display:grid;grid-template-columns:repeat(3,1fr);gap:10px;
 }
 .vibe-grid-thumb {
-  aspect-ratio:9/16;border-radius:14px;overflow:hidden;
-  position:relative;cursor:none;transition:transform .22s;
+  aspect-ratio:1/1;border-radius:14px;overflow:hidden;
+  position:relative;cursor:none;transition:transform .22s,box-shadow .22s;
 }
-.vibe-grid-thumb:hover { transform:scale(1.03); }
+.vibe-grid-thumb:hover {
+  transform:translateY(-2px);
+  box-shadow:0 8px 24px rgba(0,0,0,.08);
+}
 .vibe-grid-bg { position:absolute;inset:0; }
 .vibe-grid-overlay {
   position:absolute;inset:0;
   background:linear-gradient(to top,rgba(0,0,0,.75) 0%,transparent 55%);
 }
 .vibe-grid-play {
-  position:absolute;top:50%;left:50%;transform:translate(-50%,-50%);
-  width:36px;height:36px;border-radius:50%;
-  background:rgba(255,255,255,.2);border:1.5px solid rgba(255,255,255,.35);
+  position:absolute;top:8px;right:8px;
+  width:24px;height:24px;border-radius:50%;
+  background:rgba(0,0,0,.55);border:none;
   display:flex;align-items:center;justify-content:center;
-  font-size:12px;color:white;opacity:0;transition:opacity .18s;
-  backdrop-filter:blur(6px);
+  font-size:9px;color:white;opacity:1;
+  backdrop-filter:blur(4px);padding-left:2px;
 }
-.vibe-grid-thumb:hover .vibe-grid-play { opacity:1; }
 .vibe-grid-info { position:absolute;bottom:0;left:0;right:0;padding:10px; }
 .vibe-grid-title { font-size:11px;font-weight:600;color:white;line-height:1.3;margin-bottom:4px; }
 .vibe-grid-views { font-size:10px;color:rgba(255,255,255,.6); }
 .vibe-upload-tile {
-  aspect-ratio:9/16;border-radius:14px;
+  aspect-ratio:1/1;border-radius:14px;
   border:2px dashed rgba(28,28,30,.12);
   display:none;align-items:center;justify-content:center;
   flex-direction:column;gap:8px;font-size:12px;color:var(--muted);
   cursor:none;transition:border-color .15s,color .15s;
+}
+
+/* ── Post thumbnail cell for the All tab (text-only) ── */
+.post-thumb-cell {
+  aspect-ratio:1/1;border-radius:14px;overflow:hidden;
+  position:relative;cursor:none;
+  display:flex;align-items:center;justify-content:center;
+  padding:14px;text-align:center;
+  transition:transform .22s,box-shadow .22s;
+}
+.post-thumb-cell:hover {
+  transform:translateY(-2px);
+  box-shadow:0 8px 24px rgba(0,0,0,.08);
+}
+.post-thumb-cell .post-thumb-body {
+  font-family:'Fraunces',serif;font-weight:600;
+  font-size:14px;line-height:1.35;
+  display:-webkit-box;-webkit-line-clamp:5;-webkit-box-orient:vertical;
+  overflow:hidden;
+}
+.post-thumb-cell.theme-coral    { background:#FFE5DB;color:#C54323; }
+.post-thumb-cell.theme-purple   { background:#F0EDFF;color:#5b3fd9; }
+.post-thumb-cell.theme-mint     { background:#EAFFF5;color:#1A9E5B; }
+.post-thumb-cell.theme-gold     { background:#FFF7D6;color:#A17500; }
+.post-thumb-cell.theme-sky      { background:#E5F4FF;color:#1A6FB5; }
+.post-thumb-cell.theme-lavender { background:#F3EAFF;color:#7C3FE0; }
+
+/* ── Stats row above tabs (Followers · Following · Connections) ── */
+.profile-stats-row {
+  display:flex;gap:24px;align-items:baseline;
+  padding:0 4px 14px;margin-bottom:14px;
+  border-bottom:1px solid var(--border);
+}
+.profile-stat {
+  display:flex;flex-direction:column;gap:2px;
+  text-decoration:none;color:var(--charcoal);
+  cursor:none;transition:color .15s;
+}
+.profile-stat:hover .profile-stat-num { color:var(--accent); }
+.profile-stat-num {
+  font-family:'Fraunces',serif;font-weight:700;
+  font-size:20px;line-height:1;letter-spacing:-.5px;
+  transition:color .15s;
+}
+.profile-stat-label {
+  font-size:11px;color:var(--muted);
+  letter-spacing:.4px;text-transform:uppercase;
+}
+.profile-stat--prominent .profile-stat-num {
+  color:var(--accent);font-size:24px;
+}
+
+/* ── Empty state inside the content card (P1-011) ── */
+.content-empty {
+  text-align:center;padding:48px 24px;
+}
+.content-empty-title {
+  font-family:'Fraunces',serif;font-weight:800;
+  font-size:20px;color:var(--charcoal);margin-bottom:8px;
+}
+.content-empty-body {
+  font-size:14px;line-height:1.55;color:var(--muted);
+  max-width:340px;margin:0 auto;
 }
 body.edit-mode .vibe-upload-tile { display:flex; }
 .vibe-upload-tile:hover { border-color:var(--accent);color:var(--accent); }
@@ -2643,7 +2708,7 @@ body.empty-profile-mode #profileEmpty { display: flex !important; }
     <a href="#overview" class="active"><span class="pill-dot"></span>Overview</a>
     <a href="#experience"><span class="pill-dot"></span>Experience</a>
     <a href="#skills"><span class="pill-dot"></span>Skills</a>
-    <a href="#vibes"><span class="pill-dot"></span>Vibes</a>
+    <a href="#vibes"><span class="pill-dot"></span>Clips</a>
     <a href="#posts"><span class="pill-dot"></span>Posts</a>
   </div>
 
@@ -2779,12 +2844,30 @@ body.empty-profile-mode #profileEmpty { display: flex !important; }
         </div>
       </div>
 
-      <!-- Vibes + Posts — tabbed card -->
+      <!-- Clips + Posts — tabbed card (P1-011) -->
       <div class="card fade-in personality-section" id="vibes" style="animation-delay:.3s">
+
+        <!-- Stats row (P1-011 spec: Followers · Following · Connections, with Connections prominent).
+             Real follower/following counts wire up with P1-012 (connections model). -->
+        <div class="profile-stats-row">
+          <a href="#" class="profile-stat" onclick="return false;">
+            <span class="profile-stat-num" id="tabStatsFollowers">1.2k</span>
+            <span class="profile-stat-label">Followers</span>
+          </a>
+          <a href="#" class="profile-stat" onclick="return false;">
+            <span class="profile-stat-num" id="tabStatsFollowing">312</span>
+            <span class="profile-stat-label">Following</span>
+          </a>
+          <a href="/network" class="profile-stat profile-stat--prominent">
+            <span class="profile-stat-num" id="tabStatsConnections">847</span>
+            <span class="profile-stat-label">Connections</span>
+          </a>
+        </div>
 
         <!-- Tab header -->
         <div class="content-tabs">
-          <button class="content-tab active" onclick="switchContentTab('vibes-pane', this)">Vibes</button>
+          <button class="content-tab active" onclick="switchContentTab('all-pane', this)">All</button>
+          <button class="content-tab" onclick="switchContentTab('vibes-pane', this)">Clips</button>
           <button class="content-tab" onclick="switchContentTab('posts-pane', this)">Posts</button>
           <div class="layout-toggle" id="layoutToggle">
             <button class="layout-btn active" onclick="switchLayout('tabs', this)" title="Tabs">
@@ -2796,14 +2879,26 @@ body.empty-profile-mode #profileEmpty { display: flex !important; }
           </div>
         </div>
 
-        <!-- VIBES PANE -->
-        <div class="content-pane active" id="vibes-pane">
+        <!-- ALL PANE (default) — clips + posts mixed chronologically; populated by populateAllGrid() -->
+        <div class="content-pane active" id="all-pane">
+          <div class="vibes-tab-grid" id="profileAllGrid"></div>
+          <div class="content-empty" id="allEmptyState" style="display:none">
+            <div class="content-empty-title">Nothing here yet</div>
+            <div class="content-empty-body">
+              Posts and clips you publish show up here as a clean grid. Use the
+              composer below or in the Posts / Clips tabs to start.
+            </div>
+          </div>
+        </div>
+
+        <!-- CLIPS PANE (was Vibes — id kept for backward-compat with persistence layer) -->
+        <div class="content-pane" id="vibes-pane">
 
           <!-- Post composer — own profile only -->
           <div class="profile-composer owner-only" style="margin-bottom:16px">
             <div style="display:flex;gap:6px;margin-bottom:12px;">
               <button class="comp-type-btn active" onclick="switchCompType('post-comp',this)">Post</button>
-              <button class="comp-type-btn" onclick="switchCompType('vibe-comp',this)">Vibe</button>
+              <button class="comp-type-btn" onclick="switchCompType('vibe-comp',this)">Clip</button>
             </div>
             <div class="composer-header">
               <div class="composer-mini-avatar">MC</div>
@@ -2863,7 +2958,7 @@ body.empty-profile-mode #profileEmpty { display: flex !important; }
             </div>
             <div class="vibe-upload-tile" onclick="addVibeFromUpload()">
               <svg width="22" height="22" viewBox="0 0 22 22" fill="none"><path d="M11 3v16M3 11h16" stroke="currentColor" stroke-width="1.5" stroke-linecap="round"/></svg>
-              <span>Upload Vibe</span>
+              <span>Upload Clip</span>
             </div>
           </div>
         </div>
@@ -4302,14 +4397,13 @@ function switchLayout(layout, btn) {
   card.querySelectorAll('.content-pane').forEach(p => p.classList.remove('active'));
   if (layout === 'split') {
     card.querySelector('#split-pane').classList.add('active');
-    // Hide the tab buttons visually in split mode
     card.querySelectorAll('.content-tab').forEach(t => t.style.opacity = '.4');
   } else {
     card.querySelectorAll('.content-tab').forEach(t => t.style.opacity = '');
-    card.querySelector('#vibes-pane').classList.add('active');
-    // Re-activate the Vibes tab
+    card.querySelector('#all-pane').classList.add('active');
     card.querySelectorAll('.content-tab').forEach(t => t.classList.remove('active'));
     card.querySelector('.content-tab').classList.add('active');
+    if (typeof populateAllGrid === 'function') populateAllGrid();
   }
 }
 
@@ -4329,13 +4423,81 @@ function toggleViewerMode() {
   if (typeof refreshPinButtons === 'function') refreshPinButtons();
 }
 
-// ── Content tab switcher (Vibes / Posts) ─────────────────────────
+// ── Content tab switcher (All / Clips / Posts) ───────────────────
 function switchContentTab(paneId, btn) {
   const card = btn.closest('.card');
   card.querySelectorAll('.content-tab').forEach(b => b.classList.remove('active'));
   card.querySelectorAll('.content-pane').forEach(p => p.classList.remove('active'));
   btn.classList.add('active');
   card.querySelector('#' + paneId).classList.add('active');
+  if (paneId === 'all-pane' && typeof populateAllGrid === 'function') populateAllGrid();
+}
+
+// ── All-pane grid: clips + posts as square thumbnails (P1-011) ────
+// Posts that aren't visible in the DOM (e.g. lazy-rendered) won't appear; the
+// ALL view derives from the same nodes the Clips/Posts panes render so it's
+// always consistent with what the user can see in the other tabs.
+const POST_THEME_BUCKETS = ['coral', 'purple', 'mint', 'gold', 'sky', 'lavender'];
+function postThemeFor(card) {
+  const tag = card.querySelector('.ppost-tag');
+  const seed = (tag?.textContent || card.dataset.postId || '').replace(/\s+/g, '').toLowerCase();
+  let hash = 0;
+  for (let i = 0; i < seed.length; i++) hash = (hash * 31 + seed.charCodeAt(i)) | 0;
+  return POST_THEME_BUCKETS[Math.abs(hash) % POST_THEME_BUCKETS.length];
+}
+function postExcerpt(card) {
+  const body = card.querySelector('.ppost-body')?.textContent?.trim() || '';
+  return body.length > 180 ? body.slice(0, 177) + '…' : body;
+}
+function buildPostThumb(card) {
+  const wrap = document.createElement('div');
+  wrap.className = 'post-thumb-cell theme-' + postThemeFor(card);
+  wrap.dataset.sourcePostId = card.dataset.postId || '';
+  const body = document.createElement('div');
+  body.className = 'post-thumb-body';
+  body.textContent = postExcerpt(card);
+  wrap.appendChild(body);
+  wrap.addEventListener('click', () => {
+    const target = document.getElementById('posts');
+    if (target) target.scrollIntoView({ behavior: 'smooth', block: 'start' });
+    document.querySelector('.content-tab:nth-child(3)')?.click();
+  });
+  return wrap;
+}
+function buildClipThumb(thumb) {
+  const clone = thumb.cloneNode(true);
+  // Hide owner-only edit chrome inside the All grid — the cell is read-only there.
+  clone.querySelectorAll('.vibe-pin-btn, .vibe-delete-btn').forEach(el => el.remove());
+  return clone;
+}
+function populateAllGrid() {
+  const grid = document.getElementById('profileAllGrid');
+  const empty = document.getElementById('allEmptyState');
+  if (!grid) return;
+  const clipNodes = Array.from(document.querySelectorAll('#profileVibesGrid .vibe-grid-thumb'));
+  const postNodes = Array.from(document.querySelectorAll('#profilePostsList .profile-post-card'));
+  grid.innerHTML = '';
+  if (clipNodes.length === 0 && postNodes.length === 0) {
+    grid.style.display = 'none';
+    if (empty) empty.style.display = 'block';
+    return;
+  }
+  grid.style.display = '';
+  if (empty) empty.style.display = 'none';
+  // Zipper-merge for a mixed feel; not strict chronological — relative dates in
+  // the DOM aren't sortable without parsing. Fine for the demo until P1-017
+  // composer writes real timestamps to localStorage.
+  const max = Math.max(clipNodes.length, postNodes.length);
+  for (let i = 0; i < max; i++) {
+    if (i < clipNodes.length) grid.appendChild(buildClipThumb(clipNodes[i]));
+    if (i < postNodes.length) grid.appendChild(buildPostThumb(postNodes[i]));
+  }
+}
+// Repopulate after the persistence layer hydrates clips and posts from localStorage.
+if (document.readyState === 'loading') {
+  document.addEventListener('DOMContentLoaded', () => setTimeout(populateAllGrid, 200));
+} else {
+  setTimeout(populateAllGrid, 200);
 }
 
 // ── Composer type toggle (Post / Vibe) ───────────────────────────
@@ -4369,6 +4531,7 @@ function publishProfilePost() {
     list.insertBefore(card, list.firstChild);
     savePostsToStorage();
   }
+  if (typeof populateAllGrid === 'function') populateAllGrid();
   showToast('Posted successfully');
   input.value = '';
   input.style.height = '';
@@ -5333,6 +5496,7 @@ function deleteProfilePost(btn) {
   }
   savePostsToStorage();
   saveProfileToStorage();
+  if (typeof populateAllGrid === 'function') populateAllGrid();
   if (typeof showToast === 'function') showToast('Post removed');
 }
 
@@ -5399,7 +5563,8 @@ function deleteVibe(btn) {
   }
   saveVibesToStorage();
   saveProfileToStorage();
-  if (typeof showToast === 'function') showToast('Vibe removed');
+  if (typeof populateAllGrid === 'function') populateAllGrid();
+  if (typeof showToast === 'function') showToast('Clip removed');
 }
 
 // Upload-tile click → spawns a placeholder vibe with a random gradient.
@@ -5430,8 +5595,9 @@ function addVibeFromUpload() {
   if (uploadTile) grid.insertBefore(node, uploadTile);
   else grid.appendChild(node);
   saveVibesToStorage();
+  if (typeof populateAllGrid === 'function') populateAllGrid();
   if (typeof refreshPinButtons === 'function') refreshPinButtons();
-  if (typeof showToast === 'function') showToast('Vibe added — click to edit');
+  if (typeof showToast === 'function') showToast('Clip added — click to edit');
 }
 
 // ── Hydrate persisted sections from vibe_user_v1 ─────────────────────────
@@ -5581,6 +5747,8 @@ function renderUserSections(user) {
   if (typeof renderVibesFromStorage === 'function') {
     renderVibesFromStorage(Array.isArray(user.vibes) ? user.vibes : undefined);
   }
+  // Repopulate the All-tab grid after clips and posts have hydrated (P1-011).
+  if (typeof populateAllGrid === 'function') populateAllGrid();
 
   // Re-pin saved item once posts and vibes are rendered
   if (user.pinnedId && typeof pinFromProfile === 'function') {

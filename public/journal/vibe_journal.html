@@ -434,7 +434,7 @@ body {
   </div>
 
   <div class="sidebar-version">
-    <div class="ver-label" id="sidebarVersion">v4.3 — Session 31</div>
+    <div class="ver-label" id="sidebarVersion">v4.5 — Session 33</div>
     <div class="ver-date" id="sidebarDate">Loading...</div>
   </div>
 
@@ -498,7 +498,7 @@ body {
     <div class="hero-meta">
       <div class="hero-meta-item">
         <span class="hero-meta-label">Version</span>
-        <span class="hero-meta-val" id="heroVersion">v4.3</span>
+        <span class="hero-meta-val" id="heroVersion">v4.5</span>
       </div>
       <div class="hero-meta-item">
         <span class="hero-meta-label">Sessions</span>
@@ -1310,9 +1310,9 @@ body {
 const STORAGE_KEY = 'vibe_journal_data';
 
 const DEFAULT_DATA = {
-  version: 'v4.3',
-  sessionCount: 31,
-  lastUpdated: 'May 3, 2026',
+  version: 'v4.5',
+  sessionCount: 33,
+  lastUpdated: 'May 4, 2026',
   versions: [
     { ver: 'v1.0', label: 'Session 1',     summary: 'Initial concept. App name (Vibe), warm professional positioning, profile design, Vibes short-form feed, reaction system, landing page.' },
     { ver: 'v1.1', label: 'Session 2',     summary: 'Cursor redesign: instant dot + snappy ring at lerp 0.28.' },
@@ -1338,7 +1338,9 @@ const DEFAULT_DATA = {
     { ver: 'v4.0', label: 'Session 28',     summary: 'Phase 1 build started: P1-001 Supabase (client + /api/health/supabase) and P1-002 Cloudflare R2 (presigned Clip URLs + /api/health/r2). Franky wired dashboards; prod health checks green. Vercel Hobby unblock: git author email aligned with GitHub (Gmail).' },
     { ver: 'v4.1', label: 'Session 29',     summary: 'Phase 1 Stage 1 closed out: P1-003 Resend (+ send-only key health probe), P1-004 Sentry App Router, P1-005 Postgres schema + RLS + auth.users→public.users trigger applied in Supabase. Session handoff for P1-006 auth written.' },
     { ver: 'v4.2', label: 'Session 30',     summary: 'P1-006 auth flow hardened: post-login routing lands on /profile, Otto completion + school verification enforced on gated routes, login ?next= sanitization (no /feed or /campus bypass), onboarding bridge and onboarding-complete API aligned with static HTML. Handoff for P1-007 profile work.' },
-    { ver: 'v4.3', label: 'Session 31',     summary: 'Profile path toward P1-007: HTML bridge + profile-bootstrap/sync/upload APIs, profiles bucket migration, NavIdentityChip; campus-first global feed via NEXT_PUBLIC_SHOW_GLOBAL_FEED + redirects; local DOCS/LEARNINGS + PHASE_1 notes on shell vs campus.html. Handoff for commit/deploy and next P1-007/P1-008.', current: true },
+    { ver: 'v4.3', label: 'Session 31',     summary: 'Profile path toward P1-007: HTML bridge + profile-bootstrap/sync/upload APIs, profiles bucket migration, NavIdentityChip; campus-first global feed via NEXT_PUBLIC_SHOW_GLOBAL_FEED + redirects; local DOCS/LEARNINGS + PHASE_1 notes on shell vs campus.html. Handoff for commit/deploy and next P1-007/P1-008.' },
+    { ver: 'v4.4', label: 'Session 32',     summary: 'P1-007 closed for profile data model + RLS — confirmed migrations cover all fields used by public/html/profile.html (tagline, headline, location_text, banner_gradient, work_experience, recruiter_snapshot) with self-only RLS + storage path-prefix policies. P1-008 URL polish: middleware now redirects /html/landing.html → / and shortcuts signed-in /feed → /campus when the global feed flag is off. QA_CHECKLIST.md tracked at repo root with manual sweep for profile upload + onboarding + campus gate.' },
+    { ver: 'v4.5', label: 'Session 33',     summary: 'P1-011 profile revamp shipped (IG-style content card): All / Clips / Posts tabs with All as default and a chronological-feel zipper merge of clip thumbs + colored post cards; 3-col 1:1 square grid; new stats row (Followers · Following · Connections, Connections prominent); empty state for users with zero of either; Vibes → Clips renamed inside the card (subnav, tab, composer, upload tile, toasts) while data-layer keys stay backward-compatible. Real follower counts wait for P1-012 connections; click-through viewers wait for P1-015 / P1-016.', current: true },
   ],
   sessions: [
     {
@@ -1629,10 +1631,32 @@ const DEFAULT_DATA = {
         { icon: '·', text: '<strong>What\'s next:</strong> Commit the large WIP tree, push ahead commit + new work, run health + auth regression on Vercel. Continue <strong>P1-007</strong> profile parity and <strong>P1-008</strong> URL strategy. Handoff: <code>handoffs/2026-05-03-session-31-profile-storage-feed-flags-handoff.md</code>.' },
       ]
     },
+    {
+      num: 32, ver: 'v4.4', title: 'P1-007 close + P1-008 URL polish + manual QA checklist', date: 'Session 32 — 2026-05-04',
+      changes: [
+        { icon: '✓', text: '<strong>P1-007 — profile data model + RLS confirmed.</strong> Walked the static profile prototype against <code>public.users</code> + extension migration: every field used by <code>vibe_user_v1</code> (name, tagline, headline, location_text, website, bio, interests/skills, work_experience, recruiter_snapshot, avatar/banner/resume URLs, banner_gradient) is mapped via <code>buildVibeUserV1FromProfile()</code> → <code>profile-bootstrap</code>. RLS on <code>public.users</code> is self-only insert/update/delete; storage policies on the <code>profiles</code> bucket enforce <code>{auth.uid()}/...</code> path prefix on writes and public read.' },
+        { icon: '◐', text: '<strong>P1-008 — middleware URL polish.</strong> <code>middleware.ts</code> now redirects <code>/html/landing.html → /</code> alongside the existing legacy map. Signed-in users hitting <code>/feed</code> while <code>NEXT_PUBLIC_SHOW_GLOBAL_FEED</code> is off get redirected to <code>/campus</code> in middleware (no React mount + client redirect roundtrip). Decision: keep <code>src/app/feed/</code> (real flag-gated surface) and <code>src/app/the-map/</code> (founder-internal doc) — neither is experimental scaffolding to delete.' },
+        { icon: '▣', text: '<strong>Manual QA checklist tracked at repo root.</strong> <code>QA_CHECKLIST.md</code> covers anonymous clean URLs, signup → school verify → Otto → profile gate, feed flag both states, profile upload + sync paths, and edge cases (cookieless email browser, <code>?next=</code> sanitizer, handle conflict). Replaces the "test it manually" gap before E2E lands.' },
+        { icon: '·', text: '<strong>What\'s next:</strong> Stage 3 work — <strong>P1-011</strong> profile page revamp (IG-style grid, real <code>/profile/[handle]</code> render replacing the stub) and <strong>P1-012</strong> connections (followers/following/connections, mutual rule). Optional: wire <code>/qa</code> headless agent to replay <code>QA_CHECKLIST.md</code>.' },
+      ]
+    },
+    {
+      num: 33, ver: 'v4.5', title: 'P1-011 — IG-style profile content card (All / Clips / Posts)', date: 'Session 33 — 2026-05-04',
+      changes: [
+        { icon: '◇', text: '<strong>Tabs and default view.</strong> Content card is now <strong>All / Clips / Posts</strong>, with <strong>All</strong> as the default. <code>switchContentTab()</code> calls <code>populateAllGrid()</code> on entry; <code>switchLayout(\'tabs\')</code> activates <code>#all-pane</code> instead of the old Clips pane.' },
+        { icon: '▣', text: '<strong>3-col 1:1 square grid (IG-style).</strong> <code>.vibe-grid-thumb</code> and <code>.vibe-upload-tile</code> moved from <code>aspect-ratio:9/16</code> → <code>1/1</code>. New <code>.post-thumb-cell</code> renders text-only posts as colored squares (six themed buckets keyed off the first hashtag) for the All grid. Hover lifts the cell with a soft shadow instead of the old scale; play badge sits in the top-right of clip thumbs.' },
+        { icon: '◈', text: '<strong>Stats row above tabs.</strong> Followers · Following · Connections, with Connections shown prominently per spec (<code>#tabStatsFollowers</code>, <code>#tabStatsFollowing</code>, <code>#tabStatsConnections</code>). Counts use Maya\'s demo numbers until <strong>P1-012</strong> wires real follower/following data from Supabase.' },
+        { icon: '◐', text: '<strong>All-grid populator.</strong> <code>populateAllGrid()</code> reads <code>#profileVibesGrid</code> and <code>#profilePostsList</code>, zipper-merges them, clones clip thumbs, and builds compact post-thumb cells. Auto-runs after persistence-layer hydration and after every publish/delete (vibe upload, post publish, post delete, vibe delete). Owner-only pin/delete chrome is stripped from the All grid clones.' },
+        { icon: '·', text: '<strong>Empty state and Vibes → Clips relabeling.</strong> When the user has zero clips and zero posts, <code>#allEmptyState</code> renders inline. Subnav anchor, tab label, composer button, upload tile, and toasts say "Clip" — data-layer keys (<code>vibe_vibes_v1</code>, <code>profileVibesGrid</code>, etc.) and the <code>#vibes</code> section id stay for backward-compat with persistence + scrollspy. Global rename is still <strong>P1-036</strong>.' },
+        { icon: '·', text: '<strong>What\'s next:</strong> <strong>P1-012</strong> connections (followers / following / mutual rule) — unblocks the real numbers in the new stats row. Then <strong>P1-013 / P1-014</strong> follow buttons + stats wiring close out Stage 3.' },
+      ]
+    },
   ],
   nextSteps: [
-    { priority: 'high',   text: '<strong>Ship hygiene — Session 31 WIP</strong> — <code>git status</code>, run typecheck/lint, commit (split or monolith), <code>git push origin main</code> (journal v4.3 + app changes); confirm Vercel + Supabase migration for <code>profiles</code> bucket on prod.' },
-    { priority: 'high',   text: '<strong>Phase 1 — P1-007 Profile</strong> — Supabase-backed profile UI (reads/writes to <code>public.users</code> and related tables); replace the Next.js <code>/profile</code> stub. Align with static prototype richness where scope allows.' },
+    { priority: 'high',   text: '<strong>Phase 1 — P1-012 Connections model</strong> — followers / following / connections with mutual-follow auto-promotion. Unblocks the real numbers in the new profile stats row, follow buttons (P1-013), and Discover. Querying <code>public.connections</code> for both directions per user.' },
+    { priority: 'high',   text: '<strong>Phase 1 — P1-013 Follow / unfollow buttons</strong> — wire across cards, profile, modals once P1-012 is in. Mutual-follow detection happens server-side when both sides exist.' },
+    { priority: 'high',   text: '<strong>Phase 1 — P1-014 Wire stats row to real counts</strong> — replace the demo numbers in <code>#tabStatsFollowers</code> / <code>#tabStatsFollowing</code> / <code>#tabStatsConnections</code> with reads from <code>public.connections</code>. Closes Stage 3 when shipped together with P1-012/13.' },
+    { priority: 'high',   text: '<strong>Real <code>/profile/[handle]</code> render</strong> — replace the React stub with a Supabase fetch + the same IG-style grid. Could pivot to having the static prototype handle <code>handle</code> param too — decide during P1-011/012 wrap-up.' },
     { priority: 'high',   text: '<strong>Connect-side polish</strong> — the demo auto-accepts a Connect after 3 seconds. Wire to a real "pending requests" state with the other person\'s incoming view (accept / decline) and a notification when accepted.' },
     { priority: 'high',   text: '<strong>Per-school campus content</strong> — verified non-IU students currently still see IU\'s feed / jobs / events. Either show a "your school doesn\'t have campus content yet — be the first" empty state, or seed a few additional mock schools alongside IU.' },
     { priority: 'medium', text: '<strong>Otto v2 — backend</strong> — voice training pipeline, platform OAuth (LinkedIn, Instagram Business, TikTok, YouTube, X), posting queue, real metrics ingestion. Plus the platform-strategy notes on account authorization (otto_platform_strategy.md). Separate larger phase.' },
