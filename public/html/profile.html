@@ -2896,6 +2896,42 @@ body.empty-profile-mode #profileEmpty { display: flex !important; }
            the avatar. Tabs sit alone here. -->
       <div class="card fade-in personality-section" id="vibes" style="animation-delay:.3s">
 
+        <!-- Unified composer — own profile only. One composer for both kinds;
+             toggle picks Post (text + optional image) or Clip (video upload).
+             Sits above the tabs so it's always visible regardless of which
+             tab the viewer is on. -->
+        <div class="profile-composer owner-only" style="margin-bottom:16px">
+          <div style="display:flex;gap:6px;margin-bottom:12px;">
+            <button class="comp-type-btn active" onclick="switchCompType('post-comp',this)">Post</button>
+            <button class="comp-type-btn" onclick="switchCompType('vibe-comp',this)">Clip</button>
+          </div>
+          <div class="composer-header">
+            <div class="composer-mini-avatar">MC</div>
+            <textarea class="composer-field" id="profilePostInput" placeholder="What are you working on? Use #hashtags for tags." rows="1" maxlength="2000" oninput="this.style.height='auto';this.style.height=Math.min(this.scrollHeight,180)+'px'"></textarea>
+          </div>
+          <!-- Optional post image — picked via toolbar, previewed inline -->
+          <input type="file" id="composerPostImage" accept="image/jpeg,image/png,image/webp,image/gif" hidden onchange="composerOnImagePicked(this)">
+          <div id="composerPostImagePreview" style="display:none;position:relative;margin-top:10px;border-radius:12px;overflow:hidden;max-width:240px;">
+            <img id="composerPostImageImg" alt="" style="display:block;width:100%;height:auto;">
+            <button type="button" onclick="composerClearImage()" title="Remove image"
+              style="position:absolute;top:6px;right:6px;background:rgba(0,0,0,.65);color:white;border:none;border-radius:999px;width:24px;height:24px;font-size:14px;line-height:1;cursor:none;">&times;</button>
+          </div>
+          <div id="vibe-comp-zone" style="display:none;border:2px dashed rgba(28,28,30,.12);border-radius:14px;padding:24px;text-align:center;margin-top:10px;">
+            <div style="font-size:13px;font-weight:600;color:var(--muted)">Pick a video file to upload</div>
+            <div style="font-size:11px;color:var(--muted);margin-top:4px;">Up to 60s · MP4 / MOV / WEBM · Max 100MB</div>
+            <button type="button" onclick="composerChooseClipFile()"
+              style="margin-top:12px;font-family:'DM Sans',sans-serif;font-size:12px;font-weight:700;background:var(--charcoal);color:white;border:none;padding:8px 18px;border-radius:100px;cursor:none;">Choose file</button>
+            <input type="file" id="composerClipFile" accept="video/mp4,video/quicktime,video/webm" hidden onchange="composerOnClipPicked(this)">
+            <div id="composerClipStatus" style="font-size:11px;color:var(--muted);margin-top:8px;"></div>
+          </div>
+          <div class="composer-btns">
+            <button type="button" onclick="composerChooseImage()" title="Attach image"
+              style="font-family:'DM Sans',sans-serif;font-size:12px;font-weight:600;background:transparent;color:var(--charcoal);border:1px solid rgba(28,28,30,.18);padding:6px 12px;border-radius:100px;cursor:none;">+ Photo</button>
+            <span style="font-size:12px;color:var(--muted);flex:1;text-align:right;margin-right:10px;">Share with your connections</span>
+            <button class="composer-publish" onclick="publishProfilePost()">Publish</button>
+          </div>
+        </div>
+
         <!-- Tab header -->
         <div class="content-tabs">
           <button class="content-tab active" onclick="switchContentTab('all-pane', this)">All</button>
@@ -2918,46 +2954,13 @@ body.empty-profile-mode #profileEmpty { display: flex !important; }
             <div class="content-empty-title">Nothing here yet</div>
             <div class="content-empty-body">
               Posts and clips you publish show up here as a clean grid. Use the
-              composer below or in the Posts / Clips tabs to start.
+              composer above to start.
             </div>
           </div>
         </div>
 
         <!-- CLIPS PANE (was Vibes — id kept for backward-compat with persistence layer) -->
         <div class="content-pane" id="vibes-pane">
-
-          <!-- Post composer — own profile only -->
-          <div class="profile-composer owner-only" style="margin-bottom:16px">
-            <div style="display:flex;gap:6px;margin-bottom:12px;">
-              <button class="comp-type-btn active" onclick="switchCompType('post-comp',this)">Post</button>
-              <button class="comp-type-btn" onclick="switchCompType('vibe-comp',this)">Clip</button>
-            </div>
-            <div class="composer-header">
-              <div class="composer-mini-avatar">MC</div>
-              <textarea class="composer-field" id="profilePostInput" placeholder="What are you working on? Use #hashtags for tags." rows="1" maxlength="2000" oninput="this.style.height='auto';this.style.height=Math.min(this.scrollHeight,180)+'px'"></textarea>
-            </div>
-            <!-- Optional post image — picked via toolbar, previewed inline -->
-            <input type="file" id="composerPostImage" accept="image/jpeg,image/png,image/webp,image/gif" hidden onchange="composerOnImagePicked(this)">
-            <div id="composerPostImagePreview" style="display:none;position:relative;margin-top:10px;border-radius:12px;overflow:hidden;max-width:240px;">
-              <img id="composerPostImageImg" alt="" style="display:block;width:100%;height:auto;">
-              <button type="button" onclick="composerClearImage()" title="Remove image"
-                style="position:absolute;top:6px;right:6px;background:rgba(0,0,0,.65);color:white;border:none;border-radius:999px;width:24px;height:24px;font-size:14px;line-height:1;cursor:none;">&times;</button>
-            </div>
-            <div id="vibe-comp-zone" style="display:none;border:2px dashed rgba(28,28,30,.12);border-radius:14px;padding:24px;text-align:center;margin-top:10px;">
-              <div style="font-size:13px;font-weight:600;color:var(--muted)">Pick a video file to upload</div>
-              <div style="font-size:11px;color:var(--muted);margin-top:4px;">Up to 60s · MP4 / MOV / WEBM · Max 100MB</div>
-              <button type="button" onclick="composerChooseClipFile()"
-                style="margin-top:12px;font-family:'DM Sans',sans-serif;font-size:12px;font-weight:700;background:var(--charcoal);color:white;border:none;padding:8px 18px;border-radius:100px;cursor:none;">Choose file</button>
-              <input type="file" id="composerClipFile" accept="video/mp4,video/quicktime,video/webm" hidden onchange="composerOnClipPicked(this)">
-              <div id="composerClipStatus" style="font-size:11px;color:var(--muted);margin-top:8px;"></div>
-            </div>
-            <div class="composer-btns">
-              <button type="button" onclick="composerChooseImage()" title="Attach image"
-                style="font-family:'DM Sans',sans-serif;font-size:12px;font-weight:600;background:transparent;color:var(--charcoal);border:1px solid rgba(28,28,30,.18);padding:6px 12px;border-radius:100px;cursor:none;">+ Photo</button>
-              <span style="font-size:12px;color:var(--muted);flex:1;text-align:right;margin-right:10px;">Share with your connections</span>
-              <button class="composer-publish" onclick="publishProfilePost()">Publish</button>
-            </div>
-          </div>
 
           <!-- Vibes grid — hardcoded for Maya; rebuilt from vibe_vibes_v1 once edited -->
           <div class="vibes-tab-grid" id="profileVibesGrid">
@@ -3013,18 +3016,6 @@ body.empty-profile-mode #profileEmpty { display: flex !important; }
           <!-- Viewer hint -->
           <div class="viewer-only" style="margin-bottom:12px;padding:12px 14px;background:var(--cream);border-radius:12px;">
             <div style="font-size:12px;color:var(--muted);line-height:1.5">Viewing Maya's profile. <a href="/feed" style="color:var(--accent);font-weight:600;text-decoration:none">Go to feed</a> to post and discover people like her.</div>
-          </div>
-
-          <!-- Owner composer -->
-          <div class="profile-composer owner-only" style="margin-bottom:14px;">
-            <div class="composer-header">
-              <div class="composer-mini-avatar">MC</div>
-              <textarea class="composer-field" placeholder="Share a thought, project update, or professional insight..." rows="1" oninput="this.style.height='auto';this.style.height=Math.min(this.scrollHeight,180)+'px'"></textarea>
-            </div>
-            <div class="composer-btns" style="margin-top:8px;">
-              <span style="font-size:12px;color:var(--muted);">Visible to all connections</span>
-              <button class="composer-publish">Publish</button>
-            </div>
           </div>
 
           <!-- Posts list — own posts above, syndicated/drafted/vibe-only below.

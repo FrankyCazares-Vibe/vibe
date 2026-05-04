@@ -246,6 +246,12 @@
     const u = (typeof vibeLoad === "function") ? vibeLoad("vibe_user_v1") : null;
     return Boolean(u && u._appShell);
   }
+  // Treat anything that isn't a real UUID as a demo / hardcoded seed row.
+  // The DB columns are uuid-typed, so passing 'p1' or 'v2' through to the
+  // server bombs Postgres with "invalid input syntax for type uuid". The
+  // modal still opens and renders the prefill; interactions just no-op.
+  const UUID_RE = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
+  function isRealPostId(id) { return UUID_RE.test(String(id || "")); }
   function esc(s) {
     return String(s || "").replace(/[&<>"']/g, ch => ({
       "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;",
@@ -290,8 +296,9 @@
 
     // Always fetch the canonical post + viewer state — prefill might be
     // stale on counts/liked/saved.
-    if (!isAppShell()) {
-      // Demo path: render whatever we have, skip API
+    if (!isAppShell() || !isRealPostId(state.openId)) {
+      // Demo / hardcoded seed path: render whatever we have, skip API.
+      // Same surface used for unsigned visitors and demo Maya cards.
       if (!prefill) {
         document.getElementById("vpvName").textContent = "Sign in to view this post";
         document.getElementById("vpvBody").innerHTML = "";
@@ -436,6 +443,7 @@
   async function _vpvLoadClipSrc(postId) {
     if (!postId) return;
     if (!isAppShell()) return;
+    if (!isRealPostId(postId)) return; // demo / hardcoded clips have no R2 object
     try {
       const r = await fetch(`/api/clips/${encodeURIComponent(postId)}/view-url`, {
         credentials: "include",
@@ -485,6 +493,7 @@
   window.__vpvToggleLike = async function () {
     if (!state.openId) return;
     if (!isAppShell()) { toast("Sign in to like posts"); return; }
+    if (!isRealPostId(state.openId)) { toast("This is a demo post — interactions disabled"); return; }
     if (state.inflight) return;
     state.inflight = true;
     const wasLiked = state.liked;
@@ -516,6 +525,7 @@
   window.__vpvToggleSave = async function () {
     if (!state.openId) return;
     if (!isAppShell()) { toast("Sign in to save posts"); return; }
+    if (!isRealPostId(state.openId)) { toast("This is a demo post — interactions disabled"); return; }
     if (state.inflight) return;
     state.inflight = true;
     const wasSaved = state.saved;
@@ -550,6 +560,7 @@
     const content = (inp && inp.value || "").trim();
     if (!content) return;
     if (!isAppShell()) { toast("Sign in to comment"); return; }
+    if (!isRealPostId(state.openId)) { toast("This is a demo post — interactions disabled"); return; }
     btn.disabled = true;
     try {
       const r = await fetch(`/api/posts/${encodeURIComponent(state.openId)}/comments`, {
