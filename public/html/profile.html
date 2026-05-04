@@ -2427,15 +2427,17 @@ body.empty-profile-mode #profileEmpty { display: flex !important; }
     <a href="/campus"       class="btn-nav ghost" style="text-decoration:none;font-size:13px;padding:6px 12px;">Campus</a>
   </div>
 
-  <!-- Center: search -->
-  <div class="prof-search-wrap" id="profSearchWrap" style="flex:1;display:flex;justify-content:center;max-width:360px;margin:0 auto;">
+  <!-- Center: search — absolutely centered in the nav so it doesn't shift
+       with the asymmetric left/right side widths. Real search wires up later
+       (see P1 backlog: search across people, clubs, events, orgs). -->
+  <div class="prof-search-wrap" id="profSearchWrap" style="position:absolute;left:50%;top:50%;transform:translate(-50%,-50%);width:360px;max-width:42vw;">
     <div class="prof-search-bar" style="width:100%;">
       <svg width="14" height="14" viewBox="0 0 14 14" fill="none">
         <circle cx="6" cy="6" r="4.5" stroke="currentColor" stroke-width="1.5"/>
         <path d="M10 10l2.5 2.5" stroke="currentColor" stroke-width="1.5" stroke-linecap="round"/>
       </svg>
       <input class="prof-search-input" id="profSearchInput"
-        placeholder="Search people, companies…"
+        placeholder="Search for people, clubs, events, orgs"
         oninput="runProfSearch(this.value)"
         onfocus="openProfSearch()"
         onblur="setTimeout(function(){closeProfSearch()},180)">
