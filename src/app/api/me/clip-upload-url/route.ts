@@ -5,7 +5,7 @@ import { NextResponse } from "next/server";
 import { CLIP_KEY_PREFIX, isR2Configured, signClipPutUrl } from "@/lib/r2";
 import { createSupabaseServerClient } from "@/lib/supabase/server";
 
-const MAX_BYTES = 100 * 1024 * 1024; // 100MB cap (PHASE_1 spec)
+const MAX_BYTES = 200 * 1024 * 1024; // 200MB — bumped from 100MB to fit 2-min clips
 const ALLOWED_TYPES: Record<string, string> = {
   "video/mp4": "mp4",
   "video/quicktime": "mov",

@@ -2918,7 +2918,7 @@ body.empty-profile-mode #profileEmpty { display: flex !important; }
           </div>
           <div id="vibe-comp-zone" style="display:none;border:2px dashed rgba(28,28,30,.12);border-radius:14px;padding:24px;text-align:center;margin-top:10px;">
             <div style="font-size:13px;font-weight:600;color:var(--muted)">Pick a video file to upload</div>
-            <div style="font-size:11px;color:var(--muted);margin-top:4px;">Up to 60s · MP4 / MOV / WEBM · Max 100MB</div>
+            <div style="font-size:11px;color:var(--muted);margin-top:4px;">Up to 2 min · MP4 / MOV / WEBM · Max 200MB</div>
             <button type="button" onclick="composerChooseClipFile()"
               style="margin-top:12px;font-family:'DM Sans',sans-serif;font-size:12px;font-weight:700;background:var(--charcoal);color:white;border:none;padding:8px 18px;border-radius:100px;cursor:none;">Choose file</button>
             <input type="file" id="composerClipFile" accept="video/mp4,video/quicktime,video/webm" hidden onchange="composerOnClipPicked(this)">
@@ -5874,8 +5874,8 @@ function deleteVibe(btn) {
 // DB stores the R2 object key (per src/lib/r2.ts comment); the viewer
 // modal (P1-016) will resolve a fresh signed GET URL on demand.
 
-const CLIP_MAX_BYTES   = 100 * 1024 * 1024;
-const CLIP_MAX_SECONDS = 60;
+const CLIP_MAX_BYTES   = 200 * 1024 * 1024;
+const CLIP_MAX_SECONDS = 120;
 const CLIP_PALETTES = [
   'linear-gradient(135deg,#1a0533,#2d1b4e)',
   'linear-gradient(135deg,#001a2c,#0a2a3e)',

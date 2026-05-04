@@ -6,7 +6,7 @@ import { createSupabaseServerClient } from "@/lib/supabase/server";
 const MAX_CONTENT_CHARS = 2000;
 const MAX_TAGS = 10;
 const MAX_TAG_LEN = 32;
-const MAX_DURATION_SEC = 60;
+const MAX_DURATION_SEC = 120;
 
 type Body = {
   object_key?: unknown;
