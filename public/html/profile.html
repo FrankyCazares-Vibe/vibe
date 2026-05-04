@@ -1481,6 +1481,11 @@ body.recruiter-mode .vibe-delete-btn { display:none !important; }
 .ppost-date { font-size:11px;font-weight:700;color:var(--muted);text-transform:uppercase;letter-spacing:.5px;margin-bottom:8px; }
 .ppost-body { font-size:14px;line-height:1.75;color:var(--soft-black);margin-bottom:10px; }
 .ppost-body strong { color:var(--charcoal); }
+/* Read more truncation (LinkedIn-style) — clamped to 6 lines until expanded. */
+.ppost-body.is-clamped { display:-webkit-box; -webkit-line-clamp:6; -webkit-box-orient:vertical; overflow:hidden; }
+.ppost-body.is-expanded { display:block; }
+.ppost-readmore { display:none; background:none;border:none;padding:0;margin:-2px 0 10px;color:var(--accent);font-family:'DM Sans',sans-serif;font-size:13px;font-weight:700;cursor:none; }
+.ppost-readmore.show { display:inline-block; }
 .ppost-tags { display:flex;flex-wrap:wrap;gap:5px;margin-bottom:10px; }
 .ppost-tag { font-size:11px;font-weight:600;padding:3px 9px;border-radius:100px;background:white;color:var(--muted); }
 .ppost-reactions { display:flex;align-items:center;justify-content:space-between;padding-top:8px;border-top:1px solid var(--border); }
@@ -2923,6 +2928,13 @@ body.empty-profile-mode #profileEmpty { display: flex !important; }
             <input type="file" id="composerClipFile" accept="video/mp4,video/quicktime,video/webm" hidden onchange="composerOnClipPicked(this)">
             <div id="composerClipStatus" style="font-size:11px;color:var(--muted);margin-top:8px;"></div>
           </div>
+          <!-- Clip preview after upload, before publish — keeps the user in control. -->
+          <div id="composerClipPreview" style="display:none;position:relative;margin-top:10px;border-radius:12px;overflow:hidden;max-width:240px;background:#1C1C1E;">
+            <img id="composerClipPreviewImg" alt="" style="display:block;width:100%;height:auto;">
+            <button type="button" onclick="composerClearClip()" title="Remove clip"
+              style="position:absolute;top:6px;right:6px;background:rgba(0,0,0,.65);color:white;border:none;border-radius:999px;width:24px;height:24px;font-size:14px;line-height:1;cursor:none;">&times;</button>
+            <div id="composerClipPreviewLabel" style="position:absolute;bottom:6px;left:6px;background:rgba(0,0,0,.65);color:white;font-size:11px;font-weight:600;padding:3px 8px;border-radius:6px;"></div>
+          </div>
           <div class="composer-btns">
             <button type="button" onclick="composerChooseImage()" title="Attach image"
               style="font-family:'DM Sans',sans-serif;font-size:12px;font-weight:600;background:transparent;color:var(--charcoal);border:1px solid rgba(28,28,30,.18);padding:6px 12px;border-radius:100px;cursor:none;">+ Photo</button>
@@ -2931,36 +2943,15 @@ body.empty-profile-mode #profileEmpty { display: flex !important; }
           </div>
         </div>
 
-        <!-- Tab header -->
+        <!-- Tab header — IG/TikTok-style: Clips default, Posts as cards. -->
         <div class="content-tabs">
-          <button class="content-tab active" onclick="switchContentTab('all-pane', this)">All</button>
-          <button class="content-tab" onclick="switchContentTab('vibes-pane', this)">Clips</button>
+          <button class="content-tab active" onclick="switchContentTab('vibes-pane', this)">Clips</button>
           <button class="content-tab" onclick="switchContentTab('posts-pane', this)">Posts</button>
           <button class="content-tab owner-only" onclick="switchContentTab('saved-pane', this)">Saved</button>
-          <div class="layout-toggle" id="layoutToggle">
-            <button class="layout-btn active" onclick="switchLayout('tabs', this)" title="Tabs">
-              <svg width="12" height="12" viewBox="0 0 12 12" fill="none"><rect x="0" y="0" width="12" height="4" rx="1" fill="currentColor" opacity=".4"/><rect x="0" y="5" width="12" height="7" rx="1" fill="currentColor"/></svg>
-            </button>
-            <button class="layout-btn" onclick="switchLayout('split', this)" title="Side by side">
-              <svg width="12" height="12" viewBox="0 0 12 12" fill="none"><rect x="0" y="0" width="5.5" height="12" rx="1" fill="currentColor"/><rect x="6.5" y="0" width="5.5" height="12" rx="1" fill="currentColor"/></svg>
-            </button>
-          </div>
         </div>
 
-        <!-- ALL PANE (default) — clips + posts mixed chronologically; populated by populateAllGrid() -->
-        <div class="content-pane active" id="all-pane">
-          <div class="vibes-tab-grid" id="profileAllGrid"></div>
-          <div class="content-empty" id="allEmptyState" style="display:none">
-            <div class="content-empty-title">Nothing here yet</div>
-            <div class="content-empty-body">
-              Posts and clips you publish show up here as a clean grid. Use the
-              composer above to start.
-            </div>
-          </div>
-        </div>
-
-        <!-- CLIPS PANE (was Vibes — id kept for backward-compat with persistence layer) -->
-        <div class="content-pane" id="vibes-pane">
+        <!-- CLIPS PANE (default) — id kept for backward-compat with persistence layer -->
+        <div class="content-pane active" id="vibes-pane">
 
           <!-- Vibes grid — hardcoded for Maya; rebuilt from vibe_vibes_v1 once edited -->
           <div class="vibes-tab-grid" id="profileVibesGrid">
@@ -3085,57 +3076,6 @@ body.empty-profile-mode #profileEmpty { display: flex !important; }
           </div>
         </div>
 
-        <!-- SIDE-BY-SIDE pane (viewer, layout toggle = split) -->
-        <div class="content-pane" id="split-pane">
-          <div class="vibes-posts-split">
-            <div class="split-col">
-              <div class="split-col-title">Vibes</div>
-              <div class="vibes-split-grid">
-                <div class="vibe-grid-thumb">
-                  <div class="vibe-grid-bg" style="background:linear-gradient(135deg,#1a0533,#2d1b4e)"></div>
-                  <div class="vibe-grid-overlay"></div><div class="vibe-grid-play">&#9654;</div>
-                  <div class="vibe-grid-info"><div class="vibe-grid-title">AI tool replacing a $40k analyst</div><div class="vibe-grid-views">4.2k views &middot; 0:47</div></div>
-                </div>
-                <div class="vibe-grid-thumb">
-                  <div class="vibe-grid-bg" style="background:linear-gradient(135deg,#001a2c,#0a2a3e)"></div>
-                  <div class="vibe-grid-overlay"></div><div class="vibe-grid-play">&#9654;</div>
-                  <div class="vibe-grid-info"><div class="vibe-grid-title">Onboarding redesign &mdash; retention +23%</div><div class="vibe-grid-views">2.1k views &middot; 1:02</div></div>
-                </div>
-                <div class="vibe-grid-thumb">
-                  <div class="vibe-grid-bg" style="background:linear-gradient(135deg,#1a1a00,#2a2800)"></div>
-                  <div class="vibe-grid-overlay"></div><div class="vibe-grid-play">&#9654;</div>
-                  <div class="vibe-grid-info"><div class="vibe-grid-title">60-second pitch that landed 3 offers</div><div class="vibe-grid-views">891 views &middot; 0:58</div></div>
-                </div>
-                <div class="vibe-grid-thumb">
-                  <div class="vibe-grid-bg" style="background:linear-gradient(135deg,#1a0008,#2a000f)"></div>
-                  <div class="vibe-grid-overlay"></div><div class="vibe-grid-play">&#9654;</div>
-                  <div class="vibe-grid-info"><div class="vibe-grid-title">200-person hackathon on $0 budget</div><div class="vibe-grid-views">641 views &middot; 1:14</div></div>
-                </div>
-              </div>
-            </div>
-            <div class="split-col">
-              <div class="split-col-title">Posts</div>
-              <div class="profile-post-card">
-                <div class="ppost-date">5 hours ago</div>
-                <div class="ppost-body">The best interviews feel like a real conversation, not a performance. Clear thinking matters more than the right buzzwords.</div>
-                <div class="ppost-tags"><span class="ppost-tag">#Hiring</span><span class="ppost-tag">#UX</span></div>
-                <div class="ppost-reactions"><div class="ppost-left"><span class="ppost-chip">💡 891</span><span class="ppost-chip">🫶 128</span></div><button class="ppost-save">Save</button></div>
-              </div>
-              <div class="profile-post-card">
-                <div class="ppost-date">Yesterday</div>
-                <div class="ppost-body"><strong>"Open to work" should explain what you want</strong> — not just that you're available. Better signal = better outcomes.</div>
-                <div class="ppost-tags"><span class="ppost-tag">#OpenToWork</span></div>
-                <div class="ppost-reactions"><div class="ppost-left"><span class="ppost-chip">🔥 1.1k</span><span class="ppost-chip">💡 388</span></div><button class="ppost-save">Save</button></div>
-              </div>
-              <div class="profile-post-card">
-                <div class="ppost-date">3 days ago</div>
-                <div class="ppost-body">Systems thinking makes you slower to act and better at acting. Once you see second-order effects you can't unsee them.</div>
-                <div class="ppost-tags"><span class="ppost-tag">#ProductThinking</span></div>
-                <div class="ppost-reactions"><div class="ppost-left"><span class="ppost-chip">🤯 644</span><span class="ppost-chip">💡 221</span></div><button class="ppost-save">Save</button></div>
-              </div>
-            </div>
-          </div>
-        </div><!-- /split-pane -->
 
       </div><!-- /card -->
 
@@ -4418,26 +4358,6 @@ function refreshPinButtons() {
   });
 }
 
-// ── Layout toggle (tabs vs side-by-side) ─────────────────────────
-let currentLayout = 'tabs';
-function switchLayout(layout, btn) {
-  currentLayout = layout;
-  document.querySelectorAll('.layout-btn').forEach(b => b.classList.remove('active'));
-  btn.classList.add('active');
-  const card = btn.closest('.card');
-  card.querySelectorAll('.content-pane').forEach(p => p.classList.remove('active'));
-  if (layout === 'split') {
-    card.querySelector('#split-pane').classList.add('active');
-    card.querySelectorAll('.content-tab').forEach(t => t.style.opacity = '.4');
-  } else {
-    card.querySelectorAll('.content-tab').forEach(t => t.style.opacity = '');
-    card.querySelector('#all-pane').classList.add('active');
-    card.querySelectorAll('.content-tab').forEach(t => t.classList.remove('active'));
-    card.querySelector('.content-tab').classList.add('active');
-    if (typeof populateAllGrid === 'function') populateAllGrid();
-  }
-}
-
 // ── Viewer / Owner mode toggle ────────────────────────────────────
 let viewerMode = false;
 function toggleViewerMode() {
@@ -4707,7 +4627,8 @@ function composerClearImage() {
 async function publishProfilePost() {
   const input = document.getElementById('profilePostInput');
   const text = (input && input.value || '').trim();
-  if (!text && !_composerPendingImageUrl) return;
+  const hasPendingClip = (typeof composerHasPendingClip === 'function') && composerHasPendingClip();
+  if (!text && !_composerPendingImageUrl && !hasPendingClip) return;
 
   // Demo / mock-user view stays on the local-only path so Maya keeps working
   // until the demo flow is retired.
@@ -4719,21 +4640,27 @@ async function publishProfilePost() {
   const btn = document.querySelector('.profile-composer.owner-only .composer-publish');
   if (btn) { btn.disabled = true; btn.textContent = 'Publishing…'; }
   try {
-    const r = await fetch('/api/me/publish-post', {
-      method: 'POST',
-      credentials: 'include',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({
-        content: text,
-        tags: _extractHashtags(text),
-        media_url: _composerPendingImageUrl || undefined,
-      }),
-    });
-    const j = await r.json().catch(() => ({}));
-    if (!r.ok || !j.ok || !j.post) {
-      throw new Error((j && j.error) || 'Publish failed');
+    if (hasPendingClip) {
+      // Pending clip wins — text becomes the clip's caption (P1-017 spec).
+      await _publishPendingClip(text);
+    } else {
+      const r = await fetch('/api/me/publish-post', {
+        method: 'POST',
+        credentials: 'include',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          content: text,
+          tags: _extractHashtags(text),
+          media_url: _composerPendingImageUrl || undefined,
+        }),
+      });
+      const j = await r.json().catch(() => ({}));
+      if (!r.ok || !j.ok || !j.post) {
+        throw new Error((j && j.error) || 'Publish failed');
+      }
+      _publishProfilePostLocal(text, j.post);
     }
-    _publishProfilePostLocal(text, j.post);
+    if (input) { input.value = ''; input.style.height = ''; }
   } catch (e) {
     showToast(e && e.message ? e.message : 'Could not publish');
   } finally {
@@ -5877,6 +5804,8 @@ function _renderPostCard(p) {
   const tagsBlock = p.tagsHTML ? `<div class="ppost-tags">${p.tagsHTML}</div>` : '';
   const platformBlock = p.platformStatsHTML ? `<div class="op-platform-stats">${p.platformStatsHTML}</div>` : '';
   const reactionsLeft = p.reactionsHTML || '';
+  // Body starts clamped — _measureReadMore (called below) decides whether
+  // it actually overflows and reveals the Read more button.
   card.innerHTML = `
     <button class="ppost-pin owner-only" onclick="pinFromProfile('${card.dataset.postId}',this)" title="Pin to profile">Pin</button>
     <button class="ppost-delete owner-only" onclick="deleteProfilePost(this)" title="Delete post">&times;</button>
@@ -5884,7 +5813,8 @@ function _renderPostCard(p) {
       <div class="ppost-date" style="font-size:11px;font-weight:700;color:var(--muted);text-transform:uppercase;letter-spacing:.5px;">${_esc(p.date || 'Just now')}</div>
       ${headerExtras}
     </div>
-    <div class="ppost-body">${p.bodyHTML || ''}</div>
+    <div class="ppost-body is-clamped">${p.bodyHTML || ''}</div>
+    <button type="button" class="ppost-readmore" onclick="_togglePostReadMore(this, event)">Read more</button>
     ${tagsBlock}
     ${platformBlock}
     <div class="ppost-reactions">
@@ -5892,8 +5822,35 @@ function _renderPostCard(p) {
       <button class="ppost-save">Save</button>
     </div>
   `;
+  // Defer measurement to next frame so layout has a real height.
+  requestAnimationFrame(() => _measureReadMore(card));
   return card;
 }
+
+// Stop bubbling so click on Read more doesn't open the post viewer modal.
+function _togglePostReadMore(btn, ev) {
+  if (ev) { ev.preventDefault(); ev.stopPropagation(); }
+  const card = btn.closest('.profile-post-card');
+  const body = card?.querySelector('.ppost-body');
+  if (!body) return;
+  const expanded = body.classList.toggle('is-expanded');
+  body.classList.toggle('is-clamped', !expanded);
+  btn.textContent = expanded ? 'Show less' : 'Read more';
+}
+
+// Reveal the Read more button only when the body actually overflows the
+// 6-line clamp. Run on render and on resize since clamp is line-based.
+function _measureReadMore(card) {
+  const body = card.querySelector('.ppost-body');
+  const btn  = card.querySelector('.ppost-readmore');
+  if (!body || !btn) return;
+  const overflows = body.scrollHeight > body.clientHeight + 1;
+  btn.classList.toggle('show', overflows);
+}
+function _measureAllReadMore() {
+  document.querySelectorAll('#profilePostsList .profile-post-card').forEach(_measureReadMore);
+}
+window.addEventListener('resize', () => requestAnimationFrame(_measureAllReadMore));
 
 function deleteProfilePost(btn) {
   const card = btn.closest('.profile-post-card');
@@ -6078,6 +6035,35 @@ function _capturePosterFrame(file) {
   });
 }
 
+// Two-phase clip flow:
+//   Phase A — composerOnClipPicked: validate → sign URL → upload to R2 →
+//             capture poster → upload poster → stash everything in
+//             _pendingClip and show preview. Nothing is committed yet.
+//   Phase B — publishProfilePost: when the user clicks Publish, send the
+//             stashed object_key + current caption + tags to publish-clip.
+// This stops the "I just picked a file and it auto-posted" UX bug.
+
+let _pendingClip = null;
+// Shape: { objectKey, posterUrl, posterBlobUrl, duration, sizeBytes }
+
+function composerHasPendingClip() { return !!_pendingClip; }
+
+function composerClearClip() {
+  if (_pendingClip && _pendingClip.posterBlobUrl) {
+    try { URL.revokeObjectURL(_pendingClip.posterBlobUrl); } catch {}
+  }
+  _pendingClip = null;
+  const preview = document.getElementById('composerClipPreview');
+  const img = document.getElementById('composerClipPreviewImg');
+  const label = document.getElementById('composerClipPreviewLabel');
+  if (img) img.src = '';
+  if (label) label.textContent = '';
+  if (preview) preview.style.display = 'none';
+  // Re-show the picker zone so the user can swap clips.
+  const zone = document.getElementById('vibe-comp-zone');
+  if (zone) zone.style.display = '';
+}
+
 async function composerOnClipPicked(input) {
   const file = input && input.files && input.files[0];
   input.value = '';
@@ -6111,9 +6097,7 @@ async function composerOnClipPicked(input) {
       throw new Error((sig && sig.error) || 'Could not get upload URL');
     }
 
-    // 2. Direct PUT to R2 — XHR instead of fetch so we can show upload
-    // progress and surface specific failures (timeout vs network vs HTTP)
-    // instead of a silent "Uploading to storage…" that sits forever.
+    // 2. Direct PUT to R2 with progress
     const sizeMB = (file.size / (1024 * 1024)).toFixed(0);
     _setClipStatus(`Uploading to storage… 0% (${sizeMB}MB)`);
     await _putToR2WithProgress(sig.uploadUrl, file, ct, (pct) => {
@@ -6124,10 +6108,14 @@ async function composerOnClipPicked(input) {
     _setClipStatus('Capturing thumbnail…');
     const { blob: posterBlob, duration } = await _capturePosterFrame(file);
     if (duration && duration > CLIP_MAX_SECONDS + 1) {
-      throw new Error(`Clip exceeds ${CLIP_MAX_SECONDS}s`);
+      throw new Error(`Clip exceeds ${CLIP_MAX_SECONDS}s — please trim it`);
     }
     let posterUrl = '';
+    let posterBlobUrl = '';
     if (posterBlob) {
+      // Preview uses the local blob immediately (no roundtrip), then we
+      // upload the blob to Supabase so the published row has a public URL.
+      posterBlobUrl = URL.createObjectURL(posterBlob);
       const fd = new FormData();
       fd.append('file', new File([posterBlob], 'poster.jpg', { type: 'image/jpeg' }));
       fd.append('kind', 'poster');
@@ -6136,52 +6124,73 @@ async function composerOnClipPicked(input) {
       if (pRes.ok && pJson.ok && pJson.url) posterUrl = pJson.url;
     }
 
-    // 4. Publish row
-    _setClipStatus('Publishing…');
-    const captionInput = document.getElementById('profilePostInput');
-    const caption = ((captionInput && captionInput.value) || '').trim();
-    const pubRes = await fetch('/api/me/publish-clip', {
-      method: 'POST',
-      credentials: 'include',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({
-        object_key:   sig.objectKey,
-        content:      caption,
-        tags:         _extractHashtags(caption),
-        poster_url:   posterUrl || undefined,
-        duration_sec: duration || undefined,
-      }),
-    });
-    const pub = await pubRes.json().catch(() => ({}));
-    if (!pubRes.ok || !pub.ok || !pub.post) {
-      throw new Error((pub && pub.error) || 'Publish failed');
-    }
+    // 4. Stash + show preview. Publish waits for the user to click Publish.
+    _pendingClip = {
+      objectKey: sig.objectKey,
+      posterUrl,
+      posterBlobUrl,
+      duration: duration || null,
+      sizeBytes: file.size,
+    };
+    const preview = document.getElementById('composerClipPreview');
+    const img = document.getElementById('composerClipPreviewImg');
+    const label = document.getElementById('composerClipPreviewLabel');
+    if (img) img.src = posterBlobUrl || posterUrl || '';
+    if (label) label.textContent = duration ? `Clip · ${_formatDuration(duration)}` : 'Clip';
+    if (preview) preview.style.display = 'block';
+    // Hide the picker zone — the preview takes its place until clear.
+    const zone = document.getElementById('vibe-comp-zone');
+    if (zone) zone.style.display = 'none';
 
-    // 5. Local DOM update — keep grid feeling instant
-    const grid = document.getElementById('profileVibesGrid');
-    if (grid) {
-      const node = _renderVibeThumb({
-        id:    pub.post.id,
-        title: caption || 'New clip',
-        views: duration ? `0 views · ${_formatDuration(duration)}` : '0 views · 0:00',
-        bg:    posterUrl
-          ? `center/cover no-repeat url("${posterUrl}")`
-          : CLIP_PALETTES[Math.floor(Math.random() * CLIP_PALETTES.length)],
-      });
-      const uploadTile = grid.querySelector('.vibe-upload-tile');
-      if (uploadTile) grid.insertBefore(node, uploadTile);
-      else grid.appendChild(node);
-      saveVibesToStorage();
-    }
-    if (captionInput) { captionInput.value = ''; captionInput.style.height = ''; }
-    if (typeof populateAllGrid === 'function') populateAllGrid();
-    if (typeof refreshPinButtons === 'function') refreshPinButtons();
-    showToast('Clip published');
+    _setClipStatus('Ready — write a caption and hit Publish');
+    showToast('Clip uploaded — add a caption, then Publish');
   } catch (e) {
+    composerClearClip();
     showToast(e && e.message ? e.message : 'Upload failed');
   } finally {
-    _setClipStatus('');
+    // Status clears on next state change (publish or new pick).
+    if (!_pendingClip) _setClipStatus('');
   }
+}
+
+// Phase B — called from publishProfilePost when _pendingClip is set.
+async function _publishPendingClip(caption) {
+  if (!_pendingClip) return;
+  const c = _pendingClip;
+  const r = await fetch('/api/me/publish-clip', {
+    method: 'POST', credentials: 'include',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({
+      object_key:   c.objectKey,
+      content:      caption,
+      tags:         _extractHashtags(caption),
+      poster_url:   c.posterUrl || undefined,
+      duration_sec: c.duration  || undefined,
+    }),
+  });
+  const j = await r.json().catch(() => ({}));
+  if (!r.ok || !j.ok || !j.post) throw new Error((j && j.error) || 'Publish failed');
+
+  // Local DOM update — keep grid feeling instant
+  const grid = document.getElementById('profileVibesGrid');
+  if (grid) {
+    const node = _renderVibeThumb({
+      id:    j.post.id,
+      title: caption || 'New clip',
+      views: c.duration ? `0 views · ${_formatDuration(c.duration)}` : '0 views · 0:00',
+      bg:    c.posterUrl
+        ? `center/cover no-repeat url("${c.posterUrl}")`
+        : CLIP_PALETTES[Math.floor(Math.random() * CLIP_PALETTES.length)],
+    });
+    const uploadTile = grid.querySelector('.vibe-upload-tile');
+    if (uploadTile) grid.insertBefore(node, uploadTile);
+    else grid.appendChild(node);
+    saveVibesToStorage();
+  }
+  composerClearClip();
+  if (typeof populateAllGrid === 'function') populateAllGrid();
+  if (typeof refreshPinButtons === 'function') refreshPinButtons();
+  showToast('Clip published');
 }
 
 function _formatDuration(sec) {

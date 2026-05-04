@@ -73,7 +73,9 @@ export function buildVibeUserV1FromProfile(
   const snapshot = { ...baseSnap, ...profile.recruiter_snapshot };
 
   const u: Record<string, unknown> = {
+    id: profile.id,
     name: profile.name,
+    handle: profile.handle,
     tagline,
     headline,
     location,

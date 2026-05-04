@@ -44,6 +44,33 @@
     font-size: 18px; line-height: 1; cursor: none;
     display: flex; align-items: center; justify-content: center;
   }
+  .vpv-more {
+    position: absolute; top: 18px; right: 64px;
+    background: rgba(28,28,30,.55); color: white; border: none;
+    border-radius: 999px; width: 34px; height: 34px;
+    font-size: 18px; line-height: 1; cursor: none;
+    display: none; align-items: center; justify-content: center;
+  }
+  .vpv-more.show { display: flex; }
+  .vpv-menu {
+    position: absolute; top: 56px; right: 22px;
+    background: white; color: #1C1C1E;
+    border-radius: 12px; box-shadow: 0 8px 24px rgba(0,0,0,.18);
+    padding: 6px; min-width: 160px;
+    display: none; z-index: 1;
+    font-family: 'DM Sans', sans-serif;
+  }
+  .vpv-menu.show { display: block; }
+  .vpv-menu button {
+    display: block; width: 100%; text-align: left;
+    background: transparent; border: none;
+    padding: 8px 12px; border-radius: 8px;
+    font-family: inherit; font-size: 13px; font-weight: 600;
+    color: #1C1C1E; cursor: none;
+  }
+  .vpv-menu button:hover { background: rgba(28,28,30,.06); }
+  .vpv-menu button.danger { color: #C54323; }
+  .vpv-menu button.danger:hover { background: rgba(197,67,35,.08); }
   .vpv-header {
     display: flex; align-items: center; gap: 12px;
     padding: 18px 22px 12px;
@@ -175,6 +202,10 @@
     overlay.innerHTML = `
       <div class="vpv-card" role="dialog" aria-modal="true" aria-label="Post">
         <button class="vpv-close" aria-label="Close" onclick="window.__vpvClose()">&times;</button>
+        <button class="vpv-more" id="vpvMore" aria-label="More" onclick="window.__vpvToggleMenu(event)">⋯</button>
+        <div class="vpv-menu" id="vpvMenu" role="menu" onclick="event.stopPropagation()">
+          <button type="button" class="danger" onclick="window.__vpvDeletePost()">Delete post</button>
+        </div>
         <div class="vpv-header">
           <div class="vpv-avatar" id="vpvAvatar">·</div>
           <div class="vpv-meta">
@@ -233,12 +264,19 @@
   // ── State ─────────────────────────────────────────────────────────────
   const state = {
     openId: null,           // post id of currently open modal
+    authorId: null,         // post.user_id — drives the "..." menu visibility
+    type:     "post",
     liked:  false,
     saved:  false,
     likes:  0,
     comments: 0,
     inflight: false,        // any toggle/post in progress
   };
+
+  function viewerUserId() {
+    const u = (typeof vibeLoad === "function") ? vibeLoad("vibe_user_v1") : null;
+    return (u && u.id) || null;
+  }
 
   // ── Helpers ───────────────────────────────────────────────────────────
   function isAppShell() {
@@ -356,6 +394,10 @@
     document.getElementById("vpvLike").classList.remove("on");
     document.getElementById("vpvSave").classList.remove("on");
     document.getElementById("vpvComments").innerHTML = "";
+    const more = document.getElementById("vpvMore");
+    const menu = document.getElementById("vpvMenu");
+    if (more) more.classList.remove("show");
+    if (menu) menu.classList.remove("show");
     const inp = document.getElementById("vpvCommentInput");
     if (inp) { inp.value = ""; inp.style.height = ""; }
   }
@@ -386,6 +428,8 @@
       media_thumbnail_url: p.media_thumbnail_url,
       type:                p.type,
     });
+    state.authorId = p.user_id || (p.author && p.author.id) || null;
+    state.type     = p.type || "post";
     state.liked = !!(j.viewer && j.viewer.liked);
     state.saved = !!(j.viewer && j.viewer.saved);
     state.likes = (j.counts && j.counts.likes) || 0;
@@ -394,6 +438,11 @@
     document.getElementById("vpvCommentCount").textContent = String(state.comments);
     document.getElementById("vpvLike").classList.toggle("on", state.liked);
     document.getElementById("vpvSave").classList.toggle("on", state.saved);
+
+    // "..." menu — only show when the viewer is the post's author.
+    const isOwner = state.authorId && viewerUserId() === state.authorId;
+    const more = document.getElementById("vpvMore");
+    if (more) more.classList.toggle("show", !!isOwner);
 
     // Clip rows: now that we know the canonical id + type, mint a signed
     // R2 GET URL and attach it to the <video> created by paintBody.
@@ -552,6 +601,68 @@
     const inp = document.getElementById("vpvCommentInput");
     if (inp) inp.focus();
   };
+
+  window.__vpvToggleMenu = function (ev) {
+    if (ev) ev.stopPropagation();
+    const menu = document.getElementById("vpvMenu");
+    if (!menu) return;
+    const wasOpen = menu.classList.contains("show");
+    menu.classList.toggle("show", !wasOpen);
+    if (!wasOpen) {
+      // Close on next outside click — single-shot listener.
+      const dismiss = () => {
+        menu.classList.remove("show");
+        document.removeEventListener("click", dismiss, true);
+      };
+      setTimeout(() => document.addEventListener("click", dismiss, true), 0);
+    }
+  };
+
+  window.__vpvDeletePost = async function () {
+    if (!state.openId) return;
+    if (!isAppShell()) { toast("Sign in to delete"); return; }
+    if (!isRealPostId(state.openId)) { toast("Demo post — can't delete"); return; }
+    // Quick confirm — destructive action, can't undo.
+    if (!window.confirm("Delete this post? This can't be undone.")) return;
+    const menu = document.getElementById("vpvMenu");
+    if (menu) menu.classList.remove("show");
+    if (state.inflight) return;
+    state.inflight = true;
+    try {
+      const r = await fetch(`/api/posts/${encodeURIComponent(state.openId)}`, {
+        method: "DELETE", credentials: "include",
+      });
+      const j = await r.json().catch(() => ({}));
+      if (!r.ok || !j.ok) throw new Error((j && j.error) || "Could not delete");
+      // Remove from any visible grid/feed on the current page so the user
+      // doesn't see a ghost card after the modal closes.
+      _vpvScrubPostFromPage(state.openId);
+      toast("Deleted");
+      closeViewer();
+    } catch (e) {
+      toast(e && e.message ? e.message : "Could not delete");
+    } finally {
+      state.inflight = false;
+    }
+  };
+
+  // Strip a deleted post from every surface that might be showing it.
+  // Cheap and dumb: walk the DOM by data attributes the surfaces stamp.
+  function _vpvScrubPostFromPage(postId) {
+    const id = String(postId);
+    const selectors = [
+      `[data-post-id="${id}"]`,           // .profile-post-card, campus .post
+      `[data-source-post-id="${id}"]`,    // .post-thumb-cell in All grid
+      `[data-vibe-id="${id}"]`,           // .vibe-grid-thumb (clips)
+    ];
+    selectors.forEach(sel => {
+      document.querySelectorAll(sel).forEach(el => el.remove());
+    });
+    // Re-run aggregators where they exist so empty states show up.
+    if (typeof populateAllGrid === "function") populateAllGrid();
+    if (typeof savePostsToStorage === "function") savePostsToStorage();
+    if (typeof saveVibesToStorage === "function") saveVibesToStorage();
+  }
 
   window.__vpvSubmitComment = async function () {
     if (!state.openId) return;
