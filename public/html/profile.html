@@ -1331,7 +1331,10 @@ body.recruiter-mode .recruiter-card .rec-stat-row:last-child { border-bottom:non
   display:flex;flex-direction:column;align-items:flex-end;gap:14px;
 }
 .avatar-row-actions {
-  display:flex;align-items:center;gap:12px;
+  display:none;align-items:center;gap:12px;
+}
+body.viewer-mode .avatar-row-actions {
+  display:flex;
 }
 
 /* Stats (Followers · Following · Connections) — clean spacing, no dividers,
@@ -2539,8 +2542,10 @@ body.empty-profile-mode #profileEmpty { display: flex !important; }
          hairline border-bottom draws under them. -->
     <div class="avatar-row-right">
 
-      <!-- Viewer-only: Connect button + Soft Follow + Mutual pill, side by side -->
-      <div class="viewer-only avatar-row-actions" id="profileViewerActions">
+      <!-- Viewer-only: Connect button + Soft Follow + Mutual pill, side by side.
+           Visibility gated via body.viewer-mode so the global .viewer-only
+           display:block override doesn't fight our flex layout. -->
+      <div class="avatar-row-actions" id="profileViewerActions">
         <button class="action-btn primary vibe-connect-btn" id="vibeConnectBtn" onclick="handleVibConnect()">
           <svg width="13" height="13" viewBox="0 0 13 13" fill="none" style="flex-shrink:0"><path d="M6.5 1v11M1 6.5h11" stroke="white" stroke-width="1.8" stroke-linecap="round"/></svg>
           Connect
