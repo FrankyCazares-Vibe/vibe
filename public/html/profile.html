@@ -6006,6 +6006,33 @@ function _setClipStatus(msg) {
   if (el) el.textContent = msg || '';
 }
 
+// PUT a file to R2 with upload progress (fetch doesn't expose
+// XHR-style upload events). 5-min timeout — long enough for ~200MB on
+// slow connections, short enough to surface a stalled upload instead of
+// hanging forever. Resolves on 2xx, rejects with a specific message
+// otherwise so the user sees what actually failed.
+function _putToR2WithProgress(uploadUrl, file, contentType, onProgress) {
+  return new Promise((resolve, reject) => {
+    const xhr = new XMLHttpRequest();
+    xhr.open('PUT', uploadUrl);
+    xhr.setRequestHeader('Content-Type', contentType);
+    xhr.timeout = 5 * 60 * 1000; // 5 minutes
+    xhr.upload.onprogress = (ev) => {
+      if (ev.lengthComputable && typeof onProgress === 'function') {
+        onProgress(Math.min(99, Math.round((ev.loaded / ev.total) * 100)));
+      }
+    };
+    xhr.ontimeout = () => reject(new Error('Upload timed out — try a smaller file or check your connection'));
+    xhr.onerror   = () => reject(new Error('Network error during upload'));
+    xhr.onabort   = () => reject(new Error('Upload cancelled'));
+    xhr.onload = () => {
+      if (xhr.status >= 200 && xhr.status < 300) resolve();
+      else reject(new Error('R2 upload failed (' + xhr.status + ' ' + (xhr.statusText || '') + ')'));
+    };
+    xhr.send(file);
+  });
+}
+
 // Pull the first frame of the video as a JPEG blob via canvas. Best-effort:
 // if metadata never resolves or the format isn't decodable in-browser,
 // the clip still ships with a gradient fallback in the grid.
@@ -6084,16 +6111,14 @@ async function composerOnClipPicked(input) {
       throw new Error((sig && sig.error) || 'Could not get upload URL');
     }
 
-    // 2. Direct PUT to R2
-    _setClipStatus('Uploading to storage…');
-    const putRes = await fetch(sig.uploadUrl, {
-      method: 'PUT',
-      headers: { 'Content-Type': ct },
-      body: file,
+    // 2. Direct PUT to R2 — XHR instead of fetch so we can show upload
+    // progress and surface specific failures (timeout vs network vs HTTP)
+    // instead of a silent "Uploading to storage…" that sits forever.
+    const sizeMB = (file.size / (1024 * 1024)).toFixed(0);
+    _setClipStatus(`Uploading to storage… 0% (${sizeMB}MB)`);
+    await _putToR2WithProgress(sig.uploadUrl, file, ct, (pct) => {
+      _setClipStatus(`Uploading to storage… ${pct}% (${sizeMB}MB)`);
     });
-    if (!putRes.ok) {
-      throw new Error('R2 upload failed (' + putRes.status + ')');
-    }
 
     // 3. Poster frame (best-effort)
     _setClipStatus('Capturing thumbnail…');
