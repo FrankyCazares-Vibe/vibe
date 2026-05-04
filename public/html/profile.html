@@ -2442,7 +2442,7 @@ body.empty-profile-mode #profileEmpty { display: flex !important; }
         <path d="M5 8.5h.01M9 8.5h.01M13 8.5h.01" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"/>
       </svg>
     </button>
-    <button class="btn-nav ghost" onclick="toggleRecruiter()" id="recBtn">Recruiter view</button>
+    <button class="btn-nav ghost" onclick="toggleViewerMode()" id="viewerBtn">View as visitor</button>
     <button class="edit-toggle" id="editToggle" onclick="toggleEdit()">
       <span class="dot"></span> Edit profile
     </button>
@@ -2453,7 +2453,7 @@ body.empty-profile-mode #profileEmpty { display: flex !important; }
 <!-- Recruiter banner -->
 <div class="recruiter-banner" id="recBanner">
   <div><span class="rec-badge">RECRUITER VIEW</span> &nbsp;Showing professional snapshot — <span>personality layer one click away</span></div>
-  <button onclick="toggleRecruiter()" style="background:none;border:none;color:rgba(255,255,255,.5);cursor:none;font-size:13px">✕ Exit</button>
+  <button onclick="toggleViewerMode()" style="background:none;border:none;color:rgba(255,255,255,.5);cursor:none;font-size:13px">✕ Exit</button>
 </div>
 
 <!-- Hidden file inputs -->
@@ -3483,15 +3483,12 @@ function clearField(){ if(activeEdit) activeEdit.textContent=''; }
 
 // ── Recruiter mode ────────────────────────────────────────────────
 let recruiterMode = false;
+// Recruiter-specific styling (banner, dimmed personality section, recruiter
+// card visibility) is parked until a later phase brings recruiter accounts
+// online. The toggle now just delegates to viewer mode so any stale callers
+// (or the hidden recruiter-banner exit button) keep working.
 function toggleRecruiter(){
-  recruiterMode = !recruiterMode;
-  document.body.classList.toggle('recruiter-mode', recruiterMode);
-  document.getElementById('recBanner').classList.toggle('visible', recruiterMode);
-  const recBtn = document.getElementById('recBtn');
-  recBtn.style.color = recruiterMode ? 'var(--accent)' : '';
-  const recruiterCard = document.getElementById('recruiterCard');
-  if (recruiterCard) recruiterCard.classList.toggle('visible', true);
-  if (typeof refreshPinButtons === 'function') refreshPinButtons();
+  toggleViewerMode();
 }
 
 // ── Avatar picker ─────────────────────────────────────────────────
@@ -4420,7 +4417,7 @@ function toggleViewerMode() {
   document.body.classList.toggle('viewer-mode', viewerMode);
   document.body.classList.toggle('owner-mode', !viewerMode);
   const btn = document.getElementById('viewerBtn');
-  btn.textContent = viewerMode ? 'Back to your profile' : 'View as visitor';
+  if (btn) btn.textContent = viewerMode ? 'Back to your profile' : 'View as visitor';
   // In viewer mode — hide edit controls, show connect/message
   if (viewerMode) {
     // Exit edit mode if active
@@ -4595,18 +4592,17 @@ function setVibeRelState(state) {
       break;
 
     case 'pending':
-      btn.innerHTML = '&#8987; Request sent';
+      btn.innerHTML = '&#8987; Pending';
       btn.className += ' state-pending';
       btn.disabled = true;
-      // After 8s (demo) show "they ignored — follow instead?"
-      clearTimeout(window._ignoreTimer);
-      window._ignoreTimer = setTimeout(() => {
-        if (vibeRelState === 'pending' && soft) {
-          soft.style.display = 'block';
-          soft.textContent = softFollowing ? 'Following ✓' : 'Follow instead';
-          if (softFollowing) soft.classList.add('following');
-        }
-      }, 8000);
+      // Sending Connect implies follow — surface that immediately so the user
+      // can see they're following AND awaiting acceptance.
+      softFollowing = true;
+      if (soft) {
+        soft.style.display = 'block';
+        soft.textContent = 'Following ✓';
+        soft.classList.add('following');
+      }
       break;
 
     case 'connected':
