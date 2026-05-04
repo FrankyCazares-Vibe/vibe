@@ -2937,6 +2937,7 @@ body.empty-profile-mode #profileEmpty { display: flex !important; }
           <button class="content-tab active" onclick="switchContentTab('all-pane', this)">All</button>
           <button class="content-tab" onclick="switchContentTab('vibes-pane', this)">Clips</button>
           <button class="content-tab" onclick="switchContentTab('posts-pane', this)">Posts</button>
+          <button class="content-tab owner-only" onclick="switchContentTab('saved-pane', this)">Saved</button>
           <div class="layout-toggle" id="layoutToggle">
             <button class="layout-btn active" onclick="switchLayout('tabs', this)" title="Tabs">
               <svg width="12" height="12" viewBox="0 0 12 12" fill="none"><rect x="0" y="0" width="12" height="4" rx="1" fill="currentColor" opacity=".4"/><rect x="0" y="5" width="12" height="7" rx="1" fill="currentColor"/></svg>
@@ -3073,6 +3074,17 @@ body.empty-profile-mode #profileEmpty { display: flex !important; }
           </div><!-- /profilePostsList -->
 
         </div><!-- /posts-pane -->
+
+        <!-- SAVED pane — own-profile only; populated lazily on first tab visit -->
+        <div class="content-pane owner-only" id="saved-pane">
+          <div class="vibes-tab-grid" id="profileSavedGrid"></div>
+          <div class="content-empty" id="savedEmptyState" style="display:none">
+            <div class="content-empty-title">Nothing saved yet</div>
+            <div class="content-empty-body">
+              Tap the bookmark icon on any post to save it here. Only you can see your saves.
+            </div>
+          </div>
+        </div>
 
         <!-- SIDE-BY-SIDE pane (viewer, layout toggle = split) -->
         <div class="content-pane" id="split-pane">
@@ -4463,6 +4475,11 @@ function switchContentTab(paneId, btn) {
   btn.classList.add('active');
   card.querySelector('#' + paneId).classList.add('active');
   if (paneId === 'all-pane' && typeof populateAllGrid === 'function') populateAllGrid();
+  // Lazy-hydrate the Saved tab — first visit hits the API, subsequent
+  // visits show the cached grid until the user reloads.
+  if (paneId === 'saved-pane' && typeof hydrateSavedPaneFromAPI === 'function') {
+    hydrateSavedPaneFromAPI();
+  }
 }
 
 // ── All-pane grid: clips + posts as square thumbnails (P1-011) ────
@@ -5755,6 +5772,113 @@ function _formatRelativeDate(iso) {
   if (diff < 86400)     return Math.floor(diff / 3600) + 'h ago';
   if (diff < 86400 * 7) return Math.floor(diff / 86400) + 'd ago';
   return new Date(iso).toLocaleDateString(undefined, { month: 'short', day: 'numeric' });
+}
+
+// ── Saved tab (P1-015 follow-on) ──────────────────────────────────────
+// Lazy-hydrated on first tab click; subsequent clicks show the cached
+// grid. Each cell opens the existing post viewer modal — no separate
+// modal needed since the same data shape works.
+let _savedHydrateInflight = false;
+let _savedHydratedOnce = false;
+async function hydrateSavedPaneFromAPI() {
+  if (window.viewingMockUser) return;
+  if (_savedHydrateInflight) return;
+  const me = (typeof vibeLoad === 'function') ? vibeLoad('vibe_user_v1') : null;
+  if (!me || !me._appShell) return;
+
+  _savedHydrateInflight = true;
+  const grid = document.getElementById('profileSavedGrid');
+  const empty = document.getElementById('savedEmptyState');
+  if (!_savedHydratedOnce && grid) grid.innerHTML = '<div style="grid-column:1/-1;padding:18px;text-align:center;color:var(--muted);font-size:13px;">Loading…</div>';
+
+  try {
+    const r = await fetch('/api/me/bookmarks?limit=100', { credentials: 'include' });
+    const j = await r.json().catch(() => ({}));
+    if (!r.ok || !j.ok || !Array.isArray(j.posts)) throw new Error((j && j.error) || 'Could not load saved');
+    _savedHydratedOnce = true;
+    if (!grid) return;
+    grid.innerHTML = '';
+    if (j.posts.length === 0) {
+      grid.style.display = 'none';
+      if (empty) empty.style.display = 'block';
+      return;
+    }
+    grid.style.display = '';
+    if (empty) empty.style.display = 'none';
+    j.posts.forEach(post => grid.appendChild(_buildSavedCell(post)));
+  } catch (e) {
+    if (grid) grid.innerHTML = '<div style="grid-column:1/-1;padding:18px;text-align:center;color:var(--muted);font-size:13px;">' +
+      _esc(e && e.message ? e.message : 'Could not load saved') + '</div>';
+  } finally {
+    _savedHydrateInflight = false;
+  }
+}
+
+// Build a thumbnail cell for a saved post. Clips render with the poster
+// image as the background (or a gradient fallback) + play badge; posts
+// render as the same themed text cell the All grid uses.
+function _buildSavedCell(post) {
+  const id = post.id;
+  if (post.type === 'clip') {
+    const wrap = document.createElement('div');
+    wrap.className = 'vibe-grid-thumb';
+    wrap.dataset.vibeId = id;
+    wrap.style.position = 'relative';
+    const bgImg = post.media_thumbnail_url
+      ? `center/cover no-repeat url("${_esc(post.media_thumbnail_url)}")`
+      : 'linear-gradient(135deg,#1a0533,#2d1b4e)';
+    wrap.innerHTML = `
+      <div class="vibe-grid-bg" style="background:${bgImg}"></div>
+      <div class="vibe-grid-overlay"></div>
+      <div class="vibe-grid-play">&#9654;</div>
+      <div class="vibe-grid-info">
+        <div class="vibe-grid-title">${_esc((post.content || '').slice(0, 80))}</div>
+        <div class="vibe-grid-views">${_esc((post.author && post.author.name) || '')}</div>
+      </div>
+    `;
+    wrap.style.cursor = 'pointer';
+    wrap.addEventListener('click', () => {
+      if (typeof openPostViewer === 'function') openPostViewer(id, _savedPrefill(post));
+    });
+    return wrap;
+  }
+  // Default: post-thumb-cell
+  const wrap = document.createElement('div');
+  wrap.className = 'post-thumb-cell theme-' + _savedThemeFor(post);
+  wrap.dataset.sourcePostId = id;
+  const body = document.createElement('div');
+  body.className = 'post-thumb-body';
+  body.textContent = (post.content || '').slice(0, 240);
+  wrap.appendChild(body);
+  wrap.style.cursor = 'pointer';
+  wrap.addEventListener('click', () => {
+    if (typeof openPostViewer === 'function') openPostViewer(id, _savedPrefill(post));
+  });
+  return wrap;
+}
+
+// Pick a color theme keyed off the first hashtag (mirrors postThemeFor
+// in the All grid). Falls back to coral when there's no tag.
+function _savedThemeFor(post) {
+  const themes = ['coral','purple','mint','gold','sky','lavender'];
+  const tag = (post.tags && post.tags[0]) || '';
+  if (!tag) return themes[0];
+  let h = 0;
+  for (let i = 0; i < tag.length; i++) h = (h * 31 + tag.charCodeAt(i)) >>> 0;
+  return themes[h % themes.length];
+}
+
+function _savedPrefill(post) {
+  return {
+    id:                  post.id,
+    type:                post.type,
+    content:             post.content || '',
+    tags:                post.tags || [],
+    media_url:           post.media_url || '',
+    media_thumbnail_url: post.media_thumbnail_url || '',
+    created_at:          post.created_at,
+    author:              post.author || null,
+  };
 }
 
 function _renderPostCard(p) {
