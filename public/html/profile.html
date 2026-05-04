@@ -10,6 +10,7 @@
 <script src="/html/_mockUsers.js"></script>
 <script src="/html/_studentVerify.js"></script>
 <script src="/html/_otto.js" defer></script>
+<script src="/html/_postViewer.js" defer></script>
 <script>
 // Pre-paint: prevents the flash-of-Maya on profile loads for onboarded users.
 // Reads vibe_user_v1 synchronously before <body> renders. If the user came
@@ -2933,15 +2934,27 @@ body.empty-profile-mode #profileEmpty { display: flex !important; }
             </div>
             <div class="composer-header">
               <div class="composer-mini-avatar">MC</div>
-              <textarea class="composer-field" id="profilePostInput" placeholder="What are you working on?" rows="1" oninput="this.style.height='auto';this.style.height=Math.min(this.scrollHeight,180)+'px'"></textarea>
+              <textarea class="composer-field" id="profilePostInput" placeholder="What are you working on? Use #hashtags for tags." rows="1" maxlength="2000" oninput="this.style.height='auto';this.style.height=Math.min(this.scrollHeight,180)+'px'"></textarea>
+            </div>
+            <!-- Optional post image — picked via toolbar, previewed inline -->
+            <input type="file" id="composerPostImage" accept="image/jpeg,image/png,image/webp,image/gif" hidden onchange="composerOnImagePicked(this)">
+            <div id="composerPostImagePreview" style="display:none;position:relative;margin-top:10px;border-radius:12px;overflow:hidden;max-width:240px;">
+              <img id="composerPostImageImg" alt="" style="display:block;width:100%;height:auto;">
+              <button type="button" onclick="composerClearImage()" title="Remove image"
+                style="position:absolute;top:6px;right:6px;background:rgba(0,0,0,.65);color:white;border:none;border-radius:999px;width:24px;height:24px;font-size:14px;line-height:1;cursor:none;">&times;</button>
             </div>
             <div id="vibe-comp-zone" style="display:none;border:2px dashed rgba(28,28,30,.12);border-radius:14px;padding:24px;text-align:center;margin-top:10px;">
-              <div style="font-size:13px;font-weight:600;color:var(--muted)">Drop a video file or click to browse</div>
-              <div style="font-size:11px;color:var(--muted);margin-top:4px;">15-90 seconds · MP4, MOV · Up to 500MB</div>
-              <button style="margin-top:12px;font-family:'DM Sans',sans-serif;font-size:12px;font-weight:700;background:var(--charcoal);color:white;border:none;padding:8px 18px;border-radius:100px;cursor:none;">Choose file</button>
+              <div style="font-size:13px;font-weight:600;color:var(--muted)">Pick a video file to upload</div>
+              <div style="font-size:11px;color:var(--muted);margin-top:4px;">Up to 60s · MP4 / MOV / WEBM · Max 100MB</div>
+              <button type="button" onclick="composerChooseClipFile()"
+                style="margin-top:12px;font-family:'DM Sans',sans-serif;font-size:12px;font-weight:700;background:var(--charcoal);color:white;border:none;padding:8px 18px;border-radius:100px;cursor:none;">Choose file</button>
+              <input type="file" id="composerClipFile" accept="video/mp4,video/quicktime,video/webm" hidden onchange="composerOnClipPicked(this)">
+              <div id="composerClipStatus" style="font-size:11px;color:var(--muted);margin-top:8px;"></div>
             </div>
             <div class="composer-btns">
-              <span style="font-size:12px;color:var(--muted);">Share with your connections</span>
+              <button type="button" onclick="composerChooseImage()" title="Attach image"
+                style="font-family:'DM Sans',sans-serif;font-size:12px;font-weight:600;background:transparent;color:var(--charcoal);border:1px solid rgba(28,28,30,.18);padding:6px 12px;border-radius:100px;cursor:none;">+ Photo</button>
+              <span style="font-size:12px;color:var(--muted);flex:1;text-align:right;margin-right:10px;">Share with your connections</span>
               <button class="composer-publish" onclick="publishProfilePost()">Publish</button>
             </div>
           </div>
@@ -4485,12 +4498,36 @@ function buildPostThumb(card) {
   body.className = 'post-thumb-body';
   body.textContent = postExcerpt(card);
   wrap.appendChild(body);
+  // Open the shared post viewer modal (P1-015). Mock-card ids like 'p1' map
+  // to the static demo posts and won't fetch from the server — the modal
+  // still renders the prefill (excerpt + theme) for those.
   wrap.addEventListener('click', () => {
-    const target = document.getElementById('posts');
-    if (target) target.scrollIntoView({ behavior: 'smooth', block: 'start' });
-    document.querySelector('.content-tab:nth-child(3)')?.click();
+    const id = wrap.dataset.sourcePostId;
+    if (id && typeof openPostViewer === 'function') {
+      openPostViewer(id, _profilePrefillFromCard(card));
+    }
   });
   return wrap;
+}
+
+// Build a prefill object so the modal paints something instantly while
+// the server fetch resolves. For app-shell users, /api/posts/[id] then
+// replaces the counts + viewer state.
+function _profilePrefillFromCard(card) {
+  const me = (typeof vibeLoad === 'function') ? vibeLoad('vibe_user_v1') : null;
+  const bodyEl = card.querySelector('.ppost-body');
+  const dateEl = card.querySelector('.ppost-date');
+  const tagEls = card.querySelectorAll('.ppost-tag');
+  const tags = Array.from(tagEls).map(t => (t.textContent || '').replace(/^#/, ''));
+  return {
+    id:        card.dataset.postId || '',
+    type:      'post',
+    content:   bodyEl ? (bodyEl.textContent || '').trim() : '',
+    tags,
+    media_url: '',
+    created_at: dateEl ? dateEl.textContent : '',
+    author:    me ? { name: me.name, handle: me.handle, avatar_url: me.avatarPhoto } : null,
+  };
 }
 function buildClipThumb(thumb) {
   const clone = thumb.cloneNode(true);
@@ -4521,6 +4558,68 @@ function populateAllGrid() {
     if (i < postNodes.length) grid.appendChild(buildPostThumb(postNodes[i]));
   }
 }
+// Posts-pane card click → open viewer. Event delegation so newly added
+// (publish-post) cards work without per-card binding. Skip clicks on the
+// owner-only Pin / Delete / Save controls inside the card.
+(function bindProfilePostsClickToViewer() {
+  const list = document.getElementById('profilePostsList');
+  if (!list) return;
+  list.addEventListener('click', (ev) => {
+    const card = ev.target.closest('.profile-post-card');
+    if (!card) return;
+    if (ev.target.closest('.ppost-pin, .ppost-delete, .ppost-save')) return;
+    const id = card.dataset.postId;
+    if (!id || typeof openPostViewer !== 'function') return;
+    openPostViewer(id, _profilePrefillFromCard(card));
+  });
+  list.style.cursor = 'pointer';
+})();
+
+// Clip-thumb click → open the shared viewer in clip mode (P1-016).
+// Event-delegated on both grids so newly added clips work without
+// per-thumb binding. The All-grid clones strip owner-only chrome at
+// build time, so we don't need to filter Pin/Delete here.
+(function bindProfileClipsClickToViewer() {
+  ['profileVibesGrid', 'profileAllGrid'].forEach(gridId => {
+    const grid = document.getElementById(gridId);
+    if (!grid) return;
+    grid.addEventListener('click', (ev) => {
+      // Skip the upload tile and any owner-only chrome on the originals.
+      if (ev.target.closest('.vibe-upload-tile')) return;
+      if (ev.target.closest('.vibe-pin-btn, .vibe-delete-btn')) return;
+      const thumb = ev.target.closest('.vibe-grid-thumb');
+      if (!thumb) return;
+      const id = thumb.dataset.vibeId || '';
+      if (!id || typeof openPostViewer !== 'function') return;
+      openPostViewer(id, _profilePrefillFromClipThumb(thumb));
+    });
+  });
+})();
+
+// Pull the bits the modal can paint instantly (poster, title) from the
+// thumb DOM. Real DB clips also carry the poster URL via
+// background-image: url(...) on .vibe-grid-bg; demo clips use gradients.
+function _profilePrefillFromClipThumb(thumb) {
+  const me = (typeof vibeLoad === 'function') ? vibeLoad('vibe_user_v1') : null;
+  const bg = thumb.querySelector('.vibe-grid-bg');
+  const titleEl = thumb.querySelector('.vibe-grid-title');
+  let posterUrl = '';
+  if (bg) {
+    const m = (bg.style.background || '').match(/url\(["']?(https?:[^"')]+)["']?\)/i);
+    if (m) posterUrl = m[1];
+  }
+  return {
+    id:                  thumb.dataset.vibeId || '',
+    type:                'clip',
+    content:             titleEl ? (titleEl.textContent || '').trim() : '',
+    tags:                [],
+    media_url:           '',
+    media_thumbnail_url: posterUrl,
+    created_at:          '',
+    author:              me ? { name: me.name, handle: me.handle, avatar_url: me.avatarPhoto } : null,
+  };
+}
+
 // Repopulate after the persistence layer hydrates clips and posts from localStorage.
 if (document.readyState === 'loading') {
   document.addEventListener('DOMContentLoaded', () => setTimeout(populateAllGrid, 200));
@@ -4540,19 +4639,135 @@ function switchCompType(targetId, btn) {
 }
 
 // ── Publish post from profile ─────────────────────────────────────
-function publishProfilePost() {
+// Owner-only. Signed-in users (vibe_user_v1._appShell) hit Supabase via
+// /api/me/publish-post; demo Maya / mock-user views stay local-only.
+// Hashtags inside the body double as the tags array — chip input is a
+// later polish (P1-017+ noted in journal v4.7).
+
+const POST_TAG_RE = /(?:^|\s)#([\p{L}0-9_]{2,32})/gu;
+function _extractHashtags(text) {
+  const out = [];
+  const seen = new Set();
+  let m;
+  while ((m = POST_TAG_RE.exec(text || '')) !== null) {
+    const t = m[1].toLowerCase();
+    if (seen.has(t)) continue;
+    seen.add(t);
+    out.push(t);
+    if (out.length >= 10) break;
+  }
+  return out;
+}
+
+function _isAppShell() {
+  if (window.viewingMockUser) return false;
+  const u = (typeof vibeLoad === 'function') ? vibeLoad('vibe_user_v1') : null;
+  return Boolean(u && u._appShell);
+}
+
+// Holds the URL of the (already-uploaded) image for the next post submission.
+let _composerPendingImageUrl = '';
+
+function composerChooseImage() {
+  const inp = document.getElementById('composerPostImage');
+  if (inp) inp.click();
+}
+
+async function composerOnImagePicked(input) {
+  const file = input && input.files && input.files[0];
+  input.value = '';
+  if (!file) return;
+  if (!_isAppShell()) {
+    showToast('Sign in to attach photos');
+    return;
+  }
+  const preview = document.getElementById('composerPostImagePreview');
+  const img = document.getElementById('composerPostImageImg');
+  if (img) img.src = URL.createObjectURL(file);
+  if (preview) preview.style.display = 'block';
+  try {
+    const fd = new FormData();
+    fd.append('file', file);
+    fd.append('kind', 'post');
+    const r = await fetch('/api/me/profile-upload', { method: 'POST', credentials: 'include', body: fd });
+    const j = await r.json().catch(() => ({}));
+    if (!r.ok || !j.ok || !j.url) {
+      throw new Error((j && j.error) || 'Upload failed');
+    }
+    _composerPendingImageUrl = j.url;
+  } catch (e) {
+    composerClearImage();
+    showToast(e && e.message ? e.message : 'Could not upload photo');
+  }
+}
+
+function composerClearImage() {
+  _composerPendingImageUrl = '';
+  const preview = document.getElementById('composerPostImagePreview');
+  const img = document.getElementById('composerPostImageImg');
+  if (img) { try { URL.revokeObjectURL(img.src); } catch {} img.src = ''; }
+  if (preview) preview.style.display = 'none';
+}
+
+async function publishProfilePost() {
   const input = document.getElementById('profilePostInput');
-  if (!input || !input.value.trim()) return;
+  const text = (input && input.value || '').trim();
+  if (!text && !_composerPendingImageUrl) return;
+
+  // Demo / mock-user view stays on the local-only path so Maya keeps working
+  // until the demo flow is retired.
+  if (!_isAppShell()) {
+    _publishProfilePostLocal(text);
+    return;
+  }
+
+  const btn = document.querySelector('.profile-composer.owner-only .composer-publish');
+  if (btn) { btn.disabled = true; btn.textContent = 'Publishing…'; }
+  try {
+    const r = await fetch('/api/me/publish-post', {
+      method: 'POST',
+      credentials: 'include',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        content: text,
+        tags: _extractHashtags(text),
+        media_url: _composerPendingImageUrl || undefined,
+      }),
+    });
+    const j = await r.json().catch(() => ({}));
+    if (!r.ok || !j.ok || !j.post) {
+      throw new Error((j && j.error) || 'Publish failed');
+    }
+    _publishProfilePostLocal(text, j.post);
+  } catch (e) {
+    showToast(e && e.message ? e.message : 'Could not publish');
+  } finally {
+    if (btn) { btn.disabled = false; btn.textContent = 'Publish'; }
+  }
+}
+
+// Local rendering side-effect — used for both the Supabase success path and
+// the demo Maya fallback. `serverPost` is the row returned from the API when
+// signed in (carries the canonical id); omitted on the demo path.
+function _publishProfilePostLocal(text, serverPost) {
   const list = document.getElementById('profilePostsList');
+  const input = document.getElementById('profilePostInput');
+  const tags = _extractHashtags(text);
+  const tagsHTML = tags.length
+    ? tags.map(t => `<span class="ppost-tag">#${_esc(t)}</span>`).join('')
+    : '';
+  const imageHTML = _composerPendingImageUrl
+    ? `<img src="${_esc(_composerPendingImageUrl)}" alt="" style="display:block;width:100%;border-radius:12px;margin-top:8px;">`
+    : '';
+  const bodyText = _esc(text).replace(/\n/g, '<br>');
   if (list) {
-    const text = input.value.trim();
     const card = _renderPostCard({
-      id:       'p' + Date.now() + Math.random().toString(36).slice(2,5),
+      id:       (serverPost && serverPost.id) || 'p' + Date.now() + Math.random().toString(36).slice(2,5),
       ottoType: 'vibe-only',
       date:     'Just now',
-      bodyHTML: _esc(text).replace(/\n/g, '<br>'),
+      bodyHTML: bodyText + imageHTML,
       ottoBadgeHTML:     '<span class="op-badge gray">vibe only</span>',
-      tagsHTML:          '',
+      tagsHTML,
       platformStatsHTML: '',
       reactionsHTML:     '',
     });
@@ -4561,8 +4776,8 @@ function publishProfilePost() {
   }
   if (typeof populateAllGrid === 'function') populateAllGrid();
   showToast('Posted successfully');
-  input.value = '';
-  input.style.height = '';
+  if (input) { input.value = ''; input.style.height = ''; }
+  composerClearImage();
 }
 
 
@@ -5156,6 +5371,12 @@ window.viewingMockUser = null;
   // Maya's hardcoded markup intact for sections she's never touched.
   renderUserSections(user);
 
+  // App-shell users: pull real DB posts on top of whatever localStorage
+  // hydrated. Demo Maya stays on the hardcoded path.
+  if (user._appShell) {
+    hydrateProfilePostsFromAPI();
+  }
+
   // First-time-only: welcome banner + auto-edit mode while name is still empty.
   // Once they type a name, this stops firing on subsequent reloads.
   if (user._onboarded && !user.name) {
@@ -5491,6 +5712,60 @@ function renderPostsFromStorage(postsOverride) {
   posts.forEach(p => list.appendChild(_renderPostCard(p)));
 }
 
+// Pull real own-posts from Supabase and render them in #profilePostsList.
+// Replaces whatever localStorage hydrated so the DB is the source of truth
+// for app-shell users — demo Maya / mock-user views still use localStorage
+// or the user.posts override path.
+async function hydrateProfilePostsFromAPI() {
+  if (window.viewingMockUser) return;
+  try {
+    const r = await fetch('/api/me/posts?limit=100', { credentials: 'include' });
+    const j = await r.json().catch(() => ({}));
+    if (!r.ok || !j.ok || !Array.isArray(j.posts)) return;
+    const cards = j.posts.map(_profileMapDbRow).filter(Boolean);
+    const list = document.getElementById('profilePostsList');
+    if (!list) return;
+    // Clear existing cards (Maya hardcoded + any localStorage-rendered) and
+    // replace with the DB truth. Mirror the same shape into vibe_posts_v1
+    // so subsequent saves don't snapshot stale local DOM.
+    list.querySelectorAll('.profile-post-card').forEach(c => c.remove());
+    cards.forEach(c => list.appendChild(_renderPostCard(c)));
+    if (typeof savePostsToStorage === 'function') savePostsToStorage();
+    if (typeof populateAllGrid === 'function') populateAllGrid();
+  } catch (e) { /* silent — local cache stays */ }
+}
+
+function _profileMapDbRow(row) {
+  if (!row || row.type !== 'post') return null;
+  const tags = (row.tags || []).map(t => `<span class="ppost-tag">#${_esc(t)}</span>`).join('');
+  const bodyText = _esc(row.content || '').replace(/\n/g, '<br>');
+  const imageHTML = row.media_url
+    ? `<img src="${_esc(row.media_url)}" alt="" style="display:block;width:100%;border-radius:12px;margin-top:8px;">`
+    : '';
+  return {
+    id: row.id,
+    ottoType: 'vibe-only',
+    date: _formatRelativeDate(row.created_at),
+    bodyHTML: bodyText + imageHTML,
+    ottoBadgeHTML: '<span class="op-badge gray">vibe only</span>',
+    tagsHTML: tags,
+    platformStatsHTML: '',
+    reactionsHTML: '',
+  };
+}
+
+function _formatRelativeDate(iso) {
+  if (!iso) return 'Just now';
+  const then = new Date(iso).getTime();
+  const now  = Date.now();
+  const diff = Math.max(0, now - then) / 1000;
+  if (diff < 60)        return 'Just now';
+  if (diff < 3600)      return Math.floor(diff / 60) + 'm ago';
+  if (diff < 86400)     return Math.floor(diff / 3600) + 'h ago';
+  if (diff < 86400 * 7) return Math.floor(diff / 86400) + 'd ago';
+  return new Date(iso).toLocaleDateString(undefined, { month: 'short', day: 'numeric' });
+}
+
 function _renderPostCard(p) {
   const card = document.createElement('div');
   card.className = 'profile-post-card';
@@ -5603,29 +5878,209 @@ function deleteVibe(btn) {
   if (typeof showToast === 'function') showToast('Clip removed');
 }
 
-// Upload-tile click → spawns a placeholder vibe with a random gradient.
-// Real video upload pipeline lives in v2; this is enough for the demo
-// to feel interactive (add → reorder → delete → persists).
+// ── Clip upload pipeline (P1-017) ──────────────────────────────────
+// Browser → R2 direct (signed PUT) → poster frame → /api/me/publish-clip.
+// DB stores the R2 object key (per src/lib/r2.ts comment); the viewer
+// modal (P1-016) will resolve a fresh signed GET URL on demand.
+
+const CLIP_MAX_BYTES   = 100 * 1024 * 1024;
+const CLIP_MAX_SECONDS = 60;
+const CLIP_PALETTES = [
+  'linear-gradient(135deg,#1a0533,#2d1b4e)',
+  'linear-gradient(135deg,#001a2c,#0a2a3e)',
+  'linear-gradient(135deg,#1a1a00,#2a2800)',
+  'linear-gradient(135deg,#1a0008,#2a000f)',
+  'linear-gradient(135deg,#001a18,#0a2a26)',
+  'linear-gradient(135deg,#2a0033,#440055)',
+];
+
+function composerChooseClipFile() {
+  const inp = document.getElementById('composerClipFile');
+  if (inp) inp.click();
+}
+
+function _setClipStatus(msg) {
+  const el = document.getElementById('composerClipStatus');
+  if (el) el.textContent = msg || '';
+}
+
+// Pull the first frame of the video as a JPEG blob via canvas. Best-effort:
+// if metadata never resolves or the format isn't decodable in-browser,
+// the clip still ships with a gradient fallback in the grid.
+function _capturePosterFrame(file) {
+  return new Promise((resolve) => {
+    const url = URL.createObjectURL(file);
+    const v = document.createElement('video');
+    v.muted = true;
+    v.preload = 'metadata';
+    v.playsInline = true;
+    v.crossOrigin = 'anonymous';
+    let done = false;
+    const finish = (blob, duration) => {
+      if (done) return;
+      done = true;
+      try { URL.revokeObjectURL(url); } catch {}
+      resolve({ blob, duration });
+    };
+    v.onloadedmetadata = () => {
+      const dur = isFinite(v.duration) ? v.duration : null;
+      try { v.currentTime = Math.min(0.1, (dur || 1) - 0.05); } catch { finish(null, dur); }
+    };
+    v.onseeked = () => {
+      try {
+        const c = document.createElement('canvas');
+        const w = v.videoWidth || 720;
+        const h = v.videoHeight || 720;
+        // Square crop — matches the IG-style 1:1 grid
+        const side = Math.min(w, h);
+        c.width = c.height = Math.min(720, side);
+        const ctx = c.getContext('2d');
+        const sx = (w - side) / 2;
+        const sy = (h - side) / 2;
+        ctx.drawImage(v, sx, sy, side, side, 0, 0, c.width, c.height);
+        c.toBlob(b => finish(b, isFinite(v.duration) ? v.duration : null), 'image/jpeg', 0.82);
+      } catch {
+        finish(null, isFinite(v.duration) ? v.duration : null);
+      }
+    };
+    v.onerror = () => finish(null, null);
+    setTimeout(() => finish(null, null), 8000); // give up after 8s
+    v.src = url;
+  });
+}
+
+async function composerOnClipPicked(input) {
+  const file = input && input.files && input.files[0];
+  input.value = '';
+  if (!file) return;
+
+  if (!_isAppShell()) {
+    showToast('Sign in to upload clips');
+    return;
+  }
+  if (file.size > CLIP_MAX_BYTES) {
+    showToast(`Clip too large — max ${CLIP_MAX_BYTES / (1024 * 1024)}MB`);
+    return;
+  }
+  const ct = (file.type || '').toLowerCase();
+  if (!['video/mp4', 'video/quicktime', 'video/webm'].includes(ct)) {
+    showToast('MP4, MOV, or WEBM only');
+    return;
+  }
+
+  _setClipStatus('Preparing upload…');
+  try {
+    // 1. Signed PUT URL
+    const sigRes = await fetch('/api/me/clip-upload-url', {
+      method: 'POST',
+      credentials: 'include',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ contentType: ct, sizeBytes: file.size }),
+    });
+    const sig = await sigRes.json().catch(() => ({}));
+    if (!sigRes.ok || !sig.ok || !sig.uploadUrl || !sig.objectKey) {
+      throw new Error((sig && sig.error) || 'Could not get upload URL');
+    }
+
+    // 2. Direct PUT to R2
+    _setClipStatus('Uploading to storage…');
+    const putRes = await fetch(sig.uploadUrl, {
+      method: 'PUT',
+      headers: { 'Content-Type': ct },
+      body: file,
+    });
+    if (!putRes.ok) {
+      throw new Error('R2 upload failed (' + putRes.status + ')');
+    }
+
+    // 3. Poster frame (best-effort)
+    _setClipStatus('Capturing thumbnail…');
+    const { blob: posterBlob, duration } = await _capturePosterFrame(file);
+    if (duration && duration > CLIP_MAX_SECONDS + 1) {
+      throw new Error(`Clip exceeds ${CLIP_MAX_SECONDS}s`);
+    }
+    let posterUrl = '';
+    if (posterBlob) {
+      const fd = new FormData();
+      fd.append('file', new File([posterBlob], 'poster.jpg', { type: 'image/jpeg' }));
+      fd.append('kind', 'poster');
+      const pRes = await fetch('/api/me/profile-upload', { method: 'POST', credentials: 'include', body: fd });
+      const pJson = await pRes.json().catch(() => ({}));
+      if (pRes.ok && pJson.ok && pJson.url) posterUrl = pJson.url;
+    }
+
+    // 4. Publish row
+    _setClipStatus('Publishing…');
+    const captionInput = document.getElementById('profilePostInput');
+    const caption = ((captionInput && captionInput.value) || '').trim();
+    const pubRes = await fetch('/api/me/publish-clip', {
+      method: 'POST',
+      credentials: 'include',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        object_key:   sig.objectKey,
+        content:      caption,
+        tags:         _extractHashtags(caption),
+        poster_url:   posterUrl || undefined,
+        duration_sec: duration || undefined,
+      }),
+    });
+    const pub = await pubRes.json().catch(() => ({}));
+    if (!pubRes.ok || !pub.ok || !pub.post) {
+      throw new Error((pub && pub.error) || 'Publish failed');
+    }
+
+    // 5. Local DOM update — keep grid feeling instant
+    const grid = document.getElementById('profileVibesGrid');
+    if (grid) {
+      const node = _renderVibeThumb({
+        id:    pub.post.id,
+        title: caption || 'New clip',
+        views: duration ? `0 views · ${_formatDuration(duration)}` : '0 views · 0:00',
+        bg:    posterUrl
+          ? `center/cover no-repeat url("${posterUrl}")`
+          : CLIP_PALETTES[Math.floor(Math.random() * CLIP_PALETTES.length)],
+      });
+      const uploadTile = grid.querySelector('.vibe-upload-tile');
+      if (uploadTile) grid.insertBefore(node, uploadTile);
+      else grid.appendChild(node);
+      saveVibesToStorage();
+    }
+    if (captionInput) { captionInput.value = ''; captionInput.style.height = ''; }
+    if (typeof populateAllGrid === 'function') populateAllGrid();
+    if (typeof refreshPinButtons === 'function') refreshPinButtons();
+    showToast('Clip published');
+  } catch (e) {
+    showToast(e && e.message ? e.message : 'Upload failed');
+  } finally {
+    _setClipStatus('');
+  }
+}
+
+function _formatDuration(sec) {
+  const s = Math.max(0, Math.round(sec));
+  return Math.floor(s / 60) + ':' + String(s % 60).padStart(2, '0');
+}
+
+// Upload-tile click → routes through the same real upload pipeline.
+// Demo Maya / mock-user views still get the placeholder behavior so the
+// static prototype stays clickable without a Supabase session.
 function addVibeFromUpload() {
+  if (_isAppShell()) {
+    composerChooseClipFile();
+    return;
+  }
   if (!editMode) {
     if (typeof showToast === 'function') showToast('Enter edit mode to add a vibe');
     return;
   }
   const grid = document.getElementById('profileVibesGrid');
   if (!grid) return;
-  const palettes = [
-    'linear-gradient(135deg,#1a0533,#2d1b4e)',
-    'linear-gradient(135deg,#001a2c,#0a2a3e)',
-    'linear-gradient(135deg,#1a1a00,#2a2800)',
-    'linear-gradient(135deg,#1a0008,#2a000f)',
-    'linear-gradient(135deg,#001a18,#0a2a26)',
-    'linear-gradient(135deg,#2a0033,#440055)',
-  ];
   const node = _renderVibeThumb({
     id:    'v' + Date.now() + Math.random().toString(36).slice(2,5),
     title: 'New vibe',
     views: '0 views · 0:00',
-    bg:    palettes[Math.floor(Math.random() * palettes.length)],
+    bg:    CLIP_PALETTES[Math.floor(Math.random() * CLIP_PALETTES.length)],
   });
   const uploadTile = grid.querySelector('.vibe-upload-tile');
   if (uploadTile) grid.insertBefore(node, uploadTile);

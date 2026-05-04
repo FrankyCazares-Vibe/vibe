@@ -8,18 +8,32 @@ const KIND_EXT: Record<string, string> = {
   avatar: "jpg",
   banner: "jpg",
   resume: "pdf",
+  post: "jpg",
+  poster: "jpg",
 };
 
 const ALLOWED: Record<string, string[]> = {
   avatar: ["image/jpeg", "image/png", "image/webp", "image/gif"],
   banner: ["image/jpeg", "image/png", "image/webp", "image/gif"],
   resume: ["application/pdf", "image/jpeg", "image/png", "image/webp"],
+  post: ["image/jpeg", "image/png", "image/webp", "image/gif"],
+  poster: ["image/jpeg", "image/png", "image/webp"],
 };
 
 const MAX_BYTES: Record<string, number> = {
   avatar: 6 * 1024 * 1024,
   banner: 6 * 1024 * 1024,
   resume: 8 * 1024 * 1024,
+  post: 8 * 1024 * 1024,
+  poster: 2 * 1024 * 1024,
+};
+
+const KIND_PATH_PREFIX: Record<string, string> = {
+  avatar: "",
+  banner: "",
+  resume: "",
+  post: "posts/",
+  poster: "posters/",
 };
 
 function humanizeStorageError(message: string): string {
@@ -58,7 +72,14 @@ export async function POST(req: Request) {
   }
 
   const kindRaw = String(form.get("kind") || "resume");
-  const kind = kindRaw === "avatar" || kindRaw === "banner" || kindRaw === "resume" ? kindRaw : null;
+  const kind =
+    kindRaw === "avatar" ||
+    kindRaw === "banner" ||
+    kindRaw === "resume" ||
+    kindRaw === "post" ||
+    kindRaw === "poster"
+      ? kindRaw
+      : null;
   if (!kind) {
     return NextResponse.json({ ok: false, error: "Invalid kind" }, { status: 400 });
   }
@@ -88,7 +109,7 @@ export async function POST(req: Request) {
               ? "pdf"
               : KIND_EXT[kind];
 
-  const path = `${user.id}/${kind}-${randomUUID()}.${ext}`;
+  const path = `${user.id}/${KIND_PATH_PREFIX[kind]}${kind}-${randomUUID()}.${ext}`;
   const { error: upErr } = await supabase.storage.from("profiles").upload(path, buf, {
     contentType,
     upsert: false,

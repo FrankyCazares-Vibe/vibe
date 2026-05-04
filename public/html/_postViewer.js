@@ -1,0 +1,577 @@
+// ══════════════════════════════════════════════════════════════════════════
+// Vibe — shared post viewer modal (P1-015)
+//
+// Loaded on profile.html + campus.html. Injects its own CSS + markup once,
+// then exposes window.openPostViewer(postId, prefill?) for callers to wire
+// to .post-thumb-cell, .profile-post-card, and campus .post click handlers.
+//
+// Self-contained: hardcodes design-system colors instead of relying on each
+// page's CSS variables, so the modal looks identical wherever it opens.
+//
+// Demo Maya / mock-user views: modal still opens but Like/Save/Comment
+// surface a "Sign in to interact" toast instead of hitting the API.
+// ══════════════════════════════════════════════════════════════════════════
+
+(function () {
+  if (window.__vibePostViewerLoaded) return;
+  window.__vibePostViewerLoaded = true;
+
+  // ── Styles ────────────────────────────────────────────────────────────
+  const STYLE = `
+  .vpv-overlay {
+    position: fixed; inset: 0; z-index: 9999;
+    background: rgba(28,28,30,.72);
+    backdrop-filter: blur(8px);
+    display: none; align-items: center; justify-content: center;
+    padding: 24px; box-sizing: border-box;
+    opacity: 0; transition: opacity .18s ease;
+  }
+  .vpv-overlay.show { display: flex; opacity: 1; }
+  .vpv-card {
+    background: #FAF7F2; color: #1C1C1E;
+    border-radius: 18px; box-shadow: 0 20px 60px rgba(0,0,0,.35);
+    width: min(680px, 100%); max-height: calc(100vh - 48px);
+    display: flex; flex-direction: column;
+    font-family: 'DM Sans', system-ui, -apple-system, sans-serif;
+    overflow: hidden;
+    transform: translateY(8px) scale(.985); transition: transform .18s ease;
+  }
+  .vpv-overlay.show .vpv-card { transform: translateY(0) scale(1); }
+  .vpv-close {
+    position: absolute; top: 18px; right: 22px;
+    background: rgba(28,28,30,.55); color: white; border: none;
+    border-radius: 999px; width: 34px; height: 34px;
+    font-size: 18px; line-height: 1; cursor: none;
+    display: flex; align-items: center; justify-content: center;
+  }
+  .vpv-header {
+    display: flex; align-items: center; gap: 12px;
+    padding: 18px 22px 12px;
+  }
+  .vpv-avatar {
+    width: 40px; height: 40px; border-radius: 50%;
+    background: #1C1C1E; color: white;
+    display: flex; align-items: center; justify-content: center;
+    font-weight: 700; font-size: 13px; letter-spacing: .3px;
+    overflow: hidden; flex-shrink: 0;
+  }
+  .vpv-avatar img { width: 100%; height: 100%; object-fit: cover; display: block; }
+  .vpv-meta { flex: 1; min-width: 0; }
+  .vpv-meta .vpv-name { font-weight: 700; font-size: 14px; line-height: 1.2; }
+  .vpv-meta .vpv-sub  { font-size: 12px; color: #8A8580; margin-top: 2px; line-height: 1.2; }
+  .vpv-meta .vpv-sub strong { color: #1C1C1E; font-weight: 600; }
+
+  .vpv-body {
+    padding: 6px 22px 18px;
+    overflow-y: auto; flex: 1;
+  }
+  .vpv-text {
+    font-size: 15px; line-height: 1.55; color: #1C1C1E;
+    white-space: pre-wrap; word-wrap: break-word;
+  }
+  .vpv-image {
+    display: block; width: 100%; max-height: 540px; object-fit: cover;
+    border-radius: 12px; margin-top: 12px;
+    background: #EFEAE2;
+  }
+  .vpv-video {
+    display: block; width: 100%; max-height: 70vh;
+    border-radius: 12px; margin-top: 12px;
+    background: #1C1C1E;
+  }
+  .vpv-video-stub {
+    display: flex; align-items: center; justify-content: center;
+    width: 100%; aspect-ratio: 1 / 1; max-height: 70vh;
+    border-radius: 12px; margin-top: 12px;
+    background: #1C1C1E url('') center/cover no-repeat;
+    color: #FAF7F2; font-size: 13px; font-weight: 600; text-align: center;
+    padding: 16px; box-sizing: border-box;
+  }
+  .vpv-tags { margin-top: 10px; display: flex; flex-wrap: wrap; gap: 6px; }
+  .vpv-tag {
+    font-size: 11px; font-weight: 600; color: #FF5C35;
+    background: rgba(255,92,53,.08); padding: 3px 8px; border-radius: 999px;
+  }
+
+  .vpv-actions {
+    display: flex; align-items: center; gap: 4px;
+    padding: 10px 14px; border-top: 1px solid rgba(28,28,30,.08);
+  }
+  .vpv-act {
+    background: transparent; border: none;
+    font-family: inherit; font-size: 13px; font-weight: 600;
+    color: #1C1C1E; padding: 8px 12px; border-radius: 999px;
+    cursor: none; display: inline-flex; align-items: center; gap: 6px;
+    transition: background .12s, color .12s, transform .08s;
+  }
+  .vpv-act:hover { background: rgba(28,28,30,.06); }
+  .vpv-act:active { transform: scale(.97); }
+  .vpv-act.on { color: #FF5C35; }
+  .vpv-act.on .vpv-heart { fill: #FF5C35; stroke: #FF5C35; }
+  .vpv-act.on .vpv-bookmark { fill: #1C1C1E; stroke: #1C1C1E; }
+  .vpv-act svg { display: block; }
+  .vpv-spacer { flex: 1; }
+
+  .vpv-comments {
+    border-top: 1px solid rgba(28,28,30,.08);
+    padding: 14px 22px 0;
+  }
+  .vpv-comments-empty {
+    padding: 20px 0 18px;
+    text-align: center; color: #8A8580; font-size: 13px;
+  }
+  .vpv-comment {
+    display: flex; gap: 10px; padding: 10px 0;
+  }
+  .vpv-comment + .vpv-comment { border-top: 1px solid rgba(28,28,30,.05); }
+  .vpv-comment .vpv-avatar { width: 30px; height: 30px; font-size: 11px; }
+  .vpv-cw { flex: 1; min-width: 0; }
+  .vpv-cw .vpv-cn { font-size: 13px; font-weight: 700; color: #1C1C1E; }
+  .vpv-cw .vpv-cn .vpv-ch { color: #8A8580; font-weight: 500; margin-left: 6px; font-size: 12px; }
+  .vpv-cw .vpv-ct { font-size: 13.5px; line-height: 1.45; color: #1C1C1E; margin-top: 2px; word-wrap: break-word; }
+  .vpv-cw .vpv-cd { font-size: 11px; color: #8A8580; margin-top: 4px; }
+
+  .vpv-composer {
+    display: flex; align-items: center; gap: 8px;
+    padding: 10px 18px 14px;
+    border-top: 1px solid rgba(28,28,30,.08);
+  }
+  .vpv-composer textarea {
+    flex: 1; resize: none; min-height: 36px; max-height: 120px;
+    border: 1px solid rgba(28,28,30,.14); border-radius: 18px;
+    padding: 8px 14px; font-family: inherit; font-size: 13.5px;
+    background: white; color: #1C1C1E; outline: none;
+  }
+  .vpv-composer textarea:focus { border-color: rgba(28,28,30,.35); }
+  .vpv-composer button {
+    background: #1C1C1E; color: white; border: none;
+    font-family: inherit; font-size: 12px; font-weight: 700;
+    padding: 8px 16px; border-radius: 999px; cursor: none;
+  }
+  .vpv-composer button[disabled] { opacity: .4; cursor: default; }
+
+  .vpv-toast {
+    position: fixed; left: 50%; bottom: 32px; transform: translateX(-50%) translateY(20px);
+    background: #1C1C1E; color: white;
+    padding: 10px 18px; border-radius: 999px;
+    font-family: 'DM Sans', system-ui, sans-serif; font-size: 12.5px; font-weight: 600;
+    z-index: 10001; opacity: 0; transition: opacity .18s, transform .18s;
+    pointer-events: none;
+  }
+  .vpv-toast.show { opacity: 1; transform: translateX(-50%) translateY(0); }
+  `;
+
+  const styleEl = document.createElement("style");
+  styleEl.id = "vpvStyles";
+  styleEl.textContent = STYLE;
+  document.head.appendChild(styleEl);
+
+  // ── Markup (injected once on first open) ──────────────────────────────
+  function ensureModal() {
+    if (document.getElementById("vpvOverlay")) return;
+    const overlay = document.createElement("div");
+    overlay.className = "vpv-overlay";
+    overlay.id = "vpvOverlay";
+    overlay.innerHTML = `
+      <div class="vpv-card" role="dialog" aria-modal="true" aria-label="Post">
+        <button class="vpv-close" aria-label="Close" onclick="window.__vpvClose()">&times;</button>
+        <div class="vpv-header">
+          <div class="vpv-avatar" id="vpvAvatar">·</div>
+          <div class="vpv-meta">
+            <div class="vpv-name" id="vpvName">Loading…</div>
+            <div class="vpv-sub" id="vpvSub"></div>
+          </div>
+        </div>
+        <div class="vpv-body" id="vpvBody"></div>
+        <div class="vpv-actions">
+          <button class="vpv-act" id="vpvLike" onclick="window.__vpvToggleLike()">
+            <svg width="16" height="16" viewBox="0 0 16 16" fill="none">
+              <path class="vpv-heart" d="M8 13.5s-5-3.2-5-7a3 3 0 0 1 5-2.2A3 3 0 0 1 13 6.5c0 3.8-5 7-5 7z"
+                stroke="#1C1C1E" stroke-width="1.4" fill="none" stroke-linejoin="round"/>
+            </svg>
+            <span id="vpvLikeCount">0</span>
+          </button>
+          <button class="vpv-act" id="vpvComment" onclick="window.__vpvFocusComposer()">
+            <svg width="16" height="16" viewBox="0 0 16 16" fill="none">
+              <path d="M2 3.5A.5.5 0 0 1 2.5 3h11a.5.5 0 0 1 .5.5v7a.5.5 0 0 1-.5.5H6L2.5 14V3.5z"
+                stroke="#1C1C1E" stroke-width="1.4" fill="none" stroke-linejoin="round"/>
+            </svg>
+            <span id="vpvCommentCount">0</span>
+          </button>
+          <div class="vpv-spacer"></div>
+          <button class="vpv-act" id="vpvSave" onclick="window.__vpvToggleSave()" title="Save">
+            <svg width="16" height="16" viewBox="0 0 16 16" fill="none">
+              <path class="vpv-bookmark" d="M3.5 2.5h9v11l-4.5-3-4.5 3v-11z"
+                stroke="#1C1C1E" stroke-width="1.4" fill="none" stroke-linejoin="round"/>
+            </svg>
+          </button>
+        </div>
+        <div class="vpv-comments" id="vpvComments"></div>
+        <div class="vpv-composer">
+          <textarea id="vpvCommentInput" placeholder="Add a comment…" rows="1" maxlength="1000"
+            oninput="this.style.height='auto';this.style.height=Math.min(this.scrollHeight,120)+'px'"></textarea>
+          <button id="vpvCommentSubmit" onclick="window.__vpvSubmitComment()">Post</button>
+        </div>
+      </div>
+      <div class="vpv-toast" id="vpvToast"></div>
+    `;
+    document.body.appendChild(overlay);
+
+    overlay.addEventListener("click", (e) => {
+      if (e.target === overlay) window.__vpvClose();
+    });
+    document.addEventListener("keydown", (e) => {
+      if (state.openId && e.key === "Escape") window.__vpvClose();
+    });
+    window.addEventListener("popstate", () => {
+      // Browser back / phone back gesture closes the modal instead of
+      // navigating away from the page.
+      if (state.openId) window.__vpvClose(/*viaPopstate=*/ true);
+    });
+  }
+
+  // ── State ─────────────────────────────────────────────────────────────
+  const state = {
+    openId: null,           // post id of currently open modal
+    liked:  false,
+    saved:  false,
+    likes:  0,
+    comments: 0,
+    inflight: false,        // any toggle/post in progress
+  };
+
+  // ── Helpers ───────────────────────────────────────────────────────────
+  function isAppShell() {
+    if (window.viewingMockUser) return false;
+    const u = (typeof vibeLoad === "function") ? vibeLoad("vibe_user_v1") : null;
+    return Boolean(u && u._appShell);
+  }
+  function esc(s) {
+    return String(s || "").replace(/[&<>"']/g, ch => ({
+      "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;",
+    }[ch]));
+  }
+  function initials(name) {
+    return (name || "").split(/\s+/).map(p => p[0]).filter(Boolean).join("").slice(0,2).toUpperCase() || "?";
+  }
+  function relTime(iso) {
+    if (!iso) return "Just now";
+    const diff = Math.max(0, Date.now() - new Date(iso).getTime()) / 1000;
+    if (diff < 60)        return "Just now";
+    if (diff < 3600)      return Math.floor(diff/60)   + "m";
+    if (diff < 86400)     return Math.floor(diff/3600) + "h";
+    if (diff < 86400*7)   return Math.floor(diff/86400)+ "d";
+    return new Date(iso).toLocaleDateString(undefined, { month:"short", day:"numeric" });
+  }
+  function toast(msg) {
+    const el = document.getElementById("vpvToast");
+    if (!el) return;
+    el.textContent = msg;
+    el.classList.add("show");
+    clearTimeout(el._t);
+    el._t = setTimeout(() => el.classList.remove("show"), 2200);
+  }
+
+  // ── Open / Close ──────────────────────────────────────────────────────
+  async function openPostViewer(postId, prefill) {
+    if (!postId) return;
+    ensureModal();
+    state.openId = String(postId);
+    const overlay = document.getElementById("vpvOverlay");
+    overlay.classList.add("show");
+    document.documentElement.style.overflow = "hidden";
+
+    // Push a history entry so back gesture closes the modal — only when
+    // not already in a popstate handler so we don't double-stack.
+    try { history.pushState({ vpv: state.openId }, ""); } catch {}
+
+    if (prefill) renderFromPrefill(prefill);
+    else renderLoading();
+
+    // Always fetch the canonical post + viewer state — prefill might be
+    // stale on counts/liked/saved.
+    if (!isAppShell()) {
+      // Demo path: render whatever we have, skip API
+      if (!prefill) {
+        document.getElementById("vpvName").textContent = "Sign in to view this post";
+        document.getElementById("vpvBody").innerHTML = "";
+      }
+      renderCommentsList([]);
+      return;
+    }
+
+    try {
+      const r = await fetch(`/api/posts/${encodeURIComponent(state.openId)}`, { credentials: "include" });
+      const j = await r.json().catch(() => ({}));
+      if (!r.ok || !j.ok || !j.post) throw new Error((j && j.error) || "Could not load post");
+      // Race guard: user may have closed and opened a different post.
+      if (String(j.post.id) !== state.openId) return;
+      renderFromServer(j);
+    } catch (e) {
+      toast(e && e.message ? e.message : "Could not load post");
+    }
+
+    try {
+      const r = await fetch(`/api/posts/${encodeURIComponent(state.openId)}/comments`, { credentials: "include" });
+      const j = await r.json().catch(() => ({}));
+      if (!r.ok || !j.ok) return;
+      if (state.openId) renderCommentsList(j.comments || []);
+    } catch {}
+  }
+  window.openPostViewer = openPostViewer;
+
+  function closeViewer(viaPopstate) {
+    state.openId = null;
+    const overlay = document.getElementById("vpvOverlay");
+    if (overlay) overlay.classList.remove("show");
+    document.documentElement.style.overflow = "";
+    // Stop any playing clip so audio doesn't bleed into the next view.
+    const v = document.getElementById("vpvVideo");
+    if (v) { try { v.pause(); v.removeAttribute("src"); v.load(); } catch {} }
+    // Pop the synthetic history entry only when the close was user-driven
+    // (Esc / X / outside-click) — not when the user already hit back.
+    if (!viaPopstate) {
+      try {
+        if (history.state && history.state.vpv) history.back();
+      } catch {}
+    }
+  }
+  window.__vpvClose = closeViewer;
+
+  // ── Render paths ──────────────────────────────────────────────────────
+  function renderLoading() {
+    document.getElementById("vpvAvatar").textContent = "·";
+    document.getElementById("vpvName").textContent = "Loading…";
+    document.getElementById("vpvSub").textContent = "";
+    document.getElementById("vpvBody").innerHTML = "";
+    document.getElementById("vpvLikeCount").textContent = "0";
+    document.getElementById("vpvCommentCount").textContent = "0";
+    document.getElementById("vpvLike").classList.remove("on");
+    document.getElementById("vpvSave").classList.remove("on");
+    document.getElementById("vpvComments").innerHTML = "";
+    const inp = document.getElementById("vpvCommentInput");
+    if (inp) { inp.value = ""; inp.style.height = ""; }
+  }
+
+  function renderFromPrefill(p) {
+    // Best-effort render from in-memory data (DB row from /api/feed or
+    // /api/me/posts). Server fetch will replace counts shortly.
+    paintHeader({
+      author:    p.author || { name: p.authorName, handle: p.authorHandle, avatar_url: p.authorAvatar },
+      created_at: p.created_at || p.createdAt,
+    });
+    paintBody({
+      content:             p.content || p.body || "",
+      tags:                p.tags || [],
+      media_url:           p.media_url || p.mediaUrl || "",
+      media_thumbnail_url: p.media_thumbnail_url || p.mediaThumbnailUrl || p.posterUrl || "",
+      type:                p.type || "post",
+    });
+  }
+
+  function renderFromServer(j) {
+    const p = j.post;
+    paintHeader({ author: p.author, created_at: p.created_at });
+    paintBody({
+      content:             p.content,
+      tags:                p.tags || [],
+      media_url:           p.media_url,
+      media_thumbnail_url: p.media_thumbnail_url,
+      type:                p.type,
+    });
+    state.liked = !!(j.viewer && j.viewer.liked);
+    state.saved = !!(j.viewer && j.viewer.saved);
+    state.likes = (j.counts && j.counts.likes) || 0;
+    state.comments = (j.counts && j.counts.comments) || 0;
+    document.getElementById("vpvLikeCount").textContent = String(state.likes);
+    document.getElementById("vpvCommentCount").textContent = String(state.comments);
+    document.getElementById("vpvLike").classList.toggle("on", state.liked);
+    document.getElementById("vpvSave").classList.toggle("on", state.saved);
+
+    // Clip rows: now that we know the canonical id + type, mint a signed
+    // R2 GET URL and attach it to the <video> created by paintBody.
+    if (p.type === "clip") _vpvLoadClipSrc(p.id);
+  }
+
+  function paintHeader({ author, created_at }) {
+    const a = author || {};
+    const av = document.getElementById("vpvAvatar");
+    if (a.avatar_url) {
+      av.innerHTML = `<img src="${esc(a.avatar_url)}" alt="">`;
+    } else {
+      av.textContent = initials(a.name || a.handle);
+    }
+    const name = a.name || a.handle || "Unknown";
+    document.getElementById("vpvName").textContent = name;
+    const handle = a.handle ? `@${a.handle}` : "";
+    const when = relTime(created_at);
+    const sub = [handle, when].filter(Boolean).join(" · ");
+    document.getElementById("vpvSub").textContent = sub;
+  }
+
+  function paintBody({ content, tags, media_url, media_thumbnail_url, type }) {
+    const body = document.getElementById("vpvBody");
+    const text = content ? `<div class="vpv-text">${esc(content)}</div>` : "";
+    let media = "";
+    if (type === "clip") {
+      // P1-016: real <video> with native HTML5 controls. The poster paints
+      // instantly from media_thumbnail_url; the signed R2 GET URL resolves
+      // asynchronously via _vpvLoadClipSrc(). Demo Maya / mock clips have
+      // no DB id — we still render the poster but skip the fetch.
+      const poster = media_thumbnail_url ? `poster="${esc(media_thumbnail_url)}"` : "";
+      media = `<video class="vpv-video" id="vpvVideo" ${poster}
+        controls playsinline muted loop preload="metadata"></video>`;
+    } else if (media_url && type === "post") {
+      // Post images are stored as public URLs (Supabase profiles bucket)
+      media = `<img class="vpv-image" src="${esc(media_url)}" alt="">`;
+    }
+    const tagBlock = (tags && tags.length)
+      ? `<div class="vpv-tags">${tags.map(t => `<span class="vpv-tag">#${esc(t)}</span>`).join("")}</div>`
+      : "";
+    body.innerHTML = text + media + tagBlock;
+  }
+
+  // Fetch a fresh signed R2 URL and attach it to the open clip's <video>.
+  // Demo / mock clips skip this (no DB row) — the poster image carries the UX.
+  async function _vpvLoadClipSrc(postId) {
+    if (!postId) return;
+    if (!isAppShell()) return;
+    try {
+      const r = await fetch(`/api/clips/${encodeURIComponent(postId)}/view-url`, {
+        credentials: "include",
+      });
+      const j = await r.json().catch(() => ({}));
+      if (!r.ok || !j.ok || !j.url) {
+        // Don't toast — the poster still shows; failing silent is gentler
+        // than a noisy toast every time R2 is misconfigured in dev.
+        return;
+      }
+      // Race guard: another open may have replaced #vpvVideo since we asked.
+      if (state.openId !== String(postId)) return;
+      const v = document.getElementById("vpvVideo");
+      if (!v) return;
+      v.src = j.url;
+      // autoplay (muted) — IG/TikTok-native feel; user can unmute via controls.
+      try { v.play().catch(() => {}); } catch {}
+    } catch { /* silent */ }
+  }
+
+  function renderCommentsList(list) {
+    const wrap = document.getElementById("vpvComments");
+    if (!Array.isArray(list) || list.length === 0) {
+      wrap.innerHTML = `<div class="vpv-comments-empty">No comments yet — be the first.</div>`;
+      return;
+    }
+    wrap.innerHTML = list.map(renderCommentRow).join("");
+  }
+
+  function renderCommentRow(c) {
+    const a = c.author || {};
+    const av = a.avatar_url
+      ? `<div class="vpv-avatar"><img src="${esc(a.avatar_url)}" alt=""></div>`
+      : `<div class="vpv-avatar">${esc(initials(a.name || a.handle))}</div>`;
+    const handle = a.handle ? `<span class="vpv-ch">@${esc(a.handle)}</span>` : "";
+    return `<div class="vpv-comment">
+      ${av}
+      <div class="vpv-cw">
+        <div class="vpv-cn">${esc(a.name || a.handle || "Unknown")}${handle}</div>
+        <div class="vpv-ct">${esc(c.content)}</div>
+        <div class="vpv-cd">${esc(relTime(c.created_at))}</div>
+      </div>
+    </div>`;
+  }
+
+  // ── Action handlers ───────────────────────────────────────────────────
+  window.__vpvToggleLike = async function () {
+    if (!state.openId) return;
+    if (!isAppShell()) { toast("Sign in to like posts"); return; }
+    if (state.inflight) return;
+    state.inflight = true;
+    const wasLiked = state.liked;
+    state.liked = !wasLiked;
+    state.likes += state.liked ? 1 : -1;
+    if (state.likes < 0) state.likes = 0;
+    document.getElementById("vpvLike").classList.toggle("on", state.liked);
+    document.getElementById("vpvLikeCount").textContent = String(state.likes);
+    try {
+      const method = state.liked ? "POST" : "DELETE";
+      const r = await fetch(`/api/posts/${encodeURIComponent(state.openId)}/like`, {
+        method, credentials: "include",
+      });
+      const j = await r.json().catch(() => ({}));
+      if (!r.ok || !j.ok) throw new Error((j && j.error) || "Could not update like");
+    } catch (e) {
+      // Revert optimistic update
+      state.liked = wasLiked;
+      state.likes += wasLiked ? 1 : -1;
+      if (state.likes < 0) state.likes = 0;
+      document.getElementById("vpvLike").classList.toggle("on", state.liked);
+      document.getElementById("vpvLikeCount").textContent = String(state.likes);
+      toast(e && e.message ? e.message : "Could not update like");
+    } finally {
+      state.inflight = false;
+    }
+  };
+
+  window.__vpvToggleSave = async function () {
+    if (!state.openId) return;
+    if (!isAppShell()) { toast("Sign in to save posts"); return; }
+    if (state.inflight) return;
+    state.inflight = true;
+    const wasSaved = state.saved;
+    state.saved = !wasSaved;
+    document.getElementById("vpvSave").classList.toggle("on", state.saved);
+    try {
+      const method = state.saved ? "POST" : "DELETE";
+      const r = await fetch(`/api/posts/${encodeURIComponent(state.openId)}/save`, {
+        method, credentials: "include",
+      });
+      const j = await r.json().catch(() => ({}));
+      if (!r.ok || !j.ok) throw new Error((j && j.error) || "Could not update save");
+      toast(state.saved ? "Saved" : "Removed from saved");
+    } catch (e) {
+      state.saved = wasSaved;
+      document.getElementById("vpvSave").classList.toggle("on", state.saved);
+      toast(e && e.message ? e.message : "Could not update save");
+    } finally {
+      state.inflight = false;
+    }
+  };
+
+  window.__vpvFocusComposer = function () {
+    const inp = document.getElementById("vpvCommentInput");
+    if (inp) inp.focus();
+  };
+
+  window.__vpvSubmitComment = async function () {
+    if (!state.openId) return;
+    const inp = document.getElementById("vpvCommentInput");
+    const btn = document.getElementById("vpvCommentSubmit");
+    const content = (inp && inp.value || "").trim();
+    if (!content) return;
+    if (!isAppShell()) { toast("Sign in to comment"); return; }
+    btn.disabled = true;
+    try {
+      const r = await fetch(`/api/posts/${encodeURIComponent(state.openId)}/comments`, {
+        method: "POST", credentials: "include",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ content }),
+      });
+      const j = await r.json().catch(() => ({}));
+      if (!r.ok || !j.ok || !j.comment) throw new Error((j && j.error) || "Could not post comment");
+      // Append to the thread (oldest-first ordering — new ones go to bottom)
+      const wrap = document.getElementById("vpvComments");
+      // Drop empty-state placeholder if present
+      const empty = wrap.querySelector(".vpv-comments-empty");
+      if (empty) empty.remove();
+      wrap.insertAdjacentHTML("beforeend", renderCommentRow(j.comment));
+      state.comments += 1;
+      document.getElementById("vpvCommentCount").textContent = String(state.comments);
+      inp.value = ""; inp.style.height = "";
+    } catch (e) {
+      toast(e && e.message ? e.message : "Could not post comment");
+    } finally {
+      btn.disabled = false;
+    }
+  };
+})();

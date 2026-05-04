@@ -9,6 +9,7 @@
 <script src="/html/_persistence.js"></script>
 <script src="/html/_studentVerify.js"></script>
 <script src="/html/_otto.js" defer></script>
+<script src="/html/_postViewer.js" defer></script>
 <style>
 :root{
   --cream:#FAF7F2;--charcoal:#1C1C1E;--soft:#2D2D2D;--muted:#8A8580;
@@ -1471,7 +1472,7 @@ const campusSuggest = [
 // ── Render feed ──
 function renderFeed(posts) {
   document.getElementById('campus-feed').innerHTML = posts.map(p => `
-    <div class="post">
+    <div class="post" data-post-id="${p.id || ''}" style="cursor:pointer;">
       <div class="post-header">
         <div class="post-av" style="background:${p.bg}">${p.av}</div>
         <div class="post-meta">
@@ -1648,12 +1649,60 @@ function setPostType(btn, type) {
 }
 
 // ── Submit campus post ──
-function submitCampusPost() {
+async function submitCampusPost() {
   const input = document.getElementById('campusPostInput');
-  const text = input.value.trim();
+  const text = ((input && input.value) || '').trim();
   if (!text) return;
   const types = {ann:{badge:'b-ann',bt:'Announcement'},evt:{badge:'b-evt',bt:'Event'},job:{badge:'b-job',bt:'Opportunity'},club:{badge:'b-club',bt:'Club'},'':{badge:'b-chat',bt:'Post'}};
   const t = types[activePostType] || types[''];
+  const me = (typeof vibeLoad === 'function') ? vibeLoad('vibe_user_v1') : null;
+  const submitBtn = document.querySelector('.comp-submit');
+
+  // App-shell path -> real Supabase insert via /api/me/publish-post.
+  // Same row, same `posts` table, so the user's profile grid sees it on
+  // next hydrate. Subtype buttons (ann/evt/job/club) are still UI-only \u2014
+  // schema doesn't have a subtype column yet, so they collapse to
+  // type='post' on insert until P1-017c adds storage.
+  if (me && me._appShell) {
+    if (submitBtn) { submitBtn.disabled = true; submitBtn.textContent = 'Posting\u2026'; }
+    try {
+      const tags = _campusExtractHashtags(text);
+      const r = await fetch('/api/me/publish-post', {
+        method: 'POST', credentials: 'include',
+        headers: {'Content-Type':'application/json'},
+        body: JSON.stringify({ content: text, tags }),
+      });
+      const j = await r.json().catch(() => ({}));
+      if (!r.ok || !j.ok || !j.post) throw new Error((j && j.error) || 'Publish failed');
+
+      const initials = (me.name || '').split(/\s+/).map(p=>p[0]).filter(Boolean).join('').slice(0,2).toUpperCase() || '?';
+      const role = [me.major, me.year && (me.year + '')].filter(Boolean).join(' \u00b7 ') || (me.headline || '');
+      feedPosts.unshift({
+        id: j.post.id,
+        av: initials, bg: '#1C1C1E',
+        auth: me.name || 'You',
+        role: role || 'IU student',
+        type: '', badge: 'b-chat', bt: 'Post',
+        body: text,
+        tags: (j.post.tags || []).map(x => '#' + x),
+        r: ['&#129334; 0','&#128161; 0'],
+        rsvp: false,
+      });
+      renderFeed(feedPosts);
+      input.value=''; input.style.height='';
+      activePostType='';
+      document.querySelectorAll('.comp-type-btn').forEach(b=>b.classList.remove('on'));
+      toast('Posted to your campus feed');
+    } catch (e) {
+      toast(e && e.message ? e.message : 'Could not publish');
+    } finally {
+      if (submitBtn) { submitBtn.disabled = false; submitBtn.textContent = 'Post'; }
+    }
+    return;
+  }
+
+  // Demo / unsigned path \u2014 keep the in-memory behavior so the prototype
+  // stays clickable without a session.
   const newPost = {av:'MC',bg:'#1C1C1E',auth:'Maya Chen',role:'Product Design \u00b7 Junior',type:activePostType,badge:t.badge,bt:t.bt,
     body:text,tags:[],r:['&#129334; 0','&#128161; 0'],rsvp:false,id:'new-'+Date.now()};
   feedPosts.unshift(newPost);
@@ -1662,6 +1711,59 @@ function submitCampusPost() {
   activePostType='';
   document.querySelectorAll('.comp-type-btn').forEach(b=>b.classList.remove('on'));
   toast('Posted to IU campus feed');
+}
+
+// Pull #hashtags out of the body \u2014 v1 stand-in for a chip input.
+function _campusExtractHashtags(text) {
+  const out = []; const seen = new Set();
+  const re = /(?:^|\s)#([\p{L}0-9_]{2,32})/gu;
+  let m;
+  while ((m = re.exec(text || '')) !== null) {
+    const t = m[1].toLowerCase();
+    if (seen.has(t)) continue;
+    seen.add(t); out.push(t);
+    if (out.length >= 10) break;
+  }
+  return out;
+}
+
+// Hydrate real DB posts above the demo seed. Best-effort: errors stay
+// silent because the demo seed is a serviceable fallback, and a flaky
+// network shouldn't blank the page.
+async function hydrateCampusFeedFromAPI() {
+  const me = (typeof vibeLoad === 'function') ? vibeLoad('vibe_user_v1') : null;
+  if (!me || !me._appShell) return;
+  try {
+    const r = await fetch('/api/feed?limit=50', { credentials: 'include' });
+    const j = await r.json().catch(() => ({}));
+    if (!r.ok || !j.ok || !Array.isArray(j.posts)) return;
+    const real = j.posts.map(_campusMapDbRow).filter(Boolean);
+    if (real.length === 0) return;
+    const seenIds = new Set(real.map(p => p.id));
+    const merged = real.concat(feedPosts.filter(p => !seenIds.has(p.id)));
+    feedPosts.length = 0;
+    Array.prototype.push.apply(feedPosts, merged);
+    renderFeed(feedPosts);
+  } catch (e) { /* silent */ }
+}
+
+function _campusMapDbRow(row) {
+  if (!row || !row.author) return null;
+  const a = row.author;
+  const name = a.name || a.handle || 'Unknown';
+  const initials = name.split(/\s+/).map(p=>p[0]).filter(Boolean).join('').slice(0,2).toUpperCase() || '?';
+  const role = [a.major, a.year && (a.year + '')].filter(Boolean).join(' \u00b7 ') || (a.handle ? '@' + a.handle : '');
+  return {
+    id: row.id,
+    av: initials, bg: '#1C1C1E',
+    auth: name,
+    role: role || 'IU student',
+    type: '', badge: 'b-chat', bt: 'Post',
+    body: (row.content || '').replace(/[<>]/g, ''),
+    tags: (row.tags || []).map(x => '#' + x),
+    r: ['&#129334; 0','&#128161; 0'],
+    rsvp: false,
+  };
 }
 
 // ── RSVP ──
@@ -1689,6 +1791,39 @@ renderOrgs(orgs);
 renderCampusSuggest();
 // Pre-load chat so first click is fast
 renderChatRooms();
+// Pull real DB posts on top of the demo seed (no-op when not signed in).
+hydrateCampusFeedFromAPI();
+
+// Campus post → open shared viewer modal (P1-015). Delegated so it picks up
+// posts inserted by submitCampusPost or hydrateCampusFeedFromAPI without
+// re-binding. Skip clicks on the action chips, RSVP, tags.
+(function bindCampusFeedClickToViewer() {
+  const feed = document.getElementById('campus-feed');
+  if (!feed) return;
+  feed.addEventListener('click', (ev) => {
+    const card = ev.target.closest('.post');
+    if (!card) return;
+    if (ev.target.closest('.post-chip, .rsvp-btn, .post-tag, a, button')) return;
+    const id = card.dataset.postId;
+    if (!id || typeof openPostViewer !== 'function') return;
+    const prefill = _campusPrefillFromCard(id);
+    openPostViewer(id, prefill);
+  });
+})();
+
+function _campusPrefillFromCard(id) {
+  const p = feedPosts.find(x => String(x.id) === String(id));
+  if (!p) return null;
+  return {
+    id: p.id,
+    type: 'post',
+    content: (p.body || '').replace(/<br\s*\/?>/gi, '\n').replace(/<[^>]+>/g, ''),
+    tags: (p.tags || []).map(t => String(t).replace(/^#/, '')),
+    media_url: '',
+    created_at: '',
+    author: { name: p.auth, handle: '', avatar_url: '' },
+  };
+}
 
 // ══ CAMPUS MAP ══════════════════════════════════════════════════════════
 const PEOPLE = [
