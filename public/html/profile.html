@@ -115,7 +115,7 @@ body.recruiter-mode .profile-subnav { top: 128px; }
 .profile-subnav a:hover { background: var(--cream); color: var(--charcoal); }
 .profile-subnav a.active { background: var(--charcoal); color: white; }
 .profile-subnav .pill-dot { width: 6px; height: 6px; border-radius: 50%; background: currentColor; opacity: .65; }
-[id="overview"], [id="experience"], [id="skills"], [id="vibes"], [id="posts"] { scroll-margin-top: 160px; }
+[id="overview"], [id="experience"], [id="skills"], [id="vibes"] { scroll-margin-top: 160px; }
 @media (max-width: 768px) {
   .profile-subnav { top: 70px; overflow-x: auto; flex-wrap: nowrap; }
   body.recruiter-mode .profile-subnav { top: 120px; }
@@ -2755,8 +2755,7 @@ body.empty-profile-mode #profileEmpty { display: flex !important; }
     <a href="#overview" class="active"><span class="pill-dot"></span>Overview</a>
     <a href="#experience"><span class="pill-dot"></span>Experience</a>
     <a href="#skills"><span class="pill-dot"></span>Skills</a>
-    <a href="#vibes"><span class="pill-dot"></span>Clips</a>
-    <a href="#posts"><span class="pill-dot"></span>Posts</a>
+    <a href="#vibes"><span class="pill-dot"></span>Posts</a>
   </div>
 
   
@@ -3192,23 +3191,11 @@ body.empty-profile-mode #profileEmpty { display: flex !important; }
 <input type="file" id="resumeUploadInput" accept="application/pdf,image/*" multiple onchange="handleResumeUpload(this)" style="display:none">
     </div>
 
-    <!-- Stats card -->
+    <!-- "At a glance" stat card removed — Otto status hero (above) +
+         the avatar-row stats (Followers / Following / Connections) cover
+         the same surface. Connect lives in the avatar-row actions. -->
 
-      <div class="stat-card fade-in" id="glanceCard" style="animation-delay:.1s">
-        <div class="stat-card-title">At a glance</div>
 
-        <div class="stat-row"><span class="stat-label">Profile views</span><span class="stat-val" data-edit="true" data-glance-key="profileViews" data-placeholder="—" contenteditable="false">2,431 this month</span></div>
-        <div class="stat-row"><span class="stat-label">Vibe views</span><span class="stat-val" data-edit="true" data-glance-key="vibeViews" data-placeholder="—" contenteditable="false">7.2k total</span></div>
-        <div class="stat-row">
-          <span class="stat-label">Status</span>
-          <span class="stat-val" data-glance-key="status"><span class="avail-badge"><span class="avail-dot"></span>Open to work</span></span>
-        </div>
-        <div class="stat-row"><span class="stat-label">Response time</span><span class="stat-val" data-edit="true" data-glance-key="responseTime" data-placeholder="—" contenteditable="false">Usually same day</span></div>
-        <button class="connect-full">Connect with Maya</button>
-      <div style="font-size:12px;font-weight:700;color:#8A8580;margin-top:8px;"></div>
-      </div>
-
-      
 <div class="stat-card fade-in shared-section" style="animation-delay:.15s">
   <div class="stat-card-title" style="display:flex;align-items:center;justify-content:space-between">
     Currently working on <button class="card-add-btn" onclick="openCurrentModal()" style="font-size:11px;padding:3px 10px">+ Add</button>
