@@ -4700,6 +4700,13 @@ document.addEventListener('click', e => { const m=document.getElementById('mutua
 // Connect button visibility is now handled by .viewer-only CSS on the
 // wrapper (#profileActionBtns). The connection state is initialized by
 // loadRelationship() inside initProfilePage's mock-user branch.
+//
+// P1-013 deferred: the real follow API (POST/DELETE /api/me/follow) is wired
+// server-side and ready to call. Hooking handleVibConnect to it lights up
+// when /profile/[handle] gets a real Supabase-backed render — until then
+// there's no surface where the viewer is looking at a real other user. The
+// localStorage-backed mock-user demo path stays in place here so the button
+// keeps working visually.
 
 
 // ── Profile search (reuses same people data pattern) ──
