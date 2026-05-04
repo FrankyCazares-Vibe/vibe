@@ -14,7 +14,7 @@ export async function enforceCampusAccess(currentPath: string) {
     data: { user },
   } = await supabase.auth.getUser();
   if (!user) {
-    redirect("/auth/login");
+    redirect(`/auth/login?next=${encodeURIComponent(currentPath)}`);
   }
 
   const { data: row } = await supabase
@@ -23,16 +23,16 @@ export async function enforceCampusAccess(currentPath: string) {
     .eq("id", user.id)
     .maybeSingle();
 
-  if (!isOttoOnboardingComplete(row?.otto_answers)) {
-    redirect("/onboarding");
-  }
   if (!row?.school_verified) {
     redirect("/auth/school-email");
+  }
+  if (!isOttoOnboardingComplete(row?.otto_answers)) {
+    redirect("/onboarding");
   }
 }
 
 /**
- * School email step: only after Otto is persisted; skip if already verified.
+ * School email step: before Otto for new users; skip if already verified (then continue flow).
  */
 export async function enforceSchoolEmailPage() {
   const supabase = await createSupabaseServerClient();
@@ -49,10 +49,10 @@ export async function enforceSchoolEmailPage() {
     .eq("id", user.id)
     .maybeSingle();
 
-  if (!isOttoOnboardingComplete(row?.otto_answers)) {
-    redirect("/onboarding");
-  }
   if (row?.school_verified) {
-    redirect(DEFAULT_POST_LOGIN_PATH);
+    if (isOttoOnboardingComplete(row?.otto_answers)) {
+      redirect(DEFAULT_POST_LOGIN_PATH);
+    }
+    redirect("/onboarding");
   }
 }

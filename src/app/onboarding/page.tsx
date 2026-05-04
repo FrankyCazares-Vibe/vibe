@@ -22,7 +22,7 @@ function OnboardingBridgeInner() {
 
   return (
     <p style={{ textAlign: "center", marginTop: 48, color: "#8A8580" }}>
-      Opening Otto…
+      Opening Otto setup…
     </p>
   );
 }

@@ -5,7 +5,7 @@
 // and a dark slide-out panel that opens when the ring is clicked. The panel
 // shows the briefing quote, ready drafts, and recent activity — quick review
 // without leaving the current page. For the full command center, the panel
-// links to /html/otto.html.
+// links to /otto.
 //
 // Self-suppresses on otto.html (Otto is already the page there) and on landing
 // (no user yet — pre-auth gate). Requires _persistence.js to be loaded first.
@@ -14,7 +14,13 @@
 (function ottoCompanionInit(){
   // Suppress on Otto's own page or when no user exists.
   const path = (location.pathname || '').toLowerCase();
-  if (path.endsWith('/otto.html') || path.endsWith('/landing.html')) return;
+  if (
+    path === "/otto" ||
+    path.endsWith("/otto.html") ||
+    path === "/" ||
+    path.endsWith("/landing.html")
+  )
+    return;
   const user = (typeof vibeLoad === 'function') ? vibeLoad('vibe_user_v1') : null;
   if (!user) return;
 
@@ -319,7 +325,7 @@
       <div class="otto-panel-body"></div>
 
       <div class="otto-panel-footer">
-        <a href="/html/otto.html" class="otto-open-full">Open Otto's command center →</a>
+        <a href="/otto" class="otto-open-full">Open Otto's command center →</a>
       </div>
     `;
 

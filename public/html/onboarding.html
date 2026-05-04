@@ -29,7 +29,6 @@ input, textarea, [contenteditable="true"] { cursor:text!important; }
 .onb-shell { position: relative; min-height: 100vh; display: flex; align-items: center; justify-content: center; padding: 40px 20px; overflow: hidden; }
 .onb-bg-1 { position: absolute; top: -200px; right: -200px; width: 700px; height: 700px; border-radius: 50%; background: radial-gradient(circle, rgba(255,92,53,.16) 0%, transparent 70%); pointer-events: none; }
 .onb-bg-2 { position: absolute; bottom: -150px; left: 10%; width: 540px; height: 540px; border-radius: 50%; background: radial-gradient(circle, rgba(124,92,252,.13) 0%, transparent 70%); pointer-events: none; transition: all .8s ease; }
-.onb-bg-1.purple { background: radial-gradient(circle, rgba(124,92,252,.16) 0%, transparent 70%); }
 
 /* Top bar */
 .onb-top { position: fixed; top: 22px; left: 24px; right: 24px; display: flex; align-items: center; justify-content: space-between; z-index: 10; }
@@ -148,93 +147,82 @@ input, textarea, [contenteditable="true"] { cursor:text!important; }
 }
 .suggest-chip:hover { background: rgba(255,255,255,.1); border-color: rgba(255,255,255,.25); color: white; }
 
-/* Step 3 — platform grid */
-.platform-grid {
-  display: grid; grid-template-columns: repeat(2, 1fr); gap: 10px;
-  width: 100%; max-width: 480px; margin-bottom: 26px;
+/* Step 3 — quick profile (pre-fill Supabase; banner/photos later) */
+.onb-step[data-step="3"] { max-width: 560px; }
+.pf-form {
+  width: 100%; max-width: 480px; text-align: left;
+  display: flex; flex-direction: column; gap: 14px; margin-bottom: 22px;
 }
-.platform-card {
-  background: rgba(255,255,255,.04); border: 0.5px solid rgba(255,255,255,.1);
-  border-radius: 12px; padding: 14px 16px;
-  display: flex; align-items: center; gap: 12px; cursor: none;
-  transition: all .15s; text-align: left;
+.pf-hint {
+  font-size: 11px; color: rgba(255,255,255,.38);
+  line-height: 1.45; margin-top: 5px; font-style: italic;
 }
-.platform-card:hover { background: rgba(255,255,255,.07); border-color: rgba(255,255,255,.2); }
-.platform-card.selected { background: rgba(255,92,53,.12); border-color: var(--accent); box-shadow: 0 0 0 3px rgba(255,92,53,.08); }
-.platform-card.skip { border-style: dashed; }
-.platform-icon { width: 32px; height: 32px; border-radius: 8px; display: flex; align-items: center; justify-content: center; flex-shrink: 0; color: white; font-family: 'Fraunces', serif; font-weight: 900; font-size: 14px; }
-.platform-info { flex: 1; min-width: 0; }
-.platform-name { font-size: 13px; color: white; font-weight: 600; }
-.platform-name.skip { color: rgba(255,255,255,.65); }
-.platform-hint { font-size: 10.5px; color: rgba(255,255,255,.55); margin-top: 2px; }
-.platform-check { opacity: 0; transition: opacity .15s; }
-.platform-card.selected .platform-check { opacity: 1; }
+.pf-label {
+  font-size: 11px; font-weight: 600; color: rgba(255,255,255,.5);
+  letter-spacing: .4px; text-transform: uppercase;
+}
+.pf-input, .pf-select, .pf-textarea {
+  width: 100%; background: rgba(255,255,255,.07);
+  border: 0.5px solid rgba(255,255,255,.12); border-radius: 12px;
+  padding: 12px 14px; font-family: 'DM Sans', sans-serif; font-size: 14px;
+  color: white; outline: none; transition: border-color .15s;
+}
+.pf-input:focus, .pf-select:focus, .pf-textarea:focus {
+  border-color: var(--accent);
+}
+.pf-input::placeholder, .pf-textarea::placeholder { color: rgba(255,255,255,.35); }
+.pf-textarea { min-height: 72px; resize: vertical; }
+.pf-select { cursor: pointer; }
+.pf-looking-wrap {
+  display: flex; flex-direction: column; gap: 8px;
+  margin-top: 4px;
+}
+.pf-looking-row {
+  display: flex; align-items: center; gap: 10px;
+  font-size: 13px; color: rgba(255,255,255,.82);
+  cursor: pointer;
+}
+.pf-looking-row input { accent-color: var(--accent); width: 15px; height: 15px; }
 
-/* Step 4 — voice samples */
-.samples-stack { display: flex; flex-direction: column; gap: 10px; width: 100%; max-width: 540px; margin-bottom: 22px; }
-.sample-slot { background: rgba(255,92,53,.05); border: 0.5px solid rgba(255,92,53,.25); border-radius: 12px; padding: 13px 16px; transition: all .15s; }
-.sample-slot.empty { background: rgba(255,255,255,.03); border-style: dashed; border-color: rgba(255,255,255,.15); }
-.sample-slot.has-content { border-color: var(--accent); background: rgba(255,92,53,.07); }
-.sample-meta { display: flex; align-items: center; gap: 8px; margin-bottom: 8px; }
-.sample-num { width: 18px; height: 18px; border-radius: 50%; background: rgba(255,92,53,.2); display: flex; align-items: center; justify-content: center; font-size: 10px; color: var(--accent); font-weight: 700; flex-shrink: 0; }
-.sample-num.empty { background: rgba(255,255,255,.06); color: rgba(255,255,255,.4); }
-.sample-label { font-size: 10px; color: rgba(255,255,255,.55); letter-spacing: .5px; text-transform: uppercase; font-weight: 500; }
-.sample-label.muted { color: rgba(255,255,255,.4); }
-.sample-saved { margin-left: auto; font-size: 10px; color: var(--green); font-weight: 600; }
-.sample-textarea {
-  width: 100%; background: none; border: none; outline: none;
-  font-family: 'DM Sans', sans-serif; font-size: 13px; line-height: 1.6;
-  color: white; resize: none; min-height: 22px; max-height: 200px;
-  overflow-y: auto;
+.wx-list {
+  width: 100%;
+  max-width: 480px;
+  display: flex;
+  flex-direction: column;
+  gap: 22px;
+  text-align: left;
+  margin-bottom: 8px;
 }
-.sample-textarea::placeholder { color: rgba(255,255,255,.32); font-style: italic; }
-.otto-note { background: rgba(255,92,53,.04); border-left: 1.5px solid var(--accent); border-radius: 0 8px 8px 0; padding: 11px 14px; max-width: 540px; width: 100%; margin-bottom: 22px; text-align: left; }
-.otto-note-text { font-family: 'Fraunces', serif; font-style: italic; font-size: 12px; line-height: 1.55; color: rgba(255,255,255,.78); }
+.wx-row { display: flex; flex-direction: column; gap: 10px; }
+.wx-row-spaced { padding-top: 10px; border-top: 0.5px solid rgba(255,255,255,.08); }
+.wx-optional {
+  font-weight: 500; text-transform: none; color: rgba(255,255,255,.35);
+  font-size: 10px; letter-spacing: 0;
+}
 
-/* Step 5 — leash */
-.leash-cards { display: flex; flex-direction: column; gap: 10px; width: 100%; max-width: 480px; margin-bottom: 24px; }
-.leash-card {
-  background: rgba(255,255,255,.04); border: 0.5px solid rgba(255,255,255,.1);
-  border-radius: 14px; padding: 18px 20px; cursor: none;
-  display: flex; gap: 14px; align-items: flex-start; text-align: left;
-  transition: all .15s;
+.resume-upload-row {
+  display: flex; flex-wrap: wrap; align-items: center; gap: 12px;
+  justify-content: center; margin-bottom: 16px;
 }
-.leash-card:hover { background: rgba(255,255,255,.06); border-color: rgba(255,255,255,.2); }
-.leash-card.selected { background: rgba(255,92,53,.12); border-color: var(--accent); box-shadow: 0 0 0 3px rgba(255,92,53,.08); }
-.leash-card svg { opacity: 0; transition: opacity .15s; flex-shrink: 0; margin-top: 3px; }
-.leash-card.selected svg { opacity: 1; }
-.leash-card-body { flex: 1; }
-.leash-name-row { display: flex; align-items: center; gap: 8px; }
-.leash-name { font-family: 'Fraunces', serif; font-size: 16px; font-weight: 800; color: rgba(255,255,255,.85); letter-spacing: -.2px; }
-.leash-card.selected .leash-name { color: white; }
-.leash-tag { font-size: 9px; padding: 3px 8px; background: rgba(255,255,255,.1); color: white; border-radius: 100px; font-weight: 700; letter-spacing: .5px; }
-.leash-desc { font-size: 12px; color: rgba(255,255,255,.55); margin-top: 5px; line-height: 1.55; }
-.leash-card.selected .leash-desc { color: rgba(255,255,255,.75); }
+.resume-upload-meta { font-size: 12px; color: rgba(255,255,255,.45); }
 
-/* Step 6 — final draft */
-.draft-final {
-  background: rgba(255,92,53,.06); border: 0.5px solid rgba(255,92,53,.4);
-  border-radius: 16px; padding: 20px 22px; max-width: 540px; width: 100%;
-  box-shadow: 0 0 0 5px rgba(255,92,53,.06);
-  margin-bottom: 18px; text-align: left;
+.resume-mini-wrap {
+  width: 100%; max-width: 480px; margin: 0 auto 8px; text-align: left;
 }
-.draft-final-meta { display: flex; align-items: center; gap: 8px; margin-bottom: 14px; flex-wrap: wrap; }
-.draft-final-square { width: 14px; height: 14px; border-radius: 4px; background: #0A66C2; }
-.draft-final-label { font-size: 10px; font-weight: 700; color: rgba(255,255,255,.7); letter-spacing: .5px; }
-.draft-final-tag { margin-left: auto; font-size: 9px; padding: 3px 9px; background: rgba(124,92,252,.18); color: var(--lavender); border-radius: 100px; font-weight: 600; letter-spacing: .5px; }
-.draft-final-text { font-family: 'DM Sans', sans-serif; font-size: 14px; line-height: 1.7; color: rgba(255,255,255,.92); }
-.draft-final-notes { display: flex; align-items: center; gap: 8px; margin-top: 16px; padding-top: 14px; border-top: 0.5px solid rgba(255,255,255,.06); flex-wrap: wrap; }
-.draft-final-notes-label { font-size: 10.5px; color: rgba(255,255,255,.5); font-style: italic; font-family: 'Fraunces', serif; }
-.draft-final-notes-text { font-size: 10.5px; color: rgba(255,255,255,.72); }
-.remix-row { display: flex; gap: 8px; margin-bottom: 18px; flex-wrap: wrap; justify-content: center; }
-.remix-chip {
-  font-size: 11px; padding: 7px 14px; background: rgba(255,255,255,.05);
-  border: 0.5px solid rgba(255,255,255,.15); color: white;
-  border-radius: 100px; cursor: none; font-family: 'DM Sans', sans-serif;
-  font-weight: 500; transition: all .15s;
+.resume-mini-label {
+  font-size: 10px; font-weight: 600; color: rgba(255,255,255,.45);
+  letter-spacing: .35px; text-transform: uppercase; margin-bottom: 8px;
 }
-.remix-chip:hover { background: rgba(255,255,255,.1); border-color: rgba(255,255,255,.3); }
-.remix-chip:disabled { opacity: .4; cursor: not-allowed; }
+.resume-mini-frame {
+  display: none; width: 100%; height: 260px;
+  border: 0.5px solid rgba(255,255,255,.12); border-radius: 12px;
+  background: rgba(0,0,0,.35);
+}
+.resume-mini-img {
+  display: none; width: 100%; max-height: 260px; object-fit: contain;
+  border-radius: 12px; border: 0.5px solid rgba(255,255,255,.12);
+  background: rgba(0,0,0,.2);
+}
 
 /* Confirm dialog (close button on top) */
 .confirm-overlay {
@@ -256,7 +244,7 @@ input, textarea, [contenteditable="true"] { cursor:text!important; }
 @media (max-width: 540px) {
   .h1 { font-size: 30px; }
   .h2 { font-size: 24px; }
-  .platform-grid { grid-template-columns: 1fr; }
+  .pf-form { max-width: 100%; }
   .name-input-wrap { min-width: 0; width: 100%; max-width: 320px; }
   .progress-dots { padding: 6px 12px; }
   .progress-text { display: none; }
@@ -269,7 +257,7 @@ input, textarea, [contenteditable="true"] { cursor:text!important; }
 <div class="cursor-ring" id="cursorRing"></div>
 
 <header class="onb-top">
-  <a href="/html/landing.html" class="onb-logo">vibe<span>.</span></a>
+  <a href="/" class="onb-logo">vibe<span>.</span></a>
   <button class="onb-skip" id="onbSkip" onclick="confirmSkip()">Skip onboarding</button>
 </header>
 
@@ -279,8 +267,7 @@ input, textarea, [contenteditable="true"] { cursor:text!important; }
   <div class="dot"></div>
   <div class="dot"></div>
   <div class="dot"></div>
-  <div class="dot"></div>
-  <span class="progress-text" id="progressText">1 of 6</span>
+  <span class="progress-text" id="progressText">1 of 5</span>
 </div>
 
 <main class="onb-shell">
@@ -302,7 +289,7 @@ input, textarea, [contenteditable="true"] { cursor:text!important; }
       <button class="btn-coral" onclick="goToStep(2)">Let's go &rarr;</button>
       <button class="btn-skip-step" onclick="confirmSkip()">Maybe later</button>
     </div>
-    <div class="note">takes about 3 minutes</div>
+    <div class="note">about three minutes — name me, profile, experience, then your documents</div>
   </section>
 
   <!-- ─────────── STEP 2 — Name me ─────────── -->
@@ -331,197 +318,139 @@ input, textarea, [contenteditable="true"] { cursor:text!important; }
     </div>
   </section>
 
-  <!-- ─────────── STEP 3 — Connect a platform ─────────── -->
+  <!-- ─────────── STEP 3 — Quick profile (pre-fill DB; photos later) ─────────── -->
   <section class="onb-step" data-step="3">
     <div class="otto-sm">
       <div class="pulse-1"></div>
       <div class="orbit-out"><div class="d"></div></div>
       <div class="core"></div>
     </div>
-    <div class="h2">where do you post most?</div>
-    <div class="sub-intro">"pick one to start. you can connect more later. i'll learn how each one works for you."</div>
+    <div class="h2">let's pin down your profile</div>
+    <div class="sub-intro">"same fields as your Vibe profile — a quick pass now; photo, banner, and fine-tuning on the next screen."</div>
 
-    <div class="platform-grid" id="platformGrid">
-      <button class="platform-card selected" data-platform="LinkedIn">
-        <div class="platform-icon" style="background: #0A66C2;">in</div>
-        <div class="platform-info">
-          <div class="platform-name">LinkedIn</div>
-          <div class="platform-hint">most students start here</div>
+    <div class="pf-form">
+      <div>
+        <label class="pf-label" for="pfName">Name</label>
+        <input type="text" id="pfName" class="pf-input" maxlength="120" placeholder="How you want to appear on Vibe" autocomplete="name">
+      </div>
+      <div>
+        <label class="pf-label" for="pfBio">Bio</label>
+        <textarea id="pfBio" class="pf-textarea" rows="3" maxlength="4000" placeholder="A few lines about you — what you're into, what you're building."></textarea>
+      </div>
+      <div>
+        <label class="pf-label" for="pfMajor">Major</label>
+        <input type="text" id="pfMajor" class="pf-input" maxlength="200" placeholder="e.g. Informatics, Business, Film">
+      </div>
+      <div>
+        <label class="pf-label" for="pfDepartment">Department / school</label>
+        <input type="text" id="pfDepartment" class="pf-input" maxlength="200" placeholder="e.g. College of Engineering — optional">
+      </div>
+      <div>
+        <label class="pf-label" for="pfYear">Year</label>
+        <select id="pfYear" class="pf-select">
+          <option value="">Prefer not to say</option>
+          <option value="1">1st year</option>
+          <option value="2">2nd year</option>
+          <option value="3">3rd year</option>
+          <option value="4">4th year</option>
+          <option value="5">5th+ / grad</option>
+        </select>
+      </div>
+      <div>
+        <label class="pf-label" for="pfInterests">Interests &amp; projects</label>
+        <textarea id="pfInterests" class="pf-textarea" rows="3" maxlength="3200" placeholder="Clubs, side projects, topics — one per line or comma-separated"></textarea>
+        <p class="pf-hint">Saved as profile interests, same as the profile page.</p>
+      </div>
+      <div>
+        <label class="pf-label" for="pfSkills">Skills</label>
+        <textarea id="pfSkills" class="pf-textarea" rows="3" maxlength="4800" placeholder="e.g. Figma, Python, public speaking — one per line or comma-separated"></textarea>
+      </div>
+      <div>
+        <div class="pf-label">What are you here for?</div>
+        <div class="pf-looking-wrap">
+          <label class="pf-looking-row"><input type="checkbox" class="pf-looking" value="meeting-people"> Meeting people</label>
+          <label class="pf-looking-row"><input type="checkbox" class="pf-looking" value="showing-work"> Showing my work</label>
+          <label class="pf-looking-row"><input type="checkbox" class="pf-looking" value="finding-clubs"> Finding clubs</label>
+          <label class="pf-looking-row"><input type="checkbox" class="pf-looking" value="exploring"> Just exploring</label>
         </div>
-        <svg class="platform-check" width="14" height="14" viewBox="0 0 16 16" fill="none"><path d="M3 8 L7 12 L13 4" stroke="#FF5C35" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"/></svg>
-      </button>
-      <button class="platform-card" data-platform="Instagram">
-        <div class="platform-icon" style="background: linear-gradient(135deg, #E1306C, #C13584);">
-          <svg width="16" height="16" viewBox="0 0 24 24" fill="none"><rect x="3" y="3" width="18" height="18" rx="5" stroke="white" stroke-width="2"/><circle cx="12" cy="12" r="4" stroke="white" stroke-width="2"/><circle cx="17" cy="7" r="1.2" fill="white"/></svg>
-        </div>
-        <div class="platform-info">
-          <div class="platform-name">Instagram</div>
-          <div class="platform-hint">need a business account</div>
-        </div>
-        <svg class="platform-check" width="14" height="14" viewBox="0 0 16 16" fill="none"><path d="M3 8 L7 12 L13 4" stroke="#FF5C35" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"/></svg>
-      </button>
-      <button class="platform-card" data-platform="TikTok">
-        <div class="platform-icon" style="background: #1C1C1E; border: 0.5px solid rgba(255,255,255,.2);">d</div>
-        <div class="platform-info">
-          <div class="platform-name">TikTok</div>
-          <div class="platform-hint">best for vibes</div>
-        </div>
-        <svg class="platform-check" width="14" height="14" viewBox="0 0 16 16" fill="none"><path d="M3 8 L7 12 L13 4" stroke="#FF5C35" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"/></svg>
-      </button>
-      <button class="platform-card" data-platform="YouTube">
-        <div class="platform-icon" style="background: #FF0000;">
-          <svg width="16" height="12" viewBox="0 0 24 18" fill="white"><path d="M23.5 2.8a3 3 0 0 0-2.1-2.1C19.5 0 12 0 12 0S4.5 0 2.6.7A3 3 0 0 0 .5 2.8C0 4.7 0 9 0 9s0 4.3.5 6.2a3 3 0 0 0 2.1 2.1C4.5 18 12 18 12 18s7.5 0 9.4-.7a3 3 0 0 0 2.1-2.1c.5-1.9.5-6.2.5-6.2s0-4.3-.5-6.2zM9.6 12.9V5.1L15.8 9z"/></svg>
-        </div>
-        <div class="platform-info">
-          <div class="platform-name">YouTube Shorts</div>
-          <div class="platform-hint">best analytics</div>
-        </div>
-        <svg class="platform-check" width="14" height="14" viewBox="0 0 16 16" fill="none"><path d="M3 8 L7 12 L13 4" stroke="#FF5C35" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"/></svg>
-      </button>
-      <button class="platform-card" data-platform="X">
-        <div class="platform-icon" style="background: #000;">&#120143;</div>
-        <div class="platform-info">
-          <div class="platform-name">X</div>
-          <div class="platform-hint">limited data, fast posting</div>
-        </div>
-        <svg class="platform-check" width="14" height="14" viewBox="0 0 16 16" fill="none"><path d="M3 8 L7 12 L13 4" stroke="#FF5C35" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"/></svg>
-      </button>
-      <button class="platform-card skip" data-platform="">
-        <div class="platform-icon" style="background: rgba(255,255,255,.05); color: rgba(255,255,255,.5); font-size: 22px; font-weight: 300;">+</div>
-        <div class="platform-info">
-          <div class="platform-name skip">Skip for now</div>
-          <div class="platform-hint">connect later</div>
-        </div>
-      </button>
+      </div>
     </div>
 
-    <button class="btn-coral" id="connectBtn" onclick="goToStep(4)">Connect LinkedIn &rarr;</button>
+    <div class="cta-row" style="margin-top: 28px;">
+      <button class="btn-coral" onclick="goToStep(4)">Continue &rarr;</button>
+      <button class="btn-skip-step" onclick="goToStep(5)">Skip to resume &rarr;</button>
+    </div>
+    <div class="note italic" style="margin-top: 14px;">you can change anything later</div>
   </section>
 
-  <!-- ─────────── STEP 4 — Voice samples ─────────── -->
+  <!-- ─────────── STEP 4 — Work experience ─────────── -->
   <section class="onb-step" data-step="4">
-    <div class="otto-sm" style="width: 64px; height: 64px;">
-      <div class="pulse-1" style="inset: 14px;"></div>
-      <div class="orbit-out" style="inset: 6px;"><div class="d"></div></div>
-      <div class="core" style="width: 10px; height: 10px;"></div>
+    <div class="otto-sm">
+      <div class="pulse-1"></div>
+      <div class="orbit-out"><div class="d"></div></div>
+      <div class="core"></div>
     </div>
-    <div class="h2">teach me your voice</div>
-    <div class="sub-intro">"paste 1-3 posts that sound like you at your best. i'll learn the rhythm — how you open, how you joke, how you sign off."</div>
+    <div class="h2">where have you <em>worked</em>?</div>
+    <div class="sub-intro">"internships, campus jobs, freelance — whatever counts. Skip if you’d rather add this on your profile."</div>
 
-    <div class="samples-stack" id="samplesStack">
-      <div class="sample-slot empty" data-slot="0">
-        <div class="sample-meta">
-          <div class="sample-num empty">1</div>
-          <span class="sample-label">sample post</span>
-          <span class="sample-saved" style="display:none;">&#10003; saved</span>
-        </div>
-        <textarea class="sample-textarea" rows="1" placeholder="paste a post you're proud of" oninput="onSampleInput(this, 0)"></textarea>
+    <div class="wx-list">
+      <div class="wx-row">
+        <div class="pf-label">Role 1</div>
+        <input type="text" class="pf-input wx-company" maxlength="200" placeholder="Company or org" autocomplete="organization">
+        <input type="text" class="pf-input wx-title" maxlength="200" placeholder="Title or role" autocomplete="organization-title">
+        <input type="text" class="pf-input wx-dates" maxlength="120" placeholder="Dates (e.g. Jun 2024 — Aug 2024)">
+        <input type="text" class="pf-input wx-location" maxlength="200" placeholder="Location (optional)">
+        <textarea class="pf-textarea wx-desc" rows="2" maxlength="4000" placeholder="What you did (optional)"></textarea>
       </div>
-      <div class="sample-slot empty" data-slot="1">
-        <div class="sample-meta">
-          <div class="sample-num empty">2</div>
-          <span class="sample-label muted">sample post</span>
-          <span class="sample-saved" style="display:none;">&#10003; saved</span>
-        </div>
-        <textarea class="sample-textarea" rows="1" placeholder="paste another (the more variety, the better)" oninput="onSampleInput(this, 1)"></textarea>
-      </div>
-      <div class="sample-slot empty" data-slot="2">
-        <div class="sample-meta">
-          <div class="sample-num empty">3</div>
-          <span class="sample-label muted">paste another (optional)</span>
-          <span class="sample-saved" style="display:none;">&#10003; saved</span>
-        </div>
-        <textarea class="sample-textarea" rows="1" placeholder="one more if you have it" oninput="onSampleInput(this, 2)"></textarea>
+      <div class="wx-row wx-row-spaced">
+        <div class="pf-label">Role 2 <span class="wx-optional">optional</span></div>
+        <input type="text" class="pf-input wx-company" maxlength="200" placeholder="Company">
+        <input type="text" class="pf-input wx-title" maxlength="200" placeholder="Title">
+        <input type="text" class="pf-input wx-dates" maxlength="120" placeholder="Dates">
+        <input type="text" class="pf-input wx-location" maxlength="200" placeholder="Location (optional)">
+        <textarea class="pf-textarea wx-desc" rows="2" maxlength="4000" placeholder="Description (optional)"></textarea>
       </div>
     </div>
+    <p class="pf-hint" style="text-align:center;max-width:420px;">We’ll show this in your profile’s work section — same layout as the full editor.</p>
 
-    <div class="otto-note">
-      <div class="otto-note-text"><span id="ottoNotePrefix">otto</span> says: "two is enough to start. i'll keep learning every time you post."</div>
-    </div>
-
-    <div class="cta-row">
-      <button class="btn-coral" id="trainBtn" onclick="goToStep(5)" disabled>Train me &rarr;</button>
-      <button class="btn-skip-step" onclick="goToStep(5)">Skip for now</button>
+    <div class="cta-row" style="margin-top: 28px;">
+      <button class="btn-coral" onclick="goToStep(5)">Continue &rarr;</button>
+      <button class="btn-skip-step" onclick="goToStep(5)">Skip</button>
     </div>
   </section>
 
-  <!-- ─────────── STEP 5 — Leash ─────────── -->
+  <!-- ─────────── STEP 5 — Resume / portfolio ─────────── -->
   <section class="onb-step" data-step="5">
-    <div class="otto-sm" style="width: 64px; height: 64px;">
-      <div class="pulse-1" style="inset: 14px;"></div>
-      <div class="orbit-out" style="inset: 6px;"><div class="d"></div></div>
-      <div class="core" style="width: 10px; height: 10px;"></div>
+    <div class="otto-sm">
+      <div class="pulse-1"></div>
+      <div class="orbit-out"><div class="d"></div></div>
+      <div class="core"></div>
     </div>
-    <div class="h2">how much rope do i get?</div>
-    <div class="sub-intro">"start cautious, change anytime. most people graduate to full auto in a couple weeks."</div>
+    <div class="h2">resume or <em>portfolio</em></div>
+    <div class="sub-intro">"upload a PDF or image, or paste a link — preview below, same idea as on your profile."</div>
 
-    <div class="leash-cards" id="leashCards">
-      <button class="leash-card selected" data-leash="ask">
-        <svg width="18" height="18" viewBox="0 0 16 16" fill="none"><path d="M3 8 L7 12 L13 4" stroke="#FF5C35" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"/></svg>
-        <div class="leash-card-body">
-          <div class="leash-name-row">
-            <div class="leash-name">Ask first</div>
-            <span class="leash-tag">RECOMMENDED</span>
-          </div>
-          <div class="leash-desc">i'll draft everything and wait for your approval. nothing posts without you saying yes.</div>
-        </div>
-      </button>
-      <button class="leash-card" data-leash="sometimes">
-        <svg width="18" height="18" viewBox="0 0 16 16" fill="none"><path d="M3 8 L7 12 L13 4" stroke="#FF5C35" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"/></svg>
-        <div class="leash-card-body">
-          <div class="leash-name-row">
-            <div class="leash-name">Ask sometimes</div>
-          </div>
-          <div class="leash-desc">i'll auto-post to platforms i know are working for you, ask for the rest.</div>
-        </div>
-      </button>
-      <button class="leash-card" data-leash="auto">
-        <svg width="18" height="18" viewBox="0 0 16 16" fill="none"><path d="M3 8 L7 12 L13 4" stroke="#FF5C35" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"/></svg>
-        <div class="leash-card-body">
-          <div class="leash-name-row">
-            <div class="leash-name">Full auto</div>
-          </div>
-          <div class="leash-desc">i post everything within your rules and send a daily summary. for the brave.</div>
-        </div>
-      </button>
+    <input type="file" id="pfResumeFile" accept=".pdf,image/jpeg,image/png,image/webp,image/gif" style="display:none" onchange="onResumeFilePick(event)">
+
+    <div class="resume-upload-row">
+      <button type="button" class="btn-coral" id="btnPickResume" onclick="document.getElementById('pfResumeFile').click()">Upload PDF or image</button>
+      <span class="resume-upload-meta" id="resumeUploadStatus"></span>
     </div>
 
-    <div class="cta-row" style="margin-top: 8px;">
-      <button class="btn-coral" onclick="goToStep(6)">Continue &rarr;</button>
+    <div id="resumeMiniViewer" class="resume-mini-wrap" style="display:none;" aria-live="polite">
+      <div class="resume-mini-label">Preview</div>
+      <iframe id="resumeMiniFrame" class="resume-mini-frame" title="Document preview"></iframe>
+      <img id="resumeMiniImg" class="resume-mini-img" alt="Image preview" />
     </div>
-  </section>
 
-  <!-- ─────────── STEP 6 — Aha moment ─────────── -->
-  <section class="onb-step" data-step="6">
-    <div class="otto-sm" style="width: 86px; height: 86px;">
-      <div class="pulse-1" style="inset: 20px;"></div>
-      <div class="pulse-2" style="inset: 20px;"></div>
-      <div class="orbit-out" style="inset: 10px;"><div class="d"></div></div>
-      <div class="core" style="width: 13px; height: 13px;"></div>
-    </div>
-    <div class="h2">here's what i'd write for you</div>
-    <div class="sub-intro" style="font-size: 13.5px;">"based on your voice samples — for a hypothetical post about finishing a side project"</div>
-
-    <div class="draft-final" id="draftFinal">
-      <div class="draft-final-meta">
-        <div class="draft-final-square" id="draftPlatformSquare"></div>
-        <span class="draft-final-label" id="draftPlatformLabel">LINKEDIN DRAFT</span>
-        <span class="draft-final-tag">TRAINED ON YOUR VOICE</span>
-      </div>
-      <div class="draft-final-text" id="draftText">spent the last week chipping at one specific piece of a side project. shipped it tonight.<br><br>the gap between knowing how to do something and actually doing it is wider than tutorials make it look. that's where the real work lives.</div>
-      <div class="draft-final-notes">
-        <span class="draft-final-notes-label" id="draftNotesLabel">otto's notes:</span>
-        <span class="draft-final-notes-text" id="draftNotesText">lowercase opening &middot; short sentences &middot; meta-observation close</span>
+    <div class="pf-form" style="margin-top: 18px;">
+      <div>
+        <label class="pf-label" for="pfResumeUrl">Or paste a link</label>
+        <input type="url" id="pfResumeUrl" class="pf-input" maxlength="2048" placeholder="https://… — optional" onblur="maybePreviewResumeLink()">
+        <p class="pf-hint">https:// or http:// — if you upload a file, we’ll use that for your profile unless you clear it.</p>
       </div>
     </div>
 
-    <div class="remix-row">
-      <button class="remix-chip" onclick="remixDraft('again')">&#8635; try again</button>
-      <button class="remix-chip" onclick="remixDraft('punchier')">make it punchier</button>
-      <button class="remix-chip" onclick="remixDraft('warmer')">make it warmer</button>
-    </div>
-
-    <button class="btn-coral" onclick="completeOnboarding()">let's set up your profile &rarr;</button>
+    <button class="btn-coral" style="margin-top: 8px;" onclick="completeOnboarding()">Finish &amp; open my profile &rarr;</button>
     <div class="note italic" style="margin-top: 14px;">you can change anything later</div>
   </section>
 
@@ -531,7 +460,7 @@ input, textarea, [contenteditable="true"] { cursor:text!important; }
 <div class="confirm-overlay" id="skipOverlay">
   <div class="confirm-card">
     <div class="confirm-title">Skip onboarding?</div>
-    <div class="confirm-body">You can always come back. Otto won't have your voice yet, but you'll still see the app.</div>
+    <div class="confirm-body">You can always come back. Your profile won’t be saved from this flow until you finish.</div>
     <div class="confirm-row">
       <button class="btn-coral" onclick="closeSkipConfirm()">Keep going</button>
       <button class="btn-skip-step" onclick="bailOnboarding()">Skip anyway</button>
@@ -544,12 +473,11 @@ input, textarea, [contenteditable="true"] { cursor:text!important; }
 const state = {
   step: 1,
   ottoName: 'otto',
-  platform: 'LinkedIn',
-  voiceSamples: ['', '', ''],
-  leash: 'ask',
+  profileDraft: {},
+  uploadedResumeUrl: null,
 };
 
-const TOTAL_STEPS = 6;
+const TOTAL_STEPS = 5;
 
 // ── Cursor (matches the rest of vibe) ─────────────────────────────────────
 const cur = document.getElementById('cursor');
@@ -559,7 +487,7 @@ document.addEventListener('mousemove', e => { mx = e.clientX; my = e.clientY; cu
 function animateRing() { rx += (mx - rx) * .18; ry += (my - ry) * .18; ring.style.transform = `translate(${rx-14}px, ${ry-14}px)`; requestAnimationFrame(animateRing); }
 animateRing();
 function bindCursorHover() {
-  document.querySelectorAll('button, a, input, .platform-card, .leash-card, .suggest-chip, .remix-chip, .sample-slot').forEach(el => {
+  document.querySelectorAll('button, a, input, select, textarea, .suggest-chip, .pf-looking-row').forEach(el => {
     if (el.dataset.cursorBound) return;
     el.dataset.cursorBound = '1';
     el.addEventListener('mouseenter', () => { cur.classList.add('hover'); ring.classList.add('hover'); });
@@ -572,12 +500,9 @@ bindCursorHover();
 function goToStep(n) {
   if (n < 1 || n > TOTAL_STEPS) return;
 
-  // Capture state before leaving the current step
   if (state.step === 2) {
     const v = document.getElementById('ottoName').value.trim();
     state.ottoName = v || 'otto';
-    document.getElementById('ottoNotePrefix').textContent = state.ottoName;
-    document.getElementById('draftNotesLabel').textContent = state.ottoName + "'s notes:";
   }
 
   state.step = n;
@@ -586,24 +511,19 @@ function goToStep(n) {
     el.classList.toggle('active', Number(el.dataset.step) === n);
   });
 
-  // Re-trigger entry animation
-  const cur = document.querySelector('.onb-step.active');
-  if (cur) { cur.style.animation = 'none'; cur.offsetHeight; cur.style.animation = ''; }
+  const curStep = document.querySelector('.onb-step.active');
+  if (curStep) { curStep.style.animation = 'none'; curStep.offsetHeight; curStep.style.animation = ''; }
 
   updateProgress();
   bindCursorHover();
   window.scrollTo({ top: 0, behavior: 'smooth' });
 
-  // Skip button visible only on steps 1-4
-  document.getElementById('onbSkip').disabled = (n >= 5);
+  document.getElementById('onbSkip').disabled = false;
 
-  // Step 5 swaps the BG to purple-leaning (matches mockup)
-  document.getElementById('onbBg1').classList.toggle('purple', n === 5);
-
-  // When entering step 6, regenerate the draft preview from collected state
-  if (n === 6) renderDraft();
-  // Auto-focus the name input on entry
   if (n === 2) setTimeout(() => { const i = document.getElementById('ottoName'); i.focus(); i.select(); }, 250);
+  if (n === 3) setTimeout(() => { const i = document.getElementById('pfName'); if (i) i.focus(); }, 250);
+  if (n === 4) setTimeout(() => { const i = document.querySelector('.wx-list .wx-row .wx-company'); if (i) i.focus(); }, 250);
+  if (n === 5) setTimeout(() => { const i = document.getElementById('pfResumeUrl'); if (i) i.focus(); }, 250);
 }
 
 function updateProgress() {
@@ -623,118 +543,140 @@ function setName(name) {
   document.getElementById('ottoName').focus();
 }
 
-// ── Step 3 — Platform selection ───────────────────────────────────────────
-document.getElementById('platformGrid').addEventListener('click', e => {
-  const card = e.target.closest('.platform-card');
-  if (!card) return;
-  document.querySelectorAll('.platform-card').forEach(c => c.classList.remove('selected'));
-  card.classList.add('selected');
-  state.platform = card.dataset.platform || '';
-  const btn = document.getElementById('connectBtn');
-  if (state.platform) {
-    btn.textContent = 'Connect ' + state.platform + ' →';
-  } else {
-    btn.textContent = 'Continue →';
-  }
-});
-
-// ── Step 4 — Voice samples ────────────────────────────────────────────────
-function onSampleInput(textarea, idx) {
-  // Auto-grow
-  textarea.style.height = 'auto';
-  textarea.style.height = Math.min(textarea.scrollHeight, 200) + 'px';
-
-  const v = textarea.value.trim();
-  state.voiceSamples[idx] = v;
-
-  const slot = textarea.closest('.sample-slot');
-  const numEl = slot.querySelector('.sample-num');
-  const labelEl = slot.querySelector('.sample-label');
-  const savedEl = slot.querySelector('.sample-saved');
-
-  if (v.length > 10) {
-    slot.classList.remove('empty');
-    slot.classList.add('has-content');
-    numEl.classList.remove('empty');
-    labelEl.classList.remove('muted');
-    savedEl.style.display = '';
-  } else {
-    slot.classList.add('empty');
-    slot.classList.remove('has-content');
-    numEl.classList.add('empty');
-    if (idx > 0) labelEl.classList.add('muted');
-    savedEl.style.display = 'none';
-  }
-
-  // Enable Train button if at least one sample has real content
-  const filled = state.voiceSamples.filter(s => s.length > 10).length;
-  document.getElementById('trainBtn').disabled = (filled === 0);
+// ── Step 3 — Quick profile draft (server: sanitizeOnboardingProfile) ─────
+function collectWorkExperience() {
+  const rows = [];
+  document.querySelectorAll('.wx-list .wx-row').forEach(function (row) {
+    const company = (row.querySelector('.wx-company') || {}).value?.trim() || '';
+    const title = (row.querySelector('.wx-title') || {}).value?.trim() || '';
+    if (!company && !title) return;
+    rows.push({
+      company: company.slice(0, 200),
+      title: title.slice(0, 200),
+      dates: ((row.querySelector('.wx-dates') || {}).value || '').trim().slice(0, 120),
+      location: ((row.querySelector('.wx-location') || {}).value || '').trim().slice(0, 200),
+      description: ((row.querySelector('.wx-desc') || {}).value || '').trim().slice(0, 4000),
+    });
+  });
+  return rows.length ? rows : undefined;
 }
 
-// ── Step 5 — Leash selection ──────────────────────────────────────────────
-document.getElementById('leashCards').addEventListener('click', e => {
-  const card = e.target.closest('.leash-card');
-  if (!card) return;
-  document.querySelectorAll('.leash-card').forEach(c => c.classList.remove('selected'));
-  card.classList.add('selected');
-  state.leash = card.dataset.leash;
-});
-
-// ── Step 6 — Draft preview + remix ────────────────────────────────────────
-const PLATFORM_COLORS = {
-  LinkedIn: '#0A66C2',
-  Instagram: 'linear-gradient(135deg, #E1306C, #C13584)',
-  TikTok: 'linear-gradient(135deg, #25F4EE, #FE2C55)',
-  YouTube: '#FF0000',
-  X: '#000',
-};
-
-const DRAFT_VARIANTS = {
-  default: {
-    text: "spent the last week chipping at one specific piece of a side project. shipped it tonight.<br><br>the gap between knowing how to do something and actually doing it is wider than tutorials make it look. that's where the real work lives.",
-    notes: "lowercase opening · short sentences · meta-observation close"
-  },
-  again: {
-    text: "i've been working on a small thing for a few weeks. it's done now.<br><br>still surprised every time how different building something is from learning how to build it. the messy middle is where most of the work happens.",
-    notes: "casual lead-in · two-beat structure · honest framing"
-  },
-  punchier: {
-    text: "shipped a side project tonight.<br><br>tutorials make it look easy. the actual building is mostly figuring out what tutorials skip.",
-    notes: "tighter · more declarative · earned punchline"
-  },
-  warmer: {
-    text: "shipped a small thing tonight that took longer than i thought it would. honestly proud of it.<br><br>the part nobody mentions about side projects is how much you learn from the boring middle. the parts that don't end up on twitter.",
-    notes: "warmer opening · personal note · soft close"
-  },
-};
-
-function renderDraft() {
-  const sq = document.getElementById('draftPlatformSquare');
-  const label = document.getElementById('draftPlatformLabel');
-  const platform = state.platform || 'LinkedIn';
-  sq.style.background = PLATFORM_COLORS[platform] || PLATFORM_COLORS.LinkedIn;
-  label.textContent = platform.toUpperCase() + ' DRAFT';
-
-  const v = DRAFT_VARIANTS.default;
-  document.getElementById('draftText').innerHTML = v.text;
-  document.getElementById('draftNotesText').textContent = v.notes;
+function splitLinesToArray(raw, maxItems, maxLen) {
+  const parts = String(raw || '')
+    .split(/\n|,/)
+    .map(function (s) { return s.trim().slice(0, maxLen); })
+    .filter(Boolean);
+  if (!parts.length) return undefined;
+  return parts.slice(0, maxItems);
 }
 
-function remixDraft(kind) {
-  const v = DRAFT_VARIANTS[kind] || DRAFT_VARIANTS.default;
-  const draft = document.getElementById('draftFinal');
-  draft.style.opacity = '.4';
-  setTimeout(() => {
-    document.getElementById('draftText').innerHTML = v.text;
-    document.getElementById('draftNotesText').textContent = v.notes;
-    draft.style.opacity = '1';
-  }, 180);
+function collectProfileDraft() {
+  const name = (document.getElementById('pfName') || {}).value?.trim() || '';
+  const major = (document.getElementById('pfMajor') || {}).value?.trim() || '';
+  const department = (document.getElementById('pfDepartment') || {}).value?.trim() || '';
+  const yearSel = document.getElementById('pfYear');
+  const yearRaw = yearSel ? String(yearSel.value || '').trim() : '';
+  const bio = (document.getElementById('pfBio') || {}).value?.trim() || '';
+  const interests = splitLinesToArray(
+    (document.getElementById('pfInterests') || {}).value,
+    40,
+    80,
+  );
+  const skills = splitLinesToArray(
+    (document.getElementById('pfSkills') || {}).value,
+    60,
+    80,
+  );
+  const looking = [...document.querySelectorAll('.pf-looking:checked')].map(
+    (el) => el.value,
+  );
+  const out = {};
+  if (name) out.name = name;
+  if (major) out.major = major;
+  if (department) out.department = department;
+  if (yearRaw) {
+    const y = parseInt(yearRaw, 10);
+    if (Number.isInteger(y) && y >= 1 && y <= 12) out.year = y;
+  }
+  if (bio) out.bio = bio;
+  if (interests) out.interests = interests;
+  if (skills) out.skills = skills;
+  if (looking.length) out.looking_for = looking;
+  return out;
+}
+
+async function onResumeFilePick(ev) {
+  const input = ev.target;
+  const f = input.files && input.files[0];
+  const st = document.getElementById('resumeUploadStatus');
+  if (!f) {
+    if (st) st.textContent = '';
+    return;
+  }
+  if (st) st.textContent = 'Uploading…';
+  try {
+    const fd = new FormData();
+    fd.append('file', f);
+    fd.append('kind', 'resume');
+    const r = await fetch('/api/me/profile-upload', {
+      method: 'POST',
+      credentials: 'same-origin',
+      body: fd,
+    });
+    const j = await r.json();
+    if (!r.ok || !j.ok) {
+      if (st) st.textContent = (j && j.error) ? String(j.error) : 'Upload failed';
+      return;
+    }
+    state.uploadedResumeUrl = j.url;
+    if (st) st.textContent = 'Uploaded';
+    showResumeMiniPreview(j.url, f.type || '');
+  } catch (e) {
+    if (st) st.textContent = 'Network error';
+  }
+  input.value = '';
+}
+
+function showResumeMiniPreview(url, mimeHint) {
+  if (!url) return;
+  const wrap = document.getElementById('resumeMiniViewer');
+  const fr = document.getElementById('resumeMiniFrame');
+  const im = document.getElementById('resumeMiniImg');
+  if (!wrap || !fr || !im) return;
+  wrap.style.display = 'block';
+  var isPdf = mimeHint === 'application/pdf' || /\.pdf(\?|#|$)/i.test(url);
+  if (isPdf) {
+    im.style.display = 'none';
+    im.removeAttribute('src');
+    fr.style.display = 'block';
+    fr.src = url + (url.indexOf('#') >= 0 ? '' : '#view=FitH');
+  } else {
+    fr.style.display = 'none';
+    fr.removeAttribute('src');
+    im.style.display = 'block';
+    im.src = url;
+  }
+}
+
+function maybePreviewResumeLink() {
+  var raw = ((document.getElementById('pfResumeUrl') || {}).value || '').trim();
+  if (!raw) return;
+  try {
+    var u = new URL(raw);
+    if (u.protocol !== 'http:' && u.protocol !== 'https:') return;
+    var lower = raw.toLowerCase();
+    if (/\.pdf(\?|#|$)/i.test(lower)) {
+      showResumeMiniPreview(raw, 'application/pdf');
+    } else if (/\.(png|jpe?g|gif|webp)(\?|#|$)/i.test(lower)) {
+      showResumeMiniPreview(raw, 'image/jpeg');
+    }
+  } catch (e) { /* ignore */ }
 }
 
 // ── Skip flow ─────────────────────────────────────────────────────────────
 function confirmSkip() { document.getElementById('skipOverlay').classList.add('open'); }
 function closeSkipConfirm() { document.getElementById('skipOverlay').classList.remove('open'); }
-function bailOnboarding() { window.location.href = '/html/landing.html'; }
+function bailOnboarding() { window.location.href = '/'; }
 
 document.addEventListener('keydown', e => {
   if (e.key === 'Escape' && document.getElementById('skipOverlay').classList.contains('open')) closeSkipConfirm();
@@ -742,10 +684,19 @@ document.addEventListener('keydown', e => {
 
 // ── Completion ────────────────────────────────────────────────────────────
 async function completeOnboarding() {
-  // Build the user object — minimal sparse user, NOT a demo seed.
-  // Profile is empty by design; user fills it in via profile.html edit mode.
+  if (state.step === 2) {
+    const v = document.getElementById('ottoName').value.trim();
+    state.ottoName = v || 'otto';
+  }
+  const profile = { ...state.profileDraft, ...collectProfileDraft() };
+  const wx = collectWorkExperience();
+  if (wx) profile.work_experience = wx;
+  var linkResume = ((document.getElementById('pfResumeUrl') || {}).value || '').trim();
+  var resumeFinal = state.uploadedResumeUrl || (linkResume ? linkResume.slice(0, 2048) : '');
+  if (resumeFinal) profile.resume_url = resumeFinal;
+
   const user = {
-    name: '',
+    name: profile.name || '',
     tagline: '',
     headline: '',
     location: '',
@@ -754,12 +705,11 @@ async function completeOnboarding() {
     _onboarded: true,
   };
 
-  // Otto config gets its own key — schema grows here as features land.
   const ottoConfig = {
     name: state.ottoName,
-    platforms: state.platform ? [state.platform] : [],
-    voiceSamples: state.voiceSamples.filter(s => s.length > 10),
-    leash: state.leash,
+    platforms: [],
+    voiceSamples: [],
+    leash: 'ask',
     setupAt: new Date().toISOString(),
   };
 
@@ -771,7 +721,10 @@ async function completeOnboarding() {
       method: 'POST',
       credentials: 'same-origin',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ otto_answers: ottoConfig }),
+      body: JSON.stringify({
+        otto_answers: ottoConfig,
+        profile: Object.keys(profile).length ? profile : undefined,
+      }),
     });
     const j = await r.json();
     if (j.ok && typeof j.next === 'string' && j.next.startsWith('/')) {
@@ -780,8 +733,6 @@ async function completeOnboarding() {
     }
   } catch (e) { /* network error — fall through */ }
 
-  // No session (in-app mail browsers often drop cookies): don’t send users to
-  // campus with an empty server profile — log in so /api/me/onboarding-complete can run.
   window.location.href = '/auth/login?next=' + encodeURIComponent('/onboarding');
 }
 </script>

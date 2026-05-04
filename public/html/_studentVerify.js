@@ -342,7 +342,9 @@
 
   // ── State 3 — verified ─────────────────────────────────────────────────
   function renderState3() {
-    const onCampus = location.pathname.toLowerCase().endsWith('/campus.html');
+    const pathLower = location.pathname.toLowerCase();
+    const onCampus =
+      pathLower === "/campus" || pathLower.endsWith("/campus.html");
     setContent(`
       <div class="sv-body">
         <div class="sv-icon-wrap green">
@@ -366,7 +368,7 @@
         // Already on campus — just refresh the page so the gate hides
         window.location.reload();
       } else {
-        window.location.href = '/html/campus.html';
+        window.location.href = '/campus';
       }
     };
   }

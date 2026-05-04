@@ -3,6 +3,9 @@
 import Link from "next/link";
 import { usePathname } from "next/navigation";
 
+import { NavIdentityChip } from "@/components/nav-identity-chip";
+import { isGlobalFeedSurfaceEnabled } from "@/lib/feature-flags";
+
 const navItems = [
   {
     href: "/campus",
@@ -120,6 +123,10 @@ const navItems = [
   },
 ];
 
+const visibleNavItems = isGlobalFeedSurfaceEnabled()
+  ? navItems
+  : navItems.filter((item) => item.href !== "/feed");
+
 export default function LeftNav() {
   const pathname = usePathname();
 
@@ -154,7 +161,7 @@ export default function LeftNav() {
       </Link>
 
       <nav style={{ display: "flex", flexDirection: "column", gap: "2px" }}>
-        {navItems.map((item) => {
+        {visibleNavItems.map((item) => {
           const isActive =
             pathname === item.href ||
             (item.href !== "/" &&
@@ -193,44 +200,7 @@ export default function LeftNav() {
         }}
       />
 
-      <Link
-        href="/profile"
-        style={{
-          display: "flex",
-          alignItems: "center",
-          gap: "10px",
-          padding: "10px 12px",
-          borderRadius: "12px",
-          textDecoration: "none",
-        }}
-      >
-        <div
-          style={{
-            width: "34px",
-            height: "34px",
-            borderRadius: "10px",
-            background: "#1C1C1E",
-            display: "flex",
-            alignItems: "center",
-            justifyContent: "center",
-            fontFamily: "Fraunces, serif",
-            fontSize: "12px",
-            fontWeight: "700",
-            color: "white",
-            flexShrink: 0,
-          }}
-        >
-          —
-        </div>
-        <div>
-          <div
-            style={{ fontSize: "13px", fontWeight: "600", color: "#1C1C1E" }}
-          >
-            You
-          </div>
-          <div style={{ fontSize: "11px", color: "#8A8580" }}>Campus</div>
-        </div>
-      </Link>
+      <NavIdentityChip />
 
       <button
         type="button"

@@ -2331,13 +2331,13 @@ body.empty-profile-mode #profileEmpty { display: flex !important; }
 <!-- NAV -->
 <nav>
   <!-- Left: logo + page links -->
-  <a href="/html/feed.html" class="nav-logo">vibe<span>.</span></a>
+  <a href="/feed" class="nav-logo">vibe<span>.</span></a>
   <div style="display:flex;align-items:center;gap:4px;margin-left:8px;">
-    <a href="/html/feed.html"         class="btn-nav ghost" style="text-decoration:none;font-size:13px;padding:6px 12px;">Feed</a>
-    <a href="/html/network.html"      class="btn-nav ghost" style="text-decoration:none;font-size:13px;padding:6px 12px;">Network</a>
-    <a href="/html/campus.html"       class="btn-nav ghost" style="text-decoration:none;font-size:13px;padding:6px 12px;">Campus</a>
-    <a href="/html/opportunities.html" class="btn-nav ghost" style="text-decoration:none;font-size:13px;padding:6px 12px;">Opportunities</a>
-    <a href="/html/otto.html"          class="btn-nav ghost" style="text-decoration:none;font-size:13px;padding:6px 12px;display:inline-flex;align-items:center;gap:6px;"><span style="width:7px;height:7px;border-radius:50%;background:var(--accent);box-shadow:0 0 6px var(--accent);display:inline-block;"></span>otto</a>
+    <a href="/feed"         class="btn-nav ghost" style="text-decoration:none;font-size:13px;padding:6px 12px;">Feed</a>
+    <a href="/network"      class="btn-nav ghost" style="text-decoration:none;font-size:13px;padding:6px 12px;">Network</a>
+    <a href="/campus"       class="btn-nav ghost" style="text-decoration:none;font-size:13px;padding:6px 12px;">Campus</a>
+    <a href="/opportunities" class="btn-nav ghost" style="text-decoration:none;font-size:13px;padding:6px 12px;">Opportunities</a>
+    <a href="/otto"          class="btn-nav ghost" style="text-decoration:none;font-size:13px;padding:6px 12px;display:inline-flex;align-items:center;gap:6px;"><span style="width:7px;height:7px;border-radius:50%;background:var(--accent);box-shadow:0 0 6px var(--accent);display:inline-block;"></span>otto</a>
   </div>
 
   <!-- Center: search -->
@@ -2434,7 +2434,7 @@ body.empty-profile-mode #profileEmpty { display: flex !important; }
       Follow instead
     </button>
     <div style="display:flex;gap:10px;font-size:13px;align-items:center;margin-top:2px;">
-      <a href="/html/network.html" style="font-weight:700;color:var(--charcoal);text-decoration:none;transition:color .15s" onmouseover="this.style.color='var(--accent)'" onmouseout="this.style.color='var(--charcoal)'"><span id="statConnections">847</span> <span style="color:var(--muted);font-weight:400">connections</span></a>
+      <a href="/network" style="font-weight:700;color:var(--charcoal);text-decoration:none;transition:color .15s" onmouseover="this.style.color='var(--accent)'" onmouseout="this.style.color='var(--charcoal)'"><span id="statConnections">847</span> <span style="color:var(--muted);font-weight:400">connections</span></a>
       <span style="color:var(--border)">•</span>
       <button onclick="openMutualsModal()" style="background:none;border:none;cursor:none;font-size:13px;font-weight:700;color:var(--charcoal);padding:0;transition:color .15s" onmouseover="this.style.color='var(--accent)'" onmouseout="this.style.color='var(--charcoal)'"><span id="statMutual">32</span> <span style="color:var(--muted);font-weight:400">mutual</span></button>
       <span style="color:var(--border)">•</span>
@@ -2634,7 +2634,7 @@ body.empty-profile-mode #profileEmpty { display: flex !important; }
       <div class="op-tile" style="background:#000;" title="X"></div>
       <div class="op-tile" style="background:linear-gradient(135deg,#25F4EE,#FE2C55);" title="TikTok"></div>
     </div>
-    <a href="/html/otto.html" class="op-review">Review &rarr;</a>
+    <a href="/otto" class="op-review">Review &rarr;</a>
   </div>
   <!-- ══ END OTTO STATUS HERO ══════════════════════════════════════════════ -->
 
@@ -2873,7 +2873,7 @@ body.empty-profile-mode #profileEmpty { display: flex !important; }
 
           <!-- Viewer hint -->
           <div class="viewer-only" style="margin-bottom:12px;padding:12px 14px;background:var(--cream);border-radius:12px;">
-            <div style="font-size:12px;color:var(--muted);line-height:1.5">Viewing Maya's profile. <a href="/html/feed.html" style="color:var(--accent);font-weight:600;text-decoration:none">Go to feed</a> to post and discover people like her.</div>
+            <div style="font-size:12px;color:var(--muted);line-height:1.5">Viewing Maya's profile. <a href="/feed" style="color:var(--accent);font-weight:600;text-decoration:none">Go to feed</a> to post and discover people like her.</div>
           </div>
 
           <!-- Owner composer -->
@@ -3082,17 +3082,17 @@ body.empty-profile-mode #profileEmpty { display: flex !important; }
       <div class="stat-card fade-in" style="animation-delay:.2s">
         <div class="stat-card-title">People also viewed</div>
         <div class="pav-list">
-          <a href="/html/profile.html?user=ka" class="pav-item" style="text-decoration:none;color:inherit;cursor:none;">
+          <a href="/profile/ka" class="pav-item" style="text-decoration:none;color:inherit;cursor:none;">
             <div class="pav-avatar" style="background:#2D1B4E;font-family:'Fraunces',serif;font-size:13px;font-weight:700;color:white">KA</div>
             <div class="pav-info"><h4>Kwame Asante</h4><p>AI Founder · Lagos → SF</p></div>
             <button class="pav-follow" onclick="event.preventDefault();event.stopPropagation();this.textContent=this.textContent==='Follow'?'Following':'Follow';">Follow</button>
           </a>
-          <a href="/html/profile.html?user=ps" class="pav-item" style="text-decoration:none;color:inherit;cursor:none;">
+          <a href="/profile/ps" class="pav-item" style="text-decoration:none;color:inherit;cursor:none;">
             <div class="pav-avatar" style="background:#3B1A00;font-family:'Fraunces',serif;font-size:13px;font-weight:700;color:white">PS</div>
             <div class="pav-info"><h4>Priya Sinha</h4><p>Growth Lead · Ex-Spotify</p></div>
             <button class="pav-follow" onclick="event.preventDefault();event.stopPropagation();this.textContent=this.textContent==='Follow'?'Following':'Follow';">Follow</button>
           </a>
-          <a href="/html/profile.html?user=lm" class="pav-item" style="text-decoration:none;color:inherit;cursor:none;">
+          <a href="/profile/lm" class="pav-item" style="text-decoration:none;color:inherit;cursor:none;">
             <div class="pav-avatar" style="background:#2a2800;font-family:'Fraunces',serif;font-size:13px;font-weight:700;color:white">LM</div>
             <div class="pav-info"><h4>Luca Moretti</h4><p>Full-stack Dev · Remote</p></div>
             <button class="pav-follow" onclick="event.preventDefault();event.stopPropagation();this.textContent=this.textContent==='Follow'?'Following':'Follow';">Follow</button>
@@ -3158,10 +3158,10 @@ body.empty-profile-mode #profileEmpty { display: flex !important; }
     <button class="modal-close" onclick="closeMutualsModal()">&#215;</button>
     <div class="modal-title">People you both know</div>
     <div style="overflow-y:auto;display:flex;flex-direction:column;gap:10px;margin-top:14px;">
-      <div style="display:flex;align-items:center;gap:12px;padding:10px;border-radius:12px;background:var(--cream);"><div style="width:40px;height:40px;border-radius:12px;background:#2D1B4E;display:flex;align-items:center;justify-content:center;font-family:'Fraunces',serif;font-size:13px;font-weight:700;color:white;flex-shrink:0">KA</div><div style="flex:1"><div style="font-size:13px;font-weight:700">Kwame Asante</div><div style="font-size:11px;color:var(--muted)">AI Founder &middot; Lagos &rarr; SF</div></div><a href="/html/messages.html" style="font-size:11px;font-weight:700;background:none;border:1.5px solid var(--border);color:var(--charcoal);padding:5px 12px;border-radius:100px;cursor:none;text-decoration:none">Message</a></div>
-      <div style="display:flex;align-items:center;gap:12px;padding:10px;border-radius:12px;background:var(--cream);"><div style="width:40px;height:40px;border-radius:12px;background:#3B1A00;display:flex;align-items:center;justify-content:center;font-family:'Fraunces',serif;font-size:13px;font-weight:700;color:white;flex-shrink:0">PS</div><div style="flex:1"><div style="font-size:13px;font-weight:700">Priya Sinha</div><div style="font-size:11px;color:var(--muted)">Growth Lead &middot; Ex-Spotify</div></div><a href="/html/messages.html" style="font-size:11px;font-weight:700;background:none;border:1.5px solid var(--border);color:var(--charcoal);padding:5px 12px;border-radius:100px;cursor:none;text-decoration:none">Message</a></div>
-      <div style="display:flex;align-items:center;gap:12px;padding:10px;border-radius:12px;background:var(--cream);"><div style="width:40px;height:40px;border-radius:12px;background:#2a2800;display:flex;align-items:center;justify-content:center;font-family:'Fraunces',serif;font-size:13px;font-weight:700;color:white;flex-shrink:0">LM</div><div style="flex:1"><div style="font-size:13px;font-weight:700">Luca Moretti</div><div style="font-size:11px;color:var(--muted)">Full-stack Dev &middot; Remote</div></div><a href="/html/messages.html" style="font-size:11px;font-weight:700;background:none;border:1.5px solid var(--border);color:var(--charcoal);padding:5px 12px;border-radius:100px;cursor:none;text-decoration:none">Message</a></div>
-      <div style="text-align:center;padding:8px;font-size:12px;color:var(--muted)">+ 29 more &middot; <a href="/html/network.html" style="color:var(--accent);text-decoration:none;font-weight:600">View all</a></div>
+      <div style="display:flex;align-items:center;gap:12px;padding:10px;border-radius:12px;background:var(--cream);"><div style="width:40px;height:40px;border-radius:12px;background:#2D1B4E;display:flex;align-items:center;justify-content:center;font-family:'Fraunces',serif;font-size:13px;font-weight:700;color:white;flex-shrink:0">KA</div><div style="flex:1"><div style="font-size:13px;font-weight:700">Kwame Asante</div><div style="font-size:11px;color:var(--muted)">AI Founder &middot; Lagos &rarr; SF</div></div><a href="/messages" style="font-size:11px;font-weight:700;background:none;border:1.5px solid var(--border);color:var(--charcoal);padding:5px 12px;border-radius:100px;cursor:none;text-decoration:none">Message</a></div>
+      <div style="display:flex;align-items:center;gap:12px;padding:10px;border-radius:12px;background:var(--cream);"><div style="width:40px;height:40px;border-radius:12px;background:#3B1A00;display:flex;align-items:center;justify-content:center;font-family:'Fraunces',serif;font-size:13px;font-weight:700;color:white;flex-shrink:0">PS</div><div style="flex:1"><div style="font-size:13px;font-weight:700">Priya Sinha</div><div style="font-size:11px;color:var(--muted)">Growth Lead &middot; Ex-Spotify</div></div><a href="/messages" style="font-size:11px;font-weight:700;background:none;border:1.5px solid var(--border);color:var(--charcoal);padding:5px 12px;border-radius:100px;cursor:none;text-decoration:none">Message</a></div>
+      <div style="display:flex;align-items:center;gap:12px;padding:10px;border-radius:12px;background:var(--cream);"><div style="width:40px;height:40px;border-radius:12px;background:#2a2800;display:flex;align-items:center;justify-content:center;font-family:'Fraunces',serif;font-size:13px;font-weight:700;color:white;flex-shrink:0">LM</div><div style="flex:1"><div style="font-size:13px;font-weight:700">Luca Moretti</div><div style="font-size:11px;color:var(--muted)">Full-stack Dev &middot; Remote</div></div><a href="/messages" style="font-size:11px;font-weight:700;background:none;border:1.5px solid var(--border);color:var(--charcoal);padding:5px 12px;border-radius:100px;cursor:none;text-decoration:none">Message</a></div>
+      <div style="text-align:center;padding:8px;font-size:12px;color:var(--muted)">+ 29 more &middot; <a href="/network" style="color:var(--accent);text-decoration:none;font-weight:600">View all</a></div>
     </div>
   </div>
 </div>
@@ -4468,7 +4468,7 @@ function _viewedName() {
 function handleVibConnect() {
   if (vibeRelState === 'connected') {
     // Already connected — open DMs directly
-    window.location.href = 'messages.html';
+    window.location.href = '/messages';
     return;
   }
   if (vibeRelState === 'pending') return;
@@ -4928,7 +4928,11 @@ window.viewingMockUser = null;
   // Both demo and onboarded users get a one-click way back to landing.
   const navBtn = document.getElementById('profileShareBtn');
   if (navBtn) {
-    if (user._isDemo) {
+    if (user._appShell) {
+      navBtn.textContent = 'Back';
+      navBtn.title = 'Return to campus';
+      navBtn.onclick = () => { window.location.href = '/campus'; };
+    } else if (user._isDemo) {
       navBtn.textContent = 'Exit demo';
       navBtn.title = 'Clear demo data and return to landing';
       navBtn.onclick = exitDemoMode;
@@ -5019,7 +5023,7 @@ function showViewerBackBanner(name) {
   if (document.getElementById('viewerBackBanner')) return;
   const el = document.createElement('div');
   el.id = 'viewerBackBanner';
-  el.innerHTML = `Viewing <strong>${_esc(name)}</strong> &middot; <a href="/html/profile.html">Back to your profile</a>`;
+  el.innerHTML = `Viewing <strong>${_esc(name)}</strong> &middot; <a href="/profile">Back to your profile</a>`;
   el.style.cssText = `
     position: fixed; top: 70px; left: 50%; transform: translateX(-50%);
     background: var(--charcoal); color: white;
@@ -5051,6 +5055,12 @@ function hydrateProfileFields(user) {
 // so every change is captured.
 function _esc(s) { return (s || '').replace(/[&<>"']/g, ch => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[ch])); }
 
+function _urlFromCssBackgroundImage(bgImg) {
+  if (!bgImg || bgImg === 'none') return '';
+  const m = bgImg.trim().match(/^url\(["']?([^"')]+)["']?\)/i);
+  return m ? m[1].trim() : '';
+}
+
 function saveProfileToStorage() {
   // Never write when viewing someone else's profile — the DOM is showing
   // their data and capturing it would overwrite the owner's vibe_user_v1.
@@ -5069,14 +5079,15 @@ function saveProfileToStorage() {
   // Avatar — uploaded photo only. The fallback is the user's name initials,
   // which are derived from user.name on render (no separate field needed).
   const avPhoto = document.querySelector('#avatarEl img.avatar-photo');
-  if (avPhoto && avPhoto.src && avPhoto.src.startsWith('data:')) user.avatarPhoto = avPhoto.src;
+  const avSrc = avPhoto && avPhoto.src ? avPhoto.src : '';
+  if (avSrc && (avSrc.startsWith('data:') || avSrc.startsWith('https:') || avSrc.startsWith('http:'))) user.avatarPhoto = avSrc;
   else delete user.avatarPhoto;
   // Drop any legacy emoji avatar from older saves
   delete user.avatar;
 
   // Resume / portfolio — array of {name, type, url(data:)}
   if (typeof resumePortfolio !== 'undefined') {
-    user.resumePortfolio = resumePortfolio.filter(d => d && d.url && d.url.startsWith('data:'));
+    user.resumePortfolio = resumePortfolio.filter(d => d && d.url && (d.url.startsWith('data:') || d.url.startsWith('https:') || d.url.startsWith('http:')));
   }
 
   // Cover banner — either an uploaded photo (data: URL) or a CSS gradient
@@ -5084,9 +5095,9 @@ function saveProfileToStorage() {
   if (coverEl) {
     const bgImg = coverEl.style.backgroundImage || '';
     const bg = coverEl.style.background || '';
-    if (bgImg.startsWith('url("data:') || bgImg.startsWith('url(data:')) {
-      // Strip the wrapping url(...) to store just the data URL
-      user.coverPhoto = bgImg.replace(/^url\(["']?/, '').replace(/["']?\)$/, '');
+    const extracted = _urlFromCssBackgroundImage(bgImg);
+    if (extracted && (extracted.startsWith('data:') || extracted.startsWith('https:') || extracted.startsWith('http:'))) {
+      user.coverPhoto = extracted;
       delete user.coverGradient;
     } else if (bg.startsWith('linear-gradient') || bg.startsWith('radial-gradient')) {
       user.coverGradient = bg;
@@ -5128,7 +5139,7 @@ function saveProfileToStorage() {
       dates: subSpans[1] ? (subSpans[1].textContent || '').trim() : '',
       location: subSpans[2] ? (subSpans[2].textContent || '').trim() : '',
       description: desc ? (desc.textContent || '').trim() : '',
-      logoUrl: (logoImg && logoImg.src && logoImg.src.startsWith('data:')) ? logoImg.src : '',
+      logoUrl: (logoImg && logoImg.src && (logoImg.src.startsWith('data:') || /^https?:\/\//i.test(logoImg.src))) ? logoImg.src : '',
     };
   }).filter(w => w.title);
 
@@ -5169,6 +5180,83 @@ function saveProfileToStorage() {
   user.pinnedId = (typeof profilePinnedId !== 'undefined') ? profilePinnedId : null;
 
   vibeSave('vibe_user_v1', user);
+  scheduleProfileServerSync();
+}
+
+let profileServerSyncTimer = null;
+function scheduleProfileServerSync() {
+  if (window.viewingMockUser) return;
+  const u = (typeof vibeLoad === 'function') ? vibeLoad('vibe_user_v1') : null;
+  if (!u || !u._appShell) return;
+  clearTimeout(profileServerSyncTimer);
+  profileServerSyncTimer = setTimeout(flushProfileServerSync, 1200);
+}
+
+function buildProfileSyncPayload() {
+  const u = (typeof vibeLoad === 'function') ? vibeLoad('vibe_user_v1') : {};
+  const bannerUrl = (typeof u.coverPhoto === 'string' && u.coverPhoto.trim()) ? u.coverPhoto.trim() : null;
+  const bg = (typeof u.coverGradient === 'string' && u.coverGradient.trim()) ? u.coverGradient.trim() : '';
+  let resumeUrl = null;
+  if (Array.isArray(u.resumePortfolio) && u.resumePortfolio.length && u.resumePortfolio[0].url) {
+    resumeUrl = u.resumePortfolio[0].url;
+  }
+  const payload = {
+    name: (u.name || '').trim(),
+    tagline: (u.tagline || '').trim(),
+    headline: (u.headline || '').trim(),
+    location_text: (u.location || '').trim(),
+    website: (u.website || '').trim(),
+    bio: (u.bio || '').trim(),
+    interests: Array.isArray(u.vibeTags) ? u.vibeTags.map(t => String((t && t.label) || '').trim()).filter(Boolean) : [],
+    skills: Array.isArray(u.skills) ? u.skills.map(s => String(s).trim()).filter(Boolean) : [],
+    avatar_url: u.avatarPhoto || null,
+    resume_url: resumeUrl || null,
+    work_experience: Array.isArray(u.workExperience) ? u.workExperience : [],
+    recruiter_snapshot: (u.snapshot && typeof u.snapshot === 'object') ? u.snapshot : {},
+  };
+  if (bannerUrl) {
+    payload.banner_url = bannerUrl;
+  } else if (bg.startsWith('linear-gradient') || bg.startsWith('radial-gradient')) {
+    payload.banner_url = null;
+    payload.banner_gradient = bg;
+  } else {
+    payload.banner_url = null;
+    payload.banner_gradient = '';
+  }
+  return payload;
+}
+
+async function flushProfileServerSync() {
+  if (window.viewingMockUser) return;
+  const u = (typeof vibeLoad === 'function') ? vibeLoad('vibe_user_v1') : null;
+  if (!u || !u._appShell) return;
+  try {
+    const r = await fetch('/api/me/profile-sync', {
+      method: 'POST',
+      credentials: 'include',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(buildProfileSyncPayload()),
+    });
+    const j = await r.json();
+    if (!r.ok || !j.ok) {
+      if (typeof showToast === 'function') showToast((j && j.error) ? String(j.error) : 'Could not save to server');
+      return;
+    }
+    const rb = await fetch('/api/me/profile-bootstrap', { credentials: 'include' });
+    const jb = await rb.json();
+    if (rb.ok && jb.ok && jb.vibeUser) {
+      const prev = (typeof vibeLoad === 'function') ? vibeLoad('vibe_user_v1') : {};
+      const nu = Object.assign({}, jb.vibeUser);
+      nu._appShell = true;
+      if (prev && prev.counts) nu.counts = prev.counts;
+      if (prev && prev.glance) nu.glance = prev.glance;
+      if (prev && prev.pinnedId != null) nu.pinnedId = prev.pinnedId;
+      if (prev && Array.isArray(prev.currentlyOn)) nu.currentlyOn = prev.currentlyOn;
+      vibeSave('vibe_user_v1', nu);
+    }
+  } catch (e) {
+    if (typeof showToast === 'function') showToast('Offline — saved on this device only');
+  }
 }
 
 // ── Posts persistence (vibe_posts_v1) ────────────────────────────────────
@@ -5428,7 +5516,7 @@ function renderUserSections(user) {
       user.workExperience.forEach(w => {
         const item = document.createElement('div');
         item.className = 'work-item';
-        const hasLogo = w.logoUrl && w.logoUrl.startsWith('data:');
+        const hasLogo = w.logoUrl && (w.logoUrl.startsWith('data:') || /^https?:\/\//i.test(w.logoUrl));
         const logoImgHtml = hasLogo
           ? `<img class="work-logo-img" src="${w.logoUrl}" style="position:absolute;inset:0;width:100%;height:100%;object-fit:cover;border-radius:13px;">`
           : '';
@@ -5668,7 +5756,7 @@ function showWelcomeBanner() {
           <div class="mm-convo-name" id="mmConvoName">Kwame Asante</div>
           <div class="mm-convo-status">Active now</div>
         </div>
-        <a href="/html/profile.html" class="mm-view-profile" id="mmViewProfile">View profile</a>
+        <a href="/profile" class="mm-view-profile" id="mmViewProfile">View profile</a>
       </div>
       <!-- Messages -->
       <div class="mm-messages" id="mmMessages"></div>

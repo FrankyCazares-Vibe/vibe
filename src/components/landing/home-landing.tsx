@@ -3,6 +3,8 @@
 import Link from "next/link";
 import { useCallback, useEffect, useRef } from "react";
 
+import { getAppShellHomeHref } from "@/lib/feature-flags";
+
 declare global {
   interface Window {
     vibePersist?: { seedDemoData?: () => void };
@@ -108,9 +110,9 @@ export function HomeLanding() {
       await loadPersistenceScript();
       window.vibePersist?.seedDemoData?.();
     } catch {
-      /* still send them to feed */
+      /* still send them into the shell */
     }
-    window.location.href = "/html/feed.html";
+    window.location.href = getAppShellHomeHref();
   }, []);
 
   return (
@@ -256,8 +258,8 @@ export function HomeLanding() {
             the prototype.{" "}
             <strong style={{ color: "#1C1C1E" }}>Create your profile</strong>{" "}
             goes to <strong>sign up</strong> (your login email). Confirm that
-            inbox first; then you’ll add your <strong>.edu</strong> school email
-            — a second verification.
+            inbox first; then verify your <strong>.edu</strong> school email, then
+            meet Otto to fill your profile.
           </p>
         </main>
 

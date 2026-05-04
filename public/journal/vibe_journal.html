@@ -434,7 +434,7 @@ body {
   </div>
 
   <div class="sidebar-version">
-    <div class="ver-label" id="sidebarVersion">v4.2 — Session 30</div>
+    <div class="ver-label" id="sidebarVersion">v4.3 — Session 31</div>
     <div class="ver-date" id="sidebarDate">Loading...</div>
   </div>
 
@@ -457,7 +457,7 @@ body {
     <span class="nav-icon" style="color:var(--accent);">●</span> Otto — Flagship <span class="nav-badge" style="background:var(--lavender); color:#3C3489;">NEW</span>
   </button>
   <button class="nav-item" onclick="showSection('sessions', this)">
-    <span class="nav-icon">◰</span> Session Log <span class="nav-badge" id="sessionBadge">30</span>
+    <span class="nav-icon">◰</span> Session Log <span class="nav-badge" id="sessionBadge">31</span>
   </button>
 
   <div class="sidebar-section-label">Strategy</div>
@@ -498,15 +498,15 @@ body {
     <div class="hero-meta">
       <div class="hero-meta-item">
         <span class="hero-meta-label">Version</span>
-        <span class="hero-meta-val" id="heroVersion">v4.2</span>
+        <span class="hero-meta-val" id="heroVersion">v4.3</span>
       </div>
       <div class="hero-meta-item">
         <span class="hero-meta-label">Sessions</span>
-        <span class="hero-meta-val" id="heroSessions">30</span>
+        <span class="hero-meta-val" id="heroSessions">31</span>
       </div>
       <div class="hero-meta-item">
         <span class="hero-meta-label">Last updated</span>
-        <span class="hero-meta-val" id="heroDate">—</span>
+        <span class="hero-meta-val" id="heroDate">May 3, 2026</span>
       </div>
       <div class="hero-meta-item">
         <span class="hero-meta-label">Status</span>
@@ -518,7 +518,7 @@ body {
   <!-- Sync bar -->
   <div class="sync-bar">
     <span class="sync-pill"><span class="sync-pill-dot"></span>Synced</span>
-    <span>Last updated: <strong id="syncDate">—</strong></span>
+    <span>Last updated: <strong id="syncDate">May 3, 2026</strong></span>
     <span style="margin-left:auto;color:var(--muted)">Changes from Claude conversations persist here automatically</span>
   </div>
 
@@ -1310,9 +1310,9 @@ body {
 const STORAGE_KEY = 'vibe_journal_data';
 
 const DEFAULT_DATA = {
-  version: 'v4.2',
-  sessionCount: 30,
-  lastUpdated: 'May 1, 2026',
+  version: 'v4.3',
+  sessionCount: 31,
+  lastUpdated: 'May 3, 2026',
   versions: [
     { ver: 'v1.0', label: 'Session 1',     summary: 'Initial concept. App name (Vibe), warm professional positioning, profile design, Vibes short-form feed, reaction system, landing page.' },
     { ver: 'v1.1', label: 'Session 2',     summary: 'Cursor redesign: instant dot + snappy ring at lerp 0.28.' },
@@ -1337,7 +1337,8 @@ const DEFAULT_DATA = {
     { ver: 'v3.9', label: 'Session 27',     summary: 'GitHub + Vercel auto-deploy, Phase 1 spec finalized (37 tickets / 10 stages), Otto v1 scope tightened (onboarder + reminders), Clips naming, backend stack locked (Supabase + R2 + Resend + Sentry).' },
     { ver: 'v4.0', label: 'Session 28',     summary: 'Phase 1 build started: P1-001 Supabase (client + /api/health/supabase) and P1-002 Cloudflare R2 (presigned Clip URLs + /api/health/r2). Franky wired dashboards; prod health checks green. Vercel Hobby unblock: git author email aligned with GitHub (Gmail).' },
     { ver: 'v4.1', label: 'Session 29',     summary: 'Phase 1 Stage 1 closed out: P1-003 Resend (+ send-only key health probe), P1-004 Sentry App Router, P1-005 Postgres schema + RLS + auth.users→public.users trigger applied in Supabase. Session handoff for P1-006 auth written.' },
-    { ver: 'v4.2', label: 'Session 30',     summary: 'P1-006 auth flow hardened: post-login routing lands on /profile, Otto completion + school verification enforced on gated routes, login ?next= sanitization (no /feed or /campus bypass), onboarding bridge and onboarding-complete API aligned with static HTML. Handoff for P1-007 profile work.', current: true },
+    { ver: 'v4.2', label: 'Session 30',     summary: 'P1-006 auth flow hardened: post-login routing lands on /profile, Otto completion + school verification enforced on gated routes, login ?next= sanitization (no /feed or /campus bypass), onboarding bridge and onboarding-complete API aligned with static HTML. Handoff for P1-007 profile work.' },
+    { ver: 'v4.3', label: 'Session 31',     summary: 'Profile path toward P1-007: HTML bridge + profile-bootstrap/sync/upload APIs, profiles bucket migration, NavIdentityChip; campus-first global feed via NEXT_PUBLIC_SHOW_GLOBAL_FEED + redirects; local DOCS/LEARNINGS + PHASE_1 notes on shell vs campus.html. Handoff for commit/deploy and next P1-007/P1-008.', current: true },
   ],
   sessions: [
     {
@@ -1617,8 +1618,20 @@ const DEFAULT_DATA = {
         { icon: '·', text: '<strong>What\'s next:</strong> <strong>P1-007</strong> — real profile page data from Supabase (replace stub). Then P1-008 URL polish and remaining Phase 1 tickets per <code>DOCS/PHASE_1.md</code>. Handoff: <code>handoffs/2026-05-01-session-30-auth-onboarding-routing.md</code>.' },
       ]
     },
+    {
+      num: 31, ver: 'v4.3', title: 'Profile bridge + storage + campus-first feed flag', date: 'Session 31 — 2026-05-03',
+      changes: [
+        { icon: '◇', text: '<strong>Profile shell → real HTML under Next.</strong> <code>ProfileHtmlBridge</code> loads <code>/html/profile.html?app=1</code> after bootstrap; <code>GET/POST /api/me/profile-bootstrap</code>, <code>profile-sync</code>, <code>profile-upload</code>, and profile helpers in <code>src/lib/profile/</code> — debounced sync and clearer upload errors when the Storage bucket is missing.' },
+        { icon: '▣', text: '<strong>Supabase Storage for profile assets.</strong> Migration <code>20260503120000_profile_extension_storage.sql</code> for the <code>profiles</code> bucket + policies; apply on the linked Supabase project before expecting uploads to succeed in prod.' },
+        { icon: '◈', text: '<strong>Nav identity chip.</strong> Sidebar card with banner, avatar, and wrapped name (DM Sans) for signed-in campus shell.' },
+        { icon: '◐', text: '<strong>Global <code>/feed</code> deferred by default.</strong> <code>src/lib/feature-flags.ts</code> — <code>NEXT_PUBLIC_SHOW_GLOBAL_FEED=true</code> shows Feed in left nav and renders the feed page; otherwise Feed is hidden and <code>/feed</code> redirects to <code>/campus</code> so campus posts are not treated as a future global stream. <code>getAppShellHomeHref()</code> used from campus home, landing demo entry, and profile error links.' },
+        { icon: '◇', text: '<strong>Local documentation (not in git).</strong> <code>DOCS/LEARNINGS.md</code> and <code>DOCS/PHASE_1.md</code> updated with product/feed notes and where the real campus UI ships in the P1 table — both folders remain gitignored workshop copies.' },
+        { icon: '·', text: '<strong>What\'s next:</strong> Commit the large WIP tree, push ahead commit + new work, run health + auth regression on Vercel. Continue <strong>P1-007</strong> profile parity and <strong>P1-008</strong> URL strategy. Handoff: <code>handoffs/2026-05-03-session-31-profile-storage-feed-flags-handoff.md</code>.' },
+      ]
+    },
   ],
   nextSteps: [
+    { priority: 'high',   text: '<strong>Ship hygiene — Session 31 WIP</strong> — <code>git status</code>, run typecheck/lint, commit (split or monolith), <code>git push origin main</code> (journal v4.3 + app changes); confirm Vercel + Supabase migration for <code>profiles</code> bucket on prod.' },
     { priority: 'high',   text: '<strong>Phase 1 — P1-007 Profile</strong> — Supabase-backed profile UI (reads/writes to <code>public.users</code> and related tables); replace the Next.js <code>/profile</code> stub. Align with static prototype richness where scope allows.' },
     { priority: 'high',   text: '<strong>Connect-side polish</strong> — the demo auto-accepts a Connect after 3 seconds. Wire to a real "pending requests" state with the other person\'s incoming view (accept / decline) and a notification when accepted.' },
     { priority: 'high',   text: '<strong>Per-school campus content</strong> — verified non-IU students currently still see IU\'s feed / jobs / events. Either show a "your school doesn\'t have campus content yet — be the first" empty state, or seed a few additional mock schools alongside IU.' },

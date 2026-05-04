@@ -10,7 +10,7 @@ export function isOttoOnboardingComplete(otto: unknown): boolean {
 
 /**
  * Where to send someone after a successful password login (or when no explicit `next`).
- * Order: finish Otto → add school email if needed → profile home.
+ * Order: verify school email → finish Otto → profile home.
  */
 export async function getPostLoginDestination(
   supabase: SupabaseClient,
@@ -35,11 +35,11 @@ export async function getPostLoginDestination(
     .eq("id", user.id)
     .maybeSingle();
 
-  if (!isOttoOnboardingComplete(row?.otto_answers)) {
-    return "/onboarding";
-  }
   if (!row?.school_verified) {
     return "/auth/school-email";
+  }
+  if (!isOttoOnboardingComplete(row?.otto_answers)) {
+    return "/onboarding";
   }
   return DEFAULT_POST_LOGIN_PATH;
 }

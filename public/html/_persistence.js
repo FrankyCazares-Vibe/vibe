@@ -50,7 +50,7 @@ function seedDemoData() {
 // ── Exit demo → back to landing ───────────────────────────────────────────
 function exitDemoMode() {
   vibeClearAll();
-  window.location.href = '/html/landing.html';
+  window.location.href = '/';
 }
 
 // ── Per-page init entry point ─────────────────────────────────────────────
@@ -119,9 +119,9 @@ function vibeShowDemoPill() {
     const style = document.createElement('style');
     style.id = 'vibePrePaintStyle';
     style.textContent = `
-      html.vibe-pre-paint-sidebar .left-nav a[href="/html/profile.html"].nav-item .mini-avatar,
-      html.vibe-pre-paint-sidebar .left-nav a[href="/html/profile.html"].nav-item .mini-av,
-      html.vibe-pre-paint-sidebar .left-nav a[href="/html/profile.html"].nav-item > div:not(.mini-avatar):not(.mini-av) {
+      html.vibe-pre-paint-sidebar .left-nav a[href="/profile"].nav-item .mini-avatar,
+      html.vibe-pre-paint-sidebar .left-nav a[href="/profile"].nav-item .mini-av,
+      html.vibe-pre-paint-sidebar .left-nav a[href="/profile"].nav-item > div:not(.mini-avatar):not(.mini-av) {
         visibility: hidden;
       }
     `;
@@ -134,7 +134,7 @@ function vibeShowDemoPill() {
 
 // ── Sidebar identity hydration (auto-runs on every page) ──────────────────
 // Each non-profile page has a sidebar profile chip with a hardcoded "MC /
-// Maya Chen / Product Designer". This finds it by `a[href="/html/profile.html"]`
+// Maya Chen / Product Designer". This finds it by `a[href="/profile"]`
 // inside a left-nav and rewrites avatar + name + title from vibe_user_v1.
 // For onboarded users with no name yet, shows "Set up your profile" prompt.
 function vibeHydrateSidebar() {
@@ -147,7 +147,7 @@ function vibeHydrateSidebar() {
 
   function paintAvatar(el) {
     if (!el) return;
-    if (user.avatarPhoto && user.avatarPhoto.startsWith('data:')) {
+    if (user.avatarPhoto && (user.avatarPhoto.startsWith('data:') || user.avatarPhoto.startsWith('blob:') || user.avatarPhoto.startsWith('https:') || user.avatarPhoto.startsWith('http:'))) {
       el.innerHTML = `<img src="${user.avatarPhoto}" style="width:100%;height:100%;object-fit:cover;border-radius:inherit;display:block;">`;
       el.style.background = 'transparent';
       el.style.padding = '0';
@@ -159,7 +159,7 @@ function vibeHydrateSidebar() {
   }
 
   // Find any sidebar profile-link nav item (not the top-nav variant on profile.html)
-  const links = document.querySelectorAll('.left-nav a[href="/html/profile.html"].nav-item');
+  const links = document.querySelectorAll('.left-nav a[href="/profile"].nav-item');
   links.forEach(link => {
     paintAvatar(link.querySelector('.mini-avatar, .mini-av'));
 

@@ -1,6 +1,7 @@
 import { NextResponse } from "next/server";
 
-import { getSiteUrl } from "@/lib/auth/site-url";
+import { getSiteOriginForRequest } from "@/lib/auth/site-url";
+import { isOttoOnboardingComplete } from "@/lib/auth/post-login";
 import {
   isEduEmail,
   isSchoolVerifySecretConfigured,
@@ -120,8 +121,18 @@ export async function POST(req: Request) {
   }
 
   const token = signSchoolEmailToken(user.id, schoolEmail);
-  const site = getSiteUrl();
-  const verifyUrl = `${site}/auth/verify-school?token=${encodeURIComponent(token)}`;
+  const site = getSiteOriginForRequest(req);
+
+  const { data: progress } = await supabase
+    .from("users")
+    .select("otto_answers")
+    .eq("id", user.id)
+    .maybeSingle();
+
+  const afterVerify = isOttoOnboardingComplete(progress?.otto_answers)
+    ? "/profile"
+    : "/onboarding";
+  const verifyUrl = `${site}/auth/verify-school?token=${encodeURIComponent(token)}&next=${encodeURIComponent(afterVerify)}`;
 
   try {
     await sendSchoolVerificationEmail(schoolEmail, verifyUrl);

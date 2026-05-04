@@ -3,6 +3,10 @@
 import Link from "next/link";
 
 import { CampusAppShell } from "@/components/campus-app-shell";
+import {
+  getAppShellHomeHref,
+  isGlobalFeedSurfaceEnabled,
+} from "@/lib/feature-flags";
 
 export function CampusHome({
   showSchoolVerifiedBanner,
@@ -99,10 +103,16 @@ export function CampusHome({
             — followers & connections.
           </li>
           <li>
-            <Link href="/feed" style={{ color: "#FF5C35", fontWeight: 600 }}>
-              Feed
+            <Link
+              href={getAppShellHomeHref()}
+              style={{ color: "#FF5C35", fontWeight: 600 }}
+            >
+              {isGlobalFeedSurfaceEnabled() ? "Feed" : "Campus"}
             </Link>{" "}
-            — empty until you have something to show.
+            —
+            {isGlobalFeedSurfaceEnabled()
+              ? " empty until you have something to show."
+              : " your school home for now."}
           </li>
         </ul>
         <p style={{ fontSize: 14, color: "#8A8580" }}>

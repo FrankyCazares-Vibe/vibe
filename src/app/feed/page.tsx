@@ -1,7 +1,9 @@
 import Link from "next/link";
+import { redirect } from "next/navigation";
 
 import { enforceCampusAccess } from "@/lib/auth/campus-access";
 import { CampusAppShell } from "@/components/campus-app-shell";
+import { isGlobalFeedSurfaceEnabled } from "@/lib/feature-flags";
 
 export const metadata = {
   title: "Feed · Vibe",
@@ -9,6 +11,9 @@ export const metadata = {
 };
 
 export default async function FeedPage() {
+  if (!isGlobalFeedSurfaceEnabled()) {
+    redirect("/campus");
+  }
   await enforceCampusAccess("/feed");
   return (
     <CampusAppShell>

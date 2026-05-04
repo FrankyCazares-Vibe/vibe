@@ -308,5 +308,5 @@ const VIBE_MOCK_USERS = {
 // Loaded as a global so any page that wants to navigate to a mock profile
 // can introspect available slugs. Profile.html reads VIBE_MOCK_USERS[slug]
 // via ?user= URL param. Network.html / People-also-viewed cards link via
-// /html/profile.html?user=<slug>.
+// /profile/<slug>.
 window.VIBE_MOCK_USERS = VIBE_MOCK_USERS;

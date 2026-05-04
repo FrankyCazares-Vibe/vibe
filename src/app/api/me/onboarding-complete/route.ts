@@ -1,11 +1,15 @@
 import { NextResponse } from "next/server";
 
 import { DEFAULT_POST_LOGIN_PATH } from "@/lib/auth/email-confirm-redirect";
+import { sanitizeOnboardingProfile } from "@/lib/profile/onboarding-prefill";
 import { createSupabaseServerClient } from "@/lib/supabase/server";
 
-type Body = { otto_answers?: unknown };
+type Body = {
+  otto_answers?: unknown;
+  profile?: unknown;
+};
 
-/** Persist Otto output to public.users; client is static HTML with session cookies. */
+/** Persist Otto output + optional quick profile pre-fill to `public.users`. */
 export async function POST(req: Request) {
   const supabase = await createSupabaseServerClient();
   const {
@@ -38,9 +42,22 @@ export async function POST(req: Request) {
     );
   }
 
+  const profilePatch = sanitizeOnboardingProfile(body.profile);
+  if (profilePatch === null) {
+    return NextResponse.json(
+      { ok: false, error: "Invalid profile" },
+      { status: 400 },
+    );
+  }
+
+  const updateRow = {
+    otto_answers,
+    ...profilePatch,
+  };
+
   const { error: upErr } = await supabase
     .from("users")
-    .update({ otto_answers })
+    .update(updateRow)
     .eq("id", user.id);
 
   if (upErr) {
@@ -58,8 +75,14 @@ export async function POST(req: Request) {
     .single();
 
   const schoolVerified = row?.school_verified === true;
+  const baseNext = schoolVerified ? DEFAULT_POST_LOGIN_PATH : "/auth/school-email";
+  const next =
+    schoolVerified && Object.keys(profilePatch).length > 0
+      ? `${baseNext}?otto=1`
+      : baseNext;
+
   return NextResponse.json({
     ok: true,
-    next: schoolVerified ? DEFAULT_POST_LOGIN_PATH : "/auth/school-email",
+    next,
   });
 }

@@ -1,10 +1,15 @@
 "use client";
 
+import type { CSSProperties } from "react";
 import Link from "next/link";
-import { useSearchParams } from "next/navigation";
+import { useRouter, useSearchParams } from "next/navigation";
 import { Suspense, useEffect, useRef, useState } from "react";
 
+import { sanitizeSchoolVerifyNextParam } from "@/lib/auth/login-next";
+import { getSupabaseBrowserClient } from "@/lib/supabase/browser";
+
 function VerifySchoolInner() {
+  const router = useRouter();
   const searchParams = useSearchParams();
   const token = searchParams.get("token");
   const started = useRef(false);
@@ -16,11 +21,13 @@ function VerifySchoolInner() {
   useEffect(() => {
     if (!token || started.current) return;
     started.current = true;
+    const nextRaw = searchParams.get("next");
     setStatus("working");
     void (async () => {
       try {
         const res = await fetch("/api/auth/school-email/confirm", {
           method: "POST",
+          credentials: "include",
           headers: { "Content-Type": "application/json" },
           body: JSON.stringify({ token }),
         });
@@ -36,12 +43,38 @@ function VerifySchoolInner() {
         }
         setStatus("ok");
         setMessage(data.message ?? "Verified.");
+
+        const nextPath =
+          sanitizeSchoolVerifyNextParam(nextRaw) ?? "/onboarding";
+        const supabase = getSupabaseBrowserClient();
+        const {
+          data: { user },
+          error: authErr,
+        } = await supabase.auth.getUser();
+
+        if (!authErr && user) {
+          if (nextPath === "/profile") {
+            router.replace("/profile?school_verified=1");
+          } else {
+            router.replace(nextPath);
+          }
+          router.refresh();
+          return;
+        }
+
+        const loginNext =
+          nextPath === "/profile"
+            ? "/profile?school_verified=1"
+            : nextPath;
+        router.replace(
+          `/auth/login?next=${encodeURIComponent(loginNext)}&school_verified=1`,
+        );
       } catch {
         setStatus("err");
         setMessage("Request failed.");
       }
     })();
-  }, [token]);
+  }, [router, searchParams, token]);
 
   if (!token) {
     return (
@@ -59,6 +92,31 @@ function VerifySchoolInner() {
     );
   }
 
+  if (status === "err") {
+    return (
+      <div style={{ maxWidth: 400, margin: "0 auto", paddingTop: 48 }}>
+        <h1
+          style={{
+            fontFamily: "Fraunces, serif",
+            fontSize: 32,
+            fontWeight: 900,
+            color: "#B42318",
+            marginBottom: 16,
+          }}
+        >
+          Could not verify
+        </h1>
+        <p style={{ color: "#8A8580", marginBottom: 24 }}>{message}</p>
+        <Link href="/auth/school-email" style={linkStyle}>
+          Try again
+        </Link>
+      </div>
+    );
+  }
+
+  const nextPath =
+    sanitizeSchoolVerifyNextParam(searchParams.get("next")) ?? "/onboarding";
+
   return (
     <div style={{ maxWidth: 400, margin: "0 auto", paddingTop: 48 }}>
       <h1
@@ -66,25 +124,41 @@ function VerifySchoolInner() {
           fontFamily: "Fraunces, serif",
           fontSize: 32,
           fontWeight: 900,
-          color: status === "ok" ? "#1C1C1E" : "#B42318",
+          color: "#1C5C2E",
           marginBottom: 16,
         }}
       >
-        {status === "ok" ? "You're verified" : "Could not verify"}
+        You&apos;re verified
       </h1>
       <p style={{ color: "#8A8580", marginBottom: 24 }}>{message}</p>
-      {status === "ok" ? (
-        <Link
-          href="/profile?school_verified=1"
-          style={linkStyle}
-        >
-          Back to account
-        </Link>
-      ) : (
-        <Link href="/auth/school-email" style={linkStyle}>
-          Try again
-        </Link>
-      )}
+      <p style={{ color: "#5C5956", fontSize: 14, marginBottom: 20 }}>
+        {nextPath === "/profile"
+          ? "Taking you to your profile…"
+          : "Taking you to meet Otto — or sign in if this browser isn’t logged in yet."}
+      </p>
+      <p
+        style={{
+          color: "#8A8580",
+          fontSize: 13,
+          lineHeight: 1.55,
+          marginBottom: 20,
+        }}
+      >
+        School links often open in your email app&apos;s browser, which doesn&apos;t
+        share cookies with Safari or Chrome. If we send you to log in, use your{" "}
+        <strong>sign-up email and password</strong> — then we&apos;ll continue
+        where you left off.
+      </p>
+      <Link
+        href={
+          nextPath === "/profile"
+            ? "/profile?school_verified=1"
+            : `/auth/login?next=${encodeURIComponent(nextPath)}&school_verified=1`
+        }
+        style={linkStyle}
+      >
+        Continue manually
+      </Link>
     </div>
   );
 }
@@ -103,7 +177,7 @@ export default function VerifySchoolPage() {
   );
 }
 
-const linkStyle: React.CSSProperties = {
+const linkStyle: CSSProperties = {
   color: "#FF5C35",
   textDecoration: "none",
   fontSize: 16,

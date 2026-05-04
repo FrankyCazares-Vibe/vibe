@@ -1,7 +1,7 @@
 "use client";
 
 import Link from "next/link";
-import { useRouter, useSearchParams } from "next/navigation";
+import { useSearchParams } from "next/navigation";
 import { Suspense, useState } from "react";
 
 import { getPostLoginDestination } from "@/lib/auth/post-login";
@@ -9,7 +9,6 @@ import { sanitizeLoginNextParam } from "@/lib/auth/login-next";
 import { getSupabaseBrowserClient } from "@/lib/supabase/browser";
 
 function LoginForm() {
-  const router = useRouter();
   const searchParams = useSearchParams();
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
@@ -17,27 +16,35 @@ function LoginForm() {
   const [loading, setLoading] = useState(false);
 
   const urlError = searchParams.get("error");
+  const schoolVerifiedHint = searchParams.get("school_verified") === "1";
 
   async function onSubmit(e: React.FormEvent) {
     e.preventDefault();
     setError(null);
     setLoading(true);
     const supabase = getSupabaseBrowserClient();
-    const { error: signErr } = await supabase.auth.signInWithPassword({
-      email: email.trim(),
-      password,
-    });
-    setLoading(false);
+    const { data: signData, error: signErr } =
+      await supabase.auth.signInWithPassword({
+        email: email.trim(),
+        password,
+      });
     if (signErr) {
+      setLoading(false);
       setError(signErr.message);
+      return;
+    }
+    if (!signData.session) {
+      setLoading(false);
+      setError("No session returned — check your email and password.");
       return;
     }
     const dest = await getPostLoginDestination(
       supabase,
       sanitizeLoginNextParam(searchParams.get("next")),
     );
-    router.push(dest);
-    router.refresh();
+    // Full navigation so middleware always sees the new auth cookies (client
+    // router transitions can miss the first cookie write on some setups).
+    window.location.assign(dest);
   }
 
   return (
@@ -57,6 +64,25 @@ function LoginForm() {
         Welcome back to{" "}
         <span style={{ color: "#FF5C35" }}>vibe.</span>
       </p>
+
+      {schoolVerifiedHint ? (
+        <p
+          style={{
+            fontSize: 14,
+            lineHeight: 1.5,
+            color: "#1C5C2E",
+            background: "rgba(46, 125, 50, 0.1)",
+            border: "1px solid rgba(46, 125, 50, 0.35)",
+            borderRadius: 10,
+            padding: "14px 16px",
+            marginBottom: 20,
+          }}
+        >
+          <strong>Campus email verified.</strong> Sign in with your login email
+          (the one you used to sign up). We&apos;ll take you right back where you
+          left off.
+        </p>
+      ) : null}
 
       <form
         onSubmit={onSubmit}

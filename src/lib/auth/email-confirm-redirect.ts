@@ -1,9 +1,9 @@
 /**
  * Redirect target after Supabase email confirmation (`exchangeCodeForSession`).
- * New signups go straight to Otto (Next bridge → static onboarding).
+ * Campus .edu verification comes first, then Otto (`/onboarding` from school-email page).
  * `next` must be a same-origin path (see auth callback route).
  */
-export const POST_EMAIL_CONFIRM_PATH = "/onboarding?account_verified=1";
+export const POST_EMAIL_CONFIRM_PATH = "/auth/school-email?account_verified=1";
 
 /**
  * Default “you’re in” route after Otto + school verification (login, onboarding-complete, etc.).

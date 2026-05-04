@@ -37,12 +37,12 @@ export default function SignupPage() {
       return;
     }
     if (data.session) {
-      router.push("/onboarding");
+      router.push("/auth/school-email");
       router.refresh();
       return;
     }
     setMessage(
-      "Check this inbox for a confirmation link. After you click it, you’ll meet Otto to set up your profile — then we’ll ask for your school email to unlock campus.",
+      "Check this inbox for a confirmation link. After you click it, you’ll verify your campus .edu email first, then meet Otto to finish your profile.",
     );
   }
 
