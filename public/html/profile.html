@@ -1326,30 +1326,48 @@ body.recruiter-mode .recruiter-card .rec-stat-row:last-child { border-bottom:non
 .post-thumb-cell.theme-lavender { background:#F3EAFF;color:#7C3FE0; }
 
 /* ── Profile top-right stats (Followers · Following · Connections) ──
-   Lives in #profileActionBtns, aligned with the avatar. Always visible;
-   the Connect button + Mutual count above are viewer-only. */
+   Always visible. Anchored at a fixed top so the position is identical
+   on own profile and viewer mode (Connect+Mutual block above doesn't
+   shift the stats when it hides). */
 .profile-top-stats {
-  display:flex;gap:18px;align-items:flex-start;
+  position:absolute;top:120px;right:32px;z-index:20;
+  display:flex;align-items:flex-start;gap:0;
 }
 .profile-stat {
-  display:flex;flex-direction:column;gap:2px;
+  display:flex;flex-direction:column;align-items:center;gap:6px;
   text-decoration:none;color:var(--charcoal);
   cursor:none;transition:color .15s;
-  text-align:right;
+  padding:0 16px;
+  min-width:74px;
+  border-right:1px solid var(--border);
 }
+.profile-stat:last-child { border-right:none;padding-right:0; }
+.profile-stat:first-child { padding-left:0; }
 .profile-stat:hover .profile-stat-num { color:var(--accent); }
 .profile-stat-num {
-  font-family:'Fraunces',serif;font-weight:700;
-  font-size:18px;line-height:1;letter-spacing:-.5px;
+  font-family:'Fraunces',serif;font-weight:800;
+  font-size:22px;line-height:1;letter-spacing:-.5px;
   transition:color .15s;
 }
 .profile-stat-label {
   font-size:10px;color:var(--muted);
-  letter-spacing:.4px;text-transform:uppercase;
+  letter-spacing:.6px;text-transform:uppercase;font-weight:600;
 }
 .profile-stat--prominent .profile-stat-num {
-  color:var(--accent);font-size:22px;
+  color:var(--accent);font-size:26px;
 }
+
+/* ── Mutual pill (viewer-only, sits above stats with Connect button) ── */
+.profile-mutual-pill {
+  display:inline-flex;align-items:center;gap:6px;
+  padding:5px 14px;border-radius:100px;
+  background:rgba(28,28,30,.05);border:1px solid var(--border);
+  font-size:11px;font-weight:600;color:var(--muted);
+  cursor:none;transition:background .15s,color .15s;
+  letter-spacing:.2px;text-transform:lowercase;
+}
+.profile-mutual-pill:hover { background:rgba(28,28,30,.08);color:var(--charcoal); }
+.profile-mutual-pill #statMutual { font-weight:800;color:var(--charcoal); }
 
 /* ── Empty state inside the content card (P1-011) ── */
 .content-empty {
@@ -2490,46 +2508,44 @@ body.empty-profile-mode #profileEmpty { display: flex !important; }
 
 <!-- PROFILE WRAP -->
 <div class="profile-wrap">
-  <!-- Top-right of profile, aligned with the avatar.
-       Stats (Followers · Following · Connections) always visible; Connect button
-       and Mutuals only show in viewer mode (someone else's profile). -->
-  <div id="profileActionBtns" style="position:absolute;top:16px;right:32px;display:flex;flex-direction:column;align-items:flex-end;gap:14px;z-index:20;">
+  <!-- Top-right of profile. Stats anchor at a fixed top so they don't jump
+       between own/viewer mode when the Connect+Mutual block hides. -->
 
-    <!-- Viewer-only: Connect / Soft follow / Mutual count -->
-    <div class="viewer-only" style="display:flex;flex-direction:column;align-items:flex-end;gap:8px;">
-      <button class="action-btn primary vibe-connect-btn" id="vibeConnectBtn" onclick="handleVibConnect()">
-        <svg width="13" height="13" viewBox="0 0 13 13" fill="none" style="flex-shrink:0"><path d="M6.5 1v11M1 6.5h11" stroke="white" stroke-width="1.8" stroke-linecap="round"/></svg>
-        Connect
-      </button>
-      <button class="vibe-soft-follow" id="vibeSoftFollow" onclick="handleSoftFollow()" style="display:none">
-        Follow instead
-      </button>
-      <button onclick="openMutualsModal()" style="background:none;border:none;cursor:none;font-size:12px;font-weight:700;color:var(--charcoal);padding:0;transition:color .15s" onmouseover="this.style.color='var(--accent)'" onmouseout="this.style.color='var(--charcoal)'">
-        <span id="statMutual">32</span> <span style="color:var(--muted);font-weight:400">mutual</span>
-      </button>
-    </div>
+  <!-- Viewer-only: Connect / Soft follow / Mutual count, sits above the stats -->
+  <div class="viewer-only" id="profileViewerActions" style="position:absolute;top:16px;right:32px;display:flex;flex-direction:column;align-items:flex-end;gap:10px;z-index:21;">
+    <button class="action-btn primary vibe-connect-btn" id="vibeConnectBtn" onclick="handleVibConnect()">
+      <svg width="13" height="13" viewBox="0 0 13 13" fill="none" style="flex-shrink:0"><path d="M6.5 1v11M1 6.5h11" stroke="white" stroke-width="1.8" stroke-linecap="round"/></svg>
+      Connect
+    </button>
+    <button class="vibe-soft-follow" id="vibeSoftFollow" onclick="handleSoftFollow()" style="display:none">
+      Follow instead
+    </button>
+    <button class="profile-mutual-pill" onclick="openMutualsModal()">
+      <span id="statMutual">32</span> mutual
+    </button>
+  </div>
 
-    <!-- Always-visible stats row (P1-011 spec).
-         Real follower/following counts wire up with P1-012 (connections model). -->
-    <div class="profile-top-stats">
-      <a href="#" class="profile-stat" onclick="return false;">
-        <span class="profile-stat-num" id="statFollowers">1.2k</span>
-        <span class="profile-stat-label">Followers</span>
-      </a>
-      <a href="#" class="profile-stat" onclick="return false;">
-        <span class="profile-stat-num" id="statFollowing">312</span>
-        <span class="profile-stat-label">Following</span>
-      </a>
-      <a href="/network" class="profile-stat profile-stat--prominent">
-        <span class="profile-stat-num" id="statConnections">847</span>
-        <span class="profile-stat-label">Connections</span>
-      </a>
-    </div>
+  <!-- Always-visible stats — anchored at fixed y so position is identical
+       on own profile and viewer mode. Real follower/following counts wire up
+       with P1-012 (connections model). -->
+  <div class="profile-top-stats" id="profileTopStats">
+    <a href="#" class="profile-stat" onclick="return false;">
+      <span class="profile-stat-num" id="statFollowers">1.2k</span>
+      <span class="profile-stat-label">Followers</span>
+    </a>
+    <a href="#" class="profile-stat" onclick="return false;">
+      <span class="profile-stat-num" id="statFollowing">312</span>
+      <span class="profile-stat-label">Following</span>
+    </a>
+    <a href="/network" class="profile-stat profile-stat--prominent">
+      <span class="profile-stat-num" id="statConnections">847</span>
+      <span class="profile-stat-label">Connections</span>
+    </a>
+  </div>
 
-    <div class="connected-badge" id="connectedBadge">
-      <svg width="11" height="11" viewBox="0 0 11 11" fill="none"><path d="M1.5 5.5L4 8L9.5 2.5" stroke="#1A9E5B" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"/></svg>
-      Connected &middot; DMs open
-    </div>
+  <div class="connected-badge" id="connectedBadge" style="position:absolute;top:170px;right:32px;z-index:20;">
+    <svg width="11" height="11" viewBox="0 0 11 11" fill="none"><path d="M1.5 5.5L4 8L9.5 2.5" stroke="#1A9E5B" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"/></svg>
+    Connected &middot; DMs open
   </div>
   
   <!-- Connect button — top right of profile, above everything -->
