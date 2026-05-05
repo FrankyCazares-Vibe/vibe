@@ -59,7 +59,10 @@ export async function middleware(request: NextRequest) {
     return sessionResponse;
   }
 
-  if (LEGACY_HTML_TO_CLEAN[pathname]) {
+  // ?app=1 is the React→static handoff: a clean-URL React route deliberately
+  // forwards users to /html/X.html?app=1 so the static prototype runs in
+  // signed-in mode. Bouncing it back to the clean URL creates a redirect loop.
+  if (LEGACY_HTML_TO_CLEAN[pathname] && searchParams.get("app") !== "1") {
     const dest = new URL(LEGACY_HTML_TO_CLEAN[pathname], request.url);
     const redir = NextResponse.redirect(dest);
     return forwardCookies(sessionResponse, redir);
