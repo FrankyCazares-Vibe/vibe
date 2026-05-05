@@ -279,8 +279,27 @@ export async function GET() {
     const bt = b.last_message?.created_at ?? "";
     return bt.localeCompare(at);
   };
-  threads.sort(byRecency);
-  requests.sort(byRecency);
 
-  return NextResponse.json({ ok: true, threads, requests });
+  // Defense-in-depth: dedupe 1:1 DMs by peer id. The pre-RLS-fix bug created
+  // duplicate channels with the same peer because findExistingDm couldn't see
+  // existing rows. Future clicks won't duplicate, but legacy orphans linger.
+  // Keep the most-recent one per peer; the orphans stay in the DB (no
+  // destructive cleanup from a read endpoint) but the UI sees one row.
+  const dedupeByPeer = (entries: ThreadEntry[]): ThreadEntry[] => {
+    const seen = new Map<string, ThreadEntry>();
+    const result: ThreadEntry[] = [];
+    for (const e of [...entries].sort(byRecency)) {
+      const key = e.type === "dm" && e.peer?.id ? e.peer.id : e.id;
+      if (seen.has(key)) continue;
+      seen.set(key, e);
+      result.push(e);
+    }
+    return result;
+  };
+
+  return NextResponse.json({
+    ok: true,
+    threads: dedupeByPeer(threads),
+    requests: dedupeByPeer(requests),
+  });
 }
