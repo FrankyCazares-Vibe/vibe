@@ -133,29 +133,28 @@ function vibeShowDemoPill() {
 })();
 
 // ── Sidebar identity hydration (auto-runs on every page) ──────────────────
-// Each non-profile page has a sidebar profile chip with hardcoded demo data.
-// This replaces the chip with the rich card layout (banner + avatar + name +
-// clamped 2-line subtitle) — same visual as the React NavIdentityChip — and
-// fills it from vibe_user_v1.
-function vibeHydrateSidebar() {
-  const user = vibeLoad(VIBE_KEYS.user);
+// Replaces the static demo chip with the rich card layout (banner + avatar +
+// name + clamped 2-line subtitle) — same visual as React NavIdentityChip.
+// Paints instantly from localStorage, then refreshes from /api/me/profile-
+// bootstrap and repaints so cover/headline updates show up even on pages
+// that haven't been through ProfileHtmlBridge.
+function _vibeEsc(s) {
+  return String(s == null ? '' : s).replace(/[&<>"']/g, c =>
+    ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
+}
+
+function _vibeBannerCss(u) {
+  const photo = u.coverPhoto;
+  if (typeof photo === 'string' && /^https?:\/\//.test(photo)) {
+    return 'url("' + photo.replace(/"/g, '%22') + '") center / cover no-repeat';
+  }
+  const g = u.coverGradient;
+  if (typeof g === 'string' && g.trim()) return g.trim();
+  return 'linear-gradient(135deg, #EDE9E2 0%, #D8D2C8 45%, #C9C2B8 100%)';
+}
+
+function _vibePaintSidebarChips(user) {
   if (!user) return;
-
-  function _esc(s) {
-    return String(s == null ? '' : s).replace(/[&<>"']/g, c =>
-      ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
-  }
-
-  function _bannerCss(u) {
-    const photo = u.coverPhoto;
-    if (typeof photo === 'string' && /^https?:\/\//.test(photo)) {
-      return 'url("' + photo.replace(/"/g, '%22') + '") center / cover no-repeat';
-    }
-    const g = u.coverGradient;
-    if (typeof g === 'string' && g.trim()) return g.trim();
-    return 'linear-gradient(135deg, #EDE9E2 0%, #D8D2C8 45%, #C9C2B8 100%)';
-  }
-
   const initials = (user.name || '').split(/\s+/)
     .map(p => p[0]).filter(Boolean).join('').slice(0, 2).toUpperCase() || '?';
   const name = user.name || (user._onboarded ? 'Your name' : 'Maya Chen');
@@ -163,14 +162,13 @@ function vibeHydrateSidebar() {
   const tagline = (user.tagline || '').trim();
   const subtitle = headline || tagline
     || (user._onboarded && !user.name ? 'Set up your profile' : 'My profile');
-  const banner = _bannerCss(user);
+  const banner = _vibeBannerCss(user);
   const avatarInner = user.avatarPhoto && /^(data|blob|https?):/.test(user.avatarPhoto)
-    ? '<img src="' + _esc(user.avatarPhoto) + '" style="width:100%;height:100%;object-fit:cover;border-radius:inherit;display:block;">'
-    : _esc(initials);
+    ? '<img src="' + _vibeEsc(user.avatarPhoto) + '" style="width:100%;height:100%;object-fit:cover;border-radius:inherit;display:block;">'
+    : _vibeEsc(initials);
 
   const links = document.querySelectorAll('.left-nav a[href="/profile"].nav-item');
   links.forEach(link => {
-    // Re-style the link as a card and replace its content with the rich chip.
     link.style.cssText =
       'display:block;border-radius:12px;overflow:hidden;text-decoration:none;' +
       'border:1px solid rgba(28,28,30,0.08);box-shadow:0 4px 16px rgba(0,0,0,0.05);' +
@@ -182,17 +180,38 @@ function vibeHydrateSidebar() {
           avatarInner +
         '</div>' +
         '<div style="min-width:0;flex:1;padding-top:1px;">' +
-          '<div style="font-family:\'DM Sans\',sans-serif;font-size:12.5px;font-weight:600;color:#1C1C1E;line-height:1.38;letter-spacing:-0.01em;overflow-wrap:anywhere;word-break:break-word;">' + _esc(name) + '</div>' +
-          '<div style="font-family:\'DM Sans\',sans-serif;font-size:11px;color:#8A8580;line-height:1.4;margin-top:4px;display:-webkit-box;-webkit-box-orient:vertical;-webkit-line-clamp:2;overflow:hidden;">' + _esc(subtitle) + '</div>' +
+          '<div style="font-family:\'DM Sans\',sans-serif;font-size:12.5px;font-weight:600;color:#1C1C1E;line-height:1.38;letter-spacing:-0.01em;overflow-wrap:anywhere;word-break:break-word;">' + _vibeEsc(name) + '</div>' +
+          '<div style="font-family:\'DM Sans\',sans-serif;font-size:11px;color:#8A8580;line-height:1.4;margin-top:4px;display:-webkit-box;-webkit-box-orient:vertical;-webkit-line-clamp:2;overflow:hidden;">' + _vibeEsc(subtitle) + '</div>' +
         '</div>' +
       '</div>';
   });
+}
 
-  // Reveal — drop the pre-paint guard now that identity is painted.
-  // requestAnimationFrame waits one frame so the new content lands first.
+function vibeHydrateSidebar() {
+  const cached = vibeLoad(VIBE_KEYS.user);
+  if (!cached) return;
+
+  // Fast path: paint immediately from cache so there's no flash.
+  _vibePaintSidebarChips(cached);
   requestAnimationFrame(() => {
     document.documentElement.classList.remove('vibe-pre-paint-sidebar');
   });
+
+  // Truth path: refresh from the server so cover/headline updates show up
+  // even when localStorage is stale (e.g., user updated their banner from
+  // profile.html and then navigated to /messages without round-tripping
+  // through ProfileHtmlBridge again). Demo users skip this.
+  if (cached._isDemo) return;
+  fetch('/api/me/profile-bootstrap', { credentials: 'include' })
+    .then(r => r.ok ? r.json() : null)
+    .then(d => {
+      if (!d || !d.ok || !d.vibeUser) return;
+      // Preserve any local-only fields by merging server truth on top.
+      const merged = Object.assign({}, cached, d.vibeUser);
+      vibeSave(VIBE_KEYS.user, merged);
+      _vibePaintSidebarChips(merged);
+    })
+    .catch(() => { /* best-effort refresh; cached paint already happened */ });
 }
 document.addEventListener('DOMContentLoaded', vibeHydrateSidebar);
 
