@@ -2066,61 +2066,55 @@ function setMapFilter(zone, btn) {
 
 
 // ══ CAMPUS SEARCH ════════════════════════════════════════════════════════
-var CAMPUS_PEOPLE = [
-  {type:'student', name:'Kwame Asante',    role:'CS · Senior',               av:'KA', col:'#2D1B4E'},
-  {type:'student', name:'Priya Sinha',     role:'Informatics · Junior',      av:'PS', col:'#4E1B2D'},
-  {type:'student', name:'Zara Williams',   role:'CS · Senior',               av:'ZW', col:'#1B4E2D'},
-  {type:'student', name:'Jordan Lee',      role:'Finance · Junior',          av:'JL', col:'#1A4D7C'},
-  {type:'student', name:'Sofia Reyes',     role:'Management · Senior',       av:'SR', col:'#5D1A8B'},
-  {type:'student', name:'Omar Hassan',     role:'Data Science · Sophomore',  av:'OH', col:'#2D4A8C'},
-  {type:'student', name:'Jasmine Cole',    role:'Journalism · Junior',       av:'JC', col:'#7C1A5C'},
-  {type:'student', name:'Noah Kim',        role:'Informatics · Junior',      av:'NK', col:'#2D8C8C'},
-  {type:'student', name:'Diana Cruz',      role:'Law · 2L',                  av:'DC', col:'#3D1A7C'},
-  {type:'student', name:'Raj Menon',       role:'AI · Senior',               av:'RM', col:'#2D4E1B'},
-  {type:'org',     name:'CS Club',         role:'Technology · 340 members',  av:'CS', col:'#2563EB'},
-  {type:'org',     name:'Design @ IU',     role:'Design · 215 members',      av:'D',  col:'#FF5C35'},
-  {type:'org',     name:'Venture Club',    role:'Entrepreneurship · 180 members', av:'V', col:'#7C3AED'},
-  {type:'org',     name:'NSBE',            role:'Engineering · 290 members', av:'N',  col:'#1A7C4D'},
-  {type:'org',     name:'AI Society',      role:'Research · 160 members',    av:'AI', col:'#0C1C4A'},
-  {type:'org',     name:'Women in Computing', role:'Community · 125 members',av:'WC', col:'#BE185D'},
-];
+// Static students + orgs removed — campus search now hits the live
+// /api/users/search. Orgs surface returns when there's a real orgs API.
+function _campusEsc(s){return String(s==null?'':s).replace(/[&<>"']/g,function(c){return ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'})[c];});}
+var _campusSearchTimer = null;
+var _campusSearchSeq = 0;
 
 function runCampusSearch(q) {
   var dd = document.getElementById('campusSearchDropdown');
-  if (!q.trim()) { dd.innerHTML = renderCampusDefault(); return; }
-  var lower = q.toLowerCase();
-  var results = CAMPUS_PEOPLE.filter(function(r) {
-    return r.name.toLowerCase().indexOf(lower) >= 0 || r.role.toLowerCase().indexOf(lower) >= 0;
-  }).slice(0, 8);
-  dd.innerHTML = results.length ? renderCampusResults(results) : '<div class="search-empty">No results for "' + q + '"</div>';
+  if (!dd) return;
+  var trimmed = (q || '').trim();
+  if (!trimmed) { dd.innerHTML = renderCampusDefault(); return; }
+  var seq = ++_campusSearchSeq;
+  clearTimeout(_campusSearchTimer);
+  _campusSearchTimer = setTimeout(function(){
+    fetch('/api/users/search?q=' + encodeURIComponent(trimmed) + '&limit=10', { credentials: 'include' })
+      .then(function(r){ return r.ok ? r.json() : { ok:false }; })
+      .then(function(j){
+        if (seq !== _campusSearchSeq) return;
+        var people = (j && j.ok && Array.isArray(j.users)) ? j.users : [];
+        if (!people.length) {
+          dd.innerHTML = '<div class="search-empty">No one matches "' + _campusEsc(trimmed) + '".</div>';
+          return;
+        }
+        dd.innerHTML = '<div class="search-section-label">People</div>' + people.map(renderCampusSR).join('');
+      })
+      .catch(function(){
+        if (seq !== _campusSearchSeq) return;
+        dd.innerHTML = '<div class="search-empty">Search failed. Try again.</div>';
+      });
+  }, 220);
 }
 
 function renderCampusDefault() {
-  var students = CAMPUS_PEOPLE.filter(function(r){ return r.type==='student'; }).slice(0,4);
-  var orgs     = CAMPUS_PEOPLE.filter(function(r){ return r.type==='org'; }).slice(0,3);
-  return '<div class="search-section-label">Students near you</div>'
-    + students.map(renderCampusSR).join('')
-    + '<div class="search-section-label">Organizations</div>'
-    + orgs.map(renderCampusSR).join('')
-    + '<div class="search-footer">Browse all IU students and orgs</div>';
+  return '<div class="search-empty" style="padding:18px 16px;">Search by name or @handle.</div>';
 }
 
-function renderCampusResults(results) {
-  var students = results.filter(function(r){ return r.type==='student'; });
-  var orgs     = results.filter(function(r){ return r.type==='org'; });
-  var out = '';
-  if (students.length) out += '<div class="search-section-label">Students</div>' + students.map(renderCampusSR).join('');
-  if (orgs.length)     out += '<div class="search-section-label">Organizations</div>' + orgs.map(renderCampusSR).join('');
-  out += '<div class="search-footer">See all results</div>';
-  return out;
-}
-
-function renderCampusSR(r) {
-  var action = r.type === 'student' ? 'Connect' : 'Join';
-  return '<div class="search-result">'
-    + '<div class="sr-av" style="background:'+r.col+';border-radius:'+(r.type==='org'?'8px':'11px')+'">'+r.av+'</div>'
-    + '<div class="sr-info"><div class="sr-name">'+r.name+'</div><div class="sr-role">'+r.role+'</div></div>'
-    + '<button class="sr-action">'+action+'</button>'
+function renderCampusSR(u) {
+  var name = u.name || ('@' + (u.handle || ''));
+  var role = [u.major, u.year].filter(Boolean).join(' · ') || (u.school || '');
+  var initials = String(name).split(/\s+/).slice(0,2).map(function(s){return s[0]||'';}).join('').toUpperCase() || '?';
+  var avInner = u.avatar_url
+    ? '<img src="' + _campusEsc(u.avatar_url) + '" alt="" style="width:100%;height:100%;object-fit:cover;border-radius:inherit;display:block;">'
+    : _campusEsc(initials);
+  var nav = u.handle
+    ? ' onclick="window.location.href=\'/profile/' + encodeURIComponent(u.handle) + '\'" style="cursor:pointer"'
+    : '';
+  return '<div class="search-result"' + nav + '>'
+    + '<div class="sr-av" style="background:#1C1C1E;border-radius:11px;color:white;display:flex;align-items:center;justify-content:center;font-family:\'Fraunces\',serif;font-size:13px;font-weight:700;overflow:hidden;">' + avInner + '</div>'
+    + '<div class="sr-info"><div class="sr-name">' + _campusEsc(name) + '</div><div class="sr-role">' + _campusEsc(role) + '</div></div>'
     + '</div>';
 }
 
