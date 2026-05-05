@@ -57,7 +57,9 @@ async function resolveTargetId(
 
 /**
  * Find an existing 1:1 DM channel between viewer and target, if any.
- * Returns the channel id or null.
+ * If multiple exist (legacy RLS-recursion duplicates), returns the one with
+ * the most recent message — same selection rule as the GET dedupe, so the
+ * id POST returns and the id the UI sees in its thread list always agree.
  */
 async function findExistingDm(
   supabase: Awaited<ReturnType<typeof createSupabaseServerClient>>,
@@ -87,7 +89,19 @@ async function findExistingDm(
     console.error("[threads.findExistingDm hits]", hitsErr);
     return null;
   }
-  return (hits?.[0]?.channel_id as string | undefined) ?? null;
+  const candidates = (hits ?? []).map((h) => h.channel_id as string);
+  if (candidates.length === 0) return null;
+  if (candidates.length === 1) return candidates[0]!;
+
+  // Multiple matches → pick the channel with the latest message. Falls back
+  // to any candidate if none have messages yet.
+  const { data: latest } = await supabase
+    .from("messages")
+    .select("channel_id, created_at")
+    .in("channel_id", candidates)
+    .order("created_at", { ascending: false })
+    .limit(1);
+  return (latest?.[0]?.channel_id as string | undefined) ?? candidates[0]!;
 }
 
 /**
@@ -264,6 +278,17 @@ export async function GET() {
   for (const r of rows) {
     const last = lastByChannel.get(r.channel_id) ?? null;
     const peer = peerByChannel.get(r.channel_id) ?? null;
+
+    // Phantom-request guard: a real "request" is an inbound DM from a
+    // non-connection. A pending row with NO inbound message at all is
+    // legacy noise (the pre-RLS-fix duplicate-channel bug created stub
+    // channels where the viewer was added with accepted_at = NULL but
+    // no message ever followed). Hide those.
+    const isRequestState = r.accepted_at === null;
+    if (isRequestState) {
+      const hasInbound = !!last && last.user_id !== user.id;
+      if (!hasInbound) continue;
+    }
 
     // Soft-hide: skip threads the viewer hid, UNLESS a new message has
     // arrived since they hid it (Instagram-style un-hide on activity).
