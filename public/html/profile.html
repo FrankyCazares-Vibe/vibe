@@ -4316,7 +4316,23 @@ function setActiveSection(id) {
     link.classList.toggle('active', isActive);
   });
 }
+
+// Click on a subnav pill → set the active state immediately. Without
+// this the user has to wait for the browser smooth-scroll AND the
+// IntersectionObserver to fire before "Posts" turns black.
+sectionNavLinks.forEach(link => {
+  link.addEventListener('click', () => {
+    const href = link.getAttribute('href') || '';
+    if (href.startsWith('#')) setActiveSection(href.slice(1));
+  });
+});
+
 if (sectionEls.length) {
+  // Lower thresholds + bottom-of-document fallback so tall sections
+  // (the content card with All / Clips / Posts / Saved tabs) still
+  // trigger Active state. The previous 0.2 floor never fired for
+  // very tall sections because the visible portion / section height
+  // ratio stayed below it.
   const sectionObserver = new IntersectionObserver((entries) => {
     const visible = entries
       .filter(entry => entry.isIntersecting)
@@ -4324,10 +4340,25 @@ if (sectionEls.length) {
     if (visible) setActiveSection(visible.target.id);
   }, {
     root: null,
-    threshold: [0.2, 0.35, 0.5],
-    rootMargin: '-28% 0px -58% 0px'
+    threshold: [0, 0.05, 0.15, 0.35, 0.5],
+    rootMargin: '-15% 0px -45% 0px'
   });
   sectionEls.forEach(section => sectionObserver.observe(section));
+
+  // Bottom-of-page fallback — when the user scrolls within ~120px
+  // of the document end, force the LAST section (#vibes / Posts) to
+  // active. Catches the case where the content card is the bottom
+  // of the page and the observer's sweet spot stays above it.
+  let scrollRaf = 0;
+  window.addEventListener('scroll', () => {
+    if (scrollRaf) return;
+    scrollRaf = requestAnimationFrame(() => {
+      scrollRaf = 0;
+      const nearBottom =
+        window.innerHeight + window.scrollY >= document.body.scrollHeight - 120;
+      if (nearBottom) setActiveSection(sectionIds[sectionIds.length - 1]);
+    });
+  }, { passive: true });
 }
 
 // ── Pinned item system ──────────────────────────────────────────
@@ -4381,16 +4412,19 @@ function pinFromProfile(contentId, btn) {
     ? `<img src="${me.photo}" style="width:100%;height:100%;object-fit:cover;border-radius:inherit;display:block;">`
     : me.initials;
 
+  // Pinned cards click through to the shared post viewer modal —
+  // the Unpin button stops propagation so it doesn't also open the
+  // viewer when the user just wanted to remove the pin.
   if (postCard) {
     const body = postCard.querySelector('.ppost-body')?.innerHTML || '';
     const tagsHTML = postCard.querySelector('.ppost-tags')?.innerHTML || '';
     const reactionsHTML = postCard.querySelector('.ppost-reactions .ppost-left')?.innerHTML || '';
     contentEl.innerHTML = `
-      <div class="pinned-post-card">
+      <div class="pinned-post-card" data-pin-id="${_esc(contentId)}" style="cursor:pointer" onclick="_openPinnedItem('${_esc(contentId)}','post')">
         <div class="pin-post-header">
           <div class="pin-post-av" style="background:var(--charcoal)">${avMarkup}</div>
           <div><div class="pin-post-name">${_esc(me.name)}</div><div class="pin-post-role">${_esc(me.headline)}</div></div>
-          <button class="pin-unpin-btn" onclick="pinFromProfile('${contentId}',this)">Unpin</button>
+          <button class="pin-unpin-btn" onclick="event.stopPropagation();pinFromProfile('${contentId}',this)">Unpin</button>
         </div>
         <div class="pin-post-body">${body}</div>
         ${tagsHTML ? `<div class="pin-post-tags">${tagsHTML}</div>` : ''}
@@ -4401,7 +4435,7 @@ function pinFromProfile(contentId, btn) {
     const title = vibeThumb.querySelector('.vibe-grid-title')?.textContent || '';
     const views = vibeThumb.querySelector('.vibe-grid-views')?.textContent || '';
     contentEl.innerHTML = `
-      <div class="pinned-vibe-card">
+      <div class="pinned-vibe-card" data-pin-id="${_esc(contentId)}" style="cursor:pointer" onclick="_openPinnedItem('${_esc(contentId)}','clip')">
         <div class="pinned-vibe-bg" style="background:${bg}"></div>
         <div class="pinned-vibe-grad"></div>
         <div class="pinned-vibe-play">&#9654;</div>
@@ -4409,7 +4443,7 @@ function pinFromProfile(contentId, btn) {
           <div class="pinned-vibe-creator">
             <div class="pinned-vibe-av" style="background:var(--charcoal)">${avMarkup}</div>
             <div><div class="pinned-vibe-name">${_esc(me.name)}</div><div style="font-size:10px;color:rgba(255,255,255,.6)">${_esc(views)}</div></div>
-            <button class="pin-unpin-btn" onclick="pinFromProfile('${contentId}',this)" style="display:block;margin-left:auto;background:rgba(255,255,255,.15);color:white;border-color:rgba(255,255,255,.25)">Unpin</button>
+            <button class="pin-unpin-btn" onclick="event.stopPropagation();pinFromProfile('${contentId}',this)" style="display:block;margin-left:auto;background:rgba(255,255,255,.15);color:white;border-color:rgba(255,255,255,.25)">Unpin</button>
           </div>
           <div class="pinned-vibe-caption">${_esc(title)}</div>
         </div>
@@ -4423,6 +4457,26 @@ function pinFromProfile(contentId, btn) {
   }
   if (typeof saveProfileToStorage === 'function') saveProfileToStorage();
   if (typeof refreshPinButtons === 'function') refreshPinButtons();
+}
+
+// Click handler for the pinned card — opens the shared post viewer
+// with a prefill so the modal paints instantly while the GET resolves.
+// Demo / mock-user posts (non-UUID ids like 'p1', 'v2') still open
+// the modal but skip the API fetch (the modal handles that gracefully).
+function _openPinnedItem(contentId, type) {
+  if (typeof openPostViewer !== 'function') return;
+  const sourceCard = type === 'clip'
+    ? document.querySelector(`.vibe-grid-thumb[data-vibe-id="${contentId}"]`)
+    : document.querySelector(`.profile-post-card[data-post-id="${contentId}"]`);
+  let prefill = null;
+  if (sourceCard) {
+    if (type === 'clip' && typeof _profilePrefillFromClipThumb === 'function') {
+      prefill = _profilePrefillFromClipThumb(sourceCard);
+    } else if (type === 'post' && typeof _profilePrefillFromCard === 'function') {
+      prefill = _profilePrefillFromCard(sourceCard);
+    }
+  }
+  openPostViewer(contentId, prefill);
 }
 
 // Make pin buttons visible in edit mode and reflect pinned state.
