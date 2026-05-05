@@ -985,16 +985,24 @@ function openT(id){
 
 function renderMsgs(msgs,d){
   const a=document.getElementById('msgsArea');
-  // Preserve scroll position across re-renders (poll cycle paints every 2s).
-  // Only auto-scroll to bottom when (a) it's a fresh thread switch, OR
-  // (b) the user was already pinned to the bottom (within 80px). If they
-  // scrolled up to read older messages, leave their position alone.
+  if (!a) return;
+  // Split rendering: bubbles only re-render when message ids change
+  // (so server-signed media URLs being fresh-signed every poll doesn't
+  // remount <img>/<video> and flicker), footer (typing + Read receipt)
+  // updates every cycle but is cheap inline elements only.
   const activeKey = String(active || '');
-  const isThreadSwitch = a && a.dataset.channel !== activeKey;
-  if (a) a.dataset.channel = activeKey;
-  const wasAtBottom = !a
-    ? true
-    : (isThreadSwitch || (a.scrollHeight - a.scrollTop - a.clientHeight) < 80);
+  const isThreadSwitch = a.dataset.channel !== activeKey;
+  a.dataset.channel = activeKey;
+
+  // Stable signature based on ids only — message bodies don't mutate
+  // after creation, so id-equality === content-equality for our purposes.
+  const sig = msgs.map((m) => m.id || ('__demo' + Math.random())).join(',');
+  const sigChanged = sig !== a.dataset.sig;
+
+  const wasAtBottom = isThreadSwitch ||
+    (a.scrollHeight - a.scrollTop - a.clientHeight) < 80;
+  const prevScroll = a.scrollTop;
+
   let h='<div class="date-sep">Today</div>';
   let last=null;
   let lastSenderId=null;
@@ -1081,6 +1089,9 @@ function renderMsgs(msgs,d){
     last=mine;
     lastSenderId=senderKey;
   });
+  // Footer (typing + Read receipt) — built into a separate string so it
+  // can update on every poll without remounting media in the bubble list.
+  let footerH = '';
   if (lastSentIdx >= 0) {
     const lastSent = msgs[lastSentIdx];
     let status = 'Delivered';
@@ -1089,7 +1100,7 @@ function renderMsgs(msgs,d){
       const peerRead = __realDM.peerLastReadByChannel[active];
       if (peerRead && new Date(peerRead) >= new Date(lastSent.created_at)) status = 'Read';
     }
-    h += `<div class="rr${status==='Read'?' read':''}">${status}</div>`;
+    footerH += `<div class="rr${status==='Read'?' read':''}">${status}</div>`;
   }
 
   // Typing indicator: any peer with typing_until > now → 3 bouncing dots
@@ -1102,18 +1113,42 @@ function renderMsgs(msgs,d){
       const av = t.avatar_url
         ? `<div class="msg-av" style="background:${__dmAvBg(t.handle || t.user_id || t.name)};overflow:hidden;padding:0;"><img src="${__dmEsc(t.avatar_url)}" alt="" style="width:100%;height:100%;object-fit:cover;display:block;"></div>`
         : `<div class="msg-av" style="background:${__dmAvBg(t.handle || t.user_id || t.name)}">${__dmEsc(initials)}</div>`;
-      h += `<div class="typ-row">${av}<div class="typ-bubble"><div class="typ-dot"></div><div class="typ-dot"></div><div class="typ-dot"></div></div></div>`;
+      footerH += `<div class="typ-row">${av}<div class="typ-bubble"><div class="typ-dot"></div><div class="typ-dot"></div><div class="typ-dot"></div></div></div>`;
       if (isGroup) {
         const firstName = (t.name || t.handle || '').split(/\s+/)[0];
         if (firstName) {
-          h += `<div class="typ-label">${__dmEsc(firstName)} is typing…</div>`;
+          footerH += `<div class="typ-label">${__dmEsc(firstName)} is typing…</div>`;
         }
       }
     }
   }
 
-  a.innerHTML = h;
-  if (wasAtBottom) a.scrollTop = a.scrollHeight;
+  // Apply: on a thread switch we replace the entire area in one write
+  // so there's no empty-flash between bubble + footer paints. After
+  // that, only update the bit that changed.
+  let bubblesEl = a.querySelector(':scope > .msgs-bubbles');
+  let footerEl = a.querySelector(':scope > .msgs-footer');
+  if (isThreadSwitch || !bubblesEl || !footerEl) {
+    a.innerHTML =
+      '<div class="msgs-bubbles">' + h + '</div>' +
+      '<div class="msgs-footer">' + footerH + '</div>';
+    a.dataset.sig = sig;
+  } else {
+    if (sigChanged) {
+      bubblesEl.innerHTML = h;
+      a.dataset.sig = sig;
+    }
+    if (footerEl.innerHTML !== footerH) footerEl.innerHTML = footerH;
+  }
+
+  // Scroll: auto-pin to the bottom on thread switch or when user was
+  // already there. If they were scrolled up reading older messages and
+  // a new message landed, preserve their position so they aren't yanked.
+  if (wasAtBottom) {
+    a.scrollTop = a.scrollHeight;
+  } else if (sigChanged) {
+    a.scrollTop = prevScroll;
+  }
 }
 
 function snd(){
