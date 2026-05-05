@@ -4895,8 +4895,13 @@ function setVibeRelState(state) {
       break;
 
     case 'following':
-      btn.innerHTML = ICONS.connect + ' Connect';
-      btn.className += ' primary';
+      // I follow them, they don't follow me back yet — render the same
+      // "Pending" affordance as the mock-user request flow. The button
+      // stays clickable so a second tap unfollows (handleVibConnect
+      // routes the click to DELETE /api/me/follow when state is
+      // 'following' or 'pending' on a real user).
+      btn.innerHTML = '&#8987; Pending';
+      btn.className += ' state-pending';
       if (soft) {
         soft.style.display = 'block';
         soft.textContent = 'Following ✓';
@@ -4916,7 +4921,6 @@ async function handleVibConnect() {
     window.location.href = '/messages';
     return;
   }
-  if (vibeRelState === 'pending') return;
 
   const name = _viewedName();
 
@@ -4924,6 +4928,25 @@ async function handleVibConnect() {
   // creates a connections row; if both sides have followed each other the
   // visitor sees "connected" instead of "following" on next reload.
   if (window.viewingRealUser && window.viewingRealUser.id) {
+    // Toggle: if already following/pending, the click means "undo".
+    if (vibeRelState === 'following' || vibeRelState === 'pending') {
+      const wasState = vibeRelState;
+      setVibeRelState('none');
+      try {
+        const r = await fetch('/api/me/follow', {
+          method: 'DELETE', credentials: 'include',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ target_id: window.viewingRealUser.id }),
+        });
+        const j = await r.json().catch(() => ({}));
+        if (!r.ok || !j.ok) throw new Error((j && j.error) || 'Unfollow failed');
+        showToast(`Unfollowed ${name}`);
+      } catch (e) {
+        setVibeRelState(wasState);
+        showToast(e && e.message ? e.message : 'Could not unfollow');
+      }
+      return;
+    }
     const wasState = vibeRelState;
     setVibeRelState('following'); // optimistic — server-confirms below
     try {
@@ -4934,7 +4957,7 @@ async function handleVibConnect() {
       });
       const j = await r.json().catch(() => ({}));
       if (!r.ok || !j.ok) throw new Error((j && j.error) || 'Follow failed');
-      showToast(`Following ${name}`);
+      showToast(`Connection pending with ${name}`);
     } catch (e) {
       setVibeRelState(wasState);
       showToast(e && e.message ? e.message : 'Could not follow');
@@ -4944,6 +4967,7 @@ async function handleVibConnect() {
 
   // Demo / mock-user fallback — preserves the prototype's "request → 3s
   // auto-accept" simulation so the static demo keeps feeling alive.
+  if (vibeRelState === 'pending') return;
   setVibeRelState('pending');
   showToast(`Connection request sent to ${name}`);
   clearTimeout(window._acceptTimer);
@@ -5504,6 +5528,14 @@ window.viewingRealUser = null;
         const v = j.vibeUser;
         window.viewingRealUser = { id: v.id, handle: v.handle, name: v.name };
         hydrateProfileFields(v);
+        // Empty arrays here are critical: renderUserSections falls back
+        // to localStorage (vibe_posts_v1 / vibe_vibes_v1) when posts /
+        // vibes are missing, which would render the VIEWER's own posts
+        // on the visited user's profile. Forcing [] suppresses the
+        // fallback; we then call hydrateVisitedUserPosts to inject the
+        // visited user's real posts a moment later.
+        v.posts = [];
+        v.vibes = [];
         renderUserSections(v);
         renderStudentBadge(v, /*isOwn=*/false);
         if (typeof showViewerBackBanner === 'function') showViewerBackBanner(v.name);
@@ -5518,6 +5550,8 @@ window.viewingRealUser = null;
             return;
           } else                                          setVibeRelState('none');
         }
+        // Pull the visited user's real posts + clips and render them.
+        hydrateVisitedUserPosts(viewingHandle);
       })
       .catch(() => {
         const wrap = document.querySelector('.profile-wrap') || document.body;
@@ -6045,6 +6079,51 @@ async function hydrateProfilePostsFromAPI() {
     if (typeof savePostsToStorage === 'function') savePostsToStorage();
     if (typeof populateAllGrid === 'function') populateAllGrid();
   } catch (e) { /* silent — local cache stays */ }
+}
+
+// Hydrate the VISITED user's posts + clips when in viewer mode (P1-011b).
+// Mirror of hydrateProfilePostsFromAPI but hits /api/users/[handle]/posts
+// and explicitly does NOT call savePostsToStorage (we don't want the
+// visitor's localStorage to get clobbered with someone else's content).
+async function hydrateVisitedUserPosts(handle) {
+  if (!handle) return;
+  try {
+    const r = await fetch(`/api/users/${encodeURIComponent(handle)}/posts?limit=100`,
+      { credentials: 'include' });
+    const j = await r.json().catch(() => ({}));
+    if (!r.ok || !j.ok || !Array.isArray(j.posts)) return;
+    const postRows = j.posts.filter(p => p.type === 'post');
+    const clipRows = j.posts.filter(p => p.type === 'clip');
+
+    // Posts pane
+    const list = document.getElementById('profilePostsList');
+    if (list) {
+      list.querySelectorAll('.profile-post-card').forEach(c => c.remove());
+      postRows.map(_profileMapDbRow).filter(Boolean)
+        .forEach(c => list.appendChild(_renderPostCard(c)));
+    }
+
+    // Clips pane
+    const grid = document.getElementById('profileVibesGrid');
+    if (grid) {
+      grid.querySelectorAll('.vibe-grid-thumb').forEach(t => t.remove());
+      clipRows.forEach(row => {
+        const node = _renderVibeThumb({
+          id:    row.id,
+          title: (row.content || '').slice(0, 80) || 'Clip',
+          views: '0 views · 0:00',
+          bg:    row.media_thumbnail_url
+            ? `center/cover no-repeat url("${row.media_thumbnail_url}")`
+            : 'linear-gradient(135deg,#1a0533,#2d1b4e)',
+        });
+        const uploadTile = grid.querySelector('.vibe-upload-tile');
+        if (uploadTile) grid.insertBefore(node, uploadTile);
+        else grid.appendChild(node);
+      });
+    }
+
+    if (typeof populateAllGrid === 'function') populateAllGrid();
+  } catch (e) { /* silent — visitor still sees the empty state */ }
 }
 
 function _profileMapDbRow(row) {
