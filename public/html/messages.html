@@ -985,6 +985,16 @@ function openT(id){
 
 function renderMsgs(msgs,d){
   const a=document.getElementById('msgsArea');
+  // Preserve scroll position across re-renders (poll cycle paints every 2s).
+  // Only auto-scroll to bottom when (a) it's a fresh thread switch, OR
+  // (b) the user was already pinned to the bottom (within 80px). If they
+  // scrolled up to read older messages, leave their position alone.
+  const activeKey = String(active || '');
+  const isThreadSwitch = a && a.dataset.channel !== activeKey;
+  if (a) a.dataset.channel = activeKey;
+  const wasAtBottom = !a
+    ? true
+    : (isThreadSwitch || (a.scrollHeight - a.scrollTop - a.clientHeight) < 80);
   let h='<div class="date-sep">Today</div>';
   let last=null;
   let lastSenderId=null;
@@ -1102,7 +1112,8 @@ function renderMsgs(msgs,d){
     }
   }
 
-  a.innerHTML=h;a.scrollTop=a.scrollHeight;
+  a.innerHTML = h;
+  if (wasAtBottom) a.scrollTop = a.scrollHeight;
 }
 
 function snd(){
@@ -1656,6 +1667,10 @@ async function __dmSend(text) {
     document.getElementById('reqBar').classList.remove('show');
     __dmComposeMediaClear();
     await __dmLoadMessages(channelId);
+    // Force-scroll to bottom after sending so the sender always sees their
+    // own message even if they were scrolled up.
+    const a = document.getElementById('msgsArea');
+    if (a) a.scrollTop = a.scrollHeight;
     __dmLoadList();
     return true;
   } catch (e) {
