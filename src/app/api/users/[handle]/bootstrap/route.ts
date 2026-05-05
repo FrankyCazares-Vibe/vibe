@@ -9,8 +9,10 @@ import { createSupabaseServerClient } from "@/lib/supabase/server";
 // excluded so a visitor never sees another user's contact addresses. If we
 // add `otto_answers`, `voice_samples`, or other private columns later they
 // stay off this list by default.
+// pinned_post_id is fetched in a split try/catch below so a column-
+// missing situation (migration deploy lag) can't 404 the whole route.
 const PUBLIC_PROFILE_SELECT =
-  "id,name,handle,school,school_verified,year,major,department,bio,tagline,website,headline,location_text,banner_gradient,avatar_url,banner_url,resume_url,interests,skills,looking_for,work_experience,recruiter_snapshot,pinned_post_id";
+  "id,name,handle,school,school_verified,year,major,department,bio,tagline,website,headline,location_text,banner_gradient,avatar_url,banner_url,resume_url,interests,skills,looking_for,work_experience,recruiter_snapshot";
 
 type RouteContext = { params: Promise<{ handle: string }> };
 
@@ -75,8 +77,23 @@ export async function GET(_req: Request, ctx: RouteContext) {
   };
   vibeUser._isViewerMode = true;
   vibeUser._viewerFollowState = follow;
-  vibeUser.pinnedPostId =
-    (row as { pinned_post_id?: string | null }).pinned_post_id ?? null;
+
+  // Optional column — split query so missing-column errors during
+  // migration deploy lag don't take the whole route down.
+  let pinnedPostId: string | null = null;
+  try {
+    const { data: pinRow } = await supabase
+      .from("users")
+      .select("pinned_post_id")
+      .eq("id", profile.id)
+      .maybeSingle();
+    if (pinRow && typeof pinRow.pinned_post_id === "string") {
+      pinnedPostId = pinRow.pinned_post_id;
+    }
+  } catch {
+    /* column may not exist yet; ignore */
+  }
+  vibeUser.pinnedPostId = pinnedPostId;
 
   return NextResponse.json({ ok: true, vibeUser });
 }

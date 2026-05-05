@@ -5,8 +5,11 @@ import { buildVibeUserV1FromProfile } from "@/lib/profile/build-vibe-user-v1";
 import { normalizeProfileView } from "@/lib/profile/normalize-profile-view";
 import { createSupabaseServerClient } from "@/lib/supabase/server";
 
+// pinned_post_id is fetched in a separate try/catch below so a
+// migration-lag situation (column doesn't exist yet) can't 404 the
+// whole bootstrap and lock the user out of their profile.
 const PROFILE_SELECT =
-  "id,email,name,handle,handle_changed_at,school,school_email,school_verified,year,major,department,bio,tagline,website,headline,location_text,banner_gradient,avatar_url,banner_url,resume_url,interests,skills,looking_for,work_experience,recruiter_snapshot,pinned_post_id";
+  "id,email,name,handle,handle_changed_at,school,school_email,school_verified,year,major,department,bio,tagline,website,headline,location_text,banner_gradient,avatar_url,banner_url,resume_url,interests,skills,looking_for,work_experience,recruiter_snapshot";
 
 /**
  * Returns `vibe_user_v1`-shaped JSON for `public/html/profile.html`.
@@ -31,7 +34,26 @@ export async function GET() {
 
   if (error || !row) {
     console.error("[profile-bootstrap GET]", error);
-    return NextResponse.json({ ok: false, error: "Profile not found" }, { status: 404 });
+    return NextResponse.json(
+      { ok: false, error: error?.message ?? "Profile not found" },
+      { status: 404 },
+    );
+  }
+
+  // Optional column — split out so missing-column errors (during
+  // migration deploy lag) don't take the whole bootstrap down.
+  let pinnedPostId: string | null = null;
+  try {
+    const { data: pinRow } = await supabase
+      .from("users")
+      .select("pinned_post_id")
+      .eq("id", user.id)
+      .maybeSingle();
+    if (pinRow && typeof pinRow.pinned_post_id === "string") {
+      pinnedPostId = pinRow.pinned_post_id;
+    }
+  } catch {
+    /* column may not exist yet; ignore */
   }
 
   const counts = await getCountsFor(supabase, user.id);
@@ -47,8 +69,8 @@ export async function GET() {
   // Pass through cooldown metadata so the inline editor can show
   // "you can change again in N days" without a second roundtrip.
   vibeUser.handleChangedAt = (row as { handle_changed_at?: string | null }).handle_changed_at ?? null;
-  // Pinned post id — the static profile renders the pin slot from this.
-  vibeUser.pinnedPostId = (row as { pinned_post_id?: string | null }).pinned_post_id ?? null;
+  // Pinned post id (from the optional split query above).
+  vibeUser.pinnedPostId = pinnedPostId;
 
   return NextResponse.json({ ok: true, vibeUser });
 }
