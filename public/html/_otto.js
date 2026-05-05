@@ -381,12 +381,9 @@
           </div>
           <button class="otto-panel-close" aria-label="Close">×</button>
         </div>
-        <div class="otto-platform-pills">
-          <div class="otto-platform-pill">LinkedIn</div>
-          <div class="otto-platform-pill">Instagram</div>
-          <div class="otto-platform-pill">X</div>
-          <div class="otto-platform-pill">TikTok</div>
-        </div>
+        <!-- Platform pills (LinkedIn / IG / X / TikTok) removed alongside
+             the drafts UI — no purpose without the cross-posting feature. -->
+
       </div>
 
       <div class="otto-panel-body"></div>

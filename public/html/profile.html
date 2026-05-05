@@ -2802,11 +2802,11 @@ body.empty-profile-mode #profileEmpty { display: flex !important; }
     body.viewer-mode    .op-badge,
     body.viewer-mode    .op-platform-stats { display: none; }
 
-    /* Hide the Otto sidebar widget when viewing someone else's profile —
-       Otto belongs to the owner, not the visitor. */
-    body.viewer-mode #ottoCorner,
-    body.viewer-mode #ottoPanel,
-    body.viewer-mode #ottoBackdrop { display: none !important; }
+    /* Otto's corner ring stays visible on every profile page (owner +
+       viewer mode). The notifications it shows are always YOUR own —
+       which makes sense to be reachable while reading someone else's
+       profile too. The dark Otto status hero on the visited user's
+       page is still hidden (above) since that hero shows owner stats. */
   </style>
   <div class="otto-profile-hero" id="ottoProfileHero">
     <div class="op-bg"></div>
