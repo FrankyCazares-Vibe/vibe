@@ -3498,7 +3498,7 @@ function toggleEdit(){
   // Belt-and-suspenders: viewer-mode CSS hides the Edit button, but the
   // function is still callable from the console / shortcuts. Block it
   // explicitly so editing someone else's profile is impossible.
-  if (window.viewingMockUser) return;
+  if (window.viewingMockUser || window.viewingRealUser) return;
   editMode = !editMode;
   document.body.classList.toggle('edit-mode', editMode);
   const btn = document.getElementById('editToggle');
@@ -5930,7 +5930,7 @@ function renderStudentBadge(userObj, isOwn) {
 
 // Re-render the badge live when verification completes from the modal.
 document.addEventListener('vibeStudentVerified', () => {
-  if (window.viewingMockUser) return;
+  if (window.viewingMockUser || window.viewingRealUser) return;
   const u = (typeof vibeLoad === 'function') ? vibeLoad('vibe_user_v1') : null;
   if (!u) return;
   // Drop the CTA if present — it gets re-added if user is unverified
@@ -5985,7 +5985,7 @@ function _urlFromCssBackgroundImage(bgImg) {
 function saveProfileToStorage() {
   // Never write when viewing someone else's profile — the DOM is showing
   // their data and capturing it would overwrite the owner's vibe_user_v1.
-  if (window.viewingMockUser) return;
+  if (window.viewingMockUser || window.viewingRealUser) return;
   const user = vibeLoad('vibe_user_v1') || {};
 
   // Identity fields (data-user-field on each)
@@ -6108,7 +6108,7 @@ function saveProfileToStorage() {
 
 let profileServerSyncTimer = null;
 function scheduleProfileServerSync() {
-  if (window.viewingMockUser) return;
+  if (window.viewingMockUser || window.viewingRealUser) return;
   const u = (typeof vibeLoad === 'function') ? vibeLoad('vibe_user_v1') : null;
   if (!u || !u._appShell) return;
   clearTimeout(profileServerSyncTimer);
@@ -6256,7 +6256,7 @@ async function _saveProfileHandle(handle) {
 }
 
 async function flushProfileServerSync() {
-  if (window.viewingMockUser) return;
+  if (window.viewingMockUser || window.viewingRealUser) return;
   const u = (typeof vibeLoad === 'function') ? vibeLoad('vibe_user_v1') : null;
   if (!u || !u._appShell) return;
   try {
@@ -6295,7 +6295,7 @@ async function flushProfileServerSync() {
 // because post markup varies (otto badges, platform stats, reactions all
 // optional) and the demo doesn't yet need to reason about post content.
 function savePostsToStorage() {
-  if (window.viewingMockUser) return;
+  if (window.viewingMockUser || window.viewingRealUser) return;
   const list = document.getElementById('profilePostsList');
   if (!list) return;
   const posts = Array.from(list.querySelectorAll('.profile-post-card')).map(card => ({
@@ -6342,7 +6342,7 @@ function _restorePinIfPossible(pinnedId) {
 }
 
 async function hydrateProfilePostsFromAPI() {
-  if (window.viewingMockUser) return;
+  if (window.viewingMockUser || window.viewingRealUser) return;
   try {
     const r = await fetch('/api/me/posts?limit=100', { credentials: 'include' });
     const j = await r.json().catch(() => ({}));
@@ -6479,7 +6479,7 @@ function _formatRelativeDate(iso) {
 let _savedHydrateInflight = false;
 let _savedHydratedOnce = false;
 async function hydrateSavedPaneFromAPI() {
-  if (window.viewingMockUser) return;
+  if (window.viewingMockUser || window.viewingRealUser) return;
   if (_savedHydrateInflight) return;
   const me = (typeof vibeLoad === 'function') ? vibeLoad('vibe_user_v1') : null;
   if (!me || !me._appShell) return;
@@ -6655,7 +6655,7 @@ function deleteProfilePost(btn) {
 
 // ── Vibes persistence (vibe_vibes_v1) ────────────────────────────────────
 function saveVibesToStorage() {
-  if (window.viewingMockUser) return;
+  if (window.viewingMockUser || window.viewingRealUser) return;
   const grid = document.getElementById('profileVibesGrid');
   if (!grid) return;
   const vibes = Array.from(grid.querySelectorAll('.vibe-grid-thumb')).map(t => ({
