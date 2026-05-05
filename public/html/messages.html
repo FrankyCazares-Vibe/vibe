@@ -228,6 +228,21 @@ body{font-family:'DM Sans',sans-serif;background:var(--cream);color:var(--charco
 .snd-btn{width:32px;height:32px;border-radius:50%;background:var(--accent);border:none;cursor:none;display:flex;align-items:center;justify-content:center;flex-shrink:0;transition:all .2s;align-self:flex-end;}
 .snd-btn:hover{background:#ff7055;transform:scale(1.08);}
 .snd-btn:disabled{background:var(--border);transform:none;}
+
+/* Composer paperclip + staged-attachment chip */
+.comp-attach-btn{width:34px;height:34px;border-radius:50%;background:none;border:none;cursor:none;display:flex;align-items:center;justify-content:center;color:var(--muted);transition:background .15s,color .15s;flex-shrink:0;align-self:flex-end;}
+.comp-attach-btn:hover{background:var(--border);color:var(--charcoal);}
+.comp-staged{padding:0 22px 8px;}
+.comp-staged-card{display:inline-flex;align-items:center;gap:10px;background:var(--cream);border:1px solid var(--border);border-radius:12px;padding:6px 10px 6px 6px;}
+.comp-staged-thumb{width:46px;height:46px;border-radius:8px;background:#1C1C1E;overflow:hidden;flex-shrink:0;position:relative;}
+.comp-staged-thumb img,.comp-staged-thumb video{width:100%;height:100%;object-fit:cover;display:block;}
+.comp-staged-info{font-size:11.5px;color:var(--charcoal);}
+.comp-staged-info .cs-name{font-weight:600;}
+.comp-staged-info .cs-meta{color:var(--muted);font-size:10.5px;margin-top:2px;}
+.comp-staged-x{background:none;border:none;color:var(--muted);font-size:18px;line-height:1;padding:2px 6px;cursor:none;}
+.comp-staged-x:hover{color:#C0392B;}
+.comp-progress{height:3px;background:var(--border);border-radius:2px;margin-top:5px;overflow:hidden;width:160px;}
+.comp-progress-bar{height:100%;width:0;background:var(--accent);transition:width .12s linear;}
 .empty{flex:1;display:flex;flex-direction:column;align-items:center;justify-content:center;color:var(--muted);padding:40px;}
 .empty-icon{width:56px;height:56px;border-radius:18px;background:var(--cream);display:flex;align-items:center;justify-content:center;margin-bottom:14px;}
 .empty h3{font-family:'Fraunces',serif;font-size:19px;font-weight:700;color:var(--charcoal);margin-bottom:7px;}
@@ -861,7 +876,13 @@ input,textarea,[contenteditable="true"]{cursor:text!important;}
       <input type="file" id="cPanelPhotoInput" accept="image/jpeg,image/png,image/webp" style="display:none" onchange="__dmPanelPhotoChosen(event)">
       <div class="req-bar" id="reqBar"><p id="reqBarTxt"></p><div class="req-btns"><button class="btn-acc" onclick="accReq()">Accept</button><button class="btn-dec" onclick="decReq()">Decline</button></div></div>
       <div class="msgs" id="msgsArea"></div>
-      <div class="comp"><div class="comp-inner">
+      <div class="comp">
+        <div class="comp-staged" id="compStaged" style="display:none"></div>
+        <div class="comp-inner">
+        <button class="comp-attach-btn" type="button" onclick="document.getElementById('compMediaInput').click()" title="Attach photo or video">
+          <svg width="16" height="16" viewBox="0 0 16 16" fill="none"><path d="M13 7.5L8 12.5C6.343 14.157 3.657 14.157 2 12.5S1 8.157 2.657 6.5L8 1l4 4L6.5 10.5C5.672 11.328 4.328 11.328 3.5 10.5s-.828-2.172 0-3L9 2" stroke="currentColor" stroke-width="1.3" stroke-linecap="round" fill="none"/></svg>
+        </button>
+        <input type="file" id="compMediaInput" accept="image/jpeg,image/png,image/webp,image/gif,video/mp4,video/quicktime,video/webm" style="display:none" onchange="__dmComposeMediaChosen(event)">
         <textarea class="comp-txt" id="msgIn" placeholder="Message…" rows="1" oninput="this.style.height='auto';this.style.height=Math.min(this.scrollHeight,110)+'px';upd()" onkeydown="if(event.key==='Enter'&&!event.shiftKey){event.preventDefault();snd();}"></textarea>
         <button class="snd-btn" id="sndBtn" onclick="snd()" disabled><svg width="14" height="14" viewBox="0 0 14 14" fill="none"><path d="M13 1L1 6l5 2 2 5 5-12z" fill="white" stroke="white" stroke-width=".3" stroke-linejoin="round"/></svg></button>
       </div></div>
@@ -971,6 +992,15 @@ function renderMsgs(msgs,d){
     }
     if(m.vibe){
       h+=`<div class="msg-row${gc}">${avForMsg(m, showAv)}<div class="mv"><div class="mv-thumb" style="background:${m.vibe.bg}"><div class="mv-grad"></div><div class="mv-play">&#9654;</div></div><div class="mv-body"><div class="mv-creator">${m.vibe.creator}</div><div class="mv-title">${m.vibe.title}</div></div></div></div>`;
+    } else if (m.media) {
+      // Inline image or video upload (paperclip).
+      const mediaInner = m.media.kind === 'video'
+        ? `<video src="${__dmEsc(m.media.url)}" controls playsinline preload="metadata" style="display:block;max-width:280px;max-height:320px;border-radius:14px;background:#000;"></video>`
+        : `<img src="${__dmEsc(m.media.url)}" alt="" style="display:block;max-width:280px;max-height:320px;border-radius:14px;object-fit:cover;background:var(--cream);">`;
+      const captionBubble = m.t
+        ? `<div class="bubble">${__dmEsc(m.t)}<div class="btime">${m.ts}</div></div>`
+        : `<div class="btime" style="font-size:10px;color:var(--muted);text-align:${mine?'right':'left'};">${m.ts}</div>`;
+      h += `<div class="msg-row${mine?' mine':''}${gc}">${!mine?avForMsg(m, showAv):''}<div style="display:flex;flex-direction:column;align-items:${mine?'flex-end':'flex-start'};gap:4px;">${mediaInner}${captionBubble}</div></div>`;
     } else if (m.attachment) {
       const a = m.attachment;
       let cardInner;
@@ -1017,7 +1047,10 @@ function renderMsgs(msgs,d){
 }
 
 function snd(){
-  const inp=document.getElementById('msgIn');const txt=inp.value.trim();if(!txt||!active)return;
+  const inp=document.getElementById('msgIn');const txt=inp.value.trim();
+  const hasMedia = typeof __realDM !== 'undefined' && __realDM.enabled && __realDM.stagedMedia;
+  if(!active)return;
+  if(!txt && !hasMedia)return;
   if (typeof __realDM !== 'undefined' && __realDM.enabled) {
     const sendBtn = document.getElementById('sndBtn');
     sendBtn.disabled = true;
@@ -1214,8 +1247,11 @@ const __realDM = {
   peerLastReadByChannel:{},     // channelId → peer's last_read_at ISO
   composeAbort:null,             // AbortController for the in-flight search
   composeDebounce:null,          // setTimeout handle
-  composeMode:'direct',          // 'direct' | 'group'
+  composeMode:'direct',          // 'direct' | 'group' | 'add'
   composeSelected:[],            // group mode: [{id, handle, name, avatar_url}]
+  // Staged file in the composer (paperclip): { file, kind, previewUrl }
+  // null when nothing is staged. Cleared on successful send or cancel.
+  stagedMedia: null,
 };
 
 function __dmEsc(s){return String(s==null?'':s).replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));}
@@ -1384,6 +1420,10 @@ async function __dmLoadMessages(channelId) {
         posterUrl: null,
         unavailable: true,  // FK was set but the post is gone or not visible.
       } : null);
+      // Inline media (paperclip uploads) — server already signs the URL.
+      const media = m.media_url
+        ? { url: m.media_url, kind: m.media_kind === 'video' ? 'video' : 'image' }
+        : null;
       return {
         m: m.user_id === me ? 1 : 0,
         t: m.content,
@@ -1395,6 +1435,7 @@ async function __dmLoadMessages(channelId) {
         senderAvatarUrl: u.avatar_url || null,
         senderBg: __dmAvBg(u.handle || u.id || senderName),
         attachment,
+        media,
       };
     });
     __realDM.peerLastReadByChannel[channelId] = j.peer_last_read_at || null;
@@ -1479,18 +1520,59 @@ async function __dmOpenChannel(channelId) {
 
 async function __dmSend(text) {
   const channelId = active;
-  if (!channelId || !text) return false;
+  if (!channelId) return false;
+  const staged = __realDM.stagedMedia;
+  if (!text && !staged) return false;
   try {
+    let mediaPayload = null;
+    if (staged) {
+      // Upload to R2 first, then send the message with the resulting key.
+      const stagedFile = staged.file;
+      // 1. Sign the upload URL.
+      const signRes = await fetch('/api/me/messages-upload-url', {
+        method: 'POST',
+        credentials: 'include',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          channelId,
+          contentType: stagedFile.type,
+          sizeBytes: stagedFile.size,
+        }),
+      });
+      const signJson = await signRes.json();
+      if (!signJson.ok) throw new Error(signJson.error || 'upload sign failed');
+      // 2. PUT the bytes (XHR for progress reporting).
+      const bar = document.getElementById('compStagedProgressBar');
+      await new Promise((resolve, reject) => {
+        const xhr = new XMLHttpRequest();
+        xhr.open('PUT', signJson.uploadUrl, true);
+        xhr.setRequestHeader('Content-Type', stagedFile.type);
+        if (xhr.upload && bar) {
+          xhr.upload.onprogress = (ev) => {
+            if (!ev.lengthComputable) return;
+            bar.style.width = Math.round((ev.loaded / ev.total) * 100) + '%';
+          };
+        }
+        xhr.onload = () => xhr.status >= 200 && xhr.status < 300
+          ? resolve(null)
+          : reject(new Error('upload failed (' + xhr.status + ')'));
+        xhr.onerror = () => reject(new Error('upload network error'));
+        xhr.send(stagedFile);
+      });
+      mediaPayload = { media_url: signJson.objectKey, media_kind: signJson.kind };
+    }
+
     const r = await fetch('/api/me/threads/' + encodeURIComponent(channelId) + '/messages', {
       method:'POST',
       credentials:'include',
       headers:{'Content-Type':'application/json'},
-      body: JSON.stringify({ content: text }),
+      body: JSON.stringify({ content: text, ...(mediaPayload || {}) }),
     });
     const j = await r.json();
     if (!j.ok) throw new Error(j.error || 'send failed');
     if (__realDM.T[channelId]) __realDM.T[channelId].isRequest = false;
     document.getElementById('reqBar').classList.remove('show');
+    __dmComposeMediaClear();
     await __dmLoadMessages(channelId);
     __dmLoadList();
     return true;
@@ -1499,6 +1581,69 @@ async function __dmSend(text) {
     alert('Could not send: ' + e.message);
     return false;
   }
+}
+
+// ── Composer media (paperclip) ─────────────────────────────────────────
+function __dmComposeMediaChosen(ev) {
+  const file = ev.target.files && ev.target.files[0];
+  ev.target.value = '';
+  if (!file) return;
+  const isImage = /^image\//i.test(file.type);
+  const isVideo = /^video\//i.test(file.type);
+  if (!isImage && !isVideo) {
+    alert('Only images and videos can be attached.');
+    return;
+  }
+  const limit = isImage ? 15 * 1024 * 1024 : 200 * 1024 * 1024;
+  if (file.size > limit) {
+    alert('File too big (max ' + (limit / (1024 * 1024)) + 'MB for ' + (isImage ? 'images' : 'videos') + ').');
+    return;
+  }
+  const previewUrl = URL.createObjectURL(file);
+  __realDM.stagedMedia = {
+    file,
+    kind: isImage ? 'image' : 'video',
+    previewUrl,
+    name: file.name,
+    sizeKb: Math.round(file.size / 1024),
+  };
+  __dmComposeMediaRenderStaged();
+  document.getElementById('sndBtn').disabled = false;
+}
+
+function __dmComposeMediaClear() {
+  if (__realDM.stagedMedia && __realDM.stagedMedia.previewUrl) {
+    try { URL.revokeObjectURL(__realDM.stagedMedia.previewUrl); } catch (_) {}
+  }
+  __realDM.stagedMedia = null;
+  __dmComposeMediaRenderStaged();
+  upd(); // re-evaluate the send button
+}
+
+function __dmComposeMediaRenderStaged() {
+  const wrap = document.getElementById('compStaged');
+  if (!wrap) return;
+  const s = __realDM.stagedMedia;
+  if (!s) {
+    wrap.innerHTML = '';
+    wrap.style.display = 'none';
+    return;
+  }
+  const thumb = s.kind === 'image'
+    ? '<img src="' + s.previewUrl + '" alt="">'
+    : '<video src="' + s.previewUrl + '" muted></video>';
+  wrap.style.display = '';
+  wrap.innerHTML =
+    '<div class="comp-staged-card">' +
+      '<div class="comp-staged-thumb">' + thumb + '</div>' +
+      '<div class="comp-staged-info">' +
+        '<div class="cs-name">' + __dmEsc(s.name) + '</div>' +
+        '<div class="cs-meta">' + (s.kind === 'image' ? 'Photo' : 'Video') + ' · ' + s.sizeKb.toLocaleString() + ' KB' +
+          '<div class="comp-progress"><div class="comp-progress-bar" id="compStagedProgressBar"></div></div>' +
+        '</div>' +
+      '</div>' +
+      '<button class="comp-staged-x" type="button" onclick="__dmComposeMediaClear()" title="Remove">×</button>' +
+    '</div>';
 }
 
 async function __dmAccept() {

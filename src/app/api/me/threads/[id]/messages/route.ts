@@ -1,5 +1,10 @@
 import { NextResponse } from "next/server";
 
+import {
+  isR2Configured,
+  MESSAGE_MEDIA_KEY_PREFIX,
+  signMessageMediaGetUrl,
+} from "@/lib/r2";
 import { createSupabaseServerClient } from "@/lib/supabase/server";
 
 const MAX_CONTENT = 4000;
@@ -10,12 +15,48 @@ type SendBody = {
   content?: unknown;
   attachment_id?: unknown;
   attachment_kind?: unknown; // 'post' | 'clip'
+  media_url?: unknown;        // R2 object key (messages/<channel>/<uuid>.ext)
+  media_kind?: unknown;       // 'image' | 'video'
 };
 
 const MESSAGE_SELECT =
-  "id, content, created_at, user_id, attachment_id, attachment_kind, " +
+  "id, content, created_at, user_id, attachment_id, attachment_kind, media_url, media_kind, " +
   "users:users!messages_user_id_fkey(id, handle, name, avatar_url), " +
   "attachment:posts!messages_attachment_id_fkey(id, type, content, media_url, media_thumbnail_url, user_id)";
+
+type MessageRow = {
+  id: string;
+  content: string;
+  created_at: string;
+  user_id: string;
+  media_url?: string | null;
+  media_kind?: string | null;
+  attachment_id?: string | null;
+  attachment_kind?: string | null;
+  users?: unknown;
+  attachment?: unknown;
+};
+
+/**
+ * Replace stored R2 keys in `media_url` with short-lived signed GET URLs
+ * so the browser can render images/videos directly. No-ops when R2 isn't
+ * configured or media_url is already a public URL.
+ */
+async function signMediaUrls(rows: MessageRow[]): Promise<void> {
+  if (!isR2Configured()) return;
+  await Promise.all(
+    rows.map(async (m) => {
+      const key = m.media_url;
+      if (!key || !key.startsWith(MESSAGE_MEDIA_KEY_PREFIX)) return;
+      try {
+        m.media_url = await signMessageMediaGetUrl(key);
+      } catch (err) {
+        console.error("[messages.signMediaUrls]", err);
+        m.media_url = null;
+      }
+    }),
+  );
+}
 
 type RouteCtx = { params: Promise<{ id: string }> };
 
@@ -77,7 +118,7 @@ export async function GET(req: Request, ctx: RouteCtx) {
   }
   let { data, error } = await runQuery(MESSAGE_SELECT);
   if (error) {
-    if (/attachment|relationship|column|fkey/i.test(error.message)) {
+    if (/attachment|media|relationship|column|fkey/i.test(error.message)) {
       const fallback = await runQuery(
         "id, content, created_at, user_id, users:users!messages_user_id_fkey(id, handle, name, avatar_url)",
       );
@@ -89,6 +130,8 @@ export async function GET(req: Request, ctx: RouteCtx) {
     console.error("[messages.GET]", error);
     return NextResponse.json({ ok: false, error: error.message }, { status: 500 });
   }
+  // Sign R2 keys in media_url so the browser can render directly.
+  await signMediaUrls((data ?? []) as unknown as MessageRow[]);
 
   // Peer's last_read_at — drives the "Read" receipt on sent messages.
   // (For 1:1 dms there's exactly one peer; for groups we take the max so
@@ -139,12 +182,41 @@ export async function POST(req: Request, ctx: RouteCtx) {
       : null;
   const attachmentKindRaw =
     typeof body.attachment_kind === "string" ? body.attachment_kind : null;
+  const mediaUrlRaw =
+    typeof body.media_url === "string" && body.media_url.length > 0
+      ? body.media_url
+      : null;
+  const mediaKindRaw =
+    typeof body.media_kind === "string" ? body.media_kind : null;
 
-  if (!content && !attachmentId) {
+  if (!content && !attachmentId && !mediaUrlRaw) {
     return NextResponse.json({ ok: false, error: "Empty message" }, { status: 400 });
   }
   if (content.length > MAX_CONTENT) {
     return NextResponse.json({ ok: false, error: "Message too long" }, { status: 400 });
+  }
+
+  // Validate media: only accept R2 keys we'd have signed ourselves
+  // (channel-scoped path), and only known kinds.
+  let mediaUrl: string | null = null;
+  let mediaKind: "image" | "video" | null = null;
+  if (mediaUrlRaw) {
+    if (
+      !mediaUrlRaw.startsWith(`${MESSAGE_MEDIA_KEY_PREFIX}${channelId}/`)
+    ) {
+      return NextResponse.json(
+        { ok: false, error: "Invalid media key" },
+        { status: 400 },
+      );
+    }
+    if (mediaKindRaw !== "image" && mediaKindRaw !== "video") {
+      return NextResponse.json(
+        { ok: false, error: "Invalid media_kind" },
+        { status: 400 },
+      );
+    }
+    mediaUrl = mediaUrlRaw;
+    mediaKind = mediaKindRaw;
   }
 
   // Verify the attachment exists and is visible to the sender (RLS gates
@@ -190,16 +262,17 @@ export async function POST(req: Request, ctx: RouteCtx) {
     content: content,
     attachment_id: attachmentId,
     attachment_kind: attachmentKind,
+    media_url: mediaUrl,
+    media_kind: mediaKind,
   };
-  // Strip attachment fields if they're null AND the column might not exist
-  // yet — defensive for migration lag. Falls through to the simple select
-  // below if PostgREST rejects unknown columns (older schema).
+  // Defensive for migration lag — if either pair of optional columns is
+  // missing, retry with the bare minimum so the message still goes through.
   let insertResult = await supabase
     .from("messages")
     .insert(insertRow)
     .select(MESSAGE_SELECT)
     .single();
-  if (insertResult.error && /attachment|column/i.test(insertResult.error.message)) {
+  if (insertResult.error && /attachment|media|column/i.test(insertResult.error.message)) {
     insertResult = await supabase
       .from("messages")
       .insert({ channel_id: channelId, user_id: user.id, content })
@@ -235,5 +308,6 @@ export async function POST(req: Request, ctx: RouteCtx) {
     .eq("channel_id", channelId)
     .eq("user_id", user.id);
 
+  if (inserted) await signMediaUrls([inserted as unknown as MessageRow]);
   return NextResponse.json({ ok: true, message: inserted });
 }
