@@ -1563,8 +1563,8 @@ body.recruiter-mode .vibe-delete-btn { display:none !important; }
   cursor:none;border:1px solid transparent;transition:all .15s;
 }
 .ppost-chip:hover { border-color:var(--border); }
-.ppost-save { font-size:12px;font-weight:700;color:var(--muted);background:none;border:none;cursor:none;transition:color .15s; }
-.ppost-save:hover { color:var(--charcoal); }
+/* .ppost-save removed — duplicate of the bookmark icon in the post
+   viewer modal. Save lives in the modal action row only. */
 
 /* ── Viewer nudge ── */
 .viewer-nudge {
@@ -3128,7 +3128,6 @@ body.empty-profile-mode #profileEmpty { display: flex !important; }
             </div>
             <div class="ppost-reactions">
               <div class="ppost-left"><span class="ppost-chip">&#128161; 891</span><span class="ppost-chip">&#129334; 128</span><span class="ppost-chip">&#128172; 34</span></div>
-              <button class="ppost-save">Save</button>
             </div>
           </div>
 
@@ -3143,7 +3142,6 @@ body.empty-profile-mode #profileEmpty { display: flex !important; }
             <div class="ppost-tags"><span class="ppost-tag">#OpenToWork</span><span class="ppost-tag">#Career</span></div>
             <div class="ppost-reactions">
               <div class="ppost-left"><span class="ppost-chip">&#128293; 1.1k</span><span class="ppost-chip">&#128161; 388</span><span class="ppost-chip">&#128172; 19</span></div>
-              <button class="ppost-save">Save</button>
             </div>
           </div>
 
@@ -3157,7 +3155,6 @@ body.empty-profile-mode #profileEmpty { display: flex !important; }
             <div class="ppost-tags"><span class="ppost-tag">#ProductThinking</span><span class="ppost-tag">#Design</span></div>
             <div class="ppost-reactions">
               <div class="ppost-left"><span class="ppost-chip">&#129327; 644</span><span class="ppost-chip">&#128161; 221</span><span class="ppost-chip">&#128172; 41</span></div>
-              <button class="ppost-save">Save</button>
             </div>
           </div>
           </div><!-- /profilePostsList -->
@@ -4618,7 +4615,7 @@ function populateAllGrid() {
   list.addEventListener('click', (ev) => {
     const card = ev.target.closest('.profile-post-card');
     if (!card) return;
-    if (ev.target.closest('.ppost-pin, .ppost-delete, .ppost-save')) return;
+    if (ev.target.closest('.ppost-pin, .ppost-delete')) return;
     const id = card.dataset.postId;
     if (!id || typeof openPostViewer !== 'function') return;
     openPostViewer(id, _profilePrefillFromCard(card));
@@ -6437,7 +6434,6 @@ function _renderPostCard(p) {
     ${platformBlock}
     <div class="ppost-reactions">
       <div class="ppost-left">${reactionsLeft}</div>
-      <button class="ppost-save">Save</button>
     </div>
   `;
   // Defer measurement to next frame so layout has a real height.
