@@ -33,9 +33,12 @@ export async function GET(req: Request) {
     .from("notifications")
     .select(
       "id,type,post_id,comment_id,read_at,created_at," +
-        // Explicit FK names disambiguate the actor + post embeds.
+        // Explicit FK names disambiguate the actor + post + comment embeds.
         "actor:users!notifications_actor_id_fkey(id,name,handle,avatar_url)," +
-        "post:posts!notifications_post_id_fkey(id,type,content,media_thumbnail_url)",
+        "post:posts!notifications_post_id_fkey(id,type,content,media_thumbnail_url)," +
+        // Comment text — only present on type='comment' rows. Surfaces
+        // *what* they said so the user can scan replies in the panel.
+        "comment:post_comments!notifications_comment_id_fkey(id,content)",
     )
     .eq("user_id", user.id)
     .order("created_at", { ascending: false })

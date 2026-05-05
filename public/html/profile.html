@@ -5752,6 +5752,19 @@ window.viewingRealUser = null;
   requestAnimationFrame(() => {
     document.documentElement.classList.remove('vibe-pre-paint');
   });
+
+  // Auto-open the post viewer when arriving via /profile?post=<id>.
+  // Used by Otto notification rows that route like/comment notifs to
+  // the post (instead of the actor's profile). Wait until the posts
+  // have hydrated so the modal can find the row in the DB.
+  const targetPostId = params.get('post');
+  if (targetPostId) {
+    setTimeout(() => {
+      if (typeof openPostViewer === 'function') {
+        openPostViewer(targetPostId);
+      }
+    }, 800);
+  }
 })();
 
 // ── Student badge ────────────────────────────────────────────────────────

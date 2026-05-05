@@ -548,14 +548,24 @@
       case 'comment':    verb = 'commented on your post';       break;
       default:           verb = '';
     }
-    const snippet = (n.post && n.post.content)
-      ? `<div class="otto-notif-snippet">"${_ottoEsc(n.post.content.slice(0, 120))}"</div>`
+    // Snippet content varies by type — for comments we want to show
+    // *what they said*; for likes the post body gives the context.
+    let snippetText = '';
+    if (n.type === 'comment' && n.comment && n.comment.content) {
+      snippetText = n.comment.content;
+    } else if ((n.type === 'like' || n.type === 'comment') && n.post && n.post.content) {
+      snippetText = n.post.content;
+    }
+    const snippet = snippetText
+      ? `<div class="otto-notif-snippet">"${_ottoEsc(snippetText.slice(0, 140))}"</div>`
       : '';
-    const click = a.handle
-      ? ` onclick="window.location.href='/profile/${encodeURIComponent(a.handle)}'"`
-      : '';
+    // Click routing depends on type: like/comment open the post; follow/
+    // connection go to the actor's profile. Inline onclick can't easily
+    // call a window function with a complex arg, so we delegate via
+    // window.__ottoOpenNotif which looks up the row by id from the cache.
+    const click = ` onclick="window.__ottoOpenNotif('${_ottoEsc(n.id)}')"`;
     const cls = 'otto-notif-row' + (n.read_at ? '' : ' unread');
-    return `<div class="${cls}"${click}>
+    return `<div class="${cls}"${click} data-notif-id="${_ottoEsc(n.id)}">
       ${av}
       <div class="otto-notif-body">
         <div><span class="otto-notif-actor">${name}</span> <span class="otto-notif-text">${verb}</span></div>
@@ -564,6 +574,38 @@
       </div>
     </div>`;
   }
+
+  // Click delegate: route the row to the post viewer (likes/comments)
+  // or the actor's profile (follows/connections). Closes Otto first so
+  // the modal isn't stacked behind the panel.
+  window.__ottoOpenNotif = function (notifId) {
+    const n = (_ottoLastList || []).find(x => x.id === notifId);
+    if (!n) return;
+    closeOttoPanel();
+    if ((n.type === 'like' || n.type === 'comment') && n.post && n.post.id) {
+      const postId = n.post.id;
+      // If the shared post viewer modal is loaded on this page, open
+      // it directly — no navigation. Otherwise, send the user to their
+      // own profile with ?post=<id> and let that page auto-open it.
+      if (typeof window.openPostViewer === 'function') {
+        try {
+          window.openPostViewer(postId, {
+            id: postId, type: n.post.type || 'post',
+            content: n.post.content || '',
+            media_thumbnail_url: n.post.media_thumbnail_url || '',
+            tags: [], media_url: '',
+            created_at: n.created_at, author: null,
+          });
+          return;
+        } catch {}
+      }
+      window.location.href = '/profile?post=' + encodeURIComponent(postId);
+      return;
+    }
+    if (n.actor && n.actor.handle) {
+      window.location.href = '/profile/' + encodeURIComponent(n.actor.handle);
+    }
+  };
 
   // Poll the unread count every 30s so the dot stays current without
   // the user having to refresh. Visibility-gated so a backgrounded tab
