@@ -6068,15 +6068,41 @@ async function hydrateProfilePostsFromAPI() {
     const r = await fetch('/api/me/posts?limit=100', { credentials: 'include' });
     const j = await r.json().catch(() => ({}));
     if (!r.ok || !j.ok || !Array.isArray(j.posts)) return;
-    const cards = j.posts.map(_profileMapDbRow).filter(Boolean);
-    const list = document.getElementById('profilePostsList');
-    if (!list) return;
-    // Clear existing cards (Maya hardcoded + any localStorage-rendered) and
-    // replace with the DB truth. Mirror the same shape into vibe_posts_v1
+    const postRows = j.posts.filter(p => p.type === 'post');
+    const clipRows = j.posts.filter(p => p.type === 'clip');
+
+    // Posts pane — clear hardcoded Maya + any localStorage-rendered cards
+    // and replace with the DB truth. Mirror the shape into vibe_posts_v1
     // so subsequent saves don't snapshot stale local DOM.
-    list.querySelectorAll('.profile-post-card').forEach(c => c.remove());
-    cards.forEach(c => list.appendChild(_renderPostCard(c)));
-    if (typeof savePostsToStorage === 'function') savePostsToStorage();
+    const list = document.getElementById('profilePostsList');
+    if (list) {
+      list.querySelectorAll('.profile-post-card').forEach(c => c.remove());
+      postRows.map(_profileMapDbRow).filter(Boolean)
+        .forEach(c => list.appendChild(_renderPostCard(c)));
+      if (typeof savePostsToStorage === 'function') savePostsToStorage();
+    }
+
+    // Clips pane — same idea: replace hardcoded Maya v1/v2/v3 thumbs
+    // with the user's real DB clips so they persist across sessions.
+    const grid = document.getElementById('profileVibesGrid');
+    if (grid) {
+      grid.querySelectorAll('.vibe-grid-thumb').forEach(t => t.remove());
+      clipRows.forEach(row => {
+        const node = _renderVibeThumb({
+          id:    row.id,
+          title: (row.content || '').slice(0, 80) || 'Clip',
+          views: '0 views · 0:00',
+          bg:    row.media_thumbnail_url
+            ? `center/cover no-repeat url("${row.media_thumbnail_url}")`
+            : 'linear-gradient(135deg,#1a0533,#2d1b4e)',
+        });
+        const uploadTile = grid.querySelector('.vibe-upload-tile');
+        if (uploadTile) grid.insertBefore(node, uploadTile);
+        else grid.appendChild(node);
+      });
+      if (typeof saveVibesToStorage === 'function') saveVibesToStorage();
+    }
+
     if (typeof populateAllGrid === 'function') populateAllGrid();
   } catch (e) { /* silent — local cache stays */ }
 }
