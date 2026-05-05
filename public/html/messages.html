@@ -801,6 +801,10 @@ const T={
 let active=null;
 
 function openT(id){
+  if (typeof __realDM !== 'undefined' && __realDM.enabled) {
+    active = id;
+    return __dmOpenChannel(id);
+  }
   active=id;const d=T[id];if(!d)return;
   document.querySelectorAll('.t-item').forEach(el=>{
     const m=el.dataset.t===id;el.classList.toggle('active',m);
@@ -839,6 +843,15 @@ function renderMsgs(msgs,d){
 
 function snd(){
   const inp=document.getElementById('msgIn');const txt=inp.value.trim();if(!txt||!active)return;
+  if (typeof __realDM !== 'undefined' && __realDM.enabled) {
+    const sendBtn = document.getElementById('sndBtn');
+    sendBtn.disabled = true;
+    __dmSend(txt).then(ok => {
+      if (ok) { inp.value = ''; inp.style.height = ''; }
+      sendBtn.disabled = !inp.value.trim();
+    });
+    return;
+  }
   T[active].msgs.push({m:1,t:txt,ts:'Just now'});
   const a=document.getElementById('msgsArea');const old=a.querySelector('.rr');if(old)old.remove();
   const r=document.createElement('div');r.className='msg-row mine gt';r.innerHTML=`<div class="bubble">${txt}<div class="btime">Just now</div></div>`;a.appendChild(r);
@@ -851,8 +864,14 @@ function snd(){
   },1200);}
 }
 function upd(){document.getElementById('sndBtn').disabled=!document.getElementById('msgIn').value.trim();}
-function accReq(){document.getElementById('reqBar').classList.remove('show');if(active)T[active].req=false;}
-function decReq(){document.getElementById('reqBar').classList.remove('show');document.getElementById('cContent').style.display='none';document.getElementById('emptyState').style.display='flex';}
+function accReq(){
+  if (typeof __realDM !== 'undefined' && __realDM.enabled) return __dmAccept();
+  document.getElementById('reqBar').classList.remove('show');if(active)T[active].req=false;
+}
+function decReq(){
+  if (typeof __realDM !== 'undefined' && __realDM.enabled) return __dmDecline();
+  document.getElementById('reqBar').classList.remove('show');document.getElementById('cContent').style.display='none';document.getElementById('emptyState').style.display='flex';
+}
 function switchTab(btn,mode){document.querySelectorAll('.t-tab').forEach(b=>b.classList.remove('active'));btn.classList.add('active');document.querySelectorAll('.t-item').forEach(el=>{el.style.display=mode==='unread'?(el.classList.contains('unread')?'':'none'):''});}
 function filterT(v){document.querySelectorAll('.t-item').forEach(el=>{el.style.display=el.querySelector('.t-name').textContent.toLowerCase().includes(v.toLowerCase())?'':'none';});}
 function shareVibe(){const inp=document.getElementById('msgIn');inp.value='Check out this Vibe — ';inp.focus();upd();}
@@ -1007,31 +1026,285 @@ document.addEventListener('DOMContentLoaded',function(){
 });
 // ══ END CALENDAR SYNC ════════════════════════════════════════════════════
 
-// ══ MESSAGES PAGE INIT (uses shared _persistence.js) ═════════════════════
-(function initMessagesPage(){
-  const user = vibeInit();
-  if (!user) { window.location.href = '/'; return; }
-  if (user._isDemo) vibeShowDemoPill();
-  // Fresh-onboarded users have no threads yet — wipe Maya's demo conversations
-  // and show the empty state in both columns.
-  if (user._onboarded && !user._isDemo) {
-    document.querySelector('.req-banner')?.style.setProperty('display', 'none');
-    document.querySelector('.t-tabs')?.style.setProperty('display', 'none');
-    const tScroll = document.getElementById('tScroll');
-    if (tScroll) tScroll.style.display = 'none';
-    document.getElementById('tEmpty')?.classList.add('visible');
-    // Update right-column empty copy + remove the "Open a conversation" CTA
-    // since there's nothing to open.
-    const rightEmpty = document.getElementById('emptyState');
-    if (rightEmpty) {
-      const h3 = rightEmpty.querySelector('h3');
-      const p  = rightEmpty.querySelector('p');
-      const btn = rightEmpty.querySelector('.start-btn');
-      if (h3) h3.textContent = 'Pick someone to message';
-      if (p)  p.textContent  = 'Once you connect with people on Vibe, your conversations will live here.';
-      if (btn) btn.remove();
+// ══ REAL DMs (P1-022) ════════════════════════════════════════════════════
+// Activates only for real onboarded users. Demo users keep the hardcoded
+// T map and openT/snd/accReq/decReq paths above. Wires:
+//   GET  /api/me/threads                       → list + requests
+//   POST /api/me/threads { handle }            → find-or-create dm
+//   GET  /api/me/threads/[id]/messages         → message history
+//   POST /api/me/threads/[id]/messages         → send
+//   POST /api/me/threads/[id]/{accept,decline,read}
+const __realDM = { enabled:false, meId:null, T:{}, pollTimer:null, listTimer:null, POLL_MS:5000, LIST_POLL_MS:30000 };
+
+function __dmEsc(s){return String(s==null?'':s).replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));}
+function __dmInitials(name){const p=String(name||'').trim().split(/\s+/).slice(0,2);return (p.map(s=>s[0]||'').join('').toUpperCase())||'?';}
+function __dmAvBg(seed){const palette=['#2D1B4E','#3B1A00','#2a2800','#1A1A00','#1A3A5C','#2D3748','#3B0764','#1F2937'];const s=String(seed||'');let h=0;for(let i=0;i<s.length;i++)h=(h*31+s.charCodeAt(i))>>>0;return palette[h%palette.length];}
+function __dmFmtRel(iso){if(!iso)return'';const t=new Date(iso).getTime();if(Number.isNaN(t))return'';const d=Date.now()-t;if(d<60000)return'now';if(d<3600000)return Math.floor(d/60000)+'m';if(d<86400000)return Math.floor(d/3600000)+'h';if(d<604800000)return Math.floor(d/86400000)+'d';return new Date(iso).toLocaleDateString();}
+
+function __dmThreadRecord(thread, isRequest) {
+  const peer = thread.peer || {};
+  const name = peer.name || thread.name || 'Unknown';
+  return {
+    n: name,
+    av: __dmInitials(name),
+    bg: __dmAvBg(peer.id || peer.handle || name),
+    role: peer.school || peer.bio || '',
+    on: false,
+    conn: !isRequest,
+    vibe: null,
+    msgs: __realDM.T[thread.id]?.msgs || [],
+    peerId: peer.id || null,
+    peerHandle: peer.handle || null,
+    isRequest: !!isRequest,
+    lastMessage: thread.last_message || null,
+    unread: !!thread.unread,
+  };
+}
+
+function __dmThreadItemHtml(thread, isRequest) {
+  const rec = __realDM.T[thread.id];
+  const prev = thread.last_message?.content || (isRequest ? 'New message request' : 'No messages yet');
+  const time = __dmFmtRel(thread.last_message?.created_at);
+  const unread = thread.unread ? ' unread' : '';
+  const previewClass = thread.unread ? ' b' : '';
+  const id = __dmEsc(thread.id);
+  return '<div class="t-item' + unread + '" data-t="' + id + '" onclick="openT(\'' + id + '\')">' +
+    '<div class="t-av" style="background:' + rec.bg + '">' + __dmEsc(rec.av) + '</div>' +
+    '<div class="t-info">' +
+      '<div class="t-name">' + __dmEsc(rec.n) + '</div>' +
+      '<div class="t-prev' + previewClass + '">' + __dmEsc(prev) + '</div>' +
+    '</div>' +
+    '<div class="t-time">' + __dmEsc(time) + '</div>' +
+  '</div>';
+}
+
+function __dmRenderList(threads, requests) {
+  __realDM.T = {};
+  for (const t of threads) __realDM.T[t.id] = __dmThreadRecord(t, false);
+  for (const r of requests) __realDM.T[r.id] = __dmThreadRecord(r, true);
+
+  const tScroll = document.getElementById('tScroll');
+  const tEmpty = document.getElementById('tEmpty');
+  const reqBanner = document.querySelector('.req-banner');
+  const tabs = document.querySelector('.t-tabs');
+
+  if (threads.length === 0 && requests.length === 0) {
+    if (tScroll) tScroll.innerHTML = '';
+    if (tEmpty) tEmpty.classList.add('visible');
+    if (reqBanner) reqBanner.style.display = 'none';
+    if (tabs) tabs.style.display = 'none';
+    return;
+  }
+  if (tEmpty) tEmpty.classList.remove('visible');
+  if (tScroll) tScroll.style.display = '';
+  if (tabs) tabs.style.display = '';
+
+  if (reqBanner) {
+    if (requests.length > 0) {
+      reqBanner.style.display = '';
+      const badge = reqBanner.querySelector('.req-badge');
+      const txt = reqBanner.querySelector('.req-txt p');
+      if (badge) badge.textContent = String(requests.length);
+      if (txt) txt.textContent = requests.length === 1
+        ? "1 person you haven't connected with"
+        : requests.length + " people you haven't connected with";
+      reqBanner.onclick = () => openT(requests[0].id);
+    } else {
+      reqBanner.style.display = 'none';
     }
   }
+
+  const items = threads.map(t => __dmThreadItemHtml(t, false))
+    .concat(requests.map(r => __dmThreadItemHtml(r, true)));
+  if (tScroll) tScroll.innerHTML = items.join('');
+}
+
+async function __dmLoadList() {
+  try {
+    const r = await fetch('/api/me/threads', { credentials:'include' });
+    const j = await r.json();
+    if (!j.ok) throw new Error(j.error || 'list failed');
+    __dmRenderList(j.threads || [], j.requests || []);
+    return j;
+  } catch (e) { console.error('[dm.loadList]', e); return null; }
+}
+
+async function __dmLoadMessages(channelId) {
+  try {
+    const r = await fetch('/api/me/threads/' + encodeURIComponent(channelId) + '/messages?limit=50', { credentials:'include' });
+    const j = await r.json();
+    if (!j.ok) throw new Error(j.error || 'load failed');
+    const me = __realDM.meId;
+    const msgs = (j.messages || []).map(m => ({
+      m: m.user_id === me ? 1 : 0,
+      t: m.content,
+      ts: __dmFmtRel(m.created_at),
+      id: m.id,
+      created_at: m.created_at,
+    }));
+    if (__realDM.T[channelId]) __realDM.T[channelId].msgs = msgs;
+    if (active === channelId && __realDM.T[channelId]) {
+      renderMsgs(msgs, __realDM.T[channelId]);
+    }
+  } catch (e) { console.error('[dm.loadMessages]', e); }
+}
+
+async function __dmOpenChannel(channelId) {
+  const d = __realDM.T[channelId];
+  if (!d) return;
+
+  document.querySelectorAll('.t-item').forEach(el => {
+    const m = el.dataset.t === channelId;
+    el.classList.toggle('active', m);
+    if (m) {
+      el.classList.remove('unread');
+      const p = el.querySelector('.t-prev'); if (p) p.classList.remove('b');
+    }
+  });
+
+  document.getElementById('emptyState').style.display = 'none';
+  const cc = document.getElementById('cContent'); cc.style.display = 'flex';
+  const av = document.getElementById('cAv');
+  av.textContent = d.av; av.style.background = d.bg;
+  document.getElementById('cName').textContent = d.n;
+  document.getElementById('cStatus').textContent = d.role || '';
+  document.getElementById('cPill').style.display = 'none';
+
+  const rb = document.getElementById('reqBar');
+  if (d.isRequest) {
+    rb.classList.add('show');
+    document.getElementById('reqBarTxt').textContent =
+      d.n + " sent you a message request. You haven't connected yet — accept or decline.";
+  } else {
+    rb.classList.remove('show');
+  }
+
+  const profileBtn = document.querySelector('#cContent .c-actions .c-btn');
+  if (profileBtn) {
+    profileBtn.onclick = d.peerHandle
+      ? () => { window.location.href = '/profile/' + d.peerHandle; }
+      : null;
+  }
+  const inp = document.getElementById('msgIn');
+  if (inp) inp.placeholder = 'Message ' + (d.n.split(' ')[0] || '') + '…';
+
+  await __dmLoadMessages(channelId);
+  fetch('/api/me/threads/' + encodeURIComponent(channelId) + '/read', { method:'POST', credentials:'include' }).catch(()=>{});
+
+  if (__realDM.pollTimer) clearInterval(__realDM.pollTimer);
+  __realDM.pollTimer = setInterval(() => {
+    if (document.hidden) return;
+    if (active === channelId) __dmLoadMessages(channelId);
+  }, __realDM.POLL_MS);
+}
+
+async function __dmSend(text) {
+  const channelId = active;
+  if (!channelId || !text) return false;
+  try {
+    const r = await fetch('/api/me/threads/' + encodeURIComponent(channelId) + '/messages', {
+      method:'POST',
+      credentials:'include',
+      headers:{'Content-Type':'application/json'},
+      body: JSON.stringify({ content: text }),
+    });
+    const j = await r.json();
+    if (!j.ok) throw new Error(j.error || 'send failed');
+    if (__realDM.T[channelId]) __realDM.T[channelId].isRequest = false;
+    document.getElementById('reqBar').classList.remove('show');
+    await __dmLoadMessages(channelId);
+    __dmLoadList();
+    return true;
+  } catch (e) {
+    console.error('[dm.send]', e);
+    alert('Could not send: ' + e.message);
+    return false;
+  }
+}
+
+async function __dmAccept() {
+  const channelId = active;
+  if (!channelId) return;
+  document.getElementById('reqBar').classList.remove('show');
+  if (__realDM.T[channelId]) __realDM.T[channelId].isRequest = false;
+  try {
+    await fetch('/api/me/threads/' + encodeURIComponent(channelId) + '/accept', { method:'POST', credentials:'include' });
+    __dmLoadList();
+  } catch (e) { console.error('[dm.accept]', e); }
+}
+
+async function __dmDecline() {
+  const channelId = active;
+  if (!channelId) return;
+  document.getElementById('reqBar').classList.remove('show');
+  document.getElementById('cContent').style.display = 'none';
+  document.getElementById('emptyState').style.display = 'flex';
+  delete __realDM.T[channelId];
+  active = null;
+  try {
+    await fetch('/api/me/threads/' + encodeURIComponent(channelId) + '/decline', { method:'POST', credentials:'include' });
+    __dmLoadList();
+  } catch (e) { console.error('[dm.decline]', e); }
+}
+
+async function __dmEnsureFromHandle(handle) {
+  try {
+    const r = await fetch('/api/me/threads', {
+      method:'POST',
+      credentials:'include',
+      headers:{'Content-Type':'application/json'},
+      body: JSON.stringify({ handle }),
+    });
+    const j = await r.json();
+    if (!j.ok) { console.error('[dm.ensureFromHandle]', j.error); return null; }
+    return j.channel_id;
+  } catch (e) { console.error('[dm.ensureFromHandle]', e); return null; }
+}
+
+(async function initMessagesPage(){
+  const user = vibeInit();
+  if (!user) { window.location.href = '/'; return; }
+  if (user._isDemo) { vibeShowDemoPill(); return; }
+  if (!user._onboarded) return;
+
+  __realDM.enabled = true;
+  __realDM.meId = user.id || null;
+
+  const rb = document.querySelector('.req-banner');
+  if (rb) rb.removeAttribute('onclick');
+
+  const tScroll = document.getElementById('tScroll');
+  if (tScroll) tScroll.innerHTML = '';
+
+  const rightEmpty = document.getElementById('emptyState');
+  if (rightEmpty) {
+    const h3 = rightEmpty.querySelector('h3');
+    const p  = rightEmpty.querySelector('p');
+    const btn = rightEmpty.querySelector('.start-btn');
+    if (h3) h3.textContent = 'Pick someone to message';
+    if (p)  p.textContent  = 'Once you connect with people on Vibe, your conversations will live here.';
+    if (btn) btn.remove();
+  }
+
+  await __dmLoadList();
+
+  const params = new URLSearchParams(location.search);
+  const toHandle = params.get('to');
+  if (toHandle) {
+    const cid = await __dmEnsureFromHandle(toHandle);
+    if (cid) {
+      await __dmLoadList();
+      openT(cid);
+      const u = new URL(location.href);
+      u.searchParams.delete('to');
+      window.history.replaceState({}, '', u.toString());
+    }
+  }
+
+  __realDM.listTimer = setInterval(() => {
+    if (document.hidden) return;
+    __dmLoadList();
+  }, __realDM.LIST_POLL_MS);
 })();
 // ══ END MESSAGES INIT ════════════════════════════════════════════════════
 

@@ -5062,8 +5062,10 @@ function _viewedName() {
 
 async function handleVibConnect() {
   if (vibeRelState === 'connected') {
-    // Already connected — open DMs directly
-    window.location.href = '/messages';
+    // Already connected — open DMs directly. /messages?to=<handle>
+    // auto-creates the 1:1 channel if it doesn't exist yet.
+    const handle = window.viewingRealUser?.handle;
+    window.location.href = handle ? '/messages?to=' + encodeURIComponent(handle) : '/messages';
     return;
   }
 
