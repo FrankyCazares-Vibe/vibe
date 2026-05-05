@@ -1479,6 +1479,35 @@ body.edit-mode .vibe-delete-btn { display:flex !important; }
 body.viewer-mode .vibe-delete-btn,
 body.recruiter-mode .vibe-delete-btn { display:none !important; }
 .ppost-date { font-size:11px;font-weight:700;color:var(--muted);text-transform:uppercase;letter-spacing:.5px;margin-bottom:8px; }
+/* All-tab vertical feed — clips and posts mixed chronologically. */
+.vibes-tab-feed { display:flex;flex-direction:column;gap:14px; }
+.vibes-tab-feed .profile-post-card { margin:0; }
+/* Clip card in the All feed: poster image + play button overlay + caption. */
+.feed-clip-card {
+  position:relative;border-radius:14px;overflow:hidden;
+  background:#1C1C1E;cursor:pointer;
+  box-shadow:0 1px 3px rgba(0,0,0,.06);
+}
+.feed-clip-card:hover { box-shadow:0 6px 20px rgba(0,0,0,.10); transform:translateY(-1px); transition:all .15s; }
+.feed-clip-poster {
+  display:block;width:100%;aspect-ratio:1/1;
+  background:#1C1C1E center/cover no-repeat;
+  position:relative;
+}
+.feed-clip-play {
+  position:absolute;inset:0;display:flex;align-items:center;justify-content:center;
+  font-size:36px;color:white;text-shadow:0 2px 12px rgba(0,0,0,.5);
+  pointer-events:none;
+}
+.feed-clip-meta {
+  padding:10px 14px 12px;background:white;
+}
+.feed-clip-caption {
+  font-size:14px;line-height:1.5;color:var(--charcoal);
+  display:-webkit-box;-webkit-line-clamp:2;-webkit-box-orient:vertical;overflow:hidden;
+}
+.feed-clip-sub { font-size:11px;color:var(--muted);margin-top:4px;font-weight:600; }
+
 .ppost-body { font-size:14px;line-height:1.75;color:var(--soft-black);margin-bottom:10px; }
 .ppost-body strong { color:var(--charcoal); }
 /* Read more truncation (LinkedIn-style) — clamped to 6 lines until expanded. */
@@ -2943,15 +2972,30 @@ body.empty-profile-mode #profileEmpty { display: flex !important; }
           </div>
         </div>
 
-        <!-- Tab header — IG/TikTok-style: Clips default, Posts as cards. -->
+        <!-- Tab header — All default (mixed feed), Clips and Posts as drill-downs. -->
         <div class="content-tabs">
-          <button class="content-tab active" onclick="switchContentTab('vibes-pane', this)">Clips</button>
+          <button class="content-tab active" onclick="switchContentTab('all-pane', this)">All</button>
+          <button class="content-tab" onclick="switchContentTab('vibes-pane', this)">Clips</button>
           <button class="content-tab" onclick="switchContentTab('posts-pane', this)">Posts</button>
           <button class="content-tab owner-only" onclick="switchContentTab('saved-pane', this)">Saved</button>
         </div>
 
-        <!-- CLIPS PANE (default) — id kept for backward-compat with persistence layer -->
-        <div class="content-pane active" id="vibes-pane">
+        <!-- ALL PANE (default) — vertical chronological feed: clips render as
+             full-width cards with poster + play, posts as text cards with
+             Read More. populateAllFeed() rebuilds from #profileVibesGrid +
+             #profilePostsList so it always matches what the other tabs show. -->
+        <div class="content-pane active" id="all-pane">
+          <div class="vibes-tab-feed" id="profileAllFeed"></div>
+          <div class="content-empty" id="allEmptyState" style="display:none">
+            <div class="content-empty-title">Nothing here yet</div>
+            <div class="content-empty-body">
+              Posts and clips you publish show up here. Use the composer above to start.
+            </div>
+          </div>
+        </div>
+
+        <!-- CLIPS PANE — id kept for backward-compat with persistence layer -->
+        <div class="content-pane" id="vibes-pane">
 
           <!-- Vibes grid — hardcoded for Maya; rebuilt from vibe_vibes_v1 once edited -->
           <div class="vibes-tab-grid" id="profileVibesGrid">
@@ -4405,23 +4449,25 @@ function postExcerpt(card) {
   const body = card.querySelector('.ppost-body')?.textContent?.trim() || '';
   return body.length > 180 ? body.slice(0, 177) + '…' : body;
 }
-function buildPostThumb(card) {
+// Build a feed-style clip card for the All tab — full-width with poster
+// + play overlay + caption underneath. Clicks open the shared viewer.
+function buildFeedClipCard(thumb) {
+  const id = thumb.dataset.vibeId || '';
+  const bg = thumb.querySelector('.vibe-grid-bg')?.style.background || '';
+  const title = (thumb.querySelector('.vibe-grid-title')?.textContent || '').trim();
+  const sub   = (thumb.querySelector('.vibe-grid-views')?.textContent || '').trim();
   const wrap = document.createElement('div');
-  wrap.className = 'post-thumb-cell theme-' + postThemeFor(card);
-  wrap.dataset.sourcePostId = card.dataset.postId || '';
-  const body = document.createElement('div');
-  body.className = 'post-thumb-body';
-  body.textContent = postExcerpt(card);
-  wrap.appendChild(body);
-  // Open the shared post viewer modal (P1-015). Mock-card ids like 'p1' map
-  // to the static demo posts and won't fetch from the server — the modal
-  // still renders the prefill (excerpt + theme) for those.
-  wrap.addEventListener('click', () => {
-    const id = wrap.dataset.sourcePostId;
-    if (id && typeof openPostViewer === 'function') {
-      openPostViewer(id, _profilePrefillFromCard(card));
-    }
-  });
+  wrap.className = 'feed-clip-card';
+  wrap.dataset.vibeId = id;
+  wrap.innerHTML = `
+    <div class="feed-clip-poster" style="background:${bg || '#1C1C1E'}">
+      <div class="feed-clip-play">▶</div>
+    </div>
+    <div class="feed-clip-meta">
+      <div class="feed-clip-caption">${_esc(title)}</div>
+      ${sub ? `<div class="feed-clip-sub">${_esc(sub)}</div>` : ''}
+    </div>
+  `;
   return wrap;
 }
 
@@ -4444,33 +4490,37 @@ function _profilePrefillFromCard(card) {
     author:    me ? { name: me.name, handle: me.handle, avatar_url: me.avatarPhoto } : null,
   };
 }
-function buildClipThumb(thumb) {
-  const clone = thumb.cloneNode(true);
-  // Hide owner-only edit chrome inside the All grid — the cell is read-only there.
-  clone.querySelectorAll('.vibe-pin-btn, .vibe-delete-btn').forEach(el => el.remove());
-  return clone;
-}
+// Build the vertical mixed feed for the All tab. Clips render as full-width
+// poster cards with play overlay; posts render as the standard post card
+// (cloned, owner-only chrome stripped). Zipper-merged so the user sees a
+// mix without needing strict chronological sort.
 function populateAllGrid() {
-  const grid = document.getElementById('profileAllGrid');
+  const feed = document.getElementById('profileAllFeed');
   const empty = document.getElementById('allEmptyState');
-  if (!grid) return;
+  if (!feed) return;
   const clipNodes = Array.from(document.querySelectorAll('#profileVibesGrid .vibe-grid-thumb'));
   const postNodes = Array.from(document.querySelectorAll('#profilePostsList .profile-post-card'));
-  grid.innerHTML = '';
+  feed.innerHTML = '';
   if (clipNodes.length === 0 && postNodes.length === 0) {
-    grid.style.display = 'none';
+    feed.style.display = 'none';
     if (empty) empty.style.display = 'block';
     return;
   }
-  grid.style.display = '';
+  feed.style.display = '';
   if (empty) empty.style.display = 'none';
-  // Zipper-merge for a mixed feel; not strict chronological — relative dates in
-  // the DOM aren't sortable without parsing. Fine for the demo until P1-017
-  // composer writes real timestamps to localStorage.
   const max = Math.max(clipNodes.length, postNodes.length);
   for (let i = 0; i < max; i++) {
-    if (i < clipNodes.length) grid.appendChild(buildClipThumb(clipNodes[i]));
-    if (i < postNodes.length) grid.appendChild(buildPostThumb(postNodes[i]));
+    if (i < clipNodes.length) feed.appendChild(buildFeedClipCard(clipNodes[i]));
+    if (i < postNodes.length) {
+      const clone = postNodes[i].cloneNode(true);
+      // Strip owner-only edit chrome — the All feed is read-only.
+      clone.querySelectorAll('.ppost-pin, .ppost-delete').forEach(el => el.remove());
+      feed.appendChild(clone);
+      // Cloned cards need their own Read More measurement (clip + button
+      // shipped via _renderPostCard, but cloneNode doesn't re-run that
+      // post-render hook). Defer one frame so layout settles.
+      requestAnimationFrame(() => _measureReadMore(clone));
+    }
   }
 }
 // Posts-pane card click → open viewer. Event delegation so newly added
@@ -4495,7 +4545,7 @@ function populateAllGrid() {
 // per-thumb binding. The All-grid clones strip owner-only chrome at
 // build time, so we don't need to filter Pin/Delete here.
 (function bindProfileClipsClickToViewer() {
-  ['profileVibesGrid', 'profileAllGrid'].forEach(gridId => {
+  ['profileVibesGrid'].forEach(gridId => {
     const grid = document.getElementById(gridId);
     if (!grid) return;
     grid.addEventListener('click', (ev) => {
@@ -4508,6 +4558,39 @@ function populateAllGrid() {
       if (!id || typeof openPostViewer !== 'function') return;
       openPostViewer(id, _profilePrefillFromClipThumb(thumb));
     });
+  });
+})();
+
+// All-tab feed delegation — handles both feed-clip-card (open clip viewer)
+// and cloned .profile-post-card (open post viewer). Skip Read more taps
+// so they expand the body instead of opening the modal.
+(function bindProfileAllFeedClickToViewer() {
+  const feed = document.getElementById('profileAllFeed');
+  if (!feed) return;
+  feed.addEventListener('click', (ev) => {
+    if (ev.target.closest('.ppost-readmore')) return;
+    const clipCard = ev.target.closest('.feed-clip-card');
+    if (clipCard) {
+      const id = clipCard.dataset.vibeId || '';
+      if (!id || typeof openPostViewer !== 'function') return;
+      // Reuse the clip-thumb prefill by faking a thumb-shaped object.
+      const fakeThumb = {
+        dataset: { vibeId: id },
+        querySelector(sel) {
+          if (sel === '.vibe-grid-bg')    return clipCard.querySelector('.feed-clip-poster');
+          if (sel === '.vibe-grid-title') return clipCard.querySelector('.feed-clip-caption');
+          return null;
+        },
+      };
+      openPostViewer(id, _profilePrefillFromClipThumb(fakeThumb));
+      return;
+    }
+    const postCard = ev.target.closest('.profile-post-card');
+    if (postCard) {
+      const id = postCard.dataset.postId || '';
+      if (!id || typeof openPostViewer !== 'function') return;
+      openPostViewer(id, _profilePrefillFromCard(postCard));
+    }
   });
 })();
 

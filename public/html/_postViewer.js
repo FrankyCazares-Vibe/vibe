@@ -606,6 +606,9 @@
     if (ev) ev.stopPropagation();
     const menu = document.getElementById("vpvMenu");
     if (!menu) return;
+    // Reflect the type in the button label so the user knows what they're deleting.
+    const delBtn = menu.querySelector("button.danger");
+    if (delBtn) delBtn.textContent = state.type === "clip" ? "Delete clip" : "Delete post";
     const wasOpen = menu.classList.contains("show");
     menu.classList.toggle("show", !wasOpen);
     if (!wasOpen) {
@@ -622,8 +625,10 @@
     if (!state.openId) return;
     if (!isAppShell()) { toast("Sign in to delete"); return; }
     if (!isRealPostId(state.openId)) { toast("Demo post — can't delete"); return; }
-    // Quick confirm — destructive action, can't undo.
-    if (!window.confirm("Delete this post? This can't be undone.")) return;
+    // Quick confirm — destructive action, can't undo. Wording uses the
+    // post type so the user knows whether they're nuking a clip or a post.
+    const kindLabel = state.type === "clip" ? "clip" : "post";
+    if (!window.confirm(`Delete this ${kindLabel}? This can't be undone.`)) return;
     const menu = document.getElementById("vpvMenu");
     if (menu) menu.classList.remove("show");
     if (state.inflight) return;
