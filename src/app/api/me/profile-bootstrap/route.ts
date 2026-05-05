@@ -6,7 +6,7 @@ import { normalizeProfileView } from "@/lib/profile/normalize-profile-view";
 import { createSupabaseServerClient } from "@/lib/supabase/server";
 
 const PROFILE_SELECT =
-  "id,email,name,handle,school,school_email,school_verified,year,major,department,bio,tagline,website,headline,location_text,banner_gradient,avatar_url,banner_url,resume_url,interests,skills,looking_for,work_experience,recruiter_snapshot";
+  "id,email,name,handle,handle_changed_at,school,school_email,school_verified,year,major,department,bio,tagline,website,headline,location_text,banner_gradient,avatar_url,banner_url,resume_url,interests,skills,looking_for,work_experience,recruiter_snapshot";
 
 /**
  * Returns `vibe_user_v1`-shaped JSON for `public/html/profile.html`.
@@ -44,6 +44,9 @@ export async function GET() {
     connections: String(counts.connections),
     mutual: "0",
   };
+  // Pass through cooldown metadata so the inline editor can show
+  // "you can change again in N days" without a second roundtrip.
+  vibeUser.handleChangedAt = (row as { handle_changed_at?: string | null }).handle_changed_at ?? null;
 
   return NextResponse.json({ ok: true, vibeUser });
 }

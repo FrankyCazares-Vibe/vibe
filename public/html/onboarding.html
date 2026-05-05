@@ -334,6 +334,16 @@ input, textarea, [contenteditable="true"] { cursor:text!important; }
         <input type="text" id="pfName" class="pf-input" maxlength="120" placeholder="How you want to appear on Vibe" autocomplete="name">
       </div>
       <div>
+        <label class="pf-label" for="pfHandle">Handle <span style="font-weight:400;color:#8A8580">— how friends find you (3-20 chars, letters/numbers/_)</span></label>
+        <div style="display:flex;align-items:center;gap:8px;background:white;border:1.5px solid rgba(28,28,30,.12);border-radius:12px;padding:9px 14px;">
+          <span style="color:#8A8580;font-weight:600">@</span>
+          <input type="text" id="pfHandle" maxlength="20" placeholder="yourhandle" autocomplete="off" spellcheck="false" autocapitalize="off"
+            style="flex:1;border:none;background:none;font-family:inherit;font-size:14px;outline:none;color:#1C1C1E"
+            oninput="onHandleInput(this)">
+          <span id="pfHandleStatus" style="font-size:12px;font-weight:600;min-width:90px;text-align:right;"></span>
+        </div>
+      </div>
+      <div>
         <label class="pf-label" for="pfBio">Bio</label>
         <textarea id="pfBio" class="pf-textarea" rows="3" maxlength="4000" placeholder="A few lines about you — what you're into, what you're building."></textarea>
       </div>
@@ -570,6 +580,34 @@ function splitLinesToArray(raw, maxItems, maxLen) {
   return parts.slice(0, maxItems);
 }
 
+// Live availability check for the onboarding handle field. Mirrors the
+// debounce / status pattern used in the profile editor so the user sees
+// the same affordances in both places.
+const _ONB_HANDLE_RE = /^[a-z0-9_]{3,20}$/;
+let _onbHandleSeq = 0;
+let _onbHandleTimer = null;
+function onHandleInput(input) {
+  const s = document.getElementById('pfHandleStatus');
+  if (!s) return;
+  const v = (input.value || '').trim().toLowerCase();
+  input.value = v;
+  if (!v) { s.textContent = ''; s.style.color = ''; return; }
+  if (v.length < 3) { s.textContent = 'too short'; s.style.color = '#C54323'; return; }
+  if (!_ONB_HANDLE_RE.test(v)) { s.textContent = 'letters / numbers / _'; s.style.color = '#C54323'; return; }
+  s.textContent = 'checking…'; s.style.color = '#8A8580';
+  const seq = ++_onbHandleSeq;
+  clearTimeout(_onbHandleTimer);
+  _onbHandleTimer = setTimeout(() => {
+    fetch('/api/handle/check?h=' + encodeURIComponent(v), { credentials: 'include' })
+      .then(r => r.json()).then(j => {
+        if (seq !== _onbHandleSeq) return;
+        if (j && j.ok && j.available) { s.textContent = '✓ available'; s.style.color = '#1A9E5B'; }
+        else { s.textContent = '✗ ' + ((j && j.reason) || 'taken').toLowerCase(); s.style.color = '#C54323'; }
+      })
+      .catch(() => { if (seq === _onbHandleSeq) { s.textContent = ''; s.style.color = ''; } });
+  }, 280);
+}
+
 function collectProfileDraft() {
   const name = (document.getElementById('pfName') || {}).value?.trim() || '';
   const major = (document.getElementById('pfMajor') || {}).value?.trim() || '';
@@ -727,6 +765,20 @@ async function completeOnboarding() {
       }),
     });
     const j = await r.json();
+    // If the user picked a handle, claim it now (separate route — has
+    // its own format / cooldown / uniqueness checks). Best-effort: an
+    // error here doesn't block onboarding; user can retry from the
+    // profile editor.
+    const claimedHandle = ((document.getElementById('pfHandle') || {}).value || '').trim().toLowerCase();
+    if (claimedHandle && _ONB_HANDLE_RE.test(claimedHandle)) {
+      try {
+        await fetch('/api/me/handle', {
+          method: 'PATCH', credentials: 'same-origin',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ handle: claimedHandle }),
+        });
+      } catch {}
+    }
     if (j.ok && typeof j.next === 'string' && j.next.startsWith('/')) {
       window.location.href = j.next;
       return;

@@ -308,6 +308,26 @@ body.edit-mode .avatar:hover .avatar-edit-hint { opacity:1; }
   font-family:'Fraunces',serif;font-size:38px;font-weight:900;
   letter-spacing:-1.5px;line-height:1;
 }
+/* @handle row — small, muted, sits between name and tagline. */
+.profile-handle-row {
+  display:flex; align-items:center; gap:8px;
+  margin:2px 0 8px;
+  font-family:'DM Sans',sans-serif; font-size:14px; font-weight:600;
+  color:var(--muted);
+}
+.profile-handle { letter-spacing:.2px; }
+body.edit-mode .profile-handle:hover { color:var(--charcoal); cursor:none; }
+.profile-handle-edit { display:none; align-items:center; gap:4px; }
+.profile-handle-input {
+  border:1.5px solid rgba(28,28,30,.2); border-radius:8px;
+  padding:4px 10px; font-family:inherit; font-size:14px; font-weight:600;
+  color:var(--charcoal); background:white; outline:none; min-width:140px;
+}
+.profile-handle-input:focus { border-color:var(--accent); }
+.profile-handle-status { font-size:12px; font-weight:600; }
+.profile-handle-status.ok      { color:#1A9E5B; }
+.profile-handle-status.bad     { color:#C54323; }
+.profile-handle-status.checking{ color:var(--muted); }
 .student-badge { display:none; }
 .student-badge.visible {
   display:inline-flex; align-items:center; gap:7px;
@@ -2625,6 +2645,17 @@ body.empty-profile-mode #profileEmpty { display: flex !important; }
       <h1 class="profile-name" data-edit="true" data-user-field="name" data-placeholder="Your name" contenteditable="false">Maya Chen</h1>
       <span class="student-badge" id="studentBadgeSlot"></span>
     </div>
+    <!-- @handle row — sits under the name, owner can click in edit mode
+         to change it (server enforces a 14-day cooldown). The status
+         message lives next to the input only while editing. -->
+    <div class="profile-handle-row" id="profileHandleRow">
+      <span class="profile-handle" id="profileHandleDisplay">@mayachen</span>
+      <span class="profile-handle-edit owner-only" id="profileHandleEditWrap" style="display:none;">
+        <span style="color:var(--muted);font-weight:600">@</span>
+        <input type="text" id="profileHandleInput" class="profile-handle-input" maxlength="20" autocomplete="off" spellcheck="false" autocapitalize="off">
+        <span class="profile-handle-status" id="profileHandleStatus"></span>
+      </span>
+    </div>
     <p class="profile-tagline" data-edit="true" data-user-field="tagline" data-placeholder="A line that captures how you work" contenteditable="false">"I make things feel right before they look right."</p>
     <div class="profile-meta">
       <span class="meta-item"><span style="font-size:11px;font-weight:700;color:var(--muted);text-transform:uppercase;letter-spacing:.5px;margin-right:4px">Location</span><span data-edit="true" data-user-field="location" data-placeholder="City, country" contenteditable="false">Seoul → San Francisco, CA</span></span>
@@ -3462,6 +3493,8 @@ function toggleEdit(){
   document.querySelectorAll('[data-edit]').forEach(el=>{
     el.contentEditable = editMode ? 'true' : 'false';
   });
+  // Swap @handle display ↔ input. On exit, save if changed.
+  if (typeof _toggleProfileHandleEdit === 'function') _toggleProfileHandleEdit(editMode);
   if(!editMode){ showToast('Changes saved'); }
   // Refresh pin button visibility
   if(typeof refreshPinButtons === 'function') refreshPinButtons();
@@ -5819,6 +5852,112 @@ function buildProfileSyncPayload() {
   return payload;
 }
 
+// ── @handle inline editor ─────────────────────────────────────────────
+// Format mirrors src/lib/profile/handle.ts so the client check matches
+// the server validator. 14-day cooldown also mirrored — when the input
+// is disabled we say why ("change again in N days").
+const HANDLE_FORMAT_RE = /^[a-z0-9_]{3,20}$/;
+const HANDLE_COOLDOWN_DAYS = 14;
+let _handleCheckTimer = null;
+let _handleCheckSeq = 0;
+
+function _handleCooldownDaysLeft(iso) {
+  if (!iso) return 0;
+  const ms = HANDLE_COOLDOWN_DAYS * 24 * 60 * 60 * 1000;
+  const elapsed = Date.now() - new Date(iso).getTime();
+  if (elapsed >= ms) return 0;
+  return Math.ceil((ms - elapsed) / (24 * 60 * 60 * 1000));
+}
+
+function _setHandleStatus(text, kind) {
+  const el = document.getElementById('profileHandleStatus');
+  if (!el) return;
+  el.textContent = text || '';
+  el.className = 'profile-handle-status' + (kind ? ' ' + kind : '');
+}
+
+function _toggleProfileHandleEdit(on) {
+  const disp = document.getElementById('profileHandleDisplay');
+  const wrap = document.getElementById('profileHandleEditWrap');
+  const inp  = document.getElementById('profileHandleInput');
+  if (!disp || !wrap || !inp) return;
+
+  if (on) {
+    const current = window.__myHandle || '';
+    inp.value = current;
+    const daysLeft = _handleCooldownDaysLeft(window.__myHandleChangedAt);
+    if (daysLeft > 0) {
+      inp.disabled = true;
+      _setHandleStatus(`can change again in ${daysLeft}d`, 'checking');
+    } else {
+      inp.disabled = false;
+      _setHandleStatus('', '');
+    }
+    disp.style.display = 'none';
+    wrap.style.display = 'inline-flex';
+    // Live availability check while typing — same debounce pattern as
+    // profile search; cancels prior in-flight via _handleCheckSeq.
+    inp.oninput = () => {
+      const v = (inp.value || '').trim().toLowerCase();
+      inp.value = v;
+      if (!v || v === window.__myHandle) { _setHandleStatus('', ''); return; }
+      if (v.length < 3) { _setHandleStatus('too short', 'bad'); return; }
+      if (v.length > 20) { _setHandleStatus('too long', 'bad'); return; }
+      if (!HANDLE_FORMAT_RE.test(v)) { _setHandleStatus('letters, numbers, _', 'bad'); return; }
+      _setHandleStatus('checking…', 'checking');
+      const seq = ++_handleCheckSeq;
+      clearTimeout(_handleCheckTimer);
+      _handleCheckTimer = setTimeout(() => {
+        fetch('/api/handle/check?h=' + encodeURIComponent(v), { credentials: 'include' })
+          .then(r => r.json()).then(j => {
+            if (seq !== _handleCheckSeq) return;
+            if (j && j.ok && j.available) _setHandleStatus('✓ available', 'ok');
+            else _setHandleStatus('✗ ' + (j && j.reason ? j.reason.toLowerCase() : 'taken'), 'bad');
+          })
+          .catch(() => { if (seq === _handleCheckSeq) _setHandleStatus('', ''); });
+      }, 280);
+    };
+  } else {
+    // Closing edit mode → save if changed. Server enforces format,
+    // cooldown, and uniqueness; we just surface the result.
+    const v = (inp.value || '').trim().toLowerCase();
+    wrap.style.display = 'none';
+    disp.style.display = '';
+    if (v && v !== window.__myHandle && !inp.disabled) {
+      _saveProfileHandle(v);
+    }
+  }
+}
+
+async function _saveProfileHandle(handle) {
+  try {
+    const r = await fetch('/api/me/handle', {
+      method: 'PATCH', credentials: 'include',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ handle }),
+    });
+    const j = await r.json().catch(() => ({}));
+    if (!r.ok || !j.ok) throw new Error((j && j.error) || 'Could not change handle');
+    window.__myHandle = j.handle;
+    window.__myHandleChangedAt = j.handle_changed_at || new Date().toISOString();
+    const disp = document.getElementById('profileHandleDisplay');
+    if (disp) disp.textContent = '@' + j.handle;
+    // Update vibe_user_v1 in localStorage so other surfaces (sidebar
+    // chip, search, etc.) pick up the new handle on next read.
+    if (typeof vibeLoad === 'function' && typeof vibeSave === 'function') {
+      const u = vibeLoad('vibe_user_v1') || {};
+      u.handle = j.handle;
+      u.handleChangedAt = window.__myHandleChangedAt;
+      vibeSave('vibe_user_v1', u);
+    }
+    if (typeof showToast === 'function') showToast('Handle updated to @' + j.handle);
+  } catch (e) {
+    if (typeof showToast === 'function') {
+      showToast(e && e.message ? e.message : 'Could not change handle');
+    }
+  }
+}
+
 async function flushProfileServerSync() {
   if (window.viewingMockUser) return;
   const u = (typeof vibeLoad === 'function') ? vibeLoad('vibe_user_v1') : null;
@@ -6482,6 +6621,15 @@ function addVibeFromUpload() {
 // Skips any field user hasn't saved — keeps demo Maya's hardcoded markup
 // intact for sections she's never touched.
 function renderUserSections(user) {
+  // @handle display: under the name. Stash the cooldown timestamp so
+  // _toggleProfileHandleEdit can disable the input when the user just
+  // changed their handle.
+  if (typeof user.handle === 'string') {
+    const disp = document.getElementById('profileHandleDisplay');
+    if (disp) disp.textContent = '@' + user.handle;
+    window.__myHandle = user.handle;
+    window.__myHandleChangedAt = user.handleChangedAt || null;
+  }
   if (typeof user.bio === 'string') {
     const bio = document.querySelector('.bio-text');
     if (bio) bio.textContent = user.bio;
