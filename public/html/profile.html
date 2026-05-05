@@ -3241,27 +3241,8 @@ body.empty-profile-mode #profileEmpty { display: flex !important; }
     <div class="current-item"><span class="current-dot"></span><span class="current-text" data-edit="true" contenteditable="false">Planning Seoul trip #4</span><button class="current-delete owner-only" onclick="deleteCurrent(this)">×</button></div>
   </div>
 </div>
-<!-- People also viewed — clicking a card navigates to that mock user's profile -->
-      <div class="stat-card fade-in" style="animation-delay:.2s">
-        <div class="stat-card-title">People also viewed</div>
-        <div class="pav-list">
-          <a href="/profile/ka" class="pav-item" style="text-decoration:none;color:inherit;cursor:none;">
-            <div class="pav-avatar" style="background:#2D1B4E;font-family:'Fraunces',serif;font-size:13px;font-weight:700;color:white">KA</div>
-            <div class="pav-info"><h4>Kwame Asante</h4><p>AI Founder · Lagos → SF</p></div>
-            <button class="pav-follow" onclick="event.preventDefault();event.stopPropagation();this.textContent=this.textContent==='Follow'?'Following':'Follow';">Follow</button>
-          </a>
-          <a href="/profile/ps" class="pav-item" style="text-decoration:none;color:inherit;cursor:none;">
-            <div class="pav-avatar" style="background:#3B1A00;font-family:'Fraunces',serif;font-size:13px;font-weight:700;color:white">PS</div>
-            <div class="pav-info"><h4>Priya Sinha</h4><p>Growth Lead · Ex-Spotify</p></div>
-            <button class="pav-follow" onclick="event.preventDefault();event.stopPropagation();this.textContent=this.textContent==='Follow'?'Following':'Follow';">Follow</button>
-          </a>
-          <a href="/profile/lm" class="pav-item" style="text-decoration:none;color:inherit;cursor:none;">
-            <div class="pav-avatar" style="background:#2a2800;font-family:'Fraunces',serif;font-size:13px;font-weight:700;color:white">LM</div>
-            <div class="pav-info"><h4>Luca Moretti</h4><p>Full-stack Dev · Remote</p></div>
-            <button class="pav-follow" onclick="event.preventDefault();event.stopPropagation();this.textContent=this.textContent==='Follow'?'Following':'Follow';">Follow</button>
-          </a>
-        </div>
-      </div>
+<!-- "People also viewed" removed — was hardcoded mock users with no real
+     data source. Will return when there's a real recommendation API. -->
 
 
 
@@ -3315,16 +3296,14 @@ body.empty-profile-mode #profileEmpty { display: flex !important; }
         <!-- ── MODALS ── -->
 
 
-<!-- Mutuals modal -->
+<!-- Mutuals modal — body intentionally empty until there's a real
+     mutual-connections API. Hardcoded mock users were removed. -->
 <div id="mutualsModal" style="display:none;position:fixed;inset:0;z-index:700;background:rgba(0,0,0,.48);align-items:center;justify-content:center;">
   <div class="modal" style="width:440px;max-height:72vh;display:flex;flex-direction:column;">
     <button class="modal-close" onclick="closeMutualsModal()">&#215;</button>
     <div class="modal-title">People you both know</div>
     <div style="overflow-y:auto;display:flex;flex-direction:column;gap:10px;margin-top:14px;">
-      <div style="display:flex;align-items:center;gap:12px;padding:10px;border-radius:12px;background:var(--cream);"><div style="width:40px;height:40px;border-radius:12px;background:#2D1B4E;display:flex;align-items:center;justify-content:center;font-family:'Fraunces',serif;font-size:13px;font-weight:700;color:white;flex-shrink:0">KA</div><div style="flex:1"><div style="font-size:13px;font-weight:700">Kwame Asante</div><div style="font-size:11px;color:var(--muted)">AI Founder &middot; Lagos &rarr; SF</div></div><a href="/messages" style="font-size:11px;font-weight:700;background:none;border:1.5px solid var(--border);color:var(--charcoal);padding:5px 12px;border-radius:100px;cursor:none;text-decoration:none">Message</a></div>
-      <div style="display:flex;align-items:center;gap:12px;padding:10px;border-radius:12px;background:var(--cream);"><div style="width:40px;height:40px;border-radius:12px;background:#3B1A00;display:flex;align-items:center;justify-content:center;font-family:'Fraunces',serif;font-size:13px;font-weight:700;color:white;flex-shrink:0">PS</div><div style="flex:1"><div style="font-size:13px;font-weight:700">Priya Sinha</div><div style="font-size:11px;color:var(--muted)">Growth Lead &middot; Ex-Spotify</div></div><a href="/messages" style="font-size:11px;font-weight:700;background:none;border:1.5px solid var(--border);color:var(--charcoal);padding:5px 12px;border-radius:100px;cursor:none;text-decoration:none">Message</a></div>
-      <div style="display:flex;align-items:center;gap:12px;padding:10px;border-radius:12px;background:var(--cream);"><div style="width:40px;height:40px;border-radius:12px;background:#2a2800;display:flex;align-items:center;justify-content:center;font-family:'Fraunces',serif;font-size:13px;font-weight:700;color:white;flex-shrink:0">LM</div><div style="flex:1"><div style="font-size:13px;font-weight:700">Luca Moretti</div><div style="font-size:11px;color:var(--muted)">Full-stack Dev &middot; Remote</div></div><a href="/messages" style="font-size:11px;font-weight:700;background:none;border:1.5px solid var(--border);color:var(--charcoal);padding:5px 12px;border-radius:100px;cursor:none;text-decoration:none">Message</a></div>
-      <div style="text-align:center;padding:8px;font-size:12px;color:var(--muted)">+ 29 more &middot; <a href="/network" style="color:var(--accent);text-decoration:none;font-weight:600">View all</a></div>
+      <div style="text-align:center;padding:24px 8px;font-size:13px;color:var(--muted)">No mutual connections yet.</div>
     </div>
   </div>
 </div>
@@ -5035,9 +5014,8 @@ function setVibeRelState(state) {
       btn.innerHTML = ICONS.message + ' Message';
       btn.className += ' state-message';
       if (badge) badge.classList.add('show');
-      // Stats update
-      document.getElementById('statConnections').textContent = '848';
-      document.getElementById('statMutual').textContent = '33';
+      // Stats already painted from the visited user's bootstrap counts —
+      // don't overwrite with a hardcoded number.
       break;
 
     case 'following':
@@ -5177,24 +5155,12 @@ document.addEventListener('click', e => { const m=document.getElementById('mutua
 
 
 // ── Profile search (reuses same people data pattern) ──
-var PROF_SEARCH_DATA = [
-  {type:'person', name:'Kwame Asante',    role:'AI Founder · Senior',       av:'KA', col:'#2D1B4E', rel:'connected'},
-  {type:'person', name:'Priya Sinha',     role:'Informatics · Junior',      av:'PS', col:'#4E1B2D', rel:'mutual'},
-  {type:'person', name:'Zara Williams',   role:'CS · Senior',               av:'ZW', col:'#1B4E2D', rel:'mutual'},
-  {type:'person', name:'Luca Moretti',    role:'Product Lead · Fintech',    av:'LM', col:'#1A3D5C', rel:'mutual'},
-  {type:'person', name:'Jordan Lee',      role:'Finance · Junior',          av:'JL', col:'#1A4D7C', rel:'connected'},
-  {type:'person', name:'Nina Okonkwo',    role:'Finance · Senior',          av:'NO', col:'#1A7C7C', rel:'connected'},
-  {type:'person', name:'Omar Hassan',     role:'Data Science · Sophomore',  av:'OH', col:'#2D4A8C', rel:'none'},
-  {type:'person', name:'Sofia Reyes',     role:'Management · Senior',       av:'SR', col:'#5D1A8B', rel:'mutual'},
-  {type:'company',name:'Notion',          role:'Product & Design roles',    av:'N',  col:'#1C1C1E'},
-  {type:'company',name:'Stripe',          role:'Engineering internships',   av:'S',  col:'#6772E5'},
-  {type:'company',name:'Goldman Sachs',   role:'Summer Analyst program',    av:'GS', col:'#1A3E5C'},
-  {type:'company',name:'Apple',           role:'Design & Engineering',      av:'',   col:'#555'},
-];
+// Static demo people + companies removed — search now shows live results
+// from /api/users/search only, plus the recently-searched list.
+var PROF_SEARCH_DATA = [];
 
-// Debounced typeahead against /api/users/search — replaces the static
-// PROF_SEARCH_DATA people lookup with real Supabase users. Companies
-// stay hardcoded for now since there's no companies table yet.
+// Debounced typeahead against /api/users/search — live results only,
+// no static fallback. Companies removed (no companies table yet).
 var _profSearchTimer = null;
 var _profSearchSeq = 0;
 function runProfSearch(q) {
@@ -5203,21 +5169,6 @@ function runProfSearch(q) {
   var trimmed = (q || '').trim();
   if (!trimmed) { dd.innerHTML = renderProfDefault(); return; }
 
-  // Show static suggestions instantly, then swap in real results when
-  // the API responds — feels alive, doesn't strand the user on blank.
-  var staticPeople = PROF_SEARCH_DATA.filter(function(r){
-    return r.type==='person' && (
-      r.name.toLowerCase().indexOf(trimmed.toLowerCase())>=0 ||
-      r.role.toLowerCase().indexOf(trimmed.toLowerCase())>=0
-    );
-  });
-  var staticCompanies = PROF_SEARCH_DATA.filter(function(r){
-    return r.type==='company' && (
-      r.name.toLowerCase().indexOf(trimmed.toLowerCase())>=0 ||
-      r.role.toLowerCase().indexOf(trimmed.toLowerCase())>=0
-    );
-  });
-
   var seq = ++_profSearchSeq;
   clearTimeout(_profSearchTimer);
   _profSearchTimer = setTimeout(function(){
@@ -5225,28 +5176,16 @@ function runProfSearch(q) {
       .then(function(r){ return r.ok ? r.json() : { ok:false }; })
       .then(function(j){
         if (seq !== _profSearchSeq) return; // a newer keystroke superseded us
-        var realPeople = (j && j.ok && Array.isArray(j.users)) ? j.users.map(_profSearchUserToRow) : [];
-        // Real users first, then static demo suggestions that don't collide
-        // by handle. Companies always tail.
-        var seen = {};
-        realPeople.forEach(function(p){ if (p.handle) seen[p.handle] = true; });
-        var people = realPeople.concat(staticPeople.filter(function(p){
-          return !p.handle || !seen[p.handle];
-        }));
-        if (!people.length && !staticCompanies.length) {
+        var people = (j && j.ok && Array.isArray(j.users)) ? j.users.map(_profSearchUserToRow) : [];
+        if (!people.length) {
           dd.innerHTML = '<div class="search-empty">No results for "' + _esc(trimmed) + '"</div>';
           return;
         }
-        dd.innerHTML = renderProfResults(people.concat(staticCompanies));
+        dd.innerHTML = renderProfResults(people);
       })
       .catch(function(){
-        // API failed — fall back to static-only results so search still
-        // does *something*.
         if (seq !== _profSearchSeq) return;
-        var combined = staticPeople.concat(staticCompanies).slice(0, 8);
-        dd.innerHTML = combined.length
-          ? renderProfResults(combined)
-          : '<div class="search-empty">No results for "' + _esc(trimmed) + '"</div>';
+        dd.innerHTML = '<div class="search-empty">Search failed. Try again.</div>';
       });
   }, 220);
 }
@@ -5272,6 +5211,27 @@ function _profSearchUserToRow(u) {
     real:    true,
   };
 }
+
+// Click handler for any real-user row (search result or recently-searched
+// chip). Resolves the user's CURRENT handle by id first, so a renamed
+// account doesn't 404 the navigation. Falls back to the cached handle
+// if the lookup fails.
+async function navigateToRealUser(row) {
+  if (!row) return;
+  var fallbackHandle = row.handle ? '/profile/' + encodeURIComponent(row.handle) : null;
+  if (row.id) {
+    try {
+      var r = await fetch('/api/users/by-id/' + encodeURIComponent(row.id), { credentials: 'include' });
+      var j = await r.json();
+      if (j && j.ok && j.user && j.user.handle) {
+        window.location.href = '/profile/' + encodeURIComponent(j.user.handle);
+        return;
+      }
+    } catch (e) { /* fall through */ }
+  }
+  if (fallbackHandle) window.location.href = fallbackHandle;
+}
+window.navigateToRealUser = navigateToRealUser;
 
 // Recently-searched: tap a real user in the dropdown → push them to
 // vibe_recent_searches_v1 (capped at 8, dedup by id, most recent first)
@@ -5313,8 +5273,6 @@ function clearRecentSearches() {
 
 function renderProfDefault() {
   var recent = _loadRecentSearches();
-  var people    = PROF_SEARCH_DATA.filter(function(r){return r.type==='person';}).slice(0,4);
-  var companies = PROF_SEARCH_DATA.filter(function(r){return r.type==='company';}).slice(0,3);
   var out = '';
   if (recent.length) {
     out += '<div class="search-section-label" style="display:flex;justify-content:space-between;align-items:center">'
@@ -5322,22 +5280,18 @@ function renderProfDefault() {
       + '<button onclick="clearRecentSearches()" style="background:none;border:none;color:#8A8580;font-size:11px;font-weight:600;cursor:none">Clear</button>'
       + '</div>'
       + recent.slice(0,5).map(renderProfSR).join('');
+  } else {
+    out += '<div class="search-empty" style="padding:18px 16px;text-align:center;color:#8A8580;font-size:13px">Search for people by name or @handle.</div>';
   }
-  if (people.length) {
-    out += '<div class="search-section-label">Suggested people</div>' + people.map(renderProfSR).join('');
-  }
-  if (companies.length) {
-    out += '<div class="search-section-label">Companies hiring</div>' + companies.map(renderProfSR).join('');
-  }
-  return out + '<div class="search-footer">Search all people and companies</div>';
+  return out;
 }
 function renderProfResults(res) {
-  var people    = res.filter(function(r){return r.type==='person';});
-  var companies = res.filter(function(r){return r.type==='company';});
+  var people = res.filter(function(r){return r.type==='person';});
   var out = '';
-  if (people.length)    out += '<div class="search-section-label">People</div>'    + people.map(renderProfSR).join('');
-  if (companies.length) out += '<div class="search-section-label">Companies</div>' + companies.map(renderProfSR).join('');
-  return out + '<div class="search-footer">See all results</div>';
+  if (people.length) {
+    out += '<div class="search-section-label">People</div>' + people.map(renderProfSR).join('');
+  }
+  return out;
 }
 function renderProfSR(r) {
   // Action button reflects the viewer's relationship with the user.
@@ -5356,12 +5310,14 @@ function renderProfSR(r) {
   // serialized object so the inline onclick string survives quote
   // characters in name / role.
   var clickAttr = '';
-  if (r.real && r.handle) {
+  if (r.real && (r.handle || r.id)) {
     var rowJson = encodeURIComponent(JSON.stringify({
       id: r.id || '', name: r.name || '', handle: r.handle || '',
       avatar: r.avatar || '', av: r.av || '', rel: r.rel || 'none', role: r.role || '',
     }));
-    clickAttr = ' onclick="pushRecentSearch(JSON.parse(decodeURIComponent(\'' + rowJson + '\')));window.location.href=\'/profile/' + encodeURIComponent(r.handle) + '\'" style="cursor:pointer"';
+    // Resolve through the user id (stable) so a stale handle from a
+    // recently-searched cache doesn't 404 if they renamed since we cached.
+    clickAttr = ' onclick="pushRecentSearch(JSON.parse(decodeURIComponent(\'' + rowJson + '\')));navigateToRealUser(JSON.parse(decodeURIComponent(\'' + rowJson + '\')))" style="cursor:pointer"';
   }
   var avatarInner = r.avatar
     ? '<img src="' + _esc(r.avatar) + '" alt="" style="width:100%;height:100%;object-fit:cover;border-radius:inherit;display:block;">'

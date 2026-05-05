@@ -1627,11 +1627,17 @@ async function __dmOpenChannel(channelId) {
     rb.classList.remove('show');
   }
 
+  // Profile button only makes sense in 1:1 DMs (groups have multiple
+  // members; per-member jumps live in the side panel's member list).
   const profileBtn = document.querySelector('#cContent .c-actions .c-btn');
   if (profileBtn) {
-    profileBtn.onclick = d.peerHandle
-      ? () => { window.__vibeTopNav('/profile/' + d.peerHandle); }
-      : null;
+    if (!d.isGroup && d.peerHandle) {
+      profileBtn.style.display = '';
+      profileBtn.onclick = () => { window.__vibeTopNav('/profile/' + d.peerHandle); };
+    } else {
+      profileBtn.style.display = 'none';
+      profileBtn.onclick = null;
+    }
   }
   const inp = document.getElementById('msgIn');
   if (inp) inp.placeholder = 'Message ' + (d.n.split(' ')[0] || '') + '…';
