@@ -4317,23 +4317,30 @@ function setActiveSection(id) {
   });
 }
 
-// Click on a subnav pill → set the active state immediately. Without
-// this the user has to wait for the browser smooth-scroll AND the
-// IntersectionObserver to fire before "Posts" turns black.
+// Subnav pill click → snap to the target section, set active immediately,
+// and LOCK the active state for the duration of the smooth scroll so
+// the IntersectionObserver doesn't ping-pong us back to the previous
+// section as the page glides past it.
+let _subnavLockUntil = 0;
 sectionNavLinks.forEach(link => {
   link.addEventListener('click', () => {
     const href = link.getAttribute('href') || '';
-    if (href.startsWith('#')) setActiveSection(href.slice(1));
+    if (!href.startsWith('#')) return;
+    const id = href.slice(1);
+    setActiveSection(id);
+    // Smooth-scroll on a 1000-1200px page is ~600-800ms. 900ms gives
+    // headroom; observer takes back over after the lock expires.
+    _subnavLockUntil = Date.now() + 900;
   });
 });
 
 if (sectionEls.length) {
-  // Lower thresholds + bottom-of-document fallback so tall sections
-  // (the content card with All / Clips / Posts / Saved tabs) still
-  // trigger Active state. The previous 0.2 floor never fired for
-  // very tall sections because the visible portion / section height
-  // ratio stayed below it.
+  // Wider sweet spot (-15% top / -45% bottom = ~40% band) + lower
+  // thresholds so tall sections (the content card with All / Clips /
+  // Posts / Saved tabs) actually fire the callback. The previous
+  // 0.2 floor never triggered for sections taller than the band.
   const sectionObserver = new IntersectionObserver((entries) => {
+    if (Date.now() < _subnavLockUntil) return; // honor click lock
     const visible = entries
       .filter(entry => entry.isIntersecting)
       .sort((a, b) => b.intersectionRatio - a.intersectionRatio)[0];
@@ -4354,6 +4361,7 @@ if (sectionEls.length) {
     if (scrollRaf) return;
     scrollRaf = requestAnimationFrame(() => {
       scrollRaf = 0;
+      if (Date.now() < _subnavLockUntil) return;
       const nearBottom =
         window.innerHeight + window.scrollY >= document.body.scrollHeight - 120;
       if (nearBottom) setActiveSection(sectionIds[sectionIds.length - 1]);
@@ -4398,6 +4406,10 @@ function pinFromProfile(contentId, btn) {
     if (btn !== undefined) showToast('Unpinned');
     if (typeof saveProfileToStorage === 'function') saveProfileToStorage();
     if (typeof refreshPinButtons === 'function') refreshPinButtons();
+    // Sync to server when this is a real user-driven action on a real
+    // post (programmatic restore reuses the same function but doesn't
+    // need to round-trip the unset to the server).
+    if (btn !== undefined) _syncPinToServer(null);
     return;
   }
 
@@ -4457,6 +4469,25 @@ function pinFromProfile(contentId, btn) {
   }
   if (typeof saveProfileToStorage === 'function') saveProfileToStorage();
   if (typeof refreshPinButtons === 'function') refreshPinButtons();
+  // Sync to server when this is a real user-driven action on a real
+  // post (UUID id). Demo / mock-user pins (p1, v2) skip the API.
+  if (btn !== undefined) _syncPinToServer(contentId);
+}
+
+// PATCH /api/me/pinned with the new pin id (or null to unpin). Skipped
+// for demo/mock-user posts — they have non-UUID ids and aren't in the
+// posts table. Best-effort: a transient failure shouldn't undo the
+// local pin since the user just clicked Pin.
+const _PIN_UUID_RE = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
+function _syncPinToServer(pinId) {
+  if (window.viewingMockUser || window.viewingRealUser) return;
+  if (!_isAppShell()) return;
+  if (pinId !== null && !_PIN_UUID_RE.test(String(pinId || ''))) return;
+  fetch('/api/me/pinned', {
+    method: 'PATCH', credentials: 'include',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ post_id: pinId }),
+  }).catch(() => {});
 }
 
 // Click handler for the pinned card — opens the shared post viewer
@@ -4487,7 +4518,11 @@ function refreshPinButtons() {
 
   document.querySelectorAll('.vibe-pin-btn').forEach(btn => {
     btn.style.display = showState ? 'block' : 'none';
-    const id = btn.closest('.vibe-grid-thumb')?.dataset.vibeId || '';
+    // Pin buttons exist on both .vibe-grid-thumb (Clips pane) and on
+    // .feed-clip-card (All feed). Try both ancestors.
+    const id = btn.closest('.vibe-grid-thumb')?.dataset.vibeId
+            || btn.closest('.feed-clip-card')?.dataset.vibeId
+            || '';
     const isPinned = id && id === profilePinnedId;
     btn.textContent = isPinned ? 'Pinned' : 'Pin';
     btn.style.background = isPinned ? 'var(--charcoal)' : 'rgba(0,0,0,.55)';
@@ -4561,12 +4596,18 @@ function buildFeedClipCard(thumb) {
   const bg = thumb.querySelector('.vibe-grid-bg')?.style.background || '';
   const title = (thumb.querySelector('.vibe-grid-title')?.textContent || '').trim();
   const sub   = (thumb.querySelector('.vibe-grid-views')?.textContent || '').trim();
+  const isPinned = id && id === profilePinnedId;
   const wrap = document.createElement('div');
   wrap.className = 'feed-clip-card';
   wrap.dataset.vibeId = id;
+  // Pin button is owner-only + edit-mode-only via the same CSS rules
+  // the in-grid pin button uses. Lives top-right of the poster so it
+  // doesn't compete with the caption row.
   wrap.innerHTML = `
     <div class="feed-clip-poster" style="background:${bg || '#1C1C1E'}">
       <div class="feed-clip-play">▶</div>
+      <button class="vibe-pin-btn owner-only" onclick="event.stopPropagation();pinFromProfile('${id}',this)" title="Pin to profile"
+        style="position:absolute;top:8px;right:8px;background:${isPinned ? 'var(--charcoal)' : 'rgba(0,0,0,.55)'};color:white;border:none;border-radius:8px;padding:4px 10px;font-size:10px;font-weight:700;cursor:none;backdrop-filter:blur(4px);">${isPinned ? 'Pinned' : 'Pin'}</button>
     </div>
     <div class="feed-clip-meta">
       <div class="feed-clip-caption">${_esc(title)}</div>
@@ -4629,6 +4670,9 @@ function populateAllGrid() {
   // Per-pane empty states share the same trigger points as the All feed,
   // so refresh them here regardless of whether #profileAllFeed exists.
   if (typeof refreshPaneEmptyStates === 'function') refreshPaneEmptyStates();
+  // Pin buttons inside the All feed need their visibility/state synced
+  // each time the feed rebuilds.
+  setTimeout(() => { if (typeof refreshPinButtons === 'function') refreshPinButtons(); }, 0);
   const feed = document.getElementById('profileAllFeed');
   const empty = document.getElementById('allEmptyState');
   if (!feed) return;
@@ -4647,8 +4691,10 @@ function populateAllGrid() {
     if (i < clipNodes.length) feed.appendChild(buildFeedClipCard(clipNodes[i]));
     if (i < postNodes.length) {
       const clone = postNodes[i].cloneNode(true);
-      // Strip owner-only edit chrome — the All feed is read-only.
-      clone.querySelectorAll('.ppost-pin, .ppost-delete').forEach(el => el.remove());
+      // Strip the Delete X (still possible from the post viewer "..."
+      // menu) — keep the Pin button so the All feed is a first-class
+      // place to pin / unpin without switching to the Posts tab.
+      clone.querySelectorAll('.ppost-delete').forEach(el => el.remove());
       feed.appendChild(clone);
       // Cloned cards need their own Read More measurement (clip + button
       // shipped via _renderPostCard, but cloneNode doesn't re-run that
@@ -5697,7 +5743,10 @@ window.viewingRealUser = null;
       .then(j => {
         if (!j || !j.ok || !j.vibeUser) throw new Error('not_found');
         const v = j.vibeUser;
-        window.viewingRealUser = { id: v.id, handle: v.handle, name: v.name };
+        window.viewingRealUser = {
+          id: v.id, handle: v.handle, name: v.name,
+          _pinnedPostId: v.pinnedPostId || null,
+        };
         hydrateProfileFields(v);
         // Empty arrays here are critical: renderUserSections falls back
         // to localStorage (vibe_posts_v1 / vibe_vibes_v1) when posts /
@@ -6276,6 +6325,22 @@ function renderPostsFromStorage(postsOverride) {
 // Replaces whatever localStorage hydrated so the DB is the source of truth
 // for app-shell users — demo Maya / mock-user views still use localStorage
 // or the user.posts override path.
+// Try to render the pin slot for a given post id. Looks the source
+// thumb up in the DOM (post card or vibe thumb) — if neither exists
+// yet (mid-hydration), bails silently. Caller re-runs us after each
+// hydrate so the pin lands once the source row is in the DOM.
+function _restorePinIfPossible(pinnedId) {
+  if (!pinnedId) return;
+  if (profilePinnedId === pinnedId) return; // already pinned
+  const has = document.querySelector(`.profile-post-card[data-post-id="${pinnedId}"]`)
+           || document.querySelector(`.vibe-grid-thumb[data-vibe-id="${pinnedId}"]`);
+  if (!has) return;
+  if (typeof pinFromProfile === 'function') {
+    profilePinnedId = null;
+    pinFromProfile(pinnedId);
+  }
+}
+
 async function hydrateProfilePostsFromAPI() {
   if (window.viewingMockUser) return;
   try {
@@ -6318,6 +6383,10 @@ async function hydrateProfilePostsFromAPI() {
     }
 
     if (typeof populateAllGrid === 'function') populateAllGrid();
+    // Re-attempt pin restore now that the pinned source row may exist
+    // in the DOM (renderUserSections fired before this async hydration).
+    const me = (typeof vibeLoad === 'function') ? vibeLoad('vibe_user_v1') : null;
+    _restorePinIfPossible(me && (me.pinnedPostId || me.pinnedId));
   } catch (e) { /* silent — local cache stays */ }
 }
 
@@ -6363,6 +6432,12 @@ async function hydrateVisitedUserPosts(handle) {
     }
 
     if (typeof populateAllGrid === 'function') populateAllGrid();
+    // Visitor mode: render the visited user's pinned post if their
+    // bootstrap returned one. profilePinnedId is reset so toggling
+    // doesn't silently no-op.
+    if (window.viewingRealUser && window.viewingRealUser._pinnedPostId) {
+      _restorePinIfPossible(window.viewingRealUser._pinnedPostId);
+    }
   } catch (e) { /* silent — visitor still sees the empty state */ }
 }
 
@@ -7096,10 +7171,13 @@ function renderUserSections(user) {
   // Repopulate the All-tab grid after clips and posts have hydrated (P1-011).
   if (typeof populateAllGrid === 'function') populateAllGrid();
 
-  // Re-pin saved item once posts and vibes are rendered
-  if (user.pinnedId && typeof pinFromProfile === 'function') {
+  // Re-pin saved item once posts and vibes are rendered. Server-sourced
+  // pinnedPostId (from the bootstrap) wins over the localStorage
+  // pinnedId so logging back in restores the right pin.
+  const restoreId = user.pinnedPostId || user.pinnedId;
+  if (restoreId && typeof pinFromProfile === 'function') {
     profilePinnedId = null;
-    pinFromProfile(user.pinnedId);
+    pinFromProfile(restoreId);
   }
 }
 

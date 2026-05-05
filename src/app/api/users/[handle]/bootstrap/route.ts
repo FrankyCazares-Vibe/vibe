@@ -10,7 +10,7 @@ import { createSupabaseServerClient } from "@/lib/supabase/server";
 // add `otto_answers`, `voice_samples`, or other private columns later they
 // stay off this list by default.
 const PUBLIC_PROFILE_SELECT =
-  "id,name,handle,school,school_verified,year,major,department,bio,tagline,website,headline,location_text,banner_gradient,avatar_url,banner_url,resume_url,interests,skills,looking_for,work_experience,recruiter_snapshot";
+  "id,name,handle,school,school_verified,year,major,department,bio,tagline,website,headline,location_text,banner_gradient,avatar_url,banner_url,resume_url,interests,skills,looking_for,work_experience,recruiter_snapshot,pinned_post_id";
 
 type RouteContext = { params: Promise<{ handle: string }> };
 
@@ -75,6 +75,8 @@ export async function GET(_req: Request, ctx: RouteContext) {
   };
   vibeUser._isViewerMode = true;
   vibeUser._viewerFollowState = follow;
+  vibeUser.pinnedPostId =
+    (row as { pinned_post_id?: string | null }).pinned_post_id ?? null;
 
   return NextResponse.json({ ok: true, vibeUser });
 }

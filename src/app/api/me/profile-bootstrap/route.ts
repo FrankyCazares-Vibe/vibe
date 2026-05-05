@@ -6,7 +6,7 @@ import { normalizeProfileView } from "@/lib/profile/normalize-profile-view";
 import { createSupabaseServerClient } from "@/lib/supabase/server";
 
 const PROFILE_SELECT =
-  "id,email,name,handle,handle_changed_at,school,school_email,school_verified,year,major,department,bio,tagline,website,headline,location_text,banner_gradient,avatar_url,banner_url,resume_url,interests,skills,looking_for,work_experience,recruiter_snapshot";
+  "id,email,name,handle,handle_changed_at,school,school_email,school_verified,year,major,department,bio,tagline,website,headline,location_text,banner_gradient,avatar_url,banner_url,resume_url,interests,skills,looking_for,work_experience,recruiter_snapshot,pinned_post_id";
 
 /**
  * Returns `vibe_user_v1`-shaped JSON for `public/html/profile.html`.
@@ -47,6 +47,8 @@ export async function GET() {
   // Pass through cooldown metadata so the inline editor can show
   // "you can change again in N days" without a second roundtrip.
   vibeUser.handleChangedAt = (row as { handle_changed_at?: string | null }).handle_changed_at ?? null;
+  // Pinned post id — the static profile renders the pin slot from this.
+  vibeUser.pinnedPostId = (row as { pinned_post_id?: string | null }).pinned_post_id ?? null;
 
   return NextResponse.json({ ok: true, vibeUser });
 }
