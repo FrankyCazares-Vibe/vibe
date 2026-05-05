@@ -5340,129 +5340,12 @@ function closeProfSearch() {
 
 
 // ══ MINI MESSENGER ═══════════════════════════════════════════════════════
-// The mm* functions below are legacy and dead: toggleMessenger() now
-// defers to the shared _miniMessenger.js module which floats a real-API
-// panel from the bottom-right of every signed-in page. We zero out
-// MM_THREADS so the legacy renderers (still defined below in case
-// something inline calls them) don't surface mock people.
+// All real wiring lives in /html/_miniMessenger.js (a self-injecting
+// floating panel that uses /api/me/threads). The in-nav messages icon
+// just calls openMiniMessenger() to surface that panel. Old hardcoded
+// MM_THREADS / mmRenderThreads / mmLoadConvo / mmSend block deleted.
 function toggleMessenger() {
   if (window.openMiniMessenger) window.openMiniMessenger();
-}
-var mmOpen = false;
-var mmMinimized = false;
-var mmActiveThread = 0;
-var MM_THREADS = [];
-var __MM_LEGACY_DEAD = [
-  { id:0, name:'Kwame Asante',  av:'KA', col:'#2D1B4E', status:'Active now',    unread:2,
-    msgs:[
-      {mine:false, av:'KA', col:'#2D1B4E', text:'Hey! Saw your product update — that campus map idea is really interesting.'},
-      {mine:true,  av:'MC', col:'#1C1C1E', text:'Thanks! Still iterating on it. The node-based layout was tricky to get right.'},
-      {mine:false, av:'KA', col:'#2D1B4E', text:'Would love to jump on a call and brainstorm. I have some ideas around the connection graph.'},
-    ]
-  },
-  { id:1, name:'Priya Sinha',   av:'PS', col:'#4E1B2D', status:'Active 2h ago',  unread:0,
-    msgs:[
-      {mine:false, av:'PS', col:'#4E1B2D', text:'The Vibe of the Day feature is so smart. First thing I check every morning now.'},
-      {mine:true,  av:'MC', col:'#1C1C1E', text:'That means a lot! It was actually your feedback that pushed us to surface it earlier.'},
-    ]
-  },
-  { id:2, name:'Luca Moretti',  av:'LM', col:'#1A3D5C', status:'Active 5h ago',  unread:1,
-    msgs:[
-      {mine:true,  av:'MC', col:'#1C1C1E', text:'Congrats on the Web Summit talk! 8.7k views is no joke.'},
-      {mine:false, av:'LM', col:'#1A3D5C', text:'Thanks. The 60-second format forces you to be honest. No filler.'},
-      {mine:false, av:'LM', col:'#1A3D5C', text:'You should post your campus map walkthrough as a Vibe. People would love it.'},
-    ]
-  },
-  { id:3, name:'Jordan Lee',    av:'JL', col:'#1A4D7C', status:'Active yesterday', unread:0,
-    msgs:[
-      {mine:false, av:'JL', col:'#1A4D7C', text:'Do you know if the Goldman internship is open to non-business majors?'},
-      {mine:true,  av:'MC', col:'#1C1C1E', text:'I think so — the listing says all majors welcome. Worth applying!'},
-    ]
-  },
-  { id:4, name:'Nina Okonkwo',  av:'NO', col:'#1A7C7C', status:'Active 3d ago',  unread:0,
-    msgs:[
-      {mine:true,  av:'MC', col:'#1C1C1E', text:'Hey Nina, would you be open to being an early tester for Vibe?'},
-      {mine:false, av:'NO', col:'#1A7C7C', text:'Absolutely. Send me whatever you need me to look at.'},
-    ]
-  },
-];
-
-function toggleMessenger() {
-  var mm = document.getElementById('miniMessenger');
-  mmOpen = !mmOpen;
-  if (mmOpen) {
-    mm.classList.add('open');
-    mm.classList.remove('minimized');
-    mmMinimized = false;
-    mmRenderThreads();
-    mmLoadConvo(0);
-    document.querySelector('.nav-msg-btn').classList.remove('has-unread');
-  } else {
-    mm.classList.remove('open');
-  }
-}
-
-function toggleMmMinimize() {
-  var mm = document.getElementById('miniMessenger');
-  mmMinimized = !mmMinimized;
-  mm.classList.toggle('minimized', mmMinimized);
-}
-
-function mmRenderThreads(filter) {
-  var threads = filter
-    ? MM_THREADS.filter(function(t){ return t.name.toLowerCase().indexOf(filter.toLowerCase()) >= 0; })
-    : MM_THREADS;
-  var listHTML = threads.map(function(t) {
-    var lastMsg = t.msgs[t.msgs.length - 1];
-    var prev    = lastMsg ? (lastMsg.mine ? 'You: ' : '') + lastMsg.text : '';
-    return '<div class="mm-thread' + (t.id === mmActiveThread ? ' active' : '') + '" onclick="mmLoadConvo(' + t.id + ')">'
-      + '<div class="mm-t-av' + (t.status.indexOf('Active now') >= 0 ? ' mm-t-online' : '') + '" style="background:' + t.col + '">' + t.av + '</div>'
-      + '<div class="mm-t-info"><div class="mm-t-name">' + t.name + '</div>'
-      + '<div class="mm-t-prev">' + prev.substring(0,34) + (prev.length > 34 ? '…' : '') + '</div></div>'
-      + '<div class="mm-t-meta"><div class="mm-t-time">' + (t.status.indexOf('now') >= 0 ? 'now' : t.status.replace('Active ','')) + '</div>'
-      + (t.unread > 0 ? '<div class="mm-t-badge">' + t.unread + '</div>' : '') + '</div>'
-      + '</div>';
-  }).join('');
-  var container = document.getElementById('mmThreads');
-  if (container) {
-    container.innerHTML = '<div class="mm-search"><input type="text" placeholder="Search messages…" oninput="mmRenderThreads(this.value)"></div>' + listHTML;
-  }
-}
-
-function mmLoadConvo(id) {
-  mmActiveThread = id;
-  var t = MM_THREADS[id];
-  if (!t) return;
-  t.unread = 0;
-  var avEl   = document.getElementById('mmConvoAv');
-  var nameEl = document.getElementById('mmConvoName');
-  var statEl = document.querySelector('.mm-convo-status');
-  var inpEl  = document.getElementById('mmInput');
-  if (avEl)   { avEl.style.background = t.col; avEl.textContent = t.av; }
-  if (nameEl) nameEl.textContent = t.name;
-  if (statEl) statEl.textContent = t.status;
-  if (inpEl)  inpEl.placeholder  = 'Message ' + t.name.split(' ')[0] + '…';
-  var area = document.getElementById('mmMessages');
-  if (area) {
-    area.innerHTML = '<div class="mm-time">Today</div>'
-      + t.msgs.map(function(m) {
-        return '<div class="mm-bubble-wrap' + (m.mine ? ' mine' : '') + '">'
-          + '<div class="mm-bubble-av" style="background:' + m.col + '">' + m.av + '</div>'
-          + '<div class="mm-bubble">' + m.text + '</div>'
-          + '</div>';
-      }).join('');
-    area.scrollTop = area.scrollHeight;
-  }
-  mmRenderThreads();
-}
-
-function mmSend() {
-  var input = document.getElementById('mmInput');
-  var text  = input.value.trim();
-  if (!text) return;
-  MM_THREADS[mmActiveThread].msgs.push({ mine:true, av:'MC', col:'#1C1C1E', text:text });
-  input.value = '';
-  mmLoadConvo(mmActiveThread);
 }
 // ══ END MINI MESSENGER ════════════════════════════════════════════════════
 
@@ -7302,59 +7185,10 @@ function showWelcomeBanner() {
 }
 // ══ END PROFILE INIT ═════════════════════════════════════════════════════
 </script>
-<!-- ══ MINI MESSENGER ══════════════════════════════════════════════════ -->
-<div class="mini-messenger" id="miniMessenger">
-
-  <!-- Header -->
-  <div class="mm-header">
-    <div class="mm-title" style="font-family:'Fraunces',serif;font-size:15px;font-weight:700;letter-spacing:-.2px;flex:1;">Messages</div>
-    <button class="mm-new-msg-btn" onclick="mmNewThread()">
-      <svg width="12" height="12" viewBox="0 0 12 12" fill="none"><path d="M6 1v10M1 6h10" stroke="white" stroke-width="1.6" stroke-linecap="round"/></svg>
-      New
-    </button>
-    <button class="mm-header-btn" onclick="toggleMmMinimize()" title="Minimize" style="margin-left:6px">
-      <svg width="12" height="12" viewBox="0 0 12 12" fill="none"><path d="M2 6h8" stroke="currentColor" stroke-width="1.5" stroke-linecap="round"/></svg>
-    </button>
-    <button class="mm-header-btn" onclick="toggleMessenger()" title="Close">
-      <svg width="12" height="12" viewBox="0 0 12 12" fill="none"><path d="M2 2l8 8M10 2l-8 8" stroke="currentColor" stroke-width="1.5" stroke-linecap="round"/></svg>
-    </button>
-  </div>
-
-  <!-- Body -->
-  <div class="mm-body">
-
-    <!-- Thread list -->
-    <div class="mm-threads" id="mmThreads">
-      <div class="mm-search">
-        <input type="text" placeholder="Search messages…" oninput="mmFilterThreads(this.value)">
-      </div>
-      <!-- Threads injected by JS -->
-    </div>
-
-    <!-- Conversation -->
-    <div class="mm-convo" id="mmConvo">
-      <!-- Header -->
-      <div class="mm-convo-header" id="mmConvoHeader">
-        <div class="mm-convo-av" id="mmConvoAv" style="background:#2D1B4E">KA</div>
-        <div>
-          <div class="mm-convo-name" id="mmConvoName">Kwame Asante</div>
-          <div class="mm-convo-status">Active now</div>
-        </div>
-        <a href="/profile" class="mm-view-profile" id="mmViewProfile">View profile</a>
-      </div>
-      <!-- Messages -->
-      <div class="mm-messages" id="mmMessages"></div>
-      <!-- Compose -->
-      <div class="mm-compose">
-        <input type="text" id="mmInput" placeholder="Message Kwame…" onkeydown="if(event.key==='Enter')mmSend()">
-        <button class="mm-send" onclick="mmSend()">
-          <svg width="14" height="14" viewBox="0 0 14 14" fill="none"><path d="M13 1L1 6l5 2 2 5 5-12z" fill="white" stroke="white" stroke-width=".3" stroke-linejoin="round"/></svg>
-        </button>
-      </div>
-    </div>
-
-  </div>
-</div>
+<!-- ══ MINI MESSENGER ══════════════════════════════════════════════════
+     The old hardcoded panel was deleted. The shared _miniMessenger.js
+     module self-injects a real-API floating panel; toggleMessenger()
+     just calls window.openMiniMessenger() to surface it. -->
 <!-- ══ /MINI MESSENGER ═══════════════════════════════════════════════════ -->
 
 <!-- ══ FULL CALENDAR MODAL ══ -->

@@ -77,13 +77,19 @@
   const style = document.createElement("style");
   style.id = "vibe-mini-messenger-css";
   style.textContent = `
-    .vmm-btn{position:fixed;bottom:22px;right:22px;width:56px;height:56px;border-radius:50%;background:#1C1C1E;color:white;border:none;cursor:pointer;display:flex;align-items:center;justify-content:center;box-shadow:0 8px 24px rgba(0,0,0,.18);z-index:8500;transition:transform .15s,filter .15s;}
+    /* Mini button sits LEFT of Otto's corner ring (Otto is right:24 z:9990).
+       Bumped z-index above Otto so the open panel covers the corner ring;
+       html.vmm-open shifts Otto's #ottoCorner left so both stay clickable. */
+    .vmm-btn{position:fixed;bottom:24px;right:96px;width:56px;height:56px;border-radius:50%;background:#1C1C1E;color:white;border:none;cursor:pointer;display:flex;align-items:center;justify-content:center;box-shadow:0 8px 24px rgba(0,0,0,.18);z-index:9994;transition:transform .15s,filter .15s,right .26s cubic-bezier(.2,.8,.2,1);}
     .vmm-btn:hover{transform:translateY(-1px);filter:brightness(1.1);}
     .vmm-btn .vmm-badge{position:absolute;top:-3px;right:-3px;background:#FF5C35;color:white;font-family:'DM Sans',system-ui,sans-serif;font-size:10px;font-weight:800;border-radius:100px;min-width:18px;height:18px;padding:0 5px;display:none;align-items:center;justify-content:center;border:2px solid white;line-height:1;}
     .vmm-btn.has-unread .vmm-badge{display:flex;}
     .vmm-btn.open{display:none;}
-    .vmm-panel{position:fixed;bottom:22px;right:22px;width:360px;max-width:calc(100vw - 24px);height:520px;max-height:calc(100vh - 44px);background:white;border-radius:16px;box-shadow:0 24px 60px rgba(0,0,0,.22),0 4px 16px rgba(0,0,0,.08);display:none;flex-direction:column;overflow:hidden;z-index:8500;font-family:'DM Sans',system-ui,sans-serif;border:1px solid rgba(28,28,30,.08);}
+    .vmm-panel{position:fixed;bottom:24px;right:24px;width:360px;max-width:calc(100vw - 24px);height:520px;max-height:calc(100vh - 44px);background:white;border-radius:16px;box-shadow:0 24px 60px rgba(0,0,0,.22),0 4px 16px rgba(0,0,0,.08);display:none;flex-direction:column;overflow:hidden;z-index:9995;font-family:'DM Sans',system-ui,sans-serif;border:1px solid rgba(28,28,30,.08);}
     .vmm-panel.show{display:flex;}
+    /* When mini is open, slide Otto's corner ring leftward so it sits
+       just to the left of the panel instead of being covered by it. */
+    html.vmm-open #ottoCorner{transform:translateX(-372px) !important;transition:transform .26s cubic-bezier(.2,.8,.2,1);}
     .vmm-hdr{padding:12px 14px;border-bottom:1px solid rgba(28,28,30,.08);display:flex;align-items:center;gap:10px;flex-shrink:0;background:white;}
     .vmm-hdr-title{font-family:'Fraunces',serif;font-weight:800;font-size:15px;flex:1;color:#1C1C1E;}
     .vmm-hdr-back{background:none;border:none;color:#8A8580;cursor:pointer;padding:6px;display:flex;align-items:center;justify-content:center;border-radius:6px;}
@@ -233,6 +239,7 @@
     state.open = true;
     button.classList.add("open");
     panel.classList.add("show");
+    document.documentElement.classList.add("vmm-open");
     if (handle) {
       // Find-or-create a DM and jump to it.
       try {
@@ -263,6 +270,7 @@
     state.open = false;
     panel.classList.remove("show");
     button.classList.remove("open");
+    document.documentElement.classList.remove("vmm-open");
     if (state.listPollTimer) { clearInterval(state.listPollTimer); state.listPollTimer = null; }
     if (state.chatPollTimer) { clearInterval(state.chatPollTimer); state.chatPollTimer = null; }
     state.activeChannel = null;
