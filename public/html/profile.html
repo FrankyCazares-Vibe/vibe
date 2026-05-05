@@ -4872,10 +4872,10 @@ function setVibeRelState(state) {
 }
 
 function _viewedName() {
-  return window.viewingMockUser?.name || 'this person';
+  return window.viewingRealUser?.name || window.viewingMockUser?.name || 'this person';
 }
 
-function handleVibConnect() {
+async function handleVibConnect() {
   if (vibeRelState === 'connected') {
     // Already connected — open DMs directly
     window.location.href = '/messages';
@@ -4884,10 +4884,33 @@ function handleVibConnect() {
   if (vibeRelState === 'pending') return;
 
   const name = _viewedName();
+
+  // Real Supabase user → call the follow API directly. P1-013: a follow
+  // creates a connections row; if both sides have followed each other the
+  // visitor sees "connected" instead of "following" on next reload.
+  if (window.viewingRealUser && window.viewingRealUser.id) {
+    const wasState = vibeRelState;
+    setVibeRelState('following'); // optimistic — server-confirms below
+    try {
+      const r = await fetch('/api/me/follow', {
+        method: 'POST', credentials: 'include',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ target_id: window.viewingRealUser.id }),
+      });
+      const j = await r.json().catch(() => ({}));
+      if (!r.ok || !j.ok) throw new Error((j && j.error) || 'Follow failed');
+      showToast(`Following ${name}`);
+    } catch (e) {
+      setVibeRelState(wasState);
+      showToast(e && e.message ? e.message : 'Could not follow');
+    }
+    return;
+  }
+
+  // Demo / mock-user fallback — preserves the prototype's "request → 3s
+  // auto-accept" simulation so the static demo keeps feeling alive.
   setVibeRelState('pending');
   showToast(`Connection request sent to ${name}`);
-
-  // Simulate acceptance after 3s (demo)
   clearTimeout(window._acceptTimer);
   window._acceptTimer = setTimeout(() => {
     if (vibeRelState !== 'pending') return;
@@ -4896,7 +4919,7 @@ function handleVibConnect() {
   }, 3000);
 }
 
-function handleSoftFollow() {
+async function handleSoftFollow() {
   softFollowing = !softFollowing;
   const soft = document.getElementById('vibeSoftFollow');
   const name = _viewedName();
@@ -4905,11 +4928,29 @@ function handleSoftFollow() {
     soft.classList.add('following');
     showToast(`Following ${name}`);
     if (window.viewingMockUser) saveRelationship(window.viewingMockUser.slug, 'following');
+    if (window.viewingRealUser && window.viewingRealUser.id) {
+      try {
+        await fetch('/api/me/follow', {
+          method: 'POST', credentials: 'include',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ target_id: window.viewingRealUser.id }),
+        });
+      } catch {}
+    }
   } else {
     soft.textContent = 'Follow instead';
     soft.classList.remove('following');
     showToast('Unfollowed');
     if (window.viewingMockUser) saveRelationship(window.viewingMockUser.slug, vibeRelState === 'connected' ? 'connected' : 'none');
+    if (window.viewingRealUser && window.viewingRealUser.id) {
+      try {
+        await fetch('/api/me/follow', {
+          method: 'DELETE', credentials: 'include',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ target_id: window.viewingRealUser.id }),
+        });
+      } catch {}
+    }
   }
 }
 
@@ -4919,14 +4960,13 @@ document.addEventListener('click', e => { const m=document.getElementById('mutua
 
 // Connect button visibility is now handled by .viewer-only CSS on the
 // wrapper (#profileActionBtns). The connection state is initialized by
-// loadRelationship() inside initProfilePage's mock-user branch.
+// loadRelationship() in the mock-user branch, or by setVibeRelState() with
+// the server-side follow state in the ?handle= branch.
 //
-// P1-013 deferred: the real follow API (POST/DELETE /api/me/follow) is wired
-// server-side and ready to call. Hooking handleVibConnect to it lights up
-// when /profile/[handle] gets a real Supabase-backed render — until then
-// there's no surface where the viewer is looking at a real other user. The
-// localStorage-backed mock-user demo path stays in place here so the button
-// keeps working visually.
+// P1-013 (live): handleVibConnect / handleSoftFollow above route through
+// POST/DELETE /api/me/follow when window.viewingRealUser.id is set. The
+// localStorage-backed mock-user demo path stays in place as a fallback so
+// the static prototype keeps working without a Supabase session.
 
 
 // ── Profile search (reuses same people data pattern) ──
@@ -5295,10 +5335,12 @@ document.addEventListener('DOMContentLoaded', function() {
 // Tracks the mock user being viewed (null when on own profile). Used by
 // pinFromProfile / saveProfileToStorage to short-circuit owner-only ops.
 window.viewingMockUser = null;
+window.viewingRealUser = null;
 
 (function initProfilePage(){
   const params = new URLSearchParams(location.search);
   const viewingSlug = params.get('user');
+  const viewingHandle = (params.get('handle') || '').trim().toLowerCase();
   const mockUser = viewingSlug && window.VIBE_MOCK_USERS && window.VIBE_MOCK_USERS[viewingSlug];
 
   // ── Branch A: viewing someone else's profile (mock user) ─────────────
@@ -5331,6 +5373,56 @@ window.viewingMockUser = null;
     requestAnimationFrame(() => {
       document.documentElement.classList.remove('vibe-pre-paint');
     });
+    return;
+  }
+
+  // ── Branch A2: viewing a real Supabase user via /profile/<handle> ─────
+  // /profile/<handle> route redirects here with ?handle=<handle>. We fetch
+  // /api/users/[handle]/bootstrap (public fields only) and render the same
+  // way the owner branch does, just in viewer-mode and with the connection
+  // state seeded so the Connect button matches reality (P1-011b + P1-013).
+  if (viewingHandle) {
+    document.body.classList.add('viewer-mode');
+    document.body.classList.remove('owner-mode');
+    const navBtn = document.getElementById('profileShareBtn');
+    if (navBtn) navBtn.style.display = 'none';
+    clearFreshUserExtras();
+
+    fetch(`/api/users/${encodeURIComponent(viewingHandle)}/bootstrap`, { credentials: 'include' })
+      .then(r => r.ok ? r.json() : Promise.reject(new Error('not_found')))
+      .then(j => {
+        if (!j || !j.ok || !j.vibeUser) throw new Error('not_found');
+        const v = j.vibeUser;
+        window.viewingRealUser = { id: v.id, handle: v.handle, name: v.name };
+        hydrateProfileFields(v);
+        renderUserSections(v);
+        renderStudentBadge(v, /*isOwn=*/false);
+        if (typeof showViewerBackBanner === 'function') showViewerBackBanner(v.name);
+        // Seed the Connect button from server-side follow state so the user
+        // doesn't see a flash of "Connect" before it flips to "Following".
+        if (typeof setVibeRelState === 'function') {
+          if (v._viewerFollowState === 'connected')      setVibeRelState('connected');
+          else if (v._viewerFollowState === 'following') setVibeRelState('following');
+          else if (v._viewerFollowState === 'self') {
+            // Visiting your own /profile/<handle> — bounce to /profile.
+            window.location.href = '/profile';
+            return;
+          } else                                          setVibeRelState('none');
+        }
+      })
+      .catch(() => {
+        const wrap = document.querySelector('.profile-wrap') || document.body;
+        wrap.innerHTML = `<div style="padding:48px 32px;text-align:center;font-family:'DM Sans',sans-serif;">
+          <h1 style="font-family:'Fraunces',serif;font-size:28px;margin-bottom:8px">User not found</h1>
+          <p style="color:#8A8580;margin-bottom:24px">No one with that handle on Vibe yet.</p>
+          <a href="/campus" style="color:#FF5C35;font-weight:700;text-decoration:none">← Back to campus</a>
+        </div>`;
+      })
+      .finally(() => {
+        requestAnimationFrame(() => {
+          document.documentElement.classList.remove('vibe-pre-paint');
+        });
+      });
     return;
   }
 
