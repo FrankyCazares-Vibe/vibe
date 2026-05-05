@@ -5,9 +5,19 @@ import { createSupabaseServerClient } from "@/lib/supabase/server";
 import { createSupabaseServiceClient } from "@/lib/supabase/service";
 
 type CreateBody = {
+  /** 1:1 DM by target user id. */
   target_id?: unknown;
+  /** 1:1 DM by target handle. */
   handle?: unknown;
+  /** Set to "group" to create a group chat instead of a DM. */
+  type?: unknown;
+  /** Optional group name. */
+  name?: unknown;
+  /** Group members — array of user handles or ids. Min 2, max 49 (plus viewer = 50). */
+  members?: unknown;
 };
+
+const MAX_GROUP_MEMBERS = 50;
 
 type ThreadPeer = {
   id: string;
@@ -18,17 +28,29 @@ type ThreadPeer = {
   bio: string | null;
 };
 
+/** Lightweight member info for group threads (avatars + names for the row). */
+type ThreadMember = {
+  id: string;
+  handle: string | null;
+  name: string | null;
+  avatar_url: string | null;
+};
+
 type ThreadEntry = {
   id: string;
   type: "dm" | "group" | "org_channel" | "org_subchannel";
   name: string;
   peer: ThreadPeer | null;
+  /** All non-viewer members for groups (empty for 1:1). */
+  members: ThreadMember[];
   last_message: { content: string; created_at: string; user_id: string } | null;
   unread: boolean;
   accepted_at: string | null;
   is_request: boolean;
-  /** Peer's last_read_at — used to render "Read" receipts on sent messages. */
+  /** Peer's last_read_at — used to render "Read" receipts on sent 1:1 messages. */
   peer_last_read_at: string | null;
+  /** Pinned at this timestamp (null = not pinned). Pinned threads sort first. */
+  pinned_at: string | null;
 };
 
 async function resolveTargetId(
@@ -105,12 +127,52 @@ async function findExistingDm(
 }
 
 /**
- * POST: find or create a 1:1 DM channel between viewer and target.
- * Idempotent — returns existing channel id if one exists.
- *
- * Acceptance rule: if viewer and target are already mutually connected,
- * both members are auto-accepted. Otherwise the target's row stays NULL
- * (lands in their "requests" tab) until they accept or reply.
+ * Resolve a list of mixed handles/ids into a deduped set of user ids.
+ * Used for group-chat creation.
+ */
+async function resolveMembers(
+  supabase: Awaited<ReturnType<typeof createSupabaseServerClient>>,
+  raw: unknown,
+): Promise<{ ok: true; ids: string[] } | { ok: false; status: number; error: string }> {
+  if (!Array.isArray(raw) || raw.length === 0) {
+    return { ok: false, status: 400, error: "members must be a non-empty array" };
+  }
+  const ids = new Set<string>();
+  const handles = new Set<string>();
+  for (const v of raw) {
+    if (typeof v !== "string") continue;
+    const t = v.trim();
+    if (!t) continue;
+    if (/^[0-9a-f]{8}-[0-9a-f]{4}-/i.test(t)) ids.add(t);
+    else handles.add(t.toLowerCase());
+  }
+  if (handles.size > 0) {
+    const { data, error } = await supabase
+      .from("users")
+      .select("id, handle")
+      .in("handle", Array.from(handles));
+    if (error) {
+      console.error("[threads.resolveMembers handles]", error);
+      return { ok: false, status: 500, error: "Member lookup failed" };
+    }
+    for (const u of data ?? []) ids.add(u.id as string);
+  }
+  if (ids.size === 0) {
+    return { ok: false, status: 404, error: "No valid members" };
+  }
+  return { ok: true, ids: Array.from(ids) };
+}
+
+/**
+ * POST: create or find a thread.
+ * - Default: 1:1 DM, idempotent — returns existing channel id if one exists.
+ *   Acceptance rule: if viewer and target are mutually connected, both
+ *   members are auto-accepted. Otherwise target lands in their "requests"
+ *   tab until they accept or reply.
+ * - With `{ type: "group", name?, members: [handles_or_ids] }`: creates a
+ *   new group channel with the viewer as admin and listed users as members.
+ *   All group members are auto-accepted on creation. No find-or-reuse —
+ *   each call creates a fresh group.
  */
 export async function POST(req: Request) {
   const supabase = await createSupabaseServerClient();
@@ -129,6 +191,71 @@ export async function POST(req: Request) {
     return NextResponse.json({ ok: false, error: "Invalid JSON" }, { status: 400 });
   }
 
+  // ── Group creation path ─────────────────────────────────────────────
+  if (body.type === "group") {
+    const resolved = await resolveMembers(supabase, body.members);
+    if (!resolved.ok) {
+      return NextResponse.json({ ok: false, error: resolved.error }, { status: resolved.status });
+    }
+    const memberIds = resolved.ids.filter((id) => id !== user.id);
+    if (memberIds.length < 2) {
+      return NextResponse.json(
+        { ok: false, error: "Group chats need at least 2 other people" },
+        { status: 400 },
+      );
+    }
+    if (memberIds.length + 1 > MAX_GROUP_MEMBERS) {
+      return NextResponse.json(
+        { ok: false, error: `Max ${MAX_GROUP_MEMBERS} members per group` },
+        { status: 400 },
+      );
+    }
+    const groupName =
+      typeof body.name === "string" ? body.name.trim().slice(0, 80) : "";
+
+    const admin = createSupabaseServiceClient();
+    const { data: chan, error: chanErr } = await admin
+      .from("channels")
+      .insert({ type: "group", name: groupName })
+      .select("id")
+      .single();
+    if (chanErr || !chan) {
+      console.error("[threads.POST group channel]", chanErr);
+      return NextResponse.json(
+        { ok: false, error: "Channel create failed" },
+        { status: 500 },
+      );
+    }
+
+    const now = new Date().toISOString();
+    const rows = [
+      { channel_id: chan.id, user_id: user.id, role: "admin", accepted_at: now },
+      ...memberIds.map((id) => ({
+        channel_id: chan.id as string,
+        user_id: id,
+        role: "member",
+        accepted_at: now,
+      })),
+    ];
+    const { error: membersErr } = await admin.from("channel_members").insert(rows);
+    if (membersErr) {
+      console.error("[threads.POST group members]", membersErr);
+      await admin.from("channels").delete().eq("id", chan.id);
+      return NextResponse.json(
+        { ok: false, error: "Membership create failed" },
+        { status: 500 },
+      );
+    }
+
+    return NextResponse.json({
+      ok: true,
+      channel_id: chan.id as string,
+      created: true,
+      type: "group",
+    });
+  }
+
+  // ── 1:1 DM path (default) ───────────────────────────────────────────
   const target = await resolveTargetId(supabase, body);
   if (!target.ok) {
     return NextResponse.json({ ok: false, error: target.error }, { status: target.status });
@@ -165,7 +292,6 @@ export async function POST(req: Request) {
 
   if (membersErr) {
     console.error("[threads.POST members]", membersErr);
-    // Best-effort cleanup so we don't orphan an empty channel.
     await admin.from("channels").delete().eq("id", chan.id);
     return NextResponse.json({ ok: false, error: "Membership create failed" }, { status: 500 });
   }
@@ -191,7 +317,7 @@ export async function GET() {
   const { data: myMemberships, error: memErr } = await supabase
     .from("channel_members")
     .select(
-      "channel_id, accepted_at, last_read_at, hidden_at, channels!inner(id, type, name)",
+      "channel_id, accepted_at, last_read_at, hidden_at, pinned_at, channels!inner(id, type, name)",
     )
     .eq("user_id", user.id);
 
@@ -205,6 +331,7 @@ export async function GET() {
     accepted_at: string | null;
     last_read_at: string | null;
     hidden_at: string | null;
+    pinned_at: string | null;
     channels: { id: string; type: ThreadEntry["type"]; name: string };
   };
   const rows = (myMemberships ?? []) as unknown as Membership[];
@@ -236,11 +363,25 @@ export async function GET() {
     users: ThreadPeer | null;
   };
   const peerByChannel = new Map<string, ThreadPeer>();
+  const membersByChannel = new Map<string, ThreadMember[]>();
   const peerLastReadByChannel = new Map<string, string | null>();
   for (const o of (otherMembers ?? []) as unknown as OtherRow[]) {
     if (o.users && !peerByChannel.has(o.channel_id)) {
       peerByChannel.set(o.channel_id, o.users);
     }
+    if (o.users) {
+      const arr = membersByChannel.get(o.channel_id) ?? [];
+      arr.push({
+        id: o.users.id,
+        handle: o.users.handle,
+        name: o.users.name,
+        avatar_url: o.users.avatar_url,
+      });
+      membersByChannel.set(o.channel_id, arr);
+    }
+    // For 1:1 dms there's exactly one other member so first-write-wins is
+    // fine; for groups we'd need a per-message-author check but read
+    // receipts are intentionally not surfaced for groups in v1.
     if (!peerLastReadByChannel.has(o.channel_id)) {
       peerLastReadByChannel.set(o.channel_id, o.last_read_at ?? null);
     }
@@ -303,38 +444,57 @@ export async function GET() {
       last.user_id !== user.id &&
       (!r.last_read_at || new Date(last.created_at) > new Date(r.last_read_at));
 
+    const members = membersByChannel.get(r.channel_id) ?? [];
+    // Group display name: explicit channel.name → first 3 member first-names
+    // joined → "Group chat" as a last resort.
+    let displayName = r.channels.name?.trim() || "";
+    if (!displayName) {
+      if (r.channels.type === "dm") {
+        displayName = peer?.name || "";
+      } else {
+        const firstNames = members
+          .slice(0, 3)
+          .map((m) => (m.name?.split(/\s+/)[0] ?? m.handle ?? "").trim())
+          .filter(Boolean);
+        displayName = firstNames.length > 0 ? firstNames.join(", ") : "Group chat";
+      }
+    }
+
     const entry: ThreadEntry = {
       id: r.channel_id,
       type: r.channels.type,
-      name: r.channels.name || peer?.name || "",
+      name: displayName,
       peer,
+      members: r.channels.type === "dm" ? [] : members,
       last_message: last,
       unread,
       accepted_at: r.accepted_at,
       is_request: r.accepted_at === null,
       peer_last_read_at: peerLastReadByChannel.get(r.channel_id) ?? null,
+      pinned_at: r.pinned_at,
     };
 
     if (entry.is_request) requests.push(entry);
     else threads.push(entry);
   }
 
-  // Most-recent first (by last message, then by membership).
-  const byRecency = (a: ThreadEntry, b: ThreadEntry) => {
+  // Sort: pinned first (newest pin at the top of the pinned bucket), then
+  // by last-message recency. 1:1 DMs are deduped by peer id (legacy
+  // duplicates from the RLS-recursion bug); groups are keyed by channel id.
+  const cmp = (a: ThreadEntry, b: ThreadEntry) => {
+    const aPin = a.pinned_at ?? "";
+    const bPin = b.pinned_at ?? "";
+    if (aPin && !bPin) return -1;
+    if (!aPin && bPin) return 1;
+    if (aPin && bPin && aPin !== bPin) return bPin.localeCompare(aPin);
     const at = a.last_message?.created_at ?? "";
     const bt = b.last_message?.created_at ?? "";
     return bt.localeCompare(at);
   };
-
-  // Defense-in-depth: dedupe 1:1 DMs by peer id. The pre-RLS-fix bug created
-  // duplicate channels with the same peer because findExistingDm couldn't see
-  // existing rows. Future clicks won't duplicate, but legacy orphans linger.
-  // Keep the most-recent one per peer; the orphans stay in the DB (no
-  // destructive cleanup from a read endpoint) but the UI sees one row.
-  const dedupeByPeer = (entries: ThreadEntry[]): ThreadEntry[] => {
+  const dedupeAndSort = (entries: ThreadEntry[]): ThreadEntry[] => {
     const seen = new Map<string, ThreadEntry>();
     const result: ThreadEntry[] = [];
-    for (const e of [...entries].sort(byRecency)) {
+    for (const e of [...entries].sort(cmp)) {
       const key = e.type === "dm" && e.peer?.id ? e.peer.id : e.id;
       if (seen.has(key)) continue;
       seen.set(key, e);
@@ -345,7 +505,7 @@ export async function GET() {
 
   return NextResponse.json({
     ok: true,
-    threads: dedupeByPeer(threads),
-    requests: dedupeByPeer(requests),
+    threads: dedupeAndSort(threads),
+    requests: dedupeAndSort(requests),
   });
 }

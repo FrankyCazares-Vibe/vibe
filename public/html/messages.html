@@ -45,25 +45,43 @@ body{font-family:'DM Sans',sans-serif;background:var(--cream);color:var(--charco
 .t-new-btn:hover{transform:translateY(-1px);filter:brightness(1.05);}
 .t-new-btn svg{display:block;}
 
-/* Compose overlay (search-and-pick a user to DM) */
+/* Compose overlay (search-and-pick a user to DM, or build a group) */
 .compose-overlay{position:fixed;inset:0;background:rgba(28,28,30,.42);z-index:9000;display:none;align-items:flex-start;justify-content:center;padding-top:88px;}
 .compose-overlay.show{display:flex;}
-.compose-card{width:min(440px,92vw);max-height:72vh;background:white;border-radius:16px;box-shadow:0 28px 80px rgba(0,0,0,.18);overflow:hidden;display:flex;flex-direction:column;}
+.compose-card{width:min(460px,92vw);max-height:78vh;background:white;border-radius:16px;box-shadow:0 28px 80px rgba(0,0,0,.18);overflow:hidden;display:flex;flex-direction:column;}
 .compose-hdr{padding:16px 18px 12px;display:flex;align-items:center;gap:10px;border-bottom:1px solid var(--border);}
 .compose-title{font-family:'Fraunces',serif;font-size:17px;font-weight:800;flex:1;}
 .compose-x{background:none;border:none;color:var(--muted);cursor:none;font-size:18px;line-height:1;padding:4px 6px;}
+.compose-tabs{display:flex;padding:0 16px;border-bottom:1px solid var(--border);gap:18px;}
+.compose-tab{background:none;border:none;padding:10px 0;font-family:'DM Sans',sans-serif;font-size:13px;font-weight:600;color:var(--muted);cursor:none;position:relative;}
+.compose-tab.active{color:var(--charcoal);}
+.compose-tab.active::after{content:'';position:absolute;bottom:-1px;left:0;right:0;height:2px;background:var(--accent);border-radius:2px;}
+.compose-namefield{padding:10px 16px;border-bottom:1px solid var(--border);}
+.compose-namefield input{width:100%;border:1.5px solid var(--border);border-radius:10px;padding:9px 12px;font-family:'DM Sans',sans-serif;font-size:13px;outline:none;cursor:text;}
+.compose-namefield input:focus{border-color:rgba(28,28,30,.2);}
+.compose-selected{display:flex;flex-wrap:wrap;gap:6px;padding:10px 16px;border-bottom:1px solid var(--border);min-height:0;}
+.compose-selected:empty{display:none;}
+.compose-chip{display:inline-flex;align-items:center;gap:5px;background:var(--cream);border:1px solid var(--border);border-radius:100px;padding:4px 10px 4px 6px;font-size:11.5px;font-weight:600;}
+.compose-chip-av{width:18px;height:18px;border-radius:6px;color:white;display:flex;align-items:center;justify-content:center;font-family:'Fraunces',serif;font-size:9px;font-weight:700;overflow:hidden;}
+.compose-chip-x{background:none;border:none;color:var(--muted);cursor:none;font-size:13px;line-height:1;padding:0 0 0 2px;}
 .compose-search{padding:12px 16px;border-bottom:1px solid var(--border);}
 .compose-search input{width:100%;border:1.5px solid var(--border);border-radius:10px;padding:9px 12px;font-family:'DM Sans',sans-serif;font-size:13px;outline:none;cursor:text;}
 .compose-search input:focus{border-color:rgba(28,28,30,.2);}
-.compose-results{flex:1;overflow-y:auto;}
+.compose-results{flex:1;overflow-y:auto;min-height:120px;}
 .compose-row{display:flex;align-items:center;gap:11px;padding:10px 16px;cursor:none;border-bottom:1px solid var(--border);transition:background .12s;}
 .compose-row:hover{background:var(--cream);}
 .compose-row:last-child{border-bottom:none;}
+.compose-row .checkbox{width:18px;height:18px;border:1.5px solid var(--border);border-radius:6px;display:flex;align-items:center;justify-content:center;flex-shrink:0;background:white;}
+.compose-row.selected .checkbox{background:var(--accent);border-color:var(--accent);color:white;}
 .compose-av{width:36px;height:36px;border-radius:10px;background:#1C1C1E;color:white;display:flex;align-items:center;justify-content:center;font-family:'Fraunces',serif;font-size:12px;font-weight:700;flex-shrink:0;overflow:hidden;}
 .compose-info{flex:1;min-width:0;}
 .compose-name{font-size:13.5px;font-weight:600;color:var(--charcoal);}
 .compose-sub{font-size:11px;color:var(--muted);margin-top:2px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;}
 .compose-empty{padding:32px 16px;text-align:center;color:var(--muted);font-size:12.5px;}
+.compose-foot{padding:12px 16px;border-top:1px solid var(--border);display:flex;justify-content:flex-end;}
+.compose-cta{background:var(--accent);color:white;border:none;border-radius:100px;padding:8px 18px;font-family:'DM Sans',sans-serif;font-size:13px;font-weight:700;cursor:none;transition:filter .15s;}
+.compose-cta:disabled{opacity:.45;cursor:not-allowed;}
+.compose-cta:not(:disabled):hover{filter:brightness(1.05);}
 
 /* Chat header dropdown menu (Delete conversation, etc.) */
 .c-menu{position:absolute;top:48px;right:14px;background:white;border:1px solid var(--border);border-radius:12px;box-shadow:0 12px 36px rgba(0,0,0,.12);min-width:200px;overflow:hidden;z-index:50;display:none;}
@@ -782,6 +800,7 @@ input,textarea,[contenteditable="true"]{cursor:text!important;}
           <button class="c-btn" onclick="__dmToggleChatMenu(event)"><svg width="14" height="14" viewBox="0 0 14 14" fill="none"><circle cx="7" cy="2.5" r="1.2" fill="currentColor"/><circle cx="7" cy="7" r="1.2" fill="currentColor"/><circle cx="7" cy="11.5" r="1.2" fill="currentColor"/></svg></button>
         </div>
         <div class="c-menu" id="cMenu">
+          <button id="cMenuPin" onclick="__dmTogglePinCurrent()">Pin chat</button>
           <button class="danger" onclick="__dmDeleteCurrent()">Delete conversation</button>
         </div>
       </div>
@@ -886,7 +905,9 @@ function renderMsgs(msgs,d){
   if (lastSentIdx >= 0) {
     const lastSent = msgs[lastSentIdx];
     let status = 'Delivered';
-    if (typeof __realDM !== 'undefined' && __realDM.enabled && active && lastSent.created_at) {
+    // 1:1 only — group "Read" semantics aren't surfaced in v1.
+    const isGroup = d && d.isGroup;
+    if (!isGroup && typeof __realDM !== 'undefined' && __realDM.enabled && active && lastSent.created_at) {
       const peerRead = __realDM.peerLastReadByChannel[active];
       if (peerRead && new Date(peerRead) >= new Date(lastSent.created_at)) status = 'Read';
     }
@@ -1091,9 +1112,11 @@ document.addEventListener('DOMContentLoaded',function(){
 const __realDM = {
   enabled:false, meId:null, T:{}, pollTimer:null, listTimer:null,
   POLL_MS:5000, LIST_POLL_MS:30000,
-  peerLastReadByChannel:{},   // channelId → peer's last_read_at ISO
-  composeAbort:null,           // AbortController for the in-flight search
-  composeDebounce:null,        // setTimeout handle
+  peerLastReadByChannel:{},     // channelId → peer's last_read_at ISO
+  composeAbort:null,             // AbortController for the in-flight search
+  composeDebounce:null,          // setTimeout handle
+  composeMode:'direct',          // 'direct' | 'group'
+  composeSelected:[],            // group mode: [{id, handle, name, avatar_url}]
 };
 
 function __dmEsc(s){return String(s==null?'':s).replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));}
@@ -1102,13 +1125,23 @@ function __dmAvBg(seed){const palette=['#2D1B4E','#3B1A00','#2a2800','#1A1A00','
 function __dmFmtRel(iso){if(!iso)return'';const t=new Date(iso).getTime();if(Number.isNaN(t))return'';const d=Date.now()-t;if(d<60000)return'now';if(d<3600000)return Math.floor(d/60000)+'m';if(d<86400000)return Math.floor(d/3600000)+'h';if(d<604800000)return Math.floor(d/86400000)+'d';return new Date(iso).toLocaleDateString();}
 
 function __dmThreadRecord(thread, isRequest) {
+  const isGroup = thread.type === 'group' || thread.type === 'org_channel' || thread.type === 'org_subchannel';
   const peer = thread.peer || {};
-  const name = peer.name || thread.name || 'Unknown';
+  const members = thread.members || [];
+  const name = thread.name || peer.name || 'Unknown';
+  const seedKey = isGroup
+    ? thread.id
+    : (peer.id || peer.handle || name);
   return {
     n: name,
-    av: __dmInitials(name),
-    bg: __dmAvBg(peer.id || peer.handle || name),
-    role: peer.school || peer.bio || '',
+    av: __dmInitials(isGroup ? name : (peer.name || name)),
+    bg: __dmAvBg(seedKey),
+    avatarUrl: isGroup ? null : (peer.avatar_url || null),
+    isGroup,
+    members,
+    role: isGroup
+      ? (members.length + 1) + ' people'
+      : (peer.school || peer.bio || ''),
     on: false,
     conn: !isRequest,
     vibe: null,
@@ -1118,7 +1151,31 @@ function __dmThreadRecord(thread, isRequest) {
     isRequest: !!isRequest,
     lastMessage: thread.last_message || null,
     unread: !!thread.unread,
+    pinnedAt: thread.pinned_at || null,
   };
+}
+
+// Render the small avatar inside a thread row or chat header. Photo if we
+// have one, group icon for group chats, initials box otherwise.
+function __dmAvatarHtml(rec, opts) {
+  const size = (opts && opts.size) || 44;
+  const bgStyle = 'background:' + rec.bg + ';width:' + size + 'px;height:' + size + 'px;';
+  if (rec.isGroup) {
+    return '<div class="t-av" style="' + bgStyle + '">' +
+      '<svg width="' + Math.round(size*0.55) + '" height="' + Math.round(size*0.55) + '" viewBox="0 0 24 24" fill="none">' +
+        '<circle cx="8" cy="9" r="3.5" stroke="white" stroke-width="1.5" fill="none"/>' +
+        '<circle cx="16" cy="9" r="3.5" stroke="white" stroke-width="1.5" fill="none"/>' +
+        '<path d="M3 19c0-2.5 2.4-4 5-4s5 1.5 5 4" stroke="white" stroke-width="1.5" fill="none" stroke-linecap="round"/>' +
+        '<path d="M11 19c0-2.5 2.4-4 5-4s5 1.5 5 4" stroke="white" stroke-width="1.5" fill="none" stroke-linecap="round"/>' +
+      '</svg>' +
+    '</div>';
+  }
+  if (rec.avatarUrl) {
+    return '<div class="t-av" style="' + bgStyle + 'overflow:hidden;padding:0;">' +
+      '<img src="' + __dmEsc(rec.avatarUrl) + '" alt="" style="width:100%;height:100%;object-fit:cover;display:block;">' +
+    '</div>';
+  }
+  return '<div class="t-av" style="' + bgStyle + '">' + __dmEsc(rec.av) + '</div>';
 }
 
 function __dmThreadItemHtml(thread, isRequest) {
@@ -1128,10 +1185,13 @@ function __dmThreadItemHtml(thread, isRequest) {
   const unread = thread.unread ? ' unread' : '';
   const previewClass = thread.unread ? ' b' : '';
   const id = __dmEsc(thread.id);
+  const pinIcon = thread.pinned_at
+    ? '<svg class="t-pin" width="11" height="11" viewBox="0 0 14 14" fill="none" style="margin-right:5px;vertical-align:-1px;flex-shrink:0;"><path d="M9 1L13 5L11 7L8 6L5 9L3 11L1 13M5 9L2 12" stroke="#FF5C35" stroke-width="1.4" stroke-linecap="round" stroke-linejoin="round" fill="none"/></svg>'
+    : '';
   return '<div class="t-item' + unread + '" data-t="' + id + '" onclick="openT(\'' + id + '\')">' +
-    '<div class="t-av" style="background:' + rec.bg + '">' + __dmEsc(rec.av) + '</div>' +
+    __dmAvatarHtml(rec, { size: 44 }) +
     '<div class="t-info">' +
-      '<div class="t-name">' + __dmEsc(rec.n) + '</div>' +
+      '<div class="t-name">' + pinIcon + __dmEsc(rec.n) + '</div>' +
       '<div class="t-prev' + previewClass + '">' + __dmEsc(prev) + '</div>' +
     '</div>' +
     '<div class="t-time">' + __dmEsc(time) + '</div>' +
@@ -1226,10 +1286,30 @@ async function __dmOpenChannel(channelId) {
   document.getElementById('emptyState').style.display = 'none';
   const cc = document.getElementById('cContent'); cc.style.display = 'flex';
   const av = document.getElementById('cAv');
-  av.textContent = d.av; av.style.background = d.bg;
+  av.style.background = d.bg;
+  if (d.isGroup) {
+    av.style.padding = '0';
+    av.innerHTML = '<svg width="20" height="20" viewBox="0 0 24 24" fill="none">' +
+      '<circle cx="8" cy="9" r="3.5" stroke="white" stroke-width="1.5" fill="none"/>' +
+      '<circle cx="16" cy="9" r="3.5" stroke="white" stroke-width="1.5" fill="none"/>' +
+      '<path d="M3 19c0-2.5 2.4-4 5-4s5 1.5 5 4" stroke="white" stroke-width="1.5" fill="none" stroke-linecap="round"/>' +
+      '<path d="M11 19c0-2.5 2.4-4 5-4s5 1.5 5 4" stroke="white" stroke-width="1.5" fill="none" stroke-linecap="round"/>' +
+    '</svg>';
+  } else if (d.avatarUrl) {
+    av.style.padding = '0';
+    av.style.overflow = 'hidden';
+    av.innerHTML = '<img src="' + __dmEsc(d.avatarUrl) + '" alt="" style="width:100%;height:100%;object-fit:cover;display:block;">';
+  } else {
+    av.style.padding = '';
+    av.style.overflow = '';
+    av.textContent = d.av;
+  }
   document.getElementById('cName').textContent = d.n;
   document.getElementById('cStatus').textContent = d.role || '';
   document.getElementById('cPill').style.display = 'none';
+  // Update the Pin/Unpin label in the chat menu to reflect current state.
+  const pinBtn = document.getElementById('cMenuPin');
+  if (pinBtn) pinBtn.textContent = d.pinnedAt ? 'Unpin chat' : 'Pin chat';
 
   const rb = document.getElementById('reqBar');
   if (d.isRequest) {
@@ -1308,28 +1388,80 @@ async function __dmDecline() {
   } catch (e) { console.error('[dm.decline]', e); }
 }
 
-// ── Compose picker (search a user, open or create dm) ──────────────────
+// ── Compose picker (Direct DM or Group) ────────────────────────────────
 function __dmComposeOpen() {
   const overlay = document.getElementById('composeOverlay');
   if (!overlay) return;
   overlay.classList.add('show');
+  __realDM.composeSelected = [];
+  __dmComposeSwitchMode('direct'); // resets UI
   const input = document.getElementById('composeSearchInput');
   if (input) { input.value = ''; input.focus(); }
-  document.getElementById('composeResults').innerHTML =
-    '<div class="compose-empty">Start typing to find someone.</div>';
 }
 function __dmComposeClose() {
   const overlay = document.getElementById('composeOverlay');
   if (overlay) overlay.classList.remove('show');
   if (__realDM.composeAbort) { __realDM.composeAbort.abort(); __realDM.composeAbort = null; }
   if (__realDM.composeDebounce) { clearTimeout(__realDM.composeDebounce); __realDM.composeDebounce = null; }
+  __realDM.composeSelected = [];
+}
+function __dmComposeSwitchMode(mode) {
+  __realDM.composeMode = (mode === 'group') ? 'group' : 'direct';
+  document.getElementById('composeTabDirect').classList.toggle('active', __realDM.composeMode === 'direct');
+  document.getElementById('composeTabGroup').classList.toggle('active', __realDM.composeMode === 'group');
+  document.getElementById('composeNameWrap').style.display = __realDM.composeMode === 'group' ? '' : 'none';
+  document.getElementById('composeFoot').style.display = __realDM.composeMode === 'group' ? '' : 'none';
+  document.getElementById('composeTitle').textContent =
+    __realDM.composeMode === 'group' ? 'New group chat' : 'New message';
+  __realDM.composeSelected = [];
+  __dmComposeRenderSelected();
+  document.getElementById('composeResults').innerHTML =
+    '<div class="compose-empty">Start typing to find ' + (__realDM.composeMode === 'group' ? 'people' : 'someone') + '.</div>';
+  document.getElementById('composeSearchInput').value = '';
+  document.getElementById('composeNameInput').value = '';
+  __dmComposeUpdateCta();
+}
+function __dmComposeUpdateCta() {
+  const btn = document.getElementById('composeCreateBtn');
+  if (!btn) return;
+  btn.disabled = __realDM.composeSelected.length < 2;
+  btn.textContent = __realDM.composeSelected.length < 2
+    ? 'Pick at least 2 people'
+    : 'Create group · ' + (__realDM.composeSelected.length + 1);
+}
+function __dmComposeRenderSelected() {
+  const wrap = document.getElementById('composeSelected');
+  if (!wrap) return;
+  if (__realDM.composeMode !== 'group' || __realDM.composeSelected.length === 0) {
+    wrap.innerHTML = '';
+    return;
+  }
+  wrap.innerHTML = __realDM.composeSelected.map(u => {
+    const initials = String(u.name || u.handle || '?').split(/\s+/).slice(0,2).map(s => s[0] || '').join('').toUpperCase();
+    const av = u.avatar_url
+      ? '<img src="' + __dmEsc(u.avatar_url) + '" style="width:100%;height:100%;object-fit:cover;display:block;">'
+      : __dmEsc(initials);
+    return '<span class="compose-chip">' +
+      '<span class="compose-chip-av" style="background:' + __dmAvBg(u.handle || u.id || u.name) + '">' + av + '</span>' +
+      __dmEsc(u.name || ('@' + u.handle)) +
+      '<button class="compose-chip-x" onclick="__dmComposeRemove(' + JSON.stringify(u.id || '').replace(/"/g, '&quot;') + ')">×</button>' +
+    '</span>';
+  }).join('');
+}
+function __dmComposeRemove(userId) {
+  __realDM.composeSelected = __realDM.composeSelected.filter(u => u.id !== userId);
+  __dmComposeRenderSelected();
+  __dmComposeUpdateCta();
+  // Re-paint the current results so the row's checkbox state updates.
+  const input = document.getElementById('composeSearchInput');
+  if (input && input.value) __dmComposeSearch(input.value);
 }
 function __dmComposeSearch(q) {
   const term = (q || '').trim();
   const results = document.getElementById('composeResults');
   if (!results) return;
   if (!term) {
-    results.innerHTML = '<div class="compose-empty">Start typing to find someone.</div>';
+    results.innerHTML = '<div class="compose-empty">Start typing to find ' + (__realDM.composeMode === 'group' ? 'people' : 'someone') + '.</div>';
     return;
   }
   if (__realDM.composeDebounce) clearTimeout(__realDM.composeDebounce);
@@ -1346,6 +1478,7 @@ function __dmComposeSearch(q) {
         results.innerHTML = '<div class="compose-empty">No one matches “' + __dmEsc(term) + '”.</div>';
         return;
       }
+      const isGroup = __realDM.composeMode === 'group';
       results.innerHTML = users.map(u => {
         const name = u.name || ('@' + (u.handle || '')) || 'Unknown';
         const sub = [u.school, u.major, u.year ? 'Year ' + u.year : ''].filter(Boolean).join(' · ');
@@ -1353,7 +1486,15 @@ function __dmComposeSearch(q) {
         const av = u.avatar_url
           ? '<img src="' + __dmEsc(u.avatar_url) + '" style="width:100%;height:100%;object-fit:cover;border-radius:inherit;display:block;">'
           : __dmEsc(initials);
-        return '<div class="compose-row" onclick="__dmComposeSelect(' + JSON.stringify(u.handle || '').replace(/"/g, '&quot;') + ')">' +
+        const selected = isGroup && __realDM.composeSelected.some(s => s.id === u.id);
+        const onClick = isGroup
+          ? '__dmComposeToggle(' + JSON.stringify(JSON.stringify(u)).replace(/"/g, '&quot;') + ')'
+          : '__dmComposeSelectDirect(' + JSON.stringify(u.handle || '').replace(/"/g, '&quot;') + ')';
+        const checkbox = isGroup
+          ? '<div class="checkbox">' + (selected ? '<svg width="11" height="11" viewBox="0 0 11 11" fill="none"><path d="M2 5.5L4.5 8L9 3" stroke="white" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"/></svg>' : '') + '</div>'
+          : '';
+        return '<div class="compose-row' + (selected ? ' selected' : '') + '" onclick="' + onClick + '">' +
+          checkbox +
           '<div class="compose-av" style="background:' + __dmAvBg(u.handle || u.id || name) + '">' + av + '</div>' +
           '<div class="compose-info">' +
             '<div class="compose-name">' + __dmEsc(name) + (u.handle ? ' <span style="color:var(--muted);font-weight:500">@' + __dmEsc(u.handle) + '</span>' : '') + '</div>' +
@@ -1368,13 +1509,51 @@ function __dmComposeSearch(q) {
     }
   }, 220);
 }
-async function __dmComposeSelect(handle) {
+async function __dmComposeSelectDirect(handle) {
   if (!handle) return;
   const cid = await __dmEnsureFromHandle(handle);
   if (!cid) { alert('Could not start that conversation.'); return; }
   __dmComposeClose();
   await __dmLoadList();
   openT(cid);
+}
+function __dmComposeToggle(serialized) {
+  let u;
+  try { u = typeof serialized === 'string' ? JSON.parse(serialized) : serialized; }
+  catch (e) { console.error('[dm.composeToggle parse]', e); return; }
+  if (!u || !u.id) return;
+  const idx = __realDM.composeSelected.findIndex(s => s.id === u.id);
+  if (idx >= 0) __realDM.composeSelected.splice(idx, 1);
+  else __realDM.composeSelected.push(u);
+  __dmComposeRenderSelected();
+  __dmComposeUpdateCta();
+  // Re-render results so the selected check mark updates.
+  const input = document.getElementById('composeSearchInput');
+  if (input && input.value) __dmComposeSearch(input.value);
+}
+async function __dmComposeCreateGroup() {
+  if (__realDM.composeSelected.length < 2) return;
+  const name = (document.getElementById('composeNameInput').value || '').trim();
+  const handles = __realDM.composeSelected.map(u => u.handle).filter(Boolean);
+  const btn = document.getElementById('composeCreateBtn');
+  if (btn) btn.disabled = true;
+  try {
+    const r = await fetch('/api/me/threads', {
+      method: 'POST',
+      credentials: 'include',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ type: 'group', name, members: handles }),
+    });
+    const j = await r.json();
+    if (!j.ok) throw new Error(j.error || 'group create failed');
+    __dmComposeClose();
+    await __dmLoadList();
+    openT(j.channel_id);
+  } catch (e) {
+    console.error('[dm.composeCreateGroup]', e);
+    alert('Could not create group: ' + e.message);
+    if (btn) btn.disabled = false;
+  }
 }
 
 // ── Chat header dropdown menu (Delete conversation) ────────────────────
@@ -1396,6 +1575,30 @@ function __dmToggleChatMenu(ev) {
     }, 0);
   }
 }
+async function __dmTogglePinCurrent() {
+  const channelId = active;
+  document.getElementById('cMenu')?.classList.remove('show');
+  if (!channelId || !__realDM.T[channelId]) return;
+  const wantPin = !__realDM.T[channelId].pinnedAt;
+  try {
+    const r = await fetch('/api/me/threads/' + encodeURIComponent(channelId) + '/pin', {
+      method: 'POST',
+      credentials: 'include',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ pinned: wantPin }),
+    });
+    const j = await r.json();
+    if (!j.ok) throw new Error(j.error || 'pin failed');
+    __realDM.T[channelId].pinnedAt = wantPin ? new Date().toISOString() : null;
+    const pinBtn = document.getElementById('cMenuPin');
+    if (pinBtn) pinBtn.textContent = wantPin ? 'Unpin chat' : 'Pin chat';
+    __dmLoadList(); // re-sort
+  } catch (e) {
+    console.error('[dm.pin]', e);
+    alert('Could not update pin: ' + e.message);
+  }
+}
+
 async function __dmDeleteCurrent() {
   const channelId = active;
   document.getElementById('cMenu')?.classList.remove('show');
@@ -1487,18 +1690,29 @@ async function __dmEnsureFromHandle(handle) {
 
 </script>
 
-<!-- ══ COMPOSE OVERLAY (search a user to DM) ══ -->
+<!-- ══ COMPOSE OVERLAY (Direct message or Group chat) ══ -->
 <div class="compose-overlay" id="composeOverlay" onclick="if(event.target===this)__dmComposeClose()">
   <div class="compose-card">
     <div class="compose-hdr">
-      <div class="compose-title">New message</div>
+      <div class="compose-title" id="composeTitle">New message</div>
       <button class="compose-x" onclick="__dmComposeClose()">×</button>
     </div>
+    <div class="compose-tabs">
+      <button class="compose-tab active" id="composeTabDirect" onclick="__dmComposeSwitchMode('direct')">Direct</button>
+      <button class="compose-tab" id="composeTabGroup" onclick="__dmComposeSwitchMode('group')">Group</button>
+    </div>
+    <div class="compose-namefield" id="composeNameWrap" style="display:none">
+      <input id="composeNameInput" type="text" placeholder="Group name (optional)" autocomplete="off" maxlength="80">
+    </div>
+    <div class="compose-selected" id="composeSelected"></div>
     <div class="compose-search">
       <input id="composeSearchInput" type="text" placeholder="Search by name or @handle…" autocomplete="off" oninput="__dmComposeSearch(this.value)">
     </div>
     <div class="compose-results" id="composeResults">
       <div class="compose-empty">Start typing to find someone.</div>
+    </div>
+    <div class="compose-foot" id="composeFoot" style="display:none">
+      <button class="compose-cta" id="composeCreateBtn" onclick="__dmComposeCreateGroup()" disabled>Create group</button>
     </div>
   </div>
 </div>
