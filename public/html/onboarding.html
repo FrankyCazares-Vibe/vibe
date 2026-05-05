@@ -344,16 +344,16 @@ input, textarea, [contenteditable="true"] { cursor:text!important; }
         </div>
       </div>
       <div>
-        <label class="pf-label" for="pfBio">Bio</label>
-        <textarea id="pfBio" class="pf-textarea" rows="3" maxlength="4000" placeholder="A few lines about you — what you're into, what you're building."></textarea>
+        <label class="pf-label" for="pfBio">Bio <span style="font-weight:400;color:#8A8580">— up to 600 characters</span></label>
+        <textarea id="pfBio" class="pf-textarea" rows="3" maxlength="600" placeholder="A few lines about you — what you're into, what you're building."></textarea>
       </div>
       <div>
         <label class="pf-label" for="pfMajor">Major</label>
-        <input type="text" id="pfMajor" class="pf-input" maxlength="200" placeholder="e.g. Informatics, Business, Film">
+        <input type="text" id="pfMajor" class="pf-input" maxlength="60" placeholder="e.g. Informatics, Business, Film">
       </div>
       <div>
         <label class="pf-label" for="pfDepartment">Department / school</label>
-        <input type="text" id="pfDepartment" class="pf-input" maxlength="200" placeholder="e.g. College of Engineering — optional">
+        <input type="text" id="pfDepartment" class="pf-input" maxlength="80" placeholder="e.g. College of Engineering — optional">
       </div>
       <div>
         <label class="pf-label" for="pfYear">Year</label>
@@ -367,13 +367,13 @@ input, textarea, [contenteditable="true"] { cursor:text!important; }
         </select>
       </div>
       <div>
-        <label class="pf-label" for="pfInterests">Interests &amp; projects</label>
-        <textarea id="pfInterests" class="pf-textarea" rows="3" maxlength="3200" placeholder="Clubs, side projects, topics — one per line or comma-separated"></textarea>
+        <label class="pf-label" for="pfInterests">Interests &amp; projects <span style="font-weight:400;color:#8A8580">— up to 10 items</span></label>
+        <textarea id="pfInterests" class="pf-textarea" rows="3" maxlength="600" placeholder="Clubs, side projects, topics — one per line or comma-separated"></textarea>
         <p class="pf-hint">Saved as profile interests, same as the profile page.</p>
       </div>
       <div>
-        <label class="pf-label" for="pfSkills">Skills</label>
-        <textarea id="pfSkills" class="pf-textarea" rows="3" maxlength="4800" placeholder="e.g. Figma, Python, public speaking — one per line or comma-separated"></textarea>
+        <label class="pf-label" for="pfSkills">Skills <span style="font-weight:400;color:#8A8580">— up to 12 items, 30 chars each</span></label>
+        <textarea id="pfSkills" class="pf-textarea" rows="3" maxlength="600" placeholder="e.g. Figma, Python, public speaking — one per line or comma-separated"></textarea>
       </div>
       <div>
         <div class="pf-label">What are you here for?</div>
@@ -617,13 +617,13 @@ function collectProfileDraft() {
   const bio = (document.getElementById('pfBio') || {}).value?.trim() || '';
   const interests = splitLinesToArray(
     (document.getElementById('pfInterests') || {}).value,
-    40,
-    80,
+    10,  // max items
+    40,  // max chars per item
   );
   const skills = splitLinesToArray(
     (document.getElementById('pfSkills') || {}).value,
-    60,
-    80,
+    12,  // max items
+    30,  // max chars per item
   );
   const looking = [...document.querySelectorAll('.pf-looking:checked')].map(
     (el) => el.value,

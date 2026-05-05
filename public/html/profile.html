@@ -568,13 +568,19 @@ body.edit-mode .vibe-add-thumb { display:flex; }
 }
 .recruiter-card.visible { display:block; }
 .recruiter-card-title { font-family:'Fraunces',serif;font-size:15px;font-weight:700;color:white;margin-bottom:14px; }
+/* Two-column grid so long values (Preferred = "Meeting people · Showing
+   work · …", Top skills = comma-joined list) wrap inside their column
+   instead of bleeding into the label. */
 .rec-stat-row {
-  display:flex;justify-content:space-between;padding:8px 0;
-  border-bottom:1px solid rgba(255,255,255,.08);font-size:13px;
+  display:grid; grid-template-columns: 90px 1fr; gap:14px;
+  align-items:start; padding:8px 0;
+  border-bottom:1px solid rgba(255,255,255,.08); font-size:13px;
 }
 .rec-stat-row:last-child { border:none;padding-bottom:0; }
-.rec-stat-label { color:rgba(255,255,255,.45); }
-.rec-stat-val { color:white;font-weight:600; }
+.rec-stat-label { color:rgba(255,255,255,.45); line-height:1.4; }
+.rec-stat-val   { color:white; font-weight:600; line-height:1.4;
+                  text-align:right; word-wrap:break-word;
+                  overflow-wrap:break-word; min-width:0; }
 
 /* People also viewed */
 .pav-list { display:flex;flex-direction:column;gap:12px; }
@@ -3072,19 +3078,25 @@ body.empty-profile-mode #profileEmpty { display: flex !important; }
               <button class="vibe-delete-btn owner-only" onclick="deleteVibe(this)" title="Delete vibe"
                 style="position:absolute;top:6px;left:6px;background:rgba(0,0,0,.55);color:white;border:none;border-radius:8px;width:22px;height:22px;font-size:14px;line-height:1;cursor:none;backdrop-filter:blur(4px);display:none;align-items:center;justify-content:center;">&times;</button>
             </div>
-            <div class="vibe-upload-tile" onclick="addVibeFromUpload()">
+            <div class="vibe-upload-tile owner-only" onclick="addVibeFromUpload()">
               <svg width="22" height="22" viewBox="0 0 22 22" fill="none"><path d="M11 3v16M3 11h16" stroke="currentColor" stroke-width="1.5" stroke-linecap="round"/></svg>
               <span>Upload Clip</span>
             </div>
+          </div>
+          <!-- Empty state — JS toggles when the grid has no clips. -->
+          <div class="content-empty" id="clipsEmptyState" style="display:none">
+            <div class="content-empty-title">Nothing here yet</div>
+            <div class="content-empty-body owner-mode-text" data-owner-text="Upload a clip from the composer above to start." data-viewer-text="They haven't shared any clips yet.">Upload a clip from the composer above to start.</div>
           </div>
         </div>
 
         <!-- POSTS PANE -->
         <div class="content-pane" id="posts-pane">
 
-          <!-- Viewer hint -->
-          <div class="viewer-only" style="margin-bottom:12px;padding:12px 14px;background:var(--cream);border-radius:12px;">
-            <div style="font-size:12px;color:var(--muted);line-height:1.5">Viewing Maya's profile. <a href="/feed" style="color:var(--accent);font-weight:600;text-decoration:none">Go to feed</a> to post and discover people like her.</div>
+          <!-- Empty state — JS toggles when the list has no cards. -->
+          <div class="content-empty" id="postsEmptyState" style="display:none">
+            <div class="content-empty-title">Nothing here yet</div>
+            <div class="content-empty-body owner-mode-text" data-owner-text="Write something with the composer above to start." data-viewer-text="They haven't posted anything yet.">Write something with the composer above to start.</div>
           </div>
 
           <!-- Posts list — own posts above, syndicated/drafted/vibe-only below.
@@ -4525,11 +4537,40 @@ function _profilePrefillFromCard(card) {
     author:    me ? { name: me.name, handle: me.handle, avatar_url: me.avatarPhoto } : null,
   };
 }
+// Toggle the per-pane empty states (Clips, Posts). Run after every
+// hydration / publish / delete so they reflect reality. The body text
+// swaps based on owner vs viewer mode so visitors see "they haven't
+// posted yet" instead of an instruction telling them to publish.
+function refreshPaneEmptyStates() {
+  const isViewer = document.body.classList.contains('viewer-mode');
+  // Posts pane
+  const postList = document.getElementById('profilePostsList');
+  const postEmpty = document.getElementById('postsEmptyState');
+  if (postList && postEmpty) {
+    const has = postList.querySelector('.profile-post-card');
+    postEmpty.style.display = has ? 'none' : 'block';
+    const body = postEmpty.querySelector('.owner-mode-text');
+    if (body) body.textContent = body.dataset[isViewer ? 'viewerText' : 'ownerText'];
+  }
+  // Clips pane
+  const clipGrid = document.getElementById('profileVibesGrid');
+  const clipEmpty = document.getElementById('clipsEmptyState');
+  if (clipGrid && clipEmpty) {
+    const has = clipGrid.querySelector('.vibe-grid-thumb');
+    clipEmpty.style.display = has ? 'none' : 'block';
+    const body = clipEmpty.querySelector('.owner-mode-text');
+    if (body) body.textContent = body.dataset[isViewer ? 'viewerText' : 'ownerText'];
+  }
+}
+
 // Build the vertical mixed feed for the All tab. Clips render as full-width
 // poster cards with play overlay; posts render as the standard post card
 // (cloned, owner-only chrome stripped). Zipper-merged so the user sees a
 // mix without needing strict chronological sort.
 function populateAllGrid() {
+  // Per-pane empty states share the same trigger points as the All feed,
+  // so refresh them here regardless of whether #profileAllFeed exists.
+  if (typeof refreshPaneEmptyStates === 'function') refreshPaneEmptyStates();
   const feed = document.getElementById('profileAllFeed');
   const empty = document.getElementById('allEmptyState');
   if (!feed) return;

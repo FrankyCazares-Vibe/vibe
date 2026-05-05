@@ -68,7 +68,9 @@ export function buildVibeUserV1FromProfile(
     locationSnap: profile.school || "",
     availability: "",
     preferred: preferredFromLookingFor(profile.looking_for),
-    topSkills: profile.skills.slice(0, 8).join(", "),
+    // Cap the joined string visually — the snapshot card has limited
+    // horizontal real estate and 8 long skills overflow even with grid wrap.
+    topSkills: profile.skills.slice(0, 5).join(", "),
   };
   const snapshot = { ...baseSnap, ...profile.recruiter_snapshot };
 
