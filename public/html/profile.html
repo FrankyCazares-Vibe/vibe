@@ -6125,7 +6125,11 @@ function saveProfileToStorage() {
   scheduleProfileServerSync();
 }
 
-let profileServerSyncTimer = null;
+// var (not let) so the declaration is hoisted — initProfilePage runs
+// synchronously before this line is reached, and renderUserSections →
+// pinFromProfile → saveProfileToStorage → scheduleProfileServerSync
+// would otherwise hit a TDZ ReferenceError and blank the page.
+var profileServerSyncTimer = null;
 function scheduleProfileServerSync() {
   if (window.viewingMockUser || window.viewingRealUser) return;
   const u = (typeof vibeLoad === 'function') ? vibeLoad('vibe_user_v1') : null;
