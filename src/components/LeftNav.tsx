@@ -4,7 +4,6 @@ import Link from "next/link";
 import { usePathname } from "next/navigation";
 
 import { NavIdentityChip } from "@/components/nav-identity-chip";
-import { isGlobalFeedSurfaceEnabled } from "@/lib/feature-flags";
 
 const navItems = [
   {
@@ -56,34 +55,6 @@ const navItems = [
     ),
   },
   {
-    href: "/feed",
-    label: "Feed",
-    icon: (
-      <svg width="16" height="16" viewBox="0 0 16 16" fill="none">
-        <rect x="1" y="1" width="6" height="6" rx="2" fill="currentColor" />
-        <rect x="9" y="1" width="6" height="6" rx="2" fill="currentColor" />
-        <rect x="1" y="9" width="6" height="6" rx="2" fill="currentColor" />
-        <rect x="9" y="9" width="6" height="6" rx="2" fill="currentColor" />
-      </svg>
-    ),
-  },
-  {
-    href: "/profile",
-    label: "My Profile",
-    icon: (
-      <svg width="16" height="16" viewBox="0 0 16 16" fill="none">
-        <circle cx="8" cy="6" r="3.5" stroke="currentColor" strokeWidth="1.4" />
-        <path
-          d="M1 15c0-3.866 3.134-6 7-6s7 2.134 7 6"
-          stroke="currentColor"
-          strokeWidth="1.4"
-          fill="none"
-          strokeLinecap="round"
-        />
-      </svg>
-    ),
-  },
-  {
     href: "/network",
     label: "Network",
     icon: (
@@ -121,11 +92,34 @@ const navItems = [
       </svg>
     ),
   },
+  {
+    href: "/otto",
+    label: "otto",
+    icon: (
+      <span
+        style={{
+          display: "inline-flex",
+          width: 16,
+          height: 16,
+          alignItems: "center",
+          justifyContent: "center",
+        }}
+      >
+        <span
+          style={{
+            width: 8,
+            height: 8,
+            borderRadius: "50%",
+            background: "#FF5C35",
+            boxShadow: "0 0 6px #FF5C35",
+          }}
+        />
+      </span>
+    ),
+  },
 ];
 
-const visibleNavItems = isGlobalFeedSurfaceEnabled()
-  ? navItems
-  : navItems.filter((item) => item.href !== "/feed");
+const visibleNavItems = navItems;
 
 export default function LeftNav() {
   const pathname = usePathname();
@@ -145,7 +139,7 @@ export default function LeftNav() {
       }}
     >
       <Link
-        href="/profile"
+        href="/campus"
         style={{
           fontFamily: "Fraunces, serif",
           fontSize: "22px",
