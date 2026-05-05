@@ -12,6 +12,7 @@
 <script src="/html/_otto.js" defer></script>
 <script src="/html/_postViewer.js" defer></script>
 <script src="/html/_sharePicker.js" defer></script>
+<script src="/html/_miniMessenger.js" defer></script>
 <script>
 // Pre-paint: prevents the flash-of-Maya on profile loads for onboarded users.
 // Reads vibe_user_v1 synchronously before <body> renders. If the user came
@@ -5339,11 +5340,19 @@ function closeProfSearch() {
 
 
 // ══ MINI MESSENGER ═══════════════════════════════════════════════════════
+// The mm* functions below are legacy and dead: toggleMessenger() now
+// defers to the shared _miniMessenger.js module which floats a real-API
+// panel from the bottom-right of every signed-in page. We zero out
+// MM_THREADS so the legacy renderers (still defined below in case
+// something inline calls them) don't surface mock people.
+function toggleMessenger() {
+  if (window.openMiniMessenger) window.openMiniMessenger();
+}
 var mmOpen = false;
 var mmMinimized = false;
 var mmActiveThread = 0;
-
-var MM_THREADS = [
+var MM_THREADS = [];
+var __MM_LEGACY_DEAD = [
   { id:0, name:'Kwame Asante',  av:'KA', col:'#2D1B4E', status:'Active now',    unread:2,
     msgs:[
       {mine:false, av:'KA', col:'#2D1B4E', text:'Hey! Saw your product update — that campus map idea is really interesting.'},
