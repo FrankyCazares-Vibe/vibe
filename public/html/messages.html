@@ -141,24 +141,32 @@ body{font-family:'DM Sans',sans-serif;background:var(--cream);color:var(--charco
 .typ-label{font-size:10.5px;color:var(--muted);margin:2px 0 0 50px;}
 
 /* Inline attachment card inside a message bubble (shared post / clip). */
-.msg-attach{display:flex;flex-direction:column;width:240px;max-width:100%;border-radius:12px;overflow:hidden;background:#FAF7F2;border:1px solid var(--border);cursor:pointer;margin-top:6px;transition:transform .15s,box-shadow .15s;}
-.msg-attach:hover{transform:translateY(-1px);box-shadow:var(--shadow);}
-.msg-attach-poster{width:100%;height:140px;background:#1C1C1E;position:relative;overflow:hidden;flex-shrink:0;}
+.msg-attach{display:flex;flex-direction:column;width:280px;max-width:100%;border-radius:14px;overflow:hidden;background:white;border:1px solid var(--border);cursor:pointer;transition:transform .15s,box-shadow .15s;box-shadow:0 1px 3px rgba(0,0,0,.04);}
+.msg-attach:hover{transform:translateY(-1px);box-shadow:0 6px 18px rgba(0,0,0,.08);}
+.msg-attach-poster{width:100%;height:160px;background:#1C1C1E;position:relative;overflow:hidden;flex-shrink:0;}
 .msg-attach-poster img{width:100%;height:100%;object-fit:cover;display:block;}
 .msg-attach-play{position:absolute;inset:0;display:flex;align-items:center;justify-content:center;background:rgba(0,0,0,.18);}
-.msg-attach-play div{width:42px;height:42px;border-radius:50%;background:rgba(255,255,255,.94);display:flex;align-items:center;justify-content:center;color:var(--charcoal);}
-.msg-attach-body{padding:8px 11px 10px;}
-.msg-attach-label{font-size:9.5px;font-weight:700;letter-spacing:.14em;text-transform:uppercase;color:var(--accent);margin-bottom:3px;}
-.msg-attach-text{font-size:12.5px;color:var(--charcoal);line-height:1.35;display:-webkit-box;-webkit-box-orient:vertical;-webkit-line-clamp:3;overflow:hidden;}
+.msg-attach-play div{width:46px;height:46px;border-radius:50%;background:rgba(255,255,255,.94);display:flex;align-items:center;justify-content:center;color:var(--charcoal);}
+.msg-attach-body{padding:10px 12px 12px;}
+.msg-attach-label{font-size:9.5px;font-weight:700;letter-spacing:.14em;text-transform:uppercase;color:var(--accent);margin-bottom:5px;}
+.msg-attach-text{font-size:13px;color:var(--charcoal);line-height:1.4;display:-webkit-box;-webkit-box-orient:vertical;-webkit-line-clamp:3;overflow:hidden;}
+.msg-attach-text.empty{color:var(--muted);font-style:italic;font-size:12px;}
 .msg-attach-missing{padding:14px;text-align:center;color:var(--muted);font-size:12px;}
-.msg-attach-author{display:flex;align-items:center;gap:7px;margin-top:8px;padding-top:8px;border-top:1px solid var(--border);font-size:11px;color:var(--muted);}
-.msg-attach-av{width:20px;height:20px;border-radius:7px;background:#1C1C1E;color:white;display:flex;align-items:center;justify-content:center;font-family:'Fraunces',serif;font-size:9px;font-weight:700;overflow:hidden;flex-shrink:0;}
+.msg-attach-author{display:flex;align-items:center;gap:7px;margin-top:9px;padding-top:9px;border-top:1px solid var(--border);font-size:11px;color:var(--muted);}
+.msg-attach-av{width:22px;height:22px;border-radius:7px;background:#1C1C1E;color:white;display:flex;align-items:center;justify-content:center;font-family:'Fraunces',serif;font-size:9.5px;font-weight:700;overflow:hidden;flex-shrink:0;}
 .msg-attach-av img{width:100%;height:100%;object-fit:cover;display:block;}
 .msg-attach-author-name{font-weight:600;color:var(--charcoal);}
-.msg-row.mine .msg-attach{background:rgba(255,255,255,.18);border-color:rgba(255,255,255,.18);color:white;}
-.msg-row.mine .msg-attach-text{color:white;}
-.msg-row.mine .msg-attach-label{color:rgba(255,255,255,.85);}
-.msg-row.mine .msg-attach-author{color:rgba(255,255,255,.85);border-top-color:rgba(255,255,255,.18);}
+/* Caption bubble that introduces the attachment — same width as the card
+   for visual unity, attached above with a small overlap on the corner. */
+.msg-attach-caption{max-width:280px;background:var(--cream);color:var(--charcoal);padding:8px 13px;border-radius:14px;border-bottom-left-radius:4px;font-size:13.5px;line-height:1.45;word-break:break-word;align-self:flex-start;}
+.msg-row.mine .msg-attach-caption{background:var(--charcoal);color:white;border-bottom-right-radius:4px;border-bottom-left-radius:14px;align-self:flex-end;}
+.msg-attach-stack{display:flex;flex-direction:column;gap:3px;}
+.msg-row.mine .msg-attach-stack{align-items:flex-end;}
+/* Mine bubbles use a darker card backdrop so it reads on the dark side. */
+.msg-row.mine .msg-attach{background:#262528;border-color:rgba(255,255,255,.10);}
+.msg-row.mine .msg-attach-text{color:#F5F4F2;}
+.msg-row.mine .msg-attach-text.empty{color:rgba(255,255,255,.55);}
+.msg-row.mine .msg-attach-author{color:rgba(255,255,255,.7);border-top-color:rgba(255,255,255,.12);}
 .msg-row.mine .msg-attach-author-name{color:white;}
 .t-search{display:flex;align-items:center;gap:8px;background:var(--cream);border:1.5px solid var(--border);border-radius:12px;padding:8px 12px;transition:border-color .18s;}
 .t-search:focus-within{border-color:rgba(28,28,30,.2);background:white;}
@@ -1034,7 +1042,7 @@ function renderMsgs(msgs,d){
           : '';
         const bodyText = a.content
           ? `<div class="msg-attach-text">${__dmEsc(a.content)}</div>`
-          : '';
+          : `<div class="msg-attach-text empty">Tap to open</div>`;
         let authorBlock = '';
         if (a.authorName) {
           const initials = String(a.authorName).split(/\s+/).slice(0,2).map(s => s[0] || '').join('').toUpperCase() || '?';
@@ -1049,10 +1057,14 @@ function renderMsgs(msgs,d){
       const cardOnclick = a.unavailable
         ? ''
         : ` onclick="if(window.openPostViewer)window.openPostViewer('${__dmEsc(a.id)}')"`;
-      const captionBubble = m.t
-        ? `<div class="bubble">${__dmEsc(m.t)}<div class="btime">${m.ts}</div></div>`
+      // Caption (sender's text) appears above the card so it reads as
+      // "here's my note → here's the thing." Tightly stacked with no gap
+      // so the pair feels like one unit.
+      const captionBlock = m.t
+        ? `<div class="msg-attach-caption">${__dmEsc(m.t)}</div>`
         : '';
-      h += `<div class="msg-row${mine?' mine':''}${gc}">${!mine?avForMsg(m, showAv):''}<div style="display:flex;flex-direction:column;align-items:${mine?'flex-end':'flex-start'};gap:4px;"><div class="msg-attach"${cardOnclick}>${cardInner}</div>${captionBubble}</div></div>`;
+      const stack = `<div class="msg-attach-stack">${captionBlock}<div class="msg-attach"${cardOnclick}>${cardInner}</div><div class="btime" style="font-size:10px;color:var(--muted);text-align:${mine?'right':'left'};margin-top:2px;">${m.ts}</div></div>`;
+      h += `<div class="msg-row${mine?' mine':''}${gc}">${!mine?avForMsg(m, showAv):''}${stack}</div>`;
     } else {
       h+=`<div class="msg-row${mine?' mine':''}${gc}">${!mine?avForMsg(m, showAv):''}<div class="bubble">${m.t}<div class="btime">${m.ts}</div></div></div>`;
     }

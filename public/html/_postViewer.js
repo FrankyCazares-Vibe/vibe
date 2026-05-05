@@ -26,6 +26,11 @@
     padding: 24px; box-sizing: border-box;
     opacity: 0; transition: opacity .18s ease;
   }
+  /* Iframe context (CampusAppShell wraps /messages, /otto): position:fixed
+     only covers the iframe viewport, so a dimmed backdrop leaves the React
+     sidebar bright. Drop the dim — card's shadow + border read as modal. */
+  html.vpv-iframe .vpv-overlay { background: transparent; backdrop-filter: none; }
+  html.vpv-iframe .vpv-card { box-shadow: 0 28px 80px rgba(0,0,0,.32), 0 6px 20px rgba(0,0,0,.12); }
   .vpv-overlay.show { display: flex; opacity: 1; }
   .vpv-card {
     background: #FAF7F2; color: #1C1C1E;
@@ -192,6 +197,13 @@
   styleEl.id = "vpvStyles";
   styleEl.textContent = STYLE;
   document.head.appendChild(styleEl);
+
+  // Mark iframed contexts so the modal CSS can branch (drop the dim).
+  try {
+    if (window.top && window.top !== window.self) {
+      document.documentElement.classList.add("vpv-iframe");
+    }
+  } catch (_) { /* cross-origin guard */ }
 
   // ── Markup (injected once on first open) ──────────────────────────────
   function ensureModal() {
