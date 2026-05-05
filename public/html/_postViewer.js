@@ -229,6 +229,12 @@
             </svg>
             <span id="vpvCommentCount">0</span>
           </button>
+          <button class="vpv-act" id="vpvShare" onclick="window.__vpvShare()" title="Send to a chat">
+            <svg width="16" height="16" viewBox="0 0 16 16" fill="none">
+              <path d="M14 2L7.5 8.5M14 2L9.5 14L7.5 8.5M14 2L2 6.5L7.5 8.5"
+                stroke="#1C1C1E" stroke-width="1.4" fill="none" stroke-linejoin="round" stroke-linecap="round"/>
+            </svg>
+          </button>
           <div class="vpv-spacer"></div>
           <button class="vpv-act" id="vpvSave" onclick="window.__vpvToggleSave()" title="Save">
             <svg width="16" height="16" viewBox="0 0 16 16" fill="none">
@@ -265,7 +271,11 @@
   const state = {
     openId: null,           // post id of currently open modal
     authorId: null,         // post.user_id — drives the "..." menu visibility
+    authorName: "",         // post author display name (for share preview)
     type:     "post",
+    content: "",            // post body — used as the share-card title
+    mediaUrl: null,         // image src for posts; thumbnail for clips
+    posterUrl: null,
     liked:  false,
     saved:  false,
     likes:  0,
@@ -429,7 +439,11 @@
       type:                p.type,
     });
     state.authorId = p.user_id || (p.author && p.author.id) || null;
+    state.authorName = (p.author && p.author.name) || "";
     state.type     = p.type || "post";
+    state.content = p.content || "";
+    state.mediaUrl = p.media_url || null;
+    state.posterUrl = p.media_thumbnail_url || (p.type === "clip" ? null : p.media_url) || null;
     state.liked = !!(j.viewer && j.viewer.liked);
     state.saved = !!(j.viewer && j.viewer.saved);
     state.likes = (j.counts && j.counts.likes) || 0;
@@ -600,6 +614,25 @@
   window.__vpvFocusComposer = function () {
     const inp = document.getElementById("vpvCommentInput");
     if (inp) inp.focus();
+  };
+
+  window.__vpvShare = function () {
+    if (typeof window.openSharePicker !== "function") {
+      toast("Share isn't loaded on this page yet");
+      return;
+    }
+    if (!state.openId || !isRealPostId(state.openId)) {
+      toast("Can't share a demo post");
+      return;
+    }
+    const title = (state.content || "").slice(0, 240);
+    window.openSharePicker({
+      postId: state.openId,
+      kind: state.type === "clip" ? "clip" : "post",
+      title: title || (state.type === "clip" ? "Clip" : "Post"),
+      posterUrl: state.posterUrl,
+      authorName: state.authorName,
+    });
   };
 
   window.__vpvToggleMenu = function (ev) {

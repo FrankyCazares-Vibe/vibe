@@ -6,7 +6,16 @@ const MAX_CONTENT = 4000;
 const DEFAULT_LIMIT = 50;
 const MAX_LIMIT = 200;
 
-type SendBody = { content?: unknown };
+type SendBody = {
+  content?: unknown;
+  attachment_id?: unknown;
+  attachment_kind?: unknown; // 'post' | 'clip'
+};
+
+const MESSAGE_SELECT =
+  "id, content, created_at, user_id, attachment_id, attachment_kind, " +
+  "users:users!messages_user_id_fkey(id, handle, name, avatar_url), " +
+  "attachment:posts!messages_attachment_id_fkey(id, type, content, media_url, media_thumbnail_url, user_id)";
 
 type RouteCtx = { params: Promise<{ id: string }> };
 
@@ -54,18 +63,28 @@ export async function GET(req: Request, ctx: RouteCtx) {
   const rawLimit = Number(url.searchParams.get("limit") ?? DEFAULT_LIMIT);
   const limit = Math.min(MAX_LIMIT, Math.max(1, Number.isFinite(rawLimit) ? rawLimit : DEFAULT_LIMIT));
 
-  let q = supabase
-    .from("messages")
-    .select(
-      "id, content, created_at, user_id, users:users!messages_user_id_fkey(id, handle, name, avatar_url)",
-    )
-    .eq("channel_id", channelId)
-    .order("created_at", { ascending: false })
-    .limit(limit);
-
-  if (before) q = q.lt("created_at", before);
-
-  const { data, error } = await q;
+  // Try the join-rich select first; if attachment columns/FK aren't in
+  // the DB yet, retry with the simpler select so the page still renders.
+  async function runQuery(select: string) {
+    let q = supabase
+      .from("messages")
+      .select(select)
+      .eq("channel_id", channelId)
+      .order("created_at", { ascending: false })
+      .limit(limit);
+    if (before) q = q.lt("created_at", before);
+    return q;
+  }
+  let { data, error } = await runQuery(MESSAGE_SELECT);
+  if (error) {
+    if (/attachment|relationship|column|fkey/i.test(error.message)) {
+      const fallback = await runQuery(
+        "id, content, created_at, user_id, users:users!messages_user_id_fkey(id, handle, name, avatar_url)",
+      );
+      data = fallback.data;
+      error = fallback.error;
+    }
+  }
   if (error) {
     console.error("[messages.GET]", error);
     return NextResponse.json({ ok: false, error: error.message }, { status: 500 });
@@ -114,11 +133,50 @@ export async function POST(req: Request, ctx: RouteCtx) {
   }
 
   const content = typeof body.content === "string" ? body.content.trim() : "";
-  if (!content) {
+  const attachmentId =
+    typeof body.attachment_id === "string" && body.attachment_id.length > 0
+      ? body.attachment_id
+      : null;
+  const attachmentKindRaw =
+    typeof body.attachment_kind === "string" ? body.attachment_kind : null;
+
+  if (!content && !attachmentId) {
     return NextResponse.json({ ok: false, error: "Empty message" }, { status: 400 });
   }
   if (content.length > MAX_CONTENT) {
     return NextResponse.json({ ok: false, error: "Message too long" }, { status: 400 });
+  }
+
+  // Verify the attachment exists and is visible to the sender (RLS gates
+  // SELECT, so a SELECT that returns null = either missing or invisible —
+  // both should reject). Ensure attachment_kind agrees with posts.type.
+  let attachmentKind: "post" | "clip" | null = null;
+  if (attachmentId) {
+    if (attachmentKindRaw !== "post" && attachmentKindRaw !== "clip") {
+      return NextResponse.json(
+        { ok: false, error: "Invalid attachment_kind" },
+        { status: 400 },
+      );
+    }
+    const { data: post } = await supabase
+      .from("posts")
+      .select("id, type")
+      .eq("id", attachmentId)
+      .maybeSingle();
+    if (!post) {
+      return NextResponse.json(
+        { ok: false, error: "Attachment not found" },
+        { status: 404 },
+      );
+    }
+    const expected = post.type === "clip" ? "clip" : "post";
+    if (attachmentKindRaw !== expected) {
+      return NextResponse.json(
+        { ok: false, error: "Attachment kind mismatch" },
+        { status: 400 },
+      );
+    }
+    attachmentKind = expected;
   }
 
   const member = await ensureMember(supabase, channelId, user.id);
@@ -126,13 +184,31 @@ export async function POST(req: Request, ctx: RouteCtx) {
     return NextResponse.json({ ok: false, error: "Not a member" }, { status: member.status });
   }
 
-  const { data: inserted, error: insErr } = await supabase
+  const insertRow: Record<string, string | null> = {
+    channel_id: channelId,
+    user_id: user.id,
+    content: content,
+    attachment_id: attachmentId,
+    attachment_kind: attachmentKind,
+  };
+  // Strip attachment fields if they're null AND the column might not exist
+  // yet — defensive for migration lag. Falls through to the simple select
+  // below if PostgREST rejects unknown columns (older schema).
+  let insertResult = await supabase
     .from("messages")
-    .insert({ channel_id: channelId, user_id: user.id, content })
-    .select(
-      "id, content, created_at, user_id, users:users!messages_user_id_fkey(id, handle, name, avatar_url)",
-    )
+    .insert(insertRow)
+    .select(MESSAGE_SELECT)
     .single();
+  if (insertResult.error && /attachment|column/i.test(insertResult.error.message)) {
+    insertResult = await supabase
+      .from("messages")
+      .insert({ channel_id: channelId, user_id: user.id, content })
+      .select(
+        "id, content, created_at, user_id, users:users!messages_user_id_fkey(id, handle, name, avatar_url)",
+      )
+      .single();
+  }
+  const { data: inserted, error: insErr } = insertResult;
 
   if (insErr || !inserted) {
     console.error("[messages.POST insert]", insErr);
