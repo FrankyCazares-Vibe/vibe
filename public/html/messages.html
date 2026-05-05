@@ -45,10 +45,14 @@ body{font-family:'DM Sans',sans-serif;background:var(--cream);color:var(--charco
 .t-new-btn:hover{transform:translateY(-1px);filter:brightness(1.05);}
 .t-new-btn svg{display:block;}
 
-/* Compose overlay (search-and-pick a user to DM, or build a group) */
-.compose-overlay{position:fixed;inset:0;background:rgba(28,28,30,.42);z-index:9000;display:none;align-items:flex-start;justify-content:center;padding-top:88px;}
+/* Compose overlay (search-and-pick a user to DM, or build a group)
+   Background dim removed — we live inside an iframe (CampusAppShell on
+   /messages), and `position:fixed` only covers the iframe viewport so a
+   dim overlay would leave the React sidebar bright. The card's shadow +
+   border + scrim already sells "modal" without dimming. */
+.compose-overlay{position:fixed;inset:0;background:transparent;z-index:9000;display:none;align-items:flex-start;justify-content:center;padding-top:88px;}
 .compose-overlay.show{display:flex;}
-.compose-card{width:min(460px,92vw);max-height:78vh;background:white;border-radius:16px;box-shadow:0 28px 80px rgba(0,0,0,.18);overflow:hidden;display:flex;flex-direction:column;}
+.compose-card{width:min(460px,92vw);max-height:78vh;background:white;border-radius:16px;border:1px solid var(--border);box-shadow:0 28px 80px rgba(0,0,0,.22),0 4px 16px rgba(0,0,0,.08);overflow:hidden;display:flex;flex-direction:column;}
 .compose-hdr{padding:16px 18px 12px;display:flex;align-items:center;gap:10px;border-bottom:1px solid var(--border);}
 .compose-title{font-family:'Fraunces',serif;font-size:17px;font-weight:800;flex:1;}
 .compose-x{background:none;border:none;color:var(--muted);cursor:none;font-size:18px;line-height:1;padding:4px 6px;}
@@ -784,10 +788,11 @@ input,textarea,[contenteditable="true"]{cursor:text!important;}
       </div>
       <div class="t-search"><svg width="14" height="14" viewBox="0 0 14 14" fill="none"><circle cx="6" cy="6" r="4.5" stroke="#8A8580" stroke-width="1.3"/><path d="M10 10l2.5 2.5" stroke="#8A8580" stroke-width="1.3" stroke-linecap="round"/></svg><input type="text" placeholder="Search" oninput="filterT(this.value)"></div>
     </div>
-    <div class="req-banner" onclick="openT('recruiter')">
+    <!-- Hidden by default — populated by __dmRenderList only when real requests exist. -->
+    <div class="req-banner" style="display:none">
       <div class="req-icon"><svg width="13" height="13" viewBox="0 0 13 13" fill="none"><path d="M1 1h11v8H4L1 12V1z" stroke="white" stroke-width="1.3" fill="none" stroke-linejoin="round"/></svg></div>
-      <div class="req-txt"><h4>Message requests</h4><p>3 people you haven't connected with</p></div>
-      <div class="req-badge">3</div>
+      <div class="req-txt"><h4>Message requests</h4><p></p></div>
+      <div class="req-badge"></div>
     </div>
     <div class="t-tabs">
       <button class="t-tab active" onclick="switchTab(this,'all')">All</button>
