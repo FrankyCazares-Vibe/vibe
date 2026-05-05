@@ -150,6 +150,22 @@
     #ottoPanel .otto-activity { font-size: 12.5px; line-height: 1.6; color: rgba(255,255,255,.72); padding: 7px 0; display: flex; gap: 9px; }
     #ottoPanel .otto-activity-arrow { color: #FF5C35; font-weight: 600; flex-shrink: 0; }
 
+    /* Notification filter pills (P1-021). */
+    #ottoPanel .otto-notif-filters {
+      display:flex; gap:6px; margin:0 0 12px; flex-wrap:wrap;
+    }
+    #ottoPanel .otto-notif-filter {
+      font-family:'DM Sans',sans-serif; font-size:11px; font-weight:600;
+      padding:5px 11px; border-radius:100px;
+      border:0.5px solid rgba(255,255,255,.12);
+      background:transparent; color:rgba(255,255,255,.55);
+      cursor:none; transition:all .15s; letter-spacing:.2px;
+    }
+    #ottoPanel .otto-notif-filter:hover { color:white; border-color:rgba(255,255,255,.28); }
+    #ottoPanel .otto-notif-filter.on {
+      background:#FF5C35; color:white; border-color:#FF5C35;
+    }
+
     /* Real notification rows (P1-021). */
     #ottoPanel .otto-notif-row {
       display:flex; gap:10px; padding:10px 0; align-items:flex-start;
@@ -416,14 +432,35 @@
     body.innerHTML = renderDraftsHTML(latest) + `
       <div class="otto-divider"></div>
       <div class="otto-section-eyebrow">activity</div>
+      <div class="otto-notif-filters">
+        <button class="otto-notif-filter on" data-notif-filter="all">All</button>
+        <button class="otto-notif-filter" data-notif-filter="follow">Follows</button>
+        <button class="otto-notif-filter" data-notif-filter="connection">Connections</button>
+        <button class="otto-notif-filter" data-notif-filter="like">Likes</button>
+        <button class="otto-notif-filter" data-notif-filter="comment">Comments</button>
+      </div>
       <div class="otto-notif-list" id="ottoNotifList">
         <div class="otto-notif-empty">loading…</div>
       </div>
     `;
     bindCursorOn(body);
+    // Wire filter pill clicks — re-render list from cache, no refetch.
+    body.querySelectorAll('.otto-notif-filter').forEach(btn => {
+      btn.addEventListener('click', () => {
+        body.querySelectorAll('.otto-notif-filter').forEach(b => b.classList.remove('on'));
+        btn.classList.add('on');
+        _ottoActiveFilter = btn.dataset.notifFilter || 'all';
+        _ottoRenderNotifications(_ottoLastList);
+      });
+    });
   }
 
   // ── Notifications wiring (P1-021) ──────────────────────────────────
+  // Cache the last fetched list so filter clicks don't refetch — they
+  // just re-render the existing array through _ottoActiveFilter.
+  let _ottoLastList = [];
+  let _ottoActiveFilter = 'all';
+
   function _isAppShellUser() {
     if (typeof vibeLoad !== 'function') return false;
     const u = vibeLoad('vibe_user_v1');
@@ -480,11 +517,18 @@
   function _ottoRenderNotifications(list) {
     const wrap = document.getElementById('ottoNotifList');
     if (!wrap) return;
-    if (!list || list.length === 0) {
-      wrap.innerHTML = '<div class="otto-notif-empty">no activity yet — go say hi to someone.</div>';
+    _ottoLastList = Array.isArray(list) ? list : [];
+    const filtered = (_ottoActiveFilter && _ottoActiveFilter !== 'all')
+      ? _ottoLastList.filter(n => n.type === _ottoActiveFilter)
+      : _ottoLastList;
+    if (filtered.length === 0) {
+      const msg = (_ottoActiveFilter && _ottoActiveFilter !== 'all')
+        ? `no ${_ottoActiveFilter}s yet.`
+        : 'no activity yet — go say hi to someone.';
+      wrap.innerHTML = `<div class="otto-notif-empty">${msg}</div>`;
       return;
     }
-    wrap.innerHTML = list.map(_ottoRenderNotifRow).join('');
+    wrap.innerHTML = filtered.map(_ottoRenderNotifRow).join('');
     bindCursorOn(wrap);
   }
 
@@ -497,10 +541,13 @@
       : `<div class="otto-notif-av">${_ottoEsc(initials)}</div>`;
     const name = _ottoEsc(a.name || ('@' + (a.handle || 'someone')));
     let verb;
-    if (n.type === 'follow')        verb = 'connected with you';
-    else if (n.type === 'like')     verb = 'liked your post';
-    else if (n.type === 'comment')  verb = 'commented on your post';
-    else                            verb = '';
+    switch (n.type) {
+      case 'follow':     verb = 'started following you';        break;
+      case 'connection': verb = "you're now connected";         break;
+      case 'like':       verb = 'liked your post';              break;
+      case 'comment':    verb = 'commented on your post';       break;
+      default:           verb = '';
+    }
     const snippet = (n.post && n.post.content)
       ? `<div class="otto-notif-snippet">"${_ottoEsc(n.post.content.slice(0, 120))}"</div>`
       : '';
