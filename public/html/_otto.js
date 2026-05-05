@@ -38,12 +38,16 @@
       position: fixed; bottom: 24px; right: 24px; z-index: 9990;
       cursor: none;
     }
+    /* Notification dot — hidden by default, JS adds .has-unread when
+       /api/me/notifications/count returns > 0. */
     #ottoCorner .otto-notif {
       position: absolute; top: -2px; right: -2px;
       width: 11px; height: 11px; border-radius: 50%;
       background: #FF5C35; border: 2px solid #FAF7F2;
       z-index: 2; box-shadow: 0 0 8px rgba(255,92,53,.5);
+      display: none;
     }
+    #ottoCorner.has-unread .otto-notif { display: block; }
     #ottoCorner .otto-shell {
       width: 52px; height: 52px; border-radius: 50%;
       background: #1C1C1E; border: 0.5px solid rgba(255,92,53,.3);
@@ -145,6 +149,37 @@
     #ottoPanel .otto-section-eyebrow { font-size: 10px; font-weight: 600; letter-spacing: 1.2px; color: rgba(255,255,255,.42); text-transform: uppercase; margin-bottom: 12px; }
     #ottoPanel .otto-activity { font-size: 12.5px; line-height: 1.6; color: rgba(255,255,255,.72); padding: 7px 0; display: flex; gap: 9px; }
     #ottoPanel .otto-activity-arrow { color: #FF5C35; font-weight: 600; flex-shrink: 0; }
+
+    /* Real notification rows (P1-021). */
+    #ottoPanel .otto-notif-row {
+      display:flex; gap:10px; padding:10px 0; align-items:flex-start;
+      border-top:0.5px solid rgba(255,255,255,.05);
+      cursor:none;
+    }
+    #ottoPanel .otto-notif-row:first-of-type { border-top:none; }
+    #ottoPanel .otto-notif-row:hover { background:rgba(255,255,255,.02); }
+    #ottoPanel .otto-notif-row.unread .otto-notif-actor::after {
+      content:""; display:inline-block; width:6px; height:6px; border-radius:50%;
+      background:#FF5C35; box-shadow:0 0 6px #FF5C35; margin-left:6px; vertical-align:middle;
+    }
+    #ottoPanel .otto-notif-av {
+      width:34px; height:34px; border-radius:50%; flex-shrink:0;
+      background:#1C1C1E; color:white; display:flex; align-items:center; justify-content:center;
+      font-size:12px; font-weight:700; overflow:hidden;
+    }
+    #ottoPanel .otto-notif-av img { width:100%; height:100%; object-fit:cover; display:block; }
+    #ottoPanel .otto-notif-body { flex:1; min-width:0; font-size:12.5px; line-height:1.5; }
+    #ottoPanel .otto-notif-actor { color:white; font-weight:600; }
+    #ottoPanel .otto-notif-text { color:rgba(255,255,255,.78); }
+    #ottoPanel .otto-notif-snippet {
+      color:rgba(255,255,255,.55); font-size:11.5px; margin-top:3px;
+      display:-webkit-box;-webkit-line-clamp:2;-webkit-box-orient:vertical;overflow:hidden;
+    }
+    #ottoPanel .otto-notif-time { color:rgba(255,255,255,.4); font-size:11px; margin-top:3px; font-weight:500; }
+    #ottoPanel .otto-notif-empty {
+      padding:24px 0; text-align:center;
+      color:rgba(255,255,255,.5); font-size:12.5px; font-style:italic;
+    }
 
     #ottoPanel .otto-panel-footer {
       padding: 14px 22px; border-top: 0.5px solid rgba(255,255,255,.06); flex-shrink: 0;
@@ -356,11 +391,23 @@
       panel.style.display = '';
     }
     renderPanelBody();
+    // Pull real notifications + mark them read after the user has seen
+    // them. Best-effort — silent on failure (we still rendered the
+    // briefing / drafts above).
+    if (_isAppShellUser()) {
+      _ottoFetchNotifications().then(list => {
+        _ottoRenderNotifications(list);
+        if (list && list.some(n => !n.read_at)) {
+          _ottoMarkAllRead();
+        }
+      }).catch(() => {});
+    }
   }
 
-  // Re-renders the side-panel body (briefing + drafts + activity) from the
-  // most-recent post stored in vibe_otto_lastpost_v1. Falls back to an empty
-  // state when the user hasn't published anything yet.
+  // Re-renders the side-panel body (briefing + drafts + activity placeholder).
+  // The activity section is replaced with real notifications by
+  // _ottoRenderNotifications once the API responds; until then it shows
+  // a small "loading" line so the section isn't empty mid-fetch.
   function renderPanelBody() {
     if (!panel) return;
     const body = panel.querySelector('.otto-panel-body');
@@ -368,13 +415,123 @@
     const latest = (typeof vibeLoad === 'function') ? vibeLoad('vibe_otto_lastpost_v1') : null;
     body.innerHTML = renderDraftsHTML(latest) + `
       <div class="otto-divider"></div>
-      <div class="otto-section-eyebrow">earlier today</div>
-      <div class="otto-activity"><span class="otto-activity-arrow">›</span><span>recruiter from stripe viewed your profile. just FYI.</span></div>
-      <div class="otto-activity"><span class="otto-activity-arrow">›</span><span>your vibe from tuesday hit 240 views. solid.</span></div>
-      <div class="otto-activity"><span class="otto-activity-arrow">›</span><span>3 mutuals connected with you this week.</span></div>
+      <div class="otto-section-eyebrow">activity</div>
+      <div class="otto-notif-list" id="ottoNotifList">
+        <div class="otto-notif-empty">loading…</div>
+      </div>
     `;
     bindCursorOn(body);
   }
+
+  // ── Notifications wiring (P1-021) ──────────────────────────────────
+  function _isAppShellUser() {
+    if (typeof vibeLoad !== 'function') return false;
+    const u = vibeLoad('vibe_user_v1');
+    return Boolean(u && u._appShell);
+  }
+
+  async function _ottoFetchNotifications() {
+    const r = await fetch('/api/me/notifications?limit=30', { credentials: 'include' });
+    if (!r.ok) return [];
+    const j = await r.json().catch(() => ({}));
+    return (j && j.ok && Array.isArray(j.notifications)) ? j.notifications : [];
+  }
+
+  async function _ottoFetchUnreadCount() {
+    const r = await fetch('/api/me/notifications/count', { credentials: 'include' });
+    if (!r.ok) return 0;
+    const j = await r.json().catch(() => ({}));
+    return (j && j.ok && typeof j.unread === 'number') ? j.unread : 0;
+  }
+
+  async function _ottoMarkAllRead() {
+    try {
+      await fetch('/api/me/notifications/mark-read', {
+        method: 'POST', credentials: 'include',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ all: true }),
+      });
+      _ottoSetUnread(0);
+    } catch {}
+  }
+
+  function _ottoSetUnread(n) {
+    if (!corner) return;
+    if (n > 0) corner.classList.add('has-unread');
+    else corner.classList.remove('has-unread');
+  }
+
+  function _ottoRelTime(iso) {
+    if (!iso) return '';
+    const d = (Date.now() - new Date(iso).getTime()) / 1000;
+    if (d < 60) return 'just now';
+    if (d < 3600) return Math.floor(d/60) + 'm ago';
+    if (d < 86400) return Math.floor(d/3600) + 'h ago';
+    if (d < 86400*7) return Math.floor(d/86400) + 'd ago';
+    return new Date(iso).toLocaleDateString(undefined, { month:'short', day:'numeric' });
+  }
+
+  function _ottoEsc(s) {
+    return String(s || '').replace(/[&<>"']/g, ch => ({
+      '&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;',
+    }[ch]));
+  }
+
+  function _ottoRenderNotifications(list) {
+    const wrap = document.getElementById('ottoNotifList');
+    if (!wrap) return;
+    if (!list || list.length === 0) {
+      wrap.innerHTML = '<div class="otto-notif-empty">no activity yet — go say hi to someone.</div>';
+      return;
+    }
+    wrap.innerHTML = list.map(_ottoRenderNotifRow).join('');
+    bindCursorOn(wrap);
+  }
+
+  function _ottoRenderNotifRow(n) {
+    const a = n.actor || {};
+    const initials = (a.name || a.handle || '?').split(/\s+/)
+      .map(p => p[0]).filter(Boolean).join('').slice(0,2).toUpperCase();
+    const av = a.avatar_url
+      ? `<div class="otto-notif-av"><img src="${_ottoEsc(a.avatar_url)}" alt=""></div>`
+      : `<div class="otto-notif-av">${_ottoEsc(initials)}</div>`;
+    const name = _ottoEsc(a.name || ('@' + (a.handle || 'someone')));
+    let verb;
+    if (n.type === 'follow')        verb = 'connected with you';
+    else if (n.type === 'like')     verb = 'liked your post';
+    else if (n.type === 'comment')  verb = 'commented on your post';
+    else                            verb = '';
+    const snippet = (n.post && n.post.content)
+      ? `<div class="otto-notif-snippet">"${_ottoEsc(n.post.content.slice(0, 120))}"</div>`
+      : '';
+    const click = a.handle
+      ? ` onclick="window.location.href='/profile/${encodeURIComponent(a.handle)}'"`
+      : '';
+    const cls = 'otto-notif-row' + (n.read_at ? '' : ' unread');
+    return `<div class="${cls}"${click}>
+      ${av}
+      <div class="otto-notif-body">
+        <div><span class="otto-notif-actor">${name}</span> <span class="otto-notif-text">${verb}</span></div>
+        ${snippet}
+        <div class="otto-notif-time">${_ottoEsc(_ottoRelTime(n.created_at))}</div>
+      </div>
+    </div>`;
+  }
+
+  // Poll the unread count every 30s so the dot stays current without
+  // the user having to refresh. Visibility-gated so a backgrounded tab
+  // doesn't burn CPU.
+  function _ottoStartPolling() {
+    if (!_isAppShellUser()) return;
+    _ottoFetchUnreadCount().then(_ottoSetUnread).catch(() => {});
+    setInterval(() => {
+      if (document.hidden) return;
+      _ottoFetchUnreadCount().then(_ottoSetUnread).catch(() => {});
+    }, 30 * 1000);
+  }
+  // Defer the first poll so the corner ring is mounted by the time we
+  // try to add the .has-unread class.
+  setTimeout(_ottoStartPolling, 1500);
 
   function renderDraftsHTML(latest) {
     if (!latest || !latest.text) {
