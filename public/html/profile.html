@@ -1290,6 +1290,9 @@ body.recruiter-mode .recruiter-card .rec-stat-row:last-child { border-bottom:non
   font-size:9px;color:white;opacity:1;
   backdrop-filter:blur(4px);padding-left:2px;
 }
+/* Edit mode: hide the play badge so it doesn't stack under the Pin pill
+   (both sit at top-right). Owner is editing, not previewing playback. */
+body.edit-mode .vibe-grid-play { display:none; }
 .vibe-grid-info { position:absolute;bottom:0;left:0;right:0;padding:10px; }
 .vibe-grid-title { font-size:11px;font-weight:600;color:white;line-height:1.3;margin-bottom:4px; }
 .vibe-grid-views { font-size:10px;color:rgba(255,255,255,.6); }
@@ -3096,7 +3099,6 @@ body.empty-profile-mode #profileEmpty { display: flex !important; }
             <button class="ppost-delete owner-only" onclick="deleteProfilePost(this)" title="Delete post">&times;</button>
             <div class="ppost-header-row">
               <div class="ppost-date" style="font-size:11px;font-weight:700;color:var(--muted);text-transform:uppercase;letter-spacing:.5px;">3 days ago</div>
-              <span class="op-badge gray">vibe only</span>
             </div>
             <div class="ppost-body">Systems thinking is just noticing that everything has second-order effects. Once you start seeing it you can't stop. It makes you slower to act and better at acting.</div>
             <div class="ppost-tags"><span class="ppost-tag">#ProductThinking</span><span class="ppost-tag">#Design</span></div>
@@ -4768,10 +4770,10 @@ function _publishProfilePostLocal(text, serverPost) {
   if (list) {
     const card = _renderPostCard({
       id:       (serverPost && serverPost.id) || 'p' + Date.now() + Math.random().toString(36).slice(2,5),
-      ottoType: 'vibe-only',
+      ottoType: '',
       date:     'Just now',
       bodyHTML: bodyText + imageHTML,
-      ottoBadgeHTML:     '<span class="op-badge gray">vibe only</span>',
+      ottoBadgeHTML:     '',
       tagsHTML,
       platformStatsHTML: '',
       reactionsHTML:     '',
@@ -4985,14 +4987,81 @@ var PROF_SEARCH_DATA = [
   {type:'company',name:'Apple',           role:'Design & Engineering',      av:'',   col:'#555'},
 ];
 
+// Debounced typeahead against /api/users/search — replaces the static
+// PROF_SEARCH_DATA people lookup with real Supabase users. Companies
+// stay hardcoded for now since there's no companies table yet.
+var _profSearchTimer = null;
+var _profSearchSeq = 0;
 function runProfSearch(q) {
   var dd = document.getElementById('profSearchDropdown');
-  if (!q.trim()) { dd.innerHTML = renderProfDefault(); return; }
-  var lower = q.toLowerCase();
-  var res = PROF_SEARCH_DATA.filter(function(r){
-    return r.name.toLowerCase().indexOf(lower)>=0 || r.role.toLowerCase().indexOf(lower)>=0;
-  }).slice(0,8);
-  dd.innerHTML = res.length ? renderProfResults(res) : '<div class="search-empty">No results for "'+q+'"</div>';
+  if (!dd) return;
+  var trimmed = (q || '').trim();
+  if (!trimmed) { dd.innerHTML = renderProfDefault(); return; }
+
+  // Show static suggestions instantly, then swap in real results when
+  // the API responds — feels alive, doesn't strand the user on blank.
+  var staticPeople = PROF_SEARCH_DATA.filter(function(r){
+    return r.type==='person' && (
+      r.name.toLowerCase().indexOf(trimmed.toLowerCase())>=0 ||
+      r.role.toLowerCase().indexOf(trimmed.toLowerCase())>=0
+    );
+  });
+  var staticCompanies = PROF_SEARCH_DATA.filter(function(r){
+    return r.type==='company' && (
+      r.name.toLowerCase().indexOf(trimmed.toLowerCase())>=0 ||
+      r.role.toLowerCase().indexOf(trimmed.toLowerCase())>=0
+    );
+  });
+
+  var seq = ++_profSearchSeq;
+  clearTimeout(_profSearchTimer);
+  _profSearchTimer = setTimeout(function(){
+    fetch('/api/users/search?q=' + encodeURIComponent(trimmed) + '&limit=10', { credentials: 'include' })
+      .then(function(r){ return r.ok ? r.json() : { ok:false }; })
+      .then(function(j){
+        if (seq !== _profSearchSeq) return; // a newer keystroke superseded us
+        var realPeople = (j && j.ok && Array.isArray(j.users)) ? j.users.map(_profSearchUserToRow) : [];
+        // Real users first, then static demo suggestions that don't collide
+        // by handle. Companies always tail.
+        var seen = {};
+        realPeople.forEach(function(p){ if (p.handle) seen[p.handle] = true; });
+        var people = realPeople.concat(staticPeople.filter(function(p){
+          return !p.handle || !seen[p.handle];
+        }));
+        if (!people.length && !staticCompanies.length) {
+          dd.innerHTML = '<div class="search-empty">No results for "' + _esc(trimmed) + '"</div>';
+          return;
+        }
+        dd.innerHTML = renderProfResults(people.concat(staticCompanies));
+      })
+      .catch(function(){
+        // API failed — fall back to static-only results so search still
+        // does *something*.
+        if (seq !== _profSearchSeq) return;
+        var combined = staticPeople.concat(staticCompanies).slice(0, 8);
+        dd.innerHTML = combined.length
+          ? renderProfResults(combined)
+          : '<div class="search-empty">No results for "' + _esc(trimmed) + '"</div>';
+      });
+  }, 220);
+}
+
+// Map a Supabase users row to the search-dropdown row shape.
+function _profSearchUserToRow(u) {
+  var role = [u.major, u.year].filter(Boolean).join(' · ');
+  var initials = (u.name || u.handle || '?').split(/\s+/)
+    .map(function(p){ return p[0]; }).filter(Boolean).join('').slice(0,2).toUpperCase();
+  return {
+    type:    'person',
+    name:    u.name || ('@' + u.handle),
+    role:    role || (u.school || ''),
+    handle:  u.handle || '',
+    av:      initials,
+    avatar:  u.avatar_url || '',
+    col:     '#1C1C1E',
+    rel:     'none',
+    real:    true,
+  };
 }
 function renderProfDefault() {
   var people    = PROF_SEARCH_DATA.filter(function(r){return r.type==='person';}).slice(0,4);
@@ -5013,9 +5082,16 @@ function renderProfResults(res) {
 }
 function renderProfSR(r) {
   var action = r.type==='person' ? (r.rel==='connected'?'Message':'Connect') : 'Follow';
-  return '<div class="search-result">'
-    +'<div class="sr-av" style="background:'+r.col+';border-radius:'+(r.type==='company'?'8px':'11px')+'">'+r.av+'</div>'
-    +'<div class="sr-info"><div class="sr-name">'+r.name+'</div><div class="sr-role">'+r.role+'</div></div>'
+  var clickAttr = '';
+  if (r.real && r.handle) {
+    clickAttr = ' onclick="window.location.href=\'/profile/' + encodeURIComponent(r.handle) + '\'" style="cursor:pointer"';
+  }
+  var avatarInner = r.avatar
+    ? '<img src="' + _esc(r.avatar) + '" alt="" style="width:100%;height:100%;object-fit:cover;border-radius:inherit;display:block;">'
+    : _esc(r.av || '');
+  return '<div class="search-result"' + clickAttr + '>'
+    +'<div class="sr-av" style="background:'+r.col+';border-radius:'+(r.type==='company'?'8px':'11px')+';overflow:hidden">'+avatarInner+'</div>'
+    +'<div class="sr-info"><div class="sr-name">'+_esc(r.name)+'</div><div class="sr-role">'+_esc(r.role || '')+'</div></div>'
     +'<button class="sr-action">'+action+'</button>'
     +'</div>';
 }
@@ -5841,10 +5917,10 @@ function _profileMapDbRow(row) {
     : '';
   return {
     id: row.id,
-    ottoType: 'vibe-only',
+    ottoType: '',
     date: _formatRelativeDate(row.created_at),
     bodyHTML: bodyText + imageHTML,
-    ottoBadgeHTML: '<span class="op-badge gray">vibe only</span>',
+    ottoBadgeHTML: '',
     tagsHTML: tags,
     platformStatsHTML: '',
     reactionsHTML: '',

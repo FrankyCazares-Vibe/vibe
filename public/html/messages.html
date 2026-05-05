@@ -9,6 +9,12 @@
 <script src="/html/_persistence.js"></script>
 <script src="/html/_otto.js" defer></script>
 <style>
+/* Otto's corner ring + side panel use z-index 9990–9999, which sits over
+   the chat header / close affordances on this page (especially in
+   landscape where the panel grows wider). Hide Otto entirely on the
+   messages page — it's a 1:1 chat surface, not a content-creation
+   surface where the marketing assistant adds value. */
+#ottoCorner, #ottoPanel, #ottoBackdrop { display: none !important; }
 :root{--cream:#FAF7F2;--charcoal:#1C1C1E;--soft:#2D2D2D;--muted:#8A8580;--accent:#FF5C35;--green:#2ECC71;--border:rgba(28,28,30,.08);--shadow:0 4px 24px rgba(0,0,0,.06);--shadow-lg:0 12px 48px rgba(0,0,0,.1);}
 *{margin:0;padding:0;box-sizing:border-box;}
 html,body{height:100%;overflow:hidden;}
