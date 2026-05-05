@@ -320,12 +320,14 @@ export async function GET() {
   }
 
   // All channels the viewer is a member of (incl. pending requests).
-  // photo_url is selected separately below so a migration-lag situation
-  // (column doesn't exist yet) can't take the whole route down.
+  // pinned_at, hidden_at, photo_url are selected separately below so any
+  // missing-column situation (migration not yet applied) can't take the
+  // whole route down. accepted_at/last_read_at landed in the first DM
+  // migration; if those are missing, DMs aren't usable at all anyway.
   const { data: myMemberships, error: memErr } = await supabase
     .from("channel_members")
     .select(
-      "channel_id, accepted_at, last_read_at, hidden_at, pinned_at, role, channels!inner(id, type, name)",
+      "channel_id, accepted_at, last_read_at, role, channels!inner(id, type, name)",
     )
     .eq("user_id", user.id);
 
@@ -347,15 +349,17 @@ export async function GET() {
       name: string;
     };
   };
-  const rows = (myMemberships ?? []) as unknown as Membership[];
+  const rows: Membership[] = ((myMemberships ?? []) as unknown as Membership[]).map(
+    (r) => ({ ...r, hidden_at: null, pinned_at: null }),
+  );
   if (rows.length === 0) {
     return NextResponse.json({ ok: true, threads: [], requests: [] });
   }
 
   const channelIds = rows.map((r) => r.channel_id);
 
-  // Optional column fetched separately so a migration-lag situation (column
-  // missing) doesn't take the whole route down.
+  // Optional columns fetched separately so a migration-lag situation
+  // (column missing) doesn't take the whole route down.
   const photoByChannel = new Map<string, string | null>();
   try {
     const { data: photoRows } = await supabase
@@ -366,7 +370,30 @@ export async function GET() {
       photoByChannel.set(p.id as string, (p.photo_url as string | null) ?? null);
     }
   } catch {
-    /* column may not exist yet; treat all photos as null. */
+    /* channels.photo_url may not exist yet; treat all photos as null. */
+  }
+  try {
+    const { data: extraRows } = await supabase
+      .from("channel_members")
+      .select("channel_id, hidden_at, pinned_at")
+      .eq("user_id", user.id)
+      .in("channel_id", channelIds);
+    const byChannel = new Map<string, { hidden_at: string | null; pinned_at: string | null }>();
+    for (const e of extraRows ?? []) {
+      byChannel.set(e.channel_id as string, {
+        hidden_at: (e.hidden_at as string | null) ?? null,
+        pinned_at: (e.pinned_at as string | null) ?? null,
+      });
+    }
+    for (const r of rows) {
+      const extra = byChannel.get(r.channel_id);
+      if (extra) {
+        r.hidden_at = extra.hidden_at;
+        r.pinned_at = extra.pinned_at;
+      }
+    }
+  } catch {
+    /* hidden_at/pinned_at columns may not exist yet; both stay null. */
   }
 
   // Other members for peer hydration (1:1 dm peer = the non-viewer member)
