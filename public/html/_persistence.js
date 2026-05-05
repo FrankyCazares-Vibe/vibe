@@ -133,46 +133,59 @@ function vibeShowDemoPill() {
 })();
 
 // ── Sidebar identity hydration (auto-runs on every page) ──────────────────
-// Each non-profile page has a sidebar profile chip with a hardcoded "MC /
-// Maya Chen / Product Designer". This finds it by `a[href="/profile"]`
-// inside a left-nav and rewrites avatar + name + title from vibe_user_v1.
-// For onboarded users with no name yet, shows "Set up your profile" prompt.
+// Each non-profile page has a sidebar profile chip with hardcoded demo data.
+// This replaces the chip with the rich card layout (banner + avatar + name +
+// clamped 2-line subtitle) — same visual as the React NavIdentityChip — and
+// fills it from vibe_user_v1.
 function vibeHydrateSidebar() {
   const user = vibeLoad(VIBE_KEYS.user);
   if (!user) return;
 
-  // Avatar precedence: uploaded photo → chosen emoji → initials from name
-  const initials = (user.name || '').split(/\s+/)
-    .map(p => p[0]).filter(Boolean).join('').slice(0, 2).toUpperCase() || '?';
-
-  function paintAvatar(el) {
-    if (!el) return;
-    if (user.avatarPhoto && (user.avatarPhoto.startsWith('data:') || user.avatarPhoto.startsWith('blob:') || user.avatarPhoto.startsWith('https:') || user.avatarPhoto.startsWith('http:'))) {
-      el.innerHTML = `<img src="${user.avatarPhoto}" style="width:100%;height:100%;object-fit:cover;border-radius:inherit;display:block;">`;
-      el.style.background = 'transparent';
-      el.style.padding = '0';
-    } else {
-      el.textContent = initials;
-      el.style.fontSize = '';
-      el.style.fontFamily = '';
-    }
+  function _esc(s) {
+    return String(s == null ? '' : s).replace(/[&<>"']/g, c =>
+      ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
   }
 
-  // Find any sidebar profile-link nav item (not the top-nav variant on profile.html)
+  function _bannerCss(u) {
+    const photo = u.coverPhoto;
+    if (typeof photo === 'string' && /^https?:\/\//.test(photo)) {
+      return 'url("' + photo.replace(/"/g, '%22') + '") center / cover no-repeat';
+    }
+    const g = u.coverGradient;
+    if (typeof g === 'string' && g.trim()) return g.trim();
+    return 'linear-gradient(135deg, #EDE9E2 0%, #D8D2C8 45%, #C9C2B8 100%)';
+  }
+
+  const initials = (user.name || '').split(/\s+/)
+    .map(p => p[0]).filter(Boolean).join('').slice(0, 2).toUpperCase() || '?';
+  const name = user.name || (user._onboarded ? 'Your name' : 'Maya Chen');
+  const headline = (user.headline || '').trim();
+  const tagline = (user.tagline || '').trim();
+  const subtitle = headline || tagline
+    || (user._onboarded && !user.name ? 'Set up your profile' : 'My profile');
+  const banner = _bannerCss(user);
+  const avatarInner = user.avatarPhoto && /^(data|blob|https?):/.test(user.avatarPhoto)
+    ? '<img src="' + _esc(user.avatarPhoto) + '" style="width:100%;height:100%;object-fit:cover;border-radius:inherit;display:block;">'
+    : _esc(initials);
+
   const links = document.querySelectorAll('.left-nav a[href="/profile"].nav-item');
   links.forEach(link => {
-    paintAvatar(link.querySelector('.mini-avatar, .mini-av'));
-
-    // The text-wrap div is the child div that ISN'T the avatar
-    const wrap = Array.from(link.children).find(c =>
-      c.tagName === 'DIV' && !c.classList.contains('mini-avatar') && !c.classList.contains('mini-av'));
-    if (!wrap) return;
-    const lines = wrap.querySelectorAll(':scope > div');
-    const firstName = user.name || (user._onboarded ? 'Your name' : 'Maya Chen');
-    const titleStr = (user.headline || '').split('·')[0].trim()
-      || (user._onboarded && !user.name ? 'Set up your profile' : 'Product Designer');
-    if (lines[0]) lines[0].textContent = firstName;
-    if (lines[1]) lines[1].textContent = titleStr;
+    // Re-style the link as a card and replace its content with the rich chip.
+    link.style.cssText =
+      'display:block;border-radius:12px;overflow:hidden;text-decoration:none;' +
+      'border:1px solid rgba(28,28,30,0.08);box-shadow:0 4px 16px rgba(0,0,0,0.05);' +
+      'background:white;padding:0;margin-bottom:2px;';
+    link.innerHTML =
+      '<div aria-hidden style="height:48px;width:100%;background:' + banner + ';"></div>' +
+      '<div style="display:flex;align-items:flex-start;gap:10px;padding:10px 10px 12px;background:white;">' +
+        '<div class="mini-av" style="width:36px;height:36px;border-radius:10px;background:#1C1C1E;display:flex;align-items:center;justify-content:center;font-family:Fraunces,serif;font-size:12px;font-weight:700;color:white;flex-shrink:0;overflow:hidden;">' +
+          avatarInner +
+        '</div>' +
+        '<div style="min-width:0;flex:1;padding-top:1px;">' +
+          '<div style="font-family:\'DM Sans\',sans-serif;font-size:12.5px;font-weight:600;color:#1C1C1E;line-height:1.38;letter-spacing:-0.01em;overflow-wrap:anywhere;word-break:break-word;">' + _esc(name) + '</div>' +
+          '<div style="font-family:\'DM Sans\',sans-serif;font-size:11px;color:#8A8580;line-height:1.4;margin-top:4px;display:-webkit-box;-webkit-box-orient:vertical;-webkit-line-clamp:2;overflow:hidden;">' + _esc(subtitle) + '</div>' +
+        '</div>' +
+      '</div>';
   });
 
   // Reveal — drop the pre-paint guard now that identity is painted.
