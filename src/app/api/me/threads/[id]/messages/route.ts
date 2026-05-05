@@ -71,9 +71,23 @@ export async function GET(req: Request, ctx: RouteCtx) {
     return NextResponse.json({ ok: false, error: error.message }, { status: 500 });
   }
 
+  // Peer's last_read_at — drives the "Read" receipt on sent messages.
+  // (For 1:1 dms there's exactly one peer; for groups we take the max so
+  // "everyone has read up to here" is a safe lower bound.)
+  const { data: others } = await supabase
+    .from("channel_members")
+    .select("last_read_at")
+    .eq("channel_id", channelId)
+    .neq("user_id", user.id);
+  const peerLastReadAt = (others ?? [])
+    .map((o) => (o.last_read_at as string | null) ?? "")
+    .filter(Boolean)
+    .sort()
+    .pop() ?? null;
+
   // Return oldest-first so the UI can append straight to the bottom.
   const messages = (data ?? []).slice().reverse();
-  return NextResponse.json({ ok: true, messages });
+  return NextResponse.json({ ok: true, messages, peer_last_read_at: peerLastReadAt });
 }
 
 /**

@@ -27,6 +27,8 @@ type ThreadEntry = {
   unread: boolean;
   accepted_at: string | null;
   is_request: boolean;
+  /** Peer's last_read_at — used to render "Read" receipts on sent messages. */
+  peer_last_read_at: string | null;
 };
 
 async function resolveTargetId(
@@ -174,7 +176,9 @@ export async function GET() {
   // All channels the viewer is a member of (incl. pending requests).
   const { data: myMemberships, error: memErr } = await supabase
     .from("channel_members")
-    .select("channel_id, accepted_at, last_read_at, channels!inner(id, type, name)")
+    .select(
+      "channel_id, accepted_at, last_read_at, hidden_at, channels!inner(id, type, name)",
+    )
     .eq("user_id", user.id);
 
   if (memErr) {
@@ -186,6 +190,7 @@ export async function GET() {
     channel_id: string;
     accepted_at: string | null;
     last_read_at: string | null;
+    hidden_at: string | null;
     channels: { id: string; type: ThreadEntry["type"]; name: string };
   };
   const rows = (myMemberships ?? []) as unknown as Membership[];
@@ -195,11 +200,12 @@ export async function GET() {
 
   const channelIds = rows.map((r) => r.channel_id);
 
-  // Other members for peer hydration (1:1 dm peer = the non-viewer member).
+  // Other members for peer hydration (1:1 dm peer = the non-viewer member)
+  // and peer last_read_at for "Read" receipts.
   const { data: otherMembers, error: othersErr } = await supabase
     .from("channel_members")
     .select(
-      "channel_id, user_id, users:users!channel_members_user_id_fkey(id, handle, name, avatar_url, school, bio)",
+      "channel_id, user_id, last_read_at, users:users!channel_members_user_id_fkey(id, handle, name, avatar_url, school, bio)",
     )
     .in("channel_id", channelIds)
     .neq("user_id", user.id);
@@ -212,12 +218,17 @@ export async function GET() {
   type OtherRow = {
     channel_id: string;
     user_id: string;
+    last_read_at: string | null;
     users: ThreadPeer | null;
   };
   const peerByChannel = new Map<string, ThreadPeer>();
+  const peerLastReadByChannel = new Map<string, string | null>();
   for (const o of (otherMembers ?? []) as unknown as OtherRow[]) {
     if (o.users && !peerByChannel.has(o.channel_id)) {
       peerByChannel.set(o.channel_id, o.users);
+    }
+    if (!peerLastReadByChannel.has(o.channel_id)) {
+      peerLastReadByChannel.set(o.channel_id, o.last_read_at ?? null);
     }
   }
 
@@ -253,6 +264,15 @@ export async function GET() {
   for (const r of rows) {
     const last = lastByChannel.get(r.channel_id) ?? null;
     const peer = peerByChannel.get(r.channel_id) ?? null;
+
+    // Soft-hide: skip threads the viewer hid, UNLESS a new message has
+    // arrived since they hid it (Instagram-style un-hide on activity).
+    if (r.hidden_at) {
+      const reactivated =
+        last && new Date(last.created_at) > new Date(r.hidden_at);
+      if (!reactivated) continue;
+    }
+
     const unread =
       !!last &&
       last.user_id !== user.id &&
@@ -267,6 +287,7 @@ export async function GET() {
       unread,
       accepted_at: r.accepted_at,
       is_request: r.accepted_at === null,
+      peer_last_read_at: peerLastReadByChannel.get(r.channel_id) ?? null,
     };
 
     if (entry.is_request) requests.push(entry);

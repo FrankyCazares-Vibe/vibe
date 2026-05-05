@@ -39,7 +39,43 @@ body{font-family:'DM Sans',sans-serif;background:var(--cream);color:var(--charco
 .mini-av{width:34px;height:34px;border-radius:10px;background:var(--charcoal);display:flex;align-items:center;justify-content:center;font-family:'Fraunces',serif;font-size:12px;font-weight:700;color:white;flex-shrink:0;}
 .thread-col{border-right:1px solid var(--border);display:flex;flex-direction:column;overflow:hidden;background:white;}
 .thread-hdr{padding:18px 16px 12px;border-bottom:1px solid var(--border);flex-shrink:0;}
-.thread-title{font-family:'Fraunces',serif;font-size:20px;font-weight:800;letter-spacing:-.3px;margin-bottom:12px;}
+.thread-title-row{display:flex;align-items:center;justify-content:space-between;margin-bottom:12px;}
+.thread-title{font-family:'Fraunces',serif;font-size:20px;font-weight:800;letter-spacing:-.3px;}
+.t-new-btn{display:inline-flex;align-items:center;gap:5px;background:var(--accent);color:white;border:none;border-radius:100px;padding:6px 12px;font-family:'DM Sans',sans-serif;font-size:12px;font-weight:700;cursor:none;transition:transform .15s,filter .15s;}
+.t-new-btn:hover{transform:translateY(-1px);filter:brightness(1.05);}
+.t-new-btn svg{display:block;}
+
+/* Compose overlay (search-and-pick a user to DM) */
+.compose-overlay{position:fixed;inset:0;background:rgba(28,28,30,.42);z-index:9000;display:none;align-items:flex-start;justify-content:center;padding-top:88px;}
+.compose-overlay.show{display:flex;}
+.compose-card{width:min(440px,92vw);max-height:72vh;background:white;border-radius:16px;box-shadow:0 28px 80px rgba(0,0,0,.18);overflow:hidden;display:flex;flex-direction:column;}
+.compose-hdr{padding:16px 18px 12px;display:flex;align-items:center;gap:10px;border-bottom:1px solid var(--border);}
+.compose-title{font-family:'Fraunces',serif;font-size:17px;font-weight:800;flex:1;}
+.compose-x{background:none;border:none;color:var(--muted);cursor:none;font-size:18px;line-height:1;padding:4px 6px;}
+.compose-search{padding:12px 16px;border-bottom:1px solid var(--border);}
+.compose-search input{width:100%;border:1.5px solid var(--border);border-radius:10px;padding:9px 12px;font-family:'DM Sans',sans-serif;font-size:13px;outline:none;cursor:text;}
+.compose-search input:focus{border-color:rgba(28,28,30,.2);}
+.compose-results{flex:1;overflow-y:auto;}
+.compose-row{display:flex;align-items:center;gap:11px;padding:10px 16px;cursor:none;border-bottom:1px solid var(--border);transition:background .12s;}
+.compose-row:hover{background:var(--cream);}
+.compose-row:last-child{border-bottom:none;}
+.compose-av{width:36px;height:36px;border-radius:10px;background:#1C1C1E;color:white;display:flex;align-items:center;justify-content:center;font-family:'Fraunces',serif;font-size:12px;font-weight:700;flex-shrink:0;overflow:hidden;}
+.compose-info{flex:1;min-width:0;}
+.compose-name{font-size:13.5px;font-weight:600;color:var(--charcoal);}
+.compose-sub{font-size:11px;color:var(--muted);margin-top:2px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;}
+.compose-empty{padding:32px 16px;text-align:center;color:var(--muted);font-size:12.5px;}
+
+/* Chat header dropdown menu (Delete conversation, etc.) */
+.c-menu{position:absolute;top:48px;right:14px;background:white;border:1px solid var(--border);border-radius:12px;box-shadow:0 12px 36px rgba(0,0,0,.12);min-width:200px;overflow:hidden;z-index:50;display:none;}
+.c-menu.show{display:block;}
+.c-menu button{display:block;width:100%;text-align:left;background:none;border:none;padding:11px 14px;font-family:'DM Sans',sans-serif;font-size:13px;color:var(--charcoal);cursor:none;transition:background .12s;}
+.c-menu button:hover{background:var(--cream);}
+.c-menu button.danger{color:#C0392B;}
+.c-hdr{position:relative;}
+
+/* Read/Delivered receipt label */
+.rr{font-size:10.5px;color:var(--muted);text-align:right;padding:2px 16px 6px;letter-spacing:.02em;}
+.rr.read{color:var(--accent);font-weight:600;}
 .t-search{display:flex;align-items:center;gap:8px;background:var(--cream);border:1.5px solid var(--border);border-radius:12px;padding:8px 12px;transition:border-color .18s;}
 .t-search:focus-within{border-color:rgba(28,28,30,.2);background:white;}
 .t-search input{border:none;background:none;font-family:'DM Sans',sans-serif;font-size:13px;color:var(--charcoal);outline:none;flex:1;cursor:text;}
@@ -694,7 +730,13 @@ input,textarea,[contenteditable="true"]{cursor:text!important;}
 
   <div class="thread-col">
     <div class="thread-hdr">
-      <div class="thread-title">Messages</div>
+      <div class="thread-title-row">
+        <div class="thread-title">Messages</div>
+        <button class="t-new-btn" onclick="__dmComposeOpen()" title="New message">
+          <svg width="11" height="11" viewBox="0 0 11 11" fill="none"><path d="M5.5 1v9M1 5.5h9" stroke="white" stroke-width="1.7" stroke-linecap="round"/></svg>
+          New
+        </button>
+      </div>
       <div class="t-search"><svg width="14" height="14" viewBox="0 0 14 14" fill="none"><circle cx="6" cy="6" r="4.5" stroke="#8A8580" stroke-width="1.3"/><path d="M10 10l2.5 2.5" stroke="#8A8580" stroke-width="1.3" stroke-linecap="round"/></svg><input type="text" placeholder="Search" oninput="filterT(this.value)"></div>
     </div>
     <div class="req-banner" onclick="openT('recruiter')">
@@ -737,7 +779,10 @@ input,textarea,[contenteditable="true"]{cursor:text!important;}
         <a href="/profile" class="vibe-pill" id="cPill" style="display:none"><div class="vp-thumb"><div id="cPillBg" style="width:100%;height:100%"></div></div><div><div class="vp-label" id="cPillLabel"></div><div class="vp-sub">Latest Vibe</div></div></a>
         <div class="c-actions">
           <button class="c-btn" onclick="window.__vibeTopNav('/profile')"><svg width="14" height="14" viewBox="0 0 14 14" fill="none"><circle cx="7" cy="5" r="3" stroke="currentColor" stroke-width="1.3"/><path d="M1 13c0-3.314 2.686-5 6-5s6 1.686 6 5" stroke="currentColor" stroke-width="1.3" fill="none" stroke-linecap="round"/></svg></button>
-          <button class="c-btn"><svg width="14" height="14" viewBox="0 0 14 14" fill="none"><circle cx="7" cy="2.5" r="1.2" fill="currentColor"/><circle cx="7" cy="7" r="1.2" fill="currentColor"/><circle cx="7" cy="11.5" r="1.2" fill="currentColor"/></svg></button>
+          <button class="c-btn" onclick="__dmToggleChatMenu(event)"><svg width="14" height="14" viewBox="0 0 14 14" fill="none"><circle cx="7" cy="2.5" r="1.2" fill="currentColor"/><circle cx="7" cy="7" r="1.2" fill="currentColor"/><circle cx="7" cy="11.5" r="1.2" fill="currentColor"/></svg></button>
+        </div>
+        <div class="c-menu" id="cMenu">
+          <button class="danger" onclick="__dmDeleteCurrent()">Delete conversation</button>
         </div>
       </div>
       <div class="req-bar" id="reqBar"><p id="reqBarTxt"></p><div class="req-btns"><button class="btn-acc" onclick="accReq()">Accept</button><button class="btn-dec" onclick="decReq()">Decline</button></div></div>
@@ -825,16 +870,28 @@ function renderMsgs(msgs,d){
   const a=document.getElementById('msgsArea');
   let h='<div class="date-sep">Today</div>';
   let last=null;
+  // Find the index of the most-recent sent message — that's the only one
+  // we tag with a status (iPhone/IG style).
+  let lastSentIdx = -1;
+  for (let i = msgs.length - 1; i >= 0; i--) { if (msgs[i].m === 1) { lastSentIdx = i; break; } }
   msgs.forEach((m,i)=>{
-    const mine=m.m===1;const gb=last!==mine;const islast=i===msgs.length-1;const showAv=!mine&&(gb||i===0);const gc=gb&&i>0?' gt':'';
+    const mine=m.m===1;const gb=last!==mine;const showAv=!mine&&(gb||i===0);const gc=gb&&i>0?' gt':'';
     if(m.vibe){
       h+=`<div class="msg-row${gc}"><div class="msg-av${showAv?'':' h'}" style="background:${d.bg}">${d.av}</div><div class="mv"><div class="mv-thumb" style="background:${m.vibe.bg}"><div class="mv-grad"></div><div class="mv-play">&#9654;</div></div><div class="mv-body"><div class="mv-creator">${m.vibe.creator}</div><div class="mv-title">${m.vibe.title}</div></div></div></div>`;
     } else {
       h+=`<div class="msg-row${mine?' mine':''}${gc}">${!mine?`<div class="msg-av${showAv?'':' h'}" style="background:${d.bg}">${d.av}</div>`:''}<div class="bubble">${m.t}<div class="btime">${m.ts}</div></div></div>`;
     }
-    if(mine&&islast)h+=`<div class="rr">Read</div>`;
     last=mine;
   });
+  if (lastSentIdx >= 0) {
+    const lastSent = msgs[lastSentIdx];
+    let status = 'Delivered';
+    if (typeof __realDM !== 'undefined' && __realDM.enabled && active && lastSent.created_at) {
+      const peerRead = __realDM.peerLastReadByChannel[active];
+      if (peerRead && new Date(peerRead) >= new Date(lastSent.created_at)) status = 'Read';
+    }
+    h += `<div class="rr${status==='Read'?' read':''}">${status}</div>`;
+  }
   a.innerHTML=h;a.scrollTop=a.scrollHeight;
 }
 
@@ -1031,7 +1088,13 @@ document.addEventListener('DOMContentLoaded',function(){
 //   GET  /api/me/threads/[id]/messages         → message history
 //   POST /api/me/threads/[id]/messages         → send
 //   POST /api/me/threads/[id]/{accept,decline,read}
-const __realDM = { enabled:false, meId:null, T:{}, pollTimer:null, listTimer:null, POLL_MS:5000, LIST_POLL_MS:30000 };
+const __realDM = {
+  enabled:false, meId:null, T:{}, pollTimer:null, listTimer:null,
+  POLL_MS:5000, LIST_POLL_MS:30000,
+  peerLastReadByChannel:{},   // channelId → peer's last_read_at ISO
+  composeAbort:null,           // AbortController for the in-flight search
+  composeDebounce:null,        // setTimeout handle
+};
 
 function __dmEsc(s){return String(s==null?'':s).replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));}
 function __dmInitials(name){const p=String(name||'').trim().split(/\s+/).slice(0,2);return (p.map(s=>s[0]||'').join('').toUpperCase())||'?';}
@@ -1139,6 +1202,7 @@ async function __dmLoadMessages(channelId) {
       id: m.id,
       created_at: m.created_at,
     }));
+    __realDM.peerLastReadByChannel[channelId] = j.peer_last_read_at || null;
     if (__realDM.T[channelId]) __realDM.T[channelId].msgs = msgs;
     if (active === channelId && __realDM.T[channelId]) {
       renderMsgs(msgs, __realDM.T[channelId]);
@@ -1244,6 +1308,117 @@ async function __dmDecline() {
   } catch (e) { console.error('[dm.decline]', e); }
 }
 
+// ── Compose picker (search a user, open or create dm) ──────────────────
+function __dmComposeOpen() {
+  const overlay = document.getElementById('composeOverlay');
+  if (!overlay) return;
+  overlay.classList.add('show');
+  const input = document.getElementById('composeSearchInput');
+  if (input) { input.value = ''; input.focus(); }
+  document.getElementById('composeResults').innerHTML =
+    '<div class="compose-empty">Start typing to find someone.</div>';
+}
+function __dmComposeClose() {
+  const overlay = document.getElementById('composeOverlay');
+  if (overlay) overlay.classList.remove('show');
+  if (__realDM.composeAbort) { __realDM.composeAbort.abort(); __realDM.composeAbort = null; }
+  if (__realDM.composeDebounce) { clearTimeout(__realDM.composeDebounce); __realDM.composeDebounce = null; }
+}
+function __dmComposeSearch(q) {
+  const term = (q || '').trim();
+  const results = document.getElementById('composeResults');
+  if (!results) return;
+  if (!term) {
+    results.innerHTML = '<div class="compose-empty">Start typing to find someone.</div>';
+    return;
+  }
+  if (__realDM.composeDebounce) clearTimeout(__realDM.composeDebounce);
+  __realDM.composeDebounce = setTimeout(async () => {
+    if (__realDM.composeAbort) __realDM.composeAbort.abort();
+    __realDM.composeAbort = new AbortController();
+    try {
+      const r = await fetch('/api/users/search?q=' + encodeURIComponent(term) + '&limit=12',
+        { credentials:'include', signal: __realDM.composeAbort.signal });
+      const j = await r.json();
+      if (!j.ok) throw new Error(j.error || 'search failed');
+      const users = j.users || [];
+      if (users.length === 0) {
+        results.innerHTML = '<div class="compose-empty">No one matches “' + __dmEsc(term) + '”.</div>';
+        return;
+      }
+      results.innerHTML = users.map(u => {
+        const name = u.name || ('@' + (u.handle || '')) || 'Unknown';
+        const sub = [u.school, u.major, u.year ? 'Year ' + u.year : ''].filter(Boolean).join(' · ');
+        const initials = String(name).split(/\s+/).slice(0,2).map(s => s[0] || '').join('').toUpperCase() || '?';
+        const av = u.avatar_url
+          ? '<img src="' + __dmEsc(u.avatar_url) + '" style="width:100%;height:100%;object-fit:cover;border-radius:inherit;display:block;">'
+          : __dmEsc(initials);
+        return '<div class="compose-row" onclick="__dmComposeSelect(' + JSON.stringify(u.handle || '').replace(/"/g, '&quot;') + ')">' +
+          '<div class="compose-av" style="background:' + __dmAvBg(u.handle || u.id || name) + '">' + av + '</div>' +
+          '<div class="compose-info">' +
+            '<div class="compose-name">' + __dmEsc(name) + (u.handle ? ' <span style="color:var(--muted);font-weight:500">@' + __dmEsc(u.handle) + '</span>' : '') + '</div>' +
+            (sub ? '<div class="compose-sub">' + __dmEsc(sub) + '</div>' : '') +
+          '</div>' +
+        '</div>';
+      }).join('');
+    } catch (e) {
+      if (e.name === 'AbortError') return;
+      console.error('[dm.composeSearch]', e);
+      results.innerHTML = '<div class="compose-empty">Search failed. Try again.</div>';
+    }
+  }, 220);
+}
+async function __dmComposeSelect(handle) {
+  if (!handle) return;
+  const cid = await __dmEnsureFromHandle(handle);
+  if (!cid) { alert('Could not start that conversation.'); return; }
+  __dmComposeClose();
+  await __dmLoadList();
+  openT(cid);
+}
+
+// ── Chat header dropdown menu (Delete conversation) ────────────────────
+function __dmToggleChatMenu(ev) {
+  if (ev) ev.stopPropagation();
+  const menu = document.getElementById('cMenu');
+  if (!menu) return;
+  const showing = menu.classList.toggle('show');
+  if (showing) {
+    // Click-outside to close. Bind once; the listener removes itself.
+    setTimeout(() => {
+      const off = (e) => {
+        if (!menu.contains(e.target)) {
+          menu.classList.remove('show');
+          document.removeEventListener('click', off);
+        }
+      };
+      document.addEventListener('click', off);
+    }, 0);
+  }
+}
+async function __dmDeleteCurrent() {
+  const channelId = active;
+  document.getElementById('cMenu')?.classList.remove('show');
+  if (!channelId) return;
+  const peerName = (__realDM.T[channelId] && __realDM.T[channelId].n) || 'this person';
+  if (!confirm('Delete this conversation? It’ll hide from your view, but ' + peerName + ' will still see it.')) return;
+  try {
+    const r = await fetch('/api/me/threads/' + encodeURIComponent(channelId) + '/hide', { method:'POST', credentials:'include' });
+    const j = await r.json();
+    if (!j.ok) throw new Error(j.error || 'hide failed');
+    delete __realDM.T[channelId];
+    delete __realDM.peerLastReadByChannel[channelId];
+    active = null;
+    document.getElementById('cContent').style.display = 'none';
+    document.getElementById('emptyState').style.display = 'flex';
+    if (__realDM.pollTimer) { clearInterval(__realDM.pollTimer); __realDM.pollTimer = null; }
+    __dmLoadList();
+  } catch (e) {
+    console.error('[dm.delete]', e);
+    alert('Could not delete the conversation: ' + e.message);
+  }
+}
+
 async function __dmEnsureFromHandle(handle) {
   try {
     const r = await fetch('/api/me/threads', {
@@ -1311,6 +1486,22 @@ async function __dmEnsureFromHandle(handle) {
 // ══ END MESSAGES INIT ════════════════════════════════════════════════════
 
 </script>
+
+<!-- ══ COMPOSE OVERLAY (search a user to DM) ══ -->
+<div class="compose-overlay" id="composeOverlay" onclick="if(event.target===this)__dmComposeClose()">
+  <div class="compose-card">
+    <div class="compose-hdr">
+      <div class="compose-title">New message</div>
+      <button class="compose-x" onclick="__dmComposeClose()">×</button>
+    </div>
+    <div class="compose-search">
+      <input id="composeSearchInput" type="text" placeholder="Search by name or @handle…" autocomplete="off" oninput="__dmComposeSearch(this.value)">
+    </div>
+    <div class="compose-results" id="composeResults">
+      <div class="compose-empty">Start typing to find someone.</div>
+    </div>
+  </div>
+</div>
 
 <!-- ══ FULL CALENDAR MODAL ══ -->
   <div class="cal-modal-backdrop" id="calModalBackdrop" onclick="if(event.target===this)closeCalModal()">
