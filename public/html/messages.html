@@ -927,18 +927,42 @@ function renderMsgs(msgs,d){
   const a=document.getElementById('msgsArea');
   let h='<div class="date-sep">Today</div>';
   let last=null;
-  // Find the index of the most-recent sent message — that's the only one
-  // we tag with a status (iPhone/IG style).
+  let lastSenderId=null;
   let lastSentIdx = -1;
   for (let i = msgs.length - 1; i >= 0; i--) { if (msgs[i].m === 1) { lastSentIdx = i; break; } }
+  const isGroup = d && d.isGroup;
+  // Renders a peer-avatar element — uses the message's sender info when
+  // available so groups show each speaker's actual photo, falling back
+  // to the thread record's avatar (the legacy demo path).
+  function avForMsg(m, showAv) {
+    const url = m.senderAvatarUrl || (!isGroup ? d.avatarUrl : null);
+    const bg = m.senderBg || d.bg;
+    const initials = m.senderInit || d.av;
+    if (!showAv) {
+      return '<div class="msg-av h" style="background:' + bg + '"></div>';
+    }
+    if (url) {
+      return '<div class="msg-av" style="background:' + bg + ';overflow:hidden;padding:0;"><img src="' + __dmEsc(url) + '" alt="" style="width:100%;height:100%;object-fit:cover;display:block;"></div>';
+    }
+    return '<div class="msg-av" style="background:' + bg + '">' + __dmEsc(initials) + '</div>';
+  }
   msgs.forEach((m,i)=>{
-    const mine=m.m===1;const gb=last!==mine;const showAv=!mine&&(gb||i===0);const gc=gb&&i>0?' gt':'';
+    const mine=m.m===1;
+    // In groups, break on sender change; in 1:1s, break on side change.
+    const senderKey = mine ? '__me' : (m.senderName || (isGroup ? 'unknown' : '__peer'));
+    const gb = isGroup ? (senderKey !== lastSenderId) : (last !== mine);
+    const showAv=!mine&&(gb||i===0);const gc=gb&&i>0?' gt':'';
+    // Group + sender break + not mine → render a small "Name" header above the bubble.
+    if (isGroup && !mine && gb && m.senderName) {
+      h += '<div style="font-size:10.5px;color:var(--muted);font-weight:600;margin:0 0 2px 50px;">' + __dmEsc(m.senderName) + '</div>';
+    }
     if(m.vibe){
-      h+=`<div class="msg-row${gc}"><div class="msg-av${showAv?'':' h'}" style="background:${d.bg}">${d.av}</div><div class="mv"><div class="mv-thumb" style="background:${m.vibe.bg}"><div class="mv-grad"></div><div class="mv-play">&#9654;</div></div><div class="mv-body"><div class="mv-creator">${m.vibe.creator}</div><div class="mv-title">${m.vibe.title}</div></div></div></div>`;
+      h+=`<div class="msg-row${gc}">${avForMsg(m, showAv)}<div class="mv"><div class="mv-thumb" style="background:${m.vibe.bg}"><div class="mv-grad"></div><div class="mv-play">&#9654;</div></div><div class="mv-body"><div class="mv-creator">${m.vibe.creator}</div><div class="mv-title">${m.vibe.title}</div></div></div></div>`;
     } else {
-      h+=`<div class="msg-row${mine?' mine':''}${gc}">${!mine?`<div class="msg-av${showAv?'':' h'}" style="background:${d.bg}">${d.av}</div>`:''}<div class="bubble">${m.t}<div class="btime">${m.ts}</div></div></div>`;
+      h+=`<div class="msg-row${mine?' mine':''}${gc}">${!mine?avForMsg(m, showAv):''}<div class="bubble">${m.t}<div class="btime">${m.ts}</div></div></div>`;
     }
     last=mine;
+    lastSenderId=senderKey;
   });
   if (lastSentIdx >= 0) {
     const lastSent = msgs[lastSentIdx];
@@ -1300,13 +1324,25 @@ async function __dmLoadMessages(channelId) {
     const j = await r.json();
     if (!j.ok) throw new Error(j.error || 'load failed');
     const me = __realDM.meId;
-    const msgs = (j.messages || []).map(m => ({
-      m: m.user_id === me ? 1 : 0,
-      t: m.content,
-      ts: __dmFmtRel(m.created_at),
-      id: m.id,
-      created_at: m.created_at,
-    }));
+    const msgs = (j.messages || []).map(m => {
+      // Sender info — used in groups so each bubble shows the sender's
+      // own avatar instead of the group icon. For 1:1s the sender is
+      // always the peer, so the same data path works for both.
+      const u = m.users || {};
+      const senderName = u.name || u.handle || '';
+      const senderInit = senderName.split(/\s+/).slice(0,2).map(s => s[0] || '').join('').toUpperCase() || '?';
+      return {
+        m: m.user_id === me ? 1 : 0,
+        t: m.content,
+        ts: __dmFmtRel(m.created_at),
+        id: m.id,
+        created_at: m.created_at,
+        senderName,
+        senderInit,
+        senderAvatarUrl: u.avatar_url || null,
+        senderBg: __dmAvBg(u.handle || u.id || senderName),
+      };
+    });
     __realDM.peerLastReadByChannel[channelId] = j.peer_last_read_at || null;
     if (__realDM.T[channelId]) __realDM.T[channelId].msgs = msgs;
     if (active === channelId && __realDM.T[channelId]) {
