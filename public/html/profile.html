@@ -5792,7 +5792,26 @@ window.viewingRealUser = null;
   // ── Branch B: own profile (existing flow) ────────────────────────────
   const user = vibeInit();
   if (!user) {
+    // Empty localStorage doesn't mean an unauthenticated user — it can
+    // also mean a manual ?clear=1 OR a corrupted cache that was wiped.
+    // If the server still has a session, re-bootstrap and reload so
+    // the user lands back in their profile cleanly. Otherwise show
+    // the empty state.
     document.body.classList.add('empty-profile-mode');
+    document.documentElement.classList.remove('vibe-pre-paint');
+    fetch('/api/me/profile-bootstrap', { credentials: 'include' })
+      .then(r => r.ok ? r.json() : null)
+      .then(j => {
+        if (!j || !j.ok || !j.vibeUser) return;
+        const nu = Object.assign({}, j.vibeUser);
+        nu._appShell = true;
+        if (typeof vibeSave === 'function') vibeSave('vibe_user_v1', nu);
+        // Strip ?clear=1 so the reload doesn't loop the wipe.
+        const url = new URL(window.location.href);
+        url.searchParams.delete('clear');
+        window.location.replace(url.toString());
+      })
+      .catch(() => {});
     return;
   }
 
