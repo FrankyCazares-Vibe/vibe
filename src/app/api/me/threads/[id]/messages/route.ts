@@ -22,7 +22,7 @@ type SendBody = {
 const MESSAGE_SELECT =
   "id, content, created_at, user_id, attachment_id, attachment_kind, media_url, media_kind, " +
   "users:users!messages_user_id_fkey(id, handle, name, avatar_url), " +
-  "attachment:posts!messages_attachment_id_fkey(id, type, content, media_url, media_thumbnail_url, user_id)";
+  "attachment:posts!messages_attachment_id_fkey(id, type, content, media_url, media_thumbnail_url, user_id, author:users!posts_user_id_fkey(id, handle, name, avatar_url))";
 
 type MessageRow = {
   id: string;
@@ -133,23 +133,65 @@ export async function GET(req: Request, ctx: RouteCtx) {
   // Sign R2 keys in media_url so the browser can render directly.
   await signMediaUrls((data ?? []) as unknown as MessageRow[]);
 
-  // Peer's last_read_at — drives the "Read" receipt on sent messages.
-  // (For 1:1 dms there's exactly one peer; for groups we take the max so
-  // "everyone has read up to here" is a safe lower bound.)
-  const { data: others } = await supabase
+  // Peer last_read_at + typing — both come from the same query so we only
+  // hit channel_members once per poll cycle. typing_until column is optional
+  // (separate migration) so we try-include and ignore on column-missing.
+  type OtherSnapshot = {
+    user_id: string;
+    last_read_at: string | null;
+    typing_until: string | null;
+    users: { id: string; handle: string | null; name: string | null; avatar_url: string | null } | null;
+  };
+  let others: OtherSnapshot[] = [];
+  const tryFull = await supabase
     .from("channel_members")
-    .select("last_read_at")
+    .select(
+      "user_id, last_read_at, typing_until, users:users!channel_members_user_id_fkey(id, handle, name, avatar_url)",
+    )
     .eq("channel_id", channelId)
     .neq("user_id", user.id);
-  const peerLastReadAt = (others ?? [])
-    .map((o) => (o.last_read_at as string | null) ?? "")
+  if (tryFull.error && /typing_until|column/i.test(tryFull.error.message)) {
+    const fallback = await supabase
+      .from("channel_members")
+      .select(
+        "user_id, last_read_at, users:users!channel_members_user_id_fkey(id, handle, name, avatar_url)",
+      )
+      .eq("channel_id", channelId)
+      .neq("user_id", user.id);
+    others = (fallback.data ?? []).map((o) => ({
+      user_id: o.user_id as string,
+      last_read_at: (o.last_read_at as string | null) ?? null,
+      typing_until: null,
+      users: (o.users as unknown as OtherSnapshot["users"]) ?? null,
+    }));
+  } else {
+    others = (tryFull.data ?? []) as unknown as OtherSnapshot[];
+  }
+
+  const peerLastReadAt = others
+    .map((o) => o.last_read_at ?? "")
     .filter(Boolean)
     .sort()
     .pop() ?? null;
 
+  const now = Date.now();
+  const peerTyping = others
+    .filter((o) => o.users && o.typing_until && new Date(o.typing_until).getTime() > now)
+    .map((o) => ({
+      user_id: o.users!.id,
+      handle: o.users!.handle,
+      name: o.users!.name,
+      avatar_url: o.users!.avatar_url,
+    }));
+
   // Return oldest-first so the UI can append straight to the bottom.
   const messages = (data ?? []).slice().reverse();
-  return NextResponse.json({ ok: true, messages, peer_last_read_at: peerLastReadAt });
+  return NextResponse.json({
+    ok: true,
+    messages,
+    peer_last_read_at: peerLastReadAt,
+    peer_typing: peerTyping,
+  });
 }
 
 /**

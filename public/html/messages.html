@@ -124,9 +124,21 @@ body{font-family:'DM Sans',sans-serif;background:var(--cream);color:var(--charco
 .c-hdr{position:relative;}
 .convo{position:relative;overflow:hidden;}
 
-/* Read/Delivered receipt label */
-.rr{font-size:10.5px;color:var(--muted);text-align:right;padding:2px 16px 6px;letter-spacing:.02em;}
+/* Read/Delivered receipt label — flush to the bubble's right edge. */
+.rr{font-size:10.5px;color:var(--muted);text-align:right;padding:2px 0 6px;letter-spacing:.02em;}
 .rr.read{color:var(--accent);font-weight:600;}
+
+/* Typing indicator — peer's avatar + a bubble with 3 bouncing dots. */
+.typ-row{display:flex;gap:7px;align-items:flex-end;margin-top:6px;}
+.typ-bubble{background:var(--cream);border-radius:16px;border-bottom-left-radius:4px;padding:10px 13px;display:inline-flex;gap:4px;align-items:center;}
+.typ-dot{width:6px;height:6px;border-radius:50%;background:var(--muted);opacity:.7;animation:typingBounce 1.2s infinite;}
+.typ-dot:nth-child(2){animation-delay:.16s;}
+.typ-dot:nth-child(3){animation-delay:.32s;}
+@keyframes typingBounce{
+  0%,80%,100%{transform:translateY(0);opacity:.5;}
+  40%{transform:translateY(-3px);opacity:1;}
+}
+.typ-label{font-size:10.5px;color:var(--muted);margin:2px 0 0 50px;}
 
 /* Inline attachment card inside a message bubble (shared post / clip). */
 .msg-attach{display:flex;flex-direction:column;width:240px;max-width:100%;border-radius:12px;overflow:hidden;background:#FAF7F2;border:1px solid var(--border);cursor:pointer;margin-top:6px;transition:transform .15s,box-shadow .15s;}
@@ -139,9 +151,15 @@ body{font-family:'DM Sans',sans-serif;background:var(--cream);color:var(--charco
 .msg-attach-label{font-size:9.5px;font-weight:700;letter-spacing:.14em;text-transform:uppercase;color:var(--accent);margin-bottom:3px;}
 .msg-attach-text{font-size:12.5px;color:var(--charcoal);line-height:1.35;display:-webkit-box;-webkit-box-orient:vertical;-webkit-line-clamp:3;overflow:hidden;}
 .msg-attach-missing{padding:14px;text-align:center;color:var(--muted);font-size:12px;}
+.msg-attach-author{display:flex;align-items:center;gap:7px;margin-top:8px;padding-top:8px;border-top:1px solid var(--border);font-size:11px;color:var(--muted);}
+.msg-attach-av{width:20px;height:20px;border-radius:7px;background:#1C1C1E;color:white;display:flex;align-items:center;justify-content:center;font-family:'Fraunces',serif;font-size:9px;font-weight:700;overflow:hidden;flex-shrink:0;}
+.msg-attach-av img{width:100%;height:100%;object-fit:cover;display:block;}
+.msg-attach-author-name{font-weight:600;color:var(--charcoal);}
 .msg-row.mine .msg-attach{background:rgba(255,255,255,.18);border-color:rgba(255,255,255,.18);color:white;}
 .msg-row.mine .msg-attach-text{color:white;}
 .msg-row.mine .msg-attach-label{color:rgba(255,255,255,.85);}
+.msg-row.mine .msg-attach-author{color:rgba(255,255,255,.85);border-top-color:rgba(255,255,255,.18);}
+.msg-row.mine .msg-attach-author-name{color:white;}
 .t-search{display:flex;align-items:center;gap:8px;background:var(--cream);border:1.5px solid var(--border);border-radius:12px;padding:8px 12px;transition:border-color .18s;}
 .t-search:focus-within{border-color:rgba(28,28,30,.2);background:white;}
 .t-search input{border:none;background:none;font-family:'DM Sans',sans-serif;font-size:13px;color:var(--charcoal);outline:none;flex:1;cursor:text;}
@@ -1017,7 +1035,16 @@ function renderMsgs(msgs,d){
         const bodyText = a.content
           ? `<div class="msg-attach-text">${__dmEsc(a.content)}</div>`
           : '';
-        cardInner = `<div class="msg-attach-poster">${posterImg}${playOverlay}</div><div class="msg-attach-body"><div class="msg-attach-label">${labelText}</div>${bodyText}</div>`;
+        let authorBlock = '';
+        if (a.authorName) {
+          const initials = String(a.authorName).split(/\s+/).slice(0,2).map(s => s[0] || '').join('').toUpperCase() || '?';
+          const avInner = a.authorAvatarUrl
+            ? `<img src="${__dmEsc(a.authorAvatarUrl)}" alt="">`
+            : __dmEsc(initials);
+          const seed = a.authorHandle || a.authorName;
+          authorBlock = `<div class="msg-attach-author"><div class="msg-attach-av" style="background:${__dmAvBg(seed)}">${avInner}</div><div>by <span class="msg-attach-author-name">${__dmEsc(a.authorName)}</span>${a.authorHandle ? ` <span style="opacity:.65">@${__dmEsc(a.authorHandle)}</span>` : ''}</div></div>`;
+        }
+        cardInner = `<div class="msg-attach-poster">${posterImg}${playOverlay}</div><div class="msg-attach-body"><div class="msg-attach-label">${labelText}</div>${bodyText}${authorBlock}</div>`;
       }
       const cardOnclick = a.unavailable
         ? ''
@@ -1036,13 +1063,33 @@ function renderMsgs(msgs,d){
     const lastSent = msgs[lastSentIdx];
     let status = 'Delivered';
     // 1:1 only — group "Read" semantics aren't surfaced in v1.
-    const isGroup = d && d.isGroup;
     if (!isGroup && typeof __realDM !== 'undefined' && __realDM.enabled && active && lastSent.created_at) {
       const peerRead = __realDM.peerLastReadByChannel[active];
       if (peerRead && new Date(peerRead) >= new Date(lastSent.created_at)) status = 'Read';
     }
     h += `<div class="rr${status==='Read'?' read':''}">${status}</div>`;
   }
+
+  // Typing indicator: any peer with typing_until > now → 3 bouncing dots
+  // next to their avatar. In groups, label which member is typing.
+  if (typeof __realDM !== 'undefined' && __realDM.enabled && active) {
+    const typers = __realDM.peerTypingByChannel[active] || [];
+    if (typers.length > 0) {
+      const t = typers[0];
+      const initials = String(t.name || t.handle || '?').split(/\s+/).slice(0,2).map(s => s[0] || '').join('').toUpperCase();
+      const av = t.avatar_url
+        ? `<div class="msg-av" style="background:${__dmAvBg(t.handle || t.user_id || t.name)};overflow:hidden;padding:0;"><img src="${__dmEsc(t.avatar_url)}" alt="" style="width:100%;height:100%;object-fit:cover;display:block;"></div>`
+        : `<div class="msg-av" style="background:${__dmAvBg(t.handle || t.user_id || t.name)}">${__dmEsc(initials)}</div>`;
+      h += `<div class="typ-row">${av}<div class="typ-bubble"><div class="typ-dot"></div><div class="typ-dot"></div><div class="typ-dot"></div></div></div>`;
+      if (isGroup) {
+        const firstName = (t.name || t.handle || '').split(/\s+/)[0];
+        if (firstName) {
+          h += `<div class="typ-label">${__dmEsc(firstName)} is typing…</div>`;
+        }
+      }
+    }
+  }
+
   a.innerHTML=h;a.scrollTop=a.scrollHeight;
 }
 
@@ -1071,7 +1118,22 @@ function snd(){
     setTimeout(()=>{ty.remove();const reps=["Tuesday works — how does 10am at Sightglass sound?","Makes sense, let's lock it in.","Can't wait to dig into it.","I'll send a cal invite."];const rep=reps[Math.floor(Math.random()*reps.length)];const nr=document.createElement('div');nr.className='msg-row gt';nr.innerHTML=`<div class="msg-av" style="background:#2D1B4E">KA</div><div class="bubble">${rep}<div class="btime">Just now</div></div>`;a.appendChild(nr);rr.textContent='Read';a.scrollTop=a.scrollHeight;},1800);
   },1200);}
 }
-function upd(){document.getElementById('sndBtn').disabled=!document.getElementById('msgIn').value.trim();}
+function upd(){
+  const inp = document.getElementById('msgIn');
+  document.getElementById('sndBtn').disabled = !inp.value.trim() && !(typeof __realDM !== 'undefined' && __realDM.stagedMedia);
+  // Debounced typing ping — only one POST per TYPING_PING_MS, only when
+  // there's actually content and we're in a real channel.
+  if (typeof __realDM !== 'undefined' && __realDM.enabled && active && inp.value.trim()) {
+    const now = Date.now();
+    if (now - __realDM.lastTypingPing > __realDM.TYPING_PING_MS) {
+      __realDM.lastTypingPing = now;
+      fetch('/api/me/threads/' + encodeURIComponent(active) + '/typing', {
+        method: 'POST',
+        credentials: 'include',
+      }).catch(() => { /* polish feature; ignore failures */ });
+    }
+  }
+}
 function accReq(){
   if (typeof __realDM !== 'undefined' && __realDM.enabled) return __dmAccept();
   document.getElementById('reqBar').classList.remove('show');if(active)T[active].req=false;
@@ -1243,7 +1305,7 @@ document.addEventListener('DOMContentLoaded',function(){
 //   POST /api/me/threads/[id]/{accept,decline,read}
 const __realDM = {
   enabled:false, meId:null, T:{}, pollTimer:null, listTimer:null,
-  POLL_MS:5000, LIST_POLL_MS:30000,
+  POLL_MS:2000, LIST_POLL_MS:30000, TYPING_PING_MS:3000,
   peerLastReadByChannel:{},     // channelId → peer's last_read_at ISO
   composeAbort:null,             // AbortController for the in-flight search
   composeDebounce:null,          // setTimeout handle
@@ -1252,6 +1314,9 @@ const __realDM = {
   // Staged file in the composer (paperclip): { file, kind, previewUrl }
   // null when nothing is staged. Cleared on successful send or cancel.
   stagedMedia: null,
+  // Typing — most recent peers seen typing, keyed by channel.
+  peerTypingByChannel: {},      // channelId → [{ user_id, name, avatar_url }]
+  lastTypingPing: 0,             // ms timestamp of last outbound ping (debounce)
 };
 
 function __dmEsc(s){return String(s==null?'':s).replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));}
@@ -1406,12 +1471,16 @@ async function __dmLoadMessages(channelId) {
       const senderInit = senderName.split(/\s+/).slice(0,2).map(s => s[0] || '').join('').toUpperCase() || '?';
       // Attachment: a shared post or clip rendered inline as a card.
       const at = m.attachment;
+      const author = at && at.author ? at.author : null;
       const attachment = at && at.id ? {
         id: at.id,
         kind: at.type === 'clip' ? 'clip' : 'post',
         content: at.content || '',
         mediaUrl: at.media_url || null,
         posterUrl: at.media_thumbnail_url || (at.type === 'clip' ? null : at.media_url) || null,
+        authorName: author ? (author.name || author.handle || '') : '',
+        authorHandle: author ? author.handle : null,
+        authorAvatarUrl: author ? author.avatar_url : null,
       } : (m.attachment_id ? {
         id: m.attachment_id,
         kind: m.attachment_kind === 'clip' ? 'clip' : 'post',
@@ -1439,6 +1508,7 @@ async function __dmLoadMessages(channelId) {
       };
     });
     __realDM.peerLastReadByChannel[channelId] = j.peer_last_read_at || null;
+    __realDM.peerTypingByChannel[channelId] = j.peer_typing || [];
     if (__realDM.T[channelId]) __realDM.T[channelId].msgs = msgs;
     if (active === channelId && __realDM.T[channelId]) {
       renderMsgs(msgs, __realDM.T[channelId]);
