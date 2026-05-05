@@ -150,6 +150,22 @@
     #ottoPanel .otto-activity { font-size: 12.5px; line-height: 1.6; color: rgba(255,255,255,.72); padding: 7px 0; display: flex; gap: 9px; }
     #ottoPanel .otto-activity-arrow { color: #FF5C35; font-weight: 600; flex-shrink: 0; }
 
+    /* Stats summary at top of the activity section. */
+    #ottoPanel .otto-stats-grid {
+      display:grid; grid-template-columns:repeat(4, 1fr); gap:8px; margin-bottom:18px;
+    }
+    #ottoPanel .otto-stat-tile {
+      background:rgba(255,255,255,.04); border:0.5px solid rgba(255,255,255,.06);
+      border-radius:10px; padding:10px 8px; text-align:center;
+      transition:background .15s, border-color .15s;
+    }
+    #ottoPanel .otto-stat-tile:hover {
+      background:rgba(255,92,53,.06); border-color:rgba(255,92,53,.25);
+      cursor:none;
+    }
+    #ottoPanel .otto-stat-num  { font-family:'Fraunces',serif; font-size:20px; font-weight:800; color:white; line-height:1; }
+    #ottoPanel .otto-stat-label{ font-size:9.5px; font-weight:600; color:rgba(255,255,255,.55); letter-spacing:.6px; text-transform:uppercase; margin-top:4px; }
+
     /* Notification filter pills (P1-021). */
     #ottoPanel .otto-notif-filters {
       display:flex; gap:6px; margin:0 0 12px; flex-wrap:wrap;
@@ -400,6 +416,9 @@
     }
   }
 
+  // Exposed on window so other surfaces (profile hero, etc.) can open
+  // the panel without poking at file-internal closures.
+  window.__ottoOpenPanel = openOttoPanel;
   function openOttoPanel() {
     if (!panel) buildPanel();
     else {
@@ -428,8 +447,14 @@
     if (!panel) return;
     const body = panel.querySelector('.otto-panel-body');
     if (!body) return;
-    const latest = (typeof vibeLoad === 'function') ? vibeLoad('vibe_otto_lastpost_v1') : null;
-    body.innerHTML = renderDraftsHTML(latest) + `
+    body.innerHTML = `
+      <div class="otto-briefing" id="ottoBriefing">"loading your activity…"</div>
+      <div class="otto-stats-grid" id="ottoStatsGrid">
+        ${_ottoStatTileHTML('follow',     0, 'Follows')}
+        ${_ottoStatTileHTML('connection', 0, 'Connections')}
+        ${_ottoStatTileHTML('like',       0, 'Likes')}
+        ${_ottoStatTileHTML('comment',    0, 'Comments')}
+      </div>
       <div class="otto-divider"></div>
       <div class="otto-section-eyebrow">activity</div>
       <div class="otto-notif-filters">
@@ -444,6 +469,9 @@
       </div>
     `;
     bindCursorOn(body);
+    // Repaint stats from the cached count if we have one — feels instant
+    // when the panel opens twice in a row.
+    if (_ottoLastCount) _ottoApplyStats(_ottoLastCount);
     // Wire filter pill clicks — re-render list from cache, no refetch.
     body.querySelectorAll('.otto-notif-filter').forEach(btn => {
       btn.addEventListener('click', () => {
@@ -453,13 +481,64 @@
         _ottoRenderNotifications(_ottoLastList);
       });
     });
+    // Stat tiles double as filter shortcuts — clicking "Likes" jumps
+    // to the Likes filter pill state and re-renders.
+    body.querySelectorAll('.otto-stat-tile').forEach(tile => {
+      tile.addEventListener('click', () => {
+        const t = tile.dataset.statType;
+        if (!t) return;
+        body.querySelectorAll('.otto-notif-filter').forEach(b => {
+          b.classList.toggle('on', b.dataset.notifFilter === t);
+        });
+        _ottoActiveFilter = t;
+        _ottoRenderNotifications(_ottoLastList);
+      });
+    });
+  }
+
+  function _ottoStatTileHTML(type, n, label) {
+    return `<div class="otto-stat-tile" data-stat-type="${type}">
+      <div class="otto-stat-num" data-stat-num="${type}">${n}</div>
+      <div class="otto-stat-label">${label}</div>
+    </div>`;
+  }
+
+  function _ottoApplyStats(count) {
+    if (!panel) return;
+    const t = (count && count.totals) || {};
+    const map = { follow: 'Follows', connection: 'Connections', like: 'Likes', comment: 'Comments' };
+    Object.keys(map).forEach(k => {
+      const el = panel.querySelector(`[data-stat-num="${k}"]`);
+      if (el) el.textContent = String(t[k] || 0);
+    });
+    const briefing = panel.querySelector('#ottoBriefing');
+    if (briefing) briefing.textContent = '"' + _ottoBriefingLine(count) + '"';
+  }
+
+  function _ottoBriefingLine(count) {
+    const total = (count.totals.follow || 0) + (count.totals.connection || 0)
+                + (count.totals.like || 0)   + (count.totals.comment || 0);
+    if (total === 0)        return "quiet around here. go say hi to someone.";
+    if (count.unread > 0)   return count.unread + ' new since you last looked.';
+    return "all caught up — here's what's been happening.";
   }
 
   // ── Notifications wiring (P1-021) ──────────────────────────────────
   // Cache the last fetched list so filter clicks don't refetch — they
   // just re-render the existing array through _ottoActiveFilter.
   let _ottoLastList = [];
+  let _ottoLastCount = null;     // { unread, totals: {...} }
   let _ottoActiveFilter = 'all';
+  // Surfaces (profile hero, etc.) that want to repaint when the count
+  // changes register a callback here. Otto pushes to all subscribers
+  // after each successful poll.
+  const _ottoCountSubs = new Set();
+  window.__ottoSubscribeCount = function (cb) {
+    if (typeof cb !== 'function') return () => {};
+    _ottoCountSubs.add(cb);
+    if (_ottoLastCount) { try { cb(_ottoLastCount); } catch {} }
+    return () => _ottoCountSubs.delete(cb);
+  };
 
   function _isAppShellUser() {
     if (typeof vibeLoad !== 'function') return false;
@@ -478,7 +557,17 @@
     const r = await fetch('/api/me/notifications/count', { credentials: 'include' });
     if (!r.ok) return 0;
     const j = await r.json().catch(() => ({}));
-    return (j && j.ok && typeof j.unread === 'number') ? j.unread : 0;
+    if (!j || !j.ok) return 0;
+    // Cache the full count payload so both the side-panel stats grid
+    // and any subscribed surface (profile hero) can repaint without
+    // a second roundtrip.
+    _ottoLastCount = {
+      unread: typeof j.unread === 'number' ? j.unread : 0,
+      totals: j.totals || { follow:0, connection:0, like:0, comment:0 },
+    };
+    _ottoApplyStats(_ottoLastCount);
+    _ottoCountSubs.forEach(cb => { try { cb(_ottoLastCount); } catch {} });
+    return _ottoLastCount.unread;
   }
 
   async function _ottoMarkAllRead() {

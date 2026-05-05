@@ -2822,15 +2822,12 @@ body.empty-profile-mode #profileEmpty { display: flex !important; }
         <span class="op-name">otto</span>
         <span class="op-tag">active</span>
       </div>
-      <div class="op-status-line">syndicated <strong>4 posts</strong> this week &middot; <strong>2 drafts</strong> waiting for you</div>
+      <!-- Status line now shows live notification stats from the last
+           30 days. Subscribed to Otto's count cache so it repaints
+           whenever the polling fires. -->
+      <div class="op-status-line" id="ottoHeroStatusLine">loading your activity…</div>
     </div>
-    <div class="op-tiles">
-      <div class="op-tile" style="background:#0A66C2;" title="LinkedIn"></div>
-      <div class="op-tile" style="background:linear-gradient(135deg,#E1306C,#C13584);" title="Instagram"></div>
-      <div class="op-tile" style="background:#000;" title="X"></div>
-      <div class="op-tile" style="background:linear-gradient(135deg,#25F4EE,#FE2C55);" title="TikTok"></div>
-    </div>
-    <a href="/otto" class="op-review">Review &rarr;</a>
+    <button type="button" class="op-review" onclick="if(typeof window.__ottoOpenPanel==='function')window.__ottoOpenPanel();else if(window.openOttoPanel)openOttoPanel();">Open &rarr;</button>
   </div>
   <!-- ══ END OTTO STATUS HERO ══════════════════════════════════════════════ -->
 
@@ -5765,6 +5762,36 @@ window.viewingRealUser = null;
       }
     }, 800);
   }
+
+  // Otto hero status line — subscribe to Otto's count cache so the
+  // line repaints whenever the polling lands. window.__ottoSubscribeCount
+  // is exposed by _otto.js (deferred), so wait one tick for it.
+  function _wireOttoHero() {
+    const line = document.getElementById('ottoHeroStatusLine');
+    if (!line) return;
+    const paint = (count) => {
+      const t = (count && count.totals) || {};
+      const total = (t.follow||0) + (t.connection||0) + (t.like||0) + (t.comment||0);
+      if (total === 0) {
+        line.textContent = 'no activity yet — share something or say hi.';
+        return;
+      }
+      const parts = [];
+      if (count.unread > 0)  parts.push(`<strong>${count.unread} new</strong>`);
+      if (t.like > 0)        parts.push(`<strong>${t.like}</strong> like${t.like===1?'':'s'}`);
+      if (t.comment > 0)     parts.push(`<strong>${t.comment}</strong> comment${t.comment===1?'':'s'}`);
+      if (t.follow > 0)      parts.push(`<strong>${t.follow}</strong> follow${t.follow===1?'':'s'}`);
+      if (t.connection > 0)  parts.push(`<strong>${t.connection}</strong> new connection${t.connection===1?'':'s'}`);
+      line.innerHTML = parts.slice(0, 4).join(' &middot; ') + ' this month';
+    };
+    if (typeof window.__ottoSubscribeCount === 'function') {
+      window.__ottoSubscribeCount(paint);
+    } else {
+      // Otto's defer hasn't run yet — retry in a moment.
+      setTimeout(_wireOttoHero, 600);
+    }
+  }
+  _wireOttoHero();
 })();
 
 // ── Student badge ────────────────────────────────────────────────────────
