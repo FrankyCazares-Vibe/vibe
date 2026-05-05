@@ -8,6 +8,7 @@ import { getSignedUrl } from "@aws-sdk/s3-request-presigner";
 
 /** DB stores keys like `clips/abc123.mp4`, never public URLs (PHASE_1 storage rules). */
 export const CLIP_KEY_PREFIX = "clips/";
+export const GROUP_PHOTO_KEY_PREFIX = "groups/";
 
 const DEFAULT_SIGN_EXPIRES_SEC = 300;
 
@@ -75,6 +76,50 @@ export async function signClipPutUrl(
   });
   return getSignedUrl(client, cmd, {
     expiresIn: options?.expiresInSec ?? DEFAULT_SIGN_EXPIRES_SEC,
+  });
+}
+
+function assertGroupPhotoObjectKey(objectKey: string): void {
+  const key = objectKey.trim();
+  if (!key || key.includes("://")) {
+    throw new Error(
+      "Group photo storage keys must be object keys, not URLs",
+    );
+  }
+  if (!key.startsWith(GROUP_PHOTO_KEY_PREFIX)) {
+    throw new Error(`Group photo keys must start with "${GROUP_PHOTO_KEY_PREFIX}"`);
+  }
+}
+
+/** Short-lived signed PUT for uploading a group photo. Caller enforces auth + size. */
+export async function signGroupPhotoPutUrl(
+  objectKey: string,
+  options?: { contentType?: string; expiresInSec?: number },
+): Promise<string> {
+  assertGroupPhotoObjectKey(objectKey);
+  const bucket = requireEnv("R2_BUCKET_NAME");
+  const client = getR2S3Client();
+  const cmd = new PutObjectCommand({
+    Bucket: bucket,
+    Key: objectKey,
+    ContentType: options?.contentType ?? "image/jpeg",
+  });
+  return getSignedUrl(client, cmd, {
+    expiresIn: options?.expiresInSec ?? DEFAULT_SIGN_EXPIRES_SEC,
+  });
+}
+
+/** Short-lived signed GET for a group photo. */
+export async function signGroupPhotoGetUrl(
+  objectKey: string,
+  expiresInSec?: number,
+): Promise<string> {
+  assertGroupPhotoObjectKey(objectKey);
+  const bucket = requireEnv("R2_BUCKET_NAME");
+  const client = getR2S3Client();
+  const cmd = new GetObjectCommand({ Bucket: bucket, Key: objectKey });
+  return getSignedUrl(client, cmd, {
+    expiresIn: expiresInSec ?? DEFAULT_SIGN_EXPIRES_SEC,
   });
 }
 

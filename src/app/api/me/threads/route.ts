@@ -1,6 +1,7 @@
 import { NextResponse } from "next/server";
 
 import { getFollowState } from "@/lib/connections/queries";
+import { GROUP_PHOTO_KEY_PREFIX, isR2Configured, signGroupPhotoGetUrl } from "@/lib/r2";
 import { createSupabaseServerClient } from "@/lib/supabase/server";
 import { createSupabaseServiceClient } from "@/lib/supabase/service";
 
@@ -28,18 +29,21 @@ type ThreadPeer = {
   bio: string | null;
 };
 
-/** Lightweight member info for group threads (avatars + names for the row). */
+/** Lightweight member info for group threads (avatars + names + role for the row). */
 type ThreadMember = {
   id: string;
   handle: string | null;
   name: string | null;
   avatar_url: string | null;
+  role: "admin" | "member";
 };
 
 type ThreadEntry = {
   id: string;
   type: "dm" | "group" | "org_channel" | "org_subchannel";
   name: string;
+  /** Group photo (R2 object key) — null for 1:1 dms or unset groups. */
+  photo_url: string | null;
   peer: ThreadPeer | null;
   /** All non-viewer members for groups (empty for 1:1). */
   members: ThreadMember[];
@@ -51,6 +55,8 @@ type ThreadEntry = {
   peer_last_read_at: string | null;
   /** Pinned at this timestamp (null = not pinned). Pinned threads sort first. */
   pinned_at: string | null;
+  /** Viewer's role in this channel (admin/member) — drives kick affordance. */
+  viewer_role: "admin" | "member";
 };
 
 async function resolveTargetId(
@@ -317,7 +323,7 @@ export async function GET() {
   const { data: myMemberships, error: memErr } = await supabase
     .from("channel_members")
     .select(
-      "channel_id, accepted_at, last_read_at, hidden_at, pinned_at, channels!inner(id, type, name)",
+      "channel_id, accepted_at, last_read_at, hidden_at, pinned_at, role, channels!inner(id, type, name, photo_url)",
     )
     .eq("user_id", user.id);
 
@@ -332,7 +338,13 @@ export async function GET() {
     last_read_at: string | null;
     hidden_at: string | null;
     pinned_at: string | null;
-    channels: { id: string; type: ThreadEntry["type"]; name: string };
+    role: "admin" | "member";
+    channels: {
+      id: string;
+      type: ThreadEntry["type"];
+      name: string;
+      photo_url: string | null;
+    };
   };
   const rows = (myMemberships ?? []) as unknown as Membership[];
   if (rows.length === 0) {
@@ -346,7 +358,7 @@ export async function GET() {
   const { data: otherMembers, error: othersErr } = await supabase
     .from("channel_members")
     .select(
-      "channel_id, user_id, last_read_at, users:users!channel_members_user_id_fkey(id, handle, name, avatar_url, school, bio)",
+      "channel_id, user_id, last_read_at, role, users:users!channel_members_user_id_fkey(id, handle, name, avatar_url, school, bio)",
     )
     .in("channel_id", channelIds)
     .neq("user_id", user.id);
@@ -360,6 +372,7 @@ export async function GET() {
     channel_id: string;
     user_id: string;
     last_read_at: string | null;
+    role: "admin" | "member";
     users: ThreadPeer | null;
   };
   const peerByChannel = new Map<string, ThreadPeer>();
@@ -376,6 +389,7 @@ export async function GET() {
         handle: o.users.handle,
         name: o.users.name,
         avatar_url: o.users.avatar_url,
+        role: o.role,
       });
       membersByChannel.set(o.channel_id, arr);
     }
@@ -464,6 +478,7 @@ export async function GET() {
       id: r.channel_id,
       type: r.channels.type,
       name: displayName,
+      photo_url: r.channels.photo_url ?? null,
       peer,
       members: r.channels.type === "dm" ? [] : members,
       last_message: last,
@@ -472,6 +487,7 @@ export async function GET() {
       is_request: r.accepted_at === null,
       peer_last_read_at: peerLastReadByChannel.get(r.channel_id) ?? null,
       pinned_at: r.pinned_at,
+      viewer_role: r.role,
     };
 
     if (entry.is_request) requests.push(entry);
@@ -503,9 +519,29 @@ export async function GET() {
     return result;
   };
 
+  const finalThreads = dedupeAndSort(threads);
+  const finalRequests = dedupeAndSort(requests);
+
+  // Replace stored object keys with short-lived signed GET URLs so the
+  // browser can render the group photo directly. Skip non-R2 strings
+  // (already-public URLs) and bail to a null photo on signing failure.
+  if (isR2Configured()) {
+    const signOne = async (e: ThreadEntry) => {
+      if (!e.photo_url) return;
+      if (!e.photo_url.startsWith(GROUP_PHOTO_KEY_PREFIX)) return;
+      try {
+        e.photo_url = await signGroupPhotoGetUrl(e.photo_url);
+      } catch (err) {
+        console.error("[threads.GET signGroupPhoto]", err);
+        e.photo_url = null;
+      }
+    };
+    await Promise.all([...finalThreads, ...finalRequests].map(signOne));
+  }
+
   return NextResponse.json({
     ok: true,
-    threads: dedupeAndSort(threads),
-    requests: dedupeAndSort(requests),
+    threads: finalThreads,
+    requests: finalRequests,
   });
 }

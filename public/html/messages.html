@@ -83,13 +83,40 @@ body{font-family:'DM Sans',sans-serif;background:var(--cream);color:var(--charco
 .compose-cta:disabled{opacity:.45;cursor:not-allowed;}
 .compose-cta:not(:disabled):hover{filter:brightness(1.05);}
 
-/* Chat header dropdown menu (Delete conversation, etc.) */
-.c-menu{position:absolute;top:48px;right:14px;background:white;border:1px solid var(--border);border-radius:12px;box-shadow:0 12px 36px rgba(0,0,0,.12);min-width:200px;overflow:hidden;z-index:50;display:none;}
-.c-menu.show{display:block;}
-.c-menu button{display:block;width:100%;text-align:left;background:none;border:none;padding:11px 14px;font-family:'DM Sans',sans-serif;font-size:13px;color:var(--charcoal);cursor:none;transition:background .12s;}
-.c-menu button:hover{background:var(--cream);}
-.c-menu button.danger{color:#C0392B;}
+/* Chat info side panel (slide-in from the right of #cContent). */
+.c-panel{position:absolute;top:0;right:0;height:100%;width:340px;max-width:80%;background:white;border-left:1px solid var(--border);box-shadow:-12px 0 36px rgba(0,0,0,.06);transform:translateX(105%);transition:transform .22s cubic-bezier(.32,.72,.16,1);display:flex;flex-direction:column;z-index:60;}
+.c-panel.show{transform:translateX(0);}
+.cp-hdr{padding:14px 16px;border-bottom:1px solid var(--border);display:flex;align-items:center;justify-content:space-between;}
+.cp-title{font-family:'Fraunces',serif;font-size:16px;font-weight:800;}
+.cp-x{background:none;border:none;color:var(--muted);cursor:none;font-size:18px;line-height:1;padding:4px 8px;}
+.cp-body{flex:1;overflow-y:auto;padding:16px 16px 24px;}
+.cp-photo-wrap{display:flex;flex-direction:column;align-items:center;gap:8px;margin-bottom:14px;}
+.cp-photo{width:84px;height:84px;border-radius:20px;background:var(--cream);display:flex;align-items:center;justify-content:center;color:white;font-family:'Fraunces',serif;font-size:24px;font-weight:700;overflow:hidden;position:relative;}
+.cp-photo img{width:100%;height:100%;object-fit:cover;display:block;}
+.cp-photo-edit{position:absolute;bottom:0;right:0;background:var(--accent);color:white;width:26px;height:26px;border-radius:50%;display:flex;align-items:center;justify-content:center;border:2px solid white;cursor:none;font-size:12px;line-height:1;}
+.cp-name{font-family:'Fraunces',serif;font-size:18px;font-weight:800;text-align:center;margin-bottom:2px;}
+.cp-name input{width:100%;border:none;background:transparent;font:inherit;text-align:center;outline:none;border-bottom:1.5px solid transparent;padding:2px 0;cursor:text;}
+.cp-name input:focus{border-bottom-color:var(--accent);}
+.cp-sub{text-align:center;color:var(--muted);font-size:12px;margin-bottom:18px;}
+.cp-section{margin-bottom:14px;}
+.cp-section-hdr{display:flex;align-items:center;justify-content:space-between;margin-bottom:8px;}
+.cp-section-title{font-family:'DM Sans',sans-serif;font-size:11px;font-weight:700;letter-spacing:.12em;text-transform:uppercase;color:var(--muted);}
+.cp-add-btn{background:none;border:1px solid var(--border);border-radius:100px;padding:4px 10px;font-size:11px;font-weight:700;color:var(--charcoal);cursor:none;}
+.cp-add-btn:hover{border-color:var(--accent);color:var(--accent);}
+.cp-mem{display:flex;align-items:center;gap:10px;padding:8px 4px;}
+.cp-mem-av{width:34px;height:34px;border-radius:10px;color:white;display:flex;align-items:center;justify-content:center;font-family:'Fraunces',serif;font-size:11px;font-weight:700;flex-shrink:0;overflow:hidden;}
+.cp-mem-av img{width:100%;height:100%;object-fit:cover;display:block;}
+.cp-mem-info{flex:1;min-width:0;}
+.cp-mem-name{font-size:13px;font-weight:600;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;}
+.cp-mem-role{font-size:11px;color:var(--muted);}
+.cp-mem-kick{background:none;border:none;color:#C0392B;font-size:11px;font-weight:600;cursor:none;padding:4px 6px;}
+.cp-mem-kick:hover{text-decoration:underline;}
+.cp-action{display:block;width:100%;text-align:left;background:none;border:none;border-top:1px solid var(--border);padding:13px 0;font-family:'DM Sans',sans-serif;font-size:13px;color:var(--charcoal);cursor:none;}
+.cp-action:hover{color:var(--accent);}
+.cp-action.danger{color:#C0392B;}
+.cp-action.danger:hover{color:#9C2D1F;}
 .c-hdr{position:relative;}
+.convo{position:relative;overflow:hidden;}
 
 /* Read/Delivered receipt label */
 .rr{font-size:10.5px;color:var(--muted);text-align:right;padding:2px 16px 6px;letter-spacing:.02em;}
@@ -797,13 +824,19 @@ input,textarea,[contenteditable="true"]{cursor:text!important;}
         <a href="/profile" class="vibe-pill" id="cPill" style="display:none"><div class="vp-thumb"><div id="cPillBg" style="width:100%;height:100%"></div></div><div><div class="vp-label" id="cPillLabel"></div><div class="vp-sub">Latest Vibe</div></div></a>
         <div class="c-actions">
           <button class="c-btn" onclick="window.__vibeTopNav('/profile')"><svg width="14" height="14" viewBox="0 0 14 14" fill="none"><circle cx="7" cy="5" r="3" stroke="currentColor" stroke-width="1.3"/><path d="M1 13c0-3.314 2.686-5 6-5s6 1.686 6 5" stroke="currentColor" stroke-width="1.3" fill="none" stroke-linecap="round"/></svg></button>
-          <button class="c-btn" onclick="__dmToggleChatMenu(event)"><svg width="14" height="14" viewBox="0 0 14 14" fill="none"><circle cx="7" cy="2.5" r="1.2" fill="currentColor"/><circle cx="7" cy="7" r="1.2" fill="currentColor"/><circle cx="7" cy="11.5" r="1.2" fill="currentColor"/></svg></button>
-        </div>
-        <div class="c-menu" id="cMenu">
-          <button id="cMenuPin" onclick="__dmTogglePinCurrent()">Pin chat</button>
-          <button class="danger" onclick="__dmDeleteCurrent()">Delete conversation</button>
+          <button class="c-btn" onclick="__dmPanelOpen()"><svg width="14" height="14" viewBox="0 0 14 14" fill="none"><circle cx="7" cy="2.5" r="1.2" fill="currentColor"/><circle cx="7" cy="7" r="1.2" fill="currentColor"/><circle cx="7" cy="11.5" r="1.2" fill="currentColor"/></svg></button>
         </div>
       </div>
+      <aside class="c-panel" id="cPanel">
+        <div class="cp-hdr">
+          <div class="cp-title" id="cpTitle">Chat info</div>
+          <button class="cp-x" onclick="__dmPanelClose()">×</button>
+        </div>
+        <div class="cp-body" id="cpBody">
+          <!-- Filled dynamically by __dmPanelRender() -->
+        </div>
+      </aside>
+      <input type="file" id="cPanelPhotoInput" accept="image/jpeg,image/png,image/webp" style="display:none" onchange="__dmPanelPhotoChosen(event)">
       <div class="req-bar" id="reqBar"><p id="reqBarTxt"></p><div class="req-btns"><button class="btn-acc" onclick="accReq()">Accept</button><button class="btn-dec" onclick="decReq()">Decline</button></div></div>
       <div class="msgs" id="msgsArea"></div>
       <div class="comp"><div class="comp-inner">
@@ -1137,8 +1170,10 @@ function __dmThreadRecord(thread, isRequest) {
     av: __dmInitials(isGroup ? name : (peer.name || name)),
     bg: __dmAvBg(seedKey),
     avatarUrl: isGroup ? null : (peer.avatar_url || null),
+    photoUrl: isGroup ? (thread.photo_url || null) : null,
     isGroup,
     members,
+    viewerRole: thread.viewer_role || 'member',
     role: isGroup
       ? (members.length + 1) + ' people'
       : (peer.school || peer.bio || ''),
@@ -1161,6 +1196,11 @@ function __dmAvatarHtml(rec, opts) {
   const size = (opts && opts.size) || 44;
   const bgStyle = 'background:' + rec.bg + ';width:' + size + 'px;height:' + size + 'px;';
   if (rec.isGroup) {
+    if (rec.photoUrl) {
+      return '<div class="t-av" style="' + bgStyle + 'overflow:hidden;padding:0;">' +
+        '<img src="' + __dmEsc(rec.photoUrl) + '" alt="" style="width:100%;height:100%;object-fit:cover;display:block;">' +
+      '</div>';
+    }
     return '<div class="t-av" style="' + bgStyle + '">' +
       '<svg width="' + Math.round(size*0.55) + '" height="' + Math.round(size*0.55) + '" viewBox="0 0 24 24" fill="none">' +
         '<circle cx="8" cy="9" r="3.5" stroke="white" stroke-width="1.5" fill="none"/>' +
@@ -1289,12 +1329,18 @@ async function __dmOpenChannel(channelId) {
   av.style.background = d.bg;
   if (d.isGroup) {
     av.style.padding = '0';
-    av.innerHTML = '<svg width="20" height="20" viewBox="0 0 24 24" fill="none">' +
-      '<circle cx="8" cy="9" r="3.5" stroke="white" stroke-width="1.5" fill="none"/>' +
-      '<circle cx="16" cy="9" r="3.5" stroke="white" stroke-width="1.5" fill="none"/>' +
-      '<path d="M3 19c0-2.5 2.4-4 5-4s5 1.5 5 4" stroke="white" stroke-width="1.5" fill="none" stroke-linecap="round"/>' +
-      '<path d="M11 19c0-2.5 2.4-4 5-4s5 1.5 5 4" stroke="white" stroke-width="1.5" fill="none" stroke-linecap="round"/>' +
-    '</svg>';
+    if (d.photoUrl) {
+      av.style.overflow = 'hidden';
+      av.innerHTML = '<img src="' + __dmEsc(d.photoUrl) + '" alt="" style="width:100%;height:100%;object-fit:cover;display:block;">';
+    } else {
+      av.style.overflow = '';
+      av.innerHTML = '<svg width="20" height="20" viewBox="0 0 24 24" fill="none">' +
+        '<circle cx="8" cy="9" r="3.5" stroke="white" stroke-width="1.5" fill="none"/>' +
+        '<circle cx="16" cy="9" r="3.5" stroke="white" stroke-width="1.5" fill="none"/>' +
+        '<path d="M3 19c0-2.5 2.4-4 5-4s5 1.5 5 4" stroke="white" stroke-width="1.5" fill="none" stroke-linecap="round"/>' +
+        '<path d="M11 19c0-2.5 2.4-4 5-4s5 1.5 5 4" stroke="white" stroke-width="1.5" fill="none" stroke-linecap="round"/>' +
+      '</svg>';
+    }
   } else if (d.avatarUrl) {
     av.style.padding = '0';
     av.style.overflow = 'hidden';
@@ -1307,9 +1353,6 @@ async function __dmOpenChannel(channelId) {
   document.getElementById('cName').textContent = d.n;
   document.getElementById('cStatus').textContent = d.role || '';
   document.getElementById('cPill').style.display = 'none';
-  // Update the Pin/Unpin label in the chat menu to reflect current state.
-  const pinBtn = document.getElementById('cMenuPin');
-  if (pinBtn) pinBtn.textContent = d.pinnedAt ? 'Unpin chat' : 'Pin chat';
 
   const rb = document.getElementById('reqBar');
   if (d.isRequest) {
@@ -1392,6 +1435,11 @@ async function __dmDecline() {
 function __dmComposeOpen() {
   const overlay = document.getElementById('composeOverlay');
   if (!overlay) return;
+  // Reset any "add to group" state from a previous panel open.
+  __realDM.composeAddingToChannel = null;
+  document.getElementById('composeTabs').style.display = '';
+  const cta = document.getElementById('composeCreateBtn');
+  if (cta) cta.onclick = __dmComposeCreateGroup;
   overlay.classList.add('show');
   __realDM.composeSelected = [];
   __dmComposeSwitchMode('direct'); // resets UI
@@ -1424,6 +1472,13 @@ function __dmComposeSwitchMode(mode) {
 function __dmComposeUpdateCta() {
   const btn = document.getElementById('composeCreateBtn');
   if (!btn) return;
+  if (__realDM.composeMode === 'add') {
+    btn.disabled = __realDM.composeSelected.length < 1;
+    btn.textContent = __realDM.composeSelected.length < 1
+      ? 'Pick someone'
+      : 'Add to group · ' + __realDM.composeSelected.length;
+    return;
+  }
   btn.disabled = __realDM.composeSelected.length < 2;
   btn.textContent = __realDM.composeSelected.length < 2
     ? 'Pick at least 2 people'
@@ -1432,7 +1487,8 @@ function __dmComposeUpdateCta() {
 function __dmComposeRenderSelected() {
   const wrap = document.getElementById('composeSelected');
   if (!wrap) return;
-  if (__realDM.composeMode !== 'group' || __realDM.composeSelected.length === 0) {
+  const multi = __realDM.composeMode === 'group' || __realDM.composeMode === 'add';
+  if (!multi || __realDM.composeSelected.length === 0) {
     wrap.innerHTML = '';
     return;
   }
@@ -1478,7 +1534,8 @@ function __dmComposeSearch(q) {
         results.innerHTML = '<div class="compose-empty">No one matches “' + __dmEsc(term) + '”.</div>';
         return;
       }
-      const isGroup = __realDM.composeMode === 'group';
+      // Multi-select when building a new group OR adding to an existing one.
+      const isGroup = __realDM.composeMode === 'group' || __realDM.composeMode === 'add';
       results.innerHTML = users.map(u => {
         const name = u.name || ('@' + (u.handle || '')) || 'Unknown';
         const sub = [u.school, u.major, u.year ? 'Year ' + u.year : ''].filter(Boolean).join(' · ');
@@ -1556,28 +1613,121 @@ async function __dmComposeCreateGroup() {
   }
 }
 
-// ── Chat header dropdown menu (Delete conversation) ────────────────────
-function __dmToggleChatMenu(ev) {
-  if (ev) ev.stopPropagation();
-  const menu = document.getElementById('cMenu');
-  if (!menu) return;
-  const showing = menu.classList.toggle('show');
-  if (showing) {
-    // Click-outside to close. Bind once; the listener removes itself.
-    setTimeout(() => {
-      const off = (e) => {
-        if (!menu.contains(e.target)) {
-          menu.classList.remove('show');
-          document.removeEventListener('click', off);
-        }
-      };
-      document.addEventListener('click', off);
-    }, 0);
-  }
+// ── Chat info side panel (members, photo, pin, leave, delete) ──────────
+function __dmPanelOpen() {
+  if (!active) return;
+  __dmPanelRender();
+  document.getElementById('cPanel')?.classList.add('show');
 }
+function __dmPanelClose() {
+  document.getElementById('cPanel')?.classList.remove('show');
+}
+
+function __dmPanelRender() {
+  const channelId = active;
+  const d = __realDM.T[channelId];
+  const body = document.getElementById('cpBody');
+  const titleEl = document.getElementById('cpTitle');
+  if (!d || !body) return;
+  titleEl.textContent = d.isGroup ? 'Group info' : 'Chat info';
+
+  const photoBlock = (() => {
+    let inner;
+    if (d.isGroup && d.photoUrl) {
+      inner = '<img src="' + __dmEsc(d.photoUrl) + '" alt="">';
+    } else if (d.isGroup) {
+      inner = '<svg width="34" height="34" viewBox="0 0 24 24" fill="none">' +
+        '<circle cx="8" cy="9" r="3.5" stroke="white" stroke-width="1.5" fill="none"/>' +
+        '<circle cx="16" cy="9" r="3.5" stroke="white" stroke-width="1.5" fill="none"/>' +
+        '<path d="M3 19c0-2.5 2.4-4 5-4s5 1.5 5 4" stroke="white" stroke-width="1.5" fill="none" stroke-linecap="round"/>' +
+        '<path d="M11 19c0-2.5 2.4-4 5-4s5 1.5 5 4" stroke="white" stroke-width="1.5" fill="none" stroke-linecap="round"/>' +
+        '</svg>';
+    } else if (d.avatarUrl) {
+      inner = '<img src="' + __dmEsc(d.avatarUrl) + '" alt="">';
+    } else {
+      inner = __dmEsc(d.av);
+    }
+    const editBtn = d.isGroup
+      ? '<button class="cp-photo-edit" title="Change photo" onclick="document.getElementById(\'cPanelPhotoInput\').click()">+</button>'
+      : '';
+    return '<div class="cp-photo" style="background:' + d.bg + '">' + inner + editBtn + '</div>';
+  })();
+
+  const nameBlock = d.isGroup
+    ? '<div class="cp-name"><input id="cpNameInput" value="' + __dmEsc(d.n) + '" placeholder="Group name" onblur="__dmPanelSaveName(this.value)"></div>'
+    : '<div class="cp-name">' + __dmEsc(d.n) + '</div>';
+
+  const subText = d.isGroup
+    ? ((d.members.length + 1) + ' members')
+    : (d.role || (d.peerHandle ? '@' + d.peerHandle : ''));
+
+  // Members (groups only): include the viewer first.
+  let membersBlock = '';
+  if (d.isGroup) {
+    const viewerSelf = {
+      id: __realDM.meId,
+      handle: null,
+      name: 'You',
+      avatar_url: null,
+      role: d.viewerRole || 'member',
+      isSelf: true,
+    };
+    const allMembers = [viewerSelf, ...d.members];
+    membersBlock =
+      '<div class="cp-section">' +
+        '<div class="cp-section-hdr">' +
+          '<div class="cp-section-title">Members · ' + allMembers.length + '</div>' +
+          '<button class="cp-add-btn" onclick="__dmPanelOpenAdd()">+ Add</button>' +
+        '</div>' +
+        allMembers.map((m) => {
+          const initials = String(m.name || m.handle || '?').split(/\s+/).slice(0,2).map(s => s[0] || '').join('').toUpperCase();
+          const av = m.avatar_url
+            ? '<img src="' + __dmEsc(m.avatar_url) + '" alt="">'
+            : __dmEsc(initials);
+          const role = m.role === 'admin' ? 'Admin' : '';
+          // Kick affordance: only if viewer is admin AND this row is not the viewer.
+          const canKick = (d.viewerRole === 'admin') && !m.isSelf;
+          const kickBtn = canKick
+            ? '<button class="cp-mem-kick" onclick="__dmPanelKick(' + JSON.stringify(m.id || '').replace(/"/g, '&quot;') + ', ' + JSON.stringify(m.name || '').replace(/"/g, '&quot;') + ')">Remove</button>'
+            : '';
+          return '<div class="cp-mem">' +
+            '<div class="cp-mem-av" style="background:' + __dmAvBg(m.handle || m.id || m.name) + '">' + av + '</div>' +
+            '<div class="cp-mem-info">' +
+              '<div class="cp-mem-name">' + __dmEsc(m.name || ('@' + m.handle)) + (m.isSelf ? ' · You' : '') + '</div>' +
+              (role ? '<div class="cp-mem-role">' + role + '</div>' : '') +
+            '</div>' +
+            kickBtn +
+          '</div>';
+        }).join('') +
+      '</div>';
+  }
+
+  const profileLink = (!d.isGroup && d.peerHandle)
+    ? '<button class="cp-action" onclick="window.__vibeTopNav(\'/profile/' + encodeURIComponent(d.peerHandle) + '\')">View profile</button>'
+    : '';
+
+  const pinAction = '<button class="cp-action" onclick="__dmTogglePinCurrent()">' +
+    (d.pinnedAt ? 'Unpin chat' : 'Pin chat') + '</button>';
+
+  const leaveAction = d.isGroup
+    ? '<button class="cp-action danger" onclick="__dmPanelLeave()">Leave group</button>'
+    : '';
+
+  const deleteAction = '<button class="cp-action danger" onclick="__dmDeleteCurrent()">Delete conversation</button>';
+
+  body.innerHTML =
+    '<div class="cp-photo-wrap">' + photoBlock + '</div>' +
+    nameBlock +
+    '<div class="cp-sub">' + __dmEsc(subText) + '</div>' +
+    membersBlock +
+    profileLink +
+    pinAction +
+    leaveAction +
+    deleteAction;
+}
+
 async function __dmTogglePinCurrent() {
   const channelId = active;
-  document.getElementById('cMenu')?.classList.remove('show');
   if (!channelId || !__realDM.T[channelId]) return;
   const wantPin = !__realDM.T[channelId].pinnedAt;
   try {
@@ -1590,9 +1740,8 @@ async function __dmTogglePinCurrent() {
     const j = await r.json();
     if (!j.ok) throw new Error(j.error || 'pin failed');
     __realDM.T[channelId].pinnedAt = wantPin ? new Date().toISOString() : null;
-    const pinBtn = document.getElementById('cMenuPin');
-    if (pinBtn) pinBtn.textContent = wantPin ? 'Unpin chat' : 'Pin chat';
-    __dmLoadList(); // re-sort
+    __dmPanelRender();
+    __dmLoadList();
   } catch (e) {
     console.error('[dm.pin]', e);
     alert('Could not update pin: ' + e.message);
@@ -1601,10 +1750,9 @@ async function __dmTogglePinCurrent() {
 
 async function __dmDeleteCurrent() {
   const channelId = active;
-  document.getElementById('cMenu')?.classList.remove('show');
   if (!channelId) return;
   const peerName = (__realDM.T[channelId] && __realDM.T[channelId].n) || 'this person';
-  if (!confirm('Delete this conversation? It’ll hide from your view, but ' + peerName + ' will still see it.')) return;
+  if (!confirm('Delete this conversation? It\'ll hide from your view, but ' + peerName + ' will still see it.')) return;
   try {
     const r = await fetch('/api/me/threads/' + encodeURIComponent(channelId) + '/hide', { method:'POST', credentials:'include' });
     const j = await r.json();
@@ -1612,6 +1760,7 @@ async function __dmDeleteCurrent() {
     delete __realDM.T[channelId];
     delete __realDM.peerLastReadByChannel[channelId];
     active = null;
+    __dmPanelClose();
     document.getElementById('cContent').style.display = 'none';
     document.getElementById('emptyState').style.display = 'flex';
     if (__realDM.pollTimer) { clearInterval(__realDM.pollTimer); __realDM.pollTimer = null; }
@@ -1619,6 +1768,182 @@ async function __dmDeleteCurrent() {
   } catch (e) {
     console.error('[dm.delete]', e);
     alert('Could not delete the conversation: ' + e.message);
+  }
+}
+
+async function __dmPanelLeave() {
+  const channelId = active;
+  if (!channelId) return;
+  const groupName = __realDM.T[channelId]?.n || 'this group';
+  if (!confirm('Leave ' + groupName + '? You won\'t receive new messages.')) return;
+  try {
+    const r = await fetch(
+      '/api/me/threads/' + encodeURIComponent(channelId) + '/members/' + encodeURIComponent(__realDM.meId),
+      { method: 'DELETE', credentials: 'include' },
+    );
+    const j = await r.json();
+    if (!j.ok) throw new Error(j.error || 'leave failed');
+    delete __realDM.T[channelId];
+    active = null;
+    __dmPanelClose();
+    document.getElementById('cContent').style.display = 'none';
+    document.getElementById('emptyState').style.display = 'flex';
+    if (__realDM.pollTimer) { clearInterval(__realDM.pollTimer); __realDM.pollTimer = null; }
+    __dmLoadList();
+  } catch (e) {
+    console.error('[dm.leave]', e);
+    alert('Could not leave: ' + e.message);
+  }
+}
+
+async function __dmPanelKick(userId, name) {
+  const channelId = active;
+  if (!channelId || !userId) return;
+  if (!confirm('Remove ' + (name || 'this person') + ' from the group?')) return;
+  try {
+    const r = await fetch(
+      '/api/me/threads/' + encodeURIComponent(channelId) + '/members/' + encodeURIComponent(userId),
+      { method: 'DELETE', credentials: 'include' },
+    );
+    const j = await r.json();
+    if (!j.ok) throw new Error(j.error || 'kick failed');
+    await __dmLoadList();
+    __dmPanelRender();
+  } catch (e) {
+    console.error('[dm.kick]', e);
+    alert('Could not remove member: ' + e.message);
+  }
+}
+
+async function __dmPanelSaveName(value) {
+  const channelId = active;
+  if (!channelId || !__realDM.T[channelId]) return;
+  const newName = (value || '').trim().slice(0, 80);
+  if (newName === __realDM.T[channelId].n) return;
+  try {
+    const r = await fetch('/api/me/threads/' + encodeURIComponent(channelId), {
+      method: 'PATCH',
+      credentials: 'include',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ name: newName }),
+    });
+    const j = await r.json();
+    if (!j.ok) throw new Error(j.error || 'rename failed');
+    __realDM.T[channelId].n = newName;
+    document.getElementById('cName').textContent = newName;
+    __dmLoadList();
+  } catch (e) {
+    console.error('[dm.rename]', e);
+    alert('Could not rename: ' + e.message);
+  }
+}
+
+// ── Add-member flow: reuses the compose overlay's group multi-select ───
+function __dmPanelOpenAdd() {
+  if (!active || !__realDM.T[active]?.isGroup) return;
+  __realDM.composeAddingToChannel = active;
+  document.getElementById('composeOverlay').classList.add('show');
+  document.getElementById('composeTitle').textContent = 'Add people to group';
+  document.getElementById('composeTabs')?.style.setProperty('display', 'none');
+  document.getElementById('composeNameWrap').style.display = 'none';
+  __realDM.composeMode = 'add';
+  __realDM.composeSelected = [];
+  __dmComposeRenderSelected();
+  document.getElementById('composeResults').innerHTML =
+    '<div class="compose-empty">Type to find someone you\'re connected with.</div>';
+  document.getElementById('composeSearchInput').value = '';
+  document.getElementById('composeSearchInput').focus();
+  document.getElementById('composeFoot').style.display = '';
+  const cta = document.getElementById('composeCreateBtn');
+  cta.textContent = 'Add to group';
+  cta.disabled = true;
+  cta.onclick = __dmPanelDoAdd;
+}
+
+async function __dmPanelDoAdd() {
+  const channelId = __realDM.composeAddingToChannel;
+  if (!channelId || __realDM.composeSelected.length === 0) return;
+  const cta = document.getElementById('composeCreateBtn');
+  cta.disabled = true;
+  let added = 0; let blocked = 0;
+  for (const u of __realDM.composeSelected) {
+    try {
+      const r = await fetch(
+        '/api/me/threads/' + encodeURIComponent(channelId) + '/members',
+        {
+          method: 'POST',
+          credentials: 'include',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ handle: u.handle, target_id: u.id }),
+        },
+      );
+      const j = await r.json();
+      if (j.ok) added++;
+      else if (r.status === 403 && j.error?.includes("connected")) blocked++;
+      else console.warn('[dm.addMember]', u.handle, j.error);
+    } catch (e) { console.error('[dm.addMember]', e); }
+  }
+  __dmComposeClose();
+  __realDM.composeAddingToChannel = null;
+  // Restore default compose CTA + tabs for next time.
+  cta.onclick = __dmComposeCreateGroup;
+  document.getElementById('composeTabs')?.style.setProperty('display', '');
+  await __dmLoadList();
+  __dmPanelRender();
+  if (blocked > 0) {
+    alert(blocked + ' person' + (blocked > 1 ? 's' : '') + ' couldn\'t be added — you can only add people you\'re connected with.');
+  }
+}
+
+// ── Group photo upload ─────────────────────────────────────────────────
+async function __dmPanelPhotoChosen(ev) {
+  const file = ev.target.files?.[0];
+  ev.target.value = ''; // reset so picking the same file again still fires
+  const channelId = active;
+  if (!file || !channelId) return;
+  if (file.size > 10 * 1024 * 1024) {
+    alert('Image too large (max 10MB).');
+    return;
+  }
+  try {
+    // 1. Sign upload URL
+    const signRes = await fetch('/api/me/group-photo-upload-url', {
+      method: 'POST',
+      credentials: 'include',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        channelId,
+        contentType: file.type,
+        sizeBytes: file.size,
+      }),
+    });
+    const signJson = await signRes.json();
+    if (!signJson.ok) throw new Error(signJson.error || 'sign failed');
+    // 2. PUT to R2
+    const putRes = await fetch(signJson.uploadUrl, {
+      method: 'PUT',
+      headers: { 'Content-Type': file.type },
+      body: file,
+    });
+    if (!putRes.ok) throw new Error('upload failed (' + putRes.status + ')');
+    // 3. PATCH the channel with the new key
+    const patchRes = await fetch('/api/me/threads/' + encodeURIComponent(channelId), {
+      method: 'PATCH',
+      credentials: 'include',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ photo_url: signJson.objectKey }),
+    });
+    const patchJson = await patchRes.json();
+    if (!patchJson.ok) throw new Error(patchJson.error || 'save failed');
+    await __dmLoadList();
+    __dmPanelRender();
+    // Refresh the chat header avatar with the new photo too.
+    if (__realDM.T[channelId]) {
+      __dmOpenChannel(channelId);
+    }
+  } catch (e) {
+    console.error('[dm.photo]', e);
+    alert('Could not upload photo: ' + e.message);
   }
 }
 
@@ -1697,7 +2022,7 @@ async function __dmEnsureFromHandle(handle) {
       <div class="compose-title" id="composeTitle">New message</div>
       <button class="compose-x" onclick="__dmComposeClose()">×</button>
     </div>
-    <div class="compose-tabs">
+    <div class="compose-tabs" id="composeTabs">
       <button class="compose-tab active" id="composeTabDirect" onclick="__dmComposeSwitchMode('direct')">Direct</button>
       <button class="compose-tab" id="composeTabGroup" onclick="__dmComposeSwitchMode('group')">Group</button>
     </div>
