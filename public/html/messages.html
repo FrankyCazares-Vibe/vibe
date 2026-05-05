@@ -9,6 +9,11 @@
 <script src="/html/_persistence.js"></script>
 <script src="/html/_otto.js" defer></script>
 <style>
+/* Embedded mode: when /messages renders us inside CampusAppShell via iframe,
+   the React sidebar is provided by the parent. Suppress our own. */
+body.vibe-embedded .left-nav { display: none !important; }
+body.vibe-embedded .shell { grid-template-columns: 300px 1fr !important; }
+
 /* Otto's corner ring + side panel use z-index 9990–9999, which sits over
    the chat header / close affordances on this page (especially in
    landscape where the panel grows wider). Hide Otto entirely on the
@@ -731,7 +736,7 @@ input,textarea,[contenteditable="true"]{cursor:text!important;}
         <div><div class="c-name" id="cName"></div><div class="c-status" id="cStatus"></div></div>
         <a href="/profile" class="vibe-pill" id="cPill" style="display:none"><div class="vp-thumb"><div id="cPillBg" style="width:100%;height:100%"></div></div><div><div class="vp-label" id="cPillLabel"></div><div class="vp-sub">Latest Vibe</div></div></a>
         <div class="c-actions">
-          <button class="c-btn" onclick="window.location='/profile'"><svg width="14" height="14" viewBox="0 0 14 14" fill="none"><circle cx="7" cy="5" r="3" stroke="currentColor" stroke-width="1.3"/><path d="M1 13c0-3.314 2.686-5 6-5s6 1.686 6 5" stroke="currentColor" stroke-width="1.3" fill="none" stroke-linecap="round"/></svg></button>
+          <button class="c-btn" onclick="window.__vibeTopNav('/profile')"><svg width="14" height="14" viewBox="0 0 14 14" fill="none"><circle cx="7" cy="5" r="3" stroke="currentColor" stroke-width="1.3"/><path d="M1 13c0-3.314 2.686-5 6-5s6 1.686 6 5" stroke="currentColor" stroke-width="1.3" fill="none" stroke-linecap="round"/></svg></button>
           <button class="c-btn"><svg width="14" height="14" viewBox="0 0 14 14" fill="none"><circle cx="7" cy="2.5" r="1.2" fill="currentColor"/><circle cx="7" cy="7" r="1.2" fill="currentColor"/><circle cx="7" cy="11.5" r="1.2" fill="currentColor"/></svg></button>
         </div>
       </div>
@@ -1174,7 +1179,7 @@ async function __dmOpenChannel(channelId) {
   const profileBtn = document.querySelector('#cContent .c-actions .c-btn');
   if (profileBtn) {
     profileBtn.onclick = d.peerHandle
-      ? () => { window.location.href = '/profile/' + d.peerHandle; }
+      ? () => { window.__vibeTopNav('/profile/' + d.peerHandle); }
       : null;
   }
   const inp = document.getElementById('msgIn');
@@ -1255,7 +1260,7 @@ async function __dmEnsureFromHandle(handle) {
 
 (async function initMessagesPage(){
   const user = vibeInit();
-  if (!user) { window.location.href = '/'; return; }
+  if (!user) { window.__vibeTopNav('/'); return; }
   if (user._isDemo) { vibeShowDemoPill(); return; }
   if (!user._onboarded) return;
 
@@ -1287,9 +1292,14 @@ async function __dmEnsureFromHandle(handle) {
     if (cid) {
       await __dmLoadList();
       openT(cid);
-      const u = new URL(location.href);
-      u.searchParams.delete('to');
-      window.history.replaceState({}, '', u.toString());
+      // When iframed under /messages?to=<h>, clean the parent URL.
+      // Standalone (no iframe), top.location === self.location.
+      try {
+        const top = (window.top && window.top !== window.self) ? window.top : window;
+        const u = new URL(top.location.href);
+        u.searchParams.delete('to');
+        window.__vibeTopReplaceState({}, '', u.toString());
+      } catch (_) { /* cross-origin guard; non-fatal */ }
     }
   }
 

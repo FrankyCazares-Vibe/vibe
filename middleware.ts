@@ -6,7 +6,6 @@ import { isGlobalFeedSurfaceEnabled } from "@/lib/feature-flags";
 /** Static prototype only — no matching App Router page. */
 const STATIC_ONLY_HTML: Record<string, string> = {
   "/opportunities": "/html/opportunities.html",
-  "/otto": "/html/otto.html",
 };
 
 /** Demo shell: App routes exist for logged-in users; anonymous users get the HTML prototype. */

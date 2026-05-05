@@ -8,6 +8,10 @@
 <script src="/html/_persistence.js"></script>
 <style>
 :root{--cream:#FAF7F2;--charcoal:#1C1C1E;--soft:#2D2D2D;--muted:#8A8580;--accent:#FF5C35;--green:#2ECC71;--lavender:#C8B8FF;--purple:#7C5CFC;--gold:#F5C842;--border:rgba(28,28,30,.08);--shadow:0 4px 24px rgba(0,0,0,.06);--shadow-lg:0 12px 48px rgba(0,0,0,.1);}
+/* Embedded mode: when /otto renders us inside CampusAppShell via iframe,
+   the React sidebar is provided by the parent. Suppress our own. */
+body.vibe-embedded .left-nav { display: none !important; }
+body.vibe-embedded .shell { grid-template-columns: 1fr !important; }
 *{margin:0;padding:0;box-sizing:border-box;}
 html,body{height:100%;}
 body{font-family:'DM Sans',sans-serif;background:var(--cream);color:var(--charcoal);cursor:none;overflow-x:hidden;}
@@ -1868,7 +1872,7 @@ document.querySelectorAll('.range-opt, .toggle, .win-day, .win-slot, .chip-x, .c
 (function initOttoPage(){
   const user = vibeInit();
   if (!user) {
-    window.location.href = '/';
+    window.__vibeTopNav('/');
     return;
   }
   // Mirror the user's name + avatar initials into the sidebar profile chip.

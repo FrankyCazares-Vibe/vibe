@@ -1,6 +1,5 @@
-import { redirect } from "next/navigation";
-
 import { enforceCampusAccess } from "@/lib/auth/campus-access";
+import { CampusAppShell } from "@/components/campus-app-shell";
 
 export const metadata = {
   title: "Messages · Vibe",
@@ -12,16 +11,32 @@ type Props = {
 };
 
 /**
- * `/messages` route — auth-gates, then redirects to the static prototype.
- * Preserves `?to=<handle>` so the prototype can auto-create/open that DM
- * channel via /api/me/threads.
+ * `/messages` runs the static prototype inside CampusAppShell so the React
+ * sidebar (with the rich identity chip) matches /campus and /network. The
+ * prototype itself stays in /html/messages.html — passing ?embedded=1 tells
+ * it to suppress its own sidebar so we don't double up. ?to=<handle> is
+ * preserved so the prototype can auto-create/open the right DM channel.
  */
 export default async function MessagesPage({ searchParams }: Props) {
   await enforceCampusAccess("/messages");
   const { to } = await searchParams;
   const handle = Array.isArray(to) ? to[0] : to;
-  const target = handle
-    ? `/html/messages.html?app=1&to=${encodeURIComponent(handle.toLowerCase())}`
-    : "/html/messages.html?app=1";
-  redirect(target);
+  const params = new URLSearchParams({ app: "1", embedded: "1" });
+  if (handle) params.set("to", handle.toLowerCase());
+  const src = `/html/messages.html?${params.toString()}`;
+  return (
+    <CampusAppShell>
+      <iframe
+        src={src}
+        title="Messages"
+        style={{
+          width: "100%",
+          height: "100vh",
+          border: "none",
+          display: "block",
+          background: "#FAF7F2",
+        }}
+      />
+    </CampusAppShell>
+  );
 }

@@ -60,8 +60,43 @@ function vibeInit() {
   const params = new URLSearchParams(location.search);
   if (params.get('clear') === '1') vibeClearAll();
   if (params.get('demo')  === '1' && !vibeLoad(VIBE_KEYS.user)) seedDemoData();
+  if (params.get('embedded') === '1') {
+    // Set the marker class as soon as possible; if body isn't ready yet,
+    // wait for it. CSS rules gated on `body.vibe-embedded` then suppress
+    // the static-prototype sidebar so the parent React shell's sidebar shows.
+    function _markEmbedded() {
+      if (document.body) document.body.classList.add('vibe-embedded');
+      else document.addEventListener('DOMContentLoaded', () =>
+        document.body && document.body.classList.add('vibe-embedded'));
+    }
+    _markEmbedded();
+  }
   return vibeLoad(VIBE_KEYS.user);
 }
+
+// In an embedded iframe, cross-route navigation (e.g., `/profile/<handle>`)
+// must escape the iframe so the React shell's URL updates too. Same-origin
+// iframe = window.top works without cross-origin throws. Code paths that
+// might iframe-escape should use window.__vibeTopNav(url) instead of
+// window.location.href = url.
+window.__vibeTopNav = function(url) {
+  try {
+    if (window.top && window.top !== window.self) {
+      window.top.location.href = url;
+      return;
+    }
+  } catch (_) {}
+  window.location.href = url;
+};
+window.__vibeTopReplaceState = function(state, title, url) {
+  try {
+    if (window.top && window.top !== window.self) {
+      window.top.history.replaceState(state, title, url);
+      return;
+    }
+  } catch (_) {}
+  window.history.replaceState(state, title, url);
+};
 
 // ── Floating "demo mode · exit" pill ──────────────────────────────────────
 // Optional UI helper for pages that don't have a natural inline place to put
