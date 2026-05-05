@@ -80,5 +80,33 @@ export async function GET(req: Request) {
     if (users.length >= limit) break;
   }
 
+  // Annotate each result with the viewer's relationship state so the
+  // dropdown can render Connect / Pending / Message correctly.
+  // Two batched queries — outgoing (viewer→target) and incoming
+  // (target→viewer) — combine to none / following / followed_by /
+  // connected. Cheaper than N separate getFollowState calls.
+  if (users.length > 0) {
+    const ids = users.map((u) => String(u.id));
+    const [outRes, inRes] = await Promise.all([
+      supabase
+        .from("connections")
+        .select("following_id")
+        .eq("follower_id", user.id)
+        .in("following_id", ids),
+      supabase
+        .from("connections")
+        .select("follower_id")
+        .eq("following_id", user.id)
+        .in("follower_id", ids),
+    ]);
+    const outgoing = new Set((outRes.data ?? []).map((r) => r.following_id as string));
+    const incoming = new Set((inRes.data ?? []).map((r) => r.follower_id as string));
+    for (const u of users) {
+      const a = outgoing.has(u.id as string);
+      const b = incoming.has(u.id as string);
+      u.rel = a && b ? "connected" : a ? "following" : b ? "followed_by" : "none";
+    }
+  }
+
   return NextResponse.json({ ok: true, users });
 }

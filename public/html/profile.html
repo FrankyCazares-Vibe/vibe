@@ -250,7 +250,10 @@ body.edit-mode .cover-edit-btn { opacity:1; }
 /* Avatar row */
 .avatar-row {
   display:flex;align-items:flex-end;justify-content:space-between;
-  margin-top:-70px;position:relative;z-index:10;
+  /* -50 (was -70) so the row sits closer to the bottom of the cover —
+     keeps the right-column actions (Connect / Pending / Mutual) from
+     creeping up into the banner gradient. */
+  margin-top:-50px;position:relative;z-index:10;
   padding-bottom:20px;
   border-bottom:1px solid var(--border);
 }
@@ -1355,16 +1358,22 @@ body.edit-mode .vibe-grid-play { display:none; }
 .post-thumb-cell.theme-sky      { background:#E5F4FF;color:#1A6FB5; }
 .post-thumb-cell.theme-lavender { background:#F3EAFF;color:#7C3FE0; }
 
-/* ── Avatar-row right column: Connect+Mutual on top, stats below.
-   Sits inside .avatar-row so the row's bottom border draws under the stats. */
+/* ── Avatar-row right column: stats on top, Connect+Mutual below.
+   Sits inside .avatar-row so the row's bottom border draws under the
+   action pills. Action pills are at the bottom of the column so they
+   never reach up into the banner gradient. */
 .avatar-row-right {
-  display:flex;flex-direction:column;align-items:flex-end;gap:14px;
+  display:flex;flex-direction:column;align-items:flex-end;gap:10px;
 }
 .avatar-row-actions {
-  display:none;align-items:center;gap:12px;
+  display:none;align-items:center;gap:8px;
 }
 body.viewer-mode .avatar-row-actions {
   display:flex;
+}
+/* Tighter pills in viewer mode so the action row's footprint is small. */
+body.viewer-mode .avatar-row-actions .action-btn {
+  padding:8px 14px; font-size:12.5px;
 }
 
 /* Stats (Followers · Following · Connections) — clean spacing, no dividers,
@@ -2600,29 +2609,13 @@ body.empty-profile-mode #profileEmpty { display: flex !important; }
       </div>
     </div>
 
-    <!-- Right side of the avatar row: Connect+Mutual on top (viewer-only),
-         stats always visible below, sitting at avatar-bottom level so the
-         hairline border-bottom draws under them. -->
+    <!-- Right side of the avatar row: stats on TOP (always visible),
+         Connect+Mutual BELOW (viewer-only). Putting actions at the
+         bottom of the column anchors them to the avatar's bottom edge,
+         so they can't drift up into the banner gradient. -->
     <div class="avatar-row-right">
 
-      <!-- Viewer-only: Connect button + Soft Follow + Mutual pill, side by side.
-           Visibility gated via body.viewer-mode so the global .viewer-only
-           display:block override doesn't fight our flex layout. -->
-      <div class="avatar-row-actions" id="profileViewerActions">
-        <button class="action-btn primary vibe-connect-btn" id="vibeConnectBtn" onclick="handleVibConnect()">
-          <svg width="13" height="13" viewBox="0 0 13 13" fill="none" style="flex-shrink:0"><path d="M6.5 1v11M1 6.5h11" stroke="white" stroke-width="1.8" stroke-linecap="round"/></svg>
-          Connect
-        </button>
-        <button class="vibe-soft-follow" id="vibeSoftFollow" onclick="handleSoftFollow()" style="display:none">
-          Follow instead
-        </button>
-        <button class="profile-mutual-pill" onclick="openMutualsModal()">
-          <span id="statMutual">32</span> mutual
-        </button>
-      </div>
-
-      <!-- Always-visible stats (Followers · Following · Connections).
-           Real follower/following counts wire up with P1-012. -->
+      <!-- Always-visible stats (Followers · Following · Connections). -->
       <div class="profile-top-stats" id="profileTopStats">
         <a href="#" class="profile-stat" onclick="return false;">
           <span class="profile-stat-num" id="statFollowers">1.2k</span>
@@ -2636,6 +2629,23 @@ body.empty-profile-mode #profileEmpty { display: flex !important; }
           <span class="profile-stat-num" id="statConnections">847</span>
           <span class="profile-stat-label">Connections</span>
         </a>
+      </div>
+
+      <!-- Viewer-only: Connect button + Soft Follow + Mutual pill, side
+           by side. Sits BELOW stats so the column's bottom edge holds
+           the action pills against the avatar's bottom — no chance of
+           drifting into the cover gradient. -->
+      <div class="avatar-row-actions" id="profileViewerActions">
+        <button class="action-btn primary vibe-connect-btn" id="vibeConnectBtn" onclick="handleVibConnect()">
+          <svg width="13" height="13" viewBox="0 0 13 13" fill="none" style="flex-shrink:0"><path d="M6.5 1v11M1 6.5h11" stroke="white" stroke-width="1.8" stroke-linecap="round"/></svg>
+          Connect
+        </button>
+        <button class="vibe-soft-follow" id="vibeSoftFollow" onclick="handleSoftFollow()" style="display:none">
+          Follow instead
+        </button>
+        <button class="profile-mutual-pill" onclick="openMutualsModal()">
+          <span id="statMutual">32</span> mutual
+        </button>
       </div>
 
       <div class="connected-badge" id="connectedBadge">
@@ -5144,31 +5154,85 @@ function runProfSearch(q) {
   }, 220);
 }
 
-// Map a Supabase users row to the search-dropdown row shape.
+// Map a Supabase users row to the search-dropdown row shape. The
+// `rel` field comes from the search API's batched connections check
+// so the action button can render Connect / Pending / Message
+// without a second roundtrip.
 function _profSearchUserToRow(u) {
   var role = [u.major, u.year].filter(Boolean).join(' · ');
   var initials = (u.name || u.handle || '?').split(/\s+/)
     .map(function(p){ return p[0]; }).filter(Boolean).join('').slice(0,2).toUpperCase();
   return {
     type:    'person',
+    id:      u.id || '',
     name:    u.name || ('@' + u.handle),
     role:    role || (u.school || ''),
     handle:  u.handle || '',
     av:      initials,
     avatar:  u.avatar_url || '',
     col:     '#1C1C1E',
-    rel:     'none',
+    rel:     u.rel || 'none',
     real:    true,
   };
 }
+
+// Recently-searched: tap a real user in the dropdown → push them to
+// vibe_recent_searches_v1 (capped at 8, dedup by id, most recent first)
+// so the next time the dropdown opens they're at the top.
+const RECENT_SEARCHES_KEY = 'vibe_recent_searches_v1';
+const RECENT_SEARCHES_MAX = 8;
+function _loadRecentSearches() {
+  try {
+    var raw = localStorage.getItem(RECENT_SEARCHES_KEY);
+    var arr = raw ? JSON.parse(raw) : [];
+    return Array.isArray(arr) ? arr : [];
+  } catch (e) { return []; }
+}
+function pushRecentSearch(row) {
+  if (!row || !row.handle) return;
+  try {
+    var arr = _loadRecentSearches().filter(function(r){ return r.handle !== row.handle; });
+    arr.unshift({
+      id:     row.id || '',
+      name:   row.name || '',
+      handle: row.handle || '',
+      avatar: row.avatar || '',
+      av:     row.av || '',
+      rel:    row.rel || 'none',
+      role:   row.role || '',
+      type:   'person',
+      real:   true,
+      ts:     Date.now(),
+    });
+    if (arr.length > RECENT_SEARCHES_MAX) arr.length = RECENT_SEARCHES_MAX;
+    localStorage.setItem(RECENT_SEARCHES_KEY, JSON.stringify(arr));
+  } catch (e) {}
+}
+function clearRecentSearches() {
+  try { localStorage.removeItem(RECENT_SEARCHES_KEY); } catch (e) {}
+  var dd = document.getElementById('profSearchDropdown');
+  if (dd) dd.innerHTML = renderProfDefault();
+}
+
 function renderProfDefault() {
+  var recent = _loadRecentSearches();
   var people    = PROF_SEARCH_DATA.filter(function(r){return r.type==='person';}).slice(0,4);
   var companies = PROF_SEARCH_DATA.filter(function(r){return r.type==='company';}).slice(0,3);
-  return '<div class="search-section-label">Suggested people</div>'
-    + people.map(renderProfSR).join('')
-    + '<div class="search-section-label">Companies hiring</div>'
-    + companies.map(renderProfSR).join('')
-    + '<div class="search-footer">Search all people and companies</div>';
+  var out = '';
+  if (recent.length) {
+    out += '<div class="search-section-label" style="display:flex;justify-content:space-between;align-items:center">'
+      + '<span>Recently searched</span>'
+      + '<button onclick="clearRecentSearches()" style="background:none;border:none;color:#8A8580;font-size:11px;font-weight:600;cursor:none">Clear</button>'
+      + '</div>'
+      + recent.slice(0,5).map(renderProfSR).join('');
+  }
+  if (people.length) {
+    out += '<div class="search-section-label">Suggested people</div>' + people.map(renderProfSR).join('');
+  }
+  if (companies.length) {
+    out += '<div class="search-section-label">Companies hiring</div>' + companies.map(renderProfSR).join('');
+  }
+  return out + '<div class="search-footer">Search all people and companies</div>';
 }
 function renderProfResults(res) {
   var people    = res.filter(function(r){return r.type==='person';});
@@ -5179,10 +5243,28 @@ function renderProfResults(res) {
   return out + '<div class="search-footer">See all results</div>';
 }
 function renderProfSR(r) {
-  var action = r.type==='person' ? (r.rel==='connected'?'Message':'Connect') : 'Follow';
+  // Action button reflects the viewer's relationship with the user.
+  // Companies always show Follow (no real follow API for orgs yet).
+  var action;
+  if (r.type === 'person') {
+    if      (r.rel === 'connected')   action = 'Message';
+    else if (r.rel === 'following')   action = 'Pending';
+    else if (r.rel === 'followed_by') action = 'Connect back';
+    else                              action = 'Connect';
+  } else {
+    action = 'Follow';
+  }
+  // Real users — clicking the row navigates to /profile/<handle> AND
+  // pushes them onto the recent-searches list. We have to escape the
+  // serialized object so the inline onclick string survives quote
+  // characters in name / role.
   var clickAttr = '';
   if (r.real && r.handle) {
-    clickAttr = ' onclick="window.location.href=\'/profile/' + encodeURIComponent(r.handle) + '\'" style="cursor:pointer"';
+    var rowJson = encodeURIComponent(JSON.stringify({
+      id: r.id || '', name: r.name || '', handle: r.handle || '',
+      avatar: r.avatar || '', av: r.av || '', rel: r.rel || 'none', role: r.role || '',
+    }));
+    clickAttr = ' onclick="pushRecentSearch(JSON.parse(decodeURIComponent(\'' + rowJson + '\')));window.location.href=\'/profile/' + encodeURIComponent(r.handle) + '\'" style="cursor:pointer"';
   }
   var avatarInner = r.avatar
     ? '<img src="' + _esc(r.avatar) + '" alt="" style="width:100%;height:100%;object-fit:cover;border-radius:inherit;display:block;">'
