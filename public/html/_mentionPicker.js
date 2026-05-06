@@ -39,13 +39,13 @@
   const style = document.createElement("style");
   style.id = "vibe-mention-picker-css";
   style.textContent = `
-    /* z-index above the custom cursor (.cursor at 9999) so the popover
-       isn't visually covered by the cursor element. cursor:default
-       overrides the page's cursor:none so the SYSTEM cursor shows up
-       inside the popover (the custom cursor is hidden behind us). */
-    .vmp-popover{position:fixed;background:white;border:1px solid rgba(28,28,30,.08);border-radius:12px;box-shadow:0 14px 40px rgba(0,0,0,.18);min-width:240px;max-width:320px;max-height:280px;overflow-y:auto;z-index:100000;display:none;font-family:'DM Sans',system-ui,sans-serif;cursor:default;}
+    /* Popover sits at z-index 100000; the page's custom cursor element
+       is JS-bumped to 200000 while the popover is open so the user sees
+       it tracking over the suggestions. cursor:none inherited from body
+       keeps the system cursor suppressed (we don't want a double cursor). */
+    .vmp-popover{position:fixed;background:white;border:1px solid rgba(28,28,30,.08);border-radius:12px;box-shadow:0 14px 40px rgba(0,0,0,.18);min-width:240px;max-width:320px;max-height:280px;overflow-y:auto;z-index:100000;display:none;font-family:'DM Sans',system-ui,sans-serif;}
     .vmp-popover.show{display:block;}
-    .vmp-row{display:flex;align-items:center;gap:9px;padding:8px 12px;cursor:pointer !important;border-bottom:1px solid rgba(28,28,30,.04);}
+    .vmp-row{display:flex;align-items:center;gap:9px;padding:8px 12px;border-bottom:1px solid rgba(28,28,30,.04);}
     .vmp-row:last-child{border-bottom:none;}
     .vmp-row.active,.vmp-row:hover{background:#FAF7F2;}
     .vmp-av{width:30px;height:30px;border-radius:9px;background:#1C1C1E;color:white;display:flex;align-items:center;justify-content:center;font-family:'Fraunces',serif;font-size:11px;font-weight:700;flex-shrink:0;overflow:hidden;}
@@ -90,9 +90,11 @@
     state.boundOpts = null;
     if (state.abort) { state.abort.abort(); state.abort = null; }
     if (state.debounce) { clearTimeout(state.debounce); state.debounce = null; }
-    // Restore the page's custom cursor element when we're done.
+    // Restore the custom cursor's normal z-index. (The cursor stays
+    // visible the whole time — we only lift it above the popover while
+    // open, then drop it back.)
     Array.from(document.querySelectorAll(".cursor, .cursor-ring")).forEach((el) => {
-      el.style.display = "";
+      el.style.zIndex = "";
     });
   }
 
@@ -237,12 +239,12 @@
     state.boundOpts = textarea.__vmpOpts || null;
     popover.classList.add("show");
     position(textarea);
-    // Hide the page's custom cursor element while the popover is up.
-    // The picker's CSS sets cursor:default so the SYSTEM cursor takes
-    // over inside the popover; without hiding the custom cursor first
-    // the user sees the orange dot bleed through above the system cursor.
+    // Lift the page's custom cursor above the popover so the user sees
+    // the orange dot/ring tracking their mouse over the suggestions and
+    // can click accurately. Cursor still has pointer-events:none so
+    // clicks pass straight through to the row underneath.
     Array.from(document.querySelectorAll(".cursor, .cursor-ring")).forEach((el) => {
-      el.style.display = "none";
+      el.style.zIndex = "200000";
     });
     if (state.debounce) clearTimeout(state.debounce);
     state.debounce = setTimeout(() => fetchSuggestions(m.query), 140);
