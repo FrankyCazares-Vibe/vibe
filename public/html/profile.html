@@ -14,6 +14,7 @@
 <script src="/html/_sharePicker.js" defer></script>
 <script src="/html/_miniMessenger.js" defer></script>
 <script src="/html/_safetyActions.js" defer></script>
+<script src="/html/_mentionPicker.js" defer></script>
 <script>
 // Pre-paint: prevents the flash-of-Maya on profile loads for onboarded users.
 // Reads vibe_user_v1 synchronously before <body> renders. If the user came
@@ -5831,6 +5832,17 @@ window.viewingRealUser = null;
     }
   }
   _wireOttoHero();
+
+  // @mention typeahead on the post composer.
+  function _wireMentionPicker() {
+    const inp = document.getElementById('profilePostInput');
+    if (inp && window.vibeBindMentionPicker) {
+      window.vibeBindMentionPicker(inp);
+    } else {
+      setTimeout(_wireMentionPicker, 400);
+    }
+  }
+  _wireMentionPicker();
 })();
 
 // ── Student badge ────────────────────────────────────────────────────────

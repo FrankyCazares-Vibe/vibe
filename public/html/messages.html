@@ -11,6 +11,7 @@
 <script src="/html/_postViewer.js" defer></script>
 <script src="/html/_sharePicker.js" defer></script>
 <script src="/html/_safetyActions.js" defer></script>
+<script src="/html/_mentionPicker.js" defer></script>
 <style>
 /* Embedded mode: when /messages renders us inside CampusAppShell via iframe,
    the React sidebar is provided by the parent. Suppress our own. */
@@ -118,6 +119,8 @@ body{font-family:'DM Sans',sans-serif;background:var(--cream);color:var(--charco
 .cp-mem-role{font-size:11px;color:var(--muted);}
 .cp-mem-kick{background:none;border:none;color:#C0392B;font-size:11px;font-weight:600;cursor:none;padding:4px 6px;}
 .cp-mem-kick:hover{text-decoration:underline;}
+.cp-mem-mute{background:none;border:none;color:var(--muted);font-size:11px;font-weight:600;cursor:none;padding:4px 6px;}
+.cp-mem-mute:hover{color:var(--charcoal);text-decoration:underline;}
 .cp-action{display:block;width:100%;text-align:left;background:none;border:none;border-top:1px solid var(--border);padding:13px 0;font-family:'DM Sans',sans-serif;font-size:13px;color:var(--charcoal);cursor:none;}
 .cp-action:hover{color:var(--accent);}
 .cp-action.danger{color:#C0392B;}
@@ -2088,10 +2091,17 @@ function __dmPanelRender() {
             ? '<img src="' + __dmEsc(m.avatar_url) + '" alt="">'
             : __dmEsc(initials);
           const role = m.role === 'admin' ? 'Admin' : '';
+          const idArg = JSON.stringify(m.id || '').replace(/"/g, '&quot;');
+          const nameArg = JSON.stringify(m.name || '').replace(/"/g, '&quot;');
+          // Per-member channel mute (any member can mute another in their
+          // own view — this only silences notifications IN THIS GROUP).
+          const muteBtn = m.isSelf
+            ? ''
+            : '<button class="cp-mem-mute" onclick="__dmPanelMuteMember(' + idArg + ',' + nameArg + ')" title="Mute in this group">Mute</button>';
           // Kick affordance: only if viewer is admin AND this row is not the viewer.
           const canKick = (d.viewerRole === 'admin') && !m.isSelf;
           const kickBtn = canKick
-            ? '<button class="cp-mem-kick" onclick="__dmPanelKick(' + JSON.stringify(m.id || '').replace(/"/g, '&quot;') + ', ' + JSON.stringify(m.name || '').replace(/"/g, '&quot;') + ')">Remove</button>'
+            ? '<button class="cp-mem-kick" onclick="__dmPanelKick(' + idArg + ',' + nameArg + ')">Remove</button>'
             : '';
           return '<div class="cp-mem">' +
             '<div class="cp-mem-av" style="background:' + __dmAvBg(m.handle || m.id || m.name) + '">' + av + '</div>' +
@@ -2099,6 +2109,7 @@ function __dmPanelRender() {
               '<div class="cp-mem-name">' + __dmEsc(m.name || ('@' + m.handle)) + (m.isSelf ? ' · You' : '') + '</div>' +
               (role ? '<div class="cp-mem-role">' + role + '</div>' : '') +
             '</div>' +
+            muteBtn +
             kickBtn +
           '</div>';
         }).join('') +
@@ -2146,6 +2157,44 @@ function __dmPanelRender() {
     safetyActions +
     leaveAction +
     deleteAction;
+}
+
+// Per-member channel mute (groups). Opens the timeframe picker with an
+// info note explaining the scope is *this group only* — outside DMs and
+// posts from this person still flow through.
+async function __dmPanelMuteMember(memberId, memberName) {
+  const channelId = active;
+  if (!channelId || !memberId) return;
+  const labels = [
+    { hours: 1,   label: '1 hour' },
+    { hours: 8,   label: '8 hours' },
+    { hours: 24,  label: '24 hours' },
+    { hours: 168, label: '7 days' },
+    { hours: 0,   label: 'Until I unmute' },
+  ];
+  const note =
+    'Only mutes ' + (memberName || 'them') + ' in <strong>this group</strong>. ' +
+    'Their 1:1 DMs and posts still come through. To mute everywhere, open ' +
+    'their profile and pick Mute there.';
+  const choice = await __dmPickMuteDuration(memberName || 'this person', labels, note);
+  if (choice == null) return;
+  try {
+    const r = await fetch(
+      '/api/me/threads/' + encodeURIComponent(channelId) + '/members/' + encodeURIComponent(memberId) + '/mute',
+      {
+        method: choice === -1 ? 'DELETE' : 'POST',
+        credentials: 'include',
+        headers: { 'Content-Type': 'application/json' },
+        body: choice === -1 ? null : JSON.stringify({ duration_hours: choice > 0 ? choice : null }),
+      },
+    );
+    const j = await r.json();
+    if (!j.ok) throw new Error(j.error || 'mute failed');
+    if (window.showToast) window.showToast('Muted ' + (memberName ? memberName.split(' ')[0] : 'them') + ' in this group');
+  } catch (e) {
+    console.error('[dm.panelMuteMember]', e);
+    alert('Could not mute: ' + e.message);
+  }
 }
 
 async function __dmToggleChannelMute() {
@@ -2201,17 +2250,21 @@ async function __dmToggleChannelMute() {
 }
 
 // Lightweight inline timeframe picker — reuses the shared safety-actions
-// overlay if it's loaded, else falls back to a confirm() chain.
-function __dmPickMuteDuration(name, labels) {
+// overlay if loaded. Optional `noteHtml` is rendered above the rows
+// (used for the per-member-in-group case to explain the scope).
+function __dmPickMuteDuration(name, labels, noteHtml) {
   return new Promise((resolve) => {
     if (typeof window.__vsaCloseSheet === 'function') {
       const overlay = document.getElementById('vsaOverlay');
       const card = overlay && overlay.querySelector('.vsa-card');
       if (overlay && card) {
+        const note = noteHtml
+          ? '<div style="background:#FFF8F2;border:1px solid rgba(255,92,53,.18);border-radius:10px;padding:10px 12px;margin-bottom:12px;font-size:12px;color:#1C1C1E;line-height:1.5;">ℹ️ ' + noteHtml + '</div>'
+          : '<p class="vsa-note" style="margin-bottom:12px">No unread badge or notification ping for messages in this chat. Messages still arrive.</p>';
         card.innerHTML =
           '<div class="vsa-hdr"><div class="vsa-title">Mute ' + __dmEsc(name) + '</div><button class="vsa-x" type="button" onclick="window.__vsaCloseSheet();window.__vsaResolveMute && window.__vsaResolveMute(null);">×</button></div>' +
           '<div class="vsa-body">' +
-            '<p class="vsa-note" style="margin-bottom:12px">No unread badge or notification ping for messages in this chat. Messages still arrive.</p>' +
+            note +
             labels.map(l => '<button class="vsa-row" data-h="' + l.hours + '">' + __dmEsc(l.label) + '</button>').join('') +
           '</div>';
         overlay.classList.add('show');
@@ -2224,12 +2277,10 @@ function __dmPickMuteDuration(name, labels) {
           resolve(h);
         };
         card.addEventListener('click', onClick);
-        // Backdrop dismiss → null
         window.__vsaResolveMute = resolve;
         return;
       }
     }
-    // Fallback: prompt
     const txt = prompt('Mute ' + name + ' for: 1, 8, 24, 168 (=7d), or 0 (forever)');
     const n = Number(txt);
     if (txt == null) resolve(null);
@@ -2521,6 +2572,18 @@ async function __dmEnsureFromHandle(handle) {
     if (document.hidden) return;
     __dmLoadList();
   }, __realDM.LIST_POLL_MS);
+
+  // @mention typeahead on the chat composer.
+  if (window.vibeBindMentionPicker) {
+    const inp = document.getElementById('msgIn');
+    if (inp) window.vibeBindMentionPicker(inp);
+  } else {
+    // Module loads with `defer` → may not be ready yet on slow connections.
+    document.addEventListener('DOMContentLoaded', () => {
+      const inp = document.getElementById('msgIn');
+      if (inp && window.vibeBindMentionPicker) window.vibeBindMentionPicker(inp);
+    });
+  }
 })();
 // ══ END MESSAGES INIT ════════════════════════════════════════════════════
 

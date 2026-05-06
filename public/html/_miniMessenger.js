@@ -534,6 +534,7 @@
       });
     }
     if (b) b.addEventListener("click", sendCurrent);
+    if (t && window.vibeBindMentionPicker) window.vibeBindMentionPicker(t);
     if (search) {
       search.addEventListener("input", () => {
         const q = search.value.trim().toLowerCase();

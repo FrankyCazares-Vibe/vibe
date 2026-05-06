@@ -49,9 +49,13 @@
   const styleEl = document.createElement("style");
   styleEl.id = "vibe-safety-actions-css";
   styleEl.textContent = `
-    .vsa-overlay{position:fixed;inset:0;background:rgba(28,28,30,.45);z-index:11000;display:none;align-items:center;justify-content:center;padding:24px;}
+    /* No backdrop dim — most pages we're running on are inside an iframe
+       (CampusAppShell) where position:fixed only covers the iframe and
+       the parent React sidebar stays bright; dimming looks broken. The
+       card's strong shadow + border carries enough modal weight. */
+    .vsa-overlay{position:fixed;inset:0;background:transparent;z-index:11000;display:none;align-items:center;justify-content:center;padding:24px;}
     .vsa-overlay.show{display:flex;}
-    .vsa-card{width:min(420px,92vw);background:white;border-radius:16px;box-shadow:0 28px 80px rgba(0,0,0,.22);overflow:hidden;display:flex;flex-direction:column;font-family:'DM Sans',system-ui,sans-serif;}
+    .vsa-card{width:min(420px,92vw);background:white;border-radius:16px;border:1px solid rgba(28,28,30,.08);box-shadow:0 28px 80px rgba(0,0,0,.28),0 4px 16px rgba(0,0,0,.08);overflow:hidden;display:flex;flex-direction:column;font-family:'DM Sans',system-ui,sans-serif;}
     .vsa-hdr{padding:16px 20px 12px;display:flex;align-items:center;gap:10px;border-bottom:1px solid rgba(28,28,30,.08);}
     .vsa-title{font-family:'Fraunces',serif;font-size:17px;font-weight:800;flex:1;color:#1C1C1E;}
     .vsa-x{background:none;border:none;color:#8A8580;cursor:pointer;font-size:18px;line-height:1;padding:4px 6px;}
