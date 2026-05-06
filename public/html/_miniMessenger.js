@@ -534,7 +534,11 @@
       });
     }
     if (b) b.addEventListener("click", sendCurrent);
-    if (t && window.vibeBindMentionPicker) window.vibeBindMentionPicker(t);
+    // Channel-scoped mention picker — only members of the active chat
+    // surface as suggestions when @-typing in the mini composer.
+    if (t && window.vibeBindMentionPicker) {
+      window.vibeBindMentionPicker(t, { getChannelId: () => state.activeChannel });
+    }
     if (search) {
       search.addEventListener("input", () => {
         const q = search.value.trim().toLowerCase();

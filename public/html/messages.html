@@ -2573,17 +2573,18 @@ async function __dmEnsureFromHandle(handle) {
     __dmLoadList();
   }, __realDM.LIST_POLL_MS);
 
-  // @mention typeahead on the chat composer.
-  if (window.vibeBindMentionPicker) {
+  // @mention typeahead on the chat composer. Pass getChannelId so the
+  // picker filters to the active channel's members only — you can only
+  // tag people who are actually in the chat.
+  function _wireChatMention() {
     const inp = document.getElementById('msgIn');
-    if (inp) window.vibeBindMentionPicker(inp);
-  } else {
-    // Module loads with `defer` → may not be ready yet on slow connections.
-    document.addEventListener('DOMContentLoaded', () => {
-      const inp = document.getElementById('msgIn');
-      if (inp && window.vibeBindMentionPicker) window.vibeBindMentionPicker(inp);
-    });
+    if (inp && window.vibeBindMentionPicker) {
+      window.vibeBindMentionPicker(inp, { getChannelId: () => active });
+    } else {
+      setTimeout(_wireChatMention, 200);
+    }
   }
+  _wireChatMention();
 })();
 // ══ END MESSAGES INIT ════════════════════════════════════════════════════
 

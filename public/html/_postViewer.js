@@ -344,6 +344,10 @@
   async function openPostViewer(postId, prefill) {
     if (!postId) return;
     ensureModal();
+    // Bind the mention picker to the comment composer once the modal
+    // exists. Idempotent (vibeBindMentionPicker no-ops on re-bind).
+    const inp = document.getElementById("vpvCommentInput");
+    if (inp && window.vibeBindMentionPicker) window.vibeBindMentionPicker(inp);
     state.openId = String(postId);
     const overlay = document.getElementById("vpvOverlay");
     overlay.classList.add("show");

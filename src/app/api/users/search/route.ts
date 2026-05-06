@@ -31,9 +31,36 @@ export async function GET(req: Request) {
     MAX_LIMIT,
     Math.max(1, Number(url.searchParams.get("limit")) || DEFAULT_LIMIT),
   );
+  // Optional: scope results to members of a specific channel. Used by
+  // the @mention picker in the chat composer so groups can only tag
+  // people who are actually in the chat. Verifies the viewer is in the
+  // channel themselves before honoring it (prevents leaking membership).
+  const scopeChannelId = (url.searchParams.get("channel_id") || "").trim();
 
   if (q.length < 1) {
     return NextResponse.json({ ok: true, users: [] });
+  }
+
+  let allowedIds: Set<string> | null = null;
+  if (scopeChannelId) {
+    const { data: viewerMember } = await supabase
+      .from("channel_members")
+      .select("channel_id")
+      .eq("channel_id", scopeChannelId)
+      .eq("user_id", user.id)
+      .maybeSingle();
+    if (!viewerMember) {
+      return NextResponse.json({ ok: true, users: [] });
+    }
+    const { data: members } = await supabase
+      .from("channel_members")
+      .select("user_id")
+      .eq("channel_id", scopeChannelId)
+      .neq("user_id", user.id);
+    allowedIds = new Set((members ?? []).map((m) => m.user_id as string));
+    if (allowedIds.size === 0) {
+      return NextResponse.json({ ok: true, users: [] });
+    }
   }
 
   // Escape ILIKE wildcards in the user input so a literal `%` isn't a
@@ -73,6 +100,8 @@ export async function GET(req: Request) {
   for (const list of [prefixRes.data ?? [], containsRes.data ?? []]) {
     for (const u of list) {
       if (seen.has(u.id)) continue;
+      // Channel scope filter — only members of the requested channel.
+      if (allowedIds && !allowedIds.has(u.id as string)) continue;
       seen.add(u.id);
       users.push(u);
       if (users.length >= limit) break;

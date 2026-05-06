@@ -87,8 +87,13 @@
     state.matchEnd = -1;
     state.results = [];
     state.highlight = 0;
+    state.boundOpts = null;
     if (state.abort) { state.abort.abort(); state.abort = null; }
     if (state.debounce) { clearTimeout(state.debounce); state.debounce = null; }
+    // Restore the page's custom cursor element when we're done.
+    Array.from(document.querySelectorAll(".cursor, .cursor-ring")).forEach((el) => {
+      el.style.display = "";
+    });
   }
 
   // Position the popover ABOVE the textarea (anchored to its top-left).
@@ -192,19 +197,22 @@
     if (state.abort) state.abort.abort();
     state.abort = new AbortController();
     try {
-      // Empty query → still show recent connections-ish set; for v1
-      // we just request with a single-char or empty fallback. The
-      // search API requires q.length >= 1 — pass "_" then filter
-      // client-side? Simpler: only fetch when query.length >= 1.
       if (query.length === 0) {
         state.results = [];
         paint();
         return;
       }
-      const r = await fetch(
-        "/api/users/search?q=" + encodeURIComponent(query) + "&limit=6",
-        { credentials: "include", signal: state.abort.signal },
-      );
+      // Channel-scoped search: when the binding provided a getChannelId
+      // (chat composer in a group), pass it so the API filters down to
+      // the channel's actual members.
+      const opts = state.boundOpts || {};
+      let channelId = "";
+      try { channelId = opts.getChannelId ? (opts.getChannelId() || "") : ""; }
+      catch (_) { channelId = ""; }
+      const url =
+        "/api/users/search?q=" + encodeURIComponent(query) + "&limit=8" +
+        (channelId ? "&channel_id=" + encodeURIComponent(channelId) : "");
+      const r = await fetch(url, { credentials: "include", signal: state.abort.signal });
       const j = await r.json();
       if (!j || !j.ok) {
         state.results = [];
@@ -226,8 +234,16 @@
     state.activeTextarea = textarea;
     state.matchStart = m.start;
     state.matchEnd = m.end;
+    state.boundOpts = textarea.__vmpOpts || null;
     popover.classList.add("show");
     position(textarea);
+    // Hide the page's custom cursor element while the popover is up.
+    // The picker's CSS sets cursor:default so the SYSTEM cursor takes
+    // over inside the popover; without hiding the custom cursor first
+    // the user sees the orange dot bleed through above the system cursor.
+    Array.from(document.querySelectorAll(".cursor, .cursor-ring")).forEach((el) => {
+      el.style.display = "none";
+    });
     if (state.debounce) clearTimeout(state.debounce);
     state.debounce = setTimeout(() => fetchSuggestions(m.query), 140);
   }
@@ -265,15 +281,18 @@
   });
 
   // ── Public API ─────────────────────────────────────────────────────────
-  window.vibeBindMentionPicker = function (textarea) {
-    if (!textarea || textarea.__vmpBound) return;
+  // opts.getChannelId() — return the active channel id at fetch time so
+  // the picker can scope to channel members only (used by chat composers
+  // so a stray @stranger in a group can't be tagged).
+  window.vibeBindMentionPicker = function (textarea, opts) {
+    if (!textarea) return;
+    // Allow re-binding to update opts (e.g., active channel changed).
+    textarea.__vmpOpts = opts || null;
+    if (textarea.__vmpBound) return;
     textarea.__vmpBound = true;
     textarea.addEventListener("input", () => onInput(textarea));
-    // keydown for nav — capture phase so we beat send-on-enter handlers.
     textarea.addEventListener("keydown", (e) => onKeydown(textarea, e), true);
     textarea.addEventListener("blur", () => {
-      // Tiny delay so a click in the popover (which fires mousedown
-      // BEFORE blur) can resolve before close.
       setTimeout(() => {
         if (!popover.matches(":hover")) close();
       }, 120);
