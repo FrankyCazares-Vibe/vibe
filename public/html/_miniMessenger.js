@@ -214,6 +214,18 @@
 
   // ── Open / close ───────────────────────────────────────────────────────
   window.openMiniMessenger = async function (handle) {
+    // Defensive: if attachWhenReady hasn't run yet (e.g., script ran
+    // before document.body existed), append now so the panel actually
+    // shows up in the DOM.
+    if (!document.body) {
+      console.warn("[mini.open] document.body missing; deferring");
+      document.addEventListener("DOMContentLoaded", () => window.openMiniMessenger(handle));
+      return;
+    }
+    if (!document.body.contains(panel)) {
+      document.body.appendChild(panel);
+      bindHandlers();
+    }
     state.open = true;
     panel.classList.add("show");
     document.documentElement.classList.add("vmm-open");
