@@ -2,6 +2,7 @@
 
 import Link from "next/link";
 import { usePathname } from "next/navigation";
+import { useEffect, useState } from "react";
 
 import { NavIdentityChip } from "@/components/nav-identity-chip";
 
@@ -123,6 +124,32 @@ const visibleNavItems = navItems;
 
 export default function LeftNav() {
   const pathname = usePathname();
+  const [isPlatformAdmin, setIsPlatformAdmin] = useState(false);
+
+  // Pull admin status from the bootstrap endpoint so the Admin link only
+  // renders for platform admins. Cheap fetch (cached by the chip too) — no
+  // duplicated DB hit since the response is shared with NavIdentityChip
+  // via HTTP cache when both call /api/me/profile-bootstrap.
+  useEffect(() => {
+    let cancelled = false;
+    (async () => {
+      try {
+        const res = await fetch("/api/me/profile-bootstrap", {
+          cache: "no-store",
+        });
+        const data = await res.json();
+        if (cancelled) return;
+        if (data?.ok && data.isPlatformAdmin === true) {
+          setIsPlatformAdmin(true);
+        }
+      } catch {
+        /* unauthenticated / network — silently leave admin link hidden */
+      }
+    })();
+    return () => {
+      cancelled = true;
+    };
+  }, []);
 
   return (
     <aside
@@ -186,6 +213,49 @@ export default function LeftNav() {
         })}
       </nav>
 
+      {isPlatformAdmin ? (
+        <>
+          <div
+            style={{
+              fontSize: 10,
+              fontWeight: 700,
+              letterSpacing: "0.16em",
+              textTransform: "uppercase",
+              color: "#8A8580",
+              padding: "12px 12px 6px",
+              marginTop: 6,
+            }}
+          >
+            Platform
+          </div>
+          <Link
+            href="/admin"
+            style={{
+              display: "flex",
+              alignItems: "center",
+              gap: 10,
+              padding: "10px 12px",
+              borderRadius: 12,
+              fontSize: 14,
+              fontWeight: pathname.startsWith("/admin") ? 700 : 600,
+              color: pathname.startsWith("/admin") ? "#1C1C1E" : "#5C5853",
+              textDecoration: "none",
+              background: pathname.startsWith("/admin")
+                ? "linear-gradient(180deg, rgba(240,200,74,0.32) 0%, rgba(240,200,74,0.14) 100%)"
+                : "rgba(240,200,74,0.10)",
+              border: "1px solid rgba(240,200,74,0.4)",
+              boxShadow: pathname.startsWith("/admin")
+                ? "inset 0 1px 0 rgba(255,255,255,0.6)"
+                : "none",
+              transition: "all 0.15s",
+            }}
+          >
+            <ShieldIcon />
+            Admin
+          </Link>
+        </>
+      ) : null}
+
       <div
         style={{
           height: "1px",
@@ -218,5 +288,27 @@ export default function LeftNav() {
         + Post (soon)
       </button>
     </aside>
+  );
+}
+
+function ShieldIcon() {
+  return (
+    <svg width="16" height="16" viewBox="0 0 16 16" fill="none" aria-hidden>
+      <path
+        d="M8 1l5.5 1.8v4.4c0 3.6-2.4 6.4-5.5 7.3-3.1-.9-5.5-3.7-5.5-7.3V2.8L8 1z"
+        stroke="currentColor"
+        strokeWidth="1.4"
+        strokeLinejoin="round"
+        fill="rgba(240,200,74,0.25)"
+      />
+      <path
+        d="M5.7 8.2l1.7 1.7L10.7 6.5"
+        stroke="currentColor"
+        strokeWidth="1.5"
+        strokeLinecap="round"
+        strokeLinejoin="round"
+        fill="none"
+      />
+    </svg>
   );
 }

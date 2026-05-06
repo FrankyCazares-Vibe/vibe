@@ -65,11 +65,44 @@ async function signMediaUrls(rows: MessageRow[]): Promise<void> {
 
 type RouteCtx = { params: Promise<{ id: string }> };
 
+type ChannelAccess =
+  | { ok: true; isOrgChannel: false; orgId: null; accepted_at: string | null }
+  | { ok: true; isOrgChannel: true; orgId: string; accepted_at: null }
+  | { ok: false; status: number };
+
+/**
+ * Verify the viewer can read/post in this channel.
+ * - DM/group channels (channel_members.row exists): returns accepted_at for
+ *   the implicit-accept flow.
+ * - Org channels (channels.org_id IS NOT NULL): defers to can_view_org_channel,
+ *   which checks org_members + per-channel privacy.
+ */
 async function ensureMember(
   supabase: Awaited<ReturnType<typeof createSupabaseServerClient>>,
   channelId: string,
   userId: string,
-): Promise<{ ok: true; accepted_at: string | null } | { ok: false; status: number }> {
+): Promise<ChannelAccess> {
+  // Quick lookup: does this channel belong to an org?
+  const { data: channel } = await supabase
+    .from("channels")
+    .select("org_id")
+    .eq("id", channelId)
+    .maybeSingle();
+
+  if (channel?.org_id) {
+    const { data: canView, error: rpcErr } = await supabase.rpc(
+      "can_view_org_channel",
+      { cid: channelId, uid: userId },
+    );
+    if (rpcErr) {
+      console.error("[messages.ensureMember can_view_org_channel]", rpcErr);
+      return { ok: false, status: 500 };
+    }
+    if (canView !== true) return { ok: false, status: 403 };
+    return { ok: true, isOrgChannel: true, orgId: channel.org_id as string, accepted_at: null };
+  }
+
+  // DM/group path — original channel_members check
   const { data, error } = await supabase
     .from("channel_members")
     .select("accepted_at")
@@ -81,7 +114,12 @@ async function ensureMember(
     return { ok: false, status: 500 };
   }
   if (!data) return { ok: false, status: 403 };
-  return { ok: true, accepted_at: (data.accepted_at as string | null) ?? null };
+  return {
+    ok: true,
+    isOrgChannel: false,
+    orgId: null,
+    accepted_at: (data.accepted_at as string | null) ?? null,
+  };
 }
 
 /**
@@ -137,6 +175,19 @@ export async function GET(req: Request, ctx: RouteCtx) {
   }
   // Sign R2 keys in media_url so the browser can render directly.
   await signMediaUrls((data ?? []) as unknown as MessageRow[]);
+
+  // Org channels don't have channel_members rows — skip the peer/typing query
+  // entirely. (Org-channel read state + typing indicators are out of scope
+  // for v1; can be added later via a separate org_channel_reads table.)
+  if (member.isOrgChannel) {
+    const messages = (data ?? []).slice().reverse();
+    return NextResponse.json({
+      ok: true,
+      messages,
+      peer_last_read_at: null,
+      peer_typing: [],
+    });
+  }
 
   // Peer last_read_at + typing — both come from the same query so we only
   // hit channel_members once per poll cycle. typing_until column is optional
@@ -303,33 +354,34 @@ export async function POST(req: Request, ctx: RouteCtx) {
     return NextResponse.json({ ok: false, error: "Not a member" }, { status: member.status });
   }
 
-  // Block guard: if any other member of this channel blocks the sender
-  // (or vice versa), reject the send with a generic error so the sender
-  // can't trivially detect being blocked. is_blocked_either_way is
-  // SECURITY DEFINER so it sees both directions of the blocks table.
-  try {
-    const { data: others } = await supabase
-      .from("channel_members")
-      .select("user_id")
-      .eq("channel_id", channelId)
-      .neq("user_id", user.id);
-    for (const o of others ?? []) {
-      const { data: blocked } = await supabase.rpc("is_blocked_either_way", {
-        viewer_id: user.id,
-        other_id: o.user_id as string,
-      });
-      if (blocked === true) {
-        return NextResponse.json(
-          { ok: false, error: "Couldn't send this message" },
-          { status: 403 },
-        );
+  // Block guard: in DM/group channels, if any peer blocks the sender (or
+  // vice versa), reject the send. Skipped on org channels — orgs are larger
+  // groups where one block shouldn't silence a whole community channel.
+  if (!member.isOrgChannel) {
+    try {
+      const { data: others } = await supabase
+        .from("channel_members")
+        .select("user_id")
+        .eq("channel_id", channelId)
+        .neq("user_id", user.id);
+      for (const o of others ?? []) {
+        const { data: blocked } = await supabase.rpc("is_blocked_either_way", {
+          viewer_id: user.id,
+          other_id: o.user_id as string,
+        });
+        if (blocked === true) {
+          return NextResponse.json(
+            { ok: false, error: "Couldn't send this message" },
+            { status: 403 },
+          );
+        }
       }
-    }
-  } catch (e) {
-    // If the helper isn't installed yet (migration lag), don't block
-    // sends — the safety net is a polish, not a correctness gate.
-    if (process.env.NODE_ENV !== "production") {
-      console.warn("[messages.POST block-check]", e);
+    } catch (e) {
+      // If the helper isn't installed yet (migration lag), don't block
+      // sends — the safety net is a polish, not a correctness gate.
+      if (process.env.NODE_ENV !== "production") {
+        console.warn("[messages.POST block-check]", e);
+      }
     }
   }
 
@@ -365,41 +417,53 @@ export async function POST(req: Request, ctx: RouteCtx) {
     return NextResponse.json({ ok: false, error: insErr?.message ?? "Insert failed" }, { status: 500 });
   }
 
-  // Implicit-accept: replying clears your own pending state.
-  if (member.accepted_at === null) {
-    const { error: accErr } = await supabase
+  // DM/group housekeeping: implicit-accept on first reply, bump last_read_at.
+  // Org channels skip both — they don't use channel_members.
+  if (!member.isOrgChannel) {
+    if (member.accepted_at === null) {
+      const { error: accErr } = await supabase
+        .from("channel_members")
+        .update({ accepted_at: new Date().toISOString() })
+        .eq("channel_id", channelId)
+        .eq("user_id", user.id);
+      if (accErr) {
+        console.error("[messages.POST implicit-accept]", accErr);
+        // Non-fatal; the message went through.
+      }
+    }
+    await supabase
       .from("channel_members")
-      .update({ accepted_at: new Date().toISOString() })
+      .update({ last_read_at: new Date().toISOString() })
       .eq("channel_id", channelId)
       .eq("user_id", user.id);
-    if (accErr) {
-      console.error("[messages.POST implicit-accept]", accErr);
-      // Non-fatal; the message went through.
-    }
   }
 
-  // Update viewer's last_read_at since they just saw the channel state.
-  await supabase
-    .from("channel_members")
-    .update({ last_read_at: new Date().toISOString() })
-    .eq("channel_id", channelId)
-    .eq("user_id", user.id);
-
-  // @mention fan-out — only notifies people who are actually members of
-  // this channel, so a stray @somebody outside the chat doesn't ping
-  // strangers. Best-effort; failures don't block the send.
+  // @mention fan-out — only notifies people who can actually see this
+  // channel, so a stray @somebody outside the chat doesn't ping strangers.
+  // For DM/group: members come from channel_members. For org: from
+  // org_members on the channel's org. Best-effort; failures don't block the send.
   if (content) {
     const handles = extractMentionHandles(content);
     if (handles.length > 0) {
       try {
         const ids = await resolveMentionedUserIds(supabase, handles, user.id);
         if (ids.length > 0) {
-          const { data: members } = await supabase
-            .from("channel_members")
-            .select("user_id")
-            .eq("channel_id", channelId)
-            .in("user_id", ids);
-          const validTargets = (members ?? []).map((m) => m.user_id as string);
+          let validTargets: string[] = [];
+          if (member.isOrgChannel) {
+            const { data: orgMembers } = await supabase
+              .from("org_members")
+              .select("user_id")
+              .eq("org_id", member.orgId)
+              .in("user_id", ids);
+            validTargets = (orgMembers ?? []).map((m) => m.user_id as string);
+          } else {
+            const { data: chMembers } = await supabase
+              .from("channel_members")
+              .select("user_id")
+              .eq("channel_id", channelId)
+              .in("user_id", ids);
+            validTargets = (chMembers ?? []).map((m) => m.user_id as string);
+          }
           const insertedRow = inserted as { id?: string } | null;
           if (validTargets.length > 0 && insertedRow?.id) {
             await insertMentionNotifications(supabase, {

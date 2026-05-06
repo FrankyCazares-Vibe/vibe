@@ -1,5 +1,7 @@
 import { NextResponse } from "next/server";
 
+import { orgAssetProxyUrl } from "@/lib/org-asset-url";
+import { postMediaProxyUrl } from "@/lib/post-media-url";
 import { createSupabaseServerClient } from "@/lib/supabase/server";
 
 const DEFAULT_LIMIT = 50;
@@ -54,10 +56,11 @@ export async function GET(req: Request) {
   let query = supabase
     .from("posts")
     .select(
-      "id,user_id,type,content,tags,media_url,media_thumbnail_url,created_at," +
-        "author:users!posts_user_id_fkey!inner(id,name,handle,school,major,year,avatar_url)",
+      "id,user_id,org_id,type,content,tags,media_url,media_thumbnail_url,created_at," +
+        "author:users!posts_user_id_fkey!inner(id,name,handle,school,major,year,avatar_url)," +
+        "org:orgs(id,handle,name,logo_url,verified,is_public)",
     )
-    .eq("type", "post")
+    .in("type", ["post", "clip"])
     .order("created_at", { ascending: false })
     .limit(limit);
 
@@ -73,5 +76,31 @@ export async function GET(req: Request) {
     return NextResponse.json({ ok: false, error: error.message }, { status: 500 });
   }
 
-  return NextResponse.json({ ok: true, posts: data ?? [], viewerSchool: school });
+  // Sign org logos via the proxy so the feed can render them as `<img src>`.
+  type OrgEmbed = {
+    id: string;
+    handle: string;
+    name: string;
+    logo_url: string | null;
+    verified: boolean;
+    is_public: boolean;
+  } | null;
+  const posts = (data ?? []).map((row) => {
+    const org = (row.org as unknown as OrgEmbed) ?? null;
+    const postId = (row as Record<string, unknown>).id as string;
+    return {
+      ...row,
+      media_url: postMediaProxyUrl(postId, row.media_url as string | null, "media"),
+      media_thumbnail_url: postMediaProxyUrl(
+        postId,
+        row.media_thumbnail_url as string | null,
+        "thumbnail",
+      ),
+      org: org
+        ? { ...org, logo_url: orgAssetProxyUrl(org.handle, org.logo_url, "logo") }
+        : null,
+    };
+  });
+
+  return NextResponse.json({ ok: true, posts, viewerSchool: school });
 }

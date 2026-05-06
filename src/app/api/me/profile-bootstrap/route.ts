@@ -58,6 +58,21 @@ export async function GET() {
 
   const counts = await getCountsFor(supabase, user.id);
 
+  // Platform-admin flag — surfaced so the LeftNav can render the Admin link
+  // without a second roundtrip. Defensive: if the column is missing (a
+  // pre-governance environment), treat as false so the field still resolves.
+  let isPlatformAdmin = false;
+  try {
+    const { data: adminRow } = await supabase
+      .from("users")
+      .select("is_platform_admin")
+      .eq("id", user.id)
+      .maybeSingle();
+    isPlatformAdmin = !!adminRow?.is_platform_admin;
+  } catch {
+    /* column may not exist yet; treat as not-admin */
+  }
+
   const profile = normalizeProfileView(row as Record<string, unknown>);
   const vibeUser = buildVibeUserV1FromProfile(profile, { appShell: true });
   vibeUser.counts = {
@@ -72,5 +87,5 @@ export async function GET() {
   // Pinned post id (from the optional split query above).
   vibeUser.pinnedPostId = pinnedPostId;
 
-  return NextResponse.json({ ok: true, vibeUser });
+  return NextResponse.json({ ok: true, vibeUser, isPlatformAdmin });
 }

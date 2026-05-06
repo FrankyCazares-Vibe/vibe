@@ -10,6 +10,7 @@ import { getSignedUrl } from "@aws-sdk/s3-request-presigner";
 export const CLIP_KEY_PREFIX = "clips/";
 export const GROUP_PHOTO_KEY_PREFIX = "groups/";
 export const MESSAGE_MEDIA_KEY_PREFIX = "messages/";
+export const ORG_ASSET_KEY_PREFIX = "orgs/";
 
 const DEFAULT_SIGN_EXPIRES_SEC = 300;
 
@@ -174,6 +175,52 @@ export async function signClipGetUrl(
   expiresInSec?: number,
 ): Promise<string> {
   assertClipObjectKey(objectKey);
+  const bucket = requireEnv("R2_BUCKET_NAME");
+  const client = getR2S3Client();
+  const cmd = new GetObjectCommand({ Bucket: bucket, Key: objectKey });
+  return getSignedUrl(client, cmd, {
+    expiresIn: expiresInSec ?? DEFAULT_SIGN_EXPIRES_SEC,
+  });
+}
+
+function assertOrgAssetObjectKey(objectKey: string): void {
+  const key = objectKey.trim();
+  if (!key || key.includes("://")) {
+    throw new Error("Org asset keys must be object keys, not URLs");
+  }
+  if (!key.startsWith(ORG_ASSET_KEY_PREFIX)) {
+    throw new Error(`Org asset keys must start with "${ORG_ASSET_KEY_PREFIX}"`);
+  }
+}
+
+/**
+ * Short-lived signed PUT for an org banner / logo / post media. Caller is
+ * responsible for verifying the viewer is owner/admin of the org and for
+ * enforcing size/type limits before issuing the signed URL.
+ */
+export async function signOrgAssetPutUrl(
+  objectKey: string,
+  options?: { contentType?: string; expiresInSec?: number },
+): Promise<string> {
+  assertOrgAssetObjectKey(objectKey);
+  const bucket = requireEnv("R2_BUCKET_NAME");
+  const client = getR2S3Client();
+  const cmd = new PutObjectCommand({
+    Bucket: bucket,
+    Key: objectKey,
+    ContentType: options?.contentType ?? "application/octet-stream",
+  });
+  return getSignedUrl(client, cmd, {
+    expiresIn: options?.expiresInSec ?? DEFAULT_SIGN_EXPIRES_SEC,
+  });
+}
+
+/** Short-lived signed GET for an org asset. Used to render banner/logo and post media. */
+export async function signOrgAssetGetUrl(
+  objectKey: string,
+  expiresInSec?: number,
+): Promise<string> {
+  assertOrgAssetObjectKey(objectKey);
   const bucket = requireEnv("R2_BUCKET_NAME");
   const client = getR2S3Client();
   const cmd = new GetObjectCommand({ Bucket: bucket, Key: objectKey });
