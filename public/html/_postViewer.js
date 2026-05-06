@@ -124,7 +124,7 @@
     font-size: 11px; font-weight: 600; color: #FF5C35;
     background: rgba(255,92,53,.08); padding: 3px 8px; border-radius: 999px;
   }
-  .vpv-mention { color: #FF5C35; font-weight: 600; text-decoration: none; }
+  .vpv-mention { color: #7B5FE0; font-weight: 600; text-decoration: none; }
   .vpv-mention:hover { text-decoration: underline; }
 
   .vpv-actions {
