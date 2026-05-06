@@ -298,6 +298,36 @@ export async function POST(req: Request, ctx: RouteCtx) {
     return NextResponse.json({ ok: false, error: "Not a member" }, { status: member.status });
   }
 
+  // Block guard: if any other member of this channel blocks the sender
+  // (or vice versa), reject the send with a generic error so the sender
+  // can't trivially detect being blocked. is_blocked_either_way is
+  // SECURITY DEFINER so it sees both directions of the blocks table.
+  try {
+    const { data: others } = await supabase
+      .from("channel_members")
+      .select("user_id")
+      .eq("channel_id", channelId)
+      .neq("user_id", user.id);
+    for (const o of others ?? []) {
+      const { data: blocked } = await supabase.rpc("is_blocked_either_way", {
+        viewer_id: user.id,
+        other_id: o.user_id as string,
+      });
+      if (blocked === true) {
+        return NextResponse.json(
+          { ok: false, error: "Couldn't send this message" },
+          { status: 403 },
+        );
+      }
+    }
+  } catch (e) {
+    // If the helper isn't installed yet (migration lag), don't block
+    // sends — the safety net is a polish, not a correctness gate.
+    if (process.env.NODE_ENV !== "production") {
+      console.warn("[messages.POST block-check]", e);
+    }
+  }
+
   const insertRow: Record<string, string | null> = {
     channel_id: channelId,
     user_id: user.id,

@@ -80,6 +80,29 @@ export async function GET(req: Request) {
     if (users.length >= limit) break;
   }
 
+  // Filter blocked-either-way users out of search results so neither
+  // party surfaces in the other's discovery flow.
+  if (users.length > 0) {
+    try {
+      const { data: blockRows } = await supabase
+        .from("blocks")
+        .select("blocker_id, blocked_id")
+        .or(`blocker_id.eq.${user.id},blocked_id.eq.${user.id}`);
+      const hidden = new Set<string>();
+      for (const b of blockRows ?? []) {
+        const blocker = b.blocker_id as string;
+        const blocked = b.blocked_id as string;
+        if (blocker === user.id) hidden.add(blocked);
+        else if (blocked === user.id) hidden.add(blocker);
+      }
+      for (let i = users.length - 1; i >= 0; i--) {
+        if (hidden.has(users[i]!.id as string)) users.splice(i, 1);
+      }
+    } catch {
+      /* blocks table may not be migrated yet; surface unfiltered. */
+    }
+  }
+
   // Annotate each result with the viewer's relationship state so the
   // dropdown can render Connect / Pending / Message correctly.
   // Two batched queries — outgoing (viewer→target) and incoming

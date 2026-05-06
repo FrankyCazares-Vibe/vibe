@@ -465,10 +465,25 @@
     document.getElementById("vpvLike").classList.toggle("on", state.liked);
     document.getElementById("vpvSave").classList.toggle("on", state.saved);
 
-    // "..." menu — only show when the viewer is the post's author.
+    // "..." menu — owner sees Delete; everyone else sees Report/Mute/Block.
     const isOwner = state.authorId && viewerUserId() === state.authorId;
     const more = document.getElementById("vpvMore");
-    if (more) more.classList.toggle("show", !!isOwner);
+    const menu = document.getElementById("vpvMenu");
+    if (more) more.classList.add("show");
+    if (menu) {
+      if (isOwner) {
+        menu.innerHTML = `<button type="button" class="danger" onclick="window.__vpvDeletePost()">Delete post</button>`;
+      } else {
+        const safeId = String(state.openId || "").replace(/'/g, "\\'");
+        const safeAuthor = String(state.authorId || "").replace(/'/g, "\\'");
+        const safeName = String(state.authorName || "").replace(/'/g, "\\'");
+        menu.innerHTML = `
+          <button type="button" onclick="window.__vpvCloseMenu();window.vibeOpenReportSheet('${state.type === 'clip' ? 'post' : 'post'}','${safeId}')">Report ${state.type === 'clip' ? 'clip' : 'post'}</button>
+          ${safeAuthor ? `<button type="button" onclick="window.__vpvCloseMenu();window.vibeOpenMuteSheet('${safeAuthor}','${safeName}')">Mute ${safeName ? safeName.split(' ')[0] : 'author'}</button>` : ''}
+          ${safeAuthor ? `<button type="button" class="danger" onclick="window.__vpvCloseMenu();window.vibeBlock('${safeAuthor}','${safeName}', () => window.__vpvClose())">Block ${safeName ? safeName.split(' ')[0] : 'author'}</button>` : ''}
+        `;
+      }
+    }
 
     // Clip rows: now that we know the canonical id + type, mint a signed
     // R2 GET URL and attach it to the <video> created by paintBody.
@@ -651,19 +666,25 @@
     if (ev) ev.stopPropagation();
     const menu = document.getElementById("vpvMenu");
     if (!menu) return;
-    // Reflect the type in the button label so the user knows what they're deleting.
+    // For owners the only item is Delete — keep its label in sync with type.
     const delBtn = menu.querySelector("button.danger");
-    if (delBtn) delBtn.textContent = state.type === "clip" ? "Delete clip" : "Delete post";
+    if (delBtn && /^Delete /.test(delBtn.textContent || "")) {
+      delBtn.textContent = state.type === "clip" ? "Delete clip" : "Delete post";
+    }
     const wasOpen = menu.classList.contains("show");
     menu.classList.toggle("show", !wasOpen);
     if (!wasOpen) {
-      // Close on next outside click — single-shot listener.
       const dismiss = () => {
         menu.classList.remove("show");
         document.removeEventListener("click", dismiss, true);
       };
       setTimeout(() => document.addEventListener("click", dismiss, true), 0);
     }
+  };
+
+  window.__vpvCloseMenu = function () {
+    const menu = document.getElementById("vpvMenu");
+    if (menu) menu.classList.remove("show");
   };
 
   window.__vpvDeletePost = async function () {

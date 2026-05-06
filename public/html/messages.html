@@ -10,6 +10,7 @@
 <script src="/html/_otto.js" defer></script>
 <script src="/html/_postViewer.js" defer></script>
 <script src="/html/_sharePicker.js" defer></script>
+<script src="/html/_safetyActions.js" defer></script>
 <style>
 /* Embedded mode: when /messages renders us inside CampusAppShell via iframe,
    the React sidebar is provided by the parent. Suppress our own. */
@@ -2087,6 +2088,16 @@ function __dmPanelRender() {
   const pinAction = '<button class="cp-action" onclick="__dmTogglePinCurrent()">' +
     (d.pinnedAt ? 'Unpin chat' : 'Pin chat') + '</button>';
 
+  // Block + Report (1:1 only — group safety actions can come later).
+  let safetyActions = '';
+  if (!d.isGroup && d.peerId) {
+    const peerArg = JSON.stringify(d.peerId).replace(/"/g, '&quot;');
+    const nameArg = JSON.stringify(d.n || '').replace(/"/g, '&quot;');
+    safetyActions =
+      '<button class="cp-action" onclick="window.vibeOpenReportSheet(\'user\',' + peerArg + ')">Report ' + __dmEsc(d.n) + '</button>' +
+      '<button class="cp-action danger" onclick="window.vibeBlock(' + peerArg + ',' + nameArg + ', () => { __dmPanelClose(); active = null; if (typeof __dmLoadList === \'function\') __dmLoadList(); document.getElementById(\'cContent\').style.display=\'none\'; document.getElementById(\'emptyState\').style.display=\'flex\'; })">Block ' + __dmEsc(d.n) + '</button>';
+  }
+
   const leaveAction = d.isGroup
     ? '<button class="cp-action danger" onclick="__dmPanelLeave()">Leave group</button>'
     : '';
@@ -2100,6 +2111,7 @@ function __dmPanelRender() {
     membersBlock +
     profileLink +
     pinAction +
+    safetyActions +
     leaveAction +
     deleteAction;
 }

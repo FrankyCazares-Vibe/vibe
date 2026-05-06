@@ -470,12 +470,40 @@ export async function GET() {
     }
   }
 
+  // Block filter: hide any 1:1 thread where the peer is blocked-either-way.
+  // Defensive try/catch so missing-table (migration lag) doesn't 500 the route.
+  const blockedPeerIds = new Set<string>();
+  try {
+    const { data: blockRows } = await supabase
+      .from("blocks")
+      .select("blocker_id, blocked_id")
+      .or(`blocker_id.eq.${user.id},blocked_id.eq.${user.id}`);
+    for (const b of blockRows ?? []) {
+      const blocker = b.blocker_id as string;
+      const blocked = b.blocked_id as string;
+      if (blocker === user.id) blockedPeerIds.add(blocked);
+      else if (blocked === user.id) blockedPeerIds.add(blocker);
+    }
+  } catch {
+    /* blocks table not yet migrated — no filter applied. */
+  }
+
   const threads: ThreadEntry[] = [];
   const requests: ThreadEntry[] = [];
 
   for (const r of rows) {
     const last = lastByChannel.get(r.channel_id) ?? null;
     const peer = peerByChannel.get(r.channel_id) ?? null;
+
+    // Block filter: hide 1:1 dms where the peer is blocked-either-way.
+    // Groups stay visible (per-message filtering is a future polish).
+    if (
+      r.channels.type === "dm" &&
+      peer &&
+      blockedPeerIds.has(peer.id)
+    ) {
+      continue;
+    }
 
     // Phantom-request guard: a real "request" is an inbound DM from a
     // non-connection. A pending row with NO inbound message at all is

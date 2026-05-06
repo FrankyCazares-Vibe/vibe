@@ -13,6 +13,7 @@
 <script src="/html/_postViewer.js" defer></script>
 <script src="/html/_sharePicker.js" defer></script>
 <script src="/html/_miniMessenger.js" defer></script>
+<script src="/html/_safetyActions.js" defer></script>
 <script>
 // Pre-paint: prevents the flash-of-Maya on profile loads for onboarded users.
 // Reads vibe_user_v1 synchronously before <body> renders. If the user came
@@ -2648,6 +2649,14 @@ body.empty-profile-mode #profileEmpty { display: flex !important; }
         <button class="profile-mutual-pill" onclick="openMutualsModal()">
           <span id="statMutual">32</span> mutual
         </button>
+        <!-- Safety actions: Block / Mute / Report. Visible only in
+             viewer-mode (someone else's profile). -->
+        <div style="position:relative">
+          <button class="action-btn" id="vibeMoreBtn" onclick="toggleVibeMoreMenu(event)" title="More" style="padding:8px 10px;line-height:1;font-size:18px;background:none;border:1.5px solid var(--border);">⋯</button>
+          <div id="vibeMoreMenu" class="vibe-more-menu" style="display:none;position:absolute;top:100%;right:0;margin-top:6px;background:white;border:1px solid var(--border);border-radius:12px;box-shadow:0 12px 36px rgba(0,0,0,.12);min-width:200px;overflow:hidden;z-index:50;">
+            <!-- Items rendered dynamically by paintVibeMoreMenu() -->
+          </div>
+        </div>
       </div>
 
       <div class="connected-badge" id="connectedBadge">
@@ -5039,6 +5048,63 @@ function setVibeRelState(state) {
 function _viewedName() {
   return window.viewingRealUser?.name || window.viewingMockUser?.name || 'this person';
 }
+
+// ── Profile (...) menu: Block / Mute / Report (viewer-mode only) ────────
+async function toggleVibeMoreMenu(ev) {
+  if (ev) ev.stopPropagation();
+  const menu = document.getElementById('vibeMoreMenu');
+  if (!menu) return;
+  const showing = menu.style.display !== 'none';
+  if (showing) {
+    menu.style.display = 'none';
+    return;
+  }
+  await paintVibeMoreMenu();
+  menu.style.display = 'block';
+  // Single-shot outside-click dismiss.
+  setTimeout(() => {
+    const off = (e) => {
+      if (!menu.contains(e.target)) {
+        menu.style.display = 'none';
+        document.removeEventListener('click', off);
+      }
+    };
+    document.addEventListener('click', off);
+  }, 0);
+}
+
+async function paintVibeMoreMenu() {
+  const menu = document.getElementById('vibeMoreMenu');
+  if (!menu) return;
+  const real = window.viewingRealUser;
+  if (!real || !real.id) {
+    menu.innerHTML = '<button style="display:block;width:100%;text-align:left;background:none;border:none;padding:11px 14px;font-family:\'DM Sans\',sans-serif;font-size:13px;color:#8A8580;cursor:none">Not available</button>';
+    return;
+  }
+  // Read current relationship so we can flip Block/Unblock and Mute/Unmute.
+  let rel = null;
+  if (window.vibeFetchRelationship) rel = await window.vibeFetchRelationship(real.id);
+  const name = real.name || _viewedName();
+  const safeId = String(real.id).replace(/'/g, "\\'");
+  const safeName = String(name || '').replace(/'/g, "\\'");
+  const blockLabel = rel && rel.blocking ? 'Unblock ' : 'Block ';
+  const muteLabel = rel && rel.muting ? 'Unmute ' : 'Mute ';
+  const blockHandler = rel && rel.blocking
+    ? `window.vibeUnblock('${safeId}', () => { paintVibeMoreMenu(); })`
+    : `window.vibeBlock('${safeId}','${safeName}', () => { paintVibeMoreMenu(); })`;
+  const muteHandler = rel && rel.muting
+    ? `window.vibeUnmute('${safeId}', () => { paintVibeMoreMenu(); })`
+    : `window.vibeOpenMuteSheet('${safeId}','${safeName}', undefined, () => { paintVibeMoreMenu(); })`;
+  const css = "display:block;width:100%;text-align:left;background:none;border:none;padding:11px 14px;font-family:'DM Sans',sans-serif;font-size:13px;color:#1C1C1E;cursor:none;transition:background .12s";
+  const dangerCss = css.replace('color:#1C1C1E', 'color:#C0392B');
+  menu.innerHTML = `
+    <button style="${css}" onmouseover="this.style.background='#FAF7F2'" onmouseout="this.style.background='none'" onclick="window.vibeOpenReportSheet('user','${safeId}'); document.getElementById('vibeMoreMenu').style.display='none';">Report ${name.split(' ')[0] || ''}</button>
+    <button style="${css}" onmouseover="this.style.background='#FAF7F2'" onmouseout="this.style.background='none'" onclick="${muteHandler}; document.getElementById('vibeMoreMenu').style.display='none';">${muteLabel}${name.split(' ')[0] || ''}</button>
+    <button style="${dangerCss}" onmouseover="this.style.background='#FAF7F2'" onmouseout="this.style.background='none'" onclick="${blockHandler}; document.getElementById('vibeMoreMenu').style.display='none';">${blockLabel}${name.split(' ')[0] || ''}</button>
+  `;
+}
+window.toggleVibeMoreMenu = toggleVibeMoreMenu;
+window.paintVibeMoreMenu = paintVibeMoreMenu;
 
 async function handleVibConnect() {
   if (vibeRelState === 'connected') {
