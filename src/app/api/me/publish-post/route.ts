@@ -1,5 +1,10 @@
 import { NextResponse } from "next/server";
 
+import {
+  extractMentionHandles,
+  insertMentionNotifications,
+  resolveMentionedUserIds,
+} from "@/lib/mentions";
 import { createSupabaseServerClient } from "@/lib/supabase/server";
 
 const MAX_CONTENT_CHARS = 2000;
@@ -86,6 +91,26 @@ export async function POST(req: Request) {
       { ok: false, error: error?.message ?? "Insert failed" },
       { status: 500 },
     );
+  }
+
+  // @mention fan-out — best-effort; failures don't block the publish.
+  if (content) {
+    const handles = extractMentionHandles(content);
+    if (handles.length > 0) {
+      try {
+        const ids = await resolveMentionedUserIds(supabase, handles, user.id);
+        if (ids.length > 0) {
+          await insertMentionNotifications(supabase, {
+            actorId: user.id,
+            targetUserIds: ids,
+            kind: "post",
+            postId: row.id as string,
+          });
+        }
+      } catch (e) {
+        console.error("[publish-post mentions]", e);
+      }
+    }
   }
 
   return NextResponse.json({ ok: true, post: row });

@@ -197,7 +197,13 @@
       const j = await r.json();
       if (!j || !j.ok) return;
       const threads = j.threads || [];
-      const unread = threads.reduce((n, t) => n + (t.unread ? 1 : 0), 0);
+      const now = Date.now();
+      const unread = threads.reduce((n, t) => {
+        if (!t.unread) return n;
+        // Skip muted channels — that's the whole point of mute.
+        if (t.muted_until && new Date(t.muted_until).getTime() > now) return n;
+        return n + 1;
+      }, 0);
       paintBadge(unread);
     } catch (_) { /* ignore */ }
   }
@@ -296,7 +302,12 @@
       if (!j || !j.ok) return;
       state.threads = j.threads || [];
       state.filtered = state.threads.slice();
-      const unread = state.threads.reduce((n, t) => n + (t.unread ? 1 : 0), 0);
+      const now = Date.now();
+      const unread = state.threads.reduce((n, t) => {
+        if (!t.unread) return n;
+        if (t.muted_until && new Date(t.muted_until).getTime() > now) return n;
+        return n + 1;
+      }, 0);
       paintBadge(unread);
       if (state.view === "list") paintList();
     } catch (e) { console.error("[mini.loadThreadList]", e); }

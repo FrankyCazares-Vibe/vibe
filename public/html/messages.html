@@ -125,6 +125,12 @@ body{font-family:'DM Sans',sans-serif;background:var(--cream);color:var(--charco
 .c-hdr{position:relative;}
 .convo{position:relative;overflow:hidden;}
 
+/* @mention link inside chat bubbles. Inherit color on mine-side bubbles
+   so it stays readable against the dark background. */
+.dm-mention{color:var(--accent);font-weight:600;text-decoration:none;}
+.dm-mention:hover{text-decoration:underline;}
+.msg-row.mine .dm-mention{color:#FFB59A;}
+
 /* Read/Delivered receipt label — flush to the bubble's right edge. */
 .rr{font-size:10.5px;color:var(--muted);text-align:right;padding:2px 0 6px;letter-spacing:.02em;}
 .rr.read{color:var(--accent);font-weight:600;}
@@ -1043,7 +1049,7 @@ function renderMsgs(msgs,d){
         ? `<video src="${__dmEsc(m.media.url)}" controls playsinline preload="metadata" style="display:block;max-width:280px;max-height:320px;border-radius:14px;background:#000;"></video>`
         : `<img src="${__dmEsc(m.media.url)}" alt="" style="display:block;max-width:280px;max-height:320px;border-radius:14px;object-fit:cover;background:var(--cream);">`;
       const captionBubble = m.t
-        ? `<div class="bubble">${__dmEsc(m.t)}<div class="btime">${m.ts}</div></div>`
+        ? `<div class="bubble">${__dmFormatBody(m.t)}<div class="btime">${m.ts}</div></div>`
         : `<div class="btime" style="font-size:10px;color:var(--muted);text-align:${mine?'right':'left'};">${m.ts}</div>`;
       h += `<div class="msg-row${mine?' mine':''}${gc}">${!mine?avForMsg(m, showAv):''}<div style="display:flex;flex-direction:column;align-items:${mine?'flex-end':'flex-start'};gap:4px;">${mediaInner}${captionBubble}</div></div>`;
     } else if (m.attachment) {
@@ -1080,12 +1086,12 @@ function renderMsgs(msgs,d){
       // "here's my note → here's the thing." Tightly stacked with no gap
       // so the pair feels like one unit.
       const captionBlock = m.t
-        ? `<div class="msg-attach-caption">${__dmEsc(m.t)}</div>`
+        ? `<div class="msg-attach-caption">${__dmFormatBody(m.t)}</div>`
         : '';
       const stack = `<div class="msg-attach-stack">${captionBlock}<div class="msg-attach"${cardOnclick}>${cardInner}</div><div class="btime" style="font-size:10px;color:var(--muted);text-align:${mine?'right':'left'};margin-top:2px;">${m.ts}</div></div>`;
       h += `<div class="msg-row${mine?' mine':''}${gc}">${!mine?avForMsg(m, showAv):''}${stack}</div>`;
     } else {
-      h+=`<div class="msg-row${mine?' mine':''}${gc}">${!mine?avForMsg(m, showAv):''}<div class="bubble">${m.t}<div class="btime">${m.ts}</div></div></div>`;
+      h+=`<div class="msg-row${mine?' mine':''}${gc}">${!mine?avForMsg(m, showAv):''}<div class="bubble">${__dmFormatBody(m.t)}<div class="btime">${m.ts}</div></div></div>`;
     }
     last=mine;
     lastSenderId=senderKey;
@@ -1379,6 +1385,18 @@ const __realDM = {
 };
 
 function __dmEsc(s){return String(s==null?'':s).replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));}
+// Escape + style @handles. Mentions render as a styled link to that
+// user's profile. Pattern matches the same handle format the server uses
+// when fanning out notifications, so what's clickable mirrors what's
+// notifiable.
+function __dmFormatBody(s) {
+  return __dmEsc(s).replace(
+    /(^|[^A-Za-z0-9_@])@([a-z0-9_]{3,20})/gi,
+    function(_m, prefix, handle){
+      return prefix + '<a class="dm-mention" href="/profile/' + encodeURIComponent(handle.toLowerCase()) + '" onclick="event.stopPropagation()">@' + handle + '</a>';
+    },
+  );
+}
 function __dmInitials(name){const p=String(name||'').trim().split(/\s+/).slice(0,2);return (p.map(s=>s[0]||'').join('').toUpperCase())||'?';}
 function __dmAvBg(seed){const palette=['#2D1B4E','#3B1A00','#2a2800','#1A1A00','#1A3A5C','#2D3748','#3B0764','#1F2937'];const s=String(seed||'');let h=0;for(let i=0;i<s.length;i++)h=(h*31+s.charCodeAt(i))>>>0;return palette[h%palette.length];}
 function __dmFmtRel(iso){if(!iso)return'';const t=new Date(iso).getTime();if(Number.isNaN(t))return'';const d=Date.now()-t;if(d<60000)return'now';if(d<3600000)return Math.floor(d/60000)+'m';if(d<86400000)return Math.floor(d/3600000)+'h';if(d<604800000)return Math.floor(d/86400000)+'d';return new Date(iso).toLocaleDateString();}
@@ -1413,6 +1431,7 @@ function __dmThreadRecord(thread, isRequest) {
     lastMessage: thread.last_message || null,
     unread: !!thread.unread,
     pinnedAt: thread.pinned_at || null,
+    mutedUntil: thread.muted_until || null,
   };
 }
 
@@ -1578,6 +1597,11 @@ async function __dmLoadMessages(channelId) {
 async function __dmOpenChannel(channelId) {
   const d = __realDM.T[channelId];
   if (!d) return;
+
+  // Close any open chat-info side panel — it was tied to the previous
+  // conversation. Otherwise stale member lists / pin state stick around
+  // when you switch threads.
+  if (typeof __dmPanelClose === 'function') __dmPanelClose();
 
   document.querySelectorAll('.t-item').forEach(el => {
     const m = el.dataset.t === channelId;
@@ -2088,6 +2112,13 @@ function __dmPanelRender() {
   const pinAction = '<button class="cp-action" onclick="__dmTogglePinCurrent()">' +
     (d.pinnedAt ? 'Unpin chat' : 'Pin chat') + '</button>';
 
+  // Channel mute — silences this chat's unread badge in the mini and
+  // suppresses notification sounds (when those land). Toggle via shared
+  // mute sheet for consistent timeframe options.
+  const isMuted = d.mutedUntil && new Date(d.mutedUntil) > new Date();
+  const muteAction = '<button class="cp-action" onclick="__dmToggleChannelMute()">' +
+    (isMuted ? 'Unmute chat' : 'Mute chat…') + '</button>';
+
   // Block + Report (1:1 only — group safety actions can come later).
   let safetyActions = '';
   if (!d.isGroup && d.peerId) {
@@ -2111,9 +2142,99 @@ function __dmPanelRender() {
     membersBlock +
     profileLink +
     pinAction +
+    muteAction +
     safetyActions +
     leaveAction +
     deleteAction;
+}
+
+async function __dmToggleChannelMute() {
+  const channelId = active;
+  if (!channelId || !__realDM.T[channelId]) return;
+  const d = __realDM.T[channelId];
+  const isMuted = d.mutedUntil && new Date(d.mutedUntil) > new Date();
+  if (isMuted) {
+    try {
+      const r = await fetch('/api/me/threads/' + encodeURIComponent(channelId) + '/mute', {
+        method: 'DELETE',
+        credentials: 'include',
+      });
+      const j = await r.json();
+      if (!j.ok) throw new Error(j.error || 'unmute failed');
+      d.mutedUntil = null;
+      __dmPanelRender();
+      __dmLoadList();
+    } catch (e) {
+      console.error('[dm.unmute]', e);
+      alert('Could not unmute: ' + e.message);
+    }
+    return;
+  }
+  // Reuse the shared timeframe picker from _safetyActions.js — same
+  // 1h / 8h / 24h / 7d / Forever options as the user-mute sheet, but
+  // here it POSTs to the channel-mute endpoint instead.
+  const labels = [
+    { hours: 1,   label: '1 hour' },
+    { hours: 8,   label: '8 hours' },
+    { hours: 24,  label: '24 hours' },
+    { hours: 168, label: '7 days' },
+    { hours: 0,   label: 'Until I unmute' },
+  ];
+  const choice = await __dmPickMuteDuration(d.n || 'this chat', labels);
+  if (choice == null) return;
+  try {
+    const r = await fetch('/api/me/threads/' + encodeURIComponent(channelId) + '/mute', {
+      method: 'POST',
+      credentials: 'include',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ duration_hours: choice > 0 ? choice : null }),
+    });
+    const j = await r.json();
+    if (!j.ok) throw new Error(j.error || 'mute failed');
+    d.mutedUntil = j.muted_until || null;
+    __dmPanelRender();
+    __dmLoadList();
+  } catch (e) {
+    console.error('[dm.mute]', e);
+    alert('Could not mute: ' + e.message);
+  }
+}
+
+// Lightweight inline timeframe picker — reuses the shared safety-actions
+// overlay if it's loaded, else falls back to a confirm() chain.
+function __dmPickMuteDuration(name, labels) {
+  return new Promise((resolve) => {
+    if (typeof window.__vsaCloseSheet === 'function') {
+      const overlay = document.getElementById('vsaOverlay');
+      const card = overlay && overlay.querySelector('.vsa-card');
+      if (overlay && card) {
+        card.innerHTML =
+          '<div class="vsa-hdr"><div class="vsa-title">Mute ' + __dmEsc(name) + '</div><button class="vsa-x" type="button" onclick="window.__vsaCloseSheet();window.__vsaResolveMute && window.__vsaResolveMute(null);">×</button></div>' +
+          '<div class="vsa-body">' +
+            '<p class="vsa-note" style="margin-bottom:12px">No unread badge or notification ping for messages in this chat. Messages still arrive.</p>' +
+            labels.map(l => '<button class="vsa-row" data-h="' + l.hours + '">' + __dmEsc(l.label) + '</button>').join('') +
+          '</div>';
+        overlay.classList.add('show');
+        const onClick = (ev) => {
+          const row = ev.target.closest('.vsa-row');
+          if (!row) return;
+          const h = Number(row.dataset.h) || 0;
+          window.__vsaCloseSheet();
+          card.removeEventListener('click', onClick);
+          resolve(h);
+        };
+        card.addEventListener('click', onClick);
+        // Backdrop dismiss → null
+        window.__vsaResolveMute = resolve;
+        return;
+      }
+    }
+    // Fallback: prompt
+    const txt = prompt('Mute ' + name + ' for: 1, 8, 24, 168 (=7d), or 0 (forever)');
+    const n = Number(txt);
+    if (txt == null) resolve(null);
+    else resolve(Number.isFinite(n) && n >= 0 ? n : null);
+  });
 }
 
 async function __dmTogglePinCurrent() {

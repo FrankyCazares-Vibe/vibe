@@ -57,6 +57,8 @@ type ThreadEntry = {
   pinned_at: string | null;
   /** Viewer's role in this channel (admin/member) — drives kick affordance. */
   viewer_role: "admin" | "member";
+  /** Muted until this timestamp (null = not muted). Drives unread-badge silence. */
+  muted_until: string | null;
 };
 
 async function resolveTargetId(
@@ -342,6 +344,7 @@ export async function GET() {
     last_read_at: string | null;
     hidden_at: string | null;
     pinned_at: string | null;
+    muted_until: string | null;
     role: "admin" | "member";
     channels: {
       id: string;
@@ -350,7 +353,7 @@ export async function GET() {
     };
   };
   const rows: Membership[] = ((myMemberships ?? []) as unknown as Membership[]).map(
-    (r) => ({ ...r, hidden_at: null, pinned_at: null }),
+    (r) => ({ ...r, hidden_at: null, pinned_at: null, muted_until: null }),
   );
   if (rows.length === 0) {
     return NextResponse.json({ ok: true, threads: [], requests: [] });
@@ -375,14 +378,16 @@ export async function GET() {
   try {
     const { data: extraRows } = await supabase
       .from("channel_members")
-      .select("channel_id, hidden_at, pinned_at")
+      .select("channel_id, hidden_at, pinned_at, muted_until")
       .eq("user_id", user.id)
       .in("channel_id", channelIds);
-    const byChannel = new Map<string, { hidden_at: string | null; pinned_at: string | null }>();
+    type Extra = { hidden_at: string | null; pinned_at: string | null; muted_until: string | null };
+    const byChannel = new Map<string, Extra>();
     for (const e of extraRows ?? []) {
       byChannel.set(e.channel_id as string, {
         hidden_at: (e.hidden_at as string | null) ?? null,
         pinned_at: (e.pinned_at as string | null) ?? null,
+        muted_until: (e.muted_until as string | null) ?? null,
       });
     }
     for (const r of rows) {
@@ -390,10 +395,11 @@ export async function GET() {
       if (extra) {
         r.hidden_at = extra.hidden_at;
         r.pinned_at = extra.pinned_at;
+        r.muted_until = extra.muted_until;
       }
     }
   } catch {
-    /* hidden_at/pinned_at columns may not exist yet; both stay null. */
+    /* hidden_at/pinned_at/muted_until columns may not exist yet; stay null. */
   }
 
   // Other members for peer hydration (1:1 dm peer = the non-viewer member)
@@ -559,6 +565,7 @@ export async function GET() {
       peer_last_read_at: peerLastReadByChannel.get(r.channel_id) ?? null,
       pinned_at: r.pinned_at,
       viewer_role: r.role,
+      muted_until: r.muted_until,
     };
 
     if (entry.is_request) requests.push(entry);

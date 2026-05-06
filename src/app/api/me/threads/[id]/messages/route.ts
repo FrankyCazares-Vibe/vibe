@@ -1,6 +1,11 @@
 import { NextResponse } from "next/server";
 
 import {
+  extractMentionHandles,
+  insertMentionNotifications,
+  resolveMentionedUserIds,
+} from "@/lib/mentions";
+import {
   isR2Configured,
   MESSAGE_MEDIA_KEY_PREFIX,
   signMessageMediaGetUrl,
@@ -379,6 +384,37 @@ export async function POST(req: Request, ctx: RouteCtx) {
     .update({ last_read_at: new Date().toISOString() })
     .eq("channel_id", channelId)
     .eq("user_id", user.id);
+
+  // @mention fan-out — only notifies people who are actually members of
+  // this channel, so a stray @somebody outside the chat doesn't ping
+  // strangers. Best-effort; failures don't block the send.
+  if (content) {
+    const handles = extractMentionHandles(content);
+    if (handles.length > 0) {
+      try {
+        const ids = await resolveMentionedUserIds(supabase, handles, user.id);
+        if (ids.length > 0) {
+          const { data: members } = await supabase
+            .from("channel_members")
+            .select("user_id")
+            .eq("channel_id", channelId)
+            .in("user_id", ids);
+          const validTargets = (members ?? []).map((m) => m.user_id as string);
+          const insertedRow = inserted as { id?: string } | null;
+          if (validTargets.length > 0 && insertedRow?.id) {
+            await insertMentionNotifications(supabase, {
+              actorId: user.id,
+              targetUserIds: validTargets,
+              kind: "message",
+              messageId: insertedRow.id,
+            });
+          }
+        }
+      } catch (e) {
+        console.error("[messages.POST mentions]", e);
+      }
+    }
+  }
 
   if (inserted) await signMediaUrls([inserted as unknown as MessageRow]);
   return NextResponse.json({ ok: true, message: inserted });

@@ -124,6 +124,8 @@
     font-size: 11px; font-weight: 600; color: #FF5C35;
     background: rgba(255,92,53,.08); padding: 3px 8px; border-radius: 999px;
   }
+  .vpv-mention { color: #FF5C35; font-weight: 600; text-decoration: none; }
+  .vpv-mention:hover { text-decoration: underline; }
 
   .vpv-actions {
     display: flex; align-items: center; gap: 4px;
@@ -506,9 +508,21 @@
     document.getElementById("vpvSub").textContent = sub;
   }
 
+  // Escape, then style @handles as orange links so mentions are visible
+  // and clickable. Done after escaping so any HTML in the content is
+  // already neutralized by the time we inject spans.
+  function formatBodyText(s) {
+    const escaped = esc(s);
+    return escaped.replace(
+      /(^|[^A-Za-z0-9_@])@([a-z0-9_]{3,20})/gi,
+      (_m, prefix, handle) =>
+        `${prefix}<a class="vpv-mention" href="/profile/${encodeURIComponent(handle.toLowerCase())}">@${handle}</a>`,
+    );
+  }
+
   function paintBody({ content, tags, media_url, media_thumbnail_url, type }) {
     const body = document.getElementById("vpvBody");
-    const text = content ? `<div class="vpv-text">${esc(content)}</div>` : "";
+    const text = content ? `<div class="vpv-text">${formatBodyText(content)}</div>` : "";
     let media = "";
     if (type === "clip") {
       // P1-016: real <video> with native HTML5 controls. The poster paints
