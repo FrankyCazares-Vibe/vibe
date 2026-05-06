@@ -39,9 +39,13 @@
   const style = document.createElement("style");
   style.id = "vibe-mention-picker-css";
   style.textContent = `
-    .vmp-popover{position:fixed;background:white;border:1px solid rgba(28,28,30,.08);border-radius:12px;box-shadow:0 14px 40px rgba(0,0,0,.18);min-width:240px;max-width:320px;max-height:280px;overflow-y:auto;z-index:10500;display:none;font-family:'DM Sans',system-ui,sans-serif;}
+    /* z-index above the custom cursor (.cursor at 9999) so the popover
+       isn't visually covered by the cursor element. cursor:default
+       overrides the page's cursor:none so the SYSTEM cursor shows up
+       inside the popover (the custom cursor is hidden behind us). */
+    .vmp-popover{position:fixed;background:white;border:1px solid rgba(28,28,30,.08);border-radius:12px;box-shadow:0 14px 40px rgba(0,0,0,.18);min-width:240px;max-width:320px;max-height:280px;overflow-y:auto;z-index:100000;display:none;font-family:'DM Sans',system-ui,sans-serif;cursor:default;}
     .vmp-popover.show{display:block;}
-    .vmp-row{display:flex;align-items:center;gap:9px;padding:8px 12px;cursor:pointer;border-bottom:1px solid rgba(28,28,30,.04);}
+    .vmp-row{display:flex;align-items:center;gap:9px;padding:8px 12px;cursor:pointer !important;border-bottom:1px solid rgba(28,28,30,.04);}
     .vmp-row:last-child{border-bottom:none;}
     .vmp-row.active,.vmp-row:hover{background:#FAF7F2;}
     .vmp-av{width:30px;height:30px;border-radius:9px;background:#1C1C1E;color:white;display:flex;align-items:center;justify-content:center;font-family:'Fraunces',serif;font-size:11px;font-weight:700;flex-shrink:0;overflow:hidden;}

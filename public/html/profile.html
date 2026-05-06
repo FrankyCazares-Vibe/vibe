@@ -5832,17 +5832,19 @@ window.viewingRealUser = null;
     }
   }
   _wireOttoHero();
+})();
 
-  // @mention typeahead on the post composer.
-  function _wireMentionPicker() {
-    const inp = document.getElementById('profilePostInput');
-    if (inp && window.vibeBindMentionPicker) {
-      window.vibeBindMentionPicker(inp);
-    } else {
-      setTimeout(_wireMentionPicker, 400);
-    }
+// @mention typeahead on the post composer — outside initProfilePage so
+// the various early-return branches (no user, viewing someone else, etc.)
+// don't skip the binding. The textarea exists in the markup regardless
+// of viewer mode; it's just hidden via CSS when not the owner.
+(function _wireProfileMentionPicker() {
+  const inp = document.getElementById('profilePostInput');
+  if (inp && window.vibeBindMentionPicker) {
+    window.vibeBindMentionPicker(inp);
+    return;
   }
-  _wireMentionPicker();
+  setTimeout(_wireProfileMentionPicker, 400);
 })();
 
 // ── Student badge ────────────────────────────────────────────────────────
