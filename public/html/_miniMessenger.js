@@ -152,6 +152,23 @@
     </div>
   `;
 
+  // ── State (declared before any function that touches it is invoked) ───
+  const state = {
+    open: false,
+    view: "list", // 'list' | 'chat'
+    activeChannel: null,
+    threads: [],
+    filtered: [],
+    msgs: [],
+    peerInfo: null,
+    listPollTimer: null,
+    chatPollTimer: null,
+    bgPollTimer: null,
+    LIST_POLL_MS: 5000,
+    CHAT_POLL_MS: 2000,
+    BG_POLL_MS: 30000,
+  };
+
   function attachWhenReady() {
     if (!document.body) {
       document.addEventListener("DOMContentLoaded", attachWhenReady);
@@ -162,23 +179,6 @@
     startBackgroundPoll();
   }
   attachWhenReady();
-
-  // ── State ──────────────────────────────────────────────────────────────
-  const state = {
-    open: false,
-    view: "list", // 'list' | 'chat'
-    activeChannel: null,
-    threads: [],
-    filtered: [],
-    msgs: [],
-    peerInfo: null, // for chat view header { name, avatar_url, handle, isGroup, members }
-    listPollTimer: null,
-    chatPollTimer: null,
-    bgPollTimer: null,
-    LIST_POLL_MS: 5000,
-    CHAT_POLL_MS: 2000,
-    BG_POLL_MS: 30000,
-  };
 
   // ── Background poll (always-on, while panel is closed) ─────────────────
   // Just refreshes the unread badge so the user sees a new-message
