@@ -77,18 +77,11 @@
   const style = document.createElement("style");
   style.id = "vibe-mini-messenger-css";
   style.textContent = `
-    /* Mini button sits LEFT of Otto's corner ring (Otto is right:24 z:9990).
-       Bumped z-index above Otto so the open panel covers the corner ring;
-       html.vmm-open shifts Otto's #ottoCorner left so both stay clickable. */
-    .vmm-btn{position:fixed;bottom:24px;right:96px;width:56px;height:56px;border-radius:50%;background:#1C1C1E;color:white;border:none;cursor:pointer;display:flex;align-items:center;justify-content:center;box-shadow:0 8px 24px rgba(0,0,0,.18);z-index:9994;transition:transform .15s,filter .15s,right .26s cubic-bezier(.2,.8,.2,1);}
-    .vmm-btn:hover{transform:translateY(-1px);filter:brightness(1.1);}
-    .vmm-btn .vmm-badge{position:absolute;top:-3px;right:-3px;background:#FF5C35;color:white;font-family:'DM Sans',system-ui,sans-serif;font-size:10px;font-weight:800;border-radius:100px;min-width:18px;height:18px;padding:0 5px;display:none;align-items:center;justify-content:center;border:2px solid white;line-height:1;}
-    .vmm-btn.has-unread .vmm-badge{display:flex;}
-    .vmm-btn.open{display:none;}
+    /* No floating button — pages provide their own trigger (nav-msg-btn).
+       Panel sits at bottom-right; html.vmm-open slides Otto's corner ring
+       left so it stays clickable while the panel is up. */
     .vmm-panel{position:fixed;bottom:24px;right:24px;width:360px;max-width:calc(100vw - 24px);height:520px;max-height:calc(100vh - 44px);background:white;border-radius:16px;box-shadow:0 24px 60px rgba(0,0,0,.22),0 4px 16px rgba(0,0,0,.08);display:none;flex-direction:column;overflow:hidden;z-index:9995;font-family:'DM Sans',system-ui,sans-serif;border:1px solid rgba(28,28,30,.08);}
     .vmm-panel.show{display:flex;}
-    /* When mini is open, slide Otto's corner ring leftward so it sits
-       just to the left of the panel instead of being covered by it. */
     html.vmm-open #ottoCorner{transform:translateX(-372px) !important;transition:transform .26s cubic-bezier(.2,.8,.2,1);}
     .vmm-hdr{padding:12px 14px;border-bottom:1px solid rgba(28,28,30,.08);display:flex;align-items:center;gap:10px;flex-shrink:0;background:white;}
     .vmm-hdr-title{font-family:'Fraunces',serif;font-weight:800;font-size:15px;flex:1;color:#1C1C1E;}
@@ -138,20 +131,7 @@
   `;
   document.head.appendChild(style);
 
-  // ── Markup (button + panel) ────────────────────────────────────────────
-  const button = document.createElement("button");
-  button.className = "vmm-btn";
-  button.id = "vmmBtn";
-  button.title = "Messages";
-  button.innerHTML = `
-    <svg width="22" height="22" viewBox="0 0 22 22" fill="none">
-      <path d="M2 4A2 2 0 014 2h14a2 2 0 012 2v11a2 2 0 01-2 2H7l-5 4V4z"
-        stroke="currentColor" stroke-width="1.6" fill="none" stroke-linejoin="round"/>
-    </svg>
-    <span class="vmm-badge" id="vmmBadge"></span>
-  `;
-  button.addEventListener("click", () => window.openMiniMessenger());
-
+  // ── Markup (panel only — no floating button; pages supply their own trigger) ──
   const panel = document.createElement("div");
   panel.className = "vmm-panel";
   panel.id = "vmmPanel";
@@ -177,7 +157,6 @@
       document.addEventListener("DOMContentLoaded", attachWhenReady);
       return;
     }
-    document.body.appendChild(button);
     document.body.appendChild(panel);
     bindHandlers();
     startBackgroundPoll();
@@ -222,22 +201,20 @@
       paintBadge(unread);
     } catch (_) { /* ignore */ }
   }
+  // Update any nav-msg-btn icons on the host page (the existing dot-style
+  // unread indicator on profile.html etc.) so the user sees a notification
+  // mark without us injecting a second button.
   function paintBadge(n) {
-    const badge = document.getElementById("vmmBadge");
-    if (!badge) return;
-    if (n > 0) {
-      button.classList.add("has-unread");
-      badge.textContent = n > 9 ? "9+" : String(n);
-    } else {
-      button.classList.remove("has-unread");
-      badge.textContent = "";
-    }
+    const navBtns = document.querySelectorAll(".nav-msg-btn");
+    navBtns.forEach((b) => {
+      if (n > 0) b.classList.add("has-unread");
+      else b.classList.remove("has-unread");
+    });
   }
 
   // ── Open / close ───────────────────────────────────────────────────────
   window.openMiniMessenger = async function (handle) {
     state.open = true;
-    button.classList.add("open");
     panel.classList.add("show");
     document.documentElement.classList.add("vmm-open");
     if (handle) {
@@ -269,12 +246,18 @@
   window.closeMiniMessenger = function () {
     state.open = false;
     panel.classList.remove("show");
-    button.classList.remove("open");
     document.documentElement.classList.remove("vmm-open");
     if (state.listPollTimer) { clearInterval(state.listPollTimer); state.listPollTimer = null; }
     if (state.chatPollTimer) { clearInterval(state.chatPollTimer); state.chatPollTimer = null; }
     state.activeChannel = null;
     refreshBadge();
+  };
+
+  // Toggle alias — useful for inline onclick="toggleMessenger()" handlers
+  // that run before any host-page script has redefined toggleMessenger.
+  window.toggleMessenger = function (handle) {
+    if (state.open) window.closeMiniMessenger();
+    else window.openMiniMessenger(handle);
   };
 
   // ── List view ──────────────────────────────────────────────────────────
