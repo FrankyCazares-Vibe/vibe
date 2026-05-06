@@ -632,6 +632,7 @@
       case 'connection': verb = "you're now connected";         break;
       case 'like':       verb = 'liked your post';              break;
       case 'comment':    verb = 'commented on your post';       break;
+      case 'mention':    verb = n.message_id ? 'mentioned you in a chat' : 'mentioned you'; break;
       default:           verb = '';
     }
     // Snippet content varies by type — for comments we want to show
@@ -639,7 +640,7 @@
     let snippetText = '';
     if (n.type === 'comment' && n.comment && n.comment.content) {
       snippetText = n.comment.content;
-    } else if ((n.type === 'like' || n.type === 'comment') && n.post && n.post.content) {
+    } else if ((n.type === 'like' || n.type === 'mention' || n.type === 'comment') && n.post && n.post.content) {
       snippetText = n.post.content;
     }
     const snippet = snippetText
@@ -668,7 +669,13 @@
     const n = (_ottoLastList || []).find(x => x.id === notifId);
     if (!n) return;
     closeOttoPanel();
-    if ((n.type === 'like' || n.type === 'comment') && n.post && n.post.id) {
+    // Mention in a chat → jump to /messages (the channel is found
+     // via the message's channel_id). Mention in a post → open the post.
+    if (n.type === 'mention' && n.message_id && !n.post) {
+      window.location.href = '/messages';
+      return;
+    }
+    if ((n.type === 'like' || n.type === 'comment' || n.type === 'mention') && n.post && n.post.id) {
       const postId = n.post.id;
       // If the shared post viewer modal is loaded on this page, open
       // it directly — no navigation. Otherwise, send the user to their

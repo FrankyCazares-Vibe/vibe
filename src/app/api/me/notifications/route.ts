@@ -29,20 +29,36 @@ export async function GET(req: Request) {
     Math.max(1, Number(url.searchParams.get("limit")) || DEFAULT_LIMIT),
   );
 
-  const { data, error } = await supabase
+  // Try the full select first (includes message_id from the mention
+  // migration). If that column isn't in the DB yet (deploy lag), fall
+  // back to the older shape so the panel still renders.
+  const FULL_SELECT =
+    "id,type,post_id,comment_id,message_id,read_at,created_at," +
+    "actor:users!notifications_actor_id_fkey(id,name,handle,avatar_url)," +
+    "post:posts!notifications_post_id_fkey(id,type,content,media_thumbnail_url)," +
+    "comment:post_comments!notifications_comment_id_fkey(id,content)";
+  const FALLBACK_SELECT =
+    "id,type,post_id,comment_id,read_at,created_at," +
+    "actor:users!notifications_actor_id_fkey(id,name,handle,avatar_url)," +
+    "post:posts!notifications_post_id_fkey(id,type,content,media_thumbnail_url)," +
+    "comment:post_comments!notifications_comment_id_fkey(id,content)";
+
+  let { data, error } = await supabase
     .from("notifications")
-    .select(
-      "id,type,post_id,comment_id,read_at,created_at," +
-        // Explicit FK names disambiguate the actor + post + comment embeds.
-        "actor:users!notifications_actor_id_fkey(id,name,handle,avatar_url)," +
-        "post:posts!notifications_post_id_fkey(id,type,content,media_thumbnail_url)," +
-        // Comment text — only present on type='comment' rows. Surfaces
-        // *what* they said so the user can scan replies in the panel.
-        "comment:post_comments!notifications_comment_id_fkey(id,content)",
-    )
+    .select(FULL_SELECT)
     .eq("user_id", user.id)
     .order("created_at", { ascending: false })
     .limit(limit);
+  if (error && /message_id|column .* does not exist/i.test(error.message ?? "")) {
+    const fb = await supabase
+      .from("notifications")
+      .select(FALLBACK_SELECT)
+      .eq("user_id", user.id)
+      .order("created_at", { ascending: false })
+      .limit(limit);
+    data = fb.data;
+    error = fb.error;
+  }
 
   if (error) {
     console.error("[me/notifications GET]", error);

@@ -118,13 +118,19 @@
       </div>`;
     }).join("");
     Array.from(popover.querySelectorAll(".vmp-row")).forEach((row) => {
-      row.addEventListener("mousedown", (e) => {
-        // mousedown fires before textarea blur; use it so the click
-        // doesn't lose focus + scroll the page.
+      // mousedown fires before textarea blur, so the textarea keeps focus
+      // when the user clicks; preventDefault stops the default focus shift.
+      // We also bind click as a belt-and-suspenders for touch / synthetic
+      // events that might not deliver mousedown reliably.
+      const fire = (e) => {
         e.preventDefault();
+        e.stopPropagation();
         const idx = Number(row.dataset.i) || 0;
         select(idx);
-      });
+      };
+      row.addEventListener("mousedown", fire);
+      row.addEventListener("click", fire);
+      row.addEventListener("touchstart", fire, { passive: false });
     });
   }
 

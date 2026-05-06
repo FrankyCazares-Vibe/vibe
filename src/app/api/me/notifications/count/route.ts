@@ -26,39 +26,28 @@ export async function GET() {
 
   const since = new Date(Date.now() - 30 * 24 * 60 * 60 * 1000).toISOString();
 
-  const [unreadRes, followRes, connRes, likeRes, commentRes] = await Promise.all([
+  const countByType = (t: string) =>
+    supabase
+      .from("notifications")
+      .select("id", { count: "exact", head: true })
+      .eq("user_id", user.id)
+      .eq("type", t)
+      .gte("created_at", since);
+
+  const [unreadRes, followRes, connRes, likeRes, commentRes, mentionRes] = await Promise.all([
     supabase
       .from("notifications")
       .select("id", { count: "exact", head: true })
       .eq("user_id", user.id)
       .is("read_at", null),
-    supabase
-      .from("notifications")
-      .select("id", { count: "exact", head: true })
-      .eq("user_id", user.id)
-      .eq("type", "follow")
-      .gte("created_at", since),
-    supabase
-      .from("notifications")
-      .select("id", { count: "exact", head: true })
-      .eq("user_id", user.id)
-      .eq("type", "connection")
-      .gte("created_at", since),
-    supabase
-      .from("notifications")
-      .select("id", { count: "exact", head: true })
-      .eq("user_id", user.id)
-      .eq("type", "like")
-      .gte("created_at", since),
-    supabase
-      .from("notifications")
-      .select("id", { count: "exact", head: true })
-      .eq("user_id", user.id)
-      .eq("type", "comment")
-      .gte("created_at", since),
+    countByType("follow"),
+    countByType("connection"),
+    countByType("like"),
+    countByType("comment"),
+    countByType("mention"),
   ]);
 
-  const firstErr = [unreadRes, followRes, connRes, likeRes, commentRes].find(
+  const firstErr = [unreadRes, followRes, connRes, likeRes, commentRes, mentionRes].find(
     (r) => r.error,
   )?.error;
   if (firstErr) {
@@ -74,6 +63,7 @@ export async function GET() {
       connection: connRes.count    ?? 0,
       like:       likeRes.count    ?? 0,
       comment:    commentRes.count ?? 0,
+      mention:    mentionRes.count ?? 0,
     },
     window_days: 30,
   });
