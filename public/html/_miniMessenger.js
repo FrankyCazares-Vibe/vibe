@@ -128,6 +128,25 @@
       background:linear-gradient(180deg,rgba(255,92,53,0.22) 0%,rgba(255,92,53,0.06) 100%),linear-gradient(180deg,rgba(20,16,28,0.82) 0%,rgba(14,11,22,0.86) 100%);
       border-color:rgba(255,180,150,0.32);
     }
+    .vmm-bubble-wrap{display:inline-flex;align-items:center;gap:6px;position:relative;max-width:100%;}
+    .vmm-msg.mine .vmm-bubble-wrap{flex-direction:row-reverse;}
+    .vmm-actions{display:none;align-items:center;gap:3px;padding:3px 6px;border-radius:999px;background:rgba(20,16,28,0.92);border:1px solid rgba(255,255,255,0.14);box-shadow:inset 0 1px 0 rgba(255,255,255,0.10),0 4px 12px rgba(0,0,0,0.32);backdrop-filter:blur(20px);-webkit-backdrop-filter:blur(20px);flex-shrink:0;}
+    .vmm-bubble-wrap:hover .vmm-actions{display:inline-flex;}
+    .vmm-act-emo{background:transparent;border:none;padding:1px 3px;font-size:13px;line-height:1;cursor:none;}
+    .vmm-act-sep{width:1px;height:14px;background:rgba(255,255,255,0.16);margin:0 2px;}
+    .vmm-act-reply{background:transparent;border:none;padding:1px 4px;color:rgba(255,255,255,0.88);font-size:10.5px;font-weight:700;font-family:inherit;cursor:none;display:inline-flex;align-items:center;gap:3px;}
+    .vmm-rxs{display:flex;flex-wrap:wrap;gap:3px;margin-top:4px;}
+    .vmm-msg.mine .vmm-rxs{justify-content:flex-end;}
+    .vmm-rx{display:inline-flex;align-items:center;gap:3px;padding:1px 6px;border-radius:999px;background:rgba(20,16,28,0.55);border:1px solid rgba(255,255,255,0.10);color:rgba(255,255,255,0.85);font-family:inherit;font-size:11px;font-weight:600;cursor:none;}
+    .vmm-rx.on{background:rgba(255,140,90,0.22);border-color:rgba(255,180,150,0.55);color:#FFD0BF;}
+    .vmm-quote{margin-bottom:4px;padding:5px 8px;border-left:3px solid rgba(255,140,90,0.55);background:rgba(20,16,28,0.45);border-radius:7px;font-family:inherit;font-size:11px;color:rgba(255,255,255,0.78);max-width:fit-content;}
+    .vmm-quote-author{font-weight:700;font-size:10px;color:rgba(255,180,150,0.95);margin-bottom:1px;}
+    .vmm-quote-body{overflow:hidden;text-overflow:ellipsis;white-space:nowrap;max-width:200px;}
+    .vmm-reply-pill{display:flex;align-items:center;gap:8px;padding:6px 10px;margin:0 12px 4px;border-radius:10px;border:1px solid rgba(255,255,255,0.10);border-left:3px solid rgba(255,140,90,0.85);background:linear-gradient(180deg,rgba(20,16,28,0.82) 0%,rgba(14,11,22,0.86) 100%);}
+    .vmm-reply-pill-info{flex:1;min-width:0;}
+    .vmm-reply-pill-author{font-family:inherit;font-size:10.5px;font-weight:700;color:rgba(255,180,150,0.95);}
+    .vmm-reply-pill-body{font-family:inherit;font-size:11px;color:rgba(255,255,255,0.78);overflow:hidden;text-overflow:ellipsis;white-space:nowrap;}
+    .vmm-reply-pill-x{width:20px;height:20px;border-radius:999px;border:1px solid rgba(255,255,255,0.16);background:rgba(255,255,255,0.06);color:rgba(255,255,255,0.85);font-size:11px;line-height:1;cursor:none;}
     .vmm-comp{padding:10px 12px;border-top:1px solid rgba(28,28,30,.08);background:white;display:flex;gap:8px;align-items:flex-end;flex-shrink:0;}
     .vmm-comp textarea{flex:1;border:none;background:none;font-family:inherit;font-size:13.5px;color:#1C1C1E;resize:none;outline:none;line-height:1.45;min-height:22px;max-height:96px;padding:4px 0;}
     .vmm-comp textarea::placeholder{color:#8A8580;}
@@ -179,6 +198,9 @@
     LIST_POLL_MS: 5000,
     CHAT_POLL_MS: 2000,
     BG_POLL_MS: 30000,
+    // Quote-reply target for the active chat (cleared on send / cancel /
+    // chat switch). Shape: { id, channelId, authorName, content }.
+    replyTo: null,
   };
 
   function attachWhenReady() {
@@ -374,6 +396,10 @@
     if (!channelId) return;
     state.view = "chat";
     state.activeChannel = channelId;
+    // Switching chats: drop any pending reply target (it was tied to the
+    // previous channel and the API would reject a cross-channel parent).
+    state.replyTo = null;
+    if (typeof renderReplyPill === "function") renderReplyPill();
     if (state.listPollTimer) { clearInterval(state.listPollTimer); state.listPollTimer = null; }
 
     // Resolve peer info from current threads list (or wait for next load).
@@ -457,6 +483,8 @@
         senderAvatar: m.users && m.users.avatar_url,
         senderId: m.user_id,
         senderHandle: m.users && m.users.handle,
+        reactions: Array.isArray(m.reactions) ? m.reactions : [],
+        parentPreview: m.parent_preview || null,
       }));
       paintMessages();
     } catch (e) { console.error("[mini.loadMessages]", e); }
@@ -496,7 +524,27 @@
       } else if (m.attachment) {
         h += `<div class="vmm-msg${m.mine ? " mine" : ""}${gc}">${!m.mine ? av : ""}<div class="vmm-bubble">${m.content ? esc(m.content) + "<br>" : ""}<a href="/messages" style="color:inherit;text-decoration:underline;font-size:11.5px">View ${m.attachment.kind === "clip" ? "clip" : "post"}</a></div></div>`;
       } else {
-        h += `<div class="vmm-msg${m.mine ? " mine" : ""}${gc}">${!m.mine ? av : ""}<div class="vmm-bubble">${esc(m.content)}</div></div>`;
+        // Quote-stub if this is a reply; reaction chips below; hover pill
+        // with 5 reactions + Reply trigger.
+        let stub = "";
+        if (m.parentPreview) {
+          const author = (m.parentPreview.author && (m.parentPreview.author.name || m.parentPreview.author.handle)) || "message";
+          const txt = (m.parentPreview.content || "(media)").slice(0, 140);
+          stub = `<div class="vmm-quote"><div class="vmm-quote-author">↩ ${esc(author)}</div><div class="vmm-quote-body">${esc(txt)}</div></div>`;
+        }
+        const emos = ["❤️","👍","👎","😂","🔥"];
+        const actBtns = emos.map((e) =>
+          `<button type="button" class="vmm-act-emo" onclick="event.stopPropagation();window.__vmmToggleReaction('${esc(m.id)}','${esc(e)}')" aria-label="React with ${esc(e)}">${e}</button>`
+        ).join("");
+        const actions = `<div class="vmm-actions">${actBtns}<span class="vmm-act-sep"></span><button type="button" class="vmm-act-reply" onclick="event.stopPropagation();window.__vmmStartReply('${esc(m.id)}')" aria-label="Reply">↩ Reply</button></div>`;
+        const chips = (m.reactions && m.reactions.length > 0)
+          ? '<div class="vmm-rxs">' + m.reactions.map((r) =>
+              `<button type="button" class="vmm-rx${r.viewer_reacted ? " on" : ""}" onclick="window.__vmmToggleReaction('${esc(m.id)}','${esc(r.emoji)}')"><span>${r.emoji}</span><span>${r.count}</span></button>`
+            ).join("") + '</div>'
+          : "";
+        const wrap = `<div class="vmm-bubble-wrap"><div class="vmm-bubble">${esc(m.content)}</div>${actions}</div>`;
+        const stack = `<div style="display:flex;flex-direction:column;align-items:${m.mine ? "flex-end" : "flex-start"};max-width:100%;min-width:0;">${stub}${wrap}${chips}</div>`;
+        h += `<div class="vmm-msg${m.mine ? " mine" : ""}${gc}">${!m.mine ? av : ""}${stack}</div>`;
       }
       lastSender = m.senderId;
     });
@@ -531,17 +579,26 @@
     if (!cid || !txt) return;
     const sendBtn = document.getElementById("vmmSend");
     sendBtn.disabled = true;
+    const replyParent = state.replyTo && state.replyTo.channelId === cid
+      ? state.replyTo.id
+      : null;
     try {
       const r = await fetch(`/api/me/threads/${encodeURIComponent(cid)}/messages`, {
         method: "POST",
         credentials: "include",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ content: txt }),
+        body: JSON.stringify({
+          content: txt,
+          ...(replyParent ? { parent_message_id: replyParent } : {}),
+        }),
       });
       const j = await r.json();
       if (!j || !j.ok) throw new Error((j && j.error) || "Send failed");
       t.value = "";
       autoSize();
+      // Clear reply target on successful send.
+      state.replyTo = null;
+      renderReplyPill();
       await loadMessages();
       const el = document.getElementById("vmmMsgs");
       if (el) el.scrollTop = el.scrollHeight;
@@ -553,6 +610,91 @@
       updateSendDisabled();
     }
   }
+
+  function renderReplyPill() {
+    const root = document.getElementById("vmmRoot") || document.body;
+    let pill = document.getElementById("vmmReplyPill");
+    const r = state.replyTo;
+    if (!r) {
+      if (pill) pill.remove();
+      return;
+    }
+    const composer = document.querySelector(".vmm-comp");
+    if (!composer) return;
+    if (!pill) {
+      pill = document.createElement("div");
+      pill.id = "vmmReplyPill";
+      pill.className = "vmm-reply-pill";
+      composer.parentNode.insertBefore(pill, composer);
+    }
+    pill.innerHTML = ''
+      + '<div class="vmm-reply-pill-info">'
+      +   '<div class="vmm-reply-pill-author">↩ Replying to ' + esc(r.authorName) + '</div>'
+      +   '<div class="vmm-reply-pill-body">' + esc((r.content || '').slice(0, 200) || '(media)') + '</div>'
+      + '</div>'
+      + '<button type="button" class="vmm-reply-pill-x" onclick="window.__vmmCancelReply()" aria-label="Cancel reply">×</button>';
+    // Prevent the unused-variable lint warning if root ends up unused.
+    void root;
+  }
+
+  // ── Window-level handlers (called from message render onclicks) ──────
+  window.__vmmToggleReaction = async function (messageId, emoji) {
+    const cid = state.activeChannel;
+    if (!cid || !messageId || !emoji) return;
+    const msg = state.msgs.find((x) => x.id === messageId);
+    if (!msg) return;
+    msg.reactions = Array.isArray(msg.reactions) ? msg.reactions : [];
+    const found = msg.reactions.find((r) => r.emoji === emoji);
+    let nextActive;
+    if (found && found.viewer_reacted) {
+      const c = Math.max(0, found.count - 1);
+      if (c === 0) msg.reactions = msg.reactions.filter((r) => r.emoji !== emoji);
+      else { found.count = c; found.viewer_reacted = false; }
+      nextActive = false;
+    } else if (found) {
+      found.count += 1;
+      found.viewer_reacted = true;
+      nextActive = true;
+    } else {
+      msg.reactions.push({ emoji, count: 1, viewer_reacted: true });
+      nextActive = true;
+    }
+    paintMessages();
+    try {
+      const res = await fetch(`/api/me/threads/${encodeURIComponent(cid)}/messages/${encodeURIComponent(messageId)}/react`, {
+        method: nextActive ? "POST" : "DELETE",
+        credentials: "include",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ emoji }),
+      });
+      if (!res.ok) throw new Error("react " + res.status);
+    } catch (e) {
+      console.error("[mini.react]", e);
+      // Roll back via fresh fetch.
+      loadMessages();
+    }
+  };
+
+  window.__vmmStartReply = function (messageId) {
+    const cid = state.activeChannel;
+    if (!cid || !messageId) return;
+    const msg = state.msgs.find((x) => x.id === messageId);
+    if (!msg) return;
+    state.replyTo = {
+      id: messageId,
+      channelId: cid,
+      authorName: msg.senderName || "message",
+      content: msg.content || "(media)",
+    };
+    renderReplyPill();
+    const inp = document.getElementById("vmmInput");
+    if (inp) inp.focus();
+  };
+
+  window.__vmmCancelReply = function () {
+    state.replyTo = null;
+    renderReplyPill();
+  };
 
   function bindHandlers() {
     const t = document.getElementById("vmmInput");
