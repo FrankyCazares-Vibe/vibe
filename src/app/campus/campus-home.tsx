@@ -6721,7 +6721,7 @@ function CreateOrgBanner({ onClick }: { onClick: () => void }) {
       type="button"
       onClick={onClick}
       style={{
-        ...GLASS_SURFACE,
+        ...DARK_GLASS_SURFACE,
         display: "flex",
         alignItems: "center",
         gap: 14,
@@ -6731,10 +6731,12 @@ function CreateOrgBanner({ onClick }: { onClick: () => void }) {
         cursor: "pointer",
         color: "#fff",
         fontFamily: "DM Sans, sans-serif",
+        // Orange wash on top of the dark base — the gradient is the
+        // signal, the dark glass keeps it readable on cream.
         background:
-          "linear-gradient(180deg, rgba(255,92,53,0.32) 0%, rgba(255,92,53,0.10) 100%), " +
-          COLORS.glassFill,
-        border: "1px solid rgba(255,180,150,0.45)",
+          "linear-gradient(180deg, rgba(255,92,53,0.55) 0%, rgba(255,92,53,0.18) 100%), " +
+          "linear-gradient(180deg, rgba(20,16,28,0.78) 0%, rgba(14,11,22,0.82) 100%)",
+        border: "1px solid rgba(255,180,150,0.55)",
         width: "100%",
       }}
     >
@@ -6887,7 +6889,7 @@ function DiscoverSearchBar({
   return (
     <div
       style={{
-        ...GLASS_SURFACE,
+        ...DARK_GLASS_SURFACE,
         display: "flex",
         alignItems: "center",
         gap: 10,
@@ -6971,14 +6973,18 @@ function DiscoverFilterChips({
                 ? "1px solid rgba(255,180,150,0.55)"
                 : "1px solid rgba(255,255,255,0.14)",
               background: on
-                ? "linear-gradient(180deg, rgba(255,92,53,0.32) 0%, rgba(255,92,53,0.14) 100%)"
-                : "rgba(255,255,255,0.04)",
+                ? "linear-gradient(180deg, rgba(255,92,53,0.55) 0%, rgba(255,92,53,0.22) 100%), rgba(20,16,28,0.78)"
+                : "rgba(20,16,28,0.78)",
+              backdropFilter: "blur(20px) saturate(160%)",
+              WebkitBackdropFilter: "blur(20px) saturate(160%)",
               color: "#fff",
               fontFamily: "DM Sans, sans-serif",
               fontSize: 12,
               fontWeight: on ? 700 : 500,
               cursor: "pointer",
-              boxShadow: on ? "inset 0 1px 0 rgba(255,255,255,0.22)" : "none",
+              boxShadow: on
+                ? "inset 0 1px 0 rgba(255,255,255,0.22)"
+                : "inset 0 1px 0 rgba(255,255,255,0.06)",
             }}
           >
             {o.label}
