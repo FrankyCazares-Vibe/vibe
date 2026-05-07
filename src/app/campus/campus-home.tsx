@@ -9681,6 +9681,18 @@ function ChannelChat({
   // picker + reply button. One-at-a-time so we don't paint multiple sets.
   const [hoveredId, setHoveredId] = useState<string | null>(null);
   const composerInputRef = useRef<HTMLInputElement | null>(null);
+  // Tracks how many reaction toggles are in flight. While > 0 we skip the
+  // 2s poll so it can't clobber an optimistic chip that hasn't been
+  // server-confirmed yet (the user sees the chip pop in, vanish for ~half
+  // a second when a stale poll lands, then come back — feels broken).
+  const pendingReactionsRef = useRef(0);
+  // iMessage-style drag-to-reveal timestamps. While dragging, all message
+  // rows translate left and timestamp chips slide in from the right edge.
+  const [dragX, setDragX] = useState(0);
+  // Mirrors dragStartRef.current?.engaged but in state form so we can read
+  // it at render time (e.g. to switch off CSS transition during active
+  // drag and back on for the release-snap-back).
+  const [dragging, setDragging] = useState(false);
 
   // Channel switches remount this component (parent passes key={channelId}),
   // so initial state above is the reset — no effect needed.
@@ -9702,16 +9714,21 @@ function ChannelChat({
     }
   }, [channelId]);
 
-  // Poll messages every 2s while this channel is open.
+  // Poll messages every 2s while this channel is open. Skips while a
+  // reaction toggle is in flight — otherwise a poll that started just
+  // before the click lands a stale messages array and clobbers the
+  // freshly-flipped chip.
   useEffect(() => {
     let cancelled = false;
     const fetchOnce = async () => {
+      if (pendingReactionsRef.current > 0) return;
       try {
         const res = await fetch(`/api/me/threads/${channelId}/messages?limit=80`, {
           cache: "no-store",
         });
         const data = await res.json();
         if (cancelled) return;
+        if (pendingReactionsRef.current > 0) return; // late return — drop it
         if (data?.ok && Array.isArray(data.messages)) {
           setMessages(data.messages as ChatMessage[]);
         }
@@ -9806,6 +9823,7 @@ function ChannelChat({
   // failure so the user sees the truth.
   const toggleReaction = useCallback(
     async (messageId: string, emoji: string) => {
+      pendingReactionsRef.current += 1;
       let nextActive = false;
       setMessages((prev) =>
         prev.map((m) => {
@@ -9860,9 +9878,9 @@ function ChannelChat({
         );
         if (!res.ok) throw new Error(`react ${res.status}`);
         // Refetch immediately so the next state replace already includes
-        // (or excludes) this reaction. Without it the 2s poll can race
-        // with the POST and clobber our optimistic chip for a moment.
-        void refetchMessages();
+        // (or excludes) this reaction. The pending guard above prevents
+        // the 2s poll from racing with us in the meantime.
+        await refetchMessages();
       } catch (e) {
         console.error("[campus] react", e);
         // Roll back the optimistic flip so the UI matches the server.
@@ -9896,6 +9914,8 @@ function ChannelChat({
             };
           }),
         );
+      } finally {
+        pendingReactionsRef.current = Math.max(0, pendingReactionsRef.current - 1);
       }
     },
     [channelId, refetchMessages],
@@ -9907,14 +9927,68 @@ function ChannelChat({
   };
   const cancelReply = () => setReplyTo(null);
 
+  // iMessage drag: pull the message column left to reveal absolutely-
+  // positioned timestamp chips on the right edge of each row. We engage
+  // the gesture only when the user's motion is more horizontal than
+  // vertical so it doesn't fight the normal scroll gesture.
+  const DRAG_REVEAL = 76;
+  const dragStartRef = useRef<{ x: number; y: number; engaged: boolean } | null>(null);
+  const onScrollerPointerDown = (e: React.PointerEvent<HTMLElement>) => {
+    // Ignore touches that start on a button — those are real clicks.
+    const target = e.target as HTMLElement;
+    if (target.closest("button, input, textarea, a")) return;
+    dragStartRef.current = { x: e.clientX, y: e.clientY, engaged: false };
+  };
+  const onScrollerPointerMove = (e: React.PointerEvent<HTMLElement>) => {
+    const s = dragStartRef.current;
+    if (!s) return;
+    const dx = e.clientX - s.x;
+    const dy = e.clientY - s.y;
+    if (!s.engaged) {
+      // Need clear horizontal intent before we hijack the gesture.
+      if (Math.abs(dy) > 8) {
+        dragStartRef.current = null; // user is scrolling vertically
+        return;
+      }
+      if (Math.abs(dx) < 8) return;
+      if (Math.abs(dx) <= Math.abs(dy) * 1.4) return;
+      s.engaged = true;
+      setDragging(true);
+      try {
+        e.currentTarget.setPointerCapture(e.pointerId);
+      } catch {}
+    }
+    const clamped = Math.max(-DRAG_REVEAL, Math.min(0, dx));
+    setDragX(clamped);
+  };
+  const endDrag = (e?: React.PointerEvent<HTMLElement>) => {
+    const s = dragStartRef.current;
+    dragStartRef.current = null;
+    setDragging(false);
+    setDragX(0);
+    if (s?.engaged && e) {
+      try {
+        e.currentTarget.releasePointerCapture(e.pointerId);
+      } catch {}
+    }
+  };
+
   return (
     <>
       <section
         ref={scrollerRef}
+        onPointerDown={onScrollerPointerDown}
+        onPointerMove={onScrollerPointerMove}
+        onPointerUp={endDrag}
+        onPointerCancel={endDrag}
         style={{
           flex: 1,
           padding: "20px 28px 16px",
           overflowY: "auto",
+          // Hide horizontal overflow so the timestamp chips parked at
+          // right:-DRAG_REVEAL stay invisible until a drag pulls them in.
+          overflowX: "hidden",
+          touchAction: "pan-y", // let vertical scroll through, drag-x is ours
           display: "flex",
           flexDirection: "column",
           gap: 4,
@@ -9956,6 +10030,11 @@ function ChannelChat({
                   gap: 10,
                   paddingTop: sameAuthor ? 1 : 8,
                   position: "relative",
+                  transform: `translateX(${dragX}px)`,
+                  transition: dragging
+                    ? "none"
+                    : "transform 0.2s cubic-bezier(0.22, 1, 0.36, 1)",
+                  willChange: "transform",
                 }}
               >
                 {!sameAuthor ? (
@@ -10123,6 +10202,32 @@ function ChannelChat({
                     </div>
                   ) : null}
                 </div>
+                {/*
+                 * iMessage drag chip — parked just past the right edge of
+                 * the row, slides into view when the row is translated
+                 * left. opacity follows the drag amount so it fades in
+                 * gracefully instead of popping.
+                 */}
+                <span
+                  aria-hidden="true"
+                  style={{
+                    position: "absolute",
+                    right: -DRAG_REVEAL,
+                    top: "50%",
+                    transform: "translateY(-50%)",
+                    width: DRAG_REVEAL,
+                    paddingLeft: 8,
+                    fontFamily: "DM Sans, sans-serif",
+                    fontSize: 11,
+                    color: timeColor,
+                    whiteSpace: "nowrap",
+                    pointerEvents: "none",
+                    opacity: dragX === 0 ? 0 : Math.min(1, Math.abs(dragX) / 32),
+                    transition: dragging ? "none" : "opacity 0.2s ease-out",
+                  }}
+                >
+                  {formatChatTimeFull(m.created_at)}
+                </span>
               </article>
             );
           })
@@ -10483,6 +10588,22 @@ function formatChatTime(iso: string): string {
       return d.toLocaleTimeString([], { hour: "numeric", minute: "2-digit" });
     }
     return d.toLocaleDateString([], { month: "short", day: "numeric" });
+  } catch {
+    return "";
+  }
+}
+
+// Always-include-time variant for the iMessage drag reveal — the row's
+// own header may already show the date, but the slide-out chip should
+// always read like a clock ("3:42 PM" or "May 4, 3:42 PM").
+function formatChatTimeFull(iso: string): string {
+  try {
+    const d = new Date(iso);
+    const now = new Date();
+    const sameDay = d.toDateString() === now.toDateString();
+    const time = d.toLocaleTimeString([], { hour: "numeric", minute: "2-digit" });
+    if (sameDay) return time;
+    return `${d.toLocaleDateString([], { month: "short", day: "numeric" })}, ${time}`;
   } catch {
     return "";
   }

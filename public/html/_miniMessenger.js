@@ -201,6 +201,10 @@
     // Quote-reply target for the active chat (cleared on send / cancel /
     // chat switch). Shape: { id, channelId, authorName, content }.
     replyTo: null,
+    // Number of reaction toggles in flight. While > 0, polling-driven
+    // loadMessages calls skip — keeps optimistic chips from being
+    // clobbered by a stale poll racing with our POST.
+    pendingReactions: 0,
   };
 
   function attachWhenReady() {
@@ -461,13 +465,17 @@
     if (state.chatPollTimer) clearInterval(state.chatPollTimer);
     state.chatPollTimer = setInterval(() => {
       if (document.hidden) return;
-      if (state.activeChannel === channelId) loadMessages();
+      if (state.activeChannel === channelId) loadMessages({ fromPoll: true });
     }, state.CHAT_POLL_MS);
   }
 
-  async function loadMessages() {
+  async function loadMessages(opts) {
     const cid = state.activeChannel;
     if (!cid) return;
+    // Skip polling-driven loads while a reaction toggle is in flight,
+    // otherwise a stale poll lands a messages array without the new
+    // chip and clobbers the optimistic flip.
+    if (opts && opts.fromPoll && (state.pendingReactions || 0) > 0) return;
     try {
       const r = await fetch(`/api/me/threads/${encodeURIComponent(cid)}/messages?limit=50`, { credentials: "include" });
       const j = await r.json();
@@ -660,6 +668,7 @@
       nextActive = true;
     }
     paintMessages();
+    state.pendingReactions = (state.pendingReactions || 0) + 1;
     try {
       const res = await fetch(`/api/me/threads/${encodeURIComponent(cid)}/messages/${encodeURIComponent(messageId)}/react`, {
         method: nextActive ? "POST" : "DELETE",
@@ -668,12 +677,15 @@
         body: JSON.stringify({ emoji }),
       });
       if (!res.ok) throw new Error("react " + res.status);
-      // Refetch on success so the chip survives the next 2s poll cycle.
-      loadMessages();
+      // Refetch (direct, not from-poll) so the chip is sourced from server
+      // truth before the next 2s poll cycle. The pending guard keeps
+      // any racing poll from clobbering us in the meantime.
+      await loadMessages();
     } catch (e) {
       console.error("[mini.react]", e);
-      // Roll back via fresh fetch.
-      loadMessages();
+      await loadMessages();
+    } finally {
+      state.pendingReactions = Math.max(0, (state.pendingReactions || 0) - 1);
     }
   };
 
