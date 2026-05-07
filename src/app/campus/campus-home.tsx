@@ -10064,7 +10064,7 @@ function ChannelChat({
                 style={{
                   display: "flex",
                   gap: 10,
-                  paddingTop: sameAuthor ? 1 : 8,
+                  paddingTop: sameAuthor ? 5 : 14,
                   position: "relative",
                   transform: `translateX(${dragX}px)`,
                   transition: dragging
