@@ -151,7 +151,7 @@
     .vmm-time{font-size:10.5px;color:#8A8580;flex-shrink:0;align-self:flex-start;padding-top:2px;}
     .vmm-empty{padding:32px 16px;text-align:center;color:#8A8580;font-size:12.5px;}
     .vmm-date-sep{text-align:center;font-family:'DM Sans',sans-serif;font-size:10.5px;color:rgba(255,255,255,0.55);margin:10px 0 6px;letter-spacing:.2px;}
-    .vmm-msgs{flex:1;overflow-y:auto;padding:12px 14px;display:flex;flex-direction:column;gap:6px;background:#FAF7F2;}
+    .vmm-msgs{flex:1;overflow-y:auto;padding:12px 14px;display:flex;flex-direction:column;gap:9px;background:#FAF7F2;}
     .vmm-msg{display:flex;gap:7px;align-items:flex-end;}
     .vmm-msg.mine{flex-direction:row-reverse;}
     .vmm-msg.gt{margin-top:14px;}
