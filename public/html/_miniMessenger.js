@@ -647,6 +647,17 @@
         h += `<div class="vmm-msg${m.mine ? " mine" : ""}${gc}">${!m.mine ? av : ""}<div style="display:flex;flex-direction:column;align-items:${m.mine ? "flex-end" : "flex-start"};gap:3px;">${body}</div></div>`;
       } else if (m.attachment) {
         h += `<div class="vmm-msg${m.mine ? " mine" : ""}${gc}">${!m.mine ? av : ""}<div class="vmm-bubble">${m.content ? esc(m.content) + "<br>" : ""}<a href="/messages" style="color:inherit;text-decoration:underline;font-size:11.5px">View ${m.attachment.kind === "clip" ? "clip" : "post"}</a></div></div>`;
+      } else if (typeof window.__profilePreviewExtract === "function" && window.__profilePreviewExtract(m.content || "")) {
+        // Profile-share message → render the same rich card the full
+        // /messages page uses. Theme follows mine (dark) vs peer (light)
+        // so it reads against either bubble side.
+        const profShare = window.__profilePreviewExtract(m.content || "");
+        const theme = m.mine ? "dark" : "light";
+        const card = window.__profilePreviewSkeletonHTML(profShare.handle, { theme });
+        const caption = profShare.prefix
+          ? `<div class="vmm-bubble" style="margin-bottom:4px">${esc(profShare.prefix)}</div>`
+          : "";
+        h += `<div class="vmm-msg${m.mine ? " mine" : ""}${gc}">${!m.mine ? av : ""}<div style="display:flex;flex-direction:column;align-items:${m.mine ? "flex-end" : "flex-start"};gap:3px;max-width:100%;">${caption}${card}</div></div>`;
       } else {
         // Quote-stub if this is a reply; reaction chips below; hover pill
         // with 5 reactions + Reply trigger.
@@ -684,6 +695,10 @@
       lastSender = m.senderId;
     });
     el.innerHTML = h;
+    // Hydrate any profile-share preview cards.
+    if (typeof window.__profilePreviewHydrate === "function") {
+      window.__profilePreviewHydrate(el);
+    }
     if (wasAtBottom || state.msgs.length === 1) {
       // Defer to next frame so layout settles before we measure scrollHeight.
       requestAnimationFrame(() => { el.scrollTop = el.scrollHeight; });

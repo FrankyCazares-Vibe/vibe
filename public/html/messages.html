@@ -8,6 +8,7 @@
 <link href="https://fonts.googleapis.com/css2?family=Fraunces:ital,wght@0,400;0,700;0,900;1,400&family=DM+Sans:wght@300;400;500;600&display=swap" rel="stylesheet">
 <script src="/html/_persistence.js"></script>
 <script src="/html/_otto.js" defer></script>
+<script src="/html/_profilePreview.js" defer></script>
 <script src="/html/_postViewer.js" defer></script>
 <script src="/html/_sharePicker.js" defer></script>
 <script src="/html/_safetyActions.js" defer></script>
@@ -1353,18 +1354,34 @@ function renderMsgs(msgs,d){
       const stack = `<div class="msg-attach-stack">${captionBlock}<div class="msg-attach"${cardOnclick}>${cardInner}</div><div class="btime" style="font-size:10px;color:var(--muted);text-align:${mine?'right':'left'};margin-top:2px;">${m.ts}</div></div>`;
       h += `<div class="msg-row${mine?' mine':''}${gc}">${!mine?avForMsg(m, showAv):''}${stack}</div>`;
     } else {
-      const stub = quoteStubFor(m);
-      // Long messages (>60 chars or multi-line) get the picker stacked
-      // ABOVE the bubble — beside would push past the chat's right edge.
-      const isLong = (m.t || '').length > 60 || /\n/.test(m.t || '');
-      const longCls = isLong ? ' is-long' : '';
-      // .btime sits at the .msg-row level so it absolute-positions to
-      // the row's right edge (iMessage drag-reveal). The picker is
-      // inside .dm-bubble-wrap (now position:relative) so it can float
-      // absolutely beside the bubble without forcing it to re-wrap.
-      const wrap = `<div class="dm-bubble-wrap"><div class="bubble">${__dmFormatBody(m.t)}</div>${actionsFor(m)}</div>`;
-      const stack = `<div style="display:flex;flex-direction:column;align-items:${mine?'flex-end':'flex-start'};max-width:70%;min-width:0;">${stub}${wrap}${chipsFor(m)}</div>`;
-      h+=`<div class="msg-row${mine?' mine':''}${gc}${longCls}">${!mine?avForMsg(m, showAv):''}${stack}<div class="btime">${m.ts}</div></div>`;
+      // Profile-share message? Render a rich card (banner + avatar +
+      // name + role) instead of a raw URL bubble. The card is fetched
+      // lazily by _profilePreview.js after the DOM mounts below.
+      const profShare = (typeof window.__profilePreviewExtract === 'function')
+        ? window.__profilePreviewExtract(m.t || '')
+        : null;
+      if (profShare) {
+        const theme = mine ? 'dark' : 'light';
+        const card = window.__profilePreviewSkeletonHTML(profShare.handle, { theme });
+        const captionBlock = profShare.prefix
+          ? `<div class="msg-attach-caption">${__dmFormatBody(profShare.prefix)}</div>`
+          : '';
+        const stack = `<div class="msg-attach-stack">${captionBlock}${card}<div class="btime" style="font-size:10px;color:var(--muted);text-align:${mine?'right':'left'};margin-top:2px;">${m.ts}</div></div>`;
+        h += `<div class="msg-row${mine?' mine':''}${gc}">${!mine?avForMsg(m, showAv):''}${stack}</div>`;
+      } else {
+        const stub = quoteStubFor(m);
+        // Long messages (>60 chars or multi-line) get the picker stacked
+        // ABOVE the bubble — beside would push past the chat's right edge.
+        const isLong = (m.t || '').length > 60 || /\n/.test(m.t || '');
+        const longCls = isLong ? ' is-long' : '';
+        // .btime sits at the .msg-row level so it absolute-positions to
+        // the row's right edge (iMessage drag-reveal). The picker is
+        // inside .dm-bubble-wrap (now position:relative) so it can float
+        // absolutely beside the bubble without forcing it to re-wrap.
+        const wrap = `<div class="dm-bubble-wrap"><div class="bubble">${__dmFormatBody(m.t)}</div>${actionsFor(m)}</div>`;
+        const stack = `<div style="display:flex;flex-direction:column;align-items:${mine?'flex-end':'flex-start'};max-width:70%;min-width:0;">${stub}${wrap}${chipsFor(m)}</div>`;
+        h+=`<div class="msg-row${mine?' mine':''}${gc}${longCls}">${!mine?avForMsg(m, showAv):''}${stack}<div class="btime">${m.ts}</div></div>`;
+      }
     }
     last=mine;
     lastSenderId=senderKey;
@@ -1413,12 +1430,17 @@ function renderMsgs(msgs,d){
       '<div class="msgs-bubbles">' + h + '</div>' +
       '<div class="msgs-footer">' + footerH + '</div>';
     a.dataset.sig = sig;
+    bubblesEl = a.querySelector(':scope > .msgs-bubbles');
   } else {
     if (sigChanged) {
       bubblesEl.innerHTML = h;
       a.dataset.sig = sig;
     }
     if (footerEl.innerHTML !== footerH) footerEl.innerHTML = footerH;
+  }
+  // Hydrate any profile-share cards in the freshly-rendered bubbles.
+  if (bubblesEl && typeof window.__profilePreviewHydrate === 'function') {
+    window.__profilePreviewHydrate(bubblesEl);
   }
 
   // Scroll: auto-pin to the bottom on thread switch or when user was
