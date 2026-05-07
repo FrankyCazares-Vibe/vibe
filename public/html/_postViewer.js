@@ -164,6 +164,42 @@
   .vpv-cw .vpv-cn .vpv-ch { color: #8A8580; font-weight: 500; margin-left: 6px; font-size: 12px; }
   .vpv-cw .vpv-ct { font-size: 13.5px; line-height: 1.45; color: #1C1C1E; margin-top: 2px; word-wrap: break-word; }
   .vpv-cw .vpv-cd { font-size: 11px; color: #8A8580; margin-top: 4px; }
+  .vpv-cmeta {
+    display: flex; align-items: center; gap: 14px;
+    margin-top: 6px; font-size: 11px; color: #8A8580;
+    font-family: 'DM Sans', system-ui, sans-serif;
+  }
+  .vpv-cact {
+    display: inline-flex; align-items: center; gap: 4px;
+    background: transparent; border: none; padding: 0;
+    font: inherit; color: inherit; cursor: none;
+    font-weight: 600;
+  }
+  .vpv-cact svg { display: block; }
+  .vpv-cact.on { color: #E0245E; }
+  .vpv-cact.on svg { fill: #E0245E; stroke: #E0245E; }
+  .vpv-creply-form {
+    display: flex; gap: 6px; margin-top: 8px;
+  }
+  .vpv-creply-form input {
+    flex: 1; border: 1px solid rgba(28,28,30,.14);
+    border-radius: 999px; padding: 6px 12px;
+    font-family: inherit; font-size: 12.5px;
+    background: white; color: #1C1C1E; outline: none;
+  }
+  .vpv-creply-form button {
+    background: #1C1C1E; color: white; border: none;
+    font-family: inherit; font-size: 11px; font-weight: 700;
+    padding: 6px 12px; border-radius: 999px; cursor: none;
+  }
+  .vpv-creply-form button[disabled] { opacity: .4; }
+  .vpv-creplies {
+    margin-top: 10px; padding-left: 10px;
+    border-left: 2px solid rgba(28,28,30,.06);
+    display: flex; flex-direction: column; gap: 8px;
+  }
+  .vpv-creplies .vpv-comment { padding: 6px 0; border-top: none !important; }
+  .vpv-creplies .vpv-comment .vpv-avatar { width: 24px; height: 24px; font-size: 10px; }
 
   .vpv-composer {
     display: flex; align-items: center; gap: 8px;
@@ -587,12 +623,30 @@
       ? `<div class="vpv-avatar"><img src="${esc(a.avatar_url)}" alt=""></div>`
       : `<div class="vpv-avatar">${esc(initials(a.name || a.handle))}</div>`;
     const handle = a.handle ? `<span class="vpv-ch">@${esc(a.handle)}</span>` : "";
-    return `<div class="vpv-comment">
+    const liked = !!c.viewer_liked;
+    const likeCount = Number(c.like_count) > 0 ? Number(c.like_count) : 0;
+    const heartFill = liked ? "currentColor" : "none";
+    const heartSvg = `<svg width="12" height="12" viewBox="0 0 16 16" fill="${heartFill}"><path d="M8 13.5s-5-3.2-5-7a3 3 0 0 1 5-2.2A3 3 0 0 1 13 6.5c0 3.8-5 7-5 7z" stroke="currentColor" stroke-width="1.4" stroke-linejoin="round" fill="${heartFill}"/></svg>`;
+    const repliesHtml = Array.isArray(c.replies) && c.replies.length > 0
+      ? `<div class="vpv-creplies" id="vpv-replies-${esc(c.id)}">${c.replies.map(renderCommentRow).join("")}</div>`
+      : `<div class="vpv-creplies" id="vpv-replies-${esc(c.id)}" style="display:none"></div>`;
+    return `<div class="vpv-comment" data-comment-id="${esc(c.id)}">
       ${av}
       <div class="vpv-cw">
         <div class="vpv-cn">${esc(a.name || a.handle || "Unknown")}${handle}</div>
         <div class="vpv-ct">${esc(c.content)}</div>
-        <div class="vpv-cd">${esc(relTime(c.created_at))}</div>
+        <div class="vpv-cmeta">
+          <button class="vpv-cact${liked ? " on" : ""}" id="vpv-like-${esc(c.id)}" onclick="__vpvToggleCommentLike('${esc(c.id)}')" aria-label="Like comment">
+            ${heartSvg}<span class="vpv-clikec">${likeCount > 0 ? likeCount : ""}</span>
+          </button>
+          <button class="vpv-cact" onclick="__vpvOpenReply('${esc(c.id)}', '${esc(a.handle || "")}')">Reply</button>
+          <span style="margin-left:auto;color:#8A8580">${esc(relTime(c.created_at))}</span>
+        </div>
+        <div class="vpv-creply-form" id="vpv-reply-${esc(c.id)}" style="display:none">
+          <input type="text" maxlength="1000" placeholder="Write a reply…" onkeydown="if(event.key==='Enter'&&!event.shiftKey){event.preventDefault();__vpvSubmitReply('${esc(c.id)}', this.parentNode)}else if(event.key==='Escape'){__vpvCancelReply('${esc(c.id)}')}">
+          <button type="button" onclick="__vpvSubmitReply('${esc(c.id)}', this.parentNode)">Post</button>
+        </div>
+        ${repliesHtml}
       </div>
     </div>`;
   }
@@ -783,6 +837,106 @@
       toast(e && e.message ? e.message : "Could not post comment");
     } finally {
       btn.disabled = false;
+    }
+  };
+
+  // ── Comment-level engagement (heart + reply) ─────────────────────────
+  // Optimistic toggle for the per-comment heart. Mirrors __vpvToggleLike
+  // but targets `comment_likes` and the inline button on the row.
+  window.__vpvToggleCommentLike = async function (commentId) {
+    if (!isAppShell()) { toast("Sign in to like comments"); return; }
+    const btn = document.getElementById("vpv-like-" + commentId);
+    if (!btn) return;
+    const wasLiked = btn.classList.contains("on");
+    const countEl = btn.querySelector(".vpv-clikec");
+    const heartPath = btn.querySelector("svg path");
+    const cur = parseInt((countEl && countEl.textContent) || "0", 10) || 0;
+    const next = !wasLiked;
+    const nextCount = Math.max(0, cur + (next ? 1 : -1));
+    btn.classList.toggle("on", next);
+    if (countEl) countEl.textContent = nextCount > 0 ? String(nextCount) : "";
+    if (heartPath) {
+      heartPath.setAttribute("fill", next ? "currentColor" : "none");
+    }
+    try {
+      const r = await fetch("/api/comments/" + encodeURIComponent(commentId) + "/like", {
+        method: next ? "POST" : "DELETE",
+        credentials: "include",
+      });
+      if (!r.ok) {
+        const j = await r.json().catch(() => ({}));
+        throw new Error((j && j.error) || "Could not update");
+      }
+    } catch (e) {
+      // Rollback
+      btn.classList.toggle("on", wasLiked);
+      if (countEl) countEl.textContent = cur > 0 ? String(cur) : "";
+      if (heartPath) heartPath.setAttribute("fill", wasLiked ? "currentColor" : "none");
+      toast(e && e.message ? e.message : "Could not update like");
+    }
+  };
+
+  window.__vpvOpenReply = function (commentId, authorHandle) {
+    const form = document.getElementById("vpv-reply-" + commentId);
+    if (!form) return;
+    const visible = form.style.display !== "none";
+    if (visible) {
+      form.style.display = "none";
+      return;
+    }
+    form.style.display = "flex";
+    const input = form.querySelector("input");
+    if (input) {
+      if (!input.value && authorHandle) input.value = "@" + authorHandle + " ";
+      try { input.focus(); } catch {}
+    }
+  };
+
+  window.__vpvCancelReply = function (commentId) {
+    const form = document.getElementById("vpv-reply-" + commentId);
+    if (!form) return;
+    form.style.display = "none";
+    const input = form.querySelector("input");
+    if (input) input.value = "";
+  };
+
+  window.__vpvSubmitReply = async function (commentId, formEl) {
+    if (!state.openId) return;
+    if (!isAppShell()) { toast("Sign in to reply"); return; }
+    if (!isRealPostId(state.openId)) { toast("This is a demo post — interactions disabled"); return; }
+    if (!formEl) return;
+    const input = formEl.querySelector("input");
+    const submit = formEl.querySelector("button");
+    const text = (input && input.value || "").trim();
+    if (!text) return;
+    if (submit) submit.disabled = true;
+    try {
+      const r = await fetch("/api/posts/" + encodeURIComponent(state.openId) + "/comments", {
+        method: "POST",
+        credentials: "include",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ content: text, parent_comment_id: commentId }),
+      });
+      const j = await r.json().catch(() => ({}));
+      if (!r.ok || !j.ok || !j.comment) throw new Error((j && j.error) || "Could not post reply");
+      // The API resolves parent_comment_id up to the top-level ancestor,
+      // so the reply lives under whichever comment the user clicked on
+      // (the visible parent in the rendered tree).
+      const targetParent = j.comment.parent_comment_id || commentId;
+      const repliesWrap = document.getElementById("vpv-replies-" + targetParent);
+      if (repliesWrap) {
+        repliesWrap.style.display = "";
+        repliesWrap.insertAdjacentHTML("beforeend", renderCommentRow(j.comment));
+      }
+      state.comments += 1;
+      const countEl = document.getElementById("vpvCommentCount");
+      if (countEl) countEl.textContent = String(state.comments);
+      if (input) input.value = "";
+      formEl.style.display = "none";
+    } catch (e) {
+      toast(e && e.message ? e.message : "Could not post reply");
+    } finally {
+      if (submit) submit.disabled = false;
     }
   };
 })();

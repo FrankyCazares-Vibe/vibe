@@ -12,6 +12,7 @@
 <script src="/html/_otto.js" defer></script>
 <script src="/html/_postViewer.js" defer></script>
 <script src="/html/_sharePicker.js" defer></script>
+<script src="/html/_imageCropper.js" defer></script>
 <script src="/html/_miniMessenger.js" defer></script>
 <script src="/html/_safetyActions.js" defer></script>
 <script src="/html/_mentionPicker.js" defer></script>
@@ -1486,12 +1487,29 @@ body.edit-mode .vibe-upload-tile { display:flex; }
 }
 .composer-publish:hover { background:#ff7055;transform:translateY(-1px); }
 
-/* ── Profile post cards ── */
+/* ── Profile post cards (Stage 7 — liquid-glass match for campus feed) ── */
 .profile-post-card {
-  background:var(--cream);border-radius:16px;padding:16px;margin-bottom:10px;
-  transition:background .15s;position:relative;
+  background: linear-gradient(180deg, rgba(255,253,248,0.78) 0%, rgba(255,250,240,0.66) 100%);
+  backdrop-filter: blur(28px) saturate(180%);
+  -webkit-backdrop-filter: blur(28px) saturate(180%);
+  border: 1px solid rgba(255,255,255,0.7);
+  box-shadow:
+    inset 0 1px 0 rgba(255,255,255,0.85),
+    inset 0 -1px 0 rgba(28,28,30,0.04),
+    0 8px 32px rgba(180,120,60,0.08);
+  border-radius: 20px;
+  padding: 20px 22px;
+  margin-bottom: 14px;
+  transition: transform .15s ease, box-shadow .15s ease;
+  position: relative;
 }
-.profile-post-card:hover { background:#F5F3EE; }
+.profile-post-card:hover {
+  transform: translateY(-1px);
+  box-shadow:
+    inset 0 1px 0 rgba(255,255,255,0.85),
+    inset 0 -1px 0 rgba(28,28,30,0.04),
+    0 12px 36px rgba(180,120,60,0.12);
+}
 .ppost-delete {
   position:absolute;top:10px;right:10px;
   width:24px;height:24px;border:none;border-radius:50%;
@@ -1522,7 +1540,7 @@ body.viewer-mode .vibe-delete-btn,
 body.recruiter-mode .vibe-delete-btn { display:none !important; }
 .ppost-date { font-size:11px;font-weight:700;color:var(--muted);text-transform:uppercase;letter-spacing:.5px;margin-bottom:8px; }
 /* All-tab vertical feed — clips and posts mixed chronologically. */
-.vibes-tab-feed { display:flex;flex-direction:column;gap:14px; }
+.vibes-tab-feed { display:flex;flex-direction:column;gap:16px; }
 .vibes-tab-feed .profile-post-card { margin:0; }
 /* Clip card in the All feed: poster image + play button overlay + caption. */
 .feed-clip-card {
@@ -1550,7 +1568,7 @@ body.recruiter-mode .vibe-delete-btn { display:none !important; }
 }
 .feed-clip-sub { font-size:11px;color:var(--muted);margin-top:4px;font-weight:600; }
 
-.ppost-body { font-size:14px;line-height:1.75;color:var(--soft-black);margin-bottom:10px; }
+.ppost-body { font-size:15px;line-height:1.6;color:var(--soft-black);margin-bottom:12px; }
 .ppost-body strong { color:var(--charcoal); }
 /* Read more truncation (LinkedIn-style) — clamped to 6 lines until expanded. */
 .ppost-body.is-clamped { display:-webkit-box; -webkit-line-clamp:6; -webkit-box-orient:vertical; overflow:hidden; }
@@ -3036,6 +3054,7 @@ body.empty-profile-mode #profileEmpty { display: flex !important; }
           <button class="content-tab active" onclick="switchContentTab('all-pane', this)">All</button>
           <button class="content-tab" onclick="switchContentTab('vibes-pane', this)">Clips</button>
           <button class="content-tab" onclick="switchContentTab('posts-pane', this)">Posts</button>
+          <button class="content-tab" onclick="switchContentTab('reposts-pane', this)">Reposts</button>
           <button class="content-tab owner-only" onclick="switchContentTab('saved-pane', this)">Saved</button>
         </div>
 
@@ -3169,6 +3188,18 @@ body.empty-profile-mode #profileEmpty { display: flex !important; }
           </div><!-- /profilePostsList -->
 
         </div><!-- /posts-pane -->
+
+        <!-- REPOSTS pane — populated lazily on first tab visit. Visible on
+             every profile (own + visited) since reposts are public. -->
+        <div class="content-pane" id="reposts-pane">
+          <div class="vibes-tab-feed" id="profileRepostsList"></div>
+          <div class="content-empty" id="repostsEmptyState" style="display:none">
+            <div class="content-empty-title">No reposts yet</div>
+            <div class="content-empty-body">
+              When you repost something on the campus feed, it'll show up here.
+            </div>
+          </div>
+        </div>
 
         <!-- SAVED pane — own-profile only; populated lazily on first tab visit -->
         <div class="content-pane owner-only" id="saved-pane">
@@ -3561,8 +3592,24 @@ function _fileToDataURL(file) {
 }
 
 async function handleAvatarUpload(input){
-  const file = input.files[0];
-  if(!file) return;
+  const rawFile = input.files[0];
+  if(!rawFile) return;
+  // Reset the input so the same file can be re-picked after cancel.
+  input.value = '';
+  // Crop to a 1:1 frame before applying anywhere. Avatars render in a
+  // circle in the UI but the underlying blob is square — same convention
+  // the React org-logo path uses.
+  let file = rawFile;
+  if (typeof window.openImageCropper === 'function') {
+    const cropped = await window.openImageCropper(rawFile, {
+      aspect: 1,
+      outputMaxSize: 1024,
+      title: 'Adjust profile photo',
+      shape: 'circle',
+    });
+    if (!cropped) return;
+    file = new File([cropped], 'avatar-cropped.jpg', { type: cropped.type || 'image/jpeg' });
+  }
   const url = await _fileToDataURL(file);
   uploadedAvatars.push(url);
 
@@ -3639,8 +3686,21 @@ function openGradientModal(){
 }
 
 async function handleCoverUpload(input){
-  const file = input.files[0];
-  if(!file) return;
+  const rawFile = input.files[0];
+  if(!rawFile) return;
+  // Reset so cancel + same-file re-pick still triggers onchange.
+  input.value = '';
+  // Crop to the banner aspect (3:1 — matches the rendered cover height).
+  let file = rawFile;
+  if (typeof window.openImageCropper === 'function') {
+    const cropped = await window.openImageCropper(rawFile, {
+      aspect: 3,
+      outputMaxSize: 2400,
+      title: 'Adjust cover photo',
+    });
+    if (!cropped) return;
+    file = new File([cropped], 'cover-cropped.jpg', { type: cropped.type || 'image/jpeg' });
+  }
   const url = await _fileToDataURL(file);
   pendingCoverUrl = url;
   // Show preview in modal
@@ -4561,6 +4621,9 @@ function switchContentTab(paneId, btn) {
   // visits show the cached grid until the user reloads.
   if (paneId === 'saved-pane' && typeof hydrateSavedPaneFromAPI === 'function') {
     hydrateSavedPaneFromAPI();
+  }
+  if (paneId === 'reposts-pane' && typeof hydrateRepostsPaneFromAPI === 'function') {
+    hydrateRepostsPaneFromAPI();
   }
 }
 
@@ -6427,6 +6490,116 @@ function _formatRelativeDate(iso) {
 }
 
 // ── Saved tab (P1-015 follow-on) ──────────────────────────────────────
+// ── Reposts pane (Stage 7) ──────────────────────────────────────
+// Lazy-hydrate on first tab visit. Visible on every profile, not just
+// the owner — reposts are public. Resolves the target handle from
+// `window.viewingRealUser` (visiting another user) or from
+// `vibe_user_v1` (own profile). Mock profile views skip cleanly.
+let _repostsHydrateInflight = false;
+let _repostsHydratedOnce = false;
+async function hydrateRepostsPaneFromAPI() {
+  if (window.viewingMockUser) return;
+  if (_repostsHydrateInflight || _repostsHydratedOnce) return;
+
+  const handle = window.viewingRealUser
+    ? window.viewingRealUser.handle
+    : ((typeof vibeLoad === 'function' && vibeLoad('vibe_user_v1')) || {}).handle;
+  if (!handle) return;
+
+  const list = document.getElementById('profileRepostsList');
+  const empty = document.getElementById('repostsEmptyState');
+  if (list) list.innerHTML = '<div style="padding:18px;text-align:center;color:var(--muted);font-size:13px;">Loading…</div>';
+
+  _repostsHydrateInflight = true;
+  try {
+    const r = await fetch('/api/users/' + encodeURIComponent(handle) + '/reposts?limit=100', { credentials: 'include' });
+    const j = await r.json().catch(() => ({}));
+    if (!r.ok || !j.ok || !Array.isArray(j.reposts)) throw new Error((j && j.error) || 'Could not load reposts');
+    _repostsHydratedOnce = true;
+    if (!list) return;
+    list.innerHTML = '';
+    if (j.reposts.length === 0) {
+      list.style.display = 'none';
+      if (empty) empty.style.display = 'block';
+      return;
+    }
+    list.style.display = '';
+    if (empty) empty.style.display = 'none';
+    j.reposts.forEach(r => list.appendChild(_buildRepostCard(r)));
+  } catch (e) {
+    if (list) list.innerHTML = '<div style="padding:18px;text-align:center;color:var(--muted);font-size:13px;">' +
+      _esc(e && e.message ? e.message : 'Could not load reposts') + '</div>';
+  } finally {
+    _repostsHydrateInflight = false;
+  }
+}
+
+// Renders one repost row: optional quote text, then the embedded original
+// post in a quoted block (greyed border, author handle + content + media).
+function _buildRepostCard(repost) {
+  const post = repost.post || {};
+  const author = post.author || {};
+  const org = post.org || null;
+  const card = document.createElement('div');
+  card.className = 'profile-post-card';
+  card.style.cssText = 'padding:14px 16px;display:flex;flex-direction:column;gap:10px;cursor:pointer;';
+  card.dataset.postId = post.id;
+
+  // "🔁 reposted" header
+  const banner = document.createElement('div');
+  banner.style.cssText = 'font-size:11px;color:var(--muted);font-weight:600;display:flex;align-items:center;gap:6px;';
+  banner.innerHTML = '<span style="font-size:13px">&#128257;</span><span>Reposted</span>';
+  card.appendChild(banner);
+
+  // Optional quote
+  if (repost.comment) {
+    const quote = document.createElement('div');
+    quote.style.cssText = 'font-size:14px;color:#1c1c1e;line-height:1.45;white-space:pre-wrap;';
+    quote.textContent = repost.comment;
+    card.appendChild(quote);
+  }
+
+  // Embedded original — quoted block
+  const inner = document.createElement('div');
+  inner.style.cssText = 'border:1px solid rgba(28,28,30,0.10);border-radius:12px;padding:12px 14px;display:flex;flex-direction:column;gap:8px;background:rgba(255,255,255,0.55);';
+
+  const head = document.createElement('div');
+  head.style.cssText = 'display:flex;align-items:center;gap:8px;font-size:12px;color:var(--muted);';
+  const displayName = (org && org.name) || author.name || author.handle || 'Member';
+  const displayHandle = org ? ('@' + org.handle) : (author.handle ? ('@' + author.handle) : '');
+  head.innerHTML = '<strong style="font-family:Fraunces,serif;font-size:13px;color:#1c1c1e">' + _esc(displayName) + '</strong>' +
+    (displayHandle ? '<span>' + _esc(displayHandle) + '</span>' : '');
+  inner.appendChild(head);
+
+  if (post.content) {
+    const body = document.createElement('div');
+    body.style.cssText = 'font-size:14px;color:#1c1c1e;line-height:1.45;white-space:pre-wrap;';
+    body.textContent = post.content.length > 280 ? post.content.slice(0, 277) + '…' : post.content;
+    inner.appendChild(body);
+  }
+
+  if (post.media_url && post.type === 'post') {
+    const media = document.createElement('div');
+    media.style.cssText = 'border-radius:10px;overflow:hidden;padding-top:56%;background:url("' + _esc(post.media_url) + '") center/cover;border:1px solid rgba(28,28,30,0.06);';
+    inner.appendChild(media);
+  } else if (post.media_url && post.type === 'clip') {
+    const v = document.createElement('video');
+    v.src = post.media_url;
+    v.controls = true;
+    if (post.media_thumbnail_url) v.poster = post.media_thumbnail_url;
+    v.style.cssText = 'width:100%;border-radius:10px;background:#000;max-height:380px;border:1px solid rgba(28,28,30,0.06);';
+    inner.appendChild(v);
+  }
+
+  card.appendChild(inner);
+
+  card.addEventListener('click', () => {
+    if (typeof openPostViewer === 'function' && post.id) openPostViewer(post.id, post);
+  });
+
+  return card;
+}
+
 // Lazy-hydrated on first tab click; subsequent clicks show the cached
 // grid. Each cell opens the existing post viewer modal — no separate
 // modal needed since the same data shape works.

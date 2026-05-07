@@ -54,20 +54,24 @@ export function OrgProfileJoinButton({
   }
 
   if (role) {
-    // Already a member — link straight into Campus where the rail surfaces this org.
+    // Already a member — show a quiet "Joined" badge. The TopNav has the
+    // dedicated "Return to Organizations" pill for the back-to-Campus action.
     return (
-      <Link
-        href="/campus"
+      <span
         style={{
           ...buttonBase,
-          color: "#fff",
+          color: "rgba(255,255,255,0.9)",
           background:
-            "linear-gradient(180deg, rgba(255,255,255,0.12) 0%, rgba(255,255,255,0.04) 100%)",
-          border: "1px solid rgba(255,255,255,0.16)",
+            "linear-gradient(180deg, rgba(91,209,140,0.22) 0%, rgba(91,209,140,0.08) 100%)",
+          border: "1px solid rgba(91,209,140,0.45)",
+          cursor: "default",
+          display: "inline-flex",
+          alignItems: "center",
+          gap: 6,
         }}
       >
-        Open in Campus
-      </Link>
+        ✓ Joined
+      </span>
     );
   }
 

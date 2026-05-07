@@ -162,7 +162,7 @@ export default async function OrgProfilePage({ params }: Params) {
     .eq("org_id", org.id)
     .order("created_at", { ascending: false })
     .limit(24);
-  const allPostRows = ((postsData || []) as PostRow[]).map((p) => ({
+  const allPostRows = ((postsData || []) as unknown as PostRow[]).map((p) => ({
     ...p,
     media_url: postMediaProxyUrl(p.id, p.media_url, "media"),
     media_thumbnail_url: postMediaProxyUrl(p.id, p.media_thumbnail_url, "thumbnail"),
@@ -222,7 +222,7 @@ export default async function OrgProfilePage({ params }: Params) {
         >
           <div style={{ display: "flex", flexDirection: "column", gap: 24, minWidth: 0 }}>
             {clips.length > 0 ? <ClipsSection clips={clips} /> : null}
-            {posts.length > 0 ? <PostsSection posts={posts} /> : null}
+            {posts.length > 0 ? <PostsSection posts={posts} org={org} /> : null}
             {clips.length === 0 && posts.length === 0 ? <EmptyContent /> : null}
           </div>
 
@@ -250,23 +250,42 @@ function TopNav({ signedIn }: { signedIn: boolean }) {
         fontSize: 13,
       }}
     >
+      {/* Vibe logo with orange dot — matches the LeftNav treatment. */}
       <Link
         href="/"
         style={{
-          color: "rgba(255,255,255,0.85)",
+          color: "#fff",
           textDecoration: "none",
           fontFamily: "Fraunces, serif",
-          fontWeight: 800,
-          letterSpacing: "-0.01em",
-          fontSize: 16,
+          fontWeight: 900,
+          letterSpacing: "-0.02em",
+          fontSize: 22,
         }}
       >
-        Vibe
+        vibe<span style={{ color: "#FF5C35" }}>.</span>
       </Link>
-      {/* Sign-in CTA for anonymous viewers only — signed-in users get
-          contextual actions (Open in Campus / Join) on the org card itself,
-          so a generic top-nav button would just duplicate them. */}
-      {!signedIn ? (
+      {signedIn ? (
+        <Link
+          href="/campus"
+          style={{
+            color: "rgba(255,255,255,0.95)",
+            textDecoration: "none",
+            padding: "8px 16px",
+            borderRadius: 999,
+            border: "1px solid rgba(255,255,255,0.18)",
+            background: "rgba(255,255,255,0.08)",
+            fontWeight: 600,
+            fontSize: 13,
+            display: "inline-flex",
+            alignItems: "center",
+            gap: 6,
+            backdropFilter: "blur(12px)",
+            WebkitBackdropFilter: "blur(12px)",
+          }}
+        >
+          ← Return to Organizations
+        </Link>
+      ) : (
         <Link
           href="/auth/login"
           style={{
@@ -281,7 +300,7 @@ function TopNav({ signedIn }: { signedIn: boolean }) {
         >
           Sign in
         </Link>
-      ) : null}
+      )}
     </nav>
   );
 }
@@ -291,15 +310,20 @@ function Banner({ org }: { org: OrgProfile }) {
     <div
       style={{
         position: "relative",
-        height: 200,
-        borderRadius: 18,
+        // Stays inside the 1100px content container — feels visually
+        // anchored with the rest of the page rather than bleeding wide.
+        width: "100%",
+        // 3:1 aspect — Twitter banner shape. Auto-scales with width so
+        // the rendered aspect always matches what the user cropped at.
+        aspectRatio: "3 / 1",
         overflow: "hidden",
         marginTop: 12,
+        borderRadius: 22,
         background: org.banner_url
           ? `url(${org.banner_url}) center/cover`
           : "linear-gradient(135deg, rgba(255,255,255,0.12) 0%, rgba(255,255,255,0.04) 100%)",
         border: "1px solid rgba(255,255,255,0.1)",
-        boxShadow: "inset 0 1px 0 rgba(255,255,255,0.18), 0 8px 32px rgba(0,0,0,0.35)",
+        boxShadow: "inset 0 1px 0 rgba(255,255,255,0.18), 0 12px 40px rgba(0,0,0,0.4)",
       }}
     >
       <div
@@ -580,7 +604,14 @@ function ClipsSection({ clips }: { clips: PostRow[] }) {
   );
 }
 
-function PostsSection({ posts }: { posts: PostRow[] }) {
+function PostsSection({ posts, org }: { posts: PostRow[]; org: OrgProfile }) {
+  const orgInitials = org.name
+    .split(/\s+/)
+    .filter(Boolean)
+    .slice(0, 2)
+    .map((s) => s[0])
+    .join("")
+    .toUpperCase();
   return (
     <SectionCard title="Recent posts">
       <div style={{ display: "flex", flexDirection: "column", gap: 12 }}>
@@ -594,22 +625,42 @@ function PostsSection({ posts }: { posts: PostRow[] }) {
               border: "1px solid rgba(255,255,255,0.08)",
             }}
           >
-            <div style={{ display: "flex", alignItems: "center", gap: 8, marginBottom: 8 }}>
+            {/* Posts on the org page belong to the org, not the admin who
+                hit publish. Surface the org's identity here; we still
+                surface the admin in fine print after the org name. */}
+            <div style={{ display: "flex", alignItems: "center", gap: 10, marginBottom: 10 }}>
               <div
                 style={{
-                  width: 26,
-                  height: 26,
-                  borderRadius: 999,
-                  background: p.user?.avatar_url
-                    ? `url(${p.user.avatar_url}) center/cover`
-                    : "rgba(255,255,255,0.12)",
+                  width: 32,
+                  height: 32,
+                  borderRadius: 8,
+                  background: org.logo_url
+                    ? `url(${org.logo_url}) center/cover`
+                    : "linear-gradient(135deg, #FF5C35 0%, #7B5FE0 100%)",
+                  display: "flex",
+                  alignItems: "center",
+                  justifyContent: "center",
+                  fontFamily: "Fraunces, serif",
+                  fontWeight: 800,
+                  fontSize: 12,
+                  color: "#fff",
                   flexShrink: 0,
+                  border: "1px solid rgba(255,255,255,0.18)",
                 }}
-              />
-              <div style={{ fontSize: 13, fontWeight: 600 }}>
-                {p.user?.name || p.user?.handle || "Member"}
+              >
+                {!org.logo_url ? orgInitials : null}
               </div>
-              <div style={{ fontSize: 11, color: "rgba(255,255,255,0.5)", marginLeft: "auto" }}>
+              <div style={{ flex: 1, minWidth: 0 }}>
+                <div style={{ fontSize: 14, fontWeight: 700, color: "#fff" }}>
+                  {org.name}
+                </div>
+                {p.user?.handle ? (
+                  <div style={{ fontSize: 11, color: "rgba(255,255,255,0.5)" }}>
+                    posted by @{p.user.handle}
+                  </div>
+                ) : null}
+              </div>
+              <div style={{ fontSize: 11, color: "rgba(255,255,255,0.5)" }}>
                 {fmtDate(p.created_at)}
               </div>
             </div>
@@ -624,16 +675,16 @@ function PostsSection({ posts }: { posts: PostRow[] }) {
               {p.content}
             </p>
             {p.media_url ? (
-              <div
+              <img
+                src={p.media_url}
+                alt=""
                 style={{
-                  marginTop: 10,
+                  display: "block",
+                  width: "100%",
+                  height: "auto",
+                  marginTop: 12,
                   borderRadius: 10,
-                  overflow: "hidden",
                   border: "1px solid rgba(255,255,255,0.08)",
-                  // We don't know the image dimensions here; keep aspect open
-                  // and let the browser determine.
-                  background: `url(${p.media_url}) center/cover`,
-                  paddingTop: "56%",
                 }}
               />
             ) : null}

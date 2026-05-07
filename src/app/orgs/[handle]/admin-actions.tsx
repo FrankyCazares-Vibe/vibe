@@ -3,6 +3,8 @@
 import { useRouter } from "next/navigation";
 import { useState } from "react";
 
+import { ImageCropperModal } from "@/components/ImageCropperModal";
+
 type Link = { label: string; url: string };
 
 const MAX_DESC = 400;
@@ -254,13 +256,27 @@ function UploadAssetModal({
   const router = useRouter();
   const [file, setFile] = useState<File | null>(null);
   const [previewUrl, setPreviewUrl] = useState<string | null>(null);
+  const [pendingFile, setPendingFile] = useState<File | null>(null);
   const [busy, setBusy] = useState(false);
   const [err, setErr] = useState<string | null>(null);
 
   const onPickFile = (f: File | null) => {
+    setErr(null);
+    // Hand off to the cropper before staging — confirmed crop becomes the
+    // upload payload, cancel returns to the empty-file state.
+    setPendingFile(f);
+  };
+
+  const onCroppedConfirm = (blob: Blob) => {
     if (previewUrl) URL.revokeObjectURL(previewUrl);
-    setFile(f);
-    setPreviewUrl(f ? URL.createObjectURL(f) : null);
+    const cropped = new File(
+      [blob],
+      `${kind}-cropped.jpg`,
+      { type: blob.type || "image/jpeg" },
+    );
+    setFile(cropped);
+    setPreviewUrl(URL.createObjectURL(cropped));
+    setPendingFile(null);
   };
 
   const upload = async () => {
@@ -319,7 +335,13 @@ function UploadAssetModal({
   };
 
   const isBanner = kind === "banner";
-  const sizeHint = isBanner ? "10MB max · 16:9 looks best" : "5MB max · square";
+  const sizeHint = isBanner ? "10MB max · drag to position, scroll to zoom" : "5MB max · square crop";
+  // Banner crops at 3:1 (Twitter banner shape). Output is 2400×800 so
+  // banners stay sharp on retina + wider viewports — display container is
+  // ≤1100px so 2x scale needs ≥2200, plus headroom for future wider layouts.
+  const cropAspect = isBanner ? 3 : 1;
+  const cropOutputMax = isBanner ? 2400 : 1024;
+  const cropTitle = isBanner ? "Adjust banner" : "Adjust logo";
 
   return (
     <ModalShell
@@ -372,6 +394,17 @@ function UploadAssetModal({
           {busy ? "Uploading…" : "Save"}
         </button>
       </ModalFooter>
+      {pendingFile ? (
+        <ImageCropperModal
+          src={pendingFile}
+          aspect={cropAspect}
+          shape="rect"
+          outputMaxSize={cropOutputMax}
+          title={cropTitle}
+          onCancel={() => setPendingFile(null)}
+          onConfirm={onCroppedConfirm}
+        />
+      ) : null}
     </ModalShell>
   );
 }
@@ -390,13 +423,36 @@ function NewPostModal({
   const [content, setContent] = useState("");
   const [file, setFile] = useState<File | null>(null);
   const [previewUrl, setPreviewUrl] = useState<string | null>(null);
+  const [pendingImage, setPendingImage] = useState<File | null>(null);
   const [busy, setBusy] = useState(false);
   const [err, setErr] = useState<string | null>(null);
 
   const onPickFile = (f: File | null) => {
+    setErr(null);
+    if (!f) {
+      if (previewUrl) URL.revokeObjectURL(previewUrl);
+      setFile(null);
+      setPreviewUrl(null);
+      return;
+    }
+    // Images go through the cropper. Videos pass through as-is.
+    if (type === "post" && f.type.startsWith("image/")) {
+      setPendingImage(f);
+      return;
+    }
     if (previewUrl) URL.revokeObjectURL(previewUrl);
     setFile(f);
-    setPreviewUrl(f ? URL.createObjectURL(f) : null);
+    setPreviewUrl(URL.createObjectURL(f));
+  };
+
+  const onCroppedImage = (blob: Blob) => {
+    if (previewUrl) URL.revokeObjectURL(previewUrl);
+    const cropped = new File([blob], "post-cropped.jpg", {
+      type: blob.type || "image/jpeg",
+    });
+    setFile(cropped);
+    setPreviewUrl(URL.createObjectURL(cropped));
+    setPendingImage(null);
   };
 
   const submit = async () => {
@@ -586,6 +642,20 @@ function NewPostModal({
           {busy ? "Publishing…" : "Publish"}
         </button>
       </ModalFooter>
+      {pendingImage ? (
+        <ImageCropperModal
+          src={pendingImage}
+          aspectChoices={[
+            { label: "Square 1:1", value: 1 },
+            { label: "Portrait 4:5", value: 4 / 5 },
+            { label: "Landscape 16:9", value: 16 / 9 },
+          ]}
+          outputMaxSize={1600}
+          title="Adjust post image"
+          onCancel={() => setPendingImage(null)}
+          onConfirm={onCroppedImage}
+        />
+      ) : null}
     </ModalShell>
   );
 }

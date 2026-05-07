@@ -1,9 +1,11 @@
 "use client";
 
 import Link from "next/link";
-import { useCallback, useEffect, useRef, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 
 import { CampusAppShell } from "@/components/campus-app-shell";
+import { ImageCropperModal } from "@/components/ImageCropperModal";
+import { emitCalendarChanged } from "@/components/LeftNav";
 
 type Role = "owner" | "admin" | "mod" | "member";
 
@@ -205,11 +207,18 @@ export function CampusHome({
   // when no explicit pick exists. Derived rather than effect-driven so we
   // don't trip React 19's set-state-in-effect rule.
   const [selectedChannelByOrg, setSelectedChannelByOrg] = useState<Record<string, string>>({});
-  const [tab, setTab] = useState<CampusTab>("chat");
+  const [tab, setTab] = useState<CampusTab>("feed");
+  const [feedTagFilter, setFeedTagFilter] = useState<string | null>(null);
   const [showCreateOrg, setShowCreateOrg] = useState(false);
   const [showCreateChannel, setShowCreateChannel] = useState(false);
   const [showSettings, setShowSettings] = useState(false);
   const [channelSettingsId, setChannelSettingsId] = useState<string | null>(null);
+
+  // Trending click-through: switches to Feed tab and applies a tag filter.
+  const onPickTag = useCallback((tag: string) => {
+    setTab("feed");
+    setFeedTagFilter(tag);
+  }, []);
 
   // Load joined orgs on mount.
   useEffect(() => {
@@ -439,8 +448,13 @@ export function CampusHome({
               minHeight: 0,
             }}
           >
-            <TabBody tab={tab} onCreateOrg={() => setShowCreateOrg(true)} />
-            <OttoPanel />
+            <TabBody
+              tab={tab}
+              onCreateOrg={() => setShowCreateOrg(true)}
+              feedTagFilter={feedTagFilter}
+              onClearTagFilter={() => setFeedTagFilter(null)}
+            />
+            <OttoPanel onPickTag={onPickTag} />
           </div>
         )}
 
@@ -3106,11 +3120,22 @@ function CampusTabs({
 function TabBody({
   tab,
   onCreateOrg,
+  feedTagFilter,
+  onClearTagFilter,
 }: {
   tab: CampusTab;
   onCreateOrg: () => void;
+  feedTagFilter: string | null;
+  onClearTagFilter: () => void;
 }) {
-  if (tab === "feed") return <FeedTabBody />;
+  if (tab === "feed")
+    return (
+      <FeedTabBody
+        key={feedTagFilter ?? "all"}
+        tagFilter={feedTagFilter}
+        onClearTagFilter={onClearTagFilter}
+      />
+    );
   if (tab === "events") return <EventsTabBody />;
   if (tab === "orgs") return <OrgsTabBody onCreateOrg={onCreateOrg} />;
   if (tab === "map") return <MapTabBody />;
@@ -3160,10 +3185,27 @@ type FeedPost = {
   tags: string[] | null;
   media_url: string | null;
   media_thumbnail_url: string | null;
+  view_count: number;
+  like_count: number;
+  comment_count: number;
+  repost_count: number;
+  viewer_liked: boolean;
+  viewer_reposted: boolean;
   created_at: string;
   author: FeedAuthor | null;
   org: FeedOrg;
 };
+
+type FeedEntry =
+  | { kind: "post"; sort_at: string; post: FeedPost }
+  | {
+      kind: "repost";
+      sort_at: string;
+      reposter: FeedAuthor;
+      reposted_at: string;
+      quote: string | null;
+      post: FeedPost;
+    };
 
 function relativeTime(iso: string): string {
   try {
@@ -3185,28 +3227,51 @@ function relativeTime(iso: string): string {
   }
 }
 
-function FeedTabBody() {
-  const [posts, setPosts] = useState<FeedPost[] | null>(null);
+function FeedTabBody({
+  tagFilter,
+  onClearTagFilter,
+}: {
+  tagFilter: string | null;
+  onClearTagFilter: () => void;
+}) {
+  const [entries, setEntries] = useState<FeedEntry[] | null>(null);
+
+  const feedUrl = tagFilter
+    ? `/api/feed?limit=50&tag=${encodeURIComponent(tagFilter)}`
+    : "/api/feed?limit=50";
+
+  const refresh = useCallback(async () => {
+    try {
+      const res = await fetch(feedUrl, { cache: "no-store" });
+      const data = await res.json();
+      setEntries(
+        data?.ok && Array.isArray(data.feed) ? (data.feed as FeedEntry[]) : [],
+      );
+    } catch (e) {
+      console.error("[campus] feed", e);
+      setEntries([]);
+    }
+  }, [feedUrl]);
 
   useEffect(() => {
     let cancelled = false;
     (async () => {
       try {
-        const res = await fetch("/api/feed?limit=50", { cache: "no-store" });
+        const res = await fetch(feedUrl, { cache: "no-store" });
         const data = await res.json();
         if (cancelled) return;
-        setPosts(
-          data?.ok && Array.isArray(data.posts) ? (data.posts as FeedPost[]) : []
+        setEntries(
+          data?.ok && Array.isArray(data.feed) ? (data.feed as FeedEntry[]) : [],
         );
       } catch (e) {
         console.error("[campus] feed", e);
-        if (!cancelled) setPosts([]);
+        if (!cancelled) setEntries([]);
       }
     })();
     return () => {
       cancelled = true;
     };
-  }, []);
+  }, [feedUrl]);
 
   // Cream-tinted Liquid Glass — the whole feed is one frosted column with
   // X-style hairline-separated rows.
@@ -3238,74 +3303,56 @@ function FeedTabBody() {
         width: "100%",
       }}
     >
-      <SceneHeader
-        eyebrow="Feed · IU"
-        title="What’s on campus today"
-        subtitle="Posts from clubs, orgs, and your network."
-        tone="dark"
-      />
+      {tagFilter ? (
+        <SceneHeader
+          eyebrow={`Feed · #${tagFilter}`}
+          title={`Posts tagged #${tagFilter}`}
+          subtitle="Tap any post to open it. Back to the main feed below."
+          tone="dark"
+        />
+      ) : (
+        <SceneHeader
+          eyebrow="Feed · IU"
+          title="What’s on campus today"
+          subtitle="Posts from clubs, orgs, and your network."
+          tone="dark"
+        />
+      )}
 
-      {/* Composer card — separate glass surface for visible Liquid Glass layering */}
-      <div style={feedGlass}>
-        <div
+      {tagFilter ? (
+        <button
+          type="button"
+          onClick={onClearTagFilter}
           style={{
-            display: "flex",
-            gap: 12,
-            padding: "16px 20px",
+            alignSelf: "flex-start",
+            padding: "9px 18px",
+            borderRadius: 999,
+            border: "1px solid rgba(255,255,255,0.16)",
+            background: "rgba(20,16,32,0.72)",
+            color: "#fff",
+            fontFamily: "DM Sans, sans-serif",
+            fontWeight: 700,
+            fontSize: 13,
+            cursor: "pointer",
+            backdropFilter: "blur(20px)",
+            WebkitBackdropFilter: "blur(20px)",
+            boxShadow: "inset 0 1px 0 rgba(255,255,255,0.18), 0 6px 22px rgba(0,0,0,0.35)",
           }}
         >
-          <div
-            style={{
-              width: 40,
-              height: 40,
-              borderRadius: 999,
-              background: "#1C1C1E",
-              color: "#fff",
-              display: "flex",
-              alignItems: "center",
-              justifyContent: "center",
-              fontFamily: "Fraunces, serif",
-              fontWeight: 800,
-              fontSize: 14,
-              flexShrink: 0,
-            }}
-          >
-            FC
-          </div>
-          <div style={{ flex: 1, display: "flex", alignItems: "center" }}>
-            <div
-              style={{
-                fontFamily: "DM Sans, sans-serif",
-                fontSize: 16,
-                color: "rgba(28,28,30,0.45)",
-              }}
-            >
-              What’s happening on campus?
-            </div>
-          </div>
-          <button
-            type="button"
-            style={{
-              padding: "8px 18px",
-              borderRadius: 999,
-              border: "none",
-              background: COLORS.accent,
-              color: "#fff",
-              fontFamily: "DM Sans, sans-serif",
-              fontWeight: 700,
-              fontSize: 13,
-              cursor: "pointer",
-              boxShadow: "0 2px 8px rgba(255,92,53,0.3)",
-            }}
-          >
-            Post
-          </button>
-        </div>
-      </div>
+          ← Back to main feed
+        </button>
+      ) : (
+        <FeedComposer
+          glass={feedGlass}
+          onPosted={() => {
+            void refresh();
+          }}
+        />
+      )}
 
       {/* Posts column — second glass surface stacked under the composer */}
       <div style={feedGlass}>
-        {posts === null ? (
+        {entries === null ? (
           <div
             style={{
               padding: "24px",
@@ -3317,7 +3364,7 @@ function FeedTabBody() {
           >
             Loading feed…
           </div>
-        ) : posts.length === 0 ? (
+        ) : entries.length === 0 ? (
           <div
             style={{
               padding: "32px 24px",
@@ -3332,11 +3379,12 @@ function FeedTabBody() {
             show up here once they post.
           </div>
         ) : (
-          posts.map((p, idx) => (
+          entries.map((entry, idx) => (
             <FeedRow
-              key={p.id}
-              post={p}
-              hairline={idx < posts.length - 1 ? hairline : "none"}
+              key={entry.kind === "repost" ? `r:${entry.reposter.id}:${entry.post.id}` : `p:${entry.post.id}`}
+              entry={entry}
+              hairline={idx < entries.length - 1 ? hairline : "none"}
+              onMutate={refresh}
             />
           ))
         )}
@@ -3345,13 +3393,376 @@ function FeedTabBody() {
   );
 }
 
-function FeedRow({
-  post,
-  hairline,
+function FeedComposer({
+  glass,
+  onPosted,
 }: {
-  post: FeedPost;
-  hairline: string;
+  glass: React.CSSProperties;
+  onPosted: () => void;
 }) {
+  const [text, setText] = useState("");
+  const [imageFile, setImageFile] = useState<File | null>(null);
+  const [clipFile, setClipFile] = useState<File | null>(null);
+  const [pendingImage, setPendingImage] = useState<File | null>(null);
+  const [busy, setBusy] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+  const attachInputRef = useRef<HTMLInputElement | null>(null);
+
+  const hasContent = !!text.trim() || !!imageFile || !!clipFile;
+
+  const reset = () => {
+    setText("");
+    setImageFile(null);
+    setClipFile(null);
+    setError(null);
+    if (attachInputRef.current) attachInputRef.current.value = "";
+  };
+
+  // One paperclip → one file input → route by mimetype. Photo and clip
+  // are mutually exclusive at the row level (a post is either text+image
+  // or a clip), so picking a new file replaces whatever was staged.
+  const onPickAttachment = (file: File | null) => {
+    setError(null);
+    if (!file) return;
+    if (file.type.startsWith("image/")) {
+      if (file.size > 8 * 1024 * 1024) {
+        setError("Image too large — max 8MB.");
+        return;
+      }
+      // Open the cropper before staging — confirmed crop becomes the
+      // upload payload.
+      setPendingImage(file);
+      return;
+    }
+    if (file.type.startsWith("video/")) {
+      if (file.size > 200 * 1024 * 1024) {
+        setError("Clip too large — max 200MB.");
+        return;
+      }
+      setClipFile(file);
+      setImageFile(null);
+      return;
+    }
+    setError("Pick a photo or video file.");
+  };
+
+  const onCroppedImage = (blob: Blob) => {
+    const cropped = new File([blob], "post-cropped.jpg", {
+      type: blob.type || "image/jpeg",
+    });
+    setImageFile(cropped);
+    setClipFile(null);
+    setPendingImage(null);
+  };
+
+  const submit = useCallback(async () => {
+    if (!hasContent || busy) return;
+    setBusy(true);
+    setError(null);
+    try {
+      const trimmed = text.trim();
+      const tags = extractHashtags(trimmed);
+
+      if (clipFile) {
+        // 1. Get presigned R2 PUT URL.
+        const sig = await fetch("/api/me/clip-upload-url", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({
+            contentType: clipFile.type,
+            sizeBytes: clipFile.size,
+          }),
+        }).then((r) => r.json());
+        if (!sig?.ok) throw new Error(sig?.error || "Could not start upload");
+
+        // 2. Upload directly to R2.
+        const putRes = await fetch(sig.uploadUrl, {
+          method: "PUT",
+          headers: { "Content-Type": clipFile.type },
+          body: clipFile,
+        });
+        if (!putRes.ok) throw new Error(`Upload failed (HTTP ${putRes.status})`);
+
+        // 3. Record the row.
+        const pub = await fetch("/api/me/publish-clip", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({
+            object_key: sig.objectKey,
+            content: trimmed,
+            tags,
+          }),
+        }).then((r) => r.json());
+        if (!pub?.ok) throw new Error(pub?.error || "Publish failed");
+      } else if (imageFile) {
+        // Image path: multipart upload to the profiles bucket, then post.
+        const fd = new FormData();
+        fd.append("file", imageFile);
+        fd.append("kind", "post");
+        const up = await fetch("/api/me/profile-upload", {
+          method: "POST",
+          body: fd,
+        }).then((r) => r.json());
+        if (!up?.ok) throw new Error(up?.error || "Image upload failed");
+
+        const pub = await fetch("/api/me/publish-post", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({
+            content: trimmed,
+            tags,
+            media_url: up.url,
+          }),
+        }).then((r) => r.json());
+        if (!pub?.ok) throw new Error(pub?.error || "Publish failed");
+      } else {
+        // Text-only post.
+        const pub = await fetch("/api/me/publish-post", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ content: trimmed, tags }),
+        }).then((r) => r.json());
+        if (!pub?.ok) throw new Error(pub?.error || "Publish failed");
+      }
+
+      reset();
+      onPosted();
+    } catch (e) {
+      setError(e instanceof Error ? e.message : "Could not publish");
+    } finally {
+      setBusy(false);
+    }
+  }, [busy, clipFile, hasContent, imageFile, onPosted, text]);
+
+  const previewUrl = imageFile ? URL.createObjectURL(imageFile) : null;
+  useEffect(() => {
+    return () => {
+      if (previewUrl) URL.revokeObjectURL(previewUrl);
+    };
+  }, [previewUrl]);
+
+  return (
+    <div style={glass}>
+      <div
+        style={{
+          display: "flex",
+          flexDirection: "column",
+          gap: 10,
+          padding: "16px 20px",
+        }}
+      >
+        <textarea
+          value={text}
+          onChange={(e) => setText(e.target.value.slice(0, 2000))}
+          placeholder="What's happening on campus?  Use #hashtags to tag your post."
+          rows={2}
+          style={{
+            border: "none",
+            outline: "none",
+            resize: "vertical",
+            minHeight: 44,
+            background: "transparent",
+            fontFamily: "DM Sans, sans-serif",
+            fontSize: 15,
+            color: COLORS.text,
+            padding: 0,
+            lineHeight: 1.45,
+          }}
+        />
+        {previewUrl ? (
+          <div
+            style={{
+              borderRadius: 12,
+              overflow: "hidden",
+              border: "1px solid rgba(28,28,30,0.06)",
+              paddingTop: "56%",
+              background: `url(${previewUrl}) center/cover`,
+              position: "relative",
+            }}
+          >
+            <button
+              type="button"
+              onClick={() => setImageFile(null)}
+              style={composerRemoveButton}
+              aria-label="Remove photo"
+            >
+              ×
+            </button>
+          </div>
+        ) : null}
+        {clipFile ? (
+          <div
+            style={{
+              display: "flex",
+              alignItems: "center",
+              justifyContent: "space-between",
+              border: "1px solid rgba(28,28,30,0.08)",
+              borderRadius: 12,
+              padding: "10px 14px",
+              background: "rgba(123,95,224,0.08)",
+              fontFamily: "DM Sans, sans-serif",
+              fontSize: 13,
+              color: COLORS.text,
+            }}
+          >
+            <span style={{ overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>
+              🎬 {clipFile.name} · {(clipFile.size / (1024 * 1024)).toFixed(1)} MB
+            </span>
+            <button
+              type="button"
+              onClick={() => setClipFile(null)}
+              style={composerRemoveButton}
+              aria-label="Remove clip"
+            >
+              ×
+            </button>
+          </div>
+        ) : null}
+        {error ? (
+          <div
+            style={{
+              fontFamily: "DM Sans, sans-serif",
+              fontSize: 12,
+              color: "#C42B1C",
+              background: "rgba(196,43,28,0.08)",
+              padding: "6px 10px",
+              borderRadius: 8,
+            }}
+          >
+            {error}
+          </div>
+        ) : null}
+        <div
+          style={{
+            display: "flex",
+            gap: 10,
+            alignItems: "center",
+            justifyContent: "space-between",
+          }}
+        >
+          <div style={{ display: "flex", alignItems: "center", gap: 6 }}>
+            <input
+              ref={attachInputRef}
+              type="file"
+              accept="image/jpeg,image/png,image/webp,image/gif,video/mp4,video/quicktime,video/webm"
+              style={{ display: "none" }}
+              onChange={(e) => onPickAttachment(e.target.files?.[0] ?? null)}
+            />
+            <button
+              type="button"
+              onClick={() => attachInputRef.current?.click()}
+              disabled={busy}
+              title="Attach photo or video"
+              aria-label="Attach photo or video"
+              style={composerAttachButton}
+            >
+              <svg width="16" height="16" viewBox="0 0 16 16" fill="none" aria-hidden>
+                <path
+                  d="M13 7.5L8 12.5C6.343 14.157 3.657 14.157 2 12.5S1 8.157 2.657 6.5L8 1l4 4L6.5 10.5C5.672 11.328 4.328 11.328 3.5 10.5s-.828-2.172 0-3L9 2"
+                  stroke="currentColor"
+                  strokeWidth="1.3"
+                  strokeLinecap="round"
+                  fill="none"
+                />
+              </svg>
+            </button>
+          </div>
+          <button
+            type="button"
+            onClick={submit}
+            disabled={busy || !hasContent}
+            style={{
+              padding: "8px 20px",
+              borderRadius: 999,
+              border: "none",
+              background: hasContent && !busy ? COLORS.accent : "rgba(28,28,30,0.18)",
+              color: "#fff",
+              fontFamily: "DM Sans, sans-serif",
+              fontWeight: 700,
+              fontSize: 13,
+              cursor: busy || !hasContent ? "default" : "pointer",
+              boxShadow: hasContent && !busy ? "0 2px 8px rgba(255,92,53,0.3)" : "none",
+            }}
+          >
+            {busy ? "Posting…" : "Post"}
+          </button>
+        </div>
+      </div>
+      {pendingImage ? (
+        <ImageCropperModal
+          src={pendingImage}
+          aspectChoices={[
+            { label: "Square 1:1", value: 1 },
+            { label: "Portrait 4:5", value: 4 / 5 },
+            { label: "Landscape 16:9", value: 16 / 9 },
+          ]}
+          outputMaxSize={1600}
+          title="Adjust photo"
+          onCancel={() => setPendingImage(null)}
+          onConfirm={onCroppedImage}
+        />
+      ) : null}
+    </div>
+  );
+}
+
+const composerAttachButton: React.CSSProperties = {
+  width: 34,
+  height: 34,
+  borderRadius: 999,
+  border: "none",
+  background: "transparent",
+  color: COLORS.faint,
+  display: "flex",
+  alignItems: "center",
+  justifyContent: "center",
+  cursor: "pointer",
+  flexShrink: 0,
+  transition: "background 120ms ease, color 120ms ease",
+};
+
+const composerRemoveButton: React.CSSProperties = {
+  position: "absolute",
+  top: 8,
+  right: 8,
+  width: 24,
+  height: 24,
+  borderRadius: 999,
+  border: "none",
+  background: "rgba(0,0,0,0.55)",
+  color: "#fff",
+  fontFamily: "DM Sans, sans-serif",
+  fontSize: 14,
+  fontWeight: 700,
+  lineHeight: 1,
+  cursor: "pointer",
+};
+
+function extractHashtags(text: string): string[] {
+  const matches = text.match(/#[A-Za-z0-9_]{1,32}/g);
+  if (!matches) return [];
+  const seen = new Set<string>();
+  const out: string[] = [];
+  for (const m of matches) {
+    const t = m.replace(/^#+/, "").toLowerCase();
+    if (!t || seen.has(t)) continue;
+    seen.add(t);
+    out.push(t);
+    if (out.length >= 10) break;
+  }
+  return out;
+}
+
+function FeedRow({
+  entry,
+  hairline,
+  onMutate,
+}: {
+  entry: FeedEntry;
+  hairline: string;
+  onMutate: () => void;
+}) {
+  const post = entry.post;
   const fromOrg = !!post.org;
   const displayName =
     (fromOrg ? post.org?.name : post.author?.name) ||
@@ -3371,16 +3782,122 @@ function FeedRow({
     .join("")
     .toUpperCase();
 
+  // Local engagement state — seeded from the feed payload, mutated optimistically
+  // on click. `onMutate` re-fetches the feed so other rows (and the repost UNION)
+  // stay in sync after a quote-repost.
+  const [liked, setLiked] = useState(post.viewer_liked);
+  const [likeCount, setLikeCount] = useState(post.like_count);
+  const [reposted, setReposted] = useState(post.viewer_reposted);
+  const [repostCount, setRepostCount] = useState(post.repost_count);
+  const [commentCount, setCommentCount] = useState(post.comment_count);
+  const [viewCount, setViewCount] = useState(post.view_count);
+  const [showComments, setShowComments] = useState(false);
+  const [showRepostMenu, setShowRepostMenu] = useState(false);
+
+  // Record a view once per session per post when the row scrolls into view.
+  // The server-side dedupe (per-user-per-day) is the real source of truth;
+  // this is just to avoid spamming the endpoint while the user scrolls.
+  const articleRef = useRef<HTMLElement | null>(null);
+  const viewedRef = useRef(false);
+  useEffect(() => {
+    if (typeof IntersectionObserver === "undefined") return;
+    const el = articleRef.current;
+    if (!el) return;
+    let timer: ReturnType<typeof setTimeout> | null = null;
+    const io = new IntersectionObserver(
+      (entries) => {
+        for (const e of entries) {
+          if (e.isIntersecting && e.intersectionRatio >= 0.5) {
+            if (!viewedRef.current && timer === null) {
+              timer = setTimeout(() => {
+                viewedRef.current = true;
+                fetch(`/api/posts/${post.id}/view`, {
+                  method: "POST",
+                  cache: "no-store",
+                })
+                  .then((r) => r.json().catch(() => null))
+                  .then((j) => {
+                    if (j?.ok && j.counted) {
+                      setViewCount((c) => c + 1);
+                    }
+                  })
+                  .catch(() => {});
+              }, 1000);
+            }
+          } else if (timer !== null) {
+            clearTimeout(timer);
+            timer = null;
+          }
+        }
+      },
+      { threshold: [0, 0.5, 1] },
+    );
+    io.observe(el);
+    return () => {
+      io.disconnect();
+      if (timer !== null) clearTimeout(timer);
+    };
+  }, [post.id]);
+
+  const toggleLike = useCallback(async () => {
+    const nextLiked = !liked;
+    setLiked(nextLiked);
+    setLikeCount((c) => c + (nextLiked ? 1 : -1));
+    try {
+      const res = await fetch(`/api/posts/${post.id}/like`, {
+        method: nextLiked ? "POST" : "DELETE",
+      });
+      if (!res.ok) throw new Error(`like ${res.status}`);
+    } catch (e) {
+      console.error("[feed] like", e);
+      // Roll back.
+      setLiked(!nextLiked);
+      setLikeCount((c) => c + (nextLiked ? -1 : 1));
+    }
+  }, [liked, post.id]);
+
+  const handleShare = useCallback(async () => {
+    try {
+      const url = `${window.location.origin}/posts/${post.id}`;
+      if (navigator.share) {
+        await navigator.share({ url, title: post.content?.slice(0, 80) || "Vibe post" });
+      } else if (navigator.clipboard) {
+        await navigator.clipboard.writeText(url);
+      }
+    } catch {
+      /* user cancelled or unsupported */
+    }
+  }, [post.id, post.content]);
+
   return (
     <article
+      ref={articleRef}
       style={{
         display: "flex",
-        gap: 12,
+        flexDirection: "column",
         padding: "16px 20px",
         borderBottom: hairline,
         transition: "background 120ms ease",
       }}
     >
+      {entry.kind === "repost" ? (
+        <RepostBanner reposter={entry.reposter} />
+      ) : null}
+      {entry.kind === "repost" && entry.quote ? (
+        <p
+          style={{
+            margin: "0 0 10px 0",
+            color: COLORS.text,
+            fontFamily: "DM Sans, sans-serif",
+            fontSize: 15,
+            lineHeight: 1.45,
+            whiteSpace: "pre-wrap",
+          }}
+        >
+          {entry.quote}
+        </p>
+      ) : null}
+      <div style={{ display: "flex", gap: 12 }}>
       <div
         style={{
           width: 40,
@@ -3521,19 +4038,660 @@ function FeedRow({
         <div
           style={{
             display: "flex",
-            gap: 28,
+            gap: 24,
             marginTop: 12,
             color: COLORS.faint,
             fontFamily: "DM Sans, sans-serif",
             fontSize: 13,
+            position: "relative",
           }}
         >
-          <EngagementAction icon={<CommentIcon />} />
-          <EngagementAction icon={<LikeIcon />} />
-          <EngagementAction icon={<ShareIcon />} />
+          <EngagementAction
+            icon={<CommentIcon />}
+            count={commentCount}
+            label="Comments"
+            onClick={() => setShowComments((v) => !v)}
+            active={showComments}
+          />
+          <EngagementAction
+            icon={<RepostIcon />}
+            count={repostCount}
+            label="Repost"
+            onClick={() => setShowRepostMenu((v) => !v)}
+            active={reposted}
+            activeColor="#1A8754"
+          />
+          <EngagementAction
+            icon={<LikeIcon filled={liked} />}
+            count={likeCount}
+            label="Like"
+            onClick={toggleLike}
+            active={liked}
+            activeColor="#E0245E"
+          />
+          <EngagementAction
+            icon={<EyeIcon />}
+            count={viewCount}
+            label="Views"
+          />
+          <EngagementAction
+            icon={<ShareIcon />}
+            label="Share"
+            onClick={handleShare}
+          />
+          {showRepostMenu ? (
+            <RepostMenu
+              postId={post.id}
+              alreadyReposted={reposted}
+              onClose={() => setShowRepostMenu(false)}
+              onDone={(action) => {
+                setShowRepostMenu(false);
+                if (action === "added") {
+                  setReposted(true);
+                  setRepostCount((c) => c + 1);
+                } else if (action === "removed") {
+                  setReposted(false);
+                  setRepostCount((c) => Math.max(0, c - 1));
+                }
+                // Quote reposts add a new feed row — refresh so it appears.
+                onMutate();
+              }}
+            />
+          ) : null}
         </div>
+        {showComments ? (
+          <CommentsDrawer
+            postId={post.id}
+            onCommentAdded={() => setCommentCount((c) => c + 1)}
+          />
+        ) : null}
+      </div>
       </div>
     </article>
+  );
+}
+
+function RepostBanner({ reposter }: { reposter: FeedAuthor }) {
+  return (
+    <div
+      style={{
+        display: "flex",
+        alignItems: "center",
+        gap: 6,
+        marginBottom: 8,
+        marginLeft: 28,
+        color: COLORS.faint,
+        fontFamily: "DM Sans, sans-serif",
+        fontSize: 12,
+        fontWeight: 600,
+      }}
+    >
+      <RepostIcon />
+      <span>
+        {reposter.handle ? `@${reposter.handle}` : reposter.name || "Someone"} reposted
+      </span>
+    </div>
+  );
+}
+
+function RepostMenu({
+  postId,
+  alreadyReposted,
+  onClose,
+  onDone,
+}: {
+  postId: string;
+  alreadyReposted: boolean;
+  onClose: () => void;
+  onDone: (action: "added" | "removed" | "edited" | "noop") => void;
+}) {
+  const [comment, setComment] = useState("");
+  const [busy, setBusy] = useState(false);
+
+  const submit = async (mode: "repost" | "undo") => {
+    setBusy(true);
+    try {
+      if (mode === "undo") {
+        const res = await fetch(`/api/posts/${postId}/repost`, { method: "DELETE" });
+        if (!res.ok) throw new Error(`undo ${res.status}`);
+        onDone("removed");
+        return;
+      }
+      const trimmed = comment.trim();
+      const body = trimmed ? { comment: trimmed } : {};
+      const res = await fetch(`/api/posts/${postId}/repost`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(body),
+      });
+      if (!res.ok) throw new Error(`repost ${res.status}`);
+      onDone(alreadyReposted ? "edited" : "added");
+    } catch (e) {
+      console.error("[feed] repost", e);
+      onDone("noop");
+    } finally {
+      setBusy(false);
+    }
+  };
+
+  return (
+    <div
+      role="dialog"
+      style={{
+        position: "absolute",
+        top: 28,
+        left: 0,
+        zIndex: 20,
+        width: 320,
+        background: "#FFFFFF",
+        border: "1px solid rgba(28,28,30,0.08)",
+        borderRadius: 14,
+        boxShadow: "0 12px 36px rgba(28,28,30,0.14)",
+        padding: 14,
+        fontFamily: "DM Sans, sans-serif",
+      }}
+      onClick={(e) => e.stopPropagation()}
+    >
+      <div
+        style={{
+          fontFamily: "Fraunces, serif",
+          fontWeight: 800,
+          fontSize: 14,
+          color: COLORS.text,
+          marginBottom: 8,
+        }}
+      >
+        {alreadyReposted ? "You reposted this" : "Repost"}
+      </div>
+      {!alreadyReposted ? (
+        <textarea
+          value={comment}
+          onChange={(e) => setComment(e.target.value.slice(0, 500))}
+          placeholder="Add a comment (optional) — leave blank to just repost"
+          rows={3}
+          style={{
+            width: "100%",
+            border: "1px solid rgba(28,28,30,0.12)",
+            borderRadius: 10,
+            padding: "8px 10px",
+            fontSize: 13,
+            fontFamily: "DM Sans, sans-serif",
+            resize: "vertical",
+            outline: "none",
+            color: COLORS.text,
+          }}
+        />
+      ) : null}
+      <div style={{ display: "flex", gap: 8, marginTop: 10, justifyContent: "flex-end" }}>
+        <button
+          type="button"
+          onClick={onClose}
+          disabled={busy}
+          style={{
+            padding: "6px 12px",
+            borderRadius: 999,
+            border: "1px solid rgba(28,28,30,0.12)",
+            background: "transparent",
+            fontSize: 12,
+            fontWeight: 600,
+            cursor: busy ? "default" : "pointer",
+            color: COLORS.faint,
+          }}
+        >
+          Cancel
+        </button>
+        {alreadyReposted ? (
+          <button
+            type="button"
+            onClick={() => submit("undo")}
+            disabled={busy}
+            style={{
+              padding: "6px 14px",
+              borderRadius: 999,
+              border: "none",
+              background: "#E0245E",
+              color: "#fff",
+              fontSize: 12,
+              fontWeight: 700,
+              cursor: busy ? "default" : "pointer",
+            }}
+          >
+            Undo repost
+          </button>
+        ) : (
+          <button
+            type="button"
+            onClick={() => submit("repost")}
+            disabled={busy}
+            style={{
+              padding: "6px 16px",
+              borderRadius: 999,
+              border: "none",
+              background: "#1A8754",
+              color: "#fff",
+              fontSize: 12,
+              fontWeight: 700,
+              cursor: busy ? "default" : "pointer",
+            }}
+          >
+            Repost
+          </button>
+        )}
+      </div>
+    </div>
+  );
+}
+
+type FeedComment = {
+  id: string;
+  user_id: string;
+  parent_comment_id: string | null;
+  content: string;
+  created_at: string;
+  like_count: number;
+  viewer_liked: boolean;
+  replies?: FeedComment[];
+  author: {
+    id: string;
+    name: string | null;
+    handle: string | null;
+    avatar_url: string | null;
+  } | null;
+};
+
+function CommentsDrawer({
+  postId,
+  onCommentAdded,
+}: {
+  postId: string;
+  onCommentAdded: () => void;
+}) {
+  const [comments, setComments] = useState<FeedComment[] | null>(null);
+  const [draft, setDraft] = useState("");
+  const [submitting, setSubmitting] = useState(false);
+
+  useEffect(() => {
+    let cancelled = false;
+    (async () => {
+      try {
+        const res = await fetch(`/api/posts/${postId}/comments`, { cache: "no-store" });
+        const data = await res.json();
+        if (cancelled) return;
+        setComments(
+          data?.ok && Array.isArray(data.comments) ? (data.comments as FeedComment[]) : [],
+        );
+      } catch (e) {
+        console.error("[feed] comments", e);
+        if (!cancelled) setComments([]);
+      }
+    })();
+    return () => {
+      cancelled = true;
+    };
+  }, [postId]);
+
+  const handleNewComment = useCallback((c: FeedComment) => {
+    setComments((prev) => {
+      const next = prev ? [...prev] : [];
+      if (c.parent_comment_id) {
+        // Append to the matching root's replies. The API resolves
+        // parent_comment_id to the top-level ancestor, so a flat lookup
+        // by id matches.
+        return next.map((root) =>
+          root.id === c.parent_comment_id
+            ? { ...root, replies: [...(root.replies ?? []), c] }
+            : root,
+        );
+      }
+      return [...next, { ...c, replies: c.replies ?? [] }];
+    });
+    onCommentAdded();
+  }, [onCommentAdded]);
+
+  const submit = useCallback(async () => {
+    const text = draft.trim();
+    if (!text || submitting) return;
+    setSubmitting(true);
+    try {
+      const res = await fetch(`/api/posts/${postId}/comments`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ content: text }),
+      });
+      const data = await res.json();
+      if (data?.ok && data.comment) {
+        handleNewComment(data.comment as FeedComment);
+        setDraft("");
+      }
+    } catch (e) {
+      console.error("[feed] add comment", e);
+    } finally {
+      setSubmitting(false);
+    }
+  }, [draft, postId, submitting, handleNewComment]);
+
+  return (
+    <div
+      style={{
+        marginTop: 10,
+        borderTop: "1px solid rgba(28,28,30,0.06)",
+        paddingTop: 10,
+        fontFamily: "DM Sans, sans-serif",
+      }}
+    >
+      {comments === null ? (
+        <div style={{ fontSize: 12, color: COLORS.faint }}>Loading comments…</div>
+      ) : (
+        <div style={{ display: "flex", flexDirection: "column", gap: 12 }}>
+          {comments.length === 0 ? (
+            <div style={{ fontSize: 12, color: COLORS.faint }}>
+              No comments yet — be the first.
+            </div>
+          ) : (
+            comments.map((c) => (
+              <CommentRow
+                key={c.id}
+                comment={c}
+                postId={postId}
+                onReplyAdded={handleNewComment}
+              />
+            ))
+          )}
+          <div style={{ display: "flex", gap: 8, marginTop: 4 }}>
+            <input
+              value={draft}
+              onChange={(e) => setDraft(e.target.value.slice(0, 1000))}
+              onKeyDown={(e) => {
+                if (e.key === "Enter" && !e.shiftKey) {
+                  e.preventDefault();
+                  submit();
+                }
+              }}
+              placeholder="Write a comment…"
+              style={{
+                flex: 1,
+                border: "1px solid rgba(28,28,30,0.12)",
+                borderRadius: 999,
+                padding: "8px 14px",
+                fontSize: 13,
+                fontFamily: "DM Sans, sans-serif",
+                outline: "none",
+                color: COLORS.text,
+                background: "rgba(255,255,255,0.7)",
+              }}
+            />
+            <button
+              type="button"
+              onClick={submit}
+              disabled={submitting || !draft.trim()}
+              style={{
+                padding: "8px 16px",
+                borderRadius: 999,
+                border: "none",
+                background: draft.trim() ? COLORS.accent : "rgba(28,28,30,0.18)",
+                color: "#fff",
+                fontSize: 12,
+                fontWeight: 700,
+                cursor: submitting || !draft.trim() ? "default" : "pointer",
+              }}
+            >
+              Post
+            </button>
+          </div>
+        </div>
+      )}
+    </div>
+  );
+}
+
+function CommentRow({
+  comment,
+  postId,
+  onReplyAdded,
+  isReply = false,
+}: {
+  comment: FeedComment;
+  postId: string;
+  onReplyAdded: (c: FeedComment) => void;
+  isReply?: boolean;
+}) {
+  const [liked, setLiked] = useState(comment.viewer_liked);
+  const [likeCount, setLikeCount] = useState(comment.like_count);
+  const [replyOpen, setReplyOpen] = useState(false);
+  const [replyDraft, setReplyDraft] = useState("");
+  const [replySubmitting, setReplySubmitting] = useState(false);
+
+  const name = comment.author?.name || comment.author?.handle || "Member";
+  const initials = name
+    .split(/\s+/)
+    .filter(Boolean)
+    .slice(0, 2)
+    .map((s) => s[0])
+    .join("")
+    .toUpperCase();
+
+  const toggleLike = useCallback(async () => {
+    const next = !liked;
+    setLiked(next);
+    setLikeCount((c) => c + (next ? 1 : -1));
+    try {
+      const res = await fetch(`/api/comments/${comment.id}/like`, {
+        method: next ? "POST" : "DELETE",
+      });
+      if (!res.ok) throw new Error(`like ${res.status}`);
+    } catch (e) {
+      console.error("[feed] comment like", e);
+      setLiked(!next);
+      setLikeCount((c) => c + (next ? -1 : 1));
+    }
+  }, [comment.id, liked]);
+
+  const openReply = () => {
+    setReplyOpen(true);
+    if (comment.author?.handle && !replyDraft) {
+      setReplyDraft(`@${comment.author.handle} `);
+    }
+  };
+
+  const submitReply = useCallback(async () => {
+    const text = replyDraft.trim();
+    if (!text || replySubmitting) return;
+    setReplySubmitting(true);
+    try {
+      const res = await fetch(`/api/posts/${postId}/comments`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ content: text, parent_comment_id: comment.id }),
+      });
+      const data = await res.json();
+      if (data?.ok && data.comment) {
+        onReplyAdded(data.comment as FeedComment);
+        setReplyDraft("");
+        setReplyOpen(false);
+      }
+    } catch (e) {
+      console.error("[feed] reply", e);
+    } finally {
+      setReplySubmitting(false);
+    }
+  }, [replyDraft, postId, comment.id, replySubmitting, onReplyAdded]);
+
+  return (
+    <div style={{ display: "flex", gap: 8 }}>
+      <div
+        style={{
+          width: isReply ? 24 : 28,
+          height: isReply ? 24 : 28,
+          borderRadius: 999,
+          background: comment.author?.avatar_url
+            ? `url(${comment.author.avatar_url}) center/cover`
+            : "#1C1C1E",
+          color: "#fff",
+          display: "flex",
+          alignItems: "center",
+          justifyContent: "center",
+          fontFamily: "Fraunces, serif",
+          fontWeight: 800,
+          fontSize: isReply ? 10 : 11,
+          flexShrink: 0,
+        }}
+      >
+        {!comment.author?.avatar_url ? initials : null}
+      </div>
+      <div style={{ flex: 1, minWidth: 0 }}>
+        <div
+          style={{
+            display: "flex",
+            gap: 6,
+            alignItems: "baseline",
+            flexWrap: "wrap",
+          }}
+        >
+          <span
+            style={{
+              fontFamily: "Fraunces, serif",
+              fontWeight: 800,
+              fontSize: isReply ? 12 : 13,
+              color: COLORS.text,
+            }}
+          >
+            {name}
+          </span>
+          <span style={{ fontSize: 11, color: COLORS.faint }}>
+            {comment.author?.handle ? `@${comment.author.handle} · ` : ""}
+            {relativeTime(comment.created_at)}
+          </span>
+        </div>
+        <p
+          style={{
+            margin: "2px 0 4px 0",
+            fontSize: isReply ? 12.5 : 13,
+            color: COLORS.text,
+            whiteSpace: "pre-wrap",
+            lineHeight: 1.4,
+          }}
+        >
+          {comment.content}
+        </p>
+        <div
+          style={{
+            display: "flex",
+            alignItems: "center",
+            gap: 14,
+            fontSize: 11,
+            color: COLORS.faint,
+            fontFamily: "DM Sans, sans-serif",
+          }}
+        >
+          <button
+            type="button"
+            onClick={toggleLike}
+            aria-label={liked ? "Unlike comment" : "Like comment"}
+            aria-pressed={liked}
+            style={{
+              display: "inline-flex",
+              alignItems: "center",
+              gap: 4,
+              background: "transparent",
+              border: "none",
+              padding: 0,
+              cursor: "pointer",
+              color: liked ? "#E0245E" : "inherit",
+              font: "inherit",
+            }}
+          >
+            <LikeIcon filled={liked} />
+            {likeCount > 0 ? <span>{likeCount}</span> : null}
+          </button>
+          <button
+            type="button"
+            onClick={openReply}
+            style={{
+              background: "transparent",
+              border: "none",
+              padding: 0,
+              cursor: "pointer",
+              color: "inherit",
+              font: "inherit",
+              fontWeight: 600,
+            }}
+          >
+            Reply
+          </button>
+        </div>
+        {replyOpen ? (
+          <div style={{ display: "flex", gap: 6, marginTop: 8 }}>
+            <input
+              autoFocus
+              value={replyDraft}
+              onChange={(e) => setReplyDraft(e.target.value.slice(0, 1000))}
+              onKeyDown={(e) => {
+                if (e.key === "Enter" && !e.shiftKey) {
+                  e.preventDefault();
+                  submitReply();
+                }
+                if (e.key === "Escape") {
+                  setReplyOpen(false);
+                  setReplyDraft("");
+                }
+              }}
+              placeholder="Write a reply…"
+              style={{
+                flex: 1,
+                border: "1px solid rgba(28,28,30,0.12)",
+                borderRadius: 999,
+                padding: "6px 12px",
+                fontSize: 12.5,
+                fontFamily: "DM Sans, sans-serif",
+                outline: "none",
+                color: COLORS.text,
+                background: "rgba(255,255,255,0.7)",
+              }}
+            />
+            <button
+              type="button"
+              onClick={submitReply}
+              disabled={replySubmitting || !replyDraft.trim()}
+              style={{
+                padding: "6px 12px",
+                borderRadius: 999,
+                border: "none",
+                background: replyDraft.trim() ? COLORS.accent : "rgba(28,28,30,0.18)",
+                color: "#fff",
+                fontSize: 11,
+                fontWeight: 700,
+                cursor:
+                  replySubmitting || !replyDraft.trim() ? "default" : "pointer",
+              }}
+            >
+              Post
+            </button>
+          </div>
+        ) : null}
+        {comment.replies && comment.replies.length > 0 ? (
+          <div
+            style={{
+              marginTop: 10,
+              paddingLeft: 10,
+              borderLeft: "2px solid rgba(28,28,30,0.06)",
+              display: "flex",
+              flexDirection: "column",
+              gap: 10,
+            }}
+          >
+            {comment.replies.map((r) => (
+              <CommentRow
+                key={r.id}
+                comment={r}
+                postId={postId}
+                onReplyAdded={onReplyAdded}
+                isReply
+              />
+            ))}
+          </div>
+        ) : null}
+      </div>
+    </div>
   );
 }
 
@@ -3579,16 +4737,52 @@ function CommentIcon() {
   );
 }
 
-function LikeIcon() {
+function LikeIcon({ filled = false }: { filled?: boolean }) {
   return (
     <svg width="16" height="16" viewBox="0 0 16 16" fill="none" aria-hidden>
       <path
         d="M8 13.5s-5-3.2-5-7a3 3 0 0 1 5-2.2A3 3 0 0 1 13 6.5c0 3.8-5 7-5 7z"
         stroke="currentColor"
         strokeWidth="1.4"
-        fill="none"
+        fill={filled ? "currentColor" : "none"}
         strokeLinejoin="round"
       />
+    </svg>
+  );
+}
+
+function RepostIcon() {
+  // Two arrows tracing a recycle loop — matches Twitter's repost glyph.
+  return (
+    <svg width="16" height="16" viewBox="0 0 16 16" fill="none" aria-hidden>
+      <path
+        d="M3 6.5V11a1.5 1.5 0 0 0 1.5 1.5H10M13 9.5V5A1.5 1.5 0 0 0 11.5 3.5H6"
+        stroke="currentColor"
+        strokeWidth="1.4"
+        strokeLinecap="round"
+        strokeLinejoin="round"
+      />
+      <path
+        d="M5 1.5L3 3.5L5 5.5M11 14.5L13 12.5L11 10.5"
+        stroke="currentColor"
+        strokeWidth="1.4"
+        strokeLinecap="round"
+        strokeLinejoin="round"
+      />
+    </svg>
+  );
+}
+
+function EyeIcon() {
+  return (
+    <svg width="16" height="16" viewBox="0 0 16 16" fill="none" aria-hidden>
+      <path
+        d="M1.5 8s2.5-4.5 6.5-4.5S14.5 8 14.5 8s-2.5 4.5-6.5 4.5S1.5 8 1.5 8z"
+        stroke="currentColor"
+        strokeWidth="1.4"
+        strokeLinejoin="round"
+      />
+      <circle cx="8" cy="8" r="2" stroke="currentColor" strokeWidth="1.4" />
     </svg>
   );
 }
@@ -3611,16 +4805,54 @@ function ShareIcon() {
 function EngagementAction({
   icon,
   count,
+  label,
+  onClick,
+  active = false,
+  activeColor,
 }: {
   icon: React.ReactNode;
   count?: number;
+  label?: string;
+  onClick?: () => void;
+  active?: boolean;
+  activeColor?: string;
 }) {
+  const interactive = typeof onClick === "function";
+  const color = active && activeColor ? activeColor : undefined;
+  const formatted = formatEngagementCount(count);
   return (
-    <span style={{ display: "inline-flex", alignItems: "center", gap: 6 }}>
+    <button
+      type="button"
+      onClick={onClick}
+      aria-label={label}
+      aria-pressed={interactive ? active : undefined}
+      disabled={!interactive}
+      style={{
+        display: "inline-flex",
+        alignItems: "center",
+        gap: 6,
+        background: "transparent",
+        border: "none",
+        padding: 0,
+        margin: 0,
+        cursor: interactive ? "pointer" : "default",
+        color: color ?? "inherit",
+        font: "inherit",
+        transition: "color 120ms ease",
+      }}
+    >
       {icon}
-      {typeof count === "number" ? <span>{count}</span> : null}
-    </span>
+      {formatted ? <span>{formatted}</span> : null}
+    </button>
   );
+}
+
+function formatEngagementCount(n: number | undefined): string | null {
+  if (typeof n !== "number" || !Number.isFinite(n) || n <= 0) return null;
+  if (n < 1000) return String(n);
+  if (n < 10_000) return `${(n / 1000).toFixed(1).replace(/\.0$/, "")}K`;
+  if (n < 1_000_000) return `${Math.round(n / 1000)}K`;
+  return `${(n / 1_000_000).toFixed(1).replace(/\.0$/, "")}M`;
 }
 
 function SceneHeader({
@@ -3677,74 +4909,1135 @@ function SceneHeader({
   );
 }
 
+type CampusEvent = {
+  id: string;
+  org_id: string | null;
+  creator_id: string;
+  title: string;
+  description: string;
+  starts_at: string;
+  ends_at: string;
+  location: string;
+  going_count: number;
+  interested_count: number;
+  viewer_status: "going" | "maybe" | null;
+  is_creator: boolean;
+  viewer_can_manage: boolean;
+  org: {
+    id: string;
+    handle: string;
+    name: string;
+    logo_url: string | null;
+    verified: boolean;
+  } | null;
+  creator: {
+    id: string;
+    name: string | null;
+    handle: string | null;
+    avatar_url: string | null;
+  } | null;
+};
+
 function EventsTabBody() {
-  const events = [
-    { name: "IU Spring Hackathon 2026", when: "Sat March 15 · 9am–9pm", where: "Assembly Hall", going: 120, rsvp: "RSVP", accent: "#5A9CFF" },
-    { name: "Spring Career Fair", when: "Wed March 19 · 10am–4pm", where: "Memorial Stadium", going: 480, rsvp: "RSVP", accent: "#FFB85A" },
-    { name: "Kelley Investment Pitch Night", when: "Thu March 27 · 6pm", where: "Hodge Hall", going: 62, rsvp: "RSVP", accent: "#9B7BFF" },
-  ];
+  const [events, setEvents] = useState<CampusEvent[] | null>(null);
+  const [showCreate, setShowCreate] = useState(false);
+  const [eligibleOrgs, setEligibleOrgs] = useState<EligibleOrg[]>([]);
+
+  const refresh = useCallback(async () => {
+    try {
+      const res = await fetch("/api/events?limit=50", { cache: "no-store" });
+      const data = await res.json();
+      setEvents(
+        data?.ok && Array.isArray(data.events) ? (data.events as CampusEvent[]) : [],
+      );
+    } catch (e) {
+      console.error("[campus] events", e);
+      setEvents([]);
+    }
+  }, []);
+
+  useEffect(() => {
+    let cancelled = false;
+    (async () => {
+      try {
+        const [evRes, orgRes] = await Promise.all([
+          fetch("/api/events?limit=50", { cache: "no-store" }).then((r) => r.json()),
+          fetch("/api/orgs?filter=mine", { cache: "no-store" }).then((r) => r.json()),
+        ]);
+        if (cancelled) return;
+        setEvents(
+          evRes?.ok && Array.isArray(evRes.events)
+            ? (evRes.events as CampusEvent[])
+            : [],
+        );
+        if (orgRes?.ok && Array.isArray(orgRes.orgs)) {
+          const eligible = (orgRes.orgs as EligibleOrg[]).filter(
+            (o) => (o.role === "owner" || o.role === "admin") && !!o.verified,
+          );
+          setEligibleOrgs(eligible);
+        }
+      } catch (e) {
+        console.error("[campus] events", e);
+        if (!cancelled) setEvents([]);
+      }
+    })();
+    return () => {
+      cancelled = true;
+    };
+  }, []);
+
+  const canCreate = eligibleOrgs.length > 0;
+
   return (
-    <section style={{ flex: 1, padding: "28px 24px", display: "flex", flexDirection: "column", gap: 16, maxWidth: 1100, width: "100%" }}>
-      <SceneHeader
-        eyebrow="Events · IU"
-        title="What’s coming up"
-        subtitle="RSVP early — events on campus, in space, and online."
-        tone="light"
-      />
+    <section
+      style={{
+        flex: 1,
+        padding: "28px 24px",
+        display: "flex",
+        flexDirection: "column",
+        gap: 16,
+        maxWidth: 1100,
+        width: "100%",
+      }}
+    >
+      <div style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-end", gap: 12 }}>
+        <SceneHeader
+          eyebrow="Events · IU"
+          title="What's coming up"
+          subtitle="RSVP early — events on campus, in space, and online."
+          tone="light"
+        />
+        {canCreate ? (
+          <button
+            type="button"
+            onClick={() => setShowCreate(true)}
+            style={{
+              padding: "10px 18px",
+              borderRadius: 999,
+              border: "1px solid rgba(255,255,255,0.22)",
+              background: "rgba(255,255,255,0.10)",
+              color: "#fff",
+              fontFamily: "DM Sans, sans-serif",
+              fontWeight: 700,
+              fontSize: 13,
+              cursor: "pointer",
+              backdropFilter: "blur(12px)",
+              WebkitBackdropFilter: "blur(12px)",
+              whiteSpace: "nowrap",
+            }}
+          >
+            + Create event
+          </button>
+        ) : null}
+      </div>
+
+      {events === null ? (
+        <div style={{ color: COLORS.glassMuted, fontFamily: "DM Sans, sans-serif", fontSize: 14, padding: "20px 0" }}>
+          Loading events…
+        </div>
+      ) : events.length === 0 ? (
+        <GlassCard>
+          <div style={{ fontFamily: "DM Sans, sans-serif", fontSize: 14, color: COLORS.glassMuted, lineHeight: 1.6, textAlign: "center", padding: "12px 8px" }}>
+            <div style={{ fontFamily: "Fraunces, serif", fontWeight: 800, fontSize: 16, color: "#fff", marginBottom: 6 }}>
+              No upcoming events on campus
+            </div>
+            Be the first to post one — hit &ldquo;+ Create event&rdquo; above.
+          </div>
+        </GlassCard>
+      ) : (
+        <div
+          style={{
+            display: "grid",
+            gridTemplateColumns: "repeat(auto-fill, minmax(280px, 1fr))",
+            gap: 14,
+          }}
+        >
+          {events.map((ev) => (
+            <EventCard key={ev.id} ev={ev} onMutate={refresh} />
+          ))}
+        </div>
+      )}
+
+      {showCreate && canCreate ? (
+        <CreateEventModal
+          eligibleOrgs={eligibleOrgs}
+          onClose={() => setShowCreate(false)}
+          onCreated={() => {
+            setShowCreate(false);
+            void refresh();
+          }}
+        />
+      ) : null}
+    </section>
+  );
+}
+
+function EventCard({ ev, onMutate }: { ev: CampusEvent; onMutate: () => void }) {
+  const accent = colorForOrg(ev.org?.id ?? ev.creator_id);
+  const [status, setStatus] = useState<"going" | "maybe" | null>(ev.viewer_status);
+  const [going, setGoing] = useState(ev.going_count);
+  const [interested, setInterested] = useState(ev.interested_count);
+  const [busy, setBusy] = useState(false);
+
+  const setRsvp = async (next: "going" | "maybe" | null) => {
+    if (busy) return;
+    const prev = status;
+    setBusy(true);
+    // Optimistic counter math
+    if (prev === "going" && next !== "going") setGoing((c) => Math.max(0, c - 1));
+    if (prev === "maybe" && next !== "maybe") setInterested((c) => Math.max(0, c - 1));
+    if (next === "going" && prev !== "going") setGoing((c) => c + 1);
+    if (next === "maybe" && prev !== "maybe") setInterested((c) => c + 1);
+    setStatus(next);
+    try {
+      const res = next
+        ? await fetch(`/api/events/${ev.id}/rsvp`, {
+            method: "PUT",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({ status: next }),
+          })
+        : await fetch(`/api/events/${ev.id}/rsvp`, { method: "DELETE" });
+      if (!res.ok) throw new Error(`rsvp ${res.status}`);
+      onMutate();
+      emitCalendarChanged();
+    } catch (e) {
+      console.error("[events] rsvp", e);
+      // Roll back
+      setStatus(prev);
+      if (prev === "going" && next !== "going") setGoing((c) => c + 1);
+      if (prev === "maybe" && next !== "maybe") setInterested((c) => c + 1);
+      if (next === "going" && prev !== "going") setGoing((c) => Math.max(0, c - 1));
+      if (next === "maybe" && prev !== "maybe") setInterested((c) => Math.max(0, c - 1));
+    } finally {
+      setBusy(false);
+    }
+  };
+
+  return (
+    <GlassCard style={{ borderLeft: `3px solid ${accent}` }}>
       <div
         style={{
-          display: "grid",
-          gridTemplateColumns: "repeat(auto-fill, minmax(280px, 1fr))",
-          gap: 14,
+          display: "flex",
+          justifyContent: "space-between",
+          alignItems: "flex-start",
+          gap: 10,
+          marginBottom: 8,
         }}
       >
-        {events.map((e) => (
-          <GlassCard key={e.name} style={{ borderLeft: `3px solid ${e.accent}` }}>
-            <div style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-start", gap: 10, marginBottom: 8 }}>
-              <div style={{ fontFamily: "Fraunces, serif", fontWeight: 800, fontSize: 17, color: "#fff" }}>
-                {e.name}
-              </div>
-              <span
-                style={{
-                  fontSize: 11,
-                  fontWeight: 700,
-                  padding: "3px 8px",
-                  borderRadius: 999,
-                  background: "rgba(255,255,255,0.1)",
-                  color: "#fff",
-                  fontFamily: "DM Sans, sans-serif",
-                  whiteSpace: "nowrap",
-                }}
-              >
-                {e.going} going
-              </span>
-            </div>
-            <div style={{ fontFamily: "DM Sans, sans-serif", fontSize: 13, color: COLORS.glassMuted, lineHeight: 1.7, marginBottom: 12 }}>
-              🗓 {e.when}
-              <br />📍 {e.where}
-            </div>
-            <button
-              type="button"
+        <div style={{ flex: 1, minWidth: 0 }}>
+          <div
+            style={{
+              fontFamily: "Fraunces, serif",
+              fontWeight: 800,
+              fontSize: 17,
+              color: "#fff",
+              lineHeight: 1.25,
+            }}
+          >
+            {ev.title}
+          </div>
+          {ev.org ? (
+            <Link
+              href={`/orgs/${ev.org.handle}`}
               style={{
-                width: "100%",
-                padding: "8px 12px",
-                borderRadius: 10,
-                border: "1px solid rgba(255,255,255,0.2)",
-                background: "rgba(255,255,255,0.08)",
-                color: "#fff",
+                display: "inline-flex",
+                alignItems: "center",
+                gap: 5,
+                marginTop: 4,
                 fontFamily: "DM Sans, sans-serif",
+                fontSize: 11,
                 fontWeight: 600,
-                fontSize: 13,
-                cursor: "pointer",
-                boxShadow: "inset 0 1px 0 rgba(255,255,255,0.18)",
+                color: COLORS.glassMuted,
+                textDecoration: "none",
               }}
             >
-              {e.rsvp}
-            </button>
-          </GlassCard>
-        ))}
+              by {ev.org.name}
+              {ev.org.verified ? <VerifiedBadge size={11} /> : null}
+            </Link>
+          ) : ev.creator?.handle ? (
+            <div
+              style={{
+                marginTop: 4,
+                fontFamily: "DM Sans, sans-serif",
+                fontSize: 11,
+                color: COLORS.glassMuted,
+              }}
+            >
+              by @{ev.creator.handle}
+            </div>
+          ) : null}
+        </div>
+        <span
+          style={{
+            fontSize: 11,
+            fontWeight: 700,
+            padding: "3px 8px",
+            borderRadius: 999,
+            background: "rgba(255,255,255,0.10)",
+            color: "#fff",
+            fontFamily: "DM Sans, sans-serif",
+            whiteSpace: "nowrap",
+          }}
+        >
+          {going} going
+        </span>
       </div>
-    </section>
+      <div
+        style={{
+          fontFamily: "DM Sans, sans-serif",
+          fontSize: 13,
+          color: COLORS.glassMuted,
+          lineHeight: 1.7,
+          marginBottom: 12,
+        }}
+      >
+        🗓 {formatEventTime(ev.starts_at, ev.ends_at)}
+        {ev.location ? (
+          <>
+            <br />📍 {ev.location}
+          </>
+        ) : null}
+      </div>
+      {ev.description ? (
+        <div
+          style={{
+            fontFamily: "DM Sans, sans-serif",
+            fontSize: 12.5,
+            color: "rgba(255,255,255,0.78)",
+            lineHeight: 1.55,
+            marginBottom: 12,
+            display: "-webkit-box",
+            WebkitLineClamp: 3,
+            WebkitBoxOrient: "vertical" as const,
+            overflow: "hidden",
+          }}
+        >
+          {ev.description}
+        </div>
+      ) : null}
+      <div style={{ display: "flex", gap: 8 }}>
+        <RsvpButton
+          label="Going"
+          active={status === "going"}
+          accent={accent}
+          onClick={() => setRsvp(status === "going" ? null : "going")}
+          disabled={busy}
+        />
+        <RsvpButton
+          label={`Interested${interested > 0 ? ` · ${interested}` : ""}`}
+          active={status === "maybe"}
+          accent={accent}
+          onClick={() => setRsvp(status === "maybe" ? null : "maybe")}
+          disabled={busy}
+        />
+      </div>
+      {(status || ev.viewer_can_manage) ? (
+        <div
+          style={{
+            display: "flex",
+            gap: 6,
+            marginTop: 8,
+            flexWrap: "wrap",
+          }}
+        >
+          {status ? (
+            <a
+              href={`/api/events/${ev.id}/ics`}
+              download
+              style={eventCardSubtleLink}
+              onClick={(e) => e.stopPropagation()}
+            >
+              <CalendarIcon /> Add to calendar
+            </a>
+          ) : null}
+          {ev.viewer_can_manage ? (
+            <ManageAttendeesAction
+              eventId={ev.id}
+              eventTitle={ev.title}
+            />
+          ) : null}
+        </div>
+      ) : null}
+    </GlassCard>
+  );
+}
+
+const eventCardSubtleLink: React.CSSProperties = {
+  display: "inline-flex",
+  alignItems: "center",
+  gap: 5,
+  padding: "5px 10px",
+  borderRadius: 999,
+  border: "1px solid rgba(255,255,255,0.16)",
+  background: "rgba(255,255,255,0.06)",
+  color: "rgba(255,255,255,0.85)",
+  fontFamily: "DM Sans, sans-serif",
+  fontWeight: 600,
+  fontSize: 11,
+  textDecoration: "none",
+  cursor: "pointer",
+};
+
+function CalendarIcon() {
+  return (
+    <svg width="12" height="12" viewBox="0 0 16 16" fill="none" aria-hidden>
+      <rect x="2" y="3" width="12" height="11" rx="1.5" stroke="currentColor" strokeWidth="1.3" />
+      <path d="M2 6h12M5 1.5v3M11 1.5v3" stroke="currentColor" strokeWidth="1.3" strokeLinecap="round" />
+    </svg>
+  );
+}
+
+function ManageAttendeesAction({
+  eventId,
+  eventTitle,
+}: {
+  eventId: string;
+  eventTitle: string;
+}) {
+  const [open, setOpen] = useState(false);
+  return (
+    <>
+      <button
+        type="button"
+        onClick={() => setOpen(true)}
+        style={{ ...eventCardSubtleLink, border: "1px solid rgba(255,180,150,0.38)", color: "#FFB89C", background: "rgba(255,140,90,0.10)" }}
+      >
+        Manage attendees
+      </button>
+      {open ? (
+        <AttendeesModal
+          eventId={eventId}
+          eventTitle={eventTitle}
+          onClose={() => setOpen(false)}
+        />
+      ) : null}
+    </>
+  );
+}
+
+type Attendee = {
+  status: "going" | "maybe";
+  user: {
+    id: string;
+    name: string | null;
+    handle: string | null;
+    avatar_url: string | null;
+    major: string | null;
+    year: number | null;
+  };
+};
+
+function AttendeesModal({
+  eventId,
+  eventTitle,
+  onClose,
+}: {
+  eventId: string;
+  eventTitle: string;
+  onClose: () => void;
+}) {
+  const [going, setGoing] = useState<Attendee[] | null>(null);
+  const [interested, setInterested] = useState<Attendee[] | null>(null);
+  const [error, setError] = useState<string | null>(null);
+  const [busy, setBusy] = useState(false);
+
+  useEffect(() => {
+    let cancelled = false;
+    (async () => {
+      try {
+        const res = await fetch(`/api/events/${eventId}/attendees`, {
+          cache: "no-store",
+        });
+        const data = await res.json();
+        if (cancelled) return;
+        if (!res.ok || !data?.ok) throw new Error(data?.error || `HTTP ${res.status}`);
+        setGoing(data.going ?? []);
+        setInterested(data.interested ?? []);
+      } catch (e) {
+        if (!cancelled) {
+          setError(e instanceof Error ? e.message : "Could not load attendees");
+          setGoing([]);
+          setInterested([]);
+        }
+      }
+    })();
+    return () => {
+      cancelled = true;
+    };
+  }, [eventId]);
+
+  const messageOne = async (handle: string | null) => {
+    if (!handle) return;
+    try {
+      const res = await fetch("/api/me/threads", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ handle }),
+      });
+      const data = await res.json();
+      if (!res.ok || !data?.ok) throw new Error(data?.error || `HTTP ${res.status}`);
+      window.location.href = `/messages?channel=${data.channel_id}`;
+    } catch (e) {
+      setError(e instanceof Error ? e.message : "Could not start chat");
+    }
+  };
+
+  const messageAll = async () => {
+    if (busy) return;
+    const recipients = (going ?? []).map((a) => a.user.id);
+    if (recipients.length < 2) {
+      setError("Need at least 2 attendees marked Going to start a group chat.");
+      return;
+    }
+    setBusy(true);
+    setError(null);
+    try {
+      const res = await fetch("/api/me/threads", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          type: "group",
+          name: eventTitle.slice(0, 80),
+          members: recipients,
+        }),
+      });
+      const data = await res.json();
+      if (!res.ok || !data?.ok) throw new Error(data?.error || `HTTP ${res.status}`);
+      window.location.href = `/messages?channel=${data.channel_id}`;
+    } catch (e) {
+      setError(e instanceof Error ? e.message : "Could not create group chat");
+    } finally {
+      setBusy(false);
+    }
+  };
+
+  const goingCount = going?.length ?? 0;
+  const interestedCount = interested?.length ?? 0;
+
+  return (
+    <div
+      role="dialog"
+      aria-modal="true"
+      onClick={onClose}
+      style={{
+        position: "fixed",
+        inset: 0,
+        background: "rgba(8,6,12,0.55)",
+        backdropFilter: "blur(8px)",
+        WebkitBackdropFilter: "blur(8px)",
+        zIndex: 1000,
+        display: "flex",
+        alignItems: "center",
+        justifyContent: "center",
+        padding: 20,
+      }}
+    >
+      <div
+        onClick={(e) => e.stopPropagation()}
+        style={{ ...eventModalSurface, maxWidth: 520, maxHeight: "82vh", overflow: "auto" }}
+      >
+        <div
+          style={{
+            display: "flex",
+            alignItems: "flex-start",
+            justifyContent: "space-between",
+            gap: 12,
+          }}
+        >
+          <div>
+            <div style={{ fontFamily: "Fraunces, serif", fontWeight: 800, fontSize: 18, color: "#fff" }}>
+              Attendees
+            </div>
+            <div style={{ fontFamily: "DM Sans, sans-serif", fontSize: 12, color: "rgba(255,255,255,0.55)", marginTop: 2 }}>
+              {eventTitle}
+            </div>
+          </div>
+          {goingCount >= 2 ? (
+            <button
+              type="button"
+              onClick={messageAll}
+              disabled={busy}
+              style={{
+                padding: "8px 14px",
+                borderRadius: 999,
+                border: "none",
+                background: COLORS.accent,
+                color: "#fff",
+                fontFamily: "DM Sans, sans-serif",
+                fontWeight: 700,
+                fontSize: 12,
+                cursor: busy ? "default" : "pointer",
+                whiteSpace: "nowrap",
+                boxShadow: "0 4px 16px rgba(255,92,53,0.32)",
+              }}
+            >
+              {busy ? "Creating…" : `Message all (${goingCount})`}
+            </button>
+          ) : null}
+        </div>
+
+        {error ? (
+          <div
+            style={{
+              fontFamily: "DM Sans, sans-serif",
+              fontSize: 12,
+              color: "#FFB1A8",
+              background: "rgba(196,43,28,0.18)",
+              padding: "6px 10px",
+              borderRadius: 8,
+            }}
+          >
+            {error}
+          </div>
+        ) : null}
+
+        <AttendeeList
+          heading={`Going · ${goingCount}`}
+          rows={going}
+          onMessage={messageOne}
+          accent="#5BD18C"
+        />
+        <AttendeeList
+          heading={`Interested · ${interestedCount}`}
+          rows={interested}
+          onMessage={messageOne}
+          accent="#FFB85A"
+        />
+
+        <div style={{ display: "flex", justifyContent: "flex-end", marginTop: 4 }}>
+          <button
+            type="button"
+            onClick={onClose}
+            style={{
+              padding: "8px 14px",
+              borderRadius: 999,
+              border: "1px solid rgba(255,255,255,0.18)",
+              background: "transparent",
+              color: "rgba(255,255,255,0.78)",
+              fontFamily: "DM Sans, sans-serif",
+              fontWeight: 600,
+              fontSize: 12,
+              cursor: "pointer",
+            }}
+          >
+            Close
+          </button>
+        </div>
+      </div>
+    </div>
+  );
+}
+
+function AttendeeList({
+  heading,
+  rows,
+  onMessage,
+  accent,
+}: {
+  heading: string;
+  rows: Attendee[] | null;
+  onMessage: (handle: string | null) => void;
+  accent: string;
+}) {
+  return (
+    <div style={{ display: "flex", flexDirection: "column", gap: 6 }}>
+      <div
+        style={{
+          fontFamily: "DM Sans, sans-serif",
+          fontSize: 11,
+          fontWeight: 700,
+          letterSpacing: 0.4,
+          textTransform: "uppercase",
+          color: accent,
+        }}
+      >
+        {heading}
+      </div>
+      {rows === null ? (
+        <div style={{ fontSize: 12, color: "rgba(255,255,255,0.55)" }}>Loading…</div>
+      ) : rows.length === 0 ? (
+        <div style={{ fontSize: 12, color: "rgba(255,255,255,0.55)" }}>Nobody yet.</div>
+      ) : (
+        rows.map((a) => {
+          const name = a.user.name || a.user.handle || "Member";
+          const initials = name
+            .split(/\s+/)
+            .filter(Boolean)
+            .slice(0, 2)
+            .map((s) => s[0])
+            .join("")
+            .toUpperCase();
+          const sub = [a.user.major, a.user.year ? String(a.user.year) : null]
+            .filter(Boolean)
+            .join(" · ");
+          return (
+            <div
+              key={a.user.id}
+              style={{
+                display: "flex",
+                alignItems: "center",
+                gap: 10,
+                padding: "6px 0",
+                borderBottom: "1px solid rgba(255,255,255,0.06)",
+              }}
+            >
+              <div
+                style={{
+                  width: 30,
+                  height: 30,
+                  borderRadius: 999,
+                  background: a.user.avatar_url
+                    ? `url(${a.user.avatar_url}) center/cover`
+                    : "rgba(255,255,255,0.10)",
+                  color: "#fff",
+                  display: "flex",
+                  alignItems: "center",
+                  justifyContent: "center",
+                  fontFamily: "Fraunces, serif",
+                  fontWeight: 800,
+                  fontSize: 11,
+                  flexShrink: 0,
+                }}
+              >
+                {!a.user.avatar_url ? initials : null}
+              </div>
+              <div style={{ flex: 1, minWidth: 0 }}>
+                <div
+                  style={{
+                    fontFamily: "DM Sans, sans-serif",
+                    fontSize: 13,
+                    fontWeight: 600,
+                    color: "#fff",
+                    overflow: "hidden",
+                    textOverflow: "ellipsis",
+                    whiteSpace: "nowrap",
+                  }}
+                >
+                  {name}
+                </div>
+                {sub ? (
+                  <div
+                    style={{
+                      fontFamily: "DM Sans, sans-serif",
+                      fontSize: 11,
+                      color: "rgba(255,255,255,0.55)",
+                    }}
+                  >
+                    {sub}
+                  </div>
+                ) : null}
+              </div>
+              <button
+                type="button"
+                onClick={() => onMessage(a.user.handle)}
+                disabled={!a.user.handle}
+                style={{
+                  padding: "4px 12px",
+                  borderRadius: 999,
+                  border: "1px solid rgba(255,255,255,0.18)",
+                  background: "rgba(255,255,255,0.06)",
+                  color: "rgba(255,255,255,0.85)",
+                  fontFamily: "DM Sans, sans-serif",
+                  fontWeight: 600,
+                  fontSize: 11,
+                  cursor: a.user.handle ? "pointer" : "default",
+                }}
+              >
+                Message
+              </button>
+            </div>
+          );
+        })
+      )}
+    </div>
+  );
+}
+
+function RsvpButton({
+  label,
+  active,
+  accent,
+  onClick,
+  disabled,
+}: {
+  label: string;
+  active: boolean;
+  accent: string;
+  onClick: () => void;
+  disabled?: boolean;
+}) {
+  return (
+    <button
+      type="button"
+      onClick={onClick}
+      disabled={disabled}
+      style={{
+        flex: 1,
+        padding: "8px 12px",
+        borderRadius: 10,
+        border: active
+          ? `1px solid ${accent}`
+          : "1px solid rgba(255,255,255,0.20)",
+        background: active
+          ? `${hexToRgba(accent, 0.28)}`
+          : "rgba(255,255,255,0.08)",
+        color: "#fff",
+        fontFamily: "DM Sans, sans-serif",
+        fontWeight: 700,
+        fontSize: 13,
+        cursor: disabled ? "default" : "pointer",
+        boxShadow: active
+          ? `inset 0 1px 0 rgba(255,255,255,0.22), 0 4px 14px ${hexToRgba(accent, 0.28)}`
+          : "inset 0 1px 0 rgba(255,255,255,0.18)",
+        transition: "background 120ms ease, border-color 120ms ease",
+      }}
+    >
+      {label}
+    </button>
+  );
+}
+
+function formatUpcomingChip(startIso: string): string {
+  // Compact chip for the Otto rail. "Today" and "Tmrw" are common-case
+  // shortcuts; everything else falls back to a short month/day.
+  try {
+    const start = new Date(startIso);
+    const now = new Date();
+    const startMid = new Date(start.getFullYear(), start.getMonth(), start.getDate());
+    const nowMid = new Date(now.getFullYear(), now.getMonth(), now.getDate());
+    const diffDays = Math.round(
+      (startMid.getTime() - nowMid.getTime()) / (24 * 60 * 60 * 1000),
+    );
+    if (diffDays === 0) return "Today";
+    if (diffDays === 1) return "Tmrw";
+    if (diffDays > 1 && diffDays < 7) {
+      return start.toLocaleDateString([], { weekday: "short" });
+    }
+    return start.toLocaleDateString([], { month: "short", day: "numeric" });
+  } catch {
+    return "";
+  }
+}
+
+function formatEventTime(startIso: string, endIso: string): string {
+  try {
+    const start = new Date(startIso);
+    const end = new Date(endIso);
+    const sameDay = start.toDateString() === end.toDateString();
+    const dateStr = start.toLocaleDateString([], {
+      weekday: "short",
+      month: "short",
+      day: "numeric",
+    });
+    const startTime = start.toLocaleTimeString([], {
+      hour: "numeric",
+      minute: start.getMinutes() ? "2-digit" : undefined,
+    });
+    const endTime = end.toLocaleTimeString([], {
+      hour: "numeric",
+      minute: end.getMinutes() ? "2-digit" : undefined,
+    });
+    if (sameDay) return `${dateStr} · ${startTime} – ${endTime}`;
+    const endDate = end.toLocaleDateString([], {
+      weekday: "short",
+      month: "short",
+      day: "numeric",
+    });
+    return `${dateStr} ${startTime} → ${endDate} ${endTime}`;
+  } catch {
+    return startIso;
+  }
+}
+
+type EligibleOrg = { id: string; name: string; handle: string; verified: boolean; role: string };
+
+function CreateEventModal({
+  eligibleOrgs,
+  onClose,
+  onCreated,
+}: {
+  eligibleOrgs: EligibleOrg[];
+  onClose: () => void;
+  onCreated: () => void;
+}) {
+  const [title, setTitle] = useState("");
+  const [description, setDescription] = useState("");
+  const [location, setLocation] = useState("");
+  const [startsAt, setStartsAt] = useState(defaultStartIsoLocal());
+  const [endsAt, setEndsAt] = useState(defaultEndIsoLocal());
+  const [orgId, setOrgId] = useState<string>(eligibleOrgs[0]?.id ?? "");
+  const [busy, setBusy] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+
+  const submit = async () => {
+    if (busy) return;
+    setError(null);
+    if (!orgId) {
+      setError("Pick which verified org this event is for.");
+      return;
+    }
+    setBusy(true);
+    try {
+      const startMs = Date.parse(startsAt);
+      const endMs = Date.parse(endsAt);
+      if (!Number.isFinite(startMs) || !Number.isFinite(endMs)) {
+        throw new Error("Pick valid start and end times");
+      }
+      const res = await fetch("/api/events", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          title: title.trim(),
+          description: description.trim(),
+          location: location.trim(),
+          starts_at: new Date(startMs).toISOString(),
+          ends_at: new Date(endMs).toISOString(),
+          org_id: orgId,
+        }),
+      });
+      const data = await res.json();
+      if (!res.ok || !data?.ok) {
+        throw new Error(data?.error || `HTTP ${res.status}`);
+      }
+      onCreated();
+    } catch (e) {
+      setError(e instanceof Error ? e.message : "Could not create event");
+    } finally {
+      setBusy(false);
+    }
+  };
+
+  return (
+    <div
+      role="dialog"
+      aria-modal="true"
+      onClick={onClose}
+      style={{
+        position: "fixed",
+        inset: 0,
+        background: "rgba(8,6,12,0.55)",
+        backdropFilter: "blur(8px)",
+        WebkitBackdropFilter: "blur(8px)",
+        zIndex: 1000,
+        display: "flex",
+        alignItems: "center",
+        justifyContent: "center",
+        padding: 20,
+      }}
+    >
+      <div
+        onClick={(e) => e.stopPropagation()}
+        style={eventModalSurface}
+      >
+        <div
+          style={{
+            fontFamily: "Fraunces, serif",
+            fontWeight: 800,
+            fontSize: 20,
+            color: "#fff",
+          }}
+        >
+          Create event
+        </div>
+        <div
+          style={{
+            fontFamily: "DM Sans, sans-serif",
+            fontSize: 12,
+            color: "rgba(255,255,255,0.55)",
+            marginTop: -6,
+            marginBottom: 4,
+          }}
+        >
+          Posted on behalf of a verified org. Attendees will see your org name.
+        </div>
+        <input
+          autoFocus
+          value={title}
+          onChange={(e) => setTitle(e.target.value.slice(0, 120))}
+          placeholder="Event title"
+          style={eventModalInput}
+        />
+        <textarea
+          value={description}
+          onChange={(e) => setDescription(e.target.value.slice(0, 2000))}
+          placeholder="What's this about? (optional)"
+          rows={3}
+          style={{ ...eventModalInput, resize: "vertical", minHeight: 70 }}
+        />
+        <input
+          value={location}
+          onChange={(e) => setLocation(e.target.value.slice(0, 200))}
+          placeholder="Location (e.g. Memorial Stadium, Zoom)"
+          style={eventModalInput}
+        />
+        <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 8 }}>
+          <label style={eventModalLabel}>
+            Starts
+            <input
+              type="datetime-local"
+              value={startsAt}
+              onChange={(e) => setStartsAt(e.target.value)}
+              style={eventModalInput}
+            />
+          </label>
+          <label style={eventModalLabel}>
+            Ends
+            <input
+              type="datetime-local"
+              value={endsAt}
+              onChange={(e) => setEndsAt(e.target.value)}
+              style={eventModalInput}
+            />
+          </label>
+        </div>
+        <label style={eventModalLabel}>
+          Posting on behalf of
+          <select
+            value={orgId}
+            onChange={(e) => setOrgId(e.target.value)}
+            style={eventModalInput}
+          >
+            {eligibleOrgs.map((o) => (
+              <option key={o.id} value={o.id} style={{ color: "#1C1C1E" }}>
+                {o.name}
+              </option>
+            ))}
+          </select>
+        </label>
+        {error ? (
+          <div
+            style={{
+              fontFamily: "DM Sans, sans-serif",
+              fontSize: 12,
+              color: "#FFB1A8",
+              background: "rgba(196,43,28,0.18)",
+              padding: "6px 10px",
+              borderRadius: 8,
+            }}
+          >
+            {error}
+          </div>
+        ) : null}
+        <div style={{ display: "flex", justifyContent: "flex-end", gap: 8, marginTop: 4 }}>
+          <button
+            type="button"
+            onClick={onClose}
+            disabled={busy}
+            style={{
+              padding: "8px 14px",
+              borderRadius: 999,
+              border: "1px solid rgba(255,255,255,0.18)",
+              background: "transparent",
+              color: "rgba(255,255,255,0.78)",
+              fontFamily: "DM Sans, sans-serif",
+              fontWeight: 600,
+              fontSize: 12,
+              cursor: busy ? "default" : "pointer",
+            }}
+          >
+            Cancel
+          </button>
+          <button
+            type="button"
+            onClick={submit}
+            disabled={busy || !title.trim() || !startsAt || !endsAt || !orgId}
+            style={{
+              padding: "8px 18px",
+              borderRadius: 999,
+              border: "none",
+              background:
+                title.trim() && orgId && !busy
+                  ? COLORS.accent
+                  : "rgba(255,255,255,0.18)",
+              color: "#fff",
+              fontFamily: "DM Sans, sans-serif",
+              fontWeight: 700,
+              fontSize: 12,
+              cursor: busy || !title.trim() || !orgId ? "default" : "pointer",
+              boxShadow:
+                title.trim() && orgId && !busy
+                  ? "0 4px 16px rgba(255,92,53,0.32)"
+                  : "none",
+            }}
+          >
+            {busy ? "Creating…" : "Create event"}
+          </button>
+        </div>
+      </div>
+    </div>
+  );
+}
+
+// Dark-glass surface that matches the Events scene (midnight backdrop) so
+// the modal feels like a panel inside the scene rather than a popup from
+// nowhere. Mirrors the OttoPanel + GlassCard treatment used elsewhere.
+const eventModalSurface: React.CSSProperties = {
+  width: "100%",
+  maxWidth: 480,
+  background:
+    "linear-gradient(180deg, rgba(46,42,90,0.72) 0%, rgba(20,18,42,0.78) 100%)",
+  backdropFilter: "blur(32px) saturate(180%)",
+  WebkitBackdropFilter: "blur(32px) saturate(180%)",
+  border: "1px solid rgba(255,255,255,0.12)",
+  borderRadius: 20,
+  padding: 22,
+  boxShadow: [
+    "inset 0 1px 0 rgba(255,255,255,0.18)",
+    "inset 0 -1px 0 rgba(0,0,0,0.18)",
+    "0 24px 80px rgba(0,0,0,0.5)",
+  ].join(", "),
+  display: "flex",
+  flexDirection: "column",
+  gap: 12,
+};
+
+const eventModalInput: React.CSSProperties = {
+  border: "1px solid rgba(255,255,255,0.16)",
+  borderRadius: 10,
+  padding: "9px 12px",
+  fontFamily: "DM Sans, sans-serif",
+  fontSize: 14,
+  outline: "none",
+  color: "#fff",
+  background: "rgba(255,255,255,0.06)",
+  width: "100%",
+  boxSizing: "border-box",
+  colorScheme: "dark",
+};
+
+const eventModalLabel: React.CSSProperties = {
+  display: "flex",
+  flexDirection: "column",
+  gap: 4,
+  fontFamily: "DM Sans, sans-serif",
+  fontSize: 11,
+  fontWeight: 600,
+  color: "rgba(255,255,255,0.55)",
+  textTransform: "uppercase",
+  letterSpacing: 0.4,
+};
+
+function defaultStartIsoLocal(): string {
+  // Default: tomorrow at 6pm local. Returns a value the
+  // <input type="datetime-local"> control accepts.
+  const d = new Date();
+  d.setDate(d.getDate() + 1);
+  d.setHours(18, 0, 0, 0);
+  return toLocalDateTimeInputValue(d);
+}
+
+function defaultEndIsoLocal(): string {
+  const d = new Date();
+  d.setDate(d.getDate() + 1);
+  d.setHours(20, 0, 0, 0);
+  return toLocalDateTimeInputValue(d);
+}
+
+function toLocalDateTimeInputValue(d: Date): string {
+  const pad = (n: number) => String(n).padStart(2, "0");
+  return (
+    `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())}` +
+    `T${pad(d.getHours())}:${pad(d.getMinutes())}`
   );
 }
 
@@ -4965,43 +7258,1192 @@ function SearchIcon() {
   );
 }
 
+type MapMajor = { name: string; total: number; connected: number; mutuals: number };
+type MapOrg = {
+  id: string;
+  handle: string;
+  name: string;
+  logo_url: string | null;
+  verified: boolean;
+  is_public: boolean;
+  member_count: number;
+};
+type MapSummary = {
+  ok: boolean;
+  demo?: boolean;
+  you: { id: string; name: string | null; handle: string | null; major: string | null; avatar_url: string | null };
+  majors: MapMajor[];
+  orgs: MapOrg[];
+};
+type ZoneSelection =
+  | { kind: "major"; key: string; label: string }
+  | { kind: "org"; key: string; label: string };
+
 function MapTabBody() {
+  const [data, setData] = useState<MapSummary | null>(null);
+  const [selected, setSelected] = useState<ZoneSelection | null>(null);
+  const [pan, setPan] = useState({ x: 0, y: 0 });
+  const [dragging, setDragging] = useState(false);
+  // Default to demo mode while the school's real data is sparse. Users
+  // can toggle off to see their actual zones.
+  const [demoMode, setDemoMode] = useState(true);
+  const [orgCollapsed, setOrgCollapsed] = useState(false);
+  const dragOriginRef = useRef<{ x: number; y: number } | null>(null);
+
+  // Picking a zone auto-collapses the org rail since the panel sits on
+  // top of it. User can re-expand manually from the collapsed pill.
+  const pickZone = useCallback((sel: ZoneSelection) => {
+    setSelected(sel);
+    setOrgCollapsed(true);
+  }, []);
+
+  useEffect(() => {
+    let cancelled = false;
+    (async () => {
+      try {
+        const url = demoMode ? "/api/campus-map?demo=1" : "/api/campus-map";
+        const res = await fetch(url, { cache: "no-store" });
+        const j = await res.json();
+        if (cancelled) return;
+        if (j?.ok) {
+          setData(j as MapSummary);
+          // Reflect the API's auto-demo fallback in the local toggle so
+          // the button label tells the truth. Without this, schools with
+          // zero real zones would say "Demo · off" while actually showing
+          // demo data.
+          if (j.demo === true && !demoMode) setDemoMode(true);
+        } else {
+          setData({ ok: false } as unknown as MapSummary);
+        }
+      } catch {
+        if (!cancelled) setData({ ok: false } as unknown as MapSummary);
+      }
+    })();
+    return () => {
+      cancelled = true;
+    };
+  }, [demoMode]);
+
+  // Force-directed layout: place "you" at the center, then each major on
+  // a deterministic spiral biased toward viewer (more mutuals = closer in).
+  // After initial placement we run a small relaxation pass that pushes any
+  // overlapping pair apart, plus a center-repulsion pass so nodes don't
+  // sit on top of "you are here". Deterministic — same data → same layout.
+  const layout = useMemo(() => {
+    if (!data || !data.majors) return null;
+    type Pos = { x: number; y: number; r: number };
+    const positions = new Map<string, Pos>();
+    const total = data.majors.length || 1;
+    data.majors.forEach((m, i) => {
+      const seed = hashString(m.name);
+      const angle = (seed % 360) * (Math.PI / 180);
+      const score = m.mutuals * 6 + Math.min(m.total, 60);
+      const distance = 360 - Math.min(180, score);
+      const ringOffset = (i / total) * 40;
+      const r = distance + ringOffset;
+      const cx = Math.cos(angle) * r;
+      const cy = Math.sin(angle) * r * 0.7;
+      const radius = 40 + Math.min(34, m.total * 0.5);
+      positions.set(m.name, { x: cx, y: cy, r: radius });
+    });
+
+    // Anti-collision relaxation. 80 iterations is plenty; we usually settle
+    // in 20–30. Padding adds breathing room so bubbles don't kiss.
+    const PADDING = 14;
+    const CENTER_KEEP_OUT = 90;
+    const entries = Array.from(positions.values());
+    for (let iter = 0; iter < 80; iter++) {
+      let moved = false;
+      // Pair-wise repulsion.
+      for (let i = 0; i < entries.length; i++) {
+        for (let j = i + 1; j < entries.length; j++) {
+          const a = entries[i];
+          const b = entries[j];
+          const dx = b.x - a.x;
+          const dy = b.y - a.y;
+          const dist = Math.sqrt(dx * dx + dy * dy) || 0.01;
+          const minDist = a.r + b.r + PADDING;
+          if (dist < minDist) {
+            const push = (minDist - dist) / 2;
+            const ux = dx / dist;
+            const uy = dy / dist;
+            a.x -= ux * push;
+            a.y -= uy * push;
+            b.x += ux * push;
+            b.y += uy * push;
+            moved = true;
+          }
+        }
+      }
+      // Center keep-out so zones don't smother "you are here".
+      for (const node of entries) {
+        const d = Math.sqrt(node.x * node.x + node.y * node.y) || 0.01;
+        const minD = node.r + CENTER_KEEP_OUT;
+        if (d < minD) {
+          const push = minD - d;
+          const ux = node.x / d;
+          const uy = node.y / d;
+          node.x += ux * push;
+          node.y += uy * push;
+          moved = true;
+        }
+      }
+      if (!moved) break;
+    }
+    return positions;
+  }, [data]);
+
+  const beginDrag = (e: React.PointerEvent) => {
+    dragOriginRef.current = { x: e.clientX - pan.x, y: e.clientY - pan.y };
+    setDragging(true);
+    (e.target as HTMLElement).setPointerCapture(e.pointerId);
+  };
+  const onDrag = (e: React.PointerEvent) => {
+    if (!dragOriginRef.current) return;
+    setPan({
+      x: e.clientX - dragOriginRef.current.x,
+      y: e.clientY - dragOriginRef.current.y,
+    });
+  };
+  const endDrag = (e: React.PointerEvent) => {
+    dragOriginRef.current = null;
+    setDragging(false);
+    try {
+      (e.target as HTMLElement).releasePointerCapture(e.pointerId);
+    } catch {
+      /* ignore — element may have been unmounted */
+    }
+  };
+
+  const isLoading = data === null;
+  const hasData = !!data && Array.isArray(data.majors) && data.majors.length > 0;
+
   return (
-    <section style={{ flex: 1, padding: "28px 24px", display: "flex", flexDirection: "column", gap: 16, maxWidth: 1100, width: "100%" }}>
+    <section
+      style={{
+        flex: 1,
+        padding: "20px 24px",
+        display: "flex",
+        flexDirection: "column",
+        gap: 12,
+        maxWidth: 1300,
+        width: "100%",
+        minHeight: 0,
+      }}
+    >
       <SceneHeader
         eyebrow="Map · IU"
-        title="Find what's nearby"
-        subtitle="Buildings, events pinned in space, friends nearby."
+        title="The campus, mapped by who's where"
+        subtitle="Each zone is a major. Click in to find people you&apos;d never bump into."
         tone="light"
       />
-      <GlassCard
+
+      <div
         style={{
-          minHeight: 480,
-          display: "flex",
-          alignItems: "center",
-          justifyContent: "center",
+          flex: 1,
+          minHeight: 560,
+          position: "relative",
+          borderRadius: 22,
+          overflow: "hidden",
           background:
-            "radial-gradient(120% 80% at 30% 20%, rgba(180,220,140,0.18) 0%, rgba(180,220,140,0) 60%), " +
-            "radial-gradient(110% 90% at 80% 80%, rgba(70,160,110,0.22) 0%, rgba(70,160,110,0) 60%), " +
-            COLORS.glassFill,
+            "radial-gradient(120% 80% at 50% 35%, rgba(70,140,255,0.18) 0%, rgba(70,140,255,0) 55%)," +
+            "radial-gradient(80% 60% at 80% 80%, rgba(255,92,53,0.10) 0%, rgba(255,92,53,0) 60%)," +
+            "linear-gradient(180deg, #07091A 0%, #03050C 100%)",
+          border: "1px solid rgba(120,200,255,0.12)",
+          boxShadow:
+            "inset 0 1px 0 rgba(120,200,255,0.18), inset 0 -1px 0 rgba(0,0,0,0.4), 0 12px 48px rgba(0,0,0,0.5)",
+          touchAction: "none",
+          cursor: dragging ? "grabbing" : "grab",
         }}
+        onPointerDown={beginDrag}
+        onPointerMove={onDrag}
+        onPointerUp={endDrag}
+        onPointerCancel={endDrag}
       >
-        <div style={{ textAlign: "center", color: COLORS.glassMuted, fontFamily: "DM Sans, sans-serif" }}>
-          <div style={{ fontFamily: "Fraunces, serif", fontWeight: 800, fontSize: 22, color: "#fff", marginBottom: 6 }}>
-            Campus map coming soon
+        <ContourBackdrop />
+
+        {isLoading ? (
+          <div style={mapEmptyOverlayStyle}>
+            <div style={{ fontFamily: "Fraunces, serif", fontSize: 18, color: "#fff" }}>
+              Scanning campus…
+            </div>
           </div>
-          Interactive overlay with buildings, events pinned in space, and friends nearby.
+        ) : !hasData ? (
+          <div style={mapEmptyOverlayStyle}>
+            <div style={{ fontFamily: "Fraunces, serif", fontSize: 18, color: "#fff", marginBottom: 6 }}>
+              No zones yet
+            </div>
+            <div style={{ color: "rgba(255,255,255,0.55)", fontSize: 13, maxWidth: 320, textAlign: "center" }}>
+              We&apos;ll start lighting up zones once more students at your school have a major set on their profile.
+            </div>
+          </div>
+        ) : (
+          <div
+            style={{
+              position: "absolute",
+              left: "50%",
+              top: "50%",
+              transform: `translate(${pan.x}px, ${pan.y}px)`,
+              transition: dragging ? "none" : "transform 200ms ease",
+              width: 0,
+              height: 0,
+              pointerEvents: "none",
+            }}
+          >
+            <YouHereNode you={data!.you} />
+            {data!.majors.map((m) => {
+              const pos = layout?.get(m.name);
+              if (!pos) return null;
+              return (
+                <MajorNode
+                  key={m.name}
+                  major={m}
+                  x={pos.x}
+                  y={pos.y}
+                  radius={pos.r}
+                  active={selected?.kind === "major" && selected.key === m.name}
+                  onClick={() =>
+                    pickZone({ kind: "major", key: m.name, label: m.name })
+                  }
+                />
+              );
+            })}
+          </div>
+        )}
+
+        {/* Org Center — independent cluster, anchored to the right side. */}
+        {hasData && data!.orgs.length > 0 ? (
+          <OrgCenterCluster
+            orgs={data!.orgs}
+            collapsed={orgCollapsed}
+            onToggleCollapse={() => setOrgCollapsed((v) => !v)}
+            onPick={(org) =>
+              pickZone({ kind: "org", key: org.handle, label: org.name })
+            }
+            activeHandle={selected?.kind === "org" ? selected.key : null}
+          />
+        ) : null}
+
+        {/* Legend pill — purely decorative, won't intercept drag. */}
+        <div
+          style={{
+            position: "absolute",
+            top: 14,
+            left: 18,
+            display: "flex",
+            gap: 12,
+            alignItems: "center",
+            fontFamily: "DM Sans, sans-serif",
+            fontSize: 11,
+            color: "rgba(255,255,255,0.65)",
+            background: "rgba(8,12,28,0.55)",
+            border: "1px solid rgba(120,200,255,0.18)",
+            backdropFilter: "blur(14px)",
+            WebkitBackdropFilter: "blur(14px)",
+            padding: "6px 12px",
+            borderRadius: 999,
+            pointerEvents: "none",
+          }}
+        >
+          <LegendDot color="#5BD18C" /> Connected
+          <LegendDot color="#FFB85A" /> Mutuals
+          <LegendDot color="#5A9CFF" /> Discover
         </div>
-      </GlassCard>
+        {/* Demo toggle — separate absolutely-positioned button so the
+             canvas's pointer handlers can't swallow its click. */}
+        <div
+          style={{
+            position: "absolute",
+            top: 14,
+            right: 270,
+            zIndex: 5,
+            display: "flex",
+            gap: 6,
+          }}
+        >
+          <button
+            type="button"
+            onPointerDown={(e) => {
+              e.stopPropagation();
+              e.preventDefault();
+            }}
+            onClick={(e) => {
+              e.stopPropagation();
+              setPan({ x: 0, y: 0 });
+            }}
+            title="Recenter the map"
+            style={{
+              fontFamily: "DM Sans, sans-serif",
+              fontSize: 10,
+              fontWeight: 800,
+              letterSpacing: "0.18em",
+              textTransform: "uppercase",
+              color: "rgba(120,200,255,0.95)",
+              background: "rgba(8,12,28,0.78)",
+              border: "1px solid rgba(120,200,255,0.45)",
+              padding: "7px 14px",
+              borderRadius: 999,
+              cursor: "pointer",
+              backdropFilter: "blur(14px)",
+              WebkitBackdropFilter: "blur(14px)",
+              pointerEvents: "auto",
+            }}
+          >
+            Recenter
+          </button>
+          <button
+            type="button"
+            onPointerDown={(e) => {
+              e.stopPropagation();
+              e.preventDefault();
+            }}
+            onClick={(e) => {
+              e.stopPropagation();
+              setDemoMode((v) => !v);
+              setPan({ x: 0, y: 0 });
+            }}
+            title={
+              demoMode
+                ? "Showing demo zones — click to see your school's real data"
+                : "Showing real data — click to preview demo zones"
+            }
+            style={{
+              fontFamily: "DM Sans, sans-serif",
+              fontSize: 10,
+              fontWeight: 800,
+              letterSpacing: "0.18em",
+              textTransform: "uppercase",
+              color: demoMode ? "rgba(255,184,90,0.95)" : "rgba(120,200,255,0.95)",
+              background: demoMode
+                ? "rgba(120,80,0,0.45)"
+                : "rgba(8,12,28,0.78)",
+              border: demoMode
+                ? "1px solid rgba(255,184,90,0.55)"
+                : "1px solid rgba(120,200,255,0.45)",
+              padding: "7px 14px",
+              borderRadius: 999,
+              cursor: "pointer",
+              backdropFilter: "blur(14px)",
+              WebkitBackdropFilter: "blur(14px)",
+              pointerEvents: "auto",
+            }}
+          >
+            {demoMode ? "Demo · on" : "Demo · off"}
+          </button>
+        </div>
+      </div>
+
+      {selected ? (
+        <ZonePanel
+          key={`${selected.kind}:${selected.key}:${data?.demo ? "demo" : "real"}`}
+          selection={selected}
+          demo={!!data?.demo}
+          onClose={() => setSelected(null)}
+        />
+      ) : null}
     </section>
   );
 }
 
-function OttoPanel() {
+const mapEmptyOverlayStyle: React.CSSProperties = {
+  position: "absolute",
+  inset: 0,
+  display: "flex",
+  flexDirection: "column",
+  alignItems: "center",
+  justifyContent: "center",
+  gap: 6,
+  color: "rgba(255,255,255,0.7)",
+  fontFamily: "DM Sans, sans-serif",
+};
+
+function LegendDot({ color }: { color: string }) {
+  return (
+    <span
+      style={{
+        width: 8,
+        height: 8,
+        borderRadius: "50%",
+        background: color,
+        boxShadow: `0 0 12px ${color}`,
+        display: "inline-block",
+        marginRight: 4,
+      }}
+    />
+  );
+}
+
+// SVG topographic backdrop. Layered concentric blobs with subtle grid +
+// scan lines — gives the canvas the Tron HUD feel without dragging in a
+// 3D dependency.
+function ContourBackdrop() {
+  const rings = [60, 110, 170, 240, 320, 410];
+  return (
+    <svg
+      width="100%"
+      height="100%"
+      viewBox="-700 -400 1400 800"
+      preserveAspectRatio="xMidYMid slice"
+      style={{ position: "absolute", inset: 0, pointerEvents: "none" }}
+      aria-hidden
+    >
+      <defs>
+        <radialGradient id="hub" cx="0.5" cy="0.5" r="0.5">
+          <stop offset="0" stopColor="rgba(120,200,255,0.5)" />
+          <stop offset="1" stopColor="rgba(120,200,255,0)" />
+        </radialGradient>
+        <pattern id="grid" width="40" height="40" patternUnits="userSpaceOnUse">
+          <path
+            d="M 40 0 L 0 0 0 40"
+            fill="none"
+            stroke="rgba(120,200,255,0.06)"
+            strokeWidth="1"
+          />
+        </pattern>
+      </defs>
+      <rect x="-700" y="-400" width="1400" height="800" fill="url(#grid)" />
+      {rings.map((r) => (
+        <ellipse
+          key={r}
+          cx={0}
+          cy={0}
+          rx={r}
+          ry={r * 0.62}
+          fill="none"
+          stroke="rgba(120,200,255,0.10)"
+          strokeWidth={1}
+        />
+      ))}
+      {/* Subtle hub glow at center */}
+      <circle cx={0} cy={0} r={120} fill="url(#hub)" />
+    </svg>
+  );
+}
+
+function YouHereNode({
+  you,
+}: {
+  you: MapSummary["you"];
+}) {
+  const initials = (you.name ?? you.handle ?? "?")
+    .split(/\s+/)
+    .filter(Boolean)
+    .slice(0, 2)
+    .map((s) => s[0])
+    .join("")
+    .toUpperCase();
+  return (
+    <div
+      style={{
+        position: "absolute",
+        left: 0,
+        top: 0,
+        transform: "translate(-50%, -50%)",
+        display: "flex",
+        flexDirection: "column",
+        alignItems: "center",
+        gap: 8,
+        pointerEvents: "auto",
+      }}
+    >
+      <div
+        style={{
+          width: 56,
+          height: 56,
+          borderRadius: "50%",
+          background:
+            "radial-gradient(circle, rgba(255,92,53,0.95) 0%, rgba(255,92,53,0.3) 70%, rgba(255,92,53,0) 100%)",
+          display: "flex",
+          alignItems: "center",
+          justifyContent: "center",
+          fontFamily: "Fraunces, serif",
+          fontWeight: 900,
+          color: "#fff",
+          fontSize: 16,
+          border: "2px solid rgba(255,160,120,0.7)",
+          boxShadow:
+            "0 0 24px rgba(255,92,53,0.7), inset 0 0 14px rgba(255,200,180,0.3)",
+        }}
+      >
+        {you.avatar_url ? (
+          <div
+            style={{
+              width: "100%",
+              height: "100%",
+              borderRadius: "50%",
+              background: `url(${you.avatar_url}) center/cover`,
+            }}
+          />
+        ) : (
+          initials
+        )}
+      </div>
+      <div
+        style={{
+          fontFamily: "DM Sans, sans-serif",
+          fontSize: 10,
+          fontWeight: 800,
+          letterSpacing: "0.15em",
+          textTransform: "uppercase",
+          color: "rgba(255,180,150,0.9)",
+        }}
+      >
+        You are here
+      </div>
+    </div>
+  );
+}
+
+function MajorNode({
+  major,
+  x,
+  y,
+  radius,
+  active,
+  onClick,
+}: {
+  major: MapMajor;
+  x: number;
+  y: number;
+  radius: number;
+  active: boolean;
+  onClick: () => void;
+}) {
+  // Color heuristic: green if you're already connected to people there,
+  // amber if you have mutuals (the discovery sweet spot), blue otherwise.
+  const accent =
+    major.mutuals > 0
+      ? "#FFB85A"
+      : major.connected > 0
+      ? "#5BD18C"
+      : "#5A9CFF";
+  const showGlow = major.mutuals > 0;
+  return (
+    <button
+      type="button"
+      onClick={(e) => {
+        e.stopPropagation();
+        onClick();
+      }}
+      onPointerDown={(e) => e.stopPropagation()}
+      style={{
+        position: "absolute",
+        left: x,
+        top: y,
+        width: radius * 2,
+        height: radius * 2,
+        transform: "translate(-50%, -50%)",
+        borderRadius: "50%",
+        background:
+          `radial-gradient(circle, ${hexToRgba(accent, active ? 0.32 : 0.18)} 0%, rgba(8,12,28,0.55) 70%, rgba(8,12,28,0.0) 100%)`,
+        border: `1px solid ${hexToRgba(accent, active ? 0.85 : 0.45)}`,
+        boxShadow: showGlow
+          ? `0 0 28px ${hexToRgba(accent, 0.45)}, inset 0 0 18px ${hexToRgba(accent, 0.22)}`
+          : `0 0 12px ${hexToRgba(accent, 0.22)}`,
+        backdropFilter: "blur(6px)",
+        WebkitBackdropFilter: "blur(6px)",
+        cursor: "pointer",
+        pointerEvents: "auto",
+        display: "flex",
+        flexDirection: "column",
+        alignItems: "center",
+        justifyContent: "center",
+        gap: 2,
+        padding: 4,
+        color: "#fff",
+        fontFamily: "DM Sans, sans-serif",
+        textAlign: "center",
+        transition: "transform 160ms ease, box-shadow 160ms ease",
+      }}
+    >
+      <div
+        style={{
+          fontFamily: "Fraunces, serif",
+          fontWeight: 800,
+          fontSize: Math.max(11, Math.min(14, radius / 5)),
+          color: "#fff",
+          lineHeight: 1.1,
+          maxWidth: radius * 1.6,
+          textOverflow: "ellipsis",
+          overflow: "hidden",
+          whiteSpace: "nowrap",
+        }}
+        title={major.name}
+      >
+        {major.name}
+      </div>
+      <div
+        style={{
+          fontSize: 10,
+          fontWeight: 700,
+          color: hexToRgba(accent, 0.85),
+          letterSpacing: "0.08em",
+          textTransform: "uppercase",
+        }}
+      >
+        {major.total} ppl
+      </div>
+      {major.mutuals > 0 ? (
+        <div style={{ fontSize: 9, color: "rgba(255,255,255,0.65)" }}>
+          {major.mutuals} mutuals
+        </div>
+      ) : null}
+    </button>
+  );
+}
+
+function OrgCenterCluster({
+  orgs,
+  collapsed,
+  onToggleCollapse,
+  onPick,
+  activeHandle,
+}: {
+  orgs: MapOrg[];
+  collapsed: boolean;
+  onToggleCollapse: () => void;
+  onPick: (o: MapOrg) => void;
+  activeHandle: string | null;
+}) {
+  if (collapsed) {
+    return (
+      <button
+        type="button"
+        onPointerDown={(e) => e.stopPropagation()}
+        onClick={onToggleCollapse}
+        title={`Open Org Center (${orgs.length})`}
+        style={{
+          position: "absolute",
+          right: 14,
+          top: 60,
+          display: "inline-flex",
+          alignItems: "center",
+          gap: 6,
+          padding: "8px 14px",
+          borderRadius: 999,
+          border: "1px solid rgba(120,200,255,0.45)",
+          background: "rgba(8,12,28,0.78)",
+          color: "rgba(120,200,255,0.95)",
+          fontFamily: "DM Sans, sans-serif",
+          fontSize: 10,
+          fontWeight: 800,
+          letterSpacing: "0.18em",
+          textTransform: "uppercase",
+          cursor: "pointer",
+          backdropFilter: "blur(14px)",
+          WebkitBackdropFilter: "blur(14px)",
+          pointerEvents: "auto",
+          zIndex: 4,
+        }}
+      >
+        Org Center · {orgs.length}
+        <span style={{ fontSize: 12, lineHeight: 1 }}>‹</span>
+      </button>
+    );
+  }
+  return (
+    <div
+      style={{
+        position: "absolute",
+        right: 14,
+        top: 60,
+        bottom: 14,
+        width: 240,
+        background:
+          "linear-gradient(180deg, rgba(8,12,28,0.78) 0%, rgba(8,12,28,0.62) 100%)",
+        border: "1px solid rgba(120,200,255,0.22)",
+        borderRadius: 16,
+        backdropFilter: "blur(20px) saturate(160%)",
+        WebkitBackdropFilter: "blur(20px) saturate(160%)",
+        boxShadow:
+          "inset 0 1px 0 rgba(120,200,255,0.22), 0 12px 32px rgba(0,0,0,0.4)",
+        padding: 14,
+        overflow: "hidden",
+        display: "flex",
+        flexDirection: "column",
+        gap: 10,
+        pointerEvents: "auto",
+      }}
+      onPointerDown={(e) => e.stopPropagation()}
+    >
+      <div
+        style={{
+          display: "flex",
+          alignItems: "center",
+          justifyContent: "space-between",
+          gap: 8,
+        }}
+      >
+        <div
+          style={{
+            fontFamily: "DM Sans, sans-serif",
+            fontSize: 10,
+            fontWeight: 800,
+            letterSpacing: "0.18em",
+            textTransform: "uppercase",
+            color: "rgba(120,200,255,0.85)",
+          }}
+        >
+          Org Center
+        </div>
+        <button
+          type="button"
+          onClick={onToggleCollapse}
+          aria-label="Collapse Org Center"
+          title="Collapse"
+          style={{
+            width: 22,
+            height: 22,
+            borderRadius: 999,
+            border: "1px solid rgba(120,200,255,0.32)",
+            background: "rgba(120,200,255,0.10)",
+            color: "rgba(120,200,255,0.95)",
+            fontSize: 12,
+            cursor: "pointer",
+            lineHeight: 1,
+            display: "flex",
+            alignItems: "center",
+            justifyContent: "center",
+          }}
+        >
+          –
+        </button>
+      </div>
+      <div style={{ overflow: "auto", display: "flex", flexDirection: "column", gap: 6, flex: 1 }}>
+        {orgs.map((o) => {
+          const isActive = activeHandle === o.handle;
+          return (
+            <button
+              key={o.id}
+              type="button"
+              onClick={() => onPick(o)}
+              style={{
+                display: "flex",
+                alignItems: "center",
+                gap: 10,
+                padding: "8px 10px",
+                borderRadius: 10,
+                background: isActive ? "rgba(120,200,255,0.14)" : "transparent",
+                border: isActive
+                  ? "1px solid rgba(120,200,255,0.45)"
+                  : "1px solid rgba(120,200,255,0.10)",
+                color: "#fff",
+                cursor: "pointer",
+                fontFamily: "DM Sans, sans-serif",
+                textAlign: "left",
+              }}
+            >
+              <div
+                style={{
+                  width: 30,
+                  height: 30,
+                  borderRadius: 8,
+                  background: o.logo_url
+                    ? `url(${o.logo_url}) center/cover`
+                    : `linear-gradient(135deg, ${hexToRgba(colorForOrg(o.id), 0.95)} 0%, ${hexToRgba(colorForOrg(o.id), 0.55)} 100%)`,
+                  flexShrink: 0,
+                  display: "flex",
+                  alignItems: "center",
+                  justifyContent: "center",
+                  color: "#fff",
+                  fontFamily: "Fraunces, serif",
+                  fontWeight: 800,
+                  fontSize: 11,
+                }}
+              >
+                {!o.logo_url
+                  ? o.name
+                      .split(/\s+/)
+                      .filter(Boolean)
+                      .slice(0, 2)
+                      .map((s) => s[0])
+                      .join("")
+                      .toUpperCase()
+                  : null}
+              </div>
+              <div style={{ flex: 1, minWidth: 0 }}>
+                <div
+                  style={{
+                    display: "flex",
+                    alignItems: "center",
+                    gap: 4,
+                    fontSize: 12,
+                    fontWeight: 700,
+                    color: "#fff",
+                    overflow: "hidden",
+                    textOverflow: "ellipsis",
+                    whiteSpace: "nowrap",
+                  }}
+                >
+                  {o.name}
+                  {o.verified ? <VerifiedBadge size={10} /> : null}
+                </div>
+                <div style={{ fontSize: 10, color: "rgba(255,255,255,0.55)" }}>
+                  {o.member_count} members
+                </div>
+              </div>
+            </button>
+          );
+        })}
+      </div>
+    </div>
+  );
+}
+
+type ZoneRow = {
+  id: string;
+  name: string | null;
+  handle: string | null;
+  major: string | null;
+  year: number | null;
+  avatar_url: string | null;
+  mutual_count?: number;
+};
+
+function ZonePanel({
+  selection,
+  demo,
+  onClose,
+}: {
+  selection: ZoneSelection;
+  demo: boolean;
+  onClose: () => void;
+}) {
+  const [data, setData] = useState<{
+    connected: ZoneRow[];
+    mutuals: ZoneRow[];
+    discover: ZoneRow[];
+  } | null>(null);
+  const [tab, setTab] = useState<"discover" | "mutuals" | "connected">("discover");
+
+  useEffect(() => {
+    let cancelled = false;
+    (async () => {
+      try {
+        const base =
+          selection.kind === "major"
+            ? `/api/campus-map/zone?major=${encodeURIComponent(selection.key)}`
+            : `/api/campus-map/zone?org=${encodeURIComponent(selection.key)}`;
+        const url = demo ? `${base}&demo=1` : base;
+        const res = await fetch(url, { cache: "no-store" });
+        const j = await res.json();
+        if (cancelled) return;
+        if (j?.ok) {
+          setData({
+            connected: j.connected ?? [],
+            mutuals: j.mutuals ?? [],
+            discover: j.discover ?? [],
+          });
+          // Bias the default tab toward the bucket with the highest signal.
+          if ((j.mutuals ?? []).length > 0) setTab("mutuals");
+          else if ((j.discover ?? []).length > 0) setTab("discover");
+          else if ((j.connected ?? []).length > 0) setTab("connected");
+        }
+      } catch {
+        if (!cancelled) setData({ connected: [], mutuals: [], discover: [] });
+      }
+    })();
+    return () => {
+      cancelled = true;
+    };
+  }, [selection, demo]);
+
+  if (typeof document === "undefined") return null;
+
+  const rows = data
+    ? tab === "connected"
+      ? data.connected
+      : tab === "mutuals"
+      ? data.mutuals
+      : data.discover
+    : null;
+
+  return (
+    <div
+      style={{
+        position: "fixed",
+        right: 24,
+        top: 90,
+        bottom: 24,
+        width: 380,
+        zIndex: 50,
+        background:
+          "linear-gradient(180deg, rgba(8,12,28,0.92) 0%, rgba(4,6,18,0.95) 100%)",
+        border: "1px solid rgba(120,200,255,0.32)",
+        borderRadius: 18,
+        boxShadow:
+          "inset 0 1px 0 rgba(120,200,255,0.32), 0 24px 60px rgba(0,0,0,0.5)",
+        backdropFilter: "blur(28px) saturate(180%)",
+        WebkitBackdropFilter: "blur(28px) saturate(180%)",
+        display: "flex",
+        flexDirection: "column",
+        overflow: "hidden",
+      }}
+    >
+      <div
+        style={{
+          padding: "14px 18px",
+          display: "flex",
+          alignItems: "flex-start",
+          justifyContent: "space-between",
+          gap: 12,
+          borderBottom: "1px solid rgba(120,200,255,0.14)",
+        }}
+      >
+        <div style={{ minWidth: 0 }}>
+          <div
+            style={{
+              fontFamily: "DM Sans, sans-serif",
+              fontSize: 10,
+              letterSpacing: "0.18em",
+              textTransform: "uppercase",
+              color: "rgba(120,200,255,0.78)",
+              fontWeight: 800,
+            }}
+          >
+            {selection.kind === "major" ? "Major zone" : "Org"}
+          </div>
+          <div
+            style={{
+              fontFamily: "Fraunces, serif",
+              fontSize: 18,
+              fontWeight: 800,
+              color: "#fff",
+              marginTop: 2,
+              overflow: "hidden",
+              textOverflow: "ellipsis",
+              whiteSpace: "nowrap",
+            }}
+            title={selection.label}
+          >
+            {selection.label}
+          </div>
+        </div>
+        <button
+          type="button"
+          onClick={onClose}
+          aria-label="Close zone"
+          style={{
+            width: 28,
+            height: 28,
+            borderRadius: 999,
+            border: "1px solid rgba(120,200,255,0.32)",
+            background: "rgba(120,200,255,0.10)",
+            color: "#fff",
+            fontSize: 14,
+            cursor: "pointer",
+            flexShrink: 0,
+          }}
+        >
+          ×
+        </button>
+      </div>
+
+      <div
+        style={{
+          padding: "10px 14px",
+          display: "flex",
+          gap: 6,
+          borderBottom: "1px solid rgba(120,200,255,0.10)",
+        }}
+      >
+        {(
+          [
+            { key: "discover", label: "Discover", count: data?.discover.length ?? null, color: "#5A9CFF" },
+            { key: "mutuals", label: "Mutuals", count: data?.mutuals.length ?? null, color: "#FFB85A" },
+            { key: "connected", label: "Connected", count: data?.connected.length ?? null, color: "#5BD18C" },
+          ] as const
+        ).map((t) => {
+          const isActive = tab === t.key;
+          return (
+            <button
+              key={t.key}
+              type="button"
+              onClick={() => setTab(t.key)}
+              style={{
+                flex: 1,
+                padding: "6px 10px",
+                borderRadius: 999,
+                border: isActive
+                  ? `1px solid ${t.color}`
+                  : "1px solid rgba(120,200,255,0.16)",
+                background: isActive ? hexToRgba(t.color, 0.18) : "transparent",
+                color: isActive ? "#fff" : "rgba(255,255,255,0.7)",
+                fontFamily: "DM Sans, sans-serif",
+                fontWeight: 700,
+                fontSize: 12,
+                cursor: "pointer",
+              }}
+            >
+              {t.label}
+              {t.count !== null ? (
+                <span style={{ marginLeft: 6, color: t.color, fontWeight: 800 }}>
+                  {t.count}
+                </span>
+              ) : null}
+            </button>
+          );
+        })}
+      </div>
+
+      <div style={{ flex: 1, overflow: "auto", padding: "10px 14px" }}>
+        {rows === null ? (
+          <div style={{ color: "rgba(255,255,255,0.55)", fontFamily: "DM Sans, sans-serif", fontSize: 13, padding: "20px 0", textAlign: "center" }}>
+            Loading…
+          </div>
+        ) : rows.length === 0 ? (
+          <div style={{ color: "rgba(255,255,255,0.55)", fontFamily: "DM Sans, sans-serif", fontSize: 13, padding: "20px 0", textAlign: "center", lineHeight: 1.5 }}>
+            {tab === "discover"
+              ? "No new faces here yet."
+              : tab === "mutuals"
+              ? "No mutuals here — try Discover."
+              : "No connections here yet."}
+          </div>
+        ) : (
+          <div style={{ display: "flex", flexDirection: "column", gap: 6 }}>
+            {rows.map((u) => (
+              <ZonePersonRow key={u.id} u={u} />
+            ))}
+          </div>
+        )}
+      </div>
+    </div>
+  );
+}
+
+function ZonePersonRow({ u }: { u: ZoneRow }) {
+  const name = u.name || u.handle || "Member";
+  const initials = name
+    .split(/\s+/)
+    .filter(Boolean)
+    .slice(0, 2)
+    .map((s) => s[0])
+    .join("")
+    .toUpperCase();
+  const sub = [u.major, u.year ? String(u.year) : null].filter(Boolean).join(" · ");
+  return (
+    <Link
+      href={u.handle ? `/profile/${encodeURIComponent(u.handle)}` : "/network"}
+      style={{
+        display: "flex",
+        alignItems: "center",
+        gap: 10,
+        padding: "8px 10px",
+        borderRadius: 10,
+        border: "1px solid rgba(120,200,255,0.12)",
+        background: "rgba(120,200,255,0.04)",
+        color: "#fff",
+        textDecoration: "none",
+        fontFamily: "DM Sans, sans-serif",
+      }}
+    >
+      <div
+        style={{
+          width: 34,
+          height: 34,
+          borderRadius: "50%",
+          background: u.avatar_url
+            ? `url(${u.avatar_url}) center/cover`
+            : "rgba(120,200,255,0.18)",
+          color: "#fff",
+          display: "flex",
+          alignItems: "center",
+          justifyContent: "center",
+          fontFamily: "Fraunces, serif",
+          fontWeight: 800,
+          fontSize: 12,
+          flexShrink: 0,
+          border: "1px solid rgba(120,200,255,0.32)",
+        }}
+      >
+        {!u.avatar_url ? initials : null}
+      </div>
+      <div style={{ flex: 1, minWidth: 0 }}>
+        <div
+          style={{
+            fontSize: 13,
+            fontWeight: 700,
+            color: "#fff",
+            overflow: "hidden",
+            textOverflow: "ellipsis",
+            whiteSpace: "nowrap",
+          }}
+        >
+          {name}
+        </div>
+        <div style={{ fontSize: 11, color: "rgba(255,255,255,0.55)" }}>
+          {u.handle ? `@${u.handle}` : ""}
+          {sub ? `${u.handle ? " · " : ""}${sub}` : ""}
+        </div>
+        {typeof u.mutual_count === "number" && u.mutual_count > 0 ? (
+          <div style={{ fontSize: 10, color: "#FFB85A", fontWeight: 700, marginTop: 2 }}>
+            {u.mutual_count} mutual{u.mutual_count === 1 ? "" : "s"}
+          </div>
+        ) : null}
+      </div>
+      <span
+        style={{
+          fontSize: 11,
+          fontWeight: 700,
+          color: "rgba(120,200,255,0.85)",
+        }}
+      >
+        View →
+      </span>
+    </Link>
+  );
+}
+
+function hashString(s: string): number {
+  let h = 0;
+  for (let i = 0; i < s.length; i++) h = ((h * 31) + s.charCodeAt(i)) | 0;
+  return Math.abs(h);
+}
+
+function OttoPanel({ onPickTag }: { onPickTag: (tag: string) => void }) {
   // Otto stays dark + orange-hued regardless of scene — consistent identity
   const headingColor = "#fff";
   const subtleColor = "rgba(255,255,255,0.55)";
   const dividerColor = "rgba(255,255,255,0.06)";
+
+  const [trending, setTrending] = useState<Array<{ tag: string; count: number }> | null>(null);
+  const [upcoming, setUpcoming] = useState<
+    Array<{
+      id: string;
+      title: string;
+      starts_at: string;
+      ends_at: string;
+      location: string;
+      viewer_status: "going" | "maybe";
+      org: { handle: string; name: string; verified: boolean } | null;
+    }> | null
+  >(null);
+  useEffect(() => {
+    let cancelled = false;
+    (async () => {
+      try {
+        const [tRes, uRes] = await Promise.all([
+          fetch("/api/trending/hashtags?limit=6", { cache: "no-store" }).then((r) => r.json()),
+          fetch("/api/me/upcoming-events?limit=4", { cache: "no-store" }).then((r) => r.json()),
+        ]);
+        if (cancelled) return;
+        setTrending(
+          tRes?.ok && Array.isArray(tRes.trending) ? tRes.trending : [],
+        );
+        setUpcoming(
+          uRes?.ok && Array.isArray(uRes.upcoming) ? uRes.upcoming : [],
+        );
+      } catch {
+        if (!cancelled) {
+          setTrending([]);
+          setUpcoming([]);
+        }
+      }
+    })();
+    return () => {
+      cancelled = true;
+    };
+  }, []);
 
   const ottoSurface: React.CSSProperties = {
     background:
@@ -5056,94 +8498,110 @@ function OttoPanel() {
           </div>
         </div>
 
-        <OttoSection title="Heads up" subtitle="Events you RSVP'd to or saved." headingColor={headingColor} subtleColor={subtleColor}>
-          {[
-            { label: "IU Spring Hackathon 2026", chip: "Sat", chipColor: "#5A9CFF" },
-            { label: "Spring Career Fair", chip: "Mar 19", chipColor: "#FFB85A" },
-            { label: "Kelley Pitch Night", chip: "Mar 27", chipColor: "#9B7BFF" },
-          ].map((d) => (
-            <div key={d.label} style={{ display: "flex", alignItems: "center", gap: 10, padding: "8px 0", borderBottom: `1px solid ${dividerColor}` }}>
-              <span style={{ width: 6, height: 6, borderRadius: 3, background: d.chipColor, flexShrink: 0 }} />
-              <div style={{ flex: 1, minWidth: 0, fontFamily: "DM Sans, sans-serif", fontSize: 13, color: headingColor, lineHeight: 1.3 }}>
-                {d.label}
-              </div>
-              <span style={{ fontSize: 11, fontWeight: 700, color: d.chipColor, fontFamily: "DM Sans, sans-serif", whiteSpace: "nowrap" }}>
-                {d.chip}
-              </span>
+        <OttoSection title="Heads up" subtitle="Events you RSVP'd to." headingColor={headingColor} subtleColor={subtleColor}>
+          {upcoming === null ? (
+            <div style={{ fontSize: 12, color: subtleColor, padding: "6px 0" }}>Loading…</div>
+          ) : upcoming.length === 0 ? (
+            <div style={{ fontSize: 12, color: subtleColor, padding: "6px 0", lineHeight: 1.5 }}>
+              No upcoming events on your radar — RSVP from the Events tab and they&apos;ll show up here.
             </div>
-          ))}
+          ) : (
+            upcoming.map((u) => {
+              const accent = u.viewer_status === "going" ? "#5BD18C" : "#FFB85A";
+              const chip = formatUpcomingChip(u.starts_at);
+              return (
+                <div
+                  key={u.id}
+                  style={{
+                    display: "flex",
+                    alignItems: "center",
+                    gap: 10,
+                    padding: "8px 0",
+                    borderBottom: `1px solid ${dividerColor}`,
+                  }}
+                >
+                  <span style={{ width: 6, height: 6, borderRadius: 3, background: accent, flexShrink: 0 }} />
+                  <div style={{ flex: 1, minWidth: 0 }}>
+                    <div
+                      style={{
+                        fontFamily: "DM Sans, sans-serif",
+                        fontSize: 13,
+                        color: headingColor,
+                        lineHeight: 1.3,
+                        overflow: "hidden",
+                        textOverflow: "ellipsis",
+                        whiteSpace: "nowrap",
+                      }}
+                    >
+                      {u.title}
+                    </div>
+                    {u.org ? (
+                      <div
+                        style={{
+                          fontFamily: "DM Sans, sans-serif",
+                          fontSize: 11,
+                          color: subtleColor,
+                          marginTop: 1,
+                          overflow: "hidden",
+                          textOverflow: "ellipsis",
+                          whiteSpace: "nowrap",
+                        }}
+                      >
+                        {u.org.name}
+                      </div>
+                    ) : null}
+                  </div>
+                  <span style={{ fontSize: 11, fontWeight: 700, color: accent, fontFamily: "DM Sans, sans-serif", whiteSpace: "nowrap" }}>
+                    {chip}
+                  </span>
+                </div>
+              );
+            })
+          )}
         </OttoSection>
 
-        <OttoSection title="Trending on campus" subtitle="Most-posted hashtags right now." headingColor={headingColor} subtleColor={subtleColor}>
-          {[
-            { tag: "#IUHackathon", count: "284" },
-            { tag: "#CareerFair2026", count: "196" },
-            { tag: "#LuddySchool", count: "142" },
-            { tag: "#StartupIU", count: "98" },
-          ].map((t) => (
-            <div key={t.tag} style={{ display: "flex", alignItems: "center", justifyContent: "space-between", padding: "6px 0" }}>
-              <span style={{ fontFamily: "DM Sans, sans-serif", fontSize: 13, fontWeight: 600, color: "#FFB89C" }}>
-                {t.tag}
-              </span>
-              <span style={{ fontFamily: "DM Sans, sans-serif", fontSize: 12, color: subtleColor }}>
-                {t.count}
-              </span>
+        <OttoSection title="Trending on campus" subtitle="Most-posted hashtags this week." headingColor={headingColor} subtleColor={subtleColor}>
+          {trending === null ? (
+            <div style={{ fontSize: 12, color: subtleColor, padding: "6px 0" }}>Loading…</div>
+          ) : trending.length === 0 ? (
+            <div style={{ fontSize: 12, color: subtleColor, padding: "6px 0", lineHeight: 1.5 }}>
+              No trending tags yet — start one with a #hashtag in your post.
             </div>
-          ))}
-        </OttoSection>
-
-        <OttoSection title="People to connect" subtitle="Mutuals, same major, similar interests." headingColor={headingColor} subtleColor={subtleColor}>
-          {[
-            { name: "Jordan Thompson", sub: "CS · Senior · 4 mutuals", initials: "JT" },
-            { name: "Amara Roberts", sub: "Design · Junior · 2 mutuals", initials: "AR" },
-            { name: "Sofia Kim", sub: "InfoSci · Junior · same major", initials: "SK" },
-          ].map((p) => (
-            <div key={p.name} style={{ display: "flex", alignItems: "center", gap: 10, padding: "8px 0", borderBottom: `1px solid ${dividerColor}` }}>
-              <div
-                style={{
-                  width: 32,
-                  height: 32,
-                  borderRadius: 999,
-                  background: "rgba(255,255,255,0.08)",
-                  color: "#fff",
-                  display: "flex",
-                  alignItems: "center",
-                  justifyContent: "center",
-                  fontFamily: "Fraunces, serif",
-                  fontWeight: 700,
-                  fontSize: 12,
-                  flexShrink: 0,
-                }}
-              >
-                {p.initials}
-              </div>
-              <div style={{ flex: 1, minWidth: 0 }}>
-                <div style={{ fontFamily: "DM Sans, sans-serif", fontSize: 13, fontWeight: 600, color: headingColor }}>
-                  {p.name}
-                </div>
-                <div style={{ fontFamily: "DM Sans, sans-serif", fontSize: 11, color: subtleColor }}>
-                  {p.sub}
-                </div>
-              </div>
+          ) : (
+            trending.map((t) => (
               <button
+                key={t.tag}
                 type="button"
+                onClick={() => onPickTag(t.tag)}
                 style={{
-                  padding: "5px 12px",
-                  borderRadius: 999,
-                  border: "1px solid rgba(255,180,150,0.32)",
-                  background: "rgba(255,140,90,0.12)",
-                  color: "#FFB89C",
-                  fontFamily: "DM Sans, sans-serif",
-                  fontSize: 11,
-                  fontWeight: 600,
+                  display: "flex",
+                  width: "100%",
+                  alignItems: "center",
+                  justifyContent: "space-between",
+                  padding: "6px 0",
+                  background: "transparent",
+                  border: "none",
                   cursor: "pointer",
+                  color: "inherit",
+                  font: "inherit",
+                  textAlign: "left",
                 }}
               >
-                Connect
+                <span style={{ fontFamily: "DM Sans, sans-serif", fontSize: 13, fontWeight: 600, color: "#FFB89C" }}>
+                  #{t.tag}
+                </span>
+                <span style={{ fontFamily: "DM Sans, sans-serif", fontSize: 12, color: subtleColor }}>
+                  {t.count}
+                </span>
               </button>
-            </div>
-          ))}
+            ))
+          )}
         </OttoSection>
+
+        {/* People-to-connect section removed pre-ship — was hardcoded mock
+            users. Restore once the recommendations API is built (mutuals
+            + same-major + same-org weighted). For now Heads up + Trending
+            give the Otto rail two real surfaces. */}
 
         <button
           type="button"

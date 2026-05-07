@@ -76,7 +76,10 @@ export async function GET(_req: Request, { params }: Params) {
     .eq("org_id", org.id)
     .order("created_at", { ascending: false })
     .limit(24);
-  const allPosts = (posts || []) as Array<{
+  // PostgREST infers the embedded `user` join as an array; the actual
+  // shape at runtime is a single object (or null) since user_id is a 1:1
+  // FK. The double-cast through `unknown` quiets the TS overlap check.
+  const allPosts = (posts || []) as unknown as Array<{
     id: string;
     type: string;
     content: string;
