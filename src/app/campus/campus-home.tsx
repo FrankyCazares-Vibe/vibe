@@ -6324,15 +6324,7 @@ function OrgsTabBody({ onCreateOrg }: { onCreateOrg: () => void }) {
                   busy={busy}
                   onJoin={handleJoin}
                   onPreview={setPreviewOrg}
-                  // Black → orange gradient. Charcoal anchors at the start,
-                  // coral picks up the Vibe accent at the end.
-                  titleStyle={{
-                    background:
-                      "linear-gradient(135deg, #1C1C1E 0%, #1C1C1E 35%, #FF5C35 100%)",
-                    WebkitBackgroundClip: "text",
-                    WebkitTextFillColor: "transparent",
-                    backgroundClip: "text",
-                  }}
+                  titleStyle={{ color: "#FF5C35" }}
                 />
               ) : null}
               {dormantOrgs.length > 0 ? (
