@@ -9512,6 +9512,13 @@ function ChannelMain({
   const orgColor = colorForOrg(org.id);
   const headerTint = `linear-gradient(180deg, ${hexToRgba(orgColor, 0.32)} 0%, ${hexToRgba(orgColor, 0.12)} 100%)`;
 
+  // Cream backdrop is light, so the chat chrome (header text, icons,
+  // author labels, message text) flips to a dark palette. All other
+  // backdrops are dark and keep the original white-on-dark treatment.
+  const isCream = org.backdrop_preset === "cream";
+  const headerStrong = isCream ? "#1C1C1E" : COLORS.glassText;
+  const headerMuted = isCream ? "rgba(28,28,30,0.55)" : COLORS.glassMuted;
+
   return (
     <main
       style={{
@@ -9539,7 +9546,7 @@ function ChannelMain({
       >
         <span
           style={{
-            color: COLORS.glassMuted,
+            color: headerMuted,
             fontSize: 18,
             display: "inline-flex",
             alignItems: "center",
@@ -9552,16 +9559,16 @@ function ChannelMain({
             fontFamily: "Fraunces, serif",
             fontWeight: 800,
             fontSize: 19,
-            color: COLORS.glassText,
+            color: headerStrong,
             letterSpacing: "-0.01em",
           }}
         >
           {channel.name}
         </span>
-        <span style={{ color: COLORS.glassMuted, fontSize: 13 }}>·</span>
+        <span style={{ color: headerMuted, fontSize: 13 }}>·</span>
         <span
           style={{
-            color: COLORS.glassMuted,
+            color: headerMuted,
             fontSize: 13,
             fontFamily: "DM Sans, sans-serif",
           }}
@@ -9589,7 +9596,12 @@ function ChannelMain({
         </div>
       ) : null}
 
-      <ChannelChat key={channel.id} channelId={channel.id} channelName={channel.name} />
+      <ChannelChat
+        key={channel.id}
+        channelId={channel.id}
+        channelName={channel.name}
+        isCream={isCream}
+      />
     </main>
   );
 }
@@ -9605,10 +9617,50 @@ type ChatMessage = {
 function ChannelChat({
   channelId,
   channelName,
+  isCream,
 }: {
   channelId: string;
   channelName: string;
+  isCream: boolean;
 }) {
+  // Cream backdrop palette swap: dark text + dark glass message bubbles
+  // so messages don't render as white-on-cream (invisible). Other backdrops
+  // are dark — keep the original white treatment.
+  const authorColor = isCream ? "#1C1C1E" : "#fff";
+  const timeColor = isCream ? "rgba(28,28,30,0.55)" : COLORS.glassMuted;
+  const muted = isCream ? "rgba(28,28,30,0.6)" : COLORS.glassMuted;
+  const bubbleStyle: React.CSSProperties = isCream
+    ? {
+        background:
+          "linear-gradient(180deg, rgba(20,16,28,0.82) 0%, rgba(14,11,22,0.86) 100%)",
+        backdropFilter: "blur(24px) saturate(160%)",
+        WebkitBackdropFilter: "blur(24px) saturate(160%)",
+        border: "1px solid rgba(255,255,255,0.08)",
+        borderRadius: 14,
+        padding: "10px 14px",
+        boxShadow:
+          "inset 0 1px 0 rgba(255,255,255,0.10), 0 6px 18px rgba(20,8,40,0.18)",
+        color: "rgba(255,255,255,0.96)",
+        display: "inline-block",
+        maxWidth: "100%",
+      }
+    : {
+        margin: 0,
+        color: "rgba(255,255,255,0.9)",
+      };
+  const composerStyle: React.CSSProperties = isCream
+    ? {
+        background:
+          "linear-gradient(180deg, rgba(20,16,28,0.82) 0%, rgba(14,11,22,0.86) 100%)",
+        backdropFilter: "blur(24px) saturate(160%)",
+        WebkitBackdropFilter: "blur(24px) saturate(160%)",
+        border: "1px solid rgba(255,255,255,0.10)",
+        boxShadow:
+          "inset 0 1px 0 rgba(255,255,255,0.10), 0 8px 24px rgba(20,8,40,0.22)",
+      }
+    : {
+        ...GLASS_SURFACE,
+      };
   const [messages, setMessages] = useState<ChatMessage[]>([]);
   const [draft, setDraft] = useState("");
   const [sending, setSending] = useState(false);
@@ -9693,13 +9745,13 @@ function ChannelChat({
         }}
       >
         {!loaded ? (
-          <div style={{ color: COLORS.glassMuted, fontFamily: "DM Sans, sans-serif", fontSize: 13 }}>
+          <div style={{ color: muted, fontFamily: "DM Sans, sans-serif", fontSize: 13 }}>
             Loading messages…
           </div>
         ) : messages.length === 0 ? (
           <div
             style={{
-              color: COLORS.glassMuted,
+              color: muted,
               fontFamily: "DM Sans, sans-serif",
               fontSize: 14,
               padding: "24px 0",
@@ -9731,28 +9783,42 @@ function ChannelChat({
                 )}
                 <div style={{ flex: 1, minWidth: 0 }}>
                   {!sameAuthor ? (
-                    <div style={{ display: "flex", alignItems: "baseline", gap: 8, marginBottom: 2 }}>
-                      <span style={{ fontFamily: "Fraunces, serif", fontWeight: 800, fontSize: 14, color: "#fff" }}>
+                    <div style={{ display: "flex", alignItems: "baseline", gap: 8, marginBottom: 4 }}>
+                      <span style={{ fontFamily: "Fraunces, serif", fontWeight: 800, fontSize: 14, color: authorColor }}>
                         {author?.name ?? author?.handle ?? "Unknown"}
                       </span>
-                      <span style={{ fontFamily: "DM Sans, sans-serif", fontSize: 11, color: COLORS.glassMuted }}>
+                      <span style={{ fontFamily: "DM Sans, sans-serif", fontSize: 11, color: timeColor }}>
                         {formatChatTime(m.created_at)}
                       </span>
                     </div>
                   ) : null}
-                  <p
-                    style={{
-                      margin: 0,
-                      color: "rgba(255,255,255,0.9)",
-                      fontFamily: "DM Sans, sans-serif",
-                      fontSize: 14,
-                      lineHeight: 1.45,
-                      whiteSpace: "pre-wrap",
-                      wordWrap: "break-word",
-                    }}
-                  >
-                    {m.content}
-                  </p>
+                  {isCream ? (
+                    <div
+                      style={{
+                        ...bubbleStyle,
+                        fontFamily: "DM Sans, sans-serif",
+                        fontSize: 14,
+                        lineHeight: 1.45,
+                        whiteSpace: "pre-wrap",
+                        wordWrap: "break-word",
+                      }}
+                    >
+                      {m.content}
+                    </div>
+                  ) : (
+                    <p
+                      style={{
+                        ...bubbleStyle,
+                        fontFamily: "DM Sans, sans-serif",
+                        fontSize: 14,
+                        lineHeight: 1.45,
+                        whiteSpace: "pre-wrap",
+                        wordWrap: "break-word",
+                      }}
+                    >
+                      {m.content}
+                    </p>
+                  )}
                 </div>
               </article>
             );
@@ -9763,7 +9829,7 @@ function ChannelChat({
       <div style={{ padding: "0 24px 20px" }}>
         <div
           style={{
-            ...GLASS_SURFACE,
+            ...composerStyle,
             borderRadius: 16,
             padding: "10px 12px",
             display: "flex",
