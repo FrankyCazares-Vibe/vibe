@@ -13,19 +13,22 @@ type Suggestion = {
   major: string | null;
   year: number | null;
   mutual_count: number;
+  shared_org_count: number;
   reason: string;
 };
 
 /**
- * People-you-might-know feed for OttoPanel. Strategy in priority order:
+ * People-you-might-know feed. Strategy in priority order:
  *
  *   1. Friends-of-friends — people connected to your existing connections
  *      who you don't already follow. Sorted by overlap count desc.
- *   2. Same-major peers at the same school — fills the panel for users
- *      with very few existing connections.
+ *   2. Shared-org peers — members of orgs/clubs you're in who you haven't
+ *      connected with. Sorted by number of shared orgs.
+ *   3. Same-major peers at the same school — fills the rail for users
+ *      with very few existing connections or org memberships.
  *
- * Filters out: self, already-connected, blocked-either-way (when the
- * blocks table exists). Capped at `limit` (default 5 to fit the rail).
+ * Filters out: self, already-connected (one-way OR mutual), blocked-either-
+ * way (when the blocks table exists). Capped at `limit` (default 5).
  */
 export async function GET(req: Request) {
   const supabase = await createSupabaseServerClient();
@@ -81,6 +84,30 @@ export async function GET(req: Request) {
     }
   }
 
+  // Shared-org peers: people in the same orgs/clubs as me. Strong signal
+  // for "you should know this person" — students in the same club already
+  // share context, IRL exposure, common interests.
+  const sharedOrgCount = new Map<string, number>();
+  const { data: myOrgs } = await supabase
+    .from("org_members")
+    .select("org_id")
+    .eq("user_id", user.id);
+  const myOrgIds = (myOrgs ?? []).map((r) => (r as { org_id: string }).org_id);
+  if (myOrgIds.length > 0) {
+    const { data: peers } = await supabase
+      .from("org_members")
+      .select("user_id, org_id")
+      .in("org_id", myOrgIds)
+      .neq("user_id", user.id);
+    for (const row of peers ?? []) {
+      const r = row as { user_id: string; org_id: string };
+      // Skip: already an outgoing follow → not a "suggestion" anymore.
+      // (mutuals are also outgoing, so this covers connected too.)
+      if (outIds.has(r.user_id)) continue;
+      sharedOrgCount.set(r.user_id, (sharedOrgCount.get(r.user_id) ?? 0) + 1);
+    }
+  }
+
   // Fallback pool: same-school peers (and optionally same-major) so the
   // panel has something to show for new accounts with zero connections.
   const fallbackPool: string[] = [];
@@ -92,8 +119,9 @@ export async function GET(req: Request) {
       .neq("id", user.id);
     for (const p of peers ?? []) {
       const r = p as { id: string; major: string | null };
-      if (myConnections.has(r.id)) continue;
+      if (outIds.has(r.id)) continue; // already follow
       if (mutualCount.has(r.id)) continue;
+      if (sharedOrgCount.has(r.id)) continue;
       fallbackPool.push(r.id);
     }
   }
@@ -109,17 +137,30 @@ export async function GET(req: Request) {
     blockedIds.add(r.blocker_id === user.id ? r.blocked_id : r.blocker_id);
   }
 
-  // Final candidate list: mutuals first (sorted), then fallback pool.
-  const mutualEntries = Array.from(mutualCount.entries())
-    .filter(([id]) => !blockedIds.has(id))
-    .sort((a, b) => b[1] - a[1])
-    .map(([id, count]) => ({ id, count }));
+  // Final candidate list, priority: mutuals > shared-org > fallback.
+  // Each candidate carries both a mutual_count and shared_org_count so the
+  // UI can render the strongest reason — the API doesn't pick one.
+  type Entry = { id: string; mutuals: number; sharedOrgs: number };
+  const candidates = new Map<string, Entry>();
+  for (const [id, count] of mutualCount) {
+    if (blockedIds.has(id)) continue;
+    candidates.set(id, { id, mutuals: count, sharedOrgs: sharedOrgCount.get(id) ?? 0 });
+  }
+  for (const [id, count] of sharedOrgCount) {
+    if (blockedIds.has(id)) continue;
+    if (candidates.has(id)) continue; // already in via mutuals branch
+    candidates.set(id, { id, mutuals: 0, sharedOrgs: count });
+  }
+  for (const id of fallbackPool) {
+    if (blockedIds.has(id)) continue;
+    if (candidates.has(id)) continue;
+    candidates.set(id, { id, mutuals: 0, sharedOrgs: 0 });
+  }
 
-  const fallbackEntries = fallbackPool
-    .filter((id) => !blockedIds.has(id))
-    .map((id) => ({ id, count: 0 }));
-
-  const merged = [...mutualEntries, ...fallbackEntries].slice(0, limit);
+  // Sort: mutuals desc, then shared-orgs desc, then arbitrary.
+  const merged = Array.from(candidates.values())
+    .sort((a, b) => b.mutuals - a.mutuals || b.sharedOrgs - a.sharedOrgs)
+    .slice(0, limit);
 
   if (merged.length === 0) {
     return NextResponse.json({ ok: true, suggestions: [] });
@@ -132,23 +173,23 @@ export async function GET(req: Request) {
       "id",
       merged.map((m) => m.id),
     );
-  const profileById = new Map<string, Suggestion>();
+  const profileById = new Map<string, Omit<Suggestion, "mutual_count" | "shared_org_count" | "reason">>();
   for (const p of profiles ?? []) {
-    const u = p as Omit<Suggestion, "mutual_count" | "reason">;
-    profileById.set(u.id, {
-      ...u,
-      mutual_count: 0,
-      reason: "",
-    });
+    const u = p as Omit<Suggestion, "mutual_count" | "shared_org_count" | "reason">;
+    profileById.set(u.id, u);
   }
 
   const suggestions: Suggestion[] = merged
-    .map(({ id, count }) => {
+    .map(({ id, mutuals, sharedOrgs }) => {
       const base = profileById.get(id);
       if (!base) return null;
+      // Strongest reason wins. Mutuals first because that's the most
+      // social-graph-anchored signal.
       let reason = "";
-      if (count > 0) {
-        reason = `${count} mutual${count === 1 ? "" : "s"}`;
+      if (mutuals > 0) {
+        reason = `${mutuals} mutual${mutuals === 1 ? "" : "s"}`;
+      } else if (sharedOrgs > 0) {
+        reason = sharedOrgs === 1 ? "in your org" : `${sharedOrgs} shared orgs`;
       } else if (major && base.major && base.major === major) {
         reason = "same major";
       } else if (school) {
@@ -156,7 +197,7 @@ export async function GET(req: Request) {
       } else {
         reason = "new on Vibe";
       }
-      return { ...base, mutual_count: count, reason };
+      return { ...base, mutual_count: mutuals, shared_org_count: sharedOrgs, reason };
     })
     .filter((s): s is Suggestion => s !== null);
 
