@@ -192,7 +192,7 @@
        run off the panel's right edge. Override the side placement. */
     .vmm-msg.is-long:not(.mine) .vmm-actions{left:0;right:auto;top:auto;bottom:calc(100% + 6px);transform:none;}
     .vmm-msg.is-long.mine .vmm-actions{right:0;left:auto;top:auto;bottom:calc(100% + 6px);transform:none;}
-    .vmm-bubble-wrap:hover .vmm-actions{display:inline-flex;}
+    .vmm-bubble-wrap.show-actions .vmm-actions{display:inline-flex;}
     .vmm-act-emo{background:transparent;border:none;padding:0;width:24px;height:24px;font-size:13px;line-height:1;cursor:none;border-radius:999px;display:inline-flex;align-items:center;justify-content:center;transition:background-color .14s ease, box-shadow .14s ease;}
     .vmm-act-emo.on{background:rgba(255,140,90,0.22);box-shadow:0 0 0 1.5px rgba(255,180,150,0.7), inset 0 1px 0 rgba(255,255,255,0.10);}
     .vmm-act-sep{width:1px;height:14px;background:rgba(255,255,255,0.16);margin:0 2px;}
@@ -560,9 +560,57 @@
     } catch (e) { console.error("[mini.loadMessages]", e); }
   }
 
+  // Delegated hover-with-delay for the reaction picker. Without the
+  // 250ms hide delay the picker vanishes the moment the cursor crosses
+  // the gap from bubble to pill — by the time you reach the pill, it's
+  // already gone.
+  function installVmmActionsHover(el) {
+    if (!el || el.dataset.actsMounted === "1") return;
+    el.dataset.actsMounted = "1";
+    let openWrap = null;
+    let hideTimer = null;
+    function show(wrap) {
+      if (hideTimer) { clearTimeout(hideTimer); hideTimer = null; }
+      if (openWrap && openWrap !== wrap) openWrap.classList.remove("show-actions");
+      openWrap = wrap;
+      wrap.classList.add("show-actions");
+    }
+    function queueHide() {
+      if (hideTimer) clearTimeout(hideTimer);
+      hideTimer = setTimeout(() => {
+        if (openWrap) openWrap.classList.remove("show-actions");
+        openWrap = null;
+        hideTimer = null;
+      }, 250);
+    }
+    el.addEventListener("mouseover", (e) => {
+      const t = e.target;
+      if (!t || !t.closest) return;
+      const hit = t.closest(".vmm-bubble-wrap, .vmm-actions");
+      if (!hit) return;
+      const owning = hit.classList.contains("vmm-actions") ? hit.closest(".vmm-bubble-wrap") : hit;
+      if (owning) show(owning);
+    });
+    el.addEventListener("mouseout", (e) => {
+      const t = e.target;
+      if (!t || !t.closest) return;
+      const hit = t.closest(".vmm-bubble-wrap, .vmm-actions");
+      if (!hit) return;
+      const owning = hit.classList.contains("vmm-actions") ? hit.closest(".vmm-bubble-wrap") : hit;
+      const next = e.relatedTarget;
+      if (owning && next && next.nodeType === 1) {
+        if (owning.contains(next)) return;
+        const nextWrap = next.closest && next.closest(".vmm-bubble-wrap, .vmm-actions");
+        if (nextWrap === owning) return;
+      }
+      queueHide();
+    });
+  }
+
   function paintMessages() {
     const el = document.getElementById("vmmMsgs");
     if (!el) return;
+    installVmmActionsHover(el);
     const wasAtBottom = (el.scrollHeight - el.scrollTop - el.clientHeight) < 80;
     // Capture position BEFORE innerHTML reset, so if the user was reading
     // older messages we restore where they were instead of yanking them

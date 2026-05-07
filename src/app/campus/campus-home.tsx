@@ -9693,6 +9693,24 @@ function ChannelChat({
   // it at render time (e.g. to switch off CSS transition during active
   // drag and back on for the release-snap-back).
   const [dragging, setDragging] = useState(false);
+  // Hover hide is delayed by 250ms so the picker stays open while the
+  // cursor crosses the small gap from bubble to pill. mouseEnter (on
+  // either the row or the pill itself) cancels the pending hide.
+  const hideTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const showHover = useCallback((id: string) => {
+    if (hideTimerRef.current) clearTimeout(hideTimerRef.current);
+    hideTimerRef.current = null;
+    setHoveredId(id);
+  }, []);
+  const queueHideHover = useCallback(() => {
+    if (hideTimerRef.current) clearTimeout(hideTimerRef.current);
+    hideTimerRef.current = setTimeout(() => setHoveredId(null), 250);
+  }, []);
+  useEffect(() => {
+    return () => {
+      if (hideTimerRef.current) clearTimeout(hideTimerRef.current);
+    };
+  }, []);
 
   // Channel switches remount this component (parent passes key={channelId}),
   // so initial state above is the reset — no effect needed.
@@ -10041,10 +10059,8 @@ function ChannelChat({
                   </div>
                 ) : null}
               <article
-                onMouseEnter={() => setHoveredId(m.id)}
-                onMouseLeave={() =>
-                  setHoveredId((prev) => (prev === m.id ? null : prev))
-                }
+                onMouseEnter={() => showHover(m.id)}
+                onMouseLeave={queueHideHover}
                 style={{
                   display: "flex",
                   gap: 10,
@@ -10114,6 +10130,8 @@ function ChannelChat({
                     </div>
                     {isHovered ? (
                       <div
+                        onMouseEnter={() => showHover(m.id)}
+                        onMouseLeave={queueHideHover}
                         style={{
                           // Long messages (>60 chars or multi-line) get
                           // the picker stacked ABOVE the bubble — beside

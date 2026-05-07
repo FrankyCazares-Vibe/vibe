@@ -311,7 +311,7 @@ body{font-family:'DM Sans',sans-serif;background:var(--cream);color:var(--charco
    off the right edge of the chat. Override the side placement. */
 .msg-row.is-long:not(.mine) .dm-actions{left:0;right:auto;top:auto;bottom:calc(100% + 6px);transform:none;}
 .msg-row.is-long.mine .dm-actions{right:0;left:auto;top:auto;bottom:calc(100% + 6px);transform:none;}
-.dm-bubble-wrap:hover .dm-actions{display:inline-flex;}
+.dm-bubble-wrap.show-actions .dm-actions{display:inline-flex;}
 .dm-act-emo{background:transparent;border:none;padding:2px 4px;font-size:14px;line-height:1;cursor:none;border-radius:999px;display:inline-flex;align-items:center;justify-content:center;width:26px;height:26px;transition:background-color .14s ease, box-shadow .14s ease;}
 /* Already-used emoji in the picker — soft orange wash + ring so the
    user sees "I've reacted with this one" at a glance. Clicking it
@@ -1143,10 +1143,63 @@ function __dmInstallDrag() {
   area.addEventListener('pointerleave', end);
 }
 
+// Delegated hover-with-delay for the reaction picker. Keeps the picker
+// open while the cursor crosses the small gap between bubble and pill —
+// without the delay, mouseLeave on the wrap fires the instant cursor
+// hits dead space and the picker vanishes before you can reach it.
+function __dmInstallActionsHover() {
+  const area = document.getElementById('msgsArea');
+  if (!area || area.dataset.actsMounted === '1') return;
+  area.dataset.actsMounted = '1';
+  let openWrap = null;
+  let hideTimer = null;
+  function show(wrap) {
+    if (hideTimer) { clearTimeout(hideTimer); hideTimer = null; }
+    if (openWrap && openWrap !== wrap) openWrap.classList.remove('show-actions');
+    openWrap = wrap;
+    wrap.classList.add('show-actions');
+  }
+  function queueHide() {
+    if (hideTimer) clearTimeout(hideTimer);
+    hideTimer = setTimeout(() => {
+      if (openWrap) openWrap.classList.remove('show-actions');
+      openWrap = null;
+      hideTimer = null;
+    }, 250);
+  }
+  // mouseover/mouseout bubble, so one delegated pair handles every row.
+  area.addEventListener('mouseover', (e) => {
+    const t = e.target;
+    if (!t || !t.closest) return;
+    const wrap = t.closest('.dm-bubble-wrap, .dm-actions');
+    if (!wrap) return;
+    const owning = wrap.classList.contains('dm-actions') ? wrap.closest('.dm-bubble-wrap') : wrap;
+    if (owning) show(owning);
+  });
+  area.addEventListener('mouseout', (e) => {
+    const t = e.target;
+    if (!t || !t.closest) return;
+    const wrap = t.closest('.dm-bubble-wrap, .dm-actions');
+    if (!wrap) return;
+    // Did we leave for somewhere still inside the same wrap (or its
+    // picker)? If so, don't queue a hide — that's just an internal hop.
+    const next = e.relatedTarget;
+    const owning = wrap.classList.contains('dm-actions') ? wrap.closest('.dm-bubble-wrap') : wrap;
+    if (owning && next && next.nodeType === 1) {
+      if (owning.contains(next)) return;
+      // Picker is absolute — relatedTarget might be the picker itself.
+      const nextWrap = next.closest && next.closest('.dm-bubble-wrap, .dm-actions');
+      if (nextWrap === owning || (nextWrap && nextWrap.closest('.dm-bubble-wrap')) === owning) return;
+    }
+    queueHide();
+  });
+}
+
 function renderMsgs(msgs,d){
   const a=document.getElementById('msgsArea');
   if (!a) return;
   __dmInstallDrag();
+  __dmInstallActionsHover();
   // Split rendering: bubbles only re-render when message ids change
   // (so server-signed media URLs being fresh-signed every poll doesn't
   // remount <img>/<video> and flicker), footer (typing + Read receipt)
