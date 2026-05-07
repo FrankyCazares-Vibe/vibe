@@ -25,7 +25,7 @@ type Org = {
   philanthropy?: string;
 };
 
-type BackdropKey = "sand-purple" | "ember" | "deep-violet" | "forest" | "midnight";
+type BackdropKey = "cream" | "sand-purple" | "ember" | "deep-violet" | "forest" | "midnight";
 
 type Channel = {
   id: string;
@@ -108,6 +108,13 @@ const GLASS_SURFACE = {
 // Backdrop presets — admins/owners pick one in org settings.
 // Each composes 3 radial color washes over a dark base.
 const BACKDROP_PRESETS: Record<BackdropKey, { label: string; css: string }> = {
+  cream: {
+    label: "Cream paper",
+    css:
+      "radial-gradient(120% 80% at 0% 0%, rgba(255,222,180,0.45) 0%, rgba(255,222,180,0) 60%), " +
+      "radial-gradient(110% 80% at 100% 100%, rgba(255,200,170,0.35) 0%, rgba(255,200,170,0) 60%), " +
+      "linear-gradient(180deg, #FAF7F2 0%, #F4EDE2 100%)",
+  },
   "sand-purple": {
     label: "Sand purple",
     css:
@@ -150,7 +157,7 @@ const BACKDROP_PRESETS: Record<BackdropKey, { label: string; css: string }> = {
   },
 };
 
-const DEFAULT_BACKDROP: BackdropKey = "sand-purple";
+const DEFAULT_BACKDROP: BackdropKey = "cream";
 
 // Cream paper backdrop for the Feed tab — warm, cozy, "community noticeboard"
 const FEED_BACKDROP =
@@ -169,12 +176,15 @@ const CHAT_CHROME_BACKDROP =
 type Tone = "light" | "dark";
 
 function getTabScene(tab: CampusTab): { css: string; tone: Tone } {
+  // Chat keeps a darker chrome so the channel rail + messages list stand
+  // out, but events / orgs / map all share the cream Feed backdrop now —
+  // the user wanted less visual whiplash hopping between tabs.
   if (tab === "chat") return { css: CHAT_CHROME_BACKDROP, tone: "light" };
   if (tab === "feed") return { css: FEED_BACKDROP, tone: "dark" };
-  if (tab === "events") return { css: BACKDROP_PRESETS.midnight.css, tone: "light" };
-  if (tab === "orgs") return { css: BACKDROP_PRESETS.ember.css, tone: "light" };
-  if (tab === "map") return { css: BACKDROP_PRESETS.forest.css, tone: "light" };
-  return { css: BACKDROP_PRESETS["sand-purple"].css, tone: "light" };
+  if (tab === "events") return { css: FEED_BACKDROP, tone: "dark" };
+  if (tab === "orgs") return { css: FEED_BACKDROP, tone: "dark" };
+  if (tab === "map") return { css: FEED_BACKDROP, tone: "dark" };
+  return { css: FEED_BACKDROP, tone: "dark" };
 }
 
 type CampusTab = "feed" | "events" | "orgs" | "chat" | "map";
@@ -8355,13 +8365,26 @@ function OttoPanel({ onPickTag }: { onPickTag: (tag: string) => void }) {
       org: { handle: string; name: string; verified: boolean } | null;
     }> | null
   >(null);
+  const [suggestions, setSuggestions] = useState<
+    Array<{
+      id: string;
+      name: string | null;
+      handle: string | null;
+      avatar_url: string | null;
+      major: string | null;
+      year: number | null;
+      mutual_count: number;
+      reason: string;
+    }> | null
+  >(null);
   useEffect(() => {
     let cancelled = false;
     (async () => {
       try {
-        const [tRes, uRes] = await Promise.all([
+        const [tRes, uRes, sRes] = await Promise.all([
           fetch("/api/trending/hashtags?limit=6", { cache: "no-store" }).then((r) => r.json()),
           fetch("/api/me/upcoming-events?limit=4", { cache: "no-store" }).then((r) => r.json()),
+          fetch("/api/me/suggested-connections?limit=5", { cache: "no-store" }).then((r) => r.json()),
         ]);
         if (cancelled) return;
         setTrending(
@@ -8370,10 +8393,14 @@ function OttoPanel({ onPickTag }: { onPickTag: (tag: string) => void }) {
         setUpcoming(
           uRes?.ok && Array.isArray(uRes.upcoming) ? uRes.upcoming : [],
         );
+        setSuggestions(
+          sRes?.ok && Array.isArray(sRes.suggestions) ? sRes.suggestions : [],
+        );
       } catch {
         if (!cancelled) {
           setTrending([]);
           setUpcoming([]);
+          setSuggestions([]);
         }
       }
     })();
@@ -8535,10 +8562,97 @@ function OttoPanel({ onPickTag }: { onPickTag: (tag: string) => void }) {
           )}
         </OttoSection>
 
-        {/* People-to-connect section removed pre-ship — was hardcoded mock
-            users. Restore once the recommendations API is built (mutuals
-            + same-major + same-org weighted). For now Heads up + Trending
-            give the Otto rail two real surfaces. */}
+        <OttoSection title="People to connect" subtitle="Mutuals, same major, same school." headingColor={headingColor} subtleColor={subtleColor}>
+          {suggestions === null ? (
+            <div style={{ fontSize: 12, color: subtleColor, padding: "6px 0" }}>Loading…</div>
+          ) : suggestions.length === 0 ? (
+            <div style={{ fontSize: 12, color: subtleColor, padding: "6px 0", lineHeight: 1.5 }}>
+              We&apos;ll suggest people once your school has more students on Vibe.
+            </div>
+          ) : (
+            suggestions.map((p) => {
+              const initials = (p.name ?? p.handle ?? "?")
+                .split(/\s+/)
+                .filter(Boolean)
+                .slice(0, 2)
+                .map((s) => s[0])
+                .join("")
+                .toUpperCase();
+              const profileHref = p.handle ? `/profile/${encodeURIComponent(p.handle)}` : "/network";
+              return (
+                <Link
+                  key={p.id}
+                  href={profileHref}
+                  style={{
+                    display: "flex",
+                    alignItems: "center",
+                    gap: 10,
+                    padding: "8px 0",
+                    borderBottom: `1px solid ${dividerColor}`,
+                    textDecoration: "none",
+                  }}
+                >
+                  <div
+                    style={{
+                      width: 32,
+                      height: 32,
+                      borderRadius: 999,
+                      background: p.avatar_url
+                        ? `url(${p.avatar_url}) center/cover`
+                        : "rgba(255,255,255,0.08)",
+                      color: "#fff",
+                      display: "flex",
+                      alignItems: "center",
+                      justifyContent: "center",
+                      fontFamily: "Fraunces, serif",
+                      fontWeight: 700,
+                      fontSize: 12,
+                      flexShrink: 0,
+                    }}
+                  >
+                    {!p.avatar_url ? initials : null}
+                  </div>
+                  <div style={{ flex: 1, minWidth: 0 }}>
+                    <div
+                      style={{
+                        fontFamily: "DM Sans, sans-serif",
+                        fontSize: 13,
+                        fontWeight: 600,
+                        color: headingColor,
+                        overflow: "hidden",
+                        textOverflow: "ellipsis",
+                        whiteSpace: "nowrap",
+                      }}
+                    >
+                      {p.name || p.handle || "Member"}
+                    </div>
+                    <div
+                      style={{
+                        fontFamily: "DM Sans, sans-serif",
+                        fontSize: 11,
+                        color: subtleColor,
+                      }}
+                    >
+                      {[p.major, p.year ? String(p.year) : null, p.reason]
+                        .filter(Boolean)
+                        .join(" · ")}
+                    </div>
+                  </div>
+                  <span
+                    style={{
+                      fontFamily: "DM Sans, sans-serif",
+                      fontSize: 11,
+                      fontWeight: 700,
+                      color: "#FFB89C",
+                    }}
+                  >
+                    View →
+                  </span>
+                </Link>
+              );
+            })
+          )}
+        </OttoSection>
 
         <button
           type="button"
