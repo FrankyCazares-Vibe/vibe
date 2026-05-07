@@ -6242,20 +6242,20 @@ function OrgsTabBody({ onCreateOrg }: { onCreateOrg: () => void }) {
             gap: 8,
             padding: "6px 12px 6px 6px",
             borderRadius: 999,
-            border: showDormant
-              ? "1px solid rgba(232,77,77,0.45)"
-              : "1px solid rgba(255,255,255,0.14)",
+            border: "1px solid rgba(255,255,255,0.14)",
             background: showDormant
-              ? "linear-gradient(180deg, rgba(232,77,77,0.22) 0%, rgba(232,77,77,0.08) 100%)"
-              : "rgba(255,255,255,0.04)",
-            color: showDormant ? "#FFD0CC" : COLORS.glassMuted,
+              ? "linear-gradient(180deg, rgba(255,255,255,0.18) 0%, rgba(255,255,255,0.06) 100%), rgba(20,16,28,0.78)"
+              : "rgba(20,16,28,0.78)",
+            backdropFilter: "blur(20px) saturate(160%)",
+            WebkitBackdropFilter: "blur(20px) saturate(160%)",
+            color: "#fff",
             fontFamily: "DM Sans, sans-serif",
             fontSize: 12,
             fontWeight: showDormant ? 700 : 500,
             cursor: "pointer",
             boxShadow: showDormant
-              ? "inset 0 1px 0 rgba(255,255,255,0.18)"
-              : "none",
+              ? "inset 0 1px 0 rgba(255,255,255,0.22)"
+              : "inset 0 1px 0 rgba(255,255,255,0.06)",
             transition: "all 160ms ease",
           }}
         >
@@ -6267,7 +6267,7 @@ function OrgsTabBody({ onCreateOrg }: { onCreateOrg: () => void }) {
               borderRadius: 999,
               padding: 1,
               background: showDormant
-                ? "rgba(232,77,77,0.55)"
+                ? "rgba(255,255,255,0.45)"
                 : "rgba(255,255,255,0.12)",
               border: "1px solid rgba(255,255,255,0.16)",
               display: "inline-flex",
