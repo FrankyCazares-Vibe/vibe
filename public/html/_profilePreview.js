@@ -69,7 +69,6 @@
       <div class="msg-profile-body">
         <div class="msg-profile-av" data-prof-av>${esc(initialsOf(handle, handle))}</div>
         <div class="msg-profile-text">
-          <div class="msg-profile-label">Profile</div>
           <div class="msg-profile-name" data-prof-name>@${safe}</div>
           <div class="msg-profile-meta" data-prof-meta>&nbsp;</div>
         </div>
@@ -209,12 +208,6 @@
     .msg-profile-text {
       flex: 1; min-width: 0; padding-bottom: 2px;
     }
-    .msg-profile-label {
-      font-family: 'DM Sans', sans-serif;
-      font-size: 9.5px; font-weight: 700; letter-spacing: .14em;
-      text-transform: uppercase; color: #FF5C35;
-      margin-bottom: 2px;
-    }
     .msg-profile-name {
       font-family: 'Fraunces', serif; font-weight: 800; font-size: 15px;
       color: #1C1C1E; line-height: 1.2;
@@ -235,7 +228,6 @@
     .msg-profile-attach--dark .msg-profile-name { color: #fff; }
     .msg-profile-attach--dark .msg-profile-meta { color: rgba(255,255,255,.65); }
     .msg-profile-attach--dark .msg-profile-av { border-color: #262528; }
-    .msg-profile-attach--dark .msg-profile-label { color: #FFB89C; }
   `;
   document.head.appendChild(style);
 })();
