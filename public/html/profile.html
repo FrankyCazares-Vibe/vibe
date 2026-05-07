@@ -2641,6 +2641,15 @@ body.empty-profile-mode #profileEmpty { display: flex !important; }
         <path d="M8.5 1.4v2M8.5 13.6v2M15.6 8.5h-2M3.4 8.5h-2M13.5 3.5l-1.4 1.4M5 12l-1.4 1.4M13.5 13.5l-1.4-1.4M5 5L3.6 3.6" stroke="currentColor" stroke-width="1.3" stroke-linecap="round"/>
       </svg>
     </a>
+    <!-- Share profile. Opens a modal: copy link OR send via Vibe DM. -->
+    <button class="nav-msg-btn" onclick="openShareProfileModal()" title="Share profile" aria-label="Share profile">
+      <svg width="17" height="17" viewBox="0 0 17 17" fill="none">
+        <circle cx="4.5" cy="8.5" r="2" stroke="currentColor" stroke-width="1.4" fill="none"/>
+        <circle cx="12.5" cy="3.5" r="2" stroke="currentColor" stroke-width="1.4" fill="none"/>
+        <circle cx="12.5" cy="13.5" r="2" stroke="currentColor" stroke-width="1.4" fill="none"/>
+        <path d="M6.3 7.6l4.5-2.8M6.3 9.4l4.5 2.8" stroke="currentColor" stroke-width="1.3" stroke-linecap="round"/>
+      </svg>
+    </button>
     <!-- Hidden — kept so legacy code paths (renderUserSections, demo
          exit flow) that reference profileShareBtn keep working without
          a 404. New nav uses the cog above. -->
@@ -7762,6 +7771,380 @@ function showWelcomeBanner() {
     font-size: 13px; font-weight: 700; cursor: pointer; color: #1C1C1E;
   }
 </style>
+
+<!-- ── Share profile modal ──────────────────────────────────────────────
+     Opens from the Share button in the top nav. Two paths: copy the
+     profile link, or send it as a DM to a Vibe user. Recipient picker
+     filters via /api/me/connections (mutuals first). -->
+<style>
+  #shareProfileModal {
+    position: fixed; inset: 0; z-index: 9000;
+    background: rgba(20,20,22,0.45); backdrop-filter: blur(6px);
+    display: none; align-items: center; justify-content: center;
+    padding: 24px; font-family: 'DM Sans', sans-serif;
+  }
+  #shareProfileModal.open { display: flex; }
+  #shareProfileModal .share-card {
+    width: 100%; max-width: 480px; max-height: 86vh;
+    background: linear-gradient(180deg, #FFFDF8 0%, #FAF7F2 100%);
+    border-radius: 22px;
+    box-shadow: 0 24px 60px rgba(0,0,0,0.18), 0 8px 24px rgba(0,0,0,0.10);
+    display: flex; flex-direction: column; overflow: hidden;
+  }
+  #shareProfileModal .share-header {
+    padding: 18px 22px; border-bottom: 1px solid rgba(28,28,30,0.08);
+    display: flex; align-items: center; gap: 12px; flex-shrink: 0;
+  }
+  #shareProfileModal .share-title {
+    flex: 1; min-width: 0;
+  }
+  #shareProfileModal .share-eyebrow {
+    font-family: 'Fraunces', serif; font-size: 10px; font-weight: 700;
+    letter-spacing: 0.18em; text-transform: uppercase; color: #C84A20;
+  }
+  #shareProfileModal .share-name {
+    font-family: 'Fraunces', serif; font-size: 20px; font-weight: 800;
+    color: #1C1C1E; letter-spacing: -0.01em; margin-top: 2px;
+    overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
+  }
+  #shareProfileModal .share-close {
+    width: 32px; height: 32px; border-radius: 999px;
+    background: rgba(28,28,30,0.06); border: 1px solid rgba(28,28,30,0.10);
+    color: #1C1C1E; font-size: 18px; line-height: 1;
+    cursor: none; display: flex; align-items: center; justify-content: center;
+    flex-shrink: 0;
+  }
+  #shareProfileModal .share-body {
+    flex: 1; overflow-y: auto; padding: 16px 22px 22px;
+    display: flex; flex-direction: column; gap: 18px;
+  }
+  #shareProfileModal .share-section-eyebrow {
+    font-family: 'DM Sans', sans-serif; font-size: 11px; font-weight: 700;
+    letter-spacing: 0.12em; text-transform: uppercase; color: #8A8580;
+    margin-bottom: 8px;
+  }
+  #shareProfileModal .share-link-row {
+    display: flex; gap: 8px;
+  }
+  #shareProfileModal .share-link-input {
+    flex: 1; min-width: 0;
+    padding: 10px 14px; border-radius: 12px;
+    border: 1px solid rgba(28,28,30,0.10);
+    background: rgba(255,255,255,0.7); color: #1C1C1E;
+    font-family: 'DM Sans', sans-serif; font-size: 13px; outline: none;
+  }
+  #shareProfileModal .share-copy-btn {
+    padding: 10px 16px; border-radius: 12px;
+    background: linear-gradient(180deg, #FF7B4A 0%, #FF5C35 100%);
+    color: white; border: 1px solid rgba(200,74,32,0.35);
+    font-family: 'DM Sans', sans-serif; font-size: 13px; font-weight: 700;
+    cursor: none; flex-shrink: 0;
+    box-shadow: inset 0 1px 0 rgba(255,255,255,0.32), 0 4px 12px rgba(255,92,53,0.22);
+  }
+  #shareProfileModal .share-copy-btn.copied {
+    background: linear-gradient(180deg, #6BD18C 0%, #4AB872 100%);
+    border-color: rgba(40,140,80,0.4);
+    box-shadow: inset 0 1px 0 rgba(255,255,255,0.32), 0 4px 12px rgba(70,180,110,0.22);
+  }
+  #shareProfileModal .share-recipient-search {
+    width: 100%; padding: 10px 14px; border-radius: 999px;
+    border: 1px solid rgba(28,28,30,0.10);
+    background: rgba(255,253,248,0.78); color: #1C1C1E;
+    font-family: 'DM Sans', sans-serif; font-size: 13px; outline: none;
+    box-shadow: inset 0 1px 0 rgba(255,255,255,0.85);
+  }
+  #shareProfileModal .share-recipients {
+    margin-top: 10px; display: flex; flex-direction: column; gap: 4px;
+    max-height: 280px; overflow-y: auto;
+  }
+  #shareProfileModal .share-row {
+    display: flex; align-items: center; gap: 12px;
+    padding: 8px 10px; border-radius: 12px;
+    background: transparent; border: 1px solid transparent;
+    cursor: none; text-align: left; color: #1C1C1E;
+    font-family: 'DM Sans', sans-serif;
+    transition: background 0.12s ease;
+  }
+  #shareProfileModal .share-row:hover {
+    background: rgba(255,238,222,0.55);
+    border-color: rgba(28,28,30,0.06);
+  }
+  #shareProfileModal .share-row .share-av {
+    width: 36px; height: 36px; border-radius: 999px;
+    background-position: center; background-size: cover;
+    background: linear-gradient(180deg, #FFD8B8 0%, #FFB890 100%);
+    color: #7A3A18; flex-shrink: 0;
+    display: flex; align-items: center; justify-content: center;
+    font-family: 'Fraunces', serif; font-weight: 700; font-size: 12px;
+    border: 1px solid rgba(255,255,255,0.92);
+  }
+  #shareProfileModal .share-row .share-info {
+    flex: 1; min-width: 0;
+  }
+  #shareProfileModal .share-row .share-name-line {
+    font-weight: 700; font-size: 14px; line-height: 1.2;
+    overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
+  }
+  #shareProfileModal .share-row .share-handle-line {
+    font-size: 12px; color: #8A8580; margin-top: 2px;
+  }
+  #shareProfileModal .share-row .share-send-btn {
+    padding: 6px 12px; border-radius: 999px;
+    background: rgba(28,28,30,0.04); color: #1C1C1E;
+    border: 1px solid rgba(28,28,30,0.14);
+    font-family: 'DM Sans', sans-serif; font-size: 12px; font-weight: 700;
+    cursor: none; flex-shrink: 0;
+  }
+  #shareProfileModal .share-row .share-send-btn.sent {
+    background: linear-gradient(180deg, #6BD18C 0%, #4AB872 100%);
+    color: white; border-color: rgba(40,140,80,0.4);
+  }
+  #shareProfileModal .share-empty {
+    padding: 24px 12px; text-align: center; color: #8A8580; font-size: 13px;
+  }
+</style>
+
+<div id="shareProfileModal" onclick="if(event.target===this) closeShareProfileModal();">
+  <div class="share-card">
+    <div class="share-header">
+      <div class="share-title">
+        <div class="share-eyebrow">Share profile</div>
+        <div class="share-name" id="shareProfileName">—</div>
+      </div>
+      <button class="share-close" aria-label="Close" onclick="closeShareProfileModal()">×</button>
+    </div>
+    <div class="share-body">
+      <div>
+        <div class="share-section-eyebrow">Copy link</div>
+        <div class="share-link-row">
+          <input class="share-link-input" id="shareLinkInput" type="text" readonly />
+          <button class="share-copy-btn" id="shareCopyBtn" onclick="copyShareProfileLink()" type="button">Copy</button>
+        </div>
+      </div>
+      <div>
+        <div class="share-section-eyebrow">Send via Vibe</div>
+        <input class="share-recipient-search" id="shareRecipientSearch" type="text" placeholder="Search your connections by name or handle…" autocomplete="off" />
+        <div class="share-recipients" id="shareRecipientsList">
+          <div class="share-empty">Loading…</div>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<script>
+  // Share-profile modal — opens from the nav share button. Two paths:
+  // copy the profile link, or send it as a DM via /api/me/threads +
+  // /api/me/threads/<id>/messages.
+  (function(){
+    let shareTarget = null;     // { handle, name }
+    let recipients = [];        // cached connections list
+    let recipientSent = new Set(); // ids that already received the link in this session
+    let searchDebounce = null;
+
+    function getShareTarget() {
+      // Visiting someone via /profile/<handle>
+      if (window.viewingRealUser && window.viewingRealUser.handle) {
+        return {
+          handle: window.viewingRealUser.handle,
+          name: window.viewingRealUser.name || ('@' + window.viewingRealUser.handle),
+        };
+      }
+      // Mock user (demo)
+      if (window.viewingMockUser && window.viewingMockUser.handle) {
+        return {
+          handle: window.viewingMockUser.handle,
+          name: window.viewingMockUser.name || ('@' + window.viewingMockUser.handle),
+        };
+      }
+      // Own profile — pull from vibe_user_v1
+      const me = (typeof vibeLoad === 'function') ? vibeLoad('vibe_user_v1') : null;
+      if (me && me.handle) {
+        return {
+          handle: me.handle,
+          name: me.name || ('@' + me.handle),
+        };
+      }
+      return null;
+    }
+
+    function profileUrlFor(handle) {
+      return location.origin + '/profile/' + encodeURIComponent(handle);
+    }
+
+    function escapeHTML(s) {
+      return String(s == null ? '' : s).replace(/[&<>"']/g, ch => ({
+        '&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'
+      }[ch]));
+    }
+
+    function initialsOf(name, handle) {
+      const src = (name || handle || '?').trim();
+      return src.split(/\s+/).filter(Boolean).slice(0,2)
+        .map(p => p[0]).join('').toUpperCase() || '?';
+    }
+
+    function paintRecipients() {
+      const wrap = document.getElementById('shareRecipientsList');
+      if (!wrap) return;
+      if (recipients.length === 0) {
+        wrap.innerHTML = `<div class="share-empty">No connections to send to yet.</div>`;
+        return;
+      }
+      wrap.innerHTML = recipients.map(u => {
+        const av = u.avatar_url
+          ? `<div class="share-av" style="background-image:url(${escapeHTML(u.avatar_url)})"></div>`
+          : `<div class="share-av">${escapeHTML(initialsOf(u.name, u.handle))}</div>`;
+        const sent = recipientSent.has(u.id);
+        return `<div class="share-row" data-share-id="${escapeHTML(u.id)}" data-share-handle="${escapeHTML(u.handle || '')}">
+          ${av}
+          <div class="share-info">
+            <div class="share-name-line">${escapeHTML(u.name || u.handle || 'Member')}</div>
+            <div class="share-handle-line">@${escapeHTML(u.handle || '')}</div>
+          </div>
+          <button class="share-send-btn ${sent ? 'sent' : ''}" type="button">${sent ? 'Sent ✓' : 'Send'}</button>
+        </div>`;
+      }).join('');
+      // Wire send buttons
+      wrap.querySelectorAll('.share-row').forEach(row => {
+        const btn = row.querySelector('.share-send-btn');
+        btn.onclick = (e) => {
+          e.preventDefault(); e.stopPropagation();
+          sendShareTo(row.dataset.shareHandle, row.dataset.shareId, btn);
+        };
+      });
+    }
+
+    async function loadRecipients(query) {
+      const wrap = document.getElementById('shareRecipientsList');
+      if (wrap) wrap.innerHTML = `<div class="share-empty">Loading…</div>`;
+      try {
+        const qs = query ? `?limit=20&q=${encodeURIComponent(query)}` : '?limit=20';
+        const r = await fetch('/api/me/connections' + qs, { credentials: 'include' });
+        const j = await r.json();
+        recipients = (j && j.ok && Array.isArray(j.users)) ? j.users : [];
+        // Filter out the share target — sending someone their own profile
+        // via DM is a weird flow.
+        if (shareTarget && shareTarget.handle) {
+          recipients = recipients.filter(u =>
+            (u.handle || '').toLowerCase() !== shareTarget.handle.toLowerCase()
+          );
+        }
+        paintRecipients();
+      } catch {
+        recipients = [];
+        paintRecipients();
+      }
+    }
+
+    async function sendShareTo(handle, userId, btn) {
+      if (!handle || !shareTarget) return;
+      const url = profileUrlFor(shareTarget.handle);
+      const body = window.viewingRealUser || window.viewingMockUser
+        ? `Check out ${shareTarget.name}'s profile on Vibe → ${url}`
+        : `Here's my profile on Vibe → ${url}`;
+      btn.disabled = true;
+      btn.textContent = 'Sending…';
+      try {
+        // 1. Open or create a 1:1 thread with the target.
+        const threadRes = await fetch('/api/me/threads', {
+          method: 'POST', credentials: 'include',
+          headers: {'Content-Type':'application/json'},
+          body: JSON.stringify({ handle }),
+        });
+        const threadJ = await threadRes.json();
+        if (!threadRes.ok || !threadJ || !threadJ.ok || !threadJ.channel_id) {
+          throw new Error(threadJ && threadJ.error || 'thread_failed');
+        }
+        // 2. Post the share message.
+        const sendRes = await fetch(`/api/me/threads/${encodeURIComponent(threadJ.channel_id)}/messages`, {
+          method: 'POST', credentials: 'include',
+          headers: {'Content-Type':'application/json'},
+          body: JSON.stringify({ content: body }),
+        });
+        const sendJ = await sendRes.json();
+        if (!sendRes.ok || !sendJ || !sendJ.ok) {
+          throw new Error(sendJ && sendJ.error || 'send_failed');
+        }
+        recipientSent.add(userId);
+        btn.classList.add('sent');
+        btn.textContent = 'Sent ✓';
+        btn.disabled = false;
+      } catch (err) {
+        btn.disabled = false;
+        btn.textContent = 'Send';
+        if (typeof showToast === 'function') showToast('Could not send — try again');
+      }
+    }
+
+    window.copyShareProfileLink = async function() {
+      const input = document.getElementById('shareLinkInput');
+      const btn = document.getElementById('shareCopyBtn');
+      if (!input || !btn) return;
+      try {
+        if (navigator.clipboard && navigator.clipboard.writeText) {
+          await navigator.clipboard.writeText(input.value);
+        } else {
+          input.select();
+          document.execCommand('copy');
+        }
+        btn.classList.add('copied');
+        btn.textContent = 'Copied ✓';
+        setTimeout(() => {
+          btn.classList.remove('copied');
+          btn.textContent = 'Copy';
+        }, 1600);
+      } catch {
+        if (typeof showToast === 'function') showToast('Could not copy link');
+      }
+    };
+
+    window.openShareProfileModal = function() {
+      const target = getShareTarget();
+      if (!target) {
+        if (typeof showToast === 'function') showToast('No profile to share yet');
+        return;
+      }
+      shareTarget = target;
+      recipientSent = new Set();
+      const modal = document.getElementById('shareProfileModal');
+      if (!modal) return;
+      // Header label: "your profile" vs the target's name
+      const isOwn = !window.viewingRealUser && !window.viewingMockUser;
+      document.getElementById('shareProfileName').textContent =
+        isOwn ? 'Your profile' : target.name;
+      document.getElementById('shareLinkInput').value = profileUrlFor(target.handle);
+      const search = document.getElementById('shareRecipientSearch');
+      if (search) search.value = '';
+      modal.classList.add('open');
+      loadRecipients('');
+      // Auto-focus the search after the open animation settles.
+      if (search) setTimeout(() => search.focus({ preventScroll: true }), 80);
+    };
+
+    window.closeShareProfileModal = function() {
+      const modal = document.getElementById('shareProfileModal');
+      if (modal) modal.classList.remove('open');
+    };
+
+    // Debounced search.
+    document.addEventListener('input', e => {
+      if (e.target && e.target.id === 'shareRecipientSearch') {
+        const v = e.target.value || '';
+        if (searchDebounce) clearTimeout(searchDebounce);
+        searchDebounce = setTimeout(() => loadRecipients(v.trim()), 220);
+      }
+    });
+
+    // ESC closes.
+    document.addEventListener('keydown', e => {
+      if (e.key === 'Escape') {
+        const modal = document.getElementById('shareProfileModal');
+        if (modal && modal.classList.contains('open')) window.closeShareProfileModal();
+      }
+    });
+  })();
+</script>
 
 <div id="connectionsModal" onclick="if(event.target===this) closeConnectionsModal();">
   <div class="conn-modal-card">
