@@ -4997,7 +4997,7 @@ function EventsTabBody() {
           eyebrow="Events · IU"
           title="What's coming up"
           subtitle="RSVP early — events on campus, in space, and online."
-          tone="light"
+          tone="dark"
         />
         {canCreate ? (
           <button
@@ -6154,7 +6154,7 @@ function OrgsTabBody({ onCreateOrg }: { onCreateOrg: () => void }) {
         eyebrow="Organizations · IU"
         title="Find your communities"
         subtitle="Browse clubs and orgs at IU. Public ones you can join instantly, private ones you can request."
-        tone="light"
+        tone="dark"
       />
 
       <CreateOrgBanner onClick={onCreateOrg} />
@@ -7421,7 +7421,7 @@ function MapTabBody() {
         eyebrow="Map · IU"
         title="The campus, mapped by who's where"
         subtitle="Each zone is a major. Click in to find people you&apos;d never bump into."
-        tone="light"
+        tone="dark"
       />
 
       <div
