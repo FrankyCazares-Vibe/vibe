@@ -10014,11 +10014,9 @@ function ChannelChat({
           messages.map((m, idx) => {
             const prev = idx > 0 ? messages[idx - 1] : null;
             const sameAuthor = prev?.user_id === m.user_id;
-            // iMessage-style date separator — emit one before the row
-            // whenever the day differs from the previous message (or for
-            // the very first message in the channel).
-            const showDateSep =
-              !prev || !sameLocalDay(prev.created_at, m.created_at);
+            // iMessage-style separator — emit on the first message, on
+            // day change, or after a >1h gap.
+            const showDateSep = shouldShowChatSep(prev?.created_at, m.created_at);
             const author = m.users;
             const isHovered = hoveredId === m.id;
             const reactions = m.reactions ?? [];
@@ -10616,9 +10614,10 @@ function formatChatTime(iso: string): string {
 
 const formatChatTimeFull = formatChatTime;
 
-// Date separator label: "Today" / "Yesterday" / "Saturday" if within the
-// last week, else "May 7" or "May 7, 2025" for older. Centered between
-// message groups whenever the day changes.
+// Date+time separator label, iMessage-style. Always ends in the
+// time-of-day so the user gets both the relative day cue and the
+// exact moment the conversation picked back up — "Yesterday 7:05 PM",
+// "Today 3:42 PM", "Wednesday 4:15 PM", "May 7, 3:42 PM".
 function formatChatDateLabel(iso: string): string {
   try {
     const d = new Date(iso);
@@ -10626,32 +10625,45 @@ function formatChatDateLabel(iso: string): string {
     const startOfDay = (x: Date) =>
       new Date(x.getFullYear(), x.getMonth(), x.getDate()).getTime();
     const dayDiff = Math.round((startOfDay(now) - startOfDay(d)) / 86_400_000);
-    if (dayDiff === 0) return "Today";
-    if (dayDiff === 1) return "Yesterday";
-    if (dayDiff > 1 && dayDiff < 7) {
-      return d.toLocaleDateString([], { weekday: "long" });
+    const time = d.toLocaleTimeString([], { hour: "numeric", minute: "2-digit" });
+    let day: string;
+    if (dayDiff === 0) day = "Today";
+    else if (dayDiff === 1) day = "Yesterday";
+    else if (dayDiff > 1 && dayDiff < 7) {
+      day = d.toLocaleDateString([], { weekday: "long" });
+    } else {
+      const sameYear = d.getFullYear() === now.getFullYear();
+      day = d.toLocaleDateString(
+        [],
+        sameYear
+          ? { month: "long", day: "numeric" }
+          : { month: "long", day: "numeric", year: "numeric" },
+      );
     }
-    const sameYear = d.getFullYear() === now.getFullYear();
-    return d.toLocaleDateString(
-      [],
-      sameYear
-        ? { month: "long", day: "numeric" }
-        : { month: "long", day: "numeric", year: "numeric" },
-    );
+    return `${day} ${time}`;
   } catch {
     return "";
   }
 }
 
-function sameLocalDay(a: string, b: string): boolean {
+// Decide whether to insert a separator before this message. Emits when
+// the day rolls over OR there's a > 1h gap from the previous message —
+// matches iMessage so back-and-forth strings stay clean and a fresh
+// conversation block gets a fresh marker.
+const CHAT_GAP_MS = 60 * 60 * 1000;
+function shouldShowChatSep(prevIso: string | null | undefined, currIso: string): boolean {
+  if (!currIso) return false;
+  if (!prevIso) return true;
   try {
-    const da = new Date(a);
-    const db = new Date(b);
-    return (
-      da.getFullYear() === db.getFullYear() &&
-      da.getMonth() === db.getMonth() &&
-      da.getDate() === db.getDate()
-    );
+    const pa = new Date(prevIso);
+    const pb = new Date(currIso);
+    if (Number.isNaN(pa.getTime()) || Number.isNaN(pb.getTime())) return false;
+    const sameDay =
+      pa.getFullYear() === pb.getFullYear() &&
+      pa.getMonth() === pb.getMonth() &&
+      pa.getDate() === pb.getDate();
+    if (!sameDay) return true;
+    return pb.getTime() - pa.getTime() > CHAT_GAP_MS;
   } catch {
     return false;
   }

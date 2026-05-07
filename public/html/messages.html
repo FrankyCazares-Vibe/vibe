@@ -226,7 +226,11 @@ body{font-family:'DM Sans',sans-serif;background:var(--cream);color:var(--charco
 .btn-dec{font-family:'DM Sans',sans-serif;font-size:13px;font-weight:600;background:none;color:var(--muted);border:1.5px solid var(--border);padding:8px 20px;border-radius:100px;cursor:none;transition:all .15s;}
 .btn-dec:hover{border-color:rgba(28,28,30,.2);color:var(--charcoal);}
 .msgs{flex:1;overflow-y:auto;overflow-x:hidden;padding:18px 22px;display:flex;flex-direction:column;gap:2px;scrollbar-width:thin;scrollbar-color:var(--border) transparent;touch-action:pan-y;--dragx:0px;}
-.date-sep{text-align:center;font-size:10px;font-weight:700;color:var(--muted);margin:12px 0 8px;text-transform:uppercase;letter-spacing:.5px;}
+/* iMessage-style: "Yesterday 7:05 PM" — split into a bold day prefix
+   and a regular-weight time. Day stays sentence-case (not uppercase)
+   so the format reads as a clock annotation, not a section header. */
+.date-sep{text-align:center;font-family:'DM Sans',sans-serif;font-size:11px;color:var(--muted);margin:14px 0 6px;letter-spacing:.2px;}
+.date-sep b{font-weight:700;}
 .msg-row{display:flex;gap:7px;align-items:flex-end;position:relative;transform:translateX(var(--dragx,0px));transition:transform .2s cubic-bezier(0.22, 1, 0.36, 1);will-change:transform;}
 .msgs.is-dragging .msg-row{transition:none;}
 .msg-row.mine{flex-direction:row-reverse;}
@@ -257,7 +261,10 @@ body{font-family:'DM Sans',sans-serif;background:var(--cream);color:var(--charco
    that produced a flicker as it pushed neighbouring layout. */
 .btime{
   font-size:10px;
-  color:rgba(255,255,255,0.6);
+  /* Page background here is cream/white — white text is invisible. Dark
+     muted gray reads on the cream surface and stays subtle on dark. */
+  color:rgba(28,28,30,0.7);
+  font-weight:600;
   position:absolute;top:50%;right:-78px;transform:translateY(-50%);
   width:74px;
   opacity:0;transition:opacity 160ms ease;
@@ -1129,14 +1136,15 @@ function renderMsgs(msgs,d){
     (a.scrollHeight - a.scrollTop - a.clientHeight) < 80;
   const prevScroll = a.scrollTop;
 
-  // iMessage-style date separators: emit one above the first message
-  // and any time the day changes between consecutive messages. The
-  // server returns ISO timestamps; for the demo path (no created_at)
-  // we fall through with no separator.
+  // iMessage-style separators — emit on the first message, on day
+  // change, or after a >1h gap. Each separator carries both the day
+  // ("Today" / "Yesterday" / weekday / date) and the time of the next
+  // message ("Yesterday 9:21 PM"), so the user sees exactly when the
+  // conversation picked back up.
   let h='';
   let last=null;
   let lastSenderId=null;
-  let lastDayKey=null;
+  let lastIsoForSep=null;
   let lastSentIdx = -1;
   for (let i = msgs.length - 1; i >= 0; i--) { if (msgs[i].m === 1) { lastSentIdx = i; break; } }
   const isGroup = d && d.isGroup;
@@ -1181,14 +1189,11 @@ function renderMsgs(msgs,d){
   };
   msgs.forEach((m,i)=>{
     const mine=m.m===1;
-    // Date separator: emit when the day changes (or for the first row).
-    if (m.created_at) {
-      const dayKey = __dmDayKey(m.created_at);
-      if (dayKey !== lastDayKey) {
-        h += '<div class="date-sep">' + __dmEsc(__dmFmtChatDate(m.created_at)) + '</div>';
-        lastDayKey = dayKey;
-      }
+    // Date+time separator: emit when the day changes OR after a >1h gap.
+    if (m.created_at && __dmShouldShowSep(lastIsoForSep, m.created_at)) {
+      h += '<div class="date-sep">' + __dmEsc(__dmFmtChatDate(m.created_at)) + '</div>';
     }
+    if (m.created_at) lastIsoForSep = m.created_at;
     // In groups, break on sender change; in 1:1s, break on side change.
     const senderKey = mine ? '__me' : (m.senderName || (isGroup ? 'unknown' : '__peer'));
     const gb = isGroup ? (senderKey !== lastSenderId) : (last !== mine);
@@ -1671,27 +1676,40 @@ function __dmFmtChatTime(iso){
   if(Number.isNaN(d.getTime()))return'';
   return d.toLocaleTimeString([],{hour:'numeric',minute:'2-digit'});
 }
-// Date-separator label — "Today" / "Yesterday" / weekday within last
-// week, then "May 7" or "May 7, 2025" for older. Centered between
-// message groups whenever the day rolls over.
+// Date+time separator label, iMessage-style. Always includes the time
+// at the end ("Yesterday 7:05 PM", "Today 3:42 PM", "Monday 9:14 AM",
+// "May 7, 3:42 PM") so the user gets both the relative day cue and the
+// exact wall-clock for that moment in the conversation.
 function __dmFmtChatDate(iso){
   if(!iso)return'';
   const d=new Date(iso); if(Number.isNaN(d.getTime()))return'';
   const now=new Date();
   const startOfDay=(x)=>new Date(x.getFullYear(),x.getMonth(),x.getDate()).getTime();
   const diff=Math.round((startOfDay(now)-startOfDay(d))/86400000);
-  if(diff===0)return'Today';
-  if(diff===1)return'Yesterday';
-  if(diff>1&&diff<7)return d.toLocaleDateString([],{weekday:'long'});
-  const sameYear=d.getFullYear()===now.getFullYear();
-  return d.toLocaleDateString([],sameYear?{month:'long',day:'numeric'}:{month:'long',day:'numeric',year:'numeric'});
+  const time=d.toLocaleTimeString([],{hour:'numeric',minute:'2-digit'});
+  let day;
+  if(diff===0)day='Today';
+  else if(diff===1)day='Yesterday';
+  else if(diff>1&&diff<7)day=d.toLocaleDateString([],{weekday:'long'});
+  else{
+    const sameYear=d.getFullYear()===now.getFullYear();
+    day=d.toLocaleDateString([],sameYear?{month:'long',day:'numeric'}:{month:'long',day:'numeric',year:'numeric'});
+  }
+  return day+' '+time;
 }
-// Stable key for "is this the same calendar day?" — used to decide
-// whether to emit a new separator above this message.
-function __dmDayKey(iso){
-  if(!iso)return'';
-  const d=new Date(iso); if(Number.isNaN(d.getTime()))return'';
-  return d.getFullYear()+'-'+d.getMonth()+'-'+d.getDate();
+// Decide whether to insert a separator before this message. Emits when
+// the day rolls over or when there's a >1h gap from the previous
+// message — same heuristic iMessage uses so back-and-forth strings of
+// texts stay clean and a fresh conversation block gets a fresh marker.
+const __DM_GAP_MS = 60 * 60 * 1000;
+function __dmShouldShowSep(prevIso, currIso){
+  if(!currIso)return false;
+  if(!prevIso)return true; // first message in the channel
+  const pa=new Date(prevIso), pb=new Date(currIso);
+  if(Number.isNaN(pa.getTime())||Number.isNaN(pb.getTime()))return false;
+  const sameDay = pa.getFullYear()===pb.getFullYear()&&pa.getMonth()===pb.getMonth()&&pa.getDate()===pb.getDate();
+  if(!sameDay)return true;
+  return (pb.getTime()-pa.getTime())>__DM_GAP_MS;
 }
 
 function __dmThreadRecord(thread, isRequest) {

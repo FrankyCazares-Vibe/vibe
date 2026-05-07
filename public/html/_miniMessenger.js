@@ -72,7 +72,9 @@
     if (Number.isNaN(d.getTime())) return "";
     return d.toLocaleTimeString([], { hour: "numeric", minute: "2-digit" });
   }
-  // Date separator label: Today / Yesterday / weekday / "May 7".
+  // iMessage-style date+time separator label. Always ends in the time
+  // ("Yesterday 7:05 PM", "Today 3:42 PM") so the user reads both the
+  // relative day and the exact moment the conversation picked up.
   function fmtChatDate(iso) {
     if (!iso) return "";
     const d = new Date(iso);
@@ -80,20 +82,32 @@
     const now = new Date();
     const startOfDay = (x) => new Date(x.getFullYear(), x.getMonth(), x.getDate()).getTime();
     const diff = Math.round((startOfDay(now) - startOfDay(d)) / 86400000);
-    if (diff === 0) return "Today";
-    if (diff === 1) return "Yesterday";
-    if (diff > 1 && diff < 7) return d.toLocaleDateString([], { weekday: "long" });
-    const sameYear = d.getFullYear() === now.getFullYear();
-    return d.toLocaleDateString(
-      [],
-      sameYear ? { month: "long", day: "numeric" } : { month: "long", day: "numeric", year: "numeric" },
-    );
+    const time = d.toLocaleTimeString([], { hour: "numeric", minute: "2-digit" });
+    let day;
+    if (diff === 0) day = "Today";
+    else if (diff === 1) day = "Yesterday";
+    else if (diff > 1 && diff < 7) day = d.toLocaleDateString([], { weekday: "long" });
+    else {
+      const sameYear = d.getFullYear() === now.getFullYear();
+      day = d.toLocaleDateString(
+        [],
+        sameYear ? { month: "long", day: "numeric" } : { month: "long", day: "numeric", year: "numeric" },
+      );
+    }
+    return day + " " + time;
   }
-  function chatDayKey(iso) {
-    if (!iso) return "";
-    const d = new Date(iso);
-    if (Number.isNaN(d.getTime())) return "";
-    return d.getFullYear() + "-" + d.getMonth() + "-" + d.getDate();
+  // Same heuristic the legacy /messages page uses: emit on day change
+  // or after a >1 hour gap so back-and-forth threads stay clean and a
+  // fresh conversation block gets a fresh "Yesterday 9:21 PM" marker.
+  const VMM_GAP_MS = 60 * 60 * 1000;
+  function shouldShowSep(prevIso, currIso) {
+    if (!currIso) return false;
+    if (!prevIso) return true;
+    const pa = new Date(prevIso), pb = new Date(currIso);
+    if (Number.isNaN(pa.getTime()) || Number.isNaN(pb.getTime())) return false;
+    const sameDay = pa.getFullYear() === pb.getFullYear() && pa.getMonth() === pb.getMonth() && pa.getDate() === pb.getDate();
+    if (!sameDay) return true;
+    return (pb.getTime() - pa.getTime()) > VMM_GAP_MS;
   }
   function meId() {
     try {
@@ -136,7 +150,7 @@
     .vmm-row.unread .vmm-prev{color:#1C1C1E;font-weight:600;}
     .vmm-time{font-size:10.5px;color:#8A8580;flex-shrink:0;align-self:flex-start;padding-top:2px;}
     .vmm-empty{padding:32px 16px;text-align:center;color:#8A8580;font-size:12.5px;}
-    .vmm-date-sep{text-align:center;font-family:'DM Sans',sans-serif;font-size:10px;font-weight:700;color:rgba(255,255,255,0.55);margin:10px 0 6px;text-transform:uppercase;letter-spacing:.5px;}
+    .vmm-date-sep{text-align:center;font-family:'DM Sans',sans-serif;font-size:10.5px;color:rgba(255,255,255,0.55);margin:10px 0 6px;letter-spacing:.2px;}
     .vmm-msgs{flex:1;overflow-y:auto;padding:12px 14px;display:flex;flex-direction:column;gap:4px;background:#FAF7F2;}
     .vmm-msg{display:flex;gap:7px;align-items:flex-end;}
     .vmm-msg.mine{flex-direction:row-reverse;}
@@ -543,17 +557,13 @@
     }
     let h = "";
     let lastSender = null;
-    let lastDayKey = null;
+    let lastIsoForSep = null;
     state.msgs.forEach((m, i) => {
-      // Date separator: emit on the first row and any time the day rolls
-      // over between consecutive messages.
-      if (m.created_at) {
-        const dayKey = chatDayKey(m.created_at);
-        if (dayKey !== lastDayKey) {
-          h += '<div class="vmm-date-sep">' + esc(fmtChatDate(m.created_at)) + '</div>';
-          lastDayKey = dayKey;
-        }
+      // Date+time separator: first row, day change, or >1h gap.
+      if (m.created_at && shouldShowSep(lastIsoForSep, m.created_at)) {
+        h += '<div class="vmm-date-sep">' + esc(fmtChatDate(m.created_at)) + '</div>';
       }
+      if (m.created_at) lastIsoForSep = m.created_at;
       const gb = m.senderId !== lastSender;
       const showAv = !m.mine && (gb || i === 0);
       const gc = gb && i > 0 ? " gt" : "";
