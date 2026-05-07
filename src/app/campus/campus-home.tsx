@@ -6305,6 +6305,14 @@ function OrgsTabBody({ onCreateOrg }: { onCreateOrg: () => void }) {
                   busy={busy}
                   onJoin={handleJoin}
                   onPreview={setPreviewOrg}
+                  // Gold gradient — matches the verified ✓ badge palette.
+                  titleStyle={{
+                    background:
+                      "linear-gradient(180deg, #F5C24A 0%, #C99526 100%)",
+                    WebkitBackgroundClip: "text",
+                    WebkitTextFillColor: "transparent",
+                    backgroundClip: "text",
+                  }}
                 />
               ) : null}
               {communityOrgs.length > 0 ? (
@@ -6316,6 +6324,15 @@ function OrgsTabBody({ onCreateOrg }: { onCreateOrg: () => void }) {
                   busy={busy}
                   onJoin={handleJoin}
                   onPreview={setPreviewOrg}
+                  // Black → orange gradient. Charcoal anchors at the start,
+                  // coral picks up the Vibe accent at the end.
+                  titleStyle={{
+                    background:
+                      "linear-gradient(135deg, #1C1C1E 0%, #1C1C1E 35%, #FF5C35 100%)",
+                    WebkitBackgroundClip: "text",
+                    WebkitTextFillColor: "transparent",
+                    backgroundClip: "text",
+                  }}
                 />
               ) : null}
               {dormantOrgs.length > 0 ? (
@@ -6805,6 +6822,7 @@ function DiscoverGroup({
   busy,
   onJoin,
   onPreview,
+  titleStyle,
 }: {
   title: string;
   hint: string;
@@ -6813,6 +6831,7 @@ function DiscoverGroup({
   busy: string | null;
   onJoin: (org: DiscoverOrg) => void;
   onPreview: (org: DiscoverOrg) => void;
+  titleStyle?: React.CSSProperties;
 }) {
   return (
     <div>
@@ -6831,8 +6850,9 @@ function DiscoverGroup({
             fontFamily: "Fraunces, serif",
             fontWeight: 800,
             fontSize: 18,
-            color: "#fff",
+            color: "#1C1C1E",
             letterSpacing: "-0.01em",
+            ...titleStyle,
           }}
         >
           {title}
@@ -6841,7 +6861,11 @@ function DiscoverGroup({
               marginLeft: 8,
               fontSize: 13,
               fontWeight: 500,
-              color: COLORS.glassMuted,
+              color: "rgba(28,28,30,0.55)",
+              // Reset any inherited gradient from the title.
+              background: "none",
+              WebkitBackgroundClip: "border-box",
+              WebkitTextFillColor: "rgba(28,28,30,0.55)",
             }}
           >
             {orgs.length}
@@ -6851,7 +6875,7 @@ function DiscoverGroup({
           style={{
             fontFamily: "DM Sans, sans-serif",
             fontSize: 12,
-            color: COLORS.glassMuted,
+            color: "rgba(28,28,30,0.55)",
           }}
         >
           {hint}
