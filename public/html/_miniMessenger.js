@@ -186,8 +186,12 @@
        before, which forced long bubbles to re-wrap when the pill
        appeared (visible reflow on hover). */
     .vmm-actions{display:none;position:absolute;top:50%;transform:translateY(-50%);z-index:5;align-items:center;gap:3px;padding:3px 6px;border-radius:999px;background:rgba(20,16,28,0.92);border:1px solid rgba(255,255,255,0.14);box-shadow:inset 0 1px 0 rgba(255,255,255,0.10),0 4px 12px rgba(0,0,0,0.32);backdrop-filter:blur(20px);-webkit-backdrop-filter:blur(20px);flex-shrink:0;white-space:nowrap;}
-    .vmm-msg:not(.mine) .vmm-actions{left:calc(100% + 8px);}
-    .vmm-msg.mine .vmm-actions{right:calc(100% + 8px);}
+    .vmm-msg:not(.mine) .vmm-actions{left:calc(100% + 8px);top:50%;transform:translateY(-50%);}
+    .vmm-msg.mine .vmm-actions{right:calc(100% + 8px);top:50%;transform:translateY(-50%);}
+    /* Long messages — stack the picker ABOVE the bubble so it doesn't
+       run off the panel's right edge. Override the side placement. */
+    .vmm-msg.is-long:not(.mine) .vmm-actions{left:0;right:auto;top:auto;bottom:calc(100% + 6px);transform:none;}
+    .vmm-msg.is-long.mine .vmm-actions{right:0;left:auto;top:auto;bottom:calc(100% + 6px);transform:none;}
     .vmm-bubble-wrap:hover .vmm-actions{display:inline-flex;}
     .vmm-act-emo{background:transparent;border:none;padding:0;width:24px;height:24px;font-size:13px;line-height:1;cursor:none;border-radius:999px;display:inline-flex;align-items:center;justify-content:center;transition:background-color .14s ease, box-shadow .14s ease;}
     .vmm-act-emo.on{background:rgba(255,140,90,0.22);box-shadow:0 0 0 1.5px rgba(255,180,150,0.7), inset 0 1px 0 rgba(255,255,255,0.10);}
@@ -623,7 +627,11 @@
           : "";
         const wrap = `<div class="vmm-bubble-wrap"><div class="vmm-bubble">${esc(m.content)}</div>${actions}</div>`;
         const stack = `<div style="display:flex;flex-direction:column;align-items:${m.mine ? "flex-end" : "flex-start"};max-width:70%;min-width:0;">${stub}${wrap}${chips}</div>`;
-        h += `<div class="vmm-msg${m.mine ? " mine" : ""}${gc}">${!m.mine ? av : ""}${stack}</div>`;
+        // Long messages get the picker stacked ABOVE the bubble — the
+        // panel is narrow, so beside-placement runs off the right edge.
+        const isLong = (m.content || "").length > 60 || /\n/.test(m.content || "");
+        const longCls = isLong ? " is-long" : "";
+        h += `<div class="vmm-msg${m.mine ? " mine" : ""}${gc}${longCls}">${!m.mine ? av : ""}${stack}</div>`;
       }
       lastSender = m.senderId;
     });

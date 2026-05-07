@@ -305,8 +305,12 @@ body{font-family:'DM Sans',sans-serif;background:var(--cream);color:var(--charco
   -webkit-backdrop-filter:blur(20px);
   flex-shrink:0;white-space:nowrap;
 }
-.msg-row:not(.mine) .dm-actions{left:calc(100% + 8px);}
-.msg-row.mine .dm-actions{right:calc(100% + 8px);}
+.msg-row:not(.mine) .dm-actions{left:calc(100% + 8px);top:50%;transform:translateY(-50%);}
+.msg-row.mine .dm-actions{right:calc(100% + 8px);top:50%;transform:translateY(-50%);}
+/* Long messages — stack the picker ABOVE the bubble so it doesn't run
+   off the right edge of the chat. Override the side placement. */
+.msg-row.is-long:not(.mine) .dm-actions{left:0;right:auto;top:auto;bottom:calc(100% + 6px);transform:none;}
+.msg-row.is-long.mine .dm-actions{right:0;left:auto;top:auto;bottom:calc(100% + 6px);transform:none;}
 .dm-bubble-wrap:hover .dm-actions{display:inline-flex;}
 .dm-act-emo{background:transparent;border:none;padding:2px 4px;font-size:14px;line-height:1;cursor:none;border-radius:999px;display:inline-flex;align-items:center;justify-content:center;width:26px;height:26px;transition:background-color .14s ease, box-shadow .14s ease;}
 /* Already-used emoji in the picker — soft orange wash + ring so the
@@ -1293,13 +1297,17 @@ function renderMsgs(msgs,d){
       h += `<div class="msg-row${mine?' mine':''}${gc}">${!mine?avForMsg(m, showAv):''}${stack}</div>`;
     } else {
       const stub = quoteStubFor(m);
+      // Long messages (>60 chars or multi-line) get the picker stacked
+      // ABOVE the bubble — beside would push past the chat's right edge.
+      const isLong = (m.t || '').length > 60 || /\n/.test(m.t || '');
+      const longCls = isLong ? ' is-long' : '';
       // .btime sits at the .msg-row level so it absolute-positions to
       // the row's right edge (iMessage drag-reveal). The picker is
       // inside .dm-bubble-wrap (now position:relative) so it can float
       // absolutely beside the bubble without forcing it to re-wrap.
       const wrap = `<div class="dm-bubble-wrap"><div class="bubble">${__dmFormatBody(m.t)}</div>${actionsFor(m)}</div>`;
       const stack = `<div style="display:flex;flex-direction:column;align-items:${mine?'flex-end':'flex-start'};max-width:70%;min-width:0;">${stub}${wrap}${chipsFor(m)}</div>`;
-      h+=`<div class="msg-row${mine?' mine':''}${gc}">${!mine?avForMsg(m, showAv):''}${stack}<div class="btime">${m.ts}</div></div>`;
+      h+=`<div class="msg-row${mine?' mine':''}${gc}${longCls}">${!mine?avForMsg(m, showAv):''}${stack}<div class="btime">${m.ts}</div></div>`;
     }
     last=mine;
     lastSenderId=senderKey;

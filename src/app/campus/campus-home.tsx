@@ -10115,15 +10115,15 @@ function ChannelChat({
                     {isHovered ? (
                       <div
                         style={{
-                          // Float the picker out of the bubble's flow.
-                          // Was inline-flex next to the bubble, which
-                          // forced long bubbles to re-wrap when the pill
-                          // appeared (visible reflow on hover). Now it
-                          // overlaps the surrounding row instead.
+                          // Long messages (>60 chars or multi-line) get
+                          // the picker stacked ABOVE the bubble — beside
+                          // would push past the chat's right edge.
+                          // Short messages keep the side placement so
+                          // the picker doesn't bump into the row above.
                           position: "absolute",
-                          left: "calc(100% + 8px)",
-                          top: "50%",
-                          transform: "translateY(-50%)",
+                          ...((m.content?.length ?? 0) > 60 || /\n/.test(m.content ?? "")
+                            ? { bottom: "calc(100% + 6px)", left: 0 }
+                            : { left: "calc(100% + 8px)", top: "50%", transform: "translateY(-50%)" }),
                           zIndex: 5,
                           display: "inline-flex",
                           alignItems: "center",
