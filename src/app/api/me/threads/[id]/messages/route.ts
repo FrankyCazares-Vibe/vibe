@@ -22,10 +22,11 @@ type SendBody = {
   attachment_kind?: unknown; // 'post' | 'clip'
   media_url?: unknown;        // R2 object key (messages/<channel>/<uuid>.ext)
   media_kind?: unknown;       // 'image' | 'video'
+  parent_message_id?: unknown; // quote-reply parent
 };
 
 const MESSAGE_SELECT =
-  "id, content, created_at, user_id, attachment_id, attachment_kind, media_url, media_kind, " +
+  "id, content, created_at, user_id, attachment_id, attachment_kind, media_url, media_kind, parent_message_id, " +
   "users:users!messages_user_id_fkey(id, handle, name, avatar_url), " +
   "attachment:posts!messages_attachment_id_fkey(id, type, content, media_url, media_thumbnail_url, user_id, author:users!posts_user_id_fkey(id, handle, name, avatar_url))";
 
@@ -38,9 +39,127 @@ type MessageRow = {
   media_kind?: string | null;
   attachment_id?: string | null;
   attachment_kind?: string | null;
+  parent_message_id?: string | null;
   users?: unknown;
   attachment?: unknown;
+  // Filled in by hydrate helpers below.
+  parent_preview?: ParentPreview | null;
+  reactions?: ReactionGroup[];
 };
+
+type ParentPreview = {
+  id: string;
+  content: string | null;
+  user_id: string;
+  author: { id: string; handle: string | null; name: string | null; avatar_url: string | null } | null;
+};
+
+type ReactionGroup = {
+  emoji: string;
+  count: number;
+  viewer_reacted: boolean;
+};
+
+/**
+ * Batch-fetch reactions for the given messages and attach a grouped
+ * `reactions: [{emoji, count, viewer_reacted}]` array to each row. Stale
+ * deploys: degrade silently if the table doesn't exist yet.
+ */
+async function hydrateReactions(
+  supabase: Awaited<ReturnType<typeof createSupabaseServerClient>>,
+  rows: MessageRow[],
+  viewerId: string,
+): Promise<void> {
+  const ids = rows.map((r) => r.id);
+  if (ids.length === 0) return;
+  const { data, error } = await supabase
+    .from("message_reactions")
+    .select("message_id,emoji,user_id")
+    .in("message_id", ids);
+  if (error) {
+    if (process.env.NODE_ENV !== "production") {
+      console.warn("[messages.hydrateReactions]", error.message);
+    }
+    return;
+  }
+  // groups[messageId][emoji] = { count, viewerReacted }
+  const groups = new Map<string, Map<string, { count: number; viewerReacted: boolean }>>();
+  for (const row of data ?? []) {
+    const r = row as { message_id: string; emoji: string; user_id: string };
+    let perMessage = groups.get(r.message_id);
+    if (!perMessage) {
+      perMessage = new Map();
+      groups.set(r.message_id, perMessage);
+    }
+    let entry = perMessage.get(r.emoji);
+    if (!entry) {
+      entry = { count: 0, viewerReacted: false };
+      perMessage.set(r.emoji, entry);
+    }
+    entry.count += 1;
+    if (r.user_id === viewerId) entry.viewerReacted = true;
+  }
+  for (const m of rows) {
+    const perMessage = groups.get(m.id);
+    if (!perMessage || perMessage.size === 0) {
+      m.reactions = [];
+      continue;
+    }
+    m.reactions = Array.from(perMessage.entries())
+      .map(([emoji, { count, viewerReacted }]) => ({
+        emoji,
+        count,
+        viewer_reacted: viewerReacted,
+      }))
+      // Stable sort: most-used first, then by emoji codepoint for ties.
+      .sort((a, b) => b.count - a.count || (a.emoji < b.emoji ? -1 : 1));
+  }
+}
+
+/**
+ * Batch-fetch the parent message previews for any rows that have a
+ * `parent_message_id`. Just enough for the quote-stub render: id, content
+ * snippet, author identity. Stale deploys (no parent_message_id column)
+ * degrade silently.
+ */
+async function hydrateParentPreviews(
+  supabase: Awaited<ReturnType<typeof createSupabaseServerClient>>,
+  rows: MessageRow[],
+): Promise<void> {
+  const parentIds = Array.from(
+    new Set(
+      rows
+        .map((r) => r.parent_message_id)
+        .filter((id): id is string => typeof id === "string" && id.length > 0),
+    ),
+  );
+  if (parentIds.length === 0) return;
+  const { data, error } = await supabase
+    .from("messages")
+    .select(
+      "id, content, user_id, author:users!messages_user_id_fkey(id, handle, name, avatar_url)",
+    )
+    .in("id", parentIds);
+  if (error) {
+    if (process.env.NODE_ENV !== "production") {
+      console.warn("[messages.hydrateParentPreviews]", error.message);
+    }
+    return;
+  }
+  const byId = new Map<string, ParentPreview>();
+  for (const p of data ?? []) {
+    const row = p as unknown as ParentPreview;
+    byId.set(row.id, {
+      id: row.id,
+      content: row.content,
+      user_id: row.user_id,
+      author: row.author ?? null,
+    });
+  }
+  for (const m of rows) {
+    if (m.parent_message_id) m.parent_preview = byId.get(m.parent_message_id) ?? null;
+  }
+}
 
 /**
  * Replace stored R2 keys in `media_url` with short-lived signed GET URLs
@@ -174,7 +293,12 @@ export async function GET(req: Request, ctx: RouteCtx) {
     return NextResponse.json({ ok: false, error: error.message }, { status: 500 });
   }
   // Sign R2 keys in media_url so the browser can render directly.
-  await signMediaUrls((data ?? []) as unknown as MessageRow[]);
+  const messageRows = (data ?? []) as unknown as MessageRow[];
+  await signMediaUrls(messageRows);
+  await Promise.all([
+    hydrateReactions(supabase, messageRows, user.id),
+    hydrateParentPreviews(supabase, messageRows),
+  ]);
 
   // Org channels don't have channel_members rows — skip the peer/typing query
   // entirely. (Org-channel read state + typing indicators are out of scope
@@ -274,6 +398,10 @@ export async function POST(req: Request, ctx: RouteCtx) {
   }
 
   const content = typeof body.content === "string" ? body.content.trim() : "";
+  const parentMessageIdRaw =
+    typeof body.parent_message_id === "string" && body.parent_message_id.length > 0
+      ? body.parent_message_id
+      : null;
   const attachmentId =
     typeof body.attachment_id === "string" && body.attachment_id.length > 0
       ? body.attachment_id
@@ -354,6 +482,29 @@ export async function POST(req: Request, ctx: RouteCtx) {
     return NextResponse.json({ ok: false, error: "Not a member" }, { status: member.status });
   }
 
+  // Verify the parent message (if any) belongs to this channel — prevents
+  // cross-channel quote-replies. Stale deploys without the column degrade
+  // silently to a non-reply.
+  let parentMessageId: string | null = null;
+  if (parentMessageIdRaw) {
+    const { data: parent, error: parentErr } = await supabase
+      .from("messages")
+      .select("id, channel_id")
+      .eq("id", parentMessageIdRaw)
+      .maybeSingle();
+    if (parentErr) {
+      console.error("[messages.POST parent check]", parentErr);
+    } else if (parent && parent.channel_id === channelId) {
+      parentMessageId = parentMessageIdRaw;
+    } else if (parent) {
+      return NextResponse.json(
+        { ok: false, error: "Parent message belongs to a different channel" },
+        { status: 400 },
+      );
+    }
+    // No row found → silently drop the parent rather than rejecting the send.
+  }
+
   // Block guard: in DM/group channels, if any peer blocks the sender (or
   // vice versa), reject the send. Skipped on org channels — orgs are larger
   // groups where one block shouldn't silence a whole community channel.
@@ -393,6 +544,7 @@ export async function POST(req: Request, ctx: RouteCtx) {
     attachment_kind: attachmentKind,
     media_url: mediaUrl,
     media_kind: mediaKind,
+    parent_message_id: parentMessageId,
   };
   // Defensive for migration lag — if either pair of optional columns is
   // missing, retry with the bare minimum so the message still goes through.
@@ -480,6 +632,13 @@ export async function POST(req: Request, ctx: RouteCtx) {
     }
   }
 
-  if (inserted) await signMediaUrls([inserted as unknown as MessageRow]);
+  if (inserted) {
+    const insertedRows = [inserted as unknown as MessageRow];
+    await signMediaUrls(insertedRows);
+    // New row has no reactions yet, but if it's a reply we want to embed
+    // the parent preview so the optimistic-render quote stub is correct.
+    await hydrateParentPreviews(supabase, insertedRows);
+    if (insertedRows[0].reactions === undefined) insertedRows[0].reactions = [];
+  }
   return NextResponse.json({ ok: true, message: inserted });
 }

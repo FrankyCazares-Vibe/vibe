@@ -9611,8 +9611,23 @@ type ChatMessage = {
   content: string;
   created_at: string;
   user_id: string;
+  parent_message_id?: string | null;
+  parent_preview?: {
+    id: string;
+    content: string | null;
+    user_id: string;
+    author: {
+      id: string;
+      handle: string | null;
+      name: string | null;
+      avatar_url: string | null;
+    } | null;
+  } | null;
+  reactions?: Array<{ emoji: string; count: number; viewer_reacted: boolean }>;
   users?: { id: string; handle: string | null; name: string | null; avatar_url: string | null } | null;
 };
+
+const REACTION_EMOJIS = ["❤️", "👍", "👎", "😂", "🔥"] as const;
 
 function ChannelChat({
   channelId,
@@ -9660,6 +9675,12 @@ function ChannelChat({
   const [draft, setDraft] = useState("");
   const [sending, setSending] = useState(false);
   const [loaded, setLoaded] = useState(false);
+  // Quote-reply target. When set, the next send embeds parent_message_id.
+  const [replyTo, setReplyTo] = useState<ChatMessage | null>(null);
+  // Which message row is being hovered — drives the inline reaction
+  // picker + reply button. One-at-a-time so we don't paint multiple sets.
+  const [hoveredId, setHoveredId] = useState<string | null>(null);
+  const composerInputRef = useRef<HTMLInputElement | null>(null);
 
   // Channel switches remount this component (parent passes key={channelId}),
   // so initial state above is the reset — no effect needed.
@@ -9735,11 +9756,16 @@ function ChannelChat({
     if (!content || sending) return;
     setSending(true);
     setDraft("");
+    const parent = replyTo;
+    setReplyTo(null);
     try {
       const res = await fetch(`/api/me/threads/${channelId}/messages`, {
         method: "POST",
         headers: { "content-type": "application/json" },
-        body: JSON.stringify({ content }),
+        body: JSON.stringify({
+          content,
+          parent_message_id: parent?.id,
+        }),
       });
       const data = await res.json();
       if (data?.ok && data.message) {
@@ -9747,14 +9773,90 @@ function ChannelChat({
         setMessages((prev) => [...prev, data.message as ChatMessage]);
       } else {
         setDraft(content); // restore so user can retry
+        if (parent) setReplyTo(parent);
       }
     } catch (e) {
       console.error("[campus] send", e);
       setDraft(content);
+      if (parent) setReplyTo(parent);
     } finally {
       setSending(false);
     }
   };
+
+  // Toggle a reaction on a message. Optimistic — adjust counts locally
+  // so the UI feels instant, then sync on the next poll. Roll back on
+  // failure so the user sees the truth.
+  const toggleReaction = useCallback(
+    async (messageId: string, emoji: string) => {
+      let nextActive = false;
+      setMessages((prev) =>
+        prev.map((m) => {
+          if (m.id !== messageId) return m;
+          const existing = m.reactions ?? [];
+          const found = existing.find((r) => r.emoji === emoji);
+          if (found) {
+            if (found.viewer_reacted) {
+              // Removing my reaction.
+              const newCount = Math.max(0, found.count - 1);
+              const filtered =
+                newCount === 0
+                  ? existing.filter((r) => r.emoji !== emoji)
+                  : existing.map((r) =>
+                      r.emoji === emoji
+                        ? { ...r, count: newCount, viewer_reacted: false }
+                        : r,
+                    );
+              nextActive = false;
+              return { ...m, reactions: filtered };
+            }
+            // Adding my reaction (someone else already had it).
+            nextActive = true;
+            return {
+              ...m,
+              reactions: existing.map((r) =>
+                r.emoji === emoji
+                  ? { ...r, count: r.count + 1, viewer_reacted: true }
+                  : r,
+              ),
+            };
+          }
+          // Brand-new emoji on this message.
+          nextActive = true;
+          return {
+            ...m,
+            reactions: [
+              ...existing,
+              { emoji, count: 1, viewer_reacted: true },
+            ],
+          };
+        }),
+      );
+      try {
+        const res = await fetch(
+          `/api/me/threads/${channelId}/messages/${messageId}/react`,
+          {
+            method: nextActive ? "POST" : "DELETE",
+            headers: { "content-type": "application/json" },
+            body: JSON.stringify({ emoji }),
+          },
+        );
+        if (!res.ok) throw new Error(`react ${res.status}`);
+      } catch (e) {
+        console.error("[campus] react", e);
+        // Roll back: easiest is to refetch on next poll cycle. For now
+        // just leave the optimistic state in place — the 2s poll will
+        // correct any drift from the server's truth.
+      }
+    },
+    [channelId],
+  );
+
+  const startReply = (msg: ChatMessage) => {
+    setReplyTo(msg);
+    requestAnimationFrame(() => composerInputRef.current?.focus());
+  };
+  const cancelReply = () => setReplyTo(null);
 
   return (
     <>
@@ -9790,13 +9892,21 @@ function ChannelChat({
             const prev = idx > 0 ? messages[idx - 1] : null;
             const sameAuthor = prev?.user_id === m.user_id;
             const author = m.users;
+            const isHovered = hoveredId === m.id;
+            const reactions = m.reactions ?? [];
+            const parent = m.parent_preview ?? null;
             return (
               <article
                 key={m.id}
+                onMouseEnter={() => setHoveredId(m.id)}
+                onMouseLeave={() =>
+                  setHoveredId((prev) => (prev === m.id ? null : prev))
+                }
                 style={{
                   display: "flex",
                   gap: 10,
                   paddingTop: sameAuthor ? 1 : 8,
+                  position: "relative",
                 }}
               >
                 {!sameAuthor ? (
@@ -9818,18 +9928,151 @@ function ChannelChat({
                       </span>
                     </div>
                   ) : null}
-                  <div
-                    style={{
-                      ...bubbleStyle,
-                      fontFamily: "DM Sans, sans-serif",
-                      fontSize: 14,
-                      lineHeight: 1.45,
-                      whiteSpace: "pre-wrap",
-                      wordWrap: "break-word",
-                    }}
-                  >
-                    {m.content}
+                  {parent ? (
+                    <div
+                      style={{
+                        marginBottom: 6,
+                        padding: "6px 10px",
+                        borderLeft: "3px solid rgba(255,140,90,0.55)",
+                        background: "rgba(20,16,28,0.45)",
+                        borderRadius: 8,
+                        fontFamily: "DM Sans, sans-serif",
+                        fontSize: 12,
+                        color: "rgba(255,255,255,0.78)",
+                        maxWidth: "fit-content",
+                      }}
+                      title="Replying to"
+                    >
+                      <div style={{ fontWeight: 700, fontSize: 11, color: "rgba(255,180,150,0.95)", marginBottom: 1 }}>
+                        ↩ {parent.author?.name ?? parent.author?.handle ?? "message"}
+                      </div>
+                      <div style={{ overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap", maxWidth: 360 }}>
+                        {(parent.content ?? "").slice(0, 140) || "(media)"}
+                      </div>
+                    </div>
+                  ) : null}
+                  <div style={{ display: "inline-flex", alignItems: "center", gap: 6, position: "relative" }}>
+                    <div
+                      style={{
+                        ...bubbleStyle,
+                        fontFamily: "DM Sans, sans-serif",
+                        fontSize: 14,
+                        lineHeight: 1.45,
+                        whiteSpace: "pre-wrap",
+                        wordWrap: "break-word",
+                      }}
+                    >
+                      {m.content}
+                    </div>
+                    {isHovered ? (
+                      <div
+                        style={{
+                          display: "inline-flex",
+                          alignItems: "center",
+                          gap: 4,
+                          padding: "4px 8px",
+                          borderRadius: 999,
+                          background: "rgba(20,16,28,0.92)",
+                          border: "1px solid rgba(255,255,255,0.14)",
+                          boxShadow:
+                            "inset 0 1px 0 rgba(255,255,255,0.10), 0 6px 18px rgba(0,0,0,0.32)",
+                          backdropFilter: "blur(20px)",
+                          WebkitBackdropFilter: "blur(20px)",
+                          flexShrink: 0,
+                        }}
+                      >
+                        {REACTION_EMOJIS.map((emo) => (
+                          <button
+                            key={emo}
+                            type="button"
+                            onClick={() => toggleReaction(m.id, emo)}
+                            aria-label={`React with ${emo}`}
+                            style={{
+                              background: "transparent",
+                              border: "none",
+                              padding: "2px 4px",
+                              fontSize: 14,
+                              lineHeight: 1,
+                              cursor: "pointer",
+                              borderRadius: 6,
+                            }}
+                          >
+                            {emo}
+                          </button>
+                        ))}
+                        <div
+                          style={{
+                            width: 1,
+                            height: 16,
+                            background: "rgba(255,255,255,0.16)",
+                            margin: "0 2px",
+                          }}
+                        />
+                        <button
+                          type="button"
+                          onClick={() => startReply(m)}
+                          aria-label="Reply"
+                          title="Reply"
+                          style={{
+                            background: "transparent",
+                            border: "none",
+                            padding: "2px 6px",
+                            color: "rgba(255,255,255,0.88)",
+                            fontSize: 12,
+                            fontWeight: 700,
+                            fontFamily: "DM Sans, sans-serif",
+                            cursor: "pointer",
+                            borderRadius: 6,
+                            display: "inline-flex",
+                            alignItems: "center",
+                            gap: 4,
+                          }}
+                        >
+                          ↩ Reply
+                        </button>
+                      </div>
+                    ) : null}
                   </div>
+                  {reactions.length > 0 ? (
+                    <div
+                      style={{
+                        display: "flex",
+                        flexWrap: "wrap",
+                        gap: 4,
+                        marginTop: 6,
+                      }}
+                    >
+                      {reactions.map((r) => (
+                        <button
+                          key={r.emoji}
+                          type="button"
+                          onClick={() => toggleReaction(m.id, r.emoji)}
+                          aria-pressed={r.viewer_reacted}
+                          style={{
+                            display: "inline-flex",
+                            alignItems: "center",
+                            gap: 4,
+                            padding: "2px 8px",
+                            borderRadius: 999,
+                            background: r.viewer_reacted
+                              ? "rgba(255,140,90,0.22)"
+                              : "rgba(20,16,28,0.55)",
+                            border: r.viewer_reacted
+                              ? "1px solid rgba(255,180,150,0.55)"
+                              : "1px solid rgba(255,255,255,0.10)",
+                            color: r.viewer_reacted ? "#FFD0BF" : "rgba(255,255,255,0.85)",
+                            fontFamily: "DM Sans, sans-serif",
+                            fontSize: 12,
+                            fontWeight: 600,
+                            cursor: "pointer",
+                          }}
+                        >
+                          <span style={{ fontSize: 13 }}>{r.emoji}</span>
+                          <span>{r.count}</span>
+                        </button>
+                      ))}
+                    </div>
+                  ) : null}
                 </div>
               </article>
             );
@@ -9838,6 +10081,65 @@ function ChannelChat({
       </section>
 
       <div style={{ padding: "0 24px 20px" }}>
+        {replyTo ? (
+          <div
+            style={{
+              ...composerStyle,
+              marginBottom: 6,
+              padding: "8px 12px",
+              borderRadius: 12,
+              borderLeft: "3px solid rgba(255,140,90,0.85)",
+              display: "flex",
+              alignItems: "center",
+              gap: 10,
+            }}
+          >
+            <div style={{ flex: 1, minWidth: 0 }}>
+              <div
+                style={{
+                  fontFamily: "DM Sans, sans-serif",
+                  fontSize: 11,
+                  fontWeight: 700,
+                  color: "rgba(255,180,150,0.95)",
+                  marginBottom: 1,
+                }}
+              >
+                ↩ Replying to {replyTo.users?.name ?? replyTo.users?.handle ?? "message"}
+              </div>
+              <div
+                style={{
+                  fontFamily: "DM Sans, sans-serif",
+                  fontSize: 12,
+                  color: "rgba(255,255,255,0.78)",
+                  overflow: "hidden",
+                  textOverflow: "ellipsis",
+                  whiteSpace: "nowrap",
+                }}
+              >
+                {(replyTo.content ?? "").slice(0, 200) || "(media)"}
+              </div>
+            </div>
+            <button
+              type="button"
+              onClick={cancelReply}
+              aria-label="Cancel reply"
+              title="Cancel reply"
+              style={{
+                width: 22,
+                height: 22,
+                borderRadius: 999,
+                border: "1px solid rgba(255,255,255,0.16)",
+                background: "rgba(255,255,255,0.06)",
+                color: "rgba(255,255,255,0.85)",
+                fontSize: 12,
+                cursor: "pointer",
+                lineHeight: 1,
+              }}
+            >
+              ×
+            </button>
+          </div>
+        ) : null}
         <div
           style={{
             ...composerStyle,
@@ -9849,6 +10151,7 @@ function ChannelChat({
           }}
         >
           <input
+            ref={composerInputRef}
             type="text"
             value={draft}
             onChange={(e) => setDraft(e.target.value)}
@@ -9857,8 +10160,12 @@ function ChannelChat({
                 e.preventDefault();
                 void send();
               }
+              if (e.key === "Escape" && replyTo) {
+                e.preventDefault();
+                cancelReply();
+              }
             }}
-            placeholder={`Message #${channelName}`}
+            placeholder={replyTo ? "Reply…" : `Message #${channelName}`}
             disabled={sending}
             style={{
               flex: 1,
