@@ -1135,9 +1135,16 @@ function renderMsgs(msgs,d){
   const isThreadSwitch = a.dataset.channel !== activeKey;
   a.dataset.channel = activeKey;
 
-  // Stable signature based on ids only — message bodies don't mutate
-  // after creation, so id-equality === content-equality for our purposes.
-  const sig = msgs.map((m) => m.id || ('__demo' + Math.random())).join(',');
+  // Stable signature: ids identify the message set; reactions are part
+  // of the bubble's visible state and DO mutate after creation, so they
+  // need to be in the sig too — otherwise an optimistic toggle leaves
+  // the DOM stale (chip "looks unchanged" until the channel is reopened).
+  const sig = msgs.map((m) => {
+    const rs = Array.isArray(m.reactions)
+      ? m.reactions.map((r) => r.emoji + ':' + r.count + (r.viewer_reacted ? '*' : '')).join('|')
+      : '';
+    return (m.id || ('__demo' + Math.random())) + '#' + rs;
+  }).join(',');
   const sigChanged = sig !== a.dataset.sig;
 
   const wasAtBottom = isThreadSwitch ||
