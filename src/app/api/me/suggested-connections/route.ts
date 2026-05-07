@@ -10,10 +10,14 @@ type Suggestion = {
   name: string | null;
   handle: string | null;
   avatar_url: string | null;
+  banner_url: string | null;
+  banner_gradient: string | null;
   major: string | null;
   year: number | null;
   mutual_count: number;
   shared_org_count: number;
+  /** True if the candidate's major matches the viewer's. Independent of `reason`. */
+  same_major: boolean;
   reason: string;
 };
 
@@ -168,14 +172,18 @@ export async function GET(req: Request) {
 
   const { data: profiles } = await supabase
     .from("users")
-    .select("id,name,handle,avatar_url,major,year")
+    .select("id,name,handle,avatar_url,banner_url,banner_gradient,major,year")
     .in(
       "id",
       merged.map((m) => m.id),
     );
-  const profileById = new Map<string, Omit<Suggestion, "mutual_count" | "shared_org_count" | "reason">>();
+  type ProfileBase = Omit<
+    Suggestion,
+    "mutual_count" | "shared_org_count" | "same_major" | "reason"
+  >;
+  const profileById = new Map<string, ProfileBase>();
   for (const p of profiles ?? []) {
-    const u = p as Omit<Suggestion, "mutual_count" | "shared_org_count" | "reason">;
+    const u = p as ProfileBase;
     profileById.set(u.id, u);
   }
 
@@ -183,6 +191,7 @@ export async function GET(req: Request) {
     .map(({ id, mutuals, sharedOrgs }) => {
       const base = profileById.get(id);
       if (!base) return null;
+      const sameMajor = !!(major && base.major && base.major === major);
       // Strongest reason wins. Mutuals first because that's the most
       // social-graph-anchored signal.
       let reason = "";
@@ -190,14 +199,20 @@ export async function GET(req: Request) {
         reason = `${mutuals} mutual${mutuals === 1 ? "" : "s"}`;
       } else if (sharedOrgs > 0) {
         reason = sharedOrgs === 1 ? "in your org" : `${sharedOrgs} shared orgs`;
-      } else if (major && base.major && base.major === major) {
+      } else if (sameMajor) {
         reason = "same major";
       } else if (school) {
         reason = "same school";
       } else {
         reason = "new on Vibe";
       }
-      return { ...base, mutual_count: mutuals, shared_org_count: sharedOrgs, reason };
+      return {
+        ...base,
+        mutual_count: mutuals,
+        shared_org_count: sharedOrgs,
+        same_major: sameMajor,
+        reason,
+      };
     })
     .filter((s): s is Suggestion => s !== null);
 

@@ -150,3 +150,123 @@ export async function getMutualCount(
   if (error) return 0;
   return count ?? 0;
 }
+
+export type UserCardData = {
+  id: string;
+  name: string | null;
+  handle: string | null;
+  avatar_url: string | null;
+  banner_url: string | null;
+  banner_gradient: string | null;
+  major: string | null;
+  year: number | null;
+  mutual_count: number;
+  follow_state: ConnectionState;
+};
+
+/**
+ * Hydrate a list of candidate user IDs into UserCardData rows: profile fields,
+ * mutual count vs viewer, and follow state from viewer's perspective.
+ *
+ * Order of returned rows matches `candidateIds`. Missing/invisible profiles are
+ * dropped silently.
+ *
+ * Three batched queries regardless of page size:
+ *   1. Profiles for the candidate slice.
+ *   2. Outgoing edges (viewer → candidate) for follow_state.
+ *   3. Mutual counts: for each candidate, count their followings that overlap
+ *      with the viewer's followings.
+ */
+export async function hydrateUserCards(
+  supabase: SupabaseClient,
+  viewerId: string,
+  candidateIds: string[],
+): Promise<UserCardData[]> {
+  if (candidateIds.length === 0) return [];
+
+  // Viewer's outgoing followings — needed for both mutual computation and
+  // follow_state (incoming side comes from the candidate set itself when
+  // applicable; we fetch it separately to stay generic).
+  const { data: viewerOut } = await supabase
+    .from("connections")
+    .select("following_id")
+    .eq("follower_id", viewerId);
+  const viewerFollowingIds = (viewerOut ?? []).map(
+    (r) => (r as { following_id: string }).following_id,
+  );
+
+  const [profilesRes, outEdgesRes, inEdgesRes, mutualEdgesRes] = await Promise.all([
+    supabase
+      .from("users")
+      .select("id,name,handle,avatar_url,banner_url,banner_gradient,major,year")
+      .in("id", candidateIds),
+    supabase
+      .from("connections")
+      .select("following_id")
+      .eq("follower_id", viewerId)
+      .in("following_id", candidateIds),
+    supabase
+      .from("connections")
+      .select("follower_id")
+      .eq("following_id", viewerId)
+      .in("follower_id", candidateIds),
+    viewerFollowingIds.length === 0
+      ? Promise.resolve({ data: [] as { follower_id: string; following_id: string }[] })
+      : supabase
+          .from("connections")
+          .select("follower_id, following_id")
+          .in("follower_id", candidateIds)
+          .in("following_id", viewerFollowingIds),
+  ]);
+
+  type ProfileRow = {
+    id: string;
+    name: string | null;
+    handle: string | null;
+    avatar_url: string | null;
+    banner_url: string | null;
+    banner_gradient: string | null;
+    major: string | null;
+    year: number | null;
+  };
+  const profileById = new Map<string, ProfileRow>();
+  for (const row of profilesRes.data ?? []) {
+    profileById.set((row as ProfileRow).id, row as ProfileRow);
+  }
+
+  const viewerFollows = new Set(
+    (outEdgesRes.data ?? []).map((r) => (r as { following_id: string }).following_id),
+  );
+  const followsViewer = new Set(
+    (inEdgesRes.data ?? []).map((r) => (r as { follower_id: string }).follower_id),
+  );
+
+  const mutualByCandidate = new Map<string, number>();
+  for (const row of mutualEdgesRes.data ?? []) {
+    const r = row as { follower_id: string; following_id: string };
+    mutualByCandidate.set(
+      r.follower_id,
+      (mutualByCandidate.get(r.follower_id) ?? 0) + 1,
+    );
+  }
+
+  return candidateIds
+    .map((id) => {
+      const profile = profileById.get(id);
+      if (!profile) return null;
+      const a = viewerFollows.has(id);
+      const b = followsViewer.has(id);
+      let state: ConnectionState;
+      if (id === viewerId) state = "self";
+      else if (a && b) state = "connected";
+      else if (a) state = "following";
+      else if (b) state = "followed_by";
+      else state = "none";
+      return {
+        ...profile,
+        mutual_count: mutualByCandidate.get(id) ?? 0,
+        follow_state: state,
+      } satisfies UserCardData;
+    })
+    .filter((row): row is UserCardData => row !== null);
+}

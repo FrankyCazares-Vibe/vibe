@@ -2637,17 +2637,18 @@ body.empty-profile-mode #profileEmpty { display: flex !important; }
          so they can't drift up into the banner gradient. -->
     <div class="avatar-row-right">
 
-      <!-- Always-visible stats (Followers · Following · Connections). -->
+      <!-- Always-visible stats (Followers · Following · Connections).
+           Each opens a modal listing the actual users. -->
       <div class="profile-top-stats" id="profileTopStats">
-        <a href="#" class="profile-stat" onclick="return false;">
+        <a href="#" class="profile-stat" onclick="openConnectionsModal('followers'); return false;">
           <span class="profile-stat-num" id="statFollowers">1.2k</span>
           <span class="profile-stat-label">Followers</span>
         </a>
-        <a href="#" class="profile-stat" onclick="return false;">
+        <a href="#" class="profile-stat" onclick="openConnectionsModal('following'); return false;">
           <span class="profile-stat-num" id="statFollowing">312</span>
           <span class="profile-stat-label">Following</span>
         </a>
-        <a href="/network" class="profile-stat profile-stat--prominent">
+        <a href="#" class="profile-stat profile-stat--prominent" onclick="openConnectionsModal('connections'); return false;">
           <span class="profile-stat-num" id="statConnections">847</span>
           <span class="profile-stat-label">Connections</span>
         </a>
@@ -7532,6 +7533,366 @@ function showWelcomeBanner() {
     </div>
   </div>
 </div>
+
+<!-- ── Connections / Followers / Following modal ───────────────────────
+     Opens when any of the three stat numbers is clicked. Fetches from
+     /api/me/<kind> on the owner's profile, /api/users/<handle>/<kind>
+     on a visited profile. -->
+<style>
+  #connectionsModal {
+    position: fixed; inset: 0; z-index: 9000;
+    background: rgba(20,20,22,0.45); backdrop-filter: blur(6px);
+    display: none; align-items: center; justify-content: center;
+    padding: 24px; font-family: 'DM Sans', sans-serif;
+  }
+  #connectionsModal.open { display: flex; }
+  #connectionsModal .conn-modal-card {
+    width: 100%; max-width: 520px; max-height: 86vh;
+    background: linear-gradient(180deg, #FFFDF8 0%, #FAF7F2 100%);
+    border-radius: 22px;
+    box-shadow: 0 24px 60px rgba(0,0,0,0.18), 0 8px 24px rgba(0,0,0,0.10);
+    display: flex; flex-direction: column; overflow: hidden;
+  }
+  #connectionsModal .conn-modal-header {
+    padding: 18px 22px 14px; border-bottom: 1px solid rgba(28,28,30,0.08);
+    display: flex; flex-direction: column; gap: 12px; flex-shrink: 0;
+  }
+  #connectionsModal .conn-modal-header-row {
+    display: flex; align-items: center; gap: 12px;
+  }
+  #connectionsModal .conn-modal-search {
+    width: 100%; padding: 9px 14px; border-radius: 999px;
+    border: 1px solid rgba(28,28,30,0.10);
+    background: rgba(255,253,248,0.78);
+    color: #1C1C1E; font-family: 'DM Sans', sans-serif; font-size: 13px;
+    outline: none; box-shadow: inset 0 1px 0 rgba(255,255,255,0.85);
+  }
+  #connectionsModal .conn-modal-tabs {
+    display: flex; gap: 6px; flex: 1; flex-wrap: wrap;
+  }
+  #connectionsModal .conn-modal-tab {
+    padding: 7px 14px; border-radius: 999px;
+    border: 1px solid rgba(28,28,30,0.10);
+    background: rgba(255,255,255,0.6); color: #1C1C1E;
+    font-size: 13px; font-weight: 700; cursor: pointer;
+    transition: background 0.12s ease, color 0.12s ease;
+  }
+  #connectionsModal .conn-modal-tab.active {
+    background: linear-gradient(180deg, #FF7B4A 0%, #FF5C35 100%);
+    color: white;
+    border-color: rgba(200,74,32,0.4);
+    box-shadow: inset 0 1px 0 rgba(255,255,255,0.32), 0 4px 12px rgba(255,92,53,0.22);
+  }
+  #connectionsModal .conn-modal-close {
+    width: 32px; height: 32px; border-radius: 999px;
+    background: rgba(28,28,30,0.06); border: 1px solid rgba(28,28,30,0.10);
+    color: #1C1C1E; font-size: 18px; line-height: 1;
+    cursor: pointer; display: flex; align-items: center; justify-content: center;
+    flex-shrink: 0;
+  }
+  #connectionsModal .conn-modal-body {
+    flex: 1; overflow-y: auto; padding: 14px 18px 18px;
+    display: flex; flex-direction: column; gap: 8px;
+  }
+  #connectionsModal .conn-row {
+    display: flex; align-items: center; gap: 12px;
+    padding: 10px 12px; border-radius: 14px;
+    background: rgba(255,255,255,0.7);
+    border: 1px solid rgba(28,28,30,0.06);
+    text-decoration: none; color: #1C1C1E;
+    transition: background 0.12s ease;
+  }
+  #connectionsModal .conn-row:hover { background: rgba(255,238,222,0.55); }
+  #connectionsModal .conn-row .conn-av {
+    width: 44px; height: 44px; border-radius: 999px;
+    background-position: center; background-size: cover;
+    flex-shrink: 0; display: flex; align-items: center; justify-content: center;
+    font-family: 'Fraunces', serif; font-weight: 800; font-size: 14px;
+    border: 1px solid rgba(255,255,255,0.92);
+    color: #7A3A18;
+  }
+  #connectionsModal .conn-row .conn-info { flex: 1; min-width: 0; }
+  #connectionsModal .conn-row .conn-name {
+    font-family: 'Fraunces', serif; font-weight: 800; font-size: 15px;
+    color: #1C1C1E; line-height: 1.2;
+    overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
+  }
+  #connectionsModal .conn-row .conn-handle {
+    color: #8A8580; font-size: 12px; margin-left: 6px; font-weight: 500;
+  }
+  #connectionsModal .conn-row .conn-meta {
+    font-size: 12px; color: #5C5853; margin-top: 2px;
+    overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
+  }
+  #connectionsModal .conn-row .conn-action {
+    flex-shrink: 0; padding: 6px 12px; border-radius: 999px;
+    font-size: 12px; font-weight: 700; cursor: pointer;
+    border: 1px solid rgba(28,28,30,0.14);
+    background: rgba(28,28,30,0.04); color: #1C1C1E;
+  }
+  #connectionsModal .conn-row .conn-action.connect {
+    background: linear-gradient(180deg, #FF7B4A 0%, #FF5C35 100%);
+    color: white; border-color: rgba(200,74,32,0.35);
+    box-shadow: inset 0 1px 0 rgba(255,255,255,0.32), 0 3px 8px rgba(255,92,53,0.2);
+  }
+  #connectionsModal .conn-row .conn-action.connect-back {
+    background: rgba(255,200,90,0.16); color: #A06410;
+    border-color: rgba(200,140,30,0.45);
+  }
+  #connectionsModal .conn-empty,
+  #connectionsModal .conn-loading {
+    padding: 40px 16px; text-align: center; color: #8A8580; font-size: 14px;
+  }
+  #connectionsModal .conn-load-more {
+    margin: 6px auto 0; padding: 9px 18px; border-radius: 999px;
+    border: 1px solid rgba(28,28,30,0.12); background: rgba(255,255,255,0.7);
+    font-size: 13px; font-weight: 700; cursor: pointer; color: #1C1C1E;
+  }
+</style>
+
+<div id="connectionsModal" onclick="if(event.target===this) closeConnectionsModal();">
+  <div class="conn-modal-card">
+    <div class="conn-modal-header">
+      <div class="conn-modal-header-row">
+        <div class="conn-modal-tabs">
+          <button class="conn-modal-tab" data-conn-tab="connections" onclick="switchConnectionsTab('connections')">Connections</button>
+          <button class="conn-modal-tab" data-conn-tab="following" onclick="switchConnectionsTab('following')">Following</button>
+          <button class="conn-modal-tab" data-conn-tab="followers" onclick="switchConnectionsTab('followers')">Followers</button>
+        </div>
+        <button class="conn-modal-close" aria-label="Close" onclick="closeConnectionsModal()">×</button>
+      </div>
+      <input id="connModalSearch" class="conn-modal-search" type="text" placeholder="Search by name or handle…" autocomplete="off" />
+    </div>
+    <div class="conn-modal-body" id="connModalBody">
+      <div class="conn-loading">loading…</div>
+    </div>
+  </div>
+</div>
+
+<script>
+  // Profile stats modal — opens lists of who follows / who they follow /
+  // who their connections are. Works for both the owner's profile and
+  // visited profiles (uses /api/me/<kind> vs /api/users/<handle>/<kind>).
+  (function(){
+    let activeKind = 'connections';
+    let activeUsers = [];
+    let activeOffset = 0;
+    let activeHasMore = false;
+    let activeQuery = '';
+    let searchDebounce = null;
+
+    function getViewedHandle() {
+      // Visiting someone via /profile/<handle> → window.viewingRealUser is set
+      if (window.viewingRealUser && window.viewingRealUser.handle) {
+        return window.viewingRealUser.handle;
+      }
+      // Mock-user view
+      if (window.viewingMockUser && window.viewingMockUser.handle) {
+        return window.viewingMockUser.handle;
+      }
+      return null; // own profile
+    }
+
+    function endpointFor(kind, offset) {
+      const handle = getViewedHandle();
+      let qs = `?limit=20&offset=${offset}`;
+      if (activeQuery) qs += `&q=${encodeURIComponent(activeQuery)}`;
+      return handle
+        ? `/api/users/${encodeURIComponent(handle)}/${kind}${qs}`
+        : `/api/me/${kind}${qs}`;
+    }
+
+    function escapeHTML(s) {
+      return String(s == null ? '' : s).replace(/[&<>"']/g, ch => ({
+        '&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'
+      }[ch]));
+    }
+
+    function initialsOf(name, handle) {
+      const src = (name || handle || '?').trim();
+      return src.split(/\s+/).filter(Boolean).slice(0,2)
+        .map(p => p[0]).join('').toUpperCase() || '?';
+    }
+
+    function metaLine(u) {
+      const parts = [];
+      if (u.major) parts.push(u.major);
+      if (u.year) parts.push(String(u.year));
+      if (u.mutual_count > 0) parts.push(u.mutual_count + ' mutual' + (u.mutual_count === 1 ? '' : 's'));
+      return parts.join(' · ');
+    }
+
+    function actionFor(u) {
+      switch (u.follow_state) {
+        case 'self':       return null;
+        case 'connected':  return { label: 'Message', cls: '' };
+        case 'following':  return { label: 'Following', cls: '' };
+        case 'followed_by':return { label: 'Connect back', cls: 'connect-back' };
+        default:           return { label: 'Connect', cls: 'connect' };
+      }
+    }
+
+    function rowHTML(u) {
+      const action = actionFor(u);
+      const av = u.avatar_url
+        ? `<div class="conn-av" style="background-image:url(${escapeHTML(u.avatar_url)})"></div>`
+        : `<div class="conn-av" style="background:linear-gradient(180deg,#FFD8B8 0%,#FFB890 100%)">${escapeHTML(initialsOf(u.name, u.handle))}</div>`;
+      const handleSpan = u.handle ? `<span class="conn-handle">@${escapeHTML(u.handle)}</span>` : '';
+      const meta = metaLine(u);
+      const actionBtn = action
+        ? `<button class="conn-action ${action.cls}" data-act-id="${escapeHTML(u.id)}" data-act-handle="${escapeHTML(u.handle || '')}" data-act-state="${escapeHTML(u.follow_state)}">${action.label}</button>`
+        : '';
+      const profileHref = u.handle ? `/profile/${encodeURIComponent(u.handle)}` : '#';
+      return `<a class="conn-row" href="${profileHref}">
+        ${av}
+        <div class="conn-info">
+          <div class="conn-name">${escapeHTML(u.name || u.handle || 'Member')}${handleSpan}</div>
+          ${meta ? `<div class="conn-meta">${escapeHTML(meta)}</div>` : ''}
+        </div>
+        ${actionBtn}
+      </a>`;
+    }
+
+    function paint() {
+      const body = document.getElementById('connModalBody');
+      if (!body) return;
+      if (activeUsers.length === 0) {
+        body.innerHTML = activeQuery
+          ? `<div class="conn-empty">Nothing matches "${escapeHTML(activeQuery)}".</div>`
+          : `<div class="conn-empty">No one here yet.</div>`;
+        return;
+      }
+      const rows = activeUsers.map(rowHTML).join('');
+      const more = activeHasMore
+        ? `<button class="conn-load-more" onclick="window.__loadMoreConnModal()">Load more</button>`
+        : '';
+      body.innerHTML = rows + more;
+      // Wire action buttons (stop card-link navigation, hit follow API)
+      body.querySelectorAll('.conn-action').forEach(btn => {
+        btn.onclick = (e) => {
+          e.preventDefault(); e.stopPropagation();
+          handleAction(btn);
+        };
+      });
+    }
+
+    async function handleAction(btn) {
+      const id = btn.dataset.actId;
+      const handle = btn.dataset.actHandle;
+      const state = btn.dataset.actState;
+      if (!id) return;
+      if (state === 'connected') {
+        // Message — start a thread, jump to it
+        try {
+          const r = await fetch('/api/me/threads', {
+            method: 'POST', credentials: 'include',
+            headers: {'Content-Type':'application/json'},
+            body: JSON.stringify({ handle }),
+          });
+          const j = await r.json();
+          if (r.ok && j && j.ok && j.channel_id) {
+            window.location.href = '/messages?channel=' + j.channel_id;
+          }
+        } catch {}
+        return;
+      }
+      const isFollow = (state === 'none' || state === 'followed_by');
+      try {
+        const r = await fetch('/api/me/follow', {
+          method: isFollow ? 'POST' : 'DELETE', credentials: 'include',
+          headers: {'Content-Type':'application/json'},
+          body: JSON.stringify({ target_id: id }),
+        });
+        const j = await r.json();
+        if (r.ok && j && j.ok) {
+          // Update local state + repaint
+          const u = activeUsers.find(x => x.id === id);
+          if (u) {
+            if (isFollow) u.follow_state = (state === 'followed_by') ? 'connected' : 'following';
+            else          u.follow_state = (state === 'connected') ? 'followed_by' : 'none';
+            paint();
+          }
+        }
+      } catch {}
+    }
+
+    async function load(kind, offset) {
+      try {
+        const r = await fetch(endpointFor(kind, offset), { credentials: 'include' });
+        const j = await r.json();
+        if (j && j.ok && Array.isArray(j.users)) {
+          if (offset === 0) activeUsers = j.users;
+          else activeUsers = activeUsers.concat(j.users);
+          activeOffset = activeUsers.length;
+          activeHasMore = !!j.has_more;
+          paint();
+        } else {
+          activeUsers = [];
+          paint();
+        }
+      } catch {
+        activeUsers = [];
+        paint();
+      }
+    }
+
+    window.__loadMoreConnModal = () => load(activeKind, activeOffset);
+
+    window.switchConnectionsTab = function(kind) {
+      activeKind = kind;
+      activeUsers = []; activeOffset = 0; activeHasMore = false;
+      document.querySelectorAll('#connectionsModal .conn-modal-tab').forEach(b => {
+        b.classList.toggle('active', b.dataset.connTab === kind);
+      });
+      const body = document.getElementById('connModalBody');
+      if (body) body.innerHTML = `<div class="conn-loading">loading…</div>`;
+      load(kind, 0);
+    };
+
+    window.openConnectionsModal = function(kind) {
+      const modal = document.getElementById('connectionsModal');
+      if (!modal) return;
+      modal.classList.add('open');
+      // Reset search whenever the modal is opened so a stale query from
+      // a prior session doesn't filter the freshly-opened list.
+      activeQuery = '';
+      const search = document.getElementById('connModalSearch');
+      if (search) search.value = '';
+      window.switchConnectionsTab(kind || 'connections');
+      // Focus the search bar after the open animation settles.
+      if (search) setTimeout(() => search.focus({ preventScroll: true }), 80);
+    };
+
+    window.closeConnectionsModal = function() {
+      const modal = document.getElementById('connectionsModal');
+      if (modal) modal.classList.remove('open');
+    };
+
+    // ESC closes
+    document.addEventListener('keydown', e => {
+      if (e.key === 'Escape') {
+        const modal = document.getElementById('connectionsModal');
+        if (modal && modal.classList.contains('open')) window.closeConnectionsModal();
+      }
+    });
+
+    // Debounced search — refetch the active tab with q= after 220ms of
+    // typing pause. Server-side ILIKE so totals reflect the filtered set.
+    document.addEventListener('input', e => {
+      if (e.target && e.target.id === 'connModalSearch') {
+        const v = e.target.value || '';
+        if (searchDebounce) clearTimeout(searchDebounce);
+        searchDebounce = setTimeout(() => {
+          activeQuery = v.trim();
+          activeUsers = []; activeOffset = 0; activeHasMore = false;
+          const body = document.getElementById('connModalBody');
+          if (body) body.innerHTML = `<div class="conn-loading">loading…</div>`;
+          load(activeKind, 0);
+        }, 220);
+      }
+    });
+  })();
+</script>
 
 </body>
 </html>
