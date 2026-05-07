@@ -9691,12 +9691,43 @@ function ChannelChat({
     };
   }, [channelId]);
 
-  // Auto-scroll to bottom when new messages arrive.
+  // Pin-to-bottom semantics:
+  //   - First mount in a channel → always pin to newest (bottom).
+  //   - New message arrives → only pin if the user was already near the
+  //     bottom; otherwise don't yank them away from older messages
+  //     they're scrolled up to read.
   const scrollerRef = useRef<HTMLDivElement | null>(null);
+  const wasAtBottomRef = useRef(true);
+  const seenInitialRef = useRef(false);
+  // Track scroll position so we know whether to pin on next message.
   useEffect(() => {
     const el = scrollerRef.current;
     if (!el) return;
-    el.scrollTop = el.scrollHeight;
+    const onScroll = () => {
+      wasAtBottomRef.current =
+        el.scrollHeight - el.scrollTop - el.clientHeight < 80;
+    };
+    el.addEventListener("scroll", onScroll, { passive: true });
+    return () => el.removeEventListener("scroll", onScroll);
+  }, []);
+  useEffect(() => {
+    const el = scrollerRef.current;
+    if (!el || messages.length === 0) return;
+    const isFirst = !seenInitialRef.current;
+    if (isFirst) {
+      seenInitialRef.current = true;
+      // Defer past layout so scrollHeight reflects the rendered DOM.
+      requestAnimationFrame(() => {
+        el.scrollTop = el.scrollHeight;
+        wasAtBottomRef.current = true;
+      });
+      return;
+    }
+    if (wasAtBottomRef.current) {
+      requestAnimationFrame(() => {
+        el.scrollTop = el.scrollHeight;
+      });
+    }
   }, [messages.length]);
 
   const send = async () => {

@@ -424,6 +424,14 @@
     fetch(`/api/me/threads/${encodeURIComponent(channelId)}/read`, { method: "POST", credentials: "include" }).catch(() => {});
     await loadMessages();
 
+    // Pin to bottom (newest) when opening a chat — paintMessages already
+    // tried to, but we double up after the next frame in case layout is
+    // still settling (avatar images loading, etc).
+    requestAnimationFrame(() => {
+      const el = document.getElementById("vmmMsgs");
+      if (el) el.scrollTop = el.scrollHeight;
+    });
+
     if (state.chatPollTimer) clearInterval(state.chatPollTimer);
     state.chatPollTimer = setInterval(() => {
       if (document.hidden) return;
@@ -458,6 +466,10 @@
     const el = document.getElementById("vmmMsgs");
     if (!el) return;
     const wasAtBottom = (el.scrollHeight - el.scrollTop - el.clientHeight) < 80;
+    // Capture position BEFORE innerHTML reset, so if the user was reading
+    // older messages we restore where they were instead of yanking them
+    // back to the top (the default scrollTop after innerHTML replace).
+    const prevScrollTop = el.scrollTop;
     if (state.msgs.length === 0) {
       el.innerHTML = `<div class="vmm-empty" style="margin:auto">Say hi 👋</div>`;
       return;
@@ -489,7 +501,14 @@
       lastSender = m.senderId;
     });
     el.innerHTML = h;
-    if (wasAtBottom || state.msgs.length === 1) el.scrollTop = el.scrollHeight;
+    if (wasAtBottom || state.msgs.length === 1) {
+      // Defer to next frame so layout settles before we measure scrollHeight.
+      requestAnimationFrame(() => { el.scrollTop = el.scrollHeight; });
+    } else {
+      // User was scrolled up — restore their reading position so polling
+      // doesn't yank them back to the top.
+      el.scrollTop = prevScrollTop;
+    }
   }
 
   // ── Composer ───────────────────────────────────────────────────────────
