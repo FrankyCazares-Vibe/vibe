@@ -124,7 +124,7 @@
     /* No floating button — pages provide their own trigger (nav-msg-btn).
        Panel sits at bottom-right; html.vmm-open slides Otto's corner ring
        left so it stays clickable while the panel is up. */
-    .vmm-panel{position:fixed;bottom:24px;right:24px;width:360px;max-width:calc(100vw - 24px);height:520px;max-height:calc(100vh - 44px);background:white;border-radius:16px;box-shadow:0 24px 60px rgba(0,0,0,.22),0 4px 16px rgba(0,0,0,.08);display:none;flex-direction:column;overflow:hidden;z-index:9995;font-family:'DM Sans',system-ui,sans-serif;border:1px solid rgba(28,28,30,.08);}
+    .vmm-panel{position:fixed;bottom:24px;right:24px;width:420px;max-width:calc(100vw - 24px);height:600px;max-height:calc(100vh - 44px);background:white;border-radius:16px;box-shadow:0 24px 60px rgba(0,0,0,.22),0 4px 16px rgba(0,0,0,.08);display:none;flex-direction:column;overflow:hidden;z-index:9995;font-family:'DM Sans',system-ui,sans-serif;border:1px solid rgba(28,28,30,.08);}
     .vmm-panel.show{display:flex;}
     html.vmm-open #ottoCorner{transform:translateX(-372px) !important;transition:transform .26s cubic-bezier(.2,.8,.2,1);}
     .vmm-hdr{padding:12px 14px;border-bottom:1px solid rgba(28,28,30,.08);display:flex;align-items:center;gap:10px;flex-shrink:0;background:white;}
