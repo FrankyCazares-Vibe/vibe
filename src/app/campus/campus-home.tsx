@@ -287,26 +287,10 @@ export function CampusHome({
   const isLoading = orgs === null;
   const isEmpty = orgs !== null && orgs.length === 0;
 
+  // Backdrop is read-only at the campus level — admins change it from
+  // the org Settings modal, which has its own save handler.
   const activeBackdropKey: BackdropKey = activeOrg?.backdrop_preset ?? DEFAULT_BACKDROP;
   const activeBackdrop = BACKDROP_PRESETS[activeBackdropKey].css;
-
-  // Optimistic backdrop swap + persist via PATCH.
-  const handlePickBackdrop = useCallback(
-    (key: BackdropKey) => {
-      if (!activeOrg) return;
-      setOrgs((prev) =>
-        (prev ?? []).map((o) =>
-          o.id === activeOrg.id ? { ...o, backdrop_preset: key } : o
-        )
-      );
-      void fetch(`/api/orgs/${activeOrg.handle}`, {
-        method: "PATCH",
-        headers: { "content-type": "application/json" },
-        body: JSON.stringify({ backdrop_preset: key }),
-      }).catch((e) => console.error("[campus] patch backdrop", e));
-    },
-    [activeOrg]
-  );
 
   const handleOrgCreated = useCallback((org: Org) => {
     setOrgs((prev) => [org, ...(prev ?? [])]);
@@ -421,8 +405,6 @@ export function CampusHome({
               channels={activeChannels}
               activeChannelId={activeChannelId}
               onSelectChannel={handleSelectChannel}
-              activeBackdrop={activeBackdropKey}
-              onPickBackdrop={handlePickBackdrop}
               onOpenCreateChannel={() => setShowCreateChannel(true)}
               onOpenSettings={() => setShowSettings(true)}
               onOpenChannelSettings={(id) => setChannelSettingsId(id)}
@@ -7284,9 +7266,9 @@ function MapTabBody() {
   const [selected, setSelected] = useState<ZoneSelection | null>(null);
   const [pan, setPan] = useState({ x: 0, y: 0 });
   const [dragging, setDragging] = useState(false);
-  // Default to demo mode while the school's real data is sparse. Users
-  // can toggle off to see their actual zones.
-  const [demoMode, setDemoMode] = useState(true);
+  // The map auto-falls back to demo zones server-side when the school
+  // has no real major data yet — once real students fill in their majors
+  // the actual zones replace the placeholders, no toggle needed.
   const [orgCollapsed, setOrgCollapsed] = useState(false);
   const dragOriginRef = useRef<{ x: number; y: number } | null>(null);
 
@@ -7301,17 +7283,11 @@ function MapTabBody() {
     let cancelled = false;
     (async () => {
       try {
-        const url = demoMode ? "/api/campus-map?demo=1" : "/api/campus-map";
-        const res = await fetch(url, { cache: "no-store" });
+        const res = await fetch("/api/campus-map", { cache: "no-store" });
         const j = await res.json();
         if (cancelled) return;
         if (j?.ok) {
           setData(j as MapSummary);
-          // Reflect the API's auto-demo fallback in the local toggle so
-          // the button label tells the truth. Without this, schools with
-          // zero real zones would say "Demo · off" while actually showing
-          // demo data.
-          if (j.demo === true && !demoMode) setDemoMode(true);
         } else {
           setData({ ok: false } as unknown as MapSummary);
         }
@@ -7322,7 +7298,7 @@ function MapTabBody() {
     return () => {
       cancelled = true;
     };
-  }, [demoMode]);
+  }, []);
 
   // Force-directed layout: place "you" at the center, then each major on
   // a deterministic spiral biased toward viewer (more mutuals = closer in).
@@ -7590,45 +7566,6 @@ function MapTabBody() {
             }}
           >
             Recenter
-          </button>
-          <button
-            type="button"
-            onPointerDown={(e) => {
-              e.stopPropagation();
-              e.preventDefault();
-            }}
-            onClick={(e) => {
-              e.stopPropagation();
-              setDemoMode((v) => !v);
-              setPan({ x: 0, y: 0 });
-            }}
-            title={
-              demoMode
-                ? "Showing demo zones — click to see your school's real data"
-                : "Showing real data — click to preview demo zones"
-            }
-            style={{
-              fontFamily: "DM Sans, sans-serif",
-              fontSize: 10,
-              fontWeight: 800,
-              letterSpacing: "0.18em",
-              textTransform: "uppercase",
-              color: demoMode ? "rgba(255,184,90,0.95)" : "rgba(120,200,255,0.95)",
-              background: demoMode
-                ? "rgba(120,80,0,0.45)"
-                : "rgba(8,12,28,0.78)",
-              border: demoMode
-                ? "1px solid rgba(255,184,90,0.55)"
-                : "1px solid rgba(120,200,255,0.45)",
-              padding: "7px 14px",
-              borderRadius: 999,
-              cursor: "pointer",
-              backdropFilter: "blur(14px)",
-              WebkitBackdropFilter: "blur(14px)",
-              pointerEvents: "auto",
-            }}
-          >
-            {demoMode ? "Demo · on" : "Demo · off"}
           </button>
         </div>
       </div>
@@ -9128,8 +9065,6 @@ function ChannelRail({
   channels,
   activeChannelId,
   onSelectChannel,
-  activeBackdrop,
-  onPickBackdrop,
   onOpenCreateChannel,
   onOpenSettings,
   onOpenChannelSettings,
@@ -9138,8 +9073,6 @@ function ChannelRail({
   channels: Channel[];
   activeChannelId: string | null;
   onSelectChannel: (id: string) => void;
-  activeBackdrop: BackdropKey;
-  onPickBackdrop: (key: BackdropKey) => void;
   onOpenCreateChannel: () => void;
   onOpenSettings: () => void;
   onOpenChannelSettings: (channelId: string) => void;
@@ -9291,48 +9224,9 @@ function ChannelRail({
           gap: 10,
         }}
       >
-        <div>
-          <div
-            style={{
-              fontSize: 10,
-              fontWeight: 700,
-              letterSpacing: "0.12em",
-              textTransform: "uppercase",
-              color: COLORS.railMuted,
-              marginBottom: 6,
-            }}
-          >
-            Backdrop
-          </div>
-          <div style={{ display: "flex", gap: 6 }}>
-            {(Object.keys(BACKDROP_PRESETS) as BackdropKey[]).map((key) => {
-              const preset = BACKDROP_PRESETS[key];
-              const active = key === activeBackdrop;
-              return (
-                <button
-                  key={key}
-                  type="button"
-                  title={preset.label}
-                  onClick={() => onPickBackdrop(key)}
-                  style={{
-                    flex: 1,
-                    height: 22,
-                    borderRadius: 6,
-                    background: preset.css,
-                    border: active
-                      ? "1.5px solid rgba(255,255,255,0.85)"
-                      : "1px solid rgba(255,255,255,0.14)",
-                    boxShadow: active
-                      ? "0 0 0 2px rgba(255,255,255,0.18), inset 0 1px 0 rgba(255,255,255,0.3)"
-                      : "inset 0 1px 0 rgba(255,255,255,0.18)",
-                    cursor: "pointer",
-                    padding: 0,
-                  }}
-                />
-              );
-            })}
-          </div>
-        </div>
+        {/* Backdrop picker now lives in org settings (Overview tab) so
+            members can't change the org's vibe color from the channel
+            rail by accident — only owners/admins can, via Settings. */}
         <div style={{ display: "flex", gap: 8 }}>
           {canManage ? (
             <button
