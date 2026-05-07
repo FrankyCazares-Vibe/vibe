@@ -228,7 +228,11 @@ body{font-family:'DM Sans',sans-serif;background:var(--cream);color:var(--charco
 .btn-acc:hover{background:var(--accent);}
 .btn-dec{font-family:'DM Sans',sans-serif;font-size:13px;font-weight:600;background:none;color:var(--muted);border:1.5px solid var(--border);padding:8px 20px;border-radius:100px;cursor:none;transition:all .15s;}
 .btn-dec:hover{border-color:rgba(28,28,30,.2);color:var(--charcoal);}
-.msgs{flex:1;overflow-y:auto;overflow-x:hidden;padding:18px 22px;display:flex;flex-direction:column;gap:16px;scrollbar-width:thin;scrollbar-color:var(--border) transparent;touch-action:pan-y;--dragx:0px;}
+.msgs{flex:1;overflow-y:auto;overflow-x:hidden;padding:18px 22px;display:flex;flex-direction:column;scrollbar-width:thin;scrollbar-color:var(--border) transparent;touch-action:pan-y;--dragx:0px;}
+/* gap on .msgs only spaces .msgs-bubbles from .msgs-footer; the rows
+   live INSIDE .msgs-bubbles so the actual message-to-message spacing
+   has to be set on this inner wrapper. */
+.msgs-bubbles{display:flex;flex-direction:column;gap:14px;}
 /* iMessage-style: "Yesterday 7:05 PM" — split into a bold day prefix
    and a regular-weight time. Day stays sentence-case (not uppercase)
    so the format reads as a clock annotation, not a section header. */
