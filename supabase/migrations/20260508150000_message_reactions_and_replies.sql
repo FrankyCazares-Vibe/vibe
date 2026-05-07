@@ -37,7 +37,7 @@ CREATE POLICY "message_reactions_select_member"
     EXISTS (
       SELECT 1 FROM public.messages m
       WHERE m.id = message_reactions.message_id
-        AND public.is_channel_member(m.channel_id, auth.uid())
+        AND public.is_channel_member(m.channel_id)
     )
   );
 
@@ -49,7 +49,7 @@ CREATE POLICY "message_reactions_insert_member"
     AND EXISTS (
       SELECT 1 FROM public.messages m
       WHERE m.id = message_reactions.message_id
-        AND public.is_channel_member(m.channel_id, auth.uid())
+        AND public.is_channel_member(m.channel_id)
     )
   );
 
