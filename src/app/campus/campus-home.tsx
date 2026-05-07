@@ -1029,6 +1029,7 @@ function OrgSettingsModal({
         <nav
           style={{
             display: "flex",
+            alignItems: "center",
             gap: 4,
             padding: "8px 16px",
             borderBottom: "1px solid rgba(255,255,255,0.08)",
@@ -1042,18 +1043,7 @@ function OrgSettingsModal({
                 key={t.key}
                 type="button"
                 onClick={() => setTab(t.key)}
-                style={{
-                  padding: "8px 12px",
-                  borderRadius: 8,
-                  border: "none",
-                  background: on ? "rgba(255,92,53,0.18)" : "transparent",
-                  color: on ? "#fff" : COLORS.glassMuted,
-                  fontFamily: "DM Sans, sans-serif",
-                  fontSize: 13,
-                  fontWeight: on ? 700 : 500,
-                  cursor: "pointer",
-                  whiteSpace: "nowrap",
-                }}
+                style={modalTabPillStyle(on)}
               >
                 {t.label}
               </button>
@@ -2092,6 +2082,7 @@ function ChannelSettingsModal({
         <nav
           style={{
             display: "flex",
+            alignItems: "center",
             gap: 4,
             padding: "8px 16px",
             borderBottom: "1px solid rgba(255,255,255,0.08)",
@@ -2105,18 +2096,7 @@ function ChannelSettingsModal({
                 key={t.key}
                 type="button"
                 onClick={() => setTab(t.key)}
-                style={{
-                  padding: "8px 12px",
-                  borderRadius: 8,
-                  border: "none",
-                  background: on ? "rgba(255,92,53,0.18)" : "transparent",
-                  color: on ? "#fff" : COLORS.glassMuted,
-                  fontFamily: "DM Sans, sans-serif",
-                  fontSize: 13,
-                  fontWeight: on ? 700 : 500,
-                  cursor: "pointer",
-                  whiteSpace: "nowrap",
-                }}
+                style={modalTabPillStyle(on)}
               >
                 {t.label}
               </button>
@@ -2745,6 +2725,30 @@ const modalIconButtonStyle: React.CSSProperties = {
   cursor: "pointer",
   lineHeight: 1,
 };
+
+// Locked-height pill for modal tab navs. Both org-settings and channel-
+// settings use this so the pills line up on the same baseline regardless
+// of font-weight changes between active/inactive states.
+function modalTabPillStyle(on: boolean): React.CSSProperties {
+  return {
+    height: 32,
+    padding: "0 14px",
+    display: "inline-flex",
+    alignItems: "center",
+    justifyContent: "center",
+    borderRadius: 10,
+    border: "none",
+    background: on ? "rgba(255,92,53,0.22)" : "transparent",
+    color: on ? "#fff" : COLORS.glassMuted,
+    fontFamily: "DM Sans, sans-serif",
+    fontSize: 13,
+    fontWeight: on ? 700 : 500,
+    cursor: "pointer",
+    whiteSpace: "nowrap",
+    lineHeight: 1,
+    flexShrink: 0,
+  };
+}
 
 const modalErrorStyle: React.CSSProperties = {
   padding: "8px 12px",
@@ -9324,12 +9328,15 @@ function ChannelRail({
         }}
       >
         <div style={{ display: "flex", alignItems: "flex-start", gap: 8 }}>
-          <div
+          <Link
+            href={`/orgs/${encodeURIComponent(org.handle)}`}
+            title={`Open ${org.name} profile`}
             style={{
               flex: 1,
               minWidth: 0,
               display: "flex",
               alignItems: "center",
+              flexWrap: "wrap",
               gap: 6,
               fontFamily: "Fraunces, serif",
               fontWeight: 800,
@@ -9337,20 +9344,27 @@ function ChannelRail({
               color: COLORS.railText,
               lineHeight: 1.2,
               letterSpacing: "-0.01em",
+              textDecoration: "none",
+              cursor: "pointer",
+            }}
+            onMouseEnter={(e) => {
+              (e.currentTarget as HTMLElement).style.color = "#FF8C5A";
+            }}
+            onMouseLeave={(e) => {
+              (e.currentTarget as HTMLElement).style.color = COLORS.railText;
             }}
           >
             <span
               style={{
-                whiteSpace: "nowrap",
-                overflow: "hidden",
-                textOverflow: "ellipsis",
+                wordBreak: "break-word",
+                overflowWrap: "anywhere",
                 minWidth: 0,
               }}
             >
               {org.name}
             </span>
             {org.verified ? <VerifiedBadge size={14} /> : null}
-          </div>
+          </Link>
           <RoleChip role={org.role} />
         </div>
         <div

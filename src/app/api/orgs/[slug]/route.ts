@@ -5,6 +5,7 @@ import { createSupabaseServerClient } from "@/lib/supabase/server";
 import { createSupabaseServiceClient } from "@/lib/supabase/service";
 
 const VALID_BACKDROPS = [
+  "cream",
   "sand-purple",
   "ember",
   "deep-violet",

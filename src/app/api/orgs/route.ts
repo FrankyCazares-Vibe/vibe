@@ -6,6 +6,7 @@ import { createSupabaseServiceClient } from "@/lib/supabase/service";
 
 const HANDLE_RE = /^[a-z0-9][a-z0-9_-]{2,30}$/;
 const VALID_BACKDROPS = [
+  "cream",
   "sand-purple",
   "ember",
   "deep-violet",
