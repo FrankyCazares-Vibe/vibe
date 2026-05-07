@@ -1270,6 +1270,67 @@ body.viewer-mode .viewer-only { display:block !important; }
 body:not(.viewer-mode) .viewer-only { display:none !important; }
 body.viewer-mode .edit-toggle { display:none; }
 body.viewer-mode #viewerBtn { background:rgba(255,92,53,.1);color:var(--accent);border-color:rgba(255,92,53,.3); }
+
+/* Edit-mode visitor-preview button: only shown while editing. The
+   .owner-edit-only class also hides itself in viewer mode (the floating
+   "back to edit" pill takes over there). */
+body:not(.edit-mode) .owner-edit-only { display:none !important; }
+body.viewer-mode .owner-edit-only { display:none !important; }
+
+/* Edit-pencil icon button: when active, switches to filled orange so it
+   reads as the live mode indicator (replaces the old "Exit edit" pill). */
+.nav-edit-btn.active {
+  background: var(--accent);
+  color: white;
+  border-color: var(--accent);
+  box-shadow: 0 4px 14px rgba(255,92,53,.28);
+}
+.nav-edit-btn.active:hover {
+  background: var(--accent);
+  color: white;
+  border-color: var(--accent);
+}
+
+/* Highlight every editable text region while in edit mode so the user
+   can see the full surface area at a glance (was previously only on
+   focus). Subtle dashed peach ring + warm tint. */
+body.edit-mode [data-edit] {
+  outline: 1.5px dashed rgba(255,92,53,.45);
+  outline-offset: 4px;
+  border-radius: 4px;
+  background: rgba(255,180,150,.06);
+  transition: outline-color .18s ease, background .18s ease;
+}
+body.edit-mode [data-edit]:hover {
+  outline-color: rgba(255,92,53,.75);
+  background: rgba(255,180,150,.10);
+}
+body.edit-mode [data-edit]:focus {
+  outline: 2px solid var(--accent);
+  background: rgba(255,180,150,.14);
+}
+
+/* Floating "Previewing as visitor" pill — shown while the owner is in
+   visitor mode so they can return to edit. Lives bottom-center so it
+   doesn't fight with Otto's corner ring. */
+.preview-edit-pill {
+  position: fixed; bottom: 24px; left: 50%; transform: translateX(-50%);
+  z-index: 9500;
+  display: flex; align-items: center; gap: 12px;
+  padding: 10px 14px 10px 18px;
+  background: #1C1C1E; color: white;
+  border-radius: 999px;
+  box-shadow: 0 12px 32px rgba(0,0,0,.22), 0 4px 12px rgba(255,92,53,.18);
+  font-family: 'DM Sans', sans-serif; font-size: 13px;
+}
+.preview-edit-pill .pep-text { color: rgba(255,255,255,.78); }
+.preview-edit-pill .pep-cta {
+  padding: 6px 14px; border-radius: 999px;
+  background: var(--accent); color: white;
+  border: none; font-family: inherit; font-size: 12px; font-weight: 700;
+  cursor: none;
+}
+.preview-edit-pill .pep-cta:hover { background: #FF7B4A; }
 body.owner-mode .shared-section { display:block !important; opacity:1 !important; }
 body.owner-mode .shared-section .current-delete { display:none; }
 body.recruiter-mode .recruiter-card {
@@ -2560,11 +2621,30 @@ body.empty-profile-mode #profileEmpty { display: flex !important; }
         <path d="M5 8.5h.01M9 8.5h.01M13 8.5h.01" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"/>
       </svg>
     </button>
-    <button class="btn-nav ghost" onclick="toggleViewerMode()" id="viewerBtn">View as visitor</button>
-    <button class="edit-toggle" id="editToggle" onclick="toggleEdit()">
-      <span class="dot"></span> Edit profile
+    <!-- Visitor-preview pill — only visible in edit mode. Lets the user
+         see their profile as a visitor would, while preserving "in edit"
+         intent so cancelling drops them back into edit mode. -->
+    <button class="btn-nav ghost owner-edit-only" id="viewerBtn" onclick="toggleViewerMode()" style="display:none;">View as visitor</button>
+    <!-- Custom edit pencil. Click → enter edit mode (highlight every
+         editable field, show the visitor-preview button). Click again
+         to exit edit mode. -->
+    <button class="nav-msg-btn nav-edit-btn" id="editToggle" onclick="toggleEdit()" title="Edit profile" aria-label="Edit profile">
+      <svg width="17" height="17" viewBox="0 0 17 17" fill="none">
+        <path d="M11.6 1.9l3.5 3.5-9.2 9.2H2.4v-3.5l9.2-9.2z" stroke="currentColor" stroke-width="1.4" stroke-linejoin="round" fill="none"/>
+        <path d="M10.2 3.3l3.5 3.5" stroke="currentColor" stroke-width="1.4" stroke-linecap="round"/>
+      </svg>
     </button>
-    <button class="btn-nav dark" id="profileShareBtn">Share profile</button>
+    <!-- Settings cog. Goes to /settings (account info, sign out, danger zone). -->
+    <a class="nav-msg-btn" href="/settings" title="Settings" aria-label="Settings" style="text-decoration:none;">
+      <svg width="17" height="17" viewBox="0 0 17 17" fill="none">
+        <circle cx="8.5" cy="8.5" r="2.2" stroke="currentColor" stroke-width="1.4" fill="none"/>
+        <path d="M8.5 1.4v2M8.5 13.6v2M15.6 8.5h-2M3.4 8.5h-2M13.5 3.5l-1.4 1.4M5 12l-1.4 1.4M13.5 13.5l-1.4-1.4M5 5L3.6 3.6" stroke="currentColor" stroke-width="1.3" stroke-linecap="round"/>
+      </svg>
+    </a>
+    <!-- Hidden — kept so legacy code paths (renderUserSections, demo
+         exit flow) that reference profileShareBtn keep working without
+         a 404. New nav uses the cog above. -->
+    <button id="profileShareBtn" style="display:none;"></button>
   </div>
 </nav>
 
@@ -3525,13 +3605,17 @@ function toggleEdit(){
   editMode = !editMode;
   document.body.classList.toggle('edit-mode', editMode);
   const btn = document.getElementById('editToggle');
-  btn.classList.toggle('active', editMode);
-  btn.innerHTML = editMode
-    ? '<span class="dot"></span> Exit edit'
-    : '<span class="dot"></span> Edit profile';
+  if (btn) btn.classList.toggle('active', editMode);
+  btn.title = editMode ? 'Exit edit mode' : 'Edit profile';
+  btn.setAttribute('aria-label', editMode ? 'Exit edit mode' : 'Edit profile');
   document.querySelectorAll('[data-edit]').forEach(el=>{
     el.contentEditable = editMode ? 'true' : 'false';
   });
+  // Show the "View as visitor" pill only while editing — the new top
+  // nav has no permanent visitor toggle anymore (the floating pill in
+  // preview mode handles the return path).
+  const viewerBtn = document.getElementById('viewerBtn');
+  if (viewerBtn) viewerBtn.style.display = editMode ? '' : 'none';
   // Swap @handle display ↔ input. On exit, save if changed.
   if (typeof _toggleProfileHandleEdit === 'function') _toggleProfileHandleEdit(editMode);
   if(!editMode){ showToast('Changes saved'); }
@@ -4596,18 +4680,47 @@ function refreshPinButtons() {
 
 // ── Viewer / Owner mode toggle ────────────────────────────────────
 let viewerMode = false;
+// True when entering viewer mode FROM edit mode — used to bounce the
+// owner straight back into edit when they exit the preview pill.
+let _resumeEditAfterPreview = false;
 function toggleViewerMode() {
   viewerMode = !viewerMode;
   document.body.classList.toggle('viewer-mode', viewerMode);
   document.body.classList.toggle('owner-mode', !viewerMode);
   const btn = document.getElementById('viewerBtn');
   if (btn) btn.textContent = viewerMode ? 'Back to your profile' : 'View as visitor';
-  // In viewer mode — hide edit controls, show connect/message
   if (viewerMode) {
-    // Exit edit mode if active
-    if (editMode) toggleEdit();
+    // Entering preview — drop edit mode visually, remember to restore it
+    if (editMode) {
+      _resumeEditAfterPreview = true;
+      toggleEdit();
+    }
+    showPreviewEditPill();
+  } else {
+    hidePreviewEditPill();
+    if (_resumeEditAfterPreview) {
+      _resumeEditAfterPreview = false;
+      if (!editMode) toggleEdit();
+    }
   }
   if (typeof refreshPinButtons === 'function') refreshPinButtons();
+}
+
+// Floating "Previewing as visitor — Back to edit" pill. Lives bottom-
+// center so it doesn't fight Otto's corner ring or the messenger.
+function showPreviewEditPill() {
+  if (document.getElementById('previewEditPill')) return;
+  const el = document.createElement('div');
+  el.id = 'previewEditPill';
+  el.className = 'preview-edit-pill';
+  el.innerHTML = '<span class="pep-text">Previewing as visitor</span>'
+    + '<button class="pep-cta" type="button">Back to edit</button>';
+  el.querySelector('.pep-cta').onclick = () => toggleViewerMode();
+  document.body.appendChild(el);
+}
+function hidePreviewEditPill() {
+  const el = document.getElementById('previewEditPill');
+  if (el) el.remove();
 }
 
 // ── Content tab switcher (All / Clips / Posts) ───────────────────
