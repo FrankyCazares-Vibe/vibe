@@ -9844,9 +9844,37 @@ function ChannelChat({
         if (!res.ok) throw new Error(`react ${res.status}`);
       } catch (e) {
         console.error("[campus] react", e);
-        // Roll back: easiest is to refetch on next poll cycle. For now
-        // just leave the optimistic state in place — the 2s poll will
-        // correct any drift from the server's truth.
+        // Roll back the optimistic flip so the UI matches the server.
+        setMessages((prev) =>
+          prev.map((m) => {
+            if (m.id !== messageId) return m;
+            const existing = m.reactions ?? [];
+            const found = existing.find((r) => r.emoji === emoji);
+            if (!found) return m;
+            if (nextActive) {
+              // We had optimistically added — undo.
+              const newCount = Math.max(0, found.count - 1);
+              const filtered =
+                newCount === 0
+                  ? existing.filter((r) => r.emoji !== emoji)
+                  : existing.map((r) =>
+                      r.emoji === emoji
+                        ? { ...r, count: newCount, viewer_reacted: false }
+                        : r,
+                    );
+              return { ...m, reactions: filtered };
+            }
+            // We had optimistically removed — restore.
+            return {
+              ...m,
+              reactions: existing.map((r) =>
+                r.emoji === emoji
+                  ? { ...r, count: r.count + 1, viewer_reacted: true }
+                  : r,
+              ),
+            };
+          }),
+        );
       }
     },
     [channelId],
