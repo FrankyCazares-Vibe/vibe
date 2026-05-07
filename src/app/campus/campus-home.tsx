@@ -9629,38 +9629,33 @@ function ChannelChat({
   const authorColor = isCream ? "#1C1C1E" : "#fff";
   const timeColor = isCream ? "rgba(28,28,30,0.55)" : COLORS.glassMuted;
   const muted = isCream ? "rgba(28,28,30,0.6)" : COLORS.glassMuted;
-  const bubbleStyle: React.CSSProperties = isCream
-    ? {
-        background:
-          "linear-gradient(180deg, rgba(20,16,28,0.82) 0%, rgba(14,11,22,0.86) 100%)",
-        backdropFilter: "blur(24px) saturate(160%)",
-        WebkitBackdropFilter: "blur(24px) saturate(160%)",
-        border: "1px solid rgba(255,255,255,0.08)",
-        borderRadius: 14,
-        padding: "10px 14px",
-        boxShadow:
-          "inset 0 1px 0 rgba(255,255,255,0.10), 0 6px 18px rgba(20,8,40,0.18)",
-        color: "rgba(255,255,255,0.96)",
-        display: "inline-block",
-        maxWidth: "100%",
-      }
-    : {
-        margin: 0,
-        color: "rgba(255,255,255,0.9)",
-      };
-  const composerStyle: React.CSSProperties = isCream
-    ? {
-        background:
-          "linear-gradient(180deg, rgba(20,16,28,0.82) 0%, rgba(14,11,22,0.86) 100%)",
-        backdropFilter: "blur(24px) saturate(160%)",
-        WebkitBackdropFilter: "blur(24px) saturate(160%)",
-        border: "1px solid rgba(255,255,255,0.10)",
-        boxShadow:
-          "inset 0 1px 0 rgba(255,255,255,0.10), 0 8px 24px rgba(20,8,40,0.22)",
-      }
-    : {
-        ...GLASS_SURFACE,
-      };
+  // Dark glass bubble around every message regardless of backdrop. Legible
+  // on cream + adds depth on the darker presets too.
+  const bubbleStyle: React.CSSProperties = {
+    background:
+      "linear-gradient(180deg, rgba(20,16,28,0.82) 0%, rgba(14,11,22,0.86) 100%)",
+    backdropFilter: "blur(24px) saturate(160%)",
+    WebkitBackdropFilter: "blur(24px) saturate(160%)",
+    border: "1px solid rgba(255,255,255,0.08)",
+    borderRadius: 14,
+    padding: "10px 14px",
+    boxShadow:
+      "inset 0 1px 0 rgba(255,255,255,0.10), 0 6px 18px rgba(20,8,40,0.18)",
+    color: "rgba(255,255,255,0.96)",
+    display: "inline-block",
+    maxWidth: "100%",
+  };
+  // Composer surface uses the same dark-glass treatment so the input bar
+  // is always visible across all backdrops.
+  const composerStyle: React.CSSProperties = {
+    background:
+      "linear-gradient(180deg, rgba(20,16,28,0.82) 0%, rgba(14,11,22,0.86) 100%)",
+    backdropFilter: "blur(24px) saturate(160%)",
+    WebkitBackdropFilter: "blur(24px) saturate(160%)",
+    border: "1px solid rgba(255,255,255,0.10)",
+    boxShadow:
+      "inset 0 1px 0 rgba(255,255,255,0.10), 0 8px 24px rgba(20,8,40,0.22)",
+  };
   const [messages, setMessages] = useState<ChatMessage[]>([]);
   const [draft, setDraft] = useState("");
   const [sending, setSending] = useState(false);
@@ -9792,33 +9787,18 @@ function ChannelChat({
                       </span>
                     </div>
                   ) : null}
-                  {isCream ? (
-                    <div
-                      style={{
-                        ...bubbleStyle,
-                        fontFamily: "DM Sans, sans-serif",
-                        fontSize: 14,
-                        lineHeight: 1.45,
-                        whiteSpace: "pre-wrap",
-                        wordWrap: "break-word",
-                      }}
-                    >
-                      {m.content}
-                    </div>
-                  ) : (
-                    <p
-                      style={{
-                        ...bubbleStyle,
-                        fontFamily: "DM Sans, sans-serif",
-                        fontSize: 14,
-                        lineHeight: 1.45,
-                        whiteSpace: "pre-wrap",
-                        wordWrap: "break-word",
-                      }}
-                    >
-                      {m.content}
-                    </p>
-                  )}
+                  <div
+                    style={{
+                      ...bubbleStyle,
+                      fontFamily: "DM Sans, sans-serif",
+                      fontSize: 14,
+                      lineHeight: 1.45,
+                      whiteSpace: "pre-wrap",
+                      wordWrap: "break-word",
+                    }}
+                  >
+                    {m.content}
+                  </div>
                 </div>
               </article>
             );
