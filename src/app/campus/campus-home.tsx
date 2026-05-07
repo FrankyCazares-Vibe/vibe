@@ -2,7 +2,7 @@
 
 import Link from "next/link";
 import { useSearchParams } from "next/navigation";
-import { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import { Fragment, useCallback, useEffect, useMemo, useRef, useState } from "react";
 
 import { CampusAppShell } from "@/components/campus-app-shell";
 import { ImageCropperModal } from "@/components/ImageCropperModal";
@@ -10014,13 +10014,35 @@ function ChannelChat({
           messages.map((m, idx) => {
             const prev = idx > 0 ? messages[idx - 1] : null;
             const sameAuthor = prev?.user_id === m.user_id;
+            // iMessage-style date separator — emit one before the row
+            // whenever the day differs from the previous message (or for
+            // the very first message in the channel).
+            const showDateSep =
+              !prev || !sameLocalDay(prev.created_at, m.created_at);
             const author = m.users;
             const isHovered = hoveredId === m.id;
             const reactions = m.reactions ?? [];
             const parent = m.parent_preview ?? null;
             return (
+              <Fragment key={m.id}>
+                {showDateSep ? (
+                  <div
+                    aria-hidden="true"
+                    style={{
+                      textAlign: "center",
+                      fontFamily: "DM Sans, sans-serif",
+                      fontSize: 11,
+                      fontWeight: 700,
+                      letterSpacing: 0.5,
+                      textTransform: "uppercase",
+                      color: muted,
+                      margin: "14px 0 6px",
+                    }}
+                  >
+                    {formatChatDateLabel(m.created_at)}
+                  </div>
+                ) : null}
               <article
-                key={m.id}
                 onMouseEnter={() => setHoveredId(m.id)}
                 onMouseLeave={() =>
                   setHoveredId((prev) => (prev === m.id ? null : prev))
@@ -10229,6 +10251,7 @@ function ChannelChat({
                   {formatChatTimeFull(m.created_at)}
                 </span>
               </article>
+              </Fragment>
             );
           })
         )}
@@ -10579,33 +10602,58 @@ function RoleLegend() {
   );
 }
 
+// iMessage-style: per-message timestamps are always just hour:minute.
+// The date is carried by the centered date separator between groups,
+// so the per-message line stays clean and the user's eye reads time
+// the same way it does on a phone clock.
 function formatChatTime(iso: string): string {
   try {
-    const d = new Date(iso);
-    const now = new Date();
-    const sameDay = d.toDateString() === now.toDateString();
-    if (sameDay) {
-      return d.toLocaleTimeString([], { hour: "numeric", minute: "2-digit" });
-    }
-    return d.toLocaleDateString([], { month: "short", day: "numeric" });
+    return new Date(iso).toLocaleTimeString([], { hour: "numeric", minute: "2-digit" });
   } catch {
     return "";
   }
 }
 
-// Always-include-time variant for the iMessage drag reveal — the row's
-// own header may already show the date, but the slide-out chip should
-// always read like a clock ("3:42 PM" or "May 4, 3:42 PM").
-function formatChatTimeFull(iso: string): string {
+const formatChatTimeFull = formatChatTime;
+
+// Date separator label: "Today" / "Yesterday" / "Saturday" if within the
+// last week, else "May 7" or "May 7, 2025" for older. Centered between
+// message groups whenever the day changes.
+function formatChatDateLabel(iso: string): string {
   try {
     const d = new Date(iso);
     const now = new Date();
-    const sameDay = d.toDateString() === now.toDateString();
-    const time = d.toLocaleTimeString([], { hour: "numeric", minute: "2-digit" });
-    if (sameDay) return time;
-    return `${d.toLocaleDateString([], { month: "short", day: "numeric" })}, ${time}`;
+    const startOfDay = (x: Date) =>
+      new Date(x.getFullYear(), x.getMonth(), x.getDate()).getTime();
+    const dayDiff = Math.round((startOfDay(now) - startOfDay(d)) / 86_400_000);
+    if (dayDiff === 0) return "Today";
+    if (dayDiff === 1) return "Yesterday";
+    if (dayDiff > 1 && dayDiff < 7) {
+      return d.toLocaleDateString([], { weekday: "long" });
+    }
+    const sameYear = d.getFullYear() === now.getFullYear();
+    return d.toLocaleDateString(
+      [],
+      sameYear
+        ? { month: "long", day: "numeric" }
+        : { month: "long", day: "numeric", year: "numeric" },
+    );
   } catch {
     return "";
+  }
+}
+
+function sameLocalDay(a: string, b: string): boolean {
+  try {
+    const da = new Date(a);
+    const db = new Date(b);
+    return (
+      da.getFullYear() === db.getFullYear() &&
+      da.getMonth() === db.getMonth() &&
+      da.getDate() === db.getDate()
+    );
+  } catch {
+    return false;
   }
 }
 

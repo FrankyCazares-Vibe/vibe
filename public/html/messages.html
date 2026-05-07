@@ -1129,9 +1129,14 @@ function renderMsgs(msgs,d){
     (a.scrollHeight - a.scrollTop - a.clientHeight) < 80;
   const prevScroll = a.scrollTop;
 
-  let h='<div class="date-sep">Today</div>';
+  // iMessage-style date separators: emit one above the first message
+  // and any time the day changes between consecutive messages. The
+  // server returns ISO timestamps; for the demo path (no created_at)
+  // we fall through with no separator.
+  let h='';
   let last=null;
   let lastSenderId=null;
+  let lastDayKey=null;
   let lastSentIdx = -1;
   for (let i = msgs.length - 1; i >= 0; i--) { if (msgs[i].m === 1) { lastSentIdx = i; break; } }
   const isGroup = d && d.isGroup;
@@ -1176,6 +1181,14 @@ function renderMsgs(msgs,d){
   };
   msgs.forEach((m,i)=>{
     const mine=m.m===1;
+    // Date separator: emit when the day changes (or for the first row).
+    if (m.created_at) {
+      const dayKey = __dmDayKey(m.created_at);
+      if (dayKey !== lastDayKey) {
+        h += '<div class="date-sep">' + __dmEsc(__dmFmtChatDate(m.created_at)) + '</div>';
+        lastDayKey = dayKey;
+      }
+    }
     // In groups, break on sender change; in 1:1s, break on side change.
     const senderKey = mine ? '__me' : (m.senderName || (isGroup ? 'unknown' : '__peer'));
     const gb = isGroup ? (senderKey !== lastSenderId) : (last !== mine);
@@ -1649,6 +1662,37 @@ function __dmFormatBody(s) {
 function __dmInitials(name){const p=String(name||'').trim().split(/\s+/).slice(0,2);return (p.map(s=>s[0]||'').join('').toUpperCase())||'?';}
 function __dmAvBg(seed){const palette=['#2D1B4E','#3B1A00','#2a2800','#1A1A00','#1A3A5C','#2D3748','#3B0764','#1F2937'];const s=String(seed||'');let h=0;for(let i=0;i<s.length;i++)h=(h*31+s.charCodeAt(i))>>>0;return palette[h%palette.length];}
 function __dmFmtRel(iso){if(!iso)return'';const t=new Date(iso).getTime();if(Number.isNaN(t))return'';const d=Date.now()-t;if(d<60000)return'now';if(d<3600000)return Math.floor(d/60000)+'m';if(d<86400000)return Math.floor(d/3600000)+'h';if(d<604800000)return Math.floor(d/86400000)+'d';return new Date(iso).toLocaleDateString();}
+// In-conversation timestamp — exact hour:minute (e.g. "3:42 PM"). Used
+// inside the bubble drag-reveal chip, so the user always sees a clock
+// time per message rather than "2h ago".
+function __dmFmtChatTime(iso){
+  if(!iso)return'';
+  const d=new Date(iso);
+  if(Number.isNaN(d.getTime()))return'';
+  return d.toLocaleTimeString([],{hour:'numeric',minute:'2-digit'});
+}
+// Date-separator label — "Today" / "Yesterday" / weekday within last
+// week, then "May 7" or "May 7, 2025" for older. Centered between
+// message groups whenever the day rolls over.
+function __dmFmtChatDate(iso){
+  if(!iso)return'';
+  const d=new Date(iso); if(Number.isNaN(d.getTime()))return'';
+  const now=new Date();
+  const startOfDay=(x)=>new Date(x.getFullYear(),x.getMonth(),x.getDate()).getTime();
+  const diff=Math.round((startOfDay(now)-startOfDay(d))/86400000);
+  if(diff===0)return'Today';
+  if(diff===1)return'Yesterday';
+  if(diff>1&&diff<7)return d.toLocaleDateString([],{weekday:'long'});
+  const sameYear=d.getFullYear()===now.getFullYear();
+  return d.toLocaleDateString([],sameYear?{month:'long',day:'numeric'}:{month:'long',day:'numeric',year:'numeric'});
+}
+// Stable key for "is this the same calendar day?" — used to decide
+// whether to emit a new separator above this message.
+function __dmDayKey(iso){
+  if(!iso)return'';
+  const d=new Date(iso); if(Number.isNaN(d.getTime()))return'';
+  return d.getFullYear()+'-'+d.getMonth()+'-'+d.getDate();
+}
 
 function __dmThreadRecord(thread, isRequest) {
   const isGroup = thread.type === 'group' || thread.type === 'org_channel' || thread.type === 'org_subchannel';
@@ -1840,7 +1884,7 @@ async function __dmLoadMessages(channelId, opts) {
       return {
         m: m.user_id === me ? 1 : 0,
         t: m.content,
-        ts: __dmFmtRel(m.created_at),
+        ts: __dmFmtChatTime(m.created_at),
         id: m.id,
         created_at: m.created_at,
         senderName,

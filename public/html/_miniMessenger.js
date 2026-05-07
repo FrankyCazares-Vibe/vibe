@@ -65,6 +65,36 @@
     if (d < 604800000) return Math.floor(d / 86400000) + "d";
     return new Date(iso).toLocaleDateString();
   }
+  // In-conversation chat time — always hour:minute.
+  function fmtChatTime(iso) {
+    if (!iso) return "";
+    const d = new Date(iso);
+    if (Number.isNaN(d.getTime())) return "";
+    return d.toLocaleTimeString([], { hour: "numeric", minute: "2-digit" });
+  }
+  // Date separator label: Today / Yesterday / weekday / "May 7".
+  function fmtChatDate(iso) {
+    if (!iso) return "";
+    const d = new Date(iso);
+    if (Number.isNaN(d.getTime())) return "";
+    const now = new Date();
+    const startOfDay = (x) => new Date(x.getFullYear(), x.getMonth(), x.getDate()).getTime();
+    const diff = Math.round((startOfDay(now) - startOfDay(d)) / 86400000);
+    if (diff === 0) return "Today";
+    if (diff === 1) return "Yesterday";
+    if (diff > 1 && diff < 7) return d.toLocaleDateString([], { weekday: "long" });
+    const sameYear = d.getFullYear() === now.getFullYear();
+    return d.toLocaleDateString(
+      [],
+      sameYear ? { month: "long", day: "numeric" } : { month: "long", day: "numeric", year: "numeric" },
+    );
+  }
+  function chatDayKey(iso) {
+    if (!iso) return "";
+    const d = new Date(iso);
+    if (Number.isNaN(d.getTime())) return "";
+    return d.getFullYear() + "-" + d.getMonth() + "-" + d.getDate();
+  }
   function meId() {
     try {
       const raw = localStorage.getItem("vibe_user_v1");
@@ -106,6 +136,7 @@
     .vmm-row.unread .vmm-prev{color:#1C1C1E;font-weight:600;}
     .vmm-time{font-size:10.5px;color:#8A8580;flex-shrink:0;align-self:flex-start;padding-top:2px;}
     .vmm-empty{padding:32px 16px;text-align:center;color:#8A8580;font-size:12.5px;}
+    .vmm-date-sep{text-align:center;font-family:'DM Sans',sans-serif;font-size:10px;font-weight:700;color:rgba(255,255,255,0.55);margin:10px 0 6px;text-transform:uppercase;letter-spacing:.5px;}
     .vmm-msgs{flex:1;overflow-y:auto;padding:12px 14px;display:flex;flex-direction:column;gap:4px;background:#FAF7F2;}
     .vmm-msg{display:flex;gap:7px;align-items:flex-end;}
     .vmm-msg.mine{flex-direction:row-reverse;}
@@ -512,7 +543,17 @@
     }
     let h = "";
     let lastSender = null;
+    let lastDayKey = null;
     state.msgs.forEach((m, i) => {
+      // Date separator: emit on the first row and any time the day rolls
+      // over between consecutive messages.
+      if (m.created_at) {
+        const dayKey = chatDayKey(m.created_at);
+        if (dayKey !== lastDayKey) {
+          h += '<div class="vmm-date-sep">' + esc(fmtChatDate(m.created_at)) + '</div>';
+          lastDayKey = dayKey;
+        }
+      }
       const gb = m.senderId !== lastSender;
       const showAv = !m.mine && (gb || i === 0);
       const gc = gb && i > 0 ? " gt" : "";
