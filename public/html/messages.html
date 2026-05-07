@@ -241,7 +241,11 @@ body{font-family:'DM Sans',sans-serif;background:var(--cream);color:var(--charco
    stays via a subtle orange wash on .mine; everyone else gets the plain
    dark glass. */
 .bubble{
-  max-width:78%;padding:11px 15px;border-radius:18px;font-size:15px;line-height:1.5;word-break:break-word;
+  /* No max-width here — it created a circular sizing loop with the
+     inline-flex parent that collapsed bubbles to ~2 chars per line.
+     The cap lives on the message-row stack now (.msg-row > div). */
+  padding:11px 15px;border-radius:18px;font-size:15px;line-height:1.5;
+  overflow-wrap:anywhere;word-break:normal;
   background:linear-gradient(180deg,rgba(20,16,28,0.82) 0%,rgba(14,11,22,0.86) 100%);
   backdrop-filter:blur(24px) saturate(160%);
   -webkit-backdrop-filter:blur(24px) saturate(160%);
@@ -249,6 +253,10 @@ body{font-family:'DM Sans',sans-serif;background:var(--cream);color:var(--charco
   box-shadow:inset 0 1px 0 rgba(255,255,255,0.10),0 6px 18px rgba(20,8,40,0.18);
   color:rgba(255,255,255,0.96);
 }
+/* Cap the message column at 70% of the row so long messages wrap
+   sensibly but short ones still hug their content. Applied to the
+   stack div (immediate child of .msg-row that holds the bubble). */
+.msg-row > div:not(.msg-av):not(.mv){max-width:70%;}
 .msg-row:not(.mine) .bubble{border-bottom-left-radius:4px;}
 .msg-row.mine .bubble{
   border-bottom-right-radius:4px;
@@ -1256,7 +1264,7 @@ function renderMsgs(msgs,d){
       // .btime is now a sibling of the bubble inside .dm-bubble-wrap,
       // positioned absolutely so revealing it on hover doesn't reflow.
       const wrap = `<div class="dm-bubble-wrap"><div class="bubble">${__dmFormatBody(m.t)}</div>${actionsFor(m.id)}<div class="btime">${m.ts}</div></div>`;
-      const stack = `<div style="display:flex;flex-direction:column;align-items:${mine?'flex-end':'flex-start'};max-width:100%;min-width:0;">${stub}${wrap}${chipsFor(m)}</div>`;
+      const stack = `<div style="display:flex;flex-direction:column;align-items:${mine?'flex-end':'flex-start'};max-width:70%;min-width:0;">${stub}${wrap}${chipsFor(m)}</div>`;
       h+=`<div class="msg-row${mine?' mine':''}${gc}">${!mine?avForMsg(m, showAv):''}${stack}</div>`;
     }
     last=mine;
