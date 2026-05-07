@@ -250,8 +250,20 @@ body{font-family:'DM Sans',sans-serif;background:var(--cream);color:var(--charco
   background:linear-gradient(180deg,rgba(255,92,53,0.22) 0%,rgba(255,92,53,0.06) 100%),linear-gradient(180deg,rgba(20,16,28,0.82) 0%,rgba(14,11,22,0.86) 100%);
   border-color:rgba(255,180,150,0.32);
 }
-.btime{font-size:10px;margin-top:3px;display:none;color:rgba(255,255,255,0.55);}
-.bubble:hover .btime{display:block;}
+/* Timestamp lives outside the bubble flow so revealing it on hover
+   doesn't reflow the bubble + push other messages around. Anchored
+   beside the bubble (right for mine, left for theirs), faded to 0
+   until the row is hovered, then 1. No layout shift. */
+.btime{
+  font-size:10px;
+  color:rgba(28,28,30,0.55);
+  position:absolute;top:50%;transform:translateY(-50%);
+  opacity:0;transition:opacity 120ms ease;
+  white-space:nowrap;pointer-events:none;
+}
+.msg-row:not(.mine) .btime{left:calc(100% + 10px);}
+.msg-row.mine .btime{right:calc(100% + 10px);}
+.msg-row:hover .btime{opacity:1;}
 
 /* ── Reactions + reply UI (matches campus chat). ───────────────────── */
 .dm-bubble-wrap{display:inline-flex;align-items:center;gap:6px;position:relative;max-width:100%;}
@@ -1170,7 +1182,9 @@ function renderMsgs(msgs,d){
       h += `<div class="msg-row${mine?' mine':''}${gc}">${!mine?avForMsg(m, showAv):''}${stack}</div>`;
     } else {
       const stub = quoteStubFor(m);
-      const wrap = `<div class="dm-bubble-wrap"><div class="bubble">${__dmFormatBody(m.t)}<div class="btime">${m.ts}</div></div>${actionsFor(m.id)}</div>`;
+      // .btime is now a sibling of the bubble inside .dm-bubble-wrap,
+      // positioned absolutely so revealing it on hover doesn't reflow.
+      const wrap = `<div class="dm-bubble-wrap"><div class="bubble">${__dmFormatBody(m.t)}</div>${actionsFor(m.id)}<div class="btime">${m.ts}</div></div>`;
       const stack = `<div style="display:flex;flex-direction:column;align-items:${mine?'flex-end':'flex-start'};max-width:100%;min-width:0;">${stub}${wrap}${chipsFor(m)}</div>`;
       h+=`<div class="msg-row${mine?' mine':''}${gc}">${!mine?avForMsg(m, showAv):''}${stack}</div>`;
     }
@@ -1503,9 +1517,11 @@ window.__dmToggleReaction = async function (messageId, emoji) {
       body: JSON.stringify({ emoji }),
     });
     if (!res.ok) throw new Error('react ' + res.status);
+    // Refetch so the next render is sourced from server truth — keeps
+    // the chip from blinking off when the 2s poll races with our POST.
+    if (typeof __dmLoadMessages === 'function') __dmLoadMessages(channelId);
   } catch (e) {
     console.error('[dm.react]', e);
-    // Roll back optimistic flip — easiest is to refetch.
     if (typeof __dmLoadMessages === 'function') __dmLoadMessages(channelId);
   }
 };

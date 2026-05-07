@@ -9685,6 +9685,23 @@ function ChannelChat({
   // Channel switches remount this component (parent passes key={channelId}),
   // so initial state above is the reset — no effect needed.
 
+  // Single fetch helper. Used by the 2s poll AND on demand (e.g. after a
+  // reaction toggle, so the new chip stays put instead of getting clobbered
+  // by the next poll cycle racing with our POST).
+  const refetchMessages = useCallback(async () => {
+    try {
+      const res = await fetch(`/api/me/threads/${channelId}/messages?limit=80`, {
+        cache: "no-store",
+      });
+      const data = await res.json();
+      if (data?.ok && Array.isArray(data.messages)) {
+        setMessages(data.messages as ChatMessage[]);
+      }
+    } catch (e) {
+      console.error("[campus] refetch messages", e);
+    }
+  }, [channelId]);
+
   // Poll messages every 2s while this channel is open.
   useEffect(() => {
     let cancelled = false;
@@ -9842,6 +9859,10 @@ function ChannelChat({
           },
         );
         if (!res.ok) throw new Error(`react ${res.status}`);
+        // Refetch immediately so the next state replace already includes
+        // (or excludes) this reaction. Without it the 2s poll can race
+        // with the POST and clobber our optimistic chip for a moment.
+        void refetchMessages();
       } catch (e) {
         console.error("[campus] react", e);
         // Roll back the optimistic flip so the UI matches the server.
@@ -9877,7 +9898,7 @@ function ChannelChat({
         );
       }
     },
-    [channelId],
+    [channelId, refetchMessages],
   );
 
   const startReply = (msg: ChatMessage) => {

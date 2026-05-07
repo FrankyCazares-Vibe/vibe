@@ -668,6 +668,8 @@
         body: JSON.stringify({ emoji }),
       });
       if (!res.ok) throw new Error("react " + res.status);
+      // Refetch on success so the chip survives the next 2s poll cycle.
+      loadMessages();
     } catch (e) {
       console.error("[mini.react]", e);
       // Roll back via fresh fetch.
