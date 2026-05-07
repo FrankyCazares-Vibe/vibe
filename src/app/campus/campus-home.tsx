@@ -3149,6 +3149,45 @@ function GlassCard({ children, style }: { children: React.ReactNode; style?: Rea
   );
 }
 
+// Dark glass for cards sitting on the cream FEED backdrop (events, orgs).
+// White-glass-on-cream washed everything out (the original GlassCard
+// expected a dark scene), so we flip the fill to a translucent charcoal
+// with a backdrop blur that lets the cream warmth peek through.
+const DARK_GLASS_SURFACE: React.CSSProperties = {
+  background:
+    "linear-gradient(180deg, rgba(20,16,28,0.78) 0%, rgba(14,11,22,0.82) 100%)",
+  backdropFilter: "blur(28px) saturate(160%)",
+  WebkitBackdropFilter: "blur(28px) saturate(160%)",
+  border: "1px solid rgba(255,255,255,0.10)",
+  boxShadow: [
+    "inset 0 1px 0 rgba(255,255,255,0.10)",
+    "inset 0 -1px 0 rgba(0,0,0,0.32)",
+    "0 12px 32px rgba(20,8,40,0.22)",
+  ].join(", "),
+  color: "#fff",
+};
+
+function DarkGlassCard({
+  children,
+  style,
+}: {
+  children: React.ReactNode;
+  style?: React.CSSProperties;
+}) {
+  return (
+    <div
+      style={{
+        ...DARK_GLASS_SURFACE,
+        borderRadius: 18,
+        padding: 20,
+        ...style,
+      }}
+    >
+      {children}
+    </div>
+  );
+}
+
 type FeedAuthor = {
   id: string;
   name: string | null;
@@ -5028,14 +5067,14 @@ function EventsTabBody() {
           Loading events…
         </div>
       ) : events.length === 0 ? (
-        <GlassCard>
+        <DarkGlassCard>
           <div style={{ fontFamily: "DM Sans, sans-serif", fontSize: 14, color: COLORS.glassMuted, lineHeight: 1.6, textAlign: "center", padding: "12px 8px" }}>
             <div style={{ fontFamily: "Fraunces, serif", fontWeight: 800, fontSize: 16, color: "#fff", marginBottom: 6 }}>
               No upcoming events on campus
             </div>
             Be the first to post one — hit &ldquo;+ Create event&rdquo; above.
           </div>
-        </GlassCard>
+        </DarkGlassCard>
       ) : (
         <div
           style={{
@@ -5106,7 +5145,7 @@ function EventCard({ ev, onMutate }: { ev: CampusEvent; onMutate: () => void }) 
   };
 
   return (
-    <GlassCard style={{ borderLeft: `3px solid ${accent}` }}>
+    <DarkGlassCard style={{ borderLeft: `3px solid ${accent}` }}>
       <div
         style={{
           display: "flex",
@@ -5250,7 +5289,7 @@ function EventCard({ ev, onMutate }: { ev: CampusEvent; onMutate: () => void }) 
           ) : null}
         </div>
       ) : null}
-    </GlassCard>
+    </DarkGlassCard>
   );
 }
 
@@ -6241,7 +6280,7 @@ function OrgsTabBody({ onCreateOrg }: { onCreateOrg: () => void }) {
           Loading orgs…
         </div>
       ) : filtered.length === 0 ? (
-        <GlassCard>
+        <DarkGlassCard>
           <div style={{ color: "#fff", fontFamily: "DM Sans, sans-serif", fontSize: 14 }}>
             {debouncedQ
               ? `No orgs match “${debouncedQ}”${filter !== "all" ? ` in ${filter}` : ""}.`
@@ -6249,7 +6288,7 @@ function OrgsTabBody({ onCreateOrg }: { onCreateOrg: () => void }) {
               ? `No ${filter} orgs to discover yet.`
               : "No orgs to discover yet — be the first to create one."}
           </div>
-        </GlassCard>
+        </DarkGlassCard>
       ) : (
         (() => {
           const verifiedOrgs = filtered.filter((o) => o.verified);
@@ -6990,7 +7029,7 @@ function DiscoverCard({
         }
       }}
       style={{
-        ...GLASS_SURFACE,
+        ...DARK_GLASS_SURFACE,
         padding: 16,
         borderRadius: 16,
         display: "flex",
@@ -6999,10 +7038,10 @@ function DiscoverCard({
         transform: hover ? "translateY(-2px)" : "translateY(0)",
         boxShadow: hover
           ? [
-              "inset 0 1px 0 rgba(255,255,255,0.22)",
+              "inset 0 1px 0 rgba(255,255,255,0.10)",
               `0 12px 32px ${hexToRgba(orgColor, 0.35)}`,
             ].join(", ")
-          : "inset 0 1px 0 rgba(255,255,255,0.22), 0 8px 32px rgba(20,8,40,0.25)",
+          : "inset 0 1px 0 rgba(255,255,255,0.10), 0 8px 32px rgba(20,8,40,0.20)",
         transition: "transform 180ms ease, box-shadow 180ms ease",
         cursor: "pointer",
       }}
