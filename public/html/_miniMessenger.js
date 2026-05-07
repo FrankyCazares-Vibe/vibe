@@ -177,7 +177,8 @@
     .vmm-msg.mine .vmm-bubble-wrap{flex-direction:row-reverse;}
     .vmm-actions{display:none;align-items:center;gap:3px;padding:3px 6px;border-radius:999px;background:rgba(20,16,28,0.92);border:1px solid rgba(255,255,255,0.14);box-shadow:inset 0 1px 0 rgba(255,255,255,0.10),0 4px 12px rgba(0,0,0,0.32);backdrop-filter:blur(20px);-webkit-backdrop-filter:blur(20px);flex-shrink:0;}
     .vmm-bubble-wrap:hover .vmm-actions{display:inline-flex;}
-    .vmm-act-emo{background:transparent;border:none;padding:1px 3px;font-size:13px;line-height:1;cursor:none;}
+    .vmm-act-emo{background:transparent;border:none;padding:0;width:24px;height:24px;font-size:13px;line-height:1;cursor:none;border-radius:999px;display:inline-flex;align-items:center;justify-content:center;transition:background-color .14s ease, box-shadow .14s ease;}
+    .vmm-act-emo.on{background:rgba(255,140,90,0.22);box-shadow:0 0 0 1.5px rgba(255,180,150,0.7), inset 0 1px 0 rgba(255,255,255,0.10);}
     .vmm-act-sep{width:1px;height:14px;background:rgba(255,255,255,0.16);margin:0 2px;}
     .vmm-act-reply{background:transparent;border:none;padding:1px 4px;color:rgba(255,255,255,0.88);font-size:10.5px;font-weight:700;font-family:inherit;cursor:none;display:inline-flex;align-items:center;gap:3px;}
     .vmm-rxs{display:flex;flex-wrap:wrap;gap:3px;margin-top:4px;}
@@ -592,9 +593,16 @@
           stub = `<div class="vmm-quote"><div class="vmm-quote-author">↩ ${esc(author)}</div><div class="vmm-quote-body">${esc(txt)}</div></div>`;
         }
         const emos = ["❤️","👍","👎","😂","🔥"];
-        const actBtns = emos.map((e) =>
-          `<button type="button" class="vmm-act-emo" onclick="event.stopPropagation();window.__vmmToggleReaction('${esc(m.id)}','${esc(e)}')" aria-label="React with ${esc(e)}">${e}</button>`
-        ).join("");
+        // Mark emojis the viewer has already reacted with — orange ring
+        // gives an at-a-glance "I picked this one" cue. Click again to
+        // remove the reaction.
+        const myEmos = new Set(
+          (m.reactions || []).filter((r) => r.viewer_reacted).map((r) => r.emoji),
+        );
+        const actBtns = emos.map((e) => {
+          const cls = "vmm-act-emo" + (myEmos.has(e) ? " on" : "");
+          return `<button type="button" class="${cls}" onclick="event.stopPropagation();window.__vmmToggleReaction('${esc(m.id)}','${esc(e)}')" aria-label="React with ${esc(e)}">${e}</button>`;
+        }).join("");
         const actions = `<div class="vmm-actions">${actBtns}<span class="vmm-act-sep"></span><button type="button" class="vmm-act-reply" onclick="event.stopPropagation();window.__vmmStartReply('${esc(m.id)}')" aria-label="Reply">↩ Reply</button></div>`;
         const chips = (m.reactions && m.reactions.length > 0)
           ? '<div class="vmm-rxs">' + m.reactions.map((r) =>

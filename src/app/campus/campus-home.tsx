@@ -10129,25 +10129,46 @@ function ChannelChat({
                           flexShrink: 0,
                         }}
                       >
-                        {REACTION_EMOJIS.map((emo) => (
-                          <button
-                            key={emo}
-                            type="button"
-                            onClick={() => toggleReaction(m.id, emo)}
-                            aria-label={`React with ${emo}`}
-                            style={{
-                              background: "transparent",
-                              border: "none",
-                              padding: "2px 4px",
-                              fontSize: 14,
-                              lineHeight: 1,
-                              cursor: "pointer",
-                              borderRadius: 6,
-                            }}
-                          >
-                            {emo}
-                          </button>
-                        ))}
+                        {REACTION_EMOJIS.map((emo) => {
+                          // Mark with an orange ring if the viewer has
+                          // already reacted with this emoji — clear cue
+                          // for "I picked this one." Click again to remove.
+                          const mine = reactions.some(
+                            (r) => r.emoji === emo && r.viewer_reacted,
+                          );
+                          return (
+                            <button
+                              key={emo}
+                              type="button"
+                              onClick={() => toggleReaction(m.id, emo)}
+                              aria-label={`React with ${emo}`}
+                              aria-pressed={mine}
+                              style={{
+                                background: mine
+                                  ? "rgba(255,140,90,0.22)"
+                                  : "transparent",
+                                border: "none",
+                                padding: 0,
+                                width: 26,
+                                height: 26,
+                                fontSize: 14,
+                                lineHeight: 1,
+                                cursor: "pointer",
+                                borderRadius: 999,
+                                display: "inline-flex",
+                                alignItems: "center",
+                                justifyContent: "center",
+                                boxShadow: mine
+                                  ? "0 0 0 1.5px rgba(255,180,150,0.7), inset 0 1px 0 rgba(255,255,255,0.10)"
+                                  : "none",
+                                transition:
+                                  "background-color 0.14s ease, box-shadow 0.14s ease",
+                              }}
+                            >
+                              {emo}
+                            </button>
+                          );
+                        })}
                         <div
                           style={{
                             width: 1,
