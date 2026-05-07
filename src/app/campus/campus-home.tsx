@@ -10115,6 +10115,16 @@ function ChannelChat({
                     {isHovered ? (
                       <div
                         style={{
+                          // Float the picker out of the bubble's flow.
+                          // Was inline-flex next to the bubble, which
+                          // forced long bubbles to re-wrap when the pill
+                          // appeared (visible reflow on hover). Now it
+                          // overlaps the surrounding row instead.
+                          position: "absolute",
+                          left: "calc(100% + 8px)",
+                          top: "50%",
+                          transform: "translateY(-50%)",
+                          zIndex: 5,
                           display: "inline-flex",
                           alignItems: "center",
                           gap: 4,
@@ -10127,6 +10137,7 @@ function ChannelChat({
                           backdropFilter: "blur(20px)",
                           WebkitBackdropFilter: "blur(20px)",
                           flexShrink: 0,
+                          whiteSpace: "nowrap",
                         }}
                       >
                         {REACTION_EMOJIS.map((emo) => {

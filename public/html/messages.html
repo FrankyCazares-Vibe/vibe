@@ -286,21 +286,27 @@ body{font-family:'DM Sans',sans-serif;background:var(--cream);color:var(--charco
 .msgs:not([data-dragx="0"]) .btime{opacity:1;}
 
 /* ── Reactions + reply UI (matches campus chat). ───────────────────── */
-/* No position:relative here on purpose — .btime is a child of this wrap
-   and we want it to absolute-position relative to .msg-row, not the wrap.
-   That way the drag-reveal anchors at the row's right edge consistently. */
-.dm-bubble-wrap{display:inline-flex;align-items:center;gap:6px;max-width:100%;}
+/* position:relative here so .dm-actions can absolute-position next to
+   the bubble. .btime moved up to the .msg-row level (see below) so the
+   drag-reveal still anchors at the row's right edge. */
+.dm-bubble-wrap{display:inline-flex;align-items:center;gap:6px;max-width:100%;position:relative;}
 .msg-row.mine .dm-bubble-wrap{flex-direction:row-reverse;}
+/* Picker floats absolutely beside the bubble — was inline-flex before,
+   which forced long bubbles to re-wrap when the pill appeared
+   (visible width-shift on hover). */
 .dm-actions{
-  display:none;align-items:center;gap:4px;
+  display:none;position:absolute;top:50%;transform:translateY(-50%);z-index:5;
+  align-items:center;gap:4px;
   padding:4px 8px;border-radius:999px;
   background:rgba(20,16,28,0.92);
   border:1px solid rgba(255,255,255,0.14);
   box-shadow:inset 0 1px 0 rgba(255,255,255,0.10),0 6px 18px rgba(0,0,0,0.32);
   backdrop-filter:blur(20px);
   -webkit-backdrop-filter:blur(20px);
-  flex-shrink:0;
+  flex-shrink:0;white-space:nowrap;
 }
+.msg-row:not(.mine) .dm-actions{left:calc(100% + 8px);}
+.msg-row.mine .dm-actions{right:calc(100% + 8px);}
 .dm-bubble-wrap:hover .dm-actions{display:inline-flex;}
 .dm-act-emo{background:transparent;border:none;padding:2px 4px;font-size:14px;line-height:1;cursor:none;border-radius:999px;display:inline-flex;align-items:center;justify-content:center;width:26px;height:26px;transition:background-color .14s ease, box-shadow .14s ease;}
 /* Already-used emoji in the picker — soft orange wash + ring so the
@@ -1287,11 +1293,13 @@ function renderMsgs(msgs,d){
       h += `<div class="msg-row${mine?' mine':''}${gc}">${!mine?avForMsg(m, showAv):''}${stack}</div>`;
     } else {
       const stub = quoteStubFor(m);
-      // .btime is now a sibling of the bubble inside .dm-bubble-wrap,
-      // positioned absolutely so revealing it on hover doesn't reflow.
-      const wrap = `<div class="dm-bubble-wrap"><div class="bubble">${__dmFormatBody(m.t)}</div>${actionsFor(m)}<div class="btime">${m.ts}</div></div>`;
+      // .btime sits at the .msg-row level so it absolute-positions to
+      // the row's right edge (iMessage drag-reveal). The picker is
+      // inside .dm-bubble-wrap (now position:relative) so it can float
+      // absolutely beside the bubble without forcing it to re-wrap.
+      const wrap = `<div class="dm-bubble-wrap"><div class="bubble">${__dmFormatBody(m.t)}</div>${actionsFor(m)}</div>`;
       const stack = `<div style="display:flex;flex-direction:column;align-items:${mine?'flex-end':'flex-start'};max-width:70%;min-width:0;">${stub}${wrap}${chipsFor(m)}</div>`;
-      h+=`<div class="msg-row${mine?' mine':''}${gc}">${!mine?avForMsg(m, showAv):''}${stack}</div>`;
+      h+=`<div class="msg-row${mine?' mine':''}${gc}">${!mine?avForMsg(m, showAv):''}${stack}<div class="btime">${m.ts}</div></div>`;
     }
     last=mine;
     lastSenderId=senderKey;

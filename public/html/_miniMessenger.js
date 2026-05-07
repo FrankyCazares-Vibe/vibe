@@ -159,7 +159,11 @@
     .vmm-msg-av.h{visibility:hidden;}
     .vmm-msg-av img{width:100%;height:100%;object-fit:cover;display:block;}
     .vmm-bubble{
-      max-width:78%;padding:9px 12px;border-radius:14px;font-size:13.5px;line-height:1.45;word-break:break-word;
+      /* No max-width here — that combined with inline-flex parent
+         created circular sizing and collapsed bubbles to narrow strips.
+         Cap lives on the message column via .vmm-msg > div below. */
+      padding:9px 12px;border-radius:14px;font-size:13.5px;line-height:1.45;
+      overflow-wrap:anywhere;word-break:normal;
       background:linear-gradient(180deg,rgba(20,16,28,0.82) 0%,rgba(14,11,22,0.86) 100%);
       backdrop-filter:blur(20px) saturate(160%);
       -webkit-backdrop-filter:blur(20px) saturate(160%);
@@ -167,6 +171,9 @@
       box-shadow:inset 0 1px 0 rgba(255,255,255,0.10),0 4px 12px rgba(20,8,40,0.18);
       color:rgba(255,255,255,0.96);
     }
+    /* Cap the message column at 70% of the row so long messages wrap
+       sensibly but short ones still hug their content. */
+    .vmm-msg > div:not(.vmm-msg-av){max-width:70%;}
     .vmm-msg:not(.mine) .vmm-bubble{border-bottom-left-radius:4px;}
     .vmm-msg.mine .vmm-bubble{
       border-bottom-right-radius:4px;
@@ -175,7 +182,12 @@
     }
     .vmm-bubble-wrap{display:inline-flex;align-items:center;gap:6px;position:relative;max-width:100%;}
     .vmm-msg.mine .vmm-bubble-wrap{flex-direction:row-reverse;}
-    .vmm-actions{display:none;align-items:center;gap:3px;padding:3px 6px;border-radius:999px;background:rgba(20,16,28,0.92);border:1px solid rgba(255,255,255,0.14);box-shadow:inset 0 1px 0 rgba(255,255,255,0.10),0 4px 12px rgba(0,0,0,0.32);backdrop-filter:blur(20px);-webkit-backdrop-filter:blur(20px);flex-shrink:0;}
+    /* Picker floats absolutely beside the bubble — was inline-flex
+       before, which forced long bubbles to re-wrap when the pill
+       appeared (visible reflow on hover). */
+    .vmm-actions{display:none;position:absolute;top:50%;transform:translateY(-50%);z-index:5;align-items:center;gap:3px;padding:3px 6px;border-radius:999px;background:rgba(20,16,28,0.92);border:1px solid rgba(255,255,255,0.14);box-shadow:inset 0 1px 0 rgba(255,255,255,0.10),0 4px 12px rgba(0,0,0,0.32);backdrop-filter:blur(20px);-webkit-backdrop-filter:blur(20px);flex-shrink:0;white-space:nowrap;}
+    .vmm-msg:not(.mine) .vmm-actions{left:calc(100% + 8px);}
+    .vmm-msg.mine .vmm-actions{right:calc(100% + 8px);}
     .vmm-bubble-wrap:hover .vmm-actions{display:inline-flex;}
     .vmm-act-emo{background:transparent;border:none;padding:0;width:24px;height:24px;font-size:13px;line-height:1;cursor:none;border-radius:999px;display:inline-flex;align-items:center;justify-content:center;transition:background-color .14s ease, box-shadow .14s ease;}
     .vmm-act-emo.on{background:rgba(255,140,90,0.22);box-shadow:0 0 0 1.5px rgba(255,180,150,0.7), inset 0 1px 0 rgba(255,255,255,0.10);}
@@ -610,7 +622,7 @@
             ).join("") + '</div>'
           : "";
         const wrap = `<div class="vmm-bubble-wrap"><div class="vmm-bubble">${esc(m.content)}</div>${actions}</div>`;
-        const stack = `<div style="display:flex;flex-direction:column;align-items:${m.mine ? "flex-end" : "flex-start"};max-width:100%;min-width:0;">${stub}${wrap}${chips}</div>`;
+        const stack = `<div style="display:flex;flex-direction:column;align-items:${m.mine ? "flex-end" : "flex-start"};max-width:70%;min-width:0;">${stub}${wrap}${chips}</div>`;
         h += `<div class="vmm-msg${m.mine ? " mine" : ""}${gc}">${!m.mine ? av : ""}${stack}</div>`;
       }
       lastSender = m.senderId;
