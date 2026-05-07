@@ -1,11 +1,27 @@
 "use client";
 
 import Link from "next/link";
+import { useSearchParams } from "next/navigation";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 
 import { CampusAppShell } from "@/components/campus-app-shell";
 import { ImageCropperModal } from "@/components/ImageCropperModal";
 import { emitCalendarChanged } from "@/components/LeftNav";
+
+const CAMPUS_TAB_KEYS: ReadonlyArray<CampusTab> = [
+  "feed",
+  "events",
+  "orgs",
+  "chat",
+  "map",
+];
+
+function parseInitialTab(raw: string | null): CampusTab {
+  if (raw && (CAMPUS_TAB_KEYS as readonly string[]).includes(raw)) {
+    return raw as CampusTab;
+  }
+  return "feed";
+}
 
 type Role = "owner" | "admin" | "mod" | "member";
 
@@ -217,7 +233,14 @@ export function CampusHome({
   // when no explicit pick exists. Derived rather than effect-driven so we
   // don't trip React 19's set-state-in-effect rule.
   const [selectedChannelByOrg, setSelectedChannelByOrg] = useState<Record<string, string>>({});
-  const [tab, setTab] = useState<CampusTab>("feed");
+  // Initial tab is seeded from `?tab=` so deep links (e.g. "← Return to
+  // Organizations" on an org page) land in the right place. We only read
+  // the param once — subsequent tab changes don't push to the URL to
+  // keep things simple. Refreshes preserve the tab via the same param.
+  const searchParams = useSearchParams();
+  const [tab, setTab] = useState<CampusTab>(() =>
+    parseInitialTab(searchParams.get("tab")),
+  );
   const [feedTagFilter, setFeedTagFilter] = useState<string | null>(null);
   const [showCreateOrg, setShowCreateOrg] = useState(false);
   const [showCreateChannel, setShowCreateChannel] = useState(false);

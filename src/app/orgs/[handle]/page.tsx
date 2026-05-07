@@ -266,7 +266,7 @@ function TopNav({ signedIn }: { signedIn: boolean }) {
       </Link>
       {signedIn ? (
         <Link
-          href="/campus"
+          href="/campus?tab=orgs"
           style={{
             color: "rgba(255,255,255,0.95)",
             textDecoration: "none",
