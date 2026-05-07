@@ -30,7 +30,10 @@ html,body{height:100%;overflow:hidden;}
 body{font-family:'DM Sans',sans-serif;background:var(--cream);color:var(--charcoal);cursor:none;}
 .cursor{width:8px;height:8px;background:var(--accent);border-radius:50%;position:fixed;top:0;left:0;pointer-events:none;z-index:9999;will-change:transform;transition:width .15s,height .15s,background .15s;}
 .cursor-ring{width:28px;height:28px;border:1.5px solid var(--accent);border-radius:50%;position:fixed;top:0;left:0;pointer-events:none;z-index:9998;will-change:transform;opacity:.45;transition:width .2s,height .2s,opacity .2s;}
-.cursor.hover{width:6px;height:6px;background:var(--charcoal);}.cursor-ring.hover{width:44px;height:44px;opacity:.2;border-color:var(--charcoal);}
+/* Keep the cursor accent-orange even on hover. Used to flip to charcoal,
+   which made it disappear against dark surfaces (chat bubbles, reaction
+   picker pill, etc). Size change still cues the hoverable state. */
+.cursor.hover{width:6px;height:6px;background:var(--accent);}.cursor-ring.hover{width:44px;height:44px;opacity:.35;border-color:var(--accent);}
 .shell{display:grid;grid-template-columns:200px 300px 1fr;height:100vh;}
 .left-nav{padding:20px 14px;border-right:1px solid var(--border);display:flex;flex-direction:column;overflow-y:auto;scrollbar-width:none;}
 .left-nav::-webkit-scrollbar{display:none;}
@@ -299,7 +302,14 @@ body{font-family:'DM Sans',sans-serif;background:var(--cream);color:var(--charco
   flex-shrink:0;
 }
 .dm-bubble-wrap:hover .dm-actions{display:inline-flex;}
-.dm-act-emo{background:transparent;border:none;padding:2px 4px;font-size:14px;line-height:1;cursor:none;border-radius:6px;}
+.dm-act-emo{background:transparent;border:none;padding:2px 4px;font-size:14px;line-height:1;cursor:none;border-radius:999px;display:inline-flex;align-items:center;justify-content:center;width:26px;height:26px;transition:background-color .14s ease, box-shadow .14s ease;}
+/* Already-used emoji in the picker — soft orange wash + ring so the
+   user sees "I've reacted with this one" at a glance. Clicking it
+   again removes the reaction. */
+.dm-act-emo.on{
+  background:rgba(255,140,90,0.22);
+  box-shadow:0 0 0 1.5px rgba(255,180,150,0.7), inset 0 1px 0 rgba(255,255,255,0.10);
+}
 .dm-act-sep{width:1px;height:16px;background:rgba(255,255,255,0.16);margin:0 2px;}
 .dm-act-reply{background:transparent;border:none;padding:2px 6px;color:rgba(255,255,255,0.88);font-size:11.5px;font-weight:700;font-family:'DM Sans',sans-serif;cursor:none;border-radius:6px;display:inline-flex;align-items:center;gap:4px;}
 .dm-rxs{display:flex;flex-wrap:wrap;gap:4px;margin-top:6px;}
@@ -1187,12 +1197,21 @@ function renderMsgs(msgs,d){
     return `<div class="dm-quote"><div class="dm-quote-author">↩ ${__dmEsc(author)}</div><div class="dm-quote-body">${__dmEsc(body)}</div></div>`;
   };
   // Build the inline action pill (5 reactions + reply) for a message.
-  const actionsFor = (mid) => {
+  // Each emoji that the viewer has already reacted with gets the `on`
+  // class so it picks up the orange ring style — clear at-a-glance cue
+  // for "I already reacted with this one." Clicking again removes it.
+  const actionsFor = (m) => {
     const emos = ['❤️','👍','👎','😂','🔥'];
-    const buttons = emos.map((e) =>
-      `<button type="button" class="dm-act-emo" onclick="event.stopPropagation();__dmToggleReaction('${__dmEsc(mid)}','${__dmEsc(e)}')" aria-label="React with ${__dmEsc(e)}">${e}</button>`
-    ).join('');
-    return `<div class="dm-actions">${buttons}<span class="dm-act-sep"></span><button type="button" class="dm-act-reply" onclick="event.stopPropagation();__dmStartReply('${__dmEsc(mid)}')" aria-label="Reply">↩ Reply</button></div>`;
+    const mine = new Set(
+      Array.isArray(m && m.reactions)
+        ? m.reactions.filter((r) => r.viewer_reacted).map((r) => r.emoji)
+        : [],
+    );
+    const buttons = emos.map((e) => {
+      const cls = 'dm-act-emo' + (mine.has(e) ? ' on' : '');
+      return `<button type="button" class="${cls}" onclick="event.stopPropagation();__dmToggleReaction('${__dmEsc(m.id)}','${__dmEsc(e)}')" aria-label="React with ${__dmEsc(e)}">${e}</button>`;
+    }).join('');
+    return `<div class="dm-actions">${buttons}<span class="dm-act-sep"></span><button type="button" class="dm-act-reply" onclick="event.stopPropagation();__dmStartReply('${__dmEsc(m.id)}')" aria-label="Reply">↩ Reply</button></div>`;
   };
   // Reaction chips below the bubble.
   const chipsFor = (m) => {
@@ -1270,7 +1289,7 @@ function renderMsgs(msgs,d){
       const stub = quoteStubFor(m);
       // .btime is now a sibling of the bubble inside .dm-bubble-wrap,
       // positioned absolutely so revealing it on hover doesn't reflow.
-      const wrap = `<div class="dm-bubble-wrap"><div class="bubble">${__dmFormatBody(m.t)}</div>${actionsFor(m.id)}<div class="btime">${m.ts}</div></div>`;
+      const wrap = `<div class="dm-bubble-wrap"><div class="bubble">${__dmFormatBody(m.t)}</div>${actionsFor(m)}<div class="btime">${m.ts}</div></div>`;
       const stack = `<div style="display:flex;flex-direction:column;align-items:${mine?'flex-end':'flex-start'};max-width:70%;min-width:0;">${stub}${wrap}${chipsFor(m)}</div>`;
       h+=`<div class="msg-row${mine?' mine':''}${gc}">${!mine?avForMsg(m, showAv):''}${stack}</div>`;
     }
