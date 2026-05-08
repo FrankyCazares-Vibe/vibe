@@ -327,6 +327,8 @@ body{font-family:'DM Sans',sans-serif;background:var(--cream);color:var(--charco
 }
 .dm-act-sep{width:1px;height:16px;background:rgba(255,255,255,0.16);margin:0 2px;}
 .dm-act-reply{background:transparent;border:none;padding:2px 6px;color:rgba(255,255,255,0.88);font-size:11.5px;font-weight:700;font-family:'DM Sans',sans-serif;cursor:none;border-radius:6px;display:inline-flex;align-items:center;gap:4px;}
+.dm-act-del{background:transparent;border:none;padding:0;width:24px;height:24px;color:rgba(255,180,180,0.85);cursor:none;border-radius:999px;display:inline-flex;align-items:center;justify-content:center;transition:background-color .14s ease, color .14s ease;}
+.dm-act-del:hover{background:rgba(255,80,80,0.18);color:#FF8A8A;}
 .dm-rxs{display:flex;flex-wrap:wrap;gap:4px;margin-top:6px;}
 .msg-row.mine .dm-rxs{justify-content:flex-end;}
 .dm-rx{display:inline-flex;align-items:center;gap:4px;padding:2px 8px;border-radius:999px;background:rgba(20,16,28,0.55);border:1px solid rgba(255,255,255,0.10);color:rgba(255,255,255,0.85);font-family:'DM Sans',sans-serif;font-size:12px;font-weight:600;cursor:none;}
@@ -1270,16 +1272,24 @@ function renderMsgs(msgs,d){
   // for "I already reacted with this one." Clicking again removes it.
   const actionsFor = (m) => {
     const emos = ['❤️','👍','👎','😂','🔥'];
-    const mine = new Set(
+    const reacted = new Set(
       Array.isArray(m && m.reactions)
         ? m.reactions.filter((r) => r.viewer_reacted).map((r) => r.emoji)
         : [],
     );
     const buttons = emos.map((e) => {
-      const cls = 'dm-act-emo' + (mine.has(e) ? ' on' : '');
+      const cls = 'dm-act-emo' + (reacted.has(e) ? ' on' : '');
       return `<button type="button" class="${cls}" onclick="event.stopPropagation();__dmToggleReaction('${__dmEsc(m.id)}','${__dmEsc(e)}')" aria-label="React with ${__dmEsc(e)}">${e}</button>`;
     }).join('');
-    return `<div class="dm-actions">${buttons}<span class="dm-act-sep"></span><button type="button" class="dm-act-reply" onclick="event.stopPropagation();__dmStartReply('${__dmEsc(m.id)}')" aria-label="Reply">↩ Reply</button></div>`;
+    // Sender-only delete (matches the messages_delete_own RLS policy).
+    // Trash icon sits on the far right of the action pill — same row as
+    // reactions + reply, visible only when m.m === 1.
+    const deleteBtn = m && m.m === 1
+      ? `<button type="button" class="dm-act-del" onclick="event.stopPropagation();__dmDeleteMessage('${__dmEsc(m.id)}')" aria-label="Delete message" title="Delete">
+          <svg width="13" height="13" viewBox="0 0 13 13" fill="none"><path d="M2.5 3.5h8M5 3.5V2.2c0-.4.3-.7.7-.7h1.6c.4 0 .7.3.7.7v1.3M3.7 3.5l.6 7c0 .4.4.7.8.7h3.8c.4 0 .8-.3.8-.7l.6-7" stroke="currentColor" stroke-width="1.3" stroke-linecap="round" stroke-linejoin="round"/></svg>
+        </button>`
+      : '';
+    return `<div class="dm-actions">${buttons}<span class="dm-act-sep"></span><button type="button" class="dm-act-reply" onclick="event.stopPropagation();__dmStartReply('${__dmEsc(m.id)}')" aria-label="Reply">↩ Reply</button>${deleteBtn}</div>`;
   };
   // Reaction chips below the bubble.
   const chipsFor = (m) => {
@@ -2617,6 +2627,10 @@ function __dmPanelRender() {
     ? '<button class="cp-action danger" onclick="__dmPanelLeave()">Leave group</button>'
     : '';
 
+  // "Clear history" wipes the viewer's copy; "Delete conversation"
+  // additionally hides the thread from the inbox. Both are non-
+  // destructive for the peer (they keep their own copy).
+  const clearAction = '<button class="cp-action" onclick="__dmClearHistory()">Clear chat history</button>';
   const deleteAction = '<button class="cp-action danger" onclick="__dmDeleteCurrent()">Delete conversation</button>';
 
   body.innerHTML =
@@ -2629,6 +2643,7 @@ function __dmPanelRender() {
     muteAction +
     safetyActions +
     leaveAction +
+    clearAction +
     deleteAction;
 }
 
@@ -2780,6 +2795,66 @@ async function __dmTogglePinCurrent() {
   } catch (e) {
     console.error('[dm.pin]', e);
     alert('Could not update pin: ' + e.message);
+  }
+}
+
+// Delete a single message (sender only). Optimistic — yank from the
+// thread's cached msgs, repaint, then DELETE; on error refetch to recover.
+async function __dmDeleteMessage(messageId) {
+  const channelId = active;
+  if (!channelId || !messageId) return;
+  if (!confirm('Delete this message? Both sides will lose it.')) return;
+  const thread = __realDM.T[channelId];
+  if (thread && Array.isArray(thread.msgs)) {
+    const next = thread.msgs.filter((m) => m.id !== messageId);
+    if (next.length !== thread.msgs.length) {
+      thread.msgs = next;
+      try { renderMsgs(next, thread); } catch {}
+    }
+  }
+  try {
+    const r = await fetch(
+      '/api/me/threads/' + encodeURIComponent(channelId) +
+      '/messages/' + encodeURIComponent(messageId),
+      { method: 'DELETE', credentials: 'include' }
+    );
+    const j = await r.json();
+    if (!r.ok || !j.ok) throw new Error(j && j.error || 'delete_failed');
+  } catch (e) {
+    console.error('[dm.delete-message]', e);
+    alert('Could not delete: ' + (e.message || 'unknown'));
+    // Restore by refetching the channel from scratch.
+    if (typeof __dmLoadMessages === 'function') __dmLoadMessages(channelId);
+  }
+}
+
+// Clear the viewer's history of this thread. Stamps cleared_at on
+// channel_members; the peer's view is unaffected. After success, drop
+// the in-memory cache + repaint so the chat empties immediately.
+async function __dmClearHistory() {
+  const channelId = active;
+  if (!channelId) return;
+  const peerName = (__realDM.T[channelId] && __realDM.T[channelId].n) || 'this person';
+  if (!confirm(
+    'Clear chat history with ' + peerName + '?\n\n' +
+    'This only clears your view. ' + peerName + ' will still see their copy.'
+  )) return;
+  try {
+    const r = await fetch(
+      '/api/me/threads/' + encodeURIComponent(channelId) + '/clear',
+      { method: 'POST', credentials: 'include' }
+    );
+    const j = await r.json();
+    if (!r.ok || !j.ok) throw new Error(j && j.error || 'clear_failed');
+    const thread = __realDM.T[channelId];
+    if (thread) {
+      thread.msgs = [];
+      try { renderMsgs([], thread); } catch {}
+    }
+    if (typeof __dmPanelClose === 'function') __dmPanelClose();
+  } catch (e) {
+    console.error('[dm.clear]', e);
+    alert('Could not clear history: ' + (e.message || 'unknown'));
   }
 }
 

@@ -185,8 +185,20 @@ async function signMediaUrls(rows: MessageRow[]): Promise<void> {
 type RouteCtx = { params: Promise<{ id: string }> };
 
 type ChannelAccess =
-  | { ok: true; isOrgChannel: false; orgId: null; accepted_at: string | null }
-  | { ok: true; isOrgChannel: true; orgId: string; accepted_at: null }
+  | {
+      ok: true;
+      isOrgChannel: false;
+      orgId: null;
+      accepted_at: string | null;
+      cleared_at: string | null;
+    }
+  | {
+      ok: true;
+      isOrgChannel: true;
+      orgId: string;
+      accepted_at: null;
+      cleared_at: null;
+    }
   | { ok: false; status: number };
 
 /**
@@ -218,26 +230,49 @@ async function ensureMember(
       return { ok: false, status: 500 };
     }
     if (canView !== true) return { ok: false, status: 403 };
-    return { ok: true, isOrgChannel: true, orgId: channel.org_id as string, accepted_at: null };
+    return {
+      ok: true,
+      isOrgChannel: true,
+      orgId: channel.org_id as string,
+      accepted_at: null,
+      cleared_at: null,
+    };
   }
 
-  // DM/group path — original channel_members check
-  const { data, error } = await supabase
-    .from("channel_members")
-    .select("accepted_at")
-    .eq("channel_id", channelId)
-    .eq("user_id", userId)
-    .maybeSingle();
+  // DM/group path — original channel_members check.
+  // cleared_at is selected on the same row so the messages GET can filter
+  // out anything stamped before the viewer's last "Clear chat" call.
+  // Wrapped in a second try without cleared_at for deploy-lag safety
+  // (the column lands in 20260509100000 — fall back if missing).
+  async function readMember(includeCleared: boolean) {
+    return supabase
+      .from("channel_members")
+      .select(includeCleared ? "accepted_at, cleared_at" : "accepted_at")
+      .eq("channel_id", channelId)
+      .eq("user_id", userId)
+      .maybeSingle();
+  }
+  let { data, error } = await readMember(true);
+  if (error && /cleared_at|column .* does not exist/i.test(error.message ?? "")) {
+    const fb = await readMember(false);
+    data = fb.data;
+    error = fb.error;
+  }
   if (error) {
     console.error("[messages.ensureMember]", error);
     return { ok: false, status: 500 };
   }
   if (!data) return { ok: false, status: 403 };
+  const row = data as unknown as {
+    accepted_at: string | null;
+    cleared_at?: string | null;
+  };
   return {
     ok: true,
     isOrgChannel: false,
     orgId: null,
-    accepted_at: (data.accepted_at as string | null) ?? null,
+    accepted_at: row.accepted_at ?? null,
+    cleared_at: row.cleared_at ?? null,
   };
 }
 
@@ -268,6 +303,9 @@ export async function GET(req: Request, ctx: RouteCtx) {
 
   // Try the join-rich select first; if attachment columns/FK aren't in
   // the DB yet, retry with the simpler select so the page still renders.
+  // cleared_at filters out everything older than the viewer's last
+  // "Clear chat" call — viewer-side soft-delete; peer's view is intact.
+  const clearedAt = !member.isOrgChannel ? member.cleared_at : null;
   async function runQuery(select: string) {
     let q = supabase
       .from("messages")
@@ -276,6 +314,7 @@ export async function GET(req: Request, ctx: RouteCtx) {
       .order("created_at", { ascending: false })
       .limit(limit);
     if (before) q = q.lt("created_at", before);
+    if (clearedAt) q = q.gt("created_at", clearedAt);
     return q;
   }
   let { data, error } = await runQuery(MESSAGE_SELECT);
