@@ -1,7 +1,7 @@
 "use client";
 
 import Link from "next/link";
-import { useState } from "react";
+import { useEffect, useState } from "react";
 
 type Profile = {
   id: string;
@@ -84,10 +84,243 @@ export function SettingsClient({ profile }: { profile: Profile }) {
       </header>
 
       <AccountCard profile={profile} />
+      <BlockedUsersCard />
       <SignOutCard />
       <DangerZone handle={profile.handle} />
       <LegalFooter />
     </main>
+  );
+}
+
+type BlockedUser = {
+  id: string;
+  name: string | null;
+  handle: string | null;
+  avatar_url: string | null;
+  major: string | null;
+  year: number | null;
+  blocked_at: string | null;
+};
+
+function BlockedUsersCard() {
+  const [users, setUsers] = useState<BlockedUser[] | null>(null);
+  const [unblocking, setUnblocking] = useState<string | null>(null);
+
+  useEffect(() => {
+    let cancelled = false;
+    (async () => {
+      try {
+        const res = await fetch("/api/me/block", { cache: "no-store" });
+        const data = await res.json();
+        if (cancelled) return;
+        if (res.ok && data?.ok && Array.isArray(data.users)) {
+          setUsers(data.users as BlockedUser[]);
+        } else {
+          setUsers([]);
+        }
+      } catch {
+        if (!cancelled) setUsers([]);
+      }
+    })();
+    return () => {
+      cancelled = true;
+    };
+  }, []);
+
+  const unblock = async (u: BlockedUser) => {
+    if (unblocking) return;
+    setUnblocking(u.id);
+    try {
+      const res = await fetch("/api/me/block", {
+        method: "DELETE",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ target_id: u.id }),
+      });
+      const data = await res.json();
+      if (res.ok && data?.ok) {
+        setUsers((prev) => (prev ?? []).filter((x) => x.id !== u.id));
+      }
+    } finally {
+      setUnblocking(null);
+    }
+  };
+
+  return (
+    <section style={{ ...CARD_GLASS, padding: 22, marginBottom: 16 }}>
+      <SectionTitle>Blocked users</SectionTitle>
+      <p
+        style={{
+          fontFamily: "DM Sans, sans-serif",
+          fontSize: 14,
+          color: "#5C5853",
+          margin: "0 0 14px",
+          maxWidth: 520,
+          lineHeight: 1.5,
+        }}
+      >
+        Blocked users can&apos;t see your posts, message you, or react to
+        anything you post. Unblock anyone here.
+      </p>
+
+      {users === null ? (
+        <div
+          style={{
+            fontFamily: "DM Sans, sans-serif",
+            fontSize: 13,
+            color: "#8A8580",
+          }}
+        >
+          Loading…
+        </div>
+      ) : users.length === 0 ? (
+        <div
+          style={{
+            padding: "16px",
+            borderRadius: 12,
+            background: "rgba(28,28,30,0.03)",
+            border: "1px dashed rgba(28,28,30,0.12)",
+            fontFamily: "DM Sans, sans-serif",
+            fontSize: 13,
+            color: "#8A8580",
+            textAlign: "center",
+          }}
+        >
+          You haven&apos;t blocked anyone.
+        </div>
+      ) : (
+        <div style={{ display: "flex", flexDirection: "column", gap: 8 }}>
+          {users.map((u) => (
+            <BlockedRow
+              key={u.id}
+              user={u}
+              busy={unblocking === u.id}
+              onUnblock={() => unblock(u)}
+            />
+          ))}
+        </div>
+      )}
+    </section>
+  );
+}
+
+function BlockedRow({
+  user,
+  busy,
+  onUnblock,
+}: {
+  user: BlockedUser;
+  busy: boolean;
+  onUnblock: () => void;
+}) {
+  const initials = (user.name ?? user.handle ?? "?")
+    .trim()
+    .split(/\s+/)
+    .filter(Boolean)
+    .slice(0, 2)
+    .map((s) => s[0]!)
+    .join("")
+    .toUpperCase();
+  const meta = [user.major, user.year ? String(user.year) : null]
+    .filter(Boolean)
+    .join(" · ");
+
+  return (
+    <div
+      style={{
+        display: "flex",
+        alignItems: "center",
+        gap: 12,
+        padding: "10px 12px",
+        borderRadius: 12,
+        background: "rgba(255,255,255,0.55)",
+        border: "1px solid rgba(28,28,30,0.06)",
+      }}
+    >
+      <div
+        style={{
+          width: 40,
+          height: 40,
+          borderRadius: 999,
+          background: user.avatar_url
+            ? `url(${user.avatar_url}) center/cover`
+            : "linear-gradient(180deg, #FFD8B8 0%, #FFB890 100%)",
+          color: "#7A3A18",
+          flexShrink: 0,
+          display: "flex",
+          alignItems: "center",
+          justifyContent: "center",
+          fontFamily: "Fraunces, serif",
+          fontWeight: 700,
+          fontSize: 13,
+          border: "1px solid rgba(255,255,255,0.92)",
+        }}
+      >
+        {!user.avatar_url ? initials : null}
+      </div>
+      <div style={{ flex: 1, minWidth: 0 }}>
+        <div
+          style={{
+            fontFamily: "Fraunces, serif",
+            fontSize: 14,
+            fontWeight: 800,
+            color: "#1C1C1E",
+            overflow: "hidden",
+            textOverflow: "ellipsis",
+            whiteSpace: "nowrap",
+          }}
+        >
+          {user.name || user.handle || "Member"}
+          {user.handle ? (
+            <span
+              style={{
+                fontFamily: "DM Sans, sans-serif",
+                fontWeight: 500,
+                fontSize: 12,
+                color: "#8A8580",
+                marginLeft: 6,
+              }}
+            >
+              @{user.handle}
+            </span>
+          ) : null}
+        </div>
+        {meta ? (
+          <div
+            style={{
+              fontFamily: "DM Sans, sans-serif",
+              fontSize: 11.5,
+              color: "#5C5853",
+              marginTop: 2,
+              overflow: "hidden",
+              textOverflow: "ellipsis",
+              whiteSpace: "nowrap",
+            }}
+          >
+            {meta}
+          </div>
+        ) : null}
+      </div>
+      <button
+        type="button"
+        onClick={onUnblock}
+        disabled={busy}
+        style={{
+          padding: "7px 14px",
+          borderRadius: 999,
+          border: "1px solid rgba(28,28,30,0.14)",
+          background: "rgba(28,28,30,0.04)",
+          color: "#1C1C1E",
+          fontFamily: "DM Sans, sans-serif",
+          fontSize: 12,
+          fontWeight: 700,
+          cursor: busy ? "wait" : "pointer",
+          opacity: busy ? 0.7 : 1,
+          flexShrink: 0,
+        }}
+      >
+        {busy ? "Unblocking…" : "Unblock"}
+      </button>
+    </div>
   );
 }
 

@@ -7,6 +7,69 @@ type Body = {
   handle?: unknown;
 };
 
+/**
+ * List the users the viewer has blocked. Powers the "Blocked users"
+ * section on /settings — newest block first.
+ */
+export async function GET() {
+  const supabase = await createSupabaseServerClient();
+  const {
+    data: { user },
+    error: authErr,
+  } = await supabase.auth.getUser();
+  if (authErr || !user) {
+    return NextResponse.json({ ok: false, error: "Unauthorized" }, { status: 401 });
+  }
+
+  const { data: rows, error } = await supabase
+    .from("blocks")
+    .select("blocked_id, created_at")
+    .eq("blocker_id", user.id)
+    .order("created_at", { ascending: false });
+  if (error) {
+    console.error("[block.GET list]", error);
+    return NextResponse.json({ ok: false, error: error.message }, { status: 500 });
+  }
+
+  const ids = (rows ?? []).map((r) => (r as { blocked_id: string }).blocked_id);
+  if (ids.length === 0) {
+    return NextResponse.json({ ok: true, users: [] });
+  }
+
+  const { data: profiles } = await supabase
+    .from("users")
+    .select("id, name, handle, avatar_url, major, year")
+    .in("id", ids);
+  const byId = new Map<string, Record<string, unknown>>();
+  for (const p of profiles ?? []) {
+    byId.set((p as { id: string }).id, p as Record<string, unknown>);
+  }
+
+  // Preserve newest-first order from the blocks query.
+  const blockedAtById = new Map<string, string>();
+  for (const r of rows ?? []) {
+    const row = r as { blocked_id: string; created_at: string };
+    blockedAtById.set(row.blocked_id, row.created_at);
+  }
+  const users = ids
+    .map((id) => {
+      const p = byId.get(id);
+      if (!p) return null;
+      return {
+        id,
+        name: (p.name as string | null) ?? null,
+        handle: (p.handle as string | null) ?? null,
+        avatar_url: (p.avatar_url as string | null) ?? null,
+        major: (p.major as string | null) ?? null,
+        year: (p.year as number | null) ?? null,
+        blocked_at: blockedAtById.get(id) ?? null,
+      };
+    })
+    .filter((x): x is NonNullable<typeof x> => x !== null);
+
+  return NextResponse.json({ ok: true, users });
+}
+
 async function resolveTargetId(
   supabase: Awaited<ReturnType<typeof createSupabaseServerClient>>,
   body: Body,
