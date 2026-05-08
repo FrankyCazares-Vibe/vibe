@@ -274,6 +274,19 @@ export async function POST(req: Request) {
 
   const existing = await findExistingDm(supabase, user.id, target.id);
   if (existing) {
+    // Re-engaging an existing DM should always re-surface it in the inbox.
+    // If the viewer previously hid this thread (Delete conversation, or as
+    // a side-effect of blocking), they're explicitly trying to open it now,
+    // so clear `hidden_at`. Best-effort; non-fatal.
+    try {
+      await supabase
+        .from("channel_members")
+        .update({ hidden_at: null })
+        .eq("channel_id", existing)
+        .eq("user_id", user.id);
+    } catch (e) {
+      console.error("[threads.POST unhide existing]", e);
+    }
     return NextResponse.json({ ok: true, channel_id: existing, created: false });
   }
 

@@ -206,5 +206,43 @@ export async function DELETE(req: Request) {
     console.error("[block.DELETE]", error);
     return NextResponse.json({ ok: false, error: error.message }, { status: 500 });
   }
+
+  // Block stamps `hidden_at` on the viewer's channel_members rows for any
+  // shared 1:1 channels (so the chat disappears from the inbox). Unblock
+  // is meant to be the symmetric reverse — clear `hidden_at` so the user
+  // can find and open those threads again. Otherwise the chat is stuck
+  // hidden forever and Message-from-profile returns a channel id that
+  // /messages can't render (T[cid] is empty → __dmOpenChannel no-ops).
+  // Best-effort — non-fatal. The unblock itself already succeeded.
+  try {
+    const { data: viewerChans } = await supabase
+      .from("channel_members")
+      .select("channel_id, channels!inner(type)")
+      .eq("user_id", user.id)
+      .eq("channels.type", "dm");
+    const myChannelIds = (viewerChans ?? []).map(
+      (r) => (r as { channel_id: string }).channel_id,
+    );
+    if (myChannelIds.length > 0) {
+      const { data: shared } = await supabase
+        .from("channel_members")
+        .select("channel_id")
+        .eq("user_id", target.id)
+        .in("channel_id", myChannelIds);
+      const sharedIds = (shared ?? []).map(
+        (r) => (r as { channel_id: string }).channel_id,
+      );
+      if (sharedIds.length > 0) {
+        await supabase
+          .from("channel_members")
+          .update({ hidden_at: null })
+          .eq("user_id", user.id)
+          .in("channel_id", sharedIds);
+      }
+    }
+  } catch (e) {
+    console.error("[block.DELETE unhide]", e);
+  }
+
   return NextResponse.json({ ok: true });
 }
