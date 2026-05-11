@@ -46,6 +46,18 @@ export function CustomCursor() {
     const HOVER_SEL = "a, button, input, select, textarea, label, [role='button'], [role='tab'], [data-cursor-hover]";
     function onOver(e: MouseEvent) {
       const t = e.target as Element | null;
+      // Pointer entered an iframe (e.g. /messages embeds /html/messages.html
+      // and that page has its own cursor) — hide ours so we don't double up.
+      if (t instanceof HTMLIFrameElement) {
+        dot!.classList.add("vibe-cursor-hidden");
+        ring!.classList.add("vibe-cursor-hidden");
+        return;
+      }
+      // Back inside the parent doc — show the cursor again.
+      if (dot!.classList.contains("vibe-cursor-hidden")) {
+        dot!.classList.remove("vibe-cursor-hidden");
+        ring!.classList.remove("vibe-cursor-hidden");
+      }
       if (t && t.closest?.(HOVER_SEL)) {
         dot!.classList.add("hover");
         ring!.classList.add("hover");
