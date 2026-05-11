@@ -227,7 +227,7 @@ export function OttoSidePanel({
             }}
           />
           <SectionEyebrow>your metrics</SectionEyebrow>
-          <MetricsBlock metrics={metrics} />
+          <MetricsBlock metrics={metrics} loading={loading} />
           <div
             aria-hidden
             style={{
@@ -532,13 +532,35 @@ function StatsGrid({
   );
 }
 
-function MetricsBlock({ metrics }: { metrics: MetricsPayload | null }) {
-  // Loading state for the metrics block — the rest of the panel can render
-  // before metrics resolve, so this is a small inline skeleton.
-  if (!metrics) {
+function MetricsBlock({
+  metrics,
+  loading,
+}: {
+  metrics: MetricsPayload | null;
+  loading: boolean;
+}) {
+  // Three states: still fetching, fetched but empty (migration not applied
+  // or no posts yet), or have data. Showing real text for each so a brand-new
+  // account or a half-migrated deploy doesn't get a permanent "loading…".
+  if (loading) {
     return (
       <div style={{ color: "rgba(255,255,255,0.4)", fontSize: 12, padding: "8px 0" }}>
         loading metrics…
+      </div>
+    );
+  }
+  if (!metrics) {
+    return (
+      <div
+        style={{
+          color: "rgba(255,255,255,0.5)",
+          fontSize: 12,
+          padding: "8px 0",
+          fontStyle: "italic",
+          fontFamily: "Fraunces, serif",
+        }}
+      >
+        metrics not available yet — once posts + views land they&apos;ll show here.
       </div>
     );
   }
