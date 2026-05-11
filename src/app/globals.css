@@ -1340,6 +1340,12 @@
 .vibe-cursor--ring.hover {
   border-color: #ff5c35;
 }
+/* Set when the pointer leaves the parent document (e.g. enters an iframe
+   like /messages or moves off-window) so we don't show a stuck cursor
+   alongside the iframe's own cursor. */
+.vibe-cursor-hidden {
+  opacity: 0;
+}
 
 @media (prefers-reduced-motion: reduce) {
   .vibe-cursor--dot,

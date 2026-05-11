@@ -66,11 +66,27 @@ export function CustomCursor() {
       raf = requestAnimationFrame(tick);
     }
 
+    // When the pointer enters an iframe (e.g. the embedded static prototype
+    // on /messages) the parent doc stops getting mousemove events and our
+    // cursor would freeze in place while the iframe's own cursor takes
+    // over — two visible cursors. mouseleave/enter on the document lets us
+    // hide ours whenever the iframe (or off-window) owns the pointer.
+    function onLeave() {
+      dot!.classList.add("vibe-cursor-hidden");
+      ring!.classList.add("vibe-cursor-hidden");
+    }
+    function onEnter() {
+      dot!.classList.remove("vibe-cursor-hidden");
+      ring!.classList.remove("vibe-cursor-hidden");
+    }
+
     document.addEventListener("mousemove", onMove, { passive: true });
     document.addEventListener("mousedown", onDown);
     document.addEventListener("mouseup", onUp);
     document.addEventListener("mouseover", onOver, true);
     document.addEventListener("mouseout", onOut, true);
+    document.documentElement.addEventListener("mouseleave", onLeave);
+    document.documentElement.addEventListener("mouseenter", onEnter);
     raf = requestAnimationFrame(tick);
 
     return () => {
@@ -80,6 +96,8 @@ export function CustomCursor() {
       document.removeEventListener("mouseup", onUp);
       document.removeEventListener("mouseover", onOver, true);
       document.removeEventListener("mouseout", onOut, true);
+      document.documentElement.removeEventListener("mouseleave", onLeave);
+      document.documentElement.removeEventListener("mouseenter", onEnter);
       document.body.classList.remove("vibe-cursor-active");
     };
   }, []);
