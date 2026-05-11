@@ -146,6 +146,17 @@ const navItems = [
 
 const visibleNavItems = navItems;
 
+/**
+ * Public nav item shape — shared with the mobile bottom tab bar so the two
+ * surfaces never drift out of sync.
+ */
+export type VibeNavItem = {
+  href: string;
+  label: string;
+  icon: React.ReactNode;
+};
+export const VIBE_NAV_ITEMS: VibeNavItem[] = navItems;
+
 export default function LeftNav() {
   const pathname = usePathname();
   const [isPlatformAdmin, setIsPlatformAdmin] = useState(false);
@@ -177,6 +188,7 @@ export default function LeftNav() {
 
   return (
     <aside
+      className="vibe-left-nav-aside"
       style={{
         padding: "20px 14px",
         borderRight: "1px solid rgba(28,28,30,0.08)",
@@ -362,7 +374,7 @@ function buildMonthCells(year: number, month: number): Array<{
   return cells;
 }
 
-function CalendarWidget() {
+export function CalendarWidget() {
   const [entries, setEntries] = useState<CalEntry[] | null>(null);
   const today = new Date();
   const [view, setView] = useState({

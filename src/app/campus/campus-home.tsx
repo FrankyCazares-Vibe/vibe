@@ -548,6 +548,7 @@ export function CampusHome({
           <LoadingPane />
         ) : showThreeColumn ? (
           <div
+            className="campus-three-rail"
             style={{
               flex: 1,
               display: "grid",
@@ -555,21 +556,25 @@ export function CampusHome({
               minHeight: 0,
             }}
           >
-            <ServerRail
-              orgs={orgs ?? []}
-              activeOrgId={activeOrgId}
-              onSelectOrg={(id) => setActiveOrgId(id)}
-              onCreateOrg={() => setShowCreateOrg(true)}
-            />
-            <ChannelRail
-              org={activeOrg}
-              channels={activeChannels}
-              activeChannelId={activeChannelId}
-              onSelectChannel={handleSelectChannel}
-              onOpenCreateChannel={() => setShowCreateChannel(true)}
-              onOpenSettings={() => setShowSettings(true)}
-              onOpenChannelSettings={(id) => setChannelSettingsId(id)}
-            />
+            <div className="campus-three-rail-server">
+              <ServerRail
+                orgs={orgs ?? []}
+                activeOrgId={activeOrgId}
+                onSelectOrg={(id) => setActiveOrgId(id)}
+                onCreateOrg={() => setShowCreateOrg(true)}
+              />
+            </div>
+            <div className="campus-three-rail-channel">
+              <ChannelRail
+                org={activeOrg}
+                channels={activeChannels}
+                activeChannelId={activeChannelId}
+                onSelectChannel={handleSelectChannel}
+                onOpenCreateChannel={() => setShowCreateChannel(true)}
+                onOpenSettings={() => setShowSettings(true)}
+                onOpenChannelSettings={(id) => setChannelSettingsId(id)}
+              />
+            </div>
             <ChannelMain
               org={activeOrg}
               channel={activeChannel}
@@ -584,6 +589,7 @@ export function CampusHome({
           />
         ) : (
           <div
+            className="campus-feed-grid"
             style={{
               flex: 1,
               display: "grid",
@@ -597,7 +603,9 @@ export function CampusHome({
               feedTagFilter={feedTagFilter}
               onClearTagFilter={() => setFeedTagFilter(null)}
             />
-            <OttoPanel onPickTag={onPickTag} />
+            <div className="campus-feed-aside">
+              <OttoPanel onPickTag={onPickTag} />
+            </div>
           </div>
         )}
 

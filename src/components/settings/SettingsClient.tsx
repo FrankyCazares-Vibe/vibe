@@ -38,6 +38,7 @@ const CARD_GLASS: React.CSSProperties = {
 export function SettingsClient({ profile }: { profile: Profile }) {
   return (
     <main
+      className="vibe-settings-main"
       style={{
         background: PAGE_BG,
         borderRight: "1px solid rgba(28,28,30,0.08)",

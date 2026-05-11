@@ -1,4 +1,4 @@
-import type { Metadata } from "next";
+import type { Metadata, Viewport } from "next";
 import "./globals.css";
 import { JetBrains_Mono } from "next/font/google";
 
@@ -10,6 +10,13 @@ const jetbrainsMono = JetBrains_Mono({subsets:['latin'],variable:'--font-mono'})
 export const metadata: Metadata = {
   title: "Vibe",
   description: "Your campus, your career, one profile.",
+};
+
+export const viewport: Viewport = {
+  width: "device-width",
+  initialScale: 1,
+  viewportFit: "cover",
+  themeColor: "#FAF7F2",
 };
 
 export default function RootLayout({

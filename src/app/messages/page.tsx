@@ -29,6 +29,7 @@ export default async function MessagesPage({ searchParams }: Props) {
       <iframe
         src={src}
         title="Messages"
+        className="vibe-messages-iframe"
         style={{
           width: "100%",
           height: "100vh",

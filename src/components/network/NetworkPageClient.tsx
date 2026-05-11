@@ -327,6 +327,7 @@ export function NetworkPageClient() {
 
   return (
     <main
+      className="vibe-network-main"
       style={{
         // Same warm radial cream wash the campus Feed uses — keeps the surface
         // continuous when bouncing between Campus → Network → Messages.

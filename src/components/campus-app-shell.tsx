@@ -4,6 +4,7 @@ import { usePathname } from "next/navigation";
 import type { ReactNode } from "react";
 
 import LeftNav from "@/components/LeftNav";
+import { MobileNavChrome } from "@/components/MobileNavChrome";
 import { OttoCorner } from "@/components/network/OttoCorner";
 
 type Props = {
@@ -19,6 +20,11 @@ type Props = {
  * We hide the orb on /messages because the messaging surface already has
  * its own bottom-right composer + iframe-cursor seam, and an extra floating
  * element on top of that conflicts visually with the chat UI.
+ *
+ * Below the 900px breakpoint the layout collapses to a single column and
+ * the MobileNavChrome takes over (top bar + bottom tab bar + slide-out
+ * sheet). The desktop LeftNav and right rail are hidden via CSS — see
+ * globals.css `.vibe-app-shell` rules.
  */
 export function CampusAppShell({ children, sidebar }: Props) {
   const pathname = usePathname();
@@ -26,15 +32,14 @@ export function CampusAppShell({ children, sidebar }: Props) {
 
   return (
     <div
-      style={{
-        display: "grid",
-        gridTemplateColumns: sidebar ? "200px 1fr 320px" : "200px 1fr",
-        minHeight: "100vh",
-      }}
+      className={
+        sidebar ? "vibe-app-shell vibe-app-shell--with-rail" : "vibe-app-shell"
+      }
     >
       <LeftNav />
       {children}
-      {sidebar ?? null}
+      {sidebar ? <div className="vibe-right-rail">{sidebar}</div> : null}
+      <MobileNavChrome />
       {showOttoCorner ? <OttoCorner /> : null}
     </div>
   );
