@@ -10,6 +10,10 @@
 <script src="/html/_mockUsers.js"></script>
 <script src="/html/_studentVerify.js"></script>
 <script src="/html/_otto.js" defer></script>
+<!-- PDF.js — rasterizes uploaded PDFs into images so redaction bars can
+     live inside the same scroll container as the page content. Loaded
+     async; the resume viewer waits for it before drawing any PDFs. -->
+<script src="https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.min.js" defer></script>
 <script src="/html/_postViewer.js" defer></script>
 <script src="/html/_sharePicker.js" defer></script>
 <script src="/html/_imageCropper.js" defer></script>
@@ -890,20 +894,22 @@ body.edit-mode .resume-upload-row { display:flex; }
 .resume-clear-btn:hover { color:var(--accent);border-color:rgba(255,92,53,.25);background:#FFF7F4; }
 
 .doc-viewer-grid {
-  display:grid;grid-template-columns:280px 1fr;gap:16px;
+  display:grid;grid-template-columns:180px 1fr;gap:14px;
+  /* Modal stays compact — main column flexes, thumb column is fixed. */
 }
 .doc-thumb-panel {
   border-right:1px solid var(--border);
-  padding-right:12px;
-  max-height:68vh;
-  overflow:auto;
+  padding-right:10px;
+  /* Thumb panel scrolls independently when more thumbs are added. */
+  max-height:70vh;
+  overflow-y:auto;
 }
 .doc-pages {
   display:flex;flex-direction:column;gap:10px;
 }
 .doc-page-thumb {
   width:100%;
-  border-radius:14px;
+  border-radius:10px;
   overflow:hidden;
   border:1.5px solid transparent;
   background:var(--cream);
@@ -916,7 +922,8 @@ body.edit-mode .resume-upload-row { display:flex; }
   box-shadow:0 10px 20px rgba(255,92,53,.08);
 }
 .doc-page-thumb img,
-.doc-page-thumb iframe {
+.doc-page-thumb iframe,
+.doc-page-thumb canvas {
   display:block;
   width:100%;
   aspect-ratio:8.5/11;
@@ -924,10 +931,13 @@ body.edit-mode .resume-upload-row { display:flex; }
   border:none;
 }
 .doc-page-thumb-label {
-  padding:8px 10px;
-  font-size:11px;
+  padding:6px 8px;
+  font-size:10.5px;
   font-weight:700;
   color:var(--muted);
+  white-space:nowrap;
+  overflow:hidden;
+  text-overflow:ellipsis;
 }
 .doc-page-thumb-remove {
   position:absolute;
@@ -969,28 +979,52 @@ body.edit-mode .resume-upload-row { display:flex; }
   width:100%;
   position:relative;
   border:1px solid var(--border);
-  border-radius:18px;
-  overflow:hidden;
-  background:white;
-  /* PDF aspect ratio (Letter / A4 are close enough) locks the iframe so
-     the rendered page fills the view exactly. Redaction bars stored as
-     percentages of .doc-view land in the same page coordinate space, so
-     scrolling can't drift them off-content. Images override below. */
-  aspect-ratio: 8.5 / 11;
-  max-height:78vh;
+  border-radius:14px;
+  overflow-y:auto;
+  overflow-x:hidden;
+  background:#f5f4f0;
+  max-height:72vh;
+  /* The viewer scrolls the page stack. Each .doc-page-wrap inside is a
+     positioned container holding a rasterized page + that page's bars,
+     so bars are anchored to page coordinates and scroll with content. */
+  padding:14px;
+  display:flex;
+  flex-direction:column;
+  gap:14px;
 }
-.doc-view.is-image {
-  aspect-ratio:auto;
-  min-height:62vh;
-}
-.doc-view img,
-.doc-view iframe {
+.doc-view.is-editing-redactions { cursor:crosshair; }
+
+.doc-page-wrap {
+  position:relative;
   width:100%;
-  height:100%;
-  border:none;
-  display:block;
-  object-fit:contain;
   background:white;
+  border-radius:10px;
+  box-shadow:0 4px 12px rgba(0,0,0,.08);
+  overflow:hidden;
+  /* Pages keep their natural aspect ratio so bars positioned in % space
+     align exactly to page coordinates. */
+}
+.doc-page-wrap canvas,
+.doc-page-wrap img {
+  display:block;
+  width:100%;
+  height:auto;
+  user-select:none;
+  -webkit-user-drag:none;
+}
+.doc-page-number {
+  position:absolute;
+  bottom:6px;
+  right:8px;
+  font-size:10px;
+  font-weight:700;
+  letter-spacing:.4px;
+  text-transform:uppercase;
+  color:rgba(0,0,0,.5);
+  background:rgba(255,255,255,.85);
+  padding:2px 6px;
+  border-radius:6px;
+  pointer-events:none;
 }
 .doc-nav {
   display:flex;gap:8px;align-items:center;justify-content:space-between;
@@ -3572,8 +3606,7 @@ body.empty-profile-mode #profileEmpty { display: flex !important; }
           <div class="resume-filename" id="resumeFileName">Attach a resume or portfolio</div>
           <div class="resume-meta" id="resumeMeta">Click to open the in-site viewer. PDFs and images stay inside the app.</div>
           <div class="resume-actions" style="margin-top:8px">
-            <span class="resume-chip primary">Open viewer</span>
-            <span class="resume-chip">Compact</span>
+            <span class="resume-chip primary">Open viewer →</span>
           </div>
         </div>
       </div>
@@ -3613,9 +3646,9 @@ body.empty-profile-mode #profileEmpty { display: flex !important; }
 
 <!-- Resume / Portfolio viewer -->
 <div class="modal-backdrop" id="docModal">
-  <div class="modal" style="width:min(1100px, calc(100vw - 28px));padding:24px 24px 22px;">
+  <div class="modal" style="width:min(820px, calc(100vw - 28px));padding:16px 18px 16px;">
     <button class="modal-close" onclick="closeModal('docModal')">×</button>
-    <div class="modal-title" style="margin-bottom:14px">Resume / Portfolio</div>
+    <div class="modal-title" style="margin-bottom:10px;font-size:18px">Resume / Portfolio</div>
     <div class="doc-viewer-grid">
       <div class="doc-thumb-panel">
         <div style="font-size:11px;font-weight:800;letter-spacing:1px;text-transform:uppercase;color:var(--muted);margin-bottom:10px">Pages / files</div>
@@ -4288,12 +4321,60 @@ function deleteCurrent(btn){ btn.closest('.current-item').remove(); saveProfileT
 
 
 // ── Resume / portfolio viewer ───────────────────────────────────
+// resumePortfolio entries:
+//   { name, type: 'pdf'|'image', url, pages?: [dataUrl] }
+//   PDFs always have pages[]; images have a single page = the image url.
 let resumePortfolio = [];
 let activeDocIndex = 0;
 
 function guessDocType(fileName, mime) {
   if ((mime || '').includes('pdf') || fileName.toLowerCase().endsWith('.pdf')) return 'pdf';
   return 'image';
+}
+
+// Wait for pdf.js to load (deferred CDN script). Resolves once `pdfjsLib`
+// is available globally.
+function _waitForPdfJs(timeoutMs = 8000) {
+  return new Promise((resolve, reject) => {
+    if (window.pdfjsLib) return resolve(window.pdfjsLib);
+    const start = Date.now();
+    const tick = () => {
+      if (window.pdfjsLib) return resolve(window.pdfjsLib);
+      if (Date.now() - start > timeoutMs) return reject(new Error('pdf.js failed to load'));
+      setTimeout(tick, 80);
+    };
+    tick();
+  });
+}
+
+// Rasterize every page of a PDF (data URL) into image data URLs. The
+// scale=1.6 balances readability vs. payload size for typical Letter pages.
+async function _rasterizePdf(dataUrl) {
+  const pdfjsLib = await _waitForPdfJs();
+  pdfjsLib.GlobalWorkerOptions.workerSrc =
+    'https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.worker.min.js';
+  const pdf = await pdfjsLib.getDocument({ data: _dataUrlToUint8(dataUrl) }).promise;
+  const pages = [];
+  for (let i = 1; i <= pdf.numPages; i++) {
+    const page = await pdf.getPage(i);
+    const viewport = page.getViewport({ scale: 1.6 });
+    const canvas = document.createElement('canvas');
+    canvas.width = viewport.width;
+    canvas.height = viewport.height;
+    const ctx = canvas.getContext('2d');
+    await page.render({ canvasContext: ctx, viewport }).promise;
+    // JPEG keeps the per-page data url under ~200KB for typical resumes.
+    pages.push(canvas.toDataURL('image/jpeg', 0.85));
+  }
+  return pages;
+}
+
+function _dataUrlToUint8(dataUrl) {
+  const base64 = dataUrl.split(',')[1] || '';
+  const bin = atob(base64);
+  const arr = new Uint8Array(bin.length);
+  for (let i = 0; i < bin.length; i++) arr[i] = bin.charCodeAt(i);
+  return arr;
 }
 
 const MAX_RESUME_DOCS = 2;
@@ -4311,16 +4392,33 @@ async function handleResumeUpload(input) {
   // portfolio image alongside. Cap at MAX so the storage payload stays sane.
   const slotsLeft = MAX_RESUME_DOCS - resumePortfolio.length;
   const incoming = files.slice(0, slotsLeft);
-  const newDocs = await Promise.all(incoming.map(async file => ({
-    name: file.name,
-    type: guessDocType(file.name, file.type),
-    url: await _fileToDataURL(file),
-  })));
+  showToast('Preparing attachment…');
+  const newDocs = [];
+  for (const file of incoming) {
+    const url = await _fileToDataURL(file);
+    const type = guessDocType(file.name, file.type);
+    if (type === 'pdf') {
+      try {
+        const pages = await _rasterizePdf(url);
+        newDocs.push({ name: file.name, type, url, pages });
+      } catch (e) {
+        console.error('[resume] PDF rasterize failed', e);
+        showToast('Could not read this PDF — try saving it as images.');
+        continue;
+      }
+    } else {
+      // Images get a single "page" so the same per-page rendering loop
+      // handles both types uniformly.
+      newDocs.push({ name: file.name, type, url, pages: [url] });
+    }
+  }
+  if (!newDocs.length) {
+    input.value = '';
+    return;
+  }
   resumePortfolio = [...resumePortfolio, ...newDocs];
-  // Focus the most-recently-added doc so they see it land.
   activeDocIndex = resumePortfolio.length - 1;
   renderResumeCard();
-  // If the viewer is open while uploading, refresh it inline.
   const modal = document.getElementById('docModal');
   if (modal && modal.classList.contains('open')) renderDocViewer();
   if (files.length > slotsLeft) {
@@ -4336,10 +4434,10 @@ function removeResumeDoc(idx) {
   if (idx < 0 || idx >= resumePortfolio.length) return;
   resumePortfolio.splice(idx, 1);
   // Bars on the removed doc are dropped; bars on later docs shift down one
-  // pageIndex so they stay attached to the right attachment.
+  // docIndex so they stay attached to the right attachment.
   redactionBars = redactionBars
-    .filter(b => b.pageIndex !== idx)
-    .map(b => (b.pageIndex > idx ? { ...b, pageIndex: b.pageIndex - 1 } : b));
+    .filter(b => b.docIndex !== idx)
+    .map(b => (b.docIndex > idx ? { ...b, docIndex: b.docIndex - 1 } : b));
   if (activeDocIndex >= resumePortfolio.length) {
     activeDocIndex = Math.max(0, resumePortfolio.length - 1);
   }
@@ -4414,14 +4512,14 @@ function closeDocumentViewer() {
 
 
 // ── Redaction bars for resume / portfolio viewer ─────────────────
-// Coordinate space: percentages of .doc-view. Since .doc-view's
-// aspect-ratio is locked to a Letter page for PDFs (and to the natural
-// image bounds for images), this maps 1:1 to page coordinates and bars
-// stay anchored to the visible content — no scroll drift.
+// Coordinate space: percentages of an individual .doc-page-wrap. Each
+// page wrapper is a `position: relative` container that holds the
+// rasterized page image and the bars for that page — so when the
+// viewer scrolls, bars travel WITH the page content (no drift).
 //
-// State:
-//   redactionBars: [{ pageIndex, x, y, w, h }]  — pageIndex == doc index
-//   selectedBarIdx: index into redactionBars, or null
+// Bar entries:
+//   { docIndex, pageNumber (1-based), x, y, w, h }
+// Selection is a single absolute index into redactionBars, or null.
 let redactionBars = [];
 let selectedBarIdx = null;
 
@@ -4431,19 +4529,29 @@ function isOwnerEditing() {
   return !!(editMode && !viewerMode && resumePortfolio.length);
 }
 
+// Find the .doc-page-wrap that contains a given event target (or its
+// nearest ancestor). Used by the draw handler to know which page a
+// pointerdown landed in.
+function _pageWrapFor(target) {
+  return target.closest && target.closest('.doc-page-wrap');
+}
+function _pageNumberFor(wrap) {
+  return parseInt(wrap.dataset.page, 10) || 1;
+}
+
 function renderRedactionBars() {
   const view = getDocViewEl();
   if (!view) return;
   view.querySelectorAll('.redaction-bar').forEach(n => n.remove());
 
   if (!resumePortfolio[activeDocIndex]) return;
-
-  // Editing affordance hint on the container (changes cursor + locks iframe).
   view.classList.toggle('is-editing-redactions', isOwnerEditing());
-  view.classList.toggle('has-redactions', redactionBars.some(b => b.pageIndex === activeDocIndex));
 
+  // Build a lookup by page number for the current doc's bars.
   redactionBars.forEach((bar, absoluteIdx) => {
-    if (bar.pageIndex !== activeDocIndex) return;
+    if (bar.docIndex !== activeDocIndex) return;
+    const wrap = view.querySelector(`.doc-page-wrap[data-page="${bar.pageNumber}"]`);
+    if (!wrap) return;
     const el = document.createElement('div');
     el.className = 'redaction-bar' + (selectedBarIdx === absoluteIdx ? ' selected' : '');
     el.dataset.barIdx = String(absoluteIdx);
@@ -4454,7 +4562,6 @@ function renderRedactionBars() {
 
     if (isOwnerEditing()) {
       el.addEventListener('pointerdown', onBarPointerDown);
-      // 8 resize handles
       ['nw','n','ne','e','se','s','sw','w'].forEach(h => {
         const dot = document.createElement('div');
         dot.className = 'redaction-handle';
@@ -4462,7 +4569,6 @@ function renderRedactionBars() {
         dot.addEventListener('pointerdown', (ev) => onHandlePointerDown(ev, absoluteIdx, h));
         el.appendChild(dot);
       });
-      // Delete X
       const del = document.createElement('button');
       del.type = 'button';
       del.className = 'redaction-delete';
@@ -4477,7 +4583,7 @@ function renderRedactionBars() {
     } else {
       el.style.cursor = 'default';
     }
-    view.appendChild(el);
+    wrap.appendChild(el);
   });
 }
 
@@ -4506,7 +4612,7 @@ function clearRedactions() {
     return;
   }
   // Drop only bars on the active doc — bars on the OTHER doc keep their work.
-  redactionBars = redactionBars.filter(b => b.pageIndex !== activeDocIndex);
+  redactionBars = redactionBars.filter(b => b.docIndex !== activeDocIndex);
   selectedBarIdx = null;
   renderRedactionBars();
   saveProfileToStorage();
@@ -4514,35 +4620,29 @@ function clearRedactions() {
 }
 
 // ── Drawing + dragging + resizing ─────────────────────────────────
-// One gesture handler on .doc-view:
-//   - pointerdown on a bar → drag (move)
-//   - pointerdown on a handle → resize
-//   - pointerdown on empty area → draw new bar
+// Single gesture handler delegated from .doc-view. Coordinates are
+// computed relative to the page wrap the pointerdown landed inside, so
+// each bar lives in its specific page's coordinate space.
 function onDocViewPointerDown(e) {
   if (!isOwnerEditing()) {
-    // Even when not editing, a click on empty space should deselect any
-    // lingering selection (e.g. after a save round-trip).
     if (selectedBarIdx !== null && !e.target.closest('.redaction-bar')) deselectBar();
     return;
   }
-  // If the user clicked an existing bar / handle / delete, those have their
-  // own listeners and will stopPropagation appropriately.
   if (e.target.closest('.redaction-bar')) return;
-  // Empty-space click deselects any currently-selected bar before starting
-  // a fresh draw gesture.
+  const wrap = _pageWrapFor(e.target);
+  if (!wrap) return; // clicked in the gutter between pages
   if (selectedBarIdx !== null) deselectBar();
   e.preventDefault();
-  startDrawing(e);
+  startDrawing(e, wrap);
 }
 
-function startDrawing(e) {
-  const view = getDocViewEl();
-  const bounds = view.getBoundingClientRect();
+function startDrawing(e, wrap) {
+  const bounds = wrap.getBoundingClientRect();
+  const pageNumber = _pageNumberFor(wrap);
   const startX = ((e.clientX - bounds.left) / bounds.width) * 100;
   const startY = ((e.clientY - bounds.top) / bounds.height) * 100;
 
-  // Create a fresh bar at 0×0; size grows with the drag.
-  const bar = { pageIndex: activeDocIndex, x: startX, y: startY, w: 0, h: 0 };
+  const bar = { docIndex: activeDocIndex, pageNumber, x: startX, y: startY, w: 0, h: 0 };
   redactionBars.push(bar);
   const newIdx = redactionBars.length - 1;
   selectedBarIdx = newIdx;
@@ -4562,15 +4662,7 @@ function startDrawing(e) {
   const up = () => {
     window.removeEventListener('pointermove', move);
     window.removeEventListener('pointerup', up);
-    // Treat a no-drag click as a deselect, not a 0×0 bar.
-    if (!dragged) {
-      redactionBars.pop();
-      selectedBarIdx = null;
-      renderRedactionBars();
-      return;
-    }
-    // Floor the dimensions — anything < 1% in either axis is a misclick.
-    if (bar.w < 1 || bar.h < 1) {
+    if (!dragged || bar.w < 1 || bar.h < 1) {
       redactionBars.pop();
       selectedBarIdx = null;
       renderRedactionBars();
@@ -4584,16 +4676,16 @@ function startDrawing(e) {
 
 function onBarPointerDown(e) {
   if (!isOwnerEditing()) return;
-  // Don't capture pointerdowns on the handles or delete X — they have their
-  // own handlers and we want resize/delete to win.
   if (e.target.closest('.redaction-handle, .redaction-delete')) return;
   e.stopPropagation();
   const el = e.currentTarget;
   const absoluteIdx = parseInt(el.dataset.barIdx, 10);
   selectBar(absoluteIdx);
 
-  const view = getDocViewEl();
-  const bounds = view.getBoundingClientRect();
+  // Compute relative-to-page bounds (the bar's parent .doc-page-wrap),
+  // so dragging stays scoped to the page the bar lives on.
+  const wrap = el.parentElement;
+  const bounds = wrap.getBoundingClientRect();
   const bar = redactionBars[absoluteIdx];
   const startX = e.clientX;
   const startY = e.clientY;
@@ -4621,9 +4713,12 @@ function onHandlePointerDown(e, absoluteIdx, dir) {
   e.preventDefault();
   selectBar(absoluteIdx);
 
-  const view = getDocViewEl();
-  const bounds = view.getBoundingClientRect();
   const bar = redactionBars[absoluteIdx];
+  // Find the page wrap for this bar's page so resize coords are correct.
+  const view = getDocViewEl();
+  const wrap = view.querySelector(`.doc-page-wrap[data-page="${bar.pageNumber}"]`);
+  if (!wrap) return;
+  const bounds = wrap.getBoundingClientRect();
   const startX = e.clientX;
   const startY = e.clientY;
   const origin = { x: bar.x, y: bar.y, w: bar.w, h: bar.h };
@@ -4657,15 +4752,6 @@ function onHandlePointerDown(e, absoluteIdx, dir) {
 }
 
 
-// PDF URL fragments: lock to page 1, fit to view, hide the native toolbar.
-// view=Fit keeps the page fully inside the iframe so redaction bars
-// positioned in % space align with the actual page content. We disable
-// pointer events on the iframe in CSS so the user can't scroll inside
-// it and drift the page out from under the bars.
-function pdfSrc(url) {
-  return `${url}#view=Fit&toolbar=0&navpanes=0&scrollbar=0`;
-}
-
 function renderDocViewer() {
   const pages = document.getElementById('docPages');
   const view = document.getElementById('docView');
@@ -4680,22 +4766,21 @@ function renderDocViewer() {
         No resume or portfolio attached yet. Use the button in edit mode to attach a PDF or portfolio images. Up to ${MAX_RESUME_DOCS} files.
       </div>`;
     view.innerHTML = `
-      <div style="display:flex;align-items:center;justify-content:center;height:62vh;color:var(--muted);font-size:14px;padding:24px;text-align:center">
+      <div style="display:flex;align-items:center;justify-content:center;min-height:60vh;color:var(--muted);font-size:14px;padding:24px;text-align:center">
         Attach a file to preview it here.
       </div>`;
-    view.classList.remove('is-image', 'is-editing-redactions', 'has-redactions');
+    view.classList.remove('is-editing-redactions');
     title.textContent = 'Preview';
     sub.textContent = 'Nothing attached yet.';
     counter.textContent = '0 / 0';
     return;
   }
 
-  // Thumbnails — include a tiny × remove button per doc for owners in edit mode.
+  // Doc thumbnails — first page of each doc, with a hover × to remove.
   pages.innerHTML = resumePortfolio.map((doc, idx) => {
     const active = idx === activeDocIndex ? 'active' : '';
-    const preview = doc.type === 'image'
-      ? `<img src="${doc.url}" alt="${doc.name}">`
-      : `<iframe src="${pdfSrc(doc.url)}" tabindex="-1"></iframe>`;
+    const firstPage = (doc.pages && doc.pages[0]) || doc.url;
+    const preview = `<img src="${firstPage}" alt="${doc.name}" draggable="false">`;
     const removeBtn = (editMode && !viewerMode)
       ? `<button type="button" class="doc-page-thumb-remove" onclick="event.stopPropagation(); removeResumeDoc(${idx})" title="Remove this attachment" aria-label="Remove ${doc.name.replace(/"/g, '&quot;')}">×</button>`
       : '';
@@ -4703,28 +4788,32 @@ function renderDocViewer() {
       <div class="doc-page-thumb ${active}" onclick="setActiveDoc(${idx})" style="position:relative">
         ${removeBtn}
         ${preview}
-        <div class="doc-page-thumb-label">${doc.name}</div>
+        <div class="doc-page-thumb-label" title="${doc.name.replace(/"/g, '&quot;')}">${doc.name}</div>
       </div>`;
   }).join('');
 
   const doc = resumePortfolio[activeDocIndex];
+  const numPages = (doc.pages && doc.pages.length) || 1;
   title.textContent = doc.name;
-  sub.textContent = doc.type === 'pdf'
-    ? 'PDF preview — locked to page 1 so redactions stay anchored. Upload extra pages as images for per-page redaction.'
-    : 'Image preview. Click + drag in edit mode to add a blackout bar.';
+  sub.textContent = numPages > 1
+    ? `${numPages} pages — scroll to navigate or use ← / →. Click and drag to redact.`
+    : 'Click and drag in edit mode to redact personal details.';
   counter.textContent = `${activeDocIndex + 1} / ${resumePortfolio.length}`;
 
-  view.classList.toggle('is-image', doc.type === 'image');
-  view.innerHTML = doc.type === 'image'
-    ? `<img src="${doc.url}" alt="${doc.name}" draggable="false">`
-    : `<iframe src="${pdfSrc(doc.url)}" tabindex="-1"></iframe>`;
+  // Build the scrollable page stack. Each .doc-page-wrap is a positioned
+  // container so bars live inside the same scroll context as content.
+  const pagesHtml = (doc.pages && doc.pages.length ? doc.pages : [doc.url]).map((src, i) => {
+    const pageNumber = i + 1;
+    const badge = numPages > 1 ? `<div class="doc-page-number">${pageNumber} / ${numPages}</div>` : '';
+    return `<div class="doc-page-wrap" data-page="${pageNumber}">
+      <img src="${src}" alt="${doc.name} page ${pageNumber}" draggable="false">
+      ${badge}
+    </div>`;
+  }).join('');
+  view.innerHTML = pagesHtml;
+  view.scrollTop = 0;
 
-  // Pointer-handler for drawing new bars. Bound on every render because the
-  // .doc-view innerHTML wipe removes prior listeners attached to children
-  // but the container itself persists — still, attaching here keeps the
-  // single source of truth in one place.
   view.onpointerdown = onDocViewPointerDown;
-
   renderRedactionBars();
 }
 
@@ -4734,8 +4823,35 @@ function setActiveDoc(idx) {
   renderDocViewer();
 }
 
+// Prev/Next navigate WITHIN the active doc when it has multiple pages,
+// scrolling the next page-wrap into view. When the doc is single-page (or
+// when we hit either edge), they fall back to cycling between attached
+// documents — that's the most common 2-attachment use case.
+function _currentVisiblePage(view) {
+  const wraps = Array.from(view.querySelectorAll('.doc-page-wrap'));
+  if (!wraps.length) return 1;
+  const viewTop = view.scrollTop;
+  // The page whose top is closest to (but at or below) the viewport top.
+  let chosen = 1;
+  wraps.forEach((w) => {
+    if (w.offsetTop <= viewTop + 4) chosen = _pageNumberFor(w);
+  });
+  return chosen;
+}
+
 function prevDocPage() {
   if (!resumePortfolio.length) return;
+  const view = getDocViewEl();
+  const doc = resumePortfolio[activeDocIndex];
+  const numPages = (doc.pages && doc.pages.length) || 1;
+  if (numPages > 1 && view) {
+    const cur = _currentVisiblePage(view);
+    if (cur > 1) {
+      const target = view.querySelector(`.doc-page-wrap[data-page="${cur - 1}"]`);
+      if (target) { target.scrollIntoView({ behavior: 'smooth', block: 'start' }); return; }
+    }
+  }
+  // Fallback: previous attachment.
   activeDocIndex = (activeDocIndex - 1 + resumePortfolio.length) % resumePortfolio.length;
   selectedBarIdx = null;
   renderDocViewer();
@@ -4743,6 +4859,17 @@ function prevDocPage() {
 
 function nextDocPage() {
   if (!resumePortfolio.length) return;
+  const view = getDocViewEl();
+  const doc = resumePortfolio[activeDocIndex];
+  const numPages = (doc.pages && doc.pages.length) || 1;
+  if (numPages > 1 && view) {
+    const cur = _currentVisiblePage(view);
+    if (cur < numPages) {
+      const target = view.querySelector(`.doc-page-wrap[data-page="${cur + 1}"]`);
+      if (target) { target.scrollIntoView({ behavior: 'smooth', block: 'start' }); return; }
+    }
+  }
+  // Fallback: next attachment.
   activeDocIndex = (activeDocIndex + 1) % resumePortfolio.length;
   selectedBarIdx = null;
   renderDocViewer();
