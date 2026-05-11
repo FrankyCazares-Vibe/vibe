@@ -764,6 +764,43 @@
   line-height: 1.5;
 }
 
+/* Bottom-rail link for returning users — bypasses the visit-all-three gate
+   and warps straight to /auth/login. */
+.vibe-landing-skip {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  margin-top: 28px;
+  padding: 8px 18px;
+  font-family: "DM Sans", sans-serif;
+  font-size: 11px;
+  font-weight: 600;
+  letter-spacing: 0.18em;
+  text-transform: uppercase;
+  color: rgba(250, 247, 242, 0.55);
+  text-decoration: none;
+  border: 1px solid rgba(250, 247, 242, 0.14);
+  border-radius: 999px;
+  background: rgba(250, 247, 242, 0.03);
+  backdrop-filter: blur(8px);
+  -webkit-backdrop-filter: blur(8px);
+  transition:
+    color 200ms ease,
+    border-color 200ms ease,
+    background 200ms ease,
+    transform 200ms cubic-bezier(0.22, 1, 0.36, 1);
+}
+.vibe-landing-skip:hover {
+  color: #faf7f2;
+  border-color: rgba(255, 92, 53, 0.45);
+  background: rgba(255, 92, 53, 0.05);
+  transform: translateY(-1px);
+}
+.vibe-landing-skip-action {
+  color: #ff5c35;
+  font-weight: 700;
+}
+
 .vibe-landing-footer {
   position: relative;
   z-index: 1;

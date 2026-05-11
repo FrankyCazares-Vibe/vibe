@@ -11,6 +11,15 @@ import { TypewriterSequence } from "./landing-typewriter";
 const WARP_DURATION_MS = 750;
 const LOGIN_HREF = "/auth/login";
 
+// Module-level so the array reference is stable across re-renders — passing
+// an inline literal to TypewriterSequence makes its useEffect deps "change"
+// every render and re-types the intro from scratch each time the parent
+// updates state.
+const HERO_SENTENCES = [
+  "Hey, welcome to vibe.",
+  "I'm Otto. This is your campus, all in one place.",
+];
+
 const RING_ORDER: RingId[] = ["pulse", "scene", "connect"];
 const RING_COLOR: Record<RingId, string> = {
   pulse: "#FF5C35",
@@ -52,14 +61,17 @@ export function HomeLanding() {
       if (!trigger) return;
       e.preventDefault();
       e.stopPropagation();
-      if (!unlocked) return;
+      // Whichever element carries data-warp-trigger gets the warp — gating
+      // (visit-all-three) is enforced at render time by deciding which
+      // elements expose the attribute. The Skip link bypasses the gate
+      // for returning users by always exposing it.
       setWarping(true);
       router.prefetch(LOGIN_HREF);
       window.setTimeout(() => router.push(LOGIN_HREF), WARP_DURATION_MS);
     }
     document.addEventListener("click", onClick, true);
     return () => document.removeEventListener("click", onClick, true);
-  }, [router, warping, unlocked]);
+  }, [router, warping]);
 
   // When a ring gets focused, scroll the orbital section into view so the
   // dolly transition isn't happening below the fold.
@@ -91,10 +103,7 @@ export function HomeLanding() {
           <OttoOrb size={56} />
         </div>
         <TypewriterSequence
-          sentences={[
-            "Hey, welcome to vibe.",
-            "I'm Otto. This is your campus, all in one place.",
-          ]}
+          sentences={HERO_SENTENCES}
           speed={60}
           pauseBetween={700}
           onDone={() => setIntroDone(true)}
@@ -159,6 +168,17 @@ export function HomeLanding() {
         <p className="vibe-landing-cta-foot">
           Sign in with your school email. Your campus, your career, one profile.
         </p>
+
+        <a
+          href={LOGIN_HREF}
+          data-warp-trigger
+          className="vibe-landing-skip"
+        >
+          Already have an account?{" "}
+          <span className="vibe-landing-skip-action">
+            Log in <span aria-hidden style={{ marginLeft: 4 }}>→</span>
+          </span>
+        </a>
       </section>
 
       <footer className="vibe-landing-footer">
