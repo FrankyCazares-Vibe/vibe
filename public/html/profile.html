@@ -1013,6 +1013,7 @@ body.doc-modal-open { overflow:hidden; }
   padding:14px;
   display:flex;
   flex-direction:column;
+  align-items:center;
   gap:14px;
   /* Don't let scroll chain to the body when we hit the edge. */
   overscroll-behavior:contain;
@@ -1021,19 +1022,29 @@ body.doc-modal-open { overflow:hidden; }
 
 .doc-page-wrap {
   position:relative;
-  width:100%;
   background:white;
   border-radius:10px;
   box-shadow:0 4px 12px rgba(0,0,0,.08);
   overflow:hidden;
-  /* Pages keep their natural aspect ratio so bars positioned in % space
-     align exactly to page coordinates. */
+  /* Page is laid out by aspect-ratio so width × height stays page-shaped.
+     Width is capped to whichever of (a) full content width or (b) the
+     width that would produce a viewer-fitting height — whichever is
+     smaller. That way a single page ALWAYS fits in the viewer without
+     scrolling, and multi-page docs scroll between full-page views.
+     0.7727 = 8.5 / 11 (page aspect). The image is absolutely positioned
+     so % bar coords align 1:1 with page coordinates. */
+  width:min(100%, calc((92vh - 200px) * 0.7727));
+  aspect-ratio:8.5 / 11;
+  flex-shrink:0;
 }
 .doc-page-wrap canvas,
 .doc-page-wrap img {
-  display:block;
+  position:absolute;
+  inset:0;
   width:100%;
-  height:auto;
+  height:100%;
+  object-fit:cover;
+  display:block;
   user-select:none;
   -webkit-user-drag:none;
 }
