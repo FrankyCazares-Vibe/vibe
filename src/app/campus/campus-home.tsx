@@ -3193,12 +3193,15 @@ function CampusBanner() {
         </div>
       </div>
       <div style={{ flex: 1 }} />
+      {/* Phone-only quick-access to /messages — Instagram's DM-in-header
+          pattern. Hidden on desktop because the desktop LeftNav already
+          has a Messages link. CSS gate lives in globals.css. */}
       <Link
         href="/messages"
         aria-label="Messages"
         title="Messages"
+        className="vibe-campus-messages-btn"
         style={{
-          display: "inline-flex",
           alignItems: "center",
           justifyContent: "center",
           width: 38,

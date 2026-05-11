@@ -2253,6 +2253,14 @@ a.otto-room-row-title:hover {
 }
 .vibe-mobile-only { display: none; }
 
+/* Campus header Messages button — phone-only. Desktop already has a
+   Messages link in the LeftNav, so the DM-in-header pattern is purely
+   mobile chrome. */
+.vibe-campus-messages-btn { display: none; }
+@media (max-width: 899px) {
+  .vibe-campus-messages-btn { display: inline-flex; }
+}
+
 @media (max-width: 899px) {
   .vibe-app-shell,
   .vibe-app-shell--with-rail {
