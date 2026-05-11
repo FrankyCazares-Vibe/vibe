@@ -3,7 +3,6 @@
 import Link from "next/link";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 
-import { OttoCorner } from "./OttoCorner";
 import { UserCard, type UserCardProps } from "./UserCard";
 
 declare global {
@@ -428,8 +427,6 @@ export function NetworkPageClient() {
           />
         )}
       </div>
-
-      <OttoCorner />
     </main>
   );
 }

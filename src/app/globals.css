@@ -1390,3 +1390,816 @@
     transition: none !important;
   }
 }
+
+/* —— Otto's Room (/otto) ———————————————————————————————————————————
+   Personal cockpit for the AI side-rail. Cosmic backdrop borrowed from
+   the landing page DNA (radial violet→black gradient + a sparse fixed
+   starfield), with a vertical stack of frosted glass cards. The visual
+   eyebrow + thin coral divider is the same pattern used on the auth
+   cards so the post-landing system reads as one voice. The hero orb
+   reuses .vibe-landing-sun-* halos so it's literally the same Otto.
+   Everything else is namespaced under .otto-room-* so changes here
+   can't bleed into the landing's CTA. */
+
+.otto-room {
+  position: relative;
+  min-height: 100vh;
+  background:
+    radial-gradient(
+      ellipse at 50% 18%,
+      rgba(82, 41, 127, 0.55) 0%,
+      rgba(35, 18, 56, 0.55) 38%,
+      #07050e 78%
+    ),
+    #07050e;
+  color: #faf7f2;
+  font-family: "DM Sans", sans-serif;
+  overflow: hidden;
+}
+
+.otto-room-stars {
+  position: absolute;
+  inset: 0;
+  pointer-events: none;
+  z-index: 0;
+  background-image:
+    radial-gradient(1px 1px at 12% 8%, rgba(255, 255, 255, 0.95) 0, transparent 60%),
+    radial-gradient(1px 1px at 78% 14%, rgba(255, 255, 255, 0.7) 0, transparent 60%),
+    radial-gradient(1.5px 1.5px at 22% 28%, rgba(255, 255, 255, 0.85) 0, transparent 60%),
+    radial-gradient(1px 1px at 88% 32%, rgba(255, 255, 255, 0.5) 0, transparent 60%),
+    radial-gradient(1px 1px at 8% 48%, rgba(255, 255, 255, 0.75) 0, transparent 60%),
+    radial-gradient(1px 1px at 42% 56%, rgba(255, 255, 255, 0.4) 0, transparent 60%),
+    radial-gradient(1.5px 1.5px at 92% 64%, rgba(255, 255, 255, 0.85) 0, transparent 60%),
+    radial-gradient(1px 1px at 28% 72%, rgba(255, 255, 255, 0.55) 0, transparent 60%),
+    radial-gradient(1px 1px at 62% 78%, rgba(255, 255, 255, 0.7) 0, transparent 60%),
+    radial-gradient(1.5px 1.5px at 14% 88%, rgba(255, 255, 255, 0.9) 0, transparent 60%),
+    radial-gradient(1px 1px at 80% 92%, rgba(255, 255, 255, 0.4) 0, transparent 60%);
+}
+
+.otto-room-main {
+  position: relative;
+  z-index: 1;
+  max-width: 980px;
+  margin: 0 auto;
+  padding: 24px 24px 80px;
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 12px;
+  animation: vibe-auth-arrive 700ms cubic-bezier(0.22, 1, 0.36, 1) backwards;
+}
+
+/* Sections that should span both columns (hero + tabs + activity). */
+.otto-room-section--wide,
+.otto-room-hero,
+.otto-room-tabs {
+  grid-column: 1 / -1;
+}
+
+/* Tab strip sits under the hero, spans the grid. */
+.otto-room-tabs {
+  display: inline-flex;
+  align-self: start;
+  gap: 4px;
+  margin: -2px 0 4px;
+  padding: 4px;
+  background: rgba(250, 247, 242, 0.05);
+  border: 1px solid rgba(250, 247, 242, 0.1);
+  border-radius: 999px;
+  backdrop-filter: blur(12px);
+  -webkit-backdrop-filter: blur(12px);
+  width: fit-content;
+}
+.otto-room-tab {
+  padding: 7px 18px;
+  font-family: "DM Sans", sans-serif;
+  font-size: 12.5px;
+  font-weight: 600;
+  letter-spacing: 0.04em;
+  color: rgba(250, 247, 242, 0.62);
+  background: transparent;
+  border: none;
+  border-radius: 999px;
+  cursor: pointer;
+  transition: background 160ms ease, color 160ms ease;
+}
+.otto-room-tab:hover {
+  color: #faf7f2;
+}
+.otto-room-tab.is-active {
+  background: rgba(255, 92, 53, 0.32);
+  color: #ffe4d6;
+  box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.16);
+}
+
+/* Hero ------------------------------------------------------------- */
+.otto-room-hero {
+  display: grid;
+  grid-template-columns: 88px 1fr auto;
+  align-items: center;
+  gap: 18px;
+  padding: 8px 4px 14px;
+  text-align: left;
+}
+
+.otto-room-hero-orb {
+  position: relative;
+  width: 88px;
+  height: 88px;
+}
+
+.otto-room-hero-orb-inner {
+  position: absolute;
+  inset: 0;
+}
+
+.otto-room-hero-copy {
+  min-width: 0;
+}
+
+.otto-room-hero-name {
+  margin: 0;
+  font-family: "Fraunces", serif;
+  font-size: 36px;
+  font-weight: 900;
+  line-height: 1;
+  letter-spacing: -0.025em;
+  color: #faf7f2;
+}
+
+.otto-room-hero-tagline {
+  margin: 4px 0 2px;
+  font-family: "DM Sans", sans-serif;
+  font-size: 13px;
+  letter-spacing: 0.05em;
+  color: rgba(250, 247, 242, 0.7);
+}
+
+.otto-room-hero-voice {
+  margin: 0;
+  font-family: "Fraunces", serif;
+  font-style: italic;
+  font-size: 14px;
+  color: rgba(255, 184, 150, 0.95);
+}
+
+.otto-room-hero-stats {
+  display: inline-flex;
+  flex-direction: column;
+  align-items: flex-end;
+  gap: 2px;
+  padding: 8px 14px;
+  font-family: "DM Sans", sans-serif;
+  font-size: 10.5px;
+  letter-spacing: 0.16em;
+  text-transform: uppercase;
+  color: rgba(250, 247, 242, 0.78);
+  background: rgba(250, 247, 242, 0.06);
+  border: 1px solid rgba(250, 247, 242, 0.12);
+  border-radius: 14px;
+  backdrop-filter: blur(10px);
+}
+.otto-room-hero-stats-sep {
+  color: rgba(255, 92, 53, 0.7);
+}
+
+/* Section shell ---------------------------------------------------- */
+.otto-room-section {
+  background: rgba(250, 247, 242, 0.05);
+  border: 1px solid rgba(250, 247, 242, 0.1);
+  border-radius: 16px;
+  backdrop-filter: blur(18px) saturate(140%);
+  -webkit-backdrop-filter: blur(18px) saturate(140%);
+  padding: 12px 16px 14px;
+  box-shadow:
+    inset 0 1px 0 rgba(255, 255, 255, 0.08),
+    0 10px 28px rgba(0, 0, 0, 0.3);
+}
+
+.otto-room-section-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding-bottom: 8px;
+  margin-bottom: 10px;
+  border-bottom: 1px solid rgba(255, 92, 53, 0.22);
+}
+
+.otto-room-section-eyebrow {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  font-family: "DM Sans", sans-serif;
+  font-size: 11px;
+  font-weight: 700;
+  letter-spacing: 0.2em;
+  text-transform: uppercase;
+  color: rgba(250, 247, 242, 0.78);
+}
+
+.otto-room-section-eyebrow-dot {
+  width: 6px;
+  height: 6px;
+  border-radius: 50%;
+  background: #ff5c35;
+  box-shadow: 0 0 8px rgba(255, 92, 53, 0.8);
+  animation: vibe-landing-sun-breathe 2.4s ease-in-out infinite;
+}
+
+.otto-room-section-trailing {
+  font-family: "DM Sans", sans-serif;
+  font-size: 12px;
+  color: rgba(250, 247, 242, 0.65);
+}
+
+.otto-room-section-link {
+  color: rgba(255, 184, 150, 0.95);
+  text-decoration: none;
+  font-weight: 600;
+}
+.otto-room-section-link:hover {
+  color: #ff5c35;
+}
+
+.otto-room-section-body {
+  position: relative;
+}
+
+/* List rows -------------------------------------------------------- */
+.otto-room-list {
+  list-style: none;
+  padding: 0;
+  margin: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+
+.otto-room-row {
+  display: grid;
+  grid-template-columns: 20px 1fr auto;
+  align-items: start;
+  gap: 10px;
+  padding: 5px 4px;
+  border-radius: 10px;
+  transition: background 180ms ease;
+}
+.otto-room-row:hover {
+  background: rgba(250, 247, 242, 0.04);
+}
+
+.otto-room-row-dot {
+  width: 8px;
+  height: 8px;
+  margin-top: 8px;
+  border-radius: 50%;
+  background: rgba(255, 184, 150, 0.85);
+  box-shadow: 0 0 6px rgba(255, 92, 53, 0.5);
+}
+
+.otto-room-row-icon {
+  display: inline-flex;
+  width: 22px;
+  height: 22px;
+  margin-top: 2px;
+  align-items: center;
+  justify-content: center;
+  font-size: 12px;
+  color: rgba(255, 184, 150, 0.85);
+}
+
+.otto-room-row-avatar {
+  width: 32px;
+  height: 32px;
+  border-radius: 50%;
+  background: rgba(255, 92, 53, 0.18);
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  overflow: hidden;
+  border: 1px solid rgba(255, 184, 150, 0.3);
+}
+.otto-room-avatar-img {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+}
+.otto-room-avatar-fallback {
+  font-family: "DM Sans", sans-serif;
+  font-size: 13px;
+  font-weight: 700;
+  color: #ff5c35;
+}
+
+.otto-room-row-body {
+  min-width: 0;
+}
+
+.otto-room-row-title {
+  display: block;
+  margin: 0 0 2px;
+  font-family: "DM Sans", sans-serif;
+  font-size: 14.5px;
+  color: #faf7f2;
+  text-decoration: none;
+  font-weight: 600;
+}
+a.otto-room-row-title:hover {
+  color: #ff5c35;
+}
+
+.otto-room-row-line {
+  margin: 0;
+  font-family: "DM Sans", sans-serif;
+  font-size: 14px;
+  color: #faf7f2;
+  line-height: 1.45;
+}
+
+.otto-room-row-excerpt {
+  color: rgba(250, 247, 242, 0.55);
+}
+
+.otto-room-row-meta {
+  margin: 2px 0 0;
+  font-family: "DM Sans", sans-serif;
+  font-size: 12.5px;
+  color: rgba(250, 247, 242, 0.6);
+  display: inline-flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 6px;
+}
+
+.otto-room-row-time {
+  font-family: "DM Sans", sans-serif;
+  font-size: 11.5px;
+  letter-spacing: 0.06em;
+  color: rgba(250, 247, 242, 0.45);
+  white-space: nowrap;
+  margin-top: 4px;
+}
+
+.otto-room-pill {
+  display: inline-flex;
+  align-items: center;
+  padding: 2px 8px;
+  margin-left: 4px;
+  font-size: 10px;
+  font-weight: 700;
+  letter-spacing: 0.12em;
+  text-transform: uppercase;
+  border-radius: 999px;
+  background: rgba(255, 92, 53, 0.18);
+  color: #ffb896;
+  border: 1px solid rgba(255, 92, 53, 0.3);
+}
+.otto-room-pill--rsvp {
+  background: rgba(120, 200, 140, 0.18);
+  color: #b8e6c4;
+  border-color: rgba(120, 200, 140, 0.35);
+}
+
+.otto-room-row-actions {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+}
+
+.otto-room-action {
+  display: inline-flex;
+  align-items: center;
+  padding: 6px 12px;
+  font-family: "DM Sans", sans-serif;
+  font-size: 12px;
+  font-weight: 600;
+  letter-spacing: 0.04em;
+  color: rgba(250, 247, 242, 0.78);
+  background: rgba(250, 247, 242, 0.06);
+  border: 1px solid rgba(250, 247, 242, 0.16);
+  border-radius: 999px;
+  cursor: pointer;
+  text-decoration: none;
+  transition: background 160ms ease, color 160ms ease, border-color 160ms ease;
+}
+.otto-room-action:hover {
+  background: rgba(250, 247, 242, 0.12);
+  color: #faf7f2;
+}
+.otto-room-action--primary {
+  background: rgba(255, 92, 53, 0.32);
+  color: #ffe4d6;
+  border-color: rgba(255, 92, 53, 0.45);
+}
+.otto-room-action--primary:hover {
+  background: rgba(255, 92, 53, 0.5);
+  color: #fff;
+  border-color: rgba(255, 140, 90, 0.7);
+}
+
+.otto-room-empty {
+  margin: 6px 0 0;
+  padding: 14px 4px;
+  font-family: "Fraunces", serif;
+  font-style: italic;
+  font-size: 14px;
+  color: rgba(250, 247, 242, 0.55);
+}
+
+/* Tell-otto input -------------------------------------------------- */
+.otto-room-tell {
+  display: flex;
+  gap: 8px;
+}
+
+.otto-room-tell-input {
+  flex: 1;
+  padding: 12px 16px;
+  font-family: "DM Sans", sans-serif;
+  font-size: 14.5px;
+  color: #faf7f2;
+  background: rgba(250, 247, 242, 0.06);
+  border: 1px solid rgba(250, 247, 242, 0.18);
+  border-radius: 999px;
+  outline: none;
+  transition: border-color 160ms ease, background 160ms ease;
+}
+.otto-room-tell-input::placeholder {
+  color: rgba(250, 247, 242, 0.4);
+}
+.otto-room-tell-input:focus {
+  border-color: rgba(255, 92, 53, 0.55);
+  background: rgba(250, 247, 242, 0.09);
+}
+
+.otto-room-tell-submit {
+  padding: 12px 20px;
+  font-family: "DM Sans", sans-serif;
+  font-size: 13px;
+  font-weight: 700;
+  letter-spacing: 0.06em;
+  color: #fff;
+  background: linear-gradient(180deg, rgba(255, 140, 90, 0.6), rgba(255, 92, 53, 0.4));
+  border: 1px solid rgba(255, 184, 150, 0.5);
+  border-radius: 999px;
+  cursor: pointer;
+  transition: transform 160ms ease, filter 160ms ease;
+}
+.otto-room-tell-submit:hover:not(:disabled) {
+  transform: translateY(-1px);
+  filter: brightness(1.1);
+}
+.otto-room-tell-submit:disabled {
+  opacity: 0.45;
+  cursor: not-allowed;
+}
+
+.otto-room-tell-preview {
+  margin: 10px 0 0;
+  font-family: "Fraunces", serif;
+  font-style: italic;
+  font-size: 13px;
+  color: rgba(255, 184, 150, 0.85);
+}
+.otto-room-tell-preview--muted {
+  color: rgba(250, 247, 242, 0.5);
+}
+.otto-room-tell-error {
+  margin: 8px 0 0;
+  font-size: 12.5px;
+  color: #ff8c5a;
+}
+
+/* Settings --------------------------------------------------------- */
+.otto-room-settings {
+  display: flex;
+  flex-direction: column;
+  gap: 18px;
+}
+
+.otto-room-chatty {
+  display: flex;
+  align-items: center;
+  gap: 14px;
+  flex-wrap: wrap;
+}
+.otto-room-chatty-label {
+  font-family: "DM Sans", sans-serif;
+  font-size: 12.5px;
+  letter-spacing: 0.06em;
+  color: rgba(250, 247, 242, 0.8);
+  min-width: 92px;
+}
+.otto-room-segmented {
+  display: inline-flex;
+  background: rgba(250, 247, 242, 0.06);
+  border: 1px solid rgba(250, 247, 242, 0.14);
+  border-radius: 999px;
+  padding: 3px;
+}
+.otto-room-segment {
+  padding: 6px 14px;
+  font-family: "DM Sans", sans-serif;
+  font-size: 12px;
+  font-weight: 600;
+  letter-spacing: 0.05em;
+  color: rgba(250, 247, 242, 0.6);
+  background: transparent;
+  border: none;
+  border-radius: 999px;
+  cursor: pointer;
+  transition: background 160ms ease, color 160ms ease;
+}
+.otto-room-segment:hover {
+  color: #faf7f2;
+}
+.otto-room-segment.is-active {
+  background: rgba(255, 92, 53, 0.35);
+  color: #fff;
+  box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.18);
+}
+
+.otto-room-chatty-hint {
+  margin: 4px 0 0;
+  font-family: "Fraunces", serif;
+  font-style: italic;
+  font-size: 12.5px;
+  color: rgba(250, 247, 242, 0.55);
+}
+
+.otto-room-toggles {
+  list-style: none;
+  padding: 0;
+  margin: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+.otto-room-toggle label {
+  display: inline-flex;
+  align-items: center;
+  gap: 10px;
+  font-family: "DM Sans", sans-serif;
+  font-size: 13.5px;
+  color: rgba(250, 247, 242, 0.85);
+  cursor: pointer;
+}
+.otto-room-toggle input[type="checkbox"] {
+  appearance: none;
+  width: 16px;
+  height: 16px;
+  border-radius: 4px;
+  border: 1.5px solid rgba(250, 247, 242, 0.35);
+  background: transparent;
+  cursor: pointer;
+  position: relative;
+  transition: background 160ms ease, border-color 160ms ease;
+}
+.otto-room-toggle input[type="checkbox"]:hover {
+  border-color: rgba(255, 184, 150, 0.7);
+}
+.otto-room-toggle input[type="checkbox"]:checked {
+  background: #ff5c35;
+  border-color: #ff5c35;
+}
+.otto-room-toggle input[type="checkbox"]:checked::after {
+  content: "";
+  position: absolute;
+  left: 4px;
+  top: 1px;
+  width: 5px;
+  height: 9px;
+  border: solid #fff;
+  border-width: 0 2px 2px 0;
+  transform: rotate(45deg);
+}
+
+/* Metrics section ---------------------------------------------------- */
+.otto-metrics {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 16px;
+}
+.otto-metrics-block {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+.otto-metrics-block-head {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  font-family: "DM Sans", sans-serif;
+  font-size: 11px;
+  font-weight: 700;
+  letter-spacing: 0.18em;
+  text-transform: uppercase;
+  color: rgba(250, 247, 242, 0.7);
+}
+.otto-metrics-block-sub {
+  font-size: 10.5px;
+  letter-spacing: 0.05em;
+  text-transform: none;
+  font-weight: 600;
+  color: rgba(250, 247, 242, 0.5);
+}
+.otto-metrics-tiles {
+  display: grid;
+  gap: 6px;
+}
+.otto-metrics-tiles--4 {
+  grid-template-columns: repeat(4, 1fr);
+}
+.otto-metrics-tile {
+  padding: 10px 12px;
+  background: rgba(250, 247, 242, 0.04);
+  border: 1px solid rgba(250, 247, 242, 0.08);
+  border-radius: 12px;
+}
+.otto-metrics-tile--accent {
+  background: rgba(255, 92, 53, 0.12);
+  border-color: rgba(255, 140, 90, 0.4);
+}
+.otto-metrics-tile-n {
+  font-family: "Fraunces", serif;
+  font-size: 22px;
+  font-weight: 900;
+  line-height: 1;
+  color: #faf7f2;
+  font-variant-numeric: tabular-nums;
+}
+.otto-metrics-tile--accent .otto-metrics-tile-n {
+  color: #ffb89c;
+}
+.otto-metrics-tile-l {
+  font-size: 10.5px;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  color: rgba(250, 247, 242, 0.55);
+  margin-top: 4px;
+}
+.otto-metrics-recent,
+.otto-metrics-top {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  padding-top: 4px;
+}
+.otto-metrics-recent-label {
+  font-family: "DM Sans", sans-serif;
+  font-size: 10.5px;
+  letter-spacing: 0.16em;
+  text-transform: uppercase;
+  color: rgba(250, 247, 242, 0.5);
+}
+.otto-metrics-recent-list {
+  list-style: none;
+  padding: 0;
+  margin: 0;
+  display: flex;
+  gap: 6px;
+  flex-wrap: wrap;
+}
+.otto-metrics-recent-row {
+  display: inline-flex;
+  width: 28px;
+  height: 28px;
+  border-radius: 50%;
+  overflow: hidden;
+  background: rgba(255, 92, 53, 0.14);
+  border: 1px solid rgba(255, 184, 150, 0.25);
+  align-items: center;
+  justify-content: center;
+  color: #ff5c35;
+  font-family: "DM Sans", sans-serif;
+  font-weight: 700;
+  font-size: 11px;
+  text-decoration: none;
+  transition: transform 160ms ease, border-color 160ms ease;
+}
+.otto-metrics-recent-row:hover {
+  transform: translateY(-1px);
+  border-color: rgba(255, 184, 150, 0.6);
+}
+.otto-metrics-recent-row img {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+}
+.otto-metrics-recent-ph {
+  display: inline-flex;
+  width: 100%;
+  height: 100%;
+  align-items: center;
+  justify-content: center;
+}
+.otto-metrics-foot {
+  margin: 4px 0 0;
+  font-family: "Fraunces", serif;
+  font-style: italic;
+  font-size: 11.5px;
+  color: rgba(255, 184, 150, 0.65);
+}
+.otto-metrics-windows {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  padding: 8px 0 4px;
+}
+.otto-metrics-window-row {
+  display: flex;
+  gap: 10px;
+  font-family: "DM Sans", sans-serif;
+  font-size: 11.5px;
+  color: rgba(250, 247, 242, 0.7);
+}
+.otto-metrics-window-label {
+  min-width: 56px;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  color: rgba(250, 247, 242, 0.5);
+  font-size: 10.5px;
+  align-self: center;
+}
+.otto-metrics-window-vals {
+  display: inline-flex;
+  flex-wrap: wrap;
+  gap: 6px;
+  font-variant-numeric: tabular-nums;
+}
+.otto-metrics-top-list {
+  list-style: none;
+  padding: 0;
+  margin: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+.otto-metrics-top-row {
+  display: flex;
+  justify-content: space-between;
+  gap: 12px;
+  align-items: baseline;
+  font-family: "DM Sans", sans-serif;
+  font-size: 12px;
+  color: rgba(250, 247, 242, 0.85);
+}
+.otto-metrics-top-content {
+  flex: 1;
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.otto-metrics-top-counts {
+  font-size: 11px;
+  color: rgba(250, 247, 242, 0.55);
+  font-variant-numeric: tabular-nums;
+  white-space: nowrap;
+}
+@media (max-width: 760px) {
+  .otto-metrics {
+    grid-template-columns: 1fr;
+  }
+  .otto-metrics-tiles--4 {
+    grid-template-columns: repeat(2, 1fr);
+  }
+}
+
+@media (max-width: 760px) {
+  .otto-room-main {
+    grid-template-columns: 1fr;
+    padding: 24px 16px 64px;
+  }
+  .otto-room-hero {
+    grid-template-columns: 64px 1fr;
+    gap: 12px;
+  }
+  .otto-room-hero-orb {
+    width: 64px;
+    height: 64px;
+  }
+  .otto-room-hero-stats {
+    grid-column: 1 / -1;
+    flex-direction: row;
+    align-items: center;
+    justify-content: center;
+    gap: 14px;
+  }
+  .otto-room-hero-name {
+    font-size: 32px;
+  }
+  .otto-room-row {
+    grid-template-columns: 20px 1fr;
+  }
+  .otto-room-row-actions,
+  .otto-room-row-time {
+    grid-column: 2;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .otto-room-main,
+  .otto-room-section-eyebrow-dot {
+    animation: none !important;
+  }
+}

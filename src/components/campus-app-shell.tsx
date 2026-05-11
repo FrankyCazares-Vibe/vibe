@@ -3,6 +3,7 @@
 import type { ReactNode } from "react";
 
 import LeftNav from "@/components/LeftNav";
+import { OttoCorner } from "@/components/network/OttoCorner";
 
 type Props = {
   children: ReactNode;
@@ -10,6 +11,12 @@ type Props = {
   sidebar?: ReactNode;
 };
 
+/**
+ * Mounted on every campus-shelled route, so Otto's bottom-right orb is the
+ * unifying surface across campus / network / profile / messages / otto.
+ * The orb + side panel handle their own auth and notification polling.
+ * Per-route mounts (e.g. NetworkPageClient) were removed once this lifted.
+ */
 export function CampusAppShell({ children, sidebar }: Props) {
   return (
     <div
@@ -22,6 +29,7 @@ export function CampusAppShell({ children, sidebar }: Props) {
       <LeftNav />
       {children}
       {sidebar ?? null}
+      <OttoCorner />
     </div>
   );
 }

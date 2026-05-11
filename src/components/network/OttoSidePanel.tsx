@@ -47,6 +47,11 @@ type CountPayload = {
   };
 };
 
+type MetricsPayload = {
+  profile_views: { today: number; seven_days: number; thirty_days: number; all_time: number };
+  creator: { views: number; likes: number; comments: number; reposts: number };
+};
+
 type Filter = "all" | NotifType;
 
 /**
@@ -67,6 +72,7 @@ export function OttoSidePanel({
   const [list, setList] = useState<NotifRow[]>([]);
   const [filter, setFilter] = useState<Filter>("all");
   const [loading, setLoading] = useState(false);
+  const [metrics, setMetrics] = useState<MetricsPayload | null>(null);
 
   // ESC closes.
   useEffect(() => {
@@ -97,9 +103,11 @@ export function OttoSidePanel({
     (async () => {
       setLoading(true);
       try {
-        const [countRes, listRes] = await Promise.all([
+        const [countRes, listRes, pviewsRes, csRes] = await Promise.all([
           fetch("/api/me/notifications/count", { cache: "no-store" }),
           fetch("/api/me/notifications?limit=30", { cache: "no-store" }),
+          fetch("/api/me/profile-views", { cache: "no-store" }),
+          fetch("/api/me/creator-stats", { cache: "no-store" }),
         ]);
         const countData = await countRes.json();
         const listData = await listRes.json();
@@ -116,6 +124,24 @@ export function OttoSidePanel({
           if (rows.some((n) => !n.read_at)) {
             void markAllRead();
           }
+        }
+        // Metrics: best-effort. If either endpoint failed, we just skip the
+        // metrics block rather than blocking the whole panel render.
+        try {
+          const pv = pviewsRes.ok ? await pviewsRes.json() : null;
+          const cs = csRes.ok ? await csRes.json() : null;
+          if (pv?.ok || cs?.ok) {
+            setMetrics({
+              profile_views: pv?.ok
+                ? pv.counts
+                : { today: 0, seven_days: 0, thirty_days: 0, all_time: 0 },
+              creator: cs?.ok
+                ? cs.totals
+                : { views: 0, likes: 0, comments: 0, reposts: 0 },
+            });
+          }
+        } catch {
+          /* metrics block is optional; ignore */
         }
       } catch {
         /* keep prior state */
@@ -192,6 +218,16 @@ export function OttoSidePanel({
           }}
         >
           <StatsGrid count={count} onPick={setFilter} active={filter} />
+          <div
+            aria-hidden
+            style={{
+              height: 1,
+              background: "rgba(255,255,255,0.06)",
+              margin: "16px 0",
+            }}
+          />
+          <SectionEyebrow>your metrics</SectionEyebrow>
+          <MetricsBlock metrics={metrics} />
           <div
             aria-hidden
             style={{
@@ -494,6 +530,98 @@ function StatsGrid({
       })}
     </div>
   );
+}
+
+function MetricsBlock({ metrics }: { metrics: MetricsPayload | null }) {
+  // Loading state for the metrics block — the rest of the panel can render
+  // before metrics resolve, so this is a small inline skeleton.
+  if (!metrics) {
+    return (
+      <div style={{ color: "rgba(255,255,255,0.4)", fontSize: 12, padding: "8px 0" }}>
+        loading metrics…
+      </div>
+    );
+  }
+  const tiles: Array<{ n: number; label: string; accent?: boolean }> = [
+    { n: metrics.profile_views.thirty_days, label: "Profile views (30d)", accent: true },
+    { n: metrics.creator.views, label: "Post views" },
+    { n: metrics.creator.likes, label: "Likes" },
+    { n: metrics.creator.reposts, label: "Reposts" },
+  ];
+  return (
+    <a
+      href="/otto?tab=stats"
+      aria-label="Open full metrics in Otto's command center"
+      style={{
+        display: "block",
+        textDecoration: "none",
+        borderRadius: 12,
+        // Whole block deep-links to /otto's Stats tab so the side panel is
+        // the synced entry-point to the full metrics surface.
+      }}
+    >
+      <div
+        style={{
+          display: "grid",
+          gridTemplateColumns: "1fr 1fr",
+          gap: 8,
+        }}
+      >
+        {tiles.map((t, i) => (
+          <div
+            key={i}
+            style={{
+              padding: "12px 14px",
+              borderRadius: 12,
+              background: t.accent ? "rgba(255,92,53,0.14)" : "rgba(255,255,255,0.04)",
+              border: t.accent
+                ? "1px solid rgba(255,140,90,0.45)"
+                : "1px solid rgba(255,255,255,0.08)",
+            }}
+          >
+            <div
+              style={{
+                fontFamily: "Fraunces, serif",
+                fontSize: 22,
+                fontWeight: 800,
+                lineHeight: 1,
+                color: t.accent ? "#FFB89C" : "white",
+                fontVariantNumeric: "tabular-nums",
+              }}
+            >
+              {formatMetric(t.n)}
+            </div>
+            <div
+              style={{
+                fontSize: 11,
+                color: "rgba(255,255,255,0.55)",
+                marginTop: 4,
+                letterSpacing: "0.04em",
+              }}
+            >
+              {t.label}
+            </div>
+          </div>
+        ))}
+      </div>
+      <div
+        style={{
+          marginTop: 8,
+          fontSize: 11,
+          color: "rgba(255,180,150,0.7)",
+          textAlign: "right",
+        }}
+      >
+        full breakdown in /otto →
+      </div>
+    </a>
+  );
+}
+
+function formatMetric(n: number): string {
+  if (n < 1000) return String(n);
+  if (n < 10000) return (n / 1000).toFixed(1).replace(/\.0$/, "") + "k";
+  return Math.round(n / 1000) + "k";
 }
 
 function FilterPills({

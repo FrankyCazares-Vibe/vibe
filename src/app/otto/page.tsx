@@ -1,116 +1,64 @@
-import Link from "next/link";
+import { Suspense } from "react";
+import { redirect } from "next/navigation";
 
-import { enforceCampusAccess } from "@/lib/auth/campus-access";
+import { OttoPageClient } from "@/components/otto/OttoPageClient";
 import { CampusAppShell } from "@/components/campus-app-shell";
+import { enforceCampusAccess } from "@/lib/auth/campus-access";
+import { headers } from "next/headers";
 
 export const metadata = {
-  title: "otto · Vibe",
-  description: "Your AI co-pilot",
+  title: "otto · vibe",
+  description: "your campus compass.",
 };
 
 /**
- * `/otto` shows a placeholder until the real Otto agent is wired. The
- * legacy prototype (`/html/otto.html`) was full of hardcoded recruiter
- * messages and inbox items, which is fine for an anonymous demo but
- * misleading for signed-in users. We surface a clean "in development"
- * state instead and route the contextual Otto features (Heads up,
- * Trending) into the campus right rail where they live for real.
+ * /otto — Otto's Room.
+ *
+ * Server entry: auth-gates the page (campus-access redirects on its own),
+ * fetches the composed payload from /api/me/otto in the same request, then
+ * hands it to the client component. Doing the fetch here means the page is
+ * already populated on first paint (no skeleton flash).
  */
 export default async function OttoPage() {
   await enforceCampusAccess("/otto");
+
+  const h = await headers();
+  const proto = h.get("x-forwarded-proto") ?? "http";
+  const host = h.get("host");
+  if (!host) {
+    redirect("/auth/login?next=%2Fotto");
+  }
+  const cookie = h.get("cookie") ?? "";
+
+  // Same-origin fetch with the user's cookies — Supabase auth flows through.
+  // We don't cache because the payload is per-user and changes constantly.
+  const res = await fetch(`${proto}://${host}/api/me/otto`, {
+    headers: { cookie },
+    cache: "no-store",
+  });
+
+  if (!res.ok) {
+    return (
+      <CampusAppShell>
+        <main className="otto-room">
+          <div className="otto-room-main">
+            <p className="otto-room-empty">otto&rsquo;s offline. try again in a sec.</p>
+          </div>
+        </main>
+      </CampusAppShell>
+    );
+  }
+
+  const payload = await res.json();
+
+  // Suspense boundary: OttoPageClient reads useSearchParams (for the ?tab=
+  // tab state), which Next 16 requires to be inside a Suspense — otherwise
+  // any URL with searchParams forces the whole route into client-render.
   return (
     <CampusAppShell>
-      <main
-        style={{
-          padding: "60px 32px",
-          background:
-            "linear-gradient(180deg, #0F0B1A 0%, #07050E 100%)",
-          minHeight: "100vh",
-          color: "#fff",
-          fontFamily: "DM Sans, sans-serif",
-          display: "flex",
-          alignItems: "center",
-          justifyContent: "center",
-        }}
-      >
-        <div
-          style={{
-            maxWidth: 520,
-            textAlign: "center",
-          }}
-        >
-          <div
-            style={{
-              fontFamily: "DM Sans, sans-serif",
-              fontSize: 11,
-              fontWeight: 800,
-              letterSpacing: "0.2em",
-              textTransform: "uppercase",
-              color: "rgba(255,184,150,0.9)",
-              marginBottom: 16,
-            }}
-          >
-            otto · in development
-          </div>
-          <h1
-            style={{
-              fontFamily: "Fraunces, serif",
-              fontSize: 48,
-              fontWeight: 900,
-              lineHeight: 1.05,
-              letterSpacing: "-0.02em",
-              marginBottom: 16,
-            }}
-          >
-            Your AI co-pilot is on the way.
-          </h1>
-          <p
-            style={{
-              fontSize: 16,
-              lineHeight: 1.6,
-              color: "rgba(255,255,255,0.65)",
-              marginBottom: 28,
-            }}
-          >
-            Otto will surface your most-relevant campus signals — events
-            people you trust are going to, posts that match your stack,
-            mentions you missed, intros that make sense. We&apos;re
-            wiring that brain right now.
-          </p>
-          <p
-            style={{
-              fontSize: 14,
-              color: "rgba(255,255,255,0.55)",
-              marginBottom: 28,
-            }}
-          >
-            In the meantime, Otto&apos;s real signals already live on the
-            right rail of your campus page — RSVPs you&apos;re going to,
-            and trending hashtags from your school.
-          </p>
-          <Link
-            href="/campus"
-            style={{
-              display: "inline-flex",
-              alignItems: "center",
-              gap: 6,
-              padding: "12px 22px",
-              borderRadius: 999,
-              background:
-                "linear-gradient(180deg, rgba(255,140,90,0.55) 0%, rgba(255,92,53,0.32) 100%)",
-              border: "1px solid rgba(255,180,150,0.45)",
-              color: "#fff",
-              fontWeight: 700,
-              fontSize: 14,
-              textDecoration: "none",
-              boxShadow:
-                "inset 0 1px 0 rgba(255,255,255,0.22), 0 8px 24px rgba(255,92,53,0.2)",
-            }}
-          >
-            ← Back to campus
-          </Link>
-        </div>
-      </main>
+      <Suspense fallback={null}>
+        <OttoPageClient initial={payload} />
+      </Suspense>
     </CampusAppShell>
   );
 }
