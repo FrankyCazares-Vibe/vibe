@@ -2289,19 +2289,28 @@ a.otto-room-row-title:hover {
 }
 
 /* Bottom tab bar — 5 tabs, iOS-friendly. */
+/* Mobile-only chrome — hidden on desktop. Visibility lives on the
+   tabbar class itself (not on a separate `vibe-mobile-only` helper)
+   so the cascade can't accidentally show it when the element has
+   both classes — that bit us once already. */
 .vibe-mobile-tabbar {
-  position: fixed;
-  bottom: 0;
-  left: 0;
-  right: 0;
-  z-index: 9988;
-  display: grid;
-  grid-template-columns: repeat(5, 1fr);
-  background: rgba(250, 247, 242, 0.96);
-  backdrop-filter: saturate(160%) blur(14px);
-  -webkit-backdrop-filter: saturate(160%) blur(14px);
-  border-top: 1px solid rgba(28, 28, 30, 0.08);
-  padding-bottom: env(safe-area-inset-bottom, 0px);
+  display: none;
+}
+@media (max-width: 899px) {
+  .vibe-mobile-tabbar {
+    position: fixed;
+    bottom: 0;
+    left: 0;
+    right: 0;
+    z-index: 9988;
+    display: grid;
+    grid-template-columns: repeat(5, 1fr);
+    background: rgba(250, 247, 242, 0.96);
+    backdrop-filter: saturate(160%) blur(14px);
+    -webkit-backdrop-filter: saturate(160%) blur(14px);
+    border-top: 1px solid rgba(28, 28, 30, 0.08);
+    padding-bottom: env(safe-area-inset-bottom, 0px);
+  }
 }
 .vibe-mobile-tab {
   display: flex;

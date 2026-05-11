@@ -124,7 +124,7 @@ export function MobileNavChrome() {
     pathname === href || (href !== "/" && pathname.startsWith(`${href}/`));
 
   return (
-    <nav className="vibe-mobile-tabbar vibe-mobile-only" aria-label="Primary">
+    <nav className="vibe-mobile-tabbar" aria-label="Primary">
       {MOBILE_TABS.map((item) => {
         const active = isActive(item.href);
         return (
