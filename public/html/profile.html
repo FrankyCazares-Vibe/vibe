@@ -2876,9 +2876,14 @@ body.empty-profile-mode #profileEmpty { display: flex !important; }
   /* Top nav: lose the secondary text links + center search + non-essential
      right icons. Owner keeps: brand, edit (their own profile), messages,
      settings. Visitors keep: brand, messages, settings, share. Search is
-     reachable from /campus on mobile via the Campus tab. */
+     reachable from /campus on mobile via the Campus tab. Safe-area-top
+     padding so the bar clears the iOS notch / Dynamic Island when wrapped
+     in a Capacitor / WKWebView shell. */
   nav {
-    padding: 10px 12px;
+    padding:
+      calc(10px + env(safe-area-inset-top, 0px))
+      12px
+      10px;
     gap: 6px;
     flex-wrap: nowrap;
     overflow: hidden;
@@ -2899,7 +2904,11 @@ body.empty-profile-mode #profileEmpty { display: flex !important; }
   /* The "View as visitor" pill is text-heavy; collapse it on phone. */
   #viewerBtn { display: none !important; }
 
-  .profile-cover { height: 180px; margin-top: 56px; }
+  .profile-cover {
+    height: 180px;
+    /* Stack below the nav (which itself grew to clear the iOS notch). */
+    margin-top: calc(56px + env(safe-area-inset-top, 0px));
+  }
 
   /* Main wrap + grid */
   .profile-wrap { padding: 24px 16px 56px; }

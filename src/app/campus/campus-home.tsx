@@ -3119,11 +3119,13 @@ function CampusBanner() {
     <header
       style={{
         position: "relative",
-        height: 64,
+        minHeight: 64,
         display: "flex",
         alignItems: "center",
         gap: 14,
-        padding: "0 24px",
+        // env() is 0 on desktop; on iOS the banner grows to cover the
+        // notch / Dynamic Island so its bottom edge stays clear.
+        padding: "env(safe-area-inset-top, 0px) 24px 0",
         // Solid IU crimson — reads identical on every tab regardless of backdrop
         background:
           "linear-gradient(135deg, #8B0E18 0%, #6A0A12 50%, #3F050B 100%)",

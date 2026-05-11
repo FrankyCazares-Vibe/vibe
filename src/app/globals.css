@@ -2194,7 +2194,7 @@ a.otto-room-row-title:hover {
 @media (max-width: 760px) {
   .otto-room-main {
     grid-template-columns: 1fr;
-    padding: 24px 16px 64px;
+    padding: calc(24px + env(safe-area-inset-top, 0px)) 16px 64px;
   }
   .otto-room-hero {
     grid-template-columns: 64px 1fr;
@@ -2235,9 +2235,10 @@ a.otto-room-row-title:hover {
 
    Above 900px we run the classic three-column desktop shell (200px LeftNav,
    flex content, optional 320px right rail). Below 900px we hide the side
-   chrome entirely and lean on a slim top bar + bottom tab bar — the native
-   social-app pattern. The OttoCorner orb hides too, since /otto is one of
-   the bottom tabs.
+   chrome entirely. The ONLY mobile chrome is a bottom tab bar — pages own
+   their own headers (campus's crimson banner, otto's hero, profile's cover,
+   etc.) so each surface can match its native iOS-flavored vibe. The
+   OttoCorner orb hides too since /otto is a bottom tab.
    --------------------------------------------------------------------------- */
 
 .vibe-app-shell {
@@ -2265,7 +2266,9 @@ a.otto-room-row-title:hover {
   .vibe-app-shell,
   .vibe-app-shell--with-rail {
     grid-template-columns: 1fr;
-    padding-top: calc(52px + env(safe-area-inset-top, 0px));
+    /* No top reservation — each page paints its own header with
+       safe-area padding so it clears the iOS notch / Dynamic Island. */
+    padding-top: 0;
     padding-bottom: calc(64px + env(safe-area-inset-bottom, 0px));
   }
   .vibe-left-nav-aside { display: none !important; }
@@ -2275,51 +2278,6 @@ a.otto-room-row-title:hover {
   /* OttoCorner: orb is redundant on mobile (otto is a bottom tab). */
   #otto-corner { display: none !important; }
 }
-
-/* Slim top bar — hamburger + brand + identity stub. */
-.vibe-mobile-topbar {
-  position: fixed;
-  top: 0;
-  left: 0;
-  right: 0;
-  z-index: 9988;
-  height: calc(52px + env(safe-area-inset-top, 0px));
-  padding: env(safe-area-inset-top, 0px) 14px 0;
-  display: flex;
-  align-items: center;
-  gap: 10px;
-  background: rgba(250, 247, 242, 0.92);
-  backdrop-filter: saturate(160%) blur(14px);
-  -webkit-backdrop-filter: saturate(160%) blur(14px);
-  border-bottom: 1px solid rgba(28, 28, 30, 0.06);
-}
-.vibe-mobile-topbar-burger {
-  width: 36px;
-  height: 36px;
-  border-radius: 10px;
-  border: none;
-  background: transparent;
-  cursor: pointer;
-  display: inline-flex;
-  align-items: center;
-  justify-content: center;
-  color: #1c1c1e;
-  flex-shrink: 0;
-}
-.vibe-mobile-topbar-burger:active {
-  background: rgba(28, 28, 30, 0.06);
-}
-.vibe-mobile-topbar-brand {
-  font-family: "Fraunces", serif;
-  font-size: 20px;
-  font-weight: 900;
-  letter-spacing: -0.8px;
-  color: #1c1c1e;
-  text-decoration: none;
-  flex: 1;
-  min-width: 0;
-}
-.vibe-mobile-topbar-brand-dot { color: #ff5c35; }
 
 /* Bottom tab bar — 5 tabs, iOS-friendly. */
 .vibe-mobile-tabbar {
@@ -2376,118 +2334,39 @@ a.otto-room-row-title:hover {
   justify-content: center;
 }
 
-/* Slide-out left sheet (calendar + admin + sign out). */
-.vibe-mobile-sheet-backdrop {
-  position: fixed;
-  inset: 0;
-  z-index: 9995;
-  background: rgba(0, 0, 0, 0.32);
-  opacity: 0;
-  pointer-events: none;
-  transition: opacity 180ms ease;
-}
-.vibe-mobile-sheet-backdrop--open {
-  opacity: 1;
-  pointer-events: auto;
-}
-.vibe-mobile-sheet {
-  position: fixed;
-  top: 0;
-  bottom: 0;
-  left: 0;
-  z-index: 9996;
-  width: min(88vw, 340px);
-  background: #faf7f2;
-  border-right: 1px solid rgba(28, 28, 30, 0.08);
-  box-shadow: 0 16px 48px rgba(0, 0, 0, 0.18);
-  transform: translateX(-100%);
-  transition: transform 220ms cubic-bezier(0.22, 1, 0.36, 1);
-  display: flex;
-  flex-direction: column;
-  padding: calc(18px + env(safe-area-inset-top, 0px)) 16px 16px;
-  overflow-y: auto;
-  overscroll-behavior: contain;
-}
-.vibe-mobile-sheet--open {
-  transform: translateX(0);
-}
-.vibe-mobile-sheet-header {
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  margin-bottom: 18px;
-}
-.vibe-mobile-sheet-brand {
-  font-family: "Fraunces", serif;
-  font-size: 24px;
-  font-weight: 900;
-  letter-spacing: -1px;
-  color: #1c1c1e;
-  text-decoration: none;
-}
-.vibe-mobile-sheet-close {
-  width: 36px;
-  height: 36px;
-  border-radius: 10px;
-  border: none;
-  background: rgba(28, 28, 30, 0.05);
-  cursor: pointer;
-  color: #1c1c1e;
-  display: inline-flex;
-  align-items: center;
-  justify-content: center;
-  font-size: 18px;
-  font-family: inherit;
-}
-.vibe-mobile-sheet-divider {
-  height: 1px;
-  background: rgba(28, 28, 30, 0.08);
-  margin: 14px 0;
-}
-.vibe-mobile-sheet-link {
-  display: flex;
-  align-items: center;
-  gap: 10px;
-  padding: 12px 12px;
-  border-radius: 12px;
-  font-family: "DM Sans", sans-serif;
-  font-size: 14px;
-  font-weight: 600;
-  color: #5c5853;
-  text-decoration: none;
-  background: rgba(28, 28, 30, 0.02);
-  border: 1px solid transparent;
-  -webkit-tap-highlight-color: transparent;
-}
-.vibe-mobile-sheet-link:active {
-  background: rgba(28, 28, 30, 0.05);
-}
-.vibe-mobile-sheet-link--admin {
-  margin-top: 8px;
-  background: rgba(240, 200, 74, 0.10);
-  border-color: rgba(240, 200, 74, 0.4);
+/* Per-page top header padding — gives every mobile screen a safe-area
+   buffer above its own header (campus banner, otto hero, etc.) so
+   content clears the iOS notch / Dynamic Island. Add this class to
+   the first element of any page that paints its own header. */
+.vibe-mobile-safe-top {
+  padding-top: env(safe-area-inset-top, 0px);
 }
 
-/* Network page outer padding — tighten so UserCard rows aren't squeezed. */
+/* Network + Settings outer padding — tighten so card rows aren't
+   squeezed AND so the page header clears the iOS notch (env() folds
+   to 0 on browsers / desktops without a safe area). */
 @media (max-width: 760px) {
   .vibe-network-main,
   .vibe-settings-main {
-    padding: 20px 14px 32px !important;
+    padding:
+      calc(20px + env(safe-area-inset-top, 0px))
+      14px
+      32px !important;
     border-right: none !important;
   }
-  /* Messages iframe: subtract the mobile chrome so the iframe doesn't
-     overflow past the bottom tab bar. 100dvh handles iOS Safari's dynamic
-     URL bar collapse — falling back to 100vh on browsers that don't
-     support it. */
+  /* Messages iframe: shift below the notch + subtract bottom tab bar
+     so the embedded shell doesn't overflow past the chrome. 100dvh
+     handles iOS Safari's dynamic URL bar collapse. */
   .vibe-messages-iframe {
+    margin-top: env(safe-area-inset-top, 0px) !important;
     height: calc(
       100vh
-      - 52px - env(safe-area-inset-top, 0px)
+      - env(safe-area-inset-top, 0px)
       - 64px - env(safe-area-inset-bottom, 0px)
     ) !important;
     height: calc(
       100dvh
-      - 52px - env(safe-area-inset-top, 0px)
+      - env(safe-area-inset-top, 0px)
       - 64px - env(safe-area-inset-bottom, 0px)
     ) !important;
   }
