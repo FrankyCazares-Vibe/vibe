@@ -1037,15 +1037,33 @@ input,textarea,[contenteditable="true"]{cursor:text!important;}
 </div>
 
 <script>
+// When this page is embedded in an iframe (the /messages React route), the
+// parent renders the cursor for the *entire* viewport — including over the
+// iframe. We skip our own dot/ring and just forward mouse state to the
+// parent so a single coral cursor follows the pointer seamlessly across
+// the LeftNav ↔ iframe boundary. Standalone view of the page (no parent)
+// keeps the original cursor.
 const cur=document.getElementById('cursor'),ring=document.getElementById('cursorRing');
-let mx=window.innerWidth/2,my=window.innerHeight/2,rx=window.innerWidth/2,ry=window.innerHeight/2;
-document.addEventListener('mousemove',e=>{mx=e.clientX;my=e.clientY;cur.style.transform=`translate(${mx-4}px,${my-4}px)`;},{passive:true});
-(function tick(){rx+=(mx-rx-14)*.28;ry+=(my-ry-14)*.28;ring.style.transform=`translate(${Math.round(rx)}px,${Math.round(ry)}px)`;requestAnimationFrame(tick);})();
-document.addEventListener('mousedown',()=>cur.classList.add('clicking'));
-document.addEventListener('mouseup',()=>cur.classList.remove('clicking'));
 const HS='a,button,.nav-item,.t-item,.req-banner,.t-tab,.c-btn,.mv,.btn-acc,.btn-dec,.start-btn';
-document.addEventListener('mouseover',e=>{if(e.target.closest(HS)){cur.classList.add('hover');ring.classList.add('hover');}});
-document.addEventListener('mouseout',e=>{if(e.target.closest(HS)){cur.classList.remove('hover');ring.classList.remove('hover');}});
+const IS_EMBEDDED = (function(){ try { return window.self !== window.top; } catch(e) { return true; } })();
+if (IS_EMBEDDED) {
+  if (cur) cur.style.display='none';
+  if (ring) ring.style.display='none';
+  function post(type, extra){ try { window.parent.postMessage(Object.assign({source:'vibe-cursor',type:type}, extra||{}), '*'); } catch(e){} }
+  document.addEventListener('mousemove', e => post('move', {x:e.clientX, y:e.clientY}), {passive:true});
+  document.addEventListener('mousedown', () => post('down'));
+  document.addEventListener('mouseup',   () => post('up'));
+  document.addEventListener('mouseover', e => { if (e.target.closest(HS)) post('hover-on'); });
+  document.addEventListener('mouseout',  e => { if (e.target.closest(HS)) post('hover-off'); });
+} else {
+  let mx=window.innerWidth/2,my=window.innerHeight/2,rx=window.innerWidth/2,ry=window.innerHeight/2;
+  document.addEventListener('mousemove',e=>{mx=e.clientX;my=e.clientY;cur.style.transform=`translate(${mx-4}px,${my-4}px)`;},{passive:true});
+  (function tick(){rx+=(mx-rx-14)*.28;ry+=(my-ry-14)*.28;ring.style.transform=`translate(${Math.round(rx)}px,${Math.round(ry)}px)`;requestAnimationFrame(tick);})();
+  document.addEventListener('mousedown',()=>cur.classList.add('clicking'));
+  document.addEventListener('mouseup',()=>cur.classList.remove('clicking'));
+  document.addEventListener('mouseover',e=>{if(e.target.closest(HS)){cur.classList.add('hover');ring.classList.add('hover');}});
+  document.addEventListener('mouseout',e=>{if(e.target.closest(HS)){cur.classList.remove('hover');ring.classList.remove('hover');}});
+}
 
 const T={
   kwame:{n:'Kwame Asante',av:'KA',bg:'#2D1B4E',role:'AI Founder · Lagos → SF',on:true,conn:true,vibe:{bg:'linear-gradient(135deg,#1a0533,#2d1b4e)',lbl:'AI tool replacing a $40k analyst'},msgs:[

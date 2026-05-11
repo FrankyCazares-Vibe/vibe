@@ -8,12 +8,13 @@ import { useEffect, useRef } from "react";
  * anything interactive. Skipped on touch / coarse-pointer devices via the
  * `(pointer: fine)` media query.
  *
- * Iframes are an event boundary — once the pointer enters one, the parent
- * doc stops receiving mousemove. To avoid a "stuck twin cursor at the
- * iframe edge" (the static prototype pages embedded in `/messages` etc.
- * run their own dot+ring), we directly attach `mouseenter`/`mouseleave`
- * to every <iframe> in the document and toggle a hidden class. A
- * MutationObserver picks up iframes that mount after first paint.
+ * One cursor across iframe boundaries. iframes are an event boundary —
+ * once the pointer enters one, the parent doc stops getting mousemove. To
+ * keep a single cursor following the pointer seamlessly across (e.g.
+ * LeftNav ↔ /messages iframe content), embedded iframe pages drop their
+ * internal cursor and postMessage their mouse state up here. We translate
+ * the iframe-relative coords into parent viewport coords using the
+ * iframe's bounding rect.
  */
 export function CustomCursor() {
   const dotRef = useRef<HTMLDivElement | null>(null);
@@ -45,15 +46,25 @@ export function CustomCursor() {
       dot!.classList.remove("vibe-cursor-hidden");
       ring!.classList.remove("vibe-cursor-hidden");
     }
+    function setHover(on: boolean) {
+      if (on) {
+        dot!.classList.add("hover");
+        ring!.classList.add("hover");
+      } else {
+        dot!.classList.remove("hover");
+        ring!.classList.remove("hover");
+      }
+    }
+
+    function applyPosition(x: number, y: number) {
+      mx = x;
+      my = y;
+      dot!.style.transform = `translate(${mx - 4}px, ${my - 4}px)`;
+      if (dot!.classList.contains("vibe-cursor-hidden")) showCursor();
+    }
 
     function onMove(e: MouseEvent) {
-      mx = e.clientX;
-      my = e.clientY;
-      dot!.style.transform = `translate(${mx - 4}px, ${my - 4}px)`;
-      // Defensive: if a mousemove fires while we're flagged hidden (we re-
-      // entered the parent doc through some path that didn't trigger
-      // mouseleave on the iframe — rare but happens with rapid moves), un-hide.
-      if (dot!.classList.contains("vibe-cursor-hidden")) showCursor();
+      applyPosition(e.clientX, e.clientY);
     }
     function onDown() {
       dot!.classList.add("clicking");
@@ -66,17 +77,11 @@ export function CustomCursor() {
       "a, button, input, select, textarea, label, [role='button'], [role='tab'], [data-cursor-hover]";
     function onOver(e: MouseEvent) {
       const t = e.target as Element | null;
-      if (t && t.closest?.(HOVER_SEL)) {
-        dot!.classList.add("hover");
-        ring!.classList.add("hover");
-      }
+      if (t && t.closest?.(HOVER_SEL)) setHover(true);
     }
     function onOut(e: MouseEvent) {
       const t = e.target as Element | null;
-      if (t && t.closest?.(HOVER_SEL)) {
-        dot!.classList.remove("hover");
-        ring!.classList.remove("hover");
-      }
+      if (t && t.closest?.(HOVER_SEL)) setHover(false);
     }
 
     function tick() {
@@ -86,37 +91,49 @@ export function CustomCursor() {
       raf = requestAnimationFrame(tick);
     }
 
-    // ── iframe handlers ────────────────────────────────────────────────
-    // Direct mouseenter/mouseleave on each <iframe> is far more reliable
-    // than checking event.target in a delegated mouseover listener —
-    // browsers consistently fire these on the element at the moment of
-    // crossing, regardless of the iframe capturing inner events.
-    const observed = new WeakSet<HTMLIFrameElement>();
-    function bindIframe(frame: HTMLIFrameElement) {
-      if (observed.has(frame)) return;
-      observed.add(frame);
-      frame.addEventListener("mouseenter", hideCursor);
-      frame.addEventListener("mouseleave", showCursor);
-    }
-    function bindAllIframes() {
-      document.querySelectorAll("iframe").forEach((f) => bindIframe(f as HTMLIFrameElement));
-    }
-    bindAllIframes();
-
-    const observer = new MutationObserver((mutations) => {
-      for (const m of mutations) {
-        m.addedNodes.forEach((n) => {
-          if (n instanceof HTMLIFrameElement) bindIframe(n);
-          else if (n instanceof Element) {
-            n.querySelectorAll("iframe").forEach((f) => bindIframe(f as HTMLIFrameElement));
-          }
-        });
+    // ── iframe → parent cursor forwarding ─────────────────────────────
+    // Embedded iframe pages (e.g. /messages → /html/messages.html) skip
+    // their own cursor and postMessage their mouse state up here so a
+    // single cursor follows the pointer across the boundary. We look up
+    // the originating iframe by matching event.source against each
+    // iframe.contentWindow.
+    function iframeForSource(src: MessageEventSource | null): HTMLIFrameElement | null {
+      if (!src) return null;
+      const frames = document.querySelectorAll("iframe");
+      for (const f of Array.from(frames)) {
+        if ((f as HTMLIFrameElement).contentWindow === src) return f as HTMLIFrameElement;
       }
-    });
-    observer.observe(document.body, { childList: true, subtree: true });
+      return null;
+    }
+    function onMessage(e: MessageEvent) {
+      const d = e.data as { source?: string; type?: string; x?: number; y?: number } | null;
+      if (!d || d.source !== "vibe-cursor") return;
+      const frame = iframeForSource(e.source);
+      if (!frame) return;
+      const rect = frame.getBoundingClientRect();
+      switch (d.type) {
+        case "move":
+          if (typeof d.x === "number" && typeof d.y === "number") {
+            applyPosition(rect.left + d.x, rect.top + d.y);
+          }
+          break;
+        case "down":
+          dot!.classList.add("clicking");
+          break;
+        case "up":
+          dot!.classList.remove("clicking");
+          break;
+        case "hover-on":
+          setHover(true);
+          break;
+        case "hover-off":
+          setHover(false);
+          break;
+      }
+    }
+    window.addEventListener("message", onMessage);
 
-    // ── off-window handling — also useful so the cursor doesn't sit at
-    // the edge when the user moves off the browser window entirely.
+    // Off-window hide so the cursor doesn't sit frozen at the edge.
     document.documentElement.addEventListener("mouseleave", hideCursor);
     document.documentElement.addEventListener("mouseenter", showCursor);
 
@@ -129,11 +146,7 @@ export function CustomCursor() {
 
     return () => {
       cancelAnimationFrame(raf);
-      observer.disconnect();
-      document.querySelectorAll("iframe").forEach((f) => {
-        f.removeEventListener("mouseenter", hideCursor);
-        f.removeEventListener("mouseleave", showCursor);
-      });
+      window.removeEventListener("message", onMessage);
       document.removeEventListener("mousemove", onMove);
       document.removeEventListener("mousedown", onDown);
       document.removeEventListener("mouseup", onUp);
