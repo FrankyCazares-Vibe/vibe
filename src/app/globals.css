@@ -2260,6 +2260,15 @@ a.otto-room-row-title:hover {
 .vibe-campus-messages-btn { display: none; }
 @media (max-width: 899px) {
   .vibe-campus-messages-btn { display: inline-flex; }
+  /* Banner clears the iOS notch on mobile only. Desktop banner stays
+     fixed-height (64px); on phone we let it grow by the safe-area
+     inset and override `height` with `min-height` so content stays
+     visible below the Dynamic Island. */
+  .vibe-campus-banner {
+    height: auto !important;
+    min-height: calc(64px + env(safe-area-inset-top, 0px));
+    padding-top: env(safe-area-inset-top, 0px) !important;
+  }
 }
 
 @media (max-width: 899px) {

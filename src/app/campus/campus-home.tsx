@@ -3117,15 +3117,14 @@ const SHEEN_KEYFRAMES = `
 function CampusBanner() {
   return (
     <header
+      className="vibe-campus-banner"
       style={{
         position: "relative",
-        minHeight: 64,
+        height: 64,
         display: "flex",
         alignItems: "center",
         gap: 14,
-        // env() is 0 on desktop; on iOS the banner grows to cover the
-        // notch / Dynamic Island so its bottom edge stays clear.
-        padding: "env(safe-area-inset-top, 0px) 24px 0",
+        padding: "0 24px",
         // Solid IU crimson — reads identical on every tab regardless of backdrop
         background:
           "linear-gradient(135deg, #8B0E18 0%, #6A0A12 50%, #3F050B 100%)",
