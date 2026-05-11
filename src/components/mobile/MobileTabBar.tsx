@@ -4,17 +4,20 @@ import Link from "next/link";
 import { usePathname } from "next/navigation";
 
 /**
- * Mobile-only chrome rendered by CampusAppShell below the 900px breakpoint.
+ * Bottom tab bar — the only mobile chrome. Renders from any mobile page
+ * (MobileShell wraps every forked route; CampusAppShell also renders it
+ * for the routes that still use the legacy shell-with-media-query path
+ * during the migration to per-route forks).
  *
- * iOS-native pattern: bottom tab bar is the ONLY chrome. Per-screen
- * headers live inside each page so they can match that page's vibe
- * (e.g. campus's crimson banner, otto's hero, profile's cover). No
- * top brand bar, no slide-in hamburger sheet — those were holdover
- * web patterns. Settings + Admin are reached from the Profile tab.
+ * iOS-native pattern: per-screen headers live inside each page so they
+ * can match that page's vibe (e.g. campus's crimson banner, otto's
+ * hero, profile's cover). No top brand bar, no slide-in hamburger sheet
+ * — those were holdover web patterns. Settings + Admin are reached
+ * from the Profile tab.
  *
- * Visibility is fully driven by the `.vibe-mobile-only` CSS gate in
- * globals.css so the JSX can render unconditionally without hydration
- * mismatches.
+ * Visibility is owned by the `.vibe-mobile-tabbar` class — `display:
+ * none` by default, `display: grid` only inside @media (max-width:
+ * 899px). Desktop never renders it.
  */
 
 type MobileTab = {
@@ -117,7 +120,7 @@ const MOBILE_TABS: MobileTab[] = [
   },
 ];
 
-export function MobileNavChrome() {
+export function MobileTabBar() {
   const pathname = usePathname() ?? "";
 
   const isActive = (href: string) =>

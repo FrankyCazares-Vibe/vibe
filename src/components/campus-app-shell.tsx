@@ -4,7 +4,7 @@ import { usePathname } from "next/navigation";
 import type { ReactNode } from "react";
 
 import LeftNav from "@/components/LeftNav";
-import { MobileNavChrome } from "@/components/MobileNavChrome";
+import { MobileTabBar } from "@/components/mobile/MobileTabBar";
 import { OttoCorner } from "@/components/network/OttoCorner";
 
 type Props = {
@@ -22,9 +22,10 @@ type Props = {
  * element on top of that conflicts visually with the chat UI.
  *
  * Below the 900px breakpoint the layout collapses to a single column and
- * the MobileNavChrome takes over (top bar + bottom tab bar + slide-out
- * sheet). The desktop LeftNav and right rail are hidden via CSS — see
- * globals.css `.vibe-app-shell` rules.
+ * the MobileTabBar takes over and the desktop LeftNav + right rail
+ * hide via CSS — see globals.css `.vibe-app-shell` rules. Note: as we
+ * fork individual routes to use the new MobileShell + dedicated
+ * mobile components, this legacy path will be retired per-route.
  */
 export function CampusAppShell({ children, sidebar }: Props) {
   const pathname = usePathname();
@@ -39,7 +40,7 @@ export function CampusAppShell({ children, sidebar }: Props) {
       <LeftNav />
       {children}
       {sidebar ? <div className="vibe-right-rail">{sidebar}</div> : null}
-      <MobileNavChrome />
+      <MobileTabBar />
       {showOttoCorner ? <OttoCorner /> : null}
     </div>
   );

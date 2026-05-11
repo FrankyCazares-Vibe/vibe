@@ -3,7 +3,7 @@ import { redirect } from "next/navigation";
 import { enforceCampusAccess } from "@/lib/auth/campus-access";
 import { createSupabaseServerClient } from "@/lib/supabase/server";
 
-import { ProfileHtmlBridge } from "./profile-html-bridge";
+import { ProfileSwitch } from "./ProfileSwitch";
 
 export const metadata = {
   title: "Profile · Vibe",
@@ -20,5 +20,5 @@ export default async function ProfilePage() {
     redirect(`/auth/login?next=${encodeURIComponent("/profile")}`);
   }
 
-  return <ProfileHtmlBridge />;
+  return <ProfileSwitch />;
 }
