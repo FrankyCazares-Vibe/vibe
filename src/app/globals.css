@@ -1296,3 +1296,54 @@
     display: none;
   }
 }
+
+/* ====================================================================== */
+/* Custom cursor (dot + trailing ring) — shown on every shelled page       */
+/* ====================================================================== */
+
+@media (pointer: fine) {
+  body.vibe-cursor-active,
+  body.vibe-cursor-active * {
+    cursor: none !important;
+  }
+}
+
+.vibe-cursor {
+  position: fixed;
+  pointer-events: none;
+  top: 0;
+  left: 0;
+  z-index: 2147483646;
+}
+.vibe-cursor--dot {
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+  background: #ff5c35;
+  box-shadow: 0 0 8px rgba(255, 92, 53, 0.55);
+  transition: transform 0.08s ease-out, background 0.15s ease, box-shadow 0.15s ease;
+}
+.vibe-cursor--dot.clicking {
+  transform-origin: center;
+}
+.vibe-cursor--dot.hover {
+  background: #ffffff;
+  box-shadow: 0 0 12px rgba(255, 92, 53, 0.75);
+}
+.vibe-cursor--ring {
+  width: 28px;
+  height: 28px;
+  border-radius: 50%;
+  border: 1px solid rgba(255, 92, 53, 0.4);
+  transition: border-color 0.18s ease, transform 0.08s ease-out;
+}
+.vibe-cursor--ring.hover {
+  border-color: #ff5c35;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .vibe-cursor--dot,
+  .vibe-cursor--ring {
+    transition: none !important;
+  }
+}
