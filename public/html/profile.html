@@ -895,15 +895,32 @@ body.edit-mode .resume-upload-row { display:flex; }
 
 .doc-viewer-grid {
   display:grid;grid-template-columns:180px 1fr;gap:14px;
-  /* Modal stays compact — main column flexes, thumb column is fixed. */
+  /* The doc-viewer-grid is the body of #docModal's modal: it flexes to
+     fill the viewport-bounded modal so the inner .doc-view can scroll
+     instead of pushing the modal past the viewport edge. */
+  flex:1 1 auto;
+  min-height:0;
 }
 .doc-thumb-panel {
   border-right:1px solid var(--border);
   padding-right:10px;
   /* Thumb panel scrolls independently when more thumbs are added. */
-  max-height:70vh;
   overflow-y:auto;
+  min-height:0;
 }
+/* The viewer modal is a flex column capped at 92vh so its body
+   (.doc-viewer-grid → .doc-main → .doc-view) is the scroll container,
+   never the document body. */
+#docModal .modal {
+  display:flex;
+  flex-direction:column;
+  max-height:92vh;
+  overflow:hidden;
+  width:min(820px, calc(100vw - 28px));
+}
+/* While the doc modal is open, freeze body scroll so wheel events that
+   miss the viewer don't quietly scroll the profile underneath. */
+body.doc-modal-open { overflow:hidden; }
 .doc-pages {
   display:flex;flex-direction:column;gap:10px;
 }
@@ -965,6 +982,10 @@ body.edit-mode .resume-upload-row { display:flex; }
 .doc-page-thumb-remove:hover { background:var(--accent); transform:scale(1.1); }
 .doc-main {
   display:flex;flex-direction:column;gap:12px;
+  /* Flex child of .doc-viewer-grid — needs min-height:0 so the inner
+     .doc-view can shrink and its overflow:auto can scroll instead of
+     the modal growing past the viewport. */
+  min-height:0;
 }
 .doc-main-head {
   display:flex;align-items:center;justify-content:space-between;gap:12px;
@@ -983,14 +1004,18 @@ body.edit-mode .resume-upload-row { display:flex; }
   overflow-y:auto;
   overflow-x:hidden;
   background:#f5f4f0;
-  max-height:72vh;
-  /* The viewer scrolls the page stack. Each .doc-page-wrap inside is a
-     positioned container holding a rasterized page + that page's bars,
-     so bars are anchored to page coordinates and scroll with content. */
+  /* Flex child of .doc-main — grow to fill the viewport-bounded modal so
+     scroll happens HERE on the page stack, not on the body. min-height:0
+     is critical: without it the flex item refuses to shrink below content
+     height and the modal grows past the viewport. */
+  flex:1 1 auto;
+  min-height:0;
   padding:14px;
   display:flex;
   flex-direction:column;
   gap:14px;
+  /* Don't let scroll chain to the body when we hit the edge. */
+  overscroll-behavior:contain;
 }
 .doc-view.is-editing-redactions { cursor:crosshair; }
 
@@ -3646,9 +3671,9 @@ body.empty-profile-mode #profileEmpty { display: flex !important; }
 
 <!-- Resume / Portfolio viewer -->
 <div class="modal-backdrop" id="docModal">
-  <div class="modal" style="width:min(820px, calc(100vw - 28px));padding:16px 18px 16px;">
+  <div class="modal" style="padding:16px 18px 16px;">
     <button class="modal-close" onclick="closeModal('docModal')">×</button>
-    <div class="modal-title" style="margin-bottom:10px;font-size:18px">Resume / Portfolio</div>
+    <div class="modal-title" style="margin-bottom:10px;font-size:18px;flex-shrink:0">Resume / Portfolio</div>
     <div class="doc-viewer-grid">
       <div class="doc-thumb-panel">
         <div style="font-size:11px;font-weight:800;letter-spacing:1px;text-transform:uppercase;color:var(--muted);margin-bottom:10px">Pages / files</div>
@@ -4502,12 +4527,16 @@ function openDocumentViewer() {
   if (!modal) return;
   renderDocViewer();
   modal.classList.add('open');
+  // Freeze body scroll so wheel events that miss .doc-view don't quietly
+  // scroll the profile underneath the modal.
+  document.body.classList.add('doc-modal-open');
 }
 
 function closeDocumentViewer() {
   const modal = document.getElementById('docModal');
   if (!modal) return;
   modal.classList.remove('open');
+  document.body.classList.remove('doc-modal-open');
 }
 
 
@@ -4930,7 +4959,12 @@ function nextDocPage() {
 function openModal(id){ document.getElementById(id).classList.add('open'); }
 function closeModal(id){ document.getElementById(id).classList.remove('open'); if(id==='docModal') closeDocumentViewer(); }
 document.querySelectorAll('.modal-backdrop').forEach(b=>{
-  b.addEventListener('click', e=>{ if(e.target===b) b.classList.remove('open'); });
+  b.addEventListener('click', e=>{
+    if(e.target!==b) return;
+    b.classList.remove('open');
+    // Clean up the body scroll-lock if the doc viewer was the one closing.
+    if (b.id === 'docModal') document.body.classList.remove('doc-modal-open');
+  });
 });
 
 // ── Toast ─────────────────────────────────────────────────────────
