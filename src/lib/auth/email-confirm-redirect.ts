@@ -10,9 +10,6 @@ export const POST_EMAIL_CONFIRM_PATH = "/auth/school-email?account_verified=1";
  */
 export const DEFAULT_POST_LOGIN_PATH = "/profile";
 
-/** Static Otto HTML — load through `/onboarding` so query params are preserved. */
-export const ONBOARDING_STATIC_PATH = "/html/onboarding.html";
-
 /** Build `emailRedirectTo` for signUp / invite flows. Must be listed in Supabase → Auth → Redirect URLs. */
 export function getAuthEmailCallbackUrl(siteOrigin: string): string {
   const base = siteOrigin.replace(/\/$/, "");

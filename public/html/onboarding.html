@@ -42,6 +42,17 @@ input, textarea, [contenteditable="true"] { cursor:text!important; }
 .onb-skip:hover { color: white; }
 .onb-skip[disabled] { display: none; }
 
+.replay-pill {
+  position: absolute; top: 22px; left: 50%; transform: translate(-50%, 38px);
+  font-family: 'DM Sans', sans-serif; font-size: 10px; font-weight: 700;
+  letter-spacing: .18em; text-transform: uppercase;
+  color: #F5C842;
+  background: rgba(245, 200, 66, 0.1);
+  border: 1px solid rgba(245, 200, 66, 0.3);
+  padding: 4px 10px; border-radius: 999px;
+  pointer-events: none; white-space: nowrap;
+}
+
 /* Progress dots */
 .progress-dots {
   position: fixed; top: 22px; left: 50%; transform: translateX(-50%);
@@ -147,8 +158,8 @@ input, textarea, [contenteditable="true"] { cursor:text!important; }
 }
 .suggest-chip:hover { background: rgba(255,255,255,.1); border-color: rgba(255,255,255,.25); color: white; }
 
-/* Step 3 — quick profile (pre-fill Supabase; banner/photos later) */
-.onb-step[data-step="3"] { max-width: 560px; }
+/* Step 2 — quick profile (pre-fill Supabase; banner/photos later) */
+.onb-step[data-step="2"] { max-width: 560px; }
 .pf-form {
   width: 100%; max-width: 480px; text-align: left;
   display: flex; flex-direction: column; gap: 14px; margin-bottom: 22px;
@@ -249,6 +260,59 @@ input, textarea, [contenteditable="true"] { cursor:text!important; }
   .progress-dots { padding: 6px 12px; }
   .progress-text { display: none; }
 }
+
+/* ── Hyperdrive on Finish — same beat as the landing's warp ─────────────── */
+.ott-warp {
+  position: fixed; inset: 0; pointer-events: none; z-index: 9990;
+  opacity: 0; transition: opacity 80ms ease;
+}
+.ott-warp.active { opacity: 1; }
+.ott-warp-streak {
+  position: absolute; top: 50%; left: 50%;
+  width: 2px; height: 2px;
+  background: #ffffff;
+  border-radius: 50%;
+  box-shadow: 0 0 8px #ffffff, 0 0 18px #ffe5db, 0 0 36px rgba(255,92,53,.8);
+  transform: translate(-50%, -50%);
+  will-change: transform, opacity;
+}
+.ott-warp.active .ott-warp-streak {
+  animation: ott-warp-streak 750ms cubic-bezier(0.5, 0, 0.85, 0.4) forwards;
+}
+.ott-warp::after {
+  content: "";
+  position: absolute; inset: 0;
+  background: radial-gradient(circle at 50% 50%, #ffd9b5 0%, #ffe5db 40%, #ffffff 100%);
+  opacity: 0; pointer-events: none;
+}
+.ott-warp.active::after {
+  animation: ott-warp-flash 750ms ease-in forwards;
+}
+body.ott-warping main.onb-shell,
+body.ott-warping .progress-dots {
+  animation: ott-warp-content 750ms cubic-bezier(0.6, 0, 0.85, 0.3) forwards;
+  transform-origin: 50% 50%;
+}
+@keyframes ott-warp-streak {
+  0%   { transform: translate(-50%, -50%) rotate(var(--ang)) scaleX(1) scaleY(1); opacity: .9; }
+  25%  { transform: translate(-50%, -50%) rotate(var(--ang)) scaleX(18) scaleY(1.2); opacity: 1; }
+  100% { transform: translate(calc(-50% + var(--cos) * 2800px), calc(-50% + var(--sin) * 2800px)) rotate(var(--ang)) scaleX(90) scaleY(0.6); opacity: 0; }
+}
+@keyframes ott-warp-flash {
+  0%  { opacity: 0; }
+  80% { opacity: 0; }
+  100% { opacity: 1; }
+}
+@keyframes ott-warp-content {
+  0%   { transform: scale(1); opacity: 1; filter: blur(0); }
+  35%  { transform: scale(1.15); opacity: .9; filter: blur(2px); }
+  100% { transform: scale(8); opacity: 0; filter: blur(22px); }
+}
+@media (prefers-reduced-motion: reduce) {
+  .ott-warp.active .ott-warp-streak,
+  body.ott-warping main.onb-shell,
+  body.ott-warping .progress-dots { animation: none !important; }
+}
 </style>
 </head>
 <body>
@@ -266,9 +330,10 @@ input, textarea, [contenteditable="true"] { cursor:text!important; }
   <div class="dot"></div>
   <div class="dot"></div>
   <div class="dot"></div>
-  <div class="dot"></div>
-  <span class="progress-text" id="progressText">1 of 5</span>
+  <span class="progress-text" id="progressText">1 of 4</span>
 </div>
+
+<div class="replay-pill" id="replayPill" hidden>preview · your saved answers won't change</div>
 
 <main class="onb-shell">
   <div class="onb-bg-1" id="onbBg1"></div>
@@ -284,42 +349,16 @@ input, textarea, [contenteditable="true"] { cursor:text!important; }
       <div class="core"></div>
     </div>
     <div class="h1">i'm <em>otto</em>.</div>
-    <div class="intro">"think of me as your marketing intern. you write the post, i make sure it lands everywhere it needs to — with the right voice for each place."</div>
+    <div class="intro">"think of me as your campus compass. i'll point you to what's loud, what's tonight, and who's on your wavelength — your guide while you build out your home on vibe."</div>
     <div class="cta-row">
       <button class="btn-coral" onclick="goToStep(2)">Let's go &rarr;</button>
       <button class="btn-skip-step" onclick="confirmSkip()">Maybe later</button>
     </div>
-    <div class="note">about three minutes — name me, profile, experience, then your documents</div>
+    <div class="note">about two minutes — profile, experience, then your documents</div>
   </section>
 
-  <!-- ─────────── STEP 2 — Name me ─────────── -->
+  <!-- ─────────── STEP 2 — Quick profile (pre-fill DB; photos later) ─────────── -->
   <section class="onb-step" data-step="2">
-    <div class="otto-mid">
-      <div class="pulse-1"></div>
-      <div class="pulse-2"></div>
-      <div class="orbit-out"><div class="d"></div></div>
-      <div class="core"></div>
-    </div>
-    <div class="h2">what should i go by?</div>
-    <div class="sub-intro">"otto's the default. swap me to whatever you like."</div>
-    <div class="name-input-wrap">
-      <input type="text" id="ottoName" class="name-input" value="otto" maxlength="24" autocomplete="off" spellcheck="false" onkeydown="if(event.key==='Enter') goToStep(3);">
-    </div>
-    <div class="suggest-chips">
-      <button class="suggest-chip" onclick="setName('pico')">try: pico</button>
-      <button class="suggest-chip" onclick="setName('mox')">mox</button>
-      <button class="suggest-chip" onclick="setName('echo')">echo</button>
-      <button class="suggest-chip" onclick="setName('nimo')">nimo</button>
-      <button class="suggest-chip" onclick="setName('ember')">ember</button>
-    </div>
-    <div class="cta-row" style="margin-top: 36px;">
-      <button class="btn-coral" onclick="goToStep(3)">Continue &rarr;</button>
-      <button class="btn-skip-step" onclick="goToStep(3)">Skip</button>
-    </div>
-  </section>
-
-  <!-- ─────────── STEP 3 — Quick profile (pre-fill DB; photos later) ─────────── -->
-  <section class="onb-step" data-step="3">
     <div class="otto-sm">
       <div class="pulse-1"></div>
       <div class="orbit-out"><div class="d"></div></div>
@@ -348,12 +387,14 @@ input, textarea, [contenteditable="true"] { cursor:text!important; }
         <textarea id="pfBio" class="pf-textarea" rows="3" maxlength="600" placeholder="A few lines about you — what you're into, what you're building."></textarea>
       </div>
       <div>
-        <label class="pf-label" for="pfMajor">Major</label>
-        <input type="text" id="pfMajor" class="pf-input" maxlength="60" placeholder="e.g. Informatics, Business, Film">
+        <label class="pf-label" for="pfMajor">Major <span style="font-weight:400;color:#8A8580">— start typing to filter the IU list</span></label>
+        <input type="text" id="pfMajor" class="pf-input" maxlength="80" list="iuMajors" autocomplete="off" placeholder="Start typing — e.g. Informatics">
+        <datalist id="iuMajors"></datalist>
       </div>
       <div>
-        <label class="pf-label" for="pfDepartment">Department / school</label>
-        <input type="text" id="pfDepartment" class="pf-input" maxlength="80" placeholder="e.g. College of Engineering — optional">
+        <label class="pf-label" for="pfDepartment">Department / school <span style="font-weight:400;color:#8A8580">— optional, start typing to pick from IU</span></label>
+        <input type="text" id="pfDepartment" class="pf-input" maxlength="120" list="iuSchools" autocomplete="off" placeholder="e.g. Luddy School of Informatics…">
+        <datalist id="iuSchools"></datalist>
       </div>
       <div>
         <label class="pf-label" for="pfYear">Year</label>
@@ -387,14 +428,14 @@ input, textarea, [contenteditable="true"] { cursor:text!important; }
     </div>
 
     <div class="cta-row" style="margin-top: 28px;">
-      <button class="btn-coral" onclick="goToStep(4)">Continue &rarr;</button>
-      <button class="btn-skip-step" onclick="goToStep(5)">Skip to resume &rarr;</button>
+      <button class="btn-coral" onclick="goToStep(3)">Continue &rarr;</button>
+      <button class="btn-skip-step" onclick="goToStep(4)">Skip to resume &rarr;</button>
     </div>
     <div class="note italic" style="margin-top: 14px;">you can change anything later</div>
   </section>
 
-  <!-- ─────────── STEP 4 — Work experience ─────────── -->
-  <section class="onb-step" data-step="4">
+  <!-- ─────────── STEP 3 — Work experience ─────────── -->
+  <section class="onb-step" data-step="3">
     <div class="otto-sm">
       <div class="pulse-1"></div>
       <div class="orbit-out"><div class="d"></div></div>
@@ -424,13 +465,13 @@ input, textarea, [contenteditable="true"] { cursor:text!important; }
     <p class="pf-hint" style="text-align:center;max-width:420px;">We’ll show this in your profile’s work section — same layout as the full editor.</p>
 
     <div class="cta-row" style="margin-top: 28px;">
-      <button class="btn-coral" onclick="goToStep(5)">Continue &rarr;</button>
-      <button class="btn-skip-step" onclick="goToStep(5)">Skip</button>
+      <button class="btn-coral" onclick="goToStep(4)">Continue &rarr;</button>
+      <button class="btn-skip-step" onclick="goToStep(4)">Skip</button>
     </div>
   </section>
 
-  <!-- ─────────── STEP 5 — Resume / portfolio ─────────── -->
-  <section class="onb-step" data-step="5">
+  <!-- ─────────── STEP 4 — Resume / portfolio ─────────── -->
+  <section class="onb-step" data-step="4">
     <div class="otto-sm">
       <div class="pulse-1"></div>
       <div class="orbit-out"><div class="d"></div></div>
@@ -466,6 +507,9 @@ input, textarea, [contenteditable="true"] { cursor:text!important; }
 
 </main>
 
+<!-- Hyperdrive overlay (populated + activated by triggerHyperdrive) -->
+<div class="ott-warp" id="ottWarp" aria-hidden="true"></div>
+
 <!-- Skip-confirm dialog -->
 <div class="confirm-overlay" id="skipOverlay">
   <div class="confirm-card">
@@ -479,6 +523,16 @@ input, textarea, [contenteditable="true"] { cursor:text!important; }
 </div>
 
 <script>
+// ── Replay mode ───────────────────────────────────────────────────────────
+// `?replay=1` lets a user revisit Otto onboarding after they've already
+// finished it. In replay mode we skip the API save on Finish so existing
+// answers aren't overwritten, and surface a small banner so it's obvious.
+const IS_REPLAY = new URLSearchParams(window.location.search).get('replay') === '1';
+if (IS_REPLAY) {
+  const pill = document.getElementById('replayPill');
+  if (pill) pill.hidden = false;
+}
+
 // ── State ─────────────────────────────────────────────────────────────────
 const state = {
   step: 1,
@@ -487,7 +541,118 @@ const state = {
   uploadedResumeUrl: null,
 };
 
-const TOTAL_STEPS = 5;
+const TOTAL_STEPS = 4;
+
+// ── IU Bloomington major list (curated; users can also type freely) ──────
+const IU_MAJORS = [
+  "Undecided / Exploratory",
+  "Accounting",
+  "Adaptive Sport","African American and African Diaspora Studies","African Studies","American Studies","Animal Behavior","Anthropology","Apparel Merchandising","Applied Sciences",
+  "Arabic","Architectural Studies","Art History","Asian American Studies","Astronomy and Astrophysics","Audio Engineering and Sound Production","Ballet",
+  "Biochemistry","Biology","Biophysics","Biotechnology","Business Analytics","Business Management","Business Marketing","Business of Music",
+  "Central Eurasian Studies","Chemistry","Chinese","Cinema and Media Arts","Classical Civilization","Cognitive Science","Communication and Public Advocacy","Communication Sciences and Disorders",
+  "Comparative Literature","Composition (Music)","Computer Engineering","Computer Science","Contemporary Dance","Criminal Justice","Cybersecurity and Global Policy",
+  "Data Science","Direct Admit Kelley","East Asian Languages and Cultures","Earth and Atmospheric Sciences","Economic Consulting","Economics","Education (Elementary)","Education (Secondary)","Education (Special)",
+  "English","Entrepreneurship and Corporate Innovation","Environmental and Sustainability Studies","Environmental Science","Epidemiology","Exercise Science","Fashion Design","Finance",
+  "Folklore and Ethnomusicology","French","Game Design","Gender Studies","Geography","Geological Sciences","Germanic Studies","Graphic Design",
+  "Health and Wellness Design","Hebrew","Hispanic Linguistics","Historic Preservation","History","History of Art","Human Biology","Human-Centered Computing","Human Development and Family Studies",
+  "Individualized Major","Informatics","Information Systems","Intelligent Systems Engineering","International Business","International Law and Institutions","International Studies","Italian",
+  "Japanese","Jazz Studies","Jewish Studies","Journalism","Kelley Honors","Kinesiology","Korean","Labor Studies","Latin","Latin American and Caribbean Studies","Latino Studies","Law and Public Policy","Linguistics",
+  "Liberal Studies","Management","Marketing","Mathematics","Media (Advertising)","Media (Game Design)","Media (Production)","Media (Sports Reporting)",
+  "Medieval Studies","Microbiology","Middle Eastern Languages and Cultures","Music (BM)","Music Composition","Music Education","Music Performance","Music Theory","Musical Theatre",
+  "Neuroscience","Nonprofit Management","Nursing (BSN)","Nutrition and Dietetics","Operations Management","Painting","Philosophy","Photography","Physics","Piano","Political Science","Polish Studies",
+  "Portuguese","Pre-Dentistry","Pre-Law","Pre-Medicine","Pre-Optometry","Pre-Pharmacy","Pre-Physical Therapy","Pre-Veterinary","Professional Sales","Psychology","Public Affairs","Public Financial Management","Public Health (BSPH)","Public Policy Analysis",
+  "Real Estate","Recreational Sport Management","Religious Studies","Russian and Eastern European Studies","Russian Language","Sculpture","Slavic Languages and Literatures","Social Studies Education","Social Work","Sociology",
+  "Spanish","Speech and Hearing Sciences","Sport Marketing and Management","Statistics","Studio Art","Supply Chain Management","Sustainable Business",
+  "Telecommunications","Theatre and Drama","Therapeutic Recreation","Tourism, Hospitality and Event Management","Urban Planning and Community Development","Voice (Music)","Women's Studies","Youth Development"
+];
+(function populateIuMajors() {
+  const dl = document.getElementById('iuMajors');
+  if (!dl) return;
+  const frag = document.createDocumentFragment();
+  IU_MAJORS.forEach(function (m) {
+    const opt = document.createElement('option');
+    opt.value = m;
+    frag.appendChild(opt);
+  });
+  dl.appendChild(frag);
+})();
+
+// ── IU Bloomington schools/colleges + flagship departments ──────────────
+const IU_SCHOOLS = [
+  // Schools and colleges first — most students identify with these.
+  "College of Arts and Sciences",
+  "Eskenazi School of Art, Architecture + Design",
+  "Hamilton Lugar School of Global and International Studies",
+  "Hutton Honors College",
+  "Jacobs School of Music",
+  "Kelley School of Business",
+  "Luddy School of Informatics, Computing, and Engineering",
+  "Maurer School of Law",
+  "O'Neill School of Public and Environmental Affairs",
+  "School of Education",
+  "School of Nursing",
+  "School of Optometry",
+  "School of Public Health",
+  "School of Social Work",
+  "The Media School",
+  "University Graduate School",
+  // Common departments (mostly under the College of Arts and Sciences).
+  "Department of African American and African Diaspora Studies",
+  "Department of American Studies",
+  "Department of Anthropology",
+  "Department of Astronomy",
+  "Department of Biology",
+  "Department of Central Eurasian Studies",
+  "Department of Chemistry",
+  "Department of Classical Studies",
+  "Department of Cognitive Science",
+  "Department of Communication Sciences and Disorders",
+  "Department of Comparative Literature",
+  "Department of Computer Science",
+  "Department of Criminal Justice",
+  "Department of Earth and Atmospheric Sciences",
+  "Department of East Asian Languages and Cultures",
+  "Department of Economics",
+  "Department of English",
+  "Department of Folklore and Ethnomusicology",
+  "Department of French and Italian",
+  "Department of Gender Studies",
+  "Department of Geography",
+  "Department of Germanic Studies",
+  "Department of History",
+  "Department of History and Philosophy of Science and Medicine",
+  "Department of History of Art",
+  "Department of International Studies",
+  "Department of Kinesiology",
+  "Department of Linguistics",
+  "Department of Mathematics",
+  "Department of Middle Eastern Languages and Cultures",
+  "Department of Near Eastern Languages and Cultures",
+  "Department of Philosophy",
+  "Department of Physics",
+  "Department of Political Science",
+  "Department of Psychological and Brain Sciences",
+  "Department of Religious Studies",
+  "Department of Second Language Studies",
+  "Department of Slavic and East European Languages and Cultures",
+  "Department of Sociology",
+  "Department of Spanish and Portuguese",
+  "Department of Speech, Language and Hearing Sciences",
+  "Department of Statistics",
+  "Department of Theatre, Drama, and Contemporary Dance"
+];
+(function populateIuSchools() {
+  const dl = document.getElementById('iuSchools');
+  if (!dl) return;
+  const frag = document.createDocumentFragment();
+  IU_SCHOOLS.forEach(function (s) {
+    const opt = document.createElement('option');
+    opt.value = s;
+    frag.appendChild(opt);
+  });
+  dl.appendChild(frag);
+})();
 
 // ── Cursor (matches the rest of vibe) ─────────────────────────────────────
 const cur = document.getElementById('cursor');
@@ -510,11 +675,6 @@ bindCursorHover();
 function goToStep(n) {
   if (n < 1 || n > TOTAL_STEPS) return;
 
-  if (state.step === 2) {
-    const v = document.getElementById('ottoName').value.trim();
-    state.ottoName = v || 'otto';
-  }
-
   state.step = n;
 
   document.querySelectorAll('.onb-step').forEach(el => {
@@ -530,10 +690,9 @@ function goToStep(n) {
 
   document.getElementById('onbSkip').disabled = false;
 
-  if (n === 2) setTimeout(() => { const i = document.getElementById('ottoName'); i.focus(); i.select(); }, 250);
-  if (n === 3) setTimeout(() => { const i = document.getElementById('pfName'); if (i) i.focus(); }, 250);
-  if (n === 4) setTimeout(() => { const i = document.querySelector('.wx-list .wx-row .wx-company'); if (i) i.focus(); }, 250);
-  if (n === 5) setTimeout(() => { const i = document.getElementById('pfResumeUrl'); if (i) i.focus(); }, 250);
+  if (n === 2) setTimeout(() => { const i = document.getElementById('pfName'); if (i) i.focus(); }, 250);
+  if (n === 3) setTimeout(() => { const i = document.querySelector('.wx-list .wx-row .wx-company'); if (i) i.focus(); }, 250);
+  if (n === 4) setTimeout(() => { const i = document.getElementById('pfResumeUrl'); if (i) i.focus(); }, 250);
 }
 
 function updateProgress() {
@@ -546,14 +705,7 @@ function updateProgress() {
   document.getElementById('progressText').textContent = state.step + ' of ' + TOTAL_STEPS;
 }
 
-// ── Step 2 — Name suggestions ─────────────────────────────────────────────
-function setName(name) {
-  document.getElementById('ottoName').value = name;
-  state.ottoName = name;
-  document.getElementById('ottoName').focus();
-}
-
-// ── Step 3 — Quick profile draft (server: sanitizeOnboardingProfile) ─────
+// ── Step 2 — Quick profile draft (server: sanitizeOnboardingProfile) ─────
 function collectWorkExperience() {
   const rows = [];
   document.querySelectorAll('.wx-list .wx-row').forEach(function (row) {
@@ -722,10 +874,6 @@ document.addEventListener('keydown', e => {
 
 // ── Completion ────────────────────────────────────────────────────────────
 async function completeOnboarding() {
-  if (state.step === 2) {
-    const v = document.getElementById('ottoName').value.trim();
-    state.ottoName = v || 'otto';
-  }
   const profile = { ...state.profileDraft, ...collectProfileDraft() };
   const wx = collectWorkExperience();
   if (wx) profile.work_experience = wx;
@@ -754,6 +902,13 @@ async function completeOnboarding() {
   vibeSave('vibe_user_v1', user);
   vibeSave('vibe_otto_v1', ottoConfig);
 
+  // Replay mode: skip the server save entirely (a returning user is just
+  // re-viewing the flow) and warp straight back to their profile.
+  if (IS_REPLAY) {
+    triggerHyperdrive(function () { window.location.href = '/profile'; });
+    return;
+  }
+
   try {
     const r = await fetch('/api/me/onboarding-complete', {
       method: 'POST',
@@ -780,12 +935,44 @@ async function completeOnboarding() {
       } catch {}
     }
     if (j.ok && typeof j.next === 'string' && j.next.startsWith('/')) {
-      window.location.href = j.next;
+      // Tag the destination with ?welcome=1 so the landing surface can fire
+      // a one-time welcome overlay. Preserves any existing query string.
+      const next = j.next + (j.next.includes('?') ? '&' : '?') + 'welcome=1';
+      triggerHyperdrive(function () { window.location.href = next; });
       return;
     }
   } catch (e) { /* network error — fall through */ }
 
   window.location.href = '/auth/login?next=' + encodeURIComponent('/onboarding');
+}
+
+// ── Hyperdrive: streak the screen out, then call `onDone`. ────────────────
+function triggerHyperdrive(onDone) {
+  const overlay = document.getElementById('ottWarp');
+  if (!overlay) { onDone && onDone(); return; }
+  // Build ~24 streaks at evenly-spaced angles with slight jitter so they
+  // feel organic rather than a starburst clipart.
+  const COUNT = 24;
+  const frag = document.createDocumentFragment();
+  for (let i = 0; i < COUNT; i++) {
+    const jitter = (Math.random() - 0.5) * (Math.PI / COUNT);
+    const ang = (i / COUNT) * Math.PI * 2 + jitter;
+    const cos = Math.cos(ang).toFixed(4);
+    const sin = Math.sin(ang).toFixed(4);
+    const el = document.createElement('span');
+    el.className = 'ott-warp-streak';
+    el.style.setProperty('--ang', ang.toFixed(4) + 'rad');
+    el.style.setProperty('--cos', cos);
+    el.style.setProperty('--sin', sin);
+    frag.appendChild(el);
+  }
+  overlay.innerHTML = '';
+  overlay.appendChild(frag);
+  // Force reflow so the animation actually runs when we add `.active`.
+  overlay.getBoundingClientRect();
+  overlay.classList.add('active');
+  document.body.classList.add('ott-warping');
+  setTimeout(function () { onDone && onDone(); }, 750);
 }
 </script>
 
