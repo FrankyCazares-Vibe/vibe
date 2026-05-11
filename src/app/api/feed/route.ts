@@ -187,6 +187,18 @@ export async function GET(req: Request) {
       repost_count: 0,
     };
     const org = row.org ?? null;
+    // `media_kind` lets the client pick the right player without re-parsing
+    // the proxy URL. Clips are always video. Posts can carry a video too
+    // (X-style horizontal video posts) when their stored media_url is an
+    // R2 object key under `clips/` rather than a public image URL.
+    const rawMedia = row.media_url ?? "";
+    const isVideo =
+      row.type === "clip" || rawMedia.startsWith("clips/");
+    const mediaKind: "video" | "image" | null = rawMedia
+      ? isVideo
+        ? "video"
+        : "image"
+      : null;
     return {
       ...row,
       view_count: row.view_count ?? 0,
@@ -197,6 +209,7 @@ export async function GET(req: Request) {
       viewer_reposted: engagement.repostedByViewer.has(row.id),
       media_url: postMediaProxyUrl(row.id, row.media_url, "media"),
       media_thumbnail_url: postMediaProxyUrl(row.id, row.media_thumbnail_url, "thumbnail"),
+      media_kind: mediaKind,
       org: org
         ? { ...org, logo_url: orgAssetProxyUrl(org.handle, org.logo_url, "logo") }
         : null,

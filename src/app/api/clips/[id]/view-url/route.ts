@@ -52,17 +52,20 @@ export async function GET(_req: Request, ctx: RouteContext) {
   if (!row) {
     return NextResponse.json({ ok: false, error: "Clip not found" }, { status: 404 });
   }
-  if (row.type !== "clip") {
-    return NextResponse.json({ ok: false, error: "Not a clip" }, { status: 400 });
+  // We allow both `type='clip'` (Reels-style vertical) and `type='post'`
+  // (X-style horizontal video) here as long as the row's media_url is an
+  // R2 object key. Image-only posts have a public https://… URL — those
+  // never hit this route.
+  if (row.type !== "clip" && row.type !== "post") {
+    return NextResponse.json({ ok: false, error: "Not a video post" }, { status: 400 });
   }
   const objectKey = String(row.media_url || "").trim();
   if (!objectKey.startsWith(CLIP_KEY_PREFIX)) {
-    // Defensive: a clip row must point at a clips/ object. If not, the
-    // upload pipeline broke somewhere — surface it instead of silently
-    // signing whatever string is in the column.
+    // Defensive: only video rows go through here. If media_url is an
+    // image URL (https://) or empty, the caller asked the wrong route.
     return NextResponse.json(
-      { ok: false, error: "Clip storage key invalid" },
-      { status: 500 },
+      { ok: false, error: "Not a video post" },
+      { status: 400 },
     );
   }
 
