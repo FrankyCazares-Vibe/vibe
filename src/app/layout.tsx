@@ -1,6 +1,8 @@
 import type { Metadata } from "next";
 import "./globals.css";
 import { JetBrains_Mono } from "next/font/google";
+
+import { CustomCursor } from "@/components/CustomCursor";
 import { cn } from "@/lib/utils";
 
 const jetbrainsMono = JetBrains_Mono({subsets:['latin'],variable:'--font-mono'});
@@ -23,7 +25,12 @@ export default function RootLayout({
           rel="stylesheet"
         />
       </head>
-      <body>{children}</body>
+      <body>
+        {children}
+        {/* Single cursor for the whole React app — landing, auth, every
+            shelled surface. Static prototype pages have their own. */}
+        <CustomCursor />
+      </body>
     </html>
   );
 }

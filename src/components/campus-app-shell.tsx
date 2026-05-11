@@ -2,7 +2,6 @@
 
 import type { ReactNode } from "react";
 
-import { CustomCursor } from "@/components/CustomCursor";
 import LeftNav from "@/components/LeftNav";
 
 type Props = {
@@ -23,7 +22,6 @@ export function CampusAppShell({ children, sidebar }: Props) {
       <LeftNav />
       {children}
       {sidebar ?? null}
-      <CustomCursor />
     </div>
   );
 }
