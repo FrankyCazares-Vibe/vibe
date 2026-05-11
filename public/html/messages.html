@@ -896,6 +896,14 @@ body{font-family:'DM Sans',sans-serif;background:var(--cream);color:var(--charco
 *,*::before,*::after{cursor:none!important;}
 .cursor,.cursor-ring{cursor:none!important;}
 input,textarea,[contenteditable="true"]{cursor:text!important;}
+
+/* Hide the custom cursor on mobile / touch — see profile.html note. */
+@media (max-width: 760px), (pointer: coarse) {
+  .cursor, .cursor-ring { display: none !important; }
+  *, *::before, *::after { cursor: auto !important; }
+  a, button, [onclick], .nav-item, .t-new-btn { cursor: pointer !important; }
+  input, textarea, [contenteditable="true"] { cursor: text !important; }
+}
 </style>
 </head>
 <body>

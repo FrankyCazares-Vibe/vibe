@@ -4,20 +4,138 @@ import Link from "next/link";
 import { usePathname } from "next/navigation";
 import { useCallback, useEffect, useRef, useState } from "react";
 
-import { CalendarWidget, VIBE_NAV_ITEMS } from "@/components/LeftNav";
+import { CalendarWidget } from "@/components/LeftNav";
 import { NavIdentityChip } from "@/components/nav-identity-chip";
 
 /**
  * Mobile-only chrome rendered by CampusAppShell below the 900px breakpoint.
  *
- * Pattern: slim top bar with a hamburger + brand, bottom tab bar with the
- * five primary destinations, and a slide-in left sheet for the calendar
- * widget and the admin / sign-out tail of the desktop LeftNav.
+ * Instagram-style bottom tab bar: Campus / Network / Otto / Messages /
+ * Profile. Settings + Admin + Calendar live in the slide-out left sheet
+ * (hamburger top-left). The desktop LeftNav has Settings inline; on mobile
+ * we make room for a Profile tab instead — that was the missing piece.
  *
  * Visibility is fully driven by the `.vibe-mobile-only` CSS gate in
  * globals.css so the JSX can render unconditionally without hydration
  * mismatches.
  */
+
+type MobileTab = {
+  href: string;
+  label: string;
+  icon: React.ReactNode;
+  /** When true, only an exact match counts as active (prevents `/profile`
+   *  from lighting up on `/profile/foo` … wait, we actually WANT that.
+   *  Used for `/` style roots only.) */
+  exact?: boolean;
+};
+
+const MOBILE_TABS: MobileTab[] = [
+  {
+    href: "/campus",
+    label: "Campus",
+    icon: (
+      <svg width="22" height="22" viewBox="0 0 22 22" fill="none" aria-hidden>
+        <path
+          d="M11 2L20 6.5V9H2V6.5L11 2Z"
+          stroke="currentColor"
+          strokeWidth="1.6"
+          fill="none"
+          strokeLinejoin="round"
+        />
+        <rect x="3" y="9" width="3.2" height="8.2" stroke="currentColor" strokeWidth="1.5" fill="none" />
+        <rect x="9.4" y="9" width="3.2" height="8.2" stroke="currentColor" strokeWidth="1.5" fill="none" />
+        <rect x="15.8" y="9" width="3.2" height="8.2" stroke="currentColor" strokeWidth="1.5" fill="none" />
+        <path d="M2 17.2h18" stroke="currentColor" strokeWidth="1.6" strokeLinecap="round" />
+      </svg>
+    ),
+  },
+  {
+    href: "/network",
+    label: "Network",
+    icon: (
+      <svg width="22" height="22" viewBox="0 0 22 22" fill="none" aria-hidden>
+        <circle cx="11" cy="6" r="3.2" stroke="currentColor" strokeWidth="1.6" />
+        <circle cx="4" cy="16" r="2.6" stroke="currentColor" strokeWidth="1.6" />
+        <circle cx="18" cy="16" r="2.6" stroke="currentColor" strokeWidth="1.6" />
+        <path
+          d="M7.5 7.5L4.5 13.5M14.5 7.5L17.5 13.5M7 16h8"
+          stroke="currentColor"
+          strokeWidth="1.5"
+          strokeLinecap="round"
+        />
+      </svg>
+    ),
+  },
+  {
+    href: "/otto",
+    label: "otto",
+    icon: (
+      <span
+        style={{
+          display: "inline-flex",
+          width: 22,
+          height: 22,
+          alignItems: "center",
+          justifyContent: "center",
+        }}
+      >
+        <span
+          style={{
+            width: 12,
+            height: 12,
+            borderRadius: "50%",
+            background: "#FF5C35",
+            boxShadow: "0 0 8px rgba(255,92,53,0.55)",
+          }}
+        />
+      </span>
+    ),
+  },
+  {
+    href: "/messages",
+    label: "Messages",
+    icon: (
+      <svg width="22" height="22" viewBox="0 0 22 22" fill="none" aria-hidden>
+        <path
+          d="M2 4A1.6 1.6 0 0 1 3.6 2.4h14.8A1.6 1.6 0 0 1 20 4v10A1.6 1.6 0 0 1 18.4 15.6H6.5L2 19V4z"
+          stroke="currentColor"
+          strokeWidth="1.6"
+          fill="none"
+          strokeLinejoin="round"
+        />
+      </svg>
+    ),
+  },
+  {
+    href: "/profile",
+    label: "Profile",
+    icon: (
+      <svg width="22" height="22" viewBox="0 0 22 22" fill="none" aria-hidden>
+        <circle cx="11" cy="7.5" r="3.4" stroke="currentColor" strokeWidth="1.6" />
+        <path
+          d="M3.5 19c.7-3.6 3.8-5.8 7.5-5.8s6.8 2.2 7.5 5.8"
+          stroke="currentColor"
+          strokeWidth="1.6"
+          strokeLinecap="round"
+        />
+      </svg>
+    ),
+  },
+];
+
+const SETTINGS_ICON = (
+  <svg width="16" height="16" viewBox="0 0 16 16" fill="none" aria-hidden>
+    <circle cx="8" cy="8" r="2" stroke="currentColor" strokeWidth="1.4" />
+    <path
+      d="M8 1.5v2M8 12.5v2M14.5 8h-2M3.5 8h-2M12.6 3.4l-1.4 1.4M4.8 11.2l-1.4 1.4M12.6 12.6l-1.4-1.4M4.8 4.8L3.4 3.4"
+      stroke="currentColor"
+      strokeWidth="1.3"
+      strokeLinecap="round"
+    />
+  </svg>
+);
+
 export function MobileNavChrome() {
   const pathname = usePathname() ?? "";
   const [sheetOpen, setSheetOpen] = useState(false);
@@ -26,9 +144,8 @@ export function MobileNavChrome() {
   const closeSheet = useCallback(() => setSheetOpen(false), []);
 
   // Sheet closes whenever the route changes — covers in-sheet link taps and
-  // the browser back button. The ref guard avoids the initial-mount close
-  // (the sheet starts closed anyway) and keeps eslint happy about not
-  // setting state synchronously on every render.
+  // the browser back button. The ref guard skips the initial-mount close
+  // (the sheet starts closed anyway).
   const prevPathRef = useRef(pathname);
   useEffect(() => {
     if (prevPathRef.current === pathname) return;
@@ -36,7 +153,7 @@ export function MobileNavChrome() {
     closeSheet();
   }, [pathname, closeSheet]);
 
-  // Lock the page scroll while the sheet is open so the body underneath
+  // Lock page scroll while the sheet is open so the body underneath
   // doesn't drift when the user swipes inside the sheet's calendar.
   useEffect(() => {
     if (!sheetOpen) return;
@@ -96,7 +213,7 @@ export function MobileNavChrome() {
       </header>
 
       <nav className="vibe-mobile-tabbar" aria-label="Primary">
-        {VIBE_NAV_ITEMS.map((item) => {
+        {MOBILE_TABS.map((item) => {
           const active = isActive(item.href);
           return (
             <Link
@@ -149,29 +266,42 @@ export function MobileNavChrome() {
 
         <NavIdentityChip />
 
+        <div className="vibe-mobile-sheet-divider" />
+
+        <Link
+          href="/settings"
+          onClick={closeSheet}
+          className="vibe-mobile-sheet-link"
+        >
+          {SETTINGS_ICON}
+          Settings
+        </Link>
+
         {isPlatformAdmin ? (
-          <>
-            <div className="vibe-mobile-sheet-divider" />
-            <Link
-              href="/admin"
-              onClick={closeSheet}
-              style={{
-                display: "flex",
-                alignItems: "center",
-                gap: 10,
-                padding: "10px 12px",
-                borderRadius: 12,
-                fontSize: 14,
-                fontWeight: 600,
-                color: "#5C5853",
-                textDecoration: "none",
-                background: "rgba(240,200,74,0.10)",
-                border: "1px solid rgba(240,200,74,0.4)",
-              }}
-            >
-              Admin
-            </Link>
-          </>
+          <Link
+            href="/admin"
+            onClick={closeSheet}
+            className="vibe-mobile-sheet-link vibe-mobile-sheet-link--admin"
+          >
+            <svg width="16" height="16" viewBox="0 0 16 16" fill="none" aria-hidden>
+              <path
+                d="M8 1l5.5 1.8v4.4c0 3.6-2.4 6.4-5.5 7.3-3.1-.9-5.5-3.7-5.5-7.3V2.8L8 1z"
+                stroke="currentColor"
+                strokeWidth="1.4"
+                strokeLinejoin="round"
+                fill="rgba(240,200,74,0.25)"
+              />
+              <path
+                d="M5.7 8.2l1.7 1.7L10.7 6.5"
+                stroke="currentColor"
+                strokeWidth="1.5"
+                strokeLinecap="round"
+                strokeLinejoin="round"
+                fill="none"
+              />
+            </svg>
+            Admin
+          </Link>
         ) : null}
 
         <div className="vibe-mobile-sheet-divider" />

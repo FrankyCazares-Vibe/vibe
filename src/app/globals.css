@@ -2436,6 +2436,29 @@ a.otto-room-row-title:hover {
   background: rgba(28, 28, 30, 0.08);
   margin: 14px 0;
 }
+.vibe-mobile-sheet-link {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 12px 12px;
+  border-radius: 12px;
+  font-family: "DM Sans", sans-serif;
+  font-size: 14px;
+  font-weight: 600;
+  color: #5c5853;
+  text-decoration: none;
+  background: rgba(28, 28, 30, 0.02);
+  border: 1px solid transparent;
+  -webkit-tap-highlight-color: transparent;
+}
+.vibe-mobile-sheet-link:active {
+  background: rgba(28, 28, 30, 0.05);
+}
+.vibe-mobile-sheet-link--admin {
+  margin-top: 8px;
+  background: rgba(240, 200, 74, 0.10);
+  border-color: rgba(240, 200, 74, 0.4);
+}
 
 /* Network page outer padding — tighten so UserCard rows aren't squeezed. */
 @media (max-width: 760px) {

@@ -2862,8 +2862,10 @@ body.empty-profile-mode #profileEmpty { display: flex !important; }
 
 /* Custom cursor lives at fixed top:0 left:0 until the mouse moves. On
    touch devices the mouse never moves, so the bare orange dot stays
-   stuck in the corner. Hide it (and bring back native interaction). */
-@media (pointer: coarse) {
+   stuck in the corner. Hide on coarse pointers AND at phone widths —
+   DevTools device emulation does not always report `pointer: coarse`,
+   so the width fallback covers the desktop-emulation testing path too. */
+@media (max-width: 760px), (pointer: coarse) {
   .cursor, .cursor-ring { display: none !important; }
   body, body * { cursor: auto !important; }
   a, button, [onclick], .btn-nav, .action-btn,
@@ -2903,27 +2905,33 @@ body.empty-profile-mode #profileEmpty { display: flex !important; }
   .profile-wrap { padding: 24px 16px 56px; }
   .profile-grid { grid-template-columns: 1fr; gap: 18px; margin-top: 20px; }
 
-  /* Avatar row stacks; actions wrap to a row beneath the avatar */
+  /* Avatar row stacks; actions wrap to a row beneath the avatar. The
+     -32px lift keeps the avatar slightly overlapping the cover without
+     swallowing half of the page. */
   .avatar-row {
     flex-direction: column;
     align-items: stretch;
-    gap: 14px;
-    margin-top: -40px;
-    padding-bottom: 16px;
+    gap: 18px;
+    margin-top: -32px;
+    padding-bottom: 22px;
   }
+  /* Smaller avatar on phone — 140px takes up too much screen width. */
+  .avatar { width: 104px !important; height: 104px !important; font-size: 44px !important; border-radius: 24px !important; }
+  .avatar img.avatar-photo { border-radius: 16px !important; }
   .avatar-actions { justify-content: flex-start; flex-wrap: wrap; }
   .avatar-row-right { align-items: flex-start; }
-  .profile-top-stats { gap: 20px; }
-  .profile-stat-num { font-size: 20px; }
-  .profile-stat--prominent .profile-stat-num { font-size: 22px; }
+  .profile-top-stats { gap: 24px; }
+  .profile-stat-num { font-size: 22px; }
+  .profile-stat--prominent .profile-stat-num { font-size: 24px; }
   .avatar-row-actions { flex-wrap: wrap; }
 
-  /* Identity */
-  .identity { margin-bottom: 18px; }
-  .identity-name-row { gap: 10px; }
-  .profile-name { font-size: 28px; letter-spacing: -0.8px; }
-  .profile-tagline { font-size: 15px; margin-bottom: 12px; }
-  .profile-meta { gap: 10px; }
+  /* Identity — breathing room between blocks. */
+  .identity { margin-top: 4px; margin-bottom: 22px; }
+  .identity-name-row { gap: 10px; margin-bottom: 8px; }
+  .profile-name { font-size: 30px; letter-spacing: -0.8px; }
+  .profile-handle-row { margin: 4px 0 10px; }
+  .profile-tagline { font-size: 15px; margin-bottom: 14px; line-height: 1.45; }
+  .profile-meta { gap: 12px; row-gap: 8px; margin-bottom: 18px; }
 
   /* Cards: less padding on small screens */
   .card { padding: 20px 18px; border-radius: 20px; margin-bottom: 16px; }

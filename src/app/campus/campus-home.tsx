@@ -3193,6 +3193,36 @@ function CampusBanner() {
         </div>
       </div>
       <div style={{ flex: 1 }} />
+      <Link
+        href="/messages"
+        aria-label="Messages"
+        title="Messages"
+        style={{
+          display: "inline-flex",
+          alignItems: "center",
+          justifyContent: "center",
+          width: 38,
+          height: 38,
+          borderRadius: 12,
+          background: "rgba(255,255,255,0.14)",
+          border: "1px solid rgba(255,255,255,0.18)",
+          color: "#fff",
+          textDecoration: "none",
+          flexShrink: 0,
+          boxShadow: "inset 0 1px 0 rgba(255,255,255,0.18)",
+          transition: "background 140ms ease, transform 140ms ease",
+        }}
+      >
+        <svg width="18" height="18" viewBox="0 0 22 22" fill="none" aria-hidden>
+          <path
+            d="M2 4A1.6 1.6 0 0 1 3.6 2.4h14.8A1.6 1.6 0 0 1 20 4v10A1.6 1.6 0 0 1 18.4 15.6H6.5L2 19V4z"
+            stroke="currentColor"
+            strokeWidth="1.7"
+            fill="none"
+            strokeLinejoin="round"
+          />
+        </svg>
+      </Link>
       <CampusSearchBar />
     </header>
   );
