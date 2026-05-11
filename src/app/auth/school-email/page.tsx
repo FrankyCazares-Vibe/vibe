@@ -1,33 +1,30 @@
 "use client";
 
 import Link from "next/link";
-import { useRouter } from "next/navigation";
-import { useEffect, useState } from "react";
+import { useRouter, useSearchParams } from "next/navigation";
+import { Suspense, useEffect, useState } from "react";
 
 import { getSupabaseBrowserClient } from "@/lib/supabase/browser";
 
-export default function SchoolEmailPage() {
+function SchoolEmailInner() {
   const router = useRouter();
+  const searchParams = useSearchParams();
   const [schoolEmail, setSchoolEmail] = useState("");
   const [error, setError] = useState<string | null>(null);
   const [message, setMessage] = useState<string | null>(null);
   const [loading, setLoading] = useState(false);
   const [authChecked, setAuthChecked] = useState(false);
-  const [justVerifiedAccount, setJustVerifiedAccount] = useState(false);
+  const justVerifiedAccount = searchParams.get("account_verified") === "1";
 
+  // Strip the param after we've consumed it so the success banner doesn't
+  // re-appear on refresh.
   useEffect(() => {
-    const params = new URLSearchParams(window.location.search);
-    if (params.get("account_verified") === "1") {
-      setJustVerifiedAccount(true);
-      params.delete("account_verified");
-      const qs = params.toString();
-      window.history.replaceState(
-        {},
-        "",
-        `${window.location.pathname}${qs ? `?${qs}` : ""}`,
-      );
-    }
-  }, []);
+    if (!justVerifiedAccount) return;
+    const params = new URLSearchParams(searchParams.toString());
+    params.delete("account_verified");
+    const qs = params.toString();
+    router.replace(qs ? `?${qs}` : window.location.pathname, { scroll: false });
+  }, [justVerifiedAccount, router, searchParams]);
 
   useEffect(() => {
     const supabase = getSupabaseBrowserClient();
@@ -110,124 +107,117 @@ export default function SchoolEmailPage() {
 
   if (!authChecked) {
     return (
-      <p style={{ textAlign: "center", marginTop: 48, color: "#8A8580" }}>
-        Loading…
-      </p>
+      <div className="vibe-auth-page">
+        <p className="vibe-auth-loading">Loading…</p>
+      </div>
     );
   }
 
   return (
-    <div style={{ maxWidth: 400, margin: "0 auto", paddingTop: 48 }}>
-      {justVerifiedAccount ? (
-        <p
-          style={{
-            fontSize: 14,
-            lineHeight: 1.5,
-            color: "#1C5C2E",
-            background: "rgba(46, 125, 50, 0.1)",
-            border: "1px solid rgba(46, 125, 50, 0.35)",
-            borderRadius: 10,
-            padding: "14px 16px",
-            marginBottom: 20,
-          }}
-        >
-          <strong>You’re confirmed.</strong> Your login email is set. This next
-          step is <strong>different</strong>: add a <strong>.edu</strong> address
-          so we can verify you’re on campus — we’ll email that address separately.
+    <div className="vibe-auth-page">
+      <Link href="/" className="vibe-auth-back">
+        <span aria-hidden>←</span> back
+      </Link>
+
+      <div className="vibe-auth-card">
+        <div className="vibe-auth-brand" aria-hidden>
+          vibe<span className="vibe-auth-dot">.</span>
+        </div>
+
+        {justVerifiedAccount ? (
+          <div className="vibe-auth-banner vibe-auth-banner--success">
+            <strong>You&apos;re confirmed.</strong> Your login email is set.
+            One last verification: add the <strong>.edu</strong> address so we
+            know you&apos;re actually on campus.
+          </div>
+        ) : null}
+
+        <h1 className="vibe-auth-headline">
+          Verify your campus<span className="vibe-auth-dot">.</span>
+        </h1>
+        <p className="vibe-auth-sub">
+          Drop in your <strong>school email</strong> — the{" "}
+          <code className="vibe-auth-code vibe-auth-code--edu">.edu</code> one,
+          not the one you signed up with. We&apos;ll email a verification link
+          to <em>that</em> inbox.
         </p>
-      ) : null}
-      <h1
-        style={{
-          fontFamily: "Fraunces, serif",
-          fontSize: 32,
-          fontWeight: 900,
-          color: "#1C1C1E",
-          marginBottom: 8,
-        }}
-      >
-        School email
-      </h1>
-      <p style={{ color: "#8A8580", marginBottom: 16 }}>
-        Verify a <strong>.edu</strong> address so we know you’re on campus.
-      </p>
-      <p
-        style={{
-          fontSize: 14,
-          lineHeight: 1.55,
-          color: "#5C5853",
-          marginBottom: 24,
-          padding: "14px 16px",
-          background: "rgba(28,28,30,.04)",
-          borderRadius: 10,
-          border: "1px solid #E4E0D8",
-        }}
-      >
-        This is <strong>not</strong> the same as your login email unless you
-        sign up with your school address. Use the inbox for the{" "}
-        <strong>.edu</strong> you enter here — that’s where the campus
-        verification link goes.
-      </p>
 
-      <form
-        onSubmit={onSubmit}
-        style={{ display: "flex", flexDirection: "column", gap: 16 }}
-      >
-        <label style={{ display: "flex", flexDirection: "column", gap: 6 }}>
-          <span style={{ fontSize: 14, color: "#1C1C1E" }}>
-            Campus / school email <span style={{ color: "#8A8580" }}>(.edu)</span>
-          </span>
-          <input
-            type="email"
-            autoComplete="email"
-            required
-            placeholder="you@indiana.edu"
-            value={schoolEmail}
-            onChange={(e) => setSchoolEmail(e.target.value)}
-            style={inputStyle}
-          />
-        </label>
-        {error ? (
-          <p style={{ color: "#B42318", fontSize: 14, margin: 0 }}>{error}</p>
-        ) : null}
-        {message ? (
-          <p style={{ color: "#2E7D32", fontSize: 14, margin: 0 }}>{message}</p>
-        ) : null}
-        <button type="submit" disabled={loading} style={buttonStyle}>
-          {loading ? "Sending…" : "Send verification link"}
-        </button>
-      </form>
+        <div className="vibe-auth-steps" aria-hidden>
+          <div className="vibe-auth-step vibe-auth-step--done">
+            <span className="vibe-auth-step-num">✓</span>
+            <span className="vibe-auth-step-label">Account</span>
+          </div>
+          <span className="vibe-auth-step-divider" />
+          <div className="vibe-auth-step vibe-auth-step--active vibe-auth-step--edu">
+            <span className="vibe-auth-step-num">2</span>
+            <span className="vibe-auth-step-label">
+              <code className="vibe-auth-code vibe-auth-code--edu">.edu</code>
+            </span>
+          </div>
+          <span className="vibe-auth-step-divider" />
+          <div className="vibe-auth-step">
+            <span className="vibe-auth-step-num">3</span>
+            <span className="vibe-auth-step-label">Otto</span>
+          </div>
+        </div>
 
-      <p style={{ marginTop: 20, fontSize: 14, color: "#8A8580" }}>
-        <Link href="/" style={linkStyle}>
-          Home
-        </Link>
-      </p>
+        <form onSubmit={onSubmit} className="vibe-auth-form">
+          <label className="vibe-auth-field">
+            <span className="vibe-auth-label-row">
+              <span className="vibe-auth-label">School email</span>
+              <span className="vibe-auth-label-hint vibe-auth-label-hint--edu">
+                must end in .edu
+              </span>
+            </span>
+            <input
+              type="email"
+              autoComplete="email"
+              required
+              placeholder="you@indiana.edu"
+              value={schoolEmail}
+              onChange={(e) => setSchoolEmail(e.target.value)}
+              className="vibe-auth-input"
+            />
+          </label>
+
+          {error ? <p className="vibe-auth-error">{error}</p> : null}
+          {message ? (
+            <div className="vibe-auth-banner vibe-auth-banner--success">
+              {message}
+            </div>
+          ) : null}
+
+          <button type="submit" disabled={loading} className="vibe-auth-submit">
+            {loading ? "Sending…" : "Send verification link"}
+            {loading ? null : (
+              <span aria-hidden style={{ marginLeft: 8 }}>
+                →
+              </span>
+            )}
+          </button>
+        </form>
+
+        <p className="vibe-auth-tail">
+          Wrong email used to sign up?{" "}
+          <Link href="/auth/login" className="vibe-auth-link">
+            Log back in
+          </Link>
+        </p>
+      </div>
     </div>
   );
 }
 
-const inputStyle: React.CSSProperties = {
-  padding: "12px 14px",
-  borderRadius: 10,
-  border: "1px solid #E4E0D8",
-  fontSize: 16,
-  background: "#fff",
-  color: "#1C1C1E",
-};
-
-const buttonStyle: React.CSSProperties = {
-  padding: "14px 18px",
-  borderRadius: 10,
-  border: "none",
-  background: "#1C1C1E",
-  color: "#fff",
-  fontSize: 16,
-  fontWeight: 600,
-  cursor: "pointer",
-  marginTop: 4,
-};
-
-const linkStyle: React.CSSProperties = {
-  color: "#FF5C35",
-  textDecoration: "none",
-};
+export default function SchoolEmailPage() {
+  return (
+    <Suspense
+      fallback={
+        <div className="vibe-auth-page">
+          <p className="vibe-auth-loading">Loading…</p>
+        </div>
+      }
+    >
+      <SchoolEmailInner />
+    </Suspense>
+  );
+}

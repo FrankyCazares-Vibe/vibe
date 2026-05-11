@@ -42,120 +42,106 @@ export default function SignupPage() {
       return;
     }
     setMessage(
-      "Check this inbox for a confirmation link. After you click it, you’ll verify your campus .edu email first, then meet Otto to finish your profile.",
+      "Check this inbox for a confirmation link. Once you click it, we’ll ask for your campus .edu next.",
     );
   }
 
   return (
-    <div style={{ maxWidth: 400, margin: "0 auto", paddingTop: 48 }}>
-      <h1
-        style={{
-          fontFamily: "Fraunces, serif",
-          fontSize: 32,
-          fontWeight: 900,
-          color: "#1C1C1E",
-          marginBottom: 8,
-        }}
-      >
-        Sign up
-      </h1>
-      <p style={{ color: "#8A8580", marginBottom: 16 }}>
-        Create your <span style={{ color: "#FF5C35" }}>vibe.</span> account
-      </p>
-      <p
-        style={{
-          fontSize: 14,
-          lineHeight: 1.55,
-          color: "#5C5853",
-          marginBottom: 24,
-          padding: "14px 16px",
-          background: "rgba(28,28,30,.04)",
-          borderRadius: 10,
-          border: "1px solid #E4E0D8",
-        }}
-      >
-        <strong style={{ color: "#1C1C1E" }}>Two different emails:</strong> this
-        page is your <strong>login email</strong> (any address you can use for
-        sign-in). After you confirm it, <strong>Otto</strong> walks you through
-        your profile. Then we’ll ask for a separate <strong>.edu school
-        email</strong> to unlock campus (second verification).
-      </p>
+    <div className="vibe-auth-page">
+      <Link href="/" className="vibe-auth-back">
+        <span aria-hidden>←</span> back
+      </Link>
 
-      <form
-        onSubmit={onSubmit}
-        style={{ display: "flex", flexDirection: "column", gap: 16 }}
-      >
-        <label style={{ display: "flex", flexDirection: "column", gap: 6 }}>
-          <span style={{ fontSize: 14, color: "#1C1C1E" }}>
-            Login email{" "}
-            <span style={{ color: "#8A8580", fontWeight: 400 }}>
-              (sign-in & account mail)
+      <div className="vibe-auth-card">
+        <div className="vibe-auth-brand" aria-hidden>
+          vibe<span className="vibe-auth-dot">.</span>
+        </div>
+
+        <h1 className="vibe-auth-headline">
+          Create your account<span className="vibe-auth-dot">.</span>
+        </h1>
+        <p className="vibe-auth-sub">
+          Use your <strong>personal email</strong> — the one you actually check.
+          Your school <code className="vibe-auth-code">.edu</code> is verified
+          separately in the next step.
+        </p>
+
+        <div className="vibe-auth-steps" aria-hidden>
+          <div className="vibe-auth-step vibe-auth-step--active">
+            <span className="vibe-auth-step-num">1</span>
+            <span className="vibe-auth-step-label">Account</span>
+          </div>
+          <span className="vibe-auth-step-divider" />
+          <div className="vibe-auth-step">
+            <span className="vibe-auth-step-num">2</span>
+            <span className="vibe-auth-step-label">
+              <code className="vibe-auth-code">.edu</code>
             </span>
-          </span>
-          <input
-            type="email"
-            autoComplete="email"
-            required
-            value={email}
-            onChange={(e) => setEmail(e.target.value)}
-            style={inputStyle}
-          />
-        </label>
-        <label style={{ display: "flex", flexDirection: "column", gap: 6 }}>
-          <span style={{ fontSize: 14, color: "#1C1C1E" }}>Password</span>
-          <input
-            type="password"
-            autoComplete="new-password"
-            required
-            minLength={8}
-            value={password}
-            onChange={(e) => setPassword(e.target.value)}
-            style={inputStyle}
-          />
-        </label>
-        {error ? (
-          <p style={{ color: "#B42318", fontSize: 14, margin: 0 }}>{error}</p>
-        ) : null}
-        {message ? (
-          <p style={{ color: "#2E7D32", fontSize: 14, margin: 0 }}>{message}</p>
-        ) : null}
-        <button type="submit" disabled={loading} style={buttonStyle}>
-          {loading ? "Creating…" : "Create account"}
-        </button>
-      </form>
+          </div>
+          <span className="vibe-auth-step-divider" />
+          <div className="vibe-auth-step">
+            <span className="vibe-auth-step-num">3</span>
+            <span className="vibe-auth-step-label">Otto</span>
+          </div>
+        </div>
 
-      <p style={{ marginTop: 20, fontSize: 14, color: "#8A8580" }}>
-        Already have an account?{" "}
-        <Link href="/auth/login" style={linkStyle}>
-          Log in
-        </Link>
-      </p>
+        <form onSubmit={onSubmit} className="vibe-auth-form">
+          <label className="vibe-auth-field">
+            <span className="vibe-auth-label-row">
+              <span className="vibe-auth-label">Personal email</span>
+              <span className="vibe-auth-label-hint">not your .edu</span>
+            </span>
+            <input
+              type="email"
+              autoComplete="email"
+              placeholder="you@gmail.com"
+              required
+              value={email}
+              onChange={(e) => setEmail(e.target.value)}
+              className="vibe-auth-input"
+            />
+          </label>
+
+          <label className="vibe-auth-field">
+            <span className="vibe-auth-label-row">
+              <span className="vibe-auth-label">Password</span>
+              <span className="vibe-auth-label-hint">8+ characters</span>
+            </span>
+            <input
+              type="password"
+              autoComplete="new-password"
+              required
+              minLength={8}
+              value={password}
+              onChange={(e) => setPassword(e.target.value)}
+              className="vibe-auth-input"
+            />
+          </label>
+
+          {error ? <p className="vibe-auth-error">{error}</p> : null}
+          {message ? (
+            <div className="vibe-auth-banner vibe-auth-banner--success">
+              {message}
+            </div>
+          ) : null}
+
+          <button type="submit" disabled={loading} className="vibe-auth-submit">
+            {loading ? "Creating…" : "Create account"}
+            {loading ? null : (
+              <span aria-hidden style={{ marginLeft: 8 }}>
+                →
+              </span>
+            )}
+          </button>
+        </form>
+
+        <p className="vibe-auth-tail">
+          Already have an account?{" "}
+          <Link href="/auth/login" className="vibe-auth-link">
+            Log in
+          </Link>
+        </p>
+      </div>
     </div>
   );
 }
-
-const inputStyle: React.CSSProperties = {
-  padding: "12px 14px",
-  borderRadius: 10,
-  border: "1px solid #E4E0D8",
-  fontSize: 16,
-  background: "#fff",
-  color: "#1C1C1E",
-};
-
-const buttonStyle: React.CSSProperties = {
-  padding: "14px 18px",
-  borderRadius: 10,
-  border: "none",
-  background: "#1C1C1E",
-  color: "#fff",
-  fontSize: 16,
-  fontWeight: 600,
-  cursor: "pointer",
-  marginTop: 4,
-};
-
-const linkStyle: React.CSSProperties = {
-  color: "#FF5C35",
-  textDecoration: "none",
-};

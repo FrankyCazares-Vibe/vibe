@@ -143,6 +143,7 @@
   50% { transform: scale(1.5); opacity: 0; }
 }
 
+
 .otto-orb-wrap .orb-pulse-1 {
   position: absolute; inset: 22%;
   border-radius: 50%;
@@ -225,29 +226,6 @@
   --sidebar-ring: oklch(0.556 0 0);
 }
 
-/* —— Marketing home (/) — custom cursor + Otto corner (namespaced) —— */
-@keyframes vibe-home-otto-breathe {
-  0%,
-  100% {
-    transform: scale(1);
-    opacity: 1;
-  }
-  50% {
-    transform: scale(1.18);
-    opacity: 0.85;
-  }
-}
-@keyframes vibe-home-otto-ring {
-  0% {
-    transform: scale(0.6);
-    opacity: 0.8;
-  }
-  100% {
-    transform: scale(1.8);
-    opacity: 0;
-  }
-}
-
 /* —— Otto orb shared keyframes (reused by campus-home + network corner) —— */
 @keyframes otto-core-pulse {
   0%,
@@ -288,36 +266,1033 @@
     opacity: 0.7;
   }
 }
-.vibe-home-cursor {
+/* ====================================================================== */
+/* Marketing home (/) — Otto-as-tour-guide landing                          */
+/* ====================================================================== */
+
+.vibe-landing-root {
+  position: relative;
+  min-height: 100vh;
+  color: #faf7f2;
+  font-family: "DM Sans", sans-serif;
+  background:
+    radial-gradient(ellipse 90% 60% at 50% 38%, rgba(58, 44, 78, 0.85) 0%, rgba(28, 21, 48, 0.95) 45%, #0a0a18 100%),
+    #07060f;
+  overflow: hidden;
+}
+
+/* Starfield */
+.vibe-landing-stars {
   position: fixed;
+  inset: 0;
   pointer-events: none;
-  z-index: 2147483647;
-  top: 0;
-  left: 0;
+  z-index: 0;
 }
-.vibe-home-cursor--core {
-  width: 8px;
-  height: 8px;
+.vibe-landing-stars span {
+  position: absolute;
+  display: block;
   border-radius: 50%;
+  background: #ffe5db;
+  box-shadow: 0 0 6px rgba(255, 229, 219, 0.65);
+  animation: vibe-twinkle 4s ease-in-out infinite;
+}
+
+/* Hero — Otto + typewriter */
+.vibe-landing-hero {
+  position: relative;
+  z-index: 1;
+  min-height: 100vh;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 56px;
+  padding: 80px 24px;
+  text-align: center;
+}
+.vibe-landing-hero-orb {
+  filter: drop-shadow(0 0 24px rgba(255, 92, 53, 0.45));
+}
+
+/* Typewriter */
+.vibe-landing-typewriter {
+  font-family: "Fraunces", serif;
+  font-weight: 500;
+  color: #faf7f2;
+  letter-spacing: -1.5px;
+  line-height: 1.1;
+  font-size: clamp(36px, 6.4vw, 64px);
+  min-height: 2.6em;
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  align-items: center;
+}
+.vibe-landing-typewriter-line {
+  display: inline-flex;
+  align-items: center;
+  white-space: nowrap;
+}
+.vibe-landing-typewriter-cursor {
+  display: inline-block;
+  width: 3px;
+  height: 0.95em;
+  margin-left: 6px;
   background: #ff5c35;
-  transition: transform 0.08s ease-out;
+  border-radius: 1px;
+  animation: vibe-landing-blink 0.95s steps(2, start) infinite;
+  vertical-align: -0.05em;
 }
-.vibe-home-cursor--core.clicking {
-  transform: scale(0.6) !important;
+.vibe-landing-typewriter-dot {
+  color: #ff5c35;
 }
-.vibe-home-cursor--core.hover {
-  background: white;
-  box-shadow: 0 0 12px rgba(255, 92, 53, 0.6);
+@keyframes vibe-landing-blink {
+  to {
+    visibility: hidden;
+  }
 }
-.vibe-home-cursor--ring {
-  width: 28px;
-  height: 28px;
-  border-radius: 50%;
-  border: 1px solid rgba(255, 92, 53, 0.35);
+
+/* Scroll cue */
+.vibe-landing-scrollcue {
+  position: absolute;
+  bottom: 36px;
+  left: 50%;
+  transform: translateX(-50%);
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 10px;
+  color: rgba(250, 247, 242, 0.6);
+  transition: opacity 600ms ease 400ms;
+}
+.vibe-landing-scrollcue-line {
+  width: 1px;
+  height: 36px;
+  background: linear-gradient(to bottom, transparent, rgba(255, 92, 53, 0.7), transparent);
+}
+
+/* Orbital section */
+.vibe-landing-orbit-section {
+  position: relative;
+  z-index: 1;
+  min-height: 100vh;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  padding: 80px 24px;
+  gap: 32px;
+}
+.vibe-landing-orbit-eyebrow {
+  font-family: "DM Sans", sans-serif;
+  font-size: 11px;
+  letter-spacing: 0.22em;
+  text-transform: uppercase;
+  color: rgba(250, 247, 242, 0.55);
+  transition: color 600ms ease;
+}
+.vibe-landing-orbit-stage {
+  position: relative;
+  width: 100%;
+  max-width: 720px;
+  aspect-ratio: 1;
+}
+
+/* Orbital ring system */
+.vibe-landing-orbital {
+  position: absolute;
+  inset: 0;
+}
+.vibe-landing-orbital-svg {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  pointer-events: none;
+}
+.vibe-landing-orbital-core {
+  position: absolute;
+  top: 50%;
+  left: 50%;
+  transform: translate(-50%, -50%);
+  filter: drop-shadow(0 0 32px rgba(255, 92, 53, 0.5));
+  pointer-events: none;
+}
+
+.vibe-landing-orbital-spin {
+  position: absolute;
+  inset: 0;
+  animation-timing-function: linear;
+  animation-iteration-count: infinite;
+}
+.vibe-landing-moon-anchor {
+  position: absolute;
+  top: 50%;
+  transform: translate(-50%, -50%);
+}
+.vibe-landing-moon-counter {
+  animation-timing-function: linear;
+  animation-iteration-count: infinite;
+}
+
+/* The rotating wrappers must not block clicks on rings that sit beneath
+   them in DOM order; only the actual moon button receives pointer events. */
+.vibe-landing-orbital-spin,
+.vibe-landing-moon-anchor,
+.vibe-landing-moon-counter {
+  pointer-events: none;
+}
+.vibe-landing-moon {
+  pointer-events: auto;
+}
+.vibe-landing-moon {
+  display: inline-flex;
+  align-items: center;
+  gap: 7px;
+  padding: 6px 12px;
+  border-radius: 999px;
+  border: 1px solid;
+  font-family: "DM Sans", sans-serif;
+  font-size: 10px;
+  font-weight: 700;
+  letter-spacing: 0.16em;
+  cursor: pointer;
+  backdrop-filter: blur(8px);
+  -webkit-backdrop-filter: blur(8px);
+  white-space: nowrap;
   transition:
-    border-color 0.15s,
-    transform 0.12s ease-out;
+    transform 600ms cubic-bezier(0.22, 1, 0.36, 1),
+    box-shadow 600ms ease,
+    background 200ms ease;
 }
-.vibe-home-cursor--ring.hover {
+.vibe-landing-moon:hover {
+  transform: scale(1.08) !important;
+}
+.vibe-landing-moon-dot {
+  width: 5px;
+  height: 5px;
+  border-radius: 50%;
+  box-shadow: 0 0 6px currentColor;
+}
+
+@keyframes vibe-landing-orbit-cw {
+  from {
+    transform: rotate(0deg);
+  }
+  to {
+    transform: rotate(360deg);
+  }
+}
+@keyframes vibe-landing-orbit-ccw {
+  from {
+    transform: rotate(0deg);
+  }
+  to {
+    transform: rotate(-360deg);
+  }
+}
+
+/* Orbit detail (cinematic dolly overlay) */
+.vibe-landing-detail-layer {
+  position: absolute;
+  inset: 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  transition:
+    opacity 600ms cubic-bezier(0.22, 1, 0.36, 1),
+    transform 600ms cubic-bezier(0.22, 1, 0.36, 1);
+  z-index: 2;
+}
+.vibe-landing-glass {
+  background: linear-gradient(180deg, rgba(28, 21, 48, 0.72), rgba(10, 10, 24, 0.6));
+  border-radius: 18px;
+  padding: 18px 20px;
+  backdrop-filter: blur(18px) saturate(140%);
+  -webkit-backdrop-filter: blur(18px) saturate(140%);
+}
+.vibe-landing-card-eyebrow {
+  font-family: "DM Sans", sans-serif;
+  font-size: 10px;
+  letter-spacing: 0.2em;
+  text-transform: uppercase;
+  font-weight: 700;
+}
+.vibe-landing-inline-cta {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  margin-top: 14px;
+  font-family: "DM Sans", sans-serif;
+  font-size: 12px;
+  font-weight: 700;
+  letter-spacing: 0.14em;
+  text-transform: uppercase;
+  text-decoration: none;
+  padding: 8px 0 4px;
+  border-top: 1px solid rgba(255, 255, 255, 0.06);
+  width: 100%;
+  justify-content: center;
+  transition: gap 200ms ease, opacity 200ms ease;
+  opacity: 0.85;
+}
+.vibe-landing-inline-cta:hover {
+  gap: 10px;
+  opacity: 1;
+}
+
+.vibe-landing-back {
+  position: absolute;
+  top: 0;
+  right: 0;
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 6px 12px;
+  font-family: "DM Sans", sans-serif;
+  font-size: 11px;
+  letter-spacing: 0.14em;
+  text-transform: uppercase;
+  color: rgba(250, 247, 242, 0.75);
+  background: rgba(250, 247, 242, 0.06);
+  border: 1px solid rgba(250, 247, 242, 0.18);
+  border-radius: 999px;
+  backdrop-filter: blur(8px);
+  cursor: pointer;
+  transition: background 200ms ease, color 200ms ease;
+}
+.vibe-landing-back:hover {
+  background: rgba(250, 247, 242, 0.12);
+  color: #faf7f2;
+}
+
+/* Step inside CTA */
+.vibe-landing-cta {
+  position: relative;
+  z-index: 1;
+  padding: 60px 24px 96px;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 28px;
+  text-align: center;
+}
+.vibe-landing-cta-wrap {
+  position: relative;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 100%;
+  max-width: 520px;
+  padding: 24px 0;
+}
+.vibe-landing-cta-trail {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  pointer-events: none;
+}
+.vibe-landing-cta-progress {
+  display: inline-flex;
+  align-items: center;
+  gap: 14px;
+  padding: 6px 0 0;
+}
+.vibe-landing-cta-hint {
+  font-family: "DM Sans", sans-serif;
+  font-size: 12px;
+  letter-spacing: 0.16em;
+  text-transform: uppercase;
+  color: rgba(250, 247, 242, 0.55);
+  margin: 0;
+}
+
+/* —— Sun CTA — appears at the center of the orbital system once all three
+   forms have been visited. The disc is pinned to dead-center; the typed
+   label is absolutely positioned below so it never shifts the sun. ———— */
+.vibe-landing-sun-cta {
+  position: absolute;
+  top: 50%;
+  left: 50%;
+  width: 140px;
+  height: 140px;
+  z-index: 3;
+  display: block;
+  text-decoration: none;
+  transform: translate(-50%, -50%);
+  animation: vibe-landing-sun-appear 700ms cubic-bezier(0.22, 1, 0.36, 1) backwards;
+  cursor: pointer;
+}
+.vibe-landing-sun-disc {
+  position: absolute;
+  inset: 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+.vibe-landing-sun-halo {
+  position: absolute;
+  inset: 0;
+  border-radius: 50%;
+  border: 1px solid rgba(255, 92, 53, 0.5);
+  animation: vibe-landing-sun-wave 3.4s cubic-bezier(0.4, 0, 0.2, 1) infinite;
+  pointer-events: none;
+}
+.vibe-landing-sun-halo-2 {
+  animation-delay: 1.1s;
+}
+.vibe-landing-sun-halo-3 {
+  animation-delay: 2.2s;
+}
+.vibe-landing-sun-otto {
+  position: relative;
+  z-index: 1;
+  filter: drop-shadow(0 0 38px rgba(255, 92, 53, 0.7));
+  animation: vibe-landing-sun-breathe 3.2s ease-in-out infinite;
+  transition: filter 220ms ease, transform 220ms cubic-bezier(0.22, 1, 0.36, 1);
+}
+.vibe-landing-sun-typed {
+  position: absolute;
+  top: calc(100% + 28px);
+  left: 50%;
+  transform: translateX(-50%);
+  white-space: nowrap;
+}
+.vibe-landing-sun-typed .vibe-landing-typewriter {
+  font-family: "DM Sans", sans-serif;
+  font-size: 13px;
+  font-weight: 700;
+  letter-spacing: 0.22em;
+  text-transform: uppercase;
+  color: #ff5c35;
+  text-shadow: 0 0 14px rgba(255, 92, 53, 0.55);
+  min-height: 1em;
+  gap: 0;
+}
+.vibe-landing-sun-typed .vibe-landing-typewriter-cursor {
+  width: 2px;
+  height: 0.9em;
+  margin-left: 4px;
+}
+.vibe-landing-sun-cta:hover .vibe-landing-sun-otto {
+  filter: drop-shadow(0 0 56px rgba(255, 92, 53, 0.95));
+  transform: scale(1.05);
+}
+.vibe-landing-sun-cta:hover .vibe-landing-sun-typed .vibe-landing-typewriter {
+  letter-spacing: 0.28em;
+  transition: letter-spacing 200ms ease;
+}
+
+@keyframes vibe-landing-sun-wave {
+  0% {
+    transform: scale(0.7);
+    opacity: 0.65;
+  }
+  100% {
+    transform: scale(2.5);
+    opacity: 0;
+  }
+}
+@keyframes vibe-landing-sun-breathe {
+  0%, 100% {
+    transform: scale(1);
+  }
+  50% {
+    transform: scale(1.05);
+  }
+}
+@keyframes vibe-landing-sun-appear {
+  0% {
+    opacity: 0;
+    transform: translate(-50%, -50%) scale(0.55);
+  }
+  100% {
+    opacity: 1;
+    transform: translate(-50%, -50%) scale(1);
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .vibe-landing-sun-halo,
+  .vibe-landing-sun-otto,
+  .vibe-landing-sun-cta {
+    animation: none !important;
+  }
+}
+.vibe-landing-cta-progress-dot {
+  width: 9px;
+  height: 9px;
+  border-radius: 50%;
+  border: 1.5px solid;
+  transition:
+    background 400ms cubic-bezier(0.22, 1, 0.36, 1),
+    box-shadow 400ms ease,
+    transform 400ms cubic-bezier(0.22, 1, 0.36, 1);
+}
+.vibe-landing-cta-progress-dot.is-visited {
+  transform: scale(1.15);
+}
+
+.vibe-landing-schools {
+  display: inline-flex;
+  align-items: center;
+  gap: 10px;
+  font-family: "DM Sans", sans-serif;
+  font-size: 11px;
+  letter-spacing: 0.22em;
+  text-transform: uppercase;
+  color: rgba(250, 247, 242, 0.65);
+  flex-wrap: wrap;
+  justify-content: center;
+}
+.vibe-landing-schools-soon {
+  font-size: 9px;
+  letter-spacing: 0.18em;
+  padding: 3px 8px;
+  border: 1px solid rgba(46, 204, 113, 0.45);
+  border-radius: 999px;
+  color: #2ecc71;
+  margin-left: 4px;
+}
+.vibe-landing-cta-foot {
+  max-width: 420px;
+  font-family: "Fraunces", serif;
+  font-style: italic;
+  font-size: 14px;
+  color: rgba(250, 247, 242, 0.55);
+  line-height: 1.5;
+}
+
+.vibe-landing-footer {
+  position: relative;
+  z-index: 1;
+  display: flex;
+  justify-content: space-between;
+  padding: 18px 32px 28px;
+  font-family: "DM Sans", sans-serif;
+  font-size: 11px;
+  letter-spacing: 0.14em;
+  text-transform: uppercase;
+  color: rgba(250, 247, 242, 0.35);
+}
+
+@media (max-width: 540px) {
+  .vibe-landing-hero {
+    gap: 36px;
+    padding: 64px 18px;
+  }
+  .vibe-landing-orbit-section {
+    padding: 64px 12px;
+  }
+  .vibe-landing-back {
+    font-size: 10px;
+    padding: 5px 10px;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .vibe-landing-stars span,
+  .vibe-landing-orbital-spin,
+  .vibe-landing-moon-counter,
+  .vibe-landing-typewriter-cursor {
+    animation: none !important;
+  }
+}
+
+/* —— Hyperdrive warp (Step inside → /auth/login) ————————————————————— */
+
+.vibe-landing-warp {
+  cursor: progress;
+}
+.vibe-landing-warp .vibe-landing-stars span {
+  /* Stretch each star into a streak along its radial vector from page
+     center. --sc/--ss/--sa carry per-star cos/sin/angle so each line
+     points the right way. */
+  animation: vibe-landing-streak 750ms cubic-bezier(0.5, 0, 0.85, 0.4) forwards !important;
+  background: #ffffff;
+  box-shadow:
+    0 0 8px #ffffff,
+    0 0 18px #ffe5db,
+    0 0 36px rgba(255, 92, 53, 0.8);
+}
+.vibe-landing-warp .vibe-landing-hero,
+.vibe-landing-warp .vibe-landing-orbit-section,
+.vibe-landing-warp .vibe-landing-cta,
+.vibe-landing-warp .vibe-landing-footer {
+  animation: vibe-landing-content-warp 750ms cubic-bezier(0.6, 0, 0.85, 0.3) forwards;
+  transform-origin: 50% 50%;
+}
+.vibe-landing-warp::after {
+  content: "";
+  position: fixed;
+  inset: 0;
+  background: radial-gradient(circle at 50% 50%, #ffd9b5 0%, #ffe5db 40%, #ffffff 100%);
+  opacity: 0;
+  pointer-events: none;
+  z-index: 9999;
+  animation: vibe-landing-warp-flash 750ms ease-in forwards;
+}
+
+@keyframes vibe-landing-streak {
+  /* Phase 1 (0-25%): stars stretch into streaks while still anchored —
+     the "kicking into hyperdrive" beat. Phase 2 (25-100%): streaks fly
+     outward radially. */
+  0% {
+    transform: translate(0, 0) rotate(var(--sa)) scaleX(1) scaleY(1);
+    opacity: 0.9;
+  }
+  25% {
+    transform: translate(0, 0) rotate(var(--sa)) scaleX(18) scaleY(1.2);
+    opacity: 1;
+  }
+  100% {
+    transform:
+      translate(calc(var(--sc) * 2800px), calc(var(--ss) * 2800px))
+      rotate(var(--sa))
+      scaleX(90)
+      scaleY(0.6);
+    opacity: 0;
+  }
+}
+@keyframes vibe-landing-content-warp {
+  0% {
+    transform: scale(1);
+    opacity: 1;
+    filter: blur(0);
+  }
+  35% {
+    transform: scale(1.15);
+    opacity: 0.9;
+    filter: blur(2px);
+  }
+  100% {
+    transform: scale(8);
+    opacity: 0;
+    filter: blur(22px);
+  }
+}
+@keyframes vibe-landing-warp-flash {
+  0% {
+    opacity: 0;
+  }
+  80% {
+    opacity: 0;
+  }
+  100% {
+    opacity: 1;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .vibe-landing-warp .vibe-landing-stars span,
+  .vibe-landing-warp .vibe-landing-hero,
+  .vibe-landing-warp .vibe-landing-orbit-section,
+  .vibe-landing-warp .vibe-landing-cta,
+  .vibe-landing-warp .vibe-landing-footer {
+    animation: none !important;
+  }
+}
+/* ====================================================================== */
+/* Auth pages — login / signup / forgot                                    */
+/* ====================================================================== */
+
+.vibe-auth-page {
+  position: relative;
+  min-height: 100vh;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 40px 20px;
+  font-family: "DM Sans", sans-serif;
+  overflow: hidden;
+}
+.vibe-auth-page::before {
+  content: "";
+  position: absolute;
+  inset: 0;
+  background:
+    radial-gradient(circle at 22% 0%, rgba(255, 92, 53, 0.1), transparent 55%),
+    radial-gradient(circle at 78% 100%, rgba(123, 95, 224, 0.08), transparent 55%),
+    radial-gradient(circle at 50% 50%, rgba(255, 229, 219, 0.5), transparent 70%);
+  pointer-events: none;
+  z-index: 0;
+}
+.vibe-auth-page::after {
+  content: "";
+  position: absolute;
+  inset: 0;
+  background-image:
+    radial-gradient(rgba(28, 28, 30, 0.06) 1px, transparent 1px);
+  background-size: 24px 24px;
+  opacity: 0.4;
+  pointer-events: none;
+  z-index: 0;
+  mask-image: radial-gradient(circle at 50% 50%, black 30%, transparent 75%);
+  -webkit-mask-image: radial-gradient(circle at 50% 50%, black 30%, transparent 75%);
+}
+
+.vibe-auth-back {
+  position: absolute;
+  top: 28px;
+  left: 28px;
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 8px 14px;
+  font-size: 11px;
+  font-weight: 600;
+  letter-spacing: 0.16em;
+  text-transform: uppercase;
+  color: #8a8580;
+  background: rgba(255, 255, 255, 0.5);
+  border: 1px solid rgba(28, 28, 30, 0.08);
+  border-radius: 999px;
+  text-decoration: none;
+  backdrop-filter: blur(10px);
+  -webkit-backdrop-filter: blur(10px);
+  z-index: 2;
+  transition:
+    color 200ms ease,
+    border-color 200ms ease,
+    transform 200ms cubic-bezier(0.22, 1, 0.36, 1);
+}
+.vibe-auth-back:hover {
+  color: #1c1c1e;
+  border-color: rgba(28, 28, 30, 0.25);
+  transform: translateX(-2px);
+}
+
+.vibe-auth-card {
+  position: relative;
+  width: 100%;
+  max-width: 440px;
+  padding: 44px 38px 36px;
+  background: rgba(255, 255, 255, 0.78);
+  border-radius: 24px;
+  border: 1px solid rgba(28, 28, 30, 0.06);
+  box-shadow:
+    0 32px 80px rgba(28, 28, 30, 0.08),
+    0 0 0 1px rgba(255, 255, 255, 0.5) inset;
+  backdrop-filter: blur(20px) saturate(140%);
+  -webkit-backdrop-filter: blur(20px) saturate(140%);
+  z-index: 1;
+  animation: vibe-auth-arrive 700ms cubic-bezier(0.22, 1, 0.36, 1) backwards;
+}
+
+.vibe-auth-brand {
+  display: inline-block;
+  font-family: "Fraunces", serif;
+  font-size: 18px;
+  font-weight: 800;
+  color: #1c1c1e;
+  letter-spacing: -0.5px;
+  margin-bottom: 22px;
+  padding: 4px 10px;
+  background: rgba(28, 28, 30, 0.04);
+  border-radius: 999px;
+}
+.vibe-auth-dot {
+  color: #ff5c35;
+}
+
+.vibe-auth-headline {
+  font-family: "Fraunces", serif;
+  font-size: 38px;
+  font-weight: 700;
+  letter-spacing: -1.2px;
+  color: #1c1c1e;
+  margin: 0 0 14px;
+  line-height: 1.05;
+}
+.vibe-auth-sub {
+  font-size: 14.5px;
+  line-height: 1.55;
+  color: #5a564f;
+  margin: 0 0 26px;
+}
+.vibe-auth-sub strong {
+  color: #1c1c1e;
+  font-weight: 700;
+}
+.vibe-auth-code {
+  display: inline-block;
+  font-family: ui-monospace, "SF Mono", Menlo, Monaco, monospace;
+  font-size: 12.5px;
+  padding: 1px 7px;
+  background: rgba(255, 92, 53, 0.12);
+  color: #ff5c35;
+  border-radius: 6px;
+  border: 1px solid rgba(255, 92, 53, 0.2);
+  vertical-align: 1px;
+}
+
+.vibe-auth-banner {
+  font-size: 13px;
+  line-height: 1.5;
+  padding: 12px 14px;
+  border-radius: 12px;
+  margin: 0 0 18px;
+}
+.vibe-auth-banner--success {
+  color: #1c5c2e;
+  background: rgba(46, 125, 50, 0.08);
+  border: 1px solid rgba(46, 125, 50, 0.25);
+}
+
+.vibe-auth-form {
+  display: flex;
+  flex-direction: column;
+  gap: 18px;
+}
+.vibe-auth-field {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+.vibe-auth-label-row {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: 12px;
+}
+.vibe-auth-label {
+  font-size: 13px;
+  font-weight: 600;
+  color: #1c1c1e;
+  letter-spacing: 0.01em;
+}
+.vibe-auth-label-hint {
+  font-size: 11px;
+  font-weight: 500;
+  color: #ff5c35;
+  letter-spacing: 0.04em;
+  text-transform: lowercase;
+}
+.vibe-auth-label-link {
+  font-size: 12px;
+  font-weight: 600;
+  color: #ff5c35;
+  text-decoration: none;
+  letter-spacing: 0.01em;
+  transition: opacity 200ms ease;
+}
+.vibe-auth-label-link:hover {
+  opacity: 0.7;
+}
+.vibe-auth-input {
+  width: 100%;
+  padding: 14px 16px;
+  border-radius: 12px;
+  border: 1px solid rgba(28, 28, 30, 0.12);
+  font-family: "DM Sans", sans-serif;
+  font-size: 15px;
+  background: #fff;
+  color: #1c1c1e;
+  transition:
+    border-color 200ms ease,
+    box-shadow 200ms ease,
+    background 200ms ease;
+}
+.vibe-auth-input::placeholder {
+  color: #a8a39c;
+}
+.vibe-auth-input:focus {
+  outline: none;
   border-color: #ff5c35;
+  background: #fff;
+  box-shadow: 0 0 0 4px rgba(255, 92, 53, 0.14);
+}
+
+.vibe-auth-error {
+  font-size: 13px;
+  line-height: 1.45;
+  color: #b42318;
+  margin: 0;
+  padding: 10px 12px;
+  background: rgba(180, 35, 24, 0.07);
+  border: 1px solid rgba(180, 35, 24, 0.18);
+  border-radius: 10px;
+}
+
+.vibe-auth-submit {
+  position: relative;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  padding: 15px 22px;
+  border-radius: 12px;
+  border: none;
+  background: #ff5c35;
+  color: #fff;
+  font-family: "DM Sans", sans-serif;
+  font-size: 15px;
+  font-weight: 600;
+  cursor: pointer;
+  box-shadow:
+    0 14px 36px rgba(255, 92, 53, 0.35),
+    0 0 0 1px rgba(255, 92, 53, 0.55),
+    inset 0 1px 0 rgba(255, 255, 255, 0.22);
+  transition:
+    transform 200ms cubic-bezier(0.22, 1, 0.36, 1),
+    box-shadow 200ms ease,
+    opacity 200ms ease;
+  margin-top: 6px;
+}
+.vibe-auth-submit:hover:not(:disabled) {
+  transform: translateY(-1px);
+  box-shadow:
+    0 18px 44px rgba(255, 92, 53, 0.5),
+    0 0 0 1px rgba(255, 92, 53, 0.7),
+    inset 0 1px 0 rgba(255, 255, 255, 0.28);
+}
+.vibe-auth-submit:disabled {
+  opacity: 0.6;
+  cursor: wait;
+}
+
+.vibe-auth-tail {
+  margin: 24px 0 0;
+  text-align: center;
+  font-size: 13.5px;
+  color: #8a8580;
+}
+.vibe-auth-link {
+  color: #ff5c35;
+  text-decoration: none;
+  font-weight: 600;
+  border-bottom: 1px dashed rgba(255, 92, 53, 0.35);
+  padding-bottom: 1px;
+  transition: border-color 200ms ease, color 200ms ease;
+}
+.vibe-auth-link:hover {
+  border-bottom-color: #ff5c35;
+}
+
+.vibe-auth-loading {
+  color: #8a8580;
+  font-size: 14px;
+  text-align: center;
+}
+
+@keyframes vibe-auth-arrive {
+  0% {
+    opacity: 0;
+    transform: translateY(18px) scale(0.97);
+  }
+  100% {
+    opacity: 1;
+    transform: translateY(0) scale(1);
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .vibe-auth-card {
+    animation: none !important;
+  }
+}
+
+/* —— Auth: 3-step indicator (signup → .edu verify → meet Otto) —— */
+.vibe-auth-steps {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  margin: 0 0 24px;
+  padding: 12px 14px;
+  background: rgba(28, 28, 30, 0.03);
+  border: 1px solid rgba(28, 28, 30, 0.06);
+  border-radius: 14px;
+}
+.vibe-auth-step {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: 2px;
+  padding: 6px 8px;
+  border-radius: 10px;
+  min-width: 0;
+}
+.vibe-auth-step--active {
+  background: rgba(255, 92, 53, 0.08);
+  box-shadow: inset 0 0 0 1px rgba(255, 92, 53, 0.18);
+}
+.vibe-auth-step--active.vibe-auth-step--edu {
+  background: rgba(245, 200, 66, 0.1);
+  box-shadow: inset 0 0 0 1px rgba(245, 200, 66, 0.35);
+}
+.vibe-auth-step--done {
+  opacity: 0.6;
+}
+.vibe-auth-step-num {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 18px;
+  height: 18px;
+  border-radius: 50%;
+  font-size: 10px;
+  font-weight: 700;
+  background: rgba(28, 28, 30, 0.08);
+  color: #8a8580;
+  letter-spacing: 0;
+}
+.vibe-auth-step--active .vibe-auth-step-num {
+  background: #ff5c35;
+  color: #fff;
+}
+.vibe-auth-step--active.vibe-auth-step--edu .vibe-auth-step-num {
+  background: #d4a020;
+  color: #fff;
+}
+.vibe-auth-step--done .vibe-auth-step-num {
+  background: #2e7d32;
+  color: #fff;
+}
+.vibe-auth-step-label {
+  font-size: 12px;
+  font-weight: 600;
+  color: #1c1c1e;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  max-width: 100%;
+}
+.vibe-auth-step-meta {
+  font-size: 9.5px;
+  font-weight: 600;
+  letter-spacing: 0.12em;
+  text-transform: uppercase;
+  color: #a8a39c;
+}
+.vibe-auth-step--active .vibe-auth-step-meta {
+  color: #ff5c35;
+}
+.vibe-auth-step--active.vibe-auth-step--edu .vibe-auth-step-meta {
+  color: #b48414;
+}
+.vibe-auth-step-divider {
+  width: 14px;
+  height: 1px;
+  background: rgba(28, 28, 30, 0.18);
+  flex-shrink: 0;
+}
+
+/* —— Auth: .edu code-chip variant (gold/amber) —— */
+.vibe-auth-code--edu {
+  background: rgba(245, 200, 66, 0.18);
+  color: #b48414;
+  border-color: rgba(245, 200, 66, 0.42);
+}
+.vibe-auth-label-hint--edu {
+  color: #b48414;
+}
+
+@media (max-width: 460px) {
+  .vibe-auth-steps {
+    flex-wrap: nowrap;
+  }
+  .vibe-auth-step-meta {
+    display: none;
+  }
 }

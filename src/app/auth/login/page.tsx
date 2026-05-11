@@ -42,101 +42,97 @@ function LoginForm() {
       supabase,
       sanitizeLoginNextParam(searchParams.get("next")),
     );
-    // Full navigation so middleware always sees the new auth cookies (client
-    // router transitions can miss the first cookie write on some setups).
+    // Full navigation so middleware always sees the new auth cookies.
     window.location.assign(dest);
   }
 
   return (
-    <div style={{ maxWidth: 400, margin: "0 auto", paddingTop: 48 }}>
-      <h1
-        style={{
-          fontFamily: "Fraunces, serif",
-          fontSize: 32,
-          fontWeight: 900,
-          color: "#1C1C1E",
-          marginBottom: 8,
-        }}
-      >
-        Log in
-      </h1>
-      <p style={{ color: "#8A8580", marginBottom: 24 }}>
-        Welcome back to{" "}
-        <span style={{ color: "#FF5C35" }}>vibe.</span>
-      </p>
+    <div className="vibe-auth-page">
+      <Link href="/" className="vibe-auth-back">
+        <span aria-hidden>←</span> back
+      </Link>
 
-      {schoolVerifiedHint ? (
-        <p
-          style={{
-            fontSize: 14,
-            lineHeight: 1.5,
-            color: "#1C5C2E",
-            background: "rgba(46, 125, 50, 0.1)",
-            border: "1px solid rgba(46, 125, 50, 0.35)",
-            borderRadius: 10,
-            padding: "14px 16px",
-            marginBottom: 20,
-          }}
-        >
-          <strong>Campus email verified.</strong> Sign in with your login email
-          (the one you used to sign up). We&apos;ll take you right back where you
-          left off.
+      <div className="vibe-auth-card">
+        <div className="vibe-auth-brand" aria-hidden>
+          vibe<span className="vibe-auth-dot">.</span>
+        </div>
+
+        <h1 className="vibe-auth-headline">
+          Welcome back<span className="vibe-auth-dot">.</span>
+        </h1>
+        <p className="vibe-auth-sub">
+          Use your <strong>personal email</strong> — the one you actually check.
+          Your school <code className="vibe-auth-code">.edu</code> is verified
+          separately.
         </p>
-      ) : null}
 
-      <form
-        onSubmit={onSubmit}
-        style={{ display: "flex", flexDirection: "column", gap: 16 }}
-      >
-        <label style={{ display: "flex", flexDirection: "column", gap: 6 }}>
-          <span style={{ fontSize: 14, color: "#1C1C1E" }}>Email</span>
-          <input
-            type="email"
-            autoComplete="email"
-            required
-            value={email}
-            onChange={(e) => setEmail(e.target.value)}
-            style={inputStyle}
-          />
-        </label>
-        <label style={{ display: "flex", flexDirection: "column", gap: 6 }}>
-          <span style={{ fontSize: 14, color: "#1C1C1E" }}>Password</span>
-          <input
-            type="password"
-            autoComplete="current-password"
-            required
-            value={password}
-            onChange={(e) => setPassword(e.target.value)}
-            style={inputStyle}
-          />
-        </label>
-        {error ? (
-          <p style={{ color: "#B42318", fontSize: 14, margin: 0 }}>{error}</p>
+        {schoolVerifiedHint ? (
+          <div className="vibe-auth-banner vibe-auth-banner--success">
+            <strong>Campus email verified.</strong> Sign in with the personal
+            email you used to sign up — we&apos;ll take you right back where you
+            left off.
+          </div>
         ) : null}
-        {urlError === "auth_callback" ? (
-          <p style={{ color: "#B42318", fontSize: 14, margin: 0 }}>
-            That confirmation link is invalid or expired. Sign in if you
-            already confirmed your email, or sign up again.
-          </p>
-        ) : null}
-        <button
-          type="submit"
-          disabled={loading}
-          style={buttonStyle}
-        >
-          {loading ? "Signing in…" : "Sign in"}
-        </button>
-      </form>
 
-      <p style={{ marginTop: 20, fontSize: 14, color: "#8A8580" }}>
-        <Link href="/auth/forgot-password" style={linkStyle}>
-          Forgot password?
-        </Link>
-        {" · "}
-        <Link href="/auth/signup" style={linkStyle}>
-          Create account
-        </Link>
-      </p>
+        <form onSubmit={onSubmit} className="vibe-auth-form">
+          <label className="vibe-auth-field">
+            <span className="vibe-auth-label-row">
+              <span className="vibe-auth-label">Personal email</span>
+              <span className="vibe-auth-label-hint">not your .edu</span>
+            </span>
+            <input
+              type="email"
+              autoComplete="email"
+              placeholder="you@gmail.com"
+              required
+              value={email}
+              onChange={(e) => setEmail(e.target.value)}
+              className="vibe-auth-input"
+            />
+          </label>
+
+          <label className="vibe-auth-field">
+            <span className="vibe-auth-label-row">
+              <span className="vibe-auth-label">Password</span>
+              <Link href="/auth/forgot-password" className="vibe-auth-label-link">
+                Forgot?
+              </Link>
+            </span>
+            <input
+              type="password"
+              autoComplete="current-password"
+              required
+              value={password}
+              onChange={(e) => setPassword(e.target.value)}
+              className="vibe-auth-input"
+            />
+          </label>
+
+          {error ? <p className="vibe-auth-error">{error}</p> : null}
+          {urlError === "auth_callback" ? (
+            <p className="vibe-auth-error">
+              That confirmation link is invalid or expired. Sign in if you
+              already confirmed your email, or sign up again.
+            </p>
+          ) : null}
+
+          <button type="submit" disabled={loading} className="vibe-auth-submit">
+            {loading ? "Signing in…" : "Sign in"}
+            {loading ? null : (
+              <span aria-hidden style={{ marginLeft: 8 }}>
+                →
+              </span>
+            )}
+          </button>
+        </form>
+
+        <p className="vibe-auth-tail">
+          New to vibe?{" "}
+          <Link href="/auth/signup" className="vibe-auth-link">
+            Create an account
+          </Link>
+        </p>
+      </div>
     </div>
   );
 }
@@ -145,38 +141,12 @@ export default function LoginPage() {
   return (
     <Suspense
       fallback={
-        <p style={{ textAlign: "center", marginTop: 48, color: "#8A8580" }}>
-          Loading…
-        </p>
+        <div className="vibe-auth-page">
+          <p className="vibe-auth-loading">Loading…</p>
+        </div>
       }
     >
       <LoginForm />
     </Suspense>
   );
 }
-
-const inputStyle: React.CSSProperties = {
-  padding: "12px 14px",
-  borderRadius: 10,
-  border: "1px solid #E4E0D8",
-  fontSize: 16,
-  background: "#fff",
-  color: "#1C1C1E",
-};
-
-const buttonStyle: React.CSSProperties = {
-  padding: "14px 18px",
-  borderRadius: 10,
-  border: "none",
-  background: "#1C1C1E",
-  color: "#fff",
-  fontSize: 16,
-  fontWeight: 600,
-  cursor: "pointer",
-  marginTop: 4,
-};
-
-const linkStyle: React.CSSProperties = {
-  color: "#FF5C35",
-  textDecoration: "none",
-};
