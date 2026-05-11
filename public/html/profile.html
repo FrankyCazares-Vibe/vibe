@@ -4752,6 +4752,34 @@ function onHandlePointerDown(e, absoluteIdx, dir) {
 }
 
 
+// Self-heal: any PDFs uploaded before pdf.js was wired in have no `pages`
+// array — they were stored as raw data URLs. Render falls back to an
+// <img> tag for those which obviously doesn't display a PDF. Rasterize
+// them on the fly the first time the viewer opens; subsequent opens use
+// the cached pages.
+async function _backfillRasterIfNeeded() {
+  let dirty = false;
+  for (const doc of resumePortfolio) {
+    if (doc.type !== 'pdf') continue;
+    if (doc.pages && doc.pages.length) continue;
+    try {
+      doc.pages = await _rasterizePdf(doc.url);
+      dirty = true;
+    } catch (e) {
+      console.error('[resume] backfill rasterize failed', e);
+      // Mark with an empty-but-defined pages array so we don't retry every
+      // render — and the viewer can show a helpful "re-upload this PDF"
+      // message in place of a broken image.
+      doc.pages = [];
+      dirty = true;
+    }
+  }
+  if (dirty) {
+    saveProfileToStorage();
+    renderDocViewer();
+  }
+}
+
 function renderDocViewer() {
   const pages = document.getElementById('docPages');
   const view = document.getElementById('docView');
@@ -4759,6 +4787,15 @@ function renderDocViewer() {
   const sub = document.getElementById('docMainSub');
   const counter = document.getElementById('docCounter');
   if (!pages || !view || !title || !sub || !counter) return;
+
+  // Kick off legacy-data rasterization but don't block the initial paint.
+  const needsBackfill = resumePortfolio.some(
+    (d) => d.type === 'pdf' && !(d.pages && d.pages.length)
+  );
+  if (needsBackfill) {
+    // Fire-and-forget; the function calls renderDocViewer again when done.
+    void _backfillRasterIfNeeded();
+  }
 
   if (!resumePortfolio.length) {
     pages.innerHTML = `
@@ -4802,14 +4839,27 @@ function renderDocViewer() {
 
   // Build the scrollable page stack. Each .doc-page-wrap is a positioned
   // container so bars live inside the same scroll context as content.
-  const pagesHtml = (doc.pages && doc.pages.length ? doc.pages : [doc.url]).map((src, i) => {
-    const pageNumber = i + 1;
-    const badge = numPages > 1 ? `<div class="doc-page-number">${pageNumber} / ${numPages}</div>` : '';
-    return `<div class="doc-page-wrap" data-page="${pageNumber}">
-      <img src="${src}" alt="${doc.name} page ${pageNumber}" draggable="false">
-      ${badge}
+  let pagesHtml = '';
+  if (doc.type === 'pdf' && (!doc.pages || !doc.pages.length)) {
+    // Two flavors: rasterization is in-flight (backfill running) → show a
+    // loader. Or rasterization explicitly failed → tell the user to
+    // re-upload.
+    const rastering = doc.pages === undefined;
+    pagesHtml = `<div style="display:flex;align-items:center;justify-content:center;min-height:60vh;color:var(--muted);font-size:13px;padding:24px;text-align:center;line-height:1.6">
+      ${rastering
+        ? 'Preparing pages… (one-time conversion for the new viewer)'
+        : "Couldn't render this PDF. Remove it from the thumbnails on the left and re-upload to use the new viewer."}
     </div>`;
-  }).join('');
+  } else {
+    pagesHtml = (doc.pages && doc.pages.length ? doc.pages : [doc.url]).map((src, i) => {
+      const pageNumber = i + 1;
+      const badge = numPages > 1 ? `<div class="doc-page-number">${pageNumber} / ${numPages}</div>` : '';
+      return `<div class="doc-page-wrap" data-page="${pageNumber}">
+        <img src="${src}" alt="${doc.name} page ${pageNumber}" draggable="false">
+        ${badge}
+      </div>`;
+    }).join('');
+  }
   view.innerHTML = pagesHtml;
   view.scrollTop = 0;
 
