@@ -929,6 +929,30 @@ body.edit-mode .resume-upload-row { display:flex; }
   font-weight:700;
   color:var(--muted);
 }
+.doc-page-thumb-remove {
+  position:absolute;
+  top:6px;
+  right:6px;
+  z-index:2;
+  width:22px;
+  height:22px;
+  border-radius:50%;
+  background:rgba(0,0,0,.65);
+  color:white;
+  border:none;
+  font-size:15px;
+  font-weight:700;
+  line-height:1;
+  cursor:pointer;
+  display:flex;
+  align-items:center;
+  justify-content:center;
+  padding:0;
+  transition:background .15s, transform .15s;
+  opacity:0;
+}
+.doc-page-thumb:hover .doc-page-thumb-remove { opacity:1; }
+.doc-page-thumb-remove:hover { background:var(--accent); transform:scale(1.1); }
 .doc-main {
   display:flex;flex-direction:column;gap:12px;
 }
@@ -943,18 +967,26 @@ body.edit-mode .resume-upload-row { display:flex; }
 }
 .doc-view {
   width:100%;
-  min-height:62vh;
   position:relative;
   border:1px solid var(--border);
   border-radius:18px;
   overflow:hidden;
   background:white;
+  /* PDF aspect ratio (Letter / A4 are close enough) locks the iframe so
+     the rendered page fills the view exactly. Redaction bars stored as
+     percentages of .doc-view land in the same page coordinate space, so
+     scrolling can't drift them off-content. Images override below. */
+  aspect-ratio: 8.5 / 11;
+  max-height:78vh;
+}
+.doc-view.is-image {
+  aspect-ratio:auto;
+  min-height:62vh;
 }
 .doc-view img,
 .doc-view iframe {
   width:100%;
   height:100%;
-  min-height:62vh;
   border:none;
   display:block;
   object-fit:contain;
@@ -986,20 +1018,79 @@ body.recruiter-mode .resume-preview {
 }
 
 
-/* Resume/portfolio redaction bars */
+/* Resume/portfolio redaction bars.
+   Drawing model: click+drag anywhere on the document area to draw a new bar.
+   Selecting a bar (single click) exposes 8 resize handles + a delete X.
+   We disable pointer-events on the underlying iframe so the document can't
+   intercept the draw gesture, and bars stay anchored to the page below. */
+.doc-view.is-editing-redactions { cursor:crosshair; }
+.doc-view.is-editing-redactions iframe,
+.doc-view.has-redactions iframe { pointer-events:none; }
 .redaction-bar {
   position:absolute;
   background:rgba(0,0,0,.96);
-  border-radius:8px;
+  border-radius:6px;
   box-shadow:0 2px 8px rgba(0,0,0,.18);
   cursor:move;
   z-index:5;
   border:1px solid rgba(255,255,255,.08);
+  user-select:none;
+  touch-action:none;
 }
 .redaction-bar.selected {
-  outline:2px solid rgba(255,92,53,.55);
+  outline:2px solid rgba(255,92,53,.7);
   outline-offset:2px;
+  box-shadow:0 0 0 1px rgba(255,92,53,.5), 0 8px 24px rgba(255,92,53,.25);
 }
+.redaction-handle {
+  position:absolute;
+  width:10px;
+  height:10px;
+  background:#FF5C35;
+  border:1.5px solid white;
+  border-radius:50%;
+  box-shadow:0 1px 4px rgba(0,0,0,.3);
+  z-index:6;
+  display:none;
+}
+.redaction-bar.selected .redaction-handle { display:block; }
+.redaction-handle[data-h="nw"] { top:-7px; left:-7px; cursor:nwse-resize; }
+.redaction-handle[data-h="n"]  { top:-7px; left:calc(50% - 5px); cursor:ns-resize; }
+.redaction-handle[data-h="ne"] { top:-7px; right:-7px; cursor:nesw-resize; }
+.redaction-handle[data-h="e"]  { top:calc(50% - 5px); right:-7px; cursor:ew-resize; }
+.redaction-handle[data-h="se"] { bottom:-7px; right:-7px; cursor:nwse-resize; }
+.redaction-handle[data-h="s"]  { bottom:-7px; left:calc(50% - 5px); cursor:ns-resize; }
+.redaction-handle[data-h="sw"] { bottom:-7px; left:-7px; cursor:nesw-resize; }
+.redaction-handle[data-h="w"]  { top:calc(50% - 5px); left:-7px; cursor:ew-resize; }
+.redaction-delete {
+  position:absolute;
+  top:-12px;
+  right:-12px;
+  width:22px;
+  height:22px;
+  border-radius:50%;
+  background:#FF5C35;
+  color:white;
+  border:1.5px solid white;
+  font-size:13px;
+  font-weight:700;
+  line-height:1;
+  cursor:pointer;
+  display:none;
+  align-items:center;
+  justify-content:center;
+  box-shadow:0 2px 6px rgba(0,0,0,.3);
+  z-index:7;
+  padding:0;
+}
+.redaction-bar.selected .redaction-delete { display:flex; }
+.redaction-delete:hover { background:#ff7055; transform:scale(1.1); }
+/* When viewer-mode or anyone else is looking, just show solid bars — no
+   selection handles, no editing affordances. */
+body.viewer-mode .redaction-bar { cursor:default; }
+body.viewer-mode .redaction-bar.selected { outline:none; box-shadow:0 2px 8px rgba(0,0,0,.18); }
+body.viewer-mode .redaction-handle,
+body.viewer-mode .redaction-delete { display:none !important; }
 .redaction-toolbar {
   display:flex;
   gap:8px;
@@ -3548,14 +3639,12 @@ body.empty-profile-mode #profileEmpty { display: flex !important; }
           </div>
         </div>
         <div class="doc-view" id="docView"></div>
-        <div class="redaction-hint" id="docHint">Tip: in edit mode, add blackout bars to cover personal details before publishing.</div>
+        <div class="redaction-hint" id="docHint">Tip: in edit mode, click and drag on the document to cover personal details. Click a bar to resize or delete.</div>
         <div class="doc-redactions">
           <div class="redaction-toolbar owner-only" style="margin-top:12px">
-            <button class="redaction-chip" onclick="addRedactionBar()">+ Blackout bar</button>
-            <button class="redaction-chip" onclick="toggleRedactionMode()">Edit redactions</button>
-            <button class="redaction-chip" onclick="clearRedactions()">Clear bars</button>
+            <button class="redaction-chip" onclick="clearRedactions()">Clear all bars</button>
           </div>
-          <div class="redaction-hint owner-only">Use blackout bars to hide names, phone numbers, addresses, or anything else before the resume/portfolio is visible on profile.</div>
+          <div class="redaction-hint owner-only">Click and drag anywhere on the document to add a blackout bar. Click a bar to select — drag to move, use handles to resize, or click the × to delete. Bars are saved with your profile.</div>
         </div>
       </div>
     </div>
@@ -4207,22 +4296,58 @@ function guessDocType(fileName, mime) {
   return 'image';
 }
 
+const MAX_RESUME_DOCS = 2;
+
 async function handleResumeUpload(input) {
   const files = Array.from(input.files || []);
   if (!files.length) return;
 
-  // Replace current attachments with the latest selection — converted to
-  // base64 data URLs so they survive a page reload.
-  resumePortfolio = await Promise.all(files.map(async file => ({
+  if (resumePortfolio.length >= MAX_RESUME_DOCS) {
+    showToast(`Up to ${MAX_RESUME_DOCS} attachments. Remove one to add another.`);
+    input.value = '';
+    return;
+  }
+  // Append (not replace) so a user can keep their resume PDF AND add a
+  // portfolio image alongside. Cap at MAX so the storage payload stays sane.
+  const slotsLeft = MAX_RESUME_DOCS - resumePortfolio.length;
+  const incoming = files.slice(0, slotsLeft);
+  const newDocs = await Promise.all(incoming.map(async file => ({
     name: file.name,
     type: guessDocType(file.name, file.type),
     url: await _fileToDataURL(file),
   })));
-  activeDocIndex = 0;
+  resumePortfolio = [...resumePortfolio, ...newDocs];
+  // Focus the most-recently-added doc so they see it land.
+  activeDocIndex = resumePortfolio.length - 1;
   renderResumeCard();
-  showToast('Resume / portfolio updated');
+  // If the viewer is open while uploading, refresh it inline.
+  const modal = document.getElementById('docModal');
+  if (modal && modal.classList.contains('open')) renderDocViewer();
+  if (files.length > slotsLeft) {
+    showToast(`Only ${slotsLeft} added — limit is ${MAX_RESUME_DOCS}`);
+  } else {
+    showToast('Attachment added');
+  }
   input.value = '';
   saveProfileToStorage();
+}
+
+function removeResumeDoc(idx) {
+  if (idx < 0 || idx >= resumePortfolio.length) return;
+  resumePortfolio.splice(idx, 1);
+  // Bars on the removed doc are dropped; bars on later docs shift down one
+  // pageIndex so they stay attached to the right attachment.
+  redactionBars = redactionBars
+    .filter(b => b.pageIndex !== idx)
+    .map(b => (b.pageIndex > idx ? { ...b, pageIndex: b.pageIndex - 1 } : b));
+  if (activeDocIndex >= resumePortfolio.length) {
+    activeDocIndex = Math.max(0, resumePortfolio.length - 1);
+  }
+  renderResumeCard();
+  const modal = document.getElementById('docModal');
+  if (modal && modal.classList.contains('open')) renderDocViewer();
+  saveProfileToStorage();
+  showToast('Attachment removed');
 }
 
 function clearResumePortfolio() {
@@ -4287,120 +4412,68 @@ function closeDocumentViewer() {
   modal.classList.remove('open');
 }
 
-function renderDocViewer() {
-  const pages = document.getElementById('docPages');
-  const view = document.getElementById('docView');
-  const title = document.getElementById('docMainTitle');
-  const sub = document.getElementById('docMainSub');
-  const counter = document.getElementById('docCounter');
-  if (!pages || !view || !title || !sub || !counter) return;
-
-  if (!resumePortfolio.length) {
-    pages.innerHTML = `
-      <div style="padding:16px;border:1px dashed var(--border);border-radius:14px;color:var(--muted);font-size:13px;line-height:1.55">
-        No resume or portfolio attached yet. Use the button in edit mode to attach a PDF or portfolio images.
-      </div>`;
-    view.innerHTML = `
-      <div style="display:flex;align-items:center;justify-content:center;height:62vh;color:var(--muted);font-size:14px;padding:24px;text-align:center">
-        Attach a file to preview it here.
-      </div>`;
-    title.textContent = 'Preview';
-    sub.textContent = 'Nothing attached yet.';
-    counter.textContent = '0 / 0';
-    return;
-  }
-
-  pages.innerHTML = resumePortfolio.map((doc, idx) => {
-    const active = idx === activeDocIndex ? 'active' : '';
-    const preview = doc.type === 'image'
-      ? `<img src="${doc.url}" alt="${doc.name}">`
-      : `<iframe src="${doc.url}#toolbar=0&navpanes=0&scrollbar=0"></iframe>`;
-    return `
-      <div class="doc-page-thumb ${active}" onclick="setActiveDoc(${idx})">
-        ${preview}
-        <div class="doc-page-thumb-label">${doc.name}</div>
-      </div>`;
-  }).join('');
-
-  const doc = resumePortfolio[activeDocIndex];
-  title.textContent = doc.name;
-  sub.textContent = doc.type === 'pdf'
-    ? 'PDF preview. Use the page buttons to move through attached files.'
-    : 'Image preview. Use the page buttons to move through attached files.';
-  counter.textContent = `${activeDocIndex + 1} / ${resumePortfolio.length}`;
-
-  if (doc.type === 'image') {
-    view.innerHTML = `<img src="${doc.url}" alt="${doc.name}">`;
-  } else {
-    view.innerHTML = `<iframe src="${doc.url}#toolbar=0&navpanes=0&scrollbar=0"></iframe>`;
-  }
-}
-
-function setActiveDoc(idx) {
-  activeDocIndex = Math.max(0, Math.min(idx, resumePortfolio.length - 1));
-  renderDocViewer();
-}
-
-function prevDocPage() {
-  if (!resumePortfolio.length) return;
-  activeDocIndex = (activeDocIndex - 1 + resumePortfolio.length) % resumePortfolio.length;
-  renderDocViewer();
-}
-
-function nextDocPage() {
-  if (!resumePortfolio.length) return;
-  activeDocIndex = (activeDocIndex + 1) % resumePortfolio.length;
-  renderDocViewer();
-}
-
 
 // ── Redaction bars for resume / portfolio viewer ─────────────────
-let redactionMode = false;
-let redactionBars = []; // { pageIndex, x, y, w, h }
+// Coordinate space: percentages of .doc-view. Since .doc-view's
+// aspect-ratio is locked to a Letter page for PDFs (and to the natural
+// image bounds for images), this maps 1:1 to page coordinates and bars
+// stay anchored to the visible content — no scroll drift.
+//
+// State:
+//   redactionBars: [{ pageIndex, x, y, w, h }]  — pageIndex == doc index
+//   selectedBarIdx: index into redactionBars, or null
+let redactionBars = [];
+let selectedBarIdx = null;
 
 function getDocViewEl() { return document.getElementById('docView'); }
-function getDocViewBounds() {
-  const el = getDocViewEl();
-  return el ? el.getBoundingClientRect() : null;
-}
 
-function syncRedactionBars() {
-  const view = getDocViewEl();
-  if (!view) return;
-  const boxes = view.querySelectorAll('.redaction-bar');
-  boxes.forEach((box, idx) => {
-    const item = redactionBars[idx];
-    if (!item) return;
-    box.style.left = item.x + '%';
-    box.style.top = item.y + '%';
-    box.style.width = item.w + '%';
-    box.style.height = item.h + '%';
-  });
+function isOwnerEditing() {
+  return !!(editMode && !viewerMode && resumePortfolio.length);
 }
 
 function renderRedactionBars() {
   const view = getDocViewEl();
   if (!view) return;
-  // remove old bars
   view.querySelectorAll('.redaction-bar').forEach(n => n.remove());
 
-  const current = resumePortfolio[activeDocIndex];
-  if (!current) return;
+  if (!resumePortfolio[activeDocIndex]) return;
 
-  // render only bars for the active page/file
-  redactionBars.filter(b => b.pageIndex === activeDocIndex).forEach((bar, i) => {
+  // Editing affordance hint on the container (changes cursor + locks iframe).
+  view.classList.toggle('is-editing-redactions', isOwnerEditing());
+  view.classList.toggle('has-redactions', redactionBars.some(b => b.pageIndex === activeDocIndex));
+
+  redactionBars.forEach((bar, absoluteIdx) => {
+    if (bar.pageIndex !== activeDocIndex) return;
     const el = document.createElement('div');
-    el.className = 'redaction-bar';
-    el.dataset.index = String(i);
+    el.className = 'redaction-bar' + (selectedBarIdx === absoluteIdx ? ' selected' : '');
+    el.dataset.barIdx = String(absoluteIdx);
     el.style.left = bar.x + '%';
     el.style.top = bar.y + '%';
     el.style.width = bar.w + '%';
     el.style.height = bar.h + '%';
 
-    if (redactionMode && editMode && !viewerMode) {
-      el.title = 'Drag to move. Click to select.';
-      el.onpointerdown = startDragRedaction;
-      el.onclick = () => selectRedactionBar(el);
+    if (isOwnerEditing()) {
+      el.addEventListener('pointerdown', onBarPointerDown);
+      // 8 resize handles
+      ['nw','n','ne','e','se','s','sw','w'].forEach(h => {
+        const dot = document.createElement('div');
+        dot.className = 'redaction-handle';
+        dot.dataset.h = h;
+        dot.addEventListener('pointerdown', (ev) => onHandlePointerDown(ev, absoluteIdx, h));
+        el.appendChild(dot);
+      });
+      // Delete X
+      const del = document.createElement('button');
+      del.type = 'button';
+      del.className = 'redaction-delete';
+      del.textContent = '×';
+      del.title = 'Delete bar';
+      del.addEventListener('pointerdown', (ev) => ev.stopPropagation());
+      del.addEventListener('click', (ev) => {
+        ev.stopPropagation();
+        deleteRedactionBar(absoluteIdx);
+      });
+      el.appendChild(del);
     } else {
       el.style.cursor = 'default';
     }
@@ -4408,40 +4481,23 @@ function renderRedactionBars() {
   });
 }
 
-function selectRedactionBar(el) {
-  document.querySelectorAll('.redaction-bar').forEach(b => b.classList.remove('selected'));
-  el.classList.add('selected');
+function selectBar(absoluteIdx) {
+  selectedBarIdx = absoluteIdx;
+  renderRedactionBars();
 }
 
-function addRedactionBar() {
-  if (!editMode || viewerMode) {
-    showToast('Open edit mode to add blackout bars');
-    return;
-  }
-  if (!resumePortfolio.length) {
-    showToast('Attach a resume or portfolio first');
-    return;
-  }
-  const view = getDocViewEl();
-  if (!view) return;
-
-  const pageIndex = activeDocIndex;
-  // default placement approximates middle-left of current doc
-  redactionBars.push({ pageIndex, x: 16, y: 18, w: 38, h: 7 });
+function deselectBar() {
+  if (selectedBarIdx === null) return;
+  selectedBarIdx = null;
   renderRedactionBars();
-  openDocumentViewer();
-  redactionMode = true;
-  showToast('Blackout bar added');
 }
 
-function toggleRedactionMode() {
-  if (!editMode || viewerMode) {
-    showToast('Open edit mode to edit redactions');
-    return;
-  }
-  redactionMode = !redactionMode;
+function deleteRedactionBar(absoluteIdx) {
+  redactionBars.splice(absoluteIdx, 1);
+  if (selectedBarIdx === absoluteIdx) selectedBarIdx = null;
+  else if (selectedBarIdx !== null && selectedBarIdx > absoluteIdx) selectedBarIdx -= 1;
   renderRedactionBars();
-  showToast(redactionMode ? 'Redaction edit mode on' : 'Redaction edit mode off');
+  saveProfileToStorage();
 }
 
 function clearRedactions() {
@@ -4449,59 +4505,166 @@ function clearRedactions() {
     showToast('Open edit mode to clear redactions');
     return;
   }
-  redactionBars = [];
+  // Drop only bars on the active doc — bars on the OTHER doc keep their work.
+  redactionBars = redactionBars.filter(b => b.pageIndex !== activeDocIndex);
+  selectedBarIdx = null;
   renderRedactionBars();
-  showToast('Redaction bars cleared');
+  saveProfileToStorage();
+  showToast('Bars on this attachment cleared');
 }
 
-let dragState = null;
-function startDragRedaction(e) {
-  if (!redactionMode || !editMode || viewerMode) return;
-  const target = e.currentTarget;
-  const idx = parseInt(target.dataset.index, 10);
-  const bar = redactionBars.filter(b => b.pageIndex === activeDocIndex)[idx];
-  if (!bar) return;
-
+// ── Drawing + dragging + resizing ─────────────────────────────────
+// One gesture handler on .doc-view:
+//   - pointerdown on a bar → drag (move)
+//   - pointerdown on a handle → resize
+//   - pointerdown on empty area → draw new bar
+function onDocViewPointerDown(e) {
+  if (!isOwnerEditing()) {
+    // Even when not editing, a click on empty space should deselect any
+    // lingering selection (e.g. after a save round-trip).
+    if (selectedBarIdx !== null && !e.target.closest('.redaction-bar')) deselectBar();
+    return;
+  }
+  // If the user clicked an existing bar / handle / delete, those have their
+  // own listeners and will stopPropagation appropriately.
+  if (e.target.closest('.redaction-bar')) return;
+  // Empty-space click deselects any currently-selected bar before starting
+  // a fresh draw gesture.
+  if (selectedBarIdx !== null) deselectBar();
   e.preventDefault();
+  startDrawing(e);
+}
+
+function startDrawing(e) {
   const view = getDocViewEl();
   const bounds = view.getBoundingClientRect();
-  const startX = e.clientX;
-  const startY = e.clientY;
-  const startBar = { ...bar };
+  const startX = ((e.clientX - bounds.left) / bounds.width) * 100;
+  const startY = ((e.clientY - bounds.top) / bounds.height) * 100;
 
-  dragState = { idx, startX, startY, startBar, pageIndex: activeDocIndex, bounds };
+  // Create a fresh bar at 0×0; size grows with the drag.
+  const bar = { pageIndex: activeDocIndex, x: startX, y: startY, w: 0, h: 0 };
+  redactionBars.push(bar);
+  const newIdx = redactionBars.length - 1;
+  selectedBarIdx = newIdx;
+  renderRedactionBars();
 
+  let dragged = false;
   const move = (ev) => {
-    if (!dragState) return;
-    const dx = ((ev.clientX - dragState.startX) / bounds.width) * 100;
-    const dy = ((ev.clientY - dragState.startY) / bounds.height) * 100;
-
-    const barsForPage = redactionBars.filter(b => b.pageIndex === activeDocIndex);
-    const actual = redactionBars.findIndex(b => b.pageIndex === activeDocIndex && b.x === startBar.x && b.y === startBar.y && b.w === startBar.w && b.h === startBar.h);
-    // safer: use local filtered index mapping
-    const pageBars = redactionBars
-      .map((b, i) => ({ ...b, i }))
-      .filter(b => b.pageIndex === activeDocIndex);
-    const entry = pageBars[idx];
-    if (!entry) return;
-
-    const b = redactionBars[entry.i];
-    b.x = Math.max(0, Math.min(100 - b.w, startBar.x + dx));
-    b.y = Math.max(0, Math.min(100 - b.h, startBar.y + dy));
-    renderDocViewer();
+    const x = ((ev.clientX - bounds.left) / bounds.width) * 100;
+    const y = ((ev.clientY - bounds.top) / bounds.height) * 100;
+    bar.x = Math.max(0, Math.min(startX, x));
+    bar.y = Math.max(0, Math.min(startY, y));
+    bar.w = Math.min(100 - bar.x, Math.abs(x - startX));
+    bar.h = Math.min(100 - bar.y, Math.abs(y - startY));
+    if (bar.w > 0.5 || bar.h > 0.5) dragged = true;
     renderRedactionBars();
   };
-
   const up = () => {
-    dragState = null;
     window.removeEventListener('pointermove', move);
     window.removeEventListener('pointerup', up);
+    // Treat a no-drag click as a deselect, not a 0×0 bar.
+    if (!dragged) {
+      redactionBars.pop();
+      selectedBarIdx = null;
+      renderRedactionBars();
+      return;
+    }
+    // Floor the dimensions — anything < 1% in either axis is a misclick.
+    if (bar.w < 1 || bar.h < 1) {
+      redactionBars.pop();
+      selectedBarIdx = null;
+      renderRedactionBars();
+      return;
+    }
+    saveProfileToStorage();
   };
-
   window.addEventListener('pointermove', move);
   window.addEventListener('pointerup', up);
 }
 
+function onBarPointerDown(e) {
+  if (!isOwnerEditing()) return;
+  // Don't capture pointerdowns on the handles or delete X — they have their
+  // own handlers and we want resize/delete to win.
+  if (e.target.closest('.redaction-handle, .redaction-delete')) return;
+  e.stopPropagation();
+  const el = e.currentTarget;
+  const absoluteIdx = parseInt(el.dataset.barIdx, 10);
+  selectBar(absoluteIdx);
+
+  const view = getDocViewEl();
+  const bounds = view.getBoundingClientRect();
+  const bar = redactionBars[absoluteIdx];
+  const startX = e.clientX;
+  const startY = e.clientY;
+  const origin = { x: bar.x, y: bar.y };
+
+  const move = (ev) => {
+    const dx = ((ev.clientX - startX) / bounds.width) * 100;
+    const dy = ((ev.clientY - startY) / bounds.height) * 100;
+    bar.x = Math.max(0, Math.min(100 - bar.w, origin.x + dx));
+    bar.y = Math.max(0, Math.min(100 - bar.h, origin.y + dy));
+    renderRedactionBars();
+  };
+  const up = () => {
+    window.removeEventListener('pointermove', move);
+    window.removeEventListener('pointerup', up);
+    saveProfileToStorage();
+  };
+  window.addEventListener('pointermove', move);
+  window.addEventListener('pointerup', up);
+}
+
+function onHandlePointerDown(e, absoluteIdx, dir) {
+  if (!isOwnerEditing()) return;
+  e.stopPropagation();
+  e.preventDefault();
+  selectBar(absoluteIdx);
+
+  const view = getDocViewEl();
+  const bounds = view.getBoundingClientRect();
+  const bar = redactionBars[absoluteIdx];
+  const startX = e.clientX;
+  const startY = e.clientY;
+  const origin = { x: bar.x, y: bar.y, w: bar.w, h: bar.h };
+
+  const move = (ev) => {
+    const dx = ((ev.clientX - startX) / bounds.width) * 100;
+    const dy = ((ev.clientY - startY) / bounds.height) * 100;
+    let { x, y, w, h } = origin;
+    if (dir.includes('e')) w = Math.max(1, Math.min(100 - x, origin.w + dx));
+    if (dir.includes('s')) h = Math.max(1, Math.min(100 - y, origin.h + dy));
+    if (dir.includes('w')) {
+      const newX = Math.max(0, Math.min(origin.x + origin.w - 1, origin.x + dx));
+      w = origin.w + (origin.x - newX);
+      x = newX;
+    }
+    if (dir.includes('n')) {
+      const newY = Math.max(0, Math.min(origin.y + origin.h - 1, origin.y + dy));
+      h = origin.h + (origin.y - newY);
+      y = newY;
+    }
+    bar.x = x; bar.y = y; bar.w = w; bar.h = h;
+    renderRedactionBars();
+  };
+  const up = () => {
+    window.removeEventListener('pointermove', move);
+    window.removeEventListener('pointerup', up);
+    saveProfileToStorage();
+  };
+  window.addEventListener('pointermove', move);
+  window.addEventListener('pointerup', up);
+}
+
+
+// PDF URL fragments: lock to page 1, fit to view, hide the native toolbar.
+// view=Fit keeps the page fully inside the iframe so redaction bars
+// positioned in % space align with the actual page content. We disable
+// pointer events on the iframe in CSS so the user can't scroll inside
+// it and drift the page out from under the bars.
+function pdfSrc(url) {
+  return `${url}#view=Fit&toolbar=0&navpanes=0&scrollbar=0`;
+}
 
 function renderDocViewer() {
   const pages = document.getElementById('docPages');
@@ -4514,25 +4677,31 @@ function renderDocViewer() {
   if (!resumePortfolio.length) {
     pages.innerHTML = `
       <div style="padding:16px;border:1px dashed var(--border);border-radius:14px;color:var(--muted);font-size:13px;line-height:1.55">
-        No resume or portfolio attached yet. Use the button in edit mode to attach a PDF or portfolio images.
+        No resume or portfolio attached yet. Use the button in edit mode to attach a PDF or portfolio images. Up to ${MAX_RESUME_DOCS} files.
       </div>`;
     view.innerHTML = `
       <div style="display:flex;align-items:center;justify-content:center;height:62vh;color:var(--muted);font-size:14px;padding:24px;text-align:center">
         Attach a file to preview it here.
       </div>`;
+    view.classList.remove('is-image', 'is-editing-redactions', 'has-redactions');
     title.textContent = 'Preview';
     sub.textContent = 'Nothing attached yet.';
     counter.textContent = '0 / 0';
     return;
   }
 
+  // Thumbnails — include a tiny × remove button per doc for owners in edit mode.
   pages.innerHTML = resumePortfolio.map((doc, idx) => {
     const active = idx === activeDocIndex ? 'active' : '';
     const preview = doc.type === 'image'
       ? `<img src="${doc.url}" alt="${doc.name}">`
-      : `<iframe src="${doc.url}#toolbar=0&navpanes=0&scrollbar=0"></iframe>`;
+      : `<iframe src="${pdfSrc(doc.url)}" tabindex="-1"></iframe>`;
+    const removeBtn = (editMode && !viewerMode)
+      ? `<button type="button" class="doc-page-thumb-remove" onclick="event.stopPropagation(); removeResumeDoc(${idx})" title="Remove this attachment" aria-label="Remove ${doc.name.replace(/"/g, '&quot;')}">×</button>`
+      : '';
     return `
-      <div class="doc-page-thumb ${active}" onclick="setActiveDoc(${idx})">
+      <div class="doc-page-thumb ${active}" onclick="setActiveDoc(${idx})" style="position:relative">
+        ${removeBtn}
         ${preview}
         <div class="doc-page-thumb-label">${doc.name}</div>
       </div>`;
@@ -4541,31 +4710,41 @@ function renderDocViewer() {
   const doc = resumePortfolio[activeDocIndex];
   title.textContent = doc.name;
   sub.textContent = doc.type === 'pdf'
-    ? 'PDF preview. Use the page buttons to move through attached files.'
-    : 'Image preview. Use the page buttons to move through attached files.';
+    ? 'PDF preview — locked to page 1 so redactions stay anchored. Upload extra pages as images for per-page redaction.'
+    : 'Image preview. Click + drag in edit mode to add a blackout bar.';
   counter.textContent = `${activeDocIndex + 1} / ${resumePortfolio.length}`;
 
+  view.classList.toggle('is-image', doc.type === 'image');
   view.innerHTML = doc.type === 'image'
-    ? `<img src="${doc.url}" alt="${doc.name}">`
-    : `<iframe src="${doc.url}#toolbar=0&navpanes=0&scrollbar=0"></iframe>`;
+    ? `<img src="${doc.url}" alt="${doc.name}" draggable="false">`
+    : `<iframe src="${pdfSrc(doc.url)}" tabindex="-1"></iframe>`;
+
+  // Pointer-handler for drawing new bars. Bound on every render because the
+  // .doc-view innerHTML wipe removes prior listeners attached to children
+  // but the container itself persists — still, attaching here keeps the
+  // single source of truth in one place.
+  view.onpointerdown = onDocViewPointerDown;
 
   renderRedactionBars();
 }
 
 function setActiveDoc(idx) {
   activeDocIndex = Math.max(0, Math.min(idx, resumePortfolio.length - 1));
+  selectedBarIdx = null;
   renderDocViewer();
 }
 
 function prevDocPage() {
   if (!resumePortfolio.length) return;
   activeDocIndex = (activeDocIndex - 1 + resumePortfolio.length) % resumePortfolio.length;
+  selectedBarIdx = null;
   renderDocViewer();
 }
 
 function nextDocPage() {
   if (!resumePortfolio.length) return;
   activeDocIndex = (activeDocIndex + 1) % resumePortfolio.length;
+  selectedBarIdx = null;
   renderDocViewer();
 }
 
