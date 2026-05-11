@@ -48,7 +48,15 @@ export function ProfileHtmlBridge() {
         }
 
         localStorage.setItem("vibe_user_v1", JSON.stringify(data.vibeUser));
-        window.location.replace("/html/profile.html?app=1");
+        // Carry `?welcome=1` (and other passthrough params) into the static
+        // page so the Otto tour can pick them up. Without this the bridge
+        // strips the query and the tour never fires.
+        const incoming = new URLSearchParams(window.location.search);
+        const out = new URLSearchParams();
+        out.set("app", "1");
+        const welcome = incoming.get("welcome");
+        if (welcome === "1") out.set("welcome", "1");
+        window.location.replace(`/html/profile.html?${out.toString()}`);
       } catch {
         if (!cancelled) {
           setFatal(

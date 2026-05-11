@@ -6,6 +6,61 @@ import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { OttoCorner } from "./OttoCorner";
 import { UserCard, type UserCardProps } from "./UserCard";
 
+declare global {
+  interface Window {
+    OttoTour?: {
+      start: (
+        steps: Array<{
+          selector: string;
+          title: string;
+          body: string;
+          endLabel?: string;
+          nextLabel?: string;
+        }>,
+        options?: {
+          onDone?: () => void;
+          onSkip?: () => void;
+        },
+      ) => void;
+      isRunning: () => boolean;
+    };
+  }
+}
+
+const OTTO_TOUR_SCRIPT = "/html/_otto-tour.js";
+function loadOttoTourScript(): Promise<void> {
+  if (typeof window === "undefined") return Promise.resolve();
+  if (window.OttoTour) return Promise.resolve();
+  return new Promise<void>((resolve, reject) => {
+    const existing = document.querySelector<HTMLScriptElement>(
+      `script[src="${OTTO_TOUR_SCRIPT}"]`,
+    );
+    if (existing) {
+      existing.addEventListener("load", () => resolve(), { once: true });
+      existing.addEventListener("error", () => reject(), { once: true });
+      return;
+    }
+    const s = document.createElement("script");
+    s.src = OTTO_TOUR_SCRIPT;
+    s.async = true;
+    s.onload = () => resolve();
+    s.onerror = () => reject(new Error("otto tour failed to load"));
+    document.head.appendChild(s);
+  });
+}
+
+function stripWelcomeParam() {
+  if (typeof window === "undefined") return;
+  try {
+    const url = new URL(window.location.href);
+    if (!url.searchParams.has("welcome")) return;
+    url.searchParams.delete("welcome");
+    window.history.replaceState({}, "", url.pathname + url.search + url.hash);
+  } catch {
+    /* never block render on param strip */
+  }
+}
+
 type Tab = "connections" | "following" | "followers" | "suggestions";
 
 type ListUser = {
@@ -65,6 +120,60 @@ export function NetworkPageClient() {
     const id = window.setTimeout(() => setDebouncedQ(query.trim()), 220);
     return () => window.clearTimeout(id);
   }, [query]);
+
+  // Network tour: final leg, triggered by ?welcome=1 or pending-flag handoff.
+  useEffect(() => {
+    if (typeof window === "undefined") return;
+    const params = new URLSearchParams(window.location.search);
+    const fromUrl = params.get("welcome") === "1";
+    let fromPending = false;
+    try { fromPending = localStorage.getItem("vibe_tour_pending") === "network"; } catch {}
+    if (!fromUrl && !fromPending) return;
+    const seenKey = "vibe_network_tour_seen_v1";
+    if (localStorage.getItem(seenKey) === "1") {
+      stripWelcomeParam();
+      try { localStorage.removeItem("vibe_tour_pending"); } catch {}
+      return;
+    }
+    let cancelled = false;
+    loadOttoTourScript().then(() => {
+      if (cancelled) return;
+      window.OttoTour?.start(
+        [
+          {
+            selector: "#network-tabs",
+            title: "Your <span class=\"accent\">people</span>, sorted.",
+            body: "Connections, who you follow, your followers, and people Otto thinks you'd vibe with.",
+          },
+          {
+            selector: "#otto-corner",
+            title: "I'm always <span class=\"accent\">right here</span>.",
+            body: "Tap me anytime for notifications, reminders, or to bounce a thought. I won't pester you.",
+            endLabel: "I'm set →",
+          },
+        ],
+        {
+          onDone: () => {
+            try {
+              localStorage.setItem(seenKey, "1");
+              localStorage.removeItem("vibe_tour_pending");
+            } catch {}
+            stripWelcomeParam();
+          },
+          onSkip: () => {
+            try {
+              localStorage.setItem(seenKey, "1");
+              localStorage.removeItem("vibe_tour_pending");
+            } catch {}
+            stripWelcomeParam();
+          },
+        },
+      );
+    });
+    return () => {
+      cancelled = true;
+    };
+  }, []);
 
   // Counts refetched after follow toggles + on first mount.
   const refreshCounts = useCallback(async () => {
@@ -270,12 +379,14 @@ export function NetworkPageClient() {
         </p>
       </header>
 
-      <NetworkTabs
-        tab={tab}
-        counts={counts}
-        suggestionsCount={suggestions.length}
-        onSelect={setTab}
-      />
+      <div id="network-tabs">
+        <NetworkTabs
+          tab={tab}
+          counts={counts}
+          suggestionsCount={suggestions.length}
+          onSelect={setTab}
+        />
+      </div>
 
       <SearchBar
         query={query}

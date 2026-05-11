@@ -84,11 +84,70 @@ export function SettingsClient({ profile }: { profile: Profile }) {
       </header>
 
       <AccountCard profile={profile} />
+      <CampusTourCard handle={profile.handle} />
       <BlockedUsersCard />
       <SignOutCard />
       <DangerZone handle={profile.handle} />
       <LegalFooter />
     </main>
+  );
+}
+
+function CampusTourCard({ handle }: { handle: string | null }) {
+  const onReplay = () => {
+    // Clear the three "seen" gates so each leg of the tour fires again, and
+    // set a `pending` flag the static profile page reads on load. The flag
+    // is the actual trigger — `?welcome=1` is just a backup that can get
+    // stripped by intermediate redirects.
+    try {
+      localStorage.removeItem("vibe_profile_tour_seen_v1");
+      localStorage.removeItem("vibe_campus_tour_seen_v1");
+      localStorage.removeItem("vibe_network_tour_seen_v1");
+      localStorage.setItem("vibe_tour_pending", "profile");
+    } catch {
+      /* localStorage may be unavailable — tour will still try via the param */
+    }
+    const dest = handle ? `/profile/${handle}?welcome=1` : "/profile?welcome=1";
+    window.location.assign(dest);
+  };
+
+  return (
+    <section style={{ ...CARD_GLASS, padding: 22, marginBottom: 16 }}>
+      <SectionTitle>Campus tour</SectionTitle>
+      <p
+        style={{
+          margin: "8px 0 16px",
+          fontFamily: "DM Sans, sans-serif",
+          fontSize: 13.5,
+          color: "#5C5853",
+          lineHeight: 1.55,
+        }}
+      >
+        Walk through vibe again with Otto — profile, campus, and network in
+        order. Takes about a minute.
+      </p>
+      <button
+        type="button"
+        onClick={onReplay}
+        style={{
+          appearance: "none",
+          border: "none",
+          cursor: "pointer",
+          fontFamily: "DM Sans, sans-serif",
+          fontSize: 13,
+          fontWeight: 700,
+          letterSpacing: "0.08em",
+          padding: "10px 18px",
+          borderRadius: 999,
+          background: "#FF5C35",
+          color: "#FAF7F2",
+          boxShadow:
+            "0 6px 18px rgba(255, 92, 53, 0.35), inset 0 1px 0 rgba(255,255,255,0.18)",
+        }}
+      >
+        Replay tour <span aria-hidden style={{ marginLeft: 6 }}>→</span>
+      </button>
+    </section>
   );
 }
 

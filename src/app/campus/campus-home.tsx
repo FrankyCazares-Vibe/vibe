@@ -8,6 +8,61 @@ import { CampusAppShell } from "@/components/campus-app-shell";
 import { ImageCropperModal } from "@/components/ImageCropperModal";
 import { emitCalendarChanged } from "@/components/LeftNav";
 
+declare global {
+  interface Window {
+    OttoTour?: {
+      start: (
+        steps: Array<{
+          selector: string;
+          title: string;
+          body: string;
+          endLabel?: string;
+          nextLabel?: string;
+        }>,
+        options?: {
+          onDone?: () => void;
+          onSkip?: () => void;
+        },
+      ) => void;
+      isRunning: () => boolean;
+    };
+  }
+}
+
+const OTTO_TOUR_SCRIPT = "/html/_otto-tour.js";
+function loadOttoTourScript(): Promise<void> {
+  if (typeof window === "undefined") return Promise.resolve();
+  if (window.OttoTour) return Promise.resolve();
+  return new Promise<void>((resolve, reject) => {
+    const existing = document.querySelector<HTMLScriptElement>(
+      `script[src="${OTTO_TOUR_SCRIPT}"]`,
+    );
+    if (existing) {
+      existing.addEventListener("load", () => resolve(), { once: true });
+      existing.addEventListener("error", () => reject(), { once: true });
+      return;
+    }
+    const s = document.createElement("script");
+    s.src = OTTO_TOUR_SCRIPT;
+    s.async = true;
+    s.onload = () => resolve();
+    s.onerror = () => reject(new Error("otto tour failed to load"));
+    document.head.appendChild(s);
+  });
+}
+
+function stripWelcomeParam() {
+  if (typeof window === "undefined") return;
+  try {
+    const url = new URL(window.location.href);
+    if (!url.searchParams.has("welcome")) return;
+    url.searchParams.delete("welcome");
+    window.history.replaceState({}, "", url.pathname + url.search + url.hash);
+  } catch {
+    /* never block render on param strip */
+  }
+}
+
 const CAMPUS_TAB_KEYS: ReadonlyArray<CampusTab> = [
   "feed",
   "events",
@@ -238,9 +293,21 @@ export function CampusHome({
   // the param once — subsequent tab changes don't push to the URL to
   // keep things simple. Refreshes preserve the tab via the same param.
   const searchParams = useSearchParams();
-  const [tab, setTab] = useState<CampusTab>(() =>
-    parseInitialTab(searchParams.get("tab")),
-  );
+  const [tab, setTab] = useState<CampusTab>(() => {
+    // When the campus tour is triggered (?welcome=1 or pending-flag) land
+    // on the Feed tab so the first highlighted surface — #campus-feed —
+    // actually exists in the DOM regardless of what tab a deep link may
+    // have requested.
+    if (searchParams.get("welcome") === "1") return "feed";
+    if (typeof window !== "undefined") {
+      try {
+        if (localStorage.getItem("vibe_tour_pending") === "campus") return "feed";
+      } catch {
+        /* localStorage may be unavailable */
+      }
+    }
+    return parseInitialTab(searchParams.get("tab"));
+  });
   const [feedTagFilter, setFeedTagFilter] = useState<string | null>(null);
   const [showCreateOrg, setShowCreateOrg] = useState(false);
   const [showCreateChannel, setShowCreateChannel] = useState(false);
@@ -252,6 +319,67 @@ export function CampusHome({
     setTab("feed");
     setFeedTagFilter(tag);
   }, []);
+
+  // Campus tour: triggered by `?welcome=1` (post-onboarding) or by a
+  // `vibe_tour_pending=campus` localStorage flag (handed off from the
+  // profile leg; survives redirects that strip the URL param). Walks the
+  // user through feed, tabs, and search, then hands off to /network.
+  useEffect(() => {
+    const fromUrl = searchParams.get("welcome") === "1";
+    let fromPending = false;
+    try { fromPending = localStorage.getItem("vibe_tour_pending") === "campus"; } catch {}
+    if (!fromUrl && !fromPending) return;
+    const seenKey = "vibe_campus_tour_seen_v1";
+    if (typeof localStorage !== "undefined" && localStorage.getItem(seenKey) === "1") {
+      stripWelcomeParam();
+      try { localStorage.removeItem("vibe_tour_pending"); } catch {}
+      return;
+    }
+    let cancelled = false;
+    loadOttoTourScript().then(() => {
+      if (cancelled) return;
+      window.OttoTour?.start(
+        [
+          {
+            selector: "#campus-feed",
+            title: "Your campus <span class=\"accent\">pulse</span>.",
+            body: "Live posts from your school. Otto surfaces what's loud and what's just dropped.",
+          },
+          {
+            selector: "#campus-tabs",
+            title: "Switch lanes anytime.",
+            body: "Feed, Events, Orgs, Map — same Otto, different angle on what's happening.",
+          },
+          {
+            selector: "#campus-search",
+            title: "Find your <span class=\"accent\">people</span>.",
+            body: "Search students, clubs, or events. Otto threads the right matches in.",
+            endLabel: "Take me to network →",
+          },
+        ],
+        {
+          onDone: () => {
+            try {
+              localStorage.setItem(seenKey, "1");
+              localStorage.setItem("vibe_tour_pending", "network");
+            } catch {}
+            stripWelcomeParam();
+            window.location.href = "/network?welcome=1";
+          },
+          onSkip: () => {
+            try {
+              localStorage.setItem(seenKey, "1");
+              localStorage.removeItem("vibe_tour_pending");
+            } catch {}
+            stripWelcomeParam();
+          },
+        },
+      );
+    });
+    return () => {
+      cancelled = true;
+    };
+  }, [searchParams]);
 
   // Load joined orgs on mount.
   useEffect(() => {
@@ -3057,25 +3185,614 @@ function CampusBanner() {
         </div>
       </div>
       <div style={{ flex: 1 }} />
+      <CampusSearchBar />
+    </header>
+  );
+}
+
+// Unified typeahead used in the campus banner. Hits /api/search and
+// renders people / clubs / events under one dropdown. The dropdown is
+// rendered as `position: fixed` because the parent header sets
+// `overflow: hidden` to keep the sheen sweep clipped — that would also
+// clip the dropdown if we went absolute.
+type SearchUser = {
+  id: string;
+  name: string | null;
+  handle: string | null;
+  school: string | null;
+  major: string | null;
+  year: string | null;
+  avatar_url: string | null;
+  rel?: string;
+};
+type SearchOrg = {
+  id: string;
+  handle: string;
+  name: string;
+  description: string;
+  logo_url: string | null;
+  is_public: boolean;
+  verified: boolean;
+  member_count: number;
+};
+type SearchEvent = {
+  id: string;
+  title: string;
+  description: string;
+  starts_at: string;
+  ends_at: string;
+  location: string;
+  org: { id: string; handle: string; name: string; logo_url: string | null; verified: boolean } | null;
+};
+type RecentSearch = {
+  id: string;
+  name: string;
+  handle: string;
+  avatar: string;
+  av: string;
+  rel: string;
+  role: string;
+};
+
+const RECENT_SEARCHES_KEY = "vibe_recent_searches_v1";
+const RECENT_SEARCHES_MAX = 8;
+
+function loadRecentSearches(): RecentSearch[] {
+  try {
+    const raw = localStorage.getItem(RECENT_SEARCHES_KEY);
+    const arr = raw ? JSON.parse(raw) : [];
+    return Array.isArray(arr) ? (arr as RecentSearch[]) : [];
+  } catch {
+    return [];
+  }
+}
+function saveRecentSearches(arr: RecentSearch[]) {
+  try {
+    localStorage.setItem(RECENT_SEARCHES_KEY, JSON.stringify(arr));
+  } catch {}
+}
+function pushRecent(row: RecentSearch) {
+  if (!row.handle) return;
+  const arr = loadRecentSearches().filter((r) => r.handle !== row.handle);
+  arr.unshift({ ...row, ts: Date.now() } as RecentSearch);
+  if (arr.length > RECENT_SEARCHES_MAX) arr.length = RECENT_SEARCHES_MAX;
+  saveRecentSearches(arr);
+}
+
+function initials(s: string): string {
+  return s
+    .split(/\s+/)
+    .map((p) => p[0])
+    .filter(Boolean)
+    .join("")
+    .slice(0, 2)
+    .toUpperCase();
+}
+
+function CampusSearchBar() {
+  const wrapRef = useRef<HTMLDivElement | null>(null);
+  const inputRef = useRef<HTMLInputElement | null>(null);
+  const [value, setValue] = useState("");
+  const [debounced, setDebounced] = useState("");
+  const [open, setOpen] = useState(false);
+  const [users, setUsers] = useState<SearchUser[]>([]);
+  const [orgs, setOrgs] = useState<SearchOrg[]>([]);
+  const [events, setEvents] = useState<SearchEvent[]>([]);
+  const [loading, setLoading] = useState(false);
+  const [recents, setRecents] = useState<RecentSearch[]>([]);
+  const [coords, setCoords] = useState<{ right: number; top: number; width: number } | null>(null);
+  const seqRef = useRef(0);
+
+  // Hydrate recents from localStorage after mount. Wrapped in an async
+  // IIFE so the setState happens off the synchronous effect body —
+  // matches the pattern used elsewhere in this file.
+  useEffect(() => {
+    (async () => {
+      setRecents(loadRecentSearches());
+    })();
+  }, []);
+
+  useEffect(() => {
+    const t = setTimeout(() => setDebounced(value.trim()), 220);
+    return () => clearTimeout(t);
+  }, [value]);
+
+  useEffect(() => {
+    if (!debounced) {
+      // Render layer reads `showResults = !!debounced` and ignores the
+      // results lists, so we don't need to clear them here. Stale
+      // in-flight fetches are guarded by the seq counter below.
+      return;
+    }
+    const seq = ++seqRef.current;
+    (async () => {
+      setLoading(true);
+      try {
+        const r = await fetch(
+          `/api/search?q=${encodeURIComponent(debounced)}&limit=6`,
+          { credentials: "include" },
+        );
+        const j = r.ok ? await r.json() : { ok: false };
+        if (seq !== seqRef.current) return;
+        if (j && j.ok) {
+          setUsers(Array.isArray(j.users) ? j.users : []);
+          setOrgs(Array.isArray(j.orgs) ? j.orgs : []);
+          setEvents(Array.isArray(j.events) ? j.events : []);
+        } else {
+          setUsers([]);
+          setOrgs([]);
+          setEvents([]);
+        }
+      } catch {
+        if (seq !== seqRef.current) return;
+        setUsers([]);
+        setOrgs([]);
+        setEvents([]);
+      } finally {
+        if (seq === seqRef.current) setLoading(false);
+      }
+    })();
+  }, [debounced]);
+
+  const updateCoords = useCallback(() => {
+    const el = wrapRef.current;
+    if (!el) return;
+    const r = el.getBoundingClientRect();
+    // Right-anchor: pin the dropdown's right edge to the input's right
+    // edge so it grows leftward and never clips the viewport.
+    setCoords({
+      right: Math.max(8, window.innerWidth - r.right),
+      top: r.bottom + 6,
+      width: r.width,
+    });
+  }, []);
+
+  useEffect(() => {
+    if (!open) return;
+    updateCoords();
+    const onScroll = () => updateCoords();
+    window.addEventListener("scroll", onScroll, true);
+    window.addEventListener("resize", updateCoords);
+    return () => {
+      window.removeEventListener("scroll", onScroll, true);
+      window.removeEventListener("resize", updateCoords);
+    };
+  }, [open, updateCoords]);
+
+  useEffect(() => {
+    if (!open) return;
+    const onDown = (e: MouseEvent) => {
+      const t = e.target as Node | null;
+      if (wrapRef.current?.contains(t)) return;
+      const dd = document.getElementById("campus-search-dropdown");
+      if (dd && t && dd.contains(t)) return;
+      setOpen(false);
+    };
+    document.addEventListener("mousedown", onDown);
+    return () => document.removeEventListener("mousedown", onDown);
+  }, [open]);
+
+  const goPerson = (handle: string, row?: RecentSearch) => {
+    if (row) {
+      pushRecent(row);
+      setRecents(loadRecentSearches());
+    }
+    if (handle) window.location.assign(`/profile/${encodeURIComponent(handle)}`);
+  };
+  const goOrg = (handle: string) => {
+    if (handle) window.location.assign(`/orgs/${encodeURIComponent(handle)}`);
+  };
+  const goEvent = (id: string) => {
+    if (id) window.location.assign(`/campus?tab=events&event=${encodeURIComponent(id)}`);
+  };
+
+  const removeRecent = (handle: string) => {
+    const next = loadRecentSearches().filter((r) => r.handle !== handle);
+    saveRecentSearches(next);
+    setRecents(next);
+  };
+  const clearRecents = () => {
+    saveRecentSearches([]);
+    setRecents([]);
+  };
+
+  const showResults = !!debounced;
+  const empty =
+    showResults && !loading && users.length === 0 && orgs.length === 0 && events.length === 0;
+
+  return (
+    <>
       <div
+        ref={wrapRef}
+        id="campus-search"
         style={{
           ...GLASS_SURFACE,
-          background: "rgba(255,255,255,0.1)",
+          background: "rgba(255,255,255,0.12)",
           borderRadius: 999,
-          padding: "8px 16px",
+          padding: "6px 14px",
           fontFamily: "DM Sans, sans-serif",
           fontSize: 13,
-          color: "rgba(255,255,255,0.7)",
-          minWidth: 240,
+          color: "#fff",
+          minWidth: 280,
+          marginRight: 80,
           display: "flex",
           alignItems: "center",
           gap: 8,
+          position: "relative",
         }}
       >
         <span style={{ opacity: 0.7 }}>⌕</span>
-        Search students, orgs…
+        <input
+          ref={inputRef}
+          type="text"
+          name="vibe_search"
+          autoComplete="off"
+          autoCorrect="off"
+          autoCapitalize="off"
+          spellCheck={false}
+          placeholder="Search students, orgs, events…"
+          value={value}
+          onChange={(e) => setValue(e.target.value)}
+          onFocus={() => setOpen(true)}
+          aria-label="Search Vibe"
+          style={{
+            flex: 1,
+            background: "transparent",
+            border: "none",
+            outline: "none",
+            color: "#fff",
+            fontFamily: "inherit",
+            fontSize: 13,
+            padding: 0,
+            minWidth: 0,
+          }}
+        />
       </div>
-    </header>
+      {open && coords ? (
+        <div
+          id="campus-search-dropdown"
+          style={{
+            position: "fixed",
+            right: coords.right,
+            top: coords.top,
+            width: Math.max(coords.width, 320),
+            maxHeight: "60vh",
+            overflowY: "auto",
+            background: COLORS.bg,
+            borderRadius: 14,
+            border: `1px solid ${COLORS.border}`,
+            boxShadow: "0 18px 40px rgba(0,0,0,0.28), 0 4px 10px rgba(0,0,0,0.16)",
+            zIndex: 1000,
+            fontFamily: "DM Sans, sans-serif",
+          }}
+        >
+          {!showResults ? (
+            recents.length ? (
+              <>
+                <div
+                  style={{
+                    padding: "12px 16px 6px",
+                    display: "flex",
+                    justifyContent: "space-between",
+                    alignItems: "center",
+                  }}
+                >
+                  <span style={ddSectionLabel}>Recently searched</span>
+                  <button
+                    onClick={clearRecents}
+                    style={{
+                      background: "none",
+                      border: "none",
+                      color: COLORS.faint,
+                      fontSize: 11,
+                      fontWeight: 600,
+                      cursor: "pointer",
+                    }}
+                  >
+                    Clear
+                  </button>
+                </div>
+                {recents.slice(0, 5).map((r) => (
+                  <PersonRow
+                    key={r.handle}
+                    name={r.name}
+                    role={r.role}
+                    handle={r.handle}
+                    avatar={r.avatar}
+                    av={r.av || initials(r.name || r.handle || "?")}
+                    action={
+                      r.rel === "connected"
+                        ? "Message"
+                        : r.rel === "following"
+                          ? "Pending"
+                          : r.rel === "followed_by"
+                            ? "Connect back"
+                            : "Connect"
+                    }
+                    onClick={() => goPerson(r.handle, r)}
+                    onRemove={() => removeRecent(r.handle)}
+                    isRecent
+                  />
+                ))}
+              </>
+            ) : (
+              <div style={{ padding: "20px 16px", color: COLORS.muted, fontSize: 13, textAlign: "center" }}>
+                Search students, orgs, and events.
+              </div>
+            )
+          ) : empty ? (
+            <div style={{ padding: "20px 16px", color: COLORS.muted, fontSize: 13, textAlign: "center" }}>
+              No results for &ldquo;{debounced}&rdquo;
+            </div>
+          ) : (
+            <>
+              {users.length > 0 && (
+                <>
+                  <div style={ddSectionLabel}>People</div>
+                  {users.map((u) => {
+                    const role = [u.major, u.year].filter(Boolean).join(" · ") || u.school || "";
+                    const action =
+                      u.rel === "connected"
+                        ? "Message"
+                        : u.rel === "following"
+                          ? "Pending"
+                          : u.rel === "followed_by"
+                            ? "Connect back"
+                            : "Connect";
+                    const display = u.name || (u.handle ? `@${u.handle}` : "");
+                    return (
+                      <PersonRow
+                        key={u.id}
+                        name={display}
+                        role={role}
+                        handle={u.handle || ""}
+                        avatar={u.avatar_url || ""}
+                        av={initials(display || "?")}
+                        action={action}
+                        onClick={() =>
+                          goPerson(u.handle || "", {
+                            id: u.id,
+                            name: display,
+                            handle: u.handle || "",
+                            avatar: u.avatar_url || "",
+                            av: initials(display || "?"),
+                            rel: u.rel || "none",
+                            role,
+                          })
+                        }
+                      />
+                    );
+                  })}
+                </>
+              )}
+              {orgs.length > 0 && (
+                <>
+                  <div style={ddSectionLabel}>Clubs &amp; Orgs</div>
+                  {orgs.map((o) => (
+                    <EntityRow
+                      key={o.id}
+                      name={o.name}
+                      role={`${o.member_count} members${o.verified ? " · Verified" : ""}`}
+                      avatar={o.logo_url || ""}
+                      av={initials(o.name || o.handle)}
+                      action="View"
+                      bg="#5B3FB7"
+                      onClick={() => goOrg(o.handle)}
+                    />
+                  ))}
+                </>
+              )}
+              {events.length > 0 && (
+                <>
+                  <div style={ddSectionLabel}>Events</div>
+                  {events.map((e) => {
+                    let when = "";
+                    try {
+                      const d = new Date(e.starts_at);
+                      when =
+                        d.toLocaleDateString(undefined, { month: "short", day: "numeric" }) +
+                        " · " +
+                        d.toLocaleTimeString(undefined, { hour: "numeric", minute: "2-digit" });
+                    } catch {}
+                    const subtitle = [e.org?.name || "", when].filter(Boolean).join(" · ");
+                    return (
+                      <EntityRow
+                        key={e.id}
+                        name={e.title || "Event"}
+                        role={subtitle}
+                        avatar={e.org?.logo_url || ""}
+                        av={initials(e.title || "?")}
+                        action="Open"
+                        bg="#FF5C35"
+                        onClick={() => goEvent(e.id)}
+                      />
+                    );
+                  })}
+                </>
+              )}
+            </>
+          )}
+        </div>
+      ) : null}
+    </>
+  );
+}
+
+const ddSectionLabel: React.CSSProperties = {
+  fontSize: 10,
+  fontWeight: 800,
+  textTransform: "uppercase",
+  letterSpacing: "1.5px",
+  color: COLORS.faint,
+  padding: "12px 16px 6px",
+};
+
+function PersonRow(props: {
+  name: string;
+  role: string;
+  handle: string;
+  avatar: string;
+  av: string;
+  action: string;
+  onClick: () => void;
+  onRemove?: () => void;
+  isRecent?: boolean;
+}) {
+  return (
+    <div
+      onClick={props.onClick}
+      style={{
+        display: "flex",
+        alignItems: "center",
+        gap: 10,
+        padding: "8px 16px",
+        cursor: "pointer",
+      }}
+      onMouseEnter={(e) => (e.currentTarget.style.background = "#F2EFE9")}
+      onMouseLeave={(e) => (e.currentTarget.style.background = "transparent")}
+    >
+      <div
+        style={{
+          width: 36,
+          height: 36,
+          borderRadius: 11,
+          flexShrink: 0,
+          background: props.avatar
+            ? `url(${props.avatar}) center/cover`
+            : "#1C1C1E",
+          color: "#fff",
+          display: "flex",
+          alignItems: "center",
+          justifyContent: "center",
+          fontFamily: "Fraunces, serif",
+          fontSize: 12,
+          fontWeight: 700,
+          overflow: "hidden",
+        }}
+      >
+        {!props.avatar ? props.av : null}
+      </div>
+      <div style={{ flex: 1, minWidth: 0 }}>
+        <div style={{ fontSize: 13, fontWeight: 700, color: COLORS.text, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>
+          {props.name}
+        </div>
+        <div style={{ fontSize: 11, color: COLORS.muted, marginTop: 1, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>
+          {props.role}
+        </div>
+      </div>
+      <button
+        onClick={(e) => e.stopPropagation()}
+        style={{
+          fontSize: 11,
+          fontWeight: 700,
+          color: COLORS.accent,
+          background: "#FFF5F2",
+          border: "1px solid rgba(255,92,53,0.2)",
+          borderRadius: 100,
+          padding: "3px 10px",
+          flexShrink: 0,
+          cursor: "pointer",
+        }}
+      >
+        {props.action}
+      </button>
+      {props.isRecent && props.onRemove ? (
+        <button
+          onClick={(e) => {
+            e.stopPropagation();
+            props.onRemove?.();
+          }}
+          title="Remove from recent"
+          style={{
+            width: 22,
+            height: 22,
+            borderRadius: 999,
+            border: "none",
+            background: "transparent",
+            color: COLORS.faint,
+            fontSize: 14,
+            lineHeight: 1,
+            display: "flex",
+            alignItems: "center",
+            justifyContent: "center",
+            flexShrink: 0,
+            cursor: "pointer",
+            marginLeft: -2,
+          }}
+        >
+          ×
+        </button>
+      ) : null}
+    </div>
+  );
+}
+
+function EntityRow(props: {
+  name: string;
+  role: string;
+  avatar: string;
+  av: string;
+  action: string;
+  bg: string;
+  onClick: () => void;
+}) {
+  return (
+    <div
+      onClick={props.onClick}
+      style={{
+        display: "flex",
+        alignItems: "center",
+        gap: 10,
+        padding: "8px 16px",
+        cursor: "pointer",
+      }}
+      onMouseEnter={(e) => (e.currentTarget.style.background = "#F2EFE9")}
+      onMouseLeave={(e) => (e.currentTarget.style.background = "transparent")}
+    >
+      <div
+        style={{
+          width: 36,
+          height: 36,
+          borderRadius: 8,
+          flexShrink: 0,
+          background: props.avatar ? `url(${props.avatar}) center/cover` : props.bg,
+          color: "#fff",
+          display: "flex",
+          alignItems: "center",
+          justifyContent: "center",
+          fontFamily: "Fraunces, serif",
+          fontSize: 12,
+          fontWeight: 700,
+          overflow: "hidden",
+        }}
+      >
+        {!props.avatar ? props.av : null}
+      </div>
+      <div style={{ flex: 1, minWidth: 0 }}>
+        <div style={{ fontSize: 13, fontWeight: 700, color: COLORS.text, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>
+          {props.name}
+        </div>
+        <div style={{ fontSize: 11, color: COLORS.muted, marginTop: 1, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>
+          {props.role}
+        </div>
+      </div>
+      <button
+        onClick={(e) => e.stopPropagation()}
+        style={{
+          fontSize: 11,
+          fontWeight: 700,
+          color: COLORS.accent,
+          background: "#FFF5F2",
+          border: "1px solid rgba(255,92,53,0.2)",
+          borderRadius: 100,
+          padding: "3px 10px",
+          flexShrink: 0,
+          cursor: "pointer",
+        }}
+      >
+        {props.action}
+      </button>
+    </div>
   );
 }
 
@@ -3088,6 +3805,7 @@ function CampusTabs({
 }) {
   return (
     <nav
+      id="campus-tabs"
       style={{
         padding: "10px 24px",
         display: "flex",
@@ -3243,6 +3961,9 @@ type FeedPost = {
   tags: string[] | null;
   media_url: string | null;
   media_thumbnail_url: string | null;
+  // Client picks the right player from this. "video" for clips and for
+  // X-style video posts. "image" for image posts. null for text-only.
+  media_kind: "video" | "image" | null;
   view_count: number;
   like_count: number;
   comment_count: number;
@@ -3285,6 +4006,8 @@ function relativeTime(iso: string): string {
   }
 }
 
+type FeedMode = "posts" | "clips";
+
 function FeedTabBody({
   tagFilter,
   onClearTagFilter,
@@ -3293,6 +4016,10 @@ function FeedTabBody({
   onClearTagFilter: () => void;
 }) {
   const [entries, setEntries] = useState<FeedEntry[] | null>(null);
+  // Posts vs Clips toggle. When `clips`, the feed becomes a vertical
+  // Reels-style player that auto-plays the visible clip. Tag-filter mode
+  // forces back to Posts since hashtag drilldowns mix both kinds.
+  const [mode, setMode] = useState<FeedMode>("posts");
 
   const feedUrl = tagFilter
     ? `/api/feed?limit=50&tag=${encodeURIComponent(tagFilter)}`
@@ -3352,6 +4079,7 @@ function FeedTabBody({
 
   return (
     <section
+      id="campus-feed"
       style={{
         flex: 1,
         padding: "28px 24px 28px 28px",
@@ -3400,56 +4128,974 @@ function FeedTabBody({
           ← Back to main feed
         </button>
       ) : (
+        <FeedModeToggle mode={mode} onChange={setMode} />
+      )}
+
+      {!tagFilter && mode === "posts" ? (
         <FeedComposer
           glass={feedGlass}
           onPosted={() => {
             void refresh();
           }}
         />
-      )}
+      ) : null}
 
-      {/* Posts column — second glass surface stacked under the composer */}
-      <div style={feedGlass}>
-        {entries === null ? (
-          <div
-            style={{
-              padding: "24px",
-              fontFamily: "DM Sans, sans-serif",
-              fontSize: 14,
-              color: COLORS.faint,
-              textAlign: "center",
-            }}
-          >
-            Loading feed…
-          </div>
-        ) : entries.length === 0 ? (
-          <div
-            style={{
-              padding: "32px 24px",
-              fontFamily: "DM Sans, sans-serif",
-              fontSize: 14,
-              color: COLORS.faint,
-              textAlign: "center",
-              lineHeight: 1.5,
-            }}
-          >
-            No posts yet — orgs you follow and people from your school will
-            show up here once they post.
-          </div>
-        ) : (
-          entries.map((entry, idx) => (
-            <FeedRow
-              key={entry.kind === "repost" ? `r:${entry.reposter.id}:${entry.post.id}` : `p:${entry.post.id}`}
-              entry={entry}
-              hairline={idx < entries.length - 1 ? hairline : "none"}
-              onMutate={refresh}
-            />
-          ))
-        )}
-      </div>
+      {mode === "clips" && !tagFilter ? (
+        <ClipsReel entries={entries} />
+      ) : (
+        // Posts column — second glass surface stacked under the composer
+        <div style={feedGlass}>
+          {entries === null ? (
+            <div
+              style={{
+                padding: "24px",
+                fontFamily: "DM Sans, sans-serif",
+                fontSize: 14,
+                color: COLORS.faint,
+                textAlign: "center",
+              }}
+            >
+              Loading feed…
+            </div>
+          ) : entries.length === 0 ? (
+            <div
+              style={{
+                padding: "32px 24px",
+                fontFamily: "DM Sans, sans-serif",
+                fontSize: 14,
+                color: COLORS.faint,
+                textAlign: "center",
+                lineHeight: 1.5,
+              }}
+            >
+              No posts yet — orgs you follow and people from your school will
+              show up here once they post.
+            </div>
+          ) : (
+            entries.map((entry, idx) => (
+              <FeedRow
+                key={entry.kind === "repost" ? `r:${entry.reposter.id}:${entry.post.id}` : `p:${entry.post.id}`}
+                entry={entry}
+                hairline={idx < entries.length - 1 ? hairline : "none"}
+                onMutate={refresh}
+              />
+            ))
+          )}
+        </div>
+      )}
     </section>
   );
 }
+
+function feedModePillStyle(active: boolean): React.CSSProperties {
+  return {
+    display: "inline-flex",
+    alignItems: "center",
+    gap: 8,
+    padding: "9px 18px",
+    borderRadius: 999,
+    border: active
+      ? "1px solid rgba(255,255,255,0.32)"
+      : "1px solid rgba(255,255,255,0.12)",
+    background: active ? "rgba(255,255,255,0.16)" : "rgba(15,10,28,0.32)",
+    color: "#fff",
+    fontFamily: "DM Sans, sans-serif",
+    fontWeight: 700,
+    fontSize: 13,
+    cursor: "pointer",
+    backdropFilter: "blur(20px) saturate(160%)",
+    WebkitBackdropFilter: "blur(20px) saturate(160%)",
+    boxShadow: active
+      ? "inset 0 1px 0 rgba(255,255,255,0.22), 0 6px 22px rgba(0,0,0,0.25)"
+      : "inset 0 1px 0 rgba(255,255,255,0.1)",
+  };
+}
+
+// Posts vs Clips pill toggle, sitting where the composer used to anchor
+// the top of the feed. Same pill aesthetic as the campus tabs.
+function FeedModeToggle({
+  mode,
+  onChange,
+}: {
+  mode: FeedMode;
+  onChange: (m: FeedMode) => void;
+}) {
+  return (
+    <div style={{ display: "flex", gap: 8, alignSelf: "flex-start" }}>
+      <button
+        type="button"
+        onClick={() => onChange("posts")}
+        style={feedModePillStyle(mode === "posts")}
+      >
+        <svg width="14" height="14" viewBox="0 0 14 14" fill="none">
+          <rect
+            x="1.5"
+            y="2"
+            width="11"
+            height="10"
+            rx="2"
+            stroke="currentColor"
+            strokeWidth="1.4"
+          />
+          <path
+            d="M3.5 5.5h7M3.5 8h5"
+            stroke="currentColor"
+            strokeWidth="1.4"
+            strokeLinecap="round"
+          />
+        </svg>
+        Posts
+      </button>
+      <button
+        type="button"
+        onClick={() => onChange("clips")}
+        style={feedModePillStyle(mode === "clips")}
+      >
+        <svg width="14" height="14" viewBox="0 0 14 14" fill="none">
+          <rect
+            x="2"
+            y="1.5"
+            width="10"
+            height="11"
+            rx="2"
+            stroke="currentColor"
+            strokeWidth="1.4"
+          />
+          <path d="M5.5 4.5L9.5 7L5.5 9.5V4.5Z" fill="currentColor" />
+        </svg>
+        Clips
+      </button>
+    </div>
+  );
+}
+
+// Reels-style vertical player. Takes the same `entries` the post column
+// reads, filters to clips, and stacks them as full-width 9:16 cards. The
+// clip closest to the viewport center auto-plays (muted by default);
+// others pause to keep CPU + bandwidth bounded. Tap a card to toggle
+// mute. The action rail (like / comment / share / open) sits along the
+// right edge of each card, IG-style.
+function ClipsReel({ entries }: { entries: FeedEntry[] | null }) {
+  const clips = useMemo(() => {
+    if (!entries) return null;
+    const seen = new Set<string>();
+    const out: FeedPost[] = [];
+    for (const e of entries) {
+      if (e.kind !== "post") continue;
+      if (e.post.type !== "clip") continue;
+      if (seen.has(e.post.id)) continue;
+      seen.add(e.post.id);
+      out.push(e.post);
+    }
+    return out;
+  }, [entries]);
+
+  if (clips === null) {
+    return (
+      <div
+        style={{
+          padding: 32,
+          textAlign: "center",
+          fontFamily: "DM Sans, sans-serif",
+          color: COLORS.glassMuted,
+        }}
+      >
+        Loading clips…
+      </div>
+    );
+  }
+  if (clips.length === 0) {
+    return (
+      <div
+        style={{
+          padding: "44px 24px",
+          textAlign: "center",
+          fontFamily: "DM Sans, sans-serif",
+          color: COLORS.glassMuted,
+          lineHeight: 1.5,
+          background: "rgba(15,10,28,0.32)",
+          backdropFilter: "blur(20px) saturate(160%)",
+          WebkitBackdropFilter: "blur(20px) saturate(160%)",
+          borderRadius: 22,
+          border: `1px solid ${COLORS.glassBorder}`,
+        }}
+      >
+        No clips yet — flip back to Posts, or upload one from the composer.
+      </div>
+    );
+  }
+  return <ClipsReelInner clips={clips} />;
+}
+
+function ClipsReelInner({ clips }: { clips: FeedPost[] }) {
+  // Scroll-snap container: clips snap one-per-viewport like desktop
+  // TikTok. The container is the IntersectionObserver root for each
+  // card so auto-play only fires for the clip that snaps into view,
+  // not every clip that happens to be in the document viewport.
+  const scrollRef = useRef<HTMLDivElement | null>(null);
+  return (
+    <div
+      ref={scrollRef}
+      style={{
+        height: "min(calc(100vh - 200px), 860px)",
+        overflowY: "auto",
+        scrollSnapType: "y mandatory",
+        scrollbarWidth: "none",
+        display: "flex",
+        flexDirection: "column",
+        alignItems: "center",
+        gap: 16,
+        padding: "0 4px",
+      }}
+    >
+      {clips.map((c, i) => (
+        <div
+          key={c.id}
+          style={{
+            scrollSnapAlign: "center",
+            scrollSnapStop: "always",
+            width: "100%",
+            display: "flex",
+            justifyContent: "center",
+            flexShrink: 0,
+          }}
+        >
+          <ClipReelCard clip={c} index={i} containerRef={scrollRef} />
+        </div>
+      ))}
+    </div>
+  );
+}
+
+function ClipReelCard({
+  clip,
+  index,
+  containerRef,
+}: {
+  clip: FeedPost;
+  index: number;
+  containerRef: React.RefObject<HTMLDivElement | null>;
+}) {
+  const wrapRef = useRef<HTMLDivElement | null>(null);
+  const videoRef = useRef<HTMLVideoElement | null>(null);
+  const [muted, setMuted] = useState(true);
+  const [paused, setPaused] = useState(true);
+  const [signedUrl, setSignedUrl] = useState<string | null>(null);
+
+  // Engagement state — seeded from the feed payload, mutated optimistically
+  // on click, rolled back on API failure. Same pattern as FeedRow.
+  const [liked, setLiked] = useState(clip.viewer_liked);
+  const [likeCount, setLikeCount] = useState(clip.like_count);
+  const [reposted, setReposted] = useState(clip.viewer_reposted);
+  const [repostCount, setRepostCount] = useState(clip.repost_count);
+  const [commentCount, setCommentCount] = useState(clip.comment_count);
+  const [showComments, setShowComments] = useState(false);
+
+  // Lazy-fetch the signed playback URL once this card scrolls anywhere
+  // near the snap container's viewport. Stored URLs are R2 object keys,
+  // not direct URLs — the `/clips/:id/view-url` route signs a fresh GET.
+  const [shouldLoad, setShouldLoad] = useState(index < 2);
+  useEffect(() => {
+    const el = wrapRef.current;
+    if (!el || shouldLoad) return;
+    const io = new IntersectionObserver(
+      (entries) => {
+        for (const entry of entries) {
+          if (entry.isIntersecting) {
+            setShouldLoad(true);
+            io.disconnect();
+            break;
+          }
+        }
+      },
+      { root: containerRef.current ?? null, rootMargin: "400px 0px" },
+    );
+    io.observe(el);
+    return () => io.disconnect();
+  }, [shouldLoad, containerRef]);
+
+  useEffect(() => {
+    if (!shouldLoad || signedUrl) return;
+    let cancelled = false;
+    (async () => {
+      try {
+        const r = await fetch(`/api/clips/${encodeURIComponent(clip.id)}/view-url`, {
+          cache: "no-store",
+        });
+        const j = await r.json();
+        if (cancelled) return;
+        if (j?.ok && typeof j.url === "string") setSignedUrl(j.url);
+      } catch {}
+    })();
+    return () => {
+      cancelled = true;
+    };
+  }, [clip.id, shouldLoad, signedUrl]);
+
+  // Auto-play when at least 60% of the card is in view; pause otherwise.
+  // Skipped while the comments sheet is open — the user is reading, not
+  // watching, so suppress audio + decode work until they close it.
+  useEffect(() => {
+    const el = wrapRef.current;
+    const v = videoRef.current;
+    if (!el || !v) return;
+    if (showComments) {
+      // Indicator is hidden while the sheet is open (`!showComments`
+      // guard on the play overlay) so we don't need to mirror to React
+      // state — just stop the playback.
+      v.pause();
+      return;
+    }
+    const io = new IntersectionObserver(
+      (entries) => {
+        for (const entry of entries) {
+          if (entry.isIntersecting && entry.intersectionRatio >= 0.6) {
+            v.play()
+              .then(() => setPaused(false))
+              .catch(() => {});
+          } else {
+            v.pause();
+            setPaused(true);
+          }
+        }
+      },
+      { root: containerRef.current ?? null, threshold: [0, 0.6, 1] },
+    );
+    io.observe(el);
+    return () => io.disconnect();
+  }, [signedUrl, showComments, containerRef]);
+
+  const togglePlay = () => {
+    const v = videoRef.current;
+    if (!v) return;
+    if (v.paused) {
+      v.play().then(() => setPaused(false)).catch(() => {});
+    } else {
+      v.pause();
+      setPaused(true);
+    }
+  };
+
+  // Playback progress for the bottom scrubber. We poll via the standard
+  // `timeupdate` event (~4-15Hz, browser-dependent) which is plenty smooth
+  // for a 1-2px-tall bar.
+  const [progress, setProgress] = useState({ current: 0, duration: 0 });
+  useEffect(() => {
+    const v = videoRef.current;
+    if (!v) return;
+    const onTime = () => {
+      setProgress({
+        current: v.currentTime || 0,
+        duration: Number.isFinite(v.duration) ? v.duration : 0,
+      });
+    };
+    const onMeta = () => onTime();
+    v.addEventListener("timeupdate", onTime);
+    v.addEventListener("loadedmetadata", onMeta);
+    return () => {
+      v.removeEventListener("timeupdate", onTime);
+      v.removeEventListener("loadedmetadata", onMeta);
+    };
+  }, [signedUrl]);
+
+  const seekTo = (clientX: number, target: HTMLDivElement) => {
+    const v = videoRef.current;
+    if (!v || !progress.duration) return;
+    const rect = target.getBoundingClientRect();
+    const ratio = Math.min(1, Math.max(0, (clientX - rect.left) / rect.width));
+    v.currentTime = ratio * progress.duration;
+    setProgress((p) => ({ ...p, current: v.currentTime }));
+  };
+
+  // "Tap to unmute" hint: shows on the first card while it's auto-playing
+  // muted. Auto-dismisses after 3.5s, and stops showing the moment the
+  // user unmutes (they don't need a hint anymore once they've touched
+  // audio). Visibility is derived from state — no synchronous setState
+  // in the effect body, just an async timer that flips `dismissed`.
+  const [hintDismissed, setHintDismissed] = useState(false);
+  useEffect(() => {
+    if (index !== 0 || hintDismissed) return;
+    if (paused || !muted) return;
+    const t = setTimeout(() => setHintDismissed(true), 3500);
+    return () => clearTimeout(t);
+  }, [index, paused, muted, hintDismissed]);
+  const showUnmuteHint = index === 0 && muted && !paused && !hintDismissed;
+
+  // Double-tap to like (TikTok / IG behavior). The first tap is held in
+  // `lastTapRef` for ~300ms; a second tap inside that window calls like
+  // (only if not already liked — double-tap doesn't unlike). The side
+  // heart filling coral is the "you liked it" indicator; no overlay.
+  const lastTapRef = useRef<number>(0);
+  const handleCardTap = () => {
+    // eslint-disable-next-line react-hooks/purity -- click handler, runs at event time, not during render
+    const now = Date.now();
+    if (now - lastTapRef.current < 300) {
+      lastTapRef.current = 0;
+      if (!liked) void toggleLike();
+      return;
+    }
+    lastTapRef.current = now;
+    togglePlay();
+  };
+
+  const copyLink = useCallback(async () => {
+    try {
+      const url = `${window.location.origin}/posts/${clip.id}`;
+      if (navigator.share) {
+        await navigator.share({
+          url,
+          title: clip.content?.slice(0, 80) || "Clip on Vibe",
+        });
+      } else if (navigator.clipboard) {
+        await navigator.clipboard.writeText(url);
+      }
+    } catch {
+      /* user dismissed share sheet, or clipboard blocked — silent */
+    }
+  }, [clip.id, clip.content]);
+
+  const toggleLike = useCallback(async () => {
+    const next = !liked;
+    setLiked(next);
+    setLikeCount((c) => c + (next ? 1 : -1));
+    try {
+      const res = await fetch(`/api/posts/${clip.id}/like`, {
+        method: next ? "POST" : "DELETE",
+      });
+      if (!res.ok) throw new Error(`like ${res.status}`);
+    } catch (e) {
+      console.error("[clips] like", e);
+      setLiked(!next);
+      setLikeCount((c) => c + (next ? -1 : 1));
+    }
+  }, [clip.id, liked]);
+
+  const toggleRepost = useCallback(async () => {
+    const next = !reposted;
+    setReposted(next);
+    setRepostCount((c) => c + (next ? 1 : -1));
+    try {
+      const res = next
+        ? await fetch(`/api/posts/${clip.id}/repost`, {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({}),
+          })
+        : await fetch(`/api/posts/${clip.id}/repost`, { method: "DELETE" });
+      if (!res.ok) throw new Error(`repost ${res.status}`);
+    } catch (e) {
+      console.error("[clips] repost", e);
+      setReposted(!next);
+      setRepostCount((c) => c + (next ? -1 : 1));
+    }
+  }, [clip.id, reposted]);
+
+  const author = clip.author?.name || (clip.author?.handle ? `@${clip.author.handle}` : "");
+  const handle = clip.author?.handle ? `@${clip.author.handle}` : "";
+  const poster = clip.media_thumbnail_url;
+  const fallbackBg = clipFallbackGradient(clip.id);
+
+  return (
+    <div
+      ref={wrapRef}
+      style={{
+        position: "relative",
+        // Desktop-TikTok sizing: drive height from the viewport so the
+        // card fills as much vertical space as is comfortably available
+        // (capped to 860px for very tall screens). Width is computed
+        // from the 9:16 aspect ratio. On narrow screens, maxWidth: 100%
+        // pulls width back and shrinks height proportionally so the
+        // card never overflows.
+        height: "min(calc(100vh - 200px), 860px)",
+        aspectRatio: "9 / 16",
+        width: "auto",
+        maxWidth: "100%",
+        borderRadius: 22,
+        overflow: "hidden",
+        background: poster ? `url(${poster}) center/cover, #000` : fallbackBg,
+        boxShadow: "0 10px 40px rgba(0,0,0,0.32)",
+        alignSelf: "center",
+        cursor: "pointer",
+      }}
+      onClick={handleCardTap}
+    >
+      {signedUrl ? (
+        <video
+          ref={videoRef}
+          src={signedUrl}
+          poster={poster ?? undefined}
+          muted={muted}
+          loop
+          playsInline
+          preload="metadata"
+          style={{
+            position: "absolute",
+            inset: 0,
+            width: "100%",
+            height: "100%",
+            objectFit: "cover",
+          }}
+        />
+      ) : null}
+      {paused && signedUrl && !showComments ? (
+        <span
+          aria-hidden
+          style={{
+            position: "absolute",
+            top: "50%",
+            left: "50%",
+            transform: "translate(-50%, -50%)",
+            width: 64,
+            height: 64,
+            borderRadius: 999,
+            background: "rgba(0,0,0,0.45)",
+            color: "#fff",
+            display: "flex",
+            alignItems: "center",
+            justifyContent: "center",
+            fontSize: 24,
+            fontWeight: 700,
+            backdropFilter: "blur(8px)",
+            pointerEvents: "none",
+          }}
+        >
+          ▶
+        </span>
+      ) : null}
+
+      <button
+        type="button"
+        onClick={(e) => {
+          e.stopPropagation();
+          setMuted((m) => {
+            const next = !m;
+            if (videoRef.current) videoRef.current.muted = next;
+            return next;
+          });
+        }}
+        title={muted ? "Unmute" : "Mute"}
+        aria-label={muted ? "Unmute" : "Mute"}
+        style={{
+          position: "absolute",
+          top: 14,
+          right: 14,
+          width: 36,
+          height: 36,
+          borderRadius: 999,
+          border: "none",
+          background: "rgba(0,0,0,0.5)",
+          color: "#fff",
+          cursor: "pointer",
+          backdropFilter: "blur(6px)",
+          display: "flex",
+          alignItems: "center",
+          justifyContent: "center",
+        }}
+      >
+        {muted ? <SoundOffIcon /> : <SoundOnIcon />}
+      </button>
+
+      <div
+        onClick={(e) => e.stopPropagation()}
+        style={{
+          position: "absolute",
+          right: 14,
+          bottom: 96,
+          display: "flex",
+          flexDirection: "column",
+          gap: 18,
+          alignItems: "center",
+          fontFamily: "DM Sans, sans-serif",
+        }}
+      >
+        <ReelAction
+          icon={<LikeIcon filled={liked} />}
+          count={likeCount}
+          active={liked}
+          label={liked ? "Unlike" : "Like"}
+          onClick={toggleLike}
+        />
+        <ReelAction
+          icon={<CommentIcon />}
+          count={commentCount}
+          label="Comments"
+          onClick={() => setShowComments(true)}
+        />
+        <ReelAction
+          icon={<RepostIcon />}
+          count={repostCount}
+          active={reposted}
+          label={reposted ? "Undo repost" : "Repost"}
+          onClick={toggleRepost}
+        />
+        <ReelAction
+          icon={<ShareIcon />}
+          count={0}
+          label="Share"
+          onClick={copyLink}
+        />
+      </div>
+
+
+      <div
+        onClick={(e) => e.stopPropagation()}
+        style={{
+          position: "absolute",
+          left: 0,
+          right: 0,
+          bottom: 0,
+          padding: "60px 18px 28px",
+          background:
+            "linear-gradient(180deg, rgba(0,0,0,0) 0%, rgba(0,0,0,0.55) 50%, rgba(0,0,0,0.85) 100%)",
+          color: "#fff",
+          fontFamily: "DM Sans, sans-serif",
+          pointerEvents: "none",
+        }}
+      >
+        {author ? (
+          <a
+            href={handle ? `/profile/${encodeURIComponent(handle.slice(1))}` : "#"}
+            style={{
+              fontSize: 14,
+              fontWeight: 800,
+              color: "#fff",
+              textDecoration: "none",
+              pointerEvents: "auto",
+            }}
+            onClick={(e) => e.stopPropagation()}
+          >
+            {author}
+          </a>
+        ) : null}
+        {clip.content ? (
+          <div
+            style={{
+              fontSize: 13,
+              lineHeight: 1.4,
+              marginTop: 4,
+              maxWidth: 280,
+              display: "-webkit-box",
+              WebkitLineClamp: 3,
+              WebkitBoxOrient: "vertical",
+              overflow: "hidden",
+            }}
+          >
+            {clip.content}
+          </div>
+        ) : null}
+      </div>
+
+      {showComments ? (
+        <ClipCommentsSheet
+          postId={clip.id}
+          onClose={() => setShowComments(false)}
+          onCommentAdded={() => setCommentCount((c) => c + 1)}
+        />
+      ) : null}
+
+      {/* "Tap to unmute" hint — only on the first clip while muted */}
+      {showUnmuteHint ? (
+        <div
+          aria-hidden
+          style={{
+            position: "absolute",
+            top: 22,
+            left: "50%",
+            transform: "translateX(-50%)",
+            padding: "6px 12px",
+            borderRadius: 999,
+            background: "rgba(0,0,0,0.6)",
+            color: "#fff",
+            fontSize: 12,
+            fontWeight: 600,
+            fontFamily: "DM Sans, sans-serif",
+            backdropFilter: "blur(8px)",
+            pointerEvents: "none",
+            display: "flex",
+            alignItems: "center",
+            gap: 6,
+          }}
+        >
+          <SoundOffIcon /> Tap volume to unmute
+        </div>
+      ) : null}
+
+      {/* Progress bar — sits flush against the bottom of the card so it
+          doesn't compete with the caption gradient. Click to scrub. */}
+      <div
+        onClick={(e) => {
+          e.stopPropagation();
+          seekTo(e.clientX, e.currentTarget);
+        }}
+        style={{
+          position: "absolute",
+          left: 0,
+          right: 0,
+          bottom: 0,
+          height: 18,
+          padding: "8px 14px 4px",
+          cursor: "pointer",
+          zIndex: 3,
+        }}
+      >
+        <div
+          style={{
+            height: 3,
+            width: "100%",
+            borderRadius: 2,
+            background: "rgba(255,255,255,0.22)",
+            overflow: "hidden",
+          }}
+        >
+          <div
+            style={{
+              height: "100%",
+              width: progress.duration
+                ? `${Math.min(100, (progress.current / progress.duration) * 100)}%`
+                : "0%",
+              background: "#FF5C35",
+              transition: "width 80ms linear",
+            }}
+          />
+        </div>
+      </div>
+    </div>
+  );
+}
+
+function ReelAction({
+  icon,
+  count,
+  active,
+  label,
+  onClick,
+}: {
+  icon: React.ReactNode;
+  count: number;
+  active?: boolean;
+  label: string;
+  onClick: () => void;
+}) {
+  return (
+    <button
+      type="button"
+      onClick={(e) => {
+        e.stopPropagation();
+        onClick();
+      }}
+      title={label}
+      aria-label={label}
+      style={{
+        display: "flex",
+        flexDirection: "column",
+        alignItems: "center",
+        gap: 3,
+        background: "rgba(0,0,0,0.42)",
+        backdropFilter: "blur(6px)",
+        WebkitBackdropFilter: "blur(6px)",
+        border: "none",
+        borderRadius: 14,
+        padding: "8px 8px 6px",
+        minWidth: 44,
+        cursor: "pointer",
+        color: active ? "#FF5C35" : "#fff",
+        textShadow: "0 2px 6px rgba(0,0,0,0.4)",
+        fontFamily: "DM Sans, sans-serif",
+        transition: "transform 120ms ease",
+      }}
+    >
+      <span
+        style={{
+          width: 26,
+          height: 26,
+          display: "flex",
+          alignItems: "center",
+          justifyContent: "center",
+          transform: active ? "scale(1.08)" : "scale(1)",
+        }}
+      >
+        {icon}
+      </span>
+      {count > 0 ? (
+        <span style={{ fontSize: 11, fontWeight: 700 }}>{count}</span>
+      ) : null}
+    </button>
+  );
+}
+
+// Bottom-sheet overlay that slides up over a clip card. Reuses the
+// existing CommentsDrawer for the actual list + composer — same data
+// model the post column uses, just a different chrome.
+function ClipCommentsSheet({
+  postId,
+  onClose,
+  onCommentAdded,
+}: {
+  postId: string;
+  onClose: () => void;
+  onCommentAdded: () => void;
+}) {
+  return (
+    <div
+      onClick={(e) => {
+        e.stopPropagation();
+        if (e.target === e.currentTarget) onClose();
+      }}
+      style={{
+        position: "absolute",
+        inset: 0,
+        background: "rgba(0,0,0,0.45)",
+        zIndex: 5,
+        display: "flex",
+        alignItems: "flex-end",
+        cursor: "default",
+      }}
+    >
+      <div
+        onClick={(e) => e.stopPropagation()}
+        style={{
+          width: "100%",
+          maxHeight: "72%",
+          background: "#FAF7F2",
+          borderTopLeftRadius: 20,
+          borderTopRightRadius: 20,
+          boxShadow: "0 -10px 30px rgba(0,0,0,0.35)",
+          display: "flex",
+          flexDirection: "column",
+          fontFamily: "DM Sans, sans-serif",
+          color: COLORS.text,
+        }}
+      >
+        <div
+          style={{
+            display: "flex",
+            alignItems: "center",
+            justifyContent: "space-between",
+            padding: "12px 18px 8px",
+            borderBottom: "1px solid rgba(28,28,30,0.06)",
+          }}
+        >
+          <span style={{ fontSize: 13, fontWeight: 800, letterSpacing: "0.4px" }}>
+            Comments
+          </span>
+          <button
+            type="button"
+            onClick={onClose}
+            aria-label="Close comments"
+            style={{
+              width: 28,
+              height: 28,
+              border: "none",
+              background: "transparent",
+              color: COLORS.muted,
+              fontSize: 18,
+              cursor: "pointer",
+              borderRadius: 999,
+              lineHeight: 1,
+            }}
+          >
+            ×
+          </button>
+        </div>
+        <div style={{ overflowY: "auto", padding: "0 18px 14px" }}>
+          <CommentsDrawer postId={postId} onCommentAdded={onCommentAdded} />
+        </div>
+      </div>
+    </div>
+  );
+}
+
+// Deterministic warm gradient for clips that don't have a poster yet
+// (the older publish path didn't capture one). Hashed from the clip id
+// so the same clip always paints the same gradient.
+function clipFallbackGradient(id: string): string {
+  const presets = [
+    ["#3F1A78", "#7B5FE0"],
+    ["#3A0F1F", "#C8455B"],
+    ["#1F2D5C", "#4F7BD8"],
+    ["#5C2A0F", "#E08C5A"],
+    ["#1F4D3A", "#5FB37E"],
+    ["#4A1F4D", "#A65FB8"],
+  ];
+  let h = 0;
+  for (let i = 0; i < id.length; i++) {
+    h = (h * 31 + id.charCodeAt(i)) | 0;
+  }
+  const [a, b] = presets[Math.abs(h) % presets.length]!;
+  return `linear-gradient(135deg, ${a}, ${b})`;
+}
+
+type CapturedFrame = {
+  blob: Blob | null;
+  duration: number | null;
+  width: number | null;
+  height: number | null;
+};
+
+// Pull the first frame of a video as a square JPEG blob via canvas.
+// Best-effort: if metadata never resolves or the format isn't decodable in
+// the browser, we resolve with all-nulls and the caller falls back to
+// publishing without a poster (grid renders a gradient).
+function capturePosterFrame(file: File): Promise<CapturedFrame> {
+  return new Promise((resolve) => {
+    const url = URL.createObjectURL(file);
+    const v = document.createElement("video");
+    v.muted = true;
+    v.preload = "metadata";
+    v.playsInline = true;
+    let done = false;
+    const finish = (
+      blob: Blob | null,
+      duration: number | null,
+      width: number | null = null,
+      height: number | null = null,
+    ) => {
+      if (done) return;
+      done = true;
+      try {
+        URL.revokeObjectURL(url);
+      } catch {}
+      resolve({ blob, duration, width, height });
+    };
+    v.onloadedmetadata = () => {
+      const dur = Number.isFinite(v.duration) ? v.duration : null;
+      try {
+        v.currentTime = Math.min(0.1, (dur || 1) - 0.05);
+      } catch {
+        finish(null, dur, v.videoWidth || null, v.videoHeight || null);
+      }
+    };
+    v.onseeked = () => {
+      const w = v.videoWidth || 720;
+      const h = v.videoHeight || 720;
+      try {
+        const c = document.createElement("canvas");
+        const side = Math.min(w, h);
+        c.width = c.height = Math.min(720, side);
+        const ctx = c.getContext("2d");
+        if (!ctx) {
+          finish(null, Number.isFinite(v.duration) ? v.duration : null, w, h);
+          return;
+        }
+        const sx = (w - side) / 2;
+        const sy = (h - side) / 2;
+        ctx.drawImage(v, sx, sy, side, side, 0, 0, c.width, c.height);
+        c.toBlob(
+          (b) => finish(b, Number.isFinite(v.duration) ? v.duration : null, w, h),
+          "image/jpeg",
+          0.82,
+        );
+      } catch {
+        finish(null, Number.isFinite(v.duration) ? v.duration : null, w, h);
+      }
+    };
+    v.onerror = () => finish(null, null);
+    setTimeout(() => finish(null, null), 8000);
+    v.src = url;
+  });
+}
+
+type VideoMode = "clip" | "post-video";
 
 function FeedComposer({
   glass,
@@ -3461,6 +5107,16 @@ function FeedComposer({
   const [text, setText] = useState("");
   const [imageFile, setImageFile] = useState<File | null>(null);
   const [clipFile, setClipFile] = useState<File | null>(null);
+  // Auto-classified at file-pick time, user can override before publish.
+  // - "clip"       → vertical short-form (≤120s, h>w*1.05). Reels feed.
+  // - "post-video" → horizontal/square or longer. Renders inline in posts.
+  const [videoMode, setVideoMode] = useState<VideoMode>("clip");
+  const [videoMeta, setVideoMeta] = useState<{
+    width: number | null;
+    height: number | null;
+    duration: number | null;
+    posterBlob: Blob | null;
+  } | null>(null);
   const [pendingImage, setPendingImage] = useState<File | null>(null);
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -3472,13 +5128,15 @@ function FeedComposer({
     setText("");
     setImageFile(null);
     setClipFile(null);
+    setVideoMeta(null);
+    setVideoMode("clip");
     setError(null);
     if (attachInputRef.current) attachInputRef.current.value = "";
   };
 
-  // One paperclip → one file input → route by mimetype. Photo and clip
-  // are mutually exclusive at the row level (a post is either text+image
-  // or a clip), so picking a new file replaces whatever was staged.
+  // One paperclip → one file input → route by mimetype. Photo and video
+  // are mutually exclusive at the row level. Picking a new file replaces
+  // whatever was staged.
   const onPickAttachment = (file: File | null) => {
     setError(null);
     if (!file) return;
@@ -3494,11 +5152,33 @@ function FeedComposer({
     }
     if (file.type.startsWith("video/")) {
       if (file.size > 200 * 1024 * 1024) {
-        setError("Clip too large — max 200MB.");
+        setError("Video too large — max 200MB.");
         return;
       }
       setClipFile(file);
       setImageFile(null);
+      // Probe for aspect ratio + duration so we can suggest the right
+      // mode. Capture is best-effort (some formats won't decode in the
+      // browser); we default to "clip" if probing fails since the size
+      // cap is already lower for video posts.
+      setVideoMeta(null);
+      setVideoMode("clip");
+      void capturePosterFrame(file).then((meta) => {
+        const w = meta.width ?? 0;
+        const h = meta.height ?? 0;
+        const dur = meta.duration ?? 0;
+        const isVertical = h > 0 && w > 0 && h > w * 1.05;
+        const isShort = dur > 0 && dur <= 120;
+        const detected: VideoMode =
+          isVertical && isShort ? "clip" : "post-video";
+        setVideoMode(detected);
+        setVideoMeta({
+          width: meta.width,
+          height: meta.height,
+          duration: meta.duration,
+          posterBlob: meta.blob,
+        });
+      });
       return;
     }
     setError("Pick a photo or video file.");
@@ -3522,6 +5202,20 @@ function FeedComposer({
       const tags = extractHashtags(trimmed);
 
       if (clipFile) {
+        // Clips and X-style video posts share the same R2 storage path —
+        // only the publish endpoint differs. Probe the video here if we
+        // didn't already (covers the publish-before-probe-finished race).
+        let meta = videoMeta;
+        if (!meta) {
+          const captured = await capturePosterFrame(clipFile);
+          meta = {
+            width: captured.width,
+            height: captured.height,
+            duration: captured.duration,
+            posterBlob: captured.blob,
+          };
+        }
+
         // 1. Get presigned R2 PUT URL.
         const sig = await fetch("/api/me/clip-upload-url", {
           method: "POST",
@@ -3541,17 +5235,58 @@ function FeedComposer({
         });
         if (!putRes.ok) throw new Error(`Upload failed (HTTP ${putRes.status})`);
 
-        // 3. Record the row.
-        const pub = await fetch("/api/me/publish-clip", {
-          method: "POST",
-          headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({
-            object_key: sig.objectKey,
-            content: trimmed,
-            tags,
-          }),
-        }).then((r) => r.json());
-        if (!pub?.ok) throw new Error(pub?.error || "Publish failed");
+        // 3. Upload the poster frame we captured during pick. Best-effort
+        //    — if it fails the post still publishes with a gradient fallback.
+        let posterUrl: string | undefined;
+        const durationSec =
+          meta.duration && Number.isFinite(meta.duration) ? meta.duration : undefined;
+        if (meta.posterBlob) {
+          try {
+            const fd = new FormData();
+            fd.append(
+              "file",
+              new File([meta.posterBlob], "poster.jpg", { type: "image/jpeg" }),
+            );
+            fd.append("kind", "poster");
+            const up = await fetch("/api/me/profile-upload", {
+              method: "POST",
+              body: fd,
+            }).then((r) => r.json());
+            if (up?.ok && up.url) posterUrl = up.url as string;
+          } catch {
+            /* never block publishing on poster upload */
+          }
+        }
+
+        // 4. Record the row — endpoint depends on the user-chosen mode.
+        if (videoMode === "clip") {
+          const pub = await fetch("/api/me/publish-clip", {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({
+              object_key: sig.objectKey,
+              content: trimmed,
+              tags,
+              poster_url: posterUrl,
+              duration_sec: durationSec,
+            }),
+          }).then((r) => r.json());
+          if (!pub?.ok) throw new Error(pub?.error || "Publish failed");
+        } else {
+          // X-style video post: same storage, different table type.
+          const pub = await fetch("/api/me/publish-post", {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({
+              content: trimmed,
+              tags,
+              video_object_key: sig.objectKey,
+              media_thumbnail_url: posterUrl,
+              duration_sec: durationSec,
+            }),
+          }).then((r) => r.json());
+          if (!pub?.ok) throw new Error(pub?.error || "Publish failed");
+        }
       } else if (imageFile) {
         // Image path: multipart upload to the profiles bucket, then post.
         const fd = new FormData();
@@ -3590,7 +5325,7 @@ function FeedComposer({
     } finally {
       setBusy(false);
     }
-  }, [busy, clipFile, hasContent, imageFile, onPosted, text]);
+  }, [busy, clipFile, hasContent, imageFile, onPosted, text, videoMeta, videoMode]);
 
   const previewUrl = imageFile ? URL.createObjectURL(imageFile) : null;
   useEffect(() => {
@@ -3652,8 +5387,8 @@ function FeedComposer({
           <div
             style={{
               display: "flex",
-              alignItems: "center",
-              justifyContent: "space-between",
+              flexDirection: "column",
+              gap: 8,
               border: "1px solid rgba(28,28,30,0.08)",
               borderRadius: 12,
               padding: "10px 14px",
@@ -3661,16 +5396,50 @@ function FeedComposer({
               fontFamily: "DM Sans, sans-serif",
               fontSize: 13,
               color: COLORS.text,
+              position: "relative",
             }}
           >
-            <span style={{ overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>
+            <span style={{ overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap", paddingRight: 32 }}>
               🎬 {clipFile.name} · {(clipFile.size / (1024 * 1024)).toFixed(1)} MB
             </span>
+            <div style={{ display: "flex", gap: 6, alignItems: "center", flexWrap: "wrap" }}>
+              <span style={{ fontSize: 11, color: COLORS.faint, fontWeight: 600 }}>
+                Post as:
+              </span>
+              <button
+                type="button"
+                onClick={() => setVideoMode("clip")}
+                style={composerVideoModePill(videoMode === "clip")}
+                title="Vertical short-form, lands in the Clips reel"
+              >
+                Clip
+              </button>
+              <button
+                type="button"
+                onClick={() => setVideoMode("post-video")}
+                style={composerVideoModePill(videoMode === "post-video")}
+                title="X-style horizontal video, lands in the Posts feed"
+              >
+                Video post
+              </button>
+              {videoMeta?.duration ? (
+                <span style={{ fontSize: 11, color: COLORS.faint, marginLeft: "auto" }}>
+                  {Math.round(videoMeta.duration)}s
+                  {videoMeta.width && videoMeta.height
+                    ? ` · ${videoMeta.width}×${videoMeta.height}`
+                    : ""}
+                </span>
+              ) : null}
+            </div>
             <button
               type="button"
-              onClick={() => setClipFile(null)}
+              onClick={() => {
+                setClipFile(null);
+                setVideoMeta(null);
+                setVideoMode("clip");
+              }}
               style={composerRemoveButton}
-              aria-label="Remove clip"
+              aria-label="Remove video"
             >
               ×
             </button>
@@ -3778,6 +5547,21 @@ const composerAttachButton: React.CSSProperties = {
   flexShrink: 0,
   transition: "background 120ms ease, color 120ms ease",
 };
+
+function composerVideoModePill(active: boolean): React.CSSProperties {
+  return {
+    fontSize: 11,
+    fontWeight: 700,
+    padding: "4px 10px",
+    borderRadius: 999,
+    border: active ? "1px solid #5B41B8" : "1px solid rgba(28,28,30,0.12)",
+    background: active ? "#5B41B8" : "transparent",
+    color: active ? "#fff" : COLORS.text,
+    cursor: "pointer",
+    fontFamily: "DM Sans, sans-serif",
+    letterSpacing: "0.2px",
+  };
+}
 
 const composerRemoveButton: React.CSSProperties = {
   position: "absolute",
@@ -4066,7 +5850,7 @@ function FeedRow({
             {post.content}
           </p>
         ) : null}
-        {post.media_url && post.type === "post" ? (
+        {post.media_url && post.type === "post" && post.media_kind === "image" ? (
           <div
             style={{
               marginTop: 10,
@@ -4078,10 +5862,11 @@ function FeedRow({
             }}
           />
         ) : null}
-        {post.media_url && post.type === "clip" ? (
+        {post.media_url && post.media_kind === "video" ? (
           <video
             src={post.media_url}
             controls
+            preload="metadata"
             poster={post.media_thumbnail_url ?? undefined}
             style={{
               width: "100%",
@@ -4804,6 +6589,54 @@ function LikeIcon({ filled = false }: { filled?: boolean }) {
         strokeWidth="1.4"
         fill={filled ? "currentColor" : "none"}
         strokeLinejoin="round"
+      />
+    </svg>
+  );
+}
+
+function SoundOnIcon() {
+  return (
+    <svg width="18" height="18" viewBox="0 0 18 18" fill="none" aria-hidden>
+      <path
+        d="M3.5 6.75h2L9 4v10L5.5 11.25h-2v-4.5z"
+        stroke="currentColor"
+        strokeWidth="1.4"
+        strokeLinejoin="round"
+        fill="currentColor"
+      />
+      <path
+        d="M11.6 6.6c1 1 1 3.8 0 4.8"
+        stroke="currentColor"
+        strokeWidth="1.4"
+        strokeLinecap="round"
+        fill="none"
+      />
+      <path
+        d="M13.6 4.8c1.7 1.6 1.7 6.8 0 8.4"
+        stroke="currentColor"
+        strokeWidth="1.4"
+        strokeLinecap="round"
+        fill="none"
+      />
+    </svg>
+  );
+}
+
+function SoundOffIcon() {
+  return (
+    <svg width="18" height="18" viewBox="0 0 18 18" fill="none" aria-hidden>
+      <path
+        d="M3.5 6.75h2L9 4v10L5.5 11.25h-2v-4.5z"
+        stroke="currentColor"
+        strokeWidth="1.4"
+        strokeLinejoin="round"
+        fill="currentColor"
+      />
+      <path
+        d="M11.5 6.5l4 5M15.5 6.5l-4 5"
+        stroke="currentColor"
+        strokeWidth="1.4"
+        strokeLinecap="round"
       />
     </svg>
   );

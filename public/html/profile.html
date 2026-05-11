@@ -1766,6 +1766,9 @@ body.edit-mode:not(.viewer-mode):not(.recruiter-mode) .ppost-pin-btn { display:b
 .prof-search-wrap .sr-role{font-size:11px;color:var(--muted);margin-top:1px;}
 .prof-search-wrap .sr-action{font-size:11px;font-weight:700;color:var(--accent);background:#FFF5F2;border:1px solid rgba(255,92,53,.2);border-radius:100px;padding:3px 10px;flex-shrink:0;cursor:none;}
 .prof-search-wrap .sr-action:hover{background:var(--accent);color:white;}
+.prof-search-wrap .sr-remove{width:22px;height:22px;border-radius:999px;border:none;background:transparent;color:var(--muted);font-size:14px;line-height:1;display:flex;align-items:center;justify-content:center;flex-shrink:0;cursor:none;opacity:0;transition:opacity .12s,background .12s,color .12s;margin-left:-2px;}
+.prof-search-wrap .search-result:hover .sr-remove{opacity:1;}
+.prof-search-wrap .sr-remove:hover{background:rgba(255,92,53,.12);color:var(--accent);}
 .prof-search-wrap .search-footer{border-top:1px solid var(--border);padding:10px 16px;font-size:12px;font-weight:600;color:var(--accent);cursor:none;}
 .prof-search-wrap .search-footer:hover{background:var(--cream);}
 .prof-search-wrap .search-empty{padding:20px 16px;text-align:center;font-size:13px;color:var(--muted);}
@@ -2553,6 +2556,134 @@ body.empty-profile-mode #profileEmpty { display: flex !important; }
   font-family: ui-monospace, Monaco, monospace; font-size: 11px;
 }
 
+/* ── First-visit welcome (Otto pops in after onboarding) ─────────────── */
+.ott-welcome {
+  position: fixed;
+  bottom: 96px;
+  right: 24px;
+  z-index: 9995;
+  max-width: 320px;
+  background: rgba(28, 28, 30, 0.92);
+  color: #faf7f2;
+  border-radius: 18px;
+  padding: 18px 18px 16px;
+  box-shadow:
+    0 24px 60px rgba(0, 0, 0, 0.35),
+    0 0 0 1px rgba(255, 255, 255, 0.05),
+    0 0 32px rgba(255, 92, 53, 0.18);
+  font-family: "DM Sans", sans-serif;
+  transform-origin: bottom right;
+  animation: ott-welcome-pop 700ms cubic-bezier(0.22, 1, 0.36, 1) backwards;
+}
+.ott-welcome::before {
+  content: "";
+  position: absolute;
+  bottom: -8px;
+  right: 28px;
+  width: 16px;
+  height: 16px;
+  background: inherit;
+  transform: rotate(45deg);
+  border-bottom-right-radius: 4px;
+  box-shadow: 4px 4px 8px -3px rgba(0, 0, 0, 0.25);
+}
+.ott-welcome-eyebrow {
+  font-size: 10px;
+  letter-spacing: 0.22em;
+  text-transform: uppercase;
+  color: #ff5c35;
+  font-weight: 700;
+  margin-bottom: 6px;
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
+.ott-welcome-orb {
+  display: inline-block;
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+  background: #ff5c35;
+  box-shadow: 0 0 8px #ff5c35;
+}
+.ott-welcome-title {
+  font-family: "Fraunces", serif;
+  font-size: 20px;
+  font-weight: 700;
+  letter-spacing: -0.4px;
+  line-height: 1.15;
+  margin: 0 0 8px;
+}
+.ott-welcome-title .dot { color: #ff5c35; }
+.ott-welcome-body {
+  font-size: 13px;
+  line-height: 1.5;
+  color: rgba(250, 247, 242, 0.78);
+  margin: 0 0 14px;
+}
+.ott-welcome-tips {
+  margin: 0 0 14px;
+  padding: 0;
+  list-style: none;
+  font-size: 12px;
+  color: rgba(250, 247, 242, 0.72);
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+.ott-welcome-tips li::before {
+  content: "→";
+  color: #ff5c35;
+  margin-right: 8px;
+  font-weight: 700;
+}
+.ott-welcome-row {
+  display: flex;
+  justify-content: flex-end;
+  gap: 10px;
+}
+.ott-welcome-btn {
+  appearance: none;
+  border: none;
+  cursor: pointer;
+  font-family: "DM Sans", sans-serif;
+  font-size: 12px;
+  font-weight: 700;
+  letter-spacing: 0.06em;
+  padding: 8px 16px;
+  border-radius: 999px;
+  background: #ff5c35;
+  color: #faf7f2;
+  box-shadow:
+    0 6px 18px rgba(255, 92, 53, 0.35),
+    inset 0 1px 0 rgba(255, 255, 255, 0.18);
+  transition: transform 200ms ease, box-shadow 200ms ease;
+}
+.ott-welcome-btn:hover {
+  transform: translateY(-1px);
+  box-shadow:
+    0 10px 26px rgba(255, 92, 53, 0.45),
+    inset 0 1px 0 rgba(255, 255, 255, 0.25);
+}
+.ott-welcome.closing {
+  animation: ott-welcome-out 260ms cubic-bezier(0.4, 0, 1, 1) forwards;
+}
+@keyframes ott-welcome-pop {
+  0%   { opacity: 0; transform: translateY(20px) scale(0.85); }
+  100% { opacity: 1; transform: translateY(0) scale(1); }
+}
+@keyframes ott-welcome-out {
+  to { opacity: 0; transform: translateY(20px) scale(0.85); }
+}
+@media (prefers-reduced-motion: reduce) {
+  .ott-welcome,
+  .ott-welcome.closing { animation: none !important; }
+}
+@media (max-width: 520px) {
+  .ott-welcome { left: 18px; right: 18px; bottom: 90px; max-width: none; }
+  .ott-welcome::before { right: 30px; }
+}
+
 </style>
 </head>
 <body class="owner-mode">
@@ -2595,6 +2726,11 @@ body.empty-profile-mode #profileEmpty { display: flex !important; }
       </svg>
       <input class="prof-search-input" id="profSearchInput"
         placeholder="Search for people, clubs, events, orgs"
+        autocomplete="off"
+        autocorrect="off"
+        autocapitalize="off"
+        spellcheck="false"
+        name="vibe_search"
         oninput="runProfSearch(this.value)"
         onfocus="openProfSearch()"
         onblur="setTimeout(function(){closeProfSearch()},180)">
@@ -5427,16 +5563,19 @@ function runProfSearch(q) {
   var seq = ++_profSearchSeq;
   clearTimeout(_profSearchTimer);
   _profSearchTimer = setTimeout(function(){
-    fetch('/api/users/search?q=' + encodeURIComponent(trimmed) + '&limit=10', { credentials: 'include' })
+    fetch('/api/search?q=' + encodeURIComponent(trimmed) + '&limit=6', { credentials: 'include' })
       .then(function(r){ return r.ok ? r.json() : { ok:false }; })
       .then(function(j){
         if (seq !== _profSearchSeq) return; // a newer keystroke superseded us
-        var people = (j && j.ok && Array.isArray(j.users)) ? j.users.map(_profSearchUserToRow) : [];
-        if (!people.length) {
+        var ok = j && j.ok;
+        var people = ok && Array.isArray(j.users)  ? j.users.map(_profSearchUserToRow)  : [];
+        var orgs   = ok && Array.isArray(j.orgs)   ? j.orgs.map(_profSearchOrgToRow)    : [];
+        var events = ok && Array.isArray(j.events) ? j.events.map(_profSearchEventToRow): [];
+        if (!people.length && !orgs.length && !events.length) {
           dd.innerHTML = '<div class="search-empty">No results for "' + _esc(trimmed) + '"</div>';
           return;
         }
-        dd.innerHTML = renderProfResults(people);
+        dd.innerHTML = renderProfResults(people, orgs, events);
       })
       .catch(function(){
         if (seq !== _profSearchSeq) return;
@@ -5463,6 +5602,48 @@ function _profSearchUserToRow(u) {
     avatar:  u.avatar_url || '',
     col:     '#1C1C1E',
     rel:     u.rel || 'none',
+    real:    true,
+  };
+}
+// Map an org row to the dropdown shape. Action button reads "View"
+// (orgs don't have a public follow API yet — joining is gated on the
+// org page itself).
+function _profSearchOrgToRow(o) {
+  var meta = (o.member_count || 0) + ' members' + (o.verified ? ' · Verified' : '');
+  var initials = (o.name || o.handle || '?').split(/\s+/)
+    .map(function(p){ return p[0]; }).filter(Boolean).join('').slice(0,2).toUpperCase();
+  return {
+    type:    'org',
+    id:      o.id || '',
+    name:    o.name || ('@' + o.handle),
+    role:    meta,
+    handle:  o.handle || '',
+    av:      initials,
+    avatar:  o.logo_url || '',
+    col:     '#5B3FB7',
+    real:    true,
+  };
+}
+// Map an event row to the dropdown shape. Date formatting is local
+// to avoid a roundtrip; if `org` is present, prepend the org name.
+function _profSearchEventToRow(e) {
+  var when = '';
+  try {
+    var d = new Date(e.starts_at);
+    when = d.toLocaleDateString(undefined, { month: 'short', day: 'numeric' })
+      + ' · ' + d.toLocaleTimeString(undefined, { hour: 'numeric', minute: '2-digit' });
+  } catch (err) { when = ''; }
+  var subtitle = [e.org && e.org.name ? e.org.name : '', when].filter(Boolean).join(' · ');
+  var initials = (e.title || '?').split(/\s+/)
+    .map(function(p){ return p[0]; }).filter(Boolean).join('').slice(0,2).toUpperCase();
+  return {
+    type:    'event',
+    id:      e.id || '',
+    name:    e.title || 'Event',
+    role:    subtitle,
+    avatar:  (e.org && e.org.logo_url) || '',
+    av:      initials,
+    col:     '#FF5C35',
     real:    true,
   };
 }
@@ -5525,6 +5706,19 @@ function clearRecentSearches() {
   var dd = document.getElementById('profSearchDropdown');
   if (dd) dd.innerHTML = renderProfDefault();
 }
+// Remove a single recent-search entry (the × that appears on hover).
+// Stops click propagation in the inline handler so the row's navigate
+// onclick doesn't also fire.
+function removeRecentSearch(handle) {
+  if (!handle) return;
+  try {
+    var arr = _loadRecentSearches().filter(function(r){ return r.handle !== handle; });
+    localStorage.setItem(RECENT_SEARCHES_KEY, JSON.stringify(arr));
+  } catch (e) {}
+  var dd = document.getElementById('profSearchDropdown');
+  if (dd) dd.innerHTML = renderProfDefault();
+}
+window.removeRecentSearch = removeRecentSearch;
 
 function renderProfDefault() {
   var recent = _loadRecentSearches();
@@ -5534,53 +5728,81 @@ function renderProfDefault() {
       + '<span>Recently searched</span>'
       + '<button onclick="clearRecentSearches()" style="background:none;border:none;color:#8A8580;font-size:11px;font-weight:600;cursor:none">Clear</button>'
       + '</div>'
-      + recent.slice(0,5).map(renderProfSR).join('');
+      + recent.slice(0,5).map(function(r){ return renderProfSR(r, true); }).join('');
   } else {
     out += '<div class="search-empty" style="padding:18px 16px;text-align:center;color:#8A8580;font-size:13px">Search for people by name or @handle.</div>';
   }
   return out;
 }
-function renderProfResults(res) {
-  var people = res.filter(function(r){return r.type==='person';});
+function renderProfResults(people, orgs, events) {
   var out = '';
-  if (people.length) {
-    out += '<div class="search-section-label">People</div>' + people.map(renderProfSR).join('');
+  if (people && people.length) {
+    out += '<div class="search-section-label">People</div>'
+      + people.map(function(r){ return renderProfSR(r, false); }).join('');
+  }
+  if (orgs && orgs.length) {
+    out += '<div class="search-section-label">Clubs &amp; Orgs</div>'
+      + orgs.map(function(r){ return renderProfSR(r, false); }).join('');
+  }
+  if (events && events.length) {
+    out += '<div class="search-section-label">Events</div>'
+      + events.map(function(r){ return renderProfSR(r, false); }).join('');
   }
   return out;
 }
-function renderProfSR(r) {
-  // Action button reflects the viewer's relationship with the user.
-  // Companies always show Follow (no real follow API for orgs yet).
+function renderProfSR(r, isRecent) {
+  // Action button by kind.
   var action;
   if (r.type === 'person') {
     if      (r.rel === 'connected')   action = 'Message';
     else if (r.rel === 'following')   action = 'Pending';
     else if (r.rel === 'followed_by') action = 'Connect back';
     else                              action = 'Connect';
+  } else if (r.type === 'org') {
+    action = 'View';
+  } else if (r.type === 'event') {
+    action = 'Open';
   } else {
     action = 'Follow';
   }
-  // Real users — clicking the row navigates to /profile/<handle> AND
-  // pushes them onto the recent-searches list. We have to escape the
-  // serialized object so the inline onclick string survives quote
-  // characters in name / role.
+  // Click target by kind:
+  //   person → /profile/<handle> (resolved by id first; stale handle safe)
+  //   org    → /orgs/<handle>
+  //   event  → /campus?tab=events&event=<id>
+  // For persons, we also push them onto the recent-searches list.
   var clickAttr = '';
-  if (r.real && (r.handle || r.id)) {
-    var rowJson = encodeURIComponent(JSON.stringify({
-      id: r.id || '', name: r.name || '', handle: r.handle || '',
-      avatar: r.avatar || '', av: r.av || '', rel: r.rel || 'none', role: r.role || '',
-    }));
-    // Resolve through the user id (stable) so a stale handle from a
-    // recently-searched cache doesn't 404 if they renamed since we cached.
-    clickAttr = ' onclick="pushRecentSearch(JSON.parse(decodeURIComponent(\'' + rowJson + '\')));navigateToRealUser(JSON.parse(decodeURIComponent(\'' + rowJson + '\')))" style="cursor:pointer"';
+  if (r.real) {
+    if (r.type === 'person' && (r.handle || r.id)) {
+      var rowJson = encodeURIComponent(JSON.stringify({
+        id: r.id || '', name: r.name || '', handle: r.handle || '',
+        avatar: r.avatar || '', av: r.av || '', rel: r.rel || 'none', role: r.role || '',
+      }));
+      clickAttr = ' onclick="pushRecentSearch(JSON.parse(decodeURIComponent(\'' + rowJson + '\')));navigateToRealUser(JSON.parse(decodeURIComponent(\'' + rowJson + '\')))" style="cursor:pointer"';
+    } else if (r.type === 'org' && r.handle) {
+      clickAttr = ' onclick="window.location.href=\'/orgs/' + encodeURIComponent(r.handle) + '\'" style="cursor:pointer"';
+    } else if (r.type === 'event' && r.id) {
+      clickAttr = ' onclick="window.location.href=\'/campus?tab=events&event=' + encodeURIComponent(r.id) + '\'" style="cursor:pointer"';
+    }
   }
   var avatarInner = r.avatar
     ? '<img src="' + _esc(r.avatar) + '" alt="" style="width:100%;height:100%;object-fit:cover;border-radius:inherit;display:block;">'
     : _esc(r.av || '');
+  // Recently-searched rows get a small × on hover to drop them from the
+  // list. Stop propagation in the inline handler so the row's navigate
+  // onclick doesn't also fire.
+  var removeBtn = '';
+  if (isRecent && r.handle) {
+    removeBtn = '<button class="sr-remove" title="Remove from recent" '
+      + 'onclick="event.stopPropagation();removeRecentSearch(\'' + _esc(r.handle).replace(/\'/g, '&#39;') + '\')">×</button>';
+  }
+  // Orgs + companies + events get a rounded-square logo (8px); persons
+  // keep the more-rounded 11px square.
+  var avRadius = (r.type === 'company' || r.type === 'org' || r.type === 'event') ? '8px' : '11px';
   return '<div class="search-result"' + clickAttr + '>'
-    +'<div class="sr-av" style="background:'+r.col+';border-radius:'+(r.type==='company'?'8px':'11px')+';overflow:hidden">'+avatarInner+'</div>'
+    +'<div class="sr-av" style="background:'+r.col+';border-radius:'+avRadius+';overflow:hidden">'+avatarInner+'</div>'
     +'<div class="sr-info"><div class="sr-name">'+_esc(r.name)+'</div><div class="sr-role">'+_esc(r.role || '')+'</div></div>'
     +'<button class="sr-action">'+action+'</button>'
+    + removeBtn
     +'</div>';
 }
 function openProfSearch() {
@@ -6514,7 +6736,7 @@ async function hydrateProfilePostsFromAPI() {
           views: '0 views · 0:00',
           bg:    row.media_thumbnail_url
             ? `center/cover no-repeat url("${row.media_thumbnail_url}")`
-            : 'linear-gradient(135deg,#1a0533,#2d1b4e)',
+            : _clipFallbackGradient(row.id),
         });
         const uploadTile = grid.querySelector('.vibe-upload-tile');
         if (uploadTile) grid.insertBefore(node, uploadTile);
@@ -6564,7 +6786,7 @@ async function hydrateVisitedUserPosts(handle) {
           views: '0 views · 0:00',
           bg:    row.media_thumbnail_url
             ? `center/cover no-repeat url("${row.media_thumbnail_url}")`
-            : 'linear-gradient(135deg,#1a0533,#2d1b4e)',
+            : _clipFallbackGradient(row.id),
         });
         const uploadTile = grid.querySelector('.vibe-upload-tile');
         if (uploadTile) grid.insertBefore(node, uploadTile);
@@ -6986,6 +7208,19 @@ const CLIP_PALETTES = [
   'linear-gradient(135deg,#001a18,#0a2a26)',
   'linear-gradient(135deg,#2a0033,#440055)',
 ];
+
+// Deterministic palette pick from a clip id — same id always paints the
+// same gradient so a clip without a poster looks consistent across page
+// loads (and across viewer / owner views). Mirrors the React-side
+// `clipFallbackGradient` in campus-home.tsx.
+function _clipFallbackGradient(id) {
+  if (!id) return CLIP_PALETTES[0];
+  let h = 0;
+  for (let i = 0; i < id.length; i++) {
+    h = (h * 31 + id.charCodeAt(i)) | 0;
+  }
+  return CLIP_PALETTES[Math.abs(h) % CLIP_PALETTES.length];
+}
 
 function composerChooseClipFile() {
   const inp = document.getElementById('composerClipFile');
@@ -8389,6 +8624,89 @@ function showWelcomeBanner() {
       }
     });
   })();
+</script>
+
+<script src="/html/_otto-tour.js"></script>
+<script>
+// ── First-visit Otto tour on the profile ──────────────────────────────────
+// Triggered by the `?welcome=1` flag the onboarding flow appends. Walks the
+// user through the four most-edited surfaces, then warps them to /campus
+// for the second half of the tour. localStorage tracks completion so a
+// refresh on a share link with ?welcome=1 doesn't re-pop the tour.
+(function maybeStartProfileTour() {
+  try {
+    // Trigger comes from either the URL flag (post-onboarding) or a
+    // localStorage pending flag (Settings → Replay; survives redirects).
+    var params = new URLSearchParams(window.location.search);
+    var fromUrl = params.get('welcome') === '1';
+    var fromPending = false;
+    try { fromPending = localStorage.getItem('vibe_tour_pending') === 'profile'; } catch (e) {}
+    if (!fromUrl && !fromPending) return;
+
+    var seenKey = 'vibe_profile_tour_seen_v1';
+    function stripWelcome() {
+      try {
+        var p = new URLSearchParams(window.location.search);
+        if (!p.has('welcome')) return;
+        p.delete('welcome');
+        var qs = p.toString();
+        window.history.replaceState({}, '', window.location.pathname + (qs ? '?' + qs : '') + window.location.hash);
+      } catch (e) {}
+    }
+
+    if (localStorage.getItem(seenKey) === '1') {
+      stripWelcome();
+      return;
+    }
+
+    function go() {
+      if (!window.OttoTour) { setTimeout(go, 150); return; }
+      window.OttoTour.start([
+        {
+          selector: '#profileCover',
+          title: 'This is your <span class="accent">banner</span>.',
+          body: "Tap it to swap the cover image. First impression real estate.",
+        },
+        {
+          selector: '#avatarEl',
+          title: 'Your face on vibe.',
+          body: "Drop a photo so people know it's you — your avatar shows up everywhere.",
+        },
+        {
+          selector: '.bio-text',
+          title: 'A few lines about you.',
+          body: "Tell people what you're into. Click anywhere in your bio to edit.",
+        },
+        {
+          selector: '.profile-composer',
+          title: 'Drop your <span class="accent">first post</span>.',
+          body: "Type something, throw on a #hashtag, or switch to Clip for a quick video. Otto will keep it in front of the right people.",
+          endLabel: 'Take me to campus →',
+        },
+      ], {
+        onDone: function () {
+          try {
+            localStorage.setItem(seenKey, '1');
+            // Hand the pending flag to the next leg so the campus tour fires
+            // even if its URL param gets stripped somewhere.
+            localStorage.setItem('vibe_tour_pending', 'campus');
+          } catch (e) {}
+          stripWelcome();
+          window.location.href = '/campus?welcome=1';
+        },
+        onSkip: function () {
+          try {
+            localStorage.setItem(seenKey, '1');
+            localStorage.removeItem('vibe_tour_pending');
+          } catch (e) {}
+          stripWelcome();
+        },
+      });
+    }
+    // Wait for the post-onboarding hyperdrive flash + page paint to settle.
+    setTimeout(go, 600);
+  } catch (e) { /* never block profile render on tour */ }
+})();
 </script>
 
 </body>
