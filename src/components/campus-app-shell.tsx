@@ -1,5 +1,6 @@
 "use client";
 
+import { usePathname } from "next/navigation";
 import type { ReactNode } from "react";
 
 import LeftNav from "@/components/LeftNav";
@@ -12,12 +13,17 @@ type Props = {
 };
 
 /**
- * Mounted on every campus-shelled route, so Otto's bottom-right orb is the
- * unifying surface across campus / network / profile / messages / otto.
- * The orb + side panel handle their own auth and notification polling.
- * Per-route mounts (e.g. NetworkPageClient) were removed once this lifted.
+ * Mounted on every campus-shelled route. The bottom-right Otto orb is the
+ * unifying surface across campus / network / profile / otto.
+ *
+ * We hide the orb on /messages because the messaging surface already has
+ * its own bottom-right composer + iframe-cursor seam, and an extra floating
+ * element on top of that conflicts visually with the chat UI.
  */
 export function CampusAppShell({ children, sidebar }: Props) {
+  const pathname = usePathname();
+  const showOttoCorner = !pathname?.startsWith("/messages");
+
   return (
     <div
       style={{
@@ -29,7 +35,7 @@ export function CampusAppShell({ children, sidebar }: Props) {
       <LeftNav />
       {children}
       {sidebar ?? null}
-      <OttoCorner />
+      {showOttoCorner ? <OttoCorner /> : null}
     </div>
   );
 }
