@@ -25,7 +25,7 @@ export default async function MessagesPage({ searchParams }: Props) {
   if (handle) params.set("to", handle.toLowerCase());
   const src = `/html/messages.html?${params.toString()}`;
   return (
-    <CampusAppShell>
+    <CampusAppShell iframeEmbed>
       <iframe
         src={src}
         title="Messages"
