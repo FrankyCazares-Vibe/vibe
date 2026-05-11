@@ -166,6 +166,28 @@
     #ottoPanel .otto-stat-num  { font-family:'Fraunces',serif; font-size:20px; font-weight:800; color:white; line-height:1; }
     #ottoPanel .otto-stat-label{ font-size:9.5px; font-weight:600; color:rgba(255,255,255,.55); letter-spacing:.6px; text-transform:uppercase; margin-top:4px; }
 
+    /* "Your metrics" block — reuses the stats-grid layout, but adds a
+       coral-accent variant for the profile-views tile and a deep-link
+       footer that points to /otto's Stats tab. */
+    #ottoPanel .otto-stat-tile--accent {
+      background:rgba(255,92,53,.14);
+      border-color:rgba(255,140,90,.45);
+    }
+    #ottoPanel .otto-stat-tile--accent .otto-stat-num { color:#FFB89C; }
+    #ottoPanel .otto-metrics-foot {
+      margin-top:8px; text-align:right;
+    }
+    #ottoPanel .otto-metrics-foot a {
+      font-family:'DM Sans',sans-serif; font-size:11px; font-weight:600;
+      color:rgba(255,180,150,.85); text-decoration:none;
+      letter-spacing:.04em;
+    }
+    #ottoPanel .otto-metrics-foot a:hover { color:#FF5C35; }
+    #ottoPanel .otto-metrics-fallback {
+      font-family:'Fraunces',serif; font-style:italic; font-size:12px;
+      color:rgba(255,255,255,.5); padding:8px 0;
+    }
+
     /* Notification filter pills (P1-021). */
     #ottoPanel .otto-notif-filters {
       display:flex; gap:6px; margin:0 0 12px; flex-wrap:wrap;
@@ -433,6 +455,10 @@
           _ottoMarkAllRead();
         }
       }).catch(() => {});
+      // Metrics block — profile views + creator stats, rendered alongside
+      // the notification load. Best-effort; the panel still renders if
+      // these fail (e.g. before the migrations land on a deploy).
+      _ottoFetchMetrics().then(_ottoRenderMetrics).catch(() => {});
     }
   }
 
@@ -452,6 +478,12 @@
         ${_ottoStatTileHTML('like',       0, 'Likes')}
         ${_ottoStatTileHTML('comment',    0, 'Comments')}
       </div>
+      <div class="otto-divider"></div>
+      <div class="otto-section-eyebrow">your metrics</div>
+      <div class="otto-stats-grid" id="ottoMetricsGrid">
+        <div class="otto-metrics-fallback" id="ottoMetricsFallback">loading metrics…</div>
+      </div>
+      <div class="otto-metrics-foot"><a href="/otto?tab=stats">full breakdown in /otto →</a></div>
       <div class="otto-divider"></div>
       <div class="otto-section-eyebrow">activity</div>
       <div class="otto-notif-filters">
@@ -548,6 +580,50 @@
     if (!r.ok) return [];
     const j = await r.json().catch(() => ({}));
     return (j && j.ok && Array.isArray(j.notifications)) ? j.notifications : [];
+  }
+
+  // Fetch profile-views + creator-stats in parallel. Returns null when both
+  // fail (so the renderer can show a clear fallback rather than a stale
+  // "loading…"). Either half can be missing on its own.
+  async function _ottoFetchMetrics() {
+    const [pvRes, csRes] = await Promise.all([
+      fetch('/api/me/profile-views', { credentials: 'include' }).catch(() => null),
+      fetch('/api/me/creator-stats', { credentials: 'include' }).catch(() => null),
+    ]);
+    const pv = (pvRes && pvRes.ok) ? await pvRes.json().catch(() => null) : null;
+    const cs = (csRes && csRes.ok) ? await csRes.json().catch(() => null) : null;
+    if ((!pv || !pv.ok) && (!cs || !cs.ok)) return null;
+    return { pv: (pv && pv.ok) ? pv : null, cs: (cs && cs.ok) ? cs : null };
+  }
+
+  function _ottoFormatN(n) {
+    if (n < 1000) return String(n);
+    if (n < 10000) return (n / 1000).toFixed(1).replace(/\.0$/, '') + 'k';
+    return Math.round(n / 1000) + 'k';
+  }
+
+  function _ottoRenderMetrics(data) {
+    if (!panel) return;
+    const grid = panel.querySelector('#ottoMetricsGrid');
+    if (!grid) return;
+    if (!data) {
+      grid.innerHTML = '<div class="otto-metrics-fallback">metrics not available yet — once posts + views land they\'ll show here.</div>';
+      return;
+    }
+    const pvc = data.pv ? data.pv.counts : { thirty_days: 0 };
+    const cst = data.cs ? data.cs.totals : { views: 0, likes: 0, reposts: 0 };
+    const tiles = [
+      { n: pvc.thirty_days || 0, label: 'Profile views (30d)', accent: true },
+      { n: cst.views || 0,       label: 'Post views' },
+      { n: cst.likes || 0,       label: 'Likes' },
+      { n: cst.reposts || 0,     label: 'Reposts' },
+    ];
+    grid.innerHTML = tiles.map(t => (
+      '<div class="otto-stat-tile' + (t.accent ? ' otto-stat-tile--accent' : '') + '">' +
+        '<div class="otto-stat-num">' + _ottoFormatN(t.n) + '</div>' +
+        '<div class="otto-stat-label">' + t.label + '</div>' +
+      '</div>'
+    )).join('');
   }
 
   async function _ottoFetchUnreadCount() {
