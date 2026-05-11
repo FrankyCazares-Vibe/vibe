@@ -2850,11 +2850,53 @@ body.empty-profile-mode #profileEmpty { display: flex !important; }
    the layout collapses to single column, paddings tighten, and the resume
    viewer's left thumbnail rail becomes a horizontal scroller above the
    page stack so a single page still fills the viewport. */
+
+/* Safety net: never let any rogue element push the page wider than the
+   viewport. Without this, a single overflowing child (e.g. the desktop
+   nav search bar at 42vw absolute) creates horizontal scroll that makes
+   the whole page look shifted and "bunched" even though the cards
+   themselves are sized correctly. */
 @media (max-width: 760px) {
-  /* Top nav + cover */
-  nav { padding: 10px 14px; gap: 6px; }
+  html, body { overflow-x: hidden; }
+}
+
+/* Custom cursor lives at fixed top:0 left:0 until the mouse moves. On
+   touch devices the mouse never moves, so the bare orange dot stays
+   stuck in the corner. Hide it (and bring back native interaction). */
+@media (pointer: coarse) {
+  .cursor, .cursor-ring { display: none !important; }
+  body, body * { cursor: auto !important; }
+  a, button, [onclick], .btn-nav, .action-btn,
+  .nav-msg-btn, .vibe-tag, .edit-toggle { cursor: pointer !important; }
+}
+
+@media (max-width: 760px) {
+  /* Top nav: lose the secondary text links + center search + non-essential
+     right icons. Owner keeps: brand, edit (their own profile), messages,
+     settings. Visitors keep: brand, messages, settings, share. Search is
+     reachable from /campus on mobile via the Campus tab. */
+  nav {
+    padding: 10px 12px;
+    gap: 6px;
+    flex-wrap: nowrap;
+    overflow: hidden;
+  }
   .nav-logo { font-size: 20px; }
-  .nav-right { gap: 8px; }
+  /* Hide the secondary text links (Campus / Network) on mobile — the
+     bottom tabs of the wider app handle that nav. The Campus/Network
+     wrapper is the unnamed sibling div immediately after .nav-logo. */
+  nav > .nav-logo + div { display: none !important; }
+  /* Hide the center-floating search at phone widths — its 42vw absolute
+     position collides with the right-side icon row and forces horizontal
+     overflow. Search lives on /campus and /network anyway. */
+  .prof-search-wrap { display: none !important; }
+  /* Trim the right-side icon row: hide the share button (low-frequency
+     action), keep calendar / messages / edit / settings. */
+  .nav-right { gap: 6px; }
+  .nav-msg-btn { padding: 6px; }
+  /* The "View as visitor" pill is text-heavy; collapse it on phone. */
+  #viewerBtn { display: none !important; }
+
   .profile-cover { height: 180px; margin-top: 56px; }
 
   /* Main wrap + grid */
