@@ -6770,6 +6770,16 @@ window.viewingRealUser = null;
   // hydrated. Demo Maya stays on the hardcoded path.
   if (user._appShell) {
     hydrateProfilePostsFromAPI();
+    // One-shot backfill: push localStorage state that never made it to
+    // the server. Catches users who entered "Working on" items, drew
+    // redaction bars, or uploaded data: URI logos *before* the
+    // corresponding server-persistence flow shipped. The 1.2s debounce
+    // collapses with any subsequent edit. flushProfileServerSync runs
+    // _migrateDataUriLogos() first, so data: URI logos in this run get
+    // uploaded to Storage before the payload goes out.
+    if (typeof scheduleProfileServerSync === 'function') {
+      scheduleProfileServerSync();
+    }
   }
 
   // First-time-only: welcome banner + auto-edit mode while name is still empty.
@@ -7222,10 +7232,72 @@ async function _saveProfileHandle(handle) {
   }
 }
 
+// data: URI → Blob. Used by the auto-migrator below.
+function _dataUriToBlob(dataUri) {
+  const comma = dataUri.indexOf(',');
+  const head = comma >= 0 ? dataUri.slice(0, comma) : '';
+  const body = comma >= 0 ? dataUri.slice(comma + 1) : '';
+  const mimeMatch = /data:([^;]+)/i.exec(head);
+  const mime = mimeMatch ? mimeMatch[1] : 'application/octet-stream';
+  const bin = atob(body);
+  const bytes = new Uint8Array(bin.length);
+  for (let i = 0; i < bin.length; i++) bytes[i] = bin.charCodeAt(i);
+  return new Blob([bytes], { type: mime });
+}
+
+// Auto-migrate any work_experience entry whose logoUrl is a data: URI:
+// upload it to Supabase Storage via /api/me/profile-upload?kind=logo and
+// rewrite the entry (+ matching DOM img) to the persistable HTTPS URL.
+// Runs *before* every profile-sync so the server-side sanitizer never
+// sees a data: URI it would silently drop. Failed uploads keep the data:
+// URI so the next sync retries them.
+async function _migrateDataUriLogos() {
+  if (typeof vibeLoad !== 'function' || typeof vibeSave !== 'function') return;
+  const u = vibeLoad('vibe_user_v1');
+  if (!u || !Array.isArray(u.workExperience)) return;
+  let dirty = false;
+  for (let i = 0; i < u.workExperience.length; i++) {
+    const w = u.workExperience[i];
+    if (!w || typeof w.logoUrl !== 'string' || !w.logoUrl.startsWith('data:')) continue;
+    try {
+      const blob = _dataUriToBlob(w.logoUrl);
+      const ext = blob.type === 'image/png' ? 'png'
+        : blob.type === 'image/webp' ? 'webp'
+        : blob.type === 'image/gif' ? 'gif'
+        : 'jpg';
+      const fd = new FormData();
+      fd.append('file', blob, 'logo.' + ext);
+      fd.append('kind', 'logo');
+      const r = await fetch('/api/me/profile-upload', {
+        method: 'POST',
+        credentials: 'include',
+        body: fd,
+      });
+      const j = await r.json().catch(() => ({}));
+      if (r.ok && j && j.ok && j.url) {
+        u.workExperience[i] = Object.assign({}, w, { logoUrl: j.url });
+        dirty = true;
+        // Update the corresponding visible work-item img so the next
+        // saveProfileToStorage captures the HTTPS URL too.
+        const items = document.querySelectorAll('#workList .work-item');
+        const img = items[i] && items[i].querySelector('img.work-logo-img');
+        if (img) img.src = j.url;
+      }
+    } catch (e) {
+      console.warn('[vibe] logo migration failed for entry', i, e);
+    }
+  }
+  if (dirty) vibeSave('vibe_user_v1', u);
+}
+
 async function flushProfileServerSync() {
   if (window.viewingMockUser || window.viewingRealUser) return;
   const u = (typeof vibeLoad === 'function') ? vibeLoad('vibe_user_v1') : null;
   if (!u || !u._appShell) return;
+  // Convert any pre-fix data: URI logos to real uploads before we build
+  // the payload — the sanitizer drops data: URIs and would otherwise wipe
+  // them out of work_experience on every sync.
+  await _migrateDataUriLogos();
   try {
     const r = await fetch('/api/me/profile-sync', {
       method: 'POST',
