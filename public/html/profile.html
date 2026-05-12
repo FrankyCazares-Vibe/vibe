@@ -4597,13 +4597,18 @@ function _waitForPdfJs(timeoutMs = 8000) {
   });
 }
 
-// Rasterize every page of a PDF (data URL) into image data URLs. The
-// scale=1.6 balances readability vs. payload size for typical Letter pages.
-async function _rasterizePdf(dataUrl) {
+// Rasterize every page of a PDF into image data URLs. Accepts either a
+// `data:` URL (freshly-uploaded local file) or an `https:` URL (resume
+// fetched back from Supabase storage on a return visit). The scale=1.6
+// balances readability vs. payload size for typical Letter pages.
+async function _rasterizePdf(src) {
   const pdfjsLib = await _waitForPdfJs();
   pdfjsLib.GlobalWorkerOptions.workerSrc =
     'https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.worker.min.js';
-  const pdf = await pdfjsLib.getDocument({ data: _dataUrlToUint8(dataUrl) }).promise;
+  const source = (typeof src === 'string' && src.startsWith('data:'))
+    ? { data: _dataUrlToUint8(src) }
+    : { url: src };
+  const pdf = await pdfjsLib.getDocument(source).promise;
   const pages = [];
   for (let i = 1; i <= pdf.numPages; i++) {
     const page = await pdf.getPage(i);
