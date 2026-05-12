@@ -3094,11 +3094,6 @@ function Field({
 }
 
 const SHEEN_KEYFRAMES = `
-  @keyframes campus-banner-sheen {
-    0% { transform: translateX(-120%); }
-    60% { transform: translateX(220%); }
-    100% { transform: translateX(220%); }
-  }
   @keyframes campus-tab-glow {
     0%, 100% { opacity: 0.55; }
     50% { opacity: 1; }
@@ -3143,20 +3138,6 @@ function CampusBanner() {
         overflow: "hidden",
       }}
     >
-      {/* animated specular sweep */}
-      <div
-        aria-hidden
-        style={{
-          position: "absolute",
-          inset: 0,
-          pointerEvents: "none",
-          background:
-            "linear-gradient(110deg, transparent 30%, rgba(255,255,255,0.18) 50%, transparent 70%)",
-          width: "40%",
-          animation: "campus-banner-sheen 7s ease-in-out infinite",
-        }}
-      />
-
       <div
         style={{
           width: 44,
@@ -3242,8 +3223,7 @@ function CampusBanner() {
 // Unified typeahead used in the campus banner. Hits /api/search and
 // renders people / clubs / events under one dropdown. The dropdown is
 // rendered as `position: fixed` because the parent header sets
-// `overflow: hidden` to keep the sheen sweep clipped — that would also
-// clip the dropdown if we went absolute.
+// `overflow: hidden`, which would clip an absolute-positioned dropdown.
 type SearchUser = {
   id: string;
   name: string | null;
