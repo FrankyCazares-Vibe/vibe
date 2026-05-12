@@ -947,6 +947,32 @@ body.doc-modal-open { overflow:hidden; }
   object-fit:cover;
   border:none;
 }
+/* Image area wrapper — same aspect as the main viewer's .doc-page-wrap
+   so redaction bars positioned as page-percent coordinates land in the
+   same relative spot here as they do in the zoomed viewer. */
+.doc-page-thumb-imagewrap {
+  position:relative;
+  width:100%;
+  aspect-ratio:8.5/11;
+  overflow:hidden;
+}
+.doc-page-thumb-imagewrap img {
+  position:absolute;
+  inset:0;
+  width:100%;
+  height:100%;
+}
+/* Read-only mini bars for the thumbnail strip. Same coords as the
+   main viewer's .redaction-bar, but no shadow / cursor / interaction
+   styles — this is just a preview so the user can spot at a glance
+   which thumb has redactions applied. */
+.doc-page-thumb-bar {
+  position:absolute;
+  background:rgba(0,0,0,.96);
+  border-radius:2px;
+  pointer-events:none;
+  z-index:1;
+}
 .doc-page-thumb-label {
   padding:6px 8px;
   font-size:10.5px;
@@ -4813,6 +4839,34 @@ function renderRedactionBars() {
     }
     wrap.appendChild(el);
   });
+  // Refresh the thumbnail strip so the read-only mini bars stay in
+  // sync with the main viewer as the user draws / moves / resizes.
+  _renderThumbBars();
+}
+
+// Update the read-only redaction overlays on the left-side thumbnail
+// strip. The thumb shows page 1 of each doc, so we only paint bars
+// whose pageNumber === 1.
+function _renderThumbBars() {
+  const pages = document.getElementById('docPages');
+  if (!pages) return;
+  const thumbs = pages.querySelectorAll('.doc-page-thumb');
+  thumbs.forEach((thumb, idx) => {
+    const wrap = thumb.querySelector('.doc-page-thumb-imagewrap');
+    if (!wrap) return;
+    wrap.querySelectorAll('.doc-page-thumb-bar').forEach((n) => n.remove());
+    (redactionBars || [])
+      .filter((b) => b.docIndex === idx && b.pageNumber === 1)
+      .forEach((b) => {
+        const el = document.createElement('span');
+        el.className = 'doc-page-thumb-bar';
+        el.style.left = b.x + '%';
+        el.style.top = b.y + '%';
+        el.style.width = b.w + '%';
+        el.style.height = b.h + '%';
+        wrap.appendChild(el);
+      });
+  });
 }
 
 function selectBar(absoluteIdx) {
@@ -5041,18 +5095,31 @@ function renderDocViewer() {
     return;
   }
 
-  // Doc thumbnails — first page of each doc, with a hover × to remove.
+  // Doc thumbnails — first page of each doc, with a hover × to remove
+  // and read-only mini redaction bars overlaid in the same coord space
+  // as the main viewer so the thumb reflects what the doc actually
+  // looks like with bars applied.
   pages.innerHTML = resumePortfolio.map((doc, idx) => {
     const active = idx === activeDocIndex ? 'active' : '';
     const firstPage = (doc.pages && doc.pages[0]) || doc.url;
-    const preview = `<img src="${firstPage}" alt="${doc.name}" draggable="false">`;
     const removeBtn = (editMode && !viewerMode)
       ? `<button type="button" class="doc-page-thumb-remove" onclick="event.stopPropagation(); removeResumeDoc(${idx})" title="Remove this attachment" aria-label="Remove ${doc.name.replace(/"/g, '&quot;')}">×</button>`
       : '';
+    // Bars for this doc's first page only. (Multi-page docs' subsequent
+    // pages aren't represented in the thumbnail strip yet.)
+    const thumbBars = (redactionBars || [])
+      .filter((b) => b.docIndex === idx && b.pageNumber === 1)
+      .map((b) =>
+        `<span class="doc-page-thumb-bar" style="left:${b.x}%;top:${b.y}%;width:${b.w}%;height:${b.h}%"></span>`,
+      )
+      .join('');
     return `
       <div class="doc-page-thumb ${active}" onclick="setActiveDoc(${idx})" style="position:relative">
         ${removeBtn}
-        ${preview}
+        <div class="doc-page-thumb-imagewrap">
+          <img src="${firstPage}" alt="${doc.name}" draggable="false">
+          ${thumbBars}
+        </div>
         <div class="doc-page-thumb-label" title="${doc.name.replace(/"/g, '&quot;')}">${doc.name}</div>
       </div>`;
   }).join('');
