@@ -826,6 +826,22 @@
     font-size: 10px;
     padding: 5px 10px;
   }
+  /* Hero typewriter: the long second sentence ("I'm Otto. This is your
+     campus, all in one place.") overflowed at 36px nowrap on iPhone-
+     class widths. Shrink the min font + allow wrapping so the cursor
+     can ride to the next line instead of pushing off the right edge. */
+  .vibe-landing-typewriter {
+    font-size: clamp(22px, 7vw, 36px);
+    letter-spacing: -0.8px;
+    min-height: 3.2em;
+    padding: 0 12px;
+  }
+  .vibe-landing-typewriter-line {
+    white-space: normal;
+    text-align: center;
+    flex-wrap: wrap;
+    justify-content: center;
+  }
 }
 
 @media (prefers-reduced-motion: reduce) {
