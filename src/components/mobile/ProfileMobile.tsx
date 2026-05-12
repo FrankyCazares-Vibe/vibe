@@ -187,9 +187,16 @@ export function ProfileMobile() {
       </div>
 
       {/* Identity block — overlaps the cover */}
-      <div style={{ padding: "0 16px", marginTop: -36 }}>
+      <div style={{ padding: "0 16px", marginTop: -44 }}>
         <div
           style={{
+            // position+z-index lifts the avatar row above the cover's
+            // absolutely-positioned bottom-fade overlay. Without this,
+            // the translucent gradient paints OVER the avatar in the
+            // overlap zone (positioned descendants outrank normal-flow
+            // siblings in paint order).
+            position: "relative",
+            zIndex: 1,
             display: "flex",
             alignItems: "flex-end",
             gap: 14,
