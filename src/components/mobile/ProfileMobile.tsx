@@ -90,6 +90,14 @@ type VibeUser = {
    *  minimal identity (name, handle, avatarPhoto) is included on the
    *  payload — everything else is intentionally omitted. */
   _blockedByTarget?: boolean;
+  /** Bootstrap short-circuit: viewer has blocked the target. Same
+   *  minimal payload; UI shows an Unblock button instead of the
+   *  "restricted you" message. */
+  _viewerHasBlocked?: boolean;
+  /** Echoed alongside _blockedByTarget / _viewerHasBlocked so the
+   *  Unblock button has a stable user id to call DELETE /api/me/block
+   *  with, independent of handle changes. */
+  id?: string;
 };
 
 type FollowState = "none" | "following" | "followed_by" | "connected" | "self";
@@ -234,7 +242,7 @@ export function ProfileMobile({ targetHandle }: Props = {}) {
   if (!user) {
     return <ProfileMobileSkeleton />;
   }
-  if (user._blockedByTarget) {
+  if (user._blockedByTarget || user._viewerHasBlocked) {
     return <BlockedByTargetView user={user} />;
   }
 
@@ -1181,6 +1189,8 @@ function BlockedByTargetView({ user }: { user: VibeUser }) {
   const name = pick(user.name) ?? "This user";
   const handle = pick(user.handle);
   const avatar = pick(user.avatarPhoto);
+  const viewerHasBlocked = !!user._viewerHasBlocked;
+  const firstName = ((name as string) || "").split(/\s+/)[0] || "them";
   const initials = ((name as string) || "?")
     .split(/\s+/)
     .map((p) => p[0])
@@ -1188,6 +1198,34 @@ function BlockedByTargetView({ user }: { user: VibeUser }) {
     .join("")
     .slice(0, 2)
     .toUpperCase();
+  const heading = viewerHasBlocked
+    ? `You blocked ${firstName}`
+    : "Profile unavailable";
+  const bodyText = viewerHasBlocked
+    ? "Unblock to see their content. You won’t be reconnected — you’ll need to Connect again."
+    : "This account has restricted you. You can’t see their profile or message them.";
+  const [busy, setBusy] = useState(false);
+  const onUnblock = async () => {
+    if (!user.id || busy) return;
+    setBusy(true);
+    try {
+      const r = await fetch("/api/me/block", {
+        method: "DELETE",
+        credentials: "include",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ target_id: user.id }),
+      });
+      const j = await r.json().catch(() => ({}));
+      if (!r.ok || !j?.ok) {
+        setBusy(false);
+        return;
+      }
+      // Reload so the visitor view re-runs cleanly with the full profile.
+      window.location.reload();
+    } catch {
+      setBusy(false);
+    }
+  };
   return (
     <div
       style={{
@@ -1250,7 +1288,7 @@ function BlockedByTargetView({ user }: { user: VibeUser }) {
           marginBottom: 6,
         }}
       >
-        Profile unavailable
+        {heading}
       </div>
       <p
         style={{
@@ -1261,24 +1299,45 @@ function BlockedByTargetView({ user }: { user: VibeUser }) {
           maxWidth: 320,
         }}
       >
-        This account has restricted you. You can&rsquo;t see their profile or
-        message them.
+        {bodyText}
       </p>
-      <Link
-        href="/network"
-        style={{
-          display: "inline-block",
-          padding: "10px 20px",
-          borderRadius: 100,
-          background: "#1C1C1E",
-          color: "white",
-          textDecoration: "none",
-          fontSize: 13,
-          fontWeight: 700,
-        }}
-      >
-        ← Back
-      </Link>
+      {viewerHasBlocked ? (
+        <button
+          type="button"
+          onClick={onUnblock}
+          disabled={busy}
+          style={{
+            display: "inline-block",
+            padding: "11px 24px",
+            borderRadius: 100,
+            background: "#1C1C1E",
+            color: "white",
+            border: "none",
+            fontSize: 13,
+            fontWeight: 700,
+            cursor: busy ? "default" : "pointer",
+            opacity: busy ? 0.7 : 1,
+          }}
+        >
+          Unblock {firstName}
+        </button>
+      ) : (
+        <Link
+          href="/network"
+          style={{
+            display: "inline-block",
+            padding: "10px 20px",
+            borderRadius: 100,
+            background: "#1C1C1E",
+            color: "white",
+            textDecoration: "none",
+            fontSize: 13,
+            fontWeight: 700,
+          }}
+        >
+          ← Back
+        </Link>
+      )}
     </div>
   );
 }

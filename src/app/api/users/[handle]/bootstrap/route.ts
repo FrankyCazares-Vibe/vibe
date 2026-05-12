@@ -57,22 +57,39 @@ export async function GET(_req: Request, ctx: RouteContext) {
     return NextResponse.json({ ok: false, error: "User not found" }, { status: 404 });
   }
 
-  // Block-aware short-circuit. If the target has blocked the viewer, we
-  // return a minimal "blocked" payload — just enough identity (name,
-  // handle, avatar) for the visitor screen to render an Instagram-style
-  // "This account has restricted you" view. Posts, bio, work history,
-  // and counts are NOT included. We intentionally don't 404 here so the
-  // visitor at least knows the account still exists.
+  // Block-aware short-circuit. One round-trip pulls every block row
+  // between viewer + target (both directions) so we can answer:
+  //   - target blocked viewer  → "Profile unavailable. This account has
+  //                              restricted you." (no Unblock; we don't
+  //                              leak that the block came from them)
+  //   - viewer blocked target  → "You blocked Andres. Unblock to see
+  //                              their content." (Unblock CTA)
+  // RLS on `blocks` allows either party to read the row (migration
+  // 20260515000000_blocks_select_either_party). Posts, bio, counts are
+  // NOT included in either branch — both intentionally omit content.
   const targetIdRaw = (row as { id: string }).id;
-  const { count: blockCount } = await supabase
+  const { data: blockRows } = await supabase
     .from("blocks")
-    .select("id", { count: "exact", head: true })
-    .eq("blocker_id", targetIdRaw)
-    .eq("blocked_id", viewer.id);
-  if ((blockCount ?? 0) > 0) {
+    .select("blocker_id, blocked_id")
+    .or(
+      `and(blocker_id.eq.${targetIdRaw},blocked_id.eq.${viewer.id}),` +
+        `and(blocker_id.eq.${viewer.id},blocked_id.eq.${targetIdRaw})`,
+    );
+  const targetBlockedViewer = (blockRows ?? []).some(
+    (r) =>
+      (r as { blocker_id: string }).blocker_id === targetIdRaw &&
+      (r as { blocked_id: string }).blocked_id === viewer.id,
+  );
+  const viewerBlockedTarget = (blockRows ?? []).some(
+    (r) =>
+      (r as { blocker_id: string }).blocker_id === viewer.id &&
+      (r as { blocked_id: string }).blocked_id === targetIdRaw,
+  );
+  if (targetBlockedViewer || viewerBlockedTarget) {
     return NextResponse.json({
       ok: true,
-      blockedByTarget: true,
+      blockedByTarget: targetBlockedViewer,
+      viewerHasBlocked: viewerBlockedTarget,
       vibeUser: {
         id: targetIdRaw,
         name: (row as { name: string | null }).name,
@@ -80,7 +97,8 @@ export async function GET(_req: Request, ctx: RouteContext) {
         avatarPhoto: (row as { avatar_url: string | null }).avatar_url,
         _isViewerMode: true,
         _viewerFollowState: "none",
-        _blockedByTarget: true,
+        _blockedByTarget: targetBlockedViewer,
+        _viewerHasBlocked: viewerBlockedTarget,
       },
     });
   }

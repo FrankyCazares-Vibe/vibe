@@ -6772,12 +6772,13 @@ window.viewingRealUser = null;
       .then(j => {
         if (!j || !j.ok || !j.vibeUser) throw new Error('not_found');
         const v = j.vibeUser;
-        // Blocked-by-target short-circuit. The bootstrap response carries
-        // only minimal identity (id, name, handle, avatar) — no posts, no
-        // bio, no counts. Render an Instagram-style "this account has
-        // restricted you" view and bail before the rest of the owner-shaped
-        // hydration paints partial state.
-        if (v._blockedByTarget) {
+        // Block-aware short-circuit. Bootstrap returns minimal identity
+        // (id, name, handle, avatar) when either side blocks the other.
+        //   _blockedByTarget   → "Profile unavailable. This account has
+        //                        restricted you." (no Unblock affordance)
+        //   _viewerHasBlocked  → "You blocked X. Unblock to see their
+        //                        content." (Unblock CTA)
+        if (v._blockedByTarget || v._viewerHasBlocked) {
           renderBlockedByTargetView(v);
           requestAnimationFrame(() => {
             document.documentElement.classList.remove('vibe-pre-paint');
@@ -7023,16 +7024,27 @@ document.addEventListener('vibeStudentVerified', () => {
 
 // Floating "Viewing Kwame · Back to your profile" pill, shown only when
 // viewing a mock user. Stays out of edit chrome's way (top center, below nav).
-// Blocked-by-target visitor view. Replaces the entire .profile-wrap with
-// a minimal "this account has restricted you" card — avatar, name, @handle,
-// and a centered message. No posts, stats, bio, or Connect button. Mirrors
-// Instagram's blocked-by-user view; never leaks that they blocked you, but
-// lets the blocker reach Unblock from their own /settings → Blocked list.
+// Block-aware visitor screen. Replaces the entire .profile-wrap with a
+// minimal card and routes between two flavors:
+//   _blockedByTarget  → "Profile unavailable" (no Unblock; we don't leak
+//                       that the block came from the target)
+//   _viewerHasBlocked → "You blocked X. Unblock to see their content."
+//                       with an Unblock button that calls /api/me/block
+//                       DELETE and reloads the view.
 function renderBlockedByTargetView(v) {
   const name = v.name || 'This user';
   const handle = v.handle ? '@' + v.handle : '';
   const avatar = v.avatarPhoto || '';
+  const firstName = (name || '').split(/\s+/)[0] || 'them';
   const initials = (name || '?').split(/\s+/).map(p => p[0]).filter(Boolean).join('').slice(0, 2).toUpperCase();
+  const viewerHasBlocked = !!v._viewerHasBlocked;
+  const heading = viewerHasBlocked ? `You blocked ${firstName}` : 'Profile unavailable';
+  const body = viewerHasBlocked
+    ? `Unblock to see their content. You won't be reconnected — you'll need to Connect again.`
+    : `This account has restricted you. You can't see their profile or message them.`;
+  const actionHtml = viewerHasBlocked
+    ? `<button id="vibeBlockedUnblockBtn" style="display:inline-block;padding:10px 22px;border-radius:100px;background:#1C1C1E;color:white;text-decoration:none;font-size:13px;font-weight:700;border:none;cursor:pointer">Unblock ${_esc(firstName)}</button>`
+    : `<a href="/campus" style="display:inline-block;padding:9px 18px;border-radius:100px;background:#1C1C1E;color:white;text-decoration:none;font-size:13px;font-weight:700">← Back to campus</a>`;
   const wrap = document.querySelector('.profile-wrap') || document.body;
   wrap.innerHTML = `
     <div style="max-width:420px;margin:80px auto 0;padding:48px 32px;text-align:center;font-family:'DM Sans',sans-serif;">
@@ -7043,11 +7055,38 @@ function renderBlockedByTargetView(v) {
       </div>
       <div style="font-family:'Fraunces',serif;font-size:24px;color:#1C1C1E;margin-bottom:2px">${_esc(name)}</div>
       <div style="font-size:13px;color:#8A8580;margin-bottom:28px">${_esc(handle)}</div>
-      <div style="font-family:'Fraunces',serif;font-size:16px;color:#1C1C1E;margin-bottom:6px">Profile unavailable</div>
-      <p style="font-size:13px;color:#8A8580;line-height:1.55;margin-bottom:28px">This account has restricted you. You can't see their profile or message them.</p>
-      <a href="/campus" style="display:inline-block;padding:9px 18px;border-radius:100px;background:#1C1C1E;color:white;text-decoration:none;font-size:13px;font-weight:700">← Back to campus</a>
+      <div style="font-family:'Fraunces',serif;font-size:16px;color:#1C1C1E;margin-bottom:6px">${_esc(heading)}</div>
+      <p style="font-size:13px;color:#8A8580;line-height:1.55;margin-bottom:28px">${_esc(body)}</p>
+      ${actionHtml}
     </div>`;
   document.body.classList.add('viewer-mode');
+  // Wire the Unblock CTA — only present when viewerHasBlocked is true.
+  if (viewerHasBlocked) {
+    const btn = document.getElementById('vibeBlockedUnblockBtn');
+    if (btn) {
+      btn.addEventListener('click', async () => {
+        btn.disabled = true;
+        try {
+          const r = await fetch('/api/me/block', {
+            method: 'DELETE',
+            credentials: 'include',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ target_id: v.id }),
+          });
+          const j = await r.json().catch(() => ({}));
+          if (!r.ok || !j.ok) throw new Error((j && j.error) || 'Unblock failed');
+          // Reload so the visitor branch re-runs cleanly and renders the
+          // full profile now that the block is gone.
+          window.location.reload();
+        } catch (e) {
+          btn.disabled = false;
+          if (typeof showToast === 'function') {
+            showToast(e && e.message ? e.message : 'Could not unblock');
+          }
+        }
+      });
+    }
+  }
 }
 
 function showViewerBackBanner(name) {
