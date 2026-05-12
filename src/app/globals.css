@@ -1417,6 +1417,17 @@
   }
 }
 
+/* Touch / mobile: the CustomCursor script bails on coarse pointers,
+   but the two divs still render at fixed top:0/left:0 and were leaving
+   a stuck orange dot in the corner. Hide them entirely below the
+   mobile breakpoint OR on any coarse-pointer device. */
+@media (max-width: 899px), (pointer: coarse) {
+  .vibe-cursor--dot,
+  .vibe-cursor--ring {
+    display: none !important;
+  }
+}
+
 /* —— Otto's Room (/otto) ———————————————————————————————————————————
    Personal cockpit for the AI side-rail. Cosmic backdrop borrowed from
    the landing page DNA (radial violet→black gradient + a sparse fixed
