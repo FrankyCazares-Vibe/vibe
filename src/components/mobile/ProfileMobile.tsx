@@ -4,19 +4,22 @@ import Link from "next/link";
 import { useEffect, useState } from "react";
 
 /**
- * iOS-native mobile profile screen. Built from scratch (not a squished
- * profile.html) so we can use the native pattern: full-bleed cover
- * sitting flush with the status bar, avatar overlapping below, then a
- * clean stack of identity / stats / sections.
+ * iOS-native mobile profile screen. Instagram-style layout: full-bleed
+ * cover, avatar overlapping below, identity stack (stats / name /
+ * handle / tagline / meta / vibe tags / Edit profile), Bio block, then
+ * a tab strip with three panes:
  *
- * MVP for the pilot — top section (cover, avatar, name, handle,
- * tagline, stats, meta, vibe tags, settings gear) + bio + work
- * experience. The rest of the sections (skills, currently into,
- * clips/vibes grid, resume viewer) will land in follow-up iterations
- * once the layout feels right.
+ *   - Posts   — feed posts as a 1:1 grid
+ *   - Clips   — 9:16 short videos as a 9:14 grid with play overlay
+ *   - Resume  — work experience + resume / portfolio link, the
+ *               recruiter-facing pane
  *
- * Data source: /api/me/profile-bootstrap. Same endpoint the desktop
- * profile.html bridge uses — so identity stays in sync.
+ * Data sources:
+ *   - /api/me/profile-bootstrap  → identity + work experience + resume
+ *   - /api/me/posts              → posts + clips (filtered by `type`)
+ *
+ * Identity stays in sync with desktop profile.html because both read
+ * the same bootstrap shape.
  */
 
 /**
@@ -38,6 +41,7 @@ type WorkExp = {
   logoUrl?: string;
 };
 type StudentVerification = { status?: string; school?: string };
+type ResumeItem = { name?: string; type?: string; url?: string };
 
 type VibeUser = {
   name?: string | null;
@@ -53,12 +57,26 @@ type VibeUser = {
   vibeTags?: VibeTag[];
   studentVerification?: StudentVerification;
   workExperience?: WorkExp[];
+  resumePortfolio?: ResumeItem[];
   counts?: {
     followers?: string | number;
     following?: string | number;
     connections?: string | number;
   };
 };
+
+/** Row shape from /api/me/posts. `type === "clip"` are 9:16 short videos
+ *  shown in the Clips tab; everything else lands in Posts. */
+type PostRow = {
+  id: string;
+  type?: string | null;
+  content?: string | null;
+  media_url?: string | null;
+  media_thumbnail_url?: string | null;
+  created_at?: string | null;
+};
+
+type ProfileTab = "posts" | "clips" | "resume";
 
 function pick<T>(...vals: (T | null | undefined)[]): T | null {
   for (const v of vals) {
@@ -73,6 +91,8 @@ const DEFAULT_BANNER_GRADIENT =
 export function ProfileMobile() {
   const [user, setUser] = useState<VibeUser | null>(null);
   const [error, setError] = useState<string | null>(null);
+  const [posts, setPosts] = useState<PostRow[] | null>(null);
+  const [tab, setTab] = useState<ProfileTab>("posts");
 
   useEffect(() => {
     let cancelled = false;
@@ -90,6 +110,28 @@ export function ProfileMobile() {
         setUser(data.vibeUser as VibeUser);
       } catch {
         if (!cancelled) setError("Could not load profile");
+      }
+    })();
+    return () => {
+      cancelled = true;
+    };
+  }, []);
+
+  // Posts + clips fetch — same endpoint, filtered client-side by type.
+  useEffect(() => {
+    let cancelled = false;
+    (async () => {
+      try {
+        const res = await fetch("/api/me/posts", { cache: "no-store" });
+        const data = await res.json();
+        if (cancelled) return;
+        if (data?.ok && Array.isArray(data.posts)) {
+          setPosts(data.posts as PostRow[]);
+        } else {
+          setPosts([]);
+        }
+      } catch {
+        if (!cancelled) setPosts([]);
       }
     })();
     return () => {
@@ -128,6 +170,12 @@ export function ProfileMobile() {
   const counts = user.counts ?? {};
   const followers = String(counts.followers ?? "0");
   const connections = String(counts.connections ?? "0");
+  const resumePortfolio = (user.resumePortfolio ?? []).filter(
+    (r) => !!r?.url,
+  );
+
+  const feedPosts = (posts ?? []).filter((p) => (p.type ?? "post") !== "clip");
+  const clipPosts = (posts ?? []).filter((p) => p.type === "clip");
 
   return (
     <div style={{ minHeight: "100dvh", background: "#FAF7F2", color: "#1C1C1E" }}>
@@ -342,7 +390,7 @@ export function ProfileMobile() {
         </Link>
       </div>
 
-      {/* Bio section */}
+      {/* Bio — stays in the header area, above the tab strip */}
       {bio ? (
         <Section title="Bio">
           <p style={{ fontSize: 14, lineHeight: 1.6, color: "#3D3D3A", margin: 0 }}>
@@ -351,9 +399,305 @@ export function ProfileMobile() {
         </Section>
       ) : null}
 
-      {/* Work experience */}
+      {/* Tab strip — Instagram-style. Posts, Clips, and a Resume tab
+          aimed at recruiters (experience + portfolio + resume PDF). */}
+      <ProfileTabs active={tab} onChange={setTab} />
+
+      <div style={{ padding: "12px 16px 24px" }}>
+        {tab === "posts" ? (
+          <PostsGrid posts={feedPosts} loading={posts === null} />
+        ) : tab === "clips" ? (
+          <ClipsGrid clips={clipPosts} loading={posts === null} />
+        ) : (
+          <ResumePane
+            workExperience={workExperience}
+            resumePortfolio={resumePortfolio}
+          />
+        )}
+      </div>
+    </div>
+  );
+}
+
+// ---------------------------------------------------------------------------
+// Tab strip + content panes
+// ---------------------------------------------------------------------------
+
+function ProfileTabs({
+  active,
+  onChange,
+}: {
+  active: ProfileTab;
+  onChange: (t: ProfileTab) => void;
+}) {
+  const tabs: Array<{ id: ProfileTab; label: string; icon: React.ReactNode }> = [
+    { id: "posts", label: "Posts", icon: <IconGrid /> },
+    { id: "clips", label: "Clips", icon: <IconClip /> },
+    { id: "resume", label: "Resume", icon: <IconResume /> },
+  ];
+  return (
+    <div
+      style={{
+        display: "grid",
+        gridTemplateColumns: "repeat(3, 1fr)",
+        borderTop: "1px solid rgba(28,28,30,0.08)",
+        borderBottom: "1px solid rgba(28,28,30,0.08)",
+        background: "#FAF7F2",
+      }}
+    >
+      {tabs.map((t) => {
+        const isActive = t.id === active;
+        return (
+          <button
+            key={t.id}
+            type="button"
+            onClick={() => onChange(t.id)}
+            aria-pressed={isActive}
+            style={{
+              position: "relative",
+              display: "flex",
+              flexDirection: "column",
+              alignItems: "center",
+              justifyContent: "center",
+              gap: 4,
+              padding: "12px 4px 10px",
+              background: "transparent",
+              border: "none",
+              color: isActive ? "#1C1C1E" : "#8A8580",
+              fontFamily: "DM Sans, sans-serif",
+              fontSize: 11,
+              fontWeight: 700,
+              letterSpacing: "0.04em",
+              textTransform: "uppercase",
+              cursor: "pointer",
+              WebkitTapHighlightColor: "transparent",
+            }}
+          >
+            <span aria-hidden style={{ display: "inline-flex" }}>{t.icon}</span>
+            {t.label}
+            {isActive ? (
+              <span
+                aria-hidden
+                style={{
+                  position: "absolute",
+                  bottom: -1,
+                  left: "50%",
+                  transform: "translateX(-50%)",
+                  width: 34,
+                  height: 2,
+                  borderRadius: 2,
+                  background: "#1C1C1E",
+                }}
+              />
+            ) : null}
+          </button>
+        );
+      })}
+    </div>
+  );
+}
+
+function PostsGrid({ posts, loading }: { posts: PostRow[]; loading: boolean }) {
+  if (loading) return <GridSkeleton />;
+  if (posts.length === 0) {
+    return (
+      <EmptyTab
+        title="No posts yet"
+        body="Share a thought, a moment, or a photo — your posts land here."
+        cta={{ href: "/campus?tab=feed", label: "Open the feed →" }}
+      />
+    );
+  }
+  return (
+    <div
+      style={{
+        display: "grid",
+        gridTemplateColumns: "repeat(3, 1fr)",
+        gap: 4,
+      }}
+    >
+      {posts.map((p) => (
+        <PostThumb key={p.id} post={p} ratio="1/1" />
+      ))}
+    </div>
+  );
+}
+
+function ClipsGrid({ clips, loading }: { clips: PostRow[]; loading: boolean }) {
+  if (loading) return <GridSkeleton ratio="9/14" />;
+  if (clips.length === 0) {
+    return (
+      <EmptyTab
+        title="No clips yet"
+        body="Clips are short, 9:16 video moments. Post one from the campus feed to get started."
+      />
+    );
+  }
+  return (
+    <div
+      style={{
+        display: "grid",
+        gridTemplateColumns: "repeat(3, 1fr)",
+        gap: 4,
+      }}
+    >
+      {clips.map((p) => (
+        <PostThumb key={p.id} post={p} ratio="9/14" overlay="play" />
+      ))}
+    </div>
+  );
+}
+
+function PostThumb({
+  post,
+  ratio,
+  overlay,
+}: {
+  post: PostRow;
+  ratio: string;
+  overlay?: "play";
+}) {
+  const thumb = post.media_thumbnail_url || post.media_url || "";
+  return (
+    <div
+      style={{
+        position: "relative",
+        aspectRatio: ratio,
+        borderRadius: 6,
+        overflow: "hidden",
+        background: thumb
+          ? `url(${thumb}) center/cover`
+          : "linear-gradient(135deg,#FFE5DB,#C8B8FF)",
+      }}
+    >
+      {!thumb ? (
+        <div
+          style={{
+            position: "absolute",
+            inset: 0,
+            display: "flex",
+            alignItems: "center",
+            justifyContent: "center",
+            padding: 8,
+            fontSize: 11,
+            color: "#fff",
+            background: "rgba(0,0,0,0.18)",
+            textAlign: "center",
+            lineHeight: 1.3,
+            fontWeight: 600,
+          }}
+        >
+          {(post.content ?? "").slice(0, 60) || "Post"}
+        </div>
+      ) : null}
+      {overlay === "play" ? (
+        <span
+          aria-hidden
+          style={{
+            position: "absolute",
+            top: 6,
+            right: 6,
+            width: 18,
+            height: 18,
+            borderRadius: "50%",
+            background: "rgba(0,0,0,0.55)",
+            color: "#fff",
+            display: "inline-flex",
+            alignItems: "center",
+            justifyContent: "center",
+          }}
+        >
+          <svg width="9" height="9" viewBox="0 0 9 9" fill="currentColor">
+            <path d="M1.5 1L8 4.5 1.5 8z" />
+          </svg>
+        </span>
+      ) : null}
+    </div>
+  );
+}
+
+function ResumePane({
+  workExperience,
+  resumePortfolio,
+}: {
+  workExperience: WorkExp[];
+  resumePortfolio: ResumeItem[];
+}) {
+  const empty = workExperience.length === 0 && resumePortfolio.length === 0;
+  if (empty) {
+    return (
+      <EmptyTab
+        title="Nothing for recruiters yet"
+        body="Add work experience or upload a resume so recruiters and connections can see what you've shipped."
+        cta={{ href: "/profile?edit=1", label: "Edit profile →" }}
+      />
+    );
+  }
+  return (
+    <div style={{ display: "flex", flexDirection: "column", gap: 16 }}>
+      {resumePortfolio.length > 0 ? (
+        <div style={{ display: "flex", flexDirection: "column", gap: 8 }}>
+          {resumePortfolio.map((r, i) => (
+            <a
+              key={`${r.url}-${i}`}
+              href={r.url}
+              target="_blank"
+              rel="noopener noreferrer"
+              style={{
+                display: "flex",
+                alignItems: "center",
+                gap: 12,
+                padding: "12px 14px",
+                background: "#fff",
+                border: "1px solid rgba(28,28,30,0.08)",
+                borderRadius: 14,
+                textDecoration: "none",
+                color: "#1C1C1E",
+              }}
+            >
+              <span
+                style={{
+                  width: 36,
+                  height: 36,
+                  borderRadius: 10,
+                  background: "rgba(255,92,53,0.10)",
+                  color: "#FF5C35",
+                  display: "inline-flex",
+                  alignItems: "center",
+                  justifyContent: "center",
+                  flexShrink: 0,
+                }}
+                aria-hidden
+              >
+                <IconResume />
+              </span>
+              <div style={{ flex: 1, minWidth: 0 }}>
+                <div style={{ fontSize: 14, fontWeight: 700 }}>
+                  {r.name ?? "Resume"}
+                </div>
+                <div style={{ fontSize: 12, color: "#8A8580" }}>
+                  {(r.type ?? "file").toUpperCase()} · tap to open
+                </div>
+              </div>
+            </a>
+          ))}
+        </div>
+      ) : null}
+
       {workExperience.length > 0 ? (
-        <Section title="Experience">
+        <div>
+          <div
+            style={{
+              fontFamily: "Fraunces, serif",
+              fontSize: 14,
+              fontWeight: 800,
+              letterSpacing: "-0.2px",
+              marginBottom: 10,
+              color: "#1C1C1E",
+            }}
+          >
+            Experience
+          </div>
           <div style={{ display: "flex", flexDirection: "column", gap: 14 }}>
             {workExperience.map((w, i) => (
               <div key={`${w.title}-${i}`} style={{ display: "flex", gap: 12 }}>
@@ -394,17 +738,117 @@ export function ProfileMobile() {
               </div>
             ))}
           </div>
-        </Section>
+        </div>
       ) : null}
-
-      {/* Placeholder for future iterations */}
-      <Section title="More coming">
-        <p style={{ fontSize: 13, color: "#8A8580", margin: 0, lineHeight: 1.5 }}>
-          Vibes (clips), skills detail, currently into, and the resume
-          viewer ship in the next iteration of the mobile rebuild.
-        </p>
-      </Section>
     </div>
+  );
+}
+
+function GridSkeleton({ ratio = "1/1" }: { ratio?: string }) {
+  return (
+    <div
+      style={{
+        display: "grid",
+        gridTemplateColumns: "repeat(3, 1fr)",
+        gap: 4,
+      }}
+    >
+      {[0, 1, 2, 3, 4, 5].map((i) => (
+        <div
+          key={i}
+          style={{
+            aspectRatio: ratio,
+            background: "rgba(28,28,30,0.06)",
+            borderRadius: 6,
+          }}
+        />
+      ))}
+    </div>
+  );
+}
+
+function EmptyTab({
+  title,
+  body,
+  cta,
+}: {
+  title: string;
+  body: string;
+  cta?: { href: string; label: string };
+}) {
+  return (
+    <div
+      style={{
+        padding: "32px 18px",
+        textAlign: "center",
+        background: "rgba(255,253,248,0.65)",
+        border: "1px dashed rgba(28,28,30,0.14)",
+        borderRadius: 18,
+      }}
+    >
+      <div
+        style={{
+          fontFamily: "Fraunces, serif",
+          fontWeight: 800,
+          fontSize: 16,
+          color: "#1C1C1E",
+          marginBottom: 6,
+        }}
+      >
+        {title}
+      </div>
+      <p style={{ fontSize: 13, color: "#8A8580", margin: 0, lineHeight: 1.5 }}>
+        {body}
+      </p>
+      {cta ? (
+        <Link
+          href={cta.href}
+          style={{
+            display: "inline-block",
+            marginTop: 14,
+            padding: "9px 16px",
+            borderRadius: 999,
+            background: "#FF5C35",
+            color: "#fff",
+            fontFamily: "DM Sans, sans-serif",
+            fontSize: 12,
+            fontWeight: 700,
+            textDecoration: "none",
+          }}
+        >
+          {cta.label}
+        </Link>
+      ) : null}
+    </div>
+  );
+}
+
+// Tab strip icons — small, monochrome, 16px so they sit cleanly above text.
+function IconGrid() {
+  return (
+    <svg width="16" height="16" viewBox="0 0 16 16" fill="none" aria-hidden>
+      <rect x="1.5" y="1.5" width="4" height="4" stroke="currentColor" strokeWidth="1.3" />
+      <rect x="10.5" y="1.5" width="4" height="4" stroke="currentColor" strokeWidth="1.3" />
+      <rect x="1.5" y="10.5" width="4" height="4" stroke="currentColor" strokeWidth="1.3" />
+      <rect x="10.5" y="10.5" width="4" height="4" stroke="currentColor" strokeWidth="1.3" />
+    </svg>
+  );
+}
+function IconClip() {
+  return (
+    <svg width="16" height="16" viewBox="0 0 16 16" fill="none" aria-hidden>
+      <rect x="3" y="1.5" width="10" height="13" rx="2" stroke="currentColor" strokeWidth="1.3" />
+      <path d="M6.5 5.5L10 8l-3.5 2.5z" fill="currentColor" />
+    </svg>
+  );
+}
+function IconResume() {
+  return (
+    <svg width="16" height="16" viewBox="0 0 16 16" fill="none" aria-hidden>
+      <rect x="2" y="4" width="12" height="10" rx="2" stroke="currentColor" strokeWidth="1.3" />
+      <path d="M6 4V3a1 1 0 011-1h2a1 1 0 011 1v1" stroke="currentColor" strokeWidth="1.3" />
+      <path d="M5 8h6M5 11h4" stroke="currentColor" strokeWidth="1.3" strokeLinecap="round" />
+    </svg>
   );
 }
 
