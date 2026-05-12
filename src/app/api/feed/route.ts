@@ -57,15 +57,16 @@ type EngagementCounts = {
 };
 
 /**
- * Campus feed — posts + clips from the viewer's school, plus reposts by
- * the viewer's school (virtual rows that embed the original). Newest first.
+ * Campus feed — posts + clips from every user (global), newest first.
  *
  * Each row carries denormalized engagement counts and the viewer's own
  * like/repost state, so the client can render the engagement bar without a
  * second roundtrip per card.
  *
- * If the viewer has no `school` set (incomplete onboarding), returns their
- * own posts only — better than a blank feed during dev.
+ * The school-scoped query path is preserved below but currently unused —
+ * `users.school` isn't populated yet, so the campus feed is global. Once
+ * onboarding starts setting `school`, flip the gate to opt back into the
+ * per-school filter.
  */
 export async function GET(req: Request) {
   const supabase = await createSupabaseServerClient();
@@ -116,19 +117,15 @@ export async function GET(req: Request) {
     .order("created_at", { ascending: false })
     .limit(limit);
 
-  if (school) {
-    postsQuery = postsQuery.eq("author.school", school);
-  } else {
-    postsQuery = postsQuery.eq("user_id", user.id);
-  }
+  // Global feed for now — no school filter. See the route docblock above.
   if (tagFilter) {
     postsQuery = postsQuery.contains("tags", [tagFilter]);
   }
 
-  // Reposts by people at the viewer's school. The embedded `post` carries
-  // its own author/org joins so the client can render the original card
-  // exactly the same way it would as a top-level post.
-  let repostsQuery = supabase
+  // Reposts (global for now). The embedded `post` carries its own
+  // author/org joins so the client can render the original card exactly the
+  // same way it would as a top-level post.
+  const repostsQuery = supabase
     .from("post_reposts")
     .select(
       "post_id,user_id,comment,created_at," +
@@ -142,11 +139,8 @@ export async function GET(req: Request) {
     .order("created_at", { ascending: false })
     .limit(limit);
 
-  if (school) {
-    repostsQuery = repostsQuery.eq("reposter.school", school);
-  } else {
-    repostsQuery = repostsQuery.eq("user_id", user.id);
-  }
+  // Global feed for now — see above. `school` is still returned in the
+  // response payload (`viewerSchool`) for clients that surface it.
 
   // Tag filter focuses the view on original posts with that hashtag. We
   // skip reposts in that mode — surfacing every reshare of every #foo
