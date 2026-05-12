@@ -136,6 +136,68 @@ export function AdminOrgsClient({
       }}
     >
       <div style={{ maxWidth: 1100, margin: "0 auto" }}>
+        {/* Back-out row: Admin is its own dark surface, so the LeftNav
+            doesn't render here. A small explicit "← Campus" link
+            (plus quick jumps to Profile / Network) gives the user a
+            way back without relying on the browser back button. */}
+        <div
+          style={{
+            display: "flex",
+            alignItems: "center",
+            gap: 14,
+            marginBottom: 18,
+            fontSize: 12,
+            fontFamily: "DM Sans, sans-serif",
+          }}
+        >
+          <Link
+            href="/campus"
+            style={{
+              display: "inline-flex",
+              alignItems: "center",
+              gap: 6,
+              padding: "7px 13px",
+              borderRadius: 999,
+              background: "rgba(255,255,255,0.06)",
+              border: "1px solid rgba(255,255,255,0.12)",
+              color: COLORS.text,
+              textDecoration: "none",
+              fontWeight: 600,
+            }}
+          >
+            ← Campus
+          </Link>
+          <Link
+            href="/profile"
+            style={{
+              color: COLORS.muted,
+              textDecoration: "none",
+              fontWeight: 500,
+            }}
+          >
+            Profile
+          </Link>
+          <Link
+            href="/network"
+            style={{
+              color: COLORS.muted,
+              textDecoration: "none",
+              fontWeight: 500,
+            }}
+          >
+            Network
+          </Link>
+          <Link
+            href="/settings"
+            style={{
+              color: COLORS.muted,
+              textDecoration: "none",
+              fontWeight: 500,
+            }}
+          >
+            Settings
+          </Link>
+        </div>
         <header style={{ marginBottom: 24 }}>
           <div
             style={{
