@@ -4230,6 +4230,7 @@ function FeedTabBody({
                 entry={entry}
                 hairline={idx < entries.length - 1 ? hairline : "none"}
                 onMutate={refresh}
+                onPickTag={onPickTag}
               />
             ))
           )}
@@ -5173,6 +5174,41 @@ function FeedComposer({
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const attachInputRef = useRef<HTMLInputElement | null>(null);
+  const textareaRef = useRef<HTMLTextAreaElement | null>(null);
+
+  // Bind the existing _mentionPicker.js typeahead to the composer
+  // textarea. The script is loaded once per page (idempotent flag on
+  // window), bind is idempotent per textarea. Picker mutates the
+  // textarea via the native value setter so React's onChange fires and
+  // controlled state stays in sync.
+  useEffect(() => {
+    const ta = textareaRef.current;
+    if (!ta) return;
+    const bind = () => {
+      const w = window as unknown as {
+        vibeBindMentionPicker?: (ta: HTMLTextAreaElement) => void;
+      };
+      if (w.vibeBindMentionPicker) w.vibeBindMentionPicker(ta);
+    };
+    if ((window as unknown as { vibeBindMentionPicker?: unknown })
+      .vibeBindMentionPicker) {
+      bind();
+      return;
+    }
+    const existing = document.querySelector<HTMLScriptElement>(
+      "script[data-vibe-mention-picker]",
+    );
+    if (existing) {
+      existing.addEventListener("load", bind, { once: true });
+      return;
+    }
+    const s = document.createElement("script");
+    s.src = "/html/_mentionPicker.js";
+    s.async = true;
+    s.dataset.vibeMentionPicker = "1";
+    s.addEventListener("load", bind, { once: true });
+    document.head.appendChild(s);
+  }, []);
 
   const hasContent = !!text.trim() || !!imageFile || !!clipFile;
 
@@ -5397,9 +5433,10 @@ function FeedComposer({
         }}
       >
         <textarea
+          ref={textareaRef}
           value={text}
           onChange={(e) => setText(e.target.value.slice(0, 2000))}
-          placeholder="What's happening on campus?  Use #hashtags to tag your post."
+          placeholder="What's happening on campus?  Use #hashtags or @mention someone."
           rows={2}
           style={{
             border: "none",
@@ -5647,14 +5684,98 @@ function extractHashtags(text: string): string[] {
   return out;
 }
 
+/**
+ * Render a post body with `@handle` mentions and `#tags` linkified.
+ *
+ * Splits the raw text on a single regex that matches either an @mention
+ * or a #hashtag (each preceded by start-of-string or a non-word char so
+ * we don't grab the @ in an email or a # inside a URL fragment). Each
+ * matched token becomes a clickable element; plain runs stay as
+ * `<span>` so the surrounding `white-space: pre-wrap` keeps newlines.
+ *
+ * - @mentions → /profile/<handle> via next/link
+ * - #hashtags → onPickTag(tag) — switches the feed to the tag-filtered
+ *   view (same path the trending pills use)
+ *
+ * Handles match the users.handle CHECK (lowercase a-z, 0-9, underscore,
+ * 3–20 chars). Tags allow letters / digits / underscores up to 32 chars,
+ * which matches the publish-post tag sanitizer.
+ */
+function renderPostContent(
+  text: string,
+  onPickTag: (tag: string) => void,
+): React.ReactNode {
+  if (!text) return null;
+  const re = /(^|[^A-Za-z0-9_@#])([@#][A-Za-z0-9_]{1,32})/g;
+  const nodes: React.ReactNode[] = [];
+  let lastIndex = 0;
+  let match: RegExpExecArray | null;
+  let key = 0;
+  while ((match = re.exec(text)) !== null) {
+    const leading = match[1] ?? "";
+    const token = match[2] ?? "";
+    // Position of the @ or # within the original string.
+    const tokenStart = match.index + leading.length;
+    if (tokenStart > lastIndex) {
+      nodes.push(
+        <span key={`t${key++}`}>{text.slice(lastIndex, tokenStart)}</span>,
+      );
+    }
+    const sigil = token[0];
+    const body = token.slice(1).toLowerCase();
+    if (sigil === "@" && body.length >= 3) {
+      nodes.push(
+        <Link
+          key={`m${key++}`}
+          href={`/profile/${encodeURIComponent(body)}`}
+          style={{ color: "#FF5C35", fontWeight: 600, textDecoration: "none" }}
+        >
+          {token}
+        </Link>,
+      );
+    } else if (sigil === "#") {
+      nodes.push(
+        <button
+          key={`h${key++}`}
+          type="button"
+          onClick={() => onPickTag(body)}
+          style={{
+            background: "none",
+            border: "none",
+            padding: 0,
+            color: "#FF5C35",
+            fontWeight: 600,
+            cursor: "pointer",
+            fontFamily: "inherit",
+            fontSize: "inherit",
+            lineHeight: "inherit",
+          }}
+        >
+          {token}
+        </button>,
+      );
+    } else {
+      // Bare @ with no handle (1-2 chars) — keep as plain text.
+      nodes.push(<span key={`p${key++}`}>{token}</span>);
+    }
+    lastIndex = tokenStart + token.length;
+  }
+  if (lastIndex < text.length) {
+    nodes.push(<span key={`t${key++}`}>{text.slice(lastIndex)}</span>);
+  }
+  return nodes;
+}
+
 function FeedRow({
   entry,
   hairline,
   onMutate,
+  onPickTag,
 }: {
   entry: FeedEntry;
   hairline: string;
   onMutate: () => void;
+  onPickTag: (tag: string) => void;
 }) {
   const post = entry.post;
   const fromOrg = !!post.org;
@@ -5949,7 +6070,7 @@ function FeedRow({
               whiteSpace: "pre-wrap",
             }}
           >
-            {post.content}
+            {renderPostContent(post.content, onPickTag)}
           </p>
         ) : null}
         {post.media_url && post.type === "post" && post.media_kind === "image" ? (

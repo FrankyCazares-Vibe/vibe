@@ -155,12 +155,26 @@
     const before = ta.value.slice(0, state.matchStart);
     const after = ta.value.slice(state.matchEnd);
     const replaced = "@" + handle + " ";
-    ta.value = before + replaced + after;
+    const next = before + replaced + after;
+    // React controlled textareas need the native value setter so React's
+    // internal `_valueTracker` sees the change and re-fires onChange.
+    // Plain assignment (`ta.value = ...`) updates the DOM but doesn't
+    // trip React, so the next render would clobber the picker's output
+    // back to stale state. The descriptor-based setter works for both
+    // React-controlled and plain HTML textareas — no behavioral change
+    // outside React.
+    var proto = window.HTMLTextAreaElement && window.HTMLTextAreaElement.prototype;
+    var desc = proto && Object.getOwnPropertyDescriptor(proto, "value");
+    if (desc && typeof desc.set === "function") {
+      desc.set.call(ta, next);
+    } else {
+      ta.value = next;
+    }
     const caret = before.length + replaced.length;
     ta.setSelectionRange(caret, caret);
     ta.focus();
     // Trigger an input event so callers' own oninput handlers fire
-    // (e.g. autosize, send-button enable).
+    // (e.g. autosize, send-button enable) and React picks it up.
     ta.dispatchEvent(new Event("input", { bubbles: true }));
     close();
   }
