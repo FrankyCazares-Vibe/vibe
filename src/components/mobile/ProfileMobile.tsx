@@ -187,22 +187,11 @@ export function ProfileMobile() {
 
       {/* Identity block — overlaps the cover */}
       <div style={{ padding: "0 16px", marginTop: -44 }}>
-        <div
-          style={{
-            // position+z-index lifts the avatar row above the cover's
-            // absolutely-positioned bottom-fade overlay. Without this,
-            // the translucent gradient paints OVER the avatar in the
-            // overlap zone (positioned descendants outrank normal-flow
-            // siblings in paint order).
-            position: "relative",
-            zIndex: 1,
-            display: "flex",
-            alignItems: "flex-end",
-            gap: 14,
-            marginBottom: 14,
-          }}
-        >
-          {/* Avatar */}
+        {/* Avatar alone on its own row so the stats can breathe below it
+            instead of sitting flush against the cover. position+z-index
+            lifts it above the cover's bottom-fade overlay (positioned
+            descendants outrank normal-flow siblings in paint order). */}
+        <div style={{ position: "relative", zIndex: 1, marginBottom: 14 }}>
           <div
             style={{
               width: 88,
@@ -213,7 +202,6 @@ export function ProfileMobile() {
                 : "#FFD3C2",
               border: "3px solid #FAF7F2",
               boxShadow: "0 8px 24px rgba(0,0,0,0.12)",
-              flexShrink: 0,
               display: "flex",
               alignItems: "center",
               justifyContent: "center",
@@ -225,21 +213,22 @@ export function ProfileMobile() {
           >
             {!avatar ? initialsOf(name) : null}
           </div>
+        </div>
 
-          {/* Stats row beside avatar */}
-          <div
-            style={{
-              flex: 1,
-              display: "flex",
-              alignItems: "center",
-              justifyContent: "space-around",
-              paddingBottom: 6,
-              gap: 4,
-            }}
-          >
-            <StatTile num={followers} label="Followers" />
-            <StatTile num={connections} label="Connections" prominent />
-          </div>
+        {/* Stats row — own line below the avatar so it's no longer kissing
+            the bottom edge of the banner. Centered and capped so the two
+            counts have visual weight without spreading edge-to-edge. */}
+        <div
+          style={{
+            display: "flex",
+            justifyContent: "space-around",
+            gap: 12,
+            maxWidth: 260,
+            marginBottom: 16,
+          }}
+        >
+          <StatTile num={followers} label="Followers" />
+          <StatTile num={connections} label="Connections" prominent />
         </div>
 
         {/* Name + verified */}
