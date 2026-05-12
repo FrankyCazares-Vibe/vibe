@@ -235,7 +235,15 @@ export async function GET(req: Request) {
   // campus prototype reads this; new code should consume `feed` instead.
   const legacyPosts = postRowsOut.map((entry) => entry.post);
 
-  return NextResponse.json({ ok: true, feed, posts: legacyPosts, viewerSchool: school });
+  return NextResponse.json({
+    ok: true,
+    feed,
+    posts: legacyPosts,
+    viewerSchool: school,
+    // Echo the viewer's id so the client can gate per-row owner-only
+    // affordances (delete menu, etc.) without a separate roundtrip.
+    viewerId: user.id,
+  });
 }
 
 async function loadEngagement(

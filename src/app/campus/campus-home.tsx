@@ -4052,6 +4052,7 @@ function FeedTabBody({
   onPickTag: (tag: string) => void;
 }) {
   const [entries, setEntries] = useState<FeedEntry[] | null>(null);
+  const [viewerId, setViewerId] = useState<string | null>(null);
   // Posts vs Clips toggle. When `clips`, the feed becomes a vertical
   // Reels-style player that auto-plays the visible clip. Tag-filter mode
   // forces back to Posts since hashtag drilldowns mix both kinds.
@@ -4068,6 +4069,9 @@ function FeedTabBody({
       setEntries(
         data?.ok && Array.isArray(data.feed) ? (data.feed as FeedEntry[]) : [],
       );
+      if (data?.ok && typeof data.viewerId === "string") {
+        setViewerId(data.viewerId);
+      }
     } catch (e) {
       console.error("[campus] feed", e);
       setEntries([]);
@@ -4084,6 +4088,9 @@ function FeedTabBody({
         setEntries(
           data?.ok && Array.isArray(data.feed) ? (data.feed as FeedEntry[]) : [],
         );
+        if (data?.ok && typeof data.viewerId === "string") {
+          setViewerId(data.viewerId);
+        }
       } catch (e) {
         console.error("[campus] feed", e);
         if (!cancelled) setEntries([]);
@@ -4269,6 +4276,7 @@ function FeedTabBody({
                 hairline={idx < entries.length - 1 ? hairline : "none"}
                 onMutate={refresh}
                 onPickTag={onPickTag}
+                viewerId={viewerId}
               />
             ))
           )}
@@ -5809,14 +5817,20 @@ function FeedRow({
   hairline,
   onMutate,
   onPickTag,
+  viewerId,
 }: {
   entry: FeedEntry;
   hairline: string;
   onMutate: () => void;
   onPickTag: (tag: string) => void;
+  viewerId: string | null;
 }) {
   const post = entry.post;
   const fromOrg = !!post.org;
+  // Owner check: the post's user_id is the author. Org posts attribute
+  // back to the user too, so we treat author === viewer as ownership
+  // regardless of whether the post is org- or person-attributed.
+  const viewerOwnsPost = !!viewerId && post.user_id === viewerId;
   const displayName =
     (fromOrg ? post.org?.name : post.author?.name) ||
     post.author?.handle ||
@@ -5857,6 +5871,46 @@ function FeedRow({
   const [viewCount, setViewCount] = useState(post.view_count);
   const [showComments, setShowComments] = useState(false);
   const [showRepostMenu, setShowRepostMenu] = useState(false);
+  // Owner-only "more" menu — Delete is the only entry for now. Anchored
+  // on the row's top-right via a small kebab. Click-outside closes it.
+  const [showMoreMenu, setShowMoreMenu] = useState(false);
+  const [deleting, setDeleting] = useState(false);
+
+  const onDeletePost = useCallback(async () => {
+    if (deleting) return;
+    if (
+      typeof window !== "undefined" &&
+      !window.confirm("Delete this post? This can't be undone.")
+    ) {
+      return;
+    }
+    setDeleting(true);
+    try {
+      const res = await fetch(`/api/posts/${post.id}`, { method: "DELETE" });
+      if (!res.ok) throw new Error(`delete ${res.status}`);
+      setShowMoreMenu(false);
+      // Refetch the feed so the deleted row falls out without us having
+      // to plumb the deletion into parent state directly.
+      onMutate();
+    } catch (e) {
+      console.error("[feed] delete post", e);
+      setDeleting(false);
+    }
+  }, [deleting, post.id, onMutate]);
+
+  // Click-outside dismiss for the more menu — only attaches when open
+  // so we don't burn document listeners on every row.
+  useEffect(() => {
+    if (!showMoreMenu) return;
+    const close = (e: MouseEvent) => {
+      const target = e.target as Element | null;
+      if (!target || !target.closest?.("[data-feedrow-more]")) {
+        setShowMoreMenu(false);
+      }
+    };
+    document.addEventListener("click", close);
+    return () => document.removeEventListener("click", close);
+  }, [showMoreMenu]);
 
   // Record a view once per session per post when the row scrolls into view.
   // The server-side dedupe (per-user-per-day) is the real source of truth;
@@ -5944,8 +5998,98 @@ function FeedRow({
         padding: "16px 20px",
         borderBottom: hairline,
         transition: "background 600ms ease",
+        position: "relative",
       }}
     >
+      {viewerOwnsPost ? (
+        <div
+          data-feedrow-more
+          style={{
+            position: "absolute",
+            top: 10,
+            right: 12,
+            zIndex: 2,
+          }}
+        >
+          <button
+            type="button"
+            aria-label="Post actions"
+            onClick={() => setShowMoreMenu((v) => !v)}
+            style={{
+              width: 28,
+              height: 28,
+              borderRadius: 999,
+              background: "transparent",
+              border: "none",
+              color: COLORS.muted,
+              fontSize: 18,
+              lineHeight: 1,
+              cursor: "pointer",
+              display: "flex",
+              alignItems: "center",
+              justifyContent: "center",
+              padding: 0,
+            }}
+            onMouseEnter={(e) => {
+              e.currentTarget.style.background = "rgba(28,28,30,0.06)";
+            }}
+            onMouseLeave={(e) => {
+              e.currentTarget.style.background = "transparent";
+            }}
+          >
+            ⋯
+          </button>
+          {showMoreMenu ? (
+            <div
+              role="menu"
+              style={{
+                position: "absolute",
+                top: 32,
+                right: 0,
+                minWidth: 160,
+                background: "white",
+                border: "1px solid rgba(28,28,30,0.08)",
+                borderRadius: 12,
+                boxShadow: "0 12px 36px rgba(0,0,0,0.12)",
+                padding: 4,
+                fontFamily: "DM Sans, sans-serif",
+                fontSize: 13,
+                overflow: "hidden",
+              }}
+            >
+              <button
+                type="button"
+                role="menuitem"
+                onClick={onDeletePost}
+                disabled={deleting}
+                style={{
+                  display: "block",
+                  width: "100%",
+                  textAlign: "left",
+                  padding: "9px 12px",
+                  borderRadius: 8,
+                  background: "transparent",
+                  border: "none",
+                  color: "#C0392B",
+                  fontFamily: "inherit",
+                  fontSize: "inherit",
+                  fontWeight: 600,
+                  cursor: deleting ? "default" : "pointer",
+                  opacity: deleting ? 0.6 : 1,
+                }}
+                onMouseEnter={(e) => {
+                  if (!deleting) e.currentTarget.style.background = "#FAF7F2";
+                }}
+                onMouseLeave={(e) => {
+                  e.currentTarget.style.background = "transparent";
+                }}
+              >
+                {deleting ? "Deleting…" : "Delete post"}
+              </button>
+            </div>
+          ) : null}
+        </div>
+      ) : null}
       {entry.kind === "repost" ? (
         <RepostBanner reposter={entry.reposter} />
       ) : null}
