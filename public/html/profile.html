@@ -6082,12 +6082,53 @@ async function paintVibeMoreMenu() {
     : `window.vibeOpenMuteSheet('${safeId}','${safeName}', undefined, () => { paintVibeMoreMenu(); })`;
   const css = "display:block;width:100%;text-align:left;background:none;border:none;padding:11px 14px;font-family:'DM Sans',sans-serif;font-size:13px;color:#1C1C1E;cursor:none;transition:background .12s";
   const dangerCss = css.replace('color:#1C1C1E', 'color:#C0392B');
+  // Unfollow row — only visible when the viewer currently follows the
+  // target (state is 'following' or 'connected'). When state is
+  // 'connected', the main button now means "Message", so the kebab is
+  // the only place to drop the follow edge.
+  const showUnfollow = (typeof vibeRelState !== 'undefined') &&
+    (vibeRelState === 'following' || vibeRelState === 'connected');
+  const unfollowRow = showUnfollow
+    ? `<button style="${css}" onmouseover="this.style.background='#FAF7F2'" onmouseout="this.style.background='none'" onclick="window.vibeUnfollowFromMenu('${safeId}','${safeName}'); document.getElementById('vibeMoreMenu').style.display='none';">Unfollow ${name.split(' ')[0] || ''}</button>`
+    : '';
   menu.innerHTML = `
+    ${unfollowRow}
     <button style="${css}" onmouseover="this.style.background='#FAF7F2'" onmouseout="this.style.background='none'" onclick="window.vibeOpenReportSheet('user','${safeId}'); document.getElementById('vibeMoreMenu').style.display='none';">Report ${name.split(' ')[0] || ''}</button>
     <button style="${css}" onmouseover="this.style.background='#FAF7F2'" onmouseout="this.style.background='none'" onclick="${muteHandler}; document.getElementById('vibeMoreMenu').style.display='none';">${muteLabel}${name.split(' ')[0] || ''}</button>
     <button style="${dangerCss}" onmouseover="this.style.background='#FAF7F2'" onmouseout="this.style.background='none'" onclick="${blockHandler}; document.getElementById('vibeMoreMenu').style.display='none';">${blockLabel}${name.split(' ')[0] || ''}</button>
   `;
 }
+
+// Drop the follow edge from the kebab menu. Distinct from the main
+// Connect button's toggle so the "connected → message" semantics on the
+// primary button stay intact. After unfollow, the connection (mutual
+// follow) is no longer satisfied, so the primary button reverts from
+// "Message" to either "Connect" or "Follow back" depending on whether
+// the other party still follows the viewer.
+window.vibeUnfollowFromMenu = async function (targetId, displayName) {
+  if (!targetId) return;
+  const name = displayName || 'this person';
+  try {
+    const r = await fetch('/api/me/follow', {
+      method: 'DELETE',
+      credentials: 'include',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ target_id: targetId }),
+    });
+    const j = await r.json().catch(() => ({}));
+    if (!r.ok || !j.ok) throw new Error((j && j.error) || 'Unfollow failed');
+    // After unfollow, follow_state can only be 'followed_by' (they still
+    // follow us) or 'none'. We don't know which from the response alone,
+    // so default to 'none'; if they follow back the next view refresh
+    // will flip it. Most importantly it leaves "Connected" behind.
+    if (typeof setVibeRelState === 'function') setVibeRelState('none');
+    if (typeof showToast === 'function') showToast('Unfollowed ' + name);
+  } catch (e) {
+    if (typeof showToast === 'function') {
+      showToast(e && e.message ? e.message : 'Could not unfollow');
+    }
+  }
+};
 window.toggleVibeMoreMenu = toggleVibeMoreMenu;
 window.paintVibeMoreMenu = paintVibeMoreMenu;
 
@@ -6731,6 +6772,18 @@ window.viewingRealUser = null;
       .then(j => {
         if (!j || !j.ok || !j.vibeUser) throw new Error('not_found');
         const v = j.vibeUser;
+        // Blocked-by-target short-circuit. The bootstrap response carries
+        // only minimal identity (id, name, handle, avatar) — no posts, no
+        // bio, no counts. Render an Instagram-style "this account has
+        // restricted you" view and bail before the rest of the owner-shaped
+        // hydration paints partial state.
+        if (v._blockedByTarget) {
+          renderBlockedByTargetView(v);
+          requestAnimationFrame(() => {
+            document.documentElement.classList.remove('vibe-pre-paint');
+          });
+          return;
+        }
         window.viewingRealUser = {
           id: v.id, handle: v.handle, name: v.name,
           _pinnedPostId: v.pinnedPostId || null,
@@ -6970,6 +7023,33 @@ document.addEventListener('vibeStudentVerified', () => {
 
 // Floating "Viewing Kwame · Back to your profile" pill, shown only when
 // viewing a mock user. Stays out of edit chrome's way (top center, below nav).
+// Blocked-by-target visitor view. Replaces the entire .profile-wrap with
+// a minimal "this account has restricted you" card — avatar, name, @handle,
+// and a centered message. No posts, stats, bio, or Connect button. Mirrors
+// Instagram's blocked-by-user view; never leaks that they blocked you, but
+// lets the blocker reach Unblock from their own /settings → Blocked list.
+function renderBlockedByTargetView(v) {
+  const name = v.name || 'This user';
+  const handle = v.handle ? '@' + v.handle : '';
+  const avatar = v.avatarPhoto || '';
+  const initials = (name || '?').split(/\s+/).map(p => p[0]).filter(Boolean).join('').slice(0, 2).toUpperCase();
+  const wrap = document.querySelector('.profile-wrap') || document.body;
+  wrap.innerHTML = `
+    <div style="max-width:420px;margin:80px auto 0;padding:48px 32px;text-align:center;font-family:'DM Sans',sans-serif;">
+      <div style="width:96px;height:96px;border-radius:50%;background:#F0EBE3;display:flex;align-items:center;justify-content:center;margin:0 auto 18px;overflow:hidden;font-family:'Fraunces',serif;font-size:34px;color:#8A8580;">
+        ${avatar
+          ? `<img src="${_esc(avatar)}" alt="" style="width:100%;height:100%;object-fit:cover;filter:grayscale(.6);opacity:.85">`
+          : _esc(initials || '?')}
+      </div>
+      <div style="font-family:'Fraunces',serif;font-size:24px;color:#1C1C1E;margin-bottom:2px">${_esc(name)}</div>
+      <div style="font-size:13px;color:#8A8580;margin-bottom:28px">${_esc(handle)}</div>
+      <div style="font-family:'Fraunces',serif;font-size:16px;color:#1C1C1E;margin-bottom:6px">Profile unavailable</div>
+      <p style="font-size:13px;color:#8A8580;line-height:1.55;margin-bottom:28px">This account has restricted you. You can't see their profile or message them.</p>
+      <a href="/campus" style="display:inline-block;padding:9px 18px;border-radius:100px;background:#1C1C1E;color:white;text-decoration:none;font-size:13px;font-weight:700">← Back to campus</a>
+    </div>`;
+  document.body.classList.add('viewer-mode');
+}
+
 function showViewerBackBanner(name) {
   if (document.getElementById('viewerBackBanner')) return;
   const el = document.createElement('div');

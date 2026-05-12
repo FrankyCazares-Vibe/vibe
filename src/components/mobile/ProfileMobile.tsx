@@ -86,6 +86,10 @@ type VibeUser = {
    *  | "connected" | "self" — drives the Connect / Follow / Following
    *  pill state in visitor mode. */
   _viewerFollowState?: FollowState;
+  /** Bootstrap short-circuit: target has blocked the viewer. Only
+   *  minimal identity (name, handle, avatarPhoto) is included on the
+   *  payload — everything else is intentionally omitted. */
+  _blockedByTarget?: boolean;
 };
 
 type FollowState = "none" | "following" | "followed_by" | "connected" | "self";
@@ -229,6 +233,9 @@ export function ProfileMobile({ targetHandle }: Props = {}) {
   }
   if (!user) {
     return <ProfileMobileSkeleton />;
+  }
+  if (user._blockedByTarget) {
+    return <BlockedByTargetView user={user} />;
   }
 
   const name = pick(user.name) ?? "You";
@@ -1167,6 +1174,112 @@ function FollowButton({
     >
       {isFollowing ? `${label} ✓` : label}
     </button>
+  );
+}
+
+function BlockedByTargetView({ user }: { user: VibeUser }) {
+  const name = pick(user.name) ?? "This user";
+  const handle = pick(user.handle);
+  const avatar = pick(user.avatarPhoto);
+  const initials = ((name as string) || "?")
+    .split(/\s+/)
+    .map((p) => p[0])
+    .filter(Boolean)
+    .join("")
+    .slice(0, 2)
+    .toUpperCase();
+  return (
+    <div
+      style={{
+        minHeight: "100dvh",
+        background: "#FAF7F2",
+        color: "#1C1C1E",
+        display: "flex",
+        flexDirection: "column",
+        alignItems: "center",
+        justifyContent: "center",
+        padding: "48px 32px",
+        textAlign: "center",
+        fontFamily: "DM Sans, sans-serif",
+      }}
+    >
+      <div
+        style={{
+          width: 96,
+          height: 96,
+          borderRadius: "50%",
+          background: avatar
+            ? `url(${avatar}) center/cover, #F0EBE3`
+            : "#F0EBE3",
+          display: "flex",
+          alignItems: "center",
+          justifyContent: "center",
+          marginBottom: 18,
+          overflow: "hidden",
+          fontFamily: "Fraunces, serif",
+          fontSize: 34,
+          color: "#8A8580",
+          filter: avatar ? "grayscale(.6)" : undefined,
+          opacity: avatar ? 0.85 : 1,
+        }}
+      >
+        {avatar ? null : initials || "?"}
+      </div>
+      <div
+        style={{
+          fontFamily: "Fraunces, serif",
+          fontSize: 24,
+          color: "#1C1C1E",
+          marginBottom: 2,
+        }}
+      >
+        {name}
+      </div>
+      {handle ? (
+        <div style={{ fontSize: 13, color: "#8A8580", marginBottom: 28 }}>
+          @{handle}
+        </div>
+      ) : (
+        <div style={{ marginBottom: 28 }} />
+      )}
+      <div
+        style={{
+          fontFamily: "Fraunces, serif",
+          fontSize: 18,
+          color: "#1C1C1E",
+          marginBottom: 6,
+        }}
+      >
+        Profile unavailable
+      </div>
+      <p
+        style={{
+          fontSize: 14,
+          color: "#8A8580",
+          lineHeight: 1.55,
+          marginBottom: 28,
+          maxWidth: 320,
+        }}
+      >
+        This account has restricted you. You can&rsquo;t see their profile or
+        message them.
+      </p>
+      <Link
+        href="/network"
+        style={{
+          display: "inline-block",
+          padding: "10px 20px",
+          borderRadius: 100,
+          background: "#1C1C1E",
+          color: "white",
+          textDecoration: "none",
+          fontSize: 13,
+          fontWeight: 700,
+        }}
+      >
+        ← Back
+      </Link>
+    </div>
   );
 }
 

@@ -124,8 +124,19 @@
       .then((r) => r.json())
       .then((j) => {
         if (j && j.ok) {
-          showToast("Blocked " + name);
-          if (onAfter) onAfter({ blocking: true });
+          // Block tears down any existing follow edges (server side).
+          // Surface that in the toast so the user knows they'll need to
+          // re-Connect if they unblock later. Also reset the on-page
+          // Connect button if there is one (profile viewer mode).
+          if (j.removed_connection) {
+            showToast("Blocked " + name + " — connection removed");
+            if (typeof window.setVibeRelState === "function") {
+              window.setVibeRelState("none");
+            }
+          } else {
+            showToast("Blocked " + name);
+          }
+          if (onAfter) onAfter({ blocking: true, removed_connection: !!j.removed_connection });
         } else {
           showToast("Couldn't block: " + ((j && j.error) || "unknown"));
         }

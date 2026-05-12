@@ -57,6 +57,34 @@ export async function GET(_req: Request, ctx: RouteContext) {
     return NextResponse.json({ ok: false, error: "User not found" }, { status: 404 });
   }
 
+  // Block-aware short-circuit. If the target has blocked the viewer, we
+  // return a minimal "blocked" payload — just enough identity (name,
+  // handle, avatar) for the visitor screen to render an Instagram-style
+  // "This account has restricted you" view. Posts, bio, work history,
+  // and counts are NOT included. We intentionally don't 404 here so the
+  // visitor at least knows the account still exists.
+  const targetIdRaw = (row as { id: string }).id;
+  const { count: blockCount } = await supabase
+    .from("blocks")
+    .select("id", { count: "exact", head: true })
+    .eq("blocker_id", targetIdRaw)
+    .eq("blocked_id", viewer.id);
+  if ((blockCount ?? 0) > 0) {
+    return NextResponse.json({
+      ok: true,
+      blockedByTarget: true,
+      vibeUser: {
+        id: targetIdRaw,
+        name: (row as { name: string | null }).name,
+        handle: (row as { handle: string | null }).handle,
+        avatarPhoto: (row as { avatar_url: string | null }).avatar_url,
+        _isViewerMode: true,
+        _viewerFollowState: "none",
+        _blockedByTarget: true,
+      },
+    });
+  }
+
   const profile = normalizeProfileView(row as Record<string, unknown>);
   // `appShell: true` is for OWNER bootstrap; viewer bootstrap stays
   // false so the persistence layer doesn't try to sync the viewed

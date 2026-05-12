@@ -141,6 +141,26 @@ export async function POST(req: Request) {
     return NextResponse.json({ ok: false, error: insErr.message }, { status: 500 });
   }
 
+  // Tear down any follow edges in either direction. A block ends the
+  // relationship; an unblock later does NOT auto-restore it, so the user
+  // has to re-Connect deliberately. `removed_connection` is reflected in
+  // the response so the client can phrase the confirmation toast.
+  let removedConnection = false;
+  try {
+    const { data: removed } = await supabase
+      .from("connections")
+      .delete()
+      .or(
+        `and(follower_id.eq.${user.id},following_id.eq.${target.id}),` +
+          `and(follower_id.eq.${target.id},following_id.eq.${user.id})`,
+      )
+      .select("id");
+    removedConnection = !!(removed && removed.length > 0);
+  } catch (e) {
+    console.error("[block.POST drop-connections]", e);
+    // Non-fatal — the block row is in; follow edges can be cleaned up later.
+  }
+
   // Hide any existing 1:1 DM channels between viewer and target on the
   // viewer's side (the row stays — soft-delete pattern).
   try {
@@ -170,7 +190,7 @@ export async function POST(req: Request) {
     // Non-fatal; the block row went in.
   }
 
-  return NextResponse.json({ ok: true });
+  return NextResponse.json({ ok: true, removed_connection: removedConnection });
 }
 
 /** Unblock. Idempotent — deleting 0 rows is success. */
