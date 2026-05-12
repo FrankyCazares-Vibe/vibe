@@ -14,6 +14,18 @@ export function ProfileHtmlBridge() {
 
   useEffect(() => {
     let cancelled = false;
+    // SSR + first-paint render this component on every viewport before
+    // the useIsMobile hook in ProfileSwitch flips. If we redirected
+    // unconditionally, mobile users would get yanked to the static
+    // desktop page before ProfileMobile ever mounted — they'd be
+    // permanently stuck on /html/profile.html. Bail on mobile widths;
+    // ProfileSwitch will swap us out for ProfileMobile on hydration.
+    if (
+      typeof window !== "undefined" &&
+      window.matchMedia("(max-width: 899px)").matches
+    ) {
+      return;
+    }
     (async () => {
       try {
         const r = await fetch("/api/me/profile-bootstrap", {
