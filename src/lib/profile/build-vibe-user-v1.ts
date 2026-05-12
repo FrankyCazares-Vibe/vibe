@@ -133,5 +133,12 @@ export function buildVibeUserV1FromProfile(
     }));
   }
 
+  // Resume / portfolio redaction bars — backs the localStorage
+  // `redactionBars` array in profile.html. Mobile reads it to render
+  // overlays in the in-app document viewer.
+  if (profile.resume_redactions.length) {
+    u.resumeRedactions = profile.resume_redactions.map((b) => ({ ...b }));
+  }
+
   return u;
 }

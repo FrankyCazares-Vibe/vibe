@@ -3,6 +3,7 @@ import { NextResponse } from "next/server";
 import { sanitizeCurrentOn } from "@/lib/profile/current-on";
 import { normalizeProfileView } from "@/lib/profile/normalize-profile-view";
 import { sanitizeRecruiterSnapshot } from "@/lib/profile/recruiter-snapshot";
+import { sanitizeResumeRedactions } from "@/lib/profile/resume-redactions";
 import { inlineOrUploadProfileUrl } from "@/lib/profile/storage-upload";
 import { sanitizeWorkExperience } from "@/lib/profile/work-experience";
 import { createSupabaseServerClient } from "@/lib/supabase/server";
@@ -93,6 +94,16 @@ export async function POST(req: Request) {
     patch.current_on = sanitizeCurrentOn(raw);
   }
 
+  // Resume / portfolio redaction bars — same dual-key acceptance.
+  // Sanitizer enforces percentage ranges + caps bar count.
+  if ("resume_redactions" in body || "resumeRedactions" in body) {
+    const raw =
+      "resume_redactions" in body
+        ? body.resume_redactions
+        : body.resumeRedactions;
+    patch.resume_redactions = sanitizeResumeRedactions(raw);
+  }
+
   if ("recruiter_snapshot" in body) {
     const snap = sanitizeRecruiterSnapshot(body.recruiter_snapshot);
     if (snap === undefined) {
@@ -147,7 +158,7 @@ export async function POST(req: Request) {
   const { data: row, error: selErr } = await supabase
     .from("users")
     .select(
-      "id,email,name,handle,school,school_email,school_verified,year,major,department,bio,tagline,website,headline,location_text,banner_gradient,avatar_url,banner_url,resume_url,interests,skills,looking_for,work_experience,recruiter_snapshot,current_on",
+      "id,email,name,handle,school,school_email,school_verified,year,major,department,bio,tagline,website,headline,location_text,banner_gradient,avatar_url,banner_url,resume_url,interests,skills,looking_for,work_experience,recruiter_snapshot,current_on,resume_redactions",
     )
     .eq("id", user.id)
     .single();

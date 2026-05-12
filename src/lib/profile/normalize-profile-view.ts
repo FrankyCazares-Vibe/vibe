@@ -1,4 +1,5 @@
 import { sanitizeCurrentOn } from "@/lib/profile/current-on";
+import { sanitizeResumeRedactions } from "@/lib/profile/resume-redactions";
 import type { ProfileView } from "@/lib/profile/types";
 import { sanitizeWorkExperience } from "@/lib/profile/work-experience";
 
@@ -61,5 +62,6 @@ export function normalizeProfileView(row: Record<string, unknown>): ProfileView 
     work_experience: sanitizeWorkExperience(row.work_experience),
     recruiter_snapshot: recruiterSnapshotFromRow(row.recruiter_snapshot),
     current_on: sanitizeCurrentOn(row.current_on),
+    resume_redactions: sanitizeResumeRedactions(row.resume_redactions),
   };
 }

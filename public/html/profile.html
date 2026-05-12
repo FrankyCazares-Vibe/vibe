@@ -6959,6 +6959,13 @@ function saveProfileToStorage() {
     user.resumePortfolio = resumePortfolio.filter(d => d && d.url && (d.url.startsWith('data:') || d.url.startsWith('https:') || d.url.startsWith('http:')));
   }
 
+  // Redaction bars — coordinate snapshot of every blackout the user
+  // has drawn over their resume/portfolio. Persisted server-side as
+  // users.resume_redactions so the overlays travel cross-device.
+  if (typeof redactionBars !== 'undefined') {
+    user.resumeRedactions = Array.isArray(redactionBars) ? redactionBars.slice() : [];
+  }
+
   // Cover banner — either an uploaded photo (data: URL) or a CSS gradient
   const coverEl = document.getElementById('profileCover');
   if (coverEl) {
@@ -7092,6 +7099,10 @@ function buildProfileSyncPayload() {
     // shape matches the localStorage shape ({icon, text}); the server
     // sanitizer enforces caps + drops items missing text.
     current_on: Array.isArray(u.currentlyOn) ? u.currentlyOn : [],
+    // Redaction bars — persisted as users.resume_redactions. Shape
+    // matches what the viewer renders: {docIndex, pageNumber, x, y, w, h}
+    // in 0-100 page-percentage coordinates.
+    resume_redactions: Array.isArray(u.resumeRedactions) ? u.resumeRedactions : [],
   };
   if (bannerUrl) {
     payload.banner_url = bannerUrl;
@@ -7244,6 +7255,12 @@ async function flushProfileServerSync() {
       if (!Array.isArray(nu.currentlyOn) || nu.currentlyOn.length === 0) {
         if (prev && Array.isArray(prev.currentlyOn) && prev.currentlyOn.length) {
           nu.currentlyOn = prev.currentlyOn;
+        }
+      }
+      // Same pattern for redaction bars (users.resume_redactions).
+      if (!Array.isArray(nu.resumeRedactions) || nu.resumeRedactions.length === 0) {
+        if (prev && Array.isArray(prev.resumeRedactions) && prev.resumeRedactions.length) {
+          nu.resumeRedactions = prev.resumeRedactions;
         }
       }
       vibeSave('vibe_user_v1', nu);
@@ -8131,6 +8148,16 @@ function renderUserSections(user) {
     resumePortfolio = user.resumePortfolio.slice();
     activeDocIndex = 0;
     renderResumeCard();
+  }
+  // Redaction bars — hydrate from server (users.resume_redactions via
+  // u.resumeRedactions). If the viewer is currently open, repaint so
+  // overlays appear without a reopen.
+  if (Array.isArray(user.resumeRedactions) && typeof redactionBars !== 'undefined') {
+    redactionBars = user.resumeRedactions.slice();
+    if (typeof renderRedactionBars === 'function' &&
+        document.getElementById('docModal')?.classList.contains('open')) {
+      renderRedactionBars();
+    }
   }
   // Cover banner — uploaded photo wins; otherwise apply saved gradient
   if (user.coverPhoto && typeof applyCoverPhoto === 'function') {
