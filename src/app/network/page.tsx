@@ -1,6 +1,6 @@
 import { enforceCampusAccess } from "@/lib/auth/campus-access";
-import { CampusAppShell } from "@/components/campus-app-shell";
-import { NetworkPageClient } from "@/components/network/NetworkPageClient";
+
+import { NetworkSwitch } from "./NetworkSwitch";
 
 export const metadata = {
   title: "Network · Vibe",
@@ -9,9 +9,5 @@ export const metadata = {
 
 export default async function NetworkPage() {
   await enforceCampusAccess("/network");
-  return (
-    <CampusAppShell>
-      <NetworkPageClient />
-    </CampusAppShell>
-  );
+  return <NetworkSwitch />;
 }
