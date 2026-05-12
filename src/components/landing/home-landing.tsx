@@ -4,6 +4,7 @@ import { useRouter } from "next/navigation";
 import { useEffect, useMemo, useState } from "react";
 
 import { OttoOrb } from "@/components/the-map/OttoOrb";
+import { useIsMobile } from "@/lib/use-is-mobile";
 
 import { OrbitalRingSystem, OrbitDetail, type RingId } from "./landing-orbit";
 import { TypewriterSequence } from "./landing-typewriter";
@@ -15,9 +16,20 @@ const LOGIN_HREF = "/auth/login";
 // an inline literal to TypewriterSequence makes its useEffect deps "change"
 // every render and re-types the intro from scratch each time the parent
 // updates state.
-const HERO_SENTENCES = [
+//
+// Desktop keeps the two-line cadence ("vibe." / "I'm Otto. This is your
+// campus…"). On mobile the second line was too long and wrapped its
+// brand-coral period onto its own line, which looked broken. Splitting
+// it into three shorter beats fixes the wrap and gives Otto more
+// presence on the small screen.
+const HERO_SENTENCES_DESKTOP = [
   "Hey, welcome to vibe.",
   "I'm Otto. This is your campus, all in one place.",
+];
+const HERO_SENTENCES_MOBILE = [
+  "Hey, welcome to vibe.",
+  "I'm Otto.",
+  "This is your campus, all in one place.",
 ];
 
 const RING_ORDER: RingId[] = ["pulse", "scene", "connect"];
@@ -34,6 +46,8 @@ export function HomeLanding() {
   const [warping, setWarping] = useState(false);
   const [visited, setVisited] = useState<Set<RingId>>(() => new Set());
   const unlocked = visited.size === RING_ORDER.length;
+  const isMobile = useIsMobile();
+  const heroSentences = isMobile ? HERO_SENTENCES_MOBILE : HERO_SENTENCES_DESKTOP;
 
   const handlePick = (id: RingId) => {
     setFocused(id);
@@ -102,8 +116,13 @@ export function HomeLanding() {
         <div className="vibe-landing-hero-orb">
           <OttoOrb size={56} />
         </div>
+        {/* Keyed by viewport class so the typewriter remounts cleanly when
+            the user resizes across the breakpoint — otherwise the internal
+            `typed` state (sized to the old array length) goes out of sync
+            with the new sentence count. */}
         <TypewriterSequence
-          sentences={HERO_SENTENCES}
+          key={isMobile ? "mobile" : "desktop"}
+          sentences={heroSentences}
           speed={60}
           pauseBetween={700}
           onDone={() => setIntroDone(true)}

@@ -836,11 +836,14 @@
     min-height: 3.2em;
     padding: 0 12px;
   }
+  /* Drop the inline-flex layout from the base rule so the text + the
+     brand-coral period + the cursor flow as plain inline content. With
+     normal inline wrap, the period stays attached to the last word
+     instead of breaking onto its own flex line. */
   .vibe-landing-typewriter-line {
+    display: block;
     white-space: normal;
     text-align: center;
-    flex-wrap: wrap;
-    justify-content: center;
   }
 }
 
