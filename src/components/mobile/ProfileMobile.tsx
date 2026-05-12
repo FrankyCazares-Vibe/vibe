@@ -3,6 +3,9 @@
 import Link from "next/link";
 import { useEffect, useState } from "react";
 
+import { ResumeViewerMobile } from "@/components/mobile/ResumeViewerMobile";
+import type { RedactionBar } from "@/lib/profile/resume-redactions";
+
 /**
  * iOS-native mobile profile screen. Instagram-style layout: full-bleed
  * cover, avatar overlapping below, identity stack (stats / name /
@@ -63,10 +66,14 @@ type VibeUser = {
   workExperience?: WorkExp[];
   resumePortfolio?: ResumeItem[];
   /** "Currently working on" items — short text/icon pairs the user
-   *  enters in their profile editor. Not persisted to Supabase yet;
-   *  field stays optional and the Portfolio pane shows an empty state
-   *  until the backend wire-through lands. */
+   *  enters in their profile editor. Persisted to Supabase as
+   *  users.current_on; this field is the camelCase mirror that the
+   *  build-vibe-user-v1 builder emits. */
   currentlyOn?: CurrentProject[];
+  /** Redaction bars overlaying the user's resume / portfolio.
+   *  Persisted as users.resume_redactions; mirrored here as the
+   *  camelCase key the build-vibe-user-v1 builder emits. */
+  resumeRedactions?: RedactionBar[];
   counts?: {
     followers?: string | number;
     following?: string | number;
@@ -102,6 +109,8 @@ export function ProfileMobile() {
   const [error, setError] = useState<string | null>(null);
   const [posts, setPosts] = useState<PostRow[] | null>(null);
   const [tab, setTab] = useState<ProfileTab>("posts");
+  /** Resume item the viewer should open. null = closed. */
+  const [viewerItem, setViewerItem] = useState<ResumeItem | null>(null);
 
   useEffect(() => {
     let cancelled = false;
@@ -185,6 +194,7 @@ export function ProfileMobile() {
   const currentProjects = (user.currentlyOn ?? []).filter(
     (p) => !!p?.text,
   );
+  const resumeRedactions = user.resumeRedactions ?? [];
 
   const feedPosts = (posts ?? []).filter((p) => (p.type ?? "post") !== "clip");
   const clipPosts = (posts ?? []).filter((p) => p.type === "clip");
@@ -425,9 +435,22 @@ export function ProfileMobile() {
             currentProjects={currentProjects}
             workExperience={workExperience}
             resumePortfolio={resumePortfolio}
+            onOpenDoc={(r) => setViewerItem(r)}
           />
         )}
       </div>
+
+      {viewerItem ? (
+        <ResumeViewerMobile
+          url={viewerItem.url ?? ""}
+          type={viewerItem.type === "image" ? "image" : "pdf"}
+          name={viewerItem.name ?? "Resume"}
+          // Only doc 0 persists today (users.resume_url is a single
+          // string), so the bars saved server-side all anchor to it.
+          bars={resumeRedactions.filter((b) => b.docIndex === 0)}
+          onClose={() => setViewerItem(null)}
+        />
+      ) : null}
     </div>
   );
 }
@@ -633,10 +656,12 @@ function PortfolioPane({
   currentProjects,
   workExperience,
   resumePortfolio,
+  onOpenDoc,
 }: {
   currentProjects: CurrentProject[];
   workExperience: WorkExp[];
   resumePortfolio: ResumeItem[];
+  onOpenDoc: (r: ResumeItem) => void;
 }) {
   const allEmpty =
     currentProjects.length === 0 &&
@@ -723,11 +748,10 @@ function PortfolioPane({
         ) : (
           <div style={{ display: "flex", flexDirection: "column", gap: 8 }}>
             {resumePortfolio.map((r, i) => (
-              <a
+              <button
                 key={`${r.url}-${i}`}
-                href={r.url}
-                target="_blank"
-                rel="noopener noreferrer"
+                type="button"
+                onClick={() => onOpenDoc(r)}
                 style={{
                   display: "flex",
                   alignItems: "center",
@@ -736,8 +760,11 @@ function PortfolioPane({
                   background: "#fff",
                   border: "1px solid rgba(28,28,30,0.08)",
                   borderRadius: 14,
-                  textDecoration: "none",
                   color: "#1C1C1E",
+                  cursor: "pointer",
+                  textAlign: "left",
+                  fontFamily: "inherit",
+                  WebkitTapHighlightColor: "transparent",
                 }}
               >
                 <span
@@ -761,10 +788,21 @@ function PortfolioPane({
                     {r.name ?? "Resume"}
                   </div>
                   <div style={{ fontSize: 12, color: "#8A8580" }}>
-                    {(r.type ?? "file").toUpperCase()} · tap to open
+                    {(r.type ?? "file").toUpperCase()} · tap to open in viewer
                   </div>
                 </div>
-              </a>
+                <span
+                  aria-hidden
+                  style={{
+                    color: "#8A8580",
+                    fontSize: 18,
+                    lineHeight: 1,
+                    flexShrink: 0,
+                  }}
+                >
+                  ›
+                </span>
+              </button>
             ))}
           </div>
         )}
