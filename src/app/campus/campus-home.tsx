@@ -592,8 +592,8 @@ export function CampusHome({
             className="campus-feed-grid"
             style={{
               flex: 1,
-              display: "grid",
-              gridTemplateColumns: "1fr 340px",
+              display: "flex",
+              flexDirection: "column",
               minHeight: 0,
             }}
           >
@@ -602,10 +602,8 @@ export function CampusHome({
               onCreateOrg={() => setShowCreateOrg(true)}
               feedTagFilter={feedTagFilter}
               onClearTagFilter={() => setFeedTagFilter(null)}
+              onPickTag={onPickTag}
             />
-            <div className="campus-feed-aside">
-              <OttoPanel onPickTag={onPickTag} />
-            </div>
           </div>
         )}
 
@@ -3901,11 +3899,13 @@ function TabBody({
   onCreateOrg,
   feedTagFilter,
   onClearTagFilter,
+  onPickTag,
 }: {
   tab: CampusTab;
   onCreateOrg: () => void;
   feedTagFilter: string | null;
   onClearTagFilter: () => void;
+  onPickTag: (tag: string) => void;
 }) {
   if (tab === "feed")
     return (
@@ -3913,6 +3913,7 @@ function TabBody({
         key={feedTagFilter ?? "all"}
         tagFilter={feedTagFilter}
         onClearTagFilter={onClearTagFilter}
+        onPickTag={onPickTag}
       />
     );
   if (tab === "events") return <EventsTabBody />;
@@ -4053,9 +4054,11 @@ type FeedMode = "posts" | "clips";
 function FeedTabBody({
   tagFilter,
   onClearTagFilter,
+  onPickTag,
 }: {
   tagFilter: string | null;
   onClearTagFilter: () => void;
+  onPickTag: (tag: string) => void;
 }) {
   const [entries, setEntries] = useState<FeedEntry[] | null>(null);
   // Posts vs Clips toggle. When `clips`, the feed becomes a vertical
@@ -4139,12 +4142,30 @@ function FeedTabBody({
           tone="dark"
         />
       ) : (
-        <SceneHeader
-          eyebrow="Feed · IU"
-          title="What’s on campus today"
-          subtitle="Posts from clubs, orgs, and your network."
-          tone="dark"
-        />
+        /* Header + Otto strip in a row: header on the left, Heads-up /
+           Trending cards filling the dead space to its right. Flex-wraps
+           on narrower widths so the strip drops below the header instead
+           of squishing both. */
+        <div
+          style={{
+            display: "flex",
+            alignItems: "flex-start",
+            gap: 16,
+            flexWrap: "wrap",
+          }}
+        >
+          <div style={{ flex: "0 1 360px", minWidth: 240, maxWidth: 480 }}>
+            <SceneHeader
+              eyebrow="Feed · IU"
+              title="What’s on campus today"
+              subtitle="Posts from clubs, orgs, and your network."
+              tone="dark"
+            />
+          </div>
+          <div style={{ flex: "1 1 460px", minWidth: 280 }}>
+            <OttoFeedStrip onPickTag={onPickTag} />
+          </div>
+        </div>
       )}
 
       {tagFilter ? (
@@ -10310,12 +10331,17 @@ function hashString(s: string): number {
   return Math.abs(h);
 }
 
-function OttoPanel({ onPickTag }: { onPickTag: (tag: string) => void }) {
-  // Otto stays dark + orange-hued regardless of scene — consistent identity
-  const headingColor = "#fff";
-  const subtleColor = "rgba(255,255,255,0.55)";
-  const dividerColor = "rgba(255,255,255,0.06)";
-
+/**
+ * Horizontal Otto strip — sits above the feed, replaces the old right-
+ * column OttoPanel for the Feed tab. Two cards side by side:
+ *   - Heads up    → events the viewer has RSVP'd to (max 3 inline)
+ *   - Trending    → most-posted hashtags this week (clickable pills)
+ * People-to-Connect is intentionally NOT on this strip — that lives on
+ * /network where the user is already in discovery mode.
+ *
+ * Mobile (<900px) stacks the two cards vertically via grid auto-fit.
+ */
+function OttoFeedStrip({ onPickTag }: { onPickTag: (tag: string) => void }) {
   const [trending, setTrending] = useState<Array<{ tag: string; count: number }> | null>(null);
   const [upcoming, setUpcoming] = useState<
     Array<{
@@ -10328,42 +10354,21 @@ function OttoPanel({ onPickTag }: { onPickTag: (tag: string) => void }) {
       org: { handle: string; name: string; verified: boolean } | null;
     }> | null
   >(null);
-  const [suggestions, setSuggestions] = useState<
-    Array<{
-      id: string;
-      name: string | null;
-      handle: string | null;
-      avatar_url: string | null;
-      major: string | null;
-      year: number | null;
-      mutual_count: number;
-      reason: string;
-    }> | null
-  >(null);
   useEffect(() => {
     let cancelled = false;
     (async () => {
       try {
-        const [tRes, uRes, sRes] = await Promise.all([
-          fetch("/api/trending/hashtags?limit=6", { cache: "no-store" }).then((r) => r.json()),
-          fetch("/api/me/upcoming-events?limit=4", { cache: "no-store" }).then((r) => r.json()),
-          fetch("/api/me/suggested-connections?limit=5", { cache: "no-store" }).then((r) => r.json()),
+        const [tRes, uRes] = await Promise.all([
+          fetch("/api/trending/hashtags?limit=8", { cache: "no-store" }).then((r) => r.json()),
+          fetch("/api/me/upcoming-events?limit=3", { cache: "no-store" }).then((r) => r.json()),
         ]);
         if (cancelled) return;
-        setTrending(
-          tRes?.ok && Array.isArray(tRes.trending) ? tRes.trending : [],
-        );
-        setUpcoming(
-          uRes?.ok && Array.isArray(uRes.upcoming) ? uRes.upcoming : [],
-        );
-        setSuggestions(
-          sRes?.ok && Array.isArray(sRes.suggestions) ? sRes.suggestions : [],
-        );
+        setTrending(tRes?.ok && Array.isArray(tRes.trending) ? tRes.trending : []);
+        setUpcoming(uRes?.ok && Array.isArray(uRes.upcoming) ? uRes.upcoming : []);
       } catch {
         if (!cancelled) {
           setTrending([]);
           setUpcoming([]);
-          setSuggestions([]);
         }
       }
     })();
@@ -10372,438 +10377,344 @@ function OttoPanel({ onPickTag }: { onPickTag: (tag: string) => void }) {
     };
   }, []);
 
-  const ottoSurface: React.CSSProperties = {
+  const subtle = "rgba(255,255,255,0.55)";
+  const divider = "rgba(255,255,255,0.06)";
+
+  // Single unified bubble — outer surface wraps both sections; the
+  // vertical separator in between is drawn by .otto-strip-divider so it
+  // can flip to a horizontal rule on narrow widths via media query.
+  // Outer halo + a tighter inner orange glow give the bubble a warm
+  // signature so it reads as "Otto" without a leading orb / nameplate.
+  const surface: React.CSSProperties = {
     background:
       "linear-gradient(180deg, rgba(255,140,90,0.10) 0%, rgba(255,92,53,0.04) 50%, rgba(20,8,16,0.0) 100%), rgba(12,8,14,0.78)",
-    backdropFilter: "blur(32px) saturate(180%)",
-    WebkitBackdropFilter: "blur(32px) saturate(180%)",
-    border: "1px solid rgba(255,140,90,0.18)",
+    backdropFilter: "blur(28px) saturate(180%)",
+    WebkitBackdropFilter: "blur(28px) saturate(180%)",
+    border: "1px solid rgba(255,140,90,0.45)",
     boxShadow: [
-      "inset 0 1px 0 rgba(255,180,150,0.22)",
-      "inset 0 -1px 0 rgba(0,0,0,0.2)",
-      "0 8px 32px rgba(80,12,8,0.35)",
+      "inset 0 1px 0 rgba(255,180,150,0.28)",
+      "inset 0 -1px 0 rgba(0,0,0,0.18)",
+      "0 0 0 1px rgba(255,140,90,0.18)",
+      "0 0 24px rgba(255,92,53,0.28)",
+      "0 0 56px rgba(255,92,53,0.18)",
+      "0 8px 28px rgba(80,12,8,0.32)",
     ].join(", "),
     color: "#fff",
-    position: "relative",
+    borderRadius: 18,
     overflow: "hidden",
   };
 
+  const sectionPad: React.CSSProperties = {
+    padding: "14px 16px",
+    display: "flex",
+    flexDirection: "column",
+    minWidth: 0,
+    flex: "1 1 0",
+  };
+
   return (
-    <aside
-      style={{
-        padding: "28px 24px 28px 0",
-        display: "flex",
-        flexDirection: "column",
-        gap: 14,
-        minHeight: 0,
-        overflowY: "auto",
-      }}
-    >
-      <div style={{ ...ottoSurface, borderRadius: 22, padding: 18 }}>
-        {/* Constellation accent in the top-right */}
-        <ConstellationAccent />
-
-        <div style={{ display: "flex", alignItems: "center", gap: 12, marginBottom: 18, position: "relative" }}>
-          <OttoOrb size={42} />
-          <div>
-            <div style={{ fontFamily: "Fraunces, serif", fontWeight: 900, fontSize: 22, letterSpacing: "-0.01em", color: headingColor, lineHeight: 1 }}>
-              otto
-            </div>
-            <div
-              style={{
-                fontFamily: "DM Sans, sans-serif",
-                fontSize: 10,
-                fontWeight: 700,
-                letterSpacing: "0.16em",
-                textTransform: "uppercase",
-                color: "rgba(255,180,150,0.75)",
-                marginTop: 4,
-              }}
-            >
-              Your agent · Online
-            </div>
-          </div>
-        </div>
-
-        <OttoSection title="Heads up" subtitle="Events you RSVP'd to." headingColor={headingColor} subtleColor={subtleColor}>
-          {upcoming === null ? (
-            <div style={{ fontSize: 12, color: subtleColor, padding: "6px 0" }}>Loading…</div>
-          ) : upcoming.length === 0 ? (
-            <div style={{ fontSize: 12, color: subtleColor, padding: "6px 0", lineHeight: 1.5 }}>
-              No upcoming events on your radar — RSVP from the Events tab and they&apos;ll show up here.
-            </div>
-          ) : (
-            upcoming.map((u) => {
-              const accent = u.viewer_status === "going" ? "#5BD18C" : "#FFB85A";
-              const chip = formatUpcomingChip(u.starts_at);
-              return (
-                <div
-                  key={u.id}
-                  style={{
-                    display: "flex",
-                    alignItems: "center",
-                    gap: 10,
-                    padding: "8px 0",
-                    borderBottom: `1px solid ${dividerColor}`,
-                  }}
-                >
-                  <span style={{ width: 6, height: 6, borderRadius: 3, background: accent, flexShrink: 0 }} />
-                  <div style={{ flex: 1, minWidth: 0 }}>
-                    <div
+    <div style={surface} className="otto-strip">
+      <style>{`
+        .otto-strip-inner {
+          display: flex;
+          flex-direction: row;
+          align-items: stretch;
+        }
+        .otto-strip-divider {
+          width: 1px;
+          align-self: stretch;
+          background: linear-gradient(
+            180deg,
+            rgba(255,180,150,0) 0%,
+            rgba(255,180,150,0.28) 20%,
+            rgba(255,180,150,0.28) 80%,
+            rgba(255,180,150,0) 100%
+          );
+          flex-shrink: 0;
+        }
+        @media (max-width: 560px) {
+          .otto-strip-inner { flex-direction: column; }
+          .otto-strip-divider {
+            width: auto;
+            height: 1px;
+            background: linear-gradient(
+              90deg,
+              rgba(255,180,150,0) 0%,
+              rgba(255,180,150,0.28) 20%,
+              rgba(255,180,150,0.28) 80%,
+              rgba(255,180,150,0) 100%
+            );
+          }
+        }
+      `}</style>
+      <div className="otto-strip-inner">
+        {/* Heads up */}
+        <div style={sectionPad}>
+          <StripHeader
+            icon={<TalkingHeadIcon />}
+            title="Heads up"
+            subtitle="Events you RSVP'd to"
+            subtle={subtle}
+          />
+          <div style={{ marginTop: 4, flex: 1 }}>
+            {upcoming === null ? (
+              <div style={{ fontSize: 12, color: subtle, padding: "8px 0" }}>Loading…</div>
+            ) : upcoming.length === 0 ? (
+              <div style={{ fontSize: 12, color: subtle, padding: "8px 0", lineHeight: 1.5 }}>
+                No upcoming events on your radar — RSVP from the Events tab.
+              </div>
+            ) : (
+              upcoming.slice(0, 3).map((u, i) => {
+                const accent = u.viewer_status === "going" ? "#5BD18C" : "#FFB85A";
+                const chip = formatUpcomingChip(u.starts_at);
+                const isLast = i >= Math.min(upcoming.length, 3) - 1;
+                return (
+                  <div
+                    key={u.id}
+                    style={{
+                      display: "flex",
+                      alignItems: "center",
+                      gap: 8,
+                      padding: "6px 0",
+                      borderBottom: isLast ? "none" : `1px solid ${divider}`,
+                    }}
+                  >
+                    <span style={{ width: 5, height: 5, borderRadius: 3, background: accent, flexShrink: 0 }} />
+                    <span
                       style={{
+                        flex: 1,
+                        minWidth: 0,
                         fontFamily: "DM Sans, sans-serif",
                         fontSize: 13,
-                        color: headingColor,
-                        lineHeight: 1.3,
+                        color: "#fff",
                         overflow: "hidden",
                         textOverflow: "ellipsis",
                         whiteSpace: "nowrap",
                       }}
                     >
                       {u.title}
-                    </div>
-                    {u.org ? (
-                      <div
-                        style={{
-                          fontFamily: "DM Sans, sans-serif",
-                          fontSize: 11,
-                          color: subtleColor,
-                          marginTop: 1,
-                          overflow: "hidden",
-                          textOverflow: "ellipsis",
-                          whiteSpace: "nowrap",
-                        }}
-                      >
-                        {u.org.name}
-                      </div>
-                    ) : null}
+                    </span>
+                    <span style={{ fontSize: 11, fontWeight: 700, color: accent, whiteSpace: "nowrap" }}>
+                      {chip}
+                    </span>
                   </div>
-                  <span style={{ fontSize: 11, fontWeight: 700, color: accent, fontFamily: "DM Sans, sans-serif", whiteSpace: "nowrap" }}>
-                    {chip}
-                  </span>
-                </div>
-              );
-            })
-          )}
-        </OttoSection>
+                );
+              })
+            )}
+          </div>
+        </div>
 
-        <OttoSection title="Trending on campus" subtitle="Most-posted hashtags this week." headingColor={headingColor} subtleColor={subtleColor}>
-          {trending === null ? (
-            <div style={{ fontSize: 12, color: subtleColor, padding: "6px 0" }}>Loading…</div>
-          ) : trending.length === 0 ? (
-            <div style={{ fontSize: 12, color: subtleColor, padding: "6px 0", lineHeight: 1.5 }}>
-              No trending tags yet — start one with a #hashtag in your post.
-            </div>
-          ) : (
-            trending.map((t) => (
-              <button
-                key={t.tag}
-                type="button"
-                onClick={() => onPickTag(t.tag)}
-                style={{
-                  display: "flex",
-                  width: "100%",
-                  alignItems: "center",
-                  justifyContent: "space-between",
-                  padding: "6px 0",
-                  background: "transparent",
-                  border: "none",
-                  cursor: "pointer",
-                  color: "inherit",
-                  font: "inherit",
-                  textAlign: "left",
-                }}
-              >
-                <span style={{ fontFamily: "DM Sans, sans-serif", fontSize: 13, fontWeight: 600, color: "#FFB89C" }}>
-                  #{t.tag}
-                </span>
-                <span style={{ fontFamily: "DM Sans, sans-serif", fontSize: 12, color: subtleColor }}>
-                  {t.count}
-                </span>
-              </button>
-            ))
-          )}
-        </OttoSection>
+        {/* Vertical divider (horizontal on phone via media query) */}
+        <div className="otto-strip-divider" aria-hidden />
 
-        <OttoSection title="People to connect" subtitle="Mutuals, same major, same school." headingColor={headingColor} subtleColor={subtleColor}>
-          {suggestions === null ? (
-            <div style={{ fontSize: 12, color: subtleColor, padding: "6px 0" }}>Loading…</div>
-          ) : suggestions.length === 0 ? (
-            <div style={{ fontSize: 12, color: subtleColor, padding: "6px 0", lineHeight: 1.5 }}>
-              We&apos;ll suggest people once your school has more students on Vibe.
-            </div>
-          ) : (
-            suggestions.map((p) => {
-              const initials = (p.name ?? p.handle ?? "?")
-                .split(/\s+/)
-                .filter(Boolean)
-                .slice(0, 2)
-                .map((s) => s[0])
-                .join("")
-                .toUpperCase();
-              const profileHref = p.handle ? `/profile/${encodeURIComponent(p.handle)}` : "/network";
-              return (
-                <Link
-                  key={p.id}
-                  href={profileHref}
+        {/* Trending */}
+        <div style={sectionPad}>
+          <StripHeader
+            icon={<FireIcon />}
+            title="Trending on campus"
+            subtitle="Most-posted hashtags this week"
+            subtle={subtle}
+          />
+          <div
+            style={{
+              marginTop: 8,
+              display: "flex",
+              flexWrap: "wrap",
+              gap: 6,
+              alignContent: "flex-start",
+            }}
+          >
+            {trending === null ? (
+              <div style={{ fontSize: 12, color: subtle }}>Loading…</div>
+            ) : trending.length === 0 ? (
+              <div style={{ fontSize: 12, color: subtle, lineHeight: 1.5 }}>
+                No trending tags yet — start one with a #hashtag in your post.
+              </div>
+            ) : (
+              trending.map((t) => (
+                <button
+                  key={t.tag}
+                  type="button"
+                  onClick={() => onPickTag(t.tag)}
                   style={{
-                    display: "flex",
+                    display: "inline-flex",
                     alignItems: "center",
-                    gap: 10,
-                    padding: "8px 0",
-                    borderBottom: `1px solid ${dividerColor}`,
-                    textDecoration: "none",
+                    gap: 4,
+                    padding: "5px 10px",
+                    borderRadius: 999,
+                    background: "rgba(255,140,90,0.12)",
+                    border: "1px solid rgba(255,140,90,0.28)",
+                    color: "#FFB89C",
+                    fontFamily: "DM Sans, sans-serif",
+                    fontSize: 12,
+                    fontWeight: 700,
+                    cursor: "pointer",
+                    whiteSpace: "nowrap",
                   }}
                 >
-                  <div
-                    style={{
-                      width: 32,
-                      height: 32,
-                      borderRadius: 999,
-                      background: p.avatar_url
-                        ? `url(${p.avatar_url}) center/cover`
-                        : "rgba(255,255,255,0.08)",
-                      color: "#fff",
-                      display: "flex",
-                      alignItems: "center",
-                      justifyContent: "center",
-                      fontFamily: "Fraunces, serif",
-                      fontWeight: 700,
-                      fontSize: 12,
-                      flexShrink: 0,
-                    }}
-                  >
-                    {!p.avatar_url ? initials : null}
-                  </div>
-                  <div style={{ flex: 1, minWidth: 0 }}>
-                    <div
-                      style={{
-                        fontFamily: "DM Sans, sans-serif",
-                        fontSize: 13,
-                        fontWeight: 600,
-                        color: headingColor,
-                        overflow: "hidden",
-                        textOverflow: "ellipsis",
-                        whiteSpace: "nowrap",
-                      }}
-                    >
-                      {p.name || p.handle || "Member"}
-                    </div>
-                    <div
-                      style={{
-                        fontFamily: "DM Sans, sans-serif",
-                        fontSize: 11,
-                        color: subtleColor,
-                      }}
-                    >
-                      {[p.major, p.year ? String(p.year) : null, p.reason]
-                        .filter(Boolean)
-                        .join(" · ")}
-                    </div>
-                  </div>
-                  <span
-                    style={{
-                      fontFamily: "DM Sans, sans-serif",
-                      fontSize: 11,
-                      fontWeight: 700,
-                      color: "#FFB89C",
-                    }}
-                  >
-                    View →
+                  <span>#{t.tag}</span>
+                  <span style={{ color: "rgba(255,255,255,0.45)", fontWeight: 500 }}>
+                    {t.count}
                   </span>
-                </Link>
-              );
-            })
-          )}
-        </OttoSection>
-
-        <button
-          type="button"
-          style={{
-            marginTop: 14,
-            width: "100%",
-            padding: "12px 14px",
-            borderRadius: 999,
-            border: "1px solid rgba(255,180,150,0.4)",
-            background:
-              "linear-gradient(180deg, rgba(255,92,53,0.5) 0%, rgba(255,92,53,0.22) 100%)",
-            color: "#fff",
-            fontFamily: "DM Sans, sans-serif",
-            fontWeight: 700,
-            fontSize: 13,
-            cursor: "pointer",
-            boxShadow: "inset 0 1px 0 rgba(255,255,255,0.3), 0 4px 16px rgba(255,92,53,0.28)",
-          }}
-        >
-          Open Otto’s command center →
-        </button>
+                </button>
+              ))
+            )}
+          </div>
+        </div>
       </div>
-    </aside>
+    </div>
   );
 }
 
-function OttoSection({
+// Megaphone for the "Heads up" header. Orange horn with a coral handle
+// and stacked sound arcs fanning out the wide end so it reads as an
+// announcement at glyph size. 20×20 with a 28-wide viewBox to fit the
+// horn + sound waves without clipping.
+function TalkingHeadIcon() {
+  return (
+    <svg
+      width="22"
+      height="20"
+      viewBox="0 0 28 24"
+      fill="none"
+      aria-hidden
+      style={{ display: "block" }}
+    >
+      <defs>
+        <linearGradient id="mphHorn" x1="0" y1="0" x2="0" y2="1">
+          <stop offset="0%" stopColor="#FF9A40" />
+          <stop offset="100%" stopColor="#E04918" />
+        </linearGradient>
+        <linearGradient id="mphRim" x1="0" y1="0" x2="0" y2="1">
+          <stop offset="0%" stopColor="#FFD37A" />
+          <stop offset="100%" stopColor="#FF7A2A" />
+        </linearGradient>
+        <linearGradient id="mphHandle" x1="0" y1="0" x2="0" y2="1">
+          <stop offset="0%" stopColor="#3A2418" />
+          <stop offset="100%" stopColor="#1F140C" />
+        </linearGradient>
+      </defs>
+      {/* Handle/grip on the back end (left side). */}
+      <rect x="2.2" y="10.2" width="3.8" height="3.6" rx="1.1" fill="url(#mphHandle)" />
+      {/* Trigger button on the handle. */}
+      <rect x="3.4" y="13.6" width="1.4" height="2.2" rx="0.5" fill="#1F140C" />
+      {/* Horn body — narrow back tapering to a wide mouth on the right. */}
+      <path
+        d="M5.8 9.2h2.6l9.6-3.4c.7-.3 1.5.2 1.5 1v10.4c0 .8-.8 1.3-1.5 1l-9.6-3.4H5.8c-.6 0-1-.4-1-1V10.2c0-.6.4-1 1-1Z"
+        fill="url(#mphHorn)"
+      />
+      {/* Brass rim at the bell — gives the megaphone its signature edge. */}
+      <path
+        d="M18.6 4.7c.7-.3 1.5.2 1.5 1v12.6c0 .8-.8 1.3-1.5 1l-1-.4V5.1l1-.4Z"
+        fill="url(#mphRim)"
+      />
+      {/* Three sound arcs broadcasting out the bell, fading outward. */}
+      <path d="M22 9.5c.7.6 1.1 1.6 1.1 2.7s-.4 2.1-1.1 2.7" stroke="#FFC04A" strokeWidth="1.5" strokeLinecap="round" />
+      <path d="M24.2 7.6c1.3.9 2.1 2.6 2.1 4.6s-.8 3.7-2.1 4.6" stroke="#FF8C42" strokeWidth="1.4" strokeLinecap="round" opacity="0.85" />
+      <path d="M26.2 5.8c1.7 1.2 2.8 3.5 2.8 6.4s-1.1 5.2-2.8 6.4" stroke="#FF5C35" strokeWidth="1.3" strokeLinecap="round" opacity="0.55" />
+    </svg>
+  );
+}
+
+// Layered flame for the "Trending" header. Hot yellow-white core nested
+// inside an orange body inside a red outer flame, with a separate flicker
+// detached above so the icon reads as live fire rather than a single drop.
+function FireIcon() {
+  return (
+    <svg
+      width="20"
+      height="20"
+      viewBox="0 0 24 24"
+      fill="none"
+      aria-hidden
+      style={{ display: "block" }}
+    >
+      <defs>
+        <linearGradient id="fireOuter" x1="0.5" y1="0" x2="0.5" y2="1">
+          <stop offset="0%" stopColor="#FF8A2A" />
+          <stop offset="55%" stopColor="#FF4D14" />
+          <stop offset="100%" stopColor="#C42F0A" />
+        </linearGradient>
+        <linearGradient id="fireMid" x1="0.5" y1="0" x2="0.5" y2="1">
+          <stop offset="0%" stopColor="#FFE066" />
+          <stop offset="60%" stopColor="#FF9A1F" />
+          <stop offset="100%" stopColor="#FF5C20" />
+        </linearGradient>
+        <radialGradient id="fireCore" cx="0.5" cy="0.65" r="0.55">
+          <stop offset="0%" stopColor="#FFF7C2" />
+          <stop offset="45%" stopColor="#FFE25C" />
+          <stop offset="100%" stopColor="#FFAE2E" stopOpacity="0" />
+        </radialGradient>
+      </defs>
+      {/* Outer flame — broad base with a hooked tip so it reads as fire,
+          not a teardrop. */}
+      <path
+        d="M12 2c.2 2.5-.8 4-2 5.6C8 10 5.5 12.4 5.5 15.6 5.5 19.1 8.4 22 12 22s6.5-2.9 6.5-6.4c0-2-1-3.8-2.3-5.4-1.5-1.8-2.2-3.4-2.2-5C13.3 4 12.7 2.8 12 2Z"
+        fill="url(#fireOuter)"
+      />
+      {/* Middle flame — narrower, slightly offset so the gradient stack
+          gives the body depth instead of flat shading. */}
+      <path
+        d="M12.4 8.4c.1 1.9-1 3-2 4.4-1 1.4-2.1 2.7-2.1 4.5 0 2.3 1.7 4.1 4 4.1s4-1.9 4-4.2c0-1.5-.7-2.8-1.7-4-.9-1.2-1.6-2.5-1.6-3.8 0-.4-.2-.8-.6-1Z"
+        fill="url(#fireMid)"
+      />
+      {/* Hot core ember — radial glow at the bottom. */}
+      <ellipse cx="12.1" cy="17.4" rx="2.6" ry="3.4" fill="url(#fireCore)" />
+      {/* Detached flicker above so the flame "leaves" the body. */}
+      <path
+        d="M14.3 4.5c.4.9.1 1.7-.5 2.4-.5.6-.7 1.2-.4 1.9-.9-.3-1.3-1-1.2-1.9.1-1 .8-1.8 2.1-2.4Z"
+        fill="#FFE25C"
+        opacity="0.95"
+      />
+    </svg>
+  );
+}
+
+function StripHeader({
+  icon,
   title,
   subtitle,
-  children,
-  headingColor,
-  subtleColor,
+  subtle,
 }: {
+  icon: React.ReactNode;
   title: string;
-  subtitle?: string;
-  children: React.ReactNode;
-  headingColor: string;
-  subtleColor: string;
+  subtitle: string;
+  subtle: string;
 }) {
   return (
-    <div style={{ marginBottom: 14, position: "relative" }}>
-      <div
+    <div style={{ display: "flex", alignItems: "baseline", gap: 8, flexWrap: "wrap" }}>
+      <span
+        style={{ fontSize: 14, lineHeight: 1, display: "inline-flex", alignItems: "center" }}
+        aria-hidden
+      >
+        {icon}
+      </span>
+      <span
         style={{
           fontFamily: "DM Sans, sans-serif",
           fontSize: 11,
           fontWeight: 700,
           letterSpacing: "0.12em",
           textTransform: "uppercase",
-          color: subtleColor,
-          marginBottom: subtitle ? 2 : 6,
+          color: "#fff",
         }}
       >
         {title}
-      </div>
-      {subtitle ? (
-        <div
-          style={{
-            fontFamily: "DM Sans, sans-serif",
-            fontSize: 11,
-            color: "rgba(255,255,255,0.4)",
-            marginBottom: 6,
-            fontStyle: "italic",
-          }}
-        >
-          {subtitle}
-        </div>
-      ) : null}
-      <div style={{ color: headingColor }}>{children}</div>
-    </div>
-  );
-}
-
-// Otto's signature orb: pulsing core + spinning orbit + breathing halo.
-// Mirrors the persistent corner ring (public/html/_otto.js) so Otto reads
-// as the same agent everywhere.
-function OttoOrb({ size = 32 }: { size?: number }) {
-  // Round to even so the core lands on a whole pixel and reads centered.
-  const safeSize = size % 2 === 0 ? size : size + 1;
-  const dotSize = Math.max(3, Math.round(safeSize * 0.1));
-  const coreSize = Math.round((safeSize * 0.3) / 2) * 2;
-  return (
-    <div
-      style={{
-        position: "relative",
-        width: safeSize,
-        height: safeSize,
-        flexShrink: 0,
-        display: "flex",
-        alignItems: "center",
-        justifyContent: "center",
-      }}
-    >
-      {/* Breathing halo */}
-      <div
+      </span>
+      <span
         style={{
-          position: "absolute",
-          inset: 0,
-          borderRadius: "50%",
-          background: "radial-gradient(circle, rgba(255,92,53,0.5) 0%, rgba(255,92,53,0) 70%)",
-          animation: "otto-breath 2.8s ease-in-out infinite",
-        }}
-      />
-      {/* Spinning orbit ring with a tracer dot */}
-      <div
-        style={{
-          position: "absolute",
-          inset: 0,
-          borderRadius: "50%",
-          border: "0.5px solid rgba(255,92,53,0.45)",
-          animation: "otto-orbit-spin 8s linear infinite",
+          fontFamily: "DM Sans, sans-serif",
+          fontSize: 11,
+          color: subtle,
+          fontStyle: "italic",
         }}
       >
-        <div
-          style={{
-            position: "absolute",
-            top: -dotSize / 2,
-            left: "50%",
-            transform: "translateX(-50%)",
-            width: dotSize,
-            height: dotSize,
-            borderRadius: "50%",
-            background: "#FF5C35",
-            boxShadow: "0 0 6px rgba(255,92,53,0.8)",
-          }}
-        />
-      </div>
-      {/* Pulsing core — flex-centered so it stays perfectly in the middle */}
-      <div
-        style={{
-          width: coreSize,
-          height: coreSize,
-          borderRadius: "50%",
-          background:
-            "radial-gradient(circle at 30% 30%, #FFB89C 0%, #FF5C35 60%, #C84A20 100%)",
-          boxShadow: "inset 0 1px 0 rgba(255,255,255,0.45), 0 0 12px rgba(255,92,53,0.65)",
-          animation: "otto-core-pulse 2.2s ease-in-out infinite",
-        }}
-      />
+        {subtitle}
+      </span>
     </div>
   );
 }
 
-// Subtle constellation lines in the top-right — sells the "agent" / "network" vibe.
-function ConstellationAccent() {
-  return (
-    <svg
-      aria-hidden
-      width="120"
-      height="80"
-      viewBox="0 0 120 80"
-      style={{
-        position: "absolute",
-        top: 8,
-        right: 8,
-        pointerEvents: "none",
-        opacity: 0.55,
-      }}
-    >
-      <g stroke="rgba(255,140,90,0.4)" strokeWidth="0.5" fill="none">
-        <line x1="20" y1="40" x2="55" y2="20" />
-        <line x1="55" y1="20" x2="90" y2="35" />
-        <line x1="90" y1="35" x2="115" y2="15" />
-        <line x1="55" y1="20" x2="75" y2="55" />
-        <line x1="75" y1="55" x2="105" y2="60" />
-      </g>
-      <g fill="#FF5C35">
-        {[
-          [20, 40],
-          [55, 20],
-          [90, 35],
-          [115, 15],
-          [75, 55],
-          [105, 60],
-        ].map(([x, y], i) => (
-          <circle
-            key={i}
-            cx={x}
-            cy={y}
-            r="1.5"
-            style={{
-              animation: `otto-synapse 3s ease-in-out ${i * 0.35}s infinite`,
-            }}
-          />
-        ))}
-      </g>
-    </svg>
-  );
-}
 
 
 function ServerRail({
