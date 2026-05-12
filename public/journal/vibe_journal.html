@@ -456,6 +456,9 @@ body {
   <button class="nav-item" onclick="showSection('otto', this)" style="background:rgba(255,92,53,.08);">
     <span class="nav-icon" style="color:var(--accent);">●</span> Otto — Flagship <span class="nav-badge" style="background:var(--lavender); color:#3C3489;">NEW</span>
   </button>
+  <button class="nav-item" onclick="showSection('mobile', this)" style="background:rgba(124,92,252,.08);">
+    <span class="nav-icon" style="color:var(--purple);">▢</span> Mobile / iOS <span class="nav-badge" style="background:var(--lavender); color:#3C3489;">NEW</span>
+  </button>
   <button class="nav-item" onclick="showSection('sessions', this)">
     <span class="nav-icon">◰</span> Session Log <span class="nav-badge" id="sessionBadge">31</span>
   </button>
@@ -953,6 +956,109 @@ body {
 
     </div>
     <!-- ============ END OTTO ============ -->
+
+    <!-- ============ MOBILE / iOS ============ -->
+    <div class="section" id="sec-mobile">
+      <div class="section-header">
+        <div class="section-eyebrow" style="color: var(--purple);">▢ Surface · Session 46</div>
+        <h2 class="section-title">Mobile — <em>The iOS App</em></h2>
+      </div>
+
+      <div class="card">
+        <div class="card-body" style="font-size: 16px; line-height: 1.7;">Vibe is built mobile-first because the campus user lives on their phone. The plan is to wrap the existing Next.js app in Capacitor / WKWebView and ship it as a real iOS app — so the mobile surface is its own product, not a squished version of desktop. <strong>Mobile and desktop never share UI components.</strong> They share API routes, types, and business logic; everything else is forked.</div>
+      </div>
+
+      <div class="pull-quote">
+        <p>"No matter what the mobile version and the desktop version will look different. I will make this into an iOS app."</p>
+      </div>
+
+      <div class="callout" style="background: rgba(124,92,252,0.08); border-left: 3px solid var(--purple);">
+        <div class="callout-label" style="color: var(--purple);">Architectural call</div>
+        <div class="callout-body">The first attempt was CSS media queries collapsing the desktop tree into mobile. It bled — every change risked the desktop. After a few near-misses we pivoted to a <strong>component-fork architecture</strong>: a <code>useIsMobile()</code> hook + per-route <code>&lt;Switch&gt;</code> components that render mobile-only components from <code>src/components/mobile/</code>. Desktop stays byte-identical to before any mobile work; mobile is a parallel tree. When we wrap as iOS, the WebView always reports mobile, so only the mobile tree renders in the shipped app.</div>
+      </div>
+
+      <!-- ─── 01 NAV CHROME ─── -->
+      <div class="card">
+        <div class="card-label">01 — Bottom tab bar (only chrome)</div>
+        <div class="card-title">Instagram-style 5-tab nav</div>
+        <div class="card-body">The only persistent chrome on mobile is a bottom tab bar: <strong>Campus · Network · Otto · Messages · Profile</strong>. No top brand bar, no hamburger drawer — those are web patterns iOS users don't expect. Per-screen headers live inside each page so each surface can match its own vibe (Campus's IU crimson banner, Otto's hero, Profile's full-bleed cover). Safe-area insets via <code>env(safe-area-inset-*)</code> so content clears the iPhone notch and the home indicator.</div>
+      </div>
+
+      <!-- ─── 02 PROFILE ─── -->
+      <div class="card">
+        <div class="card-label">02 — ProfileMobile</div>
+        <div class="card-title">Cover, avatar, stats, tabs — your campus identity</div>
+        <div class="card-body">Full-bleed cover photo flush with the status bar. 88px rounded-square avatar overlapping the cover (Instagram-style). Stats row directly below: <strong>Followers · Connections</strong> (we dropped Following — three numbers crowded the row and Connections is the differentiated metric). Name + verified school badge + handle + tagline + meta chips + vibe tags + Bio. Three tabs below: <strong>Posts</strong> (1:1 grid), <strong>Clips</strong> (9:14 grid with play overlay), <strong>Portfolio</strong> (Working-on projects, work experience, resume file).</div>
+        <div class="card-body" style="margin-top: 12px;">Two top-right glyph buttons over the cover for owners only: pencil (edit) and settings gear. Mobile-native editing is up next — for now the pencil routes to the existing editor surface.</div>
+      </div>
+
+      <!-- ─── 03 VISITOR MODE ─── -->
+      <div class="card">
+        <div class="card-label">03 — Visitor mode</div>
+        <div class="card-title">/profile/&lt;someone&gt; renders the same iOS layout</div>
+        <div class="card-body">When you tap into someone else's profile, you get the same mobile design — not a squished static page. Pencil + settings hide; a full-width <strong>Connect / Follow back / Following ✓ / Connected ✓</strong> CTA replaces them. Optimistic POST/DELETE against the follow endpoint. Empty states read third-person ("<em>Maya hasn't posted yet</em>") and skip owner-only copy. Visitor reads from the public per-handle bootstrap so privacy stays intact.</div>
+      </div>
+
+      <!-- ─── 04 RESUME VIEWER ─── -->
+      <div class="card">
+        <div class="card-label">04 — ResumeViewerMobile</div>
+        <div class="card-title">Tap-to-open mini doc viewer with redactions</div>
+        <div class="card-body">Tap the Resume card in the Portfolio tab and a full-screen viewer slides in. PDFs rasterize through pdf.js to JPEG pages (scale 1.6, matches desktop coordinate space exactly). Images render directly. <strong>Redaction bars drawn on desktop overlay the same pages on mobile</strong> — coordinates are page-percent, so a bar drawn in one viewport lands in the same spot at every other width. View-only on mobile; editing redactions stays on desktop for now.</div>
+      </div>
+
+      <!-- ─── 05 NETWORK ─── -->
+      <div class="card">
+        <div class="card-label">05 — NetworkMobile</div>
+        <div class="card-title">Discovery-first — search + suggestions before existing connections</div>
+        <div class="card-body">The mobile rebuild of /network is built around finding new people, not browsing your existing graph. Sticky header with "People" title + a large search field that surfaces results as you type. Tab strip below: <strong>Discover</strong> (default, friends-of-friends + shared-org + same-major suggestions), <strong>Connections</strong>, <strong>Following</strong>, <strong>Followers</strong>. Inline Connect / Follow back / Following ✓ / Connected ✓ pill on every row with optimistic state. Search overrides the tabs while a query is in the field.</div>
+      </div>
+
+      <!-- ─── 06 PERSISTENCE ─── -->
+      <div class="card">
+        <div class="card-label">06 — Cross-device persistence</div>
+        <div class="card-title">What follows you from desktop to phone</div>
+        <div class="card-body">A surprising amount of pre-mobile state lived only in localStorage on the desktop static profile page. Mobile would have shown empty placeholders for it. So this session closed those gaps end-to-end:</div>
+        <table class="journal-table" style="margin-top: 14px;">
+          <tbody>
+            <tr><td><strong>Working on</strong></td><td>Now a <code>users.current_on</code> jsonb column. Desktop write-through via the existing sync debounce; mobile reads through the bootstrap.</td></tr>
+            <tr><td><strong>Resume redactions</strong></td><td>Now a <code>users.resume_redactions</code> jsonb column with the same <code>{docIndex, pageNumber, x, y, w, h}</code> coords. Bars drawn on desktop appear in the mobile viewer.</td></tr>
+            <tr><td><strong>Work-experience logos</strong></td><td>Used to live as base64 <code>data:</code> URIs in localStorage that the server-side sanitizer silently dropped. New <code>logo</code> upload kind routes through Supabase Storage. Auto-migrator converts any pre-fix <code>data:</code> URIs on the next sync.</td></tr>
+          </tbody>
+        </table>
+      </div>
+
+      <!-- ─── 07 ROADMAP ─── -->
+      <div class="card">
+        <div class="card-label">07 — What's next on mobile</div>
+        <div class="card-title">Post viewers, then Campus fork, then editing</div>
+        <div class="card-body" style="line-height: 1.7;"><strong>Post viewer</strong> + <strong>Clip viewer</strong> — the Posts / Clips grids on Profile are dead-end thumbnails until these land. Full-screen sheets with the existing post/clip endpoints, like/comment/repost actions inline. Pattern reuses the ResumeViewerMobile shell.</div>
+        <div class="card-body" style="margin-top: 8px; line-height: 1.7;"><strong>Campus mobile fork</strong> — the biggest remaining surface. The feed comes first; the chat 3-rail collapses to a single drawer pattern in a later iteration. Clips Reel and the IU crimson banner port from desktop.</div>
+        <div class="card-body" style="margin-top: 8px; line-height: 1.7;"><strong>Mobile-native editing</strong> — the pencil icon currently no-ops. Inline edit for name / tagline / bio / vibe tags / work experience using a sheet pattern (tap a field → modal editor). Avatar + banner upload using the existing storage endpoints.</div>
+      </div>
+
+      <!-- ─── 08 OPEN SURFACES ─── -->
+      <div class="card">
+        <div class="card-label">08 — Surface coverage</div>
+        <div class="card-title">Where we are on every route</div>
+        <table class="journal-table" style="margin-top: 14px;">
+          <tbody>
+            <tr><td>Landing</td><td>Mobile-polished (typewriter wraps, hero spacing).</td></tr>
+            <tr><td>Auth (login / signup / school-email)</td><td>Responsive sweep — usable at 375px.</td></tr>
+            <tr><td>Profile (owner)</td><td><strong>Forked.</strong> Full mobile-native rebuild.</td></tr>
+            <tr><td>Profile (visitor)</td><td><strong>Forked.</strong> Same shell, viewer chrome.</td></tr>
+            <tr><td>Resume viewer</td><td><strong>Forked.</strong> Full-screen with persisted redaction overlays.</td></tr>
+            <tr><td>Network</td><td><strong>Forked.</strong> Discovery-first rebuild.</td></tr>
+            <tr><td>Otto's Room</td><td>Responsive sweep only — 2-col grid collapses to 1-col under 760px.</td></tr>
+            <tr><td>Campus</td><td>Responsive sweep only (chat rails hidden). Full fork TODO.</td></tr>
+            <tr><td>Settings</td><td>Responsive sweep only.</td></tr>
+            <tr><td>Messages</td><td>Iframe-based; static prototype's own responsive work. Container-level only.</td></tr>
+          </tbody>
+        </table>
+      </div>
+
+    </div>
+    <!-- ============ END MOBILE ============ -->
+
     <div class="section" id="sec-sessions">
       <div class="section-header">
         <div class="section-eyebrow">Build History</div>
