@@ -1,8 +1,9 @@
 "use client";
 
+import { motion, useMotionTemplate, useMotionValue, useSpring } from "framer-motion";
 import Link from "next/link";
 import { usePathname } from "next/navigation";
-import { useCallback, useEffect, useMemo, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { createPortal } from "react-dom";
 
 import { NavIdentityChip } from "@/components/nav-identity-chip";
@@ -161,6 +162,43 @@ export default function LeftNav() {
   const pathname = usePathname();
   const [isPlatformAdmin, setIsPlatformAdmin] = useState(false);
 
+  // Cursor-tracking glow inside the sidebar. mouseX/mouseY hold the raw
+  // pointer position relative to the aside; the spring versions smooth
+  // the motion so the glow eases toward the cursor rather than snapping.
+  // useSpring + framer-motion keeps this off the React render path —
+  // the gradient updates via CSS variable subscriptions, so we don't
+  // re-render the whole nav on every mousemove.
+  const navRef = useRef<HTMLElement | null>(null);
+  const mouseX = useMotionValue(-200);
+  const mouseY = useMotionValue(-200);
+  const smoothX = useSpring(mouseX, { stiffness: 120, damping: 22 });
+  const smoothY = useSpring(mouseY, { stiffness: 120, damping: 22 });
+  // Bake the smoothed coords into a radial gradient string each frame.
+  // useMotionTemplate writes the new value to the style attribute via
+  // motion's animation loop — no React re-render fires.
+  const cursorGlow = useMotionTemplate`radial-gradient(180px circle at ${smoothX}px ${smoothY}px, rgba(255,92,53,0.18), rgba(255,92,53,0) 70%)`;
+
+  useEffect(() => {
+    const el = navRef.current;
+    if (!el) return;
+    const onMove = (e: MouseEvent) => {
+      const rect = el.getBoundingClientRect();
+      mouseX.set(e.clientX - rect.left);
+      mouseY.set(e.clientY - rect.top);
+    };
+    const onLeave = () => {
+      // Park the glow far off-screen so it fades out smoothly via spring.
+      mouseX.set(-400);
+      mouseY.set(-400);
+    };
+    el.addEventListener("mousemove", onMove);
+    el.addEventListener("mouseleave", onLeave);
+    return () => {
+      el.removeEventListener("mousemove", onMove);
+      el.removeEventListener("mouseleave", onLeave);
+    };
+  }, [mouseX, mouseY]);
+
   // Pull admin status from the bootstrap endpoint so the Admin link only
   // renders for platform admins. Cheap fetch (cached by the chip too) — no
   // duplicated DB hit since the response is shared with NavIdentityChip
@@ -188,6 +226,7 @@ export default function LeftNav() {
 
   return (
     <aside
+      ref={navRef}
       className="vibe-left-nav-aside"
       style={{
         padding: "20px 14px",
@@ -198,9 +237,38 @@ export default function LeftNav() {
         overflowY: "auto",
         display: "flex",
         flexDirection: "column",
-        background: "#FAF7F2",
+        // Two corner radial gradients painted directly on the aside's
+        // background, layered atop the cream base. Anchored to top-left
+        // and bottom-right corners of the aside's border-box (not its
+        // scrollable content) — `background-attachment: local` would
+        // scroll them with content, default `scroll` keeps them pinned.
+        // No-repeat so the gradients don't tile when the aside grows.
+        background: [
+          "radial-gradient(440px circle at 0% 0%, rgba(255,92,53,0.32) 0%, rgba(255,140,90,0.18) 28%, rgba(255,92,53,0) 60%) no-repeat",
+          "radial-gradient(420px circle at 100% 100%, rgba(255,140,90,0.30) 0%, rgba(255,92,53,0.14) 32%, rgba(255,92,53,0) 62%) no-repeat",
+          "#FAF7F2",
+        ].join(", "),
+        // Stacking context so the cursor-glow's z-index:-1 stays inside
+        // the sidebar instead of clipping behind page content.
+        isolation: "isolate",
       }}
     >
+      {/* Cursor-tracking glow — soft coral spot that eases toward the
+          mouse via framer-motion springs. useMotionTemplate bakes the
+          smoothed coords into the gradient string each frame without
+          a React re-render. Layered above the static corner bleeds
+          (which live on the aside's background) so it adds an extra
+          warm-spot at the cursor. */}
+      <motion.div
+        aria-hidden
+        style={{
+          position: "absolute",
+          inset: 0,
+          pointerEvents: "none",
+          zIndex: -1,
+          background: cursorGlow,
+        }}
+      />
       <Link
         href="/campus"
         style={{
