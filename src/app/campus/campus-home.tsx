@@ -341,6 +341,15 @@ export function CampusHome({
       window.OttoTour?.start(
         [
           {
+            // Heads-up about the LeftNav profile chip first — without an
+            // avatar + banner, the chip renders as a grey shell, which
+            // is the #1 thing users miss after onboarding. Tap it and
+            // they land on /profile in edit mode to fix it.
+            selector: "#nav-identity-chip",
+            title: "This is <span class=\"accent\">you</span> on Vibe.",
+            body: "Pop in a profile picture and a banner — click your card to jump into your profile and customize it. Without them, the card stays grey.",
+          },
+          {
             selector: "#campus-feed",
             title: "Your campus <span class=\"accent\">pulse</span>.",
             body: "Live posts from your school. Otto surfaces what's loud and what's just dropped.",

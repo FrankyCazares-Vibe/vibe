@@ -117,7 +117,7 @@ export function NavIdentityChip() {
 
   if (chip.status === "loading") {
     return (
-      <Link href="/profile" style={{ ...cardShell, opacity: 0.65 }}>
+      <Link id="nav-identity-chip" href="/profile" style={{ ...cardShell, opacity: 0.65 }}>
         <div
           style={{
             height: BANNER_PREVIEW_H,
@@ -168,7 +168,7 @@ export function NavIdentityChip() {
 
   if (chip.status === "idle") {
     return (
-      <Link href="/profile" style={cardShell}>
+      <Link id="nav-identity-chip" href="/profile" style={cardShell}>
         <div
           style={{
             height: BANNER_PREVIEW_H,
@@ -219,6 +219,7 @@ export function NavIdentityChip() {
 
   return (
     <Link
+      id="nav-identity-chip"
       href="/profile"
       style={cardShell}
       title={`${name} — ${subtitle}`}
