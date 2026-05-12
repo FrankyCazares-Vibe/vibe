@@ -127,7 +127,6 @@ export function ProfileMobile() {
   const workExperience = (user.workExperience ?? []).slice(0, 4);
   const counts = user.counts ?? {};
   const followers = String(counts.followers ?? "0");
-  const following = String(counts.following ?? "0");
   const connections = String(counts.connections ?? "0");
 
   return (
@@ -239,7 +238,6 @@ export function ProfileMobile() {
             }}
           >
             <StatTile num={followers} label="Followers" />
-            <StatTile num={following} label="Following" />
             <StatTile num={connections} label="Connections" prominent />
           </div>
         </div>
