@@ -221,38 +221,51 @@ export function ProfileMobile() {
             pointerEvents: "none",
           }}
         />
-        {/* Settings gear — floating top-right, iOS pattern */}
-        <Link
-          href="/settings"
-          aria-label="Settings"
+        {/* Floating top-right actions — edit pencil + settings gear.
+            Matches the iOS pattern of glyph-buttons over the hero
+            image. Both use the same frosted-glass treatment. */}
+        <div
           style={{
             position: "absolute",
             top: "calc(env(safe-area-inset-top, 0px) + 14px)",
             right: 14,
-            width: 38,
-            height: 38,
-            borderRadius: 999,
-            background: "rgba(0,0,0,0.32)",
-            backdropFilter: "blur(10px)",
-            WebkitBackdropFilter: "blur(10px)",
-            display: "inline-flex",
-            alignItems: "center",
-            justifyContent: "center",
-            color: "#fff",
-            textDecoration: "none",
-            border: "1px solid rgba(255,255,255,0.18)",
+            display: "flex",
+            gap: 8,
           }}
         >
-          <svg width="18" height="18" viewBox="0 0 18 18" fill="none" aria-hidden>
-            <circle cx="9" cy="9" r="2.4" stroke="currentColor" strokeWidth="1.5" />
-            <path
-              d="M9 1.5v2.2M9 14.3v2.2M16.5 9h-2.2M3.7 9H1.5M14.3 3.7l-1.55 1.55M5.25 12.75L3.7 14.3M14.3 14.3l-1.55-1.55M5.25 5.25L3.7 3.7"
-              stroke="currentColor"
-              strokeWidth="1.4"
-              strokeLinecap="round"
-            />
-          </svg>
-        </Link>
+          <Link
+            href="/profile?edit=1"
+            aria-label="Edit profile"
+            style={floatingActionStyle}
+          >
+            <svg width="17" height="17" viewBox="0 0 17 17" fill="none" aria-hidden>
+              <path
+                d="M11.6 1.9l3.5 3.5-9.2 9.2H2.4v-3.5l9.2-9.2z"
+                stroke="currentColor"
+                strokeWidth="1.5"
+                strokeLinejoin="round"
+                fill="none"
+              />
+              <path
+                d="M10.2 3.3l3.5 3.5"
+                stroke="currentColor"
+                strokeWidth="1.5"
+                strokeLinecap="round"
+              />
+            </svg>
+          </Link>
+          <Link href="/settings" aria-label="Settings" style={floatingActionStyle}>
+            <svg width="18" height="18" viewBox="0 0 18 18" fill="none" aria-hidden>
+              <circle cx="9" cy="9" r="2.4" stroke="currentColor" strokeWidth="1.5" />
+              <path
+                d="M9 1.5v2.2M9 14.3v2.2M16.5 9h-2.2M3.7 9H1.5M14.3 3.7l-1.55 1.55M5.25 12.75L3.7 14.3M14.3 14.3l-1.55-1.55M5.25 5.25L3.7 3.7"
+                stroke="currentColor"
+                strokeWidth="1.4"
+                strokeLinecap="round"
+              />
+            </svg>
+          </Link>
+        </div>
       </div>
 
       {/* Identity block — overlaps the cover */}
@@ -389,27 +402,8 @@ export function ProfileMobile() {
           </div>
         ) : null}
 
-        {/* Edit profile button */}
-        <Link
-          href="/profile?edit=1"
-          style={{
-            display: "block",
-            width: "100%",
-            textAlign: "center",
-            padding: "11px 16px",
-            borderRadius: 14,
-            background: "#1C1C1E",
-            color: "#fff",
-            textDecoration: "none",
-            fontFamily: "DM Sans, sans-serif",
-            fontWeight: 700,
-            fontSize: 14,
-            marginBottom: 22,
-            boxShadow: "0 4px 14px rgba(0,0,0,0.12)",
-          }}
-        >
-          Edit profile
-        </Link>
+        {/* Edit affordance lives in the cover top-right (pencil icon) so
+            the identity stack stays focused on actual identity content. */}
       </div>
 
       {/* Bio — stays in the header area, above the tab strip */}
@@ -1076,6 +1070,21 @@ function MetaChip({ label, icon }: { label: string; icon?: "pin" | "book" | "cal
     </span>
   );
 }
+
+const floatingActionStyle: React.CSSProperties = {
+  width: 38,
+  height: 38,
+  borderRadius: 999,
+  background: "rgba(0,0,0,0.32)",
+  backdropFilter: "blur(10px)",
+  WebkitBackdropFilter: "blur(10px)",
+  display: "inline-flex",
+  alignItems: "center",
+  justifyContent: "center",
+  color: "#fff",
+  textDecoration: "none",
+  border: "1px solid rgba(255,255,255,0.18)",
+};
 
 const vibeTagStyle: React.CSSProperties = {
   fontSize: 12,
