@@ -5679,6 +5679,17 @@ function FeedRow({
     ? `@${post.author.handle}`
     : "";
   const avatarUrl = fromOrg ? post.org?.logo_url : post.author?.avatar_url;
+  // Where the avatar / name / handle should navigate. Person posts go
+  // to /profile/<handle>; org posts go to /orgs/<handle>. Falls back to
+  // null so we render plain (non-clickable) text when there's no handle
+  // to route to (shouldn't happen in practice but keeps the row safe
+  // against malformed feed rows).
+  const authorHref =
+    fromOrg && post.org?.handle
+      ? `/orgs/${encodeURIComponent(post.org.handle)}`
+      : post.author?.handle
+        ? `/profile/${encodeURIComponent(post.author.handle)}`
+        : null;
   const initials = displayName
     .split(/\s+/)
     .filter(Boolean)
@@ -5803,8 +5814,8 @@ function FeedRow({
         </p>
       ) : null}
       <div style={{ display: "flex", gap: 12 }}>
-      <div
-        style={{
+      {(() => {
+        const avatarStyle: React.CSSProperties = {
           width: 40,
           height: 40,
           borderRadius: fromOrg ? 12 : 999,
@@ -5821,10 +5832,22 @@ function FeedRow({
           fontWeight: 800,
           fontSize: 13,
           flexShrink: 0,
-        }}
-      >
-        {!avatarUrl ? initials : null}
-      </div>
+          textDecoration: "none",
+        };
+        // Avatar links to the author's profile / org page. Plain div when
+        // there's no handle to route to.
+        return authorHref ? (
+          <Link
+            href={authorHref}
+            aria-label={`Open ${displayName}'s profile`}
+            style={avatarStyle}
+          >
+            {!avatarUrl ? initials : null}
+          </Link>
+        ) : (
+          <div style={avatarStyle}>{!avatarUrl ? initials : null}</div>
+        );
+      })()}
       <div style={{ flex: 1, minWidth: 0 }}>
         <div
           style={{
@@ -5835,9 +5858,9 @@ function FeedRow({
             flexWrap: "wrap",
           }}
         >
-          {fromOrg && post.org?.handle ? (
+          {authorHref ? (
             <Link
-              href={`/orgs/${post.org.handle}`}
+              href={authorHref}
               style={{
                 fontFamily: "Fraunces, serif",
                 fontWeight: 800,
@@ -5861,6 +5884,31 @@ function FeedRow({
             </span>
           )}
           {fromOrg && post.org?.verified ? <VerifiedBadge size={13} /> : null}
+          {displayHandle ? (
+            authorHref ? (
+              <Link
+                href={authorHref}
+                style={{
+                  fontFamily: "DM Sans, sans-serif",
+                  fontSize: 13,
+                  color: COLORS.faint,
+                  textDecoration: "none",
+                }}
+              >
+                {displayHandle}
+              </Link>
+            ) : (
+              <span
+                style={{
+                  fontFamily: "DM Sans, sans-serif",
+                  fontSize: 13,
+                  color: COLORS.faint,
+                }}
+              >
+                {displayHandle}
+              </span>
+            )
+          ) : null}
           <span
             style={{
               fontFamily: "DM Sans, sans-serif",
@@ -5868,19 +5916,21 @@ function FeedRow({
               color: COLORS.faint,
             }}
           >
-            {displayHandle ? `${displayHandle} · ` : ""}
+            {displayHandle ? "· " : ""}
             {relativeTime(post.created_at)}
           </span>
           {fromOrg && post.author?.handle ? (
-            <span
+            <Link
+              href={`/profile/${encodeURIComponent(post.author.handle)}`}
               style={{
                 fontFamily: "DM Sans, sans-serif",
                 fontSize: 12,
                 color: COLORS.faint,
+                textDecoration: "none",
               }}
             >
               · posted by @{post.author.handle}
-            </span>
+            </Link>
           ) : null}
           {post.type === "clip" ? (
             <span
@@ -6018,6 +6068,9 @@ function FeedRow({
 }
 
 function RepostBanner({ reposter }: { reposter: FeedAuthor }) {
+  const label = reposter.handle
+    ? `@${reposter.handle}`
+    : reposter.name || "Someone";
   return (
     <div
       style={{
@@ -6034,7 +6087,17 @@ function RepostBanner({ reposter }: { reposter: FeedAuthor }) {
     >
       <RepostIcon />
       <span>
-        {reposter.handle ? `@${reposter.handle}` : reposter.name || "Someone"} reposted
+        {reposter.handle ? (
+          <Link
+            href={`/profile/${encodeURIComponent(reposter.handle)}`}
+            style={{ color: COLORS.faint, textDecoration: "none" }}
+          >
+            {label}
+          </Link>
+        ) : (
+          label
+        )}{" "}
+        reposted
       </span>
     </div>
   );
