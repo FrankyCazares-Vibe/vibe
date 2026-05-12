@@ -10,6 +10,7 @@ const KIND_EXT: Record<string, string> = {
   resume: "pdf",
   post: "jpg",
   poster: "jpg",
+  logo: "jpg",
 };
 
 const ALLOWED: Record<string, string[]> = {
@@ -18,6 +19,9 @@ const ALLOWED: Record<string, string[]> = {
   resume: ["application/pdf", "image/jpeg", "image/png", "image/webp"],
   post: ["image/jpeg", "image/png", "image/webp", "image/gif"],
   poster: ["image/jpeg", "image/png", "image/webp"],
+  // SVG omitted on purpose — would need DOMPurify-style sanitization to
+  // strip embedded <script> before public hosting. Bitmaps only for v1.
+  logo: ["image/jpeg", "image/png", "image/webp", "image/gif"],
 };
 
 const MAX_BYTES: Record<string, number> = {
@@ -26,6 +30,7 @@ const MAX_BYTES: Record<string, number> = {
   resume: 8 * 1024 * 1024,
   post: 8 * 1024 * 1024,
   poster: 2 * 1024 * 1024,
+  logo: 2 * 1024 * 1024,
 };
 
 const KIND_PATH_PREFIX: Record<string, string> = {
@@ -34,6 +39,7 @@ const KIND_PATH_PREFIX: Record<string, string> = {
   resume: "",
   post: "posts/",
   poster: "posters/",
+  logo: "logos/",
 };
 
 function humanizeStorageError(message: string): string {
@@ -77,7 +83,8 @@ export async function POST(req: Request) {
     kindRaw === "banner" ||
     kindRaw === "resume" ||
     kindRaw === "post" ||
-    kindRaw === "poster"
+    kindRaw === "poster" ||
+    kindRaw === "logo"
       ? kindRaw
       : null;
   if (!kind) {

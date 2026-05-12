@@ -4362,14 +4362,49 @@ function triggerLogoUpload(wrap) {
   if (input) input.click();
 }
 
+// Upload a work-experience logo to /api/me/profile-upload?kind=logo and
+// return the persistable HTTPS URL. Throws on failure so callers can
+// fall back to a local-only data: URI without storing it server-side.
+async function _uploadWorkLogo(file) {
+  const fd = new FormData();
+  fd.append('file', file);
+  fd.append('kind', 'logo');
+  const r = await fetch('/api/me/profile-upload', {
+    method: 'POST',
+    credentials: 'include',
+    body: fd,
+  });
+  const j = await r.json().catch(() => ({}));
+  if (!r.ok || !j.ok || !j.url) {
+    throw new Error((j && j.error) || 'Could not upload logo');
+  }
+  return j.url;
+}
+
 async function applyLogoFromInput(input) {
   const file = input.files[0];
   if (!file) return;
-  const url = await _fileToDataURL(file);
   const wrap = input.closest('.work-logo-wrap');
-  applyLogoToWrap(wrap, url);
-  showToast('Logo updated');
-  saveProfileToStorage();
+  // Optimistic preview from the local file so the user sees instant
+  // feedback; we swap to the persistable HTTPS URL once upload lands.
+  const previewUrl = await _fileToDataURL(file);
+  applyLogoToWrap(wrap, previewUrl);
+  try {
+    const url = await _uploadWorkLogo(file);
+    applyLogoToWrap(wrap, url);
+    showToast('Logo updated');
+    saveProfileToStorage();
+  } catch (e) {
+    // Upload failed (likely network / size / mime). Roll back the
+    // optimistic preview so we don't leave a data: URI that the
+    // server-side sanitizer will silently drop on the next sync.
+    const img = wrap.querySelector('img.work-logo-img');
+    if (img) img.remove();
+    const def = wrap.querySelector('.work-logo-default');
+    if (def) def.style.opacity = '';
+    showToast(e && e.message ? e.message : 'Could not upload logo');
+  }
+  input.value = '';
 }
 
 function applyLogoToWrap(wrap, url) {
@@ -4388,14 +4423,27 @@ function applyLogoToWrap(wrap, url) {
 async function previewWorkLogo(input) {
   const file = input.files[0];
   if (!file) return;
-  const url = await _fileToDataURL(file);
+  // Show data: URI preview immediately.
+  const previewUrl = await _fileToDataURL(file);
   const prev = document.getElementById('workLogoPreview');
   const def = document.getElementById('workLogoDefault');
   const img = document.getElementById('workLogoImg');
-  if (img) img.src = url;
+  if (img) img.src = previewUrl;
   if (prev) prev.style.display = 'block';
   if (def) def.style.display = 'none';
-  pendingWorkLogo = url;
+  pendingWorkLogo = null;
+  try {
+    // Upload to Supabase Storage so saveWork() can persist the HTTPS
+    // URL. Until the upload lands, pendingWorkLogo stays null — the
+    // sanitizer would drop the data: URI anyway.
+    pendingWorkLogo = await _uploadWorkLogo(file);
+  } catch (e) {
+    pendingWorkLogo = null;
+    if (img) img.src = '';
+    if (prev) prev.style.display = 'none';
+    if (def) def.style.display = '';
+    showToast(e && e.message ? e.message : 'Could not upload logo');
+  }
 }
 
 let pendingWorkLogo = null;
