@@ -19,36 +19,39 @@ import { useEffect, useState } from "react";
  * profile.html bridge uses — so identity stays in sync.
  */
 
+/**
+ * Shape returned by `/api/me/profile-bootstrap` — actually the
+ * `vibe_user_v1` shape from `buildVibeUserV1FromProfile`. NOT the raw
+ * snake_case row. The naming is unusual (avatarPhoto / coverPhoto /
+ * coverGradient / vibeTags) because this shape predates the React app
+ * and was originally consumed by profile.html via localStorage. We
+ * read the same shape on mobile so identity stays in sync across
+ * surfaces.
+ */
+type VibeTag = { label?: string; color?: string };
 type WorkExp = {
   title?: string;
   company?: string;
-  start?: string;
-  end?: string;
+  dates?: string;
+  location?: string;
   description?: string;
+  logoUrl?: string;
 };
+type StudentVerification = { status?: string; school?: string };
 
 type VibeUser = {
   name?: string | null;
   handle?: string | null;
   tagline?: string | null;
   headline?: string | null;
-  avatar_url?: string | null;
-  avatarUrl?: string | null;
-  banner_url?: string | null;
-  bannerUrl?: string | null;
-  banner_gradient?: string | null;
-  bannerGradient?: string | null;
-  location_text?: string | null;
+  avatarPhoto?: string | null;
+  coverPhoto?: string | null;
+  coverGradient?: string | null;
   location?: string | null;
-  school?: string | null;
-  major?: string | null;
-  year?: number | string | null;
   bio?: string | null;
   skills?: string[];
-  interests?: string[];
-  school_verified?: boolean;
-  schoolVerified?: boolean;
-  work_experience?: WorkExp[];
+  vibeTags?: VibeTag[];
+  studentVerification?: StudentVerification;
   workExperience?: WorkExp[];
   counts?: {
     followers?: string | number;
@@ -109,19 +112,19 @@ export function ProfileMobile() {
   const handle = pick(user.handle);
   const tagline = pick(user.tagline);
   const headline = pick(user.headline);
-  const avatar = pick(user.avatar_url, user.avatarUrl);
-  const banner = pick(user.banner_url, user.bannerUrl);
-  const gradient =
-    pick(user.banner_gradient, user.bannerGradient) ?? DEFAULT_BANNER_GRADIENT;
-  const location = pick(user.location_text, user.location);
-  const school = pick(user.school);
-  const major = pick(user.major);
-  const year = pick(user.year);
+  const avatar = pick(user.avatarPhoto);
+  const banner = pick(user.coverPhoto);
+  const gradient = pick(user.coverGradient) ?? DEFAULT_BANNER_GRADIENT;
+  const location = pick(user.location);
   const bio = pick(user.bio);
-  const verified = Boolean(user.school_verified ?? user.schoolVerified);
+  const verified = user.studentVerification?.status === "verified";
+  const school = pick(user.studentVerification?.school);
   const skills = (user.skills ?? []).filter(Boolean).slice(0, 6);
-  const interests = (user.interests ?? []).filter(Boolean).slice(0, 4);
-  const workExperience = (user.work_experience ?? user.workExperience ?? []).slice(0, 4);
+  const tagsFromVibeTags = (user.vibeTags ?? [])
+    .map((t) => t?.label)
+    .filter((s): s is string => !!s)
+    .slice(0, 6);
+  const workExperience = (user.workExperience ?? []).slice(0, 4);
   const counts = user.counts ?? {};
   const followers = String(counts.followers ?? "0");
   const following = String(counts.following ?? "0");
@@ -289,8 +292,8 @@ export function ProfileMobile() {
           </p>
         ) : null}
 
-        {/* Meta chips */}
-        {(location || major || year || headline) ? (
+        {/* Meta chips — headline already encodes major + year + department */}
+        {(location || headline) ? (
           <div
             style={{
               display: "flex",
@@ -299,15 +302,13 @@ export function ProfileMobile() {
               marginBottom: 14,
             }}
           >
-            {headline ? <MetaChip label={headline} /> : null}
+            {headline ? <MetaChip label={headline} icon="book" /> : null}
             {location ? <MetaChip label={location} icon="pin" /> : null}
-            {major ? <MetaChip label={major} icon="book" /> : null}
-            {year ? <MetaChip label={`Year ${year}`} icon="cal" /> : null}
           </div>
         ) : null}
 
-        {/* Vibe tags (skills/interests blend) */}
-        {[...skills, ...interests].length > 0 ? (
+        {/* Vibe tags */}
+        {[...tagsFromVibeTags, ...skills].length > 0 ? (
           <div
             style={{
               display: "flex",
@@ -316,7 +317,7 @@ export function ProfileMobile() {
               marginBottom: 18,
             }}
           >
-            {[...skills, ...interests].slice(0, 8).map((tag) => (
+            {[...tagsFromVibeTags, ...skills].slice(0, 8).map((tag) => (
               <span key={tag} style={vibeTagStyle}>
                 {tag}
               </span>
@@ -367,7 +368,9 @@ export function ProfileMobile() {
                     width: 40,
                     height: 40,
                     borderRadius: 12,
-                    background: "#FAF7F2",
+                    background: w.logoUrl
+                      ? `url(${w.logoUrl}) center/cover`
+                      : "#FAF7F2",
                     border: "1px solid rgba(28,28,30,0.08)",
                     flexShrink: 0,
                   }}
@@ -377,7 +380,7 @@ export function ProfileMobile() {
                     {w.title ?? "—"}
                   </div>
                   <div style={{ fontSize: 12, color: "#8A8580" }}>
-                    {[w.company, formatRange(w.start, w.end)]
+                    {[w.company, w.dates, w.location]
                       .filter(Boolean)
                       .join(" · ")}
                   </div>
@@ -588,7 +591,3 @@ function initialsOf(name: string): string {
   return parts.map((p) => p[0]?.toUpperCase() ?? "").join("");
 }
 
-function formatRange(start?: string, end?: string): string | null {
-  if (!start && !end) return null;
-  return `${start ?? ""}${start || end ? " – " : ""}${end ?? "Present"}`;
-}
