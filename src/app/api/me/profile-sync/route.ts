@@ -1,5 +1,6 @@
 import { NextResponse } from "next/server";
 
+import { sanitizeCurrentOn } from "@/lib/profile/current-on";
 import { normalizeProfileView } from "@/lib/profile/normalize-profile-view";
 import { sanitizeRecruiterSnapshot } from "@/lib/profile/recruiter-snapshot";
 import { inlineOrUploadProfileUrl } from "@/lib/profile/storage-upload";
@@ -82,6 +83,16 @@ export async function POST(req: Request) {
     patch.work_experience = sanitizeWorkExperience(body.work_experience);
   }
 
+  // "Working on" / "Currently into" items — accepted under either the
+  // server-side snake_case key OR the profile.html camelCase key
+  // (currentlyOn) so the existing payload builder doesn't have to know
+  // about the rename. Sanitizer caps length + item count so the column
+  // can't grow unbounded.
+  if ("current_on" in body || "currentlyOn" in body) {
+    const raw = "current_on" in body ? body.current_on : body.currentlyOn;
+    patch.current_on = sanitizeCurrentOn(raw);
+  }
+
   if ("recruiter_snapshot" in body) {
     const snap = sanitizeRecruiterSnapshot(body.recruiter_snapshot);
     if (snap === undefined) {
@@ -136,7 +147,7 @@ export async function POST(req: Request) {
   const { data: row, error: selErr } = await supabase
     .from("users")
     .select(
-      "id,email,name,handle,school,school_email,school_verified,year,major,department,bio,tagline,website,headline,location_text,banner_gradient,avatar_url,banner_url,resume_url,interests,skills,looking_for,work_experience,recruiter_snapshot",
+      "id,email,name,handle,school,school_email,school_verified,year,major,department,bio,tagline,website,headline,location_text,banner_gradient,avatar_url,banner_url,resume_url,interests,skills,looking_for,work_experience,recruiter_snapshot,current_on",
     )
     .eq("id", user.id)
     .single();

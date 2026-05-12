@@ -1,3 +1,4 @@
+import type { CurrentOnItem } from "@/lib/profile/current-on";
 import type { WorkExperienceRow } from "@/lib/profile/work-experience";
 
 /** Subset of `public.users` passed to the profile UI and API responses. */
@@ -26,4 +27,5 @@ export type ProfileView = {
   looking_for: string[];
   work_experience: WorkExperienceRow[];
   recruiter_snapshot: Record<string, string>;
+  current_on: CurrentOnItem[];
 };

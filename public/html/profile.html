@@ -7040,6 +7040,10 @@ function buildProfileSyncPayload() {
     resume_url: resumeUrl || null,
     work_experience: Array.isArray(u.workExperience) ? u.workExperience : [],
     recruiter_snapshot: (u.snapshot && typeof u.snapshot === 'object') ? u.snapshot : {},
+    // "Working on" — persisted server-side as users.current_on. Payload
+    // shape matches the localStorage shape ({icon, text}); the server
+    // sanitizer enforces caps + drops items missing text.
+    current_on: Array.isArray(u.currentlyOn) ? u.currentlyOn : [],
   };
   if (bannerUrl) {
     payload.banner_url = bannerUrl;
@@ -7184,7 +7188,16 @@ async function flushProfileServerSync() {
       if (prev && prev.counts) nu.counts = prev.counts;
       if (prev && prev.glance) nu.glance = prev.glance;
       if (prev && prev.pinnedId != null) nu.pinnedId = prev.pinnedId;
-      if (prev && Array.isArray(prev.currentlyOn)) nu.currentlyOn = prev.currentlyOn;
+      // currentlyOn is now server-persisted via users.current_on. Server
+      // is source of truth. Fall back to localStorage ONLY when the
+      // server returned nothing — covers users who entered "Working on"
+      // items before this migration shipped. flushProfileServerSync()
+      // will push the fallback to the server on the next save.
+      if (!Array.isArray(nu.currentlyOn) || nu.currentlyOn.length === 0) {
+        if (prev && Array.isArray(prev.currentlyOn) && prev.currentlyOn.length) {
+          nu.currentlyOn = prev.currentlyOn;
+        }
+      }
       vibeSave('vibe_user_v1', nu);
     }
   } catch (e) {

@@ -123,5 +123,15 @@ export function buildVibeUserV1FromProfile(
   const we = workExperienceForVibeHtml(profile.work_experience);
   if (we.length) u.workExperience = we;
 
+  // "Working on" — pre-existing localStorage key on profile.html
+  // (`user.currentlyOn`), now backed by users.current_on. Emitted as
+  // the same camelCase key so existing consumers don't have to change.
+  if (profile.current_on.length) {
+    u.currentlyOn = profile.current_on.map((c) => ({
+      icon: c.icon,
+      text: c.text,
+    }));
+  }
+
   return u;
 }
