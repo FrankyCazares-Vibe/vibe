@@ -1,6 +1,6 @@
-import { redirect } from "next/navigation";
-
 import { enforceCampusAccess } from "@/lib/auth/campus-access";
+
+import { ProfileHandleSwitch } from "./ProfileHandleSwitch";
 
 type Props = {
   params: Promise<{ handle: string }>;
@@ -16,14 +16,17 @@ export async function generateMetadata({ params }: Props) {
 }
 
 /**
- * `/profile/<handle>` route — auth-gates the request, then redirects to the
- * static prototype with `?handle=<handle>` so the same HTML/CSS the owner
- * sees on `/profile` is reused for visiting other users (viewer mode).
+ * `/profile/<handle>` route — server auth gate, then a client-side
+ * viewport fork.
  *
- * `?welcome=1` is forwarded so the post-onboarding flow (and the Settings →
- * Replay tour entry) can fire Otto's spotlight tour on the static page —
- * without this passthrough the redirect strips the query and the tour
- * never starts.
+ * Mobile: renders ProfileMobile in visitor mode (Connect/Follow CTA,
+ * Posts/Clips/Portfolio tabs read from the per-handle public APIs).
+ * Desktop: client-side redirects to /html/profile.html?handle=<handle>
+ * so the static prototype keeps handling viewer mode there.
+ *
+ * The switch is intentionally client-side — the server has no
+ * reliable viewport signal, and UA sniffing breaks on iPad-class
+ * devices that pretend to be desktop.
  */
 export default async function ProfileByHandlePage({
   params,
@@ -32,8 +35,6 @@ export default async function ProfileByHandlePage({
   const { handle } = await params;
   const sp = await searchParams;
   await enforceCampusAccess(`/profile/${handle}`);
-  const welcome = sp?.welcome === "1" ? "&welcome=1" : "";
-  const target =
-    `/html/profile.html?app=1&handle=${encodeURIComponent(handle.toLowerCase())}${welcome}`;
-  redirect(target);
+  const welcome = sp?.welcome === "1";
+  return <ProfileHandleSwitch handle={handle} welcome={welcome} />;
 }

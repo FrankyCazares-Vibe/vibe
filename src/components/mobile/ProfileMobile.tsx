@@ -79,7 +79,16 @@ type VibeUser = {
     following?: string | number;
     connections?: string | number;
   };
+  /** Set by /api/users/[handle]/bootstrap. true = this payload is for a
+   *  visited user, not the signed-in viewer. */
+  _isViewerMode?: boolean;
+  /** Set alongside _isViewerMode. "none" | "following" | "followed_by"
+   *  | "connected" | "self" — drives the Connect / Follow / Following
+   *  pill state in visitor mode. */
+  _viewerFollowState?: FollowState;
 };
+
+type FollowState = "none" | "following" | "followed_by" | "connected" | "self";
 
 /** Row shape from /api/me/posts. `type === "clip"` are 9:16 short videos
  *  shown in the Clips tab; everything else lands in Posts. */
@@ -104,28 +113,46 @@ function pick<T>(...vals: (T | null | undefined)[]): T | null {
 const DEFAULT_BANNER_GRADIENT =
   "linear-gradient(135deg,#FFB8A0 0%,#C8B8FF 45%,#B8E4FF 100%)";
 
-export function ProfileMobile() {
+type Props = {
+  /** Optional — when set, renders visitor mode for this handle. Omit
+   *  for the signed-in user's own profile. Named `targetHandle` so it
+   *  doesn't shadow the visited user's `handle` field we destructure
+   *  out of `user` below. */
+  targetHandle?: string;
+};
+
+export function ProfileMobile({ targetHandle }: Props = {}) {
+  const isVisitor = !!targetHandle;
   const [user, setUser] = useState<VibeUser | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [posts, setPosts] = useState<PostRow[] | null>(null);
   const [tab, setTab] = useState<ProfileTab>("posts");
   /** Resume item the viewer should open. null = closed. */
   const [viewerItem, setViewerItem] = useState<ResumeItem | null>(null);
+  /** Visitor-mode follow state; mirrors the server value initially then
+   *  flips optimistically when the user taps Connect / Follow. */
+  const [followState, setFollowState] = useState<FollowState>("none");
+  const [followBusy, setFollowBusy] = useState(false);
 
   useEffect(() => {
     let cancelled = false;
+    const endpoint = isVisitor
+      ? `/api/users/${encodeURIComponent(targetHandle!)}/bootstrap`
+      : "/api/me/profile-bootstrap";
     (async () => {
       try {
-        const res = await fetch("/api/me/profile-bootstrap", {
-          cache: "no-store",
-        });
+        const res = await fetch(endpoint, { cache: "no-store" });
         const data = await res.json();
         if (cancelled) return;
         if (!data?.ok || !data.vibeUser) {
           setError("Could not load profile");
           return;
         }
-        setUser(data.vibeUser as VibeUser);
+        const u = data.vibeUser as VibeUser;
+        setUser(u);
+        if (isVisitor && u._viewerFollowState) {
+          setFollowState(u._viewerFollowState);
+        }
       } catch {
         if (!cancelled) setError("Could not load profile");
       }
@@ -133,14 +160,17 @@ export function ProfileMobile() {
     return () => {
       cancelled = true;
     };
-  }, []);
+  }, [isVisitor, targetHandle]);
 
-  // Posts + clips fetch — same endpoint, filtered client-side by type.
+  // Posts + clips fetch — same shape both ways, just routed by `handle`.
   useEffect(() => {
     let cancelled = false;
+    const endpoint = isVisitor
+      ? `/api/users/${encodeURIComponent(targetHandle!)}/posts`
+      : "/api/me/posts";
     (async () => {
       try {
-        const res = await fetch("/api/me/posts", { cache: "no-store" });
+        const res = await fetch(endpoint, { cache: "no-store" });
         const data = await res.json();
         if (cancelled) return;
         if (data?.ok && Array.isArray(data.posts)) {
@@ -155,7 +185,40 @@ export function ProfileMobile() {
     return () => {
       cancelled = true;
     };
-  }, []);
+  }, [isVisitor, targetHandle]);
+
+  // Follow/unfollow toggle for visitor mode. Optimistic so the pill
+  // updates instantly; reverts on server error.
+  const toggleFollow = async () => {
+    if (!isVisitor || !targetHandle || followBusy) return;
+    const wasFollowing = followState === "following" || followState === "connected";
+    const next: FollowState = wasFollowing
+      ? followState === "connected"
+        ? "followed_by"
+        : "none"
+      : followState === "followed_by"
+        ? "connected"
+        : "following";
+    setFollowBusy(true);
+    setFollowState(next);
+    try {
+      const r = await fetch("/api/me/follow", {
+        method: wasFollowing ? "DELETE" : "POST",
+        credentials: "include",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ target_handle: targetHandle }),
+      });
+      const j = await r.json().catch(() => ({}));
+      if (!r.ok || !j?.ok) {
+        // Roll back.
+        setFollowState(followState);
+      }
+    } catch {
+      setFollowState(followState);
+    } finally {
+      setFollowBusy(false);
+    }
+  };
 
   if (error) {
     return (
@@ -221,51 +284,53 @@ export function ProfileMobile() {
             pointerEvents: "none",
           }}
         />
-        {/* Floating top-right actions — edit pencil + settings gear.
-            Matches the iOS pattern of glyph-buttons over the hero
-            image. Both use the same frosted-glass treatment. */}
-        <div
-          style={{
-            position: "absolute",
-            top: "calc(env(safe-area-inset-top, 0px) + 14px)",
-            right: 14,
-            display: "flex",
-            gap: 8,
-          }}
-        >
-          <Link
-            href="/profile?edit=1"
-            aria-label="Edit profile"
-            style={floatingActionStyle}
+        {/* Floating top-right actions — pencil + settings for owners,
+            nothing for visitors (visitor CTA sits in the identity stack
+            below the avatar instead so it lands closer to the name). */}
+        {isVisitor ? null : (
+          <div
+            style={{
+              position: "absolute",
+              top: "calc(env(safe-area-inset-top, 0px) + 14px)",
+              right: 14,
+              display: "flex",
+              gap: 8,
+            }}
           >
-            <svg width="17" height="17" viewBox="0 0 17 17" fill="none" aria-hidden>
-              <path
-                d="M11.6 1.9l3.5 3.5-9.2 9.2H2.4v-3.5l9.2-9.2z"
-                stroke="currentColor"
-                strokeWidth="1.5"
-                strokeLinejoin="round"
-                fill="none"
-              />
-              <path
-                d="M10.2 3.3l3.5 3.5"
-                stroke="currentColor"
-                strokeWidth="1.5"
-                strokeLinecap="round"
-              />
-            </svg>
-          </Link>
-          <Link href="/settings" aria-label="Settings" style={floatingActionStyle}>
-            <svg width="18" height="18" viewBox="0 0 18 18" fill="none" aria-hidden>
-              <circle cx="9" cy="9" r="2.4" stroke="currentColor" strokeWidth="1.5" />
-              <path
-                d="M9 1.5v2.2M9 14.3v2.2M16.5 9h-2.2M3.7 9H1.5M14.3 3.7l-1.55 1.55M5.25 12.75L3.7 14.3M14.3 14.3l-1.55-1.55M5.25 5.25L3.7 3.7"
-                stroke="currentColor"
-                strokeWidth="1.4"
-                strokeLinecap="round"
-              />
-            </svg>
-          </Link>
-        </div>
+            <Link
+              href="/profile?edit=1"
+              aria-label="Edit profile"
+              style={floatingActionStyle}
+            >
+              <svg width="17" height="17" viewBox="0 0 17 17" fill="none" aria-hidden>
+                <path
+                  d="M11.6 1.9l3.5 3.5-9.2 9.2H2.4v-3.5l9.2-9.2z"
+                  stroke="currentColor"
+                  strokeWidth="1.5"
+                  strokeLinejoin="round"
+                  fill="none"
+                />
+                <path
+                  d="M10.2 3.3l3.5 3.5"
+                  stroke="currentColor"
+                  strokeWidth="1.5"
+                  strokeLinecap="round"
+                />
+              </svg>
+            </Link>
+            <Link href="/settings" aria-label="Settings" style={floatingActionStyle}>
+              <svg width="18" height="18" viewBox="0 0 18 18" fill="none" aria-hidden>
+                <circle cx="9" cy="9" r="2.4" stroke="currentColor" strokeWidth="1.5" />
+                <path
+                  d="M9 1.5v2.2M9 14.3v2.2M16.5 9h-2.2M3.7 9H1.5M14.3 3.7l-1.55 1.55M5.25 12.75L3.7 14.3M14.3 14.3l-1.55-1.55M5.25 5.25L3.7 3.7"
+                  stroke="currentColor"
+                  strokeWidth="1.4"
+                  strokeLinecap="round"
+                />
+              </svg>
+            </Link>
+          </div>
+        )}
       </div>
 
       {/* Identity block — overlaps the cover */}
@@ -402,8 +467,17 @@ export function ProfileMobile() {
           </div>
         ) : null}
 
-        {/* Edit affordance lives in the cover top-right (pencil icon) so
-            the identity stack stays focused on actual identity content. */}
+        {/* Owner: edit affordance lives in the cover top-right.
+            Visitor: Connect / Follow CTA goes here, full-width and
+            prominent (the primary call-to-action on someone else's
+            profile). */}
+        {isVisitor ? (
+          <FollowButton
+            state={followState}
+            busy={followBusy}
+            onTap={toggleFollow}
+          />
+        ) : null}
       </div>
 
       {/* Bio — stays in the header area, above the tab strip */}
@@ -421,15 +495,27 @@ export function ProfileMobile() {
 
       <div style={{ padding: "12px 16px 24px" }}>
         {tab === "posts" ? (
-          <PostsGrid posts={feedPosts} loading={posts === null} />
+          <PostsGrid
+            posts={feedPosts}
+            loading={posts === null}
+            isVisitor={isVisitor}
+            ownerName={name}
+          />
         ) : tab === "clips" ? (
-          <ClipsGrid clips={clipPosts} loading={posts === null} />
+          <ClipsGrid
+            clips={clipPosts}
+            loading={posts === null}
+            isVisitor={isVisitor}
+            ownerName={name}
+          />
         ) : (
           <PortfolioPane
             currentProjects={currentProjects}
             workExperience={workExperience}
             resumePortfolio={resumePortfolio}
             onOpenDoc={(r) => setViewerItem(r)}
+            isVisitor={isVisitor}
+            ownerName={name}
           />
         )}
       </div>
@@ -527,10 +613,22 @@ function ProfileTabs({
   );
 }
 
-function PostsGrid({ posts, loading }: { posts: PostRow[]; loading: boolean }) {
+function PostsGrid({
+  posts,
+  loading,
+  isVisitor,
+  ownerName,
+}: {
+  posts: PostRow[];
+  loading: boolean;
+  isVisitor: boolean;
+  ownerName: string;
+}) {
   if (loading) return <GridSkeleton />;
   if (posts.length === 0) {
-    return (
+    return isVisitor ? (
+      <EmptyTab title="No posts yet" body={`${ownerName} hasn't posted anything yet.`} />
+    ) : (
       <EmptyTab
         title="No posts yet"
         body="Share a thought, a moment, or a photo — your posts land here."
@@ -553,10 +651,22 @@ function PostsGrid({ posts, loading }: { posts: PostRow[]; loading: boolean }) {
   );
 }
 
-function ClipsGrid({ clips, loading }: { clips: PostRow[]; loading: boolean }) {
+function ClipsGrid({
+  clips,
+  loading,
+  isVisitor,
+  ownerName,
+}: {
+  clips: PostRow[];
+  loading: boolean;
+  isVisitor: boolean;
+  ownerName: string;
+}) {
   if (loading) return <GridSkeleton ratio="9/14" />;
   if (clips.length === 0) {
-    return (
+    return isVisitor ? (
+      <EmptyTab title="No clips yet" body={`${ownerName} hasn't posted any clips yet.`} />
+    ) : (
       <EmptyTab
         title="No clips yet"
         body="Clips are short, 9:16 video moments. Post one from the campus feed to get started."
@@ -651,17 +761,29 @@ function PortfolioPane({
   workExperience,
   resumePortfolio,
   onOpenDoc,
+  isVisitor,
+  ownerName,
 }: {
   currentProjects: CurrentProject[];
   workExperience: WorkExp[];
   resumePortfolio: ResumeItem[];
   onOpenDoc: (r: ResumeItem) => void;
+  isVisitor: boolean;
+  ownerName: string;
 }) {
   const allEmpty =
     currentProjects.length === 0 &&
     workExperience.length === 0 &&
     resumePortfolio.length === 0;
   if (allEmpty) {
+    if (isVisitor) {
+      return (
+        <EmptyTab
+          title="Nothing here yet"
+          body={`${ownerName} hasn't added projects, experience, or a resume yet.`}
+        />
+      );
+    }
     return (
       <EmptyTab
         title="Nothing for recruiters yet"
@@ -672,23 +794,29 @@ function PortfolioPane({
   }
   return (
     <div style={{ display: "flex", flexDirection: "column", gap: 22 }}>
-      <PortfolioSubsection title="Working on">
-        {currentProjects.length === 0 ? (
-          <SubsectionEmpty body="Show what you're building, learning, or planning. Adds context for recruiters and connections." />
-        ) : (
-          <ul style={projectListStyle}>
-            {currentProjects.map((p, i) => (
-              <li key={`${p.text}-${i}`} style={projectItemStyle}>
-                <span style={projectIconStyle} aria-hidden>
-                  {p.icon || "✦"}
-                </span>
-                <span style={{ fontSize: 14, lineHeight: 1.4 }}>{p.text}</span>
-              </li>
-            ))}
-          </ul>
-        )}
-      </PortfolioSubsection>
+      {/* Visitors only see subsections that have content — empty
+          subsections with owner-instruction copy ("Add roles…") would
+          be confusing on someone else's profile. */}
+      {currentProjects.length > 0 || !isVisitor ? (
+        <PortfolioSubsection title="Working on">
+          {currentProjects.length === 0 ? (
+            <SubsectionEmpty body="Show what you're building, learning, or planning. Adds context for recruiters and connections." />
+          ) : (
+            <ul style={projectListStyle}>
+              {currentProjects.map((p, i) => (
+                <li key={`${p.text}-${i}`} style={projectItemStyle}>
+                  <span style={projectIconStyle} aria-hidden>
+                    {p.icon || "✦"}
+                  </span>
+                  <span style={{ fontSize: 14, lineHeight: 1.4 }}>{p.text}</span>
+                </li>
+              ))}
+            </ul>
+          )}
+        </PortfolioSubsection>
+      ) : null}
 
+      {workExperience.length > 0 || !isVisitor ? (
       <PortfolioSubsection title="Experience">
         {workExperience.length === 0 ? (
           <SubsectionEmpty body="Add roles, internships, and side gigs from your profile editor." />
@@ -735,7 +863,9 @@ function PortfolioPane({
           </div>
         )}
       </PortfolioSubsection>
+      ) : null}
 
+      {resumePortfolio.length > 0 || !isVisitor ? (
       <PortfolioSubsection title="Resume">
         {resumePortfolio.length === 0 ? (
           <SubsectionEmpty body="Upload a PDF or portfolio image to give recruiters a quick reference document." />
@@ -801,6 +931,7 @@ function PortfolioPane({
           </div>
         )}
       </PortfolioSubsection>
+      ) : null}
     </div>
   );
 }
@@ -982,6 +1113,62 @@ function IconResume() {
 }
 
 // ---------------------------------------------------------------------------
+
+function FollowButton({
+  state,
+  busy,
+  onTap,
+}: {
+  state: FollowState;
+  busy: boolean;
+  onTap: () => void;
+}) {
+  const isFollowing = state === "following" || state === "connected";
+  const label =
+    state === "connected"
+      ? "Connected"
+      : state === "following"
+        ? "Following"
+        : state === "followed_by"
+          ? "Follow back"
+          : "Connect";
+  const filled = !isFollowing;
+  return (
+    <button
+      type="button"
+      onClick={onTap}
+      disabled={busy}
+      style={{
+        display: "block",
+        width: "100%",
+        textAlign: "center",
+        padding: "11px 16px",
+        borderRadius: 14,
+        background: filled
+          ? state === "followed_by"
+            ? "#FF5C35"
+            : "#1C1C1E"
+          : "rgba(255,255,255,0.7)",
+        color: filled ? "#fff" : "#1C1C1E",
+        border: filled
+          ? "1px solid rgba(0,0,0,0.06)"
+          : "1px solid rgba(28,28,30,0.18)",
+        fontFamily: "DM Sans, sans-serif",
+        fontWeight: 700,
+        fontSize: 14,
+        marginBottom: 22,
+        cursor: busy ? "default" : "pointer",
+        opacity: busy ? 0.65 : 1,
+        boxShadow: filled
+          ? "0 4px 14px rgba(0,0,0,0.12)"
+          : "inset 0 1px 0 rgba(255,255,255,0.6)",
+        WebkitTapHighlightColor: "transparent",
+      }}
+    >
+      {isFollowing ? `${label} ✓` : label}
+    </button>
+  );
+}
 
 function StatTile({
   num,
