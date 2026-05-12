@@ -24,6 +24,7 @@ type MentionToast = {
   name: string;
   handle: string | null;
   postId: string | null;
+  authorHandle: string | null;
   preview: string;
 };
 
@@ -36,7 +37,11 @@ type NotifLite = {
     name: string | null;
     handle: string | null;
   } | null;
-  post?: { id: string; content: string | null } | null;
+  post?: {
+    id: string;
+    content: string | null;
+    author?: { handle: string | null } | null;
+  } | null;
 };
 
 export function OttoCorner() {
@@ -78,6 +83,7 @@ export function OttoCorner() {
         name: display,
         handle: actor.handle,
         postId: notif.post?.id ?? null,
+        authorHandle: notif.post?.author?.handle ?? null,
         preview: (notif.post?.content ?? "").slice(0, 120),
       });
     };
@@ -133,6 +139,19 @@ export function OttoCorner() {
     return () => window.clearTimeout(t);
   }, [toast]);
 
+  // Ripple key — bumped whenever `unread` ticks up so the badge fires
+  // a one-shot ripple ring. Tracks the prior count via a ref so the
+  // ripple ONLY plays on increase (not on initial cold-load with
+  // unread > 0, and not when the panel clears the count to 0).
+  const prevUnreadForRippleRef = useRef(0);
+  const [rippleKey, setRippleKey] = useState(0);
+  useEffect(() => {
+    if (unread > prevUnreadForRippleRef.current) {
+      setRippleKey((k) => k + 1);
+    }
+    prevUnreadForRippleRef.current = unread;
+  }, [unread]);
+
   return (
     <>
     <button
@@ -171,23 +190,71 @@ export function OttoCorner() {
         e.currentTarget.style.boxShadow = "0 8px 24px rgba(0,0,0,0.18)";
       }}
     >
-      {/* Notification dot */}
+      {/* Unread badge — counted, gently pulsing coral pill on the
+          orb's top-right shoulder. Doubles as the "Otto has news for
+          you" signal: continuous pulse to draw the eye + a one-shot
+          ripple ring whenever the count just ticked up. Keeps under
+          20px so it never camps the orb. */}
       {unread > 0 ? (
-        <span
-          aria-hidden
-          style={{
-            position: "absolute",
-            top: -2,
-            right: -2,
-            width: 11,
-            height: 11,
-            borderRadius: "50%",
-            background: "#FF5C35",
-            border: "2px solid #FAF7F2",
-            boxShadow: "0 0 8px rgba(255,92,53,0.5)",
-            zIndex: 2,
-          }}
-        />
+        <>
+          <style>{`
+            @keyframes otto-badge-pulse {
+              0%, 100% { transform: scale(1); box-shadow: 0 0 0 0 rgba(255,92,53,0.55); }
+              50%      { transform: scale(1.08); box-shadow: 0 0 0 4px rgba(255,92,53,0); }
+            }
+            @keyframes otto-badge-ripple {
+              from { transform: scale(0.6); opacity: 0.7; }
+              to   { transform: scale(2.6); opacity: 0; }
+            }
+          `}</style>
+          {/* One-shot ripple — re-mounts on rippleKey change so the
+              animation replays from frame 0 each time. */}
+          <span
+            key={`ripple-${rippleKey}`}
+            aria-hidden
+            style={{
+              position: "absolute",
+              top: -4,
+              right: -4,
+              width: 22,
+              height: 22,
+              borderRadius: "50%",
+              border: "1.5px solid rgba(255,92,53,0.55)",
+              animation: "otto-badge-ripple 900ms ease-out forwards",
+              pointerEvents: "none",
+              zIndex: 1,
+            }}
+          />
+          <span
+            aria-hidden
+            style={{
+              position: "absolute",
+              top: -6,
+              right: -6,
+              minWidth: 18,
+              height: 18,
+              padding: "0 5px",
+              borderRadius: 999,
+              background: "#FF5C35",
+              border: "2px solid #FAF7F2",
+              boxShadow:
+                "0 0 12px rgba(255,92,53,0.6), 0 2px 6px rgba(0,0,0,0.18)",
+              color: "#FFF",
+              fontFamily: "DM Sans, sans-serif",
+              fontWeight: 800,
+              fontSize: 10,
+              lineHeight: "14px",
+              display: "flex",
+              alignItems: "center",
+              justifyContent: "center",
+              letterSpacing: "0.02em",
+              animation: "otto-badge-pulse 2.4s ease-in-out infinite",
+              zIndex: 2,
+            }}
+          >
+            {unread > 9 ? "9+" : unread}
+          </span>
+        </>
       ) : null}
 
       {/* Centered viz: breath ring + orbit dot + pulsing core */}
@@ -333,7 +400,11 @@ export function OttoCorner() {
         <div style={{ display: "flex", gap: 8 }}>
           {toast.postId ? (
             <a
-              href={`/profile?post=${encodeURIComponent(toast.postId)}`}
+              href={
+                toast.authorHandle
+                  ? `/profile/${encodeURIComponent(toast.authorHandle)}?post=${encodeURIComponent(toast.postId)}`
+                  : `/profile?post=${encodeURIComponent(toast.postId)}`
+              }
               onClick={() => setToast(null)}
               style={{
                 flex: 1,

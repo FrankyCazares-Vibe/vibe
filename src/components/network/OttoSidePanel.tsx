@@ -16,6 +16,10 @@ type NotifPost = {
   type: string | null;
   content: string | null;
   media_thumbnail_url: string | null;
+  // Author handle is pulled by the notifications GET join — used so
+  // mention clicks route to /profile/<authorHandle>?post=<id> instead
+  // of the viewer's own profile.
+  author?: { handle: string | null } | null;
 } | null;
 
 type NotifComment = {
@@ -798,12 +802,19 @@ function NotifRowView({ n, onClose }: { n: NotifRow; onClose: () => void }) {
       onClose();
       return;
     }
-    // Like/comment/mention on post → profile?post=<id>
+    // Like / comment / mention on a post → open the post viewer
+    // anchored on the *author's* profile so the row reads in context.
+    // Falls back to /profile?post=<id> when the join didn't return an
+    // author handle (defensive — should always be present in v1).
     if (
       (n.type === "like" || n.type === "comment" || n.type === "mention") &&
       n.post?.id
     ) {
-      window.location.href = `/profile?post=${encodeURIComponent(n.post.id)}`;
+      const authorHandle = n.post.author?.handle ?? null;
+      const href = authorHandle
+        ? `/profile/${encodeURIComponent(authorHandle)}?post=${encodeURIComponent(n.post.id)}`
+        : `/profile?post=${encodeURIComponent(n.post.id)}`;
+      window.location.href = href;
       onClose();
       return;
     }

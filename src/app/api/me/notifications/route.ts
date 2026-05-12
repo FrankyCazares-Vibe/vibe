@@ -29,18 +29,23 @@ export async function GET(req: Request) {
     Math.max(1, Number(url.searchParams.get("limit")) || DEFAULT_LIMIT),
   );
 
+  // Pull the post's author handle so mention rows can route the click
+  // to /profile/<authorHandle>?post=<id> — landing the mentionee on the
+  // post in its actual context instead of dropping them onto their own
+  // profile with the post-viewer query param.
+  //
   // Try the full select first (includes message_id from the mention
   // migration). If that column isn't in the DB yet (deploy lag), fall
   // back to the older shape so the panel still renders.
   const FULL_SELECT =
     "id,type,post_id,comment_id,message_id,read_at,created_at," +
     "actor:users!notifications_actor_id_fkey(id,name,handle,avatar_url)," +
-    "post:posts!notifications_post_id_fkey(id,type,content,media_thumbnail_url)," +
+    "post:posts!notifications_post_id_fkey(id,type,content,media_thumbnail_url,author:users!posts_user_id_fkey(handle))," +
     "comment:post_comments!notifications_comment_id_fkey(id,content)";
   const FALLBACK_SELECT =
     "id,type,post_id,comment_id,read_at,created_at," +
     "actor:users!notifications_actor_id_fkey(id,name,handle,avatar_url)," +
-    "post:posts!notifications_post_id_fkey(id,type,content,media_thumbnail_url)," +
+    "post:posts!notifications_post_id_fkey(id,type,content,media_thumbnail_url,author:users!posts_user_id_fkey(handle))," +
     "comment:post_comments!notifications_comment_id_fkey(id,content)";
 
   let { data, error } = await supabase
