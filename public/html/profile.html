@@ -1058,8 +1058,10 @@ body.doc-modal-open { overflow:hidden; }
      smaller. That way a single page ALWAYS fits in the viewer without
      scrolling, and multi-page docs scroll between full-page views.
      0.7727 = 8.5 / 11 (page aspect). The image is absolutely positioned
-     so % bar coords align 1:1 with page coordinates. */
-  width:min(100%, calc((92vh - 200px) * 0.7727));
+     so % bar coords align 1:1 with page coordinates. The wrap width is
+     multiplied by the --doc-zoom var the wheel handler updates so
+     redaction bars (positioned as % of wrap) scale with the page. */
+  width:calc(min(100%, calc((92vh - 200px) * 0.7727)) * var(--doc-zoom, 1));
   aspect-ratio:8.5 / 11;
   flex-shrink:0;
 }
@@ -1215,6 +1217,33 @@ body.viewer-mode .redaction-delete { display:none !important; }
   line-height:1.5;
   margin-top:8px;
 }
+
+/* Edit-mode CTA banner above the doc viewer. Visible to owners who
+   haven't enabled edit mode yet — gives them a one-tap path to start
+   redacting without closing the modal. Hidden in edit mode and for
+   visitors / viewer mode entirely. */
+.doc-edit-cta {
+  display:flex;align-items:center;gap:10px;
+  padding:10px 14px;margin-bottom:10px;
+  border:1px solid rgba(255,92,53,.25);
+  background:rgba(255,92,53,.06);
+  border-radius:12px;
+  font-family:'DM Sans',sans-serif;font-size:13px;color:#1C1C1E;
+  cursor:none;
+  transition:background .15s, border-color .15s, transform .15s;
+}
+.doc-edit-cta:hover { background:rgba(255,92,53,.12); border-color:rgba(255,92,53,.45); }
+.doc-edit-cta:active { transform:scale(0.995); }
+.doc-edit-cta-bulb { font-size:16px;line-height:1;flex-shrink:0; }
+.doc-edit-cta-text { flex:1 1 auto;line-height:1.45; }
+.doc-edit-cta-text strong { font-weight:700; }
+.doc-edit-cta-go {
+  flex-shrink:0;font-weight:700;color:var(--accent);font-size:12px;
+  letter-spacing:.3px;text-transform:uppercase;
+}
+/* Hide when edit mode is already on OR when viewing someone else. */
+body.edit-mode .doc-edit-cta,
+body.viewer-mode .doc-edit-cta { display:none; }
 
 
 .doc-redactions { display:none; }
@@ -3873,6 +3902,21 @@ body.empty-profile-mode #profileEmpty { display: flex !important; }
             <button class="doc-nav-btn primary" onclick="closeModal('docModal')">Done</button>
           </div>
         </div>
+        <!-- Owner-only edit-mode CTA. Shows ONLY when the viewer owns
+             this profile AND is not yet in edit mode. The .doc-edit-cta
+             rule below hides it once body.edit-mode is set or in viewer
+             mode. Clicking the banner flips edit mode on without making
+             them close the modal first. -->
+        <div class="doc-edit-cta owner-only" id="docEditCta" role="button"
+             tabindex="0"
+             onclick="enableEditModeFromDocViewer()"
+             onkeydown="if(event.key==='Enter'||event.key===' ')enableEditModeFromDocViewer()">
+          <span class="doc-edit-cta-bulb" aria-hidden="true">💡</span>
+          <span class="doc-edit-cta-text">
+            <strong>Turn on edit mode</strong> to add black redaction bars over personal details.
+          </span>
+          <span class="doc-edit-cta-go" aria-hidden="true">Enable →</span>
+        </div>
         <div class="doc-view" id="docView"></div>
         <div class="redaction-hint owner-only" id="docHint">Tip: in edit mode, click and drag on the document to cover personal details. Click a bar to resize or delete.</div>
         <div class="doc-redactions">
@@ -4760,6 +4804,13 @@ function openDocumentViewer() {
   // Freeze body scroll so wheel events that miss .doc-view don't quietly
   // scroll the profile underneath the modal.
   document.body.classList.add('doc-modal-open');
+  // Reset zoom on every open and attach the ctrl+wheel handler.
+  setDocZoom(1);
+  const view = document.getElementById('docView');
+  if (view && !view._docWheelBound) {
+    view.addEventListener('wheel', _onDocViewWheel, { passive: false });
+    view._docWheelBound = true;
+  }
 }
 
 function closeDocumentViewer() {
@@ -4767,7 +4818,57 @@ function closeDocumentViewer() {
   if (!modal) return;
   modal.classList.remove('open');
   document.body.classList.remove('doc-modal-open');
+  setDocZoom(1);
 }
+
+// Zoom range chosen to keep redaction bar handles still grabbable at
+// minimum and to avoid blowing past the rasterized image's pixel budget
+// at maximum (pages are rendered at 1.6x base; 3x view × 1.6x raster
+// stays under 5x effective which is fine for an 8.5x11 page).
+const DOC_ZOOM_MIN = 0.6;
+const DOC_ZOOM_MAX = 3.0;
+let _docZoom = 1;
+function setDocZoom(z) {
+  _docZoom = Math.max(DOC_ZOOM_MIN, Math.min(DOC_ZOOM_MAX, Number(z) || 1));
+  const view = document.getElementById('docView');
+  if (view) view.style.setProperty('--doc-zoom', _docZoom);
+}
+// Ctrl+wheel (Cmd+wheel on macOS) zooms the page stack while keeping
+// the cursor's anchor point roughly stable. We adjust scrollLeft so
+// the horizontal center under the cursor stays put; vertical anchor is
+// page-scoped so naive scroll math is good enough (full-page scrolling
+// already snaps to page tops).
+function _onDocViewWheel(e) {
+  if (!e.ctrlKey && !e.metaKey) return;
+  e.preventDefault();
+  const view = e.currentTarget;
+  const prev = _docZoom;
+  // 1 wheel-tick is ~100 deltaY on most mice / ~10 on trackpads. Scale
+  // so a single notch is ~10% step.
+  const step = -(e.deltaY) * 0.0015;
+  const next = Math.max(DOC_ZOOM_MIN, Math.min(DOC_ZOOM_MAX, prev + step));
+  if (next === prev) return;
+  // Anchor: keep the point under the cursor at roughly the same screen
+  // position post-zoom. Approximated by scaling scrollLeft/scrollTop
+  // around (cursor - view origin).
+  const rect = view.getBoundingClientRect();
+  const cx = e.clientX - rect.left + view.scrollLeft;
+  const cy = e.clientY - rect.top + view.scrollTop;
+  const scale = next / prev;
+  setDocZoom(next);
+  view.scrollLeft = Math.max(0, cx * scale - (e.clientX - rect.left));
+  view.scrollTop  = Math.max(0, cy * scale - (e.clientY - rect.top));
+}
+
+// Owner clicks the "Turn on edit mode" banner from inside the doc viewer.
+// Flip edit mode if it isn't already on; either way the banner hides via
+// CSS once body.edit-mode is set. Modal stays open so they immediately
+// see crosshair cursor on the doc.
+function enableEditModeFromDocViewer() {
+  if (typeof editMode !== 'undefined' && editMode) return;
+  if (typeof toggleEdit === 'function') toggleEdit();
+}
+window.enableEditModeFromDocViewer = enableEditModeFromDocViewer;
 
 
 // ── Redaction bars for resume / portfolio viewer ─────────────────

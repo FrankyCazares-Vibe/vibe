@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 
 import { rasterizePdf } from "@/lib/pdfjs-cdn";
 import type { RedactionBar } from "@/lib/profile/resume-redactions";
@@ -31,9 +31,23 @@ type Props = {
  * For images, the URL is rendered as a single page so the same
  * page-wrap + bars rendering path applies.
  */
+// Pinch-zoom range. 0.8 lets users fit a wider scan into the viewport;
+// 4 is enough to read fine print in scanned résumés without exhausting
+// the rasterized JPEG (already 1.6× scale during rasterize, so a 4× view
+// zoom is ~6.4× effective — still inside the readable range).
+const ZOOM_MIN = 0.8;
+const ZOOM_MAX = 4;
+
 export function ResumeViewerMobile({ url, type, name, bars, onClose }: Props) {
   const [pages, setPages] = useState<string[] | null>(null);
   const [error, setError] = useState<string | null>(null);
+  const [zoom, setZoom] = useState(1);
+  const scrollRef = useRef<HTMLDivElement | null>(null);
+  const pinchRef = useRef<{ baseDist: number; baseZoom: number; active: boolean }>({
+    baseDist: 0,
+    baseZoom: 1,
+    active: false,
+  });
 
   useEffect(() => {
     let cancelled = false;
@@ -69,6 +83,55 @@ export function ResumeViewerMobile({ url, type, name, bars, onClose }: Props) {
       document.body.style.overflow = prev;
     };
   }, []);
+
+  // Pinch-to-zoom on the scroll container. Single-finger touches pass
+  // through to native vertical pan; the moment a second finger lands we
+  // capture the gesture, preventDefault to suppress scrolling, and drive
+  // a CSS variable on the page stack. The variable scales each page
+  // wrapper's max-width — bars positioned as % of the wrap scale with it.
+  useEffect(() => {
+    const el = scrollRef.current;
+    if (!el) return;
+    const dist = (a: Touch, b: Touch) =>
+      Math.hypot(a.clientX - b.clientX, a.clientY - b.clientY);
+    const onStart = (e: TouchEvent) => {
+      if (e.touches.length === 2) {
+        pinchRef.current = {
+          active: true,
+          baseDist: dist(e.touches[0]!, e.touches[1]!),
+          baseZoom: zoom,
+        };
+      }
+    };
+    const onMove = (e: TouchEvent) => {
+      if (e.touches.length === 2 && pinchRef.current.active) {
+        e.preventDefault();
+        const d = dist(e.touches[0]!, e.touches[1]!);
+        const next = Math.max(
+          ZOOM_MIN,
+          Math.min(
+            ZOOM_MAX,
+            pinchRef.current.baseZoom * (d / pinchRef.current.baseDist),
+          ),
+        );
+        setZoom(next);
+      }
+    };
+    const onEnd = (e: TouchEvent) => {
+      if (e.touches.length < 2) pinchRef.current.active = false;
+    };
+    // passive:false so preventDefault during the pinch actually works.
+    el.addEventListener("touchstart", onStart, { passive: false });
+    el.addEventListener("touchmove", onMove, { passive: false });
+    el.addEventListener("touchend", onEnd, { passive: true });
+    el.addEventListener("touchcancel", onEnd, { passive: true });
+    return () => {
+      el.removeEventListener("touchstart", onStart);
+      el.removeEventListener("touchmove", onMove);
+      el.removeEventListener("touchend", onEnd);
+      el.removeEventListener("touchcancel", onEnd);
+    };
+  }, [zoom]);
 
   return (
     <div
@@ -153,20 +216,29 @@ export function ResumeViewerMobile({ url, type, name, bars, onClose }: Props) {
         </a>
       </header>
 
-      {/* Scroll area with stacked pages */}
+      {/* Scroll area with stacked pages. When the user pinches past 1x
+          the pages widen past the viewport, so overflowX flips to auto
+          to allow horizontal pan. `touch-action: pan-y` makes single-
+          finger gestures continue to vertical-scroll naturally — two
+          fingers go to our pinch handler via the useEffect above. */}
       <div
+        ref={scrollRef}
         style={{
           flex: 1,
           minHeight: 0,
           overflowY: "auto",
-          overflowX: "hidden",
+          overflowX: zoom > 1 ? "auto" : "hidden",
           overscrollBehavior: "contain",
           padding: "16px 12px calc(24px + env(safe-area-inset-bottom, 0px))",
           display: "flex",
           flexDirection: "column",
           alignItems: "center",
           gap: 12,
-        }}
+          touchAction: "pan-x pan-y",
+          // CSS var that PageWrap reads to scale its max-width. Cast
+          // through `as` since React's CSS types don't know custom vars.
+          ["--rv-zoom" as never]: zoom,
+        } as React.CSSProperties}
       >
         {error ? (
           <div
@@ -210,8 +282,13 @@ function PageWrap({
       data-page={pageNumber}
       style={{
         position: "relative",
-        width: "100%",
-        maxWidth: 720,
+        // Width = viewport-fit base × pinch zoom. At zoom 1 the page
+        // tracks the container; at zoom > 1 the page widens past the
+        // viewport so the scroll container can horizontal-pan.
+        // `flexShrink: 0` keeps the row from collapsing the page when
+        // it overflows the cross-axis.
+        width: "calc(min(100%, 720px) * var(--rv-zoom, 1))",
+        flexShrink: 0,
         borderRadius: 8,
         overflow: "hidden",
         boxShadow: "0 12px 28px rgba(0,0,0,0.35)",
