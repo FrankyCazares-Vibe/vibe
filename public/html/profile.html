@@ -6431,10 +6431,76 @@ function renderProfDefault() {
       + '<button onclick="clearRecentSearches()" style="background:none;border:none;color:#8A8580;font-size:11px;font-weight:600;cursor:none">Clear</button>'
       + '</div>'
       + recent.slice(0,5).map(function(r){ return renderProfSR(r, true); }).join('');
+    // Recently-searched rows carry a stale `rel` from when the chip was
+    // first pushed. A block/unblock/follow/unfollow between then and now
+    // would leave "Connect back" on a row that should read "Message" (and
+    // vice versa). Fire one batch refresh and rewrite the action labels
+    // in place. Stays best-effort: failure leaves the cached labels.
+    setTimeout(function () { _refreshRecentSearchRel(recent.slice(0, 5)); }, 0);
   } else {
     out += '<div class="search-empty" style="padding:18px 16px;text-align:center;color:#8A8580;font-size:13px">Search for people by name or @handle.</div>';
   }
   return out;
+}
+
+// Pull fresh rel state for the visible Recently-searched chips and patch
+// the .sr-action label on each row. Also drops chips for users who've
+// since been blocked either way. Updates localStorage so the chip stays
+// fresh after a page reload too.
+async function _refreshRecentSearchRel(rows) {
+  try {
+    var ids = rows.map(function (r) { return r.id; }).filter(Boolean);
+    if (!ids.length) return;
+    var r = await fetch('/api/me/follow-states?ids=' + encodeURIComponent(ids.join(',')),
+      { credentials: 'include' });
+    if (!r.ok) return;
+    var j = await r.json();
+    if (!j || !j.ok) return;
+    var dd = document.getElementById('profSearchDropdown');
+    if (!dd) return;
+    var blocked = new Set(Array.isArray(j.blocked) ? j.blocked : []);
+    // Walk the rendered rows; for each, find its row.id from the row's
+    // click payload (encoded in the onclick string). Easier: stamp the id
+    // on the DOM at render time. We rerender via renderProfSR with fresh
+    // rel + filter out blocked entries.
+    var fresh = rows
+      .filter(function (row) { return !blocked.has(row.id); })
+      .map(function (row) {
+        var next = (j.states && j.states[row.id]) || row.rel || 'none';
+        return Object.assign({}, row, { rel: next });
+      });
+    // Persist the fresh rel into localStorage so subsequent reopens are
+    // accurate even without re-fetching.
+    var stored = _loadRecentSearches();
+    var freshById = new Map(fresh.map(function (r) { return [r.id, r]; }));
+    var nextStored = stored
+      .filter(function (s) { return !blocked.has(s.id); })
+      .map(function (s) {
+        var f = freshById.get(s.id);
+        return f ? Object.assign({}, s, { rel: f.rel }) : s;
+      });
+    try { localStorage.setItem(RECENT_SEARCHES_KEY, JSON.stringify(nextStored)); } catch (e) {}
+    // Repaint the Recently-searched section without disturbing the rest
+    // of the dropdown (live results override this anyway when typing).
+    var rerendered = '';
+    if (fresh.length) {
+      rerendered = '<div class="search-section-label" style="display:flex;justify-content:space-between;align-items:center">'
+        + '<span>Recently searched</span>'
+        + '<button onclick="clearRecentSearches()" style="background:none;border:none;color:#8A8580;font-size:11px;font-weight:600;cursor:none">Clear</button>'
+        + '</div>'
+        + fresh.map(function (row) { return renderProfSR(row, true); }).join('');
+    } else {
+      rerendered = '<div class="search-empty" style="padding:18px 16px;text-align:center;color:#8A8580;font-size:13px">Search for people by name or @handle.</div>';
+    }
+    // Only replace if the dropdown is still showing default state (no
+    // active live query). If the user started typing during the round-
+    // trip, leave their live results alone.
+    var input = document.getElementById('profSearchInput');
+    var query = input && input.value ? input.value.trim() : '';
+    if (!query) dd.innerHTML = rerendered;
+  } catch (e) {
+    /* best-effort */
+  }
 }
 function renderProfResults(people, orgs, events) {
   var out = '';
