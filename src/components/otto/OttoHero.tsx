@@ -32,7 +32,7 @@ export function OttoHero({ counts }: Props) {
         </h1>
         <p className="otto-room-hero-tagline">your campus compass.</p>
         <p className="otto-room-hero-voice">
-          &ldquo;here&rsquo;s what i&rsquo;ve been watching.&rdquo;
+          &ldquo;here&rsquo;s what caught my eye.&rdquo;
         </p>
       </div>
 
