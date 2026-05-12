@@ -9,13 +9,16 @@ import { useEffect, useState } from "react";
  * handle / tagline / meta / vibe tags / Edit profile), Bio block, then
  * a tab strip with three panes:
  *
- *   - Posts   — feed posts as a 1:1 grid
- *   - Clips   — 9:16 short videos as a 9:14 grid with play overlay
- *   - Resume  — work experience + resume / portfolio link, the
- *               recruiter-facing pane
+ *   - Posts      — feed posts as a 1:1 grid
+ *   - Clips      — 9:16 short videos as a 9:14 grid with play overlay
+ *   - Portfolio  — recruiter-facing pane: "Working on" (currentlyOn)
+ *                  + work experience + resume / portfolio file
  *
  * Data sources:
  *   - /api/me/profile-bootstrap  → identity + work experience + resume
+ *                                  (currentlyOn is not yet persisted
+ *                                  server-side — Working-on shows an
+ *                                  empty state until that lands)
  *   - /api/me/posts              → posts + clips (filtered by `type`)
  *
  * Identity stays in sync with desktop profile.html because both read
@@ -42,6 +45,7 @@ type WorkExp = {
 };
 type StudentVerification = { status?: string; school?: string };
 type ResumeItem = { name?: string; type?: string; url?: string };
+type CurrentProject = { icon?: string; text?: string };
 
 type VibeUser = {
   name?: string | null;
@@ -58,6 +62,11 @@ type VibeUser = {
   studentVerification?: StudentVerification;
   workExperience?: WorkExp[];
   resumePortfolio?: ResumeItem[];
+  /** "Currently working on" items — short text/icon pairs the user
+   *  enters in their profile editor. Not persisted to Supabase yet;
+   *  field stays optional and the Portfolio pane shows an empty state
+   *  until the backend wire-through lands. */
+  currentlyOn?: CurrentProject[];
   counts?: {
     followers?: string | number;
     following?: string | number;
@@ -76,7 +85,7 @@ type PostRow = {
   created_at?: string | null;
 };
 
-type ProfileTab = "posts" | "clips" | "resume";
+type ProfileTab = "posts" | "clips" | "portfolio";
 
 function pick<T>(...vals: (T | null | undefined)[]): T | null {
   for (const v of vals) {
@@ -172,6 +181,9 @@ export function ProfileMobile() {
   const connections = String(counts.connections ?? "0");
   const resumePortfolio = (user.resumePortfolio ?? []).filter(
     (r) => !!r?.url,
+  );
+  const currentProjects = (user.currentlyOn ?? []).filter(
+    (p) => !!p?.text,
   );
 
   const feedPosts = (posts ?? []).filter((p) => (p.type ?? "post") !== "clip");
@@ -409,7 +421,8 @@ export function ProfileMobile() {
         ) : tab === "clips" ? (
           <ClipsGrid clips={clipPosts} loading={posts === null} />
         ) : (
-          <ResumePane
+          <PortfolioPane
+            currentProjects={currentProjects}
             workExperience={workExperience}
             resumePortfolio={resumePortfolio}
           />
@@ -433,7 +446,7 @@ function ProfileTabs({
   const tabs: Array<{ id: ProfileTab; label: string; icon: React.ReactNode }> = [
     { id: "posts", label: "Posts", icon: <IconGrid /> },
     { id: "clips", label: "Clips", icon: <IconClip /> },
-    { id: "resume", label: "Resume", icon: <IconResume /> },
+    { id: "portfolio", label: "Portfolio", icon: <IconResume /> },
   ];
   return (
     <div
@@ -616,88 +629,51 @@ function PostThumb({
   );
 }
 
-function ResumePane({
+function PortfolioPane({
+  currentProjects,
   workExperience,
   resumePortfolio,
 }: {
+  currentProjects: CurrentProject[];
   workExperience: WorkExp[];
   resumePortfolio: ResumeItem[];
 }) {
-  const empty = workExperience.length === 0 && resumePortfolio.length === 0;
-  if (empty) {
+  const allEmpty =
+    currentProjects.length === 0 &&
+    workExperience.length === 0 &&
+    resumePortfolio.length === 0;
+  if (allEmpty) {
     return (
       <EmptyTab
         title="Nothing for recruiters yet"
-        body="Add work experience or upload a resume so recruiters and connections can see what you've shipped."
+        body="Show what you're working on, where you've worked, or upload a resume — recruiters land here when they vet candidates."
         cta={{ href: "/profile?edit=1", label: "Edit profile →" }}
       />
     );
   }
   return (
-    <div style={{ display: "flex", flexDirection: "column", gap: 16 }}>
-      {resumePortfolio.length > 0 ? (
-        <div style={{ display: "flex", flexDirection: "column", gap: 8 }}>
-          {resumePortfolio.map((r, i) => (
-            <a
-              key={`${r.url}-${i}`}
-              href={r.url}
-              target="_blank"
-              rel="noopener noreferrer"
-              style={{
-                display: "flex",
-                alignItems: "center",
-                gap: 12,
-                padding: "12px 14px",
-                background: "#fff",
-                border: "1px solid rgba(28,28,30,0.08)",
-                borderRadius: 14,
-                textDecoration: "none",
-                color: "#1C1C1E",
-              }}
-            >
-              <span
-                style={{
-                  width: 36,
-                  height: 36,
-                  borderRadius: 10,
-                  background: "rgba(255,92,53,0.10)",
-                  color: "#FF5C35",
-                  display: "inline-flex",
-                  alignItems: "center",
-                  justifyContent: "center",
-                  flexShrink: 0,
-                }}
-                aria-hidden
-              >
-                <IconResume />
-              </span>
-              <div style={{ flex: 1, minWidth: 0 }}>
-                <div style={{ fontSize: 14, fontWeight: 700 }}>
-                  {r.name ?? "Resume"}
-                </div>
-                <div style={{ fontSize: 12, color: "#8A8580" }}>
-                  {(r.type ?? "file").toUpperCase()} · tap to open
-                </div>
-              </div>
-            </a>
-          ))}
-        </div>
-      ) : null}
+    <div style={{ display: "flex", flexDirection: "column", gap: 22 }}>
+      <PortfolioSubsection title="Working on">
+        {currentProjects.length === 0 ? (
+          <SubsectionEmpty body="Show what you're building, learning, or planning. Adds context for recruiters and connections." />
+        ) : (
+          <ul style={projectListStyle}>
+            {currentProjects.map((p, i) => (
+              <li key={`${p.text}-${i}`} style={projectItemStyle}>
+                <span style={projectIconStyle} aria-hidden>
+                  {p.icon || "✦"}
+                </span>
+                <span style={{ fontSize: 14, lineHeight: 1.4 }}>{p.text}</span>
+              </li>
+            ))}
+          </ul>
+        )}
+      </PortfolioSubsection>
 
-      {workExperience.length > 0 ? (
-        <div>
-          <div
-            style={{
-              fontFamily: "Fraunces, serif",
-              fontSize: 14,
-              fontWeight: 800,
-              letterSpacing: "-0.2px",
-              marginBottom: 10,
-              color: "#1C1C1E",
-            }}
-          >
-            Experience
-          </div>
+      <PortfolioSubsection title="Experience">
+        {workExperience.length === 0 ? (
+          <SubsectionEmpty body="Add roles, internships, and side gigs from your profile editor." />
+        ) : (
           <div style={{ display: "flex", flexDirection: "column", gap: 14 }}>
             {workExperience.map((w, i) => (
               <div key={`${w.title}-${i}`} style={{ display: "flex", gap: 12 }}>
@@ -738,11 +714,132 @@ function ResumePane({
               </div>
             ))}
           </div>
-        </div>
-      ) : null}
+        )}
+      </PortfolioSubsection>
+
+      <PortfolioSubsection title="Resume">
+        {resumePortfolio.length === 0 ? (
+          <SubsectionEmpty body="Upload a PDF or portfolio image to give recruiters a quick reference document." />
+        ) : (
+          <div style={{ display: "flex", flexDirection: "column", gap: 8 }}>
+            {resumePortfolio.map((r, i) => (
+              <a
+                key={`${r.url}-${i}`}
+                href={r.url}
+                target="_blank"
+                rel="noopener noreferrer"
+                style={{
+                  display: "flex",
+                  alignItems: "center",
+                  gap: 12,
+                  padding: "12px 14px",
+                  background: "#fff",
+                  border: "1px solid rgba(28,28,30,0.08)",
+                  borderRadius: 14,
+                  textDecoration: "none",
+                  color: "#1C1C1E",
+                }}
+              >
+                <span
+                  style={{
+                    width: 36,
+                    height: 36,
+                    borderRadius: 10,
+                    background: "rgba(255,92,53,0.10)",
+                    color: "#FF5C35",
+                    display: "inline-flex",
+                    alignItems: "center",
+                    justifyContent: "center",
+                    flexShrink: 0,
+                  }}
+                  aria-hidden
+                >
+                  <IconResume />
+                </span>
+                <div style={{ flex: 1, minWidth: 0 }}>
+                  <div style={{ fontSize: 14, fontWeight: 700 }}>
+                    {r.name ?? "Resume"}
+                  </div>
+                  <div style={{ fontSize: 12, color: "#8A8580" }}>
+                    {(r.type ?? "file").toUpperCase()} · tap to open
+                  </div>
+                </div>
+              </a>
+            ))}
+          </div>
+        )}
+      </PortfolioSubsection>
     </div>
   );
 }
+
+function PortfolioSubsection({
+  title,
+  children,
+}: {
+  title: string;
+  children: React.ReactNode;
+}) {
+  return (
+    <div>
+      <div
+        style={{
+          fontFamily: "Fraunces, serif",
+          fontSize: 14,
+          fontWeight: 800,
+          letterSpacing: "-0.2px",
+          marginBottom: 10,
+          color: "#1C1C1E",
+        }}
+      >
+        {title}
+      </div>
+      {children}
+    </div>
+  );
+}
+
+function SubsectionEmpty({ body }: { body: string }) {
+  return (
+    <p
+      style={{
+        fontSize: 13,
+        color: "#8A8580",
+        margin: 0,
+        lineHeight: 1.5,
+        padding: "12px 14px",
+        background: "rgba(255,253,248,0.7)",
+        border: "1px dashed rgba(28,28,30,0.12)",
+        borderRadius: 12,
+      }}
+    >
+      {body}
+    </p>
+  );
+}
+
+const projectListStyle: React.CSSProperties = {
+  listStyle: "none",
+  padding: 0,
+  margin: 0,
+  display: "flex",
+  flexDirection: "column",
+  gap: 8,
+};
+const projectItemStyle: React.CSSProperties = {
+  display: "flex",
+  alignItems: "center",
+  gap: 12,
+  padding: "10px 14px",
+  background: "#FAF7F2",
+  border: "1px solid rgba(28,28,30,0.06)",
+  borderRadius: 12,
+  color: "#3D3D3A",
+};
+const projectIconStyle: React.CSSProperties = {
+  fontSize: 16,
+  flexShrink: 0,
+};
 
 function GridSkeleton({ ratio = "1/1" }: { ratio?: string }) {
   return (
