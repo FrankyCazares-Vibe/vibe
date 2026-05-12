@@ -24,7 +24,6 @@ type MentionToast = {
   name: string;
   handle: string | null;
   postId: string | null;
-  authorHandle: string | null;
   preview: string;
 };
 
@@ -40,7 +39,6 @@ type NotifLite = {
   post?: {
     id: string;
     content: string | null;
-    author?: { handle: string | null } | null;
   } | null;
 };
 
@@ -83,7 +81,6 @@ export function OttoCorner() {
         name: display,
         handle: actor.handle,
         postId: notif.post?.id ?? null,
-        authorHandle: notif.post?.author?.handle ?? null,
         preview: (notif.post?.content ?? "").slice(0, 120),
       });
     };
@@ -145,9 +142,23 @@ export function OttoCorner() {
   // unread > 0, and not when the panel clears the count to 0).
   const prevUnreadForRippleRef = useRef(0);
   const [rippleKey, setRippleKey] = useState(0);
+  // `popping` triggers the orb-scale animation. We can't just set a
+  // CSS animation property and expect it to replay on each rippleKey
+  // change — the browser sees the same animation name and ignores
+  // restarts. Toggle off → next-frame on → off after the duration so
+  // the animation re-mounts cleanly each time.
+  const [popping, setPopping] = useState(false);
   useEffect(() => {
     if (unread > prevUnreadForRippleRef.current) {
       setRippleKey((k) => k + 1);
+      setPopping(false);
+      const raf = window.requestAnimationFrame(() => setPopping(true));
+      const t = window.setTimeout(() => setPopping(false), 720);
+      prevUnreadForRippleRef.current = unread;
+      return () => {
+        window.cancelAnimationFrame(raf);
+        window.clearTimeout(t);
+      };
     }
     prevUnreadForRippleRef.current = unread;
   }, [unread]);
@@ -180,13 +191,20 @@ export function OttoCorner() {
         border: "0.5px solid rgba(255,92,53,0.3)",
         boxShadow: "0 8px 24px rgba(0,0,0,0.18)",
         cursor: "pointer",
+        transformOrigin: "center",
+        // Orb expand on new notification — `popping` is briefly true
+        // after each unread bump (see useEffect above), which mounts
+        // the `otto-orb-pop` keyframe for ~700ms. Toggling off→on
+        // re-runs the animation each time. Keyframes live in
+        // globals.css alongside the orb's other shared animations.
+        animation: popping
+          ? "otto-orb-pop 700ms cubic-bezier(.22,1,.36,1) 1"
+          : undefined,
       }}
       onMouseEnter={(e) => {
-        e.currentTarget.style.transform = "translateY(-2px) scale(1.04)";
         e.currentTarget.style.boxShadow = "0 12px 32px rgba(255,92,53,0.25)";
       }}
       onMouseLeave={(e) => {
-        e.currentTarget.style.transform = "translateY(0) scale(1)";
         e.currentTarget.style.boxShadow = "0 8px 24px rgba(0,0,0,0.18)";
       }}
     >
@@ -400,11 +418,7 @@ export function OttoCorner() {
         <div style={{ display: "flex", gap: 8 }}>
           {toast.postId ? (
             <a
-              href={
-                toast.authorHandle
-                  ? `/profile/${encodeURIComponent(toast.authorHandle)}?post=${encodeURIComponent(toast.postId)}`
-                  : `/profile?post=${encodeURIComponent(toast.postId)}`
-              }
+              href={`/campus?post=${encodeURIComponent(toast.postId)}`}
               onClick={() => setToast(null)}
               style={{
                 flex: 1,

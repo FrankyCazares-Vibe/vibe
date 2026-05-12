@@ -297,8 +297,10 @@ export function CampusHome({
     // When the campus tour is triggered (?welcome=1 or pending-flag) land
     // on the Feed tab so the first highlighted surface — #campus-feed —
     // actually exists in the DOM regardless of what tab a deep link may
-    // have requested.
+    // have requested. Same goes for /campus?post=<id> deep links from
+    // Otto mention notifications — they only make sense on the feed.
     if (searchParams.get("welcome") === "1") return "feed";
+    if (searchParams.get("post")) return "feed";
     if (typeof window !== "undefined") {
       try {
         if (localStorage.getItem("vibe_tour_pending") === "campus") return "feed";
@@ -4092,6 +4094,42 @@ function FeedTabBody({
     };
   }, [feedUrl]);
 
+  // /campus?post=<id> deep-link from Otto mention notifications.
+  // After the feed has rendered we look up the FeedRow by id, scroll it
+  // into view, and flash a coral highlight so the user can see exactly
+  // which post they were mentioned on. Strips ?post from the URL once
+  // we've handled it so a refresh doesn't keep re-scrolling.
+  useEffect(() => {
+    if (!entries || entries.length === 0) return;
+    if (typeof window === "undefined") return;
+    const params = new URLSearchParams(window.location.search);
+    const targetId = params.get("post");
+    if (!targetId) return;
+    // requestAnimationFrame so layout has settled before we measure.
+    const raf = window.requestAnimationFrame(() => {
+      const el = document.getElementById(`post-${targetId}`);
+      if (!el) return;
+      el.scrollIntoView({ behavior: "smooth", block: "center" });
+      const prevBg = el.style.background;
+      el.style.background = "rgba(255,92,53,0.10)";
+      window.setTimeout(() => {
+        el.style.background = prevBg;
+      }, 2200);
+      // Strip the param so a manual refresh doesn't re-fire.
+      try {
+        params.delete("post");
+        const next = params.toString();
+        const url = next
+          ? `${window.location.pathname}?${next}`
+          : window.location.pathname;
+        window.history.replaceState({}, "", url);
+      } catch {
+        /* unsupported / sandbox */
+      }
+    });
+    return () => window.cancelAnimationFrame(raf);
+  }, [entries]);
+
   // Cream-tinted Liquid Glass — the whole feed is one frosted column with
   // X-style hairline-separated rows.
   const feedGlass: React.CSSProperties = {
@@ -5898,12 +5936,14 @@ function FeedRow({
   return (
     <article
       ref={articleRef}
+      id={`post-${post.id}`}
+      data-post-id={post.id}
       style={{
         display: "flex",
         flexDirection: "column",
         padding: "16px 20px",
         borderBottom: hairline,
-        transition: "background 120ms ease",
+        transition: "background 600ms ease",
       }}
     >
       {entry.kind === "repost" ? (

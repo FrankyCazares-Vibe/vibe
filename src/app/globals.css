@@ -257,6 +257,24 @@
     opacity: 0;
   }
 }
+/* Orb pop — fires once each time the unread badge count ticks up, so the
+   orb itself reacts ("hey, look") in addition to the badge pulse. Settle
+   ends at scale(1) so subsequent hover / animation states aren't fighting
+   for transform. */
+@keyframes otto-orb-pop {
+  0% {
+    transform: scale(1);
+  }
+  35% {
+    transform: scale(1.18);
+  }
+  70% {
+    transform: scale(0.97);
+  }
+  100% {
+    transform: scale(1);
+  }
+}
 @keyframes otto-synapse {
   0%,
   100% {

@@ -795,30 +795,36 @@ function NotifRowView({ n, onClose }: { n: NotifRow; onClose: () => void }) {
   const verb = verbFor(n);
   const snippet = snippetFor(n);
 
-  const onClick = () => {
-    // Mention in chat → /messages
+  // Two click targets per row:
+  //   1. Avatar + actor name  → actor profile
+  //   2. Anywhere else on row → the post (for post-bound notifs) or
+  //      the actor's profile (for bare follow / connection rows).
+  //
+  // Post-bound notifs (like / comment / mention) route to
+  // /campus?post=<id> — the campus feed picks the param up, scrolls
+  // to that FeedRow, and highlights it. Mention-in-chat still goes
+  // to /messages.
+  const openActor = () => {
+    if (!a?.handle) return;
+    window.location.href = `/profile/${encodeURIComponent(a.handle)}`;
+    onClose();
+  };
+  const openRow = () => {
     if (n.type === "mention" && n.message_id && !n.post) {
       window.location.href = "/messages";
       onClose();
       return;
     }
-    // Like / comment / mention on a post → open the post viewer
-    // anchored on the *author's* profile so the row reads in context.
-    // Falls back to /profile?post=<id> when the join didn't return an
-    // author handle (defensive — should always be present in v1).
     if (
       (n.type === "like" || n.type === "comment" || n.type === "mention") &&
       n.post?.id
     ) {
-      const authorHandle = n.post.author?.handle ?? null;
-      const href = authorHandle
-        ? `/profile/${encodeURIComponent(authorHandle)}?post=${encodeURIComponent(n.post.id)}`
-        : `/profile?post=${encodeURIComponent(n.post.id)}`;
-      window.location.href = href;
+      window.location.href = `/campus?post=${encodeURIComponent(n.post.id)}`;
       onClose();
       return;
     }
-    // Follow/connection → actor profile
+    // Follow / connection rows: clicking the row itself goes to the
+    // actor's profile (there's no post to land on).
     if (a?.handle) {
       window.location.href = `/profile/${encodeURIComponent(a.handle)}`;
       onClose();
@@ -826,9 +832,16 @@ function NotifRowView({ n, onClose }: { n: NotifRow; onClose: () => void }) {
   };
 
   return (
-    <button
-      type="button"
-      onClick={onClick}
+    <div
+      role="button"
+      tabIndex={0}
+      onClick={openRow}
+      onKeyDown={(e) => {
+        if (e.key === "Enter" || e.key === " ") {
+          e.preventDefault();
+          openRow();
+        }
+      }}
       style={{
         display: "flex",
         gap: 10,
@@ -851,7 +864,13 @@ function NotifRowView({ n, onClose }: { n: NotifRow; onClose: () => void }) {
           : "rgba(255,92,53,0.06)";
       }}
     >
-      <div
+      <button
+        type="button"
+        aria-label={`Open ${display}'s profile`}
+        onClick={(e) => {
+          e.stopPropagation();
+          openActor();
+        }}
         style={{
           width: 32,
           height: 32,
@@ -867,13 +886,42 @@ function NotifRowView({ n, onClose }: { n: NotifRow; onClose: () => void }) {
           fontFamily: "Fraunces, serif",
           fontWeight: 700,
           fontSize: 12,
+          padding: 0,
+          border: "none",
+          cursor: a?.handle ? "pointer" : "default",
         }}
       >
         {!a?.avatar_url ? initials : null}
-      </div>
+      </button>
       <div style={{ flex: 1, minWidth: 0 }}>
         <div style={{ fontSize: 13, lineHeight: 1.3 }}>
-          <span style={{ fontWeight: 700 }}>{display}</span>{" "}
+          {/* Actor name is its own click target — same /profile destination
+              as the avatar, with stopPropagation so the row's post-route
+              doesn't also fire. */}
+          {a?.handle ? (
+            <button
+              type="button"
+              onClick={(e) => {
+                e.stopPropagation();
+                openActor();
+              }}
+              style={{
+                background: "none",
+                border: "none",
+                padding: 0,
+                margin: 0,
+                color: "white",
+                fontWeight: 700,
+                fontFamily: "inherit",
+                fontSize: "inherit",
+                cursor: "pointer",
+              }}
+            >
+              {display}
+            </button>
+          ) : (
+            <span style={{ fontWeight: 700 }}>{display}</span>
+          )}{" "}
           <span style={{ color: "rgba(255,255,255,0.65)" }}>{verb}</span>
         </div>
         {snippet ? (
@@ -904,7 +952,7 @@ function NotifRowView({ n, onClose }: { n: NotifRow; onClose: () => void }) {
           {relTime(n.created_at)}
         </div>
       </div>
-    </button>
+    </div>
   );
 }
 
