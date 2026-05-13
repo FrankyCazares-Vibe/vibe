@@ -275,6 +275,38 @@
     transform: scale(1);
   }
 }
+/* Thinking + alert variants — used by the corner orb when there's an
+   unread mention. Faster orbits + a punchier core pulse make Otto feel
+   actively engaged ("trying to show you something"). Names match the
+   mockup file at ~/Downloads/otto_mockups/01_otto_states.html so this
+   stays the canonical source-of-truth for tuning. */
+@keyframes otto-core-pulse-med {
+  0%,
+  100% {
+    transform: scale(0.9);
+    opacity: 0.85;
+  }
+  50% {
+    transform: scale(1.15);
+    opacity: 1;
+  }
+}
+@keyframes otto-orbit-spin-med {
+  from {
+    transform: rotate(0deg);
+  }
+  to {
+    transform: rotate(360deg);
+  }
+}
+@keyframes otto-orbit-spin-rev-med {
+  from {
+    transform: rotate(360deg);
+  }
+  to {
+    transform: rotate(0deg);
+  }
+}
 @keyframes otto-synapse {
   0%,
   100% {

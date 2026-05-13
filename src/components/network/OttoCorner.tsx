@@ -44,6 +44,11 @@ type NotifLite = {
 
 export function OttoCorner() {
   const [unread, setUnread] = useState(0);
+  // Separate from `unread` so the corner can flip the orb's BODY into
+  // a thinking+alert state on mention specifically (the visual
+  // language for "Otto wants to show you something"). Plain unread
+  // notifs — likes, follows, comments — keep the idle viz.
+  const [unreadMention, setUnreadMention] = useState(0);
   const [open, setOpen] = useState(false);
   const [toast, setToast] = useState<MentionToast | null>(null);
   // Last unread count + newest notif id seen. Persisted via refs so the
@@ -94,8 +99,11 @@ export function OttoCorner() {
         if (cancelled) return;
         if (!data?.ok || typeof data.unread !== "number") return;
         const nextUnread = data.unread as number;
+        const nextMention =
+          typeof data.unread_mention === "number" ? data.unread_mention : 0;
         const prev = lastUnreadRef.current;
         setUnread(nextUnread);
+        setUnreadMention(nextMention);
         lastUnreadRef.current = nextUnread;
         // Only peek the newest notif when we have an established baseline
         // AND the count just went up — keeps the cold-load case silent.
@@ -171,8 +179,11 @@ export function OttoCorner() {
       onClick={() => {
         setOpen(true);
         // Optimistic — the panel will mark-read server-side; clear the
-        // dot now so it doesn't blink for the polling interval.
+        // dot now so it doesn't blink for the polling interval. Same
+        // treatment for the mention sub-count so the thinking+alert
+        // body relaxes back to idle right away.
         if (unread > 0) setUnread(0);
+        if (unreadMention > 0) setUnreadMention(0);
       }}
       aria-label={
         unread > 0 ? `Open Otto · ${unread} unread` : "Open Otto"
@@ -188,8 +199,17 @@ export function OttoCorner() {
         padding: 0,
         borderRadius: "50%",
         background: "#1C1C1E",
-        border: "0.5px solid rgba(255,92,53,0.3)",
-        boxShadow: "0 8px 24px rgba(0,0,0,0.18)",
+        // Border + ambient glow lean warmer when the orb is in
+        // thinking+alert mode, matching the mockup's "this is asking
+        // for your attention" treatment without losing the dark shell.
+        border:
+          unreadMention > 0
+            ? "0.5px solid rgba(255,92,53,0.6)"
+            : "0.5px solid rgba(255,92,53,0.3)",
+        boxShadow:
+          unreadMention > 0
+            ? "0 8px 24px rgba(0,0,0,0.18), 0 0 22px rgba(255,92,53,0.32)"
+            : "0 8px 24px rgba(0,0,0,0.18)",
         cursor: "pointer",
         transformOrigin: "center",
         // Orb expand on new notification — `popping` is briefly true
@@ -202,10 +222,16 @@ export function OttoCorner() {
           : undefined,
       }}
       onMouseEnter={(e) => {
-        e.currentTarget.style.boxShadow = "0 12px 32px rgba(255,92,53,0.25)";
+        e.currentTarget.style.boxShadow =
+          unreadMention > 0
+            ? "0 12px 32px rgba(255,92,53,0.4), 0 0 28px rgba(255,92,53,0.36)"
+            : "0 12px 32px rgba(255,92,53,0.25)";
       }}
       onMouseLeave={(e) => {
-        e.currentTarget.style.boxShadow = "0 8px 24px rgba(0,0,0,0.18)";
+        e.currentTarget.style.boxShadow =
+          unreadMention > 0
+            ? "0 8px 24px rgba(0,0,0,0.18), 0 0 22px rgba(255,92,53,0.32)"
+            : "0 8px 24px rgba(0,0,0,0.18)";
       }}
     >
       {/* Unread badge — counted, gently pulsing coral pill on the
@@ -275,7 +301,16 @@ export function OttoCorner() {
         </>
       ) : null}
 
-      {/* Centered viz: breath ring + orbit dot + pulsing core */}
+      {/* Centered viz. Two layouts:
+          - Idle (no unread mention): single breathing ring + slow
+            orbit + small pulsing core (matches the legacy _otto.js
+            corner ring).
+          - Thinking + alert (unread mention > 0): two breathing rings
+            (coral + purple), two counter-spinning orbits with mixed
+            coral/purple/cream nodes, and a larger cream-inset coral
+            core. Maps to the "thinking" + "alert" states from the
+            canonical mockup at ~/Downloads/otto_mockups/01_otto_states.html.
+            Reads as "Otto is actively trying to surface something". */}
       <div
         style={{
           position: "absolute",
@@ -285,61 +320,210 @@ export function OttoCorner() {
           justifyContent: "center",
         }}
       >
-        <div
-          style={{
-            position: "relative",
-            width: 32,
-            height: 32,
-            display: "flex",
-            alignItems: "center",
-            justifyContent: "center",
-          }}
-        >
-          {/* Inner breathing pulse ring (matches _otto.js .otto-pulse-o) */}
+        {unreadMention > 0 ? (
           <div
             style={{
-              position: "absolute",
-              inset: 4,
-              borderRadius: "50%",
-              border: "1px solid #FF5C35",
-              animation: "otto-breath 2.8s ease-out infinite",
-            }}
-          />
-          {/* Outer spinning orbit + tracer dot */}
-          <div
-            style={{
-              position: "absolute",
-              inset: 0,
-              borderRadius: "50%",
-              border: "0.5px solid rgba(255,92,53,0.3)",
-              animation: "otto-orbit-spin 8s linear infinite",
+              position: "relative",
+              width: 40,
+              height: 40,
+              display: "flex",
+              alignItems: "center",
+              justifyContent: "center",
             }}
           >
+            {/* Outer breathing ring — coral */}
             <div
               style={{
                 position: "absolute",
-                top: 0,
-                left: "50%",
-                transform: "translateX(-50%)",
-                width: 3,
-                height: 3,
+                inset: 6,
+                borderRadius: "50%",
+                border: "1px solid #FF5C35",
+                animation: "otto-breath 2.8s ease-out infinite",
+              }}
+            />
+            {/* Inner breathing ring — purple, offset delay so they don't
+                pulse in lock-step. */}
+            <div
+              style={{
+                position: "absolute",
+                inset: 6,
+                borderRadius: "50%",
+                border: "1px solid #7C5CFC",
+                animation: "otto-breath 3.4s ease-out infinite",
+                animationDelay: "0.7s",
+              }}
+            />
+            {/* Outer orbit (reverse, medium) — 3 nodes: coral top,
+                purple bottom, coral-light right. */}
+            <div
+              style={{
+                position: "absolute",
+                inset: 2,
+                borderRadius: "50%",
+                border: "0.5px solid rgba(255,92,53,0.5)",
+                animation: "otto-orbit-spin-rev-med 3.2s linear infinite",
+              }}
+            >
+              <span
+                style={{
+                  position: "absolute",
+                  top: -3,
+                  left: "50%",
+                  transform: "translateX(-50%)",
+                  width: 5,
+                  height: 5,
+                  borderRadius: "50%",
+                  background: "#FF5C35",
+                  boxShadow: "0 0 6px #FF5C35",
+                }}
+              />
+              <span
+                style={{
+                  position: "absolute",
+                  bottom: -2,
+                  left: "50%",
+                  transform: "translateX(-50%)",
+                  width: 4,
+                  height: 4,
+                  borderRadius: "50%",
+                  background: "#7C5CFC",
+                  boxShadow: "0 0 5px #7C5CFC",
+                }}
+              />
+              <span
+                style={{
+                  position: "absolute",
+                  top: "50%",
+                  right: -2,
+                  transform: "translateY(-50%)",
+                  width: 3,
+                  height: 3,
+                  borderRadius: "50%",
+                  background: "#FFB59A",
+                }}
+              />
+            </div>
+            {/* Inner orbit (forward, slightly faster) — 2 nodes:
+                cream top, purple-light bottom. */}
+            <div
+              style={{
+                position: "absolute",
+                inset: 12,
+                borderRadius: "50%",
+                border: "0.5px solid rgba(124,92,252,0.5)",
+                animation: "otto-orbit-spin-med 4.5s linear infinite",
+              }}
+            >
+              <span
+                style={{
+                  position: "absolute",
+                  top: -2,
+                  left: "50%",
+                  transform: "translateX(-50%)",
+                  width: 4,
+                  height: 4,
+                  borderRadius: "50%",
+                  background: "#FFE5DB",
+                  boxShadow: "0 0 5px #FF5C35",
+                }}
+              />
+              <span
+                style={{
+                  position: "absolute",
+                  bottom: -2,
+                  left: "50%",
+                  transform: "translateX(-50%)",
+                  width: 3,
+                  height: 3,
+                  borderRadius: "50%",
+                  background: "#C8B8FF",
+                  boxShadow: "0 0 4px #7C5CFC",
+                }}
+              />
+            </div>
+            {/* Core — coral ball with cream inset + double-color glow.
+                The cream center is the "alert state" tell from the
+                mockup. */}
+            <div
+              style={{
+                position: "relative",
+                width: 14,
+                height: 14,
                 borderRadius: "50%",
                 background: "#FF5C35",
+                boxShadow:
+                  "0 0 18px #FF5C35, 0 0 30px rgba(124,92,252,0.35)",
+                animation:
+                  "otto-core-pulse-med 1.6s ease-in-out infinite",
+              }}
+            >
+              <div
+                style={{
+                  position: "absolute",
+                  inset: 3,
+                  borderRadius: "50%",
+                  background: "#FFE5DB",
+                }}
+              />
+            </div>
+          </div>
+        ) : (
+          <div
+            style={{
+              position: "relative",
+              width: 32,
+              height: 32,
+              display: "flex",
+              alignItems: "center",
+              justifyContent: "center",
+            }}
+          >
+            {/* Inner breathing pulse ring (matches _otto.js .otto-pulse-o) */}
+            <div
+              style={{
+                position: "absolute",
+                inset: 4,
+                borderRadius: "50%",
+                border: "1px solid #FF5C35",
+                animation: "otto-breath 2.8s ease-out infinite",
+              }}
+            />
+            {/* Outer spinning orbit + tracer dot */}
+            <div
+              style={{
+                position: "absolute",
+                inset: 0,
+                borderRadius: "50%",
+                border: "0.5px solid rgba(255,92,53,0.3)",
+                animation: "otto-orbit-spin 8s linear infinite",
+              }}
+            >
+              <div
+                style={{
+                  position: "absolute",
+                  top: 0,
+                  left: "50%",
+                  transform: "translateX(-50%)",
+                  width: 3,
+                  height: 3,
+                  borderRadius: "50%",
+                  background: "#FF5C35",
+                }}
+              />
+            </div>
+            {/* Pulsing core — solid orange ball with glow (matches _otto.js .otto-core) */}
+            <div
+              style={{
+                width: 9,
+                height: 9,
+                borderRadius: "50%",
+                background: "#FF5C35",
+                boxShadow: "0 0 10px #FF5C35",
+                animation: "otto-core-pulse 2.4s ease-in-out infinite",
               }}
             />
           </div>
-          {/* Pulsing core — solid orange ball with glow (matches _otto.js .otto-core) */}
-          <div
-            style={{
-              width: 9,
-              height: 9,
-              borderRadius: "50%",
-              background: "#FF5C35",
-              boxShadow: "0 0 10px #FF5C35",
-              animation: "otto-core-pulse 2.4s ease-in-out infinite",
-            }}
-          />
-        </div>
+        )}
       </div>
     </button>
     <OttoSidePanel open={open} onClose={() => setOpen(false)} />

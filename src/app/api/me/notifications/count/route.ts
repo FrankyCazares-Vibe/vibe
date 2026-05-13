@@ -34,7 +34,26 @@ export async function GET() {
       .eq("type", t)
       .gte("created_at", since);
 
-  const [unreadRes, followRes, connRes, likeRes, commentRes, mentionRes] = await Promise.all([
+  // Unread-mention count drives the corner's "thinking + alert" morph
+  // — the orb's body switches to a richer multi-orbit treatment when
+  // there's at least one unread mention sitting in the inbox, so the
+  // user can tell at a glance "Otto wants to show me something".
+  const unreadMentionRes = supabase
+    .from("notifications")
+    .select("id", { count: "exact", head: true })
+    .eq("user_id", user.id)
+    .eq("type", "mention")
+    .is("read_at", null);
+
+  const [
+    unreadRes,
+    followRes,
+    connRes,
+    likeRes,
+    commentRes,
+    mentionRes,
+    unreadMention,
+  ] = await Promise.all([
     supabase
       .from("notifications")
       .select("id", { count: "exact", head: true })
@@ -45,11 +64,18 @@ export async function GET() {
     countByType("like"),
     countByType("comment"),
     countByType("mention"),
+    unreadMentionRes,
   ]);
 
-  const firstErr = [unreadRes, followRes, connRes, likeRes, commentRes, mentionRes].find(
-    (r) => r.error,
-  )?.error;
+  const firstErr = [
+    unreadRes,
+    followRes,
+    connRes,
+    likeRes,
+    commentRes,
+    mentionRes,
+    unreadMention,
+  ].find((r) => r.error)?.error;
   if (firstErr) {
     console.error("[me/notifications/count]", firstErr);
     return NextResponse.json({ ok: false, error: firstErr.message }, { status: 500 });
@@ -58,6 +84,7 @@ export async function GET() {
   return NextResponse.json({
     ok: true,
     unread: unreadRes.count ?? 0,
+    unread_mention: unreadMention.count ?? 0,
     totals: {
       follow:     followRes.count  ?? 0,
       connection: connRes.count    ?? 0,
