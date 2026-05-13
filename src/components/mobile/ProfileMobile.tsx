@@ -441,7 +441,25 @@ export function ProfileMobile({ targetHandle }: Props = {}) {
       });
       const jb = await rb.json().catch(() => ({}));
       if (rb.ok && jb?.ok && jb.vibeUser) {
-        setUser(jb.vibeUser as VibeUser);
+        const fresh = jb.vibeUser as VibeUser;
+        setUser(fresh);
+        // Confirm major + year actually landed in the DB — same
+        // silent-failure guard as the avatar upload. If the round-trip
+        // returns something other than what we just sent, surface a
+        // visible error instead of pretending all is well.
+        const sentMajor = snapshot.major.trim();
+        const gotMajor = (fresh.major ?? "").toString().trim();
+        if (sentMajor !== gotMajor) {
+          throw new Error(
+            `Major didn't save (sent "${sentMajor || "(blank)"}", got "${gotMajor || "(blank)"}").`,
+          );
+        }
+        const gotYear = typeof fresh.year === "number" ? fresh.year : null;
+        if (snapshot.year !== gotYear) {
+          throw new Error(
+            `Year didn't save (sent ${snapshot.year ?? "(blank)"}, got ${gotYear ?? "(blank)"}).`,
+          );
+        }
       }
       setEditMode(false);
       setDraft(null);
