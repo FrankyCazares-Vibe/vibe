@@ -29,6 +29,32 @@ type Props = {
   onPosted: () => void;
 };
 
+// Keyframe registry — injected once per page on first mount so the
+// sheet has a smooth slide-up + fade entrance instead of just popping
+// in. Transform-based so it's GPU-accelerated (no layout thrash) and
+// matches what iOS users expect from a modal sheet.
+const KEYFRAMES_ID = "vibe-composer-keyframes";
+function ensureKeyframes() {
+  if (typeof document === "undefined") return;
+  if (document.getElementById(KEYFRAMES_ID)) return;
+  const style = document.createElement("style");
+  style.id = KEYFRAMES_ID;
+  style.textContent = `
+    @keyframes vibeComposerSlideUp {
+      from { opacity: 0; transform: translateY(24px); }
+      to   { opacity: 1; transform: translateY(0); }
+    }
+    @keyframes vibeComposerSlideDown {
+      from { opacity: 1; transform: translateY(0); }
+      to   { opacity: 0; transform: translateY(24px); }
+    }
+  `;
+  document.head.appendChild(style);
+}
+
+const ENTER_DURATION_MS = 240;
+const EXIT_DURATION_MS = 180;
+
 export function PostComposerMobile({ onClose, onPosted }: Props) {
   const [text, setText] = useState("");
   const [imageFile, setImageFile] = useState<File | null>(null);
@@ -43,8 +69,17 @@ export function PostComposerMobile({ onClose, onPosted }: Props) {
   } | null>(null);
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  // Drives the exit animation. When true, the sheet plays its slide-
+  // down keyframe; the actual unmount happens via onClose() after the
+  // animation finishes.
+  const [closing, setClosing] = useState(false);
   const attachInputRef = useRef<HTMLInputElement | null>(null);
   const textareaRef = useRef<HTMLTextAreaElement | null>(null);
+
+  // Inject keyframes (idempotent) before first paint.
+  useEffect(() => {
+    ensureKeyframes();
+  }, []);
 
   // Bind the legacy mention/hashtag picker to the textarea so @ + #
   // suggestions appear inline. Idempotent across re-renders.
@@ -52,15 +87,24 @@ export function PostComposerMobile({ onClose, onPosted }: Props) {
     if (textareaRef.current) bindMentionPicker(textareaRef.current);
   }, []);
 
-  // Autofocus on mount so the keyboard opens immediately. Defer one
-  // frame so iOS doesn't swallow the focus during the sheet's mount
-  // transition.
+  // Defer autofocus until after the entrance animation lands —
+  // focusing during the slide-up causes the iOS keyboard to race with
+  // the sheet animation, which is the "choppy" feel users see when
+  // we focus immediately.
   useEffect(() => {
-    const id = window.requestAnimationFrame(() => {
+    const id = window.setTimeout(() => {
       textareaRef.current?.focus();
-    });
-    return () => window.cancelAnimationFrame(id);
+    }, ENTER_DURATION_MS + 20);
+    return () => window.clearTimeout(id);
   }, []);
+
+  // Wraps onClose with a fade-down exit so the sheet doesn't just
+  // snap away when the user taps Cancel or after a successful post.
+  const requestClose = useCallback(() => {
+    if (closing) return;
+    setClosing(true);
+    window.setTimeout(onClose, EXIT_DURATION_MS);
+  }, [closing, onClose]);
 
   const previewUrl = imageFile ? URL.createObjectURL(imageFile) : null;
   useEffect(() => {
@@ -244,7 +288,7 @@ export function PostComposerMobile({ onClose, onPosted }: Props) {
       }
 
       onPosted();
-      onClose();
+      requestClose();
     } catch (e) {
       setError(e instanceof Error ? e.message : "Could not publish");
     } finally {
@@ -255,8 +299,8 @@ export function PostComposerMobile({ onClose, onPosted }: Props) {
     clipFile,
     hasContent,
     imageFile,
-    onClose,
     onPosted,
+    requestClose,
     text,
     videoMeta,
     videoMode,
@@ -280,6 +324,13 @@ export function PostComposerMobile({ onClose, onPosted }: Props) {
         paddingBottom: "env(safe-area-inset-bottom, 0px)",
         fontFamily: "DM Sans, sans-serif",
         color: "#1C1C1E",
+        // GPU-accelerated entrance / exit so the sheet glides instead
+        // of popping. willChange hints the compositor to promote the
+        // layer ahead of time.
+        animation: closing
+          ? `vibeComposerSlideDown ${EXIT_DURATION_MS}ms ease-in forwards`
+          : `vibeComposerSlideUp ${ENTER_DURATION_MS}ms cubic-bezier(0.25, 0.46, 0.45, 0.94) both`,
+        willChange: "transform, opacity",
       }}
     >
       {/* Top bar */}
@@ -296,7 +347,7 @@ export function PostComposerMobile({ onClose, onPosted }: Props) {
           type="button"
           onClick={() => {
             if (busy) return;
-            onClose();
+            requestClose();
           }}
           disabled={busy}
           style={{
