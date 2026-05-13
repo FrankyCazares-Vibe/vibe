@@ -716,18 +716,19 @@ function PostFeedCard({
         // the dark tint + stronger shadow gives the card real
         // separation from the page instead of blending in.
         // Light liquid-glass fill matches the desktop campus feed
-        // (rgba 0.55 → 0.38 white-warm). The card LIFT comes from a
-        // visible charcoal hairline border + a soft warm drop shadow,
-        // not from darkening the fill. Mobile feels consistent with
-        // desktop instead of inventing its own treatment.
+        // (rgba 0.55 → 0.38 white-warm). Card edge gets a lavender
+        // hairline (Vibe palette accent — #C8B8FF) instead of plain
+        // charcoal, so the card has personality + ties back to the
+        // brand color set. Drop shadow tints faintly lavender to
+        // match.
         background:
           "linear-gradient(180deg, rgba(255,255,255,0.55) 0%, rgba(255,253,248,0.38) 100%)",
         backdropFilter: "blur(20px) saturate(160%)",
         WebkitBackdropFilter: "blur(20px) saturate(160%)",
-        border: "1px solid rgba(28,28,30,0.10)",
+        border: "1px solid rgba(124,92,252,0.28)",
         boxShadow: [
-          "inset 0 1px 0 rgba(255,255,255,0.65)",
-          "0 6px 18px rgba(28,28,30,0.08)",
+          "inset 0 1px 0 rgba(255,255,255,0.7)",
+          "0 6px 18px rgba(124,92,252,0.10)",
         ].join(", "),
         textAlign: "left",
         cursor: "pointer",
@@ -1242,9 +1243,9 @@ function PostFeedSkeleton() {
               "linear-gradient(180deg, rgba(255,255,255,0.55) 0%, rgba(255,253,248,0.38) 100%)",
             backdropFilter: "blur(20px) saturate(160%)",
             WebkitBackdropFilter: "blur(20px) saturate(160%)",
-            border: "1px solid rgba(28,28,30,0.10)",
+            border: "1px solid rgba(124,92,252,0.28)",
             boxShadow:
-              "inset 0 1px 0 rgba(255,255,255,0.65), 0 6px 18px rgba(28,28,30,0.08)",
+              "inset 0 1px 0 rgba(255,255,255,0.7), 0 6px 18px rgba(124,92,252,0.10)",
             display: "flex",
             flexDirection: "column",
             gap: 10,
