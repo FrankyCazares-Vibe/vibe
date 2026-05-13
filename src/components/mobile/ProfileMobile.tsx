@@ -318,8 +318,24 @@ export function ProfileMobile({ targetHandle }: Props = {}) {
   };
 
   // Composer sheet — only mounted while open so the keyboard-focus +
-  // mention picker bindings run fresh on every entry.
+  // mention picker bindings run fresh on every entry. `composerOrigin`
+  // captures the FAB's screen-space center at open time so the sheet
+  // can grow OUT OF the button (clip-path circular reveal) and shrink
+  // BACK INTO it on close.
   const [composerOpen, setComposerOpen] = useState(false);
+  const [composerOrigin, setComposerOrigin] = useState<
+    { x: number; y: number } | undefined
+  >(undefined);
+  const composeFabRef = useRef<HTMLButtonElement | null>(null);
+  const openComposer = () => {
+    const r = composeFabRef.current?.getBoundingClientRect();
+    if (r) {
+      setComposerOrigin({ x: r.x + r.width / 2, y: r.y + r.height / 2 });
+    } else {
+      setComposerOrigin(undefined);
+    }
+    setComposerOpen(true);
+  };
 
   // Avatar / banner upload — both run through the ImageCropperModal
   // FIRST so the user crops to the right aspect (1:1 for avatar, 3:1
@@ -1224,8 +1240,9 @@ export function ProfileMobile({ targetHandle }: Props = {}) {
           mode so it doesn't fight the Save/Cancel pills for tap area. */}
       {!isVisitor && !editMode ? (
         <button
+          ref={composeFabRef}
           type="button"
-          onClick={() => setComposerOpen(true)}
+          onClick={openComposer}
           aria-label="New post"
           style={{
             position: "fixed",
@@ -1263,6 +1280,7 @@ export function ProfileMobile({ targetHandle }: Props = {}) {
 
       {composerOpen ? (
         <PostComposerMobile
+          origin={composerOrigin}
           onClose={() => setComposerOpen(false)}
           onPosted={() => {
             void refetchPosts();

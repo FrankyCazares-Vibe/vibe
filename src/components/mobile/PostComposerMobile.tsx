@@ -27,12 +27,25 @@ type Props = {
   onClose: () => void;
   /** Fired after a successful publish. Caller refetches their feed. */
   onPosted: () => void;
+  /**
+   * Origin point (viewport-space px) the sheet should grow OUT OF on
+   * open, and shrink BACK INTO on close. Typically the centre of the
+   * FAB that launched the composer. If omitted, falls back to the
+   * bottom-right corner.
+   */
+  origin?: { x: number; y: number };
 };
 
-// Keyframe registry — injected once per page on first mount so the
-// sheet has a smooth slide-up + fade entrance instead of just popping
-// in. Transform-based so it's GPU-accelerated (no layout thrash) and
-// matches what iOS users expect from a modal sheet.
+// Keyframe registry — injected once per page on first mount. We animate
+// `clip-path: circle(...)` from a small disc centered on the FAB to a
+// disc that covers the viewport (radius > diagonal), so the sheet
+// reads as growing OUT OF the button that launched it. The reverse on
+// close shrinks the sheet back into the button.
+//
+// clip-path's `at <x> <y>` accepts CSS variables, and only the radius
+// interpolates between keyframes — so we keep the origin fixed via
+// --vibe-composer-x / --vibe-composer-y on the element and only the
+// disc size changes.
 const KEYFRAMES_ID = "vibe-composer-keyframes";
 function ensureKeyframes() {
   if (typeof document === "undefined") return;
@@ -40,22 +53,34 @@ function ensureKeyframes() {
   const style = document.createElement("style");
   style.id = KEYFRAMES_ID;
   style.textContent = `
-    @keyframes vibeComposerSlideUp {
-      from { opacity: 0; transform: translateY(24px); }
-      to   { opacity: 1; transform: translateY(0); }
+    @keyframes vibeComposerExpand {
+      from {
+        clip-path: circle(28px at var(--vibe-composer-x, 100%) var(--vibe-composer-y, 100%));
+        opacity: 0.6;
+      }
+      to {
+        clip-path: circle(150% at var(--vibe-composer-x, 100%) var(--vibe-composer-y, 100%));
+        opacity: 1;
+      }
     }
-    @keyframes vibeComposerSlideDown {
-      from { opacity: 1; transform: translateY(0); }
-      to   { opacity: 0; transform: translateY(24px); }
+    @keyframes vibeComposerCollapse {
+      from {
+        clip-path: circle(150% at var(--vibe-composer-x, 100%) var(--vibe-composer-y, 100%));
+        opacity: 1;
+      }
+      to {
+        clip-path: circle(28px at var(--vibe-composer-x, 100%) var(--vibe-composer-y, 100%));
+        opacity: 0.4;
+      }
     }
   `;
   document.head.appendChild(style);
 }
 
-const ENTER_DURATION_MS = 240;
-const EXIT_DURATION_MS = 180;
+const ENTER_DURATION_MS = 360;
+const EXIT_DURATION_MS = 240;
 
-export function PostComposerMobile({ onClose, onPosted }: Props) {
+export function PostComposerMobile({ onClose, onPosted, origin }: Props) {
   const [text, setText] = useState("");
   const [imageFile, setImageFile] = useState<File | null>(null);
   const [pendingImage, setPendingImage] = useState<File | null>(null);
@@ -306,6 +331,14 @@ export function PostComposerMobile({ onClose, onPosted }: Props) {
     videoMode,
   ]);
 
+  // CSS-var-driven origin for the clip-path circle. Falls back to the
+  // viewport's bottom-right (where the FAB lives by default) if the
+  // caller didn't pass a captured rect.
+  const originStyleVars = {
+    "--vibe-composer-x": origin ? `${origin.x}px` : "100%",
+    "--vibe-composer-y": origin ? `${origin.y}px` : "100%",
+  } as React.CSSProperties;
+
   const sheet = (
     <div
       role="dialog"
@@ -324,13 +357,15 @@ export function PostComposerMobile({ onClose, onPosted }: Props) {
         paddingBottom: "env(safe-area-inset-bottom, 0px)",
         fontFamily: "DM Sans, sans-serif",
         color: "#1C1C1E",
-        // GPU-accelerated entrance / exit so the sheet glides instead
-        // of popping. willChange hints the compositor to promote the
-        // layer ahead of time.
+        // Circular reveal: a small disc centred on the FAB grows out to
+        // cover the screen, so the sheet looks like it's spawning from
+        // the + button rather than sliding up from below. Reverse on
+        // close shrinks back into the same point.
         animation: closing
-          ? `vibeComposerSlideDown ${EXIT_DURATION_MS}ms ease-in forwards`
-          : `vibeComposerSlideUp ${ENTER_DURATION_MS}ms cubic-bezier(0.25, 0.46, 0.45, 0.94) both`,
-        willChange: "transform, opacity",
+          ? `vibeComposerCollapse ${EXIT_DURATION_MS}ms cubic-bezier(0.55, 0.06, 0.68, 0.19) forwards`
+          : `vibeComposerExpand ${ENTER_DURATION_MS}ms cubic-bezier(0.16, 1, 0.3, 1) both`,
+        willChange: "clip-path, opacity",
+        ...originStyleVars,
       }}
     >
       {/* Top bar */}
