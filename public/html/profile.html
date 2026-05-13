@@ -450,8 +450,52 @@ body.edit-mode .current-item .current-text { outline:1px dashed rgba(255,92,53,.
   display:grid;grid-template-columns:44px 1fr auto;gap:12px;
   align-items:start;padding:16px 0;
   border-bottom:1px solid var(--border);position:relative;
+  transition: transform .12s ease, box-shadow .15s ease, opacity .15s ease;
 }
 .work-item:last-child { border-bottom:none;padding-bottom:0; }
+
+/* Drag handle — visible only in edit mode, positioned outside the
+   grid so the existing 3-column layout is untouched. Works for both
+   .work-item and .current-item via the shared class. */
+.drag-handle {
+  display: none;
+  position: absolute;
+  left: 2px;
+  top: 50%;
+  transform: translateY(-50%);
+  width: 22px;
+  height: 32px;
+  align-items: center;
+  justify-content: center;
+  background: transparent;
+  border: none;
+  cursor: grab;
+  color: rgba(28,28,30,0.32);
+  touch-action: none;
+  z-index: 2;
+}
+body.edit-mode .drag-handle { display: inline-flex; }
+/* Make room inside each row for the handle in edit mode so the grid
+   contents don't sit on top of it. */
+body.edit-mode .work-item    { padding-left: 28px; }
+body.edit-mode .current-item { padding-left: 26px; }
+.drag-handle:hover { color: rgba(28,28,30,0.7); }
+.drag-handle:active { cursor: grabbing; }
+.drag-handle svg { display:block; pointer-events:none; }
+
+/* Dragging state — lift the row visually so the user can see what's
+   being moved while the DOM shuffles around them. */
+.work-item.is-dragging, .current-item.is-dragging {
+  opacity: .9;
+  transform: scale(1.015);
+  box-shadow: 0 16px 32px rgba(0,0,0,0.16), 0 2px 6px rgba(0,0,0,0.08);
+  background: rgba(255,253,248,0.96);
+  border-bottom: 1px solid transparent;
+  border-radius: 10px;
+  z-index: 5;
+}
+body.reordering { user-select: none; cursor: grabbing; }
+body.reordering * { user-select: none; }
 .work-logo-wrap {
   width:48px;height:48px;border-radius:14px;
   background:var(--cream);border:1px solid var(--border);
@@ -4569,6 +4613,7 @@ function saveWork(){
   const item = document.createElement('div');
   item.className='work-item';
   item.innerHTML=`
+    ${_DRAG_HANDLE_HTML}
     <div class="work-logo-wrap" onclick="triggerLogoUpload(this)">
       <div class="work-logo-default work-diamond">${makeDiamondSVG(color)}</div>
       <div class="work-logo-upload-hint">Upload<br>logo</div>
@@ -4628,7 +4673,7 @@ function saveCurrent(){
   const list = document.getElementById('currentList');
   const item = document.createElement('div');
   item.className='current-item';
-  item.innerHTML=`<span class="current-icon">${selectedCurrentIcon}</span><span data-edit="true" contenteditable="${editMode}">${text}</span><button class="current-delete" onclick="deleteCurrent(this)">×</button>`;
+  item.innerHTML=`${_DRAG_HANDLE_HTML}<span class="current-icon">${selectedCurrentIcon}</span><span data-edit="true" contenteditable="${editMode}">${text}</span><button class="current-delete" onclick="deleteCurrent(this)">×</button>`;
   list.appendChild(item);
   document.getElementById('c-text').value='';
   closeModal('currentModal');
@@ -6891,6 +6936,25 @@ document.addEventListener('DOMContentLoaded', function() {
   _calLoad();
   renderCalendar();
   if (typeof updateEventCountBadge === 'function') updateEventCountBadge();
+  // Wire pointer-event drag-to-reorder on both lists. Event delegation
+  // on the list element survives bootstrap rebuilds (list stays put,
+  // children change), so we only register once.
+  if (typeof setupReorderable === 'function') {
+    setupReorderable('#workList',    '.work-item',    function() {
+      // Once the user drags, stop overriding their order with the
+      // date-sort on subsequent renders. Stored on vibe_user_v1 so the
+      // flag survives reloads on this device.
+      if (typeof vibeLoad === 'function' && typeof vibeSave === 'function') {
+        const u = vibeLoad('vibe_user_v1') || {};
+        u._workOrderManual = true;
+        vibeSave('vibe_user_v1', u);
+      }
+      if (typeof saveProfileToStorage === 'function') saveProfileToStorage();
+    });
+    setupReorderable('#currentList', '.current-item', function() {
+      if (typeof saveProfileToStorage === 'function') saveProfileToStorage();
+    });
+  }
 });
 // ══ END CALENDAR SYNC ════════════════════════════════════════════════════
 
@@ -7392,6 +7456,79 @@ function _urlFromCssBackgroundImage(bgImg) {
   if (!bgImg || bgImg === 'none') return '';
   const m = bgImg.trim().match(/^url\(["']?([^"')]+)["']?\)/i);
   return m ? m[1].trim() : '';
+}
+
+// 6-dot grip icon used as the drag handle on .work-item / .current-item.
+// Injected into every dynamic + static template so reorder works
+// uniformly. Hidden outside edit-mode via CSS.
+const _DRAG_HANDLE_HTML = '<button type="button" class="drag-handle" aria-label="Reorder" tabindex="-1"><svg width="14" height="20" viewBox="0 0 14 20" fill="currentColor" aria-hidden="true"><circle cx="4" cy="4" r="1.5"/><circle cx="10" cy="4" r="1.5"/><circle cx="4" cy="10" r="1.5"/><circle cx="10" cy="10" r="1.5"/><circle cx="4" cy="16" r="1.5"/><circle cx="10" cy="16" r="1.5"/></svg></button>';
+
+// Pointer-event drag-to-reorder, scoped to a list element. Uses event
+// delegation so it survives bootstrap rebuilds (the list element stays;
+// children are replaced). Works for mouse + touch in one path.
+let _reorderState = null;
+function setupReorderable(listSelector, itemSelector, onChange) {
+  const list = document.querySelector(listSelector);
+  if (!list || list.dataset.reorderable === '1') return;
+  list.dataset.reorderable = '1';
+  list.addEventListener('pointerdown', (e) => {
+    const handle = e.target && e.target.closest && e.target.closest('.drag-handle');
+    if (!handle) return;
+    if (!document.body.classList.contains('edit-mode')) return;
+    const item = handle.closest(itemSelector);
+    if (!item || item.parentElement !== list) return;
+    e.preventDefault();
+    _reorderState = {
+      item, list, itemSelector, onChange,
+      startY: e.clientY,
+      pointerId: e.pointerId,
+    };
+    item.classList.add('is-dragging');
+    document.body.classList.add('reordering');
+    try { handle.setPointerCapture(e.pointerId); } catch (_) {}
+    document.addEventListener('pointermove', _onReorderMove);
+    document.addEventListener('pointerup',   _onReorderEnd);
+    document.addEventListener('pointercancel', _onReorderEnd);
+  });
+}
+function _onReorderMove(e) {
+  const s = _reorderState; if (!s) return;
+  const dy = e.clientY - s.startY;
+  s.item.style.transform = 'translateY(' + dy + 'px) scale(1.015)';
+  const siblings = Array.from(s.list.querySelectorAll(s.itemSelector))
+    .filter((c) => c !== s.item);
+  for (let i = 0; i < siblings.length; i++) {
+    const sib = siblings[i];
+    const r = sib.getBoundingClientRect();
+    if (e.clientY >= r.top && e.clientY <= r.bottom) {
+      const mid = r.top + r.height / 2;
+      if (e.clientY < mid && sib !== s.item.nextElementSibling) {
+        s.list.insertBefore(s.item, sib);
+        s.startY = e.clientY;
+        s.item.style.transform = 'translateY(0) scale(1.015)';
+      } else if (e.clientY >= mid && sib !== s.item.previousElementSibling) {
+        s.list.insertBefore(s.item, sib.nextElementSibling);
+        s.startY = e.clientY;
+        s.item.style.transform = 'translateY(0) scale(1.015)';
+      }
+      break;
+    }
+  }
+}
+function _onReorderEnd() {
+  const s = _reorderState;
+  document.removeEventListener('pointermove', _onReorderMove);
+  document.removeEventListener('pointerup',   _onReorderEnd);
+  document.removeEventListener('pointercancel', _onReorderEnd);
+  if (s) {
+    s.item.classList.remove('is-dragging');
+    s.item.style.transform = '';
+    document.body.classList.remove('reordering');
+    if (typeof s.onChange === 'function') {
+      try { s.onChange(); } catch (_) {}
+    }
+  }
+  _reorderState = null;
 }
 
 // Mirror of src/lib/profile/work-experience.ts:
@@ -8780,7 +8917,7 @@ function renderUserSections(user) {
       user.currentlyOn.forEach(c => {
         const item = document.createElement('div');
         item.className = 'current-item';
-        item.innerHTML = `<span class="current-icon">${_esc(c.icon || '📱')}</span><span data-edit="true" contenteditable="${editMode}">${_esc(c.text)}</span><button class="current-delete" onclick="deleteCurrent(this)">&times;</button>`;
+        item.innerHTML = `${_DRAG_HANDLE_HTML}<span class="current-icon">${_esc(c.icon || '📱')}</span><span data-edit="true" contenteditable="${editMode}">${_esc(c.text)}</span><button class="current-delete" onclick="deleteCurrent(this)">&times;</button>`;
         list.appendChild(item);
       });
     }
@@ -8789,10 +8926,12 @@ function renderUserSections(user) {
     const list = document.getElementById('workList');
     if (list) {
       list.querySelectorAll('.work-item').forEach(w => w.remove());
-      // Sort by parsed end date desc — most recent / current role at
-      // the top. Stable for ties so the rendered order stays
-      // deterministic when dates are ambiguous.
-      const sortedWork = _sortWorkExperienceByRecency(user.workExperience);
+      // Sort by parsed end date desc — UNLESS the user has manually
+      // dragged the list (then we trust the stored array order so
+      // their reorder isn't blown away on every render).
+      const sortedWork = user._workOrderManual
+        ? user.workExperience.slice()
+        : _sortWorkExperienceByRecency(user.workExperience);
       sortedWork.forEach(w => {
         const item = document.createElement('div');
         item.className = 'work-item';
@@ -8801,6 +8940,7 @@ function renderUserSections(user) {
           ? `<img class="work-logo-img" src="${w.logoUrl}" style="position:absolute;inset:0;width:100%;height:100%;object-fit:cover;border-radius:13px;">`
           : '';
         item.innerHTML = `
+          ${_DRAG_HANDLE_HTML}
           <div class="work-logo-wrap" onclick="triggerLogoUpload(this)">
             <div class="work-logo-default work-diamond" ${hasLogo ? 'style="opacity:0;"' : ''}>${typeof makeDiamondSVG === 'function' ? makeDiamondSVG('#1C1C1E') : ''}</div>
             <div class="work-logo-upload-hint">Upload<br>logo</div>
