@@ -2,10 +2,11 @@
 
 import Link from "next/link";
 import { useSearchParams } from "next/navigation";
-import { useEffect, useRef, useState } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 
 import { ImageCropperModal } from "@/components/ImageCropperModal";
 import { ClipViewerMobile } from "@/components/mobile/ClipViewerMobile";
+import { PostComposerMobile } from "@/components/mobile/PostComposerMobile";
 import { PostViewerMobile } from "@/components/mobile/PostViewerMobile";
 import { ResumeViewerMobile } from "@/components/mobile/ResumeViewerMobile";
 import { IU_MAJORS_BY_SCHOOL } from "@/lib/iu/majors";
@@ -211,12 +212,32 @@ export function ProfileMobile({ targetHandle }: Props = {}) {
   }, [isVisitor, targetHandle]);
 
   // Posts + clips fetch — same shape both ways, just routed by `handle`.
-  useEffect(() => {
-    let cancelled = false;
+  // Extracted to a stable callback so the composer can re-trigger it
+  // after a successful publish (otherwise the user has to refresh to
+  // see their new post in the grid).
+  const refetchPosts = useCallback(async () => {
     const endpoint = isVisitor
       ? `/api/users/${encodeURIComponent(targetHandle!)}/posts`
       : "/api/me/posts";
+    try {
+      const res = await fetch(endpoint, { cache: "no-store" });
+      const data = await res.json();
+      if (data?.ok && Array.isArray(data.posts)) {
+        setPosts(data.posts as PostRow[]);
+      } else {
+        setPosts([]);
+      }
+    } catch {
+      setPosts([]);
+    }
+  }, [isVisitor, targetHandle]);
+
+  useEffect(() => {
+    let cancelled = false;
     (async () => {
+      const endpoint = isVisitor
+        ? `/api/users/${encodeURIComponent(targetHandle!)}/posts`
+        : "/api/me/posts";
       try {
         const res = await fetch(endpoint, { cache: "no-store" });
         const data = await res.json();
@@ -295,6 +316,10 @@ export function ProfileMobile({ targetHandle }: Props = {}) {
     setEditMode(true);
     setEditError(null);
   };
+
+  // Composer sheet — only mounted while open so the keyboard-focus +
+  // mention picker bindings run fresh on every entry.
+  const [composerOpen, setComposerOpen] = useState(false);
 
   // Avatar / banner upload — both run through the ImageCropperModal
   // FIRST so the user crops to the right aspect (1:1 for avatar, 3:1
@@ -1191,6 +1216,54 @@ export function ProfileMobile({ targetHandle }: Props = {}) {
               setEditError(null);
             }
             void uploadCroppedBlob(blob, kind);
+          }}
+        />
+      ) : null}
+
+      {/* Floating compose button — own-profile only, hidden during edit
+          mode so it doesn't fight the Save/Cancel pills for tap area. */}
+      {!isVisitor && !editMode ? (
+        <button
+          type="button"
+          onClick={() => setComposerOpen(true)}
+          aria-label="New post"
+          style={{
+            position: "fixed",
+            right: 18,
+            bottom: "calc(env(safe-area-inset-bottom, 0px) + 22px)",
+            width: 56,
+            height: 56,
+            borderRadius: 999,
+            border: "none",
+            background:
+              "linear-gradient(135deg, #FF7A4D 0%, #FF5C35 60%, #E04A26 100%)",
+            color: "#fff",
+            boxShadow:
+              "0 10px 24px rgba(255,92,53,0.42), 0 2px 6px rgba(0,0,0,0.18)",
+            display: "flex",
+            alignItems: "center",
+            justifyContent: "center",
+            cursor: "pointer",
+            zIndex: 90,
+          }}
+        >
+          <svg width="22" height="22" viewBox="0 0 22 22" fill="none" aria-hidden>
+            <path
+              d="M11 4.5v13M4.5 11h13"
+              stroke="currentColor"
+              strokeWidth="2.2"
+              strokeLinecap="round"
+            />
+          </svg>
+        </button>
+      ) : null}
+
+      {composerOpen ? (
+        <PostComposerMobile
+          onClose={() => setComposerOpen(false)}
+          onPosted={() => {
+            void refetchPosts();
+            setTab("posts");
           }}
         />
       ) : null}

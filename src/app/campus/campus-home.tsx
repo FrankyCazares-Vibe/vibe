@@ -8,6 +8,13 @@ import { Fragment, useCallback, useEffect, useMemo, useRef, useState } from "rea
 import { CampusAppShell } from "@/components/campus-app-shell";
 import { ImageCropperModal } from "@/components/ImageCropperModal";
 import { emitCalendarChanged } from "@/components/LeftNav";
+import {
+  bindMentionPicker,
+  capturePosterFrame,
+  classifyVideo,
+  extractHashtags,
+  type VideoMode,
+} from "@/lib/composer/helpers";
 import { IU_SCHOOLS, schoolForMajor } from "@/lib/iu/majors";
 
 declare global {
@@ -5180,77 +5187,9 @@ function clipFallbackGradient(id: string): string {
   return `linear-gradient(135deg, ${a}, ${b})`;
 }
 
-type CapturedFrame = {
-  blob: Blob | null;
-  duration: number | null;
-  width: number | null;
-  height: number | null;
-};
-
-// Pull the first frame of a video as a square JPEG blob via canvas.
-// Best-effort: if metadata never resolves or the format isn't decodable in
-// the browser, we resolve with all-nulls and the caller falls back to
-// publishing without a poster (grid renders a gradient).
-function capturePosterFrame(file: File): Promise<CapturedFrame> {
-  return new Promise((resolve) => {
-    const url = URL.createObjectURL(file);
-    const v = document.createElement("video");
-    v.muted = true;
-    v.preload = "metadata";
-    v.playsInline = true;
-    let done = false;
-    const finish = (
-      blob: Blob | null,
-      duration: number | null,
-      width: number | null = null,
-      height: number | null = null,
-    ) => {
-      if (done) return;
-      done = true;
-      try {
-        URL.revokeObjectURL(url);
-      } catch {}
-      resolve({ blob, duration, width, height });
-    };
-    v.onloadedmetadata = () => {
-      const dur = Number.isFinite(v.duration) ? v.duration : null;
-      try {
-        v.currentTime = Math.min(0.1, (dur || 1) - 0.05);
-      } catch {
-        finish(null, dur, v.videoWidth || null, v.videoHeight || null);
-      }
-    };
-    v.onseeked = () => {
-      const w = v.videoWidth || 720;
-      const h = v.videoHeight || 720;
-      try {
-        const c = document.createElement("canvas");
-        const side = Math.min(w, h);
-        c.width = c.height = Math.min(720, side);
-        const ctx = c.getContext("2d");
-        if (!ctx) {
-          finish(null, Number.isFinite(v.duration) ? v.duration : null, w, h);
-          return;
-        }
-        const sx = (w - side) / 2;
-        const sy = (h - side) / 2;
-        ctx.drawImage(v, sx, sy, side, side, 0, 0, c.width, c.height);
-        c.toBlob(
-          (b) => finish(b, Number.isFinite(v.duration) ? v.duration : null, w, h),
-          "image/jpeg",
-          0.82,
-        );
-      } catch {
-        finish(null, Number.isFinite(v.duration) ? v.duration : null, w, h);
-      }
-    };
-    v.onerror = () => finish(null, null);
-    setTimeout(() => finish(null, null), 8000);
-    v.src = url;
-  });
-}
-
-type VideoMode = "clip" | "post-video";
+// CapturedFrame / capturePosterFrame / classifyVideo / VideoMode /
+// extractHashtags now live in @/lib/composer/helpers — shared with the
+// mobile composer sheet.
 
 function FeedComposer({
   glass,
@@ -5278,38 +5217,10 @@ function FeedComposer({
   const attachInputRef = useRef<HTMLInputElement | null>(null);
   const textareaRef = useRef<HTMLTextAreaElement | null>(null);
 
-  // Bind the existing _mentionPicker.js typeahead to the composer
-  // textarea. The script is loaded once per page (idempotent flag on
-  // window), bind is idempotent per textarea. Picker mutates the
-  // textarea via the native value setter so React's onChange fires and
-  // controlled state stays in sync.
+  // Bind the existing _mentionPicker.js typeahead — same hook used by
+  // the mobile composer (see @/lib/composer/helpers).
   useEffect(() => {
-    const ta = textareaRef.current;
-    if (!ta) return;
-    const bind = () => {
-      const w = window as unknown as {
-        vibeBindMentionPicker?: (ta: HTMLTextAreaElement) => void;
-      };
-      if (w.vibeBindMentionPicker) w.vibeBindMentionPicker(ta);
-    };
-    if ((window as unknown as { vibeBindMentionPicker?: unknown })
-      .vibeBindMentionPicker) {
-      bind();
-      return;
-    }
-    const existing = document.querySelector<HTMLScriptElement>(
-      "script[data-vibe-mention-picker]",
-    );
-    if (existing) {
-      existing.addEventListener("load", bind, { once: true });
-      return;
-    }
-    const s = document.createElement("script");
-    s.src = "/html/_mentionPicker.js";
-    s.async = true;
-    s.dataset.vibeMentionPicker = "1";
-    s.addEventListener("load", bind, { once: true });
-    document.head.appendChild(s);
+    if (textareaRef.current) bindMentionPicker(textareaRef.current);
   }, []);
 
   const hasContent = !!text.trim() || !!imageFile || !!clipFile;
@@ -5354,14 +5265,7 @@ function FeedComposer({
       setVideoMeta(null);
       setVideoMode("clip");
       void capturePosterFrame(file).then((meta) => {
-        const w = meta.width ?? 0;
-        const h = meta.height ?? 0;
-        const dur = meta.duration ?? 0;
-        const isVertical = h > 0 && w > 0 && h > w * 1.05;
-        const isShort = dur > 0 && dur <= 120;
-        const detected: VideoMode =
-          isVertical && isShort ? "clip" : "post-video";
-        setVideoMode(detected);
+        setVideoMode(classifyVideo(meta.width, meta.height, meta.duration));
         setVideoMeta({
           width: meta.width,
           height: meta.height,
@@ -5771,20 +5675,6 @@ const composerRemoveButton: React.CSSProperties = {
   cursor: "pointer",
 };
 
-function extractHashtags(text: string): string[] {
-  const matches = text.match(/#[A-Za-z0-9_]{1,32}/g);
-  if (!matches) return [];
-  const seen = new Set<string>();
-  const out: string[] = [];
-  for (const m of matches) {
-    const t = m.replace(/^#+/, "").toLowerCase();
-    if (!t || seen.has(t)) continue;
-    seen.add(t);
-    out.push(t);
-    if (out.length >= 10) break;
-  }
-  return out;
-}
 
 /**
  * Render a post body with `@handle` mentions and `#tags` linkified.
