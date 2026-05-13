@@ -1,12 +1,16 @@
 "use client";
 
 import Link from "next/link";
-import { useEffect, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 
 type Profile = {
   id: string;
   name: string | null;
   handle: string | null;
+  /** Last time the user changed their handle, ISO timestamp.
+   *  Drives the 14-day cooldown countdown in HandleCard. NULL =
+   *  first-time claim, no cooldown applies. */
+  handle_changed_at: string | null;
   email: string | null;
   school: string | null;
   school_email: string | null;
@@ -85,6 +89,10 @@ export function SettingsClient({ profile }: { profile: Profile }) {
       </header>
 
       <AccountCard profile={profile} />
+      <HandleCard
+        currentHandle={profile.handle}
+        handleChangedAt={profile.handle_changed_at}
+      />
       <CampusTourCard handle={profile.handle} />
       <BlockedUsersCard />
       <SignOutCard />
@@ -390,7 +398,6 @@ function AccountCard({ profile }: { profile: Profile }) {
       <SectionTitle>Account info</SectionTitle>
       <div style={{ display: "grid", gridTemplateColumns: "140px 1fr", rowGap: 12, columnGap: 16 }}>
         <Row label="Name" value={profile.name ?? "—"} />
-        <Row label="Handle" value={profile.handle ? `@${profile.handle}` : "—"} />
         <Row label="Email" value={profile.email ?? "—"} hint="Used for sign-in." />
         <Row
           label="School email"
@@ -431,12 +438,320 @@ function AccountCard({ profile }: { profile: Profile }) {
           fontFamily: "DM Sans, sans-serif",
         }}
       >
-        Edit your name, handle, bio, and other profile details on{" "}
+        Edit your name, bio, and other profile details on{" "}
         <Link href="/profile" style={{ color: "#FF5C35", fontWeight: 700, textDecoration: "none" }}>
           your profile page
         </Link>
-        .
+        . Change your handle in the section below.
       </p>
+    </section>
+  );
+}
+
+// Handle change with the 14-day cooldown + live availability check.
+// Source of truth for cooldown math lives in lib/profile/handle.ts;
+// we keep the formula client-side here too so the countdown updates
+// without an extra API call. NULL `handle_changed_at` means a free
+// first claim (matches the PATCH endpoint behavior).
+const HANDLE_COOLDOWN_DAYS = 14;
+const HANDLE_COOLDOWN_MS = HANDLE_COOLDOWN_DAYS * 24 * 60 * 60 * 1000;
+const HANDLE_RE = /^[a-z0-9_]{3,20}$/;
+
+function HandleCard({
+  currentHandle,
+  handleChangedAt,
+}: {
+  currentHandle: string | null;
+  handleChangedAt: string | null;
+}) {
+  const [value, setValue] = useState(currentHandle ?? "");
+  // `networkCheck` only carries states the server can produce
+  // (checking / available / taken). Synchronous validation
+  // (idle / invalid) is computed via `localValidation` and merged
+  // into `check` below — keeps the effect from doing setState for
+  // states it doesn't actually own.
+  const [networkCheck, setNetworkCheck] = useState<{
+    state: "checking" | "available" | "taken";
+    reason?: string | null;
+  } | null>(null);
+  const [saving, setSaving] = useState(false);
+  const [savedHandle, setSavedHandle] = useState<string | null>(currentHandle);
+  const [savedAt, setSavedAt] = useState<string | null>(handleChangedAt);
+  const [error, setError] = useState<string | null>(null);
+
+  // 14-day cooldown countdown. `now` ticks once per minute so the copy
+  // doesn't go stale if the user lingers on the page. Anchored via
+  // useState init so render stays pure (lint-clean).
+  const [now, setNow] = useState(() => Date.now());
+  useEffect(() => {
+    const id = window.setInterval(() => setNow(Date.now()), 60_000);
+    return () => window.clearInterval(id);
+  }, []);
+  const cooldownDaysLeft = savedAt
+    ? Math.max(
+        0,
+        Math.ceil(
+          (HANDLE_COOLDOWN_MS - (now - new Date(savedAt).getTime())) /
+            (24 * 60 * 60 * 1000),
+        ),
+      )
+    : 0;
+  const onCooldown = cooldownDaysLeft > 0;
+
+  // Synchronous validation derived from the input — empty / unchanged /
+  // bad format states resolve here without hitting the network.
+  type Check =
+    | { state: "idle" }
+    | { state: "checking" }
+    | { state: "available" }
+    | { state: "taken"; reason?: string | null }
+    | { state: "invalid"; reason: string };
+  const localValidation = useMemo<Check | null>(() => {
+    const normalized = value.trim().toLowerCase();
+    if (!normalized || normalized === (savedHandle ?? "")) {
+      return { state: "idle" };
+    }
+    if (!HANDLE_RE.test(normalized)) {
+      return {
+        state: "invalid",
+        reason:
+          normalized.length < 3
+            ? "Too short — 3 characters minimum"
+            : normalized.length > 20
+              ? "Too long — 20 characters max"
+              : "Letters, numbers, and underscore only",
+      };
+    }
+    // Network check needed — handled by the effect below.
+    return null;
+  }, [value, savedHandle]);
+
+  // Live availability check — debounced 300ms after the last keystroke.
+  // Skipped entirely when localValidation resolves the case (idle /
+  // invalid) — the effect only does the actual fetch + result write.
+  useEffect(() => {
+    if (localValidation) return; // local case; no network needed
+    const normalized = value.trim().toLowerCase();
+    let cancelled = false;
+    const t = window.setTimeout(async () => {
+      setNetworkCheck({ state: "checking" });
+      try {
+        const r = await fetch(
+          `/api/handle/check?h=${encodeURIComponent(normalized)}`,
+          { cache: "no-store" },
+        );
+        const j = await r.json();
+        if (cancelled) return;
+        if (j?.available) {
+          setNetworkCheck({ state: "available" });
+        } else {
+          setNetworkCheck({
+            state: "taken",
+            reason: j?.reason ?? "Not available",
+          });
+        }
+      } catch {
+        if (!cancelled) setNetworkCheck(null);
+      }
+    }, 300);
+    return () => {
+      cancelled = true;
+      window.clearTimeout(t);
+    };
+  }, [localValidation, value]);
+
+  // Merged check state shown in the UI. localValidation wins when
+  // present (idle / invalid); otherwise we show whatever the network
+  // is reporting (or a fallback "checking" before the first response).
+  const check: Check = localValidation
+    ? localValidation
+    : networkCheck ?? { state: "checking" };
+
+  const submit = async () => {
+    const normalized = value.trim().toLowerCase();
+    if (saving || onCooldown) return;
+    if (!normalized || normalized === (savedHandle ?? "")) return;
+    if (check.state !== "available") return;
+    setSaving(true);
+    setError(null);
+    try {
+      const r = await fetch("/api/me/handle", {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ handle: normalized }),
+      });
+      const j = await r.json();
+      if (!r.ok || !j?.ok) {
+        throw new Error(j?.error ?? `HTTP ${r.status}`);
+      }
+      setSavedHandle(j.handle as string);
+      setSavedAt((j.handle_changed_at as string | undefined) ?? new Date().toISOString());
+      setValue(j.handle as string);
+      setNetworkCheck(null);
+    } catch (e) {
+      setError(e instanceof Error ? e.message : "Could not save");
+    } finally {
+      setSaving(false);
+    }
+  };
+
+  const canSave =
+    !saving &&
+    !onCooldown &&
+    check.state === "available" &&
+    value.trim().toLowerCase() !== (savedHandle ?? "");
+
+  return (
+    <section style={{ ...CARD_GLASS, padding: 22, marginBottom: 16 }}>
+      <SectionTitle>Handle</SectionTitle>
+      <p
+        style={{
+          fontFamily: "DM Sans, sans-serif",
+          fontSize: 13.5,
+          color: "#5C5853",
+          margin: "8px 0 14px",
+          lineHeight: 1.55,
+        }}
+      >
+        Your @handle is how people find you and tag you in posts.{" "}
+        <strong style={{ color: "#1C1C1E", fontWeight: 700 }}>
+          You can change it once every 2 weeks
+        </strong>
+        , so pick something you&apos;ll want to keep.
+      </p>
+
+      {onCooldown ? (
+        <div
+          style={{
+            fontFamily: "DM Sans, sans-serif",
+            fontSize: 13,
+            color: "#8A6118",
+            background: "rgba(245, 200, 66, 0.12)",
+            border: "1px solid rgba(245, 200, 66, 0.45)",
+            borderRadius: 10,
+            padding: "10px 12px",
+            marginBottom: 14,
+          }}
+        >
+          Locked for {cooldownDaysLeft} more day{cooldownDaysLeft === 1 ? "" : "s"}.
+          You changed your handle on{" "}
+          {savedAt
+            ? new Date(savedAt).toLocaleDateString(undefined, {
+                month: "short",
+                day: "numeric",
+              })
+            : "—"}
+          .
+        </div>
+      ) : null}
+
+      <div style={{ display: "flex", gap: 8, alignItems: "stretch" }}>
+        <div
+          style={{
+            display: "flex",
+            alignItems: "center",
+            paddingLeft: 12,
+            paddingRight: 4,
+            borderRadius: 10,
+            border: "1px solid rgba(28,28,30,0.12)",
+            background: onCooldown ? "rgba(28,28,30,0.04)" : "#fff",
+            flex: 1,
+            opacity: onCooldown ? 0.55 : 1,
+          }}
+        >
+          <span
+            style={{
+              fontFamily: "DM Sans, sans-serif",
+              fontSize: 14,
+              color: "#8A8580",
+              fontWeight: 600,
+              marginRight: 2,
+            }}
+          >
+            @
+          </span>
+          <input
+            value={value}
+            onChange={(e) =>
+              setValue(
+                e.target.value.toLowerCase().replace(/[^a-z0-9_]/g, "").slice(0, 20),
+              )
+            }
+            disabled={onCooldown || saving}
+            placeholder="your_handle"
+            spellCheck={false}
+            autoCapitalize="none"
+            autoCorrect="off"
+            style={{
+              flex: 1,
+              minWidth: 0,
+              padding: "10px 8px",
+              border: "none",
+              background: "transparent",
+              outline: "none",
+              fontFamily: "DM Sans, sans-serif",
+              fontSize: 14,
+              fontWeight: 600,
+              color: "#1C1C1E",
+            }}
+          />
+          <span style={{ fontFamily: "DM Sans, sans-serif", fontSize: 12, padding: "0 10px" }}>
+            {(() => {
+              if (onCooldown || !value.trim() || value.trim().toLowerCase() === (savedHandle ?? "")) return null;
+              if (check.state === "checking")
+                return <span style={{ color: "#8A8580" }}>Checking…</span>;
+              if (check.state === "available")
+                return <span style={{ color: "#1A9E5B", fontWeight: 700 }}>Available ✓</span>;
+              if (check.state === "taken")
+                return (
+                  <span style={{ color: "#C0392B", fontWeight: 700 }}>
+                    {check.reason ?? "Taken"}
+                  </span>
+                );
+              if (check.state === "invalid")
+                return (
+                  <span style={{ color: "#C0392B", fontWeight: 700 }}>
+                    {check.reason ?? "Invalid"}
+                  </span>
+                );
+              return null;
+            })()}
+          </span>
+        </div>
+        <button
+          type="button"
+          onClick={submit}
+          disabled={!canSave}
+          style={{
+            padding: "10px 18px",
+            borderRadius: 10,
+            border: "none",
+            background: canSave ? "#FF5C35" : "rgba(28,28,30,0.10)",
+            color: canSave ? "#fff" : "#8A8580",
+            fontFamily: "DM Sans, sans-serif",
+            fontWeight: 700,
+            fontSize: 13,
+            cursor: canSave ? "pointer" : "default",
+            boxShadow: canSave ? "0 4px 14px rgba(255,92,53,0.32)" : "none",
+            whiteSpace: "nowrap",
+          }}
+        >
+          {saving ? "Saving…" : "Save"}
+        </button>
+      </div>
+
+      {error ? (
+        <div
+          style={{
+            marginTop: 10,
+            fontFamily: "DM Sans, sans-serif",
+            fontSize: 12,
+            color: "#C0392B",
+          }}
+        >
+          {error}
+        </div>
+      ) : null}
     </section>
   );
 }

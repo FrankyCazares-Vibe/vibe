@@ -2,7 +2,7 @@
 
 import Link from "next/link";
 import { useSearchParams } from "next/navigation";
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 
 import { ClipViewerMobile } from "@/components/mobile/ClipViewerMobile";
 import { PostViewerMobile } from "@/components/mobile/PostViewerMobile";
@@ -287,6 +287,61 @@ export function ProfileMobile({ targetHandle }: Props = {}) {
     setEditMode(true);
     setEditError(null);
   };
+
+  // Avatar / banner upload — both flow through /api/me/profile-upload
+  // (which writes the file to storage + returns a public URL), then
+  // /api/me/profile-sync to persist the URL on users.{avatar_url,banner_url}.
+  // We optimistically merge the returned URL into the local user state
+  // so the new image shows immediately without a full re-bootstrap.
+  const avatarInputRef = useRef<HTMLInputElement | null>(null);
+  const bannerInputRef = useRef<HTMLInputElement | null>(null);
+  const [uploadingKind, setUploadingKind] = useState<"avatar" | "banner" | null>(null);
+  const uploadProfileImage = async (
+    file: File,
+    kind: "avatar" | "banner",
+  ) => {
+    if (!user || uploadingKind) return;
+    setUploadingKind(kind);
+    setEditError(null);
+    try {
+      const form = new FormData();
+      form.set("file", file);
+      form.set("kind", kind);
+      const upload = await fetch("/api/me/profile-upload", {
+        method: "POST",
+        credentials: "include",
+        body: form,
+      });
+      const uj = await upload.json();
+      if (!upload.ok || !uj?.ok || typeof uj.url !== "string") {
+        throw new Error(uj?.error ?? "Upload failed");
+      }
+      const fieldKey = kind === "avatar" ? "avatar_url" : "banner_url";
+      const sync = await fetch("/api/me/profile-sync", {
+        method: "POST",
+        credentials: "include",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ [fieldKey]: uj.url }),
+      });
+      const sj = await sync.json();
+      if (!sync.ok || !sj?.ok) {
+        throw new Error(sj?.error ?? "Could not save");
+      }
+      // Reflect the new image in the local user shape so it paints
+      // immediately. (vibe_user_v1 uses `avatarPhoto` / `coverPhoto`.)
+      setUser((prev) =>
+        prev
+          ? kind === "avatar"
+            ? { ...prev, avatarPhoto: uj.url as string }
+            : { ...prev, coverPhoto: uj.url as string }
+          : prev,
+      );
+    } catch (e) {
+      setEditError(e instanceof Error ? e.message : "Upload failed");
+    } finally {
+      setUploadingKind(null);
+    }
+  };
   const cancelEdit = () => {
     setEditMode(false);
     setDraft(null);
@@ -399,7 +454,8 @@ export function ProfileMobile({ targetHandle }: Props = {}) {
 
   return (
     <div style={{ minHeight: "100dvh", background: "#FAF7F2", color: "#1C1C1E" }}>
-      {/* Cover — full bleed, sits under the status bar (env() pads it). */}
+      {/* Cover — full bleed, sits under the status bar (env() pads it).
+          Tappable in edit mode to upload a new banner image. */}
       <div
         style={{
           position: "relative",
@@ -419,6 +475,45 @@ export function ProfileMobile({ targetHandle }: Props = {}) {
             pointerEvents: "none",
           }}
         />
+        {editMode && !isVisitor ? (
+          <>
+            <button
+              type="button"
+              onClick={() => bannerInputRef.current?.click()}
+              disabled={uploadingKind !== null}
+              aria-label="Change cover photo"
+              style={{
+                position: "absolute",
+                bottom: 12,
+                right: 14,
+                padding: "8px 14px",
+                borderRadius: 999,
+                background: "rgba(0,0,0,0.55)",
+                border: "1px solid rgba(255,255,255,0.22)",
+                color: "#fff",
+                fontFamily: "DM Sans, sans-serif",
+                fontSize: 12,
+                fontWeight: 700,
+                cursor: uploadingKind ? "default" : "pointer",
+                backdropFilter: "blur(10px)",
+                WebkitBackdropFilter: "blur(10px)",
+              }}
+            >
+              {uploadingKind === "banner" ? "Uploading…" : "Change cover"}
+            </button>
+            <input
+              ref={bannerInputRef}
+              type="file"
+              accept="image/jpeg,image/png,image/webp"
+              style={{ display: "none" }}
+              onChange={(e) => {
+                const f = e.target.files?.[0];
+                if (f) void uploadProfileImage(f, "banner");
+                e.target.value = "";
+              }}
+            />
+          </>
+        ) : null}
         {/* Floating top-right actions — pencil + settings for owners,
             nothing for visitors (visitor CTA sits in the identity stack
             below the avatar instead so it lands closer to the name). */}
@@ -500,7 +595,7 @@ export function ProfileMobile({ targetHandle }: Props = {}) {
             instead of sitting flush against the cover. position+z-index
             lifts it above the cover's bottom-fade overlay (positioned
             descendants outrank normal-flow siblings in paint order). */}
-        <div style={{ position: "relative", zIndex: 1, marginBottom: 14 }}>
+        <div style={{ position: "relative", zIndex: 1, marginBottom: 14, width: 88 }}>
           <div
             style={{
               width: 88,
@@ -518,9 +613,57 @@ export function ProfileMobile({ targetHandle }: Props = {}) {
               fontSize: 32,
               fontWeight: 800,
               color: "#1C1C1E",
+              position: "relative",
             }}
           >
             {!avatar ? initialsOf(name) : null}
+            {editMode && !isVisitor ? (
+              <>
+                <button
+                  type="button"
+                  onClick={() => avatarInputRef.current?.click()}
+                  disabled={uploadingKind !== null}
+                  aria-label="Change profile photo"
+                  style={{
+                    position: "absolute",
+                    bottom: -4,
+                    right: -4,
+                    width: 30,
+                    height: 30,
+                    borderRadius: "50%",
+                    background: "#FF5C35",
+                    border: "2.5px solid #FAF7F2",
+                    color: "#fff",
+                    fontSize: 14,
+                    lineHeight: 1,
+                    cursor: uploadingKind ? "default" : "pointer",
+                    boxShadow: "0 4px 12px rgba(255,92,53,0.32)",
+                    display: "flex",
+                    alignItems: "center",
+                    justifyContent: "center",
+                    padding: 0,
+                  }}
+                >
+                  {uploadingKind === "avatar" ? "…" : (
+                    <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" aria-hidden>
+                      <path d="M23 19a2 2 0 0 1-2 2H3a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h4l2-3h6l2 3h4a2 2 0 0 1 2 2z" />
+                      <circle cx="12" cy="13" r="4" />
+                    </svg>
+                  )}
+                </button>
+                <input
+                  ref={avatarInputRef}
+                  type="file"
+                  accept="image/jpeg,image/png,image/webp"
+                  style={{ display: "none" }}
+                  onChange={(e) => {
+                    const f = e.target.files?.[0];
+                    if (f) void uploadProfileImage(f, "avatar");
+                    e.target.value = "";
+                  }}
+                />
+              </>
+            ) : null}
           </div>
         </div>
 

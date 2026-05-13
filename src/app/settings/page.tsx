@@ -21,7 +21,7 @@ export default async function SettingsPage() {
   const { data: profile } = await supabase
     .from("users")
     .select(
-      "id,email,name,handle,school,school_email,school_verified,year,major,created_at",
+      "id,email,name,handle,handle_changed_at,school,school_email,school_verified,year,major,created_at",
     )
     .eq("id", user.id)
     .maybeSingle();
@@ -33,6 +33,8 @@ export default async function SettingsPage() {
           id: String(profile?.id ?? user.id),
           name: (profile?.name as string | null) ?? null,
           handle: (profile?.handle as string | null) ?? null,
+          handle_changed_at:
+            (profile?.handle_changed_at as string | null) ?? null,
           email: (profile?.email as string | null) ?? user.email ?? null,
           school: (profile?.school as string | null) ?? null,
           school_email: (profile?.school_email as string | null) ?? null,
