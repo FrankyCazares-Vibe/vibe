@@ -716,14 +716,14 @@ function PostFeedCard({
         // the dark tint + stronger shadow gives the card real
         // separation from the page instead of blending in.
         background:
-          "linear-gradient(180deg, rgba(28,28,30,0.07) 0%, rgba(28,28,30,0.12) 100%)",
-        backdropFilter: "blur(20px) saturate(140%)",
-        WebkitBackdropFilter: "blur(20px) saturate(140%)",
-        border: "1px solid rgba(28,28,30,0.12)",
+          "linear-gradient(180deg, rgba(28,28,30,0.11) 0%, rgba(28,28,30,0.17) 100%)",
+        backdropFilter: "blur(22px) saturate(140%)",
+        WebkitBackdropFilter: "blur(22px) saturate(140%)",
+        border: "1px solid rgba(28,28,30,0.16)",
         boxShadow: [
-          "inset 0 1px 0 rgba(255,255,255,0.45)",
-          "inset 0 -1px 0 rgba(28,28,30,0.08)",
-          "0 12px 28px rgba(28,28,30,0.10)",
+          "inset 0 1px 0 rgba(255,255,255,0.40)",
+          "inset 0 -1px 0 rgba(28,28,30,0.10)",
+          "0 14px 32px rgba(28,28,30,0.14)",
         ].join(", "),
         textAlign: "left",
         cursor: "pointer",
@@ -1235,12 +1235,12 @@ function PostFeedSkeleton() {
             padding: 14,
             borderRadius: 16,
             background:
-              "linear-gradient(180deg, rgba(28,28,30,0.07) 0%, rgba(28,28,30,0.12) 100%)",
-            backdropFilter: "blur(20px) saturate(140%)",
-            WebkitBackdropFilter: "blur(20px) saturate(140%)",
-            border: "1px solid rgba(28,28,30,0.12)",
+              "linear-gradient(180deg, rgba(28,28,30,0.11) 0%, rgba(28,28,30,0.17) 100%)",
+            backdropFilter: "blur(22px) saturate(140%)",
+            WebkitBackdropFilter: "blur(22px) saturate(140%)",
+            border: "1px solid rgba(28,28,30,0.16)",
             boxShadow:
-              "inset 0 1px 0 rgba(255,255,255,0.45), 0 12px 28px rgba(28,28,30,0.10)",
+              "inset 0 1px 0 rgba(255,255,255,0.40), 0 14px 32px rgba(28,28,30,0.14)",
             display: "flex",
             flexDirection: "column",
             gap: 10,
