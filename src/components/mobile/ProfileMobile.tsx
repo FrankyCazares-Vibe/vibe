@@ -1034,6 +1034,27 @@ export function ProfileMobile({ targetHandle }: Props = {}) {
           // photos get the soft-output warning below.
           outputMaxSize={pendingCrop.kind === "avatar" ? 768 : 3200}
           outputQuality={pendingCrop.kind === "avatar" ? 0.92 : 0.96}
+          // For banners, draw a "desktop" + "phone" outline inside the
+          // crop frame so the user can see what each display actually
+          // crops. Desktop banner is full-bleed (~6:1), phone banner is
+          // ~2:1 — both differ from our 3:1 crop frame, so without
+          // these guides users get surprised by clipping.
+          safeAreaGuides={
+            pendingCrop.kind === "banner"
+              ? [
+                  {
+                    label: "Desktop",
+                    containerAspect: 6,
+                    color: "#FF5C35",
+                  },
+                  {
+                    label: "Phone",
+                    containerAspect: 2,
+                    color: "#7C5CFC",
+                  },
+                ]
+              : undefined
+          }
           title={pendingCrop.kind === "avatar" ? "Crop profile photo" : "Crop cover photo"}
           onCancel={() => setPendingCrop(null)}
           onConfirm={(blob, info) => {

@@ -26,6 +26,20 @@ export type AspectOption = {
   value: number; // width / height
 };
 
+/**
+ * Optional preview guide rendered on top of the crop viewport. Use to
+ * show users what each display surface will actually crop from their
+ * banner — e.g. "Desktop" (wide + short, top/bottom clipped) vs "Phone"
+ * (narrow + tall, left/right clipped).
+ */
+export type SafeAreaGuide = {
+  label: string;
+  /** Aspect ratio (width / height) of the destination display surface. */
+  containerAspect: number;
+  /** Stroke + label-chip color. */
+  color: string;
+};
+
 type Props = {
   src: File | string;
   /** When `aspect` is fixed, the user can't change it. When `aspectChoices`
@@ -38,6 +52,9 @@ type Props = {
   outputType?: "image/jpeg" | "image/png" | "image/webp";
   outputQuality?: number;
   title?: string;
+  /** Outlined preview rectangles drawn on top of the crop frame so the
+   *  user can see what each display surface will actually show. */
+  safeAreaGuides?: SafeAreaGuide[];
   onCancel: () => void;
   onConfirm: (blob: Blob, info: { width: number; height: number; aspect: number }) => void;
 };
@@ -51,6 +68,7 @@ export function ImageCropperModal({
   outputType = "image/jpeg",
   outputQuality = 0.92,
   title = "Adjust image",
+  safeAreaGuides,
   onCancel,
   onConfirm,
 }: Props) {
@@ -418,6 +436,64 @@ export function ImageCropperModal({
               pointerEvents: "none",
             }}
           />
+          {safeAreaGuides?.length && shape !== "circle"
+            ? safeAreaGuides.map((g) => {
+                // Each guide outlines the region the destination
+                // surface will actually display, given that surface's
+                // aspect ratio and `center/cover` framing. If the
+                // surface is wider than our crop (e.g. desktop banner
+                // 6:1 vs our crop 3:1) the top + bottom get clipped, so
+                // the visible band is shorter. If it's narrower (e.g.
+                // phone 2:1 vs 3:1) the left + right get clipped.
+                let widthPct = 1;
+                let heightPct = 1;
+                if (g.containerAspect > activeAspect) {
+                  heightPct = activeAspect / g.containerAspect;
+                } else if (g.containerAspect < activeAspect) {
+                  widthPct = g.containerAspect / activeAspect;
+                }
+                const leftPct = (1 - widthPct) / 2;
+                const topPct = (1 - heightPct) / 2;
+                return (
+                  <div
+                    key={g.label}
+                    aria-hidden
+                    style={{
+                      position: "absolute",
+                      left: `${leftPct * 100}%`,
+                      top: `${topPct * 100}%`,
+                      width: `${widthPct * 100}%`,
+                      height: `${heightPct * 100}%`,
+                      border: `1.5px dashed ${g.color}`,
+                      boxShadow: `0 0 0 1px rgba(0,0,0,0.35) inset`,
+                      pointerEvents: "none",
+                      borderRadius: 2,
+                    }}
+                  >
+                    <span
+                      style={{
+                        position: "absolute",
+                        top: -9,
+                        left: 6,
+                        background: g.color,
+                        color: "#fff",
+                        fontFamily: "DM Sans, sans-serif",
+                        fontSize: 9,
+                        fontWeight: 800,
+                        letterSpacing: "0.04em",
+                        textTransform: "uppercase",
+                        padding: "2px 6px",
+                        borderRadius: 999,
+                        whiteSpace: "nowrap",
+                        lineHeight: 1,
+                      }}
+                    >
+                      {g.label}
+                    </span>
+                  </div>
+                );
+              })
+            : null}
         </div>
 
         <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
