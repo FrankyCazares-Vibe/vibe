@@ -274,7 +274,7 @@ const TABS: { key: CampusTab; label: string }[] = [
 const SCHOOL = {
   initials: "IU",
   name: "Indiana University",
-  city: "Bloomington, IN",
+  city: "Indianapolis, IN",
 };
 
 export function CampusHome({
