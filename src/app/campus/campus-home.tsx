@@ -9856,16 +9856,6 @@ function schoolForMajor(majorName: string): IuSchool {
   return IU_SCHOOL_BY_ID.get(id) ?? IU_SCHOOL_BY_ID.get("other")!;
 }
 
-// Athletic-org detector. Matches handle OR name against common sports
-// keywords so the map can route orgs into the "Athletic Center"
-// cluster vs the generic "Org Center". Defensive on word boundaries
-// so "design at iu" doesn't get caught by "im" or similar.
-const ATHLETIC_RE =
-  /\b(football|basketball|soccer|baseball|softball|hockey|volleyball|tennis|swim|swimming|track|cross.?country|lacrosse|rugby|golf|field.?hockey|sport|sports|athletic|athletics|intramural|im.?sports|hoops|crew|rowing|wrestling)\b/i;
-function isAthleticOrg(o: MapOrg): boolean {
-  return ATHLETIC_RE.test(o.handle) || ATHLETIC_RE.test(o.name);
-}
-
 function MapTabBody() {
   const [data, setData] = useState<MapSummary | null>(null);
   const [selected, setSelected] = useState<ZoneSelection | null>(null);
@@ -9877,20 +9867,17 @@ function MapTabBody() {
   // has no real major data yet — once real students fill in their majors
   // the actual zones replace the placeholders, no toggle needed.
   const [orgCollapsed, setOrgCollapsed] = useState(false);
-  const [athleticCollapsed, setAthleticCollapsed] = useState(true);
   // Search-to-jump state. `searchQuery` drives a small filtered
   // dropdown over the map; clicking a result smoothly pans + zooms to
   // that bubble.
   const [searchQuery, setSearchQuery] = useState("");
   const dragOriginRef = useRef<{ x: number; y: number } | null>(null);
 
-  // Picking a zone auto-collapses both cluster rails since their
-  // panels sit on top of the canvas. User can re-expand from the
-  // collapsed pill.
+  // Picking a zone auto-collapses the org rail since its panel sits
+  // on top of the canvas. User can re-expand from the collapsed pill.
   const pickZone = useCallback((sel: ZoneSelection) => {
     setSelected(sel);
     setOrgCollapsed(true);
-    setAthleticCollapsed(true);
   }, []);
 
 
@@ -10108,7 +10095,6 @@ function MapTabBody() {
       });
       setSelected({ kind: "major", key: majorName, label: majorName });
       setOrgCollapsed(true);
-      setAthleticCollapsed(true);
       setSearchQuery("");
     },
     [layout],
@@ -10221,7 +10207,7 @@ function MapTabBody() {
       <SceneHeader
         eyebrow="Campus · IU"
         title="Find your people"
-        subtitle="Majors grouped by school, plus org and athletic centers — laid out by how close you already are. Search to jump, or wheel to zoom."
+        subtitle="Majors grouped by school, plus an org center — laid out by how close you already are. Search to jump, or wheel to zoom."
         tone="dark"
       />
 
@@ -10383,56 +10369,24 @@ function MapTabBody() {
           </div>
         )}
 
-        {/* Org Center (right, cyan) + Athletic Center (left, amber).
-            Orgs are bucketed by ATHLETIC_RE matching against handle or
-            name. Each cluster gets its own collapsed pill in the
-            corner; only one is expanded at a time to keep the
-            cluster the visual focus. Empty buckets are hidden so we
-            don't show "0 athletics" for schools that have none. */}
-        {hasData && data!.orgs.length > 0
-          ? (() => {
-              const athleticOrgs = data!.orgs.filter(isAthleticOrg);
-              const regularOrgs = data!.orgs.filter((o) => !isAthleticOrg(o));
-              return (
-                <>
-                  {regularOrgs.length > 0 ? (
-                    <OrgCenterCluster
-                      orgs={regularOrgs}
-                      collapsed={orgCollapsed}
-                      onToggleCollapse={() => {
-                        setOrgCollapsed((v) => !v);
-                        if (orgCollapsed) setAthleticCollapsed(true);
-                      }}
-                      onPick={(org) =>
-                        pickZone({ kind: "org", key: org.handle, label: org.name })
-                      }
-                      activeHandle={selected?.kind === "org" ? selected.key : null}
-                      title="Org Center"
-                      side="right"
-                      accent="#78C8FF"
-                    />
-                  ) : null}
-                  {athleticOrgs.length > 0 ? (
-                    <OrgCenterCluster
-                      orgs={athleticOrgs}
-                      collapsed={athleticCollapsed}
-                      onToggleCollapse={() => {
-                        setAthleticCollapsed((v) => !v);
-                        if (athleticCollapsed) setOrgCollapsed(true);
-                      }}
-                      onPick={(org) =>
-                        pickZone({ kind: "org", key: org.handle, label: org.name })
-                      }
-                      activeHandle={selected?.kind === "org" ? selected.key : null}
-                      title="Athletic Center"
-                      side="left"
-                      accent="#FFB85A"
-                    />
-                  ) : null}
-                </>
-              );
-            })()
-          : null}
+        {/* Org Center — single cluster on the right side. Athletics
+            was pulled because nobody (coach / RecSports) will keep
+            roster + verification fresh, and a stale athletics surface
+            is worse than no athletics surface. */}
+        {hasData && data!.orgs.length > 0 ? (
+          <OrgCenterCluster
+            orgs={data!.orgs}
+            collapsed={orgCollapsed}
+            onToggleCollapse={() => setOrgCollapsed((v) => !v)}
+            onPick={(org) =>
+              pickZone({ kind: "org", key: org.handle, label: org.name })
+            }
+            activeHandle={selected?.kind === "org" ? selected.key : null}
+            title="Org Center"
+            side="right"
+            accent="#78C8FF"
+          />
+        ) : null}
 
         {/* Search-to-jump — typing filters the major list, click a
             result and the map smoothly pans + zooms to that bubble.
