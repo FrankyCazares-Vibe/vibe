@@ -268,12 +268,13 @@ const TABS: { key: CampusTab; label: string }[] = [
   { key: "map", label: "Campus Map" },
 ];
 
+// Static identity for the campus banner header. The "on Vibe" + "active
+// now" stats line is now derived live from /api/stats/campus — no
+// hardcoded student count or fake on-Vibe count anymore.
 const SCHOOL = {
   initials: "IU",
   name: "Indiana University",
   city: "Bloomington, IN",
-  students: "45,000 students",
-  onVibe: "2,847 on Vibe",
 };
 
 export function CampusHome({
@@ -3119,6 +3120,58 @@ const SHEEN_KEYFRAMES = `
 `;
 
 function CampusBanner() {
+  // Live stats for the campus header line. The heartbeat updates the
+  // viewer's `users.last_active_at` so the active-now count includes
+  // them; the stats endpoint counts everyone with a fresh timestamp
+  // (5-minute window). Both refresh every 30s while the tab is visible.
+  const [stats, setStats] = useState<{ totalUsers: number; activeNow: number } | null>(
+    null,
+  );
+  useEffect(() => {
+    let cancelled = false;
+    const beat = async () => {
+      try {
+        await fetch("/api/me/heartbeat", { method: "POST", cache: "no-store" });
+      } catch {
+        /* silent — missing a beat just drops the user out of the window */
+      }
+    };
+    const refresh = async () => {
+      try {
+        const r = await fetch("/api/stats/campus", { cache: "no-store" });
+        const j = await r.json();
+        if (cancelled) return;
+        if (j?.ok) {
+          setStats({
+            totalUsers: typeof j.totalUsers === "number" ? j.totalUsers : 0,
+            activeNow: typeof j.activeNow === "number" ? j.activeNow : 0,
+          });
+        }
+      } catch {
+        /* keep prior value on error */
+      }
+    };
+    void (async () => {
+      await beat();
+      await refresh();
+    })();
+    const tick = window.setInterval(async () => {
+      if (document.visibilityState !== "visible") return;
+      await beat();
+      await refresh();
+    }, 30_000);
+    return () => {
+      cancelled = true;
+      window.clearInterval(tick);
+    };
+  }, []);
+  const onVibeLabel = stats
+    ? `${stats.totalUsers.toLocaleString()} on Vibe`
+    : "loading…";
+  const activeLabel = stats
+    ? `${stats.activeNow.toLocaleString()} active now`
+    : "";
+
   return (
     <header
       className="vibe-campus-banner"
@@ -3180,7 +3233,8 @@ function CampusBanner() {
             lineHeight: 1.2,
           }}
         >
-          {SCHOOL.city} · {SCHOOL.students} · {SCHOOL.onVibe}
+          {SCHOOL.city} · {onVibeLabel}
+          {activeLabel ? ` · ${activeLabel}` : ""}
         </div>
       </div>
       <div style={{ flex: 1 }} />
