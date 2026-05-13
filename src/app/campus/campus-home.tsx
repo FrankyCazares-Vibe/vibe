@@ -7325,16 +7325,29 @@ function EventsTabBody() {
             style={{
               padding: "10px 18px",
               borderRadius: 999,
-              border: "1px solid rgba(255,255,255,0.22)",
-              background: "rgba(255,255,255,0.10)",
+              border: "1px solid rgba(255,92,53,0.45)",
+              background:
+                "linear-gradient(180deg, #FF5C35 0%, #E04918 100%)",
               color: "#fff",
               fontFamily: "DM Sans, sans-serif",
               fontWeight: 700,
               fontSize: 13,
               cursor: "pointer",
-              backdropFilter: "blur(12px)",
-              WebkitBackdropFilter: "blur(12px)",
               whiteSpace: "nowrap",
+              boxShadow:
+                "0 6px 18px rgba(255,92,53,0.35), inset 0 1px 0 rgba(255,255,255,0.18)",
+              letterSpacing: "0.02em",
+              transition: "transform 150ms ease, box-shadow 150ms ease",
+            }}
+            onMouseEnter={(e) => {
+              e.currentTarget.style.transform = "translateY(-1px)";
+              e.currentTarget.style.boxShadow =
+                "0 10px 24px rgba(255,92,53,0.45), inset 0 1px 0 rgba(255,255,255,0.25)";
+            }}
+            onMouseLeave={(e) => {
+              e.currentTarget.style.transform = "translateY(0)";
+              e.currentTarget.style.boxShadow =
+                "0 6px 18px rgba(255,92,53,0.35), inset 0 1px 0 rgba(255,255,255,0.18)";
             }}
           >
             + Create event
