@@ -43,9 +43,16 @@ type PostDetail = {
 export function ClipViewerMobile({
   clipId,
   onClose,
+  canDelete = false,
+  onDeleted,
 }: {
   clipId: string;
   onClose: () => void;
+  /** Show kebab menu with a Delete action. Caller decides ownership;
+   *  server still re-checks at /api/posts/[id] DELETE. */
+  canDelete?: boolean;
+  /** Fired after a successful delete; viewer auto-closes. */
+  onDeleted?: () => void;
 }) {
   const [post, setPost] = useState<PostDetail | null>(null);
   const [error, setError] = useState<string | null>(null);
@@ -54,7 +61,32 @@ export function ClipViewerMobile({
   const [liked, setLiked] = useState(false);
   const [muted, setMuted] = useState(true);
   const [paused, setPaused] = useState(false);
+  const [menuOpen, setMenuOpen] = useState(false);
+  const [deleting, setDeleting] = useState(false);
   const videoRef = useRef<HTMLVideoElement | null>(null);
+
+  const handleDelete = async () => {
+    if (deleting) return;
+    if (typeof window !== "undefined" && !window.confirm("Delete this clip?")) {
+      return;
+    }
+    setDeleting(true);
+    try {
+      const r = await fetch(`/api/posts/${clipId}`, {
+        method: "DELETE",
+        credentials: "include",
+      });
+      const j = await r.json().catch(() => ({}));
+      if (!r.ok || !j?.ok) {
+        throw new Error(j?.error ?? "Could not delete");
+      }
+      onDeleted?.();
+      onClose();
+    } catch (e) {
+      setError(e instanceof Error ? e.message : "Could not delete");
+      setDeleting(false);
+    }
+  };
 
   // Lock body scroll while the viewer is up.
   useEffect(() => {
@@ -223,6 +255,84 @@ export function ClipViewerMobile({
         >
           {muted ? "🔇" : "🔊"}
         </button>
+        {canDelete ? (
+          <div style={{ position: "relative", flexShrink: 0 }}>
+            <button
+              type="button"
+              onClick={() => setMenuOpen((v) => !v)}
+              aria-label={menuOpen ? "Close clip menu" : "Open clip menu"}
+              aria-expanded={menuOpen}
+              style={chromeButtonStyle}
+            >
+              <svg width="16" height="16" viewBox="0 0 16 16" aria-hidden>
+                <circle cx="3"  cy="8" r="1.5" fill="currentColor" />
+                <circle cx="8"  cy="8" r="1.5" fill="currentColor" />
+                <circle cx="13" cy="8" r="1.5" fill="currentColor" />
+              </svg>
+            </button>
+            {menuOpen ? (
+              <>
+                <button
+                  type="button"
+                  aria-label="Dismiss menu"
+                  onClick={() => setMenuOpen(false)}
+                  style={{
+                    position: "fixed",
+                    inset: 0,
+                    background: "transparent",
+                    border: "none",
+                    cursor: "default",
+                    zIndex: 1,
+                  }}
+                />
+                <div
+                  role="menu"
+                  style={{
+                    position: "absolute",
+                    top: 40,
+                    right: 0,
+                    minWidth: 168,
+                    background: "rgba(28,28,30,0.92)",
+                    backdropFilter: "blur(14px)",
+                    WebkitBackdropFilter: "blur(14px)",
+                    border: "1px solid rgba(255,255,255,0.18)",
+                    borderRadius: 12,
+                    boxShadow:
+                      "0 14px 30px rgba(0,0,0,0.4), 0 2px 6px rgba(0,0,0,0.18)",
+                    padding: 6,
+                    zIndex: 2,
+                  }}
+                >
+                  <button
+                    type="button"
+                    role="menuitem"
+                    onClick={() => {
+                      setMenuOpen(false);
+                      void handleDelete();
+                    }}
+                    disabled={deleting}
+                    style={{
+                      display: "block",
+                      width: "100%",
+                      textAlign: "left",
+                      padding: "10px 12px",
+                      border: "none",
+                      background: "transparent",
+                      borderRadius: 8,
+                      fontFamily: "DM Sans, sans-serif",
+                      fontSize: 14,
+                      fontWeight: 600,
+                      color: "#FF7A6A",
+                      cursor: deleting ? "default" : "pointer",
+                    }}
+                  >
+                    {deleting ? "Deleting…" : "Delete clip"}
+                  </button>
+                </div>
+              </>
+            ) : null}
+          </div>
+        ) : null}
       </header>
 
       {/* Center play hint when paused */}

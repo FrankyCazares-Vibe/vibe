@@ -1167,12 +1167,16 @@ export function ProfileMobile({ targetHandle }: Props = {}) {
         <PostViewerMobile
           postId={openPostId}
           onClose={() => setOpenPostId(null)}
+          canDelete={!isVisitor}
+          onDeleted={() => void refetchPosts()}
         />
       ) : null}
       {openClipId ? (
         <ClipViewerMobile
           clipId={openClipId}
           onClose={() => setOpenClipId(null)}
+          canDelete={!isVisitor}
+          onDeleted={() => void refetchPosts()}
         />
       ) : null}
       {pendingCrop ? (

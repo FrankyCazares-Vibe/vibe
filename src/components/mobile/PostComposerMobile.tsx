@@ -77,8 +77,8 @@ function ensureKeyframes() {
   document.head.appendChild(style);
 }
 
-const ENTER_DURATION_MS = 360;
-const EXIT_DURATION_MS = 240;
+const ENTER_DURATION_MS = 460;
+const EXIT_DURATION_MS = 300;
 
 export function PostComposerMobile({ onClose, onPosted, origin }: Props) {
   const [text, setText] = useState("");

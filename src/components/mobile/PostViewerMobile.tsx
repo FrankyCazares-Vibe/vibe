@@ -61,9 +61,17 @@ type Viewer = { liked: boolean; saved: boolean };
 export function PostViewerMobile({
   postId,
   onClose,
+  canDelete = false,
+  onDeleted,
 }: {
   postId: string;
   onClose: () => void;
+  /** Show the kebab menu with a Delete action. Caller decides ownership;
+   *  server still re-checks at /api/posts/[id] DELETE. */
+  canDelete?: boolean;
+  /** Fired after a successful delete; viewer auto-closes. Parent
+   *  typically uses this to refresh its post grid. */
+  onDeleted?: () => void;
 }) {
   const [post, setPost] = useState<PostDetail | null>(null);
   const [counts, setCounts] = useState<Counts>({ likes: 0, comments: 0 });
@@ -73,6 +81,31 @@ export function PostViewerMobile({
   const [comments, setComments] = useState<Comment[] | null>(null);
   const [draft, setDraft] = useState("");
   const [posting, setPosting] = useState(false);
+  const [menuOpen, setMenuOpen] = useState(false);
+  const [deleting, setDeleting] = useState(false);
+
+  const handleDelete = async () => {
+    if (deleting) return;
+    if (typeof window !== "undefined" && !window.confirm("Delete this post?")) {
+      return;
+    }
+    setDeleting(true);
+    try {
+      const r = await fetch(`/api/posts/${postId}`, {
+        method: "DELETE",
+        credentials: "include",
+      });
+      const j = await r.json().catch(() => ({}));
+      if (!r.ok || !j?.ok) {
+        throw new Error(j?.error ?? "Could not delete");
+      }
+      onDeleted?.();
+      onClose();
+    } catch (e) {
+      setError(e instanceof Error ? e.message : "Could not delete");
+      setDeleting(false);
+    }
+  };
 
   // Lock body scroll while the viewer is up. Restored on close so a
   // post share-link landing into /campus?post=… can still scroll the
@@ -289,6 +322,9 @@ export function PostViewerMobile({
               color: "inherit",
               flex: 1,
               minWidth: 0,
+              // Leave room for the kebab when it's rendered, otherwise
+              // long names crash into it.
+              paddingRight: canDelete ? 4 : 0,
             }}
           >
             <div
@@ -342,6 +378,101 @@ export function PostViewerMobile({
         ) : (
           <div style={{ flex: 1 }} />
         )}
+        {canDelete ? (
+          <div style={{ position: "relative", flexShrink: 0 }}>
+            <button
+              type="button"
+              onClick={() => setMenuOpen((v) => !v)}
+              aria-label={menuOpen ? "Close post menu" : "Open post menu"}
+              aria-expanded={menuOpen}
+              style={{
+                width: 34,
+                height: 34,
+                borderRadius: 999,
+                border: "1px solid rgba(28,28,30,0.10)",
+                background: menuOpen
+                  ? "#1C1C1E"
+                  : "rgba(255,255,255,0.7)",
+                color: menuOpen ? "#fff" : "#1C1C1E",
+                display: "inline-flex",
+                alignItems: "center",
+                justifyContent: "center",
+                cursor: "pointer",
+                lineHeight: 0,
+              }}
+            >
+              <svg width="16" height="16" viewBox="0 0 16 16" aria-hidden>
+                <circle cx="3"  cy="8" r="1.5" fill="currentColor" />
+                <circle cx="8"  cy="8" r="1.5" fill="currentColor" />
+                <circle cx="13" cy="8" r="1.5" fill="currentColor" />
+              </svg>
+            </button>
+            {menuOpen ? (
+              <>
+                {/* Click-away backdrop. Transparent, sits below the
+                    menu but above the rest of the viewer so any tap
+                    outside the menu closes it. */}
+                <button
+                  type="button"
+                  aria-label="Dismiss menu"
+                  onClick={() => setMenuOpen(false)}
+                  style={{
+                    position: "fixed",
+                    inset: 0,
+                    background: "transparent",
+                    border: "none",
+                    cursor: "default",
+                    zIndex: 1,
+                  }}
+                />
+                <div
+                  role="menu"
+                  style={{
+                    position: "absolute",
+                    top: 40,
+                    right: 0,
+                    minWidth: 168,
+                    background: "rgba(255,253,248,0.98)",
+                    backdropFilter: "blur(14px)",
+                    WebkitBackdropFilter: "blur(14px)",
+                    border: "1px solid rgba(28,28,30,0.10)",
+                    borderRadius: 12,
+                    boxShadow:
+                      "0 14px 30px rgba(0,0,0,0.16), 0 2px 6px rgba(0,0,0,0.08)",
+                    padding: 6,
+                    zIndex: 2,
+                  }}
+                >
+                  <button
+                    type="button"
+                    role="menuitem"
+                    onClick={() => {
+                      setMenuOpen(false);
+                      void handleDelete();
+                    }}
+                    disabled={deleting}
+                    style={{
+                      display: "block",
+                      width: "100%",
+                      textAlign: "left",
+                      padding: "10px 12px",
+                      border: "none",
+                      background: "transparent",
+                      borderRadius: 8,
+                      fontFamily: "DM Sans, sans-serif",
+                      fontSize: 14,
+                      fontWeight: 600,
+                      color: "#C42B1C",
+                      cursor: deleting ? "default" : "pointer",
+                    }}
+                  >
+                    {deleting ? "Deleting…" : "Delete post"}
+                  </button>
+                </div>
+              </>
+            ) : null}
+          </div>
+        ) : null}
       </header>
 
       {/* Body */}
