@@ -7,16 +7,14 @@ import { ImageCropperModal } from "@/components/ImageCropperModal";
 import {
   bindMentionPicker,
   capturePosterFrame,
-  classifyVideo,
   extractHashtags,
-  type VideoMode,
 } from "@/lib/composer/helpers";
 
 /**
- * Mobile composer sheet — text + image + video post + 9:16 clip with
- * R2 presigned upload. Mirrors src/app/campus/campus-home.tsx's
- * FeedComposer feature set; the shared logic lives in
- * @/lib/composer/helpers so the two don't drift.
+ * Mobile composer sheet — text + photo + horizontal video posts.
+ * Clips (vertical 9:16, ≤120s) have their own TikTok-style composer
+ * on the Clips tab; this sheet is for the Posts feed only. Shared
+ * upload + classification logic lives in @/lib/composer/helpers.
  *
  * UX: full-viewport sheet that slides up from the bottom. Top bar holds
  * Cancel / Post; body is a textarea + attachment preview; bottom action
@@ -85,7 +83,10 @@ export function PostComposerMobile({ onClose, onPosted, origin }: Props) {
   const [imageFile, setImageFile] = useState<File | null>(null);
   const [pendingImage, setPendingImage] = useState<File | null>(null);
   const [clipFile, setClipFile] = useState<File | null>(null);
-  const [videoMode, setVideoMode] = useState<VideoMode>("clip");
+  // Videos in this composer always publish as "post-video" (X-style,
+  // shows inline in the Posts feed). Clips get their own TikTok-style
+  // composer surface in the Clips tab — different aspect, different
+  // record-vs-pick UX. So there's no mode toggle here.
   const [videoMeta, setVideoMeta] = useState<{
     width: number | null;
     height: number | null;
@@ -159,9 +160,10 @@ export function PostComposerMobile({ onClose, onPosted, origin }: Props) {
       setClipFile(file);
       setImageFile(null);
       setVideoMeta(null);
-      setVideoMode("clip");
+      // Probe for poster + duration. We still classify the video, but
+      // only to decide whether to BLOCK vertical short-form uploads
+      // here (they belong in the Clips composer) instead of routing.
       void capturePosterFrame(file).then((meta) => {
-        setVideoMode(classifyVideo(meta.width, meta.height, meta.duration));
         setVideoMeta({
           width: meta.width,
           height: meta.height,
@@ -253,34 +255,20 @@ export function PostComposerMobile({ onClose, onPosted, origin }: Props) {
           }
         }
 
-        // 4. Record the row — endpoint depends on mode.
-        if (videoMode === "clip") {
-          const pub = await fetch("/api/me/publish-clip", {
-            method: "POST",
-            headers: { "Content-Type": "application/json" },
-            body: JSON.stringify({
-              object_key: sig.objectKey,
-              content: trimmed,
-              tags,
-              poster_url: posterUrl,
-              duration_sec: durationSec,
-            }),
-          }).then((r) => r.json());
-          if (!pub?.ok) throw new Error(pub?.error || "Publish failed");
-        } else {
-          const pub = await fetch("/api/me/publish-post", {
-            method: "POST",
-            headers: { "Content-Type": "application/json" },
-            body: JSON.stringify({
-              content: trimmed,
-              tags,
-              video_object_key: sig.objectKey,
-              media_thumbnail_url: posterUrl,
-              duration_sec: durationSec,
-            }),
-          }).then((r) => r.json());
-          if (!pub?.ok) throw new Error(pub?.error || "Publish failed");
-        }
+        // 4. Always publish as a video POST. Clip publishing lives in
+        //    the separate Clips composer.
+        const pub = await fetch("/api/me/publish-post", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({
+            content: trimmed,
+            tags,
+            video_object_key: sig.objectKey,
+            media_thumbnail_url: posterUrl,
+            duration_sec: durationSec,
+          }),
+        }).then((r) => r.json());
+        if (!pub?.ok) throw new Error(pub?.error || "Publish failed");
       } else if (imageFile) {
         // Image path: multipart upload then post.
         const fd = new FormData();
@@ -328,7 +316,6 @@ export function PostComposerMobile({ onClose, onPosted, origin }: Props) {
     requestClose,
     text,
     videoMeta,
-    videoMode,
   ]);
 
   // CSS-var-driven origin for the clip-path circle. Falls back to the
@@ -503,7 +490,7 @@ export function PostComposerMobile({ onClose, onPosted, origin }: Props) {
             <circle cx="6.5" cy="8" r="1.2" fill="currentColor" />
             <path d="M3 13l3.5-3.2 2.8 2.5 2.4-2.1L15 12.5" stroke="currentColor" strokeWidth="1.4" strokeLinecap="round" strokeLinejoin="round" fill="none" />
           </svg>
-          Photo / Video / Clip
+          Photo / Video
         </button>
         <span style={{ marginLeft: "auto", fontSize: 11, color: "#8A8580" }}>
           {text.length}/2000
@@ -590,55 +577,18 @@ export function PostComposerMobile({ onClose, onPosted, origin }: Props) {
               }}
             >
               🎬 {clipFile.name} · {(clipFile.size / (1024 * 1024)).toFixed(1)} MB
-            </span>
-            <div
-              style={{
-                display: "flex",
-                gap: 6,
-                alignItems: "center",
-                flexWrap: "wrap",
-              }}
-            >
-              <span
-                style={{ fontSize: 11, color: "#8A8580", fontWeight: 600 }}
-              >
-                Post as:
-              </span>
-              <button
-                type="button"
-                onClick={() => setVideoMode("clip")}
-                style={videoModePill(videoMode === "clip")}
-              >
-                Clip
-              </button>
-              <button
-                type="button"
-                onClick={() => setVideoMode("post-video")}
-                style={videoModePill(videoMode === "post-video")}
-              >
-                Video post
-              </button>
               {videoMeta?.duration ? (
-                <span
-                  style={{
-                    fontSize: 11,
-                    color: "#8A8580",
-                    marginLeft: "auto",
-                  }}
-                >
+                <span style={{ color: "#8A8580" }}>
+                  {" · "}
                   {Math.round(videoMeta.duration)}s
-                  {videoMeta.width && videoMeta.height
-                    ? ` · ${videoMeta.width}×${videoMeta.height}`
-                    : ""}
                 </span>
               ) : null}
-            </div>
+            </span>
             <button
               type="button"
               onClick={() => {
                 setClipFile(null);
                 setVideoMeta(null);
-                setVideoMode("clip");
               }}
               style={removeButtonStyle}
               aria-label="Remove video"
@@ -702,17 +652,3 @@ const removeButtonStyle: React.CSSProperties = {
   cursor: "pointer",
 };
 
-function videoModePill(active: boolean): React.CSSProperties {
-  return {
-    fontSize: 11,
-    fontWeight: 700,
-    padding: "5px 12px",
-    borderRadius: 999,
-    border: active ? "1px solid #5B41B8" : "1px solid rgba(28,28,30,0.14)",
-    background: active ? "#5B41B8" : "transparent",
-    color: active ? "#fff" : "#1C1C1E",
-    cursor: "pointer",
-    fontFamily: "DM Sans, sans-serif",
-    letterSpacing: "0.2px",
-  };
-}
