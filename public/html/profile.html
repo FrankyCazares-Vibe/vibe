@@ -17,6 +17,7 @@
 <script src="/html/_postViewer.js" defer></script>
 <script src="/html/_sharePicker.js" defer></script>
 <script src="/html/_imageCropper.js" defer></script>
+<script src="/html/_iu-majors.js"></script>
 <script src="/html/_miniMessenger.js" defer></script>
 <script src="/html/_profilePreview.js" defer></script>
 <script src="/html/_safetyActions.js" defer></script>
@@ -367,6 +368,19 @@ body.edit-mode .profile-handle:hover { color:var(--charcoal); cursor:none; }
   font-size:13px;color:var(--muted);margin-bottom:16px;
 }
 .meta-item { display:flex;align-items:center;gap:5px; }
+
+/* Major picker — display text in normal mode, IU-grouped select in
+   edit mode. Hidden visibility flips on body.edit-mode. */
+body.edit-mode #metaMajor [data-major-display] { display:none; }
+body.edit-mode #metaMajor .meta-major-edit { display:inline-flex !important; }
+.meta-major-select, .meta-year-select {
+  font-family:'DM Sans',sans-serif; font-size:12.5px; color:var(--ink);
+  background:rgba(255,255,255,0.78); border:1px solid rgba(28,28,30,0.12);
+  border-radius:999px; padding:5px 10px; outline:none; cursor:pointer;
+  appearance:none; -webkit-appearance:none;
+}
+.meta-major-select { max-width:200px; }
+.meta-year-select  { max-width:120px; }
 
 /* Vibe tags */
 .vibe-tags { display:flex;flex-wrap:wrap;gap:8px;margin-bottom:24px; }
@@ -3284,7 +3298,7 @@ body.empty-profile-mode #profileEmpty { display: flex !important; }
     <p class="profile-tagline" data-edit="true" data-user-field="tagline" data-placeholder="A line that captures how you work" contenteditable="false">"I make things feel right before they look right."</p>
     <div class="profile-meta">
       <span class="meta-item"><span style="font-size:11px;font-weight:700;color:var(--muted);text-transform:uppercase;letter-spacing:.5px;margin-right:4px">Location</span><span data-edit="true" data-user-field="location" data-placeholder="City, country" contenteditable="false">Seoul → San Francisco, CA</span></span>
-      <span class="meta-item"><span style="font-size:11px;font-weight:700;color:var(--muted);text-transform:uppercase;letter-spacing:.5px;margin-right:4px">Role</span><span data-edit="true" data-user-field="headline" data-placeholder="Role · Company" contenteditable="false">Senior Product Designer at Figma</span></span>
+      <span class="meta-item" id="metaMajor"><span style="font-size:11px;font-weight:700;color:var(--muted);text-transform:uppercase;letter-spacing:.5px;margin-right:4px">Major</span><span data-user-field="headline" data-major-display data-placeholder="Pick a major">Senior Product Designer at Figma</span><span class="meta-major-edit" style="display:none;gap:6px;align-items:center;flex-wrap:wrap"><select id="majorSelect" class="meta-major-select" onchange="_onMajorYearChange()" aria-label="Major"></select><select id="yearSelect" class="meta-year-select" onchange="_onMajorYearChange()" aria-label="Year"><option value="">Year</option><option value="1">Year 1</option><option value="2">Year 2</option><option value="3">Year 3</option><option value="4">Year 4</option><option value="5">Year 5</option><option value="6">Grad</option></select></span></span>
       <span class="meta-item"><span style="font-size:11px;font-weight:700;color:var(--muted);text-transform:uppercase;letter-spacing:.5px;margin-right:4px">Web</span><span data-edit="true" data-user-field="website" data-placeholder="yourname.com" contenteditable="false" style="color:var(--accent)">mayachen.co</span></span>
     </div>
     <div class="vibe-tags" id="vibeTags">
@@ -7286,6 +7300,78 @@ function hydrateProfileFields(user) {
     const value = user[key];
     if (typeof value === 'string') el.textContent = value;
   });
+  _hydrateMajorPicker(user);
+}
+
+// ── Major + year edit controls ──────────────────────────────────────────
+// Replaces the legacy free-text "Role" field with IU-Indianapolis-grouped
+// dropdowns so the campus map can reliably group people by school. The
+// display span (data-major-display) shows the derived headline; the
+// selects appear in edit mode and write back to vibe_user_v1 + the
+// /api/me/profile-sync flow on change.
+function _populateMajorPicker() {
+  const sel = document.getElementById('majorSelect');
+  if (!sel || !window.IU_MAJORS_BY_SCHOOL) return;
+  // Don't repopulate if already done (idempotent for re-hydrate).
+  if (sel.dataset.populated === '1') return;
+  sel.innerHTML = '';
+  const blank = document.createElement('option');
+  blank.value = '';
+  blank.textContent = 'Major';
+  sel.appendChild(blank);
+  for (const g of window.IU_MAJORS_BY_SCHOOL) {
+    const og = document.createElement('optgroup');
+    og.label = g.school.shortLabel;
+    for (const m of g.majors) {
+      const o = document.createElement('option');
+      o.value = m;
+      o.textContent = m;
+      og.appendChild(o);
+    }
+    sel.appendChild(og);
+  }
+  sel.dataset.populated = '1';
+}
+
+function _hydrateMajorPicker(user) {
+  _populateMajorPicker();
+  const sel = document.getElementById('majorSelect');
+  const yr  = document.getElementById('yearSelect');
+  if (sel) {
+    const cur = ((user && user.major) || '').toString().trim();
+    if (cur && !Array.from(sel.querySelectorAll('option')).some(o => o.value === cur)) {
+      // Saved major doesn't match any taxonomy option (legacy free-text
+      // from before this picker shipped) — surface it as a top-of-list
+      // option so the dropdown doesn't reset to blank.
+      const extra = document.createElement('option');
+      extra.value = cur;
+      extra.textContent = cur;
+      const firstGroup = sel.querySelector('optgroup');
+      if (firstGroup) sel.insertBefore(extra, firstGroup); else sel.appendChild(extra);
+    }
+    sel.value = cur;
+  }
+  if (yr) {
+    yr.value = (user && typeof user.year === 'number') ? String(user.year) : '';
+  }
+}
+
+function _onMajorYearChange() {
+  if (typeof vibeLoad !== 'function' || typeof vibeSave !== 'function') return;
+  const u = vibeLoad('vibe_user_v1') || {};
+  const sel = document.getElementById('majorSelect');
+  const yr  = document.getElementById('yearSelect');
+  if (sel) u.major = sel.value;
+  if (yr)  u.year  = yr.value ? parseInt(yr.value, 10) : null;
+  // Clear the stored headline so the next bootstrap re-derives it from
+  // the fresh major + year (same fix as the mobile flow on the server
+  // side — but doing it locally too keeps the chip from showing stale
+  // text until the round-trip completes).
+  u.headline = '';
+  vibeSave('vibe_user_v1', u);
+  if (typeof scheduleProfileServerSync === 'function') {
+    scheduleProfileServerSync();
+  }
 }
 
 // ── Full profile snapshot persistence ────────────────────────────────────
@@ -7458,6 +7544,8 @@ function buildProfileSyncPayload() {
     tagline: (u.tagline || '').trim(),
     headline: (u.headline || '').trim(),
     location_text: (u.location || '').trim(),
+    major: (typeof u.major === 'string' ? u.major.trim() : ''),
+    year: (typeof u.year === 'number' && u.year >= 1 && u.year <= 12) ? u.year : null,
     website: (u.website || '').trim(),
     bio: (u.bio || '').trim(),
     interests: Array.isArray(u.vibeTags) ? u.vibeTags.map(t => String((t && t.label) || '').trim()).filter(Boolean) : [],
@@ -7697,6 +7785,13 @@ async function flushProfileServerSync() {
         }
       }
       vibeSave('vibe_user_v1', nu);
+      // Refresh the visible identity strip with the server's fresh
+      // derived fields (notably `headline` — gets recomputed after
+      // major / year edits via profile-sync clearing the stale stored
+      // value). Without this the chip lags until the next page nav.
+      if (typeof hydrateProfileFields === 'function') {
+        try { hydrateProfileFields(nu); } catch (_) { /* non-fatal */ }
+      }
     }
   } catch (e) {
     if (typeof showToast === 'function') showToast('Offline — saved on this device only');
