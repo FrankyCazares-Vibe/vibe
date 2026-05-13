@@ -710,10 +710,21 @@ function PostFeedCard({
         flexDirection: "column",
         gap: 10,
         padding: 14,
-        borderRadius: 14,
-        background: "linear-gradient(180deg,#FFFCF6 0%,#F5F0E5 100%)",
-        border: "1px solid rgba(28,28,30,0.06)",
-        boxShadow: "0 1px 0 rgba(255,255,255,0.6) inset, 0 4px 12px rgba(0,0,0,0.04)",
+        borderRadius: 16,
+        // Liquid-glass card — translucent white with backdrop blur so
+        // the page's cream backdrop tints THROUGH the card instead of
+        // blending into it. Soft top-edge highlight + warm drop shadow
+        // give the card lift without going harsh.
+        background:
+          "linear-gradient(180deg, rgba(255,255,255,0.78) 0%, rgba(255,253,248,0.62) 100%)",
+        backdropFilter: "blur(18px) saturate(160%)",
+        WebkitBackdropFilter: "blur(18px) saturate(160%)",
+        border: "1px solid rgba(255,255,255,0.85)",
+        boxShadow: [
+          "inset 0 1px 0 rgba(255,255,255,0.9)",
+          "inset 0 -1px 0 rgba(28,28,30,0.04)",
+          "0 8px 24px rgba(180,120,60,0.08)",
+        ].join(", "),
         textAlign: "left",
         cursor: "pointer",
         fontFamily: "DM Sans, sans-serif",
@@ -1222,9 +1233,14 @@ function PostFeedSkeleton() {
           key={i}
           style={{
             padding: 14,
-            borderRadius: 14,
-            background: "linear-gradient(180deg,#FFFCF6 0%,#F5F0E5 100%)",
-            border: "1px solid rgba(28,28,30,0.06)",
+            borderRadius: 16,
+            background:
+              "linear-gradient(180deg, rgba(255,255,255,0.78) 0%, rgba(255,253,248,0.62) 100%)",
+            backdropFilter: "blur(18px) saturate(160%)",
+            WebkitBackdropFilter: "blur(18px) saturate(160%)",
+            border: "1px solid rgba(255,255,255,0.85)",
+            boxShadow:
+              "inset 0 1px 0 rgba(255,255,255,0.9), 0 8px 24px rgba(180,120,60,0.08)",
             display: "flex",
             flexDirection: "column",
             gap: 10,
