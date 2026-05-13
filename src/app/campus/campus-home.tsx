@@ -9708,21 +9708,32 @@ type IuSchool = {
   label: string;        // tag rendered above the region
   shortLabel: string;   // pill rendered on the bubble
   color: string;        // dominant hex tint for halo + bubble core
-  angle: number;        // anchor angle in degrees
-  r: number;            // anchor distance from "you are here"
 };
+// Order matters — schools are distributed around 360° in this order so
+// thematic neighbors stay near each other on the map (Kelley next to
+// O'Neill, Luddy near Media, etc.). Actual anchor angle + distance are
+// computed per layout pass based on which schools have bubbles and how
+// big each cluster needs to be.
 const IU_SCHOOLS: IuSchool[] = [
-  { id: "kelley",   label: "Kelley · Business",       shortLabel: "Kelley",   color: "#C62828", angle:   0, r: 360 },
-  { id: "luddy",    label: "Luddy · Computing",        shortLabel: "Luddy",    color: "#4A90E2", angle:  60, r: 340 },
-  { id: "media",    label: "Media School",             shortLabel: "Media",    color: "#E879A6", angle: 120, r: 330 },
-  { id: "as",       label: "College of Arts + Sciences", shortLabel: "A & S", color: "#6FBF73", angle: 180, r: 360 },
-  { id: "jacobs",   label: "Jacobs · Music",           shortLabel: "Jacobs",   color: "#A855F7", angle: 240, r: 330 },
-  { id: "eskenazi", label: "Eskenazi · Art + Design",  shortLabel: "Eskenazi", color: "#F59E0B", angle: 300, r: 340 },
-  { id: "health",   label: "Public Health + Nursing",  shortLabel: "Health",   color: "#14B8A6", angle:  30, r: 200 },
-  { id: "oneill",   label: "O'Neill · Public Affairs", shortLabel: "O'Neill",  color: "#0EA5E9", angle: 210, r: 220 },
-  { id: "other",    label: "Other",                    shortLabel: "Other",    color: "#9CA3AF", angle: 270, r: 240 },
+  { id: "kelley",   label: "Kelley · Business",         shortLabel: "Kelley",   color: "#C62828" },
+  { id: "oneill",   label: "O'Neill · Public Affairs",  shortLabel: "O'Neill",  color: "#0EA5E9" },
+  { id: "luddy",    label: "Luddy · Computing",         shortLabel: "Luddy",    color: "#4A90E2" },
+  { id: "media",    label: "Media School",              shortLabel: "Media",    color: "#E879A6" },
+  { id: "as",       label: "College of Arts + Sciences", shortLabel: "A & S",   color: "#6FBF73" },
+  { id: "jacobs",   label: "Jacobs · Music",            shortLabel: "Jacobs",   color: "#A855F7" },
+  { id: "eskenazi", label: "Eskenazi · Art + Design",   shortLabel: "Eskenazi", color: "#F59E0B" },
+  { id: "health",   label: "Public Health + Nursing",   shortLabel: "Health",   color: "#14B8A6" },
+  { id: "other",    label: "Other",                     shortLabel: "Other",    color: "#9CA3AF" },
 ];
 const IU_SCHOOL_BY_ID = new Map(IU_SCHOOLS.map((s) => [s.id, s]));
+
+// Bubble size scaling — clear min/max, modest range so a tiny major
+// doesn't disappear and a huge one doesn't dwarf the rest.
+const BUBBLE_MIN_RADIUS = 36;
+const BUBBLE_MAX_RADIUS = 66;
+function bubbleRadiusFor(total: number): number {
+  return BUBBLE_MIN_RADIUS + Math.min(BUBBLE_MAX_RADIUS - BUBBLE_MIN_RADIUS, total * 0.4);
+}
 
 // Map common IU majors to their school. Lowercased + trimmed lookup so
 // minor spelling variation in user-entered majors still groups them.
@@ -9831,20 +9842,42 @@ function MapTabBody() {
     };
   }, []);
 
-  // School-grouped layout: every major is bucketed into its IU school
-  // (Kelley, Luddy, Jacobs, etc.), then placed around that school's
-  // anchor point so the map reads as distinct "neighborhoods" — Kelley
-  // territory in one corner, Luddy in another, and so on. Anchors come
-  // from IU_SCHOOLS (fixed angles/distances from "you are here"). Within
-  // each school we fan its majors out in a small local arc, deterministic
-  // by major-name hash so the layout is stable across reloads. A final
-  // collision-relaxation pass nudges overlapping bubbles apart without
-  // letting any major escape its region too far.
+  // School-grouped, ADAPTIVELY SPACED layout.
+  //
+  // Every major buckets into its IU school. Active schools (those with
+  // at least one bubble) are distributed evenly around the center. The
+  // anchor distance is *computed per layout pass* from how big each
+  // school's cluster actually is — never hard-coded — so when more
+  // majors show up the regions automatically fan out without colliding,
+  // and when few are present they stay tight.
+  //
+  // Algorithm:
+  //   1. Bucket majors by school.
+  //   2. Estimate each school's cluster radius from the actual bubble
+  //      sizes it contains.
+  //   3. Distribute active schools evenly around 360° (in IU_SCHOOLS
+  //      order so thematic neighbors stay near each other).
+  //   4. For each consecutive school pair, the anchor distance r must
+  //      satisfy `2 r sin(wedge/2) ≥ clusterA + clusterB + padding`.
+  //      Take the worst-case across all neighbor pairs → one shared
+  //      anchor r that keeps every region clear of every other.
+  //   5. Place each major in a fan inside its school's wedge.
+  //   6. Standard collision relaxation + per-node tether to its school
+  //      anchor so regions don't dissolve.
   const layout = useMemo(() => {
     if (!data || !data.majors) return null;
     type Pos = { x: number; y: number; r: number; schoolId: string };
+    type SchoolPlacement = {
+      id: string;
+      angleDeg: number; // anchor angle in degrees
+      anchorR: number;  // anchor distance from origin
+      ax: number;       // anchor x
+      ay: number;       // anchor y (with the 0.7 elliptical squash applied)
+      clusterR: number; // approximate cluster radius for this school
+    };
     const positions = new Map<string, Pos>();
-    // Group majors by school so we know how many slots each region needs.
+    const placements = new Map<string, SchoolPlacement>();
+
     const grouped = new Map<string, MapMajor[]>();
     for (const m of data.majors) {
       const school = schoolForMajor(m.name);
@@ -9852,37 +9885,92 @@ function MapTabBody() {
       list.push(m);
       grouped.set(school.id, list);
     }
-    // Place each major in a small fan around its school anchor. Larger
-    // schools (more majors) get a wider arc.
-    for (const [schoolId, majors] of grouped.entries()) {
-      const school = IU_SCHOOL_BY_ID.get(schoolId) ?? IU_SCHOOL_BY_ID.get("other")!;
-      const anchorAngle = (school.angle * Math.PI) / 180;
-      const ax = Math.cos(anchorAngle) * school.r;
-      const ay = Math.sin(anchorAngle) * school.r * 0.7;
-      // Fan width scales with how many majors live in the region. One
-      // major sits dead-center on the anchor; many spread across ~80°.
-      const fanRange = Math.min(80, 18 + majors.length * 14);
-      majors.forEach((m, i) => {
-        const seed = hashString(m.name);
-        // Spread evenly across the fan with a small jitter per major.
-        const t = majors.length === 1 ? 0 : (i / (majors.length - 1)) - 0.5;
-        const localAngle =
-          anchorAngle + ((t * fanRange) * Math.PI) / 180 +
-          (((seed % 11) - 5) * Math.PI) / 220;
-        const localDist = 60 + ((seed >> 4) % 30);
-        const cx = ax + Math.cos(localAngle) * localDist;
-        const cy = ay + Math.sin(localAngle) * localDist * 0.7;
-        const radius = 40 + Math.min(34, m.total * 0.5);
-        positions.set(m.name, { x: cx, y: cy, r: radius, schoolId });
-      });
+
+    // Active schools, preserving IU_SCHOOLS order.
+    const active = IU_SCHOOLS.filter((s) => grouped.has(s.id));
+    if (active.length === 0) {
+      return { majors: positions, schools: placements };
     }
 
-    // Anti-collision relaxation — same idea as before, but each node is
-    // also lightly tethered to its school's anchor so the regions don't
-    // dissolve under push pressure.
-    const PADDING = 14;
-    const CENTER_KEEP_OUT = 90;
-    const TETHER = 0.04;
+    // Cluster radius estimate: area sum of bubbles, take the radius of a
+    // circle of the same area, then multiply by a packing factor so the
+    // cluster has some breathing room within itself. Capped at a sane
+    // max so a runaway-popular school doesn't push everyone to the edge.
+    const clusterRadiusOf = (majors: MapMajor[]): number => {
+      let area = 0;
+      for (const m of majors) {
+        const br = bubbleRadiusFor(m.total);
+        area += Math.PI * br * br;
+      }
+      const packed = Math.sqrt(area / Math.PI) * 1.55 + 30;
+      return Math.min(packed, 260);
+    };
+
+    // Step 3: even angle wedges, one per active school.
+    const wedgeDeg = 360 / active.length;
+    const wedgeRad = (wedgeDeg * Math.PI) / 180;
+
+    // Step 4: solve for the shared anchor distance.
+    const PAD_BETWEEN_REGIONS = 28;
+    const YOU_KEEPOUT = 110;
+    const clusterRadii: number[] = active.map((s) =>
+      clusterRadiusOf(grouped.get(s.id)!),
+    );
+    const maxClusterR = clusterRadii.reduce((a, b) => Math.max(a, b), 0);
+    // Floor: cluster shouldn't overlap "you are here" in the middle.
+    let anchorR = YOU_KEEPOUT + maxClusterR;
+    // Ceiling-from-below: every neighbor pair must fit.
+    const sinHalf = Math.sin(wedgeRad / 2);
+    if (sinHalf > 0.0001) {
+      for (let i = 0; i < active.length; i++) {
+        const next = (i + 1) % active.length;
+        const needed =
+          (clusterRadii[i]! + clusterRadii[next]! + PAD_BETWEEN_REGIONS) /
+          (2 * sinHalf);
+        if (needed > anchorR) anchorR = needed;
+      }
+    }
+
+    // Step 5: place each school + its majors.
+    active.forEach((school, i) => {
+      const angleDeg = i * wedgeDeg + wedgeDeg / 2 - 90; // start at top
+      const angleRad = (angleDeg * Math.PI) / 180;
+      const ax = Math.cos(angleRad) * anchorR;
+      // Squash y by 0.7 so the map reads as a wider-than-tall stage,
+      // matches the existing ContourBackdrop aspect.
+      const ay = Math.sin(angleRad) * anchorR * 0.7;
+      const clusterR = clusterRadii[i]!;
+      placements.set(school.id, {
+        id: school.id,
+        angleDeg,
+        anchorR,
+        ax,
+        ay,
+        clusterR,
+      });
+
+      const majors = grouped.get(school.id)!;
+      const fanRange = Math.min(90, 18 + majors.length * 12);
+      majors.forEach((m, j) => {
+        const seed = hashString(m.name);
+        const t =
+          majors.length === 1 ? 0 : j / (majors.length - 1) - 0.5;
+        const localAngle =
+          angleRad +
+          ((t * fanRange) * Math.PI) / 180 +
+          (((seed % 11) - 5) * Math.PI) / 220;
+        const localDist = 50 + ((seed >> 4) % 28);
+        const cx = ax + Math.cos(localAngle) * localDist;
+        const cy = ay + Math.sin(localAngle) * localDist * 0.7;
+        const radius = bubbleRadiusFor(m.total);
+        positions.set(m.name, { x: cx, y: cy, r: radius, schoolId: school.id });
+      });
+    });
+
+    // Step 6: relaxation — same collision avoidance + tether back to
+    // each node's school anchor so regions hold their shape.
+    const NODE_PADDING = 14;
+    const TETHER = 0.05;
     const entries = Array.from(positions.entries());
     for (let iter = 0; iter < 80; iter++) {
       let moved = false;
@@ -9893,7 +9981,7 @@ function MapTabBody() {
           const dx = b.x - a.x;
           const dy = b.y - a.y;
           const dist = Math.sqrt(dx * dx + dy * dy) || 0.01;
-          const minDist = a.r + b.r + PADDING;
+          const minDist = a.r + b.r + NODE_PADDING;
           if (dist < minDist) {
             const push = (minDist - dist) / 2;
             const ux = dx / dist;
@@ -9908,17 +9996,15 @@ function MapTabBody() {
       }
       // Tether each node back toward its school anchor.
       for (const [, node] of entries) {
-        const school = IU_SCHOOL_BY_ID.get(node.schoolId) ?? IU_SCHOOL_BY_ID.get("other")!;
-        const aRad = (school.angle * Math.PI) / 180;
-        const ax = Math.cos(aRad) * school.r;
-        const ay = Math.sin(aRad) * school.r * 0.7;
-        node.x += (ax - node.x) * TETHER;
-        node.y += (ay - node.y) * TETHER;
+        const p = placements.get(node.schoolId);
+        if (!p) continue;
+        node.x += (p.ax - node.x) * TETHER;
+        node.y += (p.ay - node.y) * TETHER;
       }
       // Center keep-out so zones don't smother "you are here".
       for (const [, node] of entries) {
         const d = Math.sqrt(node.x * node.x + node.y * node.y) || 0.01;
-        const minD = node.r + CENTER_KEEP_OUT;
+        const minD = node.r + YOU_KEEPOUT;
         if (d < minD) {
           const push = minD - d;
           const ux = node.x / d;
@@ -9930,7 +10016,8 @@ function MapTabBody() {
       }
       if (!moved) break;
     }
-    return positions;
+
+    return { majors: positions, schools: placements };
   }, [data]);
 
   const beginDrag = (e: React.PointerEvent) => {
@@ -10034,15 +10121,10 @@ function MapTabBody() {
           >
             {/* School halos — soft tint per IU school's region.
                 Painted first so the rest of the cluster (lines, nodes,
-                labels) sits on top. Labels themselves render AFTER
-                the bubbles, below. */}
-            <SchoolHalos
-              activeSchoolIds={
-                new Set(
-                  Array.from(layout?.values() ?? []).map((p) => p.schoolId),
-                )
-              }
-            />
+                labels) sits on top. Sized to each school's actual
+                cluster radius so a packed Kelley region gets a bigger
+                halo than a single-major Other region. */}
+            <SchoolHalos placements={layout?.schools ?? new Map()} />
 
             {/* Connection lines — drawn under the nodes so the bubbles
                 sit on top. One <line> per major where the viewer has
@@ -10073,7 +10155,7 @@ function MapTabBody() {
                 </linearGradient>
               </defs>
               {data!.majors.map((m, i) => {
-                const pos = layout?.get(m.name);
+                const pos = layout?.majors.get(m.name);
                 if (!pos) return null;
                 const showLine = m.mutuals > 0 || m.connected > 0;
                 if (!showLine) return null;
@@ -10110,7 +10192,7 @@ function MapTabBody() {
 
             <YouHereNode you={data!.you} />
             {data!.majors.map((m) => {
-              const pos = layout?.get(m.name);
+              const pos = layout?.majors.get(m.name);
               if (!pos) return null;
               return (
                 <MajorNode
@@ -10128,16 +10210,11 @@ function MapTabBody() {
             })}
             {/* School labels — rendered last (after bubbles) so a node
                 landing near the outer edge of its fan can't camp the
-                pill. Pills also sit further outward radially (past the
-                school anchor + cluster), so they stay clear visually
-                in addition to z-order. */}
-            <SchoolLabels
-              activeSchoolIds={
-                new Set(
-                  Array.from(layout?.values() ?? []).map((p) => p.schoolId),
-                )
-              }
-            />
+                pill. Position is computed per-school: pushed outward
+                past the school's actual cluster radius so the pill
+                always lands beyond the bubbles regardless of how
+                packed the region is. */}
+            <SchoolLabels placements={layout?.schools ?? new Map()} />
           </div>
         )}
 
@@ -10330,30 +10407,45 @@ function Starfield() {
   );
 }
 
-// Soft tinted halo per IU school. Rendered BEFORE the bubbles so the
-// region color sits as background territory. Each halo only renders
-// if the dataset actually has a major in that school. Decorative —
-// pointerEvents: none.
-function SchoolHalos({ activeSchoolIds }: { activeSchoolIds: Set<string> }) {
-  const regions = IU_SCHOOLS.filter((s) => activeSchoolIds.has(s.id));
+type SchoolPlacementForRender = {
+  ax: number;
+  ay: number;
+  angleDeg: number;
+  anchorR: number;
+  clusterR: number;
+};
+
+// Soft tinted halo per IU school. Painted BEFORE the bubbles so the
+// region color reads as background territory. Halo size scales with
+// the school's actual cluster radius — packed regions get bigger
+// halos, sparse regions stay compact. Decorative; pointerEvents none.
+function SchoolHalos({
+  placements,
+}: {
+  placements: Map<string, SchoolPlacementForRender>;
+}) {
   return (
     <>
-      {regions.map((s) => {
-        const rad = (s.angle * Math.PI) / 180;
-        const cx = Math.cos(rad) * s.r;
-        const cy = Math.sin(rad) * s.r * 0.7;
+      {IU_SCHOOLS.map((s) => {
+        const p = placements.get(s.id);
+        if (!p) return null;
+        // Halo extends a bit past the cluster so the tint fades out
+        // beyond the bubbles instead of cutting on their edge.
+        const haloR = p.clusterR + 80;
+        const w = haloR * 2;
+        const h = haloR * 1.5;
         return (
           <div
             key={s.id}
             aria-hidden
             style={{
               position: "absolute",
-              left: cx,
-              top: cy,
-              width: 480,
-              height: 360,
-              marginLeft: -240,
-              marginTop: -180,
+              left: p.ax,
+              top: p.ay,
+              width: w,
+              height: h,
+              marginLeft: -w / 2,
+              marginTop: -h / 2,
               borderRadius: "50%",
               background: `radial-gradient(closest-side, ${hexToRgba(s.color, 0.28)} 0%, ${hexToRgba(s.color, 0.08)} 55%, ${hexToRgba(s.color, 0)} 100%)`,
               pointerEvents: "none",
@@ -10366,21 +10458,27 @@ function SchoolHalos({ activeSchoolIds }: { activeSchoolIds: Set<string> }) {
   );
 }
 
-// Region labels — small pills floating on the OUTER edge of each
-// region, away from "you are here". Rendered AFTER the bubbles so a
-// node landing near the edge of its fan can't camp the label. Each
-// label sits at the school's polar direction × (r + LABEL_OUT), so
-// it never overlaps the cluster of bubbles huddled around the anchor.
-const SCHOOL_LABEL_OUT_OFFSET = 180;
-function SchoolLabels({ activeSchoolIds }: { activeSchoolIds: Set<string> }) {
-  const regions = IU_SCHOOLS.filter((s) => activeSchoolIds.has(s.id));
+// Region labels — pills on the OUTER edge of each region (away from
+// "you are here"). Position computed from the school's actual cluster
+// radius so the pill always sits past the bubbles, no matter how
+// packed the cluster is. Rendered AFTER the bubbles so even if a node
+// drifts close, the pill paints on top.
+const SCHOOL_LABEL_OUT_PADDING = 60;
+function SchoolLabels({
+  placements,
+}: {
+  placements: Map<string, SchoolPlacementForRender>;
+}) {
   return (
     <>
-      {regions.map((s) => {
-        const rad = (s.angle * Math.PI) / 180;
-        const labelR = s.r + SCHOOL_LABEL_OUT_OFFSET;
-        const lx = Math.cos(rad) * labelR;
-        const ly = Math.sin(rad) * labelR * 0.7;
+      {IU_SCHOOLS.map((s) => {
+        const p = placements.get(s.id);
+        if (!p) return null;
+        const angleRad = (p.angleDeg * Math.PI) / 180;
+        // Push the label past the cluster's outer edge plus padding.
+        const labelR = p.anchorR + p.clusterR + SCHOOL_LABEL_OUT_PADDING;
+        const lx = Math.cos(angleRad) * labelR;
+        const ly = Math.sin(angleRad) * labelR * 0.7;
         return (
           <div
             key={s.id}
