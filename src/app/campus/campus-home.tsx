@@ -10032,12 +10032,11 @@ function MapTabBody() {
               pointerEvents: "none",
             }}
           >
-            {/* School regions — one soft glow + label per IU school that
-                has at least one major. Anchored at the school's
-                fixed angle/distance from "you are here". Painted before
-                the connection lines + bubbles so it reads as
-                background territory. */}
-            <SchoolRegions
+            {/* School halos — soft tint per IU school's region.
+                Painted first so the rest of the cluster (lines, nodes,
+                labels) sits on top. Labels themselves render AFTER
+                the bubbles, below. */}
+            <SchoolHalos
               activeSchoolIds={
                 new Set(
                   Array.from(layout?.values() ?? []).map((p) => p.schoolId),
@@ -10127,6 +10126,18 @@ function MapTabBody() {
                 />
               );
             })}
+            {/* School labels — rendered last (after bubbles) so a node
+                landing near the outer edge of its fan can't camp the
+                pill. Pills also sit further outward radially (past the
+                school anchor + cluster), so they stay clear visually
+                in addition to z-order. */}
+            <SchoolLabels
+              activeSchoolIds={
+                new Set(
+                  Array.from(layout?.values() ?? []).map((p) => p.schoolId),
+                )
+              }
+            />
           </div>
         )}
 
@@ -10319,12 +10330,11 @@ function Starfield() {
   );
 }
 
-// School regions — paints a soft tinted halo + label at each IU
-// school's anchor. Only renders regions that actually have at least
-// one major in the current dataset, so empty schools don't crowd the
-// map. Sits inside the cluster's 0×0 anchor so coords match the
-// MajorNode coord space. Decorative — pointerEvents: none.
-function SchoolRegions({ activeSchoolIds }: { activeSchoolIds: Set<string> }) {
+// Soft tinted halo per IU school. Rendered BEFORE the bubbles so the
+// region color sits as background territory. Each halo only renders
+// if the dataset actually has a major in that school. Decorative —
+// pointerEvents: none.
+function SchoolHalos({ activeSchoolIds }: { activeSchoolIds: Set<string> }) {
   const regions = IU_SCHOOLS.filter((s) => activeSchoolIds.has(s.id));
   return (
     <>
@@ -10333,54 +10343,73 @@ function SchoolRegions({ activeSchoolIds }: { activeSchoolIds: Set<string> }) {
         const cx = Math.cos(rad) * s.r;
         const cy = Math.sin(rad) * s.r * 0.7;
         return (
-          <Fragment key={s.id}>
-            {/* Soft colored halo. 240px radius is enough to envelop a
-                few clustered bubbles without bleeding into the next
-                region at the default 60°/360px anchor spacing. */}
-            <div
-              aria-hidden
-              style={{
-                position: "absolute",
-                left: cx,
-                top: cy,
-                width: 480,
-                height: 360,
-                marginLeft: -240,
-                marginTop: -180,
-                borderRadius: "50%",
-                background: `radial-gradient(closest-side, ${hexToRgba(s.color, 0.28)} 0%, ${hexToRgba(s.color, 0.08)} 55%, ${hexToRgba(s.color, 0)} 100%)`,
-                pointerEvents: "none",
-                filter: "blur(2px)",
-              }}
-            />
-            {/* Region label — small uppercase pill floating just above
-                the halo center. Subtle so it doesn't compete with the
-                bubble labels. */}
-            <div
-              aria-hidden
-              style={{
-                position: "absolute",
-                left: cx,
-                top: cy - 150,
-                transform: "translate(-50%, -50%)",
-                fontFamily: "DM Sans, sans-serif",
-                fontSize: 10,
-                fontWeight: 800,
-                letterSpacing: "0.16em",
-                textTransform: "uppercase",
-                color: hexToRgba(s.color, 0.95),
-                background: "rgba(8,12,28,0.55)",
-                border: `1px solid ${hexToRgba(s.color, 0.45)}`,
-                padding: "5px 10px",
-                borderRadius: 999,
-                whiteSpace: "nowrap",
-                pointerEvents: "none",
-                textShadow: `0 0 8px ${hexToRgba(s.color, 0.6)}`,
-              }}
-            >
-              {s.label}
-            </div>
-          </Fragment>
+          <div
+            key={s.id}
+            aria-hidden
+            style={{
+              position: "absolute",
+              left: cx,
+              top: cy,
+              width: 480,
+              height: 360,
+              marginLeft: -240,
+              marginTop: -180,
+              borderRadius: "50%",
+              background: `radial-gradient(closest-side, ${hexToRgba(s.color, 0.28)} 0%, ${hexToRgba(s.color, 0.08)} 55%, ${hexToRgba(s.color, 0)} 100%)`,
+              pointerEvents: "none",
+              filter: "blur(2px)",
+            }}
+          />
+        );
+      })}
+    </>
+  );
+}
+
+// Region labels — small pills floating on the OUTER edge of each
+// region, away from "you are here". Rendered AFTER the bubbles so a
+// node landing near the edge of its fan can't camp the label. Each
+// label sits at the school's polar direction × (r + LABEL_OUT), so
+// it never overlaps the cluster of bubbles huddled around the anchor.
+const SCHOOL_LABEL_OUT_OFFSET = 180;
+function SchoolLabels({ activeSchoolIds }: { activeSchoolIds: Set<string> }) {
+  const regions = IU_SCHOOLS.filter((s) => activeSchoolIds.has(s.id));
+  return (
+    <>
+      {regions.map((s) => {
+        const rad = (s.angle * Math.PI) / 180;
+        const labelR = s.r + SCHOOL_LABEL_OUT_OFFSET;
+        const lx = Math.cos(rad) * labelR;
+        const ly = Math.sin(rad) * labelR * 0.7;
+        return (
+          <div
+            key={s.id}
+            aria-hidden
+            style={{
+              position: "absolute",
+              left: lx,
+              top: ly,
+              transform: "translate(-50%, -50%)",
+              fontFamily: "DM Sans, sans-serif",
+              fontSize: 10,
+              fontWeight: 800,
+              letterSpacing: "0.16em",
+              textTransform: "uppercase",
+              color: hexToRgba(s.color, 0.95),
+              background: "rgba(8,12,28,0.65)",
+              border: `1px solid ${hexToRgba(s.color, 0.55)}`,
+              padding: "5px 10px",
+              borderRadius: 999,
+              whiteSpace: "nowrap",
+              pointerEvents: "none",
+              textShadow: `0 0 8px ${hexToRgba(s.color, 0.6)}`,
+              backdropFilter: "blur(8px)",
+              WebkitBackdropFilter: "blur(8px)",
+              boxShadow: `0 4px 14px rgba(0,0,0,0.35)`,
+            }}
+          >
+            {s.label}
+          </div>
         );
       })}
     </>
