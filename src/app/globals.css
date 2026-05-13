@@ -2394,6 +2394,13 @@ a.otto-room-row-title:hover {
     border-top: 1px solid rgba(28, 28, 30, 0.08);
     padding-bottom: env(safe-area-inset-bottom, 0px);
   }
+  /* Hide the tabbar while either composer sheet is open. Both sheets
+     set body.vibe-composer-open on mount so the bar doesn't paint
+     over the record button (clips) or the bottom of the photo
+     preview (posts). */
+  body.vibe-composer-open .vibe-mobile-tabbar {
+    display: none !important;
+  }
 }
 .vibe-mobile-tab {
   display: flex;

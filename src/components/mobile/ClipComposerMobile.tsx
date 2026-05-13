@@ -112,6 +112,16 @@ export function ClipComposerMobile({ onClose, onPosted, origin }: Props) {
     ensureKeyframes();
   }, []);
 
+  // Hide the mobile tab bar while we're open. CSS rule
+  // `body.vibe-composer-open .vibe-mobile-tabbar { display: none }`
+  // does the work; we just flip the class.
+  useEffect(() => {
+    document.body.classList.add("vibe-composer-open");
+    return () => {
+      document.body.classList.remove("vibe-composer-open");
+    };
+  }, []);
+
   // Request camera + mic. Called from the intro screen's button so it
   // counts as a real user gesture (iOS Safari is strict about this).
   const requestCamera = useCallback(async (next: Facing = facing) => {

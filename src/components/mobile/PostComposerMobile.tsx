@@ -107,6 +107,16 @@ export function PostComposerMobile({ onClose, onPosted, origin }: Props) {
     ensureKeyframes();
   }, []);
 
+  // Hide the mobile tab bar while we're open. CSS rule
+  // `body.vibe-composer-open .vibe-mobile-tabbar { display: none }`
+  // does the work; we just flip the class.
+  useEffect(() => {
+    document.body.classList.add("vibe-composer-open");
+    return () => {
+      document.body.classList.remove("vibe-composer-open");
+    };
+  }, []);
+
   // Bind the legacy mention/hashtag picker to the textarea so @ + #
   // suggestions appear inline. Idempotent across re-renders.
   useEffect(() => {
