@@ -9803,6 +9803,16 @@ function schoolForMajor(majorName: string): IuSchool {
   return IU_SCHOOL_BY_ID.get(id) ?? IU_SCHOOL_BY_ID.get("other")!;
 }
 
+// Athletic-org detector. Matches handle OR name against common sports
+// keywords so the map can route orgs into the "Athletic Center"
+// cluster vs the generic "Org Center". Defensive on word boundaries
+// so "design at iu" doesn't get caught by "im" or similar.
+const ATHLETIC_RE =
+  /\b(football|basketball|soccer|baseball|softball|hockey|volleyball|tennis|swim|swimming|track|cross.?country|lacrosse|rugby|golf|field.?hockey|sport|sports|athletic|athletics|intramural|im.?sports|hoops|crew|rowing|wrestling)\b/i;
+function isAthleticOrg(o: MapOrg): boolean {
+  return ATHLETIC_RE.test(o.handle) || ATHLETIC_RE.test(o.name);
+}
+
 function MapTabBody() {
   const [data, setData] = useState<MapSummary | null>(null);
   const [selected, setSelected] = useState<ZoneSelection | null>(null);
@@ -9814,14 +9824,22 @@ function MapTabBody() {
   // has no real major data yet — once real students fill in their majors
   // the actual zones replace the placeholders, no toggle needed.
   const [orgCollapsed, setOrgCollapsed] = useState(false);
+  const [athleticCollapsed, setAthleticCollapsed] = useState(true);
+  // Search-to-jump state. `searchQuery` drives a small filtered
+  // dropdown over the map; clicking a result smoothly pans + zooms to
+  // that bubble.
+  const [searchQuery, setSearchQuery] = useState("");
   const dragOriginRef = useRef<{ x: number; y: number } | null>(null);
 
-  // Picking a zone auto-collapses the org rail since the panel sits on
-  // top of it. User can re-expand manually from the collapsed pill.
+  // Picking a zone auto-collapses both cluster rails since their
+  // panels sit on top of the canvas. User can re-expand from the
+  // collapsed pill.
   const pickZone = useCallback((sel: ZoneSelection) => {
     setSelected(sel);
     setOrgCollapsed(true);
+    setAthleticCollapsed(true);
   }, []);
+
 
   useEffect(() => {
     let cancelled = false;
@@ -10022,6 +10040,38 @@ function MapTabBody() {
     return { majors: positions, schools: placements };
   }, [data]);
 
+  // Jump to a major bubble: pan so the bubble's cluster coordinate
+  // lands at the viewport center, zoom in for emphasis, and open the
+  // zone panel. Used by the search dropdown.
+  const jumpToMajor = useCallback(
+    (majorName: string) => {
+      const pos = layout?.majors.get(majorName);
+      if (!pos) return;
+      const targetZoom = 1.6;
+      setZoom(targetZoom);
+      setPan({
+        x: -pos.x * targetZoom,
+        y: -pos.y * targetZoom,
+      });
+      setSelected({ kind: "major", key: majorName, label: majorName });
+      setOrgCollapsed(true);
+      setAthleticCollapsed(true);
+      setSearchQuery("");
+    },
+    [layout],
+  );
+
+  // Filtered search results — top 6 majors whose name contains the
+  // query (case-insensitive). Dropdown only renders when the query
+  // is non-empty.
+  const searchResults = useMemo(() => {
+    const q = searchQuery.trim().toLowerCase();
+    if (!q || !data?.majors) return [];
+    return data.majors
+      .filter((m) => m.name.toLowerCase().includes(q))
+      .slice(0, 6);
+  }, [searchQuery, data]);
+
   const beginDrag = (e: React.PointerEvent) => {
     dragOriginRef.current = { x: e.clientX - pan.x, y: e.clientY - pan.y };
     setDragging(true);
@@ -10116,9 +10166,9 @@ function MapTabBody() {
       }}
     >
       <SceneHeader
-        eyebrow="Map · IU"
-        title="The campus, mapped by who's where"
-        subtitle="Each zone is a major. Click in to find people you&apos;d never bump into."
+        eyebrow="Campus · IU"
+        title="Find your people"
+        subtitle="Majors grouped by school, plus org and athletic centers — laid out by how close you already are. Search to jump, or wheel to zoom."
         tone="dark"
       />
 
@@ -10280,18 +10330,156 @@ function MapTabBody() {
           </div>
         )}
 
-        {/* Org Center — independent cluster, anchored to the right side. */}
-        {hasData && data!.orgs.length > 0 ? (
-          <OrgCenterCluster
-            orgs={data!.orgs}
-            collapsed={orgCollapsed}
-            onToggleCollapse={() => setOrgCollapsed((v) => !v)}
-            onPick={(org) =>
-              pickZone({ kind: "org", key: org.handle, label: org.name })
-            }
-            activeHandle={selected?.kind === "org" ? selected.key : null}
+        {/* Org Center (right, cyan) + Athletic Center (left, amber).
+            Orgs are bucketed by ATHLETIC_RE matching against handle or
+            name. Each cluster gets its own collapsed pill in the
+            corner; only one is expanded at a time to keep the
+            cluster the visual focus. Empty buckets are hidden so we
+            don't show "0 athletics" for schools that have none. */}
+        {hasData && data!.orgs.length > 0
+          ? (() => {
+              const athleticOrgs = data!.orgs.filter(isAthleticOrg);
+              const regularOrgs = data!.orgs.filter((o) => !isAthleticOrg(o));
+              return (
+                <>
+                  {regularOrgs.length > 0 ? (
+                    <OrgCenterCluster
+                      orgs={regularOrgs}
+                      collapsed={orgCollapsed}
+                      onToggleCollapse={() => {
+                        setOrgCollapsed((v) => !v);
+                        if (orgCollapsed) setAthleticCollapsed(true);
+                      }}
+                      onPick={(org) =>
+                        pickZone({ kind: "org", key: org.handle, label: org.name })
+                      }
+                      activeHandle={selected?.kind === "org" ? selected.key : null}
+                      title="Org Center"
+                      side="right"
+                      accent="#78C8FF"
+                    />
+                  ) : null}
+                  {athleticOrgs.length > 0 ? (
+                    <OrgCenterCluster
+                      orgs={athleticOrgs}
+                      collapsed={athleticCollapsed}
+                      onToggleCollapse={() => {
+                        setAthleticCollapsed((v) => !v);
+                        if (athleticCollapsed) setOrgCollapsed(true);
+                      }}
+                      onPick={(org) =>
+                        pickZone({ kind: "org", key: org.handle, label: org.name })
+                      }
+                      activeHandle={selected?.kind === "org" ? selected.key : null}
+                      title="Athletic Center"
+                      side="left"
+                      accent="#FFB85A"
+                    />
+                  ) : null}
+                </>
+              );
+            })()
+          : null}
+
+        {/* Search-to-jump — typing filters the major list, click a
+            result and the map smoothly pans + zooms to that bubble.
+            stopPropagation on the wrapper so the drag handler
+            doesn't grab the gesture. */}
+        <div
+          style={{
+            position: "absolute",
+            top: 14,
+            left: "50%",
+            transform: "translateX(-50%)",
+            width: "min(360px, calc(100% - 36px))",
+            zIndex: 6,
+          }}
+          onPointerDown={(e) => e.stopPropagation()}
+        >
+          <input
+            value={searchQuery}
+            onChange={(e) => setSearchQuery(e.target.value)}
+            onKeyDown={(e) => {
+              if (e.key === "Enter" && searchResults.length > 0) {
+                jumpToMajor(searchResults[0]!.name);
+              }
+              if (e.key === "Escape") setSearchQuery("");
+            }}
+            placeholder="Jump to a major…"
+            style={{
+              width: "100%",
+              padding: "9px 14px",
+              borderRadius: 999,
+              border: "1px solid rgba(120,200,255,0.32)",
+              background: "rgba(8,12,28,0.78)",
+              color: "rgba(245,247,252,0.95)",
+              fontFamily: "DM Sans, sans-serif",
+              fontSize: 13,
+              outline: "none",
+              backdropFilter: "blur(14px)",
+              WebkitBackdropFilter: "blur(14px)",
+              boxShadow: "0 6px 16px rgba(0,0,0,0.35)",
+            }}
           />
-        ) : null}
+          {searchResults.length > 0 ? (
+            <div
+              style={{
+                marginTop: 6,
+                background: "rgba(8,12,28,0.92)",
+                border: "1px solid rgba(120,200,255,0.22)",
+                borderRadius: 12,
+                backdropFilter: "blur(18px)",
+                WebkitBackdropFilter: "blur(18px)",
+                overflow: "hidden",
+                boxShadow: "0 12px 32px rgba(0,0,0,0.45)",
+              }}
+            >
+              {searchResults.map((m, i) => {
+                const school = schoolForMajor(m.name);
+                return (
+                  <button
+                    key={m.name}
+                    type="button"
+                    onClick={() => jumpToMajor(m.name)}
+                    style={{
+                      display: "flex",
+                      alignItems: "center",
+                      gap: 10,
+                      width: "100%",
+                      padding: "9px 12px",
+                      background: i === 0 ? "rgba(120,200,255,0.08)" : "transparent",
+                      border: "none",
+                      borderTop: i > 0 ? "1px solid rgba(255,255,255,0.04)" : "none",
+                      color: "#fff",
+                      fontFamily: "DM Sans, sans-serif",
+                      fontSize: 13,
+                      textAlign: "left",
+                      cursor: "pointer",
+                    }}
+                  >
+                    <span
+                      aria-hidden
+                      style={{
+                        width: 8,
+                        height: 8,
+                        borderRadius: "50%",
+                        background: school.color,
+                        flexShrink: 0,
+                        boxShadow: `0 0 8px ${hexToRgba(school.color, 0.5)}`,
+                      }}
+                    />
+                    <span style={{ flex: 1, minWidth: 0, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>
+                      {m.name}
+                    </span>
+                    <span style={{ fontSize: 10, color: "rgba(255,255,255,0.45)", letterSpacing: "0.08em", textTransform: "uppercase" }}>
+                      {school.shortLabel}
+                    </span>
+                  </button>
+                );
+              })}
+            </div>
+          ) : null}
+        </div>
 
         {/* Legend pill — purely decorative, won't intercept drag. */}
         <div
@@ -10860,32 +11048,42 @@ function OrgCenterCluster({
   onToggleCollapse,
   onPick,
   activeHandle,
+  // Identity props — drive label, side anchor, and accent color so the
+  // same cluster component can render both an Org Center (right side,
+  // cyan) and an Athletic Center (left side, amber).
+  title = "Org Center",
+  side = "right",
+  accent = "#78C8FF",
 }: {
   orgs: MapOrg[];
   collapsed: boolean;
   onToggleCollapse: () => void;
   onPick: (o: MapOrg) => void;
   activeHandle: string | null;
+  title?: string;
+  side?: "left" | "right";
+  accent?: string;
 }) {
+  const sidePos = side === "left" ? { left: 14 } : { right: 14 };
   if (collapsed) {
     return (
       <button
         type="button"
         onPointerDown={(e) => e.stopPropagation()}
         onClick={onToggleCollapse}
-        title={`Open Org Center (${orgs.length})`}
+        title={`Open ${title} (${orgs.length})`}
         style={{
           position: "absolute",
-          right: 14,
+          ...sidePos,
           top: 60,
           display: "inline-flex",
           alignItems: "center",
           gap: 6,
           padding: "8px 14px",
           borderRadius: 999,
-          border: "1px solid rgba(120,200,255,0.45)",
+          border: `1px solid ${hexToRgba(accent, 0.45)}`,
           background: "rgba(8,12,28,0.78)",
-          color: "rgba(120,200,255,0.95)",
+          color: hexToRgba(accent, 0.95),
           fontFamily: "DM Sans, sans-serif",
           fontSize: 10,
           fontWeight: 800,
@@ -10898,8 +11096,10 @@ function OrgCenterCluster({
           zIndex: 4,
         }}
       >
-        Org Center · {orgs.length}
-        <span style={{ fontSize: 12, lineHeight: 1 }}>‹</span>
+        {title} · {orgs.length}
+        <span style={{ fontSize: 12, lineHeight: 1 }}>
+          {side === "left" ? "›" : "‹"}
+        </span>
       </button>
     );
   }
@@ -10907,24 +11107,24 @@ function OrgCenterCluster({
     <div
       style={{
         position: "absolute",
-        right: 14,
+        ...sidePos,
         top: 60,
         bottom: 14,
         width: 240,
         background:
           "linear-gradient(180deg, rgba(8,12,28,0.78) 0%, rgba(8,12,28,0.62) 100%)",
-        border: "1px solid rgba(120,200,255,0.22)",
+        border: `1px solid ${hexToRgba(accent, 0.22)}`,
         borderRadius: 16,
         backdropFilter: "blur(20px) saturate(160%)",
         WebkitBackdropFilter: "blur(20px) saturate(160%)",
-        boxShadow:
-          "inset 0 1px 0 rgba(120,200,255,0.22), 0 12px 32px rgba(0,0,0,0.4)",
+        boxShadow: `inset 0 1px 0 ${hexToRgba(accent, 0.22)}, 0 12px 32px rgba(0,0,0,0.4)`,
         padding: 14,
         overflow: "hidden",
         display: "flex",
         flexDirection: "column",
         gap: 10,
         pointerEvents: "auto",
+        zIndex: 4,
       }}
       onPointerDown={(e) => e.stopPropagation()}
     >
@@ -10943,23 +11143,23 @@ function OrgCenterCluster({
             fontWeight: 800,
             letterSpacing: "0.18em",
             textTransform: "uppercase",
-            color: "rgba(120,200,255,0.85)",
+            color: hexToRgba(accent, 0.85),
           }}
         >
-          Org Center
+          {title}
         </div>
         <button
           type="button"
           onClick={onToggleCollapse}
-          aria-label="Collapse Org Center"
+          aria-label={`Collapse ${title}`}
           title="Collapse"
           style={{
             width: 22,
             height: 22,
             borderRadius: 999,
-            border: "1px solid rgba(120,200,255,0.32)",
-            background: "rgba(120,200,255,0.10)",
-            color: "rgba(120,200,255,0.95)",
+            border: `1px solid ${hexToRgba(accent, 0.32)}`,
+            background: hexToRgba(accent, 0.10),
+            color: hexToRgba(accent, 0.95),
             fontSize: 12,
             cursor: "pointer",
             lineHeight: 1,

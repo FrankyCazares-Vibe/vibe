@@ -225,10 +225,20 @@ const DEMO_MAJORS = [
 ];
 
 const DEMO_ORGS = [
+  // Standard orgs / clubs
   { id: "demo-cs", handle: "iu-cs-club", name: "IU Computer Science Club", logo_url: null, verified: true, is_public: true, member_count: 700 },
   { id: "demo-design", handle: "design-at-iu", name: "Design @ IU", logo_url: null, verified: true, is_public: true, member_count: 312 },
   { id: "demo-venture", handle: "iu-venture-club", name: "IU Venture Club", logo_url: null, verified: true, is_public: true, member_count: 540 },
   { id: "demo-nsbe", handle: "iu-nsbe", name: "NSBE", logo_url: null, verified: true, is_public: true, member_count: 280 },
   { id: "demo-wic", handle: "women-in-computing", name: "Women in Computing", logo_url: null, verified: true, is_public: true, member_count: 420 },
   { id: "demo-kis", handle: "kelley-investments", name: "Kelley Investment Society", logo_url: null, verified: true, is_public: true, member_count: 240 },
+  // Athletic crews — the map buckets these into their own "Athletic
+  // Center" cluster via name/handle keyword match (see ATHLETIC_RE on
+  // the client). Keeping the same shape so non-athletic surfaces can
+  // still treat them as plain orgs without special-casing.
+  { id: "demo-hoops", handle: "iu-hoops", name: "IU Basketball", logo_url: null, verified: true, is_public: true, member_count: 180 },
+  { id: "demo-football", handle: "iu-football", name: "IU Football", logo_url: null, verified: true, is_public: true, member_count: 220 },
+  { id: "demo-soccer", handle: "iu-soccer", name: "IU Soccer Club", logo_url: null, verified: true, is_public: true, member_count: 140 },
+  { id: "demo-track", handle: "iu-track", name: "Track & Field", logo_url: null, verified: true, is_public: true, member_count: 95 },
+  { id: "demo-im", handle: "iu-intramurals", name: "IM Sports", logo_url: null, verified: true, is_public: true, member_count: 410 },
 ];
