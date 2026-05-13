@@ -8194,14 +8194,27 @@ function CreateEventModal({
           placeholder="Location (e.g. Memorial Stadium, Zoom)"
           style={eventModalInput}
         />
-        <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 8 }}>
+        {/* `auto-fit, minmax(220px, 1fr)` lets the two date pickers sit
+            side-by-side when the modal is wide enough, and collapse to
+            a single column at narrow viewports so the calendar icons
+            never get squeezed past the field edge. `min-width: 0` on
+            each input lets the grid track actually shrink — without it
+            the native datetime-local refuses to go below its
+            content-width and overflows. */}
+        <div
+          style={{
+            display: "grid",
+            gridTemplateColumns: "repeat(auto-fit, minmax(220px, 1fr))",
+            gap: 10,
+          }}
+        >
           <label style={eventModalLabel}>
             Starts
             <input
               type="datetime-local"
               value={startsAt}
               onChange={(e) => setStartsAt(e.target.value)}
-              style={eventModalInput}
+              style={{ ...eventModalInput, minWidth: 0 }}
             />
           </label>
           <label style={eventModalLabel}>
@@ -8210,7 +8223,7 @@ function CreateEventModal({
               type="datetime-local"
               value={endsAt}
               onChange={(e) => setEndsAt(e.target.value)}
-              style={eventModalInput}
+              style={{ ...eventModalInput, minWidth: 0 }}
             />
           </label>
         </div>
@@ -8297,7 +8310,11 @@ function CreateEventModal({
 // nowhere. Mirrors the OttoPanel + GlassCard treatment used elsewhere.
 const eventModalSurface: React.CSSProperties = {
   width: "100%",
-  maxWidth: 480,
+  // Bumped from 480 → 560 because the two datetime-local inputs need
+  // ~220px each (date + time + calendar icon) and were getting visually
+  // cramped against the 480 cap. Keeps the panel comfortable but still
+  // modal-sized on desktop; flex/grid below handles narrower viewports.
+  maxWidth: 560,
   background:
     "linear-gradient(180deg, rgba(46,42,90,0.72) 0%, rgba(20,18,42,0.78) 100%)",
   backdropFilter: "blur(32px) saturate(180%)",
