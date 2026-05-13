@@ -9807,7 +9807,9 @@ function MapTabBody() {
   const [data, setData] = useState<MapSummary | null>(null);
   const [selected, setSelected] = useState<ZoneSelection | null>(null);
   const [pan, setPan] = useState({ x: 0, y: 0 });
+  const [zoom, setZoom] = useState(1);
   const [dragging, setDragging] = useState(false);
+  const mapContainerRef = useRef<HTMLDivElement | null>(null);
   // The map auto-falls back to demo zones server-side when the school
   // has no real major data yet — once real students fill in their majors
   // the actual zones replace the placeholders, no toggle needed.
@@ -10042,6 +10044,61 @@ function MapTabBody() {
     }
   };
 
+  // Zoom around the cursor. Capture where the cursor was sitting in
+  // CLUSTER coordinates (relative to the map's center, before scale
+  // and pan), then adjust pan so that same cluster point stays under
+  // the cursor at the new scale. Standard "pinch-to-zoom" anchoring.
+  // Range 0.5×–2.5× keeps the layout readable at both ends.
+  const ZOOM_MIN = 0.5;
+  const ZOOM_MAX = 2.5;
+  const zoomAround = useCallback(
+    (delta: number, anchor: { clientX: number; clientY: number } | null) => {
+      const el = mapContainerRef.current;
+      if (!el) {
+        setZoom((z) => Math.max(ZOOM_MIN, Math.min(ZOOM_MAX, z * delta)));
+        return;
+      }
+      const rect = el.getBoundingClientRect();
+      const cx = rect.left + rect.width / 2;
+      const cy = rect.top + rect.height / 2;
+      const ax = anchor ? anchor.clientX : cx;
+      const ay = anchor ? anchor.clientY : cy;
+      setZoom((prevZoom) => {
+        const next = Math.max(ZOOM_MIN, Math.min(ZOOM_MAX, prevZoom * delta));
+        if (next === prevZoom) return prevZoom;
+        // Convert cursor → cluster coords (before transform). The cluster
+        // is rendered at the rect's CENTER, then translated by pan, then
+        // scaled by zoom. Reverse:
+        //   cluster = (cursor - center - pan) / prevZoom
+        // After zoom change, we want:
+        //   cursor = center + newPan + cluster * next
+        // → newPan = cursor - center - cluster * next
+        const clusterX = (ax - cx - pan.x) / prevZoom;
+        const clusterY = (ay - cy - pan.y) / prevZoom;
+        setPan({
+          x: ax - cx - clusterX * next,
+          y: ay - cy - clusterY * next,
+        });
+        return next;
+      });
+    },
+    [pan.x, pan.y],
+  );
+  // Native wheel listener with passive:false so the wheel event can
+  // call preventDefault() without React's synthetic wrapper swallowing
+  // it. Without this the page scroll would steal the gesture.
+  useEffect(() => {
+    const el = mapContainerRef.current;
+    if (!el) return;
+    const handler = (e: WheelEvent) => {
+      e.preventDefault();
+      const delta = Math.exp(-e.deltaY * 0.0015);
+      zoomAround(delta, { clientX: e.clientX, clientY: e.clientY });
+    };
+    el.addEventListener("wheel", handler, { passive: false });
+    return () => el.removeEventListener("wheel", handler);
+  }, [zoomAround]);
+
   const isLoading = data === null;
   const hasData = !!data && Array.isArray(data.majors) && data.majors.length > 0;
 
@@ -10066,6 +10123,7 @@ function MapTabBody() {
       />
 
       <div
+        ref={mapContainerRef}
         style={{
           flex: 1,
           minHeight: 560,
@@ -10112,7 +10170,11 @@ function MapTabBody() {
               position: "absolute",
               left: "50%",
               top: "50%",
-              transform: `translate(${pan.x}px, ${pan.y}px)`,
+              // Pan first, then scale around the cluster origin. The
+              // wheel handler computes new pan values so the point
+              // under the cursor stays anchored across zoom changes.
+              transform: `translate(${pan.x}px, ${pan.y}px) scale(${zoom})`,
+              transformOrigin: "0 0",
               transition: dragging ? "none" : "transform 200ms ease",
               width: 0,
               height: 0,
@@ -10277,8 +10339,9 @@ function MapTabBody() {
             onClick={(e) => {
               e.stopPropagation();
               setPan({ x: 0, y: 0 });
+              setZoom(1);
             }}
-            title="Recenter the map"
+            title="Recenter and reset zoom"
             style={{
               fontFamily: "DM Sans, sans-serif",
               fontSize: 10,
@@ -10297,6 +10360,45 @@ function MapTabBody() {
             }}
           >
             Recenter
+          </button>
+        </div>
+
+        {/* Zoom controls — stacked +/- in the bottom-right corner.
+            Center-anchored zoom (not cursor-anchored) since the click
+            doesn't carry a meaningful cursor position. */}
+        <div
+          style={{
+            position: "absolute",
+            bottom: 14,
+            right: 14,
+            zIndex: 5,
+            display: "flex",
+            flexDirection: "column",
+            gap: 6,
+          }}
+          onPointerDown={(e) => e.stopPropagation()}
+        >
+          <button
+            type="button"
+            aria-label="Zoom in"
+            onClick={(e) => {
+              e.stopPropagation();
+              zoomAround(1.25, null);
+            }}
+            style={zoomButtonStyle}
+          >
+            +
+          </button>
+          <button
+            type="button"
+            aria-label="Zoom out"
+            onClick={(e) => {
+              e.stopPropagation();
+              zoomAround(1 / 1.25, null);
+            }}
+            style={zoomButtonStyle}
+          >
+            −
           </button>
         </div>
       </div>
@@ -10323,6 +10425,24 @@ const mapEmptyOverlayStyle: React.CSSProperties = {
   gap: 6,
   color: "rgba(255,255,255,0.7)",
   fontFamily: "DM Sans, sans-serif",
+};
+
+const zoomButtonStyle: React.CSSProperties = {
+  width: 34,
+  height: 34,
+  borderRadius: 10,
+  border: "1px solid rgba(120,200,255,0.35)",
+  background: "rgba(8,12,28,0.78)",
+  color: "rgba(220,240,255,0.95)",
+  fontFamily: "DM Sans, sans-serif",
+  fontSize: 18,
+  fontWeight: 700,
+  lineHeight: 1,
+  cursor: "pointer",
+  backdropFilter: "blur(14px)",
+  WebkitBackdropFilter: "blur(14px)",
+  pointerEvents: "auto",
+  boxShadow: "0 4px 12px rgba(0,0,0,0.35)",
 };
 
 function LegendDot({ color }: { color: string }) {
