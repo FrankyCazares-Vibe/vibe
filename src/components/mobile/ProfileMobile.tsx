@@ -711,19 +711,19 @@ function PostFeedCard({
         gap: 10,
         padding: 14,
         borderRadius: 16,
-        // Liquid-glass card — translucent white with backdrop blur so
-        // the page's cream backdrop tints THROUGH the card instead of
-        // blending into it. Soft top-edge highlight + warm drop shadow
-        // give the card lift without going harsh.
+        // Liquid-glass card — a darker warm-tinted overlay on the cream
+        // backdrop. Backdrop-blur lets the page color show through but
+        // the dark tint + stronger shadow gives the card real
+        // separation from the page instead of blending in.
         background:
-          "linear-gradient(180deg, rgba(255,255,255,0.78) 0%, rgba(255,253,248,0.62) 100%)",
-        backdropFilter: "blur(18px) saturate(160%)",
-        WebkitBackdropFilter: "blur(18px) saturate(160%)",
-        border: "1px solid rgba(255,255,255,0.85)",
+          "linear-gradient(180deg, rgba(28,28,30,0.07) 0%, rgba(28,28,30,0.12) 100%)",
+        backdropFilter: "blur(20px) saturate(140%)",
+        WebkitBackdropFilter: "blur(20px) saturate(140%)",
+        border: "1px solid rgba(28,28,30,0.12)",
         boxShadow: [
-          "inset 0 1px 0 rgba(255,255,255,0.9)",
-          "inset 0 -1px 0 rgba(28,28,30,0.04)",
-          "0 8px 24px rgba(180,120,60,0.08)",
+          "inset 0 1px 0 rgba(255,255,255,0.45)",
+          "inset 0 -1px 0 rgba(28,28,30,0.08)",
+          "0 12px 28px rgba(28,28,30,0.10)",
         ].join(", "),
         textAlign: "left",
         cursor: "pointer",
@@ -1235,12 +1235,12 @@ function PostFeedSkeleton() {
             padding: 14,
             borderRadius: 16,
             background:
-              "linear-gradient(180deg, rgba(255,255,255,0.78) 0%, rgba(255,253,248,0.62) 100%)",
-            backdropFilter: "blur(18px) saturate(160%)",
-            WebkitBackdropFilter: "blur(18px) saturate(160%)",
-            border: "1px solid rgba(255,255,255,0.85)",
+              "linear-gradient(180deg, rgba(28,28,30,0.07) 0%, rgba(28,28,30,0.12) 100%)",
+            backdropFilter: "blur(20px) saturate(140%)",
+            WebkitBackdropFilter: "blur(20px) saturate(140%)",
+            border: "1px solid rgba(28,28,30,0.12)",
             boxShadow:
-              "inset 0 1px 0 rgba(255,255,255,0.9), 0 8px 24px rgba(180,120,60,0.08)",
+              "inset 0 1px 0 rgba(255,255,255,0.45), 0 12px 28px rgba(28,28,30,0.10)",
             display: "flex",
             flexDirection: "column",
             gap: 10,
