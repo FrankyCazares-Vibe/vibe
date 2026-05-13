@@ -1,6 +1,7 @@
 "use client";
 
 import Link from "next/link";
+import { useSearchParams } from "next/navigation";
 import { useEffect, useState } from "react";
 
 import { ClipViewerMobile } from "@/components/mobile/ClipViewerMobile";
@@ -117,6 +118,17 @@ type PostRow = {
 
 type ProfileTab = "posts" | "clips" | "portfolio";
 
+// Fields the inline mobile editor touches. Mirrors the keys
+// /api/me/profile-sync accepts; vibeTagsList is an array of plain
+// strings that maps to the `interests` column on save.
+type EditDraft = {
+  name: string;
+  tagline: string;
+  bio: string;
+  location: string;
+  vibeTagsList: string[];
+};
+
 function pick<T>(...vals: (T | null | undefined)[]): T | null {
   for (const v of vals) {
     if (v !== null && v !== undefined && v !== "") return v;
@@ -151,6 +163,18 @@ export function ProfileMobile({ targetHandle }: Props = {}) {
    *  flips optimistically when the user taps Connect / Follow. */
   const [followState, setFollowState] = useState<FollowState>("none");
   const [followBusy, setFollowBusy] = useState(false);
+  // Owner inline-edit mode. `editMode` flips the identity stack into
+  // editable controls; `draft` is the working copy that gets POSTed
+  // on Save. `?edit=1` deep links into edit mode at mount (read via
+  // a lazy initializer so we don't trip the React hook lint about
+  // setState-in-effect). Subsequent toggles come from the pencil tap.
+  const searchParams = useSearchParams();
+  const [editMode, setEditMode] = useState(
+    () => !isVisitor && searchParams.get("edit") === "1",
+  );
+  const [draft, setDraft] = useState<EditDraft | null>(null);
+  const [savingEdit, setSavingEdit] = useState(false);
+  const [editError, setEditError] = useState<string | null>(null);
 
   useEffect(() => {
     let cancelled = false;
@@ -238,6 +262,96 @@ export function ProfileMobile({ targetHandle }: Props = {}) {
     }
   };
 
+  // Seed the draft from the live user object. We DON'T sync this in an
+  // effect — we just compute an "effective draft" at render time
+  // (draft ?? seed-from-user) and lazy-initialize the real `draft`
+  // state on the first edit input. Saves us from a setState-in-effect
+  // cascade and works the same for both pencil-tap entry and the
+  // `?edit=1` deep-link case.
+  const seedDraftFromUser = (u: VibeUser): EditDraft => ({
+    name: (u.name ?? "").toString(),
+    tagline: (u.tagline ?? "").toString(),
+    bio: (u.bio ?? "").toString(),
+    location: (u.location ?? "").toString(),
+    vibeTagsList: (u.vibeTags ?? [])
+      .map((t) => t?.label ?? "")
+      .filter((s): s is string => !!s),
+  });
+  const effectiveDraft: EditDraft | null = draft ?? (user ? seedDraftFromUser(user) : null);
+  const updateDraft = (patch: Partial<EditDraft>) => {
+    if (!user) return;
+    setDraft((prev) => ({ ...(prev ?? seedDraftFromUser(user)), ...patch }));
+  };
+  const enterEdit = () => {
+    if (!user) return;
+    setEditMode(true);
+    setEditError(null);
+  };
+  const cancelEdit = () => {
+    setEditMode(false);
+    setDraft(null);
+    setEditError(null);
+  };
+  const commitEdit = async () => {
+    if (savingEdit) return;
+    const snapshot = draft;
+    if (!snapshot) {
+      // Nothing was changed — just exit edit mode without firing a POST.
+      setEditMode(false);
+      setEditError(null);
+      return;
+    }
+    setSavingEdit(true);
+    setEditError(null);
+    try {
+      const r = await fetch("/api/me/profile-sync", {
+        method: "POST",
+        credentials: "include",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          name: snapshot.name.trim(),
+          tagline: snapshot.tagline.trim(),
+          bio: snapshot.bio.trim(),
+          location_text: snapshot.location.trim(),
+          // `interests` is the server-side name for vibe tags. We
+          // strip empties + dedupe here so the column stays clean.
+          interests: Array.from(
+            new Set(
+              snapshot.vibeTagsList
+                .map((s) => s.trim())
+                .filter((s) => s.length > 0),
+            ),
+          ),
+        }),
+      });
+      const j = await r.json().catch(() => ({}));
+      if (!r.ok || !j?.ok) {
+        throw new Error(
+          (j && j.error) ? String(j.error) : `HTTP ${r.status}`,
+        );
+      }
+      // Re-bootstrap so all derived fields (headline, tagline fallback,
+      // etc.) come back fresh. Re-use the existing fetch endpoint that
+      // initial-mount uses.
+      const rb = await fetch("/api/me/profile-bootstrap", {
+        cache: "no-store",
+        credentials: "include",
+      });
+      const jb = await rb.json().catch(() => ({}));
+      if (rb.ok && jb?.ok && jb.vibeUser) {
+        setUser(jb.vibeUser as VibeUser);
+      }
+      setEditMode(false);
+      setDraft(null);
+    } catch (e) {
+      setEditError(
+        e instanceof Error ? e.message : "Could not save",
+      );
+    } finally {
+      setSavingEdit(false);
+    }
+  };
+
   if (error) {
     return (
       <div style={{ padding: 24, textAlign: "center", color: "#8A8580" }}>
@@ -318,38 +432,64 @@ export function ProfileMobile({ targetHandle }: Props = {}) {
               gap: 8,
             }}
           >
-            <Link
-              href="/profile?edit=1"
-              aria-label="Edit profile"
-              style={floatingActionStyle}
-            >
-              <svg width="17" height="17" viewBox="0 0 17 17" fill="none" aria-hidden>
-                <path
-                  d="M11.6 1.9l3.5 3.5-9.2 9.2H2.4v-3.5l9.2-9.2z"
-                  stroke="currentColor"
-                  strokeWidth="1.5"
-                  strokeLinejoin="round"
-                  fill="none"
-                />
-                <path
-                  d="M10.2 3.3l3.5 3.5"
-                  stroke="currentColor"
-                  strokeWidth="1.5"
-                  strokeLinecap="round"
-                />
-              </svg>
-            </Link>
-            <Link href="/settings" aria-label="Settings" style={floatingActionStyle}>
-              <svg width="18" height="18" viewBox="0 0 18 18" fill="none" aria-hidden>
-                <circle cx="9" cy="9" r="2.4" stroke="currentColor" strokeWidth="1.5" />
-                <path
-                  d="M9 1.5v2.2M9 14.3v2.2M16.5 9h-2.2M3.7 9H1.5M14.3 3.7l-1.55 1.55M5.25 12.75L3.7 14.3M14.3 14.3l-1.55-1.55M5.25 5.25L3.7 3.7"
-                  stroke="currentColor"
-                  strokeWidth="1.4"
-                  strokeLinecap="round"
-                />
-              </svg>
-            </Link>
+            {editMode ? (
+              <>
+                <button
+                  type="button"
+                  onClick={cancelEdit}
+                  disabled={savingEdit}
+                  style={floatingActionTextStyle}
+                  aria-label="Cancel"
+                >
+                  Cancel
+                </button>
+                <button
+                  type="button"
+                  onClick={commitEdit}
+                  disabled={savingEdit}
+                  style={floatingActionSaveStyle}
+                  aria-label="Save profile"
+                >
+                  {savingEdit ? "Saving…" : "Save"}
+                </button>
+              </>
+            ) : (
+              <>
+                <button
+                  type="button"
+                  onClick={enterEdit}
+                  aria-label="Edit profile"
+                  style={floatingActionStyle}
+                >
+                  <svg width="17" height="17" viewBox="0 0 17 17" fill="none" aria-hidden>
+                    <path
+                      d="M11.6 1.9l3.5 3.5-9.2 9.2H2.4v-3.5l9.2-9.2z"
+                      stroke="currentColor"
+                      strokeWidth="1.5"
+                      strokeLinejoin="round"
+                      fill="none"
+                    />
+                    <path
+                      d="M10.2 3.3l3.5 3.5"
+                      stroke="currentColor"
+                      strokeWidth="1.5"
+                      strokeLinecap="round"
+                    />
+                  </svg>
+                </button>
+                <Link href="/settings" aria-label="Settings" style={floatingActionStyle}>
+                  <svg width="18" height="18" viewBox="0 0 18 18" fill="none" aria-hidden>
+                    <circle cx="9" cy="9" r="2.4" stroke="currentColor" strokeWidth="1.5" />
+                    <path
+                      d="M9 1.5v2.2M9 14.3v2.2M16.5 9h-2.2M3.7 9H1.5M14.3 3.7l-1.55 1.55M5.25 12.75L3.7 14.3M14.3 14.3l-1.55-1.55M5.25 5.25L3.7 3.7"
+                      stroke="currentColor"
+                      strokeWidth="1.4"
+                      strokeLinecap="round"
+                    />
+                  </svg>
+                </Link>
+              </>
+            )}
           </div>
         )}
       </div>
@@ -400,7 +540,7 @@ export function ProfileMobile({ targetHandle }: Props = {}) {
           <StatTile num={connections} label="Connections" prominent />
         </div>
 
-        {/* Name + verified */}
+        {/* Name + verified — input when editing, h1 otherwise. */}
         <div
           style={{
             display: "flex",
@@ -410,22 +550,46 @@ export function ProfileMobile({ targetHandle }: Props = {}) {
             marginBottom: 2,
           }}
         >
-          <h1
-            style={{
-              fontFamily: "Fraunces, serif",
-              fontSize: 26,
-              fontWeight: 900,
-              letterSpacing: "-0.6px",
-              lineHeight: 1.1,
-              margin: 0,
-            }}
-          >
-            {name}
-          </h1>
+          {editMode && effectiveDraft ? (
+            <input
+              value={effectiveDraft.name}
+              onChange={(e) => updateDraft({ name: e.target.value.slice(0, 120) })}
+              placeholder="Your name"
+              style={{
+                fontFamily: "Fraunces, serif",
+                fontSize: 26,
+                fontWeight: 900,
+                letterSpacing: "-0.6px",
+                lineHeight: 1.1,
+                background: "transparent",
+                border: "none",
+                borderBottom: "1.5px solid rgba(255,92,53,0.45)",
+                padding: "2px 0",
+                width: "100%",
+                outline: "none",
+                color: "#1C1C1E",
+              }}
+            />
+          ) : (
+            <h1
+              style={{
+                fontFamily: "Fraunces, serif",
+                fontSize: 26,
+                fontWeight: 900,
+                letterSpacing: "-0.6px",
+                lineHeight: 1.1,
+                margin: 0,
+              }}
+            >
+              {name}
+            </h1>
+          )}
           {verified ? <VerifiedBadge school={school} /> : null}
         </div>
 
-        {/* Handle */}
+        {/* Handle — read-only on mobile for v1 (handle changes have a
+            cooldown + uniqueness check; not worth duplicating the
+            desktop UI here yet). */}
         {handle ? (
           <div
             style={{
@@ -440,7 +604,28 @@ export function ProfileMobile({ targetHandle }: Props = {}) {
         ) : null}
 
         {/* Tagline */}
-        {tagline ? (
+        {editMode && effectiveDraft ? (
+          <input
+            value={effectiveDraft.tagline}
+            onChange={(e) => updateDraft({ tagline: e.target.value.slice(0, 500) })}
+            placeholder="A short tagline — what's the headline on you?"
+            style={{
+              fontFamily: "Fraunces, serif",
+              fontStyle: "italic",
+              fontSize: 16,
+              color: "#5C5853",
+              lineHeight: 1.45,
+              background: "transparent",
+              border: "none",
+              borderBottom: "1.5px solid rgba(255,92,53,0.35)",
+              padding: "4px 0",
+              width: "100%",
+              outline: "none",
+              marginBottom: 12,
+              display: "block",
+            }}
+          />
+        ) : tagline ? (
           <p
             style={{
               fontFamily: "Fraunces, serif",
@@ -455,8 +640,29 @@ export function ProfileMobile({ targetHandle }: Props = {}) {
           </p>
         ) : null}
 
-        {/* Meta chips — headline already encodes major + year + department */}
-        {(location || headline) ? (
+        {/* Meta chips — headline already encodes major + year + department.
+            In edit mode, location becomes an input; headline stays
+            derived (it's computed from major/year/department in
+            buildVibeUserV1, not user-editable here). */}
+        {editMode && effectiveDraft ? (
+          <input
+            value={effectiveDraft.location}
+            onChange={(e) => updateDraft({ location: e.target.value.slice(0, 300) })}
+            placeholder="Where you're based"
+            style={{
+              fontFamily: "DM Sans, sans-serif",
+              fontSize: 13,
+              color: "#1C1C1E",
+              background: "rgba(255,255,255,0.7)",
+              border: "1px solid rgba(28,28,30,0.10)",
+              borderRadius: 999,
+              padding: "8px 14px",
+              width: "100%",
+              outline: "none",
+              marginBottom: 14,
+            }}
+          />
+        ) : (location || headline) ? (
           <div
             style={{
               display: "flex",
@@ -470,8 +676,13 @@ export function ProfileMobile({ targetHandle }: Props = {}) {
           </div>
         ) : null}
 
-        {/* Vibe tags */}
-        {[...tagsFromVibeTags, ...skills].length > 0 ? (
+        {/* Vibe tags — editable chip list when editMode is on. */}
+        {editMode && effectiveDraft ? (
+          <EditableVibeTags
+            tags={effectiveDraft.vibeTagsList}
+            onChange={(next) => updateDraft({ vibeTagsList: next })}
+          />
+        ) : [...tagsFromVibeTags, ...skills].length > 0 ? (
           <div
             style={{
               display: "flex",
@@ -488,6 +699,23 @@ export function ProfileMobile({ targetHandle }: Props = {}) {
           </div>
         ) : null}
 
+        {editError ? (
+          <div
+            style={{
+              fontFamily: "DM Sans, sans-serif",
+              fontSize: 12,
+              color: "#C0392B",
+              background: "rgba(192,57,43,0.08)",
+              border: "1px solid rgba(192,57,43,0.18)",
+              borderRadius: 10,
+              padding: "8px 12px",
+              marginBottom: 14,
+            }}
+          >
+            {editError}
+          </div>
+        ) : null}
+
         {/* Owner: edit affordance lives in the cover top-right.
             Visitor: Connect / Follow CTA goes here, full-width and
             prominent (the primary call-to-action on someone else's
@@ -501,8 +729,31 @@ export function ProfileMobile({ targetHandle }: Props = {}) {
         ) : null}
       </div>
 
-      {/* Bio — stays in the header area, above the tab strip */}
-      {bio ? (
+      {/* Bio — stays in the header area, above the tab strip.
+          Textarea in edit mode (4000-char cap matches server). */}
+      {editMode && effectiveDraft ? (
+        <Section title="Bio">
+          <textarea
+            value={effectiveDraft.bio}
+            onChange={(e) => updateDraft({ bio: e.target.value.slice(0, 4000) })}
+            placeholder="What do you want people to know about you?"
+            rows={4}
+            style={{
+              width: "100%",
+              fontFamily: "DM Sans, sans-serif",
+              fontSize: 14,
+              lineHeight: 1.6,
+              color: "#1C1C1E",
+              background: "rgba(255,255,255,0.7)",
+              border: "1px solid rgba(28,28,30,0.10)",
+              borderRadius: 12,
+              padding: "10px 12px",
+              outline: "none",
+              resize: "vertical",
+            }}
+          />
+        </Section>
+      ) : bio ? (
         <Section title="Bio">
           <p style={{ fontSize: 14, lineHeight: 1.6, color: "#3D3D3A", margin: 0 }}>
             {bio}
@@ -1684,6 +1935,37 @@ const floatingActionStyle: React.CSSProperties = {
   color: "#fff",
   textDecoration: "none",
   border: "1px solid rgba(255,255,255,0.18)",
+  cursor: "pointer",
+  padding: 0,
+};
+
+// Cover-overlay Save / Cancel pills shown in edit mode. Both use the
+// same dark-glass treatment as the floating circular actions so the
+// transition reads consistent, just with text instead of an icon.
+const floatingActionTextStyle: React.CSSProperties = {
+  padding: "8px 14px",
+  borderRadius: 999,
+  background: "rgba(0,0,0,0.42)",
+  backdropFilter: "blur(10px)",
+  WebkitBackdropFilter: "blur(10px)",
+  color: "rgba(255,255,255,0.92)",
+  border: "1px solid rgba(255,255,255,0.18)",
+  fontFamily: "DM Sans, sans-serif",
+  fontSize: 12,
+  fontWeight: 700,
+  cursor: "pointer",
+};
+const floatingActionSaveStyle: React.CSSProperties = {
+  padding: "8px 16px",
+  borderRadius: 999,
+  background: "#FF5C35",
+  color: "#fff",
+  border: "1px solid rgba(255,92,53,0.55)",
+  fontFamily: "DM Sans, sans-serif",
+  fontSize: 12,
+  fontWeight: 700,
+  cursor: "pointer",
+  boxShadow: "0 4px 14px rgba(255,92,53,0.35)",
 };
 
 const vibeTagStyle: React.CSSProperties = {
@@ -1694,6 +1976,97 @@ const vibeTagStyle: React.CSSProperties = {
   background: "#FFF0EC",
   color: "#FF5C35",
 };
+
+// Tag list editor — chip with × per tag + an "add" input at the end.
+// Enter or comma submits the input. Empty input + backspace removes
+// the trailing tag (familiar from Twitter-style tag pickers).
+function EditableVibeTags({
+  tags,
+  onChange,
+}: {
+  tags: string[];
+  onChange: (next: string[]) => void;
+}) {
+  const [pending, setPending] = useState("");
+  const commit = () => {
+    const t = pending.trim();
+    if (!t) return;
+    if (tags.includes(t)) {
+      setPending("");
+      return;
+    }
+    if (tags.length >= 40) {
+      setPending("");
+      return;
+    }
+    onChange([...tags, t.slice(0, 80)]);
+    setPending("");
+  };
+  return (
+    <div
+      style={{
+        display: "flex",
+        flexWrap: "wrap",
+        gap: 6,
+        marginBottom: 18,
+        background: "rgba(255,255,255,0.55)",
+        border: "1px solid rgba(28,28,30,0.10)",
+        borderRadius: 12,
+        padding: 8,
+      }}
+    >
+      {tags.map((tag, i) => (
+        <span key={`${tag}-${i}`} style={{ ...vibeTagStyle, display: "inline-flex", alignItems: "center", gap: 6 }}>
+          {tag}
+          <button
+            type="button"
+            onClick={() => onChange(tags.filter((_, j) => j !== i))}
+            aria-label={`Remove ${tag}`}
+            style={{
+              width: 16,
+              height: 16,
+              borderRadius: 999,
+              background: "rgba(255,92,53,0.18)",
+              color: "#FF5C35",
+              border: "none",
+              fontSize: 12,
+              lineHeight: 1,
+              cursor: "pointer",
+              padding: 0,
+            }}
+          >
+            ×
+          </button>
+        </span>
+      ))}
+      <input
+        value={pending}
+        onChange={(e) => setPending(e.target.value)}
+        onKeyDown={(e) => {
+          if (e.key === "Enter" || e.key === ",") {
+            e.preventDefault();
+            commit();
+          } else if (e.key === "Backspace" && pending.length === 0 && tags.length > 0) {
+            onChange(tags.slice(0, -1));
+          }
+        }}
+        onBlur={commit}
+        placeholder={tags.length === 0 ? "Add vibe tags…" : "+ tag"}
+        style={{
+          flex: 1,
+          minWidth: 90,
+          border: "none",
+          outline: "none",
+          background: "transparent",
+          fontFamily: "DM Sans, sans-serif",
+          fontSize: 13,
+          color: "#1C1C1E",
+          padding: "4px 6px",
+        }}
+      />
+    </div>
+  );
+}
 
 function Section({ title, children }: { title: string; children: React.ReactNode }) {
   return (
