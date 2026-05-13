@@ -469,32 +469,7 @@ export function ImageCropperModal({
                       pointerEvents: "none",
                       borderRadius: 2,
                     }}
-                  >
-                    <span
-                      style={{
-                        position: "absolute",
-                        // Sit chips just INSIDE the outline so they
-                        // never clip against the viewport's
-                        // overflow:hidden — labels above the rect get
-                        // chopped off when a guide hugs the top edge.
-                        top: 4,
-                        left: 4,
-                        background: g.color,
-                        color: "#fff",
-                        fontFamily: "DM Sans, sans-serif",
-                        fontSize: 9,
-                        fontWeight: 800,
-                        letterSpacing: "0.04em",
-                        textTransform: "uppercase",
-                        padding: "2px 6px",
-                        borderRadius: 999,
-                        whiteSpace: "nowrap",
-                        lineHeight: 1,
-                      }}
-                    >
-                      {g.label}
-                    </span>
-                  </div>
+                  />
                 );
               })
             : null}
@@ -514,6 +489,43 @@ export function ImageCropperModal({
             style={{ flex: 1, accentColor: "#FF5C35" }}
           />
         </div>
+
+        {safeAreaGuides?.length && shape !== "circle" ? (
+          <div
+            style={{
+              display: "flex",
+              flexWrap: "wrap",
+              gap: 14,
+              fontFamily: "DM Sans, sans-serif",
+              fontSize: 11,
+              color: "#5C5852",
+              lineHeight: 1.4,
+            }}
+          >
+            {safeAreaGuides.map((g) => (
+              <div
+                key={g.label}
+                style={{
+                  display: "inline-flex",
+                  alignItems: "center",
+                  gap: 6,
+                }}
+              >
+                <span
+                  aria-hidden
+                  style={{
+                    display: "inline-block",
+                    width: 16,
+                    height: 0,
+                    borderTop: `2px dashed ${g.color}`,
+                  }}
+                />
+                <span style={{ fontWeight: 700 }}>{g.label}</span>
+                <span style={{ color: "#8A8580" }}>visible area</span>
+              </div>
+            ))}
+          </div>
+        ) : null}
 
         <div style={{ display: "flex", justifyContent: "flex-end", gap: 8 }}>
           <button

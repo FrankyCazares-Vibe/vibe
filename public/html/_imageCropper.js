@@ -87,6 +87,7 @@
         '    <span class="vc-zoom-label">Zoom</span>' +
         '    <input type="range" class="vc-zoom-slider" min="0" max="1" step="0.001" value="0">' +
         "  </div>" +
+        '  <div class="vc-legend"></div>' +
         '  <div class="vc-actions">' +
         '    <button type="button" class="vc-btn vc-cancel">Cancel</button>' +
         '    <button type="button" class="vc-btn vc-btn-primary vc-save" disabled>Save</button>' +
@@ -106,7 +107,9 @@
 
       // Optional safe-area outlines — drawn after the <img> so they
       // float above it. Skipped for circle shape (avatar) since circular
-      // avatars get center-cover'd the same on every surface.
+      // avatars get center-cover'd the same on every surface. Labels
+      // live in a separate legend (see below) so they never clip when a
+      // guide rect hugs the viewport edge.
       if (safeAreaGuides.length && shape !== "circle") {
         for (let i = 0; i < safeAreaGuides.length; i++) {
           const g = safeAreaGuides[i];
@@ -130,24 +133,42 @@
           guide.style.boxShadow = "0 0 0 1px rgba(0,0,0,0.35) inset";
           guide.style.pointerEvents = "none";
           guide.style.borderRadius = "2px";
-          const chip = document.createElement("span");
-          chip.textContent = g.label;
-          chip.style.position = "absolute";
-          chip.style.top = "4px";
-          chip.style.left = "4px";
-          chip.style.background = g.color;
-          chip.style.color = "#fff";
-          chip.style.fontFamily = "'DM Sans', sans-serif";
-          chip.style.fontSize = "9px";
-          chip.style.fontWeight = "800";
-          chip.style.letterSpacing = "0.04em";
-          chip.style.textTransform = "uppercase";
-          chip.style.padding = "2px 6px";
-          chip.style.borderRadius = "999px";
-          chip.style.whiteSpace = "nowrap";
-          chip.style.lineHeight = "1";
-          guide.appendChild(chip);
           stage.appendChild(guide);
+        }
+        // Build the legend below the zoom slider so users know what
+        // each dashed color stands for, without crowding the crop frame.
+        const legend = backdrop.querySelector(".vc-legend");
+        if (legend) {
+          legend.style.display = "flex";
+          legend.style.flexWrap = "wrap";
+          legend.style.gap = "14px";
+          legend.style.fontFamily = "'DM Sans', sans-serif";
+          legend.style.fontSize = "11px";
+          legend.style.color = "#5C5852";
+          legend.style.lineHeight = "1.4";
+          for (let i = 0; i < safeAreaGuides.length; i++) {
+            const g = safeAreaGuides[i];
+            const row = document.createElement("div");
+            row.style.display = "inline-flex";
+            row.style.alignItems = "center";
+            row.style.gap = "6px";
+            const swatch = document.createElement("span");
+            swatch.setAttribute("aria-hidden", "true");
+            swatch.style.display = "inline-block";
+            swatch.style.width = "16px";
+            swatch.style.height = "0";
+            swatch.style.borderTop = "2px dashed " + g.color;
+            const label = document.createElement("span");
+            label.textContent = g.label;
+            label.style.fontWeight = "700";
+            const suffix = document.createElement("span");
+            suffix.textContent = "visible area";
+            suffix.style.color = "#8A8580";
+            row.appendChild(swatch);
+            row.appendChild(label);
+            row.appendChild(suffix);
+            legend.appendChild(row);
+          }
         }
       }
 
