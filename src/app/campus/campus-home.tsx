@@ -10363,44 +10363,6 @@ function MapTabBody() {
           </button>
         </div>
 
-        {/* Zoom controls — stacked +/- in the bottom-right corner.
-            Center-anchored zoom (not cursor-anchored) since the click
-            doesn't carry a meaningful cursor position. */}
-        <div
-          style={{
-            position: "absolute",
-            bottom: 14,
-            right: 14,
-            zIndex: 5,
-            display: "flex",
-            flexDirection: "column",
-            gap: 6,
-          }}
-          onPointerDown={(e) => e.stopPropagation()}
-        >
-          <button
-            type="button"
-            aria-label="Zoom in"
-            onClick={(e) => {
-              e.stopPropagation();
-              zoomAround(1.25, null);
-            }}
-            style={zoomButtonStyle}
-          >
-            +
-          </button>
-          <button
-            type="button"
-            aria-label="Zoom out"
-            onClick={(e) => {
-              e.stopPropagation();
-              zoomAround(1 / 1.25, null);
-            }}
-            style={zoomButtonStyle}
-          >
-            −
-          </button>
-        </div>
       </div>
 
       {selected ? (
@@ -10427,23 +10389,6 @@ const mapEmptyOverlayStyle: React.CSSProperties = {
   fontFamily: "DM Sans, sans-serif",
 };
 
-const zoomButtonStyle: React.CSSProperties = {
-  width: 34,
-  height: 34,
-  borderRadius: 10,
-  border: "1px solid rgba(120,200,255,0.35)",
-  background: "rgba(8,12,28,0.78)",
-  color: "rgba(220,240,255,0.95)",
-  fontFamily: "DM Sans, sans-serif",
-  fontSize: 18,
-  fontWeight: 700,
-  lineHeight: 1,
-  cursor: "pointer",
-  backdropFilter: "blur(14px)",
-  WebkitBackdropFilter: "blur(14px)",
-  pointerEvents: "auto",
-  boxShadow: "0 4px 12px rgba(0,0,0,0.35)",
-};
 
 function LegendDot({ color }: { color: string }) {
   return (
