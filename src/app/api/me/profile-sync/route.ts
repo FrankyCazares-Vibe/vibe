@@ -66,6 +66,18 @@ export async function POST(req: Request) {
     }
   }
 
+  // headline is a derived field — buildVibeUserV1FromProfile prefers a
+  // stored headline over the derived "<major> · Year <n>" string. So
+  // when major or year change, clear the stored headline (unless the
+  // request explicitly sent a new one) so the next bootstrap rebuilds
+  // it from the fresh major + year.
+  if (
+    (patch.major !== undefined || patch.year !== undefined) &&
+    patch.headline === undefined
+  ) {
+    patch.headline = "";
+  }
+
   if ("interests" in body) {
     if (!Array.isArray(body.interests)) {
       return NextResponse.json({ ok: false, error: "Invalid interests" }, { status: 400 });
