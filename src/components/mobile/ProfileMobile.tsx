@@ -502,17 +502,6 @@ export function ProfileMobile({ targetHandle }: Props = {}) {
           background: banner ? `url(${banner}) center/cover` : gradient,
         }}
       >
-        {/* Bottom-edge fade so the avatar reads cleanly against the cover */}
-        <div
-          aria-hidden
-          style={{
-            position: "absolute",
-            inset: 0,
-            background:
-              "linear-gradient(to bottom, transparent 50%, rgba(250,247,242,0.55) 100%)",
-            pointerEvents: "none",
-          }}
-        />
         {editMode && !isVisitor ? (
           <>
             <button
@@ -539,6 +528,27 @@ export function ProfileMobile({ targetHandle }: Props = {}) {
             >
               {uploadingKind === "banner" ? "Uploading…" : "Change cover"}
             </button>
+            <div
+              aria-hidden
+              style={{
+                position: "absolute",
+                bottom: 50,
+                right: 14,
+                padding: "4px 10px",
+                borderRadius: 999,
+                background: "rgba(0,0,0,0.42)",
+                color: "rgba(255,255,255,0.92)",
+                fontFamily: "DM Sans, sans-serif",
+                fontSize: 10.5,
+                fontWeight: 600,
+                letterSpacing: "0.01em",
+                backdropFilter: "blur(8px)",
+                WebkitBackdropFilter: "blur(8px)",
+                whiteSpace: "nowrap",
+              }}
+            >
+              Tip — use a 1600 × 533 (or larger) photo
+            </div>
             <input
               ref={bannerInputRef}
               type="file"
