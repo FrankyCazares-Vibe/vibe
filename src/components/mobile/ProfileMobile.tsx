@@ -992,16 +992,36 @@ export function ProfileMobile({ targetHandle }: Props = {}) {
         <ImageCropperModal
           src={pendingCrop.file}
           aspect={pendingCrop.kind === "avatar" ? 1 : 3}
-          // outputMaxSize is the long-edge pixel count of the JPEG the
-          // cropper emits. Avatar at 640px renders crisp at any size
-          // on the profile; banner at 1800px stays sharp on the
-          // ~1000px-wide desktop cover.
-          outputMaxSize={pendingCrop.kind === "avatar" ? 640 : 1800}
+          // outputMaxSize = long-edge px count of the emitted JPEG.
+          // Avatar 768 covers retina display at typical 88-160px
+          // rendered sizes. Banner bumped to 2400 — the desktop
+          // profile cover spans full body width (~1200-1920 CSS px,
+          // doubled on retina), so ~2400px gives the browser
+          // headroom to downscale (sharp) rather than upscale (blurry).
+          // Cropper still caps at the source image's native pixels,
+          // so users who upload small screenshots get a friendly hint
+          // (see EditError surface) rather than an upscaled blur.
+          outputMaxSize={pendingCrop.kind === "avatar" ? 768 : 2400}
           title={pendingCrop.kind === "avatar" ? "Crop profile photo" : "Crop cover photo"}
           onCancel={() => setPendingCrop(null)}
-          onConfirm={(blob) => {
+          onConfirm={(blob, info) => {
             const kind = pendingCrop.kind;
             setPendingCrop(null);
+            // Soft warning: the cropper never upscales past the
+            // source image's native pixels (would just add blur).
+            // If the user picked a screenshot or tiny social-export
+            // and the banner output ended up smaller than ~1600px on
+            // the long edge, surface a hint so they know their
+            // banner may look soft on desktop.
+            if (kind === "banner" && info.width < 1600) {
+              setEditError(
+                "Heads up — that image is smaller than ideal (" +
+                  info.width +
+                  "px wide). It'll look sharp on phone but may look soft on the wider desktop banner. Try a higher-resolution photo if it matters.",
+              );
+            } else {
+              setEditError(null);
+            }
             void uploadCroppedBlob(blob, kind);
           }}
         />

@@ -2,6 +2,7 @@
 
 import {
   useCallback,
+  useEffect,
   useMemo,
   useRef,
   useState,
@@ -71,13 +72,28 @@ export function ImageCropperModal({
   const [activeAspect, setActiveAspect] = useState<number>(initialAspect);
 
   // The crop viewport is a fixed-size container; we shrink it to fit the
-  // available modal width while keeping the chosen aspect ratio.
-  const VIEWPORT_MAX = 540;
+  // available modal width while keeping the chosen aspect ratio. On
+  // narrow viewports (phones < 580px) cap the longest edge to the
+  // actual screen width minus the modal's outer + inner padding so the
+  // crop frame doesn't bleed off-screen. Updates on resize so rotating
+  // the device works.
+  const [viewportCap, setViewportCap] = useState(() =>
+    typeof window === "undefined"
+      ? 540
+      : Math.max(220, Math.min(540, window.innerWidth - 76)),
+  );
+  useEffect(() => {
+    const onResize = () => {
+      setViewportCap(Math.max(220, Math.min(540, window.innerWidth - 76)));
+    };
+    window.addEventListener("resize", onResize);
+    return () => window.removeEventListener("resize", onResize);
+  }, []);
   const viewport = useMemo(() => {
-    const w = activeAspect >= 1 ? VIEWPORT_MAX : VIEWPORT_MAX * activeAspect;
-    const h = activeAspect >= 1 ? VIEWPORT_MAX / activeAspect : VIEWPORT_MAX;
+    const w = activeAspect >= 1 ? viewportCap : viewportCap * activeAspect;
+    const h = activeAspect >= 1 ? viewportCap / activeAspect : viewportCap;
     return { w, h };
-  }, [activeAspect]);
+  }, [activeAspect, viewportCap]);
 
   // Pan / zoom state. `scale` is multiplied against the image's natural
   // size; `pos` is the top-left offset inside the viewport.
@@ -92,13 +108,13 @@ export function ImageCropperModal({
   } | null>(null);
   const [busy, setBusy] = useState(false);
 
-  // Whenever the image loads OR the aspect changes, recompute the
-  // "minimum scale to cover" so the crop frame is never empty, and
-  // recenter the image.
+  // Whenever the image loads OR the aspect/viewport-cap changes,
+  // recompute the "minimum scale to cover" so the crop frame is never
+  // empty, and recenter the image.
   const fitImage = useCallback(
     (dims: { w: number; h: number }, aspectVal: number) => {
-      const vw = aspectVal >= 1 ? VIEWPORT_MAX : VIEWPORT_MAX * aspectVal;
-      const vh = aspectVal >= 1 ? VIEWPORT_MAX / aspectVal : VIEWPORT_MAX;
+      const vw = aspectVal >= 1 ? viewportCap : viewportCap * aspectVal;
+      const vh = aspectVal >= 1 ? viewportCap / aspectVal : viewportCap;
       // "Cover" — image must fully fill the frame. Pick the larger ratio.
       const fit = Math.max(vw / dims.w, vh / dims.h);
       setScale(fit);
@@ -109,8 +125,21 @@ export function ImageCropperModal({
         y: (vh - dispH) / 2,
       });
     },
-    [],
+    [viewportCap],
   );
+
+  // Re-fit when the viewport cap changes (rotate / resize) so the
+  // image stays inside the new frame. Defer to the next animation
+  // frame so the setState calls don't fire synchronously inside the
+  // effect body (which the React 19 hook-lint flags as cascading).
+  useEffect(() => {
+    if (!imgDims) return;
+    const id = window.requestAnimationFrame(() => {
+      fitImage(imgDims, activeAspect);
+    });
+    return () => window.cancelAnimationFrame(id);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [viewportCap]);
 
   const onImgLoad = useCallback(
     (e: React.SyntheticEvent<HTMLImageElement>) => {
