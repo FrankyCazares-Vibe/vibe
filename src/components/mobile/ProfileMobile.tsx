@@ -1230,7 +1230,10 @@ export function ProfileMobile({ targetHandle }: Props = {}) {
           style={{
             position: "fixed",
             right: 18,
-            bottom: "calc(env(safe-area-inset-bottom, 0px) + 22px)",
+            // Sit above the fixed mobile tabbar (~60px tall) + its
+            // safe-area padding, plus a 16px breathing gap. Otherwise
+            // the FAB landed underneath the bottom nav.
+            bottom: "calc(env(safe-area-inset-bottom, 0px) + 78px)",
             width: 56,
             height: 56,
             borderRadius: 999,
