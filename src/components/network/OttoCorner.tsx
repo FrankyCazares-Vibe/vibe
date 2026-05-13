@@ -353,8 +353,11 @@ export function OttoCorner() {
                 animationDelay: "0.7s",
               }}
             />
-            {/* Outer orbit (reverse, medium) — 3 nodes: coral top,
-                purple bottom, coral-light right. */}
+            {/* Outer orbit — 3 nodes spinning around the sun: coral
+                top, purple bottom, coral-light right. Inner orbit was
+                removed because its two nodes sat right against the
+                core (the "sun"). Keeping only the outer ring leaves
+                clear breathing room between the orbit and the body. */}
             <div
               style={{
                 position: "absolute",
@@ -400,44 +403,6 @@ export function OttoCorner() {
                   height: 3,
                   borderRadius: "50%",
                   background: "#FFB59A",
-                }}
-              />
-            </div>
-            {/* Inner orbit (forward, slightly faster) — 2 nodes:
-                cream top, purple-light bottom. */}
-            <div
-              style={{
-                position: "absolute",
-                inset: 12,
-                borderRadius: "50%",
-                border: "0.5px solid rgba(124,92,252,0.5)",
-                animation: "otto-orbit-spin-med 4.5s linear infinite",
-              }}
-            >
-              <span
-                style={{
-                  position: "absolute",
-                  top: -2,
-                  left: "50%",
-                  transform: "translateX(-50%)",
-                  width: 4,
-                  height: 4,
-                  borderRadius: "50%",
-                  background: "#FFE5DB",
-                  boxShadow: "0 0 5px #FF5C35",
-                }}
-              />
-              <span
-                style={{
-                  position: "absolute",
-                  bottom: -2,
-                  left: "50%",
-                  transform: "translateX(-50%)",
-                  width: 3,
-                  height: 3,
-                  borderRadius: "50%",
-                  background: "#C8B8FF",
-                  boxShadow: "0 0 4px #7C5CFC",
                 }}
               />
             </div>
