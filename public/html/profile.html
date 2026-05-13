@@ -7394,6 +7394,47 @@ function _urlFromCssBackgroundImage(bgImg) {
   return m ? m[1].trim() : '';
 }
 
+// Mirror of src/lib/profile/work-experience.ts:
+// parseExperienceEndDateMs + sortWorkExperienceByRecency. Kept in
+// vanilla JS so the legacy profile.html render can sort the
+// experience list at display time without bouncing through the React
+// surfaces. Keep both in sync when you change the parser.
+const _MONTHS_TO_IDX = {
+  jan: 0, january: 0, feb: 1, february: 1, mar: 2, march: 2,
+  apr: 3, april: 3, may: 4, jun: 5, june: 5, jul: 6, july: 6,
+  aug: 7, august: 7, sep: 8, sept: 8, september: 8,
+  oct: 9, october: 9, nov: 10, november: 10, dec: 11, december: 11,
+  spring: 2, summer: 5, fall: 8, autumn: 8, winter: 11,
+};
+function _parseExperienceEndDateMs(raw) {
+  if (!raw) return 0;
+  const s = String(raw).toLowerCase();
+  if (/\b(present|current(?:ly)?|now|ongoing)\b/.test(s)) return Date.now();
+  const halves = s.split(/\s*(?:[-–—~]|to|until|through)\s*/i);
+  const tail = (halves[halves.length - 1] || '').trim();
+  if (!tail) return 0;
+  if (/\b(present|current|now|ongoing)\b/.test(tail)) return Date.now();
+  let m = tail.match(/\b([a-z]+)\.?\s+(\d{4})\b/) || tail.match(/(\d{4})/);
+  if (!m) return 0;
+  if (m.length === 3) {
+    const month = _MONTHS_TO_IDX[m[1].replace(/\./g, '')];
+    const year = parseInt(m[2], 10);
+    if (!Number.isFinite(year)) return 0;
+    if (month === undefined) return Date.UTC(year, 11, 31);
+    return Date.UTC(year, month, 28);
+  }
+  const year = parseInt(m[1], 10);
+  if (!Number.isFinite(year)) return 0;
+  return Date.UTC(year, 11, 31);
+}
+function _sortWorkExperienceByRecency(rows) {
+  if (!Array.isArray(rows)) return [];
+  return rows
+    .map((row, i) => ({ row, i, key: _parseExperienceEndDateMs(row && row.dates) }))
+    .sort((a, b) => (b.key !== a.key ? b.key - a.key : a.i - b.i))
+    .map((e) => e.row);
+}
+
 function saveProfileToStorage() {
   // Never write when viewing someone else's profile — the DOM is showing
   // their data and capturing it would overwrite the owner's vibe_user_v1.
@@ -8748,7 +8789,11 @@ function renderUserSections(user) {
     const list = document.getElementById('workList');
     if (list) {
       list.querySelectorAll('.work-item').forEach(w => w.remove());
-      user.workExperience.forEach(w => {
+      // Sort by parsed end date desc — most recent / current role at
+      // the top. Stable for ties so the rendered order stays
+      // deterministic when dates are ambiguous.
+      const sortedWork = _sortWorkExperienceByRecency(user.workExperience);
+      sortedWork.forEach(w => {
         const item = document.createElement('div');
         item.className = 'work-item';
         const hasLogo = w.logoUrl && (w.logoUrl.startsWith('data:') || /^https?:\/\//i.test(w.logoUrl));

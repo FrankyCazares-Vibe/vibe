@@ -12,6 +12,7 @@ import { PostViewerMobile } from "@/components/mobile/PostViewerMobile";
 import { ResumeViewerMobile } from "@/components/mobile/ResumeViewerMobile";
 import { IU_MAJORS_BY_SCHOOL } from "@/lib/iu/majors";
 import type { RedactionBar } from "@/lib/profile/resume-redactions";
+import { sortWorkExperienceByRecency } from "@/lib/profile/work-experience";
 
 /**
  * iOS-native mobile profile screen. Instagram-style layout: full-bleed
@@ -544,7 +545,12 @@ export function ProfileMobile({ targetHandle }: Props = {}) {
     .map((t) => t?.label)
     .filter((s): s is string => !!s)
     .slice(0, 6);
-  const workExperience = (user.workExperience ?? []).slice(0, 4);
+  // Sort by parsed end date descending — most recent / current role
+  // floats to the top. Falls back to array order for ties so the
+  // display is deterministic when dates are ambiguous.
+  const workExperience = sortWorkExperienceByRecency(
+    user.workExperience ?? [],
+  ).slice(0, 4);
   const counts = user.counts ?? {};
   const followers = String(counts.followers ?? "0");
   const connections = String(counts.connections ?? "0");
