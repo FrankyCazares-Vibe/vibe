@@ -85,8 +85,24 @@ type Props = {
   origin?: { x: number; y: number };
 };
 
+type PermState =
+  /** Haven't asked yet — show the friendly "Enable camera" CTA. */
+  | "asking"
+  /** Asked and granted — stream live. */
+  | "granted"
+  /** Asked and denied (or blocked at OS level). Show the Instagram /
+   *  TikTok-style "open settings" graphic instead of just an error. */
+  | "denied"
+  /** Browser doesn't expose getUserMedia (HTTP, in-app webview, etc). */
+  | "unsupported";
+
 export function ClipComposerMobile({ onClose, onPosted, origin }: Props) {
   const [phase, setPhase] = useState<Phase>("intro");
+  const [permState, setPermState] = useState<PermState>(() => {
+    if (typeof navigator === "undefined") return "asking";
+    if (!navigator.mediaDevices?.getUserMedia) return "unsupported";
+    return "asking";
+  });
   const [permissionError, setPermissionError] = useState<string | null>(null);
   const [stream, setStream] = useState<MediaStream | null>(null);
   const [facing, setFacing] = useState<Facing>("user");
@@ -124,7 +140,14 @@ export function ClipComposerMobile({ onClose, onPosted, origin }: Props) {
 
   // Request camera + mic. Called from the intro screen's button so it
   // counts as a real user gesture (iOS Safari is strict about this).
+  // Differentiates "denied" (NotAllowedError, NotFoundError) from other
+  // failures so we can show the Instagram-style settings prompt vs a
+  // generic error.
   const requestCamera = useCallback(async (next: Facing = facing) => {
+    if (typeof navigator === "undefined" || !navigator.mediaDevices?.getUserMedia) {
+      setPermState("unsupported");
+      return;
+    }
     setPermissionError(null);
     try {
       const s = await navigator.mediaDevices.getUserMedia({
@@ -143,12 +166,26 @@ export function ClipComposerMobile({ onClose, onPosted, origin }: Props) {
         return s;
       });
       setFacing(next);
+      setPermState("granted");
     } catch (e) {
-      setPermissionError(
-        e instanceof Error
-          ? `Couldn't open camera — ${e.message}`
-          : "Couldn't open camera. Check your browser permissions.",
-      );
+      // DOMException names that mean "user / OS said no" vs everything
+      // else (missing hardware, in-app webview, etc).
+      const name = (e as { name?: string })?.name ?? "";
+      if (
+        name === "NotAllowedError" ||
+        name === "PermissionDeniedError" ||
+        name === "SecurityError"
+      ) {
+        setPermState("denied");
+      } else if (name === "NotFoundError" || name === "OverconstrainedError") {
+        setPermState("denied");
+        setPermissionError("No camera was found on this device.");
+      } else {
+        setPermState("denied");
+        setPermissionError(
+          e instanceof Error ? e.message : "Couldn't open the camera.",
+        );
+      }
     }
   }, [facing]);
 
@@ -446,86 +483,347 @@ export function ClipComposerMobile({ onClose, onPosted, origin }: Props) {
 
   // ---------- subviews ----------
 
-  const renderIntro = () => (
-    <>
-      <video
-        ref={previewVideoRef}
-        autoPlay
-        muted
-        playsInline
+  /**
+   * Friendly first-ask screen — gradient backdrop, big camera icon,
+   * single CTA. Triggers the OS prompt via a real user gesture.
+   */
+  const renderAskingScreen = () => (
+    <div
+      style={{
+        position: "absolute",
+        inset: 0,
+        display: "flex",
+        flexDirection: "column",
+        alignItems: "center",
+        justifyContent: "center",
+        padding: "0 32px",
+        textAlign: "center",
+        color: "#fff",
+        background:
+          "radial-gradient(120% 80% at 50% 20%, rgba(255,92,53,0.32) 0%, rgba(28,28,30,0.96) 60%, #000 100%)",
+        gap: 18,
+      }}
+    >
+      <button
+        type="button"
+        onClick={requestClose}
+        aria-label="Close"
+        style={chromeButton({
+          top: "calc(env(safe-area-inset-top, 0px) + 12px)",
+          left: 14,
+        })}
+      >
+        ✕
+      </button>
+
+      <div
+        aria-hidden
+        style={{
+          width: 84,
+          height: 84,
+          borderRadius: "50%",
+          background:
+            "linear-gradient(135deg, #FF7A4D 0%, #FF5C35 60%, #E04A26 100%)",
+          display: "inline-flex",
+          alignItems: "center",
+          justifyContent: "center",
+          boxShadow: "0 12px 36px rgba(255,92,53,0.45)",
+          marginBottom: 4,
+        }}
+      >
+        <svg width="40" height="40" viewBox="0 0 24 24" fill="none" aria-hidden>
+          <rect x="2.5" y="6" width="14" height="12" rx="2.5" stroke="#fff" strokeWidth="1.8" fill="none" />
+          <path d="M16.5 10l4-2.5v9L16.5 14" stroke="#fff" strokeWidth="1.8" strokeLinejoin="round" fill="none" />
+        </svg>
+      </div>
+
+      <span
+        style={{
+          fontFamily: "Fraunces, serif",
+          fontWeight: 800,
+          fontSize: 28,
+          lineHeight: 1.15,
+        }}
+      >
+        Record your clip
+      </span>
+      <p
+        style={{
+          fontFamily: "DM Sans, sans-serif",
+          fontSize: 14,
+          opacity: 0.8,
+          maxWidth: 300,
+          lineHeight: 1.5,
+          margin: 0,
+        }}
+      >
+        Vibe needs your camera and microphone to film a vertical clip.
+        You&apos;ll see the OS permission prompt next.
+      </p>
+
+      <button
+        type="button"
+        onClick={() => void requestCamera()}
+        style={{
+          marginTop: 12,
+          padding: "13px 26px",
+          borderRadius: 999,
+          border: "none",
+          background: "#fff",
+          color: "#1C1C1E",
+          fontFamily: "DM Sans, sans-serif",
+          fontWeight: 800,
+          fontSize: 14,
+          cursor: "pointer",
+          boxShadow: "0 10px 28px rgba(0,0,0,0.35)",
+        }}
+      >
+        Enable camera + microphone
+      </button>
+    </div>
+  );
+
+  /**
+   * Permission-denied screen, modeled on Instagram + TikTok's "camera
+   * access is off" graphics. Detects iOS so we can show iOS-specific
+   * Settings-app instructions. Gives a Retry button — sometimes the
+   * user fixes it in another tab and comes back.
+   */
+  const renderDeniedScreen = () => {
+    const isIOS =
+      typeof navigator !== "undefined" &&
+      /iPad|iPhone|iPod/.test(navigator.userAgent);
+    return (
+      <div
         style={{
           position: "absolute",
           inset: 0,
-          width: "100%",
-          height: "100%",
-          objectFit: "cover",
-          background: "#000",
-          // Mirror selfie cam so it reads naturally on screen.
-          transform: facing === "user" ? "scaleX(-1)" : "none",
+          display: "flex",
+          flexDirection: "column",
+          alignItems: "center",
+          justifyContent: "center",
+          padding: "0 28px",
+          textAlign: "center",
+          color: "#fff",
+          background:
+            "radial-gradient(120% 80% at 50% 20%, rgba(255,92,53,0.18) 0%, rgba(28,28,30,0.98) 60%, #000 100%)",
+          gap: 18,
         }}
-      />
+      >
+        <button
+          type="button"
+          onClick={requestClose}
+          aria-label="Close"
+          style={chromeButton({
+            top: "calc(env(safe-area-inset-top, 0px) + 12px)",
+            left: 14,
+          })}
+        >
+          ✕
+        </button>
 
-      {!stream ? (
+        {/* Camera-with-slash icon — the universal "access denied" mark */}
         <div
+          aria-hidden
           style={{
-            position: "absolute",
-            inset: 0,
-            display: "flex",
-            flexDirection: "column",
+            width: 92,
+            height: 92,
+            borderRadius: "50%",
+            background:
+              "linear-gradient(135deg, rgba(255,255,255,0.12), rgba(255,255,255,0.04))",
+            border: "1px solid rgba(255,255,255,0.18)",
+            display: "inline-flex",
             alignItems: "center",
             justifyContent: "center",
-            padding: 32,
-            textAlign: "center",
-            color: "#fff",
-            background: "rgba(0,0,0,0.85)",
-            gap: 18,
+            position: "relative",
           }}
         >
-          <span
+          <svg width="46" height="46" viewBox="0 0 24 24" fill="none" aria-hidden>
+            <rect x="2.5" y="6" width="14" height="12" rx="2.5" stroke="#fff" strokeWidth="1.6" fill="none" opacity={0.92} />
+            <path d="M16.5 10l4-2.5v9L16.5 14" stroke="#fff" strokeWidth="1.6" strokeLinejoin="round" fill="none" opacity={0.92} />
+            {/* The slash */}
+            <line x1="3" y1="3.5" x2="22.5" y2="22" stroke="#FF5C35" strokeWidth="2.4" strokeLinecap="round" />
+            <line x1="3.5" y1="3" x2="23" y2="21.5" stroke="#1C1C1E" strokeWidth="1.0" strokeLinecap="round" opacity={0.5} />
+          </svg>
+        </div>
+
+        <span
+          style={{
+            fontFamily: "Fraunces, serif",
+            fontWeight: 800,
+            fontSize: 24,
+            lineHeight: 1.2,
+          }}
+        >
+          Camera access is off
+        </span>
+
+        <p
+          style={{
+            fontFamily: "DM Sans, sans-serif",
+            fontSize: 14,
+            opacity: 0.78,
+            maxWidth: 320,
+            lineHeight: 1.55,
+            margin: 0,
+          }}
+        >
+          To record a clip, Vibe needs your camera and microphone. Turn
+          access on in your device settings and come back here to try
+          again.
+        </p>
+
+        {/* iOS-specific path. Keeps copy from Instagram / TikTok's flows
+            so users recognize the steps. */}
+        <div
+          style={{
+            fontFamily: "DM Sans, sans-serif",
+            fontSize: 12.5,
+            color: "rgba(255,255,255,0.7)",
+            background: "rgba(255,255,255,0.05)",
+            border: "1px solid rgba(255,255,255,0.10)",
+            borderRadius: 14,
+            padding: "12px 16px",
+            maxWidth: 340,
+            textAlign: "left",
+            lineHeight: 1.55,
+          }}
+        >
+          {isIOS ? (
+            <>
+              <strong style={{ color: "#fff", fontWeight: 800 }}>How to fix it</strong>
+              <ol style={{ margin: "8px 0 0", paddingLeft: 20 }}>
+                <li>Open the <strong>Settings</strong> app</li>
+                <li>Scroll down to <strong>Safari</strong> (or Chrome)</li>
+                <li>Tap <strong>Camera</strong> + <strong>Microphone</strong></li>
+                <li>Choose <strong>Allow</strong> for this site</li>
+                <li>Come back here and tap Try again</li>
+              </ol>
+            </>
+          ) : (
+            <>
+              <strong style={{ color: "#fff", fontWeight: 800 }}>How to fix it</strong>
+              <ol style={{ margin: "8px 0 0", paddingLeft: 20 }}>
+                <li>Tap the lock or info icon in the address bar</li>
+                <li>Open Permissions / Site settings</li>
+                <li>Set <strong>Camera</strong> and <strong>Microphone</strong> to Allow</li>
+                <li>Reload the page and tap Try again</li>
+              </ol>
+            </>
+          )}
+        </div>
+
+        {permissionError ? (
+          <p
             style={{
-              fontFamily: "Fraunces, serif",
-              fontWeight: 800,
-              fontSize: 26,
+              fontFamily: "DM Sans, sans-serif",
+              fontSize: 11,
+              color: "#FF8A6F",
+              maxWidth: 320,
+              margin: 0,
             }}
           >
-            New clip
-          </span>
-          <p style={{ fontFamily: "DM Sans, sans-serif", fontSize: 14, opacity: 0.78, maxWidth: 280 }}>
-            Vibe needs your camera + microphone to record a vertical clip. Audio is captured too.
+            {permissionError}
           </p>
-          {permissionError ? (
-            <p
-              style={{
-                fontFamily: "DM Sans, sans-serif",
-                fontSize: 12,
-                color: "#FF8A6F",
-                maxWidth: 280,
-              }}
-            >
-              {permissionError}
-            </p>
-          ) : null}
+        ) : null}
+
+        <div style={{ display: "flex", gap: 10, marginTop: 6 }}>
+          <button
+            type="button"
+            onClick={requestClose}
+            style={{
+              padding: "11px 18px",
+              borderRadius: 999,
+              border: "1px solid rgba(255,255,255,0.30)",
+              background: "transparent",
+              color: "#fff",
+              fontFamily: "DM Sans, sans-serif",
+              fontWeight: 700,
+              fontSize: 13,
+              cursor: "pointer",
+            }}
+          >
+            Not now
+          </button>
           <button
             type="button"
             onClick={() => void requestCamera()}
             style={{
-              padding: "12px 22px",
+              padding: "11px 22px",
               borderRadius: 999,
               border: "none",
               background: "#FF5C35",
               color: "#fff",
               fontFamily: "DM Sans, sans-serif",
               fontWeight: 800,
-              fontSize: 14,
+              fontSize: 13,
               cursor: "pointer",
-              boxShadow: "0 8px 22px rgba(255,92,53,0.4)",
+              boxShadow: "0 6px 18px rgba(255,92,53,0.35)",
             }}
           >
-            Enable camera
+            Try again
           </button>
         </div>
-      ) : null}
-    </>
+      </div>
+    );
+  };
+
+  /**
+   * Browser doesn't expose getUserMedia at all (old Safari, in-app
+   * webviews like LinkedIn / Instagram's preview browser, http://). No
+   * recovery path — point the user at Safari directly.
+   */
+  const renderUnsupportedScreen = () => (
+    <div
+      style={{
+        position: "absolute",
+        inset: 0,
+        display: "flex",
+        flexDirection: "column",
+        alignItems: "center",
+        justifyContent: "center",
+        padding: "0 32px",
+        textAlign: "center",
+        color: "#fff",
+        background: "#000",
+        gap: 18,
+      }}
+    >
+      <button
+        type="button"
+        onClick={requestClose}
+        aria-label="Close"
+        style={chromeButton({
+          top: "calc(env(safe-area-inset-top, 0px) + 12px)",
+          left: 14,
+        })}
+      >
+        ✕
+      </button>
+      <span
+        style={{
+          fontFamily: "Fraunces, serif",
+          fontWeight: 800,
+          fontSize: 24,
+        }}
+      >
+        Open Vibe in your browser
+      </span>
+      <p
+        style={{
+          fontFamily: "DM Sans, sans-serif",
+          fontSize: 14,
+          opacity: 0.78,
+          maxWidth: 320,
+          margin: 0,
+          lineHeight: 1.55,
+        }}
+      >
+        Clip recording isn&apos;t supported in this app&apos;s preview browser.
+        Tap the share icon and choose <strong>Open in Safari</strong> (or
+        Chrome) to record a clip.
+      </p>
+    </div>
   );
 
   const renderRecordingChrome = () => (
@@ -1056,9 +1354,21 @@ export function ClipComposerMobile({ onClose, onPosted, origin }: Props) {
         ...originStyleVars,
       }}
     >
+      {/* Pre-stream: show the permission UI ONLY — never the chrome.
+          The previous build rendered both, which gave us two competing
+          <video> elements on the same ref (black screen on Safari). */}
+      {phase === "intro" && permState === "unsupported"
+        ? renderUnsupportedScreen()
+        : phase === "intro" && permState === "denied"
+          ? renderDeniedScreen()
+          : phase === "intro" && !stream
+            ? renderAskingScreen()
+            : null}
+      {/* Stream is live (or we're mid-recording / paused) → camera UI. */}
       {(phase === "intro" || phase === "recording" || phase === "paused") &&
-        renderRecordingChrome()}
-      {phase === "intro" && !stream ? renderIntro() : null}
+      stream
+        ? renderRecordingChrome()
+        : null}
       {phase === "review" ? renderReview() : null}
       {phase === "caption" ? renderCaption() : null}
       {phase === "publishing" ? renderPublishing() : null}
