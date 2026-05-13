@@ -475,6 +475,75 @@ export function PostComposerMobile({ onClose, onPosted, origin }: Props) {
           }}
         />
 
+        {/* Attach + char counter — sits inside the scrollable body so
+            it stays reachable even when the iOS keyboard pushes the
+            bottom of the sheet below the visible viewport. Originally
+            this row lived in a separate bottom-anchored bar, which
+            disappeared under the keyboard on every device tested. */}
+        <div
+          style={{
+            display: "flex",
+            alignItems: "center",
+            gap: 10,
+          }}
+        >
+          <input
+            ref={attachInputRef}
+            type="file"
+            accept="image/jpeg,image/png,image/webp,image/gif,video/mp4,video/quicktime,video/webm"
+            // visibility:hidden + size:0 keeps the input in the layout
+            // tree (some iOS Safari builds refuse to fire .click() on
+            // truly display:none inputs even from user gestures).
+            style={{
+              position: "absolute",
+              width: 1,
+              height: 1,
+              opacity: 0,
+              pointerEvents: "none",
+            }}
+            // Reset on click so the same file can be re-picked after
+            // a remove (iOS Safari otherwise no-ops onChange).
+            onClick={(e) => {
+              (e.currentTarget as HTMLInputElement).value = "";
+            }}
+            onChange={(e) => onPickAttachment(e.target.files?.[0] ?? null)}
+          />
+          <button
+            type="button"
+            onClick={() => attachInputRef.current?.click()}
+            disabled={busy}
+            aria-label="Attach photo or video"
+            style={{
+              display: "inline-flex",
+              alignItems: "center",
+              gap: 8,
+              padding: "10px 16px",
+              borderRadius: 999,
+              border: "1px solid rgba(28,28,30,0.10)",
+              background: "rgba(255,255,255,0.8)",
+              fontFamily: "inherit",
+              fontSize: 14,
+              fontWeight: 600,
+              color: "#1C1C1E",
+              cursor: busy ? "default" : "pointer",
+            }}
+          >
+            <svg width="18" height="18" viewBox="0 0 18 18" fill="none" aria-hidden>
+              <path
+                d="M14.5 8.5L9 14a4 4 0 1 1-5.5-5.5L9 3l4.5 4.5L7.5 13a2 2 0 0 1-2.8-2.8L10 5"
+                stroke="currentColor"
+                strokeWidth="1.4"
+                strokeLinecap="round"
+                fill="none"
+              />
+            </svg>
+            Add photo or video
+          </button>
+          <span style={{ marginLeft: "auto", fontSize: 11, color: "#8A8580" }}>
+            {text.length}/2000
+          </span>
+        </div>
+
         {previewUrl ? (
           <div
             style={{
@@ -594,65 +663,6 @@ export function PostComposerMobile({ onClose, onPosted, origin }: Props) {
             {error}
           </div>
         ) : null}
-      </div>
-
-      {/* Bottom action row */}
-      <div
-        style={{
-          display: "flex",
-          alignItems: "center",
-          gap: 12,
-          padding: "10px 18px",
-          borderTop: "1px solid rgba(28,28,30,0.06)",
-          background: "#FAF7F2",
-        }}
-      >
-        <input
-          ref={attachInputRef}
-          type="file"
-          accept="image/jpeg,image/png,image/webp,image/gif,video/mp4,video/quicktime,video/webm"
-          style={{ display: "none" }}
-          // Reset on click so the same file can be re-picked after a
-          // remove (iOS Safari otherwise no-ops onChange).
-          onClick={(e) => {
-            (e.currentTarget as HTMLInputElement).value = "";
-          }}
-          onChange={(e) => onPickAttachment(e.target.files?.[0] ?? null)}
-        />
-        <button
-          type="button"
-          onClick={() => attachInputRef.current?.click()}
-          disabled={busy}
-          aria-label="Attach photo or video"
-          style={{
-            display: "inline-flex",
-            alignItems: "center",
-            gap: 6,
-            padding: "8px 14px",
-            borderRadius: 999,
-            border: "1px solid rgba(28,28,30,0.10)",
-            background: "rgba(255,255,255,0.7)",
-            fontFamily: "inherit",
-            fontSize: 13,
-            fontWeight: 600,
-            color: "#1C1C1E",
-            cursor: busy ? "default" : "pointer",
-          }}
-        >
-          <svg width="16" height="16" viewBox="0 0 16 16" fill="none" aria-hidden>
-            <path
-              d="M13 7.5L8 12.5C6.343 14.157 3.657 14.157 2 12.5S1 8.157 2.657 6.5L8 1l4 4L6.5 10.5C5.672 11.328 4.328 11.328 3.5 10.5s-.828-2.172 0-3L9 2"
-              stroke="currentColor"
-              strokeWidth="1.3"
-              strokeLinecap="round"
-              fill="none"
-            />
-          </svg>
-          Photo or video
-        </button>
-        <span style={{ marginLeft: "auto", fontSize: 11, color: "#8A8580" }}>
-          {text.length}/2000
-        </span>
       </div>
 
       {pendingImage ? (
