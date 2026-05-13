@@ -1,5 +1,6 @@
 "use client";
 
+import { motion } from "framer-motion";
 import Link from "next/link";
 import { useSearchParams } from "next/navigation";
 import { Fragment, useCallback, useEffect, useMemo, useRef, useState } from "react";
@@ -9872,6 +9873,8 @@ function MapTabBody() {
         onPointerCancel={endDrag}
       >
         <ContourBackdrop />
+        <Starfield />
+
 
         {isLoading ? (
           <div style={mapEmptyOverlayStyle}>
@@ -9901,6 +9904,70 @@ function MapTabBody() {
               pointerEvents: "none",
             }}
           >
+            {/* Connection lines — drawn under the nodes so the bubbles
+                sit on top. One <line> per major where the viewer has
+                at least one mutual or connection, anchored at the
+                cluster origin (0,0 = "you are here"). SVG uses
+                overflow:visible + a 0×0 box so we can draw with raw
+                coordinate values without computing a viewBox. */}
+            <svg
+              aria-hidden
+              style={{
+                position: "absolute",
+                left: 0,
+                top: 0,
+                overflow: "visible",
+                width: 0,
+                height: 0,
+                pointerEvents: "none",
+              }}
+            >
+              <defs>
+                <linearGradient id="map-line-warm" x1="0" y1="0" x2="1" y2="0">
+                  <stop offset="0%" stopColor="rgba(255,184,90,0.45)" />
+                  <stop offset="100%" stopColor="rgba(255,184,90,0.05)" />
+                </linearGradient>
+                <linearGradient id="map-line-green" x1="0" y1="0" x2="1" y2="0">
+                  <stop offset="0%" stopColor="rgba(91,209,140,0.5)" />
+                  <stop offset="100%" stopColor="rgba(91,209,140,0.05)" />
+                </linearGradient>
+              </defs>
+              {data!.majors.map((m, i) => {
+                const pos = layout?.get(m.name);
+                if (!pos) return null;
+                const showLine = m.mutuals > 0 || m.connected > 0;
+                if (!showLine) return null;
+                const stroke =
+                  m.connected > 0 ? "url(#map-line-green)" : "url(#map-line-warm)";
+                return (
+                  <motion.line
+                    key={`line-${m.name}`}
+                    x1={0}
+                    y1={0}
+                    x2={pos.x}
+                    y2={pos.y}
+                    stroke={stroke}
+                    strokeWidth={1}
+                    strokeLinecap="round"
+                    initial={{ pathLength: 0, opacity: 0 }}
+                    animate={{
+                      pathLength: 1,
+                      opacity: [0, 0.9, 0.55, 0.9, 0.55],
+                    }}
+                    transition={{
+                      pathLength: { duration: 0.9, delay: 0.4 + i * 0.04 },
+                      opacity: {
+                        duration: 4.5,
+                        delay: 0.4 + i * 0.04,
+                        repeat: Infinity,
+                        ease: "easeInOut",
+                      },
+                    }}
+                  />
+                );
+              })}
+            </svg>
+
             <YouHereNode you={data!.you} />
             {data!.majors.map((m) => {
               const pos = layout?.get(m.name);
@@ -10042,6 +10109,72 @@ function LegendDot({ color }: { color: string }) {
         marginRight: 4,
       }}
     />
+  );
+}
+
+// Starfield — a deterministic sprinkle of tiny twinkling dots sitting
+// between the topo grid and the cluster. Each star's position +
+// twinkle period seeds from its index so the field renders the same
+// across reloads (no jittering re-randomization), but each star pulses
+// on its own beat so the whole sky doesn't blink in unison. 60 stars
+// is enough density without being noisy; CSS-only animation keeps it
+// off the JS frame budget.
+function Starfield() {
+  // Deterministic per-star "random" — purely a function of the star's
+  // index, so the PRNG runs as a pure mapping without mutating state.
+  // Each call multiplies the index by a different odd prime so the six
+  // values per star don't correlate visibly.
+  const stars = useMemo(() => {
+    const frac = (i: number, salt: number) => {
+      const x = Math.sin(i * salt + salt * 13) * 10000;
+      return x - Math.floor(x);
+    };
+    return Array.from({ length: 60 }, (_, i) => {
+      const sizePick = frac(i, 17);
+      return {
+        left: `${(frac(i, 31) * 100).toFixed(2)}%`,
+        top: `${(frac(i, 53) * 100).toFixed(2)}%`,
+        size: sizePick < 0.85 ? 1 : 2,
+        delay: frac(i, 71) * 4,
+        duration: 3 + frac(i, 97) * 4,
+        alpha: 0.3 + frac(i, 113) * 0.5,
+      };
+    });
+  }, []);
+  return (
+    <div
+      aria-hidden
+      style={{
+        position: "absolute",
+        inset: 0,
+        pointerEvents: "none",
+        zIndex: 0,
+      }}
+    >
+      <style>{`
+        @keyframes campus-map-star-twinkle {
+          0%, 100% { opacity: 0.15; transform: scale(0.85); }
+          50%      { opacity: var(--star-alpha, 0.6); transform: scale(1); }
+        }
+      `}</style>
+      {stars.map((s, i) => (
+        <span
+          key={i}
+          style={{
+            position: "absolute",
+            left: s.left,
+            top: s.top,
+            width: s.size,
+            height: s.size,
+            borderRadius: "50%",
+            background: "#FFE6C8",
+            boxShadow: "0 0 4px rgba(255,230,200,0.6)",
+            animation: `campus-map-star-twinkle ${s.duration}s ease-in-out ${s.delay}s infinite`,
+            ["--star-alpha" as never]: s.alpha,
+          } as React.CSSProperties}
+        />
+      ))}
+    </div>
   );
 }
 
@@ -10190,21 +10323,67 @@ function MajorNode({
       ? "#5BD18C"
       : "#5A9CFF";
   const showGlow = major.mutuals > 0;
+  // Deterministic per-node idle drift. Seed from the major name so the
+  // floating motion is stable across renders + every reload of the same
+  // dataset. Each node oscillates a few pixels off its anchor over 6-10s
+  // — gives the cluster a "living" feel without breaking the layout math
+  // or making nodes wander far enough to overlap.
+  const driftSeed = hashString(major.name);
+  const driftX = ((driftSeed % 7) - 3) * 1.8;
+  const driftY = (((driftSeed >> 3) % 5) - 2) * 1.6;
+  const driftDur = 6 + ((driftSeed >> 7) % 5);
+  const stagger = ((driftSeed % 19) / 19) * 0.4;
   return (
-    <button
+    <motion.button
       type="button"
       onClick={(e) => {
         e.stopPropagation();
         onClick();
       }}
       onPointerDown={(e) => e.stopPropagation()}
+      // Soft spring entrance: pop from a small dim seed to full size +
+      // opacity. Stagger by hash so nodes don't all hit at once.
+      initial={{ scale: 0.6, opacity: 0 }}
+      animate={{
+        scale: 1,
+        opacity: 1,
+        x: [0, driftX, -driftX, 0],
+        y: [0, driftY, -driftY, 0],
+      }}
+      transition={{
+        scale: { type: "spring", stiffness: 220, damping: 22, delay: stagger },
+        opacity: { duration: 0.4, delay: stagger },
+        x: {
+          duration: driftDur,
+          repeat: Infinity,
+          ease: "easeInOut",
+          delay: stagger + 0.5,
+        },
+        y: {
+          duration: driftDur + 1.6,
+          repeat: Infinity,
+          ease: "easeInOut",
+          delay: stagger + 0.7,
+        },
+      }}
+      whileHover={{
+        scale: 1.06,
+        boxShadow: showGlow
+          ? `0 0 36px ${hexToRgba(accent, 0.6)}, inset 0 0 22px ${hexToRgba(accent, 0.3)}`
+          : `0 0 22px ${hexToRgba(accent, 0.45)}`,
+      }}
+      whileTap={{ scale: 0.96 }}
       style={{
         position: "absolute",
-        left: x,
-        top: y,
+        // Anchor by offsetting `left`/`top` so the node is visually
+        // centered on (x, y). Avoids putting `translate(-50%, -50%)`
+        // on the transform property — framer-motion fully owns
+        // `transform` for its scale + x/y drift animation, so we
+        // can't share that slot.
+        left: x - radius,
+        top: y - radius,
         width: radius * 2,
         height: radius * 2,
-        transform: "translate(-50%, -50%)",
         borderRadius: "50%",
         background:
           `radial-gradient(circle, ${hexToRgba(accent, active ? 0.32 : 0.18)} 0%, rgba(8,12,28,0.55) 70%, rgba(8,12,28,0.0) 100%)`,
@@ -10225,7 +10404,6 @@ function MajorNode({
         color: "#fff",
         fontFamily: "DM Sans, sans-serif",
         textAlign: "center",
-        transition: "transform 160ms ease, box-shadow 160ms ease",
       }}
     >
       <div
@@ -10260,7 +10438,7 @@ function MajorNode({
           {major.mutuals} mutuals
         </div>
       ) : null}
-    </button>
+    </motion.button>
   );
 }
 
