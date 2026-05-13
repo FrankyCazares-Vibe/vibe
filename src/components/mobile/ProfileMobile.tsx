@@ -8,6 +8,7 @@ import { ImageCropperModal } from "@/components/ImageCropperModal";
 import { ClipViewerMobile } from "@/components/mobile/ClipViewerMobile";
 import { PostViewerMobile } from "@/components/mobile/PostViewerMobile";
 import { ResumeViewerMobile } from "@/components/mobile/ResumeViewerMobile";
+import { IU_MAJORS_BY_SCHOOL } from "@/lib/iu/majors";
 import type { RedactionBar } from "@/lib/profile/resume-redactions";
 
 /**
@@ -880,10 +881,9 @@ export function ProfileMobile({ targetHandle }: Props = {}) {
               }}
             />
             <div style={{ display: "flex", gap: 8 }}>
-              <input
+              <select
                 value={effectiveDraft.major}
-                onChange={(e) => updateDraft({ major: e.target.value.slice(0, 200) })}
-                placeholder="Major"
+                onChange={(e) => updateDraft({ major: e.target.value })}
                 style={{
                   flex: 1,
                   fontFamily: "DM Sans, sans-serif",
@@ -894,8 +894,43 @@ export function ProfileMobile({ targetHandle }: Props = {}) {
                   borderRadius: 999,
                   padding: "8px 14px",
                   outline: "none",
+                  appearance: "none",
+                  WebkitAppearance: "none",
+                  // The major dropdown can hold longer labels than the
+                  // year picker — let it ellipsize gracefully when the
+                  // chosen major (e.g. Visual Communication Design)
+                  // would otherwise wrap into the year cell.
+                  textOverflow: "ellipsis",
+                  minWidth: 0,
                 }}
-              />
+              >
+                <option value="">Major</option>
+                {/* If the user's saved major doesn't match any
+                    onboarding option (legacy free-text from the old
+                    inline editor, or a major we don't list yet),
+                    surface it at the top so the select doesn't appear
+                    to reset to blank. */}
+                {effectiveDraft.major &&
+                !IU_MAJORS_BY_SCHOOL.some((g) =>
+                  g.majors.includes(effectiveDraft.major),
+                ) ? (
+                  <option value={effectiveDraft.major}>
+                    {effectiveDraft.major}
+                  </option>
+                ) : null}
+                {IU_MAJORS_BY_SCHOOL.map((group) => (
+                  <optgroup
+                    key={group.school.id}
+                    label={group.school.shortLabel}
+                  >
+                    {group.majors.map((m) => (
+                      <option key={m} value={m}>
+                        {m}
+                      </option>
+                    ))}
+                  </optgroup>
+                ))}
+              </select>
               <select
                 value={effectiveDraft.year ?? ""}
                 onChange={(e) => {
