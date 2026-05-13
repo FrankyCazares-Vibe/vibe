@@ -9697,6 +9697,101 @@ type ZoneSelection =
   | { kind: "major"; key: string; label: string }
   | { kind: "org"; key: string; label: string };
 
+// IU schools the campus map groups majors into. Each school becomes its
+// own "neighborhood" on the map: a soft colored halo at a fixed angle
+// around "you are here", with that school's majors clustered inside.
+// `angle` is in degrees (0 = right, 90 = down per screen coords) and
+// `r` is the distance from center for the region anchor — chosen so
+// the six anchors spread evenly without colliding.
+type IuSchool = {
+  id: string;
+  label: string;        // tag rendered above the region
+  shortLabel: string;   // pill rendered on the bubble
+  color: string;        // dominant hex tint for halo + bubble core
+  angle: number;        // anchor angle in degrees
+  r: number;            // anchor distance from "you are here"
+};
+const IU_SCHOOLS: IuSchool[] = [
+  { id: "kelley",   label: "Kelley · Business",       shortLabel: "Kelley",   color: "#C62828", angle:   0, r: 360 },
+  { id: "luddy",    label: "Luddy · Computing",        shortLabel: "Luddy",    color: "#4A90E2", angle:  60, r: 340 },
+  { id: "media",    label: "Media School",             shortLabel: "Media",    color: "#E879A6", angle: 120, r: 330 },
+  { id: "as",       label: "College of Arts + Sciences", shortLabel: "A & S", color: "#6FBF73", angle: 180, r: 360 },
+  { id: "jacobs",   label: "Jacobs · Music",           shortLabel: "Jacobs",   color: "#A855F7", angle: 240, r: 330 },
+  { id: "eskenazi", label: "Eskenazi · Art + Design",  shortLabel: "Eskenazi", color: "#F59E0B", angle: 300, r: 340 },
+  { id: "health",   label: "Public Health + Nursing",  shortLabel: "Health",   color: "#14B8A6", angle:  30, r: 200 },
+  { id: "oneill",   label: "O'Neill · Public Affairs", shortLabel: "O'Neill",  color: "#0EA5E9", angle: 210, r: 220 },
+  { id: "other",    label: "Other",                    shortLabel: "Other",    color: "#9CA3AF", angle: 270, r: 240 },
+];
+const IU_SCHOOL_BY_ID = new Map(IU_SCHOOLS.map((s) => [s.id, s]));
+
+// Map common IU majors to their school. Lowercased + trimmed lookup so
+// minor spelling variation in user-entered majors still groups them.
+// Anything that doesn't match here falls into the "other" region.
+const MAJOR_TO_SCHOOL: Record<string, string> = {
+  // Kelley
+  "business": "kelley",
+  "finance": "kelley",
+  "marketing": "kelley",
+  "accounting": "kelley",
+  "management": "kelley",
+  "supply chain management": "kelley",
+  "entrepreneurship": "kelley",
+  "economics": "kelley",
+  "business analytics": "kelley",
+  // Luddy
+  "computer science": "luddy",
+  "informatics": "luddy",
+  "data science": "luddy",
+  "intelligent systems engineering": "luddy",
+  "mechanical engineering": "luddy",
+  "cybersecurity": "luddy",
+  // Media
+  "communication": "media",
+  "journalism": "media",
+  "cinema and media": "media",
+  "game design": "media",
+  "media": "media",
+  // College of Arts and Sciences (the catch-all liberal-arts bucket)
+  "psychology": "as",
+  "biology": "as",
+  "political science": "as",
+  "history": "as",
+  "english": "as",
+  "sociology": "as",
+  "mathematics": "as",
+  "math": "as",
+  "physics": "as",
+  "chemistry": "as",
+  "philosophy": "as",
+  "anthropology": "as",
+  "neuroscience": "as",
+  // Jacobs
+  "music": "jacobs",
+  "music performance": "jacobs",
+  "music composition": "jacobs",
+  // Eskenazi
+  "studio art": "eskenazi",
+  "architecture": "eskenazi",
+  "graphic design": "eskenazi",
+  "interior design": "eskenazi",
+  // Health
+  "nursing": "health",
+  "kinesiology": "health",
+  "public health": "health",
+  "health sciences": "health",
+  "nutrition": "health",
+  // O'Neill
+  "public affairs": "oneill",
+  "environmental science": "oneill",
+  "healthcare management": "oneill",
+};
+
+function schoolForMajor(majorName: string): IuSchool {
+  const key = majorName.trim().toLowerCase();
+  const id = MAJOR_TO_SCHOOL[key] ?? "other";
+  return IU_SCHOOL_BY_ID.get(id) ?? IU_SCHOOL_BY_ID.get("other")!;
+}
+
 function MapTabBody() {
   const [data, setData] = useState<MapSummary | null>(null);
   const [selected, setSelected] = useState<ZoneSelection | null>(null);
@@ -9736,41 +9831,65 @@ function MapTabBody() {
     };
   }, []);
 
-  // Force-directed layout: place "you" at the center, then each major on
-  // a deterministic spiral biased toward viewer (more mutuals = closer in).
-  // After initial placement we run a small relaxation pass that pushes any
-  // overlapping pair apart, plus a center-repulsion pass so nodes don't
-  // sit on top of "you are here". Deterministic — same data → same layout.
+  // School-grouped layout: every major is bucketed into its IU school
+  // (Kelley, Luddy, Jacobs, etc.), then placed around that school's
+  // anchor point so the map reads as distinct "neighborhoods" — Kelley
+  // territory in one corner, Luddy in another, and so on. Anchors come
+  // from IU_SCHOOLS (fixed angles/distances from "you are here"). Within
+  // each school we fan its majors out in a small local arc, deterministic
+  // by major-name hash so the layout is stable across reloads. A final
+  // collision-relaxation pass nudges overlapping bubbles apart without
+  // letting any major escape its region too far.
   const layout = useMemo(() => {
     if (!data || !data.majors) return null;
-    type Pos = { x: number; y: number; r: number };
+    type Pos = { x: number; y: number; r: number; schoolId: string };
     const positions = new Map<string, Pos>();
-    const total = data.majors.length || 1;
-    data.majors.forEach((m, i) => {
-      const seed = hashString(m.name);
-      const angle = (seed % 360) * (Math.PI / 180);
-      const score = m.mutuals * 6 + Math.min(m.total, 60);
-      const distance = 360 - Math.min(180, score);
-      const ringOffset = (i / total) * 40;
-      const r = distance + ringOffset;
-      const cx = Math.cos(angle) * r;
-      const cy = Math.sin(angle) * r * 0.7;
-      const radius = 40 + Math.min(34, m.total * 0.5);
-      positions.set(m.name, { x: cx, y: cy, r: radius });
-    });
+    // Group majors by school so we know how many slots each region needs.
+    const grouped = new Map<string, MapMajor[]>();
+    for (const m of data.majors) {
+      const school = schoolForMajor(m.name);
+      const list = grouped.get(school.id) ?? [];
+      list.push(m);
+      grouped.set(school.id, list);
+    }
+    // Place each major in a small fan around its school anchor. Larger
+    // schools (more majors) get a wider arc.
+    for (const [schoolId, majors] of grouped.entries()) {
+      const school = IU_SCHOOL_BY_ID.get(schoolId) ?? IU_SCHOOL_BY_ID.get("other")!;
+      const anchorAngle = (school.angle * Math.PI) / 180;
+      const ax = Math.cos(anchorAngle) * school.r;
+      const ay = Math.sin(anchorAngle) * school.r * 0.7;
+      // Fan width scales with how many majors live in the region. One
+      // major sits dead-center on the anchor; many spread across ~80°.
+      const fanRange = Math.min(80, 18 + majors.length * 14);
+      majors.forEach((m, i) => {
+        const seed = hashString(m.name);
+        // Spread evenly across the fan with a small jitter per major.
+        const t = majors.length === 1 ? 0 : (i / (majors.length - 1)) - 0.5;
+        const localAngle =
+          anchorAngle + ((t * fanRange) * Math.PI) / 180 +
+          (((seed % 11) - 5) * Math.PI) / 220;
+        const localDist = 60 + ((seed >> 4) % 30);
+        const cx = ax + Math.cos(localAngle) * localDist;
+        const cy = ay + Math.sin(localAngle) * localDist * 0.7;
+        const radius = 40 + Math.min(34, m.total * 0.5);
+        positions.set(m.name, { x: cx, y: cy, r: radius, schoolId });
+      });
+    }
 
-    // Anti-collision relaxation. 80 iterations is plenty; we usually settle
-    // in 20–30. Padding adds breathing room so bubbles don't kiss.
+    // Anti-collision relaxation — same idea as before, but each node is
+    // also lightly tethered to its school's anchor so the regions don't
+    // dissolve under push pressure.
     const PADDING = 14;
     const CENTER_KEEP_OUT = 90;
-    const entries = Array.from(positions.values());
+    const TETHER = 0.04;
+    const entries = Array.from(positions.entries());
     for (let iter = 0; iter < 80; iter++) {
       let moved = false;
-      // Pair-wise repulsion.
       for (let i = 0; i < entries.length; i++) {
         for (let j = i + 1; j < entries.length; j++) {
-          const a = entries[i];
-          const b = entries[j];
+          const a = entries[i]![1];
+          const b = entries[j]![1];
           const dx = b.x - a.x;
           const dy = b.y - a.y;
           const dist = Math.sqrt(dx * dx + dy * dy) || 0.01;
@@ -9787,8 +9906,17 @@ function MapTabBody() {
           }
         }
       }
+      // Tether each node back toward its school anchor.
+      for (const [, node] of entries) {
+        const school = IU_SCHOOL_BY_ID.get(node.schoolId) ?? IU_SCHOOL_BY_ID.get("other")!;
+        const aRad = (school.angle * Math.PI) / 180;
+        const ax = Math.cos(aRad) * school.r;
+        const ay = Math.sin(aRad) * school.r * 0.7;
+        node.x += (ax - node.x) * TETHER;
+        node.y += (ay - node.y) * TETHER;
+      }
       // Center keep-out so zones don't smother "you are here".
-      for (const node of entries) {
+      for (const [, node] of entries) {
         const d = Math.sqrt(node.x * node.x + node.y * node.y) || 0.01;
         const minD = node.r + CENTER_KEEP_OUT;
         if (d < minD) {
@@ -9904,6 +10032,19 @@ function MapTabBody() {
               pointerEvents: "none",
             }}
           >
+            {/* School regions — one soft glow + label per IU school that
+                has at least one major. Anchored at the school's
+                fixed angle/distance from "you are here". Painted before
+                the connection lines + bubbles so it reads as
+                background territory. */}
+            <SchoolRegions
+              activeSchoolIds={
+                new Set(
+                  Array.from(layout?.values() ?? []).map((p) => p.schoolId),
+                )
+              }
+            />
+
             {/* Connection lines — drawn under the nodes so the bubbles
                 sit on top. One <line> per major where the viewer has
                 at least one mutual or connection, anchored at the
@@ -10178,6 +10319,74 @@ function Starfield() {
   );
 }
 
+// School regions — paints a soft tinted halo + label at each IU
+// school's anchor. Only renders regions that actually have at least
+// one major in the current dataset, so empty schools don't crowd the
+// map. Sits inside the cluster's 0×0 anchor so coords match the
+// MajorNode coord space. Decorative — pointerEvents: none.
+function SchoolRegions({ activeSchoolIds }: { activeSchoolIds: Set<string> }) {
+  const regions = IU_SCHOOLS.filter((s) => activeSchoolIds.has(s.id));
+  return (
+    <>
+      {regions.map((s) => {
+        const rad = (s.angle * Math.PI) / 180;
+        const cx = Math.cos(rad) * s.r;
+        const cy = Math.sin(rad) * s.r * 0.7;
+        return (
+          <Fragment key={s.id}>
+            {/* Soft colored halo. 240px radius is enough to envelop a
+                few clustered bubbles without bleeding into the next
+                region at the default 60°/360px anchor spacing. */}
+            <div
+              aria-hidden
+              style={{
+                position: "absolute",
+                left: cx,
+                top: cy,
+                width: 480,
+                height: 360,
+                marginLeft: -240,
+                marginTop: -180,
+                borderRadius: "50%",
+                background: `radial-gradient(closest-side, ${hexToRgba(s.color, 0.28)} 0%, ${hexToRgba(s.color, 0.08)} 55%, ${hexToRgba(s.color, 0)} 100%)`,
+                pointerEvents: "none",
+                filter: "blur(2px)",
+              }}
+            />
+            {/* Region label — small uppercase pill floating just above
+                the halo center. Subtle so it doesn't compete with the
+                bubble labels. */}
+            <div
+              aria-hidden
+              style={{
+                position: "absolute",
+                left: cx,
+                top: cy - 150,
+                transform: "translate(-50%, -50%)",
+                fontFamily: "DM Sans, sans-serif",
+                fontSize: 10,
+                fontWeight: 800,
+                letterSpacing: "0.16em",
+                textTransform: "uppercase",
+                color: hexToRgba(s.color, 0.95),
+                background: "rgba(8,12,28,0.55)",
+                border: `1px solid ${hexToRgba(s.color, 0.45)}`,
+                padding: "5px 10px",
+                borderRadius: 999,
+                whiteSpace: "nowrap",
+                pointerEvents: "none",
+                textShadow: `0 0 8px ${hexToRgba(s.color, 0.6)}`,
+              }}
+            >
+              {s.label}
+            </div>
+          </Fragment>
+        );
+      })}
+    </>
+  );
+}
+
 // SVG topographic backdrop. Layered concentric blobs with subtle grid +
 // scan lines — gives the canvas the Tron HUD feel without dragging in a
 // 3D dependency.
@@ -10314,8 +10523,15 @@ function MajorNode({
   active: boolean;
   onClick: () => void;
 }) {
-  // Color heuristic: green if you're already connected to people there,
-  // amber if you have mutuals (the discovery sweet spot), blue otherwise.
+  // Two-color system per bubble:
+  //   `school` = which IU department this major belongs to (Kelley,
+  //              Luddy, Jacobs…). Drives the bubble's inner gradient so
+  //              the same color reads across the whole region halo.
+  //   `accent` = relationship distance (green = connected, amber =
+  //              mutuals, blue = strangers). Drives the outline ring +
+  //              the side-tag so you can still tell at a glance "do I
+  //              have a way in here?"
+  const school = schoolForMajor(major.name);
   const accent =
     major.mutuals > 0
       ? "#FFB85A"
@@ -10385,12 +10601,16 @@ function MajorNode({
         width: radius * 2,
         height: radius * 2,
         borderRadius: "50%",
+        // Inner gradient = school color (so Kelley bubbles all read
+        // crimson, Luddy all read blue, etc). Outer ring = accent
+        // (connection-state) so the "do I have ties?" signal stays
+        // legible against the new school tinting.
         background:
-          `radial-gradient(circle, ${hexToRgba(accent, active ? 0.32 : 0.18)} 0%, rgba(8,12,28,0.55) 70%, rgba(8,12,28,0.0) 100%)`,
-        border: `1px solid ${hexToRgba(accent, active ? 0.85 : 0.45)}`,
+          `radial-gradient(circle, ${hexToRgba(school.color, active ? 0.42 : 0.26)} 0%, rgba(8,12,28,0.55) 70%, rgba(8,12,28,0.0) 100%)`,
+        border: `1px solid ${hexToRgba(accent, active ? 0.85 : 0.5)}`,
         boxShadow: showGlow
-          ? `0 0 28px ${hexToRgba(accent, 0.45)}, inset 0 0 18px ${hexToRgba(accent, 0.22)}`
-          : `0 0 12px ${hexToRgba(accent, 0.22)}`,
+          ? `0 0 28px ${hexToRgba(accent, 0.4)}, inset 0 0 18px ${hexToRgba(school.color, 0.28)}`
+          : `0 0 12px ${hexToRgba(school.color, 0.28)}`,
         backdropFilter: "blur(6px)",
         WebkitBackdropFilter: "blur(6px)",
         cursor: "pointer",
