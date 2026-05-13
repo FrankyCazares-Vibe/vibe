@@ -346,7 +346,19 @@ export function PostComposerMobile({ onClose, onPosted, origin }: Props) {
       aria-label="Compose post"
       style={{
         position: "fixed",
-        inset: 0,
+        top: 0,
+        left: 0,
+        right: 0,
+        // 100dvh shrinks when the iOS keyboard opens, so the bottom
+        // action row (paperclip / char counter) stays visible above
+        // the keyboard. With plain `inset: 0` / 100vh the sheet stayed
+        // at the layout viewport's full height and the action row
+        // landed under the keyboard — users couldn't tap Photo/Video
+        // and could only post text. Falls back to 100vh on older
+        // browsers via the vh value preceding dvh.
+        height: "100vh",
+        maxHeight: "100dvh",
+        minHeight: "100dvh",
         zIndex: 1100,
         background: "#FAF7F2",
         display: "flex",
