@@ -194,8 +194,13 @@ export function OttoCorner() {
         right: 24,
         zIndex: 9990,
         display: "block",
-        width: 52,
-        height: 52,
+        // Persistent expand when there's an unread mention: orb grows
+        // from 52px → 64px and stays there until the badge is cleared.
+        // Pairs with the thinking+alert body so the corner reads as
+        // "Otto has something for you" at a glance. Smooth 300ms
+        // cubic-bezier transition keeps the resize from feeling abrupt.
+        width: unreadMention > 0 ? 64 : 52,
+        height: unreadMention > 0 ? 64 : 52,
         padding: 0,
         borderRadius: "50%",
         background: "#1C1C1E",
@@ -208,10 +213,12 @@ export function OttoCorner() {
             : "0.5px solid rgba(255,92,53,0.3)",
         boxShadow:
           unreadMention > 0
-            ? "0 8px 24px rgba(0,0,0,0.18), 0 0 22px rgba(255,92,53,0.32)"
+            ? "0 10px 28px rgba(0,0,0,0.20), 0 0 28px rgba(255,92,53,0.36)"
             : "0 8px 24px rgba(0,0,0,0.18)",
         cursor: "pointer",
         transformOrigin: "center",
+        transition:
+          "width 300ms cubic-bezier(.22,1,.36,1), height 300ms cubic-bezier(.22,1,.36,1), box-shadow 300ms ease, border-color 300ms ease",
         // Orb expand on new notification — `popping` is briefly true
         // after each unread bump (see useEffect above), which mounts
         // the `otto-orb-pop` keyframe for ~700ms. Toggling off→on
