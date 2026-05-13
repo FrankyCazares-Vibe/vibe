@@ -368,6 +368,13 @@ body.edit-mode .profile-handle:hover { color:var(--charcoal); cursor:none; }
   font-size:13px;color:var(--muted);margin-bottom:16px;
 }
 .meta-item { display:flex;align-items:center;gap:5px; }
+/* Uppercase tag in front of each meta value ("LOCATION", "MAJOR",
+   "WEB"). Darker than --muted so it pops cleanly against the value
+   text that follows it (which is itself --muted). */
+.meta-label {
+  font-size:11px; font-weight:700; color:#3F3D3A;
+  text-transform:uppercase; letter-spacing:.5px; margin-right:4px;
+}
 
 /* Major picker — display text in normal mode, IU-grouped select in
    edit mode. Hidden visibility flips on body.edit-mode. */
@@ -3297,9 +3304,9 @@ body.empty-profile-mode #profileEmpty { display: flex !important; }
     </div>
     <p class="profile-tagline" data-edit="true" data-user-field="tagline" data-placeholder="A line that captures how you work" contenteditable="false">"I make things feel right before they look right."</p>
     <div class="profile-meta">
-      <span class="meta-item"><span style="font-size:11px;font-weight:700;color:var(--muted);text-transform:uppercase;letter-spacing:.5px;margin-right:4px">Location</span><span data-edit="true" data-user-field="location" data-placeholder="City, country" contenteditable="false">Seoul → San Francisco, CA</span></span>
-      <span class="meta-item" id="metaMajor"><span style="font-size:11px;font-weight:700;color:var(--muted);text-transform:uppercase;letter-spacing:.5px;margin-right:4px">Major</span><span data-user-field="headline" data-major-display data-placeholder="Pick a major">Senior Product Designer at Figma</span><span class="meta-major-edit" style="display:none;gap:6px;align-items:center;flex-wrap:wrap"><select id="majorSelect" class="meta-major-select" onchange="_onMajorYearChange()" aria-label="Major"></select><select id="yearSelect" class="meta-year-select" onchange="_onMajorYearChange()" aria-label="Year"><option value="">Year</option><option value="1">Year 1</option><option value="2">Year 2</option><option value="3">Year 3</option><option value="4">Year 4</option><option value="5">Year 5</option><option value="6">Grad</option></select></span></span>
-      <span class="meta-item"><span style="font-size:11px;font-weight:700;color:var(--muted);text-transform:uppercase;letter-spacing:.5px;margin-right:4px">Web</span><span data-edit="true" data-user-field="website" data-placeholder="yourname.com" contenteditable="false" style="color:var(--accent)">mayachen.co</span></span>
+      <span class="meta-item"><span class="meta-label">Location</span><span data-edit="true" data-user-field="location" data-placeholder="City, country" contenteditable="false">Seoul → San Francisco, CA</span></span>
+      <span class="meta-item" id="metaMajor"><span class="meta-label">Major</span><span data-user-field="headline" data-major-display data-placeholder="Pick a major">Senior Product Designer at Figma</span><span class="meta-major-edit" style="display:none;gap:6px;align-items:center;flex-wrap:wrap"><select id="majorSelect" class="meta-major-select" onchange="_onMajorYearChange()" aria-label="Major"></select><select id="yearSelect" class="meta-year-select" onchange="_onMajorYearChange()" aria-label="Year"><option value="">Year</option><option value="1">Year 1</option><option value="2">Year 2</option><option value="3">Year 3</option><option value="4">Year 4</option><option value="5">Year 5</option><option value="6">Grad</option></select></span></span>
+      <span class="meta-item"><span class="meta-label">Web</span><span data-edit="true" data-user-field="website" data-placeholder="yourname.com" contenteditable="false" style="color:var(--accent)">mayachen.co</span></span>
     </div>
     <div class="vibe-tags" id="vibeTags">
       <span class="vibe-tag coral">Product Design <button class="tag-remove" onclick="removeTag(this)">×</button></span>
