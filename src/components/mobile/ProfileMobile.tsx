@@ -4,6 +4,7 @@ import Link from "next/link";
 import { useSearchParams } from "next/navigation";
 import { useEffect, useRef, useState } from "react";
 
+import { ImageCropperModal } from "@/components/ImageCropperModal";
 import { ClipViewerMobile } from "@/components/mobile/ClipViewerMobile";
 import { PostViewerMobile } from "@/components/mobile/PostViewerMobile";
 import { ResumeViewerMobile } from "@/components/mobile/ResumeViewerMobile";
@@ -288,22 +289,34 @@ export function ProfileMobile({ targetHandle }: Props = {}) {
     setEditError(null);
   };
 
-  // Avatar / banner upload — both flow through /api/me/profile-upload
-  // (which writes the file to storage + returns a public URL), then
-  // /api/me/profile-sync to persist the URL on users.{avatar_url,banner_url}.
-  // We optimistically merge the returned URL into the local user state
-  // so the new image shows immediately without a full re-bootstrap.
+  // Avatar / banner upload — both run through the ImageCropperModal
+  // FIRST so the user crops to the right aspect (1:1 for avatar, 3:1
+  // for banner) and we get a known-high-res output. Without the
+  // cropper step a small phone screenshot looked sharp on mobile
+  // (~390px wide) but blurry on desktop (~1000px wide). With the
+  // cropper we always upload at outputMaxSize px on the long edge.
   const avatarInputRef = useRef<HTMLInputElement | null>(null);
   const bannerInputRef = useRef<HTMLInputElement | null>(null);
   const [uploadingKind, setUploadingKind] = useState<"avatar" | "banner" | null>(null);
-  const uploadProfileImage = async (
-    file: File,
+  // File queued for the cropper. `kind` decides aspect + max output
+  // size; the cropper produces a cropped blob, then we upload that.
+  const [pendingCrop, setPendingCrop] = useState<{
+    file: File;
+    kind: "avatar" | "banner";
+  } | null>(null);
+
+  const uploadCroppedBlob = async (
+    blob: Blob,
     kind: "avatar" | "banner",
   ) => {
     if (!user || uploadingKind) return;
     setUploadingKind(kind);
     setEditError(null);
     try {
+      const filename = kind === "avatar" ? "avatar.jpg" : "banner.jpg";
+      const file = new File([blob], filename, {
+        type: blob.type || "image/jpeg",
+      });
       const form = new FormData();
       form.set("file", file);
       form.set("kind", kind);
@@ -327,13 +340,17 @@ export function ProfileMobile({ targetHandle }: Props = {}) {
       if (!sync.ok || !sj?.ok) {
         throw new Error(sj?.error ?? "Could not save");
       }
-      // Reflect the new image in the local user shape so it paints
-      // immediately. (vibe_user_v1 uses `avatarPhoto` / `coverPhoto`.)
+      // Cache-busting query param — Supabase storage public URLs use a
+      // unique randomUUID path so the URL itself is fresh, but a
+      // re-upload via the cropper can theoretically land on the same
+      // path. Append a ?v= so the browser doesn't show the cached
+      // background-image for the previous URL while the new one loads.
+      const cacheBustedUrl = `${uj.url}${uj.url.includes("?") ? "&" : "?"}v=${Date.now()}`;
       setUser((prev) =>
         prev
           ? kind === "avatar"
-            ? { ...prev, avatarPhoto: uj.url as string }
-            : { ...prev, coverPhoto: uj.url as string }
+            ? { ...prev, avatarPhoto: cacheBustedUrl }
+            : { ...prev, coverPhoto: cacheBustedUrl }
           : prev,
       );
     } catch (e) {
@@ -506,10 +523,18 @@ export function ProfileMobile({ targetHandle }: Props = {}) {
               type="file"
               accept="image/jpeg,image/png,image/webp"
               style={{ display: "none" }}
+              // Reset value on EVERY click so iOS Safari re-fires
+              // onChange even when the user re-picks the same file
+              // OR opens the picker a second time after a successful
+              // upload. Without this, the second upload silently
+              // no-ops because the input still holds the previous
+              // file reference.
+              onClick={(e) => {
+                (e.currentTarget as HTMLInputElement).value = "";
+              }}
               onChange={(e) => {
                 const f = e.target.files?.[0];
-                if (f) void uploadProfileImage(f, "banner");
-                e.target.value = "";
+                if (f) setPendingCrop({ file: f, kind: "banner" });
               }}
             />
           </>
@@ -656,10 +681,13 @@ export function ProfileMobile({ targetHandle }: Props = {}) {
                   type="file"
                   accept="image/jpeg,image/png,image/webp"
                   style={{ display: "none" }}
+                  // See banner input above — same iOS reset quirk.
+                  onClick={(e) => {
+                    (e.currentTarget as HTMLInputElement).value = "";
+                  }}
                   onChange={(e) => {
                     const f = e.target.files?.[0];
-                    if (f) void uploadProfileImage(f, "avatar");
-                    e.target.value = "";
+                    if (f) setPendingCrop({ file: f, kind: "avatar" });
                   }}
                 />
               </>
@@ -958,6 +986,24 @@ export function ProfileMobile({ targetHandle }: Props = {}) {
         <ClipViewerMobile
           clipId={openClipId}
           onClose={() => setOpenClipId(null)}
+        />
+      ) : null}
+      {pendingCrop ? (
+        <ImageCropperModal
+          src={pendingCrop.file}
+          aspect={pendingCrop.kind === "avatar" ? 1 : 3}
+          // outputMaxSize is the long-edge pixel count of the JPEG the
+          // cropper emits. Avatar at 640px renders crisp at any size
+          // on the profile; banner at 1800px stays sharp on the
+          // ~1000px-wide desktop cover.
+          outputMaxSize={pendingCrop.kind === "avatar" ? 640 : 1800}
+          title={pendingCrop.kind === "avatar" ? "Crop profile photo" : "Crop cover photo"}
+          onCancel={() => setPendingCrop(null)}
+          onConfirm={(blob) => {
+            const kind = pendingCrop.kind;
+            setPendingCrop(null);
+            void uploadCroppedBlob(blob, kind);
+          }}
         />
       ) : null}
     </div>
