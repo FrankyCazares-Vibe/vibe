@@ -12,10 +12,10 @@ function taglineFromBio(bio: string): string {
 }
 
 function headlineFromProfileParts(p: ProfileView): string {
-  const parts: string[] = [];
-  if (p.major) parts.push(p.major);
-  if (p.department) parts.push(p.department);
-  let h = parts.join(" · ");
+  // Major + year only. The school badge (iu.edu pill) already surfaces
+  // the school on the profile header, so injecting it here too was
+  // redundant ("accounting · Kelley · Year 2"). Keep the chip tight.
+  let h = p.major ?? "";
   if (p.year != null) {
     h = h ? `${h} · Year ${p.year}` : `Year ${p.year}`;
   }
