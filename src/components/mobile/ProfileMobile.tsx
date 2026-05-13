@@ -661,7 +661,7 @@ function PostsGrid({
   ownerName: string;
   onOpenPost: (id: string) => void;
 }) {
-  if (loading) return <GridSkeleton />;
+  if (loading) return <PostFeedSkeleton />;
   if (posts.length === 0) {
     return isVisitor ? (
       <EmptyTab title="No posts yet" body={`${ownerName} hasn't posted anything yet.`} />
@@ -673,24 +673,133 @@ function PostsGrid({
       />
     );
   }
+  // Single-column card feed — Vibe is text-first, so this reads
+  // "here's what they've been saying" instead of pretending every
+  // post is an Instagram tile. Image posts still show their image
+  // inline above the text; text posts just read as the text.
   return (
     <div
       style={{
-        display: "grid",
-        gridTemplateColumns: "repeat(3, 1fr)",
-        gap: 4,
+        display: "flex",
+        flexDirection: "column",
+        gap: 14,
       }}
     >
       {posts.map((p) => (
-        <PostThumb
-          key={p.id}
-          post={p}
-          ratio="1/1"
-          onTap={() => onOpenPost(p.id)}
-        />
+        <PostFeedCard key={p.id} post={p} onTap={() => onOpenPost(p.id)} />
       ))}
     </div>
   );
+}
+
+function PostFeedCard({
+  post,
+  onTap,
+}: {
+  post: PostRow;
+  onTap: () => void;
+}) {
+  const thumb = post.media_thumbnail_url || post.media_url || "";
+  const isImage = !!thumb;
+  return (
+    <button
+      type="button"
+      onClick={onTap}
+      style={{
+        display: "flex",
+        flexDirection: "column",
+        gap: 10,
+        padding: 14,
+        borderRadius: 14,
+        background: "linear-gradient(180deg,#FFFCF6 0%,#F5F0E5 100%)",
+        border: "1px solid rgba(28,28,30,0.06)",
+        boxShadow: "0 1px 0 rgba(255,255,255,0.6) inset, 0 4px 12px rgba(0,0,0,0.04)",
+        textAlign: "left",
+        cursor: "pointer",
+        fontFamily: "DM Sans, sans-serif",
+        color: "#1C1C1E",
+      }}
+    >
+      {post.content ? (
+        <p
+          style={{
+            margin: 0,
+            fontSize: 14.5,
+            lineHeight: 1.5,
+            whiteSpace: "pre-wrap",
+            wordBreak: "break-word",
+            display: "-webkit-box",
+            WebkitLineClamp: 6,
+            WebkitBoxOrient: "vertical",
+            overflow: "hidden",
+          }}
+        >
+          {renderInlineContentInline(post.content)}
+        </p>
+      ) : null}
+      {isImage ? (
+        <div
+          style={{
+            borderRadius: 10,
+            overflow: "hidden",
+            background: `url(${thumb}) center/cover, #EFEAE2`,
+            aspectRatio: "1 / 1",
+            border: "1px solid rgba(28,28,30,0.06)",
+          }}
+        />
+      ) : null}
+      <div
+        style={{
+          fontSize: 11,
+          color: "#8A8580",
+          letterSpacing: "0.04em",
+        }}
+      >
+        {post.created_at ? relTimeForCard(post.created_at) : ""}
+      </div>
+    </button>
+  );
+}
+
+// Inline @handle / #tag linkifier for the profile post card. Renders
+// non-link spans for now (the entire card is one big <button>, so
+// nested links would interfere); the linkified version lives in the
+// post viewer modal which has independent click targets.
+function renderInlineContentInline(text: string): React.ReactNode {
+  if (!text) return null;
+  const re = /(^|[^A-Za-z0-9_@#])([@#][A-Za-z0-9_]{1,32})/g;
+  const nodes: React.ReactNode[] = [];
+  let lastIndex = 0;
+  let m: RegExpExecArray | null;
+  let key = 0;
+  while ((m = re.exec(text)) !== null) {
+    const leading = m[1] ?? "";
+    const token = m[2] ?? "";
+    const start = m.index + leading.length;
+    if (start > lastIndex)
+      nodes.push(<span key={`t${key++}`}>{text.slice(lastIndex, start)}</span>);
+    nodes.push(
+      <span key={`tok${key++}`} style={{ color: "#FF5C35", fontWeight: 600 }}>
+        {token}
+      </span>,
+    );
+    lastIndex = start + token.length;
+  }
+  if (lastIndex < text.length)
+    nodes.push(<span key={`t${key++}`}>{text.slice(lastIndex)}</span>);
+  return nodes;
+}
+
+function relTimeForCard(iso: string): string {
+  const d = (Date.now() - new Date(iso).getTime()) / 1000;
+  if (d < 60) return "just now";
+  if (d < 3600) return `${Math.floor(d / 60)}m ago`;
+  if (d < 86400) return `${Math.floor(d / 3600)}h ago`;
+  if (d < 86400 * 7) return `${Math.floor(d / 86400)}d ago`;
+  return new Date(iso).toLocaleDateString(undefined, {
+    month: "short",
+    day: "numeric",
+  });
 }
 
 function ClipsGrid({
@@ -1104,6 +1213,31 @@ const projectIconStyle: React.CSSProperties = {
   fontSize: 16,
   flexShrink: 0,
 };
+
+function PostFeedSkeleton() {
+  return (
+    <div style={{ display: "flex", flexDirection: "column", gap: 14 }}>
+      {[0, 1, 2].map((i) => (
+        <div
+          key={i}
+          style={{
+            padding: 14,
+            borderRadius: 14,
+            background: "linear-gradient(180deg,#FFFCF6 0%,#F5F0E5 100%)",
+            border: "1px solid rgba(28,28,30,0.06)",
+            display: "flex",
+            flexDirection: "column",
+            gap: 10,
+          }}
+        >
+          <div style={{ height: 12, borderRadius: 6, background: "rgba(28,28,30,0.06)", width: "85%" }} />
+          <div style={{ height: 12, borderRadius: 6, background: "rgba(28,28,30,0.06)", width: "60%" }} />
+          <div style={{ height: 10, borderRadius: 6, background: "rgba(28,28,30,0.04)", width: 60, marginTop: 4 }} />
+        </div>
+      ))}
+    </div>
+  );
+}
 
 function GridSkeleton({ ratio = "1/1" }: { ratio?: string }) {
   return (
