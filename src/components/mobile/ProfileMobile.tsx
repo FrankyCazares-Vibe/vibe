@@ -3,6 +3,8 @@
 import Link from "next/link";
 import { useEffect, useState } from "react";
 
+import { ClipViewerMobile } from "@/components/mobile/ClipViewerMobile";
+import { PostViewerMobile } from "@/components/mobile/PostViewerMobile";
 import { ResumeViewerMobile } from "@/components/mobile/ResumeViewerMobile";
 import type { RedactionBar } from "@/lib/profile/resume-redactions";
 
@@ -141,6 +143,10 @@ export function ProfileMobile({ targetHandle }: Props = {}) {
   const [tab, setTab] = useState<ProfileTab>("posts");
   /** Resume item the viewer should open. null = closed. */
   const [viewerItem, setViewerItem] = useState<ResumeItem | null>(null);
+  /** Post id for the full-screen post viewer. null = closed. */
+  const [openPostId, setOpenPostId] = useState<string | null>(null);
+  /** Clip id for the full-screen clip viewer. null = closed. */
+  const [openClipId, setOpenClipId] = useState<string | null>(null);
   /** Visitor-mode follow state; mirrors the server value initially then
    *  flips optimistically when the user taps Connect / Follow. */
   const [followState, setFollowState] = useState<FollowState>("none");
@@ -515,6 +521,7 @@ export function ProfileMobile({ targetHandle }: Props = {}) {
             loading={posts === null}
             isVisitor={isVisitor}
             ownerName={name}
+            onOpenPost={setOpenPostId}
           />
         ) : tab === "clips" ? (
           <ClipsGrid
@@ -522,6 +529,7 @@ export function ProfileMobile({ targetHandle }: Props = {}) {
             loading={posts === null}
             isVisitor={isVisitor}
             ownerName={name}
+            onOpenClip={setOpenClipId}
           />
         ) : (
           <PortfolioPane
@@ -544,6 +552,18 @@ export function ProfileMobile({ targetHandle }: Props = {}) {
           // string), so the bars saved server-side all anchor to it.
           bars={resumeRedactions.filter((b) => b.docIndex === 0)}
           onClose={() => setViewerItem(null)}
+        />
+      ) : null}
+      {openPostId ? (
+        <PostViewerMobile
+          postId={openPostId}
+          onClose={() => setOpenPostId(null)}
+        />
+      ) : null}
+      {openClipId ? (
+        <ClipViewerMobile
+          clipId={openClipId}
+          onClose={() => setOpenClipId(null)}
         />
       ) : null}
     </div>
@@ -633,11 +653,13 @@ function PostsGrid({
   loading,
   isVisitor,
   ownerName,
+  onOpenPost,
 }: {
   posts: PostRow[];
   loading: boolean;
   isVisitor: boolean;
   ownerName: string;
+  onOpenPost: (id: string) => void;
 }) {
   if (loading) return <GridSkeleton />;
   if (posts.length === 0) {
@@ -660,7 +682,12 @@ function PostsGrid({
       }}
     >
       {posts.map((p) => (
-        <PostThumb key={p.id} post={p} ratio="1/1" />
+        <PostThumb
+          key={p.id}
+          post={p}
+          ratio="1/1"
+          onTap={() => onOpenPost(p.id)}
+        />
       ))}
     </div>
   );
@@ -671,11 +698,13 @@ function ClipsGrid({
   loading,
   isVisitor,
   ownerName,
+  onOpenClip,
 }: {
   clips: PostRow[];
   loading: boolean;
   isVisitor: boolean;
   ownerName: string;
+  onOpenClip: (id: string) => void;
 }) {
   if (loading) return <GridSkeleton ratio="9/14" />;
   if (clips.length === 0) {
@@ -697,7 +726,13 @@ function ClipsGrid({
       }}
     >
       {clips.map((p) => (
-        <PostThumb key={p.id} post={p} ratio="9/14" overlay="play" />
+        <PostThumb
+          key={p.id}
+          post={p}
+          ratio="9/14"
+          overlay="play"
+          onTap={() => onOpenClip(p.id)}
+        />
       ))}
     </div>
   );
@@ -707,14 +742,18 @@ function PostThumb({
   post,
   ratio,
   overlay,
+  onTap,
 }: {
   post: PostRow;
   ratio: string;
   overlay?: "play";
+  onTap?: () => void;
 }) {
   const thumb = post.media_thumbnail_url || post.media_url || "";
   return (
-    <div
+    <button
+      type="button"
+      onClick={onTap}
       style={{
         position: "relative",
         aspectRatio: ratio,
@@ -723,6 +762,9 @@ function PostThumb({
         background: thumb
           ? `url(${thumb}) center/cover`
           : "linear-gradient(135deg,#FFE5DB,#C8B8FF)",
+        border: "none",
+        padding: 0,
+        cursor: "pointer",
       }}
     >
       {!thumb ? (
@@ -767,7 +809,7 @@ function PostThumb({
           </svg>
         </span>
       ) : null}
-    </div>
+    </button>
   );
 }
 
