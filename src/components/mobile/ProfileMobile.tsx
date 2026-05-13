@@ -750,6 +750,11 @@ function PostThumb({
   onTap?: () => void;
 }) {
   const thumb = post.media_thumbnail_url || post.media_url || "";
+  // Text-only posts (no media) get a different tile entirely — cream
+  // surface with the actual content readable, not a fake-thumbnail
+  // gradient pretending there's an image. Keeps the grid layout but
+  // text posts read as text, not as Instagram tiles.
+  const isTextOnly = !thumb;
   return (
     <button
       type="button"
@@ -759,32 +764,71 @@ function PostThumb({
         aspectRatio: ratio,
         borderRadius: 6,
         overflow: "hidden",
-        background: thumb
-          ? `url(${thumb}) center/cover`
-          : "linear-gradient(135deg,#FFE5DB,#C8B8FF)",
-        border: "none",
+        background: isTextOnly
+          ? "linear-gradient(180deg,#FFFCF6 0%,#F5F0E5 100%)"
+          : `url(${thumb}) center/cover`,
+        border: isTextOnly ? "1px solid rgba(28,28,30,0.06)" : "none",
+        boxShadow: isTextOnly ? "inset 0 1px 0 rgba(255,255,255,0.6)" : "none",
         padding: 0,
         cursor: "pointer",
+        textAlign: "left",
       }}
     >
-      {!thumb ? (
+      {isTextOnly ? (
         <div
           style={{
             position: "absolute",
             inset: 0,
+            padding: 10,
             display: "flex",
-            alignItems: "center",
-            justifyContent: "center",
-            padding: 8,
-            fontSize: 11,
-            color: "#fff",
-            background: "rgba(0,0,0,0.18)",
-            textAlign: "center",
-            lineHeight: 1.3,
-            fontWeight: 600,
+            flexDirection: "column",
+            justifyContent: "space-between",
+            color: "#1C1C1E",
+            fontFamily: "DM Sans, sans-serif",
           }}
         >
-          {(post.content ?? "").slice(0, 60) || "Post"}
+          {/* Subtle quote glyph in the top-left so the tile reads as
+              "a thought" rather than an empty card. */}
+          <div
+            aria-hidden
+            style={{
+              fontFamily: "Fraunces, serif",
+              fontSize: 22,
+              lineHeight: 1,
+              color: "rgba(255,92,53,0.55)",
+              fontWeight: 900,
+            }}
+          >
+            &ldquo;
+          </div>
+          <div
+            style={{
+              fontSize: 11,
+              lineHeight: 1.35,
+              fontWeight: 500,
+              color: "#1C1C1E",
+              display: "-webkit-box",
+              WebkitLineClamp: 5,
+              WebkitBoxOrient: "vertical",
+              overflow: "hidden",
+              flex: 1,
+              marginTop: 4,
+            }}
+          >
+            {(post.content ?? "").trim() || "Post"}
+          </div>
+          <div
+            style={{
+              fontSize: 9,
+              fontWeight: 700,
+              letterSpacing: "0.16em",
+              textTransform: "uppercase",
+              color: "#8A8580",
+              marginTop: 6,
+            }}
+          >
+            Text
+          </div>
         </div>
       ) : null}
       {overlay === "play" ? (
