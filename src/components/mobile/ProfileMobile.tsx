@@ -5,6 +5,7 @@ import { useSearchParams } from "next/navigation";
 import { useCallback, useEffect, useRef, useState } from "react";
 
 import { ImageCropperModal } from "@/components/ImageCropperModal";
+import { ClipComposerMobile } from "@/components/mobile/ClipComposerMobile";
 import { ClipViewerMobile } from "@/components/mobile/ClipViewerMobile";
 import { PostComposerMobile } from "@/components/mobile/PostComposerMobile";
 import { PostViewerMobile } from "@/components/mobile/PostViewerMobile";
@@ -1247,7 +1248,7 @@ export function ProfileMobile({ targetHandle }: Props = {}) {
           ref={composeFabRef}
           type="button"
           onClick={openComposer}
-          aria-label="New post"
+          aria-label={tab === "clips" ? "New clip" : "New post"}
           style={{
             position: "fixed",
             right: 18,
@@ -1282,7 +1283,16 @@ export function ProfileMobile({ targetHandle }: Props = {}) {
         </button>
       ) : null}
 
-      {composerOpen ? (
+      {composerOpen && tab === "clips" ? (
+        <ClipComposerMobile
+          origin={composerOrigin}
+          onClose={() => setComposerOpen(false)}
+          onPosted={() => {
+            void refetchPosts();
+            setTab("clips");
+          }}
+        />
+      ) : composerOpen ? (
         <PostComposerMobile
           origin={composerOrigin}
           onClose={() => setComposerOpen(false)}
