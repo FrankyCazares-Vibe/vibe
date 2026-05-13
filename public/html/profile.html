@@ -6971,6 +6971,123 @@ document.addEventListener('DOMContentLoaded', function() {
 window.viewingMockUser = null;
 window.viewingRealUser = null;
 
+// NOTE: the helpers below (_DRAG_HANDLE_HTML, _sortWorkExperienceByRecency,
+// _MONTHS_TO_IDX, etc) MUST be defined ABOVE the initProfilePage IIFE
+// since the IIFE runs immediately during script parsing and calls
+// renderUserSections, which references them inside template literals.
+// Putting them below the IIFE puts them in the temporal dead zone and
+// blanks the page for any user with work/current data.
+
+// 6-dot grip icon used as the drag handle on .work-item / .current-item.
+// Injected into every dynamic + static template so reorder works
+// uniformly. Hidden outside edit-mode via CSS.
+const _DRAG_HANDLE_HTML = '<button type="button" class="drag-handle" aria-label="Reorder" tabindex="-1"><svg width="14" height="20" viewBox="0 0 14 20" fill="currentColor" aria-hidden="true"><circle cx="4" cy="4" r="1.5"/><circle cx="10" cy="4" r="1.5"/><circle cx="4" cy="10" r="1.5"/><circle cx="10" cy="10" r="1.5"/><circle cx="4" cy="16" r="1.5"/><circle cx="10" cy="16" r="1.5"/></svg></button>';
+
+// Pointer-event drag-to-reorder, scoped to a list element. Uses event
+// delegation so it survives bootstrap rebuilds (the list element stays;
+// children are replaced). Works for mouse + touch in one path.
+let _reorderState = null;
+function setupReorderable(listSelector, itemSelector, onChange) {
+  const list = document.querySelector(listSelector);
+  if (!list || list.dataset.reorderable === '1') return;
+  list.dataset.reorderable = '1';
+  list.addEventListener('pointerdown', (e) => {
+    const handle = e.target && e.target.closest && e.target.closest('.drag-handle');
+    if (!handle) return;
+    if (!document.body.classList.contains('edit-mode')) return;
+    const item = handle.closest(itemSelector);
+    if (!item || item.parentElement !== list) return;
+    e.preventDefault();
+    _reorderState = {
+      item, list, itemSelector, onChange,
+      startY: e.clientY,
+      pointerId: e.pointerId,
+    };
+    item.classList.add('is-dragging');
+    document.body.classList.add('reordering');
+    try { handle.setPointerCapture(e.pointerId); } catch (_) {}
+    document.addEventListener('pointermove', _onReorderMove);
+    document.addEventListener('pointerup',   _onReorderEnd);
+    document.addEventListener('pointercancel', _onReorderEnd);
+  });
+}
+function _onReorderMove(e) {
+  const s = _reorderState; if (!s) return;
+  const dy = e.clientY - s.startY;
+  s.item.style.transform = 'translateY(' + dy + 'px) scale(1.015)';
+  const siblings = Array.from(s.list.querySelectorAll(s.itemSelector))
+    .filter((c) => c !== s.item);
+  for (let i = 0; i < siblings.length; i++) {
+    const sib = siblings[i];
+    const r = sib.getBoundingClientRect();
+    if (e.clientY >= r.top && e.clientY <= r.bottom) {
+      const mid = r.top + r.height / 2;
+      if (e.clientY < mid && sib !== s.item.nextElementSibling) {
+        s.list.insertBefore(s.item, sib);
+        s.startY = e.clientY;
+        s.item.style.transform = 'translateY(0) scale(1.015)';
+      } else if (e.clientY >= mid && sib !== s.item.previousElementSibling) {
+        s.list.insertBefore(s.item, sib.nextElementSibling);
+        s.startY = e.clientY;
+        s.item.style.transform = 'translateY(0) scale(1.015)';
+      }
+      break;
+    }
+  }
+}
+function _onReorderEnd() {
+  const s = _reorderState;
+  document.removeEventListener('pointermove', _onReorderMove);
+  document.removeEventListener('pointerup',   _onReorderEnd);
+  document.removeEventListener('pointercancel', _onReorderEnd);
+  if (s) {
+    s.item.classList.remove('is-dragging');
+    s.item.style.transform = '';
+    document.body.classList.remove('reordering');
+    if (typeof s.onChange === 'function') {
+      try { s.onChange(); } catch (_) {}
+    }
+  }
+  _reorderState = null;
+}
+
+// Mirror of src/lib/profile/work-experience.ts. Keep in sync.
+const _MONTHS_TO_IDX = {
+  jan: 0, january: 0, feb: 1, february: 1, mar: 2, march: 2,
+  apr: 3, april: 3, may: 4, jun: 5, june: 5, jul: 6, july: 6,
+  aug: 7, august: 7, sep: 8, sept: 8, september: 8,
+  oct: 9, october: 9, nov: 10, november: 10, dec: 11, december: 11,
+  spring: 2, summer: 5, fall: 8, autumn: 8, winter: 11,
+};
+function _parseExperienceEndDateMs(raw) {
+  if (!raw) return 0;
+  const s = String(raw).toLowerCase();
+  if (/\b(present|current(?:ly)?|now|ongoing)\b/.test(s)) return Date.now();
+  const halves = s.split(/\s*(?:[-–—~]|to|until|through)\s*/i);
+  const tail = (halves[halves.length - 1] || '').trim();
+  if (!tail) return 0;
+  if (/\b(present|current|now|ongoing)\b/.test(tail)) return Date.now();
+  let m = tail.match(/\b([a-z]+)\.?\s+(\d{4})\b/) || tail.match(/(\d{4})/);
+  if (!m) return 0;
+  if (m.length === 3) {
+    const month = _MONTHS_TO_IDX[m[1].replace(/\./g, '')];
+    const year = parseInt(m[2], 10);
+    if (!Number.isFinite(year)) return 0;
+    if (month === undefined) return Date.UTC(year, 11, 31);
+    return Date.UTC(year, month, 28);
+  }
+  const year = parseInt(m[1], 10);
+  if (!Number.isFinite(year)) return 0;
+  return Date.UTC(year, 11, 31);
+}
+function _sortWorkExperienceByRecency(rows) {
+  if (!Array.isArray(rows)) return [];
+  return rows
+    .map((row, i) => ({ row, i, key: _parseExperienceEndDateMs(row && row.dates) }))
+    .sort((a, b) => (b.key !== a.key ? b.key - a.key : a.i - b.i))
+    .map((e) => e.row);
+}
+
 (function initProfilePage(){
   const params = new URLSearchParams(location.search);
   const viewingSlug = params.get('user');
@@ -7456,120 +7573,6 @@ function _urlFromCssBackgroundImage(bgImg) {
   if (!bgImg || bgImg === 'none') return '';
   const m = bgImg.trim().match(/^url\(["']?([^"')]+)["']?\)/i);
   return m ? m[1].trim() : '';
-}
-
-// 6-dot grip icon used as the drag handle on .work-item / .current-item.
-// Injected into every dynamic + static template so reorder works
-// uniformly. Hidden outside edit-mode via CSS.
-const _DRAG_HANDLE_HTML = '<button type="button" class="drag-handle" aria-label="Reorder" tabindex="-1"><svg width="14" height="20" viewBox="0 0 14 20" fill="currentColor" aria-hidden="true"><circle cx="4" cy="4" r="1.5"/><circle cx="10" cy="4" r="1.5"/><circle cx="4" cy="10" r="1.5"/><circle cx="10" cy="10" r="1.5"/><circle cx="4" cy="16" r="1.5"/><circle cx="10" cy="16" r="1.5"/></svg></button>';
-
-// Pointer-event drag-to-reorder, scoped to a list element. Uses event
-// delegation so it survives bootstrap rebuilds (the list element stays;
-// children are replaced). Works for mouse + touch in one path.
-let _reorderState = null;
-function setupReorderable(listSelector, itemSelector, onChange) {
-  const list = document.querySelector(listSelector);
-  if (!list || list.dataset.reorderable === '1') return;
-  list.dataset.reorderable = '1';
-  list.addEventListener('pointerdown', (e) => {
-    const handle = e.target && e.target.closest && e.target.closest('.drag-handle');
-    if (!handle) return;
-    if (!document.body.classList.contains('edit-mode')) return;
-    const item = handle.closest(itemSelector);
-    if (!item || item.parentElement !== list) return;
-    e.preventDefault();
-    _reorderState = {
-      item, list, itemSelector, onChange,
-      startY: e.clientY,
-      pointerId: e.pointerId,
-    };
-    item.classList.add('is-dragging');
-    document.body.classList.add('reordering');
-    try { handle.setPointerCapture(e.pointerId); } catch (_) {}
-    document.addEventListener('pointermove', _onReorderMove);
-    document.addEventListener('pointerup',   _onReorderEnd);
-    document.addEventListener('pointercancel', _onReorderEnd);
-  });
-}
-function _onReorderMove(e) {
-  const s = _reorderState; if (!s) return;
-  const dy = e.clientY - s.startY;
-  s.item.style.transform = 'translateY(' + dy + 'px) scale(1.015)';
-  const siblings = Array.from(s.list.querySelectorAll(s.itemSelector))
-    .filter((c) => c !== s.item);
-  for (let i = 0; i < siblings.length; i++) {
-    const sib = siblings[i];
-    const r = sib.getBoundingClientRect();
-    if (e.clientY >= r.top && e.clientY <= r.bottom) {
-      const mid = r.top + r.height / 2;
-      if (e.clientY < mid && sib !== s.item.nextElementSibling) {
-        s.list.insertBefore(s.item, sib);
-        s.startY = e.clientY;
-        s.item.style.transform = 'translateY(0) scale(1.015)';
-      } else if (e.clientY >= mid && sib !== s.item.previousElementSibling) {
-        s.list.insertBefore(s.item, sib.nextElementSibling);
-        s.startY = e.clientY;
-        s.item.style.transform = 'translateY(0) scale(1.015)';
-      }
-      break;
-    }
-  }
-}
-function _onReorderEnd() {
-  const s = _reorderState;
-  document.removeEventListener('pointermove', _onReorderMove);
-  document.removeEventListener('pointerup',   _onReorderEnd);
-  document.removeEventListener('pointercancel', _onReorderEnd);
-  if (s) {
-    s.item.classList.remove('is-dragging');
-    s.item.style.transform = '';
-    document.body.classList.remove('reordering');
-    if (typeof s.onChange === 'function') {
-      try { s.onChange(); } catch (_) {}
-    }
-  }
-  _reorderState = null;
-}
-
-// Mirror of src/lib/profile/work-experience.ts:
-// parseExperienceEndDateMs + sortWorkExperienceByRecency. Kept in
-// vanilla JS so the legacy profile.html render can sort the
-// experience list at display time without bouncing through the React
-// surfaces. Keep both in sync when you change the parser.
-const _MONTHS_TO_IDX = {
-  jan: 0, january: 0, feb: 1, february: 1, mar: 2, march: 2,
-  apr: 3, april: 3, may: 4, jun: 5, june: 5, jul: 6, july: 6,
-  aug: 7, august: 7, sep: 8, sept: 8, september: 8,
-  oct: 9, october: 9, nov: 10, november: 10, dec: 11, december: 11,
-  spring: 2, summer: 5, fall: 8, autumn: 8, winter: 11,
-};
-function _parseExperienceEndDateMs(raw) {
-  if (!raw) return 0;
-  const s = String(raw).toLowerCase();
-  if (/\b(present|current(?:ly)?|now|ongoing)\b/.test(s)) return Date.now();
-  const halves = s.split(/\s*(?:[-–—~]|to|until|through)\s*/i);
-  const tail = (halves[halves.length - 1] || '').trim();
-  if (!tail) return 0;
-  if (/\b(present|current|now|ongoing)\b/.test(tail)) return Date.now();
-  let m = tail.match(/\b([a-z]+)\.?\s+(\d{4})\b/) || tail.match(/(\d{4})/);
-  if (!m) return 0;
-  if (m.length === 3) {
-    const month = _MONTHS_TO_IDX[m[1].replace(/\./g, '')];
-    const year = parseInt(m[2], 10);
-    if (!Number.isFinite(year)) return 0;
-    if (month === undefined) return Date.UTC(year, 11, 31);
-    return Date.UTC(year, month, 28);
-  }
-  const year = parseInt(m[1], 10);
-  if (!Number.isFinite(year)) return 0;
-  return Date.UTC(year, 11, 31);
-}
-function _sortWorkExperienceByRecency(rows) {
-  if (!Array.isArray(rows)) return [];
-  return rows
-    .map((row, i) => ({ row, i, key: _parseExperienceEndDateMs(row && row.dates) }))
-    .sort((a, b) => (b.key !== a.key ? b.key - a.key : a.i - b.i))
-    .map((e) => e.row);
 }
 
 function saveProfileToStorage() {
