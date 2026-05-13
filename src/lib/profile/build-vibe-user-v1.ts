@@ -58,8 +58,14 @@ export function buildVibeUserV1FromProfile(
   }));
 
   const tagline = profile.tagline.trim() || taglineFromBio(profile.bio);
-  const headline =
-    profile.headline.trim() || headlineFromProfileParts(profile);
+  // Headline is now always derived from major + year (the chip format
+  // the user agreed on). The stored users.headline column is only used
+  // as a final fallback for legacy users who had a custom headline set
+  // before this picker shipped AND have no major/year. The old precedence
+  // (stored over derived) left users with stale "accounting · Kelley ·
+  // Year 2" strings even after they picked a new major.
+  const derivedHeadline = headlineFromProfileParts(profile);
+  const headline = derivedHeadline || profile.headline.trim();
   const location = profile.location_text.trim() || profile.school || "";
 
   const baseSnap: Record<string, string> = {
