@@ -84,6 +84,11 @@ export async function GET() {
   // Pass through cooldown metadata so the inline editor can show
   // "you can change again in N days" without a second roundtrip.
   vibeUser.handleChangedAt = (row as { handle_changed_at?: string | null }).handle_changed_at ?? null;
+  // Major + year exposed so the inline editor can prefill them — the
+  // VibeUser shape normally only encodes these into `headline`, which
+  // isn't reversible for editing.
+  vibeUser.major = (row as { major?: string | null }).major ?? null;
+  vibeUser.year = (row as { year?: number | null }).year ?? null;
   // Pinned post id (from the optional split query above).
   vibeUser.pinnedPostId = pinnedPostId;
 

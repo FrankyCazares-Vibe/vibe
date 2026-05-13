@@ -48,6 +48,24 @@ export async function POST(req: Request) {
     }
   }
 
+  if (typeof body.major === "string") {
+    patch.major = body.major.trim().slice(0, 200);
+  }
+
+  if ("year" in body) {
+    const y = body.year;
+    if (y === null) {
+      patch.year = null;
+    } else if (typeof y === "number" && Number.isInteger(y) && y >= 1 && y <= 12) {
+      patch.year = y;
+    } else {
+      return NextResponse.json(
+        { ok: false, error: "year must be null or integer 1-12" },
+        { status: 400 },
+      );
+    }
+  }
+
   if ("interests" in body) {
     if (!Array.isArray(body.interests)) {
       return NextResponse.json({ ok: false, error: "Invalid interests" }, { status: 400 });

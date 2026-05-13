@@ -63,6 +63,8 @@ type VibeUser = {
   coverPhoto?: string | null;
   coverGradient?: string | null;
   location?: string | null;
+  major?: string | null;
+  year?: number | null;
   bio?: string | null;
   skills?: string[];
   vibeTags?: VibeTag[];
@@ -127,6 +129,8 @@ type EditDraft = {
   tagline: string;
   bio: string;
   location: string;
+  major: string;
+  year: number | null;
   vibeTagsList: string[];
 };
 
@@ -274,6 +278,8 @@ export function ProfileMobile({ targetHandle }: Props = {}) {
     tagline: (u.tagline ?? "").toString(),
     bio: (u.bio ?? "").toString(),
     location: (u.location ?? "").toString(),
+    major: (u.major ?? "").toString(),
+    year: typeof u.year === "number" ? u.year : null,
     vibeTagsList: (u.vibeTags ?? [])
       .map((t) => t?.label ?? "")
       .filter((s): s is string => !!s),
@@ -406,6 +412,8 @@ export function ProfileMobile({ targetHandle }: Props = {}) {
           tagline: snapshot.tagline.trim(),
           bio: snapshot.bio.trim(),
           location_text: snapshot.location.trim(),
+          major: snapshot.major.trim(),
+          year: snapshot.year,
           // `interests` is the server-side name for vibe tags. We
           // strip empties + dedupe here so the column stays clean.
           interests: Array.from(
@@ -842,28 +850,82 @@ export function ProfileMobile({ targetHandle }: Props = {}) {
           </p>
         ) : null}
 
-        {/* Meta chips — headline already encodes major + year + department.
-            In edit mode, location becomes an input; headline stays
-            derived (it's computed from major/year/department in
-            buildVibeUserV1, not user-editable here). */}
+        {/* Meta chips — in display mode, headline (derived from major +
+            year + department) and location render as compact chips.
+            In edit mode, expose location + major + year as direct
+            inputs so users can change them without leaving mobile. */}
         {editMode && effectiveDraft ? (
-          <input
-            value={effectiveDraft.location}
-            onChange={(e) => updateDraft({ location: e.target.value.slice(0, 300) })}
-            placeholder="Where you're based"
+          <div
             style={{
-              fontFamily: "DM Sans, sans-serif",
-              fontSize: 13,
-              color: "#1C1C1E",
-              background: "rgba(255,255,255,0.7)",
-              border: "1px solid rgba(28,28,30,0.10)",
-              borderRadius: 999,
-              padding: "8px 14px",
-              width: "100%",
-              outline: "none",
+              display: "flex",
+              flexDirection: "column",
+              gap: 8,
               marginBottom: 14,
             }}
-          />
+          >
+            <input
+              value={effectiveDraft.location}
+              onChange={(e) => updateDraft({ location: e.target.value.slice(0, 300) })}
+              placeholder="Where you're based"
+              style={{
+                fontFamily: "DM Sans, sans-serif",
+                fontSize: 13,
+                color: "#1C1C1E",
+                background: "rgba(255,255,255,0.7)",
+                border: "1px solid rgba(28,28,30,0.10)",
+                borderRadius: 999,
+                padding: "8px 14px",
+                width: "100%",
+                outline: "none",
+              }}
+            />
+            <div style={{ display: "flex", gap: 8 }}>
+              <input
+                value={effectiveDraft.major}
+                onChange={(e) => updateDraft({ major: e.target.value.slice(0, 200) })}
+                placeholder="Major"
+                style={{
+                  flex: 1,
+                  fontFamily: "DM Sans, sans-serif",
+                  fontSize: 13,
+                  color: "#1C1C1E",
+                  background: "rgba(255,255,255,0.7)",
+                  border: "1px solid rgba(28,28,30,0.10)",
+                  borderRadius: 999,
+                  padding: "8px 14px",
+                  outline: "none",
+                }}
+              />
+              <select
+                value={effectiveDraft.year ?? ""}
+                onChange={(e) => {
+                  const v = e.target.value;
+                  updateDraft({ year: v === "" ? null : Number(v) });
+                }}
+                style={{
+                  fontFamily: "DM Sans, sans-serif",
+                  fontSize: 13,
+                  color: "#1C1C1E",
+                  background: "rgba(255,255,255,0.7)",
+                  border: "1px solid rgba(28,28,30,0.10)",
+                  borderRadius: 999,
+                  padding: "8px 14px",
+                  outline: "none",
+                  appearance: "none",
+                  WebkitAppearance: "none",
+                  paddingRight: 28,
+                }}
+              >
+                <option value="">Year</option>
+                <option value="1">Year 1</option>
+                <option value="2">Year 2</option>
+                <option value="3">Year 3</option>
+                <option value="4">Year 4</option>
+                <option value="5">Year 5</option>
+                <option value="6">Grad</option>
+              </select>
+            </div>
+          </div>
         ) : (location || headline) ? (
           <div
             style={{
