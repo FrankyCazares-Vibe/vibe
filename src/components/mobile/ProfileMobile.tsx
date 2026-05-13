@@ -340,19 +340,40 @@ export function ProfileMobile({ targetHandle }: Props = {}) {
       if (!sync.ok || !sj?.ok) {
         throw new Error(sj?.error ?? "Could not save");
       }
-      // Cache-busting query param — Supabase storage public URLs use a
-      // unique randomUUID path so the URL itself is fresh, but a
-      // re-upload via the cropper can theoretically land on the same
-      // path. Append a ?v= so the browser doesn't show the cached
-      // background-image for the previous URL while the new one loads.
-      const cacheBustedUrl = `${uj.url}${uj.url.includes("?") ? "&" : "?"}v=${Date.now()}`;
-      setUser((prev) =>
-        prev
-          ? kind === "avatar"
-            ? { ...prev, avatarPhoto: cacheBustedUrl }
-            : { ...prev, coverPhoto: cacheBustedUrl }
-          : prev,
-      );
+      // Re-fetch the bootstrap so the new URL we just wrote is the
+      // one we display — confirms the column was actually written
+      // (not just a successful API response), AND keeps the local
+      // state in sync with whatever the server says (cache-bust falls
+      // out for free since the URL itself is a fresh random-UUID path).
+      const rb = await fetch("/api/me/profile-bootstrap", {
+        cache: "no-store",
+        credentials: "include",
+      });
+      const jb = await rb.json().catch(() => ({}));
+      if (rb.ok && jb?.ok && jb.vibeUser) {
+        const fresh = jb.vibeUser as VibeUser;
+        setUser(fresh);
+        // Confirm the URL we sent is the one stored. If they don't
+        // match, the write didn't actually land (silent failure, RLS,
+        // etc.) — surface it instead of pretending things are fine.
+        const storedUrl =
+          kind === "avatar" ? fresh.avatarPhoto : fresh.coverPhoto;
+        if (typeof storedUrl !== "string" || !storedUrl.includes(uj.url.split("?")[0]!)) {
+          throw new Error(
+            `${kind === "avatar" ? "Profile photo" : "Cover photo"} didn't save. Please try again.`,
+          );
+        }
+      } else {
+        // Bootstrap fetch failed — fall back to optimistic local
+        // update so we don't lose the image visually.
+        setUser((prev) =>
+          prev
+            ? kind === "avatar"
+              ? { ...prev, avatarPhoto: uj.url }
+              : { ...prev, coverPhoto: uj.url }
+            : prev,
+        );
+      }
     } catch (e) {
       setEditError(e instanceof Error ? e.message : "Upload failed");
     } finally {
