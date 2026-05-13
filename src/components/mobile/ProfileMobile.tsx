@@ -1025,14 +1025,15 @@ export function ProfileMobile({ targetHandle }: Props = {}) {
           aspect={pendingCrop.kind === "avatar" ? 1 : 3}
           // outputMaxSize = long-edge px count of the emitted JPEG.
           // Avatar 768 covers retina display at typical 88-160px
-          // rendered sizes. Banner bumped to 2400 — the desktop
-          // profile cover spans full body width (~1200-1920 CSS px,
-          // doubled on retina), so ~2400px gives the browser
-          // headroom to downscale (sharp) rather than upscale (blurry).
-          // Cropper still caps at the source image's native pixels,
-          // so users who upload small screenshots get a friendly hint
-          // (see EditError surface) rather than an upscaled blur.
-          outputMaxSize={pendingCrop.kind === "avatar" ? 768 : 2400}
+          // rendered sizes. Banner bumped to 3200 — the desktop
+          // profile cover is full-bleed (~1440-1920 CSS px on common
+          // monitors, doubled to 2880-3840 on retina), so 3200 gives
+          // headroom to downscale (sharp) rather than upscale (blurry)
+          // on every common screen size. Cropper still caps at the
+          // source image's native pixels, so screenshots / small
+          // photos get the soft-output warning below.
+          outputMaxSize={pendingCrop.kind === "avatar" ? 768 : 3200}
+          outputQuality={pendingCrop.kind === "avatar" ? 0.92 : 0.96}
           title={pendingCrop.kind === "avatar" ? "Crop profile photo" : "Crop cover photo"}
           onCancel={() => setPendingCrop(null)}
           onConfirm={(blob, info) => {
