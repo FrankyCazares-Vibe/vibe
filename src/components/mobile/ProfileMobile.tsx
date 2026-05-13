@@ -715,15 +715,19 @@ function PostFeedCard({
         // backdrop. Backdrop-blur lets the page color show through but
         // the dark tint + stronger shadow gives the card real
         // separation from the page instead of blending in.
+        // Light liquid-glass fill matches the desktop campus feed
+        // (rgba 0.55 → 0.38 white-warm). The card LIFT comes from a
+        // visible charcoal hairline border + a soft warm drop shadow,
+        // not from darkening the fill. Mobile feels consistent with
+        // desktop instead of inventing its own treatment.
         background:
-          "linear-gradient(180deg, rgba(28,28,30,0.06) 0%, rgba(28,28,30,0.10) 100%)",
-        backdropFilter: "blur(20px) saturate(140%)",
-        WebkitBackdropFilter: "blur(20px) saturate(140%)",
-        border: "1px solid rgba(28,28,30,0.11)",
+          "linear-gradient(180deg, rgba(255,255,255,0.55) 0%, rgba(255,253,248,0.38) 100%)",
+        backdropFilter: "blur(20px) saturate(160%)",
+        WebkitBackdropFilter: "blur(20px) saturate(160%)",
+        border: "1px solid rgba(28,28,30,0.10)",
         boxShadow: [
-          "inset 0 1px 0 rgba(255,255,255,0.50)",
-          "inset 0 -1px 0 rgba(28,28,30,0.07)",
-          "0 10px 24px rgba(28,28,30,0.09)",
+          "inset 0 1px 0 rgba(255,255,255,0.65)",
+          "0 6px 18px rgba(28,28,30,0.08)",
         ].join(", "),
         textAlign: "left",
         cursor: "pointer",
@@ -1235,12 +1239,12 @@ function PostFeedSkeleton() {
             padding: 14,
             borderRadius: 16,
             background:
-              "linear-gradient(180deg, rgba(28,28,30,0.06) 0%, rgba(28,28,30,0.10) 100%)",
-            backdropFilter: "blur(20px) saturate(140%)",
-            WebkitBackdropFilter: "blur(20px) saturate(140%)",
-            border: "1px solid rgba(28,28,30,0.11)",
+              "linear-gradient(180deg, rgba(255,255,255,0.55) 0%, rgba(255,253,248,0.38) 100%)",
+            backdropFilter: "blur(20px) saturate(160%)",
+            WebkitBackdropFilter: "blur(20px) saturate(160%)",
+            border: "1px solid rgba(28,28,30,0.10)",
             boxShadow:
-              "inset 0 1px 0 rgba(255,255,255,0.50), 0 10px 24px rgba(28,28,30,0.09)",
+              "inset 0 1px 0 rgba(255,255,255,0.65), 0 6px 18px rgba(28,28,30,0.08)",
             display: "flex",
             flexDirection: "column",
             gap: 10,
