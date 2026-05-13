@@ -4290,8 +4290,15 @@ async function handleCoverUpload(input){
   if (typeof window.openImageCropper === 'function') {
     const cropped = await window.openImageCropper(rawFile, {
       aspect: 3,
-      outputMaxSize: 2400,
+      // 3200 covers retina full-bleed banners (~2880-3840 wide on
+      // 1440-1920 monitors) without forcing the browser to upscale.
+      outputMaxSize: 3200,
+      outputQuality: 0.96,
       title: 'Adjust cover photo',
+      safeAreaGuides: [
+        { label: 'Desktop', containerAspect: 6, color: '#FF5C35' },
+        { label: 'Phone',   containerAspect: 2, color: '#7C5CFC' },
+      ],
     });
     if (!cropped) return;
     file = new File([cropped], 'cover-cropped.jpg', { type: cropped.type || 'image/jpeg' });

@@ -473,8 +473,12 @@ export function ImageCropperModal({
                     <span
                       style={{
                         position: "absolute",
-                        top: -9,
-                        left: 6,
+                        // Sit chips just INSIDE the outline so they
+                        // never clip against the viewport's
+                        // overflow:hidden — labels above the rect get
+                        // chopped off when a guide hugs the top edge.
+                        top: 4,
+                        left: 4,
                         background: g.color,
                         color: "#fff",
                         fontFamily: "DM Sans, sans-serif",

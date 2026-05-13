@@ -55,6 +55,9 @@
    *   shape: 'rect' | 'circle' — default 'rect'
    *   outputType: 'image/jpeg' | 'image/png' | 'image/webp' — default 'image/jpeg'
    *   outputQuality: number 0..1 — default 0.92
+   *   safeAreaGuides: Array<{label, containerAspect, color}> — optional;
+   *     draws dashed outlines inside the crop frame for each destination
+   *     surface (e.g. desktop banner 6:1, phone banner 2:1).
    */
   window.openImageCropper = function openImageCropper(file, opts) {
     opts = opts || {};
@@ -64,6 +67,7 @@
     const shape = opts.shape || "rect";
     const outputType = opts.outputType || "image/jpeg";
     const outputQuality = typeof opts.outputQuality === "number" ? opts.outputQuality : 0.92;
+    const safeAreaGuides = Array.isArray(opts.safeAreaGuides) ? opts.safeAreaGuides : [];
 
     // Viewport sized from aspect.
     const vw = aspect >= 1 ? VIEWPORT_MAX : VIEWPORT_MAX * aspect;
@@ -99,6 +103,53 @@
       stage.style.width = vw + "px";
       stage.style.height = vh + "px";
       if (shape === "circle") stage.style.borderRadius = "50%";
+
+      // Optional safe-area outlines — drawn after the <img> so they
+      // float above it. Skipped for circle shape (avatar) since circular
+      // avatars get center-cover'd the same on every surface.
+      if (safeAreaGuides.length && shape !== "circle") {
+        for (let i = 0; i < safeAreaGuides.length; i++) {
+          const g = safeAreaGuides[i];
+          let widthPct = 1;
+          let heightPct = 1;
+          if (g.containerAspect > aspect) {
+            heightPct = aspect / g.containerAspect;
+          } else if (g.containerAspect < aspect) {
+            widthPct = g.containerAspect / aspect;
+          }
+          const leftPct = (1 - widthPct) / 2;
+          const topPct = (1 - heightPct) / 2;
+          const guide = document.createElement("div");
+          guide.setAttribute("aria-hidden", "true");
+          guide.style.position = "absolute";
+          guide.style.left = leftPct * 100 + "%";
+          guide.style.top = topPct * 100 + "%";
+          guide.style.width = widthPct * 100 + "%";
+          guide.style.height = heightPct * 100 + "%";
+          guide.style.border = "1.5px dashed " + g.color;
+          guide.style.boxShadow = "0 0 0 1px rgba(0,0,0,0.35) inset";
+          guide.style.pointerEvents = "none";
+          guide.style.borderRadius = "2px";
+          const chip = document.createElement("span");
+          chip.textContent = g.label;
+          chip.style.position = "absolute";
+          chip.style.top = "4px";
+          chip.style.left = "4px";
+          chip.style.background = g.color;
+          chip.style.color = "#fff";
+          chip.style.fontFamily = "'DM Sans', sans-serif";
+          chip.style.fontSize = "9px";
+          chip.style.fontWeight = "800";
+          chip.style.letterSpacing = "0.04em";
+          chip.style.textTransform = "uppercase";
+          chip.style.padding = "2px 6px";
+          chip.style.borderRadius = "999px";
+          chip.style.whiteSpace = "nowrap";
+          chip.style.lineHeight = "1";
+          guide.appendChild(chip);
+          stage.appendChild(guide);
+        }
+      }
 
       // Object URL for the picked file.
       const url = URL.createObjectURL(file);
