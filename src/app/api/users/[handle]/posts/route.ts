@@ -52,10 +52,15 @@ export async function GET(req: Request, ctx: RouteContext) {
     Math.max(1, Number(url.searchParams.get("limit")) || DEFAULT_LIMIT),
   );
 
+  // Filter drafts even when viewer == target owner — drafts only appear
+  // in the composer's Drafts box, never in the public-shaped grid.
   const { data, error } = await supabase
     .from("posts")
-    .select("id,user_id,type,content,tags,media_url,media_thumbnail_url,created_at")
+    .select(
+      "id,user_id,type,content,tags,media_url,media_thumbnail_url,edit_metadata,created_at",
+    )
     .eq("user_id", target.id)
+    .eq("status", "published")
     .order("created_at", { ascending: false })
     .limit(limit);
 

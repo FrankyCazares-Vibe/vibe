@@ -475,19 +475,59 @@ function DraftsListOverlay({
                 borderBottom: "1px solid rgba(255,255,255,0.04)",
               }}
             >
-              {/* Thumbnail */}
+              {/* Thumbnail — filter on the image layer, overlays as
+                  unfiltered siblings so colored text stays colored. */}
               <div
                 style={{
+                  position: "relative",
                   width: 56,
                   height: 88,
                   borderRadius: 8,
-                  background: d.media_thumbnail_url
-                    ? `url(${d.media_thumbnail_url}) center/cover, #1C1C1E`
-                    : "#1C1C1E",
+                  overflow: "hidden",
                   flexShrink: 0,
+                  background: "#1C1C1E",
                   border: "1px solid rgba(255,255,255,0.06)",
                 }}
-              />
+              >
+                {d.media_thumbnail_url ? (
+                  <div
+                    aria-hidden
+                    style={{
+                      position: "absolute",
+                      inset: 0,
+                      background: `url(${d.media_thumbnail_url}) center/cover`,
+                      filter: d.edit_metadata?.filter
+                        ? FILTER_CSS[d.edit_metadata.filter]
+                        : undefined,
+                    }}
+                  />
+                ) : null}
+                {d.edit_metadata?.text_overlays?.map((o) => (
+                  <div
+                    key={o.id}
+                    aria-hidden
+                    style={{
+                      position: "absolute",
+                      left: `${o.x}%`,
+                      top: `${o.y}%`,
+                      transform: "translate(-50%, -50%)",
+                      color: o.color,
+                      fontFamily: "DM Sans, sans-serif",
+                      fontWeight: 800,
+                      fontSize: 6,
+                      lineHeight: 1.1,
+                      textAlign: "center",
+                      textShadow: "0 1px 1px rgba(0,0,0,0.6)",
+                      maxWidth: "82%",
+                      whiteSpace: "pre-wrap",
+                      wordBreak: "break-word",
+                      pointerEvents: "none",
+                    }}
+                  >
+                    {o.text}
+                  </div>
+                ))}
+              </div>
               {/* Caption preview + time */}
               <div style={{ flex: 1, minWidth: 0 }}>
                 <div

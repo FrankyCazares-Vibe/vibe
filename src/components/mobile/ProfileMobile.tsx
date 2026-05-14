@@ -10,6 +10,7 @@ import { ClipViewerMobile } from "@/components/mobile/ClipViewerMobile";
 import { PostComposerMobile } from "@/components/mobile/PostComposerMobile";
 import { PostViewerMobile } from "@/components/mobile/PostViewerMobile";
 import { ResumeViewerMobile } from "@/components/mobile/ResumeViewerMobile";
+import { FILTER_CSS } from "@/lib/clip/edit-metadata";
 import { IU_MAJORS_BY_SCHOOL } from "@/lib/iu/majors";
 import type { RedactionBar } from "@/lib/profile/resume-redactions";
 import { sortWorkExperienceByRecency } from "@/lib/profile/work-experience";
@@ -120,6 +121,7 @@ type PostRow = {
   content?: string | null;
   media_url?: string | null;
   media_thumbnail_url?: string | null;
+  edit_metadata?: import("@/lib/clip/edit-metadata").ClipEditMetadata | null;
   created_at?: string | null;
 };
 
@@ -1622,6 +1624,13 @@ function PostThumb({
   // gradient pretending there's an image. Keeps the grid layout but
   // text posts read as text, not as Instagram tiles.
   const isTextOnly = !thumb;
+  // Lossless edit effects on the thumbnail. Filter is applied to a
+  // dedicated background layer; text overlays render as siblings so
+  // they don't inherit the filter (CSS filter on a parent applies to
+  // all descendants, which would gray out the text on a B&W clip).
+  const editMeta = post.edit_metadata ?? null;
+  const filterCss = editMeta?.filter ? FILTER_CSS[editMeta.filter] : undefined;
+  const overlays = editMeta?.text_overlays ?? [];
   return (
     <button
       type="button"
@@ -1633,7 +1642,7 @@ function PostThumb({
         overflow: "hidden",
         background: isTextOnly
           ? "linear-gradient(180deg,#FFFCF6 0%,#F5F0E5 100%)"
-          : `url(${thumb}) center/cover`,
+          : "#000",
         border: isTextOnly ? "1px solid rgba(28,28,30,0.06)" : "none",
         boxShadow: isTextOnly ? "inset 0 1px 0 rgba(255,255,255,0.6)" : "none",
         padding: 0,
@@ -1641,6 +1650,49 @@ function PostThumb({
         textAlign: "left",
       }}
     >
+      {/* Filtered background layer — separate so text overlays aren't
+          dragged through the filter too. */}
+      {!isTextOnly ? (
+        <div
+          aria-hidden
+          style={{
+            position: "absolute",
+            inset: 0,
+            background: `url(${thumb}) center/cover`,
+            filter: filterCss,
+          }}
+        />
+      ) : null}
+      {/* Text overlays at their %-coords. Font size is scaled down
+          for the grid (vs the full-screen viewer's 22px) so they
+          read at thumbnail scale. */}
+      {!isTextOnly && overlays.length > 0
+        ? overlays.map((o) => (
+            <div
+              key={o.id}
+              aria-hidden
+              style={{
+                position: "absolute",
+                left: `${o.x}%`,
+                top: `${o.y}%`,
+                transform: "translate(-50%, -50%)",
+                color: o.color,
+                fontFamily: "DM Sans, sans-serif",
+                fontWeight: 800,
+                fontSize: 9,
+                lineHeight: 1.15,
+                textAlign: "center",
+                textShadow: "0 1px 2px rgba(0,0,0,0.55)",
+                maxWidth: "82%",
+                whiteSpace: "pre-wrap",
+                wordBreak: "break-word",
+                pointerEvents: "none",
+              }}
+            >
+              {o.text}
+            </div>
+          ))
+        : null}
       {isTextOnly ? (
         <div
           style={{

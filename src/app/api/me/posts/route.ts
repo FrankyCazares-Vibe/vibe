@@ -27,10 +27,16 @@ export async function GET(req: Request) {
     Math.max(1, Number(url.searchParams.get("limit")) || DEFAULT_LIMIT),
   );
 
+  // Drafts stay out of the profile grid — they live exclusively in the
+  // composer's Drafts box. Owners can still see their own drafts there
+  // via /api/me/clip-drafts.
   const { data, error } = await supabase
     .from("posts")
-    .select("id,user_id,type,content,tags,media_url,media_thumbnail_url,created_at")
+    .select(
+      "id,user_id,type,content,tags,media_url,media_thumbnail_url,edit_metadata,created_at",
+    )
     .eq("user_id", user.id)
+    .eq("status", "published")
     .order("created_at", { ascending: false })
     .limit(limit);
 
