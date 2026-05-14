@@ -1,7 +1,7 @@
 "use client";
 
 import Link from "next/link";
-import { useEffect, useState } from "react";
+import { useCallback, useEffect, useState } from "react";
 
 type Channel = {
   id: string;
@@ -13,26 +13,29 @@ type Channel = {
 };
 
 /**
- * Lists the org's visible channels. RLS filters out private channels
- * the viewer can't see (non-staff / non-members). Each row deep-links
- * into /messages, where the channel will appear in the viewer's
- * thread list (org members are auto-subscribed via the join
- * handler's channel_members upsert).
+ * Lists the org's visible channels, grouped by Public / Private.
+ * RLS filters out private channels the viewer can't see (non-staff /
+ * non-members).
  *
- * For non-members of public orgs: channels still show, but the visit
- * to /messages won't reveal the channel until they hit Join first.
- * The empty / pinned visual treatment makes that obvious.
+ * For members: "+ Join all public" button at the top idempotently
+ *   subscribes them to every non-private channel via the
+ *   /channels/subscribe-public endpoint. Useful for users who joined
+ *   before the auto-subscribe wiring or want to (re-)pick up newer
+ *   public channels.
+ *
+ * For visitors: rows are dimmed + tap-suppressed; a "Join the org to
+ *   chat" hint sits below the list.
  */
 export function ChannelsSection({
   orgHandle,
   viewerIsMember,
 }: {
   orgHandle: string;
-  /** True when the viewer is an org_member (any role). Drives the
-   *  "Join to chat" hint vs. the deep-link CTA. */
   viewerIsMember: boolean;
 }) {
   const [channels, setChannels] = useState<Channel[] | null>(null);
+  const [subscribing, setSubscribing] = useState(false);
+  const [toast, setToast] = useState<string | null>(null);
 
   useEffect(() => {
     let cancelled = false;
@@ -56,6 +59,41 @@ export function ChannelsSection({
     };
   }, [orgHandle]);
 
+  const joinAllPublic = useCallback(async () => {
+    if (subscribing) return;
+    setSubscribing(true);
+    setToast(null);
+    try {
+      const r = await fetch(
+        `/api/orgs/${encodeURIComponent(orgHandle)}/channels/subscribe-public`,
+        { method: "POST" },
+      );
+      const j = await r.json();
+      if (!r.ok || !j?.ok) throw new Error(j?.error ?? "Failed");
+      const n = typeof j.subscribed === "number" ? j.subscribed : 0;
+      setToast(
+        n === 0
+          ? "Already in every public channel"
+          : `Joined ${n} channel${n === 1 ? "" : "s"}`,
+      );
+    } catch (e) {
+      setToast(e instanceof Error ? e.message : "Couldn't join channels");
+    } finally {
+      setSubscribing(false);
+    }
+  }, [orgHandle, subscribing]);
+
+  useEffect(() => {
+    if (!toast) return;
+    const t = window.setTimeout(() => setToast(null), 2400);
+    return () => window.clearTimeout(t);
+  }, [toast]);
+
+  const publicChannels =
+    channels?.filter((c) => !c.is_private).sort(sortChannels) ?? [];
+  const privateChannels =
+    channels?.filter((c) => c.is_private).sort(sortChannels) ?? [];
+
   return (
     <section
       style={{
@@ -68,16 +106,68 @@ export function ChannelsSection({
     >
       <div
         style={{
-          fontSize: 10.5,
-          fontWeight: 700,
-          letterSpacing: "0.16em",
-          textTransform: "uppercase",
-          color: "rgba(255,255,255,0.55)",
+          display: "flex",
+          alignItems: "center",
+          justifyContent: "space-between",
+          gap: 8,
           marginBottom: 10,
         }}
       >
-        Channels
+        <span
+          style={{
+            fontSize: 10.5,
+            fontWeight: 700,
+            letterSpacing: "0.16em",
+            textTransform: "uppercase",
+            color: "rgba(255,255,255,0.55)",
+          }}
+        >
+          Channels
+        </span>
+        {viewerIsMember && publicChannels.length > 0 ? (
+          <button
+            type="button"
+            onClick={() => void joinAllPublic()}
+            disabled={subscribing}
+            style={{
+              padding: "5px 10px",
+              borderRadius: 999,
+              border: "none",
+              background:
+                "linear-gradient(135deg,#FF7A4D 0%,#FF5C35 60%,#E04A26 100%)",
+              color: "#fff",
+              fontFamily: "DM Sans, sans-serif",
+              fontSize: 11.5,
+              fontWeight: 800,
+              letterSpacing: "0.02em",
+              cursor: subscribing ? "default" : "pointer",
+              opacity: subscribing ? 0.7 : 1,
+              boxShadow: "0 4px 12px rgba(255,92,53,0.32)",
+              WebkitTapHighlightColor: "transparent",
+            }}
+          >
+            {subscribing ? "Joining…" : "+ Join all public"}
+          </button>
+        ) : null}
       </div>
+
+      {toast ? (
+        <div
+          style={{
+            margin: "0 0 10px",
+            padding: "6px 10px",
+            borderRadius: 10,
+            background: "rgba(255,255,255,0.06)",
+            border: "1px solid rgba(255,255,255,0.10)",
+            color: "rgba(255,255,255,0.85)",
+            fontSize: 11.5,
+            fontWeight: 600,
+            textAlign: "center",
+          }}
+        >
+          {toast}
+        </div>
+      ) : null}
 
       {channels === null ? (
         <Skeleton />
@@ -93,19 +183,27 @@ export function ChannelsSection({
           No channels here yet.
         </p>
       ) : (
-        <div style={{ display: "flex", flexDirection: "column", gap: 6 }}>
-          {channels.map((c) => (
-            <ChannelRow
-              key={c.id}
-              channel={c}
+        <div style={{ display: "flex", flexDirection: "column", gap: 12 }}>
+          {publicChannels.length > 0 ? (
+            <ChannelGroup
+              label="Public"
+              channels={publicChannels}
               viewerIsMember={viewerIsMember}
               orgHandle={orgHandle}
             />
-          ))}
+          ) : null}
+          {privateChannels.length > 0 ? (
+            <ChannelGroup
+              label="Private"
+              channels={privateChannels}
+              viewerIsMember={viewerIsMember}
+              orgHandle={orgHandle}
+            />
+          ) : null}
           {!viewerIsMember ? (
             <div
               style={{
-                marginTop: 6,
+                marginTop: 2,
                 padding: "8px 10px",
                 borderRadius: 10,
                 background: "rgba(255,92,53,0.08)",
@@ -124,6 +222,46 @@ export function ChannelsSection({
   );
 }
 
+function ChannelGroup({
+  label,
+  channels,
+  viewerIsMember,
+  orgHandle,
+}: {
+  label: string;
+  channels: Channel[];
+  viewerIsMember: boolean;
+  orgHandle: string;
+}) {
+  return (
+    <div>
+      <div
+        style={{
+          padding: "0 2px 6px",
+          fontFamily: "DM Sans, sans-serif",
+          fontSize: 10.5,
+          fontWeight: 800,
+          letterSpacing: "0.10em",
+          textTransform: "uppercase",
+          color: "rgba(255,255,255,0.48)",
+        }}
+      >
+        {label}
+      </div>
+      <div style={{ display: "flex", flexDirection: "column", gap: 6 }}>
+        {channels.map((c) => (
+          <ChannelRow
+            key={c.id}
+            channel={c}
+            viewerIsMember={viewerIsMember}
+            orgHandle={orgHandle}
+          />
+        ))}
+      </div>
+    </div>
+  );
+}
+
 function ChannelRow({
   channel,
   viewerIsMember,
@@ -133,9 +271,6 @@ function ChannelRow({
   viewerIsMember: boolean;
   orgHandle: string;
 }) {
-  // Deep-link into the Campus Chat tab with this org + channel
-  // pre-selected. Members get the full chat surface; non-members get
-  // a dead link with a "Join to chat" hint above.
   const href = viewerIsMember
     ? `/campus?tab=chat&org=${encodeURIComponent(orgHandle)}&channel=${encodeURIComponent(channel.id)}`
     : "#";
@@ -245,6 +380,15 @@ function ChannelRow({
       </span>
     </Link>
   );
+}
+
+function sortChannels(a: Channel, b: Channel): number {
+  // Pinned first, then by position, then alphabetical.
+  if (!!b.pinned !== !!a.pinned) return Number(!!b.pinned) - Number(!!a.pinned);
+  const ap = a.position ?? 1000;
+  const bp = b.position ?? 1000;
+  if (ap !== bp) return ap - bp;
+  return a.name.localeCompare(b.name);
 }
 
 function Skeleton() {
