@@ -359,8 +359,8 @@ function Header({
     >
       <div
         style={{
-          width: 96,
-          height: 96,
+          width: "clamp(72px, 22vw, 96px)",
+          height: "clamp(72px, 22vw, 96px)",
           borderRadius: 20,
           background: org.logo_url
             ? `url(${org.logo_url}) center/cover`
@@ -371,7 +371,7 @@ function Header({
           justifyContent: "center",
           fontFamily: "Fraunces, serif",
           fontWeight: 900,
-          fontSize: 32,
+          fontSize: "clamp(24px, 8vw, 32px)",
           color: "#fff",
           boxShadow:
             "inset 0 1px 0 rgba(255,255,255,0.3), 0 12px 32px rgba(0,0,0,0.45)",
@@ -389,36 +389,46 @@ function Header({
           : null}
       </div>
       <div style={{ flex: 1, minWidth: 0 }}>
-        <div style={{ display: "flex", alignItems: "center", gap: 10, flexWrap: "wrap" }}>
-          <h1
-            style={{
-              margin: 0,
-              fontFamily: "Fraunces, serif",
-              fontSize: "clamp(28px, 4vw, 38px)",
-              fontWeight: 900,
-              letterSpacing: "-1px",
-            }}
-          >
-            {org.name}
-          </h1>
-          {org.verified ? <VerifiedBadge /> : null}
-          {!org.is_public ? <Chip color="#9B7BFF">Private</Chip> : <Chip color="#9DD8FF">Public</Chip>}
-          {org.dormant ? <Chip color="#E84D4D">Dormant</Chip> : null}
-        </div>
-        <div
+        {/* Title always on its own line — chips + handle + member count
+            live in a single wrap-friendly meta row below so a long name
+            doesn't push status chips to their own stacked lines. */}
+        <h1
           style={{
-            marginTop: 4,
-            fontSize: 14,
-            color: "rgba(255,255,255,0.7)",
-            display: "flex",
-            gap: 10,
-            flexWrap: "wrap",
+            margin: 0,
+            fontFamily: "Fraunces, serif",
+            fontSize: "clamp(22px, 5.5vw, 36px)",
+            fontWeight: 900,
+            letterSpacing: "-0.6px",
+            lineHeight: 1.1,
+            wordBreak: "break-word",
           }}
         >
-          <span>@{org.handle}</span>
-          <span style={{ opacity: 0.4 }}>·</span>
-          <span>
-            {org.member_count} {org.member_count === 1 ? "member" : "members"}
+          {org.name}
+        </h1>
+        <div
+          style={{
+            marginTop: 8,
+            display: "flex",
+            flexWrap: "wrap",
+            alignItems: "center",
+            gap: 8,
+            fontSize: 13,
+            color: "rgba(255,255,255,0.7)",
+          }}
+        >
+          {org.verified ? <VerifiedBadge /> : null}
+          {!org.is_public ? (
+            <Chip color="#9B7BFF">Private</Chip>
+          ) : (
+            <Chip color="#9DD8FF">Public</Chip>
+          )}
+          {org.dormant ? <Chip color="#E84D4D">Dormant</Chip> : null}
+          <span style={{ display: "inline-flex", gap: 6, alignItems: "center" }}>
+            <span>@{org.handle}</span>
+            <span style={{ opacity: 0.4 }}>·</span>
+            <span>
+              {org.member_count} {org.member_count === 1 ? "member" : "members"}
+            </span>
           </span>
         </div>
       </div>
@@ -435,15 +445,16 @@ function VerifiedBadge() {
         display: "inline-flex",
         alignItems: "center",
         gap: 4,
-        padding: "3px 10px",
+        padding: "3px 8px",
         borderRadius: 999,
-        fontSize: 11,
+        fontSize: 10.5,
         fontWeight: 700,
         letterSpacing: "0.08em",
         textTransform: "uppercase",
         color: "#FFE8A8",
         background: "rgba(240,200,74,0.18)",
         border: "1px solid rgba(240,200,74,0.45)",
+        flexShrink: 0,
       }}
     >
       <svg width="11" height="11" viewBox="0 0 16 16" aria-hidden>
@@ -468,15 +479,16 @@ function Chip({ color, children }: { color: string; children: React.ReactNode })
       style={{
         display: "inline-flex",
         alignItems: "center",
-        padding: "3px 10px",
+        padding: "3px 8px",
         borderRadius: 999,
-        fontSize: 11,
+        fontSize: 10.5,
         fontWeight: 700,
         letterSpacing: "0.08em",
         textTransform: "uppercase",
         color,
         background: `rgba(${tint},0.18)`,
         border: `1px solid rgba(${tint},0.4)`,
+        flexShrink: 0,
       }}
     >
       {children}
@@ -734,10 +746,30 @@ function LinksSection({ links }: { links: Array<{ label: string; url: string }> 
               alignItems: "center",
               justifyContent: "space-between",
               gap: 10,
+              minWidth: 0,
             }}
           >
-            <span style={{ fontWeight: 600 }}>{l.label}</span>
-            <span style={{ color: "rgba(255,255,255,0.5)", fontSize: 12 }}>↗</span>
+            <span
+              style={{
+                fontWeight: 600,
+                flex: 1,
+                minWidth: 0,
+                whiteSpace: "nowrap",
+                overflow: "hidden",
+                textOverflow: "ellipsis",
+              }}
+            >
+              {l.label}
+            </span>
+            <span
+              style={{
+                color: "rgba(255,255,255,0.5)",
+                fontSize: 12,
+                flexShrink: 0,
+              }}
+            >
+              ↗
+            </span>
           </a>
         ))}
       </div>
@@ -788,14 +820,29 @@ function Fact({ label, value }: { label: string; value: string }) {
       style={{
         display: "flex",
         justifyContent: "space-between",
+        alignItems: "baseline",
         gap: 12,
         padding: "8px 0",
         borderBottom: "1px solid rgba(255,255,255,0.06)",
-        fontSize: 13,
+        fontSize: 12.5,
+        minWidth: 0,
       }}
     >
-      <span style={{ color: "rgba(255,255,255,0.55)" }}>{label}</span>
-      <span style={{ color: "#fff" }}>{value}</span>
+      <span style={{ color: "rgba(255,255,255,0.55)", flexShrink: 0 }}>
+        {label}
+      </span>
+      <span
+        style={{
+          color: "#fff",
+          textAlign: "right",
+          minWidth: 0,
+          overflow: "hidden",
+          textOverflow: "ellipsis",
+          whiteSpace: "nowrap",
+        }}
+      >
+        {value}
+      </span>
     </div>
   );
 }
@@ -810,7 +857,7 @@ function SectionCard({
   return (
     <section
       style={{
-        padding: 16,
+        padding: "clamp(12px, 3.6vw, 16px)",
         borderRadius: 16,
         background: "rgba(255,255,255,0.04)",
         border: "1px solid rgba(255,255,255,0.1)",
@@ -819,7 +866,7 @@ function SectionCard({
     >
       <div
         style={{
-          fontSize: 11,
+          fontSize: 10.5,
           fontWeight: 700,
           letterSpacing: "0.16em",
           textTransform: "uppercase",
