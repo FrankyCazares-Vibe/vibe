@@ -1492,8 +1492,66 @@ export function ClipComposerMobile({ onClose, onPosted, origin }: Props) {
           maxHeight: "100%",
           objectFit: "cover",
           background: "#000",
+          filter: filterPreset ? FILTER_CSS[filterPreset] : undefined,
         }}
       />
+
+      {/* Filter chip tray — sits just above the bottom action bar when
+          the Filters tool is active. Tap a chip to apply (toggle off
+          by tapping the same chip again, or the None chip). */}
+      {activeEditTray === "filters" ? (
+        <div
+          style={{
+            position: "absolute",
+            left: 0,
+            right: 0,
+            bottom: "calc(env(safe-area-inset-bottom, 0px) + 80px)",
+            padding: "10px 14px",
+            display: "flex",
+            gap: 10,
+            overflowX: "auto",
+            WebkitOverflowScrolling: "touch",
+          }}
+        >
+          {([null, ...FILTER_PRESETS] as const).map((p) => {
+            const active = (filterPreset ?? null) === p;
+            const label =
+              p === null
+                ? "None"
+                : p === "bw"
+                  ? "B&W"
+                  : p[0].toUpperCase() + p.slice(1);
+            return (
+              <button
+                key={p ?? "none"}
+                type="button"
+                onClick={() => setFilterPreset(p)}
+                style={{
+                  flexShrink: 0,
+                  padding: "8px 14px",
+                  borderRadius: 999,
+                  border: active
+                    ? "1.5px solid #FF5C35"
+                    : "1px solid rgba(255,255,255,0.36)",
+                  background: active
+                    ? "rgba(255,92,53,0.18)"
+                    : "rgba(0,0,0,0.42)",
+                  color: "#fff",
+                  fontFamily: "DM Sans, sans-serif",
+                  fontWeight: 700,
+                  fontSize: 13,
+                  letterSpacing: "0.02em",
+                  cursor: "pointer",
+                  backdropFilter: "blur(10px)",
+                  WebkitBackdropFilter: "blur(10px)",
+                }}
+              >
+                {label}
+              </button>
+            );
+          })}
+        </div>
+      ) : null}
 
       {/* Top chrome — duration badge centered, close X top-left, "Edit"
           label top-right to set context. */}
