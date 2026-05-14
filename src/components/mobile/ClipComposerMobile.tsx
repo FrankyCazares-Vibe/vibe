@@ -291,6 +291,259 @@ function TextOverlayEditor({
   );
 }
 
+type DraftRow = {
+  id: string;
+  content: string | null;
+  media_thumbnail_url: string | null;
+  edit_metadata: ClipEditMetadata | null;
+  created_at: string;
+};
+
+function formatDraftWhen(iso: string): string {
+  const ms = Date.now() - Date.parse(iso);
+  if (!Number.isFinite(ms) || ms < 0) return "";
+  const min = ms / 60000;
+  if (min < 1) return "just now";
+  if (min < 60) return `${Math.floor(min)}m ago`;
+  const hr = min / 60;
+  if (hr < 24) return `${Math.floor(hr)}h ago`;
+  const d = hr / 24;
+  if (d < 7) return `${Math.floor(d)}d ago`;
+  return new Date(iso).toLocaleDateString();
+}
+
+function DraftsListOverlay({
+  onPick,
+  onCancel,
+}: {
+  onPick: (draft: ResumableDraft) => void;
+  onCancel: () => void;
+}) {
+  const [rows, setRows] = useState<DraftRow[] | null>(null);
+  const [error, setError] = useState<string | null>(null);
+
+  const fetchDrafts = useCallback(async () => {
+    try {
+      const r = await fetch("/api/me/clip-drafts", { cache: "no-store" });
+      const j = await r.json();
+      if (!j?.ok) {
+        setError(j?.error ?? "Could not load drafts");
+        return;
+      }
+      setRows((j.drafts ?? []) as DraftRow[]);
+    } catch (e) {
+      setError(e instanceof Error ? e.message : "Could not load drafts");
+    }
+  }, []);
+
+  useEffect(() => {
+    void fetchDrafts();
+  }, [fetchDrafts]);
+
+  const handleDelete = async (id: string) => {
+    if (typeof window !== "undefined" && !window.confirm("Delete this draft?")) {
+      return;
+    }
+    // Optimistic remove; revert on failure.
+    setRows((prev) => prev?.filter((r) => r.id !== id) ?? null);
+    try {
+      const r = await fetch(`/api/posts/${id}`, { method: "DELETE" });
+      const j = await r.json().catch(() => ({}));
+      if (!r.ok || !j?.ok) throw new Error(j?.error ?? "Delete failed");
+    } catch {
+      await fetchDrafts();
+    }
+  };
+
+  return (
+    <div
+      role="dialog"
+      aria-modal="true"
+      aria-label="Drafts"
+      style={{
+        position: "absolute",
+        inset: 0,
+        zIndex: 30,
+        background: "#0E0E10",
+        color: "#fff",
+        display: "flex",
+        flexDirection: "column",
+        paddingTop: "env(safe-area-inset-top, 0px)",
+        paddingBottom: "env(safe-area-inset-bottom, 0px)",
+        fontFamily: "DM Sans, sans-serif",
+      }}
+    >
+      {/* Top bar */}
+      <div
+        style={{
+          display: "flex",
+          alignItems: "center",
+          justifyContent: "space-between",
+          padding: "14px 18px",
+          borderBottom: "1px solid rgba(255,255,255,0.08)",
+        }}
+      >
+        <button
+          type="button"
+          onClick={onCancel}
+          style={{
+            background: "transparent",
+            border: "none",
+            color: "rgba(255,255,255,0.85)",
+            fontSize: 15,
+            fontWeight: 600,
+            padding: 4,
+            cursor: "pointer",
+          }}
+        >
+          Cancel
+        </button>
+        <span
+          style={{
+            fontFamily: "Fraunces, serif",
+            fontSize: 18,
+            fontWeight: 800,
+          }}
+        >
+          Drafts
+        </span>
+        <span style={{ width: 56 }} />
+      </div>
+
+      {/* Body */}
+      <div
+        style={{
+          flex: 1,
+          overflowY: "auto",
+          WebkitOverflowScrolling: "touch",
+          padding: "8px 0",
+        }}
+      >
+        {error ? (
+          <p
+            style={{
+              padding: "32px 24px",
+              color: "rgba(255,180,180,0.9)",
+              fontSize: 14,
+              textAlign: "center",
+            }}
+          >
+            {error}
+          </p>
+        ) : rows === null ? (
+          <p
+            style={{
+              padding: "32px 24px",
+              color: "rgba(255,255,255,0.55)",
+              fontSize: 14,
+              textAlign: "center",
+            }}
+          >
+            Loading drafts…
+          </p>
+        ) : rows.length === 0 ? (
+          <div
+            style={{
+              padding: "48px 28px",
+              color: "rgba(255,255,255,0.62)",
+              fontSize: 14,
+              textAlign: "center",
+              lineHeight: 1.55,
+            }}
+          >
+            No drafts yet. Hit <strong style={{ color: "#fff" }}>Save draft</strong>
+            {" "}from the caption screen to keep a clip private until you&apos;re ready.
+          </div>
+        ) : (
+          rows.map((d) => (
+            <div
+              key={d.id}
+              role="button"
+              onClick={() =>
+                onPick({
+                  id: d.id,
+                  content: d.content,
+                  edit_metadata: d.edit_metadata,
+                })
+              }
+              style={{
+                display: "flex",
+                alignItems: "center",
+                gap: 12,
+                padding: "10px 18px",
+                cursor: "pointer",
+                borderBottom: "1px solid rgba(255,255,255,0.04)",
+              }}
+            >
+              {/* Thumbnail */}
+              <div
+                style={{
+                  width: 56,
+                  height: 88,
+                  borderRadius: 8,
+                  background: d.media_thumbnail_url
+                    ? `url(${d.media_thumbnail_url}) center/cover, #1C1C1E`
+                    : "#1C1C1E",
+                  flexShrink: 0,
+                  border: "1px solid rgba(255,255,255,0.06)",
+                }}
+              />
+              {/* Caption preview + time */}
+              <div style={{ flex: 1, minWidth: 0 }}>
+                <div
+                  style={{
+                    fontSize: 14,
+                    fontWeight: 600,
+                    color: d.content ? "#fff" : "rgba(255,255,255,0.55)",
+                    lineHeight: 1.35,
+                    overflow: "hidden",
+                    textOverflow: "ellipsis",
+                    display: "-webkit-box",
+                    WebkitLineClamp: 2,
+                    WebkitBoxOrient: "vertical",
+                  }}
+                >
+                  {d.content?.trim() || "Untitled draft"}
+                </div>
+                <div
+                  style={{
+                    marginTop: 4,
+                    fontSize: 11.5,
+                    color: "rgba(255,255,255,0.5)",
+                    letterSpacing: "0.02em",
+                  }}
+                >
+                  {formatDraftWhen(d.created_at)}
+                </div>
+              </div>
+              {/* Delete */}
+              <button
+                type="button"
+                aria-label="Delete draft"
+                onClick={(e) => {
+                  e.stopPropagation();
+                  void handleDelete(d.id);
+                }}
+                style={{
+                  background: "transparent",
+                  border: "none",
+                  color: "rgba(255,140,140,0.85)",
+                  fontSize: 13,
+                  fontWeight: 600,
+                  padding: "8px 10px",
+                  cursor: "pointer",
+                }}
+              >
+                Delete
+              </button>
+            </div>
+          ))
+        )}
+      </div>
+    </div>
+  );
+}
+
 /** Cover-fit drawImage from a live <video> onto our 9:16 record canvas.
  *  The canvas is the recording's true source of truth (MediaRecorder
  *  reads from canvas.captureStream() — see startRecording below), so
@@ -448,24 +701,33 @@ export function ClipComposerMobile({
     }
   }, [phase]);
 
-  // Hydrate from initialDraft on first mount. Skips the entire record
-  // path — composer jumps straight to the review/edit phase with the
-  // saved clip's video URL, caption, and effects.
+  // Drafts box overlay — true when the user is browsing their saved
+  // drafts on the intro screen.
+  const [draftsOpen, setDraftsOpen] = useState(false);
+
+  // Shared "load this draft into the composer" callback. Used both by
+  // the initialDraft mount effect and by picking a draft from the
+  // drafts list overlay.
+  const loadDraft = useCallback((draft: ResumableDraft) => {
+    draftIdRef.current = draft.id;
+    setCaption(draft.content ?? "");
+    const meta = draft.edit_metadata;
+    setSpeed(meta?.speed ?? 1);
+    setFilterPreset(meta?.filter ?? null);
+    setTrimRange(meta?.trim ?? null);
+    setTextOverlays(meta?.text_overlays ?? []);
+    setRecordedUrl(`/api/posts/${draft.id}/media`);
+    setPhase("review");
+    setDraftsOpen(false);
+  }, []);
+
+  // Hydrate from initialDraft on first mount. Once.
   const hydratedRef = useRef(false);
   useEffect(() => {
     if (hydratedRef.current) return;
     hydratedRef.current = true;
-    if (!initialDraft) return;
-    draftIdRef.current = initialDraft.id;
-    setCaption(initialDraft.content ?? "");
-    const meta = initialDraft.edit_metadata;
-    if (meta?.speed) setSpeed(meta.speed);
-    if (meta?.filter) setFilterPreset(meta.filter);
-    if (meta?.trim) setTrimRange(meta.trim);
-    if (meta?.text_overlays) setTextOverlays(meta.text_overlays);
-    setRecordedUrl(`/api/posts/${initialDraft.id}/media`);
-    setPhase("review");
-  }, [initialDraft]);
+    if (initialDraft) loadDraft(initialDraft);
+  }, [initialDraft, loadDraft]);
 
   // Probe the loaded video's true duration so the trim scrubber and
   // any other duration-dependent UI have authoritative numbers. Runs
@@ -1148,6 +1410,28 @@ export function ClipComposerMobile({
         })}
       >
         ✕
+      </button>
+
+      {/* Drafts entry — top-right corner of the intro. Same chrome
+          style as the other corner buttons so it reads as part of the
+          camera shell, not a separate page. */}
+      <button
+        type="button"
+        onClick={() => setDraftsOpen(true)}
+        aria-label="Open drafts"
+        style={{
+          ...chromeButton({
+            top: "calc(env(safe-area-inset-top, 0px) + 12px)",
+            right: 14,
+          }),
+          width: "auto",
+          padding: "0 14px",
+          fontSize: 13,
+          fontWeight: 700,
+          letterSpacing: "0.02em",
+        }}
+      >
+        Drafts
       </button>
 
       <div
@@ -2469,6 +2753,14 @@ export function ClipComposerMobile({
       {phase === "review" ? renderReview() : null}
       {phase === "caption" ? renderCaption() : null}
       {phase === "publishing" ? renderPublishing() : null}
+
+      {/* Drafts list overlay — z-index above everything else when open. */}
+      {draftsOpen ? (
+        <DraftsListOverlay
+          onPick={loadDraft}
+          onCancel={() => setDraftsOpen(false)}
+        />
+      ) : null}
     </div>
   );
 
