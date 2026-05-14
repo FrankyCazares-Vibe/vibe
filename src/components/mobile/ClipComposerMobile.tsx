@@ -155,19 +155,14 @@ export function ClipComposerMobile({ onClose, onPosted, origin }: Props) {
     }
     setPermissionError(null);
     try {
-      // Match the viewport aspect so `objectFit: cover` doesn't crop
-      // chunks off the sides (the "randomly zoomed in" feeling came from
-      // asking for a 9:16 stream on a ~9:19.5 screen). Letting the
-      // browser pick the native resolution that best fits this aspect
-      // gives a preview that fills the sheet without trimming FOV.
-      const vw = typeof window !== "undefined" ? window.innerWidth : 0;
-      const vh = typeof window !== "undefined" ? window.innerHeight : 0;
-      const aspect = vw > 0 && vh > 0 ? vw / vh : undefined;
+      // No resolution / aspect-ratio constraints. iOS Safari interprets
+      // either as "crop the native sensor to make this fit" — which is
+      // exactly the "zoomed-in" feeling we kept hitting. With just
+      // facingMode, Safari hands back its native portrait preset
+      // (typically 1280×720 oriented for the device), and CSS `cover`
+      // does only a tiny crop instead of a brutal one.
       const s = await navigator.mediaDevices.getUserMedia({
-        video: {
-          facingMode: next,
-          ...(aspect ? { aspectRatio: { ideal: aspect } } : {}),
-        },
+        video: { facingMode: next },
         audio: true,
       });
       // Stop any prior tracks before swapping (front/back toggle).
