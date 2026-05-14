@@ -346,6 +346,19 @@ export function CampusHome({
     setFeedTagFilter(tag);
   }, []);
 
+  // Hide the bottom-right OttoCorner orb while we're on the Chat tab —
+  // it sits on top of the message composer's send button. Driven from
+  // here (not CampusAppShell) because tab changes don't push to the URL,
+  // so useSearchParams in the shell can't see them. Body class is the
+  // simplest cross-component signal.
+  useEffect(() => {
+    if (tab === "chat") {
+      document.body.classList.add("vibe-hide-otto");
+      return () => document.body.classList.remove("vibe-hide-otto");
+    }
+    return undefined;
+  }, [tab]);
+
   // Campus tour: triggered by `?welcome=1` (post-onboarding) or by a
   // `vibe_tour_pending=campus` localStorage flag (handed off from the
   // profile leg; survives redirects that strip the URL param). Walks the
@@ -597,7 +610,14 @@ export function CampusHome({
       <style>{SHEEN_KEYFRAMES}</style>
       <div
         style={{
-          minHeight: "100vh",
+          // Feed / events / orgs / map can grow with content (minHeight),
+          // but chat needs to be locked to the viewport so the message
+          // composer pins to the bottom edge instead of getting pushed
+          // below the fold. 100dvh > 100vh on mobile browsers where the
+          // URL bar collapses.
+          ...(tab === "chat"
+            ? { height: "100dvh", overflow: "hidden" }
+            : { minHeight: "100vh" }),
           background: scene.css,
           backgroundAttachment: "fixed",
           color: scene.tone === "light" ? COLORS.glassText : COLORS.text,
@@ -11926,6 +11946,10 @@ function ServerRail({
         gap: 12,
         position: "relative",
         overflow: "hidden",
+        // Fill the entire grid cell so the glass surface reaches the
+        // bottom of the chat viewport — previously the aside was only
+        // content-tall, leaving a dark gap beneath the last server pill.
+        height: "100%",
       }}
     >
       {/* Diagonal sheen overlay — subtle moving highlight that reads as
@@ -12278,6 +12302,10 @@ function ChannelRail({
         ...railGlass,
         display: "flex",
         flexDirection: "column",
+        // Same height fix as ServerRail — fill the grid cell so the
+        // channel list's glass surface reaches the bottom of the
+        // viewport instead of stopping at content height.
+        height: "100%",
       }}
     >
       <header

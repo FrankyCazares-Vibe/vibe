@@ -2415,6 +2415,11 @@ a.otto-room-row-title:hover {
   #otto-corner { display: none !important; }
 }
 
+/* CampusHome adds .vibe-hide-otto on body while on the Chat tab so the
+   orb stops sitting on top of the message composer's send button.
+   Kept outside the @media block so it works on every viewport. */
+body.vibe-hide-otto #otto-corner { display: none !important; }
+
 /* Bottom tab bar — 5 tabs, iOS-friendly. */
 /* Mobile-only chrome — hidden on desktop. Visibility lives on the
    tabbar class itself (not on a separate `vibe-mobile-only` helper)
