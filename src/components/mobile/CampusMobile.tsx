@@ -13,11 +13,11 @@ import {
   ClipsReelInner,
   EventCard,
   type FeedPost as DesktopFeedPost,
-  MapTabBody,
   OttoFeedStrip,
 } from "@/app/campus/campus-home";
 import { ClipComposerMobile } from "@/components/mobile/ClipComposerMobile";
 import { ClipViewerMobile } from "@/components/mobile/ClipViewerMobile";
+import { MapMobile } from "@/components/mobile/MapMobile";
 import { ConversationView } from "@/components/mobile/MessagesMobile";
 import { PostComposerMobile } from "@/components/mobile/PostComposerMobile";
 import { PostViewerMobile } from "@/components/mobile/PostViewerMobile";
@@ -1606,20 +1606,10 @@ const chatChromeBtnStyle: React.CSSProperties = {
 // ---------- Map pane ----------
 
 function MapPane() {
-  // MapTabBody renders its own canvas + chrome. Wrap so it fills the
-  // pane and the surrounding chrome doesn't slip in.
-  return (
-    <div
-      style={{
-        width: "100%",
-        height: "calc(100dvh - 240px)",
-        minHeight: 420,
-        overflow: "hidden",
-      }}
-    >
-      <MapTabBody />
-    </div>
-  );
+  // Native rebuild — pinch-zoom, pan, vaul zone sheet. The desktop
+  // MapTabBody embed has been retired here (was visually squished on
+  // phones); see MapMobile for the touch-first version.
+  return <MapMobile />;
 }
 
 // ---------- Orgs pane ----------
