@@ -1677,6 +1677,13 @@ function GroupSettingsView({
   const [busy, setBusy] = useState(false);
   const [addOpen, setAddOpen] = useState(false);
   const [feedback, setFeedback] = useState<string | null>(null);
+  // Per-member mute state — keyed by member id, value is the "until"
+  // ISO string returned by POST /members/:id/mute (or null = unmuted).
+  // The threads API doesn't surface this yet, so we treat unknown as
+  // unmuted and let taps drive the truth.
+  const [memberMutes, setMemberMutes] = useState<Record<string, string | null>>({});
+  // Which member's action sheet is open (null = none).
+  const [memberSheetFor, setMemberSheetFor] = useState<ThreadMember | null>(null);
 
   const viewerRole = thread.viewer_role ?? "member";
   const isAdmin = viewerRole === "admin";
@@ -1747,6 +1754,54 @@ function GroupSettingsView({
           [...prev, m].sort((a, b) => (a.name ?? "").localeCompare(b.name ?? "")),
         );
         setFeedback(e instanceof Error ? e.message : "Remove failed");
+      } finally {
+        setBusy(false);
+      }
+    },
+    [busy, threadId],
+  );
+
+  const muteMember = useCallback(
+    async (m: ThreadMember, hours: number | null) => {
+      if (busy) return;
+      setBusy(true);
+      try {
+        const r = await fetch(
+          `/api/me/threads/${encodeURIComponent(threadId)}/members/${encodeURIComponent(m.id)}/mute`,
+          {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify(hours ? { duration_hours: hours } : {}),
+          },
+        );
+        const j = await r.json();
+        if (!r.ok || !j?.ok) throw new Error(j?.error ?? "Mute failed");
+        setMemberMutes((prev) => ({ ...prev, [m.id]: j.until ?? null }));
+        setFeedback(`${m.name || "Member"} muted`);
+      } catch (e) {
+        setFeedback(e instanceof Error ? e.message : "Mute failed");
+      } finally {
+        setBusy(false);
+      }
+    },
+    [busy, threadId],
+  );
+
+  const unmuteMember = useCallback(
+    async (m: ThreadMember) => {
+      if (busy) return;
+      setBusy(true);
+      try {
+        const r = await fetch(
+          `/api/me/threads/${encodeURIComponent(threadId)}/members/${encodeURIComponent(m.id)}/mute`,
+          { method: "DELETE" },
+        );
+        const j = await r.json();
+        if (!r.ok || !j?.ok) throw new Error(j?.error ?? "Unmute failed");
+        setMemberMutes((prev) => ({ ...prev, [m.id]: null }));
+        setFeedback(`${m.name || "Member"} unmuted`);
+      } catch (e) {
+        setFeedback(e instanceof Error ? e.message : "Unmute failed");
       } finally {
         setBusy(false);
       }
@@ -2062,8 +2117,11 @@ function GroupSettingsView({
             <MemberRow
               key={m.id}
               member={m}
-              canRemove={isAdmin}
-              onRemove={() => void removeMember(m)}
+              muted={
+                !!memberMutes[m.id] &&
+                new Date(memberMutes[m.id] as string) > new Date()
+              }
+              onOpenActions={() => setMemberSheetFor(m)}
             />
           ))}
         </ul>
@@ -2080,18 +2138,45 @@ function GroupSettingsView({
           onPick={(handle) => void addMember(handle)}
         />
       ) : null}
+
+      {memberSheetFor ? (
+        <MemberActionSheet
+          member={memberSheetFor}
+          muted={
+            !!memberMutes[memberSheetFor.id] &&
+            new Date(memberMutes[memberSheetFor.id] as string) > new Date()
+          }
+          canRemove={isAdmin && memberSheetFor.role !== "admin"}
+          onClose={() => setMemberSheetFor(null)}
+          onMute={(hours) => {
+            const m = memberSheetFor;
+            setMemberSheetFor(null);
+            void muteMember(m, hours);
+          }}
+          onUnmute={() => {
+            const m = memberSheetFor;
+            setMemberSheetFor(null);
+            void unmuteMember(m);
+          }}
+          onRemove={() => {
+            const m = memberSheetFor;
+            setMemberSheetFor(null);
+            void removeMember(m);
+          }}
+        />
+      ) : null}
     </div>
   );
 }
 
 function MemberRow({
   member,
-  canRemove,
-  onRemove,
+  muted,
+  onOpenActions,
 }: {
   member: ThreadMember;
-  canRemove: boolean;
-  onRemove: () => void;
+  muted: boolean;
+  onOpenActions: () => void;
 }) {
   const initials = initialsOf(member.name || member.handle);
   return (
@@ -2190,30 +2275,158 @@ function MemberRow({
               Admin
             </span>
           ) : null}
+          {muted ? (
+            <span
+              aria-label="Muted"
+              title="Muted"
+              style={{
+                display: "inline-flex",
+                alignItems: "center",
+                gap: 4,
+                fontFamily: "DM Sans, sans-serif",
+                fontSize: 10,
+                fontWeight: 800,
+                color: "#8A8580",
+                letterSpacing: "0.06em",
+                textTransform: "uppercase",
+                background: "rgba(28,28,30,0.08)",
+                padding: "2px 6px",
+                borderRadius: 999,
+              }}
+            >
+              <svg width="9" height="9" viewBox="0 0 12 12" fill="none" aria-hidden>
+                <path d="M3 5h2l3-2v6L5 7H3V5z" stroke="currentColor" strokeWidth="1.2" strokeLinejoin="round" fill="none" />
+                <path d="M2 2l8 8" stroke="currentColor" strokeWidth="1.2" strokeLinecap="round" />
+              </svg>
+              Muted
+            </span>
+          ) : null}
         </div>
       </div>
-      {canRemove && member.role !== "admin" ? (
-        <button
-          type="button"
-          onClick={onRemove}
-          aria-label="Remove"
+      <button
+        type="button"
+        onClick={onOpenActions}
+        aria-label="Member actions"
+        style={{
+          width: 34,
+          height: 34,
+          borderRadius: 999,
+          border: "1px solid rgba(28,28,30,0.10)",
+          background: "rgba(255,255,255,0.78)",
+          color: "#1C1C1E",
+          cursor: "pointer",
+          display: "inline-flex",
+          alignItems: "center",
+          justifyContent: "center",
+          flexShrink: 0,
+          WebkitTapHighlightColor: "transparent",
+        }}
+      >
+        <svg width="16" height="16" viewBox="0 0 16 16" fill="currentColor" aria-hidden>
+          <circle cx="3.5" cy="8" r="1.4" />
+          <circle cx="8" cy="8" r="1.4" />
+          <circle cx="12.5" cy="8" r="1.4" />
+        </svg>
+      </button>
+    </li>
+  );
+}
+
+function MemberActionSheet({
+  member,
+  muted,
+  canRemove,
+  onClose,
+  onMute,
+  onUnmute,
+  onRemove,
+}: {
+  member: ThreadMember;
+  muted: boolean;
+  canRemove: boolean;
+  onClose: () => void;
+  onMute: (hours: number | null) => void;
+  onUnmute: () => void;
+  onRemove: () => void;
+}) {
+  const [muteSheetOpen, setMuteSheetOpen] = useState(false);
+  return (
+    <div
+      role="dialog"
+      aria-modal="true"
+      aria-label={`Actions for ${member.name || member.handle || "member"}`}
+      onClick={onClose}
+      style={{
+        position: "fixed",
+        inset: 0,
+        zIndex: 1300,
+        background: "rgba(0,0,0,0.42)",
+        display: "flex",
+        alignItems: "flex-end",
+      }}
+    >
+      <div
+        onClick={(e) => e.stopPropagation()}
+        style={{
+          width: "100%",
+          background: "#FAF7F2",
+          borderTopLeftRadius: 20,
+          borderTopRightRadius: 20,
+          paddingBottom: "env(safe-area-inset-bottom, 0px)",
+          boxShadow: "0 -8px 32px rgba(0,0,0,0.18)",
+        }}
+      >
+        <div
+          aria-hidden
           style={{
-            background: "transparent",
-            border: "1px solid rgba(192,57,43,0.32)",
-            color: "#C0392B",
-            fontFamily: "DM Sans, sans-serif",
-            fontSize: 12,
-            fontWeight: 700,
-            padding: "6px 10px",
+            margin: "10px auto 4px",
+            width: 38,
+            height: 4,
             borderRadius: 999,
-            cursor: "pointer",
-            flexShrink: 0,
+            background: "rgba(28,28,30,0.18)",
+          }}
+        />
+        <div
+          style={{
+            padding: "10px 18px 6px",
+            fontFamily: "Fraunces, serif",
+            fontSize: 16,
+            fontWeight: 800,
+            color: "#1C1C1E",
           }}
         >
-          Remove
-        </button>
-      ) : null}
-    </li>
+          {member.name || (member.handle ? `@${member.handle}` : "Member")}
+        </div>
+        <div style={{ padding: "4px 0 14px" }}>
+          {member.handle ? (
+            <SheetRow
+              label="View profile"
+              href={`/profile/${member.handle}`}
+              onClose={onClose}
+            />
+          ) : null}
+          {muted ? (
+            <SheetRow label="Unmute member" onClick={onUnmute} />
+          ) : (
+            <SheetRow
+              label="Mute member…"
+              onClick={() => setMuteSheetOpen(true)}
+            />
+          )}
+          {canRemove ? (
+            <SheetRow label="Remove from group" danger onClick={onRemove} />
+          ) : null}
+          <SheetRow label="Cancel" onClick={onClose} bold />
+        </div>
+
+        {muteSheetOpen ? (
+          <MuteDurationSheet
+            onClose={() => setMuteSheetOpen(false)}
+            onPick={(h) => onMute(h)}
+          />
+        ) : null}
+      </div>
+    </div>
   );
 }
 
