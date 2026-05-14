@@ -51,6 +51,7 @@ type ThreadEntry = {
   accepted_at: string | null;
   pinned_at?: string | null;
   hidden_at?: string | null;
+  muted_until?: string | null;
   unread_count?: number;
 };
 
@@ -692,6 +693,16 @@ function ConversationView({
   const [sending, setSending] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [meId, setMeId] = useState<string | null>(null);
+  const [menuOpen, setMenuOpen] = useState(false);
+  const [actionFeedback, setActionFeedback] = useState<string | null>(null);
+  // Local mirror of pinned_at + muted_until so the menu reflects taps
+  // before the thread list re-syncs. Seeded from `thread` prop.
+  const [pinnedAt, setPinnedAt] = useState<string | null>(
+    thread?.pinned_at ?? null,
+  );
+  const [mutedUntil, setMutedUntil] = useState<string | null>(
+    thread?.muted_until ?? null,
+  );
   const scrollRef = useRef<HTMLDivElement | null>(null);
   const inputRef = useRef<HTMLTextAreaElement | null>(null);
 
@@ -912,6 +923,31 @@ function ConversationView({
             </span>
           ) : null}
         </div>
+        <button
+          type="button"
+          onClick={() => setMenuOpen(true)}
+          aria-label="More actions"
+          style={{
+            width: 38,
+            height: 38,
+            borderRadius: 999,
+            border: "none",
+            background: "transparent",
+            color: "#1C1C1E",
+            cursor: "pointer",
+            display: "inline-flex",
+            alignItems: "center",
+            justifyContent: "center",
+            WebkitTapHighlightColor: "transparent",
+            flexShrink: 0,
+          }}
+        >
+          <svg width="20" height="20" viewBox="0 0 20 20" fill="currentColor" aria-hidden>
+            <circle cx="4.5" cy="10" r="1.7" />
+            <circle cx="10" cy="10" r="1.7" />
+            <circle cx="15.5" cy="10" r="1.7" />
+          </svg>
+        </button>
       </header>
 
       {/* Message list */}
@@ -1062,6 +1098,519 @@ function ConversationView({
           </svg>
         </button>
       </form>
+
+      {/* Action sheet — pinned/muted toggles, view profile, clear,
+          block, leave group, delete. Mirrors the desktop kebab menu. */}
+      {menuOpen ? (
+        <ConversationActionSheet
+          threadId={threadId}
+          thread={thread}
+          pinned={!!pinnedAt}
+          muted={!!mutedUntil && new Date(mutedUntil) > new Date()}
+          feedback={actionFeedback}
+          onFeedback={setActionFeedback}
+          onPinned={(at) => setPinnedAt(at)}
+          onMuted={(until) => setMutedUntil(until)}
+          onClose={() => setMenuOpen(false)}
+          onCleared={() => {
+            setMessages([]);
+            setMenuOpen(false);
+          }}
+          onLeftOrDeleted={() => {
+            setMenuOpen(false);
+            onClose();
+          }}
+        />
+      ) : null}
+    </div>
+  );
+}
+
+// ---------- Action sheet ----------
+
+function ConversationActionSheet({
+  threadId,
+  thread,
+  pinned,
+  muted,
+  feedback,
+  onFeedback,
+  onPinned,
+  onMuted,
+  onClose,
+  onCleared,
+  onLeftOrDeleted,
+}: {
+  threadId: string;
+  thread: ThreadEntry | null;
+  pinned: boolean;
+  muted: boolean;
+  feedback: string | null;
+  onFeedback: (msg: string | null) => void;
+  onPinned: (pinnedAt: string | null) => void;
+  onMuted: (mutedUntil: string | null) => void;
+  onClose: () => void;
+  onCleared: () => void;
+  onLeftOrDeleted: () => void;
+}) {
+  const [busy, setBusy] = useState(false);
+  const [muteSheetOpen, setMuteSheetOpen] = useState(false);
+
+  const isDm = thread?.type === "dm";
+  const isGroup = thread?.type === "group";
+  const peer = thread?.peer ?? null;
+
+  const togglePin = useCallback(async () => {
+    if (busy) return;
+    setBusy(true);
+    const wantPin = !pinned;
+    try {
+      const r = await fetch(
+        `/api/me/threads/${encodeURIComponent(threadId)}/pin`,
+        {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ pinned: wantPin }),
+        },
+      );
+      const j = await r.json();
+      if (!r.ok || !j?.ok) throw new Error(j?.error ?? "Pin failed");
+      onPinned(wantPin ? new Date().toISOString() : null);
+      onFeedback(wantPin ? "Pinned" : "Unpinned");
+    } catch (e) {
+      onFeedback(e instanceof Error ? e.message : "Pin failed");
+    } finally {
+      setBusy(false);
+    }
+  }, [busy, pinned, threadId, onPinned, onFeedback]);
+
+  const unmute = useCallback(async () => {
+    if (busy) return;
+    setBusy(true);
+    try {
+      const r = await fetch(
+        `/api/me/threads/${encodeURIComponent(threadId)}/mute`,
+        { method: "DELETE" },
+      );
+      const j = await r.json();
+      if (!r.ok || !j?.ok) throw new Error(j?.error ?? "Unmute failed");
+      onMuted(null);
+      onFeedback("Unmuted");
+    } catch (e) {
+      onFeedback(e instanceof Error ? e.message : "Unmute failed");
+    } finally {
+      setBusy(false);
+    }
+  }, [busy, threadId, onMuted, onFeedback]);
+
+  const muteFor = useCallback(
+    async (hours: number | null) => {
+      if (busy) return;
+      setBusy(true);
+      setMuteSheetOpen(false);
+      try {
+        const r = await fetch(
+          `/api/me/threads/${encodeURIComponent(threadId)}/mute`,
+          {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({ duration_hours: hours }),
+          },
+        );
+        const j = await r.json();
+        if (!r.ok || !j?.ok) throw new Error(j?.error ?? "Mute failed");
+        onMuted(j.muted_until ?? null);
+        onFeedback("Muted");
+      } catch (e) {
+        onFeedback(e instanceof Error ? e.message : "Mute failed");
+      } finally {
+        setBusy(false);
+      }
+    },
+    [busy, threadId, onMuted, onFeedback],
+  );
+
+  const clearHistory = useCallback(async () => {
+    if (busy) return;
+    if (
+      typeof window !== "undefined" &&
+      !window.confirm(
+        "Clear chat history? This only clears your view; the other side keeps their copy.",
+      )
+    )
+      return;
+    setBusy(true);
+    try {
+      const r = await fetch(
+        `/api/me/threads/${encodeURIComponent(threadId)}/clear`,
+        { method: "POST" },
+      );
+      const j = await r.json();
+      if (!r.ok || !j?.ok) throw new Error(j?.error ?? "Clear failed");
+      onCleared();
+    } catch (e) {
+      onFeedback(e instanceof Error ? e.message : "Clear failed");
+    } finally {
+      setBusy(false);
+    }
+  }, [busy, threadId, onCleared, onFeedback]);
+
+  const hideConversation = useCallback(async () => {
+    if (busy) return;
+    if (
+      typeof window !== "undefined" &&
+      !window.confirm(
+        "Delete this conversation? It'll hide from your view, but the other side will still see it.",
+      )
+    )
+      return;
+    setBusy(true);
+    try {
+      const r = await fetch(
+        `/api/me/threads/${encodeURIComponent(threadId)}/hide`,
+        { method: "POST" },
+      );
+      const j = await r.json();
+      if (!r.ok || !j?.ok) throw new Error(j?.error ?? "Delete failed");
+      onLeftOrDeleted();
+    } catch (e) {
+      onFeedback(e instanceof Error ? e.message : "Delete failed");
+    } finally {
+      setBusy(false);
+    }
+  }, [busy, threadId, onLeftOrDeleted, onFeedback]);
+
+  const leaveGroup = useCallback(async () => {
+    if (busy || !thread) return;
+    const groupName = thread.name || "this group";
+    if (
+      typeof window !== "undefined" &&
+      !window.confirm(`Leave ${groupName}? You won't receive new messages.`)
+    )
+      return;
+    // Fetch viewer id from the messages endpoint (the only one that
+    // reliably returns it) — cheaper than a profile bootstrap.
+    setBusy(true);
+    try {
+      const meR = await fetch(
+        `/api/me/threads/${encodeURIComponent(threadId)}/messages?limit=1`,
+        { cache: "no-store" },
+      );
+      const meJ = await meR.json();
+      const viewerId =
+        typeof meJ?.viewer_id === "string" ? (meJ.viewer_id as string) : null;
+      if (!viewerId) throw new Error("Could not resolve your id");
+      const r = await fetch(
+        `/api/me/threads/${encodeURIComponent(threadId)}/members/${encodeURIComponent(viewerId)}`,
+        { method: "DELETE" },
+      );
+      const j = await r.json();
+      if (!r.ok || !j?.ok) throw new Error(j?.error ?? "Leave failed");
+      onLeftOrDeleted();
+    } catch (e) {
+      onFeedback(e instanceof Error ? e.message : "Leave failed");
+    } finally {
+      setBusy(false);
+    }
+  }, [busy, thread, threadId, onLeftOrDeleted, onFeedback]);
+
+  const blockPeer = useCallback(async () => {
+    if (busy || !peer?.id) return;
+    if (
+      typeof window !== "undefined" &&
+      !window.confirm(
+        `Block @${peer.handle ?? "user"}? They won't be able to see your profile or message you.`,
+      )
+    )
+      return;
+    setBusy(true);
+    try {
+      const r = await fetch("/api/me/block", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ target_id: peer.id }),
+      });
+      const j = await r.json();
+      if (!r.ok || !j?.ok) throw new Error(j?.error ?? "Block failed");
+      onLeftOrDeleted();
+    } catch (e) {
+      onFeedback(e instanceof Error ? e.message : "Block failed");
+    } finally {
+      setBusy(false);
+    }
+  }, [busy, peer, onLeftOrDeleted, onFeedback]);
+
+  // Auto-clear the feedback toast after a beat so the menu doesn't
+  // pile up messages.
+  useEffect(() => {
+    if (!feedback) return;
+    const t = window.setTimeout(() => onFeedback(null), 1800);
+    return () => window.clearTimeout(t);
+  }, [feedback, onFeedback]);
+
+  return (
+    <div
+      role="dialog"
+      aria-modal="true"
+      aria-label="Conversation actions"
+      onClick={onClose}
+      style={{
+        position: "fixed",
+        inset: 0,
+        zIndex: 1200,
+        background: "rgba(0,0,0,0.42)",
+        display: "flex",
+        alignItems: "flex-end",
+      }}
+    >
+      <div
+        onClick={(e) => e.stopPropagation()}
+        style={{
+          width: "100%",
+          background: "#FAF7F2",
+          borderTopLeftRadius: 20,
+          borderTopRightRadius: 20,
+          paddingBottom: "env(safe-area-inset-bottom, 0px)",
+          boxShadow: "0 -8px 32px rgba(0,0,0,0.18)",
+          animation: "vibeActionSheetIn 220ms cubic-bezier(0.2, 0.8, 0.2, 1)",
+        }}
+      >
+        <style>{`
+          @keyframes vibeActionSheetIn {
+            from { transform: translateY(20px); opacity: 0; }
+            to   { transform: translateY(0);    opacity: 1; }
+          }
+        `}</style>
+        {/* Grab handle */}
+        <div
+          aria-hidden
+          style={{
+            margin: "10px auto 4px",
+            width: 38,
+            height: 4,
+            borderRadius: 999,
+            background: "rgba(28,28,30,0.18)",
+          }}
+        />
+        {feedback ? (
+          <div
+            style={{
+              margin: "6px 16px 8px",
+              padding: "8px 12px",
+              borderRadius: 12,
+              background: "rgba(28,28,30,0.06)",
+              fontFamily: "DM Sans, sans-serif",
+              fontSize: 12.5,
+              color: "#1C1C1E",
+              textAlign: "center",
+            }}
+          >
+            {feedback}
+          </div>
+        ) : null}
+
+        <div style={{ padding: "4px 0 14px" }}>
+          {isDm && peer?.handle ? (
+            <SheetRow
+              label="View profile"
+              href={`/profile/${peer.handle}`}
+              onClose={onClose}
+            />
+          ) : null}
+          <SheetRow
+            label={pinned ? "Unpin" : "Pin to top"}
+            onClick={() => void togglePin()}
+            disabled={busy}
+          />
+          {muted ? (
+            <SheetRow
+              label="Unmute"
+              onClick={() => void unmute()}
+              disabled={busy}
+            />
+          ) : (
+            <SheetRow
+              label="Mute…"
+              onClick={() => setMuteSheetOpen(true)}
+              disabled={busy}
+            />
+          )}
+          <SheetRow
+            label="Clear chat history"
+            onClick={() => void clearHistory()}
+            disabled={busy}
+          />
+          {isGroup ? (
+            <SheetRow
+              label="Leave group"
+              danger
+              onClick={() => void leaveGroup()}
+              disabled={busy}
+            />
+          ) : null}
+          {isDm && peer ? (
+            <SheetRow
+              label={`Block @${peer.handle ?? "user"}`}
+              danger
+              onClick={() => void blockPeer()}
+              disabled={busy}
+            />
+          ) : null}
+          <SheetRow
+            label="Delete conversation"
+            danger
+            onClick={() => void hideConversation()}
+            disabled={busy}
+          />
+          <SheetRow label="Cancel" onClick={onClose} bold />
+        </div>
+
+        {muteSheetOpen ? (
+          <MuteDurationSheet
+            onClose={() => setMuteSheetOpen(false)}
+            onPick={(h) => void muteFor(h)}
+          />
+        ) : null}
+      </div>
+    </div>
+  );
+}
+
+function SheetRow({
+  label,
+  onClick,
+  href,
+  onClose,
+  danger,
+  bold,
+  disabled,
+}: {
+  label: string;
+  onClick?: () => void;
+  href?: string;
+  onClose?: () => void;
+  danger?: boolean;
+  bold?: boolean;
+  disabled?: boolean;
+}) {
+  const inner = (
+    <span
+      style={{
+        display: "block",
+        padding: "14px 18px",
+        fontFamily: "DM Sans, sans-serif",
+        fontSize: 15,
+        fontWeight: bold ? 700 : 500,
+        color: danger ? "#C0392B" : "#1C1C1E",
+        textAlign: "left",
+        opacity: disabled ? 0.5 : 1,
+        cursor: disabled ? "default" : "pointer",
+        borderTop: "1px solid rgba(28,28,30,0.04)",
+        textDecoration: "none",
+        WebkitTapHighlightColor: "transparent",
+      }}
+    >
+      {label}
+    </span>
+  );
+  if (href) {
+    return (
+      <Link
+        href={href}
+        onClick={() => onClose?.()}
+        style={{ display: "block", color: "inherit" }}
+      >
+        {inner}
+      </Link>
+    );
+  }
+  return (
+    <button
+      type="button"
+      onClick={onClick}
+      disabled={disabled}
+      style={{
+        width: "100%",
+        background: "transparent",
+        border: "none",
+        padding: 0,
+        textAlign: "left",
+      }}
+    >
+      {inner}
+    </button>
+  );
+}
+
+function MuteDurationSheet({
+  onClose,
+  onPick,
+}: {
+  onClose: () => void;
+  onPick: (hours: number | null) => void;
+}) {
+  const options: Array<{ label: string; hours: number | null }> = [
+    { label: "For 1 hour", hours: 1 },
+    { label: "For 8 hours", hours: 8 },
+    { label: "For 24 hours", hours: 24 },
+    { label: "For 7 days", hours: 168 },
+    { label: "Until I unmute", hours: null },
+  ];
+  return (
+    <div
+      onClick={onClose}
+      style={{
+        position: "fixed",
+        inset: 0,
+        zIndex: 1300,
+        background: "rgba(0,0,0,0.42)",
+        display: "flex",
+        alignItems: "flex-end",
+      }}
+    >
+      <div
+        onClick={(e) => e.stopPropagation()}
+        style={{
+          width: "100%",
+          background: "#FAF7F2",
+          borderTopLeftRadius: 20,
+          borderTopRightRadius: 20,
+          paddingBottom: "env(safe-area-inset-bottom, 0px)",
+          boxShadow: "0 -8px 32px rgba(0,0,0,0.18)",
+        }}
+      >
+        <div
+          aria-hidden
+          style={{
+            margin: "10px auto 4px",
+            width: 38,
+            height: 4,
+            borderRadius: 999,
+            background: "rgba(28,28,30,0.18)",
+          }}
+        />
+        <div
+          style={{
+            padding: "10px 18px 6px",
+            fontFamily: "Fraunces, serif",
+            fontSize: 16,
+            fontWeight: 800,
+            color: "#1C1C1E",
+          }}
+        >
+          Mute this chat
+        </div>
+        <div style={{ padding: "0 0 12px" }}>
+          {options.map((opt) => (
+            <SheetRow
+              key={opt.label}
+              label={opt.label}
+              onClick={() => onPick(opt.hours)}
+            />
+          ))}
+          <SheetRow label="Cancel" onClick={onClose} bold />
+        </div>
+      </div>
     </div>
   );
 }
