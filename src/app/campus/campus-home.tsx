@@ -3260,7 +3260,10 @@ export function CampusBanner({
       <div style={{ flex: 1 }} />
       {/* Phone-only quick-access to /messages — Instagram's DM-in-header
           pattern. Hidden on desktop because the desktop LeftNav already
-          has a Messages link. CSS gate lives in globals.css. */}
+          has a Messages link. Also hidden on the mobile shell because
+          the bottom tab bar there already has a Messages tab.
+          CSS gate lives in globals.css. */}
+      {compactSearch ? null : (
       <Link
         href="/messages"
         aria-label="Messages"
@@ -3291,6 +3294,7 @@ export function CampusBanner({
           />
         </svg>
       </Link>
+      )}
       {compactSearch ? (
         <button
           type="button"
