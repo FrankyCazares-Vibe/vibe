@@ -256,7 +256,7 @@ export function CampusMobile() {
           <OrgsPane orgs={orgs} />
         </section>
         <section style={paneStyle}>
-          <ChatPane orgs={orgs} />
+          <ChatPane onOpenChannel={(id) => setOpenChannelId(id)} />
         </section>
         <section style={mapPaneStyle}>
           <MapPane />
@@ -735,9 +735,69 @@ function ClipsPane({ posts }: { posts: FeedPost[] | null }) {
 
 // ---------- Chat pane ----------
 
-function ChatPane({ orgs }: { orgs: Org[] | null }) {
-  if (orgs === null) return <PaneSkeleton />;
-  if (orgs.length === 0) {
+function ChatPane({
+  onOpenChannel,
+}: {
+  onOpenChannel: (channelId: string) => void;
+}) {
+  const [joinedOrgs, setJoinedOrgs] = useState<JoinedOrg[] | null>(null);
+  const [channelsByOrg, setChannelsByOrg] = useState<Record<string, ChannelRow[]>>({});
+
+  // Load joined orgs (filter=mine includes role).
+  useEffect(() => {
+    let cancelled = false;
+    (async () => {
+      try {
+        const r = await fetch("/api/orgs?filter=mine", { cache: "no-store" });
+        const j = await r.json();
+        if (cancelled) return;
+        setJoinedOrgs(
+          j?.ok && Array.isArray(j.orgs) ? (j.orgs as JoinedOrg[]) : [],
+        );
+      } catch {
+        if (!cancelled) setJoinedOrgs([]);
+      }
+    })();
+    return () => {
+      cancelled = true;
+    };
+  }, []);
+
+  // Once joined orgs load, fetch each org's channels in parallel. RLS
+  // filters out private channels the viewer doesn't have access to,
+  // so the rendered list matches what they can chat in.
+  useEffect(() => {
+    if (!joinedOrgs || joinedOrgs.length === 0) return;
+    let cancelled = false;
+    Promise.all(
+      joinedOrgs.map(async (o) => {
+        try {
+          const r = await fetch(
+            `/api/orgs/${encodeURIComponent(o.handle)}/channels`,
+            { cache: "no-store" },
+          );
+          const j = await r.json();
+          if (j?.ok && Array.isArray(j.channels)) {
+            return [o.id, j.channels as ChannelRow[]] as const;
+          }
+        } catch {
+          /* keep org out of the map on failure */
+        }
+        return [o.id, [] as ChannelRow[]] as const;
+      }),
+    ).then((pairs) => {
+      if (cancelled) return;
+      const next: Record<string, ChannelRow[]> = {};
+      for (const [id, list] of pairs) next[id] = list;
+      setChannelsByOrg(next);
+    });
+    return () => {
+      cancelled = true;
+    };
+  }, [joinedOrgs]);
+
+  if (joinedOrgs === null) return <PaneSkeleton />;
+  if (joinedOrgs.length === 0) {
     return (
       <EmptyTab
         title="No org chats yet"
@@ -745,98 +805,267 @@ function ChatPane({ orgs }: { orgs: Org[] | null }) {
       />
     );
   }
+
   return (
     <>
-      <div
-        style={{
-          padding: "4px 4px 8px",
-          fontFamily: "DM Sans, sans-serif",
-          fontSize: 11.5,
-          color: "#8A8580",
-          fontWeight: 700,
-          letterSpacing: "0.08em",
-          textTransform: "uppercase",
-        }}
-      >
-        Org channels
-      </div>
-      {orgs.map((o) => (
-        <Link
-          key={o.id}
-          href={`/orgs/${encodeURIComponent(o.handle)}?tab=chat`}
-          style={{ textDecoration: "none", color: "inherit", display: "block" }}
-        >
-          <div
-            style={{
-              display: "flex",
-              alignItems: "center",
-              gap: 12,
-              padding: 14,
-              borderRadius: 18,
-              background: "rgba(255,253,248,0.78)",
-              border: "1px solid rgba(255,255,255,0.7)",
-              boxShadow: "inset 0 1px 0 rgba(255,255,255,0.85), 0 4px 14px rgba(180,120,60,0.08)",
-            }}
-          >
-            <div
-              style={{
-                width: 44,
-                height: 44,
-                borderRadius: 12,
-                background: o.logo_url
-                  ? `url(${o.logo_url}) center/cover`
-                  : "linear-gradient(135deg,#FFD3C2 0%,#FF9D7E 100%)",
-                flexShrink: 0,
-                border: "1px solid rgba(255,255,255,0.6)",
-                display: "flex",
-                alignItems: "center",
-                justifyContent: "center",
-                color: "#1C1C1E",
-                fontFamily: "Fraunces, serif",
-                fontWeight: 800,
-                fontSize: 15,
-              }}
-            >
-              {!o.logo_url
-                ? o.name
-                    .split(/\s+/)
-                    .slice(0, 2)
-                    .map((p) => p[0]?.toUpperCase() ?? "")
-                    .join("")
-                : null}
-            </div>
-            <div style={{ flex: 1, minWidth: 0 }}>
-              <div
-                style={{
-                  fontFamily: "Fraunces, serif",
-                  fontSize: 15,
-                  fontWeight: 800,
-                  color: "#1C1C1E",
-                  whiteSpace: "nowrap",
-                  overflow: "hidden",
-                  textOverflow: "ellipsis",
-                }}
-              >
-                {o.name}
-              </div>
-              <div
-                style={{
-                  marginTop: 2,
-                  fontFamily: "DM Sans, sans-serif",
-                  fontSize: 12,
-                  color: "#8A8580",
-                  fontWeight: 600,
-                }}
-              >
-                # channels →
-              </div>
-            </div>
-          </div>
-        </Link>
+      {joinedOrgs.map((org) => (
+        <OrgChannelsCard
+          key={org.id}
+          org={org}
+          channels={channelsByOrg[org.id]}
+          onOpenChannel={onOpenChannel}
+        />
       ))}
     </>
   );
 }
+
+type JoinedOrg = {
+  id: string;
+  handle: string;
+  name: string;
+  logo_url: string | null;
+  verified?: boolean;
+  role?: string;
+};
+
+type ChannelRow = {
+  id: string;
+  name: string;
+  topic: string | null;
+  is_private: boolean;
+  pinned: boolean | null;
+  position: number | null;
+};
+
+function OrgChannelsCard({
+  org,
+  channels,
+  onOpenChannel,
+}: {
+  org: JoinedOrg;
+  channels: ChannelRow[] | undefined;
+  onOpenChannel: (channelId: string) => void;
+}) {
+  const sorted = (channels ?? []).slice().sort((a, b) => {
+    if (!!b.pinned !== !!a.pinned) return Number(!!b.pinned) - Number(!!a.pinned);
+    const ap = a.position ?? 1000;
+    const bp = b.position ?? 1000;
+    if (ap !== bp) return ap - bp;
+    return a.name.localeCompare(b.name);
+  });
+
+  return (
+    <section
+      style={{
+        background: "rgba(255,253,248,0.78)",
+        border: "1px solid rgba(255,255,255,0.7)",
+        borderRadius: 18,
+        padding: 12,
+        boxShadow: "inset 0 1px 0 rgba(255,255,255,0.85), 0 4px 14px rgba(180,120,60,0.08)",
+      }}
+    >
+      <header
+        style={{
+          display: "flex",
+          alignItems: "center",
+          gap: 10,
+          padding: "2px 4px 8px",
+        }}
+      >
+        <div
+          style={{
+            width: 36,
+            height: 36,
+            borderRadius: 10,
+            background: org.logo_url
+              ? `url(${org.logo_url}) center/cover`
+              : "linear-gradient(135deg,#FFD3C2 0%,#FF9D7E 100%)",
+            border: "1px solid rgba(255,255,255,0.6)",
+            display: "inline-flex",
+            alignItems: "center",
+            justifyContent: "center",
+            color: "#1C1C1E",
+            fontFamily: "Fraunces, serif",
+            fontWeight: 800,
+            fontSize: 13,
+            flexShrink: 0,
+          }}
+        >
+          {!org.logo_url
+            ? org.name
+                .split(/\s+/)
+                .slice(0, 2)
+                .map((p) => p[0]?.toUpperCase() ?? "")
+                .join("")
+            : null}
+        </div>
+        <div style={{ flex: 1, minWidth: 0 }}>
+          <Link
+            href={`/orgs/${encodeURIComponent(org.handle)}`}
+            style={{
+              fontFamily: "Fraunces, serif",
+              fontSize: 15,
+              fontWeight: 800,
+              color: "#1C1C1E",
+              textDecoration: "none",
+              display: "block",
+              whiteSpace: "nowrap",
+              overflow: "hidden",
+              textOverflow: "ellipsis",
+            }}
+          >
+            {org.name}
+          </Link>
+          <div
+            style={{
+              fontFamily: "DM Sans, sans-serif",
+              fontSize: 11.5,
+              color: "#8A8580",
+              fontWeight: 600,
+              marginTop: 1,
+            }}
+          >
+            {channels === undefined
+              ? "Loading channels…"
+              : sorted.length === 0
+                ? "No channels"
+                : `${sorted.length} channel${sorted.length === 1 ? "" : "s"}`}
+          </div>
+        </div>
+      </header>
+
+      {channels === undefined ? (
+        <div
+          style={{
+            height: 38,
+            margin: "0 0 6px",
+            borderRadius: 10,
+            background: "rgba(28,28,30,0.04)",
+          }}
+        />
+      ) : sorted.length === 0 ? null : (
+        <ul style={{ listStyle: "none", padding: 0, margin: 0, display: "flex", flexDirection: "column", gap: 4 }}>
+          {sorted.map((c) => (
+            <li key={c.id}>
+              <button
+                type="button"
+                onClick={() => onOpenChannel(c.id)}
+                style={{
+                  width: "100%",
+                  display: "flex",
+                  alignItems: "center",
+                  gap: 10,
+                  padding: "9px 10px",
+                  borderRadius: 12,
+                  border: "1px solid rgba(28,28,30,0.06)",
+                  background: "rgba(255,255,255,0.6)",
+                  cursor: "pointer",
+                  textAlign: "left",
+                  WebkitTapHighlightColor: "transparent",
+                }}
+              >
+                <span
+                  aria-hidden
+                  style={{
+                    width: 26,
+                    height: 26,
+                    borderRadius: 8,
+                    background: c.is_private
+                      ? "rgba(155,127,255,0.18)"
+                      : "rgba(28,28,30,0.06)",
+                    color: c.is_private ? "#7B5FE0" : "#5C5853",
+                    display: "inline-flex",
+                    alignItems: "center",
+                    justifyContent: "center",
+                    fontFamily: "DM Sans, sans-serif",
+                    fontWeight: 800,
+                    fontSize: 12,
+                    flexShrink: 0,
+                  }}
+                >
+                  {c.is_private ? (
+                    <svg width="11" height="11" viewBox="0 0 12 12" fill="none" aria-hidden>
+                      <rect x="2.5" y="5" width="7" height="5" rx="1" stroke="currentColor" strokeWidth="1.2" fill="none" />
+                      <path d="M4 5V3.6a2 2 0 1 1 4 0V5" stroke="currentColor" strokeWidth="1.2" fill="none" strokeLinecap="round" />
+                    </svg>
+                  ) : (
+                    "#"
+                  )}
+                </span>
+                <div style={{ flex: 1, minWidth: 0 }}>
+                  <div
+                    style={{
+                      display: "flex",
+                      alignItems: "center",
+                      gap: 6,
+                      fontFamily: "DM Sans, sans-serif",
+                      fontSize: 13.5,
+                      fontWeight: 700,
+                      color: "#1C1C1E",
+                    }}
+                  >
+                    <span
+                      style={{
+                        whiteSpace: "nowrap",
+                        overflow: "hidden",
+                        textOverflow: "ellipsis",
+                      }}
+                    >
+                      {c.name}
+                    </span>
+                    {c.pinned ? (
+                      <span
+                        aria-label="Pinned"
+                        style={{
+                          fontSize: 9,
+                          fontWeight: 800,
+                          letterSpacing: "0.06em",
+                          textTransform: "uppercase",
+                          color: "#B97C19",
+                          background: "rgba(240,200,74,0.18)",
+                          border: "1px solid rgba(240,200,74,0.45)",
+                          padding: "1px 5px",
+                          borderRadius: 999,
+                        }}
+                      >
+                        Pinned
+                      </span>
+                    ) : null}
+                  </div>
+                  {c.topic ? (
+                    <div
+                      style={{
+                        marginTop: 1,
+                        fontSize: 11.5,
+                        color: "#8A8580",
+                        whiteSpace: "nowrap",
+                        overflow: "hidden",
+                        textOverflow: "ellipsis",
+                      }}
+                    >
+                      {c.topic}
+                    </div>
+                  ) : null}
+                </div>
+                <span
+                  style={{
+                    color: "#8A8580",
+                    fontSize: 12,
+                    flexShrink: 0,
+                  }}
+                >
+                  ›
+                </span>
+              </button>
+            </li>
+          ))}
+        </ul>
+      )}
+    </section>
+  );
+}
+
 
 // ---------- Map pane ----------
 
