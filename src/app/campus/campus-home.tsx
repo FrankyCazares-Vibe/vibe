@@ -829,7 +829,7 @@ function CreateOrgModal({
           <input
             type="text"
             required
-            maxLength={80}
+            maxLength={50}
             value={name}
             onChange={(e) => handleNameChange(e.target.value)}
             placeholder="Kelley Investment Club"

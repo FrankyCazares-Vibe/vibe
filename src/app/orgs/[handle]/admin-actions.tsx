@@ -8,7 +8,7 @@ import { ImageCropperModal } from "@/components/ImageCropperModal";
 type Link = { label: string; url: string };
 
 const MAX_DESC = 400;
-const MAX_PHILANTHROPY = 1000;
+const MAX_PHILANTHROPY = 500;
 
 const inputStyle: React.CSSProperties = {
   width: "100%",

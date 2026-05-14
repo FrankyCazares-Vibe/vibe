@@ -133,15 +133,15 @@ export async function PATCH(req: Request, { params }: Params) {
   const patch: Record<string, unknown> = {};
   if (typeof body.name === "string") {
     const v = body.name.trim();
-    if (v.length < 2 || v.length > 80) {
-      return NextResponse.json({ ok: false, error: "Name must be 2–80 chars" }, { status: 400 });
+    if (v.length < 2 || v.length > 50) {
+      return NextResponse.json({ ok: false, error: "Name must be 2–50 chars" }, { status: 400 });
     }
     patch.name = v;
   }
   if (typeof body.description === "string") {
     const v = body.description.trim();
     if (v.length > 400) {
-      return NextResponse.json({ ok: false, error: "Description too long" }, { status: 400 });
+      return NextResponse.json({ ok: false, error: "Description too long (max 400)" }, { status: 400 });
     }
     patch.description = v;
   }
@@ -168,7 +168,9 @@ export async function PATCH(req: Request, { params }: Params) {
     patch.links = sanitized;
   }
   if (typeof body.philanthropy === "string") {
-    patch.philanthropy = body.philanthropy.trim().slice(0, 1000);
+    // Cap at 500 so the section card stays readable on phone widths
+    // without the user scrolling for a paragraph.
+    patch.philanthropy = body.philanthropy.trim().slice(0, 500);
   }
   patch.updated_at = new Date().toISOString();
 

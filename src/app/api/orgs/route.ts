@@ -234,9 +234,9 @@ export async function POST(req: Request) {
       { status: 400 }
     );
   }
-  if (name.length < 2 || name.length > 80) {
+  if (name.length < 2 || name.length > 50) {
     return NextResponse.json(
-      { ok: false, error: "Name must be 2–80 characters" },
+      { ok: false, error: "Name must be 2–50 characters" },
       { status: 400 }
     );
   }
