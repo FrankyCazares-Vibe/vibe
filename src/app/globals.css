@@ -2402,6 +2402,13 @@ a.otto-room-row-title:hover {
     display: none !important;
   }
 }
+
+/* Hide the scrollbar on swipeable containers (profile tabs, etc).
+   inline `scrollbar-width: none` covers Firefox; this rule covers
+   Webkit, which doesn't support that property. */
+.vibe-no-scrollbar::-webkit-scrollbar {
+  display: none;
+}
 .vibe-mobile-tab {
   display: flex;
   flex-direction: column;

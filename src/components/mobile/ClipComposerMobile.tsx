@@ -2,6 +2,7 @@
 
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { createPortal } from "react-dom";
+import { Drawer } from "vaul";
 
 import {
   ALLOWED_SPEEDS,
@@ -96,6 +97,43 @@ function ensureKeyframes() {
  *  default and matches what most users want most of the time. */
 const TEXT_COLORS = ["#FFFFFF", "#000000", "#FF5C35", "#FFD23F", "#C6A0FF", "#5BE3B9"];
 
+// Vaul style constants for the clip composer's overlays — dark theme
+// to match the rest of the camera surface (the messages-mobile
+// equivalents are cream). Slide from the right so dragging right
+// dismisses (iOS push-view semantics).
+const composerVaulOverlayStyle: React.CSSProperties = {
+  position: "fixed",
+  inset: 0,
+  background: "rgba(0,0,0,0.55)",
+  zIndex: 1200,
+};
+
+const composerVaulContentStyle: React.CSSProperties = {
+  position: "fixed",
+  top: 0,
+  right: 0,
+  bottom: 0,
+  width: "100%",
+  background: "#0E0E10",
+  color: "#fff",
+  zIndex: 1201,
+  outline: "none",
+  display: "flex",
+  flexDirection: "column",
+};
+
+const composerVaulHiddenTitleStyle: React.CSSProperties = {
+  position: "absolute",
+  width: 1,
+  height: 1,
+  padding: 0,
+  margin: -1,
+  overflow: "hidden",
+  clip: "rect(0,0,0,0)",
+  whiteSpace: "nowrap",
+  border: 0,
+};
+
 function TextOverlayEditor({
   initial,
   onSave,
@@ -138,23 +176,27 @@ function TextOverlayEditor({
   };
 
   return (
-    <div
-      role="dialog"
-      aria-modal="true"
-      aria-label={initial ? "Edit text" : "Add text"}
-      style={{
-        position: "absolute",
-        inset: 0,
-        zIndex: 20,
-        background: "rgba(0,0,0,0.78)",
-        backdropFilter: "blur(12px)",
-        WebkitBackdropFilter: "blur(12px)",
-        display: "flex",
-        flexDirection: "column",
-        paddingTop: "env(safe-area-inset-top, 0px)",
-        paddingBottom: "env(safe-area-inset-bottom, 0px)",
-      }}
+    <Drawer.Root
+      open
+      direction="right"
+      onOpenChange={(o) => { if (!o) onCancel(); }}
     >
+      <Drawer.Portal>
+        <Drawer.Overlay style={composerVaulOverlayStyle} />
+        <Drawer.Content
+          style={{
+            ...composerVaulContentStyle,
+            background: "rgba(0,0,0,0.92)",
+            backdropFilter: "blur(12px)",
+            WebkitBackdropFilter: "blur(12px)",
+            paddingTop: "env(safe-area-inset-top, 0px)",
+            paddingBottom: "env(safe-area-inset-bottom, 0px)",
+          }}
+          aria-describedby={undefined}
+        >
+          <Drawer.Title style={composerVaulHiddenTitleStyle}>
+            {initial ? "Edit text" : "Add text"}
+          </Drawer.Title>
       {/* Top bar — Cancel / Save */}
       <div
         style={{
@@ -287,7 +329,9 @@ function TextOverlayEditor({
           </button>
         </div>
       ) : null}
-    </div>
+        </Drawer.Content>
+      </Drawer.Portal>
+    </Drawer.Root>
   );
 }
 
@@ -356,24 +400,24 @@ function DraftsListOverlay({
   };
 
   return (
-    <div
-      role="dialog"
-      aria-modal="true"
-      aria-label="Drafts"
-      style={{
-        position: "absolute",
-        inset: 0,
-        zIndex: 30,
-        background: "#0E0E10",
-        color: "#fff",
-        display: "flex",
-        flexDirection: "column",
-        paddingTop: "env(safe-area-inset-top, 0px)",
-        paddingBottom: "env(safe-area-inset-bottom, 0px)",
-        fontFamily: "DM Sans, sans-serif",
-      }}
+    <Drawer.Root
+      open
+      direction="right"
+      onOpenChange={(o) => { if (!o) onCancel(); }}
     >
-      {/* Top bar */}
+      <Drawer.Portal>
+        <Drawer.Overlay style={composerVaulOverlayStyle} />
+        <Drawer.Content
+          style={{
+            ...composerVaulContentStyle,
+            paddingTop: "env(safe-area-inset-top, 0px)",
+            paddingBottom: "env(safe-area-inset-bottom, 0px)",
+            fontFamily: "DM Sans, sans-serif",
+          }}
+          aria-describedby={undefined}
+        >
+          <Drawer.Title style={composerVaulHiddenTitleStyle}>Drafts</Drawer.Title>
+          {/* Top bar */}
       <div
         style={{
           display: "flex",
@@ -580,7 +624,9 @@ function DraftsListOverlay({
           ))
         )}
       </div>
-    </div>
+        </Drawer.Content>
+      </Drawer.Portal>
+    </Drawer.Root>
   );
 }
 

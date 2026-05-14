@@ -164,6 +164,33 @@ export function ProfileMobile({ targetHandle }: Props = {}) {
   const [error, setError] = useState<string | null>(null);
   const [posts, setPosts] = useState<PostRow[] | null>(null);
   const [tab, setTab] = useState<ProfileTab>("posts");
+  // Swipeable tab content. Each pane lives side-by-side in a horizontal
+  // scroll-snap container; tapping a tab scrolls programmatically,
+  // swiping scrolls naturally and the scroll handler syncs `tab`.
+  const tabScrollRef = useRef<HTMLDivElement | null>(null);
+  const isProgrammaticScrollRef = useRef(false);
+  const TAB_ORDER: ProfileTab[] = ["posts", "clips", "portfolio"];
+
+  // When `tab` changes (tap on the tab strip or programmatic set), scroll
+  // the swipeable container to that pane. Skip if we're already there
+  // (avoids the bounce when a swipe already set tab to its new value).
+  useEffect(() => {
+    const el = tabScrollRef.current;
+    if (!el) return;
+    const idx = TAB_ORDER.indexOf(tab);
+    if (idx < 0) return;
+    const target = el.clientWidth * idx;
+    if (Math.abs(el.scrollLeft - target) < 4) return;
+    isProgrammaticScrollRef.current = true;
+    el.scrollTo({ left: target, behavior: "smooth" });
+    const t = window.setTimeout(() => {
+      isProgrammaticScrollRef.current = false;
+    }, 420);
+    return () => window.clearTimeout(t);
+    // TAB_ORDER is a stable literal — including it here would force a
+    // referential dep that doesn't change.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [tab]);
   /** Resume item the viewer should open. null = closed. */
   const [viewerItem, setViewerItem] = useState<ResumeItem | null>(null);
   /** Post id for the full-screen post viewer. null = closed. */
@@ -1167,8 +1194,37 @@ export function ProfileMobile({ targetHandle }: Props = {}) {
           aimed at recruiters (experience + portfolio + resume PDF). */}
       <ProfileTabs active={tab} onChange={setTab} />
 
-      <div style={{ padding: "12px 16px 24px" }}>
-        {tab === "posts" ? (
+      <div
+        ref={tabScrollRef}
+        onScroll={(e) => {
+          if (isProgrammaticScrollRef.current) return;
+          const el = e.currentTarget;
+          const w = el.clientWidth;
+          if (w === 0) return;
+          const idx = Math.round(el.scrollLeft / w);
+          const next = TAB_ORDER[idx];
+          if (next && next !== tab) setTab(next);
+        }}
+        style={{
+          display: "flex",
+          overflowX: "auto",
+          overflowY: "hidden",
+          scrollSnapType: "x mandatory",
+          scrollbarWidth: "none",
+          msOverflowStyle: "none",
+          WebkitOverflowScrolling: "touch",
+          width: "100%",
+        }}
+        className="vibe-no-scrollbar"
+      >
+        <div
+          style={{
+            flex: "0 0 100%",
+            scrollSnapAlign: "start",
+            padding: "12px 16px 24px",
+            minWidth: 0,
+          }}
+        >
           <PostsGrid
             posts={feedPosts}
             loading={posts === null}
@@ -1176,7 +1232,15 @@ export function ProfileMobile({ targetHandle }: Props = {}) {
             ownerName={name}
             onOpenPost={setOpenPostId}
           />
-        ) : tab === "clips" ? (
+        </div>
+        <div
+          style={{
+            flex: "0 0 100%",
+            scrollSnapAlign: "start",
+            padding: "12px 16px 24px",
+            minWidth: 0,
+          }}
+        >
           <ClipsGrid
             clips={clipPosts}
             loading={posts === null}
@@ -1189,7 +1253,15 @@ export function ProfileMobile({ targetHandle }: Props = {}) {
               setComposerOpen(true);
             }}
           />
-        ) : (
+        </div>
+        <div
+          style={{
+            flex: "0 0 100%",
+            scrollSnapAlign: "start",
+            padding: "12px 16px 24px",
+            minWidth: 0,
+          }}
+        >
           <PortfolioPane
             currentProjects={currentProjects}
             workExperience={workExperience}
@@ -1198,7 +1270,7 @@ export function ProfileMobile({ targetHandle }: Props = {}) {
             isVisitor={isVisitor}
             ownerName={name}
           />
-        )}
+        </div>
       </div>
 
       {viewerItem ? (

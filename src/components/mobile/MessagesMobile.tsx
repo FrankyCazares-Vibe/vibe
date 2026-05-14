@@ -862,20 +862,30 @@ function ConversationView({
   const avatar = thread ? threadAvatar(thread) : { url: null, initials: "?" };
 
   return (
-    <div
-      role="dialog"
-      aria-modal="true"
-      aria-label={title}
-      style={{
-        position: "fixed",
-        inset: 0,
-        zIndex: 1100,
-        background: "#FAF7F2",
-        display: "flex",
-        flexDirection: "column",
-      }}
+    <Drawer.Root
+      open
+      direction="right"
+      onOpenChange={(o) => { if (!o) onClose(); }}
     >
-      {/* Top bar */}
+      <Drawer.Portal>
+        <Drawer.Overlay style={{ ...vaulOverlayStyle, zIndex: 1099 }} />
+        <Drawer.Content
+          style={{
+            position: "fixed",
+            top: 0,
+            right: 0,
+            bottom: 0,
+            width: "100%",
+            background: "#FAF7F2",
+            display: "flex",
+            flexDirection: "column",
+            zIndex: 1100,
+            outline: "none",
+          }}
+          aria-describedby={undefined}
+        >
+          <Drawer.Title style={visuallyHiddenStyle}>{title}</Drawer.Title>
+          {/* Top bar */}
       <header
         style={{
           display: "flex",
@@ -1203,7 +1213,9 @@ function ConversationView({
           }}
         />
       ) : null}
-    </div>
+        </Drawer.Content>
+      </Drawer.Portal>
+    </Drawer.Root>
   );
 }
 
