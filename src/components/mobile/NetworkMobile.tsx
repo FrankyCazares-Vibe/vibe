@@ -58,14 +58,30 @@ const TABS: Array<{ id: Tab; label: string }> = [
 
 const PAGE_LIMIT = 25;
 
+type RelationshipTab = Exclude<Tab, "discover">;
+const TAB_ORDER: Tab[] = ["discover", "connections", "following", "followers"];
+
 export function NetworkMobile() {
   const [tab, setTab] = useState<Tab>("discover");
   const [query, setQuery] = useState("");
   const [debouncedQuery, setDebouncedQuery] = useState("");
   const [suggestions, setSuggestions] = useState<ListUser[] | null>(null);
-  const [tabUsers, setTabUsers] = useState<ListUser[] | null>(null);
+  // Per-tab cache so swiping between Connections / Following /
+  // Followers doesn't flash stale data into the next tab (each tab
+  // owns its own list rather than sharing a single tabUsers slot).
+  const [usersByTab, setUsersByTab] = useState<
+    Record<RelationshipTab, ListUser[] | null>
+  >({
+    connections: null,
+    following: null,
+    followers: null,
+  });
   const [searchResults, setSearchResults] = useState<SearchUser[] | null>(null);
   const [searchLoading, setSearchLoading] = useState(false);
+
+  // Swipeable tab content. Mirrors the profile-tabs pattern.
+  const tabScrollRef = useRef<HTMLDivElement | null>(null);
+  const isProgrammaticScrollRef = useRef(false);
 
   // Debounce the query — 280ms matches the profile.html typeahead.
   useEffect(() => {
@@ -99,14 +115,14 @@ export function NetworkMobile() {
     };
   }, []);
 
-  // Tab-scoped fetch — when switching tabs (and query is empty).
+  // Per-tab fetch — caches each relationship tab's rows in usersByTab.
+  // Skips refetching if data is already cached so swiping back is
+  // instant. Search overrides everything (handled separately below).
   useEffect(() => {
-    if (debouncedQuery) return; // Search overrides tabs.
-    if (tab === "discover") return; // Discover is fed by `suggestions` above.
+    if (debouncedQuery) return;
+    if (tab === "discover") return;
+    if (usersByTab[tab] !== null) return; // already loaded
     let cancelled = false;
-    // Reset prior tab's rows so the skeleton paints during the swap.
-    // eslint-disable-next-line react-hooks/set-state-in-effect
-    setTabUsers(null);
     (async () => {
       try {
         const path =
@@ -120,14 +136,35 @@ export function NetworkMobile() {
         });
         const j = await r.json();
         if (cancelled) return;
-        setTabUsers(j?.ok && Array.isArray(j.users) ? (j.users as ListUser[]) : []);
+        const rows =
+          j?.ok && Array.isArray(j.users) ? (j.users as ListUser[]) : [];
+        setUsersByTab((prev) => ({ ...prev, [tab]: rows }));
       } catch {
-        if (!cancelled) setTabUsers([]);
+        if (!cancelled) setUsersByTab((prev) => ({ ...prev, [tab]: [] }));
       }
     })();
     return () => {
       cancelled = true;
     };
+  }, [tab, debouncedQuery, usersByTab]);
+
+  // Programmatic scroll to the active tab pane whenever `tab` changes
+  // (via a tap on the strip). Skipped if we're already there to avoid
+  // bouncing after a swipe.
+  useEffect(() => {
+    const el = tabScrollRef.current;
+    if (!el) return;
+    if (debouncedQuery) return; // swipeable strip is hidden under search
+    const idx = TAB_ORDER.indexOf(tab);
+    if (idx < 0) return;
+    const target = el.clientWidth * idx;
+    if (Math.abs(el.scrollLeft - target) < 4) return;
+    isProgrammaticScrollRef.current = true;
+    el.scrollTo({ left: target, behavior: "smooth" });
+    const t = window.setTimeout(() => {
+      isProgrammaticScrollRef.current = false;
+    }, 420);
+    return () => window.clearTimeout(t);
   }, [tab, debouncedQuery]);
 
   // Search fetch — fires whenever the debounced query has content.
@@ -164,13 +201,19 @@ export function NetworkMobile() {
 
   const onStateChange = useCallback(
     (id: string, next: FollowState) => {
-      // Updates the right list when the in-row Connect toggle flips.
+      // Updates every tab's cached list so swiping between them shows
+      // the same toggle state regardless of which tab the user changed
+      // it from.
       const patch = (rows: ListUser[] | null) =>
         rows
           ? rows.map((u) => (u.id === id ? { ...u, follow_state: next } : u))
           : rows;
       setSuggestions(patch);
-      setTabUsers(patch);
+      setUsersByTab((prev) => ({
+        connections: patch(prev.connections),
+        following: patch(prev.following),
+        followers: patch(prev.followers),
+      }));
     },
     [],
   );
@@ -203,11 +246,6 @@ export function NetworkMobile() {
     [],
   );
 
-  const activeList: ListUser[] | null = (() => {
-    if (debouncedQuery) return null; // SearchResults render path branches below.
-    if (tab === "discover") return suggestions;
-    return tabUsers;
-  })();
 
   return (
     <main
@@ -248,22 +286,62 @@ export function NetworkMobile() {
         <TabStrip active={tab} onChange={setTab} disabled={!!debouncedQuery} />
       </header>
 
-      <div style={{ padding: "12px 16px 24px" }}>
-        {debouncedQuery ? (
+      {debouncedQuery ? (
+        <div style={{ padding: "12px 16px 24px" }}>
           <SearchPane
             query={debouncedQuery}
             loading={searchLoading}
             results={searchResults}
           />
-        ) : (
-          <ListPane
-            tab={tab}
-            users={activeList}
-            onStateChange={onStateChange}
-            onDismissSuggestion={onDismissSuggestion}
-          />
-        )}
-      </div>
+        </div>
+      ) : (
+        <div
+          ref={tabScrollRef}
+          onScroll={(e) => {
+            if (isProgrammaticScrollRef.current) return;
+            const el = e.currentTarget;
+            const w = el.clientWidth;
+            if (w === 0) return;
+            const idx = Math.round(el.scrollLeft / w);
+            const next = TAB_ORDER[idx];
+            if (next && next !== tab) setTab(next);
+          }}
+          className="vibe-no-scrollbar"
+          style={{
+            display: "flex",
+            overflowX: "auto",
+            overflowY: "hidden",
+            scrollSnapType: "x mandatory",
+            scrollbarWidth: "none",
+            msOverflowStyle: "none",
+            WebkitOverflowScrolling: "touch",
+            width: "100%",
+          }}
+        >
+          {TAB_ORDER.map((t) => (
+            <div
+              key={t}
+              style={{
+                flex: "0 0 100%",
+                scrollSnapAlign: "start",
+                padding: "12px 16px 24px",
+                minWidth: 0,
+              }}
+            >
+              <ListPane
+                tab={t}
+                users={
+                  t === "discover"
+                    ? suggestions
+                    : usersByTab[t as RelationshipTab]
+                }
+                onStateChange={onStateChange}
+                onDismissSuggestion={onDismissSuggestion}
+              />
+            </div>
+          ))}
+        </div>
+      )}
     </main>
   );
 }
