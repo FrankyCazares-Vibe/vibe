@@ -8,6 +8,7 @@ import { Fragment, useCallback, useEffect, useMemo, useRef, useState } from "rea
 import { CampusAppShell } from "@/components/campus-app-shell";
 import { ImageCropperModal } from "@/components/ImageCropperModal";
 import { emitCalendarChanged } from "@/components/LeftNav";
+import { FILTER_CSS } from "@/lib/clip/edit-metadata";
 import {
   bindMentionPicker,
   capturePosterFrame,
@@ -4058,6 +4059,7 @@ type FeedPost = {
   tags: string[] | null;
   media_url: string | null;
   media_thumbnail_url: string | null;
+  edit_metadata: import("@/lib/clip/edit-metadata").ClipEditMetadata | null;
   // Client picks the right player from this. "video" for clips and for
   // X-style video posts. "image" for image posts. null for text-only.
   media_kind: "video" | "image" | null;
@@ -4638,6 +4640,51 @@ function ClipReelCard({
     }
   };
 
+  // Apply lossless edit_metadata effects (speed, filter, trim, overlays).
+  // Mirrors ClipViewerMobile so clips look the same wherever they play.
+  const editMeta = clip.edit_metadata ?? null;
+  const filterCss = editMeta?.filter ? FILTER_CSS[editMeta.filter] : undefined;
+
+  useEffect(() => {
+    const v = videoRef.current;
+    if (!v) return;
+    v.playbackRate = editMeta?.speed ?? 1;
+  }, [editMeta?.speed, signedUrl]);
+
+  useEffect(() => {
+    const v = videoRef.current;
+    if (!v) return;
+    const trim = editMeta?.trim ?? null;
+    if (!trim) return;
+    const startSec = trim.start_ms / 1000;
+    const endSec = trim.end_ms / 1000;
+    const onLoaded = () => {
+      if (v.currentTime < startSec || v.currentTime > endSec) {
+        try {
+          v.currentTime = startSec;
+        } catch {
+          /* not yet seekable */
+        }
+      }
+    };
+    const onTimeUpdate = () => {
+      if (v.currentTime >= endSec) {
+        try {
+          v.currentTime = startSec;
+        } catch {
+          /* ignore */
+        }
+      }
+    };
+    v.addEventListener("loadedmetadata", onLoaded);
+    v.addEventListener("timeupdate", onTimeUpdate);
+    onLoaded();
+    return () => {
+      v.removeEventListener("loadedmetadata", onLoaded);
+      v.removeEventListener("timeupdate", onTimeUpdate);
+    };
+  }, [editMeta?.trim, signedUrl]);
+
   // Playback progress for the bottom scrubber. We poll via the standard
   // `timeupdate` event (~4-15Hz, browser-dependent) which is plenty smooth
   // for a 1-2px-tall bar.
@@ -4796,9 +4843,40 @@ function ClipReelCard({
             width: "100%",
             height: "100%",
             objectFit: "cover",
+            filter: filterCss,
           }}
         />
       ) : null}
+
+      {/* Text overlays — only render once we have the signed URL so they
+          appear in sync with the playback frame. */}
+      {signedUrl && editMeta?.text_overlays?.length
+        ? editMeta.text_overlays.map((o) => (
+            <div
+              key={o.id}
+              aria-hidden
+              style={{
+                position: "absolute",
+                left: `${o.x}%`,
+                top: `${o.y}%`,
+                transform: "translate(-50%, -50%)",
+                color: o.color,
+                fontFamily: "DM Sans, sans-serif",
+                fontWeight: 800,
+                fontSize: 22,
+                lineHeight: 1.2,
+                textAlign: "center",
+                textShadow: "0 1px 3px rgba(0,0,0,0.55), 0 0 1px rgba(0,0,0,0.35)",
+                pointerEvents: "none",
+                maxWidth: "82%",
+                whiteSpace: "pre-wrap",
+                wordBreak: "break-word",
+              }}
+            >
+              {o.text}
+            </div>
+          ))
+        : null}
       {paused && signedUrl && !showComments ? (
         <span
           aria-hidden

@@ -109,7 +109,7 @@ export async function GET(req: Request) {
   let postsQuery = supabase
     .from("posts")
     .select(
-      "id,user_id,org_id,type,content,tags,media_url,media_thumbnail_url,view_count,created_at," +
+      "id,user_id,org_id,type,content,tags,media_url,media_thumbnail_url,edit_metadata,view_count,created_at," +
         "author:users!posts_user_id_fkey!inner(id,name,handle,school,major,year,avatar_url)," +
         "org:orgs(id,handle,name,logo_url,verified,is_public)",
     )
@@ -131,7 +131,7 @@ export async function GET(req: Request) {
       "post_id,user_id,comment,created_at," +
         "reposter:users!post_reposts_user_id_fkey!inner(id,name,handle,school,major,year,avatar_url)," +
         "post:posts!inner(" +
-        "id,user_id,org_id,type,content,tags,media_url,media_thumbnail_url,view_count,created_at," +
+        "id,user_id,org_id,type,content,tags,media_url,media_thumbnail_url,edit_metadata,view_count,created_at," +
         "author:users!posts_user_id_fkey!inner(id,name,handle,school,major,year,avatar_url)," +
         "org:orgs(id,handle,name,logo_url,verified,is_public)" +
         ")",
