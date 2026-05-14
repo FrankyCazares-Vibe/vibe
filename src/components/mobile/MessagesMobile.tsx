@@ -762,10 +762,16 @@ export function ConversationView({
   threadId,
   thread,
   onClose,
+  backdropCss,
 }: {
   threadId: string;
   thread: ThreadEntry | null;
   onClose: () => void;
+  /** Optional org backdrop gradient (CSS background value). When set
+   *  (and not the cream preset), the chat container, header, and input
+   *  bar flip to dark-glass treatments so the wallpaper reads as the
+   *  feature instead of clashing with cream chrome. */
+  backdropCss?: string | null;
 }) {
   const [messages, setMessages] = useState<MessageRow[] | null>(null);
   const [draft, setDraft] = useState("");
@@ -895,7 +901,11 @@ export function ConversationView({
             right: 0,
             bottom: 0,
             width: "100%",
-            background: "#FAF7F2",
+            // backdropCss carries the org's chosen gradient (set by
+            // CampusMobile when opening an org channel). For DMs/groups
+            // it stays null → cream surface, same as before.
+            background: backdropCss ?? "#FAF7F2",
+            color: backdropCss ? "#fff" : undefined,
             display: "flex",
             flexDirection: "column",
             zIndex: 1100,
@@ -1082,12 +1092,20 @@ export function ConversationView({
               const isMine = m.user_id === meId;
               const prev = messages[i - 1];
               const showGap = !prev || prev.user_id !== m.user_id;
+              // For multi-party threads (groups + org channels), show the
+              // sender's avatar + name at the start of each run of their
+              // messages — Discord/iMessage-group style. DMs already have a
+              // single peer in the header so they skip this row.
+              const isMultiParty = thread?.type !== "dm";
+              const showSender = isMultiParty && !isMine && showGap;
               return (
                 <MessageBubble
                   key={m.id}
                   message={m}
                   isMine={isMine}
                   topGap={showGap ? 8 : 0}
+                  showSender={showSender}
+                  groupMode={isMultiParty}
                 />
               );
             })}
@@ -2784,39 +2802,116 @@ function MessageBubble({
   message,
   isMine,
   topGap,
+  showSender = false,
+  groupMode = false,
 }: {
   message: MessageRow;
   isMine: boolean;
   topGap: number;
+  /** Only true on the FIRST message in a sender's run — renders avatar
+   *  on the left and name+time above the bubble. Subsequent messages in
+   *  the same run reuse the column gutter for alignment. */
+  showSender?: boolean;
+  /** When the thread is multi-party (group/org), reserve a 36px left
+   *  gutter on every non-mine row so bubbles align under the first
+   *  message's avatar. No-op for DMs. */
+  groupMode?: boolean;
 }) {
+  const sender = message.users ?? null;
+  const senderName = sender?.name || sender?.handle || "Member";
+  const senderInitials =
+    (sender?.name || sender?.handle || "?")
+      .split(/\s+/)
+      .filter(Boolean)
+      .slice(0, 2)
+      .map((p) => p[0]?.toUpperCase() ?? "")
+      .join("") || "?";
+
   return (
     <div
       style={{
         display: "flex",
-        justifyContent: isMine ? "flex-end" : "flex-start",
+        flexDirection: "column",
+        alignItems: isMine ? "flex-end" : "flex-start",
         marginTop: topGap,
       }}
     >
+      {showSender ? (
+        <div
+          style={{
+            display: "flex",
+            alignItems: "center",
+            gap: 8,
+            margin: "0 0 4px 0",
+            color: "rgba(28,28,30,0.7)",
+            fontFamily: "DM Sans, sans-serif",
+            fontSize: 11.5,
+            fontWeight: 700,
+          }}
+        >
+          <div
+            style={{
+              width: 24,
+              height: 24,
+              borderRadius: 999,
+              background: sender?.avatar_url
+                ? `url(${sender.avatar_url}) center/cover`
+                : "#FFD3C2",
+              display: "inline-flex",
+              alignItems: "center",
+              justifyContent: "center",
+              fontSize: 10,
+              fontWeight: 800,
+              color: "#1C1C1E",
+              border: "1px solid rgba(255,255,255,0.6)",
+              flexShrink: 0,
+            }}
+          >
+            {!sender?.avatar_url ? senderInitials : null}
+          </div>
+          <span>{senderName}</span>
+          {sender?.handle ? (
+            <span
+              style={{
+                color: "rgba(28,28,30,0.42)",
+                fontWeight: 500,
+              }}
+            >
+              @{sender.handle}
+            </span>
+          ) : null}
+        </div>
+      ) : null}
       <div
         style={{
-          maxWidth: "78%",
-          padding: "8px 14px",
-          borderRadius: 18,
-          background: isMine ? "#FF5C35" : "rgba(255,255,255,0.88)",
-          color: isMine ? "#fff" : "#1C1C1E",
-          fontFamily: "DM Sans, sans-serif",
-          fontSize: 14.5,
-          lineHeight: 1.4,
-          fontWeight: 500,
-          border: isMine ? "none" : "1px solid rgba(28,28,30,0.06)",
-          boxShadow: isMine
-            ? "0 4px 14px rgba(255,92,53,0.22)"
-            : "0 2px 8px rgba(180,120,60,0.06)",
-          whiteSpace: "pre-wrap",
-          wordBreak: "break-word",
+          // 32px gutter (24 avatar + 8 gap) so subsequent bubbles in a
+          // sender's run align under the avatar, the way Discord does it.
+          paddingLeft: groupMode && !isMine ? 32 : 0,
+          maxWidth: "100%",
         }}
       >
-        {message.content}
+        <div
+          style={{
+            display: "inline-block",
+            maxWidth: "100%",
+            padding: "8px 14px",
+            borderRadius: 18,
+            background: isMine ? "#FF5C35" : "rgba(255,255,255,0.88)",
+            color: isMine ? "#fff" : "#1C1C1E",
+            fontFamily: "DM Sans, sans-serif",
+            fontSize: 14.5,
+            lineHeight: 1.4,
+            fontWeight: 500,
+            border: isMine ? "none" : "1px solid rgba(28,28,30,0.06)",
+            boxShadow: isMine
+              ? "0 4px 14px rgba(255,92,53,0.22)"
+              : "0 2px 8px rgba(180,120,60,0.06)",
+            whiteSpace: "pre-wrap",
+            wordBreak: "break-word",
+          }}
+        >
+          {message.content}
+        </div>
       </div>
     </div>
   );

@@ -107,7 +107,7 @@ type Org = {
   philanthropy?: string;
 };
 
-type BackdropKey = "cream" | "sand-purple" | "ember" | "deep-violet" | "forest" | "midnight";
+export type BackdropKey = "cream" | "sand-purple" | "ember" | "deep-violet" | "forest" | "midnight";
 
 type Channel = {
   id: string;
@@ -190,7 +190,7 @@ const GLASS_SURFACE = {
 
 // Backdrop presets — admins/owners pick one in org settings.
 // Each composes 3 radial color washes over a dark base.
-const BACKDROP_PRESETS: Record<BackdropKey, { label: string; css: string }> = {
+export const BACKDROP_PRESETS: Record<BackdropKey, { label: string; css: string }> = {
   cream: {
     label: "Cream paper",
     css:

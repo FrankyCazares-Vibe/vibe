@@ -1,6 +1,6 @@
 "use client";
 
-import { usePathname } from "next/navigation";
+import { usePathname, useSearchParams } from "next/navigation";
 import type { ReactNode } from "react";
 
 import LeftNav from "@/components/LeftNav";
@@ -19,7 +19,9 @@ type Props = {
  *
  * We hide the orb on /messages because the messaging surface already has
  * its own bottom-right composer + iframe-cursor seam, and an extra floating
- * element on top of that conflicts visually with the chat UI.
+ * element on top of that conflicts visually with the chat UI. Same goes
+ * for the campus Chat tab (`/campus?tab=chat`) — the orb sits right on top
+ * of the message composer's send button.
  *
  * Below the 900px breakpoint the layout collapses to a single column and
  * the MobileTabBar takes over and the desktop LeftNav + right rail
@@ -29,7 +31,11 @@ type Props = {
  */
 export function CampusAppShell({ children, sidebar }: Props) {
   const pathname = usePathname();
-  const showOttoCorner = !pathname?.startsWith("/messages");
+  const searchParams = useSearchParams();
+  const isCampusChatTab =
+    pathname === "/campus" && searchParams?.get("tab") === "chat";
+  const showOttoCorner =
+    !pathname?.startsWith("/messages") && !isCampusChatTab;
 
   return (
     <div

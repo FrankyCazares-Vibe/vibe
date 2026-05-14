@@ -6,6 +6,8 @@ import { useCallback, useEffect, useRef, useState } from "react";
 import { Drawer } from "vaul";
 
 import {
+  BACKDROP_PRESETS,
+  type BackdropKey,
   type CampusEvent,
   CampusBanner,
   ClipsReelInner,
@@ -88,7 +90,15 @@ export function CampusMobile() {
   // can show #channel-name even if the thread isn't in the cached list.
   const [selectedOrgForChat, setSelectedOrgForChat] = useState<JoinedOrg | null>(null);
   const [openChannel, setOpenChannel] = useState<OpenChannel | null>(
-    initialChannelId ? { id: initialChannelId, name: null, orgName: null, orgLogo: null } : null,
+    initialChannelId
+      ? {
+          id: initialChannelId,
+          name: null,
+          orgName: null,
+          orgLogo: null,
+          orgBackdrop: null,
+        }
+      : null,
   );
   useEffect(() => {
     if (initialChannelId) setTab("chat");
@@ -367,6 +377,11 @@ export function CampusMobile() {
           threadId={openChannel.id}
           thread={synthesizeChannelThread(openChannel)}
           onClose={() => setOpenChannel(null)}
+          backdropCss={
+            openChannel.orgBackdrop
+              ? BACKDROP_PRESETS[openChannel.orgBackdrop]?.css ?? null
+              : null
+          }
         />
       ) : null}
 
@@ -1052,6 +1067,7 @@ type JoinedOrg = {
   logo_url: string | null;
   verified?: boolean;
   role?: string;
+  backdrop_preset?: BackdropKey | null;
 };
 
 type ChannelRow = {
@@ -1072,6 +1088,9 @@ type OpenChannel = {
   name: string | null;
   orgName: string | null;
   orgLogo: string | null;
+  /** The org's chosen backdrop preset — drives the chat wallpaper so
+   *  mobile matches what the user sees in desktop's ChannelMain. */
+  orgBackdrop: BackdropKey | null;
 };
 
 /** Build a ThreadEntry-shaped object so ConversationView's top bar
@@ -1176,7 +1195,15 @@ function OrgChannelsDrawer({
             right: 0,
             bottom: 0,
             width: "100%",
-            background: "linear-gradient(180deg, #1A1B1F 0%, #16171B 100%)",
+            // Mirror the desktop chat backdrop: each org picks a preset
+            // (cream / sand-purple / ember / deep-violet / forest / midnight)
+            // in org settings, and that gradient now flows through the
+            // mobile channel rail + the conversation below it. Falls back
+            // to neutral dark when the org hasn't picked one yet.
+            background:
+              BACKDROP_PRESETS[
+                (org.backdrop_preset ?? "cream") as BackdropKey
+              ]?.css ?? "linear-gradient(180deg, #1A1B1F 0%, #16171B 100%)",
             color: "#E7E7EA",
             zIndex: 1081,
             outline: "none",
@@ -1396,6 +1423,7 @@ function OrgChannelsDrawer({
                         name: c.name,
                         orgName: org.name,
                         orgLogo: org.logo_url,
+                        orgBackdrop: org.backdrop_preset ?? null,
                       })
                     }
                   />
@@ -1416,6 +1444,7 @@ function OrgChannelsDrawer({
                         name: c.name,
                         orgName: org.name,
                         orgLogo: org.logo_url,
+                        orgBackdrop: org.backdrop_preset ?? null,
                       })
                     }
                   />
