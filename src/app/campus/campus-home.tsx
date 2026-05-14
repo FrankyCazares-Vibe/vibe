@@ -323,6 +323,17 @@ export function CampusHome({
     }
     return parseInitialTab(searchParams.get("tab"));
   });
+
+  // ?tab=chat&org=<handle>&channel=<id> deep link from /orgs/[handle]
+  // Channels section. Captured into refs so the chain of effects below
+  // (orgs load → activeOrgId set → channels load → channel set) can
+  // consume the values as each step completes.
+  const pendingDeepLinkOrgHandleRef = useRef<string | null>(
+    searchParams.get("org"),
+  );
+  const pendingDeepLinkChannelIdRef = useRef<string | null>(
+    searchParams.get("channel"),
+  );
   const [feedTagFilter, setFeedTagFilter] = useState<string | null>(null);
   const [showCreateOrg, setShowCreateOrg] = useState(false);
   const [showCreateChannel, setShowCreateChannel] = useState(false);
@@ -415,7 +426,24 @@ export function CampusHome({
         if (cancelled) return;
         if (data?.ok && Array.isArray(data.orgs)) {
           setOrgs(data.orgs);
-          if (data.orgs.length > 0) setActiveOrgId(data.orgs[0].id);
+          // If we arrived from /orgs/<handle> → Chat tab with a
+          // pending org handle, prefer that org over the default
+          // first-in-list so the requested channel's org is what
+          // mounts the channel rail.
+          const pendingHandle = pendingDeepLinkOrgHandleRef.current;
+          const pendingMatch = pendingHandle
+            ? (data.orgs as Org[]).find(
+                (o) => o.handle.toLowerCase() === pendingHandle.toLowerCase(),
+              )
+            : null;
+          if (pendingMatch) {
+            setActiveOrgId(pendingMatch.id);
+            // Clear the org-handle ref; channel-id ref stays until the
+            // channels-load effect consumes it.
+            pendingDeepLinkOrgHandleRef.current = null;
+          } else if (data.orgs.length > 0) {
+            setActiveOrgId(data.orgs[0].id);
+          }
         } else {
           setOrgs([]);
         }
@@ -452,6 +480,19 @@ export function CampusHome({
         if (cancelled) return;
         const list: Channel[] = data?.ok && Array.isArray(data.channels) ? data.channels : [];
         setChannelsByOrg((prev) => ({ ...prev, [activeOrg.id]: list }));
+        // Consume the pending channel deep link if this is the right
+        // org and the requested channel exists in the loaded list.
+        const pendingChannelId = pendingDeepLinkChannelIdRef.current;
+        if (pendingChannelId) {
+          const match = list.find((c) => c.id === pendingChannelId);
+          if (match) {
+            setSelectedChannelByOrg((prev) => ({
+              ...prev,
+              [activeOrg.id]: pendingChannelId,
+            }));
+            pendingDeepLinkChannelIdRef.current = null;
+          }
+        }
       } catch (e) {
         console.error("[campus] load channels", e);
       }

@@ -1,6 +1,7 @@
 "use client";
 
 import Link from "next/link";
+import { useSearchParams } from "next/navigation";
 import { useCallback, useEffect, useRef, useState } from "react";
 
 import {
@@ -14,6 +15,7 @@ import {
 } from "@/app/campus/campus-home";
 import { ClipComposerMobile } from "@/components/mobile/ClipComposerMobile";
 import { ClipViewerMobile } from "@/components/mobile/ClipViewerMobile";
+import { ConversationView } from "@/components/mobile/MessagesMobile";
 import { PostComposerMobile } from "@/components/mobile/PostComposerMobile";
 import { PostViewerMobile } from "@/components/mobile/PostViewerMobile";
 
@@ -70,6 +72,21 @@ export function CampusMobile() {
   >(undefined);
   const composerFabRef = useRef<HTMLButtonElement | null>(null);
   const [searchOpen, setSearchOpen] = useState(false);
+
+  // ?channel=<id> deep link from /orgs/<handle> Channels list. When
+  // present, force the Chat tab AND open the conversation view for
+  // that channel right away. ConversationView fetches messages via
+  // /api/me/threads/[id]/messages which handles org channels via
+  // can_view_org_channel even if the channel isn't in the user's
+  // pre-fetched threads list yet.
+  const searchParams = useSearchParams();
+  const initialChannelId = searchParams.get("channel") || null;
+  const [openChannelId, setOpenChannelId] = useState<string | null>(
+    initialChannelId,
+  );
+  useEffect(() => {
+    if (initialChannelId) setTab("chat");
+  }, [initialChannelId]);
 
   const tabScrollRef = useRef<HTMLDivElement | null>(null);
   const isProgrammaticScrollRef = useRef(false);
@@ -283,6 +300,18 @@ export function CampusMobile() {
           top with a focused input + live results. */}
       {searchOpen ? (
         <CampusSearchOverlay onClose={() => setSearchOpen(false)} />
+      ) : null}
+
+      {/* Channel conversation — opens when arriving via
+          /campus?tab=chat&channel=<id> from the org Channels list.
+          Reuses MessagesMobile's ConversationView so the chat UX,
+          send flow, and 3-dot menu all behave identically. */}
+      {openChannelId ? (
+        <ConversationView
+          threadId={openChannelId}
+          thread={null}
+          onClose={() => setOpenChannelId(null)}
+        />
       ) : null}
 
       {/* Viewers */}

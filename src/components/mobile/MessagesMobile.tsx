@@ -758,7 +758,7 @@ function EmptyState({ tab }: { tab: Tab }) {
 
 // ---------- Conversation view ----------
 
-function ConversationView({
+export function ConversationView({
   threadId,
   thread,
   onClose,

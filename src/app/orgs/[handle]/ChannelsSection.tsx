@@ -99,6 +99,7 @@ export function ChannelsSection({
               key={c.id}
               channel={c}
               viewerIsMember={viewerIsMember}
+              orgHandle={orgHandle}
             />
           ))}
           {!viewerIsMember ? (
@@ -126,12 +127,17 @@ export function ChannelsSection({
 function ChannelRow({
   channel,
   viewerIsMember,
+  orgHandle,
 }: {
   channel: Channel;
   viewerIsMember: boolean;
+  orgHandle: string;
 }) {
+  // Deep-link into the Campus Chat tab with this org + channel
+  // pre-selected. Members get the full chat surface; non-members get
+  // a dead link with a "Join to chat" hint above.
   const href = viewerIsMember
-    ? `/messages?channel=${encodeURIComponent(channel.id)}`
+    ? `/campus?tab=chat&org=${encodeURIComponent(orgHandle)}&channel=${encodeURIComponent(channel.id)}`
     : "#";
   return (
     <Link
