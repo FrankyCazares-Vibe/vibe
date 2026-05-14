@@ -318,15 +318,16 @@ export function CampusMobile() {
         </section>
       </div>
 
-      {/* Composer FAB — context-aware. On Feed it shows a single + that
-          opens a tiny choice sheet (Post / Clip). On other tabs it
-          jumps straight to the post composer since events / orgs don't
-          have their own mobile composer flows yet. */}
-      <ComposerFab
-        ref={composerFabRef}
-        onPost={() => openComposer("post")}
-        onClip={() => openComposer("clip")}
-      />
+      {/* Composer FAB — only on Feed + Clips. Events, Orgs, Chat, and
+          Map have no composer flow, and on those tabs the orange + just
+          covered content (e.g. the chat send button or a map bubble). */}
+      {tab === "feed" || tab === "clips" ? (
+        <ComposerFab
+          ref={composerFabRef}
+          onPost={() => openComposer("post")}
+          onClip={() => openComposer("clip")}
+        />
+      ) : null}
 
       {/* Composers */}
       {composerOpen && composerKind === "post" ? (

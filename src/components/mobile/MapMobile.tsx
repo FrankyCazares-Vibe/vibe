@@ -79,7 +79,9 @@ type ZoneRow = {
 
 const BUBBLE_MIN = 32;
 const BUBBLE_MAX = 54;
-const YOU_KEEPOUT = 92; // px — bubbles can't crowd "you are here"
+// "You are here" keep-out — bubbles can't crowd the avatar. Was 92,
+// pulled in so the zones sit closer to the center on a phone screen.
+const YOU_KEEPOUT = 60;
 
 function bubbleR(total: number): number {
   return BUBBLE_MIN + Math.min(BUBBLE_MAX - BUBBLE_MIN, total * 0.4);
@@ -121,19 +123,23 @@ function computeLayout(data: MapSummary | null): Layout | null {
   if (active.length === 0) return { majors: positions, schools };
 
   // Per-cluster radius estimate so an over-packed school gets a wider
-  // anchor radius and doesn't bleed into a neighbor.
+  // anchor radius and doesn't bleed into a neighbor. Tightened from
+  // (×1.5 + 28, cap 200) so clusters hug closer to their anchor and
+  // the whole map reads more compact on a phone.
   const clusterRadiusOf = (majors: MapMajor[]): number => {
     let area = 0;
     for (const m of majors) {
       const r = bubbleR(m.total);
       area += Math.PI * r * r;
     }
-    return Math.min(Math.sqrt(area / Math.PI) * 1.5 + 28, 200);
+    return Math.min(Math.sqrt(area / Math.PI) * 1.2 + 16, 140);
   };
 
   const wedgeDeg = 360 / active.length;
   const wedgeRad = (wedgeDeg * Math.PI) / 180;
-  const PAD_BETWEEN = 26;
+  // Padding between adjacent clusters — pulled in from 26 so neighbors
+  // sit tighter without overlapping.
+  const PAD_BETWEEN = 14;
   const clusterRadii = active.map((s) => clusterRadiusOf(grouped.get(s.id)!));
   const maxClusterR = clusterRadii.reduce((a, b) => Math.max(a, b), 0);
 
@@ -168,7 +174,9 @@ function computeLayout(data: MapSummary | null): Layout | null {
         a +
         ((t * fanDeg) * Math.PI) / 180 +
         (((seed % 11) - 5) * Math.PI) / 220;
-      const dist = 52 + ((seed >> 4) % 24);
+      // Local fan radius — how far each major sits from its school's
+      // anchor. Pulled in from 52+24 so the cluster doesn't bloom.
+      const dist = 34 + ((seed >> 4) % 18);
       positions.set(m.name, {
         x: ax + Math.cos(local) * dist,
         y: ay + Math.sin(local) * dist,
