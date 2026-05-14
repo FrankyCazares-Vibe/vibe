@@ -1,10 +1,11 @@
 import { Suspense } from "react";
 import { redirect } from "next/navigation";
 
-import { OttoPageClient } from "@/components/otto/OttoPageClient";
 import { CampusAppShell } from "@/components/campus-app-shell";
 import { enforceCampusAccess } from "@/lib/auth/campus-access";
 import { headers } from "next/headers";
+
+import { OttoSwitch } from "./OttoSwitch";
 
 export const metadata = {
   title: "otto · vibe",
@@ -55,10 +56,8 @@ export default async function OttoPage() {
   // tab state), which Next 16 requires to be inside a Suspense — otherwise
   // any URL with searchParams forces the whole route into client-render.
   return (
-    <CampusAppShell>
-      <Suspense fallback={null}>
-        <OttoPageClient initial={payload} />
-      </Suspense>
-    </CampusAppShell>
+    <Suspense fallback={null}>
+      <OttoSwitch initial={payload} />
+    </Suspense>
   );
 }
