@@ -66,6 +66,12 @@ type ThreadEntry = {
   viewer_role?: "admin" | "member";
 };
 
+type MessageReaction = {
+  emoji: string;
+  count: number;
+  viewer_reacted: boolean;
+};
+
 type MessageRow = {
   id: string;
   content: string;
@@ -77,7 +83,10 @@ type MessageRow = {
     name: string | null;
     avatar_url: string | null;
   } | null;
+  reactions?: MessageReaction[];
 };
+
+const REACTION_EMOJIS = ["❤️", "👍", "👎", "😂", "🔥", "😮", "😢"] as const;
 
 type Tab = "all" | "requests";
 
@@ -882,6 +891,71 @@ export function ConversationView({
     }
   }, [draft, sending, threadId, meId]);
 
+  const toggleReaction = useCallback(
+    async (messageId: string, emoji: string) => {
+      // Find current state to know if we're adding or removing.
+      let willAdd = true;
+      setMessages((prev) => {
+        if (!prev) return prev;
+        return prev.map((m) => {
+          if (m.id !== messageId) return m;
+          const existing = m.reactions ?? [];
+          const found = existing.find((r) => r.emoji === emoji);
+          willAdd = !found?.viewer_reacted;
+          if (found) {
+            const nextCount = willAdd ? found.count + 1 : found.count - 1;
+            const next = existing
+              .map((r) =>
+                r.emoji === emoji
+                  ? { ...r, count: nextCount, viewer_reacted: willAdd }
+                  : r,
+              )
+              .filter((r) => r.count > 0);
+            return { ...m, reactions: next };
+          }
+          return {
+            ...m,
+            reactions: [
+              ...existing,
+              { emoji, count: 1, viewer_reacted: true },
+            ],
+          };
+        });
+      });
+      try {
+        await fetch(
+          `/api/me/threads/${encodeURIComponent(threadId)}/messages/${encodeURIComponent(messageId)}/react`,
+          {
+            method: willAdd ? "POST" : "DELETE",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({ emoji }),
+          },
+        );
+      } catch {
+        // Roll back the optimistic update on failure.
+        setMessages((prev) => {
+          if (!prev) return prev;
+          return prev.map((m) => {
+            if (m.id !== messageId) return m;
+            const existing = m.reactions ?? [];
+            const found = existing.find((r) => r.emoji === emoji);
+            if (!found) return m;
+            const rolledCount = willAdd ? found.count - 1 : found.count + 1;
+            const next = existing
+              .map((r) =>
+                r.emoji === emoji
+                  ? { ...r, count: rolledCount, viewer_reacted: !willAdd }
+                  : r,
+              )
+              .filter((r) => r.count > 0);
+            return { ...m, reactions: next };
+          });
+        });
+      }
+    },
+    [threadId],
+  );
+
   const peer = thread?.peer;
   const title = thread ? threadTitle(thread) : "Conversation";
   const avatar = thread ? threadAvatar(thread) : { url: null, initials: "?" };
@@ -922,10 +996,14 @@ export function ConversationView({
           gap: 10,
           padding:
             "calc(env(safe-area-inset-top, 0px) + 8px) 12px 8px",
-          background: "rgba(250, 247, 242, 0.92)",
+          background: backdropCss
+            ? "rgba(14, 11, 22, 0.62)"
+            : "rgba(250, 247, 242, 0.92)",
           backdropFilter: "saturate(160%) blur(14px)",
           WebkitBackdropFilter: "saturate(160%) blur(14px)",
-          borderBottom: "1px solid rgba(28,28,30,0.06)",
+          borderBottom: backdropCss
+            ? "1px solid rgba(255,255,255,0.08)"
+            : "1px solid rgba(28,28,30,0.06)",
           flexShrink: 0,
         }}
       >
@@ -939,7 +1017,7 @@ export function ConversationView({
             borderRadius: 999,
             border: "none",
             background: "transparent",
-            color: "#1C1C1E",
+            color: backdropCss ? "#fff" : "#1C1C1E",
             cursor: "pointer",
             display: "inline-flex",
             alignItems: "center",
@@ -984,7 +1062,7 @@ export function ConversationView({
                 fontFamily: "Fraunces, serif",
                 fontSize: 16,
                 fontWeight: 800,
-                color: "#1C1C1E",
+                color: backdropCss ? "#fff" : "#1C1C1E",
                 textDecoration: "none",
                 display: "block",
                 whiteSpace: "nowrap",
@@ -1000,7 +1078,7 @@ export function ConversationView({
                 fontFamily: "Fraunces, serif",
                 fontSize: 16,
                 fontWeight: 800,
-                color: "#1C1C1E",
+                color: backdropCss ? "#fff" : "#1C1C1E",
                 whiteSpace: "nowrap",
                 overflow: "hidden",
                 textOverflow: "ellipsis",
@@ -1014,7 +1092,7 @@ export function ConversationView({
               style={{
                 fontFamily: "DM Sans, sans-serif",
                 fontSize: 11.5,
-                color: "#8A8580",
+                color: backdropCss ? "rgba(255,255,255,0.6)" : "#8A8580",
                 fontWeight: 600,
                 display: "block",
               }}
@@ -1031,16 +1109,22 @@ export function ConversationView({
             width: 40,
             height: 40,
             borderRadius: 999,
-            border: "1px solid rgba(28,28,30,0.10)",
-            background: "rgba(255,255,255,0.78)",
-            color: "#1C1C1E",
+            border: backdropCss
+              ? "1px solid rgba(255,255,255,0.14)"
+              : "1px solid rgba(28,28,30,0.10)",
+            background: backdropCss
+              ? "rgba(20,16,28,0.55)"
+              : "rgba(255,255,255,0.78)",
+            color: backdropCss ? "#fff" : "#1C1C1E",
             cursor: "pointer",
             display: "inline-flex",
             alignItems: "center",
             justifyContent: "center",
             WebkitTapHighlightColor: "transparent",
             flexShrink: 0,
-            boxShadow: "inset 0 1px 0 rgba(255,255,255,0.7)",
+            boxShadow: backdropCss
+              ? "inset 0 1px 0 rgba(255,255,255,0.08)"
+              : "inset 0 1px 0 rgba(255,255,255,0.7)",
           }}
         >
           <svg width="20" height="20" viewBox="0 0 20 20" fill="currentColor" aria-hidden>
@@ -1066,7 +1150,7 @@ export function ConversationView({
             style={{
               padding: 24,
               textAlign: "center",
-              color: "#8A8580",
+              color: backdropCss ? "rgba(255,255,255,0.6)" : "#8A8580",
               fontFamily: "DM Sans, sans-serif",
               fontSize: 13,
             }}
@@ -1078,7 +1162,7 @@ export function ConversationView({
             style={{
               padding: "48px 18px",
               textAlign: "center",
-              color: "#5C5853",
+              color: backdropCss ? "rgba(255,255,255,0.7)" : "#5C5853",
               fontFamily: "DM Sans, sans-serif",
               fontSize: 13.5,
               lineHeight: 1.5,
@@ -1106,6 +1190,8 @@ export function ConversationView({
                   topGap={showGap ? 8 : 0}
                   showSender={showSender}
                   groupMode={isMultiParty}
+                  darkMode={!!backdropCss}
+                  onToggleReaction={(emoji) => void toggleReaction(m.id, emoji)}
                 />
               );
             })}
@@ -1144,8 +1230,14 @@ export function ConversationView({
           gap: 8,
           padding:
             "8px 12px calc(env(safe-area-inset-bottom, 0px) + 10px)",
-          background: "rgba(250, 247, 242, 0.96)",
-          borderTop: "1px solid rgba(28,28,30,0.08)",
+          background: backdropCss
+            ? "rgba(14, 11, 22, 0.72)"
+            : "rgba(250, 247, 242, 0.96)",
+          borderTop: backdropCss
+            ? "1px solid rgba(255,255,255,0.08)"
+            : "1px solid rgba(28,28,30,0.08)",
+          backdropFilter: backdropCss ? "blur(20px) saturate(160%)" : undefined,
+          WebkitBackdropFilter: backdropCss ? "blur(20px) saturate(160%)" : undefined,
         }}
       >
         <textarea
@@ -1158,7 +1250,7 @@ export function ConversationView({
               void send();
             }
           }}
-          placeholder="Message…"
+          placeholder={`Message${thread?.type === "org" ? " " + (thread?.name ?? "") : "…"}`}
           rows={1}
           style={{
             flex: 1,
@@ -1167,11 +1259,15 @@ export function ConversationView({
             maxHeight: 120,
             padding: "10px 14px",
             borderRadius: 18,
-            border: "1px solid rgba(28,28,30,0.10)",
-            background: "rgba(255,255,255,0.92)",
+            border: backdropCss
+              ? "1px solid rgba(255,255,255,0.12)"
+              : "1px solid rgba(28,28,30,0.10)",
+            background: backdropCss
+              ? "rgba(255,255,255,0.06)"
+              : "rgba(255,255,255,0.92)",
             fontFamily: "DM Sans, sans-serif",
             fontSize: 14.5,
-            color: "#1C1C1E",
+            color: backdropCss ? "#fff" : "#1C1C1E",
             outline: "none",
             lineHeight: 1.4,
           }}
@@ -2804,6 +2900,8 @@ function MessageBubble({
   topGap,
   showSender = false,
   groupMode = false,
+  darkMode = false,
+  onToggleReaction,
 }: {
   message: MessageRow;
   isMine: boolean;
@@ -2816,6 +2914,13 @@ function MessageBubble({
    *  gutter on every non-mine row so bubbles align under the first
    *  message's avatar. No-op for DMs. */
   groupMode?: boolean;
+  /** True when the chat backdrop is dark (any org backdrop except
+   *  cream) — flips sender name color and bubble style to white-on-glass. */
+  darkMode?: boolean;
+  /** Long-press a bubble fires the picker; tapping an emoji here calls
+   *  this with the chosen emoji. Tapping an existing reaction chip
+   *  toggles it via the same handler. */
+  onToggleReaction?: (emoji: string) => void;
 }) {
   const sender = message.users ?? null;
   const senderName = sender?.name || sender?.handle || "Member";
@@ -2827,6 +2932,56 @@ function MessageBubble({
       .map((p) => p[0]?.toUpperCase() ?? "")
       .join("") || "?";
 
+  const [pickerOpen, setPickerOpen] = useState(false);
+  const longPressTimer = useRef<number | null>(null);
+  const longPressFired = useRef(false);
+
+  const clearLongPress = () => {
+    if (longPressTimer.current) {
+      window.clearTimeout(longPressTimer.current);
+      longPressTimer.current = null;
+    }
+  };
+  const startLongPress = () => {
+    longPressFired.current = false;
+    clearLongPress();
+    longPressTimer.current = window.setTimeout(() => {
+      longPressFired.current = true;
+      if (navigator.vibrate) {
+        try {
+          navigator.vibrate(8);
+        } catch {
+          /* unsupported */
+        }
+      }
+      setPickerOpen(true);
+    }, 360);
+  };
+
+  // Bubble palette flips with darkMode AND mine-ness:
+  //   - dark + theirs   → translucent dark glass, white text
+  //   - dark + mine     → orange-tinted dark glass, white text
+  //   - cream + theirs  → white tile, dark text
+  //   - cream + mine    → solid accent orange, white text
+  const bubbleBg = isMine
+    ? darkMode
+      ? "linear-gradient(180deg,rgba(255,92,53,0.32) 0%,rgba(255,92,53,0.12) 100%),linear-gradient(180deg,rgba(20,16,28,0.62) 0%,rgba(14,11,22,0.66) 100%)"
+      : "#FF5C35"
+    : darkMode
+      ? "linear-gradient(180deg,rgba(20,16,28,0.62) 0%,rgba(14,11,22,0.66) 100%)"
+      : "rgba(255,255,255,0.88)";
+  const bubbleColor = isMine || darkMode ? "#fff" : "#1C1C1E";
+  const bubbleBorder = darkMode
+    ? "1px solid rgba(255,255,255,0.08)"
+    : isMine
+      ? "none"
+      : "1px solid rgba(28,28,30,0.06)";
+
+  // Sender name + handle: flip to white on dark backdrops so they're
+  // legible against the gradient wallpaper.
+  const senderNameColor = darkMode ? "rgba(255,255,255,0.92)" : "rgba(28,28,30,0.7)";
+  const senderHandleColor = darkMode ? "rgba(255,255,255,0.5)" : "rgba(28,28,30,0.42)";
+
   return (
     <div
       style={{
@@ -2834,6 +2989,7 @@ function MessageBubble({
         flexDirection: "column",
         alignItems: isMine ? "flex-end" : "flex-start",
         marginTop: topGap,
+        position: "relative",
       }}
     >
       {showSender ? (
@@ -2843,7 +2999,7 @@ function MessageBubble({
             alignItems: "center",
             gap: 8,
             margin: "0 0 4px 0",
-            color: "rgba(28,28,30,0.7)",
+            color: senderNameColor,
             fontFamily: "DM Sans, sans-serif",
             fontSize: 11.5,
             fontWeight: 700,
@@ -2873,7 +3029,7 @@ function MessageBubble({
           {sender?.handle ? (
             <span
               style={{
-                color: "rgba(28,28,30,0.42)",
+                color: senderHandleColor,
                 fontWeight: 500,
               }}
             >
@@ -2888,31 +3044,213 @@ function MessageBubble({
           // sender's run align under the avatar, the way Discord does it.
           paddingLeft: groupMode && !isMine ? 32 : 0,
           maxWidth: "100%",
+          position: "relative",
         }}
       >
         <div
+          onPointerDown={() => startLongPress()}
+          onPointerUp={() => clearLongPress()}
+          onPointerCancel={() => clearLongPress()}
+          onPointerLeave={() => clearLongPress()}
+          onContextMenu={(e) => {
+            // Mobile Safari fires contextmenu on long-press by default —
+            // we own the gesture, so suppress its native menu.
+            e.preventDefault();
+          }}
           style={{
             display: "inline-block",
             maxWidth: "100%",
             padding: "8px 14px",
             borderRadius: 18,
-            background: isMine ? "#FF5C35" : "rgba(255,255,255,0.88)",
-            color: isMine ? "#fff" : "#1C1C1E",
+            background: bubbleBg,
+            color: bubbleColor,
             fontFamily: "DM Sans, sans-serif",
             fontSize: 14.5,
             lineHeight: 1.4,
             fontWeight: 500,
-            border: isMine ? "none" : "1px solid rgba(28,28,30,0.06)",
+            border: bubbleBorder,
+            backdropFilter: darkMode ? "blur(20px) saturate(160%)" : undefined,
+            WebkitBackdropFilter: darkMode ? "blur(20px) saturate(160%)" : undefined,
             boxShadow: isMine
-              ? "0 4px 14px rgba(255,92,53,0.22)"
-              : "0 2px 8px rgba(180,120,60,0.06)",
+              ? darkMode
+                ? "0 6px 18px rgba(255,92,53,0.18)"
+                : "0 4px 14px rgba(255,92,53,0.22)"
+              : darkMode
+                ? "0 6px 18px rgba(20,8,40,0.18)"
+                : "0 2px 8px rgba(180,120,60,0.06)",
             whiteSpace: "pre-wrap",
             wordBreak: "break-word",
+            cursor: "pointer",
+            WebkitTouchCallout: "none",
+            WebkitUserSelect: "none",
+            userSelect: "none",
+            transition: "transform 120ms ease",
+            transform: pickerOpen ? "scale(0.97)" : "scale(1)",
           }}
         >
           {message.content}
         </div>
+
+        {/* Existing reactions — tappable to toggle. Wraps below the bubble. */}
+        {message.reactions && message.reactions.length > 0 ? (
+          <div
+            style={{
+              display: "flex",
+              flexWrap: "wrap",
+              gap: 4,
+              marginTop: 4,
+              justifyContent: isMine ? "flex-end" : "flex-start",
+            }}
+          >
+            {message.reactions.map((r) => (
+              <button
+                key={r.emoji}
+                type="button"
+                onClick={() => onToggleReaction?.(r.emoji)}
+                style={{
+                  display: "inline-flex",
+                  alignItems: "center",
+                  gap: 4,
+                  padding: "2px 8px",
+                  borderRadius: 999,
+                  background: r.viewer_reacted
+                    ? "rgba(255,140,90,0.22)"
+                    : darkMode
+                      ? "rgba(20,16,28,0.55)"
+                      : "rgba(255,255,255,0.78)",
+                  border: r.viewer_reacted
+                    ? "1px solid rgba(255,180,150,0.55)"
+                    : darkMode
+                      ? "1px solid rgba(255,255,255,0.10)"
+                      : "1px solid rgba(28,28,30,0.08)",
+                  color: r.viewer_reacted
+                    ? "#FFD0BF"
+                    : darkMode
+                      ? "rgba(255,255,255,0.85)"
+                      : "#1C1C1E",
+                  fontFamily: "DM Sans, sans-serif",
+                  fontSize: 12,
+                  fontWeight: 700,
+                  cursor: "pointer",
+                  WebkitTapHighlightColor: "transparent",
+                }}
+              >
+                <span style={{ fontSize: 13 }}>{r.emoji}</span>
+                {r.count}
+              </button>
+            ))}
+          </div>
+        ) : null}
+
+        {/* Emoji picker — pops out on long-press. Anchored above the
+            bubble on the same side. */}
+        {pickerOpen ? (
+          <ReactionPicker
+            darkMode={darkMode}
+            isMine={isMine}
+            existing={message.reactions ?? []}
+            onPick={(emoji) => {
+              setPickerOpen(false);
+              onToggleReaction?.(emoji);
+            }}
+            onClose={() => setPickerOpen(false)}
+          />
+        ) : null}
       </div>
+    </div>
+  );
+}
+
+function ReactionPicker({
+  darkMode,
+  isMine,
+  existing,
+  onPick,
+  onClose,
+}: {
+  darkMode: boolean;
+  isMine: boolean;
+  existing: MessageReaction[];
+  onPick: (emoji: string) => void;
+  onClose: () => void;
+}) {
+  // Dismiss on outside tap. Capture phase so a tap on a button still
+  // fires the button's onClick first.
+  useEffect(() => {
+    const handler = () => onClose();
+    const t = window.setTimeout(() => {
+      document.addEventListener("pointerdown", handler, { once: true });
+    }, 0);
+    return () => {
+      window.clearTimeout(t);
+      document.removeEventListener("pointerdown", handler);
+    };
+  }, [onClose]);
+
+  const reactedSet = new Set(
+    existing.filter((r) => r.viewer_reacted).map((r) => r.emoji),
+  );
+
+  return (
+    <div
+      role="dialog"
+      aria-label="React"
+      style={{
+        position: "absolute",
+        bottom: "calc(100% + 6px)",
+        ...(isMine ? { right: 0 } : { left: 32 }),
+        display: "inline-flex",
+        alignItems: "center",
+        gap: 2,
+        padding: "6px 8px",
+        borderRadius: 999,
+        background: darkMode
+          ? "rgba(20,16,28,0.92)"
+          : "rgba(255,255,255,0.96)",
+        border: darkMode
+          ? "1px solid rgba(255,255,255,0.14)"
+          : "1px solid rgba(28,28,30,0.10)",
+        boxShadow: darkMode
+          ? "inset 0 1px 0 rgba(255,255,255,0.10),0 12px 28px rgba(0,0,0,0.42)"
+          : "0 12px 28px rgba(180,120,60,0.18)",
+        backdropFilter: darkMode ? "blur(20px) saturate(180%)" : undefined,
+        WebkitBackdropFilter: darkMode ? "blur(20px) saturate(180%)" : undefined,
+        zIndex: 10,
+      }}
+    >
+      {REACTION_EMOJIS.map((emoji) => {
+        const on = reactedSet.has(emoji);
+        return (
+          <button
+            key={emoji}
+            type="button"
+            onClick={(e) => {
+              e.stopPropagation();
+              onPick(emoji);
+            }}
+            style={{
+              background: on ? "rgba(255,140,90,0.22)" : "transparent",
+              border: "none",
+              padding: 0,
+              width: 32,
+              height: 32,
+              borderRadius: 999,
+              display: "inline-flex",
+              alignItems: "center",
+              justifyContent: "center",
+              fontSize: 18,
+              cursor: "pointer",
+              WebkitTapHighlightColor: "transparent",
+              boxShadow: on
+                ? "0 0 0 1.5px rgba(255,180,150,0.7)"
+                : "none",
+              transition: "transform 120ms ease",
+            }}
+          >
+            {emoji}
+          </button>
+        );
+      })}
     </div>
   );
 }
