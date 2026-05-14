@@ -83,6 +83,42 @@ function ensureKeyframes() {
   document.head.appendChild(style);
 }
 
+/** Cover-fit drawImage from a live <video> onto our 9:16 record canvas.
+ *  The canvas is the recording's true source of truth (MediaRecorder
+ *  reads from canvas.captureStream() — see startRecording below), so
+ *  this is what shapes the saved clip's framing. */
+function drawVideoToCanvas(canvas: HTMLCanvasElement, video: HTMLVideoElement) {
+  const ctx = canvas.getContext("2d");
+  if (!ctx) return;
+  const vw = video.videoWidth;
+  const vh = video.videoHeight;
+  if (vw === 0 || vh === 0) return;
+
+  const cw = canvas.width;
+  const ch = canvas.height;
+  const sourceAspect = vw / vh;
+  const targetAspect = cw / ch;
+
+  let sx: number;
+  let sy: number;
+  let sw: number;
+  let sh: number;
+  if (sourceAspect > targetAspect) {
+    // Source is wider than 9:16 → crop the sides.
+    sh = vh;
+    sw = vh * targetAspect;
+    sx = (vw - sw) / 2;
+    sy = 0;
+  } else {
+    // Source is narrower than 9:16 → crop top + bottom.
+    sw = vw;
+    sh = vw / targetAspect;
+    sx = 0;
+    sy = (vh - sh) / 2;
+  }
+  ctx.drawImage(video, sx, sy, sw, sh, 0, 0, cw, ch);
+}
+
 type Props = {
   onClose: () => void;
   onPosted: () => void;
@@ -131,6 +167,15 @@ export function ClipComposerMobile({ onClose, onPosted, origin }: Props) {
   const previewVideoRef = useRef<HTMLVideoElement | null>(null);
   const playbackVideoRef = useRef<HTMLVideoElement | null>(null);
   const captionTextareaRef = useRef<HTMLTextAreaElement | null>(null);
+  // Offscreen 9:16 canvas the recorder reads from instead of the live
+  // camera stream. The draw loop below copies the preview video's
+  // current frame onto this canvas every RAF tick, so flipping the
+  // camera mid-record just changes which frames land in the canvas —
+  // MediaRecorder is bound to canvas.captureStream(), not to the
+  // camera, so it never notices the swap. Output is fixed at 720×1280.
+  const canvasRef = useRef<HTMLCanvasElement | null>(null);
+  const drawRafRef = useRef<number | null>(null);
+  const recordingStreamRef = useRef<MediaStream | null>(null);
   // Last tap timestamp on the camera preview — second tap within 350ms
   // counts as a double-tap and flips the camera (TikTok pattern).
   const lastCameraTapRef = useRef(0);
@@ -259,11 +304,34 @@ export function ClipComposerMobile({ onClose, onPosted, origin }: Props) {
   }, [phase, facing, stream, requestCamera]);
 
   // Attach the live stream to the <video> preview every time the
-  // stream changes (initial grant + facing-toggle re-grant).
+  // stream changes (initial grant + facing-toggle re-grant). Also
+  // kicks off the canvas draw loop the first time we have a stream
+  // — once running, it stays running for the rest of the composer's
+  // life so the recording surface is always ready.
   useEffect(() => {
     const v = previewVideoRef.current;
     if (v && stream) {
       v.srcObject = stream;
+    }
+    if (!stream) return;
+
+    if (!canvasRef.current) {
+      const c = document.createElement("canvas");
+      c.width = 720;
+      c.height = 1280;
+      canvasRef.current = c;
+    }
+
+    if (drawRafRef.current === null) {
+      const loop = () => {
+        const vid = previewVideoRef.current;
+        const cnv = canvasRef.current;
+        if (vid && cnv && vid.readyState >= 2) {
+          drawVideoToCanvas(cnv, vid);
+        }
+        drawRafRef.current = window.requestAnimationFrame(loop);
+      };
+      drawRafRef.current = window.requestAnimationFrame(loop);
     }
   }, [stream]);
 
@@ -278,6 +346,10 @@ export function ClipComposerMobile({ onClose, onPosted, origin }: Props) {
       }
       if (focusFadeTimerRef.current !== null) {
         window.clearTimeout(focusFadeTimerRef.current);
+      }
+      if (drawRafRef.current !== null) {
+        cancelAnimationFrame(drawRafRef.current);
+        drawRafRef.current = null;
       }
     };
     // We deliberately read the latest refs at cleanup time — including
@@ -334,9 +406,26 @@ export function ClipComposerMobile({ onClose, onPosted, origin }: Props) {
 
   const startRecording = useCallback(() => {
     if (!stream) return;
+    const canvas = canvasRef.current;
+    if (!canvas) return;
+
     chunksRef.current = [];
     elapsedAccumRef.current = 0;
     setElapsedMs(0);
+
+    // The recorder reads from a composite stream: canvas video track
+    // (driven by the draw loop, independent of which camera is live)
+    // plus the camera's audio track. Flipping the camera mid-record
+    // just changes which frames the draw loop is copying — the
+    // recorder's view of "the video" never changes.
+    const canvasStream = canvas.captureStream(30);
+    const audioTracks = stream.getAudioTracks();
+    const recordingStream = new MediaStream([
+      ...canvasStream.getVideoTracks(),
+      ...audioTracks,
+    ]);
+    recordingStreamRef.current = recordingStream;
+
     // Prefer mp4 on iOS Safari for native playback; fall back to webm
     // on Android Chrome / desktop.
     const mp4 = "video/mp4";
@@ -352,8 +441,8 @@ export function ClipComposerMobile({ onClose, onPosted, origin }: Props) {
     let recorder: MediaRecorder;
     try {
       recorder = mimeType
-        ? new MediaRecorder(stream, { mimeType })
-        : new MediaRecorder(stream);
+        ? new MediaRecorder(recordingStream, { mimeType })
+        : new MediaRecorder(recordingStream);
     } catch (e) {
       setError(
         e instanceof Error
