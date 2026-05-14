@@ -7463,9 +7463,10 @@ function EventCard({ ev, onMutate }: { ev: CampusEvent; onMutate: () => void }) 
     }
   };
 
-  // Spotlight tint follows the org accent so each event card glows
-  // in its own color.
-  const spotlightColor = hexToRgba(accent, 0.22);
+  // Spotlight tint follows the org accent (the same value driving the
+  // left-stripe color), with higher alpha so the per-event tint reads
+  // clearly against the dark glass surface.
+  const spotlightColor = hexToRgba(accent, 0.34);
 
   return (
     <MouseSpotlight
