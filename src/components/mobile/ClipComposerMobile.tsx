@@ -112,6 +112,11 @@ export function ClipComposerMobile({ onClose, onPosted, origin }: Props) {
   const [caption, setCaption] = useState("");
   const [error, setError] = useState<string | null>(null);
   const [closing, setClosing] = useState(false);
+  // Held false until the <video> reports its first actual frame
+  // (`onPlaying`). Lets us fade the camera in instead of flashing
+  // black between "stream arrived" and "first frame painted" — the
+  // gap that read as "janky" on iOS Safari.
+  const [videoReady, setVideoReady] = useState(false);
 
   const recorderRef = useRef<MediaRecorder | null>(null);
   const chunksRef = useRef<Blob[]>([]);
@@ -172,6 +177,8 @@ export function ClipComposerMobile({ onClose, onPosted, origin }: Props) {
       });
       setFacing(next);
       setPermState("granted");
+      // New stream → wait for the new first frame before showing.
+      setVideoReady(false);
     } catch (e) {
       // DOMException names that mean "user / OS said no" vs everything
       // else (missing hardware, in-app webview, etc).
@@ -838,6 +845,7 @@ export function ClipComposerMobile({ onClose, onPosted, origin }: Props) {
         autoPlay
         muted
         playsInline
+        onPlaying={() => setVideoReady(true)}
         style={{
           position: "absolute",
           inset: 0,
@@ -846,6 +854,8 @@ export function ClipComposerMobile({ onClose, onPosted, origin }: Props) {
           objectFit: "cover",
           background: "#000",
           transform: facing === "user" ? "scaleX(-1)" : "none",
+          opacity: videoReady ? 1 : 0,
+          transition: "opacity 220ms ease-out",
         }}
       />
 
