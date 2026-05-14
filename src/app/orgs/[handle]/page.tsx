@@ -7,6 +7,7 @@ import { createSupabaseServerClient } from "@/lib/supabase/server";
 import { createSupabaseServiceClient } from "@/lib/supabase/service";
 
 import { OrgProfileAdminBar } from "./admin-actions";
+import { OrgContent } from "./OrgContent";
 import { OrgProfileJoinButton } from "./join-button";
 
 type Params = { params: Promise<{ handle: string }> };
@@ -215,29 +216,22 @@ export default async function OrgProfilePage({ params }: Params) {
         {!org.is_public ? <PrivateOrgNotice /> : null}
         {org.description ? <Description text={org.description} /> : null}
 
-        <div
-          className="vibe-org-grid"
-          style={{
-            display: "grid",
-            gridTemplateColumns: "minmax(0, 2fr) minmax(0, 1fr)",
-            gap: 24,
-            marginTop: 24,
-          }}
-        >
-          <div style={{ display: "flex", flexDirection: "column", gap: 24, minWidth: 0 }}>
-            {clips.length > 0 ? <ClipsSection clips={clips} /> : null}
-            {posts.length > 0 ? <PostsSection posts={posts} org={org} /> : null}
-            {clips.length === 0 && posts.length === 0 ? <EmptyContent /> : null}
-          </div>
-
-          <aside
-            style={{ display: "flex", flexDirection: "column", gap: 16, minWidth: 0 }}
-          >
-            {org.links && org.links.length > 0 ? <LinksSection links={org.links} /> : null}
-            {org.philanthropy ? <PhilanthropySection text={org.philanthropy} /> : null}
-            <FactsSection org={org} />
-          </aside>
-        </div>
+        <OrgContent
+          mainColumn={
+            <>
+              {clips.length > 0 ? <ClipsSection clips={clips} /> : null}
+              {posts.length > 0 ? <PostsSection posts={posts} org={org} /> : null}
+              {clips.length === 0 && posts.length === 0 ? <EmptyContent /> : null}
+            </>
+          }
+          aboutColumn={
+            <>
+              {org.links && org.links.length > 0 ? <LinksSection links={org.links} /> : null}
+              {org.philanthropy ? <PhilanthropySection text={org.philanthropy} /> : null}
+              <FactsSection org={org} />
+            </>
+          }
+        />
       </div>
     </main>
   );

@@ -2455,9 +2455,9 @@ a.otto-room-row-title:hover {
 }
 
 /* Org profile page — mobile-only overrides. Inline styles on the
-   server-rendered page are tuned for desktop; these collapse the
-   2-column content grid to a single stack and trim the outer
-   padding when the viewport is phone-sized. !important is needed
+   server-rendered page are tuned for desktop; on mobile we collapse
+   the 2-column content grid to a single stack, trim the outer
+   padding, and show the Posts/About tab strip. !important is needed
    because the inline style sets gridTemplateColumns explicitly. */
 @media (max-width: 720px) {
   .vibe-org-shell {
@@ -2466,7 +2466,16 @@ a.otto-room-row-title:hover {
   .vibe-org-grid {
     grid-template-columns: minmax(0, 1fr) !important;
     gap: 16px !important;
-    margin-top: 16px !important;
+    margin-top: 12px !important;
+  }
+  .vibe-org-tabbar {
+    display: flex !important;
+  }
+  .vibe-org-grid[data-tab="posts"] .vibe-org-about {
+    display: none !important;
+  }
+  .vibe-org-grid[data-tab="about"] .vibe-org-main {
+    display: none !important;
   }
 }
 
