@@ -3131,7 +3131,7 @@ const SHEEN_KEYFRAMES = `
   }
 `;
 
-function CampusBanner() {
+export function CampusBanner() {
   // Live stats for the campus header line. The heartbeat updates the
   // viewer's `users.last_active_at` so the active-now count includes
   // them; the stats endpoint counts everyone with a fresh timestamp
@@ -4052,7 +4052,7 @@ type FeedOrg = {
   is_public: boolean;
 } | null;
 
-type FeedPost = {
+export type FeedPost = {
   id: string;
   user_id: string;
   org_id: string | null;
@@ -4493,7 +4493,7 @@ function ClipsReel({ entries }: { entries: FeedEntry[] | null }) {
   return <ClipsReelInner clips={clips} />;
 }
 
-function ClipsReelInner({ clips }: { clips: FeedPost[] }) {
+export function ClipsReelInner({ clips }: { clips: FeedPost[] }) {
   // Scroll-snap container: clips snap one-per-viewport like desktop
   // TikTok. The container is the IntersectionObserver root for each
   // card so auto-play only fires for the clip that snaps into view,
@@ -9705,7 +9705,7 @@ function bubbleRadiusFor(total: number): number {
 // (MAJOR_TO_SCHOOL + schoolForMajor moved to src/lib/iu/majors.ts —
 // imported below.)
 
-function MapTabBody() {
+export function MapTabBody() {
   const [data, setData] = useState<MapSummary | null>(null);
   const [selected, setSelected] = useState<ZoneSelection | null>(null);
   const [pan, setPan] = useState({ x: 0, y: 0 });
@@ -11428,7 +11428,7 @@ function hashString(s: string): number {
  *
  * Mobile (<900px) stacks the two cards vertically via grid auto-fit.
  */
-function OttoFeedStrip({ onPickTag }: { onPickTag: (tag: string) => void }) {
+export function OttoFeedStrip({ onPickTag }: { onPickTag: (tag: string) => void }) {
   const [trending, setTrending] = useState<Array<{ tag: string; count: number }> | null>(null);
   const [upcoming, setUpcoming] = useState<
     Array<{

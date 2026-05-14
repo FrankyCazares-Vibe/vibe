@@ -3,7 +3,15 @@
 import Link from "next/link";
 import { useCallback, useEffect, useRef, useState } from "react";
 
-import { type CampusEvent, EventCard } from "@/app/campus/campus-home";
+import {
+  type CampusEvent,
+  CampusBanner,
+  ClipsReelInner,
+  EventCard,
+  type FeedPost as DesktopFeedPost,
+  MapTabBody,
+  OttoFeedStrip,
+} from "@/app/campus/campus-home";
 import { ClipComposerMobile } from "@/components/mobile/ClipComposerMobile";
 import { ClipViewerMobile } from "@/components/mobile/ClipViewerMobile";
 import { PostComposerMobile } from "@/components/mobile/PostComposerMobile";
@@ -28,40 +36,12 @@ import { PostViewerMobile } from "@/components/mobile/PostViewerMobile";
 
 // ---------- Types ----------
 
-type Tab = "feed" | "events" | "orgs";
-const TAB_ORDER: Tab[] = ["feed", "events", "orgs"];
+type Tab = "feed" | "clips" | "events" | "chat" | "orgs" | "map";
+const TAB_ORDER: Tab[] = ["feed", "clips", "events", "chat", "orgs", "map"];
 
-type FeedAuthor = {
-  id: string;
-  name: string | null;
-  handle: string | null;
-  avatar_url: string | null;
-};
-
-type FeedOrg = {
-  id: string;
-  handle: string;
-  name: string;
-  logo_url: string | null;
-  verified: boolean;
-} | null;
-
-type FeedPost = {
-  id: string;
-  user_id: string;
-  type: "post" | "clip";
-  content: string;
-  tags: string[] | null;
-  media_url: string | null;
-  media_thumbnail_url: string | null;
-  edit_metadata: import("@/lib/clip/edit-metadata").ClipEditMetadata | null;
-  view_count: number;
-  like_count: number;
-  comment_count: number;
-  created_at: string;
-  author: FeedAuthor | null;
-  org: FeedOrg;
-};
+// Use the desktop FeedPost shape so ClipsReelInner accepts our posts
+// without any mapping.
+type FeedPost = DesktopFeedPost;
 
 type Org = {
   id: string;
@@ -206,41 +186,44 @@ export function CampusMobile() {
         position: "relative",
       }}
     >
-      <header
+      {/* IU crimson banner — school identity, live stats line, search bar,
+          mobile-only Messages quick-link. Reused from desktop. */}
+      <div
         style={{
-          padding: "calc(env(safe-area-inset-top, 0px) + 14px) 16px 4px",
-          background: "rgba(250, 247, 242, 0.86)",
-          backdropFilter: "saturate(160%) blur(14px)",
-          WebkitBackdropFilter: "saturate(160%) blur(14px)",
+          paddingTop: "env(safe-area-inset-top, 0px)",
           position: "sticky",
           top: 0,
-          zIndex: 5,
-          borderBottom: "1px solid rgba(28,28,30,0.06)",
+          zIndex: 6,
         }}
       >
-        <div
-          style={{
-            display: "flex",
-            alignItems: "baseline",
-            justifyContent: "space-between",
-            gap: 10,
+        <CampusBanner />
+      </div>
+
+      {/* Otto horizontal strip — heads-up + trending. Tap a trending
+          tag → switch to Feed (tag filtering is desktop-only for now). */}
+      <div style={{ padding: "10px 12px 0" }}>
+        <OttoFeedStrip
+          onPickTag={() => {
+            setTab("feed");
           }}
-        >
-          <h1
-            style={{
-              fontFamily: "Fraunces, serif",
-              fontSize: 28,
-              fontWeight: 900,
-              letterSpacing: "-0.8px",
-              color: "#1C1C1E",
-              margin: 0,
-            }}
-          >
-            Campus
-          </h1>
+        />
+      </div>
+
+      <header
+        style={{
+          padding: "10px 0 4px",
+          background: "transparent",
+          position: "sticky",
+          top: "calc(env(safe-area-inset-top, 0px) + 64px)",
+          zIndex: 5,
+        }}
+      >
+        <TabStrip active={tab} onChange={setTab} />
+        {/* Compact stats line under tabs — duplicates a touch of the
+            banner info but keeps it close to the content. */}
+        <div style={{ padding: "0 16px 4px" }}>
           <CampusStatsLine stats={stats} />
         </div>
-        <TabStrip active={tab} onChange={setTab} />
       </header>
 
       <div
@@ -273,11 +256,20 @@ export function CampusMobile() {
             onOpenClip={(id) => setOpenClipId(id)}
           />
         </section>
+        <section style={clipsPaneStyle}>
+          <ClipsPane posts={feed} />
+        </section>
         <section style={paneStyle}>
           <EventsPane events={events} onMutate={refetchEvents} />
         </section>
         <section style={paneStyle}>
+          <ChatPane orgs={orgs} />
+        </section>
+        <section style={paneStyle}>
           <OrgsPane orgs={orgs} />
+        </section>
+        <section style={mapPaneStyle}>
+          <MapPane />
         </section>
       </div>
 
@@ -350,6 +342,23 @@ const paneStyle: React.CSSProperties = {
   gap: 10,
 };
 
+// Clips reel is full-bleed scroll-snap, manages its own padding.
+const clipsPaneStyle: React.CSSProperties = {
+  flex: "0 0 100%",
+  scrollSnapAlign: "start",
+  minWidth: 0,
+  padding: 0,
+};
+
+// Map needs full pane height for the canvas, no horizontal padding.
+const mapPaneStyle: React.CSSProperties = {
+  flex: "0 0 100%",
+  scrollSnapAlign: "start",
+  minWidth: 0,
+  padding: 0,
+  overflow: "hidden",
+};
+
 function CampusStatsLine({ stats }: { stats: CampusStats | null }) {
   if (!stats) {
     return (
@@ -392,16 +401,23 @@ function TabStrip({
 }) {
   const tabs: Array<{ id: Tab; label: string }> = [
     { id: "feed", label: "Feed" },
+    { id: "clips", label: "Clips" },
     { id: "events", label: "Events" },
+    { id: "chat", label: "Chat" },
     { id: "orgs", label: "Orgs" },
+    { id: "map", label: "Map" },
   ];
   return (
     <div
+      className="vibe-no-scrollbar"
       style={{
         display: "flex",
         gap: 6,
-        marginTop: 10,
-        paddingBottom: 8,
+        padding: "0 16px 8px",
+        overflowX: "auto",
+        scrollbarWidth: "none",
+        msOverflowStyle: "none",
+        WebkitOverflowScrolling: "touch",
       }}
     >
       {tabs.map((t) => {
@@ -422,6 +438,7 @@ function TabStrip({
               fontWeight: 700,
               cursor: "pointer",
               WebkitTapHighlightColor: "transparent",
+              flexShrink: 0,
             }}
           >
             {t.label}
@@ -708,6 +725,162 @@ function EventsPane({
   );
 }
 
+// ---------- Clips pane ----------
+
+function ClipsPane({ posts }: { posts: FeedPost[] | null }) {
+  if (posts === null) {
+    return (
+      <div
+        style={{
+          padding: "48px 24px",
+          textAlign: "center",
+          color: "#5C5853",
+          fontFamily: "DM Sans, sans-serif",
+          fontSize: 13,
+        }}
+      >
+        Loading clips…
+      </div>
+    );
+  }
+  const clips = posts.filter((p) => p.type === "clip");
+  if (clips.length === 0) {
+    return (
+      <div style={{ padding: "12px 16px" }}>
+        <EmptyTab
+          title="No clips yet"
+          body="Tap the + to record one — yours will appear here once it's posted."
+        />
+      </div>
+    );
+  }
+  return <ClipsReelInner clips={clips} />;
+}
+
+// ---------- Chat pane ----------
+
+function ChatPane({ orgs }: { orgs: Org[] | null }) {
+  if (orgs === null) return <PaneSkeleton />;
+  if (orgs.length === 0) {
+    return (
+      <EmptyTab
+        title="No org chats yet"
+        body="Join an org to access its channels. Direct messages live under the Messages tab."
+      />
+    );
+  }
+  return (
+    <>
+      <div
+        style={{
+          padding: "4px 4px 8px",
+          fontFamily: "DM Sans, sans-serif",
+          fontSize: 11.5,
+          color: "#8A8580",
+          fontWeight: 700,
+          letterSpacing: "0.08em",
+          textTransform: "uppercase",
+        }}
+      >
+        Org channels
+      </div>
+      {orgs.map((o) => (
+        <Link
+          key={o.id}
+          href={`/orgs/${encodeURIComponent(o.handle)}?tab=chat`}
+          style={{ textDecoration: "none", color: "inherit", display: "block" }}
+        >
+          <div
+            style={{
+              display: "flex",
+              alignItems: "center",
+              gap: 12,
+              padding: 14,
+              borderRadius: 18,
+              background: "rgba(255,253,248,0.78)",
+              border: "1px solid rgba(255,255,255,0.7)",
+              boxShadow: "inset 0 1px 0 rgba(255,255,255,0.85), 0 4px 14px rgba(180,120,60,0.08)",
+            }}
+          >
+            <div
+              style={{
+                width: 44,
+                height: 44,
+                borderRadius: 12,
+                background: o.logo_url
+                  ? `url(${o.logo_url}) center/cover`
+                  : "linear-gradient(135deg,#FFD3C2 0%,#FF9D7E 100%)",
+                flexShrink: 0,
+                border: "1px solid rgba(255,255,255,0.6)",
+                display: "flex",
+                alignItems: "center",
+                justifyContent: "center",
+                color: "#1C1C1E",
+                fontFamily: "Fraunces, serif",
+                fontWeight: 800,
+                fontSize: 15,
+              }}
+            >
+              {!o.logo_url
+                ? o.name
+                    .split(/\s+/)
+                    .slice(0, 2)
+                    .map((p) => p[0]?.toUpperCase() ?? "")
+                    .join("")
+                : null}
+            </div>
+            <div style={{ flex: 1, minWidth: 0 }}>
+              <div
+                style={{
+                  fontFamily: "Fraunces, serif",
+                  fontSize: 15,
+                  fontWeight: 800,
+                  color: "#1C1C1E",
+                  whiteSpace: "nowrap",
+                  overflow: "hidden",
+                  textOverflow: "ellipsis",
+                }}
+              >
+                {o.name}
+              </div>
+              <div
+                style={{
+                  marginTop: 2,
+                  fontFamily: "DM Sans, sans-serif",
+                  fontSize: 12,
+                  color: "#8A8580",
+                  fontWeight: 600,
+                }}
+              >
+                # channels →
+              </div>
+            </div>
+          </div>
+        </Link>
+      ))}
+    </>
+  );
+}
+
+// ---------- Map pane ----------
+
+function MapPane() {
+  // MapTabBody renders its own canvas + chrome. Wrap so it fills the
+  // pane and the surrounding chrome doesn't slip in.
+  return (
+    <div
+      style={{
+        width: "100%",
+        height: "calc(100dvh - 240px)",
+        minHeight: 420,
+        overflow: "hidden",
+      }}
+    >
+      <MapTabBody />
+    </div>
+  );
+}
+
 // ---------- Orgs pane ----------
 
 function OrgsPane({ orgs }: { orgs: Org[] | null }) {
@@ -720,12 +893,56 @@ function OrgsPane({ orgs }: { orgs: Org[] | null }) {
       />
     );
   }
+  // Partition into verified + unverified so the trusted accounts surface
+  // first. Within each bucket sort alphabetically.
+  const verified = orgs
+    .filter((o) => !!o.verified)
+    .slice()
+    .sort((a, b) => a.name.localeCompare(b.name));
+  const others = orgs
+    .filter((o) => !o.verified)
+    .slice()
+    .sort((a, b) => a.name.localeCompare(b.name));
   return (
     <>
-      {orgs.map((o) => (
-        <OrgRow key={o.id} org={o} />
-      ))}
+      {verified.length > 0 ? (
+        <>
+          <OrgSectionHeader label="Verified" />
+          {verified.map((o) => (
+            <OrgRow key={o.id} org={o} />
+          ))}
+        </>
+      ) : null}
+      {others.length > 0 ? (
+        <>
+          {verified.length > 0 ? (
+            <div style={{ height: 6 }} />
+          ) : null}
+          <OrgSectionHeader label="All orgs" />
+          {others.map((o) => (
+            <OrgRow key={o.id} org={o} />
+          ))}
+        </>
+      ) : null}
     </>
+  );
+}
+
+function OrgSectionHeader({ label }: { label: string }) {
+  return (
+    <div
+      style={{
+        padding: "4px 4px 4px",
+        fontFamily: "DM Sans, sans-serif",
+        fontSize: 11.5,
+        color: "#8A8580",
+        fontWeight: 800,
+        letterSpacing: "0.08em",
+        textTransform: "uppercase",
+      }}
+    >
+      {label}
+    </div>
   );
 }
 
