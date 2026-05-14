@@ -479,6 +479,7 @@
       media_url:           p.media_url || p.mediaUrl || "",
       media_thumbnail_url: p.media_thumbnail_url || p.mediaThumbnailUrl || p.posterUrl || "",
       type:                p.type || "post",
+      edit_metadata:       p.edit_metadata || null,
     });
   }
 
@@ -491,6 +492,7 @@
       media_url:           p.media_url,
       media_thumbnail_url: p.media_thumbnail_url,
       type:                p.type,
+      edit_metadata:       p.edit_metadata || null,
     });
     state.authorId = p.user_id || (p.author && p.author.id) || null;
     state.authorName = (p.author && p.author.name) || "";
@@ -560,7 +562,30 @@
     );
   }
 
-  function paintBody({ content, tags, media_url, media_thumbnail_url, type }) {
+  // Vanilla mirror of FILTER_CSS in src/lib/clip/edit-metadata.ts.
+  function _vpvFilterCss(filter) {
+    if (filter === "warm")  return "saturate(1.15) hue-rotate(-8deg) brightness(1.04)";
+    if (filter === "cool")  return "saturate(1.1) hue-rotate(8deg) brightness(0.98)";
+    if (filter === "bw")    return "grayscale(1) contrast(1.08)";
+    if (filter === "vivid") return "saturate(1.55) contrast(1.1)";
+    return "";
+  }
+  function _vpvOverlayHTML(editMeta) {
+    if (!editMeta || !Array.isArray(editMeta.text_overlays)) return "";
+    return editMeta.text_overlays.map(o => {
+      const x = Number(o.x) || 50;
+      const y = Number(o.y) || 50;
+      const color = /^#[0-9A-Fa-f]{6}$/.test(o.color) ? o.color : "#FFFFFF";
+      return `<div aria-hidden style="position:absolute;left:${x}%;top:${y}%;`
+        + `transform:translate(-50%,-50%);color:${color};`
+        + `font-family:'DM Sans',sans-serif;font-weight:800;font-size:22px;`
+        + `line-height:1.2;text-align:center;`
+        + `text-shadow:0 1px 3px rgba(0,0,0,.55);max-width:82%;`
+        + `white-space:pre-wrap;word-break:break-word;pointer-events:none;">${esc(String(o.text || ""))}</div>`;
+    }).join("");
+  }
+
+  function paintBody({ content, tags, media_url, media_thumbnail_url, type, edit_metadata }) {
     const body = document.getElementById("vpvBody");
     const text = content ? `<div class="vpv-text">${formatBodyText(content)}</div>` : "";
     let media = "";
@@ -570,8 +595,13 @@
       // asynchronously via _vpvLoadClipSrc(). Demo Maya / mock clips have
       // no DB id — we still render the poster but skip the fetch.
       const poster = media_thumbnail_url ? `poster="${esc(media_thumbnail_url)}"` : "";
-      media = `<video class="vpv-video" id="vpvVideo" ${poster}
-        controls playsinline muted loop preload="metadata"></video>`;
+      const filterCss = edit_metadata && edit_metadata.filter ? _vpvFilterCss(edit_metadata.filter) : "";
+      const videoStyle = filterCss ? ` style="filter:${filterCss};"` : "";
+      // Wrap the video so we can absolute-position text overlays on top.
+      media = `<div class="vpv-video-wrap" style="position:relative;">`
+        + `<video class="vpv-video" id="vpvVideo" ${poster} controls playsinline muted loop preload="metadata"${videoStyle}></video>`
+        + _vpvOverlayHTML(edit_metadata)
+        + `</div>`;
     } else if (media_url && type === "post") {
       // Post images are stored as public URLs (Supabase profiles bucket)
       media = `<img class="vpv-image" src="${esc(media_url)}" alt="">`;
@@ -580,6 +610,39 @@
       ? `<div class="vpv-tags">${tags.map(t => `<span class="vpv-tag">#${esc(t)}</span>`).join("")}</div>`
       : "";
     body.innerHTML = text + media + tagBlock;
+
+    // Wire up speed + trim if the post has metadata. Filter is already
+    // applied via inline style above; text overlays are static DOM.
+    if (type === "clip" && edit_metadata) {
+      const v = document.getElementById("vpvVideo");
+      if (v) {
+        if (edit_metadata.speed) {
+          v.playbackRate = edit_metadata.speed;
+          // Some browsers reset rate on srcChange; reapply when src lands.
+          v.addEventListener("loadedmetadata", () => {
+            v.playbackRate = edit_metadata.speed;
+          }, { once: true });
+        }
+        if (edit_metadata.trim) {
+          const startSec = edit_metadata.trim.start_ms / 1000;
+          const endSec = edit_metadata.trim.end_ms / 1000;
+          const onLoaded = () => {
+            try {
+              if (v.currentTime < startSec || v.currentTime > endSec) {
+                v.currentTime = startSec;
+              }
+            } catch {}
+          };
+          const onTimeUpdate = () => {
+            if (v.currentTime >= endSec) {
+              try { v.currentTime = startSec; } catch {}
+            }
+          };
+          v.addEventListener("loadedmetadata", onLoaded);
+          v.addEventListener("timeupdate", onTimeUpdate);
+        }
+      }
+    }
   }
 
   // Fetch a fresh signed R2 URL and attach it to the open clip's <video>.

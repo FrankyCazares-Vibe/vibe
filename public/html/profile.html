@@ -5739,21 +5739,32 @@ function postExcerpt(card) {
 function buildFeedClipCard(thumb) {
   const id = thumb.dataset.vibeId || '';
   const bg = thumb.querySelector('.vibe-grid-bg')?.style.background || '';
+  // Pull the cached edit metadata + filter that _renderVibeThumb stashed
+  // on the source thumb so the All-tab card looks identical to the grid.
+  let editMeta = null;
+  if (thumb.dataset.editMetadata) {
+    try { editMeta = JSON.parse(thumb.dataset.editMetadata); } catch {}
+  }
+  const filterCss = editMeta && editMeta.filter ? _clipFilterCss(editMeta.filter) : '';
   const title = (thumb.querySelector('.vibe-grid-title')?.textContent || '').trim();
   const sub   = (thumb.querySelector('.vibe-grid-views')?.textContent || '').trim();
   const isPinned = id && id === profilePinnedId;
   const wrap = document.createElement('div');
   wrap.className = 'feed-clip-card';
   wrap.dataset.vibeId = id;
+  if (editMeta) {
+    try { wrap.dataset.editMetadata = JSON.stringify(editMeta); } catch {}
+  }
   // Pin button is owner-only + edit-mode-only via the same CSS rules
   // the in-grid pin button uses. Lives top-right of the poster so it
   // doesn't compete with the caption row.
   wrap.innerHTML = `
-    <div class="feed-clip-poster" style="background:${bg || '#1C1C1E'}">
+    <div class="feed-clip-poster" style="background:${bg || '#1C1C1E'};${filterCss ? `filter:${filterCss};` : ''};position:relative;overflow:hidden;">
       <div class="feed-clip-play">▶</div>
       <button class="vibe-pin-btn owner-only" onclick="event.stopPropagation();pinFromProfile('${id}',this)" title="Pin to profile"
         style="position:absolute;top:8px;right:8px;background:${isPinned ? 'var(--charcoal)' : 'rgba(0,0,0,.55)'};color:white;border:none;border-radius:8px;padding:4px 10px;font-size:10px;font-weight:700;cursor:none;backdrop-filter:blur(4px);">${isPinned ? 'Pinned' : 'Pin'}</button>
     </div>
+    ${_renderClipOverlaysHTML(editMeta, 14)}
     <div class="feed-clip-meta">
       <div class="feed-clip-caption">${_esc(title)}</div>
       ${sub ? `<div class="feed-clip-sub">${_esc(sub)}</div>` : ''}
@@ -8072,6 +8083,7 @@ async function hydrateProfilePostsFromAPI() {
           bg:    row.media_thumbnail_url
             ? `center/cover no-repeat url("${row.media_thumbnail_url}")`
             : _clipFallbackGradient(row.id),
+          edit_metadata: row.edit_metadata || null,
         });
         const uploadTile = grid.querySelector('.vibe-upload-tile');
         if (uploadTile) grid.insertBefore(node, uploadTile);
@@ -8122,6 +8134,7 @@ async function hydrateVisitedUserPosts(handle) {
           bg:    row.media_thumbnail_url
             ? `center/cover no-repeat url("${row.media_thumbnail_url}")`
             : _clipFallbackGradient(row.id),
+          edit_metadata: row.edit_metadata || null,
         });
         const uploadTile = grid.querySelector('.vibe-upload-tile');
         if (uploadTile) grid.insertBefore(node, uploadTile);
@@ -8488,14 +8501,50 @@ function renderVibesFromStorage(vibesOverride) {
   });
 }
 
+// Lossless clip-edit metadata helpers — vanilla mirror of
+// src/lib/clip/edit-metadata.ts. Kept inline so the static page
+// doesn't need a separate fetch / import.
+function _clipFilterCss(filter) {
+  if (filter === 'warm')  return 'saturate(1.15) hue-rotate(-8deg) brightness(1.04)';
+  if (filter === 'cool')  return 'saturate(1.1) hue-rotate(8deg) brightness(0.98)';
+  if (filter === 'bw')    return 'grayscale(1) contrast(1.08)';
+  if (filter === 'vivid') return 'saturate(1.55) contrast(1.1)';
+  return '';
+}
+function _renderClipOverlaysHTML(editMeta, fontSize) {
+  if (!editMeta || !Array.isArray(editMeta.text_overlays)) return '';
+  return editMeta.text_overlays.map(o => {
+    const x = Number(o.x) || 50;
+    const y = Number(o.y) || 50;
+    const color = /^#[0-9A-Fa-f]{6}$/.test(o.color) ? o.color : '#FFFFFF';
+    const text = _esc(String(o.text || ''));
+    return `<div aria-hidden style="position:absolute;left:${x}%;top:${y}%;`
+      + `transform:translate(-50%,-50%);color:${color};`
+      + `font-family:'DM Sans',sans-serif;font-weight:800;`
+      + `font-size:${fontSize}px;line-height:1.15;text-align:center;`
+      + `text-shadow:0 1px 2px rgba(0,0,0,.55);max-width:82%;`
+      + `white-space:pre-wrap;word-break:break-word;pointer-events:none;">${text}</div>`;
+  }).join('');
+}
+
 function _renderVibeThumb(v) {
   const div = document.createElement('div');
   div.className = 'vibe-grid-thumb';
   div.dataset.vibeId = v.id || '';
   div.style.position = 'relative';
+  div.style.overflow = 'hidden';
   const isPinned = v.id && v.id === profilePinnedId;
+  // Stash edit_metadata on the dataset so the All-tab feed card
+  // (built from the thumb later) can re-render the same effects
+  // without an extra fetch.
+  const editMeta = v.edit_metadata || null;
+  if (editMeta) {
+    try { div.dataset.editMetadata = JSON.stringify(editMeta); } catch {}
+  }
+  const filterCss = editMeta && editMeta.filter ? _clipFilterCss(editMeta.filter) : '';
   div.innerHTML = `
-    <div class="vibe-grid-bg" style="background:${v.bg || 'linear-gradient(135deg,#1a1a1a,#2a2a2a)'}"></div>
+    <div class="vibe-grid-bg" style="background:${v.bg || 'linear-gradient(135deg,#1a1a1a,#2a2a2a)'};${filterCss ? `filter:${filterCss};` : ''}"></div>
+    ${_renderClipOverlaysHTML(editMeta, 10)}
     <div class="vibe-grid-overlay"></div>
     <div class="vibe-grid-play">&#9654;</div>
     <div class="vibe-grid-info">
