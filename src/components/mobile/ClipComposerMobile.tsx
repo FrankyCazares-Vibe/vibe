@@ -327,11 +327,25 @@ function drawVideoToCanvas(canvas: HTMLCanvasElement, video: HTMLVideoElement) {
   ctx.drawImage(video, sx, sy, sw, sh, 0, 0, cw, ch);
 }
 
+/** Shape of the draft data passed when resuming editing of a saved
+ *  draft. Comes straight from /api/me/clip-drafts (or the publish
+ *  response after the user saved). */
+export type ResumableDraft = {
+  id: string;
+  content: string | null;
+  edit_metadata: ClipEditMetadata | null;
+};
+
 type Props = {
   onClose: () => void;
   onPosted: () => void;
   /** Centre point (viewport px) the sheet grows out of on open. */
   origin?: { x: number; y: number };
+  /** When provided, the composer mounts directly into the review/edit
+   *  phase with the draft's video, caption, and effects pre-loaded.
+   *  Publishing or re-saving from here PATCHes the existing post
+   *  rather than uploading a new one. */
+  initialDraft?: ResumableDraft;
 };
 
 type PermState =
@@ -345,7 +359,12 @@ type PermState =
   /** Browser doesn't expose getUserMedia (HTTP, in-app webview, etc). */
   | "unsupported";
 
-export function ClipComposerMobile({ onClose, onPosted, origin }: Props) {
+export function ClipComposerMobile({
+  onClose,
+  onPosted,
+  origin,
+  initialDraft,
+}: Props) {
   const [phase, setPhase] = useState<Phase>("intro");
   const [permState, setPermState] = useState<PermState>(() => {
     if (typeof navigator === "undefined") return "asking";
@@ -389,6 +408,9 @@ export function ClipComposerMobile({ onClose, onPosted, origin }: Props) {
   // Drag state for text overlays. Threshold-based: <5px movement is a
   // tap (opens editor); ≥5px is a drag (updates x/y in real time).
   const overlayDragRef = useRef<{ id: string; startX: number; startY: number; dragged: boolean } | null>(null);
+  // If we're resuming a draft, this holds the existing post's id.
+  // Cleared on Retake so a new recording publishes as a fresh post.
+  const draftIdRef = useRef<string | null>(initialDraft?.id ?? null);
   // Last tap timestamp on the camera preview — second tap within 350ms
   // counts as a double-tap and flips the camera (TikTok pattern).
   const lastCameraTapRef = useRef(0);
@@ -411,7 +433,9 @@ export function ClipComposerMobile({ onClose, onPosted, origin }: Props) {
   const [editingOverlay, setEditingOverlay] = useState<TextOverlay | null | undefined>(undefined);
 
   // Reset all edit-room state when the user retakes — fresh clip, fresh
-  // canvas. Triggered by `phase` flipping back to "intro".
+  // canvas. Triggered by `phase` flipping back to "intro". Also clears
+  // draftIdRef so the next publish from a fresh recording creates a
+  // brand-new post instead of overwriting the resumed draft.
   useEffect(() => {
     if (phase === "intro") {
       setSpeed(1);
@@ -420,8 +444,44 @@ export function ClipComposerMobile({ onClose, onPosted, origin }: Props) {
       setTextOverlays([]);
       setActiveEditTray(null);
       setEditingOverlay(undefined);
+      draftIdRef.current = null;
     }
   }, [phase]);
+
+  // Hydrate from initialDraft on first mount. Skips the entire record
+  // path — composer jumps straight to the review/edit phase with the
+  // saved clip's video URL, caption, and effects.
+  const hydratedRef = useRef(false);
+  useEffect(() => {
+    if (hydratedRef.current) return;
+    hydratedRef.current = true;
+    if (!initialDraft) return;
+    draftIdRef.current = initialDraft.id;
+    setCaption(initialDraft.content ?? "");
+    const meta = initialDraft.edit_metadata;
+    if (meta?.speed) setSpeed(meta.speed);
+    if (meta?.filter) setFilterPreset(meta.filter);
+    if (meta?.trim) setTrimRange(meta.trim);
+    if (meta?.text_overlays) setTextOverlays(meta.text_overlays);
+    setRecordedUrl(`/api/posts/${initialDraft.id}/media`);
+    setPhase("review");
+  }, [initialDraft]);
+
+  // Probe the loaded video's true duration so the trim scrubber and
+  // any other duration-dependent UI have authoritative numbers. Runs
+  // for both new recordings (where the timer's elapsedMs is best-
+  // effort) and resumed drafts (where we have no timer at all).
+  useEffect(() => {
+    const v = playbackVideoRef.current;
+    if (!v) return;
+    const onLoaded = () => {
+      if (v.duration && Number.isFinite(v.duration) && v.duration > 0) {
+        setElapsedMs(Math.round(v.duration * 1000));
+      }
+    };
+    v.addEventListener("loadedmetadata", onLoaded);
+    return () => v.removeEventListener("loadedmetadata", onLoaded);
+  }, [recordedUrl]);
 
   // Apply playback speed live whenever it changes (or the playback
   // element first mounts).
@@ -917,13 +977,34 @@ export function ClipComposerMobile({ onClose, onPosted, origin }: Props) {
 
   // ---------- publish ----------
 
-  const publish = useCallback(async () => {
-    if (!recordedBlob) return;
+  const commitClip = useCallback(async (opts: { asDraft: boolean }) => {
     setPhase("publishing");
     setError(null);
     try {
       const trimmed = caption.trim();
       const tags = extractHashtags(trimmed);
+
+      // RESUME PATH: re-saving / publishing an existing draft. The
+      // video is already in R2 and the row already exists — just
+      // PATCH the row with the latest caption + effects + status.
+      if (draftIdRef.current) {
+        const patchRes = await fetch(`/api/posts/${draftIdRef.current}`, {
+          method: "PATCH",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({
+            content: trimmed,
+            edit_metadata: collectedEditMetadata,
+            status: opts.asDraft ? "draft" : "published",
+          }),
+        }).then((r) => r.json());
+        if (!patchRes?.ok) throw new Error(patchRes?.error || "Update failed");
+        onPosted();
+        requestClose();
+        return;
+      }
+
+      // NEW CLIP PATH: needs the recorded blob + R2 upload + insert.
+      if (!recordedBlob) return;
 
       // 1. Probe for poster + true duration (the chunked recording's
       //    Blob doesn't expose duration directly; readback via a
@@ -994,6 +1075,7 @@ export function ClipComposerMobile({ onClose, onPosted, origin }: Props) {
           poster_url: posterUrl,
           duration_sec: durationSec,
           edit_metadata: collectedEditMetadata,
+          is_draft: opts.asDraft,
         }),
       }).then((r) => r.json());
       if (!pub?.ok) throw new Error(pub?.error || "Publish failed");
@@ -2202,24 +2284,43 @@ export function ClipComposerMobile({ onClose, onPosted, origin }: Props) {
         <span style={{ fontFamily: "Fraunces, serif", fontSize: 17, fontWeight: 800 }}>
           Post clip
         </span>
-        <button
-          type="button"
-          onClick={() => void publish()}
-          style={{
-            padding: "7px 18px",
-            borderRadius: 999,
-            border: "none",
-            background: "#FF5C35",
-            color: "#fff",
-            fontFamily: "inherit",
-            fontSize: 13,
-            fontWeight: 700,
-            cursor: "pointer",
-            boxShadow: "0 2px 8px rgba(255,92,53,0.32)",
-          }}
-        >
-          Post
-        </button>
+        <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
+          <button
+            type="button"
+            onClick={() => void commitClip({ asDraft: true })}
+            style={{
+              background: "transparent",
+              border: "none",
+              color: "#1C1C1E",
+              fontFamily: "inherit",
+              fontSize: 13,
+              fontWeight: 600,
+              cursor: "pointer",
+              padding: "7px 4px",
+              opacity: 0.78,
+            }}
+          >
+            Save draft
+          </button>
+          <button
+            type="button"
+            onClick={() => void commitClip({ asDraft: false })}
+            style={{
+              padding: "7px 18px",
+              borderRadius: 999,
+              border: "none",
+              background: "#FF5C35",
+              color: "#fff",
+              fontFamily: "inherit",
+              fontSize: 13,
+              fontWeight: 700,
+              cursor: "pointer",
+              boxShadow: "0 2px 8px rgba(255,92,53,0.32)",
+            }}
+          >
+            {draftIdRef.current ? "Publish" : "Post"}
+          </button>
+        </div>
       </div>
 
       <div
