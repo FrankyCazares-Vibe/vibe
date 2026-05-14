@@ -1081,7 +1081,7 @@ function synthesizeChannelThread(c: OpenChannel) {
   if (!c.name) return null;
   return {
     id: c.id,
-    type: "group" as const,
+    type: "org" as const,
     name: `# ${c.name}`,
     photo_url: c.orgLogo,
     peer: null,
@@ -1116,6 +1116,14 @@ function OrgChannelsDrawer({
 }) {
   const [channels, setChannels] = useState<ChannelRow[] | null>(null);
   const [query, setQuery] = useState("");
+
+  // Hide the bottom tab bar while this drawer is up — reuses the
+  // existing CSS rule that ConversationView leverages so the chat
+  // stack feels fullscreen.
+  useEffect(() => {
+    document.body.classList.add("vibe-composer-open");
+    return () => document.body.classList.remove("vibe-composer-open");
+  }, []);
 
   useEffect(() => {
     let cancelled = false;
@@ -1155,7 +1163,10 @@ function OrgChannelsDrawer({
             position: "fixed",
             inset: 0,
             background: "rgba(0,0,0,0.55)",
-            zIndex: 1200,
+            // Sit below ConversationView (overlay 1099 / content 1100)
+            // so opening a channel can stack the chat on top of this
+            // drawer instead of being hidden behind it.
+            zIndex: 1080,
           }}
         />
         <Drawer.Content
@@ -1167,7 +1178,7 @@ function OrgChannelsDrawer({
             width: "100%",
             background: "linear-gradient(180deg, #1A1B1F 0%, #16171B 100%)",
             color: "#E7E7EA",
-            zIndex: 1201,
+            zIndex: 1081,
             outline: "none",
             display: "flex",
             flexDirection: "column",
