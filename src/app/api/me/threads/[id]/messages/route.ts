@@ -408,6 +408,7 @@ export async function GET(req: Request, ctx: RouteCtx) {
   return NextResponse.json({
     ok: true,
     messages,
+    viewer_id: user.id,
     peer_last_read_at: peerLastReadAt,
     peer_typing: peerTyping,
   });
