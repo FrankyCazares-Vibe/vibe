@@ -74,6 +74,11 @@ function ensureKeyframes() {
       0%,100% { transform: scale(1);   box-shadow: 0 0 0 0 rgba(255,92,53,0.5); }
       50%     { transform: scale(1.05); box-shadow: 0 0 0 16px rgba(255,92,53,0); }
     }
+    @keyframes vibeFocusPulse {
+      0%   { transform: translate(-50%, -50%) scale(1.7); opacity: 0; }
+      20%  { transform: translate(-50%, -50%) scale(1);   opacity: 1; }
+      100% { transform: translate(-50%, -50%) scale(0.92); opacity: 0; }
+    }
   `;
   document.head.appendChild(style);
 }
@@ -126,6 +131,13 @@ export function ClipComposerMobile({ onClose, onPosted, origin }: Props) {
   const previewVideoRef = useRef<HTMLVideoElement | null>(null);
   const playbackVideoRef = useRef<HTMLVideoElement | null>(null);
   const captionTextareaRef = useRef<HTMLTextAreaElement | null>(null);
+  // Last tap timestamp on the camera preview — second tap within 350ms
+  // counts as a double-tap and flips the camera (TikTok pattern).
+  const lastCameraTapRef = useRef(0);
+  const focusFadeTimerRef = useRef<number | null>(null);
+  // Focus indicator point (in CSS pixels relative to the video element).
+  // The `key` reuses the timestamp so each tap restarts the animation.
+  const [focusPoint, setFocusPoint] = useState<{ x: number; y: number; key: number } | null>(null);
 
   // ---------- keyframes + permissions ----------
 
@@ -213,6 +225,9 @@ export function ClipComposerMobile({ onClose, onPosted, origin }: Props) {
       if (recordedUrl) URL.revokeObjectURL(recordedUrl);
       if (elapsedTickRef.current !== null) {
         cancelAnimationFrame(elapsedTickRef.current);
+      }
+      if (focusFadeTimerRef.current !== null) {
+        window.clearTimeout(focusFadeTimerRef.current);
       }
     };
     // We deliberately read the latest refs at cleanup time — including
@@ -350,6 +365,75 @@ export function ClipComposerMobile({ onClose, onPosted, origin }: Props) {
       stopRecording();
     }
   }, [startTick, stopRecording]);
+
+  // ---------- camera tap gestures ----------
+
+  // Single tap → focus indicator + best-effort applyConstraints
+  // (iOS Safari ignores `pointsOfInterest`; on Android Chrome where it
+  //  is supported, the camera will actually refocus). The indicator is
+  //  the visible UX either way.
+  // Double tap (within 350ms) → flip camera + cancel the focus
+  //  indicator from the first tap so it doesn't linger.
+  const handleCameraTap = useCallback(
+    (e: React.MouseEvent<HTMLVideoElement>) => {
+      // Same gate as the flip button — don't flip mid-recording.
+      if (phase === "recording" || phase === "paused") return;
+
+      const now = Date.now();
+      const rect = e.currentTarget.getBoundingClientRect();
+      // Mirror the X coordinate when the front camera is mirrored, so
+      // the focus ring appears where the user's finger actually was.
+      const rawX = e.clientX - rect.left;
+      const x = facing === "user" ? rect.width - rawX : rawX;
+      const y = e.clientY - rect.top;
+
+      if (now - lastCameraTapRef.current < 350) {
+        // Double-tap: wipe the focus indicator + flip.
+        lastCameraTapRef.current = 0;
+        if (focusFadeTimerRef.current !== null) {
+          window.clearTimeout(focusFadeTimerRef.current);
+          focusFadeTimerRef.current = null;
+        }
+        setFocusPoint(null);
+        void requestCamera(facing === "user" ? "environment" : "user");
+        return;
+      }
+      lastCameraTapRef.current = now;
+
+      // Single-tap: show the focus ring and try the camera API.
+      setFocusPoint({ x, y, key: now });
+      const track = stream?.getVideoTracks?.()[0];
+      if (track) {
+        const caps =
+          (track.getCapabilities?.() as Record<string, unknown> | undefined) ?? {};
+        if ("pointsOfInterest" in caps) {
+          const nx = x / rect.width;
+          const ny = y / rect.height;
+          track
+            .applyConstraints({
+              advanced: [
+                {
+                  pointsOfInterest: [{ x: nx, y: ny }],
+                  focusMode: "single-shot",
+                } as MediaTrackConstraintSet,
+              ],
+            })
+            .catch(() => {
+              /* track doesn't support it — visual indicator only */
+            });
+        }
+      }
+
+      if (focusFadeTimerRef.current !== null) {
+        window.clearTimeout(focusFadeTimerRef.current);
+      }
+      focusFadeTimerRef.current = window.setTimeout(() => {
+        setFocusPoint(null);
+        focusFadeTimerRef.current = null;
+      }, 800);
+    },
+    [phase, facing, requestCamera, stream],
+  );
 
   // ---------- review controls ----------
 
@@ -846,6 +930,7 @@ export function ClipComposerMobile({ onClose, onPosted, origin }: Props) {
         muted
         playsInline
         onPlaying={() => setVideoReady(true)}
+        onClick={handleCameraTap}
         style={{
           position: "absolute",
           top: 0,
@@ -858,8 +943,31 @@ export function ClipComposerMobile({ onClose, onPosted, origin }: Props) {
           transform: facing === "user" ? "scaleX(-1)" : "none",
           opacity: videoReady ? 1 : 0,
           transition: "opacity 220ms ease-out",
+          cursor: "pointer",
         }}
       />
+
+      {/* Focus ring — appears wherever the user single-taps the preview.
+          Animation handles enter + dwell + fade out (vibeFocusPulse,
+          800ms). Pointer-events off so it doesn't swallow the next tap. */}
+      {focusPoint ? (
+        <div
+          key={focusPoint.key}
+          aria-hidden
+          style={{
+            position: "absolute",
+            left: focusPoint.x,
+            top: focusPoint.y,
+            width: 64,
+            height: 64,
+            border: "1.5px solid rgba(255, 224, 102, 0.95)",
+            borderRadius: 6,
+            boxShadow: "0 0 0 1px rgba(0,0,0,0.25), inset 0 0 0 1px rgba(0,0,0,0.18)",
+            pointerEvents: "none",
+            animation: "vibeFocusPulse 800ms ease-out forwards",
+          }}
+        />
+      ) : null}
 
       {/* Live timer pill — top center */}
       <div
