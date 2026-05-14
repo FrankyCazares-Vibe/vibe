@@ -185,6 +185,8 @@ export function ClipComposerMobile({ onClose, onPosted, origin }: Props) {
   const canvasRef = useRef<HTMLCanvasElement | null>(null);
   const drawRafRef = useRef<number | null>(null);
   const recordingStreamRef = useRef<MediaStream | null>(null);
+  // Trim scrubber bar — used to compute pct from pointer X.
+  const trimBarRef = useRef<HTMLDivElement | null>(null);
   // Last tap timestamp on the camera preview — second tap within 350ms
   // counts as a double-tap and flips the camera (TikTok pattern).
   const lastCameraTapRef = useRef(0);
@@ -225,6 +227,42 @@ export function ClipComposerMobile({ onClose, onPosted, origin }: Props) {
     const v = playbackVideoRef.current;
     if (v) v.playbackRate = speed;
   }, [speed, recordedUrl]);
+
+  // Apply trim range live in the edit room: clamp playback to
+  // [start_ms, end_ms] and loop within that range. Same behavior as
+  // ClipViewerMobile (reader side). If trimRange is null, the full
+  // clip plays normally.
+  useEffect(() => {
+    const v = playbackVideoRef.current;
+    if (!v || !trimRange) return;
+    const startSec = trimRange.start_ms / 1000;
+    const endSec = trimRange.end_ms / 1000;
+    const onLoaded = () => {
+      try {
+        if (v.currentTime < startSec || v.currentTime > endSec) {
+          v.currentTime = startSec;
+        }
+      } catch {
+        /* not yet seekable */
+      }
+    };
+    const onTimeUpdate = () => {
+      if (v.currentTime >= endSec) {
+        try {
+          v.currentTime = startSec;
+        } catch {
+          /* ignore */
+        }
+      }
+    };
+    v.addEventListener("loadedmetadata", onLoaded);
+    v.addEventListener("timeupdate", onTimeUpdate);
+    onLoaded();
+    return () => {
+      v.removeEventListener("loadedmetadata", onLoaded);
+      v.removeEventListener("timeupdate", onTimeUpdate);
+    };
+  }, [trimRange, recordedUrl]);
 
   // Dispatch for the side-rail tool buttons in the edit room.
   // - Speed is a stateless cycle (1 → 2 → 0.5 → 1).
@@ -1495,6 +1533,149 @@ export function ClipComposerMobile({ onClose, onPosted, origin }: Props) {
           filter: filterPreset ? FILTER_CSS[filterPreset] : undefined,
         }}
       />
+
+      {/* Trim scrubber — bar + two draggable thumbs + time labels.
+          Shown when the Trim tool is active. Minimum 0.5s between
+          thumbs so the clip can't collapse to zero length. */}
+      {activeEditTray === "trim" && elapsedMs > 0 ? (() => {
+        const totalMs = elapsedMs;
+        const startMs = trimRange?.start_ms ?? 0;
+        const endMs = trimRange?.end_ms ?? totalMs;
+        const startPct = (startMs / totalMs) * 100;
+        const endPct = (endMs / totalMs) * 100;
+        const updateThumb = (clientX: number, thumb: "start" | "end") => {
+          const rect = trimBarRef.current?.getBoundingClientRect();
+          if (!rect) return;
+          const pctRaw = (clientX - rect.left) / rect.width;
+          const pct = Math.max(0, Math.min(1, pctRaw));
+          const ms = Math.round(pct * totalMs);
+          setTrimRange((prev) => {
+            const curStart = prev?.start_ms ?? 0;
+            const curEnd = prev?.end_ms ?? totalMs;
+            const minGap = 500;
+            if (thumb === "start") {
+              return {
+                start_ms: Math.max(0, Math.min(ms, curEnd - minGap)),
+                end_ms: curEnd,
+              };
+            }
+            return {
+              start_ms: curStart,
+              end_ms: Math.min(totalMs, Math.max(ms, curStart + minGap)),
+            };
+          });
+        };
+
+        const thumbStyle: React.CSSProperties = {
+          position: "absolute",
+          top: "50%",
+          transform: "translate(-50%, -50%)",
+          width: 24,
+          height: 24,
+          borderRadius: "50%",
+          background: "#fff",
+          boxShadow: "0 2px 8px rgba(0,0,0,0.45)",
+          touchAction: "none",
+          cursor: "grab",
+        };
+
+        return (
+          <div
+            style={{
+              position: "absolute",
+              left: 0,
+              right: 0,
+              bottom: "calc(env(safe-area-inset-bottom, 0px) + 80px)",
+              padding: "10px 22px",
+            }}
+          >
+            <div
+              ref={trimBarRef}
+              style={{
+                position: "relative",
+                height: 36,
+              }}
+            >
+              {/* Track */}
+              <div
+                style={{
+                  position: "absolute",
+                  left: 0,
+                  right: 0,
+                  top: "50%",
+                  transform: "translateY(-50%)",
+                  height: 6,
+                  borderRadius: 999,
+                  background: "rgba(255,255,255,0.22)",
+                }}
+              />
+              {/* Selected range */}
+              <div
+                style={{
+                  position: "absolute",
+                  left: `${startPct}%`,
+                  width: `${endPct - startPct}%`,
+                  top: "50%",
+                  transform: "translateY(-50%)",
+                  height: 6,
+                  borderRadius: 999,
+                  background: "#FF5C35",
+                }}
+              />
+              {/* Start thumb */}
+              <div
+                aria-label="Trim start"
+                role="slider"
+                onPointerDown={(e) => {
+                  e.currentTarget.setPointerCapture(e.pointerId);
+                }}
+                onPointerMove={(e) => {
+                  if (e.currentTarget.hasPointerCapture(e.pointerId)) {
+                    updateThumb(e.clientX, "start");
+                  }
+                }}
+                onPointerUp={(e) => {
+                  e.currentTarget.releasePointerCapture(e.pointerId);
+                }}
+                style={{ ...thumbStyle, left: `${startPct}%` }}
+              />
+              {/* End thumb */}
+              <div
+                aria-label="Trim end"
+                role="slider"
+                onPointerDown={(e) => {
+                  e.currentTarget.setPointerCapture(e.pointerId);
+                }}
+                onPointerMove={(e) => {
+                  if (e.currentTarget.hasPointerCapture(e.pointerId)) {
+                    updateThumb(e.clientX, "end");
+                  }
+                }}
+                onPointerUp={(e) => {
+                  e.currentTarget.releasePointerCapture(e.pointerId);
+                }}
+                style={{ ...thumbStyle, left: `${endPct}%` }}
+              />
+            </div>
+            <div
+              style={{
+                display: "flex",
+                justifyContent: "space-between",
+                marginTop: 6,
+                fontFamily: "DM Sans, sans-serif",
+                fontWeight: 700,
+                fontSize: 12,
+                color: "rgba(255,255,255,0.92)",
+                letterSpacing: "0.02em",
+                textShadow: "0 1px 2px rgba(0,0,0,0.5)",
+              }}
+            >
+              <span>{formatMs(startMs)}</span>
+              <span>{formatMs(endMs)}</span>
+            </div>
+          </div>
+        );
+      })() : null}
 
       {/* Filter chip tray — sits just above the bottom action bar when
           the Filters tool is active. Tap a chip to apply (toggle off
