@@ -54,11 +54,6 @@ type Org = {
   verified?: boolean;
 };
 
-type CampusStats = {
-  totalUsers: number;
-  activeNow: number;
-};
-
 // ---------- Component ----------
 
 export function CampusMobile() {
@@ -66,7 +61,6 @@ export function CampusMobile() {
   const [feed, setFeed] = useState<FeedPost[] | null>(null);
   const [events, setEvents] = useState<CampusEvent[] | null>(null);
   const [orgs, setOrgs] = useState<Org[] | null>(null);
-  const [stats, setStats] = useState<CampusStats | null>(null);
   const [openPostId, setOpenPostId] = useState<string | null>(null);
   const [openClipId, setOpenClipId] = useState<string | null>(null);
   const [composerOpen, setComposerOpen] = useState(false);
@@ -123,28 +117,11 @@ export function CampusMobile() {
     }
   }, []);
 
-  const refetchStats = useCallback(async () => {
-    try {
-      const r = await fetch("/api/stats/campus", { cache: "no-store" });
-      const j = await r.json();
-      if (
-        j?.ok &&
-        typeof j.totalUsers === "number" &&
-        typeof j.activeNow === "number"
-      ) {
-        setStats({ totalUsers: j.totalUsers, activeNow: j.activeNow });
-      }
-    } catch {
-      /* silent — banner just shows skeleton */
-    }
-  }, []);
-
   useEffect(() => {
     void refetchFeed();
     void refetchEvents();
     void refetchOrgs();
-    void refetchStats();
-  }, [refetchFeed, refetchEvents, refetchOrgs, refetchStats]);
+  }, [refetchFeed, refetchEvents, refetchOrgs]);
 
   // ---------- Swipeable tab scroll sync ----------
 
@@ -220,11 +197,6 @@ export function CampusMobile() {
         }}
       >
         <TabStrip active={tab} onChange={setTab} />
-        {/* Compact stats line under tabs — duplicates a touch of the
-            banner info but keeps it close to the content. */}
-        <div style={{ padding: "0 16px 4px" }}>
-          <CampusStatsLine stats={stats} />
-        </div>
       </header>
 
       <div
@@ -366,39 +338,6 @@ const mapPaneStyle: React.CSSProperties = {
   padding: 0,
   overflow: "hidden",
 };
-
-function CampusStatsLine({ stats }: { stats: CampusStats | null }) {
-  if (!stats) {
-    return (
-      <span
-        style={{
-          fontFamily: "DM Sans, sans-serif",
-          fontSize: 11.5,
-          color: "rgba(28,28,30,0.45)",
-          fontWeight: 600,
-        }}
-      >
-        loading…
-      </span>
-    );
-  }
-  return (
-    <span
-      style={{
-        fontFamily: "DM Sans, sans-serif",
-        fontSize: 11.5,
-        color: "#5C5853",
-        fontWeight: 600,
-        letterSpacing: "0.02em",
-      }}
-    >
-      <strong style={{ color: "#1C1C1E", fontWeight: 800 }}>
-        {stats.activeNow.toLocaleString()}
-      </strong>{" "}
-      active · {stats.totalUsers.toLocaleString()} on Vibe
-    </span>
-  );
-}
 
 function TabStrip({
   active,
