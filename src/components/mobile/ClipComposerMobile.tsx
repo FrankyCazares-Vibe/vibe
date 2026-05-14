@@ -92,6 +92,205 @@ function ensureKeyframes() {
   document.head.appendChild(style);
 }
 
+/** Six-color palette for text overlays. White first so it's the
+ *  default and matches what most users want most of the time. */
+const TEXT_COLORS = ["#FFFFFF", "#000000", "#FF5C35", "#FFD23F", "#C6A0FF", "#5BE3B9"];
+
+function TextOverlayEditor({
+  initial,
+  onSave,
+  onDelete,
+  onCancel,
+}: {
+  /** null → drafting a new overlay, otherwise the overlay being edited. */
+  initial: TextOverlay | null;
+  onSave: (o: TextOverlay) => void;
+  /** Only provided in edit mode. */
+  onDelete?: () => void;
+  onCancel: () => void;
+}) {
+  const [text, setText] = useState(initial?.text ?? "");
+  const [color, setColor] = useState(initial?.color ?? TEXT_COLORS[0]);
+  const inputRef = useRef<HTMLTextAreaElement | null>(null);
+
+  // Auto-focus the text input when the modal opens — keyboard pops up
+  // immediately. iOS needs a small delay to honor focus after layout.
+  useEffect(() => {
+    const t = window.setTimeout(() => inputRef.current?.focus(), 60);
+    return () => window.clearTimeout(t);
+  }, []);
+
+  const handleSave = () => {
+    const trimmed = text.trim();
+    if (!trimmed) {
+      // Empty save behaves like cancel if drafting, or delete if editing.
+      if (initial && onDelete) onDelete();
+      else onCancel();
+      return;
+    }
+    onSave({
+      id: initial?.id ?? Math.random().toString(36).slice(2, 10),
+      text: trimmed,
+      x: initial?.x ?? 50,
+      y: initial?.y ?? 50,
+      color,
+    });
+  };
+
+  return (
+    <div
+      role="dialog"
+      aria-modal="true"
+      aria-label={initial ? "Edit text" : "Add text"}
+      style={{
+        position: "absolute",
+        inset: 0,
+        zIndex: 20,
+        background: "rgba(0,0,0,0.78)",
+        backdropFilter: "blur(12px)",
+        WebkitBackdropFilter: "blur(12px)",
+        display: "flex",
+        flexDirection: "column",
+        paddingTop: "env(safe-area-inset-top, 0px)",
+        paddingBottom: "env(safe-area-inset-bottom, 0px)",
+      }}
+    >
+      {/* Top bar — Cancel / Save */}
+      <div
+        style={{
+          display: "flex",
+          alignItems: "center",
+          justifyContent: "space-between",
+          padding: "12px 16px",
+        }}
+      >
+        <button
+          type="button"
+          onClick={onCancel}
+          style={{
+            background: "transparent",
+            border: "none",
+            color: "rgba(255,255,255,0.86)",
+            fontFamily: "DM Sans, sans-serif",
+            fontWeight: 600,
+            fontSize: 15,
+            cursor: "pointer",
+            padding: 6,
+          }}
+        >
+          Cancel
+        </button>
+        <button
+          type="button"
+          onClick={handleSave}
+          style={{
+            padding: "8px 18px",
+            borderRadius: 999,
+            border: "none",
+            background: "#FF5C35",
+            color: "#fff",
+            fontFamily: "DM Sans, sans-serif",
+            fontSize: 14,
+            fontWeight: 800,
+            cursor: "pointer",
+          }}
+        >
+          Done
+        </button>
+      </div>
+
+      {/* Text input — large, centered, full of vibes */}
+      <textarea
+        ref={inputRef}
+        value={text}
+        onChange={(e) => setText(e.target.value)}
+        placeholder="Type something…"
+        rows={4}
+        style={{
+          flex: 1,
+          margin: "8px 22px",
+          padding: 0,
+          background: "transparent",
+          border: "none",
+          outline: "none",
+          color,
+          fontFamily: "DM Sans, sans-serif",
+          fontWeight: 800,
+          fontSize: 26,
+          lineHeight: 1.25,
+          textAlign: "center",
+          textShadow: "0 1px 3px rgba(0,0,0,0.5)",
+          resize: "none",
+          caretColor: "#FF5C35",
+        }}
+      />
+
+      {/* Color row */}
+      <div
+        style={{
+          display: "flex",
+          gap: 14,
+          justifyContent: "center",
+          padding: "14px 22px 18px",
+        }}
+      >
+        {TEXT_COLORS.map((c) => {
+          const active = c === color;
+          return (
+            <button
+              key={c}
+              type="button"
+              aria-label={`Color ${c}`}
+              onClick={() => setColor(c)}
+              style={{
+                width: 28,
+                height: 28,
+                borderRadius: "50%",
+                border: active
+                  ? "2.5px solid #fff"
+                  : "1.5px solid rgba(255,255,255,0.42)",
+                boxShadow: active ? "0 0 0 1px rgba(0,0,0,0.45)" : undefined,
+                background: c,
+                cursor: "pointer",
+                padding: 0,
+              }}
+            />
+          );
+        })}
+      </div>
+
+      {/* Delete button (edit mode only) */}
+      {onDelete ? (
+        <div
+          style={{
+            display: "flex",
+            justifyContent: "center",
+            paddingBottom: 16,
+          }}
+        >
+          <button
+            type="button"
+            onClick={onDelete}
+            style={{
+              padding: "8px 18px",
+              borderRadius: 999,
+              border: "1px solid rgba(255,90,90,0.6)",
+              background: "rgba(255,90,90,0.18)",
+              color: "#FFB4B4",
+              fontFamily: "DM Sans, sans-serif",
+              fontWeight: 700,
+              fontSize: 13,
+              cursor: "pointer",
+            }}
+          >
+            Delete
+          </button>
+        </div>
+      ) : null}
+    </div>
+  );
+}
+
 /** Cover-fit drawImage from a live <video> onto our 9:16 record canvas.
  *  The canvas is the recording's true source of truth (MediaRecorder
  *  reads from canvas.captureStream() — see startRecording below), so
@@ -187,6 +386,9 @@ export function ClipComposerMobile({ onClose, onPosted, origin }: Props) {
   const recordingStreamRef = useRef<MediaStream | null>(null);
   // Trim scrubber bar — used to compute pct from pointer X.
   const trimBarRef = useRef<HTMLDivElement | null>(null);
+  // Drag state for text overlays. Threshold-based: <5px movement is a
+  // tap (opens editor); ≥5px is a drag (updates x/y in real time).
+  const overlayDragRef = useRef<{ id: string; startX: number; startY: number; dragged: boolean } | null>(null);
   // Last tap timestamp on the camera preview — second tap within 350ms
   // counts as a double-tap and flips the camera (TikTok pattern).
   const lastCameraTapRef = useRef(0);
@@ -1533,6 +1735,103 @@ export function ClipComposerMobile({ onClose, onPosted, origin }: Props) {
           filter: filterPreset ? FILTER_CSS[filterPreset] : undefined,
         }}
       />
+
+      {/* Text overlays — positioned in %-coords inside the 9:16
+          playback box. Tap to open the editor; drag (>5px) to
+          reposition. Pointer capture keeps the move events glued to
+          this element even when the finger slides off it. */}
+      {textOverlays.map((o) => (
+        <div
+          key={o.id}
+          role="button"
+          aria-label={`Edit overlay: ${o.text}`}
+          onPointerDown={(e) => {
+            e.currentTarget.setPointerCapture(e.pointerId);
+            overlayDragRef.current = {
+              id: o.id,
+              startX: e.clientX,
+              startY: e.clientY,
+              dragged: false,
+            };
+          }}
+          onPointerMove={(e) => {
+            const drag = overlayDragRef.current;
+            if (!drag || drag.id !== o.id) return;
+            const dx = e.clientX - drag.startX;
+            const dy = e.clientY - drag.startY;
+            if (!drag.dragged && Math.hypot(dx, dy) > 5) {
+              drag.dragged = true;
+            }
+            if (!drag.dragged) return;
+            const rect = playbackVideoRef.current?.getBoundingClientRect();
+            if (!rect) return;
+            const pctX = ((e.clientX - rect.left) / rect.width) * 100;
+            const pctY = ((e.clientY - rect.top) / rect.height) * 100;
+            const x = Math.max(2, Math.min(98, pctX));
+            const y = Math.max(2, Math.min(98, pctY));
+            setTextOverlays((prev) =>
+              prev.map((p) => (p.id === o.id ? { ...p, x, y } : p)),
+            );
+          }}
+          onPointerUp={(e) => {
+            e.currentTarget.releasePointerCapture(e.pointerId);
+            const drag = overlayDragRef.current;
+            overlayDragRef.current = null;
+            if (drag && drag.id === o.id && !drag.dragged) {
+              setEditingOverlay(o);
+            }
+          }}
+          style={{
+            position: "absolute",
+            left: `${o.x}%`,
+            top: `${o.y}%`,
+            transform: "translate(-50%, -50%)",
+            color: o.color,
+            fontFamily: "DM Sans, sans-serif",
+            fontWeight: 800,
+            fontSize: 22,
+            lineHeight: 1.2,
+            textAlign: "center",
+            textShadow: "0 1px 3px rgba(0,0,0,0.55), 0 0 1px rgba(0,0,0,0.35)",
+            maxWidth: "82%",
+            whiteSpace: "pre-wrap",
+            wordBreak: "break-word",
+            cursor: "grab",
+            touchAction: "none",
+            userSelect: "none",
+            padding: "2px 4px",
+          }}
+        >
+          {o.text}
+        </div>
+      ))}
+
+      {/* Text overlay editor modal — shown when editingOverlay !== undefined.
+          null means "drafting a new one", a TextOverlay means "editing it". */}
+      {editingOverlay !== undefined ? (
+        <TextOverlayEditor
+          initial={editingOverlay}
+          onSave={(o) => {
+            setTextOverlays((prev) => {
+              const exists = prev.some((p) => p.id === o.id);
+              return exists
+                ? prev.map((p) => (p.id === o.id ? o : p))
+                : [...prev, o];
+            });
+            setEditingOverlay(undefined);
+          }}
+          onDelete={
+            editingOverlay !== null
+              ? () => {
+                  const id = editingOverlay.id;
+                  setTextOverlays((prev) => prev.filter((p) => p.id !== id));
+                  setEditingOverlay(undefined);
+                }
+              : undefined
+          }
+          onCancel={() => setEditingOverlay(undefined)}
+        />
+      ) : null}
 
       {/* Trim scrubber — bar + two draggable thumbs + time labels.
           Shown when the Trim tool is active. Minimum 0.5s between
