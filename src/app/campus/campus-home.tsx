@@ -138,6 +138,7 @@ function colorForOrg(id: string): string {
   return ORG_PALETTE[hash % ORG_PALETTE.length];
 }
 
+
 function initialsForOrg(name: string): string {
   return name
     .split(/\s+/)
@@ -7462,10 +7463,14 @@ function EventCard({ ev, onMutate }: { ev: CampusEvent; onMutate: () => void }) 
     }
   };
 
+  // Spotlight tint follows the org accent so each event card glows
+  // in its own color.
+  const spotlightColor = hexToRgba(accent, 0.22);
+
   return (
     <MouseSpotlight
-      size={220}
-      color="rgba(255, 92, 53, 0.14)"
+      size={240}
+      color={spotlightColor}
       style={{
         ...DARK_GLASS_SURFACE,
         borderRadius: 18,

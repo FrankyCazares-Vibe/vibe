@@ -22,8 +22,9 @@ export function MouseSpotlight({
   size = 220,
   color = "rgba(255, 92, 53, 0.16)",
   /** Max rotation in degrees in either axis. 0 disables tilt entirely.
-   *  Defaults to a tame 2.5° — noticeable but not dramatic. */
-  tilt = 2.5,
+   *  Defaults to 5° — visible but well short of GlareCard's old ~14°.
+   *  Tune per-surface via `tilt={n}` on the call site. */
+  tilt = 5,
   className,
   style,
 }: {
@@ -38,6 +39,10 @@ export function MouseSpotlight({
   const tiltLayerRef = useRef<HTMLDivElement>(null);
   const [active, setActive] = useState(false);
 
+  // The visual `style` (background, border, radius) is applied to the
+  // INNER tilt layer so the whole card surface — bg, borders, content —
+  // rotates together. The outer wrapper is invisible chrome that only
+  // tracks the pointer and provides perspective.
   return (
     <div
       ref={ref}
@@ -47,16 +52,18 @@ export function MouseSpotlight({
         const rect = el.getBoundingClientRect();
         const x = e.clientX - rect.left;
         const y = e.clientY - rect.top;
-        el.style.setProperty("--mx", `${x}px`);
-        el.style.setProperty("--my", `${y}px`);
-        // Tilt math: % offset from center → degrees, capped by `tilt`.
-        if (tilt > 0 && tiltLayerRef.current) {
-          const px = (x / rect.width - 0.5) * 2; // -1 .. 1
-          const py = (y / rect.height - 0.5) * 2;
-          const rotY = px * tilt;
-          const rotX = -py * tilt;
-          tiltLayerRef.current.style.transform =
-            `perspective(900px) rotateX(${rotX}deg) rotateY(${rotY}deg)`;
+        const inner = tiltLayerRef.current;
+        if (inner) {
+          inner.style.setProperty("--mx", `${x}px`);
+          inner.style.setProperty("--my", `${y}px`);
+          if (tilt > 0) {
+            const px = (x / rect.width - 0.5) * 2; // -1 .. 1
+            const py = (y / rect.height - 0.5) * 2;
+            const rotY = px * tilt;
+            const rotX = -py * tilt;
+            inner.style.transform =
+              `rotateX(${rotX}deg) rotateY(${rotY}deg)`;
+          }
         }
       }}
       onPointerEnter={() => setActive(true)}
@@ -64,22 +71,31 @@ export function MouseSpotlight({
         setActive(false);
         if (tiltLayerRef.current) {
           tiltLayerRef.current.style.transform =
-            `perspective(900px) rotateX(0deg) rotateY(0deg)`;
+            "rotateX(0deg) rotateY(0deg)";
         }
       }}
       className={className}
-      style={{ position: "relative", overflow: "visible", ...style }}
+      style={{
+        position: "relative",
+        perspective: "900px",
+        // Outer holds NO visual styles — kept invisible. style.height/
+        // width still propagate so callers can size the wrapper.
+        width: style?.width,
+        height: style?.height,
+      }}
     >
       <div
         ref={tiltLayerRef}
         style={{
           position: "relative",
+          transform: "rotateX(0deg) rotateY(0deg)",
           transformStyle: "preserve-3d",
-          transform: "perspective(900px) rotateX(0deg) rotateY(0deg)",
-          transition: "transform 320ms cubic-bezier(0.2, 0.8, 0.2, 1)",
+          transition: "transform 380ms cubic-bezier(0.2, 0.8, 0.2, 1)",
           willChange: "transform",
-          borderRadius: "inherit",
           overflow: "hidden",
+          // Forwarded visual styles end up here so the bg / border / radius
+          // rotate WITH the content. Width/height pulled out above.
+          ...style,
         }}
       >
         <span
