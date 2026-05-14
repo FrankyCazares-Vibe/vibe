@@ -3,6 +3,7 @@
 import Link from "next/link";
 import { useSearchParams } from "next/navigation";
 import { useCallback, useEffect, useRef, useState } from "react";
+import { Drawer } from "vaul";
 
 import {
   type CampusEvent,
@@ -81,8 +82,13 @@ export function CampusMobile() {
   // pre-fetched threads list yet.
   const searchParams = useSearchParams();
   const initialChannelId = searchParams.get("channel") || null;
-  const [openChannelId, setOpenChannelId] = useState<string | null>(
-    initialChannelId,
+  // Discord-style drill-down state: tapping an org opens its channels
+  // drawer, tapping a channel inside that drawer opens the conversation.
+  // openChannel carries the channel info so ConversationView's top bar
+  // can show #channel-name even if the thread isn't in the cached list.
+  const [selectedOrgForChat, setSelectedOrgForChat] = useState<JoinedOrg | null>(null);
+  const [openChannel, setOpenChannel] = useState<OpenChannel | null>(
+    initialChannelId ? { id: initialChannelId, name: null, orgName: null, orgLogo: null } : null,
   );
   useEffect(() => {
     if (initialChannelId) setTab("chat");
@@ -256,7 +262,7 @@ export function CampusMobile() {
           <OrgsPane orgs={orgs} />
         </section>
         <section style={paneStyle}>
-          <ChatPane onOpenChannel={(id) => setOpenChannelId(id)} />
+          <ChatPane onSelectOrg={(o) => setSelectedOrgForChat(o)} />
         </section>
         <section style={mapPaneStyle}>
           <MapPane />
@@ -302,15 +308,26 @@ export function CampusMobile() {
         <CampusSearchOverlay onClose={() => setSearchOpen(false)} />
       ) : null}
 
-      {/* Channel conversation — opens when arriving via
-          /campus?tab=chat&channel=<id> from the org Channels list.
-          Reuses MessagesMobile's ConversationView so the chat UX,
-          send flow, and 3-dot menu all behave identically. */}
-      {openChannelId ? (
+      {/* Org channels drawer — Discord-style. Swipes in when an org
+          is tapped on the Chat tab. Holds the channel list + back +
+          search; tapping a channel mounts ConversationView below. */}
+      {selectedOrgForChat ? (
+        <OrgChannelsDrawer
+          org={selectedOrgForChat}
+          onClose={() => setSelectedOrgForChat(null)}
+          onOpenChannel={(c) => setOpenChannel(c)}
+        />
+      ) : null}
+
+      {/* Channel conversation — opens from the channels drawer OR from
+          a /campus?tab=chat&channel=<id> deep link. Reuses
+          MessagesMobile's ConversationView so the chat UX, send flow,
+          and 3-dot menu all behave identically. */}
+      {openChannel ? (
         <ConversationView
-          threadId={openChannelId}
-          thread={null}
-          onClose={() => setOpenChannelId(null)}
+          threadId={openChannel.id}
+          thread={synthesizeChannelThread(openChannel)}
+          onClose={() => setOpenChannel(null)}
         />
       ) : null}
 
@@ -735,15 +752,18 @@ function ClipsPane({ posts }: { posts: FeedPost[] | null }) {
 
 // ---------- Chat pane ----------
 
+// Discord-style: Chat tab shows a dark surface listing the user's
+// joined orgs (each as a server-card). Tap an org → channels drawer
+// slides in from the right (own component below). Tap a channel in
+// the drawer → ConversationView slides in over it.
 function ChatPane({
-  onOpenChannel,
+  onSelectOrg,
 }: {
-  onOpenChannel: (channelId: string) => void;
+  onSelectOrg: (org: JoinedOrg) => void;
 }) {
   const [joinedOrgs, setJoinedOrgs] = useState<JoinedOrg[] | null>(null);
-  const [channelsByOrg, setChannelsByOrg] = useState<Record<string, ChannelRow[]>>({});
+  const [query, setQuery] = useState("");
 
-  // Load joined orgs (filter=mine includes role).
   useEffect(() => {
     let cancelled = false;
     (async () => {
@@ -763,60 +783,226 @@ function ChatPane({
     };
   }, []);
 
-  // Once joined orgs load, fetch each org's channels in parallel. RLS
-  // filters out private channels the viewer doesn't have access to,
-  // so the rendered list matches what they can chat in.
-  useEffect(() => {
-    if (!joinedOrgs || joinedOrgs.length === 0) return;
-    let cancelled = false;
-    Promise.all(
-      joinedOrgs.map(async (o) => {
-        try {
-          const r = await fetch(
-            `/api/orgs/${encodeURIComponent(o.handle)}/channels`,
-            { cache: "no-store" },
-          );
-          const j = await r.json();
-          if (j?.ok && Array.isArray(j.channels)) {
-            return [o.id, j.channels as ChannelRow[]] as const;
-          }
-        } catch {
-          /* keep org out of the map on failure */
-        }
-        return [o.id, [] as ChannelRow[]] as const;
-      }),
-    ).then((pairs) => {
-      if (cancelled) return;
-      const next: Record<string, ChannelRow[]> = {};
-      for (const [id, list] of pairs) next[id] = list;
-      setChannelsByOrg(next);
-    });
-    return () => {
-      cancelled = true;
-    };
-  }, [joinedOrgs]);
-
-  if (joinedOrgs === null) return <PaneSkeleton />;
-  if (joinedOrgs.length === 0) {
-    return (
-      <EmptyTab
-        title="No org chats yet"
-        body="Join an org to access its channels. Direct messages live under the Messages tab."
-      />
-    );
-  }
+  const filtered = (joinedOrgs ?? []).filter((o) =>
+    query.trim()
+      ? o.name.toLowerCase().includes(query.trim().toLowerCase()) ||
+        o.handle.toLowerCase().includes(query.trim().toLowerCase())
+      : true,
+  );
 
   return (
-    <>
-      {joinedOrgs.map((org) => (
-        <OrgChannelsCard
-          key={org.id}
-          org={org}
-          channels={channelsByOrg[org.id]}
-          onOpenChannel={onOpenChannel}
+    <div
+      style={{
+        // Dark Discord-like surface that "persists" through the chat
+        // navigation stack. The campus shell behind stays cream; this
+        // pane covers it for the Chat tab.
+        background:
+          "linear-gradient(180deg, #1A1B1F 0%, #16171B 100%)",
+        margin: "-12px -16px 0",
+        padding: "14px 14px 32px",
+        minHeight: "calc(100dvh - 220px)",
+        color: "#E7E7EA",
+        borderTopLeftRadius: 12,
+        borderTopRightRadius: 12,
+      }}
+    >
+      <div
+        style={{
+          display: "flex",
+          alignItems: "center",
+          justifyContent: "space-between",
+          gap: 8,
+          marginBottom: 10,
+        }}
+      >
+        <span
+          style={{
+            fontFamily: "Fraunces, serif",
+            fontSize: 18,
+            fontWeight: 800,
+            letterSpacing: "-0.2px",
+            color: "#fff",
+          }}
+        >
+          Servers
+        </span>
+      </div>
+
+      <div style={{ position: "relative", marginBottom: 12 }}>
+        <span
+          aria-hidden
+          style={{
+            position: "absolute",
+            left: 12,
+            top: "50%",
+            transform: "translateY(-50%)",
+            color: "rgba(255,255,255,0.42)",
+            display: "inline-flex",
+          }}
+        >
+          <svg width="14" height="14" viewBox="0 0 14 14" fill="none">
+            <circle cx="6" cy="6" r="4.2" stroke="currentColor" strokeWidth="1.4" />
+            <path d="M9.5 9.5l3 3" stroke="currentColor" strokeWidth="1.4" strokeLinecap="round" />
+          </svg>
+        </span>
+        <input
+          value={query}
+          onChange={(e) => setQuery(e.target.value)}
+          type="search"
+          placeholder="Search servers"
+          style={{
+            width: "100%",
+            padding: "9px 12px 9px 34px",
+            borderRadius: 10,
+            border: "1px solid rgba(255,255,255,0.10)",
+            background: "rgba(255,255,255,0.06)",
+            color: "#fff",
+            fontSize: 14,
+            outline: "none",
+            fontFamily: "DM Sans, sans-serif",
+          }}
+        />
+      </div>
+
+      {joinedOrgs === null ? (
+        <ChatDarkSkeleton />
+      ) : filtered.length === 0 ? (
+        <div
+          style={{
+            padding: "48px 18px",
+            textAlign: "center",
+            color: "rgba(255,255,255,0.62)",
+            fontFamily: "DM Sans, sans-serif",
+            fontSize: 13.5,
+            lineHeight: 1.55,
+          }}
+        >
+          {query.trim() ? (
+            <>No servers match &ldquo;{query}&rdquo;.</>
+          ) : (
+            <>
+              No org chats yet. Join an org to get its channels.
+            </>
+          )}
+        </div>
+      ) : (
+        <ul
+          style={{
+            listStyle: "none",
+            margin: 0,
+            padding: 0,
+            display: "flex",
+            flexDirection: "column",
+            gap: 6,
+          }}
+        >
+          {filtered.map((org) => (
+            <li key={org.id}>
+              <button
+                type="button"
+                onClick={() => onSelectOrg(org)}
+                style={{
+                  width: "100%",
+                  display: "flex",
+                  alignItems: "center",
+                  gap: 12,
+                  padding: 12,
+                  borderRadius: 14,
+                  border: "1px solid rgba(255,255,255,0.06)",
+                  background: "rgba(255,255,255,0.04)",
+                  textAlign: "left",
+                  cursor: "pointer",
+                  WebkitTapHighlightColor: "transparent",
+                  color: "inherit",
+                }}
+              >
+                <div
+                  style={{
+                    width: 46,
+                    height: 46,
+                    borderRadius: 14,
+                    background: org.logo_url
+                      ? `url(${org.logo_url}) center/cover`
+                      : "linear-gradient(135deg,#5865F2 0%,#7B5FE0 100%)",
+                    border: "1px solid rgba(255,255,255,0.10)",
+                    display: "inline-flex",
+                    alignItems: "center",
+                    justifyContent: "center",
+                    color: "#fff",
+                    fontFamily: "Fraunces, serif",
+                    fontWeight: 800,
+                    fontSize: 16,
+                    flexShrink: 0,
+                  }}
+                >
+                  {!org.logo_url
+                    ? org.name
+                        .split(/\s+/)
+                        .slice(0, 2)
+                        .map((p) => p[0]?.toUpperCase() ?? "")
+                        .join("")
+                    : null}
+                </div>
+                <div style={{ flex: 1, minWidth: 0 }}>
+                  <div
+                    style={{
+                      fontFamily: "Fraunces, serif",
+                      fontSize: 15.5,
+                      fontWeight: 800,
+                      color: "#fff",
+                      whiteSpace: "nowrap",
+                      overflow: "hidden",
+                      textOverflow: "ellipsis",
+                    }}
+                  >
+                    {org.name}
+                  </div>
+                  <div
+                    style={{
+                      marginTop: 2,
+                      fontFamily: "DM Sans, sans-serif",
+                      fontSize: 12,
+                      color: "rgba(255,255,255,0.55)",
+                      fontWeight: 600,
+                    }}
+                  >
+                    @{org.handle}
+                  </div>
+                </div>
+                <span
+                  aria-hidden
+                  style={{
+                    color: "rgba(255,255,255,0.45)",
+                    fontSize: 18,
+                    flexShrink: 0,
+                  }}
+                >
+                  ›
+                </span>
+              </button>
+            </li>
+          ))}
+        </ul>
+      )}
+    </div>
+  );
+}
+
+function ChatDarkSkeleton() {
+  return (
+    <div style={{ display: "flex", flexDirection: "column", gap: 6 }}>
+      {[0, 1, 2].map((i) => (
+        <div
+          key={i}
+          style={{
+            height: 70,
+            borderRadius: 14,
+            background: "rgba(255,255,255,0.04)",
+            border: "1px solid rgba(255,255,255,0.06)",
+          }}
         />
       ))}
-    </>
+    </div>
   );
 }
 
@@ -838,234 +1024,505 @@ type ChannelRow = {
   position: number | null;
 };
 
-function OrgChannelsCard({
+/** Info passed from the channels drawer up to the parent so the
+ *  ConversationView's top bar can render #name without a separate
+ *  fetch. The channel id alone is enough to load messages — the
+ *  rest is for chrome. */
+type OpenChannel = {
+  id: string;
+  name: string | null;
+  orgName: string | null;
+  orgLogo: string | null;
+};
+
+/** Build a ThreadEntry-shaped object so ConversationView's top bar
+ *  can show #channel-name + org logo, even for channels not yet in
+ *  the user's pre-fetched threads list. */
+function synthesizeChannelThread(c: OpenChannel) {
+  if (!c.name) return null;
+  return {
+    id: c.id,
+    type: "group" as const,
+    name: `# ${c.name}`,
+    photo_url: c.orgLogo,
+    peer: null,
+    members: [],
+    last_message: null,
+    last_read_at: null,
+    accepted_at: new Date().toISOString(),
+  } as Parameters<typeof ConversationView>[0]["thread"];
+}
+
+function sortChannels(a: ChannelRow, b: ChannelRow): number {
+  if (!!b.pinned !== !!a.pinned) return Number(!!b.pinned) - Number(!!a.pinned);
+  const ap = a.position ?? 1000;
+  const bp = b.position ?? 1000;
+  if (ap !== bp) return ap - bp;
+  return a.name.localeCompare(b.name);
+}
+
+/** Discord-style channels drawer. Slides in from the right when an
+ *  org is tapped on the Chat tab. Dark themed. Top bar has back +
+ *  org name + search + settings. List shows channels grouped by
+ *  Public / Private. Tap a channel → opens ConversationView via the
+ *  parent's onOpenChannel callback. */
+function OrgChannelsDrawer({
   org,
-  channels,
+  onClose,
   onOpenChannel,
 }: {
   org: JoinedOrg;
-  channels: ChannelRow[] | undefined;
-  onOpenChannel: (channelId: string) => void;
+  onClose: () => void;
+  onOpenChannel: (c: OpenChannel) => void;
 }) {
-  const sorted = (channels ?? []).slice().sort((a, b) => {
-    if (!!b.pinned !== !!a.pinned) return Number(!!b.pinned) - Number(!!a.pinned);
-    const ap = a.position ?? 1000;
-    const bp = b.position ?? 1000;
-    if (ap !== bp) return ap - bp;
-    return a.name.localeCompare(b.name);
-  });
+  const [channels, setChannels] = useState<ChannelRow[] | null>(null);
+  const [query, setQuery] = useState("");
+
+  useEffect(() => {
+    let cancelled = false;
+    (async () => {
+      try {
+        const r = await fetch(
+          `/api/orgs/${encodeURIComponent(org.handle)}/channels`,
+          { cache: "no-store" },
+        );
+        const j = await r.json();
+        if (cancelled) return;
+        setChannels(
+          j?.ok && Array.isArray(j.channels) ? (j.channels as ChannelRow[]) : [],
+        );
+      } catch {
+        if (!cancelled) setChannels([]);
+      }
+    })();
+    return () => {
+      cancelled = true;
+    };
+  }, [org.handle]);
+
+  const all = (channels ?? []).filter((c) =>
+    query.trim()
+      ? c.name.toLowerCase().includes(query.trim().toLowerCase())
+      : true,
+  );
+  const publicChannels = all.filter((c) => !c.is_private).sort(sortChannels);
+  const privateChannels = all.filter((c) => c.is_private).sort(sortChannels);
 
   return (
-    <section
+    <Drawer.Root open direction="right" onOpenChange={(o) => { if (!o) onClose(); }}>
+      <Drawer.Portal>
+        <Drawer.Overlay
+          style={{
+            position: "fixed",
+            inset: 0,
+            background: "rgba(0,0,0,0.55)",
+            zIndex: 1200,
+          }}
+        />
+        <Drawer.Content
+          style={{
+            position: "fixed",
+            top: 0,
+            right: 0,
+            bottom: 0,
+            width: "100%",
+            background: "linear-gradient(180deg, #1A1B1F 0%, #16171B 100%)",
+            color: "#E7E7EA",
+            zIndex: 1201,
+            outline: "none",
+            display: "flex",
+            flexDirection: "column",
+          }}
+          aria-describedby={undefined}
+        >
+          <Drawer.Title
+            style={{
+              position: "absolute",
+              width: 1,
+              height: 1,
+              padding: 0,
+              margin: -1,
+              overflow: "hidden",
+              clip: "rect(0,0,0,0)",
+              whiteSpace: "nowrap",
+              border: 0,
+            }}
+          >
+            {org.name} channels
+          </Drawer.Title>
+
+          {/* Top bar */}
+          <header
+            style={{
+              display: "flex",
+              alignItems: "center",
+              gap: 10,
+              padding:
+                "calc(env(safe-area-inset-top, 0px) + 10px) 12px 10px",
+              background: "rgba(255,255,255,0.04)",
+              borderBottom: "1px solid rgba(255,255,255,0.06)",
+              flexShrink: 0,
+            }}
+          >
+            <button
+              type="button"
+              onClick={onClose}
+              aria-label="Back"
+              style={{
+                width: 38,
+                height: 38,
+                borderRadius: 999,
+                border: "none",
+                background: "transparent",
+                color: "#E7E7EA",
+                cursor: "pointer",
+                display: "inline-flex",
+                alignItems: "center",
+                justifyContent: "center",
+                WebkitTapHighlightColor: "transparent",
+              }}
+            >
+              <svg width="22" height="22" viewBox="0 0 22 22" fill="none" aria-hidden>
+                <path
+                  d="M14 4L7 11l7 7"
+                  stroke="currentColor"
+                  strokeWidth="2"
+                  strokeLinecap="round"
+                  strokeLinejoin="round"
+                />
+              </svg>
+            </button>
+            <div
+              style={{
+                width: 32,
+                height: 32,
+                borderRadius: 10,
+                background: org.logo_url
+                  ? `url(${org.logo_url}) center/cover`
+                  : "linear-gradient(135deg,#5865F2 0%,#7B5FE0 100%)",
+                border: "1px solid rgba(255,255,255,0.10)",
+                flexShrink: 0,
+                display: "inline-flex",
+                alignItems: "center",
+                justifyContent: "center",
+                color: "#fff",
+                fontFamily: "Fraunces, serif",
+                fontWeight: 800,
+                fontSize: 12,
+              }}
+            >
+              {!org.logo_url
+                ? org.name.split(/\s+/).slice(0, 2).map((p) => p[0]?.toUpperCase() ?? "").join("")
+                : null}
+            </div>
+            <div style={{ flex: 1, minWidth: 0 }}>
+              <Link
+                href={`/orgs/${encodeURIComponent(org.handle)}`}
+                style={{
+                  fontFamily: "Fraunces, serif",
+                  fontSize: 16,
+                  fontWeight: 800,
+                  color: "#fff",
+                  textDecoration: "none",
+                  whiteSpace: "nowrap",
+                  overflow: "hidden",
+                  textOverflow: "ellipsis",
+                  display: "block",
+                }}
+              >
+                {org.name}
+              </Link>
+              <div
+                style={{
+                  fontFamily: "DM Sans, sans-serif",
+                  fontSize: 11.5,
+                  color: "rgba(255,255,255,0.55)",
+                  fontWeight: 600,
+                }}
+              >
+                @{org.handle}
+              </div>
+            </div>
+            <button
+              type="button"
+              aria-label="Org settings"
+              title="Org settings (coming soon)"
+              style={chatChromeBtnStyle}
+            >
+              <svg width="18" height="18" viewBox="0 0 18 18" fill="none" aria-hidden>
+                <circle cx="9" cy="9" r="2" stroke="currentColor" strokeWidth="1.5" />
+                <path
+                  d="M9 1.5v2M9 14.5v2M16.5 9h-2M3.5 9h-2M14.3 3.7l-1.4 1.4M5.1 12.9l-1.4 1.4M14.3 14.3l-1.4-1.4M5.1 5.1L3.7 3.7"
+                  stroke="currentColor"
+                  strokeWidth="1.5"
+                  strokeLinecap="round"
+                />
+              </svg>
+            </button>
+          </header>
+
+          {/* Search */}
+          <div
+            style={{
+              padding: "10px 14px 6px",
+              flexShrink: 0,
+            }}
+          >
+            <div style={{ position: "relative" }}>
+              <span
+                aria-hidden
+                style={{
+                  position: "absolute",
+                  left: 12,
+                  top: "50%",
+                  transform: "translateY(-50%)",
+                  color: "rgba(255,255,255,0.42)",
+                  display: "inline-flex",
+                }}
+              >
+                <svg width="14" height="14" viewBox="0 0 14 14" fill="none">
+                  <circle cx="6" cy="6" r="4.2" stroke="currentColor" strokeWidth="1.4" />
+                  <path d="M9.5 9.5l3 3" stroke="currentColor" strokeWidth="1.4" strokeLinecap="round" />
+                </svg>
+              </span>
+              <input
+                value={query}
+                onChange={(e) => setQuery(e.target.value)}
+                type="search"
+                placeholder="Search channels"
+                style={{
+                  width: "100%",
+                  padding: "8px 12px 8px 34px",
+                  borderRadius: 10,
+                  border: "1px solid rgba(255,255,255,0.10)",
+                  background: "rgba(255,255,255,0.06)",
+                  color: "#fff",
+                  fontSize: 14,
+                  outline: "none",
+                  fontFamily: "DM Sans, sans-serif",
+                }}
+              />
+            </div>
+          </div>
+
+          {/* Channel list */}
+          <div
+            style={{
+              flex: 1,
+              overflowY: "auto",
+              WebkitOverflowScrolling: "touch",
+              padding: "6px 14px 24px",
+            }}
+          >
+            {channels === null ? (
+              <ChatDarkSkeleton />
+            ) : all.length === 0 ? (
+              <div
+                style={{
+                  padding: "36px 18px",
+                  textAlign: "center",
+                  color: "rgba(255,255,255,0.6)",
+                  fontFamily: "DM Sans, sans-serif",
+                  fontSize: 13,
+                  lineHeight: 1.55,
+                }}
+              >
+                {query.trim()
+                  ? `No channels match "${query}"`
+                  : "No channels yet"}
+              </div>
+            ) : (
+              <>
+                {publicChannels.length > 0 ? (
+                  <ChannelGroupHeader label="Text channels" />
+                ) : null}
+                {publicChannels.map((c) => (
+                  <DarkChannelRow
+                    key={c.id}
+                    channel={c}
+                    onTap={() =>
+                      onOpenChannel({
+                        id: c.id,
+                        name: c.name,
+                        orgName: org.name,
+                        orgLogo: org.logo_url,
+                      })
+                    }
+                  />
+                ))}
+                {privateChannels.length > 0 ? (
+                  <>
+                    <div style={{ height: 10 }} />
+                    <ChannelGroupHeader label="Private" />
+                  </>
+                ) : null}
+                {privateChannels.map((c) => (
+                  <DarkChannelRow
+                    key={c.id}
+                    channel={c}
+                    onTap={() =>
+                      onOpenChannel({
+                        id: c.id,
+                        name: c.name,
+                        orgName: org.name,
+                        orgLogo: org.logo_url,
+                      })
+                    }
+                  />
+                ))}
+              </>
+            )}
+          </div>
+        </Drawer.Content>
+      </Drawer.Portal>
+    </Drawer.Root>
+  );
+}
+
+function ChannelGroupHeader({ label }: { label: string }) {
+  return (
+    <div
       style={{
-        background: "rgba(255,253,248,0.78)",
-        border: "1px solid rgba(255,255,255,0.7)",
-        borderRadius: 18,
-        padding: 12,
-        boxShadow: "inset 0 1px 0 rgba(255,255,255,0.85), 0 4px 14px rgba(180,120,60,0.08)",
+        padding: "6px 8px 6px",
+        fontFamily: "DM Sans, sans-serif",
+        fontSize: 10.5,
+        fontWeight: 800,
+        letterSpacing: "0.10em",
+        textTransform: "uppercase",
+        color: "rgba(255,255,255,0.46)",
       }}
     >
-      <header
+      {label}
+    </div>
+  );
+}
+
+function DarkChannelRow({
+  channel,
+  onTap,
+}: {
+  channel: ChannelRow;
+  onTap: () => void;
+}) {
+  return (
+    <button
+      type="button"
+      onClick={onTap}
+      style={{
+        width: "100%",
+        display: "flex",
+        alignItems: "center",
+        gap: 10,
+        padding: "9px 10px",
+        borderRadius: 10,
+        border: "1px solid rgba(255,255,255,0.04)",
+        background: "rgba(255,255,255,0.03)",
+        textAlign: "left",
+        cursor: "pointer",
+        WebkitTapHighlightColor: "transparent",
+        color: "inherit",
+        marginBottom: 4,
+      }}
+    >
+      <span
+        aria-hidden
         style={{
-          display: "flex",
+          width: 22,
+          height: 22,
+          display: "inline-flex",
           alignItems: "center",
-          gap: 10,
-          padding: "2px 4px 8px",
+          justifyContent: "center",
+          color: channel.is_private
+            ? "rgba(198,176,255,0.85)"
+            : "rgba(255,255,255,0.55)",
+          fontFamily: "DM Sans, sans-serif",
+          fontWeight: 800,
+          fontSize: 14,
+          flexShrink: 0,
         }}
       >
+        {channel.is_private ? (
+          <svg width="14" height="14" viewBox="0 0 12 12" fill="none" aria-hidden>
+            <rect x="2.5" y="5" width="7" height="5" rx="1" stroke="currentColor" strokeWidth="1.2" fill="none" />
+            <path d="M4 5V3.6a2 2 0 1 1 4 0V5" stroke="currentColor" strokeWidth="1.2" fill="none" strokeLinecap="round" />
+          </svg>
+        ) : (
+          "#"
+        )}
+      </span>
+      <div style={{ flex: 1, minWidth: 0 }}>
         <div
           style={{
-            width: 36,
-            height: 36,
-            borderRadius: 10,
-            background: org.logo_url
-              ? `url(${org.logo_url}) center/cover`
-              : "linear-gradient(135deg,#FFD3C2 0%,#FF9D7E 100%)",
-            border: "1px solid rgba(255,255,255,0.6)",
-            display: "inline-flex",
+            display: "flex",
             alignItems: "center",
-            justifyContent: "center",
-            color: "#1C1C1E",
-            fontFamily: "Fraunces, serif",
-            fontWeight: 800,
-            fontSize: 13,
-            flexShrink: 0,
+            gap: 6,
+            fontFamily: "DM Sans, sans-serif",
+            fontSize: 14,
+            fontWeight: 600,
+            color: "#fff",
           }}
         >
-          {!org.logo_url
-            ? org.name
-                .split(/\s+/)
-                .slice(0, 2)
-                .map((p) => p[0]?.toUpperCase() ?? "")
-                .join("")
-            : null}
-        </div>
-        <div style={{ flex: 1, minWidth: 0 }}>
-          <Link
-            href={`/orgs/${encodeURIComponent(org.handle)}`}
+          <span
             style={{
-              fontFamily: "Fraunces, serif",
-              fontSize: 15,
-              fontWeight: 800,
-              color: "#1C1C1E",
-              textDecoration: "none",
-              display: "block",
               whiteSpace: "nowrap",
               overflow: "hidden",
               textOverflow: "ellipsis",
             }}
           >
-            {org.name}
-          </Link>
+            {channel.name}
+          </span>
+          {channel.pinned ? (
+            <span
+              aria-label="Pinned"
+              style={{
+                fontSize: 9,
+                fontWeight: 800,
+                letterSpacing: "0.06em",
+                textTransform: "uppercase",
+                color: "rgba(255,224,168,0.92)",
+                background: "rgba(240,200,74,0.16)",
+                border: "1px solid rgba(240,200,74,0.32)",
+                padding: "1px 5px",
+                borderRadius: 999,
+              }}
+            >
+              Pinned
+            </span>
+          ) : null}
+        </div>
+        {channel.topic ? (
           <div
             style={{
+              marginTop: 1,
               fontFamily: "DM Sans, sans-serif",
               fontSize: 11.5,
-              color: "#8A8580",
-              fontWeight: 600,
-              marginTop: 1,
+              color: "rgba(255,255,255,0.5)",
+              whiteSpace: "nowrap",
+              overflow: "hidden",
+              textOverflow: "ellipsis",
             }}
           >
-            {channels === undefined
-              ? "Loading channels…"
-              : sorted.length === 0
-                ? "No channels"
-                : `${sorted.length} channel${sorted.length === 1 ? "" : "s"}`}
+            {channel.topic}
           </div>
-        </div>
-      </header>
-
-      {channels === undefined ? (
-        <div
-          style={{
-            height: 38,
-            margin: "0 0 6px",
-            borderRadius: 10,
-            background: "rgba(28,28,30,0.04)",
-          }}
-        />
-      ) : sorted.length === 0 ? null : (
-        <ul style={{ listStyle: "none", padding: 0, margin: 0, display: "flex", flexDirection: "column", gap: 4 }}>
-          {sorted.map((c) => (
-            <li key={c.id}>
-              <button
-                type="button"
-                onClick={() => onOpenChannel(c.id)}
-                style={{
-                  width: "100%",
-                  display: "flex",
-                  alignItems: "center",
-                  gap: 10,
-                  padding: "9px 10px",
-                  borderRadius: 12,
-                  border: "1px solid rgba(28,28,30,0.06)",
-                  background: "rgba(255,255,255,0.6)",
-                  cursor: "pointer",
-                  textAlign: "left",
-                  WebkitTapHighlightColor: "transparent",
-                }}
-              >
-                <span
-                  aria-hidden
-                  style={{
-                    width: 26,
-                    height: 26,
-                    borderRadius: 8,
-                    background: c.is_private
-                      ? "rgba(155,127,255,0.18)"
-                      : "rgba(28,28,30,0.06)",
-                    color: c.is_private ? "#7B5FE0" : "#5C5853",
-                    display: "inline-flex",
-                    alignItems: "center",
-                    justifyContent: "center",
-                    fontFamily: "DM Sans, sans-serif",
-                    fontWeight: 800,
-                    fontSize: 12,
-                    flexShrink: 0,
-                  }}
-                >
-                  {c.is_private ? (
-                    <svg width="11" height="11" viewBox="0 0 12 12" fill="none" aria-hidden>
-                      <rect x="2.5" y="5" width="7" height="5" rx="1" stroke="currentColor" strokeWidth="1.2" fill="none" />
-                      <path d="M4 5V3.6a2 2 0 1 1 4 0V5" stroke="currentColor" strokeWidth="1.2" fill="none" strokeLinecap="round" />
-                    </svg>
-                  ) : (
-                    "#"
-                  )}
-                </span>
-                <div style={{ flex: 1, minWidth: 0 }}>
-                  <div
-                    style={{
-                      display: "flex",
-                      alignItems: "center",
-                      gap: 6,
-                      fontFamily: "DM Sans, sans-serif",
-                      fontSize: 13.5,
-                      fontWeight: 700,
-                      color: "#1C1C1E",
-                    }}
-                  >
-                    <span
-                      style={{
-                        whiteSpace: "nowrap",
-                        overflow: "hidden",
-                        textOverflow: "ellipsis",
-                      }}
-                    >
-                      {c.name}
-                    </span>
-                    {c.pinned ? (
-                      <span
-                        aria-label="Pinned"
-                        style={{
-                          fontSize: 9,
-                          fontWeight: 800,
-                          letterSpacing: "0.06em",
-                          textTransform: "uppercase",
-                          color: "#B97C19",
-                          background: "rgba(240,200,74,0.18)",
-                          border: "1px solid rgba(240,200,74,0.45)",
-                          padding: "1px 5px",
-                          borderRadius: 999,
-                        }}
-                      >
-                        Pinned
-                      </span>
-                    ) : null}
-                  </div>
-                  {c.topic ? (
-                    <div
-                      style={{
-                        marginTop: 1,
-                        fontSize: 11.5,
-                        color: "#8A8580",
-                        whiteSpace: "nowrap",
-                        overflow: "hidden",
-                        textOverflow: "ellipsis",
-                      }}
-                    >
-                      {c.topic}
-                    </div>
-                  ) : null}
-                </div>
-                <span
-                  style={{
-                    color: "#8A8580",
-                    fontSize: 12,
-                    flexShrink: 0,
-                  }}
-                >
-                  ›
-                </span>
-              </button>
-            </li>
-          ))}
-        </ul>
-      )}
-    </section>
+        ) : null}
+      </div>
+    </button>
   );
 }
 
+const chatChromeBtnStyle: React.CSSProperties = {
+  width: 38,
+  height: 38,
+  borderRadius: 999,
+  border: "none",
+  background: "transparent",
+  color: "rgba(255,255,255,0.78)",
+  cursor: "pointer",
+  display: "inline-flex",
+  alignItems: "center",
+  justifyContent: "center",
+  flexShrink: 0,
+};
 
 // ---------- Map pane ----------
 
