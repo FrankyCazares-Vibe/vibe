@@ -73,7 +73,9 @@ export function NetworkMobile() {
     return () => clearTimeout(t);
   }, [query]);
 
-  // Initial suggestions fetch (cached for the session).
+  // Initial suggestions fetch (cached for the session). The endpoint
+  // returns `suggestions`, not `users` — different shape from the other
+  // relationship endpoints below.
   useEffect(() => {
     let cancelled = false;
     (async () => {
@@ -83,7 +85,11 @@ export function NetworkMobile() {
         });
         const j = await r.json();
         if (cancelled) return;
-        setSuggestions(j?.ok && Array.isArray(j.users) ? (j.users as ListUser[]) : []);
+        setSuggestions(
+          j?.ok && Array.isArray(j.suggestions)
+            ? (j.suggestions as ListUser[])
+            : [],
+        );
       } catch {
         if (!cancelled) setSuggestions([]);
       }
@@ -408,7 +414,12 @@ function ListPane({
   return (
     <ul style={listStyle}>
       {users.map((u) => (
-        <UserRow key={u.id} user={u} onStateChange={onStateChange} />
+        <UserRow
+          key={u.id}
+          user={u}
+          onStateChange={onStateChange}
+          variant={tab === "discover" ? "suggestion" : "relationship"}
+        />
       ))}
     </ul>
   );
@@ -458,9 +469,14 @@ function SearchPane({
 function UserRow({
   user,
   onStateChange,
+  variant = "relationship",
 }: {
   user: ListUser;
   onStateChange: (id: string, next: FollowState) => void;
+  /** "suggestion" surfaces the reason ("3 mutuals", "Same major") as
+   *  its own line with an icon — the most clickable thing in Discover
+   *  was getting buried before. "relationship" rows skip it. */
+  variant?: "suggestion" | "relationship";
 }) {
   const [busy, setBusy] = useState(false);
   const state: FollowState = user.follow_state ?? "none";
@@ -506,16 +522,23 @@ function UserRow({
       <div style={{ flex: 1, minWidth: 0 }}>
         <UserNameLink user={user} />
         <div style={metaLineStyle}>
-          {[
-            user.handle ? `@${user.handle}` : null,
-            user.major,
-            user.mutual_count
-              ? `${user.mutual_count} mutual${user.mutual_count === 1 ? "" : "s"}`
-              : user.reason,
-          ]
-            .filter(Boolean)
-            .join(" · ")}
+          {variant === "suggestion"
+            ? [user.handle ? `@${user.handle}` : null, user.major]
+                .filter(Boolean)
+                .join(" · ")
+            : [
+                user.handle ? `@${user.handle}` : null,
+                user.major,
+                user.mutual_count
+                  ? `${user.mutual_count} mutual${user.mutual_count === 1 ? "" : "s"}`
+                  : user.reason,
+              ]
+                .filter(Boolean)
+                .join(" · ")}
         </div>
+        {variant === "suggestion" ? (
+          <SuggestionReason user={user} />
+        ) : null}
       </div>
       <button
         type="button"
@@ -545,6 +568,101 @@ function UserRow({
         {label}
       </button>
     </li>
+  );
+}
+
+type SuggestionCategory = "mutuals" | "org" | "major" | "school" | "new";
+
+function categorizeSuggestion(u: ListUser): SuggestionCategory {
+  if ((u.mutual_count ?? 0) > 0) return "mutuals";
+  if ((u.shared_org_count ?? 0) > 0) return "org";
+  if (u.same_major) return "major";
+  if (u.reason === "same school") return "school";
+  return "new";
+}
+
+function SuggestionReason({ user }: { user: ListUser }) {
+  const category = categorizeSuggestion(user);
+  const text =
+    category === "mutuals"
+      ? `${user.mutual_count} mutual${user.mutual_count === 1 ? "" : "s"}`
+      : category === "org"
+        ? user.shared_org_count === 1
+          ? "In your org"
+          : `${user.shared_org_count} shared orgs`
+        : category === "major"
+          ? "Same major as you"
+          : category === "school"
+            ? "Same school"
+            : "New on Vibe";
+  const accent =
+    category === "mutuals"
+      ? "#FF5C35"
+      : category === "org"
+        ? "#C6A0FF"
+        : category === "major"
+          ? "#FFD23F"
+          : category === "school"
+            ? "#5BE3B9"
+            : "#8A8580";
+  return (
+    <div
+      style={{
+        marginTop: 4,
+        display: "inline-flex",
+        alignItems: "center",
+        gap: 6,
+        fontFamily: "DM Sans, sans-serif",
+        fontSize: 11.5,
+        fontWeight: 700,
+        color: "#1C1C1E",
+        letterSpacing: "0.01em",
+      }}
+    >
+      <span
+        aria-hidden
+        style={{
+          display: "inline-flex",
+          width: 18,
+          height: 18,
+          borderRadius: 999,
+          background: `${accent}22`,
+          color: accent,
+          alignItems: "center",
+          justifyContent: "center",
+        }}
+      >
+        {category === "mutuals" ? (
+          <svg width="11" height="11" viewBox="0 0 12 12" fill="none">
+            <circle cx="4" cy="4" r="2" stroke="currentColor" strokeWidth="1.3" />
+            <circle cx="8.5" cy="4.5" r="1.7" stroke="currentColor" strokeWidth="1.3" />
+            <path d="M1 10.5c.4-1.6 1.6-2.4 3-2.4s2.6.8 3 2.4M7 10.5c.3-1.2 1.1-1.9 2-1.9s1.7.6 2 1.9" stroke="currentColor" strokeWidth="1.3" strokeLinecap="round" fill="none" />
+          </svg>
+        ) : category === "org" ? (
+          <svg width="11" height="11" viewBox="0 0 12 12" fill="none">
+            <path d="M3 4.5l3-2 3 2v3l-3 2-3-2z" stroke="currentColor" strokeWidth="1.3" strokeLinejoin="round" fill="none" />
+            <circle cx="6" cy="6" r="1.1" fill="currentColor" />
+          </svg>
+        ) : category === "major" ? (
+          <svg width="11" height="11" viewBox="0 0 12 12" fill="none">
+            <path d="M1 5L6 2.5l5 2.5-5 2.5z" stroke="currentColor" strokeWidth="1.3" strokeLinejoin="round" fill="none" />
+            <path d="M3 6.5v2.2c0 .8 1.3 1.6 3 1.6s3-.8 3-1.6V6.5" stroke="currentColor" strokeWidth="1.3" fill="none" strokeLinecap="round" />
+          </svg>
+        ) : category === "school" ? (
+          <svg width="11" height="11" viewBox="0 0 12 12" fill="none">
+            <path d="M2 5l4-2.5L10 5v.4H2z" stroke="currentColor" strokeWidth="1.3" fill="none" strokeLinejoin="round" />
+            <rect x="3" y="5.6" width="6" height="4.4" stroke="currentColor" strokeWidth="1.3" fill="none" />
+            <rect x="5" y="7.6" width="2" height="2.4" stroke="currentColor" strokeWidth="1.1" fill="none" />
+          </svg>
+        ) : (
+          <svg width="11" height="11" viewBox="0 0 12 12" fill="none">
+            <circle cx="6" cy="6" r="3.8" stroke="currentColor" strokeWidth="1.3" fill="none" />
+            <path d="M6 4.4v3.2M4.4 6h3.2" stroke="currentColor" strokeWidth="1.3" strokeLinecap="round" />
+          </svg>
+        )}
+      </span>
+      <span>{text}</span>
+    </div>
   );
 }
 
