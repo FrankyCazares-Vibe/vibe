@@ -121,7 +121,44 @@ export function MessagesMobile({ initialHandle }: { initialHandle?: string }) {
   const [threads, setThreads] = useState<ThreadEntry[] | null>(null);
   const [requests, setRequests] = useState<ThreadEntry[] | null>(null);
   const [openThreadId, setOpenThreadId] = useState<string | null>(null);
+  const [composeOpen, setComposeOpen] = useState(false);
   const initialHandleResolvedRef = useRef(false);
+
+  /** Resolve a handle → DM channel id, creating the thread if needed. */
+  const openOrCreateDmFromHandle = useCallback(
+    async (handle: string) => {
+      const lower = handle.toLowerCase();
+      // Cheap path: already have a thread with this peer.
+      const existing = (threads ?? []).find(
+        (t) => t.type === "dm" && t.peer?.handle?.toLowerCase() === lower,
+      );
+      if (existing) {
+        setComposeOpen(false);
+        setOpenThreadId(existing.id);
+        return;
+      }
+      try {
+        const r = await fetch("/api/me/threads", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ handle: lower }),
+        });
+        const j = await r.json();
+        if (j?.ok && j.channel_id) {
+          await refetchThreadsRef.current?.();
+          setComposeOpen(false);
+          setOpenThreadId(j.channel_id);
+        }
+      } catch {
+        /* silent — user stays on compose */
+      }
+    },
+    [threads],
+  );
+
+  // Stable handle to the refetcher so callbacks can refresh without a
+  // dep-chain rewrite. Filled in below once `refetchThreads` exists.
+  const refetchThreadsRef = useRef<(() => Promise<void>) | null>(null);
 
   const refetchThreads = useCallback(async () => {
     try {
@@ -141,6 +178,7 @@ export function MessagesMobile({ initialHandle }: { initialHandle?: string }) {
   }, []);
 
   useEffect(() => {
+    refetchThreadsRef.current = refetchThreads;
     void refetchThreads();
   }, [refetchThreads]);
 
@@ -217,18 +255,62 @@ export function MessagesMobile({ initialHandle }: { initialHandle?: string }) {
           borderBottom: "1px solid rgba(28,28,30,0.06)",
         }}
       >
-        <h1
+        <div
           style={{
-            fontFamily: "Fraunces, serif",
-            fontSize: 28,
-            fontWeight: 900,
-            letterSpacing: "-0.8px",
-            color: "#1C1C1E",
-            margin: 0,
+            display: "flex",
+            alignItems: "center",
+            justifyContent: "space-between",
+            gap: 12,
           }}
         >
-          Messages
-        </h1>
+          <h1
+            style={{
+              fontFamily: "Fraunces, serif",
+              fontSize: 28,
+              fontWeight: 900,
+              letterSpacing: "-0.8px",
+              color: "#1C1C1E",
+              margin: 0,
+            }}
+          >
+            Messages
+          </h1>
+          <button
+            type="button"
+            onClick={() => setComposeOpen(true)}
+            aria-label="New message"
+            style={{
+              width: 40,
+              height: 40,
+              borderRadius: 999,
+              border: "1px solid rgba(28,28,30,0.10)",
+              background: "rgba(255,255,255,0.78)",
+              color: "#1C1C1E",
+              cursor: "pointer",
+              display: "inline-flex",
+              alignItems: "center",
+              justifyContent: "center",
+              WebkitTapHighlightColor: "transparent",
+              boxShadow: "inset 0 1px 0 rgba(255,255,255,0.7)",
+            }}
+          >
+            <svg width="20" height="20" viewBox="0 0 22 22" fill="none" aria-hidden>
+              <path
+                d="M14.5 3.5l4 4-10 10H4v-4.5l10.5-9.5z"
+                stroke="currentColor"
+                strokeWidth="1.6"
+                fill="none"
+                strokeLinejoin="round"
+              />
+              <path
+                d="M13 5l4 4"
+                stroke="currentColor"
+                strokeWidth="1.6"
+                strokeLinecap="round"
+              />
+            </svg>
+          </button>
+        </div>
         <div
           style={{
             display: "flex",
@@ -290,6 +372,13 @@ export function MessagesMobile({ initialHandle }: { initialHandle?: string }) {
             setOpenThreadId(null);
             void refetchThreads();
           }}
+        />
+      ) : null}
+
+      {composeOpen ? (
+        <ComposeOverlay
+          onCancel={() => setComposeOpen(false)}
+          onPick={(handle) => void openOrCreateDmFromHandle(handle)}
         />
       ) : null}
     </main>
@@ -974,6 +1063,363 @@ function ConversationView({
         </button>
       </form>
     </div>
+  );
+}
+
+// ---------- Compose overlay ----------
+
+type SearchUser = {
+  id: string;
+  name: string | null;
+  handle: string | null;
+  avatar_url?: string | null;
+  major?: string | null;
+  year?: number | string | null;
+};
+
+function ComposeOverlay({
+  onCancel,
+  onPick,
+}: {
+  onCancel: () => void;
+  onPick: (handle: string) => void;
+}) {
+  const [query, setQuery] = useState("");
+  const [debounced, setDebounced] = useState("");
+  const [suggested, setSuggested] = useState<SearchUser[] | null>(null);
+  const [results, setResults] = useState<SearchUser[] | null>(null);
+  const [loading, setLoading] = useState(false);
+  const inputRef = useRef<HTMLInputElement | null>(null);
+
+  // Hide the bottom tab bar while compose is open.
+  useEffect(() => {
+    document.body.classList.add("vibe-composer-open");
+    return () => document.body.classList.remove("vibe-composer-open");
+  }, []);
+
+  // Autofocus on mount — keyboard opens immediately. Small delay so
+  // iOS Safari honors the focus after the slide-in.
+  useEffect(() => {
+    const t = window.setTimeout(() => inputRef.current?.focus(), 60);
+    return () => window.clearTimeout(t);
+  }, []);
+
+  // Debounce typing → search query.
+  useEffect(() => {
+    const t = setTimeout(() => setDebounced(query.trim()), 220);
+    return () => clearTimeout(t);
+  }, [query]);
+
+  // Initial picks — same data source as Network's Discover. Lets
+  // users start a DM with someone they already know without typing.
+  useEffect(() => {
+    let cancelled = false;
+    (async () => {
+      try {
+        const r = await fetch("/api/me/suggested-connections?limit=20", {
+          cache: "no-store",
+        });
+        const j = await r.json();
+        if (cancelled) return;
+        setSuggested(
+          j?.ok && Array.isArray(j.suggestions) ? (j.suggestions as SearchUser[]) : [],
+        );
+      } catch {
+        if (!cancelled) setSuggested([]);
+      }
+    })();
+    return () => {
+      cancelled = true;
+    };
+  }, []);
+
+  // Search fetch — same endpoint Network uses, debounced.
+  useEffect(() => {
+    if (!debounced) {
+      setResults(null);
+      setLoading(false);
+      return;
+    }
+    let cancelled = false;
+    setLoading(true);
+    (async () => {
+      try {
+        const r = await fetch(
+          `/api/users/search?q=${encodeURIComponent(debounced)}&limit=20`,
+          { cache: "no-store" },
+        );
+        const j = await r.json();
+        if (cancelled) return;
+        setResults(
+          j?.ok && Array.isArray(j.users) ? (j.users as SearchUser[]) : [],
+        );
+      } catch {
+        if (!cancelled) setResults([]);
+      } finally {
+        if (!cancelled) setLoading(false);
+      }
+    })();
+    return () => {
+      cancelled = true;
+    };
+  }, [debounced]);
+
+  const list = debounced ? results : suggested;
+
+  return (
+    <div
+      role="dialog"
+      aria-modal="true"
+      aria-label="New message"
+      style={{
+        position: "fixed",
+        inset: 0,
+        zIndex: 1200,
+        background: "#FAF7F2",
+        display: "flex",
+        flexDirection: "column",
+      }}
+    >
+      <header
+        style={{
+          display: "flex",
+          alignItems: "center",
+          justifyContent: "space-between",
+          padding: "calc(env(safe-area-inset-top, 0px) + 8px) 14px 8px",
+          background: "rgba(250, 247, 242, 0.94)",
+          backdropFilter: "saturate(160%) blur(14px)",
+          WebkitBackdropFilter: "saturate(160%) blur(14px)",
+          borderBottom: "1px solid rgba(28,28,30,0.06)",
+        }}
+      >
+        <button
+          type="button"
+          onClick={onCancel}
+          style={{
+            background: "transparent",
+            border: "none",
+            color: "#1C1C1E",
+            fontFamily: "DM Sans, sans-serif",
+            fontSize: 14,
+            fontWeight: 600,
+            padding: "8px 4px",
+            cursor: "pointer",
+            WebkitTapHighlightColor: "transparent",
+          }}
+        >
+          Cancel
+        </button>
+        <span
+          style={{
+            fontFamily: "Fraunces, serif",
+            fontSize: 17,
+            fontWeight: 800,
+            color: "#1C1C1E",
+          }}
+        >
+          New message
+        </span>
+        <span style={{ width: 60 }} />
+      </header>
+
+      {/* Search field */}
+      <div
+        style={{
+          padding: "12px 16px 8px",
+          background: "rgba(250, 247, 242, 0.94)",
+          borderBottom: "1px solid rgba(28,28,30,0.04)",
+        }}
+      >
+        <div style={{ position: "relative" }}>
+          <span
+            aria-hidden
+            style={{
+              position: "absolute",
+              left: 14,
+              top: "50%",
+              transform: "translateY(-50%)",
+              color: "#8A8580",
+              display: "inline-flex",
+            }}
+          >
+            <svg width="16" height="16" viewBox="0 0 16 16" fill="none">
+              <circle cx="7" cy="7" r="5" stroke="currentColor" strokeWidth="1.5" />
+              <path
+                d="M11 11l3 3"
+                stroke="currentColor"
+                strokeWidth="1.5"
+                strokeLinecap="round"
+              />
+            </svg>
+          </span>
+          <input
+            ref={inputRef}
+            type="search"
+            placeholder="Search people"
+            value={query}
+            onChange={(e) => setQuery(e.target.value)}
+            autoCorrect="off"
+            autoCapitalize="none"
+            spellCheck={false}
+            style={{
+              width: "100%",
+              padding: "11px 14px 11px 38px",
+              borderRadius: 14,
+              border: "1px solid rgba(28,28,30,0.10)",
+              background: "rgba(255,255,255,0.78)",
+              fontFamily: "DM Sans, sans-serif",
+              fontSize: 15,
+              color: "#1C1C1E",
+              outline: "none",
+            }}
+          />
+        </div>
+      </div>
+
+      {/* Results list */}
+      <div
+        style={{
+          flex: 1,
+          overflowY: "auto",
+          WebkitOverflowScrolling: "touch",
+          padding: "6px 0",
+        }}
+      >
+        {!debounced && suggested === null ? (
+          <ListSkeleton />
+        ) : debounced && loading ? (
+          <ListSkeleton />
+        ) : !list || list.length === 0 ? (
+          <div
+            style={{
+              padding: "48px 24px",
+              textAlign: "center",
+              color: "#5C5853",
+              fontFamily: "DM Sans, sans-serif",
+              fontSize: 13.5,
+            }}
+          >
+            {debounced
+              ? `No matches for "${debounced}"`
+              : "Search above to start a new message."}
+          </div>
+        ) : (
+          <ul
+            style={{
+              listStyle: "none",
+              padding: 0,
+              margin: 0,
+            }}
+          >
+            {!debounced ? (
+              <li
+                style={{
+                  padding: "6px 18px 8px",
+                  fontFamily: "DM Sans, sans-serif",
+                  fontSize: 11,
+                  fontWeight: 800,
+                  letterSpacing: "0.08em",
+                  textTransform: "uppercase",
+                  color: "#8A8580",
+                }}
+              >
+                Suggested
+              </li>
+            ) : null}
+            {list.map((u) => (
+              <ComposeUserRow
+                key={u.id}
+                user={u}
+                onPick={() => u.handle && onPick(u.handle)}
+              />
+            ))}
+          </ul>
+        )}
+      </div>
+    </div>
+  );
+}
+
+function ComposeUserRow({
+  user,
+  onPick,
+}: {
+  user: SearchUser;
+  onPick: () => void;
+}) {
+  const initials = initialsOf(user.name || user.handle);
+  return (
+    <li>
+      <button
+        type="button"
+        onClick={onPick}
+        disabled={!user.handle}
+        style={{
+          width: "100%",
+          display: "flex",
+          alignItems: "center",
+          gap: 12,
+          padding: "10px 16px",
+          background: "transparent",
+          border: "none",
+          textAlign: "left",
+          cursor: user.handle ? "pointer" : "default",
+          WebkitTapHighlightColor: "transparent",
+        }}
+      >
+        <div
+          style={{
+            width: 44,
+            height: 44,
+            borderRadius: 999,
+            background: user.avatar_url
+              ? `url(${user.avatar_url}) center/cover`
+              : "#FFD3C2",
+            flexShrink: 0,
+            display: "flex",
+            alignItems: "center",
+            justifyContent: "center",
+            color: "#1C1C1E",
+            fontFamily: "Fraunces, serif",
+            fontWeight: 800,
+            fontSize: 15,
+            border: "1px solid rgba(255,255,255,0.6)",
+          }}
+        >
+          {!user.avatar_url ? initials : null}
+        </div>
+        <div style={{ flex: 1, minWidth: 0 }}>
+          <div
+            style={{
+              fontFamily: "Fraunces, serif",
+              fontSize: 15,
+              fontWeight: 700,
+              color: "#1C1C1E",
+              whiteSpace: "nowrap",
+              overflow: "hidden",
+              textOverflow: "ellipsis",
+            }}
+          >
+            {user.name || (user.handle ? `@${user.handle}` : "Member")}
+          </div>
+          <div
+            style={{
+              fontFamily: "DM Sans, sans-serif",
+              fontSize: 12,
+              color: "#8A8580",
+              marginTop: 1,
+              whiteSpace: "nowrap",
+              overflow: "hidden",
+              textOverflow: "ellipsis",
+            }}
+          >
+            {[user.handle ? `@${user.handle}` : null, user.major]
+              .filter(Boolean)
+              .join(" · ")}
+          </div>
+        </div>
+      </button>
+    </li>
   );
 }
 
