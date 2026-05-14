@@ -1,6 +1,6 @@
 "use client";
 
-import { useRef, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 
 /**
  * Soft radial-gradient spotlight that tracks the pointer inside the
@@ -38,6 +38,31 @@ export function MouseSpotlight({
   const ref = useRef<HTMLDivElement>(null);
   const tiltLayerRef = useRef<HTMLDivElement>(null);
   const [active, setActive] = useState(false);
+  // Touch-primary devices (phones / most tablets) skip the spotlight +
+  // tilt entirely. Hover doesn't exist there and tap-driven glows feel
+  // weird more than they feel premium. Use matchMedia after mount so
+  // SSR and hydration stay aligned.
+  const [touchPrimary, setTouchPrimary] = useState(false);
+  useEffect(() => {
+    if (typeof window === "undefined") return;
+    const mm = window.matchMedia?.("(hover: none) and (pointer: coarse)");
+    if (!mm) return;
+    setTouchPrimary(mm.matches);
+    const onChange = (e: MediaQueryListEvent) => setTouchPrimary(e.matches);
+    mm.addEventListener?.("change", onChange);
+    return () => mm.removeEventListener?.("change", onChange);
+  }, []);
+
+  if (touchPrimary) {
+    // Render a plain wrapper that still applies the caller's styling
+    // (background, border, radius, etc.) so the card looks identical —
+    // just without the spotlight gradient and tilt.
+    return (
+      <div className={className} style={style}>
+        {children}
+      </div>
+    );
+  }
 
   // The visual `style` (background, border, radius) is applied to the
   // INNER tilt layer so the whole card surface — bg, borders, content —

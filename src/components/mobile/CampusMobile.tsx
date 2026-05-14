@@ -36,8 +36,8 @@ import { PostViewerMobile } from "@/components/mobile/PostViewerMobile";
 
 // ---------- Types ----------
 
-type Tab = "feed" | "clips" | "events" | "chat" | "orgs" | "map";
-const TAB_ORDER: Tab[] = ["feed", "clips", "events", "chat", "orgs", "map"];
+type Tab = "feed" | "clips" | "events" | "orgs" | "chat" | "map";
+const TAB_ORDER: Tab[] = ["feed", "clips", "events", "orgs", "chat", "map"];
 
 // Use the desktop FeedPost shape so ClipsReelInner accepts our posts
 // without any mapping.
@@ -236,10 +236,10 @@ export function CampusMobile() {
           <EventsPane events={events} onMutate={refetchEvents} />
         </section>
         <section style={paneStyle}>
-          <ChatPane orgs={orgs} />
+          <OrgsPane orgs={orgs} />
         </section>
         <section style={paneStyle}>
-          <OrgsPane orgs={orgs} />
+          <ChatPane orgs={orgs} />
         </section>
         <section style={mapPaneStyle}>
           <MapPane />
@@ -350,8 +350,8 @@ function TabStrip({
     { id: "feed", label: "Feed" },
     { id: "clips", label: "Clips" },
     { id: "events", label: "Events" },
-    { id: "chat", label: "Chat" },
     { id: "orgs", label: "Orgs" },
+    { id: "chat", label: "Chat" },
     { id: "map", label: "Map" },
   ];
   return (
