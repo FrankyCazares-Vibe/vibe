@@ -3,6 +3,8 @@
 import Link from "next/link";
 import { useEffect, useRef, useState } from "react";
 
+import { FILTER_CSS } from "@/lib/clip/edit-metadata";
+
 /**
  * iOS-native vertical-clip viewer. Opens as a full-screen sheet from
  * the ProfileMobile Clips grid. Single-clip experience (no swipe-to-
@@ -36,6 +38,7 @@ type PostDetail = {
   tags: string[] | null;
   media_url: string | null;
   media_thumbnail_url: string | null;
+  edit_metadata: import("@/lib/clip/edit-metadata").ClipEditMetadata | null;
   created_at: string;
   author: Author | null;
 };
@@ -169,6 +172,58 @@ export function ClipViewerMobile({
   const videoSrc = post ? `/api/posts/${clipId}/media` : null;
   const poster = post?.media_thumbnail_url ?? undefined;
 
+  // ---------- lossless edit effects (read-side) ----------
+  const editMeta = post?.edit_metadata ?? null;
+
+  // Speed → playbackRate. Re-applies on metadata change AND when the
+  // src becomes available (some browsers reset rate on srcChange).
+  useEffect(() => {
+    const v = videoRef.current;
+    if (!v) return;
+    v.playbackRate = editMeta?.speed ?? 1;
+  }, [editMeta?.speed, videoSrc]);
+
+  // Trim → clamp playback inside [start_ms, end_ms]. timeupdate fires
+  // ~250ms; seekToStart on first frame; loop back to start when we
+  // cross end_ms instead of letting the file run past the trim.
+  useEffect(() => {
+    const v = videoRef.current;
+    if (!v) return;
+    const trim = editMeta?.trim ?? null;
+    if (!trim) return;
+    const startSec = trim.start_ms / 1000;
+    const endSec = trim.end_ms / 1000;
+
+    const onLoaded = () => {
+      if (v.currentTime < startSec || v.currentTime > endSec) {
+        try {
+          v.currentTime = startSec;
+        } catch {
+          /* not yet seekable */
+        }
+      }
+    };
+    const onTimeUpdate = () => {
+      if (v.currentTime >= endSec) {
+        try {
+          v.currentTime = startSec;
+        } catch {
+          /* ignore */
+        }
+      }
+    };
+    v.addEventListener("loadedmetadata", onLoaded);
+    v.addEventListener("timeupdate", onTimeUpdate);
+    onLoaded();
+    return () => {
+      v.removeEventListener("loadedmetadata", onLoaded);
+      v.removeEventListener("timeupdate", onTimeUpdate);
+    };
+  }, [editMeta?.trim, videoSrc]);
+
+  // Filter preset → CSS `filter` string, applied inline on the <video>.
+  const filterCss = editMeta?.filter ? FILTER_CSS[editMeta.filter] : undefined;
+
   return (
     <div
       role="dialog"
@@ -205,9 +260,39 @@ export function ClipViewerMobile({
             height: "100%",
             objectFit: "cover",
             background: "#000",
+            filter: filterCss,
           }}
         />
       ) : null}
+
+      {/* Text overlays from edit_metadata — positioned in %-coords so
+          they scale with the viewport. Pointer-events off so they
+          don't intercept play/pause taps. */}
+      {editMeta?.text_overlays?.map((o) => (
+        <div
+          key={o.id}
+          aria-hidden
+          style={{
+            position: "absolute",
+            left: `${o.x}%`,
+            top: `${o.y}%`,
+            transform: "translate(-50%, -50%)",
+            color: o.color,
+            fontFamily: "DM Sans, sans-serif",
+            fontWeight: 800,
+            fontSize: 22,
+            lineHeight: 1.2,
+            textAlign: "center",
+            textShadow: "0 1px 3px rgba(0,0,0,0.55), 0 0 1px rgba(0,0,0,0.35)",
+            pointerEvents: "none",
+            maxWidth: "82%",
+            whiteSpace: "pre-wrap",
+            wordBreak: "break-word",
+          }}
+        >
+          {o.text}
+        </div>
+      ))}
 
       {/* Soft top/bottom vignette so the chrome stays readable over
           any video. */}

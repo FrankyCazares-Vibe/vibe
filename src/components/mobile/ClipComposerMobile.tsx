@@ -1,8 +1,17 @@
 "use client";
 
-import { useCallback, useEffect, useRef, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { createPortal } from "react-dom";
 
+import {
+  ALLOWED_SPEEDS,
+  FILTER_CSS,
+  FILTER_PRESETS,
+  type ClipEditMetadata,
+  type ClipSpeed,
+  type FilterPreset,
+  type TextOverlay,
+} from "@/lib/clip/edit-metadata";
 import {
   bindMentionPicker,
   capturePosterFrame,
@@ -183,6 +192,81 @@ export function ClipComposerMobile({ onClose, onPosted, origin }: Props) {
   // Focus indicator point (in CSS pixels relative to the video element).
   // The `key` reuses the timestamp so each tap restarts the animation.
   const [focusPoint, setFocusPoint] = useState<{ x: number; y: number; key: number } | null>(null);
+
+  // ---------- edit-room state ----------
+  // All effects are lossless (applied at playback). Persisted via the
+  // posts.edit_metadata JSONB column when the clip publishes.
+  const [speed, setSpeed] = useState<ClipSpeed>(1);
+  const [filterPreset, setFilterPreset] = useState<FilterPreset | null>(null);
+  const [trimRange, setTrimRange] = useState<{ start_ms: number; end_ms: number } | null>(null);
+  const [textOverlays, setTextOverlays] = useState<TextOverlay[]>([]);
+  // Which bottom tray is showing in the edit room.
+  const [activeEditTray, setActiveEditTray] = useState<"trim" | "filters" | null>(null);
+  // When non-null, the text-overlay editor modal is open. `null` for a
+  // brand-new overlay being drafted, otherwise the overlay being edited.
+  const [editingOverlay, setEditingOverlay] = useState<TextOverlay | null | undefined>(undefined);
+
+  // Reset all edit-room state when the user retakes — fresh clip, fresh
+  // canvas. Triggered by `phase` flipping back to "intro".
+  useEffect(() => {
+    if (phase === "intro") {
+      setSpeed(1);
+      setFilterPreset(null);
+      setTrimRange(null);
+      setTextOverlays([]);
+      setActiveEditTray(null);
+      setEditingOverlay(undefined);
+    }
+  }, [phase]);
+
+  // Apply playback speed live whenever it changes (or the playback
+  // element first mounts).
+  useEffect(() => {
+    const v = playbackVideoRef.current;
+    if (v) v.playbackRate = speed;
+  }, [speed, recordedUrl]);
+
+  // Dispatch for the side-rail tool buttons in the edit room.
+  // - Speed is a stateless cycle (1 → 2 → 0.5 → 1).
+  // - Filters / Trim toggle a bottom tray.
+  // - Text opens the overlay editor modal in "new" mode (null overlay).
+  const handleEditTool = useCallback(
+    (key: string) => {
+      if (key === "speed") {
+        setSpeed((prev) => {
+          const idx = ALLOWED_SPEEDS.indexOf(prev);
+          const next = ALLOWED_SPEEDS[(idx + 1) % ALLOWED_SPEEDS.length];
+          return next as ClipSpeed;
+        });
+        return;
+      }
+      if (key === "filters") {
+        setActiveEditTray((prev) => (prev === "filters" ? null : "filters"));
+        return;
+      }
+      if (key === "trim") {
+        setActiveEditTray((prev) => (prev === "trim" ? null : "trim"));
+        return;
+      }
+      if (key === "text") {
+        setActiveEditTray(null);
+        setEditingOverlay(null);
+        return;
+      }
+    },
+    [],
+  );
+
+  // Build the effective edit_metadata to send with publish-clip. Returns
+  // null when no effect is set (so the column stays NULL).
+  const collectedEditMetadata = useMemo<ClipEditMetadata | null>(() => {
+    const m: ClipEditMetadata = {};
+    if (speed !== 1) m.speed = speed;
+    if (filterPreset) m.filter = filterPreset;
+    if (trimRange) m.trim = trimRange;
+    if (textOverlays.length > 0) m.text_overlays = textOverlays;
+    return Object.keys(m).length > 0 ? m : null;
+  }, [speed, filterPreset, trimRange, textOverlays]);
 
   // ---------- keyframes + permissions ----------
 
@@ -669,6 +753,7 @@ export function ClipComposerMobile({ onClose, onPosted, origin }: Props) {
           tags,
           poster_url: posterUrl,
           duration_sec: durationSec,
+          edit_metadata: collectedEditMetadata,
         }),
       }).then((r) => r.json());
       if (!pub?.ok) throw new Error(pub?.error || "Publish failed");
@@ -679,7 +764,7 @@ export function ClipComposerMobile({ onClose, onPosted, origin }: Props) {
       setError(e instanceof Error ? e.message : "Could not publish");
       setPhase("caption");
     }
-  }, [recordedBlob, caption, elapsedMs, onPosted, requestClose]);
+  }, [recordedBlob, caption, elapsedMs, onPosted, requestClose, collectedEditMetadata]);
 
   // ---------- mention picker on caption ----------
 
@@ -1329,8 +1414,69 @@ export function ClipComposerMobile({ onClose, onPosted, origin }: Props) {
     </>
   );
 
+  // Editing room layout (mobile web v1 — chrome only, tools are stubs).
+  // 9:16 playback box anchored to the top, matching the live-preview
+  // framing so the user's clip stays in the same visual frame across
+  // record → edit. Side rail of editing tools floats over the video on
+  // the right edge (TikTok pattern). Bottom band holds Retake + Next.
+  const editTools: Array<{
+    key: string;
+    label: string;
+    icon: React.ReactNode;
+  }> = [
+    {
+      key: "text",
+      label: "Text",
+      icon: (
+        <svg width="20" height="20" viewBox="0 0 20 20" aria-hidden>
+          <text x="10" y="15" textAnchor="middle" fontFamily="DM Sans, sans-serif" fontWeight="800" fontSize="14" fill="currentColor">Aa</text>
+        </svg>
+      ),
+    },
+    {
+      key: "trim",
+      label: "Trim",
+      icon: (
+        <svg width="20" height="20" viewBox="0 0 20 20" fill="none" aria-hidden>
+          <circle cx="6" cy="6" r="2.4" stroke="currentColor" strokeWidth="1.6" />
+          <circle cx="6" cy="14" r="2.4" stroke="currentColor" strokeWidth="1.6" />
+          <path d="M8 7l9 6M8 13l9-6" stroke="currentColor" strokeWidth="1.6" strokeLinecap="round" />
+        </svg>
+      ),
+    },
+    {
+      key: "filters",
+      label: "Filters",
+      icon: (
+        <svg width="20" height="20" viewBox="0 0 20 20" fill="none" aria-hidden>
+          <circle cx="7" cy="10" r="4.5" stroke="currentColor" strokeWidth="1.6" />
+          <circle cx="13" cy="10" r="4.5" stroke="currentColor" strokeWidth="1.6" />
+        </svg>
+      ),
+    },
+    {
+      key: "speed",
+      label: `Speed ${speed}×`,
+      icon: (
+        <span
+          style={{
+            fontFamily: "DM Sans, sans-serif",
+            fontWeight: 800,
+            fontSize: 12,
+            letterSpacing: "0.02em",
+          }}
+        >
+          {speed}×
+        </span>
+      ),
+    },
+  ];
+
   const renderReview = () => (
     <>
+      {/* 9:16 playback box anchored to the top — same framing rule as
+          the live preview, so the clip stays in the same on-screen box
+          across the record → edit transition. */}
       <video
         ref={playbackVideoRef}
         src={recordedUrl ?? undefined}
@@ -1339,14 +1485,18 @@ export function ClipComposerMobile({ onClose, onPosted, origin }: Props) {
         playsInline
         style={{
           position: "absolute",
-          inset: 0,
+          top: 0,
+          left: 0,
           width: "100%",
-          height: "100%",
+          aspectRatio: "9 / 16",
+          maxHeight: "100%",
           objectFit: "cover",
           background: "#000",
         }}
       />
-      {/* Duration badge */}
+
+      {/* Top chrome — duration badge centered, close X top-left, "Edit"
+          label top-right to set context. */}
       <div
         style={{
           position: "absolute",
@@ -1367,7 +1517,6 @@ export function ClipComposerMobile({ onClose, onPosted, origin }: Props) {
       >
         {formatMs(elapsedMs)}
       </div>
-      {/* Close */}
       <button
         type="button"
         onClick={requestClose}
@@ -1376,7 +1525,48 @@ export function ClipComposerMobile({ onClose, onPosted, origin }: Props) {
       >
         ✕
       </button>
-      {/* Bottom action bar */}
+
+      {/* Right tool rail — vertical stack of icon buttons over the
+          right edge of the video. Each is a stub for now (sets a
+          brief "Coming soon" toast). Order roughly matches TikTok's
+          edit screen: text, trim, filters, music, speed. */}
+      <div
+        style={{
+          position: "absolute",
+          top: "calc(env(safe-area-inset-top, 0px) + 76px)",
+          right: 12,
+          display: "flex",
+          flexDirection: "column",
+          gap: 14,
+        }}
+      >
+        {editTools.map((tool) => (
+          <button
+            key={tool.key}
+            type="button"
+            onClick={() => handleEditTool(tool.key)}
+            aria-label={tool.label}
+            style={{
+              width: 46,
+              height: 46,
+              borderRadius: 999,
+              border: "1px solid rgba(255,255,255,0.28)",
+              background: "rgba(0,0,0,0.42)",
+              color: "#fff",
+              display: "inline-flex",
+              alignItems: "center",
+              justifyContent: "center",
+              cursor: "pointer",
+              backdropFilter: "blur(10px)",
+              WebkitBackdropFilter: "blur(10px)",
+            }}
+          >
+            {tool.icon}
+          </button>
+        ))}
+      </div>
+
+      {/* Bottom action bar — Retake (returns to camera) / Next (caption). */}
       <div
         style={{
           position: "absolute",

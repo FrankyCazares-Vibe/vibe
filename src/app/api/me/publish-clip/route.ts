@@ -1,5 +1,6 @@
 import { NextResponse } from "next/server";
 
+import { sanitizeEditMetadata } from "@/lib/clip/edit-metadata";
 import {
   extractMentionHandles,
   insertMentionNotifications,
@@ -19,6 +20,7 @@ type Body = {
   tags?: unknown;
   poster_url?: unknown;
   duration_sec?: unknown;
+  edit_metadata?: unknown;
 };
 
 function normalizeTags(input: unknown): string[] {
@@ -96,6 +98,7 @@ export async function POST(req: Request) {
       : null;
 
   const tags = normalizeTags(body.tags);
+  const editMetadata = sanitizeEditMetadata(body.edit_metadata);
 
   const { data: row, error } = await supabase
     .from("posts")
@@ -106,8 +109,11 @@ export async function POST(req: Request) {
       tags,
       media_url: objectKey,
       media_thumbnail_url: posterUrl,
+      edit_metadata: editMetadata,
     })
-    .select("id,user_id,type,content,tags,media_url,media_thumbnail_url,created_at")
+    .select(
+      "id,user_id,type,content,tags,media_url,media_thumbnail_url,edit_metadata,created_at",
+    )
     .single();
 
   if (error || !row) {

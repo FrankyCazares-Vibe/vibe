@@ -28,7 +28,7 @@ export async function GET(_req: Request, ctx: RouteContext) {
   const { data: row, error } = await supabase
     .from("posts")
     .select(
-      "id,user_id,type,content,tags,media_url,media_thumbnail_url,created_at," +
+      "id,user_id,type,content,tags,media_url,media_thumbnail_url,edit_metadata,created_at," +
         // Explicit FK name disambiguates the posts→users embed; see /api/feed for context.
         "author:users!posts_user_id_fkey!inner(id,name,handle,school,major,year,avatar_url)",
     )
