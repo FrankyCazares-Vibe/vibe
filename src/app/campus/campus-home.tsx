@@ -12513,10 +12513,16 @@ function ChannelMain({
       style={{
         display: "flex",
         flexDirection: "column",
-        minHeight: "100vh",
+        // Was minHeight: 100vh — that forced this column to grow past
+        // the grid cell, pushing the message composer below the parent's
+        // overflow: hidden. Now we fill the grid cell exactly and let
+        // the messages list inside ChannelChat handle its own scroll.
+        height: "100%",
+        minHeight: 0,
         position: "relative",
         background: backdropCss,
         transition: "background 600ms ease",
+        overflow: "hidden",
       }}
     >
       <header
@@ -12531,6 +12537,7 @@ function ChannelMain({
           display: "flex",
           alignItems: "center",
           gap: 12,
+          flexShrink: 0,
         }}
       >
         <span
