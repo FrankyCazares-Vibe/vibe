@@ -2935,16 +2935,19 @@ function MessageBubble({
   const [pickerOpen, setPickerOpen] = useState(false);
   const longPressTimer = useRef<number | null>(null);
   const longPressFired = useRef(false);
+  const pressStart = useRef<{ x: number; y: number } | null>(null);
 
   const clearLongPress = () => {
     if (longPressTimer.current) {
       window.clearTimeout(longPressTimer.current);
       longPressTimer.current = null;
     }
+    pressStart.current = null;
   };
-  const startLongPress = () => {
+  const startLongPress = (x: number, y: number) => {
     longPressFired.current = false;
-    clearLongPress();
+    pressStart.current = { x, y };
+    if (longPressTimer.current) window.clearTimeout(longPressTimer.current);
     longPressTimer.current = window.setTimeout(() => {
       longPressFired.current = true;
       if (navigator.vibrate) {
@@ -2956,6 +2959,14 @@ function MessageBubble({
       }
       setPickerOpen(true);
     }, 360);
+  };
+  // Cancel the timer if the finger drifts more than ~10px — that's a
+  // scroll, not a long-press.
+  const onPressMove = (x: number, y: number) => {
+    if (!pressStart.current) return;
+    const dx = x - pressStart.current.x;
+    const dy = y - pressStart.current.y;
+    if (dx * dx + dy * dy > 100) clearLongPress();
   };
 
   // Bubble palette flips with darkMode AND mine-ness:
@@ -3048,7 +3059,8 @@ function MessageBubble({
         }}
       >
         <div
-          onPointerDown={() => startLongPress()}
+          onPointerDown={(e) => startLongPress(e.clientX, e.clientY)}
+          onPointerMove={(e) => onPressMove(e.clientX, e.clientY)}
           onPointerUp={() => clearLongPress()}
           onPointerCancel={() => clearLongPress()}
           onPointerLeave={() => clearLongPress()}
@@ -3174,12 +3186,23 @@ function ReactionPicker({
   onPick: (emoji: string) => void;
   onClose: () => void;
 }) {
-  // Dismiss on outside tap. Capture phase so a tap on a button still
-  // fires the button's onClick first.
+  const pickerRef = useRef<HTMLDivElement | null>(null);
+
+  // Outside-tap dismiss — but only if the tap is OUTSIDE the picker.
+  // Previously we used `once: true`, which also fired when the user
+  // tapped an emoji inside, unmounting the picker before the emoji's
+  // click could fire (pointerdown happens before click on mobile). Now
+  // we check the event target and short-circuit if it's inside.
   useEffect(() => {
-    const handler = () => onClose();
+    const handler = (e: PointerEvent) => {
+      const target = e.target as Node | null;
+      if (target && pickerRef.current?.contains(target)) return;
+      onClose();
+    };
+    // Bind on the next tick so the pointerdown that opened the picker
+    // doesn't immediately close it.
     const t = window.setTimeout(() => {
-      document.addEventListener("pointerdown", handler, { once: true });
+      document.addEventListener("pointerdown", handler);
     }, 0);
     return () => {
       window.clearTimeout(t);
@@ -3193,6 +3216,7 @@ function ReactionPicker({
 
   return (
     <div
+      ref={pickerRef}
       role="dialog"
       aria-label="React"
       style={{
