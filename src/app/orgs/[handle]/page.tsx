@@ -356,17 +356,23 @@ function Header({
 }) {
   return (
     <div
+      className="vibe-org-header"
       style={{
-        display: "flex",
-        alignItems: "flex-end",
-        gap: 16,
         marginTop: 18,
         padding: "0 16px 16px",
-        flexWrap: "wrap",
+        display: "grid",
+        gridTemplateColumns: "auto minmax(0, 1fr) auto",
+        columnGap: 16,
+        rowGap: 12,
+        alignItems: "flex-end",
       }}
     >
+      {/* Logo */}
       <div
+        className="vibe-org-header-logo"
         style={{
+          gridColumn: 1,
+          gridRow: 1,
           width: "clamp(72px, 22vw, 96px)",
           height: "clamp(72px, 22vw, 96px)",
           borderRadius: 20,
@@ -383,7 +389,6 @@ function Header({
           color: "#fff",
           boxShadow:
             "inset 0 1px 0 rgba(255,255,255,0.3), 0 12px 32px rgba(0,0,0,0.45)",
-          flexShrink: 0,
         }}
       >
         {!org.logo_url
@@ -396,32 +401,44 @@ function Header({
               .toUpperCase()
           : null}
       </div>
-      <div style={{ flex: 1, minWidth: 0 }}>
-        {/* Title always on its own line — chips + handle + member count
-            live in a single wrap-friendly meta row below so a long name
-            doesn't push status chips to their own stacked lines. */}
+
+      {/* Title stack — name on its own line, chips on their own row,
+          @handle + member count on a third row. Each row gates its
+          own wrapping so a long name can't push chips into stacked
+          single-item rows. */}
+      <div
+        className="vibe-org-header-title"
+        style={{
+          gridColumn: 2,
+          gridRow: 1,
+          minWidth: 0,
+          display: "flex",
+          flexDirection: "column",
+          gap: 8,
+        }}
+      >
         <h1
           style={{
             margin: 0,
             fontFamily: "Fraunces, serif",
-            fontSize: "clamp(22px, 5.5vw, 36px)",
+            fontSize: "clamp(20px, 5.2vw, 36px)",
             fontWeight: 900,
             letterSpacing: "-0.6px",
-            lineHeight: 1.1,
-            wordBreak: "break-word",
+            lineHeight: 1.15,
+            overflowWrap: "break-word",
           }}
         >
           {org.name}
         </h1>
+        {/* Chip row: Verified · Public/Private · Dormant?
+            flex-wrap so the row breaks AFTER chips overflow, not in
+            the middle of a chip. */}
         <div
           style={{
-            marginTop: 8,
             display: "flex",
             flexWrap: "wrap",
             alignItems: "center",
-            gap: 8,
-            fontSize: 13,
-            color: "rgba(255,255,255,0.7)",
+            gap: 6,
           }}
         >
           {org.verified ? <VerifiedBadge /> : null}
@@ -431,16 +448,48 @@ function Header({
             <Chip color="#9DD8FF">Public</Chip>
           )}
           {org.dormant ? <Chip color="#E84D4D">Dormant</Chip> : null}
-          <span style={{ display: "inline-flex", gap: 6, alignItems: "center" }}>
-            <span>@{org.handle}</span>
-            <span style={{ opacity: 0.4 }}>·</span>
-            <span>
-              {org.member_count} {org.member_count === 1 ? "member" : "members"}
-            </span>
+        </div>
+        {/* Handle + member count on their own line so they never get
+            pushed onto a chip's row or under the join button. */}
+        <div
+          style={{
+            fontSize: 13,
+            color: "rgba(255,255,255,0.7)",
+            display: "flex",
+            flexWrap: "wrap",
+            alignItems: "center",
+            gap: 8,
+          }}
+        >
+          <span
+            style={{
+              whiteSpace: "nowrap",
+              overflow: "hidden",
+              textOverflow: "ellipsis",
+              maxWidth: "100%",
+            }}
+          >
+            @{org.handle}
+          </span>
+          <span style={{ opacity: 0.4 }}>·</span>
+          <span style={{ whiteSpace: "nowrap" }}>
+            {org.member_count} {org.member_count === 1 ? "member" : "members"}
           </span>
         </div>
       </div>
-      <div style={{ flexShrink: 0 }}>{children}</div>
+
+      {/* Join button — desktop lives in the 3rd column flush right,
+          mobile snaps to a full-width row below via the CSS override
+          in globals.css. */}
+      <div
+        className="vibe-org-header-join"
+        style={{
+          gridColumn: 3,
+          gridRow: 1,
+        }}
+      >
+        {children}
+      </div>
     </div>
   );
 }

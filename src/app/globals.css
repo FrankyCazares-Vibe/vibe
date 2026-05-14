@@ -2464,6 +2464,22 @@ a.otto-room-row-title:hover {
   .vibe-org-shell {
     padding: 0 14px 56px !important;
   }
+  /* Header collapses to 2 columns; the Join cell drops to its own
+     row spanning both columns, full-width on the button inside. */
+  .vibe-org-header {
+    grid-template-columns: auto minmax(0, 1fr) !important;
+    padding: 0 14px 14px !important;
+  }
+  .vibe-org-header-join {
+    grid-column: 1 / -1 !important;
+    grid-row: 2 !important;
+  }
+  /* Make whatever join control is rendered inside fill the row so
+     it can't visually overlap the meta text above it. */
+  .vibe-org-header-join > * {
+    width: 100% !important;
+    justify-content: center !important;
+  }
   .vibe-org-grid {
     grid-template-columns: minmax(0, 1fr) !important;
     gap: 16px !important;
