@@ -1,5 +1,6 @@
 "use client";
 
+import { AnimatePresence, motion } from "framer-motion";
 import Link from "next/link";
 import { useCallback, useEffect, useRef, useState } from "react";
 
@@ -566,6 +567,11 @@ function SuggestionGroups({
   onStateChange: (id: string, next: FollowState) => void;
   onDismiss: (user: ListUser) => void;
 }) {
+  // Track which suggestion row is currently being hovered/touched so we
+  // can render the Aceternity-style soft glow behind it. Single state
+  // for the whole list — only one row glows at a time.
+  const [hoveredId, setHoveredId] = useState<string | null>(null);
+
   // Bucket users by category; the API already pre-sorts by strength
   // (mutuals desc → shared_orgs desc) so within-group order is honored.
   const buckets: Record<SuggestionCategory, ListUser[]> = {
@@ -616,13 +622,52 @@ function SuggestionGroups({
             </header>
             <ul style={listStyle}>
               {bucket.map((u) => (
-                <UserRow
+                <div
                   key={u.id}
-                  user={u}
-                  onStateChange={onStateChange}
-                  variant="suggestion"
-                  onDismiss={() => onDismiss(u)}
-                />
+                  style={{ position: "relative" }}
+                  onMouseEnter={() => setHoveredId(u.id)}
+                  onMouseLeave={() => setHoveredId(null)}
+                  onPointerDown={() => setHoveredId(u.id)}
+                  onPointerUp={() => setHoveredId(null)}
+                  onPointerCancel={() => setHoveredId(null)}
+                >
+                  {/* Glow that animates between rows — same hoverBackground
+                      layoutId pattern as Aceternity's card-hover-effect. */}
+                  <AnimatePresence>
+                    {hoveredId === u.id ? (
+                      <motion.span
+                        layoutId="vibe-suggestion-hover"
+                        aria-hidden
+                        style={{
+                          position: "absolute",
+                          inset: -4,
+                          borderRadius: 20,
+                          background:
+                            "radial-gradient(120% 100% at 50% 50%, rgba(255,92,53,0.18) 0%, rgba(255,222,180,0.10) 55%, rgba(255,222,180,0) 90%)",
+                          pointerEvents: "none",
+                          zIndex: 0,
+                        }}
+                        initial={{ opacity: 0 }}
+                        animate={{
+                          opacity: 1,
+                          transition: { duration: 0.15 },
+                        }}
+                        exit={{
+                          opacity: 0,
+                          transition: { duration: 0.15, delay: 0.1 },
+                        }}
+                      />
+                    ) : null}
+                  </AnimatePresence>
+                  <div style={{ position: "relative", zIndex: 1 }}>
+                    <UserRow
+                      user={u}
+                      onStateChange={onStateChange}
+                      variant="suggestion"
+                      onDismiss={() => onDismiss(u)}
+                    />
+                  </div>
+                </div>
               ))}
             </ul>
           </section>

@@ -8,6 +8,7 @@ import { Fragment, useCallback, useEffect, useMemo, useRef, useState } from "rea
 import { CampusAppShell } from "@/components/campus-app-shell";
 import { ImageCropperModal } from "@/components/ImageCropperModal";
 import { emitCalendarChanged } from "@/components/LeftNav";
+import { GlareCard } from "@/components/ui/glare-card";
 import { FILTER_CSS } from "@/lib/clip/edit-metadata";
 import {
   bindMentionPicker,
@@ -7462,7 +7463,19 @@ function EventCard({ ev, onMutate }: { ev: CampusEvent; onMutate: () => void }) 
   };
 
   return (
-    <DarkGlassCard style={{ borderLeft: `3px solid ${accent}` }}>
+    <GlareCard containerClassName="w-full rounded-[18px]">
+      {/* Inner content surface — keeps the existing DarkGlassCard look
+          (cream-on-dark glass) but lives inside the GlareCard's
+          tilt+glare effect. Accent stripe stays on the left edge. */}
+      <div
+        style={{
+          ...DARK_GLASS_SURFACE,
+          borderRadius: 18,
+          padding: 20,
+          borderLeft: `3px solid ${accent}`,
+          height: "100%",
+        }}
+      >
       <div
         style={{
           display: "flex",
@@ -7606,7 +7619,8 @@ function EventCard({ ev, onMutate }: { ev: CampusEvent; onMutate: () => void }) 
           ) : null}
         </div>
       ) : null}
-    </DarkGlassCard>
+      </div>
+    </GlareCard>
   );
 }
 

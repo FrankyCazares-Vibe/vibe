@@ -5,9 +5,15 @@ import { useRef } from "react";
 export const GlareCard = ({
   children,
   className,
+  containerClassName,
 }: {
   children: React.ReactNode;
+  /** Inner content surface — controls the card's background color. */
   className?: string;
+  /** Outer wrapper — override to change the card's size/aspect ratio
+   *  away from the default 320×395 17:21. Pass e.g. `w-full` to make
+   *  the card fill its parent. */
+  containerClassName?: string;
 }) => {
   const isPointerInside = useRef(false);
   const refElement = useRef<HTMLDivElement>(null);
@@ -68,7 +74,11 @@ export const GlareCard = ({
   return (
     <div
       style={containerStyle}
-      className="relative isolate [aspect-ratio:17/21] w-[320px] transition-transform delay-[var(--delay)] duration-[var(--duration)] ease-[var(--easing)] will-change-transform [contain:layout_style] [perspective:600px]"
+      className={cn(
+        "relative isolate transition-transform delay-[var(--delay)] duration-[var(--duration)] ease-[var(--easing)] will-change-transform [contain:layout_style] [perspective:600px]",
+        // Default sizing — override via containerClassName.
+        containerClassName ?? "[aspect-ratio:17/21] w-[320px]",
+      )}
       ref={refElement}
       onPointerMove={(event) => {
         const rotateFactor = 0.4;
