@@ -3131,7 +3131,15 @@ const SHEEN_KEYFRAMES = `
   }
 `;
 
-export function CampusBanner() {
+export function CampusBanner({
+  compactSearch = false,
+  onSearchTap,
+}: {
+  /** Mobile collapses the search bar into a single icon so the banner
+   *  doesn't get bunched up. Tap fires `onSearchTap`. */
+  compactSearch?: boolean;
+  onSearchTap?: () => void;
+} = {}) {
   // Live stats for the campus header line. The heartbeat updates the
   // viewer's `users.last_active_at` so the active-now count includes
   // them; the stats endpoint counts everyone with a fresh timestamp
@@ -3283,7 +3291,42 @@ export function CampusBanner() {
           />
         </svg>
       </Link>
-      <CampusSearchBar />
+      {compactSearch ? (
+        <button
+          type="button"
+          onClick={() => onSearchTap?.()}
+          aria-label="Search campus"
+          title="Search"
+          style={{
+            display: "inline-flex",
+            alignItems: "center",
+            justifyContent: "center",
+            width: 38,
+            height: 38,
+            borderRadius: 12,
+            background: "rgba(255,255,255,0.14)",
+            border: "1px solid rgba(255,255,255,0.18)",
+            color: "#fff",
+            cursor: "pointer",
+            flexShrink: 0,
+            boxShadow: "inset 0 1px 0 rgba(255,255,255,0.18)",
+            transition: "background 140ms ease, transform 140ms ease",
+            WebkitTapHighlightColor: "transparent",
+          }}
+        >
+          <svg width="18" height="18" viewBox="0 0 18 18" fill="none" aria-hidden>
+            <circle cx="8" cy="8" r="5.2" stroke="currentColor" strokeWidth="1.7" />
+            <path
+              d="M12 12l4 4"
+              stroke="currentColor"
+              strokeWidth="1.7"
+              strokeLinecap="round"
+            />
+          </svg>
+        </button>
+      ) : (
+        <CampusSearchBar />
+      )}
     </header>
   );
 }

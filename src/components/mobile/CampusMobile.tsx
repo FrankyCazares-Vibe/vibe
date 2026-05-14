@@ -75,6 +75,7 @@ export function CampusMobile() {
     { x: number; y: number } | undefined
   >(undefined);
   const composerFabRef = useRef<HTMLButtonElement | null>(null);
+  const [searchOpen, setSearchOpen] = useState(false);
 
   const tabScrollRef = useRef<HTMLDivElement | null>(null);
   const isProgrammaticScrollRef = useRef(false);
@@ -196,7 +197,7 @@ export function CampusMobile() {
           zIndex: 6,
         }}
       >
-        <CampusBanner />
+        <CampusBanner compactSearch onSearchTap={() => setSearchOpen(true)} />
       </div>
 
       {/* Otto horizontal strip — heads-up + trending. Tap a trending
@@ -303,6 +304,13 @@ export function CampusMobile() {
             setComposerOpen(false);
           }}
         />
+      ) : null}
+
+      {/* Search overlay (mobile) — replaces the squished search bar
+          in the banner. Tap the search icon → this slides in from the
+          top with a focused input + live results. */}
+      {searchOpen ? (
+        <CampusSearchOverlay onClose={() => setSearchOpen(false)} />
       ) : null}
 
       {/* Viewers */}
@@ -1255,6 +1263,553 @@ const ComposerFab = ({
     </>
   );
 };
+
+// ---------- Search overlay ----------
+
+type SearchUser = {
+  id: string;
+  name: string | null;
+  handle: string | null;
+  avatar_url: string | null;
+  major: string | null;
+  year: string | number | null;
+};
+
+type SearchOrg = {
+  id: string;
+  handle: string;
+  name: string;
+  logo_url: string | null;
+  verified: boolean;
+};
+
+type SearchEvent = {
+  id: string;
+  title: string;
+  starts_at: string;
+  location: string | null;
+  org_handle: string | null;
+};
+
+function CampusSearchOverlay({ onClose }: { onClose: () => void }) {
+  const [value, setValue] = useState("");
+  const [debounced, setDebounced] = useState("");
+  const [users, setUsers] = useState<SearchUser[]>([]);
+  const [orgs, setOrgs] = useState<SearchOrg[]>([]);
+  const [events, setEvents] = useState<SearchEvent[]>([]);
+  const [loading, setLoading] = useState(false);
+  const inputRef = useRef<HTMLInputElement | null>(null);
+  const seqRef = useRef(0);
+
+  // Hide bottom tab bar while the search is up.
+  useEffect(() => {
+    document.body.classList.add("vibe-composer-open");
+    return () => document.body.classList.remove("vibe-composer-open");
+  }, []);
+
+  // Autofocus on mount.
+  useEffect(() => {
+    const t = window.setTimeout(() => inputRef.current?.focus(), 60);
+    return () => window.clearTimeout(t);
+  }, []);
+
+  // Debounce.
+  useEffect(() => {
+    const t = setTimeout(() => setDebounced(value.trim()), 220);
+    return () => clearTimeout(t);
+  }, [value]);
+
+  // Search fetch.
+  useEffect(() => {
+    if (!debounced) {
+      setUsers([]);
+      setOrgs([]);
+      setEvents([]);
+      setLoading(false);
+      return;
+    }
+    const seq = ++seqRef.current;
+    (async () => {
+      setLoading(true);
+      try {
+        const r = await fetch(
+          `/api/search?q=${encodeURIComponent(debounced)}&limit=8`,
+          { credentials: "include", cache: "no-store" },
+        );
+        const j = r.ok ? await r.json() : { ok: false };
+        if (seq !== seqRef.current) return;
+        if (j?.ok) {
+          setUsers(Array.isArray(j.users) ? j.users : []);
+          setOrgs(Array.isArray(j.orgs) ? j.orgs : []);
+          setEvents(Array.isArray(j.events) ? j.events : []);
+        } else {
+          setUsers([]);
+          setOrgs([]);
+          setEvents([]);
+        }
+      } catch {
+        if (seq !== seqRef.current) return;
+        setUsers([]);
+        setOrgs([]);
+        setEvents([]);
+      } finally {
+        if (seq === seqRef.current) setLoading(false);
+      }
+    })();
+  }, [debounced]);
+
+  const hasResults =
+    users.length > 0 || orgs.length > 0 || events.length > 0;
+
+  return (
+    <div
+      role="dialog"
+      aria-modal="true"
+      aria-label="Search"
+      style={{
+        position: "fixed",
+        inset: 0,
+        zIndex: 1300,
+        background: "#FAF7F2",
+        display: "flex",
+        flexDirection: "column",
+      }}
+    >
+      {/* Search bar */}
+      <header
+        style={{
+          display: "flex",
+          alignItems: "center",
+          gap: 8,
+          padding: "calc(env(safe-area-inset-top, 0px) + 10px) 12px 10px",
+          background: "rgba(250,247,242,0.96)",
+          backdropFilter: "saturate(160%) blur(14px)",
+          WebkitBackdropFilter: "saturate(160%) blur(14px)",
+          borderBottom: "1px solid rgba(28,28,30,0.06)",
+        }}
+      >
+        <button
+          type="button"
+          onClick={onClose}
+          aria-label="Cancel"
+          style={{
+            width: 38,
+            height: 38,
+            borderRadius: 999,
+            background: "transparent",
+            border: "none",
+            color: "#1C1C1E",
+            cursor: "pointer",
+            display: "inline-flex",
+            alignItems: "center",
+            justifyContent: "center",
+            flexShrink: 0,
+          }}
+        >
+          <svg width="22" height="22" viewBox="0 0 22 22" fill="none" aria-hidden>
+            <path
+              d="M14 4L7 11l7 7"
+              stroke="currentColor"
+              strokeWidth="2"
+              strokeLinecap="round"
+              strokeLinejoin="round"
+            />
+          </svg>
+        </button>
+        <div style={{ position: "relative", flex: 1 }}>
+          <span
+            aria-hidden
+            style={{
+              position: "absolute",
+              left: 14,
+              top: "50%",
+              transform: "translateY(-50%)",
+              color: "#8A8580",
+              display: "inline-flex",
+            }}
+          >
+            <svg width="16" height="16" viewBox="0 0 16 16" fill="none">
+              <circle cx="7" cy="7" r="5" stroke="currentColor" strokeWidth="1.5" />
+              <path d="M11 11l3 3" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" />
+            </svg>
+          </span>
+          <input
+            ref={inputRef}
+            type="search"
+            placeholder="Search people, orgs, events"
+            value={value}
+            onChange={(e) => setValue(e.target.value)}
+            autoCorrect="off"
+            autoCapitalize="none"
+            spellCheck={false}
+            style={{
+              width: "100%",
+              padding: "11px 14px 11px 38px",
+              borderRadius: 14,
+              border: "1px solid rgba(28,28,30,0.10)",
+              background: "rgba(255,255,255,0.92)",
+              fontFamily: "DM Sans, sans-serif",
+              fontSize: 15,
+              color: "#1C1C1E",
+              outline: "none",
+            }}
+          />
+        </div>
+      </header>
+
+      {/* Results */}
+      <div
+        style={{
+          flex: 1,
+          overflowY: "auto",
+          WebkitOverflowScrolling: "touch",
+          padding: "10px 0 18px",
+        }}
+      >
+        {!debounced ? (
+          <SearchHint />
+        ) : loading ? (
+          <SearchLoading />
+        ) : !hasResults ? (
+          <EmptyTab
+            title={`No matches for "${debounced}"`}
+            body="Try a name, @handle, or org. Spelling matters."
+          />
+        ) : (
+          <>
+            {users.length > 0 ? (
+              <SearchSection label="People">
+                {users.map((u) => (
+                  <SearchUserRow key={u.id} u={u} onPick={onClose} />
+                ))}
+              </SearchSection>
+            ) : null}
+            {orgs.length > 0 ? (
+              <SearchSection label="Orgs">
+                {orgs.map((o) => (
+                  <SearchOrgRow key={o.id} o={o} onPick={onClose} />
+                ))}
+              </SearchSection>
+            ) : null}
+            {events.length > 0 ? (
+              <SearchSection label="Events">
+                {events.map((ev) => (
+                  <SearchEventRow key={ev.id} ev={ev} onPick={onClose} />
+                ))}
+              </SearchSection>
+            ) : null}
+          </>
+        )}
+      </div>
+    </div>
+  );
+}
+
+function SearchSection({
+  label,
+  children,
+}: {
+  label: string;
+  children: React.ReactNode;
+}) {
+  return (
+    <section style={{ padding: "10px 16px 4px" }}>
+      <div
+        style={{
+          padding: "0 0 6px",
+          fontFamily: "DM Sans, sans-serif",
+          fontSize: 11,
+          fontWeight: 800,
+          letterSpacing: "0.08em",
+          textTransform: "uppercase",
+          color: "#8A8580",
+        }}
+      >
+        {label}
+      </div>
+      <div style={{ display: "flex", flexDirection: "column" }}>{children}</div>
+    </section>
+  );
+}
+
+function SearchUserRow({ u, onPick }: { u: SearchUser; onPick: () => void }) {
+  const initials = (u.name ?? u.handle ?? "?")
+    .trim()
+    .split(/\s+/)
+    .slice(0, 2)
+    .map((p) => p[0]?.toUpperCase() ?? "")
+    .join("");
+  const yearLabel = u.year ? `Year ${u.year}` : null;
+  return (
+    <Link
+      href={u.handle ? `/profile/${u.handle}` : "#"}
+      onClick={onPick}
+      style={{
+        display: "flex",
+        alignItems: "center",
+        gap: 12,
+        padding: "10px 4px",
+        textDecoration: "none",
+        color: "inherit",
+        borderBottom: "1px solid rgba(28,28,30,0.04)",
+      }}
+    >
+      <div
+        style={{
+          width: 42,
+          height: 42,
+          borderRadius: 999,
+          background: u.avatar_url
+            ? `url(${u.avatar_url}) center/cover`
+            : "#FFD3C2",
+          display: "flex",
+          alignItems: "center",
+          justifyContent: "center",
+          color: "#1C1C1E",
+          fontFamily: "Fraunces, serif",
+          fontWeight: 800,
+          fontSize: 15,
+          flexShrink: 0,
+          border: "1px solid rgba(255,255,255,0.6)",
+        }}
+      >
+        {!u.avatar_url ? initials : null}
+      </div>
+      <div style={{ flex: 1, minWidth: 0 }}>
+        <div
+          style={{
+            fontFamily: "Fraunces, serif",
+            fontSize: 15,
+            fontWeight: 700,
+            color: "#1C1C1E",
+            whiteSpace: "nowrap",
+            overflow: "hidden",
+            textOverflow: "ellipsis",
+          }}
+        >
+          {u.name || (u.handle ? `@${u.handle}` : "Member")}
+        </div>
+        <div
+          style={{
+            fontFamily: "DM Sans, sans-serif",
+            fontSize: 12,
+            color: "#8A8580",
+            fontWeight: 600,
+            whiteSpace: "nowrap",
+            overflow: "hidden",
+            textOverflow: "ellipsis",
+          }}
+        >
+          {[u.handle ? `@${u.handle}` : null, u.major, yearLabel]
+            .filter(Boolean)
+            .join(" · ")}
+        </div>
+      </div>
+    </Link>
+  );
+}
+
+function SearchOrgRow({ o, onPick }: { o: SearchOrg; onPick: () => void }) {
+  return (
+    <Link
+      href={`/orgs/${encodeURIComponent(o.handle)}`}
+      onClick={onPick}
+      style={{
+        display: "flex",
+        alignItems: "center",
+        gap: 12,
+        padding: "10px 4px",
+        textDecoration: "none",
+        color: "inherit",
+        borderBottom: "1px solid rgba(28,28,30,0.04)",
+      }}
+    >
+      <div
+        style={{
+          width: 42,
+          height: 42,
+          borderRadius: 12,
+          background: o.logo_url
+            ? `url(${o.logo_url}) center/cover`
+            : "linear-gradient(135deg,#FFD3C2 0%,#FF9D7E 100%)",
+          flexShrink: 0,
+          border: "1px solid rgba(255,255,255,0.6)",
+        }}
+      />
+      <div style={{ flex: 1, minWidth: 0 }}>
+        <div
+          style={{
+            display: "flex",
+            alignItems: "center",
+            gap: 6,
+            fontFamily: "Fraunces, serif",
+            fontSize: 15,
+            fontWeight: 700,
+            color: "#1C1C1E",
+          }}
+        >
+          <span
+            style={{
+              whiteSpace: "nowrap",
+              overflow: "hidden",
+              textOverflow: "ellipsis",
+            }}
+          >
+            {o.name}
+          </span>
+          {o.verified ? (
+            <span
+              aria-label="Verified"
+              style={{
+                width: 13,
+                height: 13,
+                borderRadius: "50%",
+                background: "#5BD18C",
+                display: "inline-flex",
+                alignItems: "center",
+                justifyContent: "center",
+                color: "#fff",
+                fontSize: 8.5,
+                fontWeight: 900,
+              }}
+            >
+              ✓
+            </span>
+          ) : null}
+        </div>
+        <div
+          style={{
+            fontFamily: "DM Sans, sans-serif",
+            fontSize: 12,
+            color: "#8A8580",
+            fontWeight: 600,
+          }}
+        >
+          @{o.handle}
+        </div>
+      </div>
+    </Link>
+  );
+}
+
+function SearchEventRow({
+  ev,
+  onPick,
+}: {
+  ev: SearchEvent;
+  onPick: () => void;
+}) {
+  const when = new Date(ev.starts_at).toLocaleString(undefined, {
+    weekday: "short",
+    month: "short",
+    day: "numeric",
+    hour: "numeric",
+    minute: "2-digit",
+  });
+  return (
+    <Link
+      href={
+        ev.org_handle
+          ? `/orgs/${encodeURIComponent(ev.org_handle)}?event=${ev.id}`
+          : "#"
+      }
+      onClick={onPick}
+      style={{
+        display: "flex",
+        alignItems: "center",
+        gap: 12,
+        padding: "10px 4px",
+        textDecoration: "none",
+        color: "inherit",
+        borderBottom: "1px solid rgba(28,28,30,0.04)",
+      }}
+    >
+      <div
+        style={{
+          width: 42,
+          height: 42,
+          borderRadius: 12,
+          background: "linear-gradient(135deg,#FFD3C2 0%,#FF7A4D 100%)",
+          color: "#fff",
+          display: "flex",
+          alignItems: "center",
+          justifyContent: "center",
+          flexShrink: 0,
+        }}
+      >
+        <svg width="18" height="18" viewBox="0 0 18 18" fill="none" aria-hidden>
+          <rect x="2.5" y="4" width="13" height="11" rx="2" stroke="currentColor" strokeWidth="1.6" fill="none" />
+          <path d="M2.5 7.5h13" stroke="currentColor" strokeWidth="1.6" />
+          <path d="M6 2v3M12 2v3" stroke="currentColor" strokeWidth="1.6" strokeLinecap="round" />
+        </svg>
+      </div>
+      <div style={{ flex: 1, minWidth: 0 }}>
+        <div
+          style={{
+            fontFamily: "Fraunces, serif",
+            fontSize: 15,
+            fontWeight: 700,
+            color: "#1C1C1E",
+            whiteSpace: "nowrap",
+            overflow: "hidden",
+            textOverflow: "ellipsis",
+          }}
+        >
+          {ev.title}
+        </div>
+        <div
+          style={{
+            fontFamily: "DM Sans, sans-serif",
+            fontSize: 12,
+            color: "#8A8580",
+            fontWeight: 600,
+            whiteSpace: "nowrap",
+            overflow: "hidden",
+            textOverflow: "ellipsis",
+          }}
+        >
+          {when}
+          {ev.location ? ` · ${ev.location}` : ""}
+        </div>
+      </div>
+    </Link>
+  );
+}
+
+function SearchHint() {
+  return (
+    <div
+      style={{
+        padding: "48px 24px",
+        textAlign: "center",
+        color: "#5C5853",
+        fontFamily: "DM Sans, sans-serif",
+        fontSize: 13.5,
+        lineHeight: 1.55,
+      }}
+    >
+      Search people, orgs, and events across campus.
+      <br />
+      Type a name, @handle, or topic.
+    </div>
+  );
+}
+
+function SearchLoading() {
+  return (
+    <div
+      style={{
+        padding: "32px 24px",
+        textAlign: "center",
+        color: "#8A8580",
+        fontFamily: "DM Sans, sans-serif",
+        fontSize: 13,
+      }}
+    >
+      Searching…
+    </div>
+  );
+}
 
 function FabAction({
   label,
