@@ -1325,6 +1325,76 @@ body.viewer-mode .doc-edit-cta { display:none; }
 .modal-title { font-family:'Fraunces',serif;font-size:22px;font-weight:800;margin-bottom:20px;letter-spacing:-.5px; }
 .modal-close { position:absolute;top:20px;right:20px;background:var(--cream);border:none;border-radius:50%;width:32px;height:32px;font-size:16px;cursor:none;display:flex;align-items:center;justify-content:center;transition:background .15s; }
 .modal-close:hover { background:var(--border); }
+
+/* Drafts modal (P1-018) — list of draft clips with publish/delete. */
+.drafts-list { max-height:60vh; overflow-y:auto; padding-right:4px; }
+.draft-row {
+  display:flex; align-items:center; gap:12px;
+  padding:12px; border-radius:14px;
+  border:1px solid var(--border);
+  margin-bottom:10px; background:#FAF7F2;
+}
+.draft-row-thumb {
+  width:56px; height:88px; border-radius:10px;
+  overflow:hidden; flex-shrink:0;
+  background:#1C1C1E; position:relative;
+}
+.draft-row-meta { flex:1; min-width:0; }
+.draft-row-caption {
+  font-size:14px; font-weight:600;
+  color:var(--charcoal); line-height:1.35;
+  display:-webkit-box; -webkit-line-clamp:2; -webkit-box-orient:vertical;
+  overflow:hidden;
+}
+.draft-row-time {
+  margin-top:4px; font-size:11px;
+  color:var(--muted); font-weight:600;
+  letter-spacing:.04em;
+}
+.draft-row-actions { display:flex; gap:6px; }
+.draft-row-btn {
+  padding:7px 14px; border-radius:999px;
+  font-family:'DM Sans',sans-serif; font-size:12px;
+  font-weight:700; cursor:none; border:none;
+}
+.draft-row-btn.publish { background:#FF5C35; color:white; }
+.draft-row-btn.publish:hover { background:#E04A26; }
+.draft-row-btn.delete {
+  background:transparent; color:#C54323;
+  border:1px solid #E8AAA0;
+}
+.draft-row-btn.delete:hover { background:rgba(197,67,35,.08); }
+.drafts-empty {
+  padding:32px 16px; text-align:center;
+  color:var(--muted); font-size:13px;
+}
+
+/* Drafts tile in the Clips grid — first cell, owner-only. */
+.drafts-tile { position:relative; cursor:none; }
+.drafts-tile .drafts-tile-overlay {
+  position:absolute; inset:0;
+  background:linear-gradient(180deg,rgba(0,0,0,.18) 0%,rgba(0,0,0,.62) 100%);
+}
+.drafts-tile-lock {
+  position:absolute; top:6px; right:6px;
+  width:22px; height:22px; border-radius:50%;
+  background:rgba(0,0,0,.55); color:white;
+  display:flex; align-items:center; justify-content:center;
+}
+.drafts-tile-info {
+  position:absolute; left:8px; right:8px; bottom:8px;
+  color:white; pointer-events:none;
+}
+.drafts-tile-title {
+  font-family:'DM Sans',sans-serif; font-size:13px;
+  font-weight:800; letter-spacing:.02em;
+  text-shadow:0 1px 3px rgba(0,0,0,.5);
+}
+.drafts-tile-count {
+  font-size:11px; font-weight:600;
+  opacity:.85; margin-top:2px;
+}
+
 .form-group { margin-bottom:16px; }
 .form-label { font-size:12px;font-weight:700;color:var(--muted);letter-spacing:.5px;text-transform:uppercase;margin-bottom:6px;display:block; }
 .form-input, .form-textarea {
@@ -4121,6 +4191,21 @@ body.empty-profile-mode #profileEmpty { display: flex !important; }
     <div class="modal-actions">
       <button class="btn-cancel" onclick="closeModal('currentModal')">Cancel</button>
       <button class="btn-save-modal" onclick="saveCurrent()">Add it</button>
+    </div>
+  </div>
+</div>
+
+<!-- Drafts modal — view / publish / delete saved drafts (owner only).
+     Editing the clip itself stays on mobile; desktop is a list view. -->
+<div class="modal-backdrop" id="draftsModal" onclick="if(event.target===this)closeModal('draftsModal')">
+  <div class="modal drafts-modal" style="width:560px;max-width:92vw;padding:24px;">
+    <button class="modal-close" onclick="closeModal('draftsModal')">×</button>
+    <div class="modal-title">Drafts</div>
+    <div style="font-size:12px;color:var(--muted);margin:-12px 0 14px;line-height:1.45;">
+      Drafts only show up for you. Tap Publish to make one public, or open it on mobile to keep editing.
+    </div>
+    <div id="draftsList" class="drafts-list">
+      <div class="drafts-empty">Loading drafts…</div>
     </div>
   </div>
 </div>
@@ -8097,6 +8182,8 @@ async function hydrateProfilePostsFromAPI() {
     // in the DOM (renderUserSections fired before this async hydration).
     const me = (typeof vibeLoad === 'function') ? vibeLoad('vibe_user_v1') : null;
     _restorePinIfPossible(me && (me.pinnedPostId || me.pinnedId));
+    // Owner-only: refresh the drafts tile after every clips re-render.
+    loadProfileDrafts();
   } catch (e) { /* silent — local cache stays */ }
 }
 
@@ -8557,6 +8644,138 @@ function _renderVibeThumb(v) {
       style="position:absolute;top:6px;left:6px;background:rgba(0,0,0,.55);color:white;border:none;border-radius:8px;width:22px;height:22px;font-size:14px;line-height:1;cursor:none;backdrop-filter:blur(4px);display:none;align-items:center;justify-content:center;">&times;</button>
   `;
   return div;
+}
+
+// ── Drafts tile + modal (owner-only) ──────────────────────────────
+// Lossless drafts list — same data shape as the mobile composer's
+// Drafts box, just a list view. Editing the clip itself stays on
+// mobile; desktop is view / publish / delete.
+async function loadProfileDrafts() {
+  // Owner only — viewers don't have access to anyone's drafts.
+  const isOwner = document.body.classList.contains('owner-mode')
+    || !document.body.classList.contains('viewer-mode');
+  if (!isOwner) {
+    const existing = document.getElementById('vibesGridDraftsTile');
+    if (existing) existing.remove();
+    return;
+  }
+  try {
+    const r = await fetch('/api/me/clip-drafts', { credentials:'include', cache:'no-store' });
+    const j = await r.json();
+    if (!j || !j.ok || !Array.isArray(j.drafts) || j.drafts.length === 0) {
+      const existing = document.getElementById('vibesGridDraftsTile');
+      if (existing) existing.remove();
+      return;
+    }
+    _renderDraftsTile(j.drafts.length, j.drafts[0]?.media_thumbnail_url || null);
+  } catch { /* silent — tile just doesn't appear */ }
+}
+
+function _renderDraftsTile(count, poster) {
+  const grid = document.getElementById('profileVibesGrid');
+  if (!grid) return;
+  let tile = document.getElementById('vibesGridDraftsTile');
+  if (!tile) {
+    tile = document.createElement('div');
+    tile.id = 'vibesGridDraftsTile';
+    tile.className = 'vibe-grid-thumb drafts-tile owner-only';
+    tile.onclick = () => openDraftsModal();
+    grid.insertBefore(tile, grid.firstChild);
+  }
+  tile.innerHTML = `
+    <div class="vibe-grid-bg" style="background:${poster
+      ? `center/cover no-repeat url(&quot;${poster}&quot;)`
+      : 'linear-gradient(160deg,#2A2A2D 0%,#141416 100%)'}"></div>
+    <div class="drafts-tile-overlay"></div>
+    <div class="drafts-tile-lock">
+      <svg width="11" height="11" viewBox="0 0 10 10" fill="none">
+        <rect x="2" y="4.4" width="6" height="4.2" rx="1" stroke="currentColor" stroke-width="1.1" fill="none"/>
+        <path d="M3.4 4.4V3.2a1.6 1.6 0 1 1 3.2 0v1.2" stroke="currentColor" stroke-width="1.1" fill="none" stroke-linecap="round"/>
+      </svg>
+    </div>
+    <div class="drafts-tile-info">
+      <div class="drafts-tile-title">Drafts</div>
+      <div class="drafts-tile-count">${count} clip${count === 1 ? '' : 's'}</div>
+    </div>
+  `;
+}
+
+async function openDraftsModal() {
+  openModal('draftsModal');
+  const list = document.getElementById('draftsList');
+  if (!list) return;
+  list.innerHTML = '<div class="drafts-empty">Loading drafts…</div>';
+  try {
+    const r = await fetch('/api/me/clip-drafts', { credentials:'include', cache:'no-store' });
+    const j = await r.json();
+    if (!j.ok || !Array.isArray(j.drafts) || j.drafts.length === 0) {
+      list.innerHTML = '<div class="drafts-empty">No drafts yet. Save one from the mobile composer.</div>';
+      return;
+    }
+    list.innerHTML = j.drafts.map(d => {
+      const editMeta = d.edit_metadata || null;
+      const filterCss = editMeta && editMeta.filter ? _clipFilterCss(editMeta.filter) : '';
+      const thumbBg = d.media_thumbnail_url
+        ? `background:center/cover no-repeat url("${d.media_thumbnail_url}");${filterCss ? `filter:${filterCss};` : ''}`
+        : 'background:#1C1C1E;';
+      const overlays = _renderClipOverlaysHTML(editMeta, 7);
+      const caption = _esc((d.content || '').trim() || 'Untitled draft');
+      return `
+        <div class="draft-row" data-draft-id="${d.id}">
+          <div class="draft-row-thumb">
+            <div style="position:absolute;inset:0;${thumbBg}"></div>
+            ${overlays}
+          </div>
+          <div class="draft-row-meta">
+            <div class="draft-row-caption">${caption}</div>
+            <div class="draft-row-time">${_formatRelativeDate(d.created_at)}</div>
+          </div>
+          <div class="draft-row-actions">
+            <button class="draft-row-btn publish" onclick="publishDraftFromList('${d.id}')">Publish</button>
+            <button class="draft-row-btn delete" onclick="deleteDraftFromList('${d.id}')">Delete</button>
+          </div>
+        </div>
+      `;
+    }).join('');
+  } catch {
+    list.innerHTML = '<div class="drafts-empty">Could not load drafts.</div>';
+  }
+}
+
+async function publishDraftFromList(id) {
+  if (!confirm('Publish this draft?')) return;
+  try {
+    const r = await fetch(`/api/posts/${encodeURIComponent(id)}`, {
+      method:'PATCH',
+      headers:{'Content-Type':'application/json'},
+      credentials:'include',
+      body: JSON.stringify({ status: 'published' }),
+    });
+    const j = await r.json();
+    if (!r.ok || !j.ok) throw new Error(j.error || 'Publish failed');
+    if (typeof showToast === 'function') showToast('Draft published');
+    closeModal('draftsModal');
+    if (typeof hydrateProfilePostsFromAPI === 'function') hydrateProfilePostsFromAPI();
+    loadProfileDrafts();
+  } catch {
+    if (typeof showToast === 'function') showToast('Could not publish');
+  }
+}
+
+async function deleteDraftFromList(id) {
+  if (!confirm('Delete this draft? This cannot be undone.')) return;
+  try {
+    const r = await fetch(`/api/posts/${encodeURIComponent(id)}`, {
+      method:'DELETE',
+      credentials:'include',
+    });
+    const j = await r.json();
+    if (!r.ok || !j.ok) throw new Error(j.error || 'Delete failed');
+    openDraftsModal();
+    loadProfileDrafts();
+  } catch {
+    if (typeof showToast === 'function') showToast('Could not delete');
+  }
 }
 
 function deleteVibe(btn) {
