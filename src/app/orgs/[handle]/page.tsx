@@ -183,7 +183,10 @@ export default async function OrgProfilePage({ params }: Params) {
         fontFamily: "DM Sans, sans-serif",
       }}
     >
-      <div style={{ maxWidth: 1100, margin: "0 auto", padding: "0 24px 64px" }}>
+      <div
+        className="vibe-org-shell"
+        style={{ maxWidth: 1100, margin: "0 auto", padding: "0 24px 64px" }}
+      >
         <TopNav signedIn={!!user} />
 
         {viewerRole === "owner" || viewerRole === "admin" ? (
@@ -213,6 +216,7 @@ export default async function OrgProfilePage({ params }: Params) {
         {org.description ? <Description text={org.description} /> : null}
 
         <div
+          className="vibe-org-grid"
           style={{
             display: "grid",
             gridTemplateColumns: "minmax(0, 2fr) minmax(0, 1fr)",

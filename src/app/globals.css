@@ -2453,6 +2453,23 @@ a.otto-room-row-title:hover {
 .vibe-no-scrollbar::-webkit-scrollbar {
   display: none;
 }
+
+/* Org profile page — mobile-only overrides. Inline styles on the
+   server-rendered page are tuned for desktop; these collapse the
+   2-column content grid to a single stack and trim the outer
+   padding when the viewport is phone-sized. !important is needed
+   because the inline style sets gridTemplateColumns explicitly. */
+@media (max-width: 720px) {
+  .vibe-org-shell {
+    padding: 0 14px 56px !important;
+  }
+  .vibe-org-grid {
+    grid-template-columns: minmax(0, 1fr) !important;
+    gap: 16px !important;
+    margin-top: 16px !important;
+  }
+}
+
 .vibe-mobile-tab {
   display: flex;
   flex-direction: column;
