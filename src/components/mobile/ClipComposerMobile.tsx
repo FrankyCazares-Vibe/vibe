@@ -835,6 +835,11 @@ export function ClipComposerMobile({ onClose, onPosted, origin }: Props) {
 
   const renderRecordingChrome = () => (
     <>
+      {/* 9:16 camera box anchored to the top — matches Instagram Reels
+          and TikTok. On screens taller than 9:16 (most modern iPhones)
+          the bottom band stays black and the record button lives there.
+          On 9:16 screens (iPhone SE) the box fills and chrome overlays
+          the bottom of the camera, same as before. */}
       <video
         ref={previewVideoRef}
         autoPlay
@@ -843,9 +848,11 @@ export function ClipComposerMobile({ onClose, onPosted, origin }: Props) {
         onPlaying={() => setVideoReady(true)}
         style={{
           position: "absolute",
-          inset: 0,
+          top: 0,
+          left: 0,
           width: "100%",
-          height: "100%",
+          aspectRatio: "9 / 16",
+          maxHeight: "100%",
           objectFit: "cover",
           background: "#000",
           transform: facing === "user" ? "scaleX(-1)" : "none",
