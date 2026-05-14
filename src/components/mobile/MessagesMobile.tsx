@@ -2,6 +2,7 @@
 
 import Link from "next/link";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import { Drawer } from "vaul";
 
 /**
  * iOS-native /messages rebuild for mobile. Two screens, one component:
@@ -79,6 +80,55 @@ type MessageRow = {
 };
 
 type Tab = "all" | "requests";
+
+// ---------- Vaul shared styles ----------
+// Inline styles for the bottom-sheet primitives so every sheet in this
+// file gets the same iOS-native look (cream surface, rounded top,
+// safe-area-aware bottom, drag handle). vaul owns the open/close
+// animation, drag-to-dismiss, focus trap, and scroll lock.
+
+const vaulOverlayStyle: React.CSSProperties = {
+  position: "fixed",
+  inset: 0,
+  background: "rgba(0,0,0,0.42)",
+  zIndex: 1200,
+};
+
+const vaulContentStyle: React.CSSProperties = {
+  position: "fixed",
+  bottom: 0,
+  left: 0,
+  right: 0,
+  background: "#FAF7F2",
+  borderTopLeftRadius: 20,
+  borderTopRightRadius: 20,
+  paddingBottom: "env(safe-area-inset-bottom, 0px)",
+  boxShadow: "0 -8px 32px rgba(0,0,0,0.18)",
+  zIndex: 1201,
+  outline: "none",
+};
+
+const vaulHandleStyle: React.CSSProperties = {
+  margin: "10px auto 4px",
+  width: 38,
+  height: 4,
+  borderRadius: 999,
+  background: "rgba(28,28,30,0.18)",
+};
+
+// Screen-reader-only — used to satisfy vaul's a11y requirement on
+// Drawer.Title without showing a visible header.
+const visuallyHiddenStyle: React.CSSProperties = {
+  position: "absolute",
+  width: 1,
+  height: 1,
+  padding: 0,
+  margin: -1,
+  overflow: "hidden",
+  clip: "rect(0,0,0,0)",
+  whiteSpace: "nowrap",
+  border: 0,
+};
 
 // ---------- Helpers ----------
 
@@ -1382,136 +1432,97 @@ function ConversationActionSheet({
   }, [feedback, onFeedback]);
 
   return (
-    <div
-      role="dialog"
-      aria-modal="true"
-      aria-label="Conversation actions"
-      onClick={onClose}
-      style={{
-        position: "fixed",
-        inset: 0,
-        zIndex: 1200,
-        background: "rgba(0,0,0,0.42)",
-        display: "flex",
-        alignItems: "flex-end",
-      }}
-    >
-      <div
-        onClick={(e) => e.stopPropagation()}
-        style={{
-          width: "100%",
-          background: "#FAF7F2",
-          borderTopLeftRadius: 20,
-          borderTopRightRadius: 20,
-          paddingBottom: "env(safe-area-inset-bottom, 0px)",
-          boxShadow: "0 -8px 32px rgba(0,0,0,0.18)",
-          animation: "vibeActionSheetIn 220ms cubic-bezier(0.2, 0.8, 0.2, 1)",
-        }}
-      >
-        <style>{`
-          @keyframes vibeActionSheetIn {
-            from { transform: translateY(20px); opacity: 0; }
-            to   { transform: translateY(0);    opacity: 1; }
-          }
-        `}</style>
-        {/* Grab handle */}
-        <div
-          aria-hidden
-          style={{
-            margin: "10px auto 4px",
-            width: 38,
-            height: 4,
-            borderRadius: 999,
-            background: "rgba(28,28,30,0.18)",
-          }}
-        />
-        {feedback ? (
-          <div
-            style={{
-              margin: "6px 16px 8px",
-              padding: "8px 12px",
-              borderRadius: 12,
-              background: "rgba(28,28,30,0.06)",
-              fontFamily: "DM Sans, sans-serif",
-              fontSize: 12.5,
-              color: "#1C1C1E",
-              textAlign: "center",
-            }}
-          >
-            {feedback}
+    <Drawer.Root open onOpenChange={(o) => { if (!o) onClose(); }}>
+      <Drawer.Portal>
+        <Drawer.Overlay style={vaulOverlayStyle} />
+        <Drawer.Content style={vaulContentStyle} aria-describedby={undefined}>
+          <Drawer.Title style={visuallyHiddenStyle}>Conversation actions</Drawer.Title>
+          <Drawer.Handle style={vaulHandleStyle} />
+          {feedback ? (
+            <div
+              style={{
+                margin: "6px 16px 8px",
+                padding: "8px 12px",
+                borderRadius: 12,
+                background: "rgba(28,28,30,0.06)",
+                fontFamily: "DM Sans, sans-serif",
+                fontSize: 12.5,
+                color: "#1C1C1E",
+                textAlign: "center",
+              }}
+            >
+              {feedback}
+            </div>
+          ) : null}
+
+          <div style={{ padding: "4px 0 14px" }}>
+            {isDm && peer?.handle ? (
+              <SheetRow
+                label="View profile"
+                href={`/profile/${peer.handle}`}
+                onClose={onClose}
+              />
+            ) : null}
+            {isGroup ? (
+              <SheetRow label="Group info" onClick={onOpenGroupSettings} />
+            ) : null}
+            <SheetRow
+              label={pinned ? "Unpin" : "Pin to top"}
+              onClick={() => void togglePin()}
+              disabled={busy}
+            />
+            {muted ? (
+              <SheetRow
+                label="Unmute"
+                onClick={() => void unmute()}
+                disabled={busy}
+              />
+            ) : (
+              <SheetRow
+                label="Mute…"
+                onClick={() => setMuteSheetOpen(true)}
+                disabled={busy}
+              />
+            )}
+            <SheetRow
+              label="Clear chat history"
+              onClick={() => void clearHistory()}
+              disabled={busy}
+            />
+            {isGroup ? (
+              <SheetRow
+                label="Leave group"
+                danger
+                onClick={() => void leaveGroup()}
+                disabled={busy}
+              />
+            ) : null}
+            {isDm && peer ? (
+              <SheetRow
+                label={`Block @${peer.handle ?? "user"}`}
+                danger
+                onClick={() => void blockPeer()}
+                disabled={busy}
+              />
+            ) : null}
+            <SheetRow
+              label="Delete conversation"
+              danger
+              onClick={() => void hideConversation()}
+              disabled={busy}
+            />
+            <SheetRow label="Cancel" onClick={onClose} bold />
           </div>
-        ) : null}
 
-        <div style={{ padding: "4px 0 14px" }}>
-          {isDm && peer?.handle ? (
-            <SheetRow
-              label="View profile"
-              href={`/profile/${peer.handle}`}
-              onClose={onClose}
+          {muteSheetOpen ? (
+            <MuteDurationSheet
+              onClose={() => setMuteSheetOpen(false)}
+              onPick={(h) => void muteFor(h)}
             />
           ) : null}
-          {isGroup ? (
-            <SheetRow
-              label="Group info"
-              onClick={onOpenGroupSettings}
-            />
-          ) : null}
-          <SheetRow
-            label={pinned ? "Unpin" : "Pin to top"}
-            onClick={() => void togglePin()}
-            disabled={busy}
-          />
-          {muted ? (
-            <SheetRow
-              label="Unmute"
-              onClick={() => void unmute()}
-              disabled={busy}
-            />
-          ) : (
-            <SheetRow
-              label="Mute…"
-              onClick={() => setMuteSheetOpen(true)}
-              disabled={busy}
-            />
-          )}
-          <SheetRow
-            label="Clear chat history"
-            onClick={() => void clearHistory()}
-            disabled={busy}
-          />
-          {isGroup ? (
-            <SheetRow
-              label="Leave group"
-              danger
-              onClick={() => void leaveGroup()}
-              disabled={busy}
-            />
-          ) : null}
-          {isDm && peer ? (
-            <SheetRow
-              label={`Block @${peer.handle ?? "user"}`}
-              danger
-              onClick={() => void blockPeer()}
-              disabled={busy}
-            />
-          ) : null}
-          <SheetRow
-            label="Delete conversation"
-            danger
-            onClick={() => void hideConversation()}
-            disabled={busy}
-          />
-          <SheetRow label="Cancel" onClick={onClose} bold />
-        </div>
-
-        {muteSheetOpen ? (
-          <MuteDurationSheet
-            onClose={() => setMuteSheetOpen(false)}
-            onPick={(h) => void muteFor(h)}
-          />
-        ) : null}
-      </div>
-    </div>
+        </Drawer.Content>
+      </Drawer.Portal>
+    </Drawer.Root>
   );
 }
 
@@ -1595,62 +1606,39 @@ function MuteDurationSheet({
     { label: "For 7 days", hours: 168 },
     { label: "Until I unmute", hours: null },
   ];
+  // NestedRoot — scales the parent drawer down behind this one
+  // (the iOS-native stacked-sheet feel).
   return (
-    <div
-      onClick={onClose}
-      style={{
-        position: "fixed",
-        inset: 0,
-        zIndex: 1300,
-        background: "rgba(0,0,0,0.42)",
-        display: "flex",
-        alignItems: "flex-end",
-      }}
-    >
-      <div
-        onClick={(e) => e.stopPropagation()}
-        style={{
-          width: "100%",
-          background: "#FAF7F2",
-          borderTopLeftRadius: 20,
-          borderTopRightRadius: 20,
-          paddingBottom: "env(safe-area-inset-bottom, 0px)",
-          boxShadow: "0 -8px 32px rgba(0,0,0,0.18)",
-        }}
-      >
-        <div
-          aria-hidden
-          style={{
-            margin: "10px auto 4px",
-            width: 38,
-            height: 4,
-            borderRadius: 999,
-            background: "rgba(28,28,30,0.18)",
-          }}
-        />
-        <div
-          style={{
-            padding: "10px 18px 6px",
-            fontFamily: "Fraunces, serif",
-            fontSize: 16,
-            fontWeight: 800,
-            color: "#1C1C1E",
-          }}
-        >
-          Mute this chat
-        </div>
-        <div style={{ padding: "0 0 12px" }}>
-          {options.map((opt) => (
-            <SheetRow
-              key={opt.label}
-              label={opt.label}
-              onClick={() => onPick(opt.hours)}
-            />
-          ))}
-          <SheetRow label="Cancel" onClick={onClose} bold />
-        </div>
-      </div>
-    </div>
+    <Drawer.NestedRoot open onOpenChange={(o) => { if (!o) onClose(); }}>
+      <Drawer.Portal>
+        <Drawer.Overlay style={vaulOverlayStyle} />
+        <Drawer.Content style={vaulContentStyle} aria-describedby={undefined}>
+          <Drawer.Title style={visuallyHiddenStyle}>Mute duration</Drawer.Title>
+          <Drawer.Handle style={vaulHandleStyle} />
+          <div
+            style={{
+              padding: "10px 18px 6px",
+              fontFamily: "Fraunces, serif",
+              fontSize: 16,
+              fontWeight: 800,
+              color: "#1C1C1E",
+            }}
+          >
+            Mute this chat
+          </div>
+          <div style={{ padding: "0 0 12px" }}>
+            {options.map((opt) => (
+              <SheetRow
+                key={opt.label}
+                label={opt.label}
+                onClick={() => onPick(opt.hours)}
+              />
+            ))}
+            <SheetRow label="Cancel" onClick={onClose} bold />
+          </div>
+        </Drawer.Content>
+      </Drawer.Portal>
+    </Drawer.NestedRoot>
   );
 }
 
@@ -2351,82 +2339,56 @@ function MemberActionSheet({
 }) {
   const [muteSheetOpen, setMuteSheetOpen] = useState(false);
   return (
-    <div
-      role="dialog"
-      aria-modal="true"
-      aria-label={`Actions for ${member.name || member.handle || "member"}`}
-      onClick={onClose}
-      style={{
-        position: "fixed",
-        inset: 0,
-        zIndex: 1300,
-        background: "rgba(0,0,0,0.42)",
-        display: "flex",
-        alignItems: "flex-end",
-      }}
-    >
-      <div
-        onClick={(e) => e.stopPropagation()}
-        style={{
-          width: "100%",
-          background: "#FAF7F2",
-          borderTopLeftRadius: 20,
-          borderTopRightRadius: 20,
-          paddingBottom: "env(safe-area-inset-bottom, 0px)",
-          boxShadow: "0 -8px 32px rgba(0,0,0,0.18)",
-        }}
-      >
-        <div
-          aria-hidden
-          style={{
-            margin: "10px auto 4px",
-            width: 38,
-            height: 4,
-            borderRadius: 999,
-            background: "rgba(28,28,30,0.18)",
-          }}
-        />
-        <div
-          style={{
-            padding: "10px 18px 6px",
-            fontFamily: "Fraunces, serif",
-            fontSize: 16,
-            fontWeight: 800,
-            color: "#1C1C1E",
-          }}
-        >
-          {member.name || (member.handle ? `@${member.handle}` : "Member")}
-        </div>
-        <div style={{ padding: "4px 0 14px" }}>
-          {member.handle ? (
-            <SheetRow
-              label="View profile"
-              href={`/profile/${member.handle}`}
-              onClose={onClose}
-            />
-          ) : null}
-          {muted ? (
-            <SheetRow label="Unmute member" onClick={onUnmute} />
-          ) : (
-            <SheetRow
-              label="Mute member…"
-              onClick={() => setMuteSheetOpen(true)}
-            />
-          )}
-          {canRemove ? (
-            <SheetRow label="Remove from group" danger onClick={onRemove} />
-          ) : null}
-          <SheetRow label="Cancel" onClick={onClose} bold />
-        </div>
+    <Drawer.Root open onOpenChange={(o) => { if (!o) onClose(); }}>
+      <Drawer.Portal>
+        <Drawer.Overlay style={vaulOverlayStyle} />
+        <Drawer.Content style={vaulContentStyle} aria-describedby={undefined}>
+          <Drawer.Title style={visuallyHiddenStyle}>
+            Actions for {member.name || member.handle || "member"}
+          </Drawer.Title>
+          <Drawer.Handle style={vaulHandleStyle} />
+          <div
+            style={{
+              padding: "10px 18px 6px",
+              fontFamily: "Fraunces, serif",
+              fontSize: 16,
+              fontWeight: 800,
+              color: "#1C1C1E",
+            }}
+          >
+            {member.name || (member.handle ? `@${member.handle}` : "Member")}
+          </div>
+          <div style={{ padding: "4px 0 14px" }}>
+            {member.handle ? (
+              <SheetRow
+                label="View profile"
+                href={`/profile/${member.handle}`}
+                onClose={onClose}
+              />
+            ) : null}
+            {muted ? (
+              <SheetRow label="Unmute member" onClick={onUnmute} />
+            ) : (
+              <SheetRow
+                label="Mute member…"
+                onClick={() => setMuteSheetOpen(true)}
+              />
+            )}
+            {canRemove ? (
+              <SheetRow label="Remove from group" danger onClick={onRemove} />
+            ) : null}
+            <SheetRow label="Cancel" onClick={onClose} bold />
+          </div>
 
-        {muteSheetOpen ? (
-          <MuteDurationSheet
-            onClose={() => setMuteSheetOpen(false)}
-            onPick={(h) => onMute(h)}
-          />
-        ) : null}
-      </div>
-    </div>
+          {muteSheetOpen ? (
+            <MuteDurationSheet
+              onClose={() => setMuteSheetOpen(false)}
+              onPick={(h) => onMute(h)}
+            />
+          ) : null}
+        </Drawer.Content>
+      </Drawer.Portal>
+    </Drawer.Root>
   );
 }
 
