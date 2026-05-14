@@ -177,7 +177,13 @@ function threadAvatar(t: ThreadEntry): { url: string | null; initials: string } 
 
 // ---------- Component ----------
 
-export function MessagesMobile({ initialHandle }: { initialHandle?: string }) {
+export function MessagesMobile({
+  initialHandle,
+  initialChannelId,
+}: {
+  initialHandle?: string;
+  initialChannelId?: string;
+}) {
   const [tab, setTab] = useState<Tab>("all");
   const [threads, setThreads] = useState<ThreadEntry[] | null>(null);
   const [requests, setRequests] = useState<ThreadEntry[] | null>(null);
@@ -242,6 +248,19 @@ export function MessagesMobile({ initialHandle }: { initialHandle?: string }) {
     refetchThreadsRef.current = refetchThreads;
     void refetchThreads();
   }, [refetchThreads]);
+
+  // ?channel=<id> deep link — opens the conversation view on that
+  // thread immediately. The ConversationView handles its own message
+  // fetch via /api/me/threads/[id]/messages which works for org
+  // channels via the can_view_org_channel RPC even if the thread
+  // isn't in the user's threads list yet.
+  const initialChannelResolvedRef = useRef(false);
+  useEffect(() => {
+    if (!initialChannelId) return;
+    if (initialChannelResolvedRef.current) return;
+    initialChannelResolvedRef.current = true;
+    setOpenThreadId(initialChannelId);
+  }, [initialChannelId]);
 
   // ?to=<handle> deep link — resolve to a channel id once threads have
   // loaded, then open that conversation. Handles both existing threads

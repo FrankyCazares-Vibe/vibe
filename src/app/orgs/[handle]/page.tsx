@@ -7,6 +7,7 @@ import { createSupabaseServerClient } from "@/lib/supabase/server";
 import { createSupabaseServiceClient } from "@/lib/supabase/service";
 
 import { OrgProfileAdminBar } from "./admin-actions";
+import { ChannelsSection } from "./ChannelsSection";
 import { OrgContent } from "./OrgContent";
 import { OrgEventsSection } from "./OrgEventsSection";
 import { OrgProfileJoinButton } from "./join-button";
@@ -236,6 +237,10 @@ export default async function OrgProfilePage({ params }: Params) {
           }
           aboutColumn={
             <>
+              <ChannelsSection
+                orgHandle={org.handle}
+                viewerIsMember={!!viewerRole}
+              />
               {org.links && org.links.length > 0 ? <LinksSection links={org.links} /> : null}
               {org.philanthropy ? <PhilanthropySection text={org.philanthropy} /> : null}
               <FactsSection org={org} />

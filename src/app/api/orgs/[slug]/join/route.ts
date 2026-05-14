@@ -69,6 +69,31 @@ export async function POST(req: Request, { params }: Params) {
       console.error("[orgs/[slug]/join public insert]", error);
       return NextResponse.json({ ok: false, error: "Failed to join" }, { status: 500 });
     }
+    // Subscribe to all non-private channels so the org's chats appear
+    // in the user's /messages thread list immediately. Best-effort —
+    // failure here doesn't fail the join (org membership still grants
+    // RLS read access via can_view_org_channel).
+    try {
+      const { data: channels } = await service
+        .from("channels")
+        .select("id")
+        .eq("org_id", org.id)
+        .eq("is_private", false);
+      if (channels && channels.length > 0) {
+        const now = new Date().toISOString();
+        await service.from("channel_members").upsert(
+          channels.map((c) => ({
+            channel_id: c.id as string,
+            user_id: user.id,
+            role: "member",
+            accepted_at: now,
+          })),
+          { onConflict: "channel_id,user_id", ignoreDuplicates: true },
+        );
+      }
+    } catch (e) {
+      console.error("[orgs/[slug]/join channel subscribe]", e);
+    }
     return NextResponse.json({ ok: true, joined: true, role: "member" });
   }
 

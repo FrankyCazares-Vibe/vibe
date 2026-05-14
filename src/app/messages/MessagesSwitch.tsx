@@ -16,19 +16,29 @@ import { useIsMobile } from "@/lib/use-is-mobile";
  * link like /messages?to=alex opens the right conversation regardless
  * of viewport.
  */
-export function MessagesSwitch({ initialHandle }: { initialHandle?: string }) {
+export function MessagesSwitch({
+  initialHandle,
+  initialChannelId,
+}: {
+  initialHandle?: string;
+  initialChannelId?: string;
+}) {
   const isMobile = useIsMobile();
 
   if (isMobile) {
     return (
       <MobileShell>
-        <MessagesMobile initialHandle={initialHandle} />
+        <MessagesMobile
+          initialHandle={initialHandle}
+          initialChannelId={initialChannelId}
+        />
       </MobileShell>
     );
   }
 
   const params = new URLSearchParams({ app: "1", embedded: "1" });
   if (initialHandle) params.set("to", initialHandle);
+  if (initialChannelId) params.set("channel", initialChannelId);
   const src = `/html/messages.html?${params.toString()}`;
   return (
     <CampusAppShell>
