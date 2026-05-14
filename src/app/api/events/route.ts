@@ -69,6 +69,10 @@ export async function GET(req: Request) {
     MAX_LIMIT,
     Math.max(1, Number(url.searchParams.get("limit")) || DEFAULT_LIMIT),
   );
+  // ?org_id=<uuid> — limit results to events scoped to a single org.
+  // Used by the org profile page; bypasses the school filter so a
+  // logged-in user from another school can still see public events.
+  const orgIdFilter = (url.searchParams.get("org_id") ?? "").trim();
 
   const { data: me } = await supabase
     .from("users")
@@ -96,7 +100,11 @@ export async function GET(req: Request) {
     .order("starts_at", { ascending: true })
     .limit(limit);
 
-  if (school) {
+  if (orgIdFilter) {
+    // Org-scoped query: skip the school filter so visitors from other
+    // schools can still see this org's events.
+    q = q.eq("org_id", orgIdFilter);
+  } else if (school) {
     q = q.eq("creator.school", school);
   } else {
     q = q.eq("creator_id", user.id);

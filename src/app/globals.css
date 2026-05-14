@@ -2457,8 +2457,9 @@ a.otto-room-row-title:hover {
 /* Org profile page — mobile-only overrides. Inline styles on the
    server-rendered page are tuned for desktop; on mobile we collapse
    the 2-column content grid to a single stack, trim the outer
-   padding, and show the Posts/About tab strip. !important is needed
-   because the inline style sets gridTemplateColumns explicitly. */
+   padding, and show the Posts / Events / About tab strip.
+   !important is needed because the inline style sets
+   gridTemplateColumns explicitly. */
 @media (max-width: 720px) {
   .vibe-org-shell {
     padding: 0 14px 56px !important;
@@ -2471,10 +2472,20 @@ a.otto-room-row-title:hover {
   .vibe-org-tabbar {
     display: flex !important;
   }
-  .vibe-org-grid[data-tab="posts"] .vibe-org-about {
+  /* Events row sits inside the same content wrapper. On mobile each
+     tab only reveals its slice. */
+  .vibe-org-content[data-tab="posts"] .vibe-org-events-row,
+  .vibe-org-content[data-tab="posts"] .vibe-org-about {
     display: none !important;
   }
-  .vibe-org-grid[data-tab="about"] .vibe-org-main {
+  .vibe-org-content[data-tab="events"] .vibe-org-grid {
+    display: none !important;
+  }
+  .vibe-org-content[data-tab="events"] .vibe-org-events-row {
+    margin-top: 16px !important;
+  }
+  .vibe-org-content[data-tab="about"] .vibe-org-events-row,
+  .vibe-org-content[data-tab="about"] .vibe-org-main {
     display: none !important;
   }
 }

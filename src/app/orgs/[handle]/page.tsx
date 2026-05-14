@@ -8,6 +8,7 @@ import { createSupabaseServiceClient } from "@/lib/supabase/service";
 
 import { OrgProfileAdminBar } from "./admin-actions";
 import { OrgContent } from "./OrgContent";
+import { OrgEventsSection } from "./OrgEventsSection";
 import { OrgProfileJoinButton } from "./join-button";
 
 type Params = { params: Promise<{ handle: string }> };
@@ -223,6 +224,15 @@ export default async function OrgProfilePage({ params }: Params) {
               {posts.length > 0 ? <PostsSection posts={posts} org={org} /> : null}
               {clips.length === 0 && posts.length === 0 ? <EmptyContent /> : null}
             </>
+          }
+          eventsColumn={
+            <OrgEventsSection
+              orgId={org.id}
+              orgName={org.name}
+              orgHandle={org.handle}
+              orgVerified={org.verified}
+              viewerRole={viewerRole}
+            />
           }
           aboutColumn={
             <>

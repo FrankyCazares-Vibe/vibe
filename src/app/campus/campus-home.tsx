@@ -8161,9 +8161,9 @@ function formatEventTime(startIso: string, endIso: string): string {
   }
 }
 
-type EligibleOrg = { id: string; name: string; handle: string; verified: boolean; role: string };
+export type EligibleOrg = { id: string; name: string; handle: string; verified: boolean; role: string };
 
-function CreateEventModal({
+export function CreateEventModal({
   eligibleOrgs,
   onClose,
   onCreated,

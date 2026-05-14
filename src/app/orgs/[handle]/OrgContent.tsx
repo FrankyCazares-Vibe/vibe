@@ -19,15 +19,17 @@ import { useState } from "react";
  */
 export function OrgContent({
   mainColumn,
+  eventsColumn,
   aboutColumn,
 }: {
   mainColumn: React.ReactNode;
+  eventsColumn: React.ReactNode;
   aboutColumn: React.ReactNode;
 }) {
-  const [tab, setTab] = useState<"posts" | "about">("posts");
+  const [tab, setTab] = useState<"posts" | "events" | "about">("posts");
 
   return (
-    <>
+    <div className="vibe-org-content" data-tab={tab}>
       {/* Tab strip — display:none on desktop via globals.css. */}
       <div
         className="vibe-org-tabbar"
@@ -43,15 +45,29 @@ export function OrgContent({
           onClick={() => setTab("posts")}
         />
         <OrgTabPill
+          label="Events"
+          active={tab === "events"}
+          onClick={() => setTab("events")}
+        />
+        <OrgTabPill
           label="About"
           active={tab === "about"}
           onClick={() => setTab("about")}
         />
       </div>
 
+      {/* Events row — desktop renders it full-width above the 2-col
+          grid. Mobile shows it only when the Events tab is active
+          (via attribute selector on the parent). */}
+      <div
+        className="vibe-org-events-row"
+        style={{ marginTop: 24 }}
+      >
+        {eventsColumn}
+      </div>
+
       <div
         className="vibe-org-grid"
-        data-tab={tab}
         style={{
           display: "grid",
           gridTemplateColumns: "minmax(0, 2fr) minmax(0, 1fr)",
@@ -73,7 +89,7 @@ export function OrgContent({
           {aboutColumn}
         </aside>
       </div>
-    </>
+    </div>
   );
 }
 
