@@ -174,6 +174,11 @@ export function CampusMobile() {
     setComposerOpen(true);
   };
 
+  // Tabs that are dense / interactive enough that the Otto strip just
+  // steals scroll real estate. On these we collapse Otto with a swoop-
+  // down-into-the-tab-icon animation (see render below).
+  const ottoCollapsed = tab === "orgs" || tab === "chat" || tab === "map";
+
   // ---------- Render ----------
 
   return (
@@ -201,13 +206,44 @@ export function CampusMobile() {
       </div>
 
       {/* Otto horizontal strip — heads-up + trending. Tap a trending
-          tag → switch to Feed (tag filtering is desktop-only for now). */}
-      <div style={{ padding: "10px 12px 0" }}>
-        <OttoFeedStrip
-          onPickTag={() => {
-            setTab("feed");
+          tag → switch to Feed (tag filtering is desktop-only for now).
+          On orgs / chat / map we collapse it: the strip swoops down
+          and shrinks toward the bottom Otto tab icon (3rd of 5, hence
+          bottom-center as the transform-origin), freeing vertical
+          space for those denser layouts. Tapping back to a Otto-friendly
+          tab reverses the animation. */}
+      <div
+        style={{
+          overflow: "hidden",
+          maxHeight: ottoCollapsed ? 0 : 240,
+          paddingTop: ottoCollapsed ? 0 : 10,
+          paddingLeft: 12,
+          paddingRight: 12,
+          paddingBottom: 0,
+          transition:
+            "max-height 320ms cubic-bezier(.65,0,.35,1), padding-top 320ms cubic-bezier(.65,0,.35,1)",
+          pointerEvents: ottoCollapsed ? "none" : undefined,
+        }}
+        aria-hidden={ottoCollapsed}
+      >
+        <div
+          style={{
+            transformOrigin: "50% 100%",
+            transform: ottoCollapsed
+              ? "translateY(48vh) scale(0.04)"
+              : "translateY(0) scale(1)",
+            opacity: ottoCollapsed ? 0 : 1,
+            transition:
+              "transform 380ms cubic-bezier(.65,0,.35,1), opacity 240ms ease-out",
+            willChange: "transform, opacity",
           }}
-        />
+        >
+          <OttoFeedStrip
+            onPickTag={() => {
+              setTab("feed");
+            }}
+          />
+        </div>
       </div>
 
       <header
@@ -215,8 +251,11 @@ export function CampusMobile() {
           padding: "10px 0 4px",
           background: "transparent",
           position: "sticky",
-          top: "calc(env(safe-area-inset-top, 0px) + 64px)",
+          top: ottoCollapsed
+            ? "calc(env(safe-area-inset-top, 0px) + 56px)"
+            : "calc(env(safe-area-inset-top, 0px) + 64px)",
           zIndex: 5,
+          transition: "top 320ms cubic-bezier(.65,0,.35,1)",
         }}
       >
         <TabStrip active={tab} onChange={setTab} />
