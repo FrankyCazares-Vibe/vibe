@@ -7246,7 +7246,7 @@ function SceneHeader({
   );
 }
 
-type CampusEvent = {
+export type CampusEvent = {
   id: string;
   org_id: string | null;
   creator_id: string;
@@ -7422,7 +7422,7 @@ function EventsTabBody() {
   );
 }
 
-function EventCard({ ev, onMutate }: { ev: CampusEvent; onMutate: () => void }) {
+export function EventCard({ ev, onMutate }: { ev: CampusEvent; onMutate: () => void }) {
   const accent = colorForOrg(ev.org?.id ?? ev.creator_id);
   const [status, setStatus] = useState<"going" | "maybe" | null>(ev.viewer_status);
   const [going, setGoing] = useState(ev.going_count);

@@ -1,6 +1,6 @@
 import { enforceCampusAccess } from "@/lib/auth/campus-access";
 
-import { CampusHome } from "./campus-home";
+import { CampusSwitch } from "./CampusSwitch";
 
 export const metadata = {
   title: "Campus · Vibe",
@@ -14,5 +14,5 @@ export default async function CampusPage({
 }) {
   await enforceCampusAccess("/campus");
   const sp = await searchParams;
-  return <CampusHome showSchoolVerifiedBanner={sp.school_verified === "1"} />;
+  return <CampusSwitch showSchoolVerifiedBanner={sp.school_verified === "1"} />;
 }
