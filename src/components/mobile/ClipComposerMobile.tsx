@@ -639,6 +639,10 @@ type Props = {
    *  Publishing or re-saving from here PATCHes the existing post
    *  rather than uploading a new one. */
   initialDraft?: ResumableDraft;
+  /** When true, the drafts list overlay opens immediately on mount.
+   *  Used when the entry point is the Drafts tile in the profile
+   *  Clips grid — the user wants to see their drafts, not the camera. */
+  openDraftsOnMount?: boolean;
 };
 
 type PermState =
@@ -657,6 +661,7 @@ export function ClipComposerMobile({
   onPosted,
   origin,
   initialDraft,
+  openDraftsOnMount,
 }: Props) {
   const [phase, setPhase] = useState<Phase>("intro");
   const [permState, setPermState] = useState<PermState>(() => {
@@ -742,8 +747,9 @@ export function ClipComposerMobile({
   }, [phase]);
 
   // Drafts box overlay — true when the user is browsing their saved
-  // drafts on the intro screen.
-  const [draftsOpen, setDraftsOpen] = useState(false);
+  // drafts on the intro screen. Pre-opened when the composer was
+  // launched from the Drafts tile in the profile Clips grid.
+  const [draftsOpen, setDraftsOpen] = useState(openDraftsOnMount ?? false);
 
   // Shared "load this draft into the composer" callback. Used both by
   // the initialDraft mount effect and by picking a draft from the

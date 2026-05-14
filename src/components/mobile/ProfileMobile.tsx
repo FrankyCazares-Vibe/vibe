@@ -236,6 +236,31 @@ export function ProfileMobile({ targetHandle }: Props = {}) {
     }
   }, [isVisitor, targetHandle]);
 
+  // Drafts preview — owner-only, refreshed alongside posts. Keeps
+  // the count badge + tile poster honest after publish / save / delete
+  // round-trips.
+  const refetchDraftsPreview = useCallback(async () => {
+    if (isVisitor) {
+      setDraftsPreview(null);
+      return;
+    }
+    try {
+      const res = await fetch("/api/me/clip-drafts", { cache: "no-store" });
+      const data = await res.json();
+      if (data?.ok && Array.isArray(data.drafts)) {
+        const drafts = data.drafts as Array<{ media_thumbnail_url: string | null }>;
+        setDraftsPreview({
+          count: drafts.length,
+          poster: drafts[0]?.media_thumbnail_url ?? null,
+        });
+      } else {
+        setDraftsPreview(null);
+      }
+    } catch {
+      setDraftsPreview(null);
+    }
+  }, [isVisitor]);
+
   useEffect(() => {
     let cancelled = false;
     (async () => {
@@ -255,10 +280,11 @@ export function ProfileMobile({ targetHandle }: Props = {}) {
         if (!cancelled) setPosts([]);
       }
     })();
+    void refetchDraftsPreview();
     return () => {
       cancelled = true;
     };
-  }, [isVisitor, targetHandle]);
+  }, [isVisitor, targetHandle, refetchDraftsPreview]);
 
   // Follow/unfollow toggle for visitor mode. Optimistic so the pill
   // updates instantly; reverts on server error.
@@ -330,6 +356,15 @@ export function ProfileMobile({ targetHandle }: Props = {}) {
   const [composerOrigin, setComposerOrigin] = useState<
     { x: number; y: number } | undefined
   >(undefined);
+  // When true, the composer opens directly into the Drafts overlay
+  // (instead of the camera intro). Set by tapping the Drafts tile.
+  const [composerOpensDrafts, setComposerOpensDrafts] = useState(false);
+  // Owner-only: latest draft poster + count, used to render the
+  // TikTok-style "Drafts" tile as the first cell in the Clips grid.
+  const [draftsPreview, setDraftsPreview] = useState<{
+    count: number;
+    poster: string | null;
+  } | null>(null);
   const composeFabRef = useRef<HTMLButtonElement | null>(null);
   const openComposer = () => {
     const r = composeFabRef.current?.getBoundingClientRect();
@@ -1148,6 +1183,11 @@ export function ProfileMobile({ targetHandle }: Props = {}) {
             isVisitor={isVisitor}
             ownerName={name}
             onOpenClip={setOpenClipId}
+            draftsPreview={draftsPreview}
+            onOpenDrafts={() => {
+              setComposerOpensDrafts(true);
+              setComposerOpen(true);
+            }}
           />
         ) : (
           <PortfolioPane
@@ -1294,9 +1334,15 @@ export function ProfileMobile({ targetHandle }: Props = {}) {
       {composerOpen && tab === "clips" ? (
         <ClipComposerMobile
           origin={composerOrigin}
-          onClose={() => setComposerOpen(false)}
+          openDraftsOnMount={composerOpensDrafts}
+          onClose={() => {
+            setComposerOpen(false);
+            setComposerOpensDrafts(false);
+            void refetchDraftsPreview();
+          }}
           onPosted={() => {
             void refetchPosts();
+            void refetchDraftsPreview();
             setTab("clips");
           }}
         />
@@ -1568,15 +1614,22 @@ function ClipsGrid({
   isVisitor,
   ownerName,
   onOpenClip,
+  draftsPreview,
+  onOpenDrafts,
 }: {
   clips: PostRow[];
   loading: boolean;
   isVisitor: boolean;
   ownerName: string;
   onOpenClip: (id: string) => void;
+  /** Owner-only. null when not loaded yet, count=0 when no drafts. */
+  draftsPreview?: { count: number; poster: string | null } | null;
+  onOpenDrafts?: () => void;
 }) {
+  const hasDrafts = !isVisitor && (draftsPreview?.count ?? 0) > 0;
+
   if (loading) return <GridSkeleton ratio="9/14" />;
-  if (clips.length === 0) {
+  if (clips.length === 0 && !hasDrafts) {
     return isVisitor ? (
       <EmptyTab title="No clips yet" body={`${ownerName} hasn't posted any clips yet.`} />
     ) : (
@@ -1594,6 +1647,15 @@ function ClipsGrid({
         gap: 4,
       }}
     >
+      {/* Drafts tile — owner-only, first cell, TikTok pattern. Tap
+          opens the composer's drafts overlay. */}
+      {hasDrafts && draftsPreview ? (
+        <DraftsTile
+          count={draftsPreview.count}
+          poster={draftsPreview.poster}
+          onTap={() => onOpenDrafts?.()}
+        />
+      ) : null}
       {clips.map((p) => (
         <PostThumb
           key={p.id}
@@ -1604,6 +1666,87 @@ function ClipsGrid({
         />
       ))}
     </div>
+  );
+}
+
+function DraftsTile({
+  count,
+  poster,
+  onTap,
+}: {
+  count: number;
+  poster: string | null;
+  onTap: () => void;
+}) {
+  return (
+    <button
+      type="button"
+      onClick={onTap}
+      style={{
+        position: "relative",
+        aspectRatio: "9/14",
+        borderRadius: 6,
+        overflow: "hidden",
+        background: poster
+          ? `url(${poster}) center/cover`
+          : "linear-gradient(160deg,#2A2A2D 0%,#141416 100%)",
+        border: "none",
+        padding: 0,
+        cursor: "pointer",
+        textAlign: "left",
+      }}
+    >
+      {/* Dim overlay so the label reads regardless of poster brightness. */}
+      <span
+        aria-hidden
+        style={{
+          position: "absolute",
+          inset: 0,
+          background:
+            "linear-gradient(180deg, rgba(0,0,0,0.18) 0%, rgba(0,0,0,0.62) 100%)",
+        }}
+      />
+      {/* Lock icon top-right — drafts are private. */}
+      <span
+        aria-hidden
+        style={{
+          position: "absolute",
+          top: 6,
+          right: 6,
+          width: 20,
+          height: 20,
+          borderRadius: "50%",
+          background: "rgba(0,0,0,0.55)",
+          color: "#fff",
+          display: "inline-flex",
+          alignItems: "center",
+          justifyContent: "center",
+        }}
+      >
+        <svg width="10" height="10" viewBox="0 0 10 10" fill="none" aria-hidden>
+          <rect x="2" y="4.4" width="6" height="4.2" rx="1" stroke="currentColor" strokeWidth="1.1" fill="none" />
+          <path d="M3.4 4.4V3.2a1.6 1.6 0 1 1 3.2 0v1.2" stroke="currentColor" strokeWidth="1.1" fill="none" strokeLinecap="round" />
+        </svg>
+      </span>
+      {/* Label + count bottom-left. */}
+      <div
+        style={{
+          position: "absolute",
+          left: 8,
+          right: 8,
+          bottom: 8,
+          color: "#fff",
+          fontFamily: "DM Sans, sans-serif",
+          letterSpacing: "0.02em",
+          textShadow: "0 1px 3px rgba(0,0,0,0.5)",
+        }}
+      >
+        <div style={{ fontSize: 13, fontWeight: 800 }}>Drafts</div>
+        <div style={{ fontSize: 11, fontWeight: 600, opacity: 0.85 }}>
+          {count} clip{count === 1 ? "" : "s"}
+        </div>
+      </div>
+    </button>
   );
 }
 
