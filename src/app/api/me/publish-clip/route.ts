@@ -21,6 +21,7 @@ type Body = {
   poster_url?: unknown;
   duration_sec?: unknown;
   edit_metadata?: unknown;
+  is_draft?: unknown;
 };
 
 function normalizeTags(input: unknown): string[] {
@@ -99,6 +100,7 @@ export async function POST(req: Request) {
 
   const tags = normalizeTags(body.tags);
   const editMetadata = sanitizeEditMetadata(body.edit_metadata);
+  const isDraft = body.is_draft === true;
 
   const { data: row, error } = await supabase
     .from("posts")
@@ -110,9 +112,10 @@ export async function POST(req: Request) {
       media_url: objectKey,
       media_thumbnail_url: posterUrl,
       edit_metadata: editMetadata,
+      status: isDraft ? "draft" : "published",
     })
     .select(
-      "id,user_id,type,content,tags,media_url,media_thumbnail_url,edit_metadata,created_at",
+      "id,user_id,type,content,tags,media_url,media_thumbnail_url,edit_metadata,status,created_at",
     )
     .single();
 
@@ -125,7 +128,8 @@ export async function POST(req: Request) {
   }
 
   // @mention fan-out — best-effort; failures don't block the publish.
-  if (content) {
+  // Skipped for drafts so we don't notify anyone about a private clip.
+  if (content && !isDraft) {
     const handles = extractMentionHandles(content);
     if (handles.length > 0) {
       try {

@@ -1,7 +1,15 @@
 import { NextResponse } from "next/server";
 
+import { sanitizeEditMetadata } from "@/lib/clip/edit-metadata";
+import {
+  extractMentionHandles,
+  insertMentionNotifications,
+  resolveMentionedUserIds,
+} from "@/lib/mentions";
 import { CLIP_KEY_PREFIX, getR2S3Client, isR2Configured } from "@/lib/r2";
 import { createSupabaseServerClient } from "@/lib/supabase/server";
+
+const MAX_CONTENT_CHARS = 2000;
 
 type RouteContext = { params: Promise<{ id: string }> };
 
@@ -154,4 +162,135 @@ export async function DELETE(_req: Request, ctx: RouteContext) {
   }
 
   return NextResponse.json({ ok: true });
+}
+
+/**
+ * PATCH a post — used for re-saving + publishing drafts. The author can
+ * update: content, edit_metadata, status (draft → published). Missing
+ * fields are left alone.
+ *
+ * If the status flips from draft → published, we fan out @mention
+ * notifications just like publish-clip does on the initial publish.
+ */
+export async function PATCH(req: Request, ctx: RouteContext) {
+  const { id } = await ctx.params;
+  if (!id) {
+    return NextResponse.json({ ok: false, error: "Missing post id" }, { status: 400 });
+  }
+
+  const supabase = await createSupabaseServerClient();
+  const {
+    data: { user },
+    error: authErr,
+  } = await supabase.auth.getUser();
+  if (authErr || !user) {
+    return NextResponse.json({ ok: false, error: "Unauthorized" }, { status: 401 });
+  }
+
+  let body: {
+    content?: unknown;
+    edit_metadata?: unknown;
+    status?: unknown;
+  };
+  try {
+    body = await req.json();
+  } catch {
+    return NextResponse.json({ ok: false, error: "Invalid JSON" }, { status: 400 });
+  }
+
+  // Read the row first to confirm ownership + capture the prior status.
+  const { data: prior, error: readErr } = await supabase
+    .from("posts")
+    .select("id,user_id,status,content")
+    .eq("id", id)
+    .maybeSingle();
+  if (readErr) {
+    console.error("[posts/:id PATCH read]", readErr);
+    return NextResponse.json({ ok: false, error: readErr.message }, { status: 500 });
+  }
+  if (!prior) {
+    return NextResponse.json({ ok: false, error: "Post not found" }, { status: 404 });
+  }
+  if (prior.user_id !== user.id) {
+    return NextResponse.json({ ok: false, error: "Not your post" }, { status: 403 });
+  }
+
+  const patch: Record<string, unknown> = {};
+
+  if (typeof body.content === "string") {
+    const trimmed = body.content.trim();
+    if (trimmed.length > MAX_CONTENT_CHARS) {
+      return NextResponse.json(
+        { ok: false, error: `Caption exceeds ${MAX_CONTENT_CHARS} characters` },
+        { status: 400 },
+      );
+    }
+    patch.content = trimmed;
+  }
+
+  if ("edit_metadata" in body) {
+    patch.edit_metadata = sanitizeEditMetadata(body.edit_metadata);
+  }
+
+  let didPublish = false;
+  if (typeof body.status === "string") {
+    if (body.status !== "draft" && body.status !== "published") {
+      return NextResponse.json(
+        { ok: false, error: "Invalid status" },
+        { status: 400 },
+      );
+    }
+    patch.status = body.status;
+    if (body.status === "published" && prior.status === "draft") {
+      didPublish = true;
+    }
+  }
+
+  if (Object.keys(patch).length === 0) {
+    return NextResponse.json({ ok: true, post: prior });
+  }
+
+  const { data: row, error: upErr } = await supabase
+    .from("posts")
+    .update(patch)
+    .eq("id", id)
+    .select(
+      "id,user_id,type,content,tags,media_url,media_thumbnail_url,edit_metadata,status,created_at",
+    )
+    .single();
+  if (upErr || !row) {
+    console.error("[posts/:id PATCH]", upErr);
+    return NextResponse.json(
+      { ok: false, error: upErr?.message ?? "Update failed" },
+      { status: 500 },
+    );
+  }
+
+  // First-publish mention fan-out — only fires when the draft is being
+  // promoted to published this very PATCH. Subsequent edits to a
+  // published post don't re-notify anyone.
+  if (didPublish) {
+    const finalContent =
+      typeof patch.content === "string" ? (patch.content as string) : (prior.content ?? "");
+    if (finalContent) {
+      const handles = extractMentionHandles(finalContent);
+      if (handles.length > 0) {
+        try {
+          const ids = await resolveMentionedUserIds(supabase, handles, user.id);
+          if (ids.length > 0) {
+            await insertMentionNotifications(supabase, {
+              actorId: user.id,
+              targetUserIds: ids,
+              kind: "post",
+              postId: row.id as string,
+            });
+          }
+        } catch (e) {
+          console.error("[posts/:id PATCH mentions]", e);
+        }
+      }
+    }
+  }
+
+  return NextResponse.json({ ok: true, post: row });
 }
