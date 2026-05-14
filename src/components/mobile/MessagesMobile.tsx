@@ -36,6 +36,14 @@ type ThreadPeer = {
   school: string | null;
 };
 
+type ThreadMember = {
+  id: string;
+  handle: string | null;
+  name: string | null;
+  avatar_url: string | null;
+  role: "admin" | "member";
+};
+
 type ThreadEntry = {
   id: string;
   type: ThreadType;
@@ -53,6 +61,8 @@ type ThreadEntry = {
   hidden_at?: string | null;
   muted_until?: string | null;
   unread_count?: number;
+  members?: ThreadMember[];
+  viewer_role?: "admin" | "member";
 };
 
 type MessageRow = {
@@ -694,6 +704,7 @@ function ConversationView({
   const [error, setError] = useState<string | null>(null);
   const [meId, setMeId] = useState<string | null>(null);
   const [menuOpen, setMenuOpen] = useState(false);
+  const [groupSettingsOpen, setGroupSettingsOpen] = useState(false);
   const [actionFeedback, setActionFeedback] = useState<string | null>(null);
   // Local mirror of pinned_at + muted_until so the menu reflects taps
   // before the thread list re-syncs. Seeded from `thread` prop.
@@ -928,11 +939,11 @@ function ConversationView({
           onClick={() => setMenuOpen(true)}
           aria-label="More actions"
           style={{
-            width: 38,
-            height: 38,
+            width: 40,
+            height: 40,
             borderRadius: 999,
-            border: "none",
-            background: "transparent",
+            border: "1px solid rgba(28,28,30,0.10)",
+            background: "rgba(255,255,255,0.78)",
             color: "#1C1C1E",
             cursor: "pointer",
             display: "inline-flex",
@@ -940,12 +951,13 @@ function ConversationView({
             justifyContent: "center",
             WebkitTapHighlightColor: "transparent",
             flexShrink: 0,
+            boxShadow: "inset 0 1px 0 rgba(255,255,255,0.7)",
           }}
         >
           <svg width="20" height="20" viewBox="0 0 20 20" fill="currentColor" aria-hidden>
-            <circle cx="4.5" cy="10" r="1.7" />
-            <circle cx="10" cy="10" r="1.7" />
-            <circle cx="15.5" cy="10" r="1.7" />
+            <circle cx="4.5" cy="10" r="1.8" />
+            <circle cx="10" cy="10" r="1.8" />
+            <circle cx="15.5" cy="10" r="1.8" />
           </svg>
         </button>
       </header>
@@ -1112,12 +1124,31 @@ function ConversationView({
           onPinned={(at) => setPinnedAt(at)}
           onMuted={(until) => setMutedUntil(until)}
           onClose={() => setMenuOpen(false)}
+          onOpenGroupSettings={() => {
+            setMenuOpen(false);
+            setGroupSettingsOpen(true);
+          }}
           onCleared={() => {
             setMessages([]);
             setMenuOpen(false);
           }}
           onLeftOrDeleted={() => {
             setMenuOpen(false);
+            onClose();
+          }}
+        />
+      ) : null}
+
+      {/* Group settings — photo, name, members list, add/remove,
+          per-member mute, leave. Admin-only affordances gated by
+          thread.viewer_role. */}
+      {groupSettingsOpen && thread ? (
+        <GroupSettingsView
+          threadId={threadId}
+          thread={thread}
+          onClose={() => setGroupSettingsOpen(false)}
+          onLeft={() => {
+            setGroupSettingsOpen(false);
             onClose();
           }}
         />
@@ -1138,6 +1169,7 @@ function ConversationActionSheet({
   onPinned,
   onMuted,
   onClose,
+  onOpenGroupSettings,
   onCleared,
   onLeftOrDeleted,
 }: {
@@ -1150,6 +1182,7 @@ function ConversationActionSheet({
   onPinned: (pinnedAt: string | null) => void;
   onMuted: (mutedUntil: string | null) => void;
   onClose: () => void;
+  onOpenGroupSettings: () => void;
   onCleared: () => void;
   onLeftOrDeleted: () => void;
 }) {
@@ -1417,6 +1450,12 @@ function ConversationActionSheet({
               onClose={onClose}
             />
           ) : null}
+          {isGroup ? (
+            <SheetRow
+              label="Group info"
+              onClick={onOpenGroupSettings}
+            />
+          ) : null}
           <SheetRow
             label={pinned ? "Unpin" : "Pin to top"}
             onClick={() => void togglePin()}
@@ -1612,6 +1651,569 @@ function MuteDurationSheet({
         </div>
       </div>
     </div>
+  );
+}
+
+// ---------- Group settings ----------
+
+function GroupSettingsView({
+  threadId,
+  thread,
+  onClose,
+  onLeft,
+}: {
+  threadId: string;
+  thread: ThreadEntry;
+  onClose: () => void;
+  onLeft: () => void;
+}) {
+  const [name, setName] = useState(thread.name || "Group");
+  const [editingName, setEditingName] = useState(false);
+  const [draftName, setDraftName] = useState(thread.name || "");
+  const [members, setMembers] = useState<ThreadMember[]>(
+    Array.isArray(thread.members) ? thread.members : [],
+  );
+  const [photoUrl, setPhotoUrl] = useState<string | null>(thread.photo_url);
+  const [busy, setBusy] = useState(false);
+  const [addOpen, setAddOpen] = useState(false);
+  const [feedback, setFeedback] = useState<string | null>(null);
+
+  const viewerRole = thread.viewer_role ?? "member";
+  const isAdmin = viewerRole === "admin";
+
+  useEffect(() => {
+    if (!feedback) return;
+    const t = window.setTimeout(() => setFeedback(null), 1800);
+    return () => window.clearTimeout(t);
+  }, [feedback]);
+
+  // Hide the bottom tab bar while group settings is up. Same trick we
+  // use everywhere else with full-screen overlays.
+  useEffect(() => {
+    document.body.classList.add("vibe-composer-open");
+    return () => document.body.classList.remove("vibe-composer-open");
+  }, []);
+
+  const saveName = useCallback(async () => {
+    const trimmed = draftName.trim();
+    if (!trimmed || trimmed === name || busy) {
+      setEditingName(false);
+      return;
+    }
+    setBusy(true);
+    try {
+      const r = await fetch(
+        `/api/me/threads/${encodeURIComponent(threadId)}`,
+        {
+          method: "PATCH",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ name: trimmed }),
+        },
+      );
+      const j = await r.json();
+      if (!r.ok || !j?.ok) throw new Error(j?.error ?? "Rename failed");
+      setName(trimmed);
+      setEditingName(false);
+      setFeedback("Name updated");
+    } catch (e) {
+      setFeedback(e instanceof Error ? e.message : "Rename failed");
+    } finally {
+      setBusy(false);
+    }
+  }, [draftName, name, busy, threadId]);
+
+  const removeMember = useCallback(
+    async (m: ThreadMember) => {
+      if (busy) return;
+      if (
+        typeof window !== "undefined" &&
+        !window.confirm(`Remove ${m.name || `@${m.handle ?? "user"}`} from the group?`)
+      )
+        return;
+      setBusy(true);
+      // Optimistic remove.
+      setMembers((prev) => prev.filter((x) => x.id !== m.id));
+      try {
+        const r = await fetch(
+          `/api/me/threads/${encodeURIComponent(threadId)}/members/${encodeURIComponent(m.id)}`,
+          { method: "DELETE" },
+        );
+        const j = await r.json();
+        if (!r.ok || !j?.ok) throw new Error(j?.error ?? "Remove failed");
+        setFeedback(`${m.name || "Member"} removed`);
+      } catch (e) {
+        // Roll back.
+        setMembers((prev) =>
+          [...prev, m].sort((a, b) => (a.name ?? "").localeCompare(b.name ?? "")),
+        );
+        setFeedback(e instanceof Error ? e.message : "Remove failed");
+      } finally {
+        setBusy(false);
+      }
+    },
+    [busy, threadId],
+  );
+
+  const leave = useCallback(async () => {
+    if (busy) return;
+    if (
+      typeof window !== "undefined" &&
+      !window.confirm(`Leave ${name}? You won't receive new messages.`)
+    )
+      return;
+    setBusy(true);
+    try {
+      const meR = await fetch(
+        `/api/me/threads/${encodeURIComponent(threadId)}/messages?limit=1`,
+        { cache: "no-store" },
+      );
+      const meJ = await meR.json();
+      const viewerId =
+        typeof meJ?.viewer_id === "string" ? (meJ.viewer_id as string) : null;
+      if (!viewerId) throw new Error("Could not resolve your id");
+      const r = await fetch(
+        `/api/me/threads/${encodeURIComponent(threadId)}/members/${encodeURIComponent(viewerId)}`,
+        { method: "DELETE" },
+      );
+      const j = await r.json();
+      if (!r.ok || !j?.ok) throw new Error(j?.error ?? "Leave failed");
+      onLeft();
+    } catch (e) {
+      setFeedback(e instanceof Error ? e.message : "Leave failed");
+    } finally {
+      setBusy(false);
+    }
+  }, [busy, name, threadId, onLeft]);
+
+  const addMember = useCallback(
+    async (handle: string) => {
+      if (busy) return;
+      setBusy(true);
+      try {
+        const r = await fetch(
+          `/api/me/threads/${encodeURIComponent(threadId)}/members`,
+          {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({ handle }),
+          },
+        );
+        const j = await r.json();
+        if (!r.ok || !j?.ok) throw new Error(j?.error ?? "Add failed");
+        if (j.member) {
+          setMembers((prev) => [...prev, j.member as ThreadMember]);
+        }
+        setAddOpen(false);
+        setFeedback("Member added");
+      } catch (e) {
+        setFeedback(e instanceof Error ? e.message : "Add failed");
+      } finally {
+        setBusy(false);
+      }
+    },
+    [busy, threadId],
+  );
+
+  return (
+    <div
+      role="dialog"
+      aria-modal="true"
+      aria-label="Group info"
+      style={{
+        position: "fixed",
+        inset: 0,
+        zIndex: 1250,
+        background: "#FAF7F2",
+        display: "flex",
+        flexDirection: "column",
+        overflowY: "auto",
+      }}
+    >
+      {/* Top bar */}
+      <header
+        style={{
+          display: "flex",
+          alignItems: "center",
+          gap: 10,
+          padding: "calc(env(safe-area-inset-top, 0px) + 8px) 12px 8px",
+          background: "rgba(250, 247, 242, 0.94)",
+          backdropFilter: "saturate(160%) blur(14px)",
+          WebkitBackdropFilter: "saturate(160%) blur(14px)",
+          borderBottom: "1px solid rgba(28,28,30,0.06)",
+          position: "sticky",
+          top: 0,
+          zIndex: 2,
+        }}
+      >
+        <button
+          type="button"
+          onClick={onClose}
+          aria-label="Back"
+          style={{
+            width: 38,
+            height: 38,
+            borderRadius: 999,
+            border: "none",
+            background: "transparent",
+            color: "#1C1C1E",
+            cursor: "pointer",
+            display: "inline-flex",
+            alignItems: "center",
+            justifyContent: "center",
+          }}
+        >
+          <svg width="22" height="22" viewBox="0 0 22 22" fill="none" aria-hidden>
+            <path d="M14 4L7 11l7 7" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" />
+          </svg>
+        </button>
+        <span
+          style={{
+            fontFamily: "Fraunces, serif",
+            fontSize: 17,
+            fontWeight: 800,
+            color: "#1C1C1E",
+            flex: 1,
+          }}
+        >
+          Group info
+        </span>
+      </header>
+
+      {/* Photo + name section */}
+      <section
+        style={{
+          padding: "24px 18px 14px",
+          display: "flex",
+          flexDirection: "column",
+          alignItems: "center",
+          gap: 14,
+          borderBottom: "1px solid rgba(28,28,30,0.06)",
+        }}
+      >
+        <div
+          style={{
+            width: 96,
+            height: 96,
+            borderRadius: 999,
+            background: photoUrl
+              ? `url(${photoUrl}) center/cover`
+              : "linear-gradient(135deg,#FFD3C2 0%,#FF9D7E 100%)",
+            display: "flex",
+            alignItems: "center",
+            justifyContent: "center",
+            color: "#1C1C1E",
+            fontFamily: "Fraunces, serif",
+            fontWeight: 800,
+            fontSize: 28,
+            boxShadow: "0 6px 22px rgba(180,120,60,0.18)",
+            border: "1px solid rgba(255,255,255,0.6)",
+          }}
+        >
+          {!photoUrl ? initialsOf(name) : null}
+        </div>
+        {editingName && isAdmin ? (
+          <div style={{ display: "flex", gap: 8, width: "100%", maxWidth: 320 }}>
+            <input
+              type="text"
+              value={draftName}
+              onChange={(e) => setDraftName(e.target.value)}
+              autoFocus
+              maxLength={80}
+              style={{
+                flex: 1,
+                padding: "10px 14px",
+                borderRadius: 14,
+                border: "1px solid rgba(28,28,30,0.10)",
+                background: "rgba(255,255,255,0.92)",
+                fontFamily: "Fraunces, serif",
+                fontSize: 17,
+                fontWeight: 800,
+                color: "#1C1C1E",
+                outline: "none",
+                textAlign: "center",
+              }}
+            />
+            <button
+              type="button"
+              onClick={() => void saveName()}
+              disabled={busy}
+              style={{
+                padding: "10px 16px",
+                borderRadius: 999,
+                border: "none",
+                background: "#FF5C35",
+                color: "#fff",
+                fontFamily: "DM Sans, sans-serif",
+                fontSize: 13,
+                fontWeight: 700,
+                cursor: "pointer",
+              }}
+            >
+              Save
+            </button>
+          </div>
+        ) : (
+          <button
+            type="button"
+            onClick={() => {
+              if (!isAdmin) return;
+              setDraftName(name);
+              setEditingName(true);
+            }}
+            disabled={!isAdmin}
+            style={{
+              background: "transparent",
+              border: "none",
+              padding: "6px 12px",
+              cursor: isAdmin ? "pointer" : "default",
+              display: "inline-flex",
+              alignItems: "center",
+              gap: 6,
+            }}
+          >
+            <span
+              style={{
+                fontFamily: "Fraunces, serif",
+                fontSize: 22,
+                fontWeight: 900,
+                color: "#1C1C1E",
+                letterSpacing: "-0.4px",
+              }}
+            >
+              {name}
+            </span>
+            {isAdmin ? (
+              <svg width="14" height="14" viewBox="0 0 14 14" fill="none" aria-hidden>
+                <path d="M9.5 2L12 4.5l-7 7H2.5v-2.5z" stroke="#8A8580" strokeWidth="1.3" strokeLinejoin="round" fill="none" />
+              </svg>
+            ) : null}
+          </button>
+        )}
+        <span
+          style={{
+            fontFamily: "DM Sans, sans-serif",
+            fontSize: 12,
+            color: "#8A8580",
+            fontWeight: 600,
+            letterSpacing: "0.02em",
+          }}
+        >
+          {members.length + 1} {members.length + 1 === 1 ? "member" : "members"}
+        </span>
+      </section>
+
+      {feedback ? (
+        <div
+          style={{
+            margin: "10px 16px 0",
+            padding: "8px 12px",
+            borderRadius: 12,
+            background: "rgba(28,28,30,0.06)",
+            fontFamily: "DM Sans, sans-serif",
+            fontSize: 12.5,
+            color: "#1C1C1E",
+            textAlign: "center",
+          }}
+        >
+          {feedback}
+        </div>
+      ) : null}
+
+      {/* Members list */}
+      <section style={{ padding: "16px 0 8px" }}>
+        <div
+          style={{
+            padding: "0 18px 8px",
+            fontFamily: "DM Sans, sans-serif",
+            fontSize: 11,
+            fontWeight: 800,
+            letterSpacing: "0.08em",
+            textTransform: "uppercase",
+            color: "#8A8580",
+            display: "flex",
+            justifyContent: "space-between",
+            alignItems: "center",
+          }}
+        >
+          <span>Members</span>
+          {isAdmin ? (
+            <button
+              type="button"
+              onClick={() => setAddOpen(true)}
+              style={{
+                background: "transparent",
+                border: "none",
+                color: "#FF5C35",
+                fontFamily: "DM Sans, sans-serif",
+                fontSize: 12.5,
+                fontWeight: 800,
+                letterSpacing: "0.02em",
+                cursor: "pointer",
+                padding: 0,
+                textTransform: "none",
+              }}
+            >
+              + Add
+            </button>
+          ) : null}
+        </div>
+        <ul style={{ listStyle: "none", padding: 0, margin: 0 }}>
+          {members.map((m) => (
+            <MemberRow
+              key={m.id}
+              member={m}
+              canRemove={isAdmin}
+              onRemove={() => void removeMember(m)}
+            />
+          ))}
+        </ul>
+      </section>
+
+      {/* Leave group */}
+      <section style={{ padding: "8px 0 28px", marginTop: 8 }}>
+        <SheetRow label="Leave group" danger onClick={() => void leave()} />
+      </section>
+
+      {addOpen ? (
+        <ComposeOverlay
+          onCancel={() => setAddOpen(false)}
+          onPick={(handle) => void addMember(handle)}
+        />
+      ) : null}
+    </div>
+  );
+}
+
+function MemberRow({
+  member,
+  canRemove,
+  onRemove,
+}: {
+  member: ThreadMember;
+  canRemove: boolean;
+  onRemove: () => void;
+}) {
+  const initials = initialsOf(member.name || member.handle);
+  return (
+    <li
+      style={{
+        display: "flex",
+        alignItems: "center",
+        gap: 12,
+        padding: "10px 18px",
+        borderTop: "1px solid rgba(28,28,30,0.04)",
+      }}
+    >
+      <div
+        style={{
+          width: 44,
+          height: 44,
+          borderRadius: 999,
+          background: member.avatar_url
+            ? `url(${member.avatar_url}) center/cover`
+            : "#FFD3C2",
+          flexShrink: 0,
+          display: "flex",
+          alignItems: "center",
+          justifyContent: "center",
+          color: "#1C1C1E",
+          fontFamily: "Fraunces, serif",
+          fontWeight: 800,
+          fontSize: 15,
+          border: "1px solid rgba(255,255,255,0.6)",
+        }}
+      >
+        {!member.avatar_url ? initials : null}
+      </div>
+      <div style={{ flex: 1, minWidth: 0 }}>
+        {member.handle ? (
+          <Link
+            href={`/profile/${member.handle}`}
+            style={{
+              fontFamily: "Fraunces, serif",
+              fontSize: 15,
+              fontWeight: 700,
+              color: "#1C1C1E",
+              textDecoration: "none",
+              display: "block",
+              whiteSpace: "nowrap",
+              overflow: "hidden",
+              textOverflow: "ellipsis",
+            }}
+          >
+            {member.name || `@${member.handle}`}
+          </Link>
+        ) : (
+          <span
+            style={{
+              fontFamily: "Fraunces, serif",
+              fontSize: 15,
+              fontWeight: 700,
+              color: "#1C1C1E",
+            }}
+          >
+            {member.name || "Member"}
+          </span>
+        )}
+        <div
+          style={{
+            display: "flex",
+            alignItems: "center",
+            gap: 6,
+            marginTop: 1,
+          }}
+        >
+          <span
+            style={{
+              fontFamily: "DM Sans, sans-serif",
+              fontSize: 12,
+              color: "#8A8580",
+              fontWeight: 600,
+            }}
+          >
+            {member.handle ? `@${member.handle}` : ""}
+          </span>
+          {member.role === "admin" ? (
+            <span
+              style={{
+                fontFamily: "DM Sans, sans-serif",
+                fontSize: 10,
+                fontWeight: 800,
+                color: "#FF5C35",
+                letterSpacing: "0.06em",
+                textTransform: "uppercase",
+                background: "rgba(255,92,53,0.10)",
+                padding: "2px 6px",
+                borderRadius: 999,
+              }}
+            >
+              Admin
+            </span>
+          ) : null}
+        </div>
+      </div>
+      {canRemove && member.role !== "admin" ? (
+        <button
+          type="button"
+          onClick={onRemove}
+          aria-label="Remove"
+          style={{
+            background: "transparent",
+            border: "1px solid rgba(192,57,43,0.32)",
+            color: "#C0392B",
+            fontFamily: "DM Sans, sans-serif",
+            fontSize: 12,
+            fontWeight: 700,
+            padding: "6px 10px",
+            borderRadius: 999,
+            cursor: "pointer",
+            flexShrink: 0,
+          }}
+        >
+          Remove
+        </button>
+      ) : null}
+    </li>
   );
 }
 
