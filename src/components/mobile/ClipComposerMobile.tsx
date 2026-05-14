@@ -150,13 +150,18 @@ export function ClipComposerMobile({ onClose, onPosted, origin }: Props) {
     }
     setPermissionError(null);
     try {
+      // Match the viewport aspect so `objectFit: cover` doesn't crop
+      // chunks off the sides (the "randomly zoomed in" feeling came from
+      // asking for a 9:16 stream on a ~9:19.5 screen). Letting the
+      // browser pick the native resolution that best fits this aspect
+      // gives a preview that fills the sheet without trimming FOV.
+      const vw = typeof window !== "undefined" ? window.innerWidth : 0;
+      const vh = typeof window !== "undefined" ? window.innerHeight : 0;
+      const aspect = vw > 0 && vh > 0 ? vw / vh : undefined;
       const s = await navigator.mediaDevices.getUserMedia({
         video: {
           facingMode: next,
-          // Ask for vertical 720x1280. Browsers usually round to the
-          // nearest supported config (iPhone camera is happy with this).
-          width: { ideal: 720 },
-          height: { ideal: 1280 },
+          ...(aspect ? { aspectRatio: { ideal: aspect } } : {}),
         },
         audio: true,
       });
@@ -897,44 +902,50 @@ export function ClipComposerMobile({ onClose, onPosted, origin }: Props) {
         </svg>
       </button>
 
-      {/* Bottom controls — record + pause/resume + finish */}
+      {/* Bottom controls — record always dead-center via a 3-column
+          grid (left flank · record · right flank). Flanks render
+          conditionally; the record cell never shifts. */}
       <div
         style={{
           position: "absolute",
           left: 0,
           right: 0,
           bottom: "calc(env(safe-area-inset-bottom, 0px) + 28px)",
-          display: "flex",
+          display: "grid",
+          gridTemplateColumns: "1fr auto 1fr",
           alignItems: "center",
-          justifyContent: "center",
-          gap: 32,
+          justifyItems: "center",
+          columnGap: 32,
+          paddingInline: 24,
         }}
       >
-        {/* Pause / resume — left of record button, only after a segment exists */}
-        {recording ? (
-          <button
-            type="button"
-            onClick={pauseRecording}
-            aria-label="Pause"
-            style={sideButton}
-          >
-            <svg width="22" height="22" viewBox="0 0 22 22" aria-hidden>
-              <rect x="6" y="5" width="3" height="12" rx="1" fill="currentColor" />
-              <rect x="13" y="5" width="3" height="12" rx="1" fill="currentColor" />
-            </svg>
-          </button>
-        ) : paused ? (
-          <button
-            type="button"
-            onClick={resumeRecording}
-            aria-label="Resume"
-            style={sideButton}
-          >
-            <svg width="22" height="22" viewBox="0 0 22 22" aria-hidden>
-              <polygon points="6,4 18,11 6,18" fill="currentColor" />
-            </svg>
-          </button>
-        ) : null}
+        {/* Pause / resume — left flank, only after a segment exists */}
+        <div style={{ justifySelf: "end" }}>
+          {recording ? (
+            <button
+              type="button"
+              onClick={pauseRecording}
+              aria-label="Pause"
+              style={sideButton}
+            >
+              <svg width="22" height="22" viewBox="0 0 22 22" aria-hidden>
+                <rect x="6" y="5" width="3" height="12" rx="1" fill="currentColor" />
+                <rect x="13" y="5" width="3" height="12" rx="1" fill="currentColor" />
+              </svg>
+            </button>
+          ) : paused ? (
+            <button
+              type="button"
+              onClick={resumeRecording}
+              aria-label="Resume"
+              style={sideButton}
+            >
+              <svg width="22" height="22" viewBox="0 0 22 22" aria-hidden>
+                <polygon points="6,4 18,11 6,18" fill="currentColor" />
+              </svg>
+            </button>
+          ) : null}
+        </div>
 
         {/* Record (big) — tap to toggle. Hold-to-record is layered on via
             pointerdown/up handlers below. */}
@@ -1003,25 +1014,25 @@ export function ClipComposerMobile({ onClose, onPosted, origin }: Props) {
           ) : null}
         </button>
 
-        {/* Finish — only visible after at least one segment exists */}
-        {(recording || paused) && elapsedMs > 800 ? (
-          <button
-            type="button"
-            onClick={stopRecording}
-            aria-label="Finish"
-            style={{
-              ...sideButton,
-              background: "rgba(255,255,255,0.92)",
-              color: "#1C1C1E",
-            }}
-          >
-            <svg width="22" height="22" viewBox="0 0 22 22" aria-hidden>
-              <polyline points="5,12 9,16 17,7" stroke="currentColor" strokeWidth="2.4" fill="none" strokeLinecap="round" strokeLinejoin="round" />
-            </svg>
-          </button>
-        ) : (
-          <span style={{ width: 52, height: 52, display: "inline-block" }} />
-        )}
+        {/* Finish — right flank, only after a segment >800ms exists */}
+        <div style={{ justifySelf: "start" }}>
+          {(recording || paused) && elapsedMs > 800 ? (
+            <button
+              type="button"
+              onClick={stopRecording}
+              aria-label="Finish"
+              style={{
+                ...sideButton,
+                background: "rgba(255,255,255,0.92)",
+                color: "#1C1C1E",
+              }}
+            >
+              <svg width="22" height="22" viewBox="0 0 22 22" aria-hidden>
+                <polyline points="5,12 9,16 17,7" stroke="currentColor" strokeWidth="2.4" fill="none" strokeLinecap="round" strokeLinejoin="round" />
+              </svg>
+            </button>
+          ) : null}
+        </div>
       </div>
 
       {/* Cancel — top-left, always visible */}
