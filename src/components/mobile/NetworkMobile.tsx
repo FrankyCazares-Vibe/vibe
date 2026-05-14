@@ -175,6 +175,34 @@ export function NetworkMobile() {
     [],
   );
 
+  // Dismiss a Discover suggestion — optimistic remove + server POST.
+  // On failure, restore the user back into the suggestions list so the
+  // UI matches reality.
+  const onDismissSuggestion = useCallback(
+    async (user: ListUser) => {
+      let snapshot: ListUser[] | null = null;
+      setSuggestions((prev) => {
+        snapshot = prev;
+        if (!prev) return prev;
+        return prev.filter((u) => u.id !== user.id);
+      });
+      try {
+        const r = await fetch("/api/me/dismiss-suggestion", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          credentials: "include",
+          body: JSON.stringify({ target_id: user.id }),
+        });
+        const j = await r.json().catch(() => ({}));
+        if (!r.ok || !j?.ok) throw new Error(j?.error ?? "Dismiss failed");
+      } catch {
+        // Restore on failure.
+        setSuggestions(snapshot);
+      }
+    },
+    [],
+  );
+
   const activeList: ListUser[] | null = (() => {
     if (debouncedQuery) return null; // SearchResults render path branches below.
     if (tab === "discover") return suggestions;
@@ -232,6 +260,7 @@ export function NetworkMobile() {
             tab={tab}
             users={activeList}
             onStateChange={onStateChange}
+            onDismissSuggestion={onDismissSuggestion}
           />
         )}
       </div>
@@ -381,10 +410,12 @@ function ListPane({
   tab,
   users,
   onStateChange,
+  onDismissSuggestion,
 }: {
   tab: Tab;
   users: ListUser[] | null;
   onStateChange: (id: string, next: FollowState) => void;
+  onDismissSuggestion: (user: ListUser) => void;
 }) {
   if (users === null) return <ListSkeleton />;
   if (users.length === 0) {
@@ -415,7 +446,11 @@ function ListPane({
   // Other tabs: flat list — they're relationship views, not discovery.
   if (tab === "discover") {
     return (
-      <SuggestionGroups users={users} onStateChange={onStateChange} />
+      <SuggestionGroups
+        users={users}
+        onStateChange={onStateChange}
+        onDismiss={onDismissSuggestion}
+      />
     );
   }
   return (
@@ -447,9 +482,11 @@ const SUGGESTION_GROUP_ORDER: Array<{
 function SuggestionGroups({
   users,
   onStateChange,
+  onDismiss,
 }: {
   users: ListUser[];
   onStateChange: (id: string, next: FollowState) => void;
+  onDismiss: (user: ListUser) => void;
 }) {
   // Bucket users by category; the API already pre-sorts by strength
   // (mutuals desc → shared_orgs desc) so within-group order is honored.
@@ -506,6 +543,7 @@ function SuggestionGroups({
                   user={u}
                   onStateChange={onStateChange}
                   variant="suggestion"
+                  onDismiss={() => onDismiss(u)}
                 />
               ))}
             </ul>
@@ -561,6 +599,7 @@ function UserRow({
   user,
   onStateChange,
   variant = "relationship",
+  onDismiss,
 }: {
   user: ListUser;
   onStateChange: (id: string, next: FollowState) => void;
@@ -568,6 +607,9 @@ function UserRow({
    *  its own line with an icon — the most clickable thing in Discover
    *  was getting buried before. "relationship" rows skip it. */
   variant?: "suggestion" | "relationship";
+  /** When provided, renders a top-right × that hides the row + tells
+   *  the server "don't suggest this person again". Suggestion-only. */
+  onDismiss?: () => void;
 }) {
   const [busy, setBusy] = useState(false);
   const state: FollowState = user.follow_state ?? "none";
@@ -608,7 +650,34 @@ function UserRow({
   };
 
   return (
-    <li style={rowItemStyle}>
+    <li style={{ ...rowItemStyle, position: "relative" }}>
+      {variant === "suggestion" && onDismiss ? (
+        <button
+          type="button"
+          aria-label="Dismiss suggestion"
+          onClick={onDismiss}
+          style={{
+            position: "absolute",
+            top: 6,
+            right: 6,
+            width: 22,
+            height: 22,
+            borderRadius: 999,
+            border: "none",
+            background: "rgba(28,28,30,0.08)",
+            color: "#5C5853",
+            fontSize: 12,
+            lineHeight: 1,
+            cursor: "pointer",
+            display: "inline-flex",
+            alignItems: "center",
+            justifyContent: "center",
+            WebkitTapHighlightColor: "transparent",
+          }}
+        >
+          ×
+        </button>
+      ) : null}
       <UserAvatarLink user={user} />
       <div style={{ flex: 1, minWidth: 0 }}>
         <UserNameLink user={user} />

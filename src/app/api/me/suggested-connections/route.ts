@@ -141,6 +141,15 @@ export async function GET(req: Request) {
     blockedIds.add(r.blocker_id === user.id ? r.blocked_id : r.blocker_id);
   }
 
+  // Dismissed list — viewer has hit × on these before; don't resurface.
+  const { data: dismissals } = await supabase
+    .from("suggestion_dismissals")
+    .select("target_id")
+    .eq("user_id", user.id);
+  for (const row of dismissals ?? []) {
+    blockedIds.add((row as { target_id: string }).target_id);
+  }
+
   // Final candidate list, priority: mutuals > shared-org > fallback.
   // Each candidate carries both a mutual_count and shared_org_count so the
   // UI can render the strongest reason — the API doesn't pick one.
