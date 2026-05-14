@@ -208,6 +208,56 @@ export function ClipComposerMobile({ onClose, onPosted, origin }: Props) {
     }
   }, [facing]);
 
+  // Toggle front ↔ back. Two paths:
+  //  - Pre-record: full re-acquire via requestCamera() (cleans up cleanly).
+  //  - Mid-record / paused: swap only the video track inside the existing
+  //    MediaStream so MediaRecorder keeps consuming the same source — the
+  //    recording continues with the new camera instead of ending. iOS
+  //    Safari supports MediaStream.removeTrack/addTrack and MediaRecorder
+  //    survives the swap with a tiny visible glitch at the seam (matches
+  //    TikTok / Reels behavior). Any failure falls back to the full re-
+  //    acquire, which ends recording cleanly.
+  const flipCamera = useCallback(async () => {
+    const next: Facing = facing === "user" ? "environment" : "user";
+
+    if (phase !== "recording" && phase !== "paused") {
+      void requestCamera(next);
+      return;
+    }
+    if (!stream) {
+      void requestCamera(next);
+      return;
+    }
+
+    setVideoReady(false);
+    try {
+      // Audio: only request video, keep the existing audio track + recorder.
+      const newStream = await navigator.mediaDevices.getUserMedia({
+        video: { facingMode: next },
+        audio: false,
+      });
+      const newVideo = newStream.getVideoTracks()[0];
+      if (!newVideo) throw new Error("No video track on new stream");
+
+      stream.getVideoTracks().forEach((t) => {
+        t.stop();
+        stream.removeTrack(t);
+      });
+      stream.addTrack(newVideo);
+
+      // Some browsers need a re-bind even when the MediaStream ref is the
+      // same — without this iOS sometimes keeps showing the frozen last
+      // frame of the old track.
+      if (previewVideoRef.current) {
+        previewVideoRef.current.srcObject = stream;
+      }
+      setFacing(next);
+    } catch {
+      // Anything goes wrong → full restart (will end the current recording).
+      void requestCamera(next);
+    }
+  }, [phase, facing, stream, requestCamera]);
+
   // Attach the live stream to the <video> preview every time the
   // stream changes (initial grant + facing-toggle re-grant).
   useEffect(() => {
@@ -376,9 +426,6 @@ export function ClipComposerMobile({ onClose, onPosted, origin }: Props) {
   //  indicator from the first tap so it doesn't linger.
   const handleCameraTap = useCallback(
     (e: React.MouseEvent<HTMLVideoElement>) => {
-      // Same gate as the flip button — don't flip mid-recording.
-      if (phase === "recording" || phase === "paused") return;
-
       const now = Date.now();
       const rect = e.currentTarget.getBoundingClientRect();
       // Mirror the X coordinate when the front camera is mirrored, so
@@ -395,7 +442,7 @@ export function ClipComposerMobile({ onClose, onPosted, origin }: Props) {
           focusFadeTimerRef.current = null;
         }
         setFocusPoint(null);
-        void requestCamera(facing === "user" ? "environment" : "user");
+        void flipCamera();
         return;
       }
       lastCameraTapRef.current = now;
@@ -432,7 +479,7 @@ export function ClipComposerMobile({ onClose, onPosted, origin }: Props) {
         focusFadeTimerRef.current = null;
       }, 800);
     },
-    [phase, facing, requestCamera, stream],
+    [flipCamera, stream, facing],
   );
 
   // ---------- review controls ----------
@@ -1006,11 +1053,12 @@ export function ClipComposerMobile({ onClose, onPosted, origin }: Props) {
         {formatMs(elapsedMs)} / {formatMs(MAX_CLIP_SEC * 1000)}
       </div>
 
-      {/* Camera flip — top-right */}
+      {/* Camera flip — top-right. Allowed at any phase: while recording
+          or paused, flipCamera() does an in-place video track swap so
+          the recording keeps going on the new camera. */}
       <button
         type="button"
-        onClick={() => void requestCamera(facing === "user" ? "environment" : "user")}
-        disabled={recording || paused}
+        onClick={() => void flipCamera()}
         aria-label="Flip camera"
         style={chromeButton({ top: "calc(env(safe-area-inset-top, 0px) + 12px)", right: 14 })}
       >
