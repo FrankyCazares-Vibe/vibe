@@ -411,6 +411,13 @@ function ListPane({
       />
     );
   }
+  // Discover: group by reason category so users see WHY before WHO.
+  // Other tabs: flat list — they're relationship views, not discovery.
+  if (tab === "discover") {
+    return (
+      <SuggestionGroups users={users} onStateChange={onStateChange} />
+    );
+  }
   return (
     <ul style={listStyle}>
       {users.map((u) => (
@@ -418,10 +425,94 @@ function ListPane({
           key={u.id}
           user={u}
           onStateChange={onStateChange}
-          variant={tab === "discover" ? "suggestion" : "relationship"}
+          variant="relationship"
         />
       ))}
     </ul>
+  );
+}
+
+const SUGGESTION_GROUP_ORDER: Array<{
+  key: SuggestionCategory;
+  label: string;
+  blurb: string;
+}> = [
+  { key: "mutuals", label: "Friends of friends",  blurb: "People your connections know" },
+  { key: "org",     label: "From your clubs",     blurb: "Members of orgs you're already in" },
+  { key: "major",   label: "Same major",          blurb: "Other students studying what you study" },
+  { key: "school",  label: "Around your school",  blurb: "On campus, not yet in your circle" },
+  { key: "new",     label: "New on Vibe",         blurb: "Just joined" },
+];
+
+function SuggestionGroups({
+  users,
+  onStateChange,
+}: {
+  users: ListUser[];
+  onStateChange: (id: string, next: FollowState) => void;
+}) {
+  // Bucket users by category; the API already pre-sorts by strength
+  // (mutuals desc → shared_orgs desc) so within-group order is honored.
+  const buckets: Record<SuggestionCategory, ListUser[]> = {
+    mutuals: [],
+    org: [],
+    major: [],
+    school: [],
+    new: [],
+  };
+  for (const u of users) buckets[categorizeSuggestion(u)].push(u);
+
+  return (
+    <div style={{ display: "flex", flexDirection: "column", gap: 18 }}>
+      {SUGGESTION_GROUP_ORDER.map(({ key, label, blurb }) => {
+        const bucket = buckets[key];
+        if (bucket.length === 0) return null;
+        return (
+          <section key={key}>
+            <header
+              style={{
+                padding: "0 4px 8px",
+                display: "flex",
+                flexDirection: "column",
+                gap: 2,
+              }}
+            >
+              <span
+                style={{
+                  fontFamily: "Fraunces, serif",
+                  fontSize: 16,
+                  fontWeight: 800,
+                  color: "#1C1C1E",
+                  letterSpacing: "-0.2px",
+                }}
+              >
+                {label}
+              </span>
+              <span
+                style={{
+                  fontFamily: "DM Sans, sans-serif",
+                  fontSize: 11.5,
+                  color: "#8A8580",
+                  letterSpacing: "0.01em",
+                }}
+              >
+                {blurb}
+              </span>
+            </header>
+            <ul style={listStyle}>
+              {bucket.map((u) => (
+                <UserRow
+                  key={u.id}
+                  user={u}
+                  onStateChange={onStateChange}
+                  variant="suggestion"
+                />
+              ))}
+            </ul>
+          </section>
+        );
+      })}
+    </div>
   );
 }
 
