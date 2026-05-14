@@ -8,7 +8,7 @@ import { Fragment, useCallback, useEffect, useMemo, useRef, useState } from "rea
 import { CampusAppShell } from "@/components/campus-app-shell";
 import { ImageCropperModal } from "@/components/ImageCropperModal";
 import { emitCalendarChanged } from "@/components/LeftNav";
-import { GlareCard } from "@/components/ui/glare-card";
+import { MouseSpotlight } from "@/components/ui/mouse-spotlight";
 import { FILTER_CSS } from "@/lib/clip/edit-metadata";
 import {
   bindMentionPicker,
@@ -7463,19 +7463,16 @@ function EventCard({ ev, onMutate }: { ev: CampusEvent; onMutate: () => void }) 
   };
 
   return (
-    <GlareCard containerClassName="w-full rounded-[18px]">
-      {/* Inner content surface — keeps the existing DarkGlassCard look
-          (cream-on-dark glass) but lives inside the GlareCard's
-          tilt+glare effect. Accent stripe stays on the left edge. */}
-      <div
-        style={{
-          ...DARK_GLASS_SURFACE,
-          borderRadius: 18,
-          padding: 20,
-          borderLeft: `3px solid ${accent}`,
-          height: "100%",
-        }}
-      >
+    <MouseSpotlight
+      size={220}
+      color="rgba(255, 92, 53, 0.14)"
+      style={{
+        ...DARK_GLASS_SURFACE,
+        borderRadius: 18,
+        borderLeft: `3px solid ${accent}`,
+      }}
+    >
+      <div style={{ padding: 20 }}>
       <div
         style={{
           display: "flex",
@@ -7620,7 +7617,7 @@ function EventCard({ ev, onMutate }: { ev: CampusEvent; onMutate: () => void }) 
         </div>
       ) : null}
       </div>
-    </GlareCard>
+    </MouseSpotlight>
   );
 }
 
