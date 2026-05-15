@@ -77,11 +77,12 @@ type ZoneRow = {
 
 // ---------- Layout helpers ----------
 
-const BUBBLE_MIN = 32;
-const BUBBLE_MAX = 54;
-// "You are here" keep-out — bubbles can't crowd the avatar. Was 92,
-// pulled in so the zones sit closer to the center on a phone screen.
-const YOU_KEEPOUT = 60;
+const BUBBLE_MIN = 28;
+const BUBBLE_MAX = 48;
+// "You are here" keep-out — bubbles can't crowd the avatar. Pulled all
+// the way in (92 → 60 → 38) so the closest zones sit right next to the
+// "you" node on a phone screen.
+const YOU_KEEPOUT = 38;
 
 function bubbleR(total: number): number {
   return BUBBLE_MIN + Math.min(BUBBLE_MAX - BUBBLE_MIN, total * 0.4);
@@ -123,23 +124,22 @@ function computeLayout(data: MapSummary | null): Layout | null {
   if (active.length === 0) return { majors: positions, schools };
 
   // Per-cluster radius estimate so an over-packed school gets a wider
-  // anchor radius and doesn't bleed into a neighbor. Tightened from
-  // (×1.5 + 28, cap 200) so clusters hug closer to their anchor and
-  // the whole map reads more compact on a phone.
+  // anchor radius and doesn't bleed into a neighbor. Pulled all the way
+  // in for mobile so the cluster doesn't dictate a huge anchor distance.
   const clusterRadiusOf = (majors: MapMajor[]): number => {
     let area = 0;
     for (const m of majors) {
       const r = bubbleR(m.total);
       area += Math.PI * r * r;
     }
-    return Math.min(Math.sqrt(area / Math.PI) * 1.2 + 16, 140);
+    return Math.min(Math.sqrt(area / Math.PI) * 0.95 + 10, 92);
   };
 
   const wedgeDeg = 360 / active.length;
   const wedgeRad = (wedgeDeg * Math.PI) / 180;
-  // Padding between adjacent clusters — pulled in from 26 so neighbors
-  // sit tighter without overlapping.
-  const PAD_BETWEEN = 14;
+  // Padding between adjacent clusters — minimal so neighbors can sit
+  // tight; collision relaxation still keeps individual bubbles apart.
+  const PAD_BETWEEN = 8;
   const clusterRadii = active.map((s) => clusterRadiusOf(grouped.get(s.id)!));
   const maxClusterR = clusterRadii.reduce((a, b) => Math.max(a, b), 0);
 
@@ -175,8 +175,9 @@ function computeLayout(data: MapSummary | null): Layout | null {
         ((t * fanDeg) * Math.PI) / 180 +
         (((seed % 11) - 5) * Math.PI) / 220;
       // Local fan radius — how far each major sits from its school's
-      // anchor. Pulled in from 52+24 so the cluster doesn't bloom.
-      const dist = 34 + ((seed >> 4) % 18);
+      // anchor. Pulled all the way in for mobile (52+24 → 34+18 → 18+12)
+      // so the cluster hugs its anchor instead of blooming outward.
+      const dist = 18 + ((seed >> 4) % 12);
       positions.set(m.name, {
         x: ax + Math.cos(local) * dist,
         y: ay + Math.sin(local) * dist,
@@ -188,8 +189,9 @@ function computeLayout(data: MapSummary | null): Layout | null {
 
   // Collision relaxation — same idea as desktop but fewer iterations
   // since the mobile bubble set is smaller and we have less screen.
+  // Tight node padding so bubbles can sit shoulder-to-shoulder.
   const entries = Array.from(positions.entries());
-  const NODE_PAD = 10;
+  const NODE_PAD = 4;
   for (let iter = 0; iter < 60; iter++) {
     let moved = false;
     for (let i = 0; i < entries.length; i++) {
