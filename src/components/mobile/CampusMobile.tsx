@@ -565,30 +565,27 @@ function FeedCard({
   const repostingRef = useRef(false);
   const savingRef = useRef(false);
 
-  const toggleLike = useCallback(
-    async (forceLike?: boolean) => {
-      if (likingRef.current) return;
-      likingRef.current = true;
-      const targetLiked = forceLike ?? !liked;
-      const prevLiked = liked;
-      const prevCount = likeCount;
-      setLiked(targetLiked);
-      setLikeCount((n) => Math.max(0, n + (targetLiked ? 1 : -1)));
-      try {
-        const r = await fetch(`/api/posts/${post.id}/like`, {
-          method: targetLiked ? "POST" : "DELETE",
-          credentials: "include",
-        });
-        if (!r.ok) throw new Error("Like failed");
-      } catch {
-        setLiked(prevLiked);
-        setLikeCount(prevCount);
-      } finally {
-        likingRef.current = false;
-      }
-    },
-    [liked, likeCount, post.id],
-  );
+  const toggleLike = useCallback(async () => {
+    if (likingRef.current) return;
+    likingRef.current = true;
+    const targetLiked = !liked;
+    const prevLiked = liked;
+    const prevCount = likeCount;
+    setLiked(targetLiked);
+    setLikeCount((n) => Math.max(0, n + (targetLiked ? 1 : -1)));
+    try {
+      const r = await fetch(`/api/posts/${post.id}/like`, {
+        method: targetLiked ? "POST" : "DELETE",
+        credentials: "include",
+      });
+      if (!r.ok) throw new Error("Like failed");
+    } catch {
+      setLiked(prevLiked);
+      setLikeCount(prevCount);
+    } finally {
+      likingRef.current = false;
+    }
+  }, [liked, likeCount, post.id]);
 
   const toggleRepost = useCallback(async () => {
     if (repostingRef.current) return;
@@ -638,14 +635,14 @@ function FeedCard({
   }, []);
 
   // Manual tap-vs-double-tap split. Single tap fires after 240ms so the
-  // double-tap window has time to land. Double tap silently toggles
-  // like — the only visible feedback is the heart pill in the action
-  // row swapping into its filled/liked state.
+  // double-tap window has time to land. Double-tap toggles like once
+  // (so it works as both "like" and "unlike") — was force-liking each
+  // time, which made repeated double-taps stack the count.
   const handleCardClick = useCallback(() => {
     if (tapTimerRef.current) {
       window.clearTimeout(tapTimerRef.current);
       tapTimerRef.current = null;
-      void toggleLike(true);
+      void toggleLike();
       return;
     }
     tapTimerRef.current = window.setTimeout(() => {
