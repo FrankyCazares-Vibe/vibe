@@ -884,8 +884,10 @@ function FeedCard({
           </svg>
           {likeCount}
         </button>
-        <span>{post.comment_count} comments</span>
 
+        {/* Repost — sits immediately next to the heart so the two
+            engagement actions read as a pair, matches the desktop
+            feed row order (like → repost → comment). */}
         <button
           type="button"
           onClick={(e) => {
@@ -930,8 +932,33 @@ function FeedCard({
           {repostCount}
         </button>
 
+        <span>{post.comment_count} comments</span>
+
         {post.view_count > 0 ? (
-          <span>{post.view_count} views</span>
+          <span
+            style={{
+              display: "inline-flex",
+              alignItems: "center",
+              gap: 4,
+            }}
+          >
+            <svg
+              width="14"
+              height="14"
+              viewBox="0 0 16 16"
+              fill="none"
+              aria-hidden
+            >
+              <path
+                d="M1.5 8s2.5-4.5 6.5-4.5S14.5 8 14.5 8s-2.5 4.5-6.5 4.5S1.5 8 1.5 8z"
+                stroke="currentColor"
+                strokeWidth="1.4"
+                strokeLinejoin="round"
+              />
+              <circle cx="8" cy="8" r="2" stroke="currentColor" strokeWidth="1.4" />
+            </svg>
+            {post.view_count}
+          </span>
         ) : null}
 
         {/* Save (bookmark) — pinned to the right of the action row.
