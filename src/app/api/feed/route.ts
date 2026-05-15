@@ -216,18 +216,14 @@ export async function GET(req: Request) {
     post: renderPost(p),
   }));
 
-  const repostRowsOut = repostRows
-    .filter((r) => r.post && r.reposter)
-    .map((r) => ({
-      kind: "repost" as const,
-      sort_at: r.created_at,
-      reposter: r.reposter,
-      reposted_at: r.created_at,
-      quote: r.comment,
-      post: renderPost(r.post as PostRow),
-    }));
+  // Reposts no longer surface as their own feed entries (Instagram-style
+  // model: the act of reposting is private to the user's profile, plus a
+  // social-proof signal on the original post). We still consume the
+  // repostRows above for engagement-count hydration; we just don't emit
+  // a separate "repost"-kind row into the feed.
+  void repostRows;
 
-  const feed = [...postRowsOut, ...repostRowsOut]
+  const feed = postRowsOut
     .sort((a, b) => (a.sort_at < b.sort_at ? 1 : a.sort_at > b.sort_at ? -1 : 0))
     .slice(0, limit);
 

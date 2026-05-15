@@ -127,6 +127,60 @@ type PostRow = {
 
 type ProfileTab = "posts" | "clips" | "portfolio";
 
+/** Sub-tabs inside the Posts pane. Reposts is public (visible to every
+ *  viewer); Saved is owner-only. Per the Instagram-ish model the user
+ *  asked for, reposting doesn't generate a feed entry — it's just a
+ *  per-user list that shows up here. */
+type PostsSubTab = "mine" | "reposts" | "saved";
+
+type RepostEntry = {
+  post_id: string;
+  comment: string | null;
+  reposted_at: string;
+  post: {
+    id: string;
+    user_id: string;
+    org_id: string | null;
+    type: "post" | "clip";
+    content: string;
+    tags: string[] | null;
+    media_url: string | null;
+    media_thumbnail_url: string | null;
+    view_count: number | null;
+    created_at: string;
+    author: {
+      id: string;
+      name: string | null;
+      handle: string | null;
+      avatar_url: string | null;
+    } | null;
+    org: {
+      id: string;
+      handle: string;
+      name: string;
+      logo_url: string | null;
+      verified: boolean;
+    } | null;
+  };
+};
+
+type SavedPost = {
+  id: string;
+  type: "post" | "clip";
+  content: string;
+  tags: string[] | null;
+  media_url: string | null;
+  media_thumbnail_url: string | null;
+  created_at: string;
+  saved_at: string;
+  author: {
+    id: string;
+    name: string | null;
+    handle: string | null;
+    avatar_url: string | null;
+  } | null;
+};
+
 // Fields the inline mobile editor touches. Mirrors the keys
 // /api/me/profile-sync accepts; vibeTagsList is an array of plain
 // strings that maps to the `interests` column on save.
@@ -170,6 +224,11 @@ export function ProfileMobile({ targetHandle }: Props = {}) {
   const tabScrollRef = useRef<HTMLDivElement | null>(null);
   const isProgrammaticScrollRef = useRef(false);
   const TAB_ORDER: ProfileTab[] = ["posts", "clips", "portfolio"];
+  // Sub-tab state inside the Posts pane — see PostsSubTab type for
+  // why these aren't top-level tabs.
+  const [postsSubTab, setPostsSubTab] = useState<PostsSubTab>("mine");
+  const [reposts, setReposts] = useState<RepostEntry[] | null>(null);
+  const [savedPosts, setSavedPosts] = useState<SavedPost[] | null>(null);
 
   // When `tab` changes (tap on the tab strip or programmatic set), scroll
   // the swipeable container to that pane. Skip if we're already there
@@ -312,6 +371,62 @@ export function ProfileMobile({ targetHandle }: Props = {}) {
       cancelled = true;
     };
   }, [isVisitor, targetHandle, refetchDraftsPreview]);
+
+  // Reposts — public, available for both own + visited profiles.
+  // /api/users/[handle]/reposts requires auth but is the same endpoint
+  // for either case, so we just resolve the right handle.
+  useEffect(() => {
+    const handle = targetHandle ?? user?.handle ?? null;
+    if (!handle) return;
+    let cancelled = false;
+    (async () => {
+      try {
+        const res = await fetch(
+          `/api/users/${encodeURIComponent(handle)}/reposts`,
+          { cache: "no-store" },
+        );
+        const data = await res.json();
+        if (cancelled) return;
+        if (data?.ok && Array.isArray(data.reposts)) {
+          setReposts(data.reposts as RepostEntry[]);
+        } else {
+          setReposts([]);
+        }
+      } catch {
+        if (!cancelled) setReposts([]);
+      }
+    })();
+    return () => {
+      cancelled = true;
+    };
+  }, [targetHandle, user?.handle]);
+
+  // Saved (bookmarks) — owner-only. Visitors never see this tab so we
+  // skip the fetch entirely for them.
+  useEffect(() => {
+    if (isVisitor) {
+      setSavedPosts(null);
+      return;
+    }
+    let cancelled = false;
+    (async () => {
+      try {
+        const res = await fetch("/api/me/bookmarks", { cache: "no-store" });
+        const data = await res.json();
+        if (cancelled) return;
+        if (data?.ok && Array.isArray(data.posts)) {
+          setSavedPosts(data.posts as SavedPost[]);
+        } else {
+          setSavedPosts([]);
+        }
+      } catch {
+        if (!cancelled) setSavedPosts([]);
+      }
+    })();
+    return () => {
+      cancelled = true;
+    };
+  }, [isVisitor]);
 
   // Follow/unfollow toggle for visitor mode. Optimistic so the pill
   // updates instantly; reverts on server error.
@@ -1225,13 +1340,38 @@ export function ProfileMobile({ targetHandle }: Props = {}) {
             minWidth: 0,
           }}
         >
-          <PostsGrid
-            posts={feedPosts}
-            loading={posts === null}
+          <PostsSubTabs
+            active={postsSubTab}
+            onChange={setPostsSubTab}
             isVisitor={isVisitor}
-            ownerName={name}
-            onOpenPost={setOpenPostId}
           />
+          {postsSubTab === "mine" ? (
+            <PostsGrid
+              posts={feedPosts}
+              loading={posts === null}
+              isVisitor={isVisitor}
+              ownerName={name}
+              onOpenPost={setOpenPostId}
+            />
+          ) : postsSubTab === "reposts" ? (
+            <RepostsList
+              reposts={reposts}
+              isVisitor={isVisitor}
+              ownerName={name}
+              onOpenPost={(p) => {
+                if (p.type === "clip") setOpenClipId(p.id);
+                else setOpenPostId(p.id);
+              }}
+            />
+          ) : (
+            <SavedGrid
+              posts={savedPosts}
+              onOpenPost={(p) => {
+                if (p.type === "clip") setOpenClipId(p.id);
+                else setOpenPostId(p.id);
+              }}
+            />
+          )}
         </div>
         <div
           style={{
@@ -1678,6 +1818,401 @@ function relTimeForCard(iso: string): string {
     month: "short",
     day: "numeric",
   });
+}
+
+/** Sub-tab strip inside the Posts pane: Mine / Reposts / Saved (owner). */
+function PostsSubTabs({
+  active,
+  onChange,
+  isVisitor,
+}: {
+  active: PostsSubTab;
+  onChange: (t: PostsSubTab) => void;
+  isVisitor: boolean;
+}) {
+  const tabs: Array<{ id: PostsSubTab; label: string }> = isVisitor
+    ? [
+        { id: "mine", label: "Posts" },
+        { id: "reposts", label: "Reposts" },
+      ]
+    : [
+        { id: "mine", label: "Posts" },
+        { id: "reposts", label: "Reposts" },
+        { id: "saved", label: "Saved" },
+      ];
+  return (
+    <div
+      role="tablist"
+      style={{
+        display: "flex",
+        gap: 6,
+        padding: "2px 0 12px",
+        overflowX: "auto",
+        scrollbarWidth: "none",
+        msOverflowStyle: "none",
+      }}
+      className="vibe-no-scrollbar"
+    >
+      {tabs.map((t) => {
+        const on = t.id === active;
+        return (
+          <button
+            key={t.id}
+            type="button"
+            role="tab"
+            aria-selected={on}
+            onClick={() => onChange(t.id)}
+            style={{
+              padding: "6px 14px",
+              borderRadius: 999,
+              border: on
+                ? "1px solid rgba(28,28,30,0.85)"
+                : "1px solid rgba(28,28,30,0.12)",
+              background: on ? "#1C1C1E" : "rgba(255,255,255,0.62)",
+              color: on ? "#fff" : "#1C1C1E",
+              fontFamily: "DM Sans, sans-serif",
+              fontSize: 12.5,
+              fontWeight: 700,
+              cursor: "pointer",
+              WebkitTapHighlightColor: "transparent",
+              whiteSpace: "nowrap",
+              flexShrink: 0,
+            }}
+          >
+            {t.label}
+          </button>
+        );
+      })}
+    </div>
+  );
+}
+
+/** Reposts list inside the Posts pane. Each row carries the original
+ *  post (poster on the left, author handle + content snippet on the
+ *  right) and opens that post's full viewer on tap. */
+function RepostsList({
+  reposts,
+  isVisitor,
+  ownerName,
+  onOpenPost,
+}: {
+  reposts: RepostEntry[] | null;
+  isVisitor: boolean;
+  ownerName: string | null;
+  onOpenPost: (p: { id: string; type: "post" | "clip" }) => void;
+}) {
+  if (reposts === null) {
+    return <SubPaneSkeleton />;
+  }
+  if (reposts.length === 0) {
+    return (
+      <SubPaneEmpty
+        title="No reposts yet"
+        body={
+          isVisitor
+            ? `${ownerName ?? "They"} hasn't reposted anything yet.`
+            : "Tap the repost button on a post to add it here."
+        }
+      />
+    );
+  }
+  return (
+    <div style={{ display: "flex", flexDirection: "column", gap: 10 }}>
+      {reposts.map((r) => (
+        <RepostRow key={`${r.post_id}-${r.reposted_at}`} entry={r} onOpen={onOpenPost} />
+      ))}
+    </div>
+  );
+}
+
+function RepostRow({
+  entry,
+  onOpen,
+}: {
+  entry: RepostEntry;
+  onOpen: (p: { id: string; type: "post" | "clip" }) => void;
+}) {
+  const p = entry.post;
+  const author = p.author;
+  const initials =
+    (author?.name ?? author?.handle ?? "?")
+      .trim()
+      .split(/\s+/)
+      .slice(0, 2)
+      .map((s) => s[0]?.toUpperCase() ?? "")
+      .join("") || "?";
+  const thumb = p.media_thumbnail_url || (p.type === "post" ? p.media_url : null);
+  return (
+    <button
+      type="button"
+      onClick={() => onOpen({ id: p.id, type: p.type })}
+      style={{
+        width: "100%",
+        textAlign: "left",
+        display: "flex",
+        gap: 10,
+        padding: 10,
+        borderRadius: 14,
+        border: "1px solid rgba(255,255,255,0.7)",
+        background: "rgba(255,253,248,0.78)",
+        cursor: "pointer",
+        WebkitTapHighlightColor: "transparent",
+        boxShadow: "inset 0 1px 0 rgba(255,255,255,0.85)",
+      }}
+    >
+      {thumb ? (
+        <div
+          style={{
+            width: 72,
+            height: 72,
+            borderRadius: 12,
+            background: `url(${thumb}) center/cover, #1C1C1E`,
+            flexShrink: 0,
+          }}
+        />
+      ) : (
+        <div
+          style={{
+            width: 72,
+            height: 72,
+            borderRadius: 12,
+            background: "rgba(28,28,30,0.08)",
+            flexShrink: 0,
+            display: "inline-flex",
+            alignItems: "center",
+            justifyContent: "center",
+            color: "#8A8580",
+            fontFamily: "Fraunces, serif",
+            fontSize: 11,
+            fontWeight: 700,
+            letterSpacing: "0.05em",
+            textTransform: "uppercase",
+          }}
+        >
+          {p.type === "clip" ? "Clip" : "Post"}
+        </div>
+      )}
+      <div style={{ flex: 1, minWidth: 0 }}>
+        <div
+          style={{
+            display: "flex",
+            alignItems: "center",
+            gap: 6,
+            color: "#8A8580",
+            fontFamily: "DM Sans, sans-serif",
+            fontSize: 11.5,
+            fontWeight: 700,
+            letterSpacing: "0.02em",
+          }}
+        >
+          <IconRepost />
+          Reposted {relTimeForCard(entry.reposted_at)}
+        </div>
+        <div
+          style={{
+            marginTop: 4,
+            display: "flex",
+            alignItems: "center",
+            gap: 8,
+          }}
+        >
+          <div
+            style={{
+              width: 22,
+              height: 22,
+              borderRadius: 999,
+              background: author?.avatar_url
+                ? `url(${author.avatar_url}) center/cover`
+                : "#FFD3C2",
+              display: "inline-flex",
+              alignItems: "center",
+              justifyContent: "center",
+              color: "#1C1C1E",
+              fontFamily: "Fraunces, serif",
+              fontSize: 10,
+              fontWeight: 800,
+              flexShrink: 0,
+            }}
+          >
+            {!author?.avatar_url ? initials : null}
+          </div>
+          <span
+            style={{
+              fontFamily: "Fraunces, serif",
+              fontSize: 13.5,
+              fontWeight: 800,
+              color: "#1C1C1E",
+              whiteSpace: "nowrap",
+              overflow: "hidden",
+              textOverflow: "ellipsis",
+              minWidth: 0,
+              flex: 1,
+            }}
+          >
+            {author?.name || (author?.handle ? `@${author.handle}` : "Member")}
+          </span>
+        </div>
+        {p.content ? (
+          <div
+            style={{
+              marginTop: 4,
+              fontFamily: "DM Sans, sans-serif",
+              fontSize: 13,
+              color: "#3C3A36",
+              lineHeight: 1.4,
+              display: "-webkit-box",
+              WebkitLineClamp: 2,
+              WebkitBoxOrient: "vertical",
+              overflow: "hidden",
+            }}
+          >
+            {p.content}
+          </div>
+        ) : null}
+      </div>
+    </button>
+  );
+}
+
+/** Saved (bookmarks) grid — owner-only, grid of thumbnails. Falls back
+ *  to a content-snippet tile for posts without media. */
+function SavedGrid({
+  posts,
+  onOpenPost,
+}: {
+  posts: SavedPost[] | null;
+  onOpenPost: (p: { id: string; type: "post" | "clip" }) => void;
+}) {
+  if (posts === null) return <SubPaneSkeleton />;
+  if (posts.length === 0) {
+    return (
+      <SubPaneEmpty
+        title="Nothing saved yet"
+        body="Tap the bookmark on any post or clip to keep it here. Only you see this list."
+      />
+    );
+  }
+  return (
+    <div
+      style={{
+        display: "grid",
+        gridTemplateColumns: "repeat(3, 1fr)",
+        gap: 4,
+      }}
+    >
+      {posts.map((p) => {
+        const thumb =
+          p.media_thumbnail_url || (p.type === "post" ? p.media_url : null);
+        return (
+          <button
+            key={p.id}
+            type="button"
+            onClick={() => onOpenPost({ id: p.id, type: p.type })}
+            style={{
+              position: "relative",
+              aspectRatio: "1 / 1",
+              border: "none",
+              padding: 0,
+              borderRadius: 2,
+              overflow: "hidden",
+              background: thumb
+                ? `url(${thumb}) center/cover, #1C1C1E`
+                : "rgba(28,28,30,0.06)",
+              cursor: "pointer",
+              WebkitTapHighlightColor: "transparent",
+            }}
+          >
+            {!thumb ? (
+              <span
+                style={{
+                  position: "absolute",
+                  inset: 0,
+                  padding: 8,
+                  fontFamily: "DM Sans, sans-serif",
+                  fontSize: 11.5,
+                  color: "#3C3A36",
+                  textAlign: "left",
+                  display: "-webkit-box",
+                  WebkitLineClamp: 5,
+                  WebkitBoxOrient: "vertical",
+                  overflow: "hidden",
+                  whiteSpace: "pre-wrap",
+                }}
+              >
+                {p.content || "Saved post"}
+              </span>
+            ) : null}
+            {p.type === "clip" ? (
+              <span
+                aria-hidden
+                style={{
+                  position: "absolute",
+                  top: 6,
+                  right: 6,
+                  padding: "2px 6px",
+                  borderRadius: 999,
+                  background: "rgba(0,0,0,0.55)",
+                  color: "#fff",
+                  fontFamily: "DM Sans, sans-serif",
+                  fontSize: 9.5,
+                  fontWeight: 800,
+                  letterSpacing: "0.08em",
+                  textTransform: "uppercase",
+                }}
+              >
+                Clip
+              </span>
+            ) : null}
+          </button>
+        );
+      })}
+    </div>
+  );
+}
+
+function SubPaneSkeleton() {
+  return (
+    <div
+      style={{
+        padding: "32px 16px",
+        textAlign: "center",
+        color: "#8A8580",
+        fontFamily: "DM Sans, sans-serif",
+        fontSize: 13,
+      }}
+    >
+      Loading…
+    </div>
+  );
+}
+
+function SubPaneEmpty({ title, body }: { title: string; body: string }) {
+  return (
+    <div
+      style={{
+        padding: "40px 18px",
+        textAlign: "center",
+        color: "#5C5853",
+        fontFamily: "DM Sans, sans-serif",
+        background: "rgba(255,253,248,0.55)",
+        border: "1px solid rgba(255,255,255,0.7)",
+        borderRadius: 14,
+      }}
+    >
+      <div
+        style={{
+          fontFamily: "Fraunces, serif",
+          fontWeight: 800,
+          fontSize: 16,
+          color: "#1C1C1E",
+          marginBottom: 6,
+        }}
+      >
+        {title}
+      </div>
+      <div style={{ fontSize: 13, lineHeight: 1.55 }}>{body}</div>
+    </div>
+  );
 }
 
 function ClipsGrid({
@@ -2373,6 +2908,41 @@ function IconResume() {
       <rect x="2" y="4" width="12" height="10" rx="2" stroke="currentColor" strokeWidth="1.3" />
       <path d="M6 4V3a1 1 0 011-1h2a1 1 0 011 1v1" stroke="currentColor" strokeWidth="1.3" />
       <path d="M5 8h6M5 11h4" stroke="currentColor" strokeWidth="1.3" strokeLinecap="round" />
+    </svg>
+  );
+}
+function IconRepost() {
+  return (
+    <svg
+      width="16"
+      height="16"
+      viewBox="0 0 16 16"
+      fill="none"
+      stroke="currentColor"
+      strokeWidth="1.3"
+      strokeLinecap="round"
+      strokeLinejoin="round"
+      aria-hidden
+    >
+      <path d="M2.5 6V5a1.5 1.5 0 0 1 1.5-1.5h7L9.5 2" />
+      <path d="M13.5 10v1A1.5 1.5 0 0 1 12 12.5H5l1.5 1.5" />
+    </svg>
+  );
+}
+function IconBookmark() {
+  return (
+    <svg
+      width="16"
+      height="16"
+      viewBox="0 0 16 16"
+      fill="none"
+      stroke="currentColor"
+      strokeWidth="1.3"
+      strokeLinecap="round"
+      strokeLinejoin="round"
+      aria-hidden
+    >
+      <path d="M3.5 2h9v12L8 11l-4.5 3z" />
     </svg>
   );
 }
