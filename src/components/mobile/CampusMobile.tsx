@@ -560,8 +560,6 @@ function FeedCard({
   const [reposted, setReposted] = useState(!!post.viewer_reposted);
   const [repostCount, setRepostCount] = useState(post.repost_count ?? 0);
   const [saved, setSaved] = useState(false);
-  const [burst, setBurst] = useState(false);
-  const burstTimerRef = useRef<number | null>(null);
   const tapTimerRef = useRef<number | null>(null);
   const likingRef = useRef(false);
   const repostingRef = useRef(false);
@@ -633,38 +631,28 @@ function FeedCard({
     }
   }, [saved, post.id]);
 
-  // Heart burst animation: only paints when going from unliked → liked
-  // (positive feedback). Untoggle is silent.
-  const playBurst = useCallback(() => {
-    if (burstTimerRef.current) window.clearTimeout(burstTimerRef.current);
-    setBurst(true);
-    burstTimerRef.current = window.setTimeout(() => setBurst(false), 700);
-  }, []);
   useEffect(() => {
     return () => {
-      if (burstTimerRef.current) window.clearTimeout(burstTimerRef.current);
       if (tapTimerRef.current) window.clearTimeout(tapTimerRef.current);
     };
   }, []);
 
   // Manual tap-vs-double-tap split. Single tap fires after 240ms so the
-  // double-tap window has time to land. iMessage/Instagram do roughly
-  // the same — adds a small delay to single tap but keeps double-tap
-  // available as a like gesture.
+  // double-tap window has time to land. Double tap silently toggles
+  // like — the only visible feedback is the heart pill in the action
+  // row swapping into its filled/liked state.
   const handleCardClick = useCallback(() => {
     if (tapTimerRef.current) {
-      // Second tap inside the window — treat as double-tap.
       window.clearTimeout(tapTimerRef.current);
       tapTimerRef.current = null;
       void toggleLike(true);
-      playBurst();
       return;
     }
     tapTimerRef.current = window.setTimeout(() => {
       tapTimerRef.current = null;
       onOpen();
     }, 240);
-  }, [onOpen, toggleLike, playBurst]);
+  }, [onOpen, toggleLike]);
 
   return (
     <button
@@ -861,11 +849,7 @@ function FeedCard({
           type="button"
           onClick={(e) => {
             e.stopPropagation();
-            // Tap on the heart bypasses the double-tap window —
-            // toggles immediately and only bursts on a fresh like.
-            const willLike = !liked;
             void toggleLike();
-            if (willLike) playBurst();
           }}
           aria-label={liked ? "Unlike" : "Like"}
           aria-pressed={liked}
@@ -999,28 +983,6 @@ function FeedCard({
         </button>
       </div>
 
-      {/* Double-tap burst — Instagram-style heart that fades in/out
-          over the card center. pointer-events:none so it doesn't eat
-          the next tap. */}
-      {burst ? (
-        <span
-          aria-hidden
-          style={{
-            position: "absolute",
-            top: "50%",
-            left: "50%",
-            transform: "translate(-50%, -50%)",
-            pointerEvents: "none",
-            color: "#FF5C35",
-            filter: "drop-shadow(0 6px 22px rgba(255,92,53,0.45))",
-            animation: "vibe-feed-heart-burst 700ms ease-out forwards",
-          }}
-        >
-          <svg width="120" height="120" viewBox="0 0 20 20" fill="currentColor" aria-hidden>
-            <path d="M10 17s-6-3.6-6-8.2A3.8 3.8 0 0 1 7.8 5c1.3 0 2.4.65 2.95 1.65A3.4 3.4 0 0 1 13.7 5 3.8 3.8 0 0 1 17.5 8.8C17.5 13.4 11.5 17 11.5 17z" />
-          </svg>
-        </span>
-      ) : null}
     </button>
   );
 }

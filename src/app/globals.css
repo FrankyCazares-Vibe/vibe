@@ -2420,15 +2420,6 @@ a.otto-room-row-title:hover {
    Kept outside the @media block so it works on every viewport. */
 body.vibe-hide-otto #otto-corner { display: none !important; }
 
-/* Mobile feed double-tap-to-like burst — Instagram-style heart that
-   pops in over the post card center, then fades back out. */
-@keyframes vibe-feed-heart-burst {
-  0%   { opacity: 0; transform: translate(-50%, -50%) scale(0.4); }
-  30%  { opacity: 0.95; transform: translate(-50%, -50%) scale(1.05); }
-  55%  { opacity: 0.95; transform: translate(-50%, -50%) scale(0.95); }
-  100% { opacity: 0;    transform: translate(-50%, -50%) scale(1.1); }
-}
-
 /* Bottom tab bar — 5 tabs, iOS-friendly. */
 /* Mobile-only chrome — hidden on desktop. Visibility lives on the
    tabbar class itself (not on a separate `vibe-mobile-only` helper)
