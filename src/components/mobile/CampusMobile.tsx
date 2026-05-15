@@ -551,10 +551,125 @@ function FeedCard({
   const hasMedia = !!post.media_url || !!post.media_thumbnail_url;
   const thumb = post.media_thumbnail_url || (isClip ? null : post.media_url);
 
+  // Local engagement state, seeded from the feed payload. Heart +
+  // double-tap-to-like + repost + save all flow through their own
+  // optimistic toggles with rollback on network failure. Save state
+  // isn't in the feed payload so it starts unsaved; tapping seeds it.
+  const [liked, setLiked] = useState(!!post.viewer_liked);
+  const [likeCount, setLikeCount] = useState(post.like_count ?? 0);
+  const [reposted, setReposted] = useState(!!post.viewer_reposted);
+  const [repostCount, setRepostCount] = useState(post.repost_count ?? 0);
+  const [saved, setSaved] = useState(false);
+  const [burst, setBurst] = useState(false);
+  const burstTimerRef = useRef<number | null>(null);
+  const tapTimerRef = useRef<number | null>(null);
+  const likingRef = useRef(false);
+  const repostingRef = useRef(false);
+  const savingRef = useRef(false);
+
+  const toggleLike = useCallback(
+    async (forceLike?: boolean) => {
+      if (likingRef.current) return;
+      likingRef.current = true;
+      const targetLiked = forceLike ?? !liked;
+      const prevLiked = liked;
+      const prevCount = likeCount;
+      setLiked(targetLiked);
+      setLikeCount((n) => Math.max(0, n + (targetLiked ? 1 : -1)));
+      try {
+        const r = await fetch(`/api/posts/${post.id}/like`, {
+          method: targetLiked ? "POST" : "DELETE",
+          credentials: "include",
+        });
+        if (!r.ok) throw new Error("Like failed");
+      } catch {
+        setLiked(prevLiked);
+        setLikeCount(prevCount);
+      } finally {
+        likingRef.current = false;
+      }
+    },
+    [liked, likeCount, post.id],
+  );
+
+  const toggleRepost = useCallback(async () => {
+    if (repostingRef.current) return;
+    repostingRef.current = true;
+    const target = !reposted;
+    const prevReposted = reposted;
+    const prevCount = repostCount;
+    setReposted(target);
+    setRepostCount((n) => Math.max(0, n + (target ? 1 : -1)));
+    try {
+      const r = await fetch(`/api/posts/${post.id}/repost`, {
+        method: target ? "POST" : "DELETE",
+        credentials: "include",
+      });
+      if (!r.ok) throw new Error("Repost failed");
+    } catch {
+      setReposted(prevReposted);
+      setRepostCount(prevCount);
+    } finally {
+      repostingRef.current = false;
+    }
+  }, [reposted, repostCount, post.id]);
+
+  const toggleSave = useCallback(async () => {
+    if (savingRef.current) return;
+    savingRef.current = true;
+    const target = !saved;
+    const prev = saved;
+    setSaved(target);
+    try {
+      const r = await fetch(`/api/posts/${post.id}/save`, {
+        method: target ? "POST" : "DELETE",
+        credentials: "include",
+      });
+      if (!r.ok) throw new Error("Save failed");
+    } catch {
+      setSaved(prev);
+    } finally {
+      savingRef.current = false;
+    }
+  }, [saved, post.id]);
+
+  // Heart burst animation: only paints when going from unliked → liked
+  // (positive feedback). Untoggle is silent.
+  const playBurst = useCallback(() => {
+    if (burstTimerRef.current) window.clearTimeout(burstTimerRef.current);
+    setBurst(true);
+    burstTimerRef.current = window.setTimeout(() => setBurst(false), 700);
+  }, []);
+  useEffect(() => {
+    return () => {
+      if (burstTimerRef.current) window.clearTimeout(burstTimerRef.current);
+      if (tapTimerRef.current) window.clearTimeout(tapTimerRef.current);
+    };
+  }, []);
+
+  // Manual tap-vs-double-tap split. Single tap fires after 240ms so the
+  // double-tap window has time to land. iMessage/Instagram do roughly
+  // the same — adds a small delay to single tap but keeps double-tap
+  // available as a like gesture.
+  const handleCardClick = useCallback(() => {
+    if (tapTimerRef.current) {
+      // Second tap inside the window — treat as double-tap.
+      window.clearTimeout(tapTimerRef.current);
+      tapTimerRef.current = null;
+      void toggleLike(true);
+      playBurst();
+      return;
+    }
+    tapTimerRef.current = window.setTimeout(() => {
+      tapTimerRef.current = null;
+      onOpen();
+    }, 240);
+  }, [onOpen, toggleLike, playBurst]);
+
   return (
     <button
       type="button"
-      onClick={onOpen}
+      onClick={handleCardClick}
       style={{
         width: "100%",
         background: "rgba(255,253,248,0.78)",
@@ -565,6 +680,8 @@ function FeedCard({
         cursor: "pointer",
         WebkitTapHighlightColor: "transparent",
         boxShadow: "inset 0 1px 0 rgba(255,255,255,0.85), 0 4px 14px rgba(180,120,60,0.08)",
+        position: "relative",
+        overflow: "hidden",
       }}
     >
       <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
@@ -723,25 +840,187 @@ function FeedCard({
         </div>
       ) : null}
 
-      {/* Counts strip */}
+      {/* Action row — heart + comments + views. Heart is a real button
+          and stops click propagation so toggling like doesn't also
+          fire the card's tap-to-open. Double-tapping anywhere else on
+          the card also likes (see handleCardClick). */}
       <div
         style={{
           marginTop: 10,
           display: "flex",
+          alignItems: "center",
           gap: 14,
           fontFamily: "DM Sans, sans-serif",
-          fontSize: 11.5,
+          fontSize: 12,
           color: "#8A8580",
           fontWeight: 700,
           letterSpacing: "0.02em",
         }}
       >
-        <span>{post.like_count} likes</span>
+        <button
+          type="button"
+          onClick={(e) => {
+            e.stopPropagation();
+            // Tap on the heart bypasses the double-tap window —
+            // toggles immediately and only bursts on a fresh like.
+            const willLike = !liked;
+            void toggleLike();
+            if (willLike) playBurst();
+          }}
+          aria-label={liked ? "Unlike" : "Like"}
+          aria-pressed={liked}
+          style={{
+            display: "inline-flex",
+            alignItems: "center",
+            gap: 6,
+            padding: "4px 8px",
+            borderRadius: 999,
+            border: "1px solid rgba(28,28,30,0.06)",
+            background: liked ? "rgba(255,92,53,0.10)" : "rgba(255,255,255,0.55)",
+            color: liked ? "#E04A26" : "#5C5853",
+            fontFamily: "inherit",
+            fontWeight: 700,
+            cursor: "pointer",
+            WebkitTapHighlightColor: "transparent",
+            transition: "transform 140ms ease, background 140ms ease",
+            transform: liked ? "scale(1.03)" : "scale(1)",
+          }}
+        >
+          <svg
+            width="14"
+            height="14"
+            viewBox="0 0 20 20"
+            fill={liked ? "#FF5C35" : "none"}
+            stroke={liked ? "#FF5C35" : "currentColor"}
+            strokeWidth="1.8"
+            aria-hidden
+          >
+            <path
+              d="M10 17s-6-3.6-6-8.2A3.8 3.8 0 0 1 7.8 5c1.3 0 2.4.65 2.95 1.65A3.4 3.4 0 0 1 13.7 5 3.8 3.8 0 0 1 17.5 8.8C17.5 13.4 11.5 17 11.5 17z"
+              strokeLinecap="round"
+              strokeLinejoin="round"
+            />
+          </svg>
+          {likeCount}
+        </button>
         <span>{post.comment_count} comments</span>
+
+        <button
+          type="button"
+          onClick={(e) => {
+            e.stopPropagation();
+            void toggleRepost();
+          }}
+          aria-label={reposted ? "Undo repost" : "Repost"}
+          aria-pressed={reposted}
+          style={{
+            display: "inline-flex",
+            alignItems: "center",
+            gap: 6,
+            padding: "4px 8px",
+            borderRadius: 999,
+            border: "1px solid rgba(28,28,30,0.06)",
+            background: reposted
+              ? "rgba(46,160,72,0.12)"
+              : "rgba(255,255,255,0.55)",
+            color: reposted ? "#2E8242" : "#5C5853",
+            fontFamily: "inherit",
+            fontWeight: 700,
+            cursor: "pointer",
+            WebkitTapHighlightColor: "transparent",
+            transition: "transform 140ms ease, background 140ms ease",
+            transform: reposted ? "scale(1.03)" : "scale(1)",
+          }}
+        >
+          <svg
+            width="14"
+            height="14"
+            viewBox="0 0 22 22"
+            fill="none"
+            stroke="currentColor"
+            strokeWidth="1.8"
+            strokeLinecap="round"
+            strokeLinejoin="round"
+            aria-hidden
+          >
+            <path d="M4 9V7a2 2 0 0 1 2-2h10l-2.5-2.5" />
+            <path d="M18 13v2a2 2 0 0 1-2 2H6l2.5 2.5" />
+          </svg>
+          {repostCount}
+        </button>
+
         {post.view_count > 0 ? (
           <span>{post.view_count} views</span>
         ) : null}
+
+        {/* Save (bookmark) — pinned to the right of the action row.
+            Separate from like/repost since the save list is private
+            to the viewer. */}
+        <button
+          type="button"
+          onClick={(e) => {
+            e.stopPropagation();
+            void toggleSave();
+          }}
+          aria-label={saved ? "Unsave" : "Save"}
+          aria-pressed={saved}
+          style={{
+            marginLeft: "auto",
+            display: "inline-flex",
+            alignItems: "center",
+            justifyContent: "center",
+            width: 30,
+            height: 30,
+            borderRadius: 999,
+            border: "1px solid rgba(28,28,30,0.06)",
+            background: saved
+              ? "rgba(28,28,30,0.10)"
+              : "rgba(255,255,255,0.55)",
+            color: saved ? "#1C1C1E" : "#5C5853",
+            cursor: "pointer",
+            WebkitTapHighlightColor: "transparent",
+            transition: "transform 140ms ease, background 140ms ease",
+            transform: saved ? "scale(1.05)" : "scale(1)",
+          }}
+        >
+          <svg
+            width="14"
+            height="14"
+            viewBox="0 0 20 20"
+            fill={saved ? "currentColor" : "none"}
+            stroke="currentColor"
+            strokeWidth="1.8"
+            strokeLinecap="round"
+            strokeLinejoin="round"
+            aria-hidden
+          >
+            <path d="M5 3.5h10v14L10 14l-5 3.5z" />
+          </svg>
+        </button>
       </div>
+
+      {/* Double-tap burst — Instagram-style heart that fades in/out
+          over the card center. pointer-events:none so it doesn't eat
+          the next tap. */}
+      {burst ? (
+        <span
+          aria-hidden
+          style={{
+            position: "absolute",
+            top: "50%",
+            left: "50%",
+            transform: "translate(-50%, -50%)",
+            pointerEvents: "none",
+            color: "#FF5C35",
+            filter: "drop-shadow(0 6px 22px rgba(255,92,53,0.45))",
+            animation: "vibe-feed-heart-burst 700ms ease-out forwards",
+          }}
+        >
+          <svg width="120" height="120" viewBox="0 0 20 20" fill="currentColor" aria-hidden>
+            <path d="M10 17s-6-3.6-6-8.2A3.8 3.8 0 0 1 7.8 5c1.3 0 2.4.65 2.95 1.65A3.4 3.4 0 0 1 13.7 5 3.8 3.8 0 0 1 17.5 8.8C17.5 13.4 11.5 17 11.5 17z" />
+          </svg>
+        </span>
+      ) : null}
     </button>
   );
 }

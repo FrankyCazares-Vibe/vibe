@@ -2,6 +2,7 @@
 
 import Link from "next/link";
 import { useEffect, useState } from "react";
+import { Drawer } from "vaul";
 
 /**
  * iOS-native mobile post viewer. Opens as a full-screen sheet from the
@@ -262,20 +263,51 @@ export function PostViewerMobile({
     post && post.media_url && !post.media_url.includes("clips/") && post.type === "post";
 
   return (
-    <div
-      role="dialog"
-      aria-modal="true"
-      aria-label="Post"
-      style={{
-        position: "fixed",
-        inset: 0,
-        zIndex: 10000,
-        background: "#FAF7F2",
-        display: "flex",
-        flexDirection: "column",
-        color: "#1C1C1E",
+    <Drawer.Root
+      open
+      direction="right"
+      onOpenChange={(o) => {
+        if (!o) onClose();
       }}
     >
+      <Drawer.Portal>
+        {/* No dim overlay — the content takes the full screen and the
+            user expects to return to the underlying feed at the same
+            scroll position, not to a darkened "modal" backdrop. */}
+        <Drawer.Content
+          role="dialog"
+          aria-modal="true"
+          aria-label="Post"
+          aria-describedby={undefined}
+          style={{
+            position: "fixed",
+            top: 0,
+            right: 0,
+            bottom: 0,
+            width: "100%",
+            zIndex: 10000,
+            background: "#FAF7F2",
+            display: "flex",
+            flexDirection: "column",
+            color: "#1C1C1E",
+            outline: "none",
+          }}
+        >
+          <Drawer.Title
+            style={{
+              position: "absolute",
+              width: 1,
+              height: 1,
+              padding: 0,
+              margin: -1,
+              overflow: "hidden",
+              clip: "rect(0,0,0,0)",
+              whiteSpace: "nowrap",
+              border: 0,
+            }}
+          >
+            Post
+          </Drawer.Title>
       {/* Top bar */}
       <header
         style={{
@@ -688,7 +720,9 @@ export function PostViewerMobile({
           </button>
         </div>
       ) : null}
-    </div>
+        </Drawer.Content>
+      </Drawer.Portal>
+    </Drawer.Root>
   );
 }
 
