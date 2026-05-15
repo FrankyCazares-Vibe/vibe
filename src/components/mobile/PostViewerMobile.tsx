@@ -410,101 +410,120 @@ export function PostViewerMobile({
         ) : (
           <div style={{ flex: 1 }} />
         )}
-        {canDelete ? (
-          <div style={{ position: "relative", flexShrink: 0 }}>
-            <button
-              type="button"
-              onClick={() => setMenuOpen((v) => !v)}
-              aria-label={menuOpen ? "Close post menu" : "Open post menu"}
-              aria-expanded={menuOpen}
-              style={{
-                width: 34,
-                height: 34,
-                borderRadius: 999,
-                border: "1px solid rgba(28,28,30,0.10)",
-                background: menuOpen
-                  ? "#1C1C1E"
-                  : "rgba(255,255,255,0.7)",
-                color: menuOpen ? "#fff" : "#1C1C1E",
-                display: "inline-flex",
-                alignItems: "center",
-                justifyContent: "center",
-                cursor: "pointer",
-                lineHeight: 0,
-              }}
-            >
-              <svg width="16" height="16" viewBox="0 0 16 16" aria-hidden>
-                <circle cx="3"  cy="8" r="1.5" fill="currentColor" />
-                <circle cx="8"  cy="8" r="1.5" fill="currentColor" />
-                <circle cx="13" cy="8" r="1.5" fill="currentColor" />
-              </svg>
-            </button>
-            {menuOpen ? (
-              <>
-                {/* Click-away backdrop. Transparent, sits below the
-                    menu but above the rest of the viewer so any tap
-                    outside the menu closes it. */}
-                <button
-                  type="button"
-                  aria-label="Dismiss menu"
-                  onClick={() => setMenuOpen(false)}
-                  style={{
-                    position: "fixed",
-                    inset: 0,
-                    background: "transparent",
-                    border: "none",
-                    cursor: "default",
-                    zIndex: 1,
+        <div style={{ position: "relative", flexShrink: 0 }}>
+          <button
+            type="button"
+            onClick={() => setMenuOpen((v) => !v)}
+            aria-label={menuOpen ? "Close post menu" : "Open post menu"}
+            aria-expanded={menuOpen}
+            style={{
+              width: 34,
+              height: 34,
+              borderRadius: 999,
+              border: "1px solid rgba(28,28,30,0.10)",
+              background: menuOpen
+                ? "#1C1C1E"
+                : "rgba(255,255,255,0.7)",
+              color: menuOpen ? "#fff" : "#1C1C1E",
+              display: "inline-flex",
+              alignItems: "center",
+              justifyContent: "center",
+              cursor: "pointer",
+              lineHeight: 0,
+            }}
+          >
+            <svg width="16" height="16" viewBox="0 0 16 16" aria-hidden>
+              <circle cx="3"  cy="8" r="1.5" fill="currentColor" />
+              <circle cx="8"  cy="8" r="1.5" fill="currentColor" />
+              <circle cx="13" cy="8" r="1.5" fill="currentColor" />
+            </svg>
+          </button>
+          {menuOpen ? (
+            <>
+              {/* Click-away backdrop. Transparent, sits below the
+                  menu but above the rest of the viewer so any tap
+                  outside the menu closes it. */}
+              <button
+                type="button"
+                aria-label="Dismiss menu"
+                onClick={() => setMenuOpen(false)}
+                style={{
+                  position: "fixed",
+                  inset: 0,
+                  background: "transparent",
+                  border: "none",
+                  cursor: "default",
+                  zIndex: 1,
+                }}
+              />
+              <div
+                role="menu"
+                style={{
+                  position: "absolute",
+                  top: 40,
+                  right: 0,
+                  minWidth: 180,
+                  background: "rgba(255,253,248,0.98)",
+                  backdropFilter: "blur(14px)",
+                  WebkitBackdropFilter: "blur(14px)",
+                  border: "1px solid rgba(28,28,30,0.10)",
+                  borderRadius: 12,
+                  boxShadow:
+                    "0 14px 30px rgba(0,0,0,0.16), 0 2px 6px rgba(0,0,0,0.08)",
+                  padding: 6,
+                  zIndex: 2,
+                }}
+              >
+                <ViewerMenuItem
+                  label="Copy link"
+                  onClick={async () => {
+                    setMenuOpen(false);
+                    try {
+                      const url = `${window.location.origin}/campus?post=${encodeURIComponent(postId)}`;
+                      await navigator.clipboard.writeText(url);
+                    } catch {
+                      /* clipboard may be blocked — silent */
+                    }
                   }}
                 />
-                <div
-                  role="menu"
-                  style={{
-                    position: "absolute",
-                    top: 40,
-                    right: 0,
-                    minWidth: 168,
-                    background: "rgba(255,253,248,0.98)",
-                    backdropFilter: "blur(14px)",
-                    WebkitBackdropFilter: "blur(14px)",
-                    border: "1px solid rgba(28,28,30,0.10)",
-                    borderRadius: 12,
-                    boxShadow:
-                      "0 14px 30px rgba(0,0,0,0.16), 0 2px 6px rgba(0,0,0,0.08)",
-                    padding: 6,
-                    zIndex: 2,
-                  }}
-                >
-                  <button
-                    type="button"
-                    role="menuitem"
+                {!canDelete ? (
+                  <ViewerMenuItem
+                    label="Report post"
+                    tone="danger"
+                    onClick={async () => {
+                      setMenuOpen(false);
+                      try {
+                        await fetch("/api/me/reports", {
+                          method: "POST",
+                          headers: { "Content-Type": "application/json" },
+                          body: JSON.stringify({
+                            target_type: "post",
+                            target_id: postId,
+                            reason_code: "other",
+                            reason: "",
+                          }),
+                        });
+                      } catch {
+                        /* swallow — UI just dismisses */
+                      }
+                    }}
+                  />
+                ) : null}
+                {canDelete ? (
+                  <ViewerMenuItem
+                    label={deleting ? "Deleting…" : "Delete post"}
+                    tone="danger"
+                    disabled={deleting}
                     onClick={() => {
                       setMenuOpen(false);
                       void handleDelete();
                     }}
-                    disabled={deleting}
-                    style={{
-                      display: "block",
-                      width: "100%",
-                      textAlign: "left",
-                      padding: "10px 12px",
-                      border: "none",
-                      background: "transparent",
-                      borderRadius: 8,
-                      fontFamily: "DM Sans, sans-serif",
-                      fontSize: 14,
-                      fontWeight: 600,
-                      color: "#C42B1C",
-                      cursor: deleting ? "default" : "pointer",
-                    }}
-                  >
-                    {deleting ? "Deleting…" : "Delete post"}
-                  </button>
-                </div>
-              </>
-            ) : null}
-          </div>
-        ) : null}
+                  />
+                ) : null}
+              </div>
+            </>
+          ) : null}
+        </div>
       </header>
 
       {/* Body */}
@@ -614,11 +633,6 @@ export function PostViewerMobile({
                 activeColor="#1C1C1E"
                 icon={<BookmarkIcon filled={viewer.saved} />}
               />
-              <EngagementButton
-                label=""
-                onTap={share}
-                icon={<ShareIcon />}
-              />
             </div>
 
             {/* Comments drawer */}
@@ -723,6 +737,48 @@ export function PostViewerMobile({
         </Drawer.Content>
       </Drawer.Portal>
     </Drawer.Root>
+  );
+}
+
+/** Row in the 3-dot dropdown menu. Centralizes the menu-item style so
+ *  Copy link / Report / Delete all read the same. */
+function ViewerMenuItem({
+  label,
+  onClick,
+  tone,
+  disabled = false,
+}: {
+  label: string;
+  onClick: () => void;
+  tone?: "danger";
+  disabled?: boolean;
+}) {
+  return (
+    <button
+      type="button"
+      role="menuitem"
+      onClick={() => {
+        if (!disabled) onClick();
+      }}
+      disabled={disabled}
+      style={{
+        display: "block",
+        width: "100%",
+        textAlign: "left",
+        padding: "10px 12px",
+        border: "none",
+        background: "transparent",
+        borderRadius: 8,
+        fontFamily: "DM Sans, sans-serif",
+        fontSize: 14,
+        fontWeight: 600,
+        color: tone === "danger" ? "#C42B1C" : "#1C1C1E",
+        cursor: disabled ? "default" : "pointer",
+        opacity: disabled ? 0.6 : 1,
+      }}
+    >
+      {label}
+    </button>
   );
 }
 

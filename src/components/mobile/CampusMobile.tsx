@@ -560,6 +560,7 @@ function FeedCard({
   const [reposted, setReposted] = useState(!!post.viewer_reposted);
   const [repostCount, setRepostCount] = useState(post.repost_count ?? 0);
   const [saved, setSaved] = useState(false);
+  const [menuOpen, setMenuOpen] = useState(false);
   const tapTimerRef = useRef<number | null>(null);
   const likingRef = useRef(false);
   const repostingRef = useRef(false);
@@ -737,6 +738,37 @@ function FeedCard({
             Clip
           </span>
         ) : null}
+        {/* 3-dot menu — top right of the card. Holds Report / Copy
+            link / Hide for now; owner-only Delete lives in the post
+            viewer (kept off the card to avoid clutter). */}
+        <button
+          type="button"
+          onClick={(e) => {
+            e.stopPropagation();
+            setMenuOpen(true);
+          }}
+          aria-label="More actions"
+          style={{
+            width: 30,
+            height: 30,
+            borderRadius: 999,
+            border: "1px solid rgba(28,28,30,0.06)",
+            background: "rgba(255,255,255,0.62)",
+            color: "#5C5853",
+            display: "inline-flex",
+            alignItems: "center",
+            justifyContent: "center",
+            cursor: "pointer",
+            flexShrink: 0,
+            WebkitTapHighlightColor: "transparent",
+          }}
+        >
+          <svg width="16" height="16" viewBox="0 0 16 16" fill="currentColor" aria-hidden>
+            <circle cx="3" cy="8" r="1.6" />
+            <circle cx="8" cy="8" r="1.6" />
+            <circle cx="13" cy="8" r="1.6" />
+          </svg>
+        </button>
       </div>
 
       {post.content ? (
@@ -927,9 +959,52 @@ function FeedCard({
           {likeCount}
         </button>
 
-        {/* Repost — sits immediately next to the heart so the two
-            engagement actions read as a pair, matches the desktop
-            feed row order (like → repost → comment). */}
+        {/* Comment — opens the post viewer (which has the comments
+            drawer); same destination as tapping the card body, just
+            with the explicit icon affordance. */}
+        <button
+          type="button"
+          onClick={(e) => {
+            e.stopPropagation();
+            // Cancel any pending single-tap timer so we don't double-fire.
+            if (tapTimerRef.current) {
+              window.clearTimeout(tapTimerRef.current);
+              tapTimerRef.current = null;
+            }
+            onOpen();
+          }}
+          aria-label="Comment"
+          style={{
+            display: "inline-flex",
+            alignItems: "center",
+            gap: 6,
+            padding: "4px 8px",
+            borderRadius: 999,
+            border: "1px solid rgba(28,28,30,0.06)",
+            background: "rgba(255,255,255,0.55)",
+            color: "#5C5853",
+            fontFamily: "inherit",
+            fontWeight: 700,
+            cursor: "pointer",
+            WebkitTapHighlightColor: "transparent",
+          }}
+        >
+          <svg
+            width="14"
+            height="14"
+            viewBox="0 0 16 16"
+            fill="none"
+            stroke="currentColor"
+            strokeWidth="1.6"
+            strokeLinecap="round"
+            strokeLinejoin="round"
+            aria-hidden
+          >
+            <path d="M2.5 4a1.5 1.5 0 0 1 1.5-1.5h8a1.5 1.5 0 0 1 1.5 1.5v6A1.5 1.5 0 0 1 12 11.5H5.6L2.5 14V4z" />
+          </svg>
+          {post.comment_count}
+        </button>
+
         <button
           type="button"
           onClick={(e) => {
@@ -974,14 +1049,15 @@ function FeedCard({
           {repostCount}
         </button>
 
-        <span>{post.comment_count} comments</span>
-
+        {/* Views — small inline metric. Kept subtle so the three
+            action buttons read as the primary affordances. */}
         {post.view_count > 0 ? (
           <span
             style={{
               display: "inline-flex",
               alignItems: "center",
               gap: 4,
+              color: "#8A8580",
             }}
           >
             <svg
@@ -1049,6 +1125,12 @@ function FeedCard({
         </button>
       </div>
 
+      {menuOpen ? (
+        <PostActionsSheet
+          postId={post.id}
+          onClose={() => setMenuOpen(false)}
+        />
+      ) : null}
     </button>
   );
 }
@@ -2171,6 +2253,194 @@ function EmptyTab({ title, body }: { title: string; body: string }) {
         {body}
       </p>
     </div>
+  );
+}
+
+/** 3-dot menu sheet — slides up from the bottom. Holds Report, Copy
+ *  link, and Hide. Owner-only Delete still lives in the post viewer
+ *  (we'd rather not clutter the feed card with delete affordances).
+ *
+ *  Implemented as a portaled vaul Drawer so it doesn't inherit the
+ *  feed card's button cursor / hover styles, and so the tap on the
+ *  scrim closes it cleanly. */
+function PostActionsSheet({
+  postId,
+  onClose,
+}: {
+  postId: string;
+  onClose: () => void;
+}) {
+  const [reporting, setReporting] = useState(false);
+  const [toast, setToast] = useState<string | null>(null);
+
+  const report = useCallback(
+    async (reasonCode: string) => {
+      if (reporting) return;
+      setReporting(true);
+      try {
+        const r = await fetch("/api/me/reports", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({
+            target_type: "post",
+            target_id: postId,
+            reason_code: reasonCode,
+            reason: "",
+          }),
+        });
+        const j = await r.json();
+        if (!r.ok || !j?.ok) throw new Error(j?.error ?? "Report failed");
+        setToast("Reported — thanks for letting us know.");
+        setTimeout(onClose, 900);
+      } catch (e) {
+        setToast(e instanceof Error ? e.message : "Couldn't report");
+        setReporting(false);
+      }
+    },
+    [postId, reporting, onClose],
+  );
+
+  const copyLink = useCallback(async () => {
+    try {
+      const url = `${window.location.origin}/campus?post=${encodeURIComponent(postId)}`;
+      await navigator.clipboard.writeText(url);
+      setToast("Link copied.");
+      setTimeout(onClose, 700);
+    } catch {
+      setToast("Couldn't copy link");
+    }
+  }, [postId, onClose]);
+
+  return (
+    <Drawer.Root open onOpenChange={(o) => { if (!o) onClose(); }}>
+      <Drawer.Portal>
+        <Drawer.Overlay
+          style={{
+            position: "fixed",
+            inset: 0,
+            background: "rgba(0,0,0,0.42)",
+            zIndex: 1200,
+          }}
+        />
+        <Drawer.Content
+          aria-describedby={undefined}
+          style={{
+            position: "fixed",
+            bottom: 0,
+            left: 0,
+            right: 0,
+            background: "#FAF7F2",
+            borderTopLeftRadius: 20,
+            borderTopRightRadius: 20,
+            paddingBottom: "env(safe-area-inset-bottom, 0px)",
+            boxShadow: "0 -8px 32px rgba(0,0,0,0.18)",
+            zIndex: 1201,
+            outline: "none",
+          }}
+        >
+          <div
+            aria-hidden
+            style={{
+              alignSelf: "center",
+              margin: "10px auto 4px",
+              width: 38,
+              height: 4,
+              borderRadius: 999,
+              background: "rgba(28,28,30,0.18)",
+            }}
+          />
+          <Drawer.Title
+            style={{
+              padding: "8px 18px 6px",
+              fontFamily: "Fraunces, serif",
+              fontSize: 14,
+              fontWeight: 800,
+              color: "#1C1C1E",
+            }}
+          >
+            Post options
+          </Drawer.Title>
+
+          {toast ? (
+            <div
+              style={{
+                margin: "0 14px 8px",
+                padding: "8px 12px",
+                borderRadius: 12,
+                background: "rgba(46,160,72,0.10)",
+                border: "1px solid rgba(46,160,72,0.22)",
+                color: "#1F6B3A",
+                fontFamily: "DM Sans, sans-serif",
+                fontSize: 12.5,
+                fontWeight: 700,
+                textAlign: "center",
+              }}
+            >
+              {toast}
+            </div>
+          ) : null}
+
+          <ActionSheetRow label="Copy link" onClick={copyLink} />
+          <ActionSheetRow
+            label="Report post"
+            tone="danger"
+            onClick={() => void report("other")}
+            disabled={reporting}
+          />
+          <ActionSheetRow
+            label="Cancel"
+            onClick={onClose}
+            divider={false}
+            bold
+          />
+        </Drawer.Content>
+      </Drawer.Portal>
+    </Drawer.Root>
+  );
+}
+
+function ActionSheetRow({
+  label,
+  onClick,
+  tone,
+  divider = true,
+  bold = false,
+  disabled = false,
+}: {
+  label: string;
+  onClick: () => void;
+  tone?: "danger";
+  divider?: boolean;
+  bold?: boolean;
+  disabled?: boolean;
+}) {
+  return (
+    <button
+      type="button"
+      onClick={(e) => {
+        e.stopPropagation();
+        if (!disabled) onClick();
+      }}
+      disabled={disabled}
+      style={{
+        display: "block",
+        width: "100%",
+        textAlign: "center",
+        padding: "14px 16px",
+        background: "transparent",
+        border: "none",
+        borderTop: divider ? "1px solid rgba(28,28,30,0.08)" : "none",
+        color: tone === "danger" ? "#B83A1A" : "#1C1C1E",
+        fontFamily: "DM Sans, sans-serif",
+        fontSize: 15,
+        fontWeight: bold ? 800 : 600,
+        cursor: disabled ? "default" : "pointer",
+        opacity: disabled ? 0.55 : 1,
+        WebkitTapHighlightColor: "transparent",
+      }}
+    >
+      {label}
+    </button>
   );
 }
 

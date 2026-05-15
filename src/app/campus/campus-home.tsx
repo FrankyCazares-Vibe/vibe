@@ -6118,6 +6118,24 @@ function FeedRow({
     }
   }, [liked, post.id]);
 
+  // Save (bookmark) state. The /api/feed payload doesn't carry viewer
+  // save state yet — start unsaved and seed from the first tap. Same
+  // optimistic-with-rollback pattern as like.
+  const [saved, setSaved] = useState(false);
+  const toggleSave = useCallback(async () => {
+    const nextSaved = !saved;
+    setSaved(nextSaved);
+    try {
+      const res = await fetch(`/api/posts/${post.id}/save`, {
+        method: nextSaved ? "POST" : "DELETE",
+      });
+      if (!res.ok) throw new Error(`save ${res.status}`);
+    } catch (e) {
+      console.error("[feed] save", e);
+      setSaved(!nextSaved);
+    }
+  }, [saved, post.id]);
+
   const handleShare = useCallback(async () => {
     try {
       const url = `${window.location.origin}/posts/${post.id}`;
@@ -6145,81 +6163,125 @@ function FeedRow({
         position: "relative",
       }}
     >
-      {viewerOwnsPost ? (
-        <div
-          data-feedrow-more
+      <div
+        data-feedrow-more
+        style={{
+          position: "absolute",
+          top: 10,
+          right: 12,
+          zIndex: 2,
+        }}
+      >
+        <button
+          type="button"
+          aria-label="Post actions"
+          onClick={() => setShowMoreMenu((v) => !v)}
           style={{
-            position: "absolute",
-            top: 10,
-            right: 12,
-            zIndex: 2,
+            width: 28,
+            height: 28,
+            borderRadius: 999,
+            background: "transparent",
+            border: "none",
+            color: COLORS.muted,
+            fontSize: 18,
+            lineHeight: 1,
+            cursor: "pointer",
+            display: "flex",
+            alignItems: "center",
+            justifyContent: "center",
+            padding: 0,
+          }}
+          onMouseEnter={(e) => {
+            e.currentTarget.style.background = "rgba(28,28,30,0.06)";
+          }}
+          onMouseLeave={(e) => {
+            e.currentTarget.style.background = "transparent";
           }}
         >
-          <button
-            type="button"
-            aria-label="Post actions"
-            onClick={() => setShowMoreMenu((v) => !v)}
+          ⋯
+        </button>
+        {showMoreMenu ? (
+          <div
+            role="menu"
             style={{
-              width: 28,
-              height: 28,
-              borderRadius: 999,
-              background: "transparent",
-              border: "none",
-              color: COLORS.muted,
-              fontSize: 18,
-              lineHeight: 1,
-              cursor: "pointer",
-              display: "flex",
-              alignItems: "center",
-              justifyContent: "center",
-              padding: 0,
-            }}
-            onMouseEnter={(e) => {
-              e.currentTarget.style.background = "rgba(28,28,30,0.06)";
-            }}
-            onMouseLeave={(e) => {
-              e.currentTarget.style.background = "transparent";
+              position: "absolute",
+              top: 32,
+              right: 0,
+              minWidth: 180,
+              background: "white",
+              border: "1px solid rgba(28,28,30,0.08)",
+              borderRadius: 12,
+              boxShadow: "0 12px 36px rgba(0,0,0,0.12)",
+              padding: 4,
+              fontFamily: "DM Sans, sans-serif",
+              fontSize: 13,
+              overflow: "hidden",
             }}
           >
-            ⋯
-          </button>
-          {showMoreMenu ? (
-            <div
-              role="menu"
-              style={{
-                position: "absolute",
-                top: 32,
-                right: 0,
-                minWidth: 160,
-                background: "white",
-                border: "1px solid rgba(28,28,30,0.08)",
-                borderRadius: 12,
-                boxShadow: "0 12px 36px rgba(0,0,0,0.12)",
-                padding: 4,
-                fontFamily: "DM Sans, sans-serif",
-                fontSize: 13,
-                overflow: "hidden",
+            <button
+              type="button"
+              role="menuitem"
+              onClick={async () => {
+                setShowMoreMenu(false);
+                try {
+                  const url = `${window.location.origin}/campus?post=${encodeURIComponent(post.id)}`;
+                  await navigator.clipboard.writeText(url);
+                } catch {
+                  /* silent */
+                }
+              }}
+              style={feedRowMenuItemStyle()}
+              onMouseEnter={(e) => {
+                e.currentTarget.style.background = "#FAF7F2";
+              }}
+              onMouseLeave={(e) => {
+                e.currentTarget.style.background = "transparent";
               }}
             >
+              Copy link
+            </button>
+            {!viewerOwnsPost ? (
+              <button
+                type="button"
+                role="menuitem"
+                onClick={async () => {
+                  setShowMoreMenu(false);
+                  try {
+                    await fetch("/api/me/reports", {
+                      method: "POST",
+                      headers: { "Content-Type": "application/json" },
+                      body: JSON.stringify({
+                        target_type: "post",
+                        target_id: post.id,
+                        reason_code: "other",
+                        reason: "",
+                      }),
+                    });
+                  } catch {
+                    /* silent */
+                  }
+                }}
+                style={feedRowMenuItemStyle("danger")}
+                onMouseEnter={(e) => {
+                  e.currentTarget.style.background = "#FAF7F2";
+                }}
+                onMouseLeave={(e) => {
+                  e.currentTarget.style.background = "transparent";
+                }}
+              >
+                Report post
+              </button>
+            ) : null}
+            {viewerOwnsPost ? (
               <button
                 type="button"
                 role="menuitem"
                 onClick={onDeletePost}
                 disabled={deleting}
                 style={{
-                  display: "block",
-                  width: "100%",
-                  textAlign: "left",
-                  padding: "9px 12px",
-                  borderRadius: 8,
-                  background: "transparent",
-                  border: "none",
-                  color: "#C0392B",
-                  fontFamily: "inherit",
-                  fontSize: "inherit",
-                  fontWeight: 600,
-                  cursor: deleting ? "default" : "pointer",
+                  ...feedRowMenuItemStyle("danger"),
                   opacity: deleting ? 0.6 : 1,
+                  cursor: deleting ? "default" : "pointer",
                 }}
                 onMouseEnter={(e) => {
                   if (!deleting) e.currentTarget.style.background = "#FAF7F2";
@@ -6230,10 +6292,10 @@ function FeedRow({
               >
                 {deleting ? "Deleting…" : "Delete post"}
               </button>
-            </div>
-          ) : null}
-        </div>
-      ) : null}
+            ) : null}
+          </div>
+        ) : null}
+      </div>
       {entry.kind === "repost" ? (
         <RepostBanner reposter={entry.reposter} />
       ) : null}
@@ -6446,6 +6508,14 @@ function FeedRow({
           }}
         >
           <EngagementAction
+            icon={<LikeIcon filled={liked} />}
+            count={likeCount}
+            label="Like"
+            onClick={toggleLike}
+            active={liked}
+            activeColor="#E0245E"
+          />
+          <EngagementAction
             icon={<CommentIcon />}
             count={commentCount}
             label="Comments"
@@ -6460,23 +6530,18 @@ function FeedRow({
             active={reposted}
             activeColor="#1A8754"
           />
-          <EngagementAction
-            icon={<LikeIcon filled={liked} />}
-            count={likeCount}
-            label="Like"
-            onClick={toggleLike}
-            active={liked}
-            activeColor="#E0245E"
-          />
+          <div style={{ flex: 1 }} />
           <EngagementAction
             icon={<EyeIcon />}
             count={viewCount}
             label="Views"
           />
           <EngagementAction
-            icon={<ShareIcon />}
-            label="Share"
-            onClick={handleShare}
+            icon={<BookmarkIcon filled={saved} />}
+            label={saved ? "Saved" : "Save"}
+            onClick={toggleSave}
+            active={saved}
+            activeColor="#1C1C1E"
           />
           {showRepostMenu ? (
             <RepostMenu
@@ -6508,6 +6573,27 @@ function FeedRow({
       </div>
     </article>
   );
+}
+
+/** Shared styles for items inside the FeedRow 3-dot menu so Copy link
+ *  / Report / Delete all read uniformly. */
+function feedRowMenuItemStyle(
+  tone?: "danger",
+): React.CSSProperties {
+  return {
+    display: "block",
+    width: "100%",
+    textAlign: "left",
+    padding: "9px 12px",
+    borderRadius: 8,
+    background: "transparent",
+    border: "none",
+    color: tone === "danger" ? "#C0392B" : "#1C1C1E",
+    fontFamily: "inherit",
+    fontSize: "inherit",
+    fontWeight: 600,
+    cursor: "pointer",
+  };
 }
 
 /** Instagram-style social proof on the original post: "Alice and 4
@@ -7314,6 +7400,20 @@ function ShareIcon() {
         stroke="currentColor"
         strokeWidth="1.4"
         fill="none"
+        strokeLinejoin="round"
+        strokeLinecap="round"
+      />
+    </svg>
+  );
+}
+
+function BookmarkIcon({ filled = false }: { filled?: boolean }) {
+  return (
+    <svg width="16" height="16" viewBox="0 0 16 16" aria-hidden fill={filled ? "currentColor" : "none"}>
+      <path
+        d="M3.5 2h9v12L8 11l-4.5 3z"
+        stroke="currentColor"
+        strokeWidth="1.4"
         strokeLinejoin="round"
         strokeLinecap="round"
       />
