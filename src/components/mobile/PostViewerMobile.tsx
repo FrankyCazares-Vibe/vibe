@@ -78,7 +78,11 @@ export function PostViewerMobile({
   const [counts, setCounts] = useState<Counts>({ likes: 0, comments: 0 });
   const [viewer, setViewer] = useState<Viewer>({ liked: false, saved: false });
   const [error, setError] = useState<string | null>(null);
-  const [commentsOpen, setCommentsOpen] = useState(false);
+  // Open the comments drawer by default when the viewer mounts —
+  // tapping into a post almost always means the user wants to read /
+  // join the conversation. The lazy-fetch effect below fires the
+  // initial GET as soon as this becomes true.
+  const [commentsOpen, setCommentsOpen] = useState(true);
   const [comments, setComments] = useState<Comment[] | null>(null);
   const [draft, setDraft] = useState("");
   const [posting, setPosting] = useState(false);
