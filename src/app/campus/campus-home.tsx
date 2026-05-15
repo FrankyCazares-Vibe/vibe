@@ -4179,6 +4179,16 @@ export type FeedPost = {
   repost_count: number;
   viewer_liked: boolean;
   viewer_reposted: boolean;
+  /** Up to 3 most-recent reposters that the viewer follows. Drives the
+   *  Instagram-style "X reposted this" social-proof pill. */
+  friend_reposters?: Array<{
+    id: string;
+    name: string | null;
+    handle: string | null;
+    avatar_url: string | null;
+  }>;
+  /** Total count of friends who reposted (≥ friend_reposters.length). */
+  friend_reposter_count?: number;
   created_at: string;
   author: FeedAuthor | null;
   org: FeedOrg;
@@ -6241,6 +6251,11 @@ function FeedRow({
           {entry.quote}
         </p>
       ) : null}
+      {entry.kind === "post" &&
+      post.friend_reposters &&
+      post.friend_reposters.length > 0 ? (
+        <FriendRepostPill post={post} />
+      ) : null}
       <div style={{ display: "flex", gap: 12 }}>
       {(() => {
         const avatarStyle: React.CSSProperties = {
@@ -6492,6 +6507,65 @@ function FeedRow({
       </div>
       </div>
     </article>
+  );
+}
+
+/** Instagram-style social proof on the original post: "Alice and 4
+ *  others reposted this", with up to 3 stacked avatars. Only paints
+ *  when at least one of the viewer's followings has reposted. */
+function FriendRepostPill({ post }: { post: FeedPost }) {
+  const samples = post.friend_reposters ?? [];
+  if (samples.length === 0) return null;
+  const total = post.friend_reposter_count ?? samples.length;
+  const first =
+    samples[0]!.name || (samples[0]!.handle ? `@${samples[0]!.handle}` : "Someone");
+  let label: string;
+  if (total <= 1) label = `${first} reposted this`;
+  else if (samples[1] && total === 2) {
+    const second =
+      samples[1].name ||
+      (samples[1].handle ? `@${samples[1].handle}` : "");
+    label = `${first} and ${second} reposted this`;
+  } else {
+    label = `${first} and ${total - 1} others reposted this`;
+  }
+  return (
+    <div
+      style={{
+        display: "inline-flex",
+        alignItems: "center",
+        gap: 8,
+        margin: "0 0 10px 0",
+        padding: "5px 10px 5px 6px",
+        borderRadius: 999,
+        background: "rgba(46,160,72,0.10)",
+        border: "1px solid rgba(46,160,72,0.22)",
+        color: "#1F6B3A",
+        fontFamily: "DM Sans, sans-serif",
+        fontSize: 12,
+        fontWeight: 700,
+      }}
+    >
+      <div style={{ display: "inline-flex" }}>
+        {samples.slice(0, 3).map((u, i) => (
+          <span
+            key={u.id}
+            aria-hidden
+            style={{
+              width: 20,
+              height: 20,
+              borderRadius: 999,
+              background: u.avatar_url
+                ? `url(${u.avatar_url}) center/cover`
+                : "#FFD3C2",
+              border: "2px solid #FAF7F2",
+              marginLeft: i === 0 ? 0 : -7,
+            }}
+          />
+        ))}
+      </div>
+      {label}
+    </div>
   );
 }
 

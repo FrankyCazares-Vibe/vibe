@@ -174,12 +174,23 @@ export async function GET(req: Request) {
 
   const engagement = await loadEngagement(supabase, Array.from(allPostIds), user.id);
 
+  // Social-proof signal: for each post in this batch, find up to 3
+  // reposters who are FOLLOWED BY the viewer (Instagram-style "X and N
+  // others reposted this"). We don't surface generic reposter counts
+  // here — the value is the friend signal, not raw popularity.
+  const friendReposters = await loadFriendReposters(
+    supabase,
+    Array.from(allPostIds),
+    user.id,
+  );
+
   const renderPost = (row: PostRow) => {
     const e = engagement.counts.get(row.id) ?? {
       like_count: 0,
       comment_count: 0,
       repost_count: 0,
     };
+    const fr = friendReposters.get(row.id) ?? { samples: [], totalFriends: 0 };
     const org = row.org ?? null;
     // `media_kind` lets the client pick the right player without re-parsing
     // the proxy URL. Clips are always video. Posts can carry a video too
@@ -201,6 +212,8 @@ export async function GET(req: Request) {
       repost_count: e.repost_count,
       viewer_liked: engagement.likedByViewer.has(row.id),
       viewer_reposted: engagement.repostedByViewer.has(row.id),
+      friend_reposters: fr.samples,
+      friend_reposter_count: fr.totalFriends,
       media_url: postMediaProxyUrl(row.id, row.media_url, "media"),
       media_thumbnail_url: postMediaProxyUrl(row.id, row.media_thumbnail_url, "thumbnail"),
       media_kind: mediaKind,
@@ -307,4 +320,94 @@ async function loadEngagement(
   }
 
   return { counts, likedByViewer, repostedByViewer };
+}
+
+type FriendReposterSample = {
+  id: string;
+  name: string | null;
+  handle: string | null;
+  avatar_url: string | null;
+};
+
+/**
+ * For each post in `postIds`, return up to 3 most-recent friend reposters
+ * plus the total count of friends who reposted. "Friends" = users the
+ * viewer follows in `connections`. Drives the "X and N others reposted
+ * this" social-proof pill on FeedCard.
+ *
+ * Three batched queries:
+ *   1. Viewer's followings → list of friend ids.
+ *   2. post_reposts WHERE user_id IN friends AND post_id IN postIds.
+ *   3. users for the (up to 3 × N) reposter ids we'll actually surface.
+ */
+async function loadFriendReposters(
+  supabase: Awaited<ReturnType<typeof createSupabaseServerClient>>,
+  postIds: string[],
+  viewerId: string,
+): Promise<Map<string, { samples: FriendReposterSample[]; totalFriends: number }>> {
+  const out = new Map<
+    string,
+    { samples: FriendReposterSample[]; totalFriends: number }
+  >();
+  if (postIds.length === 0) return out;
+
+  const { data: followingRows, error: followingErr } = await supabase
+    .from("connections")
+    .select("following_id")
+    .eq("follower_id", viewerId);
+  if (followingErr) {
+    console.error("[feed.loadFriendReposters following]", followingErr);
+    return out;
+  }
+  const friendIds = (followingRows ?? []).map(
+    (r) => (r as { following_id: string }).following_id,
+  );
+  if (friendIds.length === 0) return out;
+
+  const { data: friendRepostRows, error: rrErr } = await supabase
+    .from("post_reposts")
+    .select("post_id, user_id, created_at")
+    .in("post_id", postIds)
+    .in("user_id", friendIds)
+    .order("created_at", { ascending: false });
+  if (rrErr || !friendRepostRows || friendRepostRows.length === 0) {
+    if (rrErr) console.error("[feed.loadFriendReposters reposts]", rrErr);
+    return out;
+  }
+
+  type Row = { post_id: string; user_id: string; created_at: string };
+  const byPost = new Map<string, Row[]>();
+  for (const row of friendRepostRows as Row[]) {
+    const list = byPost.get(row.post_id) ?? [];
+    list.push(row);
+    byPost.set(row.post_id, list);
+  }
+
+  // Resolve the unique user_ids we need for the SAMPLE slice (max 3 per
+  // post). Don't hydrate names for the long tail beyond the top 3.
+  const sampleUserIds = new Set<string>();
+  for (const [, rows] of byPost) {
+    rows.slice(0, 3).forEach((r) => sampleUserIds.add(r.user_id));
+  }
+  const { data: userRows, error: usersErr } = await supabase
+    .from("users")
+    .select("id,name,handle,avatar_url")
+    .in("id", Array.from(sampleUserIds));
+  if (usersErr) {
+    console.error("[feed.loadFriendReposters users]", usersErr);
+  }
+  const userById = new Map<string, FriendReposterSample>();
+  for (const u of userRows ?? []) {
+    const r = u as FriendReposterSample;
+    userById.set(r.id, r);
+  }
+
+  for (const [postId, rows] of byPost) {
+    const samples = rows
+      .slice(0, 3)
+      .map((r) => userById.get(r.user_id))
+      .filter((u): u is FriendReposterSample => !!u);
+    out.set(postId, { samples, totalFriends: rows.length });
+  }
+  return out;
 }

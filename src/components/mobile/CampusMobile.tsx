@@ -825,6 +825,48 @@ function FeedCard({
         </div>
       ) : null}
 
+      {/* Friend-repost social proof — Instagram-style "X reposted this"
+          pill. Only renders when at least one of the viewer's friends
+          reposted; we never show generic popularity here. */}
+      {post.friend_reposters && post.friend_reposters.length > 0 ? (
+        <div
+          style={{
+            marginTop: 10,
+            display: "inline-flex",
+            alignItems: "center",
+            gap: 6,
+            padding: "4px 8px 4px 4px",
+            borderRadius: 999,
+            background: "rgba(46,160,72,0.10)",
+            border: "1px solid rgba(46,160,72,0.22)",
+            color: "#1F6B3A",
+            fontFamily: "DM Sans, sans-serif",
+            fontSize: 11.5,
+            fontWeight: 700,
+          }}
+        >
+          <div style={{ display: "inline-flex", marginRight: 2 }}>
+            {post.friend_reposters.slice(0, 3).map((u, i) => (
+              <span
+                key={u.id}
+                aria-hidden
+                style={{
+                  width: 18,
+                  height: 18,
+                  borderRadius: 999,
+                  background: u.avatar_url
+                    ? `url(${u.avatar_url}) center/cover`
+                    : "#FFD3C2",
+                  border: "1.5px solid #FAF7F2",
+                  marginLeft: i === 0 ? 0 : -6,
+                }}
+              />
+            ))}
+          </div>
+          {friendRepostLabel(post)}
+        </div>
+      ) : null}
+
       {/* Action row — heart + comments + views. Heart is a real button
           and stops click propagation so toggling like doesn't also
           fire the card's tap-to-open. Double-tapping anywhere else on
@@ -2130,6 +2172,24 @@ function EmptyTab({ title, body }: { title: string; body: string }) {
       </p>
     </div>
   );
+}
+
+/** "Alice reposted this" / "Alice and 4 others reposted this" — names
+ *  for up to 2 friends, then collapse the tail into "and N others". */
+function friendRepostLabel(post: FeedPost): string {
+  const samples = post.friend_reposters ?? [];
+  const total = post.friend_reposter_count ?? samples.length;
+  if (samples.length === 0) return "Reposted by your network";
+  const first = samples[0]!.name || (samples[0]!.handle ? `@${samples[0]!.handle}` : "Someone");
+  if (total <= 1) return `${first} reposted this`;
+  if (samples.length === 1 || total === 2) {
+    const second = samples[1]
+      ? samples[1].name || (samples[1].handle ? `@${samples[1].handle}` : null)
+      : null;
+    if (second && total === 2) return `${first} and ${second} reposted this`;
+    return `${first} and ${total - 1} other${total - 1 === 1 ? "" : "s"} reposted this`;
+  }
+  return `${first} and ${total - 1} others reposted this`;
 }
 
 function relativeTime(iso: string): string {
