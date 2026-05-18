@@ -7734,13 +7734,21 @@ function saveProfileToStorage() {
     (p.firstChild?.textContent || '').trim()
   ).filter(Boolean);
 
-  // Currently working on — array of {icon, text}
+  // Currently working on — array of {icon, text, logoUrl?}.
+  // If the item carries an uploaded logo, read the url back off the
+  // <img> we rendered (data-logo-url). Otherwise fall back to the
+  // emoji text in the .current-icon span. The persist loop ran
+  // every save and was previously dropping logoUrl on the floor
+  // (because it only read textContent) — so mobile uploads got
+  // wiped on the next desktop edit. Fixed.
   user.currentlyOn = Array.from(document.querySelectorAll('#currentList .current-item')).map(i => {
-    const icon = i.querySelector('.current-icon, .current-dot');
+    const iconEl = i.querySelector('.current-icon, .current-dot');
     const txt = i.querySelector('[data-edit], .current-text');
+    const logoUrl = iconEl && iconEl.getAttribute('data-logo-url');
     return {
-      icon: icon ? (icon.textContent || '').trim() : '',
+      icon: iconEl && !logoUrl ? (iconEl.textContent || '').trim() : '',
       text: txt ? (txt.textContent || '').trim() : '',
+      logoUrl: logoUrl || '',
     };
   }).filter(c => c.text);
 
@@ -9194,7 +9202,14 @@ function renderUserSections(user) {
       user.currentlyOn.forEach(c => {
         const item = document.createElement('div');
         item.className = 'current-item';
-        item.innerHTML = `${_DRAG_HANDLE_HTML}<span class="current-icon">${_esc(c.icon || '📱')}</span><span data-edit="true" contenteditable="${editMode}">${_esc(c.text)}</span><button class="current-delete" onclick="deleteCurrent(this)">&times;</button>`;
+        // logoUrl wins over the emoji icon when set — same precedence
+        // mobile uses. Stored as <img> so the desktop persistence loop
+        // (line ~7738) can read it back via the `src` attribute.
+        const hasLogo = typeof c.logoUrl === 'string' && /^https?:\/\//i.test(c.logoUrl);
+        const iconHtml = hasLogo
+          ? `<img class="current-icon current-icon-img" src="${_esc(c.logoUrl)}" data-logo-url="${_esc(c.logoUrl)}" style="width:18px;height:18px;border-radius:999px;object-fit:cover;display:inline-block;vertical-align:middle;">`
+          : `<span class="current-icon">${_esc(c.icon || '📱')}</span>`;
+        item.innerHTML = `${_DRAG_HANDLE_HTML}${iconHtml}<span data-edit="true" contenteditable="${editMode}">${_esc(c.text)}</span><button class="current-delete" onclick="deleteCurrent(this)">&times;</button>`;
         list.appendChild(item);
       });
     }

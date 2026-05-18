@@ -3481,6 +3481,43 @@ function ExperienceEditSheet({
       onSave={handleSave}
       saving={saving}
       error={error}
+      footer={
+        <>
+          <button
+            type="button"
+            onClick={add}
+            disabled={items.length >= 15}
+            style={{
+              width: "100%",
+              padding: "12px",
+              borderRadius: 14,
+              border: "1px dashed rgba(28,28,30,0.22)",
+              background: "rgba(255,255,255,0.4)",
+              color: "#1C1C1E",
+              fontFamily: "DM Sans, sans-serif",
+              fontSize: 14,
+              fontWeight: 700,
+              cursor: items.length >= 15 ? "default" : "pointer",
+              opacity: items.length >= 15 ? 0.5 : 1,
+              WebkitTapHighlightColor: "transparent",
+            }}
+          >
+            + Add role
+          </button>
+          {items.length >= 15 ? (
+            <div
+              style={{
+                marginTop: 6,
+                fontSize: 11.5,
+                color: "#8A8580",
+                textAlign: "center",
+              }}
+            >
+              Maximum of 15 roles.
+            </div>
+          ) : null}
+        </>
+      }
     >
       <div
         ref={listRef}
@@ -3518,38 +3555,6 @@ function ExperienceEditSheet({
             />
           ))
         )}
-
-        <button
-          type="button"
-          onClick={add}
-          disabled={items.length >= 15}
-          style={{
-            padding: "12px",
-            borderRadius: 14,
-            border: "1px dashed rgba(28,28,30,0.22)",
-            background: "rgba(255,255,255,0.4)",
-            color: "#1C1C1E",
-            fontFamily: "DM Sans, sans-serif",
-            fontSize: 14,
-            fontWeight: 700,
-            cursor: items.length >= 15 ? "default" : "pointer",
-            opacity: items.length >= 15 ? 0.5 : 1,
-            WebkitTapHighlightColor: "transparent",
-          }}
-        >
-          + Add role
-        </button>
-        {items.length >= 15 ? (
-          <div
-            style={{
-              fontSize: 11.5,
-              color: "#8A8580",
-              textAlign: "center",
-            }}
-          >
-            Maximum of 15 roles.
-          </div>
-        ) : null}
       </div>
     </PortfolioEditorShell>
   );
@@ -3784,6 +3789,43 @@ function WorkingOnEditSheet({
       onSave={handleSave}
       saving={saving}
       error={error}
+      footer={
+        <>
+          <button
+            type="button"
+            onClick={add}
+            disabled={items.length >= 10}
+            style={{
+              width: "100%",
+              padding: "10px",
+              borderRadius: 12,
+              border: "1px dashed rgba(28,28,30,0.22)",
+              background: "rgba(255,255,255,0.4)",
+              color: "#1C1C1E",
+              fontFamily: "DM Sans, sans-serif",
+              fontSize: 14,
+              fontWeight: 700,
+              cursor: items.length >= 10 ? "default" : "pointer",
+              opacity: items.length >= 10 ? 0.5 : 1,
+              WebkitTapHighlightColor: "transparent",
+            }}
+          >
+            + Add item
+          </button>
+          {items.length >= 10 ? (
+            <div
+              style={{
+                marginTop: 6,
+                fontSize: 11.5,
+                color: "#8A8580",
+                textAlign: "center",
+              }}
+            >
+              Maximum of 10 items.
+            </div>
+          ) : null}
+        </>
+      }
     >
       <div style={{ display: "flex", flexDirection: "column", gap: 10 }}>
         {items.length === 0 ? (
@@ -3874,38 +3916,6 @@ function WorkingOnEditSheet({
             </div>
           ))
         )}
-
-        <button
-          type="button"
-          onClick={add}
-          disabled={items.length >= 10}
-          style={{
-            padding: "10px",
-            borderRadius: 12,
-            border: "1px dashed rgba(28,28,30,0.22)",
-            background: "rgba(255,255,255,0.4)",
-            color: "#1C1C1E",
-            fontFamily: "DM Sans, sans-serif",
-            fontSize: 14,
-            fontWeight: 700,
-            cursor: items.length >= 10 ? "default" : "pointer",
-            opacity: items.length >= 10 ? 0.5 : 1,
-            WebkitTapHighlightColor: "transparent",
-          }}
-        >
-          + Add item
-        </button>
-        {items.length >= 10 ? (
-          <div
-            style={{
-              fontSize: 11.5,
-              color: "#8A8580",
-              textAlign: "center",
-            }}
-          >
-            Maximum of 10 items.
-          </div>
-        ) : null}
       </div>
     </PortfolioEditorShell>
   );
@@ -3921,6 +3931,7 @@ function PortfolioEditorShell({
   saving,
   error,
   children,
+  footer,
 }: {
   title: string;
   onClose: () => void;
@@ -3928,6 +3939,10 @@ function PortfolioEditorShell({
   saving: boolean;
   error: string | null;
   children: React.ReactNode;
+  /** Pinned to the bottom of the sheet above the safe area — used for
+   *  the "+ Add" button so the user doesn't have to scroll past every
+   *  card to find it. Optional. */
+  footer?: React.ReactNode;
 }) {
   return (
     <Drawer.Root
@@ -4066,11 +4081,29 @@ function PortfolioEditorShell({
               flex: 1,
               overflowY: "auto",
               WebkitOverflowScrolling: "touch",
-              padding: "14px 14px calc(20px + env(safe-area-inset-bottom, 0px))",
+              padding: footer
+                ? "14px 14px 14px"
+                : "14px 14px calc(20px + env(safe-area-inset-bottom, 0px))",
             }}
           >
             {children}
           </div>
+
+          {footer ? (
+            <div
+              style={{
+                flexShrink: 0,
+                padding:
+                  "10px 14px calc(12px + env(safe-area-inset-bottom, 0px))",
+                background: "rgba(250, 247, 242, 0.96)",
+                borderTop: "1px solid rgba(28,28,30,0.06)",
+                backdropFilter: "blur(14px)",
+                WebkitBackdropFilter: "blur(14px)",
+              }}
+            >
+              {footer}
+            </div>
+          ) : null}
         </Drawer.Content>
       </Drawer.Portal>
     </Drawer.Root>
