@@ -658,12 +658,19 @@ export function ProfileMobile({ targetHandle }: Props = {}) {
     [],
   );
 
-  /** Pick a PDF/image and upload it as the user's resume.
-   *  Mirrors the avatar/banner upload flow but uses a plain file
-   *  input (no crop step) since resumes are docs, not portraits. */
+  /** Pick a PDF/image and APPEND it to the user's resume_docs array.
+   *  Up to 3 docs total; older docs are kept untouched. Mirrors the
+   *  avatar/banner upload flow but uses a plain file input (no crop
+   *  step) since resumes are docs, not portraits. */
   const handleResumeUpload = useCallback(
     async (file: File) => {
       if (uploadingResume) return;
+      const existing = user?.resumePortfolio ?? [];
+      if (existing.length >= 3) {
+        setEditError("Maximum of 3 documents — remove one to add another.");
+        if (resumeInputRef.current) resumeInputRef.current.value = "";
+        return;
+      }
       setUploadingResume(true);
       setEditError(null);
       try {
@@ -679,17 +686,51 @@ export function ProfileMobile({ targetHandle }: Props = {}) {
         if (!upload.ok || !uj?.ok || typeof uj.url !== "string") {
           throw new Error(uj?.error ?? "Upload failed");
         }
-        const ok = await savePortfolioPatch({ resume_url: uj.url });
-        if (!ok) throw new Error("Couldn't save resume URL");
+        const isImage =
+          (file.type && file.type.startsWith("image/")) ||
+          /\.(png|jpe?g|gif|webp|svg)$/i.test(file.name);
+        const next = [
+          ...existing.map((r) => ({
+            name: r.name ?? "Resume",
+            type: r.type === "image" ? "image" : "pdf",
+            url: r.url ?? "",
+          })),
+          {
+            name:
+              file.name.replace(/\.[^.]+$/, "").slice(0, 80) ||
+              (isImage ? "Portfolio" : "Resume"),
+            type: isImage ? "image" : "pdf",
+            url: uj.url as string,
+          },
+        ].filter((d) => d.url);
+        const ok = await savePortfolioPatch({ resume_docs: next });
+        if (!ok) throw new Error("Couldn't save resume docs");
       } catch (e) {
         setEditError(e instanceof Error ? e.message : "Couldn't upload resume");
       } finally {
         setUploadingResume(false);
-        // Clear the input value so picking the same file twice still fires onChange.
         if (resumeInputRef.current) resumeInputRef.current.value = "";
       }
     },
-    [uploadingResume, savePortfolioPatch],
+    [uploadingResume, savePortfolioPatch, user?.resumePortfolio],
+  );
+
+  /** Remove the doc at `index` from resume_docs and save. */
+  const handleResumeDocDelete = useCallback(
+    async (index: number) => {
+      const existing = user?.resumePortfolio ?? [];
+      if (index < 0 || index >= existing.length) return;
+      const next = existing
+        .filter((_, i) => i !== index)
+        .map((r) => ({
+          name: r.name ?? "Resume",
+          type: r.type === "image" ? "image" : "pdf",
+          url: r.url ?? "",
+        }))
+        .filter((d) => d.url);
+      await savePortfolioPatch({ resume_docs: next });
+    },
+    [savePortfolioPatch, user?.resumePortfolio],
   );
 
   const cancelEdit = () => {
@@ -1497,6 +1538,7 @@ export function ProfileMobile({ targetHandle }: Props = {}) {
             onEditCurrentOn={() => setEditingPortfolio("current-on")}
             onPickResume={() => resumeInputRef.current?.click()}
             uploadingResume={uploadingResume}
+            onDeleteDoc={(i) => void handleResumeDocDelete(i)}
           />
         </div>
       </div>
@@ -2673,6 +2715,7 @@ function PortfolioPane({
   onEditCurrentOn,
   onPickResume,
   uploadingResume,
+  onDeleteDoc,
 }: {
   currentProjects: CurrentProject[];
   workExperience: WorkExp[];
@@ -2688,6 +2731,8 @@ function PortfolioPane({
   onPickResume?: () => void;
   /** Owner-only — true while a resume upload is in flight. */
   uploadingResume?: boolean;
+  /** Owner-only — remove the doc at this index from resume_docs. */
+  onDeleteDoc?: (index: number) => void;
 }) {
   const allEmpty =
     currentProjects.length === 0 &&
@@ -2809,9 +2854,11 @@ function PortfolioPane({
                   ? "Uploading…"
                   : resumePortfolio.length === 0
                     ? "Upload"
-                    : "Replace"
+                    : resumePortfolio.length >= 3
+                      ? "Max 3"
+                      : "Add"
               }
-              disabled={uploadingResume}
+              disabled={!!uploadingResume || resumePortfolio.length >= 3}
             />
           ) : null
         }
@@ -2821,61 +2868,106 @@ function PortfolioPane({
         ) : (
           <div style={{ display: "flex", flexDirection: "column", gap: 8 }}>
             {resumePortfolio.map((r, i) => (
-              <button
+              <div
                 key={`${r.url}-${i}`}
-                type="button"
-                onClick={() => onOpenDoc(r)}
                 style={{
                   display: "flex",
                   alignItems: "center",
                   gap: 12,
-                  padding: "12px 14px",
+                  padding: "10px 12px 10px 14px",
                   background: "#fff",
                   border: "1px solid rgba(28,28,30,0.08)",
                   borderRadius: 14,
                   color: "#1C1C1E",
-                  cursor: "pointer",
-                  textAlign: "left",
-                  fontFamily: "inherit",
-                  WebkitTapHighlightColor: "transparent",
                 }}
               >
-                <span
+                <button
+                  type="button"
+                  onClick={() => onOpenDoc(r)}
                   style={{
-                    width: 36,
-                    height: 36,
-                    borderRadius: 10,
-                    background: "rgba(255,92,53,0.10)",
-                    color: "#FF5C35",
-                    display: "inline-flex",
+                    flex: 1,
+                    minWidth: 0,
+                    display: "flex",
                     alignItems: "center",
-                    justifyContent: "center",
-                    flexShrink: 0,
-                  }}
-                  aria-hidden
-                >
-                  <IconResume />
-                </span>
-                <div style={{ flex: 1, minWidth: 0 }}>
-                  <div style={{ fontSize: 14, fontWeight: 700 }}>
-                    {r.name ?? "Resume"}
-                  </div>
-                  <div style={{ fontSize: 12, color: "#8A8580" }}>
-                    {(r.type ?? "file").toUpperCase()} · tap to open in viewer
-                  </div>
-                </div>
-                <span
-                  aria-hidden
-                  style={{
-                    color: "#8A8580",
-                    fontSize: 18,
-                    lineHeight: 1,
-                    flexShrink: 0,
+                    gap: 12,
+                    padding: 0,
+                    background: "transparent",
+                    border: "none",
+                    color: "inherit",
+                    cursor: "pointer",
+                    textAlign: "left",
+                    fontFamily: "inherit",
+                    WebkitTapHighlightColor: "transparent",
                   }}
                 >
-                  ›
-                </span>
-              </button>
+                  <span
+                    style={{
+                      width: 36,
+                      height: 36,
+                      borderRadius: 10,
+                      background: "rgba(255,92,53,0.10)",
+                      color: "#FF5C35",
+                      display: "inline-flex",
+                      alignItems: "center",
+                      justifyContent: "center",
+                      flexShrink: 0,
+                    }}
+                    aria-hidden
+                  >
+                    <IconResume />
+                  </span>
+                  <div style={{ flex: 1, minWidth: 0 }}>
+                    <div style={{ fontSize: 14, fontWeight: 700 }}>
+                      {r.name ?? "Resume"}
+                    </div>
+                    <div style={{ fontSize: 12, color: "#8A8580" }}>
+                      {(r.type ?? "file").toUpperCase()} · tap to open in viewer
+                    </div>
+                  </div>
+                  <span
+                    aria-hidden
+                    style={{
+                      color: "#8A8580",
+                      fontSize: 18,
+                      lineHeight: 1,
+                      flexShrink: 0,
+                    }}
+                  >
+                    ›
+                  </span>
+                </button>
+                {!isVisitor && onDeleteDoc ? (
+                  <button
+                    type="button"
+                    onClick={(e) => {
+                      e.stopPropagation();
+                      if (
+                        typeof window !== "undefined" &&
+                        !window.confirm(`Remove "${r.name ?? "Resume"}"?`)
+                      ) {
+                        return;
+                      }
+                      onDeleteDoc(i);
+                    }}
+                    aria-label="Remove document"
+                    style={{
+                      width: 30,
+                      height: 30,
+                      borderRadius: 999,
+                      border: "1px solid rgba(192,57,43,0.22)",
+                      background: "rgba(192,57,43,0.06)",
+                      color: "#B83A1A",
+                      fontSize: 16,
+                      lineHeight: 1,
+                      cursor: "pointer",
+                      flexShrink: 0,
+                      WebkitTapHighlightColor: "transparent",
+                    }}
+                  >
+                    ×
+                  </button>
+                ) : null}
+              </div>
             ))}
           </div>
         )}

@@ -1,4 +1,5 @@
 import { sanitizeCurrentOn } from "@/lib/profile/current-on";
+import { sanitizeResumeDocs } from "@/lib/profile/resume-docs";
 import { sanitizeResumeRedactions } from "@/lib/profile/resume-redactions";
 import type { ProfileView } from "@/lib/profile/types";
 import { sanitizeWorkExperience } from "@/lib/profile/work-experience";
@@ -56,6 +57,7 @@ export function normalizeProfileView(row: Record<string, unknown>): ProfileView 
       row.resume_url != null && String(row.resume_url).trim() !== ""
         ? String(row.resume_url)
         : null,
+    resume_docs: sanitizeResumeDocs(row.resume_docs),
     interests: strArr(row.interests),
     skills: strArr(row.skills),
     looking_for: strArr(row.looking_for),

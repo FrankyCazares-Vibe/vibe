@@ -113,7 +113,17 @@ export function buildVibeUserV1FromProfile(
     u.coverGradient = profile.banner_gradient.trim();
   }
 
-  if (profile.resume_url) {
+  // Resume / portfolio docs — prefer the new multi-doc array. Fall
+  // back to the legacy single `resume_url` so users who haven't
+  // migrated still see their existing doc. The shape emitted matches
+  // what profile.html + mobile already render: { name, type, url }.
+  if (profile.resume_docs.length > 0) {
+    u.resumePortfolio = profile.resume_docs.map((d) => ({
+      name: d.name,
+      type: d.type,
+      url: d.url,
+    }));
+  } else if (profile.resume_url) {
     const lower = profile.resume_url.toLowerCase();
     const isImage =
       /\.(png|jpe?g|gif|webp|svg)(\?|$)/i.test(lower) && !/\.pdf(\?|$)/i.test(lower);

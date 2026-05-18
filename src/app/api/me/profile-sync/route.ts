@@ -3,6 +3,7 @@ import { NextResponse } from "next/server";
 import { sanitizeCurrentOn } from "@/lib/profile/current-on";
 import { normalizeProfileView } from "@/lib/profile/normalize-profile-view";
 import { sanitizeRecruiterSnapshot } from "@/lib/profile/recruiter-snapshot";
+import { sanitizeResumeDocs } from "@/lib/profile/resume-docs";
 import { sanitizeResumeRedactions } from "@/lib/profile/resume-redactions";
 import { inlineOrUploadProfileUrl } from "@/lib/profile/storage-upload";
 import { sanitizeWorkExperience } from "@/lib/profile/work-experience";
@@ -162,6 +163,13 @@ export async function POST(req: Request) {
   const resume = await inlineOrUploadProfileUrl(supabase, user.id, body.resume_url, "resume");
   if (resume !== undefined) patch.resume_url = resume;
 
+  // Multi-doc resume array — preferred over the single resume_url.
+  // Pure data field; uploads already happened client-side via
+  // /api/me/profile-upload, so this only persists URLs.
+  if ("resume_docs" in body) {
+    patch.resume_docs = sanitizeResumeDocs(body.resume_docs);
+  }
+
   if ("banner_url" in body || "banner_gradient" in body) {
     const bu = body.banner_url;
     const bgStr =
@@ -199,7 +207,7 @@ export async function POST(req: Request) {
   const { data: row, error: selErr } = await supabase
     .from("users")
     .select(
-      "id,email,name,handle,school,school_email,school_verified,year,major,department,bio,tagline,website,headline,location_text,banner_gradient,avatar_url,banner_url,resume_url,interests,skills,looking_for,work_experience,work_order_manual,recruiter_snapshot,current_on,resume_redactions",
+      "id,email,name,handle,school,school_email,school_verified,year,major,department,bio,tagline,website,headline,location_text,banner_gradient,avatar_url,banner_url,resume_url,resume_docs,interests,skills,looking_for,work_experience,work_order_manual,recruiter_snapshot,current_on,resume_redactions",
     )
     .eq("id", user.id)
     .single();

@@ -1,4 +1,5 @@
 import type { CurrentOnItem } from "@/lib/profile/current-on";
+import type { ResumeDocRow } from "@/lib/profile/resume-docs";
 import type { RedactionBar } from "@/lib/profile/resume-redactions";
 import type { WorkExperienceRow } from "@/lib/profile/work-experience";
 
@@ -23,6 +24,9 @@ export type ProfileView = {
   avatar_url: string | null;
   banner_url: string | null;
   resume_url: string | null;
+  /** Multi-doc array. Empty means "fall back to resume_url" for
+   *  backwards compat. See lib/profile/resume-docs.ts. */
+  resume_docs: ResumeDocRow[];
   interests: string[];
   skills: string[];
   looking_for: string[];
