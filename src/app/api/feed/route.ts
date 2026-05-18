@@ -89,6 +89,17 @@ export async function GET(req: Request) {
     .trim()
     .toLowerCase()
     .replace(/^#+/, "");
+  // Optional sort override. `recent` skips the ranking pass and returns
+  // strictly newest-first (useful for the legacy clients + the "Latest"
+  // tab when we add one). Default is the engagement-weighted ranking.
+  const sortMode = (url.searchParams.get("sort") || "ranked").toLowerCase();
+  const useRanking = sortMode !== "recent" && !tagFilter;
+  // Pull a wider candidate pool when we're going to re-rank so the
+  // ranking has room to lift older-but-popular posts above the
+  // strict-recency cut. Capped to stay within MAX_LIMIT.
+  const candidatePoolSize = useRanking
+    ? Math.min(MAX_LIMIT, Math.max(limit * 4, 80))
+    : limit;
 
   const { data: me, error: meErr } = await supabase
     .from("users")
@@ -115,7 +126,7 @@ export async function GET(req: Request) {
     )
     .in("type", ["post", "clip"])
     .order("created_at", { ascending: false })
-    .limit(limit);
+    .limit(candidatePoolSize);
 
   // Global feed for now — no school filter. See the route docblock above.
   if (tagFilter) {
@@ -174,6 +185,11 @@ export async function GET(req: Request) {
 
   const engagement = await loadEngagement(supabase, Array.from(allPostIds), user.id);
 
+  // Viewer's outgoing followings — used both for the friend-repost
+  // social-proof query AND for the ranking pass below (posts by people
+  // you follow get a meaningful score boost).
+  const viewerFollowingIds = await loadViewerFollowings(supabase, user.id);
+
   // Social-proof signal: for each post in this batch, find up to 3
   // reposters who are FOLLOWED BY the viewer (Instagram-style "X and N
   // others reposted this"). We don't surface generic reposter counts
@@ -181,7 +197,7 @@ export async function GET(req: Request) {
   const friendReposters = await loadFriendReposters(
     supabase,
     Array.from(allPostIds),
-    user.id,
+    viewerFollowingIds,
   );
 
   const renderPost = (row: PostRow) => {
@@ -237,13 +253,46 @@ export async function GET(req: Request) {
   // a separate "repost"-kind row into the feed.
   void repostRows;
 
-  const feed = postRowsOut
-    .sort((a, b) => (a.sort_at < b.sort_at ? 1 : a.sort_at > b.sort_at ? -1 : 0))
-    .slice(0, limit);
+  // Tier-1 ranking pass. We pulled `candidatePoolSize` candidates above
+  // (≥ 4× the requested page) so this can lift older-but-popular and
+  // friend-of-friend posts above the strict recency cut. See
+  // scoreFeedRow for the formula. When `sort=recent` or a tag filter is
+  // active we keep the original chronological order.
+  const now = Date.now();
+  const sorted = useRanking
+    ? postRowsOut
+        .map((entry) => ({
+          entry,
+          score: scoreFeedRow(entry.post, now, viewerFollowingIds),
+        }))
+        .sort((a, b) => b.score - a.score)
+        .map((s) => s.entry)
+    : postRowsOut.sort((a, b) =>
+        a.sort_at < b.sort_at ? 1 : a.sort_at > b.sort_at ? -1 : 0,
+      );
+
+  // Diversity cap: no single author can dominate a page. Walk the
+  // ranked list in order, skip a post once we've already seen 3 from
+  // the same author. Org posts use org_id as the bucket so a single
+  // org account doesn't carpet the feed either.
+  const MAX_PER_AUTHOR = 3;
+  const perAuthorCount = new Map<string, number>();
+  const capped: typeof sorted = [];
+  for (const entry of sorted) {
+    const key = entry.post.org?.id ?? entry.post.user_id;
+    const c = perAuthorCount.get(key) ?? 0;
+    if (c >= MAX_PER_AUTHOR) continue;
+    perAuthorCount.set(key, c + 1);
+    capped.push(entry);
+    if (capped.length >= limit) break;
+  }
+  const feed = capped;
 
   // Legacy `posts` field — flat list, no reposts. The legacy public/html
   // campus prototype reads this; new code should consume `feed` instead.
-  const legacyPosts = postRowsOut.map((entry) => entry.post);
+  // We pre-filter to what survived the ranking + cap so legacy clients
+  // see the same shape, just newer-first sort isn't preserved here.
+  const legacyPosts = feed.map((entry) => entry.post);
 
   return NextResponse.json({
     ok: true,
@@ -354,10 +403,85 @@ type FriendReposterSample = {
  *   2. post_reposts WHERE user_id IN friends AND post_id IN postIds.
  *   3. users for the (up to 3 × N) reposter ids we'll actually surface.
  */
+/**
+ * Tier-1 feed ranking score. Hand-tuned heuristic — no ML. The shape
+ * is the same Hacker-News-style decay, plus additive boosts from the
+ * viewer's social graph:
+ *
+ *     engagement = 1 + likes + 2*reposts + comments
+ *     base       = engagement / (age_hours + 2)^1.5
+ *     score      = base
+ *                  * (1.6  if the viewer follows the author, else 1.0)
+ *                  + 3 * friend_reposter_count
+ *
+ * Why these numbers (subject to tuning once we have engagement data):
+ *   - Baseline +1 keeps brand-new no-engagement posts from scoring 0
+ *     and dropping out of the candidate pool entirely.
+ *   - Reposts > comments > likes — reposts spend "social capital" and
+ *     show up on someone's profile, so they're the strongest signal.
+ *   - Decay exponent 1.5 is gentler than HN's 1.8 so good content can
+ *     live ~24h on the feed before being aged out.
+ *   - Follow boost is multiplicative so a stale post from a friend
+ *     doesn't beat a fresh popular one purely from the additive +5
+ *     trap. Friend-repost boost is additive and per-reposter (max 3)
+ *     since each fresh reposter is a separate endorsement.
+ *
+ * @param post A post already rendered by `renderPost` — carries
+ *   like/comment/repost counts, friend_reposter_count, etc.
+ * @param nowMs Date.now() snapshot for the whole batch (consistency).
+ * @param viewerFollowingIds The viewer's outgoing follows set.
+ */
+function scoreFeedRow(
+  post: {
+    user_id: string;
+    created_at: string;
+    like_count: number;
+    comment_count: number;
+    repost_count: number;
+    friend_reposter_count?: number;
+  },
+  nowMs: number,
+  viewerFollowingIds: Set<string>,
+): number {
+  const ageHours = Math.max(
+    0,
+    (nowMs - new Date(post.created_at).getTime()) / 3_600_000,
+  );
+  const engagement =
+    1 +
+    (post.like_count ?? 0) +
+    2 * (post.repost_count ?? 0) +
+    (post.comment_count ?? 0);
+  let score = engagement / Math.pow(ageHours + 2, 1.5);
+  if (viewerFollowingIds.has(post.user_id)) score *= 1.6;
+  score += 3 * (post.friend_reposter_count ?? 0);
+  return score;
+}
+
+/** Single fetch of who-the-viewer-follows — used by both
+ *  loadFriendReposters and the ranking pass. Returns a Set for O(1)
+ *  membership checks. */
+async function loadViewerFollowings(
+  supabase: Awaited<ReturnType<typeof createSupabaseServerClient>>,
+  viewerId: string,
+): Promise<Set<string>> {
+  const { data, error } = await supabase
+    .from("connections")
+    .select("following_id")
+    .eq("follower_id", viewerId);
+  if (error) {
+    console.error("[feed.loadViewerFollowings]", error);
+    return new Set();
+  }
+  return new Set(
+    (data ?? []).map((r) => (r as { following_id: string }).following_id),
+  );
+}
+
 async function loadFriendReposters(
   supabase: Awaited<ReturnType<typeof createSupabaseServerClient>>,
   postIds: string[],
-  viewerId: string,
+  viewerFollowingIds: Set<string>,
 ): Promise<Map<string, { samples: FriendReposterSample[]; totalFriends: number }>> {
   const out = new Map<
     string,
@@ -365,17 +489,7 @@ async function loadFriendReposters(
   >();
   if (postIds.length === 0) return out;
 
-  const { data: followingRows, error: followingErr } = await supabase
-    .from("connections")
-    .select("following_id")
-    .eq("follower_id", viewerId);
-  if (followingErr) {
-    console.error("[feed.loadFriendReposters following]", followingErr);
-    return out;
-  }
-  const friendIds = (followingRows ?? []).map(
-    (r) => (r as { following_id: string }).following_id,
-  );
+  const friendIds = Array.from(viewerFollowingIds);
   if (friendIds.length === 0) return out;
 
   const { data: friendRepostRows, error: rrErr } = await supabase
