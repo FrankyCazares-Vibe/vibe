@@ -150,6 +150,9 @@ export function buildVibeUserV1FromProfile(
     u.currentlyOn = profile.current_on.map((c) => ({
       icon: c.icon,
       text: c.text,
+      // Logo URL (optional, owner-uploaded). Mirrors the work-experience
+      // logoUrl shape so profile.html + mobile both read it the same way.
+      logoUrl: c.logoUrl ?? "",
     }));
   }
 

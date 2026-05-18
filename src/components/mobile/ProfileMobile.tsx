@@ -58,7 +58,12 @@ type WorkExp = {
 };
 type StudentVerification = { status?: string; school?: string };
 type ResumeItem = { name?: string; type?: string; url?: string };
-type CurrentProject = { icon?: string; text?: string };
+type CurrentProject = {
+  icon?: string;
+  text?: string;
+  /** Optional uploaded logo. UI prefers this over `icon` when set. */
+  logoUrl?: string | null;
+};
 
 type VibeUser = {
   name?: string | null;
@@ -717,6 +722,51 @@ export function ProfileMobile({ targetHandle }: Props = {}) {
       }
     },
     [uploadingResume, savePortfolioPatch, user?.resumePortfolio],
+  );
+
+  /** Upload a logo image (kind=logo) and patch it into a portfolio
+   *  list at `index`. Used by both experience entries and working-on
+   *  items — they share the same logo upload endpoint + shape, just
+   *  different target lists. Returns once the patch round-trip
+   *  completes so callers can clear an "uploading…" indicator. */
+  const handlePortfolioLogoUpload = useCallback(
+    async (
+      target: "experience" | "currentOn",
+      index: number,
+      file: File,
+    ): Promise<boolean> => {
+      const form = new FormData();
+      form.set("file", file);
+      form.set("kind", "logo");
+      try {
+        const r = await fetch("/api/me/profile-upload", {
+          method: "POST",
+          credentials: "include",
+          body: form,
+        });
+        const j = await r.json();
+        if (!r.ok || !j?.ok || typeof j.url !== "string") {
+          throw new Error(j?.error ?? "Upload failed");
+        }
+        const url = j.url as string;
+        if (target === "experience") {
+          const items = (user?.workExperience ?? []).map((w, i) =>
+            i === index ? { ...w, logoUrl: url } : { ...w },
+          );
+          return await savePortfolioPatch({ work_experience: items });
+        }
+        const items = (user?.currentlyOn ?? []).map((p, i) =>
+          i === index ? { ...p, logoUrl: url } : { ...p },
+        );
+        return await savePortfolioPatch({ current_on: items });
+      } catch (e) {
+        setEditError(
+          e instanceof Error ? e.message : "Couldn't upload logo",
+        );
+        return false;
+      }
+    },
+    [user?.workExperience, user?.currentlyOn, savePortfolioPatch],
   );
 
   /** Remove the doc at `index` from resume_docs and save. */
@@ -1552,6 +1602,12 @@ export function ProfileMobile({ targetHandle }: Props = {}) {
             }
             onReorderCurrentOn={(items) =>
               void savePortfolioPatch({ current_on: items })
+            }
+            onUploadExperienceLogo={(i, file) =>
+              handlePortfolioLogoUpload("experience", i, file)
+            }
+            onUploadCurrentOnLogo={(i, file) =>
+              handlePortfolioLogoUpload("currentOn", i, file)
             }
           />
         </div>
@@ -2748,6 +2804,8 @@ function PortfolioPane({
   onDeleteDoc,
   onReorderExperience,
   onReorderCurrentOn,
+  onUploadExperienceLogo,
+  onUploadCurrentOnLogo,
 }: {
   currentProjects: CurrentProject[];
   workExperience: WorkExp[];
@@ -2778,6 +2836,12 @@ function PortfolioPane({
   onReorderExperience?: (items: WorkExp[]) => void;
   /** Owner-only — same for working-on items. Persists current_on. */
   onReorderCurrentOn?: (items: CurrentProject[]) => void;
+  /** Owner-only — tap-to-upload a logo for the experience entry at
+   *  `index`. Returns the patch round-trip result so the slot can
+   *  show an "uploading…" indicator. */
+  onUploadExperienceLogo?: (index: number, file: File) => Promise<boolean>;
+  /** Owner-only — same shape for working-on entries. */
+  onUploadCurrentOnLogo?: (index: number, file: File) => Promise<boolean>;
 }) {
   // Edit affordances only render when the owner has explicitly entered
   // edit mode via the pencil. Visitors never see them.
@@ -2947,9 +3011,18 @@ function PortfolioPane({
                       onPointerUp={coHandlers.end}
                     />
                   ) : null}
-                  <span style={projectIconStyle} aria-hidden>
-                    {p.icon || "✦"}
-                  </span>
+                  <UploadableLogo
+                    size={32}
+                    rounded="circle"
+                    logoUrl={p.logoUrl ?? undefined}
+                    fallbackEmoji={p.icon || "✦"}
+                    editable={showOwnerEdits}
+                    onPick={(file) =>
+                      onUploadCurrentOnLogo
+                        ? onUploadCurrentOnLogo(i, file)
+                        : Promise.resolve(false)
+                    }
+                  />
                   <span style={{ fontSize: 14, lineHeight: 1.4, flex: 1 }}>
                     {p.text}
                   </span>
@@ -3011,17 +3084,16 @@ function PortfolioPane({
                     onPointerUp={expHandlers.end}
                   />
                 ) : null}
-                <div
-                  style={{
-                    width: 40,
-                    height: 40,
-                    borderRadius: 12,
-                    background: w.logoUrl
-                      ? `url(${w.logoUrl}) center/cover`
-                      : "#FAF7F2",
-                    border: "1px solid rgba(28,28,30,0.08)",
-                    flexShrink: 0,
-                  }}
+                <UploadableLogo
+                  size={40}
+                  rounded="square"
+                  logoUrl={w.logoUrl ?? undefined}
+                  editable={showOwnerEdits}
+                  onPick={(file) =>
+                    onUploadExperienceLogo
+                      ? onUploadExperienceLogo(i, file)
+                      : Promise.resolve(false)
+                  }
                 />
                 <div style={{ flex: 1, minWidth: 0 }}>
                   <div style={{ fontSize: 14, fontWeight: 700 }}>
@@ -4002,6 +4074,134 @@ function PortfolioEditorShell({
         </Drawer.Content>
       </Drawer.Portal>
     </Drawer.Root>
+  );
+}
+
+/** Avatar-style logo slot with an orange-camera upload overlay when in
+ *  edit mode. Matches the profile-pic upload affordance. Renders the
+ *  uploaded image when set, the emoji icon as a fallback, then a
+ *  generic glyph when neither is present. */
+function UploadableLogo({
+  size = 40,
+  rounded = "square", // "square" for orgs/companies, "circle" for projects
+  logoUrl,
+  fallbackEmoji,
+  editable,
+  onPick,
+}: {
+  size?: number;
+  rounded?: "square" | "circle";
+  logoUrl?: string | null;
+  fallbackEmoji?: string;
+  /** When true, tapping the slot opens a file picker. */
+  editable: boolean;
+  /** Called with the picked file. Returns when the upload + save round
+   *  trip completes so the slot can clear its loading state. */
+  onPick?: (file: File) => Promise<boolean>;
+}) {
+  const inputRef = useRef<HTMLInputElement | null>(null);
+  const [uploading, setUploading] = useState(false);
+  const radius = rounded === "circle" ? 999 : 12;
+  const handleClick = () => {
+    if (!editable || uploading) return;
+    inputRef.current?.click();
+  };
+  const handleChange = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file || !onPick) return;
+    setUploading(true);
+    try {
+      await onPick(file);
+    } finally {
+      setUploading(false);
+      if (inputRef.current) inputRef.current.value = "";
+    }
+  };
+  return (
+    <div
+      style={{
+        position: "relative",
+        width: size,
+        height: size,
+        flexShrink: 0,
+      }}
+    >
+      <button
+        type="button"
+        onClick={handleClick}
+        disabled={!editable || uploading}
+        aria-label={editable ? "Upload logo" : undefined}
+        style={{
+          width: size,
+          height: size,
+          borderRadius: radius,
+          background: logoUrl
+            ? `url(${logoUrl}) center/cover`
+            : "#FAF7F2",
+          border: "1px solid rgba(28,28,30,0.08)",
+          display: "inline-flex",
+          alignItems: "center",
+          justifyContent: "center",
+          padding: 0,
+          color: "#1C1C1E",
+          fontFamily: "DM Sans, sans-serif",
+          fontSize: Math.round(size * 0.45),
+          cursor: editable && !uploading ? "pointer" : "default",
+          opacity: uploading ? 0.55 : 1,
+          WebkitTapHighlightColor: "transparent",
+        }}
+      >
+        {!logoUrl ? fallbackEmoji ?? "✦" : null}
+      </button>
+      {editable ? (
+        <>
+          <input
+            ref={inputRef}
+            type="file"
+            accept="image/jpeg,image/png,image/webp,image/gif"
+            onChange={handleChange}
+            style={{ display: "none" }}
+          />
+          {/* Orange camera badge — same pattern as the profile avatar.
+              pointer-events: none so the click falls through to the
+              underlying button. */}
+          <span
+            aria-hidden
+            style={{
+              position: "absolute",
+              bottom: -2,
+              right: -2,
+              width: Math.round(size * 0.5),
+              height: Math.round(size * 0.5),
+              borderRadius: 999,
+              background: "#FF5C35",
+              border: "2px solid #FAF7F2",
+              color: "#fff",
+              display: "inline-flex",
+              alignItems: "center",
+              justifyContent: "center",
+              boxShadow: "0 2px 6px rgba(255,92,53,0.32)",
+              pointerEvents: "none",
+            }}
+          >
+            <svg
+              width={Math.round(size * 0.26)}
+              height={Math.round(size * 0.26)}
+              viewBox="0 0 16 16"
+              fill="none"
+              stroke="currentColor"
+              strokeWidth="1.6"
+              strokeLinecap="round"
+              strokeLinejoin="round"
+              aria-hidden
+            >
+              <path d="M2 5.5h2L5.5 4h5L12 5.5h2v7H2z" />
+              <circle cx="8" cy="9" r="2.2" />
+            </svg>
+          </span>
+        </>
+      ) : null}
+    </div>
   );
 }
 
