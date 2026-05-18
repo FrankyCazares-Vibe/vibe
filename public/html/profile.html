@@ -563,6 +563,46 @@ body.edit-mode .skill-remove { display:flex; }
   font-size:13px;position:relative;
 }
 .current-icon { font-size:18px;flex-shrink:0; }
+/* Edit mode: tap the icon to upload an image. Wraps the existing
+   icon (emoji or img) with a small relative-positioned target +
+   absolutely-positioned orange camera badge. Mirrors the mobile
+   UploadableLogo affordance. Owner only — outside edit mode the
+   icon is inert. */
+.current-icon-wrap {
+  position:relative;
+  display:inline-flex;
+  align-items:center;
+  justify-content:center;
+  width:24px;
+  height:24px;
+  flex-shrink:0;
+}
+.current-icon-wrap .current-icon-img,
+.current-icon-wrap .current-icon { display:inline-flex; }
+body.edit-mode .current-icon-wrap { cursor:pointer; }
+body.edit-mode .current-icon-wrap::after {
+  /* Orange camera badge — mirrors the mobile UploadableLogo affordance.
+     "+" used as a lightweight, font-agnostic camera-substitute glyph
+     (true camera emoji renders inconsistently across OSes at 12px). */
+  content:'+';
+  position:absolute;
+  bottom:-3px;
+  right:-3px;
+  width:13px;
+  height:13px;
+  border-radius:999px;
+  background:#FF5C35;
+  border:2px solid #FAF7F2;
+  color:#fff;
+  font-size:10px;
+  line-height:1;
+  font-weight:800;
+  display:flex;
+  align-items:center;
+  justify-content:center;
+  box-shadow:0 1px 3px rgba(255,92,53,0.32);
+  pointer-events:none;
+}
 .current-delete {
   margin-left:auto;background:none;border:none;cursor:none;
   color:var(--muted);opacity:0;font-size:14px;
@@ -4643,6 +4683,42 @@ function applyLogoToWrap(wrap, url) {
   if (def) def.style.opacity = '0';
 }
 
+// --- Current-on logo upload --------------------------------------------------
+// Click handler attached to .current-icon-wrap rows in edit mode. Opens a
+// hidden file input, uploads via the existing /api/me/profile-upload (same
+// pattern as work-experience logos), and replaces the wrap's inner content
+// with an <img> carrying data-logo-url so the persist loop at line ~7738
+// picks the URL up on the next save.
+function triggerCurrentLogoUpload(wrapEl) {
+  if (!document.body.classList.contains('edit-mode')) return;
+  const input = wrapEl.querySelector('input.current-logo-input');
+  if (input) input.click();
+}
+
+async function applyCurrentLogoFromInput(input) {
+  const file = input.files[0];
+  if (!file) return;
+  const wrap = input.closest('.current-icon-wrap');
+  if (!wrap) { input.value = ''; return; }
+  try {
+    const url = await _uploadWorkLogo(file);
+    // Replace any existing emoji span or img with a fresh <img> that
+    // carries data-logo-url. Drop sibling inputs so the wrap is clean.
+    wrap.querySelectorAll('.current-icon, .current-icon-img').forEach(el => el.remove());
+    const img = document.createElement('img');
+    img.className = 'current-icon current-icon-img';
+    img.src = url;
+    img.setAttribute('data-logo-url', url);
+    img.style.cssText = 'width:20px;height:20px;border-radius:999px;object-fit:cover;display:inline-block;vertical-align:middle;';
+    wrap.insertBefore(img, input);
+    if (typeof showToast === 'function') showToast('Logo updated');
+    if (typeof saveProfileToStorage === 'function') saveProfileToStorage();
+  } catch (e) {
+    if (typeof showToast === 'function') showToast(e && e.message ? e.message : 'Could not upload logo');
+  }
+  input.value = '';
+}
+
 async function previewWorkLogo(input) {
   const file = input.files[0];
   if (!file) return;
@@ -4758,7 +4834,7 @@ function saveCurrent(){
   const list = document.getElementById('currentList');
   const item = document.createElement('div');
   item.className='current-item';
-  item.innerHTML=`${_DRAG_HANDLE_HTML}<span class="current-icon">${selectedCurrentIcon}</span><span data-edit="true" contenteditable="${editMode}">${text}</span><button class="current-delete" onclick="deleteCurrent(this)">×</button>`;
+  item.innerHTML=`${_DRAG_HANDLE_HTML}<span class="current-icon-wrap" onclick="triggerCurrentLogoUpload(this)"><span class="current-icon">${selectedCurrentIcon}</span><input type="file" accept="image/*" class="current-logo-input" onchange="applyCurrentLogoFromInput(this)" style="display:none"></span><span data-edit="true" contenteditable="${editMode}">${text}</span><button class="current-delete" onclick="deleteCurrent(this)">×</button>`;
   list.appendChild(item);
   document.getElementById('c-text').value='';
   closeModal('currentModal');
@@ -9203,13 +9279,15 @@ function renderUserSections(user) {
         const item = document.createElement('div');
         item.className = 'current-item';
         // logoUrl wins over the emoji icon when set — same precedence
-        // mobile uses. Stored as <img> so the desktop persistence loop
-        // (line ~7738) can read it back via the `src` attribute.
+        // mobile uses. The icon (img or span) sits inside
+        // .current-icon-wrap so edit mode can attach the click +
+        // camera-badge affordance without changing the persist loop
+        // (it still queries .current-icon, just inside the wrap).
         const hasLogo = typeof c.logoUrl === 'string' && /^https?:\/\//i.test(c.logoUrl);
         const iconHtml = hasLogo
-          ? `<img class="current-icon current-icon-img" src="${_esc(c.logoUrl)}" data-logo-url="${_esc(c.logoUrl)}" style="width:18px;height:18px;border-radius:999px;object-fit:cover;display:inline-block;vertical-align:middle;">`
+          ? `<img class="current-icon current-icon-img" src="${_esc(c.logoUrl)}" data-logo-url="${_esc(c.logoUrl)}" style="width:20px;height:20px;border-radius:999px;object-fit:cover;display:inline-block;vertical-align:middle;">`
           : `<span class="current-icon">${_esc(c.icon || '📱')}</span>`;
-        item.innerHTML = `${_DRAG_HANDLE_HTML}${iconHtml}<span data-edit="true" contenteditable="${editMode}">${_esc(c.text)}</span><button class="current-delete" onclick="deleteCurrent(this)">&times;</button>`;
+        item.innerHTML = `${_DRAG_HANDLE_HTML}<span class="current-icon-wrap" onclick="triggerCurrentLogoUpload(this)">${iconHtml}<input type="file" accept="image/*" class="current-logo-input" onchange="applyCurrentLogoFromInput(this)" style="display:none"></span><span data-edit="true" contenteditable="${editMode}">${_esc(c.text)}</span><button class="current-delete" onclick="deleteCurrent(this)">&times;</button>`;
         list.appendChild(item);
       });
     }
