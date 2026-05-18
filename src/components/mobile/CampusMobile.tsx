@@ -559,7 +559,7 @@ function FeedCard({
   const [likeCount, setLikeCount] = useState(post.like_count ?? 0);
   const [reposted, setReposted] = useState(!!post.viewer_reposted);
   const [repostCount, setRepostCount] = useState(post.repost_count ?? 0);
-  const [saved, setSaved] = useState(false);
+  const [saved, setSaved] = useState(!!post.viewer_saved);
   const [menuOpen, setMenuOpen] = useState(false);
   const tapTimerRef = useRef<number | null>(null);
   const likingRef = useRef(false);

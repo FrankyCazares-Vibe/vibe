@@ -212,6 +212,7 @@ export async function GET(req: Request) {
       repost_count: e.repost_count,
       viewer_liked: engagement.likedByViewer.has(row.id),
       viewer_reposted: engagement.repostedByViewer.has(row.id),
+      viewer_saved: engagement.savedByViewer.has(row.id),
       friend_reposters: fr.samples,
       friend_reposter_count: fr.totalFriends,
       media_url: postMediaProxyUrl(row.id, row.media_url, "media"),
@@ -263,13 +264,15 @@ async function loadEngagement(
   counts: Map<string, EngagementCounts>;
   likedByViewer: Set<string>;
   repostedByViewer: Set<string>;
+  savedByViewer: Set<string>;
 }> {
   const counts = new Map<string, EngagementCounts>();
   const likedByViewer = new Set<string>();
   const repostedByViewer = new Set<string>();
+  const savedByViewer = new Set<string>();
 
   if (postIds.length === 0) {
-    return { counts, likedByViewer, repostedByViewer };
+    return { counts, likedByViewer, repostedByViewer, savedByViewer };
   }
 
   const ensure = (id: string): EngagementCounts => {
@@ -282,7 +285,7 @@ async function loadEngagement(
   };
 
   // Three independent count queries + viewer-state queries, in parallel.
-  const [likesAll, commentsAll, repostsAll, likesMine, repostsMine] = await Promise.all([
+  const [likesAll, commentsAll, repostsAll, likesMine, repostsMine, savesMine] = await Promise.all([
     supabase.from("post_likes").select("post_id").in("post_id", postIds),
     supabase.from("post_comments").select("post_id").in("post_id", postIds),
     supabase.from("post_reposts").select("post_id").in("post_id", postIds),
@@ -293,6 +296,11 @@ async function loadEngagement(
       .eq("user_id", viewerId),
     supabase
       .from("post_reposts")
+      .select("post_id")
+      .in("post_id", postIds)
+      .eq("user_id", viewerId),
+    supabase
+      .from("bookmarks")
       .select("post_id")
       .in("post_id", postIds)
       .eq("user_id", viewerId),
@@ -318,8 +326,14 @@ async function loadEngagement(
       repostedByViewer.add((row as { post_id: string }).post_id);
     }
   }
+  // bookmarks table may not exist on stale deploys — degrade silently.
+  if (!savesMine.error) {
+    for (const row of savesMine.data ?? []) {
+      savedByViewer.add((row as { post_id: string }).post_id);
+    }
+  }
 
-  return { counts, likedByViewer, repostedByViewer };
+  return { counts, likedByViewer, repostedByViewer, savedByViewer };
 }
 
 type FriendReposterSample = {

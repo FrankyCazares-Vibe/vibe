@@ -4179,6 +4179,9 @@ export type FeedPost = {
   repost_count: number;
   viewer_liked: boolean;
   viewer_reposted: boolean;
+  /** True when the viewer has bookmarked this post. The feed now
+   *  hydrates this so saved state persists across page loads. */
+  viewer_saved?: boolean;
   /** Up to 3 most-recent reposters that the viewer follows. Drives the
    *  Instagram-style "X reposted this" social-proof pill. */
   friend_reposters?: Array<{
@@ -6118,10 +6121,10 @@ function FeedRow({
     }
   }, [liked, post.id]);
 
-  // Save (bookmark) state. The /api/feed payload doesn't carry viewer
-  // save state yet — start unsaved and seed from the first tap. Same
+  // Save (bookmark) state — seeded from the feed payload's
+  // viewer_saved so saves survive page reloads. Same
   // optimistic-with-rollback pattern as like.
-  const [saved, setSaved] = useState(false);
+  const [saved, setSaved] = useState(!!post.viewer_saved);
   const toggleSave = useCallback(async () => {
     const nextSaved = !saved;
     setSaved(nextSaved);
@@ -6456,6 +6459,15 @@ function FeedRow({
         </div>
         {post.content ? (
           <p
+            onClick={(e) => {
+              // Tapping the post body opens its comments — analog to
+              // the mobile "tap card to open" gesture. Skip when the
+              // click landed on an inline link/button (mentions,
+              // hashtags) so those routes still work.
+              const target = e.target as HTMLElement;
+              if (target.closest("a, button")) return;
+              if (!showComments) setShowComments(true);
+            }}
             style={{
               margin: 0,
               color: COLORS.text,
@@ -6463,6 +6475,7 @@ function FeedRow({
               fontSize: 15,
               lineHeight: 1.45,
               whiteSpace: "pre-wrap",
+              cursor: "pointer",
             }}
           >
             {renderPostContent(post.content, onPickTag)}
@@ -6470,6 +6483,12 @@ function FeedRow({
         ) : null}
         {post.media_url && post.type === "post" && post.media_kind === "image" ? (
           <div
+            onClick={() => {
+              if (!showComments) setShowComments(true);
+            }}
+            role="button"
+            tabIndex={0}
+            aria-label="Open comments"
             style={{
               marginTop: 10,
               borderRadius: 12,
@@ -6477,6 +6496,7 @@ function FeedRow({
               border: "1px solid rgba(28,28,30,0.06)",
               paddingTop: "56%",
               background: `url(${post.media_url}) center/cover`,
+              cursor: "pointer",
             }}
           />
         ) : null}
