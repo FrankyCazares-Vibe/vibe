@@ -89,6 +89,15 @@ export function ResumeViewerMobile({ url, type, name, bars, onClose }: Props) {
   // capture the gesture, preventDefault to suppress scrolling, and drive
   // a CSS variable on the page stack. The variable scales each page
   // wrapper's max-width — bars positioned as % of the wrap scale with it.
+  //
+  // Also wires double-tap to toggle between 1× and 2× — same gesture
+  // iOS Photos uses, gives users a quick "fit / fill" alternative to
+  // pinching.
+  const lastTapRef = useRef<{ t: number; x: number; y: number }>({
+    t: 0,
+    x: 0,
+    y: 0,
+  });
   useEffect(() => {
     const el = scrollRef.current;
     if (!el) return;
@@ -101,6 +110,23 @@ export function ResumeViewerMobile({ url, type, name, bars, onClose }: Props) {
           baseDist: dist(e.touches[0]!, e.touches[1]!),
           baseZoom: zoom,
         };
+        return;
+      }
+      // Single-tap path — record for double-tap detection.
+      if (e.touches.length === 1) {
+        const t = e.touches[0]!;
+        const now = Date.now();
+        const prev = lastTapRef.current;
+        const dt = now - prev.t;
+        const dx = Math.abs(t.clientX - prev.x);
+        const dy = Math.abs(t.clientY - prev.y);
+        if (dt < 320 && dx < 30 && dy < 30) {
+          // Double tap → toggle zoom. 1 → 2, anything else → 1.
+          setZoom((z) => (z > 1.05 ? 1 : 2));
+          lastTapRef.current = { t: 0, x: 0, y: 0 };
+        } else {
+          lastTapRef.current = { t: now, x: t.clientX, y: t.clientY };
+        }
       }
     };
     const onMove = (e: TouchEvent) => {
@@ -215,6 +241,37 @@ export function ResumeViewerMobile({ url, type, name, bars, onClose }: Props) {
           Open
         </a>
       </header>
+
+      {/* Zoom reset pill — only visible when the user has zoomed past
+          1×. Pinch ↔ this button are the two ways back to fit-to-width. */}
+      {zoom > 1.02 ? (
+        <button
+          type="button"
+          onClick={() => setZoom(1)}
+          aria-label="Reset zoom"
+          style={{
+            position: "absolute",
+            top: "calc(env(safe-area-inset-top, 0px) + 56px)",
+            right: 14,
+            zIndex: 2,
+            padding: "6px 12px",
+            borderRadius: 999,
+            border: "1px solid rgba(255,255,255,0.22)",
+            background: "rgba(20,18,16,0.78)",
+            color: "#fff",
+            fontFamily: "DM Sans, sans-serif",
+            fontSize: 12,
+            fontWeight: 700,
+            cursor: "pointer",
+            backdropFilter: "blur(10px)",
+            WebkitBackdropFilter: "blur(10px)",
+            boxShadow: "0 6px 18px rgba(0,0,0,0.45)",
+            WebkitTapHighlightColor: "transparent",
+          }}
+        >
+          {Math.round(zoom * 100)}% · Reset
+        </button>
+      ) : null}
 
       {/* Scroll area with stacked pages. When the user pinches past 1x
           the pages widen past the viewport, so overflowX flips to auto
