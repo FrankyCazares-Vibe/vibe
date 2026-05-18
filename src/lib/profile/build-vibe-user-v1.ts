@@ -128,6 +128,10 @@ export function buildVibeUserV1FromProfile(
 
   const we = workExperienceForVibeHtml(profile.work_experience);
   if (we.length) u.workExperience = we;
+  // Flag the manual-order override for both viewports. profile.html
+  // reads `_workOrderManual` (with underscore); mobile reads it via
+  // the camelCase key on the user object.
+  if (profile.work_order_manual) u._workOrderManual = true;
 
   // "Working on" — pre-existing localStorage key on profile.html
   // (`user.currentlyOn`), now backed by users.current_on. Emitted as

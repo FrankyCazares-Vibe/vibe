@@ -76,6 +76,11 @@ type VibeUser = {
   vibeTags?: VibeTag[];
   studentVerification?: StudentVerification;
   workExperience?: WorkExp[];
+  /** Set by build-vibe-user-v1 when users.work_order_manual is true.
+   *  Tells the UI to preserve the stored array order instead of
+   *  auto-sorting by parsed end date. Mirrors the localStorage flag
+   *  profile.html already uses. */
+  _workOrderManual?: boolean;
   resumePortfolio?: ResumeItem[];
   /** "Currently working on" items — short text/icon pairs the user
    *  enters in their profile editor. Persisted to Supabase as
@@ -802,12 +807,13 @@ export function ProfileMobile({ targetHandle }: Props = {}) {
     .map((t) => t?.label)
     .filter((s): s is string => !!s)
     .slice(0, 6);
-  // Sort by parsed end date descending — most recent / current role
-  // floats to the top. Falls back to array order for ties so the
-  // display is deterministic when dates are ambiguous.
-  const workExperience = sortWorkExperienceByRecency(
-    user.workExperience ?? [],
-  ).slice(0, 4);
+  // When the user has manually re-ordered their work experience via
+  // the editor (work_order_manual = true), preserve that order exactly.
+  // Otherwise auto-sort by parsed end date descending so the most
+  // recent / current role floats to the top.
+  const workExperience = user._workOrderManual
+    ? (user.workExperience ?? []).slice()
+    : sortWorkExperienceByRecency(user.workExperience ?? []);
   const counts = user.counts ?? {};
   const followers = String(counts.followers ?? "0");
   const connections = String(counts.connections ?? "0");
@@ -1531,9 +1537,13 @@ export function ProfileMobile({ targetHandle }: Props = {}) {
       {editingPortfolio === "experience" && user ? (
         <ExperienceEditSheet
           initial={user.workExperience ?? []}
+          initialManualOrder={!!user._workOrderManual}
           onClose={() => setEditingPortfolio(null)}
-          onSave={async (items) => {
-            const ok = await savePortfolioPatch({ work_experience: items });
+          onSave={async (items, manualOrder) => {
+            const ok = await savePortfolioPatch({
+              work_experience: items,
+              work_order_manual: manualOrder,
+            });
             if (ok) setEditingPortfolio(null);
             return ok;
           }}
@@ -2980,16 +2990,24 @@ function SubsectionEmpty({ body }: { body: string }) {
  *  through /api/me/profile-sync via the parent's onSave callback. */
 function ExperienceEditSheet({
   initial,
+  initialManualOrder,
   onClose,
   onSave,
 }: {
   initial: WorkExp[];
+  /** Carries the current `users.work_order_manual` so we don't flip it
+   *  on first save if the user only edited a field (not the order). */
+  initialManualOrder: boolean;
   onClose: () => void;
-  onSave: (items: WorkExp[]) => Promise<boolean>;
+  onSave: (items: WorkExp[], manualOrder: boolean) => Promise<boolean>;
 }) {
   const [items, setItems] = useState<WorkExp[]>(() =>
     initial.map((w) => ({ ...w })),
   );
+  // Flips to true the moment the user drags / arrows a row. Once true
+  // we send work_order_manual=true so subsequent server-side sorts
+  // don't undo their order on the next render.
+  const [orderTouched, setOrderTouched] = useState(false);
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
@@ -3005,6 +3023,16 @@ function ExperienceEditSheet({
       { title: "", company: "", dates: "", location: "", description: "" },
     ]);
   };
+  const move = (i: number, dir: -1 | 1) => {
+    setItems((prev) => {
+      const j = i + dir;
+      if (j < 0 || j >= prev.length) return prev;
+      const next = prev.slice();
+      [next[i], next[j]] = [next[j]!, next[i]!];
+      return next;
+    });
+    setOrderTouched(true);
+  };
 
   const handleSave = async () => {
     if (saving) return;
@@ -3016,7 +3044,10 @@ function ExperienceEditSheet({
       const fields = [w.title, w.company, w.dates, w.location, w.description];
       return fields.some((f) => (f ?? "").trim().length > 0);
     });
-    const ok = await onSave(cleaned);
+    // Preserve the existing manual-order flag unless the user explicitly
+    // reordered this session. (orderTouched OR they already had it on.)
+    const manualOrder = initialManualOrder || orderTouched;
+    const ok = await onSave(cleaned, manualOrder);
     if (!ok) {
       setError("Couldn't save — try again.");
       setSaving(false);
@@ -3055,6 +3086,8 @@ function ExperienceEditSheet({
               w={w}
               onChange={(patch) => update(i, patch)}
               onRemove={() => remove(i)}
+              onMoveUp={i > 0 ? () => move(i, -1) : undefined}
+              onMoveDown={i < items.length - 1 ? () => move(i, +1) : undefined}
               index={i}
             />
           ))
@@ -3100,11 +3133,17 @@ function ExperienceCard({
   w,
   onChange,
   onRemove,
+  onMoveUp,
+  onMoveDown,
   index,
 }: {
   w: WorkExp;
   onChange: (patch: Partial<WorkExp>) => void;
   onRemove: () => void;
+  /** undefined when the card is already at the top edge. */
+  onMoveUp?: () => void;
+  /** undefined when the card is already at the bottom edge. */
+  onMoveDown?: () => void;
   index: number;
 }) {
   return (
@@ -3141,25 +3180,39 @@ function ExperienceCard({
         >
           Role {index + 1}
         </span>
-        <button
-          type="button"
-          onClick={onRemove}
-          aria-label="Remove role"
-          style={{
-            padding: "3px 9px",
-            borderRadius: 999,
-            border: "1px solid rgba(192,57,43,0.22)",
-            background: "rgba(192,57,43,0.06)",
-            color: "#B83A1A",
-            fontFamily: "DM Sans, sans-serif",
-            fontSize: 11,
-            fontWeight: 700,
-            cursor: "pointer",
-            WebkitTapHighlightColor: "transparent",
-          }}
-        >
-          Remove
-        </button>
+        <div style={{ display: "inline-flex", gap: 6 }}>
+          <ReorderButton
+            onClick={onMoveUp}
+            disabled={!onMoveUp}
+            label="Move up"
+            arrow="↑"
+          />
+          <ReorderButton
+            onClick={onMoveDown}
+            disabled={!onMoveDown}
+            label="Move down"
+            arrow="↓"
+          />
+          <button
+            type="button"
+            onClick={onRemove}
+            aria-label="Remove role"
+            style={{
+              padding: "3px 9px",
+              borderRadius: 999,
+              border: "1px solid rgba(192,57,43,0.22)",
+              background: "rgba(192,57,43,0.06)",
+              color: "#B83A1A",
+              fontFamily: "DM Sans, sans-serif",
+              fontSize: 11,
+              fontWeight: 700,
+              cursor: "pointer",
+              WebkitTapHighlightColor: "transparent",
+            }}
+          >
+            Remove
+          </button>
+        </div>
       </div>
       <SheetInput
         label="Title"
@@ -3538,6 +3591,47 @@ function PortfolioEditorShell({
         </Drawer.Content>
       </Drawer.Portal>
     </Drawer.Root>
+  );
+}
+
+/** Up/down arrow button for ExperienceCard reordering. Renders disabled
+ *  (greyed) when the card is at an edge so the user gets visual
+ *  feedback instead of a tap doing nothing. */
+function ReorderButton({
+  onClick,
+  disabled,
+  label,
+  arrow,
+}: {
+  onClick?: () => void;
+  disabled: boolean;
+  label: string;
+  arrow: "↑" | "↓";
+}) {
+  return (
+    <button
+      type="button"
+      onClick={disabled ? undefined : onClick}
+      disabled={disabled}
+      aria-label={label}
+      style={{
+        width: 26,
+        height: 22,
+        padding: 0,
+        borderRadius: 999,
+        border: "1px solid rgba(28,28,30,0.12)",
+        background: disabled ? "rgba(28,28,30,0.04)" : "rgba(255,255,255,0.7)",
+        color: disabled ? "rgba(28,28,30,0.32)" : "#1C1C1E",
+        fontFamily: "DM Sans, sans-serif",
+        fontSize: 13,
+        fontWeight: 800,
+        lineHeight: 1,
+        cursor: disabled ? "default" : "pointer",
+        WebkitTapHighlightColor: "transparent",
+      }}
+    >
+      {arrow}
+    </button>
   );
 }
 

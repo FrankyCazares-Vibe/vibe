@@ -27,6 +27,9 @@ export type ProfileView = {
   skills: string[];
   looking_for: string[];
   work_experience: WorkExperienceRow[];
+  /** When true, preserve the stored array order of work_experience instead of
+   *  auto-sorting by parsed end date. Flipped by drag/up-down reorder editors. */
+  work_order_manual: boolean;
   recruiter_snapshot: Record<string, string>;
   current_on: CurrentOnItem[];
   resume_redactions: RedactionBar[];

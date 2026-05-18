@@ -114,6 +114,17 @@ export async function POST(req: Request) {
     patch.work_experience = sanitizeWorkExperience(body.work_experience);
   }
 
+  // Manual-order override flag. Accepted under either snake_case (the
+  // server-side column) or camelCase (the localStorage key on
+  // profile.html). Stored as a plain boolean column on `users`.
+  if ("work_order_manual" in body || "_workOrderManual" in body) {
+    const raw =
+      "work_order_manual" in body
+        ? body.work_order_manual
+        : (body as Record<string, unknown>)._workOrderManual;
+    patch.work_order_manual = raw === true;
+  }
+
   // "Working on" / "Currently into" items — accepted under either the
   // server-side snake_case key OR the profile.html camelCase key
   // (currentlyOn) so the existing payload builder doesn't have to know
@@ -188,7 +199,7 @@ export async function POST(req: Request) {
   const { data: row, error: selErr } = await supabase
     .from("users")
     .select(
-      "id,email,name,handle,school,school_email,school_verified,year,major,department,bio,tagline,website,headline,location_text,banner_gradient,avatar_url,banner_url,resume_url,interests,skills,looking_for,work_experience,recruiter_snapshot,current_on,resume_redactions",
+      "id,email,name,handle,school,school_email,school_verified,year,major,department,bio,tagline,website,headline,location_text,banner_gradient,avatar_url,banner_url,resume_url,interests,skills,looking_for,work_experience,work_order_manual,recruiter_snapshot,current_on,resume_redactions",
     )
     .eq("id", user.id)
     .single();

@@ -7837,6 +7837,12 @@ function buildProfileSyncPayload() {
     avatar_url: u.avatarPhoto || null,
     resume_url: resumeUrl || null,
     work_experience: Array.isArray(u.workExperience) ? u.workExperience : [],
+    // Cross-device sync for the manual-drag order. profile.html's
+    // setupReorderable handler flips `_workOrderManual` to true on
+    // every drag; passing it through here persists that pin into
+    // users.work_order_manual so mobile + a fresh desktop session
+    // both keep the order.
+    work_order_manual: !!u._workOrderManual,
     recruiter_snapshot: (u.snapshot && typeof u.snapshot === 'object') ? u.snapshot : {},
     // "Working on" — persisted server-side as users.current_on. Payload
     // shape matches the localStorage shape ({icon, text}); the server

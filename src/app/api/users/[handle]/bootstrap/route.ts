@@ -12,7 +12,7 @@ import { createSupabaseServerClient } from "@/lib/supabase/server";
 // pinned_post_id is fetched in a split try/catch below so a column-
 // missing situation (migration deploy lag) can't 404 the whole route.
 const PUBLIC_PROFILE_SELECT =
-  "id,name,handle,school,school_verified,year,major,department,bio,tagline,website,headline,location_text,banner_gradient,avatar_url,banner_url,resume_url,interests,skills,looking_for,work_experience,recruiter_snapshot,current_on,resume_redactions";
+  "id,name,handle,school,school_verified,year,major,department,bio,tagline,website,headline,location_text,banner_gradient,avatar_url,banner_url,resume_url,interests,skills,looking_for,work_experience,work_order_manual,recruiter_snapshot,current_on,resume_redactions";
 
 type RouteContext = { params: Promise<{ handle: string }> };
 

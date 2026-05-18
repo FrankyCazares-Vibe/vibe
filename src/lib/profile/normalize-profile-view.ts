@@ -60,6 +60,7 @@ export function normalizeProfileView(row: Record<string, unknown>): ProfileView 
     skills: strArr(row.skills),
     looking_for: strArr(row.looking_for),
     work_experience: sanitizeWorkExperience(row.work_experience),
+    work_order_manual: row.work_order_manual === true,
     recruiter_snapshot: recruiterSnapshotFromRow(row.recruiter_snapshot),
     current_on: sanitizeCurrentOn(row.current_on),
     resume_redactions: sanitizeResumeRedactions(row.resume_redactions),
