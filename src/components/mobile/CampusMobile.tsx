@@ -2802,9 +2802,20 @@ export function CampusSearchOverlay({ onClose }: { onClose: () => void }) {
   // Filter the viewer's threads by the debounced query — match
   // against group/channel name OR peer name OR peer handle. Cap at 6
   // so the section doesn't dominate the results.
+  //
+  // Drop DMs whose peer is already in the People section — otherwise
+  // searching "alex" surfaces both Alex's profile (People) AND the
+  // existing DM with Alex (Chats), which the user reasonably misreads
+  // as duplicate / picks the wrong one. Group chats + channels stay
+  // in Chats since they're unique to that section.
   const matchedThreads = (() => {
     if (!debounced) return [] as SearchThread[];
     const q = debounced.toLowerCase();
+    const peopleHandles = new Set(
+      users
+        .map((u) => u.handle?.toLowerCase())
+        .filter((h): h is string => !!h),
+    );
     return threads
       .filter((t) => {
         const hay = [
@@ -2814,7 +2825,12 @@ export function CampusSearchOverlay({ onClose }: { onClose: () => void }) {
         ]
           .join(" ")
           .toLowerCase();
-        return hay.includes(q);
+        if (!hay.includes(q)) return false;
+        if (t.type === "dm") {
+          const peerHandle = t.peer?.handle?.toLowerCase();
+          if (peerHandle && peopleHandles.has(peerHandle)) return false;
+        }
+        return true;
       })
       .slice(0, 6);
   })();
@@ -2941,13 +2957,11 @@ export function CampusSearchOverlay({ onClose }: { onClose: () => void }) {
           />
         ) : (
           <>
-            {matchedThreads.length > 0 ? (
-              <SearchSection label="Chats">
-                {matchedThreads.map((t) => (
-                  <SearchThreadRow key={t.id} t={t} onPick={onClose} />
-                ))}
-              </SearchSection>
-            ) : null}
+            {/* People first — typing a person's name almost always
+                means "open their profile", not "open the DM I have
+                with them". Chats follow underneath for the
+                less-common "find a specific group chat by name"
+                case. */}
             {users.length > 0 ? (
               <SearchSection label="People">
                 {users.map((u) => (
@@ -2959,6 +2973,13 @@ export function CampusSearchOverlay({ onClose }: { onClose: () => void }) {
               <SearchSection label="Orgs">
                 {orgs.map((o) => (
                   <SearchOrgRow key={o.id} o={o} onPick={onClose} />
+                ))}
+              </SearchSection>
+            ) : null}
+            {matchedThreads.length > 0 ? (
+              <SearchSection label="Chats">
+                {matchedThreads.map((t) => (
+                  <SearchThreadRow key={t.id} t={t} onPick={onClose} />
                 ))}
               </SearchSection>
             ) : null}
