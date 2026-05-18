@@ -3,6 +3,7 @@
 import Link from "next/link";
 import { useSearchParams } from "next/navigation";
 import { useCallback, useEffect, useRef, useState } from "react";
+import { Drawer } from "vaul";
 
 import { ImageCropperModal } from "@/components/ImageCropperModal";
 import { ClipComposerMobile } from "@/components/mobile/ClipComposerMobile";
@@ -218,6 +219,13 @@ export function ProfileMobile({ targetHandle }: Props = {}) {
   const [error, setError] = useState<string | null>(null);
   const [posts, setPosts] = useState<PostRow[] | null>(null);
   const [tab, setTab] = useState<ProfileTab>("posts");
+  // Which portfolio sub-section the owner is currently editing.
+  // `null` = read-only. Sheets are full-screen vaul drawers.
+  const [editingPortfolio, setEditingPortfolio] = useState<
+    null | "experience" | "current-on"
+  >(null);
+  const resumeInputRef = useRef<HTMLInputElement | null>(null);
+  const [uploadingResume, setUploadingResume] = useState(false);
   // Swipeable tab content. Each pane lives side-by-side in a horizontal
   // scroll-snap container; tapping a tab scrolls programmatically,
   // swiping scrolls naturally and the scroll handler syncs `tab`.
@@ -609,6 +617,76 @@ export function ProfileMobile({ targetHandle }: Props = {}) {
       setUploadingKind(null);
     }
   };
+  /** Generic portfolio-field save. Called by the experience /
+   *  working-on sheets when the user taps Save. POSTs the patch
+   *  to /api/me/profile-sync, re-bootstraps so the local view
+   *  matches what landed in the DB, returns true on success.
+   *  Errors surface via setEditError so the sheet can show them. */
+  const savePortfolioPatch = useCallback(
+    async (patch: Record<string, unknown>): Promise<boolean> => {
+      setEditError(null);
+      try {
+        const r = await fetch("/api/me/profile-sync", {
+          method: "POST",
+          credentials: "include",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify(patch),
+        });
+        const j = await r.json().catch(() => ({}));
+        if (!r.ok || !j?.ok) {
+          throw new Error((j && j.error) ? String(j.error) : `HTTP ${r.status}`);
+        }
+        const rb = await fetch("/api/me/profile-bootstrap", {
+          cache: "no-store",
+          credentials: "include",
+        });
+        const jb = await rb.json().catch(() => ({}));
+        if (rb.ok && jb?.ok && jb.vibeUser) {
+          setUser(jb.vibeUser as VibeUser);
+        }
+        return true;
+      } catch (e) {
+        setEditError(e instanceof Error ? e.message : "Couldn't save");
+        return false;
+      }
+    },
+    [],
+  );
+
+  /** Pick a PDF/image and upload it as the user's resume.
+   *  Mirrors the avatar/banner upload flow but uses a plain file
+   *  input (no crop step) since resumes are docs, not portraits. */
+  const handleResumeUpload = useCallback(
+    async (file: File) => {
+      if (uploadingResume) return;
+      setUploadingResume(true);
+      setEditError(null);
+      try {
+        const form = new FormData();
+        form.set("file", file);
+        form.set("kind", "resume");
+        const upload = await fetch("/api/me/profile-upload", {
+          method: "POST",
+          credentials: "include",
+          body: form,
+        });
+        const uj = await upload.json();
+        if (!upload.ok || !uj?.ok || typeof uj.url !== "string") {
+          throw new Error(uj?.error ?? "Upload failed");
+        }
+        const ok = await savePortfolioPatch({ resume_url: uj.url });
+        if (!ok) throw new Error("Couldn't save resume URL");
+      } catch (e) {
+        setEditError(e instanceof Error ? e.message : "Couldn't upload resume");
+      } finally {
+        setUploadingResume(false);
+        // Clear the input value so picking the same file twice still fires onChange.
+        if (resumeInputRef.current) resumeInputRef.current.value = "";
+      }
+    },
+    [uploadingResume, savePortfolioPatch],
+  );
+
   const cancelEdit = () => {
     setEditMode(false);
     setDraft(null);
@@ -1409,6 +1487,10 @@ export function ProfileMobile({ targetHandle }: Props = {}) {
             onOpenDoc={(r) => setViewerItem(r)}
             isVisitor={isVisitor}
             ownerName={name}
+            onEditExperience={() => setEditingPortfolio("experience")}
+            onEditCurrentOn={() => setEditingPortfolio("current-on")}
+            onPickResume={() => resumeInputRef.current?.click()}
+            uploadingResume={uploadingResume}
           />
         </div>
       </div>
@@ -1422,6 +1504,50 @@ export function ProfileMobile({ targetHandle }: Props = {}) {
           // string), so the bars saved server-side all anchor to it.
           bars={resumeRedactions.filter((b) => b.docIndex === 0)}
           onClose={() => setViewerItem(null)}
+        />
+      ) : null}
+
+      {/* Hidden file input — clicked by the "Upload resume" / "Replace
+          resume" buttons inside the portfolio pane. Accepts PDF + image
+          types (matches the /api/me/profile-upload allow-list for
+          resume). */}
+      {!isVisitor ? (
+        <input
+          ref={resumeInputRef}
+          type="file"
+          accept="application/pdf,image/jpeg,image/png,image/webp"
+          style={{ display: "none" }}
+          onChange={(e) => {
+            const file = e.target.files?.[0];
+            if (file) void handleResumeUpload(file);
+          }}
+        />
+      ) : null}
+
+      {/* Portfolio editor sheets. Each opens as a vaul right-side drawer
+          (full-screen on phone). State carries which one is open, the
+          parent owns the save handler so a successful save refreshes
+          the user object via the existing /api/me/profile-bootstrap. */}
+      {editingPortfolio === "experience" && user ? (
+        <ExperienceEditSheet
+          initial={user.workExperience ?? []}
+          onClose={() => setEditingPortfolio(null)}
+          onSave={async (items) => {
+            const ok = await savePortfolioPatch({ work_experience: items });
+            if (ok) setEditingPortfolio(null);
+            return ok;
+          }}
+        />
+      ) : null}
+      {editingPortfolio === "current-on" && user ? (
+        <WorkingOnEditSheet
+          initial={user.currentlyOn ?? []}
+          onClose={() => setEditingPortfolio(null)}
+          onSave={async (items) => {
+            const ok = await savePortfolioPatch({ current_on: items });
+            if (ok) setEditingPortfolio(null);
+            return ok;
+          }}
         />
       ) : null}
       {openPostId ? (
@@ -2533,6 +2659,10 @@ function PortfolioPane({
   onOpenDoc,
   isVisitor,
   ownerName,
+  onEditExperience,
+  onEditCurrentOn,
+  onPickResume,
+  uploadingResume,
 }: {
   currentProjects: CurrentProject[];
   workExperience: WorkExp[];
@@ -2540,6 +2670,14 @@ function PortfolioPane({
   onOpenDoc: (r: ResumeItem) => void;
   isVisitor: boolean;
   ownerName: string;
+  /** Owner-only — open the experience editor sheet. */
+  onEditExperience?: () => void;
+  /** Owner-only — open the working-on editor sheet. */
+  onEditCurrentOn?: () => void;
+  /** Owner-only — click the hidden resume file input. */
+  onPickResume?: () => void;
+  /** Owner-only — true while a resume upload is in flight. */
+  uploadingResume?: boolean;
 }) {
   const allEmpty =
     currentProjects.length === 0 &&
@@ -2568,7 +2706,14 @@ function PortfolioPane({
           subsections with owner-instruction copy ("Add roles…") would
           be confusing on someone else's profile. */}
       {currentProjects.length > 0 || !isVisitor ? (
-        <PortfolioSubsection title="Working on">
+        <PortfolioSubsection
+          title="Working on"
+          action={
+            !isVisitor && onEditCurrentOn ? (
+              <EditPill onClick={onEditCurrentOn} label="Edit" />
+            ) : null
+          }
+        >
           {currentProjects.length === 0 ? (
             <SubsectionEmpty body="Show what you're building, learning, or planning. Adds context for recruiters and connections." />
           ) : (
@@ -2587,7 +2732,14 @@ function PortfolioPane({
       ) : null}
 
       {workExperience.length > 0 || !isVisitor ? (
-      <PortfolioSubsection title="Experience">
+      <PortfolioSubsection
+        title="Experience"
+        action={
+          !isVisitor && onEditExperience ? (
+            <EditPill onClick={onEditExperience} label="Edit" />
+          ) : null
+        }
+      >
         {workExperience.length === 0 ? (
           <SubsectionEmpty body="Add roles, internships, and side gigs from your profile editor." />
         ) : (
@@ -2636,7 +2788,24 @@ function PortfolioPane({
       ) : null}
 
       {resumePortfolio.length > 0 || !isVisitor ? (
-      <PortfolioSubsection title="Resume">
+      <PortfolioSubsection
+        title="Resume"
+        action={
+          !isVisitor && onPickResume ? (
+            <EditPill
+              onClick={onPickResume}
+              label={
+                uploadingResume
+                  ? "Uploading…"
+                  : resumePortfolio.length === 0
+                    ? "Upload"
+                    : "Replace"
+              }
+              disabled={uploadingResume}
+            />
+          ) : null
+        }
+      >
         {resumePortfolio.length === 0 ? (
           <SubsectionEmpty body="Upload a PDF or portfolio image to give recruiters a quick reference document." />
         ) : (
@@ -2709,26 +2878,76 @@ function PortfolioPane({
 function PortfolioSubsection({
   title,
   children,
+  action,
 }: {
   title: string;
   children: React.ReactNode;
+  /** Optional trailing widget rendered to the right of the title — used
+   *  for owner-only Edit / Upload buttons. */
+  action?: React.ReactNode;
 }) {
   return (
     <div>
       <div
         style={{
-          fontFamily: "Fraunces, serif",
-          fontSize: 14,
-          fontWeight: 800,
-          letterSpacing: "-0.2px",
+          display: "flex",
+          alignItems: "center",
+          justifyContent: "space-between",
+          gap: 8,
           marginBottom: 10,
-          color: "#1C1C1E",
         }}
       >
-        {title}
+        <div
+          style={{
+            fontFamily: "Fraunces, serif",
+            fontSize: 14,
+            fontWeight: 800,
+            letterSpacing: "-0.2px",
+            color: "#1C1C1E",
+          }}
+        >
+          {title}
+        </div>
+        {action}
       </div>
       {children}
     </div>
+  );
+}
+
+/** Owner-only pill button rendered to the right of each portfolio
+ *  subsection title. Opens the relevant editor sheet (or fires a file
+ *  picker for resume). */
+function EditPill({
+  onClick,
+  label,
+  disabled = false,
+}: {
+  onClick: () => void;
+  label: string;
+  disabled?: boolean;
+}) {
+  return (
+    <button
+      type="button"
+      onClick={onClick}
+      disabled={disabled}
+      style={{
+        padding: "4px 10px",
+        borderRadius: 999,
+        border: "1px solid rgba(28,28,30,0.12)",
+        background: disabled ? "rgba(28,28,30,0.05)" : "rgba(255,255,255,0.7)",
+        color: "#1C1C1E",
+        fontFamily: "DM Sans, sans-serif",
+        fontSize: 11.5,
+        fontWeight: 700,
+        cursor: disabled ? "default" : "pointer",
+        WebkitTapHighlightColor: "transparent",
+        opacity: disabled ? 0.65 : 1,
+      }}
+    >
+      {label}
+    </button>
   );
 }
 
@@ -2748,6 +2967,671 @@ function SubsectionEmpty({ body }: { body: string }) {
     >
       {body}
     </p>
+  );
+}
+
+// ---------------------------------------------------------------------------
+// Portfolio editor sheets
+// ---------------------------------------------------------------------------
+
+/** Full-screen vaul drawer (slides in from the right) for editing the
+ *  Experience subsection. Each row is a card with the six WorkExp
+ *  fields; add/remove inline; one Save round-trips the whole array
+ *  through /api/me/profile-sync via the parent's onSave callback. */
+function ExperienceEditSheet({
+  initial,
+  onClose,
+  onSave,
+}: {
+  initial: WorkExp[];
+  onClose: () => void;
+  onSave: (items: WorkExp[]) => Promise<boolean>;
+}) {
+  const [items, setItems] = useState<WorkExp[]>(() =>
+    initial.map((w) => ({ ...w })),
+  );
+  const [saving, setSaving] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+
+  const update = (i: number, patch: Partial<WorkExp>) => {
+    setItems((prev) => prev.map((w, j) => (j === i ? { ...w, ...patch } : w)));
+  };
+  const remove = (i: number) => {
+    setItems((prev) => prev.filter((_, j) => j !== i));
+  };
+  const add = () => {
+    setItems((prev) => [
+      ...prev,
+      { title: "", company: "", dates: "", location: "", description: "" },
+    ]);
+  };
+
+  const handleSave = async () => {
+    if (saving) return;
+    setSaving(true);
+    setError(null);
+    // Drop rows that are completely empty so a stray "+ Add" doesn't
+    // persist an empty entry.
+    const cleaned = items.filter((w) => {
+      const fields = [w.title, w.company, w.dates, w.location, w.description];
+      return fields.some((f) => (f ?? "").trim().length > 0);
+    });
+    const ok = await onSave(cleaned);
+    if (!ok) {
+      setError("Couldn't save — try again.");
+      setSaving(false);
+    }
+    // On success, parent closes the sheet — no need to setSaving(false).
+  };
+
+  return (
+    <PortfolioEditorShell
+      title="Edit experience"
+      onClose={onClose}
+      onSave={handleSave}
+      saving={saving}
+      error={error}
+    >
+      <div style={{ display: "flex", flexDirection: "column", gap: 14 }}>
+        {items.length === 0 ? (
+          <div
+            style={{
+              padding: "16px",
+              borderRadius: 12,
+              background: "rgba(255,253,248,0.7)",
+              border: "1px dashed rgba(28,28,30,0.12)",
+              color: "#8A8580",
+              fontFamily: "DM Sans, sans-serif",
+              fontSize: 13.5,
+              textAlign: "center",
+            }}
+          >
+            No experience added yet. Tap &ldquo;Add role&rdquo; below to start.
+          </div>
+        ) : (
+          items.map((w, i) => (
+            <ExperienceCard
+              key={i}
+              w={w}
+              onChange={(patch) => update(i, patch)}
+              onRemove={() => remove(i)}
+              index={i}
+            />
+          ))
+        )}
+
+        <button
+          type="button"
+          onClick={add}
+          disabled={items.length >= 15}
+          style={{
+            padding: "12px",
+            borderRadius: 14,
+            border: "1px dashed rgba(28,28,30,0.22)",
+            background: "rgba(255,255,255,0.4)",
+            color: "#1C1C1E",
+            fontFamily: "DM Sans, sans-serif",
+            fontSize: 14,
+            fontWeight: 700,
+            cursor: items.length >= 15 ? "default" : "pointer",
+            opacity: items.length >= 15 ? 0.5 : 1,
+            WebkitTapHighlightColor: "transparent",
+          }}
+        >
+          + Add role
+        </button>
+        {items.length >= 15 ? (
+          <div
+            style={{
+              fontSize: 11.5,
+              color: "#8A8580",
+              textAlign: "center",
+            }}
+          >
+            Maximum of 15 roles.
+          </div>
+        ) : null}
+      </div>
+    </PortfolioEditorShell>
+  );
+}
+
+function ExperienceCard({
+  w,
+  onChange,
+  onRemove,
+  index,
+}: {
+  w: WorkExp;
+  onChange: (patch: Partial<WorkExp>) => void;
+  onRemove: () => void;
+  index: number;
+}) {
+  return (
+    <div
+      style={{
+        padding: 12,
+        borderRadius: 14,
+        background: "rgba(255,253,248,0.92)",
+        border: "1px solid rgba(28,28,30,0.06)",
+        boxShadow: "inset 0 1px 0 rgba(255,255,255,0.7)",
+        display: "flex",
+        flexDirection: "column",
+        gap: 8,
+      }}
+    >
+      <div
+        style={{
+          display: "flex",
+          alignItems: "center",
+          justifyContent: "space-between",
+          gap: 8,
+          marginBottom: 2,
+        }}
+      >
+        <span
+          style={{
+            fontFamily: "DM Sans, sans-serif",
+            fontSize: 10.5,
+            fontWeight: 800,
+            letterSpacing: "0.12em",
+            textTransform: "uppercase",
+            color: "#8A8580",
+          }}
+        >
+          Role {index + 1}
+        </span>
+        <button
+          type="button"
+          onClick={onRemove}
+          aria-label="Remove role"
+          style={{
+            padding: "3px 9px",
+            borderRadius: 999,
+            border: "1px solid rgba(192,57,43,0.22)",
+            background: "rgba(192,57,43,0.06)",
+            color: "#B83A1A",
+            fontFamily: "DM Sans, sans-serif",
+            fontSize: 11,
+            fontWeight: 700,
+            cursor: "pointer",
+            WebkitTapHighlightColor: "transparent",
+          }}
+        >
+          Remove
+        </button>
+      </div>
+      <SheetInput
+        label="Title"
+        value={w.title ?? ""}
+        onChange={(v) => onChange({ title: v })}
+        placeholder="Software Engineering Intern"
+      />
+      <SheetInput
+        label="Company"
+        value={w.company ?? ""}
+        onChange={(v) => onChange({ company: v })}
+        placeholder="Acme Corp"
+      />
+      <SheetInput
+        label="Dates"
+        value={w.dates ?? ""}
+        onChange={(v) => onChange({ dates: v })}
+        placeholder="Jun 2024 – Aug 2024"
+      />
+      <SheetInput
+        label="Location"
+        value={w.location ?? ""}
+        onChange={(v) => onChange({ location: v })}
+        placeholder="Indianapolis, IN"
+      />
+      <SheetTextarea
+        label="Description"
+        value={w.description ?? ""}
+        onChange={(v) => onChange({ description: v })}
+        placeholder="What you did, what you shipped, what you learned…"
+        rows={3}
+      />
+      <SheetInput
+        label="Logo URL (optional)"
+        value={w.logoUrl ?? ""}
+        onChange={(v) => onChange({ logoUrl: v })}
+        placeholder="https://…/logo.png"
+      />
+    </div>
+  );
+}
+
+/** Full-screen editor for the Working-on subsection — a list of small
+ *  rows with just an icon + text input. Same shell as experience. */
+function WorkingOnEditSheet({
+  initial,
+  onClose,
+  onSave,
+}: {
+  initial: CurrentProject[];
+  onClose: () => void;
+  onSave: (items: CurrentProject[]) => Promise<boolean>;
+}) {
+  const [items, setItems] = useState<CurrentProject[]>(() =>
+    initial.map((p) => ({ ...p })),
+  );
+  const [saving, setSaving] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+
+  const update = (i: number, patch: Partial<CurrentProject>) => {
+    setItems((prev) => prev.map((p, j) => (j === i ? { ...p, ...patch } : p)));
+  };
+  const remove = (i: number) => {
+    setItems((prev) => prev.filter((_, j) => j !== i));
+  };
+  const add = () => {
+    setItems((prev) => [...prev, { icon: "✦", text: "" }]);
+  };
+
+  const handleSave = async () => {
+    if (saving) return;
+    setSaving(true);
+    setError(null);
+    const cleaned = items.filter((p) => (p.text ?? "").trim().length > 0);
+    const ok = await onSave(cleaned);
+    if (!ok) {
+      setError("Couldn't save — try again.");
+      setSaving(false);
+    }
+  };
+
+  return (
+    <PortfolioEditorShell
+      title="Working on"
+      onClose={onClose}
+      onSave={handleSave}
+      saving={saving}
+      error={error}
+    >
+      <div style={{ display: "flex", flexDirection: "column", gap: 10 }}>
+        {items.length === 0 ? (
+          <div
+            style={{
+              padding: "16px",
+              borderRadius: 12,
+              background: "rgba(255,253,248,0.7)",
+              border: "1px dashed rgba(28,28,30,0.12)",
+              color: "#8A8580",
+              fontFamily: "DM Sans, sans-serif",
+              fontSize: 13.5,
+              textAlign: "center",
+            }}
+          >
+            Add what you&apos;re building or learning right now.
+          </div>
+        ) : (
+          items.map((p, i) => (
+            <div
+              key={i}
+              style={{
+                display: "flex",
+                alignItems: "center",
+                gap: 8,
+                padding: 8,
+                borderRadius: 12,
+                background: "rgba(255,253,248,0.92)",
+                border: "1px solid rgba(28,28,30,0.06)",
+              }}
+            >
+              <input
+                type="text"
+                value={p.icon ?? ""}
+                onChange={(e) => update(i, { icon: e.target.value })}
+                placeholder="✦"
+                maxLength={12}
+                style={{
+                  width: 44,
+                  textAlign: "center",
+                  padding: "8px 4px",
+                  borderRadius: 8,
+                  border: "1px solid rgba(28,28,30,0.10)",
+                  background: "#fff",
+                  fontSize: 18,
+                  outline: "none",
+                  flexShrink: 0,
+                }}
+              />
+              <input
+                type="text"
+                value={p.text ?? ""}
+                onChange={(e) => update(i, { text: e.target.value })}
+                placeholder="Building a campus social network"
+                maxLength={160}
+                style={{
+                  flex: 1,
+                  minWidth: 0,
+                  padding: "8px 10px",
+                  borderRadius: 8,
+                  border: "1px solid rgba(28,28,30,0.10)",
+                  background: "#fff",
+                  fontFamily: "DM Sans, sans-serif",
+                  fontSize: 14,
+                  outline: "none",
+                }}
+              />
+              <button
+                type="button"
+                onClick={() => remove(i)}
+                aria-label="Remove"
+                style={{
+                  width: 30,
+                  height: 30,
+                  borderRadius: 999,
+                  border: "1px solid rgba(192,57,43,0.22)",
+                  background: "rgba(192,57,43,0.06)",
+                  color: "#B83A1A",
+                  cursor: "pointer",
+                  flexShrink: 0,
+                  fontSize: 16,
+                  lineHeight: 1,
+                  WebkitTapHighlightColor: "transparent",
+                }}
+              >
+                ×
+              </button>
+            </div>
+          ))
+        )}
+
+        <button
+          type="button"
+          onClick={add}
+          disabled={items.length >= 10}
+          style={{
+            padding: "10px",
+            borderRadius: 12,
+            border: "1px dashed rgba(28,28,30,0.22)",
+            background: "rgba(255,255,255,0.4)",
+            color: "#1C1C1E",
+            fontFamily: "DM Sans, sans-serif",
+            fontSize: 14,
+            fontWeight: 700,
+            cursor: items.length >= 10 ? "default" : "pointer",
+            opacity: items.length >= 10 ? 0.5 : 1,
+            WebkitTapHighlightColor: "transparent",
+          }}
+        >
+          + Add item
+        </button>
+        {items.length >= 10 ? (
+          <div
+            style={{
+              fontSize: 11.5,
+              color: "#8A8580",
+              textAlign: "center",
+            }}
+          >
+            Maximum of 10 items.
+          </div>
+        ) : null}
+      </div>
+    </PortfolioEditorShell>
+  );
+}
+
+/** Shared chrome for portfolio editor sheets — vaul drawer with a
+ *  cancel/save top bar and a scrolling body. Avoids reimplementing
+ *  the shell in each editor. */
+function PortfolioEditorShell({
+  title,
+  onClose,
+  onSave,
+  saving,
+  error,
+  children,
+}: {
+  title: string;
+  onClose: () => void;
+  onSave: () => void;
+  saving: boolean;
+  error: string | null;
+  children: React.ReactNode;
+}) {
+  return (
+    <Drawer.Root
+      open
+      direction="right"
+      onOpenChange={(o) => {
+        if (!o) onClose();
+      }}
+    >
+      <Drawer.Portal>
+        <Drawer.Overlay
+          style={{
+            position: "fixed",
+            inset: 0,
+            background: "rgba(0,0,0,0.42)",
+            zIndex: 1200,
+          }}
+        />
+        <Drawer.Content
+          aria-describedby={undefined}
+          style={{
+            position: "fixed",
+            top: 0,
+            right: 0,
+            bottom: 0,
+            width: "100%",
+            background: "#FAF7F2",
+            display: "flex",
+            flexDirection: "column",
+            zIndex: 1201,
+            outline: "none",
+          }}
+        >
+          <Drawer.Title
+            style={{
+              position: "absolute",
+              width: 1,
+              height: 1,
+              padding: 0,
+              margin: -1,
+              overflow: "hidden",
+              clip: "rect(0,0,0,0)",
+              whiteSpace: "nowrap",
+              border: 0,
+            }}
+          >
+            {title}
+          </Drawer.Title>
+
+          <header
+            style={{
+              display: "flex",
+              alignItems: "center",
+              justifyContent: "space-between",
+              gap: 10,
+              padding:
+                "calc(env(safe-area-inset-top, 0px) + 10px) 14px 10px",
+              background: "rgba(250, 247, 242, 0.92)",
+              backdropFilter: "blur(12px)",
+              WebkitBackdropFilter: "blur(12px)",
+              borderBottom: "1px solid rgba(28,28,30,0.06)",
+              flexShrink: 0,
+            }}
+          >
+            <button
+              type="button"
+              onClick={onClose}
+              disabled={saving}
+              style={{
+                padding: "6px 12px",
+                borderRadius: 999,
+                border: "1px solid rgba(28,28,30,0.10)",
+                background: "rgba(255,255,255,0.7)",
+                color: "#1C1C1E",
+                fontFamily: "DM Sans, sans-serif",
+                fontSize: 13,
+                fontWeight: 600,
+                cursor: saving ? "default" : "pointer",
+                opacity: saving ? 0.5 : 1,
+              }}
+            >
+              Cancel
+            </button>
+            <span
+              style={{
+                fontFamily: "Fraunces, serif",
+                fontSize: 16,
+                fontWeight: 800,
+                color: "#1C1C1E",
+              }}
+            >
+              {title}
+            </span>
+            <button
+              type="button"
+              onClick={onSave}
+              disabled={saving}
+              style={{
+                padding: "6px 14px",
+                borderRadius: 999,
+                border: "none",
+                background: saving ? "rgba(28,28,30,0.25)" : "#FF5C35",
+                color: "#fff",
+                fontFamily: "DM Sans, sans-serif",
+                fontSize: 13,
+                fontWeight: 800,
+                cursor: saving ? "default" : "pointer",
+                WebkitTapHighlightColor: "transparent",
+              }}
+            >
+              {saving ? "Saving…" : "Save"}
+            </button>
+          </header>
+
+          {error ? (
+            <div
+              role="alert"
+              style={{
+                margin: "10px 14px 0",
+                padding: "10px 12px",
+                borderRadius: 12,
+                background: "rgba(192,57,43,0.08)",
+                border: "1px solid rgba(192,57,43,0.22)",
+                color: "#B83A1A",
+                fontFamily: "DM Sans, sans-serif",
+                fontSize: 12.5,
+                fontWeight: 600,
+              }}
+            >
+              {error}
+            </div>
+          ) : null}
+
+          <div
+            style={{
+              flex: 1,
+              overflowY: "auto",
+              WebkitOverflowScrolling: "touch",
+              padding: "14px 14px calc(20px + env(safe-area-inset-bottom, 0px))",
+            }}
+          >
+            {children}
+          </div>
+        </Drawer.Content>
+      </Drawer.Portal>
+    </Drawer.Root>
+  );
+}
+
+function SheetInput({
+  label,
+  value,
+  onChange,
+  placeholder,
+}: {
+  label: string;
+  value: string;
+  onChange: (v: string) => void;
+  placeholder?: string;
+}) {
+  return (
+    <label style={{ display: "flex", flexDirection: "column", gap: 4 }}>
+      <span
+        style={{
+          fontFamily: "DM Sans, sans-serif",
+          fontSize: 11,
+          fontWeight: 700,
+          letterSpacing: "0.06em",
+          textTransform: "uppercase",
+          color: "#8A8580",
+        }}
+      >
+        {label}
+      </span>
+      <input
+        type="text"
+        value={value}
+        onChange={(e) => onChange(e.target.value)}
+        placeholder={placeholder}
+        style={{
+          padding: "8px 10px",
+          borderRadius: 8,
+          border: "1px solid rgba(28,28,30,0.10)",
+          background: "#fff",
+          fontFamily: "DM Sans, sans-serif",
+          fontSize: 14,
+          color: "#1C1C1E",
+          outline: "none",
+        }}
+      />
+    </label>
+  );
+}
+
+function SheetTextarea({
+  label,
+  value,
+  onChange,
+  placeholder,
+  rows = 3,
+}: {
+  label: string;
+  value: string;
+  onChange: (v: string) => void;
+  placeholder?: string;
+  rows?: number;
+}) {
+  return (
+    <label style={{ display: "flex", flexDirection: "column", gap: 4 }}>
+      <span
+        style={{
+          fontFamily: "DM Sans, sans-serif",
+          fontSize: 11,
+          fontWeight: 700,
+          letterSpacing: "0.06em",
+          textTransform: "uppercase",
+          color: "#8A8580",
+        }}
+      >
+        {label}
+      </span>
+      <textarea
+        value={value}
+        onChange={(e) => onChange(e.target.value)}
+        placeholder={placeholder}
+        rows={rows}
+        style={{
+          padding: "8px 10px",
+          borderRadius: 8,
+          border: "1px solid rgba(28,28,30,0.10)",
+          background: "#fff",
+          fontFamily: "DM Sans, sans-serif",
+          fontSize: 14,
+          color: "#1C1C1E",
+          outline: "none",
+          resize: "vertical",
+          lineHeight: 1.5,
+        }}
+      />
+    </label>
   );
 }
 
