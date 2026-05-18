@@ -801,9 +801,10 @@ function NotifRowView({ n, onClose }: { n: NotifRow; onClose: () => void }) {
   //      the actor's profile (for bare follow / connection rows).
   //
   // Post-bound notifs (like / comment / mention) route to
-  // /campus?post=<id> — the campus feed picks the param up, scrolls
-  // to that FeedRow, and highlights it. Mention-in-chat still goes
-  // to /messages.
+  // /posts/<id> — the dedicated post page opens the viewer with
+  // comments already expanded, works for posts of any age (the old
+  // /campus?post= deep link silently failed for posts outside the
+  // 50-row feed window). Mention-in-chat still goes to /messages.
   const openActor = () => {
     if (!a?.handle) return;
     window.location.href = `/profile/${encodeURIComponent(a.handle)}`;
@@ -819,7 +820,7 @@ function NotifRowView({ n, onClose }: { n: NotifRow; onClose: () => void }) {
       (n.type === "like" || n.type === "comment" || n.type === "mention") &&
       n.post?.id
     ) {
-      window.location.href = `/campus?post=${encodeURIComponent(n.post.id)}`;
+      window.location.href = `/posts/${encodeURIComponent(n.post.id)}`;
       onClose();
       return;
     }

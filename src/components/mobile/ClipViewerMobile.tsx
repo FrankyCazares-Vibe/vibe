@@ -143,7 +143,7 @@ export function ClipViewerMobile({
   };
   const share = async () => {
     try {
-      const url = `${window.location.origin}/campus?post=${encodeURIComponent(clipId)}`;
+      const url = `${window.location.origin}/posts/${encodeURIComponent(clipId)}`;
       if (navigator.share) {
         await navigator.share({ url, title: "Vibe clip" });
       } else if (navigator.clipboard) {
@@ -471,10 +471,11 @@ export function ClipViewerMobile({
           icon={<ChatIcon />}
           count={comments}
           // No mobile comments drawer for clips in v1 — tap routes to
-          // /campus?post=<id>, where the full post viewer can host the
-          // comments UX without crowding the vertical canvas.
+          // /posts/<id>, where the full post viewer mounts with the
+          // comments drawer already expanded (no need to crowd the
+          // vertical clip canvas with a second drawer).
           onTap={() => {
-            window.location.href = `/campus?post=${encodeURIComponent(clipId)}`;
+            window.location.href = `/posts/${encodeURIComponent(clipId)}`;
           }}
         />
         <SideAction

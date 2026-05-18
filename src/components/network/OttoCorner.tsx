@@ -574,7 +574,7 @@ export function OttoCorner() {
         <div style={{ display: "flex", gap: 8 }}>
           {toast.postId ? (
             <a
-              href={`/campus?post=${encodeURIComponent(toast.postId)}`}
+              href={`/posts/${encodeURIComponent(toast.postId)}`}
               onClick={() => setToast(null)}
               style={{
                 flex: 1,
