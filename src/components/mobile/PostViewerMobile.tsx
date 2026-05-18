@@ -224,7 +224,7 @@ export function PostViewerMobile({
   };
   const share = async () => {
     try {
-      const url = `${window.location.origin}/campus?post=${encodeURIComponent(postId)}`;
+      const url = `${window.location.origin}/posts/${encodeURIComponent(postId)}`;
       if (navigator.share) {
         await navigator.share({
           url,
@@ -483,7 +483,7 @@ export function PostViewerMobile({
                   onClick={async () => {
                     setMenuOpen(false);
                     try {
-                      const url = `${window.location.origin}/campus?post=${encodeURIComponent(postId)}`;
+                      const url = `${window.location.origin}/posts/${encodeURIComponent(postId)}`;
                       await navigator.clipboard.writeText(url);
                     } catch {
                       /* clipboard may be blocked — silent */

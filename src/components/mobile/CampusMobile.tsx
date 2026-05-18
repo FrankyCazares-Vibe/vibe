@@ -84,6 +84,38 @@ export function CampusMobile() {
   // pre-fetched threads list yet.
   const searchParams = useSearchParams();
   const initialChannelId = searchParams.get("channel") || null;
+  // ?post=<id> / ?clip=<id> deep links — used by Copy Link share
+  // targets + Otto mention notifications. Mobile opens the viewer
+  // directly (vs desktop which scrolls + flashes the feed row).
+  // Stripped from the URL after handling so a refresh doesn't keep
+  // re-opening the viewer.
+  const initialPostId = searchParams.get("post") || null;
+  const initialClipId = searchParams.get("clip") || null;
+  useEffect(() => {
+    if (initialPostId) {
+      setOpenPostId(initialPostId);
+      setTab("feed");
+    } else if (initialClipId) {
+      setOpenClipId(initialClipId);
+      setTab("feed");
+    }
+    if (initialPostId || initialClipId) {
+      try {
+        const p = new URLSearchParams(window.location.search);
+        p.delete("post");
+        p.delete("clip");
+        const next = p.toString();
+        window.history.replaceState(
+          {},
+          "",
+          next ? `${window.location.pathname}?${next}` : window.location.pathname,
+        );
+      } catch {
+        /* ignore */
+      }
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
   // Discord-style drill-down state: tapping an org opens its channels
   // drawer, tapping a channel inside that drawer opens the conversation.
   // openChannel carries the channel info so ConversationView's top bar
@@ -2302,7 +2334,11 @@ function PostActionsSheet({
 
   const copyLink = useCallback(async () => {
     try {
-      const url = `${window.location.origin}/campus?post=${encodeURIComponent(postId)}`;
+      // Share-link target now points at the dedicated /posts/[id] page
+      // so the recipient lands on a real OG-rendering URL instead of
+      // /campus's deep-link-and-scroll fallback (which silently fails
+      // when the post is older than the 50-row feed window).
+      const url = `${window.location.origin}/posts/${encodeURIComponent(postId)}`;
       await navigator.clipboard.writeText(url);
       setToast("Link copied.");
       setTimeout(onClose, 700);

@@ -6227,7 +6227,11 @@ function FeedRow({
               onClick={async () => {
                 setShowMoreMenu(false);
                 try {
-                  const url = `${window.location.origin}/campus?post=${encodeURIComponent(post.id)}`;
+                  // Share-link target now points at /posts/[id] (OG meta
+                  // + 404-safe + works for older posts outside the
+                  // 50-row feed window). /campus?post= deep link still
+                  // works as a fallback for inbound links.
+                  const url = `${window.location.origin}/posts/${encodeURIComponent(post.id)}`;
                   await navigator.clipboard.writeText(url);
                 } catch {
                   /* silent */
