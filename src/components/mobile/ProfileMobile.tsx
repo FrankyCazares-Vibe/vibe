@@ -264,7 +264,11 @@ export function ProfileMobile({ targetHandle }: Props = {}) {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [tab]);
   /** Resume item the viewer should open. null = closed. */
-  const [viewerItem, setViewerItem] = useState<ResumeItem | null>(null);
+  // Track the docIndex alongside the item so the resume viewer filters
+  // its bars to the right doc instead of always defaulting to doc 0.
+  const [viewerItem, setViewerItem] = useState<
+    { item: ResumeItem; index: number } | null
+  >(null);
   /** Post id for the full-screen post viewer. null = closed. */
   const [openPostId, setOpenPostId] = useState<string | null>(null);
   /** Clip id for the full-screen clip viewer. null = closed. */
@@ -1531,7 +1535,7 @@ export function ProfileMobile({ targetHandle }: Props = {}) {
             currentProjects={currentProjects}
             workExperience={workExperience}
             resumePortfolio={resumePortfolio}
-            onOpenDoc={(r) => setViewerItem(r)}
+            onOpenDoc={(r, index) => setViewerItem({ item: r, index })}
             isVisitor={isVisitor}
             ownerName={name}
             editMode={editMode}
@@ -1546,12 +1550,27 @@ export function ProfileMobile({ targetHandle }: Props = {}) {
 
       {viewerItem ? (
         <ResumeViewerMobile
-          url={viewerItem.url ?? ""}
-          type={viewerItem.type === "image" ? "image" : "pdf"}
-          name={viewerItem.name ?? "Resume"}
-          // Only doc 0 persists today (users.resume_url is a single
-          // string), so the bars saved server-side all anchor to it.
-          bars={resumeRedactions.filter((b) => b.docIndex === 0)}
+          url={viewerItem.item.url ?? ""}
+          type={viewerItem.item.type === "image" ? "image" : "pdf"}
+          name={viewerItem.item.name ?? "Resume"}
+          // Filter bars to THIS doc only — fixes the bug where doc 1
+          // inherited doc 0's bars. docIndex is captured at tap time.
+          bars={resumeRedactions.filter(
+            (b) => b.docIndex === viewerItem.index,
+          )}
+          docIndex={viewerItem.index}
+          editable={!isVisitor}
+          onBarsChange={(barsForDoc) => {
+            // Merge the editor's per-doc bars back into the full
+            // resume_redactions array: keep bars for OTHER docs as-is,
+            // replace bars for this doc with what the editor returned.
+            const others = resumeRedactions.filter(
+              (b) => b.docIndex !== viewerItem.index,
+            );
+            void savePortfolioPatch({
+              resume_redactions: [...others, ...barsForDoc],
+            });
+          }}
           onClose={() => setViewerItem(null)}
         />
       ) : null}
@@ -2722,7 +2741,9 @@ function PortfolioPane({
   currentProjects: CurrentProject[];
   workExperience: WorkExp[];
   resumePortfolio: ResumeItem[];
-  onOpenDoc: (r: ResumeItem) => void;
+  /** Open this doc in the resume viewer. `index` is its position in
+   *  resume_docs so the viewer can scope redaction bars to it. */
+  onOpenDoc: (r: ResumeItem, index: number) => void;
   isVisitor: boolean;
   ownerName: string;
   /** Owner-only — when true, the Edit pills + per-doc delete × appear.
@@ -2893,7 +2914,7 @@ function PortfolioPane({
               >
                 <button
                   type="button"
-                  onClick={() => onOpenDoc(r)}
+                  onClick={() => onOpenDoc(r, i)}
                   style={{
                     flex: 1,
                     minWidth: 0,

@@ -13,6 +13,17 @@ type Props = {
   /** Persisted bars to overlay. Already filtered to the right docIndex
    *  by the caller; we just split them per page on render. */
   bars: RedactionBar[];
+  /** Index of this doc in `users.resume_docs`. Stamped onto every bar
+   *  the user draws here so the server can scope bars per doc. */
+  docIndex?: number;
+  /** Owner-only — true on /profile (own page), false in visitor mode.
+   *  When true, an "Edit bars" toggle appears and the viewer can draw
+   *  new bars or remove existing ones. */
+  editable?: boolean;
+  /** Called when the user adds or removes a bar in edit mode. Parent
+   *  is responsible for merging this back into the full
+   *  `users.resume_redactions` array (others docs' bars stay intact). */
+  onBarsChange?: (barsForDoc: RedactionBar[]) => void;
   onClose: () => void;
 };
 
@@ -38,10 +49,30 @@ type Props = {
 const ZOOM_MIN = 0.8;
 const ZOOM_MAX = 4;
 
-export function ResumeViewerMobile({ url, type, name, bars, onClose }: Props) {
+export function ResumeViewerMobile({
+  url,
+  type,
+  name,
+  bars,
+  docIndex = 0,
+  editable = false,
+  onBarsChange,
+  onClose,
+}: Props) {
   const [pages, setPages] = useState<string[] | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [zoom, setZoom] = useState(1);
+  // Local copy of bars-for-this-doc so the user sees their drawing
+  // immediately (parent sync is async via onBarsChange). Re-seeded
+  // whenever the prop changes, e.g. after a server-confirmed save.
+  const [localBars, setLocalBars] = useState<RedactionBar[]>(bars);
+  useEffect(() => {
+    setLocalBars(bars);
+  }, [bars]);
+  // Owner-only "draw mode" toggle. Off by default — pinch-zoom +
+  // scrolling stay on. On flips the pointer handlers in PageWrap from
+  // "ignore" to "draw a new bar / tap to delete".
+  const [editing, setEditing] = useState(false);
   const scrollRef = useRef<HTMLDivElement | null>(null);
   const pinchRef = useRef<{ baseDist: number; baseZoom: number; active: boolean }>({
     baseDist: 0,
@@ -104,6 +135,10 @@ export function ResumeViewerMobile({ url, type, name, bars, onClose }: Props) {
     const dist = (a: Touch, b: Touch) =>
       Math.hypot(a.clientX - b.clientX, a.clientY - b.clientY);
     const onStart = (e: TouchEvent) => {
+      // While editing bars, pinch + double-tap-to-zoom are suppressed
+      // so a finger drawing a rect doesn't accidentally also zoom or
+      // toggle the page. Bars are drawn at 1× zoom anyway.
+      if (editing) return;
       if (e.touches.length === 2) {
         pinchRef.current = {
           active: true,
@@ -157,7 +192,7 @@ export function ResumeViewerMobile({ url, type, name, bars, onClose }: Props) {
       el.removeEventListener("touchend", onEnd);
       el.removeEventListener("touchcancel", onEnd);
     };
-  }, [zoom]);
+  }, [zoom, editing]);
 
   return (
     <div
@@ -220,6 +255,32 @@ export function ResumeViewerMobile({ url, type, name, bars, onClose }: Props) {
         >
           {name}
         </div>
+        {editable ? (
+          <button
+            type="button"
+            onClick={() => {
+              if (editing) setZoom(1); // reset zoom so the page coords line up
+              setEditing((v) => !v);
+            }}
+            aria-pressed={editing}
+            style={{
+              padding: "8px 12px",
+              borderRadius: 999,
+              border: editing
+                ? "1px solid #FF5C35"
+                : "1px solid rgba(255,255,255,0.18)",
+              background: editing ? "#FF5C35" : "rgba(255,255,255,0.06)",
+              color: "#fff",
+              fontFamily: "DM Sans, sans-serif",
+              fontSize: 12,
+              fontWeight: 700,
+              cursor: "pointer",
+              flexShrink: 0,
+            }}
+          >
+            {editing ? "Done" : "Edit bars"}
+          </button>
+        ) : null}
         <a
           href={url}
           target="_blank"
@@ -311,14 +372,35 @@ export function ResumeViewerMobile({ url, type, name, bars, onClose }: Props) {
         ) : pages === null ? (
           <ViewerSkeleton />
         ) : (
-          pages.map((pageUrl, i) => (
-            <PageWrap
-              key={`${i}-${pageUrl.slice(0, 32)}`}
-              pageUrl={pageUrl}
-              pageNumber={i + 1}
-              bars={bars.filter((b) => b.pageNumber === i + 1)}
-            />
-          ))
+          pages.map((pageUrl, i) => {
+            const pageNum = i + 1;
+            const pageBars = localBars.filter((b) => b.pageNumber === pageNum);
+            return (
+              <PageWrap
+                key={`${i}-${pageUrl.slice(0, 32)}`}
+                pageUrl={pageUrl}
+                pageNumber={pageNum}
+                bars={pageBars}
+                editing={editing}
+                onAddBar={(bar) => {
+                  const next = [
+                    ...localBars,
+                    { ...bar, docIndex, pageNumber: pageNum },
+                  ];
+                  setLocalBars(next);
+                  onBarsChange?.(next);
+                }}
+                onDeleteBar={(barIdxOnPage) => {
+                  // Translate page-local idx to absolute idx in localBars.
+                  const target = pageBars[barIdxOnPage];
+                  if (!target) return;
+                  const next = localBars.filter((b) => b !== target);
+                  setLocalBars(next);
+                  onBarsChange?.(next);
+                }}
+              />
+            );
+          })
         )}
       </div>
     </div>
@@ -329,14 +411,86 @@ function PageWrap({
   pageUrl,
   pageNumber,
   bars,
+  editing = false,
+  onAddBar,
+  onDeleteBar,
 }: {
   pageUrl: string;
   pageNumber: number;
   bars: RedactionBar[];
+  /** When true, pointer drag on the page draws a new bar and tap on a
+   *  bar deletes it. When false (the default), bars are static. */
+  editing?: boolean;
+  onAddBar?: (bar: Pick<RedactionBar, "x" | "y" | "w" | "h">) => void;
+  onDeleteBar?: (idxOnPage: number) => void;
 }) {
+  const wrapRef = useRef<HTMLDivElement | null>(null);
+  // Drag-to-draw state. Stored in % coords (relative to the page wrap)
+  // so we can preview the rect using the same coordinate system as
+  // persisted bars.
+  const [draft, setDraft] = useState<{
+    x: number;
+    y: number;
+    w: number;
+    h: number;
+  } | null>(null);
+  const drawStartRef = useRef<{ x: number; y: number } | null>(null);
+
+  const pctFromEvent = (e: React.PointerEvent) => {
+    const r = wrapRef.current?.getBoundingClientRect();
+    if (!r || r.width === 0 || r.height === 0) return { x: 0, y: 0 };
+    const x = ((e.clientX - r.left) / r.width) * 100;
+    const y = ((e.clientY - r.top) / r.height) * 100;
+    return {
+      x: Math.max(0, Math.min(100, x)),
+      y: Math.max(0, Math.min(100, y)),
+    };
+  };
+
+  const handlePointerDown = (e: React.PointerEvent) => {
+    if (!editing || !onAddBar) return;
+    // Skip if the press landed on an existing bar — those have their
+    // own onClick to delete. Without this, tapping a bar would also
+    // start a 0×0 drag.
+    const target = e.target as HTMLElement;
+    if (target.dataset.bar === "1") return;
+    e.preventDefault();
+    (e.currentTarget as HTMLElement).setPointerCapture(e.pointerId);
+    const p = pctFromEvent(e);
+    drawStartRef.current = p;
+    setDraft({ x: p.x, y: p.y, w: 0, h: 0 });
+  };
+  const handlePointerMove = (e: React.PointerEvent) => {
+    if (!editing || !drawStartRef.current) return;
+    const p = pctFromEvent(e);
+    const start = drawStartRef.current;
+    setDraft({
+      x: Math.min(start.x, p.x),
+      y: Math.min(start.y, p.y),
+      w: Math.abs(p.x - start.x),
+      h: Math.abs(p.y - start.y),
+    });
+  };
+  const handlePointerEnd = () => {
+    if (!editing) return;
+    const d = draft;
+    drawStartRef.current = null;
+    setDraft(null);
+    // Drop the rect if it's basically a tap (no drag distance). 1.5% on
+    // either axis is roughly a pixel or two of finger travel on phone —
+    // anything below that, treat as accidental.
+    if (!d || d.w < 1.5 || d.h < 1.5) return;
+    onAddBar?.({ x: d.x, y: d.y, w: d.w, h: d.h });
+  };
+
   return (
     <div
+      ref={wrapRef}
       data-page={pageNumber}
+      onPointerDown={editing ? handlePointerDown : undefined}
+      onPointerMove={editing ? handlePointerMove : undefined}
+      onPointerUp={editing ? handlePointerEnd : undefined}
+      onPointerCancel={editing ? handlePointerEnd : undefined}
       style={{
         position: "relative",
         // Width = viewport-fit base × pinch zoom. At zoom 1 the page
@@ -350,22 +504,45 @@ function PageWrap({
         overflow: "hidden",
         boxShadow: "0 12px 28px rgba(0,0,0,0.35)",
         background: "#fff",
+        cursor: editing ? "crosshair" : "default",
+        // Suppress native scroll/pinch handling on the page itself
+        // while editing — otherwise a one-finger drag tries to scroll.
+        touchAction: editing ? "none" : undefined,
+        outline: editing ? "2px dashed rgba(255,92,53,0.55)" : "none",
+        outlineOffset: editing ? -2 : 0,
       }}
     >
       {/* eslint-disable-next-line @next/next/no-img-element */}
       <img
         src={pageUrl}
         alt={`Page ${pageNumber}`}
+        draggable={false}
         style={{
           display: "block",
           width: "100%",
           height: "auto",
+          pointerEvents: editing ? "none" : "auto",
         }}
       />
       {bars.map((bar, j) => (
         <div
           key={`bar-${j}`}
-          aria-hidden
+          data-bar="1"
+          aria-label={editing ? "Tap to remove bar" : undefined}
+          onClick={
+            editing && onDeleteBar
+              ? (e) => {
+                  e.stopPropagation();
+                  if (
+                    typeof window !== "undefined" &&
+                    !window.confirm("Remove this bar?")
+                  ) {
+                    return;
+                  }
+                  onDeleteBar(j);
+                }
+              : undefined
+          }
           style={{
             position: "absolute",
             left: `${bar.x}%`,
@@ -377,9 +554,30 @@ function PageWrap({
             // redaction rather than a missing image region.
             boxShadow:
               "inset 0 0 0 1px rgba(255,255,255,0.06), 0 1px 3px rgba(0,0,0,0.25)",
+            cursor: editing ? "pointer" : "default",
+            outline: editing ? "1px solid rgba(255,92,53,0.6)" : "none",
           }}
         />
       ))}
+
+      {/* Live draft of the rect being drawn. Same coord system as
+          persisted bars; pointer-events none so it doesn't block its
+          own pointermove. */}
+      {draft ? (
+        <div
+          aria-hidden
+          style={{
+            position: "absolute",
+            left: `${draft.x}%`,
+            top: `${draft.y}%`,
+            width: `${draft.w}%`,
+            height: `${draft.h}%`,
+            background: "rgba(28,28,30,0.6)",
+            border: "1px solid rgba(255,92,53,0.95)",
+            pointerEvents: "none",
+          }}
+        />
+      ) : null}
     </div>
   );
 }
