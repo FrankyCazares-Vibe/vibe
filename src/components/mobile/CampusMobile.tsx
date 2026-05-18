@@ -2678,40 +2678,11 @@ type SearchOrg = {
   verified: boolean;
 };
 
-type SearchEvent = {
-  id: string;
-  title: string;
-  starts_at: string;
-  location: string | null;
-  org_handle: string | null;
-};
-
-/** Shape of an entry in the viewer's `/api/me/threads` payload that we
- *  care about for search. Reused for both group chats and channels. */
-type SearchThread = {
-  id: string;
-  type: "dm" | "group" | "org_channel" | "org_subchannel";
-  name: string;
-  photo_url: string | null;
-  peer: {
-    id: string;
-    name: string | null;
-    handle: string | null;
-    avatar_url: string | null;
-  } | null;
-  is_request?: boolean;
-};
-
 export function CampusSearchOverlay({ onClose }: { onClose: () => void }) {
   const [value, setValue] = useState("");
   const [debounced, setDebounced] = useState("");
   const [users, setUsers] = useState<SearchUser[]>([]);
   const [orgs, setOrgs] = useState<SearchOrg[]>([]);
-  const [events, setEvents] = useState<SearchEvent[]>([]);
-  // Threads (DMs + groupchats + channels) are filtered client-side
-  // from /api/me/threads — they're the viewer's own list, so cheap
-  // to load once on overlay open and filter in JS.
-  const [threads, setThreads] = useState<SearchThread[]>([]);
   const [loading, setLoading] = useState(false);
   const inputRef = useRef<HTMLInputElement | null>(null);
   const seqRef = useRef(0);
@@ -2728,44 +2699,20 @@ export function CampusSearchOverlay({ onClose }: { onClose: () => void }) {
     return () => window.clearTimeout(t);
   }, []);
 
-  // Load the viewer's threads once on mount. We filter client-side
-  // against the debounced query (the threads list is the viewer's
-  // own, small enough to scan in JS).
-  useEffect(() => {
-    let cancelled = false;
-    (async () => {
-      try {
-        const r = await fetch("/api/me/threads", { cache: "no-store" });
-        const j = await r.json();
-        if (cancelled) return;
-        if (j?.ok) {
-          const all: SearchThread[] = [
-            ...((j.threads ?? []) as SearchThread[]),
-            ...((j.requests ?? []) as SearchThread[]),
-          ].filter((t) => !t.is_request);
-          setThreads(all);
-        }
-      } catch {
-        /* silent — search still works without threads */
-      }
-    })();
-    return () => {
-      cancelled = true;
-    };
-  }, []);
-
   // Debounce.
   useEffect(() => {
     const t = setTimeout(() => setDebounced(value.trim()), 220);
     return () => clearTimeout(t);
   }, [value]);
 
-  // Search fetch.
+  // Search fetch — scoped to people + orgs only. The /api/search
+  // endpoint also returns events, but the overlay surfaces just the
+  // two profile-class lookups for now (matches the "look up people +
+  // orgs/clubs" intent the search bar is for).
   useEffect(() => {
     if (!debounced) {
       setUsers([]);
       setOrgs([]);
-      setEvents([]);
       setLoading(false);
       return;
     }
@@ -2774,7 +2721,7 @@ export function CampusSearchOverlay({ onClose }: { onClose: () => void }) {
       setLoading(true);
       try {
         const r = await fetch(
-          `/api/search?q=${encodeURIComponent(debounced)}&limit=8`,
+          `/api/search?q=${encodeURIComponent(debounced)}&limit=8&kinds=users,orgs`,
           { credentials: "include", cache: "no-store" },
         );
         const j = r.ok ? await r.json() : { ok: false };
@@ -2782,64 +2729,21 @@ export function CampusSearchOverlay({ onClose }: { onClose: () => void }) {
         if (j?.ok) {
           setUsers(Array.isArray(j.users) ? j.users : []);
           setOrgs(Array.isArray(j.orgs) ? j.orgs : []);
-          setEvents(Array.isArray(j.events) ? j.events : []);
         } else {
           setUsers([]);
           setOrgs([]);
-          setEvents([]);
         }
       } catch {
         if (seq !== seqRef.current) return;
         setUsers([]);
         setOrgs([]);
-        setEvents([]);
       } finally {
         if (seq === seqRef.current) setLoading(false);
       }
     })();
   }, [debounced]);
 
-  // Filter the viewer's threads by the debounced query — match
-  // against group/channel name OR peer name OR peer handle. Cap at 6
-  // so the section doesn't dominate the results.
-  //
-  // Drop DMs whose peer is already in the People section — otherwise
-  // searching "alex" surfaces both Alex's profile (People) AND the
-  // existing DM with Alex (Chats), which the user reasonably misreads
-  // as duplicate / picks the wrong one. Group chats + channels stay
-  // in Chats since they're unique to that section.
-  const matchedThreads = (() => {
-    if (!debounced) return [] as SearchThread[];
-    const q = debounced.toLowerCase();
-    const peopleHandles = new Set(
-      users
-        .map((u) => u.handle?.toLowerCase())
-        .filter((h): h is string => !!h),
-    );
-    return threads
-      .filter((t) => {
-        const hay = [
-          t.name,
-          t.peer?.name ?? "",
-          t.peer?.handle ?? "",
-        ]
-          .join(" ")
-          .toLowerCase();
-        if (!hay.includes(q)) return false;
-        if (t.type === "dm") {
-          const peerHandle = t.peer?.handle?.toLowerCase();
-          if (peerHandle && peopleHandles.has(peerHandle)) return false;
-        }
-        return true;
-      })
-      .slice(0, 6);
-  })();
-
-  const hasResults =
-    users.length > 0 ||
-    orgs.length > 0 ||
-    events.length > 0 ||
-    matchedThreads.length > 0;
+  const hasResults = users.length > 0 || orgs.length > 0;
 
   return (
     <div
@@ -2916,7 +2820,7 @@ export function CampusSearchOverlay({ onClose }: { onClose: () => void }) {
           <input
             ref={inputRef}
             type="search"
-            placeholder="Search people, chats, orgs, events"
+            placeholder="Search people, orgs, clubs"
             value={value}
             onChange={(e) => setValue(e.target.value)}
             autoCorrect="off"
@@ -2957,11 +2861,6 @@ export function CampusSearchOverlay({ onClose }: { onClose: () => void }) {
           />
         ) : (
           <>
-            {/* People first — typing a person's name almost always
-                means "open their profile", not "open the DM I have
-                with them". Chats follow underneath for the
-                less-common "find a specific group chat by name"
-                case. */}
             {users.length > 0 ? (
               <SearchSection label="People">
                 {users.map((u) => (
@@ -2970,23 +2869,9 @@ export function CampusSearchOverlay({ onClose }: { onClose: () => void }) {
               </SearchSection>
             ) : null}
             {orgs.length > 0 ? (
-              <SearchSection label="Orgs">
+              <SearchSection label="Orgs / Clubs">
                 {orgs.map((o) => (
                   <SearchOrgRow key={o.id} o={o} onPick={onClose} />
-                ))}
-              </SearchSection>
-            ) : null}
-            {matchedThreads.length > 0 ? (
-              <SearchSection label="Chats">
-                {matchedThreads.map((t) => (
-                  <SearchThreadRow key={t.id} t={t} onPick={onClose} />
-                ))}
-              </SearchSection>
-            ) : null}
-            {events.length > 0 ? (
-              <SearchSection label="Events">
-                {events.map((ev) => (
-                  <SearchEventRow key={ev.id} ev={ev} onPick={onClose} />
                 ))}
               </SearchSection>
             ) : null}
@@ -3216,221 +3101,6 @@ function SearchOrgRow({ o, onPick }: { o: SearchOrg; onPick: () => void }) {
   );
 }
 
-/** Row in the search Chats section. DMs route to /messages with the
- *  ?to=<handle> deep link; group + org channels route to
- *  /campus?tab=chat&channel=<id> (CampusMobile / CampusHome both
- *  honor that). */
-function SearchThreadRow({
-  t,
-  onPick,
-}: {
-  t: SearchThread;
-  onPick: () => void;
-}) {
-  const isChannel = t.type === "org_channel" || t.type === "org_subchannel";
-  const isGroup = t.type === "group";
-  const avatarUrl = t.type === "dm" ? t.peer?.avatar_url : t.photo_url;
-  const initials =
-    (t.type === "dm"
-      ? t.peer?.name || t.peer?.handle || "?"
-      : t.name || "?")
-      .split(/\s+/)
-      .filter(Boolean)
-      .slice(0, 2)
-      .map((p) => p[0]?.toUpperCase() ?? "")
-      .join("") || "?";
-  const href =
-    t.type === "dm" && t.peer?.handle
-      ? `/messages?to=${encodeURIComponent(t.peer.handle)}`
-      : isChannel
-        ? `/campus?tab=chat&channel=${encodeURIComponent(t.id)}`
-        : `/messages`;
-  const label =
-    t.type === "dm"
-      ? t.peer?.name || (t.peer?.handle ? `@${t.peer.handle}` : "Direct message")
-      : isChannel
-        ? `# ${t.name}`
-        : t.name || "Group";
-  const subline = isChannel
-    ? "Channel"
-    : isGroup
-      ? "Group chat"
-      : t.peer?.handle
-        ? `@${t.peer.handle}`
-        : "Direct message";
-  const router = useRouter();
-  const go = () => {
-    router.push(href);
-    window.setTimeout(onPick, 0);
-  };
-  return (
-    <button
-      type="button"
-      onClick={go}
-      style={{
-        width: "100%",
-        display: "flex",
-        alignItems: "center",
-        gap: 12,
-        padding: "10px 4px",
-        textAlign: "left",
-        background: "transparent",
-        border: "none",
-        borderBottom: "1px solid rgba(28,28,30,0.04)",
-        color: "inherit",
-        fontFamily: "inherit",
-        cursor: "pointer",
-        WebkitTapHighlightColor: "transparent",
-      }}
-    >
-      <div
-        style={{
-          width: 42,
-          height: 42,
-          borderRadius: isChannel ? 12 : 999,
-          background: avatarUrl
-            ? `url(${avatarUrl}) center/cover`
-            : "linear-gradient(135deg, #FFD3C2 0%, #FF9D7E 100%)",
-          display: "flex",
-          alignItems: "center",
-          justifyContent: "center",
-          color: "#1C1C1E",
-          fontFamily: "Fraunces, serif",
-          fontWeight: 800,
-          fontSize: 15,
-          flexShrink: 0,
-          border: "1px solid rgba(255,255,255,0.6)",
-        }}
-      >
-        {!avatarUrl ? initials : null}
-      </div>
-      <div style={{ flex: 1, minWidth: 0 }}>
-        <div
-          style={{
-            fontFamily: "Fraunces, serif",
-            fontSize: 15,
-            fontWeight: 800,
-            color: "#1C1C1E",
-            whiteSpace: "nowrap",
-            overflow: "hidden",
-            textOverflow: "ellipsis",
-          }}
-        >
-          {label}
-        </div>
-        <div
-          style={{
-            fontFamily: "DM Sans, sans-serif",
-            fontSize: 12,
-            color: "#8A8580",
-            marginTop: 1,
-            whiteSpace: "nowrap",
-            overflow: "hidden",
-            textOverflow: "ellipsis",
-          }}
-        >
-          {subline}
-        </div>
-      </div>
-    </button>
-  );
-}
-
-function SearchEventRow({
-  ev,
-  onPick,
-}: {
-  ev: SearchEvent;
-  onPick: () => void;
-}) {
-  const when = new Date(ev.starts_at).toLocaleString(undefined, {
-    weekday: "short",
-    month: "short",
-    day: "numeric",
-    hour: "numeric",
-    minute: "2-digit",
-  });
-  const router = useRouter();
-  const href = ev.org_handle
-    ? `/orgs/${encodeURIComponent(ev.org_handle)}?event=${ev.id}`
-    : null;
-  const go = () => {
-    if (!href) return;
-    router.push(href);
-    window.setTimeout(onPick, 0);
-  };
-  return (
-    <button
-      type="button"
-      onClick={go}
-      disabled={!href}
-      style={{
-        width: "100%",
-        display: "flex",
-        alignItems: "center",
-        gap: 12,
-        padding: "10px 4px",
-        textAlign: "left",
-        background: "transparent",
-        border: "none",
-        borderBottom: "1px solid rgba(28,28,30,0.04)",
-        color: "inherit",
-        fontFamily: "inherit",
-        cursor: href ? "pointer" : "default",
-        WebkitTapHighlightColor: "transparent",
-      }}
-    >
-      <div
-        style={{
-          width: 42,
-          height: 42,
-          borderRadius: 12,
-          background: "linear-gradient(135deg,#FFD3C2 0%,#FF7A4D 100%)",
-          color: "#fff",
-          display: "flex",
-          alignItems: "center",
-          justifyContent: "center",
-          flexShrink: 0,
-        }}
-      >
-        <svg width="18" height="18" viewBox="0 0 18 18" fill="none" aria-hidden>
-          <rect x="2.5" y="4" width="13" height="11" rx="2" stroke="currentColor" strokeWidth="1.6" fill="none" />
-          <path d="M2.5 7.5h13" stroke="currentColor" strokeWidth="1.6" />
-          <path d="M6 2v3M12 2v3" stroke="currentColor" strokeWidth="1.6" strokeLinecap="round" />
-        </svg>
-      </div>
-      <div style={{ flex: 1, minWidth: 0 }}>
-        <div
-          style={{
-            fontFamily: "Fraunces, serif",
-            fontSize: 15,
-            fontWeight: 700,
-            color: "#1C1C1E",
-            whiteSpace: "nowrap",
-            overflow: "hidden",
-            textOverflow: "ellipsis",
-          }}
-        >
-          {ev.title}
-        </div>
-        <div
-          style={{
-            fontFamily: "DM Sans, sans-serif",
-            fontSize: 12,
-            color: "#8A8580",
-            fontWeight: 600,
-            whiteSpace: "nowrap",
-            overflow: "hidden",
-            textOverflow: "ellipsis",
-          }}
-        >
-          {when}
-          {ev.location ? ` · ${ev.location}` : ""}
-        </div>
-      </div>
-    </button>
-  );
-}
 
 function SearchHint() {
   return (
@@ -3444,9 +3114,9 @@ function SearchHint() {
         lineHeight: 1.55,
       }}
     >
-      Search people, orgs, and events across campus.
+      Search people, orgs, and clubs across campus.
       <br />
-      Type a name, @handle, or topic.
+      Type a name, @handle, or org.
     </div>
   );
 }
