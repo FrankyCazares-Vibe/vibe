@@ -1544,6 +1544,15 @@ export function ProfileMobile({ targetHandle }: Props = {}) {
             onPickResume={() => resumeInputRef.current?.click()}
             uploadingResume={uploadingResume}
             onDeleteDoc={(i) => void handleResumeDocDelete(i)}
+            onReorderExperience={(items) =>
+              void savePortfolioPatch({
+                work_experience: items,
+                work_order_manual: true,
+              })
+            }
+            onReorderCurrentOn={(items) =>
+              void savePortfolioPatch({ current_on: items })
+            }
           />
         </div>
       </div>
@@ -2737,6 +2746,8 @@ function PortfolioPane({
   onPickResume,
   uploadingResume,
   onDeleteDoc,
+  onReorderExperience,
+  onReorderCurrentOn,
 }: {
   currentProjects: CurrentProject[];
   workExperience: WorkExp[];
@@ -2761,10 +2772,111 @@ function PortfolioPane({
   uploadingResume?: boolean;
   /** Owner-only — remove the doc at this index from resume_docs. */
   onDeleteDoc?: (index: number) => void;
+  /** Owner-only — fires when the user drags work-experience entries
+   *  into a new order on the read pane (no sheet needed). Parent
+   *  persists work_experience + work_order_manual=true. */
+  onReorderExperience?: (items: WorkExp[]) => void;
+  /** Owner-only — same for working-on items. Persists current_on. */
+  onReorderCurrentOn?: (items: CurrentProject[]) => void;
 }) {
   // Edit affordances only render when the owner has explicitly entered
   // edit mode via the pencil. Visitors never see them.
   const showOwnerEdits = !isVisitor && !!editMode;
+
+  // Local draft state used during a touch drag so the array can shuffle
+  // in real time without waiting for the parent re-fetch. Cleared back
+  // to null on drop; props become the source of truth again.
+  const [expDraft, setExpDraft] = useState<WorkExp[] | null>(null);
+  const [currentOnDraft, setCurrentOnDraft] = useState<CurrentProject[] | null>(
+    null,
+  );
+  const expListRef = useRef<HTMLDivElement | null>(null);
+  const currentOnListRef = useRef<HTMLDivElement | null>(null);
+  // Track which row is the active drag source so we can fade it.
+  const [expDragIdx, setExpDragIdx] = useState<number | null>(null);
+  const [coDragIdx, setCoDragIdx] = useState<number | null>(null);
+  const expDragRef = useRef<{ idx: number } | null>(null);
+  const coDragRef = useRef<{ idx: number } | null>(null);
+
+  // Generic-ish reorder builder. Wires up onPointerDown / Move / Up to a
+  // [data-row] sibling hit-test inside the given list ref.
+  const buildDragHandlers = <T,>(
+    listRef: React.RefObject<HTMLDivElement | null>,
+    draft: T[] | null,
+    setDraft: (next: T[] | null) => void,
+    dragRef: React.MutableRefObject<{ idx: number } | null>,
+    setDragIdx: (i: number | null) => void,
+    sourceItems: T[],
+    onDrop: (items: T[]) => void,
+  ) => ({
+    start: (i: number) => (e: React.PointerEvent) => {
+      (e.currentTarget as HTMLElement).setPointerCapture(e.pointerId);
+      dragRef.current = { idx: i };
+      setDraft(sourceItems.slice());
+      setDragIdx(i);
+    },
+    move: (e: React.PointerEvent) => {
+      const info = dragRef.current;
+      const list = listRef.current;
+      if (!info || !list) return;
+      const rows = list.querySelectorAll<HTMLDivElement>("[data-row]");
+      let target = info.idx;
+      rows.forEach((el, idx) => {
+        const r = el.getBoundingClientRect();
+        const mid = r.top + r.height / 2;
+        if (idx < info.idx && e.clientY < mid && idx < target) target = idx;
+        else if (idx > info.idx && e.clientY > mid && idx > target) target = idx;
+      });
+      if (target !== info.idx && draft) {
+        const next = draft.slice();
+        const [moved] = next.splice(info.idx, 1);
+        if (moved !== undefined) next.splice(target, 0, moved);
+        setDraft(next);
+        info.idx = target;
+        setDragIdx(target);
+      }
+    },
+    end: () => {
+      const finalDraft = draft;
+      dragRef.current = null;
+      setDragIdx(null);
+      // Only persist if the order actually changed. Compare reference
+      // equality first (cheap), then deep-ish equality via index of
+      // first non-matching item.
+      if (
+        finalDraft &&
+        finalDraft.some((item, i) => item !== sourceItems[i])
+      ) {
+        onDrop(finalDraft);
+      }
+      // Clear the draft AFTER calling onDrop so the optimistic order
+      // stays on screen until the parent re-fetches.
+      setDraft(null);
+    },
+  });
+
+  const expHandlers = buildDragHandlers(
+    expListRef,
+    expDraft,
+    setExpDraft,
+    expDragRef,
+    setExpDragIdx,
+    workExperience,
+    (items) => onReorderExperience?.(items),
+  );
+  const coHandlers = buildDragHandlers(
+    currentOnListRef,
+    currentOnDraft,
+    setCurrentOnDraft,
+    coDragRef,
+    setCoDragIdx,
+    currentProjects,
+    (items) => onReorderCurrentOn?.(items),
+  );
+
+  // Rendered slices — prefer the live draft while dragging.
+  const expItems = expDraft ?? workExperience;
+  const coItems = currentOnDraft ?? currentProjects;
   const allEmpty =
     currentProjects.length === 0 &&
     workExperience.length === 0 &&
@@ -2800,19 +2912,50 @@ function PortfolioPane({
             ) : null
           }
         >
-          {currentProjects.length === 0 ? (
+          {coItems.length === 0 ? (
             <SubsectionEmpty body="Show what you're building, learning, or planning. Adds context for recruiters and connections." />
           ) : (
-            <ul style={projectListStyle}>
-              {currentProjects.map((p, i) => (
-                <li key={`${p.text}-${i}`} style={projectItemStyle}>
+            <div
+              ref={currentOnListRef}
+              style={{ display: "flex", flexDirection: "column", gap: 6 }}
+            >
+              {coItems.map((p, i) => (
+                <div
+                  key={`${p.text}-${i}`}
+                  data-row
+                  style={{
+                    ...projectItemStyle,
+                    display: "flex",
+                    alignItems: "center",
+                    gap: 8,
+                    opacity: coDragIdx === i ? 0.7 : 1,
+                    transform: coDragIdx === i ? "scale(1.01)" : "scale(1)",
+                    boxShadow:
+                      coDragIdx === i
+                        ? "0 8px 22px rgba(20,8,40,0.18)"
+                        : undefined,
+                    transition:
+                      coDragIdx === i
+                        ? "none"
+                        : "transform 160ms ease, opacity 160ms ease",
+                  }}
+                >
+                  {showOwnerEdits ? (
+                    <DragHandleButton
+                      onPointerDown={coHandlers.start(i)}
+                      onPointerMove={coHandlers.move}
+                      onPointerUp={coHandlers.end}
+                    />
+                  ) : null}
                   <span style={projectIconStyle} aria-hidden>
                     {p.icon || "✦"}
                   </span>
-                  <span style={{ fontSize: 14, lineHeight: 1.4 }}>{p.text}</span>
-                </li>
+                  <span style={{ fontSize: 14, lineHeight: 1.4, flex: 1 }}>
+                    {p.text}
+                  </span>
+                </div>
               ))}
-            </ul>
+            </div>
           )}
         </PortfolioSubsection>
       ) : null}
@@ -2826,12 +2969,48 @@ function PortfolioPane({
           ) : null
         }
       >
-        {workExperience.length === 0 ? (
+        {expItems.length === 0 ? (
           <SubsectionEmpty body="Add roles, internships, and side gigs from your profile editor." />
         ) : (
-          <div style={{ display: "flex", flexDirection: "column", gap: 14 }}>
-            {workExperience.map((w, i) => (
-              <div key={`${w.title}-${i}`} style={{ display: "flex", gap: 12 }}>
+          <div
+            ref={expListRef}
+            style={{ display: "flex", flexDirection: "column", gap: 14 }}
+          >
+            {expItems.map((w, i) => (
+              <div
+                key={`${w.title}-${i}`}
+                data-row
+                style={{
+                  display: "flex",
+                  alignItems: "flex-start",
+                  gap: 10,
+                  padding: showOwnerEdits ? 8 : 0,
+                  borderRadius: showOwnerEdits ? 12 : 0,
+                  background: showOwnerEdits
+                    ? "rgba(255,253,248,0.78)"
+                    : "transparent",
+                  border: showOwnerEdits
+                    ? "1px solid rgba(28,28,30,0.06)"
+                    : "none",
+                  opacity: expDragIdx === i ? 0.7 : 1,
+                  transform: expDragIdx === i ? "scale(1.01)" : "scale(1)",
+                  boxShadow:
+                    expDragIdx === i
+                      ? "0 12px 28px rgba(20,8,40,0.18)"
+                      : "none",
+                  transition:
+                    expDragIdx === i
+                      ? "none"
+                      : "transform 160ms ease, opacity 160ms ease",
+                }}
+              >
+                {showOwnerEdits ? (
+                  <DragHandleButton
+                    onPointerDown={expHandlers.start(i)}
+                    onPointerMove={expHandlers.move}
+                    onPointerUp={expHandlers.end}
+                  />
+                ) : null}
                 <div
                   style={{
                     width: 40,
@@ -3823,6 +4002,59 @@ function PortfolioEditorShell({
         </Drawer.Content>
       </Drawer.Portal>
     </Drawer.Root>
+  );
+}
+
+/** Small 6-dot drag handle button. Used in the inline Portfolio reorder
+ *  (read-pane drag handles when editMode is on). Caller wires
+ *  pointer events; we just paint the icon + handle styles. */
+function DragHandleButton({
+  onPointerDown,
+  onPointerMove,
+  onPointerUp,
+}: {
+  onPointerDown: (e: React.PointerEvent) => void;
+  onPointerMove: (e: React.PointerEvent) => void;
+  onPointerUp: () => void;
+}) {
+  return (
+    <button
+      type="button"
+      aria-label="Drag to reorder"
+      onPointerDown={onPointerDown}
+      onPointerMove={onPointerMove}
+      onPointerUp={onPointerUp}
+      onPointerCancel={onPointerUp}
+      style={{
+        width: 24,
+        height: 28,
+        padding: 0,
+        marginRight: 2,
+        borderRadius: 8,
+        border: "1px solid rgba(28,28,30,0.10)",
+        background: "rgba(255,255,255,0.7)",
+        color: "#5C5853",
+        cursor: "grab",
+        // Suppress native scroll/pan on the handle while the user
+        // touches it so the gesture stays ours.
+        touchAction: "none",
+        WebkitTapHighlightColor: "transparent",
+        display: "inline-flex",
+        alignItems: "center",
+        justifyContent: "center",
+        flexShrink: 0,
+        lineHeight: 1,
+      }}
+    >
+      <svg width="14" height="14" viewBox="0 0 14 14" aria-hidden>
+        <circle cx="4.5" cy="3.5" r="1.1" fill="currentColor" />
+        <circle cx="9.5" cy="3.5" r="1.1" fill="currentColor" />
+        <circle cx="4.5" cy="7" r="1.1" fill="currentColor" />
+        <circle cx="9.5" cy="7" r="1.1" fill="currentColor" />
+        <circle cx="4.5" cy="10.5" r="1.1" fill="currentColor" />
+        <circle cx="9.5" cy="10.5" r="1.1" fill="currentColor" />
+      </svg>
+    </button>
   );
 }
 
