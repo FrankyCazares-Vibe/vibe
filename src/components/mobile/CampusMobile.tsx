@@ -21,6 +21,7 @@ import { MapMobile } from "@/components/mobile/MapMobile";
 import { ConversationView } from "@/components/mobile/MessagesMobile";
 import { PostComposerMobile } from "@/components/mobile/PostComposerMobile";
 import { PostViewerMobile } from "@/components/mobile/PostViewerMobile";
+import { SharePostSheet } from "@/components/mobile/SharePostSheet";
 
 /**
  * iOS-native rebuild of `/campus` for mobile. Three swipeable tabs:
@@ -1160,6 +1161,13 @@ function FeedCard({
       {menuOpen ? (
         <PostActionsSheet
           postId={post.id}
+          postKind={post.type}
+          postTitle={post.content ?? ""}
+          postPosterUrl={post.media_thumbnail_url ?? post.media_url ?? null}
+          authorName={
+            post.author?.name ||
+            (post.author?.handle ? `@${post.author.handle}` : null)
+          }
           onClose={() => setMenuOpen(false)}
         />
       ) : null}
@@ -2297,13 +2305,25 @@ function EmptyTab({ title, body }: { title: string; body: string }) {
  *  scrim closes it cleanly. */
 function PostActionsSheet({
   postId,
+  postKind,
+  postTitle,
+  postPosterUrl,
+  authorName,
   onClose,
 }: {
   postId: string;
+  postKind?: "post" | "clip";
+  postTitle?: string;
+  postPosterUrl?: string | null;
+  authorName?: string | null;
   onClose: () => void;
 }) {
   const [reporting, setReporting] = useState(false);
   const [toast, setToast] = useState<string | null>(null);
+  // "Send to chats" launches the in-app share picker. Stays mounted
+  // while the picker is open so an unrelated dismiss of the picker
+  // doesn't also close the surrounding 3-dot sheet.
+  const [shareOpen, setShareOpen] = useState(false);
 
   const report = useCallback(
     async (reasonCode: string) => {
@@ -2416,6 +2436,10 @@ function PostActionsSheet({
             </div>
           ) : null}
 
+          <ActionSheetRow
+            label="Send to chats"
+            onClick={() => setShareOpen(true)}
+          />
           <ActionSheetRow label="Copy link" onClick={copyLink} />
           <ActionSheetRow
             label="Report post"
@@ -2431,6 +2455,22 @@ function PostActionsSheet({
           />
         </Drawer.Content>
       </Drawer.Portal>
+
+      {shareOpen ? (
+        <SharePostSheet
+          postId={postId}
+          postKind={postKind ?? "post"}
+          postTitle={postTitle}
+          postPosterUrl={postPosterUrl ?? null}
+          authorName={authorName ?? null}
+          onClose={() => setShareOpen(false)}
+          onSent={(count) => {
+            setShareOpen(false);
+            setToast(`Sent to ${count} chat${count === 1 ? "" : "s"}.`);
+            setTimeout(onClose, 900);
+          }}
+        />
+      ) : null}
     </Drawer.Root>
   );
 }

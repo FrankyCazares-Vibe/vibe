@@ -4,6 +4,8 @@ import Link from "next/link";
 import { useEffect, useState } from "react";
 import { Drawer } from "vaul";
 
+import { SharePostSheet } from "@/components/mobile/SharePostSheet";
+
 /**
  * iOS-native mobile post viewer. Opens as a full-screen sheet from the
  * ProfileMobile Posts grid; ProfileMobile owns the open/close state.
@@ -88,6 +90,7 @@ export function PostViewerMobile({
   const [posting, setPosting] = useState(false);
   const [menuOpen, setMenuOpen] = useState(false);
   const [deleting, setDeleting] = useState(false);
+  const [shareOpen, setShareOpen] = useState(false);
 
   const handleDelete = async () => {
     if (deleting) return;
@@ -479,6 +482,13 @@ export function PostViewerMobile({
                 }}
               >
                 <ViewerMenuItem
+                  label="Send to chats"
+                  onClick={() => {
+                    setMenuOpen(false);
+                    setShareOpen(true);
+                  }}
+                />
+                <ViewerMenuItem
                   label="Copy link"
                   onClick={async () => {
                     setMenuOpen(false);
@@ -740,6 +750,28 @@ export function PostViewerMobile({
       ) : null}
         </Drawer.Content>
       </Drawer.Portal>
+
+      {shareOpen ? (
+        <SharePostSheet
+          postId={postId}
+          postKind={post?.type === "clip" ? "clip" : "post"}
+          postTitle={post?.content ?? ""}
+          postPosterUrl={
+            (post && "media_thumbnail_url" in post
+              ? (post as { media_thumbnail_url?: string | null }).media_thumbnail_url
+              : null) ??
+            (post && "media_url" in post
+              ? (post as { media_url?: string | null }).media_url
+              : null) ??
+            null
+          }
+          authorName={
+            author?.name ||
+            (author?.handle ? `@${author.handle}` : null)
+          }
+          onClose={() => setShareOpen(false)}
+        />
+      ) : null}
     </Drawer.Root>
   );
 }

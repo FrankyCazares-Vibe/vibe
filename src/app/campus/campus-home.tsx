@@ -8,6 +8,7 @@ import { Fragment, useCallback, useEffect, useMemo, useRef, useState } from "rea
 import { CampusAppShell } from "@/components/campus-app-shell";
 import { ImageCropperModal } from "@/components/ImageCropperModal";
 import { emitCalendarChanged } from "@/components/LeftNav";
+import { SharePostSheet } from "@/components/mobile/SharePostSheet";
 import { MouseSpotlight } from "@/components/ui/mouse-spotlight";
 import { FILTER_CSS } from "@/lib/clip/edit-metadata";
 import {
@@ -6021,6 +6022,8 @@ function FeedRow({
   // Owner-only "more" menu — Delete is the only entry for now. Anchored
   // on the row's top-right via a small kebab. Click-outside closes it.
   const [showMoreMenu, setShowMoreMenu] = useState(false);
+  // "Send to chats" picker (in-app share to DMs/groups/channels).
+  const [shareOpen, setShareOpen] = useState(false);
   const [deleting, setDeleting] = useState(false);
 
   const onDeletePost = useCallback(async () => {
@@ -6221,6 +6224,23 @@ function FeedRow({
               overflow: "hidden",
             }}
           >
+            <button
+              type="button"
+              role="menuitem"
+              onClick={() => {
+                setShowMoreMenu(false);
+                setShareOpen(true);
+              }}
+              style={feedRowMenuItemStyle()}
+              onMouseEnter={(e) => {
+                e.currentTarget.style.background = "#FAF7F2";
+              }}
+              onMouseLeave={(e) => {
+                e.currentTarget.style.background = "transparent";
+              }}
+            >
+              Send to chats
+            </button>
             <button
               type="button"
               role="menuitem"
@@ -6595,6 +6615,20 @@ function FeedRow({
         ) : null}
       </div>
       </div>
+
+      {shareOpen ? (
+        <SharePostSheet
+          postId={post.id}
+          postKind={post.type}
+          postTitle={post.content ?? ""}
+          postPosterUrl={post.media_thumbnail_url ?? post.media_url ?? null}
+          authorName={
+            post.author?.name ||
+            (post.author?.handle ? `@${post.author.handle}` : null)
+          }
+          onClose={() => setShareOpen(false)}
+        />
+      ) : null}
     </article>
   );
 }
