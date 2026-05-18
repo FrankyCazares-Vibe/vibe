@@ -1,7 +1,7 @@
 "use client";
 
 import Link from "next/link";
-import { useSearchParams } from "next/navigation";
+import { useRouter, useSearchParams } from "next/navigation";
 import { useCallback, useEffect, useRef, useState } from "react";
 import { Drawer } from "vaul";
 
@@ -3004,6 +3004,7 @@ function SearchSection({
 }
 
 function SearchUserRow({ u, onPick }: { u: SearchUser; onPick: () => void }) {
+  const router = useRouter();
   const initials = (u.name ?? u.handle ?? "?")
     .trim()
     .split(/\s+/)
@@ -3011,18 +3012,38 @@ function SearchUserRow({ u, onPick }: { u: SearchUser; onPick: () => void }) {
     .map((p) => p[0]?.toUpperCase() ?? "")
     .join("");
   const yearLabel = u.year ? `Year ${u.year}` : null;
+  // Imperative push instead of <Link>: covers the case where the user
+  // is already on /profile (own) and clicks another profile result —
+  // <Link>'s default behavior would close the overlay AND navigate in
+  // the same tick, sometimes losing the navigation when the parent
+  // remounts. Pushing first then closing the overlay (next tick) makes
+  // the order deterministic.
+  const go = () => {
+    if (!u.handle) return;
+    router.push(`/profile/${encodeURIComponent(u.handle)}`);
+    // Defer the overlay close so the navigation event has time to
+    // commit before this surface unmounts.
+    window.setTimeout(onPick, 0);
+  };
   return (
-    <Link
-      href={u.handle ? `/profile/${u.handle}` : "#"}
-      onClick={onPick}
+    <button
+      type="button"
+      onClick={go}
+      disabled={!u.handle}
       style={{
+        width: "100%",
         display: "flex",
         alignItems: "center",
         gap: 12,
         padding: "10px 4px",
-        textDecoration: "none",
-        color: "inherit",
+        textAlign: "left",
+        background: "transparent",
+        border: "none",
         borderBottom: "1px solid rgba(28,28,30,0.04)",
+        color: "inherit",
+        fontFamily: "inherit",
+        cursor: u.handle ? "pointer" : "default",
+        WebkitTapHighlightColor: "transparent",
       }}
     >
       <div
@@ -3076,23 +3097,34 @@ function SearchUserRow({ u, onPick }: { u: SearchUser; onPick: () => void }) {
             .join(" · ")}
         </div>
       </div>
-    </Link>
+    </button>
   );
 }
 
 function SearchOrgRow({ o, onPick }: { o: SearchOrg; onPick: () => void }) {
+  const router = useRouter();
+  const go = () => {
+    router.push(`/orgs/${encodeURIComponent(o.handle)}`);
+    window.setTimeout(onPick, 0);
+  };
   return (
-    <Link
-      href={`/orgs/${encodeURIComponent(o.handle)}`}
-      onClick={onPick}
+    <button
+      type="button"
+      onClick={go}
       style={{
+        width: "100%",
         display: "flex",
         alignItems: "center",
         gap: 12,
         padding: "10px 4px",
-        textDecoration: "none",
-        color: "inherit",
+        textAlign: "left",
+        background: "transparent",
+        border: "none",
         borderBottom: "1px solid rgba(28,28,30,0.04)",
+        color: "inherit",
+        fontFamily: "inherit",
+        cursor: "pointer",
+        WebkitTapHighlightColor: "transparent",
       }}
     >
       <div
@@ -3159,7 +3191,7 @@ function SearchOrgRow({ o, onPick }: { o: SearchOrg; onPick: () => void }) {
           @{o.handle}
         </div>
       </div>
-    </Link>
+    </button>
   );
 }
 
@@ -3205,18 +3237,29 @@ function SearchThreadRow({
       : t.peer?.handle
         ? `@${t.peer.handle}`
         : "Direct message";
+  const router = useRouter();
+  const go = () => {
+    router.push(href);
+    window.setTimeout(onPick, 0);
+  };
   return (
-    <Link
-      href={href}
-      onClick={onPick}
+    <button
+      type="button"
+      onClick={go}
       style={{
+        width: "100%",
         display: "flex",
         alignItems: "center",
         gap: 12,
         padding: "10px 4px",
-        textDecoration: "none",
-        color: "inherit",
+        textAlign: "left",
+        background: "transparent",
+        border: "none",
         borderBottom: "1px solid rgba(28,28,30,0.04)",
+        color: "inherit",
+        fontFamily: "inherit",
+        cursor: "pointer",
+        WebkitTapHighlightColor: "transparent",
       }}
     >
       <div
@@ -3268,7 +3311,7 @@ function SearchThreadRow({
           {subline}
         </div>
       </div>
-    </Link>
+    </button>
   );
 }
 
@@ -3286,22 +3329,34 @@ function SearchEventRow({
     hour: "numeric",
     minute: "2-digit",
   });
+  const router = useRouter();
+  const href = ev.org_handle
+    ? `/orgs/${encodeURIComponent(ev.org_handle)}?event=${ev.id}`
+    : null;
+  const go = () => {
+    if (!href) return;
+    router.push(href);
+    window.setTimeout(onPick, 0);
+  };
   return (
-    <Link
-      href={
-        ev.org_handle
-          ? `/orgs/${encodeURIComponent(ev.org_handle)}?event=${ev.id}`
-          : "#"
-      }
-      onClick={onPick}
+    <button
+      type="button"
+      onClick={go}
+      disabled={!href}
       style={{
+        width: "100%",
         display: "flex",
         alignItems: "center",
         gap: 12,
         padding: "10px 4px",
-        textDecoration: "none",
-        color: "inherit",
+        textAlign: "left",
+        background: "transparent",
+        border: "none",
         borderBottom: "1px solid rgba(28,28,30,0.04)",
+        color: "inherit",
+        fontFamily: "inherit",
+        cursor: href ? "pointer" : "default",
+        WebkitTapHighlightColor: "transparent",
       }}
     >
       <div
@@ -3352,7 +3407,7 @@ function SearchEventRow({
           {ev.location ? ` · ${ev.location}` : ""}
         </div>
       </div>
-    </Link>
+    </button>
   );
 }
 
