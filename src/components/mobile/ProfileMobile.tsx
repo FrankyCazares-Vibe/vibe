@@ -6,6 +6,7 @@ import { useCallback, useEffect, useRef, useState } from "react";
 import { Drawer } from "vaul";
 
 import { ImageCropperModal } from "@/components/ImageCropperModal";
+import { CampusSearchOverlay } from "@/components/mobile/CampusMobile";
 import { ClipComposerMobile } from "@/components/mobile/ClipComposerMobile";
 import { ClipViewerMobile } from "@/components/mobile/ClipViewerMobile";
 import { PostComposerMobile } from "@/components/mobile/PostComposerMobile";
@@ -229,6 +230,10 @@ export function ProfileMobile({ targetHandle }: Props = {}) {
   const [error, setError] = useState<string | null>(null);
   const [posts, setPosts] = useState<PostRow[] | null>(null);
   const [tab, setTab] = useState<ProfileTab>("posts");
+  // Unified search overlay — opened by the magnifying-glass button in
+  // the floating top-right actions. Reuses CampusMobile's overlay so
+  // the search experience is identical across the two surfaces.
+  const [searchOpen, setSearchOpen] = useState(false);
   // Which portfolio sub-section the owner is currently editing.
   // `null` = read-only. Sheets are full-screen vaul drawers.
   const [editingPortfolio, setEditingPortfolio] = useState<
@@ -1003,79 +1008,97 @@ export function ProfileMobile({ targetHandle }: Props = {}) {
             />
           </>
         ) : null}
-        {/* Floating top-right actions — pencil + settings for owners,
-            nothing for visitors (visitor CTA sits in the identity stack
-            below the avatar instead so it lands closer to the name). */}
-        {isVisitor ? null : (
-          <div
-            style={{
-              position: "absolute",
-              top: "calc(env(safe-area-inset-top, 0px) + 14px)",
-              right: 14,
-              display: "flex",
-              gap: 8,
-            }}
-          >
-            {editMode ? (
-              <>
-                <button
-                  type="button"
-                  onClick={cancelEdit}
-                  disabled={savingEdit}
-                  style={floatingActionTextStyle}
-                  aria-label="Cancel"
-                >
-                  Cancel
-                </button>
-                <button
-                  type="button"
-                  onClick={commitEdit}
-                  disabled={savingEdit}
-                  style={floatingActionSaveStyle}
-                  aria-label="Save profile"
-                >
-                  {savingEdit ? "Saving…" : "Save"}
-                </button>
-              </>
-            ) : (
-              <>
-                <button
-                  type="button"
-                  onClick={enterEdit}
-                  aria-label="Edit profile"
-                  style={floatingActionStyle}
-                >
-                  <svg width="17" height="17" viewBox="0 0 17 17" fill="none" aria-hidden>
-                    <path
-                      d="M11.6 1.9l3.5 3.5-9.2 9.2H2.4v-3.5l9.2-9.2z"
-                      stroke="currentColor"
-                      strokeWidth="1.5"
-                      strokeLinejoin="round"
-                      fill="none"
-                    />
-                    <path
-                      d="M10.2 3.3l3.5 3.5"
-                      stroke="currentColor"
-                      strokeWidth="1.5"
-                      strokeLinecap="round"
-                    />
-                  </svg>
-                </button>
-                <Link href="/settings" aria-label="Settings" style={floatingActionStyle}>
-                  <svg width="18" height="18" viewBox="0 0 18 18" fill="none" aria-hidden>
-                    <circle cx="9" cy="9" r="2.4" stroke="currentColor" strokeWidth="1.5" />
-                    <path
-                      d="M9 1.5v2.2M9 14.3v2.2M16.5 9h-2.2M3.7 9H1.5M14.3 3.7l-1.55 1.55M5.25 12.75L3.7 14.3M14.3 14.3l-1.55-1.55M5.25 5.25L3.7 3.7"
-                      stroke="currentColor"
-                      strokeWidth="1.4"
-                      strokeLinecap="round"
-                    />
-                  </svg>
-                </Link>
-              </>
-            )}
-          </div>
-        )}
+        {/* Floating top-right actions — search is present for everyone
+            (visitor + owner); owners ALSO get the pencil + settings.
+            Search opens the unified CampusSearchOverlay so you can look
+            up other people, group chats, orgs, and events from the
+            profile surface without bouncing to /campus. */}
+        <div
+          style={{
+            position: "absolute",
+            top: "calc(env(safe-area-inset-top, 0px) + 14px)",
+            right: 14,
+            display: "flex",
+            gap: 8,
+          }}
+        >
+          {isVisitor || !editMode ? (
+            <button
+              type="button"
+              onClick={() => setSearchOpen(true)}
+              aria-label="Search"
+              style={floatingActionStyle}
+            >
+              <svg width="17" height="17" viewBox="0 0 17 17" fill="none" aria-hidden>
+                <circle cx="7.2" cy="7.2" r="5" stroke="currentColor" strokeWidth="1.6" />
+                <path
+                  d="M11 11l4 4"
+                  stroke="currentColor"
+                  strokeWidth="1.6"
+                  strokeLinecap="round"
+                />
+              </svg>
+            </button>
+          ) : null}
+          {isVisitor ? null : editMode ? (
+            <>
+              <button
+                type="button"
+                onClick={cancelEdit}
+                disabled={savingEdit}
+                style={floatingActionTextStyle}
+                aria-label="Cancel"
+              >
+                Cancel
+              </button>
+              <button
+                type="button"
+                onClick={commitEdit}
+                disabled={savingEdit}
+                style={floatingActionSaveStyle}
+                aria-label="Save profile"
+              >
+                {savingEdit ? "Saving…" : "Save"}
+              </button>
+            </>
+          ) : (
+            <>
+              <button
+                type="button"
+                onClick={enterEdit}
+                aria-label="Edit profile"
+                style={floatingActionStyle}
+              >
+                <svg width="17" height="17" viewBox="0 0 17 17" fill="none" aria-hidden>
+                  <path
+                    d="M11.6 1.9l3.5 3.5-9.2 9.2H2.4v-3.5l9.2-9.2z"
+                    stroke="currentColor"
+                    strokeWidth="1.5"
+                    strokeLinejoin="round"
+                    fill="none"
+                  />
+                  <path
+                    d="M10.2 3.3l3.5 3.5"
+                    stroke="currentColor"
+                    strokeWidth="1.5"
+                    strokeLinecap="round"
+                  />
+                </svg>
+              </button>
+              <Link href="/settings" aria-label="Settings" style={floatingActionStyle}>
+                <svg width="18" height="18" viewBox="0 0 18 18" fill="none" aria-hidden>
+                  <circle cx="9" cy="9" r="2.4" stroke="currentColor" strokeWidth="1.5" />
+                  <path
+                    d="M9 1.5v2.2M9 14.3v2.2M16.5 9h-2.2M3.7 9H1.5M14.3 3.7l-1.55 1.55M5.25 12.75L3.7 14.3M14.3 14.3l-1.55-1.55M5.25 5.25L3.7 3.7"
+                    stroke="currentColor"
+                    strokeWidth="1.4"
+                    strokeLinecap="round"
+                  />
+                </svg>
+              </Link>
+            </>
+          )}
+        </div>
       </div>
 
       {/* Identity block — overlaps the cover */}
@@ -1612,6 +1635,10 @@ export function ProfileMobile({ targetHandle }: Props = {}) {
           />
         </div>
       </div>
+
+      {searchOpen ? (
+        <CampusSearchOverlay onClose={() => setSearchOpen(false)} />
+      ) : null}
 
       {viewerItem ? (
         <ResumeViewerMobile
