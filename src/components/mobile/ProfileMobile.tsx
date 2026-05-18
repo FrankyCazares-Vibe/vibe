@@ -1534,6 +1534,7 @@ export function ProfileMobile({ targetHandle }: Props = {}) {
             onOpenDoc={(r) => setViewerItem(r)}
             isVisitor={isVisitor}
             ownerName={name}
+            editMode={editMode}
             onEditExperience={() => setEditingPortfolio("experience")}
             onEditCurrentOn={() => setEditingPortfolio("current-on")}
             onPickResume={() => resumeInputRef.current?.click()}
@@ -2711,6 +2712,7 @@ function PortfolioPane({
   onOpenDoc,
   isVisitor,
   ownerName,
+  editMode,
   onEditExperience,
   onEditCurrentOn,
   onPickResume,
@@ -2723,6 +2725,11 @@ function PortfolioPane({
   onOpenDoc: (r: ResumeItem) => void;
   isVisitor: boolean;
   ownerName: string;
+  /** Owner-only — when true, the Edit pills + per-doc delete × appear.
+   *  Toggled by the pencil button in the header chrome. Keeping the
+   *  affordances tucked behind edit mode means a visitor-shaped view
+   *  for the owner until they explicitly intend to edit. */
+  editMode?: boolean;
   /** Owner-only — open the experience editor sheet. */
   onEditExperience?: () => void;
   /** Owner-only — open the working-on editor sheet. */
@@ -2734,6 +2741,9 @@ function PortfolioPane({
   /** Owner-only — remove the doc at this index from resume_docs. */
   onDeleteDoc?: (index: number) => void;
 }) {
+  // Edit affordances only render when the owner has explicitly entered
+  // edit mode via the pencil. Visitors never see them.
+  const showOwnerEdits = !isVisitor && !!editMode;
   const allEmpty =
     currentProjects.length === 0 &&
     workExperience.length === 0 &&
@@ -2764,7 +2774,7 @@ function PortfolioPane({
         <PortfolioSubsection
           title="Working on"
           action={
-            !isVisitor && onEditCurrentOn ? (
+            showOwnerEdits && onEditCurrentOn ? (
               <EditPill onClick={onEditCurrentOn} label="Edit" />
             ) : null
           }
@@ -2790,7 +2800,7 @@ function PortfolioPane({
       <PortfolioSubsection
         title="Experience"
         action={
-          !isVisitor && onEditExperience ? (
+          showOwnerEdits && onEditExperience ? (
             <EditPill onClick={onEditExperience} label="Edit" />
           ) : null
         }
@@ -2846,7 +2856,7 @@ function PortfolioPane({
       <PortfolioSubsection
         title="Resume"
         action={
-          !isVisitor && onPickResume ? (
+          showOwnerEdits && onPickResume ? (
             <EditPill
               onClick={onPickResume}
               label={
@@ -2936,7 +2946,7 @@ function PortfolioPane({
                     ›
                   </span>
                 </button>
-                {!isVisitor && onDeleteDoc ? (
+                {showOwnerEdits && onDeleteDoc ? (
                   <button
                     type="button"
                     onClick={(e) => {
@@ -3102,6 +3112,11 @@ function ExperienceEditSheet({
   const [orderTouched, setOrderTouched] = useState(false);
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  // Index of the card currently being touch-dragged, or null. Used to
+  // dim the source card and suppress its hit-testing.
+  const [dragIndex, setDragIndex] = useState<number | null>(null);
+  const dragRef = useRef<{ idx: number; pointerId: number } | null>(null);
+  const listRef = useRef<HTMLDivElement | null>(null);
 
   const update = (i: number, patch: Partial<WorkExp>) => {
     setItems((prev) => prev.map((w, j) => (j === i ? { ...w, ...patch } : w)));
@@ -3125,6 +3140,46 @@ function ExperienceEditSheet({
     });
     setOrderTouched(true);
   };
+
+  // Touch / mouse drag-to-reorder. Drag handle calls dragStart with its
+  // index; pointer moves on the handle resize the array in real time
+  // based on which card's vertical midpoint the pointer crosses. Single
+  // listener on the handle thanks to pointer capture, so the gesture
+  // works even when the pointer leaves the handle's box (which it will
+  // immediately, since cards are bigger than the handle).
+  const dragStart = useCallback((i: number, e: React.PointerEvent) => {
+    (e.currentTarget as HTMLElement).setPointerCapture(e.pointerId);
+    dragRef.current = { idx: i, pointerId: e.pointerId };
+    setDragIndex(i);
+  }, []);
+  const dragMove = useCallback((e: React.PointerEvent) => {
+    const info = dragRef.current;
+    const list = listRef.current;
+    if (!info || !list) return;
+    const cards = list.querySelectorAll<HTMLDivElement>("[data-exp-card]");
+    let target = info.idx;
+    cards.forEach((el, idx) => {
+      const r = el.getBoundingClientRect();
+      const mid = r.top + r.height / 2;
+      if (idx < info.idx && e.clientY < mid && idx < target) target = idx;
+      else if (idx > info.idx && e.clientY > mid && idx > target) target = idx;
+    });
+    if (target !== info.idx) {
+      setItems((prev) => {
+        const next = prev.slice();
+        const [moved] = next.splice(info.idx, 1);
+        if (moved) next.splice(target, 0, moved);
+        return next;
+      });
+      setOrderTouched(true);
+      info.idx = target;
+      setDragIndex(target);
+    }
+  }, []);
+  const dragEnd = useCallback(() => {
+    dragRef.current = null;
+    setDragIndex(null);
+  }, []);
 
   const handleSave = async () => {
     if (saving) return;
@@ -3155,7 +3210,10 @@ function ExperienceEditSheet({
       saving={saving}
       error={error}
     >
-      <div style={{ display: "flex", flexDirection: "column", gap: 14 }}>
+      <div
+        ref={listRef}
+        style={{ display: "flex", flexDirection: "column", gap: 14 }}
+      >
         {items.length === 0 ? (
           <div
             style={{
@@ -3180,6 +3238,10 @@ function ExperienceEditSheet({
               onRemove={() => remove(i)}
               onMoveUp={i > 0 ? () => move(i, -1) : undefined}
               onMoveDown={i < items.length - 1 ? () => move(i, +1) : undefined}
+              onDragStart={(e) => dragStart(i, e)}
+              onDragMove={dragMove}
+              onDragEnd={dragEnd}
+              dragging={dragIndex === i}
               index={i}
             />
           ))
@@ -3227,6 +3289,10 @@ function ExperienceCard({
   onRemove,
   onMoveUp,
   onMoveDown,
+  onDragStart,
+  onDragMove,
+  onDragEnd,
+  dragging,
   index,
 }: {
   w: WorkExp;
@@ -3236,19 +3302,35 @@ function ExperienceCard({
   onMoveUp?: () => void;
   /** undefined when the card is already at the bottom edge. */
   onMoveDown?: () => void;
+  /** Drag handle pointer callbacks. Sheet wires these to a custom
+   *  touch-based reorder that hit-tests siblings to find the drop
+   *  target. setPointerCapture in onPointerDown keeps the gesture
+   *  glued to the handle even when the finger leaves its box. */
+  onDragStart?: (e: React.PointerEvent) => void;
+  onDragMove?: (e: React.PointerEvent) => void;
+  onDragEnd?: () => void;
+  /** True while this card is the active drag source — fades it so
+   *  the list reads as "this is where you dropped from". */
+  dragging?: boolean;
   index: number;
 }) {
   return (
     <div
+      data-exp-card
       style={{
         padding: 12,
         borderRadius: 14,
         background: "rgba(255,253,248,0.92)",
         border: "1px solid rgba(28,28,30,0.06)",
-        boxShadow: "inset 0 1px 0 rgba(255,255,255,0.7)",
+        boxShadow: dragging
+          ? "0 12px 28px rgba(20,8,40,0.18)"
+          : "inset 0 1px 0 rgba(255,255,255,0.7)",
         display: "flex",
         flexDirection: "column",
         gap: 8,
+        opacity: dragging ? 0.7 : 1,
+        transform: dragging ? "scale(1.01)" : "scale(1)",
+        transition: dragging ? "none" : "transform 160ms ease, opacity 160ms ease",
       }}
     >
       <div
@@ -3260,18 +3342,55 @@ function ExperienceCard({
           marginBottom: 2,
         }}
       >
-        <span
-          style={{
-            fontFamily: "DM Sans, sans-serif",
-            fontSize: 10.5,
-            fontWeight: 800,
-            letterSpacing: "0.12em",
-            textTransform: "uppercase",
-            color: "#8A8580",
-          }}
-        >
-          Role {index + 1}
-        </span>
+        <div style={{ display: "inline-flex", alignItems: "center", gap: 8 }}>
+          {onDragStart ? (
+            <button
+              type="button"
+              aria-label="Drag to reorder"
+              onPointerDown={onDragStart}
+              onPointerMove={onDragMove}
+              onPointerUp={onDragEnd}
+              onPointerCancel={onDragEnd}
+              style={{
+                width: 26,
+                height: 22,
+                padding: 0,
+                borderRadius: 8,
+                border: "1px solid rgba(28,28,30,0.12)",
+                background: "rgba(255,255,255,0.7)",
+                color: "#5C5853",
+                cursor: "grab",
+                touchAction: "none",
+                WebkitTapHighlightColor: "transparent",
+                display: "inline-flex",
+                alignItems: "center",
+                justifyContent: "center",
+                lineHeight: 1,
+              }}
+            >
+              <svg width="14" height="14" viewBox="0 0 14 14" aria-hidden>
+                <circle cx="4.5" cy="3.5" r="1.1" fill="currentColor" />
+                <circle cx="9.5" cy="3.5" r="1.1" fill="currentColor" />
+                <circle cx="4.5" cy="7"   r="1.1" fill="currentColor" />
+                <circle cx="9.5" cy="7"   r="1.1" fill="currentColor" />
+                <circle cx="4.5" cy="10.5" r="1.1" fill="currentColor" />
+                <circle cx="9.5" cy="10.5" r="1.1" fill="currentColor" />
+              </svg>
+            </button>
+          ) : null}
+          <span
+            style={{
+              fontFamily: "DM Sans, sans-serif",
+              fontSize: 10.5,
+              fontWeight: 800,
+              letterSpacing: "0.12em",
+              textTransform: "uppercase",
+              color: "#8A8580",
+            }}
+          >
+            Role {index + 1}
+          </span>
+        </div>
         <div style={{ display: "inline-flex", gap: 6 }}>
           <ReorderButton
             onClick={onMoveUp}
