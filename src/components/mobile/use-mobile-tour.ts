@@ -182,33 +182,48 @@ export function useMobileTour(leg: Leg) {
     }
     if (pending !== leg) return;
 
-    // Clear the flag immediately so a refresh mid-tour doesn't double-fire.
-    try {
-      localStorage.removeItem(PENDING_KEY);
-    } catch {
-      /* non-fatal */
-    }
+    // If a tour is already running (e.g., the desktop effect briefly
+    // mounted before the viewport-switch swapped to the mobile tree),
+    // bail rather than stacking two engines.
+    if (window.OttoTour?.isRunning?.()) return;
+
+    const MAX_POLL_MS = 8000;
+    const POLL_INTERVAL_MS = 250;
+    const startedAt = Date.now();
 
     void loadTourScript()
       .then(() => {
         if (cancelled) return;
-        // Wait one more frame + a small delay so React has flushed
-        // the layout and our targets exist with sane dimensions.
+        // Wait for the first target to render. ProfileMobile / CampusMobile
+        // do their own data fetches and mount the anchored elements only
+        // after data arrives, so we poll until the target exists or we
+        // hit a max so we don't spin forever on a busted route.
         const start = () => {
           if (cancelled || !window.OttoTour) return;
-          // Verify the first target actually exists. If not, retry once
-          // — content sometimes mounts a beat after initial paint.
           const firstSel = STEPS_BY_LEG[leg][0]?.selector;
           if (firstSel && !document.querySelector(firstSel)) {
-            setTimeout(start, 300);
+            if (Date.now() - startedAt > MAX_POLL_MS) {
+              // Restore the flag so a refresh / next visit can retry.
+              return;
+            }
+            setTimeout(start, POLL_INTERVAL_MS);
             return;
           }
+          // Clear the pending flag NOW — right before starting — so a
+          // failed start (target never appeared) keeps the flag for a
+          // retry, but a successful start doesn't re-fire on refresh.
+          try {
+            localStorage.removeItem(PENDING_KEY);
+          } catch {
+            /* non-fatal */
+          }
+          stripWelcomeParam();
           window.OttoTour.start(STEPS_BY_LEG[leg], {
             onDone: () => handleDone(leg, "done"),
             onSkip: () => handleDone(leg, "skip"),
           });
         };
-        setTimeout(start, 250);
+        setTimeout(start, POLL_INTERVAL_MS);
       })
       .catch(() => {
         /* network error — silent fail; user can try again from Settings */
@@ -218,6 +233,20 @@ export function useMobileTour(leg: Leg) {
       cancelled = true;
     };
   }, [leg]);
+}
+
+/** Remove `?welcome=1` from the URL without a navigation, so a refresh
+ *  during/after the tour doesn't re-trigger the desktop effects. */
+function stripWelcomeParam() {
+  if (typeof window === "undefined") return;
+  try {
+    const url = new URL(window.location.href);
+    if (!url.searchParams.has("welcome")) return;
+    url.searchParams.delete("welcome");
+    window.history.replaceState({}, "", url.pathname + url.search + url.hash);
+  } catch {
+    /* non-fatal */
+  }
 }
 
 function handleDone(leg: Leg, reason: "done" | "skip") {

@@ -123,6 +123,11 @@ export function NetworkPageClient() {
   // Network tour: final leg, triggered by ?welcome=1 or pending-flag handoff.
   useEffect(() => {
     if (typeof window === "undefined") return;
+    // Desktop-only. Mobile network tour is wired in `useMobileTour` and
+    // targets `#otto-mobile-tour-network-tabs` + the Otto tab in the
+    // bottom bar. Skip here so the engine doesn't fall back to a
+    // centered bubble with desktop-targeted selectors that don't exist.
+    if (window.matchMedia("(max-width: 899px)").matches) return;
     const params = new URLSearchParams(window.location.search);
     const fromUrl = params.get("welcome") === "1";
     let fromPending = false;

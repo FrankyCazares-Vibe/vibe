@@ -365,6 +365,16 @@ export function CampusHome({
   // profile leg; survives redirects that strip the URL param). Walks the
   // user through feed, tabs, and search, then hands off to /network.
   useEffect(() => {
+    // Desktop-only tour. The mobile equivalent lives in `useMobileTour`
+    // and targets the mobile-specific element IDs in `CampusMobile`. If
+    // this effect fires on a mobile viewport (CampusSwitch picks the
+    // tree at hydration time, but the desktop branch can still mount
+    // briefly during the SSR → mobile-viewport swap), the desktop
+    // selectors don't exist and the engine falls back to a centered
+    // bubble with desktop copy.
+    if (typeof window !== "undefined" && window.matchMedia("(max-width: 899px)").matches) {
+      return;
+    }
     const fromUrl = searchParams.get("welcome") === "1";
     let fromPending = false;
     try { fromPending = localStorage.getItem("vibe_tour_pending") === "campus"; } catch {}
