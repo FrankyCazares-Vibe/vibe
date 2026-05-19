@@ -3,7 +3,7 @@
 import Link from "next/link";
 import { useEffect, useRef, useState } from "react";
 
-import { FILTER_CSS } from "@/lib/clip/edit-metadata";
+import { FILTER_CSS, getOverlayCss } from "@/lib/clip/edit-metadata";
 
 /**
  * iOS-native vertical-clip viewer. Opens as a full-screen sheet from
@@ -267,7 +267,8 @@ export function ClipViewerMobile({
 
       {/* Text overlays from edit_metadata — positioned in %-coords so
           they scale with the viewport. Pointer-events off so they
-          don't intercept play/pause taps. */}
+          don't intercept play/pause taps. Style comes from
+          `getOverlayCss` so composer + viewer stay in lock-step. */}
       {editMeta?.text_overlays?.map((o) => (
         <div
           key={o.id}
@@ -277,17 +278,8 @@ export function ClipViewerMobile({
             left: `${o.x}%`,
             top: `${o.y}%`,
             transform: "translate(-50%, -50%)",
-            color: o.color,
-            fontFamily: "DM Sans, sans-serif",
-            fontWeight: 800,
-            fontSize: 22,
-            lineHeight: 1.2,
-            textAlign: "center",
-            textShadow: "0 1px 3px rgba(0,0,0,0.55), 0 0 1px rgba(0,0,0,0.35)",
             pointerEvents: "none",
-            maxWidth: "82%",
-            whiteSpace: "pre-wrap",
-            wordBreak: "break-word",
+            ...getOverlayCss(o),
           }}
         >
           {o.text}

@@ -8,10 +8,17 @@ import {
   ALLOWED_SPEEDS,
   FILTER_CSS,
   FILTER_PRESETS,
+  TEXT_OVERLAY_BGS,
+  TEXT_OVERLAY_FONTS,
+  TEXT_OVERLAY_SIZES,
   type ClipEditMetadata,
   type ClipSpeed,
   type FilterPreset,
   type TextOverlay,
+  type TextOverlayBg,
+  type TextOverlayFont,
+  type TextOverlaySize,
+  getOverlayCss,
 } from "@/lib/clip/edit-metadata";
 import {
   bindMentionPicker,
@@ -134,6 +141,91 @@ const composerVaulHiddenTitleStyle: React.CSSProperties = {
   border: 0,
 };
 
+/** Inline label + horizontally-laid-out controls row, used inside the
+ *  TextOverlayEditor for Color / Background / Font / Size pickers. */
+function ControlRow({
+  label,
+  children,
+}: {
+  label: string;
+  children: React.ReactNode;
+}) {
+  return (
+    <div
+      style={{
+        display: "flex",
+        alignItems: "center",
+        gap: 10,
+      }}
+    >
+      <span
+        style={{
+          fontFamily: "DM Sans, sans-serif",
+          fontSize: 10,
+          fontWeight: 700,
+          letterSpacing: "0.16em",
+          color: "rgba(255,255,255,0.55)",
+          textTransform: "uppercase",
+          minWidth: 76,
+        }}
+      >
+        {label}
+      </span>
+      <div
+        style={{
+          display: "flex",
+          gap: 6,
+          alignItems: "center",
+          flex: 1,
+          flexWrap: "wrap",
+        }}
+      >
+        {children}
+      </div>
+    </div>
+  );
+}
+
+function PillButton({
+  active,
+  onClick,
+  children,
+  style,
+  ...rest
+}: {
+  active: boolean;
+  onClick: () => void;
+  children: React.ReactNode;
+  style?: React.CSSProperties;
+  "aria-label"?: string;
+}) {
+  return (
+    <button
+      type="button"
+      onClick={onClick}
+      style={{
+        padding: "6px 12px",
+        borderRadius: 999,
+        border: active
+          ? "1.5px solid rgba(255,255,255,0.95)"
+          : "1px solid rgba(255,255,255,0.18)",
+        background: active
+          ? "rgba(255,255,255,0.16)"
+          : "rgba(255,255,255,0.04)",
+        color: "#fff",
+        fontFamily: "DM Sans, sans-serif",
+        fontSize: 13,
+        fontWeight: 700,
+        cursor: "pointer",
+        ...style,
+      }}
+      {...rest}
+    >
+      {children}
+    </button>
+  );
+}
+
 function TextOverlayEditor({
   initial,
   onSave,
@@ -149,6 +241,9 @@ function TextOverlayEditor({
 }) {
   const [text, setText] = useState(initial?.text ?? "");
   const [color, setColor] = useState(initial?.color ?? TEXT_COLORS[0]);
+  const [bg, setBg] = useState<TextOverlayBg>(initial?.bg ?? "none");
+  const [font, setFont] = useState<TextOverlayFont>(initial?.font ?? "sans");
+  const [size, setSize] = useState<TextOverlaySize>(initial?.size ?? "m");
   const inputRef = useRef<HTMLTextAreaElement | null>(null);
 
   // Auto-focus the text input when the modal opens — keyboard pops up
@@ -172,8 +267,17 @@ function TextOverlayEditor({
       x: initial?.x ?? 50,
       y: initial?.y ?? 50,
       color,
+      bg,
+      font,
+      size,
     });
   };
+
+  // Live preview style for the textarea so the user sees the chosen
+  // font / size / color / bg as they type.
+  const previewStyle = getOverlayCss(
+    { id: "preview", text: text || " ", x: 50, y: 50, color, bg, font, size },
+  );
 
   return (
     <Drawer.Root
@@ -241,64 +345,134 @@ function TextOverlayEditor({
         </button>
       </div>
 
-      {/* Text input — large, centered, full of vibes */}
-      <textarea
-        ref={inputRef}
-        value={text}
-        onChange={(e) => setText(e.target.value)}
-        placeholder="Type something…"
-        rows={4}
+      {/* Text input — picks up the live preview style so the user
+          sees their font / size / color / bg as they type. */}
+      <div
         style={{
           flex: 1,
-          margin: "8px 22px",
-          padding: 0,
-          background: "transparent",
-          border: "none",
-          outline: "none",
-          color,
-          fontFamily: "DM Sans, sans-serif",
-          fontWeight: 800,
-          fontSize: 26,
-          lineHeight: 1.25,
-          textAlign: "center",
-          textShadow: "0 1px 3px rgba(0,0,0,0.5)",
-          resize: "none",
-          caretColor: "#FF5C35",
+          display: "flex",
+          alignItems: "center",
+          justifyContent: "center",
+          padding: "8px 22px",
         }}
-      />
+      >
+        <textarea
+          ref={inputRef}
+          value={text}
+          onChange={(e) => setText(e.target.value)}
+          placeholder="Type something…"
+          rows={4}
+          style={{
+            ...previewStyle,
+            // Override a few things so the textarea is editable + visible
+            // (`maxWidth` from getOverlayCss is for rendered text, not
+            // input controls; `fontSize` we bump slightly so typing feels
+            // chunkier than the rendered size).
+            width: "100%",
+            maxWidth: "100%",
+            background:
+              previewStyle.background ?? "transparent",
+            border: "none",
+            outline: "none",
+            resize: "none",
+            caretColor: "#FF5C35",
+            fontSize: Math.max(
+              22,
+              typeof previewStyle.fontSize === "number"
+                ? previewStyle.fontSize
+                : 22,
+            ),
+          }}
+        />
+      </div>
 
-      {/* Color row */}
+      {/* ── Controls ───────────────────────────────────────────────── */}
       <div
         style={{
           display: "flex",
-          gap: 14,
-          justifyContent: "center",
-          padding: "14px 22px 18px",
+          flexDirection: "column",
+          gap: 12,
+          padding: "10px 22px 16px",
         }}
       >
-        {TEXT_COLORS.map((c) => {
-          const active = c === color;
-          return (
-            <button
-              key={c}
-              type="button"
-              aria-label={`Color ${c}`}
-              onClick={() => setColor(c)}
+        {/* Color row */}
+        <ControlRow label="Color">
+          {TEXT_COLORS.map((c) => {
+            const active = c === color;
+            return (
+              <button
+                key={c}
+                type="button"
+                aria-label={`Color ${c}`}
+                onClick={() => setColor(c)}
+                style={{
+                  width: 28,
+                  height: 28,
+                  borderRadius: "50%",
+                  border: active
+                    ? "2.5px solid #fff"
+                    : "1.5px solid rgba(255,255,255,0.42)",
+                  boxShadow: active
+                    ? "0 0 0 1px rgba(0,0,0,0.45)"
+                    : undefined,
+                  background: c,
+                  cursor: "pointer",
+                  padding: 0,
+                }}
+              />
+            );
+          })}
+        </ControlRow>
+
+        {/* Background row */}
+        <ControlRow label="Background">
+          {TEXT_OVERLAY_BGS.map((b) => (
+            <PillButton
+              key={b}
+              active={b === bg}
+              onClick={() => setBg(b)}
+              aria-label={`Background ${b}`}
+            >
+              {b === "none" ? "None" : b === "scrim" ? "Scrim" : "Fill"}
+            </PillButton>
+          ))}
+        </ControlRow>
+
+        {/* Font row */}
+        <ControlRow label="Font">
+          {TEXT_OVERLAY_FONTS.map((f) => (
+            <PillButton
+              key={f}
+              active={f === font}
+              onClick={() => setFont(f)}
+              aria-label={`Font ${f}`}
               style={{
-                width: 28,
-                height: 28,
-                borderRadius: "50%",
-                border: active
-                  ? "2.5px solid #fff"
-                  : "1.5px solid rgba(255,255,255,0.42)",
-                boxShadow: active ? "0 0 0 1px rgba(0,0,0,0.45)" : undefined,
-                background: c,
-                cursor: "pointer",
-                padding: 0,
+                fontFamily:
+                  f === "sans"
+                    ? "DM Sans, sans-serif"
+                    : f === "serif"
+                      ? "Fraunces, Georgia, serif"
+                      : "ui-monospace, Menlo, monospace",
               }}
-            />
-          );
-        })}
+            >
+              {f === "sans" ? "Sans" : f === "serif" ? "Serif" : "Mono"}
+            </PillButton>
+          ))}
+        </ControlRow>
+
+        {/* Size row */}
+        <ControlRow label="Size">
+          {TEXT_OVERLAY_SIZES.map((s) => (
+            <PillButton
+              key={s}
+              active={s === size}
+              onClick={() => setSize(s)}
+              aria-label={`Size ${s}`}
+            >
+              {s === "s" ? "S" : s === "m" ? "M" : "L"}
+            </PillButton>
+          ))}
+        </ControlRow>
       </div>
 
       {/* Delete button (edit mode only) */}
@@ -555,17 +729,8 @@ function DraftsListOverlay({
                       left: `${o.x}%`,
                       top: `${o.y}%`,
                       transform: "translate(-50%, -50%)",
-                      color: o.color,
-                      fontFamily: "DM Sans, sans-serif",
-                      fontWeight: 800,
-                      fontSize: 6,
-                      lineHeight: 1.1,
-                      textAlign: "center",
-                      textShadow: "0 1px 1px rgba(0,0,0,0.6)",
-                      maxWidth: "82%",
-                      whiteSpace: "pre-wrap",
-                      wordBreak: "break-word",
                       pointerEvents: "none",
+                      ...getOverlayCss(o, 0.27),
                     }}
                   >
                     {o.text}
@@ -2244,20 +2409,10 @@ export function ClipComposerMobile({
             left: `${o.x}%`,
             top: `${o.y}%`,
             transform: "translate(-50%, -50%)",
-            color: o.color,
-            fontFamily: "DM Sans, sans-serif",
-            fontWeight: 800,
-            fontSize: 22,
-            lineHeight: 1.2,
-            textAlign: "center",
-            textShadow: "0 1px 3px rgba(0,0,0,0.55), 0 0 1px rgba(0,0,0,0.35)",
-            maxWidth: "82%",
-            whiteSpace: "pre-wrap",
-            wordBreak: "break-word",
             cursor: "grab",
             touchAction: "none",
             userSelect: "none",
-            padding: "2px 4px",
+            ...getOverlayCss(o),
           }}
         >
           {o.text}

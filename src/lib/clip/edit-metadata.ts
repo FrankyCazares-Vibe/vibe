@@ -4,11 +4,24 @@
  * it on playback and applies each effect lossless (no re-encode).
  */
 
+import type { CSSProperties } from "react";
+
 export const FILTER_PRESETS = ["warm", "cool", "bw", "vivid"] as const;
 export type FilterPreset = (typeof FILTER_PRESETS)[number];
 
 export const ALLOWED_SPEEDS = [0.5, 1, 2] as const;
 export type ClipSpeed = (typeof ALLOWED_SPEEDS)[number];
+
+// Style enums for text overlays. All optional on the wire — older
+// overlays predate these fields and fall back to the defaults below.
+export const TEXT_OVERLAY_BGS = ["none", "scrim", "fill"] as const;
+export type TextOverlayBg = (typeof TEXT_OVERLAY_BGS)[number];
+
+export const TEXT_OVERLAY_FONTS = ["sans", "serif", "mono"] as const;
+export type TextOverlayFont = (typeof TEXT_OVERLAY_FONTS)[number];
+
+export const TEXT_OVERLAY_SIZES = ["s", "m", "l"] as const;
+export type TextOverlaySize = (typeof TEXT_OVERLAY_SIZES)[number];
 
 export type TextOverlay = {
   id: string;
@@ -16,6 +29,12 @@ export type TextOverlay = {
   x: number; // 0-100 (% of width)
   y: number; // 0-100 (% of height)
   color: string; // hex like #FFFFFF
+  /** Background style. Default "none" (text only with drop shadow). */
+  bg?: TextOverlayBg;
+  /** Font family. Default "sans" (DM Sans). */
+  font?: TextOverlayFont;
+  /** Font size bucket. Default "m" (22px at full scale). */
+  size?: TextOverlaySize;
 };
 
 export type ClipEditMetadata = {
@@ -35,6 +54,92 @@ export const FILTER_CSS: Record<FilterPreset, string> = {
   bw: "grayscale(1) contrast(1.08)",
   vivid: "saturate(1.55) contrast(1.1)",
 };
+
+// ── Style helper ───────────────────────────────────────────────────────────
+//
+// Every surface that renders text overlays (composer, ClipViewerMobile,
+// ProfileMobile clips grid, desktop campus clip card) calls this so the
+// look stays in sync. `scale` lets the small thumbnails downscale —
+// pass 0.5 for a 1/2-size grid cell, etc.
+
+const FONT_FAMILY: Record<TextOverlayFont, string> = {
+  sans: "DM Sans, sans-serif",
+  serif: "Fraunces, Georgia, serif",
+  mono: "ui-monospace, 'SF Mono', Menlo, Consolas, monospace",
+};
+
+const FONT_WEIGHT: Record<TextOverlayFont, number> = {
+  sans: 800,
+  serif: 800,
+  mono: 700,
+};
+
+const FONT_SIZE_PX: Record<TextOverlaySize, number> = {
+  s: 18,
+  m: 22,
+  l: 32,
+};
+
+/**
+ * Lightness check — picks dark/light text color when the user chose a
+ * `fill` background. Crude (just averaged RGB) but accurate enough that
+ * white text on yellow and black text on midnight both come out right.
+ */
+function isLightHex(hex: string): boolean {
+  if (!/^#[0-9A-Fa-f]{6}$/.test(hex)) return true;
+  const r = parseInt(hex.slice(1, 3), 16);
+  const g = parseInt(hex.slice(3, 5), 16);
+  const b = parseInt(hex.slice(5, 7), 16);
+  return r * 0.299 + g * 0.587 + b * 0.114 > 160;
+}
+
+export function getOverlayCss(
+  o: TextOverlay,
+  scale = 1,
+): CSSProperties {
+  const font = o.font ?? "sans";
+  const size = o.size ?? "m";
+  const bg = o.bg ?? "none";
+  const fontSize = Math.max(10, Math.round(FONT_SIZE_PX[size] * scale));
+
+  const base: CSSProperties = {
+    color: o.color,
+    fontFamily: FONT_FAMILY[font],
+    fontWeight: FONT_WEIGHT[font],
+    fontSize,
+    lineHeight: 1.2,
+    textAlign: "center",
+    maxWidth: "82%",
+    whiteSpace: "pre-wrap",
+    wordBreak: "break-word",
+  };
+
+  if (bg === "scrim") {
+    return {
+      ...base,
+      padding: `${Math.round(4 * scale)}px ${Math.round(10 * scale)}px`,
+      borderRadius: Math.round(8 * scale),
+      background: "rgba(0,0,0,0.55)",
+      backdropFilter: "blur(2px)",
+    };
+  }
+  if (bg === "fill") {
+    return {
+      ...base,
+      color: isLightHex(o.color) ? "#0E0E10" : "#FFFFFF",
+      padding: `${Math.round(4 * scale)}px ${Math.round(10 * scale)}px`,
+      borderRadius: Math.round(8 * scale),
+      background: o.color,
+    };
+  }
+  // "none" — just text with a drop shadow so it reads over anything.
+  return {
+    ...base,
+    textShadow: "0 1px 3px rgba(0,0,0,0.55), 0 0 1px rgba(0,0,0,0.35)",
+  };
+}
+
+// ── Sanitizer ──────────────────────────────────────────────────────────────
 
 function clamp(n: number, lo: number, hi: number): number {
   if (!Number.isFinite(n)) return lo;
@@ -74,7 +179,10 @@ export function sanitizeEditMetadata(input: unknown): ClipEditMetadata | null {
     const overlays: TextOverlay[] = [];
     for (const raw of input.text_overlays) {
       if (!isObject(raw)) continue;
-      const text = typeof raw.text === "string" ? raw.text.slice(0, MAX_OVERLAY_TEXT_LEN) : "";
+      const text =
+        typeof raw.text === "string"
+          ? raw.text.slice(0, MAX_OVERLAY_TEXT_LEN)
+          : "";
       if (!text.trim()) continue;
       const id =
         typeof raw.id === "string" && raw.id.length > 0
@@ -82,9 +190,29 @@ export function sanitizeEditMetadata(input: unknown): ClipEditMetadata | null {
           : Math.random().toString(36).slice(2, 10);
       const x = clamp(Number(raw.x), 0, 100);
       const y = clamp(Number(raw.y), 0, 100);
-      const colorRaw = typeof raw.color === "string" ? raw.color : "#FFFFFF";
+      const colorRaw =
+        typeof raw.color === "string" ? raw.color : "#FFFFFF";
       const color = /^#[0-9A-Fa-f]{6}$/.test(colorRaw) ? colorRaw : "#FFFFFF";
-      overlays.push({ id, text, x, y, color });
+      const overlay: TextOverlay = { id, text, x, y, color };
+      if (
+        typeof raw.bg === "string" &&
+        (TEXT_OVERLAY_BGS as readonly string[]).includes(raw.bg)
+      ) {
+        overlay.bg = raw.bg as TextOverlayBg;
+      }
+      if (
+        typeof raw.font === "string" &&
+        (TEXT_OVERLAY_FONTS as readonly string[]).includes(raw.font)
+      ) {
+        overlay.font = raw.font as TextOverlayFont;
+      }
+      if (
+        typeof raw.size === "string" &&
+        (TEXT_OVERLAY_SIZES as readonly string[]).includes(raw.size)
+      ) {
+        overlay.size = raw.size as TextOverlaySize;
+      }
+      overlays.push(overlay);
       if (overlays.length >= MAX_OVERLAYS) break;
     }
     if (overlays.length > 0) out.text_overlays = overlays;

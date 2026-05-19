@@ -10,7 +10,7 @@ import { ImageCropperModal } from "@/components/ImageCropperModal";
 import { emitCalendarChanged } from "@/components/LeftNav";
 import { SharePostSheet } from "@/components/mobile/SharePostSheet";
 import { MouseSpotlight } from "@/components/ui/mouse-spotlight";
-import { FILTER_CSS } from "@/lib/clip/edit-metadata";
+import { FILTER_CSS, getOverlayCss } from "@/lib/clip/edit-metadata";
 import {
   bindMentionPicker,
   capturePosterFrame,
@@ -4983,7 +4983,8 @@ function ClipReelCard({
       ) : null}
 
       {/* Text overlays — only render once we have the signed URL so they
-          appear in sync with the playback frame. */}
+          appear in sync with the playback frame. Style comes from
+          `getOverlayCss` so mobile + desktop stay in lock-step. */}
       {signedUrl && editMeta?.text_overlays?.length
         ? editMeta.text_overlays.map((o) => (
             <div
@@ -4994,17 +4995,8 @@ function ClipReelCard({
                 left: `${o.x}%`,
                 top: `${o.y}%`,
                 transform: "translate(-50%, -50%)",
-                color: o.color,
-                fontFamily: "DM Sans, sans-serif",
-                fontWeight: 800,
-                fontSize: 22,
-                lineHeight: 1.2,
-                textAlign: "center",
-                textShadow: "0 1px 3px rgba(0,0,0,0.55), 0 0 1px rgba(0,0,0,0.35)",
                 pointerEvents: "none",
-                maxWidth: "82%",
-                whiteSpace: "pre-wrap",
-                wordBreak: "break-word",
+                ...getOverlayCss(o),
               }}
             >
               {o.text}

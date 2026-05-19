@@ -13,7 +13,7 @@ import { PostComposerMobile } from "@/components/mobile/PostComposerMobile";
 import { PostViewerMobile } from "@/components/mobile/PostViewerMobile";
 import { ResumeViewerMobile } from "@/components/mobile/ResumeViewerMobile";
 import { useMobileTour } from "@/components/mobile/use-mobile-tour";
-import { FILTER_CSS } from "@/lib/clip/edit-metadata";
+import { FILTER_CSS, getOverlayCss } from "@/lib/clip/edit-metadata";
 import { IU_MAJORS_BY_SCHOOL } from "@/lib/iu/majors";
 import type { RedactionBar } from "@/lib/profile/resume-redactions";
 import { sortWorkExperienceByRecency } from "@/lib/profile/work-experience";
@@ -2711,9 +2711,8 @@ function PostThumb({
           }}
         />
       ) : null}
-      {/* Text overlays at their %-coords. Font size is scaled down
-          for the grid (vs the full-screen viewer's 22px) so they
-          read at thumbnail scale. */}
+      {/* Text overlays at their %-coords. Scaled down for the grid
+          via getOverlayCss(o, 0.41) so they read at thumbnail size. */}
       {!isTextOnly && overlays.length > 0
         ? overlays.map((o) => (
             <div
@@ -2724,17 +2723,8 @@ function PostThumb({
                 left: `${o.x}%`,
                 top: `${o.y}%`,
                 transform: "translate(-50%, -50%)",
-                color: o.color,
-                fontFamily: "DM Sans, sans-serif",
-                fontWeight: 800,
-                fontSize: 9,
-                lineHeight: 1.15,
-                textAlign: "center",
-                textShadow: "0 1px 2px rgba(0,0,0,0.55)",
-                maxWidth: "82%",
-                whiteSpace: "pre-wrap",
-                wordBreak: "break-word",
                 pointerEvents: "none",
+                ...getOverlayCss(o, 0.41),
               }}
             >
               {o.text}
