@@ -10,7 +10,11 @@ import { ImageCropperModal } from "@/components/ImageCropperModal";
 import { emitCalendarChanged } from "@/components/LeftNav";
 import { SharePostSheet } from "@/components/mobile/SharePostSheet";
 import { MouseSpotlight } from "@/components/ui/mouse-spotlight";
-import { FILTER_CSS, getOverlayCss } from "@/lib/clip/edit-metadata";
+import {
+  FILTER_CSS,
+  getOverlayCss,
+  isOverlayVisible,
+} from "@/lib/clip/edit-metadata";
 import {
   bindMentionPicker,
   capturePosterFrame,
@@ -4679,6 +4683,9 @@ function ClipReelCard({
   const [muted, setMuted] = useState(true);
   const [paused, setPaused] = useState(true);
   const [signedUrl, setSignedUrl] = useState<string | null>(null);
+  // Playback time for per-overlay timing gates. Only tracked when at
+  // least one overlay actually has timing constraints.
+  const [currentMs, setCurrentMs] = useState(0);
 
   // Engagement state — seeded from the feed payload, mutated optimistically
   // on click, rolled back on API failure. Same pattern as FeedRow.
@@ -4784,6 +4791,21 @@ function ClipReelCard({
     if (!v) return;
     v.playbackRate = editMeta?.speed ?? 1;
   }, [editMeta?.speed, signedUrl]);
+
+  // Track currentTime → ms for the per-overlay timing gate. Skip when
+  // no overlay has timing constraints so simple clips don't burn
+  // re-renders 4×/second.
+  useEffect(() => {
+    const hasTimed = (editMeta?.text_overlays ?? []).some(
+      (o) => o.startMs !== undefined || o.endMs !== undefined,
+    );
+    if (!hasTimed) return;
+    const v = videoRef.current;
+    if (!v) return;
+    const onTU = () => setCurrentMs(Math.round(v.currentTime * 1000));
+    v.addEventListener("timeupdate", onTU);
+    return () => v.removeEventListener("timeupdate", onTU);
+  }, [editMeta?.text_overlays, signedUrl]);
 
   useEffect(() => {
     const v = videoRef.current;
@@ -4984,9 +5006,13 @@ function ClipReelCard({
 
       {/* Text overlays — only render once we have the signed URL so they
           appear in sync with the playback frame. Style comes from
-          `getOverlayCss` so mobile + desktop stay in lock-step. */}
+          `getOverlayCss` so mobile + desktop stay in lock-step.
+          Per-overlay timing (startMs/endMs) gates visibility against
+          the current playback ms. */}
       {signedUrl && editMeta?.text_overlays?.length
-        ? editMeta.text_overlays.map((o) => (
+        ? editMeta.text_overlays
+            .filter((o) => isOverlayVisible(o, currentMs))
+            .map((o) => (
             <div
               key={o.id}
               aria-hidden

@@ -35,6 +35,15 @@ export type TextOverlay = {
   font?: TextOverlayFont;
   /** Font size bucket. Default "m" (22px at full scale). */
   size?: TextOverlaySize;
+  /** Continuous scale multiplier (pinch-to-resize). Default 1.0.
+   *  Clamped 0.4–3.0 server-side. Stacks with the `size` bucket — pick
+   *  S / M / L for the base feel, then pinch for fine adjustment. */
+  scale?: number;
+  /** Visibility window in ms relative to clip start. When both are set
+   *  the overlay only renders when `currentMs` is in [startMs, endMs].
+   *  Either side optional — startMs default 0, endMs default clip end. */
+  startMs?: number;
+  endMs?: number;
 };
 
 export type ClipEditMetadata = {
@@ -100,7 +109,13 @@ export function getOverlayCss(
   const font = o.font ?? "sans";
   const size = o.size ?? "m";
   const bg = o.bg ?? "none";
-  const fontSize = Math.max(10, Math.round(FONT_SIZE_PX[size] * scale));
+  // Continuous user-controlled scale (pinch-to-resize) stacks on top of
+  // the per-surface render scale (small thumbnails downscale).
+  const userScale = typeof o.scale === "number" ? o.scale : 1;
+  const fontSize = Math.max(
+    10,
+    Math.round(FONT_SIZE_PX[size] * scale * userScale),
+  );
 
   const base: CSSProperties = {
     color: o.color,
@@ -137,6 +152,15 @@ export function getOverlayCss(
     ...base,
     textShadow: "0 1px 3px rgba(0,0,0,0.55), 0 0 1px rgba(0,0,0,0.35)",
   };
+}
+
+/** True when the overlay should be painted at the given playback time.
+ *  Both endpoints are optional — `startMs` defaults to 0 (clip start)
+ *  and `endMs` defaults to infinity. */
+export function isOverlayVisible(o: TextOverlay, currentMs: number): boolean {
+  if (typeof o.startMs === "number" && currentMs < o.startMs) return false;
+  if (typeof o.endMs === "number" && currentMs > o.endMs) return false;
+  return true;
 }
 
 // ── Sanitizer ──────────────────────────────────────────────────────────────
@@ -211,6 +235,25 @@ export function sanitizeEditMetadata(input: unknown): ClipEditMetadata | null {
         (TEXT_OVERLAY_SIZES as readonly string[]).includes(raw.size)
       ) {
         overlay.size = raw.size as TextOverlaySize;
+      }
+      if (typeof raw.scale === "number" && Number.isFinite(raw.scale)) {
+        overlay.scale = clamp(raw.scale, 0.4, 3);
+      }
+      if (typeof raw.startMs === "number" && Number.isFinite(raw.startMs)) {
+        overlay.startMs = Math.max(0, Math.round(raw.startMs));
+      }
+      if (typeof raw.endMs === "number" && Number.isFinite(raw.endMs)) {
+        overlay.endMs = Math.max(0, Math.round(raw.endMs));
+      }
+      // Sanity: if both endpoints set, ensure end > start. If not, drop
+      // both so the overlay defaults back to "always visible."
+      if (
+        overlay.startMs !== undefined &&
+        overlay.endMs !== undefined &&
+        overlay.endMs <= overlay.startMs
+      ) {
+        delete overlay.startMs;
+        delete overlay.endMs;
       }
       overlays.push(overlay);
       if (overlays.length >= MAX_OVERLAYS) break;

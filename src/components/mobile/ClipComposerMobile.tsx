@@ -226,11 +226,141 @@ function PillButton({
   );
 }
 
+/**
+ * Two-thumb range slider for picking a `start_ms — end_ms` window of
+ * the clip during which a text overlay should be visible. When both
+ * thumbs are at the rail extremes, returns `undefined` for both so the
+ * overlay defaults back to "always on" (no startMs/endMs persisted).
+ */
+function TimingRange({
+  durationMs,
+  startMs,
+  endMs,
+  onChange,
+}: {
+  durationMs: number;
+  startMs: number | undefined;
+  endMs: number | undefined;
+  onChange: (s: number | undefined, e: number | undefined) => void;
+}) {
+  const barRef = useRef<HTMLDivElement | null>(null);
+  // Resolved values for rendering (fall back to full range when null).
+  const startPct = ((startMs ?? 0) / durationMs) * 100;
+  const endPct = ((endMs ?? durationMs) / durationMs) * 100;
+
+  const setThumb = (which: "start" | "end", clientX: number) => {
+    const rect = barRef.current?.getBoundingClientRect();
+    if (!rect || rect.width === 0) return;
+    const pct = Math.max(0, Math.min(100, ((clientX - rect.left) / rect.width) * 100));
+    const ms = Math.round((pct / 100) * durationMs);
+    let s = startMs ?? 0;
+    let e = endMs ?? durationMs;
+    if (which === "start") {
+      s = Math.min(ms, e - 100); // keep at least 100ms gap
+    } else {
+      e = Math.max(ms, s + 100);
+    }
+    // Treat full range as "no constraint" so the saved overlay stays
+    // simple (no startMs/endMs).
+    const noConstraint = s <= 1 && e >= durationMs - 1;
+    onChange(noConstraint ? undefined : s, noConstraint ? undefined : e);
+  };
+
+  const dragRef = useRef<"start" | "end" | null>(null);
+
+  const fmt = (ms: number) => `${(ms / 1000).toFixed(1)}s`;
+
+  return (
+    <div style={{ flex: 1, display: "flex", flexDirection: "column", gap: 4 }}>
+      <div
+        ref={barRef}
+        style={{
+          position: "relative",
+          height: 22,
+          touchAction: "none",
+          userSelect: "none",
+        }}
+        onPointerDown={(e) => {
+          // Pick whichever thumb is closer to the tap point.
+          const rect = e.currentTarget.getBoundingClientRect();
+          const pct = ((e.clientX - rect.left) / rect.width) * 100;
+          dragRef.current = Math.abs(pct - startPct) <= Math.abs(pct - endPct) ? "start" : "end";
+          e.currentTarget.setPointerCapture(e.pointerId);
+          setThumb(dragRef.current, e.clientX);
+        }}
+        onPointerMove={(e) => {
+          if (!dragRef.current) return;
+          setThumb(dragRef.current, e.clientX);
+        }}
+        onPointerUp={(e) => {
+          e.currentTarget.releasePointerCapture(e.pointerId);
+          dragRef.current = null;
+        }}
+      >
+        {/* Track */}
+        <div
+          style={{
+            position: "absolute",
+            top: 10,
+            left: 0,
+            right: 0,
+            height: 3,
+            background: "rgba(255,255,255,0.18)",
+            borderRadius: 2,
+          }}
+        />
+        {/* Selected range */}
+        <div
+          style={{
+            position: "absolute",
+            top: 10,
+            left: `${startPct}%`,
+            width: `${Math.max(0, endPct - startPct)}%`,
+            height: 3,
+            background: "#FF5C35",
+            borderRadius: 2,
+          }}
+        />
+        {/* Thumbs */}
+        {(["start", "end"] as const).map((which) => (
+          <div
+            key={which}
+            style={{
+              position: "absolute",
+              top: 4,
+              left: `${which === "start" ? startPct : endPct}%`,
+              transform: "translateX(-50%)",
+              width: 14,
+              height: 14,
+              borderRadius: "50%",
+              background: "#fff",
+              boxShadow: "0 1px 4px rgba(0,0,0,0.4)",
+              border: "2px solid #FF5C35",
+            }}
+          />
+        ))}
+      </div>
+      <div
+        style={{
+          fontSize: 10,
+          color: "rgba(255,255,255,0.55)",
+          fontFamily: "DM Sans, sans-serif",
+          letterSpacing: "0.04em",
+        }}
+      >
+        {fmt(startMs ?? 0)} — {fmt(endMs ?? durationMs)}
+        {startMs === undefined && endMs === undefined ? " (whole clip)" : ""}
+      </div>
+    </div>
+  );
+}
+
 function TextOverlayEditor({
   initial,
   onSave,
   onDelete,
   onCancel,
+  clipDurationMs,
 }: {
   /** null → drafting a new overlay, otherwise the overlay being edited. */
   initial: TextOverlay | null;
@@ -238,12 +368,18 @@ function TextOverlayEditor({
   /** Only provided in edit mode. */
   onDelete?: () => void;
   onCancel: () => void;
+  /** When > 0, enables the "Timing" control so the user can scope an
+   *  overlay to a sub-range of the clip. Otherwise the timing UI is
+   *  hidden and the overlay shows for the whole clip. */
+  clipDurationMs?: number;
 }) {
   const [text, setText] = useState(initial?.text ?? "");
   const [color, setColor] = useState(initial?.color ?? TEXT_COLORS[0]);
   const [bg, setBg] = useState<TextOverlayBg>(initial?.bg ?? "none");
   const [font, setFont] = useState<TextOverlayFont>(initial?.font ?? "sans");
   const [size, setSize] = useState<TextOverlaySize>(initial?.size ?? "m");
+  const [startMs, setStartMs] = useState<number | undefined>(initial?.startMs);
+  const [endMs, setEndMs] = useState<number | undefined>(initial?.endMs);
   const inputRef = useRef<HTMLTextAreaElement | null>(null);
 
   // Auto-focus the text input when the modal opens — keyboard pops up
@@ -261,7 +397,7 @@ function TextOverlayEditor({
       else onCancel();
       return;
     }
-    onSave({
+    const next: TextOverlay = {
       id: initial?.id ?? Math.random().toString(36).slice(2, 10),
       text: trimmed,
       x: initial?.x ?? 50,
@@ -270,7 +406,11 @@ function TextOverlayEditor({
       bg,
       font,
       size,
-    });
+    };
+    if (typeof initial?.scale === "number") next.scale = initial.scale;
+    if (typeof startMs === "number") next.startMs = startMs;
+    if (typeof endMs === "number") next.endMs = endMs;
+    onSave(next);
   };
 
   // Live preview style for the textarea so the user sees the chosen
@@ -279,28 +419,29 @@ function TextOverlayEditor({
     { id: "preview", text: text || " ", x: 50, y: 50, color, bg, font, size },
   );
 
+  // Instagram-style editor: full-screen translucent overlay so the
+  // composer's video preview stays visible behind. Top bar (Cancel /
+  // Done), centered textarea, floating controls just above the
+  // keyboard. No vaul Drawer — we don't need the swipe gesture and
+  // the drawer's opaque content panel was the source of the "screen
+  // turns black" complaint.
   return (
-    <Drawer.Root
-      open
-      direction="right"
-      onOpenChange={(o) => { if (!o) onCancel(); }}
+    <div
+      role="dialog"
+      aria-label={initial ? "Edit text" : "Add text"}
+      style={{
+        position: "fixed",
+        inset: 0,
+        zIndex: 1300,
+        display: "flex",
+        flexDirection: "column",
+        background: "rgba(0,0,0,0.32)",
+        backdropFilter: "blur(2px)",
+        WebkitBackdropFilter: "blur(2px)",
+        paddingTop: "env(safe-area-inset-top, 0px)",
+        paddingBottom: "env(safe-area-inset-bottom, 0px)",
+      }}
     >
-      <Drawer.Portal>
-        <Drawer.Overlay style={composerVaulOverlayStyle} />
-        <Drawer.Content
-          style={{
-            ...composerVaulContentStyle,
-            background: "rgba(0,0,0,0.92)",
-            backdropFilter: "blur(12px)",
-            WebkitBackdropFilter: "blur(12px)",
-            paddingTop: "env(safe-area-inset-top, 0px)",
-            paddingBottom: "env(safe-area-inset-bottom, 0px)",
-          }}
-          aria-describedby={undefined}
-        >
-          <Drawer.Title style={composerVaulHiddenTitleStyle}>
-            {initial ? "Edit text" : "Add text"}
-          </Drawer.Title>
       {/* Top bar — Cancel / Save */}
       <div
         style={{
@@ -314,14 +455,15 @@ function TextOverlayEditor({
           type="button"
           onClick={onCancel}
           style={{
-            background: "transparent",
-            border: "none",
-            color: "rgba(255,255,255,0.86)",
+            background: "rgba(0,0,0,0.4)",
+            border: "1px solid rgba(255,255,255,0.18)",
+            color: "rgba(255,255,255,0.92)",
             fontFamily: "DM Sans, sans-serif",
             fontWeight: 600,
-            fontSize: 15,
+            fontSize: 14,
             cursor: "pointer",
-            padding: 6,
+            padding: "8px 14px",
+            borderRadius: 999,
           }}
         >
           Cancel
@@ -339,14 +481,16 @@ function TextOverlayEditor({
             fontSize: 14,
             fontWeight: 800,
             cursor: "pointer",
+            boxShadow: "0 4px 14px rgba(255,92,53,0.4)",
           }}
         >
           Done
         </button>
       </div>
 
-      {/* Text input — picks up the live preview style so the user
-          sees their font / size / color / bg as they type. */}
+      {/* Text input — flex grows to fill space between top bar and
+          controls. Textarea picks up the live overlay style so the user
+          sees the exact result while typing. */}
       <div
         style={{
           flex: 1,
@@ -354,6 +498,7 @@ function TextOverlayEditor({
           alignItems: "center",
           justifyContent: "center",
           padding: "8px 22px",
+          minHeight: 0,
         }}
       >
         <textarea
@@ -361,21 +506,20 @@ function TextOverlayEditor({
           value={text}
           onChange={(e) => setText(e.target.value)}
           placeholder="Type something…"
-          rows={4}
+          rows={3}
           style={{
             ...previewStyle,
-            // Override a few things so the textarea is editable + visible
-            // (`maxWidth` from getOverlayCss is for rendered text, not
-            // input controls; `fontSize` we bump slightly so typing feels
-            // chunkier than the rendered size).
             width: "100%",
             maxWidth: "100%",
-            background:
-              previewStyle.background ?? "transparent",
+            background: previewStyle.background ?? "transparent",
             border: "none",
             outline: "none",
             resize: "none",
             caretColor: "#FF5C35",
+            // While typing keep a minimum of 22px so input feels chunky
+            // even when the user picked "Small". The pinned overlay still
+            // renders at the chosen size — only the editor's typing
+            // feedback boosts the floor.
             fontSize: Math.max(
               22,
               typeof previewStyle.fontSize === "number"
@@ -386,16 +530,19 @@ function TextOverlayEditor({
         />
       </div>
 
-      {/* ── Controls ───────────────────────────────────────────────── */}
+      {/* Floating controls — small, glassy, sitting just above the
+          on-screen keyboard. Each row is a pill group so the layout
+          stays tight on a phone. */}
       <div
         style={{
           display: "flex",
           flexDirection: "column",
-          gap: 12,
-          padding: "10px 22px 16px",
+          gap: 8,
+          padding: "8px 12px 12px",
+          background:
+            "linear-gradient(to top, rgba(0,0,0,0.45) 60%, rgba(0,0,0,0))",
         }}
       >
-        {/* Color row */}
         <ControlRow label="Color">
           {TEXT_COLORS.map((c) => {
             const active = c === color;
@@ -406,8 +553,8 @@ function TextOverlayEditor({
                 aria-label={`Color ${c}`}
                 onClick={() => setColor(c)}
                 style={{
-                  width: 28,
-                  height: 28,
+                  width: 26,
+                  height: 26,
                   borderRadius: "50%",
                   border: active
                     ? "2.5px solid #fff"
@@ -424,7 +571,6 @@ function TextOverlayEditor({
           })}
         </ControlRow>
 
-        {/* Background row */}
         <ControlRow label="Background">
           {TEXT_OVERLAY_BGS.map((b) => (
             <PillButton
@@ -438,7 +584,6 @@ function TextOverlayEditor({
           ))}
         </ControlRow>
 
-        {/* Font row */}
         <ControlRow label="Font">
           {TEXT_OVERLAY_FONTS.map((f) => (
             <PillButton
@@ -460,7 +605,6 @@ function TextOverlayEditor({
           ))}
         </ControlRow>
 
-        {/* Size row */}
         <ControlRow label="Size">
           {TEXT_OVERLAY_SIZES.map((s) => (
             <PillButton
@@ -473,39 +617,55 @@ function TextOverlayEditor({
             </PillButton>
           ))}
         </ControlRow>
-      </div>
 
-      {/* Delete button (edit mode only) */}
-      {onDelete ? (
-        <div
-          style={{
-            display: "flex",
-            justifyContent: "center",
-            paddingBottom: 16,
-          }}
-        >
-          <button
-            type="button"
-            onClick={onDelete}
+        {/* Timing — only when the composer passed a clip duration.
+            Drag thumbs to scope when the overlay is visible during
+            playback. Defaults to the whole clip. */}
+        {clipDurationMs && clipDurationMs > 0 ? (
+          <ControlRow label="When">
+            <TimingRange
+              durationMs={clipDurationMs}
+              startMs={startMs}
+              endMs={endMs}
+              onChange={(s, e) => {
+                setStartMs(s);
+                setEndMs(e);
+              }}
+            />
+          </ControlRow>
+        ) : null}
+
+        {/* Delete button (edit mode only) — sits below the controls so
+            it's reachable without scrolling past them. */}
+        {onDelete ? (
+          <div
             style={{
-              padding: "8px 18px",
-              borderRadius: 999,
-              border: "1px solid rgba(255,90,90,0.6)",
-              background: "rgba(255,90,90,0.18)",
-              color: "#FFB4B4",
-              fontFamily: "DM Sans, sans-serif",
-              fontWeight: 700,
-              fontSize: 13,
-              cursor: "pointer",
+              display: "flex",
+              justifyContent: "center",
+              paddingTop: 4,
             }}
           >
-            Delete
-          </button>
-        </div>
-      ) : null}
-        </Drawer.Content>
-      </Drawer.Portal>
-    </Drawer.Root>
+            <button
+              type="button"
+              onClick={onDelete}
+              style={{
+                padding: "6px 14px",
+                borderRadius: 999,
+                border: "1px solid rgba(255,90,90,0.6)",
+                background: "rgba(255,90,90,0.18)",
+                color: "#FFB4B4",
+                fontFamily: "DM Sans, sans-serif",
+                fontWeight: 700,
+                fontSize: 12,
+                cursor: "pointer",
+              }}
+            >
+              Delete
+            </button>
+          </div>
+        ) : null}
+      </div>
+    </div>
   );
 }
 
@@ -914,9 +1074,24 @@ export function ClipComposerMobile({
   const recordingStreamRef = useRef<MediaStream | null>(null);
   // Trim scrubber bar — used to compute pct from pointer X.
   const trimBarRef = useRef<HTMLDivElement | null>(null);
-  // Drag state for text overlays. Threshold-based: <5px movement is a
-  // tap (opens editor); ≥5px is a drag (updates x/y in real time).
-  const overlayDragRef = useRef<{ id: string; startX: number; startY: number; dragged: boolean } | null>(null);
+  // Gesture state for text overlays. Tracks all live pointers so we
+  // can switch between single-finger drag and two-finger pinch.
+  //
+  // - <5px movement with one pointer = tap (opens editor on pointer up)
+  // - ≥5px movement with one pointer = drag (updates x/y in real time)
+  // - second pointer lands on the same overlay = pinch (updates scale)
+  //   The initial distance + scale are captured when the 2nd pointer
+  //   arrives; current distance / initial distance × initial scale.
+  const overlayGestureRef = useRef<{
+    id: string;
+    pointers: Map<number, { x: number; y: number }>;
+    dragged: boolean;
+    startX: number;
+    startY: number;
+    pinching: boolean;
+    initialDist: number;
+    initialScale: number;
+  } | null>(null);
   // If we're resuming a draft, this holds the existing post's id.
   // Cleared on Retake so a new recording publishes as a fresh post.
   const draftIdRef = useRef<string | null>(initialDraft?.id ?? null);
@@ -1123,7 +1298,18 @@ export function ClipComposerMobile({
       // does only a tiny crop instead of a brutal one.
       const s = await navigator.mediaDevices.getUserMedia({
         video: { facingMode: next },
-        audio: true,
+        // Audio constraints: keep echoCancellation (helps voice-over-mic
+        // bleed) but disable noiseSuppression + autoGainControl, which
+        // are the usual culprits behind "metallic / lispy / pumping"
+        // audio in mobile webview recordings. Request stereo + 48kHz
+        // so we don't get downsampled to mono 16kHz.
+        audio: {
+          echoCancellation: true,
+          noiseSuppression: false,
+          autoGainControl: false,
+          channelCount: 2,
+          sampleRate: 48000,
+        },
       });
       // Stop any prior tracks before swapping (front/back toggle).
       setStream((prev) => {
@@ -1341,11 +1527,17 @@ export function ClipComposerMobile({
         : MediaRecorder.isTypeSupported(webmVp8)
           ? webmVp8
           : "";
+    // Recorder options. Audio bitrate explicit so Safari doesn't default
+    // to its ~32 kbps mono "speech codec" which sounds compressed and
+    // tinny. 128 kbps is the same target as voice memos / IG / TikTok.
+    // Video bitrate is left default since the canvas is already 720p-ish.
+    const recorderOpts: MediaRecorderOptions = {
+      audioBitsPerSecond: 128000,
+    };
+    if (mimeType) recorderOpts.mimeType = mimeType;
     let recorder: MediaRecorder;
     try {
-      recorder = mimeType
-        ? new MediaRecorder(recordingStream, { mimeType })
-        : new MediaRecorder(recordingStream);
+      recorder = new MediaRecorder(recordingStream, recorderOpts);
     } catch (e) {
       setError(
         e instanceof Error
@@ -2370,22 +2562,60 @@ export function ClipComposerMobile({
           aria-label={`Edit overlay: ${o.text}`}
           onPointerDown={(e) => {
             e.currentTarget.setPointerCapture(e.pointerId);
-            overlayDragRef.current = {
-              id: o.id,
-              startX: e.clientX,
-              startY: e.clientY,
-              dragged: false,
-            };
+            const g = overlayGestureRef.current;
+            if (g && g.id === o.id) {
+              // Second (or third+) pointer on the same overlay → pinch.
+              g.pointers.set(e.pointerId, { x: e.clientX, y: e.clientY });
+              if (g.pointers.size >= 2 && !g.pinching) {
+                const pts = [...g.pointers.values()];
+                g.pinching = true;
+                g.initialDist = Math.hypot(
+                  pts[0].x - pts[1].x,
+                  pts[0].y - pts[1].y,
+                );
+                g.initialScale = o.scale ?? 1;
+              }
+            } else {
+              overlayGestureRef.current = {
+                id: o.id,
+                pointers: new Map([
+                  [e.pointerId, { x: e.clientX, y: e.clientY }],
+                ]),
+                dragged: false,
+                startX: e.clientX,
+                startY: e.clientY,
+                pinching: false,
+                initialDist: 0,
+                initialScale: o.scale ?? 1,
+              };
+            }
           }}
           onPointerMove={(e) => {
-            const drag = overlayDragRef.current;
-            if (!drag || drag.id !== o.id) return;
-            const dx = e.clientX - drag.startX;
-            const dy = e.clientY - drag.startY;
-            if (!drag.dragged && Math.hypot(dx, dy) > 5) {
-              drag.dragged = true;
+            const g = overlayGestureRef.current;
+            if (!g || g.id !== o.id) return;
+            g.pointers.set(e.pointerId, { x: e.clientX, y: e.clientY });
+
+            if (g.pinching && g.pointers.size >= 2 && g.initialDist > 0) {
+              const pts = [...g.pointers.values()];
+              const dist = Math.hypot(
+                pts[0].x - pts[1].x,
+                pts[0].y - pts[1].y,
+              );
+              const scale = Math.max(
+                0.4,
+                Math.min(3, g.initialScale * (dist / g.initialDist)),
+              );
+              setTextOverlays((prev) =>
+                prev.map((p) => (p.id === o.id ? { ...p, scale } : p)),
+              );
+              return;
             }
-            if (!drag.dragged) return;
+
+            // Single-pointer drag.
+            const dx = e.clientX - g.startX;
+            const dy = e.clientY - g.startY;
+            if (!g.dragged && Math.hypot(dx, dy) > 5) g.dragged = true;
+            if (!g.dragged) return;
             const rect = playbackVideoRef.current?.getBoundingClientRect();
             if (!rect) return;
             const pctX = ((e.clientX - rect.left) / rect.width) * 100;
@@ -2398,11 +2628,28 @@ export function ClipComposerMobile({
           }}
           onPointerUp={(e) => {
             e.currentTarget.releasePointerCapture(e.pointerId);
-            const drag = overlayDragRef.current;
-            overlayDragRef.current = null;
-            if (drag && drag.id === o.id && !drag.dragged) {
-              setEditingOverlay(o);
+            const g = overlayGestureRef.current;
+            if (!g || g.id !== o.id) return;
+            g.pointers.delete(e.pointerId);
+            if (g.pointers.size === 0) {
+              const wasTap = !g.dragged && !g.pinching;
+              overlayGestureRef.current = null;
+              if (wasTap) setEditingOverlay(o);
+            } else if (g.pointers.size === 1 && g.pinching) {
+              // Dropped from pinch back to a single drag — reset drag
+              // tracking origin to the remaining pointer's spot.
+              g.pinching = false;
+              const remaining = [...g.pointers.values()][0];
+              g.startX = remaining.x;
+              g.startY = remaining.y;
+              g.dragged = true;
             }
+          }}
+          onPointerCancel={(e) => {
+            const g = overlayGestureRef.current;
+            if (!g || g.id !== o.id) return;
+            g.pointers.delete(e.pointerId);
+            if (g.pointers.size === 0) overlayGestureRef.current = null;
           }}
           style={{
             position: "absolute",
@@ -2443,6 +2690,7 @@ export function ClipComposerMobile({
               : undefined
           }
           onCancel={() => setEditingOverlay(undefined)}
+          clipDurationMs={elapsedMs}
         />
       ) : null}
 

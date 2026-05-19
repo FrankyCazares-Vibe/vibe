@@ -1,9 +1,13 @@
 "use client";
 
 import Link from "next/link";
-import { useEffect, useRef, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 
-import { FILTER_CSS, getOverlayCss } from "@/lib/clip/edit-metadata";
+import {
+  FILTER_CSS,
+  getOverlayCss,
+  isOverlayVisible,
+} from "@/lib/clip/edit-metadata";
 
 /**
  * iOS-native vertical-clip viewer. Opens as a full-screen sheet from
@@ -66,6 +70,10 @@ export function ClipViewerMobile({
   const [paused, setPaused] = useState(false);
   const [menuOpen, setMenuOpen] = useState(false);
   const [deleting, setDeleting] = useState(false);
+  // Playback position in ms — drives the per-overlay visibility gate.
+  // Only updates from `timeupdate` (≈250ms cadence) so we don't churn
+  // re-renders.
+  const [currentMs, setCurrentMs] = useState(0);
   const videoRef = useRef<HTMLVideoElement | null>(null);
 
   const handleDelete = async () => {
@@ -221,6 +229,26 @@ export function ClipViewerMobile({
     };
   }, [editMeta?.trim, videoSrc]);
 
+  // Track playback time so per-overlay timing (startMs/endMs) can gate
+  // visibility. `timeupdate` fires ~4×/sec — fine granularity for show/
+  // hide. Only set when an overlay actually has timing constraints so
+  // simple clips don't churn unnecessary state updates.
+  const hasTimedOverlay = useMemo(
+    () =>
+      (editMeta?.text_overlays ?? []).some(
+        (o) => o.startMs !== undefined || o.endMs !== undefined,
+      ),
+    [editMeta?.text_overlays],
+  );
+  useEffect(() => {
+    if (!hasTimedOverlay) return;
+    const v = videoRef.current;
+    if (!v) return;
+    const onTU = () => setCurrentMs(Math.round(v.currentTime * 1000));
+    v.addEventListener("timeupdate", onTU);
+    return () => v.removeEventListener("timeupdate", onTU);
+  }, [hasTimedOverlay, videoSrc]);
+
   // Filter preset → CSS `filter` string, applied inline on the <video>.
   const filterCss = editMeta?.filter ? FILTER_CSS[editMeta.filter] : undefined;
 
@@ -268,23 +296,27 @@ export function ClipViewerMobile({
       {/* Text overlays from edit_metadata — positioned in %-coords so
           they scale with the viewport. Pointer-events off so they
           don't intercept play/pause taps. Style comes from
-          `getOverlayCss` so composer + viewer stay in lock-step. */}
-      {editMeta?.text_overlays?.map((o) => (
-        <div
-          key={o.id}
-          aria-hidden
-          style={{
-            position: "absolute",
-            left: `${o.x}%`,
-            top: `${o.y}%`,
-            transform: "translate(-50%, -50%)",
-            pointerEvents: "none",
-            ...getOverlayCss(o),
-          }}
-        >
-          {o.text}
-        </div>
-      ))}
+          `getOverlayCss` so composer + viewer stay in lock-step.
+          Per-overlay timing (startMs/endMs) gates visibility against
+          the current playback ms. */}
+      {editMeta?.text_overlays
+        ?.filter((o) => isOverlayVisible(o, currentMs))
+        .map((o) => (
+          <div
+            key={o.id}
+            aria-hidden
+            style={{
+              position: "absolute",
+              left: `${o.x}%`,
+              top: `${o.y}%`,
+              transform: "translate(-50%, -50%)",
+              pointerEvents: "none",
+              ...getOverlayCss(o),
+            }}
+          >
+            {o.text}
+          </div>
+        ))}
 
       {/* Soft top/bottom vignette so the chrome stays readable over
           any video. */}
