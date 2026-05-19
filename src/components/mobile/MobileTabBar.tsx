@@ -130,9 +130,14 @@ export function MobileTabBar() {
     <nav className="vibe-mobile-tabbar" aria-label="Primary">
       {MOBILE_TABS.map((item) => {
         const active = isActive(item.href);
+        // The Otto tab is the final spotlight target on the network leg
+        // of the Otto tour — anchor it with a stable id so the engine
+        // can find it.
+        const id = item.href === "/otto" ? "otto-mobile-tour-network-otto" : undefined;
         return (
           <Link
             key={item.href}
+            id={id}
             href={item.href}
             className={
               active

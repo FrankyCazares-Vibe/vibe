@@ -4,6 +4,8 @@ import { AnimatePresence, motion } from "framer-motion";
 import Link from "next/link";
 import { useCallback, useEffect, useRef, useState } from "react";
 
+import { useMobileTour } from "@/components/mobile/use-mobile-tour";
+
 /**
  * iOS-native mobile rebuild of the /network surface. Built around
  * discovery: the page opens to a search field + a Suggestions feed of
@@ -63,6 +65,10 @@ type RelationshipTab = Exclude<Tab, "discover">;
 const TAB_ORDER: Tab[] = ["discover", "connections", "following", "followers"];
 
 export function NetworkMobile() {
+  // Otto spotlight tour — fires on visit when Settings → Replay tour
+  // sets the network pending flag. Final leg in the 3-leg flow.
+  useMobileTour("network");
+
   const [tab, setTab] = useState<Tab>("discover");
   const [query, setQuery] = useState("");
   const [debouncedQuery, setDebouncedQuery] = useState("");
@@ -259,6 +265,7 @@ export function NetworkMobile() {
       }}
     >
       <header
+        id="otto-mobile-tour-network-tabs"
         style={{
           padding:
             "calc(env(safe-area-inset-top, 0px) + 14px) 16px 6px",

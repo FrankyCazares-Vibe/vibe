@@ -12,6 +12,7 @@ import { ClipViewerMobile } from "@/components/mobile/ClipViewerMobile";
 import { PostComposerMobile } from "@/components/mobile/PostComposerMobile";
 import { PostViewerMobile } from "@/components/mobile/PostViewerMobile";
 import { ResumeViewerMobile } from "@/components/mobile/ResumeViewerMobile";
+import { useMobileTour } from "@/components/mobile/use-mobile-tour";
 import { FILTER_CSS } from "@/lib/clip/edit-metadata";
 import { IU_MAJORS_BY_SCHOOL } from "@/lib/iu/majors";
 import type { RedactionBar } from "@/lib/profile/resume-redactions";
@@ -225,6 +226,11 @@ type Props = {
 };
 
 export function ProfileMobile({ targetHandle }: Props = {}) {
+  // Otto spotlight tour — fires on first visit when Settings → Replay
+  // tour was triggered. No-op when the pending flag doesn't match.
+  // Only the owner's profile is part of the multi-leg flow.
+  useMobileTour("profile");
+
   const isVisitor = !!targetHandle;
   const [user, setUser] = useState<VibeUser | null>(null);
   const [error, setError] = useState<string | null>(null);
@@ -933,6 +939,7 @@ export function ProfileMobile({ targetHandle }: Props = {}) {
       {/* Cover — full bleed, sits under the status bar (env() pads it).
           Tappable in edit mode to upload a new banner image. */}
       <div
+        id="otto-mobile-tour-cover"
         style={{
           position: "relative",
           height: "calc(200px + env(safe-area-inset-top, 0px))",
@@ -1014,6 +1021,7 @@ export function ProfileMobile({ targetHandle }: Props = {}) {
             up other people, group chats, orgs, and events from the
             profile surface without bouncing to /campus. */}
         <div
+          id="otto-mobile-tour-actions"
           style={{
             position: "absolute",
             top: "calc(env(safe-area-inset-top, 0px) + 14px)",
@@ -1102,7 +1110,7 @@ export function ProfileMobile({ targetHandle }: Props = {}) {
       </div>
 
       {/* Identity block — overlaps the cover */}
-      <div style={{ padding: "0 16px", marginTop: -44 }}>
+      <div id="otto-mobile-tour-identity" style={{ padding: "0 16px", marginTop: -44 }}>
         {/* Avatar alone on its own row so the stats can breathe below it
             instead of sitting flush against the cover. position+z-index
             lifts it above the cover's bottom-fade overlay (positioned

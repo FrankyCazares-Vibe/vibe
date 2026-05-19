@@ -22,6 +22,7 @@ import { ConversationView } from "@/components/mobile/MessagesMobile";
 import { PostComposerMobile } from "@/components/mobile/PostComposerMobile";
 import { PostViewerMobile } from "@/components/mobile/PostViewerMobile";
 import { SharePostSheet } from "@/components/mobile/SharePostSheet";
+import { useMobileTour } from "@/components/mobile/use-mobile-tour";
 
 /**
  * iOS-native rebuild of `/campus` for mobile. Three swipeable tabs:
@@ -63,6 +64,10 @@ type Org = {
 // ---------- Component ----------
 
 export function CampusMobile() {
+  // Otto spotlight tour — fires on visit when Settings → Replay tour
+  // sets the campus pending flag. No-op otherwise.
+  useMobileTour("campus");
+
   const [tab, setTab] = useState<Tab>("feed");
   const [feed, setFeed] = useState<FeedPost[] | null>(null);
   const [events, setEvents] = useState<CampusEvent[] | null>(null);
@@ -290,6 +295,7 @@ export function CampusMobile() {
       </div>
 
       <header
+        id="otto-mobile-tour-tabs"
         style={{
           padding: "10px 0 4px",
           background: "transparent",
@@ -305,6 +311,7 @@ export function CampusMobile() {
       </header>
 
       <div
+        id="otto-mobile-tour-feed"
         ref={tabScrollRef}
         onScroll={(e) => {
           if (isProgrammaticScrollRef.current) return;
@@ -2570,6 +2577,7 @@ const ComposerFab = ({
   return (
     <>
       <button
+        id="otto-mobile-tour-compose"
         ref={ref}
         type="button"
         onClick={() => setOpen((v) => !v)}
