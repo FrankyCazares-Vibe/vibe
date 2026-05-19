@@ -1,7 +1,7 @@
 "use client";
 
 import Link from "next/link";
-import { useEffect, useMemo, useRef, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 
 import {
   FILTER_CSS,
@@ -230,28 +230,21 @@ export function ClipViewerMobile({
   }, [editMeta?.trim, videoSrc]);
 
   // Track playback time so per-overlay timing (startMs/endMs) can gate
-  // visibility. `timeupdate` fires ~4×/sec, which works most of the
-  // time — but some iOS Safari clips stop firing it after a loop or
-  // background tab. Belt-and-suspenders: also poll currentTime via
-  // requestAnimationFrame so currentMs always tracks live playback,
-  // even when timeupdate goes silent.
-  const hasTimedOverlay = useMemo(
-    () =>
-      (editMeta?.text_overlays ?? []).some(
-        (o) => o.startMs !== undefined || o.endMs !== undefined,
-      ),
-    [editMeta?.text_overlays],
-  );
+  // visibility. Polled via requestAnimationFrame because Safari is
+  // known to stop firing `timeupdate` after a loop. The loop ALWAYS
+  // runs once the video element + src exist — no `hasTimedOverlay`
+  // gate. If the gate ever returns a false negative (e.g., the
+  // sanitizer ships before the gate detects new fields), timing would
+  // silently never start. Cheap to always run: one currentTime read
+  // per frame, throttled setState only on ≥50ms changes.
   useEffect(() => {
-    if (!hasTimedOverlay) return;
+    if (!videoSrc) return;
     const v = videoRef.current;
     if (!v) return;
     let raf = 0;
     let lastMs = -1;
     const tick = () => {
       const ms = Math.round(v.currentTime * 1000);
-      // Only re-render on ≥50ms changes so the loop doesn't churn
-      // setState every frame for the same value.
       if (Math.abs(ms - lastMs) >= 50) {
         lastMs = ms;
         setCurrentMs(ms);
@@ -260,7 +253,7 @@ export function ClipViewerMobile({
     };
     raf = window.requestAnimationFrame(tick);
     return () => window.cancelAnimationFrame(raf);
-  }, [hasTimedOverlay, videoSrc]);
+  }, [videoSrc]);
 
   // Filter preset → CSS `filter` string, applied inline on the <video>.
   const filterCss = editMeta?.filter ? FILTER_CSS[editMeta.filter] : undefined;

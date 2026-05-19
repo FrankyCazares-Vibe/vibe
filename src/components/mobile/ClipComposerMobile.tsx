@@ -1501,23 +1501,33 @@ export function ClipComposerMobile({
     elapsedAccumRef.current = 0;
     setElapsedMs(0);
 
-    // Record the camera stream DIRECTLY (video + audio tracks from
-    // getUserMedia) rather than merging a canvas.captureStream() video
-    // track with the camera's audio. The canvas-merge approach was the
-    // source of the "echoy / choppy" audio iOS Safari kept producing —
-    // synthesizing a video track from a draw loop and stitching it to
-    // a live audio track makes the recorder buffer-mismanage the
-    // audio: buffers drop during canvas paints, duplicate on underruns.
-    // Recording the camera stream directly is what the native iOS
-    // Camera app does (well, AVFoundation does it for them) and is the
-    // only way the audio sounds normal in a webview.
+    // Build a FRESH MediaStream from the camera's real video + audio
+    // tracks. Critical points:
     //
-    // Trade-off: live filter preview during recording is gone (filters
-    // still apply at playback via CSS — `edit_metadata.filter`). Mid-
-    // record camera flip continues to work via the existing track-swap
-    // path on the camera stream, though iOS Safari's behavior there
-    // is sometimes flaky.
-    const recordingStream = stream;
+    //  - Use the camera's video track (NOT canvas.captureStream). The
+    //    previous "echoy / choppy" audio came from iOS Safari mishandling
+    //    a synthetic canvas video track muxed with a live audio track —
+    //    audio buffers dropped during canvas paints + duplicated on
+    //    underruns. Recording real camera video + real audio is what
+    //    AVFoundation does under the hood for the native iPhone camera.
+    //
+    //  - Wrap the same tracks in a NEW MediaStream object rather than
+    //    handing MediaRecorder the same `stream` the <video> preview is
+    //    using. Sharing one MediaStream between MediaRecorder and a
+    //    `<video srcObject={stream}>` causes iOS Safari to silently drop
+    //    the audio from the recording (track is "owned" by the video
+    //    element). A fresh MediaStream containing the same MediaStreamTrack
+    //    refs is the well-known workaround — tracks can belong to many
+    //    streams concurrently without issue.
+    //
+    // Trade-off vs the canvas approach: live filter preview during record
+    // is gone (filters still apply at playback via `edit_metadata.filter`
+    // CSS). Mid-record camera flip continues to work via the existing
+    // track-swap on the camera stream.
+    const recordingStream = new MediaStream([
+      ...stream.getVideoTracks(),
+      ...stream.getAudioTracks(),
+    ]);
     recordingStreamRef.current = recordingStream;
 
     // Prefer mp4 on iOS Safari for native playback; fall back to webm
@@ -2559,8 +2569,15 @@ export function ClipComposerMobile({
 
       {/* Text overlays — positioned in %-coords inside the 9:16
           playback box. Tap to open the editor; drag (>5px) to
-          reposition. Pointer capture keeps the move events glued to
-          this element even when the finger slides off it. */}
+          reposition; pinch (two fingers) to resize.
+
+          The OUTER div is a transparent ~60px touch zone wrapping the
+          visible text — without it a natural two-finger pinch (~150px
+          apart) lands one or both fingers outside the small text
+          bounding box and the second pointerdown goes to the playback
+          video below, not to this overlay. With the inflated hit area
+          both fingers land here, both pointerdowns fire on this same
+          element, and the gesture's pinch path triggers. */}
       {textOverlays.map((o) => (
         <div
           key={o.id}
@@ -2662,13 +2679,22 @@ export function ClipComposerMobile({
             left: `${o.x}%`,
             top: `${o.y}%`,
             transform: "translate(-50%, -50%)",
+            // Inflated transparent touch zone so a two-finger pinch
+            // (~150px apart) lands both fingers on this element. Without
+            // this padding pinch was effectively broken for any overlay
+            // narrower than the user's pinch span — the second finger
+            // would hit the playback video underneath.
+            padding: 30,
             cursor: "grab",
             touchAction: "none",
             userSelect: "none",
-            ...getOverlayCss(o),
+            // Center the inner styled text within the inflated zone.
+            display: "flex",
+            alignItems: "center",
+            justifyContent: "center",
           }}
         >
-          {o.text}
+          <span style={getOverlayCss(o)}>{o.text}</span>
         </div>
       ))}
 

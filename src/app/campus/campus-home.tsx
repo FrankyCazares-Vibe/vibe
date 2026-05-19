@@ -4792,15 +4792,12 @@ function ClipReelCard({
     v.playbackRate = editMeta?.speed ?? 1;
   }, [editMeta?.speed, signedUrl]);
 
-  // Track currentTime → ms for the per-overlay timing gate. Polled via
-  // rAF rather than `timeupdate` because Safari can stop firing the
-  // event after a loop. Skip when no overlay has timing constraints
-  // so simple clips don't run a render-loop for nothing.
+  // Track currentTime → ms for the per-overlay timing gate. Always
+  // attach rAF once the signed URL is ready — no overlay-shape gate,
+  // so a sanitizer/gate mismatch can't silently disable timing. Cheap:
+  // one currentTime read per frame, throttled setState on ≥50ms.
   useEffect(() => {
-    const hasTimed = (editMeta?.text_overlays ?? []).some(
-      (o) => o.startMs !== undefined || o.endMs !== undefined,
-    );
-    if (!hasTimed) return;
+    if (!signedUrl) return;
     const v = videoRef.current;
     if (!v) return;
     let raf = 0;
@@ -4815,7 +4812,7 @@ function ClipReelCard({
     };
     raf = window.requestAnimationFrame(tick);
     return () => window.cancelAnimationFrame(raf);
-  }, [editMeta?.text_overlays, signedUrl]);
+  }, [signedUrl]);
 
   useEffect(() => {
     const v = videoRef.current;
