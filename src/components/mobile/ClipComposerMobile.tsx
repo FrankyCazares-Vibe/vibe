@@ -1298,17 +1298,18 @@ export function ClipComposerMobile({
       // does only a tiny crop instead of a brutal one.
       const s = await navigator.mediaDevices.getUserMedia({
         video: { facingMode: next },
-        // Audio constraints: keep echoCancellation (helps voice-over-mic
-        // bleed) but disable noiseSuppression + autoGainControl, which
-        // are the usual culprits behind "metallic / lispy / pumping"
-        // audio in mobile webview recordings. Request stereo + 48kHz
-        // so we don't get downsampled to mono 16kHz.
+        // Audio: disable ALL three processing flags. iOS WebKit's
+        // echoCancellation has a long-standing bug where it distorts
+        // voice (sounds robotic / metallic / lispy), noiseSuppression
+        // adds artifacts during pauses, and autoGainControl pumps the
+        // volume. Sounds worse with them on. Skip channelCount /
+        // sampleRate — iOS often silently downgrades stereo and we
+        // don't want a partial-spec rejection. Default is 48kHz mono,
+        // which is fine for clips of someone talking.
         audio: {
-          echoCancellation: true,
+          echoCancellation: false,
           noiseSuppression: false,
           autoGainControl: false,
-          channelCount: 2,
-          sampleRate: 48000,
         },
       });
       // Stop any prior tracks before swapping (front/back toggle).
@@ -1527,12 +1528,13 @@ export function ClipComposerMobile({
         : MediaRecorder.isTypeSupported(webmVp8)
           ? webmVp8
           : "";
-    // Recorder options. Audio bitrate explicit so Safari doesn't default
-    // to its ~32 kbps mono "speech codec" which sounds compressed and
-    // tinny. 128 kbps is the same target as voice memos / IG / TikTok.
-    // Video bitrate is left default since the canvas is already 720p-ish.
+    // Recorder options. Bump audio bitrate to 192 kbps — 128 still
+    // sounded compressed on some iOS devices; 192 is the IG / TikTok
+    // ceiling and gives clean voice + ambient. Safari ignores this
+    // for some codec/container combos, but on combos that respect it
+    // we get noticeably cleaner audio.
     const recorderOpts: MediaRecorderOptions = {
-      audioBitsPerSecond: 128000,
+      audioBitsPerSecond: 192000,
     };
     if (mimeType) recorderOpts.mimeType = mimeType;
     let recorder: MediaRecorder;

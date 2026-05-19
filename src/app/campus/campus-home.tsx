@@ -4792,9 +4792,10 @@ function ClipReelCard({
     v.playbackRate = editMeta?.speed ?? 1;
   }, [editMeta?.speed, signedUrl]);
 
-  // Track currentTime → ms for the per-overlay timing gate. Skip when
-  // no overlay has timing constraints so simple clips don't burn
-  // re-renders 4×/second.
+  // Track currentTime → ms for the per-overlay timing gate. Polled via
+  // rAF rather than `timeupdate` because Safari can stop firing the
+  // event after a loop. Skip when no overlay has timing constraints
+  // so simple clips don't run a render-loop for nothing.
   useEffect(() => {
     const hasTimed = (editMeta?.text_overlays ?? []).some(
       (o) => o.startMs !== undefined || o.endMs !== undefined,
@@ -4802,9 +4803,18 @@ function ClipReelCard({
     if (!hasTimed) return;
     const v = videoRef.current;
     if (!v) return;
-    const onTU = () => setCurrentMs(Math.round(v.currentTime * 1000));
-    v.addEventListener("timeupdate", onTU);
-    return () => v.removeEventListener("timeupdate", onTU);
+    let raf = 0;
+    let lastMs = -1;
+    const tick = () => {
+      const ms = Math.round(v.currentTime * 1000);
+      if (Math.abs(ms - lastMs) >= 50) {
+        lastMs = ms;
+        setCurrentMs(ms);
+      }
+      raf = window.requestAnimationFrame(tick);
+    };
+    raf = window.requestAnimationFrame(tick);
+    return () => window.cancelAnimationFrame(raf);
   }, [editMeta?.text_overlays, signedUrl]);
 
   useEffect(() => {

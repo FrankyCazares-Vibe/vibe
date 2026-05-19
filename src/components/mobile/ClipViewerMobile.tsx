@@ -230,9 +230,11 @@ export function ClipViewerMobile({
   }, [editMeta?.trim, videoSrc]);
 
   // Track playback time so per-overlay timing (startMs/endMs) can gate
-  // visibility. `timeupdate` fires ~4×/sec — fine granularity for show/
-  // hide. Only set when an overlay actually has timing constraints so
-  // simple clips don't churn unnecessary state updates.
+  // visibility. `timeupdate` fires ~4×/sec, which works most of the
+  // time — but some iOS Safari clips stop firing it after a loop or
+  // background tab. Belt-and-suspenders: also poll currentTime via
+  // requestAnimationFrame so currentMs always tracks live playback,
+  // even when timeupdate goes silent.
   const hasTimedOverlay = useMemo(
     () =>
       (editMeta?.text_overlays ?? []).some(
@@ -244,9 +246,20 @@ export function ClipViewerMobile({
     if (!hasTimedOverlay) return;
     const v = videoRef.current;
     if (!v) return;
-    const onTU = () => setCurrentMs(Math.round(v.currentTime * 1000));
-    v.addEventListener("timeupdate", onTU);
-    return () => v.removeEventListener("timeupdate", onTU);
+    let raf = 0;
+    let lastMs = -1;
+    const tick = () => {
+      const ms = Math.round(v.currentTime * 1000);
+      // Only re-render on ≥50ms changes so the loop doesn't churn
+      // setState every frame for the same value.
+      if (Math.abs(ms - lastMs) >= 50) {
+        lastMs = ms;
+        setCurrentMs(ms);
+      }
+      raf = window.requestAnimationFrame(tick);
+    };
+    raf = window.requestAnimationFrame(tick);
+    return () => window.cancelAnimationFrame(raf);
   }, [hasTimedOverlay, videoSrc]);
 
   // Filter preset → CSS `filter` string, applied inline on the <video>.
