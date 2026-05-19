@@ -1496,24 +1496,28 @@ export function ClipComposerMobile({
 
   const startRecording = useCallback(() => {
     if (!stream) return;
-    const canvas = canvasRef.current;
-    if (!canvas) return;
 
     chunksRef.current = [];
     elapsedAccumRef.current = 0;
     setElapsedMs(0);
 
-    // The recorder reads from a composite stream: canvas video track
-    // (driven by the draw loop, independent of which camera is live)
-    // plus the camera's audio track. Flipping the camera mid-record
-    // just changes which frames the draw loop is copying — the
-    // recorder's view of "the video" never changes.
-    const canvasStream = canvas.captureStream(30);
-    const audioTracks = stream.getAudioTracks();
-    const recordingStream = new MediaStream([
-      ...canvasStream.getVideoTracks(),
-      ...audioTracks,
-    ]);
+    // Record the camera stream DIRECTLY (video + audio tracks from
+    // getUserMedia) rather than merging a canvas.captureStream() video
+    // track with the camera's audio. The canvas-merge approach was the
+    // source of the "echoy / choppy" audio iOS Safari kept producing —
+    // synthesizing a video track from a draw loop and stitching it to
+    // a live audio track makes the recorder buffer-mismanage the
+    // audio: buffers drop during canvas paints, duplicate on underruns.
+    // Recording the camera stream directly is what the native iOS
+    // Camera app does (well, AVFoundation does it for them) and is the
+    // only way the audio sounds normal in a webview.
+    //
+    // Trade-off: live filter preview during recording is gone (filters
+    // still apply at playback via CSS — `edit_metadata.filter`). Mid-
+    // record camera flip continues to work via the existing track-swap
+    // path on the camera stream, though iOS Safari's behavior there
+    // is sometimes flaky.
+    const recordingStream = stream;
     recordingStreamRef.current = recordingStream;
 
     // Prefer mp4 on iOS Safari for native playback; fall back to webm
