@@ -12,8 +12,12 @@ export const metadata: Metadata = {
   description: "Your campus, your career, one profile.",
   icons: {
     icon: [
+      // Google Search does not use SVG. It wants a square ICO/PNG >48px
+      // on a stable URL, linked from the homepage.
+      { url: "/icon.png", type: "image/png", sizes: "192x192" },
+      { url: "/favicon-48.png", type: "image/png", sizes: "48x48" },
+      { url: "/favicon.ico", sizes: "48x48" },
       { url: "/vibe-icon.svg", type: "image/svg+xml" },
-      { url: "/favicon.ico", sizes: "32x32" },
     ],
     apple: "/apple-icon.png",
   },
