@@ -1,0 +1,145 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Vibe · brand kit</title>
+<link href="https://fonts.googleapis.com/css2?family=Fraunces:ital,wght@0,400;0,700;0,900;1,400&family=DM+Sans:wght@400;500;600&display=swap" rel="stylesheet">
+<style>
+  :root {
+    --cream: #FAF7F2;
+    --charcoal: #1C1C1E;
+    --accent: #FF5C35;
+    --purple: #7C5CFC;
+    --muted: #8A8580;
+  }
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+  body {
+    font-family: "DM Sans", sans-serif;
+    background: var(--cream);
+    color: var(--charcoal);
+    padding: 56px 28px 80px;
+  }
+  .wrap { max-width: 980px; margin: 0 auto; }
+  .eyebrow {
+    font-size: 11px;
+    letter-spacing: 0.18em;
+    text-transform: uppercase;
+    color: var(--muted);
+    font-weight: 500;
+  }
+  h1 {
+    font-family: "Fraunces", serif;
+    font-size: 42px;
+    font-weight: 900;
+    letter-spacing: -1.2px;
+    margin: 8px 0 10px;
+  }
+  h1 em { color: var(--accent); font-style: italic; }
+  .lede {
+    font-family: "Fraunces", serif;
+    font-style: italic;
+    font-size: 16px;
+    line-height: 1.55;
+    color: var(--muted);
+    max-width: 560px;
+    margin-bottom: 36px;
+  }
+  h2 {
+    font-family: "Fraunces", serif;
+    font-size: 22px;
+    font-weight: 900;
+    letter-spacing: -0.5px;
+    margin: 40px 0 14px;
+  }
+  h2 em { color: var(--accent); font-style: italic; }
+  .swatches { display: flex; gap: 10px; flex-wrap: wrap; margin-bottom: 8px; }
+  .swatch {
+    width: 72px;
+    border-radius: 12px;
+    overflow: hidden;
+    border: 0.5px solid rgba(28,28,30,.08);
+    background: #fff;
+  }
+  .swatch .chip { height: 48px; }
+  .swatch .meta { padding: 8px; font-size: 10px; color: var(--muted); }
+  .swatch .meta strong { display: block; color: var(--charcoal); font-size: 11px; }
+  .grid { display: grid; grid-template-columns: 1fr 1fr; gap: 14px; }
+  .card {
+    background: #fff;
+    border-radius: 14px;
+    border: 0.5px solid rgba(28,28,30,.08);
+    overflow: hidden;
+  }
+  .card img { width: 100%; display: block; background: #fff; }
+  .card .cap { padding: 12px 14px 14px; }
+  .card .cap strong { display: block; font-family: "Fraunces", serif; font-size: 15px; margin-bottom: 4px; }
+  .card .cap span { font-size: 12px; color: var(--muted); line-height: 1.45; }
+  .logo-row { display: flex; gap: 14px; align-items: center; }
+  .logo-row img { width: 160px; height: 160px; border-radius: 28px; border: 0.5px solid rgba(28,28,30,.08); }
+  .note { font-size: 13px; color: var(--muted); line-height: 1.5; }
+  @media (max-width: 700px) {
+    .grid, .logo-row { grid-template-columns: 1fr; display: block; }
+    .logo-row img { margin-bottom: 12px; }
+  }
+</style>
+</head>
+<body>
+<div class="wrap">
+  <div class="eyebrow">Brand kit</div>
+  <h1>What vibe <em>feels</em> like</h1>
+  <p class="lede">Serious chrome. Warm cream. One orange period. Otto is a glowing core, not a mascot with a face.</p>
+
+  <h2>Color</h2>
+  <div class="swatches">
+    <div class="swatch"><div class="chip" style="background:#FAF7F2"></div><div class="meta"><strong>Cream</strong>#FAF7F2</div></div>
+    <div class="swatch"><div class="chip" style="background:#1C1C1E"></div><div class="meta"><strong>Charcoal</strong>#1C1C1E</div></div>
+    <div class="swatch"><div class="chip" style="background:#FF5C35"></div><div class="meta"><strong>Accent</strong>#FF5C35</div></div>
+    <div class="swatch"><div class="chip" style="background:#7C5CFC"></div><div class="meta"><strong>Otto purple</strong>#7C5CFC</div></div>
+    <div class="swatch"><div class="chip" style="background:#8A8580"></div><div class="meta"><strong>Muted</strong>#8A8580</div></div>
+  </div>
+
+  <h2>The <em>mark</em></h2>
+  <div class="logo-row">
+    <img src="vibe/logo.png" alt="Vibe app icon">
+    <p class="note">V in an incomplete orbit. Orange node at 4 o’clock. This is the tab / home-screen icon. In the product, the wordmark stays lowercase <strong>vibe.</strong> in Fraunces with the orange period.</p>
+  </div>
+
+  <h2>Vibe as a <em>whole</em></h2>
+  <div class="grid">
+    <div class="card">
+      <img src="vibe/landing.png" alt="Landing night sky with Otto">
+      <div class="cap"><strong>Landing</strong><span>Night sky, Otto speaking. Fraunces, orange periods, no chrome noise.</span></div>
+    </div>
+    <div class="card">
+      <img src="vibe/login.png" alt="Login on cream">
+      <div class="cap"><strong>Login</strong><span>Cream field, quiet card, vibe. pill, coral CTA.</span></div>
+    </div>
+  </div>
+
+  <h2>Otto</h2>
+  <div class="grid">
+    <div class="card">
+      <img src="otto/states.png" alt="Otto four states">
+      <div class="cap"><strong>Four states</strong><span>Idle, thinking, briefing, alert. Coral = action. Purple = intelligence.</span></div>
+    </div>
+    <div class="card">
+      <img src="otto/index.png" alt="Otto mockup index">
+      <div class="cap"><strong>Mockup index</strong><span>The Otto reference set. Live HTML is in otto_mockups/.</span></div>
+    </div>
+    <div class="card">
+      <img src="otto/idle-corner.png" alt="Otto idle in the corner">
+      <div class="cap"><strong>Idle in the corner</strong><span>Always there, never loud. Notification is a dot, not a bounce.</span></div>
+    </div>
+    <div class="card">
+      <img src="otto/slideout.png" alt="Otto slide-out panel">
+      <div class="cap"><strong>Slide-out panel</strong><span>Dark surface so Otto owns the drawer. Drafts with opinions.</span></div>
+    </div>
+    <div class="card">
+      <img src="otto/onboarding.png" alt="Otto onboarding hello">
+      <div class="cap"><strong>Onboarding</strong><span>“i’m otto.” First beat is calm, not a settings form.</span></div>
+    </div>
+  </div>
+</div>
+</body>
+</html>
