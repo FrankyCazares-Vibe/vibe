@@ -1,9 +1,11 @@
 import { NextResponse } from "next/server";
+import type { SupabaseClient } from "@supabase/supabase-js";
 
 import { getCountsFor, getFollowState } from "@/lib/connections/queries";
 import { buildVibeUserV1FromProfile } from "@/lib/profile/build-vibe-user-v1";
 import { normalizeProfileView } from "@/lib/profile/normalize-profile-view";
 import { createSupabaseServerClient } from "@/lib/supabase/server";
+import { createSupabaseServiceClient } from "@/lib/supabase/service";
 
 // PUBLIC profile fields only — `email` and `school_email` are intentionally
 // excluded so a visitor never sees another user's contact addresses. If we
@@ -18,14 +20,19 @@ type RouteContext = { params: Promise<{ handle: string }> };
 
 /**
  * Public profile bootstrap by handle. Powers the static prototype's
- * viewer-mode render at `/html/profile.html?handle=<handle>` (P1-011b).
+ * viewer-mode render at `/html/profile.html?handle=<handle>` (P1-011b)
+ * and logged-out share-link visits (iMessage in-app browser, etc).
  *
  * Response is `vibe_user_v1`-shaped so the same `renderUserSections`
  * code path that paints the owner's data also paints visited users.
  * Counts come from `getCountsFor`; the viewer's connection state to
  * the visited user (none / following / followed_by / connected / self)
  * is included so the Connect button can initialize correctly without
- * a second roundtrip (P1-013).
+ * a second roundtrip (P1-013). Logged-out visitors get follow state
+ * `none` — Connect still 401s until they sign in.
+ *
+ * `users` RLS is authenticated-only, so unsigned reads use the
+ * service-role client against the public column list above.
  */
 export async function GET(_req: Request, ctx: RouteContext) {
   const { handle: rawHandle } = await ctx.params;
@@ -37,13 +44,16 @@ export async function GET(_req: Request, ctx: RouteContext) {
   const supabase = await createSupabaseServerClient();
   const {
     data: { user: viewer },
-    error: authErr,
   } = await supabase.auth.getUser();
-  if (authErr || !viewer) {
+
+  let reader: SupabaseClient;
+  try {
+    reader = viewer ? supabase : createSupabaseServiceClient();
+  } catch {
     return NextResponse.json({ ok: false, error: "Unauthorized" }, { status: 401 });
   }
 
-  const { data: row, error } = await supabase
+  const { data: row, error } = await reader
     .from("users")
     .select(PUBLIC_PROFILE_SELECT)
     .eq("handle", handle)
@@ -68,39 +78,41 @@ export async function GET(_req: Request, ctx: RouteContext) {
   // 20260515000000_blocks_select_either_party). Posts, bio, counts are
   // NOT included in either branch — both intentionally omit content.
   const targetIdRaw = (row as { id: string }).id;
-  const { data: blockRows } = await supabase
-    .from("blocks")
-    .select("blocker_id, blocked_id")
-    .or(
-      `and(blocker_id.eq.${targetIdRaw},blocked_id.eq.${viewer.id}),` +
-        `and(blocker_id.eq.${viewer.id},blocked_id.eq.${targetIdRaw})`,
+  if (viewer) {
+    const { data: blockRows } = await supabase
+      .from("blocks")
+      .select("blocker_id, blocked_id")
+      .or(
+        `and(blocker_id.eq.${targetIdRaw},blocked_id.eq.${viewer.id}),` +
+          `and(blocker_id.eq.${viewer.id},blocked_id.eq.${targetIdRaw})`,
+      );
+    const targetBlockedViewer = (blockRows ?? []).some(
+      (r) =>
+        (r as { blocker_id: string }).blocker_id === targetIdRaw &&
+        (r as { blocked_id: string }).blocked_id === viewer.id,
     );
-  const targetBlockedViewer = (blockRows ?? []).some(
-    (r) =>
-      (r as { blocker_id: string }).blocker_id === targetIdRaw &&
-      (r as { blocked_id: string }).blocked_id === viewer.id,
-  );
-  const viewerBlockedTarget = (blockRows ?? []).some(
-    (r) =>
-      (r as { blocker_id: string }).blocker_id === viewer.id &&
-      (r as { blocked_id: string }).blocked_id === targetIdRaw,
-  );
-  if (targetBlockedViewer || viewerBlockedTarget) {
-    return NextResponse.json({
-      ok: true,
-      blockedByTarget: targetBlockedViewer,
-      viewerHasBlocked: viewerBlockedTarget,
-      vibeUser: {
-        id: targetIdRaw,
-        name: (row as { name: string | null }).name,
-        handle: (row as { handle: string | null }).handle,
-        avatarPhoto: (row as { avatar_url: string | null }).avatar_url,
-        _isViewerMode: true,
-        _viewerFollowState: "none",
-        _blockedByTarget: targetBlockedViewer,
-        _viewerHasBlocked: viewerBlockedTarget,
-      },
-    });
+    const viewerBlockedTarget = (blockRows ?? []).some(
+      (r) =>
+        (r as { blocker_id: string }).blocker_id === viewer.id &&
+        (r as { blocked_id: string }).blocked_id === targetIdRaw,
+    );
+    if (targetBlockedViewer || viewerBlockedTarget) {
+      return NextResponse.json({
+        ok: true,
+        blockedByTarget: targetBlockedViewer,
+        viewerHasBlocked: viewerBlockedTarget,
+        vibeUser: {
+          id: targetIdRaw,
+          name: (row as { name: string | null }).name,
+          handle: (row as { handle: string | null }).handle,
+          avatarPhoto: (row as { avatar_url: string | null }).avatar_url,
+          _isViewerMode: true,
+          _viewerFollowState: "none",
+          _blockedByTarget: targetBlockedViewer,
+          _viewerHasBlocked: viewerBlockedTarget,
+        },
+      });
+    }
   }
 
   const profile = normalizeProfileView(row as Record<string, unknown>);
@@ -111,8 +123,10 @@ export async function GET(_req: Request, ctx: RouteContext) {
 
   const targetId = profile.id;
   const [counts, follow] = await Promise.all([
-    getCountsFor(supabase, targetId),
-    getFollowState(supabase, viewer.id, targetId),
+    getCountsFor(reader, targetId),
+    viewer
+      ? getFollowState(supabase, viewer.id, targetId)
+      : Promise.resolve("none" as const),
   ]);
 
   vibeUser.counts = {
@@ -128,7 +142,7 @@ export async function GET(_req: Request, ctx: RouteContext) {
   // migration deploy lag don't take the whole route down.
   let pinnedPostId: string | null = null;
   try {
-    const { data: pinRow } = await supabase
+    const { data: pinRow } = await reader
       .from("users")
       .select("pinned_post_id")
       .eq("id", profile.id)

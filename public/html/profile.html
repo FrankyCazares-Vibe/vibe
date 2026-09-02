@@ -7,7 +7,7 @@
 <link rel="icon" href="/favicon.ico" sizes="any">
 <link rel="icon" href="/icon.png" type="image/png" sizes="192x192">
 <link rel="apple-touch-icon" href="/apple-icon.png" sizes="180x180">
-<title>Maya Chen — Vibe Profile</title>
+<title>Vibe Profile</title>
 <link href="https://fonts.googleapis.com/css2?family=Fraunces:ital,wght@0,300;0,400;0,600;0,900;1,300;1,400&family=DM+Sans:wght@300;400;500;600&display=swap" rel="stylesheet">
 <script src="/html/_persistence.js"></script>
 <script src="/html/_mockUsers.js"></script>
@@ -6858,8 +6858,14 @@ function _sortWorkExperienceByRecency(rows) {
 (function initProfilePage(){
   const params = new URLSearchParams(location.search);
   const viewingSlug = params.get('user');
-  const viewingHandle = (params.get('handle') || '').trim().toLowerCase();
+  let viewingHandle = (params.get('handle') || '').trim().toLowerCase();
   const mockUser = viewingSlug && window.VIBE_MOCK_USERS && window.VIBE_MOCK_USERS[viewingSlug];
+  // Old unsigned rewrite put the live handle in ?user=, which is the
+  // mock-user slot. If that slug isn't a demo character, treat it as a
+  // real handle so we never fall through to Maya Chen's hardcoded markup.
+  if (!viewingHandle && viewingSlug && !mockUser) {
+    viewingHandle = viewingSlug.trim().toLowerCase();
+  }
 
   // ── Branch A: viewing someone else's profile (mock user) ─────────────
   if (mockUser) {
@@ -6872,6 +6878,7 @@ function _sortWorkExperienceByRecency(rows) {
     if (navBtn) navBtn.style.display = 'none';
 
     hydrateProfileFields(mockUser);
+    document.title = (mockUser.name || viewingSlug) + ' · Vibe';
 
     // Mock users always have full data, so we wipe Maya's hardcoded markup
     // first (same wipe used for fresh-onboarded users), then renderUserSections
@@ -6902,6 +6909,7 @@ function _sortWorkExperienceByRecency(rows) {
   if (viewingHandle) {
     document.body.classList.add('viewer-mode');
     document.body.classList.remove('owner-mode');
+    document.title = '@' + viewingHandle + ' · Vibe';
     const navBtn = document.getElementById('profileShareBtn');
     if (navBtn) navBtn.style.display = 'none';
     clearFreshUserExtras();
@@ -6928,6 +6936,7 @@ function _sortWorkExperienceByRecency(rows) {
           id: v.id, handle: v.handle, name: v.name,
           _pinnedPostId: v.pinnedPostId || null,
         };
+        document.title = (v.name ? v.name + ' (@' + (v.handle || viewingHandle) + ')' : '@' + viewingHandle) + ' · Vibe';
         hydrateProfileFields(v);
         // The empty array here is critical: renderUserSections falls back
         // to localStorage (vibe_posts_v1) when posts are missing, which
@@ -7017,6 +7026,7 @@ function _sortWorkExperienceByRecency(rows) {
   }
 
   hydrateProfileFields(user);
+  if (user.name) document.title = user.name + ' · Vibe';
 
   // Onboarded users: wipe demo content on load, THEN inject anything they've
   // already saved. Without this, hardcoded Maya markup re-appears on reload.

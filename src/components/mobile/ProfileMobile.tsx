@@ -453,6 +453,10 @@ export function ProfileMobile({ targetHandle }: Props = {}) {
         body: JSON.stringify({ target_handle: targetHandle }),
       });
       const j = await r.json().catch(() => ({}));
+      if (r.status === 401) {
+        window.location.href = `/auth/login?next=${encodeURIComponent(`/profile/${targetHandle}`)}`;
+        return;
+      }
       if (!r.ok || !j?.ok) {
         // Roll back.
         setFollowState(followState);

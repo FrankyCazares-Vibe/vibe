@@ -1,6 +1,8 @@
 import { NextResponse } from "next/server";
+import type { SupabaseClient } from "@supabase/supabase-js";
 
 import { createSupabaseServerClient } from "@/lib/supabase/server";
+import { createSupabaseServiceClient } from "@/lib/supabase/service";
 
 const DEFAULT_LIMIT = 100;
 const MAX_LIMIT = 500;
@@ -8,12 +10,12 @@ const MAX_LIMIT = 500;
 type RouteContext = { params: Promise<{ handle: string }> };
 
 /**
- * Public posts for a visited user, newest first. Returns both type='post'
- * and type='clip' rows so the viewer's profile All-feed and Clips/Posts
- * tabs can hydrate.
+ * Public posts for a visited user, newest first. Published `type='post'`
+ * rows only (clips are backlogged) so the viewer's profile grid can hydrate.
  *
- * Auth-gated. Uses RLS (`posts_select_authenticated` allows any signed-in
- * user to SELECT) so we don't need to special-case visibility here.
+ * Signed-in reads use the session client (RLS). Logged-out share-link
+ * visits use the service-role client against the same published-only
+ * filter — `posts` RLS is authenticated-only, same as profile bootstrap.
  */
 export async function GET(req: Request, ctx: RouteContext) {
   const { handle: rawHandle } = await ctx.params;
@@ -25,15 +27,18 @@ export async function GET(req: Request, ctx: RouteContext) {
   const supabase = await createSupabaseServerClient();
   const {
     data: { user },
-    error: authErr,
   } = await supabase.auth.getUser();
-  if (authErr || !user) {
+
+  let reader: SupabaseClient;
+  try {
+    reader = user ? supabase : createSupabaseServiceClient();
+  } catch {
     return NextResponse.json({ ok: false, error: "Unauthorized" }, { status: 401 });
   }
 
   // Resolve handle → id first (one indexed lookup) so the posts query
   // can use the FK directly. Cheaper than a join+filter.
-  const { data: target, error: tErr } = await supabase
+  const { data: target, error: tErr } = await reader
     .from("users")
     .select("id")
     .eq("handle", handle)
@@ -55,7 +60,7 @@ export async function GET(req: Request, ctx: RouteContext) {
   // Filter drafts even when viewer == target owner — drafts only appear
   // in the composer's Drafts box, never in the public-shaped grid.
   // Clips are backlogged, so only `type='post'` rows surface.
-  const { data, error } = await supabase
+  const { data, error } = await reader
     .from("posts")
     .select(
       "id,user_id,type,content,tags,media_url,media_thumbnail_url,created_at",

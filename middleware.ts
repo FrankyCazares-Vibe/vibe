@@ -102,14 +102,10 @@ export async function middleware(request: NextRequest) {
     return forwardCookies(sessionResponse, rw);
   }
 
-  const profileSlugMatch = /^\/profile\/([^/]+)$/.exec(pathname);
-  if (profileSlugMatch && !user) {
-    const url = request.nextUrl.clone();
-    url.pathname = "/html/profile.html";
-    url.searchParams.set("user", decodeURIComponent(profileSlugMatch[1]));
-    const rw = NextResponse.rewrite(url);
-    return forwardCookies(sessionResponse, rw);
-  }
+  // Do NOT rewrite unsigned `/profile/[handle]` to the Maya Chen HTML
+  // demo. Share links (iMessage, Discord, a logged-out in-app browser)
+  // must hit the App Router page so generateMetadata can emit the real
+  // person's OG title and the client can load them via ?handle=.
 
   return sessionResponse;
 }
