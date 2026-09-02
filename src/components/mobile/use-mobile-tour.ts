@@ -74,7 +74,7 @@ const PROFILE_STEPS: TourStep[] = [
   {
     selector: "#otto-mobile-tour-identity",
     title: "Name, handle, bio.",
-    body: "How everyone finds you and gets the gist. Posts, clips, and your portfolio live just below.",
+    body: "How everyone finds you and gets the gist. Your posts and portfolio live just below.",
   },
   {
     selector: "#otto-mobile-tour-actions",
@@ -88,7 +88,7 @@ const CAMPUS_STEPS: TourStep[] = [
   {
     selector: "#otto-mobile-tour-tabs",
     title: "Swipe between everything.",
-    body: "Feed, Clips, Events, Orgs, Chat, and the campus Map all live here. Swipe or tap to switch.",
+    body: "Feed, Events, Orgs, Chat, and the campus Map all live here. Swipe or tap to switch.",
   },
   {
     selector: "#otto-mobile-tour-feed",
@@ -97,8 +97,8 @@ const CAMPUS_STEPS: TourStep[] = [
   },
   {
     selector: "#otto-mobile-tour-compose",
-    title: "Post or record a clip.",
-    body: "The + opens the composer. Posts for text and photos, clips for short videos.",
+    title: "Share what you're up to.",
+    body: "The + opens the composer — text, photos, and video all go here.",
     endLabel: "Next: network →",
   },
 ];

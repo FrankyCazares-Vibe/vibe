@@ -5,6 +5,7 @@ import { createSupabaseServiceClient } from "@/lib/supabase/service";
 
 type Params = { params: Promise<{ slug: string }> };
 type Body = {
+  /** Accepted but ignored — clips are backlogged, everything is a post. */
   type?: unknown;
   content?: unknown;
   media_url?: unknown;
@@ -15,7 +16,11 @@ const MAX_CONTENT = 2000;
 
 /**
  * POST /api/orgs/[slug]/posts
- * Body: { type: 'post' | 'clip', content?, media_url?, media_thumbnail_url? }
+ * Body: { content?, media_url?, media_thumbnail_url? }
+ *
+ * Clips are backlogged — every org post is created as `type='post'`. A
+ * legacy `type: 'clip'` in the body is ignored rather than rejected so old
+ * clients degrade to a normal post instead of erroring.
  *
  * Creates a row in `public.posts` with `org_id` set to this org. The author
  * (`user_id`) is the current viewer — posts always have a real human author
@@ -66,7 +71,7 @@ export async function POST(req: Request, { params }: Params) {
     return NextResponse.json({ ok: false, error: "Invalid JSON" }, { status: 400 });
   }
 
-  const type = body.type === "clip" ? "clip" : "post";
+  const type = "post";
   const content = typeof body.content === "string" ? body.content.trim() : "";
   const mediaUrl =
     typeof body.media_url === "string" ? body.media_url.trim() : "";
@@ -87,13 +92,6 @@ export async function POST(req: Request, { params }: Params) {
       { status: 400 },
     );
   }
-  if (type === "clip" && !mediaUrl) {
-    return NextResponse.json(
-      { ok: false, error: "Clip requires a video upload" },
-      { status: 400 },
-    );
-  }
-
   const { data: row, error } = await service
     .from("posts")
     .insert({

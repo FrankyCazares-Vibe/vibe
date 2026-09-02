@@ -1,6 +1,5 @@
 import { NextResponse } from "next/server";
 
-import { sanitizeEditMetadata } from "@/lib/clip/edit-metadata";
 import {
   extractMentionHandles,
   insertMentionNotifications,
@@ -36,7 +35,7 @@ export async function GET(_req: Request, ctx: RouteContext) {
   const { data: row, error } = await supabase
     .from("posts")
     .select(
-      "id,user_id,type,content,tags,media_url,media_thumbnail_url,edit_metadata,created_at," +
+      "id,user_id,type,content,tags,media_url,media_thumbnail_url,created_at," +
         // Explicit FK name disambiguates the posts→users embed; see /api/feed for context.
         "author:users!posts_user_id_fkey!inner(id,name,handle,school,major,year,avatar_url)",
     )
@@ -141,8 +140,9 @@ export async function DELETE(_req: Request, ctx: RouteContext) {
     return NextResponse.json({ ok: false, error: delErr.message }, { status: 500 });
   }
 
-  // Best-effort R2 cleanup — only for clips, only if the key looks valid.
-  if (row.type === "clip" && isR2Configured()) {
+  // Best-effort R2 cleanup for any post whose media is an R2 video object.
+  // The `clips/` prefix is legacy naming — it backs regular video posts.
+  if (isR2Configured()) {
     const key = String(row.media_url || "").trim();
     if (key.startsWith(CLIP_KEY_PREFIX) && !key.includes("..")) {
       try {
@@ -166,11 +166,11 @@ export async function DELETE(_req: Request, ctx: RouteContext) {
 
 /**
  * PATCH a post — used for re-saving + publishing drafts. The author can
- * update: content, edit_metadata, status (draft → published). Missing
- * fields are left alone.
+ * update: content, status (draft → published). Missing fields are left
+ * alone.
  *
  * If the status flips from draft → published, we fan out @mention
- * notifications just like publish-clip does on the initial publish.
+ * notifications just like publish-post does on the initial publish.
  */
 export async function PATCH(req: Request, ctx: RouteContext) {
   const { id } = await ctx.params;
@@ -189,7 +189,6 @@ export async function PATCH(req: Request, ctx: RouteContext) {
 
   let body: {
     content?: unknown;
-    edit_metadata?: unknown;
     status?: unknown;
   };
   try {
@@ -228,10 +227,6 @@ export async function PATCH(req: Request, ctx: RouteContext) {
     patch.content = trimmed;
   }
 
-  if ("edit_metadata" in body) {
-    patch.edit_metadata = sanitizeEditMetadata(body.edit_metadata);
-  }
-
   let didPublish = false;
   if (typeof body.status === "string") {
     if (body.status !== "draft" && body.status !== "published") {
@@ -255,7 +250,7 @@ export async function PATCH(req: Request, ctx: RouteContext) {
     .update(patch)
     .eq("id", id)
     .select(
-      "id,user_id,type,content,tags,media_url,media_thumbnail_url,edit_metadata,status,created_at",
+      "id,user_id,type,content,tags,media_url,media_thumbnail_url,status,created_at",
     )
     .single();
   if (upErr || !row) {

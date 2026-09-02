@@ -5,9 +5,9 @@ import { Drawer } from "vaul";
 
 /**
  * In-app "Send to…" picker. Lists every chat the viewer can post to
- * (DMs, groups, org channels) and multi-sends the post/clip as an
- * attached message via /api/me/threads/[id]/messages with
- * { content, attachment_id, attachment_kind }.
+ * (DMs, groups, org channels) and multi-sends the post as an attached
+ * message via /api/me/threads/[id]/messages with
+ * { content, attachment_id, attachment_kind: 'post' }.
  *
  * Mounted from the 3-dot menus on both the feed card and the post
  * viewer (mobile + desktop). The sheet is a bottom vaul drawer on
@@ -38,7 +38,6 @@ type ThreadEntry = {
 
 export function SharePostSheet({
   postId,
-  postKind,
   postTitle,
   postPosterUrl,
   authorName,
@@ -46,7 +45,6 @@ export function SharePostSheet({
   onSent,
 }: {
   postId: string;
-  postKind: "post" | "clip";
   /** Short preview text — usually the post's content. Shown in the
    *  sticky preview row above the threads list so the user knows
    *  what they're about to send. */
@@ -139,7 +137,7 @@ export function SharePostSheet({
               body: JSON.stringify({
                 content: caption.trim(),
                 attachment_id: postId,
-                attachment_kind: postKind,
+                attachment_kind: "post",
               }),
             },
           ),
@@ -161,7 +159,7 @@ export function SharePostSheet({
     } finally {
       setSending(false);
     }
-  }, [sending, selectedIds, caption, postId, postKind, onSent, onClose]);
+  }, [sending, selectedIds, caption, postId, onSent, onClose]);
 
   return (
     <Drawer.Root open onOpenChange={(o) => { if (!o) onClose(); }}>
@@ -251,7 +249,7 @@ export function SharePostSheet({
                   marginBottom: 2,
                 }}
               >
-                {postKind === "clip" ? "Clip" : "Post"}
+                Post
               </div>
               <div
                 style={{
@@ -266,8 +264,7 @@ export function SharePostSheet({
                   overflow: "hidden",
                 }}
               >
-                {postTitle?.trim() ||
-                  (postKind === "clip" ? "Untitled clip" : "Post")}
+                {postTitle?.trim() || "Post"}
               </div>
               {authorName ? (
                 <div

@@ -1,5 +1,5 @@
 // ══════════════════════════════════════════════════════════════════════════
-// Vibe — shared "Send to..." picker for sharing posts/clips into DMs.
+// Vibe — shared "Send to..." picker for sharing posts into DMs.
 // Self-injects markup + CSS on first call. Pages just include this file
 // and call `window.openSharePicker({ postId, kind, title?, posterUrl?, posterCss?, authorName? })`.
 //
@@ -116,7 +116,7 @@
     el.innerHTML = `
       <div class="vsp-poster">${posterInner}</div>
       <div class="vsp-pinfo">
-        <div class="vsp-plabel">${p.kind === "clip" ? "Clip" : "Post"}</div>
+        <div class="vsp-plabel">Post</div>
         <div class="vsp-ptitle">${esc(p.title || "")}</div>
         ${p.authorName ? `<div class="vsp-pauthor">by ${esc(p.authorName)}</div>` : ""}
       </div>
@@ -226,7 +226,7 @@
     }
     state.post = {
       postId: post.postId,
-      kind: post.kind === "clip" ? "clip" : "post",
+      kind: "post",
       title: post.title || "",
       posterUrl: post.posterUrl || null,
       posterCss: post.posterCss || null,

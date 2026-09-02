@@ -754,7 +754,6 @@ export function PostViewerMobile({
       {shareOpen ? (
         <SharePostSheet
           postId={postId}
-          postKind={post?.type === "clip" ? "clip" : "post"}
           postTitle={post?.content ?? ""}
           postPosterUrl={
             (post && "media_thumbnail_url" in post

@@ -106,11 +106,6 @@
     border-radius: 12px; margin-top: 12px;
     background: #EFEAE2;
   }
-  .vpv-video {
-    display: block; width: 100%; max-height: 70vh;
-    border-radius: 12px; margin-top: 12px;
-    background: #1C1C1E;
-  }
   .vpv-video-stub {
     display: flex; align-items: center; justify-content: center;
     width: 100%; aspect-ratio: 1 / 1; max-height: 70vh;
@@ -324,7 +319,7 @@
     authorName: "",         // post author display name (for share preview)
     type:     "post",
     content: "",            // post body — used as the share-card title
-    mediaUrl: null,         // image src for posts; thumbnail for clips
+    mediaUrl: null,         // image src for posts
     posterUrl: null,
     liked:  false,
     saved:  false,
@@ -434,9 +429,6 @@
     const overlay = document.getElementById("vpvOverlay");
     if (overlay) overlay.classList.remove("show");
     document.documentElement.style.overflow = "";
-    // Stop any playing clip so audio doesn't bleed into the next view.
-    const v = document.getElementById("vpvVideo");
-    if (v) { try { v.pause(); v.removeAttribute("src"); v.load(); } catch {} }
     // Pop the synthetic history entry only when the close was user-driven
     // (Esc / X / outside-click) — not when the user already hit back.
     if (!viaPopstate) {
@@ -477,9 +469,7 @@
       content:             p.content || p.body || "",
       tags:                p.tags || [],
       media_url:           p.media_url || p.mediaUrl || "",
-      media_thumbnail_url: p.media_thumbnail_url || p.mediaThumbnailUrl || p.posterUrl || "",
       type:                p.type || "post",
-      edit_metadata:       p.edit_metadata || null,
     });
   }
 
@@ -490,16 +480,14 @@
       content:             p.content,
       tags:                p.tags || [],
       media_url:           p.media_url,
-      media_thumbnail_url: p.media_thumbnail_url,
       type:                p.type,
-      edit_metadata:       p.edit_metadata || null,
     });
     state.authorId = p.user_id || (p.author && p.author.id) || null;
     state.authorName = (p.author && p.author.name) || "";
     state.type     = p.type || "post";
     state.content = p.content || "";
     state.mediaUrl = p.media_url || null;
-    state.posterUrl = p.media_thumbnail_url || (p.type === "clip" ? null : p.media_url) || null;
+    state.posterUrl = p.media_thumbnail_url || p.media_url || null;
     state.liked = !!(j.viewer && j.viewer.liked);
     state.saved = !!(j.viewer && j.viewer.saved);
     state.likes = (j.counts && j.counts.likes) || 0;
@@ -522,16 +510,12 @@
         const safeAuthor = String(state.authorId || "").replace(/'/g, "\\'");
         const safeName = String(state.authorName || "").replace(/'/g, "\\'");
         menu.innerHTML = `
-          <button type="button" onclick="window.__vpvCloseMenu();window.vibeOpenReportSheet('${state.type === 'clip' ? 'post' : 'post'}','${safeId}')">Report ${state.type === 'clip' ? 'clip' : 'post'}</button>
+          <button type="button" onclick="window.__vpvCloseMenu();window.vibeOpenReportSheet('post','${safeId}')">Report post</button>
           ${safeAuthor ? `<button type="button" onclick="window.__vpvCloseMenu();window.vibeOpenMuteSheet('${safeAuthor}','${safeName}')">Mute ${safeName ? safeName.split(' ')[0] : 'author'}</button>` : ''}
           ${safeAuthor ? `<button type="button" class="danger" onclick="window.__vpvCloseMenu();window.vibeBlock('${safeAuthor}','${safeName}', () => window.__vpvClose())">Block ${safeName ? safeName.split(' ')[0] : 'author'}</button>` : ''}
         `;
       }
     }
-
-    // Clip rows: now that we know the canonical id + type, mint a signed
-    // R2 GET URL and attach it to the <video> created by paintBody.
-    if (p.type === "clip") _vpvLoadClipSrc(p.id);
   }
 
   function paintHeader({ author, created_at }) {
@@ -562,47 +546,11 @@
     );
   }
 
-  // Vanilla mirror of FILTER_CSS in src/lib/clip/edit-metadata.ts.
-  function _vpvFilterCss(filter) {
-    if (filter === "warm")  return "saturate(1.15) hue-rotate(-8deg) brightness(1.04)";
-    if (filter === "cool")  return "saturate(1.1) hue-rotate(8deg) brightness(0.98)";
-    if (filter === "bw")    return "grayscale(1) contrast(1.08)";
-    if (filter === "vivid") return "saturate(1.55) contrast(1.1)";
-    return "";
-  }
-  function _vpvOverlayHTML(editMeta) {
-    if (!editMeta || !Array.isArray(editMeta.text_overlays)) return "";
-    return editMeta.text_overlays.map(o => {
-      const x = Number(o.x) || 50;
-      const y = Number(o.y) || 50;
-      const color = /^#[0-9A-Fa-f]{6}$/.test(o.color) ? o.color : "#FFFFFF";
-      return `<div aria-hidden style="position:absolute;left:${x}%;top:${y}%;`
-        + `transform:translate(-50%,-50%);color:${color};`
-        + `font-family:'DM Sans',sans-serif;font-weight:800;font-size:22px;`
-        + `line-height:1.2;text-align:center;`
-        + `text-shadow:0 1px 3px rgba(0,0,0,.55);max-width:82%;`
-        + `white-space:pre-wrap;word-break:break-word;pointer-events:none;">${esc(String(o.text || ""))}</div>`;
-    }).join("");
-  }
-
-  function paintBody({ content, tags, media_url, media_thumbnail_url, type, edit_metadata }) {
+  function paintBody({ content, tags, media_url, type }) {
     const body = document.getElementById("vpvBody");
     const text = content ? `<div class="vpv-text">${formatBodyText(content)}</div>` : "";
     let media = "";
-    if (type === "clip") {
-      // P1-016: real <video> with native HTML5 controls. The poster paints
-      // instantly from media_thumbnail_url; the signed R2 GET URL resolves
-      // asynchronously via _vpvLoadClipSrc(). Demo Maya / mock clips have
-      // no DB id — we still render the poster but skip the fetch.
-      const poster = media_thumbnail_url ? `poster="${esc(media_thumbnail_url)}"` : "";
-      const filterCss = edit_metadata && edit_metadata.filter ? _vpvFilterCss(edit_metadata.filter) : "";
-      const videoStyle = filterCss ? ` style="filter:${filterCss};"` : "";
-      // Wrap the video so we can absolute-position text overlays on top.
-      media = `<div class="vpv-video-wrap" style="position:relative;">`
-        + `<video class="vpv-video" id="vpvVideo" ${poster} controls playsinline muted loop preload="metadata"${videoStyle}></video>`
-        + _vpvOverlayHTML(edit_metadata)
-        + `</div>`;
-    } else if (media_url && type === "post") {
+    if (media_url && type === "post") {
       // Post images are stored as public URLs (Supabase profiles bucket)
       media = `<img class="vpv-image" src="${esc(media_url)}" alt="">`;
     }
@@ -610,65 +558,6 @@
       ? `<div class="vpv-tags">${tags.map(t => `<span class="vpv-tag">#${esc(t)}</span>`).join("")}</div>`
       : "";
     body.innerHTML = text + media + tagBlock;
-
-    // Wire up speed + trim if the post has metadata. Filter is already
-    // applied via inline style above; text overlays are static DOM.
-    if (type === "clip" && edit_metadata) {
-      const v = document.getElementById("vpvVideo");
-      if (v) {
-        if (edit_metadata.speed) {
-          v.playbackRate = edit_metadata.speed;
-          // Some browsers reset rate on srcChange; reapply when src lands.
-          v.addEventListener("loadedmetadata", () => {
-            v.playbackRate = edit_metadata.speed;
-          }, { once: true });
-        }
-        if (edit_metadata.trim) {
-          const startSec = edit_metadata.trim.start_ms / 1000;
-          const endSec = edit_metadata.trim.end_ms / 1000;
-          const onLoaded = () => {
-            try {
-              if (v.currentTime < startSec || v.currentTime > endSec) {
-                v.currentTime = startSec;
-              }
-            } catch {}
-          };
-          const onTimeUpdate = () => {
-            if (v.currentTime >= endSec) {
-              try { v.currentTime = startSec; } catch {}
-            }
-          };
-          v.addEventListener("loadedmetadata", onLoaded);
-          v.addEventListener("timeupdate", onTimeUpdate);
-        }
-      }
-    }
-  }
-
-  // Fetch a fresh signed R2 URL and attach it to the open clip's <video>.
-  // Demo / mock clips skip this (no DB row) — the poster image carries the UX.
-  async function _vpvLoadClipSrc(postId) {
-    if (!postId) return;
-    if (!isAppShell()) return;
-    if (!isRealPostId(postId)) return; // demo / hardcoded clips have no R2 object
-    try {
-      const r = await fetch(`/api/clips/${encodeURIComponent(postId)}/view-url`, {
-        credentials: "include",
-      });
-      const j = await r.json().catch(() => ({}));
-      if (!r.ok || !j.ok || !j.url) {
-        // Don't toast — the poster still shows; failing silent is gentler
-        // than a noisy toast every time R2 is misconfigured in dev.
-        return;
-      }
-      // Race guard: another open may have replaced #vpvVideo since we asked.
-      if (state.openId !== String(postId)) return;
-      const v = document.getElementById("vpvVideo");
-      if (!v) return;
-      v.src = j.url;
-      // autoplay (muted) — IG/TikTok-native feel; user can unmute via controls.
-      try { v.play().catch(() => {}); } catch {}
-    } catch { /* silent */ }
   }
 
   function renderCommentsList(list) {
@@ -790,8 +679,8 @@
     const title = (state.content || "").slice(0, 240);
     window.openSharePicker({
       postId: state.openId,
-      kind: state.type === "clip" ? "clip" : "post",
-      title: title || (state.type === "clip" ? "Clip" : "Post"),
+      kind: "post",
+      title: title || "Post",
       posterUrl: state.posterUrl,
       authorName: state.authorName,
     });
@@ -801,11 +690,6 @@
     if (ev) ev.stopPropagation();
     const menu = document.getElementById("vpvMenu");
     if (!menu) return;
-    // For owners the only item is Delete — keep its label in sync with type.
-    const delBtn = menu.querySelector("button.danger");
-    if (delBtn && /^Delete /.test(delBtn.textContent || "")) {
-      delBtn.textContent = state.type === "clip" ? "Delete clip" : "Delete post";
-    }
     const wasOpen = menu.classList.contains("show");
     menu.classList.toggle("show", !wasOpen);
     if (!wasOpen) {
@@ -826,10 +710,8 @@
     if (!state.openId) return;
     if (!isAppShell()) { toast("Sign in to delete"); return; }
     if (!isRealPostId(state.openId)) { toast("Demo post — can't delete"); return; }
-    // Quick confirm — destructive action, can't undo. Wording uses the
-    // post type so the user knows whether they're nuking a clip or a post.
-    const kindLabel = state.type === "clip" ? "clip" : "post";
-    if (!window.confirm(`Delete this ${kindLabel}? This can't be undone.`)) return;
+    // Quick confirm — destructive action, can't undo.
+    if (!window.confirm("Delete this post? This can't be undone.")) return;
     const menu = document.getElementById("vpvMenu");
     if (menu) menu.classList.remove("show");
     if (state.inflight) return;
@@ -859,7 +741,7 @@
     const selectors = [
       `[data-post-id="${id}"]`,           // .profile-post-card, campus .post
       `[data-source-post-id="${id}"]`,    // .post-thumb-cell in All grid
-      `[data-vibe-id="${id}"]`,           // .vibe-grid-thumb (clips)
+      `[data-vibe-id="${id}"]`,           // .vibe-grid-thumb in the Saved grid
     ];
     selectors.forEach(sel => {
       document.querySelectorAll(sel).forEach(el => el.remove());
@@ -867,7 +749,6 @@
     // Re-run aggregators where they exist so empty states show up.
     if (typeof populateAllGrid === "function") populateAllGrid();
     if (typeof savePostsToStorage === "function") savePostsToStorage();
-    if (typeof saveVibesToStorage === "function") saveVibesToStorage();
   }
 
   window.__vpvSubmitComment = async function () {

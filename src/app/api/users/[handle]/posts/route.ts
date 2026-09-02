@@ -54,12 +54,14 @@ export async function GET(req: Request, ctx: RouteContext) {
 
   // Filter drafts even when viewer == target owner — drafts only appear
   // in the composer's Drafts box, never in the public-shaped grid.
+  // Clips are backlogged, so only `type='post'` rows surface.
   const { data, error } = await supabase
     .from("posts")
     .select(
-      "id,user_id,type,content,tags,media_url,media_thumbnail_url,edit_metadata,created_at",
+      "id,user_id,type,content,tags,media_url,media_thumbnail_url,created_at",
     )
     .eq("user_id", target.id)
+    .eq("type", "post")
     .eq("status", "published")
     .order("created_at", { ascending: false })
     .limit(limit);

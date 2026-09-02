@@ -45,7 +45,7 @@ export async function generateMetadata({ params }: Params): Promise<Metadata> {
     // and normalize once below.
     const raw = row as unknown as {
       id: string;
-      type: "post" | "clip";
+      type: string;
       content: string | null;
       media_url: string | null;
       media_thumbnail_url: string | null;
@@ -66,9 +66,7 @@ export async function generateMetadata({ params }: Params): Promise<Metadata> {
     const content = (post.content ?? "").trim();
     const titleSnippet = content
       ? content.slice(0, 60) + (content.length > 60 ? "…" : "")
-      : post.type === "clip"
-        ? "Clip on Vibe"
-        : "Post on Vibe";
+      : "Post on Vibe";
     const title = `${authorLabel}: ${titleSnippet}`;
     const description =
       content.length > 140

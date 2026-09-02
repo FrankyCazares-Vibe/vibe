@@ -409,7 +409,11 @@ function UploadAssetModal({
   );
 }
 
-// ─── New post / clip ─────────────────────────────────────────────────────
+// ─── New post ────────────────────────────────────────────────────────────
+//
+// Used to offer a post/clip toggle where "clip" uploaded a vertical video.
+// Clips are backlogged (DOCS/BACKLOG_CLIPS.md), so org posts are now text
+// + image only.
 
 function NewPostModal({
   orgHandle,
@@ -419,7 +423,6 @@ function NewPostModal({
   onClose: () => void;
 }) {
   const router = useRouter();
-  const [type, setType] = useState<"post" | "clip">("post");
   const [content, setContent] = useState("");
   const [file, setFile] = useState<File | null>(null);
   const [previewUrl, setPreviewUrl] = useState<string | null>(null);
@@ -435,8 +438,8 @@ function NewPostModal({
       setPreviewUrl(null);
       return;
     }
-    // Images go through the cropper. Videos pass through as-is.
-    if (type === "post" && f.type.startsWith("image/")) {
+    // Images go through the cropper.
+    if (f.type.startsWith("image/")) {
       setPendingImage(f);
       return;
     }
@@ -460,10 +463,6 @@ function NewPostModal({
       setErr("Add text or media before posting");
       return;
     }
-    if (type === "clip" && !file) {
-      setErr("Clip needs a video upload");
-      return;
-    }
     setBusy(true);
     setErr(null);
     try {
@@ -474,7 +473,7 @@ function NewPostModal({
           method: "POST",
           headers: { "content-type": "application/json" },
           body: JSON.stringify({
-            kind: type === "clip" ? "post-video" : "post-image",
+            kind: "post-image",
             contentType: file.type,
             sizeBytes: file.size,
           }),
@@ -502,7 +501,6 @@ function NewPostModal({
         method: "POST",
         headers: { "content-type": "application/json" },
         body: JSON.stringify({
-          type,
           content: content.trim(),
           media_url: mediaUrl,
         }),
@@ -523,77 +521,20 @@ function NewPostModal({
     }
   };
 
-  const accept =
-    type === "clip"
-      ? "video/mp4,video/quicktime,video/webm"
-      : "image/png,image/jpeg,image/webp,image/gif";
-
   return (
     <ModalShell title="Post as the org" onClose={onClose}>
-      {/* Post / Clip toggle */}
-      <div style={{ display: "flex", gap: 6 }}>
-        {(["post", "clip"] as const).map((opt) => {
-          const on = type === opt;
-          return (
-            <button
-              key={opt}
-              type="button"
-              onClick={() => {
-                setType(opt);
-                onPickFile(null);
-              }}
-              style={{
-                flex: 1,
-                padding: "8px 10px",
-                borderRadius: 10,
-                border: on
-                  ? "1px solid rgba(255,180,150,0.55)"
-                  : "1px solid rgba(255,255,255,0.12)",
-                background: on
-                  ? "linear-gradient(180deg, rgba(255,92,53,0.32) 0%, rgba(255,92,53,0.14) 100%)"
-                  : "rgba(255,255,255,0.04)",
-                color: "#fff",
-                fontFamily: "DM Sans, sans-serif",
-                fontWeight: 700,
-                fontSize: 13,
-                cursor: "pointer",
-                textTransform: "capitalize",
-              }}
-            >
-              {opt}
-            </button>
-          );
-        })}
-      </div>
-
       <FieldLabel>Caption</FieldLabel>
       <textarea
         value={content}
         maxLength={2000}
         rows={4}
         onChange={(e) => setContent(e.target.value)}
-        placeholder={
-          type === "clip"
-            ? "Caption your clip…"
-            : "Announce something, share a recap, drop a thread."
-        }
+        placeholder="Announce something, share a recap, drop a thread."
         style={{ ...inputStyle, resize: "vertical", minHeight: 90 }}
       />
 
-      <FieldLabel>{type === "clip" ? "Video" : "Image (optional)"}</FieldLabel>
-      {previewUrl && type === "clip" ? (
-        <video
-          src={previewUrl}
-          controls
-          style={{
-            width: "100%",
-            borderRadius: 12,
-            border: "1px solid rgba(255,255,255,0.1)",
-            maxHeight: 360,
-            background: "#000",
-          }}
-        />
-      ) : previewUrl ? (
+      <FieldLabel>Image (optional)</FieldLabel>
+      {previewUrl ? (
         // Background-image preview keeps the upload component dependency-free.
         <div
           style={{
@@ -613,19 +554,15 @@ function NewPostModal({
           marginTop: previewUrl ? 8 : 0,
         }}
       >
-        {file ? "Change file" : type === "clip" ? "Pick video" : "Pick image"}
+        {file ? "Change file" : "Pick image"}
         <input
           type="file"
-          accept={accept}
+          accept="image/png,image/jpeg,image/webp,image/gif"
           onChange={(e) => onPickFile(e.target.files?.[0] ?? null)}
           style={{ display: "none" }}
         />
       </label>
-      <Hint>
-        {type === "clip"
-          ? "MP4 / MOV / WEBM · 200MB max"
-          : "JPG / PNG / WEBP / GIF · 15MB max"}
-      </Hint>
+      <Hint>JPG / PNG / WEBP / GIF · 15MB max</Hint>
 
       {err ? <ErrorBanner text={err} /> : null}
 

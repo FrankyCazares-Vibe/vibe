@@ -11,16 +11,9 @@ import { emitCalendarChanged } from "@/components/LeftNav";
 import { SharePostSheet } from "@/components/mobile/SharePostSheet";
 import { MouseSpotlight } from "@/components/ui/mouse-spotlight";
 import {
-  FILTER_CSS,
-  getOverlayCss,
-  isOverlayVisible,
-} from "@/lib/clip/edit-metadata";
-import {
   bindMentionPicker,
   capturePosterFrame,
-  classifyVideo,
   extractHashtags,
-  type VideoMode,
 } from "@/lib/composer/helpers";
 import { IU_SCHOOLS, schoolForMajor } from "@/lib/iu/majors";
 
@@ -4179,14 +4172,13 @@ export type FeedPost = {
   id: string;
   user_id: string;
   org_id: string | null;
-  type: "post" | "clip";
+  type: "post";
   content: string;
   tags: string[] | null;
   media_url: string | null;
   media_thumbnail_url: string | null;
-  edit_metadata: import("@/lib/clip/edit-metadata").ClipEditMetadata | null;
-  // Client picks the right player from this. "video" for clips and for
-  // X-style video posts. "image" for image posts. null for text-only.
+  // Client picks the right player from this. "video" for video posts,
+  // "image" for image posts, null for text-only.
   media_kind: "video" | "image" | null;
   view_count: number;
   like_count: number;
@@ -4243,8 +4235,6 @@ function relativeTime(iso: string): string {
   }
 }
 
-type FeedMode = "posts" | "clips";
-
 function FeedTabBody({
   tagFilter,
   onClearTagFilter,
@@ -4256,10 +4246,6 @@ function FeedTabBody({
 }) {
   const [entries, setEntries] = useState<FeedEntry[] | null>(null);
   const [viewerId, setViewerId] = useState<string | null>(null);
-  // Posts vs Clips toggle. When `clips`, the feed becomes a vertical
-  // Reels-style player that auto-plays the visible clip. Tag-filter mode
-  // forces back to Posts since hashtag drilldowns mix both kinds.
-  const [mode, setMode] = useState<FeedMode>("posts");
 
   const feedUrl = tagFilter
     ? `/api/feed?limit=50&tag=${encodeURIComponent(tagFilter)}`
@@ -4427,11 +4413,9 @@ function FeedTabBody({
         >
           ← Back to main feed
         </button>
-      ) : (
-        <FeedModeToggle mode={mode} onChange={setMode} />
-      )}
+      ) : null}
 
-      {!tagFilter && mode === "posts" ? (
+      {!tagFilter ? (
         <FeedComposer
           glass={feedGlass}
           onPosted={() => {
@@ -4440,993 +4424,53 @@ function FeedTabBody({
         />
       ) : null}
 
-      {mode === "clips" && !tagFilter ? (
-        <ClipsReel entries={entries} />
-      ) : (
-        // Posts column — second glass surface stacked under the composer
-        <div style={feedGlass}>
-          {entries === null ? (
-            <div
-              style={{
-                padding: "24px",
-                fontFamily: "DM Sans, sans-serif",
-                fontSize: 14,
-                color: COLORS.faint,
-                textAlign: "center",
-              }}
-            >
-              Loading feed…
-            </div>
-          ) : entries.length === 0 ? (
-            <div
-              style={{
-                padding: "32px 24px",
-                fontFamily: "DM Sans, sans-serif",
-                fontSize: 14,
-                color: COLORS.faint,
-                textAlign: "center",
-                lineHeight: 1.5,
-              }}
-            >
-              No posts yet — orgs you follow and people from your school will
-              show up here once they post.
-            </div>
-          ) : (
-            entries.map((entry, idx) => (
-              <FeedRow
-                key={entry.kind === "repost" ? `r:${entry.reposter.id}:${entry.post.id}` : `p:${entry.post.id}`}
-                entry={entry}
-                hairline={idx < entries.length - 1 ? hairline : "none"}
-                onMutate={refresh}
-                onPickTag={onPickTag}
-                viewerId={viewerId}
-              />
-            ))
-          )}
-        </div>
-      )}
+      {/* Posts column — second glass surface stacked under the composer */}
+      <div style={feedGlass}>
+        {entries === null ? (
+          <div
+            style={{
+              padding: "24px",
+              fontFamily: "DM Sans, sans-serif",
+              fontSize: 14,
+              color: COLORS.faint,
+              textAlign: "center",
+            }}
+          >
+            Loading feed…
+          </div>
+        ) : entries.length === 0 ? (
+          <div
+            style={{
+              padding: "32px 24px",
+              fontFamily: "DM Sans, sans-serif",
+              fontSize: 14,
+              color: COLORS.faint,
+              textAlign: "center",
+              lineHeight: 1.5,
+            }}
+          >
+            No posts yet — orgs you follow and people from your school will
+            show up here once they post.
+          </div>
+        ) : (
+          entries.map((entry, idx) => (
+            <FeedRow
+              key={entry.kind === "repost" ? `r:${entry.reposter.id}:${entry.post.id}` : `p:${entry.post.id}`}
+              entry={entry}
+              hairline={idx < entries.length - 1 ? hairline : "none"}
+              onMutate={refresh}
+              onPickTag={onPickTag}
+              viewerId={viewerId}
+            />
+          ))
+        )}
+      </div>
     </section>
   );
 }
 
-function feedModePillStyle(active: boolean): React.CSSProperties {
-  return {
-    display: "inline-flex",
-    alignItems: "center",
-    gap: 8,
-    padding: "9px 18px",
-    borderRadius: 999,
-    border: active
-      ? "1px solid rgba(255,255,255,0.32)"
-      : "1px solid rgba(255,255,255,0.12)",
-    background: active ? "rgba(255,255,255,0.16)" : "rgba(15,10,28,0.32)",
-    color: "#fff",
-    fontFamily: "DM Sans, sans-serif",
-    fontWeight: 700,
-    fontSize: 13,
-    cursor: "pointer",
-    backdropFilter: "blur(20px) saturate(160%)",
-    WebkitBackdropFilter: "blur(20px) saturate(160%)",
-    boxShadow: active
-      ? "inset 0 1px 0 rgba(255,255,255,0.22), 0 6px 22px rgba(0,0,0,0.25)"
-      : "inset 0 1px 0 rgba(255,255,255,0.1)",
-  };
-}
-
-// Posts vs Clips pill toggle, sitting where the composer used to anchor
-// the top of the feed. Same pill aesthetic as the campus tabs.
-function FeedModeToggle({
-  mode,
-  onChange,
-}: {
-  mode: FeedMode;
-  onChange: (m: FeedMode) => void;
-}) {
-  return (
-    <div style={{ display: "flex", gap: 8, alignSelf: "flex-start" }}>
-      <button
-        type="button"
-        onClick={() => onChange("posts")}
-        style={feedModePillStyle(mode === "posts")}
-      >
-        <svg width="14" height="14" viewBox="0 0 14 14" fill="none">
-          <rect
-            x="1.5"
-            y="2"
-            width="11"
-            height="10"
-            rx="2"
-            stroke="currentColor"
-            strokeWidth="1.4"
-          />
-          <path
-            d="M3.5 5.5h7M3.5 8h5"
-            stroke="currentColor"
-            strokeWidth="1.4"
-            strokeLinecap="round"
-          />
-        </svg>
-        Posts
-      </button>
-      <button
-        type="button"
-        onClick={() => onChange("clips")}
-        style={feedModePillStyle(mode === "clips")}
-      >
-        <svg width="14" height="14" viewBox="0 0 14 14" fill="none">
-          <rect
-            x="2"
-            y="1.5"
-            width="10"
-            height="11"
-            rx="2"
-            stroke="currentColor"
-            strokeWidth="1.4"
-          />
-          <path d="M5.5 4.5L9.5 7L5.5 9.5V4.5Z" fill="currentColor" />
-        </svg>
-        Clips
-      </button>
-    </div>
-  );
-}
-
-// Reels-style vertical player. Takes the same `entries` the post column
-// reads, filters to clips, and stacks them as full-width 9:16 cards. The
-// clip closest to the viewport center auto-plays (muted by default);
-// others pause to keep CPU + bandwidth bounded. Tap a card to toggle
-// mute. The action rail (like / comment / share / open) sits along the
-// right edge of each card, IG-style.
-function ClipsReel({ entries }: { entries: FeedEntry[] | null }) {
-  const clips = useMemo(() => {
-    if (!entries) return null;
-    const seen = new Set<string>();
-    const out: FeedPost[] = [];
-    for (const e of entries) {
-      if (e.kind !== "post") continue;
-      if (e.post.type !== "clip") continue;
-      if (seen.has(e.post.id)) continue;
-      seen.add(e.post.id);
-      out.push(e.post);
-    }
-    return out;
-  }, [entries]);
-
-  if (clips === null) {
-    return (
-      <div
-        style={{
-          padding: 32,
-          textAlign: "center",
-          fontFamily: "DM Sans, sans-serif",
-          color: COLORS.glassMuted,
-        }}
-      >
-        Loading clips…
-      </div>
-    );
-  }
-  if (clips.length === 0) {
-    return (
-      <div
-        style={{
-          padding: "44px 24px",
-          textAlign: "center",
-          fontFamily: "DM Sans, sans-serif",
-          color: COLORS.glassMuted,
-          lineHeight: 1.5,
-          background: "rgba(15,10,28,0.32)",
-          backdropFilter: "blur(20px) saturate(160%)",
-          WebkitBackdropFilter: "blur(20px) saturate(160%)",
-          borderRadius: 22,
-          border: `1px solid ${COLORS.glassBorder}`,
-        }}
-      >
-        No clips yet — flip back to Posts, or upload one from the composer.
-      </div>
-    );
-  }
-  return <ClipsReelInner clips={clips} />;
-}
-
-export function ClipsReelInner({ clips }: { clips: FeedPost[] }) {
-  // Scroll-snap container: clips snap one-per-viewport like desktop
-  // TikTok. The container is the IntersectionObserver root for each
-  // card so auto-play only fires for the clip that snaps into view,
-  // not every clip that happens to be in the document viewport.
-  const scrollRef = useRef<HTMLDivElement | null>(null);
-  return (
-    <div
-      ref={scrollRef}
-      style={{
-        height: "min(calc(100vh - 200px), 860px)",
-        overflowY: "auto",
-        scrollSnapType: "y mandatory",
-        scrollbarWidth: "none",
-        display: "flex",
-        flexDirection: "column",
-        alignItems: "center",
-        gap: 16,
-        padding: "0 4px",
-      }}
-    >
-      {clips.map((c, i) => (
-        <div
-          key={c.id}
-          style={{
-            scrollSnapAlign: "center",
-            scrollSnapStop: "always",
-            width: "100%",
-            display: "flex",
-            justifyContent: "center",
-            flexShrink: 0,
-          }}
-        >
-          <ClipReelCard clip={c} index={i} containerRef={scrollRef} />
-        </div>
-      ))}
-    </div>
-  );
-}
-
-function ClipReelCard({
-  clip,
-  index,
-  containerRef,
-}: {
-  clip: FeedPost;
-  index: number;
-  containerRef: React.RefObject<HTMLDivElement | null>;
-}) {
-  const wrapRef = useRef<HTMLDivElement | null>(null);
-  const videoRef = useRef<HTMLVideoElement | null>(null);
-  const [muted, setMuted] = useState(true);
-  const [paused, setPaused] = useState(true);
-  const [signedUrl, setSignedUrl] = useState<string | null>(null);
-  // Playback time for per-overlay timing gates. Only tracked when at
-  // least one overlay actually has timing constraints.
-  const [currentMs, setCurrentMs] = useState(0);
-
-  // Engagement state — seeded from the feed payload, mutated optimistically
-  // on click, rolled back on API failure. Same pattern as FeedRow.
-  const [liked, setLiked] = useState(clip.viewer_liked);
-  const [likeCount, setLikeCount] = useState(clip.like_count);
-  const [reposted, setReposted] = useState(clip.viewer_reposted);
-  const [repostCount, setRepostCount] = useState(clip.repost_count);
-  const [commentCount, setCommentCount] = useState(clip.comment_count);
-  const [showComments, setShowComments] = useState(false);
-
-  // Lazy-fetch the signed playback URL once this card scrolls anywhere
-  // near the snap container's viewport. Stored URLs are R2 object keys,
-  // not direct URLs — the `/clips/:id/view-url` route signs a fresh GET.
-  const [shouldLoad, setShouldLoad] = useState(index < 2);
-  useEffect(() => {
-    const el = wrapRef.current;
-    if (!el || shouldLoad) return;
-    const io = new IntersectionObserver(
-      (entries) => {
-        for (const entry of entries) {
-          if (entry.isIntersecting) {
-            setShouldLoad(true);
-            io.disconnect();
-            break;
-          }
-        }
-      },
-      { root: containerRef.current ?? null, rootMargin: "400px 0px" },
-    );
-    io.observe(el);
-    return () => io.disconnect();
-  }, [shouldLoad, containerRef]);
-
-  useEffect(() => {
-    if (!shouldLoad || signedUrl) return;
-    let cancelled = false;
-    (async () => {
-      try {
-        const r = await fetch(`/api/clips/${encodeURIComponent(clip.id)}/view-url`, {
-          cache: "no-store",
-        });
-        const j = await r.json();
-        if (cancelled) return;
-        if (j?.ok && typeof j.url === "string") setSignedUrl(j.url);
-      } catch {}
-    })();
-    return () => {
-      cancelled = true;
-    };
-  }, [clip.id, shouldLoad, signedUrl]);
-
-  // Auto-play when at least 60% of the card is in view; pause otherwise.
-  // Skipped while the comments sheet is open — the user is reading, not
-  // watching, so suppress audio + decode work until they close it.
-  useEffect(() => {
-    const el = wrapRef.current;
-    const v = videoRef.current;
-    if (!el || !v) return;
-    if (showComments) {
-      // Indicator is hidden while the sheet is open (`!showComments`
-      // guard on the play overlay) so we don't need to mirror to React
-      // state — just stop the playback.
-      v.pause();
-      return;
-    }
-    const io = new IntersectionObserver(
-      (entries) => {
-        for (const entry of entries) {
-          if (entry.isIntersecting && entry.intersectionRatio >= 0.6) {
-            v.play()
-              .then(() => setPaused(false))
-              .catch(() => {});
-          } else {
-            v.pause();
-            setPaused(true);
-          }
-        }
-      },
-      { root: containerRef.current ?? null, threshold: [0, 0.6, 1] },
-    );
-    io.observe(el);
-    return () => io.disconnect();
-  }, [signedUrl, showComments, containerRef]);
-
-  const togglePlay = () => {
-    const v = videoRef.current;
-    if (!v) return;
-    if (v.paused) {
-      v.play().then(() => setPaused(false)).catch(() => {});
-    } else {
-      v.pause();
-      setPaused(true);
-    }
-  };
-
-  // Apply lossless edit_metadata effects (speed, filter, trim, overlays).
-  // Mirrors ClipViewerMobile so clips look the same wherever they play.
-  const editMeta = clip.edit_metadata ?? null;
-  const filterCss = editMeta?.filter ? FILTER_CSS[editMeta.filter] : undefined;
-
-  useEffect(() => {
-    const v = videoRef.current;
-    if (!v) return;
-    v.playbackRate = editMeta?.speed ?? 1;
-  }, [editMeta?.speed, signedUrl]);
-
-  // Track currentTime → ms for the per-overlay timing gate. Always
-  // attach rAF once the signed URL is ready — no overlay-shape gate,
-  // so a sanitizer/gate mismatch can't silently disable timing. Cheap:
-  // one currentTime read per frame, throttled setState on ≥50ms.
-  useEffect(() => {
-    if (!signedUrl) return;
-    const v = videoRef.current;
-    if (!v) return;
-    let raf = 0;
-    let lastMs = -1;
-    const tick = () => {
-      const ms = Math.round(v.currentTime * 1000);
-      if (Math.abs(ms - lastMs) >= 50) {
-        lastMs = ms;
-        setCurrentMs(ms);
-      }
-      raf = window.requestAnimationFrame(tick);
-    };
-    raf = window.requestAnimationFrame(tick);
-    return () => window.cancelAnimationFrame(raf);
-  }, [signedUrl]);
-
-  useEffect(() => {
-    const v = videoRef.current;
-    if (!v) return;
-    const trim = editMeta?.trim ?? null;
-    if (!trim) return;
-    const startSec = trim.start_ms / 1000;
-    const endSec = trim.end_ms / 1000;
-    const onLoaded = () => {
-      if (v.currentTime < startSec || v.currentTime > endSec) {
-        try {
-          v.currentTime = startSec;
-        } catch {
-          /* not yet seekable */
-        }
-      }
-    };
-    const onTimeUpdate = () => {
-      if (v.currentTime >= endSec) {
-        try {
-          v.currentTime = startSec;
-        } catch {
-          /* ignore */
-        }
-      }
-    };
-    v.addEventListener("loadedmetadata", onLoaded);
-    v.addEventListener("timeupdate", onTimeUpdate);
-    onLoaded();
-    return () => {
-      v.removeEventListener("loadedmetadata", onLoaded);
-      v.removeEventListener("timeupdate", onTimeUpdate);
-    };
-  }, [editMeta?.trim, signedUrl]);
-
-  // Playback progress for the bottom scrubber. We poll via the standard
-  // `timeupdate` event (~4-15Hz, browser-dependent) which is plenty smooth
-  // for a 1-2px-tall bar.
-  const [progress, setProgress] = useState({ current: 0, duration: 0 });
-  useEffect(() => {
-    const v = videoRef.current;
-    if (!v) return;
-    const onTime = () => {
-      setProgress({
-        current: v.currentTime || 0,
-        duration: Number.isFinite(v.duration) ? v.duration : 0,
-      });
-    };
-    const onMeta = () => onTime();
-    v.addEventListener("timeupdate", onTime);
-    v.addEventListener("loadedmetadata", onMeta);
-    return () => {
-      v.removeEventListener("timeupdate", onTime);
-      v.removeEventListener("loadedmetadata", onMeta);
-    };
-  }, [signedUrl]);
-
-  const seekTo = (clientX: number, target: HTMLDivElement) => {
-    const v = videoRef.current;
-    if (!v || !progress.duration) return;
-    const rect = target.getBoundingClientRect();
-    const ratio = Math.min(1, Math.max(0, (clientX - rect.left) / rect.width));
-    v.currentTime = ratio * progress.duration;
-    setProgress((p) => ({ ...p, current: v.currentTime }));
-  };
-
-  // "Tap to unmute" hint: shows on the first card while it's auto-playing
-  // muted. Auto-dismisses after 3.5s, and stops showing the moment the
-  // user unmutes (they don't need a hint anymore once they've touched
-  // audio). Visibility is derived from state — no synchronous setState
-  // in the effect body, just an async timer that flips `dismissed`.
-  const [hintDismissed, setHintDismissed] = useState(false);
-  useEffect(() => {
-    if (index !== 0 || hintDismissed) return;
-    if (paused || !muted) return;
-    const t = setTimeout(() => setHintDismissed(true), 3500);
-    return () => clearTimeout(t);
-  }, [index, paused, muted, hintDismissed]);
-  const showUnmuteHint = index === 0 && muted && !paused && !hintDismissed;
-
-  // Double-tap to like (TikTok / IG behavior). The first tap is held in
-  // `lastTapRef` for ~300ms; a second tap inside that window calls like
-  // (only if not already liked — double-tap doesn't unlike). The side
-  // heart filling coral is the "you liked it" indicator; no overlay.
-  const lastTapRef = useRef<number>(0);
-  const handleCardTap = () => {
-    // eslint-disable-next-line react-hooks/purity -- click handler, runs at event time, not during render
-    const now = Date.now();
-    if (now - lastTapRef.current < 300) {
-      lastTapRef.current = 0;
-      if (!liked) void toggleLike();
-      return;
-    }
-    lastTapRef.current = now;
-    togglePlay();
-  };
-
-  const copyLink = useCallback(async () => {
-    try {
-      const url = `${window.location.origin}/posts/${clip.id}`;
-      if (navigator.share) {
-        await navigator.share({
-          url,
-          title: clip.content?.slice(0, 80) || "Clip on Vibe",
-        });
-      } else if (navigator.clipboard) {
-        await navigator.clipboard.writeText(url);
-      }
-    } catch {
-      /* user dismissed share sheet, or clipboard blocked — silent */
-    }
-  }, [clip.id, clip.content]);
-
-  const toggleLike = useCallback(async () => {
-    const next = !liked;
-    setLiked(next);
-    setLikeCount((c) => c + (next ? 1 : -1));
-    try {
-      const res = await fetch(`/api/posts/${clip.id}/like`, {
-        method: next ? "POST" : "DELETE",
-      });
-      if (!res.ok) throw new Error(`like ${res.status}`);
-    } catch (e) {
-      console.error("[clips] like", e);
-      setLiked(!next);
-      setLikeCount((c) => c + (next ? -1 : 1));
-    }
-  }, [clip.id, liked]);
-
-  const toggleRepost = useCallback(async () => {
-    const next = !reposted;
-    setReposted(next);
-    setRepostCount((c) => c + (next ? 1 : -1));
-    try {
-      const res = next
-        ? await fetch(`/api/posts/${clip.id}/repost`, {
-            method: "POST",
-            headers: { "Content-Type": "application/json" },
-            body: JSON.stringify({}),
-          })
-        : await fetch(`/api/posts/${clip.id}/repost`, { method: "DELETE" });
-      if (!res.ok) throw new Error(`repost ${res.status}`);
-    } catch (e) {
-      console.error("[clips] repost", e);
-      setReposted(!next);
-      setRepostCount((c) => c + (next ? -1 : 1));
-    }
-  }, [clip.id, reposted]);
-
-  const author = clip.author?.name || (clip.author?.handle ? `@${clip.author.handle}` : "");
-  const handle = clip.author?.handle ? `@${clip.author.handle}` : "";
-  const poster = clip.media_thumbnail_url;
-  const fallbackBg = clipFallbackGradient(clip.id);
-
-  return (
-    <div
-      ref={wrapRef}
-      style={{
-        position: "relative",
-        // Desktop-TikTok sizing: drive height from the viewport so the
-        // card fills as much vertical space as is comfortably available
-        // (capped to 860px for very tall screens). Width is computed
-        // from the 9:16 aspect ratio. On narrow screens, maxWidth: 100%
-        // pulls width back and shrinks height proportionally so the
-        // card never overflows.
-        height: "min(calc(100vh - 200px), 860px)",
-        aspectRatio: "9 / 16",
-        width: "auto",
-        maxWidth: "100%",
-        borderRadius: 22,
-        overflow: "hidden",
-        background: poster ? `url(${poster}) center/cover, #000` : fallbackBg,
-        boxShadow: "0 10px 40px rgba(0,0,0,0.32)",
-        alignSelf: "center",
-        cursor: "pointer",
-      }}
-      onClick={handleCardTap}
-    >
-      {signedUrl ? (
-        <video
-          ref={videoRef}
-          src={signedUrl}
-          poster={poster ?? undefined}
-          muted={muted}
-          loop
-          playsInline
-          preload="metadata"
-          style={{
-            position: "absolute",
-            inset: 0,
-            width: "100%",
-            height: "100%",
-            objectFit: "cover",
-            filter: filterCss,
-          }}
-        />
-      ) : null}
-
-      {/* Text overlays — only render once we have the signed URL so they
-          appear in sync with the playback frame. Style comes from
-          `getOverlayCss` so mobile + desktop stay in lock-step.
-          Per-overlay timing (startMs/endMs) gates visibility against
-          the current playback ms. */}
-      {signedUrl && editMeta?.text_overlays?.length
-        ? editMeta.text_overlays
-            .filter((o) => isOverlayVisible(o, currentMs))
-            .map((o) => (
-            <div
-              key={o.id}
-              aria-hidden
-              style={{
-                position: "absolute",
-                left: `${o.x}%`,
-                top: `${o.y}%`,
-                transform: "translate(-50%, -50%)",
-                pointerEvents: "none",
-                ...getOverlayCss(o),
-              }}
-            >
-              {o.text}
-            </div>
-          ))
-        : null}
-      {paused && signedUrl && !showComments ? (
-        <span
-          aria-hidden
-          style={{
-            position: "absolute",
-            top: "50%",
-            left: "50%",
-            transform: "translate(-50%, -50%)",
-            width: 64,
-            height: 64,
-            borderRadius: 999,
-            background: "rgba(0,0,0,0.45)",
-            color: "#fff",
-            display: "flex",
-            alignItems: "center",
-            justifyContent: "center",
-            fontSize: 24,
-            fontWeight: 700,
-            backdropFilter: "blur(8px)",
-            pointerEvents: "none",
-          }}
-        >
-          ▶
-        </span>
-      ) : null}
-
-      <button
-        type="button"
-        onClick={(e) => {
-          e.stopPropagation();
-          setMuted((m) => {
-            const next = !m;
-            if (videoRef.current) videoRef.current.muted = next;
-            return next;
-          });
-        }}
-        title={muted ? "Unmute" : "Mute"}
-        aria-label={muted ? "Unmute" : "Mute"}
-        style={{
-          position: "absolute",
-          top: 14,
-          right: 14,
-          width: 36,
-          height: 36,
-          borderRadius: 999,
-          border: "none",
-          background: "rgba(0,0,0,0.5)",
-          color: "#fff",
-          cursor: "pointer",
-          backdropFilter: "blur(6px)",
-          display: "flex",
-          alignItems: "center",
-          justifyContent: "center",
-        }}
-      >
-        {muted ? <SoundOffIcon /> : <SoundOnIcon />}
-      </button>
-
-      <div
-        onClick={(e) => e.stopPropagation()}
-        style={{
-          position: "absolute",
-          right: 14,
-          bottom: 96,
-          display: "flex",
-          flexDirection: "column",
-          gap: 18,
-          alignItems: "center",
-          fontFamily: "DM Sans, sans-serif",
-        }}
-      >
-        <ReelAction
-          icon={<LikeIcon filled={liked} />}
-          count={likeCount}
-          active={liked}
-          label={liked ? "Unlike" : "Like"}
-          onClick={toggleLike}
-        />
-        <ReelAction
-          icon={<CommentIcon />}
-          count={commentCount}
-          label="Comments"
-          onClick={() => setShowComments(true)}
-        />
-        <ReelAction
-          icon={<RepostIcon />}
-          count={repostCount}
-          active={reposted}
-          label={reposted ? "Undo repost" : "Repost"}
-          onClick={toggleRepost}
-        />
-        <ReelAction
-          icon={<ShareIcon />}
-          count={0}
-          label="Share"
-          onClick={copyLink}
-        />
-      </div>
-
-
-      <div
-        onClick={(e) => e.stopPropagation()}
-        style={{
-          position: "absolute",
-          left: 0,
-          right: 0,
-          bottom: 0,
-          padding: "60px 18px 28px",
-          background:
-            "linear-gradient(180deg, rgba(0,0,0,0) 0%, rgba(0,0,0,0.55) 50%, rgba(0,0,0,0.85) 100%)",
-          color: "#fff",
-          fontFamily: "DM Sans, sans-serif",
-          pointerEvents: "none",
-        }}
-      >
-        {author ? (
-          <a
-            href={handle ? `/profile/${encodeURIComponent(handle.slice(1))}` : "#"}
-            style={{
-              fontSize: 14,
-              fontWeight: 800,
-              color: "#fff",
-              textDecoration: "none",
-              pointerEvents: "auto",
-            }}
-            onClick={(e) => e.stopPropagation()}
-          >
-            {author}
-          </a>
-        ) : null}
-        {clip.content ? (
-          <div
-            style={{
-              fontSize: 13,
-              lineHeight: 1.4,
-              marginTop: 4,
-              maxWidth: 280,
-              display: "-webkit-box",
-              WebkitLineClamp: 3,
-              WebkitBoxOrient: "vertical",
-              overflow: "hidden",
-            }}
-          >
-            {clip.content}
-          </div>
-        ) : null}
-      </div>
-
-      {showComments ? (
-        <ClipCommentsSheet
-          postId={clip.id}
-          onClose={() => setShowComments(false)}
-          onCommentAdded={() => setCommentCount((c) => c + 1)}
-        />
-      ) : null}
-
-      {/* "Tap to unmute" hint — only on the first clip while muted */}
-      {showUnmuteHint ? (
-        <div
-          aria-hidden
-          style={{
-            position: "absolute",
-            top: 22,
-            left: "50%",
-            transform: "translateX(-50%)",
-            padding: "6px 12px",
-            borderRadius: 999,
-            background: "rgba(0,0,0,0.6)",
-            color: "#fff",
-            fontSize: 12,
-            fontWeight: 600,
-            fontFamily: "DM Sans, sans-serif",
-            backdropFilter: "blur(8px)",
-            pointerEvents: "none",
-            display: "flex",
-            alignItems: "center",
-            gap: 6,
-          }}
-        >
-          <SoundOffIcon /> Tap volume to unmute
-        </div>
-      ) : null}
-
-      {/* Progress bar — sits flush against the bottom of the card so it
-          doesn't compete with the caption gradient. Click to scrub. */}
-      <div
-        onClick={(e) => {
-          e.stopPropagation();
-          seekTo(e.clientX, e.currentTarget);
-        }}
-        style={{
-          position: "absolute",
-          left: 0,
-          right: 0,
-          bottom: 0,
-          height: 18,
-          padding: "8px 14px 4px",
-          cursor: "pointer",
-          zIndex: 3,
-        }}
-      >
-        <div
-          style={{
-            height: 3,
-            width: "100%",
-            borderRadius: 2,
-            background: "rgba(255,255,255,0.22)",
-            overflow: "hidden",
-          }}
-        >
-          <div
-            style={{
-              height: "100%",
-              width: progress.duration
-                ? `${Math.min(100, (progress.current / progress.duration) * 100)}%`
-                : "0%",
-              background: "#FF5C35",
-              transition: "width 80ms linear",
-            }}
-          />
-        </div>
-      </div>
-    </div>
-  );
-}
-
-function ReelAction({
-  icon,
-  count,
-  active,
-  label,
-  onClick,
-}: {
-  icon: React.ReactNode;
-  count: number;
-  active?: boolean;
-  label: string;
-  onClick: () => void;
-}) {
-  return (
-    <button
-      type="button"
-      onClick={(e) => {
-        e.stopPropagation();
-        onClick();
-      }}
-      title={label}
-      aria-label={label}
-      style={{
-        display: "flex",
-        flexDirection: "column",
-        alignItems: "center",
-        gap: 3,
-        background: "rgba(0,0,0,0.42)",
-        backdropFilter: "blur(6px)",
-        WebkitBackdropFilter: "blur(6px)",
-        border: "none",
-        borderRadius: 14,
-        padding: "8px 8px 6px",
-        minWidth: 44,
-        cursor: "pointer",
-        color: active ? "#FF5C35" : "#fff",
-        textShadow: "0 2px 6px rgba(0,0,0,0.4)",
-        fontFamily: "DM Sans, sans-serif",
-        transition: "transform 120ms ease",
-      }}
-    >
-      <span
-        style={{
-          width: 26,
-          height: 26,
-          display: "flex",
-          alignItems: "center",
-          justifyContent: "center",
-          transform: active ? "scale(1.08)" : "scale(1)",
-        }}
-      >
-        {icon}
-      </span>
-      {count > 0 ? (
-        <span style={{ fontSize: 11, fontWeight: 700 }}>{count}</span>
-      ) : null}
-    </button>
-  );
-}
-
-// Bottom-sheet overlay that slides up over a clip card. Reuses the
-// existing CommentsDrawer for the actual list + composer — same data
-// model the post column uses, just a different chrome.
-function ClipCommentsSheet({
-  postId,
-  onClose,
-  onCommentAdded,
-}: {
-  postId: string;
-  onClose: () => void;
-  onCommentAdded: () => void;
-}) {
-  return (
-    <div
-      onClick={(e) => {
-        e.stopPropagation();
-        if (e.target === e.currentTarget) onClose();
-      }}
-      style={{
-        position: "absolute",
-        inset: 0,
-        background: "rgba(0,0,0,0.45)",
-        zIndex: 5,
-        display: "flex",
-        alignItems: "flex-end",
-        cursor: "default",
-      }}
-    >
-      <div
-        onClick={(e) => e.stopPropagation()}
-        style={{
-          width: "100%",
-          maxHeight: "72%",
-          background: "#FAF7F2",
-          borderTopLeftRadius: 20,
-          borderTopRightRadius: 20,
-          boxShadow: "0 -10px 30px rgba(0,0,0,0.35)",
-          display: "flex",
-          flexDirection: "column",
-          fontFamily: "DM Sans, sans-serif",
-          color: COLORS.text,
-        }}
-      >
-        <div
-          style={{
-            display: "flex",
-            alignItems: "center",
-            justifyContent: "space-between",
-            padding: "12px 18px 8px",
-            borderBottom: "1px solid rgba(28,28,30,0.06)",
-          }}
-        >
-          <span style={{ fontSize: 13, fontWeight: 800, letterSpacing: "0.4px" }}>
-            Comments
-          </span>
-          <button
-            type="button"
-            onClick={onClose}
-            aria-label="Close comments"
-            style={{
-              width: 28,
-              height: 28,
-              border: "none",
-              background: "transparent",
-              color: COLORS.muted,
-              fontSize: 18,
-              cursor: "pointer",
-              borderRadius: 999,
-              lineHeight: 1,
-            }}
-          >
-            ×
-          </button>
-        </div>
-        <div style={{ overflowY: "auto", padding: "0 18px 14px" }}>
-          <CommentsDrawer postId={postId} onCommentAdded={onCommentAdded} />
-        </div>
-      </div>
-    </div>
-  );
-}
-
-// Deterministic warm gradient for clips that don't have a poster yet
-// (the older publish path didn't capture one). Hashed from the clip id
-// so the same clip always paints the same gradient.
-function clipFallbackGradient(id: string): string {
-  const presets = [
-    ["#3F1A78", "#7B5FE0"],
-    ["#3A0F1F", "#C8455B"],
-    ["#1F2D5C", "#4F7BD8"],
-    ["#5C2A0F", "#E08C5A"],
-    ["#1F4D3A", "#5FB37E"],
-    ["#4A1F4D", "#A65FB8"],
-  ];
-  let h = 0;
-  for (let i = 0; i < id.length; i++) {
-    h = (h * 31 + id.charCodeAt(i)) | 0;
-  }
-  const [a, b] = presets[Math.abs(h) % presets.length]!;
-  return `linear-gradient(135deg, ${a}, ${b})`;
-}
-
-// CapturedFrame / capturePosterFrame / classifyVideo / VideoMode /
-// extractHashtags now live in @/lib/composer/helpers — shared with the
-// mobile composer sheet.
+// CapturedFrame / capturePosterFrame / extractHashtags now live in
+// @/lib/composer/helpers — shared with the mobile composer sheet.
 
 function FeedComposer({
   glass,
@@ -5437,11 +4481,10 @@ function FeedComposer({
 }) {
   const [text, setText] = useState("");
   const [imageFile, setImageFile] = useState<File | null>(null);
-  const [clipFile, setClipFile] = useState<File | null>(null);
-  // Auto-classified at file-pick time, user can override before publish.
-  // - "clip"       → vertical short-form (≤120s, h>w*1.05). Reels feed.
-  // - "post-video" → horizontal/square or longer. Renders inline in posts.
-  const [videoMode, setVideoMode] = useState<VideoMode>("clip");
+  // Staged video for a regular video post. Clips are backlogged, so every
+  // video publishes through /api/me/publish-post — there's no mode choice
+  // anymore. See DOCS/BACKLOG_CLIPS.md.
+  const [videoFile, setVideoFile] = useState<File | null>(null);
   const [videoMeta, setVideoMeta] = useState<{
     width: number | null;
     height: number | null;
@@ -5460,14 +4503,13 @@ function FeedComposer({
     if (textareaRef.current) bindMentionPicker(textareaRef.current);
   }, []);
 
-  const hasContent = !!text.trim() || !!imageFile || !!clipFile;
+  const hasContent = !!text.trim() || !!imageFile || !!videoFile;
 
   const reset = () => {
     setText("");
     setImageFile(null);
-    setClipFile(null);
+    setVideoFile(null);
     setVideoMeta(null);
-    setVideoMode("clip");
     setError(null);
     if (attachInputRef.current) attachInputRef.current.value = "";
   };
@@ -5493,16 +4535,13 @@ function FeedComposer({
         setError("Video too large — max 200MB.");
         return;
       }
-      setClipFile(file);
+      setVideoFile(file);
       setImageFile(null);
-      // Probe for aspect ratio + duration so we can suggest the right
-      // mode. Capture is best-effort (some formats won't decode in the
-      // browser); we default to "clip" if probing fails since the size
-      // cap is already lower for video posts.
+      // Grab a poster frame + dimensions. Best-effort — some formats
+      // won't decode in the browser, in which case the post just ships
+      // without a poster.
       setVideoMeta(null);
-      setVideoMode("clip");
       void capturePosterFrame(file).then((meta) => {
-        setVideoMode(classifyVideo(meta.width, meta.height, meta.duration));
         setVideoMeta({
           width: meta.width,
           height: meta.height,
@@ -5520,7 +4559,7 @@ function FeedComposer({
       type: blob.type || "image/jpeg",
     });
     setImageFile(cropped);
-    setClipFile(null);
+    setVideoFile(null);
     setPendingImage(null);
   };
 
@@ -5532,13 +4571,14 @@ function FeedComposer({
       const trimmed = text.trim();
       const tags = extractHashtags(trimmed);
 
-      if (clipFile) {
-        // Clips and X-style video posts share the same R2 storage path —
-        // only the publish endpoint differs. Probe the video here if we
-        // didn't already (covers the publish-before-probe-finished race).
+      if (videoFile) {
+        // Video posts live in R2 under the legacy `clips/` key prefix —
+        // the naming predates the clips backlog, the storage path is
+        // shared. Probe the video here if we didn't already (covers the
+        // publish-before-probe-finished race).
         let meta = videoMeta;
         if (!meta) {
-          const captured = await capturePosterFrame(clipFile);
+          const captured = await capturePosterFrame(videoFile);
           meta = {
             width: captured.width,
             height: captured.height,
@@ -5552,8 +4592,8 @@ function FeedComposer({
           method: "POST",
           headers: { "Content-Type": "application/json" },
           body: JSON.stringify({
-            contentType: clipFile.type,
-            sizeBytes: clipFile.size,
+            contentType: videoFile.type,
+            sizeBytes: videoFile.size,
           }),
         }).then((r) => r.json());
         if (!sig?.ok) throw new Error(sig?.error || "Could not start upload");
@@ -5561,8 +4601,8 @@ function FeedComposer({
         // 2. Upload directly to R2.
         const putRes = await fetch(sig.uploadUrl, {
           method: "PUT",
-          headers: { "Content-Type": clipFile.type },
-          body: clipFile,
+          headers: { "Content-Type": videoFile.type },
+          body: videoFile,
         });
         if (!putRes.ok) throw new Error(`Upload failed (HTTP ${putRes.status})`);
 
@@ -5589,35 +4629,19 @@ function FeedComposer({
           }
         }
 
-        // 4. Record the row — endpoint depends on the user-chosen mode.
-        if (videoMode === "clip") {
-          const pub = await fetch("/api/me/publish-clip", {
-            method: "POST",
-            headers: { "Content-Type": "application/json" },
-            body: JSON.stringify({
-              object_key: sig.objectKey,
-              content: trimmed,
-              tags,
-              poster_url: posterUrl,
-              duration_sec: durationSec,
-            }),
-          }).then((r) => r.json());
-          if (!pub?.ok) throw new Error(pub?.error || "Publish failed");
-        } else {
-          // X-style video post: same storage, different table type.
-          const pub = await fetch("/api/me/publish-post", {
-            method: "POST",
-            headers: { "Content-Type": "application/json" },
-            body: JSON.stringify({
-              content: trimmed,
-              tags,
-              video_object_key: sig.objectKey,
-              media_thumbnail_url: posterUrl,
-              duration_sec: durationSec,
-            }),
-          }).then((r) => r.json());
-          if (!pub?.ok) throw new Error(pub?.error || "Publish failed");
-        }
+        // 4. Record the row as a regular video post.
+        const pub = await fetch("/api/me/publish-post", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({
+            content: trimmed,
+            tags,
+            video_object_key: sig.objectKey,
+            media_thumbnail_url: posterUrl,
+            duration_sec: durationSec,
+          }),
+        }).then((r) => r.json());
+        if (!pub?.ok) throw new Error(pub?.error || "Publish failed");
       } else if (imageFile) {
         // Image path: multipart upload to the profiles bucket, then post.
         const fd = new FormData();
@@ -5656,7 +4680,7 @@ function FeedComposer({
     } finally {
       setBusy(false);
     }
-  }, [busy, clipFile, hasContent, imageFile, onPosted, text, videoMeta, videoMode]);
+  }, [busy, videoFile, hasContent, imageFile, onPosted, text, videoMeta]);
 
   const previewUrl = imageFile ? URL.createObjectURL(imageFile) : null;
   useEffect(() => {
@@ -5715,11 +4739,11 @@ function FeedComposer({
             </button>
           </div>
         ) : null}
-        {clipFile ? (
+        {videoFile ? (
           <div
             style={{
               display: "flex",
-              flexDirection: "column",
+              alignItems: "center",
               gap: 8,
               border: "1px solid rgba(28,28,30,0.08)",
               borderRadius: 12,
@@ -5732,43 +4756,21 @@ function FeedComposer({
             }}
           >
             <span style={{ overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap", paddingRight: 32 }}>
-              🎬 {clipFile.name} · {(clipFile.size / (1024 * 1024)).toFixed(1)} MB
+              🎬 {videoFile.name} · {(videoFile.size / (1024 * 1024)).toFixed(1)} MB
             </span>
-            <div style={{ display: "flex", gap: 6, alignItems: "center", flexWrap: "wrap" }}>
-              <span style={{ fontSize: 11, color: COLORS.faint, fontWeight: 600 }}>
-                Post as:
+            {videoMeta?.duration ? (
+              <span style={{ fontSize: 11, color: COLORS.faint, marginLeft: "auto", paddingRight: 24 }}>
+                {Math.round(videoMeta.duration)}s
+                {videoMeta.width && videoMeta.height
+                  ? ` · ${videoMeta.width}×${videoMeta.height}`
+                  : ""}
               </span>
-              <button
-                type="button"
-                onClick={() => setVideoMode("clip")}
-                style={composerVideoModePill(videoMode === "clip")}
-                title="Vertical short-form, lands in the Clips reel"
-              >
-                Clip
-              </button>
-              <button
-                type="button"
-                onClick={() => setVideoMode("post-video")}
-                style={composerVideoModePill(videoMode === "post-video")}
-                title="X-style horizontal video, lands in the Posts feed"
-              >
-                Video post
-              </button>
-              {videoMeta?.duration ? (
-                <span style={{ fontSize: 11, color: COLORS.faint, marginLeft: "auto" }}>
-                  {Math.round(videoMeta.duration)}s
-                  {videoMeta.width && videoMeta.height
-                    ? ` · ${videoMeta.width}×${videoMeta.height}`
-                    : ""}
-                </span>
-              ) : null}
-            </div>
+            ) : null}
             <button
               type="button"
               onClick={() => {
-                setClipFile(null);
+                setVideoFile(null);
                 setVideoMeta(null);
-                setVideoMode("clip");
               }}
               style={composerRemoveButton}
               aria-label="Remove video"
@@ -5879,21 +4881,6 @@ const composerAttachButton: React.CSSProperties = {
   flexShrink: 0,
   transition: "background 120ms ease, color 120ms ease",
 };
-
-function composerVideoModePill(active: boolean): React.CSSProperties {
-  return {
-    fontSize: 11,
-    fontWeight: 700,
-    padding: "4px 10px",
-    borderRadius: 999,
-    border: active ? "1px solid #5B41B8" : "1px solid rgba(28,28,30,0.12)",
-    background: active ? "#5B41B8" : "transparent",
-    color: active ? "#fff" : COLORS.text,
-    cursor: "pointer",
-    fontFamily: "DM Sans, sans-serif",
-    letterSpacing: "0.2px",
-  };
-}
 
 const composerRemoveButton: React.CSSProperties = {
   position: "absolute",
@@ -6499,22 +5486,6 @@ function FeedRow({
               · posted by @{post.author.handle}
             </Link>
           ) : null}
-          {post.type === "clip" ? (
-            <span
-              style={{
-                marginLeft: "auto",
-                fontSize: 11,
-                fontWeight: 700,
-                padding: "2px 8px",
-                borderRadius: 999,
-                background: "rgba(123,95,224,0.14)",
-                color: "#5B41B8",
-                fontFamily: "DM Sans, sans-serif",
-              }}
-            >
-              Clip
-            </span>
-          ) : null}
         </div>
         {post.content ? (
           <p
@@ -6654,7 +5625,6 @@ function FeedRow({
       {shareOpen ? (
         <SharePostSheet
           postId={post.id}
-          postKind={post.type}
           postTitle={post.content ?? ""}
           postPosterUrl={post.media_thumbnail_url ?? post.media_url ?? null}
           authorName={
@@ -7401,54 +6371,6 @@ function LikeIcon({ filled = false }: { filled?: boolean }) {
   );
 }
 
-function SoundOnIcon() {
-  return (
-    <svg width="18" height="18" viewBox="0 0 18 18" fill="none" aria-hidden>
-      <path
-        d="M3.5 6.75h2L9 4v10L5.5 11.25h-2v-4.5z"
-        stroke="currentColor"
-        strokeWidth="1.4"
-        strokeLinejoin="round"
-        fill="currentColor"
-      />
-      <path
-        d="M11.6 6.6c1 1 1 3.8 0 4.8"
-        stroke="currentColor"
-        strokeWidth="1.4"
-        strokeLinecap="round"
-        fill="none"
-      />
-      <path
-        d="M13.6 4.8c1.7 1.6 1.7 6.8 0 8.4"
-        stroke="currentColor"
-        strokeWidth="1.4"
-        strokeLinecap="round"
-        fill="none"
-      />
-    </svg>
-  );
-}
-
-function SoundOffIcon() {
-  return (
-    <svg width="18" height="18" viewBox="0 0 18 18" fill="none" aria-hidden>
-      <path
-        d="M3.5 6.75h2L9 4v10L5.5 11.25h-2v-4.5z"
-        stroke="currentColor"
-        strokeWidth="1.4"
-        strokeLinejoin="round"
-        fill="currentColor"
-      />
-      <path
-        d="M11.5 6.5l4 5M15.5 6.5l-4 5"
-        stroke="currentColor"
-        strokeWidth="1.4"
-        strokeLinecap="round"
-      />
-    </svg>
-  );
-}
-
 function RepostIcon() {
   // Two arrows tracing a recycle loop — matches Twitter's repost glyph.
   return (
@@ -7481,21 +6403,6 @@ function EyeIcon() {
         strokeLinejoin="round"
       />
       <circle cx="8" cy="8" r="2" stroke="currentColor" strokeWidth="1.4" />
-    </svg>
-  );
-}
-
-function ShareIcon() {
-  return (
-    <svg width="16" height="16" viewBox="0 0 16 16" fill="none" aria-hidden>
-      <path
-        d="M14 2L7.5 8.5M14 2L9.5 14L7.5 8.5M14 2L2 6.5L7.5 8.5"
-        stroke="currentColor"
-        strokeWidth="1.4"
-        fill="none"
-        strokeLinejoin="round"
-        strokeLinecap="round"
-      />
     </svg>
   );
 }

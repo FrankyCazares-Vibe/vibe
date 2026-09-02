@@ -2,8 +2,6 @@
 // /campus and the mobile PostComposerMobile sheet. Both surfaces share
 // the same publish APIs, so the upload + classification math lives here.
 
-export type VideoMode = "clip" | "post-video";
-
 export type CapturedFrame = {
   blob: Blob | null;
   duration: number | null;
@@ -93,24 +91,6 @@ export function extractHashtags(text: string): string[] {
     if (out.length >= 10) break;
   }
   return out;
-}
-
-/**
- * Classify a video into "clip" (vertical short-form, ≤120s) vs
- * "post-video" (horizontal/square or longer). Falls back to "clip" if
- * dimensions or duration aren't known.
- */
-export function classifyVideo(
-  width: number | null,
-  height: number | null,
-  duration: number | null,
-): VideoMode {
-  const w = width ?? 0;
-  const h = height ?? 0;
-  const dur = duration ?? 0;
-  const isVertical = h > 0 && w > 0 && h > w * 1.05;
-  const isShort = dur > 0 && dur <= 120;
-  return isVertical && isShort ? "clip" : "post-video";
 }
 
 /**

@@ -29,7 +29,7 @@ type EmbeddedPost = {
   id: string;
   user_id: string;
   org_id: string | null;
-  type: "post" | "clip";
+  type: "post";
   content: string;
   tags: string[] | null;
   media_url: string | null;
@@ -99,6 +99,8 @@ export async function GET(req: Request, ctx: RouteContext) {
         ")",
     )
     .eq("user_id", target.id)
+    // Clips are backlogged — a repost of a clip must not surface here.
+    .eq("post.type", "post")
     .order("created_at", { ascending: false })
     .limit(limit);
 

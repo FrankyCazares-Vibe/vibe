@@ -6,10 +6,13 @@ const DEFAULT_LIMIT = 50;
 const MAX_LIMIT = 200;
 
 /**
- * Returns the signed-in user's own posts + clips, newest first, so profile
+ * Returns the signed-in user's own posts, newest first, so profile
  * surfaces (P1-011 grid + P1-015/016 viewers) can hydrate from Supabase
  * instead of localStorage. Read-only — no joins needed since the viewer
  * already has their own identity in vibe_user_v1.
+ *
+ * Clips are backlogged, so this filters to `type='post'`. Existing clip
+ * rows stay in the table — see DOCS/BACKLOG_CLIPS.md.
  */
 export async function GET(req: Request) {
   const supabase = await createSupabaseServerClient();
@@ -27,15 +30,14 @@ export async function GET(req: Request) {
     Math.max(1, Number(url.searchParams.get("limit")) || DEFAULT_LIMIT),
   );
 
-  // Drafts stay out of the profile grid — they live exclusively in the
-  // composer's Drafts box. Owners can still see their own drafts there
-  // via /api/me/clip-drafts.
+  // Drafts stay out of the profile grid.
   const { data, error } = await supabase
     .from("posts")
     .select(
-      "id,user_id,type,content,tags,media_url,media_thumbnail_url,edit_metadata,created_at",
+      "id,user_id,type,content,tags,media_url,media_thumbnail_url,created_at",
     )
     .eq("user_id", user.id)
+    .eq("type", "post")
     .eq("status", "published")
     .order("created_at", { ascending: false })
     .limit(limit);

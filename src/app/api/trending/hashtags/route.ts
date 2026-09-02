@@ -50,7 +50,7 @@ export async function GET(req: Request) {
       "tags," +
         "author:users!posts_user_id_fkey!inner(school)",
     )
-    .in("type", ["post", "clip"])
+    .eq("type", "post")
     .gte("created_at", since)
     .limit(POST_SCAN_LIMIT);
 

@@ -20,7 +20,7 @@ type ProfileViewsPayload = {
 
 type CreatorStatsPayload = {
   ok: true;
-  totals: { posts: number; clips: number; views: number; likes: number; comments: number; reposts: number };
+  totals: { posts: number; views: number; likes: number; comments: number; reposts: number };
   by_window: {
     seven_days: { views: number; likes: number; comments: number; reposts: number };
     thirty_days: { views: number; likes: number; comments: number; reposts: number };
@@ -48,7 +48,7 @@ function fmt(n: number): string {
  * compact MetricsBlock in OttoSidePanel.
  *
  * Two halves: profile views (today / 7d / 30d / all-time) + recent viewer
- * thumbnails, and creator stats (posts/clips, views, likes, comments,
+ * thumbnails, and creator stats (posts, views, likes, comments,
  * reposts) with a 7d/30d/all-time bucket grid and a top-5 posts list.
  *
  * Self-contained data fetch — runs in a useEffect on mount. The cost is
@@ -146,10 +146,10 @@ export function OttoMetrics() {
           {/* Creator stats half */}
           <div className="otto-metrics-block">
             <div className="otto-metrics-block-head">
-              Posts & clips
+              Posts
               {cs ? (
                 <span className="otto-metrics-block-sub">
-                  {cs.totals.posts} posts · {cs.totals.clips} clips
+                  {cs.totals.posts} posts
                 </span>
               ) : null}
             </div>
@@ -176,7 +176,7 @@ export function OttoMetrics() {
                   {cs.top_posts.map((p) => (
                     <li key={p.id} className="otto-metrics-top-row">
                       <span className="otto-metrics-top-content">
-                        {p.content?.slice(0, 80) || (p.type === "clip" ? "Clip" : "(no text)")}
+                        {p.content?.slice(0, 80) || "(no text)"}
                       </span>
                       <span className="otto-metrics-top-counts">
                         {fmt(p.view_count)}v · {fmt(p.like_count)}❤ · {fmt(p.comment_count)}💬 ·{" "}

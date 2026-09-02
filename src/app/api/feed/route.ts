@@ -30,7 +30,7 @@ type PostRow = {
   id: string;
   user_id: string;
   org_id: string | null;
-  type: "post" | "clip";
+  type: "post";
   content: string;
   tags: string[] | null;
   media_url: string | null;
@@ -57,7 +57,10 @@ type EngagementCounts = {
 };
 
 /**
- * Campus feed — posts + clips from every user (global), newest first.
+ * Campus feed — posts from every user (global), newest first.
+ *
+ * Clips (`type='clip'`) are backlogged — the query filters to `type='post'`
+ * only. Existing clip rows stay in the table; see DOCS/BACKLOG_CLIPS.md.
  *
  * Each row carries denormalized engagement counts and the viewer's own
  * like/repost state, so the client can render the engagement bar without a
@@ -120,11 +123,11 @@ export async function GET(req: Request) {
   let postsQuery = supabase
     .from("posts")
     .select(
-      "id,user_id,org_id,type,content,tags,media_url,media_thumbnail_url,edit_metadata,view_count,created_at," +
+      "id,user_id,org_id,type,content,tags,media_url,media_thumbnail_url,view_count,created_at," +
         "author:users!posts_user_id_fkey!inner(id,name,handle,school,major,year,avatar_url)," +
         "org:orgs(id,handle,name,logo_url,verified,is_public)",
     )
-    .in("type", ["post", "clip"])
+    .eq("type", "post")
     .order("created_at", { ascending: false })
     .limit(candidatePoolSize);
 
@@ -142,11 +145,14 @@ export async function GET(req: Request) {
       "post_id,user_id,comment,created_at," +
         "reposter:users!post_reposts_user_id_fkey!inner(id,name,handle,school,major,year,avatar_url)," +
         "post:posts!inner(" +
-        "id,user_id,org_id,type,content,tags,media_url,media_thumbnail_url,edit_metadata,view_count,created_at," +
+        "id,user_id,org_id,type,content,tags,media_url,media_thumbnail_url,view_count,created_at," +
         "author:users!posts_user_id_fkey!inner(id,name,handle,school,major,year,avatar_url)," +
         "org:orgs(id,handle,name,logo_url,verified,is_public)" +
         ")",
     )
+    // Clips are backlogged — a repost of a clip must not leak into the feed
+    // through the embedded post join.
+    .eq("post.type", "post")
     .order("created_at", { ascending: false })
     .limit(limit);
 
@@ -209,12 +215,11 @@ export async function GET(req: Request) {
     const fr = friendReposters.get(row.id) ?? { samples: [], totalFriends: 0 };
     const org = row.org ?? null;
     // `media_kind` lets the client pick the right player without re-parsing
-    // the proxy URL. Clips are always video. Posts can carry a video too
-    // (X-style horizontal video posts) when their stored media_url is an
-    // R2 object key under `clips/` rather than a public image URL.
+    // the proxy URL. A post carries video when its stored media_url is an
+    // R2 object key under `clips/` rather than a public image URL. The
+    // prefix is legacy naming — it backs regular video posts, not clips.
     const rawMedia = row.media_url ?? "";
-    const isVideo =
-      row.type === "clip" || rawMedia.startsWith("clips/");
+    const isVideo = rawMedia.startsWith("clips/");
     const mediaKind: "video" | "image" | null = rawMedia
       ? isVideo
         ? "video"

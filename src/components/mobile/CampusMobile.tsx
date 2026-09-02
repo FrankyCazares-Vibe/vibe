@@ -10,13 +10,10 @@ import {
   type BackdropKey,
   type CampusEvent,
   CampusBanner,
-  ClipsReelInner,
   EventCard,
   type FeedPost as DesktopFeedPost,
   OttoFeedStrip,
 } from "@/app/campus/campus-home";
-import { ClipComposerMobile } from "@/components/mobile/ClipComposerMobile";
-import { ClipViewerMobile } from "@/components/mobile/ClipViewerMobile";
 import { MapMobile } from "@/components/mobile/MapMobile";
 import { ConversationView } from "@/components/mobile/MessagesMobile";
 import { PostComposerMobile } from "@/components/mobile/PostComposerMobile";
@@ -25,16 +22,19 @@ import { SharePostSheet } from "@/components/mobile/SharePostSheet";
 import { useMobileTour } from "@/components/mobile/use-mobile-tour";
 
 /**
- * iOS-native rebuild of `/campus` for mobile. Three swipeable tabs:
+ * iOS-native rebuild of `/campus` for mobile. Swipeable tabs:
  *
- *   - Feed       → posts + clips (mixed, vertical), with a clips-only
- *                  toggle that swaps the body for an embedded reel.
+ *   - Feed       → posts (text, photo, video), vertical single column.
  *   - Events     → vertical stack of EventCard (reused from desktop).
  *   - Orgs       → list of orgs the viewer can browse/join.
+ *   - Chat / Map → Discord-style org chat + the campus social map.
  *
  * Sticky header has the school greeting + live "on Vibe / active now"
- * stats. Composer FAB at the bottom-right opens the appropriate
- * mobile composer (post or clip) based on the active tab.
+ * stats. Composer FAB at the bottom-right opens the mobile post
+ * composer on the Feed tab.
+ *
+ * Clips (vertical short-form video) are backlogged — see
+ * DOCS/BACKLOG_CLIPS.md. Video still posts to the feed as a normal post.
  *
  * Sub-components shared with desktop: EventCard from campus-home.
  * Everything else is mobile-tuned (lighter chrome, single column,
@@ -43,11 +43,11 @@ import { useMobileTour } from "@/components/mobile/use-mobile-tour";
 
 // ---------- Types ----------
 
-type Tab = "feed" | "clips" | "events" | "orgs" | "chat" | "map";
-const TAB_ORDER: Tab[] = ["feed", "clips", "events", "orgs", "chat", "map"];
+type Tab = "feed" | "events" | "orgs" | "chat" | "map";
+const TAB_ORDER: Tab[] = ["feed", "events", "orgs", "chat", "map"];
 
-// Use the desktop FeedPost shape so ClipsReelInner accepts our posts
-// without any mapping.
+// Reuse the desktop FeedPost shape so shared card components accept our
+// posts without any mapping.
 type FeedPost = DesktopFeedPost;
 
 type Org = {
@@ -73,9 +73,7 @@ export function CampusMobile() {
   const [events, setEvents] = useState<CampusEvent[] | null>(null);
   const [orgs, setOrgs] = useState<Org[] | null>(null);
   const [openPostId, setOpenPostId] = useState<string | null>(null);
-  const [openClipId, setOpenClipId] = useState<string | null>(null);
   const [composerOpen, setComposerOpen] = useState(false);
-  const [composerKind, setComposerKind] = useState<"post" | "clip">("post");
   const [composerOrigin, setComposerOrigin] = useState<
     { x: number; y: number } | undefined
   >(undefined);
@@ -90,22 +88,18 @@ export function CampusMobile() {
   // pre-fetched threads list yet.
   const searchParams = useSearchParams();
   const initialChannelId = searchParams.get("channel") || null;
-  // ?post=<id> / ?clip=<id> deep links — used by Copy Link share
-  // targets + Otto mention notifications. Mobile opens the viewer
-  // directly (vs desktop which scrolls + flashes the feed row).
-  // Stripped from the URL after handling so a refresh doesn't keep
-  // re-opening the viewer.
-  const initialPostId = searchParams.get("post") || null;
-  const initialClipId = searchParams.get("clip") || null;
+  // ?post=<id> deep link — used by Copy Link share targets + Otto
+  // mention notifications. Mobile opens the viewer directly (vs desktop
+  // which scrolls + flashes the feed row). Stripped from the URL after
+  // handling so a refresh doesn't keep re-opening the viewer.
+  //
+  // Legacy `?clip=<id>` links land on the post viewer too — clips are
+  // backlogged, so there's no separate clip surface to route to.
+  const initialPostId = searchParams.get("post") || searchParams.get("clip") || null;
   useEffect(() => {
     if (initialPostId) {
       setOpenPostId(initialPostId);
       setTab("feed");
-    } else if (initialClipId) {
-      setOpenClipId(initialClipId);
-      setTab("feed");
-    }
-    if (initialPostId || initialClipId) {
       try {
         const p = new URLSearchParams(window.location.search);
         p.delete("post");
@@ -213,12 +207,11 @@ export function CampusMobile() {
 
   // ---------- Composer FAB ----------
 
-  const openComposer = (kind: "post" | "clip") => {
+  const openComposer = () => {
     const r = composerFabRef.current?.getBoundingClientRect();
     setComposerOrigin(
       r ? { x: r.x + r.width / 2, y: r.y + r.height / 2 } : undefined,
     );
-    setComposerKind(kind);
     setComposerOpen(true);
   };
 
@@ -335,14 +328,7 @@ export function CampusMobile() {
         }}
       >
         <section style={paneStyle}>
-          <FeedPane
-            posts={feed}
-            onOpenPost={(id) => setOpenPostId(id)}
-            onOpenClip={(id) => setOpenClipId(id)}
-          />
-        </section>
-        <section style={clipsPaneStyle}>
-          <ClipsPane posts={feed} />
+          <FeedPane posts={feed} onOpenPost={(id) => setOpenPostId(id)} />
         </section>
         <section style={paneStyle}>
           <EventsPane events={events} onMutate={refetchEvents} />
@@ -358,30 +344,14 @@ export function CampusMobile() {
         </section>
       </div>
 
-      {/* Composer FAB — only on Feed + Clips. Events, Orgs, Chat, and
-          Map have no composer flow, and on those tabs the orange + just
-          covered content (e.g. the chat send button or a map bubble). */}
-      {tab === "feed" || tab === "clips" ? (
-        <ComposerFab
-          ref={composerFabRef}
-          onPost={() => openComposer("post")}
-          onClip={() => openComposer("clip")}
-        />
-      ) : null}
+      {/* Composer FAB — Feed only. Events, Orgs, Chat, and Map have no
+          composer flow, and on those tabs the orange + just covered
+          content (e.g. the chat send button or a map bubble). */}
+      {tab === "feed" ? <ComposerFab ref={composerFabRef} onPost={openComposer} /> : null}
 
-      {/* Composers */}
-      {composerOpen && composerKind === "post" ? (
+      {/* Composer */}
+      {composerOpen ? (
         <PostComposerMobile
-          origin={composerOrigin}
-          onClose={() => setComposerOpen(false)}
-          onPosted={() => {
-            void refetchFeed();
-            setComposerOpen(false);
-          }}
-        />
-      ) : null}
-      {composerOpen && composerKind === "clip" ? (
-        <ClipComposerMobile
           origin={composerOrigin}
           onClose={() => setComposerOpen(false)}
           onPosted={() => {
@@ -437,16 +407,6 @@ export function CampusMobile() {
           }}
         />
       ) : null}
-      {openClipId ? (
-        <ClipViewerMobile
-          clipId={openClipId}
-          onClose={() => setOpenClipId(null)}
-          onDeleted={() => {
-            void refetchFeed();
-            setOpenClipId(null);
-          }}
-        />
-      ) : null}
     </main>
   );
 }
@@ -461,14 +421,6 @@ const paneStyle: React.CSSProperties = {
   display: "flex",
   flexDirection: "column",
   gap: 10,
-};
-
-// Clips reel is full-bleed scroll-snap, manages its own padding.
-const clipsPaneStyle: React.CSSProperties = {
-  flex: "0 0 100%",
-  scrollSnapAlign: "start",
-  minWidth: 0,
-  padding: 0,
 };
 
 // Map needs full pane height for the canvas, no horizontal padding.
@@ -489,7 +441,6 @@ function TabStrip({
 }) {
   const tabs: Array<{ id: Tab; label: string }> = [
     { id: "feed", label: "Feed" },
-    { id: "clips", label: "Clips" },
     { id: "events", label: "Events" },
     { id: "orgs", label: "Orgs" },
     { id: "chat", label: "Chat" },
@@ -542,31 +493,23 @@ function TabStrip({
 function FeedPane({
   posts,
   onOpenPost,
-  onOpenClip,
 }: {
   posts: FeedPost[] | null;
   onOpenPost: (id: string) => void;
-  onOpenClip: (id: string) => void;
 }) {
   if (posts === null) return <PaneSkeleton />;
   if (posts.length === 0) {
     return (
       <EmptyTab
         title="The feed is quiet"
-        body="Be the first to drop a post or clip — tap the + in the corner."
+        body="Be the first to drop a post — tap the + in the corner."
       />
     );
   }
   return (
     <>
       {posts.map((p) => (
-        <FeedCard
-          key={p.id}
-          post={p}
-          onOpen={() =>
-            p.type === "clip" ? onOpenClip(p.id) : onOpenPost(p.id)
-          }
-        />
+        <FeedCard key={p.id} post={p} onOpen={() => onOpenPost(p.id)} />
       ))}
     </>
   );
@@ -587,9 +530,9 @@ function FeedCard({
     .map((p) => p[0]?.toUpperCase() ?? "")
     .join("");
   const time = relativeTime(post.created_at);
-  const isClip = post.type === "clip";
+  const isVideo = post.media_kind === "video";
   const hasMedia = !!post.media_url || !!post.media_thumbnail_url;
-  const thumb = post.media_thumbnail_url || (isClip ? null : post.media_url);
+  const thumb = post.media_thumbnail_url || (isVideo ? null : post.media_url);
 
   // Local engagement state, seeded from the feed payload. Heart +
   // double-tap-to-like + repost + save all flow through their own
@@ -760,24 +703,6 @@ function FeedCard({
             {post.org ? ` · ${post.org.name}` : ""}
           </div>
         </div>
-        {isClip ? (
-          <span
-            aria-hidden
-            style={{
-              padding: "3px 8px",
-              borderRadius: 999,
-              background: "rgba(255,92,53,0.12)",
-              color: "#FF5C35",
-              fontFamily: "DM Sans, sans-serif",
-              fontSize: 10,
-              fontWeight: 800,
-              letterSpacing: "0.06em",
-              textTransform: "uppercase",
-            }}
-          >
-            Clip
-          </span>
-        ) : null}
         {/* 3-dot menu — top right of the card. Holds Report / Copy
             link / Hide for now; owner-only Delete lives in the post
             viewer (kept off the card to avoid clutter). */}
@@ -837,13 +762,13 @@ function FeedCard({
             marginTop: 10,
             position: "relative",
             width: "100%",
-            aspectRatio: isClip ? "9 / 12" : "1 / 1",
+            aspectRatio: "1 / 1",
             borderRadius: 14,
             overflow: "hidden",
             background: `url(${thumb}) center/cover, #1C1C1E`,
           }}
         >
-          {isClip ? (
+          {isVideo ? (
             <span
               aria-hidden
               style={{
@@ -1168,7 +1093,6 @@ function FeedCard({
       {menuOpen ? (
         <PostActionsSheet
           postId={post.id}
-          postKind={post.type}
           postTitle={post.content ?? ""}
           postPosterUrl={post.media_thumbnail_url ?? post.media_url ?? null}
           authorName={
@@ -1207,38 +1131,6 @@ function EventsPane({
       ))}
     </>
   );
-}
-
-// ---------- Clips pane ----------
-
-function ClipsPane({ posts }: { posts: FeedPost[] | null }) {
-  if (posts === null) {
-    return (
-      <div
-        style={{
-          padding: "48px 24px",
-          textAlign: "center",
-          color: "#5C5853",
-          fontFamily: "DM Sans, sans-serif",
-          fontSize: 13,
-        }}
-      >
-        Loading clips…
-      </div>
-    );
-  }
-  const clips = posts.filter((p) => p.type === "clip");
-  if (clips.length === 0) {
-    return (
-      <div style={{ padding: "12px 16px" }}>
-        <EmptyTab
-          title="No clips yet"
-          body="Tap the + to record one — yours will appear here once it's posted."
-        />
-      </div>
-    );
-  }
-  return <ClipsReelInner clips={clips} />;
 }
 
 // ---------- Chat pane ----------
@@ -2312,14 +2204,12 @@ function EmptyTab({ title, body }: { title: string; body: string }) {
  *  scrim closes it cleanly. */
 function PostActionsSheet({
   postId,
-  postKind,
   postTitle,
   postPosterUrl,
   authorName,
   onClose,
 }: {
   postId: string;
-  postKind?: "post" | "clip";
   postTitle?: string;
   postPosterUrl?: string | null;
   authorName?: string | null;
@@ -2466,7 +2356,6 @@ function PostActionsSheet({
       {shareOpen ? (
         <SharePostSheet
           postId={postId}
-          postKind={postKind ?? "post"}
           postTitle={postTitle}
           postPosterUrl={postPosterUrl ?? null}
           authorName={authorName ?? null}
@@ -2563,25 +2452,24 @@ function relativeTime(iso: string): string {
 
 // ---------- Composer FAB ----------
 
+// Single-action FAB: taps straight through to the post composer. It used
+// to expand into a "New post" / "New clip" menu, but clips are backlogged
+// (DOCS/BACKLOG_CLIPS.md) and a one-item menu is just an extra tap.
 const ComposerFab = ({
   ref,
   onPost,
-  onClip,
 }: {
   ref: React.RefObject<HTMLButtonElement | null>;
   onPost: () => void;
-  onClip: () => void;
 }) => {
-  const [open, setOpen] = useState(false);
-
   return (
     <>
       <button
         id="otto-mobile-tour-compose"
         ref={ref}
         type="button"
-        onClick={() => setOpen((v) => !v)}
-        aria-label={open ? "Close composer menu" : "Open composer"}
+        onClick={onPost}
+        aria-label="New post"
         style={{
           position: "fixed",
           right: 18,
@@ -2599,8 +2487,6 @@ const ComposerFab = ({
           justifyContent: "center",
           zIndex: 50,
           WebkitTapHighlightColor: "transparent",
-          transform: open ? "rotate(45deg)" : "rotate(0deg)",
-          transition: "transform 220ms cubic-bezier(0.2, 0.8, 0.2, 1)",
         }}
       >
         <svg width="22" height="22" viewBox="0 0 22 22" fill="none" aria-hidden>
@@ -2612,57 +2498,6 @@ const ComposerFab = ({
           />
         </svg>
       </button>
-
-      {open ? (
-        <div
-          onClick={() => setOpen(false)}
-          style={{
-            position: "fixed",
-            inset: 0,
-            zIndex: 49,
-          }}
-        >
-          <div
-            onClick={(e) => e.stopPropagation()}
-            style={{
-              position: "absolute",
-              right: 18,
-              bottom: "calc(env(safe-area-inset-bottom, 0px) + 144px)",
-              display: "flex",
-              flexDirection: "column",
-              gap: 10,
-              alignItems: "flex-end",
-            }}
-          >
-            <FabAction
-              label="New post"
-              icon={
-                <svg width="18" height="18" viewBox="0 0 18 18" fill="none" aria-hidden>
-                  <rect x="2" y="3.5" width="14" height="11" rx="2" stroke="currentColor" strokeWidth="1.6" fill="none" />
-                  <path d="M5 7h8M5 10h5" stroke="currentColor" strokeWidth="1.6" strokeLinecap="round" />
-                </svg>
-              }
-              onClick={() => {
-                setOpen(false);
-                onPost();
-              }}
-            />
-            <FabAction
-              label="New clip"
-              icon={
-                <svg width="18" height="18" viewBox="0 0 18 18" fill="none" aria-hidden>
-                  <rect x="2" y="4" width="11" height="10" rx="2" stroke="currentColor" strokeWidth="1.6" fill="none" />
-                  <path d="M13 8l3-2v6l-3-2" stroke="currentColor" strokeWidth="1.6" strokeLinejoin="round" fill="none" />
-                </svg>
-              }
-              onClick={() => {
-                setOpen(false);
-                onClip();
-              }}
-            />
-          </div>
-        </div>
-      ) : null}
     </>
   );
 };
@@ -3145,38 +2980,3 @@ function SearchLoading() {
   );
 }
 
-function FabAction({
-  label,
-  icon,
-  onClick,
-}: {
-  label: string;
-  icon: React.ReactNode;
-  onClick: () => void;
-}) {
-  return (
-    <button
-      type="button"
-      onClick={onClick}
-      style={{
-        display: "inline-flex",
-        alignItems: "center",
-        gap: 10,
-        padding: "10px 16px",
-        borderRadius: 999,
-        border: "1px solid rgba(28,28,30,0.10)",
-        background: "rgba(255,253,248,0.96)",
-        color: "#1C1C1E",
-        boxShadow: "0 8px 24px rgba(180,120,60,0.18)",
-        fontFamily: "DM Sans, sans-serif",
-        fontSize: 14,
-        fontWeight: 700,
-        cursor: "pointer",
-        WebkitTapHighlightColor: "transparent",
-      }}
-    >
-      {icon}
-      {label}
-    </button>
-  );
-}

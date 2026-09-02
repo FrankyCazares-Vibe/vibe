@@ -7,13 +7,10 @@ import { Drawer } from "vaul";
 
 import { ImageCropperModal } from "@/components/ImageCropperModal";
 import { CampusSearchOverlay } from "@/components/mobile/CampusMobile";
-import { ClipComposerMobile } from "@/components/mobile/ClipComposerMobile";
-import { ClipViewerMobile } from "@/components/mobile/ClipViewerMobile";
 import { PostComposerMobile } from "@/components/mobile/PostComposerMobile";
 import { PostViewerMobile } from "@/components/mobile/PostViewerMobile";
 import { ResumeViewerMobile } from "@/components/mobile/ResumeViewerMobile";
 import { useMobileTour } from "@/components/mobile/use-mobile-tour";
-import { FILTER_CSS, getOverlayCss } from "@/lib/clip/edit-metadata";
 import { IU_MAJORS_BY_SCHOOL } from "@/lib/iu/majors";
 import type { RedactionBar } from "@/lib/profile/resume-redactions";
 import { sortWorkExperienceByRecency } from "@/lib/profile/work-experience";
@@ -22,19 +19,21 @@ import { sortWorkExperienceByRecency } from "@/lib/profile/work-experience";
  * iOS-native mobile profile screen. Instagram-style layout: full-bleed
  * cover, avatar overlapping below, identity stack (stats / name /
  * handle / tagline / meta / vibe tags / Edit profile), Bio block, then
- * a tab strip with three panes:
+ * a tab strip with two panes:
  *
  *   - Posts      — feed posts as a 1:1 grid
- *   - Clips      — 9:16 short videos as a 9:14 grid with play overlay
  *   - Portfolio  — recruiter-facing pane: "Working on" (currentlyOn)
  *                  + work experience + resume / portfolio file
+ *
+ * A Clips tab used to sit between them; clips are backlogged, see
+ * DOCS/BACKLOG_CLIPS.md.
  *
  * Data sources:
  *   - /api/me/profile-bootstrap  → identity + work experience + resume
  *                                  (currentlyOn is not yet persisted
  *                                  server-side — Working-on shows an
  *                                  empty state until that lands)
- *   - /api/me/posts              → posts + clips (filtered by `type`)
+ *   - /api/me/posts              → the viewer's published posts
  *
  * Identity stays in sync with desktop profile.html because both read
  * the same bootstrap shape.
@@ -126,19 +125,18 @@ type VibeUser = {
 
 type FollowState = "none" | "following" | "followed_by" | "connected" | "self";
 
-/** Row shape from /api/me/posts. `type === "clip"` are 9:16 short videos
- *  shown in the Clips tab; everything else lands in Posts. */
+/** Row shape from /api/me/posts. Clips are backlogged, so the route only
+ *  ever returns `type === "post"`. */
 type PostRow = {
   id: string;
   type?: string | null;
   content?: string | null;
   media_url?: string | null;
   media_thumbnail_url?: string | null;
-  edit_metadata?: import("@/lib/clip/edit-metadata").ClipEditMetadata | null;
   created_at?: string | null;
 };
 
-type ProfileTab = "posts" | "clips" | "portfolio";
+type ProfileTab = "posts" | "portfolio";
 
 /** Sub-tabs inside the Posts pane. Reposts is public (visible to every
  *  viewer); Saved is owner-only. Per the Instagram-ish model the user
@@ -154,7 +152,7 @@ type RepostEntry = {
     id: string;
     user_id: string;
     org_id: string | null;
-    type: "post" | "clip";
+    type: "post";
     content: string;
     tags: string[] | null;
     media_url: string | null;
@@ -179,7 +177,7 @@ type RepostEntry = {
 
 type SavedPost = {
   id: string;
-  type: "post" | "clip";
+  type: "post";
   content: string;
   tags: string[] | null;
   media_url: string | null;
@@ -252,7 +250,7 @@ export function ProfileMobile({ targetHandle }: Props = {}) {
   // swiping scrolls naturally and the scroll handler syncs `tab`.
   const tabScrollRef = useRef<HTMLDivElement | null>(null);
   const isProgrammaticScrollRef = useRef(false);
-  const TAB_ORDER: ProfileTab[] = ["posts", "clips", "portfolio"];
+  const TAB_ORDER: ProfileTab[] = ["posts", "portfolio"];
   // Sub-tab state inside the Posts pane — see PostsSubTab type for
   // why these aren't top-level tabs.
   const [postsSubTab, setPostsSubTab] = useState<PostsSubTab>("mine");
@@ -287,8 +285,6 @@ export function ProfileMobile({ targetHandle }: Props = {}) {
   >(null);
   /** Post id for the full-screen post viewer. null = closed. */
   const [openPostId, setOpenPostId] = useState<string | null>(null);
-  /** Clip id for the full-screen clip viewer. null = closed. */
-  const [openClipId, setOpenClipId] = useState<string | null>(null);
   /** Visitor-mode follow state; mirrors the server value initially then
    *  flips optimistically when the user taps Connect / Follow. */
   const [followState, setFollowState] = useState<FollowState>("none");
@@ -334,7 +330,7 @@ export function ProfileMobile({ targetHandle }: Props = {}) {
     };
   }, [isVisitor, targetHandle]);
 
-  // Posts + clips fetch — same shape both ways, just routed by `handle`.
+  // Posts fetch — same shape both ways, just routed by `handle`.
   // Extracted to a stable callback so the composer can re-trigger it
   // after a successful publish (otherwise the user has to refresh to
   // see their new post in the grid).
@@ -355,31 +351,6 @@ export function ProfileMobile({ targetHandle }: Props = {}) {
     }
   }, [isVisitor, targetHandle]);
 
-  // Drafts preview — owner-only, refreshed alongside posts. Keeps
-  // the count badge + tile poster honest after publish / save / delete
-  // round-trips.
-  const refetchDraftsPreview = useCallback(async () => {
-    if (isVisitor) {
-      setDraftsPreview(null);
-      return;
-    }
-    try {
-      const res = await fetch("/api/me/clip-drafts", { cache: "no-store" });
-      const data = await res.json();
-      if (data?.ok && Array.isArray(data.drafts)) {
-        const drafts = data.drafts as Array<{ media_thumbnail_url: string | null }>;
-        setDraftsPreview({
-          count: drafts.length,
-          poster: drafts[0]?.media_thumbnail_url ?? null,
-        });
-      } else {
-        setDraftsPreview(null);
-      }
-    } catch {
-      setDraftsPreview(null);
-    }
-  }, [isVisitor]);
-
   useEffect(() => {
     let cancelled = false;
     (async () => {
@@ -399,11 +370,10 @@ export function ProfileMobile({ targetHandle }: Props = {}) {
         if (!cancelled) setPosts([]);
       }
     })();
-    void refetchDraftsPreview();
     return () => {
       cancelled = true;
     };
-  }, [isVisitor, targetHandle, refetchDraftsPreview]);
+  }, [isVisitor, targetHandle]);
 
   // Reposts — public, available for both own + visited profiles.
   // /api/users/[handle]/reposts requires auth but is the same endpoint
@@ -531,15 +501,6 @@ export function ProfileMobile({ targetHandle }: Props = {}) {
   const [composerOrigin, setComposerOrigin] = useState<
     { x: number; y: number } | undefined
   >(undefined);
-  // When true, the composer opens directly into the Drafts overlay
-  // (instead of the camera intro). Set by tapping the Drafts tile.
-  const [composerOpensDrafts, setComposerOpensDrafts] = useState(false);
-  // Owner-only: latest draft poster + count, used to render the
-  // TikTok-style "Drafts" tile as the first cell in the Clips grid.
-  const [draftsPreview, setDraftsPreview] = useState<{
-    count: number;
-    poster: string | null;
-  } | null>(null);
   const composeFabRef = useRef<HTMLButtonElement | null>(null);
   const openComposer = () => {
     const r = composeFabRef.current?.getBoundingClientRect();
@@ -931,8 +892,7 @@ export function ProfileMobile({ targetHandle }: Props = {}) {
   );
   const resumeRedactions = user.resumeRedactions ?? [];
 
-  const feedPosts = (posts ?? []).filter((p) => (p.type ?? "post") !== "clip");
-  const clipPosts = (posts ?? []).filter((p) => p.type === "clip");
+  const feedPosts = posts ?? [];
 
   return (
     <div style={{ minHeight: "100dvh", background: "#FAF7F2", color: "#1C1C1E" }}>
@@ -1515,8 +1475,8 @@ export function ProfileMobile({ targetHandle }: Props = {}) {
         </Section>
       ) : null}
 
-      {/* Tab strip — Instagram-style. Posts, Clips, and a Resume tab
-          aimed at recruiters (experience + portfolio + resume PDF). */}
+      {/* Tab strip — Instagram-style. Posts + a Portfolio tab aimed at
+          recruiters (experience + portfolio + resume PDF). */}
       <ProfileTabs active={tab} onChange={setTab} />
 
       <div
@@ -1568,41 +1528,14 @@ export function ProfileMobile({ targetHandle }: Props = {}) {
               reposts={reposts}
               isVisitor={isVisitor}
               ownerName={name}
-              onOpenPost={(p) => {
-                if (p.type === "clip") setOpenClipId(p.id);
-                else setOpenPostId(p.id);
-              }}
+              onOpenPost={(p) => setOpenPostId(p.id)}
             />
           ) : (
             <SavedGrid
               posts={savedPosts}
-              onOpenPost={(p) => {
-                if (p.type === "clip") setOpenClipId(p.id);
-                else setOpenPostId(p.id);
-              }}
+              onOpenPost={(p) => setOpenPostId(p.id)}
             />
           )}
-        </div>
-        <div
-          style={{
-            flex: "0 0 100%",
-            scrollSnapAlign: "start",
-            padding: "12px 16px 24px",
-            minWidth: 0,
-          }}
-        >
-          <ClipsGrid
-            clips={clipPosts}
-            loading={posts === null}
-            isVisitor={isVisitor}
-            ownerName={name}
-            onOpenClip={setOpenClipId}
-            draftsPreview={draftsPreview}
-            onOpenDrafts={() => {
-              setComposerOpensDrafts(true);
-              setComposerOpen(true);
-            }}
-          />
         </div>
         <div
           style={{
@@ -1730,14 +1663,6 @@ export function ProfileMobile({ targetHandle }: Props = {}) {
           onDeleted={() => void refetchPosts()}
         />
       ) : null}
-      {openClipId ? (
-        <ClipViewerMobile
-          clipId={openClipId}
-          onClose={() => setOpenClipId(null)}
-          canDelete={!isVisitor}
-          onDeleted={() => void refetchPosts()}
-        />
-      ) : null}
       {pendingCrop ? (
         <ImageCropperModal
           src={pendingCrop.file}
@@ -1806,7 +1731,7 @@ export function ProfileMobile({ targetHandle }: Props = {}) {
           ref={composeFabRef}
           type="button"
           onClick={openComposer}
-          aria-label={tab === "clips" ? "New clip" : "New post"}
+          aria-label="New post"
           style={{
             position: "fixed",
             right: 18,
@@ -1841,22 +1766,7 @@ export function ProfileMobile({ targetHandle }: Props = {}) {
         </button>
       ) : null}
 
-      {composerOpen && tab === "clips" ? (
-        <ClipComposerMobile
-          origin={composerOrigin}
-          openDraftsOnMount={composerOpensDrafts}
-          onClose={() => {
-            setComposerOpen(false);
-            setComposerOpensDrafts(false);
-            void refetchDraftsPreview();
-          }}
-          onPosted={() => {
-            void refetchPosts();
-            void refetchDraftsPreview();
-            setTab("clips");
-          }}
-        />
-      ) : composerOpen ? (
+      {composerOpen ? (
         <PostComposerMobile
           origin={composerOrigin}
           onClose={() => setComposerOpen(false)}
@@ -1883,14 +1793,13 @@ function ProfileTabs({
 }) {
   const tabs: Array<{ id: ProfileTab; label: string; icon: React.ReactNode }> = [
     { id: "posts", label: "Posts", icon: <IconGrid /> },
-    { id: "clips", label: "Clips", icon: <IconClip /> },
     { id: "portfolio", label: "Portfolio", icon: <IconResume /> },
   ];
   return (
     <div
       style={{
         display: "grid",
-        gridTemplateColumns: "repeat(3, 1fr)",
+        gridTemplateColumns: `repeat(${tabs.length}, 1fr)`,
         borderTop: "1px solid rgba(28,28,30,0.08)",
         borderBottom: "1px solid rgba(28,28,30,0.08)",
         background: "#FAF7F2",
@@ -2197,7 +2106,7 @@ function RepostsList({
   reposts: RepostEntry[] | null;
   isVisitor: boolean;
   ownerName: string | null;
-  onOpenPost: (p: { id: string; type: "post" | "clip" }) => void;
+  onOpenPost: (p: { id: string }) => void;
 }) {
   if (reposts === null) {
     return <SubPaneSkeleton />;
@@ -2228,7 +2137,7 @@ function RepostRow({
   onOpen,
 }: {
   entry: RepostEntry;
-  onOpen: (p: { id: string; type: "post" | "clip" }) => void;
+  onOpen: (p: { id: string }) => void;
 }) {
   const p = entry.post;
   const author = p.author;
@@ -2243,7 +2152,7 @@ function RepostRow({
   return (
     <button
       type="button"
-      onClick={() => onOpen({ id: p.id, type: p.type })}
+      onClick={() => onOpen({ id: p.id })}
       style={{
         width: "100%",
         textAlign: "left",
@@ -2287,7 +2196,7 @@ function RepostRow({
             textTransform: "uppercase",
           }}
         >
-          {p.type === "clip" ? "Clip" : "Post"}
+          Post
         </div>
       )}
       <div style={{ flex: 1, minWidth: 0 }}>
@@ -2379,14 +2288,14 @@ function SavedGrid({
   onOpenPost,
 }: {
   posts: SavedPost[] | null;
-  onOpenPost: (p: { id: string; type: "post" | "clip" }) => void;
+  onOpenPost: (p: { id: string }) => void;
 }) {
   if (posts === null) return <SubPaneSkeleton />;
   if (posts.length === 0) {
     return (
       <SubPaneEmpty
         title="Nothing saved yet"
-        body="Tap the bookmark on any post or clip to keep it here. Only you see this list."
+        body="Tap the bookmark on any post to keep it here. Only you see this list."
       />
     );
   }
@@ -2405,7 +2314,7 @@ function SavedGrid({
           <button
             key={p.id}
             type="button"
-            onClick={() => onOpenPost({ id: p.id, type: p.type })}
+            onClick={() => onOpenPost({ id: p.id })}
             style={{
               position: "relative",
               aspectRatio: "1 / 1",
@@ -2438,27 +2347,6 @@ function SavedGrid({
                 }}
               >
                 {p.content || "Saved post"}
-              </span>
-            ) : null}
-            {p.type === "clip" ? (
-              <span
-                aria-hidden
-                style={{
-                  position: "absolute",
-                  top: 6,
-                  right: 6,
-                  padding: "2px 6px",
-                  borderRadius: 999,
-                  background: "rgba(0,0,0,0.55)",
-                  color: "#fff",
-                  fontFamily: "DM Sans, sans-serif",
-                  fontSize: 9.5,
-                  fontWeight: 800,
-                  letterSpacing: "0.08em",
-                  textTransform: "uppercase",
-                }}
-              >
-                Clip
               </span>
             ) : null}
           </button>
@@ -2510,307 +2398,6 @@ function SubPaneEmpty({ title, body }: { title: string; body: string }) {
       </div>
       <div style={{ fontSize: 13, lineHeight: 1.55 }}>{body}</div>
     </div>
-  );
-}
-
-function ClipsGrid({
-  clips,
-  loading,
-  isVisitor,
-  ownerName,
-  onOpenClip,
-  draftsPreview,
-  onOpenDrafts,
-}: {
-  clips: PostRow[];
-  loading: boolean;
-  isVisitor: boolean;
-  ownerName: string;
-  onOpenClip: (id: string) => void;
-  /** Owner-only. null when not loaded yet, count=0 when no drafts. */
-  draftsPreview?: { count: number; poster: string | null } | null;
-  onOpenDrafts?: () => void;
-}) {
-  const hasDrafts = !isVisitor && (draftsPreview?.count ?? 0) > 0;
-
-  if (loading) return <GridSkeleton ratio="9/14" />;
-  if (clips.length === 0 && !hasDrafts) {
-    return isVisitor ? (
-      <EmptyTab title="No clips yet" body={`${ownerName} hasn't posted any clips yet.`} />
-    ) : (
-      <EmptyTab
-        title="No clips yet"
-        body="Clips are short, 9:16 video moments. Post one from the campus feed to get started."
-      />
-    );
-  }
-  return (
-    <div
-      style={{
-        display: "grid",
-        gridTemplateColumns: "repeat(3, 1fr)",
-        gap: 4,
-      }}
-    >
-      {/* Drafts tile — owner-only, first cell, TikTok pattern. Tap
-          opens the composer's drafts overlay. */}
-      {hasDrafts && draftsPreview ? (
-        <DraftsTile
-          count={draftsPreview.count}
-          poster={draftsPreview.poster}
-          onTap={() => onOpenDrafts?.()}
-        />
-      ) : null}
-      {clips.map((p) => (
-        <PostThumb
-          key={p.id}
-          post={p}
-          ratio="9/14"
-          overlay="play"
-          onTap={() => onOpenClip(p.id)}
-        />
-      ))}
-    </div>
-  );
-}
-
-function DraftsTile({
-  count,
-  poster,
-  onTap,
-}: {
-  count: number;
-  poster: string | null;
-  onTap: () => void;
-}) {
-  return (
-    <button
-      type="button"
-      onClick={onTap}
-      style={{
-        position: "relative",
-        aspectRatio: "9/14",
-        borderRadius: 6,
-        overflow: "hidden",
-        background: poster
-          ? `url(${poster}) center/cover`
-          : "linear-gradient(160deg,#2A2A2D 0%,#141416 100%)",
-        border: "none",
-        padding: 0,
-        cursor: "pointer",
-        textAlign: "left",
-      }}
-    >
-      {/* Dim overlay so the label reads regardless of poster brightness. */}
-      <span
-        aria-hidden
-        style={{
-          position: "absolute",
-          inset: 0,
-          background:
-            "linear-gradient(180deg, rgba(0,0,0,0.18) 0%, rgba(0,0,0,0.62) 100%)",
-        }}
-      />
-      {/* Lock icon top-right — drafts are private. */}
-      <span
-        aria-hidden
-        style={{
-          position: "absolute",
-          top: 6,
-          right: 6,
-          width: 20,
-          height: 20,
-          borderRadius: "50%",
-          background: "rgba(0,0,0,0.55)",
-          color: "#fff",
-          display: "inline-flex",
-          alignItems: "center",
-          justifyContent: "center",
-        }}
-      >
-        <svg width="10" height="10" viewBox="0 0 10 10" fill="none" aria-hidden>
-          <rect x="2" y="4.4" width="6" height="4.2" rx="1" stroke="currentColor" strokeWidth="1.1" fill="none" />
-          <path d="M3.4 4.4V3.2a1.6 1.6 0 1 1 3.2 0v1.2" stroke="currentColor" strokeWidth="1.1" fill="none" strokeLinecap="round" />
-        </svg>
-      </span>
-      {/* Label + count bottom-left. */}
-      <div
-        style={{
-          position: "absolute",
-          left: 8,
-          right: 8,
-          bottom: 8,
-          color: "#fff",
-          fontFamily: "DM Sans, sans-serif",
-          letterSpacing: "0.02em",
-          textShadow: "0 1px 3px rgba(0,0,0,0.5)",
-        }}
-      >
-        <div style={{ fontSize: 13, fontWeight: 800 }}>Drafts</div>
-        <div style={{ fontSize: 11, fontWeight: 600, opacity: 0.85 }}>
-          {count} clip{count === 1 ? "" : "s"}
-        </div>
-      </div>
-    </button>
-  );
-}
-
-function PostThumb({
-  post,
-  ratio,
-  overlay,
-  onTap,
-}: {
-  post: PostRow;
-  ratio: string;
-  overlay?: "play";
-  onTap?: () => void;
-}) {
-  const thumb = post.media_thumbnail_url || post.media_url || "";
-  // Text-only posts (no media) get a different tile entirely — cream
-  // surface with the actual content readable, not a fake-thumbnail
-  // gradient pretending there's an image. Keeps the grid layout but
-  // text posts read as text, not as Instagram tiles.
-  const isTextOnly = !thumb;
-  // Lossless edit effects on the thumbnail. Filter is applied to a
-  // dedicated background layer; text overlays render as siblings so
-  // they don't inherit the filter (CSS filter on a parent applies to
-  // all descendants, which would gray out the text on a B&W clip).
-  const editMeta = post.edit_metadata ?? null;
-  const filterCss = editMeta?.filter ? FILTER_CSS[editMeta.filter] : undefined;
-  const overlays = editMeta?.text_overlays ?? [];
-  return (
-    <button
-      type="button"
-      onClick={onTap}
-      style={{
-        position: "relative",
-        aspectRatio: ratio,
-        borderRadius: 6,
-        overflow: "hidden",
-        background: isTextOnly
-          ? "linear-gradient(180deg,#FFFCF6 0%,#F5F0E5 100%)"
-          : "#000",
-        border: isTextOnly ? "1px solid rgba(28,28,30,0.06)" : "none",
-        boxShadow: isTextOnly ? "inset 0 1px 0 rgba(255,255,255,0.6)" : "none",
-        padding: 0,
-        cursor: "pointer",
-        textAlign: "left",
-      }}
-    >
-      {/* Filtered background layer — separate so text overlays aren't
-          dragged through the filter too. */}
-      {!isTextOnly ? (
-        <div
-          aria-hidden
-          style={{
-            position: "absolute",
-            inset: 0,
-            background: `url(${thumb}) center/cover`,
-            filter: filterCss,
-          }}
-        />
-      ) : null}
-      {/* Text overlays at their %-coords. Scaled down for the grid
-          via getOverlayCss(o, 0.41) so they read at thumbnail size. */}
-      {!isTextOnly && overlays.length > 0
-        ? overlays.map((o) => (
-            <div
-              key={o.id}
-              aria-hidden
-              style={{
-                position: "absolute",
-                left: `${o.x}%`,
-                top: `${o.y}%`,
-                transform: "translate(-50%, -50%)",
-                pointerEvents: "none",
-                ...getOverlayCss(o, 0.41),
-              }}
-            >
-              {o.text}
-            </div>
-          ))
-        : null}
-      {isTextOnly ? (
-        <div
-          style={{
-            position: "absolute",
-            inset: 0,
-            padding: 10,
-            display: "flex",
-            flexDirection: "column",
-            justifyContent: "space-between",
-            color: "#1C1C1E",
-            fontFamily: "DM Sans, sans-serif",
-          }}
-        >
-          {/* Subtle quote glyph in the top-left so the tile reads as
-              "a thought" rather than an empty card. */}
-          <div
-            aria-hidden
-            style={{
-              fontFamily: "Fraunces, serif",
-              fontSize: 22,
-              lineHeight: 1,
-              color: "rgba(255,92,53,0.55)",
-              fontWeight: 900,
-            }}
-          >
-            &ldquo;
-          </div>
-          <div
-            style={{
-              fontSize: 11,
-              lineHeight: 1.35,
-              fontWeight: 500,
-              color: "#1C1C1E",
-              display: "-webkit-box",
-              WebkitLineClamp: 5,
-              WebkitBoxOrient: "vertical",
-              overflow: "hidden",
-              flex: 1,
-              marginTop: 4,
-            }}
-          >
-            {(post.content ?? "").trim() || "Post"}
-          </div>
-          <div
-            style={{
-              fontSize: 9,
-              fontWeight: 700,
-              letterSpacing: "0.16em",
-              textTransform: "uppercase",
-              color: "#8A8580",
-              marginTop: 6,
-            }}
-          >
-            Text
-          </div>
-        </div>
-      ) : null}
-      {overlay === "play" ? (
-        <span
-          aria-hidden
-          style={{
-            position: "absolute",
-            top: 6,
-            right: 6,
-            width: 18,
-            height: 18,
-            borderRadius: "50%",
-            background: "rgba(0,0,0,0.55)",
-            color: "#fff",
-            display: "inline-flex",
-            alignItems: "center",
-            justifyContent: "center",
-          }}
-        >
-          <svg width="9" height="9" viewBox="0 0 9 9" fill="currentColor">
-            <path d="M1.5 1L8 4.5 1.5 8z" />
-          </svg>
-        </span>
-      ) : null}
-    </button>
   );
 }
 
@@ -4484,29 +4071,6 @@ function PostFeedSkeleton() {
   );
 }
 
-function GridSkeleton({ ratio = "1/1" }: { ratio?: string }) {
-  return (
-    <div
-      style={{
-        display: "grid",
-        gridTemplateColumns: "repeat(3, 1fr)",
-        gap: 4,
-      }}
-    >
-      {[0, 1, 2, 3, 4, 5].map((i) => (
-        <div
-          key={i}
-          style={{
-            aspectRatio: ratio,
-            background: "rgba(28,28,30,0.06)",
-            borderRadius: 6,
-          }}
-        />
-      ))}
-    </div>
-  );
-}
-
 function EmptyTab({
   title,
   body,
@@ -4571,14 +4135,6 @@ function IconGrid() {
       <rect x="10.5" y="1.5" width="4" height="4" stroke="currentColor" strokeWidth="1.3" />
       <rect x="1.5" y="10.5" width="4" height="4" stroke="currentColor" strokeWidth="1.3" />
       <rect x="10.5" y="10.5" width="4" height="4" stroke="currentColor" strokeWidth="1.3" />
-    </svg>
-  );
-}
-function IconClip() {
-  return (
-    <svg width="16" height="16" viewBox="0 0 16 16" fill="none" aria-hidden>
-      <rect x="3" y="1.5" width="10" height="13" rx="2" stroke="currentColor" strokeWidth="1.3" />
-      <path d="M6.5 5.5L10 8l-3.5 2.5z" fill="currentColor" />
     </svg>
   );
 }

@@ -41,6 +41,8 @@ export async function GET(req: Request) {
         ")",
     )
     .eq("user_id", user.id)
+    // Clips are backlogged — a bookmarked clip must not surface here.
+    .eq("post.type", "post")
     .order("created_at", { ascending: false })
     .limit(limit);
 

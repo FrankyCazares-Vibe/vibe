@@ -852,7 +852,6 @@ body.recruiter-mode .personality-section .content-tabs,
 body.recruiter-mode .personality-section .layout-toggle,
 body.recruiter-mode .personality-section .content-tab,
 body.recruiter-mode .personality-section .layout-btn,
-body.recruiter-mode .personality-section .comp-type-btn,
 body.recruiter-mode .personality-section .composer-publish {
   pointer-events:auto;
 }
@@ -1366,75 +1365,6 @@ body.viewer-mode .doc-edit-cta { display:none; }
 .modal-close { position:absolute;top:20px;right:20px;background:var(--cream);border:none;border-radius:50%;width:32px;height:32px;font-size:16px;cursor:none;display:flex;align-items:center;justify-content:center;transition:background .15s; }
 .modal-close:hover { background:var(--border); }
 
-/* Drafts modal (P1-018) — list of draft clips with publish/delete. */
-.drafts-list { max-height:60vh; overflow-y:auto; padding-right:4px; }
-.draft-row {
-  display:flex; align-items:center; gap:12px;
-  padding:12px; border-radius:14px;
-  border:1px solid var(--border);
-  margin-bottom:10px; background:#FAF7F2;
-}
-.draft-row-thumb {
-  width:56px; height:88px; border-radius:10px;
-  overflow:hidden; flex-shrink:0;
-  background:#1C1C1E; position:relative;
-}
-.draft-row-meta { flex:1; min-width:0; }
-.draft-row-caption {
-  font-size:14px; font-weight:600;
-  color:var(--charcoal); line-height:1.35;
-  display:-webkit-box; -webkit-line-clamp:2; -webkit-box-orient:vertical;
-  overflow:hidden;
-}
-.draft-row-time {
-  margin-top:4px; font-size:11px;
-  color:var(--muted); font-weight:600;
-  letter-spacing:.04em;
-}
-.draft-row-actions { display:flex; gap:6px; }
-.draft-row-btn {
-  padding:7px 14px; border-radius:999px;
-  font-family:'DM Sans',sans-serif; font-size:12px;
-  font-weight:700; cursor:none; border:none;
-}
-.draft-row-btn.publish { background:#FF5C35; color:white; }
-.draft-row-btn.publish:hover { background:#E04A26; }
-.draft-row-btn.delete {
-  background:transparent; color:#C54323;
-  border:1px solid #E8AAA0;
-}
-.draft-row-btn.delete:hover { background:rgba(197,67,35,.08); }
-.drafts-empty {
-  padding:32px 16px; text-align:center;
-  color:var(--muted); font-size:13px;
-}
-
-/* Drafts tile in the Clips grid — first cell, owner-only. */
-.drafts-tile { position:relative; cursor:none; }
-.drafts-tile .drafts-tile-overlay {
-  position:absolute; inset:0;
-  background:linear-gradient(180deg,rgba(0,0,0,.18) 0%,rgba(0,0,0,.62) 100%);
-}
-.drafts-tile-lock {
-  position:absolute; top:6px; right:6px;
-  width:22px; height:22px; border-radius:50%;
-  background:rgba(0,0,0,.55); color:white;
-  display:flex; align-items:center; justify-content:center;
-}
-.drafts-tile-info {
-  position:absolute; left:8px; right:8px; bottom:8px;
-  color:white; pointer-events:none;
-}
-.drafts-tile-title {
-  font-family:'DM Sans',sans-serif; font-size:13px;
-  font-weight:800; letter-spacing:.02em;
-  text-shadow:0 1px 3px rgba(0,0,0,.5);
-}
-.drafts-tile-count {
-  font-size:11px; font-weight:600;
-  opacity:.85; margin-top:2px;
-}
-
 .form-group { margin-bottom:16px; }
 .form-label { font-size:12px;font-weight:700;color:var(--muted);letter-spacing:.5px;text-transform:uppercase;margin-bottom:6px;display:block; }
 .form-input, .form-textarea {
@@ -1577,10 +1507,6 @@ body.edit-mode .profile-cover:hover .cover-panel { opacity:1;pointer-events:all;
 
 
 /* ── Pinned item ── */
-.vibe-pin-btn { display:none !important; }
-body.edit-mode:not(.viewer-mode):not(.recruiter-mode) .vibe-pin-btn { display:block !important; }
-body.viewer-mode .vibe-pin-btn,
-body.recruiter-mode .vibe-pin-btn { display:none !important; }
 #pinnedItem { display:none; }
 #pinnedItem.has-pin { display:block; margin-bottom:24px; }
 .pinned-label {
@@ -1624,29 +1550,6 @@ body.recruiter-mode .pin-unpin-btn { display:none !important; }
 .pin-post-reactions { display:flex;gap:6px;padding-top:12px;border-top:1px solid var(--border); }
 .pin-reaction { display:inline-flex;align-items:center;gap:4px;background:var(--cream);padding:5px 11px;border-radius:100px;font-size:12px;font-weight:600;cursor:none;border:1px solid transparent;transition:all .15s; }
 .pin-reaction:hover { border-color:var(--border);background:white; }
-/* Pinned Vibe card */
-.pinned-vibe-card {
-  border-radius:20px;overflow:hidden;position:relative;height:220px;
-  box-shadow:var(--shadow-lg);
-}
-.pinned-vibe-bg { position:absolute;inset:0; }
-.pinned-vibe-grad { position:absolute;inset:0;background:linear-gradient(to top,rgba(0,0,0,.85) 0%,rgba(0,0,0,.1) 60%); }
-.pinned-vibe-play {
-  position:absolute;top:50%;left:50%;transform:translate(-50%,-60%);
-  width:48px;height:48px;border-radius:50%;background:rgba(255,255,255,.2);
-  border:2px solid rgba(255,255,255,.4);display:flex;align-items:center;
-  justify-content:center;font-size:16px;color:white;backdrop-filter:blur(8px);
-}
-.pinned-vibe-info { position:absolute;bottom:0;left:0;right:0;padding:0 16px 16px; }
-.pinned-vibe-creator { display:flex;align-items:center;gap:8px;margin-bottom:8px; }
-.pinned-vibe-av {
-  width:30px;height:30px;border-radius:9px;border:2px solid rgba(255,255,255,.5);
-  display:flex;align-items:center;justify-content:center;
-  font-family:'Fraunces',serif;font-size:10px;font-weight:700;color:white;
-}
-.pinned-vibe-name { font-size:13px;font-weight:700;color:white; }
-.pinned-vibe-caption { font-size:13px;color:rgba(255,255,255,.9);line-height:1.5; }
-.pinned-vibe-caption strong { color:white; }
 
 /* ── Animations ── */
 .fade-in { animation:fadeUp .6s ease both; }
@@ -1748,7 +1651,7 @@ body.recruiter-mode .recruiter-card .rec-stat-row:last-child { border-bottom:non
 .content-pane { display:none; }
 .content-pane.active { display:block; }
 
-/* ── Clips grid (IG-style tabbed view, P1-011) ── */
+/* ── Media thumbnail grid (IG-style) — used by the Saved pane ── */
 .vibes-tab-grid {
   display:grid;grid-template-columns:repeat(3,1fr);gap:10px;
 }
@@ -1773,19 +1676,11 @@ body.recruiter-mode .recruiter-card .rec-stat-row:last-child { border-bottom:non
   font-size:9px;color:white;opacity:1;
   backdrop-filter:blur(4px);padding-left:2px;
 }
-/* Edit mode: hide the play badge so it doesn't stack under the Pin pill
-   (both sit at top-right). Owner is editing, not previewing playback. */
+/* Edit mode: hide the play badge — owner is editing, not previewing. */
 body.edit-mode .vibe-grid-play { display:none; }
 .vibe-grid-info { position:absolute;bottom:0;left:0;right:0;padding:10px; }
 .vibe-grid-title { font-size:11px;font-weight:600;color:white;line-height:1.3;margin-bottom:4px; }
 .vibe-grid-views { font-size:10px;color:rgba(255,255,255,.6); }
-.vibe-upload-tile {
-  aspect-ratio:1/1;border-radius:14px;
-  border:2px dashed rgba(28,28,30,.12);
-  display:none;align-items:center;justify-content:center;
-  flex-direction:column;gap:8px;font-size:12px;color:var(--muted);
-  cursor:none;transition:border-color .15s,color .15s;
-}
 
 /* ── Post thumbnail cell for the All tab (text-only) ── */
 .post-thumb-cell {
@@ -1880,8 +1775,6 @@ body.viewer-mode .avatar-row-actions .action-btn {
   font-size:14px;line-height:1.55;color:var(--muted);
   max-width:340px;margin:0 auto;
 }
-body.edit-mode .vibe-upload-tile { display:flex; }
-.vibe-upload-tile:hover { border-color:var(--accent);color:var(--accent); }
 
 /* ── Side-by-side Vibes+Posts layout ── */
 .vibes-posts-split {
@@ -1922,13 +1815,6 @@ body.edit-mode .vibe-upload-tile { display:flex; }
 .composer-field::placeholder { color:var(--muted); }
 .composer-field:focus { border-color:rgba(28,28,30,.25); }
 .composer-btns { display:flex;align-items:center;justify-content:space-between; }
-.comp-type-btn {
-  font-size:12px;font-weight:600;padding:6px 14px;border-radius:100px;
-  border:1.5px solid var(--border);background:transparent;color:var(--muted);
-  cursor:none;transition:all .15s;
-}
-.comp-type-btn.active { background:var(--charcoal);color:white;border-color:var(--charcoal); }
-.comp-type-btn:hover:not(.active) { color:var(--charcoal);border-color:rgba(28,28,30,.2); }
 .composer-publish {
   font-family:'DM Sans',sans-serif;font-size:13px;font-weight:700;
   background:var(--accent);color:white;border:none;padding:8px 18px;
@@ -1984,38 +1870,10 @@ body.viewer-mode .ppost-pin,
 body.recruiter-mode .ppost-pin { display:none !important; }
 .ppost-pin:hover { background:var(--charcoal);color:white; }
 .ppost-pin.pinned { background:var(--charcoal);color:white; }
-body.edit-mode .vibe-delete-btn { display:flex !important; }
-body.viewer-mode .vibe-delete-btn,
-body.recruiter-mode .vibe-delete-btn { display:none !important; }
 .ppost-date { font-size:11px;font-weight:700;color:var(--muted);text-transform:uppercase;letter-spacing:.5px;margin-bottom:8px; }
-/* All-tab vertical feed — clips and posts mixed chronologically. */
+/* All-tab vertical feed — posts in chronological order. */
 .vibes-tab-feed { display:flex;flex-direction:column;gap:16px; }
 .vibes-tab-feed .profile-post-card { margin:0; }
-/* Clip card in the All feed: poster image + play button overlay + caption. */
-.feed-clip-card {
-  position:relative;border-radius:14px;overflow:hidden;
-  background:#1C1C1E;cursor:pointer;
-  box-shadow:0 1px 3px rgba(0,0,0,.06);
-}
-.feed-clip-card:hover { box-shadow:0 6px 20px rgba(0,0,0,.10); transform:translateY(-1px); transition:all .15s; }
-.feed-clip-poster {
-  display:block;width:100%;aspect-ratio:1/1;
-  background:#1C1C1E center/cover no-repeat;
-  position:relative;
-}
-.feed-clip-play {
-  position:absolute;inset:0;display:flex;align-items:center;justify-content:center;
-  font-size:36px;color:white;text-shadow:0 2px 12px rgba(0,0,0,.5);
-  pointer-events:none;
-}
-.feed-clip-meta {
-  padding:10px 14px 12px;background:white;
-}
-.feed-clip-caption {
-  font-size:14px;line-height:1.5;color:var(--charcoal);
-  display:-webkit-box;-webkit-line-clamp:2;-webkit-box-orient:vertical;overflow:hidden;
-}
-.feed-clip-sub { font-size:11px;color:var(--muted);margin-top:4px;font-weight:600; }
 
 .ppost-body { font-size:15px;line-height:1.6;color:var(--soft-black);margin-bottom:12px; }
 .ppost-body strong { color:var(--charcoal); }
@@ -3755,20 +3613,15 @@ body.empty-profile-mode #profileEmpty { display: flex !important; }
         </div>
       </div>
 
-      <!-- Clips + Posts — tabbed card (P1-011).
+      <!-- Posts — tabbed card (P1-011).
            Stats row lives at the top-right of the profile (above), aligned with
            the avatar. Tabs sit alone here. -->
       <div class="card fade-in personality-section" id="vibes" style="animation-delay:.3s">
 
-        <!-- Unified composer — own profile only. One composer for both kinds;
-             toggle picks Post (text + optional image) or Clip (video upload).
+        <!-- Post composer — own profile only (text + optional image).
              Sits above the tabs so it's always visible regardless of which
              tab the viewer is on. -->
         <div class="profile-composer owner-only" style="margin-bottom:16px">
-          <div style="display:flex;gap:6px;margin-bottom:12px;">
-            <button class="comp-type-btn active" onclick="switchCompType('post-comp',this)">Post</button>
-            <button class="comp-type-btn" onclick="switchCompType('vibe-comp',this)">Clip</button>
-          </div>
           <div class="composer-header">
             <div class="composer-mini-avatar">MC</div>
             <textarea class="composer-field" id="profilePostInput" placeholder="What are you working on? Use #hashtags for tags." rows="1" maxlength="2000" oninput="this.style.height='auto';this.style.height=Math.min(this.scrollHeight,180)+'px'"></textarea>
@@ -3780,21 +3633,6 @@ body.empty-profile-mode #profileEmpty { display: flex !important; }
             <button type="button" onclick="composerClearImage()" title="Remove image"
               style="position:absolute;top:6px;right:6px;background:rgba(0,0,0,.65);color:white;border:none;border-radius:999px;width:24px;height:24px;font-size:14px;line-height:1;cursor:none;">&times;</button>
           </div>
-          <div id="vibe-comp-zone" style="display:none;border:2px dashed rgba(28,28,30,.12);border-radius:14px;padding:24px;text-align:center;margin-top:10px;">
-            <div style="font-size:13px;font-weight:600;color:var(--muted)">Pick a video file to upload</div>
-            <div style="font-size:11px;color:var(--muted);margin-top:4px;">Up to 2 min · MP4 / MOV / WEBM · Max 200MB</div>
-            <button type="button" onclick="composerChooseClipFile()"
-              style="margin-top:12px;font-family:'DM Sans',sans-serif;font-size:12px;font-weight:700;background:var(--charcoal);color:white;border:none;padding:8px 18px;border-radius:100px;cursor:none;">Choose file</button>
-            <input type="file" id="composerClipFile" accept="video/mp4,video/quicktime,video/webm" hidden onchange="composerOnClipPicked(this)">
-            <div id="composerClipStatus" style="font-size:11px;color:var(--muted);margin-top:8px;"></div>
-          </div>
-          <!-- Clip preview after upload, before publish — keeps the user in control. -->
-          <div id="composerClipPreview" style="display:none;position:relative;margin-top:10px;border-radius:12px;overflow:hidden;max-width:240px;background:#1C1C1E;">
-            <img id="composerClipPreviewImg" alt="" style="display:block;width:100%;height:auto;">
-            <button type="button" onclick="composerClearClip()" title="Remove clip"
-              style="position:absolute;top:6px;right:6px;background:rgba(0,0,0,.65);color:white;border:none;border-radius:999px;width:24px;height:24px;font-size:14px;line-height:1;cursor:none;">&times;</button>
-            <div id="composerClipPreviewLabel" style="position:absolute;bottom:6px;left:6px;background:rgba(0,0,0,.65);color:white;font-size:11px;font-weight:600;padding:3px 8px;border-radius:6px;"></div>
-          </div>
           <div class="composer-btns">
             <button type="button" onclick="composerChooseImage()" title="Attach image"
               style="font-family:'DM Sans',sans-serif;font-size:12px;font-weight:600;background:transparent;color:var(--charcoal);border:1px solid rgba(28,28,30,.18);padding:6px 12px;border-radius:100px;cursor:none;">+ Photo</button>
@@ -3803,82 +3641,24 @@ body.empty-profile-mode #profileEmpty { display: flex !important; }
           </div>
         </div>
 
-        <!-- Tab header — All default (mixed feed), Clips and Posts as drill-downs. -->
+        <!-- Tab header — All default (full feed), Posts as a drill-down. -->
         <div class="content-tabs">
           <button class="content-tab active" onclick="switchContentTab('all-pane', this)">All</button>
-          <button class="content-tab" onclick="switchContentTab('vibes-pane', this)">Clips</button>
           <button class="content-tab" onclick="switchContentTab('posts-pane', this)">Posts</button>
           <button class="content-tab" onclick="switchContentTab('reposts-pane', this)">Reposts</button>
           <button class="content-tab owner-only" onclick="switchContentTab('saved-pane', this)">Saved</button>
         </div>
 
-        <!-- ALL PANE (default) — vertical chronological feed: clips render as
-             full-width cards with poster + play, posts as text cards with
-             Read More. populateAllFeed() rebuilds from #profileVibesGrid +
-             #profilePostsList so it always matches what the other tabs show. -->
+        <!-- ALL PANE (default) — vertical chronological feed of post cards
+             with Read More. populateAllGrid() rebuilds from
+             #profilePostsList so it always matches the Posts tab. -->
         <div class="content-pane active" id="all-pane">
           <div class="vibes-tab-feed" id="profileAllFeed"></div>
           <div class="content-empty" id="allEmptyState" style="display:none">
             <div class="content-empty-title">Nothing here yet</div>
             <div class="content-empty-body">
-              Posts and clips you publish show up here. Use the composer above to start.
+              Posts you publish show up here. Use the composer above to start.
             </div>
-          </div>
-        </div>
-
-        <!-- CLIPS PANE — id kept for backward-compat with persistence layer -->
-        <div class="content-pane" id="vibes-pane">
-
-          <!-- Vibes grid — hardcoded for Maya; rebuilt from vibe_vibes_v1 once edited -->
-          <div class="vibes-tab-grid" id="profileVibesGrid">
-            <div class="vibe-grid-thumb" data-vibe-id="v1" style="position:relative">
-              <div class="vibe-grid-bg" style="background:linear-gradient(135deg,#1a0533,#2d1b4e)"></div>
-              <div class="vibe-grid-overlay"></div>
-              <div class="vibe-grid-play">&#9654;</div>
-              <div class="vibe-grid-info">
-                <div class="vibe-grid-title">Built an AI tool that replaces a $40k analyst</div>
-                <div class="vibe-grid-views">4.2k views &middot; 0:47</div>
-              </div>
-              <button class="vibe-pin-btn owner-only" onclick="pinFromProfile('v1',this)" title="Pin to profile"
-                style="position:absolute;top:6px;right:6px;background:rgba(0,0,0,.55);color:white;border:none;border-radius:8px;padding:4px 8px;font-size:10px;font-weight:700;cursor:none;backdrop-filter:blur(4px)">Pin</button>
-              <button class="vibe-delete-btn owner-only" onclick="deleteVibe(this)" title="Delete vibe"
-                style="position:absolute;top:6px;left:6px;background:rgba(0,0,0,.55);color:white;border:none;border-radius:8px;width:22px;height:22px;font-size:14px;line-height:1;cursor:none;backdrop-filter:blur(4px);display:none;align-items:center;justify-content:center;">&times;</button>
-            </div>
-            <div class="vibe-grid-thumb" data-vibe-id="v2" style="position:relative">
-              <div class="vibe-grid-bg" style="background:linear-gradient(135deg,#001a2c,#0a2a3e)"></div>
-              <div class="vibe-grid-overlay"></div>
-              <div class="vibe-grid-play">&#9654;</div>
-              <div class="vibe-grid-info">
-                <div class="vibe-grid-title">Redesigned onboarding &mdash; retention up 23%</div>
-                <div class="vibe-grid-views">2.1k views &middot; 1:02</div>
-              </div>
-              <button class="vibe-pin-btn owner-only" onclick="pinFromProfile('v2',this)" title="Pin to profile"
-                style="position:absolute;top:6px;right:6px;background:rgba(0,0,0,.55);color:white;border:none;border-radius:8px;padding:4px 8px;font-size:10px;font-weight:700;cursor:none;backdrop-filter:blur(4px);display:none;">Pin</button>
-              <button class="vibe-delete-btn owner-only" onclick="deleteVibe(this)" title="Delete vibe"
-                style="position:absolute;top:6px;left:6px;background:rgba(0,0,0,.55);color:white;border:none;border-radius:8px;width:22px;height:22px;font-size:14px;line-height:1;cursor:none;backdrop-filter:blur(4px);display:none;align-items:center;justify-content:center;">&times;</button>
-            </div>
-            <div class="vibe-grid-thumb" data-vibe-id="v3" style="position:relative">
-              <div class="vibe-grid-bg" style="background:linear-gradient(135deg,#1a1a00,#2a2800)"></div>
-              <div class="vibe-grid-overlay"></div>
-              <div class="vibe-grid-play">&#9654;</div>
-              <div class="vibe-grid-info">
-                <div class="vibe-grid-title">My 60-second pitch that landed 3 offers</div>
-                <div class="vibe-grid-views">891 views &middot; 0:58</div>
-              </div>
-              <button class="vibe-pin-btn owner-only" onclick="pinFromProfile('v3',this)" title="Pin to profile"
-                style="position:absolute;top:6px;right:6px;background:rgba(0,0,0,.55);color:white;border:none;border-radius:8px;padding:4px 8px;font-size:10px;font-weight:700;cursor:none;backdrop-filter:blur(4px);display:none;">Pin</button>
-              <button class="vibe-delete-btn owner-only" onclick="deleteVibe(this)" title="Delete vibe"
-                style="position:absolute;top:6px;left:6px;background:rgba(0,0,0,.55);color:white;border:none;border-radius:8px;width:22px;height:22px;font-size:14px;line-height:1;cursor:none;backdrop-filter:blur(4px);display:none;align-items:center;justify-content:center;">&times;</button>
-            </div>
-            <div class="vibe-upload-tile owner-only" onclick="addVibeFromUpload()">
-              <svg width="22" height="22" viewBox="0 0 22 22" fill="none"><path d="M11 3v16M3 11h16" stroke="currentColor" stroke-width="1.5" stroke-linecap="round"/></svg>
-              <span>Upload Clip</span>
-            </div>
-          </div>
-          <!-- Empty state — JS toggles when the grid has no clips. -->
-          <div class="content-empty" id="clipsEmptyState" style="display:none">
-            <div class="content-empty-title">Nothing here yet</div>
-            <div class="content-empty-body owner-mode-text" data-owner-text="Upload a clip from the composer above to start." data-viewer-text="They haven't shared any clips yet.">Upload a clip from the composer above to start.</div>
           </div>
         </div>
 
@@ -4231,21 +4011,6 @@ body.empty-profile-mode #profileEmpty { display: flex !important; }
     <div class="modal-actions">
       <button class="btn-cancel" onclick="closeModal('currentModal')">Cancel</button>
       <button class="btn-save-modal" onclick="saveCurrent()">Add it</button>
-    </div>
-  </div>
-</div>
-
-<!-- Drafts modal — view / publish / delete saved drafts (owner only).
-     Editing the clip itself stays on mobile; desktop is a list view. -->
-<div class="modal-backdrop" id="draftsModal" onclick="if(event.target===this)closeModal('draftsModal')">
-  <div class="modal drafts-modal" style="width:560px;max-width:92vw;padding:24px;">
-    <button class="modal-close" onclick="closeModal('draftsModal')">×</button>
-    <div class="modal-title">Drafts</div>
-    <div style="font-size:12px;color:var(--muted);margin:-12px 0 14px;line-height:1.45;">
-      Drafts only show up for you. Tap Publish to make one public, or open it on mobile to keep editing.
-    </div>
-    <div id="draftsList" class="drafts-list">
-      <div class="drafts-empty">Loading drafts…</div>
     </div>
   </div>
 </div>
@@ -5610,8 +5375,8 @@ sectionNavLinks.forEach(link => {
 
 if (sectionEls.length) {
   // Wider sweet spot (-15% top / -45% bottom = ~40% band) + lower
-  // thresholds so tall sections (the content card with All / Clips /
-  // Posts / Saved tabs) actually fire the callback. The previous
+  // thresholds so tall sections (the content card with All / Posts /
+  // Reposts / Saved tabs) actually fire the callback. The previous
   // 0.2 floor never triggered for sections taller than the band.
   const sectionObserver = new IntersectionObserver((entries) => {
     if (Date.now() < _subnavLockUntil) return; // honor click lock
@@ -5644,9 +5409,9 @@ if (sectionEls.length) {
 }
 
 // ── Pinned item system ──────────────────────────────────────────
-// Pin reads its content live from the DOM (post card or vibe thumb), so
-// every post and every vibe is pinnable — including ones the user just
-// added. Persisted to vibe_user_v1.pinnedId; restored on reload.
+// Pin reads its content live from the DOM (post card), so every post is
+// pinnable — including ones the user just added. Persisted to
+// vibe_user_v1.pinnedId; restored on reload.
 
 let profilePinnedId = null;
 
@@ -5689,8 +5454,7 @@ function pinFromProfile(contentId, btn) {
 
   // Find the source element by id
   const postCard = document.querySelector(`.profile-post-card[data-post-id="${contentId}"]`);
-  const vibeThumb = document.querySelector(`.vibe-grid-thumb[data-vibe-id="${contentId}"]`);
-  if (!postCard && !vibeThumb) return;
+  if (!postCard) return;
 
   profilePinnedId = contentId;
   const me = _currentUserIdentity();
@@ -5701,40 +5465,20 @@ function pinFromProfile(contentId, btn) {
   // Pinned cards click through to the shared post viewer modal —
   // the Unpin button stops propagation so it doesn't also open the
   // viewer when the user just wanted to remove the pin.
-  if (postCard) {
-    const body = postCard.querySelector('.ppost-body')?.innerHTML || '';
-    const tagsHTML = postCard.querySelector('.ppost-tags')?.innerHTML || '';
-    const reactionsHTML = postCard.querySelector('.ppost-reactions .ppost-left')?.innerHTML || '';
-    contentEl.innerHTML = `
-      <div class="pinned-post-card" data-pin-id="${_esc(contentId)}" style="cursor:pointer" onclick="_openPinnedItem('${_esc(contentId)}','post')">
-        <div class="pin-post-header">
-          <div class="pin-post-av" style="background:var(--charcoal)">${avMarkup}</div>
-          <div><div class="pin-post-name">${_esc(me.name)}</div><div class="pin-post-role">${_esc(me.headline)}</div></div>
-          <button class="pin-unpin-btn" onclick="event.stopPropagation();pinFromProfile('${contentId}',this)">Unpin</button>
-        </div>
-        <div class="pin-post-body">${body}</div>
-        ${tagsHTML ? `<div class="pin-post-tags">${tagsHTML}</div>` : ''}
-        <div class="pin-post-reactions">${reactionsHTML}</div>
-      </div>`;
-  } else if (vibeThumb) {
-    const bg = vibeThumb.querySelector('.vibe-grid-bg')?.style.background || '';
-    const title = vibeThumb.querySelector('.vibe-grid-title')?.textContent || '';
-    const views = vibeThumb.querySelector('.vibe-grid-views')?.textContent || '';
-    contentEl.innerHTML = `
-      <div class="pinned-vibe-card" data-pin-id="${_esc(contentId)}" style="cursor:pointer" onclick="_openPinnedItem('${_esc(contentId)}','clip')">
-        <div class="pinned-vibe-bg" style="background:${bg}"></div>
-        <div class="pinned-vibe-grad"></div>
-        <div class="pinned-vibe-play">&#9654;</div>
-        <div class="pinned-vibe-info">
-          <div class="pinned-vibe-creator">
-            <div class="pinned-vibe-av" style="background:var(--charcoal)">${avMarkup}</div>
-            <div><div class="pinned-vibe-name">${_esc(me.name)}</div><div style="font-size:10px;color:rgba(255,255,255,.6)">${_esc(views)}</div></div>
-            <button class="pin-unpin-btn" onclick="event.stopPropagation();pinFromProfile('${contentId}',this)" style="display:block;margin-left:auto;background:rgba(255,255,255,.15);color:white;border-color:rgba(255,255,255,.25)">Unpin</button>
-          </div>
-          <div class="pinned-vibe-caption">${_esc(title)}</div>
-        </div>
-      </div>`;
-  }
+  const body = postCard.querySelector('.ppost-body')?.innerHTML || '';
+  const tagsHTML = postCard.querySelector('.ppost-tags')?.innerHTML || '';
+  const reactionsHTML = postCard.querySelector('.ppost-reactions .ppost-left')?.innerHTML || '';
+  contentEl.innerHTML = `
+    <div class="pinned-post-card" data-pin-id="${_esc(contentId)}" style="cursor:pointer" onclick="_openPinnedItem('${_esc(contentId)}')">
+      <div class="pin-post-header">
+        <div class="pin-post-av" style="background:var(--charcoal)">${avMarkup}</div>
+        <div><div class="pin-post-name">${_esc(me.name)}</div><div class="pin-post-role">${_esc(me.headline)}</div></div>
+        <button class="pin-unpin-btn" onclick="event.stopPropagation();pinFromProfile('${contentId}',this)">Unpin</button>
+      </div>
+      <div class="pin-post-body">${body}</div>
+      ${tagsHTML ? `<div class="pin-post-tags">${tagsHTML}</div>` : ''}
+      <div class="pin-post-reactions">${reactionsHTML}</div>
+    </div>`;
 
   pinnedEl.classList.add('has-pin');
   if (btn !== undefined) {
@@ -5744,7 +5488,7 @@ function pinFromProfile(contentId, btn) {
   if (typeof saveProfileToStorage === 'function') saveProfileToStorage();
   if (typeof refreshPinButtons === 'function') refreshPinButtons();
   // Sync to server when this is a real user-driven action on a real
-  // post (UUID id). Demo / mock-user pins (p1, v2) skip the API.
+  // post (UUID id). Demo / mock-user pins (p1, p2) skip the API.
   if (btn !== undefined) _syncPinToServer(contentId);
 }
 
@@ -5768,40 +5512,21 @@ function _syncPinToServer(pinId) {
 // with a prefill so the modal paints instantly while the GET resolves.
 // Demo / mock-user posts (non-UUID ids like 'p1', 'v2') still open
 // the modal but skip the API fetch (the modal handles that gracefully).
-function _openPinnedItem(contentId, type) {
+function _openPinnedItem(contentId) {
   if (typeof openPostViewer !== 'function') return;
-  const sourceCard = type === 'clip'
-    ? document.querySelector(`.vibe-grid-thumb[data-vibe-id="${contentId}"]`)
-    : document.querySelector(`.profile-post-card[data-post-id="${contentId}"]`);
+  const sourceCard = document.querySelector(`.profile-post-card[data-post-id="${contentId}"]`);
   let prefill = null;
-  if (sourceCard) {
-    if (type === 'clip' && typeof _profilePrefillFromClipThumb === 'function') {
-      prefill = _profilePrefillFromClipThumb(sourceCard);
-    } else if (type === 'post' && typeof _profilePrefillFromCard === 'function') {
-      prefill = _profilePrefillFromCard(sourceCard);
-    }
+  if (sourceCard && typeof _profilePrefillFromCard === 'function') {
+    prefill = _profilePrefillFromCard(sourceCard);
   }
   openPostViewer(contentId, prefill);
 }
 
 // Make pin buttons visible in edit mode and reflect pinned state.
-// Reads ids from the parent post card / vibe thumb so any number of
-// posts/vibes can show their own pin button without per-button wiring.
+// Reads ids from the parent post card so any number of posts can show
+// their own pin button without per-button wiring.
 function refreshPinButtons() {
   const showState = editMode && !viewerMode && !recruiterMode;
-
-  document.querySelectorAll('.vibe-pin-btn').forEach(btn => {
-    btn.style.display = showState ? 'block' : 'none';
-    // Pin buttons exist on both .vibe-grid-thumb (Clips pane) and on
-    // .feed-clip-card (All feed). Try both ancestors.
-    const id = btn.closest('.vibe-grid-thumb')?.dataset.vibeId
-            || btn.closest('.feed-clip-card')?.dataset.vibeId
-            || '';
-    const isPinned = id && id === profilePinnedId;
-    btn.textContent = isPinned ? 'Pinned' : 'Pin';
-    btn.style.background = isPinned ? 'var(--charcoal)' : 'rgba(0,0,0,.55)';
-    btn.style.color = 'white';
-  });
 
   document.querySelectorAll('.ppost-pin').forEach(btn => {
     btn.style.display = showState ? 'inline-block' : 'none';
@@ -5861,7 +5586,7 @@ function hidePreviewEditPill() {
   if (el) el.remove();
 }
 
-// ── Content tab switcher (All / Clips / Posts) ───────────────────
+// ── Content tab switcher (All / Posts / Reposts / Saved) ─────────
 function switchContentTab(paneId, btn) {
   const card = btn.closest('.card');
   card.querySelectorAll('.content-tab').forEach(b => b.classList.remove('active'));
@@ -5879,9 +5604,9 @@ function switchContentTab(paneId, btn) {
   }
 }
 
-// ── All-pane grid: clips + posts as square thumbnails (P1-011) ────
+// ── All-pane feed: posts as full-width cards (P1-011) ────────────
 // Posts that aren't visible in the DOM (e.g. lazy-rendered) won't appear; the
-// ALL view derives from the same nodes the Clips/Posts panes render so it's
+// ALL view derives from the same nodes the Posts pane renders so it's
 // always consistent with what the user can see in the other tabs.
 const POST_THEME_BUCKETS = ['coral', 'purple', 'mint', 'gold', 'sky', 'lavender'];
 function postThemeFor(card) {
@@ -5895,45 +5620,6 @@ function postExcerpt(card) {
   const body = card.querySelector('.ppost-body')?.textContent?.trim() || '';
   return body.length > 180 ? body.slice(0, 177) + '…' : body;
 }
-// Build a feed-style clip card for the All tab — full-width with poster
-// + play overlay + caption underneath. Clicks open the shared viewer.
-function buildFeedClipCard(thumb) {
-  const id = thumb.dataset.vibeId || '';
-  const bg = thumb.querySelector('.vibe-grid-bg')?.style.background || '';
-  // Pull the cached edit metadata + filter that _renderVibeThumb stashed
-  // on the source thumb so the All-tab card looks identical to the grid.
-  let editMeta = null;
-  if (thumb.dataset.editMetadata) {
-    try { editMeta = JSON.parse(thumb.dataset.editMetadata); } catch {}
-  }
-  const filterCss = editMeta && editMeta.filter ? _clipFilterCss(editMeta.filter) : '';
-  const title = (thumb.querySelector('.vibe-grid-title')?.textContent || '').trim();
-  const sub   = (thumb.querySelector('.vibe-grid-views')?.textContent || '').trim();
-  const isPinned = id && id === profilePinnedId;
-  const wrap = document.createElement('div');
-  wrap.className = 'feed-clip-card';
-  wrap.dataset.vibeId = id;
-  if (editMeta) {
-    try { wrap.dataset.editMetadata = JSON.stringify(editMeta); } catch {}
-  }
-  // Pin button is owner-only + edit-mode-only via the same CSS rules
-  // the in-grid pin button uses. Lives top-right of the poster so it
-  // doesn't compete with the caption row.
-  wrap.innerHTML = `
-    <div class="feed-clip-poster" style="background:${bg || '#1C1C1E'};${filterCss ? `filter:${filterCss};` : ''};position:relative;overflow:hidden;">
-      <div class="feed-clip-play">▶</div>
-      <button class="vibe-pin-btn owner-only" onclick="event.stopPropagation();pinFromProfile('${id}',this)" title="Pin to profile"
-        style="position:absolute;top:8px;right:8px;background:${isPinned ? 'var(--charcoal)' : 'rgba(0,0,0,.55)'};color:white;border:none;border-radius:8px;padding:4px 10px;font-size:10px;font-weight:700;cursor:none;backdrop-filter:blur(4px);">${isPinned ? 'Pinned' : 'Pin'}</button>
-    </div>
-    ${_renderClipOverlaysHTML(editMeta, 14)}
-    <div class="feed-clip-meta">
-      <div class="feed-clip-caption">${_esc(title)}</div>
-      ${sub ? `<div class="feed-clip-sub">${_esc(sub)}</div>` : ''}
-    </div>
-  `;
-  return wrap;
-}
-
 // Build a prefill object so the modal paints something instantly while
 // the server fetch resolves. For app-shell users, /api/posts/[id] then
 // replaces the counts + viewer state.
@@ -5953,7 +5639,7 @@ function _profilePrefillFromCard(card) {
     author:    me ? { name: me.name, handle: me.handle, avatar_url: me.avatarPhoto } : null,
   };
 }
-// Toggle the per-pane empty states (Clips, Posts). Run after every
+// Toggle the per-pane empty state (Posts). Run after every
 // hydration / publish / delete so they reflect reality. The body text
 // swaps based on owner vs viewer mode so visitors see "they haven't
 // posted yet" instead of an instruction telling them to publish.
@@ -5968,21 +5654,10 @@ function refreshPaneEmptyStates() {
     const body = postEmpty.querySelector('.owner-mode-text');
     if (body) body.textContent = body.dataset[isViewer ? 'viewerText' : 'ownerText'];
   }
-  // Clips pane
-  const clipGrid = document.getElementById('profileVibesGrid');
-  const clipEmpty = document.getElementById('clipsEmptyState');
-  if (clipGrid && clipEmpty) {
-    const has = clipGrid.querySelector('.vibe-grid-thumb');
-    clipEmpty.style.display = has ? 'none' : 'block';
-    const body = clipEmpty.querySelector('.owner-mode-text');
-    if (body) body.textContent = body.dataset[isViewer ? 'viewerText' : 'ownerText'];
-  }
 }
 
-// Build the vertical mixed feed for the All tab. Clips render as full-width
-// poster cards with play overlay; posts render as the standard post card
-// (cloned, owner-only chrome stripped). Zipper-merged so the user sees a
-// mix without needing strict chronological sort.
+// Build the vertical feed for the All tab. Posts render as the standard
+// post card (cloned, owner-only chrome stripped).
 function populateAllGrid() {
   // Per-pane empty states share the same trigger points as the All feed,
   // so refresh them here regardless of whether #profileAllFeed exists.
@@ -5993,32 +5668,27 @@ function populateAllGrid() {
   const feed = document.getElementById('profileAllFeed');
   const empty = document.getElementById('allEmptyState');
   if (!feed) return;
-  const clipNodes = Array.from(document.querySelectorAll('#profileVibesGrid .vibe-grid-thumb'));
   const postNodes = Array.from(document.querySelectorAll('#profilePostsList .profile-post-card'));
   feed.innerHTML = '';
-  if (clipNodes.length === 0 && postNodes.length === 0) {
+  if (postNodes.length === 0) {
     feed.style.display = 'none';
     if (empty) empty.style.display = 'block';
     return;
   }
   feed.style.display = '';
   if (empty) empty.style.display = 'none';
-  const max = Math.max(clipNodes.length, postNodes.length);
-  for (let i = 0; i < max; i++) {
-    if (i < clipNodes.length) feed.appendChild(buildFeedClipCard(clipNodes[i]));
-    if (i < postNodes.length) {
-      const clone = postNodes[i].cloneNode(true);
-      // Strip the Delete X (still possible from the post viewer "..."
-      // menu) — keep the Pin button so the All feed is a first-class
-      // place to pin / unpin without switching to the Posts tab.
-      clone.querySelectorAll('.ppost-delete').forEach(el => el.remove());
-      feed.appendChild(clone);
-      // Cloned cards need their own Read More measurement (clip + button
-      // shipped via _renderPostCard, but cloneNode doesn't re-run that
-      // post-render hook). Defer one frame so layout settles.
-      requestAnimationFrame(() => _measureReadMore(clone));
-    }
-  }
+  postNodes.forEach(node => {
+    const clone = node.cloneNode(true);
+    // Strip the Delete X (still possible from the post viewer "..."
+    // menu) — keep the Pin button so the All feed is a first-class
+    // place to pin / unpin without switching to the Posts tab.
+    clone.querySelectorAll('.ppost-delete').forEach(el => el.remove());
+    feed.appendChild(clone);
+    // Cloned cards need their own Read More measurement (clamp + button
+    // shipped via _renderPostCard, but cloneNode doesn't re-run that
+    // post-render hook). Defer one frame so layout settles.
+    requestAnimationFrame(() => _measureReadMore(clone));
+  });
 }
 // Posts-pane card click → open viewer. Event delegation so newly added
 // (publish-post) cards work without per-card binding. Skip clicks on the
@@ -6037,51 +5707,14 @@ function populateAllGrid() {
   list.style.cursor = 'pointer';
 })();
 
-// Clip-thumb click → open the shared viewer in clip mode (P1-016).
-// Event-delegated on both grids so newly added clips work without
-// per-thumb binding. The All-grid clones strip owner-only chrome at
-// build time, so we don't need to filter Pin/Delete here.
-(function bindProfileClipsClickToViewer() {
-  ['profileVibesGrid'].forEach(gridId => {
-    const grid = document.getElementById(gridId);
-    if (!grid) return;
-    grid.addEventListener('click', (ev) => {
-      // Skip the upload tile and any owner-only chrome on the originals.
-      if (ev.target.closest('.vibe-upload-tile')) return;
-      if (ev.target.closest('.vibe-pin-btn, .vibe-delete-btn')) return;
-      const thumb = ev.target.closest('.vibe-grid-thumb');
-      if (!thumb) return;
-      const id = thumb.dataset.vibeId || '';
-      if (!id || typeof openPostViewer !== 'function') return;
-      openPostViewer(id, _profilePrefillFromClipThumb(thumb));
-    });
-  });
-})();
-
-// All-tab feed delegation — handles both feed-clip-card (open clip viewer)
-// and cloned .profile-post-card (open post viewer). Skip Read more taps
-// so they expand the body instead of opening the modal.
+// All-tab feed delegation — cloned .profile-post-card opens the post
+// viewer. Skip Read more taps so they expand the body instead of
+// opening the modal.
 (function bindProfileAllFeedClickToViewer() {
   const feed = document.getElementById('profileAllFeed');
   if (!feed) return;
   feed.addEventListener('click', (ev) => {
     if (ev.target.closest('.ppost-readmore')) return;
-    const clipCard = ev.target.closest('.feed-clip-card');
-    if (clipCard) {
-      const id = clipCard.dataset.vibeId || '';
-      if (!id || typeof openPostViewer !== 'function') return;
-      // Reuse the clip-thumb prefill by faking a thumb-shaped object.
-      const fakeThumb = {
-        dataset: { vibeId: id },
-        querySelector(sel) {
-          if (sel === '.vibe-grid-bg')    return clipCard.querySelector('.feed-clip-poster');
-          if (sel === '.vibe-grid-title') return clipCard.querySelector('.feed-clip-caption');
-          return null;
-        },
-      };
-      openPostViewer(id, _profilePrefillFromClipThumb(fakeThumb));
-      return;
-    }
     const postCard = ev.target.closest('.profile-post-card');
     if (postCard) {
       const id = postCard.dataset.postId || '';
@@ -6091,46 +5724,11 @@ function populateAllGrid() {
   });
 })();
 
-// Pull the bits the modal can paint instantly (poster, title) from the
-// thumb DOM. Real DB clips also carry the poster URL via
-// background-image: url(...) on .vibe-grid-bg; demo clips use gradients.
-function _profilePrefillFromClipThumb(thumb) {
-  const me = (typeof vibeLoad === 'function') ? vibeLoad('vibe_user_v1') : null;
-  const bg = thumb.querySelector('.vibe-grid-bg');
-  const titleEl = thumb.querySelector('.vibe-grid-title');
-  let posterUrl = '';
-  if (bg) {
-    const m = (bg.style.background || '').match(/url\(["']?(https?:[^"')]+)["']?\)/i);
-    if (m) posterUrl = m[1];
-  }
-  return {
-    id:                  thumb.dataset.vibeId || '',
-    type:                'clip',
-    content:             titleEl ? (titleEl.textContent || '').trim() : '',
-    tags:                [],
-    media_url:           '',
-    media_thumbnail_url: posterUrl,
-    created_at:          '',
-    author:              me ? { name: me.name, handle: me.handle, avatar_url: me.avatarPhoto } : null,
-  };
-}
-
-// Repopulate after the persistence layer hydrates clips and posts from localStorage.
+// Repopulate after the persistence layer hydrates posts from localStorage.
 if (document.readyState === 'loading') {
   document.addEventListener('DOMContentLoaded', () => setTimeout(populateAllGrid, 200));
 } else {
   setTimeout(populateAllGrid, 200);
-}
-
-// ── Composer type toggle (Post / Vibe) ───────────────────────────
-function switchCompType(targetId, btn) {
-  const composer = btn.closest('.profile-composer');
-  composer.querySelectorAll('.comp-type-btn').forEach(b => b.classList.remove('active'));
-  btn.classList.add('active');
-  const vibeZone = document.getElementById('vibe-comp-zone');
-  if (vibeZone) {
-    vibeZone.style.display = (targetId === 'vibe-comp') ? 'block' : 'none';
-  }
 }
 
 // ── Publish post from profile ─────────────────────────────────────
@@ -6207,8 +5805,7 @@ function composerClearImage() {
 async function publishProfilePost() {
   const input = document.getElementById('profilePostInput');
   const text = (input && input.value || '').trim();
-  const hasPendingClip = (typeof composerHasPendingClip === 'function') && composerHasPendingClip();
-  if (!text && !_composerPendingImageUrl && !hasPendingClip) return;
+  if (!text && !_composerPendingImageUrl) return;
 
   // Demo / mock-user view stays on the local-only path so Maya keeps working
   // until the demo flow is retired.
@@ -6220,26 +5817,21 @@ async function publishProfilePost() {
   const btn = document.querySelector('.profile-composer.owner-only .composer-publish');
   if (btn) { btn.disabled = true; btn.textContent = 'Publishing…'; }
   try {
-    if (hasPendingClip) {
-      // Pending clip wins — text becomes the clip's caption (P1-017 spec).
-      await _publishPendingClip(text);
-    } else {
-      const r = await fetch('/api/me/publish-post', {
-        method: 'POST',
-        credentials: 'include',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          content: text,
-          tags: _extractHashtags(text),
-          media_url: _composerPendingImageUrl || undefined,
-        }),
-      });
-      const j = await r.json().catch(() => ({}));
-      if (!r.ok || !j.ok || !j.post) {
-        throw new Error((j && j.error) || 'Publish failed');
-      }
-      _publishProfilePostLocal(text, j.post);
+    const r = await fetch('/api/me/publish-post', {
+      method: 'POST',
+      credentials: 'include',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        content: text,
+        tags: _extractHashtags(text),
+        media_url: _composerPendingImageUrl || undefined,
+      }),
+    });
+    const j = await r.json().catch(() => ({}));
+    if (!r.ok || !j.ok || !j.post) {
+      throw new Error((j && j.error) || 'Publish failed');
     }
+    _publishProfilePostLocal(text, j.post);
     if (input) { input.value = ''; input.style.height = ''; }
   } catch (e) {
     showToast(e && e.message ? e.message : 'Could not publish');
@@ -7334,14 +6926,13 @@ function _sortWorkExperienceByRecency(rows) {
           _pinnedPostId: v.pinnedPostId || null,
         };
         hydrateProfileFields(v);
-        // Empty arrays here are critical: renderUserSections falls back
-        // to localStorage (vibe_posts_v1 / vibe_vibes_v1) when posts /
-        // vibes are missing, which would render the VIEWER's own posts
-        // on the visited user's profile. Forcing [] suppresses the
-        // fallback; we then call hydrateVisitedUserPosts to inject the
-        // visited user's real posts a moment later.
+        // The empty array here is critical: renderUserSections falls back
+        // to localStorage (vibe_posts_v1) when posts are missing, which
+        // would render the VIEWER's own posts on the visited user's
+        // profile. Forcing [] suppresses the fallback; we then call
+        // hydrateVisitedUserPosts to inject the visited user's real
+        // posts a moment later.
         v.posts = [];
-        v.vibes = [];
         renderUserSections(v);
         renderStudentBadge(v, /*isOwn=*/false);
         if (typeof showViewerBackBanner === 'function') showViewerBackBanner(v.name);
@@ -7356,7 +6947,7 @@ function _sortWorkExperienceByRecency(rows) {
             return;
           } else                                          setVibeRelState('none');
         }
-        // Pull the visited user's real posts + clips and render them.
+        // Pull the visited user's real posts and render them.
         hydrateVisitedUserPosts(viewingHandle);
       })
       .catch(() => {
@@ -8210,14 +7801,13 @@ function renderPostsFromStorage(postsOverride) {
 // for app-shell users — demo Maya / mock-user views still use localStorage
 // or the user.posts override path.
 // Try to render the pin slot for a given post id. Looks the source
-// thumb up in the DOM (post card or vibe thumb) — if neither exists
-// yet (mid-hydration), bails silently. Caller re-runs us after each
-// hydrate so the pin lands once the source row is in the DOM.
+// post card up in the DOM — if it doesn't exist yet (mid-hydration),
+// bails silently. Caller re-runs us after each hydrate so the pin
+// lands once the source row is in the DOM.
 function _restorePinIfPossible(pinnedId) {
   if (!pinnedId) return;
   if (profilePinnedId === pinnedId) return; // already pinned
-  const has = document.querySelector(`.profile-post-card[data-post-id="${pinnedId}"]`)
-           || document.querySelector(`.vibe-grid-thumb[data-vibe-id="${pinnedId}"]`);
+  const has = document.querySelector(`.profile-post-card[data-post-id="${pinnedId}"]`);
   if (!has) return;
   if (typeof pinFromProfile === 'function') {
     profilePinnedId = null;
@@ -8232,7 +7822,6 @@ async function hydrateProfilePostsFromAPI() {
     const j = await r.json().catch(() => ({}));
     if (!r.ok || !j.ok || !Array.isArray(j.posts)) return;
     const postRows = j.posts.filter(p => p.type === 'post');
-    const clipRows = j.posts.filter(p => p.type === 'clip');
 
     // Posts pane — clear hardcoded Maya + any localStorage-rendered cards
     // and replace with the DB truth. Mirror the shape into vibe_posts_v1
@@ -8245,39 +7834,15 @@ async function hydrateProfilePostsFromAPI() {
       if (typeof savePostsToStorage === 'function') savePostsToStorage();
     }
 
-    // Clips pane — same idea: replace hardcoded Maya v1/v2/v3 thumbs
-    // with the user's real DB clips so they persist across sessions.
-    const grid = document.getElementById('profileVibesGrid');
-    if (grid) {
-      grid.querySelectorAll('.vibe-grid-thumb').forEach(t => t.remove());
-      clipRows.forEach(row => {
-        const node = _renderVibeThumb({
-          id:    row.id,
-          title: (row.content || '').slice(0, 80) || 'Clip',
-          views: '0 views · 0:00',
-          bg:    row.media_thumbnail_url
-            ? `center/cover no-repeat url("${row.media_thumbnail_url}")`
-            : _clipFallbackGradient(row.id),
-          edit_metadata: row.edit_metadata || null,
-        });
-        const uploadTile = grid.querySelector('.vibe-upload-tile');
-        if (uploadTile) grid.insertBefore(node, uploadTile);
-        else grid.appendChild(node);
-      });
-      if (typeof saveVibesToStorage === 'function') saveVibesToStorage();
-    }
-
     if (typeof populateAllGrid === 'function') populateAllGrid();
     // Re-attempt pin restore now that the pinned source row may exist
     // in the DOM (renderUserSections fired before this async hydration).
     const me = (typeof vibeLoad === 'function') ? vibeLoad('vibe_user_v1') : null;
     _restorePinIfPossible(me && (me.pinnedPostId || me.pinnedId));
-    // Owner-only: refresh the drafts tile after every clips re-render.
-    loadProfileDrafts();
   } catch (e) { /* silent — local cache stays */ }
 }
 
-// Hydrate the VISITED user's posts + clips when in viewer mode (P1-011b).
+// Hydrate the VISITED user's posts when in viewer mode (P1-011b).
 // Mirror of hydrateProfilePostsFromAPI but hits /api/users/[handle]/posts
 // and explicitly does NOT call savePostsToStorage (we don't want the
 // visitor's localStorage to get clobbered with someone else's content).
@@ -8289,7 +7854,6 @@ async function hydrateVisitedUserPosts(handle) {
     const j = await r.json().catch(() => ({}));
     if (!r.ok || !j.ok || !Array.isArray(j.posts)) return;
     const postRows = j.posts.filter(p => p.type === 'post');
-    const clipRows = j.posts.filter(p => p.type === 'clip');
 
     // Posts pane
     const list = document.getElementById('profilePostsList');
@@ -8297,26 +7861,6 @@ async function hydrateVisitedUserPosts(handle) {
       list.querySelectorAll('.profile-post-card').forEach(c => c.remove());
       postRows.map(_profileMapDbRow).filter(Boolean)
         .forEach(c => list.appendChild(_renderPostCard(c)));
-    }
-
-    // Clips pane
-    const grid = document.getElementById('profileVibesGrid');
-    if (grid) {
-      grid.querySelectorAll('.vibe-grid-thumb').forEach(t => t.remove());
-      clipRows.forEach(row => {
-        const node = _renderVibeThumb({
-          id:    row.id,
-          title: (row.content || '').slice(0, 80) || 'Clip',
-          views: '0 views · 0:00',
-          bg:    row.media_thumbnail_url
-            ? `center/cover no-repeat url("${row.media_thumbnail_url}")`
-            : _clipFallbackGradient(row.id),
-          edit_metadata: row.edit_metadata || null,
-        });
-        const uploadTile = grid.querySelector('.vibe-upload-tile');
-        if (uploadTile) grid.insertBefore(node, uploadTile);
-        else grid.appendChild(node);
-      });
     }
 
     if (typeof populateAllGrid === 'function') populateAllGrid();
@@ -8449,17 +7993,25 @@ function _buildRepostCard(repost) {
     inner.appendChild(body);
   }
 
-  if (post.media_url && post.type === 'post') {
-    const media = document.createElement('div');
-    media.style.cssText = 'border-radius:10px;overflow:hidden;padding-top:56%;background:url("' + _esc(post.media_url) + '") center/cover;border:1px solid rgba(28,28,30,0.06);';
-    inner.appendChild(media);
-  } else if (post.media_url && post.type === 'clip') {
-    const v = document.createElement('video');
-    v.src = post.media_url;
-    v.controls = true;
-    if (post.media_thumbnail_url) v.poster = post.media_thumbnail_url;
-    v.style.cssText = 'width:100%;border-radius:10px;background:#000;max-height:380px;border:1px solid rgba(28,28,30,0.06);';
-    inner.appendChild(v);
+  // Video posts store an R2 object key under `clips/` (legacy prefix name)
+  // and get a <video>; image posts store a public URL and get a backdrop.
+  // /api/feed pre-computes media_kind; the profile endpoints don't, so fall
+  // back to sniffing the key prefix.
+  if (post.media_url) {
+    const isVideo =
+      post.media_kind === 'video' || String(post.media_url).startsWith('clips/');
+    if (isVideo) {
+      const v = document.createElement('video');
+      v.src = post.media_url;
+      v.controls = true;
+      if (post.media_thumbnail_url) v.poster = post.media_thumbnail_url;
+      v.style.cssText = 'width:100%;border-radius:10px;background:#000;max-height:380px;border:1px solid rgba(28,28,30,0.06);';
+      inner.appendChild(v);
+    } else {
+      const media = document.createElement('div');
+      media.style.cssText = 'border-radius:10px;overflow:hidden;padding-top:56%;background:url("' + _esc(post.media_url) + '") center/cover;border:1px solid rgba(28,28,30,0.06);';
+      inner.appendChild(media);
+    }
   }
 
   card.appendChild(inner);
@@ -8510,35 +8062,11 @@ async function hydrateSavedPaneFromAPI() {
   }
 }
 
-// Build a thumbnail cell for a saved post. Clips render with the poster
-// image as the background (or a gradient fallback) + play badge; posts
-// render as the same themed text cell the All grid uses.
+// Build a thumbnail cell for a saved post — the same themed text cell the
+// All grid uses. Clips are backlogged and /api/me/bookmarks filters them
+// out, so there's no video variant here.
 function _buildSavedCell(post) {
   const id = post.id;
-  if (post.type === 'clip') {
-    const wrap = document.createElement('div');
-    wrap.className = 'vibe-grid-thumb';
-    wrap.dataset.vibeId = id;
-    wrap.style.position = 'relative';
-    const bgImg = post.media_thumbnail_url
-      ? `center/cover no-repeat url("${_esc(post.media_thumbnail_url)}")`
-      : 'linear-gradient(135deg,#1a0533,#2d1b4e)';
-    wrap.innerHTML = `
-      <div class="vibe-grid-bg" style="background:${bgImg}"></div>
-      <div class="vibe-grid-overlay"></div>
-      <div class="vibe-grid-play">&#9654;</div>
-      <div class="vibe-grid-info">
-        <div class="vibe-grid-title">${_esc((post.content || '').slice(0, 80))}</div>
-        <div class="vibe-grid-views">${_esc((post.author && post.author.name) || '')}</div>
-      </div>
-    `;
-    wrap.style.cursor = 'pointer';
-    wrap.addEventListener('click', () => {
-      if (typeof openPostViewer === 'function') openPostViewer(id, _savedPrefill(post));
-    });
-    return wrap;
-  }
-  // Default: post-thumb-cell
   const wrap = document.createElement('div');
   wrap.className = 'post-thumb-cell theme-' + _savedThemeFor(post);
   wrap.dataset.sourcePostId = id;
@@ -8649,544 +8177,6 @@ function deleteProfilePost(btn) {
   saveProfileToStorage();
   if (typeof populateAllGrid === 'function') populateAllGrid();
   if (typeof showToast === 'function') showToast('Post removed');
-}
-
-// ── Vibes persistence (vibe_vibes_v1) ────────────────────────────────────
-function saveVibesToStorage() {
-  if (window.viewingMockUser || window.viewingRealUser) return;
-  const grid = document.getElementById('profileVibesGrid');
-  if (!grid) return;
-  const vibes = Array.from(grid.querySelectorAll('.vibe-grid-thumb')).map(t => ({
-    id:       t.dataset.vibeId || ('v' + Date.now() + Math.random().toString(36).slice(2,6)),
-    title:    (t.querySelector('.vibe-grid-title')?.textContent || '').trim(),
-    views:    (t.querySelector('.vibe-grid-views')?.textContent || '').trim(),
-    bg:       t.querySelector('.vibe-grid-bg')?.style.background || '',
-  }));
-  vibeSave('vibe_vibes_v1', vibes);
-}
-
-function renderVibesFromStorage(vibesOverride) {
-  const grid = document.getElementById('profileVibesGrid');
-  const vibes = Array.isArray(vibesOverride) ? vibesOverride : vibeLoad('vibe_vibes_v1');
-  if (!grid || !Array.isArray(vibes)) return;
-  grid.querySelectorAll('.vibe-grid-thumb').forEach(t => t.remove());
-  const uploadTile = grid.querySelector('.vibe-upload-tile');
-  vibes.forEach(v => {
-    const node = _renderVibeThumb(v);
-    if (uploadTile) grid.insertBefore(node, uploadTile);
-    else grid.appendChild(node);
-  });
-}
-
-// Lossless clip-edit metadata helpers — vanilla mirror of
-// src/lib/clip/edit-metadata.ts. Kept inline so the static page
-// doesn't need a separate fetch / import.
-function _clipFilterCss(filter) {
-  if (filter === 'warm')  return 'saturate(1.15) hue-rotate(-8deg) brightness(1.04)';
-  if (filter === 'cool')  return 'saturate(1.1) hue-rotate(8deg) brightness(0.98)';
-  if (filter === 'bw')    return 'grayscale(1) contrast(1.08)';
-  if (filter === 'vivid') return 'saturate(1.55) contrast(1.1)';
-  return '';
-}
-function _renderClipOverlaysHTML(editMeta, fontSize) {
-  if (!editMeta || !Array.isArray(editMeta.text_overlays)) return '';
-  return editMeta.text_overlays.map(o => {
-    const x = Number(o.x) || 50;
-    const y = Number(o.y) || 50;
-    const color = /^#[0-9A-Fa-f]{6}$/.test(o.color) ? o.color : '#FFFFFF';
-    const text = _esc(String(o.text || ''));
-    return `<div aria-hidden style="position:absolute;left:${x}%;top:${y}%;`
-      + `transform:translate(-50%,-50%);color:${color};`
-      + `font-family:'DM Sans',sans-serif;font-weight:800;`
-      + `font-size:${fontSize}px;line-height:1.15;text-align:center;`
-      + `text-shadow:0 1px 2px rgba(0,0,0,.55);max-width:82%;`
-      + `white-space:pre-wrap;word-break:break-word;pointer-events:none;">${text}</div>`;
-  }).join('');
-}
-
-function _renderVibeThumb(v) {
-  const div = document.createElement('div');
-  div.className = 'vibe-grid-thumb';
-  div.dataset.vibeId = v.id || '';
-  div.style.position = 'relative';
-  div.style.overflow = 'hidden';
-  const isPinned = v.id && v.id === profilePinnedId;
-  // Stash edit_metadata on the dataset so the All-tab feed card
-  // (built from the thumb later) can re-render the same effects
-  // without an extra fetch.
-  const editMeta = v.edit_metadata || null;
-  if (editMeta) {
-    try { div.dataset.editMetadata = JSON.stringify(editMeta); } catch {}
-  }
-  const filterCss = editMeta && editMeta.filter ? _clipFilterCss(editMeta.filter) : '';
-  div.innerHTML = `
-    <div class="vibe-grid-bg" style="background:${v.bg || 'linear-gradient(135deg,#1a1a1a,#2a2a2a)'};${filterCss ? `filter:${filterCss};` : ''}"></div>
-    ${_renderClipOverlaysHTML(editMeta, 10)}
-    <div class="vibe-grid-overlay"></div>
-    <div class="vibe-grid-play">&#9654;</div>
-    <div class="vibe-grid-info">
-      <div class="vibe-grid-title">${_esc(v.title || 'Untitled vibe')}</div>
-      <div class="vibe-grid-views">${_esc(v.views || '')}</div>
-    </div>
-    <button class="vibe-pin-btn owner-only" onclick="pinFromProfile('${v.id}',this)" title="Pin to profile"
-      style="position:absolute;top:6px;right:6px;background:${isPinned ? 'var(--charcoal)' : 'rgba(0,0,0,.55)'};color:white;border:none;border-radius:8px;padding:4px 8px;font-size:10px;font-weight:700;cursor:none;backdrop-filter:blur(4px);display:none;">${isPinned ? 'Pinned' : 'Pin'}</button>
-    <button class="vibe-delete-btn owner-only" onclick="deleteVibe(this)" title="Delete vibe"
-      style="position:absolute;top:6px;left:6px;background:rgba(0,0,0,.55);color:white;border:none;border-radius:8px;width:22px;height:22px;font-size:14px;line-height:1;cursor:none;backdrop-filter:blur(4px);display:none;align-items:center;justify-content:center;">&times;</button>
-  `;
-  return div;
-}
-
-// ── Drafts tile + modal (owner-only) ──────────────────────────────
-// Lossless drafts list — same data shape as the mobile composer's
-// Drafts box, just a list view. Editing the clip itself stays on
-// mobile; desktop is view / publish / delete.
-async function loadProfileDrafts() {
-  // Owner only — viewers don't have access to anyone's drafts.
-  const isOwner = document.body.classList.contains('owner-mode')
-    || !document.body.classList.contains('viewer-mode');
-  if (!isOwner) {
-    const existing = document.getElementById('vibesGridDraftsTile');
-    if (existing) existing.remove();
-    return;
-  }
-  try {
-    const r = await fetch('/api/me/clip-drafts', { credentials:'include', cache:'no-store' });
-    const j = await r.json();
-    if (!j || !j.ok || !Array.isArray(j.drafts) || j.drafts.length === 0) {
-      const existing = document.getElementById('vibesGridDraftsTile');
-      if (existing) existing.remove();
-      return;
-    }
-    _renderDraftsTile(j.drafts.length, j.drafts[0]?.media_thumbnail_url || null);
-  } catch { /* silent — tile just doesn't appear */ }
-}
-
-function _renderDraftsTile(count, poster) {
-  const grid = document.getElementById('profileVibesGrid');
-  if (!grid) return;
-  let tile = document.getElementById('vibesGridDraftsTile');
-  if (!tile) {
-    tile = document.createElement('div');
-    tile.id = 'vibesGridDraftsTile';
-    tile.className = 'vibe-grid-thumb drafts-tile owner-only';
-    tile.onclick = () => openDraftsModal();
-    grid.insertBefore(tile, grid.firstChild);
-  }
-  tile.innerHTML = `
-    <div class="vibe-grid-bg" style="background:${poster
-      ? `center/cover no-repeat url(&quot;${poster}&quot;)`
-      : 'linear-gradient(160deg,#2A2A2D 0%,#141416 100%)'}"></div>
-    <div class="drafts-tile-overlay"></div>
-    <div class="drafts-tile-lock">
-      <svg width="11" height="11" viewBox="0 0 10 10" fill="none">
-        <rect x="2" y="4.4" width="6" height="4.2" rx="1" stroke="currentColor" stroke-width="1.1" fill="none"/>
-        <path d="M3.4 4.4V3.2a1.6 1.6 0 1 1 3.2 0v1.2" stroke="currentColor" stroke-width="1.1" fill="none" stroke-linecap="round"/>
-      </svg>
-    </div>
-    <div class="drafts-tile-info">
-      <div class="drafts-tile-title">Drafts</div>
-      <div class="drafts-tile-count">${count} clip${count === 1 ? '' : 's'}</div>
-    </div>
-  `;
-}
-
-async function openDraftsModal() {
-  openModal('draftsModal');
-  const list = document.getElementById('draftsList');
-  if (!list) return;
-  list.innerHTML = '<div class="drafts-empty">Loading drafts…</div>';
-  try {
-    const r = await fetch('/api/me/clip-drafts', { credentials:'include', cache:'no-store' });
-    const j = await r.json();
-    if (!j.ok || !Array.isArray(j.drafts) || j.drafts.length === 0) {
-      list.innerHTML = '<div class="drafts-empty">No drafts yet. Save one from the mobile composer.</div>';
-      return;
-    }
-    list.innerHTML = j.drafts.map(d => {
-      const editMeta = d.edit_metadata || null;
-      const filterCss = editMeta && editMeta.filter ? _clipFilterCss(editMeta.filter) : '';
-      const thumbBg = d.media_thumbnail_url
-        ? `background:center/cover no-repeat url("${d.media_thumbnail_url}");${filterCss ? `filter:${filterCss};` : ''}`
-        : 'background:#1C1C1E;';
-      const overlays = _renderClipOverlaysHTML(editMeta, 7);
-      const caption = _esc((d.content || '').trim() || 'Untitled draft');
-      return `
-        <div class="draft-row" data-draft-id="${d.id}">
-          <div class="draft-row-thumb">
-            <div style="position:absolute;inset:0;${thumbBg}"></div>
-            ${overlays}
-          </div>
-          <div class="draft-row-meta">
-            <div class="draft-row-caption">${caption}</div>
-            <div class="draft-row-time">${_formatRelativeDate(d.created_at)}</div>
-          </div>
-          <div class="draft-row-actions">
-            <button class="draft-row-btn publish" onclick="publishDraftFromList('${d.id}')">Publish</button>
-            <button class="draft-row-btn delete" onclick="deleteDraftFromList('${d.id}')">Delete</button>
-          </div>
-        </div>
-      `;
-    }).join('');
-  } catch {
-    list.innerHTML = '<div class="drafts-empty">Could not load drafts.</div>';
-  }
-}
-
-async function publishDraftFromList(id) {
-  if (!confirm('Publish this draft?')) return;
-  try {
-    const r = await fetch(`/api/posts/${encodeURIComponent(id)}`, {
-      method:'PATCH',
-      headers:{'Content-Type':'application/json'},
-      credentials:'include',
-      body: JSON.stringify({ status: 'published' }),
-    });
-    const j = await r.json();
-    if (!r.ok || !j.ok) throw new Error(j.error || 'Publish failed');
-    if (typeof showToast === 'function') showToast('Draft published');
-    closeModal('draftsModal');
-    if (typeof hydrateProfilePostsFromAPI === 'function') hydrateProfilePostsFromAPI();
-    loadProfileDrafts();
-  } catch {
-    if (typeof showToast === 'function') showToast('Could not publish');
-  }
-}
-
-async function deleteDraftFromList(id) {
-  if (!confirm('Delete this draft? This cannot be undone.')) return;
-  try {
-    const r = await fetch(`/api/posts/${encodeURIComponent(id)}`, {
-      method:'DELETE',
-      credentials:'include',
-    });
-    const j = await r.json();
-    if (!r.ok || !j.ok) throw new Error(j.error || 'Delete failed');
-    openDraftsModal();
-    loadProfileDrafts();
-  } catch {
-    if (typeof showToast === 'function') showToast('Could not delete');
-  }
-}
-
-function deleteVibe(btn) {
-  const thumb = btn.closest('.vibe-grid-thumb');
-  if (!thumb) return;
-  const id = thumb.dataset.vibeId;
-  thumb.remove();
-  if (id && id === profilePinnedId) {
-    profilePinnedId = null;
-    const pinnedEl = document.getElementById('pinnedItem');
-    const contentEl = document.getElementById('pinnedContent');
-    if (pinnedEl) pinnedEl.classList.remove('has-pin');
-    if (contentEl) contentEl.innerHTML = '';
-  }
-  saveVibesToStorage();
-  saveProfileToStorage();
-  if (typeof populateAllGrid === 'function') populateAllGrid();
-  if (typeof showToast === 'function') showToast('Clip removed');
-}
-
-// ── Clip upload pipeline (P1-017) ──────────────────────────────────
-// Browser → R2 direct (signed PUT) → poster frame → /api/me/publish-clip.
-// DB stores the R2 object key (per src/lib/r2.ts comment); the viewer
-// modal (P1-016) will resolve a fresh signed GET URL on demand.
-
-const CLIP_MAX_BYTES   = 200 * 1024 * 1024;
-const CLIP_MAX_SECONDS = 120;
-const CLIP_PALETTES = [
-  'linear-gradient(135deg,#1a0533,#2d1b4e)',
-  'linear-gradient(135deg,#001a2c,#0a2a3e)',
-  'linear-gradient(135deg,#1a1a00,#2a2800)',
-  'linear-gradient(135deg,#1a0008,#2a000f)',
-  'linear-gradient(135deg,#001a18,#0a2a26)',
-  'linear-gradient(135deg,#2a0033,#440055)',
-];
-
-// Deterministic palette pick from a clip id — same id always paints the
-// same gradient so a clip without a poster looks consistent across page
-// loads (and across viewer / owner views). Mirrors the React-side
-// `clipFallbackGradient` in campus-home.tsx.
-function _clipFallbackGradient(id) {
-  if (!id) return CLIP_PALETTES[0];
-  let h = 0;
-  for (let i = 0; i < id.length; i++) {
-    h = (h * 31 + id.charCodeAt(i)) | 0;
-  }
-  return CLIP_PALETTES[Math.abs(h) % CLIP_PALETTES.length];
-}
-
-function composerChooseClipFile() {
-  const inp = document.getElementById('composerClipFile');
-  if (inp) inp.click();
-}
-
-function _setClipStatus(msg) {
-  const el = document.getElementById('composerClipStatus');
-  if (el) el.textContent = msg || '';
-}
-
-// PUT a file to R2 with upload progress (fetch doesn't expose
-// XHR-style upload events). 5-min timeout — long enough for ~200MB on
-// slow connections, short enough to surface a stalled upload instead of
-// hanging forever. Resolves on 2xx, rejects with a specific message
-// otherwise so the user sees what actually failed.
-function _putToR2WithProgress(uploadUrl, file, contentType, onProgress) {
-  return new Promise((resolve, reject) => {
-    const xhr = new XMLHttpRequest();
-    xhr.open('PUT', uploadUrl);
-    xhr.setRequestHeader('Content-Type', contentType);
-    xhr.timeout = 5 * 60 * 1000; // 5 minutes
-    xhr.upload.onprogress = (ev) => {
-      if (ev.lengthComputable && typeof onProgress === 'function') {
-        onProgress(Math.min(99, Math.round((ev.loaded / ev.total) * 100)));
-      }
-    };
-    xhr.ontimeout = () => reject(new Error('Upload timed out — try a smaller file or check your connection'));
-    xhr.onerror   = () => reject(new Error('Network error during upload'));
-    xhr.onabort   = () => reject(new Error('Upload cancelled'));
-    xhr.onload = () => {
-      if (xhr.status >= 200 && xhr.status < 300) resolve();
-      else reject(new Error('R2 upload failed (' + xhr.status + ' ' + (xhr.statusText || '') + ')'));
-    };
-    xhr.send(file);
-  });
-}
-
-// Pull the first frame of the video as a JPEG blob via canvas. Best-effort:
-// if metadata never resolves or the format isn't decodable in-browser,
-// the clip still ships with a gradient fallback in the grid.
-function _capturePosterFrame(file) {
-  return new Promise((resolve) => {
-    const url = URL.createObjectURL(file);
-    const v = document.createElement('video');
-    v.muted = true;
-    v.preload = 'metadata';
-    v.playsInline = true;
-    v.crossOrigin = 'anonymous';
-    let done = false;
-    const finish = (blob, duration) => {
-      if (done) return;
-      done = true;
-      try { URL.revokeObjectURL(url); } catch {}
-      resolve({ blob, duration });
-    };
-    v.onloadedmetadata = () => {
-      const dur = isFinite(v.duration) ? v.duration : null;
-      try { v.currentTime = Math.min(0.1, (dur || 1) - 0.05); } catch { finish(null, dur); }
-    };
-    v.onseeked = () => {
-      try {
-        const c = document.createElement('canvas');
-        const w = v.videoWidth || 720;
-        const h = v.videoHeight || 720;
-        // Square crop — matches the IG-style 1:1 grid
-        const side = Math.min(w, h);
-        c.width = c.height = Math.min(720, side);
-        const ctx = c.getContext('2d');
-        const sx = (w - side) / 2;
-        const sy = (h - side) / 2;
-        ctx.drawImage(v, sx, sy, side, side, 0, 0, c.width, c.height);
-        c.toBlob(b => finish(b, isFinite(v.duration) ? v.duration : null), 'image/jpeg', 0.82);
-      } catch {
-        finish(null, isFinite(v.duration) ? v.duration : null);
-      }
-    };
-    v.onerror = () => finish(null, null);
-    setTimeout(() => finish(null, null), 8000); // give up after 8s
-    v.src = url;
-  });
-}
-
-// Two-phase clip flow:
-//   Phase A — composerOnClipPicked: validate → sign URL → upload to R2 →
-//             capture poster → upload poster → stash everything in
-//             _pendingClip and show preview. Nothing is committed yet.
-//   Phase B — publishProfilePost: when the user clicks Publish, send the
-//             stashed object_key + current caption + tags to publish-clip.
-// This stops the "I just picked a file and it auto-posted" UX bug.
-
-let _pendingClip = null;
-// Shape: { objectKey, posterUrl, posterBlobUrl, duration, sizeBytes }
-
-function composerHasPendingClip() { return !!_pendingClip; }
-
-function composerClearClip() {
-  if (_pendingClip && _pendingClip.posterBlobUrl) {
-    try { URL.revokeObjectURL(_pendingClip.posterBlobUrl); } catch {}
-  }
-  _pendingClip = null;
-  const preview = document.getElementById('composerClipPreview');
-  const img = document.getElementById('composerClipPreviewImg');
-  const label = document.getElementById('composerClipPreviewLabel');
-  if (img) img.src = '';
-  if (label) label.textContent = '';
-  if (preview) preview.style.display = 'none';
-  // Re-show the picker zone so the user can swap clips.
-  const zone = document.getElementById('vibe-comp-zone');
-  if (zone) zone.style.display = '';
-}
-
-async function composerOnClipPicked(input) {
-  const file = input && input.files && input.files[0];
-  input.value = '';
-  if (!file) return;
-
-  if (!_isAppShell()) {
-    showToast('Sign in to upload clips');
-    return;
-  }
-  if (file.size > CLIP_MAX_BYTES) {
-    showToast(`Clip too large — max ${CLIP_MAX_BYTES / (1024 * 1024)}MB`);
-    return;
-  }
-  const ct = (file.type || '').toLowerCase();
-  if (!['video/mp4', 'video/quicktime', 'video/webm'].includes(ct)) {
-    showToast('MP4, MOV, or WEBM only');
-    return;
-  }
-
-  _setClipStatus('Preparing upload…');
-  try {
-    // 1. Signed PUT URL
-    const sigRes = await fetch('/api/me/clip-upload-url', {
-      method: 'POST',
-      credentials: 'include',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ contentType: ct, sizeBytes: file.size }),
-    });
-    const sig = await sigRes.json().catch(() => ({}));
-    if (!sigRes.ok || !sig.ok || !sig.uploadUrl || !sig.objectKey) {
-      throw new Error((sig && sig.error) || 'Could not get upload URL');
-    }
-
-    // 2. Direct PUT to R2 with progress
-    const sizeMB = (file.size / (1024 * 1024)).toFixed(0);
-    _setClipStatus(`Uploading to storage… 0% (${sizeMB}MB)`);
-    await _putToR2WithProgress(sig.uploadUrl, file, ct, (pct) => {
-      _setClipStatus(`Uploading to storage… ${pct}% (${sizeMB}MB)`);
-    });
-
-    // 3. Poster frame (best-effort)
-    _setClipStatus('Capturing thumbnail…');
-    const { blob: posterBlob, duration } = await _capturePosterFrame(file);
-    if (duration && duration > CLIP_MAX_SECONDS + 1) {
-      throw new Error(`Clip exceeds ${CLIP_MAX_SECONDS}s — please trim it`);
-    }
-    let posterUrl = '';
-    let posterBlobUrl = '';
-    if (posterBlob) {
-      // Preview uses the local blob immediately (no roundtrip), then we
-      // upload the blob to Supabase so the published row has a public URL.
-      posterBlobUrl = URL.createObjectURL(posterBlob);
-      const fd = new FormData();
-      fd.append('file', new File([posterBlob], 'poster.jpg', { type: 'image/jpeg' }));
-      fd.append('kind', 'poster');
-      const pRes = await fetch('/api/me/profile-upload', { method: 'POST', credentials: 'include', body: fd });
-      const pJson = await pRes.json().catch(() => ({}));
-      if (pRes.ok && pJson.ok && pJson.url) posterUrl = pJson.url;
-    }
-
-    // 4. Stash + show preview. Publish waits for the user to click Publish.
-    _pendingClip = {
-      objectKey: sig.objectKey,
-      posterUrl,
-      posterBlobUrl,
-      duration: duration || null,
-      sizeBytes: file.size,
-    };
-    const preview = document.getElementById('composerClipPreview');
-    const img = document.getElementById('composerClipPreviewImg');
-    const label = document.getElementById('composerClipPreviewLabel');
-    if (img) img.src = posterBlobUrl || posterUrl || '';
-    if (label) label.textContent = duration ? `Clip · ${_formatDuration(duration)}` : 'Clip';
-    if (preview) preview.style.display = 'block';
-    // Hide the picker zone — the preview takes its place until clear.
-    const zone = document.getElementById('vibe-comp-zone');
-    if (zone) zone.style.display = 'none';
-
-    _setClipStatus('Ready — write a caption and hit Publish');
-    showToast('Clip uploaded — add a caption, then Publish');
-  } catch (e) {
-    composerClearClip();
-    showToast(e && e.message ? e.message : 'Upload failed');
-  } finally {
-    // Status clears on next state change (publish or new pick).
-    if (!_pendingClip) _setClipStatus('');
-  }
-}
-
-// Phase B — called from publishProfilePost when _pendingClip is set.
-async function _publishPendingClip(caption) {
-  if (!_pendingClip) return;
-  const c = _pendingClip;
-  const r = await fetch('/api/me/publish-clip', {
-    method: 'POST', credentials: 'include',
-    headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify({
-      object_key:   c.objectKey,
-      content:      caption,
-      tags:         _extractHashtags(caption),
-      poster_url:   c.posterUrl || undefined,
-      duration_sec: c.duration  || undefined,
-    }),
-  });
-  const j = await r.json().catch(() => ({}));
-  if (!r.ok || !j.ok || !j.post) throw new Error((j && j.error) || 'Publish failed');
-
-  // Local DOM update — keep grid feeling instant
-  const grid = document.getElementById('profileVibesGrid');
-  if (grid) {
-    const node = _renderVibeThumb({
-      id:    j.post.id,
-      title: caption || 'New clip',
-      views: c.duration ? `0 views · ${_formatDuration(c.duration)}` : '0 views · 0:00',
-      bg:    c.posterUrl
-        ? `center/cover no-repeat url("${c.posterUrl}")`
-        : CLIP_PALETTES[Math.floor(Math.random() * CLIP_PALETTES.length)],
-    });
-    const uploadTile = grid.querySelector('.vibe-upload-tile');
-    if (uploadTile) grid.insertBefore(node, uploadTile);
-    else grid.appendChild(node);
-    saveVibesToStorage();
-  }
-  composerClearClip();
-  if (typeof populateAllGrid === 'function') populateAllGrid();
-  if (typeof refreshPinButtons === 'function') refreshPinButtons();
-  showToast('Clip published');
-}
-
-function _formatDuration(sec) {
-  const s = Math.max(0, Math.round(sec));
-  return Math.floor(s / 60) + ':' + String(s % 60).padStart(2, '0');
-}
-
-// Upload-tile click → routes through the same real upload pipeline.
-// Demo Maya / mock-user views still get the placeholder behavior so the
-// static prototype stays clickable without a Supabase session.
-function addVibeFromUpload() {
-  if (_isAppShell()) {
-    composerChooseClipFile();
-    return;
-  }
-  if (!editMode) {
-    if (typeof showToast === 'function') showToast('Enter edit mode to add a vibe');
-    return;
-  }
-  const grid = document.getElementById('profileVibesGrid');
-  if (!grid) return;
-  const node = _renderVibeThumb({
-    id:    'v' + Date.now() + Math.random().toString(36).slice(2,5),
-    title: 'New vibe',
-    views: '0 views · 0:00',
-    bg:    CLIP_PALETTES[Math.floor(Math.random() * CLIP_PALETTES.length)],
-  });
-  const uploadTile = grid.querySelector('.vibe-upload-tile');
-  if (uploadTile) grid.insertBefore(node, uploadTile);
-  else grid.appendChild(node);
-  saveVibesToStorage();
-  if (typeof populateAllGrid === 'function') populateAllGrid();
-  if (typeof refreshPinButtons === 'function') refreshPinButtons();
-  if (typeof showToast === 'function') showToast('Clip added — click to edit');
 }
 
 // ── Hydrate persisted sections from vibe_user_v1 ─────────────────────────
@@ -9363,20 +8353,17 @@ function renderUserSections(user) {
     if (sg && typeof user.counts.following === 'string')   sg.textContent = user.counts.following;
   }
 
-  // Posts and vibes — if the user object carries inline arrays (mock users
-  // for viewer-mode), render those. Otherwise load from vibe_posts_v1 /
-  // vibe_vibes_v1. These no-op when neither source has data, keeping Maya's
-  // hardcoded markup intact until she edits/publishes/deletes something.
+  // Posts — if the user object carries an inline array (mock users for
+  // viewer-mode), render that. Otherwise load from vibe_posts_v1. No-ops
+  // when neither source has data, keeping Maya's hardcoded markup intact
+  // until she edits/publishes/deletes something.
   if (typeof renderPostsFromStorage === 'function') {
     renderPostsFromStorage(Array.isArray(user.posts) ? user.posts : undefined);
   }
-  if (typeof renderVibesFromStorage === 'function') {
-    renderVibesFromStorage(Array.isArray(user.vibes) ? user.vibes : undefined);
-  }
-  // Repopulate the All-tab grid after clips and posts have hydrated (P1-011).
+  // Repopulate the All-tab feed after posts have hydrated (P1-011).
   if (typeof populateAllGrid === 'function') populateAllGrid();
 
-  // Re-pin saved item once posts and vibes are rendered. Server-sourced
+  // Re-pin saved item once posts are rendered. Server-sourced
   // pinnedPostId (from the bootstrap) wins over the localStorage
   // pinnedId so logging back in restores the right pin.
   const restoreId = user.pinnedPostId || user.pinnedId;
@@ -9440,9 +8427,6 @@ function clearFreshUserExtras() {
   // during the viewer-mode pass, likely deriving from user.snapshot.topSkills.
   const relevantStrip = document.getElementById('relevantSkillsStrip');
   if (relevantStrip) relevantStrip.style.display = 'none';
-
-  // ── Vibes grid (the 4 hardcoded thumbnails) ──────────────────────────
-  document.querySelectorAll('.vibe-grid-thumb').forEach(t => t.remove());
 
   // ── Posts (all 3 hardcoded post cards in main posts pane + split pane)
   document.querySelectorAll('.profile-post-card').forEach(p => p.remove());
@@ -10399,7 +9383,7 @@ function showWelcomeBanner() {
         {
           selector: '.profile-composer',
           title: 'Drop your <span class="accent">first post</span>.',
-          body: "Type something, throw on a #hashtag, or switch to Clip for a quick video. Otto will keep it in front of the right people.",
+          body: "Type something, throw on a #hashtag, or attach a photo. Otto will keep it in front of the right people.",
           endLabel: 'Take me to campus →',
         },
       ], {

@@ -93,8 +93,8 @@ export async function GET(_req: Request, { params }: Params) {
     media_url: postMediaProxyUrl(p.id, p.media_url, "media"),
     media_thumbnail_url: postMediaProxyUrl(p.id, p.media_thumbnail_url, "thumbnail"),
   }));
+  // Clips are backlogged — only `type='post'` rows surface on org profiles.
   const postRows = signedAll.filter((p) => p.type === "post").slice(0, 12);
-  const clipRows = signedAll.filter((p) => p.type === "clip").slice(0, 12);
 
   return NextResponse.json({
     ok: true,
@@ -106,6 +106,5 @@ export async function GET(_req: Request, { params }: Params) {
     },
     viewer: { role: viewerRole, pending_request: pendingRequest },
     posts: postRows,
-    clips: clipRows,
   });
 }

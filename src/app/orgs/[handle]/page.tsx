@@ -54,7 +54,7 @@ type OrgProfile = {
 
 type PostRow = {
   id: string;
-  type: "post" | "clip";
+  type: "post";
   content: string;
   media_url: string | null;
   media_thumbnail_url: string | null;
@@ -154,15 +154,17 @@ export default async function OrgProfilePage({ params }: Params) {
     }
   }
 
-  // Recent posts + clips. Always fetched (even for private orgs) — the
-  // public profile is meant to give visitors the context they need to
-  // decide whether to request access. Channel content stays gated by RLS.
+  // Recent posts. Always fetched (even for private orgs) — the public
+  // profile is meant to give visitors the context they need to decide
+  // whether to request access. Channel content stays gated by RLS.
+  // Clips are backlogged, so `type='clip'` rows are filtered out.
   const { data: postsData } = await service
     .from("posts")
     .select(
       "id, type, content, media_url, media_thumbnail_url, created_at, user:user_id(id, handle, name, avatar_url)"
     )
     .eq("org_id", org.id)
+    .eq("type", "post")
     .order("created_at", { ascending: false })
     .limit(24);
   const allPostRows = ((postsData || []) as unknown as PostRow[]).map((p) => ({
@@ -170,8 +172,7 @@ export default async function OrgProfilePage({ params }: Params) {
     media_url: postMediaProxyUrl(p.id, p.media_url, "media"),
     media_thumbnail_url: postMediaProxyUrl(p.id, p.media_thumbnail_url, "thumbnail"),
   }));
-  const posts: PostRow[] = allPostRows.filter((p) => p.type === "post").slice(0, 12);
-  const clips: PostRow[] = allPostRows.filter((p) => p.type === "clip").slice(0, 12);
+  const posts: PostRow[] = allPostRows.slice(0, 12);
 
   const backdrop =
     BACKDROP_PRESETS[org.backdrop_preset] ?? BACKDROP_PRESETS["sand-purple"];
@@ -213,7 +214,7 @@ export default async function OrgProfilePage({ params }: Params) {
         </Header>
 
         {/* Private orgs gate channel content, not the public profile.
-            Description, posts, clips, links, and philanthropy all show so a
+            Description, posts, links, and philanthropy all show so a
             visitor can decide whether to request access. */}
         {!org.is_public ? <PrivateOrgNotice /> : null}
         {org.description ? <Description text={org.description} /> : null}
@@ -221,9 +222,11 @@ export default async function OrgProfilePage({ params }: Params) {
         <OrgContent
           mainColumn={
             <>
-              {clips.length > 0 ? <ClipsSection clips={clips} /> : null}
-              {posts.length > 0 ? <PostsSection posts={posts} org={org} /> : null}
-              {clips.length === 0 && posts.length === 0 ? <EmptyContent /> : null}
+              {posts.length > 0 ? (
+                <PostsSection posts={posts} org={org} />
+              ) : (
+                <EmptyContent />
+              )}
             </>
           }
           eventsColumn={
@@ -624,57 +627,6 @@ function PrivateOrgNotice() {
         the chat.
       </div>
     </div>
-  );
-}
-
-function ClipsSection({ clips }: { clips: PostRow[] }) {
-  return (
-    <SectionCard title="Recent clips">
-      <div
-        style={{
-          display: "grid",
-          gridTemplateColumns: "repeat(auto-fill, minmax(120px, 1fr))",
-          gap: 8,
-        }}
-      >
-        {clips.map((c) => (
-          <div
-            key={c.id}
-            style={{
-              aspectRatio: "9 / 16",
-              borderRadius: 10,
-              background: c.media_thumbnail_url
-                ? `url(${c.media_thumbnail_url}) center/cover`
-                : "rgba(255,255,255,0.08)",
-              border: "1px solid rgba(255,255,255,0.1)",
-              position: "relative",
-              overflow: "hidden",
-            }}
-          >
-            <div
-              aria-hidden
-              style={{
-                position: "absolute",
-                inset: 0,
-                background: "linear-gradient(180deg, rgba(0,0,0,0) 50%, rgba(0,0,0,0.55) 100%)",
-              }}
-            />
-            <div
-              style={{
-                position: "absolute",
-                left: 8,
-                bottom: 6,
-                fontSize: 11,
-                color: "#fff",
-                opacity: 0.85,
-              }}
-            >
-              {c.user?.handle ? `@${c.user.handle}` : null}
-            </div>
-          </div>
-        ))}
-      </div>
-    </SectionCard>
   );
 }
 

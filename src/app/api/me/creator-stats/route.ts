@@ -4,7 +4,7 @@ import { createSupabaseServerClient } from "@/lib/supabase/server";
 
 /**
  * GET /api/me/creator-stats — aggregate engagement across the viewer's
- * own posts + clips. Three buckets per metric: last 7 days, last 30 days,
+ * own posts. Three buckets per metric: last 7 days, last 30 days,
  * all-time.
  *
  * Computed live on each call (no materialized rollup table yet). For a
@@ -14,7 +14,7 @@ import { createSupabaseServerClient } from "@/lib/supabase/server";
  *
  * Returns:
  *   {
- *     totals: { posts, clips, views, likes, comments, reposts },
+ *     totals: { posts, views, likes, comments, reposts },
  *     by_window: {
  *       seven_days:  { views, likes, comments, reposts },
  *       thirty_days: { views, likes, comments, reposts },
@@ -42,12 +42,13 @@ export async function GET() {
   const sevenAgoDate = sevenAgo.slice(0, 10);
   const thirtyAgoDate = thirtyAgo.slice(0, 10);
 
-  // 1. All of the viewer's posts + their denormalized view_count.
-  //    type='post' vs type='clip' are the two creator surfaces today.
+  // 1. All of the viewer's posts + their denormalized view_count. Clips are
+  //    backlogged, so `type='post'` is the only creator surface today.
   const postsRes = await supabase
     .from("posts")
     .select("id,type,content,view_count,created_at")
     .eq("user_id", user.id)
+    .eq("type", "post")
     .order("view_count", { ascending: false });
 
   if (postsRes.error) {
@@ -64,14 +65,13 @@ export async function GET() {
   };
   const posts = (postsRes.data ?? []) as PostRow[];
   const postIds = posts.map((p) => p.id);
-  const postCount = posts.filter((p) => p.type === "post" || p.type === "post-video").length;
-  const clipCount = posts.filter((p) => p.type === "clip").length;
+  const postCount = posts.length;
   const allTimeViews = posts.reduce((acc, p) => acc + (p.view_count ?? 0), 0);
 
   if (postIds.length === 0) {
     return NextResponse.json({
       ok: true,
-      totals: { posts: 0, clips: 0, views: 0, likes: 0, comments: 0, reposts: 0 },
+      totals: { posts: 0, views: 0, likes: 0, comments: 0, reposts: 0 },
       by_window: {
         seven_days: { views: 0, likes: 0, comments: 0, reposts: 0 },
         thirty_days: { views: 0, likes: 0, comments: 0, reposts: 0 },
@@ -155,7 +155,6 @@ export async function GET() {
     ok: true,
     totals: {
       posts: postCount,
-      clips: clipCount,
       views: allTimeViews,
       likes: likesAllRes.count ?? 0,
       comments: commentsAllRes.count ?? 0,
