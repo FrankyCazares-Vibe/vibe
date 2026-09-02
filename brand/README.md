@@ -34,8 +34,9 @@ No decorative emoji in UI chrome.
 
 ## The mark
 
-`vibe/logo.png` — V in an incomplete orange orbit, orange node at 4 o'clock.
-White rounded square. That's the app icon (`src/app/icon.png`, `apple-icon.png`).
+`vibe/vibe-icon.svg` — V in an incomplete orange orbit, orange node at 4 o'clock.
+That's the canonical mark. The app serves it as `/vibe-icon.svg` (tab icon);
+PNG/ICO fallbacks are rasterized from this file.
 
 Wordmark in product UI is still lowercase **vibe.** in Fraunces, charcoal, with
 the orange period. Don't replace that with the V-mark on in-app headers.

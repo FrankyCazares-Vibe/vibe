@@ -10,6 +10,13 @@ const jetbrainsMono = JetBrains_Mono({subsets:['latin'],variable:'--font-mono'})
 export const metadata: Metadata = {
   title: "Vibe",
   description: "Your campus, your career, one profile.",
+  icons: {
+    icon: [
+      { url: "/vibe-icon.svg", type: "image/svg+xml" },
+      { url: "/favicon.ico", sizes: "32x32" },
+    ],
+    apple: "/apple-icon.png",
+  },
 };
 
 export const viewport: Viewport = {
