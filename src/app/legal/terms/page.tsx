@@ -155,10 +155,10 @@ export default function TermsPage() {
       <LegalP>
         Questions or notices about these Terms? Email us at{" "}
         <a
-          href="mailto:hello@vibe-app.vercel.app"
+          href="mailto:hello@connectvibe.app"
           style={{ color: "#FF5C35", fontWeight: 700, textDecoration: "none" }}
         >
-          hello@vibe-app.vercel.app
+          hello@connectvibe.app
         </a>
         .
       </LegalP>

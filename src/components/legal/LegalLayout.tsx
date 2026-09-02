@@ -110,7 +110,7 @@ export function LegalLayout({
           </Link>
           <span style={{ margin: "0 8px" }}>·</span>
           <a
-            href="mailto:hello@vibe-app.vercel.app"
+            href="mailto:hello@connectvibe.app"
             style={{ color: "#5C5853", fontWeight: 700, textDecoration: "none" }}
           >
             Contact

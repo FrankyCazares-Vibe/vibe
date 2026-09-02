@@ -6,23 +6,25 @@ Public URLs, dashboards, and entry points for Vibe.
 
 ## Production site
 
-- **Main URL:** https://vibe-mocha-iota.vercel.app
-- **Product journal:** https://vibe-mocha-iota.vercel.app/journal/vibe_journal.html
-- **Custom domain:** TBD — see local `DOCS/PHASE_1.md` ticket P1-034 (candidates: `getvibe.app`, `vibe.cc`, `joinvibe.app`, `vibe.so`, `withvibe.com`)
+- **Canonical URL:** https://www.connectvibe.app
+- **Apex:** https://connectvibe.app → 301 to `www`
+- **Vercel alias (don't share this):** https://vibe-mocha-iota.vercel.app
+- **Product journal:** https://www.connectvibe.app/journal/vibe_journal.html
 
 ## Demo entry points (for James + Rylan to share)
 
-- **Landing → View demo:** https://vibe-mocha-iota.vercel.app/ — no signup required, lands on full Maya demo experience
-- **Landing → Create profile:** https://vibe-mocha-iota.vercel.app/ — fresh-onboarded flow with empty states
-- **Direct page links** (cleaner URLs ship later in Phase 1):
-  - Feed: https://vibe-mocha-iota.vercel.app/html/feed.html
-  - Profile: https://vibe-mocha-iota.vercel.app/html/profile.html
-  - Otto: https://vibe-mocha-iota.vercel.app/html/otto.html
-  - Campus: https://vibe-mocha-iota.vercel.app/html/campus.html
-  - Network: https://vibe-mocha-iota.vercel.app/html/network.html
-  - Messages: https://vibe-mocha-iota.vercel.app/html/messages.html
-  - Opportunities: https://vibe-mocha-iota.vercel.app/html/opportunities.html
-  - Onboarding: https://vibe-mocha-iota.vercel.app/html/onboarding.html
+Share `https://www.connectvibe.app` — landing, login, and onboarding all live there.
+
+Direct routes (signed-in):
+
+- Campus: https://www.connectvibe.app/campus
+- Profile: https://www.connectvibe.app/profile
+- Network: https://www.connectvibe.app/network
+- Messages: https://www.connectvibe.app/messages
+- Otto: https://www.connectvibe.app/otto
+- Onboarding: https://www.connectvibe.app/onboarding
+
+Legacy static HTML under `/html/*.html` still exists for prototypes; do not send testers there.
 
 ## Repository
 
@@ -30,21 +32,22 @@ Public URLs, dashboards, and entry points for Vibe.
 - **Default branch:** `main`
 - **Auto-deploy:** every push to `main` triggers a Vercel production deploy
 - **Account owner:** FrankyCazares-Vibe (separate from any personal GitHub)
+- **Clips restore tag:** `clips-before-backlog` (`a0734fc`) — see local `DOCS/BACKLOG_CLIPS.md`
 
 ## Vercel dashboards (Franky only)
 
 - **Project home:** https://vercel.com/fracazar-1988s-projects/vibe
 - **Deployments list:** https://vercel.com/fracazar-1988s-projects/vibe/deployments
 - **Git settings:** https://vercel.com/fracazar-1988s-projects/vibe/settings/git
-- **Environment variables:** https://vercel.com/fracazar-1988s-projects/vibe/settings/environment-variables (where Supabase + R2 + Resend + Sentry keys will live)
+- **Environment variables:** https://vercel.com/fracazar-1988s-projects/vibe/settings/environment-variables
 
-## Future external services (to be added in Phase 1)
+## External services
 
-- **Supabase project dashboard:** TBD — add link once project is created
-- **Cloudflare R2 dashboard:** TBD — add link once bucket is created
-- **Resend dashboard:** TBD — add link once account exists
-- **Sentry project:** TBD — add link once wired
+- **Supabase:** dashboard for the linked project (Auth, SQL, Storage). Was paused over an unpaid Pro invoice May 2026; resumed Session 49. Health: `/api/health/supabase`, `/api/health/auth`
+- **Cloudflare R2:** post-video objects under the legacy `clips/` prefix. Health: `/api/health/r2`
+- **Resend:** transactional email. Health: `/api/health/resend`. Custom SMTP for Supabase Confirm email is still TBD.
+- **Sentry:** error monitoring. Health: `/api/health/sentry`
 
 ---
 
-_Last updated: 2026-04-30 (Session 27)_
+_Last updated: 2026-09-02 (Session 49)_

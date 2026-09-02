@@ -78,7 +78,7 @@ Signed in, on `/profile` (the HTML bridge).
 ## 6. Post-deploy smoke (production only)
 
 - [ ] Build is green in Vercel.
-- [ ] `https://vibe-mocha-iota.vercel.app/` loads the React landing.
+- [ ] `https://www.connectvibe.app/` loads the React landing.
 - [ ] Run §1 + §3 against production.
 - [ ] Verify Sentry (when wired) records no spike of new errors in the 5 minutes after promotion.
 

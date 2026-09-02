@@ -120,10 +120,10 @@ export default function PrivacyPage() {
         <li>
           <strong>Export.</strong> Email{" "}
           <a
-            href="mailto:hello@vibe-app.vercel.app"
+            href="mailto:hello@connectvibe.app"
             style={{ color: "#FF5C35", fontWeight: 700, textDecoration: "none" }}
           >
-            hello@vibe-app.vercel.app
+            hello@connectvibe.app
           </a>{" "}
           and we&apos;ll send you a copy of the personal data we hold on you.
         </li>
@@ -175,10 +175,10 @@ export default function PrivacyPage() {
       <LegalP>
         Questions about your privacy? Email us at{" "}
         <a
-          href="mailto:hello@vibe-app.vercel.app"
+          href="mailto:hello@connectvibe.app"
           style={{ color: "#FF5C35", fontWeight: 700, textDecoration: "none" }}
         >
-          hello@vibe-app.vercel.app
+          hello@connectvibe.app
         </a>
         .
       </LegalP>
