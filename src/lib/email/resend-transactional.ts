@@ -1,3 +1,4 @@
+import "server-only";
 import { createResendClient } from "@/lib/resend";
 import { getSiteUrl } from "@/lib/auth/site-url";
 

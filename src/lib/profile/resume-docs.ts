@@ -37,13 +37,15 @@ export function sanitizeResumeDocs(input: unknown): ResumeDocRow[] {
     try {
       const u = new URL(rawUrl);
       if (u.protocol !== "https:" && u.protocol !== "http:") continue;
-      url = rawUrl.slice(0, MAX_URL_LEN);
+      // Store the normalized form so quotes/angle brackets in a crafted URL
+      // are percent-encoded before they can reach an HTML attribute.
+      url = u.href.slice(0, MAX_URL_LEN);
     } catch {
       continue;
     }
     const name =
       typeof o.name === "string" && o.name.trim()
-        ? o.name.trim().slice(0, MAX_NAME_LEN)
+        ? o.name.trim().replace(/[<>"'&]/g, "").slice(0, MAX_NAME_LEN)
         : "Resume";
     const tRaw =
       typeof o.type === "string" ? o.type.trim().toLowerCase() : "";

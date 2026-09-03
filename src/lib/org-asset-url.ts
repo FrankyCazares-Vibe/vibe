@@ -50,7 +50,6 @@ export function isSupabaseHttpsUrl(url: string): boolean {
   }
   if (parsed.protocol !== "https:") return false;
   const host = parsed.hostname.toLowerCase();
-  if (host.endsWith(".supabase.co")) return true;
   const own = supabaseHost();
   return own !== null && host === own;
 }

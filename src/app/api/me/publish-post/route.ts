@@ -5,6 +5,7 @@ import {
   insertMentionNotifications,
   resolveMentionedUserIds,
 } from "@/lib/mentions";
+import { isSupabaseHttpsUrl } from "@/lib/org-asset-url";
 import { CLIP_KEY_PREFIX } from "@/lib/r2";
 import { rateLimit, tooManyRequests } from "@/lib/rate-limit";
 import { createSupabaseServerClient } from "@/lib/supabase/server";
@@ -41,7 +42,7 @@ function isOwnedMediaRef(value: string, userId: string): boolean {
   }
   try {
     const u = new URL(value);
-    return u.protocol === "https:";
+    return u.protocol === "https:" && isSupabaseHttpsUrl(value);
   } catch {
     return false;
   }

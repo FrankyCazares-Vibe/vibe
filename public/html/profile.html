@@ -5223,10 +5223,10 @@ function renderDocViewer() {
       <div class="doc-page-thumb ${active}" onclick="setActiveDoc(${idx})" style="position:relative">
         ${removeBtn}
         <div class="doc-page-thumb-imagewrap">
-          <img src="${firstPage}" alt="${doc.name}" draggable="false">
+          <img src="${_esc(firstPage)}" alt="${_esc(doc.name)}" draggable="false">
           ${thumbBars}
         </div>
-        <div class="doc-page-thumb-label" title="${doc.name.replace(/"/g, '&quot;')}">${doc.name}</div>
+        <div class="doc-page-thumb-label" title="${_esc(doc.name)}">${_esc(doc.name)}</div>
       </div>`;
   }).join('');
 
@@ -5256,7 +5256,7 @@ function renderDocViewer() {
       const pageNumber = i + 1;
       const badge = numPages > 1 ? `<div class="doc-page-number">${pageNumber} / ${numPages}</div>` : '';
       return `<div class="doc-page-wrap" data-page="${pageNumber}">
-        <img src="${src}" alt="${doc.name} page ${pageNumber}" draggable="false">
+        <img src="${_esc(src)}" alt="${_esc(doc.name)} page ${pageNumber}" draggable="false">
         ${badge}
       </div>`;
     }).join('');

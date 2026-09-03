@@ -6,6 +6,7 @@ import {
   signClipGetUrl,
   signOrgAssetGetUrl,
 } from "@/lib/r2";
+import { isSupabaseHttpsUrl } from "@/lib/org-asset-url";
 import { createSupabaseServiceClient } from "@/lib/supabase/service";
 
 type Params = { params: Promise<{ id: string }> };
@@ -51,6 +52,11 @@ export async function GET(req: Request, { params }: Params) {
 
   // Pre-existing http(s) URLs pass through unchanged.
   if (stored.startsWith("http://") || stored.startsWith("https://")) {
+    // Only our own Supabase Storage host — anything else would make this
+    // endpoint an open redirect on the app domain.
+    if (!isSupabaseHttpsUrl(stored)) {
+      return NextResponse.json({ ok: false, error: "Unrecognized media" }, { status: 404 });
+    }
     return NextResponse.redirect(stored, 307);
   }
 
