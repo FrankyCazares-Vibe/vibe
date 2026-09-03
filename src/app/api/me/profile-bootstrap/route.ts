@@ -4,6 +4,7 @@ import { getCountsFor } from "@/lib/connections/queries";
 import { buildVibeUserV1FromProfile } from "@/lib/profile/build-vibe-user-v1";
 import { normalizeProfileView } from "@/lib/profile/normalize-profile-view";
 import { createSupabaseServerClient } from "@/lib/supabase/server";
+import { createSupabaseServiceClient } from "@/lib/supabase/service";
 
 // pinned_post_id is fetched in a separate try/catch below so a
 // migration-lag situation (column doesn't exist yet) can't 404 the
@@ -26,7 +27,10 @@ export async function GET() {
     return NextResponse.json({ ok: false, error: "Unauthorized" }, { status: 401 });
   }
 
-  const { data: row, error } = await supabase
+  // PROFILE_SELECT includes email / school_email, which are private
+  // columns (no RLS read). Self-read via the service role scoped to the
+  // signed-in user's id.
+  const { data: row, error } = await createSupabaseServiceClient()
     .from("users")
     .select(PROFILE_SELECT)
     .eq("id", user.id)

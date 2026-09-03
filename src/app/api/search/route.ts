@@ -1,6 +1,7 @@
 import { NextResponse } from "next/server";
 
 import { orgAssetProxyUrl } from "@/lib/org-asset-url";
+import { ilikeOrFilter, ilikePrefixOrFilter } from "@/lib/pgrest";
 import { createSupabaseServerClient } from "@/lib/supabase/server";
 import { createSupabaseServiceClient } from "@/lib/supabase/service";
 
@@ -49,11 +50,16 @@ export async function GET(req: Request) {
     return NextResponse.json({ ok: true, users: [], orgs: [], events: [] });
   }
 
-  // Escape ILIKE wildcards in the user input so a literal `%` isn't a
-  // free-form glob. % and _ are the only metacharacters in LIKE.
-  const safe = q.replace(/[%_]/g, (m) => `\\${m}`);
-  const prefixPattern = `${safe}%`;
-  const containsPattern = `%${safe}%`;
+  // Strip PostgREST filter syntax + LIKE wildcards and quote the value so
+  // user text can never extend the `or=` expression onto other columns.
+  // The orgs branch runs on the service client, so this matters doubly.
+  const usersPrefix = ilikePrefixOrFilter(["name", "handle"], q);
+  const usersContains = ilikeOrFilter(["name", "handle"], q);
+  const orgsContains = ilikeOrFilter(["handle", "name"], q);
+  const eventsContains = ilikeOrFilter(["title", "description"], q);
+  if (!usersPrefix || !usersContains || !orgsContains || !eventsContains) {
+    return NextResponse.json({ ok: true, users: [], orgs: [], events: [] });
+  }
 
   const service = createSupabaseServiceClient();
 
@@ -66,7 +72,7 @@ export async function GET(req: Request) {
             .from("users")
             .select("id,name,handle,school,major,year,avatar_url")
             .neq("id", user.id)
-            .or(`name.ilike.${prefixPattern},handle.ilike.${prefixPattern}`)
+            .or(usersPrefix)
             .limit(limit)
         : Promise.resolve({ data: [], error: null } as const),
       wantUsers
@@ -74,7 +80,7 @@ export async function GET(req: Request) {
             .from("users")
             .select("id,name,handle,school,major,year,avatar_url")
             .neq("id", user.id)
-            .or(`name.ilike.${containsPattern},handle.ilike.${containsPattern}`)
+            .or(usersContains)
             .limit(limit)
         : Promise.resolve({ data: [], error: null } as const),
       wantOrgs
@@ -83,7 +89,7 @@ export async function GET(req: Request) {
             .select(
               "id,handle,name,description,logo_url,banner_url,is_public,verified,members:org_members(count)",
             )
-            .or(`handle.ilike.${containsPattern},name.ilike.${containsPattern}`)
+            .or(orgsContains)
             .order("verified", { ascending: false })
             .limit(limit)
         : Promise.resolve({ data: [], error: null } as const),
@@ -96,7 +102,7 @@ export async function GET(req: Request) {
                 "org:orgs(id,handle,name,logo_url,verified)",
             )
             .gte("ends_at", new Date().toISOString())
-            .or(`title.ilike.${containsPattern},description.ilike.${containsPattern}`)
+            .or(eventsContains)
             .order("starts_at", { ascending: true })
             .limit(limit)
         : Promise.resolve({ data: [], error: null } as const),

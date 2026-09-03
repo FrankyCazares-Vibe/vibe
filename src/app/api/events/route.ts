@@ -113,7 +113,7 @@ export async function GET(req: Request) {
   const { data, error } = await q;
   if (error) {
     console.error("[events GET]", error);
-    return NextResponse.json({ ok: false, error: error.message }, { status: 500 });
+    return NextResponse.json({ ok: false, error: "Request failed" }, { status: 500 });
   }
 
   const rows = (data as unknown as EventRow[]) ?? [];
@@ -274,11 +274,11 @@ export async function POST(req: Request) {
   ]);
   if (orgErr) {
     console.error("[events POST org]", orgErr);
-    return NextResponse.json({ ok: false, error: orgErr.message }, { status: 500 });
+    return NextResponse.json({ ok: false, error: "Request failed" }, { status: 500 });
   }
   if (mErr) {
     console.error("[events POST org membership]", mErr);
-    return NextResponse.json({ ok: false, error: mErr.message }, { status: 500 });
+    return NextResponse.json({ ok: false, error: "Request failed" }, { status: 500 });
   }
   if (!org) {
     return NextResponse.json({ ok: false, error: "Org not found" }, { status: 404 });
@@ -316,10 +316,7 @@ export async function POST(req: Request) {
 
   if (error || !row) {
     console.error("[events POST]", error);
-    return NextResponse.json(
-      { ok: false, error: error?.message ?? "Insert failed" },
-      { status: 500 },
-    );
+    return NextResponse.json({ ok: false, error: "Request failed" }, { status: 500 });
   }
 
   return NextResponse.json({ ok: true, event: row });

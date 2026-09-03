@@ -53,10 +53,8 @@ export async function GET(req: Request) {
     .eq("id", user.id)
     .single();
   if (meErr || !me) {
-    return NextResponse.json(
-      { ok: false, error: meErr?.message ?? "Profile not found" },
-      { status: 500 },
-    );
+    console.error("[campus-map]", meErr);
+    return NextResponse.json({ ok: false, error: "Request failed" }, { status: 500 });
   }
   const school = (me.school ?? "").trim();
   if (!school) {
@@ -80,7 +78,7 @@ export async function GET(req: Request) {
     .eq("school", school);
   if (usersErr) {
     console.error("[campus-map users]", usersErr);
-    return NextResponse.json({ ok: false, error: usersErr.message }, { status: 500 });
+    return NextResponse.json({ ok: false, error: "Request failed" }, { status: 500 });
   }
   const peers = (schoolUsers ?? []).filter((u) => u.id !== me.id);
   const peerIds = new Set(peers.map((u) => u.id));

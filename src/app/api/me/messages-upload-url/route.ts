@@ -73,7 +73,7 @@ export async function POST(req: Request) {
     .maybeSingle();
   if (memErr) {
     console.error("[messages-upload-url membership]", memErr);
-    return NextResponse.json({ ok: false, error: memErr.message }, { status: 500 });
+    return NextResponse.json({ ok: false, error: "Request failed" }, { status: 500 });
   }
   if (!membership) {
     return NextResponse.json({ ok: false, error: "Not a member" }, { status: 403 });

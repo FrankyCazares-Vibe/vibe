@@ -1,6 +1,7 @@
 import { NextResponse } from "next/server";
 
 import { verifySchoolEmailToken } from "@/lib/auth/school-email-token";
+import { createSupabaseServerClient } from "@/lib/supabase/server";
 import {
   createSupabaseServiceClient,
   isSupabaseServiceConfigured,
@@ -8,13 +9,29 @@ import {
 
 type Body = { token?: string };
 
-/** P1-006 — consume signed token; set users.school_email + school_verified (service role). */
+/**
+ * P1-006 — consume signed token; set users.school_email + school_verified (service role).
+ *
+ * The token alone is not enough: the caller must be signed in as the account
+ * that requested the link. Otherwise an attacker could request a link for a
+ * victim's .edu address and have the victim's click verify the attacker's row.
+ */
 export async function POST(req: Request) {
   if (!isSupabaseServiceConfigured()) {
     return NextResponse.json(
       { ok: false, error: "Server misconfiguration." },
       { status: 503 },
     );
+  }
+
+  const supabase = await createSupabaseServerClient();
+  const {
+    data: { user },
+    error: userErr,
+  } = await supabase.auth.getUser();
+
+  if (userErr || !user) {
+    return NextResponse.json({ ok: false, error: "Unauthorized" }, { status: 401 });
   }
 
   let body: Body;
@@ -37,7 +54,36 @@ export async function POST(req: Request) {
     );
   }
 
+  if (user.id !== payload.userId) {
+    return NextResponse.json(
+      {
+        ok: false,
+        error:
+          "This link belongs to a different account. Sign in with the account that requested it.",
+      },
+      { status: 403 },
+    );
+  }
+
   const admin = createSupabaseServiceClient();
+
+  // Idempotent: a re-click of an already-consumed link is a no-op.
+  const { data: current } = await admin
+    .from("users")
+    .select("school_email, school_verified")
+    .eq("id", user.id)
+    .maybeSingle();
+
+  if (
+    current?.school_verified === true &&
+    typeof current.school_email === "string" &&
+    current.school_email.toLowerCase() === payload.email
+  ) {
+    return NextResponse.json({
+      ok: true,
+      message: "School email verified.",
+    });
+  }
 
   const { data: taken } = await admin
     .from("users")
@@ -45,7 +91,7 @@ export async function POST(req: Request) {
     .eq("school_email", payload.email)
     .maybeSingle();
 
-  if (taken && taken.id !== payload.userId) {
+  if (taken && taken.id !== user.id) {
     return NextResponse.json(
       {
         ok: false,
@@ -61,7 +107,7 @@ export async function POST(req: Request) {
       school_email: payload.email,
       school_verified: true,
     })
-    .eq("id", payload.userId);
+    .eq("id", user.id);
 
   if (error) {
     console.error("[school-email/confirm]", error);
@@ -74,6 +120,5 @@ export async function POST(req: Request) {
   return NextResponse.json({
     ok: true,
     message: "School email verified.",
-    school_email: payload.email,
   });
 }

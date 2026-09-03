@@ -79,7 +79,7 @@ export async function POST(req: Request, ctx: RouteContext) {
 
   if (error) {
     console.error("[posts/:id/repost POST]", error);
-    return NextResponse.json({ ok: false, error: error.message }, { status: 500 });
+    return NextResponse.json({ ok: false, error: "Request failed" }, { status: 500 });
   }
   return NextResponse.json({ ok: true });
 }
@@ -110,7 +110,7 @@ export async function PATCH(req: Request, ctx: RouteContext) {
 
   if (error) {
     console.error("[posts/:id/repost PATCH]", error);
-    return NextResponse.json({ ok: false, error: error.message }, { status: 500 });
+    return NextResponse.json({ ok: false, error: "Request failed" }, { status: 500 });
   }
   return NextResponse.json({ ok: true });
 }
@@ -132,7 +132,7 @@ export async function DELETE(_req: Request, ctx: RouteContext) {
 
   if (error) {
     console.error("[posts/:id/repost DELETE]", error);
-    return NextResponse.json({ ok: false, error: error.message }, { status: 500 });
+    return NextResponse.json({ ok: false, error: "Request failed" }, { status: 500 });
   }
   return NextResponse.json({ ok: true });
 }

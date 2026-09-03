@@ -1,5 +1,6 @@
 import { NextResponse } from "next/server";
 
+import { GROUP_PHOTO_KEY_PREFIX } from "@/lib/r2";
 import { createSupabaseServerClient } from "@/lib/supabase/server";
 import { createSupabaseServiceClient } from "@/lib/supabase/service";
 
@@ -41,7 +42,7 @@ export async function PATCH(req: Request, ctx: RouteCtx) {
     .maybeSingle();
   if (chanErr) {
     console.error("[threads.PATCH chan]", chanErr);
-    return NextResponse.json({ ok: false, error: chanErr.message }, { status: 500 });
+    return NextResponse.json({ ok: false, error: "Request failed" }, { status: 500 });
   }
   if (!chan) {
     return NextResponse.json({ ok: false, error: "Not found" }, { status: 404 });
@@ -69,7 +70,26 @@ export async function PATCH(req: Request, ctx: RouteCtx) {
   }
   if (typeof body.photo_url === "string") {
     const t = body.photo_url.trim();
-    update.photo_url = t.length === 0 ? null : t;
+    if (t.length === 0) {
+      update.photo_url = null;
+    } else {
+      // Only keys minted by /api/me/group-photo-upload-url for THIS
+      // channel. Anything else could point the inbox at another group's
+      // object or an external tracking pixel.
+      const expectedPrefix = `${GROUP_PHOTO_KEY_PREFIX}${channelId}/`;
+      if (
+        !t.startsWith(expectedPrefix) ||
+        t.includes("..") ||
+        t.length > 512 ||
+        !/^[A-Za-z0-9_\-./]+$/.test(t)
+      ) {
+        return NextResponse.json(
+          { ok: false, error: "photo_url must be an upload key for this group" },
+          { status: 400 },
+        );
+      }
+      update.photo_url = t;
+    }
   } else if (body.photo_url === null) {
     update.photo_url = null;
   }
@@ -86,7 +106,7 @@ export async function PATCH(req: Request, ctx: RouteCtx) {
     .eq("id", channelId);
   if (updErr) {
     console.error("[threads.PATCH update]", updErr);
-    return NextResponse.json({ ok: false, error: updErr.message }, { status: 500 });
+    return NextResponse.json({ ok: false, error: "Could not update thread" }, { status: 500 });
   }
   return NextResponse.json({ ok: true });
 }

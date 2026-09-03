@@ -51,7 +51,7 @@ export async function GET(req: Request) {
   const { data, error } = await q;
   if (error) {
     console.error("[personal-events GET]", error);
-    return NextResponse.json({ ok: false, error: error.message }, { status: 500 });
+    return NextResponse.json({ ok: false, error: "Request failed" }, { status: 500 });
   }
   return NextResponse.json({ ok: true, events: data ?? [] });
 }
@@ -145,10 +145,7 @@ export async function POST(req: Request) {
 
   if (error || !data) {
     console.error("[personal-events POST]", error);
-    return NextResponse.json(
-      { ok: false, error: error?.message ?? "Insert failed" },
-      { status: 500 },
-    );
+    return NextResponse.json({ ok: false, error: "Request failed" }, { status: 500 });
   }
   return NextResponse.json({ ok: true, event: data });
 }

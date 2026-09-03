@@ -6,6 +6,7 @@ import {
   resolveMentionedUserIds,
 } from "@/lib/mentions";
 import { CLIP_KEY_PREFIX } from "@/lib/r2";
+import { rateLimit, tooManyRequests } from "@/lib/rate-limit";
 import { createSupabaseServerClient } from "@/lib/supabase/server";
 
 const MAX_CONTENT_CHARS = 2000;
@@ -26,6 +27,26 @@ type PublishPostBody = {
   duration_sec?: unknown;
 };
 
+const TAG_RE = /^[\p{L}\p{N}_]+$/u;
+const MAX_MEDIA_REF_LEN = 2048;
+
+/**
+ * True when `value` is safe to store as a post media reference for `userId`:
+ * an https URL (max 2048 chars) or an R2 key under clips/<userId>/.
+ */
+function isOwnedMediaRef(value: string, userId: string): boolean {
+  if (value.length > MAX_MEDIA_REF_LEN || value.includes("..")) return false;
+  if (value.startsWith(CLIP_KEY_PREFIX)) {
+    return value.startsWith(`${CLIP_KEY_PREFIX}${userId}/`);
+  }
+  try {
+    const u = new URL(value);
+    return u.protocol === "https:";
+  } catch {
+    return false;
+  }
+}
+
 function normalizeTags(input: unknown): string[] {
   if (!Array.isArray(input)) return [];
   const seen = new Set<string>();
@@ -34,6 +55,9 @@ function normalizeTags(input: unknown): string[] {
     if (typeof raw !== "string") continue;
     const t = raw.trim().toLowerCase().replace(/^#+/, "");
     if (!t || t.length > MAX_TAG_LEN) continue;
+    // Hashtags are rendered unescaped in a few prototype templates; keep
+    // them to word characters so a tag can never carry markup.
+    if (!TAG_RE.test(t)) continue;
     if (seen.has(t)) continue;
     seen.add(t);
     out.push(t);
@@ -52,6 +76,9 @@ export async function POST(req: Request) {
   if (authErr || !user) {
     return NextResponse.json({ ok: false, error: "Unauthorized" }, { status: 401 });
   }
+
+  const rl = await rateLimit(`publish-post:${user.id}`, { limit: 20, windowSec: 600 });
+  if (!rl.allowed) return tooManyRequests(rl);
 
   let body: PublishPostBody;
   try {
@@ -83,6 +110,23 @@ export async function POST(req: Request) {
     if (!videoObjectKey.startsWith(expectedPrefix) || videoObjectKey.includes("..")) {
       return NextResponse.json(
         { ok: false, error: "Object key does not belong to this user" },
+        { status: 400 },
+      );
+    }
+  }
+
+  // `media_url` / `media_thumbnail_url` are rendered by the feed and signed
+  // by /api/posts/[id]/media, so they get the same ownership gate: either
+  // an https URL (Supabase Storage public object) or a clips/<me>/ key.
+  // Anything else (another user's clip key, javascript:, data:) is rejected.
+  for (const [label, value] of [
+    ["media_url", mediaUrl],
+    ["media_thumbnail_url", mediaThumb],
+  ] as const) {
+    if (!value) continue;
+    if (!isOwnedMediaRef(value, user.id)) {
+      return NextResponse.json(
+        { ok: false, error: `${label} must be an https URL or one of your own uploads` },
         { status: 400 },
       );
     }
@@ -137,10 +181,7 @@ export async function POST(req: Request) {
 
   if (error || !row) {
     console.error("[publish-post]", error);
-    return NextResponse.json(
-      { ok: false, error: error?.message ?? "Insert failed" },
-      { status: 500 },
-    );
+    return NextResponse.json({ ok: false, error: "Request failed" }, { status: 500 });
   }
 
   // @mention fan-out — best-effort; failures don't block the publish.

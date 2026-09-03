@@ -55,7 +55,7 @@ export async function DELETE(req: Request) {
     .maybeSingle();
   if (lookupErr) {
     console.error("[me.DELETE lookup]", lookupErr);
-    return NextResponse.json({ ok: false, error: lookupErr.message }, { status: 500 });
+    return NextResponse.json({ ok: false, error: "Request failed" }, { status: 500 });
   }
   const actualHandle = String(row?.handle ?? "").trim().toLowerCase();
   if (!actualHandle || confirm !== actualHandle) {
@@ -80,7 +80,7 @@ export async function DELETE(req: Request) {
   const { error: deleteErr } = await admin.auth.admin.deleteUser(user.id);
   if (deleteErr) {
     console.error("[me.DELETE auth.admin.deleteUser]", deleteErr);
-    return NextResponse.json({ ok: false, error: deleteErr.message }, { status: 500 });
+    return NextResponse.json({ ok: false, error: "Request failed" }, { status: 500 });
   }
 
   await supabase.auth.signOut();

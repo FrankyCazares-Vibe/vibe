@@ -1,5 +1,6 @@
 import { NextResponse } from "next/server";
 
+import { isUuid } from "@/lib/pgrest";
 import { createSupabaseServerClient } from "@/lib/supabase/server";
 
 type Body = {
@@ -28,7 +29,7 @@ export async function GET() {
     .order("created_at", { ascending: false });
   if (error) {
     console.error("[block.GET list]", error);
-    return NextResponse.json({ ok: false, error: error.message }, { status: 500 });
+    return NextResponse.json({ ok: false, error: "Request failed" }, { status: 500 });
   }
 
   const ids = (rows ?? []).map((r) => (r as { blocked_id: string }).blocked_id);
@@ -74,7 +75,12 @@ async function resolveTargetId(
   supabase: Awaited<ReturnType<typeof createSupabaseServerClient>>,
   body: Body,
 ): Promise<{ ok: true; id: string } | { ok: false; status: number; error: string }> {
-  if (typeof body.target_id === "string" && body.target_id.length > 0) {
+  if (body.target_id !== undefined && body.target_id !== null && body.target_id !== "") {
+    // The id is interpolated into a PostgREST `or=` filter below, so it
+    // must be a real UUID — never free text.
+    if (!isUuid(body.target_id)) {
+      return { ok: false, status: 400, error: "Invalid target_id" };
+    }
     return { ok: true, id: body.target_id };
   }
   if (typeof body.handle === "string" && body.handle.length > 0) {
@@ -138,7 +144,7 @@ export async function POST(req: Request) {
       return NextResponse.json({ ok: true, already: true });
     }
     console.error("[block.POST]", insErr);
-    return NextResponse.json({ ok: false, error: insErr.message }, { status: 500 });
+    return NextResponse.json({ ok: false, error: "Request failed" }, { status: 500 });
   }
 
   // Tear down any follow edges in either direction. A block ends the
@@ -224,7 +230,7 @@ export async function DELETE(req: Request) {
 
   if (error) {
     console.error("[block.DELETE]", error);
-    return NextResponse.json({ ok: false, error: error.message }, { status: 500 });
+    return NextResponse.json({ ok: false, error: "Request failed" }, { status: 500 });
   }
 
   // Block stamps `hidden_at` on the viewer's channel_members rows for any

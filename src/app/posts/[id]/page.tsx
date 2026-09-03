@@ -38,6 +38,7 @@ export async function generateMetadata({ params }: Params): Promise<Metadata> {
         "id,type,content,media_url,media_thumbnail_url,author:users!posts_user_id_fkey(name,handle)",
       )
       .eq("id", id)
+      .eq("status", "published")
       .maybeSingle();
     if (!row) return { title: "Post · Vibe" };
     // PostgREST embed shape varies by FK config — author can come back

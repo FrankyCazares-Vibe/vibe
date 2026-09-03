@@ -6009,16 +6009,19 @@ async function paintVibeMoreMenu() {
   let rel = null;
   if (window.vibeFetchRelationship) rel = await window.vibeFetchRelationship(real.id);
   const name = real.name || _viewedName();
-  const safeId = String(real.id).replace(/'/g, "\\'");
-  const safeName = String(name || '').replace(/'/g, "\\'");
+  // Attribute-safe JS literals: JSON.stringify makes a proper JS string,
+  // _esc makes it safe inside onclick="..." (decodes back before eval).
+  const safeId = _esc(JSON.stringify(String(real.id)));
+  const safeName = _esc(JSON.stringify(String(name || '')));
+  const nameText = _esc(String(name || '').split(' ')[0] || '');
   const blockLabel = rel && rel.blocking ? 'Unblock ' : 'Block ';
   const muteLabel = rel && rel.muting ? 'Unmute ' : 'Mute ';
   const blockHandler = rel && rel.blocking
-    ? `window.vibeUnblock('${safeId}', () => { paintVibeMoreMenu(); })`
-    : `window.vibeBlock('${safeId}','${safeName}', () => { paintVibeMoreMenu(); })`;
+    ? `window.vibeUnblock(${safeId}, () => { paintVibeMoreMenu(); })`
+    : `window.vibeBlock(${safeId},${safeName}, () => { paintVibeMoreMenu(); })`;
   const muteHandler = rel && rel.muting
-    ? `window.vibeUnmute('${safeId}', () => { paintVibeMoreMenu(); })`
-    : `window.vibeOpenMuteSheet('${safeId}','${safeName}', undefined, () => { paintVibeMoreMenu(); })`;
+    ? `window.vibeUnmute(${safeId}, () => { paintVibeMoreMenu(); })`
+    : `window.vibeOpenMuteSheet(${safeId},${safeName}, undefined, () => { paintVibeMoreMenu(); })`;
   const css = "display:block;width:100%;text-align:left;background:none;border:none;padding:11px 14px;font-family:'DM Sans',sans-serif;font-size:13px;color:#1C1C1E;cursor:none;transition:background .12s";
   const dangerCss = css.replace('color:#1C1C1E', 'color:#C0392B');
   // Unfollow row — only visible when the viewer currently follows the
@@ -6028,13 +6031,13 @@ async function paintVibeMoreMenu() {
   const showUnfollow = (typeof vibeRelState !== 'undefined') &&
     (vibeRelState === 'following' || vibeRelState === 'connected');
   const unfollowRow = showUnfollow
-    ? `<button style="${css}" onmouseover="this.style.background='#FAF7F2'" onmouseout="this.style.background='none'" onclick="window.vibeUnfollowFromMenu('${safeId}','${safeName}'); document.getElementById('vibeMoreMenu').style.display='none';">Unfollow ${name.split(' ')[0] || ''}</button>`
+    ? `<button style="${css}" onmouseover="this.style.background='#FAF7F2'" onmouseout="this.style.background='none'" onclick="window.vibeUnfollowFromMenu(${safeId},${safeName}); document.getElementById('vibeMoreMenu').style.display='none';">Unfollow ${nameText}</button>`
     : '';
   menu.innerHTML = `
     ${unfollowRow}
-    <button style="${css}" onmouseover="this.style.background='#FAF7F2'" onmouseout="this.style.background='none'" onclick="window.vibeOpenReportSheet('user','${safeId}'); document.getElementById('vibeMoreMenu').style.display='none';">Report ${name.split(' ')[0] || ''}</button>
-    <button style="${css}" onmouseover="this.style.background='#FAF7F2'" onmouseout="this.style.background='none'" onclick="${muteHandler}; document.getElementById('vibeMoreMenu').style.display='none';">${muteLabel}${name.split(' ')[0] || ''}</button>
-    <button style="${dangerCss}" onmouseover="this.style.background='#FAF7F2'" onmouseout="this.style.background='none'" onclick="${blockHandler}; document.getElementById('vibeMoreMenu').style.display='none';">${blockLabel}${name.split(' ')[0] || ''}</button>
+    <button style="${css}" onmouseover="this.style.background='#FAF7F2'" onmouseout="this.style.background='none'" onclick="window.vibeOpenReportSheet('user',${safeId}); document.getElementById('vibeMoreMenu').style.display='none';">Report ${nameText}</button>
+    <button style="${css}" onmouseover="this.style.background='#FAF7F2'" onmouseout="this.style.background='none'" onclick="${muteHandler}; document.getElementById('vibeMoreMenu').style.display='none';">${muteLabel}${nameText}</button>
+    <button style="${dangerCss}" onmouseover="this.style.background='#FAF7F2'" onmouseout="this.style.background='none'" onclick="${blockHandler}; document.getElementById('vibeMoreMenu').style.display='none';">${blockLabel}${nameText}</button>
   `;
 }
 
@@ -8312,7 +8315,7 @@ function renderUserSections(user) {
         item.className = 'work-item';
         const hasLogo = w.logoUrl && (w.logoUrl.startsWith('data:') || /^https?:\/\//i.test(w.logoUrl));
         const logoImgHtml = hasLogo
-          ? `<img class="work-logo-img" src="${w.logoUrl}" style="position:absolute;inset:0;width:100%;height:100%;object-fit:cover;border-radius:13px;">`
+          ? `<img class="work-logo-img" src="${_esc(w.logoUrl)}" style="position:absolute;inset:0;width:100%;height:100%;object-fit:cover;border-radius:13px;">`
           : '';
         item.innerHTML = `
           ${_DRAG_HANDLE_HTML}

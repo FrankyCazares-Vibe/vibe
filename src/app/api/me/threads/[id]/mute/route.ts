@@ -68,7 +68,7 @@ export async function POST(req: Request, ctx: RouteCtx) {
       );
     }
     console.error("[threads.mute.POST]", error);
-    return NextResponse.json({ ok: false, error: error.message }, { status: 500 });
+    return NextResponse.json({ ok: false, error: "Request failed" }, { status: 500 });
   }
   return NextResponse.json({ ok: true, muted_until: until });
 }
@@ -93,7 +93,7 @@ export async function DELETE(_req: Request, ctx: RouteCtx) {
 
   if (error) {
     console.error("[threads.mute.DELETE]", error);
-    return NextResponse.json({ ok: false, error: error.message }, { status: 500 });
+    return NextResponse.json({ ok: false, error: "Request failed" }, { status: 500 });
   }
   return NextResponse.json({ ok: true });
 }

@@ -8,6 +8,7 @@ import { sanitizeResumeRedactions } from "@/lib/profile/resume-redactions";
 import { inlineOrUploadProfileUrl } from "@/lib/profile/storage-upload";
 import { sanitizeWorkExperience } from "@/lib/profile/work-experience";
 import { createSupabaseServerClient } from "@/lib/supabase/server";
+import { createSupabaseServiceClient } from "@/lib/supabase/service";
 
 /**
  * Full profile sync from `public/html/profile.html` (authenticated, same-origin).
@@ -201,10 +202,12 @@ export async function POST(req: Request) {
 
   if (upErr) {
     console.error("[profile-sync POST]", upErr);
-    return NextResponse.json({ ok: false, error: upErr.message }, { status: 500 });
+    return NextResponse.json({ ok: false, error: "Request failed" }, { status: 500 });
   }
 
-  const { data: row, error: selErr } = await supabase
+  // email / school_email are private columns (no RLS read); self-read via
+  // the service role scoped to the caller's id.
+  const { data: row, error: selErr } = await createSupabaseServiceClient()
     .from("users")
     .select(
       "id,email,name,handle,school,school_email,school_verified,year,major,department,bio,tagline,website,headline,location_text,banner_gradient,avatar_url,banner_url,resume_url,resume_docs,interests,skills,looking_for,work_experience,work_order_manual,recruiter_snapshot,current_on,resume_redactions",

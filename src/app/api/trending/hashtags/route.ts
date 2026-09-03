@@ -59,7 +59,7 @@ export async function GET(req: Request) {
   const { data, error } = await query;
   if (error) {
     console.error("[trending/hashtags]", error);
-    return NextResponse.json({ ok: false, error: error.message }, { status: 500 });
+    return NextResponse.json({ ok: false, error: "Request failed" }, { status: 500 });
   }
 
   const counts = new Map<string, number>();

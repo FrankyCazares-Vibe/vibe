@@ -1,9 +1,13 @@
 import { NextResponse } from "next/server";
 
+import { requirePlatformAdmin } from "@/lib/auth/require-platform-admin";
 import { isR2Configured, probeR2Bucket } from "@/lib/r2";
 
 /** P1-002 smoke check: R2 env vars + bucket reachable (Clip signing helpers live in src/lib/r2.ts). */
 export async function GET() {
+  const gate = await requirePlatformAdmin();
+  if (!gate.ok) return gate.response;
+
   if (!isR2Configured()) {
     return NextResponse.json(
       {

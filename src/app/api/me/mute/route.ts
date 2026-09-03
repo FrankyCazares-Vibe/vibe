@@ -84,7 +84,7 @@ export async function POST(req: Request) {
 
   if (error) {
     console.error("[mute.POST]", error);
-    return NextResponse.json({ ok: false, error: error.message }, { status: 500 });
+    return NextResponse.json({ ok: false, error: "Request failed" }, { status: 500 });
   }
   return NextResponse.json({ ok: true, until });
 }
@@ -120,7 +120,7 @@ export async function DELETE(req: Request) {
 
   if (error) {
     console.error("[mute.DELETE]", error);
-    return NextResponse.json({ ok: false, error: error.message }, { status: 500 });
+    return NextResponse.json({ ok: false, error: "Request failed" }, { status: 500 });
   }
   return NextResponse.json({ ok: true });
 }

@@ -8,6 +8,7 @@ import {
   signSchoolEmailToken,
 } from "@/lib/auth/school-email-token";
 import { sendSchoolVerificationEmail } from "@/lib/email/resend-transactional";
+import { clientIp, rateLimit, tooManyRequests } from "@/lib/rate-limit";
 import { createSupabaseServerClient } from "@/lib/supabase/server";
 import {
   createSupabaseServiceClient,
@@ -52,6 +53,19 @@ export async function POST(req: Request) {
     return NextResponse.json({ ok: false, error: "Unauthorized" }, { status: 401 });
   }
 
+  // Outbound email is the expensive part; cap per account and per source IP.
+  const perUser = await rateLimit(`school-email:${user.id}`, {
+    limit: 3,
+    windowSec: 3600,
+  });
+  if (!perUser.allowed) return tooManyRequests(perUser);
+
+  const perIp = await rateLimit(`school-email-ip:${clientIp(req)}`, {
+    limit: 10,
+    windowSec: 3600,
+  });
+  if (!perIp.allowed) return tooManyRequests(perIp);
+
   let body: Body;
   try {
     body = (await req.json()) as Body;
@@ -79,11 +93,23 @@ export async function POST(req: Request) {
     );
   }
 
-  const { data: profile } = await supabase
+  // `school_email` / `otto_answers` are private columns the RLS role cannot
+  // select; read them with the service client scoped to the session's user id.
+  const admin = createSupabaseServiceClient();
+
+  const { data: profile, error: profileErr } = await admin
     .from("users")
-    .select("school_email, school_verified")
+    .select("school_email, school_verified, otto_answers")
     .eq("id", user.id)
     .maybeSingle();
+
+  if (profileErr) {
+    console.error("[school-email/request] profile", profileErr);
+    return NextResponse.json(
+      { ok: false, error: "Could not load your profile." },
+      { status: 500 },
+    );
+  }
 
   if (
     profile?.school_verified &&
@@ -95,10 +121,9 @@ export async function POST(req: Request) {
     });
   }
 
-  const admin = createSupabaseServiceClient();
   const { data: row, error: lookupErr } = await admin
     .from("users")
-    .select("id, school_email, school_verified")
+    .select("id")
     .eq("school_email", schoolEmail)
     .maybeSingle();
 
@@ -123,13 +148,7 @@ export async function POST(req: Request) {
   const token = signSchoolEmailToken(user.id, schoolEmail);
   const site = getSiteOriginForRequest(req);
 
-  const { data: progress } = await supabase
-    .from("users")
-    .select("otto_answers")
-    .eq("id", user.id)
-    .maybeSingle();
-
-  const afterVerify = isOttoOnboardingComplete(progress?.otto_answers)
+  const afterVerify = isOttoOnboardingComplete(profile?.otto_answers)
     ? "/profile"
     : "/onboarding";
   const verifyUrl = `${site}/auth/verify-school?token=${encodeURIComponent(token)}&next=${encodeURIComponent(afterVerify)}`;

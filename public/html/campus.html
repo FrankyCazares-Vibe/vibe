@@ -1474,28 +1474,28 @@ const campusSuggest = [
 // ── Render feed ──
 function renderFeed(posts) {
   document.getElementById('campus-feed').innerHTML = posts.map(p => `
-    <div class="post" data-post-id="${p.id || ''}" style="cursor:pointer;">
+    <div class="post" data-post-id="${_campusEsc(p.id || '')}" style="cursor:pointer;">
       <div class="post-header">
-        <div class="post-av" style="background:${p.bg}">${p.av}</div>
+        <div class="post-av" style="background:${_campusEsc(p.bg)}">${_campusEsc(p.av)}</div>
         <div class="post-meta">
-          <h4>${p.auth} <span class="post-type-badge ${p.badge}">${p.bt}</span></h4>
-          <p>${p.role}</p>
+          <h4>${_campusEsc(p.auth)} <span class="post-type-badge ${_campusEsc(p.badge)}">${_campusEsc(p.bt)}</span></h4>
+          <p>${_campusEsc(p.role)}</p>
         </div>
       </div>
       <div class="post-body">${p.body.replace(/\n/g,'<br>')}</div>
       ${p.event ? `<div class="event-card">
-        <h4>${p.event.title}</h4>
+        <h4>${_campusEsc(p.event.title)}</h4>
         <div class="event-meta">
-          <div class="event-meta-row"><svg width="12" height="12" viewBox="0 0 12 12" fill="none"><rect x="1" y="2" width="10" height="9" rx="2" stroke="currentColor" stroke-width="1.2" fill="none"/><path d="M1 5h10M4 1v2M8 1v2" stroke="currentColor" stroke-width="1.2" stroke-linecap="round"/></svg>${p.event.date} &middot; ${p.event.time}</div>
-          <div class="event-meta-row"><svg width="12" height="12" viewBox="0 0 12 12" fill="none"><path d="M6 1C3.79 1 2 2.79 2 5c0 3 4 6 4 6s4-3 4-6c0-2.21-1.79-4-4-4z" stroke="currentColor" stroke-width="1.2" fill="none"/><circle cx="6" cy="5" r="1.2" fill="currentColor"/></svg>${p.event.loc}</div>
-          <div class="event-meta-row" style="color:var(--blue)">${p.event.detail}</div>
+          <div class="event-meta-row"><svg width="12" height="12" viewBox="0 0 12 12" fill="none"><rect x="1" y="2" width="10" height="9" rx="2" stroke="currentColor" stroke-width="1.2" fill="none"/><path d="M1 5h10M4 1v2M8 1v2" stroke="currentColor" stroke-width="1.2" stroke-linecap="round"/></svg>${_campusEsc(p.event.date)} &middot; ${_campusEsc(p.event.time)}</div>
+          <div class="event-meta-row"><svg width="12" height="12" viewBox="0 0 12 12" fill="none"><path d="M6 1C3.79 1 2 2.79 2 5c0 3 4 6 4 6s4-3 4-6c0-2.21-1.79-4-4-4z" stroke="currentColor" stroke-width="1.2" fill="none"/><circle cx="6" cy="5" r="1.2" fill="currentColor"/></svg>${_campusEsc(p.event.loc)}</div>
+          <div class="event-meta-row" style="color:var(--blue)">${_campusEsc(p.event.detail)}</div>
         </div>
       </div>` : ''}
-      <div class="post-tags">${p.tags.map(t=>`<span class="post-tag">${t}</span>`).join('')}</div>
+      <div class="post-tags">${p.tags.map(t=>`<span class="post-tag">${_campusEsc(t)}</span>`).join('')}</div>
       <div class="post-bar">
         ${p.r.map(r=>`<button class="post-chip" onclick="this.classList.toggle('reacted')">${r}</button>`).join('')}
         <button class="post-chip" onclick="toast('Comment added')">&#128172; Comment</button>
-        ${p.rsvp ? `<button class="rsvp-btn" id="rsvp-${p.id}" onclick="rsvpPost('${p.id}',this)">RSVP</button>` : ''}
+        ${p.rsvp ? `<button class="rsvp-btn" id="rsvp-${_campusEsc(p.id)}" onclick="rsvpPost(${_campusEsc(JSON.stringify(String(p.id)))},this)">RSVP</button>` : ''}
       </div>
     </div>`).join('');
 }
@@ -1685,7 +1685,7 @@ async function submitCampusPost() {
         auth: me.name || 'You',
         role: role || 'IU student',
         type: '', badge: 'b-chat', bt: 'Post',
-        body: text,
+        body: _campusEsc(text),
         tags: (j.post.tags || []).map(x => '#' + x),
         r: ['&#129334; 0','&#128161; 0'],
         rsvp: false,
@@ -1761,7 +1761,7 @@ function _campusMapDbRow(row) {
     auth: name,
     role: role || 'IU student',
     type: '', badge: 'b-chat', bt: 'Post',
-    body: (row.content || '').replace(/[<>]/g, ''),
+    body: _campusEsc(row.content || ''),
     tags: (row.tags || []).map(x => '#' + x),
     r: ['&#129334; 0','&#128161; 0'],
     rsvp: false,

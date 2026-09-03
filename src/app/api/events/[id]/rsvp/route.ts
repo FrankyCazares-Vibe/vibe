@@ -51,7 +51,7 @@ export async function PUT(req: Request, ctx: RouteContext) {
 
   if (error) {
     console.error("[events/:id/rsvp PUT]", error);
-    return NextResponse.json({ ok: false, error: error.message }, { status: 500 });
+    return NextResponse.json({ ok: false, error: "Request failed" }, { status: 500 });
   }
   return NextResponse.json({ ok: true });
 }
@@ -80,7 +80,7 @@ export async function DELETE(_req: Request, ctx: RouteContext) {
 
   if (error) {
     console.error("[events/:id/rsvp DELETE]", error);
-    return NextResponse.json({ ok: false, error: error.message }, { status: 500 });
+    return NextResponse.json({ ok: false, error: "Request failed" }, { status: 500 });
   }
   return NextResponse.json({ ok: true });
 }

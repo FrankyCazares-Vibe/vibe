@@ -76,7 +76,7 @@ export async function GET(req: Request, ctx: RouteContext) {
     .maybeSingle();
   if (tErr) {
     console.error("[users/:handle/reposts target]", tErr);
-    return NextResponse.json({ ok: false, error: tErr.message }, { status: 500 });
+    return NextResponse.json({ ok: false, error: "Request failed" }, { status: 500 });
   }
   if (!target) {
     return NextResponse.json({ ok: false, error: "User not found" }, { status: 404 });

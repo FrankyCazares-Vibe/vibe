@@ -1,5 +1,6 @@
 import { NextResponse } from "next/server";
 
+import { rateLimit, tooManyRequests } from "@/lib/rate-limit";
 import { createSupabaseServerClient } from "@/lib/supabase/server";
 
 const MAX_CONTENT = 1000;
@@ -70,7 +71,7 @@ export async function GET(req: Request, ctx: RouteContext) {
 
   if (error) {
     console.error("[posts/:id/comments GET]", error);
-    return NextResponse.json({ ok: false, error: error.message }, { status: 500 });
+    return NextResponse.json({ ok: false, error: "Request failed" }, { status: 500 });
   }
 
   const rows = (data as unknown as CommentRow[]) ?? [];
@@ -157,6 +158,9 @@ export async function POST(req: Request, ctx: RouteContext) {
     return NextResponse.json({ ok: false, error: "Unauthorized" }, { status: 401 });
   }
 
+  const rl = await rateLimit(`comment:${user.id}`, { limit: 30, windowSec: 300 });
+  if (!rl.allowed) return tooManyRequests(rl);
+
   let body: CommentBody;
   try {
     body = (await req.json()) as CommentBody;
@@ -221,10 +225,7 @@ export async function POST(req: Request, ctx: RouteContext) {
 
   if (error || !row) {
     console.error("[posts/:id/comments POST]", error);
-    return NextResponse.json(
-      { ok: false, error: error?.message ?? "Insert failed" },
-      { status: 500 },
-    );
+    return NextResponse.json({ ok: false, error: "Request failed" }, { status: 500 });
   }
 
   const inserted = row as unknown as CommentRow;

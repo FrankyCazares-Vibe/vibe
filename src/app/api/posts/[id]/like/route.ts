@@ -40,7 +40,7 @@ export async function POST(_req: Request, ctx: RouteContext) {
       return NextResponse.json({ ok: true, already: true });
     }
     console.error("[posts/:id/like POST]", error);
-    return NextResponse.json({ ok: false, error: error.message }, { status: 500 });
+    return NextResponse.json({ ok: false, error: "Request failed" }, { status: 500 });
   }
   return NextResponse.json({ ok: true });
 }
@@ -62,7 +62,7 @@ export async function DELETE(_req: Request, ctx: RouteContext) {
 
   if (error) {
     console.error("[posts/:id/like DELETE]", error);
-    return NextResponse.json({ ok: false, error: error.message }, { status: 500 });
+    return NextResponse.json({ ok: false, error: "Request failed" }, { status: 500 });
   }
   return NextResponse.json({ ok: true });
 }

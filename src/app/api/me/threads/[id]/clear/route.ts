@@ -35,7 +35,7 @@ export async function POST(_req: Request, ctx: RouteCtx) {
     // surfaces a column-missing error. Surface it as a 500 so the UI
     // can show a fallback toast — same pattern other endpoints use.
     console.error("[threads.clear]", error);
-    return NextResponse.json({ ok: false, error: error.message }, { status: 500 });
+    return NextResponse.json({ ok: false, error: "Request failed" }, { status: 500 });
   }
   return NextResponse.json({ ok: true });
 }

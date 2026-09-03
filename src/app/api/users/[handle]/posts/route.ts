@@ -45,10 +45,24 @@ export async function GET(req: Request, ctx: RouteContext) {
     .maybeSingle();
   if (tErr) {
     console.error("[users/:handle/posts target]", tErr);
-    return NextResponse.json({ ok: false, error: tErr.message }, { status: 500 });
+    return NextResponse.json({ ok: false, error: "Request failed" }, { status: 500 });
   }
   if (!target) {
     return NextResponse.json({ ok: false, error: "User not found" }, { status: 404 });
+  }
+
+  // Blocks in either direction hide the grid, matching the bootstrap
+  // route's "Profile unavailable" branch. Without this a blocked user could
+  // still read every post through this endpoint directly.
+  if (user && user.id !== target.id) {
+    const { data: blockRows } = await supabase
+      .from("blocks")
+      .select("blocker_id, blocked_id")
+      .in("blocker_id", [user.id, target.id])
+      .in("blocked_id", [user.id, target.id]);
+    if ((blockRows ?? []).length > 0) {
+      return NextResponse.json({ ok: true, posts: [], blocked: true });
+    }
   }
 
   const url = new URL(req.url);
@@ -73,7 +87,7 @@ export async function GET(req: Request, ctx: RouteContext) {
 
   if (error) {
     console.error("[users/:handle/posts]", error);
-    return NextResponse.json({ ok: false, error: error.message }, { status: 500 });
+    return NextResponse.json({ ok: false, error: "Request failed" }, { status: 500 });
   }
 
   return NextResponse.json({ ok: true, posts: data ?? [] });

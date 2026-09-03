@@ -13,9 +13,9 @@ function VerifySchoolInner() {
   const searchParams = useSearchParams();
   const token = searchParams.get("token");
   const started = useRef(false);
-  const [status, setStatus] = useState<"idle" | "working" | "ok" | "err">(
-    "idle",
-  );
+  const [status, setStatus] = useState<
+    "idle" | "working" | "login" | "ok" | "err"
+  >("idle");
   const [message, setMessage] = useState<string | null>(null);
 
   useEffect(() => {
@@ -36,6 +36,17 @@ function VerifySchoolInner() {
           error?: string;
           message?: string;
         };
+
+        if (res.status === 401) {
+          // Confirm requires the requesting account's session. Send them to
+          // log in and come straight back to this exact link (same-origin
+          // path only) so the token is consumed once they are signed in.
+          const returnTo = window.location.pathname + window.location.search;
+          setStatus("login");
+          router.replace(`/auth/login?next=${encodeURIComponent(returnTo)}`);
+          return;
+        }
+
         if (!res.ok || !data.ok) {
           setStatus("err");
           setMessage(data.error ?? "Verification failed.");
@@ -88,6 +99,15 @@ function VerifySchoolInner() {
     return (
       <p style={{ textAlign: "center", marginTop: 48, color: "#8A8580" }}>
         Verifying your school email…
+      </p>
+    );
+  }
+
+  if (status === "login") {
+    return (
+      <p style={{ textAlign: "center", marginTop: 48, color: "#8A8580" }}>
+        Sign in with the account that requested this link — we&apos;ll finish
+        verifying right after.
       </p>
     );
   }

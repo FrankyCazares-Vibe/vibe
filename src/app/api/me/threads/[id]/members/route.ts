@@ -115,7 +115,7 @@ export async function POST(req: Request, ctx: RouteCtx) {
   });
   if (insErr) {
     console.error("[threads.members.POST]", insErr);
-    return NextResponse.json({ ok: false, error: insErr.message }, { status: 500 });
+    return NextResponse.json({ ok: false, error: "Request failed" }, { status: 500 });
   }
   return NextResponse.json({ ok: true });
 }

@@ -3,6 +3,7 @@ import { redirect } from "next/navigation";
 import { DEFAULT_POST_LOGIN_PATH } from "@/lib/auth/email-confirm-redirect";
 import { isOttoOnboardingComplete } from "@/lib/auth/post-login";
 import { createSupabaseServerClient } from "@/lib/supabase/server";
+import { createSupabaseServiceClient } from "@/lib/supabase/service";
 
 import { OnboardingSwitch } from "./OnboardingSwitch";
 
@@ -35,7 +36,8 @@ export default async function OnboardingPage({
     redirect(`/auth/login?next=/onboarding${replay ? "?replay=1" : ""}`);
   }
 
-  const { data: row } = await supabase
+  // otto_answers is private (no RLS read); self-read via service role.
+  const { data: row } = await createSupabaseServiceClient()
     .from("users")
     .select("school_verified, otto_answers")
     .eq("id", user.id)

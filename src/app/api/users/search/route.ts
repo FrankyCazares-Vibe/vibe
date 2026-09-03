@@ -1,6 +1,7 @@
 import { NextResponse } from "next/server";
 
 import { createSupabaseServerClient } from "@/lib/supabase/server";
+import { ilikeOrFilter, ilikePrefixOrFilter, isUuid } from "@/lib/pgrest";
 
 const DEFAULT_LIMIT = 10;
 const MAX_LIMIT = 50;
@@ -36,6 +37,9 @@ export async function GET(req: Request) {
   // people who are actually in the chat. Verifies the viewer is in the
   // channel themselves before honoring it (prevents leaking membership).
   const scopeChannelId = (url.searchParams.get("channel_id") || "").trim();
+  if (scopeChannelId && !isUuid(scopeChannelId)) {
+    return NextResponse.json({ ok: false, error: "Invalid channel_id" }, { status: 400 });
+  }
 
   if (q.length < 1) {
     return NextResponse.json({ ok: true, users: [] });
@@ -63,11 +67,13 @@ export async function GET(req: Request) {
     }
   }
 
-  // Escape ILIKE wildcards in the user input so a literal `%` isn't a
-  // free-form glob. % and _ are the only metacharacters in LIKE.
-  const safe = q.replace(/[%_]/g, (m) => `\\${m}`);
-  const pattern = `${safe}%`;
-  const containsPattern = `%${safe}%`;
+  // Strip PostgREST filter syntax + LIKE wildcards and quote the value so
+  // user text can never extend the `or=` expression onto other columns.
+  const prefixFilter = ilikePrefixOrFilter(["name", "handle"], q);
+  const containsFilter = ilikeOrFilter(["name", "handle"], q);
+  if (!prefixFilter || !containsFilter) {
+    return NextResponse.json({ ok: true, users: [] });
+  }
 
   // Two-phase ranking: prefix matches first (better signal), then
   // contains-anywhere as a fallback. Easier than a custom sort and keeps
@@ -77,20 +83,20 @@ export async function GET(req: Request) {
       .from("users")
       .select("id,name,handle,school,major,year,avatar_url")
       .neq("id", user.id)
-      .or(`name.ilike.${pattern},handle.ilike.${pattern}`)
+      .or(prefixFilter)
       .limit(limit),
     supabase
       .from("users")
       .select("id,name,handle,school,major,year,avatar_url")
       .neq("id", user.id)
-      .or(`name.ilike.${containsPattern},handle.ilike.${containsPattern}`)
+      .or(containsFilter)
       .limit(limit),
   ]);
 
   if (prefixRes.error || containsRes.error) {
     console.error("[users/search]", prefixRes.error ?? containsRes.error);
     return NextResponse.json(
-      { ok: false, error: (prefixRes.error ?? containsRes.error)!.message },
+      { ok: false, error: "Request failed" },
       { status: 500 },
     );
   }

@@ -1,6 +1,7 @@
 import { NextResponse } from "next/server";
 
 import { hydrateUserCards } from "@/lib/connections/queries";
+import { ilikeOrFilter } from "@/lib/pgrest";
 import { createSupabaseServerClient } from "@/lib/supabase/server";
 
 const DEFAULT_LIMIT = 20;
@@ -70,12 +71,15 @@ export async function GET(req: Request, ctx: RouteContext) {
 
   let filteredIds = mutualIds;
   if (q.length > 0 && mutualIds.length > 0) {
-    const escaped = q.replace(/[%_]/g, (c) => `\\${c}`);
+    const filter = ilikeOrFilter(["name", "handle"], q);
+    if (!filter) {
+      return NextResponse.json({ ok: true, users: [], total: 0, has_more: false });
+    }
     const { data: matches } = await supabase
       .from("users")
       .select("id")
       .in("id", mutualIds)
-      .or(`name.ilike.%${escaped}%,handle.ilike.%${escaped}%`);
+      .or(filter);
     const matchSet = new Set(
       (matches ?? []).map((r) => (r as { id: string }).id),
     );

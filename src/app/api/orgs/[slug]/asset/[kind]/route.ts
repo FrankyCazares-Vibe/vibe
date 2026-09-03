@@ -1,5 +1,6 @@
 import { NextResponse } from "next/server";
 
+import { isSupabaseHttpsUrl } from "@/lib/org-asset-url";
 import { ORG_ASSET_KEY_PREFIX, signOrgAssetGetUrl } from "@/lib/r2";
 import { createSupabaseServiceClient } from "@/lib/supabase/service";
 
@@ -40,8 +41,13 @@ export async function GET(_req: Request, { params }: Params) {
     return NextResponse.json({ ok: false, error: "No asset" }, { status: 404 });
   }
 
-  // Forward-compat: if someone set a full URL directly, just redirect to it.
+  // Forward-compat for direct-set URLs — but only redirect to Supabase
+  // storage hosts. Anything else would make this route an open redirect
+  // on the app domain.
   if (stored.startsWith("http://") || stored.startsWith("https://")) {
+    if (!isSupabaseHttpsUrl(stored)) {
+      return NextResponse.json({ ok: false, error: "Unrecognized asset" }, { status: 404 });
+    }
     return NextResponse.redirect(stored, 307);
   }
 

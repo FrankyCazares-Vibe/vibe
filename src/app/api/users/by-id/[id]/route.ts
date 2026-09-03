@@ -31,7 +31,7 @@ export async function GET(_req: Request, ctx: RouteCtx) {
 
   if (error) {
     console.error("[users/by-id]", error);
-    return NextResponse.json({ ok: false, error: error.message }, { status: 500 });
+    return NextResponse.json({ ok: false, error: "Request failed" }, { status: 500 });
   }
   if (!data) {
     return NextResponse.json({ ok: false, error: "User not found" }, { status: 404 });

@@ -1,5 +1,6 @@
 import { NextResponse } from "next/server";
 
+import { isAllowedMediaUrl } from "@/lib/org-asset-url";
 import { createSupabaseServerClient } from "@/lib/supabase/server";
 import { createSupabaseServiceClient } from "@/lib/supabase/service";
 
@@ -86,6 +87,17 @@ export async function POST(req: Request, { params }: Params) {
       { status: 400 },
     );
   }
+  // Media must be an org-scoped R2 key (`orgs/<orgId>/...`) or a Supabase-
+  // hosted URL. Rejects `clips/` keys (user-owned) and third-party URLs.
+  if (mediaUrl && !isAllowedMediaUrl(mediaUrl, org.id)) {
+    return NextResponse.json({ ok: false, error: "Invalid media_url" }, { status: 400 });
+  }
+  if (mediaThumb && !isAllowedMediaUrl(mediaThumb, org.id)) {
+    return NextResponse.json(
+      { ok: false, error: "Invalid media_thumbnail_url" },
+      { status: 400 },
+    );
+  }
   if (content.length > MAX_CONTENT) {
     return NextResponse.json(
       { ok: false, error: `Content exceeds ${MAX_CONTENT} characters` },
@@ -109,7 +121,7 @@ export async function POST(req: Request, { params }: Params) {
   if (error || !row) {
     console.error("[orgs/[slug]/posts POST]", error);
     return NextResponse.json(
-      { ok: false, error: error?.message ?? "Insert failed" },
+      { ok: false, error: "Request failed" },
       { status: 500 },
     );
   }

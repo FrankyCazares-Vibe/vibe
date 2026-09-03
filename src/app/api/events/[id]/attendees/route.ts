@@ -44,7 +44,7 @@ export async function GET(_req: Request, ctx: RouteContext) {
     .maybeSingle();
   if (evErr) {
     console.error("[events/:id/attendees event]", evErr);
-    return NextResponse.json({ ok: false, error: evErr.message }, { status: 500 });
+    return NextResponse.json({ ok: false, error: "Request failed" }, { status: 500 });
   }
   if (!ev) {
     return NextResponse.json({ ok: false, error: "Event not found" }, { status: 404 });
@@ -75,7 +75,7 @@ export async function GET(_req: Request, ctx: RouteContext) {
 
   if (error) {
     console.error("[events/:id/attendees rsvps]", error);
-    return NextResponse.json({ ok: false, error: error.message }, { status: 500 });
+    return NextResponse.json({ ok: false, error: "Request failed" }, { status: 500 });
   }
 
   const rows = (data as unknown as RsvpRow[]) ?? [];

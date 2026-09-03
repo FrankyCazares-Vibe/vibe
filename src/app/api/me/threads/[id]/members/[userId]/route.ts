@@ -42,6 +42,22 @@ export async function DELETE(_req: Request, ctx: RouteCtx) {
   }
 
   const admin = createSupabaseServiceClient();
+
+  // Kicks are a group-chat concept. The DM initiator is stored as "admin",
+  // which must not let them evict the other party from a 1:1 thread.
+  if (!isSelf) {
+    const { data: chan } = await admin
+      .from("channels")
+      .select("type")
+      .eq("id", channelId)
+      .maybeSingle();
+    if (!chan || chan.type !== "group") {
+      return NextResponse.json(
+        { ok: false, error: "Members can only be removed from group chats" },
+        { status: 403 },
+      );
+    }
+  }
   const { error: delErr } = await admin
     .from("channel_members")
     .delete()
@@ -49,7 +65,7 @@ export async function DELETE(_req: Request, ctx: RouteCtx) {
     .eq("user_id", targetUserId);
   if (delErr) {
     console.error("[threads.members.DELETE]", delErr);
-    return NextResponse.json({ ok: false, error: delErr.message }, { status: 500 });
+    return NextResponse.json({ ok: false, error: "Could not remove member" }, { status: 500 });
   }
   return NextResponse.json({ ok: true });
 }

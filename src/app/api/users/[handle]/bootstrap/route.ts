@@ -61,7 +61,7 @@ export async function GET(_req: Request, ctx: RouteContext) {
 
   if (error) {
     console.error("[users/:handle/bootstrap]", error);
-    return NextResponse.json({ ok: false, error: error.message }, { status: 500 });
+    return NextResponse.json({ ok: false, error: "Request failed" }, { status: 500 });
   }
   if (!row) {
     return NextResponse.json({ ok: false, error: "User not found" }, { status: 404 });
@@ -115,7 +115,21 @@ export async function GET(_req: Request, ctx: RouteContext) {
     }
   }
 
-  const profile = normalizeProfileView(row as Record<string, unknown>);
+  // Logged-out share-link visitors get the profile card but not the
+  // documents. Resume PDFs live in a public bucket and the redaction bars
+  // are client-side overlays, so handing the URLs to an anonymous scraper
+  // would expose the un-redacted file. Signed-in viewers still get them.
+  const rowForViewer = viewer
+    ? (row as Record<string, unknown>)
+    : {
+        ...(row as Record<string, unknown>),
+        resume_url: null,
+        resume_docs: [],
+        resume_redactions: [],
+        recruiter_snapshot: {},
+      };
+
+  const profile = normalizeProfileView(rowForViewer);
   // `appShell: true` is for OWNER bootstrap; viewer bootstrap stays
   // false so the persistence layer doesn't try to sync the viewed
   // user's data as if it were the viewer's own.

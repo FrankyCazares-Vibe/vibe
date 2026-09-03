@@ -1,5 +1,6 @@
 import { NextResponse } from "next/server";
 
+import { rateLimit, tooManyRequests } from "@/lib/rate-limit";
 import { createSupabaseServerClient } from "@/lib/supabase/server";
 
 type Body = {
@@ -35,6 +36,9 @@ export async function POST(req: Request) {
     return NextResponse.json({ ok: false, error: "Unauthorized" }, { status: 401 });
   }
 
+  const rl = await rateLimit(`report:${user.id}`, { limit: 10, windowSec: 3600 });
+  if (!rl.allowed) return tooManyRequests(rl);
+
   let body: Body;
   try {
     body = (await req.json()) as Body;
@@ -68,7 +72,7 @@ export async function POST(req: Request) {
 
   if (error) {
     console.error("[reports.POST]", error);
-    return NextResponse.json({ ok: false, error: error.message }, { status: 500 });
+    return NextResponse.json({ ok: false, error: "Request failed" }, { status: 500 });
   }
   return NextResponse.json({ ok: true });
 }

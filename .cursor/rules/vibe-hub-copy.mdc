@@ -1,0 +1,22 @@
+---
+description: Sync Finder-facing files to Desktop/VIBE HUB copy after sessions
+alwaysApply: true
+---
+
+# Vibe Hub copy (Finder)
+
+Code lives in `~/vibe`. Franky also wants a Files-visible copy at:
+
+`~/Desktop/VIBE HUB copy`
+
+Do **not** treat that folder as a second codebase. Do **not** write app code there.
+
+After a session that changed any of: `brand/`, `public/html/`, `public/journal/`, `DOCS/`, `handoffs/`, `otto_mockups/`, or the Obsidian brand note — run:
+
+```bash
+bash ~/vibe/scripts/sync-vibe-hub.sh
+```
+
+Also run it at the end of a session if you created docs, a brand kit, a handoff, or HTML prototypes.
+
+The Desktop `sync.command` does the same copy (vibe → hub). The old direction (hub HTML → `public/html`) is retired.

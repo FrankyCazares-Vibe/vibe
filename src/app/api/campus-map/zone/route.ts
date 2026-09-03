@@ -75,7 +75,7 @@ export async function GET(req: Request) {
       .neq("id", user.id);
     if (error) {
       console.error("[campus-map/zone major]", error);
-      return NextResponse.json({ ok: false, error: error.message }, { status: 500 });
+      return NextResponse.json({ ok: false, error: "Request failed" }, { status: 500 });
     }
     candidateIds = (data ?? []).map((r) => (r as { id: string }).id);
   } else {
@@ -143,7 +143,7 @@ export async function GET(req: Request) {
     .in("id", candidateIds);
   if (pErr) {
     console.error("[campus-map/zone users]", pErr);
-    return NextResponse.json({ ok: false, error: pErr.message }, { status: 500 });
+    return NextResponse.json({ ok: false, error: "Request failed" }, { status: 500 });
   }
   const profiles = (profileRows as unknown as UserRow[]) ?? [];
 

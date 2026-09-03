@@ -2692,7 +2692,7 @@ async function __dmPanelMuteMember(memberId, memberName) {
     { hours: 0,   label: 'Until I unmute' },
   ];
   const note =
-    'Only mutes ' + (memberName || 'them') + ' in <strong>this group</strong>. ' +
+    'Only mutes ' + __dmEsc(memberName || 'them') + ' in <strong>this group</strong>. ' +
     'Their 1:1 DMs and posts still come through. To mute everywhere, open ' +
     'their profile and pick Mute there.';
   const choice = await __dmPickMuteDuration(memberName || 'this person', labels, note);

@@ -39,7 +39,7 @@ export async function PATCH(req: Request) {
       .eq("id", user.id);
     if (error) {
       console.error("[me/pinned PATCH unpin]", error);
-      return NextResponse.json({ ok: false, error: error.message }, { status: 500 });
+      return NextResponse.json({ ok: false, error: "Request failed" }, { status: 500 });
     }
     return NextResponse.json({ ok: true, pinned_post_id: null });
   }
@@ -60,7 +60,7 @@ export async function PATCH(req: Request) {
     .maybeSingle();
   if (postErr) {
     console.error("[me/pinned PATCH post]", postErr);
-    return NextResponse.json({ ok: false, error: postErr.message }, { status: 500 });
+    return NextResponse.json({ ok: false, error: "Request failed" }, { status: 500 });
   }
   if (!post) {
     return NextResponse.json({ ok: false, error: "Post not found" }, { status: 404 });
@@ -75,7 +75,7 @@ export async function PATCH(req: Request) {
     .eq("id", user.id);
   if (upErr) {
     console.error("[me/pinned PATCH update]", upErr);
-    return NextResponse.json({ ok: false, error: upErr.message }, { status: 500 });
+    return NextResponse.json({ ok: false, error: "Request failed" }, { status: 500 });
   }
   return NextResponse.json({ ok: true, pinned_post_id: raw });
 }

@@ -1,6 +1,7 @@
 import { NextResponse } from "next/server";
 
 import { createSupabaseServerClient } from "@/lib/supabase/server";
+import { createSupabaseServiceClient } from "@/lib/supabase/service";
 
 /**
  * GET /api/me/otto — single-roundtrip composition of Otto's home screen.
@@ -139,7 +140,8 @@ export async function GET() {
   const weekFromNowIso = new Date(Date.now() + 7 * 24 * 60 * 60 * 1000).toISOString();
 
   // Settings live on users.otto_settings — single read.
-  const settingsRes = await supabase
+  // otto_settings is private (no RLS read); self-read via service role.
+  const settingsRes = await createSupabaseServiceClient()
     .from("users")
     .select("otto_settings")
     .eq("id", user.id)

@@ -55,7 +55,7 @@ export async function POST(req: Request) {
   });
   if (error) {
     console.error("[profile-views POST]", error);
-    return NextResponse.json({ ok: false, error: error.message }, { status: 500 });
+    return NextResponse.json({ ok: false, error: "Request failed" }, { status: 500 });
   }
   return NextResponse.json({ ok: true, counted: !!data });
 }

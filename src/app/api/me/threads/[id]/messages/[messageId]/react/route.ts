@@ -85,7 +85,7 @@ export async function POST(req: Request, ctx: RouteCtx) {
       return NextResponse.json({ ok: true, already: true });
     }
     console.error("[messages/:id/react POST]", error);
-    return NextResponse.json({ ok: false, error: error.message }, { status: 500 });
+    return NextResponse.json({ ok: false, error: "Request failed" }, { status: 500 });
   }
   return NextResponse.json({ ok: true });
 }
@@ -120,7 +120,7 @@ export async function DELETE(req: Request, ctx: RouteCtx) {
 
   if (error) {
     console.error("[messages/:id/react DELETE]", error);
-    return NextResponse.json({ ok: false, error: error.message }, { status: 500 });
+    return NextResponse.json({ ok: false, error: "Request failed" }, { status: 500 });
   }
   return NextResponse.json({ ok: true });
 }

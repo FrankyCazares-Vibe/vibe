@@ -92,10 +92,7 @@ export async function POST(_req: Request, { params }: Params) {
   );
   if (error) {
     console.error("[channels.subscribe-public]", error);
-    return NextResponse.json(
-      { ok: false, error: error.message },
-      { status: 500 },
-    );
+    return NextResponse.json({ ok: false, error: "Request failed" }, { status: 500 });
   }
 
   return NextResponse.json({ ok: true, subscribed: missing.length });

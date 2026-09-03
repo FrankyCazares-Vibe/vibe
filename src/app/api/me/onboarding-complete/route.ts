@@ -62,10 +62,7 @@ export async function POST(req: Request) {
 
   if (upErr) {
     console.error("[onboarding-complete]", upErr);
-    return NextResponse.json(
-      { ok: false, error: upErr.message },
-      { status: 500 },
-    );
+    return NextResponse.json({ ok: false, error: "Request failed" }, { status: 500 });
   }
 
   const { data: row } = await supabase

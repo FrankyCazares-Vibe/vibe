@@ -4,6 +4,8 @@ import { createSupabaseServerClient } from "@/lib/supabase/server";
 import { createSupabaseServiceClient } from "@/lib/supabase/service";
 
 const CHANNEL_NAME_RE = /^[a-z0-9][a-z0-9_-]{1,30}$/;
+const MIN_POSITION = 0;
+const MAX_POSITION = 10000;
 
 type Params = { params: Promise<{ slug: string; channelId: string }> };
 type PatchBody = {
@@ -26,7 +28,7 @@ async function requireStaff(slug: string, channelId: string, viewerId: string) {
 
   const { data: channel } = await service
     .from("channels")
-    .select("id, org_id")
+    .select("id, org_id, is_private")
     .eq("id", channelId)
     .maybeSingle();
   if (!channel || channel.org_id !== org.id) {
@@ -102,8 +104,20 @@ export async function PATCH(req: Request, { params }: Params) {
   if (typeof body.is_private === "boolean") {
     patch.is_private = body.is_private;
   }
-  if (typeof body.position === "number" && Number.isFinite(body.position)) {
-    patch.position = body.position;
+  if (body.position !== undefined) {
+    const pos = body.position;
+    if (
+      typeof pos !== "number" ||
+      !Number.isInteger(pos) ||
+      pos < MIN_POSITION ||
+      pos > MAX_POSITION
+    ) {
+      return NextResponse.json(
+        { ok: false, error: `position must be an integer ${MIN_POSITION}–${MAX_POSITION}` },
+        { status: 400 }
+      );
+    }
+    patch.position = pos;
   }
   if (typeof body.pinned === "boolean") {
     patch.pinned = body.pinned;
@@ -122,6 +136,21 @@ export async function PATCH(req: Request, { params }: Params) {
   if (error || !updated) {
     console.error("[orgs/[slug]/channels/[channelId] PATCH]", error);
     return NextResponse.json({ ok: false, error: "Failed to update channel" }, { status: 500 });
+  }
+
+  // Public → private flip: drop the legacy auto-subscription rows. Every
+  // org member got a `channel_members` row while the channel was public;
+  // leaving them would keep read access through older policies. Owner /
+  // admin still auto-pass via can_view_org_channel; everyone else must be
+  // re-added to the explicit allow list.
+  if (patch.is_private === true && guard.channel.is_private === false) {
+    const { error: purgeErr } = await guard.service
+      .from("channel_members")
+      .delete()
+      .eq("channel_id", channelId);
+    if (purgeErr) {
+      console.error("[orgs/[slug]/channels/[channelId] PATCH purge-members]", purgeErr);
+    }
   }
   return NextResponse.json({ ok: true, channel: updated });
 }

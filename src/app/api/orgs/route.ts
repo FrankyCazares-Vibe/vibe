@@ -1,6 +1,8 @@
 import { NextResponse } from "next/server";
 
-import { orgAssetProxyUrl } from "@/lib/org-asset-url";
+import { normalizeOrgAssetInput, orgAssetProxyUrl } from "@/lib/org-asset-url";
+import { ilikeOrFilter } from "@/lib/pgrest";
+import { rateLimit, tooManyRequests } from "@/lib/rate-limit";
 import { createSupabaseServerClient } from "@/lib/supabase/server";
 import { createSupabaseServiceClient } from "@/lib/supabase/service";
 
@@ -122,7 +124,9 @@ export async function GET(req: Request) {
     .order("last_activity_at", { ascending: false, nullsFirst: false })
     .limit(120);
   if (q) {
-    query = query.or(`handle.ilike.%${q}%,name.ilike.%${q}%`);
+    const filter = ilikeOrFilter(["handle", "name"], q);
+    if (!filter) return NextResponse.json({ ok: true, orgs: [] });
+    query = query.or(filter);
   }
   const { data, error } = await query;
   if (error) {
@@ -189,6 +193,9 @@ export async function POST(req: Request) {
     return NextResponse.json({ ok: false, error: "Unauthorized" }, { status: 401 });
   }
 
+  const rl = await rateLimit(`org-create:${user.id}`, { limit: 5, windowSec: 3600 });
+  if (!rl.allowed) return tooManyRequests(rl);
+
   let body: CreateBody;
   try {
     body = (await req.json()) as CreateBody;
@@ -205,8 +212,13 @@ export async function POST(req: Request) {
     (VALID_BACKDROPS as readonly string[]).includes(body.backdrop_preset)
       ? (body.backdrop_preset as BackdropKey)
       : "sand-purple";
-  const logoUrl = typeof body.logo_url === "string" ? body.logo_url : null;
-  const bannerUrl = typeof body.banner_url === "string" ? body.banner_url : null;
+  // Asset values must be our own R2 keys or Supabase-hosted URLs — never an
+  // arbitrary third-party URL that the asset proxy would then redirect to.
+  const logoUrl = normalizeOrgAssetInput(body.logo_url ?? null);
+  const bannerUrl = normalizeOrgAssetInput(body.banner_url ?? null);
+  if (logoUrl === undefined || bannerUrl === undefined) {
+    return NextResponse.json({ ok: false, error: "Invalid logo_url or banner_url" }, { status: 400 });
+  }
 
   // Org creation is gated on school-verified status. Unverified accounts can
   // still join existing orgs but can't spawn new ones — keeps the directory

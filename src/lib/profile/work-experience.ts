@@ -31,7 +31,9 @@ export function sanitizeWorkExperience(input: unknown): WorkExperienceRow[] {
         try {
           const u = new URL(s);
           if (u.protocol === "https:" || u.protocol === "http:") {
-            logo_url = s.slice(0, 2048);
+            // Store the normalized href, not the raw input, so stray
+            // quotes/whitespace never reach the client attribute.
+            logo_url = u.href.slice(0, 2048);
           }
         } catch {
           logo_url = null;
@@ -41,7 +43,7 @@ export function sanitizeWorkExperience(input: unknown): WorkExperienceRow[] {
       try {
         const u = new URL(o.logo_url.trim());
         if (u.protocol === "https:" || u.protocol === "http:") {
-          logo_url = o.logo_url.trim().slice(0, 2048);
+          logo_url = u.href.slice(0, 2048);
         }
       } catch {
         logo_url = null;

@@ -1,5 +1,6 @@
 import { NextResponse } from "next/server";
 
+import { requirePlatformAdmin } from "@/lib/auth/require-platform-admin";
 import { createSupabaseClient } from "@/lib/supabase";
 
 /**
@@ -7,6 +8,9 @@ import { createSupabaseClient } from "@/lib/supabase";
  * Schema-backed queries land in P1-005+.
  */
 export async function GET() {
+  const gate = await requirePlatformAdmin();
+  if (!gate.ok) return gate.response;
+
   try {
     const baseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL?.replace(/\/$/, "");
     const anonKey = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY?.trim();

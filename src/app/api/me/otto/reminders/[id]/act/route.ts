@@ -31,7 +31,7 @@ export async function POST(_req: Request, ctx: { params: Promise<{ id: string }>
 
   if (error) {
     console.error("[otto/reminders ACT]", error);
-    return NextResponse.json({ ok: false, error: error.message }, { status: 500 });
+    return NextResponse.json({ ok: false, error: "Request failed" }, { status: 500 });
   }
   return NextResponse.json({ ok: true });
 }

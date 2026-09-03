@@ -32,10 +32,13 @@ export async function GET(req: Request, { params }: Params) {
   const service = createSupabaseServiceClient();
   const column = variant === "thumbnail" ? "media_thumbnail_url" : "media_url";
 
+  // Published posts only — drafts must never be reachable by id from an
+  // unauthenticated caller.
   const { data: row } = await service
     .from("posts")
     .select(`id, ${column}`)
     .eq("id", id)
+    .eq("status", "published")
     .maybeSingle();
   if (!row) {
     return NextResponse.json({ ok: false, error: "Not found" }, { status: 404 });

@@ -37,7 +37,7 @@ export async function POST(req: Request, ctx: RouteCtx) {
 
   if (readErr) {
     console.error("[threads.pin read]", readErr);
-    return NextResponse.json({ ok: false, error: readErr.message }, { status: 500 });
+    return NextResponse.json({ ok: false, error: "Request failed" }, { status: 500 });
   }
   if (!existing) {
     return NextResponse.json({ ok: false, error: "Not a member" }, { status: 403 });
@@ -55,7 +55,7 @@ export async function POST(req: Request, ctx: RouteCtx) {
 
   if (updErr) {
     console.error("[threads.pin update]", updErr);
-    return NextResponse.json({ ok: false, error: updErr.message }, { status: 500 });
+    return NextResponse.json({ ok: false, error: "Request failed" }, { status: 500 });
   }
   return NextResponse.json({ ok: true, pinned: wantPinned });
 }

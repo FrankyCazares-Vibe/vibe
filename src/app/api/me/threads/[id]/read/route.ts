@@ -24,7 +24,7 @@ export async function POST(_req: Request, ctx: RouteCtx) {
 
   if (error) {
     console.error("[threads.read]", error);
-    return NextResponse.json({ ok: false, error: error.message }, { status: 500 });
+    return NextResponse.json({ ok: false, error: "Request failed" }, { status: 500 });
   }
   return NextResponse.json({ ok: true });
 }

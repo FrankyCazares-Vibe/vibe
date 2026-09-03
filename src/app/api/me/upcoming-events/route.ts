@@ -59,7 +59,7 @@ export async function GET(req: Request) {
 
   if (error) {
     console.error("[me/upcoming-events]", error);
-    return NextResponse.json({ ok: false, error: error.message }, { status: 500 });
+    return NextResponse.json({ ok: false, error: "Request failed" }, { status: 500 });
   }
 
   const rows = (data as unknown as RsvpRow[]) ?? [];

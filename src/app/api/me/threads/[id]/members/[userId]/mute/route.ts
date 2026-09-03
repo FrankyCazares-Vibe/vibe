@@ -78,7 +78,7 @@ export async function POST(req: Request, ctx: RouteCtx) {
       );
     }
     console.error("[channelMemberMute.POST]", error);
-    return NextResponse.json({ ok: false, error: error.message }, { status: 500 });
+    return NextResponse.json({ ok: false, error: "Request failed" }, { status: 500 });
   }
   return NextResponse.json({ ok: true, until });
 }
@@ -102,7 +102,7 @@ export async function DELETE(_req: Request, ctx: RouteCtx) {
     .eq("muted_user_id", targetUserId);
   if (error) {
     console.error("[channelMemberMute.DELETE]", error);
-    return NextResponse.json({ ok: false, error: error.message }, { status: 500 });
+    return NextResponse.json({ ok: false, error: "Request failed" }, { status: 500 });
   }
   return NextResponse.json({ ok: true });
 }

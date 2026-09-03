@@ -1,6 +1,6 @@
 import { NextResponse } from "next/server";
 
-import { orgAssetProxyUrl } from "@/lib/org-asset-url";
+import { normalizeOrgAssetInput, orgAssetProxyUrl } from "@/lib/org-asset-url";
 import { createSupabaseServerClient } from "@/lib/supabase/server";
 import { createSupabaseServiceClient } from "@/lib/supabase/service";
 
@@ -151,11 +151,19 @@ export async function PATCH(req: Request, { params }: Params) {
   ) {
     patch.backdrop_preset = body.backdrop_preset;
   }
-  if (typeof body.logo_url === "string" || body.logo_url === null) {
-    patch.logo_url = body.logo_url;
+  if (body.logo_url !== undefined) {
+    const v = normalizeOrgAssetInput(body.logo_url);
+    if (v === undefined) {
+      return NextResponse.json({ ok: false, error: "Invalid logo_url" }, { status: 400 });
+    }
+    patch.logo_url = v;
   }
-  if (typeof body.banner_url === "string" || body.banner_url === null) {
-    patch.banner_url = body.banner_url;
+  if (body.banner_url !== undefined) {
+    const v = normalizeOrgAssetInput(body.banner_url);
+    if (v === undefined) {
+      return NextResponse.json({ ok: false, error: "Invalid banner_url" }, { status: 400 });
+    }
+    patch.banner_url = v;
   }
   if (typeof body.is_public === "boolean") {
     patch.is_public = body.is_public;
@@ -210,7 +218,26 @@ export async function DELETE(_req: Request, { params }: Params) {
     return NextResponse.json({ ok: false, error: "Unauthorized" }, { status: 401 });
   }
 
-  const { error } = await supabase.from("orgs").delete().eq("handle", slug);
+  // Resolve + authorize explicitly. An RLS-scoped delete silently affects 0
+  // rows for non-owners and would still report success here.
+  const service = createSupabaseServiceClient();
+  const { data: org, error: fetchErr } = await service
+    .from("orgs")
+    .select("id, owner_id")
+    .eq("handle", slug)
+    .maybeSingle();
+  if (fetchErr) {
+    console.error("[orgs/[slug] DELETE lookup]", fetchErr);
+    return NextResponse.json({ ok: false, error: "Failed to delete" }, { status: 500 });
+  }
+  if (!org) {
+    return NextResponse.json({ ok: false, error: "Not found" }, { status: 404 });
+  }
+  if (org.owner_id !== user.id) {
+    return NextResponse.json({ ok: false, error: "Owner only" }, { status: 403 });
+  }
+
+  const { error } = await service.from("orgs").delete().eq("id", org.id);
   if (error) {
     console.error("[orgs/[slug] DELETE]", error);
     return NextResponse.json({ ok: false, error: "Failed to delete" }, { status: 500 });

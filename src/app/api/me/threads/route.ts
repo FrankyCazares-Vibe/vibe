@@ -2,6 +2,7 @@ import { NextResponse } from "next/server";
 
 import { getFollowState } from "@/lib/connections/queries";
 import { GROUP_PHOTO_KEY_PREFIX, isR2Configured, signGroupPhotoGetUrl } from "@/lib/r2";
+import { rateLimit, tooManyRequests } from "@/lib/rate-limit";
 import { createSupabaseServerClient } from "@/lib/supabase/server";
 import { createSupabaseServiceClient } from "@/lib/supabase/service";
 
@@ -192,6 +193,9 @@ export async function POST(req: Request) {
     return NextResponse.json({ ok: false, error: "Unauthorized" }, { status: 401 });
   }
 
+  const rl = await rateLimit(`thread-create:${user.id}`, { limit: 30, windowSec: 600 });
+  if (!rl.allowed) return tooManyRequests(rl);
+
   let body: CreateBody;
   try {
     body = (await req.json()) as CreateBody;
@@ -216,6 +220,23 @@ export async function POST(req: Request) {
       return NextResponse.json(
         { ok: false, error: `Max ${MAX_GROUP_MEMBERS} members per group` },
         { status: 400 },
+      );
+    }
+    // Same rule as adding someone to an existing group: you can only pull
+    // people you're mutually connected with into a chat. Without this,
+    // group creation was a way to bypass the 1:1 message-request inbox.
+    const states = await Promise.all(
+      memberIds.map((id) => getFollowState(supabase, user.id, id)),
+    );
+    const notConnected = memberIds.filter((_, i) => states[i] !== "connected");
+    if (notConnected.length > 0) {
+      return NextResponse.json(
+        {
+          ok: false,
+          error: "You can only add people you're connected with",
+          not_connected: notConnected,
+        },
+        { status: 403 },
       );
     }
     const groupName =
@@ -348,7 +369,7 @@ export async function GET() {
 
   if (memErr) {
     console.error("[threads.GET memberships]", memErr);
-    return NextResponse.json({ ok: false, error: memErr.message }, { status: 500 });
+    return NextResponse.json({ ok: false, error: "Request failed" }, { status: 500 });
   }
 
   type Membership = {
@@ -427,7 +448,7 @@ export async function GET() {
 
   if (othersErr) {
     console.error("[threads.GET others]", othersErr);
-    return NextResponse.json({ ok: false, error: othersErr.message }, { status: 500 });
+    return NextResponse.json({ ok: false, error: "Request failed" }, { status: 500 });
   }
 
   type OtherRow = {

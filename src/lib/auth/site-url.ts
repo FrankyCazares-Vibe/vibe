@@ -5,14 +5,21 @@
  * Guards against env mistakes (e.g. value literally "NEXT_PUBLIC_SITE_URL"),
  * so email templates never emit broken links.
  *
- * For school verification, prefer getSiteOriginForRequest(req) so the link matches
- * the host the user is signed in on (e.g. localhost during dev).
+ * For school verification, getSiteOriginForRequest(req) honours the request
+ * origin only for localhost / 127.0.0.1 (dev); otherwise it is getSiteUrl().
  */
 
+const DEV_HOSTNAMES = new Set(["localhost", "127.0.0.1", "[::1]", "::1"]);
+
+/**
+ * Only local development may derive the link origin from the incoming
+ * request; in production the Host header is attacker-influenced and would
+ * let a forged request mint verification links pointing at another host.
+ */
 export function getSiteOriginForRequest(req: Request): string {
   try {
     const u = new URL(req.url);
-    if (u.host) {
+    if (DEV_HOSTNAMES.has(u.hostname.toLowerCase())) {
       return u.origin;
     }
   } catch {

@@ -44,7 +44,7 @@ export async function GET(_req: Request, ctx: RouteContext) {
 
   if (error) {
     console.error("[posts/:id GET]", error);
-    return NextResponse.json({ ok: false, error: error.message }, { status: 500 });
+    return NextResponse.json({ ok: false, error: "Request failed" }, { status: 500 });
   }
   if (!row) {
     return NextResponse.json({ ok: false, error: "Post not found" }, { status: 404 });
@@ -125,7 +125,7 @@ export async function DELETE(_req: Request, ctx: RouteContext) {
     .maybeSingle();
   if (readErr) {
     console.error("[posts/:id DELETE read]", readErr);
-    return NextResponse.json({ ok: false, error: readErr.message }, { status: 500 });
+    return NextResponse.json({ ok: false, error: "Request failed" }, { status: 500 });
   }
   if (!row) {
     return NextResponse.json({ ok: false, error: "Post not found" }, { status: 404 });
@@ -137,7 +137,7 @@ export async function DELETE(_req: Request, ctx: RouteContext) {
   const { error: delErr } = await supabase.from("posts").delete().eq("id", id);
   if (delErr) {
     console.error("[posts/:id DELETE]", delErr);
-    return NextResponse.json({ ok: false, error: delErr.message }, { status: 500 });
+    return NextResponse.json({ ok: false, error: "Request failed" }, { status: 500 });
   }
 
   // Best-effort R2 cleanup for any post whose media is an R2 video object.
@@ -205,7 +205,7 @@ export async function PATCH(req: Request, ctx: RouteContext) {
     .maybeSingle();
   if (readErr) {
     console.error("[posts/:id PATCH read]", readErr);
-    return NextResponse.json({ ok: false, error: readErr.message }, { status: 500 });
+    return NextResponse.json({ ok: false, error: "Request failed" }, { status: 500 });
   }
   if (!prior) {
     return NextResponse.json({ ok: false, error: "Post not found" }, { status: 404 });
@@ -255,10 +255,7 @@ export async function PATCH(req: Request, ctx: RouteContext) {
     .single();
   if (upErr || !row) {
     console.error("[posts/:id PATCH]", upErr);
-    return NextResponse.json(
-      { ok: false, error: upErr?.message ?? "Update failed" },
-      { status: 500 },
-    );
+    return NextResponse.json({ ok: false, error: "Request failed" }, { status: 500 });
   }
 
   // First-publish mention fan-out — only fires when the draft is being

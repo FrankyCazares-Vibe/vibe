@@ -1,6 +1,7 @@
 import { NextResponse } from "next/server";
 
 import { createSupabaseServerClient } from "@/lib/supabase/server";
+import { createSupabaseServiceClient } from "@/lib/supabase/service";
 
 /**
  * PATCH /api/me/otto/settings
@@ -79,18 +80,21 @@ export async function PATCH(req: Request) {
     return NextResponse.json({ ok: true, settings: null, noop: true });
   }
 
-  const cur = await supabase
+  // otto_settings is private (no RLS read); read + write-return go through
+  // the service role scoped to the signed-in user's id.
+  const service = createSupabaseServiceClient();
+  const cur = await service
     .from("users")
     .select("otto_settings")
     .eq("id", user.id)
     .maybeSingle();
   if (cur.error) {
     console.error("[otto/settings PATCH read]", cur.error);
-    return NextResponse.json({ ok: false, error: cur.error.message }, { status: 500 });
+    return NextResponse.json({ ok: false, error: "Could not load settings" }, { status: 500 });
   }
   const next = { ...(cur.data?.otto_settings ?? {}), ...patch };
 
-  const { data, error } = await supabase
+  const { data, error } = await service
     .from("users")
     .update({ otto_settings: next })
     .eq("id", user.id)
@@ -98,7 +102,7 @@ export async function PATCH(req: Request) {
     .single();
   if (error) {
     console.error("[otto/settings PATCH write]", error);
-    return NextResponse.json({ ok: false, error: error.message }, { status: 500 });
+    return NextResponse.json({ ok: false, error: "Could not save settings" }, { status: 500 });
   }
 
   return NextResponse.json({ ok: true, settings: data.otto_settings });

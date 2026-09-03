@@ -1,10 +1,13 @@
 import { NextResponse } from "next/server";
 
+import { isUuid } from "@/lib/pgrest";
 import { createSupabaseServerClient } from "@/lib/supabase/server";
 import { createSupabaseServiceClient } from "@/lib/supabase/service";
 
 type Params = { params: Promise<{ slug: string }> };
 type Body = { channel_ids?: unknown };
+
+const MAX_IDS = 200;
 
 /**
  * POST /api/orgs/[slug]/channels/reorder
@@ -43,6 +46,18 @@ export async function POST(req: Request, { params }: Params) {
   const channelIds = body.channel_ids as string[];
   if (channelIds.length === 0) {
     return NextResponse.json({ ok: true });
+  }
+  if (channelIds.length > MAX_IDS) {
+    return NextResponse.json(
+      { ok: false, error: `channel_ids may contain at most ${MAX_IDS} entries` },
+      { status: 400 }
+    );
+  }
+  if (!channelIds.every(isUuid)) {
+    return NextResponse.json(
+      { ok: false, error: "channel_ids must be UUIDs" },
+      { status: 400 }
+    );
   }
 
   const service = createSupabaseServiceClient();

@@ -39,7 +39,7 @@ export async function POST(req: Request) {
       .is("read_at", null);
     if (error) {
       console.error("[notifications/mark-read all]", error);
-      return NextResponse.json({ ok: false, error: error.message }, { status: 500 });
+      return NextResponse.json({ ok: false, error: "Request failed" }, { status: 500 });
     }
     return NextResponse.json({ ok: true, updated: count ?? 0 });
   }
@@ -57,7 +57,7 @@ export async function POST(req: Request) {
       .is("read_at", null);
     if (error) {
       console.error("[notifications/mark-read ids]", error);
-      return NextResponse.json({ ok: false, error: error.message }, { status: 500 });
+      return NextResponse.json({ ok: false, error: "Request failed" }, { status: 500 });
     }
     return NextResponse.json({ ok: true, updated: count ?? 0 });
   }

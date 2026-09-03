@@ -35,7 +35,7 @@ export async function DELETE(_req: Request, ctx: RouteCtx) {
     .maybeSingle();
   if (lookupErr) {
     console.error("[messages.DELETE lookup]", lookupErr);
-    return NextResponse.json({ ok: false, error: lookupErr.message }, { status: 500 });
+    return NextResponse.json({ ok: false, error: "Request failed" }, { status: 500 });
   }
   if (!msg) {
     return NextResponse.json({ ok: false, error: "Message not found" }, { status: 404 });
@@ -54,7 +54,7 @@ export async function DELETE(_req: Request, ctx: RouteCtx) {
     .eq("user_id", user.id);
   if (error) {
     console.error("[messages.DELETE]", error);
-    return NextResponse.json({ ok: false, error: error.message }, { status: 500 });
+    return NextResponse.json({ ok: false, error: "Request failed" }, { status: 500 });
   }
   return NextResponse.json({ ok: true });
 }

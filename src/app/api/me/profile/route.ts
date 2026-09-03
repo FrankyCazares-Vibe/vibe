@@ -1,8 +1,10 @@
 import { NextResponse } from "next/server";
 
 import { sanitizeRecruiterSnapshot } from "@/lib/profile/recruiter-snapshot";
+import { changeHandleForUser } from "@/lib/profile/handle-change";
 import { sanitizeWorkExperience } from "@/lib/profile/work-experience";
 import { createSupabaseServerClient } from "@/lib/supabase/server";
+import { createSupabaseServiceClient } from "@/lib/supabase/service";
 
 const LOOKING_FOR_OPTIONS = [
   "meeting-people",
@@ -65,49 +67,6 @@ function lookingForArray(val: unknown): string[] | undefined {
   return [...out];
 }
 
-const HANDLE_RE = /^[a-z][a-z0-9_]{2,29}$/;
-
-const RESERVED_HANDLES = new Set([
-  "admin",
-  "api",
-  "support",
-  "system",
-  "vibe",
-  "help",
-  "feed",
-  "campus",
-  "profile",
-  "messages",
-  "network",
-  "settings",
-  "login",
-  "signup",
-  "auth",
-]);
-
-function parsePublicHandle(val: unknown):
-  | { ok: true; handle: string }
-  | { ok: false; error: string } {
-  if (typeof val !== "string") {
-    return { ok: false, error: "Invalid handle." };
-  }
-  const t = val.trim().toLowerCase();
-  if (!t) {
-    return { ok: false, error: "Handle is required." };
-  }
-  if (!HANDLE_RE.test(t)) {
-    return {
-      ok: false,
-      error:
-        "Use 3–30 characters: start with a letter, then lowercase letters, numbers, or underscores.",
-    };
-  }
-  if (RESERVED_HANDLES.has(t)) {
-    return { ok: false, error: "That handle is reserved. Try another." };
-  }
-  return { ok: true, handle: t };
-}
-
 /**
  * Update the signed-in user's `public.users` row. Only whitelisted columns; RLS enforces self-only.
  */
@@ -129,16 +88,29 @@ export async function PATCH(req: Request) {
   }
 
   const patch: Record<string, unknown> = {};
+  let handleTouched = false;
 
   const name = trimStr(body.name, 120);
   if (name !== null) patch.name = name;
 
+  // Handle changes share the same validator + 14-day cooldown as
+  // /api/me/handle (changeHandleForUser). `users.handle` is not
+  // self-updatable via RLS, so this branch writes through the service role.
   if ("handle" in body && body.handle !== undefined && body.handle !== null) {
-    const parsed = parsePublicHandle(body.handle);
-    if (!parsed.ok) {
-      return NextResponse.json({ ok: false, error: parsed.error }, { status: 400 });
+    handleTouched = true;
+    const result = await changeHandleForUser(user.id, body.handle);
+    if (!result.ok) {
+      return NextResponse.json(
+        {
+          ok: false,
+          error: result.status === 409 ? "That @handle is already taken. Try another." : result.error,
+          ...(result.cooldown_days_left !== undefined
+            ? { cooldown_days_left: result.cooldown_days_left }
+            : {}),
+        },
+        { status: result.status },
+      );
     }
-    patch.handle = parsed.handle;
   }
 
   const bio = trimStr(body.bio, 4000);
@@ -147,8 +119,17 @@ export async function PATCH(req: Request) {
   const tagline = trimStr(body.tagline, 500);
   if (tagline !== null) patch.tagline = tagline;
 
-  const website = trimStr(body.website, 2048);
-  if (website !== null) patch.website = website;
+  if ("website" in body) {
+    if (body.website === "" || body.website === null) {
+      patch.website = "";
+    } else {
+      try {
+        patch.website = parseUrlField(body.website) ?? "";
+      } catch {
+        return NextResponse.json({ ok: false, error: "Invalid website" }, { status: 400 });
+      }
+    }
+  }
 
   const headline = trimStr(body.headline, 500);
   if (headline !== null) patch.headline = headline;
@@ -234,25 +215,23 @@ export async function PATCH(req: Request) {
     patch.recruiter_snapshot = snap;
   }
 
-  if (Object.keys(patch).length === 0) {
+  if (Object.keys(patch).length === 0 && !handleTouched) {
     return NextResponse.json({ ok: false, error: "No valid fields to update" }, { status: 400 });
   }
 
-  const { error: upErr } = await supabase.from("users").update(patch).eq("id", user.id);
+  const { error: upErr } =
+    Object.keys(patch).length > 0
+      ? await supabase.from("users").update(patch).eq("id", user.id)
+      : { error: null };
 
   if (upErr) {
     console.error("[me/profile PATCH]", upErr);
-    const msg = upErr.message ?? "";
-    if (/duplicate key|unique constraint/i.test(msg) && patch.handle !== undefined) {
-      return NextResponse.json(
-        { ok: false, error: "That @handle is already taken. Try another." },
-        { status: 409 },
-      );
-    }
-    return NextResponse.json({ ok: false, error: upErr.message }, { status: 500 });
+    return NextResponse.json({ ok: false, error: "Could not save profile" }, { status: 500 });
   }
 
-  const { data: row, error: selErr } = await supabase
+  // email / school_email are private columns (no RLS read); self-read via
+  // the service role scoped to the caller's id.
+  const { data: row, error: selErr } = await createSupabaseServiceClient()
     .from("users")
     .select(
       "id,email,name,handle,school,school_email,school_verified,year,major,department,bio,tagline,website,headline,location_text,banner_gradient,avatar_url,banner_url,resume_url,interests,skills,looking_for,work_experience,recruiter_snapshot",

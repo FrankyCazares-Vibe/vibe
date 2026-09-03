@@ -35,7 +35,7 @@ export async function GET() {
   const firstErr = totalRes.error ?? activeRes.error;
   if (firstErr) {
     console.error("[stats/campus]", firstErr);
-    return NextResponse.json({ ok: false, error: firstErr.message }, { status: 500 });
+    return NextResponse.json({ ok: false, error: "Request failed" }, { status: 500 });
   }
 
   return NextResponse.json({

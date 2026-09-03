@@ -111,7 +111,7 @@ export async function GET(req: Request) {
     .single();
   if (meErr) {
     console.error("[feed me]", meErr);
-    return NextResponse.json({ ok: false, error: meErr.message }, { status: 500 });
+    return NextResponse.json({ ok: false, error: "Request failed" }, { status: 500 });
   }
 
   const school = (me?.school ?? "").trim();

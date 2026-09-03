@@ -3,6 +3,7 @@ import { redirect } from "next/navigation";
 import { DEFAULT_POST_LOGIN_PATH } from "@/lib/auth/email-confirm-redirect";
 import { isOttoOnboardingComplete } from "@/lib/auth/post-login";
 import { createSupabaseServerClient } from "@/lib/supabase/server";
+import { createSupabaseServiceClient } from "@/lib/supabase/service";
 
 /**
  * Campus shell routes: require login, Otto saved to DB, and verified school email.
@@ -17,7 +18,9 @@ export async function enforceCampusAccess(currentPath: string) {
     redirect(`/auth/login?next=${encodeURIComponent(currentPath)}`);
   }
 
-  const { data: row } = await supabase
+  // otto_answers is a private column (not readable through RLS), so the
+  // self-read goes through the service role scoped to the caller's id.
+  const { data: row } = await createSupabaseServiceClient()
     .from("users")
     .select("otto_answers, school_verified")
     .eq("id", user.id)
@@ -43,7 +46,9 @@ export async function enforceSchoolEmailPage() {
     redirect(`/auth/login?next=${encodeURIComponent("/auth/school-email")}`);
   }
 
-  const { data: row } = await supabase
+  // otto_answers is a private column (not readable through RLS), so the
+  // self-read goes through the service role scoped to the caller's id.
+  const { data: row } = await createSupabaseServiceClient()
     .from("users")
     .select("otto_answers, school_verified")
     .eq("id", user.id)

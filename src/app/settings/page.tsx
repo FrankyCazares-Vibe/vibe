@@ -3,6 +3,7 @@ import { redirect } from "next/navigation";
 import { CampusAppShell } from "@/components/campus-app-shell";
 import { SettingsClient } from "@/components/settings/SettingsClient";
 import { createSupabaseServerClient } from "@/lib/supabase/server";
+import { createSupabaseServiceClient } from "@/lib/supabase/service";
 
 export const metadata = {
   title: "Settings · Vibe",
@@ -18,7 +19,9 @@ export default async function SettingsPage() {
     redirect(`/auth/login?next=${encodeURIComponent("/settings")}`);
   }
 
-  const { data: profile } = await supabase
+  // email / school_email are private columns (no RLS read); the self-read
+  // goes through the service role scoped to the signed-in user's id.
+  const { data: profile } = await createSupabaseServiceClient()
     .from("users")
     .select(
       "id,email,name,handle,handle_changed_at,school,school_email,school_verified,year,major,created_at",

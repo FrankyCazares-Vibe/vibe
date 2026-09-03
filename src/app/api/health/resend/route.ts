@@ -1,9 +1,13 @@
 import { NextResponse } from "next/server";
 
+import { requirePlatformAdmin } from "@/lib/auth/require-platform-admin";
 import { isResendConfigured, probeResendApi } from "@/lib/resend";
 
 /** P1-003 smoke check: Resend API key valid (domains.list, or inferred OK for send-only keys — never sends mail). */
 export async function GET() {
+  const gate = await requirePlatformAdmin();
+  if (!gate.ok) return gate.response;
+
   if (!isResendConfigured()) {
     return NextResponse.json(
       {

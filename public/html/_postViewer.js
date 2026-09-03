@@ -506,13 +506,18 @@
       if (isOwner) {
         menu.innerHTML = `<button type="button" class="danger" onclick="window.__vpvDeletePost()">Delete post</button>`;
       } else {
-        const safeId = String(state.openId || "").replace(/'/g, "\\'");
-        const safeAuthor = String(state.authorId || "").replace(/'/g, "\\'");
-        const safeName = String(state.authorName || "").replace(/'/g, "\\'");
+        // Attribute-safe JS literals: JSON.stringify builds the JS string,
+        // esc() makes it safe inside onclick="..." (decoded before eval).
+        const authorId = String(state.authorId || "");
+        const authorName = String(state.authorName || "");
+        const safeId = esc(JSON.stringify(String(state.openId || "")));
+        const safeAuthor = esc(JSON.stringify(authorId));
+        const safeName = esc(JSON.stringify(authorName));
+        const firstName = esc(authorName.split(' ')[0] || 'author');
         menu.innerHTML = `
-          <button type="button" onclick="window.__vpvCloseMenu();window.vibeOpenReportSheet('post','${safeId}')">Report post</button>
-          ${safeAuthor ? `<button type="button" onclick="window.__vpvCloseMenu();window.vibeOpenMuteSheet('${safeAuthor}','${safeName}')">Mute ${safeName ? safeName.split(' ')[0] : 'author'}</button>` : ''}
-          ${safeAuthor ? `<button type="button" class="danger" onclick="window.__vpvCloseMenu();window.vibeBlock('${safeAuthor}','${safeName}', () => window.__vpvClose())">Block ${safeName ? safeName.split(' ')[0] : 'author'}</button>` : ''}
+          <button type="button" onclick="window.__vpvCloseMenu();window.vibeOpenReportSheet('post',${safeId})">Report post</button>
+          ${authorId ? `<button type="button" onclick="window.__vpvCloseMenu();window.vibeOpenMuteSheet(${safeAuthor},${safeName})">Mute ${firstName}</button>` : ''}
+          ${authorId ? `<button type="button" class="danger" onclick="window.__vpvCloseMenu();window.vibeBlock(${safeAuthor},${safeName}, () => window.__vpvClose())">Block ${firstName}</button>` : ''}
         `;
       }
     }

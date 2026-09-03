@@ -1,5 +1,6 @@
 import { NextResponse } from "next/server";
 
+import { requirePlatformAdmin } from "@/lib/auth/require-platform-admin";
 import { isSchoolVerifySecretConfigured } from "@/lib/auth/school-email-token";
 import { isResendConfigured } from "@/lib/resend";
 import { isSupabaseServiceConfigured } from "@/lib/supabase/service";
@@ -8,6 +9,9 @@ import { isSupabaseServiceConfigured } from "@/lib/supabase/service";
  * P1-006 — reports whether server-side auth email flows can run.
  */
 export async function GET() {
+  const gate = await requirePlatformAdmin();
+  if (!gate.ok) return gate.response;
+
   const resendFrom = Boolean(process.env.RESEND_FROM?.trim());
   const siteUrl = Boolean(
     process.env.NEXT_PUBLIC_SITE_URL?.trim() || process.env.VERCEL_URL?.trim(),

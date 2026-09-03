@@ -10,6 +10,7 @@ import {
   MESSAGE_MEDIA_KEY_PREFIX,
   signMessageMediaGetUrl,
 } from "@/lib/r2";
+import { rateLimit, tooManyRequests } from "@/lib/rate-limit";
 import { createSupabaseServerClient } from "@/lib/supabase/server";
 
 const MAX_CONTENT = 4000;
@@ -329,7 +330,7 @@ export async function GET(req: Request, ctx: RouteCtx) {
   }
   if (error) {
     console.error("[messages.GET]", error);
-    return NextResponse.json({ ok: false, error: error.message }, { status: 500 });
+    return NextResponse.json({ ok: false, error: "Request failed" }, { status: 500 });
   }
   // Sign R2 keys in media_url so the browser can render directly.
   const messageRows = (data ?? []) as unknown as MessageRow[];
@@ -429,6 +430,9 @@ export async function POST(req: Request, ctx: RouteCtx) {
   if (authErr || !user) {
     return NextResponse.json({ ok: false, error: "Unauthorized" }, { status: 401 });
   }
+
+  const rl = await rateLimit(`message-send:${user.id}`, { limit: 60, windowSec: 60 });
+  if (!rl.allowed) return tooManyRequests(rl);
 
   let body: SendBody;
   try {
@@ -606,7 +610,7 @@ export async function POST(req: Request, ctx: RouteCtx) {
 
   if (insErr || !inserted) {
     console.error("[messages.POST insert]", insErr);
-    return NextResponse.json({ ok: false, error: insErr?.message ?? "Insert failed" }, { status: 500 });
+    return NextResponse.json({ ok: false, error: "Request failed" }, { status: 500 });
   }
 
   // DM/group housekeeping: implicit-accept on first reply, bump last_read_at.

@@ -2,6 +2,7 @@ import { NextResponse } from "next/server";
 
 import { getSiteUrl } from "@/lib/auth/site-url";
 import { sendPasswordResetEmail } from "@/lib/email/resend-transactional";
+import { clientIp, rateLimit, tooManyRequests } from "@/lib/rate-limit";
 import {
   createSupabaseServiceClient,
   isSupabaseServiceConfigured,
@@ -12,6 +13,9 @@ type Body = { email?: string };
 /**
  * P1-006 — password reset via Resend: admin generateLink (recovery) + custom email.
  * Configure Supabase Auth redirect URLs to include `${SITE_URL}/auth/update-password`.
+ *
+ * Every non-config outcome returns the same constant body so the endpoint
+ * cannot be used to enumerate which emails have accounts.
  */
 export async function POST(req: Request) {
   const generic = {
@@ -19,6 +23,12 @@ export async function POST(req: Request) {
     message:
       "If an account exists for that email, you'll receive reset instructions shortly.",
   };
+
+  const perIp = await rateLimit(`pw-reset-ip:${clientIp(req)}`, {
+    limit: 5,
+    windowSec: 900,
+  });
+  if (!perIp.allowed) return tooManyRequests(perIp);
 
   let body: Body;
   try {
@@ -32,6 +42,12 @@ export async function POST(req: Request) {
   if (!email || !email.includes("@")) {
     return NextResponse.json(generic);
   }
+
+  const perEmail = await rateLimit(`pw-reset-email:${email}`, {
+    limit: 3,
+    windowSec: 3600,
+  });
+  if (!perEmail.allowed) return tooManyRequests(perEmail);
 
   if (!isSupabaseServiceConfigured()) {
     return NextResponse.json(
@@ -56,15 +72,16 @@ export async function POST(req: Request) {
     });
 
     if (error || !data?.properties?.action_link) {
+      if (error) {
+        console.error("[auth/password-reset] generateLink", error.message);
+      }
       return NextResponse.json(generic);
     }
 
     await sendPasswordResetEmail(email, data.properties.action_link);
   } catch (err) {
+    // Never surface provider/config messages to the caller.
     const message = err instanceof Error ? err.message : String(err);
-    if (/RESEND_FROM/i.test(message)) {
-      return NextResponse.json({ ok: false, error: message }, { status: 503 });
-    }
     console.error("[auth/password-reset]", message);
     return NextResponse.json(generic);
   }

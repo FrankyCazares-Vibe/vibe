@@ -4,14 +4,12 @@ import { Suspense, useEffect, useRef, useState } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
 
 import { POST_EMAIL_CONFIRM_PATH } from "@/lib/auth/email-confirm-redirect";
+import { isSafeRelativePath } from "@/lib/auth/login-next";
 import { getSupabaseBrowserClient } from "@/lib/supabase/browser";
 import type { SupabaseClient } from "@supabase/supabase-js";
 
 function safeNextPath(next: string | null): string | null {
-  if (!next || !next.startsWith("/") || next.startsWith("//")) {
-    return null;
-  }
-  return next;
+  return isSafeRelativePath(next) ? next : null;
 }
 
 /** One exchange per PKCE code — React Strict Mode runs effects twice and would otherwise race. */
