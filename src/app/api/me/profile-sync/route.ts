@@ -3,8 +3,14 @@ import { NextResponse } from "next/server";
 import { sanitizeCurrentOn } from "@/lib/profile/current-on";
 import { normalizeProfileView } from "@/lib/profile/normalize-profile-view";
 import { sanitizeRecruiterSnapshot } from "@/lib/profile/recruiter-snapshot";
+import { resumeKeyOwnerId } from "@/lib/profile/resume-doc-url";
 import { sanitizeResumeDocs } from "@/lib/profile/resume-docs";
 import { sanitizeResumeRedactions } from "@/lib/profile/resume-redactions";
+import {
+  deleteResumeObjects,
+  resolveResumeUrlInput,
+  resumeKeysReferenced,
+} from "@/lib/profile/resume-storage";
 import { inlineOrUploadProfileUrl } from "@/lib/profile/storage-upload";
 import { sanitizeWorkExperience } from "@/lib/profile/work-experience";
 import { createSupabaseServerClient } from "@/lib/supabase/server";
@@ -161,14 +167,37 @@ export async function POST(req: Request) {
   const avatar = await inlineOrUploadProfileUrl(supabase, user.id, body.avatar_url, "avatar");
   if (avatar !== undefined) patch.avatar_url = avatar;
 
-  const resume = await inlineOrUploadProfileUrl(supabase, user.id, body.resume_url, "resume");
+  // Resume objects live in the PRIVATE `resumes` bucket and are stored as
+  // `/api/resume/<key>` proxy paths. Snapshot the current refs BEFORE the
+  // update so we can delete objects this request un-references: repeated
+  // uploads left 37 orphaned, un-redacted PDFs in prod in one month.
+  const touchesResume = "resume_url" in body || "resume_docs" in body;
+  type ResumeRefs = { resume_url: unknown; resume_docs: unknown };
+  let resumeBefore: ResumeRefs | null = null;
+  if (touchesResume) {
+    try {
+      const { data, error } = await createSupabaseServiceClient()
+        .from("users")
+        .select("resume_url, resume_docs")
+        .eq("id", user.id)
+        .maybeSingle();
+      if (error) console.error("[profile-sync] resume pre-read", error.message);
+      else resumeBefore = (data as ResumeRefs | null) ?? null;
+    } catch (e) {
+      console.error("[profile-sync] resume pre-read threw", e);
+    }
+  }
+
+  // data: URL → uploaded to `resumes`; proxy / legacy / external refs are
+  // re-validated against user.id (own-bucket keys must carry our prefix).
+  const resume = await resolveResumeUrlInput(user.id, body.resume_url);
   if (resume !== undefined) patch.resume_url = resume;
 
   // Multi-doc resume array — preferred over the single resume_url.
   // Pure data field; uploads already happened client-side via
-  // /api/me/profile-upload, so this only persists URLs.
+  // /api/me/profile-upload, so this only persists refs.
   if ("resume_docs" in body) {
-    patch.resume_docs = sanitizeResumeDocs(body.resume_docs);
+    patch.resume_docs = sanitizeResumeDocs(body.resume_docs, user.id);
   }
 
   if ("banner_url" in body || "banner_gradient" in body) {
@@ -203,6 +232,28 @@ export async function POST(req: Request) {
   if (upErr) {
     console.error("[profile-sync POST]", upErr);
     return NextResponse.json({ ok: false, error: "Request failed" }, { status: 500 });
+  }
+
+  // Best-effort orphan cleanup: keys referenced before the update but not
+  // after, restricted to objects under this user's own prefix. Failures
+  // are logged and never fail the request.
+  if (touchesResume && resumeBefore) {
+    try {
+      const before = resumeKeysReferenced(resumeBefore.resume_url, resumeBefore.resume_docs);
+      const after = resumeKeysReferenced(
+        "resume_url" in patch ? patch.resume_url : resumeBefore.resume_url,
+        "resume_docs" in patch ? patch.resume_docs : resumeBefore.resume_docs,
+      );
+      const orphans = [...before].filter(
+        (k) => !after.has(k) && resumeKeyOwnerId(k) === user.id,
+      );
+      if (orphans.length > 0) {
+        await deleteResumeObjects(orphans);
+        console.log(`[profile-sync] removed ${orphans.length} un-referenced resume object(s)`);
+      }
+    } catch (e) {
+      console.error("[profile-sync] resume orphan cleanup", e);
+    }
   }
 
   // email / school_email are private columns (no RLS read); self-read via

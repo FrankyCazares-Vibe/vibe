@@ -8,15 +8,18 @@ const MIME_EXT: Record<string, string> = {
   "image/png": "png",
   "image/webp": "webp",
   "image/gif": "gif",
-  "application/pdf": "pdf",
 };
 
-/** Upload base64 data URL to `profiles` bucket; returns public URL or null. */
+const MAX_IMAGE_BYTES = 6 * 1024 * 1024;
+
+/** Upload base64 data URL to the public `profiles` bucket (avatar / banner
+ *  only — resumes go to the private `resumes` bucket via
+ *  lib/profile/resume-storage.ts); returns public URL or null. */
 export async function uploadProfileDataUrl(
   supabase: SupabaseClient,
   userId: string,
   dataUrl: string,
-  kind: "avatar" | "banner" | "resume",
+  kind: "avatar" | "banner",
 ): Promise<string | null> {
   const m = dataUrl.trim().match(/^data:([\w/+.-]+);base64,(.+)$/i);
   if (!m) return null;
@@ -30,8 +33,7 @@ export async function uploadProfileDataUrl(
   } catch {
     return null;
   }
-  const max = kind === "resume" ? 8 * 1024 * 1024 : 6 * 1024 * 1024;
-  if (buf.length > max || buf.length === 0) return null;
+  if (buf.length > MAX_IMAGE_BYTES || buf.length === 0) return null;
   const path = `${userId}/${kind}-${randomUUID()}.${ext}`;
   const { error } = await supabase.storage.from("profiles").upload(path, buf, {
     contentType,
@@ -50,7 +52,7 @@ export async function inlineOrUploadProfileUrl(
   supabase: SupabaseClient,
   userId: string,
   value: unknown,
-  kind: "avatar" | "banner" | "resume",
+  kind: "avatar" | "banner",
 ): Promise<string | null | undefined> {
   if (value === undefined) return undefined;
   if (value === null) return null;

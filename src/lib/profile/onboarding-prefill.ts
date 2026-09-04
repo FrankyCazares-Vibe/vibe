@@ -1,3 +1,4 @@
+import { normalizeResumeRef } from "@/lib/profile/resume-doc-url";
 import { sanitizeWorkExperience, type WorkExperienceRow } from "@/lib/profile/work-experience";
 
 const LOOKING_FOR = [
@@ -32,11 +33,16 @@ export type SanitizedOnboardingProfile = Record<
   string | number | null | string[] | WorkExperienceRow[]
 >;
 
-function parseResumeUrlStrict(val: unknown): string | null | "omit" {
+/** Onboarding uploads through /api/me/profile-upload (kind=resume), which
+ *  returns a `/api/resume/<key>` proxy path; pasted links are external
+ *  http(s) URLs. With `ownerId` both go through normalizeResumeRef so an
+ *  own-bucket ref must carry the caller's owner prefix. */
+function parseResumeUrlStrict(val: unknown, ownerId?: string): string | null | "omit" {
   if (val === undefined || val === null) return "omit";
   if (typeof val !== "string") return null;
   const t = val.trim();
   if (!t) return "omit";
+  if (ownerId) return normalizeResumeRef(t, ownerId);
   try {
     const u = new URL(t);
     if (u.protocol !== "https:" && u.protocol !== "http:") return null;
@@ -62,9 +68,11 @@ function sanitizeStringArrayField(
   return out;
 }
 
-/** Maps Otto "quick profile" JSON from onboarding.html into `public.users` columns. */
+/** Maps Otto "quick profile" JSON from onboarding.html into `public.users`
+ *  columns. `ownerId` (the signed-in user's id) scopes `resume_url`. */
 export function sanitizeOnboardingProfile(
   input: unknown,
+  ownerId?: string,
 ): SanitizedOnboardingProfile | null {
   if (input === undefined) return {};
   if (!input || typeof input !== "object" || Array.isArray(input)) return null;
@@ -118,7 +126,7 @@ export function sanitizeOnboardingProfile(
   }
 
   if ("resume_url" in o && o.resume_url !== undefined && o.resume_url !== null) {
-    const r = parseResumeUrlStrict(o.resume_url);
+    const r = parseResumeUrlStrict(o.resume_url, ownerId);
     if (r === null) return null;
     if (r !== "omit") out.resume_url = r;
   }

@@ -1,4 +1,5 @@
 import { sanitizeCurrentOn } from "@/lib/profile/current-on";
+import { normalizeResumeRef } from "@/lib/profile/resume-doc-url";
 import { sanitizeResumeDocs } from "@/lib/profile/resume-docs";
 import { sanitizeResumeRedactions } from "@/lib/profile/resume-redactions";
 import type { ProfileView } from "@/lib/profile/types";
@@ -25,8 +26,14 @@ export function normalizeProfileView(row: Record<string, unknown>): ProfileView 
   const year =
     typeof yearRaw === "number" && Number.isInteger(yearRaw) ? yearRaw : null;
 
+  // Resume refs are re-validated against the row's own id on every read:
+  // own-bucket refs must carry this user's owner prefix (and are emitted
+  // as `/api/resume/<key>` proxy paths, even if the column still holds a
+  // legacy public URL); anything else on our Supabase host is dropped.
+  const ownerId = String(row.id ?? "");
+
   return {
-    id: String(row.id ?? ""),
+    id: ownerId,
     email: String(row.email ?? ""),
     name: String(row.name ?? ""),
     handle: String(row.handle ?? ""),
@@ -53,11 +60,8 @@ export function normalizeProfileView(row: Record<string, unknown>): ProfileView 
       row.banner_url != null && String(row.banner_url).trim() !== ""
         ? String(row.banner_url)
         : null,
-    resume_url:
-      row.resume_url != null && String(row.resume_url).trim() !== ""
-        ? String(row.resume_url)
-        : null,
-    resume_docs: sanitizeResumeDocs(row.resume_docs),
+    resume_url: normalizeResumeRef(row.resume_url, ownerId),
+    resume_docs: sanitizeResumeDocs(row.resume_docs, ownerId),
     interests: strArr(row.interests),
     skills: strArr(row.skills),
     looking_for: strArr(row.looking_for),

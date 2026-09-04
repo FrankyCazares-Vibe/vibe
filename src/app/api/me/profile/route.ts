@@ -2,6 +2,7 @@ import { NextResponse } from "next/server";
 
 import { sanitizeRecruiterSnapshot } from "@/lib/profile/recruiter-snapshot";
 import { changeHandleForUser } from "@/lib/profile/handle-change";
+import { normalizeResumeRef } from "@/lib/profile/resume-doc-url";
 import { sanitizeWorkExperience } from "@/lib/profile/work-experience";
 import { createSupabaseServerClient } from "@/lib/supabase/server";
 import { createSupabaseServiceClient } from "@/lib/supabase/service";
@@ -179,11 +180,18 @@ export async function PATCH(req: Request) {
   const looking_for = lookingForArray(body.looking_for);
   if (looking_for !== undefined) patch.looking_for = looking_for;
 
+  // Resume refs: own-bucket proxy paths (`/api/resume/<key>`, key owner
+  // must be this user) or external http(s) links. Anything else is 400.
   if ("resume_url" in body) {
-    try {
-      patch.resume_url = parseUrlField(body.resume_url);
-    } catch {
-      return NextResponse.json({ ok: false, error: "Invalid resume_url" }, { status: 400 });
+    const raw = body.resume_url;
+    if (raw === null || (typeof raw === "string" && !raw.trim())) {
+      patch.resume_url = null;
+    } else {
+      const normalized = normalizeResumeRef(raw, user.id);
+      if (normalized === null) {
+        return NextResponse.json({ ok: false, error: "Invalid resume_url" }, { status: 400 });
+      }
+      patch.resume_url = normalized;
     }
   }
 

@@ -2,6 +2,8 @@ import { randomUUID } from "node:crypto";
 
 import { NextResponse } from "next/server";
 
+import { resumeDocProxyPath } from "@/lib/profile/resume-doc-url";
+import { uploadResumeObject } from "@/lib/profile/resume-storage";
 import { createSupabaseServerClient } from "@/lib/supabase/server";
 
 const KIND_EXT: Record<string, string> = {
@@ -54,7 +56,14 @@ function humanizeStorageError(message: string): string {
   return m;
 }
 
-/** Multipart upload → Supabase `profiles` bucket + public URL. */
+/**
+ * Multipart upload.
+ *   - kind=resume → PRIVATE `resumes` bucket via the service role; the
+ *     response `url` is the proxy path `/api/resume/<uid>/resume-<uuid>.<ext>`
+ *     (store it as-is in resume_url / resume_docs[].url).
+ *   - every other kind → public `profiles` bucket via the user's cookie
+ *     client; the response `url` is the public object URL.
+ */
 export async function POST(req: Request) {
   const supabase = await createSupabaseServerClient();
   const {
@@ -101,6 +110,19 @@ export async function POST(req: Request) {
   if (contentType === "image/jpg") contentType = "image/jpeg";
   if (!ALLOWED[kind].includes(contentType)) {
     return NextResponse.json({ ok: false, error: "Unsupported file type" }, { status: 400 });
+  }
+
+  if (kind === "resume") {
+    try {
+      const key = await uploadResumeObject(user.id, buf, contentType);
+      return NextResponse.json({ ok: true, url: resumeDocProxyPath(key), kind });
+    } catch (e) {
+      console.error("[profile-upload] resume", e);
+      return NextResponse.json(
+        { ok: false, error: e instanceof Error ? e.message : "Upload failed" },
+        { status: 500 },
+      );
+    }
   }
 
   const ext =

@@ -42,7 +42,7 @@ export async function POST(req: Request) {
     );
   }
 
-  const profilePatch = sanitizeOnboardingProfile(body.profile);
+  const profilePatch = sanitizeOnboardingProfile(body.profile, user.id);
   if (profilePatch === null) {
     return NextResponse.json(
       { ok: false, error: "Invalid profile" },

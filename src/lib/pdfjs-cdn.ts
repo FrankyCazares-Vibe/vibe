@@ -71,6 +71,12 @@ export function loadPdfJs(): Promise<PdfJs> {
  * JPEG data URL. Scale 1.6 matches desktop profile.html so the
  * resulting image is sharp enough for redaction-bar overlay math to
  * line up at any viewport width.
+ *
+ * Deliberately dumb about WHAT the URL is: callers that hold a private
+ * resume proxy path (`/api/resume/...`) must resolve it to a signed URL
+ * first via `resolveResumeDocUrl` (src/lib/profile/resolve-resume-url.ts)
+ * so pdf.js's Range requests hit storage directly instead of re-minting
+ * a signed URL through the proxy on every chunk.
  */
 export async function rasterizePdf(input: string): Promise<string[]> {
   const lib = await loadPdfJs();
@@ -84,7 +90,9 @@ export async function rasterizePdf(input: string): Promise<string[]> {
     for (let i = 0; i < bin.length; i++) bytes[i] = bin.charCodeAt(i);
     source = { data: bytes };
   } else {
-    source = { url: input };
+    // pdf.js resolves relative URLs against the worker, not the page —
+    // always hand it an absolute URL.
+    source = { url: new URL(input, window.location.href).href };
   }
   const doc = await lib.getDocument(source).promise;
   const pages: string[] = [];

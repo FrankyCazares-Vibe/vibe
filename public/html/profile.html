@@ -4641,17 +4641,78 @@ function _waitForPdfJs(timeoutMs = 8000) {
   });
 }
 
-// Rasterize every page of a PDF into image data URLs. Accepts either a
-// `data:` URL (freshly-uploaded local file) or an `https:` URL (resume
-// fetched back from Supabase storage on a return visit). The scale=1.6
-// balances readability vs. payload size for typical Letter pages.
+// Resume / portfolio docs live in PRIVATE storage. The server hands us an
+// app-relative proxy path (/api/resume/<uid>/resume-<uuid>.<ext>) instead
+// of a public storage URL. A plain same-origin GET of that path 307s to a
+// short-lived signed URL, which is all <img>/<iframe> need. pdf.js is the
+// exception: it issues extra Range requests (xref at end of file) and each
+// one would re-hit the proxy and mint a fresh signed URL. So for pdf.js we
+// resolve ONCE via ?json=1 and hand it the absolute signed URL.
+// Mirrors src/lib/profile/resolve-resume-url.ts (profile.html can't import
+// the TS module). Prefix literal is inlined — no top-level binding, so the
+// synchronous initProfilePage IIFE can never hit a TDZ on it.
+function _isResumeProxyPath(src) {
+  if (typeof src !== 'string' || !src) return false;
+  if (src.startsWith('/api/resume/')) return true;
+  if (!/^https?:\/\//i.test(src)) return false;
+  try {
+    const u = new URL(src);
+    // Same-origin only — a pasted external link that happens to contain
+    // /api/resume/ must never trigger a credentialed fetch.
+    return u.origin === location.origin && u.pathname.startsWith('/api/resume/');
+  } catch (_) {
+    return false;
+  }
+}
+
+async function _resolveResumeDocUrl(src) {
+  if (typeof src !== 'string' || !src) throw new Error('No document URL');
+  if (!_isResumeProxyPath(src)) {
+    if (/^(data|blob):/i.test(src)) return src;
+    return new URL(src, location.href).href;
+  }
+  // Never append the query after a fragment.
+  const hashIdx = src.indexOf('#');
+  const base = hashIdx >= 0 ? src.slice(0, hashIdx) : src;
+  const target = base + (base.includes('?') ? '&' : '?') + 'json=1';
+  let r;
+  try {
+    r = await fetch(target, { credentials: 'include', cache: 'no-store' });
+  } catch (_) {
+    throw new Error('Network error while opening this document');
+  }
+  let j = null;
+  try { j = await r.json(); } catch (_) { j = null; }
+  if (!r.ok) {
+    // Known statuses get our copy (the server's `error` there is a code
+    // like "unauthorized", not something to show a person). Anything
+    // else: prefer the server's message, then a generic HTTP fallback.
+    const known =
+      r.status === 401 ? 'Sign in to view this document'
+      : (r.status === 403 || r.status === 404) ? "This document isn't available"
+      : r.status === 429 ? 'Too many document requests — try again in a few minutes'
+      : '';
+    const serverMsg = (j && typeof j.error === 'string' && j.error.trim()) ? j.error.trim() : '';
+    throw new Error(known || serverMsg || ("Couldn't open this document (HTTP " + r.status + ')'));
+  }
+  if (!j || !j.ok || typeof j.url !== 'string' || !j.url) {
+    throw new Error("Couldn't open this document");
+  }
+  return j.url;
+}
+
+// Rasterize every page of a PDF into image data URLs. Accepts a `data:`
+// URL (freshly-uploaded local file), a private proxy path (resume fetched
+// back from the server on a return visit — resolved to a signed URL
+// above), or any other absolute URL. The scale=1.6 balances readability
+// vs. payload size for typical Letter pages.
 async function _rasterizePdf(src) {
   const pdfjsLib = await _waitForPdfJs();
   pdfjsLib.GlobalWorkerOptions.workerSrc =
     'https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.worker.min.js';
   const source = (typeof src === 'string' && src.startsWith('data:'))
     ? { data: _dataUrlToUint8(src) }
-    : { url: src };
+    : { url: await _resolveResumeDocUrl(src) };
   const pdf = await pdfjsLib.getDocument(source).promise;
   const pages = [];
   for (let i = 1; i <= pdf.numPages; i++) {
@@ -5152,13 +5213,17 @@ async function _backfillRasterIfNeeded() {
     if (doc.pages && doc.pages.length) continue;
     try {
       doc.pages = await _rasterizePdf(doc.url);
+      delete doc._renderError;
       dirty = true;
     } catch (e) {
       console.error('[resume] backfill rasterize failed', e);
       // Mark with an empty-but-defined pages array so we don't retry every
       // render — and the viewer can show a helpful "re-upload this PDF"
-      // message in place of a broken image.
+      // message in place of a broken image. Keep the reason: a 401/429
+      // from the private-storage proxy is NOT a "re-upload" situation,
+      // and the viewer should say so instead.
       doc.pages = [];
+      doc._renderError = (e && typeof e.message === 'string') ? e.message : '';
       dirty = true;
     }
   }
@@ -5246,10 +5311,13 @@ function renderDocViewer() {
     // loader. Or rasterization explicitly failed → tell the user to
     // re-upload.
     const rastering = doc.pages === undefined;
+    const reason = (typeof doc._renderError === 'string' && doc._renderError.trim()) ? doc._renderError.trim() : '';
     pagesHtml = `<div style="display:flex;align-items:center;justify-content:center;min-height:60vh;color:var(--muted);font-size:13px;padding:24px;text-align:center;line-height:1.6">
       ${rastering
         ? 'Preparing pages… (one-time conversion for the new viewer)'
-        : "Couldn't render this PDF. Remove it from the thumbnails on the left and re-upload to use the new viewer."}
+        : (reason
+            ? `Couldn't render this PDF — ${_esc(reason)}. Reload to try again.`
+            : "Couldn't render this PDF. Remove it from the thumbnails on the left and re-upload to use the new viewer.")}
     </div>`;
   } else {
     pagesHtml = (doc.pages && doc.pages.length ? doc.pages : [doc.url]).map((src, i) => {
@@ -7380,9 +7448,20 @@ function saveProfileToStorage() {
   // Drop any legacy emoji avatar from older saves
   delete user.avatar;
 
-  // Resume / portfolio — array of {name, type, url(data:)}
+  // Resume / portfolio — array of {name, type, url}. url is one of:
+  //   data:            fresh local upload, not yet synced
+  //   /api/resume/…    private-storage proxy path from the server (opaque —
+  //                    echoed back unchanged as resume_url on sync)
+  //   http(s)://…      user-pasted external link
+  // Dropping proxy paths here would send resume_url:null on the next sync
+  // and wipe the user's resume server-side.
   if (typeof resumePortfolio !== 'undefined') {
-    user.resumePortfolio = resumePortfolio.filter(d => d && d.url && (d.url.startsWith('data:') || d.url.startsWith('https:') || d.url.startsWith('http:')));
+    user.resumePortfolio = resumePortfolio.filter(d => d && typeof d.url === 'string' && d.url && (
+      d.url.startsWith('data:') ||
+      d.url.startsWith('https:') ||
+      d.url.startsWith('http:') ||
+      _isResumeProxyPath(d.url)
+    ));
   }
 
   // Redaction bars — coordinate snapshot of every blackout the user
@@ -7722,6 +7801,30 @@ async function _migrateDataUriLogos() {
   if (dirty) vibeSave('vibe_user_v1', u);
 }
 
+// Swap in-memory data: resume docs for the proxy paths the server now
+// holds for them. Returns true when at least one url changed. Index guard:
+// buildProfileSyncPayload only ever sends resumePortfolio[0].url as
+// resume_url, so only doc 0 has a server counterpart. A later in-memory
+// doc never reaches the server from desktop, and a same-index entry in the
+// echo would be a different file (mobile-uploaded resume_docs, which the
+// bootstrap prefers over resume_url) — swapping it would relabel that
+// file's url onto ours and orphan our upload on the next sync.
+function _adoptServerResumeRefs(serverUser) {
+  if (typeof resumePortfolio === 'undefined' || !Array.isArray(resumePortfolio)) return false;
+  const remote = (serverUser && Array.isArray(serverUser.resumePortfolio)) ? serverUser.resumePortfolio : [];
+  let changed = false;
+  resumePortfolio.forEach((doc, i) => {
+    if (i >= 1) return; // only doc 0 is synced from desktop (see above)
+    if (!doc || typeof doc.url !== 'string' || !doc.url.startsWith('data:')) return;
+    const r = remote[i];
+    const remoteUrl = (r && typeof r.url === 'string') ? r.url : '';
+    if (!remoteUrl || !_isResumeProxyPath(remoteUrl)) return;
+    doc.url = remoteUrl;
+    changed = true;
+  });
+  return changed;
+}
+
 async function flushProfileServerSync() {
   if (window.viewingMockUser || window.viewingRealUser) return;
   const u = (typeof vibeLoad === 'function') ? vibeLoad('vibe_user_v1') : null;
@@ -7766,6 +7869,17 @@ async function flushProfileServerSync() {
         if (prev && Array.isArray(prev.resumeRedactions) && prev.resumeRedactions.length) {
           nu.resumeRedactions = prev.resumeRedactions;
         }
+      }
+      // Adopt the server's private-storage ref for the doc we just sent.
+      // A fresh desktop upload is a data: URL; profile-sync uploads it and
+      // the bootstrap echoes the doc back as /api/resume/<key>. Without
+      // this swap the in-memory doc keeps the data: URL for the whole
+      // session, so every later edit re-sends (and re-uploads) the same
+      // bytes. Only the url changes — pages/name/type stay, so an open
+      // viewer is unaffected. Folded into the vibeSave below: NOT via
+      // saveProfileToStorage(), which always schedules another sync.
+      if (_adoptServerResumeRefs(nu)) {
+        nu.resumePortfolio = resumePortfolio.slice();
       }
       vibeSave('vibe_user_v1', nu);
       // Refresh the visible identity strip with the server's fresh

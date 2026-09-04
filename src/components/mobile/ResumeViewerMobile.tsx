@@ -3,6 +3,7 @@
 import { useEffect, useRef, useState } from "react";
 
 import { rasterizePdf } from "@/lib/pdfjs-cdn";
+import { resolveResumeDocUrl } from "@/lib/profile/resolve-resume-url";
 import type { RedactionBar } from "@/lib/profile/resume-redactions";
 
 type Props = {
@@ -85,10 +86,18 @@ export function ResumeViewerMobile({
     (async () => {
       try {
         if (type === "image") {
+          // `url` may be a private proxy path (/api/resume/...). The
+          // same-origin GET 307s to a signed URL, which <img> follows
+          // with the session cookie — no resolution needed.
           if (!cancelled) setPages([url]);
           return;
         }
-        const rasterized = await rasterizePdf(url);
+        // PDFs: resolve the proxy path ONCE to a short-lived signed URL
+        // so pdf.js's Range requests go straight to storage. Non-proxy
+        // inputs (data:, external https) pass through unchanged.
+        const src = await resolveResumeDocUrl(url);
+        if (cancelled) return;
+        const rasterized = await rasterizePdf(src);
         if (cancelled) return;
         if (rasterized.length === 0) {
           setError("Could not render this PDF");

@@ -116,9 +116,10 @@ export async function GET(_req: Request, ctx: RouteContext) {
   }
 
   // Logged-out share-link visitors get the profile card but not the
-  // documents. Resume PDFs live in a public bucket and the redaction bars
-  // are client-side overlays, so handing the URLs to an anonymous scraper
-  // would expose the un-redacted file. Signed-in viewers still get them.
+  // documents. Resumes now live in the PRIVATE `resumes` bucket and are
+  // only reachable through GET /api/resume/<key>, which itself 401s
+  // anonymous callers — this strip stays as defense in depth (and keeps
+  // external-link resumes + redaction geometry off the anonymous payload).
   const rowForViewer = viewer
     ? (row as Record<string, unknown>)
     : {
