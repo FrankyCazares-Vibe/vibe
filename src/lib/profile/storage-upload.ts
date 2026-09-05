@@ -1,6 +1,8 @@
+import "server-only";
+
 import { randomUUID } from "node:crypto";
 
-import type { SupabaseClient } from "@supabase/supabase-js";
+import { createSupabaseServiceClient } from "@/lib/supabase/service";
 
 const MIME_EXT: Record<string, string> = {
   "image/jpeg": "jpg",
@@ -14,9 +16,13 @@ const MAX_IMAGE_BYTES = 6 * 1024 * 1024;
 
 /** Upload base64 data URL to the public `profiles` bucket (avatar / banner
  *  only — resumes go to the private `resumes` bucket via
- *  lib/profile/resume-storage.ts); returns public URL or null. */
+ *  lib/profile/resume-storage.ts); returns public URL or null.
+ *
+ *  Server-only: writes use the service role. The bucket's owner-write RLS
+ *  policies were dropped (20260904110000) so the only way into `profiles`
+ *  is through server routes that enforce rate limits + size caps. The
+ *  object key is still scoped to `userId`. */
 export async function uploadProfileDataUrl(
-  supabase: SupabaseClient,
   userId: string,
   dataUrl: string,
   kind: "avatar" | "banner",
@@ -35,7 +41,8 @@ export async function uploadProfileDataUrl(
   }
   if (buf.length > MAX_IMAGE_BYTES || buf.length === 0) return null;
   const path = `${userId}/${kind}-${randomUUID()}.${ext}`;
-  const { error } = await supabase.storage.from("profiles").upload(path, buf, {
+  const service = createSupabaseServiceClient();
+  const { error } = await service.storage.from("profiles").upload(path, buf, {
     contentType,
     upsert: false,
   });
@@ -43,13 +50,12 @@ export async function uploadProfileDataUrl(
     console.error("[storage] profiles upload", error);
     return null;
   }
-  const { data } = supabase.storage.from("profiles").getPublicUrl(path);
+  const { data } = service.storage.from("profiles").getPublicUrl(path);
   return data.publicUrl;
 }
 
 /** Keep remote URL or upload data URL. Returns undefined if field omitted from patch. */
 export async function inlineOrUploadProfileUrl(
-  supabase: SupabaseClient,
   userId: string,
   value: unknown,
   kind: "avatar" | "banner",
@@ -69,7 +75,7 @@ export async function inlineOrUploadProfileUrl(
     }
   }
   if (t.startsWith("data:")) {
-    return uploadProfileDataUrl(supabase, userId, t, kind);
+    return uploadProfileDataUrl(userId, t, kind);
   }
   return null;
 }

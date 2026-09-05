@@ -13,6 +13,7 @@ import {
 } from "@/lib/profile/resume-storage";
 import { inlineOrUploadProfileUrl } from "@/lib/profile/storage-upload";
 import { sanitizeWorkExperience } from "@/lib/profile/work-experience";
+import { rateLimit, tooManyRequests } from "@/lib/rate-limit";
 import { createSupabaseServerClient } from "@/lib/supabase/server";
 import { createSupabaseServiceClient } from "@/lib/supabase/service";
 
@@ -35,6 +36,17 @@ export async function POST(req: Request) {
     body = (await req.json()) as Record<string, unknown>;
   } catch {
     return NextResponse.json({ ok: false, error: "Invalid JSON" }, { status: 400 });
+  }
+
+  // Only inline `data:` payloads hit Storage (avatar / banner → `profiles`,
+  // resume → `resumes`), so only those are throttled — plain text edits
+  // must never be blocked by the upload budget.
+  const hasInlineUpload = [body.avatar_url, body.banner_url, body.resume_url].some(
+    (v) => typeof v === "string" && /^data:/i.test(v.trim()),
+  );
+  if (hasInlineUpload) {
+    const rl = await rateLimit(`upload:profile-sync:${user.id}`, { limit: 20, windowSec: 600 });
+    if (!rl.allowed) return tooManyRequests(rl);
   }
 
   const patch: Record<string, unknown> = {};
@@ -164,7 +176,7 @@ export async function POST(req: Request) {
     patch.recruiter_snapshot = snap;
   }
 
-  const avatar = await inlineOrUploadProfileUrl(supabase, user.id, body.avatar_url, "avatar");
+  const avatar = await inlineOrUploadProfileUrl(user.id, body.avatar_url, "avatar");
   if (avatar !== undefined) patch.avatar_url = avatar;
 
   // Resume objects live in the PRIVATE `resumes` bucket and are stored as
@@ -208,7 +220,7 @@ export async function POST(req: Request) {
         : "";
 
     if (typeof bu === "string" && bu.trim()) {
-      const resolved = await inlineOrUploadProfileUrl(supabase, user.id, bu, "banner");
+      const resolved = await inlineOrUploadProfileUrl(user.id, bu, "banner");
       if (resolved === undefined || resolved === null) {
         return NextResponse.json({ ok: false, error: "Invalid banner" }, { status: 400 });
       }

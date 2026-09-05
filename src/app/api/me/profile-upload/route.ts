@@ -4,7 +4,9 @@ import { NextResponse } from "next/server";
 
 import { resumeDocProxyPath } from "@/lib/profile/resume-doc-url";
 import { uploadResumeObject } from "@/lib/profile/resume-storage";
+import { rateLimit, tooManyRequests } from "@/lib/rate-limit";
 import { createSupabaseServerClient } from "@/lib/supabase/server";
+import { createSupabaseServiceClient } from "@/lib/supabase/service";
 
 const KIND_EXT: Record<string, string> = {
   avatar: "jpg",
@@ -61,8 +63,14 @@ function humanizeStorageError(message: string): string {
  *   - kind=resume → PRIVATE `resumes` bucket via the service role; the
  *     response `url` is the proxy path `/api/resume/<uid>/resume-<uuid>.<ext>`
  *     (store it as-is in resume_url / resume_docs[].url).
- *   - every other kind → public `profiles` bucket via the user's cookie
- *     client; the response `url` is the public object URL.
+ *   - every other kind → public `profiles` bucket via the service role
+ *     (key scoped to `user.id`); the response `url` is the public object
+ *     URL. Writes are server-only: the owner INSERT/UPDATE/DELETE storage
+ *     policies were dropped (20260904110000) so the Storage REST API
+ *     cannot bypass this route's rate limit and per-kind size caps.
+ *   - Rate limited per user (30 / 10 min). Unlike the presigned-PUT routes
+ *     there is no signature to bind a size into: the bytes arrive here, so
+ *     MAX_BYTES is enforced on the received buffer directly.
  */
 export async function POST(req: Request) {
   const supabase = await createSupabaseServerClient();
@@ -73,6 +81,9 @@ export async function POST(req: Request) {
   if (userErr || !user) {
     return NextResponse.json({ ok: false, error: "Unauthorized" }, { status: 401 });
   }
+
+  const rl = await rateLimit(`upload:profile-upload:${user.id}`, { limit: 30, windowSec: 600 });
+  if (!rl.allowed) return tooManyRequests(rl);
 
   let form: FormData;
   try {
@@ -139,7 +150,8 @@ export async function POST(req: Request) {
               : KIND_EXT[kind];
 
   const path = `${user.id}/${KIND_PATH_PREFIX[kind]}${kind}-${randomUUID()}.${ext}`;
-  const { error: upErr } = await supabase.storage.from("profiles").upload(path, buf, {
+  const service = createSupabaseServiceClient();
+  const { error: upErr } = await service.storage.from("profiles").upload(path, buf, {
     contentType,
     upsert: false,
   });
@@ -152,6 +164,6 @@ export async function POST(req: Request) {
     );
   }
 
-  const { data } = supabase.storage.from("profiles").getPublicUrl(path);
+  const { data } = service.storage.from("profiles").getPublicUrl(path);
   return NextResponse.json({ ok: true, url: data.publicUrl, kind });
 }

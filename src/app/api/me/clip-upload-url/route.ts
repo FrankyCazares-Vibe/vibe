@@ -3,6 +3,7 @@ import { randomUUID } from "node:crypto";
 import { NextResponse } from "next/server";
 
 import { CLIP_KEY_PREFIX, isR2Configured, signClipPutUrl } from "@/lib/r2";
+import { rateLimit, tooManyRequests } from "@/lib/rate-limit";
 import { createSupabaseServerClient } from "@/lib/supabase/server";
 
 const MAX_BYTES = 200 * 1024 * 1024; // 200MB — bumped from 100MB to fit 2-min clips
@@ -21,6 +22,9 @@ type Body = { contentType?: unknown; sizeBytes?: unknown };
  *
  * Object keys are scoped to the user (`clips/<user_id>/<uuid>.<ext>`) so
  * `/api/me/publish-clip` can verify ownership before inserting.
+ *
+ * The declared `sizeBytes` is bound into the signature as Content-Length, so
+ * clients must PUT exactly the bytes they declared or R2 rejects the upload.
  */
 export async function POST(req: Request) {
   if (!isR2Configured()) {
@@ -38,6 +42,12 @@ export async function POST(req: Request) {
   if (authErr || !user) {
     return NextResponse.json({ ok: false, error: "Unauthorized" }, { status: 401 });
   }
+
+  const rl = await rateLimit(`upload:clip-upload-url:${user.id}`, {
+    limit: 20,
+    windowSec: 600,
+  });
+  if (!rl.allowed) return tooManyRequests(rl);
 
   let body: Body;
   try {
@@ -59,7 +69,10 @@ export async function POST(req: Request) {
   }
 
   const sizeBytes = typeof body.sizeBytes === "number" ? body.sizeBytes : -1;
-  if (!Number.isFinite(sizeBytes) || sizeBytes <= 0 || sizeBytes > MAX_BYTES) {
+  if (!Number.isSafeInteger(sizeBytes) || sizeBytes <= 0) {
+    return NextResponse.json({ ok: false, error: "Invalid file size" }, { status: 400 });
+  }
+  if (sizeBytes > MAX_BYTES) {
     return NextResponse.json(
       { ok: false, error: `Clip too large (max ${MAX_BYTES / (1024 * 1024)}MB)` },
       { status: 400 },
@@ -68,7 +81,10 @@ export async function POST(req: Request) {
 
   const objectKey = `${CLIP_KEY_PREFIX}${user.id}/${randomUUID()}.${ext}`;
   try {
-    const uploadUrl = await signClipPutUrl(objectKey, { contentType });
+    const uploadUrl = await signClipPutUrl(objectKey, {
+      contentType,
+      contentLength: sizeBytes,
+    });
     return NextResponse.json({ ok: true, uploadUrl, objectKey });
   } catch (err) {
     console.error("[clip-upload-url]", err);

@@ -7825,6 +7825,71 @@ function _adoptServerResumeRefs(serverUser) {
   return changed;
 }
 
+// Run `apply` once `url` is in the browser's image cache. Swapping the
+// cover's CSS background-image to an un-cached URL repaints it empty
+// until the bytes arrive, so the swap waits for a probe <img> to load.
+// No onerror handler on purpose: a failed preload keeps the data: URL
+// and the next flush's echo retries the adoption.
+function _swapWhenCached(url, apply) {
+  if (typeof Image !== 'function') { apply(); return; }
+  const probe = new Image();
+  probe.onload = () => { try { apply(); } catch (_) { /* non-fatal */ } };
+  probe.src = url;
+}
+
+// Avatar + cover-photo counterpart of _adoptServerResumeRefs. For these
+// two the DOM *is* the in-memory state: there is no module variable —
+// saveProfileToStorage() reads the avatar back off `#avatarEl img.avatar-photo`
+// and the cover off `#profileCover`'s background-image on every edit.
+// profile-sync uploads a data: avatar_url / banner_url to Storage and the
+// bootstrap echoes the public https URL as avatarPhoto / coverPhoto; the
+// vibeSave(nu) in flushProfileServerSync already persists that. But the
+// DOM still holds the data: URL, so the very next saveProfileToStorage()
+// writes it straight back over the https URL and every later edit
+// re-sends (and the server re-uploads) the same bytes — one orphaned
+// object per edit. Swapping the DOM to the echoed URL closes the loop.
+//
+// `sent` is the payload this flush just posted. A swap only happens when
+// the DOM's data: URL is byte-identical to what we sent: a sync scheduled
+// by a path that skips saveProfileToStorage (e.g. _onMajorYearChange)
+// can echo the *previous* https photo while the DOM shows a fresh pick,
+// and adopting that would silently revert the pick. Each swap re-checks
+// the DOM when the preload lands for the same reason. Returns which
+// swaps were scheduled. Never calls saveProfileToStorage() — that would
+// schedule another sync from inside the sync.
+function _adoptServerMediaRefs(serverUser, sent) {
+  const out = { avatar: false, cover: false };
+  if (!serverUser || typeof document === 'undefined') return out;
+  const sentPayload = (sent && typeof sent === 'object') ? sent : {};
+  const isHttps = v => typeof v === 'string' && /^https:\/\//i.test(v);
+
+  const avImg = document.querySelector('#avatarEl img.avatar-photo');
+  const avSrc = (avImg && typeof avImg.src === 'string') ? avImg.src : '';
+  if (avImg && avSrc.startsWith('data:') && sentPayload.avatar_url === avSrc && isHttps(serverUser.avatarPhoto)) {
+    const next = serverUser.avatarPhoto;
+    _swapWhenCached(next, () => {
+      if (avImg.src === avSrc) avImg.src = next;
+    });
+    out.avatar = true;
+  }
+
+  const coverEl = document.getElementById('profileCover');
+  const coverSrc = coverEl ? _urlFromCssBackgroundImage(coverEl.style.backgroundImage || '') : '';
+  if (coverEl && coverSrc.startsWith('data:') && sentPayload.banner_url === coverSrc && isHttps(serverUser.coverPhoto)) {
+    const next = serverUser.coverPhoto;
+    _swapWhenCached(next, () => {
+      if (_urlFromCssBackgroundImage(coverEl.style.backgroundImage || '') !== coverSrc) return;
+      if (typeof applyCoverPhoto === 'function') applyCoverPhoto(next);
+      else coverEl.style.backgroundImage = 'url("' + next + '")';
+      // applyGradient() re-applies pendingCoverUrl on the next cover-modal
+      // save; leaving the data: URL there would resurrect the payload.
+      if (typeof pendingCoverUrl === 'string' && pendingCoverUrl === coverSrc) pendingCoverUrl = next;
+    });
+    out.cover = true;
+  }
+  return out;
+}
+
 async function flushProfileServerSync() {
   if (window.viewingMockUser || window.viewingRealUser) return;
   const u = (typeof vibeLoad === 'function') ? vibeLoad('vibe_user_v1') : null;
@@ -7834,11 +7899,12 @@ async function flushProfileServerSync() {
   // them out of work_experience on every sync.
   await _migrateDataUriLogos();
   try {
+    const payload = buildProfileSyncPayload();
     const r = await fetch('/api/me/profile-sync', {
       method: 'POST',
       credentials: 'include',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify(buildProfileSyncPayload()),
+      body: JSON.stringify(payload),
     });
     const j = await r.json();
     if (!r.ok || !j.ok) {
@@ -7881,6 +7947,10 @@ async function flushProfileServerSync() {
       if (_adoptServerResumeRefs(nu)) {
         nu.resumePortfolio = resumePortfolio.slice();
       }
+      // Same for the avatar + cover photo. Their state lives in the DOM,
+      // so this swaps <img src> / background-image rather than `nu`
+      // (which already carries the echoed https URLs).
+      _adoptServerMediaRefs(nu, payload);
       vibeSave('vibe_user_v1', nu);
       // Refresh the visible identity strip with the server's fresh
       // derived fields (notably `headline` — gets recomputed after

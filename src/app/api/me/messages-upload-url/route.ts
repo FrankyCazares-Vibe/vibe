@@ -7,6 +7,7 @@ import {
   MESSAGE_MEDIA_KEY_PREFIX,
   signMessageMediaPutUrl,
 } from "@/lib/r2";
+import { rateLimit, tooManyRequests } from "@/lib/rate-limit";
 import { createSupabaseServerClient } from "@/lib/supabase/server";
 
 const MAX_IMAGE_BYTES = 15 * 1024 * 1024; // 15MB for images
@@ -32,8 +33,11 @@ type Body = {
 
 /**
  * Sign a short-lived R2 PUT for an image/video uploaded inline in a chat.
- * Auth + channel-membership gated. The client uploads, then POSTs the
- * resulting `objectKey` + `kind` along with `/api/me/threads/[id]/messages`.
+ * Auth + channel-membership gated, rate limited per user. The declared
+ * `sizeBytes` is bound into the signature (Content-Length), so the client
+ * must PUT exactly the bytes it declared or R2 rejects the upload.
+ * The client uploads, then POSTs the resulting `objectKey` + `kind` along
+ * with `/api/me/threads/[id]/messages`.
  */
 export async function POST(req: Request) {
   if (!isR2Configured()) {
@@ -51,6 +55,12 @@ export async function POST(req: Request) {
   if (authErr || !user) {
     return NextResponse.json({ ok: false, error: "Unauthorized" }, { status: 401 });
   }
+
+  const rl = await rateLimit(`upload:messages-upload-url:${user.id}`, {
+    limit: 20,
+    windowSec: 600,
+  });
+  if (!rl.allowed) return tooManyRequests(rl);
 
   let body: Body;
   try {
@@ -99,7 +109,10 @@ export async function POST(req: Request) {
   const max = isImage ? MAX_IMAGE_BYTES : MAX_VIDEO_BYTES;
 
   const sizeBytes = typeof body.sizeBytes === "number" ? body.sizeBytes : -1;
-  if (!Number.isFinite(sizeBytes) || sizeBytes <= 0 || sizeBytes > max) {
+  if (!Number.isSafeInteger(sizeBytes) || sizeBytes <= 0) {
+    return NextResponse.json({ ok: false, error: "Invalid file size" }, { status: 400 });
+  }
+  if (sizeBytes > max) {
     return NextResponse.json(
       { ok: false, error: `File too large (max ${max / (1024 * 1024)}MB for ${kind}s)` },
       { status: 400 },
@@ -108,7 +121,10 @@ export async function POST(req: Request) {
 
   const objectKey = `${MESSAGE_MEDIA_KEY_PREFIX}${channelId}/${randomUUID()}.${ext}`;
   try {
-    const uploadUrl = await signMessageMediaPutUrl(objectKey, { contentType });
+    const uploadUrl = await signMessageMediaPutUrl(objectKey, {
+      contentType,
+      contentLength: sizeBytes,
+    });
     return NextResponse.json({ ok: true, uploadUrl, objectKey, kind });
   } catch (err) {
     console.error("[messages-upload-url]", err);

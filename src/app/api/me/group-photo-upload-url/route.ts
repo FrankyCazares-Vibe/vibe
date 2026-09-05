@@ -7,6 +7,7 @@ import {
   isR2Configured,
   signGroupPhotoPutUrl,
 } from "@/lib/r2";
+import { rateLimit, tooManyRequests } from "@/lib/rate-limit";
 import { createSupabaseServerClient } from "@/lib/supabase/server";
 
 const MAX_BYTES = 10 * 1024 * 1024; // 10MB cap for group photos
@@ -26,6 +27,9 @@ type Body = {
  * Sign a short-lived R2 PUT for a group chat photo. The viewer must be a
  * member of the channel — we don't gate on admin role for v1, since the
  * user wants anyone in the group to be able to change the photo.
+ * Rate limited per user. The declared `sizeBytes` is bound into the
+ * signature (Content-Length), so the client must PUT exactly the bytes it
+ * declared or R2 rejects the upload.
  *
  * After upload, the client PATCHes /api/me/threads/[id] with the returned
  * `objectKey` to set channels.photo_url.
@@ -46,6 +50,12 @@ export async function POST(req: Request) {
   if (authErr || !user) {
     return NextResponse.json({ ok: false, error: "Unauthorized" }, { status: 401 });
   }
+
+  const rl = await rateLimit(`upload:group-photo-upload-url:${user.id}`, {
+    limit: 20,
+    windowSec: 600,
+  });
+  if (!rl.allowed) return tooManyRequests(rl);
 
   let body: Body;
   try {
@@ -87,7 +97,10 @@ export async function POST(req: Request) {
   }
 
   const sizeBytes = typeof body.sizeBytes === "number" ? body.sizeBytes : -1;
-  if (!Number.isFinite(sizeBytes) || sizeBytes <= 0 || sizeBytes > MAX_BYTES) {
+  if (!Number.isSafeInteger(sizeBytes) || sizeBytes <= 0) {
+    return NextResponse.json({ ok: false, error: "Invalid file size" }, { status: 400 });
+  }
+  if (sizeBytes > MAX_BYTES) {
     return NextResponse.json(
       { ok: false, error: `Image too large (max ${MAX_BYTES / (1024 * 1024)}MB)` },
       { status: 400 },
@@ -96,7 +109,10 @@ export async function POST(req: Request) {
 
   const objectKey = `${GROUP_PHOTO_KEY_PREFIX}${channelId}/${randomUUID()}.${ext}`;
   try {
-    const uploadUrl = await signGroupPhotoPutUrl(objectKey, { contentType });
+    const uploadUrl = await signGroupPhotoPutUrl(objectKey, {
+      contentType,
+      contentLength: sizeBytes,
+    });
     return NextResponse.json({ ok: true, uploadUrl, objectKey });
   } catch (err) {
     console.error("[group-photo-upload-url]", err);

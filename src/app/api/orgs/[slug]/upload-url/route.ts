@@ -7,6 +7,7 @@ import {
   isR2Configured,
   signOrgAssetPutUrl,
 } from "@/lib/r2";
+import { rateLimit, tooManyRequests } from "@/lib/rate-limit";
 import { createSupabaseServerClient } from "@/lib/supabase/server";
 import { createSupabaseServiceClient } from "@/lib/supabase/service";
 
@@ -46,6 +47,9 @@ const VALID_KINDS = new Set<Kind>(["banner", "logo", "post-image", "post-video"]
  *
  * Returns: { uploadUrl, objectKey, publicUrl? }
  *
+ * `sizeBytes` is bound into the signature (Content-Length is a signed
+ * header), so clients must PUT exactly the bytes they declared or R2 403s.
+ *
  * Permissions: owner / admin only. We check role directly here and via the
  * service client (RLS isn't sufficient since signed URLs aren't a row).
  */
@@ -65,6 +69,12 @@ export async function POST(req: Request, { params }: Params) {
   if (!user) {
     return NextResponse.json({ ok: false, error: "Unauthorized" }, { status: 401 });
   }
+
+  const rl = await rateLimit(`upload:org-upload-url:${user.id}`, {
+    limit: 20,
+    windowSec: 600,
+  });
+  if (!rl.allowed) return tooManyRequests(rl);
 
   const service = createSupabaseServiceClient();
   const { data: org } = await service
@@ -124,7 +134,10 @@ export async function POST(req: Request, { params }: Params) {
 
   const sizeBytes = typeof body.sizeBytes === "number" ? body.sizeBytes : -1;
   const limit = LIMITS[kind];
-  if (!Number.isFinite(sizeBytes) || sizeBytes <= 0 || sizeBytes > limit) {
+  if (!Number.isSafeInteger(sizeBytes) || sizeBytes <= 0) {
+    return NextResponse.json({ ok: false, error: "Invalid file size" }, { status: 400 });
+  }
+  if (sizeBytes > limit) {
     return NextResponse.json(
       {
         ok: false,
@@ -142,7 +155,10 @@ export async function POST(req: Request, { params }: Params) {
   const objectKey = `${ORG_ASSET_KEY_PREFIX}${org.id}/${subdir}/${randomUUID()}.${ext}`;
 
   try {
-    const uploadUrl = await signOrgAssetPutUrl(objectKey, { contentType });
+    const uploadUrl = await signOrgAssetPutUrl(objectKey, {
+      contentType,
+      contentLength: sizeBytes,
+    });
     return NextResponse.json({ ok: true, uploadUrl, objectKey });
   } catch (err) {
     console.error("[orgs/[slug]/upload-url POST]", err);

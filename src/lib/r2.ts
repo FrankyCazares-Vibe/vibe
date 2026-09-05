@@ -52,6 +52,35 @@ export function isR2Configured(): boolean {
   );
 }
 
+/**
+ * Options shared by every presigned PUT signer.
+ *
+ * `contentLength` is REQUIRED and is bound into the signature: SigV4 signs the
+ * `content-length` header (it is not in @smithy/signature-v4's unsignable set),
+ * so R2 rejects with 403 any PUT whose actual body length differs from the
+ * value signed here. The browser sets Content-Length automatically from the
+ * body, so callers just need to upload exactly the bytes they declared.
+ *
+ * Note: the presigner deliberately marks `content-type` as unsignable, so the
+ * Content-Type passed here is a default for the stored object, not an
+ * enforced constraint on the upload.
+ */
+type PutSignOptions = {
+  /** Exact byte length of the upload body. Must be a positive safe integer. */
+  contentLength: number;
+  contentType?: string;
+  expiresInSec?: number;
+};
+
+/** Throws unless `contentLength` is a positive safe integer — never sign an unbounded PUT. */
+function assertPutContentLength(contentLength: number): void {
+  if (!Number.isSafeInteger(contentLength) || contentLength <= 0) {
+    throw new Error(
+      "Presigned PUT contentLength must be a positive safe integer (bytes)",
+    );
+  }
+}
+
 function assertClipObjectKey(objectKey: string): void {
   const key = objectKey.trim();
   if (!key || key.includes("://")) {
@@ -64,21 +93,27 @@ function assertClipObjectKey(objectKey: string): void {
   }
 }
 
-/** Short-lived signed PUT for uploading a Clip. Caller must enforce auth + max size before issuing URL (P1-017+). */
+/**
+ * Short-lived signed PUT for uploading a Clip. Caller must enforce auth + max
+ * size before issuing the URL (P1-017+); the validated size is passed as
+ * `contentLength` so R2 enforces it at upload time (see PutSignOptions).
+ */
 export async function signClipPutUrl(
   objectKey: string,
-  options?: { contentType?: string; expiresInSec?: number },
+  options: PutSignOptions,
 ): Promise<string> {
   assertClipObjectKey(objectKey);
+  assertPutContentLength(options.contentLength);
   const bucket = requireEnv("R2_BUCKET_NAME");
   const client = getR2S3Client();
   const cmd = new PutObjectCommand({
     Bucket: bucket,
     Key: objectKey,
-    ContentType: options?.contentType ?? "video/mp4",
+    ContentType: options.contentType ?? "video/mp4",
+    ContentLength: options.contentLength,
   });
   return getSignedUrl(client, cmd, {
-    expiresIn: options?.expiresInSec ?? DEFAULT_SIGN_EXPIRES_SEC,
+    expiresIn: options.expiresInSec ?? DEFAULT_SIGN_EXPIRES_SEC,
   });
 }
 
@@ -94,21 +129,27 @@ function assertGroupPhotoObjectKey(objectKey: string): void {
   }
 }
 
-/** Short-lived signed PUT for uploading a group photo. Caller enforces auth + size. */
+/**
+ * Short-lived signed PUT for uploading a group photo. Caller enforces auth +
+ * size; the validated size is passed as `contentLength` so R2 enforces it at
+ * upload time (see PutSignOptions).
+ */
 export async function signGroupPhotoPutUrl(
   objectKey: string,
-  options?: { contentType?: string; expiresInSec?: number },
+  options: PutSignOptions,
 ): Promise<string> {
   assertGroupPhotoObjectKey(objectKey);
+  assertPutContentLength(options.contentLength);
   const bucket = requireEnv("R2_BUCKET_NAME");
   const client = getR2S3Client();
   const cmd = new PutObjectCommand({
     Bucket: bucket,
     Key: objectKey,
-    ContentType: options?.contentType ?? "image/jpeg",
+    ContentType: options.contentType ?? "image/jpeg",
+    ContentLength: options.contentLength,
   });
   return getSignedUrl(client, cmd, {
-    expiresIn: options?.expiresInSec ?? DEFAULT_SIGN_EXPIRES_SEC,
+    expiresIn: options.expiresInSec ?? DEFAULT_SIGN_EXPIRES_SEC,
   });
 }
 
@@ -138,21 +179,27 @@ function assertMessageMediaObjectKey(objectKey: string): void {
   }
 }
 
-/** Short-lived signed PUT for an image or video uploaded inline in a chat. */
+/**
+ * Short-lived signed PUT for an image or video uploaded inline in a chat.
+ * Caller enforces auth + size; the validated size is passed as
+ * `contentLength` so R2 enforces it at upload time (see PutSignOptions).
+ */
 export async function signMessageMediaPutUrl(
   objectKey: string,
-  options?: { contentType?: string; expiresInSec?: number },
+  options: PutSignOptions,
 ): Promise<string> {
   assertMessageMediaObjectKey(objectKey);
+  assertPutContentLength(options.contentLength);
   const bucket = requireEnv("R2_BUCKET_NAME");
   const client = getR2S3Client();
   const cmd = new PutObjectCommand({
     Bucket: bucket,
     Key: objectKey,
-    ContentType: options?.contentType ?? "application/octet-stream",
+    ContentType: options.contentType ?? "application/octet-stream",
+    ContentLength: options.contentLength,
   });
   return getSignedUrl(client, cmd, {
-    expiresIn: options?.expiresInSec ?? DEFAULT_SIGN_EXPIRES_SEC,
+    expiresIn: options.expiresInSec ?? DEFAULT_SIGN_EXPIRES_SEC,
   });
 }
 
@@ -197,22 +244,26 @@ function assertOrgAssetObjectKey(objectKey: string): void {
 /**
  * Short-lived signed PUT for an org banner / logo / post media. Caller is
  * responsible for verifying the viewer is owner/admin of the org and for
- * enforcing size/type limits before issuing the signed URL.
+ * enforcing size/type limits before issuing the signed URL; the validated
+ * size is passed as `contentLength` so R2 enforces it at upload time
+ * (see PutSignOptions).
  */
 export async function signOrgAssetPutUrl(
   objectKey: string,
-  options?: { contentType?: string; expiresInSec?: number },
+  options: PutSignOptions,
 ): Promise<string> {
   assertOrgAssetObjectKey(objectKey);
+  assertPutContentLength(options.contentLength);
   const bucket = requireEnv("R2_BUCKET_NAME");
   const client = getR2S3Client();
   const cmd = new PutObjectCommand({
     Bucket: bucket,
     Key: objectKey,
-    ContentType: options?.contentType ?? "application/octet-stream",
+    ContentType: options.contentType ?? "application/octet-stream",
+    ContentLength: options.contentLength,
   });
   return getSignedUrl(client, cmd, {
-    expiresIn: options?.expiresInSec ?? DEFAULT_SIGN_EXPIRES_SEC,
+    expiresIn: options.expiresInSec ?? DEFAULT_SIGN_EXPIRES_SEC,
   });
 }
 
