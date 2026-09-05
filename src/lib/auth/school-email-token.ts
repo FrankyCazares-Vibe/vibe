@@ -87,7 +87,21 @@ export function verifySchoolEmailToken(
   return payload;
 }
 
-/** Basic US-style .edu check (IU and partners use subdomains like *.iu.edu). */
+// Campus allowlist (SCHOOL_EMAIL_DOMAINS, default iu.edu + iupui.edu). The
+// helpers live in a client-safe module; re-exported here so server callers
+// keep a single import.
+export {
+  isSchoolEmail,
+  normalizeSchoolEmail,
+  schoolEmailDomains,
+  schoolEmailDomainsLabel,
+  schoolEmailHost,
+} from "./school-email-domains";
+
+/**
+ * @deprecated Accepts any .edu address. Verification is scoped to the IU
+ * allowlist — use `isSchoolEmail` instead. Kept exported for compatibility.
+ */
 export function isEduEmail(email: string): boolean {
   const host = email.split("@")[1]?.toLowerCase().trim() ?? "";
   return host.endsWith(".edu");

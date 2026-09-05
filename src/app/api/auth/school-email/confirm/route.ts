@@ -1,6 +1,10 @@
 import { NextResponse } from "next/server";
 
-import { verifySchoolEmailToken } from "@/lib/auth/school-email-token";
+import {
+  isSchoolEmail,
+  schoolEmailDomainsLabel,
+  verifySchoolEmailToken,
+} from "@/lib/auth/school-email-token";
 import { createSupabaseServerClient } from "@/lib/supabase/server";
 import {
   createSupabaseServiceClient,
@@ -83,6 +87,19 @@ export async function POST(req: Request) {
       ok: true,
       message: "School email verified.",
     });
+  }
+
+  // Re-check the allowlist before writing: a token minted before the list
+  // changed (48h TTL) must not verify an address that is no longer allowed.
+  // Sits after the idempotent branch so already-verified rows are untouched.
+  if (!isSchoolEmail(payload.email)) {
+    return NextResponse.json(
+      {
+        ok: false,
+        error: `That address isn't an IU email (${schoolEmailDomainsLabel()}). Request a new link with your IU address.`,
+      },
+      { status: 400 },
+    );
   }
 
   const { data: taken } = await admin

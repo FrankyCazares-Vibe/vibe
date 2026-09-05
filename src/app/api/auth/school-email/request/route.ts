@@ -3,8 +3,10 @@ import { NextResponse } from "next/server";
 import { getSiteOriginForRequest } from "@/lib/auth/site-url";
 import { isOttoOnboardingComplete } from "@/lib/auth/post-login";
 import {
-  isEduEmail,
+  isSchoolEmail,
   isSchoolVerifySecretConfigured,
+  normalizeSchoolEmail,
+  schoolEmailDomainsLabel,
   signSchoolEmailToken,
 } from "@/lib/auth/school-email-token";
 import { sendSchoolVerificationEmail } from "@/lib/email/resend-transactional";
@@ -18,7 +20,9 @@ import {
 type Body = { schoolEmail?: string };
 
 /**
- * P1-006 — request .edu verification email (signed token, Resend).
+ * P1-006 — request campus email verification (signed token, Resend).
+ * Only addresses on the SCHOOL_EMAIL_DOMAINS allowlist (default IU: iu.edu,
+ * iupui.edu + subdomains) are accepted; other .edu domains get a clear 400.
  * Caller must be logged in; does not mutate DB until confirm.
  */
 export async function POST(req: Request) {
@@ -73,21 +77,25 @@ export async function POST(req: Request) {
     return NextResponse.json({ ok: false, error: "Invalid JSON" }, { status: 400 });
   }
 
+  // Canonical form (trimmed, lowercased, trailing host dot stripped) so the
+  // stored value, the token payload and the uniqueness lookup all agree.
   const schoolEmail =
-    typeof body.schoolEmail === "string" ? body.schoolEmail.trim().toLowerCase() : "";
+    typeof body.schoolEmail === "string"
+      ? normalizeSchoolEmail(body.schoolEmail)
+      : null;
 
-  if (!schoolEmail || !schoolEmail.includes("@")) {
+  if (!schoolEmail) {
     return NextResponse.json(
       { ok: false, error: "Enter a valid school email." },
       { status: 400 },
     );
   }
 
-  if (!isEduEmail(schoolEmail)) {
+  if (!isSchoolEmail(schoolEmail)) {
     return NextResponse.json(
       {
         ok: false,
-        error: "School email must be a .edu address.",
+        error: `Use your IU email address (${schoolEmailDomainsLabel()}).`,
       },
       { status: 400 },
     );

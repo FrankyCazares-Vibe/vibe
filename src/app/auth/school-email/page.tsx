@@ -127,8 +127,8 @@ function SchoolEmailInner() {
         {justVerifiedAccount ? (
           <div className="vibe-auth-banner vibe-auth-banner--success">
             <strong>You&apos;re confirmed.</strong> Your login email is set.
-            One last verification: add the <strong>.edu</strong> address so we
-            know you&apos;re actually on campus.
+            One last verification: add your <strong>IU email</strong> (@iu.edu
+            or @iupui.edu) so we know you&apos;re actually on campus.
           </div>
         ) : null}
 
@@ -136,10 +136,12 @@ function SchoolEmailInner() {
           Verify your campus<span className="vibe-auth-dot">.</span>
         </h1>
         <p className="vibe-auth-sub">
-          Drop in your <strong>school email</strong> — the{" "}
-          <code className="vibe-auth-code vibe-auth-code--edu">.edu</code> one,
-          not the one you signed up with. We&apos;ll email a verification link
-          to <em>that</em> inbox.
+          Drop in your <strong>IU email</strong> — the{" "}
+          <code className="vibe-auth-code vibe-auth-code--edu">@iu.edu</code>{" "}
+          or{" "}
+          <code className="vibe-auth-code vibe-auth-code--edu">@iupui.edu</code>{" "}
+          one, not the one you signed up with. We&apos;ll email a verification
+          link to <em>that</em> inbox.
         </p>
 
         <div className="vibe-auth-steps" aria-hidden>
@@ -151,7 +153,7 @@ function SchoolEmailInner() {
           <div className="vibe-auth-step vibe-auth-step--active vibe-auth-step--edu">
             <span className="vibe-auth-step-num">2</span>
             <span className="vibe-auth-step-label">
-              <code className="vibe-auth-code vibe-auth-code--edu">.edu</code>
+              <code className="vibe-auth-code vibe-auth-code--edu">iu.edu</code>
             </span>
           </div>
           <span className="vibe-auth-step-divider" />
@@ -166,14 +168,14 @@ function SchoolEmailInner() {
             <span className="vibe-auth-label-row">
               <span className="vibe-auth-label">School email</span>
               <span className="vibe-auth-label-hint vibe-auth-label-hint--edu">
-                must end in .edu
+                @iu.edu or @iupui.edu
               </span>
             </span>
             <input
               type="email"
               autoComplete="email"
               required
-              placeholder="you@indiana.edu"
+              placeholder="you@iu.edu"
               value={schoolEmail}
               onChange={(e) => setSchoolEmail(e.target.value)}
               className="vibe-auth-input"
