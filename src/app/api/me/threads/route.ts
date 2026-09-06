@@ -1,6 +1,7 @@
 import { NextResponse } from "next/server";
 
 import { getFollowState } from "@/lib/connections/queries";
+import { requireTermsAccepted } from "@/lib/legal/require-terms";
 import { GROUP_PHOTO_KEY_PREFIX, isR2Configured, signGroupPhotoGetUrl } from "@/lib/r2";
 import { rateLimit, tooManyRequests } from "@/lib/rate-limit";
 import { createSupabaseServerClient } from "@/lib/supabase/server";
@@ -195,6 +196,9 @@ export async function POST(req: Request) {
 
   const rl = await rateLimit(`thread-create:${user.id}`, { limit: 30, windowSec: 600 });
   if (!rl.allowed) return tooManyRequests(rl);
+
+  const termsGate = await requireTermsAccepted(user.id);
+  if (termsGate) return termsGate;
 
   let body: CreateBody;
   try {

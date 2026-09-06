@@ -2,6 +2,7 @@ import { redirect } from "next/navigation";
 
 import { DEFAULT_POST_LOGIN_PATH } from "@/lib/auth/email-confirm-redirect";
 import { isOttoOnboardingComplete } from "@/lib/auth/post-login";
+import { hasRecordedConsent, CONSENT_COLUMNS } from "@/lib/legal/terms";
 import { createSupabaseServerClient } from "@/lib/supabase/server";
 import { createSupabaseServiceClient } from "@/lib/supabase/service";
 
@@ -36,13 +37,21 @@ export default async function OnboardingPage({
     redirect(`/auth/login?next=/onboarding${replay ? "?replay=1" : ""}`);
   }
 
-  // otto_answers is private (no RLS read); self-read via service role.
+  // otto_answers + the consent columns are private (no RLS read); self-read
+  // via service role.
   const { data: row } = await createSupabaseServiceClient()
     .from("users")
-    .select("school_verified, otto_answers")
+    .select(`school_verified, otto_answers, ${CONSENT_COLUMNS}`)
     .eq("id", user.id)
     .maybeSingle();
 
+  // Consent first (S53 A4): accounts that predate consent capture see the
+  // /auth/terms interstitial once, then come back here.
+  if (!hasRecordedConsent(row)) {
+    redirect(
+      `/auth/terms?next=${encodeURIComponent(`/onboarding${replay ? "?replay=1" : ""}`)}`,
+    );
+  }
   if (!row?.school_verified) {
     redirect("/auth/school-email");
   }

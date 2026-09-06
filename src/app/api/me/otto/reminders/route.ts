@@ -1,5 +1,6 @@
 import { NextResponse } from "next/server";
 
+import { requireTermsAccepted } from "@/lib/legal/require-terms";
 import { createSupabaseServerClient } from "@/lib/supabase/server";
 
 const TITLE_MAX = 240;
@@ -27,6 +28,9 @@ export async function POST(req: Request) {
   if (authErr || !user) {
     return NextResponse.json({ ok: false, error: "Unauthorized" }, { status: 401 });
   }
+
+  const termsGate = await requireTermsAccepted(user.id);
+  if (termsGate) return termsGate;
 
   let body: { title?: unknown; body?: unknown; remind_at?: unknown };
   try {

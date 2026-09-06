@@ -1,5 +1,6 @@
 import { NextResponse } from "next/server";
 
+import { requireTermsAccepted } from "@/lib/legal/require-terms";
 import { createSupabaseServerClient } from "@/lib/supabase/server";
 
 const MAX_COMMENT = 500;
@@ -61,6 +62,9 @@ export async function POST(req: Request, ctx: RouteContext) {
   const auth = await authorize();
   if (!auth.ok) return auth.res;
 
+  const termsGate = await requireTermsAccepted(auth.userId);
+  if (termsGate) return termsGate;
+
   let body: RepostBody = {};
   try {
     body = (await req.json()) as RepostBody;
@@ -92,6 +96,9 @@ export async function PATCH(req: Request, ctx: RouteContext) {
   }
   const auth = await authorize();
   if (!auth.ok) return auth.res;
+
+  const termsGate = await requireTermsAccepted(auth.userId);
+  if (termsGate) return termsGate;
 
   let body: RepostBody;
   try {

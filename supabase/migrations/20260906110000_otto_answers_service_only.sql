@@ -1,0 +1,22 @@
+-- Session 53 / A4 fix pass: otto_answers becomes service-role-only on write.
+--
+-- Why: POST /api/me/onboarding-complete refuses (403 terms_required) until
+-- the user's consent record exists, but `otto_answers` was still in the
+-- authenticated UPDATE column grant from 20260903100000 (policy
+-- users_update_self). A signed-in user with no consent record could therefore
+-- `PATCH /rest/v1/users?id=eq.<uid> {"otto_answers": {...}}` straight through
+-- PostgREST and mark Otto complete without ever touching the gated route.
+-- Grants, not routes, are the boundary — so the grant goes.
+--
+-- The route now writes otto_answers (and the sanitized profile pre-fill)
+-- through the service client after its own auth + consent checks. Reads were
+-- never granted to `authenticated` (otto_answers is a private column).
+--
+-- DEPLOY ORDER: apply AFTER (or together with) the S53 A4 code deploy. The
+-- previous build's onboarding-complete updates otto_answers with the caller's
+-- session, which this REVOKE turns into "permission denied" — i.e. anyone
+-- finishing Otto in the minutes between applying this and the deploy landing
+-- would see "Request failed" and have to retry. Nothing else is affected; a
+-- retry after the deploy succeeds.
+
+REVOKE UPDATE (otto_answers) ON public.users FROM authenticated;

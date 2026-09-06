@@ -367,6 +367,13 @@ export function OnboardingMobile({ replay }: { replay: boolean }) {
       });
       const j = await r.json();
 
+      // Consent gate (S53 A4): the server refuses until the Terms are
+      // accepted. Go record it and come back — not the login page.
+      if (r.status === 403 && j?.code === "terms_required") {
+        window.location.href = `/auth/terms?next=${encodeURIComponent("/onboarding")}`;
+        return;
+      }
+
       // Best-effort handle claim (separate route — has own validation).
       const claimed = handle.trim().toLowerCase();
       if (claimed && HANDLE_RE.test(claimed)) {

@@ -29,6 +29,10 @@ export default async function SettingsPage() {
     .eq("id", user.id)
     .maybeSingle();
 
+  // No consent gate here on purpose (S53 A4): someone who declines the
+  // Terms must still be able to reach account deletion. The page's own
+  // writes (handle change, deletion) are gated per-API instead.
+
   return (
     <CampusAppShell>
       <SettingsClient

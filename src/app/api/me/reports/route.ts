@@ -1,5 +1,6 @@
 import { NextResponse } from "next/server";
 
+import { requireTermsAccepted } from "@/lib/legal/require-terms";
 import { rateLimit, tooManyRequests } from "@/lib/rate-limit";
 import { createSupabaseServerClient } from "@/lib/supabase/server";
 
@@ -38,6 +39,9 @@ export async function POST(req: Request) {
 
   const rl = await rateLimit(`report:${user.id}`, { limit: 10, windowSec: 3600 });
   if (!rl.allowed) return tooManyRequests(rl);
+
+  const termsGate = await requireTermsAccepted(user.id);
+  if (termsGate) return termsGate;
 
   let body: Body;
   try {

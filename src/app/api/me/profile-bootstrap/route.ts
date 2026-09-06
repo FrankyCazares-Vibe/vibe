@@ -1,6 +1,8 @@
 import { NextResponse } from "next/server";
 
 import { getCountsFor } from "@/lib/connections/queries";
+import { termsRequiredResponse } from "@/lib/legal/require-terms";
+import { hasRecordedConsent } from "@/lib/legal/terms";
 import { buildVibeUserV1FromProfile } from "@/lib/profile/build-vibe-user-v1";
 import { normalizeProfileView } from "@/lib/profile/normalize-profile-view";
 import { createSupabaseServerClient } from "@/lib/supabase/server";
@@ -10,12 +12,18 @@ import { createSupabaseServiceClient } from "@/lib/supabase/service";
 // migration-lag situation (column doesn't exist yet) can't 404 the
 // whole bootstrap and lock the user out of their profile.
 const PROFILE_SELECT =
-  "id,email,name,handle,handle_changed_at,school,school_email,school_verified,year,major,department,bio,tagline,website,headline,location_text,banner_gradient,avatar_url,banner_url,resume_url,resume_docs,interests,skills,looking_for,work_experience,work_order_manual,recruiter_snapshot,current_on,resume_redactions";
+  "id,email,name,handle,handle_changed_at,school,school_email,school_verified,year,major,department,bio,tagline,website,headline,location_text,banner_gradient,avatar_url,banner_url,resume_url,resume_docs,interests,skills,looking_for,work_experience,work_order_manual,recruiter_snapshot,current_on,resume_redactions,terms_accepted_at,terms_version,age_attested_at";
 
 /**
  * Returns `vibe_user_v1`-shaped JSON for `public/html/profile.html`.
  * Includes real follower / following / connection counts so the profile stats
  * row (P1-014) renders truth instead of demo numbers.
+ *
+ * Consent gate (S53 A4): the static `?app=1` shells bootstrap through this
+ * route with no server page in front of them, so a user without a complete,
+ * current consent record gets 403 `terms_required` (public/html/_persistence.js
+ * forwards them to /auth/terms). `termsAccepted` / `termsVersion` are still
+ * exposed top-level (not on `vibeUser`) for clients that want the flag.
  */
 export async function GET() {
   const supabase = await createSupabaseServerClient();
@@ -43,6 +51,18 @@ export async function GET() {
       { status: 404 },
     );
   }
+
+  // Consent record (S53 A4) — service-role-only columns; surfaced as flags,
+  // never editable from the client. No record → 403 so the static shells
+  // redirect to the interstitial instead of running signed-in.
+  const consentRow = row as {
+    terms_accepted_at?: string | null;
+    terms_version?: string | null;
+    age_attested_at?: string | null;
+  };
+  const termsAccepted = hasRecordedConsent(consentRow);
+  if (!termsAccepted) return termsRequiredResponse();
+  const termsVersion = consentRow.terms_version ?? null;
 
   // Optional column — split out so missing-column errors (during
   // migration deploy lag) don't take the whole bootstrap down.
@@ -96,5 +116,5 @@ export async function GET() {
   // Pinned post id (from the optional split query above).
   vibeUser.pinnedPostId = pinnedPostId;
 
-  return NextResponse.json({ ok: true, vibeUser, isPlatformAdmin });
+  return NextResponse.json({ ok: true, vibeUser, isPlatformAdmin, termsAccepted, termsVersion });
 }

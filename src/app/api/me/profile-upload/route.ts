@@ -4,6 +4,7 @@ import { NextResponse } from "next/server";
 
 import { resumeDocProxyPath } from "@/lib/profile/resume-doc-url";
 import { uploadResumeObject } from "@/lib/profile/resume-storage";
+import { requireTermsAccepted } from "@/lib/legal/require-terms";
 import { rateLimit, tooManyRequests } from "@/lib/rate-limit";
 import { createSupabaseServerClient } from "@/lib/supabase/server";
 import { createSupabaseServiceClient } from "@/lib/supabase/service";
@@ -84,6 +85,9 @@ export async function POST(req: Request) {
 
   const rl = await rateLimit(`upload:profile-upload:${user.id}`, { limit: 30, windowSec: 600 });
   if (!rl.allowed) return tooManyRequests(rl);
+
+  const termsGate = await requireTermsAccepted(user.id);
+  if (termsGate) return termsGate;
 
   let form: FormData;
   try {

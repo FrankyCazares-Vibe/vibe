@@ -14,6 +14,7 @@ import {
 } from "@/lib/profile/resume-storage";
 import { inlineOrUploadProfileUrl } from "@/lib/profile/storage-upload";
 import { sanitizeWorkExperience } from "@/lib/profile/work-experience";
+import { requireTermsAccepted } from "@/lib/legal/require-terms";
 import { rateLimit, tooManyRequests } from "@/lib/rate-limit";
 import { createSupabaseServerClient } from "@/lib/supabase/server";
 import { createSupabaseServiceClient } from "@/lib/supabase/service";
@@ -31,6 +32,9 @@ export async function POST(req: Request) {
   if (userErr || !user) {
     return NextResponse.json({ ok: false, error: "Unauthorized" }, { status: 401 });
   }
+
+  const termsGate = await requireTermsAccepted(user.id);
+  if (termsGate) return termsGate;
 
   let body: Record<string, unknown>;
   try {

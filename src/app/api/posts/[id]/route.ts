@@ -1,5 +1,6 @@
 import { NextResponse } from "next/server";
 
+import { requireTermsAccepted } from "@/lib/legal/require-terms";
 import {
   extractMentionHandles,
   insertMentionNotifications,
@@ -186,6 +187,9 @@ export async function PATCH(req: Request, ctx: RouteContext) {
   if (authErr || !user) {
     return NextResponse.json({ ok: false, error: "Unauthorized" }, { status: 401 });
   }
+
+  const termsGate = await requireTermsAccepted(user.id);
+  if (termsGate) return termsGate;
 
   let body: {
     content?: unknown;

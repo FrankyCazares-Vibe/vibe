@@ -7,6 +7,7 @@ import {
   MESSAGE_MEDIA_KEY_PREFIX,
   signMessageMediaPutUrl,
 } from "@/lib/r2";
+import { requireTermsAccepted } from "@/lib/legal/require-terms";
 import { rateLimit, tooManyRequests } from "@/lib/rate-limit";
 import { createSupabaseServerClient } from "@/lib/supabase/server";
 
@@ -61,6 +62,9 @@ export async function POST(req: Request) {
     windowSec: 600,
   });
   if (!rl.allowed) return tooManyRequests(rl);
+
+  const termsGate = await requireTermsAccepted(user.id);
+  if (termsGate) return termsGate;
 
   let body: Body;
   try {

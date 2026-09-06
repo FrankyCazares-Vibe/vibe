@@ -238,7 +238,20 @@ function vibeHydrateSidebar() {
   // through ProfileHtmlBridge again). Demo users skip this.
   if (cached._isDemo) return;
   fetch('/api/me/profile-bootstrap', { credentials: 'include' })
-    .then(r => r.ok ? r.json() : null)
+    .then(async r => {
+      // Consent gate (S53 A4): the static ?app=1 shells have no server page
+      // in front of them, so the bootstrap is where a signed-in user with no
+      // consent record gets caught. Send them to the interstitial and back.
+      if (r.status === 403) {
+        const j = await r.json().catch(() => null);
+        if (j && j.code === 'terms_required') {
+          const here = window.location.pathname + window.location.search;
+          window.location.replace('/auth/terms?next=' + encodeURIComponent(here));
+        }
+        return null;
+      }
+      return r.ok ? r.json() : null;
+    })
     .then(d => {
       if (!d || !d.ok || !d.vibeUser) return;
       // Preserve any local-only fields by merging server truth on top.

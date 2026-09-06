@@ -1,7 +1,9 @@
 import "server-only";
 import {
+  DeleteObjectsCommand,
   GetObjectCommand,
   HeadBucketCommand,
+  ListObjectsV2Command,
   PutObjectCommand,
   S3Client,
 } from "@aws-sdk/client-s3";
@@ -279,6 +281,138 @@ export async function signOrgAssetGetUrl(
   return getSignedUrl(client, cmd, {
     expiresIn: expiresInSec ?? DEFAULT_SIGN_EXPIRES_SEC,
   });
+}
+
+/**
+ * The ONLY shape `deleteR2Prefix` will ever purge: `clips/<uuid>/`. Every
+ * other key family in the bucket (`messages/<channelId>/`,
+ * `groups/<channelId>/`, `orgs/<orgId>/`) is shared, not user-owned, and
+ * must survive an account deletion.
+ *
+ * Case-SENSITIVE on purpose: S3 keys are byte-exact, so `Clips/<uuid>/` is
+ * a different (nonexistent) prefix from `clips/<uuid>/` and must be refused
+ * rather than silently listed as empty. Lower-case hex only, matching the
+ * canonical UUID text form Postgres emits.
+ */
+const CLIP_OWNER_PREFIX_RE =
+  /^clips\/[0-9a-f]{8}-[0-9a-f]{4}-[1-8][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}\/$/;
+
+/**
+ * The ONLY key shape `deleteR2Keys` will ever delete: one object directly
+ * under `messages/<channelId>/`. Explicit keys, never prefixes — a trailing
+ * slash or a nested path is refused. `[0-9a-f-]{36}` is the loose UUID
+ * form used on the write side (`messages/<channelId>/<uuid>.<ext>`), so it
+ * accepts every key we ever signed and nothing outside the family.
+ */
+export const MESSAGE_MEDIA_KEY_RE = /^messages\/[0-9a-f-]{36}\/[^/]+$/;
+
+const R2_LIST_PAGE = 1000;
+const R2_DELETE_BATCH = 1000;
+
+/**
+ * Delete an explicit list of message-media objects
+ * (`messages/<channelId>/<file>`). Used by account deletion (S53 A4 F4):
+ * message media is stored under the CHANNEL, not the user, so the purge
+ * cannot list a user prefix — it collects the exact keys from the user's
+ * `messages.media_url` rows and hands them here.
+ *
+ * Every key must match `MESSAGE_MEDIA_KEY_RE` or the whole call throws
+ * before anything is deleted (no prefixes, no `..`, no other key family).
+ * Deletes in DeleteObjects batches of 1000; THROWS on any per-key error
+ * (callers must not proceed with the account deletion — the purge is
+ * idempotent, so a retry is safe). S3 DeleteObjects treats a missing key as
+ * a success, so re-running after a partial failure is fine. Returns the
+ * number of keys submitted (duplicates collapsed).
+ */
+export async function deleteR2Keys(keys: readonly string[]): Promise<number> {
+  const unique = Array.from(new Set(keys));
+  for (const key of unique) {
+    if (!MESSAGE_MEDIA_KEY_RE.test(key)) {
+      throw new Error(
+        'deleteR2Keys only deletes explicit "messages/<channelId>/<file>" keys',
+      );
+    }
+  }
+  if (unique.length === 0) return 0;
+
+  const bucket = requireEnv("R2_BUCKET_NAME");
+  const client = getR2S3Client();
+
+  let deleted = 0;
+  for (let i = 0; i < unique.length; i += R2_DELETE_BATCH) {
+    const batch = unique.slice(i, i + R2_DELETE_BATCH);
+    const res = await client.send(
+      new DeleteObjectsCommand({
+        Bucket: bucket,
+        Delete: { Objects: batch.map((Key) => ({ Key })), Quiet: true },
+      }),
+    );
+    if (res.Errors && res.Errors.length > 0) {
+      const first = res.Errors[0];
+      throw new Error(
+        `R2 DeleteObjects failed for ${res.Errors.length} key(s): ${first.Code ?? "?"} ${first.Message ?? ""}`.trim(),
+      );
+    }
+    deleted += batch.length;
+  }
+  return deleted;
+}
+
+/**
+ * Delete every object under a user's clip prefix (`clips/<uid>/`). Used by
+ * account deletion (S53 A4). Paginates with ListObjectsV2 + ContinuationToken
+ * and deletes in DeleteObjects batches of 1000. Returns the number of objects
+ * deleted; THROWS on any list / delete error (callers must not proceed with
+ * the account deletion when this fails — the purge is idempotent, so a retry
+ * is safe). Refuses any prefix that is not exactly `clips/<uuid>/`.
+ */
+export async function deleteR2Prefix(prefix: string): Promise<number> {
+  if (!CLIP_OWNER_PREFIX_RE.test(prefix)) {
+    throw new Error(
+      'deleteR2Prefix only purges "clips/<uuid>/" prefixes',
+    );
+  }
+  const bucket = requireEnv("R2_BUCKET_NAME");
+  const client = getR2S3Client();
+
+  let deleted = 0;
+  let continuationToken: string | undefined;
+  do {
+    const page = await client.send(
+      new ListObjectsV2Command({
+        Bucket: bucket,
+        Prefix: prefix,
+        MaxKeys: R2_LIST_PAGE,
+        ContinuationToken: continuationToken,
+      }),
+    );
+    // Belt and braces: never delete a key the listing returned outside the
+    // prefix we asked for (S3 semantics say it cannot, but it is cheap).
+    const keys = (page.Contents ?? [])
+      .map((o) => o.Key)
+      .filter((k): k is string => typeof k === "string" && k.startsWith(prefix));
+
+    for (let i = 0; i < keys.length; i += R2_DELETE_BATCH) {
+      const batch = keys.slice(i, i + R2_DELETE_BATCH);
+      const res = await client.send(
+        new DeleteObjectsCommand({
+          Bucket: bucket,
+          Delete: { Objects: batch.map((Key) => ({ Key })), Quiet: true },
+        }),
+      );
+      if (res.Errors && res.Errors.length > 0) {
+        const first = res.Errors[0];
+        throw new Error(
+          `R2 DeleteObjects failed for ${res.Errors.length} key(s): ${first.Code ?? "?"} ${first.Message ?? ""}`.trim(),
+        );
+      }
+      deleted += batch.length;
+    }
+
+    continuationToken = page.IsTruncated ? page.NextContinuationToken : undefined;
+  } while (continuationToken);
+
+  return deleted;
 }
 
 export async function probeR2Bucket(): Promise<

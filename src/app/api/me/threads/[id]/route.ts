@@ -1,5 +1,6 @@
 import { NextResponse } from "next/server";
 
+import { requireTermsAccepted } from "@/lib/legal/require-terms";
 import { GROUP_PHOTO_KEY_PREFIX } from "@/lib/r2";
 import { createSupabaseServerClient } from "@/lib/supabase/server";
 import { createSupabaseServiceClient } from "@/lib/supabase/service";
@@ -26,6 +27,9 @@ export async function PATCH(req: Request, ctx: RouteCtx) {
   if (authErr || !user) {
     return NextResponse.json({ ok: false, error: "Unauthorized" }, { status: 401 });
   }
+
+  const termsGate = await requireTermsAccepted(user.id);
+  if (termsGate) return termsGate;
 
   let body: Body;
   try {

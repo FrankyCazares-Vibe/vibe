@@ -5,12 +5,18 @@ import { useRouter } from "next/navigation";
 import { useState } from "react";
 
 import { getAuthEmailCallbackUrl } from "@/lib/auth/email-confirm-redirect";
+import {
+  MIN_AGE,
+  TERMS_METADATA_KEYS,
+  TERMS_VERSION,
+} from "@/lib/legal/terms";
 import { getSupabaseBrowserClient } from "@/lib/supabase/browser";
 
 export default function SignupPage() {
   const router = useRouter();
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
+  const [agreed, setAgreed] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [loading, setLoading] = useState(false);
   const [message, setMessage] = useState<string | null>(null);
@@ -19,6 +25,12 @@ export default function SignupPage() {
     e.preventDefault();
     setError(null);
     setMessage(null);
+    if (!agreed) {
+      setError(
+        `Confirm you're ${MIN_AGE} or older and agree to the Terms to create an account.`,
+      );
+      return;
+    }
     setLoading(true);
     const supabase = getSupabaseBrowserClient();
     const siteOrigin =
@@ -29,6 +41,13 @@ export default function SignupPage() {
       password,
       options: {
         emailRedirectTo: getAuthEmailCallbackUrl(siteOrigin),
+        // Lands in auth.users.raw_user_meta_data; the on_auth_user_created
+        // trigger copies it into users.terms_version / terms_accepted_at /
+        // age_attested_at so the consent record is born with the row.
+        data: {
+          [TERMS_METADATA_KEYS.version]: TERMS_VERSION,
+          [TERMS_METADATA_KEYS.age]: true,
+        },
       },
     });
     setLoading(false);
@@ -118,6 +137,44 @@ export default function SignupPage() {
             />
           </label>
 
+          <label
+            className={`vibe-auth-consent${agreed ? " vibe-auth-consent--checked" : ""}`}
+          >
+            <input
+              type="checkbox"
+              required
+              checked={agreed}
+              onChange={(e) => setAgreed(e.target.checked)}
+              aria-describedby="signup-consent-note"
+            />
+            <span>
+              I&apos;m <strong>{MIN_AGE} or older</strong> and I agree to the{" "}
+              <Link
+                href="/legal/terms"
+                target="_blank"
+                rel="noopener noreferrer"
+                className="vibe-auth-link"
+              >
+                Terms of Service
+              </Link>{" "}
+              and{" "}
+              <Link
+                href="/legal/privacy"
+                target="_blank"
+                rel="noopener noreferrer"
+                className="vibe-auth-link"
+              >
+                Privacy Policy
+              </Link>
+              .
+            </span>
+          </label>
+          {!agreed ? (
+            <p id="signup-consent-note" className="vibe-auth-consent-note">
+              Required — check the box above to create your account.
+            </p>
+          ) : null}
+
           {error ? <p className="vibe-auth-error">{error}</p> : null}
           {message ? (
             <div className="vibe-auth-banner vibe-auth-banner--success">
@@ -125,7 +182,11 @@ export default function SignupPage() {
             </div>
           ) : null}
 
-          <button type="submit" disabled={loading} className="vibe-auth-submit">
+          <button
+            type="submit"
+            disabled={loading || !agreed}
+            className={`vibe-auth-submit${!agreed ? " vibe-auth-submit--locked" : ""}`}
+          >
             {loading ? "Creating…" : "Create account"}
             {loading ? null : (
               <span aria-hidden style={{ marginLeft: 8 }}>

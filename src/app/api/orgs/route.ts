@@ -1,5 +1,6 @@
 import { NextResponse } from "next/server";
 
+import { requireTermsAccepted } from "@/lib/legal/require-terms";
 import { normalizeOrgAssetInput, orgAssetProxyUrl } from "@/lib/org-asset-url";
 import { ilikeOrFilter } from "@/lib/pgrest";
 import { rateLimit, tooManyRequests } from "@/lib/rate-limit";
@@ -195,6 +196,9 @@ export async function POST(req: Request) {
 
   const rl = await rateLimit(`org-create:${user.id}`, { limit: 5, windowSec: 3600 });
   if (!rl.allowed) return tooManyRequests(rl);
+
+  const termsGate = await requireTermsAccepted(user.id);
+  if (termsGate) return termsGate;
 
   let body: CreateBody;
   try {

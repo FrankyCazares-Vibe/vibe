@@ -845,6 +845,7 @@ function DangerZone({ handle }: { handle: string | null }) {
 
   return (
     <section
+      id="delete-account"
       style={{
         ...CARD_GLASS,
         padding: 22,

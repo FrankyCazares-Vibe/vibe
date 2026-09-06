@@ -91,8 +91,15 @@ function SchoolEmailInner() {
       const data = (await res.json()) as {
         ok?: boolean;
         error?: string;
+        code?: string;
         message?: string;
       };
+      if (res.status === 403 && data.code === "terms_required") {
+        // Consent must be on record before verification (S53 A4); the
+        // interstitial brings the user straight back here.
+        router.replace("/auth/terms?next=/auth/school-email");
+        return;
+      }
       if (!res.ok || !data.ok) {
         setError(data.error ?? "Request failed.");
         return;

@@ -10,6 +10,7 @@ import {
   signSchoolEmailToken,
 } from "@/lib/auth/school-email-token";
 import { sendSchoolVerificationEmail } from "@/lib/email/resend-transactional";
+import { requireTermsAccepted } from "@/lib/legal/require-terms";
 import { clientIp, rateLimit, tooManyRequests } from "@/lib/rate-limit";
 import { createSupabaseServerClient } from "@/lib/supabase/server";
 import {
@@ -69,6 +70,9 @@ export async function POST(req: Request) {
     windowSec: 3600,
   });
   if (!perIp.allowed) return tooManyRequests(perIp);
+
+  const termsGate = await requireTermsAccepted(user.id);
+  if (termsGate) return termsGate;
 
   let body: Body;
   try {

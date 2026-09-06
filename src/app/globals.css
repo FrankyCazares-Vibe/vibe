@@ -1441,6 +1441,70 @@
   color: #b48414;
 }
 
+/* —— Auth: consent row (18+ attestation + Terms / Privacy agreement) ——
+   Shared by /auth/signup and the /auth/terms interstitial (S53 A4). —— */
+.vibe-auth-consent {
+  display: flex;
+  align-items: flex-start;
+  gap: 12px;
+  padding: 12px 14px;
+  background: rgba(28, 28, 30, 0.03);
+  border: 1px solid rgba(28, 28, 30, 0.08);
+  border-radius: 12px;
+  font-size: 13px;
+  line-height: 1.5;
+  color: #5a564f;
+  cursor: pointer;
+  transition:
+    border-color 200ms ease,
+    background 200ms ease;
+}
+.vibe-auth-consent:hover {
+  border-color: rgba(28, 28, 30, 0.18);
+}
+.vibe-auth-consent--checked {
+  background: rgba(255, 92, 53, 0.06);
+  border-color: rgba(255, 92, 53, 0.3);
+}
+.vibe-auth-consent input[type="checkbox"] {
+  flex-shrink: 0;
+  width: 18px;
+  height: 18px;
+  margin: 2px 0 0;
+  accent-color: #ff5c35;
+  cursor: pointer;
+}
+.vibe-auth-consent input[type="checkbox"]:focus-visible {
+  outline: 2px solid #ff5c35;
+  outline-offset: 2px;
+  border-radius: 4px;
+}
+.vibe-auth-consent strong {
+  color: #1c1c1e;
+  font-weight: 600;
+}
+.vibe-auth-consent-note {
+  margin: -8px 0 0;
+  padding: 0 2px;
+  font-size: 12px;
+  line-height: 1.4;
+  color: #8a8580;
+}
+/* Unchecked consent locks the submit; that's a "not yet", not a "busy". */
+.vibe-auth-submit--locked:disabled {
+  cursor: not-allowed;
+}
+/* The "Sign out" escape on /auth/terms is a button styled as the tail link. */
+button.vibe-auth-link {
+  background: none;
+  border: 0;
+  border-bottom: 1px dashed rgba(255, 92, 53, 0.35);
+  padding: 0 0 1px;
+  font: inherit;
+  font-weight: 600;
+  cursor: pointer;
+}
+
 @media (max-width: 540px) {
   /* Auth cards: tight padding + lift the back button into a smaller corner
      so it doesn't kiss the card edge on phone widths. */

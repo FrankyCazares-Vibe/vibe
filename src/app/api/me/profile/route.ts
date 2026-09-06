@@ -2,6 +2,7 @@ import { NextResponse } from "next/server";
 
 import { sanitizeRecruiterSnapshot } from "@/lib/profile/recruiter-snapshot";
 import { changeHandleForUser } from "@/lib/profile/handle-change";
+import { requireTermsAccepted } from "@/lib/legal/require-terms";
 import { normalizeResumeRef } from "@/lib/profile/resume-doc-url";
 import { sanitizeWorkExperience } from "@/lib/profile/work-experience";
 import { createSupabaseServerClient } from "@/lib/supabase/server";
@@ -80,6 +81,9 @@ export async function PATCH(req: Request) {
   if (userErr || !user) {
     return NextResponse.json({ ok: false, error: "Unauthorized" }, { status: 401 });
   }
+
+  const termsGate = await requireTermsAccepted(user.id);
+  if (termsGate) return termsGate;
 
   let body: Record<string, unknown>;
   try {

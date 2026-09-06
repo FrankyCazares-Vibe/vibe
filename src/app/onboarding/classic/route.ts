@@ -4,6 +4,7 @@ import type { NextRequest } from "next/server";
 
 import { DEFAULT_POST_LOGIN_PATH } from "@/lib/auth/email-confirm-redirect";
 import { isOttoOnboardingComplete } from "@/lib/auth/post-login";
+import { hasRecordedConsent, CONSENT_COLUMNS } from "@/lib/legal/terms";
 import { createSupabaseServerClient } from "@/lib/supabase/server";
 import { createSupabaseServiceClient } from "@/lib/supabase/service";
 
@@ -32,13 +33,24 @@ export async function GET(request: NextRequest) {
     );
   }
 
-  // otto_answers is private (no RLS read); self-read via service role.
+  // otto_answers + the consent columns are private (no RLS read); self-read
+  // via service role.
   const { data: row } = await createSupabaseServiceClient()
     .from("users")
-    .select("school_verified, otto_answers")
+    .select(`school_verified, otto_answers, ${CONSENT_COLUMNS}`)
     .eq("id", user.id)
     .maybeSingle();
 
+  // Consent first (S53 A4) — mirrors src/app/onboarding/page.tsx so a direct
+  // hit on /onboarding/classic (bookmark, back button) can't skip the
+  // interstitial and then dead-end on onboarding-complete's 403.
+  if (!hasRecordedConsent(row)) {
+    const back = `/onboarding${replay ? "?replay=1" : ""}`;
+    return Response.redirect(
+      new URL(`/auth/terms?next=${encodeURIComponent(back)}`, request.url),
+      302,
+    );
+  }
   if (!row?.school_verified) {
     return Response.redirect(
       new URL("/auth/school-email", request.url),

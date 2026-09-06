@@ -1,5 +1,6 @@
 import { NextResponse } from "next/server";
 
+import { requireTermsAccepted } from "@/lib/legal/require-terms";
 import { orgAssetProxyUrl } from "@/lib/org-asset-url";
 import { createSupabaseServerClient } from "@/lib/supabase/server";
 
@@ -196,6 +197,9 @@ export async function POST(req: Request) {
   if (authErr || !user) {
     return NextResponse.json({ ok: false, error: "Unauthorized" }, { status: 401 });
   }
+
+  const termsGate = await requireTermsAccepted(user.id);
+  if (termsGate) return termsGate;
 
   let body: CreateEventBody;
   try {
