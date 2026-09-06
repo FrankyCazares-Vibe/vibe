@@ -4,6 +4,7 @@ import type { SupabaseClient } from "@supabase/supabase-js";
 import { getCountsFor, getFollowState } from "@/lib/connections/queries";
 import { buildVibeUserV1FromProfile } from "@/lib/profile/build-vibe-user-v1";
 import { normalizeProfileView } from "@/lib/profile/normalize-profile-view";
+import { parseResumeDocRef } from "@/lib/profile/resume-doc-url";
 import { createSupabaseServerClient } from "@/lib/supabase/server";
 import { createSupabaseServiceClient } from "@/lib/supabase/service";
 
@@ -31,8 +32,13 @@ type RouteContext = { params: Promise<{ handle: string }> };
  * a second roundtrip (P1-013). Logged-out visitors get follow state
  * `none` — Connect still 401s until they sign in.
  *
- * `users` RLS is authenticated-only, so unsigned reads use the
- * service-role client against the public column list above.
+ * The profile row is ALWAYS read with the service-role client against
+ * the public column list above: `users` RLS is authenticated-only (so
+ * anonymous visitors need it), and `resume_redactions` is no longer
+ * SELECT-granted to `authenticated` (migration 20260905100000) because
+ * bar geometry must never reach a non-owner — this route strips it
+ * below, and the column grant is what makes that strip unbypassable.
+ * The viewer's own client is still used for the block / follow reads.
  */
 export async function GET(_req: Request, ctx: RouteContext) {
   const { handle: rawHandle } = await ctx.params;
@@ -46,14 +52,18 @@ export async function GET(_req: Request, ctx: RouteContext) {
     data: { user: viewer },
   } = await supabase.auth.getUser();
 
-  let reader: SupabaseClient;
+  // `service` reads the profile row (see the docblock); `reader` is the
+  // client used for counts / pinned post — the viewer's own when signed
+  // in so those reads stay RLS-scoped, the service role otherwise.
+  let service: SupabaseClient;
   try {
-    reader = viewer ? supabase : createSupabaseServiceClient();
+    service = createSupabaseServiceClient();
   } catch {
     return NextResponse.json({ ok: false, error: "Unauthorized" }, { status: 401 });
   }
+  const reader: SupabaseClient = viewer ? supabase : service;
 
-  const { data: row, error } = await reader
+  const { data: row, error } = await service
     .from("users")
     .select(PUBLIC_PROFILE_SELECT)
     .eq("handle", handle)
@@ -131,6 +141,35 @@ export async function GET(_req: Request, ctx: RouteContext) {
       };
 
   const profile = normalizeProfileView(rowForViewer);
+
+  // Signed-in NON-OWNER viewers: redaction bars are burned into the bytes
+  // server-side (GET /api/resume/<key> signs a derivative), so the bar
+  // geometry must never leave the server — strip it. And because we can
+  // only redact files we host, an EXTERNAL-link doc that has bars for its
+  // docIndex is hidden from viewers entirely. docIndex is computed on the
+  // sanitised portfolio order (resume_docs, or [resume_url] when empty),
+  // which is the same order the proxy route uses; indices are read BEFORE
+  // filtering so a dropped doc doesn't shift its neighbours' bars.
+  if (viewer && viewer.id !== profile.id) {
+    const barDocs = new Set(profile.resume_redactions.map((b) => b.docIndex));
+    if (profile.resume_docs.length > 0) {
+      profile.resume_docs = profile.resume_docs.filter(
+        (d, i) => parseResumeDocRef(d.url) !== null || !barDocs.has(i),
+      );
+      // The portfolio was docs-based; never let an emptied list fall back
+      // to a resume_url the viewer was not meant to see (and which the
+      // proxy would 404 anyway, since it is not in the portfolio).
+      profile.resume_url = null;
+    } else if (
+      profile.resume_url &&
+      parseResumeDocRef(profile.resume_url) === null &&
+      barDocs.has(0)
+    ) {
+      profile.resume_url = null;
+    }
+    profile.resume_redactions = [];
+  }
+
   // `appShell: true` is for OWNER bootstrap; viewer bootstrap stays
   // false so the persistence layer doesn't try to sync the viewed
   // user's data as if it were the viewer's own.

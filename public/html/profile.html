@@ -1054,11 +1054,14 @@ body.doc-modal-open { overflow:hidden; }
 }
 /* Image area wrapper — same aspect as the main viewer's .doc-page-wrap
    so redaction bars positioned as page-percent coordinates land in the
-   same relative spot here as they do in the zoomed viewer. */
+   same relative spot here as they do in the zoomed viewer. The aspect
+   is the page's REAL width/height (set by _fitDocPageWrap from the
+   image's natural size once it loads); 8.5/11 is only the pre-load
+   fallback. */
 .doc-page-thumb-imagewrap {
   position:relative;
   width:100%;
-  aspect-ratio:8.5/11;
+  aspect-ratio:var(--page-aspect, 8.5/11);
   overflow:hidden;
 }
 .doc-page-thumb-imagewrap img {
@@ -1066,6 +1069,7 @@ body.doc-modal-open { overflow:hidden; }
   inset:0;
   width:100%;
   height:100%;
+  object-fit:fill;
 }
 /* Read-only mini bars for the thumbnail strip. Same coords as the
    main viewer's .redaction-bar, but no shadow / cursor / interaction
@@ -1162,12 +1166,20 @@ body.doc-modal-open { overflow:hidden; }
      width that would produce a viewer-fitting height — whichever is
      smaller. That way a single page ALWAYS fits in the viewer without
      scrolling, and multi-page docs scroll between full-page views.
-     0.7727 = 8.5 / 11 (page aspect). The image is absolutely positioned
-     so % bar coords align 1:1 with page coordinates. The wrap width is
-     multiplied by the --doc-zoom var the wheel handler updates so
-     redaction bars (positioned as % of wrap) scale with the page. */
-  width:calc(min(100%, calc((92vh - 200px) * 0.7727)) * var(--doc-zoom, 1));
-  aspect-ratio:8.5 / 11;
+     --page-aspect is the page's REAL width/height, set per wrap by
+     _fitDocPageWrap from the rasterised image's natural size (0.7727 =
+     8.5 / 11 is only the pre-load fallback). The wrap MUST match the
+     true page box: bar coords are stored as % of this wrap, and the
+     server (resume-redact.ts) and mobile viewer burn/draw them as % of
+     the full page bitmap — a cropped or letterboxed wrap would put the
+     burned bars somewhere else than the owner drew them. The image is
+     absolutely positioned (object-fit:fill, exact since the wrap shares
+     its aspect) so % bar coords align 1:1 with page coordinates. The
+     wrap width is multiplied by the --doc-zoom var the wheel handler
+     updates so redaction bars (positioned as % of wrap) scale with the
+     page. */
+  width:calc(min(100%, calc((92vh - 200px) * var(--page-aspect, 0.7727))) * var(--doc-zoom, 1));
+  aspect-ratio:var(--page-aspect, 8.5 / 11);
   flex-shrink:0;
 }
 .doc-page-wrap canvas,
@@ -1176,7 +1188,7 @@ body.doc-modal-open { overflow:hidden; }
   inset:0;
   width:100%;
   height:100%;
-  object-fit:cover;
+  object-fit:fill;
   display:block;
   user-select:none;
   -webkit-user-drag:none;
@@ -5233,6 +5245,20 @@ async function _backfillRasterIfNeeded() {
   }
 }
 
+// Size a page wrap (main viewer or thumbnail strip) to the rasterised
+// page's REAL aspect. Redaction bars are stored as % of the wrap, and
+// the server burns them in as % of the full page bitmap (PDFium CropBox
+// with /Rotate applied — the same box pdf.js rasterised here), so the
+// wrap must be exactly page-shaped for every page size, not just Letter.
+// Bars are % positioned inside the wrap, so they follow without a
+// re-render.
+function _fitDocPageWrap(img) {
+  if (!img || !img.naturalWidth || !img.naturalHeight) return;
+  const wrap = img.parentElement;
+  if (!wrap) return;
+  wrap.style.setProperty('--page-aspect', String(img.naturalWidth / img.naturalHeight));
+}
+
 function renderDocViewer() {
   const pages = document.getElementById('docPages');
   const view = document.getElementById('docView');
@@ -5288,7 +5314,7 @@ function renderDocViewer() {
       <div class="doc-page-thumb ${active}" onclick="setActiveDoc(${idx})" style="position:relative">
         ${removeBtn}
         <div class="doc-page-thumb-imagewrap">
-          <img src="${_esc(firstPage)}" alt="${_esc(doc.name)}" draggable="false">
+          <img src="${_esc(firstPage)}" alt="${_esc(doc.name)}" draggable="false" onload="_fitDocPageWrap(this)">
           ${thumbBars}
         </div>
         <div class="doc-page-thumb-label" title="${_esc(doc.name)}">${_esc(doc.name)}</div>
@@ -5324,13 +5350,21 @@ function renderDocViewer() {
       const pageNumber = i + 1;
       const badge = numPages > 1 ? `<div class="doc-page-number">${pageNumber} / ${numPages}</div>` : '';
       return `<div class="doc-page-wrap" data-page="${pageNumber}">
-        <img src="${_esc(src)}" alt="${_esc(doc.name)} page ${pageNumber}" draggable="false">
+        <img src="${_esc(src)}" alt="${_esc(doc.name)} page ${pageNumber}" draggable="false" onload="_fitDocPageWrap(this)">
         ${badge}
       </div>`;
     }).join('');
   }
   view.innerHTML = pagesHtml;
   view.scrollTop = 0;
+  // Images already decoded (same data URL re-rendered) still fire
+  // `load` after insertion, but size the wraps synchronously when we
+  // can so the first paint is page-shaped rather than a Letter fallback.
+  [pages, view].forEach((root) => {
+    root.querySelectorAll('.doc-page-wrap img, .doc-page-thumb-imagewrap img').forEach((img) => {
+      if (img.complete && img.naturalWidth) _fitDocPageWrap(img);
+    });
+  });
 
   view.onpointerdown = onDocViewPointerDown;
   renderRedactionBars();
@@ -8416,10 +8450,19 @@ function renderUserSections(user) {
     renderResumeCard();
   }
   // Redaction bars — hydrate from server (users.resume_redactions via
-  // u.resumeRedactions). If the viewer is currently open, repaint so
-  // overlays appear without a reopen.
-  if (Array.isArray(user.resumeRedactions) && typeof redactionBars !== 'undefined') {
-    redactionBars = user.resumeRedactions.slice();
+  // u.resumeRedactions). A missing or empty array is authoritative, not
+  // a "skip": build-vibe-user-v1 omits resumeRedactions when the row has
+  // none, and the visitor bootstrap sends [] on purpose — bars are burned
+  // into a server-rendered derivative and their geometry never leaves
+  // the server. Without this reset, a visitor's OWN bars (hydrated a
+  // moment earlier from their localStorage user at init) would linger in
+  // `redactionBars` and be drawn over the visited user's document. The
+  // owner's keep-prev-bars fallback lives in flushProfileServerSync,
+  // which never routes through here, so nothing of the owner's is lost.
+  // If the viewer is currently open, repaint so overlays update without
+  // a reopen.
+  if (typeof redactionBars !== 'undefined') {
+    redactionBars = Array.isArray(user.resumeRedactions) ? user.resumeRedactions.slice() : [];
     if (typeof renderRedactionBars === 'function' &&
         document.getElementById('docModal')?.classList.contains('open')) {
       renderRedactionBars();

@@ -2,6 +2,15 @@ import type { NextConfig } from "next";
 import { withSentryConfig } from "@sentry/nextjs";
 
 const nextConfig: NextConfig = {
+  // Server-side resume redaction (src/lib/profile/resume-redact.ts).
+  // PDFium's Emscripten glue relies on createRequire / import.meta.url and
+  // sharp is a native addon, so none of these may be bundled into route
+  // code. The 3.9 MB pdfium.wasm is read from disk at runtime; the tracing
+  // include copies it into the resume proxy's lambda.
+  serverExternalPackages: ["@hyzyla/pdfium", "sharp", "pdf-lib"],
+  outputFileTracingIncludes: {
+    "/api/resume/[...path]": ["./node_modules/@hyzyla/pdfium/dist/pdfium.wasm"],
+  },
   async redirects() {
     return [
       {

@@ -3,11 +3,12 @@ import { NextResponse } from "next/server";
 import { sanitizeCurrentOn } from "@/lib/profile/current-on";
 import { normalizeProfileView } from "@/lib/profile/normalize-profile-view";
 import { sanitizeRecruiterSnapshot } from "@/lib/profile/recruiter-snapshot";
-import { resumeKeyOwnerId } from "@/lib/profile/resume-doc-url";
+import { normalizeResumeRef, resumeKeyOwnerId } from "@/lib/profile/resume-doc-url";
 import { sanitizeResumeDocs } from "@/lib/profile/resume-docs";
 import { sanitizeResumeRedactions } from "@/lib/profile/resume-redactions";
 import {
   deleteResumeObjects,
+  purgeRedactedDerivatives,
   resolveResumeUrlInput,
   resumeKeysReferenced,
 } from "@/lib/profile/resume-storage";
@@ -184,13 +185,16 @@ export async function POST(req: Request) {
   // update so we can delete objects this request un-references: repeated
   // uploads left 37 orphaned, un-redacted PDFs in prod in one month.
   const touchesResume = "resume_url" in body || "resume_docs" in body;
-  type ResumeRefs = { resume_url: unknown; resume_docs: unknown };
+  // Redaction bars change which DERIVATIVE viewers must be served, so the
+  // pre-read also snapshots them (see the derivative purge below).
+  const touchesRedactions = "resume_redactions" in patch;
+  type ResumeRefs = { resume_url: unknown; resume_docs: unknown; resume_redactions: unknown };
   let resumeBefore: ResumeRefs | null = null;
-  if (touchesResume) {
+  if (touchesResume || touchesRedactions) {
     try {
       const { data, error } = await createSupabaseServiceClient()
         .from("users")
-        .select("resume_url, resume_docs")
+        .select("resume_url, resume_docs, resume_redactions")
         .eq("id", user.id)
         .maybeSingle();
       if (error) console.error("[profile-sync] resume pre-read", error.message);
@@ -265,6 +269,44 @@ export async function POST(req: Request) {
       }
     } catch (e) {
       console.error("[profile-sync] resume orphan cleanup", e);
+    }
+  }
+
+  // Best-effort derivative invalidation: viewers are served burned-in
+  // copies under `<uid>/redacted/` keyed by (source key, bars). Whenever
+  // the docs, the legacy resume_url or the bars actually change, drop
+  // every derivative so the next viewer request regenerates it lazily.
+  // If the pre-read failed we cannot compare, so purge conservatively.
+  if (touchesResume || touchesRedactions) {
+    try {
+      let changed = true;
+      if (resumeBefore) {
+        const canon = (docs: unknown, url: unknown, bars: unknown) =>
+          JSON.stringify([
+            sanitizeResumeDocs(docs, user.id),
+            normalizeResumeRef(url, user.id),
+            sanitizeResumeRedactions(bars),
+          ]);
+        const before = canon(
+          resumeBefore.resume_docs,
+          resumeBefore.resume_url,
+          resumeBefore.resume_redactions,
+        );
+        const after = canon(
+          "resume_docs" in patch ? patch.resume_docs : resumeBefore.resume_docs,
+          "resume_url" in patch ? patch.resume_url : resumeBefore.resume_url,
+          "resume_redactions" in patch
+            ? patch.resume_redactions
+            : resumeBefore.resume_redactions,
+        );
+        changed = before !== after;
+      }
+      if (changed) {
+        const n = await purgeRedactedDerivatives(user.id);
+        if (n > 0) console.log(`[profile-sync] purged ${n} redacted derivative(s)`);
+      }
+    } catch (e) {
+      console.error("[profile-sync] redacted derivative purge", e);
     }
   }
 

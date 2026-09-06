@@ -1,0 +1,38 @@
+-- Session 53 / A1 fix pass: bar geometry never leaves the server.
+--
+-- `users.resume_redactions` holds the owner's blackout-bar coordinates.
+-- Since A1, non-owner viewers only ever receive a server-rendered
+-- derivative with the bars burned in (GET /api/resume/<key> →
+-- resolveResumeKeyForViewer), and /api/users/[handle]/bootstrap strips
+-- the geometry from the payload. That route-level strip was bypassable:
+-- 20260903100000 column-GRANTed SELECT on resume_redactions to
+-- `authenticated`, and `users_select_authenticated` is USING (true), so
+-- any signed-in user could read the exact bar rectangles for every doc
+-- straight from PostgREST with their own JWT. Grants — not routes — are
+-- the boundary, so the column comes off the authenticated SELECT list.
+--
+-- UPDATE stays granted: /api/me/profile-sync writes the column through
+-- the caller's own cookie client (RLS-scoped to id = auth.uid()). An
+-- UPDATE that neither filters on nor RETURNs the column does not need
+-- SELECT on it (the same is already true of otto_answers / voice_samples).
+--
+-- Every remaining reader uses the service role:
+--   * /api/me/profile-bootstrap and the profile-sync echo (owner)
+--   * /api/users/[handle]/bootstrap (row read moved to service role)
+--   * /api/resume/[...path] (owner row lookup)
+--
+-- DEPLOY ORDER: apply AFTER the bootstrap route that reads the profile
+-- row with the service role for signed-in viewers is live; the previous
+-- build selected resume_redactions with the viewer's JWT and would 500.
+
+-- Widened after the completeness critic: resume_url and resume_docs were
+-- still SELECT-granted to `authenticated`, so any signed-in user could read
+-- another user's full document list straight from PostgREST — including
+-- external (Drive / Dropbox) links the bootstrap route hides when they carry
+-- bars. Every reader of these three columns is service-role (verified:
+-- profile-bootstrap, profile-sync pre-read + echo, /api/me/profile echo,
+-- users/[handle]/bootstrap, /api/resume/[...path]); UPDATE stays granted
+-- for the cookie-client writes in profile-sync and /api/me/profile
+-- (return=minimal, no SELECT needed).
+
+REVOKE SELECT (resume_url, resume_docs, resume_redactions) ON public.users FROM authenticated;

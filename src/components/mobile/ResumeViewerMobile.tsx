@@ -30,9 +30,17 @@ type Props = {
 
 /**
  * Full-screen mobile viewer for the user's resume / portfolio.
- * View-only — no drawing or editing on mobile (that surface lives on
- * profile.html). Redaction bars are pulled from
- * `vibeUser.resumeRedactions` (server-persisted, cross-device).
+ * Owner drawing / editing is gated by `editable`; redaction bars are
+ * pulled from `vibeUser.resumeRedactions` (server-persisted,
+ * cross-device).
+ *
+ * Visitor mode (`editable` false, `bars` []): the bootstrap sends
+ * visitors no bar geometry, and the /api/resume proxy resolves to a
+ * server-rendered derivative with the owner's bars already burned in
+ * (an image-only PDF, or a re-encoded image). Nothing below reads a
+ * PDF text layer — pages are rasterised to canvas — so that derivative
+ * renders exactly like an original. The "Open" link opens the same
+ * proxy URL, i.e. the derivative, never the un-redacted file.
  *
  * For PDFs we rasterize each page to JPEG via pdf.js at scale 1.6,
  * stack the page images vertically, and overlay bars as
@@ -294,7 +302,7 @@ export function ResumeViewerMobile({
           href={url}
           target="_blank"
           rel="noopener noreferrer"
-          aria-label="Open original"
+          aria-label="Open file"
           style={{
             padding: "8px 12px",
             borderRadius: 999,

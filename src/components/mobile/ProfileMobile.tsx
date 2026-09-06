@@ -894,7 +894,13 @@ export function ProfileMobile({ targetHandle }: Props = {}) {
   const currentProjects = (user.currentlyOn ?? []).filter(
     (p) => !!p?.text,
   );
-  const resumeRedactions = user.resumeRedactions ?? [];
+  // Visitors never receive bar geometry: the bootstrap sends them [] and
+  // the resume proxy serves a derivative with the bars burned in. The
+  // isVisitor guard is belt-and-braces so a stray payload can't put
+  // overlays (or the coordinates behind them) on a visitor's screen.
+  const resumeRedactions: RedactionBar[] = isVisitor
+    ? []
+    : (user.resumeRedactions ?? []);
 
   const feedPosts = posts ?? [];
 

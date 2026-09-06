@@ -5,14 +5,21 @@ import {
   resumeKeyOwnerId,
 } from "@/lib/profile/resume-doc-url";
 import {
+  resolveResumeKeyForViewer,
   resumeKeysReferenced,
   signResumeGetUrl,
+  type ResumeOwnerRow,
 } from "@/lib/profile/resume-storage";
 import { rateLimit, tooManyRequests } from "@/lib/rate-limit";
 import { createSupabaseServerClient } from "@/lib/supabase/server";
 import { createSupabaseServiceClient } from "@/lib/supabase/service";
 
 type RouteContext = { params: Promise<{ path: string[] }> };
+
+export const runtime = "nodejs";
+// Non-owner requests may rasterise a PDF on first view (PDFium + sharp);
+// well under a second in practice, but give the lambda headroom.
+export const maxDuration = 60;
 
 const SIGNED_TTL_SEC = 300;
 const NO_STORE = { "cache-control": "private, no-store" } as const;
@@ -35,12 +42,21 @@ const NO_STORE = { "cache-control": "private, no-store" } as const;
  *         nothing;
  *      b. no `blocks` row exists in either direction.
  *
- * Every failure is a 404 (no distinction between missing / removed /
- * blocked) except auth (401), rate limit (429) and signing errors (500).
+ *   4. for a NON-OWNER, the key that gets signed is whatever
+ *      `resolveResumeKeyForViewer` returns: the original only when the
+ *      document has no redaction bars, otherwise a server-rendered
+ *      derivative with the bars burned in as opaque pixels (image-only PDF
+ *      / re-encoded image). A viewer therefore never receives redacted
+ *      bytes, and the bar geometry itself never leaves the server (the
+ *      bootstrap route strips it too). If the derivative cannot be
+ *      produced the answer is 503 — NOT the original.
  *
- * Accepted residual: redaction bars are still client-side overlays, so a
- * signed-in, non-blocked viewer can fetch the un-redacted bytes during the
- * TTL. Tracked for server-side redaction later.
+ * Every failure is a 404 (no distinction between missing / removed /
+ * blocked) except auth (401), rate limit (429), signing errors (500) and
+ * a derivative that could not be prepared (503).
+ *
+ * Accepted residual: the owner always gets their own original (they edit
+ * the bars against it).
  */
 export async function GET(req: Request, ctx: RouteContext) {
   const { path } = await ctx.params;
@@ -69,7 +85,7 @@ export async function GET(req: Request, ctx: RouteContext) {
   const service = createSupabaseServiceClient();
   const { data: row, error: rowErr } = await service
     .from("users")
-    .select("id, resume_url, resume_docs")
+    .select("id, resume_url, resume_docs, resume_redactions")
     .eq("id", ownerId)
     .maybeSingle();
   if (rowErr) {
@@ -79,6 +95,10 @@ export async function GET(req: Request, ctx: RouteContext) {
   if (!row) {
     return NextResponse.json({ ok: false, error: "Not found" }, { status: 404 });
   }
+
+  // The key actually signed: the original for the owner, the redacted
+  // derivative (or the original when there are no bars) for everyone else.
+  let keyToSign = key;
 
   if (user.id !== ownerId) {
     // Membership is enforced for third-party viewers only. The owner may
@@ -110,11 +130,30 @@ export async function GET(req: Request, ctx: RouteContext) {
     if ((blockRows ?? []).length > 0) {
       return NextResponse.json({ ok: false, error: "Not found" }, { status: 404 });
     }
+
+    // Redaction: swap the original for the burned-in derivative when the
+    // document has bars. Any failure here is a 503, never a fallback to
+    // the original — see resume-storage.ts.
+    try {
+      const resolved = await resolveResumeKeyForViewer(row as ResumeOwnerRow, key);
+      if (!resolved) {
+        // Referenced by the row but not in the viewer-visible portfolio
+        // (e.g. a stale resume_url next to a non-empty resume_docs).
+        return NextResponse.json({ ok: false, error: "Not found" }, { status: 404 });
+      }
+      keyToSign = resolved;
+    } catch (e) {
+      console.error("[resume GET] redacted derivative", e);
+      return NextResponse.json(
+        { ok: false, error: "Document is being prepared" },
+        { status: 503, headers: { ...NO_STORE, "retry-after": "5" } },
+      );
+    }
   }
 
   let signed: string;
   try {
-    signed = await signResumeGetUrl(key, SIGNED_TTL_SEC);
+    signed = await signResumeGetUrl(keyToSign, SIGNED_TTL_SEC);
   } catch (e) {
     console.error("[resume GET] sign", e);
     return NextResponse.json(
