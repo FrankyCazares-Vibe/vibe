@@ -1485,7 +1485,7 @@ const DEFAULT_DATA = {
     { ver: 'v6.2', label: 'Session 50',     summary: 'Brand + share-link fixes. Profile share links (iMessage, Discord) now unfurl with the real person\'s name instead of "Maya Chen — Vibe Profile" — middleware rewrite removed, generateMetadata hits Supabase service role for OG tags, bootstrap + posts APIs open to logged-out visitors via service role. vibe-icon.svg canonicalised as the app mark; favicon rebuilt with 48px+ PNG/ICO for Google Search; robots.txt added so Googlebot-Image can crawl. Desktop VIBE HUB copy sync scripted and wired to Cursor rules so every session auto-updates. 4 commits on main, all on prod.' },
     { ver: 'v6.3', label: 'Session 51',     summary: 'Security audit + hardening (first Fable session). Found and closed: self-serve is_platform_admin / school_verified via RLS, every user\'s email readable by any signed-in user, stale Phase-1 org policies (create verified orgs, join as owner, admin→owner), PostgREST filter injection in search, session-unbound .edu verification token, stored XSS in campus feed / profile / post menus, backslash open redirect, group-chat request bypass, draft posts reachable by id. Shipped column-level grants + rewritten policies (migration 20260903100000), Postgres-backed rate limiter on auth + write endpoints, security headers, next 16.3.4, generic 500s. One commit on main, migration applied live.' },
     { ver: 'v6.4', label: 'Session 52',     summary: 'Security sentinel. Built a reusable read-only "hacker agent" workflow (11 attacker lenses + adversarial verify + sectioned report) and ran it: 41 findings, ~25 distinct. Caught a Critical stored XSS in the resume/portfolio viewer that Session 51 missed, plus a High RLS grant hole letting users re-point their chat membership into any DM. Both fixed same day with the media open redirects and server-only guards. Report in handoffs/. Orchestrator working style saved to memory.', current: true },
-    { ver: 'v6.5', label: 'Session 53',     summary: 'Hardening sprint A1. Resumes and portfolio PDFs moved out of the public, listable profiles bucket into a private resumes bucket that only the server can touch. Rows now store /api/resume/<key> proxy paths; the route checks sign-in, ownership, row membership and blocks, then hands out a 5-minute signed URL. 39 objects migrated (4 referenced + 35 orphans from repeated uploads), 3 rows rewritten, public copies deleted, anonymous bucket listing closed. Zero downtime. Shipped 9b7c7d1. Then A2 (876e540): every upload path rate-limited per user and R2 presigned PUTs bind the declared size into the signature (verified live: mismatched bodies 403); a critic found signed-in users could write straight to the profiles bucket via its RLS policies, so writes are server-only now (policies dropped). Ran as an 18-agent workflow with adversarial verification. A3 (df4858c): school-email verification scoped to IU domains via SCHOOL_EMAIL_DOMAINS. Then the A1 residual closed for good (db67ae8): redaction bars are burned into a server-rendered derivative, so viewers never receive un-redacted bytes or bar coordinates.' },
+    { ver: 'v6.5', label: 'Session 53',     summary: 'Hardening sprint A1. Resumes and portfolio PDFs moved out of the public, listable profiles bucket into a private resumes bucket that only the server can touch. Rows now store /api/resume/<key> proxy paths; the route checks sign-in, ownership, row membership and blocks, then hands out a 5-minute signed URL. 39 objects migrated (4 referenced + 35 orphans from repeated uploads), 3 rows rewritten, public copies deleted, anonymous bucket listing closed. Zero downtime. Shipped 9b7c7d1. Then A2 (876e540): every upload path rate-limited per user and R2 presigned PUTs bind the declared size into the signature (verified live: mismatched bodies 403); a critic found signed-in users could write straight to the profiles bucket via its RLS policies, so writes are server-only now (policies dropped). Ran as an 18-agent workflow with adversarial verification. A3 (df4858c): school-email verification scoped to IU domains via SCHOOL_EMAIL_DOMAINS. Then the A1 residual closed for good (db67ae8): redaction bars are burned into a server-rendered derivative, so viewers never receive un-redacted bytes or bar coordinates. A4 (0f39bcc): 18+ attestation and terms acceptance recorded at signup with an append-only ledger, consent-gated writes down to the database policies, and account deletion that purges every upload before removing the account.' },
   ],
   sessions: [
     {
@@ -2039,11 +2039,146 @@ const DEFAULT_DATA = {
         { icon: 'shield', text: '<strong>A3 · Verification is IU-only now (df4858c).</strong> Any .edu inbox used to mint a "verified IU student". The check is an allowlist from <code>SCHOOL_EMAIL_DOMAINS</code> (default iu.edu + iupui.edu and their subdomains; a blank env var falls back to the default so nobody gets locked out). Addresses are canonicalised, non-ASCII and punycode hosts rejected, and the confirm route re-checks the list after the idempotent branch so a link minted for a non-IU address before the change cannot complete. Existing verified rows untouched. Note: indiana.edu (Bloomington) is deliberately not in the default. Ran as a 3-agent workflow; both lenses clean.' },
         { icon: 'shield', text: '<strong>Redactions are real now (db67ae8).</strong> Bars used to be rectangles the browser drew over the PDF, with the exact coordinates handed to every viewer. Now a viewer who is not the owner only ever gets a derivative the server rendered: PDFium (WebAssembly) rasterises each page, the bars are painted as opaque black into the pixels, sharp encodes JPEG, pdf-lib wraps an image-only PDF at the original page size — no text layer, no fonts, nothing under the bars to recover. Images get the same treatment in their own format. Rendered lazily on first view, cached under <code>resumes/&lt;uid&gt;/redacted/</code>, purged whenever docs or bars change, and if the render fails the viewer gets a 503 rather than the original. The owner keeps the original and the bars, since they edit against it.' },
         { icon: 'code', text: '<strong>Bake-off, then a workflow that caught two Highs.</strong> Two prototype agents raced pdf.js + native skia against PDFium-in-WASM + pure JS on the founder\'s real resume; WASM won (no 34 MB binary, one asset to trace, built-in fallback fonts, and pdf.js silently renders tofu if one flag is wrong). The 11-agent implementation workflow then found: (1) the bootstrap strip of bar geometry was bypassable because <code>resume_redactions</code> was still SELECT-granted to signed-in users through PostgREST — migration 20260905100000 revokes it, plus <code>resume_url</code> / <code>resume_docs</code> after the critic showed external Drive links leaked the same way; (2) the desktop viewer forced every page into a Letter-shaped, centre-cropped box, so bars drawn on A4 pages would have burned in the wrong place — the wrap now follows the page\'s real aspect ratio. Verified with a proof render of the founder\'s resume and real bars: pixels inside the bars are 0,0,0 and the output PDF has zero fonts and zero text operators.' },
+        { icon: 'shield', text: '<strong>A4 · Consent is recorded, and enforced below the app (0f39bcc).</strong> Signup now requires "I\'m 18 or older and I agree to the Terms of Service and Privacy Policy"; the attestation rides the signup metadata and the database trigger stamps <code>terms_version</code>, <code>terms_accepted_at</code> and <code>age_attested_at</code> all-or-nothing, into columns only the server can read or write. An append-only <code>terms_acceptances</code> ledger keeps every acceptance, so a later Terms revision never overwrites the original record. Anyone without a current record — the 8 existing accounts included — meets a one-time interstitial before any campus page, and every content- or identity-producing API answers 403 until they accept; a user who declines can still reach account deletion. Because the sprint\'s rule is that grants, not routes, are the boundary, migration 20260906130000 folds a <code>has_recorded_consent()</code> predicate into the insert policies for posts, comments, reposts, events, channels and messages, so PostgREST cannot be used to skip the gate. For the lawyer: we record an attestation, a server timestamp and a version — no date of birth, IP or user agent.' },
+        { icon: 'code', text: '<strong>Delete really deletes.</strong> "Delete my account" used to remove the login and leave every file behind. It now purges <code>profiles/&lt;uid&gt;/</code> (posts, posters, logos), the private <code>resumes/&lt;uid&gt;/</code> tree including burned-in derivatives, <code>clips/&lt;uid&gt;/</code> in R2 and the media of every message the user sent — and only then deletes the account; if any purge fails, nothing is deleted and the user retries. Prefix guards make it impossible to reach another user\'s files. Proven with a seed-and-purge script on fake prefixes against the real buckets, with control objects surviving. Two workflows, 16 agents: the first round caught that the 18+ half of the attestation was never checked and that a static onboarding page skipped the gate; the critic then pushed the gate into the database. What survives deletion, for the privacy policy: provider backups for their retention window, auth audit logs, email-provider logs, org and group records the user authored, and reports they filed.' },
       ]
     },
   ],
   nextSteps: [
-    { priority: 'high',   text: '<strong>Decision (S52): security is a bounded sprint, then part of every milestone.</strong> Not a whole phase, not deferred to the end. A1–A3 shipped in S53; do A4–A6 below before the next real student uploads a resume; then run the sentinel each milestone and fix Medium+; live pentest on a preview deploy before app-store submission. Full plan in the Session 52 handoff §4.' },
+    { priority: 'high',   text: '<strong>Decision (S52): security is a bounded sprint, then part of every milestone.</strong> Not a whole phase, not deferred to the end. A1–A4 shipped in S53; A5–A6 below are Franky + lawyer items before the next real student uploads a resume; then run the sentinel each milestone and fix Medium+; live pentest on a preview deploy before app-store submission. Full plan in the Session 52 handoff §4.' },
+    { priority: 'medium', text: '<strong>A1 follow-up · signed-in smoke test.</strong> Own resume on phone + desktop <code>/profile</code>, another user\'s resume, onboarding upload preview, redaction bars still aligned. Everything else in A1 was verified live from the agent side (anonymous paths, bucket state, rows). Now also: view a redacted resume as a second account — the first view renders the derivative (expect a short wait), the bars must be solid black, and the coordinates must not appear in the bootstrap JSON.' },
+    { priority: 'low',    text: '<strong>A2 follow-ups.</strong> Verify a real clip / DM photo / org logo upload still succeeds after the size binding (expected: yes, same File is PUT); optional orphan sweep of un-referenced R2 and Storage objects; the 429 paths show a generic error in a couple of clients.' },
+    { priority: 'low',    text: '<strong>A3 follow-up.</strong> Decide whether indiana.edu belongs in SCHOOL_EMAIL_DOMAINS; the request endpoint still reveals whether an address is already linked (409 vs 200) — pre-existing Low.' },
+    { priority: 'high',   text: '<strong>A4 · Signup legal + deletion purge.</strong> Age gate + real consent capture (<code>terms_accepted_at</code>, <code>terms_version</code>); <code>/api/me</code> DELETE also purges Storage + R2 prefixes. Also purge <code>resumes/&lt;uid&gt;/*</code> — 35 orphaned PDFs sit there after A1.' },
+    { priority: 'high',   text: '<strong>A5 · Supabase Auth dashboard (Franky):</strong> leaked-password protection, min length 8, Confirm email + Resend SMTP.' },
+    { priority: 'high',   text: '<strong>A6 · Legal wording → lawyer (parallel):</strong> privacy policy sub-processors (Resend, Sentry) + contradictions, Terms venue (Marion County), data-export process, minors policy.' },
+    { priority: 'medium', text: '<strong>Before app-store submission:</strong> CSP (report-only → enforce), throttle likes/reposts/reactions/views + remaining write endpoints, proxy-trusted <code>clientIp</code>, Sentry PII scrub, live pentest on a Vercel preview deploy, Apple prerequisites (in-app deletion, privacy labels, age rating).' },
+    { priority: 'high',   text: '<strong>Then product (S50 carry-over):</strong> QA mobile onboarding + Otto tour on a real phone; video-in-feed / video-in-DM on a phone; one real IU student through signup → post → send; Search Console re-index.' },
+    { priority: 'medium', text: '<strong>Clips stay parked.</strong> Restore only if demand shows up (video attach rate, repeat video posters, unprompted editing/cap complaints). Heavy DM video with no public video is a <em>negative</em> signal. Guide: <code>DOCS/BACKLOG_CLIPS.md</code>. Tag: <code>clips-before-backlog</code>.' },
+    { priority: 'medium', text: '<strong>First-class Notifications panel (#29).</strong> Chat reactions, replies, mentions, RSVPs still silent unless the user is on the right page.' },
+    { priority: 'medium', text: '<strong>Premium reveal gate (monetization seed).</strong> <code>profile_views</code> already captures viewer identity. Model: every 3 days see 3 names, rest behind paywall.' },
+    { priority: 'medium', text: '<strong>Discover Browse + Departments views (#30, #31).</strong> Empty stubs. Can ship as v1.1 after launch.' },
+    { priority: 'medium', text: '<strong>Realtime instead of 2s polling</strong> in chat. Supabase Realtime is wired but unused.' },
+    { priority: 'medium', text: '<strong>Email notifications via Resend.</strong> Client is wired, never used for product mail. Welcome + follow digest.' },
+    { priority: 'medium', text: '<strong>Edit own posts.</strong> Delete exists; no edit. Common ask.' },
+    { priority: 'medium', text: '<strong>Real .edu verification</strong> with one-time-link email send + click confirmation. Pairs with Confirm email / SMTP above.' },
+    { priority: 'low',    text: '<strong>Native app.</strong> Not yet. Apple/Google developer accounts are cheap paperwork. Capacitor wrap when testers complain about Safari. React Native after IU is locked (map stage Vega).' },
+    { priority: 'low',    text: '<strong>Rename <code>clip*</code> → <code>video*</code></strong> in shared R2 plumbing so the next grep does not delete feed video. Pure rename, not a removal.' },
+    { priority: 'low',    text: '<strong>Otto v2 — backend.</strong> Voice, OAuth, posting queue. Separate larger phase.' },
+  ],
+}
+
+// ── STORAGE ────────────────────────────────────────────────────────
+function loadData() {
+  try {
+    const stored = localStorage.getItem(STORAGE_KEY);
+    if (stored) {
+      const parsed = JSON.parse(stored);
+      // Merge: keep stored data but fill any missing keys from default
+      return { ...DEFAULT_DATA, ...parsed };
+    }
+  } catch(e) {}
+  return DEFAULT_DATA;
+}
+
+function saveData(data) {
+  try {
+    localStorage.setItem(STORAGE_KEY, JSON.stringify(data));
+  } catch(e) {}
+}
+
+// On first load, always write the latest default data so it reflects current session
+const journalData = DEFAULT_DATA;
+saveData(journalData);
+
+// ── RENDER ────────────────────────────────────────────────────────
+function render(data) {
+  // Update header/meta
+  document.getElementById('heroVersion').textContent = data.version;
+  document.getElementById('heroSessions').textContent = data.sessionCount;
+  document.getElementById('heroDate').textContent = data.lastUpdated;
+  document.getElementById('sidebarVersion').textContent = `${data.version} — Session ${data.sessionCount}`;
+  document.getElementById('sidebarDate').textContent = data.lastUpdated;
+  document.getElementById('syncDate').textContent = data.lastUpdated;
+  document.getElementById('sessionBadge').textContent = data.sessionCount;
+
+  // Version table
+  const vb = document.getElementById('versionBody');
+  vb.innerHTML = '';
+  data.versions.forEach(v => {
+    const tr = document.createElement('tr');
+    tr.className = 'version-row' + (v.current ? ' current' : '');
+    tr.innerHTML = `<td>${v.ver} — ${v.label}</td><td>${v.summary}</td>`;
+    vb.appendChild(tr);
+  });
+
+  // Session log
+  const sl = document.getElementById('sessionLog');
+  sl.innerHTML = '';
+  [...data.sessions].reverse().forEach(s => {
+    const div = document.createElement('div');
+    div.className = 'session-card';
+    div.innerHTML = `
+      <div class="session-card-header">
+        <div class="session-number">${s.num}</div>
+        <div class="session-header-text">
+          <h3>${s.title}</h3>
+          <p>${s.date}</p>
+        </div>
+        <span class="session-version-chip">${s.ver}</span>
+      </div>
+      <div class="session-card-body">
+        ${s.changes.map(c=>`
+          <div class="session-change">
+            <span class="session-change-icon">${c.icon}</span>
+            <span class="session-change-text">${c.text}</span>
+          </div>
+        `).join('')}
+      </div>`;
+    sl.appendChild(div);
+  });
+}
+
+render(journalData);
+
+// ── NAV ───────────────────────────────────────────────────────────
+function showSection(id, btn) {
+  document.querySelectorAll('.section').forEach(s => s.classList.remove('active'));
+  document.querySelectorAll('.nav-item').forEach(b => b.classList.remove('active'));
+  document.getElementById('sec-' + id).classList.add('active');
+  btn.classList.add('active');
+  // Scroll to top of content
+  document.querySelector('.sync-bar').scrollIntoView({ behavior: 'smooth', block: 'start' });
+}
+
+// ── EXPOSE UPDATE API ─────────────────────────────────────────────
+// Claude calls window.vibeJournal.update(patch) to update the journal.
+// patch can contain: version, sessionCount, lastUpdated, newVersion{}, newSession{}
+window.vibeJournal = {
+  update(patch) {
+    const data = loadData();
+    if (patch.version)      data.version = patch.version;
+    if (patch.sessionCount) data.sessionCount = patch.sessionCount;
+    if (patch.lastUpdated)  data.lastUpdated = patch.lastUpdated;
+    if (patch.newVersion)   data.versions.push(patch.newVersion);
+    if (patch.newSession)   data.sessions.push(patch.newSession);
+    if (patch.nextSteps)    data.nextSteps = patch.nextSteps;
+    saveData(data);
+    render(data);
+    return 'Journal updated to ' + data.version;
+  },
+  getData() { return loadData(); },
+  reset() { localStorage.removeItem(STORAGE_KEY); location.reload(); }
+};
+</script>
+</body>
+</html>    { priority: 'medium', text: '<strong>A4 follow-ups.</strong> Franky: sign in once and accept the Terms on the new interstitial; try one post afterwards. Lawyer (A6): confirm the 18+ self-attestation is sufficient, whether the Privacy Policy needs its own version, whether consent records should outlive a deleted account (today they cascade), and the deletion-disclosure wording (backups, audit logs, email logs, org/group records, reports).' },
+        { icon: 'code', text: '<strong>Delete really deletes.</strong> "Delete my account" used to remove the login and leave every file behind. It now purges <code>profiles/&lt;uid&gt;/</code> (posts, posters, logos), the private <code>resumes/&lt;uid&gt;/</code> tree including burned-in derivatives, <code>clips/&lt;uid&gt;/</code> in R2 and the media of every message the user sent — and only then deletes the account; if any purge fails, nothing is deleted and the user retries. Prefix guards make it impossible to reach another user\'s files. Proven with a seed-and-purge script on fake prefixes against the real buckets, with control objects surviving. Two workflows, 16 agents: the first round caught that the 18+ half of the attestation was never checked and that a static onboarding page skipped the gate; the critic then pushed the gate into the database. What survives deletion, for the privacy policy: provider backups for their retention window, auth audit logs, email-provider logs, org and group records the user authored, and reports they filed.' },
+      ]
+    },
+  ],
+  nextSteps: [
+    { priority: 'high',   text: '<strong>Decision (S52): security is a bounded sprint, then part of every milestone.</strong> Not a whole phase, not deferred to the end. A1–A4 shipped in S53; A5–A6 below are Franky + lawyer items before the next real student uploads a resume; then run the sentinel each milestone and fix Medium+; live pentest on a preview deploy before app-store submission. Full plan in the Session 52 handoff §4.' },
     { priority: 'medium', text: '<strong>A1 follow-up · signed-in smoke test.</strong> Own resume on phone + desktop <code>/profile</code>, another user\'s resume, onboarding upload preview, redaction bars still aligned. Everything else in A1 was verified live from the agent side (anonymous paths, bucket state, rows). Now also: view a redacted resume as a second account — the first view renders the derivative (expect a short wait), the bars must be solid black, and the coordinates must not appear in the bootstrap JSON.' },
     { priority: 'low',    text: '<strong>A2 follow-ups.</strong> Verify a real clip / DM photo / org logo upload still succeeds after the size binding (expected: yes, same File is PUT); optional orphan sweep of un-referenced R2 and Storage objects; the 429 paths show a generic error in a couple of clients.' },
     { priority: 'low',    text: '<strong>A3 follow-up.</strong> Decide whether indiana.edu belongs in SCHOOL_EMAIL_DOMAINS; the request endpoint still reveals whether an address is already linked (409 vs 200) — pre-existing Low.' },
