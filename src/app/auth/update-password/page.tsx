@@ -91,7 +91,8 @@ export default function UpdatePasswordPage() {
             type="password"
             autoComplete="new-password"
             required
-            minLength={12}
+            minLength={8}
+            maxLength={20}
             value={password}
             onChange={(e) => setPassword(e.target.value)}
             style={inputStyle}

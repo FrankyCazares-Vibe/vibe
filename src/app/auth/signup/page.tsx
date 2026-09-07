@@ -124,13 +124,14 @@ export default function SignupPage() {
           <label className="vibe-auth-field">
             <span className="vibe-auth-label-row">
               <span className="vibe-auth-label">Password</span>
-              <span className="vibe-auth-label-hint">12+ characters</span>
+              <span className="vibe-auth-label-hint">8–20 characters</span>
             </span>
             <input
               type="password"
               autoComplete="new-password"
               required
-              minLength={12}
+              minLength={8}
+              maxLength={20}
               value={password}
               onChange={(e) => setPassword(e.target.value)}
               className="vibe-auth-input"
