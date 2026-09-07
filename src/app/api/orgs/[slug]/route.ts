@@ -1,5 +1,6 @@
 import { NextResponse } from "next/server";
 
+import { normalizeCampusLabel } from "@/lib/iu/campuses";
 import { requireTermsAccepted } from "@/lib/legal/require-terms";
 import { normalizeOrgAssetInput, orgAssetProxyUrl } from "@/lib/org-asset-url";
 import { createSupabaseServerClient } from "@/lib/supabase/server";
@@ -25,6 +26,7 @@ type UpdateBody = {
   is_public?: unknown;
   links?: unknown;
   philanthropy?: unknown;
+  campus?: unknown;
 };
 
 type LinkRow = { label: string; url: string };
@@ -64,7 +66,7 @@ export async function GET(_req: Request, { params }: Params) {
   const { data: org, error } = await supabase
     .from("orgs")
     .select(
-      "id, handle, name, description, logo_url, banner_url, is_public, backdrop_preset, verified, last_activity_at, links, philanthropy, owner_id, created_at"
+      "id, handle, name, description, logo_url, banner_url, is_public, backdrop_preset, verified, last_activity_at, links, philanthropy, school, owner_id, created_at"
     )
     .eq("handle", slug)
     .maybeSingle();
@@ -114,7 +116,12 @@ export async function GET(_req: Request, { params }: Params) {
 
 /**
  * PATCH /api/orgs/[slug] — update org metadata.
- * Owner or admin only (RLS enforces).
+ * Owner or admin only (RLS enforces; `school` is in the column-level UPDATE
+ * grant from the security_hardening migration).
+ *
+ * `campus` accepts a campus id or canonical label (validated through
+ * `normalizeCampusLabel`); pass null or "" to clear it, which makes the org
+ * campus-less and therefore visible in every campus view.
  */
 export async function PATCH(req: Request, { params }: Params) {
   const { slug } = await params;
@@ -179,6 +186,20 @@ export async function PATCH(req: Request, { params }: Params) {
     }
     patch.links = sanitized;
   }
+  if (body.campus !== undefined) {
+    // Owners/admins can move an org between campuses (a chapter that
+    // actually meets in Kokomo shouldn't be filed under its founder's
+    // campus). null / "" clears the stamp → campus-less → shows everywhere.
+    if (body.campus === null || body.campus === "") {
+      patch.school = "";
+    } else {
+      const normalized = normalizeCampusLabel(body.campus);
+      if (!normalized) {
+        return NextResponse.json({ ok: false, error: "Unknown campus" }, { status: 400 });
+      }
+      patch.school = normalized;
+    }
+  }
   if (typeof body.philanthropy === "string") {
     // Cap at 500 so the section card stays readable on phone widths
     // without the user scrolling for a paragraph.
@@ -194,7 +215,7 @@ export async function PATCH(req: Request, { params }: Params) {
     .from("orgs")
     .update(patch)
     .eq("handle", slug)
-    .select("id, handle, name, description, logo_url, banner_url, is_public, backdrop_preset, verified, last_activity_at, links, philanthropy")
+    .select("id, handle, name, description, logo_url, banner_url, is_public, backdrop_preset, verified, last_activity_at, links, philanthropy, school")
     .single();
   if (error || !org) {
     console.error("[orgs/[slug] PATCH]", error);

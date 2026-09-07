@@ -1,3 +1,4 @@
+import { campusBadgeLabel, campusByLabel } from "@/lib/iu/campuses";
 import type { ProfileView } from "@/lib/profile/types";
 import { workExperienceForVibeHtml } from "@/lib/profile/work-experience";
 
@@ -11,24 +12,26 @@ function taglineFromBio(bio: string): string {
   return `${first.slice(0, 217)}…`;
 }
 
+/**
+ * The user's self-declared campus, or "" when they never picked one (or the
+ * stored value is legacy / not a known IU campus). `users.school` is directly
+ * self-updatable through PostgREST, so every render of it goes through the
+ * campus table first — never trust the raw column for display.
+ */
+function campusLabelForDisplay(p: ProfileView): string {
+  return campusByLabel(p.school)?.label ?? "";
+}
+
 function headlineFromProfileParts(p: ProfileView): string {
-  // Major + year only. The school badge (iu.edu pill) already surfaces
-  // the school on the profile header, so injecting it here too was
-  // redundant ("accounting · Kelley · Year 2"). Keep the chip tight.
+  // Major + year only. The campus badge already surfaces the campus on
+  // the profile header, so injecting it here too was redundant
+  // ("accounting · Kelley · Year 2"). Keep the chip tight.
   let h = p.major ?? "";
   if (p.year != null) {
     h = h ? `${h} · Year ${p.year}` : `Year ${p.year}`;
   }
-  if (!h && p.school) h = p.school;
+  if (!h) h = campusLabelForDisplay(p);
   return h;
-}
-
-function schoolLabelForBadge(p: ProfileView): string {
-  if (p.school?.trim()) return p.school.trim();
-  if (p.school_email?.includes("@")) {
-    return p.school_email.split("@")[1] ?? "Student";
-  }
-  return "Student";
 }
 
 const LOOKING_LABELS: Record<string, string> = {
@@ -66,12 +69,13 @@ export function buildVibeUserV1FromProfile(
   // Year 2" strings even after they picked a new major.
   const derivedHeadline = headlineFromProfileParts(profile);
   const headline = derivedHeadline || profile.headline.trim();
-  const location = profile.location_text.trim() || profile.school || "";
+  const campusLabel = campusLabelForDisplay(profile);
+  const location = profile.location_text.trim() || campusLabel;
 
   const baseSnap: Record<string, string> = {
     role: profile.major || "",
     seniority: profile.year != null ? `Year ${profile.year}` : "",
-    locationSnap: profile.school || "",
+    locationSnap: campusLabel,
     availability: "",
     preferred: preferredFromLookingFor(profile.looking_for),
     // Cap the joined string visually — the snapshot card has limited
@@ -99,7 +103,10 @@ export function buildVibeUserV1FromProfile(
   if (profile.school_verified) {
     u.studentVerification = {
       status: "verified",
-      school: schoolLabelForBadge(profile),
+      // Campus label when the user picked one, else "IU verified". The old
+      // fallback used the school_email domain, which rendered the literal
+      // string "iu.edu" on every profile (nobody had a campus set).
+      school: campusBadgeLabel(profile.school),
     };
   }
 

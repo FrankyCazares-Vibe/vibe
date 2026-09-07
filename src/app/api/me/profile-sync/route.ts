@@ -1,5 +1,6 @@
 import { NextResponse } from "next/server";
 
+import { normalizeCampusLabel } from "@/lib/iu/campuses";
 import { sanitizeCurrentOn } from "@/lib/profile/current-on";
 import { normalizeProfileView } from "@/lib/profile/normalize-profile-view";
 import { sanitizeRecruiterSnapshot } from "@/lib/profile/recruiter-snapshot";
@@ -75,6 +76,26 @@ export async function POST(req: Request) {
 
   if (typeof body.major === "string") {
     patch.major = body.major.trim().slice(0, 200);
+  }
+
+  // Self-declared IU campus, stored as the canonical label in users.school.
+  // Accepts a campus id or a label; an explicit empty value un-sets it.
+  // Never a privacy boundary (users.school is self-updatable through
+  // PostgREST anyway) — this just keeps junk out of the column.
+  if ("school" in body || "campus" in body) {
+    const raw = "school" in body ? body.school : body.campus;
+    if (raw === null || (typeof raw === "string" && !raw.trim())) {
+      patch.school = "";
+    } else {
+      const label = normalizeCampusLabel(raw);
+      if (label === null) {
+        return NextResponse.json(
+          { ok: false, error: "Invalid campus" },
+          { status: 400 },
+        );
+      }
+      patch.school = label;
+    }
   }
 
   if ("year" in body) {

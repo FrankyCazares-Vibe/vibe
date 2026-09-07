@@ -1,5 +1,7 @@
 import { NextResponse } from "next/server";
 
+import { campusOrFilter, resolveCampusScope } from "@/lib/iu/campus-scope";
+import { ALL_CAMPUSES, normalizeCampusLabel } from "@/lib/iu/campuses";
 import { requireTermsAccepted } from "@/lib/legal/require-terms";
 import { normalizeOrgAssetInput, orgAssetProxyUrl } from "@/lib/org-asset-url";
 import { ilikeOrFilter } from "@/lib/pgrest";
@@ -26,16 +28,24 @@ type CreateBody = {
   backdrop_preset?: unknown;
   logo_url?: unknown;
   banner_url?: unknown;
+  campus?: unknown;
 };
 
 /**
- * GET /api/orgs?filter=mine|discover&q=<search>
+ * GET /api/orgs?filter=mine|discover&q=<search>&campus=<id|all>
  *
  * - filter=mine (default): orgs the viewer is a member of, with their role.
  * - filter=discover: public orgs the viewer is NOT in, optionally filtered by `q`.
  *
  * Both return [{ id, handle, name, photo, banner, is_public, backdrop_preset,
- * member_count, role? }].
+ * member_count, role? }] plus `viewerCampus` + `campusScope`.
+ *
+ * CAMPUS SCOPING (discover only — see lib/iu/campus-scope.ts for the full
+ * contract): clubs are physically campus-bound, so discover hard-filters to
+ * the viewer's campus by default, `?campus=<id>` pins another one, and
+ * `?campus=all` turns the filter off. A viewer with no campus set sees
+ * everything. `filter=mine` is never campus-filtered — membership beats
+ * geography.
  */
 export async function GET(req: Request) {
   const supabase = await createSupabaseServerClient();
@@ -49,11 +59,26 @@ export async function GET(req: Request) {
   const q = (url.searchParams.get("q") || "").trim().toLowerCase();
   const includeDormant = url.searchParams.get("include_dormant") === "true";
 
+  // `users.school` is SELECT-granted to authenticated (security_hardening
+  // migration), so the session client can read the viewer's own campus.
+  const { data: me } = await supabase
+    .from("users")
+    .select("school")
+    .eq("id", user.id)
+    .maybeSingle();
+  const scope = resolveCampusScope(url.searchParams.get("campus"), me?.school ?? null);
+  if (!scope.ok) {
+    return NextResponse.json(
+      { ok: false, error: scope.error, viewerCampus: scope.viewerCampus },
+      { status: 400 },
+    );
+  }
+
   if (filter === "mine") {
     const { data, error } = await supabase
       .from("org_members")
       .select(
-        "role, org:org_id(id, handle, name, description, logo_url, banner_url, is_public, backdrop_preset, verified, last_activity_at, links, philanthropy)"
+        "role, org:org_id(id, handle, name, description, logo_url, banner_url, is_public, backdrop_preset, verified, last_activity_at, links, philanthropy, school)"
       )
       .eq("user_id", user.id);
     if (error) {
@@ -75,6 +100,7 @@ export async function GET(req: Request) {
           last_activity_at: string | null;
           links: unknown;
           philanthropy: string;
+          school: string;
         } | null;
         if (!org) return null;
         return {
@@ -85,7 +111,15 @@ export async function GET(req: Request) {
         };
       })
       .filter((x): x is NonNullable<typeof x> => x !== null);
-    return NextResponse.json({ ok: true, orgs });
+    // Membership beats geography: an org you already joined stays in your
+    // list even if it sits on another campus. Report scope "all" so the
+    // client doesn't render a switcher that would do nothing here.
+    return NextResponse.json({
+      ok: true,
+      orgs,
+      viewerCampus: scope.viewerCampus,
+      campusScope: ALL_CAMPUSES,
+    });
   }
 
   // Discover: list ALL orgs (including ones the viewer's already in) so the
@@ -119,14 +153,37 @@ export async function GET(req: Request) {
   let query = service
     .from("orgs")
     .select(
-      "id, handle, name, description, logo_url, banner_url, is_public, backdrop_preset, verified, last_activity_at, links, philanthropy, members:org_members(count)"
+      "id, handle, name, description, logo_url, banner_url, is_public, backdrop_preset, verified, last_activity_at, links, philanthropy, school, members:org_members(count)"
     )
     .order("verified", { ascending: false })
     .order("last_activity_at", { ascending: false, nullsFirst: false })
     .limit(120);
+
+  // DECISION — an explicit text search searches ALL campuses, unless the
+  // caller pinned a campus with `?campus=`. A student typing a club's name
+  // already knows which club they want; "no results" because it belongs to
+  // another campus reads as a bug, not as scoping. Browsing (no `q`) stays
+  // hard-scoped to the viewer's campus.
+  const searchIgnoresCampus = q !== "" && !scope.explicit;
+  const campusLabel = searchIgnoresCampus ? null : scope.campusLabel;
+  const campusScope = searchIgnoresCampus ? ALL_CAMPUSES : scope.scope;
+  if (campusLabel) {
+    // Campus-less orgs (school = '') show up in every campus view — see
+    // campusOrFilter. Repeated PostgREST `or=` params are ANDed, so this
+    // composes correctly with the search filter below.
+    query = query.or(campusOrFilter("school", campusLabel));
+  }
+
   if (q) {
     const filter = ilikeOrFilter(["handle", "name"], q);
-    if (!filter) return NextResponse.json({ ok: true, orgs: [] });
+    if (!filter) {
+      return NextResponse.json({
+        ok: true,
+        orgs: [],
+        viewerCampus: scope.viewerCampus,
+        campusScope,
+      });
+    }
     query = query.or(filter);
   }
   const { data, error } = await query;
@@ -147,6 +204,7 @@ export async function GET(req: Request) {
     last_activity_at: string | null;
     links: unknown;
     philanthropy: string;
+    school: string;
     members?: Array<{ count: number }> | null;
   };
   const DORMANT_MS = 60 * 24 * 60 * 60 * 1000; // 60 days; mirror migration
@@ -174,12 +232,23 @@ export async function GET(req: Request) {
     };
   });
   const visible = includeDormant ? enriched : enriched.filter((o) => !o.dormant);
-  return NextResponse.json({ ok: true, orgs: visible.slice(0, 60) });
+  return NextResponse.json({
+    ok: true,
+    orgs: visible.slice(0, 60),
+    viewerCampus: scope.viewerCampus,
+    campusScope,
+  });
 }
 
 /**
  * POST /api/orgs — create an org. Body:
- *   { handle, name, description?, is_public?, backdrop_preset?, logo_url?, banner_url? }
+ *   { handle, name, description?, is_public?, backdrop_preset?, logo_url?,
+ *     banner_url?, campus? }
+ *
+ * `campus` accepts a campus id or canonical label and is validated through
+ * `normalizeCampusLabel`; omit it and the org inherits the creator's campus
+ * (`users.school`). A creator with no campus produces a campus-less org
+ * (school = ''), which stays visible in EVERY campus view rather than none.
  *
  * On success creates the org row, an `org_members` row with role='owner' for
  * the creator, and default channels `#general` + `#announcements` (per
@@ -230,7 +299,7 @@ export async function POST(req: Request) {
   const service = createSupabaseServiceClient();
   const { data: viewerRow } = await service
     .from("users")
-    .select("school_verified")
+    .select("school_verified, school")
     .eq("id", user.id)
     .maybeSingle();
   if (!viewerRow?.school_verified) {
@@ -263,6 +332,22 @@ export async function POST(req: Request) {
     );
   }
 
+  // Campus stamp. Explicit `campus` wins (an Indianapolis student may be
+  // founding the Kokomo chapter); otherwise inherit the creator's campus.
+  // `normalizeCampusLabel` canonicalizes an id or a label and rejects junk,
+  // so `orgs.school` only ever holds a value the campus filter can match.
+  // Empty string = campus-less, which shows in every campus view.
+  let school = "";
+  if (body.campus !== undefined && body.campus !== null && body.campus !== "") {
+    const normalized = normalizeCampusLabel(body.campus);
+    if (!normalized) {
+      return NextResponse.json({ ok: false, error: "Unknown campus" }, { status: 400 });
+    }
+    school = normalized;
+  } else {
+    school = normalizeCampusLabel(viewerRow.school) ?? "";
+  }
+
   // Reject duplicate handle up front for a clean error (the unique constraint
   // would also catch it but with a less friendly message).
   const { data: existing } = await service
@@ -292,8 +377,9 @@ export async function POST(req: Request) {
       logo_url: logoUrl,
       banner_url: bannerUrl,
       owner_id: user.id,
+      school,
     })
-    .select("id, handle, name, description, logo_url, banner_url, is_public, backdrop_preset, verified, last_activity_at, links, philanthropy")
+    .select("id, handle, name, description, logo_url, banner_url, is_public, backdrop_preset, verified, last_activity_at, links, philanthropy, school")
     .single();
   if (orgErr || !org) {
     console.error("[orgs POST insert org]", orgErr);

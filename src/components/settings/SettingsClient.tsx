@@ -3,6 +3,8 @@
 import Link from "next/link";
 import { useEffect, useMemo, useState } from "react";
 
+import { IU_CAMPUSES, campusByLabel } from "@/lib/iu/campuses";
+
 type Profile = {
   id: string;
   name: string | null;
@@ -89,6 +91,7 @@ export function SettingsClient({ profile }: { profile: Profile }) {
       </header>
 
       <AccountCard profile={profile} />
+      <CampusCard initialSchool={profile.school} />
       <HandleCard
         currentHandle={profile.handle}
         handleChangedAt={profile.handle_changed_at}
@@ -408,7 +411,9 @@ function AccountCard({ profile }: { profile: Profile }) {
               : "Not yet verified — visit /auth/school-email."
           }
         />
-        <Row label="School" value={profile.school ?? "—"} />
+        {/* Campus deliberately isn't mirrored here — it's editable in the
+            card directly below, and a read-only copy rendered from the
+            server prop would go stale the moment the user changes it. */}
         <Row
           label="Major / Year"
           value={
@@ -444,6 +449,127 @@ function AccountCard({ profile }: { profile: Profile }) {
         </Link>
         . Change your handle in the section below.
       </p>
+    </section>
+  );
+}
+
+// Campus — self-declared, and the thing that scopes what the whole app
+// shows you first, so it lives in Settings rather than only inside the
+// profile editor. IU issues @iu.edu addresses university-wide, so
+// verifying the address proves IU membership, NOT which campus: nothing
+// here is verified and nothing sensitive may be gated on it.
+//
+// Writes a single field through PATCH /api/me/profile, which normalizes
+// the value against src/lib/iu/campuses.ts and accepts "" as "not set".
+// Saves on change (it's a preference, not a claim) — no Save button.
+function CampusCard({ initialSchool }: { initialSchool: string | null }) {
+  // Anything stored that isn't a known campus (legacy free text) reads as
+  // "not set" here rather than being offered back as a bogus option.
+  const [value, setValue] = useState(
+    () => campusByLabel(initialSchool)?.label ?? "",
+  );
+  const [saving, setSaving] = useState(false);
+  const [saved, setSaved] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+
+  const onPick = async (next: string) => {
+    if (saving || next === value) return;
+    const prev = value;
+    setValue(next);
+    setSaving(true);
+    setSaved(false);
+    setError(null);
+    try {
+      const r = await fetch("/api/me/profile", {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ school: next }),
+      });
+      const j = await r.json().catch(() => ({}));
+      if (!r.ok || !j?.ok) {
+        throw new Error(j?.error ?? `HTTP ${r.status}`);
+      }
+      setSaved(true);
+    } catch (e) {
+      // Put the select back where it was so the UI never claims a
+      // campus the server didn't take.
+      setValue(prev);
+      setError(e instanceof Error ? e.message : "Could not save");
+    } finally {
+      setSaving(false);
+    }
+  };
+
+  return (
+    <section style={{ ...CARD_GLASS, padding: 22, marginBottom: 16 }}>
+      <SectionTitle>Campus</SectionTitle>
+      <p
+        style={{
+          fontFamily: "DM Sans, sans-serif",
+          fontSize: 13.5,
+          color: "#5C5853",
+          margin: "8px 0 14px",
+          lineHeight: 1.55,
+        }}
+      >
+        Sets which campus&apos;s clubs and events you see first.{" "}
+        <strong style={{ color: "#1C1C1E", fontWeight: 700 }}>
+          Not verified — change it any time.
+        </strong>{" "}
+        Leave it unset to see everything across IU.
+      </p>
+
+      <div style={{ display: "flex", gap: 10, alignItems: "center", flexWrap: "wrap" }}>
+        <select
+          value={value}
+          onChange={(e) => onPick(e.target.value)}
+          disabled={saving}
+          aria-label="Campus"
+          style={{
+            padding: "10px 12px",
+            borderRadius: 10,
+            border: "1px solid rgba(28,28,30,0.12)",
+            background: "#fff",
+            outline: "none",
+            fontFamily: "DM Sans, sans-serif",
+            fontSize: 14,
+            fontWeight: 600,
+            color: "#1C1C1E",
+            minWidth: 240,
+            maxWidth: "100%",
+            opacity: saving ? 0.6 : 1,
+          }}
+        >
+          <option value="">Not set — show everything</option>
+          {IU_CAMPUSES.map((c) => (
+            <option key={c.id} value={c.label}>
+              {c.city && c.city !== c.shortLabel
+                ? `${c.label} — ${c.city}`
+                : c.label}
+            </option>
+          ))}
+        </select>
+        <span style={{ fontFamily: "DM Sans, sans-serif", fontSize: 12 }}>
+          {saving ? (
+            <span style={{ color: "#8A8580" }}>Saving…</span>
+          ) : saved ? (
+            <span style={{ color: "#1A9E5B", fontWeight: 700 }}>Saved ✓</span>
+          ) : null}
+        </span>
+      </div>
+
+      {error ? (
+        <div
+          style={{
+            marginTop: 10,
+            fontFamily: "DM Sans, sans-serif",
+            fontSize: 12,
+            color: "#C0392B",
+          }}
+        >
+          {error}
+        </div>
+      ) : null}
     </section>
   );
 }

@@ -1,9 +1,18 @@
 import { NextResponse } from "next/server";
 
+import { campusByLabel } from "@/lib/iu/campuses";
 import { createSupabaseServerClient } from "@/lib/supabase/server";
 
 const DEFAULT_LIMIT = 5;
 const MAX_LIMIT = 25;
+/**
+ * Per-query cap on the cold-start fallback pool. Two bounded queries run
+ * instead of one so the cap can never turn the campus PREFERENCE back into
+ * a de-facto filter in either direction: same-campus peers get their own
+ * slice, and a global slice guarantees cross-campus people stay reachable
+ * even on a campus with only a couple of signups.
+ */
+const FALLBACK_POOL_SIZE = 250;
 
 type Suggestion = {
   id: string;
@@ -18,6 +27,12 @@ type Suggestion = {
   shared_org_count: number;
   /** True if the candidate's major matches the viewer's. Independent of `reason`. */
   same_major: boolean;
+  /**
+   * True if the candidate's self-declared campus matches the viewer's.
+   * Always false when either side has no campus set. Ranking hint only —
+   * cross-campus people are still suggested.
+   */
+  same_campus: boolean;
   reason: string;
 };
 
@@ -28,11 +43,24 @@ type Suggestion = {
  *      who you don't already follow. Sorted by overlap count desc.
  *   2. Shared-org peers — members of orgs/clubs you're in who you haven't
  *      connected with. Sorted by number of shared orgs.
- *   3. Same-major peers at the same school — fills the rail for users
- *      with very few existing connections or org memberships.
+ *   3. Cold-start pool — anyone else on Vibe, so the rail is never empty
+ *      for users with few connections or org memberships. Within this
+ *      tier, same-campus peers rank first, then same-major peers from
+ *      other campuses, then everyone else.
+ *
+ * CAMPUS IS A PREFERENCE, NOT A FILTER. `users.school` holds a
+ * self-declared IU campus label (lib/iu/campuses.ts) that nothing
+ * verifies. Tier 3 used to hard-scope to `.eq("school", school)`, which
+ * meant a viewer on a campus with no other signups — or, worse, any
+ * viewer who simply never picked a campus, since the whole tier was
+ * gated behind `if (school)` — got an empty rail. Both are now ranking
+ * signals: same-campus candidates sort above same-major-different-campus,
+ * and cross-campus people remain suggestible once same-campus candidates
+ * run out. An empty rail is the failure mode to avoid.
  *
  * Filters out: self, already-connected (one-way OR mutual), blocked-either-
- * way (when the blocks table exists). Capped at `limit` (default 5).
+ * way (when the blocks table exists), previously dismissed. Capped at
+ * `limit` (default 5).
  */
 export async function GET(req: Request) {
   const supabase = await createSupabaseServerClient();
@@ -57,6 +85,9 @@ export async function GET(req: Request) {
     .single();
   const school = (me?.school ?? "").trim();
   const major = (me?.major ?? "").trim();
+  // Canonical campus label, or null when unset / not a known IU campus.
+  // Null simply makes the campus preference inert — it never empties a tier.
+  const viewerCampus = campusByLabel(school)?.label ?? null;
 
   // Compute the viewer's mutual-follow set. Same math as /api/campus-map.
   const [outRes, inRes] = await Promise.all([
@@ -112,22 +143,46 @@ export async function GET(req: Request) {
     }
   }
 
-  // Fallback pool: same-school peers (and optionally same-major) so the
-  // panel has something to show for new accounts with zero connections.
-  const fallbackPool: string[] = [];
-  if (school) {
-    const { data: peers } = await supabase
+  // Traits (campus + major) for every candidate we might rank, filled
+  // opportunistically from the fallback queries and topped up below for
+  // graph-derived candidates.
+  type Traits = { school: string | null; major: string | null };
+  const traitById = new Map<string, Traits>();
+
+  // Cold-start pool. Two bounded queries, run in parallel:
+  //   a) same-campus peers — the preferred slice, only when the viewer
+  //      actually declared a campus;
+  //   b) a global slice — the guarantee that cross-campus people stay
+  //      suggestible, including for viewers with no campus at all.
+  // Neither is a filter; ranking below decides the order.
+  const [campusPeersRes, globalPeersRes] = await Promise.all([
+    viewerCampus
+      ? supabase
+          .from("users")
+          .select("id,school,major")
+          .eq("school", viewerCampus)
+          .neq("id", user.id)
+          .limit(FALLBACK_POOL_SIZE)
+      : Promise.resolve({ data: [] as unknown[] }),
+    supabase
       .from("users")
-      .select("id,major")
-      .eq("school", school)
-      .neq("id", user.id);
-    for (const p of peers ?? []) {
-      const r = p as { id: string; major: string | null };
-      if (outIds.has(r.id)) continue; // already follow
-      if (mutualCount.has(r.id)) continue;
-      if (sharedOrgCount.has(r.id)) continue;
-      fallbackPool.push(r.id);
-    }
+      .select("id,school,major")
+      .neq("id", user.id)
+      .order("created_at", { ascending: false })
+      .limit(FALLBACK_POOL_SIZE),
+  ]);
+
+  const fallbackPool: string[] = [];
+  const seenFallback = new Set<string>();
+  for (const p of [...(campusPeersRes.data ?? []), ...(globalPeersRes.data ?? [])]) {
+    const r = p as { id: string; school: string | null; major: string | null };
+    traitById.set(r.id, { school: r.school, major: r.major });
+    if (seenFallback.has(r.id)) continue;
+    seenFallback.add(r.id);
+    if (outIds.has(r.id)) continue; // already follow
+    if (mutualCount.has(r.id)) continue;
+    if (sharedOrgCount.has(r.id)) continue;
+    fallbackPool.push(r.id);
   }
 
   // Block list — exclude either direction.
@@ -170,9 +225,47 @@ export async function GET(req: Request) {
     candidates.set(id, { id, mutuals: 0, sharedOrgs: 0 });
   }
 
-  // Sort: mutuals desc, then shared-orgs desc, then arbitrary.
+  // Top up traits for graph-derived candidates (friends-of-friends and
+  // org peers never went through the fallback queries above).
+  const missingTraitIds = Array.from(candidates.keys()).filter(
+    (id) => !traitById.has(id),
+  );
+  if (missingTraitIds.length > 0) {
+    const { data: traitRows } = await supabase
+      .from("users")
+      .select("id,school,major")
+      .in("id", missingTraitIds);
+    for (const row of traitRows ?? []) {
+      const r = row as { id: string; school: string | null; major: string | null };
+      traitById.set(r.id, { school: r.school, major: r.major });
+    }
+  }
+
+  const traitsFor = (id: string) => {
+    const t = traitById.get(id);
+    const candidateCampus = campusByLabel(t?.school)?.label ?? null;
+    return {
+      sameCampus: !!viewerCampus && candidateCampus === viewerCampus,
+      sameMajor: !!(major && t?.major && t.major === major),
+    };
+  };
+
+  // Sort: mutuals desc → shared-orgs desc → same-campus → same-major.
+  // Campus sits BELOW the two graph signals (a real mutual on another
+  // campus is a better suggestion than a stranger on yours) but ABOVE
+  // major, which is the founder's call: same-campus outranks
+  // same-major-different-campus. Nothing here excludes anyone — a
+  // cross-campus candidate just sorts later, and still fills the rail
+  // once same-campus candidates run out.
   const merged = Array.from(candidates.values())
-    .sort((a, b) => b.mutuals - a.mutuals || b.sharedOrgs - a.sharedOrgs)
+    .map((e) => ({ ...e, ...traitsFor(e.id) }))
+    .sort(
+      (a, b) =>
+        b.mutuals - a.mutuals ||
+        b.sharedOrgs - a.sharedOrgs ||
+        Number(b.sameCampus) - Number(a.sameCampus) ||
+        Number(b.sameMajor) - Number(a.sameMajor),
+    )
     .slice(0, limit);
 
   if (merged.length === 0) {
@@ -188,7 +281,7 @@ export async function GET(req: Request) {
     );
   type ProfileBase = Omit<
     Suggestion,
-    "mutual_count" | "shared_org_count" | "same_major" | "reason"
+    "mutual_count" | "shared_org_count" | "same_major" | "same_campus" | "reason"
   >;
   const profileById = new Map<string, ProfileBase>();
   for (const p of profiles ?? []) {
@@ -197,12 +290,14 @@ export async function GET(req: Request) {
   }
 
   const suggestions: Suggestion[] = merged
-    .map(({ id, mutuals, sharedOrgs }) => {
+    .map(({ id, mutuals, sharedOrgs, sameCampus, sameMajor }) => {
       const base = profileById.get(id);
       if (!base) return null;
-      const sameMajor = !!(major && base.major && base.major === major);
       // Strongest reason wins. Mutuals first because that's the most
-      // social-graph-anchored signal.
+      // social-graph-anchored signal. "same school" now requires an
+      // actual campus match — it previously fired whenever the VIEWER
+      // had a school set, which would mislabel cross-campus candidates
+      // now that they can reach this tier.
       let reason = "";
       if (mutuals > 0) {
         reason = `${mutuals} mutual${mutuals === 1 ? "" : "s"}`;
@@ -210,7 +305,7 @@ export async function GET(req: Request) {
         reason = sharedOrgs === 1 ? "in your org" : `${sharedOrgs} shared orgs`;
       } else if (sameMajor) {
         reason = "same major";
-      } else if (school) {
+      } else if (sameCampus) {
         reason = "same school";
       } else {
         reason = "new on Vibe";
@@ -220,6 +315,7 @@ export async function GET(req: Request) {
         mutual_count: mutuals,
         shared_org_count: sharedOrgs,
         same_major: sameMajor,
+        same_campus: sameCampus,
         reason,
       };
     })

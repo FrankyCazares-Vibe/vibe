@@ -11,6 +11,7 @@ import { PostComposerMobile } from "@/components/mobile/PostComposerMobile";
 import { PostViewerMobile } from "@/components/mobile/PostViewerMobile";
 import { ResumeViewerMobile } from "@/components/mobile/ResumeViewerMobile";
 import { useMobileTour } from "@/components/mobile/use-mobile-tour";
+import { IU_CAMPUSES, campusByLabel } from "@/lib/iu/campuses";
 import { IU_MAJORS_BY_SCHOOL } from "@/lib/iu/majors";
 import type { RedactionBar } from "@/lib/profile/resume-redactions";
 import { sortWorkExperienceByRecency } from "@/lib/profile/work-experience";
@@ -202,6 +203,9 @@ type EditDraft = {
   location: string;
   major: string;
   year: number | null;
+  /** Self-declared IU campus — the canonical label from IU_CAMPUSES, or
+   *  "" for "not set". Sent to profile-sync as `school`. */
+  campus: string;
   vibeTagsList: string[];
 };
 
@@ -299,6 +303,16 @@ export function ProfileMobile({ targetHandle }: Props = {}) {
     () => !isVisitor && searchParams.get("edit") === "1",
   );
   const [draft, setDraft] = useState<EditDraft | null>(null);
+  // Self-declared campus, delivered TOP-LEVEL by /api/me/profile-bootstrap
+  // (not on `vibeUser`, which only carries the rendered badge text). Null
+  // when the user never picked one. Owner-only — the visitor bootstrap
+  // doesn't send it, and visitors can't edit anyway.
+  const [campus, setCampus] = useState<string | null>(null);
+  // Set once the user actually touches the campus picker. Until then the
+  // save payload omits `school` entirely — profile-sync leaves the column
+  // alone when the key is absent, so a client that never learned the
+  // current campus can't blank one set on another device.
+  const [campusTouched, setCampusTouched] = useState(false);
   const [savingEdit, setSavingEdit] = useState(false);
   const [editError, setEditError] = useState<string | null>(null);
 
@@ -318,6 +332,9 @@ export function ProfileMobile({ targetHandle }: Props = {}) {
         }
         const u = data.vibeUser as VibeUser;
         setUser(u);
+        setCampus(
+          typeof data.campus === "string" && data.campus ? data.campus : null,
+        );
         if (isVisitor && u._viewerFollowState) {
           setFollowState(u._viewerFollowState);
         }
@@ -481,6 +498,12 @@ export function ProfileMobile({ targetHandle }: Props = {}) {
     location: (u.location ?? "").toString(),
     major: (u.major ?? "").toString(),
     year: typeof u.year === "number" ? u.year : null,
+    // Falls back to the badge text, which build-vibe-user renders from
+    // the same column ("IU verified" when unset — matches no campus, so
+    // it resolves to ""). Keeps the picker honest on a client whose
+    // bootstrap predates the top-level `campus` field.
+    campus:
+      campus ?? campusByLabel(u.studentVerification?.school)?.label ?? "",
     vibeTagsList: (u.vibeTags ?? [])
       .map((t) => t?.label ?? "")
       .filter((s): s is string => !!s),
@@ -766,6 +789,7 @@ export function ProfileMobile({ targetHandle }: Props = {}) {
   const cancelEdit = () => {
     setEditMode(false);
     setDraft(null);
+    setCampusTouched(false);
     setEditError(null);
   };
   const commitEdit = async () => {
@@ -779,28 +803,39 @@ export function ProfileMobile({ targetHandle }: Props = {}) {
     }
     setSavingEdit(true);
     setEditError(null);
+    const body: Record<string, unknown> = {
+      name: snapshot.name.trim(),
+      tagline: snapshot.tagline.trim(),
+      bio: snapshot.bio.trim(),
+      location_text: snapshot.location.trim(),
+      major: snapshot.major.trim(),
+      year: snapshot.year,
+      // `interests` is the server-side name for vibe tags. We
+      // strip empties + dedupe here so the column stays clean.
+      interests: Array.from(
+        new Set(
+          snapshot.vibeTagsList
+            .map((s) => s.trim())
+            .filter((s) => s.length > 0),
+        ),
+      ),
+    };
+    // Self-declared campus → users.school. Only sent when we know the
+    // value: profile-sync skips the column when the key is absent, so a
+    // client that never learned the current campus can't blank it. An
+    // explicit "Not set" pick in this session is the one case where the
+    // empty string is what the user meant.
+    if (snapshot.campus) {
+      body.school = snapshot.campus;
+    } else if (campusTouched) {
+      body.school = "";
+    }
     try {
       const r = await fetch("/api/me/profile-sync", {
         method: "POST",
         credentials: "include",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          name: snapshot.name.trim(),
-          tagline: snapshot.tagline.trim(),
-          bio: snapshot.bio.trim(),
-          location_text: snapshot.location.trim(),
-          major: snapshot.major.trim(),
-          year: snapshot.year,
-          // `interests` is the server-side name for vibe tags. We
-          // strip empties + dedupe here so the column stays clean.
-          interests: Array.from(
-            new Set(
-              snapshot.vibeTagsList
-                .map((s) => s.trim())
-                .filter((s) => s.length > 0),
-            ),
-          ),
-        }),
+        body: JSON.stringify(body),
       });
       const j = await r.json().catch(() => ({}));
       if (!r.ok || !j?.ok) {
@@ -819,6 +854,9 @@ export function ProfileMobile({ targetHandle }: Props = {}) {
       if (rb.ok && jb?.ok && jb.vibeUser) {
         const fresh = jb.vibeUser as VibeUser;
         setUser(fresh);
+        const freshCampus =
+          typeof jb.campus === "string" && jb.campus ? jb.campus : null;
+        setCampus(freshCampus);
         // Confirm major + year actually landed in the DB — same
         // silent-failure guard as the avatar upload. If the round-trip
         // returns something other than what we just sent, surface a
@@ -836,9 +874,15 @@ export function ProfileMobile({ targetHandle }: Props = {}) {
             `Year didn't save (sent ${snapshot.year ?? "(blank)"}, got ${gotYear ?? "(blank)"}).`,
           );
         }
+        if ("school" in body && snapshot.campus !== (freshCampus ?? "")) {
+          throw new Error(
+            `Campus didn't save (sent "${snapshot.campus || "(not set)"}", got "${freshCampus ?? "(not set)"}").`,
+          );
+        }
       }
       setEditMode(false);
       setDraft(null);
+      setCampusTouched(false);
     } catch (e) {
       setEditError(
         e instanceof Error ? e.message : "Could not save",
@@ -1385,6 +1429,52 @@ export function ProfileMobile({ targetHandle }: Props = {}) {
                 <option value="6">Grad</option>
               </select>
             </div>
+            {/* Campus — self-declared, never verified. An @iu.edu address
+                proves IU membership university-wide, not which campus, so
+                this is a preference, not a credential. "Not set" is a
+                valid choice: the server reads an empty school as
+                "show everything". */}
+            <select
+              value={effectiveDraft.campus}
+              onChange={(e) => {
+                setCampusTouched(true);
+                updateDraft({ campus: e.target.value });
+              }}
+              style={{
+                fontFamily: "DM Sans, sans-serif",
+                fontSize: 13,
+                color: "#1C1C1E",
+                background: "rgba(255,255,255,0.7)",
+                border: "1px solid rgba(28,28,30,0.10)",
+                borderRadius: 999,
+                padding: "8px 14px",
+                width: "100%",
+                outline: "none",
+                appearance: "none",
+                WebkitAppearance: "none",
+                textOverflow: "ellipsis",
+                minWidth: 0,
+              }}
+            >
+              <option value="">Campus — not set</option>
+              {IU_CAMPUSES.map((c) => (
+                <option key={c.id} value={c.label}>
+                  {c.label}
+                </option>
+              ))}
+            </select>
+            <p
+              style={{
+                fontFamily: "DM Sans, sans-serif",
+                fontSize: 11,
+                lineHeight: 1.4,
+                color: "#8A8580",
+                margin: "-2px 4px 0",
+              }}
+            >
+              Sets which campus&apos;s clubs and events you see first. Not
+              verified — change it any time.
+            </p>
           </div>
         ) : (location || headline) ? (
           <div

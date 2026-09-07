@@ -1,6 +1,7 @@
 import { NextResponse } from "next/server";
 
 import { getCountsFor } from "@/lib/connections/queries";
+import { campusByLabel } from "@/lib/iu/campuses";
 import { termsRequiredResponse } from "@/lib/legal/require-terms";
 import { hasRecordedConsent } from "@/lib/legal/terms";
 import { buildVibeUserV1FromProfile } from "@/lib/profile/build-vibe-user-v1";
@@ -116,5 +117,19 @@ export async function GET() {
   // Pinned post id (from the optional split query above).
   vibeUser.pinnedPostId = pinnedPostId;
 
-  return NextResponse.json({ ok: true, vibeUser, isPlatformAdmin, termsAccepted, termsVersion });
+  // Self-declared campus, surfaced TOP-LEVEL (not on `vibeUser`, whose
+  // shape profile.html already depends on) so the campus pickers can
+  // prefill the current selection. Canonical label, or null when the user
+  // never picked one / the stored value isn't a known IU campus — the
+  // badge inside `vibeUser` degrades to "IU verified" in the same case.
+  const campus = campusByLabel(profile.school)?.label ?? null;
+
+  return NextResponse.json({
+    ok: true,
+    vibeUser,
+    campus,
+    isPlatformAdmin,
+    termsAccepted,
+    termsVersion,
+  });
 }

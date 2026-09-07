@@ -392,6 +392,11 @@ body.ott-warping .progress-dots {
         <textarea id="pfBio" class="pf-textarea" rows="3" maxlength="600" placeholder="A few lines about you — what you're into, what you're building."></textarea>
       </div>
       <div>
+        <label class="pf-label" for="pfCampus">Which campus are you at? <span style="font-weight:400;color:#8A8580">— not verified, just how we scope what you see</span></label>
+        <select id="pfCampus" class="pf-select"></select>
+        <p class="pf-hint">You can change this any time in settings.</p>
+      </div>
+      <div>
         <label class="pf-label" for="pfMajor">Major <span style="font-weight:400;color:#8A8580">— start typing to filter the IU list</span></label>
         <input type="text" id="pfMajor" class="pf-input" maxlength="80" list="iuMajors" autocomplete="off" placeholder="Start typing — e.g. Informatics">
         <datalist id="iuMajors"></datalist>
@@ -547,6 +552,38 @@ const state = {
 };
 
 const TOTAL_STEPS = 4;
+
+// ── IU campuses (self-declared, never verified) ─────────────────────────
+// Mirrors src/lib/iu/campuses.ts — that file is the source of truth; this
+// page is static (no build step) so it cannot import it. Keep in sync.
+// We store the canonical LABEL in users.school, not the id.
+const IU_CAMPUSES = [
+  { id: "indianapolis", label: "IU Indianapolis", city: "Indianapolis" },
+  { id: "bloomington", label: "IU Bloomington", city: "Bloomington" },
+  { id: "east", label: "IU East", city: "Richmond" },
+  { id: "fort-wayne", label: "IU Fort Wayne", city: "Fort Wayne" },
+  { id: "kokomo", label: "IU Kokomo", city: "Kokomo" },
+  { id: "northwest", label: "IU Northwest", city: "Gary" },
+  { id: "south-bend", label: "IU South Bend", city: "South Bend" },
+  { id: "southeast", label: "IU Southeast", city: "New Albany" },
+  { id: "online", label: "IU Online", city: "Online" },
+];
+const DEFAULT_CAMPUS_ID = "indianapolis";
+(function populateIuCampuses() {
+  const sel = document.getElementById('pfCampus');
+  if (!sel) return;
+  const frag = document.createDocumentFragment();
+  IU_CAMPUSES.forEach(function (c) {
+    const opt = document.createElement('option');
+    opt.value = c.label;
+    opt.textContent = c.city && c.city !== c.label.replace(/^IU /, '')
+      ? c.label + ' — ' + c.city
+      : c.label;
+    if (c.id === DEFAULT_CAMPUS_ID) opt.selected = true;
+    frag.appendChild(opt);
+  });
+  sel.appendChild(frag);
+})();
 
 // ── IU Bloomington major list (curated; users can also type freely) ──────
 const IU_MAJORS = [
@@ -767,6 +804,8 @@ function onHandleInput(input) {
 
 function collectProfileDraft() {
   const name = (document.getElementById('pfName') || {}).value?.trim() || '';
+  const campusSel = document.getElementById('pfCampus');
+  const campus = campusSel ? String(campusSel.value || '').trim() : '';
   const major = (document.getElementById('pfMajor') || {}).value?.trim() || '';
   const department = (document.getElementById('pfDepartment') || {}).value?.trim() || '';
   const yearSel = document.getElementById('pfYear');
@@ -787,6 +826,8 @@ function collectProfileDraft() {
   );
   const out = {};
   if (name) out.name = name;
+  // Campus label — self-declared, never blocking. Empty means "no campus".
+  if (campus) out.school = campus;
   if (major) out.major = major;
   if (department) out.department = department;
   if (yearRaw) {

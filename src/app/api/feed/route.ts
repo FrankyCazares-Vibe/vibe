@@ -1,5 +1,6 @@
 import { NextResponse } from "next/server";
 
+import { campusByLabel } from "@/lib/iu/campuses";
 import { orgAssetProxyUrl } from "@/lib/org-asset-url";
 import { postMediaProxyUrl } from "@/lib/post-media-url";
 import { createSupabaseServerClient } from "@/lib/supabase/server";
@@ -66,10 +67,18 @@ type EngagementCounts = {
  * like/repost state, so the client can render the engagement bar without a
  * second roundtrip per card.
  *
- * The school-scoped query path is preserved below but currently unused —
- * `users.school` isn't populated yet, so the campus feed is global. Once
- * onboarding starts setting `school`, flip the gate to opt back into the
- * per-school filter.
+ * CAMPUS IS A RANKING SIGNAL, NOT A FILTER. `users.school` holds a
+ * self-declared IU campus label (see lib/iu/campuses.ts) that nothing
+ * verifies, so it is never a privacy or access boundary — orgs and events
+ * scope hard, the feed does not. The query stays global and the ranking
+ * pass floats same-campus posts to the top while everything else stays
+ * reachable below it. That matters most at cold start: with a handful of
+ * live users, a hard campus filter would hand the first student from any
+ * other campus an empty app.
+ *
+ * The response echoes both `viewerSchool` (raw stored string, kept for
+ * existing clients) and `viewerCampus` (canonical campus label, or null
+ * when the viewer has not picked one / stored junk).
  */
 export async function GET(req: Request) {
   const supabase = await createSupabaseServerClient();
@@ -115,6 +124,10 @@ export async function GET(req: Request) {
   }
 
   const school = (me?.school ?? "").trim();
+  // Canonical campus label, or null when the viewer never picked one (or
+  // `school` holds a legacy/unknown string). Null makes the same-campus
+  // ranking boost inert, so the feed behaves exactly as it did before.
+  const viewerCampus = campusByLabel(school)?.label ?? null;
 
   // Name the FK constraint explicitly (`posts_user_id_fkey`) — the implicit
   // form ambiguates in PostgREST when more than one relationship exists. The
@@ -262,13 +275,14 @@ export async function GET(req: Request) {
   // (≥ 4× the requested page) so this can lift older-but-popular and
   // friend-of-friend posts above the strict recency cut. See
   // scoreFeedRow for the formula. When `sort=recent` or a tag filter is
-  // active we keep the original chronological order.
+  // active we keep the original chronological order — `sort=recent` is a
+  // pure chronological escape hatch with zero campus influence.
   const now = Date.now();
   const sorted = useRanking
     ? postRowsOut
         .map((entry) => ({
           entry,
-          score: scoreFeedRow(entry.post, now, viewerFollowingIds),
+          score: scoreFeedRow(entry.post, now, viewerFollowingIds, viewerCampus),
         }))
         .sort((a, b) => b.score - a.score)
         .map((s) => s.entry)
@@ -304,6 +318,10 @@ export async function GET(req: Request) {
     feed,
     posts: legacyPosts,
     viewerSchool: school,
+    // Canonical campus label (null when unset/unknown). `viewerSchool` is
+    // the raw stored string and stays for existing clients; new clients
+    // should label the feed off `viewerCampus`.
+    viewerCampus,
     // Echo the viewer's id so the client can gate per-row owner-only
     // affordances (delete menu, etc.) without a separate roundtrip.
     viewerId: user.id,
@@ -417,6 +435,7 @@ type FriendReposterSample = {
  *     base       = engagement / (age_hours + 2)^1.5
  *     score      = base
  *                  * (1.6  if the viewer follows the author, else 1.0)
+ *                  * (1.35 if the author is on the viewer's campus, else 1.0)
  *                  + 3 * friend_reposter_count
  *
  * Why these numbers (subject to tuning once we have engagement data):
@@ -431,11 +450,42 @@ type FriendReposterSample = {
  *     trap. Friend-repost boost is additive and per-reposter (max 3)
  *     since each fresh reposter is a separate endorsement.
  *
+ * SAME-CAMPUS BOOST (1.35, multiplicative). Campus is never a filter here
+ * — the query is global and cross-campus posts stay reachable — so the
+ * whole scoping job falls on this coefficient. Sizing, relative to the
+ * existing weights:
+ *   - Multiplicative for the same reason the follow boost is: an additive
+ *     bonus would let a dead same-campus post from last week float above
+ *     a fresh popular one, which is exactly the "empty-feeling feed"
+ *     failure we're trying to avoid from the other direction.
+ *   - 1.35 sits deliberately BELOW the 1.6 follow boost. Following someone
+ *     is an explicit, deliberate act; campus is self-declared, unverified,
+ *     and often just a dropdown someone skipped past. A person you chose
+ *     to follow on another campus should still outrank a stranger on
+ *     yours, and at 1.35 they do. (ln 1.35 / ln 1.6 ≈ 0.64, so campus
+ *     carries roughly two-thirds the pull of a follow. They compound to
+ *     2.16x for a followed same-campus author, which is the right ceiling.)
+ *   - Translated through the 1.5 decay exponent, 1.35 buys an effective
+ *     recency head start of 1.35^(1/1.5) ≈ 1.22 — a same-campus post beats
+ *     an equally-engaged post from elsewhere that is up to ~22% fresher,
+ *     and needs only ~74% of its engagement at equal age. So at similar
+ *     recency/engagement same-campus content sweeps the page, while a
+ *     stale same-campus post loses decisively to a fresh, well-engaged
+ *     one from another campus (e.g. 24h old with 10 likes scores 0.11 vs
+ *     0.25 for a 2h-old cross-campus post with a single like).
+ *   - Inert when the viewer has no campus (`viewerCampus === null`) or the
+ *     author has none: the multiplier stays 1.0 and ranking is unchanged.
+ *   - Compared against the canonical label via `campusByLabel` on both
+ *     sides, so casing/legacy strings can't produce a false match.
+ *
  * @param post A post already rendered by `renderPost` — carries
- *   like/comment/repost counts, friend_reposter_count, etc.
+ *   like/comment/repost counts, friend_reposter_count, author, etc.
  * @param nowMs Date.now() snapshot for the whole batch (consistency).
  * @param viewerFollowingIds The viewer's outgoing follows set.
+ * @param viewerCampus Canonical campus label, or null to disable the boost.
  */
+const SAME_CAMPUS_BOOST = 1.35;
+
 function scoreFeedRow(
   post: {
     user_id: string;
@@ -444,9 +494,11 @@ function scoreFeedRow(
     comment_count: number;
     repost_count: number;
     friend_reposter_count?: number;
+    author?: { school: string | null } | null;
   },
   nowMs: number,
   viewerFollowingIds: Set<string>,
+  viewerCampus: string | null,
 ): number {
   const ageHours = Math.max(
     0,
@@ -459,6 +511,10 @@ function scoreFeedRow(
     (post.comment_count ?? 0);
   let score = engagement / Math.pow(ageHours + 2, 1.5);
   if (viewerFollowingIds.has(post.user_id)) score *= 1.6;
+  if (viewerCampus) {
+    const authorCampus = campusByLabel(post.author?.school)?.label ?? null;
+    if (authorCampus === viewerCampus) score *= SAME_CAMPUS_BOOST;
+  }
   score += 3 * (post.friend_reposter_count ?? 0);
   return score;
 }

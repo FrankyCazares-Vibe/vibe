@@ -1,5 +1,6 @@
 import { NextResponse } from "next/server";
 
+import { normalizeCampusLabel } from "@/lib/iu/campuses";
 import { sanitizeRecruiterSnapshot } from "@/lib/profile/recruiter-snapshot";
 import { changeHandleForUser } from "@/lib/profile/handle-change";
 import { requireTermsAccepted } from "@/lib/legal/require-terms";
@@ -160,6 +161,23 @@ export async function PATCH(req: Request) {
 
   const department = trimStr(body.department, 200);
   if (department !== null) patch.department = department;
+
+  // Self-declared IU campus → users.school (canonical label). Accepts a
+  // campus id or a label; an explicit empty value un-sets it; anything else
+  // is a 400, matching this route's convention for invalid fields. Campus is
+  // never verified and never gates access — it only scopes feeds and search.
+  if ("school" in body || "campus" in body) {
+    const raw = "school" in body ? body.school : body.campus;
+    if (raw === null || (typeof raw === "string" && !raw.trim())) {
+      patch.school = "";
+    } else {
+      const label = normalizeCampusLabel(raw);
+      if (label === null) {
+        return NextResponse.json({ ok: false, error: "Invalid campus" }, { status: 400 });
+      }
+      patch.school = label;
+    }
+  }
 
   if ("year" in body) {
     const y = body.year;

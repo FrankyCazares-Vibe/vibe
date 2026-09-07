@@ -37,6 +37,13 @@ export function normalizeProfileView(row: Record<string, unknown>): ProfileView 
     email: String(row.email ?? ""),
     name: String(row.name ?? ""),
     handle: String(row.handle ?? ""),
+    // Self-declared campus label. Kept RAW on purpose: `users.school` is
+    // compared with equality by /api/events and
+    // /api/me/suggested-connections, so coercing it here would silently
+    // change those matches. It is never rendered raw — every display path
+    // resolves it through lib/iu/campuses (campusBadgeLabel /
+    // campusByLabel), which degrades an unknown or crafted value to
+    // "IU verified" / "".
     school: String(row.school ?? ""),
     school_email:
       row.school_email != null && row.school_email !== ""

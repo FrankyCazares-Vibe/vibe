@@ -385,7 +385,7 @@ body.edit-mode .profile-handle:hover { color:var(--charcoal); cursor:none; }
    edit mode. Hidden visibility flips on body.edit-mode. */
 body.edit-mode #metaMajor [data-major-display] { display:none; }
 body.edit-mode #metaMajor .meta-major-edit { display:inline-flex !important; }
-.meta-major-select, .meta-year-select {
+.meta-major-select, .meta-year-select, .meta-campus-select {
   font-family:'DM Sans',sans-serif; font-size:12.5px; color:var(--ink);
   background:rgba(255,255,255,0.78); border:1px solid rgba(28,28,30,0.12);
   border-radius:999px; padding:5px 10px; outline:none; cursor:pointer;
@@ -393,6 +393,19 @@ body.edit-mode #metaMajor .meta-major-edit { display:inline-flex !important; }
 }
 .meta-major-select { max-width:200px; }
 .meta-year-select  { max-width:120px; }
+
+/* Campus picker — self-declared, never verified (an @iu.edu address
+   proves IU membership, not which campus). Same display/edit flip as
+   the major picker; the hint takes its own line inside .profile-meta
+   so the caveat is impossible to miss while editing. */
+body.edit-mode #metaCampus [data-campus-display] { display:none; }
+body.edit-mode #metaCampus .meta-campus-edit { display:inline-flex !important; }
+body.edit-mode .meta-campus-hint { display:block !important; }
+.meta-campus-select { max-width:220px; }
+.meta-campus-hint {
+  flex-basis:100%; font-size:11.5px; color:var(--muted); line-height:1.4;
+  margin-top:-6px;
+}
 
 /* Vibe tags */
 .vibe-tags { display:flex;flex-wrap:wrap;gap:8px;margin-bottom:24px; }
@@ -3335,7 +3348,9 @@ body.empty-profile-mode #profileEmpty { display: flex !important; }
     <div class="profile-meta">
       <span class="meta-item"><span class="meta-label">Location</span><span data-edit="true" data-user-field="location" data-placeholder="City, country" contenteditable="false">Seoul → San Francisco, CA</span></span>
       <span class="meta-item" id="metaMajor"><span class="meta-label">Major</span><span data-user-field="headline" data-major-display data-placeholder="Pick a major">Senior Product Designer at Figma</span><span class="meta-major-edit" style="display:none;gap:6px;align-items:center;flex-wrap:wrap"><select id="majorSelect" class="meta-major-select" onchange="_onMajorYearChange()" aria-label="Major"></select><select id="yearSelect" class="meta-year-select" onchange="_onMajorYearChange()" aria-label="Year"><option value="">Year</option><option value="1">Year 1</option><option value="2">Year 2</option><option value="3">Year 3</option><option value="4">Year 4</option><option value="5">Year 5</option><option value="6">Grad</option></select></span></span>
+      <span class="meta-item" id="metaCampus"><span class="meta-label">Campus</span><span data-campus-display>Not set</span><span class="meta-campus-edit" style="display:none;gap:6px;align-items:center;flex-wrap:wrap"><select id="campusSelect" class="meta-campus-select" onchange="_onCampusChange()" aria-label="Campus"></select></span></span>
       <span class="meta-item"><span class="meta-label">Web</span><span data-edit="true" data-user-field="website" data-placeholder="yourname.com" contenteditable="false" style="color:var(--accent)">mayachen.co</span></span>
+      <span class="meta-campus-hint" style="display:none">Sets which campus's clubs and events you see first. Not verified — change it any time.</span>
     </div>
     <div class="vibe-tags" id="vibeTags">
       <span class="vibe-tag coral">Product Design <button class="tag-remove" onclick="removeTag(this)">×</button></span>
@@ -6962,6 +6977,119 @@ function _sortWorkExperienceByRecency(rows) {
     .map((e) => e.row);
 }
 
+// ── Campus picker ───────────────────────────────────────────────────────
+// Campus is SELF-DECLARED: IU issues @iu.edu addresses university-wide, so
+// verifying the address proves IU membership but not which campus. It's a
+// filtering preference, never a privacy boundary — nothing sensitive may
+// be gated on it.
+//
+// MIRROR of IU_CAMPUSES in src/lib/iu/campuses.ts — that module is the
+// source of truth (the server validates every write against it). This page
+// is static with no build step, so it can't import the TS module; keep the
+// labels below in sync by hand, the same way HANDLE_FORMAT_RE mirrors
+// src/lib/profile/handle.ts. Stored value is the LABEL, not the id.
+//
+// Lives ABOVE initProfilePage() on purpose: that IIFE runs the moment the
+// script is parsed and hydrates this picker, so the same `const` further
+// down the file would still be in its temporal dead zone.
+const IU_CAMPUSES = [
+  { id: 'indianapolis', label: 'IU Indianapolis', city: 'Indianapolis' },
+  { id: 'bloomington',  label: 'IU Bloomington',  city: 'Bloomington' },
+  { id: 'east',         label: 'IU East',         city: 'Richmond' },
+  { id: 'fort-wayne',   label: 'IU Fort Wayne',   city: 'Fort Wayne' },
+  { id: 'kokomo',       label: 'IU Kokomo',       city: 'Kokomo' },
+  { id: 'northwest',    label: 'IU Northwest',    city: 'Gary' },
+  { id: 'south-bend',   label: 'IU South Bend',   city: 'South Bend' },
+  { id: 'southeast',    label: 'IU Southeast',    city: 'New Albany' },
+  { id: 'online',       label: 'IU Online',       city: 'Online' },
+];
+
+// Option text — matches onboarding.html's picker, which disambiguates the
+// campuses whose name isn't the city ("IU East — Richmond").
+function _campusOptionText(c) {
+  return (c.city && c.city !== c.label.replace(/^IU /, ''))
+    ? c.label + ' \u2014 ' + c.city
+    : c.label;
+}
+
+// Coerce anything (a stored label, a badge string, junk) to a canonical
+// campus label, or '' when it matches no known campus. Mirrors
+// normalizeCampusLabel() / campusByLabel() on the server.
+function _canonicalCampusLabel(value) {
+  const v = (typeof value === 'string' ? value : '').trim().toLowerCase();
+  if (!v) return '';
+  const hit = IU_CAMPUSES.find(c => c.label.toLowerCase() === v || c.id === v);
+  return hit ? hit.label : '';
+}
+
+// The user's current campus. `campus` is the authoritative copy that
+// /api/me/profile-bootstrap sends top-level and flushProfileServerSync
+// stores; the student badge is the fallback for storage written before
+// this shipped (build-vibe-user renders the campus label there, and
+// "IU verified" — which matches no campus — when it's unset).
+function _currentCampusLabel(u) {
+  if (!u) return '';
+  const stored = _canonicalCampusLabel(u.campus);
+  if (stored) return stored;
+  return _canonicalCampusLabel(u.studentVerification && u.studentVerification.school);
+}
+
+function _populateCampusPicker() {
+  const sel = document.getElementById('campusSelect');
+  if (!sel) return;
+  if (sel.dataset.populated === '1') return;
+  sel.innerHTML = '';
+  // "Not set" stays a legitimate choice — the server reads an empty
+  // school as "show everything", so nobody is forced to pick.
+  const blank = document.createElement('option');
+  blank.value = '';
+  blank.textContent = 'Not set';
+  sel.appendChild(blank);
+  for (const c of IU_CAMPUSES) {
+    const o = document.createElement('option');
+    o.value = c.label;
+    o.textContent = _campusOptionText(c);
+    sel.appendChild(o);
+  }
+  sel.dataset.populated = '1';
+}
+
+function _hydrateCampusPicker(user) {
+  _populateCampusPicker();
+  const label = _currentCampusLabel(user);
+  const item = document.getElementById('metaCampus');
+  const disp = item ? item.querySelector('[data-campus-display]') : null;
+  const sel = document.getElementById('campusSelect');
+  if (disp) disp.textContent = label || 'Not set';
+  if (sel) sel.value = label;
+  // On someone else's profile there's no picker and no owner to prompt,
+  // so an empty campus is just noise — drop the whole chip.
+  const isVisitor = !!(window.viewingMockUser || window.viewingRealUser);
+  if (item) item.style.display = (isVisitor && !label) ? 'none' : '';
+  const hint = document.querySelector('.meta-campus-hint');
+  if (hint && isVisitor) hint.style.display = 'none';
+}
+
+function _onCampusChange() {
+  if (typeof vibeLoad !== 'function' || typeof vibeSave !== 'function') return;
+  const sel = document.getElementById('campusSelect');
+  if (!sel) return;
+  const u = vibeLoad('vibe_user_v1') || {};
+  const label = _canonicalCampusLabel(sel.value);
+  u.campus = label;
+  // Local-only flag (never sent as-is). buildProfileSyncPayload omits
+  // `school` when we don't have a campus, so a stale cache can't blank a
+  // campus set on another device; this records that the user *meant* to
+  // clear it, which is the one case where sending '' is correct.
+  if (label) delete u._campusCleared; else u._campusCleared = true;
+  vibeSave('vibe_user_v1', u);
+  const disp = document.querySelector('#metaCampus [data-campus-display]');
+  if (disp) disp.textContent = label || 'Not set';
+  if (typeof scheduleProfileServerSync === 'function') {
+    scheduleProfileServerSync();
+  }
+}
+
 (function initProfilePage(){
   const params = new URLSearchParams(location.search);
   const viewingSlug = params.get('user');
@@ -7101,6 +7229,9 @@ function _sortWorkExperienceByRecency(rows) {
         if (!j || !j.ok || !j.vibeUser) return;
         const nu = Object.assign({}, j.vibeUser);
         nu._appShell = true;
+        // Top-level on the bootstrap, not inside vibeUser — carry it over
+        // so the campus picker prefills on the very first paint.
+        nu.campus = (typeof j.campus === 'string') ? j.campus : '';
         if (typeof vibeSave === 'function') vibeSave('vibe_user_v1', nu);
         // Strip ?clear=1 so the reload doesn't loop the wipe.
         const url = new URL(window.location.href);
@@ -7372,6 +7503,7 @@ function hydrateProfileFields(user) {
     if (typeof value === 'string') el.textContent = value;
   });
   _hydrateMajorPicker(user);
+  _hydrateCampusPicker(user);
 }
 
 // ── Major + year edit controls ──────────────────────────────────────────
@@ -7659,6 +7791,17 @@ function buildProfileSyncPayload() {
     // in 0-100 page-percentage coordinates.
     resume_redactions: Array.isArray(u.resumeRedactions) ? u.resumeRedactions : [],
   };
+  // Self-declared campus → users.school. Only sent when we actually know
+  // the value: profile-sync leaves the column alone when the key is
+  // absent, so omitting it keeps a stale desktop cache from wiping a
+  // campus the user set on mobile. The one exception is an explicit
+  // "Not set" pick in this browser, which must be able to clear it.
+  const campusLabel = _currentCampusLabel(u);
+  if (campusLabel) {
+    payload.school = campusLabel;
+  } else if (u._campusCleared) {
+    payload.school = '';
+  }
   if (bannerUrl) {
     payload.banner_url = bannerUrl;
   } else if (bg.startsWith('linear-gradient') || bg.startsWith('radial-gradient')) {
@@ -7951,6 +8094,13 @@ async function flushProfileServerSync() {
       const prev = (typeof vibeLoad === 'function') ? vibeLoad('vibe_user_v1') : {};
       const nu = Object.assign({}, jb.vibeUser);
       nu._appShell = true;
+      // Campus rides top-level on the bootstrap (not inside vibeUser,
+      // which only carries the rendered badge text), so carry it across
+      // by hand. Server is source of truth: adopting a real campus also
+      // retires the local "user cleared it" flag.
+      nu.campus = (typeof jb.campus === 'string') ? jb.campus : '';
+      if (nu.campus) delete nu._campusCleared;
+      else if (prev && prev._campusCleared) nu._campusCleared = true;
       if (prev && prev.counts) nu.counts = prev.counts;
       if (prev && prev.glance) nu.glance = prev.glance;
       if (prev && prev.pinnedId != null) nu.pinnedId = prev.pinnedId;

@@ -10,6 +10,7 @@ import {
   type ChangeEvent,
 } from "react";
 
+import { DEFAULT_CAMPUS_ID, IU_CAMPUSES } from "@/lib/iu/campuses";
 import { IU_MAJORS_BY_SCHOOL } from "@/lib/iu/majors";
 
 /**
@@ -76,6 +77,14 @@ const ALL_IU_MAJORS = (() => {
 })();
 
 const ALL_IU_SCHOOLS = IU_MAJORS_BY_SCHOOL.map((g) => g.school.label);
+
+/**
+ * Campus is self-declared — an @iu.edu address proves IU membership, not
+ * which campus — so we store the canonical label and default to the pilot
+ * campus. Never blocking: an empty value just means "show me everything".
+ */
+const DEFAULT_CAMPUS_LABEL =
+  IU_CAMPUSES.find((c) => c.id === DEFAULT_CAMPUS_ID)?.label ?? "";
 
 function splitLinesToArray(
   raw: string,
@@ -150,6 +159,7 @@ export function OnboardingMobile({ replay }: { replay: boolean }) {
     color: string;
   } | null>(null);
   const [bio, setBio] = useState("");
+  const [campus, setCampus] = useState(DEFAULT_CAMPUS_LABEL);
   const [major, setMajor] = useState("");
   const [department, setDepartment] = useState("");
   const [year, setYear] = useState("");
@@ -300,6 +310,8 @@ export function OnboardingMobile({ replay }: { replay: boolean }) {
     const profile: Record<string, unknown> = {};
     const n = name.trim();
     if (n) profile.name = n.slice(0, 120);
+    const c = campus.trim();
+    if (c) profile.school = c;
     const m = major.trim();
     if (m) profile.major = m.slice(0, 80);
     const d = department.trim();
@@ -405,6 +417,7 @@ export function OnboardingMobile({ replay }: { replay: boolean }) {
     name,
     handle,
     bio,
+    campus,
     major,
     department,
     year,
@@ -549,6 +562,25 @@ export function OnboardingMobile({ replay }: { replay: boolean }) {
                   placeholder="A few lines about you — what you're into, what you're building."
                   style={textareaStyle}
                 />
+              </Field>
+
+              <Field
+                label="Which campus are you at?"
+                hint="not verified; you can change this any time in settings"
+              >
+                <select
+                  value={campus}
+                  onChange={(e) => setCampus(e.target.value)}
+                  style={inputStyle}
+                >
+                  {IU_CAMPUSES.map((c) => (
+                    <option key={c.id} value={c.label}>
+                      {c.city && c.city !== c.label.replace(/^IU /, "")
+                        ? `${c.label} — ${c.city}`
+                        : c.label}
+                    </option>
+                  ))}
+                </select>
               </Field>
 
               <Field label="Major" hint="start typing — IU Indianapolis list">

@@ -1,3 +1,4 @@
+import { normalizeCampusLabel } from "@/lib/iu/campuses";
 import { normalizeResumeRef } from "@/lib/profile/resume-doc-url";
 import { sanitizeWorkExperience, type WorkExperienceRow } from "@/lib/profile/work-experience";
 
@@ -16,6 +17,9 @@ function isLookingFor(s: string): s is LookingFor {
 
 export type OnboardingProfileInput = {
   name?: unknown;
+  /** Self-declared IU campus — a campus id or its canonical label. */
+  school?: unknown;
+  campus?: unknown;
   major?: unknown;
   department?: unknown;
   year?: unknown;
@@ -83,6 +87,24 @@ export function sanitizeOnboardingProfile(
   if (typeof o.name === "string") {
     const t = o.name.trim().slice(0, 120);
     if (t) out.name = t;
+  }
+
+  // Self-declared campus. Accepted under `school` (the column name) or
+  // `campus` (what the pickers call it). An id or a label both work; an
+  // explicit empty value clears the field; anything else is invalid, which
+  // matches this sanitizer's convention of returning null so the caller
+  // 400s the whole request.
+  if ("school" in o || "campus" in o) {
+    const raw = o.school !== undefined ? o.school : o.campus;
+    if (raw === undefined) {
+      /* key present but undefined (never from JSON) — treat as absent */
+    } else if (raw === null || (typeof raw === "string" && !raw.trim())) {
+      out.school = "";
+    } else {
+      const label = normalizeCampusLabel(raw);
+      if (label === null) return null;
+      out.school = label;
+    }
   }
 
   if (typeof o.major === "string") {
