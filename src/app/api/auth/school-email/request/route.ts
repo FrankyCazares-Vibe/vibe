@@ -58,19 +58,6 @@ export async function POST(req: Request) {
     return NextResponse.json({ ok: false, error: "Unauthorized" }, { status: 401 });
   }
 
-  // Outbound email is the expensive part; cap per account and per source IP.
-  const perUser = await rateLimit(`school-email:${user.id}`, {
-    limit: 3,
-    windowSec: 3600,
-  });
-  if (!perUser.allowed) return tooManyRequests(perUser);
-
-  const perIp = await rateLimit(`school-email-ip:${clientIp(req)}`, {
-    limit: 10,
-    windowSec: 3600,
-  });
-  if (!perIp.allowed) return tooManyRequests(perIp);
-
   const termsGate = await requireTermsAccepted(user.id);
   if (termsGate) return termsGate;
 
@@ -104,6 +91,24 @@ export async function POST(req: Request) {
       { status: 400 },
     );
   }
+
+  // Rate limit ONLY requests that will actually send mail. Placing these
+  // above the validation above meant a typo — a malformed address, or a
+  // non-IU domain, which A3 made the common rejection — spent the same
+  // budget as a real send. Three typos locked a student out of the signup
+  // gate for an hour having received zero emails. Outbound email is still
+  // the expensive part; it just costs nothing to reject a bad address.
+  const perUser = await rateLimit(`school-email:${user.id}`, {
+    limit: 3,
+    windowSec: 3600,
+  });
+  if (!perUser.allowed) return tooManyRequests(perUser);
+
+  const perIp = await rateLimit(`school-email-ip:${clientIp(req)}`, {
+    limit: 10,
+    windowSec: 3600,
+  });
+  if (!perIp.allowed) return tooManyRequests(perIp);
 
   // `school_email` / `otto_answers` are private columns the RLS role cannot
   // select; read them with the service client scoped to the session's user id.

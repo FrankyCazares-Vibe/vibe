@@ -12,6 +12,9 @@ import {
 } from "@/lib/legal/terms";
 import { getSupabaseBrowserClient } from "@/lib/supabase/browser";
 
+/** Cap enforced on submit, never via maxLength (which truncates silently). */
+const MAX_PASSWORD_LENGTH = 20;
+
 export default function SignupPage() {
   const router = useRouter();
   const [email, setEmail] = useState("");
@@ -29,6 +32,14 @@ export default function SignupPage() {
       setError(
         `Confirm you're ${MIN_AGE} or older and agree to the Terms to create an account.`,
       );
+      return;
+    }
+    // Validate the length cap instead of letting the input truncate. A
+    // maxLength here silently cut a pasted password down to 20 characters,
+    // so a password manager could create (or reset to) a credential the
+    // user never saw and could not reproduce at login.
+    if (password.length > MAX_PASSWORD_LENGTH) {
+      setError(`Password must be ${MAX_PASSWORD_LENGTH} characters or fewer.`);
       return;
     }
     setLoading(true);
@@ -131,7 +142,6 @@ export default function SignupPage() {
               autoComplete="new-password"
               required
               minLength={8}
-              maxLength={20}
               value={password}
               onChange={(e) => setPassword(e.target.value)}
               className="vibe-auth-input"

@@ -6,6 +6,9 @@ import { useEffect, useState } from "react";
 
 import { getSupabaseBrowserClient } from "@/lib/supabase/browser";
 
+/** Cap enforced on submit, never via maxLength (which truncates silently). */
+const MAX_PASSWORD_LENGTH = 20;
+
 export default function UpdatePasswordPage() {
   const router = useRouter();
   const [password, setPassword] = useState("");
@@ -44,6 +47,14 @@ export default function UpdatePasswordPage() {
   async function onSubmit(e: React.FormEvent) {
     e.preventDefault();
     setError(null);
+    // Validate the length cap instead of letting the input truncate. A
+    // maxLength here silently cut a pasted password down to 20 characters,
+    // so a password manager could create (or reset to) a credential the
+    // user never saw and could not reproduce at login.
+    if (password.length > MAX_PASSWORD_LENGTH) {
+      setError(`Password must be ${MAX_PASSWORD_LENGTH} characters or fewer.`);
+      return;
+    }
     setLoading(true);
     const supabase = getSupabaseBrowserClient();
     const { error: updErr } = await supabase.auth.updateUser({ password });
@@ -92,7 +103,6 @@ export default function UpdatePasswordPage() {
             autoComplete="new-password"
             required
             minLength={8}
-            maxLength={20}
             value={password}
             onChange={(e) => setPassword(e.target.value)}
             style={inputStyle}
