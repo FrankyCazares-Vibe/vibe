@@ -39,7 +39,15 @@ const nextConfig: NextConfig = {
             value: "max-age=63072000; includeSubDomains; preload",
           },
           { key: "X-Content-Type-Options", value: "nosniff" },
-          { key: "X-Frame-Options", value: "DENY" },
+          // SAMEORIGIN, not DENY: Vibe frames its OWN pages in four places
+          // — the desktop messages shell (app/messages/MessagesSwitch.tsx)
+          // and onboarding shell (app/onboarding/OnboardingSwitch.tsx) both
+          // iframe /html/*.html, and both onboarding flows iframe the resume
+          // preview. DENY blocked every one of them ("refused to connect"),
+          // which is how it shipped in S51. SAMEORIGIN keeps the
+          // clickjacking protection that matters — no OTHER site can frame
+          // Vibe — while letting the app frame itself.
+          { key: "X-Frame-Options", value: "SAMEORIGIN" },
           { key: "Referrer-Policy", value: "strict-origin-when-cross-origin" },
           {
             key: "Permissions-Policy",
