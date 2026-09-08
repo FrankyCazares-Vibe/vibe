@@ -1438,9 +1438,9 @@ body {
 const STORAGE_KEY = 'vibe_journal_data';
 
 const DEFAULT_DATA = {
-  version: 'v6.4',
-  sessionCount: 52,
-  lastUpdated: 'September 3, 2026',
+  version: 'v6.6',
+  sessionCount: 54,
+  lastUpdated: 'September 8, 2026',
   versions: [
     { ver: 'v1.0', label: 'Session 1',     summary: 'Initial concept. App name (Vibe), warm professional positioning, profile design, Vibes short-form feed, reaction system, landing page.' },
     { ver: 'v1.1', label: 'Session 2',     summary: 'Cursor redesign: instant dot + snappy ring at lerp 0.28.' },
@@ -1484,9 +1484,9 @@ const DEFAULT_DATA = {
     { ver: 'v6.1', label: 'Session 49',     summary: 'Summer-break return. Supabase resumed after unpaid Pro invoice pause. Vertical clips surface backlogged (~8,100 lines) — keep feed + DM video. CQO (Rylan) endorsed: creator-supply problem, not just storage cost. Shipped 0078c9c, live on www.connectvibe.app. Restore tag clips-before-backlog.' },
     { ver: 'v6.2', label: 'Session 50',     summary: 'Brand + share-link fixes. Profile share links (iMessage, Discord) now unfurl with the real person\'s name instead of "Maya Chen — Vibe Profile" — middleware rewrite removed, generateMetadata hits Supabase service role for OG tags, bootstrap + posts APIs open to logged-out visitors via service role. vibe-icon.svg canonicalised as the app mark; favicon rebuilt with 48px+ PNG/ICO for Google Search; robots.txt added so Googlebot-Image can crawl. Desktop VIBE HUB copy sync scripted and wired to Cursor rules so every session auto-updates. 4 commits on main, all on prod.' },
     { ver: 'v6.3', label: 'Session 51',     summary: 'Security audit + hardening (first Fable session). Found and closed: self-serve is_platform_admin / school_verified via RLS, every user\'s email readable by any signed-in user, stale Phase-1 org policies (create verified orgs, join as owner, admin→owner), PostgREST filter injection in search, session-unbound .edu verification token, stored XSS in campus feed / profile / post menus, backslash open redirect, group-chat request bypass, draft posts reachable by id. Shipped column-level grants + rewritten policies (migration 20260903100000), Postgres-backed rate limiter on auth + write endpoints, security headers, next 16.3.4, generic 500s. One commit on main, migration applied live.' },
-    { ver: 'v6.4', label: 'Session 52',     summary: 'Security sentinel. Built a reusable read-only "hacker agent" workflow (11 attacker lenses + adversarial verify + sectioned report) and ran it: 41 findings, ~25 distinct. Caught a Critical stored XSS in the resume/portfolio viewer that Session 51 missed, plus a High RLS grant hole letting users re-point their chat membership into any DM. Both fixed same day with the media open redirects and server-only guards. Report in handoffs/. Orchestrator working style saved to memory.', current: true },
+    { ver: 'v6.4', label: 'Session 52',     summary: 'Security sentinel. Built a reusable read-only "hacker agent" workflow (11 attacker lenses + adversarial verify + sectioned report) and ran it: 41 findings, ~25 distinct. Caught a Critical stored XSS in the resume/portfolio viewer that Session 51 missed, plus a High RLS grant hole letting users re-point their chat membership into any DM. Both fixed same day with the media open redirects and server-only guards. Report in handoffs/. Orchestrator working style saved to memory.' },
     { ver: 'v6.5', label: 'Session 53',     summary: 'Hardening sprint A1. Resumes and portfolio PDFs moved out of the public, listable profiles bucket into a private resumes bucket that only the server can touch. Rows now store /api/resume/<key> proxy paths; the route checks sign-in, ownership, row membership and blocks, then hands out a 5-minute signed URL. 39 objects migrated (4 referenced + 35 orphans from repeated uploads), 3 rows rewritten, public copies deleted, anonymous bucket listing closed. Zero downtime. Shipped 9b7c7d1. Then A2 (876e540): every upload path rate-limited per user and R2 presigned PUTs bind the declared size into the signature (verified live: mismatched bodies 403); a critic found signed-in users could write straight to the profiles bucket via its RLS policies, so writes are server-only now (policies dropped). Ran as an 18-agent workflow with adversarial verification. A3 (df4858c): school-email verification scoped to IU domains via SCHOOL_EMAIL_DOMAINS. Then the A1 residual closed for good (db67ae8): redaction bars are burned into a server-rendered derivative, so viewers never receive un-redacted bytes or bar coordinates. A4 (0f39bcc): 18+ attestation and terms acceptance recorded at signup with an append-only ledger, consent-gated writes down to the database policies, and account deletion that purges every upload before removing the account.' },
-    { ver: 'v6.6', label: 'Session 54',     summary: 'Auth email fixed end to end (Resend SMTP, confirmation on, branded templates, DMARC, hello@ routing). Code-accurate Privacy Policy + Terms drafts under CONNECTVIBE. LLC. Vibe went IU-wide: campus is self-declared, orgs and events scope hard to it, feed and people only rank by it — which surfaced two surfaces that were empty because an unpopulated column was used as a filter.' },
+    { ver: 'v6.6', label: 'Session 54',     summary: 'Auth email fixed end to end (Resend SMTP, confirmation on, branded templates, DMARC, hello@ routing). Code-accurate Privacy Policy + Terms drafts under CONNECTVIBE. LLC. Vibe went IU-wide: campus is self-declared, orgs and events scope hard to it, feed and people only rank by it — which surfaced two surfaces that were empty because an unpopulated column was used as a filter. Found that X-Frame-Options DENY (S51) had broken four self-framed screens for four days — fixed to SAMEORIGIN (1f883ef). Built the feature sentinel (the second sentinel: "does this still work?") and ran it: 50 live findings, 38 confirmed, report in handoffs/. Fixed the two front-door bugs it found (8869df0): rate limiter before validation, password cap truncating pasted passwords.', current: true },
   ],
   sessions: [
     {
@@ -2045,157 +2045,26 @@ const DEFAULT_DATA = {
       ]
     },
     {
-      num: 54, ver: 'v6.6', title: 'Auth email, legal drafts, and IU-wide campuses', date: 'Session 54 — 2026-09-06 → 07',
+      num: 54, ver: 'v6.6', title: 'Auth email, legal drafts, IU-wide campuses, and the feature sentinel', date: 'Session 54 — 2026-09-06 → 08',
       changes: [
         { icon: 'gear', text: '<strong>A5 · Auth email actually works now.</strong> Resend SMTP wired into Supabase, email confirmation turned on, the send limit raised to 30/hour, and the stock one-line auth emails replaced with real templates (a sentence explaining who is writing and why, a button plus the visible link, an expiry note, a footer). The first test landed in Gmail spam; the cause was a missing DMARC record, now added on Cloudflare. Cloudflare Email Routing means hello@connectvibe.app — the address printed on the legal pages — finally reaches an inbox instead of bouncing. Minimum password length 8, max 20. Leaked-password protection needs the Pro plan and is deferred; staying on Free for now.' },
         { icon: 'list', text: '<strong>Legal drafts written against the code, not a template.</strong> A replacement Privacy Policy and Terms of Service where every factual claim was checked against what the app actually does, plus a one-page sheet of the six questions only a lawyer should answer. It took three revision passes because the verifiers kept finding real errors — post media links last an hour rather than five minutes, and "any user can create events" was simply false. The operator is now named: CONNECTVIBE. LLC, an Indiana LLC effective May 8 2026, with all three cofounders listed and a plain statement that only one of them can reach user data. No postal address is published, which is fine at this size; the drafts list the four things that would change that. Drafts sit in handoffs/legal-drafts/ and are not live.' },
         { icon: 'shield', text: '<strong>Vibe is IU-wide now, and campus is self-declared.</strong> Franky spotted that IU issues @iu.edu addresses across every campus, so the school-email check proves you belong to Indiana University and cannot prove which campus you attend. Rather than pretend otherwise, campus became something you pick and we never verify. Orgs and events scope hard to your campus with an explicit way to see all of IU, because clubs and events are bound to a physical place. The feed and people suggestions only rank by campus — hard-filtering a feed at eight users is how you show someone an empty app. The profile badge reads your campus, or "IU verified" when unset; it previously rendered the literal string "iu.edu" on every profile.' },
         { icon: 'shield', text: '<strong>The security headers had been breaking four screens since Sept 3 (1f883ef).</strong> Desktop messages showed "www.connectvibe.app refused to connect" where the conversation should be. Cause: Session 51 added <code>X-Frame-Options: DENY</code> to every response, and DENY blocks a page from being framed by anyone — including itself. Vibe frames its own pages in four places: the desktop messages shell, the desktop onboarding shell, and the resume preview in both onboarding flows. All four were dead for four days, which is the likeliest reason the pilot went quiet. Fixed to SAMEORIGIN, which still stops any other site framing Vibe (the clickjacking protection the header is actually for) while letting the app frame itself. Lesson recorded: the sentinel reviews for vulnerabilities, not for features its own hardening breaks — the next run gets a pass for exactly that.' },
         { icon: 'code', text: '<strong>Two surfaces were quietly broken by a column nothing filled.</strong> Building this exposed that <code>users.school</code> was already being read as a filter by code that nothing populated. The events endpoint fell back to showing only events you had created yourself, and the suggested-people rail had a tier gated on having a campus, so it returned nothing for anybody. Both read as "not much happening yet" and were actually bugs. Five agents built the campus list, both pickers, the scoping and the ranking in parallel against one shared contract; an org with no campus deliberately shows in every campus view so no existing club disappears.' },
+        { icon: 'gear', text: '<strong>A second sentinel, for what the first one cannot see.</strong> The security sentinel asks "can this be attacked?", so a header that blocks a real screen reads as success to it. The new feature sentinel (<code>.claude/workflows/feature-sentinel.js</code>) asks "does this still work?" — ten lenses for failures that never throw: hardening fallout, filters on data nothing populates, client/server drift in the untyped static pages, dead ends, empty states that are really errors, render blockers, desktop-vs-mobile divergence, writes that fail silently, a diff-anchored regression sweep, and a live smoke test. First run: 60 agents, 50 live findings, 38 confirmed broken. Its own verdict on the pattern: mostly self-inflicted — the hardening tightened the database and routes faster than the UI caught up. Report in handoffs/2026-09-07-broken-features-report.md. A merge stage was added afterwards so a bug seen by three lenses costs one verifier, not three.' },
+        { icon: 'shield', text: '<strong>Two front-door bugs fixed the same day (8869df0).</strong> The school-email rate limiter ran before the address was validated, so three typos burned the hour with zero emails sent — and IU-only verification had made rejection the common path. Limiters now sit right before the send. And the 20-character password cap added that morning silently truncated a pasted password, so a password manager could create a credential the user could never reproduce; it is validated with a message now. Also learned: all 8 accounts are real IU students — the "demo accounts" are fabricated personas hardcoded in the prototype pages that logged-out visitors still see, which is the next job.' },
       ]
     },
   ],
   nextSteps: [
-    { priority: 'high',   text: '<strong>Decision (S52): security is a bounded sprint, then part of every milestone.</strong> Not a whole phase, not deferred to the end. A1–A4 shipped in S53; A5–A6 below are Franky + lawyer items before the next real student uploads a resume; then run the sentinel each milestone and fix Medium+; live pentest on a preview deploy before app-store submission. Full plan in the Session 52 handoff §4.' },
-    { priority: 'medium', text: '<strong>A1 follow-up · signed-in smoke test.</strong> Own resume on phone + desktop <code>/profile</code>, another user\'s resume, onboarding upload preview, redaction bars still aligned. Everything else in A1 was verified live from the agent side (anonymous paths, bucket state, rows). Now also: view a redacted resume as a second account — the first view renders the derivative (expect a short wait), the bars must be solid black, and the coordinates must not appear in the bootstrap JSON.' },
-    { priority: 'low',    text: '<strong>A2 follow-ups.</strong> Verify a real clip / DM photo / org logo upload still succeeds after the size binding (expected: yes, same File is PUT); optional orphan sweep of un-referenced R2 and Storage objects; the 429 paths show a generic error in a couple of clients.' },
-    { priority: 'low',    text: '<strong>A3 follow-up.</strong> Decide whether indiana.edu belongs in SCHOOL_EMAIL_DOMAINS; the request endpoint still reveals whether an address is already linked (409 vs 200) — pre-existing Low.' },
-    { priority: 'high',   text: '<strong>A4 · Signup legal + deletion purge.</strong> Age gate + real consent capture (<code>terms_accepted_at</code>, <code>terms_version</code>); <code>/api/me</code> DELETE also purges Storage + R2 prefixes. Also purge <code>resumes/&lt;uid&gt;/*</code> — 35 orphaned PDFs sit there after A1.' },
-    { priority: 'low',    text: '<strong>A5 · Supabase Auth settings — done (2026-09-06).</strong> Minimum password length 8 (management API). Resend custom SMTP configured, email rate limit 30/hour, Confirm email ON, branded email templates applied via the API (real copy, button + visible link, 1-hour expiry note, footer). Cloudflare DMARC added (p=none, reports to Cloudflare) after the first test landed in Gmail spam. Deferred: leaked-password protection needs the Pro plan; Franky is staying on Free for now. Open: hello@connectvibe.app has no MX — set up Cloudflare Email Routing before the lawyer review.' },
-    { priority: 'high',   text: '<strong>A6 · Legal wording → lawyer (parallel):</strong> privacy policy sub-processors (Resend, Sentry) + contradictions, Terms venue (Marion County), data-export process, minors policy.' },
-    { priority: 'medium', text: '<strong>Before app-store submission:</strong> CSP (report-only → enforce), throttle likes/reposts/reactions/views + remaining write endpoints, proxy-trusted <code>clientIp</code>, Sentry PII scrub, live pentest on a Vercel preview deploy, Apple prerequisites (in-app deletion, privacy labels, age rating).' },
-    { priority: 'high',   text: '<strong>Then product (S50 carry-over):</strong> QA mobile onboarding + Otto tour on a real phone; video-in-feed / video-in-DM on a phone; one real IU student through signup → post → send; Search Console re-index.' },
-    { priority: 'medium', text: '<strong>Clips stay parked.</strong> Restore only if demand shows up (video attach rate, repeat video posters, unprompted editing/cap complaints). Heavy DM video with no public video is a <em>negative</em> signal. Guide: <code>DOCS/BACKLOG_CLIPS.md</code>. Tag: <code>clips-before-backlog</code>.' },
-    { priority: 'medium', text: '<strong>First-class Notifications panel (#29).</strong> Chat reactions, replies, mentions, RSVPs still silent unless the user is on the right page.' },
-    { priority: 'medium', text: '<strong>Premium reveal gate (monetization seed).</strong> <code>profile_views</code> already captures viewer identity. Model: every 3 days see 3 names, rest behind paywall.' },
-    { priority: 'medium', text: '<strong>Discover Browse + Departments views (#30, #31).</strong> Empty stubs. Can ship as v1.1 after launch.' },
-    { priority: 'medium', text: '<strong>Realtime instead of 2s polling</strong> in chat. Supabase Realtime is wired but unused.' },
-    { priority: 'medium', text: '<strong>Email notifications via Resend.</strong> Client is wired, never used for product mail. Welcome + follow digest.' },
-    { priority: 'medium', text: '<strong>Edit own posts.</strong> Delete exists; no edit. Common ask.' },
-    { priority: 'medium', text: '<strong>Real .edu verification</strong> with one-time-link email send + click confirmation. Pairs with Confirm email / SMTP above.' },
-    { priority: 'low',    text: '<strong>Native app.</strong> Not yet. Apple/Google developer accounts are cheap paperwork. Capacitor wrap when testers complain about Safari. React Native after IU is locked (map stage Vega).' },
-    { priority: 'low',    text: '<strong>Rename <code>clip*</code> → <code>video*</code></strong> in shared R2 plumbing so the next grep does not delete feed video. Pure rename, not a removal.' },
-    { priority: 'low',    text: '<strong>Otto v2 — backend.</strong> Voice, OAuth, posting queue. Separate larger phase.' },
-  ],
-}
-
-// ── STORAGE ────────────────────────────────────────────────────────
-function loadData() {
-  try {
-    const stored = localStorage.getItem(STORAGE_KEY);
-    if (stored) {
-      const parsed = JSON.parse(stored);
-      // Merge: keep stored data but fill any missing keys from default
-      return { ...DEFAULT_DATA, ...parsed };
-    }
-  } catch(e) {}
-  return DEFAULT_DATA;
-}
-
-function saveData(data) {
-  try {
-    localStorage.setItem(STORAGE_KEY, JSON.stringify(data));
-  } catch(e) {}
-}
-
-// On first load, always write the latest default data so it reflects current session
-const journalData = DEFAULT_DATA;
-saveData(journalData);
-
-// ── RENDER ────────────────────────────────────────────────────────
-function render(data) {
-  // Update header/meta
-  document.getElementById('heroVersion').textContent = data.version;
-  document.getElementById('heroSessions').textContent = data.sessionCount;
-  document.getElementById('heroDate').textContent = data.lastUpdated;
-  document.getElementById('sidebarVersion').textContent = `${data.version} — Session ${data.sessionCount}`;
-  document.getElementById('sidebarDate').textContent = data.lastUpdated;
-  document.getElementById('syncDate').textContent = data.lastUpdated;
-  document.getElementById('sessionBadge').textContent = data.sessionCount;
-
-  // Version table
-  const vb = document.getElementById('versionBody');
-  vb.innerHTML = '';
-  data.versions.forEach(v => {
-    const tr = document.createElement('tr');
-    tr.className = 'version-row' + (v.current ? ' current' : '');
-    tr.innerHTML = `<td>${v.ver} — ${v.label}</td><td>${v.summary}</td>`;
-    vb.appendChild(tr);
-  });
-
-  // Session log
-  const sl = document.getElementById('sessionLog');
-  sl.innerHTML = '';
-  [...data.sessions].reverse().forEach(s => {
-    const div = document.createElement('div');
-    div.className = 'session-card';
-    div.innerHTML = `
-      <div class="session-card-header">
-        <div class="session-number">${s.num}</div>
-        <div class="session-header-text">
-          <h3>${s.title}</h3>
-          <p>${s.date}</p>
-        </div>
-        <span class="session-version-chip">${s.ver}</span>
-      </div>
-      <div class="session-card-body">
-        ${s.changes.map(c=>`
-          <div class="session-change">
-            <span class="session-change-icon">${c.icon}</span>
-            <span class="session-change-text">${c.text}</span>
-          </div>
-        `).join('')}
-      </div>`;
-    sl.appendChild(div);
-  });
-}
-
-render(journalData);
-
-// ── NAV ───────────────────────────────────────────────────────────
-function showSection(id, btn) {
-  document.querySelectorAll('.section').forEach(s => s.classList.remove('active'));
-  document.querySelectorAll('.nav-item').forEach(b => b.classList.remove('active'));
-  document.getElementById('sec-' + id).classList.add('active');
-  btn.classList.add('active');
-  // Scroll to top of content
-  document.querySelector('.sync-bar').scrollIntoView({ behavior: 'smooth', block: 'start' });
-}
-
-// ── EXPOSE UPDATE API ─────────────────────────────────────────────
-// Claude calls window.vibeJournal.update(patch) to update the journal.
-// patch can contain: version, sessionCount, lastUpdated, newVersion{}, newSession{}
-window.vibeJournal = {
-  update(patch) {
-    const data = loadData();
-    if (patch.version)      data.version = patch.version;
-    if (patch.sessionCount) data.sessionCount = patch.sessionCount;
-    if (patch.lastUpdated)  data.lastUpdated = patch.lastUpdated;
-    if (patch.newVersion)   data.versions.push(patch.newVersion);
-    if (patch.newSession)   data.sessions.push(patch.newSession);
-    if (patch.nextSteps)    data.nextSteps = patch.nextSteps;
-    saveData(data);
-    render(data);
-    return 'Journal updated to ' + data.version;
-  },
-  getData() { return loadData(); },
-  reset() { localStorage.removeItem(STORAGE_KEY); location.reload(); }
-};
-</script>
-</body>
-</html>    { priority: 'medium', text: '<strong>A4 follow-ups.</strong> Franky: sign in once and accept the Terms on the new interstitial; try one post afterwards. Lawyer (A6): confirm the 18+ self-attestation is sufficient, whether the Privacy Policy needs its own version, whether consent records should outlive a deleted account (today they cascade), and the deletion-disclosure wording (backups, audit logs, email logs, org/group records, reports).' },
-        { icon: 'code', text: '<strong>Delete really deletes.</strong> "Delete my account" used to remove the login and leave every file behind. It now purges <code>profiles/&lt;uid&gt;/</code> (posts, posters, logos), the private <code>resumes/&lt;uid&gt;/</code> tree including burned-in derivatives, <code>clips/&lt;uid&gt;/</code> in R2 and the media of every message the user sent — and only then deletes the account; if any purge fails, nothing is deleted and the user retries. Prefix guards make it impossible to reach another user\'s files. Proven with a seed-and-purge script on fake prefixes against the real buckets, with control objects surviving. Two workflows, 16 agents: the first round caught that the 18+ half of the attestation was never checked and that a static onboarding page skipped the gate; the critic then pushed the gate into the database. What survives deletion, for the privacy policy: provider backups for their retention window, auth audit logs, email-provider logs, org and group records the user authored, and reports they filed.' },
-      ]
-    },
-  ],
-  nextSteps: [
-    { priority: 'high',   text: '<strong>Decision (S52): security is a bounded sprint, then part of every milestone.</strong> Not a whole phase, not deferred to the end. A1–A4 shipped in S53; A5–A6 below are Franky + lawyer items before the next real student uploads a resume; then run the sentinel each milestone and fix Medium+; live pentest on a preview deploy before app-store submission. Full plan in the Session 52 handoff §4.' },
-    { priority: 'medium', text: '<strong>A1 follow-up · signed-in smoke test.</strong> Own resume on phone + desktop <code>/profile</code>, another user\'s resume, onboarding upload preview, redaction bars still aligned. Everything else in A1 was verified live from the agent side (anonymous paths, bucket state, rows). Now also: view a redacted resume as a second account — the first view renders the derivative (expect a short wait), the bars must be solid black, and the coordinates must not appear in the bootstrap JSON.' },
-    { priority: 'low',    text: '<strong>A2 follow-ups.</strong> Verify a real clip / DM photo / org logo upload still succeeds after the size binding (expected: yes, same File is PUT); optional orphan sweep of un-referenced R2 and Storage objects; the 429 paths show a generic error in a couple of clients.' },
-    { priority: 'low',    text: '<strong>A3 follow-up.</strong> Decide whether indiana.edu belongs in SCHOOL_EMAIL_DOMAINS; the request endpoint still reveals whether an address is already linked (409 vs 200) — pre-existing Low.' },
-    { priority: 'high',   text: '<strong>A4 · Signup legal + deletion purge.</strong> Age gate + real consent capture (<code>terms_accepted_at</code>, <code>terms_version</code>); <code>/api/me</code> DELETE also purges Storage + R2 prefixes. Also purge <code>resumes/&lt;uid&gt;/*</code> — 35 orphaned PDFs sit there after A1.' },
-    { priority: 'high',   text: '<strong>A5 · Supabase Auth dashboard (Franky):</strong> leaked-password protection, min length 8, Confirm email + Resend SMTP.' },
-    { priority: 'high',   text: '<strong>A6 · Legal wording → lawyer (parallel):</strong> privacy policy sub-processors (Resend, Sentry) + contradictions, Terms venue (Marion County), data-export process, minors policy.' },
+    { priority: 'high',   text: '<strong>Where we are (S54): hardening sprint A1–A5 done; the app now needs to be made honest and un-broken before real students.</strong> The feature sentinel found 50 live problems (38 confirmed). Work the list below in order, re-running the feature sentinel after each cluster; the security sentinel re-run is the milestone check at step 6 (handoff §4-9), after the legal and verification work.' },
+    { priority: 'high',   text: '<strong>1 · Strip the demo personas.</strong> Maya Chen / Jordan Lee / Priya Sinha and the fabricated Map majors, clubs and headcounts are hardcoded in the prototype pages, and logged-out visitors to /feed, /campus, /network, /messages are served those pages by middleware. Send anonymous visitors to the landing page instead; remove the fake data from the shipped pages without deleting the pages (messages.html and profile.html ARE the desktop app); wire or remove the fake "Applied" on /opportunities; add a sign-up link to the landing page (it only has "Log in").' },
+    { priority: 'high',   text: '<strong>2 · Empty states that lie.</strong> On a 401/403/500 the feed says "No posts yet", the network page says you have no followers, mobile messages wipes an already-loaded list. Show "couldn\'t load" and keep what was loaded — an outage must never look like data loss (report rows 11–14, 44).' },
+    { priority: 'high',   text: '<strong>3 · Writes that silently fail.</strong> Report post, mobile repost, DM accept/decline, desktop "Follow instead", Otto reminder done/dismiss, group "Add people", pin post — all optimistic, none check the response (rows 21–26, 36, 46).' },
+    { priority: 'medium', text: '<strong>4 · Hardening fallout + desktop/mobile parity.</strong> post_views has RLS with no policies (views read 0); declining a message request does nothing (no DELETE policy); Settings cards surface a raw 403. Mobile has no notification badge and drops message media; profile views only count on desktop; desktop onboarding finishes inside its iframe (rows 2, 3, 7, 16–20).' },
+    { priority: 'medium', text: '<strong>5 · Verify with a second account.</strong> Server-side redaction has never produced a derivative in production (viewers get 503 if it fails); resume viewer; one upload; campus scoping once someone picks a campus — fix the strict-equality trending/search paths first (rows 41, 42, 45, 47, 48). Also: the 7 teammates must accept the Terms once before they can post or message.' },
+    { priority: 'medium', text: '<strong>6 · Legal + milestone.</strong> Franky resolves the [DECISION] markers in handoffs/legal-drafts (the drafts already cover sub-processors, Marion County venue, data export, minors policy — confirm with the reviewer), a reviewer answers the six questions, then publish + bump TERMS_VERSION in the same deploy. Security-sentinel re-run (last: Sept 3), fix Medium+, then §C: throttle likes/reposts/views, CSP report-only with frame-ancestors self, Sentry PII scrub, drop x-powered-by, live pentest on a preview deploy.' },
     { priority: 'medium', text: '<strong>Before app-store submission:</strong> CSP (report-only → enforce), throttle likes/reposts/reactions/views + remaining write endpoints, proxy-trusted <code>clientIp</code>, Sentry PII scrub, live pentest on a Vercel preview deploy, Apple prerequisites (in-app deletion, privacy labels, age rating).' },
     { priority: 'high',   text: '<strong>Then product (S50 carry-over):</strong> QA mobile onboarding + Otto tour on a real phone; video-in-feed / video-in-DM on a phone; one real IU student through signup → post → send; Search Console re-index.' },
     { priority: 'medium', text: '<strong>Clips stay parked.</strong> Restore only if demand shows up (video attach rate, repeat video posters, unprompted editing/cap complaints). Heavy DM video with no public video is a <em>negative</em> signal. Guide: <code>DOCS/BACKLOG_CLIPS.md</code>. Tag: <code>clips-before-backlog</code>.' },
