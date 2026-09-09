@@ -12,8 +12,6 @@
 <title>Vibe Profile</title>
 <link href="https://fonts.googleapis.com/css2?family=Fraunces:ital,wght@0,300;0,400;0,600;0,900;1,300;1,400&family=DM+Sans:wght@300;400;500;600&display=swap" rel="stylesheet">
 <script src="/html/_persistence.js"></script>
-<script src="/html/_mockUsers.js"></script>
-<script src="/html/_studentVerify.js"></script>
 <script src="/html/_otto.js" defer></script>
 <!-- PDF.js — rasterizes uploaded PDFs into images so redaction bars can
      live inside the same scroll container as the page content. Loaded
@@ -28,25 +26,26 @@
 <script src="/html/_safetyActions.js" defer></script>
 <script src="/html/_mentionPicker.js" defer></script>
 <script>
-// Pre-paint: prevents the flash-of-Maya on profile loads for onboarded users.
-// Reads vibe_user_v1 synchronously before <body> renders. If the user came
-// through onboarding (not demo), adds html.vibe-pre-paint so CSS can hide
-// .profile-wrap until initProfilePage finishes wiping/rendering. The class
-// is removed at the end of init.
+// Pre-paint: hides the profile shell until initProfilePage has hydrated it,
+// so the static placeholder markup never flashes before real data lands.
+// Reads vibe_user_v1 synchronously before <body> renders. Onboarded owners
+// get html.vibe-pre-paint, and so do ?handle= viewers with no localStorage
+// (anonymous share-link visitors). Every init branch removes the class when
+// it finishes so .profile-wrap fades in.
 (function () {
   try {
     const raw = localStorage.getItem('vibe_user_v1');
-    if (!raw) return;
+    if (!raw) { if (/[?&]handle=/.test(location.search)) document.documentElement.classList.add('vibe-pre-paint'); return; }
     const user = JSON.parse(raw);
-    if (user && user._onboarded && !user._isDemo) {
+    if (user && user._onboarded) {
       document.documentElement.classList.add('vibe-pre-paint');
     }
   } catch (e) {}
 })();
 </script>
 <style>
-/* Pre-paint guard — see <head> script. Hides demo content for onboarded
-   users until init finishes wiping + hydrating, then fades in. */
+/* Pre-paint guard — see <head> script. Hides the profile shell until init
+   finishes hydrating, then fades in. */
 html.vibe-pre-paint .profile-wrap,
 html.vibe-pre-paint .profile-cover { opacity: 0; }
 .profile-wrap, .profile-cover { transition: opacity .18s ease-in; }
@@ -1630,6 +1629,12 @@ body.edit-mode [data-edit]:focus {
   outline: 2px solid var(--accent);
   background: rgba(255,180,150,.14);
 }
+/* Empty editable fields show their data-placeholder while editing. */
+body.edit-mode [data-placeholder][contenteditable="true"]:empty::before { content: attr(data-placeholder); color: var(--muted); font-style: italic; opacity: .7; }
+/* In view mode a blank Location / Major / Web row would show a bare label —
+   hide the whole row until it has a value. Pure CSS so it can't go stale
+   after an inline edit. */
+body:not(.edit-mode) .meta-item:has(> [data-user-field]:empty) { display: none; }
 
 /* Floating "Previewing as visitor" pill — shown while the owner is in
    visitor mode so they can return to edit. Lives bottom-center so it
@@ -2822,14 +2827,6 @@ body.empty-profile-mode #profileEmpty { display: flex !important; }
   background: white; color: var(--charcoal); border-color: var(--border);
 }
 .empty-secondary:hover { border-color: var(--charcoal); }
-.empty-footnote {
-  margin-top: 24px; font-size: 12px; color: var(--muted);
-}
-.empty-footnote code {
-  background: rgba(28,28,30,.06);
-  padding: 2px 6px; border-radius: 4px;
-  font-family: ui-monospace, Monaco, monospace; font-size: 11px;
-}
 
 /* ── First-visit welcome (Otto pops in after onboarding) ─────────────── */
 .ott-welcome {
@@ -3206,10 +3203,6 @@ body.empty-profile-mode #profileEmpty { display: flex !important; }
         <path d="M6.3 7.6l4.5-2.8M6.3 9.4l4.5 2.8" stroke="currentColor" stroke-width="1.3" stroke-linecap="round"/>
       </svg>
     </button>
-    <!-- Hidden — kept so legacy code paths (renderUserSections, demo
-         exit flow) that reference profileShareBtn keep working without
-         a 404. New nav uses the cog above. -->
-    <button id="profileShareBtn" style="display:none;"></button>
   </div>
 </nav>
 
@@ -3223,7 +3216,7 @@ body.empty-profile-mode #profileEmpty { display: flex !important; }
 <input type="file" id="coverFileInput" accept="image/*" onchange="handleCoverUpload(this)">
 <input type="file" id="avatarFileInput" accept="image/*" onchange="handleAvatarUpload(this)">
 
-<!-- EMPTY STATE (Session 23 — shown when vibe_user_v1 is absent) -->
+<!-- LOADING / RECOVERY STATE — a signed-in user with empty localStorage re-bootstraps here -->
 <div id="profileEmpty">
   <div class="empty-otto-orb">
     <span class="orb-ring"></span>
@@ -3231,13 +3224,12 @@ body.empty-profile-mode #profileEmpty { display: flex !important; }
     <span class="orb-core"></span>
   </div>
   <div class="empty-eyebrow">— otto</div>
-  <h1 class="empty-title">your profile is <em>empty.</em><br>let's fix that.</h1>
-  <p class="empty-otto-line">"three minutes, six questions. you'll walk out with a profile that actually shows who you are. ready when you are."</p>
-  <div class="empty-actions">
-      <a class="empty-primary" href="/auth/signup">Create your account</a>
-    <button class="empty-secondary" onclick="seedDemoData(); location.reload();">Load demo profile</button>
+  <h1 class="empty-title" id="profileEmptyTitle">one sec — <em>loading</em> your profile.</h1>
+  <p class="empty-otto-line" id="profileEmptyLine">"pulling your profile from the server. this usually takes a blink."</p>
+  <div class="empty-actions" id="profileEmptyActions" style="display:none">
+    <a class="empty-primary" href="/auth/login?next=%2Fprofile">Sign in again</a>
+    <button class="empty-secondary" onclick="location.reload()">Try again</button>
   </div>
-  <p class="empty-footnote">Or append <code>?demo=1</code> to the URL to load demo data. <code>?clear=1</code> to reset.</p>
 </div>
 
 <!-- COVER -->
@@ -3258,7 +3250,7 @@ body.empty-profile-mode #profileEmpty { display: flex !important; }
   <div class="avatar-row">
     <div class="avatar-wrap">
       <div class="avatar" onclick="toggleAvatarPicker()" id="avatarEl">
-        <span id="avatarEmoji">MC</span>
+        <span id="avatarEmoji">?</span>
         <div class="avatar-edit-hint">
           <svg width="18" height="16" viewBox="0 0 18 16" fill="none"><rect x="1" y="4" width="16" height="11" rx="3" stroke="white" stroke-width="1.3"/><circle cx="9" cy="9.5" r="3" stroke="white" stroke-width="1.3"/><path d="M6 4l1.5-3h3L12 4" stroke="white" stroke-width="1.3" stroke-linecap="round"/></svg>
           <span>Change</span>
@@ -3286,11 +3278,11 @@ body.empty-profile-mode #profileEmpty { display: flex !important; }
            Each opens a modal listing the actual users. -->
       <div class="profile-top-stats" id="profileTopStats">
         <a href="#" class="profile-stat" onclick="openConnectionsModal('followers'); return false;">
-          <span class="profile-stat-num" id="statFollowers">1.2k</span>
+          <span class="profile-stat-num" id="statFollowers">0</span>
           <span class="profile-stat-label">Followers</span>
         </a>
         <a href="#" class="profile-stat profile-stat--prominent" onclick="openConnectionsModal('connections'); return false;">
-          <span class="profile-stat-num" id="statConnections">847</span>
+          <span class="profile-stat-num" id="statConnections">0</span>
           <span class="profile-stat-label">Connections</span>
         </a>
       </div>
@@ -3307,8 +3299,9 @@ body.empty-profile-mode #profileEmpty { display: flex !important; }
         <button class="vibe-soft-follow" id="vibeSoftFollow" onclick="handleSoftFollow()" style="display:none">
           Follow instead
         </button>
-        <button class="profile-mutual-pill" onclick="openMutualsModal()">
-          <span id="statMutual">32</span> mutual
+        <!-- Hidden until a real mutual-connections API exists (S55): the count was hardcoded to 0 and the modal is a static shell. -->
+        <button class="profile-mutual-pill" onclick="openMutualsModal()" style="display:none">
+          <span id="statMutual">0</span> mutual
         </button>
         <!-- Safety actions: Block / Mute / Report. Visible only in
              viewer-mode (someone else's profile). -->
@@ -3330,34 +3323,29 @@ body.empty-profile-mode #profileEmpty { display: flex !important; }
   <!-- IDENTITY -->
   <div class="identity fade-in" id="overview" style="animation-delay:.05s">
     <div class="identity-name-row">
-      <h1 class="profile-name" data-edit="true" data-user-field="name" data-placeholder="Your name" contenteditable="false">Maya Chen</h1>
+      <h1 class="profile-name" data-edit="true" data-user-field="name" data-placeholder="Your name" contenteditable="false"></h1>
       <span class="student-badge" id="studentBadgeSlot"></span>
     </div>
     <!-- @handle row — sits under the name, owner can click in edit mode
          to change it (server enforces a 14-day cooldown). The status
          message lives next to the input only while editing. -->
     <div class="profile-handle-row" id="profileHandleRow">
-      <span class="profile-handle" id="profileHandleDisplay">@mayachen</span>
+      <span class="profile-handle" id="profileHandleDisplay"></span>
       <span class="profile-handle-edit owner-only" id="profileHandleEditWrap" style="display:none;">
         <span style="color:var(--muted);font-weight:600">@</span>
         <input type="text" id="profileHandleInput" class="profile-handle-input" maxlength="20" autocomplete="off" spellcheck="false" autocapitalize="off">
         <span class="profile-handle-status" id="profileHandleStatus"></span>
       </span>
     </div>
-    <p class="profile-tagline" data-edit="true" data-user-field="tagline" data-placeholder="A line that captures how you work" contenteditable="false">"I make things feel right before they look right."</p>
+    <p class="profile-tagline" data-edit="true" data-user-field="tagline" data-placeholder="A line that captures how you work" contenteditable="false"></p>
     <div class="profile-meta">
-      <span class="meta-item"><span class="meta-label">Location</span><span data-edit="true" data-user-field="location" data-placeholder="City, country" contenteditable="false">Seoul → San Francisco, CA</span></span>
-      <span class="meta-item" id="metaMajor"><span class="meta-label">Major</span><span data-user-field="headline" data-major-display data-placeholder="Pick a major">Senior Product Designer at Figma</span><span class="meta-major-edit" style="display:none;gap:6px;align-items:center;flex-wrap:wrap"><select id="majorSelect" class="meta-major-select" onchange="_onMajorYearChange()" aria-label="Major"></select><select id="yearSelect" class="meta-year-select" onchange="_onMajorYearChange()" aria-label="Year"><option value="">Year</option><option value="1">Year 1</option><option value="2">Year 2</option><option value="3">Year 3</option><option value="4">Year 4</option><option value="5">Year 5</option><option value="6">Grad</option></select></span></span>
+      <span class="meta-item"><span class="meta-label">Location</span><span data-edit="true" data-user-field="location" data-placeholder="City, country" contenteditable="false"></span></span>
+      <span class="meta-item" id="metaMajor"><span class="meta-label">Major</span><span data-user-field="headline" data-major-display data-placeholder="Pick a major"></span><span class="meta-major-edit" style="display:none;gap:6px;align-items:center;flex-wrap:wrap"><select id="majorSelect" class="meta-major-select" onchange="_onMajorYearChange()" aria-label="Major"></select><select id="yearSelect" class="meta-year-select" onchange="_onMajorYearChange()" aria-label="Year"><option value="">Year</option><option value="1">Year 1</option><option value="2">Year 2</option><option value="3">Year 3</option><option value="4">Year 4</option><option value="5">Year 5</option><option value="6">Grad</option></select></span></span>
       <span class="meta-item" id="metaCampus"><span class="meta-label">Campus</span><span data-campus-display>Not set</span><span class="meta-campus-edit" style="display:none;gap:6px;align-items:center;flex-wrap:wrap"><select id="campusSelect" class="meta-campus-select" onchange="_onCampusChange()" aria-label="Campus"></select></span></span>
-      <span class="meta-item"><span class="meta-label">Web</span><span data-edit="true" data-user-field="website" data-placeholder="yourname.com" contenteditable="false" style="color:var(--accent)">mayachen.co</span></span>
+      <span class="meta-item"><span class="meta-label">Web</span><span data-edit="true" data-user-field="website" data-placeholder="yourname.com" contenteditable="false" style="color:var(--accent)"></span></span>
       <span class="meta-campus-hint" style="display:none">Sets which campus's clubs and events you see first. Not verified — change it any time.</span>
     </div>
     <div class="vibe-tags" id="vibeTags">
-      <span class="vibe-tag coral">Product Design <button class="tag-remove" onclick="removeTag(this)">×</button></span>
-      <span class="vibe-tag purple">Systems thinker <button class="tag-remove" onclick="removeTag(this)">×</button></span>
-      <span class="vibe-tag sky">Seoul → SF <button class="tag-remove" onclick="removeTag(this)">×</button></span>
-      <span class="vibe-tag gold">Coffee snob ☕ <button class="tag-remove" onclick="removeTag(this)">×</button></span>
-      <span class="vibe-tag mint">Open to collabs <button class="tag-remove" onclick="removeTag(this)">×</button></span>
       <button class="tag-add" onclick="addTag()">+ Add tag</button>
     </div>
   </div>
@@ -3514,17 +3502,6 @@ body.empty-profile-mode #profileEmpty { display: flex !important; }
   </div>
 
   
-<div id="relevantSkillsStrip" style="margin-top:20px;">
-  <div style="font-size:11px;font-weight:700;color:#8A8580;margin-bottom:6px;letter-spacing:1px;text-transform:uppercase;">
-    Relevant Skills
-  </div>
-  <div style="display:flex;flex-wrap:wrap;gap:8px;">
-    <span style="font-size:11px;font-weight:600;background:#FFF0EC;color:#FF5C35;padding:5px 12px;border-radius:100px;">Figma</span>
-    <span style="font-size:11px;font-weight:600;background:#F0EDFF;color:#7C5CFC;padding:5px 12px;border-radius:100px;">Design Systems</span>
-    <span style="font-size:11px;font-weight:600;background:#EAFFF5;color:#1A9E5B;padding:5px 12px;border-radius:100px;">User Research</span>
-  </div>
-</div>
-
 <!-- MAIN GRID -->
   <!-- PINNED ITEM — only shown when something is pinned -->
   <div id="pinnedItem" style="margin-bottom:0;">
@@ -3545,7 +3522,7 @@ body.empty-profile-mode #profileEmpty { display: flex !important; }
       <!-- Bio -->
       <div class="card fade-in personality-section" style="animation-delay:.1s">
         <div class="card-title">About me</div>
-        <p class="bio-text" data-edit="true" contenteditable="false">I've been designing interfaces for 7 years, but what I actually love is the moment a complex thing becomes obvious. I've done that at Figma, a climate startup that ran out of money, and my own side projects. I work best at the intersection of UX craft and systems thinking — and I'm always down to nerd out about type, feedback loops, or fermentation.</p>
+        <p class="bio-text" data-edit="true" contenteditable="false"></p>
       </div>
 
       <!-- Experience -->
@@ -3554,77 +3531,7 @@ body.empty-profile-mode #profileEmpty { display: flex !important; }
           Experience
           <button class="card-add-btn" onclick="openWorkModal()">+ Add role</button>
         </div>
-        <div class="work-list" id="workList">
-          <div class="work-item">
-            <div class="work-logo-wrap" onclick="triggerLogoUpload(this)">
-              <div class="work-logo-default work-diamond">
-                <svg width="26" height="26" viewBox="0 0 26 26" fill="none" xmlns="http://www.w3.org/2000/svg">
-                  <path d="M13 2L24 8.5V17.5L13 24L2 17.5V8.5L13 2Z" fill="#1C1C1E" stroke="#1C1C1E" stroke-width="0" stroke-linejoin="round"/>
-                  <path d="M13 2L24 8.5V17.5L13 24L2 17.5V8.5L13 2Z" fill="none" stroke="#1C1C1E" stroke-width="1.5" stroke-linejoin="round"/>
-                  <path d="M13 6L20 10V16L13 20L6 16V10L13 6Z" fill="white" opacity="0.15"/>
-                </svg>
-              </div>
-              <div class="work-logo-upload-hint">Upload<br>logo</div>
-              <input type="file" accept="image/*" onchange="applyLogoFromInput(this)" style="display:none">
-            </div>
-            <div class="work-info">
-              <div class="work-title" data-edit="true" contenteditable="false">Senior Product Designer</div>
-              <div class="work-sub">
-                <span data-edit="true" contenteditable="false">Figma</span>
-                <span data-edit="true" contenteditable="false">Jan 2022 – Present</span>
-                <span data-edit="true" contenteditable="false">Remote</span>
-              </div>
-              <div class="work-desc" data-edit="true" contenteditable="false">Led community & templates product. Collaborated with 12 PMs across 3 timezones. Shipped the redesigned community hub to 5M+ users.</div>
-            </div>
-            <button class="work-delete" onclick="deleteWork(this)" title="Remove">×</button>
-          </div>
-          <div class="work-item">
-            <div class="work-logo-wrap" onclick="triggerLogoUpload(this)">
-              <div class="work-logo-default work-diamond">
-                <svg width="26" height="26" viewBox="0 0 26 26" fill="none" xmlns="http://www.w3.org/2000/svg">
-                  <path d="M13 2L24 8.5V17.5L13 24L2 17.5V8.5L13 2Z" fill="#1A9E5B" stroke="#1A9E5B" stroke-width="0"/>
-                  <path d="M13 2L24 8.5V17.5L13 24L2 17.5V8.5L13 2Z" fill="none" stroke="#1A9E5B" stroke-width="1.5" stroke-linejoin="round"/>
-                  <path d="M13 6L20 10V16L13 20L6 16V10L13 6Z" fill="white" opacity="0.2"/>
-                </svg>
-              </div>
-              <div class="work-logo-upload-hint">Upload<br>logo</div>
-              <input type="file" accept="image/*" onchange="applyLogoFromInput(this)" style="display:none">
-            </div>
-            <div class="work-info">
-              <div class="work-title" data-edit="true" contenteditable="false">Lead Designer</div>
-              <div class="work-sub">
-                <span data-edit="true" contenteditable="false">Greenly</span>
-                <span data-edit="true" contenteditable="false">2020 – 2022</span>
-                <span data-edit="true" contenteditable="false">Paris / Remote</span>
-              </div>
-              <div class="work-desc" data-edit="true" contenteditable="false">0→1 product design for a B2B climate tech platform. Built the design system from scratch. Raised Series A during my time there.</div>
-            </div>
-            <button class="work-delete" onclick="deleteWork(this)" title="Remove">×</button>
-          </div>
-          <div class="work-item">
-            <div class="work-logo-wrap" onclick="triggerLogoUpload(this)">
-              <div class="work-logo-default work-diamond">
-                <svg width="26" height="26" viewBox="0 0 26 26" fill="none" xmlns="http://www.w3.org/2000/svg">
-                  <path d="M13 2L24 8.5V17.5L13 24L2 17.5V8.5L13 2Z" fill="#7C5CFC" stroke="#7C5CFC" stroke-width="0"/>
-                  <path d="M13 2L24 8.5V17.5L13 24L2 17.5V8.5L13 2Z" fill="none" stroke="#7C5CFC" stroke-width="1.5" stroke-linejoin="round"/>
-                  <path d="M13 6L20 10V16L13 20L6 16V10L13 6Z" fill="white" opacity="0.2"/>
-                </svg>
-              </div>
-              <div class="work-logo-upload-hint">Upload<br>logo</div>
-              <input type="file" accept="image/*" onchange="applyLogoFromInput(this)" style="display:none">
-            </div>
-            <div class="work-info">
-              <div class="work-title" data-edit="true" contenteditable="false">UI Designer</div>
-              <div class="work-sub">
-                <span data-edit="true" contenteditable="false">Shopify</span>
-                <span data-edit="true" contenteditable="false">2019 – 2020</span>
-                <span data-edit="true" contenteditable="false">Ottawa</span>
-              </div>
-              <div class="work-desc" data-edit="true" contenteditable="false">Contributed to Polaris design system. Reduced component inconsistencies by 60% across merchant-facing dashboards.</div>
-            </div>
-            <button class="work-delete" onclick="deleteWork(this)" title="Remove">×</button>
-          </div>
-        </div>
+        <div class="work-list" id="workList"></div>
       </div>
 
       <!-- Skills -->
@@ -3633,16 +3540,7 @@ body.empty-profile-mode #profileEmpty { display: flex !important; }
           Skills
           <button class="card-add-btn" onclick="addSkill()">+ Add skill</button>
         </div>
-        <div class="skills-wrap" id="skillsWrap">
-          <span class="skill-pill">Figma <button class="skill-remove" onclick="removeSkill(this)">×</button></span>
-          <span class="skill-pill">Design Systems <button class="skill-remove" onclick="removeSkill(this)">×</button></span>
-          <span class="skill-pill">User Research <button class="skill-remove" onclick="removeSkill(this)">×</button></span>
-          <span class="skill-pill">Prototyping <button class="skill-remove" onclick="removeSkill(this)">×</button></span>
-          <span class="skill-pill">Product Strategy <button class="skill-remove" onclick="removeSkill(this)">×</button></span>
-          <span class="skill-pill">Motion Design <button class="skill-remove" onclick="removeSkill(this)">×</button></span>
-          <span class="skill-pill">HTML / CSS <button class="skill-remove" onclick="removeSkill(this)">×</button></span>
-          <span class="skill-pill">Accessibility <button class="skill-remove" onclick="removeSkill(this)">×</button></span>
-        </div>
+        <div class="skills-wrap" id="skillsWrap"></div>
       </div>
 
       <!-- Posts — tabbed card (P1-011).
@@ -3655,7 +3553,7 @@ body.empty-profile-mode #profileEmpty { display: flex !important; }
              tab the viewer is on. -->
         <div class="profile-composer owner-only" style="margin-bottom:16px">
           <div class="composer-header">
-            <div class="composer-mini-avatar">MC</div>
+            <div class="composer-mini-avatar" id="composerMiniAvatar">?</div>
             <textarea class="composer-field" id="profilePostInput" placeholder="What are you working on? Use #hashtags for tags." rows="1" maxlength="2000" oninput="this.style.height='auto';this.style.height=Math.min(this.scrollHeight,180)+'px'"></textarea>
           </div>
           <!-- Optional post image — picked via toolbar, previewed inline -->
@@ -3703,55 +3601,8 @@ body.empty-profile-mode #profileEmpty { display: flex !important; }
             <div class="content-empty-body owner-mode-text" data-owner-text="Write something with the composer above to start." data-viewer-text="They haven't posted anything yet.">Write something with the composer above to start.</div>
           </div>
 
-          <!-- Posts list — own posts above, syndicated/drafted/vibe-only below.
-               Hardcoded for Maya; rebuilt from vibe_posts_v1 once user edits. -->
-          <div id="profilePostsList">
-          <div class="profile-post-card" data-post-id="p1" data-post-otto="syndicated">
-            <button class="ppost-pin owner-only" onclick="pinFromProfile('p1',this)" title="Pin to profile">Pin</button>
-            <button class="ppost-delete owner-only" onclick="deleteProfilePost(this)" title="Delete post">&times;</button>
-            <div class="ppost-header-row">
-              <div class="ppost-date" style="font-size:11px;font-weight:700;color:var(--muted);text-transform:uppercase;letter-spacing:.5px;">5 hours ago</div>
-              <span class="op-badge orange"><span class="op-badge-dot"></span>otto &middot; 3 platforms</span>
-            </div>
-            <div class="ppost-body">I care far more about whether a team has clear thinking than whether they use the right buzzwords. The best interviews feel like a real conversation &mdash; not a performance.</div>
-            <div class="ppost-tags"><span class="ppost-tag">#Hiring</span><span class="ppost-tag">#UX</span><span class="ppost-tag">#Career</span></div>
-            <div class="op-platform-stats">
-              <div class="op-ps"><div class="op-ps-tile" style="background:#0A66C2;"></div>LinkedIn &middot; <strong>124 views</strong></div>
-              <div class="op-ps"><div class="op-ps-tile" style="background:linear-gradient(135deg,#E1306C,#C13584);"></div>Instagram &middot; <strong>38 views</strong></div>
-              <div class="op-ps"><div class="op-ps-tile" style="background:#000;"></div>X &middot; <strong>12 views</strong></div>
-            </div>
-            <div class="ppost-reactions">
-              <div class="ppost-left"><span class="ppost-chip">&#128161; 891</span><span class="ppost-chip">&#129334; 128</span><span class="ppost-chip">&#128172; 34</span></div>
-            </div>
-          </div>
-
-          <div class="profile-post-card" data-post-id="p2" data-post-otto="drafted">
-            <button class="ppost-pin owner-only" onclick="pinFromProfile('p2',this)" title="Pin to profile">Pin</button>
-            <button class="ppost-delete owner-only" onclick="deleteProfilePost(this)" title="Delete post">&times;</button>
-            <div class="ppost-header-row">
-              <div class="ppost-date" style="font-size:11px;font-weight:700;color:var(--muted);text-transform:uppercase;letter-spacing:.5px;">Yesterday</div>
-              <span class="op-badge purple"><span class="op-badge-dot"></span>otto drafted &middot; review</span>
-            </div>
-            <div class="ppost-body"><strong>"Open to work" should explain what you actually want.</strong><br><br>Not just that you're available &mdash; what role, what stage, what type of team. Better signal gets better results.</div>
-            <div class="ppost-tags"><span class="ppost-tag">#OpenToWork</span><span class="ppost-tag">#Career</span></div>
-            <div class="ppost-reactions">
-              <div class="ppost-left"><span class="ppost-chip">&#128293; 1.1k</span><span class="ppost-chip">&#128161; 388</span><span class="ppost-chip">&#128172; 19</span></div>
-            </div>
-          </div>
-
-          <div class="profile-post-card" data-post-id="p3" data-post-otto="vibe-only">
-            <button class="ppost-pin owner-only" onclick="pinFromProfile('p3',this)" title="Pin to profile">Pin</button>
-            <button class="ppost-delete owner-only" onclick="deleteProfilePost(this)" title="Delete post">&times;</button>
-            <div class="ppost-header-row">
-              <div class="ppost-date" style="font-size:11px;font-weight:700;color:var(--muted);text-transform:uppercase;letter-spacing:.5px;">3 days ago</div>
-            </div>
-            <div class="ppost-body">Systems thinking is just noticing that everything has second-order effects. Once you start seeing it you can't stop. It makes you slower to act and better at acting.</div>
-            <div class="ppost-tags"><span class="ppost-tag">#ProductThinking</span><span class="ppost-tag">#Design</span></div>
-            <div class="ppost-reactions">
-              <div class="ppost-left"><span class="ppost-chip">&#129327; 644</span><span class="ppost-chip">&#128161; 221</span><span class="ppost-chip">&#128172; 41</span></div>
-            </div>
-          </div>
-          </div><!-- /profilePostsList -->
+          <!-- Posts list — rebuilt from vibe_posts_v1 / the API on load. -->
+          <div id="profilePostsList"></div><!-- /profilePostsList -->
 
         </div><!-- /posts-pane -->
 
@@ -3790,12 +3641,12 @@ body.empty-profile-mode #profileEmpty { display: flex !important; }
       <div class="recruiter-card-title" style="display:flex;align-items:center;gap:8px">
         <span class="rec-badge">PROFESSIONAL SNAPSHOT</span>
       </div>
-      <div class="rec-stat-row"><span class="rec-stat-label">Role</span><span class="rec-stat-val" data-edit="true" data-snapshot-key="role" data-placeholder="Add role" contenteditable="false">Product Designer</span></div>
-      <div class="rec-stat-row"><span class="rec-stat-label">Seniority</span><span class="rec-stat-val" data-edit="true" data-snapshot-key="seniority" data-placeholder="Add seniority" contenteditable="false">Senior (7 yrs)</span></div>
-      <div class="rec-stat-row"><span class="rec-stat-label">Location</span><span class="rec-stat-val" data-edit="true" data-snapshot-key="locationSnap" data-placeholder="Add location" contenteditable="false">San Francisco, CA</span></div>
-      <div class="rec-stat-row"><span class="rec-stat-label">Availability</span><span class="rec-stat-val" data-edit="true" data-snapshot-key="availability" data-placeholder="Add availability" contenteditable="false" style="color:#2ECC71">Open to roles ✓</span></div>
-      <div class="rec-stat-row"><span class="rec-stat-label">Preferred</span><span class="rec-stat-val" data-edit="true" data-snapshot-key="preferred" data-placeholder="Add preferences" contenteditable="false">Full-time / Remote</span></div>
-      <div class="rec-stat-row"><span class="rec-stat-label">Top skills</span><span class="rec-stat-val" data-edit="true" data-snapshot-key="topSkills" data-placeholder="Add top skills" contenteditable="false">Figma, Design Systems</span></div>
+      <div class="rec-stat-row"><span class="rec-stat-label">Role</span><span class="rec-stat-val" data-edit="true" data-snapshot-key="role" data-placeholder="Add role" contenteditable="false"></span></div>
+      <div class="rec-stat-row"><span class="rec-stat-label">Seniority</span><span class="rec-stat-val" data-edit="true" data-snapshot-key="seniority" data-placeholder="Add seniority" contenteditable="false"></span></div>
+      <div class="rec-stat-row"><span class="rec-stat-label">Location</span><span class="rec-stat-val" data-edit="true" data-snapshot-key="locationSnap" data-placeholder="Add location" contenteditable="false"></span></div>
+      <div class="rec-stat-row"><span class="rec-stat-label">Availability</span><span class="rec-stat-val" data-edit="true" data-snapshot-key="availability" data-placeholder="Add availability" contenteditable="false"></span></div>
+      <div class="rec-stat-row"><span class="rec-stat-label">Preferred</span><span class="rec-stat-val" data-edit="true" data-snapshot-key="preferred" data-placeholder="Add preferences" contenteditable="false"></span></div>
+      <div class="rec-stat-row"><span class="rec-stat-label">Top skills</span><span class="rec-stat-val" data-edit="true" data-snapshot-key="topSkills" data-placeholder="Add top skills" contenteditable="false"></span></div>
 
 
     </div>
@@ -3841,15 +3692,10 @@ body.empty-profile-mode #profileEmpty { display: flex !important; }
   <div class="stat-card-title" style="display:flex;align-items:center;justify-content:space-between">
     Currently working on <button class="card-add-btn" onclick="openCurrentModal()" style="font-size:11px;padding:3px 10px">+ Add</button>
   </div>
-  <div id="currentList" style="display:flex;flex-direction:column;gap:6px;margin-top:4px">
-    <div class="current-item"><span class="current-dot"></span><span class="current-text" data-edit="true" contenteditable="false">Designing a personal finance app for Gen Z</span><button class="current-delete owner-only" onclick="deleteCurrent(this)">×</button></div>
-    <div class="current-item"><span class="current-dot"></span><span class="current-text" data-edit="true" contenteditable="false">Reading Shape Up</span><button class="current-delete owner-only" onclick="deleteCurrent(this)">×</button></div>
-    <div class="current-item"><span class="current-dot"></span><span class="current-text" data-edit="true" contenteditable="false">Learning fermentation</span><button class="current-delete owner-only" onclick="deleteCurrent(this)">×</button></div>
-    <div class="current-item"><span class="current-dot"></span><span class="current-text" data-edit="true" contenteditable="false">Planning Seoul trip #4</span><button class="current-delete owner-only" onclick="deleteCurrent(this)">×</button></div>
-  </div>
+  <div id="currentList" style="display:flex;flex-direction:column;gap:6px;margin-top:4px"></div>
 </div>
-<!-- "People also viewed" removed — was hardcoded mock users with no real
-     data source. Will return when there's a real recommendation API. -->
+<!-- "People also viewed" removed — no real data source yet. Will return
+     when there's a real recommendation API. -->
 
 
 
@@ -3917,7 +3763,7 @@ body.empty-profile-mode #profileEmpty { display: flex !important; }
 
 
 <!-- Mutuals modal — body intentionally empty until there's a real
-     mutual-connections API. Hardcoded mock users were removed. -->
+     mutual-connections API. -->
 <div id="mutualsModal" style="display:none;position:fixed;inset:0;z-index:700;background:rgba(0,0,0,.48);align-items:center;justify-content:center;">
   <div class="modal" style="width:440px;max-height:72vh;display:flex;flex-direction:column;">
     <button class="modal-close" onclick="closeMutualsModal()">&#215;</button>
@@ -4098,7 +3944,7 @@ function toggleEdit(){
   // Belt-and-suspenders: viewer-mode CSS hides the Edit button, but the
   // function is still callable from the console / shortcuts. Block it
   // explicitly so editing someone else's profile is impossible.
-  if (window.viewingMockUser || window.viewingRealUser) return;
+  if (window.viewingRealUser) return;
   editMode = !editMode;
   document.body.classList.toggle('edit-mode', editMode);
   const btn = document.getElementById('editToggle');
@@ -5538,8 +5384,8 @@ if (sectionEls.length) {
 let profilePinnedId = null;
 
 function _currentUserIdentity() {
-  const name = (document.querySelector('[data-user-field="name"]')?.textContent || '').trim() || 'Maya Chen';
-  const headline = (document.querySelector('[data-user-field="headline"]')?.textContent || '').trim() || 'Product Designer · Figma';
+  const name = (document.querySelector('[data-user-field="name"]')?.textContent || '').trim() || '';
+  const headline = (document.querySelector('[data-user-field="headline"]')?.textContent || '').trim() || '';
   const initials = name.split(/\s+/).map(p => p[0]).filter(Boolean).join('').slice(0, 2).toUpperCase() || '?';
   const photo = document.querySelector('#avatarEl img.avatar-photo')?.src || '';
   return { name, headline, initials, photo };
@@ -5610,17 +5456,17 @@ function pinFromProfile(contentId, btn) {
   if (typeof saveProfileToStorage === 'function') saveProfileToStorage();
   if (typeof refreshPinButtons === 'function') refreshPinButtons();
   // Sync to server when this is a real user-driven action on a real
-  // post (UUID id). Demo / mock-user pins (p1, p2) skip the API.
+  // post (UUID id). Non-UUID pins skip the API.
   if (btn !== undefined) _syncPinToServer(contentId);
 }
 
 // PATCH /api/me/pinned with the new pin id (or null to unpin). Skipped
-// for demo/mock-user posts — they have non-UUID ids and aren't in the
+// for local-only posts — they have non-UUID ids and aren't in the
 // posts table. Best-effort: a transient failure shouldn't undo the
 // local pin since the user just clicked Pin.
 const _PIN_UUID_RE = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
 function _syncPinToServer(pinId) {
-  if (window.viewingMockUser || window.viewingRealUser) return;
+  if (window.viewingRealUser) return;
   if (!_isAppShell()) return;
   if (pinId !== null && !_PIN_UUID_RE.test(String(pinId || ''))) return;
   fetch('/api/me/pinned', {
@@ -5632,7 +5478,7 @@ function _syncPinToServer(pinId) {
 
 // Click handler for the pinned card — opens the shared post viewer
 // with a prefill so the modal paints instantly while the GET resolves.
-// Demo / mock-user posts (non-UUID ids like 'p1', 'v2') still open
+// Local-only posts (non-UUID ids) still open
 // the modal but skip the API fetch (the modal handles that gracefully).
 function _openPinnedItem(contentId) {
   if (typeof openPostViewer !== 'function') return;
@@ -5855,7 +5701,7 @@ if (document.readyState === 'loading') {
 
 // ── Publish post from profile ─────────────────────────────────────
 // Owner-only. Signed-in users (vibe_user_v1._appShell) hit Supabase via
-// /api/me/publish-post; demo Maya / mock-user views stay local-only.
+// /api/me/publish-post; sessions without an app shell stay local-only.
 // Hashtags inside the body double as the tags array — chip input is a
 // later polish (P1-017+ noted in journal v4.7).
 
@@ -5875,7 +5721,6 @@ function _extractHashtags(text) {
 }
 
 function _isAppShell() {
-  if (window.viewingMockUser) return false;
   const u = (typeof vibeLoad === 'function') ? vibeLoad('vibe_user_v1') : null;
   return Boolean(u && u._appShell);
 }
@@ -5929,8 +5774,7 @@ async function publishProfilePost() {
   const text = (input && input.value || '').trim();
   if (!text && !_composerPendingImageUrl) return;
 
-  // Demo / mock-user view stays on the local-only path so Maya keeps working
-  // until the demo flow is retired.
+  // Sessions without an app shell stay on the local-only path.
   if (!_isAppShell()) {
     _publishProfilePostLocal(text);
     return;
@@ -5963,8 +5807,8 @@ async function publishProfilePost() {
 }
 
 // Local rendering side-effect — used for both the Supabase success path and
-// the demo Maya fallback. `serverPost` is the row returned from the API when
-// signed in (carries the canonical id); omitted on the demo path.
+// the local-only fallback. `serverPost` is the row returned from the API when
+// signed in (carries the canonical id); omitted on the local-only path.
 function _publishProfilePostLocal(text, serverPost) {
   const list = document.getElementById('profilePostsList');
   const input = document.getElementById('profilePostInput');
@@ -6011,24 +5855,8 @@ const ICONS = {
   message: '<svg width="13" height="13" viewBox="0 0 13 13" fill="none" style="flex-shrink:0"><path d="M1 1.5A.5.5 0 011.5 1h10a.5.5 0 01.5.5v7a.5.5 0 01-.5.5H4.5L1 12V1.5z" stroke="white" stroke-width="1.4" fill="none" stroke-linejoin="round"/></svg>',
 };
 
-// Persist Connect/Follow state per slug so the relationship stays consistent
-// when the visitor navigates away and back. State map shape: { ka:'connected', ps:'pending', ... }
-function loadRelationship(slug) {
-  const all = vibeLoad('vibe_relationships_v1') || {};
-  const state = all[slug] || 'none';
-  softFollowing = state === 'following';
-  setVibeRelState(state);
-}
-function saveRelationship(slug, state) {
-  const all = vibeLoad('vibe_relationships_v1') || {};
-  if (!state || state === 'none') delete all[slug];
-  else all[slug] = state;
-  vibeSave('vibe_relationships_v1', all);
-}
-
 function setVibeRelState(state) {
   vibeRelState = state;
-  if (window.viewingMockUser) saveRelationship(window.viewingMockUser.slug, state);
   const btn  = document.getElementById('vibeConnectBtn');
   const soft = document.getElementById('vibeSoftFollow');
   const badge = document.getElementById('connectedBadge');
@@ -6071,7 +5899,7 @@ function setVibeRelState(state) {
 
     case 'following':
       // I follow them, they don't follow me back yet — render the same
-      // "Pending" affordance as the mock-user request flow. The button
+      // "Pending" affordance as the connection-request flow. The button
       // stays clickable so a second tap unfollows (handleVibConnect
       // routes the click to DELETE /api/me/follow when state is
       // 'following' or 'pending' on a real user).
@@ -6087,7 +5915,7 @@ function setVibeRelState(state) {
 }
 
 function _viewedName() {
-  return window.viewingRealUser?.name || window.viewingMockUser?.name || 'this person';
+  return window.viewingRealUser?.name || 'this person';
 }
 
 // ── Profile (...) menu: Block / Mute / Report (viewer-mode only) ────────
@@ -6243,8 +6071,8 @@ async function handleVibConnect() {
     return;
   }
 
-  // Demo / mock-user fallback — preserves the prototype's "request → 3s
-  // auto-accept" simulation so the static demo keeps feeling alive.
+  // Local-only fallback when no real user id is available (should not happen
+  // on a hydrated visited profile) — keeps the button responsive.
   if (vibeRelState === 'pending') return;
   setVibeRelState('pending');
   showToast(`Connection request sent to ${name}`);
@@ -6264,7 +6092,6 @@ async function handleSoftFollow() {
     soft.textContent = 'Following ✓';
     soft.classList.add('following');
     showToast(`Following ${name}`);
-    if (window.viewingMockUser) saveRelationship(window.viewingMockUser.slug, 'following');
     if (window.viewingRealUser && window.viewingRealUser.id) {
       try {
         await fetch('/api/me/follow', {
@@ -6278,7 +6105,6 @@ async function handleSoftFollow() {
     soft.textContent = 'Follow instead';
     soft.classList.remove('following');
     showToast('Unfollowed');
-    if (window.viewingMockUser) saveRelationship(window.viewingMockUser.slug, vibeRelState === 'connected' ? 'connected' : 'none');
     if (window.viewingRealUser && window.viewingRealUser.id) {
       try {
         await fetch('/api/me/follow', {
@@ -6297,18 +6123,15 @@ document.addEventListener('click', e => { const m=document.getElementById('mutua
 
 // Connect button visibility is now handled by .viewer-only CSS on the
 // wrapper (#profileActionBtns). The connection state is initialized by
-// loadRelationship() in the mock-user branch, or by setVibeRelState() with
-// the server-side follow state in the ?handle= branch.
+// setVibeRelState() with the server-side follow state in the ?handle= branch.
 //
 // P1-013 (live): handleVibConnect / handleSoftFollow above route through
-// POST/DELETE /api/me/follow when window.viewingRealUser.id is set. The
-// localStorage-backed mock-user demo path stays in place as a fallback so
-// the static prototype keeps working without a Supabase session.
+// POST/DELETE /api/me/follow when window.viewingRealUser.id is set.
 
 
 // ── Profile search (reuses same people data pattern) ──
-// Static demo people + companies removed — search now shows live results
-// from /api/users/search only, plus the recently-searched list.
+// Search shows live results from /api/users/search only, plus the
+// recently-searched list.
 var PROF_SEARCH_DATA = [];
 
 // Debounced typeahead against /api/users/search — live results only,
@@ -6848,16 +6671,17 @@ document.addEventListener('DOMContentLoaded', function() {
 // ══ END CALENDAR SYNC ════════════════════════════════════════════════════
 
 // ══ PROFILE PAGE INIT (uses shared _persistence.js) ══════════════════════
-// vibeInit() handles ?clear=1 / ?demo=1 URL params and returns the user.
+// vibeInit() handles the ?clear=1 URL param and returns the user.
 // States:
-//   1. No user → empty-state UI (Otto invitation pre-onboarding)
-//   2. Demo Maya → hydrate identity, swap top-nav button to "Exit demo"
-//   3. Onboarded real user → wipe demo content on every load (until those
-//      sections get their own persistence), top-nav button becomes "Exit",
-//      first-time-only welcome banner + auto-edit mode while name is empty
-// Tracks the mock user being viewed (null when on own profile). Used by
+//   1. ?handle=<h> → viewer mode: fetch /api/users/<h>/bootstrap and paint
+//      (signed-in users and anonymous share-link visitors alike)
+//   2. No localStorage user → loading/recovery state; re-bootstraps from
+//      /api/me/profile-bootstrap when the server still has a session
+//   3. Onboarded owner → wipe the static placeholder markup on every load,
+//      hydrate from vibe_user_v1 + the API, first-time-only welcome banner
+//      + auto-edit mode while name is empty
+// Tracks the real user being viewed (null when on own profile). Used by
 // pinFromProfile / saveProfileToStorage to short-circuit owner-only ops.
-window.viewingMockUser = null;
 window.viewingRealUser = null;
 
 // NOTE: the helpers below (_DRAG_HANDLE_HTML, _sortWorkExperienceByRecency,
@@ -7064,7 +6888,7 @@ function _hydrateCampusPicker(user) {
   if (sel) sel.value = label;
   // On someone else's profile there's no picker and no owner to prompt,
   // so an empty campus is just noise — drop the whole chip.
-  const isVisitor = !!(window.viewingMockUser || window.viewingRealUser);
+  const isVisitor = !!window.viewingRealUser;
   if (item) item.style.display = (isVisitor && !label) ? 'none' : '';
   const hint = document.querySelector('.meta-campus-hint');
   if (hint && isVisitor) hint.style.display = 'none';
@@ -7092,49 +6916,7 @@ function _onCampusChange() {
 
 (function initProfilePage(){
   const params = new URLSearchParams(location.search);
-  const viewingSlug = params.get('user');
-  let viewingHandle = (params.get('handle') || '').trim().toLowerCase();
-  const mockUser = viewingSlug && window.VIBE_MOCK_USERS && window.VIBE_MOCK_USERS[viewingSlug];
-  // Old unsigned rewrite put the live handle in ?user=, which is the
-  // mock-user slot. If that slug isn't a demo character, treat it as a
-  // real handle so we never fall through to Maya Chen's hardcoded markup.
-  if (!viewingHandle && viewingSlug && !mockUser) {
-    viewingHandle = viewingSlug.trim().toLowerCase();
-  }
-
-  // ── Branch A: viewing someone else's profile (mock user) ─────────────
-  if (mockUser) {
-    window.viewingMockUser = mockUser;
-    document.body.classList.add('viewer-mode');
-    document.body.classList.remove('owner-mode');
-
-    // Hide the top-nav owner button entirely
-    const navBtn = document.getElementById('profileShareBtn');
-    if (navBtn) navBtn.style.display = 'none';
-
-    hydrateProfileFields(mockUser);
-    document.title = (mockUser.name || viewingSlug) + ' · Vibe';
-
-    // Mock users always have full data, so we wipe Maya's hardcoded markup
-    // first (same wipe used for fresh-onboarded users), then renderUserSections
-    // injects everything from the mock object — bio, work, skills, posts, vibes.
-    clearFreshUserExtras();
-    renderUserSections(mockUser);
-
-    // Restore the saved Connect/Follow state for this person, if any
-    if (typeof loadRelationship === 'function') loadRelationship(viewingSlug);
-
-    // Floating banner so visitors can get back to their own profile
-    showViewerBackBanner(mockUser.name);
-
-    // Render student badge for the mock user (no edit affordance in viewer mode)
-    renderStudentBadge(mockUser, /*isOwn=*/false);
-
-    requestAnimationFrame(() => {
-      document.documentElement.classList.remove('vibe-pre-paint');
-    });
-    return;
-  }
+  const viewingHandle = (params.get('handle') || params.get('user') || '').trim().toLowerCase();
 
   // ── Branch A2: viewing a real Supabase user via /profile/<handle> ─────
   // /profile/<handle> route redirects here with ?handle=<handle>. We fetch
@@ -7145,8 +6927,6 @@ function _onCampusChange() {
     document.body.classList.add('viewer-mode');
     document.body.classList.remove('owner-mode');
     document.title = '@' + viewingHandle + ' · Vibe';
-    const navBtn = document.getElementById('profileShareBtn');
-    if (navBtn) navBtn.style.display = 'none';
     clearFreshUserExtras();
 
     fetch(`/api/users/${encodeURIComponent(viewingHandle)}/bootstrap`, { credentials: 'include' })
@@ -7223,10 +7003,19 @@ function _onCampusChange() {
     // the empty state.
     document.body.classList.add('empty-profile-mode');
     document.documentElement.classList.remove('vibe-pre-paint');
+    const _emptyFail = () => { const t = document.getElementById('profileEmptyTitle'), l = document.getElementById('profileEmptyLine'), a = document.getElementById('profileEmptyActions'); if (t) t.innerHTML = "we couldn't load <em>your profile.</em>"; if (l) l.textContent = '"sign in again and I\'ll bring it right back."'; if (a) a.style.display = 'flex'; };
     fetch('/api/me/profile-bootstrap', { credentials: 'include' })
-      .then(r => r.ok ? r.json() : null)
+      .then(r => {
+        if (r.status === 401) { window.location.replace('/auth/login?next=%2Fprofile'); return { _redirecting: true }; }
+        // Consent gate: a signed-in user with no terms record. The sidebar
+        // hydrator that normally catches this bails on empty localStorage,
+        // so handle it here the same way.
+        if (r.status === 403) { window.location.replace('/auth/terms?next=%2Fprofile'); return { _redirecting: true }; }
+        return r.ok ? r.json() : null;
+      })
       .then(j => {
-        if (!j || !j.ok || !j.vibeUser) return;
+        if (j && j._redirecting) return;
+        if (!j || !j.ok || !j.vibeUser) { _emptyFail(); return; }
         const nu = Object.assign({}, j.vibeUser);
         nu._appShell = true;
         // Top-level on the bootstrap, not inside vibeUser — carry it over
@@ -7238,48 +7027,26 @@ function _onCampusChange() {
         url.searchParams.delete('clear');
         window.location.replace(url.toString());
       })
-      .catch(() => {});
+      .catch(_emptyFail);
     return;
-  }
-
-  // Top-nav button: drops the "Share profile" pill in favor of an exit/reset.
-  // Both demo and onboarded users get a one-click way back to landing.
-  const navBtn = document.getElementById('profileShareBtn');
-  if (navBtn) {
-    if (user._appShell) {
-      navBtn.textContent = 'Back';
-      navBtn.title = 'Return to campus';
-      navBtn.onclick = () => { window.location.href = '/campus'; };
-    } else if (user._isDemo) {
-      navBtn.textContent = 'Exit demo';
-      navBtn.title = 'Clear demo data and return to landing';
-      navBtn.onclick = exitDemoMode;
-    } else if (user._onboarded) {
-      navBtn.textContent = 'Exit';
-      navBtn.title = 'Clear your data and return to landing';
-      navBtn.onclick = exitDemoMode;
-    } else {
-      navBtn.style.display = 'none';
-    }
   }
 
   hydrateProfileFields(user);
   if (user.name) document.title = user.name + ' · Vibe';
 
-  // Onboarded users: wipe demo content on load, THEN inject anything they've
-  // already saved. Without this, hardcoded Maya markup re-appears on reload.
-  if (user._onboarded && !user._isDemo) {
+  // Onboarded users: wipe the static placeholder markup on load, THEN inject
+  // anything they've already saved.
+  if (user._onboarded) {
     document.body.classList.add('fresh-onboarded');
     clearFreshUserExtras();
   }
 
   // Hydrate persisted sections from user object (bio, tags, skills, work,
-  // currentlyOn, avatar). Skips fields user hasn't saved — keeps demo
-  // Maya's hardcoded markup intact for sections she's never touched.
+  // currentlyOn, avatar). Skips fields the user hasn't saved.
   renderUserSections(user);
 
   // App-shell users: pull real DB posts on top of whatever localStorage
-  // hydrated. Demo Maya stays on the hardcoded path.
+  // hydrated.
   if (user._appShell) {
     hydrateProfilePostsFromAPI();
     // One-shot backfill: push localStorage state that never made it to
@@ -7370,7 +7137,7 @@ function _onCampusChange() {
 // ── Student badge ────────────────────────────────────────────────────────
 // Renders next to the profile name. On own profile: shows the verified badge
 // when verified, or a small "+ Verify your student status" CTA otherwise.
-// On mock-user views: only the verified badge is rendered, never the CTA.
+// On visited profiles: only the verified badge is rendered, never the CTA.
 function renderStudentBadge(userObj, isOwn) {
   const slot = document.getElementById('studentBadgeSlot');
   if (!slot) return;
@@ -7383,33 +7150,21 @@ function renderStudentBadge(userObj, isOwn) {
     slot.innerHTML = `<span class="sb-cap">🎓</span><span>Student · <span class="sb-school">${verification.school.replace(/[<>]/g,'')}</span></span>`;
     return;
   }
-  if (isOwn && !window.viewingMockUser) {
+  if (isOwn) {
     // Inject "+ Verify" CTA inline (uses a sibling button so the badge slot
     // stays empty and the .visible toggle is purely about the verified badge)
-    let cta = document.getElementById('studentVerifyCta');
+    let cta = document.getElementById('verifyStudentCta');
     if (!cta) {
       cta = document.createElement('button');
-      cta.id = 'studentVerifyCta';
+      cta.id = 'verifyStudentCta';
       cta.className = 'student-verify-cta';
       cta.innerHTML = '<span style="font-size:13px;line-height:1;">🎓</span> Verify your student status';
-      cta.onclick = () => window.studentVerify?.open();
+      cta.onclick = () => { window.location.href = '/auth/school-email'; };
       slot.parentNode.appendChild(cta);
     }
   }
 }
 
-// Re-render the badge live when verification completes from the modal.
-document.addEventListener('vibeStudentVerified', () => {
-  if (window.viewingMockUser || window.viewingRealUser) return;
-  const u = (typeof vibeLoad === 'function') ? vibeLoad('vibe_user_v1') : null;
-  if (!u) return;
-  // Drop the CTA if present — it gets re-added if user is unverified
-  document.getElementById('studentVerifyCta')?.remove();
-  renderStudentBadge(u, /*isOwn=*/true);
-});
-
-// Floating "Viewing Kwame · Back to your profile" pill, shown only when
-// viewing a mock user. Stays out of edit chrome's way (top center, below nav).
 // Block-aware visitor screen. Replaces the entire .profile-wrap with a
 // minimal card and routes between two flavors:
 //   _blockedByTarget  → "Profile unavailable" (no Unblock; we don't leak
@@ -7593,7 +7348,7 @@ function _urlFromCssBackgroundImage(bgImg) {
 function saveProfileToStorage() {
   // Never write when viewing someone else's profile — the DOM is showing
   // their data and capturing it would overwrite the owner's vibe_user_v1.
-  if (window.viewingMockUser || window.viewingRealUser) return;
+  if (window.viewingRealUser) return;
   const user = vibeLoad('vibe_user_v1') || {};
 
   // Identity fields (data-user-field on each)
@@ -7746,7 +7501,7 @@ function saveProfileToStorage() {
 // would otherwise hit a TDZ ReferenceError and blank the page.
 var profileServerSyncTimer = null;
 function scheduleProfileServerSync() {
-  if (window.viewingMockUser || window.viewingRealUser) return;
+  if (window.viewingRealUser) return;
   const u = (typeof vibeLoad === 'function') ? vibeLoad('vibe_user_v1') : null;
   if (!u || !u._appShell) return;
   clearTimeout(profileServerSyncTimer);
@@ -8068,7 +7823,7 @@ function _adoptServerMediaRefs(serverUser, sent) {
 }
 
 async function flushProfileServerSync() {
-  if (window.viewingMockUser || window.viewingRealUser) return;
+  if (window.viewingRealUser) return;
   const u = (typeof vibeLoad === 'function') ? vibeLoad('vibe_user_v1') : null;
   if (!u || !u._appShell) return;
   // Convert any pre-fix data: URI logos to real uploads before we build
@@ -8154,9 +7909,9 @@ async function flushProfileServerSync() {
 // as {id, date, body, tagsHTML, ottoBadgeHTML, platformStatsHTML, reactionsHTML}.
 // We store rendered HTML fragments rather than parsing back to structured data
 // because post markup varies (otto badges, platform stats, reactions all
-// optional) and the demo doesn't yet need to reason about post content.
+// optional) and nothing yet needs to reason about post content.
 function savePostsToStorage() {
-  if (window.viewingMockUser || window.viewingRealUser) return;
+  if (window.viewingRealUser) return;
   const list = document.getElementById('profilePostsList');
   if (!list) return;
   const posts = Array.from(list.querySelectorAll('.profile-post-card')).map(card => ({
@@ -8172,8 +7927,8 @@ function savePostsToStorage() {
   vibeSave('vibe_posts_v1', posts);
 }
 
-// Pass an explicit posts array when rendering someone else's profile
-// (mock user). Otherwise loads the owner's posts from localStorage.
+// Pass an explicit posts array when rendering someone else's profile.
+// Otherwise loads the owner's posts from localStorage.
 function renderPostsFromStorage(postsOverride) {
   const list = document.getElementById('profilePostsList');
   const posts = Array.isArray(postsOverride) ? postsOverride : vibeLoad('vibe_posts_v1');
@@ -8184,8 +7939,7 @@ function renderPostsFromStorage(postsOverride) {
 
 // Pull real own-posts from Supabase and render them in #profilePostsList.
 // Replaces whatever localStorage hydrated so the DB is the source of truth
-// for app-shell users — demo Maya / mock-user views still use localStorage
-// or the user.posts override path.
+// for app-shell users; visited profiles use the user.posts override path.
 // Try to render the pin slot for a given post id. Looks the source
 // post card up in the DOM — if it doesn't exist yet (mid-hydration),
 // bails silently. Caller re-runs us after each hydrate so the pin
@@ -8202,14 +7956,14 @@ function _restorePinIfPossible(pinnedId) {
 }
 
 async function hydrateProfilePostsFromAPI() {
-  if (window.viewingMockUser || window.viewingRealUser) return;
+  if (window.viewingRealUser) return;
   try {
     const r = await fetch('/api/me/posts?limit=100', { credentials: 'include' });
     const j = await r.json().catch(() => ({}));
     if (!r.ok || !j.ok || !Array.isArray(j.posts)) return;
     const postRows = j.posts.filter(p => p.type === 'post');
 
-    // Posts pane — clear hardcoded Maya + any localStorage-rendered cards
+    // Posts pane — clear any localStorage-rendered cards
     // and replace with the DB truth. Mirror the shape into vibe_posts_v1
     // so subsequent saves don't snapshot stale local DOM.
     const list = document.getElementById('profilePostsList');
@@ -8295,11 +8049,10 @@ function _formatRelativeDate(iso) {
 // Lazy-hydrate on first tab visit. Visible on every profile, not just
 // the owner — reposts are public. Resolves the target handle from
 // `window.viewingRealUser` (visiting another user) or from
-// `vibe_user_v1` (own profile). Mock profile views skip cleanly.
+// `vibe_user_v1` (own profile).
 let _repostsHydrateInflight = false;
 let _repostsHydratedOnce = false;
 async function hydrateRepostsPaneFromAPI() {
-  if (window.viewingMockUser) return;
   if (_repostsHydrateInflight || _repostsHydratedOnce) return;
 
   const handle = window.viewingRealUser
@@ -8415,7 +8168,7 @@ function _buildRepostCard(repost) {
 let _savedHydrateInflight = false;
 let _savedHydratedOnce = false;
 async function hydrateSavedPaneFromAPI() {
-  if (window.viewingMockUser || window.viewingRealUser) return;
+  if (window.viewingRealUser) return;
   if (_savedHydrateInflight) return;
   const me = (typeof vibeLoad === 'function') ? vibeLoad('vibe_user_v1') : null;
   if (!me || !me._appShell) return;
@@ -8566,8 +8319,7 @@ function deleteProfilePost(btn) {
 }
 
 // ── Hydrate persisted sections from vibe_user_v1 ─────────────────────────
-// Skips any field user hasn't saved — keeps demo Maya's hardcoded markup
-// intact for sections she's never touched.
+// Skips any field the user hasn't saved.
 function renderUserSections(user) {
   // @handle display: under the name. Stash the cooldown timestamp so
   // _toggleProfileHandleEdit can disable the input when the user just
@@ -8584,12 +8336,12 @@ function renderUserSections(user) {
   }
   // Avatar fallback: initials derived from user.name (or "?" if blank).
   // Photo upload overrides this visually.
+  const initials = (user.name || '').split(/\s+/)
+    .map(p => p[0]).filter(Boolean).join('').slice(0, 2).toUpperCase() || '?';
   const avEl = document.getElementById('avatarEmoji');
-  if (avEl) {
-    const initials = (user.name || '').split(/\s+/)
-      .map(p => p[0]).filter(Boolean).join('').slice(0, 2).toUpperCase() || '?';
-    avEl.textContent = initials;
-  }
+  if (avEl) avEl.textContent = initials;
+  const cm = document.getElementById('composerMiniAvatar');
+  if (cm) cm.textContent = initials;
   if (user.avatarPhoto && typeof applyAvatarPhoto === 'function') {
     applyAvatarPhoto(user.avatarPhoto);
   }
@@ -8748,10 +8500,8 @@ function renderUserSections(user) {
     if (sg && typeof user.counts.following === 'string')   sg.textContent = user.counts.following;
   }
 
-  // Posts — if the user object carries an inline array (mock users for
-  // viewer-mode), render that. Otherwise load from vibe_posts_v1. No-ops
-  // when neither source has data, keeping Maya's hardcoded markup intact
-  // until she edits/publishes/deletes something.
+  // Posts — if the user object carries an inline array (viewer-mode), render
+  // that. Otherwise load from vibe_posts_v1. No-ops when neither has data.
   if (typeof renderPostsFromStorage === 'function') {
     renderPostsFromStorage(Array.isArray(user.posts) ? user.posts : undefined);
   }
@@ -8784,12 +8534,14 @@ document.addEventListener('input', e => {
       const initials = (e.target.textContent || '').split(/\s+/)
         .map(p => p[0]).filter(Boolean).join('').slice(0, 2).toUpperCase() || '?';
       av.textContent = initials;
+      const cm = document.getElementById('composerMiniAvatar');
+      if (cm) cm.textContent = initials;
     }
   }
 });
 
 // ── Fresh-onboarded UX helpers ───────────────────────────────────────────
-// Wipes every demo section so the page reads as a fresh canvas waiting for
+// Wipes every static placeholder section so the page reads as a fresh canvas waiting for
 // input. Edit-mode "+ Add" buttons stay visible, so the user has obvious
 // next steps in every section.
 function clearFreshUserExtras() {
@@ -8817,13 +8569,7 @@ function clearFreshUserExtras() {
   const skillsWrap = document.getElementById('skillsWrap');
   if (skillsWrap) skillsWrap.querySelectorAll('.skill-pill').forEach(p => p.remove());
 
-  // ── "Relevant Skills" mini-strip below the subnav ────────────────────
-  // Hidden (not removed) for onboarded users — the strip will get rewired
-  // during the viewer-mode pass, likely deriving from user.snapshot.topSkills.
-  const relevantStrip = document.getElementById('relevantSkillsStrip');
-  if (relevantStrip) relevantStrip.style.display = 'none';
-
-  // ── Posts (all 3 hardcoded post cards in main posts pane + split pane)
+  // ── Posts: drop any rendered post cards
   document.querySelectorAll('.profile-post-card').forEach(p => p.remove());
 
   // ── Currently working on items ───────────────────────────────────────
@@ -8846,7 +8592,7 @@ function clearFreshUserExtras() {
     }
   });
 
-  // ── Connect-with-Maya CTA in the at-a-glance card ────────────────────
+  // ── Connect CTA in the at-a-glance card ──────────────────────────────
   const connectFull = document.querySelector('.connect-full');
   if (connectFull) connectFull.style.display = 'none';
 
@@ -8887,8 +8633,7 @@ function showWelcomeBanner() {
   if (!document.getElementById('freshWelcomeStyle')) {
     const s = document.createElement('style');
     s.id = 'freshWelcomeStyle';
-    s.textContent = `@keyframes freshWelcomeIn { from { opacity: 0; transform: translate(-50%, -8px); } to { opacity: 1; transform: translate(-50%, 0); } }
-      [data-user-field][contenteditable="true"]:empty::before { content: attr(data-placeholder); color: var(--muted); font-style: italic; opacity: .7; }`;
+    s.textContent = `@keyframes freshWelcomeIn { from { opacity: 0; transform: translate(-50%, -8px); } to { opacity: 1; transform: translate(-50%, 0); } }`;
     document.head.appendChild(s);
   }
   document.body.appendChild(banner);
@@ -9284,13 +9029,6 @@ function showWelcomeBanner() {
           name: window.viewingRealUser.name || ('@' + window.viewingRealUser.handle),
         };
       }
-      // Mock user (demo)
-      if (window.viewingMockUser && window.viewingMockUser.handle) {
-        return {
-          handle: window.viewingMockUser.handle,
-          name: window.viewingMockUser.name || ('@' + window.viewingMockUser.handle),
-        };
-      }
       // Own profile — pull from vibe_user_v1
       const me = (typeof vibeLoad === 'function') ? vibeLoad('vibe_user_v1') : null;
       if (me && me.handle) {
@@ -9374,7 +9112,7 @@ function showWelcomeBanner() {
     async function sendShareTo(handle, userId, btn) {
       if (!handle || !shareTarget) return;
       const url = profileUrlFor(shareTarget.handle);
-      const body = window.viewingRealUser || window.viewingMockUser
+      const body = window.viewingRealUser
         ? `Check out ${shareTarget.name}'s profile on Vibe → ${url}`
         : `Here's my profile on Vibe → ${url}`;
       btn.disabled = true;
@@ -9444,7 +9182,7 @@ function showWelcomeBanner() {
       const modal = document.getElementById('shareProfileModal');
       if (!modal) return;
       // Header label: "your profile" vs the target's name
-      const isOwn = !window.viewingRealUser && !window.viewingMockUser;
+      const isOwn = !window.viewingRealUser;
       document.getElementById('shareProfileName').textContent =
         isOwn ? 'Your profile' : target.name;
       document.getElementById('shareLinkInput').value = profileUrlFor(target.handle);
@@ -9515,10 +9253,6 @@ function showWelcomeBanner() {
       // Visiting someone via /profile/<handle> → window.viewingRealUser is set
       if (window.viewingRealUser && window.viewingRealUser.handle) {
         return window.viewingRealUser.handle;
-      }
-      // Mock-user view
-      if (window.viewingMockUser && window.viewingMockUser.handle) {
-        return window.viewingMockUser.handle;
       }
       return null; // own profile
     }

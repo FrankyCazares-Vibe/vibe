@@ -5,7 +5,7 @@
 // Add new keys to VIBE_KEYS as we touch each page. Schema grows incrementally.
 //
 // Each page should call vibeInit() near the top of its inline <script>, then
-// branch on the returned user object (null → empty state, _isDemo → swap UI).
+// branch on the returned user object (null → empty state / bounce, object → hydrate).
 // ══════════════════════════════════════════════════════════════════════════
 
 const VIBE_KEYS = {
@@ -27,39 +27,12 @@ function vibeSave(key, val) {
 function vibeClear(key) { try { localStorage.removeItem(key); } catch(e) {} }
 function vibeClearAll() { Object.values(VIBE_KEYS).forEach(vibeClear); }
 
-// ── Demo seed ─────────────────────────────────────────────────────────────
-// Populates Maya Chen across keys so the demo site feels real on every page.
-// Triggered from the landing page "View demo site" button OR ?demo=1 URL param.
-function seedDemoData() {
-  vibeSave(VIBE_KEYS.user, {
-    name:     "Maya Chen",
-    tagline:  "I make things feel right before they look right.",
-    headline: "Senior Product Designer · Figma",
-    location: "Seoul → SF",
-    vibeTags: ["Product Design", "Systems thinker", "Quiet collaborator", "Calm UI"],
-    _isDemo:  true
-  });
-  // Don't seed posts/vibes — Maya's hardcoded markup stays as the demo source
-  // until she edits it, at which point savePostsToStorage / saveVibesToStorage
-  // captures the DOM and the keys become authoritative. Same pattern as
-  // workExperience and vibeTags above (vibeTags here only because it's
-  // simpler to seed than walk markup).
-  // Future keys (connections, messages, etc.) seeded as those pages adopt.
-}
-
-// ── Exit demo → back to landing ───────────────────────────────────────────
-function exitDemoMode() {
-  vibeClearAll();
-  window.location.href = '/';
-}
-
 // ── Per-page init entry point ─────────────────────────────────────────────
-// Handles ?clear=1 and ?demo=1 URL params, returns the current user (or null).
+// Handles ?clear=1 and ?embedded=1 URL params, returns the current user (or null).
 // Pages call this first, then run their own page-specific init logic.
 function vibeInit() {
   const params = new URLSearchParams(location.search);
   if (params.get('clear') === '1') vibeClearAll();
-  if (params.get('demo')  === '1' && !vibeLoad(VIBE_KEYS.user)) seedDemoData();
   if (params.get('embedded') === '1') {
     // Set the marker class as soon as possible; if body isn't ready yet,
     // wait for it. CSS rules gated on `body.vibe-embedded` then suppress
@@ -98,53 +71,11 @@ window.__vibeTopReplaceState = function(state, title, url) {
   window.history.replaceState(state, title, url);
 };
 
-// ── Floating "demo mode · exit" pill ──────────────────────────────────────
-// Optional UI helper for pages that don't have a natural inline place to put
-// a demo-exit affordance (everything except profile.html, which has the
-// "Exit demo profile" button in its top nav). Idempotent — safe to call twice.
-function vibeShowDemoPill() {
-  if (document.getElementById('vibeDemoExitPill')) return;
-
-  const style = document.createElement('style');
-  style.textContent = `
-    #vibeDemoExitPill {
-      position: fixed; top: 18px; right: 24px; z-index: 90;
-      background: #1C1C1E; color: white;
-      border: none; border-radius: 100px;
-      padding: 9px 16px 9px 14px; font-family: 'DM Sans', sans-serif;
-      font-size: 12px; font-weight: 600; letter-spacing: .2px;
-      cursor: none; display: inline-flex; align-items: center; gap: 9px;
-      box-shadow: 0 6px 18px rgba(0,0,0,.18);
-      transition: background .18s, transform .18s;
-    }
-    #vibeDemoExitPill:hover { background: #FF5C35; transform: translateY(-1px); }
-    #vibeDemoExitPill .vibe-demo-dot {
-      width: 6px; height: 6px; border-radius: 50%;
-      background: #FF5C35;
-      box-shadow: 0 0 8px rgba(255,92,53,.8);
-      animation: vibeDemoPulse 2s ease-in-out infinite;
-    }
-    #vibeDemoExitPill:hover .vibe-demo-dot { background: white; box-shadow: none; }
-    @keyframes vibeDemoPulse {
-      0%,100% { transform: scale(1); opacity: 1; }
-      50% { transform: scale(1.25); opacity: .8; }
-    }
-  `;
-  document.head.appendChild(style);
-
-  const btn = document.createElement('button');
-  btn.id = 'vibeDemoExitPill';
-  btn.innerHTML = '<span class="vibe-demo-dot"></span> Demo mode · Exit';
-  btn.onclick = exitDemoMode;
-  document.body.appendChild(btn);
-}
-
 // ── Pre-paint guard for sidebar identity ──────────────────────────────────
 // _persistence.js loads synchronously in <head>, before any body content.
-// We add an html class + inject CSS so the hardcoded "Maya Chen / MC" in
-// every page's sidebar profile chip stays invisible until vibeHydrateSidebar
-// runs at DOMContentLoaded. Without this, every page nav flashes Maya for
-// a frame before the user's real identity paints.
+// When a cached user exists we hide the static sidebar profile chip until
+// vibeHydrateSidebar repaints it at DOMContentLoaded, so the placeholder
+// never flashes before the real identity. With no cached user we do nothing.
 (function vibePrePaintSidebar() {
   try {
     const raw = localStorage.getItem(VIBE_KEYS.user);
@@ -168,7 +99,7 @@ function vibeShowDemoPill() {
 })();
 
 // ── Sidebar identity hydration (auto-runs on every page) ──────────────────
-// Replaces the static demo chip with the rich card layout (banner + avatar +
+// Replaces the static placeholder chip with the rich card layout (banner + avatar +
 // name + clamped 2-line subtitle) — same visual as React NavIdentityChip.
 // Paints instantly from localStorage, then refreshes from /api/me/profile-
 // bootstrap and repaints so cover/headline updates show up even on pages
@@ -192,11 +123,11 @@ function _vibePaintSidebarChips(user) {
   if (!user) return;
   const initials = (user.name || '').split(/\s+/)
     .map(p => p[0]).filter(Boolean).join('').slice(0, 2).toUpperCase() || '?';
-  const name = user.name || (user._onboarded ? 'Your name' : 'Maya Chen');
+  const name = user.name || 'Your name';
   const headline = (user.headline || '').trim();
   const tagline = (user.tagline || '').trim();
   const subtitle = headline || tagline
-    || (user._onboarded && !user.name ? 'Set up your profile' : 'My profile');
+    || (!user.name ? 'Set up your profile' : 'My profile');
   const banner = _vibeBannerCss(user);
   const avatarInner = user.avatarPhoto && /^(data|blob|https?):/.test(user.avatarPhoto)
     ? '<img src="' + _vibeEsc(user.avatarPhoto) + '" style="width:100%;height:100%;object-fit:cover;border-radius:inherit;display:block;">'
@@ -235,8 +166,7 @@ function vibeHydrateSidebar() {
   // Truth path: refresh from the server so cover/headline updates show up
   // even when localStorage is stale (e.g., user updated their banner from
   // profile.html and then navigated to /messages without round-tripping
-  // through ProfileHtmlBridge again). Demo users skip this.
-  if (cached._isDemo) return;
+  // through ProfileHtmlBridge again).
   fetch('/api/me/profile-bootstrap', { credentials: 'include' })
     .then(async r => {
       // Consent gate (S53 A4): the static ?app=1 shells have no server page
@@ -269,10 +199,7 @@ window.vibePersist = {
   save:             vibeSave,
   clear:            vibeClear,
   clearAll:         vibeClearAll,
-  seedDemoData:     seedDemoData,
-  exitDemoMode:     exitDemoMode,
   init:             vibeInit,
-  showDemoPill:     vibeShowDemoPill,
   hydrateSidebar:   vibeHydrateSidebar,
   KEYS:             VIBE_KEYS
 };
