@@ -17,8 +17,7 @@
 //     find-or-create a 1:1 dm and jump straight to that chat
 //   window.closeMiniMessenger()
 //
-// Self-injects on DOMContentLoaded if running in app shell. Skips itself
-// on /messages and inside the /messages or /otto iframe to avoid stacking.
+// Self-injects on DOMContentLoaded. Skips itself on /messages (and inside the /messages iframe) to avoid stacking.
 // ══════════════════════════════════════════════════════════════════════════
 (function vibeMiniMessengerInit() {
   if (window.__vibeMiniMessengerInjected) return;
@@ -30,7 +29,6 @@
     try {
       const path = location.pathname || "";
       if (path.startsWith("/html/messages.html")) return true;
-      if (path.startsWith("/html/otto.html")) return true;
       // /messages inside CampusAppShell loads messages.html in an iframe;
       // the iframe-internal check above catches that. The parent
       // React route never includes us anyway.

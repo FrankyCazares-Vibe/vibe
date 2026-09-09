@@ -8,8 +8,8 @@
 // Self-contained: hardcodes design-system colors instead of relying on each
 // page's CSS variables, so the modal looks identical wherever it opens.
 //
-// Demo Maya / mock-user views: modal still opens but Like/Save/Comment
-// surface a "Sign in to interact" toast instead of hitting the API.
+// Unsigned visitors (share links): modal still opens but Like/Save/Comment
+// surface a "Sign in" toast instead of hitting the API.
 // ══════════════════════════════════════════════════════════════════════════
 
 (function () {
@@ -335,11 +335,10 @@
 
   // ── Helpers ───────────────────────────────────────────────────────────
   function isAppShell() {
-    if (window.viewingMockUser) return false;
     const u = (typeof vibeLoad === "function") ? vibeLoad("vibe_user_v1") : null;
     return Boolean(u && u._appShell);
   }
-  // Treat anything that isn't a real UUID as a demo / hardcoded seed row.
+  // Treat anything that isn't a real UUID as a non-API row.
   // The DB columns are uuid-typed, so passing 'p1' or 'v2' through to the
   // server bombs Postgres with "invalid input syntax for type uuid". The
   // modal still opens and renders the prefill; interactions just no-op.
@@ -394,8 +393,7 @@
     // Always fetch the canonical post + viewer state — prefill might be
     // stale on counts/liked/saved.
     if (!isAppShell() || !isRealPostId(state.openId)) {
-      // Demo / hardcoded seed path: render whatever we have, skip API.
-      // Same surface used for unsigned visitors and demo Maya cards.
+      // Unsigned visitor or non-UUID id: render what we have, skip the API.
       if (!prefill) {
         document.getElementById("vpvName").textContent = "Sign in to view this post";
         document.getElementById("vpvBody").innerHTML = "";
@@ -612,7 +610,7 @@
   window.__vpvToggleLike = async function () {
     if (!state.openId) return;
     if (!isAppShell()) { toast("Sign in to like posts"); return; }
-    if (!isRealPostId(state.openId)) { toast("This is a demo post — interactions disabled"); return; }
+    if (!isRealPostId(state.openId)) { toast("This post can't be interacted with"); return; }
     if (state.inflight) return;
     state.inflight = true;
     const wasLiked = state.liked;
@@ -644,7 +642,7 @@
   window.__vpvToggleSave = async function () {
     if (!state.openId) return;
     if (!isAppShell()) { toast("Sign in to save posts"); return; }
-    if (!isRealPostId(state.openId)) { toast("This is a demo post — interactions disabled"); return; }
+    if (!isRealPostId(state.openId)) { toast("This post can't be interacted with"); return; }
     if (state.inflight) return;
     state.inflight = true;
     const wasSaved = state.saved;
@@ -678,7 +676,7 @@
       return;
     }
     if (!state.openId || !isRealPostId(state.openId)) {
-      toast("Can't share a demo post");
+      toast("This post can't be shared");
       return;
     }
     const title = (state.content || "").slice(0, 240);
@@ -714,7 +712,7 @@
   window.__vpvDeletePost = async function () {
     if (!state.openId) return;
     if (!isAppShell()) { toast("Sign in to delete"); return; }
-    if (!isRealPostId(state.openId)) { toast("Demo post — can't delete"); return; }
+    if (!isRealPostId(state.openId)) { toast("This post can't be deleted"); return; }
     // Quick confirm — destructive action, can't undo.
     if (!window.confirm("Delete this post? This can't be undone.")) return;
     const menu = document.getElementById("vpvMenu");
@@ -763,7 +761,7 @@
     const content = (inp && inp.value || "").trim();
     if (!content) return;
     if (!isAppShell()) { toast("Sign in to comment"); return; }
-    if (!isRealPostId(state.openId)) { toast("This is a demo post — interactions disabled"); return; }
+    if (!isRealPostId(state.openId)) { toast("This post can't be interacted with"); return; }
     btn.disabled = true;
     try {
       const r = await fetch(`/api/posts/${encodeURIComponent(state.openId)}/comments`, {
@@ -852,7 +850,7 @@
   window.__vpvSubmitReply = async function (commentId, formEl) {
     if (!state.openId) return;
     if (!isAppShell()) { toast("Sign in to reply"); return; }
-    if (!isRealPostId(state.openId)) { toast("This is a demo post — interactions disabled"); return; }
+    if (!isRealPostId(state.openId)) { toast("This post can't be interacted with"); return; }
     if (!formEl) return;
     const input = formEl.querySelector("input");
     const submit = formEl.querySelector("button");

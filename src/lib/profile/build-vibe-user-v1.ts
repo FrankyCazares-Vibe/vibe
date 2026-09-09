@@ -97,7 +97,6 @@ export function buildVibeUserV1FromProfile(
     skills: profile.skills.slice(),
     snapshot,
     _onboarded: true,
-    _isDemo: false,
   };
 
   if (profile.school_verified) {

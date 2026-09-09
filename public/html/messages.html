@@ -207,6 +207,9 @@ body{font-family:'DM Sans',sans-serif;background:var(--cream);color:var(--charco
 .t-item:hover{background:#FAFAF8;}
 .t-item.active{background:var(--cream);}
 .t-item.unread::before{content:'';position:absolute;left:5px;top:50%;transform:translateY(-50%);width:6px;height:6px;border-radius:50%;background:var(--accent);}
+.t-skel{display:flex;align-items:center;gap:11px;padding:13px 16px;border-bottom:1px solid var(--border);}
+.t-skel .sk-av{width:40px;height:40px;border-radius:13px;background:var(--cream);flex-shrink:0;}
+.t-skel .sk-l{height:10px;border-radius:5px;background:var(--cream);}
 .t-av{width:40px;height:40px;border-radius:13px;display:flex;align-items:center;justify-content:center;font-family:'Fraunces',serif;font-size:13px;font-weight:700;color:white;flex-shrink:0;position:relative;}
 .online{position:absolute;bottom:1px;right:1px;width:9px;height:9px;border-radius:50%;background:var(--green);border:2px solid white;}
 .t-info{flex:1;min-width:0;}
@@ -936,7 +939,7 @@ input,textarea,[contenteditable="true"]{cursor:text!important;}
       </a>
     </nav>
     <div class="nav-divider"></div>
-    <a href="/profile" class="nav-item"><div class="mini-av">MC</div><div><div style="font-size:13px;font-weight:600;color:var(--charcoal)">Maya Chen</div><div style="font-size:11px;color:var(--muted)">Product Designer</div></div></a>
+    <a href="/profile" class="nav-item" aria-label="Your profile"><div class="mini-av" aria-hidden="true"></div><div><div style="font-size:13px;font-weight:600;color:var(--charcoal)">&nbsp;</div><div style="font-size:11px;color:var(--muted)">&nbsp;</div></div></a>
   
     
   
@@ -997,21 +1000,18 @@ input,textarea,[contenteditable="true"]{cursor:text!important;}
       <p>Connect with someone on Vibe, then start a message from their profile.</p>
       <a href="/network" class="t-empty-cta">Find people →</a>
     </div>
-    <div class="t-scroll" id="tScroll">
-      <div class="t-item unread" data-t="kwame" onclick="openT('kwame')"><div class="t-av" style="background:#2D1B4E">KA<div class="online"></div></div><div class="t-info"><div class="t-name">Kwame Asante</div><div class="t-prev b">Let's lock in that coffee — Tuesday?</div></div><div class="t-time">2m</div></div>
-      <div class="t-item" data-t="priya" onclick="openT('priya')"><div class="t-av" style="background:#3B1A00">PS</div><div class="t-info"><div class="t-name">Priya Sinha</div><div class="t-prev">Would love to collab on the growth deck</div></div><div class="t-time">1h</div></div>
-      <div class="t-item unread" data-t="luca" onclick="openT('luca')"><div class="t-av" style="background:#2a2800">LM<div class="online"></div></div><div class="t-info"><div class="t-name">Luca Moretti</div><div class="t-prev b">Shared a Vibe with you</div></div><div class="t-time">3h</div></div>
-      <div class="t-item" data-t="zara" onclick="openT('zara')"><div class="t-av" style="background:#1A1A00">ZW</div><div class="t-info"><div class="t-name">Zara Williams</div><div class="t-prev">Hackathon template is in the drive</div></div><div class="t-time">Yesterday</div></div>
-      <div class="t-item" data-t="recruiter" onclick="openT('recruiter')"><div class="t-av" style="background:#1A3A5C">JR</div><div class="t-info"><div class="t-name">Jamie Reid · Stripe</div><div class="t-prev">I came across your Vibe on the redesign project</div></div><div class="t-time">2d</div></div>
+    <div class="t-scroll" id="tScroll" aria-busy="true">
+      <div class="t-skel"><div class="sk-av"></div><div style="flex:1"><div class="sk-l" style="width:55%;margin-bottom:8px"></div><div class="sk-l" style="width:80%"></div></div></div>
+      <div class="t-skel"><div class="sk-av"></div><div style="flex:1"><div class="sk-l" style="width:55%;margin-bottom:8px"></div><div class="sk-l" style="width:80%"></div></div></div>
+      <div class="t-skel"><div class="sk-av"></div><div style="flex:1"><div class="sk-l" style="width:55%;margin-bottom:8px"></div><div class="sk-l" style="width:80%"></div></div></div>
     </div>
   </div>
 
   <div class="convo" id="convoPanel">
     <div class="empty" id="emptyState">
       <div class="empty-icon"><svg width="26" height="26" viewBox="0 0 26 26" fill="none"><path d="M2 4A2 2 0 014 2h18a2 2 0 012 2v13a2 2 0 01-2 2H7L2 23V4z" stroke="#8A8580" stroke-width="1.5" fill="none" stroke-linejoin="round"/></svg></div>
-      <h3>Your messages</h3>
-      <p>Start a conversation with any connection. Non-connections go to message requests.</p>
-      <button class="start-btn" onclick="openT('kwame')">Open a conversation</button>
+      <h3>Pick someone to message</h3>
+      <p>Once you connect with people on Vibe, your conversations will live here.</p>
     </div>
     <div id="cContent" style="display:none;flex-direction:column;height:100%;">
       <div class="c-hdr">
@@ -1078,60 +1078,12 @@ if (IS_EMBEDDED) {
   document.addEventListener('mouseout',e=>{if(e.target.closest(HS)){cur.classList.remove('hover');ring.classList.remove('hover');}});
 }
 
-const T={
-  kwame:{n:'Kwame Asante',av:'KA',bg:'#2D1B4E',role:'AI Founder · Lagos → SF',on:true,conn:true,vibe:{bg:'linear-gradient(135deg,#1a0533,#2d1b4e)',lbl:'AI tool replacing a $40k analyst'},msgs:[
-    {m:0,t:'Hey! Saw the onboarding post — 23% lift from one weekend is wild.',ts:'Yesterday 2:14 PM'},
-    {m:1,t:'Remove friction instead of adding features. That was the whole move.',ts:'Yesterday 2:31 PM'},
-    {m:0,t:'What was the single biggest thing you cut?',ts:'Yesterday 2:33 PM'},
-    {m:1,t:"The 'tell us about yourself' step. Nobody filled it out. Replaced it with one question: what are you here to do?",ts:'Yesterday 2:40 PM'},
-    {m:0,t:"We're rebuilding our onboarding too. Open to a quick call?",ts:'Yesterday 3:02 PM'},
-    {m:1,t:'100% — happy to talk onboarding rabbit holes. What timezone?',ts:'Yesterday 3:08 PM'},
-    {m:0,t:'SF! Same as you. Coffee next week?',ts:'Yesterday 3:10 PM'},
-    {m:1,t:'Yes — Tuesday or Wednesday. You pick the spot.',ts:'Yesterday 3:15 PM'},
-    {m:0,t:"Let's lock in that coffee — Tuesday?",ts:'2m ago'},
-  ]},
-  priya:{n:'Priya Sinha',av:'PS',bg:'#3B1A00',role:'Growth Lead · Ex-Spotify',on:false,conn:true,vibe:{bg:'linear-gradient(135deg,#3b1a00,#5a2900)',lbl:'60-second pitch that landed 3 offers'},msgs:[
-    {m:0,t:"Loved your 'open to work' post. Said exactly what every recruiter thinks but won't tweet.",ts:'Mon 10:02 AM'},
-    {m:1,t:'If I say it I might as well say it clearly. Vague signals frustrate everyone.',ts:'Mon 10:45 AM'},
-    {m:0,t:'Would love to collab on the growth deck — free Thursday?',ts:'1h ago'},
-  ]},
-  luca:{n:'Luca Moretti',av:'LM',bg:'#2a2800',role:'Full-stack Dev · Remote-first',on:true,conn:true,vibe:null,msgs:[
-    {m:0,t:"Thought you'd appreciate this one",ts:'3h ago',vibe:{bg:'linear-gradient(135deg,#1a1a00,#2a2800)',creator:'Luca Moretti',title:'Web Summit Lisbon — what I said and what happened'}},
-    {m:0,t:'The bit at 0:48 is exactly what you wrote about in your post',ts:'3h ago'},
-  ]},
-  zara:{n:'Zara Williams',av:'ZW',bg:'#1A1A00',role:'COO · Seed-stage Ops',on:false,conn:true,vibe:null,msgs:[
-    {m:0,t:'Hackathon template is in the drive — feel free to use it.',ts:'Yesterday'},
-    {m:1,t:'This is incredible. Can I share with a few other founders?',ts:'Yesterday'},
-    {m:0,t:'Of course — just credit as a community template. Let me know how the event goes!',ts:'Yesterday'},
-  ]},
-  recruiter:{n:'Jamie Reid · Stripe',av:'JR',bg:'#1A3A5C',role:'Engineering Recruiter · Stripe',on:false,conn:false,req:true,reqTxt:"Jamie Reid sent you a message request. You haven't connected with Jamie yet — you can accept or decline.",vibe:null,msgs:[
-    {m:0,t:"Hi Maya — I came across your Vibe on the redesign project and your work is genuinely impressive. We're building out a design systems team at Stripe and I think you'd be a great fit. Would you be open to a conversation?",ts:'2d ago'},
-  ]},
-};
 let active=null;
 
 function openT(id){
-  if (typeof __realDM !== 'undefined' && __realDM.enabled) {
-    active = id;
-    return __dmOpenChannel(id);
-  }
-  active=id;const d=T[id];if(!d)return;
-  document.querySelectorAll('.t-item').forEach(el=>{
-    const m=el.dataset.t===id;el.classList.toggle('active',m);
-    if(m){el.classList.remove('unread');const p=el.querySelector('.t-prev');if(p)p.classList.remove('b');}
-  });
-  document.getElementById('emptyState').style.display='none';
-  const cc=document.getElementById('cContent');cc.style.display='flex';
-  const av=document.getElementById('cAv');av.textContent=d.av;av.style.background=d.bg;
-  document.getElementById('cName').textContent=d.n;
-  document.getElementById('cStatus').textContent=d.on?'Active now':d.role;
-  const pill=document.getElementById('cPill');
-  if(d.vibe){pill.style.display='flex';document.getElementById('cPillBg').style.background=d.vibe.bg;const l=d.vibe.lbl;document.getElementById('cPillLabel').textContent=l.length>24?l.slice(0,24)+'…':l;}
-  else pill.style.display='none';
-  const rb=document.getElementById('reqBar');
-  if(d.req){rb.classList.add('show');document.getElementById('reqBarTxt').textContent=d.reqTxt;}
-  else rb.classList.remove('show');
-  renderMsgs(d.msgs,d);
+  if (typeof __realDM === 'undefined' || !__realDM.enabled) return;
+  active = id;
+  return __dmOpenChannel(id);
 }
 
 // iMessage drag — pull all rows left to slide timestamp chips into view.
@@ -1254,7 +1206,7 @@ function renderMsgs(msgs,d){
     const rs = Array.isArray(m.reactions)
       ? m.reactions.map((r) => r.emoji + ':' + r.count + (r.viewer_reacted ? '*' : '')).join('|')
       : '';
-    return (m.id || ('__demo' + Math.random())) + '#' + rs;
+    return (m.id || ('__noid' + Math.random())) + '#' + rs;
   }).join(',');
   const sigChanged = sig !== a.dataset.sig;
 
@@ -1276,7 +1228,7 @@ function renderMsgs(msgs,d){
   const isGroup = d && d.isGroup;
   // Renders a peer-avatar element — uses the message's sender info when
   // available so groups show each speaker's actual photo, falling back
-  // to the thread record's avatar (the legacy demo path).
+  // to the thread record's avatar.
   function avForMsg(m, showAv) {
     const url = m.senderAvatarUrl || (!isGroup ? d.avatarUrl : null);
     const bg = m.senderBg || d.bg;
@@ -1495,29 +1447,16 @@ function renderMsgs(msgs,d){
 }
 
 function snd(){
+  if (typeof __realDM === 'undefined' || !__realDM.enabled) return;
   const inp=document.getElementById('msgIn');const txt=inp.value.trim();
-  const hasMedia = typeof __realDM !== 'undefined' && __realDM.enabled && __realDM.stagedMedia;
   if(!active)return;
-  if(!txt && !hasMedia)return;
-  if (typeof __realDM !== 'undefined' && __realDM.enabled) {
-    const sendBtn = document.getElementById('sndBtn');
-    sendBtn.disabled = true;
-    __dmSend(txt).then(ok => {
-      if (ok) { inp.value = ''; inp.style.height = ''; }
-      sendBtn.disabled = !inp.value.trim();
-    });
-    return;
-  }
-  T[active].msgs.push({m:1,t:txt,ts:'Just now'});
-  const a=document.getElementById('msgsArea');const old=a.querySelector('.rr');if(old)old.remove();
-  const r=document.createElement('div');r.className='msg-row mine gt';r.innerHTML=`<div class="bubble">${txt}<div class="btime">Just now</div></div>`;a.appendChild(r);
-  const rr=document.createElement('div');rr.className='rr';rr.textContent='Sent';a.appendChild(rr);
-  a.scrollTop=a.scrollHeight;inp.value='';inp.style.height='';document.getElementById('sndBtn').disabled=true;
-  const ti=document.querySelector(`[data-t="${active}"]`);if(ti){const p=ti.querySelector('.t-prev');if(p)p.textContent=txt.length>38?txt.slice(0,38)+'…':txt;}
-  if(active==='kwame'){const d=T[active];setTimeout(()=>{
-    const ty=document.createElement('div');ty.className='typ-row';ty.innerHTML=`<div class="msg-av" style="background:#2D1B4E">KA</div><div class="typ-dots"><div class="td"></div><div class="td"></div><div class="td"></div></div>`;a.appendChild(ty);a.scrollTop=a.scrollHeight;
-    setTimeout(()=>{ty.remove();const reps=["Tuesday works — how does 10am at Sightglass sound?","Makes sense, let's lock it in.","Can't wait to dig into it.","I'll send a cal invite."];const rep=reps[Math.floor(Math.random()*reps.length)];const nr=document.createElement('div');nr.className='msg-row gt';nr.innerHTML=`<div class="msg-av" style="background:#2D1B4E">KA</div><div class="bubble">${rep}<div class="btime">Just now</div></div>`;a.appendChild(nr);rr.textContent='Read';a.scrollTop=a.scrollHeight;},1800);
-  },1200);}
+  if(!txt && !__realDM.stagedMedia)return;
+  const sendBtn = document.getElementById('sndBtn');
+  sendBtn.disabled = true;
+  __dmSend(txt).then(ok => {
+    if (ok) { inp.value = ''; inp.style.height = ''; }
+    sendBtn.disabled = !inp.value.trim();
+  });
 }
 function upd(){
   const inp = document.getElementById('msgIn');
@@ -1535,14 +1474,8 @@ function upd(){
     }
   }
 }
-function accReq(){
-  if (typeof __realDM !== 'undefined' && __realDM.enabled) return __dmAccept();
-  document.getElementById('reqBar').classList.remove('show');if(active)T[active].req=false;
-}
-function decReq(){
-  if (typeof __realDM !== 'undefined' && __realDM.enabled) return __dmDecline();
-  document.getElementById('reqBar').classList.remove('show');document.getElementById('cContent').style.display='none';document.getElementById('emptyState').style.display='flex';
-}
+function accReq(){ if (typeof __realDM !== 'undefined' && __realDM.enabled) return __dmAccept(); }
+function decReq(){ if (typeof __realDM !== 'undefined' && __realDM.enabled) return __dmDecline(); }
 function switchTab(btn,mode){document.querySelectorAll('.t-tab').forEach(b=>b.classList.remove('active'));btn.classList.add('active');document.querySelectorAll('.t-item').forEach(el=>{el.style.display=mode==='unread'?(el.classList.contains('unread')?'':'none'):''});}
 function filterT(v){document.querySelectorAll('.t-item').forEach(el=>{el.style.display=el.querySelector('.t-name').textContent.toLowerCase().includes(v.toLowerCase())?'':'none';});}
 
@@ -1697,8 +1630,8 @@ document.addEventListener('DOMContentLoaded',function(){
 // ══ END CALENDAR SYNC ════════════════════════════════════════════════════
 
 // ══ REAL DMs (P1-022) ════════════════════════════════════════════════════
-// Activates only for real onboarded users. Demo users keep the hardcoded
-// T map and openT/snd/accReq/decReq paths above. Wires:
+// The page is signed-in only. openT/snd/accReq/decReq delegate here;
+// there is no offline/demo thread source. Wires:
 //   GET  /api/me/threads                       → list + requests
 //   POST /api/me/threads { handle }            → find-or-create dm
 //   GET  /api/me/threads/[id]/messages         → message history
@@ -1970,6 +1903,7 @@ function __dmRenderList(threads, requests) {
   for (const r of requests) __realDM.T[r.id] = __dmThreadRecord(r, true);
 
   const tScroll = document.getElementById('tScroll');
+  if (tScroll) tScroll.removeAttribute('aria-busy');
   const tEmpty = document.getElementById('tEmpty');
   const reqBanner = document.querySelector('.req-banner');
   const tabs = document.querySelector('.t-tabs');
@@ -2012,7 +1946,16 @@ async function __dmLoadList() {
     if (!j.ok) throw new Error(j.error || 'list failed');
     __dmRenderList(j.threads || [], j.requests || []);
     return j;
-  } catch (e) { console.error('[dm.loadList]', e); return null; }
+  } catch (e) {
+    console.error('[dm.loadList]', e);
+    // First paint failed: swap a still-present skeleton for a retry state.
+    const s = document.getElementById('tScroll');
+    if (s && s.querySelector('.t-skel')) {
+      s.removeAttribute('aria-busy');
+      s.innerHTML = '<div class="t-empty visible" style="display:flex"><h4>Couldn\'t load messages</h4><p>Check your connection and try again.</p><a href="#" class="t-empty-cta" onclick="__dmLoadList();return false;">Retry</a></div>';
+    }
+    return null;
+  }
 }
 
 async function __dmLoadMessages(channelId, opts) {
@@ -3103,29 +3046,26 @@ async function __dmEnsureFromHandle(handle) {
 }
 
 (async function initMessagesPage(){
-  const user = vibeInit();
-  if (!user) { window.__vibeTopNav('/'); return; }
-  if (user._isDemo) { vibeShowDemoPill(); return; }
-  if (!user._onboarded) return;
+  // Signed-in only (src/proxy.ts gates the URL); localStorage is a cache, the bootstrap is the truth.
+  let user = vibeInit();
+  if (!user || !user._onboarded) {
+    let r = null;
+    try { r = await fetch('/api/me/profile-bootstrap', { credentials: 'include' }); } catch (_) {}
+    if (!r || r.status === 401) { window.__vibeTopNav('/auth/login?next=' + encodeURIComponent('/messages')); return; }
+    if (r.status === 403) {
+      const j = await r.json().catch(() => null);
+      window.__vibeTopNav(j && j.code === 'terms_required' ? '/auth/terms?next=' + encodeURIComponent('/messages') : '/');
+      return;
+    }
+    const j = await r.json().catch(() => null);
+    if (!j || !j.ok || !j.vibeUser) { window.__vibeTopNav('/'); return; }
+    vibeSave(VIBE_KEYS.user, j.vibeUser);
+    user = j.vibeUser;
+    if (typeof _vibePaintSidebarChips === 'function') _vibePaintSidebarChips(user);
+  }
 
   __realDM.enabled = true;
   __realDM.meId = user.id || null;
-
-  const rb = document.querySelector('.req-banner');
-  if (rb) rb.removeAttribute('onclick');
-
-  const tScroll = document.getElementById('tScroll');
-  if (tScroll) tScroll.innerHTML = '';
-
-  const rightEmpty = document.getElementById('emptyState');
-  if (rightEmpty) {
-    const h3 = rightEmpty.querySelector('h3');
-    const p  = rightEmpty.querySelector('p');
-    const btn = rightEmpty.querySelector('.start-btn');
-    if (h3) h3.textContent = 'Pick someone to message';
-    if (p)  p.textContent  = 'Once you connect with people on Vibe, your conversations will live here.';
-    if (btn) btn.remove();
-  }
 
   await __dmLoadList();
 
@@ -3145,6 +3085,18 @@ async function __dmEnsureFromHandle(handle) {
         window.__vibeTopReplaceState({}, '', u.toString());
       } catch (_) { /* cross-origin guard; non-fatal */ }
     }
+  }
+
+  // ?channel=<id> (forwarded by MessagesSwitch) opens that thread directly.
+  const channelParam = params.get('channel');
+  if (!toHandle && channelParam && __realDM.T && __realDM.T[channelParam]) {
+    openT(channelParam);
+    try {
+      const top = (window.top && window.top !== window.self) ? window.top : window;
+      const u = new URL(top.location.href);
+      u.searchParams.delete('channel');
+      window.__vibeTopReplaceState({}, '', u.toString());
+    } catch (_) { /* cross-origin guard; non-fatal */ }
   }
 
   __realDM.listTimer = setInterval(() => {
