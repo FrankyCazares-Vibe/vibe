@@ -411,7 +411,7 @@ export function MapMobile() {
               No zones yet
             </div>
             <div style={{ color: "rgba(255,255,255,0.55)", fontSize: 13, maxWidth: 280, textAlign: "center", lineHeight: 1.55 }}>
-              We&apos;ll start lighting zones up once more students at your school set a major on their profile.
+              You&apos;re the first here. Once other students pick this campus, their majors light up as zones.
             </div>
           </MapOverlay>
         ) : (

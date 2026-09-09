@@ -174,7 +174,11 @@ export function CampusMobile() {
 
   const refetchOrgs = useCallback(async () => {
     try {
-      const r = await fetch("/api/orgs", { cache: "no-store" });
+      // `filter=discover` is the club directory; without it the route
+      // defaults to "mine", so every student who has not joined an org yet
+      // saw an empty Orgs tab and concluded the app had no clubs. Desktop
+      // has always asked for discover (campus-home.tsx).
+      const r = await fetch("/api/orgs?filter=discover", { cache: "no-store" });
       const j = await r.json();
       setOrgs(j?.ok && Array.isArray(j.orgs) ? (j.orgs as Org[]) : []);
     } catch {

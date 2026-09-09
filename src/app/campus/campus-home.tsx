@@ -9403,7 +9403,7 @@ export function MapTabBody() {
               No zones yet
             </div>
             <div style={{ color: "rgba(255,255,255,0.55)", fontSize: 13, maxWidth: 320, textAlign: "center" }}>
-              We&apos;ll start lighting up zones once more students at your school have a major set on their profile.
+              You&apos;re the first here. Once other students pick this campus, their majors light up as zones.
             </div>
           </div>
         ) : (
