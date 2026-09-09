@@ -1649,22 +1649,6 @@ function OrgChannelsDrawer({
                 @{org.handle}
               </div>
             </div>
-            <button
-              type="button"
-              aria-label="Org settings"
-              title="Org settings (coming soon)"
-              style={chatChromeBtnStyle}
-            >
-              <svg width="18" height="18" viewBox="0 0 18 18" fill="none" aria-hidden>
-                <circle cx="9" cy="9" r="2" stroke="currentColor" strokeWidth="1.5" />
-                <path
-                  d="M9 1.5v2M9 14.5v2M16.5 9h-2M3.5 9h-2M14.3 3.7l-1.4 1.4M5.1 12.9l-1.4 1.4M14.3 14.3l-1.4-1.4M5.1 5.1L3.7 3.7"
-                  stroke="currentColor"
-                  strokeWidth="1.5"
-                  strokeLinecap="round"
-                />
-              </svg>
-            </button>
           </header>
 
           {/* Search */}
@@ -1917,20 +1901,6 @@ function DarkChannelRow({
     </button>
   );
 }
-
-const chatChromeBtnStyle: React.CSSProperties = {
-  width: 38,
-  height: 38,
-  borderRadius: 999,
-  border: "none",
-  background: "transparent",
-  color: "rgba(255,255,255,0.78)",
-  cursor: "pointer",
-  display: "inline-flex",
-  alignItems: "center",
-  justifyContent: "center",
-  flexShrink: 0,
-};
 
 // ---------- Map pane ----------
 

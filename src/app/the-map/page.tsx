@@ -1,6 +1,13 @@
+import { notFound, redirect } from "next/navigation";
+
 import { Badge } from "@/components/ui/badge";
 import { OttoOrb } from "@/components/the-map/OttoOrb";
 import LyraConstellation from "@/components/the-map/LyraConstellation";
+import { createSupabaseServerClient } from "@/lib/supabase/server";
+import {
+  createSupabaseServiceClient,
+  isSupabaseServiceConfigured,
+} from "@/lib/supabase/service";
 
 export const metadata = {
   title: "The Map · Vibe",
@@ -8,7 +15,26 @@ export const metadata = {
     "Where we are, what's built, what's next. For Franky, James, & Rylan.",
 };
 
-export default function TheMap() {
+/**
+ * Founder roadmap — internal. Until S55 this rendered for anyone (stale
+ * "nine pages shipped" metrics, cofounder task lists, investor targets, all
+ * indexed). Platform admins only now: anonymous → login, everyone else → 404
+ * so the URL does not even confirm the page exists.
+ */
+export default async function TheMap() {
+  const supabase = await createSupabaseServerClient();
+  const {
+    data: { user },
+  } = await supabase.auth.getUser();
+  if (!user) redirect("/auth/login?next=%2Fthe-map");
+  if (!isSupabaseServiceConfigured()) notFound();
+  const { data: row } = await createSupabaseServiceClient()
+    .from("users")
+    .select("is_platform_admin")
+    .eq("id", user.id)
+    .maybeSingle();
+  if (!row?.is_platform_admin) notFound();
+
   return (
     <main style={{ background: "#FAF7F2", color: "#1C1C1E", minHeight: "100vh" }}>
       <Hero />
