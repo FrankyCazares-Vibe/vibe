@@ -284,7 +284,6 @@ const TABS: { key: CampusTab; label: string }[] = [
 const SCHOOL = {
   initials: "IU",
   name: "Indiana University",
-  city: "Indianapolis, IN",
 };
 
 export function CampusHome({
@@ -3322,7 +3321,7 @@ export function CampusBanner({
             lineHeight: 1.2,
           }}
         >
-          {SCHOOL.city} · {onVibeLabel}
+          {onVibeLabel}
           {activeLabel ? ` · ${activeLabel}` : ""}
         </div>
       </div>
