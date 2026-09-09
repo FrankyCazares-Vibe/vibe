@@ -678,6 +678,7 @@ export function CampusHome({
           <EmptyState
             showSchoolVerifiedBanner={showSchoolVerifiedBanner}
             onCreateOrg={() => setShowCreateOrg(true)}
+            onBrowseOrgs={() => setTab("orgs")}
           />
         ) : (
           <div
@@ -9544,6 +9545,7 @@ export function MapTabBody() {
             result and the map smoothly pans + zooms to that bubble.
             stopPropagation on the wrapper so the drag handler
             doesn't grab the gesture. */}
+        {hasData ? (
         <div
           style={{
             position: "absolute",
@@ -9639,6 +9641,7 @@ export function MapTabBody() {
             </div>
           ) : null}
         </div>
+        ) : null}
 
         {/* Legend pill — purely decorative, won't intercept drag. */}
         <div
@@ -12934,9 +12937,13 @@ function hexToRgba(hex: string, alpha: number): string {
 function EmptyState({
   showSchoolVerifiedBanner,
   onCreateOrg,
+  onBrowseOrgs,
 }: {
   showSchoolVerifiedBanner: boolean;
   onCreateOrg: () => void;
+  // `tab` is seeded from ?tab= once at mount, so a <Link> to /campus?tab=orgs
+  // changes the URL without changing the view. Switch the tab in state.
+  onBrowseOrgs: () => void;
 }) {
   return (
     <main style={{ padding: "48px 32px" }}>
@@ -13006,14 +13013,19 @@ function EmptyState({
           maxWidth: 760,
         }}
       >
-        <Link
-          href="/campus?tab=orgs"
+        <button
+          type="button"
+          onClick={onBrowseOrgs}
           style={{
             ...GLASS_SURFACE,
             display: "block",
+            width: "100%",
+            font: "inherit",
+            cursor: "pointer",
             padding: 24,
             borderRadius: 20,
             textDecoration: "none",
+            textAlign: "left",
             color: COLORS.glassText,
           }}
         >
@@ -13040,7 +13052,7 @@ function EmptyState({
             Browse clubs and orgs at IU. Public ones you can join instantly,
             private ones you can request to join.
           </p>
-        </Link>
+        </button>
         <button
           type="button"
           onClick={onCreateOrg}

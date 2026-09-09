@@ -7004,8 +7004,13 @@ function _onCampusChange() {
     document.body.classList.add('empty-profile-mode');
     document.documentElement.classList.remove('vibe-pre-paint');
     const _emptyFail = () => { const t = document.getElementById('profileEmptyTitle'), l = document.getElementById('profileEmptyLine'), a = document.getElementById('profileEmptyActions'); if (t) t.innerHTML = "we couldn't load <em>your profile.</em>"; if (l) l.textContent = '"sign in again and I\'ll bring it right back."'; if (a) a.style.display = 'flex'; };
+    // Watchdog: every settled outcome below reaches _emptyFail, but a request
+    // that never settles would leave the user staring at "one sec" with no
+    // buttons at all. Arm the recovery actions after 8s regardless.
+    const _emptyWatchdog = setTimeout(_emptyFail, 8000);
     fetch('/api/me/profile-bootstrap', { credentials: 'include' })
       .then(r => {
+        clearTimeout(_emptyWatchdog);
         if (r.status === 401) { window.location.replace('/auth/login?next=%2Fprofile'); return { _redirecting: true }; }
         // Consent gate: a signed-in user with no terms record. The sidebar
         // hydrator that normally catches this bails on empty localStorage,

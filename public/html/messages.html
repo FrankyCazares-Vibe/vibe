@@ -998,7 +998,7 @@ input,textarea,[contenteditable="true"]{cursor:text!important;}
       <div class="t-empty-icon">💬</div>
       <h4>No conversations yet</h4>
       <p>Connect with someone on Vibe, then start a message from their profile.</p>
-      <a href="/network" class="t-empty-cta">Find people →</a>
+      <a href="/network" class="t-empty-cta" onclick="event.preventDefault();window.__vibeTopNav('/network')">Find people →</a>
     </div>
     <div class="t-scroll" id="tScroll" aria-busy="true">
       <div class="t-skel"><div class="sk-av"></div><div style="flex:1"><div class="sk-l" style="width:55%;margin-bottom:8px"></div><div class="sk-l" style="width:80%"></div></div></div>
@@ -1532,7 +1532,7 @@ function miniSelectDay(year,month,day){
   const evts=calendarEvents[key]||[],panel=document.getElementById('calEventsPanel'),
         list=document.getElementById('calEventsList'),title=document.getElementById('calPanelTitle');
   title.textContent=new Date(year,month,day).toLocaleDateString('en-US',{weekday:'short',month:'short',day:'numeric'});
-  if(!evts.length){list.innerHTML=`<div class="cal-empty">No events &mdash; <button onclick="openCreateEventForKey('${key}')" style="background:none;border:none;color:var(--accent);cursor:none;font-size:11px;font-weight:700;padding:0">+ Add</button></div>`;}
+  if(!evts.length){list.innerHTML=`<div class="cal-empty">No events </div>`;}
   else{list.innerHTML=evts.map(e=>`<div class="cal-event-item"><div class="cal-event-dot" style="background:${e.color}"></div><div class="cal-event-info"><div class="cal-event-name">${e.name}</div><div class="cal-event-time">${fmtTime(e.time)}${e.location?' &middot; '+e.location:''}</div></div><button onclick="removeCalEvent('${key}','${e.name}')" style="background:none;border:none;color:var(--muted);cursor:none;font-size:14px;padding:2px 4px;border-radius:5px;transition:color .15s" onmouseover="this.style.color='var(--accent)'" onmouseout="this.style.color='var(--muted)'">&times;</button></div>`).join('');}
   panel.classList.add('open');
 }
@@ -1582,7 +1582,7 @@ function renderModalSidebar(){
   const p=modalSelectedKey.split('-').map(Number),dateObj=new Date(p[0],p[1]-1,p[2]);
   dateEl.textContent=dateObj.toLocaleDateString('en-US',{weekday:'long',month:'long',day:'numeric'});
   const evts=calendarEvents[modalSelectedKey]||[];
-  if(!evts.length){listEl.innerHTML=noEvtHTML+`No events yet<br><button onclick="openCreateEventForKey('${modalSelectedKey}')" style="background:none;border:none;color:var(--accent);cursor:none;font-size:13px;font-weight:700;margin-top:8px;padding:0">+ Add an event</button></div>`;}
+  if(!evts.length){listEl.innerHTML=noEvtHTML+`No events yet</div>`;}
   else{listEl.innerHTML=evts.map(e=>`<div class="cal-modal-event-card"><div class="cal-modal-event-bar" style="background:${e.color}"></div><div class="cal-modal-event-body"><div class="cal-modal-event-name">${e.name}</div><div class="cal-modal-event-meta">${e.time?fmtTime(e.time)+'<br>':''}${e.location?'&#128205; '+e.location+'<br>':''}${e.notes?'&#128221; '+e.notes:''}</div></div><button class="cal-modal-event-del" onclick="removeCalEvent('${modalSelectedKey}','${e.name}')">&times;</button></div>`).join('')+`<button onclick="openCreateEventForKey('${modalSelectedKey}')" style="width:100%;margin-top:8px;padding:10px;border-radius:12px;border:1.5px dashed var(--border);background:none;color:var(--muted);font-family:'DM Sans',sans-serif;font-size:12px;font-weight:700;cursor:none;transition:all .15s" onmouseover="this.style.borderColor='var(--accent)';this.style.color='var(--accent)'" onmouseout="this.style.borderColor='var(--border)';this.style.color='var(--muted)'">+ Add another event</button>`;}
 }
 
@@ -1763,7 +1763,10 @@ function __dmFormatBody(s) {
   return __dmEsc(s).replace(
     /(^|[^A-Za-z0-9_@])@([a-z0-9_]{3,20})/gi,
     function(_m, prefix, handle){
-      return prefix + '<a class="dm-mention" href="/profile/' + encodeURIComponent(handle.toLowerCase()) + '" onclick="event.stopPropagation()">@' + handle + '</a>';
+      // The page runs inside the /messages iframe, so a plain anchor would
+      // render the whole profile app nested in the frame. Break out to the top.
+      const _mh = encodeURIComponent(handle.toLowerCase());
+      return prefix + '<a class="dm-mention" href="/profile/' + _mh + '" onclick="event.preventDefault();event.stopPropagation();window.__vibeTopNav(\'/profile/' + _mh + '\')">@' + handle + '</a>';
     },
   );
 }
@@ -1942,7 +1945,18 @@ function __dmRenderList(threads, requests) {
 async function __dmLoadList() {
   try {
     const r = await fetch('/api/me/threads', { credentials:'include' });
+    // An expired session or a missing consent record is not a connection
+    // problem: send the user where they can fix it instead of showing the
+    // retry state below, whose Retry could never succeed.
+    if (r.status === 401) {
+      window.__vibeTopNav('/auth/login?next=' + encodeURIComponent('/messages'));
+      return null;
+    }
     const j = await r.json();
+    if (r.status === 403 && j && j.code === 'terms_required') {
+      window.__vibeTopNav('/auth/terms?next=' + encodeURIComponent('/messages'));
+      return null;
+    }
     if (!j.ok) throw new Error(j.error || 'list failed');
     __dmRenderList(j.threads || [], j.requests || []);
     return j;
@@ -3051,7 +3065,19 @@ async function __dmEnsureFromHandle(handle) {
   if (!user || !user._onboarded) {
     let r = null;
     try { r = await fetch('/api/me/profile-bootstrap', { credentials: 'include' }); } catch (_) {}
-    if (!r || r.status === 401) { window.__vibeTopNav('/auth/login?next=' + encodeURIComponent('/messages')); return; }
+    if (!r) {
+      // The request never completed (offline, blocked, reset). We cannot
+      // tell signed-out from unreachable, so keep the user here and let
+      // them retry rather than sending them to a login form they may not
+      // need.
+      const s = document.getElementById('tScroll');
+      if (s) {
+        s.removeAttribute('aria-busy');
+        s.innerHTML = '<div class="t-empty visible" style="display:flex"><h4>Couldn\'t load messages</h4><p>Check your connection and try again.</p><a href="#" class="t-empty-cta" onclick="location.reload();return false;">Retry</a></div>';
+      }
+      return;
+    }
+    if (r.status === 401) { window.__vibeTopNav('/auth/login?next=' + encodeURIComponent('/messages')); return; }
     if (r.status === 403) {
       const j = await r.json().catch(() => null);
       window.__vibeTopNav(j && j.code === 'terms_required' ? '/auth/terms?next=' + encodeURIComponent('/messages') : '/');
@@ -3089,6 +3115,17 @@ async function __dmEnsureFromHandle(handle) {
 
   // ?channel=<id> (forwarded by MessagesSwitch) opens that thread directly.
   const channelParam = params.get('channel');
+  if (!toHandle && channelParam && __realDM.T && !__realDM.T[channelParam]) {
+    // The thread list did not include the channel we were sent to (the list
+    // fetch failed, or the row is not visible to us). Say so instead of
+    // silently showing the generic panel.
+    console.warn('[dm] channel not in list:', channelParam);
+    const _es = document.getElementById('emptyState');
+    const _h = _es && _es.querySelector('h3');
+    const _p = _es && _es.querySelector('p');
+    if (_h) _h.textContent = "Couldn't open that conversation";
+    if (_p) _p.textContent = 'It may have been removed, or the list failed to load. Pick one on the left.';
+  }
   if (!toHandle && channelParam && __realDM.T && __realDM.T[channelParam]) {
     openT(channelParam);
     try {
@@ -3159,10 +3196,6 @@ async function __dmEnsureFromHandle(handle) {
           <button class="cal-modal-nav-btn" onclick="modalChangeMonth(1)">&#8250;</button>
         </div>
         <div class="cal-modal-header-actions">
-          <button class="cal-modal-add-btn" onclick="openCreateEvent()">
-            <svg width="13" height="13" viewBox="0 0 13 13" fill="none"><path d="M6.5 1v11M1 6.5h11" stroke="white" stroke-width="1.8" stroke-linecap="round"/></svg>
-            New Event
-          </button>
           <button class="cal-modal-close" onclick="closeCalModal()">&#215;</button>
         </div>
       </div>
