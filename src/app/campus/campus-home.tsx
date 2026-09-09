@@ -13007,7 +13007,7 @@ function EmptyState({
         }}
       >
         <Link
-          href="/campus/discover"
+          href="/campus?tab=orgs"
           style={{
             ...GLASS_SURFACE,
             display: "block",

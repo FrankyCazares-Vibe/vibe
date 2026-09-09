@@ -1,6 +1,5 @@
 "use client";
 
-import Link from "next/link";
 
 import type { ActivityRow } from "@/app/api/me/otto/route";
 
@@ -63,11 +62,6 @@ export function OttoActivity({ rows }: Props) {
     <OttoSection
       eyebrow="Otto saw"
       wide
-      trailing={
-        <Link href="/notifications" className="otto-room-section-link">
-          view all activity →
-        </Link>
-      }
     >
       {rows.length === 0 ? (
         <p className="otto-room-empty">nothing new on campus yet.</p>
