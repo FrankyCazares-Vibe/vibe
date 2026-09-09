@@ -11,6 +11,7 @@ import { TypewriterSequence } from "./landing-typewriter";
 
 const WARP_DURATION_MS = 750;
 const LOGIN_HREF = "/auth/login";
+const SIGNUP_HREF = "/auth/signup";
 
 // Module-level so the array reference is stable across re-renders — passing
 // an inline literal to TypewriterSequence makes its useEffect deps "change"
@@ -60,11 +61,11 @@ export function HomeLanding() {
   };
 
   // Hyperdrive: intercept any element marked data-warp-trigger, play the
-  // streak animation, then navigate. Capture phase + stopPropagation so we
-  // beat Next.js Link's onClick (which would otherwise navigate immediately
-  // and skip the animation). Skip modifier-clicks so cmd/ctrl/middle-click
-  // still open in a new tab. Gated until the visitor has clicked all three
-  // moons.
+  // streak animation, then navigate to that element's own href (sign-up for
+  // the sun and the "new here" link, login for returning users). Capture
+  // phase + stopPropagation so we beat Next.js Link's onClick (which would
+  // otherwise navigate immediately and skip the animation). Skip
+  // modifier-clicks so cmd/ctrl/middle-click still open in a new tab.
   useEffect(() => {
     function onClick(e: MouseEvent) {
       if (warping) return;
@@ -79,9 +80,11 @@ export function HomeLanding() {
       // (visit-all-three) is enforced at render time by deciding which
       // elements expose the attribute. The Skip link bypasses the gate
       // for returning users by always exposing it.
+      const href = trigger.getAttribute("href");
+      const dest = href && href.startsWith("/") ? href : LOGIN_HREF;
       setWarping(true);
-      router.prefetch(LOGIN_HREF);
-      window.setTimeout(() => router.push(LOGIN_HREF), WARP_DURATION_MS);
+      router.prefetch(dest);
+      window.setTimeout(() => router.push(dest), WARP_DURATION_MS);
     }
     document.addEventListener("click", onClick, true);
     return () => document.removeEventListener("click", onClick, true);
@@ -185,13 +188,25 @@ export function HomeLanding() {
         </div>
 
         <p className="vibe-landing-cta-foot">
-          Sign in with your school email. Your campus, your career, one profile.
+          Sign up with your school email. Your campus, your career, one profile.
         </p>
 
+        {/* Both doors are always visible: a new student should never have to
+            discover the three-ring dance to find the sign-up. */}
+        <a
+          href={SIGNUP_HREF}
+          data-warp-trigger
+          className="vibe-landing-skip vibe-landing-signup"
+        >
+          New here?{" "}
+          <span className="vibe-landing-skip-action">
+            Create your account <span aria-hidden style={{ marginLeft: 4 }}>→</span>
+          </span>
+        </a>
         <a
           href={LOGIN_HREF}
           data-warp-trigger
-          className="vibe-landing-skip"
+          className="vibe-landing-skip vibe-landing-skip-secondary"
         >
           Already have an account?{" "}
           <span className="vibe-landing-skip-action">

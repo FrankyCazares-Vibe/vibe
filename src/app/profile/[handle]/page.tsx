@@ -24,11 +24,14 @@ type PublicProfileRow = {
 /** Deduped across generateMetadata + the page so we don't hit Supabase twice. */
 const loadPublicProfile = cache(async (handle: string) => {
   const service = createSupabaseServiceClient();
-  const { data } = await service
+  const { data, error } = await service
     .from("users")
     .select("id,name,handle,tagline,bio,avatar_url")
     .eq("handle", handle)
     .maybeSingle();
+  // Throw on transport/RLS errors so callers can tell "Supabase is down"
+  // (keep the share link alive) from "no such handle" (404).
+  if (error) throw error;
   return (data as PublicProfileRow | null) ?? null;
 });
 
@@ -113,13 +116,17 @@ export default async function ProfileByHandlePage({
   const handle = (raw || "").trim().toLowerCase();
   if (!handle) notFound();
 
+  // notFound() signals by throwing, so it must live OUTSIDE the try: the
+  // bare catch below used to swallow it and every unknown handle returned a
+  // 200 shell with a real-looking title (feature-sentinel #27/#37, S54).
+  let row: PublicProfileRow | null | undefined;
   try {
-    const row = await loadPublicProfile(handle);
-    if (!row) notFound();
+    row = await loadPublicProfile(handle);
   } catch {
     // Service role missing/down: still mount the client and let the
     // bootstrap fetch surface the error, rather than 500 the share link.
   }
+  if (row === null) notFound();
 
   const sp = await searchParams;
   const welcome = sp?.welcome === "1";

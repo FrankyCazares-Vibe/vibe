@@ -37,21 +37,11 @@ export async function GET(req: Request) {
   const url = new URL(req.url);
   const major = (url.searchParams.get("major") ?? "").trim();
   const orgHandle = (url.searchParams.get("org") ?? "").trim().toLowerCase();
-  const forceDemo = url.searchParams.get("demo") === "1";
   if (!major && !orgHandle) {
     return NextResponse.json(
       { ok: false, error: "major or org required" },
       { status: 400 },
     );
-  }
-
-  if (forceDemo) {
-    const seed = (major || orgHandle) + ":" + user.id;
-    return NextResponse.json({
-      ok: true,
-      demo: true,
-      ...buildDemoBuckets(seed),
-    });
   }
 
   const { data: me } = await supabase
@@ -97,15 +87,9 @@ export async function GET(req: Request) {
   }
 
   if (candidateIds.length === 0) {
-    // No real candidates → return demo people so the panel isn't empty
-    // while the school spins up. Stable per-zone seed so the same zone
-    // always shows the same demo cohort across reloads.
-    const seed = (major || orgHandle) + ":" + user.id;
-    return NextResponse.json({
-      ok: true,
-      demo: true,
-      ...buildDemoBuckets(seed),
-    });
+    // Nobody in this zone yet. Empty buckets — the client says so. (Until
+    // S55 this returned a seeded roster of fake people with fake handles.)
+    return NextResponse.json({ ok: true, connected: [], mutuals: [], discover: [] });
   }
 
   // Viewer's connections (mutual follows).
@@ -173,67 +157,4 @@ export async function GET(req: Request) {
     mutuals: mutuals.slice(0, MAX_BUCKET),
     discover: discover.slice(0, MAX_BUCKET),
   });
-}
-
-const DEMO_FIRSTS = [
-  "Maya", "Jordan", "Amara", "Sofia", "Diego", "Priya", "Liam", "Ava", "Ethan",
-  "Mia", "Noah", "Zoe", "Aiden", "Layla", "Theo", "Nora", "Kai", "Ines",
-  "Marcus", "Sam", "Riley", "Casey", "Drew", "Quinn", "Avery",
-];
-const DEMO_LASTS = [
-  "Chen", "Thompson", "Roberts", "Kim", "Patel", "Garcia", "Lopez", "Nguyen",
-  "Park", "Khan", "Singh", "Adams", "Brooks", "Rivera", "Walker", "Bennett",
-  "Hayes", "Foster", "Ortiz", "Reyes",
-];
-
-function buildDemoBuckets(seed: string): {
-  connected: ReturnType<typeof demoUser>[];
-  mutuals: Array<ReturnType<typeof demoUser> & { mutual_count: number }>;
-  discover: ReturnType<typeof demoUser>[];
-} {
-  // Deterministic pseudo-random sequence keyed on seed string. Same zone +
-  // same viewer = same fake roster; bonkers across zones.
-  let h = 0;
-  for (let i = 0; i < seed.length; i++) h = ((h * 31) + seed.charCodeAt(i)) | 0;
-  let cursor = Math.abs(h) || 1;
-  const next = () => {
-    cursor = (cursor * 1103515245 + 12345) & 0x7fffffff;
-    return cursor;
-  };
-  const pick = <T,>(arr: T[]): T => arr[next() % arr.length];
-
-  const make = (i: number) => {
-    const first = pick(DEMO_FIRSTS);
-    const last = pick(DEMO_LASTS);
-    return demoUser(`${first}-${last}-${i}`, `${first} ${last}`);
-  };
-
-  const connected = Array.from({ length: 4 }, (_, i) => make(i));
-  const mutuals = Array.from({ length: 8 }, (_, i) => ({
-    ...make(100 + i),
-    mutual_count: (next() % 5) + 1,
-  })).sort((a, b) => b.mutual_count - a.mutual_count);
-  const discover = Array.from({ length: 12 }, (_, i) => make(200 + i));
-  return { connected, mutuals, discover };
-}
-
-const DEMO_MAJORS_FOR_ROSTER = [
-  "Computer Science", "Business", "Psychology", "Biology", "Communication",
-  "Mechanical Engineering", "Economics", "Music", "Studio Art", "Marketing",
-];
-
-function demoUser(seed: string, name: string) {
-  // Hash seed so the same person gets a stable major + year across reloads.
-  let h = 0;
-  for (let i = 0; i < seed.length; i++) h = ((h * 31) + seed.charCodeAt(i)) | 0;
-  const handle = name.toLowerCase().replace(/[^a-z]/g, "").slice(0, 14) +
-    String(Math.abs(h) % 100);
-  return {
-    id: `demo-${seed}`,
-    name,
-    handle,
-    major: DEMO_MAJORS_FOR_ROSTER[Math.abs(h) % DEMO_MAJORS_FOR_ROSTER.length],
-    year: (Math.abs(h) % 4) + 1,
-    avatar_url: null,
-  };
 }

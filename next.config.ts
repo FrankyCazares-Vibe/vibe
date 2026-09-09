@@ -19,6 +19,13 @@ const nextConfig: NextConfig = {
         permanent: false,
       },
       {
+        // The static Opportunities prototype (fake "Apply" / "Post") was
+        // retired in S55; there is no product surface behind it yet.
+        source: "/opportunities",
+        destination: "/campus",
+        permanent: false,
+      },
+      {
         source: "/:path*",
         has: [{ type: "host", value: "connectvibe.app" }],
         destination: "https://www.connectvibe.app/:path*",

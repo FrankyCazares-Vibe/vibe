@@ -68,11 +68,11 @@ export function OrbitalRingSystem({ focused, onPick, unlocked }: Props) {
 
       {showSunCta ? (
         <Link
-          href="/auth/login"
+          href="/auth/signup"
           prefetch
           data-warp-trigger
           className="vibe-landing-sun-cta"
-          aria-label="Step inside vibe"
+          aria-label="Create your vibe account"
         >
           <span className="vibe-landing-sun-disc">
             <span className="vibe-landing-sun-halo" aria-hidden />

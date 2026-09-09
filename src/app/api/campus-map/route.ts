@@ -20,10 +20,7 @@ import { createSupabaseServerClient } from "@/lib/supabase/server";
  * how many of those land on each candidate. Cheap because the viewer's
  * connection set is small (Dunbar) and the index on `follower_id` is hot.
  */
-export async function GET(req: Request) {
-  const url = new URL(req.url);
-  const forceDemo = url.searchParams.get("demo") === "1";
-
+export async function GET() {
   const supabase = await createSupabaseServerClient();
   const {
     data: { user },
@@ -31,19 +28,6 @@ export async function GET(req: Request) {
   } = await supabase.auth.getUser();
   if (authErr || !user) {
     return NextResponse.json({ ok: false, error: "Unauthorized" }, { status: 401 });
-  }
-
-  // Force-demo path: short-circuit before any DB-shape checks. Lets the UI
-  // preview the visual even when the viewer has no school yet OR when the
-  // school has zero peers in `users`.
-  if (forceDemo) {
-    return NextResponse.json({
-      ok: true,
-      demo: true,
-      you: { id: user.id, name: null, handle: null, major: null, avatar_url: null },
-      majors: DEMO_MAJORS,
-      orgs: DEMO_ORGS,
-    });
   }
 
   // Viewer identity — needed for "you are here" and the school filter.
@@ -58,14 +42,14 @@ export async function GET(req: Request) {
   }
   const school = (me.school ?? "").trim();
   if (!school) {
-    // No school on the viewer's profile yet — show demo zones so the
-    // page isn't a dead end. The badge tells the user it's a preview.
+    // No campus on the viewer's profile yet. Honest empty payload; the
+    // client turns `reason` into a "pick your campus" prompt. (Until S55
+    // this branch returned a fabricated roster of majors and orgs.)
     return NextResponse.json({
       ok: true,
-      demo: true,
       you: me,
-      majors: DEMO_MAJORS,
-      orgs: DEMO_ORGS,
+      majors: [],
+      orgs: [],
       reason: "no_school",
     });
   }
@@ -182,16 +166,10 @@ export async function GET(req: Request) {
     member_count: orgMembers.get(o.id) ?? 0,
   }));
 
-  // Empty-state fallback OR explicit demo override. The UI exposes a
-  // "Demo" toggle so users can preview the visual even when their school
-  // already has a few real zones (which would otherwise suppress the demo).
-  const showDemo = forceDemo || majors.length === 0;
-  const finalMajors = showDemo ? DEMO_MAJORS : majors;
-  const finalOrgs = showDemo ? DEMO_ORGS : orgsOut;
-
+  // Real data only. A campus with no peers yet returns empty arrays and the
+  // client shows its "no zones yet" state instead of a fake roster.
   return NextResponse.json({
     ok: true,
-    demo: showDemo,
     you: {
       id: me.id,
       name: me.name,
@@ -199,34 +177,7 @@ export async function GET(req: Request) {
       major: me.major,
       avatar_url: me.avatar_url,
     },
-    majors: finalMajors,
-    orgs: finalOrgs,
+    majors,
+    orgs: orgsOut,
   });
 }
-
-// Curated mock zones — used only when the school has no real major data
-// yet. Numbers chosen so the UI shows variety: high-mutual (Discovery
-// sweet spot), high-connected (already-found), and stranger zones.
-const DEMO_MAJORS = [
-  { name: "Computer Science", total: 240, connected: 8, mutuals: 14 },
-  { name: "Business", total: 320, connected: 5, mutuals: 22 },
-  { name: "Psychology", total: 280, connected: 1, mutuals: 18 },
-  { name: "Biology", total: 180, connected: 2, mutuals: 6 },
-  { name: "Communication", total: 200, connected: 6, mutuals: 12 },
-  { name: "Mechanical Engineering", total: 110, connected: 3, mutuals: 4 },
-  { name: "Economics", total: 150, connected: 4, mutuals: 9 },
-  { name: "Music", total: 90, connected: 0, mutuals: 0 },
-  { name: "Studio Art", total: 70, connected: 0, mutuals: 1 },
-  { name: "Nursing", total: 95, connected: 0, mutuals: 0 },
-  { name: "Political Science", total: 165, connected: 1, mutuals: 7 },
-  { name: "Marketing", total: 145, connected: 2, mutuals: 11 },
-];
-
-const DEMO_ORGS = [
-  { id: "demo-cs", handle: "iu-cs-club", name: "IU Computer Science Club", logo_url: null, verified: true, is_public: true, member_count: 700 },
-  { id: "demo-design", handle: "design-at-iu", name: "Design @ IU", logo_url: null, verified: true, is_public: true, member_count: 312 },
-  { id: "demo-venture", handle: "iu-venture-club", name: "IU Venture Club", logo_url: null, verified: true, is_public: true, member_count: 540 },
-  { id: "demo-nsbe", handle: "iu-nsbe", name: "NSBE", logo_url: null, verified: true, is_public: true, member_count: 280 },
-  { id: "demo-wic", handle: "women-in-computing", name: "Women in Computing", logo_url: null, verified: true, is_public: true, member_count: 420 },
-  { id: "demo-kis", handle: "kelley-investments", name: "Kelley Investment Society", logo_url: null, verified: true, is_public: true, member_count: 240 },
-];

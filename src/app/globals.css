@@ -894,6 +894,18 @@
   color: #ff5c35;
   font-weight: 700;
 }
+/* Primary door for new students — same pill, warmer fill. */
+.vibe-landing-signup {
+  color: #faf7f2;
+  border-color: rgba(255, 92, 53, 0.55);
+  background: rgba(255, 92, 53, 0.1);
+}
+.vibe-landing-signup:hover {
+  background: rgba(255, 92, 53, 0.18);
+}
+.vibe-landing-skip-secondary {
+  margin-top: 12px;
+}
 
 .vibe-landing-footer {
   position: relative;
