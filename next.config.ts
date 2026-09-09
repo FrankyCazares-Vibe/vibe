@@ -72,6 +72,15 @@ const nextConfig: NextConfig = {
           },
         ],
       },
+      {
+        // The product journal is an internal document served from public/.
+        // robots.txt asks crawlers not to fetch it; this tells the ones that
+        // fetch anyway not to index it.
+        source: "/journal/:path*",
+        headers: [
+          { key: "X-Robots-Tag", value: "noindex, nofollow, noarchive" },
+        ],
+      },
     ];
   },
 };
