@@ -501,7 +501,7 @@ function CampusCard({ initialSchool }: { initialSchool: string | null }) {
   };
 
   return (
-    <section style={{ ...CARD_GLASS, padding: 22, marginBottom: 16 }}>
+    <section id="campus" style={{ ...CARD_GLASS, padding: 22, marginBottom: 16, scrollMarginTop: 24 }}>
       <SectionTitle>Campus</SectionTitle>
       <p
         style={{

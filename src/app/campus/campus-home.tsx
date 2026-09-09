@@ -8956,7 +8956,8 @@ type MapOrg = {
 };
 type MapSummary = {
   ok: boolean;
-  demo?: boolean;
+  // Set by the server when users.school is empty; majors/orgs are [] in that case.
+  reason?: "no_school";
   you: { id: string; name: string | null; handle: string | null; major: string | null; avatar_url: string | null };
   majors: MapMajor[];
   orgs: MapOrg[];
@@ -8994,9 +8995,7 @@ export function MapTabBody() {
   const [zoom, setZoom] = useState(1);
   const [dragging, setDragging] = useState(false);
   const mapContainerRef = useRef<HTMLDivElement | null>(null);
-  // The map auto-falls back to demo zones server-side when the school
-  // has no real major data yet — once real students fill in their majors
-  // the actual zones replace the placeholders, no toggle needed.
+  // No demo fallback: an empty campus renders the honest empty states below.
   const [orgCollapsed, setOrgCollapsed] = useState(false);
   // Search-to-jump state. `searchQuery` drives a small filtered
   // dropdown over the map; clicking a result smoothly pans + zooms to
@@ -9321,6 +9320,8 @@ export function MapTabBody() {
 
   const isLoading = data === null;
   const hasData = !!data && Array.isArray(data.majors) && data.majors.length > 0;
+  const noSchool = !!data && data.ok && data.reason === "no_school";
+  const loadFailed = !!data && !data.ok;
 
   return (
     <section
@@ -9374,6 +9375,27 @@ export function MapTabBody() {
             <div style={{ fontFamily: "Fraunces, serif", fontSize: 18, color: "#fff" }}>
               Scanning campus…
             </div>
+          </div>
+        ) : loadFailed ? (
+          <div style={mapEmptyOverlayStyle}>
+            <div style={{ fontFamily: "Fraunces, serif", fontSize: 18, color: "#fff", marginBottom: 6, textAlign: "center" }}>Couldn&apos;t load the map</div>
+            <div style={{ color: "rgba(255,255,255,0.55)", fontSize: 13, maxWidth: 320, textAlign: "center", lineHeight: 1.5 }}>Reload to try again.</div>
+          </div>
+        ) : noSchool ? (
+          <div style={mapEmptyOverlayStyle}>
+            <div style={{ fontFamily: "Fraunces, serif", fontSize: 18, color: "#fff", marginBottom: 6, textAlign: "center" }}>
+              Pick your campus in Settings to see your map
+            </div>
+            <div style={{ color: "rgba(255,255,255,0.55)", fontSize: 13, maxWidth: 320, textAlign: "center", lineHeight: 1.5 }}>
+              The map groups people by major at your campus. Nothing here is verified — you can change it any time.
+            </div>
+            <Link
+              href="/settings#campus"
+              onPointerDown={(e) => e.stopPropagation()}
+              style={{ marginTop: 10, fontFamily: "DM Sans, sans-serif", fontSize: 10, fontWeight: 800, letterSpacing: "0.18em", textTransform: "uppercase", color: "rgba(120,200,255,0.95)", background: "rgba(8,12,28,0.78)", border: "1px solid rgba(120,200,255,0.45)", padding: "8px 14px", borderRadius: 999, textDecoration: "none", pointerEvents: "auto" }}
+            >
+              Go to Settings →
+            </Link>
           </div>
         ) : !hasData ? (
           <div style={mapEmptyOverlayStyle}>
@@ -9644,58 +9666,61 @@ export function MapTabBody() {
           <LegendDot color="#FFB85A" /> Mutuals
           <LegendDot color="#5A9CFF" /> Discover
         </div>
-        {/* Demo toggle — separate absolutely-positioned button so the
-             canvas's pointer handlers can't swallow its click. */}
-        <div
-          style={{
-            position: "absolute",
-            top: 14,
-            right: 270,
-            zIndex: 5,
-            display: "flex",
-            gap: 6,
-          }}
-        >
-          <button
-            type="button"
-            onPointerDown={(e) => {
-              e.stopPropagation();
-              e.preventDefault();
-            }}
-            onClick={(e) => {
-              e.stopPropagation();
-              setPan({ x: 0, y: 0 });
-              setZoom(1);
-            }}
-            title="Recenter and reset zoom"
+        {/* Recenter — separate absolutely-positioned button so the
+             canvas's pointer handlers can't swallow its click.
+             Hidden until zones exist so it doesn't float over the
+             empty-state overlays. */}
+        {hasData ? (
+          <div
             style={{
-              fontFamily: "DM Sans, sans-serif",
-              fontSize: 10,
-              fontWeight: 800,
-              letterSpacing: "0.18em",
-              textTransform: "uppercase",
-              color: "rgba(120,200,255,0.95)",
-              background: "rgba(8,12,28,0.78)",
-              border: "1px solid rgba(120,200,255,0.45)",
-              padding: "7px 14px",
-              borderRadius: 999,
-              cursor: "pointer",
-              backdropFilter: "blur(14px)",
-              WebkitBackdropFilter: "blur(14px)",
-              pointerEvents: "auto",
+              position: "absolute",
+              top: 14,
+              right: 270,
+              zIndex: 5,
+              display: "flex",
+              gap: 6,
             }}
           >
-            Recenter
-          </button>
-        </div>
+            <button
+              type="button"
+              onPointerDown={(e) => {
+                e.stopPropagation();
+                e.preventDefault();
+              }}
+              onClick={(e) => {
+                e.stopPropagation();
+                setPan({ x: 0, y: 0 });
+                setZoom(1);
+              }}
+              title="Recenter and reset zoom"
+              style={{
+                fontFamily: "DM Sans, sans-serif",
+                fontSize: 10,
+                fontWeight: 800,
+                letterSpacing: "0.18em",
+                textTransform: "uppercase",
+                color: "rgba(120,200,255,0.95)",
+                background: "rgba(8,12,28,0.78)",
+                border: "1px solid rgba(120,200,255,0.45)",
+                padding: "7px 14px",
+                borderRadius: 999,
+                cursor: "pointer",
+                backdropFilter: "blur(14px)",
+                WebkitBackdropFilter: "blur(14px)",
+                pointerEvents: "auto",
+              }}
+            >
+              Recenter
+            </button>
+          </div>
+        ) : null}
 
       </div>
 
       {selected ? (
         <ZonePanel
-          key={`${selected.kind}:${selected.key}:${data?.demo ? "demo" : "real"}`}
+          key={`${selected.kind}:${selected.key}`}
           selection={selected}
-          demo={!!data?.demo}
           onClose={() => setSelected(null)}
         />
       ) : null}
@@ -10402,11 +10427,9 @@ type ZoneRow = {
 
 function ZonePanel({
   selection,
-  demo,
   onClose,
 }: {
   selection: ZoneSelection;
-  demo: boolean;
   onClose: () => void;
 }) {
   const [data, setData] = useState<{
@@ -10424,8 +10447,7 @@ function ZonePanel({
           selection.kind === "major"
             ? `/api/campus-map/zone?major=${encodeURIComponent(selection.key)}`
             : `/api/campus-map/zone?org=${encodeURIComponent(selection.key)}`;
-        const url = demo ? `${base}&demo=1` : base;
-        const res = await fetch(url, { cache: "no-store" });
+        const res = await fetch(base, { cache: "no-store" });
         const j = await res.json();
         if (cancelled) return;
         if (j?.ok) {
@@ -10438,6 +10460,8 @@ function ZonePanel({
           if ((j.mutuals ?? []).length > 0) setTab("mutuals");
           else if ((j.discover ?? []).length > 0) setTab("discover");
           else if ((j.connected ?? []).length > 0) setTab("connected");
+        } else {
+          setData({ connected: [], mutuals: [], discover: [] });
         }
       } catch {
         if (!cancelled) setData({ connected: [], mutuals: [], discover: [] });
@@ -10446,7 +10470,7 @@ function ZonePanel({
     return () => {
       cancelled = true;
     };
-  }, [selection, demo]);
+  }, [selection]);
 
   if (typeof document === "undefined") return null;
 
@@ -10457,6 +10481,11 @@ function ZonePanel({
       ? data.mutuals
       : data.discover
     : null;
+  const zoneEmpty =
+    data !== null &&
+    data.connected.length === 0 &&
+    data.mutuals.length === 0 &&
+    data.discover.length === 0;
 
   return (
     <div
@@ -10591,12 +10620,18 @@ function ZonePanel({
           <div style={{ color: "rgba(255,255,255,0.55)", fontFamily: "DM Sans, sans-serif", fontSize: 13, padding: "20px 0", textAlign: "center" }}>
             Loading…
           </div>
+        ) : zoneEmpty ? (
+          <div style={{ color: "rgba(255,255,255,0.55)", fontFamily: "DM Sans, sans-serif", fontSize: 13, padding: "20px 0", textAlign: "center", lineHeight: 1.5 }}>
+            {selection.kind === "major"
+              ? "Nobody else at your campus has this major on their profile yet."
+              : "No other members in this org yet."}
+          </div>
         ) : rows.length === 0 ? (
           <div style={{ color: "rgba(255,255,255,0.55)", fontFamily: "DM Sans, sans-serif", fontSize: 13, padding: "20px 0", textAlign: "center", lineHeight: 1.5 }}>
             {tab === "discover"
               ? "No new faces here yet."
               : tab === "mutuals"
-              ? "No mutuals here — try Discover."
+              ? "No mutuals here yet."
               : "No connections here yet."}
           </div>
         ) : (

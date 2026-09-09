@@ -49,7 +49,7 @@ type MapOrg = {
 
 type MapSummary = {
   ok: boolean;
-  demo?: boolean;
+  reason?: "no_school";
   you: {
     id: string;
     name: string | null;
@@ -281,6 +281,8 @@ export function MapMobile() {
 
   const layout = useMemo(() => computeLayout(data), [data]);
   const hasData = !!data?.ok && (data.majors?.length ?? 0) > 0;
+  const noSchool = !!data?.ok && data.reason === "no_school";
+  const loadFailed = !!data && !data.ok;
 
   const onPointerDown = useCallback((e: React.PointerEvent<HTMLDivElement>) => {
     pointersRef.current.set(e.pointerId, { x: e.clientX, y: e.clientY });
@@ -382,6 +384,27 @@ export function MapMobile() {
       >
         {data === null ? (
           <MapOverlay>Scanning campus…</MapOverlay>
+        ) : loadFailed ? (
+          <MapOverlay subtle>
+            <div style={{ fontFamily: "Fraunces, serif", fontSize: 17, color: "#fff", marginBottom: 6, textAlign: "center" }}>Couldn&apos;t load the map</div>
+            <div style={{ color: "rgba(255,255,255,0.55)", fontFamily: "DM Sans, sans-serif", fontSize: 13, textAlign: "center" }}>Pull to refresh or reopen the tab.</div>
+          </MapOverlay>
+        ) : noSchool ? (
+          <MapOverlay subtle>
+            <div style={{ fontFamily: "Fraunces, serif", fontSize: 17, color: "#fff", marginBottom: 6, textAlign: "center" }}>
+              Pick your campus in Settings to see your map
+            </div>
+            <div style={{ color: "rgba(255,255,255,0.55)", fontFamily: "DM Sans, sans-serif", fontSize: 13, maxWidth: 280, textAlign: "center", lineHeight: 1.55 }}>
+              The map groups people by major at your campus. Nothing here is verified — you can change it any time.
+            </div>
+            <Link
+              href="/settings#campus"
+              onPointerDown={(e) => e.stopPropagation()}
+              style={{ marginTop: 12, fontFamily: "DM Sans, sans-serif", fontSize: 12, fontWeight: 800, color: "#fff", background: "rgba(120,200,255,0.18)", border: "1px solid rgba(120,200,255,0.45)", padding: "10px 16px", borderRadius: 999, textDecoration: "none", WebkitTapHighlightColor: "transparent" }}
+            >
+              Go to Settings →
+            </Link>
+          </MapOverlay>
         ) : !hasData ? (
           <MapOverlay subtle>
             <div style={{ fontFamily: "Fraunces, serif", fontSize: 17, color: "#fff", marginBottom: 6 }}>
@@ -462,7 +485,6 @@ export function MapMobile() {
       {selection ? (
         <ZoneSheet
           selection={selection}
-          demo={!!data?.demo}
           onClose={() => setSelection(null)}
         />
       ) : null}
@@ -660,11 +682,9 @@ function MajorBubble({
 
 function ZoneSheet({
   selection,
-  demo,
   onClose,
 }: {
   selection: ZoneSelection;
-  demo: boolean;
   onClose: () => void;
 }) {
   const [data, setData] = useState<{
@@ -684,8 +704,7 @@ function ZoneSheet({
           selection.kind === "major"
             ? `/api/campus-map/zone?major=${encodeURIComponent(selection.key)}`
             : `/api/campus-map/zone?org=${encodeURIComponent(selection.key)}`;
-        const url = demo ? `${base}&demo=1` : base;
-        const res = await fetch(url, { cache: "no-store" });
+        const res = await fetch(base, { cache: "no-store" });
         const j = await res.json();
         if (cancelled) return;
         if (j?.ok) {
@@ -709,7 +728,7 @@ function ZoneSheet({
     return () => {
       cancelled = true;
     };
-  }, [selection, demo]);
+  }, [selection]);
 
   const rows =
     data === null
@@ -719,6 +738,11 @@ function ZoneSheet({
         : tab === "mutuals"
           ? data.mutuals
           : data.discover;
+  const zoneEmpty =
+    data !== null &&
+    data.connected.length === 0 &&
+    data.mutuals.length === 0 &&
+    data.discover.length === 0;
 
   const accent =
     selection.kind === "major"
@@ -872,6 +896,12 @@ function ZoneSheet({
                 }}
               >
                 Loading…
+              </div>
+            ) : zoneEmpty ? (
+              <div style={{ padding: "40px 18px", textAlign: "center", color: "rgba(255,255,255,0.62)", fontFamily: "DM Sans, sans-serif", fontSize: 13, lineHeight: 1.5 }}>
+                {selection.kind === "major"
+                  ? "Nobody else at your campus has this major on their profile yet."
+                  : "No other members in this org yet."}
               </div>
             ) : rows.length === 0 ? (
               <div
