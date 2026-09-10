@@ -1,7 +1,7 @@
 import { NextResponse } from "next/server";
 import type { SupabaseClient } from "@supabase/supabase-js";
 
-import { getCountsFor, getFollowState } from "@/lib/connections/queries";
+import { getCountsFor, getFollowState, getMutualCount } from "@/lib/connections/queries";
 import { buildVibeUserV1FromProfile } from "@/lib/profile/build-vibe-user-v1";
 import { normalizeProfileView } from "@/lib/profile/normalize-profile-view";
 import { parseResumeDocRef } from "@/lib/profile/resume-doc-url";
@@ -176,18 +176,27 @@ export async function GET(_req: Request, ctx: RouteContext) {
   const vibeUser = buildVibeUserV1FromProfile(profile, { appShell: false });
 
   const targetId = profile.id;
-  const [counts, follow] = await Promise.all([
+  const [counts, follow, mutual] = await Promise.all([
     getCountsFor(reader, targetId),
     viewer
       ? getFollowState(supabase, viewer.id, targetId)
       : Promise.resolve("none" as const),
+    // "N mutual" on a visited profile. Deliberately the service client, not
+    // `reader`: the intersection has to read the TARGET's connection rows as
+    // well as the viewer's, and `reader` is the cookie client whenever a
+    // viewer exists, so RLS could silently zero this the way it zeroed view
+    // counts. Only the resulting number leaves the route. The helper already
+    // returns 0 for a self-view, and we pass 0 when signed out.
+    viewer
+      ? getMutualCount(service, viewer.id, targetId)
+      : Promise.resolve(0),
   ]);
 
   vibeUser.counts = {
     followers: String(counts.followers),
     following: String(counts.following),
     connections: String(counts.connections),
-    mutual: "0",
+    mutual: String(mutual),
   };
   vibeUser._isViewerMode = true;
   vibeUser._viewerFollowState = follow;
