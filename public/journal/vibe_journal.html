@@ -454,6 +454,9 @@ body {
   <button class="nav-item" onclick="showSection('vision', this)">
     <span class="nav-icon">◇</span> Vision &amp; Positioning
   </button>
+  <button class="nav-item" onclick="showSection('principles', this)">
+    <span class="nav-icon">✦</span> Principles
+  </button>
   <button class="nav-item" onclick="showSection('features', this)">
     <span class="nav-icon">◧</span> Feature Breakdown
   </button>
@@ -638,6 +641,61 @@ body {
     </div>
 
     <!-- FEATURES -->
+    <div class="section" id="sec-principles">
+      <div class="section-header">
+        <div class="section-eyebrow">Design Principles</div>
+        <h2 class="section-title">How We Make Every <em>Decision</em></h2>
+      </div>
+
+      <div class="card">
+        <div class="card-body" style="font-size: 16px; line-height: 1.7;">Every product decision &mdash; from copy to color to feature scope &mdash; is run through these principles. They&rsquo;re not values on a wall. They&rsquo;re the actual filter.</div>
+      </div>
+
+      <div class="card">
+        <div class="card-label">01 &middot; Personality is professional</div>
+        <div class="card-body" style="line-height: 1.7;">We never treat &ldquo;being yourself&rdquo; as the casual, low-stakes version of professional presence. How you think, communicate, and create is exactly the information employers and collaborators need. We design for this truth at every layer of the product.</div>
+      </div>
+
+      <div class="card">
+        <div class="card-label">02 &middot; Show, don&rsquo;t list</div>
+        <div class="card-body" style="line-height: 1.7;">A 60-second video of someone explaining a project they built communicates more signal than three pages of bullet points. Every product decision should move toward showing over listing. The Vibes tab is the purest expression of this principle.</div>
+      </div>
+
+      <div class="card">
+        <div class="card-label">03 &middot; Both sides must win</div>
+        <div class="card-body" style="line-height: 1.7;">A recruiter-hostile platform won&rsquo;t sustain demand. A candidate-hostile platform won&rsquo;t build supply. Every major feature should be legible and valuable to both audiences, even if it delights one more than the other.</div>
+      </div>
+
+      <div class="card">
+        <div class="card-label">04 &middot; Warm, not casual</div>
+        <div class="card-body" style="line-height: 1.7;">There&rsquo;s a difference between &ldquo;relaxed&rdquo; and &ldquo;unprofessional.&rdquo; Vibe&rsquo;s tone is the equivalent of a great first conversation at a networking event &mdash; warm, confident, direct &mdash; not a TikTok comment section. The UI, copy, and features should all feel like that conversation.</div>
+      </div>
+
+      <div class="card">
+        <div class="card-label">05 &middot; No vanity metrics</div>
+        <div class="card-body" style="line-height: 1.7;">Likes and follower counts create the exact incentives that make LinkedIn exhausting. Vibe uses contextual emoji reactions (not a generic thumbs-up), contextual saves, and meaningful connection signals. We don&rsquo;t show follower counts on profiles by default.</div>
+      </div>
+
+      <div class="card">
+        <div class="card-label">06 &middot; Your signal, your control</div>
+        <div class="card-body" style="line-height: 1.7;">Users control who can contact them, how, and with what context. No cold InMail. No recruiter spam unless you opt in. This isn&rsquo;t just a feature &mdash; it&rsquo;s a core trust mechanism that makes both sides feel safe on the platform.</div>
+      </div>
+
+      <div class="callout coral">
+        <div class="callout-label">Where we are not living up to them (Sept 10, 2026)</div>
+        <div class="callout-body">Recorded honestly, because a principle nobody checks is decoration.<br><br>
+          <strong>05 &middot; No vanity metrics</strong> was broken for five months and nobody caught it. The desktop profile shipped a hardcoded &ldquo;1.2k followers / 847 connections / 32 mutual&rdquo;, the campus map invented a 700-member CS club, and a clip claimed 2.1k views. All of it fabricated, all of it removed in Session 55. This principle explicitly says we don&rsquo;t show follower counts on profiles by default, and the profile was showing an invented one.<br><br>
+          <strong>02 &middot; Show, don&rsquo;t list</strong> names the Vibes tab as its purest expression, and Clips are currently parked until demand shows up. That may be the right commercial call. It should be made knowingly, not by drift.<br><br>
+          <strong>03 &middot; Both sides must win</strong> is half true. The recruiter-facing profile view exists; the jobs half was a prototype with a fake &ldquo;Applied&rdquo; button and now redirects to Campus. Supply has a product, demand has nothing.<br><br>
+          <strong>06 &middot; Your signal, your control</strong> is the one being honoured well, and it happened without anyone naming it: the private resumes bucket, redaction bars, consent capture and the deletion purge are all this principle in code.</div>
+      </div>
+
+      <div class="callout dark">
+        <div class="callout-label">Provenance</div>
+        <div class="callout-body">These six were written on April 1, 2026, in a separate prose journal that was never committed to git. They existed only as a file in Downloads until Session 55 found them and moved them here. Nothing else in the project referenced them. They are early &mdash; two sessions in &mdash; so re-read them at each milestone and retire any that stopped being true rather than treating them as scripture.</div>
+      </div>
+    </div>
+
     <div class="section" id="sec-features">
       <div class="section-header">
         <div class="section-eyebrow">Feature Breakdown</div>
