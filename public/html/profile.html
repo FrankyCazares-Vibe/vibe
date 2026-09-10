@@ -1588,7 +1588,8 @@ body.recruiter-mode .pin-unpin-btn { display:none !important; }
 body.viewer-mode .owner-only { display:none !important; }
 body.viewer-mode .viewer-only { display:block !important; }
 body:not(.viewer-mode) .viewer-only { display:none !important; }
-body.viewer-mode .edit-toggle { display:none; }
+body.viewer-mode .edit-toggle,
+body.viewer-mode #editToggle { display:none !important; }
 body.viewer-mode #viewerBtn { background:rgba(255,92,53,.1);color:var(--accent);border-color:rgba(255,92,53,.3); }
 
 /* Edit-mode visitor-preview button: only shown while editing. The

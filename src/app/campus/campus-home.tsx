@@ -3894,7 +3894,6 @@ function PersonRow(props: {
         </div>
       </div>
       <button
-        onClick={(e) => e.stopPropagation()}
         style={{
           fontSize: 11,
           fontWeight: 700,
@@ -3990,7 +3989,6 @@ function EntityRow(props: {
         </div>
       </div>
       <button
-        onClick={(e) => e.stopPropagation()}
         style={{
           fontSize: 11,
           fontWeight: 700,
