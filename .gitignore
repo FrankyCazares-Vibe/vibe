@@ -44,8 +44,15 @@ yarn-error.log*
 *.tsbuildinfo
 next-env.d.ts
 
-# claude code local settings
-/.claude/
+# claude code local settings. Everything under .claude stays local EXCEPT the
+# two audit workflows: 600 lines of project-specific tooling (the security
+# sentinel and the feature sentinel) that had no backup at all until S55.
+# git will not descend into an excluded directory, so exclude the CONTENTS
+# and re-include the one subtree we want.
+/.claude/*
+!/.claude/workflows/
+/.claude/workflows/*
+!/.claude/workflows/*.js
 
 # workshop content (private — local only, never commit or deploy)
 /DOCS/
