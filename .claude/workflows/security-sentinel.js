@@ -179,7 +179,17 @@ const sectionFindings = (s) => live.filter((f) => s.dims.includes(f.dimension)).
 const sectionPrompt = (s) => {
   const fs = sectionFindings(s).map(compact)
   const scope = DIMENSIONS.filter((d) => s.dims.includes(d.key)).map((d) => `- ${d.title}: ${d.focus}`).join('\n')
-  return `You are writing ONE section of a security + risk report for the founder of Vibe (a college social network). Audience: a smart founder who is NOT a security specialist, plus the peers they will share this with. Be plain, concrete, and calm — no jargon without a one-line gloss, no scare tactics, no filler.
+  return `You are writing ONE section of a security + risk report for the founder of Vibe (a college social network).
+
+WHO READS THIS. Franky, the founder. He is smart, he writes every line of the code himself, and he has asked explicitly to have these reports explained non-technically so he can fully understand them. He also shares them with two cofounders who do not code at all. The same document is later handed to the engineer who fixes the findings. So write every finding in two layers, always in this order: a plain-English layer a non-coder understands completely on its own, then the technical detail underneath for whoever does the work. Never satisfy the plain layer by deleting the technical detail.
+
+PLAIN-ENGLISH CONTRACT (absolute in the plain layer, the default everywhere else):
+- No unexplained jargon. These words are BANNED unless you gloss them in plain words in the same sentence, the first time they appear in your output: API, endpoint, route, field, payload, contract, RLS, row-level security, policy, grant, service role, 401, 403, 404, 307, cache, header, OG, OpenGraph, proxy, middleware, iframe, localStorage, component, prop, hydration, bundle, key, bucket, migration, schema, XSS, cross-site scripting, CSP, Content-Security-Policy, CSRF, SSRF, open redirect, injection, token, JWT, sanitize, escape, presigned. In the plain layer, prefer dropping the word entirely over glossing it — a gloss is the fallback, not the goal. A gloss is words a parent could follow, e.g. "a Content-Security-Policy (a browser rule listing which code is allowed to run on your pages)".
+- Prefer what a STUDENT experiences over what the code does. "A stranger could read the private messages between two students" beats "channel_members is missing a row-level policy".
+- Say why it matters in human terms: trust, safety, someone's first impression of Vibe, whether they come back, money leaving the company's account, a complaint a regulator would act on.
+- Concrete over abstract. Never stop at "security risk", "attack surface" or "suboptimal" — say what the person on the other end actually sees, loses, or pays.
+- Calm and specific. No drama, no scare language, no filler. Short sentences.
+- Severity words (Critical / High / Medium / Low) stay, but never lean on the label to carry the seriousness. A reader who ignores the label entirely must still grasp the stakes from your plain sentences alone.
 
 SECTION: ${s.title}
 
@@ -189,32 +199,41 @@ ${scope}
 VERIFIED FINDINGS FOR THIS SECTION (JSON; already filtered to still-relevant items; status tells you if it is confirmed now vs needs a live test):
 ${JSON.stringify(fs).slice(0, 9000)}
 
-Write the section body in GitHub-flavoured markdown. Start with 2-3 sentences of plain-English framing (what this area covers and the overall state). Then one subsection per finding as:
+Write the section body in GitHub-flavoured markdown. Start with 2-3 sentences of plain-English framing: what this area covers, said in everyday words ("this is about who can see whose messages"), and the overall state. Then one subsection per finding as:
 ### [SEVERITY] Short title  — <status in plain words>
+**In plain terms:** Two or three sentences that a cofounder who does not code can read on their own and fully understand. Zero unexplained jargon — this paragraph obeys the banned-word list with no exceptions. Say what could actually happen to a student on Vibe, or to the company, in this order: what someone could do, who it lands on, and why that matters (trust, safety, privacy, money, whether people come back). Open with the consequence, never with the mechanism. This paragraph must stand alone: a reader who stops here, and who ignores the severity label, still has the whole point.
 **What it is:** ...  **How an attacker uses it:** ...  **Impact:** ...  **What to do:** ...  **Where:** <file/route/policy>
-Order findings hardest-first (Critical → Low). If there are NO findings, say so in one line and briefly note what was checked and why it looks sound. Do NOT invent findings beyond the JSON. Output ONLY the markdown body — no top-level heading (the assembler adds "## ${s.title}"), no preamble, no sign-off.`
+The four fields after "In plain terms" are for the engineer who will fix this, so keep them precise and technical — exact names, exact steps, no dumbing down. They will repeat what the plain paragraph already said; that is correct, not redundant. Do not move technical detail up into the plain paragraph, and do not drop it to save space.
+Order findings hardest-first (Critical → Low). If there are NO findings, say so in one line and briefly note what was checked and why it looks sound, in words a non-coder follows. Do NOT invent findings beyond the JSON. Output ONLY the markdown body — no top-level heading (the assembler adds "## ${s.title}"), no preamble, no sign-off.`
 }
 
 const execInput = JSON.stringify(live.map((f) => ({ area: f.dimension, title: f.title, severity: sevOf(f), status: f.verdict, impact: f.impact })).sort((a, b) => (sevRank[a.severity] ?? 9) - (sevRank[b.severity] ?? 9))).slice(0, 9000)
 
-const execPrompt = `You are writing the EXECUTIVE SUMMARY of a security + privacy + cost risk report for the founder of Vibe (a live college social network at ${SITE}) and the peers they will share it with. Audience is smart but not security specialists.
+const execPrompt = `You are writing the EXECUTIVE SUMMARY of a security + privacy + cost risk report for the founder of Vibe (a live college social network at ${SITE}) and the two cofounders he shares it with, neither of whom writes code. This summary is the part most likely to be read on its own, so every sentence in it must be understandable by someone who has never heard of row-level security or cross-site scripting.
+
+PLAIN-ENGLISH CONTRACT (governs every sentence here):
+- No unexplained jargon. These words are BANNED unless you gloss them in plain words in the same sentence, the first time they appear in your output: API, endpoint, route, field, payload, contract, RLS, row-level security, policy, grant, service role, 401, 403, 404, 307, cache, header, OG, OpenGraph, proxy, middleware, iframe, localStorage, component, prop, hydration, bundle, key, bucket, migration, schema, XSS, cross-site scripting, CSP, Content-Security-Policy, CSRF, SSRF, open redirect, injection, token, JWT, sanitize, escape, presigned. Prefer dropping the word entirely over glossing it. A gloss is words a parent could follow, e.g. "a Content-Security-Policy (a browser rule listing which code is allowed to run on your pages)".
+- Prefer what a STUDENT experiences over what the code does, and say why it matters in human terms: trust, safety, privacy, money leaving the company's account, whether students come back.
+- Concrete over abstract. Never stop at "security risk" or "attack surface" — say what the person on the other end actually sees, loses, or pays.
+- Calm and specific. No drama, no scare language, no filler. Short sentences.
+- Severity words (Critical / High / Medium / Low) stay, but a reader who ignores every label must still grasp the stakes from your plain sentences alone.
 
 Inventory: ${JSON.stringify(inventory).slice(0, 1500)}
 All still-relevant verified findings (JSON): ${execInput}
 Counts: ${JSON.stringify(counts)}
 
 Write, in GitHub-flavoured markdown, ONLY the body (no top-level heading — the assembler adds "## Executive Summary"):
-1) Two or three short paragraphs: what was audited, the method (read-only static + DB-policy + config + dependency analysis, adversarially verified; NOT live exploitation of production), and the honest overall posture — acknowledge that a big hardening pass just landed, and whether anything material remains.
-2) A "Risk register" markdown table: columns  | # | Risk | Area | Severity | Status | One-line impact |  — one row per finding, hardest-first. Keep each cell short; never use a raw "|" inside a cell.
-3) A "Top things to do now" numbered list (max 6) of the highest-leverage actions, each one line.
+1) Two or three short paragraphs, written so a reader who has never heard of row-level security or cross-site scripting understands every sentence. Cover: what was looked at, named as places and questions rather than systems ("who can read whose messages", "what happens to the files students upload", "what the app costs if someone abuses it"); how it was done (reading the code, the database's own access rules, the settings, and the outside packages, with a second reviewer trying to knock every finding down — nobody attacked the live site, because real students' data and private messages are on it, so anything only a live attempt could settle is marked as needing a test on a copy of the site); and the honest overall state — say plainly whether a student using Vibe today is exposed to anything serious, credit the hardening pass that just landed, and name what real risk is left. If a technical term is genuinely unavoidable here, gloss it in the same sentence.
+2) A "Risk register" markdown table: columns  | # | Risk | Area | Severity | Status | One-line impact |  — one row per finding, hardest-first. Keep each cell short; never use a raw "|" inside a cell. The "Risk" cell may name the mechanism. The "One-line impact" cell may NOT: it must be a plain consequence a non-technical reader feels immediately, in the shape "someone could do X to Y" — for example "a student could read another student's private messages", "anyone with the link could download a student's un-redacted resume", "one free account could run up your storage bill overnight", "an outsider could pass as a verified IU student". Never a mechanism ("missing row-level policy on channel_members"), never a restatement of the severity ("high risk"), never a vague noun phrase ("data exposure").
+3) A "Top things to do now" numbered list (max 6) of the highest-leverage actions. Each is one line and names two things: what to do, and — in plain words — the risk that disappears once it is done.
 No preamble, no sign-off.`
 
-const roadmapPrompt = `You are writing the REMEDIATION ROADMAP for a founder acting on a security + risk report for Vibe. From the verified findings below, produce a phased, do-this-next plan.
+const roadmapPrompt = `You are writing the REMEDIATION ROADMAP for a founder acting on a security + risk report for Vibe. From the verified findings below, produce a phased, do-this-next plan. He writes all the code himself and shares this list with two cofounders who do not code, so every bullet has to read as a plain outcome as well as a task. Avoid jargon; if a technical term is unavoidable, gloss it in plain words in the same breath (e.g. "a live pentest — paying someone to attack a copy of the site on purpose"). No drama, no filler, short sentences.
 
 Findings (JSON): ${JSON.stringify(live.map(compact)).slice(0, 9000)}
 Counts: ${JSON.stringify(counts)}
 
-Output ONLY markdown body (assembler adds "## Remediation Roadmap"). Group actions into four subsections: "### Immediate (this week)", "### Short term (this month)", "### Ongoing / process", "### Needs a specialist" (e.g. a lawyer for compliance items, or a live pentest against a staging deploy). Each action is one bullet: the fix, then in parentheses a rough owner + effort tag like (code, ~1h) / (Supabase dashboard, 5 min) / (lawyer) / (staging pentest). Order within each group hardest-first. Be specific enough to act on without re-reading the whole report.`
+Output ONLY markdown body (assembler adds "## Remediation Roadmap"). Group actions into four subsections: "### Immediate (this week)", "### Short term (this month)", "### Ongoing / process", "### Needs a specialist" (e.g. a lawyer for compliance items, or a live pentest against a staging deploy). Each action is one bullet with three parts, in this exact order: (a) the fix, specific enough to act on without re-reading the whole report; (b) in parentheses, a rough owner + effort tag like (code, ~1h) / (Supabase dashboard, 5 min) / (lawyer) / (staging pentest); (c) after an em dash, ONE plain sentence naming the risk that goes away when it is done, written for a reader who does not code — e.g. "— after this, a stranger with a link can no longer download a student's resume", "— after this, one account can no longer flood every student's notifications". Part (c) is required on every bullet without exception; no bullet may end at the effort tag, and "— reduces risk" does not count. Order within each group hardest-first.`
 
 const [execMd, roadmapMd, ...sectionMds] = await parallel([
   () => agent(execPrompt, { label: 'exec-summary', phase: 'Report' }),

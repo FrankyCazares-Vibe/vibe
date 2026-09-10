@@ -53,6 +53,11 @@ next-env.d.ts
 !/.claude/workflows/
 /.claude/workflows/*
 !/.claude/workflows/*.js
+# Skills we wrote for this project are committed too. Third-party skills
+# installed under .claude/skills stay local — they are re-installable and big.
+!/.claude/skills/
+/.claude/skills/*
+!/.claude/skills/audit-sentinels/
 
 # workshop content (private — local only, never commit or deploy)
 /DOCS/

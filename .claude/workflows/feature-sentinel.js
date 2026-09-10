@@ -228,26 +228,53 @@ const SECTIONS = [
   { key: 'rest', title: 'Cosmetic and latent', pick: (f) => ['Cosmetic', 'Latent'].includes(impactOf(f)) && !['empty-state-lies', 'inert-data'].includes(f.dimension) },
 ]
 
-const sectionPrompt = (s, items) => `You are writing one section of a BREAKAGE report for the founder of Vibe (a live college social app at ${SITE}) and the teammates they share it with. Readers are smart; only the founder writes code.
+const sectionPrompt = (s, items) => `You are writing one section of a BREAKAGE report for the founder of Vibe (a live college social app at ${SITE}) and the two cofounders he shares it with. He is the only one who writes code; they write none. He has asked to be able to read this report and fully understand every finding without reading code — while it stays actionable for the engineer who will fix it.
 
 SECTION: ${s.title}
 
 FINDINGS (JSON):
 ${JSON.stringify(items.map(compact), null, 1).slice(0, 12000)}
 
-Write clean markdown. For each finding use a "### " heading that names the thing a user would name, then short paragraphs (no nested bullets): **What breaks** (the symptom, in the user's words), **Why** (the actual mechanism, naming the file or setting), **Fix** (what to change), and **Where** (evidence). Order by how much it hurts a real user. Be concrete and unhedged where the evidence is solid; say plainly when something still needs a live signed-in check. No preamble, no restating the section title, no closing summary. If there are no findings, output exactly: _Nothing found in this category._`
+Write clean markdown. Order findings by how much they hurt a real student. Every finding uses EXACTLY this shape, in this order, as short paragraphs (no nested bullets):
+
+A "### " heading — name the thing the way a student would name it, not the way the code names it.
+
+**In plain terms** — two or three sentences of ordinary English, written for the founder and his two cofounders who do not code. Say what a student actually sees (or fails to see), and why that matters to them: what they conclude about Vibe, whether they trust it, whether they come back. THIS PARAGRAPH MUST STAND ALONE. Someone who reads only this paragraph and nothing below it must understand the problem completely. Do not refer forward to the paragraphs below. Do not name a file, function, table, setting, status code, or library here.
+
+**What breaks** — the concrete symptom in a student's own words, as if quoting a tester.
+
+**Why it happens** — the real mechanism, technical, written for whoever fixes it. Name the file and line, the setting, the query. This is the FIRST place technical detail is allowed.
+
+**Fix** — what to change.
+
+**Where** — the evidence that proves it.
+
+RULES FOR THE PLAIN-TERMS PARAGRAPH ONLY (the three paragraphs below it stay as technical as they need to be):
+- These words are banned there unless the same sentence explains them in ordinary English: API, endpoint, route, field, payload, contract, RLS, policy, grant, 401, 403, 404, 307, cache, header, OG, OpenGraph, proxy, middleware, iframe, localStorage, component, prop, hydration, bundle, key, bucket, migration, schema, client, server-side, render, viewport. Write "on a phone" instead of a screen width. Write "the link sends you to the login screen before it can show anything" instead of a status code. Write "a Vibe link pasted into a group chat shows up as a bare word with no picture" instead of naming preview tags.
+- Describe what a person experiences, never what the code does. "Someone sends a photo and the message shows up empty" beats "the media fields are absent from the row type."
+- Concrete over abstract. Never "suboptimal user experience" or "degraded functionality" — say what appears on the screen.
+- Short sentences. Calm and specific. No drama, no scare language, no filler, no selling.
+- If it only bites on a phone, or only someone who is not signed in, or only once there is more real data, say that here in plain words.
+
+Be concrete and unhedged where the evidence is solid; say plainly when something still needs a live signed-in check. No preamble, no restating the section title, no closing summary. If there are no findings, output exactly: _Nothing found in this category._`
 
 const execPrompt = `You are writing the EXECUTIVE SUMMARY of a breakage report for the founder of Vibe, a live college social app at ${SITE} piloting with a handful of real students.
 
 VERIFIED FINDINGS (JSON):
 ${JSON.stringify(sorted.map((f) => ({ area: f.dimension, title: f.title, impact: impactOf(f), status: f.verdict, symptom: f.user_symptom, surface: f.surface })), null, 1).slice(0, 9000)}
 
-Write 4-7 short paragraphs, no bullets, plain language:
+Write 4-7 short paragraphs, no bullets. The founder reads this first and forwards it to two cofounders who write no code at all, so every sentence must land for someone who has never seen the codebase:
 1. The honest headline: is the product usable right now, and what is the worst thing a tester would hit?
-2. The pattern, if there is one — are the breaks concentrated in a viewport, a recent change, a defensive measure, or an assumption about data that stopped being true?
-3. The two or three that cost the most trust with a pilot user, and why those.
+2. The pattern, if there is one — say it as a plain sentence about what keeps going wrong, not as an architecture note. Is it concentrated on phones, on a recent change, on a protection that is too strict, or on an assumption about the data that stopped being true?
+3. The two or three that cost the most trust with a pilot user, and why those — in terms of what a student concludes about Vibe and whether they open it a second time.
 4. What is NOT broken — say so specifically; a report that only lists problems misleads.
 5. What this run could not check (especially anything behind login${AUTHED ? '' : ', since no signed-in session was available'}).
+
+HOW TO WRITE IT — a hard requirement, not a preference:
+- Say what a student sees. Do not say what the code does. "Photos sent in a message show up as empty bubbles on a phone" beats "the mobile client asks the API for a field the API stopped sending." "A Vibe link pasted into a group chat shows up as a bare word with no picture or name" beats "the page 307s to login before the crawler reads its OG tags."
+- These words are banned unless the same sentence explains them in ordinary English: API, endpoint, route, field, payload, contract, RLS, policy, grant, 401, 403, 404, 307, cache, header, OG, OpenGraph, proxy, middleware, iframe, localStorage, component, prop, hydration, bundle, key, bucket, migration, schema, client, server-side, render, viewport. If a technical word is genuinely unavoidable, define it in plain words in the same sentence and move on.
+- Concrete over abstract. Never "suboptimal user experience" or "degraded functionality" — say what appears on the screen.
+- Short sentences. Calm and specific. No drama, no scare language, no filler.
 No preamble. Do not restate the finding list.`
 
 const fixOrderPrompt = `You are writing the FIX ORDER for the founder of Vibe from the breakage findings below. One person does the work.
@@ -255,7 +282,13 @@ const fixOrderPrompt = `You are writing the FIX ORDER for the founder of Vibe fr
 FINDINGS (JSON):
 ${JSON.stringify(sorted.map(compact), null, 1).slice(0, 12000)}
 
-Produce a short ordered plan in markdown: "Right now" (anything blocking a core flow for a real tester), "This week", "When convenient", and "Needs a decision, not a fix" (things that are working as designed but feel broken to users). For each item: one line naming it and the file or setting to change, plus how to confirm it is fixed. Group items that share a root cause into one entry — do not list the same fix five times. If something needs a signed-in check before it can even be diagnosed, say that instead of guessing.`
+Produce a short ordered plan in markdown: "Right now" (anything blocking a core flow for a real tester), "This week", "When convenient", and "Needs a decision, not a fix" (things that are working as designed but feel broken to users). Group items that share a root cause into one entry — do not list the same fix five times. If something needs a signed-in check before it can even be diagnosed, say that instead of guessing.
+
+Each item has two parts, in this order:
+1. One plain sentence, in ordinary English, naming what a student STOPS experiencing once this is done — for example "students stop seeing empty grey boxes where their friends' photos should be." No file names, no jargon, no status codes. The founder should be able to read only these sentences, top to bottom, and know exactly what the day's work buys him.
+2. Then the working detail for whoever does the fix: the file or setting to change, and how to confirm it is fixed.
+
+Part 1 must avoid the words API, endpoint, route, field, payload, contract, RLS, policy, cache, header, OG, proxy, middleware, component, prop, bundle, bucket, migration and schema, and must not use status codes like 401 or 404. Part 2 may use whatever it needs.`
 
 const [execMd, fixMd, ...sectionMds] = await parallel([
   () => agent(execPrompt, { label: 'exec-summary', phase: 'Report' }),
@@ -276,6 +309,8 @@ const markdown = `# Vibe — Broken Features Report
 **Prepared:** ${DATE}  |  **Target:** ${SITE}  |  **Method:** read-only breakage audit — ${DIMENSIONS.length} lenses over code, live database state, and the running site, with every user-impacting finding independently re-checked before it was kept.
 
 > **What this is.** The sibling of the security report. That one asks "can someone attack this?"; this one asks "does this still work?" It hunts the failures that do not throw — a feature that renders nothing, a filter on data that is always empty, a defensive header that blocks a real screen — because those are invisible to type checks, to builds, and to a security review.
+>
+> **How to read it.** Every finding opens with a paragraph called **In plain terms**. That paragraph is written for you and for anyone you share this with: no code, no jargon, just what a student runs into and why it matters. Everything below it is working detail for whoever fixes the finding. Read only the plain-terms paragraphs and you still have the whole picture.
 >
 > **Scope.** Read-only: nothing was modified, no data was written, no migration was run.${AUTHED ? ' A signed-in session was available, so authenticated surfaces were loaded live.' : ' **No signed-in session was available**, so anything behind login was assessed from code and database state only — findings marked "needs authed test" are unconfirmed and should be checked with a real account.'}
 
