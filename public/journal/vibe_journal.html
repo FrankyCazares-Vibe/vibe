@@ -672,8 +672,8 @@ body {
       </div>
 
       <div class="card">
-        <div class="card-label">05 &middot; No vanity metrics</div>
-        <div class="card-body" style="line-height: 1.7;">Likes and follower counts create the exact incentives that make LinkedIn exhausting. Vibe uses contextual emoji reactions (not a generic thumbs-up), contextual saves, and meaningful connection signals. We don&rsquo;t show follower counts on profiles by default.</div>
+        <div class="card-label">05 &middot; Counts are public, identities are private</div>
+        <div class="card-body" style="line-height: 1.7;">Vibe is a social network and it should feel like one. Anyone can open a profile and see how many followers, connections, mutuals and posts that person has &mdash; the same as Instagram, Facebook or X. What stays private is <em>who</em>: only you see who viewed your profile, who viewed each post, who liked and who commented. That &ldquo;who&rdquo; is the thing premium sells. <span style="opacity:.75">Replaces the original 05, &ldquo;No vanity metrics&rdquo;, retired September 10, 2026 &mdash; see the note below.</span></div>
       </div>
 
       <div class="card">
@@ -684,7 +684,7 @@ body {
       <div class="callout coral">
         <div class="callout-label">Where we are not living up to them (Sept 10, 2026)</div>
         <div class="callout-body">Recorded honestly, because a principle nobody checks is decoration.<br><br>
-          <strong>05 &middot; No vanity metrics</strong> was broken for five months and nobody caught it. The desktop profile shipped a hardcoded &ldquo;1.2k followers / 847 connections / 32 mutual&rdquo;, the campus map invented a 700-member CS club, and a clip claimed 2.1k views. All of it fabricated, all of it removed in Session 55. This principle explicitly says we don&rsquo;t show follower counts on profiles by default, and the profile was showing an invented one.<br><br>
+          <strong>05 was rewritten, not violated.</strong> The original said &ldquo;no vanity metrics&rdquo; and forbade public follower counts. Read back on September 10 it did not describe the product being built, and Franky did not recognise it &mdash; the intent was always a normal social network with public counts and private analytics. The real fault it exposed was different and still real: the desktop profile shipped a hardcoded &ldquo;1.2k followers / 847 connections / 32 mutual&rdquo;, the map invented a 700-member club, and a clip claimed 2.1k views. The sin was <em>fabricated</em> numbers, not public ones. All removed in Session 55; the counts are real now (followers, following and connections all return live values), except mutuals, which is still hardcoded to zero and is on the build list.<br><br>
           <strong>02 &middot; Show, don&rsquo;t list</strong> names the Vibes tab as its purest expression, and Clips are currently parked until demand shows up. That may be the right commercial call. It should be made knowingly, not by drift.<br><br>
           <strong>03 &middot; Both sides must win</strong> is half true. The recruiter-facing profile view exists; the jobs half was a prototype with a fake &ldquo;Applied&rdquo; button and now redirects to Campus. Supply has a product, demand has nothing.<br><br>
           <strong>06 &middot; Your signal, your control</strong> is the one being honoured well, and it happened without anyone naming it: the private resumes bucket, redaction bars, consent capture and the deletion purge are all this principle in code.</div>
@@ -692,7 +692,7 @@ body {
 
       <div class="callout dark">
         <div class="callout-label">Provenance</div>
-        <div class="callout-body">These six were written on April 1, 2026, in a separate prose journal that was never committed to git. They existed only as a file in Downloads until Session 55 found them and moved them here. Nothing else in the project referenced them. They are early &mdash; two sessions in &mdash; so re-read them at each milestone and retire any that stopped being true rather than treating them as scripture.</div>
+        <div class="callout-body">These six were written on April 1, 2026, in a separate prose journal that was never committed to git. They existed only as a file in Downloads until Session 55 found them and moved them here. Nothing else in the project referenced them. They are early &mdash; two sessions in &mdash; so re-read them at each milestone and retire any that stopped being true rather than treating them as scripture. That happened immediately: principle 05 was retired and rewritten the same day it was recovered, because the founder read it back and did not recognise it. <strong>A principle nobody recognises is worse than no principle</strong>, because an agent will apply it against the founder&rsquo;s actual intent. When a recovered principle conflicts with what the founder says today, the founder wins and the text gets rewritten.</div>
       </div>
     </div>
 
