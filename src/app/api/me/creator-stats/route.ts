@@ -1,6 +1,7 @@
 import { NextResponse } from "next/server";
 
 import { createSupabaseServerClient } from "@/lib/supabase/server";
+import { createSupabaseServiceClient } from "@/lib/supabase/service";
 
 /**
  * GET /api/me/creator-stats — aggregate engagement across the viewer's
@@ -27,6 +28,9 @@ const TOP_POSTS_LIMIT = 5;
 
 export async function GET() {
   const supabase = await createSupabaseServerClient();
+  // Aggregating the caller's own view ledger needs to bypass RLS (see the
+  // post_views queries below); everything else stays on the cookie client.
+  const viewsClient = createSupabaseServiceClient();
   const {
     data: { user },
     error: authErr,
@@ -105,8 +109,15 @@ export async function GET() {
     supabase.from("post_reposts").select("post_id", { count: "exact", head: true }).in("post_id", postIds).gte("created_at", sevenAgo),
     supabase.from("post_reposts").select("post_id", { count: "exact", head: true }).in("post_id", postIds).gte("created_at", thirtyAgo),
     // Windowed view counts come from the dedupe ledger (per-user-per-day rows).
-    supabase.from("post_views").select("post_id", { count: "exact", head: true }).in("post_id", postIds).gte("viewed_on", sevenAgoDate),
-    supabase.from("post_views").select("post_id", { count: "exact", head: true }).in("post_id", postIds).gte("viewed_on", thirtyAgoDate),
+    // `post_views` intentionally has RLS on with NO client SELECT policy — we
+    // never expose individual view rows (20260508110000_post_views.sql). The
+    // cookie client therefore counted zero here for every user since the table
+    // shipped, which is why "Views 7d/30d" always read 0. These are the
+    // caller's OWN posts (postIds is derived from their user id above), so the
+    // service client is the right tool: it bypasses RLS to aggregate, and only
+    // the count ever leaves this route.
+    viewsClient.from("post_views").select("post_id", { count: "exact", head: true }).in("post_id", postIds).gte("viewed_on", sevenAgoDate),
+    viewsClient.from("post_views").select("post_id", { count: "exact", head: true }).in("post_id", postIds).gte("viewed_on", thirtyAgoDate),
   ]);
 
   // 3. Per-post engagement counts for the "top 5" list. Reuse the all-time
