@@ -832,6 +832,20 @@ export function ConversationView({
   );
   const scrollRef = useRef<HTMLDivElement | null>(null);
   const inputRef = useRef<HTMLTextAreaElement | null>(null);
+  // When the message list last scrolled (performance.now()). A bubble's
+  // pending long-press reads it so a scroll never opens the picker.
+  const listScrolledAtRef = useRef(Number.NEGATIVE_INFINITY);
+
+  // The composer grows with its draft up to its 120px max, so a normal
+  // draft never needs scrolling inside the box: under handleOnly, vaul's
+  // iOS scroll lock blocks a finger-scroll there.
+  useEffect(() => {
+    const el = inputRef.current;
+    if (!el) return;
+    el.style.height = "auto";
+    // +2 for the 1px top and bottom border (border-box).
+    el.style.height = `${Math.min(el.scrollHeight + 2, 120)}px`;
+  }, [draft]);
 
   // Hide the tab bar while the conversation is open. Reuses the
   // existing composer-overlay rule in globals.css.
@@ -1002,10 +1016,23 @@ export function ConversationView({
   const title = thread ? threadTitle(thread) : "Conversation";
   const avatar = thread ? threadAvatar(thread) : { url: null, initials: "?" };
 
+  // handleOnly: vaul lets a side drawer drag from anywhere, so a
+  // sideways drift while scrolling slid the chat or closed it. No
+  // Drawer.Handle is rendered, so nothing drags it now; Back closes it
+  // through onClose, here and in CampusMobile's org channels.
+  // On iPhone it also keeps vaul's scroll lock on while the chat is
+  // open (the lock used to lift for every touch, since each touch
+  // started a drag). The lock blocks a finger scroll inside the
+  // composer, a list scroll that starts on the list's padding, and a
+  // pinch while the list sits at its top or bottom edge. Org channels
+  // already had this: their channel drawer stays open underneath and
+  // holds the lock. repositionInputs={false} would lift it, but would
+  // also stop vaul keeping the chat above the keyboard.
   return (
     <Drawer.Root
       open
       direction="right"
+      handleOnly
       onOpenChange={(o) => { if (!o) onClose(); }}
     >
       <Drawer.Portal>
@@ -1047,6 +1074,11 @@ export function ConversationView({
             ? "1px solid rgba(255,255,255,0.08)"
             : "1px solid rgba(28,28,30,0.06)",
           flexShrink: 0,
+          // A resting finger starts no text selection, and a held
+          // profile link opens no iOS preview.
+          WebkitUserSelect: "none",
+          userSelect: "none",
+          WebkitTouchCallout: "none",
         }}
       >
         <button
@@ -1181,6 +1213,7 @@ export function ConversationView({
       <div
         ref={scrollRef}
         onScroll={(e) => {
+          listScrolledAtRef.current = performance.now();
           // Within ~80px of the bottom counts as reading the latest.
           const el = e.currentTarget;
           pinnedToBottomRef.current =
@@ -1191,6 +1224,20 @@ export function ConversationView({
           overflowY: "auto",
           padding: "16px 14px 8px",
           WebkitOverflowScrolling: "touch",
+          // No double-tap zoom; pan and pinch are left to the browser.
+          // It has to sit on the scroller itself: a scroll container
+          // resets touch-action, so nothing set higher up reaches in
+          // here. On iPhone, vaul's scroll lock can still cancel a pinch
+          // at the list's top or bottom edge (see handleOnly above).
+          touchAction: "manipulation",
+          // Pulling past the top or bottom doesn't bounce the page behind.
+          overscrollBehavior: "contain",
+          // No text selection or iOS callout from a resting finger. The
+          // composer's textarea is outside this list, so typing and
+          // pasting are untouched.
+          WebkitUserSelect: "none",
+          userSelect: "none",
+          WebkitTouchCallout: "none",
         }}
       >
         {messages === null ? (
@@ -1241,6 +1288,7 @@ export function ConversationView({
                   darkMode={!!backdropCss}
                   onToggleReaction={(emoji) => void toggleReaction(m.id, emoji)}
                   onMediaLoad={keepPinnedToBottom}
+                  listScrolledAtRef={listScrolledAtRef}
                 />
               );
             })}
@@ -1306,7 +1354,9 @@ export function ConversationView({
             resize: "none",
             minHeight: 38,
             maxHeight: 120,
-            padding: "10px 14px",
+            // 1px less than before, so the 16px text keeps the bar the
+            // same height (about 42px on one line).
+            padding: "9px 14px",
             borderRadius: 18,
             border: backdropCss
               ? "1px solid rgba(255,255,255,0.12)"
@@ -1315,7 +1365,9 @@ export function ConversationView({
               ? "rgba(255,255,255,0.06)"
               : "rgba(255,255,255,0.92)",
             fontFamily: "DM Sans, sans-serif",
-            fontSize: 14.5,
+            // At least 16px: iOS Safari zooms the page into any field
+            // under 16px when it's focused, and never zooms back out.
+            fontSize: 16,
             color: backdropCss ? "#fff" : "#1C1C1E",
             outline: "none",
             lineHeight: 1.4,
@@ -2152,6 +2204,8 @@ function GroupSettingsView({
           <div style={{ display: "flex", gap: 8, width: "100%", maxWidth: 320 }}>
             <input
               type="text"
+              // 17px on purpose: keep it out of the phone 16px input rule.
+              data-keep-font
               value={draftName}
               onChange={(e) => setDraftName(e.target.value)}
               autoFocus
@@ -2618,7 +2672,8 @@ function ComposeOverlay({
   }, []);
 
   // Autofocus on mount — keyboard opens immediately. Small delay so
-  // iOS Safari honors the focus after the slide-in.
+  // iOS Safari honors the focus after the slide-in. The field is 16px,
+  // so taking focus no longer zooms the page in.
   useEffect(() => {
     const t = window.setTimeout(() => inputRef.current?.focus(), 60);
     return () => window.clearTimeout(t);
@@ -2788,7 +2843,9 @@ function ComposeOverlay({
               border: "1px solid rgba(28,28,30,0.10)",
               background: "rgba(255,255,255,0.78)",
               fontFamily: "DM Sans, sans-serif",
-              fontSize: 15,
+              // 16px: any smaller and iOS zooms in when the autofocus
+              // above lands.
+              fontSize: 16,
               color: "#1C1C1E",
               outline: "none",
             }}
@@ -2952,6 +3009,7 @@ function MessageBubble({
   darkMode = false,
   onToggleReaction,
   onMediaLoad,
+  listScrolledAtRef,
 }: {
   message: MessageRow;
   isMine: boolean;
@@ -2974,6 +3032,9 @@ function MessageBubble({
   /** Fired when a photo/video learns its real size, so the thread can
    *  stay pinned to the bottom. */
   onMediaLoad?: () => void;
+  /** When the message list last scrolled (performance.now()). A pending
+   *  long-press checks it so a scroll never opens the picker. */
+  listScrolledAtRef?: React.RefObject<number>;
 }) {
   const sender = message.users ?? null;
   const senderName = sender?.name || sender?.handle || "Member";
@@ -3005,8 +3066,18 @@ function MessageBubble({
   const startLongPress = (x: number, y: number) => {
     longPressFired.current = false;
     pressStart.current = { x, y };
+    const pressedAt = performance.now();
     if (longPressTimer.current) window.clearTimeout(longPressTimer.current);
+    // 500ms, iOS's own long-press. At 360ms a thumb resting on a bubble
+    // while reading was enough to open the picker.
     longPressTimer.current = window.setTimeout(() => {
+      longPressTimer.current = null;
+      // The list scrolled after this finger came down, or was still
+      // gliding just before it (the touch that stops a flick lands on
+      // a bubble too). That's a scroll, not a hold.
+      const scrolledAt =
+        listScrolledAtRef?.current ?? Number.NEGATIVE_INFINITY;
+      if (scrolledAt >= pressedAt - 150) return;
       longPressFired.current = true;
       if (navigator.vibrate) {
         try {
@@ -3016,7 +3087,7 @@ function MessageBubble({
         }
       }
       setPickerOpen(true);
-    }, 360);
+    }, 500);
   };
   // Cancel the timer if the finger drifts more than ~10px — that's a
   // scroll, not a long-press.
@@ -3027,12 +3098,20 @@ function MessageBubble({
     if (dx * dx + dy * dy > 100) clearLongPress();
   };
 
-  // The same long-press gesture on the text bubble, the photo/video and
-  // the shared-post card, so the reaction picker opens from any of them.
-  // Nothing here prevents the pointerdown default, so native video
-  // controls still take their taps.
+  // The same long-press gesture on the text bubble, the photo, the
+  // shared-post card and the notice tiles, so the reaction picker opens
+  // from any of them. Not on the video: its native controls need every
+  // touch, and holding the scrubber opened the picker.
   const pressHandlers = {
-    onPointerDown: (e: React.PointerEvent) => startLongPress(e.clientX, e.clientY),
+    onPointerDown: (e: React.PointerEvent) => {
+      // Only the first finger's primary press arms it. A second finger
+      // means a pinch, so it cancels one that's pending.
+      if (!e.isPrimary || e.button !== 0) {
+        clearLongPress();
+        return;
+      }
+      startLongPress(e.clientX, e.clientY);
+    },
     onPointerMove: (e: React.PointerEvent) => onPressMove(e.clientX, e.clientY),
     onPointerUp: () => clearLongPress(),
     onPointerCancel: () => clearLongPress(),
@@ -3043,7 +3122,7 @@ function MessageBubble({
       e.preventDefault();
     },
     // The click that ends a long-press must not also open the shared
-    // post or toggle the video.
+    // post.
     onClickCapture: (e: React.MouseEvent) => {
       if (!longPressFired.current) return;
       longPressFired.current = false;
@@ -3087,8 +3166,8 @@ function MessageBubble({
   const onTint = isMine || darkMode;
   const cardMuted = onTint ? "rgba(255,255,255,0.66)" : "#8A8580";
 
-  // Everything long-pressable shares this: no iOS callout or selection,
-  // and the same press-in scale while the picker is open.
+  // Every piece of the message shares this: no iOS callout or
+  // selection, and the same press-in scale while the picker is open.
   const pressStyle: React.CSSProperties = {
     cursor: "pointer",
     WebkitTouchCallout: "none",
@@ -3177,11 +3256,11 @@ function MessageBubble({
       mediaKind === "video" ? "Video couldn't load" : "Photo couldn't load",
     );
   } else if (mediaKind === "video" && mediaUrl) {
+    // No long-press handlers here: the native controls (play, scrub,
+    // fullscreen) keep all their touches. pressStyle stays so the video
+    // shrinks with the rest of the message while the picker is open.
     media = (
-      <div
-        {...pressHandlers}
-        style={{ ...pressStyle, borderRadius: 14, overflow: "hidden" }}
-      >
+      <div style={{ ...pressStyle, borderRadius: 14, overflow: "hidden" }}>
         <video
           key={`${message.id}:video`}
           src={mediaUrl}
@@ -3480,7 +3559,8 @@ function MessageBubble({
         }}
       >
         {/* Photo/video, shared-post card and caption, stacked on the
-            sender's side. Each piece carries the long-press handlers. */}
+            sender's side. Each piece but the video carries the
+            long-press handlers. */}
         <div
           style={{
             display: "flex",
@@ -3566,6 +3646,33 @@ function MessageBubble({
   );
 }
 
+// Eats the click that ends one press, so the tap that closes the
+// reaction picker doesn't also open whatever is under the finger. It
+// listens in the capture phase on document, ahead of React and links.
+// The next press, this press turning into a scroll (pointercancel), or
+// a second with no click ends it without eating anything.
+function swallowNextClick(pointerId: number) {
+  let timer = 0;
+  const onClick = (e: MouseEvent) => {
+    e.preventDefault();
+    e.stopPropagation();
+    stop();
+  };
+  const onCancel = (e: PointerEvent) => {
+    if (e.pointerId === pointerId) stop();
+  };
+  const stop = () => {
+    window.clearTimeout(timer);
+    document.removeEventListener("click", onClick, true);
+    document.removeEventListener("pointerdown", stop, true);
+    document.removeEventListener("pointercancel", onCancel, true);
+  };
+  document.addEventListener("click", onClick, true);
+  document.addEventListener("pointerdown", stop, true);
+  document.addEventListener("pointercancel", onCancel, true);
+  timer = window.setTimeout(stop, 1000);
+}
+
 function ReactionPicker({
   darkMode,
   isMine,
@@ -3586,10 +3693,14 @@ function ReactionPicker({
   // tapped an emoji inside, unmounting the picker before the emoji's
   // click could fire (pointerdown happens before click on mobile). Now
   // we check the event target and short-circuit if it's inside.
+  // Closing still happens on pointerdown, so a scroll that starts
+  // outside closes it too. That tap's click is eaten: it used to open
+  // the shared post, reaction chip or More sheet under the finger.
   useEffect(() => {
     const handler = (e: PointerEvent) => {
       const target = e.target as Node | null;
       if (target && pickerRef.current?.contains(target)) return;
+      swallowNextClick(e.pointerId);
       onClose();
     };
     // Bind on the next tick so the pointerdown that opened the picker
