@@ -6,6 +6,7 @@ import { useSearchParams } from "next/navigation";
 import { Fragment, useCallback, useEffect, useMemo, useRef, useState } from "react";
 
 import { CampusAppShell } from "@/components/campus-app-shell";
+import { asLoadFailure, LoadFailed, type LoadFailure } from "@/components/feedback/LoadFailed";
 import { ImageCropperModal } from "@/components/ImageCropperModal";
 import { emitCalendarChanged } from "@/components/LeftNav";
 import { SharePostSheet } from "@/components/mobile/SharePostSheet";
@@ -16,6 +17,7 @@ import {
   extractHashtags,
 } from "@/lib/composer/helpers";
 import { copyText, vibeRequest } from "@/lib/feedback/request";
+import { toast } from "@/lib/feedback/toast";
 import { IU_SCHOOLS, schoolForMajor } from "@/lib/iu/majors";
 
 declare global {
@@ -293,8 +295,13 @@ export function CampusHome({
   showSchoolVerifiedBanner: boolean;
 }) {
   const [orgs, setOrgs] = useState<Org[] | null>(null); // null = loading
+  // Set when loading your orgs fails; the Chat tab shows it with Retry.
+  const [orgsLoadErr, setOrgsLoadErr] = useState<LoadFailure | null>(null);
+  const [orgsLoadKey, setOrgsLoadKey] = useState(0);
   const [activeOrgId, setActiveOrgId] = useState<string | null>(null);
   const [channelsByOrg, setChannelsByOrg] = useState<Record<string, Channel[]>>({});
+  // Per-org channel-load failures, kept beside the cache (never cached as []).
+  const [channelsErrByOrg, setChannelsErrByOrg] = useState<Record<string, LoadFailure>>({});
   // Per-org user-selected channel. Falls back to the org's first channel
   // when no explicit pick exists. Derived rather than effect-driven so we
   // don't trip React 19's set-state-in-effect rule.
@@ -445,46 +452,46 @@ export function CampusHome({
     };
   }, [searchParams]);
 
-  // Load joined orgs on mount.
+  // Load joined orgs on mount, and again on Retry after a failed load.
   useEffect(() => {
     let cancelled = false;
     (async () => {
-      try {
-        const res = await fetch("/api/orgs?filter=mine", { cache: "no-store" });
-        const data = await res.json();
-        if (cancelled) return;
-        if (data?.ok && Array.isArray(data.orgs)) {
-          setOrgs(data.orgs);
-          // If we arrived from /orgs/<handle> → Chat tab with a
-          // pending org handle, prefer that org over the default
-          // first-in-list so the requested channel's org is what
-          // mounts the channel rail.
-          const pendingHandle = pendingDeepLinkOrgHandleRef.current;
-          const pendingMatch = pendingHandle
-            ? (data.orgs as Org[]).find(
-                (o) => o.handle.toLowerCase() === pendingHandle.toLowerCase(),
-              )
-            : null;
-          if (pendingMatch) {
-            setActiveOrgId(pendingMatch.id);
-            // Clear the org-handle ref; channel-id ref stays until the
-            // channels-load effect consumes it.
-            pendingDeepLinkOrgHandleRef.current = null;
-          } else if (data.orgs.length > 0) {
-            setActiveOrgId(data.orgs[0].id);
-          }
-        } else {
-          setOrgs([]);
-        }
-      } catch (e) {
-        console.error("[campus] load orgs", e);
-        if (!cancelled) setOrgs([]);
+      const r = await vibeRequest<{ orgs?: Org[] }>("/api/orgs?filter=mine", {
+        cache: "no-store",
+        quiet: true,
+        failure: "Couldn't load your orgs.",
+      });
+      if (cancelled) return;
+      if (!r.ok || !Array.isArray(r.data.orgs)) {
+        // orgs stays null, so the Chat tab shows this with Retry instead of
+        // the "create or browse orgs" card meant for someone in no orgs.
+        setOrgsLoadErr(asLoadFailure(r, "Couldn't load your orgs."));
+        return;
+      }
+      const list = r.data.orgs;
+      setOrgsLoadErr(null);
+      setOrgs(list);
+      // If we arrived from /orgs/<handle> → Chat tab with a
+      // pending org handle, prefer that org over the default
+      // first-in-list so the requested channel's org is what
+      // mounts the channel rail.
+      const pendingHandle = pendingDeepLinkOrgHandleRef.current;
+      const pendingMatch = pendingHandle
+        ? list.find((o) => o.handle.toLowerCase() === pendingHandle.toLowerCase())
+        : null;
+      if (pendingMatch) {
+        setActiveOrgId(pendingMatch.id);
+        // Clear the org-handle ref; channel-id ref stays until the
+        // channels-load effect consumes it.
+        pendingDeepLinkOrgHandleRef.current = null;
+      } else if (list.length > 0) {
+        setActiveOrgId(list[0].id);
       }
     })();
     return () => {
       cancelled = true;
     };
-  }, []);
+  }, [orgsLoadKey]);
 
   const activeOrg = (orgs ?? []).find((o) => o.id === activeOrgId) ?? null;
   const activeChannels: Channel[] = activeOrg ? channelsByOrg[activeOrg.id] ?? [] : [];
@@ -492,44 +499,48 @@ export function CampusHome({
     ? selectedChannelByOrg[activeOrg.id] ?? activeChannels[0]?.id ?? null
     : null;
   const activeChannel = activeChannels.find((c) => c.id === activeChannelId) ?? null;
+  const activeChannelsErr = activeOrg ? channelsErrByOrg[activeOrg.id] ?? null : null;
 
   // When the active org changes and we don't yet have its channels cached,
   // fetch them. Selecting the active channel is derived above, so this
-  // effect only writes to channelsByOrg.
+  // effect only writes to channelsByOrg. A failed load is never cached (an
+  // empty list would read as "no channels" for good): it goes in
+  // channelsErrByOrg, and Retry deletes that entry to fetch again.
   useEffect(() => {
     if (!activeOrg) return;
-    if (channelsByOrg[activeOrg.id]) return;
+    if (channelsByOrg[activeOrg.id] || channelsErrByOrg[activeOrg.id]) return;
     let cancelled = false;
     (async () => {
-      try {
-        const res = await fetch(`/api/orgs/${activeOrg.handle}/channels`, {
-          cache: "no-store",
-        });
-        const data = await res.json();
-        if (cancelled) return;
-        const list: Channel[] = data?.ok && Array.isArray(data.channels) ? data.channels : [];
-        setChannelsByOrg((prev) => ({ ...prev, [activeOrg.id]: list }));
-        // Consume the pending channel deep link if this is the right
-        // org and the requested channel exists in the loaded list.
-        const pendingChannelId = pendingDeepLinkChannelIdRef.current;
-        if (pendingChannelId) {
-          const match = list.find((c) => c.id === pendingChannelId);
-          if (match) {
-            setSelectedChannelByOrg((prev) => ({
-              ...prev,
-              [activeOrg.id]: pendingChannelId,
-            }));
-            pendingDeepLinkChannelIdRef.current = null;
-          }
+      const r = await vibeRequest<{ channels?: Channel[] }>(
+        `/api/orgs/${activeOrg.handle}/channels`,
+        { cache: "no-store", quiet: true, failure: "Couldn't load this org's channels." },
+      );
+      if (cancelled) return;
+      if (!r.ok || !Array.isArray(r.data.channels)) {
+        const failure = asLoadFailure(r, "Couldn't load this org's channels.");
+        setChannelsErrByOrg((prev) => ({ ...prev, [activeOrg.id]: failure }));
+        return;
+      }
+      const list = r.data.channels;
+      setChannelsByOrg((prev) => ({ ...prev, [activeOrg.id]: list }));
+      // Consume the pending channel deep link if this is the right
+      // org and the requested channel exists in the loaded list.
+      const pendingChannelId = pendingDeepLinkChannelIdRef.current;
+      if (pendingChannelId) {
+        const match = list.find((c) => c.id === pendingChannelId);
+        if (match) {
+          setSelectedChannelByOrg((prev) => ({
+            ...prev,
+            [activeOrg.id]: pendingChannelId,
+          }));
+          pendingDeepLinkChannelIdRef.current = null;
         }
-      } catch (e) {
-        console.error("[campus] load channels", e);
       }
     })();
     return () => {
       cancelled = true;
     };
-  }, [activeOrg, channelsByOrg]);
+  }, [activeOrg, channelsByOrg, channelsErrByOrg]);
 
   const handleSelectChannel = useCallback(
     (channelId: string) => {
@@ -538,6 +549,25 @@ export function CampusHome({
     },
     [activeOrg]
   );
+
+  // Retry after a failed channel load: forget the failure, plus anything
+  // cached for the org since (a channel created meanwhile would otherwise
+  // pass for the whole list), so the effect above fetches again.
+  const retryChannels = useCallback(() => {
+    if (!activeOrg) return;
+    const orgId = activeOrg.id;
+    setChannelsErrByOrg((prev) => {
+      const next = { ...prev };
+      delete next[orgId];
+      return next;
+    });
+    setChannelsByOrg((prev) => {
+      if (!(orgId in prev)) return prev;
+      const next = { ...prev };
+      delete next[orgId];
+      return next;
+    });
+  }, [activeOrg]);
 
   const isLoading = orgs === null;
   const isEmpty = orgs !== null && orgs.length === 0;
@@ -645,7 +675,26 @@ export function CampusHome({
         <CampusBanner />
         <CampusTabs active={tab} onChange={setTab} />
 
-        {isLoading && tab === "chat" ? (
+        {orgsLoadErr && tab === "chat" ? (
+          <main
+            style={{
+              flex: 1,
+              display: "flex",
+              alignItems: "center",
+              justifyContent: "center",
+              padding: 32,
+            }}
+          >
+            <LoadFailed
+              tone="dark"
+              failure={orgsLoadErr}
+              onRetry={() => {
+                setOrgsLoadErr(null);
+                setOrgsLoadKey((k) => k + 1);
+              }}
+            />
+          </main>
+        ) : isLoading && tab === "chat" ? (
           <LoadingPane />
         ) : showThreeColumn ? (
           <div
@@ -669,6 +718,8 @@ export function CampusHome({
               <ChannelRail
                 org={activeOrg}
                 channels={activeChannels}
+                loadErr={activeChannelsErr}
+                onRetryLoad={retryChannels}
                 activeChannelId={activeChannelId}
                 onSelectChannel={handleSelectChannel}
                 onOpenCreateChannel={() => setShowCreateChannel(true)}
@@ -727,7 +778,11 @@ export function CampusHome({
         {showSettings && activeOrg ? (
           <OrgSettingsModal
             org={activeOrg}
-            channels={activeChannels}
+            // null until the org's list is cached, so the Channels tab
+            // says "Loading" rather than "No channels yet." mid-fetch.
+            channels={activeOrg.id in channelsByOrg ? activeChannels : null}
+            channelsErr={activeChannelsErr}
+            onRetryChannels={retryChannels}
             onClose={() => setShowSettings(false)}
             onOrgUpdated={handleOrgUpdated}
             onOrgRemoved={handleOrgRemoved}
@@ -1193,6 +1248,8 @@ type SettingsTab = "overview" | "channels" | "members" | "requests" | "danger";
 function OrgSettingsModal({
   org,
   channels,
+  channelsErr,
+  onRetryChannels,
   onClose,
   onOrgUpdated,
   onOrgRemoved,
@@ -1200,7 +1257,11 @@ function OrgSettingsModal({
   onChannelRemoved,
 }: {
   org: Org;
-  channels: Channel[];
+  // null while the org's channel list is still loading.
+  channels: Channel[] | null;
+  // The same failure the rail shows; the Channels tab shows it too.
+  channelsErr: LoadFailure | null;
+  onRetryChannels: () => void;
   onClose: () => void;
   onOrgUpdated: (org: Org) => void;
   onOrgRemoved: (orgId: string) => void;
@@ -1295,6 +1356,8 @@ function OrgSettingsModal({
             <SettingsChannels
               org={org}
               channels={channels}
+              loadErr={channelsErr}
+              onRetryLoad={onRetryChannels}
               onChannelUpdated={onChannelUpdated}
               onChannelRemoved={onChannelRemoved}
             />
@@ -1502,11 +1565,15 @@ function SettingsOverview({
 function SettingsChannels({
   org,
   channels,
+  loadErr,
+  onRetryLoad,
   onChannelUpdated,
   onChannelRemoved,
 }: {
   org: Org;
-  channels: Channel[];
+  channels: Channel[] | null;
+  loadErr: LoadFailure | null;
+  onRetryLoad: () => void;
   onChannelUpdated: (channel: Channel) => void;
   onChannelRemoved: (channelId: string) => void;
 }) {
@@ -1516,7 +1583,13 @@ function SettingsChannels({
         Rename, change topic, toggle privacy, or delete a channel. Deleting is
         permanent — messages are removed too.
       </p>
-      {channels.length === 0 ? (
+      {/* The failure wins even over a cached list: a channel created after
+          it caches a one-item list that isn't the org's real one. */}
+      {loadErr ? (
+        <LoadFailed tone="dark" failure={loadErr} onRetry={onRetryLoad} />
+      ) : channels === null ? (
+        <div style={{ color: COLORS.glassMuted, fontSize: 14 }}>Loading channels…</div>
+      ) : channels.length === 0 ? (
         <div style={{ color: COLORS.glassMuted, fontSize: 14 }}>No channels yet.</div>
       ) : (
         channels.map((c) => (
@@ -1722,28 +1795,31 @@ function SettingsMembers({
 }) {
   const [members, setMembers] = useState<MemberRow[] | null>(null);
   const [err, setErr] = useState<string | null>(null);
+  // The list itself failing to load; `err` is for role and kick refusals.
+  const [loadErr, setLoadErr] = useState<LoadFailure | null>(null);
   const [busyId, setBusyId] = useState<string | null>(null);
   const [reloadKey, setReloadKey] = useState(0);
+  const loadedRef = useRef(false);
 
   useEffect(() => {
     let cancelled = false;
     (async () => {
-      try {
-        const res = await fetch(`/api/orgs/${org.handle}/members`, { cache: "no-store" });
-        const data = await res.json();
-        if (cancelled) return;
-        if (data?.ok && Array.isArray(data.members)) {
-          setMembers(data.members as MemberRow[]);
-        } else {
-          setErr(data?.error || "Failed to load members");
-          setMembers([]);
-        }
-      } catch (e) {
-        if (cancelled) return;
-        console.error("[campus] load members", e);
-        setErr("Network error");
-        setMembers([]);
+      const r = await vibeRequest<{ members?: MemberRow[] }>(
+        `/api/orgs/${org.handle}/members`,
+        { cache: "no-store", quiet: true, failure: "Couldn't load members." },
+      );
+      if (cancelled) return;
+      if (r.ok && Array.isArray(r.data.members)) {
+        loadedRef.current = true;
+        setLoadErr(null);
+        setMembers(r.data.members);
+        return;
       }
+      const failure = asLoadFailure(r, "Couldn't load members.");
+      // A reload after a role change or kick keeps the rows and toasts;
+      // only a first load shows the failure in place of the list.
+      if (loadedRef.current) toast({ message: failure.message, tone: "error", action: failure.action });
+      else setLoadErr(failure);
     })();
     return () => {
       cancelled = true;
@@ -1790,6 +1866,18 @@ function SettingsMembers({
   };
 
   if (members === null) {
+    if (loadErr) {
+      return (
+        <LoadFailed
+          tone="dark"
+          failure={loadErr}
+          onRetry={() => {
+            setLoadErr(null);
+            refresh();
+          }}
+        />
+      );
+    }
     return <div style={{ color: COLORS.glassMuted, fontSize: 14 }}>Loading members…</div>;
   }
 
@@ -1932,28 +2020,31 @@ type RequestRow = {
 function SettingsRequests({ org }: { org: Org }) {
   const [requests, setRequests] = useState<RequestRow[] | null>(null);
   const [err, setErr] = useState<string | null>(null);
+  // The list itself failing to load; `err` is for approve/deny refusals.
+  const [loadErr, setLoadErr] = useState<LoadFailure | null>(null);
   const [busyId, setBusyId] = useState<string | null>(null);
   const [reloadKey, setReloadKey] = useState(0);
+  const loadedRef = useRef(false);
 
   useEffect(() => {
     let cancelled = false;
     (async () => {
-      try {
-        const res = await fetch(`/api/orgs/${org.handle}/requests`, { cache: "no-store" });
-        const data = await res.json();
-        if (cancelled) return;
-        if (data?.ok && Array.isArray(data.requests)) {
-          setRequests(data.requests as RequestRow[]);
-        } else {
-          setErr(data?.error || "Failed to load requests");
-          setRequests([]);
-        }
-      } catch (e) {
-        if (cancelled) return;
-        console.error("[campus] load requests", e);
-        setErr("Network error");
-        setRequests([]);
+      const r = await vibeRequest<{ requests?: RequestRow[] }>(
+        `/api/orgs/${org.handle}/requests`,
+        { cache: "no-store", quiet: true, failure: "Couldn't load join requests." },
+      );
+      if (cancelled) return;
+      if (r.ok && Array.isArray(r.data.requests)) {
+        loadedRef.current = true;
+        setLoadErr(null);
+        setRequests(r.data.requests);
+        return;
       }
+      const failure = asLoadFailure(r, "Couldn't load join requests.");
+      // A reload after approve or deny keeps the rows and toasts; only a
+      // first load shows the failure (and never "No pending requests.").
+      if (loadedRef.current) toast({ message: failure.message, tone: "error", action: failure.action });
+      else setLoadErr(failure);
     })();
     return () => {
       cancelled = true;
@@ -1982,6 +2073,18 @@ function SettingsRequests({ org }: { org: Org }) {
   };
 
   if (requests === null) {
+    if (loadErr) {
+      return (
+        <LoadFailed
+          tone="dark"
+          failure={loadErr}
+          onRetry={() => {
+            setLoadErr(null);
+            refresh();
+          }}
+        />
+      );
+    }
     return <div style={{ color: COLORS.glassMuted, fontSize: 14 }}>Loading requests…</div>;
   }
 
@@ -3505,6 +3608,10 @@ function CampusSearchBar() {
   const [orgs, setOrgs] = useState<SearchOrg[]>([]);
   const [events, setEvents] = useState<SearchEvent[]>([]);
   const [loading, setLoading] = useState(false);
+  // The last search failed: the dropdown says so instead of "No results",
+  // and Retry reruns the same query by bumping retryKey.
+  const [searchErr, setSearchErr] = useState<LoadFailure | null>(null);
+  const [retryKey, setRetryKey] = useState(0);
   const [recents, setRecents] = useState<RecentSearch[]>([]);
   const [coords, setCoords] = useState<{ right: number; top: number; width: number } | null>(null);
   const seqRef = useRef(0);
@@ -3533,32 +3640,33 @@ function CampusSearchBar() {
     const seq = ++seqRef.current;
     (async () => {
       setLoading(true);
-      try {
-        const r = await fetch(
-          `/api/search?q=${encodeURIComponent(debounced)}&limit=6`,
-          { credentials: "include" },
-        );
-        const j = r.ok ? await r.json() : { ok: false };
-        if (seq !== seqRef.current) return;
-        if (j && j.ok) {
-          setUsers(Array.isArray(j.users) ? j.users : []);
-          setOrgs(Array.isArray(j.orgs) ? j.orgs : []);
-          setEvents(Array.isArray(j.events) ? j.events : []);
-        } else {
-          setUsers([]);
-          setOrgs([]);
-          setEvents([]);
-        }
-      } catch {
-        if (seq !== seqRef.current) return;
-        setUsers([]);
-        setOrgs([]);
-        setEvents([]);
-      } finally {
-        if (seq === seqRef.current) setLoading(false);
+      const r = await vibeRequest<{
+        users?: SearchUser[];
+        orgs?: SearchOrg[];
+        events?: SearchEvent[];
+      }>(`/api/search?q=${encodeURIComponent(debounced)}&limit=6`, {
+        credentials: "include",
+        quiet: true,
+        failure: "Search failed.",
+      });
+      // A newer query (or a Retry) owns the dropdown now.
+      if (seq !== seqRef.current) return;
+      setLoading(false);
+      if (
+        r.ok &&
+        Array.isArray(r.data.users) &&
+        Array.isArray(r.data.orgs) &&
+        Array.isArray(r.data.events)
+      ) {
+        setSearchErr(null);
+        setUsers(r.data.users);
+        setOrgs(r.data.orgs);
+        setEvents(r.data.events);
+      } else {
+        setSearchErr(asLoadFailure(r, "Search failed."));
       }
     })();
-  }, [debounced]);
+  }, [debounced, retryKey]);
 
   const updateCoords = useCallback(() => {
     const el = wrapRef.current;
@@ -3623,8 +3731,14 @@ function CampusSearchBar() {
   };
 
   const showResults = !!debounced;
+  // A failed search is never "No results"; its failure line renders instead.
   const empty =
-    showResults && !loading && users.length === 0 && orgs.length === 0 && events.length === 0;
+    showResults &&
+    !loading &&
+    !searchErr &&
+    users.length === 0 &&
+    orgs.length === 0 &&
+    events.length === 0;
 
   return (
     <>
@@ -3746,6 +3860,14 @@ function CampusSearchBar() {
                 Search students, orgs, and events.
               </div>
             )
+          ) : searchErr && !loading ? (
+            <div style={{ padding: 12 }}>
+              <LoadFailed
+                compact
+                failure={searchErr}
+                onRetry={() => setRetryKey((k) => k + 1)}
+              />
+            </div>
           ) : empty ? (
             <div style={{ padding: "20px 16px", color: COLORS.muted, fontSize: 13, textAlign: "center" }}>
               No results for &ldquo;{debounced}&rdquo;
@@ -4257,49 +4379,51 @@ function FeedTabBody({
 }) {
   const [entries, setEntries] = useState<FeedEntry[] | null>(null);
   const [viewerId, setViewerId] = useState<string | null>(null);
+  // First-load failure only; a failed refresh keeps the posts on screen.
+  const [loadErr, setLoadErr] = useState<LoadFailure | null>(null);
+  const [loadKey, setLoadKey] = useState(0);
 
   const feedUrl = tagFilter
     ? `/api/feed?limit=50&tag=${encodeURIComponent(tagFilter)}`
     : "/api/feed?limit=50";
 
+  // After a post or a row change. The student started it, so a refusal
+  // toasts (vibeRequest's, or ours for a bad body) and the feed stays put.
   const refresh = useCallback(async () => {
-    try {
-      const res = await fetch(feedUrl, { cache: "no-store" });
-      const data = await res.json();
-      setEntries(
-        data?.ok && Array.isArray(data.feed) ? (data.feed as FeedEntry[]) : [],
-      );
-      if (data?.ok && typeof data.viewerId === "string") {
-        setViewerId(data.viewerId);
-      }
-    } catch (e) {
-      console.error("[campus] feed", e);
-      setEntries([]);
+    const r = await vibeRequest<{ feed?: FeedEntry[]; viewerId?: string }>(feedUrl, {
+      cache: "no-store",
+      failure: "Couldn't refresh the feed.",
+    });
+    if (r.ok && Array.isArray(r.data.feed)) {
+      setLoadErr(null);
+      setEntries(r.data.feed);
+      if (typeof r.data.viewerId === "string") setViewerId(r.data.viewerId);
+    } else if (r.ok) {
+      toast({ message: "Couldn't refresh the feed. Try again.", tone: "error" });
     }
   }, [feedUrl]);
 
   useEffect(() => {
     let cancelled = false;
     (async () => {
-      try {
-        const res = await fetch(feedUrl, { cache: "no-store" });
-        const data = await res.json();
-        if (cancelled) return;
-        setEntries(
-          data?.ok && Array.isArray(data.feed) ? (data.feed as FeedEntry[]) : [],
-        );
-        if (data?.ok && typeof data.viewerId === "string") {
-          setViewerId(data.viewerId);
-        }
-      } catch (e) {
-        console.error("[campus] feed", e);
-        if (!cancelled) setEntries([]);
+      const r = await vibeRequest<{ feed?: FeedEntry[]; viewerId?: string }>(feedUrl, {
+        cache: "no-store",
+        quiet: true,
+        failure: "Couldn't load the feed.",
+      });
+      if (cancelled) return;
+      if (r.ok && Array.isArray(r.data.feed)) {
+        setLoadErr(null);
+        setEntries(r.data.feed);
+        if (typeof r.data.viewerId === "string") setViewerId(r.data.viewerId);
+      } else {
+        setLoadErr(asLoadFailure(r, "Couldn't load the feed."));
       }
     })();
     return () => {
       cancelled = true;
     };
-  }, [feedUrl]);
+  }, [feedUrl, loadKey]);
 
   // /campus?post=<id> deep-link from Otto mention notifications.
   // After the feed has rendered we look up the FeedRow by id, scroll it
@@ -4437,7 +4561,17 @@ function FeedTabBody({
 
       {/* Posts column — second glass surface stacked under the composer */}
       <div style={feedGlass}>
-        {entries === null ? (
+        {entries === null && loadErr ? (
+          <div style={{ padding: 24 }}>
+            <LoadFailed
+              failure={loadErr}
+              onRetry={() => {
+                setLoadErr(null);
+                setLoadKey((k) => k + 1);
+              }}
+            />
+          </div>
+        ) : entries === null ? (
           <div
             style={{
               padding: "24px",
@@ -5933,28 +6067,30 @@ function CommentsDrawer({
   onCommentAdded: () => void;
 }) {
   const [comments, setComments] = useState<FeedComment[] | null>(null);
+  const [loadErr, setLoadErr] = useState<LoadFailure | null>(null);
+  const [loadKey, setLoadKey] = useState(0);
   const [draft, setDraft] = useState("");
   const [submitting, setSubmitting] = useState(false);
 
   useEffect(() => {
     let cancelled = false;
     (async () => {
-      try {
-        const res = await fetch(`/api/posts/${postId}/comments`, { cache: "no-store" });
-        const data = await res.json();
-        if (cancelled) return;
-        setComments(
-          data?.ok && Array.isArray(data.comments) ? (data.comments as FeedComment[]) : [],
-        );
-      } catch (e) {
-        console.error("[feed] comments", e);
-        if (!cancelled) setComments([]);
+      const r = await vibeRequest<{ comments?: FeedComment[] }>(
+        `/api/posts/${postId}/comments`,
+        { cache: "no-store", quiet: true, failure: "Couldn't load comments." },
+      );
+      if (cancelled) return;
+      if (r.ok && Array.isArray(r.data.comments)) {
+        setLoadErr(null);
+        setComments(r.data.comments);
+      } else {
+        setLoadErr(asLoadFailure(r, "Couldn't load comments."));
       }
     })();
     return () => {
       cancelled = true;
     };
-  }, [postId]);
+  }, [postId, loadKey]);
 
   const handleNewComment = useCallback((c: FeedComment) => {
     setComments((prev) => {
@@ -6006,7 +6142,18 @@ function CommentsDrawer({
         fontFamily: "DM Sans, sans-serif",
       }}
     >
-      {comments === null ? (
+      {comments === null && loadErr ? (
+        // No composer while the thread failed: a lone new comment would
+        // read as the only one.
+        <LoadFailed
+          compact
+          failure={loadErr}
+          onRetry={() => {
+            setLoadErr(null);
+            setLoadKey((k) => k + 1);
+          }}
+        />
+      ) : comments === null ? (
         <div style={{ fontSize: 12, color: COLORS.faint }}>Loading comments…</div>
       ) : (
         <div style={{ display: "flex", flexDirection: "column", gap: 12 }}>
@@ -6586,46 +6733,63 @@ export type CampusEvent = {
 
 function EventsTabBody() {
   const [events, setEvents] = useState<CampusEvent[] | null>(null);
+  // First-load failure only; a failed refresh keeps the events on screen.
+  const [loadErr, setLoadErr] = useState<LoadFailure | null>(null);
+  const [loadKey, setLoadKey] = useState(0);
   const [showCreate, setShowCreate] = useState(false);
   const [eligibleOrgs, setEligibleOrgs] = useState<EligibleOrg[]>([]);
 
+  // After an RSVP or a new event. The student started it, so a refusal
+  // toasts (vibeRequest's, or ours for a bad body) and the list stays put.
   const refresh = useCallback(async () => {
-    try {
-      const res = await fetch("/api/events?limit=50", { cache: "no-store" });
-      const data = await res.json();
-      setEvents(
-        data?.ok && Array.isArray(data.events) ? (data.events as CampusEvent[]) : [],
-      );
-    } catch (e) {
-      console.error("[campus] events", e);
-      setEvents([]);
+    const r = await vibeRequest<{ events?: CampusEvent[] }>("/api/events?limit=50", {
+      cache: "no-store",
+      failure: "Couldn't refresh events.",
+    });
+    if (r.ok && Array.isArray(r.data.events)) {
+      setLoadErr(null);
+      setEvents(r.data.events);
+    } else if (r.ok) {
+      toast({ message: "Couldn't refresh events. Try again.", tone: "error" });
     }
   }, []);
+
+  // Events and your orgs load separately, so a failed orgs call (it only
+  // decides whether "+ Create event" shows) can't blank the events list.
+  useEffect(() => {
+    let cancelled = false;
+    (async () => {
+      const r = await vibeRequest<{ events?: CampusEvent[] }>("/api/events?limit=50", {
+        cache: "no-store",
+        quiet: true,
+        failure: "Couldn't load events.",
+      });
+      if (cancelled) return;
+      if (r.ok && Array.isArray(r.data.events)) {
+        setLoadErr(null);
+        setEvents(r.data.events);
+      } else {
+        setLoadErr(asLoadFailure(r, "Couldn't load events."));
+      }
+    })();
+    return () => {
+      cancelled = true;
+    };
+  }, [loadKey]);
 
   useEffect(() => {
     let cancelled = false;
     (async () => {
-      try {
-        const [evRes, orgRes] = await Promise.all([
-          fetch("/api/events?limit=50", { cache: "no-store" }).then((r) => r.json()),
-          fetch("/api/orgs?filter=mine", { cache: "no-store" }).then((r) => r.json()),
-        ]);
-        if (cancelled) return;
-        setEvents(
-          evRes?.ok && Array.isArray(evRes.events)
-            ? (evRes.events as CampusEvent[])
-            : [],
-        );
-        if (orgRes?.ok && Array.isArray(orgRes.orgs)) {
-          const eligible = (orgRes.orgs as EligibleOrg[]).filter(
-            (o) => (o.role === "owner" || o.role === "admin") && !!o.verified,
-          );
-          setEligibleOrgs(eligible);
-        }
-      } catch (e) {
-        console.error("[campus] events", e);
-        if (!cancelled) setEvents([]);
-      }
+      // Quiet: on a failure the create button just stays hidden.
+      const r = await vibeRequest<{ orgs?: EligibleOrg[] }>("/api/orgs?filter=mine", {
+        cache: "no-store",
+        quiet: true,
+        failure: "Couldn't load your orgs.",
+      });
+      if (cancelled || !r.ok || !Array.isArray(r.data.orgs)) return;
+      setEligibleOrgs(
+        r.data.orgs.filter((o) => (o.role === "owner" || o.role === "admin") && !!o.verified),
+      );
     })();
     return () => {
       cancelled = true;
@@ -6690,7 +6854,18 @@ function EventsTabBody() {
         ) : null}
       </div>
 
-      {events === null ? (
+      {events === null && loadErr ? (
+        <DarkGlassCard>
+          <LoadFailed
+            tone="dark"
+            failure={loadErr}
+            onRetry={() => {
+              setLoadErr(null);
+              setLoadKey((k) => k + 1);
+            }}
+          />
+        </DarkGlassCard>
+      ) : events === null ? (
         <div style={{ color: COLORS.glassMuted, fontFamily: "DM Sans, sans-serif", fontSize: 14, padding: "20px 0" }}>
           Loading events…
         </div>
@@ -7761,6 +7936,10 @@ function OrgsTabBody({ onCreateOrg }: { onCreateOrg: () => void }) {
   const [filter, setFilter] = useState<DiscoverFilter>("all");
   const [showDormant, setShowDormant] = useState(false);
   const [previewOrg, setPreviewOrg] = useState<DiscoverOrg | null>(null);
+  // First-load failure only; once orgs are shown a failed refetch keeps them.
+  const [loadErr, setLoadErr] = useState<LoadFailure | null>(null);
+  const [loadKey, setLoadKey] = useState(0);
+  const loadedRef = useRef(false);
 
   // Debounce the search input → debouncedQ. The fetch effect below depends
   // on debouncedQ, so it only refires after the user pauses typing.
@@ -7772,40 +7951,49 @@ function OrgsTabBody({ onCreateOrg }: { onCreateOrg: () => void }) {
   useEffect(() => {
     let cancelled = false;
     (async () => {
-      try {
-        const params = new URLSearchParams({ filter: "discover" });
-        if (debouncedQ) params.set("q", debouncedQ);
-        if (showDormant) params.set("include_dormant", "true");
-        const res = await fetch(`/api/orgs?${params.toString()}`, { cache: "no-store" });
-        const data = await res.json();
-        if (cancelled) return;
-        const orgs: DiscoverOrg[] =
-          data?.ok && Array.isArray(data.orgs) ? data.orgs : [];
-        setResults(orgs);
-        const seeded: Record<string, "joined" | "pending"> = {};
-        for (const o of orgs) {
-          if (o.role) seeded[o.handle] = "joined";
-          else if (o.pending_request) seeded[o.handle] = "pending";
-        }
-        // Merge with any in-session "joined" states so a successful join
-        // earlier doesn't get reverted by the next fetch (this matters
-        // less now that the API returns role, but kept defensively).
-        setPending((prev) => {
-          const next = { ...seeded };
-          for (const [handle, status] of Object.entries(prev)) {
-            if (status === "joined") next[handle] = "joined";
-          }
-          return next;
-        });
-      } catch (e) {
-        console.error("[campus] discover", e);
-        if (!cancelled) setResults([]);
+      const params = new URLSearchParams({ filter: "discover" });
+      if (debouncedQ) params.set("q", debouncedQ);
+      if (showDormant) params.set("include_dormant", "true");
+      // Quiet even for a refetch: a query typed since owns the list, so any
+      // toast waits for the cancelled check below.
+      const r = await vibeRequest<{ orgs?: DiscoverOrg[] }>(`/api/orgs?${params.toString()}`, {
+        cache: "no-store",
+        quiet: true,
+        failure: "Couldn't load orgs.",
+      });
+      if (cancelled) return;
+      if (!r.ok || !Array.isArray(r.data.orgs)) {
+        const failure = asLoadFailure(r, "Couldn't load orgs.");
+        // Nothing shown yet: the failure takes the list's place. After a
+        // new query or the dormant toggle, the results stay and it toasts.
+        if (!loadedRef.current) setLoadErr(failure);
+        else toast({ message: failure.message, tone: "error", action: failure.action });
+        return;
       }
+      const orgs = r.data.orgs;
+      loadedRef.current = true;
+      setLoadErr(null);
+      setResults(orgs);
+      const seeded: Record<string, "joined" | "pending"> = {};
+      for (const o of orgs) {
+        if (o.role) seeded[o.handle] = "joined";
+        else if (o.pending_request) seeded[o.handle] = "pending";
+      }
+      // Merge with any in-session "joined" states so a successful join
+      // earlier doesn't get reverted by the next fetch (this matters
+      // less now that the API returns role, but kept defensively).
+      setPending((prev) => {
+        const next = { ...seeded };
+        for (const [handle, status] of Object.entries(prev)) {
+          if (status === "joined") next[handle] = "joined";
+        }
+        return next;
+      });
     })();
     return () => {
       cancelled = true;
     };
-  }, [debouncedQ, showDormant]);
+  }, [debouncedQ, showDormant, loadKey]);
 
   const handleJoin = async (org: DiscoverOrg) => {
     setBusy(org.handle);
@@ -7930,7 +8118,18 @@ function OrgsTabBody({ onCreateOrg }: { onCreateOrg: () => void }) {
         </button>
       </div>
 
-      {results === null ? (
+      {results === null && loadErr ? (
+        <DarkGlassCard>
+          <LoadFailed
+            tone="dark"
+            failure={loadErr}
+            onRetry={() => {
+              setLoadErr(null);
+              setLoadKey((k) => k + 1);
+            }}
+          />
+        </DarkGlassCard>
+      ) : results === null ? (
         <div
           style={{
             color: COLORS.glassMuted,
@@ -9018,6 +9217,9 @@ function bubbleRadiusFor(total: number): number {
 
 export function MapTabBody() {
   const [data, setData] = useState<MapSummary | null>(null);
+  // Set when the map fails to load; data stays null, never a fake summary.
+  const [loadErr, setLoadErr] = useState<LoadFailure | null>(null);
+  const [loadKey, setLoadKey] = useState(0);
   const [selected, setSelected] = useState<ZoneSelection | null>(null);
   const [pan, setPan] = useState({ x: 0, y: 0 });
   const [zoom, setZoom] = useState(1);
@@ -9042,23 +9244,25 @@ export function MapTabBody() {
   useEffect(() => {
     let cancelled = false;
     (async () => {
-      try {
-        const res = await fetch("/api/campus-map", { cache: "no-store" });
-        const j = await res.json();
-        if (cancelled) return;
-        if (j?.ok) {
-          setData(j as MapSummary);
-        } else {
-          setData({ ok: false } as unknown as MapSummary);
-        }
-      } catch {
-        if (!cancelled) setData({ ok: false } as unknown as MapSummary);
+      const r = await vibeRequest<MapSummary>("/api/campus-map", {
+        cache: "no-store",
+        quiet: true,
+        failure: "Couldn't load the map.",
+      });
+      if (cancelled) return;
+      // Every 2xx carries `majors` (empty for no_school), so a body without
+      // it is a failure, not an empty campus.
+      if (r.ok && Array.isArray(r.data.majors)) {
+        setLoadErr(null);
+        setData(r.data);
+      } else {
+        setLoadErr(asLoadFailure(r, "Couldn't load the map."));
       }
     })();
     return () => {
       cancelled = true;
     };
-  }, []);
+  }, [loadKey]);
 
   // School-grouped, ADAPTIVELY SPACED layout.
   //
@@ -9346,10 +9550,9 @@ export function MapTabBody() {
     return () => el.removeEventListener("wheel", handler);
   }, [zoomAround]);
 
-  const isLoading = data === null;
+  const isLoading = data === null && loadErr === null;
   const hasData = !!data && Array.isArray(data.majors) && data.majors.length > 0;
   const noSchool = !!data && data.ok && data.reason === "no_school";
-  const loadFailed = !!data && !data.ok;
 
   return (
     <section
@@ -9404,10 +9607,23 @@ export function MapTabBody() {
               Scanning campus…
             </div>
           </div>
-        ) : loadFailed ? (
+        ) : loadErr ? (
           <div style={mapEmptyOverlayStyle}>
-            <div style={{ fontFamily: "Fraunces, serif", fontSize: 18, color: "#fff", marginBottom: 6, textAlign: "center" }}>Couldn&apos;t load the map</div>
-            <div style={{ color: "rgba(255,255,255,0.55)", fontSize: 13, maxWidth: 320, textAlign: "center", lineHeight: 1.5 }}>Reload to try again.</div>
+            {/* stopPropagation keeps a Retry press from starting a canvas
+                drag, the same as the Settings link below. */}
+            <div
+              onPointerDown={(e) => e.stopPropagation()}
+              style={{ maxWidth: 360, padding: "0 16px" }}
+            >
+              <LoadFailed
+                tone="dark"
+                failure={loadErr}
+                onRetry={() => {
+                  setLoadErr(null);
+                  setLoadKey((k) => k + 1);
+                }}
+              />
+            </div>
           </div>
         ) : noSchool ? (
           <div style={mapEmptyOverlayStyle}>
@@ -10468,39 +10684,46 @@ function ZonePanel({
     discover: ZoneRow[];
   } | null>(null);
   const [tab, setTab] = useState<"discover" | "mutuals" | "connected">("discover");
+  const [loadErr, setLoadErr] = useState<LoadFailure | null>(null);
+  const [loadKey, setLoadKey] = useState(0);
 
   useEffect(() => {
     let cancelled = false;
     (async () => {
-      try {
-        const base =
-          selection.kind === "major"
-            ? `/api/campus-map/zone?major=${encodeURIComponent(selection.key)}`
-            : `/api/campus-map/zone?org=${encodeURIComponent(selection.key)}`;
-        const res = await fetch(base, { cache: "no-store" });
-        const j = await res.json();
-        if (cancelled) return;
-        if (j?.ok) {
-          setData({
-            connected: j.connected ?? [],
-            mutuals: j.mutuals ?? [],
-            discover: j.discover ?? [],
-          });
-          // Bias the default tab toward the bucket with the highest signal.
-          if ((j.mutuals ?? []).length > 0) setTab("mutuals");
-          else if ((j.discover ?? []).length > 0) setTab("discover");
-          else if ((j.connected ?? []).length > 0) setTab("connected");
-        } else {
-          setData({ connected: [], mutuals: [], discover: [] });
-        }
-      } catch {
-        if (!cancelled) setData({ connected: [], mutuals: [], discover: [] });
+      const base =
+        selection.kind === "major"
+          ? `/api/campus-map/zone?major=${encodeURIComponent(selection.key)}`
+          : `/api/campus-map/zone?org=${encodeURIComponent(selection.key)}`;
+      const r = await vibeRequest<{
+        connected?: ZoneRow[];
+        mutuals?: ZoneRow[];
+        discover?: ZoneRow[];
+      }>(base, { cache: "no-store", quiet: true, failure: "Couldn't load this zone." });
+      if (cancelled) return;
+      if (
+        !r.ok ||
+        !Array.isArray(r.data.connected) ||
+        !Array.isArray(r.data.mutuals) ||
+        !Array.isArray(r.data.discover)
+      ) {
+        // Never empty buckets: those read as "nobody here".
+        setLoadErr(asLoadFailure(r, "Couldn't load this zone."));
+        return;
       }
+      const connected = r.data.connected;
+      const mutuals = r.data.mutuals;
+      const discover = r.data.discover;
+      setLoadErr(null);
+      setData({ connected, mutuals, discover });
+      // Bias the default tab toward the bucket with the highest signal.
+      if (mutuals.length > 0) setTab("mutuals");
+      else if (discover.length > 0) setTab("discover");
+      else if (connected.length > 0) setTab("connected");
     })();
     return () => {
       cancelled = true;
     };
-  }, [selection]);
+  }, [selection, loadKey]);
 
   if (typeof document === "undefined") return null;
 
@@ -10646,7 +10869,17 @@ function ZonePanel({
       </div>
 
       <div style={{ flex: 1, overflow: "auto", padding: "10px 14px" }}>
-        {rows === null ? (
+        {rows === null && loadErr ? (
+          <LoadFailed
+            tone="dark"
+            compact
+            failure={loadErr}
+            onRetry={() => {
+              setLoadErr(null);
+              setLoadKey((k) => k + 1);
+            }}
+          />
+        ) : rows === null ? (
           <div style={{ color: "rgba(255,255,255,0.55)", fontFamily: "DM Sans, sans-serif", fontSize: 13, padding: "20px 0", textAlign: "center" }}>
             Loading…
           </div>
@@ -10765,6 +10998,17 @@ function hashString(s: string): number {
   return Math.abs(h);
 }
 
+type StripTrend = { tag: string; count: number };
+type StripUpcoming = {
+  id: string;
+  title: string;
+  starts_at: string;
+  ends_at: string;
+  location: string;
+  viewer_status: "going" | "maybe";
+  org: { handle: string; name: string; verified: boolean } | null;
+};
+
 /**
  * Horizontal Otto strip — sits above the feed, replaces the old right-
  * column OttoPanel for the Feed tab. Two cards side by side:
@@ -10776,40 +11020,54 @@ function hashString(s: string): number {
  * Mobile (<900px) stacks the two cards vertically via grid auto-fit.
  */
 export function OttoFeedStrip({ onPickTag }: { onPickTag: (tag: string) => void }) {
-  const [trending, setTrending] = useState<Array<{ tag: string; count: number }> | null>(null);
-  const [upcoming, setUpcoming] = useState<
-    Array<{
-      id: string;
-      title: string;
-      starts_at: string;
-      ends_at: string;
-      location: string;
-      viewer_status: "going" | "maybe";
-      org: { handle: string; name: string; verified: boolean } | null;
-    }> | null
-  >(null);
+  const [trending, setTrending] = useState<StripTrend[] | null>(null);
+  const [upcoming, setUpcoming] = useState<StripUpcoming[] | null>(null);
+  // Each section loads, fails and retries on its own, so one outage never
+  // blanks the other or reads as "nothing here".
+  const [trendingErr, setTrendingErr] = useState<LoadFailure | null>(null);
+  const [upcomingErr, setUpcomingErr] = useState<LoadFailure | null>(null);
+  const [trendingKey, setTrendingKey] = useState(0);
+  const [upcomingKey, setUpcomingKey] = useState(0);
   useEffect(() => {
     let cancelled = false;
     (async () => {
-      try {
-        const [tRes, uRes] = await Promise.all([
-          fetch("/api/trending/hashtags?limit=8", { cache: "no-store" }).then((r) => r.json()),
-          fetch("/api/me/upcoming-events?limit=3", { cache: "no-store" }).then((r) => r.json()),
-        ]);
-        if (cancelled) return;
-        setTrending(tRes?.ok && Array.isArray(tRes.trending) ? tRes.trending : []);
-        setUpcoming(uRes?.ok && Array.isArray(uRes.upcoming) ? uRes.upcoming : []);
-      } catch {
-        if (!cancelled) {
-          setTrending([]);
-          setUpcoming([]);
-        }
+      const r = await vibeRequest<{ trending?: StripTrend[] }>("/api/trending/hashtags?limit=8", {
+        cache: "no-store",
+        quiet: true,
+        failure: "Couldn't load trending tags.",
+      });
+      if (cancelled) return;
+      if (r.ok && Array.isArray(r.data.trending)) {
+        setTrendingErr(null);
+        setTrending(r.data.trending);
+      } else {
+        setTrendingErr(asLoadFailure(r, "Couldn't load trending tags."));
       }
     })();
     return () => {
       cancelled = true;
     };
-  }, []);
+  }, [trendingKey]);
+  useEffect(() => {
+    let cancelled = false;
+    (async () => {
+      const r = await vibeRequest<{ upcoming?: StripUpcoming[] }>("/api/me/upcoming-events?limit=3", {
+        cache: "no-store",
+        quiet: true,
+        failure: "Couldn't load your upcoming events.",
+      });
+      if (cancelled) return;
+      if (r.ok && Array.isArray(r.data.upcoming)) {
+        setUpcomingErr(null);
+        setUpcoming(r.data.upcoming);
+      } else {
+        setUpcomingErr(asLoadFailure(r, "Couldn't load your upcoming events."));
+      }
+    })();
+    return () => {
+      cancelled = true;
+    };
+  }, [upcomingKey]);
 
   const subtle = "rgba(255,255,255,0.55)";
   const divider = "rgba(255,255,255,0.06)";
@@ -10891,7 +11149,17 @@ export function OttoFeedStrip({ onPickTag }: { onPickTag: (tag: string) => void 
             subtle={subtle}
           />
           <div style={{ marginTop: 4, flex: 1 }}>
-            {upcoming === null ? (
+            {upcoming === null && upcomingErr ? (
+              <LoadFailed
+                tone="dark"
+                compact
+                failure={upcomingErr}
+                onRetry={() => {
+                  setUpcomingErr(null);
+                  setUpcomingKey((k) => k + 1);
+                }}
+              />
+            ) : upcoming === null ? (
               <div style={{ fontSize: 12, color: subtle, padding: "8px 0" }}>Loading…</div>
             ) : upcoming.length === 0 ? (
               <div style={{ fontSize: 12, color: subtle, padding: "8px 0", lineHeight: 1.5 }}>
@@ -10958,7 +11226,17 @@ export function OttoFeedStrip({ onPickTag }: { onPickTag: (tag: string) => void 
               alignContent: "flex-start",
             }}
           >
-            {trending === null ? (
+            {trending === null && trendingErr ? (
+              <LoadFailed
+                tone="dark"
+                compact
+                failure={trendingErr}
+                onRetry={() => {
+                  setTrendingErr(null);
+                  setTrendingKey((k) => k + 1);
+                }}
+              />
+            ) : trending === null ? (
               <div style={{ fontSize: 12, color: subtle }}>Loading…</div>
             ) : trending.length === 0 ? (
               <div style={{ fontSize: 12, color: subtle, lineHeight: 1.5 }}>
@@ -11489,6 +11767,8 @@ function ChannelRow({
 function ChannelRail({
   org,
   channels,
+  loadErr,
+  onRetryLoad,
   activeChannelId,
   onSelectChannel,
   onOpenCreateChannel,
@@ -11497,6 +11777,9 @@ function ChannelRail({
 }: {
   org: Org | null;
   channels: Channel[];
+  // The org's channel list failed to load; shown in its place with Retry.
+  loadErr: LoadFailure | null;
+  onRetryLoad: () => void;
   activeChannelId: string | null;
   onSelectChannel: (id: string) => void;
   onOpenCreateChannel: () => void;
@@ -11612,12 +11895,15 @@ function ChannelRail({
             </span>
           ) : (
             "Public"
-          )}{" "}
-          · {channels.length} channels
+          )}
+          {/* No count while the list failed: "0 channels" would be a guess. */}
+          {loadErr ? null : ` · ${channels.length} channels`}
         </div>
       </header>
       <div style={{ flex: 1, overflowY: "auto", padding: "12px 8px", position: "relative", zIndex: 1 }}>
-        {(() => {
+        {loadErr ? (
+          <LoadFailed tone="dark" compact failure={loadErr} onRetry={onRetryLoad} />
+        ) : (() => {
           const pinned = channels.filter((c) => c.pinned);
           const regular = channels.filter((c) => !c.pinned);
           return (
@@ -11909,7 +12195,11 @@ function ChannelChat({
   const [messages, setMessages] = useState<ChatMessage[]>([]);
   const [draft, setDraft] = useState("");
   const [sending, setSending] = useState(false);
+  // True after the first successful fetch. Until then a failure shows in
+  // place of the list; after it, a failed poll just keeps the messages.
   const [loaded, setLoaded] = useState(false);
+  const loadedRef = useRef(false);
+  const [loadErr, setLoadErr] = useState<LoadFailure | null>(null);
   // Quote-reply target. When set, the next send embeds parent_message_id.
   const [replyTo, setReplyTo] = useState<ChatMessage | null>(null);
   // Which message row is being hovered — drives the inline reaction
@@ -11950,45 +12240,47 @@ function ChannelChat({
   // Channel switches remount this component (parent passes key={channelId}),
   // so initial state above is the reset — no effect needed.
 
-  // Single fetch helper. Used by the 2s poll AND on demand (e.g. after a
-  // reaction toggle, so the new chip stays put instead of getting clobbered
-  // by the next poll cycle racing with our POST).
+  // On-demand fetch: after a reaction toggle (so the new chip stays put
+  // instead of getting clobbered by the next poll cycle racing with our
+  // POST), and for Retry after a failed first load. Quiet like the poll:
+  // with messages on screen, a failure keeps them.
   const refetchMessages = useCallback(async () => {
-    try {
-      const res = await fetch(`/api/me/threads/${channelId}/messages?limit=80`, {
-        cache: "no-store",
-      });
-      const data = await res.json();
-      if (data?.ok && Array.isArray(data.messages)) {
-        setMessages(data.messages as ChatMessage[]);
-      }
-    } catch (e) {
-      console.error("[campus] refetch messages", e);
+    const r = await vibeRequest<{ messages?: ChatMessage[] }>(
+      `/api/me/threads/${channelId}/messages?limit=80`,
+      { cache: "no-store", quiet: true, failure: "Couldn't load messages." },
+    );
+    if (r.ok && Array.isArray(r.data.messages)) {
+      loadedRef.current = true;
+      setMessages(r.data.messages);
+      setLoadErr(null);
+      setLoaded(true);
+    } else if (!loadedRef.current) {
+      setLoadErr(asLoadFailure(r, "Couldn't load messages."));
     }
   }, [channelId]);
 
   // Poll messages every 2s while this channel is open. Skips while a
   // reaction toggle is in flight — otherwise a poll that started just
   // before the click lands a stale messages array and clobbers the
-  // freshly-flipped chip.
+  // freshly-flipped chip. Never toasts: a failed poll keeps the messages,
+  // and before the first success it only sets the inline failure.
   useEffect(() => {
     let cancelled = false;
     const fetchOnce = async () => {
       if (pendingReactionsRef.current > 0) return;
-      try {
-        const res = await fetch(`/api/me/threads/${channelId}/messages?limit=80`, {
-          cache: "no-store",
-        });
-        const data = await res.json();
-        if (cancelled) return;
-        if (pendingReactionsRef.current > 0) return; // late return — drop it
-        if (data?.ok && Array.isArray(data.messages)) {
-          setMessages(data.messages as ChatMessage[]);
-        }
-      } catch (e) {
-        console.error("[campus] poll messages", e);
-      } finally {
-        if (!cancelled) setLoaded(true);
+      const r = await vibeRequest<{ messages?: ChatMessage[] }>(
+        `/api/me/threads/${channelId}/messages?limit=80`,
+        { cache: "no-store", quiet: true, failure: "Couldn't load messages." },
+      );
+      if (cancelled) return;
+      if (pendingReactionsRef.current > 0) return; // late return — drop it
+      if (r.ok && Array.isArray(r.data.messages)) {
+        loadedRef.current = true;
+        setMessages(r.data.messages);
+        setLoadErr(null);
+        setLoaded(true);
+      } else if (!loadedRef.current) {
+        setLoadErr(asLoadFailure(r, "Couldn't load messages."));
       }
     };
     fetchOnce();
@@ -12244,7 +12536,16 @@ function ChannelChat({
           minHeight: 0,
         }}
       >
-        {!loaded ? (
+        {!loaded && loadErr ? (
+          <LoadFailed
+            tone={isCream ? "light" : "dark"}
+            failure={loadErr}
+            onRetry={() => {
+              setLoadErr(null);
+              void refetchMessages();
+            }}
+          />
+        ) : !loaded ? (
           <div style={{ color: muted, fontFamily: "DM Sans, sans-serif", fontSize: 13 }}>
             Loading messages…
           </div>
