@@ -3824,7 +3824,8 @@ function PortfolioEditorShell({
             position: "fixed",
             inset: 0,
             background: "rgba(0,0,0,0.42)",
-            zIndex: 1200,
+            // Above the tab bar (z 9988), which this page keeps on screen.
+            zIndex: 10000,
           }}
         />
         <Drawer.Content
@@ -3838,7 +3839,7 @@ function PortfolioEditorShell({
             background: "#FAF7F2",
             display: "flex",
             flexDirection: "column",
-            zIndex: 1201,
+            zIndex: 10001,
             outline: "none",
           }}
         >
@@ -5085,11 +5086,14 @@ function SafetySheetRow({
 // their layers (1200 / 1201). vaul owns the open/close animation,
 // drag-to-dismiss, focus trap and scroll lock; ToastHost (12000) stays
 // above, so a toast shows over an open sheet.
+// Above the mobile tab bar (globals.css .vibe-mobile-tabbar, z 9988):
+// this page keeps the bar on screen, so at 1200 the bar painted over the
+// bottom of every sheet — Cancel, and the Report sheet's Submit.
 const sheetOverlayStyle: React.CSSProperties = {
   position: "fixed",
   inset: 0,
   background: "rgba(0,0,0,0.42)",
-  zIndex: 1200,
+  zIndex: 10000,
 };
 
 const sheetContentStyle: React.CSSProperties = {
@@ -5102,7 +5106,7 @@ const sheetContentStyle: React.CSSProperties = {
   borderTopRightRadius: 20,
   paddingBottom: "env(safe-area-inset-bottom, 0px)",
   boxShadow: "0 -8px 32px rgba(0,0,0,0.18)",
-  zIndex: 1201,
+  zIndex: 10001,
   outline: "none",
 };
 
