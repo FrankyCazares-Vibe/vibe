@@ -2003,15 +2003,18 @@ async function __dmLoadMessages(channelId, opts) {
         authorName: author ? (author.name || author.handle || '') : '',
         authorHandle: author ? author.handle : null,
         authorAvatarUrl: author ? author.avatar_url : null,
-      } : (m.attachment_id ? {
-        id: m.attachment_id,
+      } : ((m.attachment_id || m.attachment_kind) ? {
+        id: m.attachment_id || null,
         kind: m.attachment_kind === 'clip' ? 'clip' : 'post',
         content: '',
         mediaUrl: null,
         posterUrl: null,
-        unavailable: true,  // FK was set but the post is gone or not visible.
+        // Not visible, or deleted: deleting a post nulls attachment_id (FK is
+        // ON DELETE SET NULL) and only attachment_kind survives.
+        unavailable: true,
       } : null);
-      // Inline media (paperclip uploads) — server already signs the URL.
+      // Inline media (paperclip uploads) — a stable same-origin URL that
+      // signs per request, so it never expires in an open thread.
       const media = m.media_url
         ? { url: m.media_url, kind: m.media_kind === 'video' ? 'video' : 'image' }
         : null;

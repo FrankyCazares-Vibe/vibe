@@ -6,10 +6,11 @@ import {
   resolveMentionedUserIds,
 } from "@/lib/mentions";
 import {
-  isR2Configured,
-  MESSAGE_MEDIA_KEY_PREFIX,
-  signMessageMediaGetUrl,
-} from "@/lib/r2";
+  ensureMember,
+  isChannelMessageMediaKey,
+  messageMediaProxyUrl,
+} from "@/lib/messages/channel-access";
+import { postMediaProxyUrl } from "@/lib/post-media-url";
 import { requireTermsAccepted } from "@/lib/legal/require-terms";
 import { rateLimit, tooManyRequests } from "@/lib/rate-limit";
 import { createSupabaseServerClient } from "@/lib/supabase/server";
@@ -43,10 +44,22 @@ type MessageRow = {
   attachment_kind?: string | null;
   parent_message_id?: string | null;
   users?: unknown;
-  attachment?: unknown;
+  attachment?: AttachmentRow | null;
   // Filled in by hydrate helpers below.
   parent_preview?: ParentPreview | null;
   reactions?: ReactionGroup[];
+};
+
+// The shared post/clip joined via messages_attachment_id_fkey. null when the
+// post is gone or RLS hides it from the viewer.
+type AttachmentRow = {
+  id: string;
+  type: string;
+  content: string;
+  media_url: string | null;
+  media_thumbnail_url: string | null;
+  user_id: string;
+  author: { id: string; handle: string; name: string; avatar_url: string | null } | null;
 };
 
 type ParentPreview = {
@@ -164,119 +177,39 @@ async function hydrateParentPreviews(
 }
 
 /**
- * Replace stored R2 keys in `media_url` with short-lived signed GET URLs
- * so the browser can render images/videos directly. No-ops when R2 isn't
- * configured or media_url is already a public URL.
+ * Last pass before rows go to the client. `media_url` becomes the stable
+ * same-origin proxy (/api/me/threads/<channel>/messages/<id>/media) instead
+ * of a signed R2 URL minted here: those died after 5 minutes, and desktop
+ * only re-renders a bubble when its id changes, so an open thread's photos
+ * and videos went dead until reload. A shared post's stored media is often
+ * an R2 key too (org posts, clips), so it goes through the post media proxy
+ * the same way. Hydrated fields get their empty defaults so every row has
+ * the same keys.
  */
-async function signMediaUrls(rows: MessageRow[]): Promise<void> {
-  if (!isR2Configured()) return;
-  await Promise.all(
-    rows.map(async (m) => {
-      const key = m.media_url;
-      if (!key || !key.startsWith(MESSAGE_MEDIA_KEY_PREFIX)) return;
-      try {
-        m.media_url = await signMessageMediaGetUrl(key);
-      } catch (err) {
-        console.error("[messages.signMediaUrls]", err);
-        m.media_url = null;
-      }
-    }),
-  );
+function prepareForClient(rows: MessageRow[], channelId: string): void {
+  for (const m of rows) {
+    // Only a key the proxy will actually serve — anything else would render
+    // as a broken image, so it's dropped here instead.
+    m.media_url =
+      m.media_url && isChannelMessageMediaKey(m.media_url, channelId)
+        ? messageMediaProxyUrl(channelId, m.id)
+        : null;
+    m.media_kind = m.media_kind ?? null;
+    const at = m.attachment ?? null;
+    if (at) {
+      at.media_url = postMediaProxyUrl(at.id, at.media_url, "media");
+      at.media_thumbnail_url = postMediaProxyUrl(at.id, at.media_thumbnail_url, "thumbnail");
+    }
+    m.attachment = at;
+    m.attachment_id = m.attachment_id ?? null;
+    m.attachment_kind = m.attachment_kind ?? null;
+    m.parent_message_id = m.parent_message_id ?? null;
+    m.parent_preview = m.parent_preview ?? null;
+    m.reactions = m.reactions ?? [];
+  }
 }
 
 type RouteCtx = { params: Promise<{ id: string }> };
-
-type ChannelAccess =
-  | {
-      ok: true;
-      isOrgChannel: false;
-      orgId: null;
-      accepted_at: string | null;
-      cleared_at: string | null;
-    }
-  | {
-      ok: true;
-      isOrgChannel: true;
-      orgId: string;
-      accepted_at: null;
-      cleared_at: null;
-    }
-  | { ok: false; status: number };
-
-/**
- * Verify the viewer can read/post in this channel.
- * - DM/group channels (channel_members.row exists): returns accepted_at for
- *   the implicit-accept flow.
- * - Org channels (channels.org_id IS NOT NULL): defers to can_view_org_channel,
- *   which checks org_members + per-channel privacy.
- */
-async function ensureMember(
-  supabase: Awaited<ReturnType<typeof createSupabaseServerClient>>,
-  channelId: string,
-  userId: string,
-): Promise<ChannelAccess> {
-  // Quick lookup: does this channel belong to an org?
-  const { data: channel } = await supabase
-    .from("channels")
-    .select("org_id")
-    .eq("id", channelId)
-    .maybeSingle();
-
-  if (channel?.org_id) {
-    const { data: canView, error: rpcErr } = await supabase.rpc(
-      "can_view_org_channel",
-      { cid: channelId, uid: userId },
-    );
-    if (rpcErr) {
-      console.error("[messages.ensureMember can_view_org_channel]", rpcErr);
-      return { ok: false, status: 500 };
-    }
-    if (canView !== true) return { ok: false, status: 403 };
-    return {
-      ok: true,
-      isOrgChannel: true,
-      orgId: channel.org_id as string,
-      accepted_at: null,
-      cleared_at: null,
-    };
-  }
-
-  // DM/group path — original channel_members check.
-  // cleared_at is selected on the same row so the messages GET can filter
-  // out anything stamped before the viewer's last "Clear chat" call.
-  // Wrapped in a second try without cleared_at for deploy-lag safety
-  // (the column lands in 20260509100000 — fall back if missing).
-  async function readMember(includeCleared: boolean) {
-    return supabase
-      .from("channel_members")
-      .select(includeCleared ? "accepted_at, cleared_at" : "accepted_at")
-      .eq("channel_id", channelId)
-      .eq("user_id", userId)
-      .maybeSingle();
-  }
-  let { data, error } = await readMember(true);
-  if (error && /cleared_at|column .* does not exist/i.test(error.message ?? "")) {
-    const fb = await readMember(false);
-    data = fb.data;
-    error = fb.error;
-  }
-  if (error) {
-    console.error("[messages.ensureMember]", error);
-    return { ok: false, status: 500 };
-  }
-  if (!data) return { ok: false, status: 403 };
-  const row = data as unknown as {
-    accepted_at: string | null;
-    cleared_at?: string | null;
-  };
-  return {
-    ok: true,
-    isOrgChannel: false,
-    orgId: null,
-    accepted_at: row.accepted_at ?? null,
-    cleared_at: row.cleared_at ?? null,
-  };
-}
 
 /**
  * GET: list messages in a channel, oldest-first.
@@ -333,13 +266,13 @@ export async function GET(req: Request, ctx: RouteCtx) {
     console.error("[messages.GET]", error);
     return NextResponse.json({ ok: false, error: "Request failed" }, { status: 500 });
   }
-  // Sign R2 keys in media_url so the browser can render directly.
   const messageRows = (data ?? []) as unknown as MessageRow[];
-  await signMediaUrls(messageRows);
   await Promise.all([
     hydrateReactions(supabase, messageRows, user.id),
     hydrateParentPreviews(supabase, messageRows),
   ]);
+  // After hydration, so the empty defaults only fill what hydration left.
+  prepareForClient(messageRows, channelId);
 
   // Org channels don't have channel_members rows — skip the peer/typing query
   // entirely. (Org-channel read state + typing indicators are out of scope
@@ -475,9 +408,7 @@ export async function POST(req: Request, ctx: RouteCtx) {
   let mediaUrl: string | null = null;
   let mediaKind: "image" | "video" | null = null;
   if (mediaUrlRaw) {
-    if (
-      !mediaUrlRaw.startsWith(`${MESSAGE_MEDIA_KEY_PREFIX}${channelId}/`)
-    ) {
+    if (!isChannelMessageMediaKey(mediaUrlRaw, channelId)) {
       return NextResponse.json(
         { ok: false, error: "Invalid media key" },
         { status: 400 },
@@ -682,11 +613,11 @@ export async function POST(req: Request, ctx: RouteCtx) {
 
   if (inserted) {
     const insertedRows = [inserted as unknown as MessageRow];
-    await signMediaUrls(insertedRows);
     // New row has no reactions yet, but if it's a reply we want to embed
     // the parent preview so the optimistic-render quote stub is correct.
     await hydrateParentPreviews(supabase, insertedRows);
-    if (insertedRows[0].reactions === undefined) insertedRows[0].reactions = [];
+    // Same client shape as the GET: proxy media URLs, reactions: [].
+    prepareForClient(insertedRows, channelId);
   }
   return NextResponse.json({ ok: true, message: inserted });
 }

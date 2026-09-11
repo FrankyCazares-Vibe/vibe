@@ -56,12 +56,15 @@ type ThreadEntry = {
     created_at: string;
     user_id: string;
   } | null;
-  last_read_at: string | null;
+  /** Server-computed: the last message is someone else's and newer than
+   *  the viewer's last_read_at. The API never sends last_read_at, so this
+   *  flag is the only source for the unread dot and the badge. Optional
+   *  because CampusMobile's synthesized org-channel entries omit it. */
+  unread?: boolean;
   accepted_at: string | null;
   pinned_at?: string | null;
   hidden_at?: string | null;
   muted_until?: string | null;
-  unread_count?: number;
   members?: ThreadMember[];
   viewer_role?: "admin" | "member";
 };
@@ -70,6 +73,23 @@ type MessageReaction = {
   emoji: string;
   count: number;
   viewer_reacted: boolean;
+};
+
+/** A shared post/clip as joined by the messages API. Its media URLs are
+ *  opaque src values — use them as-is, never parse them. */
+type MessageAttachment = {
+  id: string;
+  type: "post" | "clip";
+  content: string | null;
+  media_url: string | null;
+  media_thumbnail_url: string | null;
+  user_id: string;
+  author: {
+    id: string;
+    handle: string | null;
+    name: string | null;
+    avatar_url: string | null;
+  } | null;
 };
 
 type MessageRow = {
@@ -83,6 +103,17 @@ type MessageRow = {
     name: string | null;
     avatar_url: string | null;
   } | null;
+  /** Inline photo/video. media_url is an opaque same-origin src (the
+   *  server redirects it to storage) — never parse it. */
+  media_url?: string | null;
+  media_kind?: "image" | "video" | null;
+  /** Shared post/clip. `attachment` is null when the post isn't visible to
+   *  the viewer, or was deleted — then attachment_id is nulled too (FK is
+   *  ON DELETE SET NULL) and only attachment_kind remains. */
+  attachment_id?: string | null;
+  attachment_kind?: "post" | "clip" | null;
+  attachment?: MessageAttachment | null;
+  parent_message_id?: string | null;
   reactions?: MessageReaction[];
 };
 
@@ -311,17 +342,18 @@ export function MessagesMobile({
     return threads ?? [];
   }, [tab, threads, requests]);
 
-  const unreadCount = useMemo(() => {
-    if (!threads) return 0;
-    return threads.filter((t) => {
-      if (!t.last_message) return false;
-      if (t.last_message.user_id === t.peer?.id) {
-        if (!t.last_read_at) return true;
-        return new Date(t.last_message.created_at) > new Date(t.last_read_at);
-      }
-      return false;
-    }).length;
-  }, [threads]);
+  // Threads with an unread message — the server's flag, because only the
+  // server knows the viewer's last_read_at. A muted thread keeps its dot
+  // but stays out of the badge: mute promises silence (desktop's copy
+  // says so, and the server documents muted_until as badge silence).
+  const unreadCount = useMemo(
+    () =>
+      (threads ?? []).filter(
+        (t) =>
+          t.unread && !(t.muted_until && new Date(t.muted_until) > new Date()),
+      ).length,
+    [threads],
+  );
 
   return (
     <main
@@ -540,13 +572,13 @@ function ThreadRow({
 }) {
   const { url: avatarUrl, initials } = threadAvatar(thread);
   const title = threadTitle(thread);
-  const preview = thread.last_message?.content?.trim() || "No messages yet";
+  // A photo, video or shared post sent without a caption has empty
+  // content — say so instead of a blank line.
+  const preview = thread.last_message
+    ? thread.last_message.content?.trim() || "Attachment"
+    : "No messages yet";
   const when = relativeTime(thread.last_message?.created_at);
-  const unread =
-    !!thread.last_message &&
-    thread.last_message.user_id === thread.peer?.id &&
-    (!thread.last_read_at ||
-      new Date(thread.last_message.created_at) > new Date(thread.last_read_at));
+  const unread = !!thread.unread;
 
   return (
     <li>
@@ -847,6 +879,16 @@ export function ConversationView({
     el.scrollTop = el.scrollHeight;
   }, [messages]);
 
+  // Photos and videos only take their real height once they load, which
+  // pushes the newest message below the fold after the scroll above ran.
+  // Track whether the reader is at the bottom so a late-loading one keeps
+  // them pinned there — and leaves them alone if they scrolled up.
+  const pinnedToBottomRef = useRef(true);
+  const keepPinnedToBottom = useCallback(() => {
+    const el = scrollRef.current;
+    if (el && pinnedToBottomRef.current) el.scrollTop = el.scrollHeight;
+  }, []);
+
   const send = useCallback(async () => {
     const text = draft.trim();
     if (!text || sending) return;
@@ -1138,6 +1180,12 @@ export function ConversationView({
       {/* Message list */}
       <div
         ref={scrollRef}
+        onScroll={(e) => {
+          // Within ~80px of the bottom counts as reading the latest.
+          const el = e.currentTarget;
+          pinnedToBottomRef.current =
+            el.scrollHeight - el.scrollTop - el.clientHeight < 80;
+        }}
         style={{
           flex: 1,
           overflowY: "auto",
@@ -1192,6 +1240,7 @@ export function ConversationView({
                   groupMode={isMultiParty}
                   darkMode={!!backdropCss}
                   onToggleReaction={(emoji) => void toggleReaction(m.id, emoji)}
+                  onMediaLoad={keepPinnedToBottom}
                 />
               );
             })}
@@ -2902,6 +2951,7 @@ function MessageBubble({
   groupMode = false,
   darkMode = false,
   onToggleReaction,
+  onMediaLoad,
 }: {
   message: MessageRow;
   isMine: boolean;
@@ -2921,6 +2971,9 @@ function MessageBubble({
    *  this with the chosen emoji. Tapping an existing reaction chip
    *  toggles it via the same handler. */
   onToggleReaction?: (emoji: string) => void;
+  /** Fired when a photo/video learns its real size, so the thread can
+   *  stay pinned to the bottom. */
+  onMediaLoad?: () => void;
 }) {
   const sender = message.users ?? null;
   const senderName = sender?.name || sender?.handle || "Member";
@@ -2936,6 +2989,11 @@ function MessageBubble({
   const longPressTimer = useRef<number | null>(null);
   const longPressFired = useRef(false);
   const pressStart = useRef<{ x: number; y: number } | null>(null);
+  // Flipped by onError: a photo/video (or a shared post's poster) that
+  // 404s or whose link expired shows a muted tile / the gradient instead
+  // of a broken image.
+  const [mediaFailed, setMediaFailed] = useState(false);
+  const [posterFailed, setPosterFailed] = useState(false);
 
   const clearLongPress = () => {
     if (longPressTimer.current) {
@@ -2969,6 +3027,31 @@ function MessageBubble({
     if (dx * dx + dy * dy > 100) clearLongPress();
   };
 
+  // The same long-press gesture on the text bubble, the photo/video and
+  // the shared-post card, so the reaction picker opens from any of them.
+  // Nothing here prevents the pointerdown default, so native video
+  // controls still take their taps.
+  const pressHandlers = {
+    onPointerDown: (e: React.PointerEvent) => startLongPress(e.clientX, e.clientY),
+    onPointerMove: (e: React.PointerEvent) => onPressMove(e.clientX, e.clientY),
+    onPointerUp: () => clearLongPress(),
+    onPointerCancel: () => clearLongPress(),
+    onPointerLeave: () => clearLongPress(),
+    onContextMenu: (e: React.MouseEvent) => {
+      // Mobile Safari fires contextmenu on long-press by default —
+      // we own the gesture, so suppress its native menu.
+      e.preventDefault();
+    },
+    // The click that ends a long-press must not also open the shared
+    // post or toggle the video.
+    onClickCapture: (e: React.MouseEvent) => {
+      if (!longPressFired.current) return;
+      longPressFired.current = false;
+      e.preventDefault();
+      e.stopPropagation();
+    },
+  };
+
   // Bubble palette flips with darkMode AND mine-ness:
   //   - dark + theirs   → translucent dark glass, white text
   //   - dark + mine     → orange-tinted dark glass, white text
@@ -2992,6 +3075,344 @@ function MessageBubble({
   // legible against the gradient wallpaper.
   const senderNameColor = darkMode ? "rgba(255,255,255,0.92)" : "rgba(28,28,30,0.7)";
   const senderHandleColor = darkMode ? "rgba(255,255,255,0.5)" : "rgba(28,28,30,0.42)";
+  const bubbleShadow = isMine
+    ? darkMode
+      ? "0 6px 18px rgba(255,92,53,0.18)"
+      : "0 4px 14px rgba(255,92,53,0.22)"
+    : darkMode
+      ? "0 6px 18px rgba(20,8,40,0.18)"
+      : "0 2px 8px rgba(180,120,60,0.06)";
+  // Shared-post card text: white on the coral / dark-glass surfaces,
+  // charcoal with an accent label on the cream theirs-card (desktop's).
+  const onTint = isMine || darkMode;
+  const cardMuted = onTint ? "rgba(255,255,255,0.66)" : "#8A8580";
+
+  // Everything long-pressable shares this: no iOS callout or selection,
+  // and the same press-in scale while the picker is open.
+  const pressStyle: React.CSSProperties = {
+    cursor: "pointer",
+    WebkitTouchCallout: "none",
+    WebkitUserSelect: "none",
+    userSelect: "none",
+    transition: "transform 120ms ease",
+    transform: pickerOpen ? "scale(0.97)" : "scale(1)",
+  };
+
+  // What the message carries besides text. A media kind with no URL
+  // means the server couldn't produce a link — it gets the same
+  // "couldn't load" tile as a load error. Never a blank bubble.
+  const hasText = !!message.content?.trim();
+  const mediaUrl = message.media_url || null;
+  const mediaKind: "image" | "video" | null =
+    message.media_kind === "video"
+      ? "video"
+      : message.media_kind === "image" || mediaUrl
+        ? "image"
+        : null;
+  const attachment = message.attachment ?? null;
+  const hasCard =
+    !!attachment || !!message.attachment_id || !!message.attachment_kind;
+  const isEmpty = !hasText && !mediaKind && !hasCard;
+  // Desktop's order: a caption sits under a photo/video, but above a
+  // shared post ("here's my note → here's the thing").
+  const captionAbove = hasCard && !mediaKind;
+
+  const noticeTile = (label: string, wide = false) => (
+    <div
+      {...pressHandlers}
+      style={{
+        width: wide ? 260 : undefined,
+        maxWidth: "100%",
+        padding: wide ? 14 : "10px 14px",
+        textAlign: wide ? "center" : undefined,
+        borderRadius: 14,
+        background: darkMode ? "rgba(20,16,28,0.55)" : "rgba(28,28,30,0.04)",
+        border: darkMode
+          ? "1px dashed rgba(255,255,255,0.18)"
+          : "1px dashed rgba(28,28,30,0.16)",
+        color: darkMode ? "rgba(255,255,255,0.62)" : "#8A8580",
+        fontFamily: "DM Sans, sans-serif",
+        fontSize: 12.5,
+        fontWeight: 600,
+        ...pressStyle,
+      }}
+    >
+      {label}
+    </div>
+  );
+
+  const textBubble = hasText ? (
+    <div
+      {...pressHandlers}
+      style={{
+        display: "inline-block",
+        maxWidth: "100%",
+        padding: "8px 14px",
+        borderRadius: 18,
+        background: bubbleBg,
+        color: bubbleColor,
+        fontFamily: "DM Sans, sans-serif",
+        fontSize: 14.5,
+        lineHeight: 1.4,
+        fontWeight: 500,
+        border: bubbleBorder,
+        backdropFilter: darkMode ? "blur(20px) saturate(160%)" : undefined,
+        WebkitBackdropFilter: darkMode ? "blur(20px) saturate(160%)" : undefined,
+        boxShadow: bubbleShadow,
+        whiteSpace: "pre-wrap",
+        wordBreak: "break-word",
+        ...pressStyle,
+      }}
+    >
+      {message.content}
+    </div>
+  ) : null;
+
+  // Photo/video, keyed by message id so a refetch never remounts (and
+  // re-downloads) it. Max 260×320 with the aspect kept; the photo's min
+  // box holds space while it lazy-loads, and object-fit crops panoramas.
+  let media: React.ReactNode = null;
+  if (mediaKind && (!mediaUrl || mediaFailed)) {
+    media = noticeTile(
+      mediaKind === "video" ? "Video couldn't load" : "Photo couldn't load",
+    );
+  } else if (mediaKind === "video" && mediaUrl) {
+    media = (
+      <div
+        {...pressHandlers}
+        style={{ ...pressStyle, borderRadius: 14, overflow: "hidden" }}
+      >
+        <video
+          key={`${message.id}:video`}
+          src={mediaUrl}
+          controls
+          playsInline
+          preload="metadata"
+          onLoadedMetadata={onMediaLoad}
+          onError={() => setMediaFailed(true)}
+          style={{
+            display: "block",
+            maxWidth: 260,
+            maxHeight: 320,
+            borderRadius: 14,
+            background: "#000",
+          }}
+        />
+      </div>
+    );
+  } else if (mediaKind === "image" && mediaUrl) {
+    media = (
+      <div
+        {...pressHandlers}
+        style={{ ...pressStyle, borderRadius: 14, overflow: "hidden" }}
+      >
+        {/* eslint-disable-next-line @next/next/no-img-element */}
+        <img
+          key={`${message.id}:photo`}
+          src={mediaUrl}
+          alt="Photo"
+          loading="lazy"
+          decoding="async"
+          draggable={false}
+          onLoad={onMediaLoad}
+          onError={() => setMediaFailed(true)}
+          style={{
+            display: "block",
+            minWidth: 120,
+            minHeight: 120,
+            maxWidth: 260,
+            maxHeight: 320,
+            objectFit: "cover",
+            borderRadius: 14,
+            background: darkMode ? "rgba(255,255,255,0.06)" : "rgba(28,28,30,0.06)",
+          }}
+        />
+      </div>
+    );
+  }
+
+  // Shared post/clip → a card that opens /posts/<id>. A card with no joined
+  // row means the post isn't visible, or was deleted — deleting nulls
+  // attachment_id (FK is ON DELETE SET NULL) and only attachment_kind stays.
+  let card: React.ReactNode = null;
+  if (hasCard && !attachment) {
+    card = noticeTile("Post unavailable", true);
+  } else if (attachment) {
+    const isClip = attachment.type === "clip";
+    // Poster: the thumbnail, else the post's own image. A clip's
+    // media_url is a video, so it never doubles as a poster.
+    const posterUrl =
+      attachment.media_thumbnail_url || (!isClip ? attachment.media_url : null);
+    const author = attachment.author;
+    card = (
+      <Link
+        href={`/posts/${encodeURIComponent(attachment.id)}`}
+        draggable={false}
+        {...pressHandlers}
+        style={{
+          display: "block",
+          width: 260,
+          maxWidth: "100%",
+          borderRadius: 14,
+          overflow: "hidden",
+          background: bubbleBg,
+          color: bubbleColor,
+          border: bubbleBorder,
+          boxShadow: bubbleShadow,
+          backdropFilter: darkMode ? "blur(20px) saturate(160%)" : undefined,
+          WebkitBackdropFilter: darkMode ? "blur(20px) saturate(160%)" : undefined,
+          fontFamily: "DM Sans, sans-serif",
+          textDecoration: "none",
+          ...pressStyle,
+        }}
+      >
+        <div
+          style={{
+            position: "relative",
+            height: 150,
+            background: "linear-gradient(135deg,#2D1B4E,#1A3A5C)",
+            overflow: "hidden",
+          }}
+        >
+          {posterUrl && !posterFailed ? (
+            // eslint-disable-next-line @next/next/no-img-element
+            <img
+              key={`${message.id}:poster`}
+              src={posterUrl}
+              alt=""
+              loading="lazy"
+              decoding="async"
+              draggable={false}
+              onError={() => setPosterFailed(true)}
+              style={{
+                display: "block",
+                width: "100%",
+                height: "100%",
+                objectFit: "cover",
+              }}
+            />
+          ) : null}
+          {isClip ? (
+            <div
+              aria-hidden
+              style={{
+                position: "absolute",
+                inset: 0,
+                display: "flex",
+                alignItems: "center",
+                justifyContent: "center",
+                background: "rgba(0,0,0,0.18)",
+              }}
+            >
+              <span
+                style={{
+                  width: 44,
+                  height: 44,
+                  borderRadius: 999,
+                  background: "rgba(255,255,255,0.94)",
+                  color: "#1C1C1E",
+                  display: "inline-flex",
+                  alignItems: "center",
+                  justifyContent: "center",
+                }}
+              >
+                <svg width="16" height="16" viewBox="0 0 16 16" fill="currentColor" aria-hidden>
+                  <path d="M5 3.5v9l8-4.5z" />
+                </svg>
+              </span>
+            </div>
+          ) : null}
+        </div>
+        <div style={{ padding: "10px 12px 12px" }}>
+          <div
+            style={{
+              fontSize: 9.5,
+              fontWeight: 800,
+              letterSpacing: "0.14em",
+              textTransform: "uppercase",
+              color: onTint ? "rgba(255,255,255,0.8)" : "#FF5C35",
+              marginBottom: 5,
+            }}
+          >
+            {isClip ? "Clip" : "Post"}
+          </div>
+          {attachment.content?.trim() ? (
+            <div
+              style={{
+                fontSize: 13,
+                lineHeight: 1.4,
+                fontWeight: 500,
+                display: "-webkit-box",
+                WebkitLineClamp: 2,
+                WebkitBoxOrient: "vertical",
+                overflow: "hidden",
+                wordBreak: "break-word",
+              }}
+            >
+              {attachment.content}
+            </div>
+          ) : (
+            <div style={{ fontSize: 12, fontStyle: "italic", color: cardMuted }}>
+              Tap to open
+            </div>
+          )}
+          {author && (author.name || author.handle) ? (
+            <div
+              style={{
+                display: "flex",
+                alignItems: "center",
+                gap: 7,
+                marginTop: 9,
+                paddingTop: 9,
+                borderTop: onTint
+                  ? "1px solid rgba(255,255,255,0.16)"
+                  : "1px solid rgba(28,28,30,0.08)",
+                fontSize: 11,
+                color: cardMuted,
+              }}
+            >
+              <span
+                style={{
+                  width: 20,
+                  height: 20,
+                  borderRadius: 7,
+                  background: author.avatar_url
+                    ? `url(${author.avatar_url}) center/cover`
+                    : "#FFD3C2",
+                  color: "#1C1C1E",
+                  display: "inline-flex",
+                  alignItems: "center",
+                  justifyContent: "center",
+                  fontFamily: "Fraunces, serif",
+                  fontSize: 9,
+                  fontWeight: 800,
+                  flexShrink: 0,
+                }}
+              >
+                {!author.avatar_url ? initialsOf(author.name || author.handle) : null}
+              </span>
+              <span
+                style={{
+                  minWidth: 0,
+                  whiteSpace: "nowrap",
+                  overflow: "hidden",
+                  textOverflow: "ellipsis",
+                }}
+              >
+                by{" "}
+                <span style={{ fontWeight: 700, color: onTint ? "#fff" : "#1C1C1E" }}>
+                  {author.name || `@${author.handle}`}
+                </span>
+                {author.name && author.handle ? (
+                  <span style={{ opacity: 0.8 }}> @{author.handle}</span>
+                ) : null}
+              </span>
+            </div>
+          ) : null}
+        </div>
+      </Link>
+    );
+  }
 
   return (
     <div
@@ -3058,49 +3479,21 @@ function MessageBubble({
           position: "relative",
         }}
       >
+        {/* Photo/video, shared-post card and caption, stacked on the
+            sender's side. Each piece carries the long-press handlers. */}
         <div
-          onPointerDown={(e) => startLongPress(e.clientX, e.clientY)}
-          onPointerMove={(e) => onPressMove(e.clientX, e.clientY)}
-          onPointerUp={() => clearLongPress()}
-          onPointerCancel={() => clearLongPress()}
-          onPointerLeave={() => clearLongPress()}
-          onContextMenu={(e) => {
-            // Mobile Safari fires contextmenu on long-press by default —
-            // we own the gesture, so suppress its native menu.
-            e.preventDefault();
-          }}
           style={{
-            display: "inline-block",
-            maxWidth: "100%",
-            padding: "8px 14px",
-            borderRadius: 18,
-            background: bubbleBg,
-            color: bubbleColor,
-            fontFamily: "DM Sans, sans-serif",
-            fontSize: 14.5,
-            lineHeight: 1.4,
-            fontWeight: 500,
-            border: bubbleBorder,
-            backdropFilter: darkMode ? "blur(20px) saturate(160%)" : undefined,
-            WebkitBackdropFilter: darkMode ? "blur(20px) saturate(160%)" : undefined,
-            boxShadow: isMine
-              ? darkMode
-                ? "0 6px 18px rgba(255,92,53,0.18)"
-                : "0 4px 14px rgba(255,92,53,0.22)"
-              : darkMode
-                ? "0 6px 18px rgba(20,8,40,0.18)"
-                : "0 2px 8px rgba(180,120,60,0.06)",
-            whiteSpace: "pre-wrap",
-            wordBreak: "break-word",
-            cursor: "pointer",
-            WebkitTouchCallout: "none",
-            WebkitUserSelect: "none",
-            userSelect: "none",
-            transition: "transform 120ms ease",
-            transform: pickerOpen ? "scale(0.97)" : "scale(1)",
+            display: "flex",
+            flexDirection: "column",
+            alignItems: isMine ? "flex-end" : "flex-start",
+            gap: 4,
           }}
         >
-          {message.content}
+          {captionAbove ? textBubble : null}
+          {media}
+          {card}
+          {captionAbove ? null : textBubble}
+          {isEmpty ? noticeTile("Attachment") : null}
         </div>
 
         {/* Existing reactions — tappable to toggle. Wraps below the bubble. */}
