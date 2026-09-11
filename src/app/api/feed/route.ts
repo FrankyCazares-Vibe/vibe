@@ -3,6 +3,7 @@ import { NextResponse } from "next/server";
 import { campusByLabel } from "@/lib/iu/campuses";
 import { orgAssetProxyUrl } from "@/lib/org-asset-url";
 import { withPostMediaUrls } from "@/lib/post-media-url";
+import { loadHiddenUsers } from "@/lib/safety/hidden-users";
 import { createSupabaseServerClient } from "@/lib/supabase/server";
 
 const DEFAULT_LIMIT = 50;
@@ -113,15 +114,25 @@ export async function GET(req: Request) {
     ? Math.min(MAX_LIMIT, Math.max(limit * 4, 80))
     : limit;
 
-  const { data: me, error: meErr } = await supabase
-    .from("users")
-    .select("school")
-    .eq("id", user.id)
-    .single();
+  // The viewer's campus and the people they shouldn't see (blocked either
+  // way, muted right now) load together, so the hidden list costs no extra
+  // round trip.
+  const [meRes, hiddenRes] = await Promise.all([
+    supabase.from("users").select("school").eq("id", user.id).single(),
+    loadHiddenUsers(supabase, user.id),
+  ]);
+  const { data: me, error: meErr } = meRes;
   if (meErr) {
     console.error("[feed me]", meErr);
     return NextResponse.json({ ok: false, error: "Request failed" }, { status: 500 });
   }
+  // Fail closed: a feed that quietly shows someone the viewer blocked is
+  // worse than one that asks them to try again.
+  if (!hiddenRes.ok) {
+    console.error("[feed hidden-users]", hiddenRes.error);
+    return NextResponse.json({ ok: false, error: "Request failed" }, { status: 500 });
+  }
+  const hiddenIds = hiddenRes.hidden.ids;
 
   const school = (me?.school ?? "").trim();
   // Canonical campus label, or null when the viewer never picked one (or
@@ -148,11 +159,17 @@ export async function GET(req: Request) {
   if (tagFilter) {
     postsQuery = postsQuery.contains("tags", [tagFilter]);
   }
+  // Blocked and muted authors are excluded in the query itself — before the
+  // limit and the ranking pass — so they never take a slot on the page.
+  // Keyed on the posting user, so it covers posts they made for an org too.
+  if (hiddenIds.length > 0) {
+    postsQuery = postsQuery.notIn("user_id", hiddenIds);
+  }
 
   // Reposts (global for now). The embedded `post` carries its own
   // author/org joins so the client can render the original card exactly the
   // same way it would as a top-level post.
-  const repostsQuery = supabase
+  let repostsQuery = supabase
     .from("post_reposts")
     .select(
       "post_id,user_id,comment,created_at," +
@@ -168,6 +185,14 @@ export async function GET(req: Request) {
     .eq("post.type", "post")
     .order("created_at", { ascending: false })
     .limit(limit);
+  // Same exclusion for reposts: drop one when the reposter OR the original
+  // post's author is hidden. `post` is an !inner embed, so the embedded
+  // filter removes the whole repost row, not just its `post`.
+  if (hiddenIds.length > 0) {
+    repostsQuery = repostsQuery
+      .notIn("user_id", hiddenIds)
+      .notIn("post.user_id", hiddenIds);
+  }
 
   // Global feed for now — see above. `school` is still returned in the
   // response payload (`viewerSchool`) for clients that surface it.
@@ -208,6 +233,10 @@ export async function GET(req: Request) {
   // social-proof query AND for the ranking pass below (posts by people
   // you follow get a meaningful score boost).
   const viewerFollowingIds = await loadViewerFollowings(supabase, user.id);
+  // Mute doesn't unfollow, so a muted (or not-yet-torn-down blocked) person
+  // can still be in this set. Drop them so their repost never surfaces as
+  // "X reposted this" and they never get the follow boost.
+  for (const id of hiddenIds) viewerFollowingIds.delete(id);
 
   // Social-proof signal: for each post in this batch, find up to 3
   // reposters who are FOLLOWED BY the viewer (Instagram-style "X and N

@@ -1,6 +1,7 @@
 import { NextResponse } from "next/server";
 
 import { withPostMediaUrls } from "@/lib/post-media-url";
+import { loadHiddenUsers } from "@/lib/safety/hidden-users";
 import { createSupabaseServerClient } from "@/lib/supabase/server";
 
 const DEFAULT_LIMIT = 30;
@@ -49,17 +50,36 @@ export async function GET(req: Request) {
     "post:posts!notifications_post_id_fkey(id,type,content,media_thumbnail_url,author:users!posts_user_id_fkey(handle))," +
     "comment:post_comments!notifications_comment_id_fkey(id,content)";
 
-  let { data, error } = await supabase
+  // Nothing from someone blocked either way, or muted right now. It's
+  // excluded in the query, before the limit, so the page stays full. The
+  // actor is the right column: every type's post is either the viewer's own
+  // (like, comment) or the actor's (mention), so a hidden person can't
+  // reach the viewer through another actor's row. Fail closed on error.
+  // ./count (the unread badge) must exclude the same people: OttoCorner
+  // peeks `?limit=1` when that count rises, and a count that includes a
+  // hidden row makes the peek return an older, visible row instead.
+  const hiddenRes = await loadHiddenUsers(supabase, user.id);
+  if (!hiddenRes.ok) {
+    console.error("[me/notifications hidden-users]", hiddenRes.error);
+    return NextResponse.json({ ok: false, error: "Request failed" }, { status: 500 });
+  }
+  const hiddenIds = hiddenRes.hidden.ids;
+
+  let fullQuery = supabase
     .from("notifications")
     .select(FULL_SELECT)
-    .eq("user_id", user.id)
+    .eq("user_id", user.id);
+  if (hiddenIds.length > 0) fullQuery = fullQuery.notIn("actor_id", hiddenIds);
+  let { data, error } = await fullQuery
     .order("created_at", { ascending: false })
     .limit(limit);
   if (error && /message_id|column .* does not exist/i.test(error.message ?? "")) {
-    const fb = await supabase
+    let fbQuery = supabase
       .from("notifications")
       .select(FALLBACK_SELECT)
-      .eq("user_id", user.id)
+      .eq("user_id", user.id);
+    if (hiddenIds.length > 0) fbQuery = fbQuery.notIn("actor_id", hiddenIds);
+    const fb = await fbQuery
       .order("created_at", { ascending: false })
       .limit(limit);
     data = fb.data;

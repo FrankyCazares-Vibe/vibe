@@ -2,6 +2,7 @@ import { NextResponse } from "next/server";
 
 import { isUuid } from "@/lib/pgrest";
 import { createSupabaseServerClient } from "@/lib/supabase/server";
+import { createSupabaseServiceClient } from "@/lib/supabase/service";
 
 type Body = {
   target_id?: unknown;
@@ -151,17 +152,49 @@ export async function POST(req: Request) {
   // relationship; an unblock later does NOT auto-restore it, so the user
   // has to re-Connect deliberately. `removed_connection` is reflected in
   // the response so the client can phrase the confirmation toast.
+  //
+  // The viewer's own follow (viewer → target) goes through the session:
+  // RLS `connections_delete_follower` (auth.uid() = follower_id) allows it.
+  // The target's follow of the viewer (target → viewer) never passes that
+  // policy — through the session it matched zero rows with no error, so
+  // the blocked user quietly stayed a follower. That one edge is deleted
+  // with the service client, scoped by both ids, and then both directions
+  // are re-counted to confirm nothing survived.
   let removedConnection = false;
   try {
-    const { data: removed } = await supabase
+    const { data: mine, error: mineErr } = await supabase
       .from("connections")
       .delete()
-      .or(
-        `and(follower_id.eq.${user.id},following_id.eq.${target.id}),` +
-          `and(follower_id.eq.${target.id},following_id.eq.${user.id})`,
-      )
+      .eq("follower_id", user.id)
+      .eq("following_id", target.id)
       .select("id");
-    removedConnection = !!(removed && removed.length > 0);
+    if (mineErr) console.error("[block.POST drop-connections mine]", mineErr);
+    if (mine && mine.length > 0) removedConnection = true;
+
+    const service = createSupabaseServiceClient();
+    const { data: theirs, error: theirsErr } = await service
+      .from("connections")
+      .delete()
+      .eq("follower_id", target.id)
+      .eq("following_id", user.id)
+      .select("id");
+    if (theirsErr) console.error("[block.POST drop-connections theirs]", theirsErr);
+    if (theirs && theirs.length > 0) removedConnection = true;
+
+    // `connections_check` forbids follower = following, so these two `in`s
+    // match exactly the two possible edges between this pair.
+    const { count: remaining, error: checkErr } = await service
+      .from("connections")
+      .select("id", { count: "exact", head: true })
+      .in("follower_id", [user.id, target.id])
+      .in("following_id", [user.id, target.id]);
+    if (checkErr) {
+      console.error("[block.POST drop-connections check]", checkErr);
+    } else if ((remaining ?? 0) > 0) {
+      console.error("[block.POST drop-connections] follow edge survived the block", {
+        remaining,
+      });
+    }
   } catch (e) {
     console.error("[block.POST drop-connections]", e);
     // Non-fatal — the block row is in; follow edges can be cleaned up later.
