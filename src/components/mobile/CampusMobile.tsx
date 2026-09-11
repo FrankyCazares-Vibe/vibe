@@ -20,6 +20,7 @@ import { PostComposerMobile } from "@/components/mobile/PostComposerMobile";
 import { PostViewerMobile } from "@/components/mobile/PostViewerMobile";
 import { SharePostSheet } from "@/components/mobile/SharePostSheet";
 import { useMobileTour } from "@/components/mobile/use-mobile-tour";
+import { vibeRequest } from "@/lib/feedback/request";
 
 /**
  * iOS-native rebuild of `/campus` for mobile. Swipeable tabs:
@@ -68,7 +69,16 @@ export function CampusMobile() {
   // sets the campus pending flag. No-op otherwise.
   useMobileTour("campus");
 
-  const [tab, setTab] = useState<Tab>("feed");
+  // ?tab=<feed|events|orgs|chat|map> opens that tab on arrival — Otto's
+  // "Coming up" links send /campus?tab=events, and desktop reads the same
+  // param. The ?channel / ?post / ?tag links below still take precedence.
+  const searchParams = useSearchParams();
+  const [tab, setTab] = useState<Tab>(() => {
+    const t = searchParams.get("tab");
+    return t === "events" || t === "orgs" || t === "chat" || t === "map"
+      ? t
+      : "feed";
+  });
   const [feed, setFeed] = useState<FeedPost[] | null>(null);
   const [events, setEvents] = useState<CampusEvent[] | null>(null);
   const [orgs, setOrgs] = useState<Org[] | null>(null);
@@ -86,7 +96,6 @@ export function CampusMobile() {
   // /api/me/threads/[id]/messages which handles org channels via
   // can_view_org_channel even if the channel isn't in the user's
   // pre-fetched threads list yet.
-  const searchParams = useSearchParams();
   const initialChannelId = searchParams.get("channel") || null;
   // ?post=<id> deep link — used by Copy Link share targets + Otto
   // mention notifications. Mobile opens the viewer directly (vs desktop
@@ -116,6 +125,47 @@ export function CampusMobile() {
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
+
+  // #tag feed filter. Set by the Otto strip's trending chips, the #chips
+  // on each feed card, or a ?tag= link — the post viewer's hashtags land
+  // on /campus?tab=feed&tag=<t>, in-app when the viewer is open over this
+  // page, so a new ?tag= also closes the viewer. Adjusted during render
+  // rather than in an effect, so the filter is right on the first paint.
+  const urlTag = normalizeFeedTag(searchParams.get("tag"));
+  const [feedTag, setFeedTag] = useState<string | null>(urlTag);
+  const [lastUrlTag, setLastUrlTag] = useState<string | null>(urlTag);
+  if (urlTag !== lastUrlTag) {
+    setLastUrlTag(urlTag);
+    if (urlTag) {
+      setFeedTag(urlTag);
+      setTab("feed");
+      setOpenPostId(null);
+    }
+  }
+  // Strip ?tag= once read, like ?post= above: a refresh doesn't re-apply
+  // a filter the student cleared, and tapping the same #tag in the viewer
+  // again is still a URL change this page can see.
+  useEffect(() => {
+    if (!urlTag) return;
+    const p = new URLSearchParams(window.location.search);
+    p.delete("tag");
+    const next = p.toString();
+    window.history.replaceState(
+      null,
+      "",
+      next ? `${window.location.pathname}?${next}` : window.location.pathname,
+    );
+  }, [urlTag]);
+  const pickFeedTag = (raw: string) => {
+    const t = normalizeFeedTag(raw);
+    if (!t) return;
+    setFeedTag(t);
+    setTab("feed");
+    // The chip and the first matches sit at the top of the feed; a card's
+    // #chip can be far down it.
+    window.scrollTo({ top: 0, behavior: "smooth" });
+  };
+
   // Discord-style drill-down state: tapping an org opens its channels
   // drawer, tapping a channel inside that drawer opens the conversation.
   // openChannel carries the channel info so ConversationView's top bar
@@ -192,6 +242,42 @@ export function CampusMobile() {
     void refetchOrgs();
   }, [refetchFeed, refetchEvents, refetchOrgs]);
 
+  // The loaded feed is only the 50 top-ranked posts, so a tag's posts can
+  // sit past it; /api/feed?tag= returns the newest 50 with that tag (what
+  // the desktop filter uses). Waits for the main feed, whose matches show
+  // in the meantime, and re-runs when it refreshes after a post or a delete.
+  // `posts: null` records a failed answer: keep the loaded matches, and let
+  // the toast say so — silently, an empty result would read as "Nothing
+  // tagged #x yet" when the truth is "couldn't check".
+  const [tagFeed, setTagFeed] = useState<{
+    tag: string;
+    posts: FeedPost[] | null;
+  } | null>(null);
+  useEffect(() => {
+    if (!feedTag || feed === null) return;
+    let cancelled = false;
+    void (async () => {
+      const r = await vibeRequest<{ entries?: Array<{ post?: FeedPost }> }>(
+        `/api/feed?limit=50&tag=${encodeURIComponent(feedTag)}`,
+        {
+          cache: "no-store",
+          failure: `Couldn't load every post tagged #${feedTag}.`,
+        },
+      );
+      if (cancelled) return;
+      const posts =
+        r.ok && Array.isArray(r.data.entries)
+          ? r.data.entries
+              .map((e) => e.post)
+              .filter((p): p is FeedPost => !!p)
+          : null;
+      setTagFeed({ tag: feedTag, posts });
+    })();
+    return () => {
+      cancelled = true;
+    };
+  }, [feedTag, feed]);
+
   // ---------- Swipeable tab scroll sync ----------
 
   useEffect(() => {
@@ -224,6 +310,20 @@ export function CampusMobile() {
   // down-into-the-tab-icon animation (see render below).
   const ottoCollapsed = tab === "orgs" || tab === "chat" || tab === "map";
 
+  // What the Feed pane shows. With a #tag: the complete list once
+  // /api/feed?tag= answers (the loaded matches if it failed); until then
+  // the loaded feed's matches, or the skeleton when none have loaded.
+  const loadedTagMatches =
+    feedTag && feed ? feed.filter((p) => p.tags?.includes(feedTag)) : null;
+  const tagAnswer = tagFeed && tagFeed.tag === feedTag ? tagFeed : null;
+  const visibleFeed = !feedTag
+    ? feed
+    : tagAnswer
+      ? (tagAnswer.posts ?? loadedTagMatches)
+      : loadedTagMatches && loadedTagMatches.length > 0
+        ? loadedTagMatches
+        : null;
+
   // ---------- Render ----------
 
   return (
@@ -251,7 +351,7 @@ export function CampusMobile() {
       </div>
 
       {/* Otto horizontal strip — heads-up + trending. Tap a trending
-          tag → switch to Feed (tag filtering is desktop-only for now).
+          tag → switch to Feed, filtered to that tag.
           On orgs / chat / map we collapse it: the strip swoops down
           and shrinks toward the bottom Otto tab icon (3rd of 5, hence
           bottom-center as the transform-origin), freeing vertical
@@ -283,11 +383,7 @@ export function CampusMobile() {
             willChange: "transform, opacity",
           }}
         >
-          <OttoFeedStrip
-            onPickTag={() => {
-              setTab("feed");
-            }}
-          />
+          <OttoFeedStrip onPickTag={pickFeedTag} />
         </div>
       </div>
 
@@ -332,7 +428,13 @@ export function CampusMobile() {
         }}
       >
         <section style={paneStyle}>
-          <FeedPane posts={feed} onOpenPost={(id) => setOpenPostId(id)} />
+          <FeedPane
+            posts={visibleFeed}
+            tag={feedTag}
+            onOpenPost={(id) => setOpenPostId(id)}
+            onPickTag={pickFeedTag}
+            onClearTag={() => setFeedTag(null)}
+          />
         </section>
         <section style={paneStyle}>
           <EventsPane events={events} onMutate={refetchEvents} />
@@ -494,37 +596,146 @@ function TabStrip({
 
 // ---------- Feed pane ----------
 
+/** A #tag as publish-post stores it and /api/feed?tag= matches it: no
+ *  leading #, lowercase, letters / digits / underscore, at most 32.
+ *  Anything else (a hand-edited ?tag=) is no filter at all. */
+function normalizeFeedTag(raw: string | null | undefined): string | null {
+  const t = (raw ?? "").trim().toLowerCase().replace(/^#+/, "");
+  return /^[\p{L}\p{N}_]{1,32}$/u.test(t) ? t : null;
+}
+
 function FeedPane({
   posts,
+  tag,
   onOpenPost,
+  onPickTag,
+  onClearTag,
 }: {
   posts: FeedPost[] | null;
+  /** Active #tag filter; `posts` is already filtered to it. */
+  tag: string | null;
   onOpenPost: (id: string) => void;
+  onPickTag: (tag: string) => void;
+  onClearTag: () => void;
 }) {
-  if (posts === null) return <PaneSkeleton />;
+  const chip = tag ? <FeedTagChip tag={tag} onClear={onClearTag} /> : null;
+  if (posts === null) {
+    return (
+      <>
+        {chip}
+        <PaneSkeleton />
+      </>
+    );
+  }
   if (posts.length === 0) {
     return (
-      <EmptyTab
-        title="The feed is quiet"
-        body="Be the first to drop a post — tap the + in the corner."
-      />
+      <>
+        {chip}
+        {tag ? (
+          <EmptyTab
+            title={`Nothing tagged #${tag} yet`}
+            body="Posts with this hashtag will show up here."
+          />
+        ) : (
+          <EmptyTab
+            title="The feed is quiet"
+            body="Be the first to drop a post — tap the + in the corner."
+          />
+        )}
+      </>
     );
   }
   return (
     <>
+      {chip}
       {posts.map((p) => (
-        <FeedCard key={p.id} post={p} onOpen={() => onOpenPost(p.id)} />
+        <FeedCard
+          key={p.id}
+          post={p}
+          onOpen={() => onOpenPost(p.id)}
+          onPickTag={onPickTag}
+        />
       ))}
     </>
+  );
+}
+
+/** "#tag ×" above the feed while a tag filter is on; tap to clear it. */
+function FeedTagChip({ tag, onClear }: { tag: string; onClear: () => void }) {
+  return (
+    <button
+      type="button"
+      onClick={onClear}
+      aria-label={`Clear the #${tag} filter`}
+      style={{
+        alignSelf: "flex-start",
+        display: "inline-flex",
+        alignItems: "center",
+        gap: 6,
+        padding: "6px 10px 6px 12px",
+        borderRadius: 999,
+        border: "1px solid rgba(255,92,53,0.22)",
+        background: "rgba(255,92,53,0.10)",
+        color: "#B83A1A",
+        fontFamily: "DM Sans, sans-serif",
+        fontSize: 13,
+        fontWeight: 700,
+        cursor: "pointer",
+        WebkitTapHighlightColor: "transparent",
+      }}
+    >
+      #{tag}
+      <span aria-hidden style={{ fontSize: 16, lineHeight: 1, opacity: 0.75 }}>
+        ×
+      </span>
+    </button>
+  );
+}
+
+/** A FeedCard's avatar or author name as a link to their profile. The card
+ *  is itself a tap-to-open button, so the click stops here and `onTap`
+ *  drops the card's pending open. No handle, no link. */
+function AuthorLink({
+  handle,
+  onTap,
+  decorative = false,
+  style,
+  children,
+}: {
+  handle: string | null;
+  onTap: () => void;
+  /** The avatar repeats the name link, so it stays out of the tab order
+   *  and the accessibility tree. */
+  decorative?: boolean;
+  style?: React.CSSProperties;
+  children: React.ReactNode;
+}) {
+  if (!handle) return <>{children}</>;
+  return (
+    <Link
+      href={`/profile/${encodeURIComponent(handle)}`}
+      onClick={(e) => {
+        e.stopPropagation();
+        onTap();
+      }}
+      tabIndex={decorative ? -1 : undefined}
+      aria-hidden={decorative || undefined}
+      style={{ color: "inherit", textDecoration: "none", ...style }}
+    >
+      {children}
+    </Link>
   );
 }
 
 function FeedCard({
   post,
   onOpen,
+  onPickTag,
 }: {
   post: FeedPost;
   onOpen: () => void;
+  /** A #chip on the card filters the feed to that tag. */
+  onPickTag: (tag: string) => void;
 }) {
   const author = post.author;
   const initials = (author?.name ?? author?.handle ?? "?")
@@ -561,18 +772,17 @@ function FeedCard({
     const prevCount = likeCount;
     setLiked(targetLiked);
     setLikeCount((n) => Math.max(0, n + (targetLiked ? 1 : -1)));
-    try {
-      const r = await fetch(`/api/posts/${post.id}/like`, {
-        method: targetLiked ? "POST" : "DELETE",
-        credentials: "include",
-      });
-      if (!r.ok) throw new Error("Like failed");
-    } catch {
+    // The heart flips first; on a refusal it flips back and the toast says why.
+    const r = await vibeRequest(`/api/posts/${post.id}/like`, {
+      method: targetLiked ? "POST" : "DELETE",
+      credentials: "include",
+      failure: targetLiked ? "Couldn't like this post." : "Couldn't unlike this post.",
+    });
+    if (!r.ok) {
       setLiked(prevLiked);
       setLikeCount(prevCount);
-    } finally {
-      likingRef.current = false;
     }
+    likingRef.current = false;
   }, [liked, likeCount, post.id]);
 
   const toggleRepost = useCallback(async () => {
@@ -583,18 +793,18 @@ function FeedCard({
     const prevCount = repostCount;
     setReposted(target);
     setRepostCount((n) => Math.max(0, n + (target ? 1 : -1)));
-    try {
-      const r = await fetch(`/api/posts/${post.id}/repost`, {
-        method: target ? "POST" : "DELETE",
-        credentials: "include",
-      });
-      if (!r.ok) throw new Error("Repost failed");
-    } catch {
+    // Reposting is terms-gated: an un-consented account used to watch it
+    // silently undo itself. Now it flips back and the toast says why.
+    const r = await vibeRequest(`/api/posts/${post.id}/repost`, {
+      method: target ? "POST" : "DELETE",
+      credentials: "include",
+      failure: target ? "Couldn't repost this." : "Couldn't undo your repost.",
+    });
+    if (!r.ok) {
       setReposted(prevReposted);
       setRepostCount(prevCount);
-    } finally {
-      repostingRef.current = false;
     }
+    repostingRef.current = false;
   }, [reposted, repostCount, post.id]);
 
   const toggleSave = useCallback(async () => {
@@ -603,17 +813,15 @@ function FeedCard({
     const target = !saved;
     const prev = saved;
     setSaved(target);
-    try {
-      const r = await fetch(`/api/posts/${post.id}/save`, {
-        method: target ? "POST" : "DELETE",
-        credentials: "include",
-      });
-      if (!r.ok) throw new Error("Save failed");
-    } catch {
-      setSaved(prev);
-    } finally {
-      savingRef.current = false;
-    }
+    const r = await vibeRequest(`/api/posts/${post.id}/save`, {
+      method: target ? "POST" : "DELETE",
+      credentials: "include",
+      failure: target
+        ? "Couldn't save this post."
+        : "Couldn't remove this from your saved posts.",
+    });
+    if (!r.ok) setSaved(prev);
+    savingRef.current = false;
   }, [saved, post.id]);
 
   useEffect(() => {
@@ -639,6 +847,16 @@ function FeedCard({
     }, 240);
   }, [onOpen, toggleLike]);
 
+  // A link or #chip inside the card handles its own tap: its handler stops
+  // the click reaching the card, and this drops a first tap still waiting
+  // out the double-tap window, so the post doesn't open as well.
+  const cancelPendingOpen = () => {
+    if (tapTimerRef.current) {
+      window.clearTimeout(tapTimerRef.current);
+      tapTimerRef.current = null;
+    }
+  };
+
   return (
     <button
       type="button"
@@ -658,27 +876,34 @@ function FeedCard({
       }}
     >
       <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
-        <div
-          style={{
-            width: 36,
-            height: 36,
-            borderRadius: 999,
-            background: author?.avatar_url
-              ? `url(${author.avatar_url}) center/cover`
-              : "#FFD3C2",
-            display: "flex",
-            alignItems: "center",
-            justifyContent: "center",
-            color: "#1C1C1E",
-            fontFamily: "Fraunces, serif",
-            fontWeight: 800,
-            fontSize: 13,
-            flexShrink: 0,
-            border: "1px solid rgba(255,255,255,0.6)",
-          }}
+        <AuthorLink
+          handle={author?.handle ?? null}
+          onTap={cancelPendingOpen}
+          decorative
+          style={{ display: "flex", flexShrink: 0 }}
         >
-          {!author?.avatar_url ? initials || "?" : null}
-        </div>
+          <div
+            style={{
+              width: 36,
+              height: 36,
+              borderRadius: 999,
+              background: author?.avatar_url
+                ? `url(${author.avatar_url}) center/cover`
+                : "#FFD3C2",
+              display: "flex",
+              alignItems: "center",
+              justifyContent: "center",
+              color: "#1C1C1E",
+              fontFamily: "Fraunces, serif",
+              fontWeight: 800,
+              fontSize: 13,
+              flexShrink: 0,
+              border: "1px solid rgba(255,255,255,0.6)",
+            }}
+          >
+            {!author?.avatar_url ? initials || "?" : null}
+          </div>
+        </AuthorLink>
         <div style={{ flex: 1, minWidth: 0 }}>
           <div
             style={{
@@ -691,7 +916,9 @@ function FeedCard({
               textOverflow: "ellipsis",
             }}
           >
-            {author?.name || (author?.handle ? `@${author.handle}` : "Member")}
+            <AuthorLink handle={author?.handle ?? null} onTap={cancelPendingOpen}>
+              {author?.name || (author?.handle ? `@${author.handle}` : "Member")}
+            </AuthorLink>
           </div>
           <div
             style={{
@@ -808,20 +1035,31 @@ function FeedCard({
           }}
         >
           {post.tags.slice(0, 4).map((t) => (
-            <span
+            <button
               key={t}
+              type="button"
+              onClick={(e) => {
+                // Filters the feed to this tag instead of opening the post.
+                e.stopPropagation();
+                cancelPendingOpen();
+                onPickTag(t);
+              }}
+              aria-label={`Show posts tagged #${t}`}
               style={{
                 padding: "3px 9px",
                 borderRadius: 999,
+                border: "none",
                 background: "rgba(255,92,53,0.10)",
                 color: "#B83A1A",
                 fontFamily: "DM Sans, sans-serif",
                 fontSize: 11.5,
                 fontWeight: 700,
+                cursor: "pointer",
+                WebkitTapHighlightColor: "transparent",
               }}
             >
               #{t}
-            </span>
+            </button>
           ))}
         </div>
       ) : null}

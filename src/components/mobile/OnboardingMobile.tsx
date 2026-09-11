@@ -10,6 +10,9 @@ import {
   type ChangeEvent,
 } from "react";
 
+import { isSafeRelativePath } from "@/lib/auth/login-next";
+import { vibeRequest } from "@/lib/feedback/request";
+import { toast } from "@/lib/feedback/toast";
 import { DEFAULT_CAMPUS_ID, IU_CAMPUSES } from "@/lib/iu/campuses";
 import { IU_MAJORS_BY_SCHOOL } from "@/lib/iu/majors";
 
@@ -106,6 +109,20 @@ function isHttpUrl(raw: string): boolean {
   } catch {
     return false;
   }
+}
+
+/**
+ * Otto's saved config. Finish and Skip both send it: any non-empty
+ * `otto_answers` marks onboarding done (`isOttoOnboardingComplete`).
+ */
+function buildOttoConfig() {
+  return {
+    name: "otto",
+    platforms: [] as string[],
+    voiceSamples: [] as string[],
+    leash: "ask",
+    setupAt: new Date().toISOString(),
+  };
 }
 
 // ── Otto orb ────────────────────────────────────────────────────────────────
@@ -348,69 +365,77 @@ export function OnboardingMobile({ replay }: { replay: boolean }) {
       resumeUploadedUrl || (linkResume ? linkResume.slice(0, 2048) : "");
     if (resumeFinal) profile.resume_url = resumeFinal;
 
-    const ottoConfig = {
-      name: "otto",
-      platforms: [] as string[],
-      voiceSamples: [] as string[],
-      leash: "ask",
-      setupAt: new Date().toISOString(),
-    };
-
-    setWarping(true);
+    const ottoConfig = buildOttoConfig();
 
     // Replay mode: skip the server save (returning user re-viewing the flow)
     if (replay) {
+      setWarping(true);
       setTimeout(() => {
         window.location.href = "/profile";
       }, 700);
       return;
     }
 
-    let nextHref: string | null = null;
-    try {
-      const r = await fetch("/api/me/onboarding-complete", {
+    // The warp waits for the save. A refusal keeps every answer on screen
+    // and the toast says why, with Review Terms for the consent gate (S53
+    // A4) and Sign in for a 401, so there's no blind fall-through to login.
+    const saved = await vibeRequest<{ next?: unknown }>(
+      "/api/me/onboarding-complete",
+      {
         method: "POST",
-        credentials: "same-origin",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
+        json: {
           otto_answers: ottoConfig,
           profile: Object.keys(profile).length ? profile : undefined,
-        }),
-      });
-      const j = await r.json();
-
-      // Consent gate (S53 A4): the server refuses until the Terms are
-      // accepted. Go record it and come back — not the login page.
-      if (r.status === 403 && j?.code === "terms_required") {
-        window.location.href = `/auth/terms?next=${encodeURIComponent("/onboarding")}`;
-        return;
-      }
-
-      // Best-effort handle claim (separate route — has own validation).
-      const claimed = handle.trim().toLowerCase();
-      if (claimed && HANDLE_RE.test(claimed)) {
-        try {
-          await fetch("/api/me/handle", {
-            method: "PATCH",
-            credentials: "same-origin",
-            headers: { "Content-Type": "application/json" },
-            body: JSON.stringify({ handle: claimed }),
-          });
-        } catch {
-          /* non-fatal */
-        }
-      }
-
-      if (j?.ok && typeof j.next === "string" && j.next.startsWith("/")) {
-        nextHref = j.next + (j.next.includes("?") ? "&" : "?") + "welcome=1";
-      }
-    } catch {
-      /* network error — fall back below */
+        },
+        failure: "Couldn't save your profile.",
+      },
+    );
+    if (!saved.ok) {
+      setSubmitting(false);
+      return;
     }
 
+    // Handle claim (separate route — has own validation). The profile is
+    // saved by now, but a handle that didn't stick is said before leaving:
+    // taken (409) or rejected (400, e.g. reserved) goes back to step 2 to
+    // pick another; anything else stays here so Finish can try again.
+    const claimed = handle.trim().toLowerCase();
+    if (claimed && HANDLE_RE.test(claimed)) {
+      const claim = await vibeRequest("/api/me/handle", {
+        method: "PATCH",
+        json: { handle: claimed },
+        failure: "Couldn't save your handle.",
+        quiet: true,
+      });
+      if (!claim.ok) {
+        if (claim.status === 409 || claim.status === 400) {
+          const taken = claim.status === 409;
+          setHandleStatus({
+            text: `✗ ${taken ? "taken" : (claim.error ?? "not allowed").toLowerCase()}`,
+            color: COLORS.red,
+          });
+          toast({
+            message: taken
+              ? "That handle is taken. Pick another one."
+              : "That handle won't work. Pick another one.",
+            tone: "error",
+          });
+          setStep(2);
+        } else {
+          toast({ message: claim.message, tone: "error", action: claim.action });
+        }
+        setSubmitting(false);
+        return;
+      }
+    }
+
+    const next = typeof saved.data.next === "string" ? saved.data.next : null;
+    const nextHref = isSafeRelativePath(next)
+      ? `${next}${next.includes("?") ? "&" : "?"}welcome=1`
+      : "/profile?welcome=1";
+    setWarping(true);
     setTimeout(() => {
-      window.location.href =
-        nextHref ?? `/auth/login?next=${encodeURIComponent("/onboarding")}`;
+      window.location.href = nextHref;
     }, 700);
   }, [
     submitting,
@@ -430,6 +455,37 @@ export function OnboardingMobile({ replay }: { replay: boolean }) {
     resumeLink,
     replay,
   ]);
+
+  // ── Skip ──────────────────────────────────────────────────────────────────
+  // Every app page sends a student back here until otto_answers is saved,
+  // so leaving without saving reloads this page at step 1 with the answers
+  // gone. Skip saves Otto's config and no profile, then goes where the
+  // server says. A refusal keeps the sheet open and the toast says why.
+  const skipOnboarding = useCallback(async () => {
+    if (submitting) return;
+    setSubmitting(true);
+
+    // Replay mode never saves, same as Finish.
+    let dest = "/profile";
+    if (!replay) {
+      const skipped = await vibeRequest<{ next?: unknown }>(
+        "/api/me/onboarding-complete",
+        {
+          method: "POST",
+          json: { otto_answers: buildOttoConfig() },
+          failure: "Couldn't skip onboarding.",
+        },
+      );
+      if (!skipped.ok) {
+        setSubmitting(false);
+        return;
+      }
+      const next =
+        typeof skipped.data.next === "string" ? skipped.data.next : null;
+      if (isSafeRelativePath(next)) dest = next;
+    }
+    window.location.href = dest;
+  }, [submitting, replay]);
 
   // ── Render helpers ────────────────────────────────────────────────────────
   const progressDots = (
@@ -464,6 +520,7 @@ export function OnboardingMobile({ replay }: { replay: boolean }) {
           <button
             type="button"
             style={skipBtnStyle}
+            disabled={submitting}
             onClick={() => setSkipOpen(true)}
           >
             Skip
@@ -864,7 +921,7 @@ export function OnboardingMobile({ replay }: { replay: boolean }) {
           <div style={skipCardStyle}>
             <div style={skipTitleStyle}>Skip onboarding?</div>
             <div style={skipBodyStyle}>
-              {"You can always come back. Your profile won't be saved from this flow until you finish."}
+              {"What you've typed here won't be saved. You can fill in your profile any time from your profile page."}
             </div>
             <div style={skipRowStyle}>
               <button
@@ -877,11 +934,10 @@ export function OnboardingMobile({ replay }: { replay: boolean }) {
               <button
                 type="button"
                 style={secondaryLinkStyle}
-                onClick={() => {
-                  window.location.href = "/";
-                }}
+                disabled={submitting}
+                onClick={skipOnboarding}
               >
-                Skip anyway
+                {submitting ? "Skipping…" : "Skip anyway"}
               </button>
             </div>
           </div>

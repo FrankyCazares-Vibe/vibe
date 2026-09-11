@@ -11,6 +11,8 @@ import { PostComposerMobile } from "@/components/mobile/PostComposerMobile";
 import { PostViewerMobile } from "@/components/mobile/PostViewerMobile";
 import { ResumeViewerMobile } from "@/components/mobile/ResumeViewerMobile";
 import { useMobileTour } from "@/components/mobile/use-mobile-tour";
+import { vibeRequest } from "@/lib/feedback/request";
+import { toast } from "@/lib/feedback/toast";
 import { IU_CAMPUSES, campusByLabel } from "@/lib/iu/campuses";
 import { IU_MAJORS_BY_SCHOOL } from "@/lib/iu/majors";
 import type { RedactionBar } from "@/lib/profile/resume-redactions";
@@ -634,48 +636,67 @@ export function ProfileMobile({ targetHandle }: Props = {}) {
    *  working-on sheets when the user taps Save. POSTs the patch
    *  to /api/me/profile-sync, re-bootstraps so the local view
    *  matches what landed in the DB, returns true on success.
-   *  Errors surface via setEditError so the sheet can show them. */
+   *  Errors surface via setEditError so the sheet can show them.
+   *  Quiet by default, since the sheets render their own inline
+   *  error; the logo and resume uploads, whose controls show
+   *  nothing, pass `quiet: false` so a failure toasts too. */
   const savePortfolioPatch = useCallback(
-    async (patch: Record<string, unknown>): Promise<boolean> => {
+    async (
+      patch: Record<string, unknown>,
+      {
+        failure = "Couldn't save your portfolio.",
+        quiet = true,
+      }: { failure?: string; quiet?: boolean } = {},
+    ): Promise<boolean> => {
       setEditError(null);
-      try {
-        const r = await fetch("/api/me/profile-sync", {
-          method: "POST",
-          credentials: "include",
-          headers: { "Content-Type": "application/json" },
-          body: JSON.stringify(patch),
-        });
-        const j = await r.json().catch(() => ({}));
-        if (!r.ok || !j?.ok) {
-          throw new Error((j && j.error) ? String(j.error) : `HTTP ${r.status}`);
-        }
-        const rb = await fetch("/api/me/profile-bootstrap", {
-          cache: "no-store",
-          credentials: "include",
-        });
-        const jb = await rb.json().catch(() => ({}));
-        if (rb.ok && jb?.ok && jb.vibeUser) {
-          setUser(jb.vibeUser as VibeUser);
-        }
-        return true;
-      } catch (e) {
-        setEditError(e instanceof Error ? e.message : "Couldn't save");
+      const r = await vibeRequest("/api/me/profile-sync", {
+        method: "POST",
+        credentials: "include",
+        json: patch,
+        failure,
+        quiet,
+      });
+      if (!r.ok) {
+        setEditError(r.message);
         return false;
       }
+      const rb = await fetch("/api/me/profile-bootstrap", {
+        cache: "no-store",
+        credentials: "include",
+      }).catch(() => null);
+      const jb = rb ? await rb.json().catch(() => ({})) : {};
+      if (rb?.ok && jb?.ok && jb.vibeUser) {
+        setUser(jb.vibeUser as VibeUser);
+      } else {
+        // The save landed; only the refresh didn't, so it isn't a failure.
+        toast("Saved. Refresh to see the change.");
+      }
+      return true;
     },
     [],
   );
 
+  /** editError renders two screens above the portfolio controls, so
+   *  their failures toast as well; the banner stays. */
+  const showPortfolioError = useCallback((message: string) => {
+    setEditError(message);
+    toast({ message, tone: "error" });
+  }, []);
+
   /** Pick a PDF/image and APPEND it to the user's resume_docs array.
    *  Up to 3 docs total; older docs are kept untouched. Mirrors the
    *  avatar/banner upload flow but uses a plain file input (no crop
-   *  step) since resumes are docs, not portraits. */
+   *  step) since resumes are docs, not portraits. The pill only
+   *  says "Uploading…" and editError renders two screens up, so
+   *  failures toast as well; the banner stays. */
   const handleResumeUpload = useCallback(
     async (file: File) => {
       if (uploadingResume) return;
       const existing = user?.resumePortfolio ?? [];
       if (existing.length >= 3) {
-        setEditError("Maximum of 3 documents — remove one to add another.");
+        showPortfolioError(
+          "You can add up to 3 documents. Remove one to add another.",
+        );
         if (resumeInputRef.current) resumeInputRef.current.value = "";
         return;
       }
@@ -685,14 +706,23 @@ export function ProfileMobile({ targetHandle }: Props = {}) {
         const form = new FormData();
         form.set("file", file);
         form.set("kind", "resume");
-        const upload = await fetch("/api/me/profile-upload", {
-          method: "POST",
-          credentials: "include",
-          body: form,
-        });
-        const uj = await upload.json();
-        if (!upload.ok || !uj?.ok || typeof uj.url !== "string") {
-          throw new Error(uj?.error ?? "Upload failed");
+        const upload = await vibeRequest<{ url?: unknown }>(
+          "/api/me/profile-upload",
+          {
+            method: "POST",
+            credentials: "include",
+            body: form,
+            failure: "Couldn't upload your resume.",
+          },
+        );
+        if (!upload.ok) {
+          setEditError(upload.message);
+          return;
+        }
+        const url = upload.data.url;
+        if (typeof url !== "string") {
+          showPortfolioError("Couldn't upload your resume. Try again.");
+          return;
         }
         const isImage =
           (file.type && file.type.startsWith("image/")) ||
@@ -708,19 +738,24 @@ export function ProfileMobile({ targetHandle }: Props = {}) {
               file.name.replace(/\.[^.]+$/, "").slice(0, 80) ||
               (isImage ? "Portfolio" : "Resume"),
             type: isImage ? "image" : "pdf",
-            url: uj.url as string,
+            url,
           },
         ].filter((d) => d.url);
-        const ok = await savePortfolioPatch({ resume_docs: next });
-        if (!ok) throw new Error("Couldn't save resume docs");
-      } catch (e) {
-        setEditError(e instanceof Error ? e.message : "Couldn't upload resume");
+        await savePortfolioPatch(
+          { resume_docs: next },
+          { failure: "Couldn't save your resume.", quiet: false },
+        );
       } finally {
         setUploadingResume(false);
         if (resumeInputRef.current) resumeInputRef.current.value = "";
       }
     },
-    [uploadingResume, savePortfolioPatch, user?.resumePortfolio],
+    [
+      uploadingResume,
+      savePortfolioPatch,
+      showPortfolioError,
+      user?.resumePortfolio,
+    ],
   );
 
   /** Upload a logo image (kind=logo) and patch it into a portfolio
@@ -737,35 +772,44 @@ export function ProfileMobile({ targetHandle }: Props = {}) {
       const form = new FormData();
       form.set("file", file);
       form.set("kind", "logo");
-      try {
-        const r = await fetch("/api/me/profile-upload", {
+      // The slot only dims while it works and editError renders two
+      // screens up, so failures toast as well; the banner stays.
+      const upload = await vibeRequest<{ url?: unknown }>(
+        "/api/me/profile-upload",
+        {
           method: "POST",
           credentials: "include",
           body: form,
-        });
-        const j = await r.json();
-        if (!r.ok || !j?.ok || typeof j.url !== "string") {
-          throw new Error(j?.error ?? "Upload failed");
-        }
-        const url = j.url as string;
-        if (target === "experience") {
-          const items = (user?.workExperience ?? []).map((w, i) =>
-            i === index ? { ...w, logoUrl: url } : { ...w },
-          );
-          return await savePortfolioPatch({ work_experience: items });
-        }
-        const items = (user?.currentlyOn ?? []).map((p, i) =>
-          i === index ? { ...p, logoUrl: url } : { ...p },
-        );
-        return await savePortfolioPatch({ current_on: items });
-      } catch (e) {
-        setEditError(
-          e instanceof Error ? e.message : "Couldn't upload logo",
-        );
+          failure: "Couldn't upload that logo.",
+        },
+      );
+      if (!upload.ok) {
+        setEditError(upload.message);
         return false;
       }
+      const url = upload.data.url;
+      if (typeof url !== "string") {
+        showPortfolioError("Couldn't upload that logo. Try again.");
+        return false;
+      }
+      const saveOpts = { failure: "Couldn't save that logo.", quiet: false };
+      if (target === "experience") {
+        const items = (user?.workExperience ?? []).map((w, i) =>
+          i === index ? { ...w, logoUrl: url } : { ...w },
+        );
+        return await savePortfolioPatch({ work_experience: items }, saveOpts);
+      }
+      const items = (user?.currentlyOn ?? []).map((p, i) =>
+        i === index ? { ...p, logoUrl: url } : { ...p },
+      );
+      return await savePortfolioPatch({ current_on: items }, saveOpts);
     },
-    [user?.workExperience, user?.currentlyOn, savePortfolioPatch],
+    [
+      user?.workExperience,
+      user?.currentlyOn,
+      savePortfolioPatch,
+      showPortfolioError,
+    ],
   );
 
   /** Remove the doc at `index` from resume_docs and save. */
@@ -4364,23 +4408,19 @@ function BlockedByTargetView({ user }: { user: VibeUser }) {
   const onUnblock = async () => {
     if (!user.id || busy) return;
     setBusy(true);
-    try {
-      const r = await fetch("/api/me/block", {
-        method: "DELETE",
-        credentials: "include",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ target_id: user.id }),
-      });
-      const j = await r.json().catch(() => ({}));
-      if (!r.ok || !j?.ok) {
-        setBusy(false);
-        return;
-      }
-      // Reload so the visitor view re-runs cleanly with the full profile.
-      window.location.reload();
-    } catch {
+    const r = await vibeRequest("/api/me/block", {
+      method: "DELETE",
+      credentials: "include",
+      json: { target_id: user.id },
+      failure: `Couldn't unblock ${firstName}.`,
+    });
+    if (!r.ok) {
+      // The toast says why; the button comes back for another try.
       setBusy(false);
+      return;
     }
+    // Reload so the visitor view re-runs cleanly with the full profile.
+    window.location.reload();
   };
   return (
     <div

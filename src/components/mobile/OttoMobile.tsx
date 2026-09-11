@@ -17,9 +17,18 @@ import { OttoSettings } from "@/components/otto/OttoSettings";
 import { OttoTellInput } from "@/components/otto/OttoTellInput";
 import { OttoUpcoming } from "@/components/otto/OttoUpcoming";
 import { OttoOrb } from "@/components/the-map/OttoOrb";
+import { vibeRequest } from "@/lib/feedback/request";
 
 type Tab = "today" | "stats";
 const TAB_ORDER: Tab[] = ["today", "stats"];
+
+/** Puts a row the student cleared back at `index`, unless it's already back. */
+function restoreAt<T>(list: T[], row: T, index: number): T[] {
+  if (list.includes(row)) return list;
+  const next = list.slice();
+  next.splice(Math.min(index, next.length), 0, row);
+  return next;
+}
 
 /**
  * iOS-native rebuild of /otto for mobile. Compact hero + swipeable
@@ -27,7 +36,8 @@ const TAB_ORDER: Tab[] = ["today", "stats"];
  * OttoRequests / OttoTellInput / OttoSettings / OttoMetrics components
  * inside the panes — they're all single-column-friendly already.
  *
- * State logic mirrors OttoPageClient: optimistic mutations, hero
+ * State logic mirrors OttoPageClient: optimistic mutations (a row the
+ * server refuses to clear goes back where it was, with a toast), hero
  * counts derive from local state, ?tab=stats URL deep-link respected.
  */
 export function OttoMobile({ initial }: { initial: OttoPayload }) {
@@ -62,40 +72,72 @@ export function OttoMobile({ initial }: { initial: OttoPayload }) {
   const unreadDmRow = asking.find((r) => r.kind === "unread_dms");
   const unreadCount = unreadDmRow?.kind === "unread_dms" ? unreadDmRow.count : 0;
 
-  const dismissReminder = useCallback(async (id: string) => {
-    setUpcoming((u) => u.filter((r) => !(r.kind === "reminder" && r.id === id)));
-    setAsking((a) => a.filter((r) => !(r.kind === "reminder" && r.id === id)));
-    try {
-      await fetch(`/api/me/otto/reminders/${id}`, { method: "DELETE" });
-    } catch (e) {
-      console.error("[otto-mobile] dismissReminder", e);
-    }
-  }, []);
+  // Done / Dismiss / Pass clear the reminder straight away. If the server
+  // refuses, it goes back where it was (snapshot from this render, never a
+  // refetch) and vibeRequest's toast says why.
+  const clearReminder = useCallback(
+    async (
+      id: string,
+      url: string,
+      method: "POST" | "DELETE",
+      failure: string,
+    ) => {
+      const isIt = (r: UpcomingRow | AskingRow) =>
+        r.kind === "reminder" && r.id === id;
+      const upIndex = upcoming.findIndex(isIt);
+      const askIndex = asking.findIndex(isIt);
+      const upRow = upIndex >= 0 ? upcoming[upIndex] : null;
+      const askRow = askIndex >= 0 ? asking[askIndex] : null;
+      setUpcoming((u) => u.filter((r) => !isIt(r)));
+      setAsking((a) => a.filter((r) => !isIt(r)));
+      const res = await vibeRequest(url, { method, failure });
+      if (res.ok) return;
+      if (upRow) setUpcoming((u) => restoreAt(u, upRow, upIndex));
+      if (askRow) setAsking((a) => restoreAt(a, askRow, askIndex));
+    },
+    [upcoming, asking],
+  );
 
-  const actReminder = useCallback(async (id: string) => {
-    setUpcoming((u) => u.filter((r) => !(r.kind === "reminder" && r.id === id)));
-    setAsking((a) => a.filter((r) => !(r.kind === "reminder" && r.id === id)));
-    try {
-      await fetch(`/api/me/otto/reminders/${id}/act`, { method: "POST" });
-    } catch (e) {
-      console.error("[otto-mobile] actReminder", e);
-    }
-  }, []);
+  const dismissReminder = useCallback(
+    (id: string) =>
+      clearReminder(
+        id,
+        `/api/me/otto/reminders/${id}`,
+        "DELETE",
+        "Couldn't dismiss that reminder.",
+      ),
+    [clearReminder],
+  );
 
-  const followBack = useCallback(async (userId: string) => {
-    setAsking((a) =>
-      a.filter((r) => !(r.kind === "follower" && r.user_id === userId)),
-    );
-    try {
-      await fetch("/api/me/follow", {
+  const actReminder = useCallback(
+    (id: string) =>
+      clearReminder(
+        id,
+        `/api/me/otto/reminders/${id}/act`,
+        "POST",
+        "Couldn't mark that reminder done.",
+      ),
+    [clearReminder],
+  );
+
+  // Connect clears the row straight away; a refused follow (a block, the
+  // rate limit) puts it back where it was so Connect can be tapped again.
+  const followBack = useCallback(
+    async (userId: string) => {
+      const isIt = (r: AskingRow) =>
+        r.kind === "follower" && r.user_id === userId;
+      const index = asking.findIndex(isIt);
+      const row = index >= 0 ? asking[index] : null;
+      setAsking((a) => a.filter((r) => !isIt(r)));
+      const res = await vibeRequest("/api/me/follow", {
         method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ target_id: userId }),
+        json: { target_id: userId },
+        failure: "Couldn't connect with them.",
       });
-    } catch (e) {
-      console.error("[otto-mobile] followBack", e);
-    }
-  }, []);
+      if (!res.ok && row) setAsking((a) => restoreAt(a, row, index));
+    },
+    [asking],
+  );
 
   const passFollower = useCallback((userId: string) => {
     setAsking((a) =>

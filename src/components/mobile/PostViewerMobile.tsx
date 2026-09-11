@@ -1,10 +1,11 @@
 "use client";
 
 import Link from "next/link";
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { Drawer } from "vaul";
 
 import { SharePostSheet } from "@/components/mobile/SharePostSheet";
+import { copyText, vibeRequest } from "@/lib/feedback/request";
 
 /**
  * iOS-native mobile post viewer. Opens as a full-screen sheet from the
@@ -13,7 +14,7 @@ import { SharePostSheet } from "@/components/mobile/SharePostSheet";
  * Layout:
  *   - Top bar (safe-area padded): close × + author avatar/name/handle
  *     + the post's relative timestamp.
- *   - Scrollable body: image (if any), content with @handle / #tag
+ *   - Scrollable body: image or video (if any), content with @handle / #tag
  *     linkified, tag chips, then the engagement bar.
  *   - Engagement bar: Like (heart + count), Comment (chat + count),
  *     Repost (loop + count), Save (bookmark), Share. Hits the same
@@ -94,6 +95,9 @@ export function PostViewerMobile({
   const [menuOpen, setMenuOpen] = useState(false);
   const [deleting, setDeleting] = useState(false);
   const [shareOpen, setShareOpen] = useState(false);
+  // Whether the latest pointerdown landed on the app toast; the drawer's
+  // onPointerDownOutside reads it (see the effect below).
+  const toastTapRef = useRef(false);
 
   const handleDelete = async () => {
     if (deleting) return;
@@ -127,6 +131,22 @@ export function PostViewerMobile({
     return () => {
       document.body.style.overflow = prev;
     };
+  }, []);
+
+  // The app toast (ToastHost) floats above this sheet, so tapping it is a
+  // tap outside the drawer and Radix would close the viewer, throwing away
+  // the comment draft the toast is about. Note where each pointerdown lands
+  // while the toast is still on the page: on touch, Radix only acts on the
+  // click that follows, and by then the tap has already dismissed (removed)
+  // the toast, so its target can't be checked there.
+  useEffect(() => {
+    const onPointerDown = (e: PointerEvent) => {
+      const t = e.target;
+      toastTapRef.current =
+        t instanceof Element && t.closest('[role="alert"], [role="status"]') !== null;
+    };
+    document.addEventListener("pointerdown", onPointerDown, true);
+    return () => document.removeEventListener("pointerdown", onPointerDown, true);
   }, []);
 
   // Fetch the single post + counts + viewer state in one roundtrip.
@@ -217,16 +237,14 @@ export function PostViewerMobile({
   };
   const repost = async () => {
     // Simple repost (no quote on mobile v1) — POST adds, server treats
-    // a re-post by the same user as a no-op.
-    try {
-      await fetch(`/api/posts/${postId}/repost`, {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({}),
-      });
-    } catch {
-      /* silent — engagement count refresh would need another fetch */
-    }
+    // a re-post by the same user as a no-op. Nothing on screen changes,
+    // so the toast is the only sign it worked (or was refused).
+    await vibeRequest(`/api/posts/${postId}/repost`, {
+      method: "POST",
+      json: {},
+      failure: "Couldn't repost this.",
+      success: "Reposted",
+    });
   };
   const share = async () => {
     try {
@@ -248,23 +266,20 @@ export function PostViewerMobile({
     const text = draft.trim();
     if (!text || posting) return;
     setPosting(true);
-    try {
-      const r = await fetch(`/api/posts/${postId}/comments`, {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ content: text }),
-      });
-      const j = await r.json();
-      if (r.ok && j?.ok && j.comment) {
-        setComments((prev) => [...(prev ?? []), j.comment as Comment]);
-        setCounts((c) => ({ ...c, comments: c.comments + 1 }));
-        setDraft("");
-      }
-    } catch {
-      /* silent */
-    } finally {
-      setPosting(false);
+    // Confirm, then paint: on a refusal the toast says why, the draft
+    // stays in the box and Post re-enables.
+    const r = await vibeRequest<{ comment?: Comment }>(`/api/posts/${postId}/comments`, {
+      method: "POST",
+      json: { content: text },
+      failure: "Couldn't post your comment.",
+    });
+    if (r.ok) {
+      const posted = r.data.comment;
+      if (posted) setComments((prev) => [...(prev ?? []), posted]);
+      setCounts((c) => ({ ...c, comments: c.comments + 1 }));
+      setDraft("");
     }
+    setPosting(false);
   };
 
   const author = post?.author ?? null;
@@ -273,6 +288,9 @@ export function PostViewerMobile({
   // would call every video an image — trust the server's media_kind.
   const isImage =
     post && post.media_url && post.media_kind !== "video" && post.type === "post";
+  // Video posts and clips alike, as the desktop feed plays both: a clip's
+  // share link (/posts/<id>) lands here on every viewport.
+  const isVideo = post && post.media_url && post.media_kind === "video";
 
   return (
     <Drawer.Root
@@ -291,6 +309,11 @@ export function PostViewerMobile({
           aria-modal="true"
           aria-label="Post"
           aria-describedby={undefined}
+          // Tapping a toast only clears the toast; see toastTapRef. vaul runs
+          // this first and skips the close once it's default-prevented.
+          onPointerDownOutside={(e) => {
+            if (toastTapRef.current) e.preventDefault();
+          }}
           style={{
             position: "fixed",
             top: 0,
@@ -495,36 +518,34 @@ export function PostViewerMobile({
                 />
                 <ViewerMenuItem
                   label="Copy link"
-                  onClick={async () => {
+                  onClick={() => {
                     setMenuOpen(false);
-                    try {
-                      const url = `${window.location.origin}/posts/${encodeURIComponent(postId)}`;
-                      await navigator.clipboard.writeText(url);
-                    } catch {
-                      /* clipboard may be blocked — silent */
-                    }
+                    // Straight from the tap, so the clipboard still counts it
+                    // as the student's gesture; toasts "Link copied" or why not.
+                    void copyText(
+                      `${window.location.origin}/posts/${encodeURIComponent(postId)}`,
+                    );
                   }}
                 />
                 {!canDelete ? (
                   <ViewerMenuItem
                     label="Report post"
                     tone="danger"
-                    onClick={async () => {
+                    onClick={() => {
                       setMenuOpen(false);
-                      try {
-                        await fetch("/api/me/reports", {
-                          method: "POST",
-                          headers: { "Content-Type": "application/json" },
-                          body: JSON.stringify({
-                            target_type: "post",
-                            target_id: postId,
-                            reason_code: "other",
-                            reason: "",
-                          }),
-                        });
-                      } catch {
-                        /* swallow — UI just dismisses */
-                      }
+                      // The menu just closes, so the toast is the only sign
+                      // the report landed (or was refused).
+                      void vibeRequest("/api/me/reports", {
+                        method: "POST",
+                        json: {
+                          target_type: "post",
+                          target_id: postId,
+                          reason_code: "other",
+                          reason: "",
+                        },
+                        failure: "Couldn't report this post.",
+                        success: "Reported. Thanks for letting us know.",
+                      });
                     }}
                   />
                 ) : null}
@@ -574,6 +595,26 @@ export function PostViewerMobile({
                   width: "100%",
                   aspectRatio: "1 / 1",
                   border: "1px solid rgba(28,28,30,0.06)",
+                }}
+              />
+            ) : null}
+
+            {isVideo ? (
+              <video
+                src={post.media_url ?? undefined}
+                controls
+                playsInline
+                preload="metadata"
+                poster={post.media_thumbnail_url ?? undefined}
+                // The drawer closes on a sideways drag, and scrubbing the
+                // timeline is one, so keep vaul's drag handling off it.
+                data-vaul-no-drag
+                style={{
+                  width: "100%",
+                  maxHeight: "70vh",
+                  borderRadius: 14,
+                  border: "1px solid rgba(28,28,30,0.06)",
+                  background: "#000",
                 }}
               />
             ) : null}
