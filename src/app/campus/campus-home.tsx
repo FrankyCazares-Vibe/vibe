@@ -15,6 +15,7 @@ import {
   capturePosterFrame,
   extractHashtags,
 } from "@/lib/composer/helpers";
+import { copyText, vibeRequest } from "@/lib/feedback/request";
 import { IU_SCHOOLS, schoolForMajor } from "@/lib/iu/majors";
 
 declare global {
@@ -311,6 +312,8 @@ export function CampusHome({
     // Otto mention notifications — they only make sense on the feed.
     if (searchParams.get("welcome") === "1") return "feed";
     if (searchParams.get("post")) return "feed";
+    // Same for /campus?tag=<t> hashtag links — the filter is feed-only.
+    if (searchParams.get("tag")) return "feed";
     if (typeof window !== "undefined") {
       try {
         if (localStorage.getItem("vibe_tour_pending") === "campus") return "feed";
@@ -331,7 +334,13 @@ export function CampusHome({
   const pendingDeepLinkChannelIdRef = useRef<string | null>(
     searchParams.get("channel"),
   );
-  const [feedTagFilter, setFeedTagFilter] = useState<string | null>(null);
+  // Seeded from `?tag=` (hashtag links on /posts/[id] and in the post
+  // viewer point at /campus?tab=feed&tag=<t>). Read once, like ?tab=.
+  // Normalized the way /api/feed does it, so the header never reads "##".
+  const [feedTagFilter, setFeedTagFilter] = useState<string | null>(() => {
+    const tag = (searchParams.get("tag") ?? "").trim().toLowerCase().replace(/^#+/, "");
+    return tag || null;
+  });
   const [showCreateOrg, setShowCreateOrg] = useState(false);
   const [showCreateChannel, setShowCreateChannel] = useState(false);
   const [showSettings, setShowSettings] = useState(false);
@@ -2379,6 +2388,9 @@ function ChannelOverview({
   const [pinned, setPinned] = useState(channel.pinned);
   const [busy, setBusy] = useState(false);
   const [msg, setMsg] = useState<{ tone: "ok" | "err"; text: string } | null>(null);
+  // One reorder in flight at a time, so a rollback's snapshot is always
+  // the order the server last agreed to.
+  const [reordering, setReordering] = useState(false);
 
   const dirty =
     name.trim() !== channel.name ||
@@ -2421,22 +2433,23 @@ function ChannelOverview({
   const idx = regular.findIndex((c) => c.id === channel.id);
   const canReorder = canManage && !pinned && idx !== -1;
   const move = async (delta: number) => {
-    if (!canReorder) return;
+    if (!canReorder || reordering) return;
     const next = idx + delta;
     if (next < 0 || next >= regular.length) return;
+    // Snapshot before the swap — the rollback if the server refuses.
+    const prevIds = regular.map((c) => c.id);
     const nextOrder = regular.slice();
     [nextOrder[idx], nextOrder[next]] = [nextOrder[next], nextOrder[idx]];
     const orderedIds = nextOrder.map((c) => c.id);
     onChannelsReordered(orderedIds);
-    try {
-      await fetch(`/api/orgs/${org.handle}/channels/reorder`, {
-        method: "POST",
-        headers: { "content-type": "application/json" },
-        body: JSON.stringify({ channel_ids: orderedIds }),
-      });
-    } catch (e) {
-      console.error("[campus] reorder", e);
-    }
+    setReordering(true);
+    const r = await vibeRequest(`/api/orgs/${org.handle}/channels/reorder`, {
+      method: "POST",
+      json: { channel_ids: orderedIds },
+      failure: "Couldn't move the channel.",
+    });
+    setReordering(false);
+    if (!r.ok) onChannelsReordered(prevIds);
   };
 
   if (!canManage) {
@@ -2519,7 +2532,7 @@ function ChannelOverview({
           <button
             type="button"
             onClick={() => move(-1)}
-            disabled={!canReorder || idx <= 0}
+            disabled={!canReorder || reordering || idx <= 0}
             style={modalCancelStyle}
           >
             ↑ Up
@@ -2527,7 +2540,7 @@ function ChannelOverview({
           <button
             type="button"
             onClick={() => move(1)}
-            disabled={!canReorder || idx >= regular.length - 1}
+            disabled={!canReorder || reordering || idx >= regular.length - 1}
             style={modalCancelStyle}
           >
             ↓ Down
@@ -5055,17 +5068,19 @@ function FeedRow({
       return;
     }
     setDeleting(true);
-    try {
-      const res = await fetch(`/api/posts/${post.id}`, { method: "DELETE" });
-      if (!res.ok) throw new Error(`delete ${res.status}`);
-      setShowMoreMenu(false);
-      // Refetch the feed so the deleted row falls out without us having
-      // to plumb the deletion into parent state directly.
-      onMutate();
-    } catch (e) {
-      console.error("[feed] delete post", e);
+    const r = await vibeRequest(`/api/posts/${post.id}`, {
+      method: "DELETE",
+      failure: "Couldn't delete your post.",
+    });
+    if (!r.ok) {
+      // Menu stays open with the button re-enabled, so they can retry.
       setDeleting(false);
+      return;
     }
+    setShowMoreMenu(false);
+    // Refetch the feed so the deleted row falls out without us having
+    // to plumb the deletion into parent state directly.
+    onMutate();
   }, [deleting, post.id, onMutate]);
 
   // Click-outside dismiss for the more menu — only attaches when open
@@ -5264,18 +5279,14 @@ function FeedRow({
             <button
               type="button"
               role="menuitem"
-              onClick={async () => {
+              onClick={() => {
                 setShowMoreMenu(false);
-                try {
-                  // Share-link target now points at /posts/[id] (OG meta
-                  // + 404-safe + works for older posts outside the
-                  // 50-row feed window). /campus?post= deep link still
-                  // works as a fallback for inbound links.
-                  const url = `${window.location.origin}/posts/${encodeURIComponent(post.id)}`;
-                  await navigator.clipboard.writeText(url);
-                } catch {
-                  /* silent */
-                }
+                // Share-link target now points at /posts/[id] (OG meta
+                // + 404-safe + works for older posts outside the
+                // 50-row feed window). /campus?post= deep link still
+                // works as a fallback for inbound links.
+                const url = `${window.location.origin}/posts/${encodeURIComponent(post.id)}`;
+                void copyText(url, { failure: "Couldn't copy the link." });
               }}
               style={feedRowMenuItemStyle()}
               onMouseEnter={(e) => {
@@ -5291,22 +5302,20 @@ function FeedRow({
               <button
                 type="button"
                 role="menuitem"
-                onClick={async () => {
+                onClick={() => {
                   setShowMoreMenu(false);
-                  try {
-                    await fetch("/api/me/reports", {
-                      method: "POST",
-                      headers: { "Content-Type": "application/json" },
-                      body: JSON.stringify({
-                        target_type: "post",
-                        target_id: post.id,
-                        reason_code: "other",
-                        reason: "",
-                      }),
-                    });
-                  } catch {
-                    /* silent */
-                  }
+                  // The menu is gone, so the toast is the only receipt.
+                  void vibeRequest("/api/me/reports", {
+                    method: "POST",
+                    json: {
+                      target_type: "post",
+                      target_id: post.id,
+                      reason_code: "other",
+                      reason: "",
+                    },
+                    failure: "Couldn't report this post.",
+                    success: "Reported — thanks for letting us know.",
+                  });
                 }}
                 style={feedRowMenuItemStyle("danger")}
                 onMouseEnter={(e) => {
@@ -5766,27 +5775,26 @@ function RepostMenu({
   const [comment, setComment] = useState("");
   const [busy, setBusy] = useState(false);
 
+  // Confirm, then paint: on a refusal the menu stays open (the quote still
+  // in the box, the buttons re-enabled) and vibeRequest's toast says why.
   const submit = async (mode: "repost" | "undo") => {
     setBusy(true);
     try {
       if (mode === "undo") {
-        const res = await fetch(`/api/posts/${postId}/repost`, { method: "DELETE" });
-        if (!res.ok) throw new Error(`undo ${res.status}`);
-        onDone("removed");
+        const r = await vibeRequest(`/api/posts/${postId}/repost`, {
+          method: "DELETE",
+          failure: "Couldn't undo your repost.",
+        });
+        if (r.ok) onDone("removed");
         return;
       }
       const trimmed = comment.trim();
-      const body = trimmed ? { comment: trimmed } : {};
-      const res = await fetch(`/api/posts/${postId}/repost`, {
+      const r = await vibeRequest(`/api/posts/${postId}/repost`, {
         method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify(body),
+        json: trimmed ? { comment: trimmed } : {},
+        failure: "Couldn't repost this.",
       });
-      if (!res.ok) throw new Error(`repost ${res.status}`);
-      onDone(alreadyReposted ? "edited" : "added");
-    } catch (e) {
-      console.error("[feed] repost", e);
-      onDone("noop");
+      if (r.ok) onDone(alreadyReposted ? "edited" : "added");
     } finally {
       setBusy(false);
     }
@@ -5971,18 +5979,19 @@ function CommentsDrawer({
     if (!text || submitting) return;
     setSubmitting(true);
     try {
-      const res = await fetch(`/api/posts/${postId}/comments`, {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ content: text }),
-      });
-      const data = await res.json();
-      if (data?.ok && data.comment) {
-        handleNewComment(data.comment as FeedComment);
+      const r = await vibeRequest<{ comment?: FeedComment }>(
+        `/api/posts/${postId}/comments`,
+        {
+          method: "POST",
+          json: { content: text },
+          failure: "Couldn't post your comment.",
+        },
+      );
+      // On a refusal the draft stays in the box for a retry.
+      if (r.ok && r.data.comment) {
+        handleNewComment(r.data.comment);
         setDraft("");
       }
-    } catch (e) {
-      console.error("[feed] add comment", e);
     } finally {
       setSubmitting(false);
     }
@@ -6087,6 +6096,35 @@ function CommentRow({
     .map((s) => s[0])
     .join("")
     .toUpperCase();
+  // Avatar + name open the author's profile, like the FeedRow header.
+  // Plain elements when there's no handle to route to.
+  const profileHref = comment.author?.handle
+    ? `/profile/${encodeURIComponent(comment.author.handle)}`
+    : null;
+  const avatarStyle: React.CSSProperties = {
+    width: isReply ? 24 : 28,
+    height: isReply ? 24 : 28,
+    borderRadius: 999,
+    background: comment.author?.avatar_url
+      ? `url(${comment.author.avatar_url}) center/cover`
+      : "#1C1C1E",
+    color: "#fff",
+    display: "flex",
+    alignItems: "center",
+    justifyContent: "center",
+    fontFamily: "Fraunces, serif",
+    fontWeight: 800,
+    fontSize: isReply ? 10 : 11,
+    flexShrink: 0,
+    textDecoration: "none",
+  };
+  const nameStyle: React.CSSProperties = {
+    fontFamily: "Fraunces, serif",
+    fontWeight: 800,
+    fontSize: isReply ? 12 : 13,
+    color: COLORS.text,
+    textDecoration: "none",
+  };
 
   const toggleLike = useCallback(async () => {
     const next = !liked;
@@ -6116,19 +6154,20 @@ function CommentRow({
     if (!text || replySubmitting) return;
     setReplySubmitting(true);
     try {
-      const res = await fetch(`/api/posts/${postId}/comments`, {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ content: text, parent_comment_id: comment.id }),
-      });
-      const data = await res.json();
-      if (data?.ok && data.comment) {
-        onReplyAdded(data.comment as FeedComment);
+      const r = await vibeRequest<{ comment?: FeedComment }>(
+        `/api/posts/${postId}/comments`,
+        {
+          method: "POST",
+          json: { content: text, parent_comment_id: comment.id },
+          failure: "Couldn't post your reply.",
+        },
+      );
+      // On a refusal the reply box stays open with its text.
+      if (r.ok && r.data.comment) {
+        onReplyAdded(r.data.comment);
         setReplyDraft("");
         setReplyOpen(false);
       }
-    } catch (e) {
-      console.error("[feed] reply", e);
     } finally {
       setReplySubmitting(false);
     }
@@ -6136,26 +6175,19 @@ function CommentRow({
 
   return (
     <div style={{ display: "flex", gap: 8 }}>
-      <div
-        style={{
-          width: isReply ? 24 : 28,
-          height: isReply ? 24 : 28,
-          borderRadius: 999,
-          background: comment.author?.avatar_url
-            ? `url(${comment.author.avatar_url}) center/cover`
-            : "#1C1C1E",
-          color: "#fff",
-          display: "flex",
-          alignItems: "center",
-          justifyContent: "center",
-          fontFamily: "Fraunces, serif",
-          fontWeight: 800,
-          fontSize: isReply ? 10 : 11,
-          flexShrink: 0,
-        }}
-      >
-        {!comment.author?.avatar_url ? initials : null}
-      </div>
+      {profileHref ? (
+        <Link
+          href={profileHref}
+          aria-label={`Open ${name}'s profile`}
+          style={avatarStyle}
+        >
+          {!comment.author?.avatar_url ? initials : null}
+        </Link>
+      ) : (
+        <div style={avatarStyle}>
+          {!comment.author?.avatar_url ? initials : null}
+        </div>
+      )}
       <div style={{ flex: 1, minWidth: 0 }}>
         <div
           style={{
@@ -6165,16 +6197,13 @@ function CommentRow({
             flexWrap: "wrap",
           }}
         >
-          <span
-            style={{
-              fontFamily: "Fraunces, serif",
-              fontWeight: 800,
-              fontSize: isReply ? 12 : 13,
-              color: COLORS.text,
-            }}
-          >
-            {name}
-          </span>
+          {profileHref ? (
+            <Link href={profileHref} style={nameStyle}>
+              {name}
+            </Link>
+          ) : (
+            <span style={nameStyle}>{name}</span>
+          )}
           <span style={{ fontSize: 11, color: COLORS.faint }}>
             {comment.author?.handle ? `@${comment.author.handle} · ` : ""}
             {relativeTime(comment.created_at)}
@@ -7781,20 +7810,21 @@ function OrgsTabBody({ onCreateOrg }: { onCreateOrg: () => void }) {
   const handleJoin = async (org: DiscoverOrg) => {
     setBusy(org.handle);
     try {
-      const res = await fetch(`/api/orgs/${org.handle}/join`, {
+      const r = await vibeRequest<{ joined?: boolean }>(`/api/orgs/${org.handle}/join`, {
         method: "POST",
-        headers: { "content-type": "application/json" },
-        body: JSON.stringify({}),
+        json: {},
+        failure: org.is_public
+          ? "Couldn't join this org."
+          : "Couldn't send your join request.",
       });
-      const data = await res.json();
-      if (data?.ok) {
+      // Confirm, then paint: the button only flips once the server agrees.
+      if (r.ok) {
+        const joined = r.data.joined === true;
         setPending((p) => ({
           ...p,
-          [org.handle]: data.joined ? "joined" : "pending",
+          [org.handle]: joined ? "joined" : "pending",
         }));
       }
-    } catch (e) {
-      console.error("[campus] join", e);
     } finally {
       setBusy(null);
     }
@@ -12016,26 +12046,22 @@ function ChannelChat({
     const parent = replyTo;
     setReplyTo(null);
     try {
-      const res = await fetch(`/api/me/threads/${channelId}/messages`, {
-        method: "POST",
-        headers: { "content-type": "application/json" },
-        body: JSON.stringify({
-          content,
-          parent_message_id: parent?.id,
-        }),
-      });
-      const data = await res.json();
-      if (data?.ok && data.message) {
+      const r = await vibeRequest<{ message?: ChatMessage }>(
+        `/api/me/threads/${channelId}/messages`,
+        {
+          method: "POST",
+          json: { content, parent_message_id: parent?.id },
+          failure: "Couldn't send your message.",
+        },
+      );
+      const sent = r.ok ? r.data.message : undefined;
+      if (sent) {
         // Optimistic — append immediately so it doesn't take 2s to show.
-        setMessages((prev) => [...prev, data.message as ChatMessage]);
+        setMessages((prev) => [...prev, sent]);
       } else {
         setDraft(content); // restore so user can retry
         if (parent) setReplyTo(parent);
       }
-    } catch (e) {
-      console.error("[campus] send", e);
-      setDraft(content);
-      if (parent) setReplyTo(parent);
     } finally {
       setSending(false);
     }
