@@ -196,6 +196,14 @@ body{font-family:'DM Sans',sans-serif;background:var(--cream);color:var(--charco
 .req-icon{width:28px;height:28px;border-radius:8px;background:var(--accent);display:flex;align-items:center;justify-content:center;flex-shrink:0;}
 .req-txt h4{font-size:12px;font-weight:700;}.req-txt p{font-size:11px;color:var(--muted);}
 .req-badge{margin-left:auto;background:var(--accent);color:white;font-size:11px;font-weight:800;width:20px;height:20px;border-radius:50%;display:flex;align-items:center;justify-content:center;flex-shrink:0;}
+/* Requests view: the banner opens it, the list shows only message
+   requests, and the back button returns to All (__dmShowRequests). */
+.req-view-hdr{display:flex;align-items:center;gap:10px;padding:10px 12px;border-bottom:1px solid var(--border);flex-shrink:0;}
+.req-view-back{width:28px;height:28px;border-radius:8px;background:var(--cream);border:1px solid var(--border);color:var(--charcoal);font-size:17px;line-height:1;display:flex;align-items:center;justify-content:center;flex-shrink:0;cursor:none;transition:all .15s;}
+.req-view-back:hover{background:white;box-shadow:var(--shadow);}
+.req-view-hdr h4{font-size:12px;font-weight:700;}.req-view-hdr p{font-size:11px;color:var(--muted);}
+/* A tab or search that leaves no rows says so instead of a blank column. */
+.t-filter-empty{padding:28px 20px;text-align:center;font-size:12.5px;color:var(--muted);line-height:1.5;}
 .t-tabs{display:flex;border-bottom:1px solid var(--border);flex-shrink:0;}
 .t-tab{flex:1;font-family:'DM Sans',sans-serif;font-size:12px;font-weight:700;color:var(--muted);padding:11px 0;text-align:center;border:none;background:none;cursor:none;position:relative;transition:color .15s;}
 .t-tab::after{content:'';position:absolute;bottom:-1px;left:25%;right:25%;height:2px;background:var(--accent);border-radius:2px;transform:scaleX(0);transition:transform .2s;}
@@ -237,6 +245,8 @@ body{font-family:'DM Sans',sans-serif;background:var(--cream);color:var(--charco
 .btn-acc:hover{background:var(--accent);}
 .btn-dec{font-family:'DM Sans',sans-serif;font-size:13px;font-weight:600;background:none;color:var(--muted);border:1.5px solid var(--border);padding:8px 20px;border-radius:100px;cursor:none;transition:all .15s;}
 .btn-dec:hover{border-color:rgba(28,28,30,.2);color:var(--charcoal);}
+/* Disabled while an Accept / Decline is waiting on the server. */
+.btn-acc:disabled,.btn-dec:disabled{opacity:.5;pointer-events:none;}
 .msgs{flex:1;overflow-y:auto;overflow-x:hidden;padding:18px 22px;display:flex;flex-direction:column;scrollbar-width:thin;scrollbar-color:var(--border) transparent;touch-action:pan-y;--dragx:0px;}
 /* gap on .msgs only spaces .msgs-bubbles from .msgs-footer; the rows
    live INSIDE .msgs-bubbles so the actual message-to-message spacing
@@ -988,10 +998,16 @@ input,textarea,[contenteditable="true"]{cursor:text!important;}
       <div class="req-txt"><h4>Message requests</h4><p></p></div>
       <div class="req-badge"></div>
     </div>
+    <!-- Requests view header: replaces the banner and tabs while the list
+         shows only message requests. Toggled by __dmApplyListFilter. -->
+    <div class="req-view-hdr" id="reqViewHdr" style="display:none">
+      <button class="req-view-back" type="button" onclick="__dmShowAllThreads()" aria-label="Back to all messages">&#8249;</button>
+      <div class="req-txt"><h4>Message requests</h4><p>From people you haven't connected with</p></div>
+    </div>
     <div class="t-tabs">
-      <button class="t-tab active" onclick="switchTab(this,'all')">All</button>
-      <button class="t-tab" onclick="switchTab(this,'unread')">Unread</button>
-      <button class="t-tab" onclick="switchTab(this,'conn')">Connections</button>
+      <button class="t-tab active" data-mode="all" onclick="switchTab(this,'all')">All</button>
+      <button class="t-tab" data-mode="unread" onclick="switchTab(this,'unread')">Unread</button>
+      <button class="t-tab" data-mode="conn" onclick="switchTab(this,'conn')">Connections</button>
     </div>
     <!-- Empty state (fresh-onboarded users with no threads) -->
     <div class="t-empty" id="tEmpty">
@@ -1083,6 +1099,9 @@ let active=null;
 function openT(id){
   if (typeof __realDM === 'undefined' || !__realDM.enabled) return;
   active = id;
+  // A failed deep link may have repainted the empty state; opening a real
+  // thread puts the default copy back for the next time it shows.
+  if (__realDM.T[id]) __dmSetEmptyState();
   return __dmOpenChannel(id);
 }
 
@@ -1476,8 +1495,17 @@ function upd(){
 }
 function accReq(){ if (typeof __realDM !== 'undefined' && __realDM.enabled) return __dmAccept(); }
 function decReq(){ if (typeof __realDM !== 'undefined' && __realDM.enabled) return __dmDecline(); }
-function switchTab(btn,mode){document.querySelectorAll('.t-tab').forEach(b=>b.classList.remove('active'));btn.classList.add('active');document.querySelectorAll('.t-item').forEach(el=>{el.style.display=mode==='unread'?(el.classList.contains('unread')?'':'none'):''});}
-function filterT(v){document.querySelectorAll('.t-item').forEach(el=>{el.style.display=el.querySelector('.t-name').textContent.toLowerCase().includes(v.toLowerCase())?'':'none';});}
+// Thread-list tabs and search. Both only set state; __dmApplyListFilter
+// does the hiding, and __dmRenderList re-runs it after every refresh (the
+// 30s list poll used to wipe the active tab's filter). 'conn' used to fall
+// through to 'all', so the Connections tab lit up and changed nothing.
+function switchTab(btn,mode){
+  __realDM.listMode = mode;
+  // Retry here if the page-load connections fetch failed.
+  if (mode === 'conn' && !__realDM.connIds) __dmLoadConnections();
+  __dmApplyListFilter();
+}
+function filterT(v){ __realDM.listQuery = String(v || ''); __dmApplyListFilter(); }
 
 
 
@@ -1578,45 +1606,18 @@ function renderModalSidebar(){
   const listEl=document.getElementById('modalEventsList'),dateEl=document.getElementById('modalSidebarDate');
   if(!listEl)return;
   const noEvtHTML=`<div class="cal-modal-no-events"><svg width="36" height="36" viewBox="0 0 36 36" fill="none" style="margin:0 auto 10px;display:block;opacity:.3"><rect x="3" y="6" width="30" height="27" rx="6" stroke="currentColor" stroke-width="2" fill="none"/><path d="M3 14h30" stroke="currentColor" stroke-width="2" stroke-linecap="round"/><path d="M11 3v6M25 3v6" stroke="currentColor" stroke-width="2" stroke-linecap="round"/></svg>`;
-  if(!modalSelectedKey){dateEl.textContent='Click a day to see events';listEl.innerHTML=noEvtHTML+'Select a day to see<br>or add events</div>';return;}
+  if(!modalSelectedKey){dateEl.textContent='Click a day to see events';listEl.innerHTML=noEvtHTML+'Select a day to see<br>its events</div>';return;}
   const p=modalSelectedKey.split('-').map(Number),dateObj=new Date(p[0],p[1]-1,p[2]);
   dateEl.textContent=dateObj.toLocaleDateString('en-US',{weekday:'long',month:'long',day:'numeric'});
   const evts=calendarEvents[modalSelectedKey]||[];
   if(!evts.length){listEl.innerHTML=noEvtHTML+`No events yet</div>`;}
-  else{listEl.innerHTML=evts.map(e=>`<div class="cal-modal-event-card"><div class="cal-modal-event-bar" style="background:${e.color}"></div><div class="cal-modal-event-body"><div class="cal-modal-event-name">${e.name}</div><div class="cal-modal-event-meta">${e.time?fmtTime(e.time)+'<br>':''}${e.location?'&#128205; '+e.location+'<br>':''}${e.notes?'&#128221; '+e.notes:''}</div></div><button class="cal-modal-event-del" onclick="removeCalEvent('${modalSelectedKey}','${e.name}')">&times;</button></div>`).join('')+`<button onclick="openCreateEventForKey('${modalSelectedKey}')" style="width:100%;margin-top:8px;padding:10px;border-radius:12px;border:1.5px dashed var(--border);background:none;color:var(--muted);font-family:'DM Sans',sans-serif;font-size:12px;font-weight:700;cursor:none;transition:all .15s" onmouseover="this.style.borderColor='var(--accent)';this.style.color='var(--accent)'" onmouseout="this.style.borderColor='var(--border)';this.style.color='var(--muted)'">+ Add another event</button>`;}
+  else{listEl.innerHTML=evts.map(e=>`<div class="cal-modal-event-card"><div class="cal-modal-event-bar" style="background:${e.color}"></div><div class="cal-modal-event-body"><div class="cal-modal-event-name">${e.name}</div><div class="cal-modal-event-meta">${e.time?fmtTime(e.time)+'<br>':''}${e.location?'&#128205; '+e.location+'<br>':''}${e.notes?'&#128221; '+e.notes:''}</div></div><button class="cal-modal-event-del" onclick="removeCalEvent('${modalSelectedKey}','${e.name}')">&times;</button></div>`).join('');}
 }
 
-// CREATE EVENT
-let selectedEventColor='#FF5C35',prefillDateKey=null;
-function openCreateEvent(){prefillDateKey=modalSelectedKey;_openCreateForm();}
-function openCreateEventForKey(key){prefillDateKey=key;_openCreateForm();}
-function _openCreateForm(){
-  document.getElementById('evtDate').value=prefillDateKey||dateKey(new Date());
-  document.getElementById('evtName').value='';document.getElementById('evtTime').value='';
-  document.getElementById('evtLocation').value='';document.getElementById('evtNotes').value='';
-  selectedEventColor='#FF5C35';
-  document.querySelectorAll('.color-swatch').forEach(s=>s.classList.toggle('active',s.dataset.color===selectedEventColor));
-  document.getElementById('createEventModal').classList.add('open');
-  setTimeout(()=>document.getElementById('evtName').focus(),80);
-}
-function closeCreateEvent(){document.getElementById('createEventModal').classList.remove('open');}
-function pickColor(el){selectedEventColor=el.dataset.color;document.querySelectorAll('.color-swatch').forEach(s=>s.classList.remove('active'));el.classList.add('active');}
-function saveNewEvent(){
-  const name=document.getElementById('evtName').value.trim();
-  const dateStr=document.getElementById('evtDate').value;
-  const time=document.getElementById('evtTime').value;
-  const location=document.getElementById('evtLocation').value.trim();
-  const notes=document.getElementById('evtNotes').value.trim();
-  if(!name){document.getElementById('evtName').focus();return;}
-  if(!dateStr){document.getElementById('evtDate').focus();return;}
-  const p=dateStr.split('-').map(Number),dateObj=new Date(p[0],p[1]-1,p[2]);
-  addCalEvent(dateObj,name,time,selectedEventColor,location,notes);
-  if(modalOpen){modalSelectedKey=dateKey(dateObj);modalYear=p[0];modalMonth=p[1]-1;renderModalGrid();renderModalSidebar();}
-  calSelectedKey=dateKey(dateObj);calYear=p[0];calMonth=p[1]-1;
-  miniSelectDay(p[0],p[1]-1,p[2]);
-  closeCreateEvent();
-  showFeedToast('Event saved: '+name);
-}
+// No create-event form on this page. The "+ Add another event" button
+// opened #createEventModal, which only exists in profile.html, so every
+// click threw (2026-09-09 broken-features report, item 19). This calendar
+// is read-only now; the button, its openers and the save path are gone.
 
 // ══ CALENDAR SYNC ════════════════════════════════════════════════════════
 const CAL_KEY = 'vibe_cal_events_v1';
@@ -1660,6 +1661,21 @@ const __realDM = {
   // a stale messages array and clobber the freshly-flipped chip, making
   // it look like the reaction "didn't take" until the next page load.
   pendingReactions: 0,
+  // Thread-list view (__dmApplyListFilter): 'all' | 'unread' | 'conn' |
+  // 'requests', plus the search box text. Kept here so every list refresh
+  // re-applies them.
+  listMode: 'all',
+  listQuery: '',
+  listLoaded: false,             // the first __dmRenderList has run
+  listHasRows: false,            // any threads or requests at all
+  requestCount: 0,
+  // Mutual-connection user ids for the Connections tab. null until
+  // __dmLoadConnections succeeds; connFailed after a failed load.
+  connIds: null,
+  connLoading: false,
+  connFailed: false,
+  // An Accept / Decline is waiting on the server (__dmReqBarBusy).
+  reqBusy: false,
 };
 
 // ── Reactions + replies (legacy /messages) ─────────────────────────────
@@ -1670,6 +1686,10 @@ window.__dmToggleReaction = async function (messageId, emoji) {
   if (!thread || !Array.isArray(thread.msgs)) return;
   const msg = thread.msgs.find((m) => m.id === messageId);
   if (!msg) return;
+  // The chip paints before the request, so keep an exact copy of what was
+  // there: a refused toggle puts it back and says so (a silent refetch used
+  // to revert it without a word).
+  const before = Array.isArray(msg.reactions) ? msg.reactions.map((r) => Object.assign({}, r)) : [];
   msg.reactions = Array.isArray(msg.reactions) ? msg.reactions : [];
   const found = msg.reactions.find((r) => r.emoji === emoji);
   let nextActive;
@@ -1690,18 +1710,24 @@ window.__dmToggleReaction = async function (messageId, emoji) {
   if (active === channelId) renderMsgs(thread.msgs, thread);
   __realDM.pendingReactions = (__realDM.pendingReactions || 0) + 1;
   try {
-    const res = await fetch('/api/me/threads/' + encodeURIComponent(channelId) + '/messages/' + encodeURIComponent(messageId) + '/react', {
+    const r = await window.vibeRequest('/api/me/threads/' + encodeURIComponent(channelId) + '/messages/' + encodeURIComponent(messageId) + '/react', {
       method: nextActive ? 'POST' : 'DELETE',
-      credentials: 'include',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ emoji }),
+      json: { emoji },
+      failure: nextActive ? "Couldn't add your reaction." : "Couldn't remove your reaction.",
     });
-    if (!res.ok) throw new Error('react ' + res.status);
-    // Refetch so the next render is sourced from server truth.
-    if (typeof __dmLoadMessages === 'function') await __dmLoadMessages(channelId);
-  } catch (e) {
-    console.error('[dm.react]', e);
-    if (typeof __dmLoadMessages === 'function') await __dmLoadMessages(channelId);
+    if (r.ok) {
+      // Refetch so the next render is sourced from server truth.
+      if (typeof __dmLoadMessages === 'function') await __dmLoadMessages(channelId);
+    } else {
+      // Put the chip back. If a refetch already swapped in a fresh copy of
+      // the messages (another toggle's refresh, a send), that copy is
+      // server truth and has nothing to undo.
+      const cur = __realDM.T[channelId];
+      if (cur && Array.isArray(cur.msgs) && cur.msgs.indexOf(msg) >= 0) {
+        msg.reactions = before;
+        if (active === channelId) renderMsgs(cur.msgs, cur);
+      }
+    }
   } finally {
     __realDM.pendingReactions = Math.max(0, (__realDM.pendingReactions || 0) - 1);
   }
@@ -1890,7 +1916,10 @@ function __dmThreadItemHtml(thread, isRequest) {
   const pinIcon = thread.pinned_at
     ? '<svg class="t-pin" width="11" height="11" viewBox="0 0 14 14" fill="none" style="margin-right:5px;vertical-align:-1px;flex-shrink:0;"><path d="M9 1L13 5L11 7L8 6L5 9L3 11L1 13M5 9L2 12" stroke="#FF5C35" stroke-width="1.4" stroke-linecap="round" stroke-linejoin="round" fill="none"/></svg>'
     : '';
-  return '<div class="t-item' + unread + '" data-t="' + id + '" onclick="openT(\'' + id + '\')">' +
+  // data-peer / data-req feed the Connections and Requests filters.
+  const peerAttr = !rec.isGroup && rec.peerId ? ' data-peer="' + __dmEsc(rec.peerId) + '"' : '';
+  const reqAttr = isRequest ? ' data-req="1"' : '';
+  return '<div class="t-item' + unread + '" data-t="' + id + '"' + peerAttr + reqAttr + ' onclick="openT(\'' + id + '\')">' +
     __dmAvatarHtml(rec, { size: 44 }) +
     '<div class="t-info">' +
       '<div class="t-name">' + pinIcon + __dmEsc(rec.n) + '</div>' +
@@ -1901,45 +1930,164 @@ function __dmThreadItemHtml(thread, isRequest) {
 }
 
 function __dmRenderList(threads, requests) {
-  __realDM.T = {};
-  for (const t of threads) __realDM.T[t.id] = __dmThreadRecord(t, false);
-  for (const r of requests) __realDM.T[r.id] = __dmThreadRecord(r, true);
+  // Build the new map before swapping it in: __dmThreadRecord carries each
+  // thread's loaded messages over from __realDM.T, and the old first line
+  // (`__realDM.T = {}`) emptied it first. Every 30s refresh wiped the open
+  // thread's cache, so a reaction or Reply in the next ~2s found no message.
+  const nextT = {};
+  for (const t of threads) nextT[t.id] = __dmThreadRecord(t, false);
+  for (const r of requests) nextT[r.id] = __dmThreadRecord(r, true);
+  __realDM.T = nextT;
+  __realDM.listLoaded = true;
+  __realDM.listHasRows = threads.length + requests.length > 0;
+  __realDM.requestCount = requests.length;
 
   const tScroll = document.getElementById('tScroll');
   if (tScroll) tScroll.removeAttribute('aria-busy');
   const tEmpty = document.getElementById('tEmpty');
   const reqBanner = document.querySelector('.req-banner');
-  const tabs = document.querySelector('.t-tabs');
 
   if (threads.length === 0 && requests.length === 0) {
     if (tScroll) tScroll.innerHTML = '';
     if (tEmpty) tEmpty.classList.add('visible');
-    if (reqBanner) reqBanner.style.display = 'none';
-    if (tabs) tabs.style.display = 'none';
+    __dmApplyListFilter(); // hides the banner, the tabs and the requests header
     return;
   }
   if (tEmpty) tEmpty.classList.remove('visible');
   if (tScroll) tScroll.style.display = '';
-  if (tabs) tabs.style.display = '';
 
-  if (reqBanner) {
-    if (requests.length > 0) {
-      reqBanner.style.display = '';
-      const badge = reqBanner.querySelector('.req-badge');
-      const txt = reqBanner.querySelector('.req-txt p');
-      if (badge) badge.textContent = String(requests.length);
-      if (txt) txt.textContent = requests.length === 1
-        ? "1 person you haven't connected with"
-        : requests.length + " people you haven't connected with";
-      reqBanner.onclick = () => openT(requests[0].id);
-    } else {
-      reqBanner.style.display = 'none';
-    }
+  if (reqBanner && requests.length > 0) {
+    const badge = reqBanner.querySelector('.req-badge');
+    const txt = reqBanner.querySelector('.req-txt p');
+    if (badge) badge.textContent = String(requests.length);
+    if (txt) txt.textContent = requests.length === 1
+      ? "1 person you haven't connected with"
+      : requests.length + " people you haven't connected with";
+    // Opens the list of every pending request. It used to open requests[0]
+    // even while it said "3 people".
+    reqBanner.onclick = __dmShowRequests;
   }
 
   const items = threads.map(t => __dmThreadItemHtml(t, false))
     .concat(requests.map(r => __dmThreadItemHtml(r, true)));
   if (tScroll) tScroll.innerHTML = items.join('');
+  __dmApplyListFilter();
+}
+
+// Show or hide rows for the current tab + search, and the chrome around
+// them: the requests banner, the tabs, or (in the Requests view) its header.
+function __dmApplyListFilter() {
+  // The last request was accepted or declined: nothing left to show there.
+  if (__realDM.listMode === 'requests' && !__realDM.requestCount) __realDM.listMode = 'all';
+  const mode = __realDM.listMode || 'all';
+  const q = (__realDM.listQuery || '').trim().toLowerCase();
+  const conn = __realDM.connIds;
+  document.querySelectorAll('.t-tab').forEach(b => b.classList.toggle('active', b.dataset.mode === mode));
+  // Before the first list paint the skeleton owns the column; leave the
+  // chrome as the markup has it.
+  if (__realDM.listLoaded) {
+    const inReqs = mode === 'requests';
+    const hasRows = __realDM.listHasRows;
+    const banner = document.querySelector('.req-banner');
+    const tabs = document.querySelector('.t-tabs');
+    const hdr = document.getElementById('reqViewHdr');
+    if (banner) banner.style.display = hasRows && !inReqs && __realDM.requestCount > 0 ? '' : 'none';
+    if (tabs) tabs.style.display = hasRows && !inReqs ? '' : 'none';
+    if (hdr) hdr.style.display = hasRows && inReqs ? '' : 'none';
+  }
+  const scroll = document.getElementById('tScroll');
+  if (!scroll) return;
+  const items = scroll.querySelectorAll('.t-item');
+  let shown = 0;
+  items.forEach(el => {
+    let ok = true;
+    if (mode === 'unread') ok = el.classList.contains('unread');
+    else if (mode === 'requests') ok = el.dataset.req === '1';
+    // 1:1 threads whose peer is a mutual connection; a group has no single peer.
+    else if (mode === 'conn') ok = !!(conn && el.dataset.peer && conn.has(el.dataset.peer));
+    if (ok && q) {
+      const n = el.querySelector('.t-name');
+      ok = !!n && n.textContent.toLowerCase().includes(q);
+    }
+    el.style.display = ok ? '' : 'none';
+    if (ok) shown++;
+  });
+  let msg = '';
+  if (items.length && !shown) {
+    if (mode === 'conn' && !conn) {
+      msg = __realDM.connFailed
+        ? "Couldn't load your connections. Click Connections to try again."
+        : 'Loading your connections…';
+    } else if (q) msg = 'No conversations match “' + __realDM.listQuery.trim() + '”.';
+    else if (mode === 'unread') msg = "You're all caught up. No unread conversations.";
+    else if (mode === 'conn') msg = 'No conversations with your connections yet.';
+  }
+  let note = scroll.querySelector('.t-filter-empty');
+  if (msg) {
+    if (!note) {
+      note = document.createElement('div');
+      note.className = 't-filter-empty';
+      scroll.appendChild(note);
+    }
+    note.textContent = msg;
+  } else if (note) {
+    note.remove();
+  }
+}
+
+// The requests banner opens the request list; the header's back button
+// (or answering the last request) returns to All.
+function __dmShowRequests() {
+  __realDM.listMode = 'requests';
+  __dmApplyListFilter();
+  const s = document.getElementById('tScroll');
+  if (s) s.scrollTop = 0;
+}
+function __dmShowAllThreads() {
+  __realDM.listMode = 'all';
+  __dmApplyListFilter();
+}
+
+// Mutual connections for the Connections tab. A thread row carries no
+// connection state (the list's peer is id/handle/name/school/bio), so the
+// ids come from /api/me/connections once per page load, 50 a page, capped
+// at 1,000. connIds stays null until that works; clicking the tab retries
+// a failed load.
+async function __dmLoadConnections() {
+  if (__realDM.connLoading) return;
+  __realDM.connLoading = true;
+  __realDM.connFailed = false;
+  const ids = new Set();
+  let ok = true;
+  for (let page = 0; page < 20; page++) {
+    // Quiet: a failure shows as the Connections tab's note, not a toast.
+    const r = await window.vibeRequest('/api/me/connections?limit=50&offset=' + (page * 50), {
+      failure: "Couldn't load your connections.",
+      quiet: true,
+    });
+    if (!r.ok) { console.warn('[dm.connections]', r.status, r.error); ok = false; break; }
+    for (const u of (r.data.users || [])) if (u && u.id) ids.add(u.id);
+    if (!r.data.has_more) break;
+  }
+  __realDM.connLoading = false;
+  if (ok) __realDM.connIds = ids;
+  else __realDM.connFailed = true;
+  __dmApplyListFilter();
+}
+
+// The conversation pane's empty state. Deep-link failures (?to=, ?channel=)
+// put their own lines in it; no arguments restores the default copy.
+function __dmSetEmptyState(title, body) {
+  const es = document.getElementById('emptyState');
+  const h = es && es.querySelector('h3');
+  const p = es && es.querySelector('p');
+  if (!h || !p) return;
+  if (es.dataset.defTitle == null) {
+    es.dataset.defTitle = h.textContent;
+    es.dataset.defBody = p.textContent;
+  }
+  h.textContent = title || es.dataset.defTitle;
+  p.textContent = body || es.dataset.defBody;
 }
 
 async function __dmLoadList() {
@@ -2286,29 +2434,51 @@ function __dmComposeMediaRenderStaged() {
     '</div>';
 }
 
+// Accept / Decline a message request: confirm, then paint. The bar, the
+// thread and the open conversation stay as they are until the server
+// agrees, so a refused request has nothing to roll back: the toast says
+// why and the buttons come back. Both used to hide the bar (and Decline to
+// drop the thread) before the request, and never read the answer. The
+// student may open another thread meanwhile, so only touch the
+// conversation if it's still this one.
+function __dmReqBarBusy(busy) {
+  __realDM.reqBusy = !!busy;
+  document.querySelectorAll('#reqBar button').forEach((b) => { b.disabled = !!busy; });
+}
+
 async function __dmAccept() {
   const channelId = active;
-  if (!channelId) return;
-  document.getElementById('reqBar').classList.remove('show');
+  if (!channelId || __realDM.reqBusy) return;
+  __dmReqBarBusy(true);
+  const r = await window.vibeRequest('/api/me/threads/' + encodeURIComponent(channelId) + '/accept', {
+    method: 'POST',
+    failure: "Couldn't accept this request.",
+  });
+  __dmReqBarBusy(false);
+  if (!r.ok) return;
   if (__realDM.T[channelId]) __realDM.T[channelId].isRequest = false;
-  try {
-    await fetch('/api/me/threads/' + encodeURIComponent(channelId) + '/accept', { method:'POST', credentials:'include' });
-    __dmLoadList();
-  } catch (e) { console.error('[dm.accept]', e); }
+  if (active === channelId) document.getElementById('reqBar').classList.remove('show');
+  __dmLoadList();
 }
 
 async function __dmDecline() {
   const channelId = active;
-  if (!channelId) return;
-  document.getElementById('reqBar').classList.remove('show');
-  document.getElementById('cContent').style.display = 'none';
-  document.getElementById('emptyState').style.display = 'flex';
+  if (!channelId || __realDM.reqBusy) return;
+  __dmReqBarBusy(true);
+  const r = await window.vibeRequest('/api/me/threads/' + encodeURIComponent(channelId) + '/decline', {
+    method: 'POST',
+    failure: "Couldn't decline this request.",
+  });
+  __dmReqBarBusy(false);
+  if (!r.ok) return;
   delete __realDM.T[channelId];
-  active = null;
-  try {
-    await fetch('/api/me/threads/' + encodeURIComponent(channelId) + '/decline', { method:'POST', credentials:'include' });
-    __dmLoadList();
-  } catch (e) { console.error('[dm.decline]', e); }
+  if (active === channelId) {
+    document.getElementById('reqBar').classList.remove('show');
+    document.getElementById('cContent').style.display = 'none';
+    document.getElementById('emptyState').style.display = 'flex';
+    active = null;
+  }
+  __dmLoadList();
 }
 
 // ── Compose picker (Direct DM or Group) ────────────────────────────────
@@ -2448,11 +2618,13 @@ function __dmComposeSearch(q) {
 }
 async function __dmComposeSelectDirect(handle) {
   if (!handle) return;
-  const cid = await __dmEnsureFromHandle(handle);
-  if (!cid) { alert('Could not start that conversation.'); return; }
+  const res = await __dmEnsureFromHandle(handle, "Couldn't start that conversation.");
+  // One toast, with Review Terms when that's the reason (it was a bare
+  // alert). The picker stays open so they can pick again.
+  if (!res.ok) { window.vibeToast(res.message, { tone: 'error', action: res.action }); return; }
   __dmComposeClose();
   await __dmLoadList();
-  openT(cid);
+  openT(res.channelId);
 }
 function __dmComposeToggle(serialized) {
   let u;
@@ -2789,33 +2961,27 @@ async function __dmTogglePinCurrent() {
   }
 }
 
-// Delete a single message (sender only). Optimistic — yank from the
-// thread's cached msgs, repaint, then DELETE; on error refetch to recover.
+// Delete a single message (sender only). Confirm, then paint: the bubble
+// stays until the server says it's gone, so a refused delete has nothing
+// to roll back. (It used to vanish first, then come back on a refetch
+// behind an alert.)
 async function __dmDeleteMessage(messageId) {
   const channelId = active;
   if (!channelId || !messageId) return;
   if (!confirm('Delete this message? Both sides will lose it.')) return;
+  const r = await window.vibeRequest(
+    '/api/me/threads/' + encodeURIComponent(channelId) +
+    '/messages/' + encodeURIComponent(messageId),
+    { method: 'DELETE', failure: "Couldn't delete that message." }
+  );
+  if (!r.ok) return;
   const thread = __realDM.T[channelId];
   if (thread && Array.isArray(thread.msgs)) {
     const next = thread.msgs.filter((m) => m.id !== messageId);
     if (next.length !== thread.msgs.length) {
       thread.msgs = next;
-      try { renderMsgs(next, thread); } catch {}
+      if (active === channelId) renderMsgs(next, thread);
     }
-  }
-  try {
-    const r = await fetch(
-      '/api/me/threads/' + encodeURIComponent(channelId) +
-      '/messages/' + encodeURIComponent(messageId),
-      { method: 'DELETE', credentials: 'include' }
-    );
-    const j = await r.json();
-    if (!r.ok || !j.ok) throw new Error(j && j.error || 'delete_failed');
-  } catch (e) {
-    console.error('[dm.delete-message]', e);
-    alert('Could not delete: ' + (e.message || 'unknown'));
-    // Restore by refetching the channel from scratch.
-    if (typeof __dmLoadMessages === 'function') __dmLoadMessages(channelId);
   }
 }
 
@@ -2966,23 +3132,42 @@ async function __dmPanelDoAdd() {
   if (!channelId || __realDM.composeSelected.length === 0) return;
   const cta = document.getElementById('composeCreateBtn');
   cta.disabled = true;
-  let added = 0; let blocked = 0;
-  for (const u of __realDM.composeSelected) {
-    try {
-      const r = await fetch(
-        '/api/me/threads/' + encodeURIComponent(channelId) + '/members',
-        {
-          method: 'POST',
-          credentials: 'include',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ handle: u.handle, target_id: u.id }),
-        },
-      );
-      const j = await r.json();
-      if (j.ok) added++;
-      else if (r.status === 403 && j.error?.includes("connected")) blocked++;
-      else console.warn('[dm.addMember]', u.handle, j.error);
-    } catch (e) { console.error('[dm.addMember]', e); }
+  const picked = __realDM.composeSelected.slice();
+  let added = 0;
+  const fails = [];
+  // Refusals that would repeat for everyone left: offline, signed out,
+  // rate-limited, or Terms not accepted.
+  const stops = (f) => f.status === 0 || f.status === 401 || f.status === 429 || f.code === 'terms_required';
+  for (const u of picked) {
+    // Quiet: one summary toast after the loop, not one per person.
+    const r = await window.vibeRequest('/api/me/threads/' + encodeURIComponent(channelId) + '/members', {
+      method: 'POST',
+      json: { handle: u.handle, target_id: u.id },
+      failure: "Couldn't add them to the group.",
+      quiet: true,
+    });
+    if (r.ok) { added++; continue; }
+    console.warn('[dm.addMember]', u.handle, r.status, r.error);
+    fails.push(r);
+    if (stops(r)) break;
+  }
+  if (fails.length) {
+    // Every refusal counts now (only the not-connected 403 used to; the
+    // rest went to the console and looked like a full success).
+    const left = picked.length - added; // refused, or never tried after a stop
+    const who = left === 1 ? '1 person' : left + ' people';
+    const notConnected = fails.every((f) => f.status === 403 && /connected with/i.test(f.error || ''));
+    const line = !added && stops(fails[0])
+      ? fails[0].message
+      : (added ? 'Added ' + added + ' of ' + picked.length + '. ' : '') + who + " couldn't be added. " +
+        (notConnected ? "You can only add people you're connected with." : 'Try again.');
+    const withAction = fails.find((f) => f.action);
+    window.vibeToast(line, { tone: 'error', action: withAction && withAction.action });
+    if (!added) {
+      // Nothing changed: keep the picker open with everyone still picked.
+      __dmComposeUpdateCta();
+      return;
+    }
   }
   __dmComposeClose();
   __realDM.composeAddingToChannel = null;
@@ -2991,9 +3176,6 @@ async function __dmPanelDoAdd() {
   document.getElementById('composeTabs')?.style.setProperty('display', '');
   await __dmLoadList();
   __dmPanelRender();
-  if (blocked > 0) {
-    alert(blocked + ' person' + (blocked > 1 ? 's' : '') + ' couldn\'t be added — you can only add people you\'re connected with.');
-  }
 }
 
 // ── Group photo upload ─────────────────────────────────────────────────
@@ -3048,18 +3230,21 @@ async function __dmPanelPhotoChosen(ev) {
   }
 }
 
-async function __dmEnsureFromHandle(handle) {
-  try {
-    const r = await fetch('/api/me/threads', {
-      method:'POST',
-      credentials:'include',
-      headers:{'Content-Type':'application/json'},
-      body: JSON.stringify({ handle }),
-    });
-    const j = await r.json();
-    if (!j.ok) { console.error('[dm.ensureFromHandle]', j.error); return null; }
-    return j.channel_id;
-  } catch (e) { console.error('[dm.ensureFromHandle]', e); return null; }
+// POST /api/me/threads { handle } → find or create the 1:1. Quiet: each
+// caller says what went wrong where the student is looking. Resolves to
+// { ok: true, channelId } or the vibeRequest failure ({ ok: false,
+// message, action? }); never throws.
+async function __dmEnsureFromHandle(handle, failure) {
+  const line = failure || "Couldn't open that conversation.";
+  const r = await window.vibeRequest('/api/me/threads', {
+    method: 'POST',
+    json: { handle },
+    failure: line,
+    quiet: true,
+  });
+  if (!r.ok) { console.error('[dm.ensureFromHandle]', r.status, r.error); return r; }
+  if (!r.data.channel_id) return { ok: false, status: r.status, code: null, error: null, message: line + ' Try again.' };
+  return { ok: true, channelId: r.data.channel_id };
 }
 
 (async function initMessagesPage(){
@@ -3067,7 +3252,7 @@ async function __dmEnsureFromHandle(handle) {
   let user = vibeInit();
   if (!user || !user._onboarded) {
     let r = null;
-    try { r = await fetch('/api/me/profile-bootstrap', { credentials: 'include' }); } catch (_) {}
+    try { r = await fetch('/api/me/profile-bootstrap', { credentials: 'include' }); } catch (_) { /* r stays null: the retry state below */ }
     if (!r) {
       // The request never completed (offline, blocked, reset). We cannot
       // tell signed-out from unreachable, so keep the user here and let
@@ -3096,15 +3281,17 @@ async function __dmEnsureFromHandle(handle) {
   __realDM.enabled = true;
   __realDM.meId = user.id || null;
 
+  // Connection ids for the Connections tab, alongside the list (not awaited).
+  __dmLoadConnections();
   await __dmLoadList();
 
   const params = new URLSearchParams(location.search);
   const toHandle = params.get('to');
   if (toHandle) {
-    const cid = await __dmEnsureFromHandle(toHandle);
-    if (cid) {
-      await __dmLoadList();
-      openT(cid);
+    const res = await __dmEnsureFromHandle(toHandle);
+    if (res.ok) await __dmLoadList();
+    if (res.ok && __realDM.T[res.channelId]) {
+      openT(res.channelId);
       // When iframed under /messages?to=<h>, clean the parent URL.
       // Standalone (no iframe), top.location === self.location.
       try {
@@ -3113,6 +3300,15 @@ async function __dmEnsureFromHandle(handle) {
         u.searchParams.delete('to');
         window.__vibeTopReplaceState({}, '', u.toString());
       } catch (_) { /* cross-origin guard; non-fatal */ }
+    } else {
+      // Say so instead of the generic panel (this branch used to do nothing
+      // at all). ?to= stays in the URL, so Review Terms or a reload lands
+      // back here and tries again.
+      console.warn('[dm] could not open ?to=', toHandle, res.ok ? 'not in list' : res.status);
+      __dmSetEmptyState("Couldn't open that conversation", res.ok
+        ? 'It may have been removed, or the list failed to load. Pick one on the left.'
+        : res.message);
+      if (!res.ok) window.vibeToast(res.message, { tone: 'error', action: res.action });
     }
   }
 
@@ -3123,11 +3319,7 @@ async function __dmEnsureFromHandle(handle) {
     // fetch failed, or the row is not visible to us). Say so instead of
     // silently showing the generic panel.
     console.warn('[dm] channel not in list:', channelParam);
-    const _es = document.getElementById('emptyState');
-    const _h = _es && _es.querySelector('h3');
-    const _p = _es && _es.querySelector('p');
-    if (_h) _h.textContent = "Couldn't open that conversation";
-    if (_p) _p.textContent = 'It may have been removed, or the list failed to load. Pick one on the left.';
+    __dmSetEmptyState("Couldn't open that conversation", 'It may have been removed, or the list failed to load. Pick one on the left.');
   }
   if (!toHandle && channelParam && __realDM.T && __realDM.T[channelParam]) {
     openT(channelParam);
@@ -3215,7 +3407,7 @@ async function __dmEnsureFromHandle(handle) {
           <div class="cal-modal-events-list" id="modalEventsList">
             <div class="cal-modal-no-events">
               <svg width="36" height="36" viewBox="0 0 36 36" fill="none" style="margin:0 auto 10px;display:block;opacity:.3"><rect x="3" y="6" width="30" height="27" rx="6" stroke="currentColor" stroke-width="2" fill="none"/><path d="M3 14h30" stroke="currentColor" stroke-width="2" stroke-linecap="round"/><path d="M11 3v6M25 3v6" stroke="currentColor" stroke-width="2" stroke-linecap="round"/></svg>
-              Select a day to see<br>or add events
+              Select a day to see<br>its events
             </div>
           </div>
         </div>
