@@ -96,6 +96,9 @@ function _vibeTopHere() {
 //     → Promise<{ ok: true, status, data } | { ok: false, status, code, error, message, action? }>
 //     Never throws; branch on r.ok. `failure` is the caller's own line.
 //   window.vibeCopy(text, success) → Promise<boolean>
+//   window.vibeLoadFailure(r, line) → { message, action? }  (a failed first load's line)
+//   window.vibeLoadFailed(el, failure, onRetry, { tone: 'light'|'dark', compact })
+//     → the box it put in `el`, or null when `el` is missing
 // The toast renders inside this document even in an iframe (both iframes
 // fill the view, so bottom-center is where the student is looking). Only
 // navigation escapes, through __vibeTopNav.
@@ -320,6 +323,83 @@ function _vibeTopHere() {
     }
     window.vibeToast(copied ? (success || 'Link copied') : "Couldn't copy the link.", { tone: copied ? 'info' : 'error' });
     return copied;
+  };
+
+  // ── Load failure: a failed first load says so where the list goes ──
+  // Twin of src/components/feedback/LoadFailed.tsx (empty-states design §3).
+  // The caller loads with { quiet: !loaded }. With nothing on screen yet, a
+  // failure goes through vibeLoadFailed and the pane's empty state stays
+  // hidden; with rows loaded, the rows stay.
+  window.vibeLoadFailure = function(r, line) {
+    if (r && r.ok === false && r.message) {
+      return r.action ? { message: r.message, action: r.action } : { message: r.message };
+    }
+    // A 2xx whose body lacked the expected list. No copy rule maps a 2xx, so
+    // this is the caller's line plus "Try again.", the same line a 5xx gets.
+    return { message: describeFailure({ status: 200, code: null, error: null, retryAfterSec: null }, line, '').message };
+  };
+
+  // Empties `el` and puts one role=alert box in it: the message (textContent,
+  // so no escaping) and one coral pill, the mapped action (Sign in / Review
+  // Terms) when there is one, else Retry. Elements are made per call, never
+  // at load: this file runs in <head>.
+  window.vibeLoadFailed = function(el, failure, onRetry, opts) {
+    if (!el || typeof el.appendChild !== 'function') return null;
+    const o = opts || {};
+    const dark = o.tone === 'dark';
+    const compact = !!o.compact;
+    const f = failure || {};
+    const action = f.action && f.action.href ? f.action : null;
+
+    const box = document.createElement('div');
+    box.className = 'vibe-load-failed';
+    box.setAttribute('role', 'alert');
+    // grid-column:1/-1 because `el` is emptied first, so the box is its only
+    // child: in a grid list (profile's Saved pane, repeat(3,1fr)) it spans the
+    // row instead of filling one cell. Ignored outside a grid. LoadFailed.tsx
+    // leaves it off: it renders among siblings, and its callers place it.
+    box.style.cssText =
+      'display:flex;align-items:center;max-width:100%;box-sizing:border-box;grid-column:1/-1;' +
+      (compact
+        ? 'flex-direction:row;flex-wrap:wrap;justify-content:space-between;gap:8px 12px;' +
+          'padding:10px 12px;border-radius:12px;font-size:13px;text-align:left;'
+        : 'flex-direction:column;justify-content:center;gap:12px;' +
+          'padding:20px 16px;border-radius:16px;font-size:14px;text-align:center;') +
+      'border:1px dashed ' + (dark ? 'rgba(255,255,255,.14)' : 'rgba(28,28,30,.14)') + ';' +
+      'color:' + (dark ? 'rgba(255,255,255,.7)' : '#5C5853') + ';' +
+      "font-family:'DM Sans',sans-serif;font-weight:500;line-height:1.45;";
+
+    const text = document.createElement('span');
+    text.style.cssText = 'min-width:0;overflow-wrap:anywhere;';
+    text.textContent = String(f.message || '').trim() || 'Something went wrong. Try again.';
+    box.appendChild(text);
+
+    const btn = document.createElement('button');
+    btn.type = 'button';
+    btn.textContent = action ? (action.label || 'Open') : 'Retry';
+    // cursor:inherit rather than the React pill's pointer: these pages hide
+    // the native cursor behind their own dot, and their phone rules already
+    // force pointer on buttons.
+    btn.style.cssText =
+      'flex-shrink:0;margin:0;border:none;border-radius:999px;' +
+      (compact ? 'padding:5px 12px;font-size:12px;' : 'padding:7px 16px;font-size:13px;') +
+      "background:#FF5C35;color:#FAF7F2;font-family:'DM Sans',sans-serif;" +
+      'font-weight:700;letter-spacing:.02em;line-height:1.4;white-space:nowrap;cursor:inherit;';
+    btn.addEventListener('click', e => {
+      // Kept from click-outside handlers: a retry usually repaints `el`,
+      // detaching this button before the click reaches document.
+      e.preventDefault();
+      e.stopPropagation();
+      // Out of the iframe: Terms / Sign in replace the whole shell.
+      if (action) window.__vibeTopNav(action.href);
+      else if (typeof onRetry === 'function') onRetry();
+      else location.reload();
+    });
+    box.appendChild(btn);
+
+    el.textContent = '';
+    el.appendChild(box);
+    return box;
   };
 
   // messages.html and onboarding.html have no toast of their own, so their
