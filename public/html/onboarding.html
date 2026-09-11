@@ -326,7 +326,7 @@ body.ott-warping .progress-dots {
 <div class="cursor-ring" id="cursorRing"></div>
 
 <header class="onb-top">
-  <a href="/" class="onb-logo">vibe<span>.</span></a>
+  <a href="/campus" class="onb-logo" onclick="event.preventDefault();leaveViaLogo()">vibe<span>.</span></a>
   <button class="onb-skip" id="onbSkip" onclick="confirmSkip()">Skip onboarding</button>
 </header>
 
@@ -508,10 +508,11 @@ body.ott-warping .progress-dots {
         <label class="pf-label" for="pfResumeUrl">Or paste a link</label>
         <input type="url" id="pfResumeUrl" class="pf-input" maxlength="2048" placeholder="https://… — optional" onblur="maybePreviewResumeLink()">
         <p class="pf-hint">https:// or http:// — if you upload a file, we’ll use that for your profile unless you clear it.</p>
+        <p class="pf-hint" id="pfResumeLinkNote" aria-live="polite" style="font-style:normal;" hidden></p>
       </div>
     </div>
 
-    <button class="btn-coral" style="margin-top: 8px;" onclick="completeOnboarding()">Finish &amp; open my profile &rarr;</button>
+    <button class="btn-coral" id="btnFinish" style="margin-top: 8px;" onclick="completeOnboarding()">Finish &amp; open my profile &rarr;</button>
     <div class="note italic" style="margin-top: 14px;">you can change anything later</div>
   </section>
 
@@ -524,10 +525,10 @@ body.ott-warping .progress-dots {
 <div class="confirm-overlay" id="skipOverlay">
   <div class="confirm-card">
     <div class="confirm-title">Skip onboarding?</div>
-    <div class="confirm-body">You can always come back. Your profile won’t be saved from this flow until you finish.</div>
+    <div class="confirm-body">What you’ve typed here won’t be saved. You can fill in your profile any time from your profile page.</div>
     <div class="confirm-row">
       <button class="btn-coral" onclick="closeSkipConfirm()">Keep going</button>
-      <button class="btn-skip-step" onclick="bailOnboarding()">Skip anyway</button>
+      <button class="btn-skip-step" id="btnSkipAnyway" onclick="bailOnboarding()">Skip anyway</button>
     </div>
   </div>
 </div>
@@ -785,20 +786,25 @@ function onHandleInput(input) {
   if (!s) return;
   const v = (input.value || '').trim().toLowerCase();
   input.value = v;
+  // Every keystroke retires the pending check, so an answer for "abc"
+  // can't land after the field already says "too short" for "ab".
+  const seq = ++_onbHandleSeq;
+  clearTimeout(_onbHandleTimer);
   if (!v) { s.textContent = ''; s.style.color = ''; return; }
   if (v.length < 3) { s.textContent = 'too short'; s.style.color = '#C54323'; return; }
   if (!_ONB_HANDLE_RE.test(v)) { s.textContent = 'letters / numbers / _'; s.style.color = '#C54323'; return; }
   s.textContent = 'checking…'; s.style.color = '#8A8580';
-  const seq = ++_onbHandleSeq;
-  clearTimeout(_onbHandleTimer);
-  _onbHandleTimer = setTimeout(() => {
-    fetch('/api/handle/check?h=' + encodeURIComponent(v), { credentials: 'include' })
-      .then(r => r.json()).then(j => {
-        if (seq !== _onbHandleSeq) return;
-        if (j && j.ok && j.available) { s.textContent = '✓ available'; s.style.color = '#1A9E5B'; }
-        else { s.textContent = '✗ ' + ((j && j.reason) || 'taken').toLowerCase(); s.style.color = '#C54323'; }
-      })
-      .catch(() => { if (seq === _onbHandleSeq) { s.textContent = ''; s.style.color = ''; } });
+  _onbHandleTimer = setTimeout(async () => {
+    const r = await window.vibeRequest('/api/handle/check?h=' + encodeURIComponent(v), {
+      failure: "Couldn't check that handle.",
+      quiet: true,
+    });
+    if (seq !== _onbHandleSeq) return;
+    // Signed out, a server error or offline: the check didn't run, so
+    // don't call the handle taken. Finish still has the final say.
+    if (!r.ok) { s.textContent = "couldn't check"; s.style.color = '#8A8580'; return; }
+    if (r.data.available) { s.textContent = '✓ available'; s.style.color = '#1A9E5B'; }
+    else { s.textContent = '✗ ' + (r.data.reason || 'taken').toLowerCase(); s.style.color = '#C54323'; }
   }, 280);
 }
 
@@ -867,6 +873,8 @@ async function onResumeFilePick(ev) {
     state.uploadedResumeUrl = j.url;
     if (st) st.textContent = 'Uploaded';
     showResumeMiniPreview(j.url, f.type || '');
+    // The upload now wins over any pasted link at Finish; retell the note.
+    maybePreviewResumeLink();
   } catch (e) {
     if (st) st.textContent = 'Network error';
   }
@@ -894,32 +902,141 @@ function showResumeMiniPreview(url, mimeHint) {
   }
 }
 
+function hideResumeMiniPreview() {
+  const wrap = document.getElementById('resumeMiniViewer');
+  const fr = document.getElementById('resumeMiniFrame');
+  const im = document.getElementById('resumeMiniImg');
+  if (wrap) wrap.style.display = 'none';
+  if (fr) fr.removeAttribute('src');
+  if (im) im.removeAttribute('src');
+}
+
+// Only http(s) links are stored. The server (normalizeResumeRef) turns
+// anything else into a 400 that fails the whole Finish, so say it here.
+function resumeLinkProblem(raw) {
+  if (!/^https?:\/\//i.test(raw)) return 'Links need to start with https:// so we can save them.';
+  try {
+    new URL(raw);
+  } catch (e) {
+    return 'That link doesn’t look right. Check it and paste it again.';
+  }
+  return '';
+}
+
+// One line under "Or paste a link" saying what Finish will do with it.
+function setResumeLinkNote(text, isError) {
+  const el = document.getElementById('pfResumeLinkNote');
+  if (!el) return;
+  el.textContent = text || '';
+  el.hidden = !text;
+  el.style.color = isError ? 'var(--accent)' : 'rgba(255,255,255,.62)';
+}
+
 function maybePreviewResumeLink() {
   var raw = ((document.getElementById('pfResumeUrl') || {}).value || '').trim();
-  if (!raw) return;
-  try {
-    var u = new URL(raw);
-    if (u.protocol !== 'http:' && u.protocol !== 'https:') return;
-    var lower = raw.toLowerCase();
-    if (/\.pdf(\?|#|$)/i.test(lower)) {
-      showResumeMiniPreview(raw, 'application/pdf');
-    } else if (/\.(png|jpe?g|gif|webp)(\?|#|$)/i.test(lower)) {
-      showResumeMiniPreview(raw, 'image/jpeg');
-    }
-  } catch (e) { /* ignore */ }
+  if (!raw) {
+    setResumeLinkNote('');
+    if (!state.uploadedResumeUrl) hideResumeMiniPreview();
+    return;
+  }
+  // Finish saves an upload over a link, so say which one wins and leave
+  // the upload's preview up.
+  if (state.uploadedResumeUrl) {
+    setResumeLinkNote('You uploaded a file, so we’ll save that instead of this link.');
+    return;
+  }
+  var problem = resumeLinkProblem(raw);
+  if (problem) {
+    hideResumeMiniPreview();
+    setResumeLinkNote(problem, true);
+    return;
+  }
+  if (/\.pdf(\?|#|$)/i.test(raw)) {
+    setResumeLinkNote('');
+    showResumeMiniPreview(raw, 'application/pdf');
+  } else if (/\.(png|jpe?g|gif|webp)(\?|#|$)/i.test(raw)) {
+    setResumeLinkNote('');
+    showResumeMiniPreview(raw, 'image/jpeg');
+  } else {
+    // Drive, Notion, a portfolio site: Finish still saves it as the
+    // resume link, there's just no file here to draw.
+    hideResumeMiniPreview();
+    setResumeLinkNote('We’ll save this as a link. Previews only work for direct PDF or image links.');
+  }
 }
 
 // ── Skip flow ─────────────────────────────────────────────────────────────
 function confirmSkip() { document.getElementById('skipOverlay').classList.add('open'); }
 function closeSkipConfirm() { document.getElementById('skipOverlay').classList.remove('open'); }
-function bailOnboarding() { window.location.href = '/'; }
+// Every app page sends a student back here until otto_answers is saved
+// (enforceCampusAccess), so a bare jump to /campus would land right back
+// on step 1. Skip saves Otto's config and no profile (same as mobile),
+// then leaves the iframe for the app. Replay never saves: onboarding is
+// already done, so it just leaves.
+async function bailOnboarding() {
+  const btn = document.getElementById('btnSkipAnyway');
+  if (btn && btn.disabled) return;
+  if (!IS_REPLAY) {
+    if (btn) { btn.disabled = true; btn.textContent = 'Skipping…'; }
+    const r = await window.vibeRequest('/api/me/onboarding-complete', {
+      method: 'POST',
+      json: { otto_answers: buildOttoConfig() },
+      failure: "Couldn't skip onboarding.",
+    });
+    if (!r.ok) {
+      if (btn) { btn.disabled = false; btn.textContent = 'Skip anyway'; }
+      return;
+    }
+  }
+  window.__vibeTopNav('/campus');
+}
+
+// Header logo. In replay it's a plain jump to the app. On a first run
+// /campus would bounce straight back here, so leaving asks first.
+function leaveViaLogo() {
+  if (IS_REPLAY) window.__vibeTopNav('/campus');
+  else confirmSkip();
+}
 
 document.addEventListener('keydown', e => {
   if (e.key === 'Escape' && document.getElementById('skipOverlay').classList.contains('open')) closeSkipConfirm();
 });
 
 // ── Completion ────────────────────────────────────────────────────────────
+function buildOttoConfig() {
+  return {
+    name: state.ottoName,
+    platforms: [],
+    voiceSamples: [],
+    leash: 'ask',
+    setupAt: new Date().toISOString(),
+  };
+}
+
+const FINISH_LABEL = 'Finish &amp; open my profile &rarr;';
+function setFinishBusy(busy) {
+  const btn = document.getElementById('btnFinish');
+  if (!btn) return;
+  btn.disabled = busy;
+  btn.innerHTML = busy ? 'Saving…' : FINISH_LABEL;
+}
+
+// A handle Finish couldn't use: back to step 2 with the field marked, so
+// the student can pick another (or clear it) and Finish again.
+function sendBackToHandle(statusText, message) {
+  _onbHandleSeq++; // a late live check must not paint over this
+  clearTimeout(_onbHandleTimer);
+  goToStep(2);
+  const s = document.getElementById('pfHandleStatus');
+  if (s) { s.textContent = statusText; s.style.color = '#C54323'; }
+  window.vibeToast(message, { tone: 'error' });
+  // After goToStep's own focus on the name field (250ms).
+  setTimeout(() => { const i = document.getElementById('pfHandle'); if (i) i.focus(); }, 300);
+}
+
 async function completeOnboarding() {
+  const finishBtn = document.getElementById('btnFinish');
+  if (finishBtn && finishBtn.disabled) return; // a save is already in flight
   const profile = { ...state.profileDraft, ...collectProfileDraft() };
   const wx = collectWorkExperience();
   if (wx) profile.work_experience = wx;
@@ -936,65 +1053,92 @@ async function completeOnboarding() {
     _onboarded: true,
   };
 
-  const ottoConfig = {
-    name: state.ottoName,
-    platforms: [],
-    voiceSamples: [],
-    leash: 'ask',
-    setupAt: new Date().toISOString(),
-  };
-
-  vibeSave('vibe_user_v1', user);
-  vibeSave('vibe_otto_v1', ottoConfig);
+  const ottoConfig = buildOttoConfig();
 
   // Replay mode: skip the server save entirely (a returning user is just
   // re-viewing the flow) and warp straight back to their profile.
   if (IS_REPLAY) {
-    triggerHyperdrive(function () { window.location.href = '/profile'; });
+    vibeSave('vibe_user_v1', user);
+    vibeSave('vibe_otto_v1', ottoConfig);
+    if (finishBtn) finishBtn.disabled = true;
+    triggerHyperdrive(function () { window.__vibeTopNav('/profile'); });
     return;
   }
 
-  try {
-    const r = await fetch('/api/me/onboarding-complete', {
-      method: 'POST',
-      credentials: 'same-origin',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({
-        otto_answers: ottoConfig,
-        profile: Object.keys(profile).length ? profile : undefined,
-      }),
-    });
-    const j = await r.json();
-    // Consent gate (S53 A4): the server refuses until the Terms are accepted.
-    // Go record it and come back here — not the login page (already signed in).
-    if (r.status === 403 && j && j.code === 'terms_required') {
-      window.location.href = '/auth/terms?next=' + encodeURIComponent('/onboarding');
+  // Said before anything is sent: a link the server can't store 400s the
+  // whole save, and a malformed handle used to be skipped without a word.
+  if (!state.uploadedResumeUrl && linkResume) {
+    const problem = resumeLinkProblem(linkResume);
+    if (problem) {
+      setResumeLinkNote(problem, true);
+      const i = document.getElementById('pfResumeUrl');
+      if (i) i.focus();
       return;
     }
-    // If the user picked a handle, claim it now (separate route — has
-    // its own format / cooldown / uniqueness checks). Best-effort: an
-    // error here doesn't block onboarding; user can retry from the
-    // profile editor.
-    const claimedHandle = ((document.getElementById('pfHandle') || {}).value || '').trim().toLowerCase();
-    if (claimedHandle && _ONB_HANDLE_RE.test(claimedHandle)) {
-      try {
-        await fetch('/api/me/handle', {
-          method: 'PATCH', credentials: 'same-origin',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ handle: claimedHandle }),
-        });
-      } catch {}
-    }
-    if (j.ok && typeof j.next === 'string' && j.next.startsWith('/')) {
-      // Tag the destination with ?welcome=1 so the landing surface can fire
-      // a one-time welcome overlay. Preserves any existing query string.
-      const next = j.next + (j.next.includes('?') ? '&' : '?') + 'welcome=1';
-      triggerHyperdrive(function () { window.location.href = next; });
-      return;
-    }
-  } catch (e) { /* network error — fall through */ }
+  }
+  const claimedHandle = ((document.getElementById('pfHandle') || {}).value || '').trim().toLowerCase();
+  if (claimedHandle && !_ONB_HANDLE_RE.test(claimedHandle)) {
+    sendBackToHandle('letters / numbers / _', 'Handles are 3–20 letters, numbers or _. Fix it or clear it.');
+    return;
+  }
 
-  window.location.href = '/auth/login?next=' + encodeURIComponent('/onboarding');
+  setFinishBusy(true);
+
+  // The warp waits for the save. A refusal keeps every answer on screen and
+  // the toast says why: Review Terms for the consent gate (S53 A4), Sign in
+  // for a 401. Both actions leave the iframe through __vibeTopNav, so there
+  // is no blind fall-through to login inside the frame.
+  const saved = await window.vibeRequest('/api/me/onboarding-complete', {
+    method: 'POST',
+    json: {
+      otto_answers: ottoConfig,
+      profile: Object.keys(profile).length ? profile : undefined,
+    },
+    failure: "Couldn't save your profile.",
+  });
+  if (!saved.ok) {
+    setFinishBusy(false);
+    return;
+  }
+  // Only a confirmed save rewrites the cached user.
+  vibeSave('vibe_user_v1', user);
+  vibeSave('vibe_otto_v1', ottoConfig);
+
+  // Handle claim (separate route: its own format / cooldown / uniqueness
+  // checks). The profile is saved by now, but a handle that didn't stick
+  // is said before leaving: taken (409), rejected (400, e.g. reserved) or
+  // inside the 14-day cooldown (429 with its own line) goes back to step
+  // 2; anything else stays here so Finish can try again.
+  if (claimedHandle) {
+    const claim = await window.vibeRequest('/api/me/handle', {
+      method: 'PATCH',
+      json: { handle: claimedHandle },
+      failure: "Couldn't save your handle.",
+      quiet: true,
+    });
+    if (!claim.ok) {
+      const cooldown = claim.status === 429 && /^You can change your handle/.test(claim.error || '');
+      if (claim.status === 409) {
+        sendBackToHandle('✗ taken', 'That handle is taken. Pick another one.');
+      } else if (claim.status === 400) {
+        sendBackToHandle('✗ ' + (claim.error || 'not allowed').toLowerCase(), 'That handle won’t work. Pick another one.');
+      } else if (cooldown) {
+        sendBackToHandle('✗ can’t change yet', claim.error.replace(/[.!?]?$/, '.') + ' Clear the handle to finish without changing it.');
+      } else {
+        window.vibeToast(claim.message, { tone: 'error', action: claim.action });
+      }
+      setFinishBusy(false);
+      return;
+    }
+  }
+
+  const next = saved.data.next;
+  const safeNext = typeof next === 'string' && next.startsWith('/') && !next.startsWith('//') ? next : '/profile';
+  // Tag the destination with ?welcome=1 so the landing surface can fire
+  // a one-time welcome overlay. Preserves any existing query string.
+  const dest = safeNext + (safeNext.includes('?') ? '&' : '?') + 'welcome=1';
+  // Out of the iframe: the app replaces the whole onboarding shell.
+  triggerHyperdrive(function () { window.__vibeTopNav(dest); });
 }
 
 // ── Hyperdrive: streak the screen out, then call `onDone`. ────────────────

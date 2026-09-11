@@ -290,33 +290,30 @@
       const submit = document.getElementById("vsaReportSubmit");
       if (submit) {
         submit.disabled = !selected;
-        submit.addEventListener("click", () => {
+        submit.addEventListener("click", async () => {
           submit.disabled = true;
           submit.textContent = "Sending…";
           const note = (document.getElementById("vsaReportNote") || {}).value || "";
-          fetch("/api/me/reports", {
+          const r = await window.vibeRequest("/api/me/reports", {
             method: "POST",
-            credentials: "include",
-            headers: { "Content-Type": "application/json" },
-            body: JSON.stringify({
+            json: {
               target_type: targetType,
               target_id: targetId,
               reason_code: selected,
               reason: note,
-            }),
-          })
-            .then((r) => r.json())
-            .then((j) => {
-              if (j && j.ok) {
-                showToast("Report submitted. Thanks for telling us.");
-                closeSheet();
-                if (onAfter) onAfter({ reported: true });
-              } else {
-                showToast("Couldn't submit: " + ((j && j.error) || "unknown"));
-                submit.disabled = false;
-                submit.textContent = "Submit report";
-              }
-            });
+            },
+            failure: "Couldn't send your report.",
+          });
+          if (!r.ok) {
+            // vibeRequest's toast says why. The sheet stays open with the
+            // reason and note kept, so Submit can just be pressed again.
+            submit.disabled = false;
+            submit.textContent = "Submit report";
+            return;
+          }
+          showToast("Report submitted. Thanks for telling us.");
+          closeSheet();
+          if (onAfter) onAfter({ reported: true });
         });
       }
     }

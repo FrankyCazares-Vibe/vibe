@@ -261,37 +261,51 @@
 
   window.__vibeSharePickerSend = async function() {
     if (!state.post || state.selectedIds.size === 0) return;
+    // Held locally: closing the picker mid-send nulls state.post.
+    const post = state.post;
     const cta = document.getElementById("vspCta");
     cta.disabled = true;
     cta.textContent = "Sending…";
     const caption = (document.getElementById("vspCaption").value || "").trim();
     const ids = Array.from(state.selectedIds);
-    let ok = 0; let fail = 0;
+    const sent = [];
+    let refusal = null; // the first failure, for the toast
     for (const cid of ids) {
-      try {
-        const r = await fetch("/api/me/threads/" + encodeURIComponent(cid) + "/messages", {
-          method: "POST",
-          credentials: "include",
-          headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({
-            content: caption,
-            attachment_id: state.post.postId,
-            attachment_kind: state.post.kind,
-          }),
-        });
-        const j = await r.json();
-        if (j.ok) ok++;
-        else { fail++; console.warn("[sharePicker.send]", cid, j.error); }
-      } catch (e) {
-        fail++;
-        console.error("[sharePicker.send]", cid, e);
-      }
+      const r = await window.vibeRequest("/api/me/threads/" + encodeURIComponent(cid) + "/messages", {
+        method: "POST",
+        json: {
+          content: caption,
+          attachment_id: post.postId,
+          attachment_kind: post.kind,
+        },
+        failure: "Couldn't send the post.",
+        quiet: true,
+      });
+      if (r.ok) { sent.push(cid); continue; }
+      if (!refusal) refusal = r;
+      // Signed out, the Terms gate and the rate limit refuse every chat the
+      // same way: stop instead of collecting N identical refusals.
+      if (r.status === 401 || r.code === "terms_required" || r.status === 429) break;
     }
-    window.closeSharePicker();
-    if (window.showToast) {
-      window.showToast(fail > 0
-        ? `Shared to ${ok} of ${ids.length} chats — ${fail} failed`
-        : (ok === 1 ? "Sent" : `Sent to ${ok} chats`));
+    if (!refusal) {
+      window.closeSharePicker();
+      window.vibeToast(sent.length === 1 ? "Sent" : `Sent to ${sent.length} chats`);
+      return;
+    }
+    // Something didn't go through. The picker stays open with only the
+    // unsent chats still selected and the caption kept, so Send retries
+    // just those.
+    if (state.open && state.post === post) {
+      sent.forEach((cid) => state.selectedIds.delete(cid));
+      renderList();
+      renderCta();
+    }
+    const left = ids.length - sent.length;
+    if (sent.length === 0 || refusal.code === "terms_required") {
+      window.vibeToast(refusal.message, { tone: "error", action: refusal.action });
+    } else {
+      window.vibeToast(`Sent to ${sent.length} of ${ids.length} chats. Try the other ${left === 1 ? "one" : left} again.`,
+        { tone: "error", action: refusal.action });
     }
   };
 })();

@@ -106,6 +106,11 @@
     border-radius: 12px; margin-top: 12px;
     background: #EFEAE2;
   }
+  .vpv-video {
+    display: block; width: 100%; max-height: 540px; object-fit: contain;
+    border-radius: 12px; margin-top: 12px;
+    background: #1C1C1E;
+  }
   .vpv-video-stub {
     display: flex; align-items: center; justify-content: center;
     width: 100%; aspect-ratio: 1 / 1; max-height: 70vh;
@@ -426,13 +431,19 @@
     state.openId = null;
     const overlay = document.getElementById("vpvOverlay");
     if (overlay) overlay.classList.remove("show");
+    // Hiding the overlay doesn't stop a playing <video>; pause it so the
+    // sound doesn't carry on after the modal closes.
+    const vid = document.querySelector("#vpvBody video");
+    if (vid) vid.pause();
     document.documentElement.style.overflow = "";
     // Pop the synthetic history entry only when the close was user-driven
     // (Esc / X / outside-click) — not when the user already hit back.
     if (!viaPopstate) {
       try {
         if (history.state && history.state.vpv) history.back();
-      } catch {}
+      } catch (_) {
+        // history can refuse in a sandboxed frame; the modal is already closed.
+      }
     }
   }
   window.__vpvClose = closeViewer;
@@ -468,6 +479,8 @@
       tags:                p.tags || [],
       media_url:           p.media_url || p.mediaUrl || "",
       type:                p.type || "post",
+      media_kind:          p.media_kind || p.mediaKind || "",
+      media_thumbnail_url: p.media_thumbnail_url || p.mediaThumbnailUrl || "",
     });
   }
 
@@ -479,13 +492,16 @@
       tags:                p.tags || [],
       media_url:           p.media_url,
       type:                p.type,
+      media_kind:          p.media_kind,
+      media_thumbnail_url: p.media_thumbnail_url,
     });
     state.authorId = p.user_id || (p.author && p.author.id) || null;
     state.authorName = (p.author && p.author.name) || "";
     state.type     = p.type || "post";
     state.content = p.content || "";
     state.mediaUrl = p.media_url || null;
-    state.posterUrl = p.media_thumbnail_url || p.media_url || null;
+    // A video URL is no <img> poster for the share card; fall back to none.
+    state.posterUrl = p.media_thumbnail_url || (p.media_kind === "video" ? null : p.media_url) || null;
     state.liked = !!(j.viewer && j.viewer.liked);
     state.saved = !!(j.viewer && j.viewer.saved);
     state.likes = (j.counts && j.counts.likes) || 0;
@@ -539,21 +555,28 @@
 
   // Escape, then style @handles as orange links so mentions are visible
   // and clickable. Done after escaping so any HTML in the content is
-  // already neutralized by the time we inject spans.
+  // already neutralized by the time we inject spans. The click goes through
+  // __vibeTopNav: inside the /messages iframe a plain link would load the
+  // profile in the frame, under a second sidebar.
   function formatBodyText(s) {
     const escaped = esc(s);
     return escaped.replace(
       /(^|[^A-Za-z0-9_@])@([a-z0-9_]{3,20})/gi,
       (_m, prefix, handle) =>
-        `${prefix}<a class="vpv-mention" href="/profile/${encodeURIComponent(handle.toLowerCase())}">@${handle}</a>`,
+        `${prefix}<a class="vpv-mention" href="/profile/${encodeURIComponent(handle.toLowerCase())}" onclick="event.preventDefault();event.stopPropagation();window.__vibeTopNav(this.getAttribute('href'))">@${handle}</a>`,
     );
   }
 
-  function paintBody({ content, tags, media_url, type }) {
+  function paintBody({ content, tags, media_url, type, media_kind, media_thumbnail_url }) {
     const body = document.getElementById("vpvBody");
     const text = content ? `<div class="vpv-text">${formatBodyText(content)}</div>` : "";
     let media = "";
-    if (media_url && type === "post") {
+    if (media_url && type === "post" && media_kind === "video") {
+      // Video posts (an R2 clips/ key behind the /media proxy). The API says
+      // which player to use in media_kind; the thumbnail is the poster.
+      const poster = media_thumbnail_url ? ` poster="${esc(media_thumbnail_url)}"` : "";
+      media = `<video class="vpv-video" src="${esc(media_url)}"${poster} controls playsinline preload="metadata"></video>`;
+    } else if (media_url && type === "post") {
       // Post images are stored as public URLs (Supabase profiles bucket)
       media = `<img class="vpv-image" src="${esc(media_url)}" alt="">`;
     }

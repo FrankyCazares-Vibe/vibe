@@ -64,7 +64,9 @@
   window.__profilePreviewSkeletonHTML = function(handle, opts) {
     const safe = esc(handle);
     const theme = (opts && opts.theme) || 'light';
-    return `<a class="msg-profile-attach msg-profile-attach--${theme}" href="/profile/${encodeURIComponent(handle)}" data-prof-handle="${safe}" target="_self" rel="noopener">
+    // The click goes through __vibeTopNav: inside the /messages iframe a
+    // plain link loads the profile in the frame, under a second sidebar.
+    return `<a class="msg-profile-attach msg-profile-attach--${theme}" href="/profile/${encodeURIComponent(handle)}" data-prof-handle="${safe}" onclick="event.preventDefault();event.stopPropagation();window.__vibeTopNav(this.getAttribute('href'))">
       <div class="msg-profile-banner" data-prof-banner style="background:${DEFAULT_BANNER}"></div>
       <div class="msg-profile-body">
         <div class="msg-profile-av" data-prof-av>${esc(initialsOf(handle, handle))}</div>
