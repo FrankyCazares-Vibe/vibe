@@ -7,6 +7,7 @@ import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { createPortal } from "react-dom";
 
 import { NavIdentityChip } from "@/components/nav-identity-chip";
+import { downloadFile, vibeRequest } from "@/lib/feedback/request";
 
 /** Site-wide event so any component can ping the calendar to refetch. */
 export const CALENDAR_CHANGED_EVENT = "vibe:calendar-changed";
@@ -1218,24 +1219,26 @@ function ExportRow({
 
 function ExportPopover({ onClose }: { onClose: () => void }) {
   const trigger = (label: string) => () => {
-    // All three options use the same .ics bundle — Apple Calendar, Outlook,
-    // and Google Calendar's web UI all accept it on import. We expose three
-    // labels so the user knows the right path on their device.
-    const a = document.createElement("a");
-    a.href = "/api/me/calendar/ics";
-    a.download = "vibe-calendar.ics";
-    document.body.appendChild(a);
-    a.click();
-    a.remove();
-    onClose();
     if (label === "google") {
       // Google's import flow lives at calendar.google.com — pop it open.
+      // First, synchronously inside the click: after an await, popup
+      // blockers eat it.
       window.open(
         "https://calendar.google.com/calendar/u/0/r/settings/export",
         "_blank",
         "noopener",
       );
     }
+    onClose();
+    // All three options use the same .ics bundle — Apple Calendar, Outlook,
+    // and Google Calendar's web UI all accept it on import. We expose three
+    // labels so the user knows the right path on their device. downloadFile
+    // won't save a refusal (a signed-out 401 is JSON) as the .ics; it says
+    // what went wrong instead.
+    void downloadFile("/api/me/calendar/ics", "vibe-calendar.ics", {
+      failure: "Couldn't export your calendar.",
+      success: "Calendar file downloaded. Open it to import.",
+    });
   };
 
   return (
@@ -1324,17 +1327,14 @@ function CalModalEventCard({
     if (!isPersonal || busy) return;
     if (!confirm(`Delete "${entry.title}"?`)) return;
     setBusy(true);
-    try {
-      const res = await fetch(`/api/me/personal-events/${entry.id}`, {
-        method: "DELETE",
-      });
-      if (!res.ok) throw new Error(`HTTP ${res.status}`);
-      onDeleted();
-    } catch (e) {
-      console.error("[calendar] delete personal", e);
-    } finally {
-      setBusy(false);
-    }
+    // Confirm, then remove: the card only goes once the server says so, and
+    // a refusal toasts instead of reaching only the console.
+    const r = await vibeRequest(`/api/me/personal-events/${entry.id}`, {
+      method: "DELETE",
+      failure: "Couldn't delete that event.",
+    });
+    setBusy(false);
+    if (r.ok) onDeleted();
   };
 
   return (

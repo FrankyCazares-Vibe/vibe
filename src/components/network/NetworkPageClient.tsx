@@ -3,6 +3,8 @@
 import Link from "next/link";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 
+import { vibeRequest } from "@/lib/feedback/request";
+
 import { UserCard, type UserCardProps } from "./UserCard";
 
 declare global {
@@ -276,24 +278,28 @@ export function NetworkPageClient() {
 
   const loadMore = async () => {
     if (loading || !hasMore || tab === "suggestions") return;
+    // Same stale-response guard as the first-page fetch: a tab switch or a
+    // new search mid-request must not append this page to the new list.
+    const seq = requestSeq.current;
     setLoading(true);
-    try {
-      const params = new URLSearchParams({
-        limit: String(PAGE_SIZE),
-        offset: String(users.length),
-      });
-      if (debouncedQ.length > 0) params.set("q", debouncedQ);
-      const res = await fetch(`/api/me/${tab}?${params.toString()}`, {
-        cache: "no-store",
-      });
-      const data = await res.json();
-      if (data?.ok && Array.isArray(data.users)) {
-        setUsers((prev) => [...prev, ...(data.users as ListUser[])]);
-        setHasMore(Boolean(data.has_more));
-      }
-    } finally {
-      setLoading(false);
+    const params = new URLSearchParams({
+      limit: String(PAGE_SIZE),
+      offset: String(users.length),
+    });
+    if (debouncedQ.length > 0) params.set("q", debouncedQ);
+    // vibeRequest never throws: an HTML 500 page used to make res.json()
+    // reject unhandled. A failure toasts and the button comes back.
+    const r = await vibeRequest<{ users?: ListUser[]; has_more?: boolean }>(
+      `/api/me/${tab}?${params.toString()}`,
+      { cache: "no-store", failure: "Couldn't load more people." },
+    );
+    if (seq !== requestSeq.current) return;
+    if (r.ok && Array.isArray(r.data.users)) {
+      const more = r.data.users;
+      setUsers((prev) => [...prev, ...more]);
+      setHasMore(Boolean(r.data.has_more));
     }
+    setLoading(false);
   };
 
   // After a follow/unfollow inside a card, splice the new state in place so

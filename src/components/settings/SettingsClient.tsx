@@ -3,7 +3,9 @@
 import Link from "next/link";
 import { useEffect, useMemo, useState } from "react";
 
+import { vibeRequest } from "@/lib/feedback/request";
 import { IU_CAMPUSES, campusByLabel } from "@/lib/iu/campuses";
+import { MOBILE_BREAKPOINT_PX } from "@/lib/use-is-mobile";
 
 type Profile = {
   id: string;
@@ -119,7 +121,12 @@ function CampusTourCard({ handle }: { handle: string | null }) {
     } catch {
       /* localStorage may be unavailable — tour will still try via the param */
     }
-    const dest = handle ? `/profile/${handle}?welcome=1` : "/profile?welcome=1";
+    // Phones go straight to /profile (no handle): it's the owner view the
+    // mobile tour runs on, while /profile/<handle> is the share-link route.
+    // Desktop keeps the handle route, which carries ?welcome=1 into the
+    // static profile page.
+    const mobile = window.matchMedia(`(max-width: ${MOBILE_BREAKPOINT_PX - 1}px)`).matches;
+    const dest = handle && !mobile ? `/profile/${handle}?welcome=1` : "/profile?welcome=1";
     window.location.assign(dest);
   };
 
@@ -406,9 +413,19 @@ function AccountCard({ profile }: { profile: Profile }) {
           label="School email"
           value={profile.school_email ?? "—"}
           hint={
-            profile.school_verified
-              ? "Verified."
-              : "Not yet verified — visit /auth/school-email."
+            profile.school_verified ? (
+              "Verified."
+            ) : (
+              <>
+                Not yet verified.{" "}
+                <Link
+                  href="/auth/school-email"
+                  style={{ color: "#FF5C35", fontWeight: 700, textDecoration: "none" }}
+                >
+                  Verify now →
+                </Link>
+              </>
+            )
           }
         />
         {/* Campus deliberately isn't mirrored here — it's editable in the
@@ -888,17 +905,19 @@ function SignOutCard() {
   const onSignOut = async () => {
     if (busy) return;
     setBusy(true);
-    try {
-      await fetch("/api/auth/logout", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-      });
-      // Hard reload so the cookie clear is reflected in any cached
-      // bootstrap fetches and the next nav lands on /auth/login.
-      window.location.href = "/auth/login";
-    } catch {
+    const r = await vibeRequest("/api/auth/logout", {
+      method: "POST",
+      failure: "Couldn't sign you out. Try again.",
+    });
+    if (!r.ok) {
+      // Stay put: heading to /auth/login anyway could leave a live
+      // session behind a page that looks signed out.
       setBusy(false);
+      return;
     }
+    // Hard reload so the cookie clear is reflected in any cached
+    // bootstrap fetches and the next nav lands on /auth/login.
+    window.location.href = "/auth/login";
   };
 
   return (
@@ -1195,7 +1214,7 @@ function Row({
 }: {
   label: string;
   value: string;
-  hint?: string;
+  hint?: React.ReactNode;
 }) {
   return (
     <>

@@ -10,6 +10,7 @@ import type {
   OttoSettings as OttoSettingsT,
   UpcomingRow,
 } from "@/app/api/me/otto/route";
+import { vibeRequest } from "@/lib/feedback/request";
 
 import { OttoActivity } from "./OttoActivity";
 import { OttoHero } from "./OttoHero";
@@ -23,9 +24,18 @@ type Props = { initial: OttoPayload };
 
 type Tab = "today" | "stats";
 
+/** Puts a removed row back at its old index, unless it's already back. */
+function reinsertAt<T>(list: T[], index: number, row: T, isRow: (r: T) => boolean): T[] {
+  if (list.some(isRow)) return list;
+  const next = list.slice();
+  next.splice(Math.min(index, next.length), 0, row);
+  return next;
+}
+
 /**
  * Owns the live state for Otto's Room. Every mutation runs optimistically —
- * the user sees instant feedback and we reconcile only if the server fails.
+ * the user sees instant feedback, and if the server refuses, the row goes
+ * back where it was and a toast says why.
  *
  * Two tabs share the hero: "Today" (activity + upcoming + asking + tell-otto
  * + settings) and "Stats" (the metrics block). Tab state is URL-backed via
@@ -72,38 +82,63 @@ export function OttoPageClient({ initial }: Props) {
   const unreadDmRow = asking.find((r) => r.kind === "unread_dms");
   const unreadCount = unreadDmRow?.kind === "unread_dms" ? unreadDmRow.count : 0;
 
-  const dismissReminder = useCallback(async (id: string) => {
-    setUpcoming((u) => u.filter((r) => !(r.kind === "reminder" && r.id === id)));
-    setAsking((a) => a.filter((r) => !(r.kind === "reminder" && r.id === id)));
-    try {
-      await fetch(`/api/me/otto/reminders/${id}`, { method: "DELETE" });
-    } catch (e) {
-      console.error("[otto] dismissReminder", e);
-    }
-  }, []);
+  // Done / Dismiss / Connect remove the row first. Each snapshots the row and
+  // its index beforehand and puts it back there if the server refuses
+  // (vibeRequest has already toasted why). A refetch is never the rollback.
+  const removeReminder = useCallback(
+    async (id: string, url: string, method: "DELETE" | "POST", failure: string) => {
+      const isRow = (r: UpcomingRow | AskingRow) => r.kind === "reminder" && r.id === id;
+      const uIndex = upcoming.findIndex(isRow);
+      const aIndex = asking.findIndex(isRow);
+      const uRow = uIndex >= 0 ? upcoming[uIndex] : null;
+      const aRow = aIndex >= 0 ? asking[aIndex] : null;
+      setUpcoming((u) => u.filter((r) => !isRow(r)));
+      setAsking((a) => a.filter((r) => !isRow(r)));
+      const res = await vibeRequest(url, { method, failure });
+      if (res.ok) return;
+      if (uRow) setUpcoming((u) => reinsertAt(u, uIndex, uRow, isRow));
+      if (aRow) setAsking((a) => reinsertAt(a, aIndex, aRow, isRow));
+    },
+    [upcoming, asking],
+  );
 
-  const actReminder = useCallback(async (id: string) => {
-    setUpcoming((u) => u.filter((r) => !(r.kind === "reminder" && r.id === id)));
-    setAsking((a) => a.filter((r) => !(r.kind === "reminder" && r.id === id)));
-    try {
-      await fetch(`/api/me/otto/reminders/${id}/act`, { method: "POST" });
-    } catch (e) {
-      console.error("[otto] actReminder", e);
-    }
-  }, []);
+  const dismissReminder = useCallback(
+    (id: string) =>
+      removeReminder(
+        id,
+        `/api/me/otto/reminders/${id}`,
+        "DELETE",
+        "Couldn't dismiss that reminder.",
+      ),
+    [removeReminder],
+  );
 
-  const followBack = useCallback(async (userId: string) => {
-    setAsking((a) => a.filter((r) => !(r.kind === "follower" && r.user_id === userId)));
-    try {
-      await fetch("/api/me/follow", {
+  const actReminder = useCallback(
+    (id: string) =>
+      removeReminder(
+        id,
+        `/api/me/otto/reminders/${id}/act`,
+        "POST",
+        "Couldn't mark that reminder done.",
+      ),
+    [removeReminder],
+  );
+
+  const followBack = useCallback(
+    async (userId: string) => {
+      const isRow = (r: AskingRow) => r.kind === "follower" && r.user_id === userId;
+      const index = asking.findIndex(isRow);
+      const row = index >= 0 ? asking[index] : null;
+      setAsking((a) => a.filter((r) => !isRow(r)));
+      const res = await vibeRequest("/api/me/follow", {
         method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ target_id: userId }),
+        json: { target_id: userId },
+        failure: "Couldn't connect with them.",
       });
-    } catch (e) {
-      console.error("[otto] followBack", e);
-    }
-  }, []);
+      if (!res.ok && row) setAsking((a) => reinsertAt(a, index, row, isRow));
+    },
+    [asking],
+  );
 
   const passFollower = useCallback((userId: string) => {
     // "Pass" is local-only at v1 — we drop the row from this session's

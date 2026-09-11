@@ -6,6 +6,23 @@ import { Suspense, useEffect, useState } from "react";
 
 import { getSupabaseBrowserClient } from "@/lib/supabase/browser";
 
+/**
+ * True when the previous history entry is a Vibe page, so "← back" can step
+ * back to it instead of leaving the app.
+ */
+function hasInAppHistory(): boolean {
+  // The Navigation API only lists same-origin entries, so this is exact.
+  const nav = (window as Window & { navigation?: { canGoBack?: boolean } }).navigation;
+  if (typeof nav?.canGoBack === "boolean") return nav.canGoBack;
+  // Elsewhere: something to go back to, and a referrer that's ours.
+  if (window.history.length <= 1 || !document.referrer) return false;
+  try {
+    return new URL(document.referrer).origin === window.location.origin;
+  } catch {
+    return false;
+  }
+}
+
 function SchoolEmailInner() {
   const router = useRouter();
   const searchParams = useSearchParams();
@@ -77,6 +94,14 @@ function SchoolEmailInner() {
     };
   }, [router]);
 
+  function onBack(e: React.MouseEvent<HTMLAnchorElement>) {
+    // Modified clicks (new tab, new window) keep the plain /campus link.
+    if (e.button !== 0 || e.metaKey || e.ctrlKey || e.shiftKey || e.altKey) return;
+    if (!hasInAppHistory()) return;
+    e.preventDefault();
+    router.back();
+  }
+
   async function onSubmit(e: React.FormEvent) {
     e.preventDefault();
     setError(null);
@@ -122,7 +147,10 @@ function SchoolEmailInner() {
 
   return (
     <div className="vibe-auth-page">
-      <Link href="/" className="vibe-auth-back">
+      {/* Back to wherever the student came from inside Vibe; with nothing
+          to go back to (they opened the email link) it's /campus, never
+          "/", which is the logged-out landing page. */}
+      <Link href="/campus" className="vibe-auth-back" onClick={onBack}>
         <span aria-hidden>←</span> back
       </Link>
 

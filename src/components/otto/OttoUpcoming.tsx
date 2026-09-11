@@ -45,7 +45,9 @@ export function OttoUpcoming({ rows, onDismissReminder, onActReminder }: Props) 
               <li key={`e-${r.id}`} className="otto-room-row">
                 <span className="otto-room-row-icon">▶</span>
                 <div className="otto-room-row-body">
-                  <Link href={`/events/${r.id}`} className="otto-room-row-title">
+                  {/* There's no /events/<id> page yet (that link 404'd);
+                      the campus Events tab is the closest real place. */}
+                  <Link href="/campus?tab=events" className="otto-room-row-title">
                     {r.title}
                   </Link>
                   <p className="otto-room-row-meta">

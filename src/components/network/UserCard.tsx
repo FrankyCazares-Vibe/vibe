@@ -3,6 +3,9 @@
 import Link from "next/link";
 import { useMemo, useState } from "react";
 
+import { vibeRequest } from "@/lib/feedback/request";
+import { toast } from "@/lib/feedback/toast";
+
 export type UserCardProps = {
   id: string;
   name: string | null;
@@ -330,60 +333,56 @@ function ActionButton({
   const [busy, setBusy] = useState(false);
   const [hovered, setHovered] = useState(false);
 
+  // Connect / Connect back / Unfollow flip the button only once the server
+  // confirms, so a refusal needs no rollback: vibeRequest's toast says why
+  // (signed out, blocked, going too fast…) and the button re-enables.
   const follow = async () => {
     if (busy) return;
     setBusy(true);
-    try {
-      const res = await fetch("/api/me/follow", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ target_id: targetId }),
-      });
-      const data = await res.json();
-      if (res.ok && data?.ok) {
-        const next = state === "followed_by" ? "connected" : "following";
-        onStateChange?.(next);
-      }
-    } finally {
-      setBusy(false);
+    const r = await vibeRequest("/api/me/follow", {
+      method: "POST",
+      json: { target_id: targetId },
+      failure: "Couldn't connect with them.",
+    });
+    if (r.ok) {
+      const next = state === "followed_by" ? "connected" : "following";
+      onStateChange?.(next);
     }
+    setBusy(false);
   };
 
   const unfollow = async () => {
     if (busy) return;
     setBusy(true);
-    try {
-      const res = await fetch("/api/me/follow", {
-        method: "DELETE",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ target_id: targetId }),
-      });
-      const data = await res.json();
-      if (res.ok && data?.ok) {
-        const next = state === "connected" ? "followed_by" : "none";
-        onStateChange?.(next);
-      }
-    } finally {
-      setBusy(false);
+    const r = await vibeRequest("/api/me/follow", {
+      method: "DELETE",
+      json: { target_id: targetId },
+      failure: "Couldn't unfollow them.",
+    });
+    if (r.ok) {
+      const next = state === "connected" ? "followed_by" : "none";
+      onStateChange?.(next);
     }
+    setBusy(false);
   };
 
   const message = async () => {
     if (busy || !handle) return;
     setBusy(true);
-    try {
-      const res = await fetch("/api/me/threads", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ handle }),
-      });
-      const data = await res.json();
-      if (res.ok && data?.ok && data.channel_id) {
-        window.location.href = `/messages?channel=${data.channel_id}`;
-      }
-    } finally {
-      setBusy(false);
+    // Opening a chat is Terms-gated, so an account that hasn't accepted them
+    // gets the Review Terms toast here instead of a button that does nothing.
+    const r = await vibeRequest<{ channel_id?: string }>("/api/me/threads", {
+      method: "POST",
+      json: { handle },
+      failure: "Couldn't open a chat with them.",
+    });
+    if (r.ok && r.data.channel_id) {
+      window.location.href = `/messages?channel=${r.data.channel_id}`;
+    } else if (r.ok) {
+      // Every ok reply carries a channel_id; still, never let the tap do nothing.
+      toast({ message: "Couldn't open a chat with them. Try again.", tone: "error" });
     }
+    setBusy(false);
   };
 
   const ORANGE_FILLED: React.CSSProperties = {

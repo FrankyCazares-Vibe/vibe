@@ -3,6 +3,7 @@
 import { useEffect, useRef, useState } from "react";
 
 import type { OttoSettings } from "@/app/api/me/otto/route";
+import { vibeRequest } from "@/lib/feedback/request";
 
 import { OttoSection } from "./OttoSection";
 
@@ -87,11 +88,20 @@ function detectPreset(s: OttoSettings): OttoSettings["chattiness"] | null {
  * choice updates local state immediately (optimistic), then a single
  * trailing-edge PATCH fires 350ms after the last change so a user toggling
  * a few in a row only triggers one network roundtrip.
+ *
+ * One PATCH can carry several keys (a preset sets six), so a refused save
+ * rolls the whole card back to the last settings the server confirmed and
+ * shows one toast for that flush. Flushes never overlap: changes made while
+ * one is in flight wait for it, so confirmations land in order. Shared by
+ * Otto's Room (desktop) and OttoMobile.
  */
 export function OttoSettings({ settings }: Props) {
   const [state, setState] = useState<OttoSettings>(settings);
   const pendingRef = useRef<Partial<OttoSettings>>({});
   const timerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  // The rollback target: the settings the server last confirmed as saved.
+  const lastConfirmedRef = useRef<OttoSettings>(settings);
+  const inFlightRef = useRef(false);
 
   useEffect(
     () => () => {
@@ -100,18 +110,39 @@ export function OttoSettings({ settings }: Props) {
     [],
   );
 
+  function flush() {
+    timerRef.current = null;
+    // A flush already in flight picks up the queue when it settles.
+    if (inFlightRef.current) return;
+    const body = pendingRef.current;
+    if (Object.keys(body).length === 0) return;
+    pendingRef.current = {};
+    inFlightRef.current = true;
+    void vibeRequest<{ settings?: Partial<OttoSettings> | null }>("/api/me/otto/settings", {
+      method: "PATCH",
+      json: body,
+      failure: "Couldn't save your Otto settings.",
+    }).then((r) => {
+      inFlightRef.current = false;
+      if (r.ok) {
+        lastConfirmedRef.current = {
+          ...lastConfirmedRef.current,
+          ...body,
+          ...(r.data.settings ?? {}),
+        };
+      } else {
+        // Undo every key this flush carried, not just the last one tapped.
+        // Changes queued behind it stay on screen; they're sent next.
+        setState({ ...lastConfirmedRef.current, ...pendingRef.current });
+      }
+      if (Object.keys(pendingRef.current).length > 0 && !timerRef.current) flush();
+    });
+  }
+
   function queuePatch(patch: Partial<OttoSettings>) {
     pendingRef.current = { ...pendingRef.current, ...patch };
     if (timerRef.current) clearTimeout(timerRef.current);
-    timerRef.current = setTimeout(() => {
-      const body = pendingRef.current;
-      pendingRef.current = {};
-      fetch("/api/me/otto/settings", {
-        method: "PATCH",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify(body),
-      }).catch((e) => console.error("[otto/settings PATCH]", e));
-    }, 350);
+    timerRef.current = setTimeout(flush, 350);
   }
 
   function setKey<K extends keyof OttoSettings>(k: K, v: OttoSettings[K]) {
