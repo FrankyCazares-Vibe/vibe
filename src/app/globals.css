@@ -1570,13 +1570,17 @@ button.vibe-auth-link {
   left: 0;
   z-index: 2147483646;
 }
+/* No transform transition on the dot or the ring. CustomCursor already
+   positions them itself (the dot on every move, the ring on a timed
+   follow); an eased transform on top made the pointer trail the hand
+   (dot 83ms, ring 166ms to 90% at 120Hz). */
 .vibe-cursor--dot {
   width: 8px;
   height: 8px;
   border-radius: 50%;
   background: #ff5c35;
   box-shadow: 0 0 8px rgba(255, 92, 53, 0.55);
-  transition: transform 0.08s ease-out, background 0.15s ease, box-shadow 0.15s ease;
+  transition: background 0.15s ease, box-shadow 0.15s ease;
 }
 .vibe-cursor--dot.clicking {
   transform-origin: center;
@@ -1590,7 +1594,7 @@ button.vibe-auth-link {
   height: 28px;
   border-radius: 50%;
   border: 1px solid rgba(255, 92, 53, 0.4);
-  transition: border-color 0.18s ease, transform 0.08s ease-out;
+  transition: border-color 0.18s ease;
 }
 .vibe-cursor--ring.hover {
   border-color: #ff5c35;
@@ -2496,6 +2500,28 @@ a.otto-room-row-title:hover {
    Kept outside the @media block so it works on every viewport. */
 body.vibe-hide-otto #otto-corner { display: none !important; }
 
+/* Phone focus zoom. iOS Safari zooms the page when a text field under
+   16px takes focus, and never zooms back out. The phone screens size
+   their fields inline at 13-15px, hence the !important. Checkboxes,
+   radios, sliders, file and colour pickers have no text to zoom to.
+   A field sized above 16px on purpose (the 26px profile name editor)
+   carries data-keep-font, or this rule would shrink it to 16px. */
+@media (max-width: 899px) {
+  input:not([type=checkbox]):not([type=radio]):not([type=range]):not([type=file]):not([type=color]):not([data-keep-font]),
+  textarea:not([data-keep-font]),
+  select:not([data-keep-font]) {
+    font-size: 16px !important;
+  }
+}
+
+/* No double-tap zoom; pinch still works. iOS turns double-tap zoom back
+   on once the page is off its starting scale, so one stray zoom used to
+   snowball. Scroll containers reset touch-action, so a scrolling list
+   that needs this has to set it itself. */
+html {
+  touch-action: manipulation;
+}
+
 /* Bottom tab bar — 5 tabs, iOS-friendly. */
 /* Mobile-only chrome — hidden on desktop. Visibility lives on the
    tabbar class itself (not on a separate `vibe-mobile-only` helper)
@@ -2603,6 +2629,8 @@ body.vibe-hide-otto #otto-corner { display: none !important; }
   font-weight: 600;
   cursor: pointer;
   -webkit-tap-highlight-color: transparent;
+  /* No iOS link-preview callout when a tab is long-pressed. */
+  -webkit-touch-callout: none;
   position: relative;
 }
 .vibe-mobile-tab--active {

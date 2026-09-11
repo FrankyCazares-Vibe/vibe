@@ -2,11 +2,24 @@
 
 import { useEffect, useRef } from "react";
 
+// Ring follow time constant: the ring covers 90% of a jump in ~40ms,
+// whatever the refresh rate.
+const RING_TAU_MS = 17;
+
 /**
  * Custom cursor — coral dot that snaps to the pointer + a thin ring that
  * eases behind it. Both dot and ring grow + brighten when hovering over
  * anything interactive. Skipped on touch / coarse-pointer devices via the
  * `(pointer: fine)` media query.
+ *
+ * The native cursor is hidden, so the dot IS the pointer: it is written
+ * straight from mousemove, with no easing. The ring follows on a
+ * time-based curve, a = 1 - e^(-dt/TAU), so it trails the same at 60Hz,
+ * 120Hz or a throttled 30fps (a fixed per-frame lerp slowed down with
+ * the refresh rate). Its rAF loop stops once the ring has caught up and
+ * the next move restarts it, so a still mouse costs no frames.
+ * public/html/profile.html, messages.html and onboarding.html run the
+ * same follow.
  *
  * One cursor across iframe boundaries. iframes are an event boundary —
  * once the pointer enters one, the parent doc stops getting mousemove. To
@@ -33,9 +46,10 @@ export function CustomCursor() {
     let rx = mx;
     let ry = my;
     let raf = 0;
+    let last = 0;
 
-    dot.style.transform = `translate(${mx - 4}px, ${my - 4}px)`;
-    ring.style.transform = `translate(${Math.round(rx) - 14}px, ${Math.round(ry) - 14}px)`;
+    dot.style.transform = `translate3d(${mx - 4}px, ${my - 4}px, 0)`;
+    ring.style.transform = `translate3d(${rx - 14}px, ${ry - 14}px, 0)`;
     document.body.classList.add("vibe-cursor-active");
 
     function hideCursor() {
@@ -56,11 +70,14 @@ export function CustomCursor() {
       }
     }
 
+    // Both the document's mousemove and the iframe's forwarded moves land
+    // here, so the ring restarts from either.
     function applyPosition(x: number, y: number) {
       mx = x;
       my = y;
-      dot!.style.transform = `translate(${mx - 4}px, ${my - 4}px)`;
+      dot!.style.transform = `translate3d(${mx - 4}px, ${my - 4}px, 0)`;
       if (dot!.classList.contains("vibe-cursor-hidden")) showCursor();
+      kick();
     }
 
     function onMove(e: MouseEvent) {
@@ -84,11 +101,24 @@ export function CustomCursor() {
       if (t && t.closest?.(HOVER_SEL)) setHover(false);
     }
 
-    function tick() {
-      rx += (mx - rx) * 0.22;
-      ry += (my - ry) * 0.22;
-      ring!.style.transform = `translate(${Math.round(rx) - 14}px, ${Math.round(ry) - 14}px)`;
-      raf = requestAnimationFrame(tick);
+    function tick(t: number) {
+      // The first frame after a rest has no previous timestamp: assume one
+      // 60Hz frame. The clamp bounds the step after a stall or a hidden tab.
+      const dt = last ? Math.min(t - last, 64) : 16.7;
+      last = t;
+      const a = 1 - Math.exp(-dt / RING_TAU_MS);
+      rx += (mx - rx) * a;
+      ry += (my - ry) * a;
+      ring!.style.transform = `translate3d(${rx - 14}px, ${ry - 14}px, 0)`;
+      if (Math.abs(mx - rx) + Math.abs(my - ry) < 0.2) {
+        raf = 0;
+        last = 0;
+      } else {
+        raf = requestAnimationFrame(tick);
+      }
+    }
+    function kick() {
+      if (!raf) raf = requestAnimationFrame(tick);
     }
 
     // ── iframe → parent cursor forwarding ─────────────────────────────
@@ -137,12 +167,12 @@ export function CustomCursor() {
     document.documentElement.addEventListener("mouseleave", hideCursor);
     document.documentElement.addEventListener("mouseenter", showCursor);
 
+    // No loop yet: the ring starts on the dot, and the first move kicks it.
     document.addEventListener("mousemove", onMove, { passive: true });
     document.addEventListener("mousedown", onDown);
     document.addEventListener("mouseup", onUp);
     document.addEventListener("mouseover", onOver, true);
     document.addEventListener("mouseout", onOut, true);
-    raf = requestAnimationFrame(tick);
 
     return () => {
       cancelAnimationFrame(raf);

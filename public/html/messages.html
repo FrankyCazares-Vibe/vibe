@@ -1085,9 +1085,19 @@ if (IS_EMBEDDED) {
   document.addEventListener('mouseover', e => { if (e.target.closest(HS)) post('hover-on'); });
   document.addEventListener('mouseout',  e => { if (e.target.closest(HS)) post('hover-off'); });
 } else {
-  let mx=window.innerWidth/2,my=window.innerHeight/2,rx=window.innerWidth/2,ry=window.innerHeight/2;
-  document.addEventListener('mousemove',e=>{mx=e.clientX;my=e.clientY;cur.style.transform=`translate(${mx-4}px,${my-4}px)`;},{passive:true});
-  (function tick(){rx+=(mx-rx-14)*.28;ry+=(my-ry-14)*.28;ring.style.transform=`translate(${Math.round(rx)}px,${Math.round(ry)}px)`;requestAnimationFrame(tick);})();
+  // Dot written straight from mousemove; ring on a time-based curve (90% of
+  // a jump in ~40ms at any refresh rate) whose loop stops once it has caught
+  // up. Same follow as src/components/CustomCursor.tsx.
+  let mx=window.innerWidth/2,my=window.innerHeight/2,rx=mx,ry=my,raf=0,last=0;
+  const tick=t=>{
+    const dt=last?Math.min(t-last,64):16.7; last=t;
+    const a=1-Math.exp(-dt/17);
+    rx+=(mx-rx)*a; ry+=(my-ry)*a;
+    ring.style.transform=`translate3d(${rx-14}px,${ry-14}px,0)`;
+    if(Math.abs(mx-rx)+Math.abs(my-ry)<0.2){raf=0;last=0;}else raf=requestAnimationFrame(tick);
+  };
+  ring.style.transform=`translate3d(${rx-14}px,${ry-14}px,0)`;
+  document.addEventListener('mousemove',e=>{mx=e.clientX;my=e.clientY;cur.style.transform=`translate3d(${mx-4}px,${my-4}px,0)`;if(!raf)raf=requestAnimationFrame(tick);},{passive:true});
   document.addEventListener('mousedown',()=>cur.classList.add('clicking'));
   document.addEventListener('mouseup',()=>cur.classList.remove('clicking'));
   document.addEventListener('mouseover',e=>{if(e.target.closest(HS)){cur.classList.add('hover');ring.classList.add('hover');}});

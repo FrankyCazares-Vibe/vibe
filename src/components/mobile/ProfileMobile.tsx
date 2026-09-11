@@ -1276,6 +1276,8 @@ export function ProfileMobile({ targetHandle }: Props = {}) {
         >
           {editMode && effectiveDraft ? (
             <input
+              // Deliberately larger than the phone 16px input rule.
+              data-keep-font
               value={effectiveDraft.name}
               onChange={(e) => updateDraft({ name: e.target.value.slice(0, 120) })}
               placeholder="Your name"
@@ -3573,6 +3575,8 @@ function WorkingOnEditSheet({
             >
               <input
                 type="text"
+                // Deliberately larger than the phone 16px input rule.
+                data-keep-font
                 value={p.icon ?? ""}
                 onChange={(e) => update(i, { icon: e.target.value })}
                 placeholder="✦"

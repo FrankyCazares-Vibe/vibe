@@ -14,9 +14,9 @@
 <script src="/html/_persistence.js"></script>
 <script src="/html/_otto.js" defer></script>
 <!-- PDF.js — rasterizes uploaded PDFs into images so redaction bars can
-     live inside the same scroll container as the page content. Loaded
-     async; the resume viewer waits for it before drawing any PDFs. -->
-<script src="https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.min.js" defer></script>
+     live inside the same scroll container as the page content. Not
+     loaded here: _waitForPdfJs injects it the first time a PDF is
+     rasterized (an upload, or opening the viewer on an older PDF). -->
 <script src="/html/_postViewer.js" defer></script>
 <script src="/html/_sharePicker.js" defer></script>
 <script src="/html/_imageCropper.js" defer></script>
@@ -3922,12 +3922,25 @@ body.empty-profile-mode #profileEmpty { display: flex !important; }
 // ── Cursor ────────────────────────────────────────────────────────
 const cur = document.getElementById('cursor');
 const ring = document.getElementById('cursorRing');
-let mx=0,my=0,rx=0,ry=0;
+// The dot is the pointer, written straight from mousemove. The ring follows
+// on a time-based curve (a = 1 - e^(-dt/17ms): 90% of a jump in ~40ms at any
+// refresh rate) and its loop stops once it has caught up, so a still mouse
+// costs no frames. Same follow as src/components/CustomCursor.tsx.
+let mx=0,my=0,rx=0,ry=0,_ringRaf=0,_ringLast=0;
+function _ringTick(t){
+  const dt=_ringLast?Math.min(t-_ringLast,64):16.7; _ringLast=t;
+  const a=1-Math.exp(-dt/17);
+  rx+=(mx-rx)*a; ry+=(my-ry)*a;
+  ring.style.transform=`translate3d(${rx-14}px,${ry-14}px,0)`;
+  if(Math.abs(mx-rx)+Math.abs(my-ry)<0.2){_ringRaf=0;_ringLast=0;}
+  else _ringRaf=requestAnimationFrame(_ringTick);
+}
+ring.style.transform=`translate3d(${rx-14}px,${ry-14}px,0)`;
 document.addEventListener('mousemove', e=>{
   mx=e.clientX; my=e.clientY;
-  cur.style.transform=`translate(${mx-4}px,${my-4}px)`;
+  cur.style.transform=`translate3d(${mx-4}px,${my-4}px,0)`;
+  if(!_ringRaf) _ringRaf=requestAnimationFrame(_ringTick);
 },{passive:true});
-(function tick(){rx+=(mx-rx-14)*.28;ry+=(my-ry-14)*.28;ring.style.transform=`translate(${Math.round(rx)}px,${Math.round(ry)}px)`;requestAnimationFrame(tick)})();
 document.addEventListener('mousedown',()=>cur.classList.add('clicking'));
 document.addEventListener('mouseup',()=>cur.classList.remove('clicking'));
 // Event delegation cursor — works for all elements inc. dynamically added
@@ -4581,19 +4594,35 @@ function guessDocType(fileName, mime) {
   return 'image';
 }
 
-// Wait for pdf.js to load (deferred CDN script). Resolves once `pdfjsLib`
-// is available globally.
-function _waitForPdfJs(timeoutMs = 8000) {
-  return new Promise((resolve, reject) => {
-    if (window.pdfjsLib) return resolve(window.pdfjsLib);
-    const start = Date.now();
-    const tick = () => {
-      if (window.pdfjsLib) return resolve(window.pdfjsLib);
-      if (Date.now() - start > timeoutMs) return reject(new Error('pdf.js failed to load'));
-      setTimeout(tick, 80);
+// Load pdf.js on first use instead of with the page: it is 313 KB and most
+// profile views never open a PDF. Every caller awaits this before touching
+// `pdfjsLib`. The in-flight promise is shared, kept on the function rather
+// than a top-level let so an early caller can never hit a TDZ, and dropped
+// on failure so the next attempt retries. Mirrors src/lib/pdfjs-cdn.ts.
+function _waitForPdfJs(timeoutMs = 15000) {
+  if (window.pdfjsLib) return Promise.resolve(window.pdfjsLib);
+  if (_waitForPdfJs.pending) return _waitForPdfJs.pending;
+  const p = new Promise((resolve, reject) => {
+    const s = document.createElement('script');
+    const fail = () => {
+      clearTimeout(timer);
+      s.remove(); // the retry injects a fresh tag; don't leave dead ones in <head>
+      if (_waitForPdfJs.pending === p) _waitForPdfJs.pending = null;
+      reject(new Error("the PDF reader didn't load"));
     };
-    tick();
+    const timer = setTimeout(fail, timeoutMs);
+    s.onload = () => {
+      clearTimeout(timer);
+      if (window.pdfjsLib) resolve(window.pdfjsLib);
+      else fail();
+    };
+    s.onerror = fail;
+    s.async = true;
+    s.src = 'https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.min.js';
+    document.head.appendChild(s);
   });
+  _waitForPdfJs.pending = p;
+  return p;
 }
 
 // Resume / portfolio docs live in PRIVATE storage. The server hands us an
@@ -5161,30 +5190,43 @@ function onHandlePointerDown(e, absoluteIdx, dir) {
 // <img> tag for those which obviously doesn't display a PDF. Rasterize
 // them on the fly the first time the viewer opens; subsequent opens use
 // the cached pages.
+//
+// One run at a time. The flag lives on the function, not on the docs:
+// saveProfileToStorage persists the docs, so a flag there would outlive
+// a reload. A failure leaves pages = [], which renderDocViewer still
+// counts as needing backfill, so the render at the end used to re-enter
+// this at once; with pdf.js blocked that retried as fast as the script
+// could fail. Now that render sees the flag and stops, and the next one
+// the user causes (opening the viewer, moving between docs) tries again.
 async function _backfillRasterIfNeeded() {
-  let dirty = false;
-  for (const doc of resumePortfolio) {
-    if (doc.type !== 'pdf') continue;
-    if (doc.pages && doc.pages.length) continue;
-    try {
-      doc.pages = await _rasterizePdf(doc.url);
-      delete doc._renderError;
-      dirty = true;
-    } catch (e) {
-      console.error('[resume] backfill rasterize failed', e);
-      // Mark with an empty-but-defined pages array so we don't retry every
-      // render — and the viewer can show a helpful "re-upload this PDF"
-      // message in place of a broken image. Keep the reason: a 401/429
-      // from the private-storage proxy is NOT a "re-upload" situation,
-      // and the viewer should say so instead.
-      doc.pages = [];
-      doc._renderError = (e && typeof e.message === 'string') ? e.message : '';
-      dirty = true;
+  if (_backfillRasterIfNeeded.busy) return;
+  _backfillRasterIfNeeded.busy = true;
+  try {
+    let dirty = false;
+    for (const doc of resumePortfolio) {
+      if (doc.type !== 'pdf') continue;
+      if (doc.pages && doc.pages.length) continue;
+      try {
+        doc.pages = await _rasterizePdf(doc.url);
+        delete doc._renderError;
+        dirty = true;
+      } catch (e) {
+        console.error('[resume] backfill rasterize failed', e);
+        // Mark with an empty-but-defined pages array so the viewer can
+        // show a helpful "re-upload this PDF" message in place of a broken
+        // image. Keep the reason: a 401/429 from the private-storage proxy
+        // is NOT a "re-upload" situation, and the viewer should say so.
+        doc.pages = [];
+        doc._renderError = (e && typeof e.message === 'string') ? e.message : '';
+        dirty = true;
+      }
     }
-  }
-  if (dirty) {
-    saveProfileToStorage();
-    renderDocViewer();
+    if (dirty) {
+      saveProfileToStorage();
+      renderDocViewer();
+    }
+  } finally {
+    _backfillRasterIfNeeded.busy = false;
   }
 }
 

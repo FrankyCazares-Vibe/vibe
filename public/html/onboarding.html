@@ -698,12 +698,23 @@ const IU_SCHOOLS = [
 })();
 
 // ── Cursor (matches the rest of vibe) ─────────────────────────────────────
+// Dot written straight from mousemove; ring on a time-based curve (90% of a
+// jump in ~40ms at any refresh rate) whose loop stops once it has caught up.
+// Same follow as src/components/CustomCursor.tsx.
 const cur = document.getElementById('cursor');
 const ring = document.getElementById('cursorRing');
-let mx = 0, my = 0, rx = 0, ry = 0;
-document.addEventListener('mousemove', e => { mx = e.clientX; my = e.clientY; cur.style.transform = `translate(${mx-4}px, ${my-4}px)`; });
-function animateRing() { rx += (mx - rx) * .18; ry += (my - ry) * .18; ring.style.transform = `translate(${rx-14}px, ${ry-14}px)`; requestAnimationFrame(animateRing); }
-animateRing();
+let mx = 0, my = 0, rx = 0, ry = 0, ringRaf = 0, ringLast = 0;
+function animateRing(t) {
+  const dt = ringLast ? Math.min(t - ringLast, 64) : 16.7;
+  ringLast = t;
+  const a = 1 - Math.exp(-dt / 17);
+  rx += (mx - rx) * a; ry += (my - ry) * a;
+  ring.style.transform = `translate3d(${rx-14}px, ${ry-14}px, 0)`;
+  if (Math.abs(mx - rx) + Math.abs(my - ry) < 0.2) { ringRaf = 0; ringLast = 0; }
+  else ringRaf = requestAnimationFrame(animateRing);
+}
+ring.style.transform = `translate3d(${rx-14}px, ${ry-14}px, 0)`;
+document.addEventListener('mousemove', e => { mx = e.clientX; my = e.clientY; cur.style.transform = `translate3d(${mx-4}px, ${my-4}px, 0)`; if (!ringRaf) ringRaf = requestAnimationFrame(animateRing); });
 function bindCursorHover() {
   document.querySelectorAll('button, a, input, select, textarea, .suggest-chip, .pf-looking-row').forEach(el => {
     if (el.dataset.cursorBound) return;
