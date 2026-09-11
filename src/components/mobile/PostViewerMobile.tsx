@@ -4,6 +4,7 @@ import Link from "next/link";
 import { useEffect, useRef, useState } from "react";
 import { Drawer } from "vaul";
 
+import { asLoadFailure, LoadFailed, type LoadFailure } from "@/components/feedback/LoadFailed";
 import { SharePostSheet } from "@/components/mobile/SharePostSheet";
 import { copyText, vibeRequest } from "@/lib/feedback/request";
 
@@ -83,13 +84,17 @@ export function PostViewerMobile({
   const [post, setPost] = useState<PostDetail | null>(null);
   const [counts, setCounts] = useState<Counts>({ likes: 0, comments: 0 });
   const [viewer, setViewer] = useState<Viewer>({ liked: false, saved: false });
-  const [error, setError] = useState<string | null>(null);
+  // Why the post didn't load; the body shows LoadFailed in its place.
+  const [loadErr, setLoadErr] = useState<LoadFailure | null>(null);
+  // Bumped by Retry to run the post load again.
+  const [attempt, setAttempt] = useState(0);
   // Open the comments drawer by default when the viewer mounts —
   // tapping into a post almost always means the user wants to read /
   // join the conversation. The lazy-fetch effect below fires the
   // initial GET as soon as this becomes true.
   const [commentsOpen, setCommentsOpen] = useState(true);
   const [comments, setComments] = useState<Comment[] | null>(null);
+  const [commentsErr, setCommentsErr] = useState<LoadFailure | null>(null);
   const [draft, setDraft] = useState("");
   const [posting, setPosting] = useState(false);
   const [menuOpen, setMenuOpen] = useState(false);
@@ -105,21 +110,19 @@ export function PostViewerMobile({
       return;
     }
     setDeleting(true);
-    try {
-      const r = await fetch(`/api/posts/${postId}`, {
-        method: "DELETE",
-        credentials: "include",
-      });
-      const j = await r.json().catch(() => ({}));
-      if (!r.ok || !j?.ok) {
-        throw new Error(j?.error ?? "Could not delete");
-      }
-      onDeleted?.();
-      onClose();
-    } catch (e) {
-      setError(e instanceof Error ? e.message : "Could not delete");
+    // A refusal used to replace the whole post with the raw server error;
+    // now the post stays up and the toast says why.
+    const r = await vibeRequest(`/api/posts/${postId}`, {
+      method: "DELETE",
+      credentials: "include",
+      failure: "Couldn't delete this post.",
+    });
+    if (!r.ok) {
       setDeleting(false);
+      return;
     }
+    onDeleted?.();
+    onClose();
   };
 
   // Lock body scroll while the viewer is up. Restored on close so a
@@ -149,65 +152,68 @@ export function PostViewerMobile({
     return () => document.removeEventListener("pointerdown", onPointerDown, true);
   }, []);
 
-  // Fetch the single post + counts + viewer state in one roundtrip.
-  // Also fires the per-day-deduped /view endpoint so view counts get
-  // attributed even when the post is opened from a profile, not the
-  // feed.
+  // Fetch the single post + counts + viewer state in one roundtrip. A
+  // failure shows LoadFailed with Retry (a deleted post reads "That's no
+  // longer available.") where the raw server error used to sit.
   useEffect(() => {
     let cancelled = false;
     (async () => {
-      try {
-        const r = await fetch(`/api/posts/${postId}`, { cache: "no-store" });
-        const j = await r.json();
-        if (cancelled) return;
-        if (!j?.ok) {
-          setError(j?.error ?? "Could not load post");
-          return;
-        }
-        setPost(j.post as PostDetail);
-        setCounts(j.counts as Counts);
-        setViewer(j.viewer as Viewer);
-      } catch (e) {
-        if (!cancelled) setError(e instanceof Error ? e.message : "Could not load post");
+      const r = await vibeRequest<{ post?: PostDetail; counts?: Counts; viewer?: Viewer }>(
+        `/api/posts/${postId}`,
+        { cache: "no-store", quiet: true, failure: "Couldn't load this post." },
+      );
+      if (cancelled) return;
+      if (!r.ok || !r.data.post) {
+        setLoadErr(asLoadFailure(r, "Couldn't load this post."));
+        return;
       }
+      setLoadErr(null);
+      setPost(r.data.post);
+      if (r.data.counts) setCounts(r.data.counts);
+      if (r.data.viewer) setViewer(r.data.viewer);
     })();
+    return () => {
+      cancelled = true;
+    };
+  }, [postId, attempt]);
+
+  // Fires the per-day-deduped /view endpoint so view counts get
+  // attributed even when the post is opened from a profile, not the
+  // feed. Its own effect, so a Retry of the load doesn't ping again.
+  useEffect(() => {
     // Fire and forget the view ping — server dedupes per-user-per-day.
     fetch(`/api/posts/${postId}/view`, { method: "POST", cache: "no-store" })
       .catch(() => {});
-    return () => {
-      cancelled = true;
-    };
   }, [postId]);
 
-  // Lazy-fetch comments the first time the drawer opens.
+  // Lazy-fetch comments the first time the drawer opens. A failure waits
+  // in `commentsErr` until Retry clears it, which runs this again.
   useEffect(() => {
-    if (!commentsOpen || comments !== null) return;
+    if (!commentsOpen || comments !== null || commentsErr) return;
     let cancelled = false;
     (async () => {
-      try {
-        const r = await fetch(`/api/posts/${postId}/comments?limit=80`, {
-          cache: "no-store",
-        });
-        const j = await r.json();
-        if (cancelled) return;
-        if (j?.ok) {
-          // Flatten roots + replies into one chronological list so the
-          // mobile drawer reads top-to-bottom without indentation gymnastics.
-          const flat: Comment[] = [];
-          for (const root of (j.comments ?? []) as Array<Comment & { replies?: Comment[] }>) {
-            flat.push(root);
-            for (const rep of root.replies ?? []) flat.push(rep);
-          }
-          setComments(flat);
-        }
-      } catch {
-        if (!cancelled) setComments([]);
+      const r = await vibeRequest<{ comments?: unknown }>(
+        `/api/posts/${postId}/comments?limit=80`,
+        { cache: "no-store", quiet: true, failure: "Couldn't load the comments." },
+      );
+      if (cancelled) return;
+      if (!r.ok || !Array.isArray(r.data.comments)) {
+        setCommentsErr(asLoadFailure(r, "Couldn't load the comments."));
+        return;
       }
+      // Flatten roots + replies into one chronological list so the
+      // mobile drawer reads top-to-bottom without indentation gymnastics.
+      const flat: Comment[] = [];
+      for (const root of r.data.comments as Array<Comment & { replies?: Comment[] }>) {
+        flat.push(root);
+        for (const rep of root.replies ?? []) flat.push(rep);
+      }
+      setComments(flat);
     })();
     return () => {
       cancelled = true;
     };
-  }, [commentsOpen, comments, postId]);
+  }, [commentsOpen, comments, commentsErr, postId]);
 
   const toggleLike = async () => {
     const next = !viewer.liked;
@@ -275,7 +281,10 @@ export function PostViewerMobile({
     });
     if (r.ok) {
       const posted = r.data.comment;
-      if (posted) setComments((prev) => [...(prev ?? []), posted]);
+      // Onto a loaded list only: alone in a list that never loaded, it would
+      // read as the only comment. A failed load runs again and picks it up.
+      if (posted) setComments((prev) => (prev ? [...prev, posted] : prev));
+      setCommentsErr(null);
       setCounts((c) => ({ ...c, comments: c.comments + 1 }));
       setDraft("");
     }
@@ -578,9 +587,15 @@ export function PostViewerMobile({
           gap: 14,
         }}
       >
-        {error ? (
-          <div style={{ color: "#C0392B", fontSize: 14, textAlign: "center", padding: "32px 16px" }}>
-            {error}
+        {loadErr ? (
+          <div style={{ paddingTop: 18 }}>
+            <LoadFailed
+              failure={loadErr}
+              onRetry={() => {
+                setLoadErr(null);
+                setAttempt((n) => n + 1);
+              }}
+            />
           </div>
         ) : !post ? (
           <PostViewerSkeleton />
@@ -712,9 +727,17 @@ export function PostViewerMobile({
                   Comments
                 </div>
                 {comments === null ? (
-                  <div style={{ color: "#8A8580", fontSize: 13, padding: "12px 0" }}>
-                    Loading…
-                  </div>
+                  commentsErr ? (
+                    <LoadFailed
+                      compact
+                      failure={commentsErr}
+                      onRetry={() => setCommentsErr(null)}
+                    />
+                  ) : (
+                    <div style={{ color: "#8A8580", fontSize: 13, padding: "12px 0" }}>
+                      Loading…
+                    </div>
+                  )
                 ) : comments.length === 0 ? (
                   <div style={{ color: "#8A8580", fontSize: 13, padding: "12px 0" }}>
                     Be the first to comment.
@@ -732,8 +755,9 @@ export function PostViewerMobile({
         )}
       </div>
 
-      {/* Composer — sticky at the bottom over the body's bottom padding */}
-      {commentsOpen ? (
+      {/* Composer — sticky at the bottom over the body's bottom padding.
+          Not under a post that didn't load: there's nothing to reply to. */}
+      {commentsOpen && !loadErr ? (
         <div
           style={{
             position: "absolute",
