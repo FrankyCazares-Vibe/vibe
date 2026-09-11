@@ -305,11 +305,13 @@
       paintBadge(unread);
     } catch (_) { /* ignore */ }
   }
-  // Update any nav-msg-btn icons on the host page (the existing dot-style
-  // unread indicator on profile.html etc.) so the user sees a notification
-  // mark without us injecting a second button.
+  // Update the host page's Messages icon (the dot-style unread indicator
+  // on profile.html) so the user sees a notification mark without us
+  // injecting a second button. Only buttons marked data-messages-badge:
+  // the calendar, edit, settings and share icons are .nav-msg-btn too,
+  // and a bare ".nav-msg-btn" put the unread dot on every one of them.
   function paintBadge(n) {
-    const navBtns = document.querySelectorAll(".nav-msg-btn");
+    const navBtns = document.querySelectorAll(".nav-msg-btn[data-messages-badge]");
     navBtns.forEach((b) => {
       if (n > 0) b.classList.add("has-unread");
       else b.classList.remove("has-unread");

@@ -3113,10 +3113,8 @@ body.empty-profile-mode #profileEmpty { display: flex !important; }
 <div id="edit-toolbar">
   <span style="font-size:10px;color:rgba(255,255,255,.5);padding:0 4px">Edit</span>
   <div class="tb-divider"></div>
-  <button onclick="execCmd('bold')"><b>B</b></button>
-  <button onclick="execCmd('italic')"><i>I</i></button>
-  <button onclick="execCmd('underline')"><u>U</u></button>
-  <div class="tb-divider"></div>
+  <!-- No B / I / U: saveProfileToStorage stores textContent, so any
+       formatting was painted and then silently dropped on save. -->
   <button onclick="clearField()">Clear</button>
 </div>
 
@@ -3168,8 +3166,9 @@ body.empty-profile-mode #profileEmpty { display: flex !important; }
         <circle cx="11.5" cy="11" r="1" fill="currentColor"/>
       </svg>
     </button>
-    <!-- Messages icon -->
-    <button class="nav-msg-btn has-unread" onclick="toggleMessenger()" title="Messages">
+    <!-- Messages icon. The unread dot comes only from _miniMessenger's
+         paintBadge (it targets data-messages-badge), never from markup. -->
+    <button class="nav-msg-btn" data-messages-badge onclick="toggleMessenger()" title="Messages">
       <svg width="18" height="18" viewBox="0 0 18 18" fill="none">
         <path d="M9 1C4.58 1 1 4.36 1 8.5c0 2.18 1 4.14 2.6 5.52L3 17l3.42-1.72C7.23 15.72 8.1 15.9 9 15.9c4.42 0 8-3.36 8-7.4C17 4.36 13.42 1 9 1z" stroke="currentColor" stroke-width="1.4" fill="none" stroke-linejoin="round"/>
         <path d="M5 8.5h.01M9 8.5h.01M13 8.5h.01" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"/>
@@ -3940,6 +3939,10 @@ function refreshHoverTargets(){} // no-op
 // ── Edit mode ────────────────────────────────────────────────────
 let editMode = false;
 let saveTimer;
+// The "Auto-saved" toast's own timer. It used to share saveTimer with the
+// 500ms snapshot listener further down, so each cancelled the other.
+// (Not toastTimer: showToast already owns that name.)
+let autoSavedToastTimer;
 
 function toggleEdit(){
   // Belt-and-suspenders: viewer-mode CSS hides the Edit button, but the
@@ -3962,17 +3965,38 @@ function toggleEdit(){
   if (viewerBtn) viewerBtn.style.display = editMode ? '' : 'none';
   // Swap @handle display ↔ input. On exit, save if changed.
   if (typeof _toggleProfileHandleEdit === 'function') _toggleProfileHandleEdit(editMode);
-  if(!editMode){ showToast('Changes saved'); }
+  // "Changes saved" only once the server has them: entering edit mode
+  // starts a fresh tally, leaving flushes whatever is still pending.
+  if (editMode) _profileSyncLastOk = null;
+  else _confirmProfileSaveOnExit();
   // Refresh pin button visibility
   if(typeof refreshPinButtons === 'function') refreshPinButtons();
 }
 
 document.addEventListener('input', e=>{
   if(e.target.hasAttribute('data-edit') && editMode){
-    clearTimeout(saveTimer);
-    saveTimer = setTimeout(()=> showToast('Auto-saved'), 1800);
+    clearTimeout(autoSavedToastTimer);
+    autoSavedToastTimer = setTimeout(async ()=>{
+      // Say "Auto-saved" only after the save it describes went through.
+      const ok = await _saveProfileNow();
+      if (ok !== false && editMode) showToast('Auto-saved');
+    }, 1800);
   }
 });
+
+// Leaving edit mode: run the save still waiting out its debounce (and the
+// 500ms snapshot, if keystrokes are still inside it), then say "Changes
+// saved" only when the server took it. A refused save already showed
+// vibeRequest's error; an edit session with no edits shows nothing.
+async function _confirmProfileSaveOnExit() {
+  if (saveTimer) {
+    clearTimeout(saveTimer);
+    saveTimer = null;
+    saveProfileToStorage();
+  }
+  const ok = await _saveProfileNow(undefined, true);
+  if (ok === true) showToast('Changes saved');
+}
 
 // Floating toolbar
 const toolbar = document.getElementById('edit-toolbar');
@@ -3992,7 +4016,6 @@ function positionToolbar(el){
   toolbar.style.top = (r.top - 44 + window.scrollY) + 'px';
   toolbar.style.left = r.left + 'px';
 }
-function execCmd(cmd){ document.execCommand(cmd, false, null); }
 function clearField(){ if(activeEdit) activeEdit.textContent=''; }
 
 // ── Recruiter mode ────────────────────────────────────────────────
@@ -4042,21 +4065,52 @@ async function handleAvatarUpload(input){
   const url = await _fileToDataURL(file);
   uploadedAvatars.push(url);
 
-  // Apply immediately
-  applyAvatarPhoto(url);
-
   // Add to preview strip
   const strip = document.getElementById('avatarPreviewStrip');
   const img = document.createElement('img');
   img.src=url; img.className='avatar-preview-thumb';
-  img.onclick=()=>{ applyAvatarPhoto(url); strip.querySelectorAll('img').forEach(i=>i.classList.remove('selected')); img.classList.add('selected'); saveProfileToStorage(); };
+  img.onclick=()=>{ strip.querySelectorAll('img').forEach(i=>i.classList.remove('selected')); img.classList.add('selected'); _applyAvatarAndSave(url); };
   img.classList.add('selected');
   strip.querySelectorAll('img').forEach(i=>i.classList.remove('selected'));
   strip.appendChild(img);
   refreshHoverTargets();
   closePickers();
-  showToast('Profile photo updated');
+  // Apply immediately; the toast waits for the save.
+  _applyAvatarAndSave(url);
+}
+
+// Paint the photo now, save, and say "Profile photo updated" only once
+// the server has it (profile-sync uploads the data: URL). A refused save
+// puts the previous photo back, in the DOM and in vibe_user_v1, without
+// saveProfileToStorage (which would queue the refused photo again).
+async function _applyAvatarAndSave(url) {
+  const prevImg = avatarEl.querySelector('img.avatar-photo');
+  const prevSrc = prevImg ? prevImg.getAttribute('src') : null;
+  const prevEmojiDisplay = avatarEmoji.style.display;
+  const prevStored = (vibeLoad('vibe_user_v1') || {}).avatarPhoto;
+  applyAvatarPhoto(url);
   saveProfileToStorage();
+  const ok = await _saveProfileNow("Couldn't update your profile photo.");
+  if (ok !== false) { showToast('Profile photo updated'); return; }
+  // Leave it if a newer photo went up while this save ran.
+  const cur = avatarEl.querySelector('img.avatar-photo');
+  if (!cur || cur.getAttribute('src') !== url) return;
+  if (prevSrc) cur.src = prevSrc;
+  else { cur.remove(); avatarEmoji.style.display = prevEmojiDisplay; }
+  document.querySelectorAll('#avatarPreviewStrip img').forEach(i =>
+    i.classList.toggle('selected', !!prevSrc && i.getAttribute('src') === prevSrc));
+  _restoreStoredUserFields({ avatarPhoto: prevStored });
+}
+
+// Put vibe_user_v1 fields back to a snapshot (undefined → removed). Not
+// saveProfileToStorage: that snapshots the DOM and queues another sync.
+function _restoreStoredUserFields(snap) {
+  const u = vibeLoad('vibe_user_v1') || {};
+  Object.keys(snap).forEach(k => {
+    if (snap[k] === undefined) delete u[k];
+    else u[k] = snap[k];
+  });
+  vibeSave('vibe_user_v1', u);
 }
 
 function applyAvatarPhoto(url){
@@ -4119,6 +4173,14 @@ async function handleCoverUpload(input){
   if(!rawFile) return;
   // Reset so cancel + same-file re-pick still triggers onchange.
   input.value = '';
+  await _ingestCoverFile(rawFile);
+}
+
+// One path for a picked or a dropped cover image: crop, read as a data:
+// URL, then preview it in the modal or apply it from the cover panel. The
+// drop zone used to make a blob: URL instead, which saveProfileToStorage's
+// data:/http(s) allowlist skips, so a dropped cover was never saved.
+async function _ingestCoverFile(rawFile) {
   // Crop to the banner aspect (3:1 — matches the rendered cover height).
   let file = rawFile;
   if (typeof window.openImageCropper === 'function') {
@@ -4145,9 +4207,7 @@ async function handleCoverUpload(input){
   // If triggered from cover panel directly (not modal), apply immediately
   const gradModal = document.getElementById('gradientModal');
   if(!gradModal || !gradModal.classList.contains('open')){
-    applyCoverPhoto(url);
-    showToast('Cover photo updated');
-    saveProfileToStorage();
+    _applyCoverAndSave(() => applyCoverPhoto(url), 'Cover photo updated', "Couldn't update your cover photo.");
   }
 }
 
@@ -4164,17 +4224,42 @@ function applyCoverPhoto(url){
 
 function applyGradient(){
   const cover = document.getElementById('profileCover');
-  if(pendingCoverUrl){
-    applyCoverPhoto(pendingCoverUrl);
-    showToast('Cover photo updated');
-  } else {
-    cover.style.backgroundImage='';
-    cover.style.background=selectedGradient;
-    document.body.classList.remove('has-cover-photo');
-    showToast('Cover updated');
-  }
+  const url = pendingCoverUrl;
+  const grad = selectedGradient;
   closeModal('gradientModal');
+  if(url){
+    _applyCoverAndSave(() => applyCoverPhoto(url), 'Cover photo updated', "Couldn't update your cover photo.");
+  } else {
+    _applyCoverAndSave(() => {
+      cover.style.backgroundImage='';
+      cover.style.background=grad;
+      document.body.classList.remove('has-cover-photo');
+    }, 'Cover updated', "Couldn't update your cover.");
+  }
+}
+
+// Paint the cover now, save, and toast only once the server has it. A
+// refused save restores the exact previous cover (its inline style, the
+// has-cover-photo class and the vibe_user_v1 fields) without
+// saveProfileToStorage, which would queue the refused cover again.
+async function _applyCoverAndSave(paint, success, failure) {
+  const cover = document.getElementById('profileCover');
+  if (!cover) return;
+  const prevStyle = cover.getAttribute('style');
+  const prevHasPhoto = document.body.classList.contains('has-cover-photo');
+  const stored = vibeLoad('vibe_user_v1') || {};
+  const prevStored = { coverPhoto: stored.coverPhoto, coverGradient: stored.coverGradient };
+  paint();
+  const paintedStyle = cover.getAttribute('style');
   saveProfileToStorage();
+  const ok = await _saveProfileNow(failure);
+  if (ok !== false) { showToast(success); return; }
+  // Leave it if a newer cover went up while this save ran.
+  if (cover.getAttribute('style') !== paintedStyle) return;
+  if (prevStyle === null) cover.removeAttribute('style');
+  else cover.setAttribute('style', prevStyle);
+  document.body.classList.toggle('has-cover-photo', prevHasPhoto);
+  _restoreStoredUserFields(prevStored);
 }
 
 // Drag-and-drop on cover drop zone
@@ -4185,12 +4270,8 @@ if(dropZone){
   dropZone.addEventListener('drop', e=>{
     e.preventDefault(); dropZone.classList.remove('drag-over');
     const file = e.dataTransfer.files[0];
-    if(file && file.type.startsWith('image/')){
-      const url = URL.createObjectURL(file);
-      pendingCoverUrl=url;
-      const prev=document.getElementById('coverPreviewImg');
-      if(prev){ prev.src=url; prev.classList.add('visible'); }
-    }
+    if(file && file.type.startsWith('image/')) _ingestCoverFile(file);
+    else if(file) window.vibeToast("That file isn't an image.", { tone: 'error' });
   });
 }
 
@@ -5405,19 +5486,20 @@ function pinFromProfile(contentId, btn) {
   const pinnedEl = document.getElementById('pinnedItem');
   const contentEl = document.getElementById('pinnedContent');
   if (!pinnedEl || !contentEl) return;
+  // What to put back if the server refuses this click.
+  const prevPinnedId = profilePinnedId;
 
   // Toggle off if clicking the same item
   if (profilePinnedId === contentId) {
     profilePinnedId = null;
     pinnedEl.classList.remove('has-pin');
     contentEl.innerHTML = '';
-    if (btn !== undefined) showToast('Unpinned');
     if (typeof saveProfileToStorage === 'function') saveProfileToStorage();
     if (typeof refreshPinButtons === 'function') refreshPinButtons();
     // Sync to server when this is a real user-driven action on a real
     // post (programmatic restore reuses the same function but doesn't
-    // need to round-trip the unset to the server).
-    if (btn !== undefined) _syncPinToServer(null);
+    // need to round-trip the unset to the server). The toast waits for it.
+    if (btn !== undefined) _syncPinToServer(null, prevPinnedId, 'Unpinned');
     return;
   }
 
@@ -5452,29 +5534,37 @@ function pinFromProfile(contentId, btn) {
   pinnedEl.classList.add('has-pin');
   if (btn !== undefined) {
     pinnedEl.scrollIntoView({ behavior: 'smooth', block: 'start' });
-    showToast('Pinned to your profile');
   }
   if (typeof saveProfileToStorage === 'function') saveProfileToStorage();
   if (typeof refreshPinButtons === 'function') refreshPinButtons();
   // Sync to server when this is a real user-driven action on a real
-  // post (UUID id). Non-UUID pins skip the API.
-  if (btn !== undefined) _syncPinToServer(contentId);
+  // post (UUID id). Non-UUID pins skip the API. The toast waits for it.
+  if (btn !== undefined) _syncPinToServer(contentId, prevPinnedId, 'Pinned to your profile');
 }
 
-// PATCH /api/me/pinned with the new pin id (or null to unpin). Skipped
-// for local-only posts — they have non-UUID ids and aren't in the
-// posts table. Best-effort: a transient failure shouldn't undo the
-// local pin since the user just clicked Pin.
+// PATCH /api/me/pinned with the new pin id (or null to unpin), then toast
+// `success`. Local-only posts (non-UUID ids, not in the posts table) skip
+// the API and confirm right away. The pin is painted before the PATCH, so
+// a refused one puts prevId back by calling pinFromProfile without a btn:
+// the programmatic path, which never re-syncs, so the rollback can't loop.
 const _PIN_UUID_RE = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
-function _syncPinToServer(pinId) {
+async function _syncPinToServer(pinId, prevId, success) {
   if (window.viewingRealUser) return;
-  if (!_isAppShell()) return;
-  if (pinId !== null && !_PIN_UUID_RE.test(String(pinId || ''))) return;
-  fetch('/api/me/pinned', {
-    method: 'PATCH', credentials: 'include',
-    headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify({ post_id: pinId }),
-  }).catch(() => {});
+  if (!_isAppShell() || (pinId !== null && !_PIN_UUID_RE.test(String(pinId || '')))) {
+    showToast(success);
+    return;
+  }
+  const r = await window.vibeRequest('/api/me/pinned', {
+    method: 'PATCH',
+    json: { post_id: pinId },
+    failure: pinId === null ? "Couldn't unpin that post." : "Couldn't pin that post.",
+  });
+  if (r.ok) { showToast(success); return; }
+  // A newer pin click owns the slot now; leave it alone.
+  if (profilePinnedId !== pinId) return;
+  // Unpin refused → pin prevId again. Pin refused with nothing pinned
+  // before → toggle this one back off. Swap refused → pin prevId again.
+  pinFromProfile(prevId || pinId);
 }
 
 // Click handler for the pinned card — opens the shared post viewer
@@ -5849,7 +5939,9 @@ function _publishProfilePostLocal(text, serverPost) {
 // Once connected: DMs automatically unlocked, button becomes Message
 
 let vibeRelState = 'none'; // 'none' | 'pending' | 'connected' | 'following'
-let softFollowing = false;
+// One follow request at a time from this header: the Connect button and
+// the "Following ✓" pill write the same follow edge.
+let _vibeFollowBusy = false;
 
 const ICONS = {
   connect: '<svg width="13" height="13" viewBox="0 0 13 13" fill="none" style="flex-shrink:0"><path d="M6.5 1v11M1 6.5h11" stroke="white" stroke-width="1.8" stroke-linecap="round"/></svg>',
@@ -5882,7 +5974,6 @@ function setVibeRelState(state) {
       btn.disabled = true;
       // Sending Connect implies follow — surface that immediately so the user
       // can see they're following AND awaiting acceptance.
-      softFollowing = true;
       if (soft) {
         soft.style.display = 'block';
         soft.textContent = 'Following ✓';
@@ -6023,99 +6114,76 @@ window.paintVibeMoreMenu = paintVibeMoreMenu;
 async function handleVibConnect() {
   if (vibeRelState === 'connected') {
     // Already connected — open DMs directly. /messages?to=<handle>
-    // auto-creates the 1:1 channel if it doesn't exist yet.
+    // auto-creates the 1:1 channel if it doesn't exist yet. Top-level,
+    // in case this page is ever framed.
     const handle = window.viewingRealUser?.handle;
-    window.location.href = handle ? '/messages?to=' + encodeURIComponent(handle) : '/messages';
+    window.__vibeTopNav(handle ? '/messages?to=' + encodeURIComponent(handle) : '/messages');
     return;
   }
 
   const name = _viewedName();
+  const real = window.viewingRealUser;
+
+  // No real user id: the visited profile never finished loading, so there
+  // is nothing to ask the server. The old fallback faked Pending and then
+  // a timer faked "accepted" 3s later; say what happened instead.
+  if (!real || !real.id) {
+    window.vibeToast("This profile didn't finish loading. Refresh and try again.", { tone: 'error' });
+    return;
+  }
+  if (_vibeFollowBusy) return;
 
   // Real Supabase user → call the follow API directly. P1-013: a follow
   // creates a connections row; if both sides have followed each other the
   // visitor sees "connected" instead of "following" on next reload.
-  if (window.viewingRealUser && window.viewingRealUser.id) {
-    // Toggle: if already following/pending, the click means "undo".
-    if (vibeRelState === 'following' || vibeRelState === 'pending') {
-      const wasState = vibeRelState;
-      setVibeRelState('none');
-      try {
-        const r = await fetch('/api/me/follow', {
-          method: 'DELETE', credentials: 'include',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ target_id: window.viewingRealUser.id }),
-        });
-        const j = await r.json().catch(() => ({}));
-        if (!r.ok || !j.ok) throw new Error((j && j.error) || 'Unfollow failed');
-        showToast(`Unfollowed ${name}`);
-      } catch (e) {
-        setVibeRelState(wasState);
-        showToast(e && e.message ? e.message : 'Could not unfollow');
-      }
-      return;
-    }
-    const wasState = vibeRelState;
-    setVibeRelState('following'); // optimistic — server-confirms below
-    try {
-      const r = await fetch('/api/me/follow', {
-        method: 'POST', credentials: 'include',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ target_id: window.viewingRealUser.id }),
-      });
-      const j = await r.json().catch(() => ({}));
-      if (!r.ok || !j.ok) throw new Error((j && j.error) || 'Follow failed');
-      showToast(`Connection pending with ${name}`);
-    } catch (e) {
-      setVibeRelState(wasState);
-      showToast(e && e.message ? e.message : 'Could not follow');
-    }
+  // Toggle: if already following/pending, the click means "undo". The
+  // button repaints from the server's answer, not before it.
+  const undo = vibeRelState === 'following' || vibeRelState === 'pending';
+  const btn = document.getElementById('vibeConnectBtn');
+  _vibeFollowBusy = true;
+  if (btn) btn.disabled = true;
+  const r = await window.vibeRequest('/api/me/follow', {
+    method: undo ? 'DELETE' : 'POST',
+    json: { target_id: real.id },
+    failure: undo ? `Couldn't unfollow ${name}.` : `Couldn't send your connection request to ${name}.`,
+  });
+  _vibeFollowBusy = false;
+  if (!r.ok) {
+    setVibeRelState(vibeRelState); // unchanged; just gives the button back
     return;
   }
-
-  // Local-only fallback when no real user id is available (should not happen
-  // on a hydrated visited profile) — keeps the button responsive.
-  if (vibeRelState === 'pending') return;
-  setVibeRelState('pending');
-  showToast(`Connection request sent to ${name}`);
-  clearTimeout(window._acceptTimer);
-  window._acceptTimer = setTimeout(() => {
-    if (vibeRelState !== 'pending') return;
-    setVibeRelState('connected');
-    showToast(`${name} accepted — you can now message each other`);
-  }, 3000);
+  setVibeRelState(undo ? 'none' : 'following');
+  showToast(undo ? `Unfollowed ${name}` : `Connection pending with ${name}`);
 }
 
+// The "Following ✓" pill beside Connect. setVibeRelState only shows it
+// while I follow them (pending / following), so a click unfollows. It
+// writes the same follow edge as the main button, so both repaint through
+// setVibeRelState, and only after the server answers. (It used to flip
+// its own label and toast first, never read the response, and leave the
+// main button reading Pending after an unfollow.)
 async function handleSoftFollow() {
-  softFollowing = !softFollowing;
-  const soft = document.getElementById('vibeSoftFollow');
-  const name = _viewedName();
-  if (softFollowing) {
-    soft.textContent = 'Following ✓';
-    soft.classList.add('following');
-    showToast(`Following ${name}`);
-    if (window.viewingRealUser && window.viewingRealUser.id) {
-      try {
-        await fetch('/api/me/follow', {
-          method: 'POST', credentials: 'include',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ target_id: window.viewingRealUser.id }),
-        });
-      } catch {}
-    }
-  } else {
-    soft.textContent = 'Follow instead';
-    soft.classList.remove('following');
-    showToast('Unfollowed');
-    if (window.viewingRealUser && window.viewingRealUser.id) {
-      try {
-        await fetch('/api/me/follow', {
-          method: 'DELETE', credentials: 'include',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ target_id: window.viewingRealUser.id }),
-        });
-      } catch {}
-    }
+  const real = window.viewingRealUser;
+  if (!real || !real.id) {
+    window.vibeToast("This profile didn't finish loading. Refresh and try again.", { tone: 'error' });
+    return;
   }
+  if (_vibeFollowBusy) return;
+  const name = _viewedName();
+  const unfollow = vibeRelState === 'pending' || vibeRelState === 'following';
+  const soft = document.getElementById('vibeSoftFollow');
+  _vibeFollowBusy = true;
+  if (soft) soft.disabled = true;
+  const r = await window.vibeRequest('/api/me/follow', {
+    method: unfollow ? 'DELETE' : 'POST',
+    json: { target_id: real.id },
+    failure: unfollow ? `Couldn't unfollow ${name}.` : `Couldn't follow ${name}.`,
+  });
+  _vibeFollowBusy = false;
+  if (soft) soft.disabled = false;
+  if (!r.ok) return;
+  setVibeRelState(unfollow ? 'none' : 'following');
+  showToast(unfollow ? `Unfollowed ${name}` : `Following ${name}`);
 }
 
 function openMutualsModal()  { const m=document.getElementById('mutualsModal'); if(m) m.style.display='flex'; }
@@ -6446,15 +6514,58 @@ function renderProfSR(r, isRecent) {
     removeBtn = '<button class="sr-remove" title="Remove from recent" '
       + 'onclick="event.stopPropagation();removeRecentSearch(\'' + _esc(r.handle).replace(/\'/g, '&#39;') + '\')">×</button>';
   }
+  // The pill does what it says. It used to be a bare <button>, so every
+  // click fell through to the row and just opened the profile. Person rows
+  // carry id / handle / rel for _profSRAction; View, Open and Pending need
+  // nothing beyond the row, so their click still reaches the row's own
+  // navigation. mousedown is cancelled so the search input keeps focus and
+  // its blur doesn't close the dropdown while a follow is in flight.
+  var actionAttr = '';
+  if (r.real && r.type === 'person' && r.id) {
+    actionAttr = ' data-sr-id="' + _esc(r.id) + '" data-sr-handle="' + _esc(r.handle || '') + '"'
+      + ' data-sr-rel="' + _esc(r.rel || 'none') + '"'
+      + ' onmousedown="event.preventDefault()" onclick="_profSRAction(this, event)"';
+  }
   // Orgs + companies + events get a rounded-square logo (8px); persons
   // keep the more-rounded 11px square.
   var avRadius = (r.type === 'company' || r.type === 'org' || r.type === 'event') ? '8px' : '11px';
   return '<div class="search-result"' + clickAttr + '>'
     +'<div class="sr-av" style="background:'+r.col+';border-radius:'+avRadius+';overflow:hidden">'+avatarInner+'</div>'
     +'<div class="sr-info"><div class="sr-name">'+_esc(r.name)+'</div><div class="sr-role">'+_esc(r.role || '')+'</div></div>'
-    +'<button class="sr-action">'+action+'</button>'
+    +'<button class="sr-action"' + actionAttr + '>'+action+'</button>'
     + removeBtn
     +'</div>';
+}
+
+// Search-row pill (see renderProfSR). Message opens the DM at the top
+// level; Connect / Connect back follow in place. Anything else (Pending)
+// returns without stopping the click, so the row opens the profile.
+function _profSRAction(btn, ev) {
+  var rel = btn.dataset.srRel;
+  if (rel === 'connected' && btn.dataset.srHandle) {
+    ev.stopPropagation();
+    window.__vibeTopNav('/messages?to=' + encodeURIComponent(btn.dataset.srHandle));
+  } else if (rel === 'none' || rel === 'followed_by') {
+    ev.stopPropagation();
+    _profSRFollow(btn);
+  }
+}
+// Flip the pill only once the server confirms the follow.
+async function _profSRFollow(btn) {
+  var id = btn.dataset.srId;
+  if (!id || btn.disabled) return;
+  var back = btn.dataset.srRel === 'followed_by';
+  btn.disabled = true;
+  var r = await window.vibeRequest('/api/me/follow', {
+    method: 'POST',
+    json: { target_id: id },
+    failure: "Couldn't send your connection request.",
+  });
+  btn.disabled = false;
+  if (!r.ok) return;
+  // Following back makes it mutual; otherwise it's a pending request.
+  btn.dataset.srRel = back ? 'connected' : 'following';
+  btn.textContent = back ? 'Message' : 'Pending';
 }
 function openProfSearch() {
   var dd = document.getElementById('profSearchDropdown');
@@ -7506,12 +7617,38 @@ function saveProfileToStorage() {
 // pinFromProfile → saveProfileToStorage → scheduleProfileServerSync
 // would otherwise hit a TDZ ReferenceError and blank the page.
 var profileServerSyncTimer = null;
+// Sync bookkeeping, var for the same reason. The toasts that describe a
+// save (avatar, cover, "Auto-saved", "Changes saved") wait on these
+// instead of firing before the request:
+//   _profileSyncDirty     local edits the server hasn't confirmed yet
+//   _profileSyncInflight  the flush running now (resolves true / false)
+//   _profileSyncLastOk    how the last flush went; reset on entering edit
+var _profileSyncDirty = false;
+var _profileSyncInflight = null;
+var _profileSyncLastOk = null;
 function scheduleProfileServerSync() {
   if (window.viewingRealUser) return;
   const u = (typeof vibeLoad === 'function') ? vibeLoad('vibe_user_v1') : null;
   if (!u || !u._appShell) return;
+  _profileSyncDirty = true;
   clearTimeout(profileServerSyncTimer);
-  profileServerSyncTimer = setTimeout(flushProfileServerSync, 1200);
+  profileServerSyncTimer = setTimeout(() => flushProfileServerSync(), 1200);
+}
+
+// Run the sync that's waiting out its debounce now, and report how it
+// went: true (the server has it), false (refused; vibeRequest already said
+// why) or null (nothing went to the server: a local-only session, or
+// nothing to save). `failure` is the caller's own line for a refusal.
+// retryFailed re-sends when the last flush was refused and nothing newer
+// is queued (leaving edit mode); otherwise a refusal isn't re-sent here.
+async function _saveProfileNow(failure, retryFailed) {
+  if (profileServerSyncTimer !== null) {
+    clearTimeout(profileServerSyncTimer);
+    return flushProfileServerSync(failure);
+  }
+  if (_profileSyncInflight) return _profileSyncInflight;
+  if (retryFailed && _profileSyncDirty) return flushProfileServerSync(failure);
+  return _profileSyncLastOk;
 }
 
 function buildProfileSyncPayload() {
@@ -7828,30 +7965,63 @@ function _adoptServerMediaRefs(serverUser, sent) {
   return out;
 }
 
-async function flushProfileServerSync() {
-  if (window.viewingRealUser) return;
+// Returns true when the server saved the profile, false when it refused
+// (vibeRequest shows why), null when nothing goes to the server.
+async function flushProfileServerSync(failure) {
+  profileServerSyncTimer = null;
+  if (window.viewingRealUser) return null;
   const u = (typeof vibeLoad === 'function') ? vibeLoad('vibe_user_v1') : null;
-  if (!u || !u._appShell) return;
+  if (!u || !u._appShell) return null;
+  // One flush at a time: a second POST racing the first could land first
+  // and then be overwritten by the older payload.
+  while (_profileSyncInflight) await _profileSyncInflight;
+  const run = _runProfileServerSync(failure).catch(e => {
+    console.error('[profile-sync]', e);
+    window.vibeToast("Couldn't save your profile changes. Try again.", { tone: 'error' });
+    _profileSyncDirty = true;
+    _profileSyncLastOk = false;
+    return false;
+  });
+  _profileSyncInflight = run;
+  run.then(() => { if (_profileSyncInflight === run) _profileSyncInflight = null; });
+  return run;
+}
+
+async function _runProfileServerSync(failure) {
   // Convert any pre-fix data: URI logos to real uploads before we build
   // the payload — the sanitizer drops data: URIs and would otherwise wipe
   // them out of work_experience on every sync.
   await _migrateDataUriLogos();
+  const payload = buildProfileSyncPayload();
+  // This payload carries every edit so far; an edit from here on marks
+  // the profile dirty again and gets its own flush.
+  _profileSyncDirty = false;
+  const r = await window.vibeRequest('/api/me/profile-sync', {
+    method: 'POST',
+    json: payload,
+    failure: failure || "Couldn't save your profile changes.",
+  });
+  if (!r.ok) {
+    _profileSyncDirty = true;
+    _profileSyncLastOk = false;
+    return false;
+  }
+  _profileSyncLastOk = true;
+  // Adopt the server's copy below only while nothing newer is on this
+  // device. An edit made during this flight has either marked the profile
+  // dirty again (its flush is queued behind this one) or is still inside
+  // the 500ms snapshot (saveTimer), which queues one when it fires. This
+  // echo predates that edit: writing it over vibe_user_v1 would drop the
+  // edit from the queued payload (which would then report a clean save
+  // without it), and hydrateProfileFields would repaint a name typed
+  // meanwhile back to the old one. The queued flush adopts its own echo.
+  const localIsNewer = () => _profileSyncDirty || !!saveTimer;
+  if (localIsNewer()) return true;
   try {
-    const payload = buildProfileSyncPayload();
-    const r = await fetch('/api/me/profile-sync', {
-      method: 'POST',
-      credentials: 'include',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify(payload),
-    });
-    const j = await r.json();
-    if (!r.ok || !j.ok) {
-      if (typeof showToast === 'function') showToast((j && j.error) ? String(j.error) : 'Could not save to server');
-      return;
-    }
     const rb = await fetch('/api/me/profile-bootstrap', { credentials: 'include' });
     const jb = await rb.json();
-    if (rb.ok && jb.ok && jb.vibeUser) {
+    // Checked again: an edit can land while the bootstrap is in flight.
+    if (rb.ok && jb.ok && jb.vibeUser && !localIsNewer()) {
       const prev = (typeof vibeLoad === 'function') ? vibeLoad('vibe_user_v1') : {};
       const nu = Object.assign({}, jb.vibeUser);
       nu._appShell = true;
@@ -7906,8 +8076,11 @@ async function flushProfileServerSync() {
       }
     }
   } catch (e) {
-    if (typeof showToast === 'function') showToast('Offline — saved on this device only');
+    // The save itself went through; only the refresh after it failed, so
+    // the local copy stays as it was. Nothing for the student to redo.
+    console.warn('[profile-sync] refresh after save failed', e);
   }
+  return true;
 }
 
 // ── Posts persistence (vibe_posts_v1) ────────────────────────────────────
@@ -8023,14 +8196,21 @@ function _profileMapDbRow(row) {
   if (!row || row.type !== 'post') return null;
   const tags = (row.tags || []).map(t => `<span class="ppost-tag">#${_esc(t)}</span>`).join('');
   const bodyText = _esc(row.content || '').replace(/\n/g, '<br>');
-  const imageHTML = row.media_url
-    ? `<img src="${_esc(row.media_url)}" alt="" style="display:block;width:100%;border-radius:12px;margin-top:8px;">`
-    : '';
+  // Every post from the API carries media_kind ('image' | 'video', set by
+  // withPostMediaUrls). A video gets a muted, metadata-only <video> with
+  // its thumbnail as the poster; the card itself opens the post viewer.
+  let mediaHTML = '';
+  if (row.media_url && row.media_kind === 'video') {
+    const poster = row.media_thumbnail_url ? ` poster="${_esc(row.media_thumbnail_url)}"` : '';
+    mediaHTML = `<video src="${_esc(row.media_url)}"${poster} muted playsinline preload="metadata" style="display:block;width:100%;max-height:380px;border-radius:12px;margin-top:8px;background:#000;"></video>`;
+  } else if (row.media_url) {
+    mediaHTML = `<img src="${_esc(row.media_url)}" alt="" style="display:block;width:100%;border-radius:12px;margin-top:8px;">`;
+  }
   return {
     id: row.id,
     ottoType: '',
     date: _formatRelativeDate(row.created_at),
-    bodyHTML: bodyText + imageHTML,
+    bodyHTML: bodyText + mediaHTML,
     ottoBadgeHTML: '',
     tagsHTML: tags,
     platformStatsHTML: '',
@@ -8138,13 +8318,12 @@ function _buildRepostCard(repost) {
     inner.appendChild(body);
   }
 
-  // Video posts store an R2 object key under `clips/` (legacy prefix name)
-  // and get a <video>; image posts store a public URL and get a backdrop.
-  // /api/feed pre-computes media_kind; the profile endpoints don't, so fall
-  // back to sniffing the key prefix.
+  // Video posts get a <video>; image posts get a backdrop. The reposts
+  // endpoint sends media_kind on the embedded post (withPostMediaUrls),
+  // and media_url is a proxy URL either way, so there is no `clips/` key
+  // prefix left to sniff.
   if (post.media_url) {
-    const isVideo =
-      post.media_kind === 'video' || String(post.media_url).startsWith('clips/');
+    const isVideo = post.media_kind === 'video';
     if (isVideo) {
       const v = document.createElement('video');
       v.src = post.media_url;
@@ -8306,10 +8485,31 @@ function _measureAllReadMore() {
 }
 window.addEventListener('resize', () => requestAnimationFrame(_measureAllReadMore));
 
-function deleteProfilePost(btn) {
+// × on a post card (edit mode). Confirm, delete on the server, and only
+// then take the card out. This used to remove the card locally and never
+// call the API, so the post came back on reload. Mirrors __vpvDeletePost
+// in _postViewer.js. Local-only posts (non-UUID ids, never in the posts
+// table) just come off this device.
+async function deleteProfilePost(btn) {
   const card = btn.closest('.profile-post-card');
-  if (!card) return;
+  if (!card || btn.disabled) return;
   const id = card.dataset.postId;
+  if (!window.confirm("Delete this post? This can't be undone.")) return;
+  let alreadyGone = false;
+  if (id && _isAppShell() && _PIN_UUID_RE.test(id)) {
+    btn.disabled = true;
+    const r = await window.vibeRequest('/api/posts/' + encodeURIComponent(id), {
+      method: 'DELETE',
+      failure: "Couldn't delete that post.",
+    });
+    btn.disabled = false;
+    if (!r.ok) {
+      // 404: already deleted on the server, so the card goes too and
+      // vibeRequest's "no longer available" toast stands on its own.
+      if (r.status !== 404) return;
+      alreadyGone = true;
+    }
+  }
   card.remove();
   if (id && id === profilePinnedId) {
     profilePinnedId = null;
@@ -8321,7 +8521,7 @@ function deleteProfilePost(btn) {
   savePostsToStorage();
   saveProfileToStorage();
   if (typeof populateAllGrid === 'function') populateAllGrid();
-  if (typeof showToast === 'function') showToast('Post removed');
+  if (!alreadyGone) showToast('Post deleted');
 }
 
 // ── Hydrate persisted sections from vibe_user_v1 ─────────────────────────
@@ -8529,7 +8729,9 @@ function renderUserSections(user) {
 document.addEventListener('input', e => {
   if (e.target.hasAttribute('data-edit') && editMode) {
     clearTimeout(saveTimer);
-    saveTimer = setTimeout(() => { saveProfileToStorage(); }, 500);
+    // Nulled when it fires, so leaving edit mode can tell whether a
+    // snapshot is still waiting (_confirmProfileSaveOnExit).
+    saveTimer = setTimeout(() => { saveTimer = null; saveProfileToStorage(); }, 500);
   }
   // Live-update the avatar initials when the name field is being typed —
   // only if there's no uploaded photo overriding the initials.
@@ -8855,6 +9057,7 @@ function showWelcomeBanner() {
     border: 1px solid rgba(28,28,30,0.12); background: rgba(255,255,255,0.7);
     font-size: 13px; font-weight: 700; cursor: pointer; color: #1C1C1E;
   }
+  #connectionsModal .conn-retry { margin-top: 12px; }
 </style>
 
 <!-- ── Share profile modal ──────────────────────────────────────────────
@@ -8987,6 +9190,12 @@ function showWelcomeBanner() {
   #shareProfileModal .share-empty {
     padding: 24px 12px; text-align: center; color: #8A8580; font-size: 13px;
   }
+  #shareProfileModal .share-retry {
+    margin-top: 10px; padding: 6px 14px; border-radius: 999px;
+    border: 1px solid rgba(28,28,30,0.14); background: white; color: #1C1C1E;
+    font-family: 'DM Sans', sans-serif; font-size: 12px; font-weight: 700;
+    cursor: none;
+  }
 </style>
 
 <div id="shareProfileModal" onclick="if(event.target===this) closeShareProfileModal();">
@@ -9026,6 +9235,7 @@ function showWelcomeBanner() {
     let recipients = [];        // cached connections list
     let recipientSent = new Set(); // ids that already received the link in this session
     let searchDebounce = null;
+    let recipientsSeq = 0;      // the newest loadRecipients() owns the list
 
     function getShareTarget() {
       // Visiting someone via /profile/<handle>
@@ -9096,23 +9306,36 @@ function showWelcomeBanner() {
     async function loadRecipients(query) {
       const wrap = document.getElementById('shareRecipientsList');
       if (wrap) wrap.innerHTML = `<div class="share-empty">Loading…</div>`;
-      try {
-        const qs = query ? `?limit=20&q=${encodeURIComponent(query)}` : '?limit=20';
-        const r = await fetch('/api/me/connections' + qs, { credentials: 'include' });
-        const j = await r.json();
-        recipients = (j && j.ok && Array.isArray(j.users)) ? j.users : [];
-        // Filter out the share target — sending someone their own profile
-        // via DM is a weird flow.
-        if (shareTarget && shareTarget.handle) {
-          recipients = recipients.filter(u =>
-            (u.handle || '').toLowerCase() !== shareTarget.handle.toLowerCase()
-          );
-        }
-        paintRecipients();
-      } catch {
+      const seq = ++recipientsSeq;
+      const qs = query ? `?limit=20&q=${encodeURIComponent(query)}` : '?limit=20';
+      const r = await window.vibeRequest('/api/me/connections' + qs, {
+        quiet: true,
+        failure: "Couldn't load your connections.",
+      });
+      if (seq !== recipientsSeq) return; // a newer search owns the list
+      if (!r.ok || !Array.isArray(r.data.users)) {
+        // A failed read, not "No connections to send to yet.": say so
+        // inline, with Retry.
         recipients = [];
-        paintRecipients();
+        if (wrap) {
+          const line = r.ok ? "Couldn't load your connections. Try again." : r.message;
+          wrap.innerHTML = `<div class="share-empty">${escapeHTML(line)}<br><button type="button" class="share-retry">Retry</button></div>`;
+          wrap.querySelector('.share-retry').onclick = (e) => {
+            e.preventDefault(); e.stopPropagation();
+            loadRecipients(query);
+          };
+        }
+        return;
       }
+      recipients = r.data.users;
+      // Filter out the share target — sending someone their own profile
+      // via DM is a weird flow.
+      if (shareTarget && shareTarget.handle) {
+        recipients = recipients.filter(u =>
+          (u.handle || '').toLowerCase() !== shareTarget.handle.toLowerCase()
+        );
+      }
+      paintRecipients();
     }
 
     async function sendShareTo(handle, userId, btn) {
@@ -9254,6 +9477,8 @@ function showWelcomeBanner() {
     let activeHasMore = false;
     let activeQuery = '';
     let searchDebounce = null;
+    let activeError = null; // a failed first-page read, painted with Retry
+    let loadSeq = 0;        // the newest load() owns the list
 
     function getViewedHandle() {
       // Visiting someone via /profile/<handle> → window.viewingRealUser is set
@@ -9326,6 +9551,11 @@ function showWelcomeBanner() {
     function paint() {
       const body = document.getElementById('connModalBody');
       if (!body) return;
+      if (activeError) {
+        // A failed read is not "No one here yet."
+        body.innerHTML = `<div class="conn-empty">${escapeHTML(activeError)}<br><button class="conn-load-more conn-retry" onclick="window.__retryConnModal()">Retry</button></div>`;
+        return;
+      }
       if (activeUsers.length === 0) {
         body.innerHTML = activeQuery
           ? `<div class="conn-empty">Nothing matches "${escapeHTML(activeQuery)}".</div>`
@@ -9350,63 +9580,76 @@ function showWelcomeBanner() {
       const id = btn.dataset.actId;
       const handle = btn.dataset.actHandle;
       const state = btn.dataset.actState;
-      if (!id) return;
+      if (!id || btn.disabled) return;
+      btn.disabled = true;
       if (state === 'connected') {
-        // Message — start a thread, jump to it
-        try {
-          const r = await fetch('/api/me/threads', {
-            method: 'POST', credentials: 'include',
-            headers: {'Content-Type':'application/json'},
-            body: JSON.stringify({ handle }),
-          });
-          const j = await r.json();
-          if (r.ok && j && j.ok && j.channel_id) {
-            window.location.href = '/messages?channel=' + j.channel_id;
-          }
-        } catch {}
+        // Message — start a thread, jump to it (top-level, in case this
+        // page is framed). The threads POST is terms-gated.
+        const r = await window.vibeRequest('/api/me/threads', {
+          method: 'POST',
+          json: { handle },
+          failure: "Couldn't open a chat with this person.",
+        });
+        btn.disabled = false;
+        if (!r.ok) return;
+        window.__vibeTopNav(r.data.channel_id
+          ? '/messages?channel=' + encodeURIComponent(r.data.channel_id)
+          : '/messages?to=' + encodeURIComponent(handle));
         return;
       }
       const isFollow = (state === 'none' || state === 'followed_by');
-      try {
-        const r = await fetch('/api/me/follow', {
-          method: isFollow ? 'POST' : 'DELETE', credentials: 'include',
-          headers: {'Content-Type':'application/json'},
-          body: JSON.stringify({ target_id: id }),
-        });
-        const j = await r.json();
-        if (r.ok && j && j.ok) {
-          // Update local state + repaint
-          const u = activeUsers.find(x => x.id === id);
-          if (u) {
-            if (isFollow) u.follow_state = (state === 'followed_by') ? 'connected' : 'following';
-            else          u.follow_state = (state === 'connected') ? 'followed_by' : 'none';
-            paint();
-          }
-        }
-      } catch {}
-    }
-
-    async function load(kind, offset) {
-      try {
-        const r = await fetch(endpointFor(kind, offset), { credentials: 'include' });
-        const j = await r.json();
-        if (j && j.ok && Array.isArray(j.users)) {
-          if (offset === 0) activeUsers = j.users;
-          else activeUsers = activeUsers.concat(j.users);
-          activeOffset = activeUsers.length;
-          activeHasMore = !!j.has_more;
-          paint();
-        } else {
-          activeUsers = [];
-          paint();
-        }
-      } catch {
-        activeUsers = [];
+      const r = await window.vibeRequest('/api/me/follow', {
+        method: isFollow ? 'POST' : 'DELETE',
+        json: { target_id: id },
+        failure: isFollow ? "Couldn't follow this person." : "Couldn't unfollow this person.",
+      });
+      btn.disabled = false;
+      if (!r.ok) return;
+      // Update local state + repaint, now that the server has it
+      const u = activeUsers.find(x => x.id === id);
+      if (u) {
+        if (isFollow) u.follow_state = (state === 'followed_by') ? 'connected' : 'following';
+        else          u.follow_state = (state === 'connected') ? 'followed_by' : 'none';
         paint();
       }
     }
 
+    async function load(kind, offset) {
+      const seq = ++loadSeq;
+      // A failed first page is painted inline with Retry; a failed Load
+      // more keeps the rows already shown and says so in a toast.
+      const r = await window.vibeRequest(endpointFor(kind, offset), {
+        quiet: offset === 0,
+        failure: offset === 0 ? "Couldn't load this list." : "Couldn't load more people.",
+      });
+      if (seq !== loadSeq) return; // a tab switch or a newer search took over
+      const users = r.ok && Array.isArray(r.data.users) ? r.data.users : null;
+      if (users) {
+        activeError = null;
+        if (offset === 0) activeUsers = users;
+        else activeUsers = activeUsers.concat(users);
+        activeOffset = activeUsers.length;
+        activeHasMore = !!r.data.has_more;
+        paint();
+        return;
+      }
+      if (offset === 0) {
+        activeUsers = []; activeHasMore = false;
+        activeError = r.ok ? "Couldn't load this list. Try again." : r.message;
+        paint();
+      } else if (r.ok) {
+        window.vibeToast("Couldn't load more people. Try again.", { tone: 'error' });
+      }
+    }
+
     window.__loadMoreConnModal = () => load(activeKind, activeOffset);
+
+    window.__retryConnModal = () => {
+      activeError = null;
+      const body = document.getElementById('connModalBody');
+      if (body) body.innerHTML = `<div class="conn-loading">loading…</div>`;
+      load(activeKind, 0);
+    };
 
     window.switchConnectionsTab = function(kind) {
       activeKind = kind;
