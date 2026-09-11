@@ -4,7 +4,9 @@ import { AnimatePresence, motion } from "framer-motion";
 import Link from "next/link";
 import { useCallback, useEffect, useRef, useState } from "react";
 
+import { asLoadFailure, LoadFailed, type LoadFailure } from "@/components/feedback/LoadFailed";
 import { useMobileTour } from "@/components/mobile/use-mobile-tour";
+import { vibeRequest } from "@/lib/feedback/request";
 
 /**
  * iOS-native mobile rebuild of the /network surface. Built around
@@ -64,6 +66,16 @@ const PAGE_LIMIT = 25;
 type RelationshipTab = Exclude<Tab, "discover">;
 const TAB_ORDER: Tab[] = ["discover", "connections", "following", "followers"];
 
+// What a failed load says (empty-states design §1). It renders as
+// LoadFailed in the pane's place, never as the pane's empty copy.
+const LOAD_FAILURE: Record<Tab, string> = {
+  discover: "Couldn't load suggestions.",
+  connections: "Couldn't load your connections.",
+  following: "Couldn't load who you follow.",
+  followers: "Couldn't load your followers.",
+};
+const SEARCH_FAILURE = "Couldn't search people.";
+
 export function NetworkMobile() {
   // Otto spotlight tour — fires on visit when Settings → Replay tour
   // sets the network pending flag. Final leg in the 3-leg flow.
@@ -73,6 +85,9 @@ export function NetworkMobile() {
   const [query, setQuery] = useState("");
   const [debouncedQuery, setDebouncedQuery] = useState("");
   const [suggestions, setSuggestions] = useState<ListUser[] | null>(null);
+  // Discover's failed load, and the tick its Retry bumps to refetch.
+  const [suggestionsErr, setSuggestionsErr] = useState<LoadFailure | null>(null);
+  const [suggestionsTick, setSuggestionsTick] = useState(0);
   // Per-tab cache so swiping between Connections / Following /
   // Followers doesn't flash stale data into the next tab (each tab
   // owns its own list rather than sharing a single tabUsers slot).
@@ -83,8 +98,18 @@ export function NetworkMobile() {
     following: null,
     followers: null,
   });
+  // Failures live beside the cache, never in it: a failed tab stays null
+  // in usersByTab (caching [] read as "No followers yet" for the rest of
+  // the session and was never refetched). The per-tab fetch skips a tab
+  // with an entry here; its Retry deletes the entry, which refetches.
+  const [errByTab, setErrByTab] = useState<
+    Partial<Record<RelationshipTab, LoadFailure>>
+  >({});
   const [searchResults, setSearchResults] = useState<SearchUser[] | null>(null);
   const [searchLoading, setSearchLoading] = useState(false);
+  // A failed search, and the tick its Retry bumps to run it again.
+  const [searchErr, setSearchErr] = useState<LoadFailure | null>(null);
+  const [searchTick, setSearchTick] = useState(0);
 
   // Swipeable tab content. Mirrors the profile-tabs pattern.
   const tabScrollRef = useRef<HTMLDivElement | null>(null);
@@ -96,64 +121,70 @@ export function NetworkMobile() {
     return () => clearTimeout(t);
   }, [query]);
 
-  // Initial suggestions fetch (cached for the session). The endpoint
-  // returns `suggestions`, not `users` — different shape from the other
-  // relationship endpoints below.
+  // Initial suggestions fetch (cached for the session), rerun by Retry.
+  // The endpoint returns `suggestions`, not `users` — different shape
+  // from the other relationship endpoints below.
   useEffect(() => {
     let cancelled = false;
     (async () => {
-      try {
-        const r = await fetch("/api/me/suggested-connections?limit=25", {
-          cache: "no-store",
-        });
-        const j = await r.json();
-        if (cancelled) return;
-        setSuggestions(
-          j?.ok && Array.isArray(j.suggestions)
-            ? (j.suggestions as ListUser[])
-            : [],
-        );
-      } catch {
-        if (!cancelled) setSuggestions([]);
+      setSuggestionsErr(null);
+      const failure = LOAD_FAILURE.discover;
+      // vibeRequest never throws. quiet: a failure renders LoadFailed in
+      // the pane, and a 2xx without the array is a failure too.
+      const r = await vibeRequest<{ suggestions?: ListUser[] }>(
+        "/api/me/suggested-connections?limit=25",
+        { cache: "no-store", quiet: true, failure },
+      );
+      if (cancelled) return;
+      if (r.ok && Array.isArray(r.data.suggestions)) {
+        setSuggestions(r.data.suggestions);
+      } else {
+        // Left null, never [], which read as "No suggestions yet".
+        setSuggestionsErr(asLoadFailure(r, failure));
       }
     })();
     return () => {
       cancelled = true;
     };
-  }, []);
+  }, [suggestionsTick]);
 
   // Per-tab fetch — caches each relationship tab's rows in usersByTab.
   // Skips refetching if data is already cached so swiping back is
-  // instant. Search overrides everything (handled separately below).
+  // instant, and skips a failed tab until its Retry clears errByTab.
+  // Search overrides everything (handled separately below).
   useEffect(() => {
     if (debouncedQuery) return;
     if (tab === "discover") return;
     if (usersByTab[tab] !== null) return; // already loaded
+    if (errByTab[tab]) return; // failed; LoadFailed shows until Retry
     let cancelled = false;
     (async () => {
-      try {
-        const path =
-          tab === "connections"
-            ? "/api/me/connections"
-            : tab === "following"
-              ? "/api/me/following"
-              : "/api/me/followers";
-        const r = await fetch(`${path}?limit=${PAGE_LIMIT}&offset=0`, {
-          cache: "no-store",
-        });
-        const j = await r.json();
-        if (cancelled) return;
-        const rows =
-          j?.ok && Array.isArray(j.users) ? (j.users as ListUser[]) : [];
+      const path =
+        tab === "connections"
+          ? "/api/me/connections"
+          : tab === "following"
+            ? "/api/me/following"
+            : "/api/me/followers";
+      const failure = LOAD_FAILURE[tab];
+      // vibeRequest never throws. quiet: a failure renders LoadFailed in
+      // the pane, and a 2xx without the array is a failure too.
+      const r = await vibeRequest<{ users?: ListUser[] }>(
+        `${path}?limit=${PAGE_LIMIT}&offset=0`,
+        { cache: "no-store", quiet: true, failure },
+      );
+      if (cancelled) return;
+      if (r.ok && Array.isArray(r.data.users)) {
+        const rows = r.data.users;
         setUsersByTab((prev) => ({ ...prev, [tab]: rows }));
-      } catch {
-        if (!cancelled) setUsersByTab((prev) => ({ ...prev, [tab]: [] }));
+      } else {
+        const err = asLoadFailure(r, failure);
+        setErrByTab((prev) => ({ ...prev, [tab]: err }));
       }
     })();
     return () => {
       cancelled = true;
     };
-  }, [tab, debouncedQuery, usersByTab]);
+  }, [tab, debouncedQuery, usersByTab, errByTab]);
 
   // Programmatic scroll to the active tab pane whenever `tab` changes
   // (via a tap on the strip). Skipped if we're already there to avoid
@@ -174,7 +205,8 @@ export function NetworkMobile() {
     return () => window.clearTimeout(t);
   }, [tab, debouncedQuery]);
 
-  // Search fetch — fires whenever the debounced query has content.
+  // Search fetch — fires whenever the debounced query has content, and
+  // again for the same query on Retry.
   useEffect(() => {
     if (!debouncedQuery) {
       // Clear stale results when the query empties so the tab-content
@@ -182,29 +214,32 @@ export function NetworkMobile() {
       // eslint-disable-next-line react-hooks/set-state-in-effect
       setSearchResults(null);
       setSearchLoading(false);
+      setSearchErr(null);
       return;
     }
     let cancelled = false;
     setSearchLoading(true);
     (async () => {
-      try {
-        const r = await fetch(
-          `/api/users/search?q=${encodeURIComponent(debouncedQuery)}&limit=20`,
-          { cache: "no-store" },
-        );
-        const j = await r.json();
-        if (cancelled) return;
-        setSearchResults(j?.ok && Array.isArray(j.users) ? (j.users as SearchUser[]) : []);
-      } catch {
-        if (!cancelled) setSearchResults([]);
-      } finally {
-        if (!cancelled) setSearchLoading(false);
+      setSearchErr(null);
+      // vibeRequest never throws. quiet: a failed search renders LoadFailed
+      // in the results' place, never "No matches for …".
+      const r = await vibeRequest<{ users?: SearchUser[] }>(
+        `/api/users/search?q=${encodeURIComponent(debouncedQuery)}&limit=20`,
+        { cache: "no-store", quiet: true, failure: SEARCH_FAILURE },
+      );
+      if (cancelled) return;
+      if (r.ok && Array.isArray(r.data.users)) {
+        setSearchResults(r.data.users);
+      } else {
+        setSearchResults(null);
+        setSearchErr(asLoadFailure(r, SEARCH_FAILURE));
       }
+      setSearchLoading(false);
     })();
     return () => {
       cancelled = true;
     };
-  }, [debouncedQuery]);
+  }, [debouncedQuery, searchTick]);
 
   const onStateChange = useCallback(
     (id: string, next: FollowState) => {
@@ -224,6 +259,21 @@ export function NetworkMobile() {
     },
     [],
   );
+
+  // Retry for a pane whose load failed. Discover reruns its fetch; a
+  // relationship tab drops its errByTab entry, which reruns the per-tab
+  // fetch (its cache slot is still null, never []).
+  const retryPane = useCallback((t: Tab) => {
+    if (t === "discover") {
+      setSuggestionsTick((n) => n + 1);
+      return;
+    }
+    setErrByTab((prev) => {
+      const next = { ...prev };
+      delete next[t];
+      return next;
+    });
+  }, []);
 
   // Dismiss a Discover suggestion — optimistic remove + server POST.
   // On failure, restore the user back into the suggestions list so the
@@ -300,6 +350,8 @@ export function NetworkMobile() {
             query={debouncedQuery}
             loading={searchLoading}
             results={searchResults}
+            failure={searchErr}
+            onRetry={() => setSearchTick((n) => n + 1)}
           />
         </div>
       ) : (
@@ -343,6 +395,12 @@ export function NetworkMobile() {
                     ? suggestions
                     : usersByTab[t as RelationshipTab]
                 }
+                failure={
+                  t === "discover"
+                    ? suggestionsErr
+                    : (errByTab[t as RelationshipTab] ?? null)
+                }
+                onRetry={() => retryPane(t)}
                 onStateChange={onStateChange}
                 onDismissSuggestion={onDismissSuggestion}
               />
@@ -495,14 +553,21 @@ function TabStrip({
 function ListPane({
   tab,
   users,
+  failure,
+  onRetry,
   onStateChange,
   onDismissSuggestion,
 }: {
   tab: Tab;
   users: ListUser[] | null;
+  /** This pane's failed load; its rows stay null behind it. */
+  failure: LoadFailure | null;
+  onRetry: () => void;
   onStateChange: (id: string, next: FollowState) => void;
   onDismissSuggestion: (user: ListUser) => void;
 }) {
+  // A failed load is never "No followers yet" (empty-states design §1).
+  if (failure) return <LoadFailed failure={failure} onRetry={onRetry} />;
   if (users === null) return <ListSkeleton />;
   if (users.length === 0) {
     return (
@@ -688,11 +753,19 @@ function SearchPane({
   query,
   loading,
   results,
+  failure,
+  onRetry,
 }: {
   query: string;
   loading: boolean;
   results: SearchUser[] | null;
+  /** The search for `query` failed; results stay null behind it. */
+  failure: LoadFailure | null;
+  onRetry: () => void;
 }) {
+  // A failed search is never "No matches for …". Compact: one tight row
+  // under the search field (empty-states design §2).
+  if (failure) return <LoadFailed failure={failure} onRetry={onRetry} compact />;
   if (loading || results === null) return <ListSkeleton />;
   if (results.length === 0) {
     return (

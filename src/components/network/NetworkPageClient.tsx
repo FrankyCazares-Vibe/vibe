@@ -3,6 +3,7 @@
 import Link from "next/link";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 
+import { asLoadFailure, LoadFailed, type LoadFailure } from "@/components/feedback/LoadFailed";
 import { vibeRequest } from "@/lib/feedback/request";
 
 import { UserCard, type UserCardProps } from "./UserCard";
@@ -98,6 +99,15 @@ const TAB_LABEL: Record<Tab, string> = {
 };
 
 const PAGE_SIZE = 20;
+
+// What a failed first page says, per list (empty-states design §1). A
+// search inside a tab fails with that tab's line.
+const LOAD_FAILURE: Record<Tab, string> = {
+  connections: "Couldn't load your connections.",
+  following: "Couldn't load who you follow.",
+  followers: "Couldn't load your followers.",
+  suggestions: "Couldn't load suggestions.",
+};
 
 export function NetworkPageClient() {
   const [tab, setTab] = useState<Tab>("connections");
@@ -215,66 +225,73 @@ export function NetworkPageClient() {
     };
   }, []);
 
-  // Fetch the current tab's first page when tab/query changes. All setState
-  // calls live inside the async IIFE — the synchronous effect body only
-  // bumps a sequence number used to discard stale responses.
+  // A failed first page. LoadFailed renders in the list's place, never the
+  // empty copy ("No followers yet") a failed read used to show. Retry bumps
+  // retryTick, which reruns the fetch below for the same tab and search.
+  const [loadErr, setLoadErr] = useState<LoadFailure | null>(null);
+  const [retryTick, setRetryTick] = useState(0);
+
+  // Fetch the current tab's first page when tab/query changes, or on Retry.
+  // All setState calls live inside the async IIFE — the synchronous effect
+  // body only bumps a sequence number used to discard stale responses.
+  // Each run loads a different list (or retries a failed one), so the
+  // skeleton shows until it lands and a failure is LoadFailed, not a toast.
   const requestSeq = useRef(0);
   useEffect(() => {
     const seq = ++requestSeq.current;
     (async () => {
       setLoading(true);
+      setLoadErr(null);
       setUsers([]);
       setSuggestions([]);
       setHasMore(false);
 
-      try {
-        if (tab === "suggestions") {
-          const res = await fetch(
-            `/api/me/suggested-connections?limit=${PAGE_SIZE}`,
-            { cache: "no-store" },
-          );
-          const data = await res.json();
-          if (seq !== requestSeq.current) return;
-          if (data?.ok && Array.isArray(data.suggestions)) {
-            setSuggestions(data.suggestions as SuggestionUser[]);
-            setTabTotal(data.suggestions.length);
-          } else {
-            setSuggestions([]);
-            setTabTotal(0);
-          }
-          setHasMore(false);
-          return;
-        }
-
-        const params = new URLSearchParams({
-          limit: String(PAGE_SIZE),
-          offset: "0",
-        });
-        if (debouncedQ.length > 0) params.set("q", debouncedQ);
-        const res = await fetch(`/api/me/${tab}?${params.toString()}`, {
-          cache: "no-store",
-        });
-        const data = await res.json();
+      // vibeRequest never throws. A 2xx without the array is a failure
+      // too, never an empty list.
+      const failure = LOAD_FAILURE[tab];
+      if (tab === "suggestions") {
+        const r = await vibeRequest<{ suggestions?: SuggestionUser[] }>(
+          `/api/me/suggested-connections?limit=${PAGE_SIZE}`,
+          { cache: "no-store", quiet: true, failure },
+        );
         if (seq !== requestSeq.current) return;
-        if (data?.ok && Array.isArray(data.users)) {
-          setUsers(data.users as ListUser[]);
-          setTabTotal(data.total ?? data.users.length);
-          setHasMore(Boolean(data.has_more));
+        if (r.ok && Array.isArray(r.data.suggestions)) {
+          setSuggestions(r.data.suggestions);
+          setTabTotal(r.data.suggestions.length);
         } else {
-          setUsers([]);
+          setLoadErr(asLoadFailure(r, failure));
           setTabTotal(0);
-          setHasMore(false);
         }
-      } catch {
-        if (seq !== requestSeq.current) return;
-        setUsers([]);
-        setSuggestions([]);
-        setTabTotal(0);
-      } finally {
-        if (seq === requestSeq.current) setLoading(false);
+        setLoading(false);
+        return;
       }
+
+      const params = new URLSearchParams({
+        limit: String(PAGE_SIZE),
+        offset: "0",
+      });
+      if (debouncedQ.length > 0) params.set("q", debouncedQ);
+      const r = await vibeRequest<{
+        users?: ListUser[];
+        total?: number;
+        has_more?: boolean;
+      }>(`/api/me/${tab}?${params.toString()}`, {
+        cache: "no-store",
+        quiet: true,
+        failure,
+      });
+      if (seq !== requestSeq.current) return;
+      if (r.ok && Array.isArray(r.data.users)) {
+        setUsers(r.data.users);
+        setTabTotal(r.data.total ?? r.data.users.length);
+        setHasMore(Boolean(r.data.has_more));
+      } else {
+        setLoadErr(asLoadFailure(r, failure));
+        setTabTotal(0);
+      }
+      setLoading(false);
     })();
-  }, [tab, debouncedQ]);
+  }, [tab, debouncedQ, retryTick]);
 
   const loadMore = async () => {
     if (loading || !hasMore || tab === "suggestions") return;
@@ -420,6 +437,8 @@ export function NetworkPageClient() {
         {tab === "suggestions" ? (
           <SuggestionsList
             loading={loading}
+            loadErr={loadErr}
+            onRetry={() => setRetryTick((n) => n + 1)}
             users={filteredSuggestions}
             isFiltered={
               debouncedQ.length > 0 || suggestionFilter !== "all"
@@ -430,6 +449,8 @@ export function NetworkPageClient() {
           <ListBody
             tab={tab}
             loading={loading}
+            loadErr={loadErr}
+            onRetry={() => setRetryTick((n) => n + 1)}
             users={users}
             tabTotal={tabTotal}
             hasMore={hasMore}
@@ -609,6 +630,8 @@ function SuggestionFilters({
 function ListBody({
   tab,
   loading,
+  loadErr,
+  onRetry,
   users,
   tabTotal,
   hasMore,
@@ -618,6 +641,8 @@ function ListBody({
 }: {
   tab: Tab;
   loading: boolean;
+  loadErr: LoadFailure | null;
+  onRetry: () => void;
   users: ListUser[];
   tabTotal: number;
   hasMore: boolean;
@@ -625,6 +650,9 @@ function ListBody({
   onStateChange: (id: string, next: UserCardProps["follow_state"]) => void;
   isFiltered: boolean;
 }) {
+  // A failed first page is never "No followers yet" or "Nothing matches
+  // that search." (empty-states design §1).
+  if (loadErr) return <LoadFailed failure={loadErr} onRetry={onRetry} />;
   if (loading && users.length === 0) {
     return <SkeletonList />;
   }
@@ -674,15 +702,21 @@ function ListBody({
 
 function SuggestionsList({
   loading,
+  loadErr,
+  onRetry,
   users,
   isFiltered,
   onStateChange,
 }: {
   loading: boolean;
+  loadErr: LoadFailure | null;
+  onRetry: () => void;
   users: SuggestionUser[];
   isFiltered: boolean;
   onStateChange: (id: string, next: UserCardProps["follow_state"]) => void;
 }) {
+  // A failed load is never "Nothing to suggest yet".
+  if (loadErr) return <LoadFailed failure={loadErr} onRetry={onRetry} />;
   if (loading && users.length === 0) {
     return <SkeletonList />;
   }

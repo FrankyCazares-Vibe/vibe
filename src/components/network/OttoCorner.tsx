@@ -31,6 +31,8 @@ type NotifLite = {
   id: string;
   type: string;
   created_at: string;
+  /** Set once it's been read: the panel, another tab, another device. */
+  read_at?: string | null;
   actor?: {
     id: string;
     name: string | null;
@@ -61,6 +63,9 @@ export function OttoCorner() {
 
     const tryToastMention = async (notif: NotifLite) => {
       if (notif.type !== "mention") return;
+      // Read means seen already, so it isn't news. The count can rise on
+      // an unread row while the newest row is one that's been read.
+      if (notif.read_at) return;
       const actor = notif.actor;
       if (!actor?.id) return;
       // Only pop the toast when the mentioner is mutually connected.

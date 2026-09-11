@@ -1,5 +1,6 @@
 import { NextResponse } from "next/server";
 
+import { loadHiddenUsers } from "@/lib/safety/hidden-users";
 import { createSupabaseServerClient } from "@/lib/supabase/server";
 
 /**
@@ -24,26 +25,39 @@ export async function GET() {
     return NextResponse.json({ ok: false, error: "Unauthorized" }, { status: 401 });
   }
 
+  // Nothing from someone blocked either way, or muted right now: the same
+  // people ../route.ts leaves out of the list, with the same filter on
+  // actor_id, so the badge never counts a row the list won't show.
+  // OttoCorner peeks `?limit=1` when `unread` rises, and a hidden row
+  // counted here would land that peek on an older, visible notification.
+  // The 30-day totals sit beside the list in the side panel, so they
+  // leave the same people out. Fail closed on error, as the list does.
+  const hiddenRes = await loadHiddenUsers(supabase, user.id);
+  if (!hiddenRes.ok) {
+    console.error("[me/notifications/count hidden-users]", hiddenRes.error);
+    return NextResponse.json({ ok: false, error: "Request failed" }, { status: 500 });
+  }
+  const hiddenIds = hiddenRes.hidden.ids;
+
+  // Every count below starts here.
+  const visible = () => {
+    const q = supabase
+      .from("notifications")
+      .select("id", { count: "exact", head: true })
+      .eq("user_id", user.id);
+    return hiddenIds.length > 0 ? q.notIn("actor_id", hiddenIds) : q;
+  };
+
   const since = new Date(Date.now() - 30 * 24 * 60 * 60 * 1000).toISOString();
 
   const countByType = (t: string) =>
-    supabase
-      .from("notifications")
-      .select("id", { count: "exact", head: true })
-      .eq("user_id", user.id)
-      .eq("type", t)
-      .gte("created_at", since);
+    visible().eq("type", t).gte("created_at", since);
 
   // Unread-mention count drives the corner's "thinking + alert" morph
   // — the orb's body switches to a richer multi-orbit treatment when
   // there's at least one unread mention sitting in the inbox, so the
   // user can tell at a glance "Otto wants to show me something".
-  const unreadMentionRes = supabase
-    .from("notifications")
-    .select("id", { count: "exact", head: true })
-    .eq("user_id", user.id)
-    .eq("type", "mention")
-    .is("read_at", null);
+  const unreadMentionRes = visible().eq("type", "mention").is("read_at", null);
 
   const [
     unreadRes,
@@ -54,11 +68,7 @@ export async function GET() {
     mentionRes,
     unreadMention,
   ] = await Promise.all([
-    supabase
-      .from("notifications")
-      .select("id", { count: "exact", head: true })
-      .eq("user_id", user.id)
-      .is("read_at", null),
+    visible().is("read_at", null),
     countByType("follow"),
     countByType("connection"),
     countByType("like"),
