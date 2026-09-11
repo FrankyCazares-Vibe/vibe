@@ -67,6 +67,8 @@ type ParentPreview = {
   content: string | null;
   user_id: string;
   author: { id: string; handle: string | null; name: string | null; avatar_url: string | null } | null;
+  media_kind: "image" | "video" | null;
+  attachment_kind: "post" | "clip" | null;
 };
 
 type ReactionGroup = {
@@ -134,8 +136,11 @@ async function hydrateReactions(
 /**
  * Batch-fetch the parent message previews for any rows that have a
  * `parent_message_id`. Just enough for the quote-stub render: id, content
- * snippet, author identity. Stale deploys (no parent_message_id column)
- * degrade silently.
+ * snippet, author identity, plus media_kind / attachment_kind so a stub for
+ * a photo, video or shared-post parent can say so instead of "Attachment".
+ * Stale deploys (no parent_message_id column) degrade silently — which also
+ * means a bad column in this select silently drops every stub in production,
+ * so check a stub live after changing it.
  */
 async function hydrateParentPreviews(
   supabase: Awaited<ReturnType<typeof createSupabaseServerClient>>,
@@ -152,7 +157,7 @@ async function hydrateParentPreviews(
   const { data, error } = await supabase
     .from("messages")
     .select(
-      "id, content, user_id, author:users!messages_user_id_fkey(id, handle, name, avatar_url)",
+      "id, content, user_id, media_kind, attachment_kind, author:users!messages_user_id_fkey(id, handle, name, avatar_url)",
     )
     .in("id", parentIds);
   if (error) {
@@ -169,6 +174,8 @@ async function hydrateParentPreviews(
       content: row.content,
       user_id: row.user_id,
       author: row.author ?? null,
+      media_kind: row.media_kind ?? null,
+      attachment_kind: row.attachment_kind ?? null,
     });
   }
   for (const m of rows) {

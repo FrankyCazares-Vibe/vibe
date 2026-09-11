@@ -1,0 +1,63 @@
+-- Session 58: declining a message request removes the viewer's own,
+-- still-pending membership row (src/app/api/me/threads/[id]/decline).
+-- channel_members has RLS on and `authenticated` holds DELETE, but no
+-- DELETE policy ever existed, so the route's delete matched zero rows,
+-- returned no error, answered ok:true, and the request came straight back
+-- (S54 broken-features report #3; re-verified live 2026-09-11).
+-- Scoped to rows still pending: an accepted conversation is hidden with
+-- Delete conversation (hidden_at) or left with Leave group (service role),
+-- never deleted through this door. No GRANT change: DELETE is already
+-- granted to authenticated.
+--
+-- What it allows: a user can remove only themselves, and only from a thread
+-- they haven't accepted. The worst case is leaving a request unanswered,
+-- which is exactly what Decline means.
+--
+-- Live state before this migration (read-only SQL, 2026-09-11):
+--   * pg_policies on public.channel_members: channel_members_select_member
+--     (SELECT, is_channel_member(channel_id)) and channel_members_update_own
+--     (UPDATE, auth.uid() = user_id). Both PERMISSIVE. No INSERT policy, no
+--     DELETE policy, no RESTRICTIVE policy — nothing to conflict with or to
+--     restate.
+--   * relrowsecurity = true, relforcerowsecurity = false,
+--     relacl authenticated=rdDxtm (table-level SELECT + DELETE).
+--   * No user triggers on public.channel_members.
+--
+-- DEPLOY ORDER: apply this BEFORE the code deploy that changes the decline
+-- route (batch B1-server-dm, item F2). The new route deletes with
+-- `accepted_at IS NULL` + RETURNING and answers 500 when a pending row
+-- survives the delete; without this policy that is every decline, so every
+-- student who taps Decline would see "Couldn't decline this request. Try
+-- again." The route currently in production works with or without this
+-- policy (it simply starts actually deleting once this lands).
+--
+-- HOW TO APPLY BY HAND. The Supabase MCP execute_sql is read-only, and
+-- `supabase db push` needs the DB password, which is not on this machine.
+--   1. From the repo root, with SUPABASE_ACCESS_TOKEN exported from
+--      .env.local (the project ref is in supabase/.temp/project-ref). Use
+--      curl, not Python: urllib gets a Cloudflare 1010 block.
+--        export SUPABASE_ACCESS_TOKEN="$(grep '^SUPABASE_ACCESS_TOKEN=' .env.local | cut -d= -f2-)"
+--        curl -sS -X POST "https://api.supabase.com/v1/projects/$(cat supabase/.temp/project-ref)/database/query" \
+--          -H "Authorization: Bearer $SUPABASE_ACCESS_TOKEN" \
+--          -H "Content-Type: application/json" \
+--          --data "$(jq -n --rawfile q supabase/migrations/20260911100000_channel_members_delete_own_pending.sql '{query:$q}')"
+--   2. Record it so `db push` stays in sync. Send this the same way (save it
+--      to a scratch .sql file and point --rawfile at that):
+--        INSERT INTO supabase_migrations.schema_migrations (version, name, statements)
+--        VALUES ('20260911100000', 'channel_members_delete_own_pending', ARRAY[$m$DROP POLICY IF EXISTS "channel_members_delete_own_pending" ON public.channel_members; CREATE POLICY "channel_members_delete_own_pending" ON public.channel_members FOR DELETE TO authenticated USING (auth.uid () = user_id AND accepted_at IS NULL);$m$]);
+--   3. Verify (read-only; the MCP execute_sql is fine for this):
+--        SELECT policyname, cmd, roles, qual FROM pg_policies
+--        WHERE schemaname = 'public' AND tablename = 'channel_members'
+--        ORDER BY policyname;
+--      Expect three rows. The new one: channel_members_delete_own_pending,
+--      DELETE, {authenticated}, ((auth.uid() = user_id) AND (accepted_at IS NULL)).
+--   4. Live: a second account DMs you, you Decline, you hard-refresh. The
+--      request must not come back, and no error toast appears.
+--
+-- ROLLBACK (roll the F2 route back first, or every decline answers 500):
+--   DROP POLICY IF EXISTS "channel_members_delete_own_pending" ON public.channel_members;
+--   DELETE FROM supabase_migrations.schema_migrations WHERE version = '20260911100000';
+DROP POLICY IF EXISTS "channel_members_delete_own_pending" ON public.channel_members;
+CREATE POLICY "channel_members_delete_own_pending"
+  ON public.channel_members FOR DELETE TO authenticated
+  USING (auth.uid () = user_id AND accepted_at IS NULL);

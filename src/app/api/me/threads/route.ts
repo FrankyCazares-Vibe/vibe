@@ -49,7 +49,14 @@ type ThreadEntry = {
   peer: ThreadPeer | null;
   /** All non-viewer members for groups (empty for 1:1). */
   members: ThreadMember[];
-  last_message: { content: string; created_at: string; user_id: string } | null;
+  /** media_kind / attachment_kind let a photo-only message preview as "Photo". */
+  last_message: {
+    content: string;
+    created_at: string;
+    user_id: string;
+    media_kind: "image" | "video" | null;
+    attachment_kind: "post" | "clip" | null;
+  } | null;
   unread: boolean;
   accepted_at: string | null;
   is_request: boolean;
@@ -490,26 +497,51 @@ export async function GET() {
 
   // Last message per channel — fetch all candidates and reduce client-side
   // (cheap for v1; revisit if a user has many active threads).
-  const { data: lastMsgs, error: lastErr } = await supabase
-    .from("messages")
-    .select("channel_id, content, created_at, user_id")
-    .in("channel_id", channelIds)
-    .order("created_at", { ascending: false })
-    .limit(channelIds.length * 5);
-
+  // media_kind / attachment_kind let a photo-only last message preview as
+  // "Photo" instead of a blank line. This read is soft-fail, but the
+  // phantom-request guard below needs `last`: with no last message, every
+  // pending thread is hidden. So if the wider select ever errors, retry with
+  // the base columns rather than lose every preview and every request.
+  const lastMsgsQuery = (select: string) =>
+    supabase
+      .from("messages")
+      .select(select)
+      .in("channel_id", channelIds)
+      .order("created_at", { ascending: false })
+      .limit(channelIds.length * 5);
+  let { data: lastMsgs, error: lastErr } = await lastMsgsQuery(
+    "channel_id, content, created_at, user_id, media_kind, attachment_kind",
+  );
   if (lastErr) {
     console.error("[threads.GET lastMsgs]", lastErr);
-    // Soft-fail: still render the list without previews.
+    ({ data: lastMsgs, error: lastErr } = await lastMsgsQuery(
+      "channel_id, content, created_at, user_id",
+    ));
+    if (lastErr) {
+      console.error("[threads.GET lastMsgs fallback]", lastErr);
+      // Soft-fail: still render the list without previews.
+    }
   }
 
+  type LastMsgRow = {
+    channel_id: string;
+    content: string;
+    created_at: string;
+    user_id: string;
+    // Absent from the fallback select; check-constrained to these values.
+    media_kind?: "image" | "video" | null;
+    attachment_kind?: "post" | "clip" | null;
+  };
   const lastByChannel = new Map<string, ThreadEntry["last_message"]>();
-  for (const m of lastMsgs ?? []) {
+  for (const m of (lastMsgs ?? []) as unknown as LastMsgRow[]) {
     const cid = m.channel_id as string;
     if (!lastByChannel.has(cid)) {
       lastByChannel.set(cid, {
         content: m.content as string,
         created_at: m.created_at as string,
         user_id: m.user_id as string,
+        media_kind: m.media_kind ?? null,
+        attachment_kind: m.attachment_kind ?? null,
       });
     }
   }
