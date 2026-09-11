@@ -3,6 +3,7 @@ import "./globals.css";
 import { JetBrains_Mono } from "next/font/google";
 
 import { CustomCursor } from "@/components/CustomCursor";
+import { ToastHost } from "@/components/feedback/ToastHost";
 import { cn } from "@/lib/utils";
 
 const jetbrainsMono = JetBrains_Mono({subsets:['latin'],variable:'--font-mono'});
@@ -45,6 +46,9 @@ export default function RootLayout({
       </head>
       <body>
         {children}
+        {/* One toast for every React route; failed requests land here via
+            vibeRequest (src/lib/feedback). Static pages have their own. */}
+        <ToastHost />
         {/* Single cursor for the whole React app — landing, auth, every
             shelled surface. Static prototype pages have their own. */}
         <CustomCursor />

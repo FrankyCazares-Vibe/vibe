@@ -51,15 +51,19 @@ function vibeInit() {
 // must escape the iframe so the React shell's URL updates too. Same-origin
 // iframe = window.top works without cross-origin throws. Code paths that
 // might iframe-escape should use window.__vibeTopNav(url) instead of
-// window.location.href = url.
-window.__vibeTopNav = function(url) {
+// window.location.href = url. Pass { replace: true } for a gate redirect,
+// where the page being left shouldn't stay in history.
+window.__vibeTopNav = function(url, opts) {
+  const replace = !!(opts && opts.replace);
   try {
     if (window.top && window.top !== window.self) {
-      window.top.location.href = url;
+      if (replace) window.top.location.replace(url);
+      else window.top.location.href = url;
       return;
     }
   } catch (_) {}
-  window.location.href = url;
+  if (replace) window.location.replace(url);
+  else window.location.href = url;
 };
 window.__vibeTopReplaceState = function(state, title, url) {
   try {
@@ -70,6 +74,260 @@ window.__vibeTopReplaceState = function(state, title, url) {
   } catch (_) {}
   window.history.replaceState(state, title, url);
 };
+
+// The top-level page's path + query. Inside the /messages iframe that's
+// /messages?…, not /html/messages.html?app=1, so a Sign in / Terms `next`
+// brings the student back to the page they were on. Falls back to this
+// document when the top window can't be read.
+function _vibeTopHere() {
+  try {
+    return window.top.location.pathname + window.top.location.search;
+  } catch (_) {
+    return window.location.pathname + window.location.search;
+  }
+}
+
+// ── Failure feedback (static twin of src/lib/feedback/*) ─────────────────
+// A refused action must say so in one short line (silent-failure design,
+// handoffs/2026-09-11-silent-failure-design.md). React routes use
+// vibeRequest + <ToastHost />; the static pages get the same helpers here:
+//   window.vibeToast(message, { tone: 'info'|'error', action: { label, href }, durationMs })
+//   window.vibeRequest(url, { method, json, body, headers, failure, success, quiet })
+//     → Promise<{ ok: true, status, data } | { ok: false, status, code, error, message, action? }>
+//     Never throws; branch on r.ok. `failure` is the caller's own line.
+//   window.vibeCopy(text, success) → Promise<boolean>
+// The toast renders inside this document even in an iframe (both iframes
+// fill the view, so bottom-center is where the student is looking). Only
+// navigation escapes, through __vibeTopNav.
+(function vibeFeedbackInit() {
+  // Copy table: a copy of src/lib/feedback/failure-copy.ts, first match
+  // wins. Change both together.
+  const GENERIC = ['unauthorized', 'forbidden', 'request failed', 'unavailable',
+    'not found', 'invalid json', 'bad request', 'internal server error'];
+  const PASS_400 = ['Comment is empty', 'Message too long', 'Empty message'];
+  function sentence(line) {
+    const s = String(line || '').trim() || 'Something went wrong.';
+    return /[.!?]$/.test(s) ? s : s + '.';
+  }
+  function isSentence(err) {
+    if (typeof err !== 'string') return false;
+    const s = err.trim();
+    return s.length > 0 && s.length <= 160 && GENERIC.indexOf(s.toLowerCase()) < 0
+      && /^[A-Z]/.test(s) && s.split(/\s+/).length >= 3
+      && /^[A-Za-z0-9 ,.'’"“”!?:()/&—–→…·-]+$/.test(s) && !/\b(json|uuid|null|undefined|ids?)\b/i.test(s);
+  }
+  function retryLine(sec) {
+    if (sec > 0 && sec < 60) {
+      const n = Math.ceil(sec);
+      return 'Try again in ' + n + (n === 1 ? ' second.' : ' seconds.');
+    }
+    return sec >= 120 ? 'Try again later.' : 'Try again in a minute.';
+  }
+  function describeFailure(sig, fallback, here) {
+    const st = sig.status, err = sig.error;
+    const next = encodeURIComponent(here || '/');
+    if (st === 0) return { message: "Couldn't reach Vibe. Check your connection and try again." };
+    if (st === 401) return { message: "You've been signed out. Sign in and try again.", action: { label: 'Sign in', href: '/auth/login?next=' + next } };
+    if (st === 403 && sig.code === 'terms_required') return { message: 'Accept the Terms first, then try again.', action: { label: 'Review Terms', href: '/auth/terms?next=' + next } };
+    if (st === 429) return { message: "You're going a little fast. " + retryLine(sig.retryAfterSec) };
+    if (st === 403 && err === 'Unavailable') return { message: "You can't connect with this person." };
+    if (st === 403 && isSentence(err)) return { message: err.trim() };
+    if (st === 403 && err) return { message: "You don't have access to do that." };
+    if (st === 404) return { message: "That's no longer available." };
+    if (st === 409 && isSentence(err)) return { message: err.trim() };
+    if (st === 400) return { message: err && (PASS_400.indexOf(err) >= 0 || /exceeds \d+ characters/.test(err)) ? err : sentence(fallback) };
+    const s = sentence(fallback);
+    return { message: /try again/i.test(s) ? s : s + ' Try again.' };
+  }
+
+  // ── Toast: one at a time, same message within 1.5 s dropped ──
+  const DEDUPE_MS = 1500;
+  let el = null;
+  let hideT = 0;
+  let clearT = 0;
+  let lastMsg = '';
+  let lastAt = 0;
+
+  function hide() {
+    clearTimeout(hideT);
+    if (!el) return;
+    el.style.opacity = '0';
+    el.style.transform = 'translate(-50%,8px)';
+    el.style.pointerEvents = 'none';
+    // Empty it after the fade so the next toast is fresh content in the
+    // live region (and gets announced).
+    clearTimeout(clearT);
+    clearT = setTimeout(() => { if (el && el.style.opacity === '0') el.textContent = ''; }, 250);
+  }
+
+  // Created on first use: this file runs in <head>, before <body> exists.
+  // z 11600: above page modals (≤10000) and _safetyActions' #vsa-toast,
+  // below the custom cursor. Never profile's ✓ #save-toast.
+  function toastEl() {
+    if (el && el.isConnected) return el;
+    el = document.createElement('div');
+    el.id = 'vibe-toast';
+    el.style.cssText =
+      'position:fixed;left:50%;bottom:calc(env(safe-area-inset-bottom,0px) + 24px);' +
+      'transform:translate(-50%,8px);z-index:11600;display:flex;align-items:center;gap:10px;' +
+      'width:max-content;max-width:min(520px,calc(100vw - 32px));box-sizing:border-box;' +
+      'border-radius:22px;background:#1C1C1E;color:#FAF7F2;' +
+      "font-family:'DM Sans',sans-serif;font-size:13px;font-weight:600;line-height:1.4;" +
+      'cursor:pointer;opacity:0;pointer-events:none;' +
+      'transition:opacity .2s ease,transform .22s cubic-bezier(.22,1,.36,1);';
+    el.addEventListener('click', hide);
+    (document.body || document.documentElement).appendChild(el);
+    return el;
+  }
+
+  window.vibeToast = function(message, opts) {
+    const msg = String(message == null ? '' : message).trim();
+    if (!msg) return;
+    const now = Date.now();
+    if (msg === lastMsg && now - lastAt < DEDUPE_MS) return;
+    lastMsg = msg;
+    lastAt = now;
+    const o = opts || {};
+    const isError = o.tone === 'error';
+    const action = o.action && o.action.href ? o.action : null;
+    const t = toastEl();
+    clearTimeout(clearT);
+    t.setAttribute('role', isError ? 'alert' : 'status');
+    t.setAttribute('aria-live', isError ? 'assertive' : 'polite');
+    t.style.padding = action ? '7px 7px 7px 16px' : '11px 18px';
+    t.style.border = isError ? '1px solid rgba(255,92,53,.45)' : '1px solid rgba(255,255,255,.08)';
+    t.style.boxShadow = isError
+      ? '0 12px 36px rgba(0,0,0,.22),0 0 20px rgba(255,92,53,.18)'
+      : '0 12px 36px rgba(0,0,0,.18)';
+    t.textContent = '';
+    if (isError) {
+      const dot = document.createElement('span');
+      dot.setAttribute('aria-hidden', 'true');
+      dot.style.cssText = 'width:7px;height:7px;border-radius:50%;background:#FF5C35;box-shadow:0 0 8px rgba(255,92,53,.6);flex-shrink:0;';
+      t.appendChild(dot);
+    }
+    const text = document.createElement('span');
+    text.style.cssText = 'min-width:0;overflow-wrap:anywhere;';
+    text.textContent = msg;
+    t.appendChild(text);
+    if (action) {
+      const btn = document.createElement('button');
+      btn.type = 'button';
+      btn.textContent = action.label || 'Open';
+      btn.style.cssText =
+        'flex-shrink:0;margin:0;padding:6px 12px;border:none;border-radius:999px;' +
+        "background:#FF5C35;color:#FAF7F2;font-family:'DM Sans',sans-serif;font-size:12px;" +
+        'font-weight:700;letter-spacing:.02em;line-height:1.4;white-space:nowrap;cursor:pointer;';
+      btn.addEventListener('click', e => {
+        e.stopPropagation();
+        hide();
+        // Out of the iframe: Terms / Sign in replace the whole shell.
+        window.__vibeTopNav(action.href);
+      });
+      t.appendChild(btn);
+    }
+    void t.offsetWidth; // flush so the first show animates in
+    t.style.opacity = '1';
+    t.style.transform = 'translate(-50%,0)';
+    t.style.pointerEvents = 'auto';
+    clearTimeout(hideT);
+    hideT = setTimeout(hide, o.durationMs || (isError ? (action ? 8000 : 5000) : 2400));
+  };
+
+  // ── Request: same result shape as src/lib/feedback/request.ts ──
+  function parseRetryAfter(v) {
+    if (!v) return null;
+    const s = String(v).trim();
+    if (/^\d+$/.test(s)) return Number(s);
+    const at = Date.parse(s);
+    return isNaN(at) ? null : Math.max(0, Math.ceil((at - Date.now()) / 1000));
+  }
+  function failed(sig, failure, quiet) {
+    const d = describeFailure(sig, failure, _vibeTopHere());
+    if (!quiet) window.vibeToast(d.message, { tone: 'error', action: d.action });
+    const r = { ok: false, status: sig.status, code: sig.code, error: sig.error, message: d.message };
+    if (d.action) r.action = d.action;
+    return r;
+  }
+  window.vibeRequest = async function(url, opts) {
+    const o = opts || {};
+    let res;
+    try {
+      const headers = new Headers(o.headers || {});
+      const init = { method: o.method, credentials: 'same-origin', headers: headers };
+      if (o.json !== undefined) {
+        headers.set('content-type', 'application/json');
+        init.body = JSON.stringify(o.json);
+      } else if (o.body != null) {
+        init.body = o.body;
+      }
+      // A body with no method would be a GET-with-body, which fetch rejects
+      // before sending (and would read as "can't reach Vibe"). Default POST.
+      if (!init.method && init.body != null) init.method = 'POST';
+      res = await fetch(url, init);
+    } catch (_) {
+      return failed({ status: 0, code: null, error: null, retryAfterSec: null }, o.failure, o.quiet);
+    }
+    let body = null;
+    try {
+      const text = await res.text();
+      body = text ? JSON.parse(text) : null;
+    } catch (_) {
+      body = null; // HTML error page or a dropped read
+    }
+    const obj = body && typeof body === 'object' && !Array.isArray(body) ? body : null;
+    if (!res.ok || (obj && obj.ok === false)) {
+      return failed({
+        status: res.status,
+        code: obj && typeof obj.code === 'string' ? obj.code : null,
+        error: obj && typeof obj.error === 'string' ? obj.error : null,
+        retryAfterSec: parseRetryAfter(res.headers.get('retry-after')),
+      }, o.failure, o.quiet);
+    }
+    if (o.success) window.vibeToast(o.success);
+    return { ok: true, status: res.status, data: body == null ? {} : body };
+  };
+
+  // ── Copy: Clipboard API, then the textarea fallback; says which ──
+  window.vibeCopy = async function(text, success) {
+    const value = String(text == null ? '' : text);
+    let copied = false;
+    try {
+      // The first await in the call, so the click's user activation still counts.
+      if (navigator.clipboard && navigator.clipboard.writeText) {
+        await navigator.clipboard.writeText(value);
+        copied = true;
+      }
+    } catch (_) {
+      copied = false;
+    }
+    if (!copied && document.body) {
+      const active = document.activeElement;
+      const ta = document.createElement('textarea');
+      ta.value = value;
+      ta.setAttribute('readonly', '');
+      ta.style.cssText = 'position:fixed;top:0;left:0;width:1px;height:1px;opacity:0;font-size:12pt;border:0;padding:0;';
+      document.body.appendChild(ta);
+      try {
+        ta.select();
+        ta.setSelectionRange(0, value.length);
+        copied = document.execCommand('copy');
+      } catch (_) {
+        copied = false;
+      }
+      ta.remove();
+      if (active && active.focus) active.focus();
+    }
+    window.vibeToast(copied ? (success || 'Link copied') : "Couldn't copy the link.", { tone: copied ? 'info' : 'error' });
+    return copied;
+  };
+
+  // messages.html and onboarding.html have no toast of their own, so their
+  // guarded `if (window.showToast)` calls went nowhere. Plain assignment on
+  // purpose: profile.html's later top-level `function showToast` still
+  // replaces it, so profile keeps its ✓ save toast.
+  window.showToast = window.showToast || (m => window.vibeToast(m));
+})();
 
 // ── Pre-paint guard for sidebar identity ──────────────────────────────────
 // _persistence.js loads synchronously in <head>, before any body content.
@@ -175,8 +433,10 @@ function vibeHydrateSidebar() {
       if (r.status === 403) {
         const j = await r.json().catch(() => null);
         if (j && j.code === 'terms_required') {
-          const here = window.location.pathname + window.location.search;
-          window.location.replace('/auth/terms?next=' + encodeURIComponent(here));
+          // Top-level path and navigation: from inside the /messages iframe
+          // the Terms page must replace the whole shell, and accepting has
+          // to land back on /messages, not the bare static URL.
+          window.__vibeTopNav('/auth/terms?next=' + encodeURIComponent(_vibeTopHere()), { replace: true });
         }
         return null;
       }
