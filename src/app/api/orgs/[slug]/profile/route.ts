@@ -1,7 +1,7 @@
 import { NextResponse } from "next/server";
 
 import { orgAssetProxyUrl } from "@/lib/org-asset-url";
-import { postMediaProxyUrl } from "@/lib/post-media-url";
+import { withPostMediaUrls } from "@/lib/post-media-url";
 import { createSupabaseServerClient } from "@/lib/supabase/server";
 import { createSupabaseServiceClient } from "@/lib/supabase/service";
 
@@ -88,11 +88,7 @@ export async function GET(_req: Request, { params }: Params) {
     created_at: string;
     user: { id: string; handle: string; name: string; avatar_url: string | null } | null;
   }>;
-  const signedAll = allPosts.map((p) => ({
-    ...p,
-    media_url: postMediaProxyUrl(p.id, p.media_url, "media"),
-    media_thumbnail_url: postMediaProxyUrl(p.id, p.media_thumbnail_url, "thumbnail"),
-  }));
+  const signedAll = allPosts.map((p) => withPostMediaUrls(p));
   // Clips are backlogged — only `type='post'` rows surface on org profiles.
   const postRows = signedAll.filter((p) => p.type === "post").slice(0, 12);
 

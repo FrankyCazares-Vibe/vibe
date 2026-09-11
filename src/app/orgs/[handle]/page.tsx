@@ -2,7 +2,7 @@ import { notFound } from "next/navigation";
 import Link from "next/link";
 
 import { orgAssetProxyUrl } from "@/lib/org-asset-url";
-import { postMediaProxyUrl } from "@/lib/post-media-url";
+import { withPostMediaUrls } from "@/lib/post-media-url";
 import { createSupabaseServerClient } from "@/lib/supabase/server";
 import { createSupabaseServiceClient } from "@/lib/supabase/service";
 
@@ -167,11 +167,9 @@ export default async function OrgProfilePage({ params }: Params) {
     .eq("type", "post")
     .order("created_at", { ascending: false })
     .limit(24);
-  const allPostRows = ((postsData || []) as unknown as PostRow[]).map((p) => ({
-    ...p,
-    media_url: postMediaProxyUrl(p.id, p.media_url, "media"),
-    media_thumbnail_url: postMediaProxyUrl(p.id, p.media_thumbnail_url, "thumbnail"),
-  }));
+  const allPostRows = ((postsData || []) as unknown as PostRow[]).map((p) =>
+    withPostMediaUrls(p),
+  );
   const posts: PostRow[] = allPostRows.slice(0, 12);
 
   const backdrop =

@@ -6,6 +6,7 @@ import {
   insertMentionNotifications,
   resolveMentionedUserIds,
 } from "@/lib/mentions";
+import { withPostMediaUrls } from "@/lib/post-media-url";
 import { CLIP_KEY_PREFIX, getR2S3Client, isR2Configured } from "@/lib/r2";
 import { createSupabaseServerClient } from "@/lib/supabase/server";
 
@@ -73,9 +74,13 @@ export async function GET(_req: Request, ctx: RouteContext) {
       .eq("user_id", user.id),
   ]);
 
+  // The concatenated select string defeats Supabase's row typing
+  // (GenericStringError); cast through unknown.
+  const post = row as unknown as { id: string } & Record<string, unknown>;
+
   return NextResponse.json({
     ok: true,
-    post: row,
+    post: withPostMediaUrls(post),
     counts: {
       likes:    likeCountRes.count ?? 0,
       comments: commentCountRes.count ?? 0,
@@ -288,5 +293,5 @@ export async function PATCH(req: Request, ctx: RouteContext) {
     }
   }
 
-  return NextResponse.json({ ok: true, post: row });
+  return NextResponse.json({ ok: true, post: withPostMediaUrls(row) });
 }

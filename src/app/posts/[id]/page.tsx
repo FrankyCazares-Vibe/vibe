@@ -1,7 +1,7 @@
 import { notFound, redirect } from "next/navigation";
 import type { Metadata } from "next";
 
-import { postMediaProxyUrl } from "@/lib/post-media-url";
+import { withPostMediaUrls } from "@/lib/post-media-url";
 import { createSupabaseServerClient } from "@/lib/supabase/server";
 import { createSupabaseServiceClient } from "@/lib/supabase/service";
 
@@ -56,10 +56,10 @@ export async function generateMetadata({ params }: Params): Promise<Metadata> {
         | null;
     };
     const authorObj = Array.isArray(raw.author) ? raw.author[0] : raw.author;
-    const post = {
+    const post = withPostMediaUrls({
       ...raw,
       author: authorObj ?? null,
-    };
+    });
 
     const authorLabel =
       post.author?.name ||
@@ -74,14 +74,11 @@ export async function generateMetadata({ params }: Params): Promise<Metadata> {
         ? `${content.slice(0, 137)}…`
         : content || `${authorLabel} shared a ${post.type} on Vibe`;
 
-    // Prefer the thumbnail (always an image) over the raw media URL,
-    // which on clips is a video. Pre-sign via the proxy so previews
-    // that don't pass auth headers can still render the image.
-    const ogImage = postMediaProxyUrl(
-      post.id,
-      post.media_thumbnail_url ?? post.media_url,
-      post.media_thumbnail_url ? "thumbnail" : "media",
-    );
+    // Prefer the thumbnail (always an image) over the media URL, which
+    // on clips is a video. Both are already proxy URLs (R2 keys routed
+    // through /api/posts/[id]/media), so previews that don't pass auth
+    // headers can still render the image.
+    const ogImage = post.media_thumbnail_url ?? post.media_url;
 
     return {
       title,

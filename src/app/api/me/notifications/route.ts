@@ -1,5 +1,6 @@
 import { NextResponse } from "next/server";
 
+import { withPostMediaUrls } from "@/lib/post-media-url";
 import { createSupabaseServerClient } from "@/lib/supabase/server";
 
 const DEFAULT_LIMIT = 30;
@@ -70,5 +71,12 @@ export async function GET(req: Request) {
     return NextResponse.json({ ok: false, error: "Request failed" }, { status: 500 });
   }
 
-  return NextResponse.json({ ok: true, notifications: data ?? [] });
+  // The embedded post's thumbnail goes out as a proxy URL, never a raw
+  // R2 key (see withPostMediaUrls).
+  type NotificationRow = Record<string, unknown> & { post?: { id: string } | null };
+  const notifications = ((data ?? []) as unknown as NotificationRow[]).map((n) =>
+    n.post ? { ...n, post: withPostMediaUrls(n.post) } : n,
+  );
+
+  return NextResponse.json({ ok: true, notifications });
 }

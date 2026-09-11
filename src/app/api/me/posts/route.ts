@@ -1,5 +1,6 @@
 import { NextResponse } from "next/server";
 
+import { withPostMediaUrls } from "@/lib/post-media-url";
 import { createSupabaseServerClient } from "@/lib/supabase/server";
 
 const DEFAULT_LIMIT = 50;
@@ -47,5 +48,9 @@ export async function GET(req: Request) {
     return NextResponse.json({ ok: false, error: "Request failed" }, { status: 500 });
   }
 
-  return NextResponse.json({ ok: true, posts: data ?? [] });
+  // Raw R2 keys become proxy URLs — as an <img src> a bare key 404s.
+  return NextResponse.json({
+    ok: true,
+    posts: (data ?? []).map((p) => withPostMediaUrls(p)),
+  });
 }

@@ -1,5 +1,6 @@
 import { NextResponse } from "next/server";
 
+import { withPostMediaUrls } from "@/lib/post-media-url";
 import { createSupabaseServerClient } from "@/lib/supabase/server";
 
 const DEFAULT_LIMIT = 100;
@@ -54,11 +55,13 @@ export async function GET(req: Request) {
   // Flatten — callers want a list of posts with a `saved_at` timestamp,
   // not a list of bookmark rows. Supabase's generated types for embedded
   // resources are a union that includes error shapes; cast through unknown.
-  type Row = { id: string; created_at: string; post: Record<string, unknown> | null };
+  // Media goes out as proxy URLs, never raw R2 keys (see withPostMediaUrls).
+  type SavedPost = { id: string } & Record<string, unknown>;
+  type Row = { id: string; created_at: string; post: SavedPost | null };
   const rows = (data ?? []) as unknown as Row[];
   const posts = rows
-    .filter((r) => r.post != null)
-    .map((r) => ({ ...r.post, saved_at: r.created_at }));
+    .filter((r): r is Row & { post: SavedPost } => r.post != null)
+    .map((r) => ({ ...withPostMediaUrls(r.post), saved_at: r.created_at }));
 
   return NextResponse.json({ ok: true, posts });
 }

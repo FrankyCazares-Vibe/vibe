@@ -46,6 +46,9 @@ type PostDetail = {
   tags: string[] | null;
   media_url: string | null;
   media_thumbnail_url: string | null;
+  /** Server-computed from the stored key; media_url itself is an opaque
+   *  proxy path, so it can't tell an image from a video. */
+  media_kind?: "video" | "image" | null;
   created_at: string;
   author: Author | null;
 };
@@ -266,8 +269,10 @@ export function PostViewerMobile({
 
   const author = post?.author ?? null;
   const authorHandle = author?.handle ?? null;
+  // media_url is a /api/posts/[id]/media proxy path, so a `clips/` sniff
+  // would call every video an image — trust the server's media_kind.
   const isImage =
-    post && post.media_url && !post.media_url.includes("clips/") && post.type === "post";
+    post && post.media_url && post.media_kind !== "video" && post.type === "post";
 
   return (
     <Drawer.Root

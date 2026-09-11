@@ -2,6 +2,7 @@ import { NextResponse } from "next/server";
 
 import { requireTermsAccepted } from "@/lib/legal/require-terms";
 import { isAllowedMediaUrl } from "@/lib/org-asset-url";
+import { withPostMediaUrls } from "@/lib/post-media-url";
 import { createSupabaseServerClient } from "@/lib/supabase/server";
 import { createSupabaseServiceClient } from "@/lib/supabase/service";
 
@@ -130,5 +131,8 @@ export async function POST(req: Request, { params }: Params) {
     );
   }
 
-  return NextResponse.json({ ok: true, post: row }, { status: 201 });
+  return NextResponse.json(
+    { ok: true, post: withPostMediaUrls(row) },
+    { status: 201 },
+  );
 }

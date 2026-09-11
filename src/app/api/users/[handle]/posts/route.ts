@@ -1,6 +1,7 @@
 import { NextResponse } from "next/server";
 import type { SupabaseClient } from "@supabase/supabase-js";
 
+import { withPostMediaUrls } from "@/lib/post-media-url";
 import { createSupabaseServerClient } from "@/lib/supabase/server";
 import { createSupabaseServiceClient } from "@/lib/supabase/service";
 
@@ -90,5 +91,9 @@ export async function GET(req: Request, ctx: RouteContext) {
     return NextResponse.json({ ok: false, error: "Request failed" }, { status: 500 });
   }
 
-  return NextResponse.json({ ok: true, posts: data ?? [] });
+  // Raw R2 keys become proxy URLs — as an <img src> a bare key 404s.
+  return NextResponse.json({
+    ok: true,
+    posts: (data ?? []).map((p) => withPostMediaUrls(p)),
+  });
 }

@@ -1,7 +1,7 @@
 import { NextResponse } from "next/server";
 
 import { orgAssetProxyUrl } from "@/lib/org-asset-url";
-import { postMediaProxyUrl } from "@/lib/post-media-url";
+import { withPostMediaUrls } from "@/lib/post-media-url";
 import { createSupabaseServerClient } from "@/lib/supabase/server";
 
 const DEFAULT_LIMIT = 100;
@@ -120,14 +120,8 @@ export async function GET(req: Request, ctx: RouteContext) {
         comment: r.comment,
         reposted_at: r.created_at,
         post: {
-          ...p,
+          ...withPostMediaUrls(p),
           view_count: p.view_count ?? 0,
-          media_url: postMediaProxyUrl(p.id, p.media_url, "media"),
-          media_thumbnail_url: postMediaProxyUrl(
-            p.id,
-            p.media_thumbnail_url,
-            "thumbnail",
-          ),
           org: org
             ? { ...org, logo_url: orgAssetProxyUrl(org.handle, org.logo_url, "logo") }
             : null,

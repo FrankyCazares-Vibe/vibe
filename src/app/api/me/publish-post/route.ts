@@ -6,6 +6,7 @@ import {
   resolveMentionedUserIds,
 } from "@/lib/mentions";
 import { isSupabaseHttpsUrl } from "@/lib/org-asset-url";
+import { withPostMediaUrls } from "@/lib/post-media-url";
 import { CLIP_KEY_PREFIX } from "@/lib/r2";
 import { requireTermsAccepted } from "@/lib/legal/require-terms";
 import { rateLimit, tooManyRequests } from "@/lib/rate-limit";
@@ -209,5 +210,6 @@ export async function POST(req: Request) {
     }
   }
 
-  return NextResponse.json({ ok: true, post: row });
+  // A video post's media_url is its R2 key — send the proxy URL instead.
+  return NextResponse.json({ ok: true, post: withPostMediaUrls(row) });
 }

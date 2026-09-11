@@ -2,7 +2,7 @@ import { NextResponse } from "next/server";
 
 import { campusByLabel } from "@/lib/iu/campuses";
 import { orgAssetProxyUrl } from "@/lib/org-asset-url";
-import { postMediaProxyUrl } from "@/lib/post-media-url";
+import { withPostMediaUrls } from "@/lib/post-media-url";
 import { createSupabaseServerClient } from "@/lib/supabase/server";
 
 const DEFAULT_LIMIT = 50;
@@ -227,19 +227,12 @@ export async function GET(req: Request) {
     };
     const fr = friendReposters.get(row.id) ?? { samples: [], totalFriends: 0 };
     const org = row.org ?? null;
-    // `media_kind` lets the client pick the right player without re-parsing
-    // the proxy URL. A post carries video when its stored media_url is an
-    // R2 object key under `clips/` rather than a public image URL. The
-    // prefix is legacy naming — it backs regular video posts, not clips.
-    const rawMedia = row.media_url ?? "";
-    const isVideo = rawMedia.startsWith("clips/");
-    const mediaKind: "video" | "image" | null = rawMedia
-      ? isVideo
-        ? "video"
-        : "image"
-      : null;
     return {
-      ...row,
+      // Proxy URLs for media, plus `media_kind` so the client picks the
+      // right player without re-parsing the proxy URL. A post carries video
+      // when its stored media_url is an R2 key under `clips/` (legacy
+      // naming — it backs regular video posts, not clips).
+      ...withPostMediaUrls(row),
       view_count: row.view_count ?? 0,
       like_count: e.like_count,
       comment_count: e.comment_count,
@@ -249,9 +242,6 @@ export async function GET(req: Request) {
       viewer_saved: engagement.savedByViewer.has(row.id),
       friend_reposters: fr.samples,
       friend_reposter_count: fr.totalFriends,
-      media_url: postMediaProxyUrl(row.id, row.media_url, "media"),
-      media_thumbnail_url: postMediaProxyUrl(row.id, row.media_thumbnail_url, "thumbnail"),
-      media_kind: mediaKind,
       org: org
         ? { ...org, logo_url: orgAssetProxyUrl(org.handle, org.logo_url, "logo") }
         : null,
