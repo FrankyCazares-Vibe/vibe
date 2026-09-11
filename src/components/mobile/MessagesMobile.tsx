@@ -1,8 +1,12 @@
 "use client";
 
 import Link from "next/link";
-import { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState } from "react";
 import { Drawer } from "vaul";
+
+import { asLoadFailure, LoadFailed, type LoadFailure } from "@/components/feedback/LoadFailed";
+import { vibeRequest } from "@/lib/feedback/request";
+import { toast } from "@/lib/feedback/toast";
 
 /**
  * iOS-native /messages rebuild for mobile. Two screens, one component:
@@ -51,10 +55,14 @@ type ThreadEntry = {
   name: string;
   photo_url: string | null;
   peer: ThreadPeer | null;
+  /** media_kind / attachment_kind let a photo-only message preview as
+   *  "Photo". Optional: older servers send only the first three. */
   last_message: {
     content: string;
     created_at: string;
     user_id: string;
+    media_kind?: "image" | "video" | null;
+    attachment_kind?: "post" | "clip" | null;
   } | null;
   /** Server-computed: the last message is someone else's and newer than
    *  the viewer's last_read_at. The API never sends last_read_at, so this
@@ -62,6 +70,9 @@ type ThreadEntry = {
    *  because CampusMobile's synthesized org-channel entries omit it. */
   unread?: boolean;
   accepted_at: string | null;
+  /** Server-computed: the viewer hasn't accepted this thread yet. Optional
+   *  because CampusMobile's org-channel entries omit it (never a request). */
+  is_request?: boolean;
   pinned_at?: string | null;
   hidden_at?: string | null;
   muted_until?: string | null;
@@ -92,6 +103,23 @@ type MessageAttachment = {
   } | null;
 };
 
+/** The message a reply quotes, as the messages API embeds it. The two
+ *  kinds let a stub for a photo or shared-post parent say so; older
+ *  servers omit them. */
+type ParentPreview = {
+  id: string;
+  content: string | null;
+  user_id: string;
+  author: {
+    id: string;
+    handle: string | null;
+    name: string | null;
+    avatar_url: string | null;
+  } | null;
+  media_kind?: "image" | "video" | null;
+  attachment_kind?: "post" | "clip" | null;
+};
+
 type MessageRow = {
   id: string;
   content: string;
@@ -114,10 +142,35 @@ type MessageRow = {
   attachment_kind?: "post" | "clip" | null;
   attachment?: MessageAttachment | null;
   parent_message_id?: string | null;
+  /** Set on a reply; null when the parent was deleted (FK is ON DELETE
+   *  SET NULL, so the stub quietly goes away). */
+  parent_preview?: ParentPreview | null;
   reactions?: MessageReaction[];
 };
 
 const REACTION_EMOJIS = ["❤️", "👍", "👎", "😂", "🔥", "😮", "😢"] as const;
+
+// What the composer can attach: the upload route's own types and limits
+// (src/app/api/me/messages-upload-url). They're checked here before any
+// request, because the route's 400 text never reaches the student.
+const ATTACH_ACCEPT =
+  "image/jpeg,image/png,image/webp,image/gif,video/mp4,video/quicktime,video/webm";
+const ATTACH_IMAGE_TYPES = new Set(["image/jpeg", "image/png", "image/webp", "image/gif"]);
+const ATTACH_VIDEO_TYPES = new Set(["video/mp4", "video/quicktime", "video/webm"]);
+const MAX_IMAGE_BYTES = 15 * 1024 * 1024;
+const MAX_VIDEO_BYTES = 200 * 1024 * 1024;
+
+/** A photo or video picked for the next message. previewUrl is a blob: URL. */
+type StagedMedia = {
+  file: File;
+  kind: "image" | "video";
+  contentType: string;
+  previewUrl: string;
+};
+
+/** The message being replied to: the stub the optimistic row carries, and
+ *  the name the pill above the composer shows. */
+type ReplyTarget = { parent: ParentPreview; authorName: string };
 
 type Tab = "all" | "requests";
 
@@ -215,6 +268,23 @@ function threadAvatar(t: ThreadEntry): { url: string | null; initials: string } 
   };
 }
 
+/** The one line a quote stub or the reply pill shows: the quoted text,
+ *  else what the message carried. */
+function quotedBody(p: ParentPreview): string {
+  return (
+    p.content?.trim() ||
+    (p.media_kind === "video"
+      ? "Video"
+      : p.media_kind === "image"
+        ? "Photo"
+        : p.attachment_kind === "clip"
+          ? "Shared clip"
+          : p.attachment_kind === "post"
+            ? "Shared post"
+            : "Attachment")
+  );
+}
+
 // ---------- Component ----------
 
 export function MessagesMobile({
@@ -227,6 +297,11 @@ export function MessagesMobile({
   const [tab, setTab] = useState<Tab>("all");
   const [threads, setThreads] = useState<ThreadEntry[] | null>(null);
   const [requests, setRequests] = useState<ThreadEntry[] | null>(null);
+  // The first list load's failure, shown in the list's place. A refetch
+  // that fails keeps the rows already on screen instead.
+  const [listErr, setListErr] = useState<LoadFailure | null>(null);
+  const listLoadedRef = useRef(false);
+  const listSeqRef = useRef(0);
   const [openThreadId, setOpenThreadId] = useState<string | null>(null);
   const [composeOpen, setComposeOpen] = useState(false);
   const initialHandleResolvedRef = useRef(false);
@@ -244,49 +319,68 @@ export function MessagesMobile({
         setOpenThreadId(existing.id);
         return;
       }
-      try {
-        const r = await fetch("/api/me/threads", {
-          method: "POST",
-          headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({ handle: lower }),
-        });
-        const j = await r.json();
-        if (j?.ok && j.channel_id) {
-          await refetchThreadsRef.current?.();
-          setComposeOpen(false);
-          setOpenThreadId(j.channel_id);
-        }
-      } catch {
-        /* silent — user stays on compose */
+      const r = await vibeRequest<{ channel_id?: string }>("/api/me/threads", {
+        json: { handle: lower },
+        failure: "Couldn't start that conversation.",
+      });
+      // A refusal has toasted why; compose stays open for another pick.
+      if (!r.ok) return;
+      const channelId = r.data.channel_id;
+      if (typeof channelId !== "string" || !channelId) {
+        toast({ message: "Couldn't start that conversation. Try again.", tone: "error" });
+        return;
       }
+      await refetchThreadsRef.current?.();
+      setComposeOpen(false);
+      setOpenThreadId(channelId);
     },
     [threads],
   );
 
   // Stable handle to the refetcher so callbacks can refresh without a
   // dep-chain rewrite. Filled in below once `refetchThreads` exists.
-  const refetchThreadsRef = useRef<(() => Promise<void>) | null>(null);
+  const refetchThreadsRef = useRef<
+    ((mode?: "first" | "refresh") => Promise<void>) | null
+  >(null);
 
-  const refetchThreads = useCallback(async () => {
-    try {
-      const r = await fetch("/api/me/threads", { cache: "no-store" });
-      const j = await r.json();
-      if (j?.ok) {
-        setThreads(Array.isArray(j.threads) ? j.threads : []);
-        setRequests(Array.isArray(j.requests) ? j.requests : []);
-      } else {
-        setThreads([]);
-        setRequests([]);
+  // "first" is the page's own load and its Retry: a failure shows in the
+  // list's place, with no toast. "refresh" follows something the student
+  // did (closing a thread, accepting a request): a failure keeps both
+  // lists on screen and toasts. Until one load has worked there are no
+  // rows to keep, so every failure is a first-load failure.
+  const refetchThreads = useCallback(
+    async (mode: "first" | "refresh" = "refresh") => {
+      const seq = ++listSeqRef.current;
+      const r = await vibeRequest<{ threads?: ThreadEntry[]; requests?: ThreadEntry[] }>(
+        "/api/me/threads",
+        {
+          cache: "no-store",
+          quiet: mode === "first" || !listLoadedRef.current,
+          failure: "Couldn't load your messages.",
+        },
+      );
+      // A newer load has started; its answer is the one to paint.
+      if (seq !== listSeqRef.current) return;
+      if (r.ok && Array.isArray(r.data.threads) && Array.isArray(r.data.requests)) {
+        listLoadedRef.current = true;
+        setListErr(null);
+        setThreads(r.data.threads);
+        setRequests(r.data.requests);
+        return;
       }
-    } catch {
-      setThreads([]);
-      setRequests([]);
-    }
-  }, []);
+      if (!listLoadedRef.current) {
+        setListErr(asLoadFailure(r, "Couldn't load your messages."));
+      } else if (r.ok && mode === "refresh") {
+        // A 2xx without the lists: vibeRequest didn't toast that one.
+        toast({ message: "Couldn't load your messages. Try again.", tone: "error" });
+      }
+    },
+    [],
+  );
 
   useEffect(() => {
     refetchThreadsRef.current = refetchThreads;
-    void refetchThreads();
+    void refetchThreads("first");
   }, [refetchThreads]);
 
   // ?channel=<id> deep link — opens the conversation view on that
@@ -302,40 +396,42 @@ export function MessagesMobile({
     setOpenThreadId(initialChannelId);
   }, [initialChannelId]);
 
-  // ?to=<handle> deep link — resolve to a channel id once threads have
-  // loaded, then open that conversation. Handles both existing threads
-  // (peer.handle matches) and brand-new ones (POST to /api/me/threads).
+  // ?to=<handle> deep link — resolve to a channel id once the first list
+  // load has settled, then open that conversation. Handles both existing
+  // threads (peer.handle matches) and brand-new ones (POST to
+  // /api/me/threads). A failed first load still resolves it through the
+  // POST, which finds an existing DM too, so the link never waits on a
+  // Retry; the ref keeps a later successful load from posting again.
   useEffect(() => {
     if (!initialHandle) return;
-    if (threads === null) return; // wait for initial fetch
+    if (threads === null && !listErr) return; // wait for the first load to settle
     if (initialHandleResolvedRef.current) return;
     initialHandleResolvedRef.current = true;
     const lower = initialHandle.toLowerCase();
-    const existing = threads.find(
+    const existing = (threads ?? []).find(
       (t) => t.type === "dm" && t.peer?.handle?.toLowerCase() === lower,
     );
     if (existing) {
       setOpenThreadId(existing.id);
       return;
     }
-    // Create / resolve the DM channel server-side.
+    // Create / resolve the DM channel server-side. A refusal toasts why
+    // and the student lands on the thread list.
     (async () => {
-      try {
-        const r = await fetch("/api/me/threads", {
-          method: "POST",
-          headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({ handle: lower }),
-        });
-        const j = await r.json();
-        if (j?.ok && j.channel_id) {
-          await refetchThreads();
-          setOpenThreadId(j.channel_id);
-        }
-      } catch {
-        /* silent — user lands on the thread list */
+      const r = await vibeRequest<{ channel_id?: string }>("/api/me/threads", {
+        json: { handle: lower },
+        failure: "Couldn't open that conversation.",
+      });
+      if (!r.ok) return;
+      const channelId = r.data.channel_id;
+      if (typeof channelId !== "string" || !channelId) {
+        toast({ message: "Couldn't open that conversation. Try again.", tone: "error" });
+        return;
       }
+      await refetchThreads();
+      setOpenThreadId(channelId);
     })();
-  }, [initialHandle, threads, refetchThreads]);
+  }, [initialHandle, threads, listErr, refetchThreads]);
 
   const visibleThreads = useMemo(() => {
     if (tab === "requests") return requests ?? [];
@@ -457,7 +553,19 @@ export function MessagesMobile({
 
       <div style={{ padding: "8px 0 24px" }}>
         {threads === null ? (
-          <ListSkeleton />
+          listErr ? (
+            <div style={{ padding: "16px 16px 0" }}>
+              <LoadFailed
+                failure={listErr}
+                onRetry={() => {
+                  setListErr(null);
+                  void refetchThreads("first");
+                }}
+              />
+            </div>
+          ) : (
+            <ListSkeleton />
+          )
         ) : visibleThreads.length === 0 ? (
           <EmptyState tab={tab} />
         ) : (
@@ -489,6 +597,7 @@ export function MessagesMobile({
             requests?.find((t) => t.id === openThreadId) ??
             null
           }
+          onThreadsChanged={() => void refetchThreads()}
           onClose={() => {
             setOpenThreadId(null);
             void refetchThreads();
@@ -573,10 +682,21 @@ function ThreadRow({
   const { url: avatarUrl, initials } = threadAvatar(thread);
   const title = threadTitle(thread);
   // A photo, video or shared post sent without a caption has empty
-  // content — say so instead of a blank line.
-  const preview = thread.last_message
-    ? thread.last_message.content?.trim() || "Attachment"
-    : "No messages yet";
+  // content — say which instead of a blank line. "Attachment" is left for
+  // a server that doesn't send the kinds.
+  const lm = thread.last_message;
+  const preview = !lm
+    ? "No messages yet"
+    : lm.content?.trim() ||
+      (lm.media_kind === "video"
+        ? "Video"
+        : lm.media_kind === "image"
+          ? "Photo"
+          : lm.attachment_kind === "clip"
+            ? "Shared a clip"
+            : lm.attachment_kind === "post"
+              ? "Shared a post"
+              : "Attachment");
   const when = relativeTime(thread.last_message?.created_at);
   const unread = !!thread.unread;
 
@@ -803,11 +923,15 @@ export function ConversationView({
   threadId,
   thread,
   onClose,
+  onThreadsChanged,
   backdropCss,
 }: {
   threadId: string;
   thread: ThreadEntry | null;
   onClose: () => void;
+  /** The thread list should re-sync: a request was accepted, or a reply
+   *  accepted it. MessagesMobile refetches; CampusMobile passes nothing. */
+  onThreadsChanged?: () => void;
   /** Optional org backdrop gradient (CSS background value). When set
    *  (and not the cream preset), the chat container, header, and input
    *  bar flip to dark-glass treatments so the wallpaper reads as the
@@ -815,10 +939,21 @@ export function ConversationView({
   backdropCss?: string | null;
 }) {
   const [messages, setMessages] = useState<MessageRow[] | null>(null);
+  // Why the first load failed, shown in the list's place. Retry bumps
+  // loadSeq, which re-runs the load.
+  const [loadErr, setLoadErr] = useState<LoadFailure | null>(null);
+  const [loadSeq, setLoadSeq] = useState(0);
   const [draft, setDraft] = useState("");
   const [sending, setSending] = useState(false);
-  const [error, setError] = useState<string | null>(null);
   const [meId, setMeId] = useState<string | null>(null);
+  const [staged, setStaged] = useState<StagedMedia | null>(null);
+  const [replyTo, setReplyTo] = useState<ReplyTarget | null>(null);
+  // Where a message request stands once the viewer answers it here, so
+  // the bar goes before the thread list re-syncs.
+  const [requestState, setRequestState] = useState<"pending" | "accepted" | "declined">(
+    "pending",
+  );
+  const [reqBusy, setReqBusy] = useState(false);
   const [menuOpen, setMenuOpen] = useState(false);
   const [groupSettingsOpen, setGroupSettingsOpen] = useState(false);
   const [actionFeedback, setActionFeedback] = useState<string | null>(null);
@@ -830,8 +965,22 @@ export function ConversationView({
   const [mutedUntil, setMutedUntil] = useState<string | null>(
     thread?.muted_until ?? null,
   );
+  // The messages, their load failure, the reply target, the staged file
+  // and the request bar all belong to one thread. If the thread changes
+  // under a mounted view, reset them here during render, before anything
+  // of the old thread paints (an effect would paint it first).
+  const [shownThreadId, setShownThreadId] = useState(threadId);
+  if (shownThreadId !== threadId) {
+    setShownThreadId(threadId);
+    setMessages(null);
+    setLoadErr(null);
+    setReplyTo(null);
+    setStaged(null);
+    setRequestState("pending");
+  }
   const scrollRef = useRef<HTMLDivElement | null>(null);
   const inputRef = useRef<HTMLTextAreaElement | null>(null);
+  const fileInputRef = useRef<HTMLInputElement | null>(null);
   // When the message list last scrolled (performance.now()). A bubble's
   // pending long-press reads it so a scroll never opens the picker.
   const listScrolledAtRef = useRef(Number.NEGATIVE_INFINITY);
@@ -854,36 +1003,41 @@ export function ConversationView({
     return () => document.body.classList.remove("vibe-composer-open");
   }, []);
 
-  // Initial fetch + mark-as-read.
+  // Initial fetch, and Retry. A first load that fails shows LoadFailed in
+  // the list's place and the composer stays; once rows are on screen, a
+  // later failed load keeps them.
   useEffect(() => {
     let cancelled = false;
     (async () => {
-      try {
-        const r = await fetch(
-          `/api/me/threads/${encodeURIComponent(threadId)}/messages?limit=50`,
-          { cache: "no-store" },
-        );
-        const j = await r.json();
-        if (cancelled) return;
-        if (j?.ok && Array.isArray(j.messages)) {
-          // API returns oldest-first — UI appends new messages to the
-          // bottom, so the array can be used as-is.
-          setMessages(j.messages as MessageRow[]);
-          if (typeof j.viewer_id === "string") setMeId(j.viewer_id);
-        } else {
-          setMessages([]);
-        }
-      } catch {
-        if (!cancelled) setMessages([]);
+      const r = await vibeRequest<{ messages?: MessageRow[]; viewer_id?: string }>(
+        `/api/me/threads/${encodeURIComponent(threadId)}/messages?limit=50`,
+        { cache: "no-store", quiet: true, failure: "Couldn't load this conversation." },
+      );
+      // Closed, another thread, or a newer Retry: drop it, failures too.
+      if (cancelled) return;
+      if (r.ok && Array.isArray(r.data.messages)) {
+        // API returns oldest-first — UI appends new messages to the
+        // bottom, so the array can be used as-is.
+        setLoadErr(null);
+        setMessages(r.data.messages);
+        if (typeof r.data.viewer_id === "string") setMeId(r.data.viewer_id);
+        return;
       }
+      setLoadErr(asLoadFailure(r, "Couldn't load this conversation."));
     })();
-    // Mark as read — best-effort, non-blocking.
-    fetch(`/api/me/threads/${encodeURIComponent(threadId)}/read`, {
-      method: "POST",
-    }).catch(() => {});
     return () => {
       cancelled = true;
     };
+  }, [threadId, loadSeq]);
+
+  // Mark as read — best-effort and quiet: the student didn't ask for it,
+  // and only the unread dot would notice.
+  useEffect(() => {
+    void vibeRequest(`/api/me/threads/${encodeURIComponent(threadId)}/read`, {
+      method: "POST",
+      quiet: true,
+      failure: "Couldn't mark this conversation as read.",
+    });
   }, [threadId]);
 
   // Auto-scroll to the bottom on first message-paint + after sends.
@@ -903,49 +1057,228 @@ export function ConversationView({
     if (el && pinnedToBottomRef.current) el.scrollTop = el.scrollHeight;
   }, []);
 
+  // A message request the viewer hasn't answered here yet. CampusMobile's
+  // org entries carry no is_request, so the bar never shows there.
+  const isRequest = thread?.is_request === true && requestState === "pending";
+
+  // Re-runs the load: Retry, and a send that couldn't be painted onto the
+  // list (none loaded yet, or no row in the server's answer).
+  const reload = useCallback(() => {
+    setLoadErr(null);
+    setLoadSeq((n) => n + 1);
+  }, []);
+
   const send = useCallback(async () => {
     const text = draft.trim();
-    if (!text || sending) return;
+    const media = staged;
+    if ((!text && !media) || sending) return;
+    const reply = replyTo;
+    const body = {
+      content: text,
+      ...(reply ? { parent_message_id: reply.parent.id } : {}),
+    };
+    const url = `/api/me/threads/${encodeURIComponent(threadId)}/messages`;
     setSending(true);
-    setError(null);
-    // Optimistic append.
-    const tempId = `temp_${Date.now()}`;
-    setMessages((prev) => [
-      ...(prev ?? []),
-      {
-        id: tempId,
-        content: text,
-        created_at: new Date().toISOString(),
-        user_id: meId ?? "me",
-      },
-    ]);
-    setDraft("");
     try {
-      const r = await fetch(
-        `/api/me/threads/${encodeURIComponent(threadId)}/messages`,
-        {
-          method: "POST",
-          headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({ content: text }),
-        },
-      );
-      const j = await r.json();
-      if (!r.ok || !j?.ok) throw new Error(j?.error ?? "Send failed");
-      // Replace the temp row with the server row.
-      setMessages((prev) =>
-        (prev ?? []).map((m) =>
-          m.id === tempId ? (j.message as MessageRow) : m,
-        ),
-      );
-    } catch (e) {
-      setMessages((prev) => (prev ?? []).filter((m) => m.id !== tempId));
-      setDraft(text);
-      setError(e instanceof Error ? e.message : "Send failed");
+      let row: MessageRow | undefined;
+      if (media) {
+        // Non-optimistic: nothing is painted until the server has the
+        // message. A failure at any step keeps the file, the draft and
+        // the reply target, and the toast has said why.
+        const failure =
+          media.kind === "video" ? "Couldn't upload your video." : "Couldn't upload your photo.";
+        const sign = await vibeRequest<{
+          uploadUrl?: string;
+          objectKey?: string;
+          kind?: "image" | "video";
+        }>("/api/me/messages-upload-url", {
+          json: { channelId: threadId, contentType: media.contentType, sizeBytes: media.file.size },
+          failure,
+        });
+        if (!sign.ok) return;
+        const { uploadUrl, objectKey } = sign.data;
+        if (!uploadUrl || !objectKey) {
+          toast({ message: `${failure} Try again.`, tone: "error" });
+          return;
+        }
+        // The signature binds Content-Length to the declared size, and a
+        // File body sends exactly those bytes. R2 is another origin, so
+        // the same-origin default sends no cookies.
+        const put = await vibeRequest(uploadUrl, {
+          method: "PUT",
+          body: media.file,
+          headers: { "content-type": media.contentType },
+          failure,
+        });
+        if (!put.ok) return;
+        const r = await vibeRequest<{ message?: MessageRow }>(url, {
+          json: { ...body, media_url: objectKey, media_kind: sign.data.kind ?? media.kind },
+          failure: "Couldn't send your message.",
+        });
+        if (!r.ok) return;
+        row = r.data.message;
+        const sent = row;
+        setMessages((prev) => (prev && sent ? [...prev, sent] : prev));
+        setStaged(null);
+        // Anything typed while it uploaded stays in the box.
+        setDraft((d) => (d.trim() === text ? "" : d));
+      } else {
+        // Optimistic, but only onto a list that loaded: one row under a
+        // failed load would read as the whole conversation.
+        const tempId = `temp_${Date.now()}`;
+        setMessages((prev) =>
+          prev
+            ? [
+                ...prev,
+                {
+                  id: tempId,
+                  content: text,
+                  created_at: new Date().toISOString(),
+                  user_id: meId ?? "me",
+                  parent_preview: reply?.parent ?? null,
+                },
+              ]
+            : prev,
+        );
+        setDraft("");
+        const r = await vibeRequest<{ message?: MessageRow }>(url, {
+          json: body,
+          failure: "Couldn't send your message.",
+        });
+        if (!r.ok) {
+          setMessages((prev) => (prev ? prev.filter((m) => m.id !== tempId) : prev));
+          setDraft(text);
+          return;
+        }
+        row = r.data.message;
+        const sent = row;
+        // Replace the temp row with the server row.
+        setMessages((prev) =>
+          prev && sent ? prev.map((m) => (m.id === tempId ? sent : m)) : prev,
+        );
+      }
+      // Sent. A reply target picked while it was sending stays.
+      setReplyTo((cur) => (cur === reply ? null : cur));
+      pinnedToBottomRef.current = true;
+      if (!row || messages === null) reload();
+      // A reply accepts a request on the server (messages route), so the
+      // bar goes and the thread moves from Requests to All.
+      if (isRequest) {
+        setRequestState("accepted");
+        onThreadsChanged?.();
+      }
     } finally {
       setSending(false);
       inputRef.current?.focus();
     }
-  }, [draft, sending, threadId, meId]);
+  }, [
+    draft,
+    staged,
+    sending,
+    replyTo,
+    threadId,
+    meId,
+    messages,
+    reload,
+    isRequest,
+    onThreadsChanged,
+  ]);
+
+  // Accept / Decline a message request. The bar stays until the server
+  // agrees, so a refusal has nothing to roll back: the toast says why and
+  // the buttons come back.
+  const acceptRequest = useCallback(async () => {
+    if (reqBusy) return;
+    setReqBusy(true);
+    const r = await vibeRequest(`/api/me/threads/${encodeURIComponent(threadId)}/accept`, {
+      method: "POST",
+      failure: "Couldn't accept this request.",
+    });
+    setReqBusy(false);
+    if (!r.ok) return;
+    setRequestState("accepted");
+    onThreadsChanged?.();
+  }, [reqBusy, threadId, onThreadsChanged]);
+
+  const declineRequest = useCallback(async () => {
+    if (reqBusy) return;
+    // Asked first: the two buttons sit side by side on a phone, and a
+    // decline can't be undone. The sender is never told.
+    if (
+      typeof window !== "undefined" &&
+      !window.confirm("Decline this request? It'll be removed from your inbox.")
+    )
+      return;
+    setReqBusy(true);
+    const r = await vibeRequest(`/api/me/threads/${encodeURIComponent(threadId)}/decline`, {
+      method: "POST",
+      failure: "Couldn't decline this request.",
+    });
+    setReqBusy(false);
+    if (!r.ok) return;
+    setRequestState("declined");
+    // Closing refetches the thread list (MessagesMobile's onClose), which
+    // takes the request out of the Requests tab.
+    onClose();
+  }, [reqBusy, threadId, onClose]);
+
+  const startReply = useCallback(
+    (m: MessageRow) => {
+      const mine = !!meId && m.user_id === meId;
+      setReplyTo({
+        parent: {
+          id: m.id,
+          content: m.content?.trim() ? m.content : null,
+          user_id: m.user_id,
+          author: m.users ?? null,
+          media_kind: m.media_kind ?? null,
+          attachment_kind: m.attachment_kind ?? null,
+        },
+        authorName: mine ? "yourself" : m.users?.name || m.users?.handle || "Member",
+      });
+      inputRef.current?.focus();
+    },
+    [meId],
+  );
+
+  // Photos and videos attach in DMs and groups only: the upload route
+  // checks channel_members, which org channels don't have, so it 403s there.
+  const canAttach = thread?.type === "dm" || thread?.type === "group";
+
+  // A picked photo or video, checked against the upload route's rules
+  // before anything is sent. A new pick replaces the staged one.
+  const chooseMedia = useCallback((file: File | undefined) => {
+    if (!file) return;
+    const contentType = file.type.split(";")[0].trim().toLowerCase();
+    const kind = ATTACH_IMAGE_TYPES.has(contentType)
+      ? "image"
+      : ATTACH_VIDEO_TYPES.has(contentType)
+        ? "video"
+        : null;
+    if (!kind) {
+      toast({
+        message: "Photos can be JPG, PNG, WebP or GIF, and videos MP4, MOV or WebM.",
+        tone: "error",
+      });
+      return;
+    }
+    if (file.size > (kind === "image" ? MAX_IMAGE_BYTES : MAX_VIDEO_BYTES)) {
+      toast({
+        message: kind === "image" ? "That photo is over 15 MB." : "That video is over 200 MB.",
+        tone: "error",
+      });
+      return;
+    }
+    setStaged({ file, kind, contentType, previewUrl: URL.createObjectURL(file) });
+  }, []);
+
+  // The staged preview is a blob: URL. Free it once the file is sent,
+  // removed or replaced, and when the conversation closes.
+  useEffect(() => {
+    if (!staged) return;
+    const url = staged.previewUrl;
+    return () => URL.revokeObjectURL(url);
+  }, [staged]);
 
   const toggleReaction = useCallback(
     async (messageId: string, emoji: string) => {
@@ -1241,17 +1574,25 @@ export function ConversationView({
         }}
       >
         {messages === null ? (
-          <div
-            style={{
-              padding: 24,
-              textAlign: "center",
-              color: backdropCss ? "rgba(255,255,255,0.6)" : "#8A8580",
-              fontFamily: "DM Sans, sans-serif",
-              fontSize: 13,
-            }}
-          >
-            Loading messages…
-          </div>
+          loadErr ? (
+            <LoadFailed
+              failure={loadErr}
+              onRetry={reload}
+              tone={backdropCss ? "dark" : "light"}
+            />
+          ) : (
+            <div
+              style={{
+                padding: 24,
+                textAlign: "center",
+                color: backdropCss ? "rgba(255,255,255,0.6)" : "#8A8580",
+                fontFamily: "DM Sans, sans-serif",
+                fontSize: 13,
+              }}
+            >
+              Loading messages…
+            </div>
+          )
         ) : messages.length === 0 ? (
           <div
             style={{
@@ -1289,6 +1630,8 @@ export function ConversationView({
                   onToggleReaction={(emoji) => void toggleReaction(m.id, emoji)}
                   onMediaLoad={keepPinnedToBottom}
                   listScrolledAtRef={listScrolledAtRef}
+                  parentIsMine={!!meId && m.parent_preview?.user_id === meId}
+                  onReply={() => startReply(m)}
                 />
               );
             })}
@@ -1296,21 +1639,217 @@ export function ConversationView({
         )}
       </div>
 
-      {/* Error banner */}
-      {error ? (
+      {/* Message request: desktop's bar, above the composer. Replying
+          accepts it too. */}
+      {isRequest && thread ? (
         <div
-          role="alert"
           style={{
-            padding: "8px 14px",
-            background: "rgba(255,92,53,0.10)",
-            color: "#B83A1A",
+            flexShrink: 0,
+            padding: "12px 16px",
+            background: "rgba(255,92,53,0.06)",
+            borderTop: "1px solid rgba(28,28,30,0.08)",
             fontFamily: "DM Sans, sans-serif",
-            fontSize: 12.5,
-            fontWeight: 600,
-            textAlign: "center",
           }}
         >
-          {error}
+          <p
+            style={{
+              margin: "0 0 10px",
+              fontSize: 13,
+              lineHeight: 1.45,
+              color: "#5C5853",
+              textAlign: "center",
+            }}
+          >
+            {`${threadTitle(thread)} sent you a message request. You haven't connected yet — accept or decline.`}
+          </p>
+          <div style={{ display: "flex", gap: 8 }}>
+            <button
+              type="button"
+              onClick={() => void acceptRequest()}
+              disabled={reqBusy}
+              style={{
+                flex: 1,
+                height: 40,
+                borderRadius: 999,
+                border: "none",
+                background: "#FF5C35",
+                color: "#fff",
+                fontFamily: "DM Sans, sans-serif",
+                fontSize: 14,
+                fontWeight: 700,
+                cursor: reqBusy ? "default" : "pointer",
+                opacity: reqBusy ? 0.6 : 1,
+                WebkitTapHighlightColor: "transparent",
+              }}
+            >
+              Accept
+            </button>
+            <button
+              type="button"
+              onClick={() => void declineRequest()}
+              disabled={reqBusy}
+              style={{
+                flex: 1,
+                height: 40,
+                borderRadius: 999,
+                border: "1px solid rgba(28,28,30,0.14)",
+                background: "transparent",
+                color: "#1C1C1E",
+                fontFamily: "DM Sans, sans-serif",
+                fontSize: 14,
+                fontWeight: 700,
+                cursor: reqBusy ? "default" : "pointer",
+                opacity: reqBusy ? 0.6 : 1,
+                WebkitTapHighlightColor: "transparent",
+              }}
+            >
+              Decline
+            </button>
+          </div>
+        </div>
+      ) : null}
+
+      {/* Reply pill and staged photo/video, on the composer's surface
+          (desktop's reply pill and compStaged). */}
+      {replyTo || staged ? (
+        <div
+          style={{
+            flexShrink: 0,
+            display: "flex",
+            flexDirection: "column",
+            gap: 8,
+            padding: "8px 12px 0",
+            background: backdropCss
+              ? "rgba(14, 11, 22, 0.72)"
+              : "rgba(250, 247, 242, 0.96)",
+            borderTop: backdropCss
+              ? "1px solid rgba(255,255,255,0.08)"
+              : "1px solid rgba(28,28,30,0.08)",
+            backdropFilter: backdropCss ? "blur(20px) saturate(160%)" : undefined,
+            WebkitBackdropFilter: backdropCss ? "blur(20px) saturate(160%)" : undefined,
+            fontFamily: "DM Sans, sans-serif",
+          }}
+        >
+          {replyTo ? (
+            <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
+              <div
+                style={{
+                  flex: 1,
+                  minWidth: 0,
+                  padding: "2px 0 2px 10px",
+                  borderLeft: "3px solid #FF5C35",
+                }}
+              >
+                <div
+                  style={{
+                    fontSize: 12,
+                    fontWeight: 700,
+                    color: backdropCss ? "rgba(255,180,150,0.95)" : "#FF5C35",
+                    whiteSpace: "nowrap",
+                    overflow: "hidden",
+                    textOverflow: "ellipsis",
+                  }}
+                >
+                  Replying to {replyTo.authorName}
+                </div>
+                <div
+                  style={{
+                    fontSize: 13,
+                    color: backdropCss ? "rgba(255,255,255,0.7)" : "#5C5853",
+                    whiteSpace: "nowrap",
+                    overflow: "hidden",
+                    textOverflow: "ellipsis",
+                  }}
+                >
+                  {quotedBody(replyTo.parent)}
+                </div>
+              </div>
+              <button
+                type="button"
+                onClick={() => setReplyTo(null)}
+                aria-label="Cancel reply"
+                style={{
+                  width: 34,
+                  height: 34,
+                  borderRadius: 999,
+                  border: "none",
+                  background: backdropCss ? "rgba(255,255,255,0.10)" : "rgba(28,28,30,0.06)",
+                  color: backdropCss ? "#fff" : "#1C1C1E",
+                  fontSize: 18,
+                  lineHeight: 1,
+                  cursor: "pointer",
+                  flexShrink: 0,
+                  WebkitTapHighlightColor: "transparent",
+                }}
+              >
+                ×
+              </button>
+            </div>
+          ) : null}
+          {staged ? (
+            <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
+              <div
+                style={{
+                  width: 48,
+                  height: 48,
+                  borderRadius: 10,
+                  overflow: "hidden",
+                  flexShrink: 0,
+                  background: staged.kind === "video" ? "#000" : "rgba(28,28,30,0.06)",
+                }}
+              >
+                {staged.kind === "image" ? (
+                  // eslint-disable-next-line @next/next/no-img-element
+                  <img
+                    src={staged.previewUrl}
+                    alt=""
+                    draggable={false}
+                    style={{ display: "block", width: "100%", height: "100%", objectFit: "cover" }}
+                  />
+                ) : (
+                  <video
+                    src={staged.previewUrl}
+                    muted
+                    playsInline
+                    preload="metadata"
+                    style={{ display: "block", width: "100%", height: "100%", objectFit: "cover" }}
+                  />
+                )}
+              </div>
+              <div style={{ flex: 1, minWidth: 0 }}>
+                <div style={{ fontSize: 13.5, fontWeight: 700, color: "#1C1C1E" }}>
+                  {staged.kind === "video" ? "Video" : "Photo"}
+                </div>
+                <div style={{ fontSize: 12, fontWeight: 600, color: "#8A8580" }}>
+                  {sending
+                    ? "Sending…"
+                    : `${Math.max(1, Math.round(staged.file.size / 1024)).toLocaleString()} KB`}
+                </div>
+              </div>
+              <button
+                type="button"
+                onClick={() => setStaged(null)}
+                disabled={sending}
+                aria-label="Remove attachment"
+                style={{
+                  width: 34,
+                  height: 34,
+                  borderRadius: 999,
+                  border: "none",
+                  background: "rgba(28,28,30,0.06)",
+                  color: "#1C1C1E",
+                  fontSize: 18,
+                  lineHeight: 1,
+                  cursor: sending ? "default" : "pointer",
+                  opacity: sending ? 0.4 : 1,
+                  flexShrink: 0,
+                  WebkitTapHighlightColor: "transparent",
+                }}
+              >
+                ×
+              </button>
+            </div>
+          ) : null}
         </div>
       ) : null}
 
@@ -1330,13 +1869,74 @@ export function ConversationView({
           background: backdropCss
             ? "rgba(14, 11, 22, 0.72)"
             : "rgba(250, 247, 242, 0.96)",
-          borderTop: backdropCss
-            ? "1px solid rgba(255,255,255,0.08)"
-            : "1px solid rgba(28,28,30,0.08)",
+          // The reply pill / staged chip above carries the top edge.
+          borderTop:
+            replyTo || staged
+              ? "none"
+              : backdropCss
+                ? "1px solid rgba(255,255,255,0.08)"
+                : "1px solid rgba(28,28,30,0.08)",
           backdropFilter: backdropCss ? "blur(20px) saturate(160%)" : undefined,
           WebkitBackdropFilter: backdropCss ? "blur(20px) saturate(160%)" : undefined,
         }}
       >
+        {canAttach ? (
+          <>
+            <input
+              ref={fileInputRef}
+              type="file"
+              accept={ATTACH_ACCEPT}
+              style={{ display: "none" }}
+              // Reset on every click so iOS fires onChange again when the
+              // same file is picked twice (ProfileMobile's fix).
+              onClick={(e) => {
+                e.currentTarget.value = "";
+              }}
+              onChange={(e) => chooseMedia(e.target.files?.[0])}
+            />
+            <button
+              type="button"
+              onClick={() => fileInputRef.current?.click()}
+              disabled={sending}
+              aria-label="Attach a photo or video"
+              style={{
+                width: 40,
+                height: 40,
+                borderRadius: 999,
+                border: "1px solid rgba(28,28,30,0.10)",
+                background: "rgba(255,255,255,0.78)",
+                color: "#1C1C1E",
+                cursor: sending ? "default" : "pointer",
+                opacity: sending ? 0.5 : 1,
+                display: "inline-flex",
+                alignItems: "center",
+                justifyContent: "center",
+                flexShrink: 0,
+                WebkitTapHighlightColor: "transparent",
+              }}
+            >
+              <svg width="20" height="20" viewBox="0 0 20 20" fill="none" aria-hidden>
+                <rect
+                  x="2.5"
+                  y="4"
+                  width="15"
+                  height="12"
+                  rx="2.5"
+                  stroke="currentColor"
+                  strokeWidth="1.6"
+                />
+                <circle cx="7.25" cy="8.25" r="1.5" fill="currentColor" />
+                <path
+                  d="M3 14.5l4.25-4 3.25 3 2.5-2.25L17 14.5"
+                  stroke="currentColor"
+                  strokeWidth="1.6"
+                  strokeLinecap="round"
+                  strokeLinejoin="round"
+                />
+              </svg>
+            </button>
+          </>
+        ) : null}
         <textarea
           ref={inputRef}
           value={draft}
@@ -1375,7 +1975,8 @@ export function ConversationView({
         />
         <button
           type="submit"
-          disabled={!draft.trim() || sending}
+          // Same test as send(): text, or a staged photo/video.
+          disabled={(!draft.trim() && !staged) || sending}
           aria-label="Send"
           style={{
             width: 40,
@@ -1383,9 +1984,9 @@ export function ConversationView({
             borderRadius: 999,
             border: "none",
             background:
-              !draft.trim() || sending ? "rgba(28,28,30,0.18)" : "#FF5C35",
+              (!draft.trim() && !staged) || sending ? "rgba(28,28,30,0.18)" : "#FF5C35",
             color: "#fff",
-            cursor: !draft.trim() || sending ? "default" : "pointer",
+            cursor: (!draft.trim() && !staged) || sending ? "default" : "pointer",
             display: "inline-flex",
             alignItems: "center",
             justifyContent: "center",
@@ -2663,6 +3264,10 @@ function ComposeOverlay({
   const [suggested, setSuggested] = useState<SearchUser[] | null>(null);
   const [results, setResults] = useState<SearchUser[] | null>(null);
   const [loading, setLoading] = useState(false);
+  // A search that didn't run, shown instead of "No matches". Retry bumps
+  // searchSeq, which re-runs the same query.
+  const [searchErr, setSearchErr] = useState<LoadFailure | null>(null);
+  const [searchSeq, setSearchSeq] = useState(0);
   const inputRef = useRef<HTMLInputElement | null>(null);
 
   // Hide the bottom tab bar while compose is open.
@@ -2718,26 +3323,25 @@ function ComposeOverlay({
     let cancelled = false;
     setLoading(true);
     (async () => {
-      try {
-        const r = await fetch(
-          `/api/users/search?q=${encodeURIComponent(debounced)}&limit=20`,
-          { cache: "no-store" },
-        );
-        const j = await r.json();
-        if (cancelled) return;
-        setResults(
-          j?.ok && Array.isArray(j.users) ? (j.users as SearchUser[]) : [],
-        );
-      } catch {
-        if (!cancelled) setResults([]);
-      } finally {
-        if (!cancelled) setLoading(false);
+      const r = await vibeRequest<{ users?: SearchUser[] }>(
+        `/api/users/search?q=${encodeURIComponent(debounced)}&limit=20`,
+        { cache: "no-store", quiet: true, failure: "Couldn't search people." },
+      );
+      // A newer query (or Retry) owns the list now.
+      if (cancelled) return;
+      if (r.ok && Array.isArray(r.data.users)) {
+        setSearchErr(null);
+        setResults(r.data.users);
+      } else {
+        setSearchErr(asLoadFailure(r, "Couldn't search people."));
+        setResults(null);
       }
+      setLoading(false);
     })();
     return () => {
       cancelled = true;
     };
-  }, [debounced]);
+  }, [debounced, searchSeq]);
 
   const list = debounced ? results : suggested;
 
@@ -2866,6 +3470,14 @@ function ComposeOverlay({
           <ListSkeleton />
         ) : debounced && loading ? (
           <ListSkeleton />
+        ) : debounced && searchErr ? (
+          <div style={{ padding: "12px 16px" }}>
+            <LoadFailed
+              failure={searchErr}
+              compact
+              onRetry={() => setSearchSeq((n) => n + 1)}
+            />
+          </div>
         ) : !list || list.length === 0 ? (
           <div
             style={{
@@ -3010,6 +3622,8 @@ function MessageBubble({
   onToggleReaction,
   onMediaLoad,
   listScrolledAtRef,
+  parentIsMine = false,
+  onReply,
 }: {
   message: MessageRow;
   isMine: boolean;
@@ -3035,6 +3649,10 @@ function MessageBubble({
   /** When the message list last scrolled (performance.now()). A pending
    *  long-press checks it so a scroll never opens the picker. */
   listScrolledAtRef?: React.RefObject<number>;
+  /** The reply's quoted parent is the viewer's own, so its stub reads "You". */
+  parentIsMine?: boolean;
+  /** "↩ Reply" in the long-press picker. */
+  onReply?: () => void;
 }) {
   const sender = message.users ?? null;
   const senderName = sender?.name || sender?.handle || "Member";
@@ -3493,6 +4111,43 @@ function MessageBubble({
     );
   }
 
+  // A reply's quote stub (desktop's .dm-quote): who it answers and one
+  // line of what they sent. It sits on the chat surface above the
+  // message, whatever kind it is, and takes no long-press.
+  const parent = message.parent_preview ?? null;
+  const quote = parent ? (
+    <div
+      style={{
+        maxWidth: "min(260px, 100%)",
+        boxSizing: "border-box",
+        padding: "5px 10px",
+        borderLeft: darkMode ? "3px solid rgba(255,140,90,0.55)" : "3px solid #FF5C35",
+        borderRadius: 8,
+        background: darkMode ? "rgba(20,16,28,0.45)" : "rgba(28,28,30,0.05)",
+        color: darkMode ? "rgba(255,255,255,0.78)" : "#5C5853",
+        fontFamily: "DM Sans, sans-serif",
+        fontSize: 12,
+        lineHeight: 1.35,
+      }}
+    >
+      <div
+        style={{
+          fontSize: 11,
+          fontWeight: 700,
+          color: darkMode ? "rgba(255,180,150,0.95)" : "#FF5C35",
+          whiteSpace: "nowrap",
+          overflow: "hidden",
+          textOverflow: "ellipsis",
+        }}
+      >
+        ↩ {parentIsMine ? "You" : parent.author?.name || parent.author?.handle || "message"}
+      </div>
+      <div style={{ whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>
+        {quotedBody(parent)}
+      </div>
+    </div>
+  ) : null;
+
   return (
     <div
       style={{
@@ -3558,9 +4213,9 @@ function MessageBubble({
           position: "relative",
         }}
       >
-        {/* Photo/video, shared-post card and caption, stacked on the
-            sender's side. Each piece but the video carries the
-            long-press handlers. */}
+        {/* Quote stub, photo/video, shared-post card and caption,
+            stacked on the sender's side. Each piece but the video and
+            the stub carries the long-press handlers. */}
         <div
           style={{
             display: "flex",
@@ -3569,6 +4224,7 @@ function MessageBubble({
             gap: 4,
           }}
         >
+          {quote}
           {captionAbove ? textBubble : null}
           {media}
           {card}
@@ -3628,7 +4284,8 @@ function MessageBubble({
         ) : null}
 
         {/* Emoji picker — pops out on long-press. Anchored above the
-            bubble on the same side. */}
+            bubble on the same side, or below it when the list has no
+            room above. */}
         {pickerOpen ? (
           <ReactionPicker
             darkMode={darkMode}
@@ -3638,6 +4295,16 @@ function MessageBubble({
               setPickerOpen(false);
               onToggleReaction?.(emoji);
             }}
+            // Not on a row still sending: the server silently drops a
+            // parent it can't find, and a temp_ id is one.
+            onReply={
+              onReply && !message.id.startsWith("temp_")
+                ? () => {
+                    setPickerOpen(false);
+                    onReply();
+                  }
+                : undefined
+            }
             onClose={() => setPickerOpen(false)}
           />
         ) : null}
@@ -3678,15 +4345,39 @@ function ReactionPicker({
   isMine,
   existing,
   onPick,
+  onReply,
   onClose,
 }: {
   darkMode: boolean;
   isMine: boolean;
   existing: MessageReaction[];
   onPick: (emoji: string) => void;
+  /** Adds "↩ Reply", on the emoji row's far side from the bubble. */
+  onReply?: () => void;
   onClose: () => void;
 }) {
   const pickerRef = useRef<HTMLDivElement | null>(null);
+
+  // Opens above the bubble unless the message list can't show it
+  // there, then below. The list clips it at its top edge, and above the
+  // first message no scroll brings it back, so on a request or DM with
+  // one or two messages the emojis and Reply were cut off. Measured
+  // before paint, so it never shows on the wrong side first.
+  const [below, setBelow] = useState(false);
+  useLayoutEffect(() => {
+    const el = pickerRef.current;
+    // The bubble wrapper it's positioned against.
+    const anchor = el?.offsetParent;
+    if (!el || !anchor) return;
+    let list = anchor.parentElement;
+    while (list && !/auto|scroll/.test(getComputedStyle(list).overflowY)) {
+      list = list.parentElement;
+    }
+    const listTop = list ? list.getBoundingClientRect().top : 0;
+    if (anchor.getBoundingClientRect().top - listTop < el.offsetHeight + 6) {
+      setBelow(true);
+    }
+  }, []);
 
   // Outside-tap dismiss — but only if the tap is OUTSIDE the picker.
   // Previously we used `once: true`, which also fired when the user
@@ -3725,13 +4416,19 @@ function ReactionPicker({
       aria-label="React"
       style={{
         position: "absolute",
-        bottom: "calc(100% + 6px)",
+        ...(below
+          ? { top: "calc(100% + 6px)" }
+          : { bottom: "calc(100% + 6px)" }),
         ...(isMine ? { right: 0 } : { left: 32 }),
-        display: "inline-flex",
-        alignItems: "center",
-        gap: 2,
+        display: "flex",
+        // The emojis sit next to the bubble on either side (above, that's
+        // where they were before Reply), and Reply goes on the far side.
+        flexDirection: below ? "column" : "column-reverse",
         padding: "6px 8px",
-        borderRadius: 999,
+        // A pill for the emoji row alone; a card once Reply joins it.
+        // Reply gets its own row because beside the emojis the picker
+        // ran past a phone's width and scrolled the list sideways.
+        borderRadius: onReply ? 20 : 999,
         background: darkMode
           ? "rgba(20,16,28,0.92)"
           : "rgba(255,255,255,0.96)",
@@ -3746,39 +4443,81 @@ function ReactionPicker({
         zIndex: 10,
       }}
     >
-      {REACTION_EMOJIS.map((emoji) => {
-        const on = reactedSet.has(emoji);
-        return (
+      <div style={{ display: "flex", alignItems: "center", gap: 2 }}>
+        {REACTION_EMOJIS.map((emoji) => {
+          const on = reactedSet.has(emoji);
+          return (
+            <button
+              key={emoji}
+              type="button"
+              onClick={(e) => {
+                e.stopPropagation();
+                onPick(emoji);
+              }}
+              style={{
+                background: on ? "rgba(255,140,90,0.22)" : "transparent",
+                border: "none",
+                padding: 0,
+                width: 32,
+                height: 32,
+                borderRadius: 999,
+                display: "inline-flex",
+                alignItems: "center",
+                justifyContent: "center",
+                fontSize: 18,
+                cursor: "pointer",
+                WebkitTapHighlightColor: "transparent",
+                boxShadow: on
+                  ? "0 0 0 1.5px rgba(255,180,150,0.7)"
+                  : "none",
+                transition: "transform 120ms ease",
+              }}
+            >
+              {emoji}
+            </button>
+          );
+        })}
+      </div>
+      {onReply ? (
+        <>
+          <div
+            aria-hidden
+            style={{
+              height: 1,
+              // 6px on the emoji side, 4px on Reply's, in either order.
+              margin: below ? "6px 2px 4px" : "4px 2px 6px",
+              background: darkMode ? "rgba(255,255,255,0.12)" : "rgba(28,28,30,0.08)",
+            }}
+          />
           <button
-            key={emoji}
             type="button"
+            aria-label="Reply"
             onClick={(e) => {
               e.stopPropagation();
-              onPick(emoji);
+              onReply();
             }}
             style={{
-              background: on ? "rgba(255,140,90,0.22)" : "transparent",
-              border: "none",
-              padding: 0,
-              width: 32,
-              height: 32,
-              borderRadius: 999,
-              display: "inline-flex",
+              display: "flex",
               alignItems: "center",
-              justifyContent: "center",
-              fontSize: 18,
+              gap: 8,
+              height: 36,
+              padding: "0 8px",
+              borderRadius: 12,
+              border: "none",
+              background: "transparent",
+              color: darkMode ? "#fff" : "#1C1C1E",
+              fontFamily: "DM Sans, sans-serif",
+              fontSize: 14,
+              fontWeight: 700,
               cursor: "pointer",
               WebkitTapHighlightColor: "transparent",
-              boxShadow: on
-                ? "0 0 0 1.5px rgba(255,180,150,0.7)"
-                : "none",
-              transition: "transform 120ms ease",
             }}
           >
-            {emoji}
+            <span aria-hidden>↩</span>
+            Reply
           </button>
-        );
-      })}
+        </>
+      ) : null}
     </div>
   );
 }
