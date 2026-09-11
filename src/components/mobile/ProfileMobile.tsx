@@ -6,6 +6,7 @@ import { useCallback, useEffect, useRef, useState } from "react";
 import { Drawer } from "vaul";
 
 import { ImageCropperModal } from "@/components/ImageCropperModal";
+import { LoadFailed, asLoadFailure, type LoadFailure } from "@/components/feedback/LoadFailed";
 import { CampusSearchOverlay } from "@/components/mobile/CampusMobile";
 import { PostComposerMobile } from "@/components/mobile/PostComposerMobile";
 import { PostViewerMobile } from "@/components/mobile/PostViewerMobile";
@@ -237,13 +238,20 @@ export function ProfileMobile({ targetHandle }: Props = {}) {
 
   const isVisitor = !!targetHandle;
   const [user, setUser] = useState<VibeUser | null>(null);
-  const [error, setError] = useState<string | null>(null);
+  // A failed first load of the profile itself. Retry bumps
+  // bootstrapTry, which re-runs the bootstrap effect.
+  const [error, setError] = useState<LoadFailure | null>(null);
+  const [bootstrapTry, setBootstrapTry] = useState(0);
   const [posts, setPosts] = useState<PostRow[] | null>(null);
+  /** Set only while no posts have loaded; loaded rows stay on a failure. */
+  const [postsErr, setPostsErr] = useState<LoadFailure | null>(null);
   const [tab, setTab] = useState<ProfileTab>("posts");
   // Unified search overlay — opened by the magnifying-glass button in
   // the floating top-right actions. Reuses CampusMobile's overlay so
   // the search experience is identical across the two surfaces.
   const [searchOpen, setSearchOpen] = useState(false);
+  // Visitor ⋯ menu (Report / Mute / Block). Mounted only while open.
+  const [safetyOpen, setSafetyOpen] = useState(false);
   // Which portfolio sub-section the owner is currently editing.
   // `null` = read-only. Sheets are full-screen vaul drawers.
   const [editingPortfolio, setEditingPortfolio] = useState<
@@ -262,6 +270,13 @@ export function ProfileMobile({ targetHandle }: Props = {}) {
   const [postsSubTab, setPostsSubTab] = useState<PostsSubTab>("mine");
   const [reposts, setReposts] = useState<RepostEntry[] | null>(null);
   const [savedPosts, setSavedPosts] = useState<SavedPost[] | null>(null);
+  // Failed reads for the two sub-panes. A failure never writes [] (that
+  // reads as the empty copy); Retry bumps the *Try counter, which
+  // re-runs that pane's load effect.
+  const [repostsErr, setRepostsErr] = useState<LoadFailure | null>(null);
+  const [repostsTry, setRepostsTry] = useState(0);
+  const [savedErr, setSavedErr] = useState<LoadFailure | null>(null);
+  const [savedTry, setSavedTry] = useState(0);
 
   // When `tab` changes (tap on the tab strip or programmatic set), scroll
   // the swipeable container to that pane. Skip if we're already there
@@ -323,76 +338,83 @@ export function ProfileMobile({ targetHandle }: Props = {}) {
     const endpoint = isVisitor
       ? `/api/users/${encodeURIComponent(targetHandle!)}/bootstrap`
       : "/api/me/profile-bootstrap";
+    const line = isVisitor
+      ? "Couldn't load this profile."
+      : "Couldn't load your profile.";
     (async () => {
-      try {
-        const res = await fetch(endpoint, { cache: "no-store" });
-        const data = await res.json();
-        if (cancelled) return;
-        if (!data?.ok || !data.vibeUser) {
-          setError("Could not load profile");
-          return;
-        }
-        const u = data.vibeUser as VibeUser;
-        setUser(u);
-        setCampus(
-          typeof data.campus === "string" && data.campus ? data.campus : null,
-        );
-        if (isVisitor && u._viewerFollowState) {
-          setFollowState(u._viewerFollowState);
-        }
-      } catch {
-        if (!cancelled) setError("Could not load profile");
+      // Quiet: a failure renders LoadFailed in the page's place, with
+      // Sign in / Review Terms instead of Retry when that's the fix.
+      const r = await vibeRequest<{ vibeUser?: VibeUser; campus?: unknown }>(
+        endpoint,
+        { cache: "no-store", failure: line, quiet: true },
+      );
+      if (cancelled) return;
+      if (!r.ok || !r.data.vibeUser) {
+        setError(asLoadFailure(r, line));
+        return;
+      }
+      const u = r.data.vibeUser;
+      setUser(u);
+      setCampus(
+        typeof r.data.campus === "string" && r.data.campus ? r.data.campus : null,
+      );
+      if (isVisitor && u._viewerFollowState) {
+        setFollowState(u._viewerFollowState);
       }
     })();
     return () => {
       cancelled = true;
     };
-  }, [isVisitor, targetHandle]);
+  }, [isVisitor, targetHandle, bootstrapTry]);
 
-  // Posts fetch — same shape both ways, just routed by `handle`.
-  // Extracted to a stable callback so the composer can re-trigger it
-  // after a successful publish (otherwise the user has to refresh to
-  // see their new post in the grid).
-  const refetchPosts = useCallback(async () => {
-    const endpoint = isVisitor
-      ? `/api/users/${encodeURIComponent(targetHandle!)}/posts`
-      : "/api/me/posts";
-    try {
-      const res = await fetch(endpoint, { cache: "no-store" });
-      const data = await res.json();
-      if (data?.ok && Array.isArray(data.posts)) {
-        setPosts(data.posts as PostRow[]);
-      } else {
-        setPosts([]);
-      }
-    } catch {
-      setPosts([]);
-    }
-  }, [isVisitor, targetHandle]);
-
-  useEffect(() => {
-    let cancelled = false;
-    (async () => {
+  // Posts fetch — same shape both ways, just routed by `handle`. One
+  // loader serves the first load and the refetch the composer and the
+  // post viewer trigger after a publish or delete (otherwise the user
+  // has to refresh to see the change in the grid). The newest call
+  // wins, so a slow older response can't repaint the grid.
+  const postsSeqRef = useRef(0);
+  const postsLoadedRef = useRef(false);
+  const loadPosts = useCallback(
+    (mode: "first" | "refresh") => {
+      const seq = ++postsSeqRef.current;
       const endpoint = isVisitor
         ? `/api/users/${encodeURIComponent(targetHandle!)}/posts`
         : "/api/me/posts";
-      try {
-        const res = await fetch(endpoint, { cache: "no-store" });
-        const data = await res.json();
-        if (cancelled) return;
-        if (data?.ok && Array.isArray(data.posts)) {
-          setPosts(data.posts as PostRow[]);
-        } else {
-          setPosts([]);
+      const line = "Couldn't load posts.";
+      // The state updates live in the .then callback, so the mount
+      // effect below schedules them rather than running them in its body.
+      return vibeRequest<{ posts?: unknown }>(endpoint, {
+        cache: "no-store",
+        failure: line,
+        // A refetch follows the student's own publish or delete, so its
+        // failure toasts; a first load renders LoadFailed instead.
+        quiet: mode === "first",
+      }).then((r) => {
+        if (seq !== postsSeqRef.current) return;
+        if (r.ok && Array.isArray(r.data.posts)) {
+          postsLoadedRef.current = true;
+          setPostsErr(null);
+          setPosts(r.data.posts as PostRow[]);
+          return;
         }
-      } catch {
-        if (!cancelled) setPosts([]);
-      }
-    })();
-    return () => {
-      cancelled = true;
-    };
-  }, [isVisitor, targetHandle]);
+        // Never [] on a failure: that reads as "No posts yet". Rows
+        // already on screen stay put.
+        if (!postsLoadedRef.current) {
+          setPostsErr(asLoadFailure(r, line));
+        } else if (r.ok && mode === "refresh") {
+          // A 2xx with the wrong shape, which vibeRequest counted as a
+          // success and so didn't toast.
+          toast({ message: "Couldn't load posts. Try again.", tone: "error" });
+        }
+      });
+    },
+    [isVisitor, targetHandle],
+  );
+  const refetchPosts = useCallback(() => loadPosts("refresh"), [loadPosts]);
+
+  useEffect(() => {
+    void loadPosts("first");
+  }, [loadPosts]);
 
   // Reposts — public, available for both own + visited profiles.
   // /api/users/[handle]/reposts requires auth but is the same endpoint
@@ -402,26 +424,25 @@ export function ProfileMobile({ targetHandle }: Props = {}) {
     if (!handle) return;
     let cancelled = false;
     (async () => {
-      try {
-        const res = await fetch(
-          `/api/users/${encodeURIComponent(handle)}/reposts`,
-          { cache: "no-store" },
-        );
-        const data = await res.json();
-        if (cancelled) return;
-        if (data?.ok && Array.isArray(data.reposts)) {
-          setReposts(data.reposts as RepostEntry[]);
-        } else {
-          setReposts([]);
-        }
-      } catch {
-        if (!cancelled) setReposts([]);
+      const line = "Couldn't load reposts.";
+      const r = await vibeRequest<{ reposts?: unknown }>(
+        `/api/users/${encodeURIComponent(handle)}/reposts`,
+        { cache: "no-store", failure: line, quiet: true },
+      );
+      if (cancelled) return;
+      if (r.ok && Array.isArray(r.data.reposts)) {
+        setRepostsErr(null);
+        setReposts(r.data.reposts as RepostEntry[]);
+      } else {
+        // Loaded rows stay (the pane only reads the error while
+        // `reposts` is null); with none, the pane shows LoadFailed.
+        setRepostsErr(asLoadFailure(r, line));
       }
     })();
     return () => {
       cancelled = true;
     };
-  }, [targetHandle, user?.handle]);
+  }, [targetHandle, user?.handle, repostsTry]);
 
   // Saved (bookmarks) — owner-only. Visitors never see this tab so we
   // skip the fetch entirely for them.
@@ -432,23 +453,25 @@ export function ProfileMobile({ targetHandle }: Props = {}) {
     }
     let cancelled = false;
     (async () => {
-      try {
-        const res = await fetch("/api/me/bookmarks", { cache: "no-store" });
-        const data = await res.json();
-        if (cancelled) return;
-        if (data?.ok && Array.isArray(data.posts)) {
-          setSavedPosts(data.posts as SavedPost[]);
-        } else {
-          setSavedPosts([]);
-        }
-      } catch {
-        if (!cancelled) setSavedPosts([]);
+      const line = "Couldn't load your saved posts.";
+      const r = await vibeRequest<{ posts?: unknown }>("/api/me/bookmarks", {
+        cache: "no-store",
+        failure: line,
+        quiet: true,
+      });
+      if (cancelled) return;
+      if (r.ok && Array.isArray(r.data.posts)) {
+        setSavedErr(null);
+        setSavedPosts(r.data.posts as SavedPost[]);
+      } else {
+        // Same rule as reposts: never [] on a failure.
+        setSavedErr(asLoadFailure(r, line));
       }
     })();
     return () => {
       cancelled = true;
     };
-  }, [isVisitor]);
+  }, [isVisitor, savedTry]);
 
   // Follow/unfollow toggle for visitor mode. Optimistic so the pill
   // updates instantly; reverts on server error.
@@ -937,9 +960,24 @@ export function ProfileMobile({ targetHandle }: Props = {}) {
   };
 
   if (error) {
+    // The first load failed. LoadFailed says why and carries the fix:
+    // Sign in / Review Terms when that's it, otherwise Retry, which
+    // re-runs the bootstrap behind the skeleton.
     return (
-      <div style={{ padding: 24, textAlign: "center", color: "#8A8580" }}>
-        {error}
+      <div
+        style={{
+          minHeight: "100dvh",
+          background: "#FAF7F2",
+          padding: "calc(env(safe-area-inset-top, 0px) + 48px) 16px 24px",
+        }}
+      >
+        <LoadFailed
+          failure={error}
+          onRetry={() => {
+            setError(null);
+            setBootstrapTry((n) => n + 1);
+          }}
+        />
       </div>
     );
   }
@@ -952,6 +990,9 @@ export function ProfileMobile({ targetHandle }: Props = {}) {
 
   const name = pick(user.name) ?? "You";
   const handle = pick(user.handle);
+  // Display name for the ⋯ menu's copy ("Block Jordan Lee?"). `name`
+  // falls back to "You", which only reads right on your own profile.
+  const safetyName = pick(user.name) ?? (handle ? `@${handle}` : "this person");
   const tagline = pick(user.tagline);
   const headline = pick(user.headline);
   const avatar = pick(user.avatarPhoto);
@@ -1103,6 +1144,23 @@ export function ProfileMobile({ targetHandle }: Props = {}) {
                   strokeWidth="1.6"
                   strokeLinecap="round"
                 />
+              </svg>
+            </button>
+          ) : null}
+          {/* Report / Mute / Block. Never on your own profile, and only
+              when the payload carries the target's id, which every one
+              of those calls is keyed by. */}
+          {isVisitor && user.id && user._viewerFollowState !== "self" ? (
+            <button
+              type="button"
+              onClick={() => setSafetyOpen(true)}
+              aria-label={`More options for ${safetyName}`}
+              style={floatingActionStyle}
+            >
+              <svg width="18" height="18" viewBox="0 0 20 20" fill="currentColor" aria-hidden>
+                <circle cx="4.5" cy="10" r="1.8" />
+                <circle cx="10" cy="10" r="1.8" />
+                <circle cx="15.5" cy="10" r="1.8" />
               </svg>
             </button>
           ) : null}
@@ -1665,6 +1723,11 @@ export function ProfileMobile({ targetHandle }: Props = {}) {
             <PostsGrid
               posts={feedPosts}
               loading={posts === null}
+              failure={postsErr}
+              onRetry={() => {
+                setPostsErr(null);
+                void loadPosts("first");
+              }}
               isVisitor={isVisitor}
               ownerName={name}
               onOpenPost={setOpenPostId}
@@ -1672,6 +1735,11 @@ export function ProfileMobile({ targetHandle }: Props = {}) {
           ) : postsSubTab === "reposts" ? (
             <RepostsList
               reposts={reposts}
+              failure={repostsErr}
+              onRetry={() => {
+                setRepostsErr(null);
+                setRepostsTry((n) => n + 1);
+              }}
               isVisitor={isVisitor}
               ownerName={name}
               onOpenPost={(p) => setOpenPostId(p.id)}
@@ -1679,6 +1747,11 @@ export function ProfileMobile({ targetHandle }: Props = {}) {
           ) : (
             <SavedGrid
               posts={savedPosts}
+              failure={savedErr}
+              onRetry={() => {
+                setSavedErr(null);
+                setSavedTry((n) => n + 1);
+              }}
               onOpenPost={(p) => setOpenPostId(p.id)}
             />
           )}
@@ -1725,6 +1798,22 @@ export function ProfileMobile({ targetHandle }: Props = {}) {
 
       {searchOpen ? (
         <CampusSearchOverlay onClose={() => setSearchOpen(false)} />
+      ) : null}
+
+      {safetyOpen && isVisitor && user.id ? (
+        <ProfileSafetySheet
+          targetId={user.id}
+          name={safetyName}
+          onClose={() => setSafetyOpen(false)}
+          onBlocked={() => {
+            setSafetyOpen(false);
+            setFollowState("none");
+            // The early return above now renders BlockedByTargetView
+            // ("You blocked X" + Unblock) in place. No reload: that would
+            // wipe the "Blocked X" toast before anyone read it.
+            setUser((u) => (u ? { ...u, _viewerHasBlocked: true } : u));
+          }}
+        />
       ) : null}
 
       {viewerItem ? (
@@ -2006,17 +2095,29 @@ function ProfileTabs({
 function PostsGrid({
   posts,
   loading,
+  failure,
+  onRetry,
   isVisitor,
   ownerName,
   onOpenPost,
 }: {
   posts: PostRow[];
   loading: boolean;
+  /** The first load failed: LoadFailed takes the skeleton's place,
+   *  never the empty copy. */
+  failure: LoadFailure | null;
+  onRetry: () => void;
   isVisitor: boolean;
   ownerName: string;
   onOpenPost: (id: string) => void;
 }) {
-  if (loading) return <PostFeedSkeleton />;
+  if (loading) {
+    return failure ? (
+      <LoadFailed failure={failure} onRetry={onRetry} />
+    ) : (
+      <PostFeedSkeleton />
+    );
+  }
   if (posts.length === 0) {
     return isVisitor ? (
       <EmptyTab title="No posts yet" body={`${ownerName} hasn't posted anything yet.`} />
@@ -2245,17 +2346,26 @@ function PostsSubTabs({
  *  right) and opens that post's full viewer on tap. */
 function RepostsList({
   reposts,
+  failure,
+  onRetry,
   isVisitor,
   ownerName,
   onOpenPost,
 }: {
   reposts: RepostEntry[] | null;
+  /** Read only while nothing has loaded; loaded rows win. */
+  failure: LoadFailure | null;
+  onRetry: () => void;
   isVisitor: boolean;
   ownerName: string | null;
   onOpenPost: (p: { id: string }) => void;
 }) {
   if (reposts === null) {
-    return <SubPaneSkeleton />;
+    return failure ? (
+      <LoadFailed failure={failure} onRetry={onRetry} />
+    ) : (
+      <SubPaneSkeleton />
+    );
   }
   if (reposts.length === 0) {
     return (
@@ -2431,12 +2541,23 @@ function RepostRow({
  *  to a content-snippet tile for posts without media. */
 function SavedGrid({
   posts,
+  failure,
+  onRetry,
   onOpenPost,
 }: {
   posts: SavedPost[] | null;
+  /** Read only while nothing has loaded; loaded rows win. */
+  failure: LoadFailure | null;
+  onRetry: () => void;
   onOpenPost: (p: { id: string }) => void;
 }) {
-  if (posts === null) return <SubPaneSkeleton />;
+  if (posts === null) {
+    return failure ? (
+      <LoadFailed failure={failure} onRetry={onRetry} />
+    ) : (
+      <SubPaneSkeleton />
+    );
+  }
   if (posts.length === 0) {
     return (
       <SubPaneEmpty
@@ -4541,6 +4662,511 @@ function BlockedByTargetView({ user }: { user: VibeUser }) {
     </div>
   );
 }
+
+// ---------------------------------------------------------------------------
+// Visitor ⋯ menu: Report / Mute / Block (phone-parity design §e,
+// handoffs/2026-09-11-phone-parity-design.md). Copy and flow mirror the
+// desktop helpers in public/html/_safetyActions.js. Every write goes
+// through vibeRequest, so a refusal always reaches the student as a toast.
+// ---------------------------------------------------------------------------
+
+/** Desktop's durations; the mute route takes 1 / 8 / 24 / 168, or null
+ *  for "until I unmute". */
+const MUTE_OPTIONS: Array<{ hours: number | null; label: string }> = [
+  { hours: 1, label: "1 hour" },
+  { hours: 8, label: "8 hours" },
+  { hours: 24, label: "24 hours" },
+  { hours: 168, label: "7 days" },
+  { hours: null, label: "Until I unmute" },
+];
+
+/** Codes match the reports route's allow-list and its check constraint. */
+const REPORT_REASONS: Array<{ code: string; label: string }> = [
+  { code: "spam", label: "Spam" },
+  { code: "harassment", label: "Harassment or bullying" },
+  { code: "sexual", label: "Sexual content" },
+  { code: "hate", label: "Hate speech" },
+  { code: "self_harm", label: "Self-harm or violence" },
+  { code: "other", label: "Other" },
+];
+
+function ProfileSafetySheet({
+  targetId,
+  name,
+  onClose,
+  onBlocked,
+}: {
+  targetId: string;
+  /** Display name for the copy ("Block Jordan Lee?"). */
+  name: string;
+  onClose: () => void;
+  /** The block landed: the parent swaps in BlockedByTargetView. */
+  onBlocked: () => void;
+}) {
+  const first = name.split(/\s+/)[0] || name;
+  const [nested, setNested] = useState<null | "report" | "mute">(null);
+  // Mute vs Unmute comes from the relationship read below; null while it
+  // loads, so the row can't offer the wrong one.
+  const [muting, setMuting] = useState<boolean | null>(null);
+  const [relNote, setRelNote] = useState<string | null>(null);
+  const [busy, setBusy] = useState(false);
+
+  useEffect(() => {
+    let cancelled = false;
+    (async () => {
+      const r = await vibeRequest<{ muting?: unknown }>(
+        `/api/me/relationships?with=${encodeURIComponent(targetId)}`,
+        {
+          cache: "no-store",
+          failure: "Couldn't check your mute setting.",
+          quiet: true,
+        },
+      );
+      if (cancelled) return;
+      if (r.ok) {
+        setMuting(r.data.muting === true);
+        return;
+      }
+      // Still a working menu: it offers Mute and says why it can't tell.
+      setMuting(false);
+      setRelNote(r.message);
+    })();
+    return () => {
+      cancelled = true;
+    };
+  }, [targetId]);
+
+  const mute = async (hours: number | null, label: string) => {
+    if (busy) return;
+    setBusy(true);
+    const r = await vibeRequest("/api/me/mute", {
+      json: { target_id: targetId, duration_hours: hours },
+      failure: `Couldn't mute ${first}.`,
+      success: hours ? `Muted for ${label}` : `Muted ${first}`,
+    });
+    setBusy(false);
+    // A failure's toast says why, and the durations stay up for a retry.
+    if (!r.ok) return;
+    setMuting(true);
+    onClose();
+  };
+
+  const unmute = async () => {
+    if (busy) return;
+    setBusy(true);
+    const r = await vibeRequest("/api/me/mute", {
+      method: "DELETE",
+      json: { target_id: targetId },
+      failure: `Couldn't unmute ${first}.`,
+      success: `Unmuted ${first}`,
+    });
+    setBusy(false);
+    if (!r.ok) return;
+    setMuting(false);
+    onClose();
+  };
+
+  const block = async () => {
+    if (busy) return;
+    if (
+      !window.confirm(
+        `Block ${name}?\n\nThey won't be able to message you, see your posts, or find you in search. You also won't see their content.`,
+      )
+    )
+      return;
+    setBusy(true);
+    const r = await vibeRequest<{ removed_connection?: boolean; already?: boolean }>(
+      "/api/me/block",
+      { json: { target_id: targetId }, failure: `Couldn't block ${first}.` },
+    );
+    if (!r.ok) {
+      // The toast says why; the profile stays as it is.
+      setBusy(false);
+      return;
+    }
+    toast(
+      r.data.removed_connection
+        ? `Blocked ${name} — connection removed`
+        : `Blocked ${name}`,
+    );
+    onBlocked();
+  };
+
+  return (
+    <Drawer.Root open onOpenChange={(o) => { if (!o) onClose(); }}>
+      <Drawer.Portal>
+        <Drawer.Overlay style={sheetOverlayStyle} />
+        <Drawer.Content style={sheetContentStyle} aria-describedby={undefined}>
+          <Drawer.Title style={sheetHiddenTitleStyle}>
+            More options for {name}
+          </Drawer.Title>
+          <Drawer.Handle style={sheetHandleStyle} />
+          <div style={{ padding: "4px 0 12px" }}>
+            <SafetySheetRow
+              label={`Report ${first}`}
+              onClick={() => setNested("report")}
+              disabled={busy}
+            />
+            <SafetySheetRow
+              label={muting ? `Unmute ${first}` : `Mute ${first}…`}
+              onClick={() => {
+                if (muting) void unmute();
+                else setNested("mute");
+              }}
+              disabled={busy || muting === null}
+            />
+            {relNote ? <div style={sheetNoteStyle}>{relNote}</div> : null}
+            <SafetySheetRow
+              label={`Block ${first}`}
+              onClick={() => void block()}
+              danger
+              disabled={busy}
+            />
+            <SafetySheetRow label="Cancel" onClick={onClose} bold />
+          </div>
+          {nested === "report" ? (
+            <ReportUserSheet
+              targetId={targetId}
+              first={first}
+              onClose={() => setNested(null)}
+              onSent={onClose}
+            />
+          ) : null}
+          {nested === "mute" ? (
+            <MuteUserSheet
+              name={name}
+              busy={busy}
+              onClose={() => setNested(null)}
+              onPick={(hours, label) => void mute(hours, label)}
+            />
+          ) : null}
+        </Drawer.Content>
+      </Drawer.Portal>
+    </Drawer.Root>
+  );
+}
+
+/** Six reasons, an optional note, and Submit once a reason is picked.
+ *  A NestedRoot, so the menu scales down behind it (MessagesMobile's
+ *  MuteDurationSheet pattern). */
+function ReportUserSheet({
+  targetId,
+  first,
+  onClose,
+  onSent,
+}: {
+  targetId: string;
+  first: string;
+  onClose: () => void;
+  /** The report landed: close both sheets. */
+  onSent: () => void;
+}) {
+  const [reason, setReason] = useState("");
+  const [note, setNote] = useState("");
+  const [sending, setSending] = useState(false);
+  const canSubmit = !!reason && !sending;
+
+  const submit = async () => {
+    if (!canSubmit) return;
+    setSending(true);
+    const r = await vibeRequest("/api/me/reports", {
+      json: {
+        target_type: "user",
+        target_id: targetId,
+        reason_code: reason,
+        reason: note.trim(),
+      },
+      failure: "Couldn't send your report.",
+      success: "Report submitted. Thanks for telling us.",
+    });
+    setSending(false);
+    // On a failure the toast says why; the reason and note stay as they
+    // are, so Submit can just be pressed again.
+    if (r.ok) onSent();
+  };
+
+  return (
+    <Drawer.NestedRoot open onOpenChange={(o) => { if (!o) onClose(); }}>
+      <Drawer.Portal>
+        <Drawer.Overlay style={sheetOverlayStyle} />
+        <Drawer.Content style={sheetContentStyle} aria-describedby={undefined}>
+          <Drawer.Handle style={sheetHandleStyle} />
+          <div
+            style={{
+              maxHeight: "calc(88dvh - 18px)",
+              overflowY: "auto",
+              overscrollBehavior: "contain",
+            }}
+          >
+            <Drawer.Title style={sheetHeadingStyle}>Report {first}</Drawer.Title>
+            <p style={sheetNoteStyle}>
+              {"Reports go to admins only. The person you're reporting won't see this."}
+            </p>
+            <div
+              role="radiogroup"
+              aria-label="Reason"
+              style={{ display: "flex", flexDirection: "column", gap: 8, padding: "0 18px" }}
+            >
+              {REPORT_REASONS.map((o) => {
+                const on = reason === o.code;
+                return (
+                  <button
+                    key={o.code}
+                    type="button"
+                    role="radio"
+                    aria-checked={on}
+                    onClick={() => setReason(o.code)}
+                    disabled={sending}
+                    style={{
+                      display: "block",
+                      width: "100%",
+                      padding: "11px 14px",
+                      borderRadius: 10,
+                      border: on
+                        ? "1px solid #FF5C35"
+                        : "1px solid rgba(28,28,30,0.08)",
+                      background: on ? "rgba(255,92,53,0.06)" : "#fff",
+                      fontFamily: "DM Sans, sans-serif",
+                      fontSize: 14,
+                      fontWeight: 600,
+                      color: "#1C1C1E",
+                      textAlign: "left",
+                      cursor: sending ? "default" : "pointer",
+                      WebkitTapHighlightColor: "transparent",
+                    }}
+                  >
+                    {o.label}
+                  </button>
+                );
+              })}
+            </div>
+            <div style={{ padding: "10px 18px 0" }}>
+              <textarea
+                value={note}
+                onChange={(e) => setNote(e.target.value)}
+                placeholder="More detail (optional)"
+                aria-label="More detail (optional)"
+                maxLength={1000}
+                rows={3}
+                disabled={sending}
+                // Scrolling the note shouldn't drag the sheet shut.
+                data-vaul-no-drag
+                style={{
+                  display: "block",
+                  width: "100%",
+                  boxSizing: "border-box",
+                  padding: "10px 12px",
+                  borderRadius: 10,
+                  border: "1.5px solid rgba(28,28,30,0.08)",
+                  background: "#fff",
+                  fontFamily: "DM Sans, sans-serif",
+                  // 16px keeps iOS Safari from zooming in on focus.
+                  fontSize: 16,
+                  lineHeight: 1.45,
+                  color: "#1C1C1E",
+                  outline: "none",
+                  resize: "none",
+                }}
+              />
+            </div>
+            <div
+              style={{
+                display: "flex",
+                justifyContent: "flex-end",
+                gap: 10,
+                padding: "12px 18px 14px",
+              }}
+            >
+              <button type="button" onClick={onClose} style={sheetGhostButtonStyle}>
+                Cancel
+              </button>
+              <button
+                type="button"
+                onClick={() => void submit()}
+                disabled={!canSubmit}
+                style={{
+                  ...sheetDangerButtonStyle,
+                  opacity: canSubmit ? 1 : 0.45,
+                  cursor: canSubmit ? "pointer" : "default",
+                }}
+              >
+                {sending ? "Sending…" : "Submit report"}
+              </button>
+            </div>
+          </div>
+        </Drawer.Content>
+      </Drawer.Portal>
+    </Drawer.NestedRoot>
+  );
+}
+
+/** Desktop's five durations and note, stacked over the menu. */
+function MuteUserSheet({
+  name,
+  busy,
+  onClose,
+  onPick,
+}: {
+  name: string;
+  busy: boolean;
+  onClose: () => void;
+  onPick: (hours: number | null, label: string) => void;
+}) {
+  return (
+    <Drawer.NestedRoot open onOpenChange={(o) => { if (!o) onClose(); }}>
+      <Drawer.Portal>
+        <Drawer.Overlay style={sheetOverlayStyle} />
+        <Drawer.Content style={sheetContentStyle} aria-describedby={undefined}>
+          <Drawer.Handle style={sheetHandleStyle} />
+          <Drawer.Title style={sheetHeadingStyle}>Mute {name}</Drawer.Title>
+          <p style={sheetNoteStyle}>
+            {"You won't see their posts in your feed or get notifications from them. They won't know."}
+          </p>
+          <div style={{ padding: "0 0 12px" }}>
+            {MUTE_OPTIONS.map((o) => (
+              <SafetySheetRow
+                key={o.label}
+                label={o.label}
+                onClick={() => onPick(o.hours, o.label)}
+                disabled={busy}
+              />
+            ))}
+            <SafetySheetRow label="Cancel" onClick={onClose} bold />
+          </div>
+        </Drawer.Content>
+      </Drawer.Portal>
+    </Drawer.NestedRoot>
+  );
+}
+
+/** One full-width row, the same look as MessagesMobile's SheetRow. */
+function SafetySheetRow({
+  label,
+  onClick,
+  danger,
+  bold,
+  disabled,
+}: {
+  label: string;
+  onClick: () => void;
+  danger?: boolean;
+  bold?: boolean;
+  disabled?: boolean;
+}) {
+  return (
+    <button
+      type="button"
+      onClick={onClick}
+      disabled={disabled}
+      style={{
+        display: "block",
+        width: "100%",
+        padding: "14px 18px",
+        background: "transparent",
+        border: "none",
+        borderTop: "1px solid rgba(28,28,30,0.04)",
+        fontFamily: "DM Sans, sans-serif",
+        fontSize: 15,
+        fontWeight: bold ? 700 : 500,
+        color: danger ? "#C0392B" : "#1C1C1E",
+        textAlign: "left",
+        opacity: disabled ? 0.5 : 1,
+        cursor: disabled ? "default" : "pointer",
+        WebkitTapHighlightColor: "transparent",
+      }}
+    >
+      {label}
+    </button>
+  );
+}
+
+// Bottom-sheet chrome for the ⋯ menu, matching MessagesMobile's sheets
+// (cream surface, rounded top, safe-area-aware bottom, drag handle) and
+// their layers (1200 / 1201). vaul owns the open/close animation,
+// drag-to-dismiss, focus trap and scroll lock; ToastHost (12000) stays
+// above, so a toast shows over an open sheet.
+const sheetOverlayStyle: React.CSSProperties = {
+  position: "fixed",
+  inset: 0,
+  background: "rgba(0,0,0,0.42)",
+  zIndex: 1200,
+};
+
+const sheetContentStyle: React.CSSProperties = {
+  position: "fixed",
+  bottom: 0,
+  left: 0,
+  right: 0,
+  background: "#FAF7F2",
+  borderTopLeftRadius: 20,
+  borderTopRightRadius: 20,
+  paddingBottom: "env(safe-area-inset-bottom, 0px)",
+  boxShadow: "0 -8px 32px rgba(0,0,0,0.18)",
+  zIndex: 1201,
+  outline: "none",
+};
+
+const sheetHandleStyle: React.CSSProperties = {
+  margin: "10px auto 4px",
+  width: 38,
+  height: 4,
+  borderRadius: 999,
+  background: "rgba(28,28,30,0.18)",
+};
+
+/** Screen-reader-only Drawer.Title for the menu, which has no heading. */
+const sheetHiddenTitleStyle: React.CSSProperties = {
+  position: "absolute",
+  width: 1,
+  height: 1,
+  padding: 0,
+  margin: -1,
+  overflow: "hidden",
+  clip: "rect(0,0,0,0)",
+  whiteSpace: "nowrap",
+  border: 0,
+};
+
+const sheetHeadingStyle: React.CSSProperties = {
+  margin: 0,
+  padding: "10px 18px 6px",
+  fontFamily: "Fraunces, serif",
+  fontSize: 16,
+  fontWeight: 800,
+  color: "#1C1C1E",
+};
+
+const sheetNoteStyle: React.CSSProperties = {
+  margin: 0,
+  padding: "0 18px 12px",
+  fontFamily: "DM Sans, sans-serif",
+  fontSize: 12.5,
+  lineHeight: 1.5,
+  color: "#8A8580",
+};
+
+const sheetGhostButtonStyle: React.CSSProperties = {
+  padding: "9px 18px",
+  borderRadius: 999,
+  border: "1px solid rgba(28,28,30,0.12)",
+  background: "transparent",
+  color: "#1C1C1E",
+  fontFamily: "DM Sans, sans-serif",
+  fontSize: 13,
+  fontWeight: 700,
+  cursor: "pointer",
+};
+
+const sheetDangerButtonStyle: React.CSSProperties = {
+  padding: "9px 18px",
+  borderRadius: 999,
+  border: "none",
+  background: "#C0392B",
+  color: "#fff",
+  fontFamily: "DM Sans, sans-serif",
+  fontSize: 13,
+  fontWeight: 700,
+};
 
 function StatTile({
   num,
