@@ -2,10 +2,14 @@
 
 
 import type { ActivityRow } from "@/app/api/me/otto/route";
+import { LoadFailed } from "@/components/feedback/LoadFailed";
 
 import { OttoSection } from "./OttoSection";
 
-type Props = { rows: ActivityRow[] };
+/** `failed` comes from the payload's `failed` list — the read was refused. */
+type Props = { rows: ActivityRow[]; failed?: boolean };
+
+const LOAD_FAILURE = "Couldn't load your activity. Try again.";
 
 function relative(t: string): string {
   const then = new Date(t).getTime();
@@ -57,13 +61,17 @@ function describe(n: ActivityRow): string {
   }
 }
 
-export function OttoActivity({ rows }: Props) {
+export function OttoActivity({ rows, failed }: Props) {
   return (
     <OttoSection
       eyebrow="Otto saw"
       wide
     >
-      {rows.length === 0 ? (
+      {/* A refused read is never "nothing new on campus yet." The payload
+          comes with the page, so Retry reloads it. */}
+      {failed ? (
+        <LoadFailed failure={{ message: LOAD_FAILURE }} tone="dark" />
+      ) : rows.length === 0 ? (
         <p className="otto-room-empty">nothing new on campus yet.</p>
       ) : (
         <ul className="otto-room-list">

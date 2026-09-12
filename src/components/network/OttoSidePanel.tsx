@@ -1,6 +1,9 @@
 "use client";
 
-import { useCallback, useEffect, useMemo, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
+
+import { asLoadFailure, LoadFailed, type LoadFailure } from "@/components/feedback/LoadFailed";
+import { vibeRequest } from "@/lib/feedback/request";
 
 type NotifType = "follow" | "connection" | "like" | "comment" | "mention";
 
@@ -58,6 +61,11 @@ type MetricsPayload = {
 
 type Filter = "all" | NotifType;
 
+/** One line per section, so a refused read says which part didn't load. */
+const COUNT_FAILURE = "Couldn't load your activity counts.";
+const LIST_FAILURE = "Couldn't load your activity.";
+const METRICS_FAILURE = "Couldn't load your metrics.";
+
 /**
  * React port of the legacy `_otto.js` slide-out panel. Mounts when `open` is
  * true; renders a dark backdrop + right-side dark panel with header, stats
@@ -77,6 +85,9 @@ export function OttoSidePanel({
   const [filter, setFilter] = useState<Filter>("all");
   const [loading, setLoading] = useState(false);
   const [metrics, setMetrics] = useState<MetricsPayload | null>(null);
+  const [countErr, setCountErr] = useState<LoadFailure | null>(null);
+  const [listErr, setListErr] = useState<LoadFailure | null>(null);
+  const [metricsErr, setMetricsErr] = useState<LoadFailure | null>(null);
 
   // ESC closes.
   useEffect(() => {
@@ -89,77 +100,105 @@ export function OttoSidePanel({
   }, [open, onClose]);
 
   const markAllRead = useCallback(async () => {
-    try {
-      await fetch("/api/me/notifications/mark-read", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ all: true }),
-      });
-    } catch {
-      /* silent */
-    }
+    await vibeRequest("/api/me/notifications/mark-read", {
+      method: "POST",
+      json: { all: true },
+      failure: "Couldn't mark your notifications read.",
+    });
   }, []);
 
-  // Fetch + mark-read whenever the panel opens.
+  // One read per section: the counts, the list and the metrics each keep
+  // their own failure, so a refused read shows an inline line in that
+  // section's place instead of blanking the panel or reading as "no
+  // activity yet". Whatever already loaded stays — a reopen only ever
+  // replaces rows with rows. vibeRequest never throws, so an HTML error
+  // page is a failure instead of a crash in .json().
+  //
+  // Quiet only while there's nothing on screen to contradict. The first
+  // open renders the inline line, and Retry repaints the box that's
+  // already there; a reopen that keeps yesterday's rows lets vibeRequest
+  // toast instead, so stale numbers never pass for fresh ones.
+  const runRef = useRef(0);
+  const loadedRef = useRef(false);
+  const load = useCallback(async (mode: "open" | "retry" = "open") => {
+    const run = ++runRef.current;
+    const quiet = mode === "retry" || !loadedRef.current;
+    setLoading(true);
+    const [countRes, listRes, pvRes, csRes] = await Promise.all([
+      vibeRequest<{ unread?: number; totals?: CountPayload["totals"] }>(
+        "/api/me/notifications/count",
+        { cache: "no-store", quiet, failure: COUNT_FAILURE },
+      ),
+      vibeRequest<{ notifications?: NotifRow[] }>("/api/me/notifications?limit=30", {
+        cache: "no-store",
+        quiet,
+        failure: LIST_FAILURE,
+      }),
+      vibeRequest<{ counts?: MetricsPayload["profile_views"] }>("/api/me/profile-views", {
+        cache: "no-store",
+        quiet,
+        failure: METRICS_FAILURE,
+      }),
+      vibeRequest<{ totals?: MetricsPayload["creator"] }>("/api/me/creator-stats", {
+        cache: "no-store",
+        quiet,
+        failure: METRICS_FAILURE,
+      }),
+    ]);
+    if (runRef.current !== run) return;
+
+    if (countRes.ok && typeof countRes.data.unread === "number") {
+      setCount({ unread: countRes.data.unread, totals: countRes.data.totals ?? {} });
+      setCountErr(null);
+      loadedRef.current = true;
+    } else {
+      setCountErr(asLoadFailure(countRes, COUNT_FAILURE));
+    }
+
+    if (listRes.ok && Array.isArray(listRes.data.notifications)) {
+      const rows = listRes.data.notifications;
+      setList(rows);
+      setListErr(null);
+      loadedRef.current = true;
+      if (rows.some((n) => !n.read_at)) void markAllRead();
+    } else {
+      setListErr(asLoadFailure(listRes, LIST_FAILURE));
+    }
+
+    // Four tiles from two endpoints: a zero standing in for a refused read
+    // looks like a real number, so either one failing fails the block.
+    if (pvRes.ok && pvRes.data.counts && csRes.ok && csRes.data.totals) {
+      setMetrics({ profile_views: pvRes.data.counts, creator: csRes.data.totals });
+      setMetricsErr(null);
+      loadedRef.current = true;
+    } else {
+      const refused = !pvRes.ok || !pvRes.data.counts ? pvRes : csRes;
+      setMetricsErr(asLoadFailure(refused, METRICS_FAILURE));
+    }
+
+    setLoading(false);
+  }, [markAllRead]);
+
+  // Fetch + mark-read whenever the panel opens. The load runs in an async
+  // IIFE, the way every other list in the app does it, so the effect body
+  // itself stays synchronous.
   useEffect(() => {
     if (!open) return;
-    let cancelled = false;
-    (async () => {
-      setLoading(true);
-      try {
-        const [countRes, listRes, pviewsRes, csRes] = await Promise.all([
-          fetch("/api/me/notifications/count", { cache: "no-store" }),
-          fetch("/api/me/notifications?limit=30", { cache: "no-store" }),
-          fetch("/api/me/profile-views", { cache: "no-store" }),
-          fetch("/api/me/creator-stats", { cache: "no-store" }),
-        ]);
-        const countData = await countRes.json();
-        const listData = await listRes.json();
-        if (cancelled) return;
-        if (countData?.ok) {
-          setCount({
-            unread: typeof countData.unread === "number" ? countData.unread : 0,
-            totals: countData.totals ?? {},
-          });
-        }
-        if (listData?.ok && Array.isArray(listData.notifications)) {
-          const rows = listData.notifications as NotifRow[];
-          setList(rows);
-          if (rows.some((n) => !n.read_at)) {
-            void markAllRead();
-          }
-        }
-        // Metrics: best-effort. If either endpoint failed, we just skip the
-        // metrics block rather than blocking the whole panel render.
-        try {
-          const pv = pviewsRes.ok ? await pviewsRes.json() : null;
-          const cs = csRes.ok ? await csRes.json() : null;
-          if (pv?.ok || cs?.ok) {
-            setMetrics({
-              profile_views: pv?.ok
-                ? pv.counts
-                : { today: 0, seven_days: 0, thirty_days: 0, all_time: 0 },
-              creator: cs?.ok
-                ? cs.totals
-                : { views: 0, likes: 0, comments: 0, reposts: 0 },
-            });
-          }
-        } catch {
-          /* metrics block is optional; ignore */
-        }
-      } catch {
-        /* keep prior state */
-      } finally {
-        if (!cancelled) setLoading(false);
-      }
+    void (async () => {
+      await load();
     })();
     return () => {
-      cancelled = true;
+      // Drop an in-flight response once the panel closes.
+      runRef.current += 1;
     };
-  }, [open, markAllRead]);
+  }, [open, load]);
 
   const briefing = useMemo(() => {
-    if (!count) return "loading your activity…";
+    // The counts are what this line is about, so a refused read says so
+    // instead of sitting on "loading…" for good.
+    if (!count) {
+      return countErr ? "couldn't check your activity just now." : "loading your activity…";
+    }
     const total =
       (count.totals.follow ?? 0) +
       (count.totals.connection ?? 0) +
@@ -168,7 +207,7 @@ export function OttoSidePanel({
     if (total === 0) return "quiet around here. go say hi to someone.";
     if (count.unread > 0) return `${count.unread} new since you last looked.`;
     return "all caught up — here's what's been happening.";
-  }, [count]);
+  }, [count, countErr]);
 
   const filtered = useMemo(() => {
     if (filter === "all") return list;
@@ -221,7 +260,15 @@ export function OttoSidePanel({
             padding: "0 18px 18px",
           }}
         >
-          <StatsGrid count={count} onPick={setFilter} active={filter} />
+          {/* Each section keeps whatever it already has: a failure only
+              takes the place of a section that never loaded. */}
+          <StatsGrid
+            count={count}
+            failure={count ? null : countErr}
+            onRetry={() => void load("retry")}
+            onPick={setFilter}
+            active={filter}
+          />
           <div
             aria-hidden
             style={{
@@ -231,7 +278,12 @@ export function OttoSidePanel({
             }}
           />
           <SectionEyebrow>your metrics</SectionEyebrow>
-          <MetricsBlock metrics={metrics} loading={loading} />
+          <MetricsBlock
+            metrics={metrics}
+            loading={loading}
+            failure={metrics ? null : metricsErr}
+            onRetry={() => void load("retry")}
+          />
           <div
             aria-hidden
             style={{
@@ -242,7 +294,16 @@ export function OttoSidePanel({
           />
           <SectionEyebrow>activity</SectionEyebrow>
           <FilterPills value={filter} onChange={setFilter} />
-          <NotifList loading={loading} rows={filtered} filter={filter} onClose={onClose} />
+          {/* Only a failure with nothing loaded replaces the list — a
+              filter with no matches is a real empty. */}
+          <NotifList
+            loading={loading}
+            rows={filtered}
+            filter={filter}
+            onClose={onClose}
+            failure={list.length === 0 ? listErr : null}
+            onRetry={() => void load("retry")}
+          />
         </div>
         <Footer />
       </aside>
@@ -462,13 +523,25 @@ function SectionEyebrow({ children }: { children: React.ReactNode }) {
 
 function StatsGrid({
   count,
+  failure,
+  onRetry,
   onPick,
   active,
 }: {
   count: CountPayload | null;
+  failure: LoadFailure | null;
+  onRetry: () => void;
   onPick: (f: Filter) => void;
   active: Filter;
 }) {
+  // Four tiles of 0 read as "nobody's been by", so a refused count says so.
+  if (failure) {
+    return (
+      <div style={{ marginTop: 16 }}>
+        <LoadFailed failure={failure} onRetry={onRetry} tone="dark" compact />
+      </div>
+    );
+  }
   const tiles: Array<{ key: NotifType; label: string }> = [
     { key: "follow", label: "Follows" },
     { key: "connection", label: "Connections" },
@@ -539,19 +612,27 @@ function StatsGrid({
 function MetricsBlock({
   metrics,
   loading,
+  failure,
+  onRetry,
 }: {
   metrics: MetricsPayload | null;
   loading: boolean;
+  failure: LoadFailure | null;
+  onRetry: () => void;
 }) {
-  // Three states: still fetching, fetched but empty (migration not applied
-  // or no posts yet), or have data. Showing real text for each so a brand-new
-  // account or a half-migrated deploy doesn't get a permanent "loading…".
+  // Four states: still fetching, refused, fetched but empty (migration not
+  // applied or no posts yet), or have data. Showing real text for each so a
+  // brand-new account or a half-migrated deploy doesn't get a permanent
+  // "loading…", and an outage doesn't read as "no numbers yet".
   if (loading) {
     return (
       <div style={{ color: "rgba(255,255,255,0.4)", fontSize: 12, padding: "8px 0" }}>
         loading metrics…
       </div>
     );
+  }
+  if (failure) {
+    return <LoadFailed failure={failure} onRetry={onRetry} tone="dark" compact />;
   }
   if (!metrics) {
     return (
@@ -709,11 +790,15 @@ function NotifList({
   rows,
   filter,
   onClose,
+  failure,
+  onRetry,
 }: {
   loading: boolean;
   rows: NotifRow[];
   filter: Filter;
   onClose: () => void;
+  failure: LoadFailure | null;
+  onRetry: () => void;
 }) {
   if (loading && rows.length === 0) {
     return (
@@ -721,6 +806,10 @@ function NotifList({
         loading…
       </div>
     );
+  }
+  // A refused read is never "no activity yet — go say hi to someone."
+  if (failure) {
+    return <LoadFailed failure={failure} onRetry={onRetry} tone="dark" compact />;
   }
   if (rows.length === 0) {
     const msg =

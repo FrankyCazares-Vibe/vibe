@@ -66,6 +66,19 @@ export function OttoMobile({ initial }: { initial: OttoPayload }) {
   const [asking, setAsking] = useState<AskingRow[]>(initial.asking);
   const [settings] = useState<OttoSettingsT>(initial.settings);
 
+  // The sections /api/me/otto couldn't read. Each says so in its own place
+  // instead of showing its empty copy, and the chip above it shows "—"
+  // rather than a 0 that would read as a real count. A payload from before
+  // the field existed carries nothing, which reads as "nothing failed".
+  const failed = initial.failed ?? [];
+  const activityFailed = failed.includes("activity");
+  const upcomingFailed = failed.includes("upcoming");
+  const askingFailed = failed.includes("asking");
+  // The unread-DM read is its own section server-side — it fails without
+  // taking followers or reminders with it — but its row sits in "Asking for
+  // you", so that list is incomplete either way.
+  const dmsFailed = failed.includes("dms");
+
   const reminderCount =
     upcoming.filter((u) => u.kind === "reminder").length +
     asking.filter((r) => r.kind === "reminder").length;
@@ -292,9 +305,18 @@ export function OttoMobile({ initial }: { initial: OttoPayload }) {
             justifyContent: "center",
           }}
         >
-          <CountChip label="nudges" value={initial.counts.nudges} />
-          <CountChip label="reminders" value={reminderCount} />
-          <CountChip label="unread" value={unreadCount} />
+          <CountChip
+            label="nudges"
+            value={activityFailed ? null : initial.counts.nudges}
+          />
+          <CountChip
+            label="reminders"
+            value={upcomingFailed || askingFailed ? null : reminderCount}
+          />
+          <CountChip
+            label="unread"
+            value={askingFailed || dmsFailed ? null : unreadCount}
+          />
         </div>
       </header>
 
@@ -350,11 +372,12 @@ export function OttoMobile({ initial }: { initial: OttoPayload }) {
           <h2 id="otto-today-heading" style={visuallyHidden}>
             Today
           </h2>
-          <OttoActivity rows={activity} />
+          <OttoActivity rows={activity} failed={activityFailed} />
           <OttoUpcoming
             rows={upcoming}
             onDismissReminder={dismissReminder}
             onActReminder={actReminder}
+            failed={upcomingFailed}
           />
           <OttoRequests
             rows={asking}
@@ -362,6 +385,7 @@ export function OttoMobile({ initial }: { initial: OttoPayload }) {
             onPassFollower={passFollower}
             onDismissReminder={dismissReminder}
             onActReminder={actReminder}
+            failed={askingFailed || dmsFailed}
           />
           <OttoTellInput onCreated={handleCreated} />
           <OttoSettings settings={settings} />
@@ -432,7 +456,8 @@ function TabPill({
   );
 }
 
-function CountChip({ label, value }: { label: string; value: number }) {
+/** `null` when the section behind the count didn't load — "—", not a 0. */
+function CountChip({ label, value }: { label: string; value: number | null }) {
   return (
     <span
       style={{
@@ -458,7 +483,7 @@ function CountChip({ label, value }: { label: string; value: number }) {
           color: "#fff",
         }}
       >
-        {value}
+        {value ?? "—"}
       </span>
       {label}
     </span>

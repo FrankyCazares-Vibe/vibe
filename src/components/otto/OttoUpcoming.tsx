@@ -3,6 +3,7 @@
 import Link from "next/link";
 
 import type { UpcomingRow } from "@/app/api/me/otto/route";
+import { LoadFailed } from "@/components/feedback/LoadFailed";
 
 import { OttoSection } from "./OttoSection";
 
@@ -10,7 +11,11 @@ type Props = {
   rows: UpcomingRow[];
   onDismissReminder: (id: string) => void;
   onActReminder: (id: string) => void;
+  /** From the payload's `failed` list — the read was refused. */
+  failed?: boolean;
 };
+
+const LOAD_FAILURE = "Couldn't load what's coming up. Try again.";
 
 function whenLabel(iso: string): string {
   const d = new Date(iso);
@@ -33,10 +38,14 @@ function whenLabel(iso: string): string {
   });
 }
 
-export function OttoUpcoming({ rows, onDismissReminder, onActReminder }: Props) {
+export function OttoUpcoming({ rows, onDismissReminder, onActReminder, failed }: Props) {
   return (
     <OttoSection eyebrow="Coming up">
-      {rows.length === 0 ? (
+      {/* A refused read is never "quiet week." The payload comes with the
+          page, so Retry reloads it. */}
+      {failed ? (
+        <LoadFailed failure={{ message: LOAD_FAILURE }} tone="dark" />
+      ) : rows.length === 0 ? (
         <p className="otto-room-empty">nothing on the horizon. quiet week.</p>
       ) : (
         <ul className="otto-room-list">

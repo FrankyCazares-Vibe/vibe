@@ -72,6 +72,11 @@ export function OttoPageClient({ initial }: Props) {
   const [asking, setAsking] = useState<AskingRow[]>(initial.asking);
   const [settings] = useState<OttoSettingsT>(initial.settings);
 
+  // The sections /api/me/otto couldn't read. Each one says so in its own
+  // place instead of showing its empty copy. A payload from before the
+  // field existed carries nothing, which reads as "nothing failed".
+  const failed = initial.failed ?? [];
+
   // Hero counts: nudges = unread notifications still in the feed; reminders =
   // every active reminder (dated upcoming + undated asking); unread = DMs
   // (this one isn't currently re-derived after dismissal — that would need
@@ -217,18 +222,22 @@ export function OttoPageClient({ initial }: Props) {
 
         {tab === "today" ? (
           <>
-            <OttoActivity rows={activity} />
+            <OttoActivity rows={activity} failed={failed.includes("activity")} />
             <OttoUpcoming
               rows={upcoming}
               onDismissReminder={dismissReminder}
               onActReminder={actReminder}
+              failed={failed.includes("upcoming")}
             />
+            {/* The unread-DM read fails on its own, but its row lives in
+                this section — either one means the list is incomplete. */}
             <OttoRequests
               rows={asking}
               onFollowBack={followBack}
               onPassFollower={passFollower}
               onDismissReminder={dismissReminder}
               onActReminder={actReminder}
+              failed={failed.includes("asking") || failed.includes("dms")}
             />
             <OttoTellInput onCreated={handleCreated} />
             <OttoSettings settings={settings} />

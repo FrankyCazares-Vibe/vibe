@@ -1,5 +1,6 @@
 import { NextResponse } from "next/server";
 
+import { loadHiddenUsers } from "@/lib/safety/hidden-users";
 import { createSupabaseServerClient } from "@/lib/supabase/server";
 import { createSupabaseServiceClient } from "@/lib/supabase/service";
 
@@ -19,6 +20,10 @@ import { createSupabaseServiceClient } from "@/lib/supabase/service";
  *
  * Designed to be cheap on a fresh page load (no cron / no fanout table at v1).
  * Each section caps at 12 rows so a chatty viewer doesn't blow up the response.
+ *
+ * A section whose read fails is named in `failed` instead of coming back as
+ * an empty array, so the page can say "couldn't load" where it used to say
+ * "nothing new on campus yet." Every other section still ships.
  */
 
 const ACTIVITY_LIMIT = 12;
@@ -98,6 +103,13 @@ export type AskingReminder = {
 
 export type AskingRow = AskingFollower | AskingUnreadDm | AskingReminder;
 
+/**
+ * A section whose read was refused. See `OttoPayload.failed`. "dms" is the
+ * unread-DM read behind the "N unread DMs" row and `counts.unread`: it can
+ * fail on its own while the rest of "Asking for you" loads fine.
+ */
+export type OttoFailedSection = "activity" | "upcoming" | "asking" | "dms";
+
 export type OttoPayload = {
   ok: true;
   activity: ActivityRow[];
@@ -105,6 +117,14 @@ export type OttoPayload = {
   asking: AskingRow[];
   settings: OttoSettings;
   counts: { nudges: number; reminders: number; unread: number };
+  /**
+   * The sections whose read failed, so each one renders its own inline
+   * failure instead of its empty copy. Optional and additive: it's always
+   * sent, but a payload from before it existed reads as "nothing failed",
+   * and a client that doesn't know the field still gets every section that
+   * did load.
+   */
+  failed?: OttoFailedSection[];
 };
 
 function mergeSettings(raw: unknown): OttoSettings {
@@ -149,18 +169,45 @@ export async function GET() {
 
   const settings = mergeSettings(settingsRes.data?.otto_settings);
 
+  // The sections whose read was refused. Each stays out of the payload's
+  // arrays, so the page shows "couldn't load" where it used to show the
+  // empty copy.
+  const failed: OttoFailedSection[] = [];
+
+  // Nobody blocked in either direction, and nobody muted right now — the
+  // same people /api/me/notifications leaves out, filtered on actor_id
+  // before the limit so a hidden row doesn't cost a visible one its slot.
+  // The nudges count reads off this same query and the unread-DM count
+  // skips their messages, so Mute's and Block's "you won't get
+  // notifications from them" holds on the phone Otto tab too. Fail closed
+  // as the notifications route does: without the list there's no way to
+  // tell which rows to drop.
+  const hiddenRes = await loadHiddenUsers(supabase, user.id);
+  if (!hiddenRes.ok) {
+    console.error("[api/me/otto hidden-users]", hiddenRes.error);
+    return NextResponse.json({ ok: false, error: "Request failed" }, { status: 500 });
+  }
+  const hiddenIds = hiddenRes.hidden.ids;
+  const hidden = new Set(hiddenIds);
+
   // ── Activity (notifications) ────────────────────────────────────────
   const ACTIVITY_SELECT =
     "id,type,created_at,post_id,read_at," +
     "actor:users!notifications_actor_id_fkey(id,name,handle,avatar_url)," +
     "post:posts!notifications_post_id_fkey(id,content)," +
     "comment:post_comments!notifications_comment_id_fkey(id,content)";
-  const activityRes = await supabase
+  let activityQuery = supabase
     .from("notifications")
     .select(ACTIVITY_SELECT)
-    .eq("user_id", user.id)
+    .eq("user_id", user.id);
+  if (hiddenIds.length > 0) activityQuery = activityQuery.notIn("actor_id", hiddenIds);
+  const activityRes = await activityQuery
     .order("created_at", { ascending: false })
     .limit(ACTIVITY_LIMIT);
+  if (activityRes.error) {
+    console.error("[api/me/otto activity]", activityRes.error);
+    failed.push("activity");
+  }
 
   type RawActivity = {
     id: string;
@@ -209,6 +256,13 @@ export async function GET() {
       .order("remind_at", { ascending: true })
       .limit(UPCOMING_LIMIT),
   ]);
+
+  // Both reads make up one list, so either one failing means "Coming up" is
+  // incomplete — and an incomplete list is indistinguishable from a quiet week.
+  if (rsvpsRes.error || datedRemRes.error) {
+    console.error("[api/me/otto upcoming]", rsvpsRes.error ?? datedRemRes.error);
+    failed.push("upcoming");
+  }
 
   type RawRsvp = {
     status: "going" | "maybe";
@@ -266,6 +320,11 @@ export async function GET() {
       .limit(ASKING_LIMIT),
   ]);
 
+  // A refused read of who the viewer already follows would make every
+  // follower look new, so it fails the section rather than inventing rows.
+  let askingError: unknown =
+    followersInRes.error ?? viewerOutRes.error ?? undatedRemRes.error ?? null;
+
   const viewerFollows = new Set(
     ((viewerOutRes.data ?? []) as { following_id: string }[]).map((r) => r.following_id),
   );
@@ -284,6 +343,7 @@ export async function GET() {
       .from("users")
       .select("id,name,handle,avatar_url")
       .in("id", followerIds);
+    if (profilesRes.error) askingError = profilesRes.error;
     type ProfileRow = {
       id: string;
       name: string | null;
@@ -306,14 +366,17 @@ export async function GET() {
   // accepted, not hidden, and the latest message is newer than last_read_at
   // (or last_read_at is null). The threads route does this in detail; here
   // we just need the count. Defensive try/catch — channels schema lag won't
-  // 500 the page.
+  // 500 the page. Either read failing names "dms" in `failed` rather than
+  // leaving the count at 0: an unread DM the student can't see is worse than
+  // a section that admits it didn't load.
   let unreadDmCount = 0;
   try {
-    const { data: dmMemberships } = await supabase
+    const { data: dmMemberships, error: membersErr } = await supabase
       .from("channel_members")
       .select("channel_id,last_read_at,accepted_at,hidden_at,channels!inner(id,type)")
       .eq("user_id", user.id)
       .eq("channels.type", "dm");
+    if (membersErr) throw membersErr;
     type DmRow = {
       channel_id: string;
       last_read_at: string | null;
@@ -325,12 +388,13 @@ export async function GET() {
     );
     if (dms.length > 0) {
       const channelIds = dms.map((r) => r.channel_id);
-      const { data: lastMsgs } = await supabase
+      const { data: lastMsgs, error: msgsErr } = await supabase
         .from("messages")
         .select("channel_id,user_id,created_at")
         .in("channel_id", channelIds)
         .order("created_at", { ascending: false })
         .limit(channelIds.length * 3);
+      if (msgsErr) throw msgsErr;
       const latestByChannel = new Map<string, { user_id: string; created_at: string }>();
       type MsgRow = { channel_id: string; user_id: string; created_at: string };
       for (const m of (lastMsgs ?? []) as MsgRow[]) {
@@ -342,6 +406,9 @@ export async function GET() {
         const last = latestByChannel.get(r.channel_id);
         if (!last) continue;
         if (last.user_id === user.id) continue;
+        // A blocked or muted sender doesn't raise the unread count: the
+        // hero chip and the "N unread DMs" row keep Mute's promise too.
+        if (hidden.has(last.user_id)) continue;
         if (!r.last_read_at || new Date(last.created_at) > new Date(r.last_read_at)) {
           unreadDmCount += 1;
         }
@@ -349,6 +416,7 @@ export async function GET() {
     }
   } catch (e) {
     console.error("[api/me/otto unread-dms]", e);
+    failed.push("dms");
   }
 
   type RawUndatedRem = { id: string; title: string; body: string | null; created_at: string };
@@ -359,6 +427,11 @@ export async function GET() {
     body: r.body,
     created_at: r.created_at,
   }));
+
+  if (askingError) {
+    console.error("[api/me/otto asking]", askingError);
+    failed.push("asking");
+  }
 
   const asking: AskingRow[] = [
     ...(unreadDmCount > 0 ? [{ kind: "unread_dms" as const, count: unreadDmCount }] : []),
@@ -380,6 +453,7 @@ export async function GET() {
     asking,
     settings,
     counts,
+    failed,
   };
 
   return NextResponse.json(payload);

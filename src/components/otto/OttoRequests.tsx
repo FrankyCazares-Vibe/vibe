@@ -4,6 +4,7 @@ import Image from "next/image";
 import Link from "next/link";
 
 import type { AskingRow } from "@/app/api/me/otto/route";
+import { LoadFailed } from "@/components/feedback/LoadFailed";
 
 import { OttoSection } from "./OttoSection";
 
@@ -13,7 +14,11 @@ type Props = {
   onPassFollower: (userId: string) => void;
   onDismissReminder: (id: string) => void;
   onActReminder: (id: string) => void;
+  /** From the payload's `failed` list — the read was refused. */
+  failed?: boolean;
 };
+
+const LOAD_FAILURE = "Couldn't load who's waiting on you. Try again.";
 
 export function OttoRequests({
   rows,
@@ -21,10 +26,15 @@ export function OttoRequests({
   onPassFollower,
   onDismissReminder,
   onActReminder,
+  failed,
 }: Props) {
   return (
     <OttoSection eyebrow="Asking for you">
-      {rows.length === 0 ? (
+      {/* A refused read is never "no one's waiting on you right now." The
+          payload comes with the page, so Retry reloads it. */}
+      {failed ? (
+        <LoadFailed failure={{ message: LOAD_FAILURE }} tone="dark" />
+      ) : rows.length === 0 ? (
         <p className="otto-room-empty">no one&rsquo;s waiting on you right now.</p>
       ) : (
         <ul className="otto-room-list">
