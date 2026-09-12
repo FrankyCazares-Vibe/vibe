@@ -10,13 +10,15 @@ import { OttoSection } from "./OttoSection";
 
 type ProfileViewsPayload = {
   counts: { today: number; seven_days: number; thirty_days: number; all_time: number };
+  /** null on a free account: the route omits viewer identities entirely
+   *  rather than sending them for the client to hide. */
   recent: Array<{
     id: string;
     handle: string | null;
     name: string | null;
     avatar_url: string | null;
     viewed_on: string;
-  }>;
+  }> | null;
   premium: boolean;
 };
 
@@ -93,10 +95,13 @@ export function OttoMetrics() {
     ]);
     if (runRef.current !== run) return;
 
-    if (pvRes.ok && pvRes.data.counts && Array.isArray(pvRes.data.recent)) {
+    // `recent` is absent for a free account — the route omits viewer
+    // identities entirely rather than sending them and hiding them, so a
+    // payload with counts and no `recent` is a success, not a failure.
+    if (pvRes.ok && pvRes.data.counts) {
       setPv({
         counts: pvRes.data.counts,
-        recent: pvRes.data.recent,
+        recent: Array.isArray(pvRes.data.recent) ? pvRes.data.recent : null,
         premium: Boolean(pvRes.data.premium),
       });
       setPvErr(null);
@@ -159,7 +164,19 @@ export function OttoMetrics() {
                   <Tile n={pv?.counts.all_time ?? 0} label="All time" />
                 </div>
                 <div className="otto-metrics-recent">
-                  {pv?.recent.length ? (
+                  {pv && !pv.recent && pv.counts.thirty_days > 0 ? (
+                    // Free account: the route sent counts and no identities.
+                    // Only shown when there is actually someone behind the
+                    // lock — with no views, "names hidden" would imply views
+                    // that don't exist.
+                    <>
+                      <div className="otto-metrics-recent-label">Recent viewers</div>
+                      <p className="otto-metrics-foot">
+                        Vibe+ shows you who viewed your profile.{" "}
+                        <Link href="/plus">See what&rsquo;s included →</Link>
+                      </p>
+                    </>
+                  ) : pv?.recent?.length ? (
                     <>
                       <div className="otto-metrics-recent-label">Recent viewers</div>
                       <ul className="otto-metrics-recent-list">
@@ -185,11 +202,6 @@ export function OttoMetrics() {
                           </li>
                         ))}
                       </ul>
-                      {pv.premium ? null : (
-                        <p className="otto-metrics-foot">
-                          premium soon — viewer identity will move behind the paywall.
-                        </p>
-                      )}
                     </>
                   ) : (
                     <p className="otto-room-empty">no profile views yet.</p>
