@@ -16,6 +16,7 @@ import { vibeRequest } from "@/lib/feedback/request";
 import { toast } from "@/lib/feedback/toast";
 import { IU_CAMPUSES, campusByLabel } from "@/lib/iu/campuses";
 import { IU_MAJORS_BY_SCHOOL } from "@/lib/iu/majors";
+import { DEFAULT_COVER_THEME_CSS, resolveCoverThemeCss } from "@/lib/profile/cover-themes";
 import type { RedactionBar } from "@/lib/profile/resume-redactions";
 import { sortWorkExperienceByRecency } from "@/lib/profile/work-experience";
 
@@ -219,8 +220,7 @@ function pick<T>(...vals: (T | null | undefined)[]): T | null {
   return null;
 }
 
-const DEFAULT_BANNER_GRADIENT =
-  "linear-gradient(135deg,#FFB8A0 0%,#C8B8FF 45%,#B8E4FF 100%)";
+const DEFAULT_BANNER_GRADIENT = DEFAULT_COVER_THEME_CSS;
 
 type Props = {
   /** Optional — when set, renders visitor mode for this handle. Omit
@@ -366,6 +366,42 @@ export function ProfileMobile({ targetHandle }: Props = {}) {
       cancelled = true;
     };
   }, [isVisitor, targetHandle, bootstrapTry]);
+
+  // Profile views — the phone's half of the ledger.
+  //
+  // Desktop records from the viewer-mode tracker at the bottom of
+  // public/html/profile.html, which fires on `?handle=`. Every viewport
+  // under 900px renders THIS component instead and never called the
+  // endpoint, so the whole profile_views ledger was desktop-only traffic.
+  //
+  // The guards mirror that tracker: a real visit to someone else's
+  // profile (`viewer-mode` there is exactly `isVisitor` here). Self and
+  // signed-out viewers are refused by record_profile_view itself — it
+  // returns false when auth.uid() is null or equals the profile owner —
+  // which is the same and only thing protecting desktop, since that
+  // tracker has no client-side check for either. The checks below just
+  // avoid firing a request we already know the server will drop.
+  // Blocked in either direction renders BlockedByTargetView instead of a
+  // profile, so it is not a view and is not recorded.
+  const viewRecordedFor = useRef<string | null>(null);
+  useEffect(() => {
+    if (!isVisitor || !targetHandle) return;
+    if (!user?.id) return;
+    if (user._viewerFollowState === "self") return;
+    if (user._blockedByTarget || user._viewerHasBlocked) return;
+    const key = targetHandle.trim().toLowerCase();
+    if (!key || viewRecordedFor.current === key) return;
+    viewRecordedFor.current = key;
+    // Fire-and-forget. A student came here to read a profile, not to be
+    // told that view tracking failed, so this is quiet and the result is
+    // discarded — the desktop tracker swallows its failure the same way.
+    void vibeRequest("/api/profile-views", {
+      json: { handle: key, referrer: document.referrer || null },
+      cache: "no-store",
+      failure: "Couldn't record this profile view.",
+      quiet: true,
+    });
+  }, [isVisitor, targetHandle, user]);
 
   // Posts fetch — same shape both ways, just routed by `handle`. One
   // loader serves the first load and the refetch the composer and the
@@ -997,7 +1033,10 @@ export function ProfileMobile({ targetHandle }: Props = {}) {
   const headline = pick(user.headline);
   const avatar = pick(user.avatarPhoto);
   const banner = pick(user.coverPhoto);
-  const gradient = pick(user.coverGradient) ?? DEFAULT_BANNER_GRADIENT;
+  // coverGradient is a cover-theme KEY — resolved to CSS from a fixed table
+  // so a stored value is never painted as-is. This screen renders visited
+  // profiles too, not just your own.
+  const gradient = resolveCoverThemeCss(user.coverGradient) ?? DEFAULT_BANNER_GRADIENT;
   const location = pick(user.location);
   const bio = pick(user.bio);
   const verified = user.studentVerification?.status === "verified";
