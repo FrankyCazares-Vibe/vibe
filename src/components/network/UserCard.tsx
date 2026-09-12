@@ -5,6 +5,7 @@ import { useMemo, useState } from "react";
 
 import { vibeRequest } from "@/lib/feedback/request";
 import { toast } from "@/lib/feedback/toast";
+import { resolveCoverThemeCss } from "@/lib/profile/cover-themes";
 
 export type UserCardProps = {
   id: string;
@@ -137,8 +138,12 @@ function bannerStyleFor(
       backgroundPosition: "center",
     };
   }
-  if (banner_gradient && banner_gradient.trim().length > 0) {
-    return { background: banner_gradient };
+  // banner_gradient is a cover-theme KEY, resolved to CSS from a fixed
+  // table. It used to be painted here verbatim, which let any student turn
+  // every viewer of their card into a request to a host they chose.
+  const themeCss = resolveCoverThemeCss(banner_gradient);
+  if (themeCss) {
+    return { background: themeCss };
   }
   const fallback =
     DEFAULT_BANNER_GRADIENTS[

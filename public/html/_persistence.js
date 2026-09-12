@@ -447,14 +447,72 @@ function _vibeEsc(s) {
     ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
 }
 
+// ── Cover themes ───────────────────────────────────────────────────────────
+// The static-page twin of src/lib/profile/cover-themes.ts. users.banner_gradient
+// stores one of these KEYS, never CSS — it used to hold a free-text CSS string
+// that any student could write straight through PostgREST and that was painted
+// verbatim on other students' screens, which made `background:
+// linear-gradient(#000,#000), url(https://attacker.example/x)` an IP beacon on
+// everyone who saw their card. Keys must match cover-themes.ts AND
+// users_banner_gradient_preset_check (migration 20260912100000).
+//
+// Defined here because _persistence.js is loaded first and non-deferred on
+// profile.html, messages.html and onboarding.html, so it is always in place
+// before _profilePreview.js (deferred) or profile.html's own script runs.
+window.VIBE_COVER_THEMES = {
+  'peach-sky':   { label: 'Peach sky',   css: 'linear-gradient(135deg,#FFB8A0 0%,#C8B8FF 45%,#B8E4FF 100%)' },
+  'sky-peach':   { label: 'Sky peach',   css: 'linear-gradient(135deg,#B8E4FF 0%,#C8B8FF 50%,#FFB8A0 100%)' },
+  'mint-lilac':  { label: 'Mint lilac',  css: 'linear-gradient(135deg,#EAFFF5 0%,#B8E4FF 50%,#C8B8FF 100%)' },
+  'sunrise':     { label: 'Sunrise',     css: 'linear-gradient(135deg,#FFF9E0 0%,#FFB8A0 50%,#FF5C35 100%)' },
+  'ember-night': { label: 'Ember night', css: 'linear-gradient(135deg,#1C1C1E 0%,#2D1B4E 50%,#FF5C35 100%)' },
+  'deep-sea':    { label: 'Deep sea',    css: 'linear-gradient(135deg,#0A1628 0%,#1A3A5C 50%,#2E86AB 100%)' },
+  'orchid':      { label: 'Orchid',      css: 'linear-gradient(135deg,#2D0A3E 0%,#6B21A8 50%,#C084FC 100%)' },
+  'pine':        { label: 'Pine',        css: 'linear-gradient(135deg,#0D2B1D 0%,#166534 50%,#4ADE80 100%)' },
+};
+
+// Lowercase, strip whitespace, and rewrite rgb(r, g, b) as #rrggbb, so a
+// value that round-tripped through the DOM (the browser re-serializes hex as
+// rgb()) still matches its preset.
+function _vibeCanonicalCss(raw) {
+  return String(raw).toLowerCase().replace(/\s+/g, '').replace(
+    /rgb\((\d{1,3}),(\d{1,3}),(\d{1,3})\)/g,
+    (_m, r, g, b) => '#' + [r, g, b].map(n => Number(n).toString(16).padStart(2, '0')).join(''),
+  );
+}
+
+var _VIBE_LEGACY_COVER_CSS = (function () {
+  const m = {};
+  Object.keys(window.VIBE_COVER_THEMES).forEach(k => {
+    m[_vibeCanonicalCss(window.VIBE_COVER_THEMES[k].css)] = k;
+  });
+  return m;
+})();
+
+// Stored value → preset key, or '' when it is not one of ours. Accepts a key
+// or (from a client older than this change) one of the preset CSS strings.
+window.vibeCoverThemeKey = function (stored) {
+  if (typeof stored !== 'string') return '';
+  const t = stored.trim();
+  if (!t) return '';
+  if (Object.prototype.hasOwnProperty.call(window.VIBE_COVER_THEMES, t)) return t;
+  return _VIBE_LEGACY_COVER_CSS[_vibeCanonicalCss(t)] || '';
+};
+
+// Stored value → the CSS to paint, or null. This is the ONLY way a stored
+// value becomes a style on the static pages; it can only return a constant
+// from the table above.
+window.vibeCoverThemeCss = function (stored) {
+  const key = window.vibeCoverThemeKey(stored);
+  return key ? window.VIBE_COVER_THEMES[key].css : null;
+};
+
 function _vibeBannerCss(u) {
   const photo = u.coverPhoto;
   if (typeof photo === 'string' && /^https?:\/\//.test(photo)) {
     return 'url("' + photo.replace(/"/g, '%22') + '") center / cover no-repeat';
   }
-  const g = u.coverGradient;
-  if (typeof g === 'string' && g.trim()) return g.trim();
-  return 'linear-gradient(135deg, #EDE9E2 0%, #D8D2C8 45%, #C9C2B8 100%)';
+  return window.vibeCoverThemeCss(u.coverGradient)
+    || 'linear-gradient(135deg, #EDE9E2 0%, #D8D2C8 45%, #C9C2B8 100%)';
 }
 
 function _vibePaintSidebarChips(user) {

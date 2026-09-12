@@ -3,6 +3,8 @@
 import Link from "next/link";
 import { useEffect, useState } from "react";
 
+import { resolveCoverThemeCss } from "@/lib/profile/cover-themes";
+
 const BANNER_PREVIEW_H = 48;
 const AVATAR_SZ = 36;
 
@@ -47,9 +49,10 @@ function bannerCssFromVibeUser(u: Record<string, unknown>): string | null {
       return `url(${JSON.stringify(t)}) center / cover no-repeat`;
     }
   }
-  const g = u.coverGradient;
-  if (typeof g === "string" && g.trim()) return g.trim();
-  return null;
+  // coverGradient is a cover-theme KEY. Anything this doesn't recognize
+  // resolves to null and the chip falls back to bannerFallback — a stored
+  // value never reaches the DOM as CSS.
+  return resolveCoverThemeCss(u.coverGradient);
 }
 
 const cardShell: React.CSSProperties = {

@@ -120,7 +120,15 @@
         banner.style.background =
           `url(${profile.banner_url}) center/cover no-repeat`;
       } else if (profile.banner_gradient) {
-        banner.style.background = profile.banner_gradient;
+        // banner_gradient is a cover-theme KEY, mapped to CSS through the
+        // table in _persistence.js (loaded first, non-deferred). An
+        // unrecognized value falls back to the default rather than being
+        // painted — this card renders someone ELSE's profile inside a DM,
+        // so a raw CSS value here would fetch whatever host they chose.
+        const css = (typeof window.vibeCoverThemeCss === 'function')
+          ? window.vibeCoverThemeCss(profile.banner_gradient)
+          : null;
+        banner.style.background = css || DEFAULT_BANNER;
       }
     }
     const av = card.querySelector('[data-prof-av]');

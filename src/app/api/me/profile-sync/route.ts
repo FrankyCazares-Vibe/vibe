@@ -1,6 +1,8 @@
 import { NextResponse } from "next/server";
 
 import { normalizeCampusLabel } from "@/lib/iu/campuses";
+import { isSupabaseHttpsUrl } from "@/lib/org-asset-url";
+import { normalizeCoverThemeInput } from "@/lib/profile/cover-themes";
 import { sanitizeCurrentOn } from "@/lib/profile/current-on";
 import { normalizeProfileView } from "@/lib/profile/normalize-profile-view";
 import { sanitizeRecruiterSnapshot } from "@/lib/profile/recruiter-snapshot";
@@ -56,6 +58,10 @@ export async function POST(req: Request) {
   }
 
   const patch: Record<string, unknown> = {};
+  // avatar_url / banner_url are no longer UPDATE-granted to `authenticated`
+  // (migration 20260912102000), so they are collected separately here and
+  // written with the service role alongside banner_gradient further down.
+  const mediaPatch: Record<string, unknown> = {};
 
   if (typeof body.name === "string") {
     const t = body.name.trim().slice(0, 120);
@@ -202,8 +208,18 @@ export async function POST(req: Request) {
     patch.recruiter_snapshot = snap;
   }
 
+  // An uploaded `data:` payload comes back as a public URL on our own
+  // Supabase host; a plain http(s) string is passed straight through by
+  // inlineOrUploadProfileUrl, which accepts ANY host. That value is rendered
+  // into a CSS `url()` on other students' screens, so it is pinned to our
+  // host here — the same pin org assets already use. `null` still clears.
   const avatar = await inlineOrUploadProfileUrl(user.id, body.avatar_url, "avatar");
-  if (avatar !== undefined) patch.avatar_url = avatar;
+  if (avatar !== undefined) {
+    if (typeof avatar === "string" && !isSupabaseHttpsUrl(avatar)) {
+      return NextResponse.json({ ok: false, error: "Invalid avatar_url" }, { status: 400 });
+    }
+    mediaPatch.avatar_url = avatar;
+  }
 
   // Resume objects live in the PRIVATE `resumes` bucket and are stored as
   // `/api/resume/<key>` proxy paths. Snapshot the current refs BEFORE the
@@ -241,38 +257,81 @@ export async function POST(req: Request) {
     patch.resume_docs = sanitizeResumeDocs(body.resume_docs, user.id);
   }
 
+  // Cover: an uploaded photo wins; otherwise a cover-theme preset KEY.
+  // users.banner_gradient holds a key, never CSS (migration 20260912100000
+  // CHECKs the key and takes the column off the authenticated UPDATE grant),
+  // so it is written with the service role further down and a raw CSS value
+  // from an older client is accepted only when it is exactly one of the
+  // presets.
+  let coverThemePatch: string | undefined;
   if ("banner_url" in body || "banner_gradient" in body) {
     const bu = body.banner_url;
-    const bgStr =
+    const bgKey =
       typeof body.banner_gradient === "string"
-        ? body.banner_gradient.trim().slice(0, 4000)
+        ? normalizeCoverThemeInput(body.banner_gradient)
         : "";
 
     if (typeof bu === "string" && bu.trim()) {
       const resolved = await inlineOrUploadProfileUrl(user.id, bu, "banner");
-      if (resolved === undefined || resolved === null) {
+      // Same host pin as the avatar above: an uploaded photo resolves to our
+      // own Supabase host, and an arbitrary http(s) link must not become a
+      // CSS `url()` fetch on every viewer's screen.
+      if (resolved === undefined || resolved === null || !isSupabaseHttpsUrl(resolved)) {
         return NextResponse.json({ ok: false, error: "Invalid banner" }, { status: 400 });
       }
-      patch.banner_url = resolved;
-      patch.banner_gradient = "";
-    } else if (bgStr.startsWith("linear-gradient") || bgStr.startsWith("radial-gradient")) {
-      patch.banner_url = null;
-      patch.banner_gradient = bgStr;
+      mediaPatch.banner_url = resolved;
+      coverThemePatch = "";
+    } else if (bgKey === null) {
+      return NextResponse.json(
+        { ok: false, error: "Invalid banner_gradient" },
+        { status: 400 },
+      );
+    } else if (bgKey !== "") {
+      mediaPatch.banner_url = null;
+      coverThemePatch = bgKey;
     } else if (bu === null && "banner_url" in body) {
-      patch.banner_url = null;
-      patch.banner_gradient = "";
+      mediaPatch.banner_url = null;
+      coverThemePatch = "";
     }
   }
 
-  if (Object.keys(patch).length === 0) {
+  if (
+    Object.keys(patch).length === 0 &&
+    Object.keys(mediaPatch).length === 0 &&
+    coverThemePatch === undefined
+  ) {
     return NextResponse.json({ ok: false, error: "No valid fields to update" }, { status: 400 });
   }
 
-  const { error: upErr } = await supabase.from("users").update(patch).eq("id", user.id);
+  const { error: upErr } =
+    Object.keys(patch).length > 0
+      ? await supabase.from("users").update(patch).eq("id", user.id)
+      : { error: null };
 
   if (upErr) {
     console.error("[profile-sync POST]", upErr);
     return NextResponse.json({ ok: false, error: "Request failed" }, { status: 500 });
+  }
+
+  // banner_gradient (migration 20260912100000) and avatar_url / banner_url
+  // (migration 20260912102000) are no longer UPDATE-granted to
+  // `authenticated` — write them with the service role, scoped to the
+  // caller's own id. These three columns go in ONE statement so they cannot
+  // half-apply against each other; the `patch` update above is still a
+  // separate statement, so a failure here leaves that one applied (the
+  // pre-existing shape — the response below reports what actually stuck).
+  const servicePatch: Record<string, unknown> = { ...mediaPatch };
+  if (coverThemePatch !== undefined) servicePatch.banner_gradient = coverThemePatch;
+
+  if (Object.keys(servicePatch).length > 0) {
+    const { error: svcErr } = await createSupabaseServiceClient()
+      .from("users")
+      .update(servicePatch)
+      .eq("id", user.id);
+    if (svcErr) {
+      console.error("[profile-sync POST avatar/cover]", svcErr);
+      return NextResponse.json({ ok: false, error: "Request failed" }, { status: 500 });
+    }
   }
 
   // Best-effort orphan cleanup: keys referenced before the update but not

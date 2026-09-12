@@ -1,6 +1,8 @@
 import { NextResponse } from "next/server";
 
 import { normalizeCampusLabel } from "@/lib/iu/campuses";
+import { isSupabaseHttpsUrl } from "@/lib/org-asset-url";
+import { normalizeCoverThemeInput } from "@/lib/profile/cover-themes";
 import { sanitizeRecruiterSnapshot } from "@/lib/profile/recruiter-snapshot";
 import { changeHandleForUser } from "@/lib/profile/handle-change";
 import { requireTermsAccepted } from "@/lib/legal/require-terms";
@@ -43,6 +45,36 @@ function parseUrlField(val: unknown): string | null {
   } catch {
     throw new Error("invalid");
   }
+}
+
+/**
+ * Avatar / cover URLs, which are rendered into a CSS `url()` on OTHER
+ * students' screens. `parseUrlField` accepts any http(s) host, which made
+ * these columns the same IP beacon `banner_gradient` was — no CSS needed.
+ * So the value must live on our own Supabase host, the pin
+ * `isSupabaseHttpsUrl` already applies to org assets.
+ *
+ * `null` / "" clears the field. Over-long input is REJECTED rather than
+ * sliced: truncating a media URL silently yields a broken image, and a
+ * Supabase public object URL is ~120 chars, so the cap is never reached by
+ * anything legitimate.
+ *
+ * Note this returns false for every value when NEXT_PUBLIC_SUPABASE_URL is
+ * unset, which would 400 these two fields — an environment without that
+ * variable cannot create a Supabase client at all, so the route is already
+ * dead by then.
+ */
+function parseMediaUrlField(val: unknown): string | null {
+  if (val === null) return null;
+  if (typeof val !== "string") {
+    throw new Error("invalid");
+  }
+  const t = val.trim();
+  if (!t) return null;
+  if (t.length > 2048 || !isSupabaseHttpsUrl(t)) {
+    throw new Error("invalid");
+  }
+  return t;
 }
 
 function stringArray(val: unknown, maxItems: number, maxEach: number): string[] | undefined {
@@ -94,6 +126,10 @@ export async function PATCH(req: Request) {
   }
 
   const patch: Record<string, unknown> = {};
+  // Columns the caller's own client may no longer UPDATE (migration
+  // 20260912102000) — written with the service role, scoped to this user,
+  // alongside banner_gradient further down.
+  const mediaPatch: Record<string, unknown> = {};
   let handleTouched = false;
 
   const name = trimStr(body.name, 120);
@@ -143,17 +179,22 @@ export async function PATCH(req: Request) {
   const location_text = trimStr(body.location_text, 300);
   if (location_text !== null) patch.location_text = location_text;
 
+  // Cover theme. The column stores a preset KEY, never CSS: the old check
+  // here ("starts with linear-gradient") passed
+  // `linear-gradient(#000,#000),url(https://attacker.example/x)`, and it was
+  // never a boundary anyway because the column was UPDATE-granted to
+  // `authenticated` and reachable straight through PostgREST. Since
+  // migration 20260912100000 the boundary is the CHECK constraint plus the
+  // removed grant; this is defence in depth. A raw CSS string from an older
+  // client is accepted only when it is exactly one of the presets, and is
+  // stored as that preset's key.
+  let coverThemePatch: string | undefined;
   if (typeof body.banner_gradient === "string") {
-    const g = body.banner_gradient.trim().slice(0, 4000);
-    if (
-      g.startsWith("linear-gradient") ||
-      g.startsWith("radial-gradient") ||
-      g === ""
-    ) {
-      patch.banner_gradient = g;
-    } else {
+    const key = normalizeCoverThemeInput(body.banner_gradient);
+    if (key === null) {
       return NextResponse.json({ ok: false, error: "Invalid banner_gradient" }, { status: 400 });
     }
+    coverThemePatch = key;
   }
 
   const major = trimStr(body.major, 200);
@@ -219,7 +260,7 @@ export async function PATCH(req: Request) {
 
   if ("avatar_url" in body) {
     try {
-      patch.avatar_url = parseUrlField(body.avatar_url);
+      mediaPatch.avatar_url = parseMediaUrlField(body.avatar_url);
     } catch {
       return NextResponse.json({ ok: false, error: "Invalid avatar_url" }, { status: 400 });
     }
@@ -227,7 +268,7 @@ export async function PATCH(req: Request) {
 
   if ("banner_url" in body) {
     try {
-      patch.banner_url = parseUrlField(body.banner_url);
+      mediaPatch.banner_url = parseMediaUrlField(body.banner_url);
     } catch {
       return NextResponse.json({ ok: false, error: "Invalid banner_url" }, { status: 400 });
     }
@@ -245,7 +286,12 @@ export async function PATCH(req: Request) {
     patch.recruiter_snapshot = snap;
   }
 
-  if (Object.keys(patch).length === 0 && !handleTouched) {
+  if (
+    Object.keys(patch).length === 0 &&
+    Object.keys(mediaPatch).length === 0 &&
+    coverThemePatch === undefined &&
+    !handleTouched
+  ) {
     return NextResponse.json({ ok: false, error: "No valid fields to update" }, { status: 400 });
   }
 
@@ -257,6 +303,28 @@ export async function PATCH(req: Request) {
   if (upErr) {
     console.error("[me/profile PATCH]", upErr);
     return NextResponse.json({ ok: false, error: "Could not save profile" }, { status: 500 });
+  }
+
+  // banner_gradient (migration 20260912100000) and avatar_url / banner_url
+  // (migration 20260912102000) are no longer UPDATE-granted to
+  // `authenticated`, so they are written with the service role, scoped to
+  // the caller's own id — the same shape changeHandleForUser uses for
+  // users.handle. These three columns go in ONE statement so they cannot
+  // half-apply against each other; the `patch` update above is still a
+  // separate statement, so a failure here leaves that one applied (the
+  // pre-existing shape — the response below reports what actually stuck).
+  const servicePatch: Record<string, unknown> = { ...mediaPatch };
+  if (coverThemePatch !== undefined) servicePatch.banner_gradient = coverThemePatch;
+
+  if (Object.keys(servicePatch).length > 0) {
+    const { error: svcErr } = await createSupabaseServiceClient()
+      .from("users")
+      .update(servicePatch)
+      .eq("id", user.id);
+    if (svcErr) {
+      console.error("[me/profile PATCH avatar/cover]", svcErr);
+      return NextResponse.json({ ok: false, error: "Could not save profile" }, { status: 500 });
+    }
   }
 
   // email / school_email are private columns (no RLS read); self-read via

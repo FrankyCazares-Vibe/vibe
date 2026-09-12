@@ -1,0 +1,119 @@
+-- Session 58 / batch A2 follow-up: users.avatar_url and users.banner_url stop
+-- being free-text URLs that any student can write straight through PostgREST.
+--
+-- WHY THIS EXISTS. 20260912100000 took `banner_gradient` off the self-serve
+-- UPDATE grant so a student could no longer beacon every viewer of their card
+-- through a CSS `url()`. That closed one column and left the two next to it
+-- open: `avatar_url` and `banner_url` are also student-written, also rendered
+-- into a CSS `url()` on other students' screens, and do not even need CSS to
+-- do it. The same attack — "make every viewer of my card fetch a host I
+-- control" — still worked the day after that migration was written.
+--
+-- MEASURED ON THE LIVE DB, 2026-09-12 (read-only, before this file):
+--   * has_column_privilege('authenticated','public.users','avatar_url','UPDATE')
+--       = true, and the same for 'banner_url'. ('handle' = false — the shape
+--       this file copies.)
+--   * The table-level ACL for `authenticated` is `dDxtm/postgres` — there is
+--       NO table-wide `w`, so the per-column grants below are the ONLY UPDATE
+--       path. Revoking the column is a real boundary, not decoration.
+--   * Policy `users_update_self` is USING/WITH CHECK (auth.uid() = id), and
+--       the browser holds the anon key, so
+--         PATCH /rest/v1/users?id=eq.<me> {"avatar_url":"https://attacker/x"}
+--       succeeded and no route validator ran.
+--   * src/components/network/UserCard.tsx:136 renders
+--       backgroundImage: `url(${banner_url})` verbatim — five lines above the
+--       banner_gradient fix. public/html/_profilePreview.js:121 does the same
+--       for the profile card inside DMs.
+--
+-- EXISTING ROWS — read before writing this file, and treated explicitly.
+-- SELECT over public.users on 2026-09-12 (8 users):
+--   * avatar_url: 4 rows set, ALL on host rqopjkimxbjkwdkpkbfq.supabase.co
+--   * banner_url: 3 rows set, ALL on the same host
+--   * 0 rows contain '(', ')', a quote or whitespace — nothing stored today
+--     can break out of a CSS url(...) even before the render sites are fixed.
+-- That host is exactly NEXT_PUBLIC_SUPABASE_URL, which is what the new write
+-- validator pins to, so NO existing profile picture or cover is invalidated
+-- and nothing needs to be rewritten or cleared. There is no data step in this
+-- migration for that reason.
+--
+-- Also verified, because it decides whether pinning to one host is safe:
+-- `handle_new_user` (the on_auth_user_created trigger) inserts id, email,
+-- handle, name and the consent columns ONLY — it does not copy an OAuth
+-- avatar into public.users. No DB function anywhere in `public` or `auth`
+-- references avatar_url at all, so a third-party host is never introduced
+-- behind the app's back by a Google sign-up.
+--
+-- ---------------------------------------------------------------------------
+-- WHAT THIS FILE DOES AND DOES NOT DO
+--
+-- DOES: removes the self-serve UPDATE grant on the two columns, so the only
+-- writer becomes the server. Paired with this deploy, /api/me/profile and
+-- /api/me/profile-sync validate the value against the Supabase host
+-- (isSupabaseHttpsUrl, src/lib/org-asset-url.ts:44-55) and then write it with
+-- the service-role client scoped to .eq("id", user.id) — the same shape
+-- used for users.handle and, since 20260912100000, users.banner_gradient.
+--
+-- DOES NOT: fix the render sites. There are ~40 raw `url(${...})`
+-- interpolations across src/ and public/ (UserCard.tsx:136,
+-- _profilePreview.js:121, campus-home.tsx:1914/2115/2846/5849/6256/7439/
+-- 10277/10944 among them). After this migration a hostile value can no
+-- longer GET INTO those two columns, which is the boundary; escaping at
+-- render is defence in depth and belongs with the batch that owns those
+-- files. Nothing in this file should be read as claiming that work is done.
+--
+-- DOES NOT: touch public.orgs. has_column_privilege('authenticated',
+-- 'public.orgs','banner_url','UPDATE') and the same for 'logo_url' are BOTH
+-- still true. Org assets have a route-side validator already
+-- (normalizeOrgAssetInput, src/lib/org-asset-url.ts:66-78) but, exactly like
+-- the old gradient validator, it is bypassable through PostgREST. That is a
+-- real open hole and it is deliberately NOT closed here: org writes go
+-- through a different route with a different client and revoking those grants
+-- without changing that code would break org editing. It needs its own batch.
+-- ---------------------------------------------------------------------------
+
+-- ─── Take the two columns off the self-serve UPDATE grant ──────────────────
+-- Grants, not routes, are the boundary. They sit in the GRANT UPDATE list at
+-- supabase/migrations/20260903100000_security_hardening.sql:53-59; this
+-- narrows that list. SELECT stays granted on both — avatars and covers are
+-- public display data and every feed, card and DM header reads them.
+REVOKE UPDATE (avatar_url, banner_url) ON public.users FROM authenticated;
+
+-- ---------------------------------------------------------------------------
+-- DEPLOY ORDER: apply this AFTER the code deploy that ships with it, for the
+-- same reason 20260912100000 carries the same warning.
+--   * The new code writes both columns through the service role, so it works
+--     with or without this migration.
+--   * The code currently in production writes them through the CALLER's
+--     cookie client. Against this migration that is a permission denial, so
+--     every avatar change and every cover-photo upload on old code would fail
+--     with "Could not save profile" / "Request failed". Migration last.
+--   * Read paths are unaffected in either order — SELECT is untouched.
+--
+-- HOW TO APPLY BY HAND. The Supabase MCP execute_sql is read-only, and
+-- `supabase db push` needs the DB password, which is not on this machine.
+--   1. From the repo root, with SUPABASE_ACCESS_TOKEN exported from
+--      .env.local (project ref is in supabase/.temp/project-ref). Use curl,
+--      not Python: urllib gets a Cloudflare 1010 block.
+--        export SUPABASE_ACCESS_TOKEN="$(grep '^SUPABASE_ACCESS_TOKEN=' .env.local | cut -d= -f2-)"
+--        curl -sS -X POST "https://api.supabase.com/v1/projects/$(cat supabase/.temp/project-ref)/database/query" \
+--          -H "Authorization: Bearer $SUPABASE_ACCESS_TOKEN" \
+--          -H "Content-Type: application/json" \
+--          --data "$(jq -n --rawfile q supabase/migrations/20260912102000_users_media_url_host_lock.sql '{query:$q}')"
+--   2. Record it so `db push` stays in sync:
+--        INSERT INTO supabase_migrations.schema_migrations (version, name)
+--        VALUES ('20260912102000', 'users_media_url_host_lock');
+--   3. Verify (read-only; the MCP execute_sql is fine for this):
+--        SELECT has_column_privilege('authenticated','public.users','avatar_url','UPDATE'),
+--               has_column_privilege('authenticated','public.users','banner_url','UPDATE'),
+--               has_column_privilege('authenticated','public.users','avatar_url','SELECT');
+--        -- expect false, false, true
+--        SELECT count(*) FROM public.users WHERE avatar_url <> '' OR banner_url <> '';
+--        -- expect the same count as before this migration (nothing cleared)
+--   4. Live: sign in, open /profile, upload a new profile picture and a new
+--      cover photo, hard refresh. Both must persist. Then pick a cover
+--      gradient and confirm that still persists too (20260912100000's path).
+--
+-- ROLLBACK (roll the code back first, or avatar/cover saves fail):
+--   GRANT UPDATE (avatar_url, banner_url) ON public.users TO authenticated;
+--   DELETE FROM supabase_migrations.schema_migrations WHERE version = '20260912102000';
+-- ---------------------------------------------------------------------------

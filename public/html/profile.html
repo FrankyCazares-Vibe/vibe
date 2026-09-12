@@ -3300,8 +3300,15 @@ body.empty-profile-mode #profileEmpty { display: flex !important; }
           Follow instead
         </button>
         <!-- Hidden until a real mutual-connections API exists (S55): the count was hardcoded to 0 and the modal is a static shell. -->
+        <!-- The label says what the number actually is. getMutualCount
+             (src/lib/connections/queries.ts:128) counts people the VISITED
+             user follows whom you also follow — a directed intersection, not
+             reciprocal pairs. Measured against the live DB 2026-09-12:
+             frankycazares → james reads 2; strict both-ways mutuals is 1.
+             The math is kept (it matches every user card in the product);
+             only the wording changed, so the pill can't claim "mutual". -->
         <button class="profile-mutual-pill" onclick="openMutualsModal()" style="display:none">
-          <span id="statMutual">0</span> mutual
+          <span id="statMutual">0</span> you both follow
         </button>
         <!-- Safety actions: Block / Mute / Report. Visible only in
              viewer-mode (someone else's profile). -->
@@ -3767,9 +3774,9 @@ body.empty-profile-mode #profileEmpty { display: flex !important; }
 <div id="mutualsModal" style="display:none;position:fixed;inset:0;z-index:700;background:rgba(0,0,0,.48);align-items:center;justify-content:center;">
   <div class="modal" style="width:440px;max-height:72vh;display:flex;flex-direction:column;">
     <button class="modal-close" onclick="closeMutualsModal()">&#215;</button>
-    <div class="modal-title">People you both know</div>
+    <div class="modal-title">People you both follow</div>
     <div style="overflow-y:auto;display:flex;flex-direction:column;gap:10px;margin-top:14px;">
-      <div style="text-align:center;padding:24px 8px;font-size:13px;color:var(--muted)">No mutual connections yet.</div>
+      <div style="text-align:center;padding:24px 8px;font-size:13px;color:var(--muted)">No one you both follow yet.</div>
     </div>
   </div>
 </div>
@@ -4147,28 +4154,43 @@ document.addEventListener('click', e=>{
 });
 
 // ── Cover upload & gradient ───────────────────────────────────────
-const gradients = [
-  'linear-gradient(135deg,#FFB8A0 0%,#C8B8FF 45%,#B8E4FF 100%)',
-  'linear-gradient(135deg,#B8E4FF 0%,#C8B8FF 50%,#FFB8A0 100%)',
-  'linear-gradient(135deg,#EAFFF5 0%,#B8E4FF 50%,#C8B8FF 100%)',
-  'linear-gradient(135deg,#FFF9E0 0%,#FFB8A0 50%,#FF5C35 100%)',
-  'linear-gradient(135deg,#1C1C1E 0%,#2D1B4E 50%,#FF5C35 100%)',
-  'linear-gradient(135deg,#0A1628 0%,#1A3A5C 50%,#2E86AB 100%)',
-  'linear-gradient(135deg,#2D0A3E 0%,#6B21A8 50%,#C084FC 100%)',
-  'linear-gradient(135deg,#0D2B1D 0%,#166534 50%,#4ADE80 100%)',
-];
-let selectedGradient = gradients[0];
+// The cover is stored as a preset KEY in users.banner_gradient, never as a
+// CSS string: the column is CHECK-constrained to these keys and is no longer
+// self-updatable (migration 20260912100000). window.VIBE_COVER_THEMES is the
+// one static-side table, defined in _persistence.js — loaded first and
+// non-deferred, so it is always here by the time this runs.
+const COVER_THEME_KEYS = window.VIBE_COVER_THEMES
+  ? Object.keys(window.VIBE_COVER_THEMES)
+  : [];
+// The key currently PAINTED on the cover, tracked in JS instead of read back
+// out of the DOM. `selectedCoverTheme` is the pick in the open modal.
+let currentCoverTheme = '';
+let selectedCoverTheme = COVER_THEME_KEYS[0] || '';
 let pendingCoverUrl = null;
+
+function _coverThemeCss(key){
+  return (typeof window.vibeCoverThemeCss === 'function')
+    ? window.vibeCoverThemeCss(key)
+    : null;
+}
 
 function openGradientModal(){
   const sw = document.getElementById('gradientSwatches');
   sw.innerHTML='';
-  gradients.forEach((g,i)=>{
+  if(!COVER_THEME_KEYS.length){
+    window.vibeToast("Couldn't load the cover themes. Refresh and try again.", { tone: 'error' });
+    return;
+  }
+  selectedCoverTheme = currentCoverTheme || COVER_THEME_KEYS[0];
+  COVER_THEME_KEYS.forEach(key=>{
+    const css = _coverThemeCss(key);
+    if(!css) return;
     const d=document.createElement('div');
-    d.className='grad-swatch'+(i===0?' selected':'');
-    d.style.background=g;
+    d.className='grad-swatch'+(key===selectedCoverTheme?' selected':'');
+    d.style.background=css;
+    d.title=window.VIBE_COVER_THEMES[key].label;
     d.onclick=()=>{
-      selectedGradient=g; pendingCoverUrl=null;
+      selectedCoverTheme=key; pendingCoverUrl=null;
       sw.querySelectorAll('.grad-swatch').forEach(s=>s.classList.remove('selected'));
       d.classList.add('selected');
       // Reset preview
@@ -4230,6 +4252,8 @@ function applyCoverPhoto(url){
   cover.style.backgroundImage = `url(${url})`;
   cover.style.backgroundSize = 'cover';
   cover.style.backgroundPosition = 'center';
+  // A photo replaces the theme, so the tracked key goes with it.
+  currentCoverTheme = '';
   // Hide the cream-tinted overlay that fades the bottom of the banner —
   // it makes uploaded photos look hazy. Keep it for gradients.
   document.body.classList.add('has-cover-photo');
@@ -4238,28 +4262,37 @@ function applyCoverPhoto(url){
 function applyGradient(){
   const cover = document.getElementById('profileCover');
   const url = pendingCoverUrl;
-  const grad = selectedGradient;
+  const key = selectedCoverTheme;
+  const css = _coverThemeCss(key);
   closeModal('gradientModal');
   if(url){
     _applyCoverAndSave(() => applyCoverPhoto(url), 'Cover photo updated', "Couldn't update your cover photo.");
-  } else {
+  } else if(css){
     _applyCoverAndSave(() => {
       cover.style.backgroundImage='';
-      cover.style.background=grad;
+      cover.style.background=css;
+      currentCoverTheme = key;
       document.body.classList.remove('has-cover-photo');
     }, 'Cover updated', "Couldn't update your cover.");
+  } else {
+    window.vibeToast("Couldn't load the cover themes. Refresh and try again.", { tone: 'error' });
   }
 }
 
 // Paint the cover now, save, and toast only once the server has it. A
 // refused save restores the exact previous cover (its inline style, the
-// has-cover-photo class and the vibe_user_v1 fields) without
-// saveProfileToStorage, which would queue the refused cover again.
+// has-cover-photo class, the tracked theme key and the vibe_user_v1
+// fields) without saveProfileToStorage, which would queue the refused
+// cover again.
 async function _applyCoverAndSave(paint, success, failure) {
   const cover = document.getElementById('profileCover');
   if (!cover) return;
   const prevStyle = cover.getAttribute('style');
   const prevHasPhoto = document.body.classList.contains('has-cover-photo');
+  // The painted theme key is JS state, not DOM state, so restoring the
+  // inline style is no longer enough to undo a refused save — without this
+  // the next saveProfileToStorage() would re-persist the rejected theme.
+  const prevCoverTheme = currentCoverTheme;
   const stored = vibeLoad('vibe_user_v1') || {};
   const prevStored = { coverPhoto: stored.coverPhoto, coverGradient: stored.coverGradient };
   paint();
@@ -4272,6 +4305,7 @@ async function _applyCoverAndSave(paint, success, failure) {
   if (prevStyle === null) cover.removeAttribute('style');
   else cover.setAttribute('style', prevStyle);
   document.body.classList.toggle('has-cover-photo', prevHasPhoto);
+  currentCoverTheme = prevCoverTheme;
   _restoreStoredUserFields(prevStored);
 }
 
@@ -7607,17 +7641,21 @@ function saveProfileToStorage() {
     user.resumeRedactions = Array.isArray(redactionBars) ? redactionBars.slice() : [];
   }
 
-  // Cover banner — either an uploaded photo (data: URL) or a CSS gradient
+  // Cover banner — either an uploaded photo (data: URL) or a cover-theme
+  // preset KEY. The key comes from `currentCoverTheme`, NOT from reading
+  // coverEl.style.background back out of the DOM: that scrape persisted
+  // whatever had reached the element (devtools, a browser extension, a
+  // future XSS) as cross-device CSS, and it is how a browser-serialized
+  // rgb() gradient ended up stored in prod.
   const coverEl = document.getElementById('profileCover');
   if (coverEl) {
     const bgImg = coverEl.style.backgroundImage || '';
-    const bg = coverEl.style.background || '';
     const extracted = _urlFromCssBackgroundImage(bgImg);
     if (extracted && (extracted.startsWith('data:') || extracted.startsWith('https:') || extracted.startsWith('http:'))) {
       user.coverPhoto = extracted;
       delete user.coverGradient;
-    } else if (bg.startsWith('linear-gradient') || bg.startsWith('radial-gradient')) {
-      user.coverGradient = bg;
+    } else if (currentCoverTheme) {
+      user.coverGradient = currentCoverTheme;
       delete user.coverPhoto;
     }
   }
@@ -7752,7 +7790,12 @@ async function _saveProfileNow(failure, retryFailed) {
 function buildProfileSyncPayload() {
   const u = (typeof vibeLoad === 'function') ? vibeLoad('vibe_user_v1') : {};
   const bannerUrl = (typeof u.coverPhoto === 'string' && u.coverPhoto.trim()) ? u.coverPhoto.trim() : null;
-  const bg = (typeof u.coverGradient === 'string' && u.coverGradient.trim()) ? u.coverGradient.trim() : '';
+  // coverGradient is a cover-theme preset key. Normalize it (a cached
+  // vibe_user_v1 from before this change may still hold the preset's CSS)
+  // so the payload only ever carries a key the server will accept.
+  const coverThemeKey = (typeof window.vibeCoverThemeKey === 'function')
+    ? window.vibeCoverThemeKey(u.coverGradient)
+    : '';
   let resumeUrl = null;
   if (Array.isArray(u.resumePortfolio) && u.resumePortfolio.length && u.resumePortfolio[0].url) {
     resumeUrl = u.resumePortfolio[0].url;
@@ -7800,9 +7843,9 @@ function buildProfileSyncPayload() {
   }
   if (bannerUrl) {
     payload.banner_url = bannerUrl;
-  } else if (bg.startsWith('linear-gradient') || bg.startsWith('radial-gradient')) {
+  } else if (coverThemeKey) {
     payload.banner_url = null;
-    payload.banner_gradient = bg;
+    payload.banner_gradient = coverThemeKey;
   } else {
     payload.banner_url = null;
     payload.banner_gradient = '';
@@ -8772,16 +8815,27 @@ function renderUserSections(user) {
       renderRedactionBars();
     }
   }
-  // Cover banner — uploaded photo wins; otherwise apply saved gradient
+  // Cover banner — uploaded photo wins; otherwise the saved cover theme.
+  // user.coverGradient is a preset KEY (or, from a stale cache, the preset's
+  // own CSS); either way it is mapped back to a constant from the table. An
+  // unrecognized value paints nothing rather than reaching the DOM as CSS —
+  // this same path renders VISITED profiles, not just your own.
   if (user.coverPhoto && typeof applyCoverPhoto === 'function') {
     applyCoverPhoto(user.coverPhoto);
   } else if (user.coverGradient) {
-    const cover = document.getElementById('profileCover');
-    if (cover) {
-      cover.style.backgroundImage = '';
-      cover.style.background = user.coverGradient;
+    const themeKey = (typeof window.vibeCoverThemeKey === 'function')
+      ? window.vibeCoverThemeKey(user.coverGradient)
+      : '';
+    const css = themeKey ? _coverThemeCss(themeKey) : null;
+    if (css) {
+      const cover = document.getElementById('profileCover');
+      if (cover) {
+        cover.style.backgroundImage = '';
+        cover.style.background = css;
+      }
+      currentCoverTheme = themeKey;
+      document.body.classList.remove('has-cover-photo');
     }
-    document.body.classList.remove('has-cover-photo');
   }
   if (Array.isArray(user.vibeTags)) {
     const wrap = document.getElementById('vibeTags');
@@ -9705,11 +9759,23 @@ function showWelcomeBanner() {
         .map(p => p[0]).join('').toUpperCase() || '?';
     }
 
+    // Same wording as the mutual pill (3311) and the modal title (3777),
+    // and for the same reason: mutual_count is a DIRECTED intersection, not
+    // a reciprocal pair. hydrateUserCards (src/lib/connections/queries.ts)
+    // counts rows where follower_id = the listed user AND following_id is
+    // someone the viewer follows — so it answers "people they follow whom
+    // you also follow", which is not what "mutual" means. Measured against
+    // the live DB 2026-09-12 from frankycazares: james and vibecqo each read
+    // 2 here while strict both-ways mutuals is 1, and henryodie reads 1
+    // where the strict count is 0. Every tab of this modal (connections /
+    // following / followers) is hydrated by that same function, so this one
+    // line is the whole fix for the modal. The math is kept — only the
+    // wording, so the row can't claim a number the data doesn't support.
     function metaLine(u) {
       const parts = [];
       if (u.major) parts.push(u.major);
       if (u.year) parts.push(String(u.year));
-      if (u.mutual_count > 0) parts.push(u.mutual_count + ' mutual' + (u.mutual_count === 1 ? '' : 's'));
+      if (u.mutual_count > 0) parts.push(u.mutual_count + ' you both follow');
       return parts.join(' · ');
     }
 
