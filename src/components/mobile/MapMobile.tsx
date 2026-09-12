@@ -778,12 +778,16 @@ function ZoneSheet({
   return (
     <Drawer.Root open onOpenChange={(o) => { if (!o) onClose(); }}>
       <Drawer.Portal>
+        {/* Above the tab bar (z 9988): Map is a primary tab, so the bar is
+            on screen and nothing here sets vibe-composer-open — at 1201 the
+            bar painted over this sheet's bottom row. Still below the toasts
+            (11600 static, 12000 React). */}
         <Drawer.Overlay
           style={{
             position: "fixed",
             inset: 0,
             background: "rgba(0,0,0,0.55)",
-            zIndex: 1200,
+            zIndex: 10000,
           }}
         />
         <Drawer.Content
@@ -800,7 +804,7 @@ function ZoneSheet({
             border: "1px solid rgba(120,200,255,0.22)",
             boxShadow:
               "inset 0 1px 0 rgba(120,200,255,0.22), 0 -16px 40px rgba(0,0,0,0.5)",
-            zIndex: 1201,
+            zIndex: 10001,
             outline: "none",
             display: "flex",
             flexDirection: "column",

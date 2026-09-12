@@ -2642,12 +2642,17 @@ function PostActionsSheet({
   return (
     <Drawer.Root open onOpenChange={(o) => { if (!o) onClose(); }}>
       <Drawer.Portal>
+        {/* Above the tab bar (z 9988): this sheet opens from a feed card
+            with the bar on screen and no vibe-composer-open, so at 1201 the
+            bar painted over its bottom row. Below SharePostSheet
+            (10400/10401), which "Send to chats" opens from here, and below
+            the toasts, so a refusal still shows over both. */}
         <Drawer.Overlay
           style={{
             position: "fixed",
             inset: 0,
             background: "rgba(0,0,0,0.42)",
-            zIndex: 1200,
+            zIndex: 10000,
           }}
         />
         <Drawer.Content
@@ -2662,7 +2667,7 @@ function PostActionsSheet({
             borderTopRightRadius: 20,
             paddingBottom: "env(safe-area-inset-bottom, 0px)",
             boxShadow: "0 -8px 32px rgba(0,0,0,0.18)",
-            zIndex: 1201,
+            zIndex: 10001,
             outline: "none",
           }}
         >
