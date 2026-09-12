@@ -3,6 +3,13 @@
 import Link from "next/link";
 import { useCallback, useEffect, useState } from "react";
 
+import {
+  asLoadFailure,
+  LoadFailed,
+  type LoadFailure,
+} from "@/components/feedback/LoadFailed";
+import { vibeRequest } from "@/lib/feedback/request";
+
 type Channel = {
   id: string;
   name: string;
@@ -34,30 +41,36 @@ export function ChannelsSection({
   viewerIsMember: boolean;
 }) {
   const [channels, setChannels] = useState<Channel[] | null>(null);
+  // A failed read is not an org without channels: it renders as the failure
+  // line, never "No channels here yet."
+  const [loadErr, setLoadErr] = useState<LoadFailure | null>(null);
+  const [loadKey, setLoadKey] = useState(0);
   const [subscribing, setSubscribing] = useState(false);
   const [toast, setToast] = useState<string | null>(null);
 
   useEffect(() => {
     let cancelled = false;
     (async () => {
-      try {
-        const r = await fetch(
-          `/api/orgs/${encodeURIComponent(orgHandle)}/channels`,
-          { cache: "no-store" },
-        );
-        const j = await r.json();
-        if (cancelled) return;
-        setChannels(
-          j?.ok && Array.isArray(j.channels) ? (j.channels as Channel[]) : [],
-        );
-      } catch {
-        if (!cancelled) setChannels([]);
+      const r = await vibeRequest<{ channels?: Channel[] }>(
+        `/api/orgs/${encodeURIComponent(orgHandle)}/channels`,
+        {
+          cache: "no-store",
+          quiet: true,
+          failure: "Couldn't load this org's channels.",
+        },
+      );
+      if (cancelled) return;
+      if (r.ok && Array.isArray(r.data.channels)) {
+        setLoadErr(null);
+        setChannels(r.data.channels);
+      } else {
+        setLoadErr(asLoadFailure(r, "Couldn't load this org's channels."));
       }
     })();
     return () => {
       cancelled = true;
     };
-  }, [orgHandle]);
+  }, [orgHandle, loadKey]);
 
   const joinAllPublic = useCallback(async () => {
     if (subscribing) return;
@@ -169,7 +182,16 @@ export function ChannelsSection({
         </div>
       ) : null}
 
-      {channels === null ? (
+      {channels === null && loadErr ? (
+        <LoadFailed
+          tone="dark"
+          failure={loadErr}
+          onRetry={() => {
+            setLoadErr(null);
+            setLoadKey((k) => k + 1);
+          }}
+        />
+      ) : channels === null ? (
         <Skeleton />
       ) : channels.length === 0 ? (
         <p

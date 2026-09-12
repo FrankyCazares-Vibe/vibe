@@ -4,6 +4,12 @@ import Link from "next/link";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { Drawer } from "vaul";
 
+import {
+  asLoadFailure,
+  LoadFailed,
+  type LoadFailure,
+} from "@/components/feedback/LoadFailed";
+import { vibeRequest } from "@/lib/feedback/request";
 import { IU_SCHOOLS, schoolForMajor } from "@/lib/iu/majors";
 
 /**
@@ -244,6 +250,8 @@ function clamp(v: number, lo: number, hi: number) {
 
 export function MapMobile() {
   const [data, setData] = useState<MapSummary | null>(null);
+  const [loadErr, setLoadErr] = useState<LoadFailure | null>(null);
+  const [loadKey, setLoadKey] = useState(0);
   const [selection, setSelection] = useState<ZoneSelection | null>(null);
   const [pan, setPan] = useState({ x: 0, y: 0 });
   const [zoom, setZoom] = useState(1);
@@ -265,24 +273,27 @@ export function MapMobile() {
   useEffect(() => {
     let cancelled = false;
     (async () => {
-      try {
-        const r = await fetch("/api/campus-map", { cache: "no-store" });
-        const j = await r.json();
-        if (cancelled) return;
-        setData(j?.ok ? (j as MapSummary) : ({ ok: false } as MapSummary));
-      } catch {
-        if (!cancelled) setData({ ok: false } as MapSummary);
+      const r = await vibeRequest<MapSummary>("/api/campus-map", {
+        cache: "no-store",
+        quiet: true,
+        failure: "Couldn't load the map.",
+      });
+      if (cancelled) return;
+      if (r.ok && Array.isArray(r.data.majors)) {
+        setLoadErr(null);
+        setData(r.data);
+      } else {
+        setLoadErr(asLoadFailure(r, "Couldn't load the map."));
       }
     })();
     return () => {
       cancelled = true;
     };
-  }, []);
+  }, [loadKey]);
 
   const layout = useMemo(() => computeLayout(data), [data]);
   const hasData = !!data?.ok && (data.majors?.length ?? 0) > 0;
   const noSchool = !!data?.ok && data.reason === "no_school";
-  const loadFailed = !!data && !data.ok;
 
   const onPointerDown = useCallback((e: React.PointerEvent<HTMLDivElement>) => {
     pointersRef.current.set(e.pointerId, { x: e.clientX, y: e.clientY });
@@ -382,13 +393,19 @@ export function MapMobile() {
           position: "relative",
         }}
       >
-        {data === null ? (
-          <MapOverlay>Scanning campus…</MapOverlay>
-        ) : loadFailed ? (
+        {loadErr ? (
           <MapOverlay subtle>
-            <div style={{ fontFamily: "Fraunces, serif", fontSize: 17, color: "#fff", marginBottom: 6, textAlign: "center" }}>Couldn&apos;t load the map</div>
-            <div style={{ color: "rgba(255,255,255,0.55)", fontFamily: "DM Sans, sans-serif", fontSize: 13, textAlign: "center" }}>Pull to refresh or reopen the tab.</div>
+            <LoadFailed
+              tone="dark"
+              failure={loadErr}
+              onRetry={() => {
+                setLoadErr(null);
+                setLoadKey((k) => k + 1);
+              }}
+            />
           </MapOverlay>
+        ) : data === null ? (
+          <MapOverlay>Scanning campus…</MapOverlay>
         ) : noSchool ? (
           <MapOverlay subtle>
             <div style={{ fontFamily: "Fraunces, serif", fontSize: 17, color: "#fff", marginBottom: 6, textAlign: "center" }}>
@@ -692,6 +709,10 @@ function ZoneSheet({
     mutuals: ZoneRow[];
     discover: ZoneRow[];
   } | null>(null);
+  // A failed zone read is not an empty zone: it renders as the failure line,
+  // never "Nobody to discover here right now."
+  const [loadErr, setLoadErr] = useState<LoadFailure | null>(null);
+  const [loadKey, setLoadKey] = useState(0);
   const [tab, setTab] = useState<"discover" | "mutuals" | "connected">(
     "discover",
   );
@@ -699,36 +720,41 @@ function ZoneSheet({
   useEffect(() => {
     let cancelled = false;
     (async () => {
-      try {
-        const base =
-          selection.kind === "major"
-            ? `/api/campus-map/zone?major=${encodeURIComponent(selection.key)}`
-            : `/api/campus-map/zone?org=${encodeURIComponent(selection.key)}`;
-        const res = await fetch(base, { cache: "no-store" });
-        const j = await res.json();
-        if (cancelled) return;
-        if (j?.ok) {
-          setData({
-            connected: j.connected ?? [],
-            mutuals: j.mutuals ?? [],
-            discover: j.discover ?? [],
-          });
-          // Bias default tab toward the strongest signal.
-          if ((j.mutuals ?? []).length > 0) setTab("mutuals");
-          else if ((j.discover ?? []).length > 0) setTab("discover");
-          else if ((j.connected ?? []).length > 0) setTab("connected");
-        } else {
-          setData({ connected: [], mutuals: [], discover: [] });
-        }
-      } catch {
-        if (!cancelled)
-          setData({ connected: [], mutuals: [], discover: [] });
+      const base =
+        selection.kind === "major"
+          ? `/api/campus-map/zone?major=${encodeURIComponent(selection.key)}`
+          : `/api/campus-map/zone?org=${encodeURIComponent(selection.key)}`;
+      const r = await vibeRequest<{
+        connected?: ZoneRow[];
+        mutuals?: ZoneRow[];
+        discover?: ZoneRow[];
+      }>(base, {
+        cache: "no-store",
+        quiet: true,
+        failure: "Couldn't load this zone.",
+      });
+      if (cancelled) return;
+      if (
+        r.ok &&
+        Array.isArray(r.data.connected) &&
+        Array.isArray(r.data.mutuals) &&
+        Array.isArray(r.data.discover)
+      ) {
+        const { connected, mutuals, discover } = r.data;
+        setLoadErr(null);
+        setData({ connected, mutuals, discover });
+        // Bias default tab toward the strongest signal.
+        if (mutuals.length > 0) setTab("mutuals");
+        else if (discover.length > 0) setTab("discover");
+        else if (connected.length > 0) setTab("connected");
+      } else {
+        setLoadErr(asLoadFailure(r, "Couldn't load this zone."));
       }
     })();
     return () => {
       cancelled = true;
     };
-  }, [selection]);
+  }, [selection, loadKey]);
 
   const rows =
     data === null
@@ -885,7 +911,18 @@ function ZoneSheet({
               padding: "8px 12px 16px",
             }}
           >
-            {rows === null ? (
+            {rows === null && loadErr ? (
+              <div style={{ padding: "16px 6px" }}>
+                <LoadFailed
+                  tone="dark"
+                  failure={loadErr}
+                  onRetry={() => {
+                    setLoadErr(null);
+                    setLoadKey((k) => k + 1);
+                  }}
+                />
+              </div>
+            ) : rows === null ? (
               <div
                 style={{
                   padding: "24px 12px",

@@ -3,6 +3,13 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { Drawer } from "vaul";
 
+import {
+  asLoadFailure,
+  LoadFailed,
+  type LoadFailure,
+} from "@/components/feedback/LoadFailed";
+import { vibeRequest } from "@/lib/feedback/request";
+
 /**
  * In-app "Send to…" picker. Lists every chat the viewer can post to
  * (DMs, groups, org channels) and multi-sends the post as an attached
@@ -63,37 +70,40 @@ export function SharePostSheet({
   const [query, setQuery] = useState("");
   const [caption, setCaption] = useState("");
   const [sending, setSending] = useState(false);
+  /** Send failures only — the pill above the caption box. A chat list that
+   *  fails to load renders as LoadFailed in the list's place instead. */
   const [error, setError] = useState<string | null>(null);
+  const [loadErr, setLoadErr] = useState<LoadFailure | null>(null);
+  const [loadKey, setLoadKey] = useState(0);
   const ranSendRef = useRef(false);
 
   useEffect(() => {
     let cancelled = false;
     (async () => {
-      try {
-        const r = await fetch("/api/me/threads", { cache: "no-store" });
-        const j = await r.json();
-        if (cancelled) return;
-        if (!j?.ok) {
-          setError(j?.error ?? "Couldn't load chats");
-          setThreads([]);
-          return;
-        }
-        const all: ThreadEntry[] = [
-          ...((j.threads ?? []) as ThreadEntry[]),
-          ...((j.requests ?? []) as ThreadEntry[]),
-        ].filter((t) => !t.is_request);
-        setThreads(all);
-      } catch {
-        if (!cancelled) {
-          setError("Couldn't load chats");
-          setThreads([]);
-        }
+      const r = await vibeRequest<{
+        threads?: ThreadEntry[];
+        requests?: ThreadEntry[];
+      }>("/api/me/threads", {
+        cache: "no-store",
+        quiet: true,
+        failure: "Couldn't load your chats.",
+      });
+      if (cancelled) return;
+      if (r.ok && Array.isArray(r.data.threads)) {
+        setLoadErr(null);
+        setThreads(
+          [...r.data.threads, ...(r.data.requests ?? [])].filter(
+            (t) => !t.is_request,
+          ),
+        );
+      } else {
+        setLoadErr(asLoadFailure(r, "Couldn't load your chats."));
       }
     })();
     return () => {
       cancelled = true;
     };
-  }, []);
+  }, [loadKey]);
 
   const filtered = useMemo(() => {
     if (!threads) return [];
@@ -315,7 +325,17 @@ export function SharePostSheet({
               overscrollBehavior: "contain",
             }}
           >
-            {threads === null ? (
+            {threads === null && loadErr ? (
+              <div style={{ padding: "20px 14px" }}>
+                <LoadFailed
+                  failure={loadErr}
+                  onRetry={() => {
+                    setLoadErr(null);
+                    setLoadKey((k) => k + 1);
+                  }}
+                />
+              </div>
+            ) : threads === null ? (
               <div
                 style={{
                   padding: "32px 16px",

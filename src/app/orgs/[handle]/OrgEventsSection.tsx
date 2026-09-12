@@ -8,6 +8,13 @@ import {
   type EligibleOrg,
   EventCard,
 } from "@/app/campus/campus-home";
+import {
+  asLoadFailure,
+  LoadFailed,
+  type LoadFailure,
+} from "@/components/feedback/LoadFailed";
+import { vibeRequest } from "@/lib/feedback/request";
+import { toast } from "@/lib/feedback/toast";
 
 /**
  * Org-scoped events section. Lives on the org profile page (desktop +
@@ -31,28 +38,47 @@ export function OrgEventsSection({
   viewerRole: string | null;
 }) {
   const [events, setEvents] = useState<CampusEvent[] | null>(null);
+  // First-load failure only; a failed refresh keeps the events on screen.
+  const [loadErr, setLoadErr] = useState<LoadFailure | null>(null);
+  const [loadKey, setLoadKey] = useState(0);
   const [createOpen, setCreateOpen] = useState(false);
 
   const canManage = viewerRole === "owner" || viewerRole === "admin";
 
-  const refetch = useCallback(async () => {
-    try {
-      const r = await fetch(
-        `/api/events?org_id=${encodeURIComponent(orgId)}&limit=50`,
-        { cache: "no-store" },
-      );
-      const j = await r.json();
-      setEvents(
-        j?.ok && Array.isArray(j.events) ? (j.events as CampusEvent[]) : [],
-      );
-    } catch {
-      setEvents([]);
+  // After an RSVP or a new event. The student started it, so a refusal
+  // toasts (vibeRequest's, or ours for a bad body) and the list stays put.
+  const refresh = useCallback(async () => {
+    const r = await vibeRequest<{ events?: CampusEvent[] }>(
+      `/api/events?org_id=${encodeURIComponent(orgId)}&limit=50`,
+      { cache: "no-store", failure: "Couldn't refresh events." },
+    );
+    if (r.ok && Array.isArray(r.data.events)) {
+      setLoadErr(null);
+      setEvents(r.data.events);
+    } else if (r.ok) {
+      toast({ message: "Couldn't refresh events. Try again.", tone: "error" });
     }
   }, [orgId]);
 
   useEffect(() => {
-    void refetch();
-  }, [refetch]);
+    let cancelled = false;
+    (async () => {
+      const r = await vibeRequest<{ events?: CampusEvent[] }>(
+        `/api/events?org_id=${encodeURIComponent(orgId)}&limit=50`,
+        { cache: "no-store", quiet: true, failure: "Couldn't load events." },
+      );
+      if (cancelled) return;
+      if (r.ok && Array.isArray(r.data.events)) {
+        setLoadErr(null);
+        setEvents(r.data.events);
+      } else {
+        setLoadErr(asLoadFailure(r, "Couldn't load events."));
+      }
+    })();
+    return () => {
+      cancelled = true;
+    };
+  }, [orgId, loadKey]);
 
   return (
     <section
@@ -109,7 +135,16 @@ export function OrgEventsSection({
         ) : null}
       </div>
 
-      {events === null ? (
+      {events === null && loadErr ? (
+        <LoadFailed
+          tone="dark"
+          failure={loadErr}
+          onRetry={() => {
+            setLoadErr(null);
+            setLoadKey((k) => k + 1);
+          }}
+        />
+      ) : events === null ? (
         <Skeleton />
       ) : events.length === 0 ? (
         <p
@@ -127,7 +162,7 @@ export function OrgEventsSection({
       ) : (
         <div style={{ display: "flex", flexDirection: "column", gap: 12 }}>
           {events.map((ev) => (
-            <EventCard key={ev.id} ev={ev} onMutate={refetch} />
+            <EventCard key={ev.id} ev={ev} onMutate={refresh} />
           ))}
         </div>
       )}
@@ -148,7 +183,7 @@ export function OrgEventsSection({
           onClose={() => setCreateOpen(false)}
           onCreated={() => {
             setCreateOpen(false);
-            void refetch();
+            void refresh();
           }}
         />
       ) : null}

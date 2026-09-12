@@ -1,6 +1,7 @@
 import { notFound } from "next/navigation";
 import Link from "next/link";
 
+import { LoadFailed } from "@/components/feedback/LoadFailed";
 import { orgAssetProxyUrl } from "@/lib/org-asset-url";
 import { withPostMediaUrls } from "@/lib/post-media-url";
 import { createSupabaseServerClient } from "@/lib/supabase/server";
@@ -158,7 +159,9 @@ export default async function OrgProfilePage({ params }: Params) {
   // profile is meant to give visitors the context they need to decide
   // whether to request access. Channel content stays gated by RLS.
   // Clips are backlogged, so `type='clip'` rows are filtered out.
-  const { data: postsData } = await service
+  // A query error is not an empty org: it renders as the failure line below,
+  // never as "Nothing posted to the org yet."
+  const { data: postsData, error: postsErr } = await service
     .from("posts")
     .select(
       "id, type, content, media_url, media_thumbnail_url, created_at, user:user_id(id, handle, name, avatar_url)"
@@ -220,7 +223,9 @@ export default async function OrgProfilePage({ params }: Params) {
         <OrgContent
           mainColumn={
             <>
-              {posts.length > 0 ? (
+              {postsErr ? (
+                <PostsFailed />
+              ) : posts.length > 0 ? (
                 <PostsSection posts={posts} org={org} />
               ) : (
                 <EmptyContent />
@@ -732,6 +737,19 @@ function EmptyContent() {
       >
         Nothing posted to the org yet.
       </div>
+    </SectionCard>
+  );
+}
+
+function PostsFailed() {
+  return (
+    <SectionCard title="Recent activity">
+      {/* Rendered from a server component, which can only pass serializable
+          props — no onRetry, so the pill reloads the page. */}
+      <LoadFailed
+        tone="dark"
+        failure={{ message: "Couldn't load this org's posts. Try again." }}
+      />
     </SectionCard>
   );
 }

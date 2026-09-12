@@ -6,6 +6,11 @@ import { usePathname } from "next/navigation";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { createPortal } from "react-dom";
 
+import {
+  asLoadFailure,
+  LoadFailed,
+  type LoadFailure,
+} from "@/components/feedback/LoadFailed";
 import { NavIdentityChip } from "@/components/nav-identity-chip";
 import { downloadFile, vibeRequest } from "@/lib/feedback/request";
 
@@ -445,6 +450,10 @@ function buildMonthCells(year: number, month: number): Array<{
 
 export function CalendarWidget() {
   const [entries, setEntries] = useState<CalEntry[] | null>(null);
+  // First-load failure only. A failed reload keeps the entries already on
+  // screen, so the count badge doesn't vanish on a hiccup.
+  const [loadErr, setLoadErr] = useState<LoadFailure | null>(null);
+  const [loadKey, setLoadKey] = useState(0);
   const today = new Date();
   const [view, setView] = useState({
     year: today.getFullYear(),
@@ -452,38 +461,47 @@ export function CalendarWidget() {
   });
   const [modalOpen, setModalOpen] = useState(false);
 
+  // A mirror refresh (an RSVP elsewhere, a modal edit): quiet, and a refusal
+  // keeps what's on screen rather than blanking the month.
   const reload = useCallback(async () => {
-    try {
-      const res = await fetch("/api/me/calendar", { cache: "no-store" });
-      const data = await res.json();
-      if (data?.ok && Array.isArray(data.entries)) {
-        setEntries(data.entries as CalEntry[]);
-      } else {
-        setEntries([]);
-      }
-    } catch {
-      setEntries([]);
+    const r = await vibeRequest<{ entries?: CalEntry[] }>("/api/me/calendar", {
+      cache: "no-store",
+      quiet: true,
+      failure: "Couldn't load your calendar.",
+    });
+    if (r.ok && Array.isArray(r.data.entries)) {
+      setLoadErr(null);
+      setEntries(r.data.entries);
     }
+  }, []);
+
+  // Shared by the widget's inline failure and the modal's, so a retry from
+  // either place re-runs the first load.
+  const retryLoad = useCallback(() => {
+    setLoadErr(null);
+    setLoadKey((k) => k + 1);
   }, []);
 
   useEffect(() => {
     let cancelled = false;
     (async () => {
-      try {
-        const res = await fetch("/api/me/calendar", { cache: "no-store" });
-        const data = await res.json();
-        if (cancelled) return;
-        setEntries(
-          data?.ok && Array.isArray(data.entries) ? (data.entries as CalEntry[]) : [],
-        );
-      } catch {
-        if (!cancelled) setEntries([]);
+      const r = await vibeRequest<{ entries?: CalEntry[] }>("/api/me/calendar", {
+        cache: "no-store",
+        quiet: true,
+        failure: "Couldn't load your calendar.",
+      });
+      if (cancelled) return;
+      if (r.ok && Array.isArray(r.data.entries)) {
+        setLoadErr(null);
+        setEntries(r.data.entries);
+      } else {
+        setLoadErr(asLoadFailure(r, "Couldn't load your calendar."));
       }
     })();
     return () => {
       cancelled = true;
     };
-  }, []);
+  }, [loadKey]);
 
   // Listen for RSVP / personal-event changes from anywhere in the app so
   // the calendar mirror stays in sync without remounting.
@@ -602,83 +620,95 @@ export function CalendarWidget() {
           </button>
         </div>
 
-        <div
-          style={{
-            display: "grid",
-            gridTemplateColumns: "repeat(7, 1fr)",
-            gap: 1,
-          }}
-        >
-          {CAL_DAYS.map((d, i) => (
-            <div
-              key={`d-${i}`}
-              style={{
-                fontSize: 8,
-                fontWeight: 800,
-                color: "#8A8580",
-                textAlign: "center",
-                padding: "2px 0",
-                textTransform: "uppercase",
-                letterSpacing: "0.3px",
-                fontFamily: "DM Sans, sans-serif",
-              }}
-            >
-              {d}
-            </div>
-          ))}
-          {cells.map((cell, i) => {
-            const hasEvent = !!byDay[cell.key];
-            const isToday = cell.key === todayKey;
-            const dayBg = isToday ? "#1C1C1E" : "transparent";
-            const dayColor = isToday ? "#fff" : cell.otherMonth ? "#8A8580" : "#1C1C1E";
-            const dayOpacity = cell.otherMonth ? 0.35 : 1;
-            return (
-              <button
-                key={`c-${i}`}
-                type="button"
-                onClick={() => setModalOpen(true)}
-                aria-label={cell.date.toDateString()}
+        {entries === null && loadErr ? (
+          // A grid with no dots reads as "nothing scheduled", so a first
+          // load that failed shows the failure in the grid's place.
+          <LoadFailed
+            compact
+            failure={loadErr}
+            onRetry={retryLoad}
+          />
+        ) : (
+          <div
+            style={{
+              display: "grid",
+              gridTemplateColumns: "repeat(7, 1fr)",
+              gap: 1,
+            }}
+          >
+            {CAL_DAYS.map((d, i) => (
+              <div
+                key={`d-${i}`}
                 style={{
-                  aspectRatio: "1",
-                  borderRadius: 6,
-                  border: "none",
-                  display: "flex",
-                  alignItems: "center",
-                  justifyContent: "center",
-                  fontSize: 10,
-                  fontWeight: isToday ? 800 : 600,
+                  fontSize: 8,
+                  fontWeight: 800,
+                  color: "#8A8580",
+                  textAlign: "center",
+                  padding: "2px 0",
+                  textTransform: "uppercase",
+                  letterSpacing: "0.3px",
                   fontFamily: "DM Sans, sans-serif",
-                  color: dayColor,
-                  background: dayBg,
-                  opacity: dayOpacity,
-                  cursor: "pointer",
-                  position: "relative",
-                  padding: 0,
-                  transition: "background 120ms ease",
                 }}
               >
-                {cell.date.getDate()}
-                {hasEvent ? (
-                  <span
-                    style={{
-                      width: 4,
-                      height: 4,
-                      borderRadius: "50%",
-                      background: isToday ? "#fff" : "#FF5C35",
-                      position: "absolute",
-                      bottom: 2,
-                    }}
-                  />
-                ) : null}
-              </button>
-            );
-          })}
-        </div>
+                {d}
+              </div>
+            ))}
+            {cells.map((cell, i) => {
+              const hasEvent = !!byDay[cell.key];
+              const isToday = cell.key === todayKey;
+              const dayBg = isToday ? "#1C1C1E" : "transparent";
+              const dayColor = isToday ? "#fff" : cell.otherMonth ? "#8A8580" : "#1C1C1E";
+              const dayOpacity = cell.otherMonth ? 0.35 : 1;
+              return (
+                <button
+                  key={`c-${i}`}
+                  type="button"
+                  onClick={() => setModalOpen(true)}
+                  aria-label={cell.date.toDateString()}
+                  style={{
+                    aspectRatio: "1",
+                    borderRadius: 6,
+                    border: "none",
+                    display: "flex",
+                    alignItems: "center",
+                    justifyContent: "center",
+                    fontSize: 10,
+                    fontWeight: isToday ? 800 : 600,
+                    fontFamily: "DM Sans, sans-serif",
+                    color: dayColor,
+                    background: dayBg,
+                    opacity: dayOpacity,
+                    cursor: "pointer",
+                    position: "relative",
+                    padding: 0,
+                    transition: "background 120ms ease",
+                  }}
+                >
+                  {cell.date.getDate()}
+                  {hasEvent ? (
+                    <span
+                      style={{
+                        width: 4,
+                        height: 4,
+                        borderRadius: "50%",
+                        background: isToday ? "#fff" : "#FF5C35",
+                        position: "absolute",
+                        bottom: 2,
+                      }}
+                    />
+                  ) : null}
+                </button>
+              );
+            })}
+          </div>
+        )}
       </div>
 
       {modalOpen ? (
         <CalendarModal
           entries={entries ?? []}
+          failure={entries === null ? loadErr : null}
+          onRetry={retryLoad}
           onClose={() => setModalOpen(false)}
           onChange={() => void reload()}
         />
@@ -689,10 +719,16 @@ export function CalendarWidget() {
 
 function CalendarModal({
   entries,
+  failure,
+  onRetry,
   onClose,
   onChange,
 }: {
   entries: CalEntry[];
+  // Set only while the first load failed, so the modal shows the failure
+  // instead of a month with no dots.
+  failure: LoadFailure | null;
+  onRetry: () => void;
   onClose: () => void;
   onChange: () => void;
 }) {
@@ -894,260 +930,277 @@ function CalendarModal({
           </button>
         </div>
 
-        {/* Body: grid + side panel */}
-        <div
-          style={{
-            display: "grid",
-            gridTemplateColumns: "1fr 280px",
-            gap: 0,
-            flex: 1,
-            minHeight: 0,
-            overflow: "hidden",
-          }}
-        >
-          {/* Month grid */}
+        {/* Body: grid + side panel. A first load that failed would paint a
+            dotless month and "Nothing scheduled." on every day the student
+            clicks, so the failure takes the body's place instead. */}
+        {failure ? (
           <div
             style={{
-              padding: 18,
+              flex: 1,
+              minHeight: 0,
               display: "flex",
-              flexDirection: "column",
-              gap: 8,
-              overflow: "auto",
+              alignItems: "center",
+              justifyContent: "center",
+              padding: 24,
             }}
           >
+            <LoadFailed failure={failure} onRetry={onRetry} />
+          </div>
+        ) : (
+          <div
+            style={{
+              display: "grid",
+              gridTemplateColumns: "1fr 280px",
+              gap: 0,
+              flex: 1,
+              minHeight: 0,
+              overflow: "hidden",
+            }}
+          >
+            {/* Month grid */}
             <div
               style={{
-                display: "grid",
-                gridTemplateColumns: "repeat(7, 1fr)",
-                gap: 6,
+                padding: 18,
+                display: "flex",
+                flexDirection: "column",
+                gap: 8,
+                overflow: "auto",
               }}
             >
-              {CAL_DAYS.map((d, i) => (
-                <div
-                  key={`md-${i}`}
-                  style={{
-                    fontSize: 10,
-                    fontWeight: 800,
-                    color: "#8A8580",
-                    textAlign: "center",
-                    padding: "4px 0",
-                    textTransform: "uppercase",
-                    letterSpacing: "0.4px",
-                  }}
-                >
-                  {d}
-                </div>
-              ))}
-              {cells.map((cell, i) => {
-                const dayEntries = byDay[cell.key] ?? [];
-                const isToday = cell.key === todayKey;
-                const isSelected = cell.key === selected;
-                const cellBorder = isSelected
-                  ? "2px solid #1C1C1E"
-                  : "1px solid rgba(28,28,30,0.08)";
-                return (
-                  <button
-                    key={`mc-${i}`}
-                    type="button"
-                    onClick={() => setSelected(cell.key)}
-                    style={{
-                      minHeight: 84,
-                      borderRadius: 12,
-                      padding: "6px 7px",
-                      display: "flex",
-                      flexDirection: "column",
-                      gap: 3,
-                      background: cell.otherMonth ? "rgba(28,28,30,0.02)" : "#FFFFFF",
-                      border: cellBorder,
-                      // Compensate for selected's heavier border so cells stay aligned.
-                      margin: isSelected ? "-1px" : 0,
-                      opacity: cell.otherMonth ? 0.45 : 1,
-                      cursor: "pointer",
-                      textAlign: "left",
-                      fontFamily: "inherit",
-                      transition: "border-color 120ms ease",
-                    }}
-                  >
-                    {isToday ? (
-                      <div
-                        style={{
-                          width: 24,
-                          height: 24,
-                          borderRadius: "50%",
-                          background: "#1C1C1E",
-                          color: "#fff",
-                          display: "flex",
-                          alignItems: "center",
-                          justifyContent: "center",
-                          fontFamily: "Fraunces, serif",
-                          fontSize: 13,
-                          fontWeight: 800,
-                          lineHeight: 1,
-                        }}
-                      >
-                        {cell.date.getDate()}
-                      </div>
-                    ) : (
-                      <div
-                        style={{
-                          fontFamily: "Fraunces, serif",
-                          fontSize: 14,
-                          fontWeight: 800,
-                          color: "#1C1C1E",
-                          lineHeight: 1,
-                          padding: "4px 0 0 2px",
-                        }}
-                      >
-                        {cell.date.getDate()}
-                      </div>
-                    )}
-                    {/* Spacer pushes pills to the bottom. */}
-                    <div style={{ flex: 1 }} />
-                    {dayEntries.slice(0, 2).map((e) => (
-                      <div
-                        key={`${cell.key}-${e.id}`}
-                        style={{
-                          fontSize: 9.5,
-                          fontWeight: 700,
-                          color: "#fff",
-                          background: e.color,
-                          borderRadius: 6,
-                          padding: "2px 5px",
-                          whiteSpace: "nowrap",
-                          overflow: "hidden",
-                          textOverflow: "ellipsis",
-                        }}
-                      >
-                        {e.title}
-                      </div>
-                    ))}
-                    {dayEntries.length > 2 ? (
-                      <div
-                        style={{
-                          fontSize: 9,
-                          fontWeight: 700,
-                          color: "#8A8580",
-                        }}
-                      >
-                        +{dayEntries.length - 2} more
-                      </div>
-                    ) : null}
-                  </button>
-                );
-              })}
-            </div>
-          </div>
-
-          {/* Side panel: selected day details OR no-selection empty state. */}
-          <div
-            style={{
-              borderLeft: "1px solid rgba(28,28,30,0.08)",
-              padding: 18,
-              overflow: "auto",
-              background: "#FAF7F2",
-              display: "flex",
-              flexDirection: "column",
-            }}
-          >
-            {selected === null ? (
-              <>
-                <div
-                  style={{
-                    fontFamily: "Fraunces, serif",
-                    fontWeight: 800,
-                    fontSize: 18,
-                    color: "#1C1C1E",
-                  }}
-                >
-                  Events
-                </div>
-                <div
-                  style={{
-                    fontSize: 12,
-                    color: "#8A8580",
-                    marginTop: 2,
-                  }}
-                >
-                  Click a day to see events
-                </div>
-                <div
-                  style={{
-                    flex: 1,
-                    display: "flex",
-                    flexDirection: "column",
-                    alignItems: "center",
-                    justifyContent: "center",
-                    gap: 12,
-                    color: "#8A8580",
-                    fontSize: 13,
-                    textAlign: "center",
-                    padding: "20px 0",
-                  }}
-                >
-                  <svg width="36" height="36" viewBox="0 0 36 36" fill="none" style={{ opacity: 0.3 }}>
-                    <rect x="3" y="6" width="30" height="27" rx="6" stroke="currentColor" strokeWidth="2" fill="none" />
-                    <path d="M3 14h30" stroke="currentColor" strokeWidth="2" strokeLinecap="round" />
-                    <path d="M11 3v6M25 3v6" stroke="currentColor" strokeWidth="2" strokeLinecap="round" />
-                  </svg>
-                  Select a day to see
-                  <br />
-                  or add events
-                </div>
-              </>
-            ) : (
-              <div style={{ display: "flex", flexDirection: "column", gap: 10 }}>
-                <div
-                  style={{
-                    fontSize: 10,
-                    fontWeight: 800,
-                    letterSpacing: "0.5px",
-                    textTransform: "uppercase",
-                    color: "#8A8580",
-                  }}
-                >
-                  {selectedDateLabel}
-                </div>
-                {selectedEntries.length === 0 ? (
+              <div
+                style={{
+                  display: "grid",
+                  gridTemplateColumns: "repeat(7, 1fr)",
+                  gap: 6,
+                }}
+              >
+                {CAL_DAYS.map((d, i) => (
                   <div
+                    key={`md-${i}`}
                     style={{
-                      fontSize: 13,
+                      fontSize: 10,
+                      fontWeight: 800,
                       color: "#8A8580",
-                      lineHeight: 1.5,
-                      padding: "20px 0",
                       textAlign: "center",
+                      padding: "4px 0",
+                      textTransform: "uppercase",
+                      letterSpacing: "0.4px",
                     }}
                   >
-                    Nothing scheduled.
-                    <br />
+                    {d}
+                  </div>
+                ))}
+                {cells.map((cell, i) => {
+                  const dayEntries = byDay[cell.key] ?? [];
+                  const isToday = cell.key === todayKey;
+                  const isSelected = cell.key === selected;
+                  const cellBorder = isSelected
+                    ? "2px solid #1C1C1E"
+                    : "1px solid rgba(28,28,30,0.08)";
+                  return (
                     <button
+                      key={`mc-${i}`}
                       type="button"
-                      onClick={() => setShowAdd(true)}
+                      onClick={() => setSelected(cell.key)}
                       style={{
-                        marginTop: 10,
-                        background: "transparent",
-                        border: "none",
-                        color: "#FF5C35",
-                        fontWeight: 700,
-                        fontSize: 13,
+                        minHeight: 84,
+                        borderRadius: 12,
+                        padding: "6px 7px",
+                        display: "flex",
+                        flexDirection: "column",
+                        gap: 3,
+                        background: cell.otherMonth ? "rgba(28,28,30,0.02)" : "#FFFFFF",
+                        border: cellBorder,
+                        // Compensate for selected's heavier border so cells stay aligned.
+                        margin: isSelected ? "-1px" : 0,
+                        opacity: cell.otherMonth ? 0.45 : 1,
                         cursor: "pointer",
+                        textAlign: "left",
+                        fontFamily: "inherit",
+                        transition: "border-color 120ms ease",
                       }}
                     >
-                      + Add an event
+                      {isToday ? (
+                        <div
+                          style={{
+                            width: 24,
+                            height: 24,
+                            borderRadius: "50%",
+                            background: "#1C1C1E",
+                            color: "#fff",
+                            display: "flex",
+                            alignItems: "center",
+                            justifyContent: "center",
+                            fontFamily: "Fraunces, serif",
+                            fontSize: 13,
+                            fontWeight: 800,
+                            lineHeight: 1,
+                          }}
+                        >
+                          {cell.date.getDate()}
+                        </div>
+                      ) : (
+                        <div
+                          style={{
+                            fontFamily: "Fraunces, serif",
+                            fontSize: 14,
+                            fontWeight: 800,
+                            color: "#1C1C1E",
+                            lineHeight: 1,
+                            padding: "4px 0 0 2px",
+                          }}
+                        >
+                          {cell.date.getDate()}
+                        </div>
+                      )}
+                      {/* Spacer pushes pills to the bottom. */}
+                      <div style={{ flex: 1 }} />
+                      {dayEntries.slice(0, 2).map((e) => (
+                        <div
+                          key={`${cell.key}-${e.id}`}
+                          style={{
+                            fontSize: 9.5,
+                            fontWeight: 700,
+                            color: "#fff",
+                            background: e.color,
+                            borderRadius: 6,
+                            padding: "2px 5px",
+                            whiteSpace: "nowrap",
+                            overflow: "hidden",
+                            textOverflow: "ellipsis",
+                          }}
+                        >
+                          {e.title}
+                        </div>
+                      ))}
+                      {dayEntries.length > 2 ? (
+                        <div
+                          style={{
+                            fontSize: 9,
+                            fontWeight: 700,
+                            color: "#8A8580",
+                          }}
+                        >
+                          +{dayEntries.length - 2} more
+                        </div>
+                      ) : null}
                     </button>
-                  </div>
-                ) : (
-                  selectedEntries.map((e) => (
-                    <CalModalEventCard
-                      key={`${e.kind}-${e.id}`}
-                      entry={e}
-                      onDeleted={onChange}
-                    />
-                  ))
-                )}
+                  );
+                })}
               </div>
-            )}
+            </div>
+
+            {/* Side panel: selected day details OR no-selection empty state. */}
+            <div
+              style={{
+                borderLeft: "1px solid rgba(28,28,30,0.08)",
+                padding: 18,
+                overflow: "auto",
+                background: "#FAF7F2",
+                display: "flex",
+                flexDirection: "column",
+              }}
+            >
+              {selected === null ? (
+                <>
+                  <div
+                    style={{
+                      fontFamily: "Fraunces, serif",
+                      fontWeight: 800,
+                      fontSize: 18,
+                      color: "#1C1C1E",
+                    }}
+                  >
+                    Events
+                  </div>
+                  <div
+                    style={{
+                      fontSize: 12,
+                      color: "#8A8580",
+                      marginTop: 2,
+                    }}
+                  >
+                    Click a day to see events
+                  </div>
+                  <div
+                    style={{
+                      flex: 1,
+                      display: "flex",
+                      flexDirection: "column",
+                      alignItems: "center",
+                      justifyContent: "center",
+                      gap: 12,
+                      color: "#8A8580",
+                      fontSize: 13,
+                      textAlign: "center",
+                      padding: "20px 0",
+                    }}
+                  >
+                    <svg width="36" height="36" viewBox="0 0 36 36" fill="none" style={{ opacity: 0.3 }}>
+                      <rect x="3" y="6" width="30" height="27" rx="6" stroke="currentColor" strokeWidth="2" fill="none" />
+                      <path d="M3 14h30" stroke="currentColor" strokeWidth="2" strokeLinecap="round" />
+                      <path d="M11 3v6M25 3v6" stroke="currentColor" strokeWidth="2" strokeLinecap="round" />
+                    </svg>
+                    Select a day to see
+                    <br />
+                    or add events
+                  </div>
+                </>
+              ) : (
+                <div style={{ display: "flex", flexDirection: "column", gap: 10 }}>
+                  <div
+                    style={{
+                      fontSize: 10,
+                      fontWeight: 800,
+                      letterSpacing: "0.5px",
+                      textTransform: "uppercase",
+                      color: "#8A8580",
+                    }}
+                  >
+                    {selectedDateLabel}
+                  </div>
+                  {selectedEntries.length === 0 ? (
+                    <div
+                      style={{
+                        fontSize: 13,
+                        color: "#8A8580",
+                        lineHeight: 1.5,
+                        padding: "20px 0",
+                        textAlign: "center",
+                      }}
+                    >
+                      Nothing scheduled.
+                      <br />
+                      <button
+                        type="button"
+                        onClick={() => setShowAdd(true)}
+                        style={{
+                          marginTop: 10,
+                          background: "transparent",
+                          border: "none",
+                          color: "#FF5C35",
+                          fontWeight: 700,
+                          fontSize: 13,
+                          cursor: "pointer",
+                        }}
+                      >
+                        + Add an event
+                      </button>
+                    </div>
+                  ) : (
+                    selectedEntries.map((e) => (
+                      <CalModalEventCard
+                        key={`${e.kind}-${e.id}`}
+                        entry={e}
+                        onDeleted={onChange}
+                      />
+                    ))
+                  )}
+                </div>
+              )}
+            </div>
           </div>
-        </div>
+        )}
 
         {showAdd ? (
           <AddPersonalEventForm

@@ -3,6 +3,11 @@
 import Link from "next/link";
 import { useEffect, useMemo, useState } from "react";
 
+import {
+  asLoadFailure,
+  LoadFailed,
+  type LoadFailure,
+} from "@/components/feedback/LoadFailed";
 import { vibeRequest } from "@/lib/feedback/request";
 import { IU_CAMPUSES, campusByLabel } from "@/lib/iu/campuses";
 import { MOBILE_BREAKPOINT_PX } from "@/lib/use-is-mobile";
@@ -182,28 +187,32 @@ type BlockedUser = {
 
 function BlockedUsersCard() {
   const [users, setUsers] = useState<BlockedUser[] | null>(null);
+  // A failed read is not an empty block list: it renders as the failure
+  // line, never "You haven't blocked anyone."
+  const [loadErr, setLoadErr] = useState<LoadFailure | null>(null);
+  const [loadKey, setLoadKey] = useState(0);
   const [unblocking, setUnblocking] = useState<string | null>(null);
 
   useEffect(() => {
     let cancelled = false;
     (async () => {
-      try {
-        const res = await fetch("/api/me/block", { cache: "no-store" });
-        const data = await res.json();
-        if (cancelled) return;
-        if (res.ok && data?.ok && Array.isArray(data.users)) {
-          setUsers(data.users as BlockedUser[]);
-        } else {
-          setUsers([]);
-        }
-      } catch {
-        if (!cancelled) setUsers([]);
+      const r = await vibeRequest<{ users?: BlockedUser[] }>("/api/me/block", {
+        cache: "no-store",
+        quiet: true,
+        failure: "Couldn't load your blocked list.",
+      });
+      if (cancelled) return;
+      if (r.ok && Array.isArray(r.data.users)) {
+        setLoadErr(null);
+        setUsers(r.data.users);
+      } else {
+        setLoadErr(asLoadFailure(r, "Couldn't load your blocked list."));
       }
     })();
     return () => {
       cancelled = true;
     };
-  }, []);
+  }, [loadKey]);
 
   const unblock = async (u: BlockedUser) => {
     if (unblocking) return;
@@ -240,7 +249,15 @@ function BlockedUsersCard() {
         anything you post. Unblock anyone here.
       </p>
 
-      {users === null ? (
+      {users === null && loadErr ? (
+        <LoadFailed
+          failure={loadErr}
+          onRetry={() => {
+            setLoadErr(null);
+            setLoadKey((k) => k + 1);
+          }}
+        />
+      ) : users === null ? (
         <div
           style={{
             fontFamily: "DM Sans, sans-serif",
