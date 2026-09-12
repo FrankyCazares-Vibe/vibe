@@ -1652,6 +1652,7 @@ const __realDM = {
   enabled:false, meId:null, T:{}, pollTimer:null, listTimer:null,
   POLL_MS:2000, LIST_POLL_MS:30000, TYPING_PING_MS:3000,
   peerLastReadByChannel:{},     // channelId → peer's last_read_at ISO
+  msgsLoadedByChannel:{},        // channelId → true once its messages painted once
   composeAbort:null,             // AbortController for the in-flight search
   composeDebounce:null,          // setTimeout handle
   composeMode:'direct',          // 'direct' | 'group' | 'add'
@@ -1916,9 +1917,25 @@ function __dmAvatarHtml(rec, opts) {
   return '<div class="t-av" style="' + bgStyle + '">' + __dmEsc(rec.av) + '</div>';
 }
 
+// A photo-only or shared-post last message carries no content, so the row
+// used to read "No messages yet". media_kind / attachment_kind come from
+// /api/me/threads and say what it actually was. '' when there's no last
+// message at all, so the caller keeps its own copy for that case.
+function __dmLastMessageLabel(lm) {
+  if (!lm) return '';
+  const c = (lm.content || '').trim();
+  if (c) return c;
+  if (lm.media_kind === 'video') return 'Video';
+  if (lm.media_kind === 'image') return 'Photo';
+  if (lm.attachment_kind === 'clip') return 'Shared a clip';
+  if (lm.attachment_kind === 'post') return 'Shared a post';
+  return 'Attachment';
+}
+
 function __dmThreadItemHtml(thread, isRequest) {
   const rec = __realDM.T[thread.id];
-  const prev = thread.last_message?.content || (isRequest ? 'New message request' : 'No messages yet');
+  const prev = __dmLastMessageLabel(thread.last_message)
+    || (isRequest ? 'New message request' : 'No messages yet');
   const time = __dmFmtRel(thread.last_message?.created_at);
   const unread = thread.unread ? ' unread' : '';
   const previewClass = thread.unread ? ' b' : '';
@@ -2101,33 +2118,41 @@ function __dmSetEmptyState(title, body) {
 }
 
 async function __dmLoadList() {
-  try {
-    const r = await fetch('/api/me/threads', { credentials:'include' });
-    // An expired session or a missing consent record is not a connection
-    // problem: send the user where they can fix it instead of showing the
-    // retry state below, whose Retry could never succeed.
-    if (r.status === 401) {
-      window.__vibeTopNav('/auth/login?next=' + encodeURIComponent('/messages'));
-      return null;
-    }
-    const j = await r.json();
-    if (r.status === 403 && j && j.code === 'terms_required') {
-      window.__vibeTopNav('/auth/terms?next=' + encodeURIComponent('/messages'));
-      return null;
-    }
-    if (!j.ok) throw new Error(j.error || 'list failed');
-    __dmRenderList(j.threads || [], j.requests || []);
-    return j;
-  } catch (e) {
-    console.error('[dm.loadList]', e);
-    // First paint failed: swap a still-present skeleton for a retry state.
-    const s = document.getElementById('tScroll');
-    if (s && s.querySelector('.t-skel')) {
-      s.removeAttribute('aria-busy');
-      s.innerHTML = '<div class="t-empty visible" style="display:flex"><h4>Couldn\'t load messages</h4><p>Check your connection and try again.</p><a href="#" class="t-empty-cta" onclick="__dmLoadList();return false;">Retry</a></div>';
-    }
+  // Quiet: this runs on the 30s list poll as well as on open, so the line
+  // belongs in the list itself, not a toast. A refresh that fails keeps
+  // the rows already on screen.
+  const line = "Couldn't load your messages.";
+  const r = await window.vibeRequest('/api/me/threads', { failure: line, quiet: true });
+  // An expired session or a missing consent record is not a connection
+  // problem: send the user where they can fix it instead of showing the
+  // retry state below, whose Retry could never succeed.
+  if (!r.ok && r.status === 401) {
+    window.__vibeTopNav('/auth/login?next=' + encodeURIComponent('/messages'));
     return null;
   }
+  if (!r.ok && r.status === 403 && r.code === 'terms_required') {
+    window.__vibeTopNav('/auth/terms?next=' + encodeURIComponent('/messages'));
+    return null;
+  }
+  // A 2xx without the array is a failure too, not an empty inbox.
+  if (r.ok && Array.isArray(r.data.threads)) {
+    __dmRenderList(r.data.threads, r.data.requests || []);
+    return r.data;
+  }
+  console.error('[dm.loadList]', r.status, r.error);
+  // Nothing has ever painted: the mapped line replaces the skeleton (a 500
+  // no longer claims the connection is down) and the "no conversations"
+  // state stays hidden. Once rows are up, a failed refresh leaves them.
+  if (!__realDM.listLoaded) {
+    const s = document.getElementById('tScroll');
+    const tEmpty = document.getElementById('tEmpty');
+    if (tEmpty) tEmpty.classList.remove('visible');
+    if (s) {
+      s.removeAttribute('aria-busy');
+      window.vibeLoadFailed(s, window.vibeLoadFailure(r, line), __dmLoadList);
+    }
+  }
+  return null;
 }
 
 async function __dmLoadMessages(channelId, opts) {
@@ -2137,10 +2162,48 @@ async function __dmLoadMessages(channelId, opts) {
   if (opts && opts.fromPoll && (__realDM.pendingReactions || 0) > 0) {
     return;
   }
+  const fromPoll = !!(opts && opts.fromPoll);
+  const loaded = !!__realDM.msgsLoadedByChannel[channelId];
+  const line = "Couldn't load this conversation.";
+  // Only a refresh the student started (sending, reopening a thread) gets a
+  // toast. The first load puts its line where the bubbles go, and the 2s
+  // poll stays silent and keeps whatever is already on screen.
+  const r = await window.vibeRequest(
+    '/api/me/threads/' + encodeURIComponent(channelId) + '/messages?limit=50',
+    { failure: line, quiet: fromPoll || !loaded }
+  );
+  // A 2xx without the array is a failure too, not an empty thread.
+  if (!r.ok || !Array.isArray(r.data.messages)) {
+    console.error('[dm.loadMessages]', r.status, r.error);
+    // What #msgsArea is showing decides this, not whether the channel ever
+    // loaded: reopening a thread during an outage would otherwise leave the
+    // previous thread's bubbles — and their reply/react buttons, which
+    // resolve against the new channel — sitting under the new header.
+    const a = document.getElementById('msgsArea');
+    const showing = !!a && a.dataset.channel === String(channelId);
+    if (a && !showing && !fromPoll && active === channelId) {
+      const cached = (__realDM.msgsLoadedByChannel[channelId] && __realDM.T[channelId])
+        ? __realDM.T[channelId].msgs
+        : null;
+      if (Array.isArray(cached)) {
+        // This thread painted before, so its own (stale) messages beat a
+        // failure box. That load was non-quiet, so the toast already said
+        // the refresh didn't go through.
+        renderMsgs(cached, __realDM.T[channelId]);
+      } else {
+        // renderMsgs diffs on these two; clearing them makes the next good
+        // load rebuild the area instead of trusting a stale signature.
+        delete a.dataset.channel;
+        delete a.dataset.sig;
+        window.vibeLoadFailed(a, window.vibeLoadFailure(r, line),
+          () => { __dmLoadMessages(channelId); });
+      }
+    }
+    return;
+  }
+  __realDM.msgsLoadedByChannel[channelId] = true;
   try {
-    const r = await fetch('/api/me/threads/' + encodeURIComponent(channelId) + '/messages?limit=50', { credentials:'include' });
-    const j = await r.json();
-    if (!j.ok) throw new Error(j.error || 'load failed');
+    const j = r.data;
     const me = __realDM.meId;
     const msgs = (j.messages || []).map(m => {
       // Sender info — used in groups so each bubble shows the sender's

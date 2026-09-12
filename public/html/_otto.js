@@ -446,19 +446,19 @@
     }
     renderPanelBody();
     // Pull real notifications + mark them read after the user has seen
-    // them. Best-effort — silent on failure (we still rendered the
-    // briefing / drafts above).
+    // them. A failure says so in the activity section itself instead of
+    // leaving "loading…" or claiming nothing has happened yet.
     if (_isAppShellUser()) {
-      _ottoFetchNotifications().then(list => {
-        _ottoRenderNotifications(list);
-        if (list && list.some(n => !n.read_at)) {
-          _ottoMarkAllRead();
-        }
-      }).catch(() => {});
+      _ottoLoadNotifications();
       // Metrics block — profile views + creator stats, rendered alongside
-      // the notification load. Best-effort; the panel still renders if
-      // these fail (e.g. before the migrations land on a deploy).
-      _ottoFetchMetrics().then(_ottoRenderMetrics).catch(() => {});
+      // the notification load. Either half can be missing on its own and
+      // the grid still renders; both gone is a real failure and says so.
+      _ottoLoadMetrics();
+      // The count poll's first fetch runs 1.5s after page load, before this
+      // panel exists, so a failure then had nowhere to paint. Without this
+      // the briefing sits at "loading your activity…" until a later 30s tick
+      // happens to fail too.
+      if (!_ottoLastCount) _ottoFetchUnreadCount().then(_ottoSetUnread).catch(() => {});
     }
   }
 
@@ -556,6 +556,7 @@
   // Cache the last fetched list so filter clicks don't refetch — they
   // just re-render the existing array through _ottoActiveFilter.
   let _ottoLastList = [];
+  let _ottoNotifFailed = false;  // the last activity load failed
   let _ottoLastCount = null;     // { unread, totals: {...} }
   let _ottoActiveFilter = 'all';
   // Surfaces (profile hero, etc.) that want to repaint when the count
@@ -575,25 +576,60 @@
     return Boolean(u && u._appShell);
   }
 
-  async function _ottoFetchNotifications() {
-    const r = await fetch('/api/me/notifications?limit=30', { credentials: 'include' });
-    if (!r.ok) return [];
-    const j = await r.json().catch(() => ({}));
-    return (j && j.ok && Array.isArray(j.notifications)) ? j.notifications : [];
+  // One failed Otto section says so where its rows would go, instead of
+  // reading as "nothing has happened yet". The panel is dark glass and each
+  // section is a narrow column, so: dark + compact.
+  function _ottoSectionFailed(sel, r, line, onRetry) {
+    if (!panel) return;
+    const el = panel.querySelector(sel);
+    if (!el) return;
+    window.vibeLoadFailed(el, window.vibeLoadFailure(r, line), onRetry,
+      { tone: 'dark', compact: true });
   }
 
-  // Fetch profile-views + creator-stats in parallel. Returns null when both
-  // fail (so the renderer can show a clear fallback rather than a stale
-  // "loading…"). Either half can be missing on its own.
+  async function _ottoFetchNotifications() {
+    // Quiet: the activity section carries the line, not a toast.
+    const line = "Couldn't load your activity.";
+    const r = await window.vibeRequest('/api/me/notifications?limit=30', {
+      failure: line, quiet: true,
+    });
+    if (r.ok && r.data.ok && Array.isArray(r.data.notifications)) {
+      _ottoNotifFailed = false;
+      return r.data.notifications;
+    }
+    _ottoNotifFailed = true;
+    _ottoSectionFailed('#ottoNotifList', r, line, _ottoLoadNotifications);
+    return null;
+  }
+
+  function _ottoLoadNotifications() {
+    return _ottoFetchNotifications().then(list => {
+      if (!list) return;            // the section already says it failed
+      _ottoRenderNotifications(list);
+      if (list.some(n => !n.read_at)) _ottoMarkAllRead();
+    }).catch(() => {});
+  }
+
+  // Fetch profile-views + creator-stats in parallel. Either half can be
+  // missing on its own and the grid still renders what it has; only both
+  // failing replaces the grid with the reason.
   async function _ottoFetchMetrics() {
-    const [pvRes, csRes] = await Promise.all([
-      fetch('/api/me/profile-views', { credentials: 'include' }).catch(() => null),
-      fetch('/api/me/creator-stats', { credentials: 'include' }).catch(() => null),
+    const line = "Couldn't load your metrics.";
+    const [pvr, csr] = await Promise.all([
+      window.vibeRequest('/api/me/profile-views', { failure: line, quiet: true }),
+      window.vibeRequest('/api/me/creator-stats', { failure: line, quiet: true }),
     ]);
-    const pv = (pvRes && pvRes.ok) ? await pvRes.json().catch(() => null) : null;
-    const cs = (csRes && csRes.ok) ? await csRes.json().catch(() => null) : null;
-    if ((!pv || !pv.ok) && (!cs || !cs.ok)) return null;
-    return { pv: (pv && pv.ok) ? pv : null, cs: (cs && cs.ok) ? cs : null };
+    const pv = (pvr.ok && pvr.data.ok) ? pvr.data : null;
+    const cs = (csr.ok && csr.data.ok) ? csr.data : null;
+    if (!pv && !cs) {
+      _ottoSectionFailed('#ottoMetricsGrid', pvr.ok ? csr : pvr, line, _ottoLoadMetrics);
+      return null;
+    }
+    return { pv, cs };
+  }
+
+  function _ottoLoadMetrics() {
+    return _ottoFetchMetrics().then(_ottoRenderMetrics).catch(() => {});
   }
 
   function _ottoFormatN(n) {
@@ -606,10 +642,10 @@
     if (!panel) return;
     const grid = panel.querySelector('#ottoMetricsGrid');
     if (!grid) return;
-    if (!data) {
-      grid.innerHTML = '<div class="otto-metrics-fallback">metrics not available yet — once posts + views land they\'ll show here.</div>';
-      return;
-    }
+    // Both halves failed: _ottoFetchMetrics already put the reason, and a
+    // Retry, in the grid. Painting "not available yet" over it would turn a
+    // failed load back into a shrug.
+    if (!data) return;
     const pvc = data.pv ? data.pv.counts : { thirty_days: 0 };
     const cst = data.cs ? data.cs.totals : { views: 0, likes: 0, reposts: 0 };
     const tiles = [
@@ -627,10 +663,22 @@
   }
 
   async function _ottoFetchUnreadCount() {
-    const r = await fetch('/api/me/notifications/count', { credentials: 'include' });
-    if (!r.ok) return 0;
-    const j = await r.json().catch(() => ({}));
-    if (!j || !j.ok) return 0;
+    // Quiet: this polls every 30s in the background. A failure with a count
+    // already cached keeps that count; with none, the briefing line — which
+    // otherwise sits at "loading your activity…" forever — says so.
+    const line = "Couldn't load your activity.";
+    const r = await window.vibeRequest('/api/me/notifications/count', {
+      failure: line, quiet: true,
+    });
+    const j = r.ok ? r.data : null;
+    if (!j || !j.ok) {
+      if (!_ottoLastCount) {
+        _ottoSectionFailed('#ottoBriefing', r, line, () => {
+          _ottoFetchUnreadCount().then(_ottoSetUnread).catch(() => {});
+        });
+      }
+      return 0;
+    }
     // Cache the full count payload so both the side-panel stats grid
     // and any subscribed surface (profile hero) can repaint without
     // a second roundtrip.
@@ -680,6 +728,10 @@
     const wrap = document.getElementById('ottoNotifList');
     if (!wrap) return;
     _ottoLastList = Array.isArray(list) ? list : [];
+    // A failed load owns this section until a retry succeeds: the filter
+    // pills re-render from the (empty) cache, and that would quietly swap
+    // "couldn't load" for "no activity yet".
+    if (_ottoNotifFailed && _ottoLastList.length === 0) return;
     const filtered = (_ottoActiveFilter && _ottoActiveFilter !== 'all')
       ? _ottoLastList.filter(n => n.type === _ottoActiveFilter)
       : _ottoLastList;

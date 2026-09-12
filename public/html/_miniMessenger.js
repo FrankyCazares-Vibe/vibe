@@ -52,6 +52,19 @@
   function initialsOf(name) {
     return String(name || "?").split(/\s+/).slice(0, 2).map((p) => p[0] || "").join("").toUpperCase() || "?";
   }
+  // A photo-only or shared-post last message carries no content; the kind
+  // columns from /api/me/threads say what it was. "" when there is no last
+  // message at all, so the caller keeps its own copy for that case.
+  function lastMessageLabel(lm) {
+    if (!lm) return "";
+    const c = (lm.content || "").trim();
+    if (c) return c;
+    if (lm.media_kind === "video") return "Video";
+    if (lm.media_kind === "image") return "Photo";
+    if (lm.attachment_kind === "clip") return "Shared a clip";
+    if (lm.attachment_kind === "post") return "Shared a post";
+    return "Attachment";
+  }
   function fmtRel(iso) {
     if (!iso) return "";
     const t = new Date(iso).getTime();
@@ -251,6 +264,15 @@
     threads: [],
     filtered: [],
     msgs: [],
+    // First-load flags: until these are set an empty list (or thread) means
+    // "still loading", not "nothing here".
+    listLoaded: false,
+    chatLoaded: {},               // channelId → true once its messages painted
+    // The first list load failed. Kept here because paintList runs again on
+    // every search keystroke and on every return from a chat — without it
+    // those repaint "Loading…" over the reason.
+    listFailure: null,
+
     peerInfo: null,
     listPollTimer: null,
     chatPollTimer: null,
@@ -357,7 +379,7 @@
     if (state.listPollTimer) clearInterval(state.listPollTimer);
     state.listPollTimer = setInterval(() => {
       if (document.hidden) return;
-      if (state.open && state.view === "list") loadThreadList();
+      if (state.open && state.view === "list") loadThreadList({ fromPoll: true });
     }, state.LIST_POLL_MS);
   };
 
@@ -395,27 +417,55 @@
     paintList();
   }
 
-  async function loadThreadList() {
-    try {
-      const r = await fetch("/api/me/threads", { credentials: "include" });
-      const j = await r.json();
-      if (!j || !j.ok) return;
-      state.threads = j.threads || [];
-      state.filtered = state.threads.slice();
-      const now = Date.now();
-      const unread = state.threads.reduce((n, t) => {
-        if (!t.unread) return n;
-        if (t.muted_until && new Date(t.muted_until).getTime() > now) return n;
-        return n + 1;
-      }, 0);
-      paintBadge(unread);
-      if (state.view === "list") paintList();
-    } catch (e) { console.error("[mini.loadThreadList]", e); }
+  async function loadThreadList(opts) {
+    const fromPoll = !!(opts && opts.fromPoll);
+    const line = "Couldn't load your messages.";
+    // Quiet: the panel's own list carries the line. A failed refresh keeps
+    // the rows already on screen.
+    const r = await window.vibeRequest("/api/me/threads", {
+      failure: line, quiet: fromPoll || !state.listLoaded,
+    });
+    // A 2xx without the array is a failure too, not an empty inbox.
+    if (!r.ok || !Array.isArray(r.data.threads)) {
+      console.error("[mini.loadThreadList]", r.status, r.error);
+      // Nothing loaded yet: say so instead of "No conversations yet", and
+      // record it so paintList — not this branch — owns the pane.
+      if (!state.listLoaded) {
+        state.listFailure = window.vibeLoadFailure(r, line);
+        if (state.view === "list") paintList();
+      }
+      return;
+    }
+    state.listLoaded = true;
+    state.listFailure = null;
+    state.threads = r.data.threads;
+    state.filtered = state.threads.slice();
+    const now = Date.now();
+    const unread = state.threads.reduce((n, t) => {
+      if (!t.unread) return n;
+      if (t.muted_until && new Date(t.muted_until).getTime() > now) return n;
+      return n + 1;
+    }, 0);
+    paintBadge(unread);
+    if (state.view === "list") paintList();
   }
 
   function paintList() {
     const el = document.getElementById("vmmList");
     if (!el) return;
+    // A failed first load owns the pane until a retry succeeds — otherwise
+    // the next repaint turns "couldn't load" back into "Loading…".
+    if (!state.listLoaded && state.listFailure) {
+      window.vibeLoadFailed(el, state.listFailure,
+        () => loadThreadList(), { compact: true });
+      return;
+    }
+    // showListView paints before any fetch has landed, so an empty array
+    // here is "still loading" until the first load actually succeeds.
+    if (!state.listLoaded && state.threads.length === 0) {
+      el.innerHTML = `<div class="vmm-loading">Loading…</div>`;
+      return;
+    }
     if (state.threads.length === 0) {
       el.innerHTML = `<div class="vmm-empty">No conversations yet.<br><a href="/messages" style="color:#FF5C35;font-weight:600;text-decoration:none">Start one</a></div>`;
       return;
@@ -445,7 +495,8 @@
     } else {
       av = `<div class="vmm-av" style="background:${avBg(seed)}">${esc(initialsOf(name))}</div>`;
     }
-    const prev = t.last_message?.content || (t.is_request ? "New message request" : "No messages yet");
+    const prev = lastMessageLabel(t.last_message)
+      || (t.is_request ? "New message request" : "No messages yet");
     const time = fmtRel(t.last_message?.created_at);
     return `<div class="vmm-row${t.unread ? " unread" : ""}" data-cid="${esc(t.id)}">
       ${av}
@@ -538,10 +589,31 @@
     // otherwise a stale poll lands a messages array without the new
     // chip and clobbers the optimistic flip.
     if (opts && opts.fromPoll && (state.pendingReactions || 0) > 0) return;
+    const fromPoll = !!(opts && opts.fromPoll);
+    const loaded = !!state.chatLoaded[cid];
+    const line = "Couldn't load this conversation.";
+    const r = await window.vibeRequest(
+      `/api/me/threads/${encodeURIComponent(cid)}/messages?limit=50`,
+      { failure: line, quiet: fromPoll || !loaded }
+    );
+    if (!r.ok || !Array.isArray(r.data.messages)) {
+      console.error("[mini.loadMessages]", r.status, r.error);
+      // Otherwise openChat's "Loading…" sits there forever — on a reopen too,
+      // where the channel is already flagged loaded but openChat repainted the
+      // placeholder. The pane still holding the placeholder (or a previous
+      // failure box, so Retry updates the line) is what decides: a refetch
+      // after a send or a reaction keeps the bubbles it has.
+      const el = document.getElementById("vmmMsgs");
+      if (!fromPoll && state.activeChannel === cid
+          && el && el.querySelector(".vmm-loading, .vibe-load-failed")) {
+        window.vibeLoadFailed(el, window.vibeLoadFailure(r, line),
+          () => loadMessages(), { compact: true });
+      }
+      return;
+    }
+    state.chatLoaded[cid] = true;
     try {
-      const r = await fetch(`/api/me/threads/${encodeURIComponent(cid)}/messages?limit=50`, { credentials: "include" });
-      const j = await r.json();
-      if (!j || !j.ok) return;
+      const j = r.data;
       state.msgs = (j.messages || []).map((m) => ({
         id: m.id,
         mine: m.user_id === meId(),

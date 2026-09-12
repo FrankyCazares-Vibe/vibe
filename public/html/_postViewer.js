@@ -407,23 +407,45 @@
       return;
     }
 
-    try {
-      const r = await fetch(`/api/posts/${encodeURIComponent(state.openId)}`, { credentials: "include" });
-      const j = await r.json().catch(() => ({}));
-      if (!r.ok || !j.ok || !j.post) throw new Error((j && j.error) || "Could not load post");
+    // Non-quiet: vibeRequest toasts the mapped line itself, so the student
+    // no longer reads a raw server error.
+    const postLine = "Couldn't load this post.";
+    const pr = await window.vibeRequest(
+      `/api/posts/${encodeURIComponent(state.openId)}`, { failure: postLine }
+    );
+    if (pr.ok && pr.data.ok && pr.data.post) {
       // Race guard: user may have closed and opened a different post.
-      if (String(j.post.id) !== state.openId) return;
-      renderFromServer(j);
-    } catch (e) {
-      toast(e && e.message ? e.message : "Could not load post");
+      if (String(pr.data.post.id) !== state.openId) return;
+      renderFromServer(pr.data);
+    } else if (pr.ok) {
+      // A 2xx with no post: no copy rule maps a 2xx, so say it here.
+      window.vibeToast(postLine + " Try again.", { tone: "error" });
     }
 
-    try {
-      const r = await fetch(`/api/posts/${encodeURIComponent(state.openId)}/comments`, { credentials: "include" });
-      const j = await r.json().catch(() => ({}));
-      if (!r.ok || !j.ok) return;
-      if (state.openId) renderCommentsList(j.comments || []);
-    } catch {}
+    await loadComments();
+  }
+
+  // Also the Retry target. Quiet: the list itself carries the line, and a
+  // post that failed alongside it has already toasted.
+  async function loadComments() {
+    const id = state.openId;
+    if (!id) return;
+    const line = "Couldn't load comments.";
+    const r = await window.vibeRequest(
+      `/api/posts/${encodeURIComponent(id)}/comments`, { failure: line, quiet: true }
+    );
+    // Closed the modal, or opened a different post, mid-flight.
+    if (state.openId !== id) return;
+    if (r.ok && Array.isArray(r.data.comments)) {
+      renderCommentsList(r.data.comments);
+      return;
+    }
+    // renderLoading() emptied the list, so without this it just stays blank.
+    const wrap = document.getElementById("vpvComments");
+    if (wrap) {
+      window.vibeLoadFailed(wrap, window.vibeLoadFailure(r, line), loadComments,
+        { compact: true });
+    }
   }
   window.openPostViewer = openPostViewer;
 

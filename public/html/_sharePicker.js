@@ -84,6 +84,9 @@
     threads: [],
     filtered: [],
     selectedIds: new Set(),
+    // The thread load failed and the list is showing the reason. renderList
+    // leaves it alone while this is set.
+    loadFailed: false,
   };
 
   function esc(s) {
@@ -139,17 +142,38 @@
     return `<div class="vsp-av" style="background:${avBg(seed)}">${esc(initialsOf(peer.name || thread.name))}</div>`;
   }
 
+  // A photo-only or shared-post last message carries no content; the kind
+  // columns from /api/me/threads say what it was. "" when there is no last
+  // message at all, so the caller keeps its own copy for that case.
+  function lastMessageLabel(lm) {
+    if (!lm) return "";
+    const c = (lm.content || "").trim();
+    if (c) return c;
+    if (lm.media_kind === "video") return "Video";
+    if (lm.media_kind === "image") return "Photo";
+    if (lm.attachment_kind === "clip") return "Shared a clip";
+    if (lm.attachment_kind === "post") return "Shared a post";
+    return "Attachment";
+  }
+
   function renderList() {
     const el = document.getElementById("vspList");
     if (!el) return;
+    // A failed load owns the list until a retry succeeds. The picker has no
+    // poll, so letting one keystroke in the search box repaint "No
+    // conversations yet" would leave that lie up for the whole session.
+    if (state.loadFailed) return;
     if (state.filtered.length === 0) {
       el.innerHTML = '<div class="vsp-empty">No conversations yet — start one from someone\'s profile or the messages page.</div>';
       return;
     }
     el.innerHTML = state.filtered.map((t) => {
       const sel = state.selectedIds.has(t.id) ? "selected" : "";
-      const sub = t.last_message?.content
-        ? esc(t.last_message.content).slice(0, 80)
+      // Slice before escaping: cutting escaped text at 80 chars can land
+      // inside an &amp; and print a broken entity.
+      const label = lastMessageLabel(t.last_message);
+      const sub = label
+        ? esc(label.slice(0, 80))
         : (t.type === "group" ? `${(t.members || []).length + 1} members` : "");
       const cb = state.selectedIds.has(t.id)
         ? '<svg width="11" height="11" viewBox="0 0 11 11"><path d="M2 5.5L4.5 8L9 3" stroke="white" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round" fill="none"/></svg>'
@@ -187,18 +211,21 @@
   async function loadThreads() {
     const el = document.getElementById("vspList");
     if (el) el.innerHTML = '<div class="vsp-empty">Loading your threads…</div>';
-    try {
-      const r = await fetch("/api/me/threads", { credentials: "include" });
-      const j = await r.json();
-      if (!j.ok) throw new Error(j.error || "load failed");
-      // Combine threads + accepted requests; user can share into either.
-      state.threads = [...(j.threads || []), ...(j.requests || [])];
-      state.filtered = state.threads.slice();
-      renderList();
-    } catch (e) {
-      console.error("[sharePicker.loadThreads]", e);
-      if (el) el.innerHTML = '<div class="vsp-empty">Could not load threads.</div>';
+    state.loadFailed = false;
+    // Quiet: the picker's list is where the line goes, and it carries the
+    // Retry. A 401 becomes Sign in instead of an unanswerable "Retry".
+    const line = "Couldn't load your chats.";
+    const r = await window.vibeRequest("/api/me/threads", { failure: line, quiet: true });
+    if (!r.ok || !Array.isArray(r.data.threads)) {
+      console.error("[sharePicker.loadThreads]", r.status, r.error);
+      state.loadFailed = true;
+      if (el) window.vibeLoadFailed(el, window.vibeLoadFailure(r, line), loadThreads);
+      return;
     }
+    // Combine threads + accepted requests; user can share into either.
+    state.threads = [...r.data.threads, ...(r.data.requests || [])];
+    state.filtered = state.threads.slice();
+    renderList();
   }
 
   function applyFilter(q) {
