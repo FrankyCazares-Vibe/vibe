@@ -5751,7 +5751,10 @@ function refreshPaneEmptyStates() {
   const postEmpty = document.getElementById('postsEmptyState');
   if (postList && postEmpty) {
     const has = postList.querySelector('.profile-post-card');
-    postEmpty.style.display = has ? 'none' : 'block';
+    // A load-failure box owns the pane while it's up: "Nothing here yet"
+    // beside it would be the same lie the box is there to correct.
+    const failed = postList.querySelector('.vibe-load-failed');
+    postEmpty.style.display = (has || failed) ? 'none' : 'block';
     const body = postEmpty.querySelector('.owner-mode-text');
     if (body) body.textContent = body.dataset[isViewer ? 'viewerText' : 'ownerText'];
   }
@@ -5770,8 +5773,17 @@ function populateAllGrid() {
   const empty = document.getElementById('allEmptyState');
   if (!feed) return;
   const postNodes = Array.from(document.querySelectorAll('#profilePostsList .profile-post-card'));
+  // Pulled out before the rebuild wipes it: with no posts to show, a load
+  // failure is the truth and "Nothing here yet" isn't.
+  const failedBox = feed.querySelector('.vibe-load-failed');
   feed.innerHTML = '';
   if (postNodes.length === 0) {
+    if (failedBox) {
+      feed.style.display = '';
+      feed.appendChild(failedBox);
+      if (empty) empty.style.display = 'none';
+      return;
+    }
     feed.style.display = 'none';
     if (empty) empty.style.display = 'block';
     return;
@@ -6258,14 +6270,31 @@ function runProfSearch(q) {
   var seq = ++_profSearchSeq;
   clearTimeout(_profSearchTimer);
   _profSearchTimer = setTimeout(function(){
-    fetch('/api/search?q=' + encodeURIComponent(trimmed) + '&limit=6', { credentials: 'include' })
-      .then(function(r){ return r.ok ? r.json() : { ok:false }; })
-      .then(function(j){
+    var LINE = "Couldn't search Vibe.";
+    // The dropdown is small, so the box goes in compact. The padding wrapper
+    // keeps it off the dropdown's edges.
+    function paintFailure(failure) {
+      dd.innerHTML = '<div style="padding:12px"></div>';
+      window.vibeLoadFailed(dd.firstChild, failure, function(){ runProfSearch(trimmed); },
+        { compact: true });
+    }
+    window.vibeRequest('/api/search?q=' + encodeURIComponent(trimmed) + '&limit=6', {
+      quiet: true,
+      failure: LINE,
+    })
+      .then(function(r){
         if (seq !== _profSearchSeq) return; // a newer keystroke superseded us
-        var ok = j && j.ok;
-        var people = ok && Array.isArray(j.users)  ? j.users.map(_profSearchUserToRow)  : [];
-        var orgs   = ok && Array.isArray(j.orgs)   ? j.orgs.map(_profSearchOrgToRow)    : [];
-        var events = ok && Array.isArray(j.events) ? j.events.map(_profSearchEventToRow): [];
+        var d = r.ok ? (r.data || {}) : null;
+        // A read that didn't come back with any of the three arrays is a
+        // broken search, not an answer: only a real answer may say
+        // "No results for …", which used to cover 401s and 500s too.
+        if (!d || !(Array.isArray(d.users) || Array.isArray(d.orgs) || Array.isArray(d.events))) {
+          paintFailure(window.vibeLoadFailure(r, LINE));
+          return;
+        }
+        var people = Array.isArray(d.users)  ? d.users.map(_profSearchUserToRow)  : [];
+        var orgs   = Array.isArray(d.orgs)   ? d.orgs.map(_profSearchOrgToRow)    : [];
+        var events = Array.isArray(d.events) ? d.events.map(_profSearchEventToRow): [];
         if (!people.length && !orgs.length && !events.length) {
           dd.innerHTML = '<div class="search-empty">No results for "' + _esc(trimmed) + '"</div>';
           return;
@@ -6274,7 +6303,7 @@ function runProfSearch(q) {
       })
       .catch(function(){
         if (seq !== _profSearchSeq) return;
-        dd.innerHTML = '<div class="search-empty">Search failed. Try again.</div>';
+        paintFailure({ message: LINE + ' Try again.' });
       });
   }, 220);
 }
@@ -7083,11 +7112,42 @@ function _onCampusChange() {
     document.title = '@' + viewingHandle + ' · Vibe';
     clearFreshUserExtras();
 
-    fetch(`/api/users/${encodeURIComponent(viewingHandle)}/bootstrap`, { credentials: 'include' })
-      .then(r => r.ok ? r.json() : Promise.reject(new Error('not_found')))
-      .then(j => {
-        if (!j || !j.ok || !j.vibeUser) throw new Error('not_found');
-        const v = j.vibeUser;
+    // "User not found" is only true for a 404, or a 2xx that came back with
+    // no vibeUser. A 401, a 500 or a dropped connection is a failed read:
+    // saying the student doesn't exist there is a lie about someone who
+    // does. Those get the message plus Retry (or Sign in on a 401).
+    const NOT_FOUND_HTML = `<div style="padding:48px 32px;text-align:center;font-family:'DM Sans',sans-serif;">
+          <h1 style="font-family:'Fraunces',serif;font-size:28px;margin-bottom:8px">User not found</h1>
+          <p style="color:#8A8580;margin-bottom:24px">No one with that handle on Vibe yet.</p>
+          <a href="/campus" style="color:#FF5C35;font-weight:700;text-decoration:none">← Back to campus</a>
+        </div>`;
+    const BOOTSTRAP_LINE = "Couldn't load this profile.";
+    // No onRetry: the box's Retry reloads the page, which re-runs this whole
+    // branch. Repainting in place would have to rebuild .profile-wrap's
+    // markup, which every render function below reaches into.
+    const paintBootstrapFailure = (failure) => {
+      const wrap = document.querySelector('.profile-wrap') || document.body;
+      wrap.innerHTML = '';
+      const slot = document.createElement('div');
+      slot.style.cssText = 'padding:48px 32px;';
+      wrap.appendChild(slot);
+      window.vibeLoadFailed(slot, failure);
+    };
+    (async () => {
+      try {
+        const r = await window.vibeRequest(
+          `/api/users/${encodeURIComponent(viewingHandle)}/bootstrap`,
+          { quiet: true, failure: BOOTSTRAP_LINE });
+        const v = r.ok && r.data && r.data.vibeUser ? r.data.vibeUser : null;
+        if (!v) {
+          if (r.ok || r.status === 404) {
+            const wrap = document.querySelector('.profile-wrap') || document.body;
+            wrap.innerHTML = NOT_FOUND_HTML;
+          } else {
+            paintBootstrapFailure(window.vibeLoadFailure(r, BOOTSTRAP_LINE));
+          }
+          return;
+        }
         // Block-aware short-circuit. Bootstrap returns minimal identity
         // (id, name, handle, avatar) when either side blocks the other.
         //   _blockedByTarget   → "Profile unavailable. This account has
@@ -7130,20 +7190,16 @@ function _onCampusChange() {
         }
         // Pull the visited user's real posts and render them.
         hydrateVisitedUserPosts(viewingHandle);
-      })
-      .catch(() => {
-        const wrap = document.querySelector('.profile-wrap') || document.body;
-        wrap.innerHTML = `<div style="padding:48px 32px;text-align:center;font-family:'DM Sans',sans-serif;">
-          <h1 style="font-family:'Fraunces',serif;font-size:28px;margin-bottom:8px">User not found</h1>
-          <p style="color:#8A8580;margin-bottom:24px">No one with that handle on Vibe yet.</p>
-          <a href="/campus" style="color:#FF5C35;font-weight:700;text-decoration:none">← Back to campus</a>
-        </div>`;
-      })
-      .finally(() => {
+      } catch (e) {
+        // A render bug below, not a transport failure — vibeRequest never
+        // throws. Still not grounds for saying the student doesn't exist.
+        paintBootstrapFailure({ message: BOOTSTRAP_LINE + ' Try again.' });
+      } finally {
         requestAnimationFrame(() => {
           document.documentElement.classList.remove('vibe-pre-paint');
         });
-      });
+      }
+    })();
     return;
   }
 
@@ -8176,18 +8232,68 @@ function _restorePinIfPossible(pinnedId) {
   }
 }
 
+// A failed first load of the posts panes. Both panes the student could be
+// looking at get the box: #profileAllFeed is the default tab and
+// #profilePostsList is the other one. The "Nothing here yet" copy stays
+// hidden so an outage never reads as an empty profile.
+function _profilePaintPostsFailure(failure, onRetry) {
+  const list = document.getElementById('profilePostsList');
+  const feed = document.getElementById('profileAllFeed');
+  const postEmpty = document.getElementById('postsEmptyState');
+  const allEmpty = document.getElementById('allEmptyState');
+  if (postEmpty) postEmpty.style.display = 'none';
+  if (allEmpty) allEmpty.style.display = 'none';
+  if (feed) {
+    feed.style.display = '';
+    window.vibeLoadFailed(feed, failure, onRetry);
+  }
+  if (list) window.vibeLoadFailed(list, failure, onRetry);
+}
+
+// The mirror of the painter, for the load that finally works. Both panes
+// have to be cleared, not just the list: populateAllGrid deliberately
+// carries a live box across its rebuild, so one left in #profileAllFeed is
+// re-appended every repaint and the default tab goes on claiming the load
+// failed while the Posts tab says "Nothing here yet". The empty states are
+// left alone — populateAllGrid sets them from the card count right after.
+function _profileClearPostsFailure() {
+  ['profilePostsList', 'profileAllFeed'].forEach(id => {
+    const el = document.getElementById(id);
+    if (el) el.querySelectorAll('.vibe-load-failed').forEach(b => b.remove());
+  });
+}
+
 async function hydrateProfilePostsFromAPI() {
   if (window.viewingRealUser) return;
+  const list = document.getElementById('profilePostsList');
+  // Cards already on screen came out of vibe_posts_v1. They're the
+  // student's own posts, just possibly stale, so a failed refresh keeps
+  // them and says so (non-quiet, so vibeRequest toasts) instead of
+  // wiping them back to "Nothing here yet".
+  const hasCards = !!(list && list.querySelector('.profile-post-card'));
+  const LINE = "Couldn't load your posts.";
+  const r = await window.vibeRequest('/api/me/posts?limit=100', {
+    quiet: !hasCards,
+    failure: LINE,
+  });
+  const posts = r.ok && Array.isArray(r.data.posts) ? r.data.posts : null;
+  if (!posts) {
+    // Nothing is written back to vibe_posts_v1 on this path, so a bad
+    // read can never overwrite a good cache.
+    if (hasCards) {
+      // A 2xx with the wrong shape never toasted inside vibeRequest.
+      if (r.ok) window.vibeToast(LINE + ' Try again.', { tone: 'error' });
+      return;
+    }
+    _profilePaintPostsFailure(window.vibeLoadFailure(r, LINE), hydrateProfilePostsFromAPI);
+    return;
+  }
   try {
-    const r = await fetch('/api/me/posts?limit=100', { credentials: 'include' });
-    const j = await r.json().catch(() => ({}));
-    if (!r.ok || !j.ok || !Array.isArray(j.posts)) return;
-    const postRows = j.posts.filter(p => p.type === 'post');
+    const postRows = posts.filter(p => p.type === 'post');
 
     // Posts pane — clear any localStorage-rendered cards
     // and replace with the DB truth. Mirror the shape into vibe_posts_v1
     // so subsequent saves don't snapshot stale local DOM.
-    const list = document.getElementById('profilePostsList');
     if (list) {
       list.querySelectorAll('.profile-post-card').forEach(c => c.remove());
       postRows.map(_profileMapDbRow).filter(Boolean)
@@ -8195,12 +8301,15 @@ async function hydrateProfilePostsFromAPI() {
       if (typeof savePostsToStorage === 'function') savePostsToStorage();
     }
 
+    // Ahead of the rebuild, and for both panes: a Retry that succeeds with
+    // zero posts must not leave the All feed's box behind.
+    _profileClearPostsFailure();
     if (typeof populateAllGrid === 'function') populateAllGrid();
     // Re-attempt pin restore now that the pinned source row may exist
     // in the DOM (renderUserSections fired before this async hydration).
     const me = (typeof vibeLoad === 'function') ? vibeLoad('vibe_user_v1') : null;
     _restorePinIfPossible(me && (me.pinnedPostId || me.pinnedId));
-  } catch (e) { /* silent — local cache stays */ }
+  } catch (e) { /* silent — the rows just rendered stay */ }
 }
 
 // Hydrate the VISITED user's posts when in viewer mode (P1-011b).
@@ -8209,12 +8318,21 @@ async function hydrateProfilePostsFromAPI() {
 // visitor's localStorage to get clobbered with someone else's content).
 async function hydrateVisitedUserPosts(handle) {
   if (!handle) return;
+  const LINE = "Couldn't load their posts.";
+  // The bootstrap forces posts to [] before this runs, so there is never a
+  // cached row to keep here: this is always a first load.
+  const r = await window.vibeRequest(
+    `/api/users/${encodeURIComponent(handle)}/posts?limit=100`,
+    { quiet: true, failure: LINE });
+  const posts = r.ok && Array.isArray(r.data.posts) ? r.data.posts : null;
+  if (!posts) {
+    // Without this the pane reads "They haven't posted anything yet."
+    _profilePaintPostsFailure(window.vibeLoadFailure(r, LINE),
+      () => hydrateVisitedUserPosts(handle));
+    return;
+  }
   try {
-    const r = await fetch(`/api/users/${encodeURIComponent(handle)}/posts?limit=100`,
-      { credentials: 'include' });
-    const j = await r.json().catch(() => ({}));
-    if (!r.ok || !j.ok || !Array.isArray(j.posts)) return;
-    const postRows = j.posts.filter(p => p.type === 'post');
+    const postRows = posts.filter(p => p.type === 'post');
 
     // Posts pane
     const list = document.getElementById('profilePostsList');
@@ -8224,6 +8342,9 @@ async function hydrateVisitedUserPosts(handle) {
         .forEach(c => list.appendChild(_renderPostCard(c)));
     }
 
+    // Same for a visited profile: a student with no posts would otherwise
+    // keep "Couldn't load their posts." on the tab that opens by default.
+    _profileClearPostsFailure();
     if (typeof populateAllGrid === 'function') populateAllGrid();
     // Visitor mode: render the visited user's pinned post if their
     // bootstrap returned one. profilePinnedId is reset so toggling
@@ -8231,7 +8352,7 @@ async function hydrateVisitedUserPosts(handle) {
     if (window.viewingRealUser && window.viewingRealUser._pinnedPostId) {
       _restorePinIfPossible(window.viewingRealUser._pinnedPostId);
     }
-  } catch (e) { /* silent — visitor still sees the empty state */ }
+  } catch (e) { /* silent — the rows just rendered stay */ }
 }
 
 function _profileMapDbRow(row) {
@@ -8293,24 +8414,38 @@ async function hydrateRepostsPaneFromAPI() {
   if (list) list.innerHTML = '<div style="padding:18px;text-align:center;color:var(--muted);font-size:13px;">Loading…</div>';
 
   _repostsHydrateInflight = true;
+  const LINE = "Couldn't load reposts.";
   try {
-    const r = await fetch('/api/users/' + encodeURIComponent(handle) + '/reposts?limit=100', { credentials: 'include' });
-    const j = await r.json().catch(() => ({}));
-    if (!r.ok || !j.ok || !Array.isArray(j.reposts)) throw new Error((j && j.error) || 'Could not load reposts');
+    // Nothing is on screen but the Loading… line, and the guard above means
+    // we only get here once, so a failure is always a failed first load.
+    const r = await window.vibeRequest(
+      '/api/users/' + encodeURIComponent(handle) + '/reposts?limit=100',
+      { quiet: true, failure: LINE });
+    const reposts = r.ok && Array.isArray(r.data.reposts) ? r.data.reposts : null;
+    if (!reposts) {
+      // Was the raw server word ("Unauthorized") with nothing to click.
+      // _repostsHydratedOnce stays false, so Retry re-enters here.
+      if (empty) empty.style.display = 'none';
+      if (list) {
+        list.style.display = '';
+        window.vibeLoadFailed(list, window.vibeLoadFailure(r, LINE), hydrateRepostsPaneFromAPI);
+      }
+      return;
+    }
     _repostsHydratedOnce = true;
     if (!list) return;
     list.innerHTML = '';
-    if (j.reposts.length === 0) {
+    if (reposts.length === 0) {
       list.style.display = 'none';
       if (empty) empty.style.display = 'block';
       return;
     }
     list.style.display = '';
     if (empty) empty.style.display = 'none';
-    j.reposts.forEach(r => list.appendChild(_buildRepostCard(r)));
+    reposts.forEach(row => list.appendChild(_buildRepostCard(row)));
   } catch (e) {
-    if (list) list.innerHTML = '<div style="padding:18px;text-align:center;color:var(--muted);font-size:13px;">' +
-      _esc(e && e.message ? e.message : 'Could not load reposts') + '</div>';
+    // A render bug, not a transport failure — vibeRequest never throws.
+    if (list) window.vibeLoadFailed(list, { message: LINE + ' Try again.' }, hydrateRepostsPaneFromAPI);
   } finally {
     _repostsHydrateInflight = false;
   }
@@ -8405,24 +8540,43 @@ async function hydrateSavedPaneFromAPI() {
   const empty = document.getElementById('savedEmptyState');
   if (!_savedHydratedOnce && grid) grid.innerHTML = '<div style="grid-column:1/-1;padding:18px;text-align:center;color:var(--muted);font-size:13px;">Loading…</div>';
 
+  const LINE = "Couldn't load your saved posts.";
   try {
-    const r = await fetch('/api/me/bookmarks?limit=100', { credentials: 'include' });
-    const j = await r.json().catch(() => ({}));
-    if (!r.ok || !j.ok || !Array.isArray(j.posts)) throw new Error((j && j.error) || 'Could not load saved');
+    // A later tab visit re-reads with cells already on screen: that one keeps
+    // them and toasts (non-quiet). The first visit says so inline instead.
+    const loaded = _savedHydratedOnce;
+    const r = await window.vibeRequest('/api/me/bookmarks?limit=100', {
+      quiet: !loaded,
+      failure: LINE,
+    });
+    const saved = r.ok && Array.isArray(r.data.posts) ? r.data.posts : null;
+    if (!saved) {
+      if (loaded) {
+        // A 2xx with the wrong shape never toasted inside vibeRequest.
+        if (r.ok) window.vibeToast(LINE + ' Try again.', { tone: 'error' });
+        return;
+      }
+      if (empty) empty.style.display = 'none';
+      if (grid) {
+        grid.style.display = '';
+        window.vibeLoadFailed(grid, window.vibeLoadFailure(r, LINE), hydrateSavedPaneFromAPI);
+      }
+      return;
+    }
     _savedHydratedOnce = true;
     if (!grid) return;
     grid.innerHTML = '';
-    if (j.posts.length === 0) {
+    if (saved.length === 0) {
       grid.style.display = 'none';
       if (empty) empty.style.display = 'block';
       return;
     }
     grid.style.display = '';
     if (empty) empty.style.display = 'none';
-    j.posts.forEach(post => grid.appendChild(_buildSavedCell(post)));
+    saved.forEach(post => grid.appendChild(_buildSavedCell(post)));
   } catch (e) {
-    if (grid) grid.innerHTML = '<div style="grid-column:1/-1;padding:18px;text-align:center;color:var(--muted);font-size:13px;">' +
-      _esc(e && e.message ? e.message : 'Could not load saved') + '</div>';
+    // A render bug, not a transport failure — vibeRequest never throws.
+    if (grid) window.vibeLoadFailed(grid, { message: LINE + ' Try again.' }, hydrateSavedPaneFromAPI);
   } finally {
     _savedHydrateInflight = false;
   }
