@@ -329,6 +329,9 @@ export function PostViewerMobile({
             right: 0,
             bottom: 0,
             width: "100%",
+            // SharePostSheet ("Send to chats", below) portals to <body> too,
+            // so it's a sibling of this drawer and only z-index separates
+            // them: it sits at 10400/10401 to land above this.
             zIndex: 10000,
             background: "#FAF7F2",
             display: "flex",
@@ -838,6 +841,11 @@ export function PostViewerMobile({
             author?.name ||
             (author?.handle ? `@${author.handle}` : null)
           }
+          // This sheet sits inside the viewer's own open drawer. Without
+          // `nested`, closing it hands the page's scroll position back and
+          // clears vaul's body-lock while the viewer is still full-screen —
+          // iOS Safari only. See the Nesting note in SharePostSheet.
+          nested
           onClose={() => setShareOpen(false)}
         />
       ) : null}

@@ -2730,6 +2730,9 @@ function PostActionsSheet({
 
       {shareOpen ? (
         <SharePostSheet
+          // Opens inside this sheet's own Drawer.Root: without `nested`,
+          // closing it tears down the scroll lock this one still needs.
+          nested
           postId={postId}
           postTitle={postTitle}
           postPosterUrl={postPosterUrl ?? null}

@@ -4,6 +4,7 @@ import { getFollowState } from "@/lib/connections/queries";
 import { requireTermsAccepted } from "@/lib/legal/require-terms";
 import { GROUP_PHOTO_KEY_PREFIX, isR2Configured, signGroupPhotoGetUrl } from "@/lib/r2";
 import { rateLimit, tooManyRequests } from "@/lib/rate-limit";
+import { loadHiddenUsers } from "@/lib/safety/hidden-users";
 import { createSupabaseServerClient } from "@/lib/supabase/server";
 import { createSupabaseServiceClient } from "@/lib/supabase/service";
 
@@ -547,22 +548,18 @@ export async function GET() {
   }
 
   // Block filter: hide any 1:1 thread where the peer is blocked-either-way.
-  // Defensive try/catch so missing-table (migration lag) doesn't 500 the route.
-  const blockedPeerIds = new Set<string>();
-  try {
-    const { data: blockRows } = await supabase
-      .from("blocks")
-      .select("blocker_id, blocked_id")
-      .or(`blocker_id.eq.${user.id},blocked_id.eq.${user.id}`);
-    for (const b of blockRows ?? []) {
-      const blocker = b.blocker_id as string;
-      const blocked = b.blocked_id as string;
-      if (blocker === user.id) blockedPeerIds.add(blocked);
-      else if (blocked === user.id) blockedPeerIds.add(blocker);
-    }
-  } catch {
-    /* blocks table not yet migrated — no filter applied. */
+  // Through the shared helper, and failing closed like /api/feed and
+  // /api/me/notifications: this used to read `blocks` itself and keep only
+  // `data`, so a failed query left the filter empty and listed chats with
+  // blocked people as if nothing were wrong — a failure served as data.
+  // Mutes are deliberately not used here: muting someone silences their
+  // posts and notifications, it doesn't hide the conversation you have.
+  const hiddenRes = await loadHiddenUsers(supabase, user.id);
+  if (!hiddenRes.ok) {
+    console.error("[me/threads GET] hidden users", hiddenRes.error);
+    return NextResponse.json({ ok: false, error: "Request failed" }, { status: 500 });
   }
+  const blockedPeerIds = hiddenRes.hidden.blocked;
 
   const threads: ThreadEntry[] = [];
   const requests: ThreadEntry[] = [];

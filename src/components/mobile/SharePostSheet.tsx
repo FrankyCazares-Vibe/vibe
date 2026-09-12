@@ -43,11 +43,30 @@ type ThreadEntry = {
   is_request: boolean;
 };
 
+/**
+ * Layers. This sheet opens on top of surfaces that are themselves high in
+ * the stack, so it has to clear all of them:
+ *   - the phone tab bar (globals.css .vibe-mobile-tabbar, z 9988), which
+ *     stays on screen under CampusMobile's feed — at 1200/1201 the bar
+ *     painted over the Send button, the same way it covered the profile
+ *     sheets until 67dca17;
+ *   - PostViewerMobile's full-screen drawer (z 10000). Both this sheet and
+ *     the viewer portal to <body>, so they're siblings in the root stacking
+ *     context and z-index alone decides — at 1201 "Send to chats" opened
+ *     the sheet *behind* the viewer, which read as the tap doing nothing;
+ *   - ProfileMobile's sheets and full-screen drawer (10000/10001).
+ * Stays below the toasts (11600 static, 12000 ToastHost) so a refusal still
+ * shows over an open sheet, and below ImageCropperModal (11000).
+ */
+const SHARE_SHEET_OVERLAY_Z = 10400;
+const SHARE_SHEET_CONTENT_Z = 10401;
+
 export function SharePostSheet({
   postId,
   postTitle,
   postPosterUrl,
   authorName,
+  nested = false,
   onClose,
   onSent,
 }: {
@@ -60,6 +79,10 @@ export function SharePostSheet({
   postPosterUrl?: string | null;
   /** Author display name for the preview row's subline. */
   authorName?: string | null;
+  /** True when this sheet is mounted inside an already-open vaul drawer
+   *  (the post viewer, the feed card's action sheet). See the "Nesting"
+   *  note below — getting this wrong breaks scrolling on iOS. */
+  nested?: boolean;
   onClose: () => void;
   /** Fired after a successful multi-send. Callers can use this to
    *  show a toast or close the parent menu. */
@@ -171,15 +194,33 @@ export function SharePostSheet({
     }
   }, [sending, selectedIds, caption, postId, onSent, onClose]);
 
+  /**
+   * Nesting. vaul keeps its iOS body-scroll lock in a module-level global
+   * shared by every Drawer.Root: the first drawer to open saves the body's
+   * position/top/left, and the next one to *close* puts those styles back,
+   * scrolls the window to the saved offset, and clears the global. So when
+   * this sheet opens on top of an already-open drawer and then closes, the
+   * drawer underneath loses `position: fixed` while it's still full-screen,
+   * the page jumps behind it, and that drawer's own close then restores
+   * nothing. `nested` is the flag that tells vaul this drawer isn't the one
+   * holding the lock. Safari-only, so it doesn't show up on desktop Chrome.
+   * Drawer.NestedRoot does the same thing but throws when there's no drawer
+   * above it, which would break the desktop feed's mount (campus-home), so
+   * the caller passes the flag instead.
+   */
   return (
-    <Drawer.Root open onOpenChange={(o) => { if (!o) onClose(); }}>
+    <Drawer.Root
+      open
+      nested={nested}
+      onOpenChange={(o) => { if (!o) onClose(); }}
+    >
       <Drawer.Portal>
         <Drawer.Overlay
           style={{
             position: "fixed",
             inset: 0,
             background: "rgba(0,0,0,0.42)",
-            zIndex: 1200,
+            zIndex: SHARE_SHEET_OVERLAY_Z,
           }}
         />
         <Drawer.Content
@@ -195,7 +236,7 @@ export function SharePostSheet({
             borderTopRightRadius: 20,
             paddingBottom: "env(safe-area-inset-bottom, 0px)",
             boxShadow: "0 -8px 32px rgba(0,0,0,0.18)",
-            zIndex: 1201,
+            zIndex: SHARE_SHEET_CONTENT_Z,
             outline: "none",
             display: "flex",
             flexDirection: "column",
