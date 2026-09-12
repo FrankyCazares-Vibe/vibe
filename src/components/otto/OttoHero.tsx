@@ -3,7 +3,13 @@
 import { OttoOrb } from "@/components/the-map/OttoOrb";
 
 type Props = {
-  counts: { nudges: number; reminders: number; unread: number };
+  /**
+   * A count is `null` when the section behind it didn't load. The hero
+   * prints an em dash there instead of a 0 — "0 nudges" is a claim about
+   * campus, and a read that was refused can't make it. Same rule, same
+   * dash, as the phone hero's chips in `OttoMobile`.
+   */
+  counts: { nudges: number | null; reminders: number | null; unread: number | null };
 };
 
 /**
@@ -37,9 +43,9 @@ export function OttoHero({ counts }: Props) {
       </div>
 
       <div className="otto-room-hero-stats" aria-label="otto status">
-        <span>{counts.nudges} nudges</span>
-        <span>{counts.reminders} reminders</span>
-        <span>{counts.unread} unread</span>
+        <span>{counts.nudges ?? "—"} nudges</span>
+        <span>{counts.reminders ?? "—"} reminders</span>
+        <span>{counts.unread ?? "—"} unread</span>
       </div>
     </header>
   );

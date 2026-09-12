@@ -73,9 +73,18 @@ export function OttoPageClient({ initial }: Props) {
   const [settings] = useState<OttoSettingsT>(initial.settings);
 
   // The sections /api/me/otto couldn't read. Each one says so in its own
-  // place instead of showing its empty copy. A payload from before the
-  // field existed carries nothing, which reads as "nothing failed".
+  // place instead of showing its empty copy, and the hero stat above it
+  // shows an em dash rather than a 0 that would read as a real count. A
+  // payload from before the field existed carries nothing, which reads as
+  // "nothing failed".
   const failed = initial.failed ?? [];
+  const activityFailed = failed.includes("activity");
+  const upcomingFailed = failed.includes("upcoming");
+  const askingFailed = failed.includes("asking");
+  // The unread-DM read is its own section server-side — it fails without
+  // taking followers or reminders with it — but its row lives in "Asking
+  // for you", so either one means that list is incomplete.
+  const dmsFailed = failed.includes("dms");
 
   // Hero counts: nudges = unread notifications still in the feed; reminders =
   // every active reminder (dated upcoming + undated asking); unread = DMs
@@ -193,9 +202,9 @@ export function OttoPageClient({ initial }: Props) {
       <main className="otto-room-main">
         <OttoHero
           counts={{
-            nudges: initial.counts.nudges,
-            reminders: reminderCount,
-            unread: unreadCount,
+            nudges: activityFailed ? null : initial.counts.nudges,
+            reminders: upcomingFailed || askingFailed ? null : reminderCount,
+            unread: askingFailed || dmsFailed ? null : unreadCount,
           }}
         />
 
@@ -222,22 +231,20 @@ export function OttoPageClient({ initial }: Props) {
 
         {tab === "today" ? (
           <>
-            <OttoActivity rows={activity} failed={failed.includes("activity")} />
+            <OttoActivity rows={activity} failed={activityFailed} />
             <OttoUpcoming
               rows={upcoming}
               onDismissReminder={dismissReminder}
               onActReminder={actReminder}
-              failed={failed.includes("upcoming")}
+              failed={upcomingFailed}
             />
-            {/* The unread-DM read fails on its own, but its row lives in
-                this section — either one means the list is incomplete. */}
             <OttoRequests
               rows={asking}
               onFollowBack={followBack}
               onPassFollower={passFollower}
               onDismissReminder={dismissReminder}
               onActReminder={actReminder}
-              failed={failed.includes("asking") || failed.includes("dms")}
+              failed={askingFailed || dmsFailed}
             />
             <OttoTellInput onCreated={handleCreated} />
             <OttoSettings settings={settings} />

@@ -12,6 +12,8 @@ import { createSupabaseServiceClient } from "@/lib/supabase/service";
  *   - rsvps + events → "Coming up" (next 7 days, going/maybe)
  *   - otto_reminders → split into dated (Coming up) + undated (Asking for you)
  *   - connections    → new followers viewer hasn't followed back yet
+ *                      (blocks in either direction excluded; mutes are not —
+ *                      see the note above that query)
  *   - channel_members→ unread DM channel count
  *   - users.otto_settings → preset blob (merged with defaults)
  *
@@ -302,13 +304,29 @@ export async function GET() {
   // connections" is one-way followers viewer hasn't followed back —
   // they're saying "let's connect", and the [Follow back] button mirrors
   // the Network page action.
+  //
+  // This list filters on BLOCKS only — not mutes — and the two controls'
+  // own copy is why. Block says you don't see each other; offering a
+  // [Connect] button for someone the viewer blocked, or who blocked them,
+  // contradicts that (and the follow would be refused anyway). Mute's own
+  // copy is "You won't see their posts in your feed or get notifications
+  // from them. They won't know." — both halves are kept by `hiddenIds` on
+  // the activity feed and the unread-DM count above. A follower row is
+  // neither a post nor a notification: it's a question still waiting on a
+  // yes or no, so a muted follower stays visible here. Blocks are
+  // excluded in the query, before the 50-row window, so a blocked
+  // follower can't push a real one out of the list.
+  const blockedIds = Array.from(hiddenRes.hidden.blocked).filter((id) => id !== user.id);
+  let followersInQuery = supabase
+    .from("connections")
+    .select("follower_id,created_at")
+    .eq("following_id", user.id);
+  if (blockedIds.length > 0) {
+    followersInQuery = followersInQuery.notIn("follower_id", blockedIds);
+  }
+
   const [followersInRes, viewerOutRes, undatedRemRes] = await Promise.all([
-    supabase
-      .from("connections")
-      .select("follower_id,created_at")
-      .eq("following_id", user.id)
-      .order("created_at", { ascending: false })
-      .limit(50),
+    followersInQuery.order("created_at", { ascending: false }).limit(50),
     supabase.from("connections").select("following_id").eq("follower_id", user.id),
     supabase
       .from("otto_reminders")
