@@ -1040,11 +1040,24 @@ export function ConversationView({
     });
   }, [threadId]);
 
-  // Auto-scroll to the bottom on first message-paint + after sends.
+  // Auto-scroll to the bottom on first message-paint + after sends. Keyed on
+  // the newest message's id, not on `messages`: a reaction rewrites that
+  // array, and scrolling then yanked the reader away from the message they
+  // had just reacted to. A first paint always scrolls; after that only a
+  // genuinely new message does, and only if the reader was already at the
+  // bottom (they may have scrolled up to read while a message arrived).
+  const lastMessageIdRef = useRef<string | null>(null);
   useEffect(() => {
     const el = scrollRef.current;
-    if (!el) return;
-    el.scrollTop = el.scrollHeight;
+    if (!el || messages === null) return;
+    const newestId = messages.length ? messages[messages.length - 1].id : null;
+    if (newestId === lastMessageIdRef.current) return;
+    const isFirstPaint = lastMessageIdRef.current === null;
+    lastMessageIdRef.current = newestId;
+    // Measured here rather than read from the scroll handler's ref: same
+    // ~80px test, but it reflects where the reader is right now.
+    const atBottom = el.scrollHeight - el.scrollTop - el.clientHeight < 80;
+    if (isFirstPaint || atBottom) el.scrollTop = el.scrollHeight;
   }, [messages]);
 
   // Photos and videos only take their real height once they load, which
