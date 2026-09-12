@@ -9,6 +9,13 @@ type RouteContext = { params: Promise<{ id: string }> };
  * inside the SECURITY DEFINER `record_post_view` RPC. Refreshing the same
  * post on the same day is a no-op; viewing it the next day counts again.
  *
+ * `counted: false` covers every case where no row was written: a signed-out
+ * viewer, a repeat view on the same day, a post that no longer exists, and
+ * — once 20260912100500_post_views_self_guard.sql is applied — the author
+ * looking at their own post. Clients must not treat it as an error; the
+ * campus post viewer uses it to decide whether to tick its local number,
+ * which is exactly why an author's own view must answer false.
+ *
  * Fire-and-forget from the client — failures are non-fatal.
  */
 export async function POST(_req: Request, ctx: RouteContext) {

@@ -3,6 +3,7 @@ import { NextResponse } from "next/server";
 import { campusByLabel } from "@/lib/iu/campuses";
 import { orgAssetProxyUrl } from "@/lib/org-asset-url";
 import { withPostMediaUrls } from "@/lib/post-media-url";
+import { loadHonestViewRows, tallyViews } from "@/lib/posts/honest-views";
 import { loadHiddenUsers } from "@/lib/safety/hidden-users";
 import { createSupabaseServerClient } from "@/lib/supabase/server";
 
@@ -227,7 +228,27 @@ export async function GET(req: Request) {
     if (r.post?.id) allPostIds.add(r.post.id);
   }
 
-  const engagement = await loadEngagement(supabase, Array.from(allPostIds), user.id);
+  // The view number on a card is counted from the `post_views` ledger with
+  // the post author's own views dropped. `posts.view_count` counts an author
+  // refreshing their own post — `record_post_view` had no self-view guard
+  // until 20260912100500 — and on the live DB 71 of 149 ledger rows were
+  // self-views. Only the posts we actually render need this: reposts no
+  // longer emit their own feed rows (see `void repostRows` below).
+  const authorByPostId = new Map(postRows.map((p) => [p.id, p.user_id]));
+  const renderedPostIds = Array.from(authorByPostId.keys());
+
+  const [engagement, viewRows] = await Promise.all([
+    loadEngagement(supabase, Array.from(allPostIds), user.id),
+    loadHonestViewRows(renderedPostIds, authorByPostId),
+  ]);
+
+  // A per-card view count is a secondary metric on a page whose job is the
+  // posts themselves, so if the ledger can't be read we keep showing the
+  // stored counter — the number that has shipped for months — rather than
+  // failing the whole feed or printing a 0 the data doesn't support. The
+  // helper has already logged why. The metrics screen makes the opposite
+  // call: there the number IS the product, so creator-stats fails loudly.
+  const honestViews = viewRows === null ? null : tallyViews(viewRows, renderedPostIds);
 
   // Viewer's outgoing followings — used both for the friend-repost
   // social-proof query AND for the ranking pass below (posts by people
@@ -262,7 +283,9 @@ export async function GET(req: Request) {
       // when its stored media_url is an R2 key under `clips/` (legacy
       // naming — it backs regular video posts, not clips).
       ...withPostMediaUrls(row),
-      view_count: row.view_count ?? 0,
+      // `honestViews === null` means the ledger was unreadable, not that
+      // nobody looked — hence the stored-counter fallback noted above.
+      view_count: honestViews ? (honestViews.get(row.id) ?? 0) : (row.view_count ?? 0),
       like_count: e.like_count,
       comment_count: e.comment_count,
       repost_count: e.repost_count,

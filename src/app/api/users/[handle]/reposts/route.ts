@@ -2,6 +2,7 @@ import { NextResponse } from "next/server";
 
 import { orgAssetProxyUrl } from "@/lib/org-asset-url";
 import { withPostMediaUrls } from "@/lib/post-media-url";
+import { loadHonestViewRows, tallyViews } from "@/lib/posts/honest-views";
 import { createSupabaseServerClient } from "@/lib/supabase/server";
 
 const DEFAULT_LIMIT = 100;
@@ -110,24 +111,39 @@ export async function GET(req: Request, ctx: RouteContext) {
     return NextResponse.json({ ok: true, reposts: [] });
   }
 
-  const reposts = ((data as unknown as RepostRow[]) ?? [])
-    .filter((r) => r.post)
-    .map((r) => {
-      const p = r.post as EmbeddedPost;
-      const org = p.org ?? null;
-      return {
-        post_id: r.post_id,
-        comment: r.comment,
-        reposted_at: r.created_at,
-        post: {
-          ...withPostMediaUrls(p),
-          view_count: p.view_count ?? 0,
-          org: org
-            ? { ...org, logo_url: orgAssetProxyUrl(org.handle, org.logo_url, "logo") }
-            : null,
-        },
-      };
-    });
+  const rows = ((data as unknown as RepostRow[]) ?? []).filter((r) => r.post);
+
+  // View counts come from the `post_views` ledger with each post author's own
+  // views dropped. `posts.view_count` counts an author refreshing their own
+  // post — `record_post_view` had no self-view guard until 20260912100500 —
+  // so the stored number runs high (71 of 149 live ledger rows were
+  // self-views). If the ledger can't be read we keep showing the stored
+  // counter rather than a 0 the data doesn't support, same as the feed.
+  const authorByPostId = new Map<string, string>();
+  for (const r of rows) {
+    const p = r.post as EmbeddedPost;
+    authorByPostId.set(p.id, p.user_id);
+  }
+  const viewedPostIds = Array.from(authorByPostId.keys());
+  const viewRows = await loadHonestViewRows(viewedPostIds, authorByPostId);
+  const honestViews = viewRows === null ? null : tallyViews(viewRows, viewedPostIds);
+
+  const reposts = rows.map((r) => {
+    const p = r.post as EmbeddedPost;
+    const org = p.org ?? null;
+    return {
+      post_id: r.post_id,
+      comment: r.comment,
+      reposted_at: r.created_at,
+      post: {
+        ...withPostMediaUrls(p),
+        view_count: honestViews ? (honestViews.get(p.id) ?? 0) : (p.view_count ?? 0),
+        org: org
+          ? { ...org, logo_url: orgAssetProxyUrl(org.handle, org.logo_url, "logo") }
+          : null,
+      },
+    };
+  });
 
   return NextResponse.json({ ok: true, reposts });
 }
