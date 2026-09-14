@@ -1786,9 +1786,17 @@ body.viewer-mode .avatar-row-actions .action-btn {
   color:var(--accent);font-size:28px;
 }
 
-/* ── Mutual pill — sits to the right of the Connect button ── */
+/* ── Mutual pill — sits to the right of the Connect button ──
+   Hidden by default and revealed by adding .is-shown. The default used to
+   be an inline style="display:none" in the markup (S55, when the number was
+   hardcoded); the decision now belongs to updateMutualPillVisibility() in
+   the main script, which shows the pill only on a visited profile whose
+   hydrated count is above 0. Keeping the default OFF here (rather than
+   dropping the hide entirely) matters: if the visited bootstrap fails, the
+   page reveals itself without ever hydrating the count, and a pill reading
+   "0 you both follow" would be a refused read painting a zero. */
 .profile-mutual-pill {
-  display:inline-flex;align-items:center;gap:6px;
+  display:none;align-items:center;gap:6px;
   padding:7px 14px;border-radius:100px;
   background:rgba(28,28,30,.05);border:1px solid var(--border);
   font-size:11px;font-weight:600;color:var(--muted);
@@ -1796,6 +1804,7 @@ body.viewer-mode .avatar-row-actions .action-btn {
   letter-spacing:.2px;text-transform:lowercase;
   white-space:nowrap;
 }
+.profile-mutual-pill.is-shown { display:inline-flex; }
 .profile-mutual-pill:hover { background:rgba(28,28,30,.08);color:var(--charcoal); }
 .profile-mutual-pill #statMutual { font-weight:800;color:var(--charcoal); }
 
@@ -3299,15 +3308,20 @@ body.empty-profile-mode #profileEmpty { display: flex !important; }
         <button class="vibe-soft-follow" id="vibeSoftFollow" onclick="handleSoftFollow()" style="display:none">
           Follow instead
         </button>
-        <!-- Hidden until a real mutual-connections API exists (S55): the count was hardcoded to 0 and the modal is a static shell. -->
-        <!-- The label says what the number actually is. getMutualCount
-             (src/lib/connections/queries.ts:128) counts people the VISITED
+        <!-- The label says what the number actually is. getMutualIds
+             (src/lib/connections/queries.ts) returns people the VISITED
              user follows whom you also follow — a directed intersection, not
              reciprocal pairs. Measured against the live DB 2026-09-12:
              frankycazares → james reads 2; strict both-ways mutuals is 1.
              The math is kept (it matches every user card in the product);
-             only the wording changed, so the pill can't claim "mutual". -->
-        <button class="profile-mutual-pill" onclick="openMutualsModal()" style="display:none">
+             only the wording changed, so the pill can't claim "mutual".
+             The pill stays hidden until updateMutualPillVisibility() finds a
+             visited profile with a count above 0 — a "0 you both follow"
+             pill is what S55 removed, and it is also what a failed read
+             would otherwise paint. Clicking opens the connections modal on
+             its "You both follow" tab, which lists exactly the people this
+             number counts (GET /api/users/<handle>/mutuals). -->
+        <button class="profile-mutual-pill" id="profileMutualPill" onclick="openConnectionsModal('mutuals')">
           <span id="statMutual">0</span> you both follow
         </button>
         <!-- Safety actions: Block / Mute / Report. Visible only in
@@ -3769,17 +3783,10 @@ body.empty-profile-mode #profileEmpty { display: flex !important; }
         <!-- ── MODALS ── -->
 
 
-<!-- Mutuals modal — body intentionally empty until there's a real
-     mutual-connections API. -->
-<div id="mutualsModal" style="display:none;position:fixed;inset:0;z-index:700;background:rgba(0,0,0,.48);align-items:center;justify-content:center;">
-  <div class="modal" style="width:440px;max-height:72vh;display:flex;flex-direction:column;">
-    <button class="modal-close" onclick="closeMutualsModal()">&#215;</button>
-    <div class="modal-title">People you both follow</div>
-    <div style="overflow-y:auto;display:flex;flex-direction:column;gap:10px;margin-top:14px;">
-      <div style="text-align:center;padding:24px 8px;font-size:13px;color:var(--muted)">No one you both follow yet.</div>
-    </div>
-  </div>
-</div>
+<!-- The mutuals modal used to live here as an empty shell with a hardcoded
+     "No one you both follow yet." and no fetch. It is gone: the pill now
+     opens the connections modal's "You both follow" tab (search, paging,
+     Retry and the follow buttons all come for free from that IIFE). -->
 
 <!-- Gradient cover modal -->
 <div class="modal-backdrop" id="gradientModal">
@@ -6274,9 +6281,31 @@ async function handleSoftFollow() {
   showToast(unfollow ? `Unfollowed ${name}` : `Following ${name}`);
 }
 
-function openMutualsModal()  { const m=document.getElementById('mutualsModal'); if(m) m.style.display='flex'; }
-function closeMutualsModal() { const m=document.getElementById('mutualsModal'); if(m) m.style.display='none'; }
-document.addEventListener('click', e => { const m=document.getElementById('mutualsModal'); if(m && e.target===m) closeMutualsModal(); });
+// ── The "N you both follow" pill (markup ~3324) ───────────────────────────
+// One decider, called from everywhere #statMutual is written: hydrate
+// (hydrateProfileFields' counts block) and the fresh-user reset
+// (clearFreshUserExtras). The pill is shown only when BOTH are true:
+//   • we are on someone else's profile (window.viewingRealUser is set) —
+//     /api/me/profile-bootstrap hardcodes counts.mutual to "0" anyway, and
+//     "0 people you both follow" about yourself is nonsense;
+//   • the hydrated count parses to a number above 0.
+// counts.mutual arrives as a STRING ("0", "2"), so this has to be a numeric
+// test: '0' is truthy. Anything unparseable is treated as "don't show",
+// which is also what a profile whose bootstrap failed gets — no pill rather
+// than a pill claiming zero.
+function updateMutualPillVisibility() {
+  const pill = document.getElementById('profileMutualPill');
+  if (!pill) return;
+  const sm = document.getElementById('statMutual');
+  const n = Number((sm && sm.textContent || '').trim());
+  // Same predicate the modal's getViewedHandle() uses (the handle, not just
+  // the object): if the two ever disagreed, the pill would open a tab whose
+  // endpoint falls back to the VIEWER's own connections list.
+  const show = !!(window.viewingRealUser && window.viewingRealUser.handle)
+    && Number.isFinite(n) && n > 0;
+  pill.classList.toggle('is-shown', show);
+}
+window.updateMutualPillVisibility = updateMutualPillVisibility;
 
 // Connect button visibility is now handled by .viewer-only CSS on the
 // wrapper (#profileActionBtns). The connection state is initialized by
@@ -8954,6 +8983,8 @@ function renderUserSections(user) {
     if (sm && typeof user.counts.mutual === 'string')      sm.textContent = user.counts.mutual;
     if (sf && typeof user.counts.followers === 'string')   sf.textContent = user.counts.followers;
     if (sg && typeof user.counts.following === 'string')   sg.textContent = user.counts.following;
+    // #statMutual just changed — re-decide whether the pill is on screen.
+    updateMutualPillVisibility();
   }
 
   // Posts — if the user object carries an inline array (viewer-mode), render
@@ -9018,6 +9049,7 @@ function clearFreshUserExtras() {
   const sm = document.getElementById('statMutual');      if (sm) sm.textContent = '0';
   const sf = document.getElementById('statFollowers');   if (sf) sf.textContent = '0';
   const sg = document.getElementById('statFollowing');   if (sg) sg.textContent = '0';
+  updateMutualPillVisibility(); // back to 0 → the pill goes away with it
 
   // ── Experience: drop all preset roles ────────────────────────────────
   const workList = document.getElementById('workList');
@@ -9193,10 +9225,11 @@ function showWelcomeBanner() {
   </div>
 </div>
 
-<!-- ── Connections / Followers / Following modal ───────────────────────
-     Opens when any of the three stat numbers is clicked. Fetches from
+<!-- ── Connections / Followers / Following / You both follow modal ──────
+     Opens when any of the three stat numbers is clicked, or the mutual
+     pill (markup ~3324) on a visited profile. Fetches from
      /api/me/<kind> on the owner's profile, /api/users/<handle>/<kind>
-     on a visited profile. -->
+     on a visited profile; the mutuals kind is visited-profile only. -->
 <style>
   #connectionsModal {
     position: fixed; inset: 0; z-index: 9000;
@@ -9705,6 +9738,10 @@ function showWelcomeBanner() {
           <button class="conn-modal-tab" data-conn-tab="connections" onclick="switchConnectionsTab('connections')">Connections</button>
           <button class="conn-modal-tab" data-conn-tab="following" onclick="switchConnectionsTab('following')">Following</button>
           <button class="conn-modal-tab" data-conn-tab="followers" onclick="switchConnectionsTab('followers')">Followers</button>
+          <!-- Visited profiles only — there is no /api/me/mutuals, and
+               "people you both follow" with yourself is not a thing.
+               openConnectionsModal() shows or hides this tab per profile. -->
+          <button class="conn-modal-tab" data-conn-tab="mutuals" id="connModalMutualsTab" onclick="switchConnectionsTab('mutuals')" style="display:none">You both follow</button>
         </div>
         <button class="conn-modal-close" aria-label="Close" onclick="closeConnectionsModal()">×</button>
       </div>
@@ -9720,10 +9757,27 @@ function showWelcomeBanner() {
   // Profile stats modal — opens lists of who follows / who they follow /
   // who their connections are. Works for both the owner's profile and
   // visited profiles (uses /api/me/<kind> vs /api/users/<handle>/<kind>).
+  //
+  // A fourth kind, 'mutuals', backs the "You both follow" tab and the mutual
+  // pill. It is a mode of this IIFE rather than its own modal on purpose: the
+  // search box, the paging, the inline-error-with-Retry on a failed first
+  // page and the Connect/Message buttons are all here already, and the rows
+  // come back in the same UserCardData shape from
+  // GET /api/users/<handle>/mutuals. That route's ids come from getMutualIds,
+  // the same function the pill's number is computed from, so the pill and the
+  // list can never disagree — which is the whole reason the old static
+  // #mutualsModal shell was deleted instead of being filled in.
   (function(){
+    const LIMIT = 20;       // page size sent to every list route
     let activeKind = 'connections';
     let activeUsers = [];
-    let activeOffset = 0;
+    // The offset to ask the server for NEXT — counted in CANDIDATE IDS, which
+    // is what every list route offsets into, not in rendered rows. The two
+    // differ: hydrateUserCards (src/lib/connections/queries.ts) drops ids with
+    // no readable profile row, so a page of 20 ids can paint 19 people. Using
+    // activeUsers.length here would walk the cursor backwards by one per
+    // dropped id and show someone twice on the next page.
+    let activeReqOffset = 0;
     let activeHasMore = false;
     let activeQuery = '';
     let searchDebounce = null;
@@ -9738,13 +9792,27 @@ function showWelcomeBanner() {
       return null; // own profile
     }
 
+    // Returns null when there is nothing legitimate to ask for: 'mutuals'
+    // exists only as /api/users/<handle>/mutuals, so on the owner's own
+    // profile there is no URL. Better a null the caller handles than a
+    // request to /api/me/mutuals, which would 404 and read as a failure.
     function endpointFor(kind, offset) {
       const handle = getViewedHandle();
-      let qs = `?limit=20&offset=${offset}`;
+      let qs = `?limit=${LIMIT}&offset=${offset}`;
       if (activeQuery) qs += `&q=${encodeURIComponent(activeQuery)}`;
+      if (kind === 'mutuals') {
+        return handle ? `/api/users/${encodeURIComponent(handle)}/mutuals${qs}` : null;
+      }
       return handle
         ? `/api/users/${encodeURIComponent(handle)}/${kind}${qs}`
         : `/api/me/${kind}${qs}`;
+    }
+
+    // The empty line has to name the list. "No one here yet." under the
+    // "You both follow" tab reads as "this person knows nobody", which is
+    // not what an empty directed intersection means.
+    function emptyLineFor(kind) {
+      return kind === 'mutuals' ? 'No one you both follow yet.' : 'No one here yet.';
     }
 
     function escapeHTML(s) {
@@ -9759,10 +9827,10 @@ function showWelcomeBanner() {
         .map(p => p[0]).join('').toUpperCase() || '?';
     }
 
-    // Same wording as the mutual pill (3311) and the modal title (3777),
-    // and for the same reason: mutual_count is a DIRECTED intersection, not
-    // a reciprocal pair. hydrateUserCards (src/lib/connections/queries.ts)
-    // counts rows where follower_id = the listed user AND following_id is
+    // Same wording as the mutual pill (3325), and for the same reason:
+    // mutual_count is a DIRECTED intersection, not a reciprocal pair.
+    // hydrateUserCards (src/lib/connections/queries.ts) counts rows where
+    // follower_id = the listed user AND following_id is
     // someone the viewer follows — so it answers "people they follow whom
     // you also follow", which is not what "mutual" means. Measured against
     // the live DB 2026-09-12 from frankycazares: james and vibecqo each read
@@ -9821,7 +9889,7 @@ function showWelcomeBanner() {
       if (activeUsers.length === 0) {
         body.innerHTML = activeQuery
           ? `<div class="conn-empty">Nothing matches "${escapeHTML(activeQuery)}".</div>`
-          : `<div class="conn-empty">No one here yet.</div>`;
+          : `<div class="conn-empty">${escapeHTML(emptyLineFor(activeKind))}</div>`;
         return;
       }
       const rows = activeUsers.map(rowHTML).join('');
@@ -9878,9 +9946,21 @@ function showWelcomeBanner() {
 
     async function load(kind, offset) {
       const seq = ++loadSeq;
+      const url = endpointFor(kind, offset);
+      if (!url) {
+        // Belt and braces. The real guard is switchConnectionsTab below, which
+        // rewrites 'mutuals' → 'connections' on the owner's own profile before
+        // load() is ever called, so nothing reaches here today — don't go
+        // hunting for the caller. Kept because endpointFor can return null and
+        // a silent request to /api/me/mutuals (404) would read as a failure.
+        // There is no read to refuse here, so this is a genuine empty list.
+        activeError = null; activeUsers = []; activeReqOffset = 0; activeHasMore = false;
+        paint();
+        return;
+      }
       // A failed first page is painted inline with Retry; a failed Load
       // more keeps the rows already shown and says so in a toast.
-      const r = await window.vibeRequest(endpointFor(kind, offset), {
+      const r = await window.vibeRequest(url, {
         quiet: offset === 0,
         failure: offset === 0 ? "Couldn't load this list." : "Couldn't load more people.",
       });
@@ -9890,7 +9970,7 @@ function showWelcomeBanner() {
         activeError = null;
         if (offset === 0) activeUsers = users;
         else activeUsers = activeUsers.concat(users);
-        activeOffset = activeUsers.length;
+        activeReqOffset = offset + LIMIT;
         activeHasMore = !!r.data.has_more;
         paint();
         return;
@@ -9904,7 +9984,7 @@ function showWelcomeBanner() {
       }
     }
 
-    window.__loadMoreConnModal = () => load(activeKind, activeOffset);
+    window.__loadMoreConnModal = () => load(activeKind, activeReqOffset);
 
     window.__retryConnModal = () => {
       activeError = null;
@@ -9914,8 +9994,11 @@ function showWelcomeBanner() {
     };
 
     window.switchConnectionsTab = function(kind) {
+      // "You both follow" has no owner-side list; asking for it on your own
+      // profile lands on the tab the modal opens with by default.
+      if (kind === 'mutuals' && !getViewedHandle()) kind = 'connections';
       activeKind = kind;
-      activeUsers = []; activeOffset = 0; activeHasMore = false;
+      activeUsers = []; activeReqOffset = 0; activeHasMore = false;
       document.querySelectorAll('#connectionsModal .conn-modal-tab').forEach(b => {
         b.classList.toggle('active', b.dataset.connTab === kind);
       });
@@ -9927,6 +10010,10 @@ function showWelcomeBanner() {
     window.openConnectionsModal = function(kind) {
       const modal = document.getElementById('connectionsModal');
       if (!modal) return;
+      // The mutuals tab is about you and the person whose profile this is,
+      // so it only exists on a visited profile.
+      const mutualsTab = document.getElementById('connModalMutualsTab');
+      if (mutualsTab) mutualsTab.style.display = getViewedHandle() ? '' : 'none';
       modal.classList.add('open');
       // Reset search whenever the modal is opened so a stale query from
       // a prior session doesn't filter the freshly-opened list.
@@ -9959,7 +10046,7 @@ function showWelcomeBanner() {
         if (searchDebounce) clearTimeout(searchDebounce);
         searchDebounce = setTimeout(() => {
           activeQuery = v.trim();
-          activeUsers = []; activeOffset = 0; activeHasMore = false;
+          activeUsers = []; activeReqOffset = 0; activeHasMore = false;
           const body = document.getElementById('connModalBody');
           if (body) body.innerHTML = `<div class="conn-loading">loading…</div>`;
           load(activeKind, 0);
