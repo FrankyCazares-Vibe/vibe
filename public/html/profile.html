@@ -9263,10 +9263,12 @@ function showWelcomeBanner() {
     display: flex; gap: 6px; flex: 1; flex-wrap: wrap;
   }
   #connectionsModal .conn-modal-tab {
-    padding: 7px 14px; border-radius: 999px;
+    /* Four tabs since S59 ("You both follow"): tightened so all four sit on
+       one row of the 520px card instead of the fourth wrapping alone. */
+    padding: 7px 11px; border-radius: 999px;
     border: 1px solid rgba(28,28,30,0.10);
     background: rgba(255,255,255,0.6); color: #1C1C1E;
-    font-size: 13px; font-weight: 700; cursor: pointer;
+    font-size: 12.5px; font-weight: 700; cursor: pointer; white-space: nowrap;
     transition: background 0.12s ease, color 0.12s ease;
   }
   #connectionsModal .conn-modal-tab.active {

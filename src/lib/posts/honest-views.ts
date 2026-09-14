@@ -130,7 +130,9 @@ export async function loadHonestViewRows(
     }
     scanned += page.length;
 
-    if (scanned >= LEDGER_SCAN_CAP) {
+    // A scan that ends exactly on the cap is complete, not partial: only a
+    // FULL page at the cap means there may be more behind it.
+    if (page.length === LEDGER_PAGE && scanned >= LEDGER_SCAN_CAP) {
       console.error(
         `[honest-views] ledger scan hit ${LEDGER_SCAN_CAP} rows for ${postIds.length} posts — refusing to report a partial count`,
       );
