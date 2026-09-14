@@ -187,10 +187,11 @@ export async function hasPlus(userId: string): Promise<boolean> {
 
 /**
  * The 403 a Vibe+-only route returns. The `plus_required` code is what
- * failure-copy maps to a plain line plus a "See Vibe+" action — see the note
- * in the batch report: that copy rule is not in src/lib/feedback/failure-copy.ts
- * or its static twin yet, so until it is, this 403 falls through to the
- * generic "You don't have access to do that."
+ * failure-copy maps to "That's a Vibe+ feature." plus a "See Vibe+" action —
+ * the rule lives in src/lib/feedback/failure-copy.ts and its static twin in
+ * public/html/_persistence.js (session 59). The sentence below is not what a
+ * student sees: it fails the human-sentence check (no `+` allowed), so the
+ * code, not the text, is the contract.
  */
 export function plusRequiredResponse(): NextResponse {
   return NextResponse.json(

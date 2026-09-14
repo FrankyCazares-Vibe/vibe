@@ -1,5 +1,6 @@
 import { NextResponse } from "next/server";
 
+import { loadPostSaveRows } from "@/lib/metrics/post-audience";
 import { loadHonestViewRows, tallyViews } from "@/lib/posts/honest-views";
 import { createSupabaseServerClient } from "@/lib/supabase/server";
 
@@ -26,14 +27,28 @@ import { createSupabaseServerClient } from "@/lib/supabase/server";
  * cheap. If a creator ever has 10k+ posts, the views half is the one that
  * wants a grouped RPC or a nightly rollup first; not a v1 concern.
  *
+ * SAVES ARE COUNTED THE SAME WAY VIEWS ARE. `bookmarks` RLS is
+ * `bookmarks_all_own` — owner of the BOOKMARK — so a cookie-client read of
+ * other people's saves of your posts comes back empty with no error, the same
+ * silent zero `post_views` used to produce. The rows therefore come through
+ * src/lib/metrics/post-audience.ts with the service role, paged (PostgREST
+ * truncates at 1000 without erroring), and with the author's own bookmarks
+ * dropped: "12 saves" has to mean twelve other people, or it is the same lie
+ * the self-view guard removed. A read that fails is a 500 here, never a 0 —
+ * on this screen the numbers ARE the product.
+ *
+ * The top-post score is deliberately NOT changed to weigh saves. Adding a term
+ * would silently reorder a list people have already seen; if saves should
+ * count, that is a decision to take on purpose.
+ *
  * Returns:
  *   {
- *     totals: { posts, views, likes, comments, reposts },
+ *     totals: { posts, views, likes, comments, reposts, saves },
  *     by_window: {
- *       seven_days:  { views, likes, comments, reposts },
- *       thirty_days: { views, likes, comments, reposts },
+ *       seven_days:  { views, likes, comments, reposts, saves },
+ *       thirty_days: { views, likes, comments, reposts, saves },
  *     },
- *     top_posts: [{ id, content, view_count, like_count, comment_count, repost_count, created_at }]
+ *     top_posts: [{ id, content, view_count, like_count, comment_count, repost_count, save_count, created_at }]
  *   }
  */
 
@@ -69,8 +84,10 @@ export async function GET() {
     .order("created_at", { ascending: false });
 
   if (postsRes.error) {
+    // Opaque on purpose: the raw Postgres message used to ship to the client
+    // here, which is a free schema tour for anyone who can make this fail.
     console.error("[creator-stats posts]", postsRes.error);
-    return NextResponse.json({ ok: false, error: postsRes.error.message }, { status: 500 });
+    return NextResponse.json({ ok: false, error: "Request failed" }, { status: 500 });
   }
 
   type PostRow = {
@@ -86,18 +103,19 @@ export async function GET() {
   if (postIds.length === 0) {
     return NextResponse.json({
       ok: true,
-      totals: { posts: 0, views: 0, likes: 0, comments: 0, reposts: 0 },
+      totals: { posts: 0, views: 0, likes: 0, comments: 0, reposts: 0, saves: 0 },
       by_window: {
-        seven_days: { views: 0, likes: 0, comments: 0, reposts: 0 },
-        thirty_days: { views: 0, likes: 0, comments: 0, reposts: 0 },
+        seven_days: { views: 0, likes: 0, comments: 0, reposts: 0, saves: 0 },
+        thirty_days: { views: 0, likes: 0, comments: 0, reposts: 0, saves: 0 },
       },
       top_posts: [],
     });
   }
 
-  // 2. Engagement totals + per-window. Nine small head-only counts plus one
-  //    read of the view ledger, which feeds all-time, 7d, 30d AND the
-  //    per-post view numbers in the top-posts list below.
+  // 2. Engagement totals + per-window. Nine small head-only counts plus two
+  //    row reads — the view ledger and the bookmarks table — each of which
+  //    feeds all-time, 7d, 30d AND the per-post numbers in the top-posts list
+  //    below.
   const [
     likesAllRes,
     likes7Res,
@@ -109,6 +127,7 @@ export async function GET() {
     reposts7Res,
     reposts30Res,
     viewRows,
+    saveRows,
   ] = await Promise.all([
     supabase.from("post_likes").select("post_id", { count: "exact", head: true }).in("post_id", postIds),
     supabase.from("post_likes").select("post_id", { count: "exact", head: true }).in("post_id", postIds).gte("created_at", sevenAgo),
@@ -127,6 +146,11 @@ export async function GET() {
     // service role; every id in `postIds` belongs to the caller, and only
     // counts ever leave this route — never a viewer's identity.
     loadHonestViewRows(postIds, new Map(postIds.map((id) => [id, user.id]))),
+    // Saves come back as ROWS, not three counts, for the same reason views do:
+    // the author's own bookmarks have to be dropped, and the per-post tally
+    // for the top-posts list needs the rows anyway. One service-role read
+    // feeds all-time, 7d, 30d and per-post.
+    loadPostSaveRows(postIds, new Map(postIds.map((id) => [id, user.id]))),
   ]);
 
   // `null` means the ledger could not be read — which is not the same as
@@ -138,10 +162,32 @@ export async function GET() {
     return NextResponse.json({ ok: false, error: "Request failed" }, { status: 500 });
   }
 
+  // Same rule for saves: unreadable is not zero, and a 0 save tile beside a
+  // real view tile is a claim about the product that nothing supports.
+  if (saveRows === null) {
+    console.error("[creator-stats saves] bookmarks unreadable");
+    return NextResponse.json({ ok: false, error: "Request failed" }, { status: 500 });
+  }
+
   const viewsByPost = tallyViews(viewRows, postIds);
   const allTimeViews = viewRows.length;
   const views7 = viewRows.filter((r) => r.viewed_on >= sevenAgoDate).length;
   const views30 = viewRows.filter((r) => r.viewed_on >= thirtyAgoDate).length;
+
+  // `bookmarks.created_at` is a real timestamptz, so the windows are compared
+  // as instants — NOT as strings against `sevenAgo`, because PostgREST returns
+  // `+00:00` where `toISOString()` writes `Z` and the two sort differently.
+  // The boundaries are the same now-minus-N-days the like/comment/repost
+  // counts use, so every 7d tile on the screen means the same seven days.
+  const sevenAgoMs = now.getTime() - 7 * 86400000;
+  const thirtyAgoMs = now.getTime() - 30 * 86400000;
+  const savedAtMs = (iso: string) => new Date(iso).getTime();
+  const savesByPost = new Map<string, number>();
+  for (const id of postIds) savesByPost.set(id, 0);
+  for (const r of saveRows) savesByPost.set(r.post_id, (savesByPost.get(r.post_id) ?? 0) + 1);
+  const allTimeSaves = saveRows.length;
+  const saves7 = saveRows.filter((r) => savedAtMs(r.created_at) >= sevenAgoMs).length;
+  const saves30 = saveRows.filter((r) => savedAtMs(r.created_at) >= thirtyAgoMs).length;
 
   // 3. Per-post engagement counts for the "top 5" list. Reuse the all-time
   //    queries' rows so we don't refetch — fetch the raw post_id arrays and
@@ -162,7 +208,9 @@ export async function GET() {
   const repostsByPost = tally((repostRowsRes.data ?? []) as IdRow[]);
 
   // Sort posts by an engagement score (views + 4*likes + 6*comments + 8*reposts)
-  // so the "top posts" list isn't dominated by raw view counts.
+  // so the "top posts" list isn't dominated by raw view counts. Saves ship as
+  // a number on each row but are deliberately NOT in the score — adding a term
+  // would quietly reshuffle a list people have already read.
   const scored = posts.map((p) => ({
     id: p.id,
     type: p.type,
@@ -171,6 +219,7 @@ export async function GET() {
     like_count: likesByPost.get(p.id) ?? 0,
     comment_count: commentsByPost.get(p.id) ?? 0,
     repost_count: repostsByPost.get(p.id) ?? 0,
+    save_count: savesByPost.get(p.id) ?? 0,
     created_at: p.created_at,
     score:
       (viewsByPost.get(p.id) ?? 0) +
@@ -193,6 +242,7 @@ export async function GET() {
       likes: likesAllRes.count ?? 0,
       comments: commentsAllRes.count ?? 0,
       reposts: repostsAllRes.count ?? 0,
+      saves: allTimeSaves,
     },
     by_window: {
       seven_days: {
@@ -200,12 +250,14 @@ export async function GET() {
         likes: likes7Res.count ?? 0,
         comments: comments7Res.count ?? 0,
         reposts: reposts7Res.count ?? 0,
+        saves: saves7,
       },
       thirty_days: {
         views: views30,
         likes: likes30Res.count ?? 0,
         comments: comments30Res.count ?? 0,
         reposts: reposts30Res.count ?? 0,
+        saves: saves30,
       },
     },
     top_posts: top,

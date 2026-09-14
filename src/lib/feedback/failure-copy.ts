@@ -108,6 +108,21 @@ export function describeFailure(
       action: { label: "Review Terms", href: `/auth/terms?next=${next}` },
     };
   }
+  // A Vibe+ gate is not a wrist-slap: the student did nothing wrong, they just
+  // don't have the plan. "You don't have access to do that." (the generic 403
+  // below) reads as a telling-off and gives them nowhere to go — and the
+  // route's own sentence, `plusRequiredResponse()` in
+  // src/lib/premium/require-plus.ts, can't fall through `isHumanSentence`
+  // anyway, because "Vibe+" contains a "+". Say the plain thing and point at
+  // the page. `/plus` re-checks `next` with isSafeRelativePath, so an
+  // attacker-shaped path lands on the page with no back link rather than off
+  // the site.
+  if (status === 403 && code === "plus_required") {
+    return {
+      message: "That's a Vibe+ feature.",
+      action: { label: "See Vibe+", href: `/plus?next=${next}` },
+    };
+  }
   if (status === 429) {
     return { message: `You're going a little fast. ${retryLine(sig.retryAfterSec)}` };
   }

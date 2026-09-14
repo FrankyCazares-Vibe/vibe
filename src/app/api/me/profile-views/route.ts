@@ -1,5 +1,6 @@
 import { NextResponse } from "next/server";
 
+import { loadProfileViewers, type ProfileViewersPage } from "@/lib/metrics/profile-viewers";
 import { hasPlus } from "@/lib/premium/require-plus";
 import { createSupabaseServerClient } from "@/lib/supabase/server";
 
@@ -19,7 +20,8 @@ import { createSupabaseServerClient } from "@/lib/supabase/server";
  * the principle.
  *
  *   free   → { counts, premium: false, viewer_identities: "locked", locked_count? }
- *   Vibe+  → { counts, premium: true,  viewer_identities: "visible", recent: [...] }
+ *   Vibe+  → { counts, premium: true,  viewer_identities: "visible", recent: [...],
+ *              recent_total, recent_has_more, recent_next_offset }
  *
  * `locked_count` is the number of DISTINCT PEOPLE who looked in the LAST SEVEN
  * DAYS — the same window as the `seven_days` tile, filtered the same way — so
@@ -52,7 +54,28 @@ import { createSupabaseServerClient } from "@/lib/supabase/server";
  * caller's own profile, so this route cannot leak someone else's viewers even
  * if the entitlement branch were wrong.
  *
- * Hot-path read; 1 auth + 2 parallel + 4 parallel roundtrips.
+ * `recent` IS THE FIRST PAGE OF /api/me/profile-viewers, not a second opinion
+ * about it. Both come from `loadProfileViewers`
+ * (src/lib/metrics/profile-viewers.ts), so the rows under the heading and the
+ * rows "Show more" appends are one list: same ninety-day UTC window, same
+ * per-person dedupe, same block/mute filter, same ordering. `recent_total` and
+ * `recent_has_more` are that list's totals, so the client knows whether to
+ * offer "Show more" without a second request.
+ *
+ * The rows are a SUPERSET of what this route used to send: every field the old
+ * raw `users` embed carried (id, handle, name, avatar_url, viewed_on,
+ * first_viewed_at) is still there, plus the rest of `UserCardData` — so a
+ * viewer row can render as a normal people row with a follow button.
+ *
+ * Hot-path read, and the two branches no longer cost the same. Free: 1 auth +
+ * 2 parallel + 4 parallel roundtrips. Vibe+: the same, except the fourth of
+ * those four is `loadProfileViewers` — a paged ledger scan (1 request per 1000
+ * rows) in parallel with the block/mute read, then `hydrateUserCards` for the
+ * page — so budget it at roughly a dozen round trips, not four. The ledger
+ * scan is also not index-backed: `idx_profile_views_owner_recent` is
+ * (profile_user_id, viewed_on DESC, first_viewed_at DESC) and the scan orders
+ * by first_viewed_at, so Postgres sorts. Fine at pilot volume (the busiest
+ * profile has 8 rows all-time); the thing to watch if this page gets slow.
  */
 const RECENT_LIMIT = 25;
 
@@ -66,18 +89,9 @@ const RECENT_LIMIT = 25;
  */
 const LOCKED_WINDOW_ROW_CAP = 1000;
 
-type RecentViewer = {
-  id: string;
-  handle: string | null;
-  name: string | null;
-  avatar_url: string | null;
-  viewed_on: string;
-  first_viewed_at: string;
-};
-
 /**
  * The paid half of the read, shaped by the entitlement before the query runs.
- * Two different SELECTs on purpose: the free branch asks the database only for
+ * Two different reads on purpose: the free branch asks the database only for
  * viewer ids, which it counts and discards, so the names never enter this
  * process, let alone the response.
  */
@@ -85,7 +99,7 @@ type ViewerSlice =
   | { ok: false }
   /** `distinct: null` = the query worked but no exact number can be stated. */
   | { ok: true; locked: true; distinct: number | null }
-  | { ok: true; locked: false; recent: RecentViewer[] };
+  | { ok: true; locked: false; page: ProfileViewersPage };
 
 async function loadViewerSlice(
   supabase: Awaited<ReturnType<typeof createSupabaseServerClient>>,
@@ -117,37 +131,12 @@ async function loadViewerSlice(
     return { ok: true, locked: true, distinct: new Set(rows.map((r) => r.viewer_user_id)).size };
   }
 
-  const res = await supabase
-    .from("profile_views")
-    .select(
-      "viewer_user_id,viewed_on,first_viewed_at," +
-        "viewer:users!profile_views_viewer_user_id_fkey(id,handle,name,avatar_url)",
-    )
-    .eq("profile_user_id", userId)
-    .order("first_viewed_at", { ascending: false })
-    .limit(RECENT_LIMIT);
-  if (res.error) {
-    console.error("[me/profile-views] recent", res.error);
-    return { ok: false };
-  }
-
-  type RecentRow = {
-    viewer_user_id: string;
-    viewed_on: string;
-    first_viewed_at: string;
-    viewer: { id: string; handle: string | null; name: string | null; avatar_url: string | null } | null;
-  };
-  const recent = ((res.data ?? []) as unknown as RecentRow[])
-    .filter((r) => r.viewer)
-    .map((r) => ({
-      id: r.viewer!.id,
-      handle: r.viewer!.handle,
-      name: r.viewer!.name,
-      avatar_url: r.viewer!.avatar_url,
-      viewed_on: r.viewed_on,
-      first_viewed_at: r.first_viewed_at,
-    }));
-  return { ok: true, locked: false, recent };
+  // The paid list lives in one place so this route and
+  // /api/me/profile-viewers cannot drift apart. `null` is "we could not read
+  // it", never "nobody" — see the 500 below.
+  const page = await loadProfileViewers(supabase, userId, { limit: RECENT_LIMIT, offset: 0 });
+  if (!page) return { ok: false };
+  return { ok: true, locked: false, page };
 }
 
 export async function GET() {
@@ -228,9 +217,11 @@ export async function GET() {
     });
   }
 
-  if (!viewers.ok) {
+  if (!viewers.ok || viewers.locked) {
     // The counts are fine but the paid half isn't. Say so rather than send
     // `recent: []`, which a paying account would read as "nobody looked".
+    // (`locked` is unreachable here — the slice branches on the same `plus` —
+    // but "we don't have the list" is the honest answer either way.)
     return NextResponse.json({ ok: false, error: "Request failed" }, { status: 500 });
   }
 
@@ -239,6 +230,11 @@ export async function GET() {
     counts,
     premium: true,
     viewer_identities: "visible",
-    recent: viewers.locked ? [] : viewers.recent,
+    recent: viewers.page.users,
+    recent_total: viewers.page.total,
+    recent_has_more: viewers.page.has_more,
+    // Where "Show more" starts, counted in people consumed, not rows sent —
+    // see ProfileViewersPage.next_offset.
+    recent_next_offset: viewers.page.next_offset,
   });
 }

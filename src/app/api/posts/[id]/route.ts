@@ -7,8 +7,13 @@ import {
   resolveMentionedUserIds,
 } from "@/lib/mentions";
 import { withPostMediaUrls } from "@/lib/post-media-url";
+import { loadHonestViewRows } from "@/lib/posts/honest-views";
 import { CLIP_KEY_PREFIX, getR2S3Client, isR2Configured } from "@/lib/r2";
 import { createSupabaseServerClient } from "@/lib/supabase/server";
+import {
+  createSupabaseServiceClient,
+  isSupabaseServiceConfigured,
+} from "@/lib/supabase/service";
 
 const MAX_CONTENT_CHARS = 2000;
 
@@ -16,8 +21,36 @@ type RouteContext = { params: Promise<{ id: string }> };
 
 /**
  * Single post fetch for the viewer modal (P1-015). Returns the post + author
- * + counts (likes, comments) + viewer-relative state (liked, saved). One
- * roundtrip on modal open instead of three.
+ * + counts (likes, comments, views, reposts, saves) + viewer-relative state
+ * (liked, saved) + `is_owner`. One roundtrip on modal open instead of three.
+ *
+ * WHY `is_owner` IS COMPUTED HERE. Both post viewers used to be told who the
+ * author was by their caller — `PostViewerMobile` takes a `canDelete` prop and
+ * only ProfileMobile passes it, so on the feed and on a shared link the viewer
+ * did not know it was looking at its own post. An owner-only affordance ("who
+ * saw this") cannot be built on a flag the caller forgets to pass, so the
+ * server that already knows says so.
+ *
+ * WHY `counts.views` IS NOT `posts.view_count`. The stored counter includes
+ * the author refreshing their own post (`record_post_view` had no self-view
+ * guard until 20260912100500; 71 of 149 live ledger rows were self-views), so
+ * the number here is tallied from the `post_views` ledger with the author's
+ * own rows dropped — the same figure the feed card shows. See
+ * src/lib/posts/honest-views.ts.
+ *
+ * `counts.saves` is OPTIONAL: the key is omitted, never sent as 0, when the
+ * bookmarks count cannot be read. Zero saves and an unreadable count are
+ * different claims and the client has to be able to tell them apart.
+ *
+ * `counts.saves` COUNTS OTHER PEOPLE — the author's own bookmark is excluded
+ * (see loadSaveCount) so it can never disagree by one with the savers list at
+ * /api/me/posts/[id]/savers, which excludes it too. `viewer.saved` below is
+ * the caller's OWN bookmark and carries no such exclusion, so for the author
+ * the two move independently: an owner who taps Save flips `viewer.saved` to
+ * true while `counts.saves` stays where it was. That is correct — "12 saves"
+ * means twelve other people — but it means a client MUST NOT optimistically
+ * bump `counts.saves` on a Save tap when `is_owner` is true, or the number it
+ * paints will be contradicted by the very next fetch.
  */
 export async function GET(_req: Request, ctx: RouteContext) {
   const { id } = await ctx.params;
@@ -37,7 +70,9 @@ export async function GET(_req: Request, ctx: RouteContext) {
   const { data: row, error } = await supabase
     .from("posts")
     .select(
-      "id,user_id,type,content,tags,media_url,media_thumbnail_url,created_at," +
+      // `view_count` is read only as the fallback below and is stripped off
+      // the post before it ships — nothing should render the inflated counter.
+      "id,user_id,type,content,tags,media_url,media_thumbnail_url,view_count,created_at," +
         // Explicit FK name disambiguates the posts→users embed; see /api/feed for context.
         "author:users!posts_user_id_fkey!inner(id,name,handle,school,major,year,avatar_url)",
     )
@@ -52,8 +87,26 @@ export async function GET(_req: Request, ctx: RouteContext) {
     return NextResponse.json({ ok: false, error: "Post not found" }, { status: 404 });
   }
 
+  // The concatenated select string defeats Supabase's row typing
+  // (GenericStringError); cast through unknown. `view_count` comes off here so
+  // the inflated stored counter never reaches a client — `counts.views` below
+  // is the honest number.
+  const { view_count: storedViewCount, ...postFields } = row as unknown as {
+    view_count: number | null;
+  } & Record<string, unknown>;
+  const post = postFields as { id: string; user_id: string } & Record<string, unknown>;
+  const authorId = String(post.user_id);
+
   // Counts + viewer state in parallel — small queries, cheap to fan out.
-  const [likeCountRes, commentCountRes, viewerLikeRes, viewerSaveRes] = await Promise.all([
+  const [
+    likeCountRes,
+    commentCountRes,
+    repostCountRes,
+    viewerLikeRes,
+    viewerSaveRes,
+    viewRows,
+    saveCount,
+  ] = await Promise.all([
     supabase
       .from("post_likes")
       .select("post_id", { count: "exact", head: true })
@@ -61,6 +114,10 @@ export async function GET(_req: Request, ctx: RouteContext) {
     supabase
       .from("post_comments")
       .select("id", { count: "exact", head: true })
+      .eq("post_id", id),
+    supabase
+      .from("post_reposts")
+      .select("post_id", { count: "exact", head: true })
       .eq("post_id", id),
     supabase
       .from("post_likes")
@@ -72,24 +129,66 @@ export async function GET(_req: Request, ctx: RouteContext) {
       .select("id", { count: "exact", head: true })
       .eq("post_id", id)
       .eq("user_id", user.id),
+    // Honest views: the ledger, with this post's author's own rows dropped.
+    loadHonestViewRows([id], new Map([[id, authorId]])),
+    loadSaveCount(id, authorId),
   ]);
 
-  // The concatenated select string defeats Supabase's row typing
-  // (GenericStringError); cast through unknown.
-  const post = row as unknown as { id: string } & Record<string, unknown>;
+  // `null` from the ledger means "we could not read it", not "nobody looked".
+  // A single post is a secondary number on a screen whose job is the post
+  // itself, so this makes the same call /api/feed:251 does and keeps showing
+  // the stored counter rather than failing the fetch — which means the number
+  // can fall back to one that still INCLUDES the author's own self-views. The
+  // metrics screens make the opposite call (creator-stats 500s) because there
+  // the number is the product.
+  const views = viewRows === null ? (storedViewCount ?? 0) : viewRows.length;
 
   return NextResponse.json({
     ok: true,
     post: withPostMediaUrls(post),
+    is_owner: authorId === user.id,
     counts: {
       likes:    likeCountRes.count ?? 0,
       comments: commentCountRes.count ?? 0,
+      views,
+      reposts:  repostCountRes.count ?? 0,
+      // Omitted, not zeroed, when the count could not be read.
+      ...(saveCount === null ? {} : { saves: saveCount }),
     },
     viewer: {
       liked: (viewerLikeRes.count ?? 0) > 0,
       saved: (viewerSaveRes.count ?? 0) > 0,
     },
   });
+}
+
+/**
+ * How many people saved this post. `null` means "we could not read it", which
+ * the caller turns into an ABSENT key rather than a 0.
+ *
+ * Service role because `bookmarks` RLS is `bookmarks_all_own` — owner of the
+ * bookmark — so a cookie-client count returns 1 or 0 (the caller's own save)
+ * however many people saved it. Head-only: the count crosses the wire, never a
+ * row, so no identity can escape here. Who saved it is the owner-only, paid
+ * surface and lives in /api/me/posts/[id]/savers.
+ *
+ * The author's own bookmark is excluded, exactly as the savers list and
+ * creator-stats exclude it, so the count and the list can never disagree by
+ * one — and so "12 saves" means twelve other people, the same rule the view
+ * numbers got in b3f23df.
+ */
+async function loadSaveCount(postId: string, authorId: string): Promise<number | null> {
+  if (!isSupabaseServiceConfigured()) return null;
+  const { count, error } = await createSupabaseServiceClient()
+    .from("bookmarks")
+    .select("id", { count: "exact", head: true })
+    .eq("post_id", postId)
+    .neq("user_id", authorId);
+  if (error) {
+    console.error("[posts/:id GET saves]", error);
+    return null;
+  }
+  return count ?? 0;
 }
 
 /**

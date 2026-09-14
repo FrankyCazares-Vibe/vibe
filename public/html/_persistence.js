@@ -132,6 +132,10 @@ function _vibeTopHere() {
     if (st === 0) return { message: "Couldn't reach Vibe. Check your connection and try again." };
     if (st === 401) return { message: "You've been signed out. Sign in and try again.", action: { label: 'Sign in', href: '/auth/login?next=' + next } };
     if (st === 403 && sig.code === 'terms_required') return { message: 'Accept the Terms first, then try again.', action: { label: 'Review Terms', href: '/auth/terms?next=' + next } };
+    // A Vibe+ gate, not a wrist-slap: the generic 403 line below reads as a
+    // telling-off and points nowhere. Mirrors the plus_required rule in
+    // src/lib/feedback/failure-copy.ts — change both together.
+    if (st === 403 && sig.code === 'plus_required') return { message: "That's a Vibe+ feature.", action: { label: 'See Vibe+', href: '/plus?next=' + next } };
     if (st === 429) return { message: "You're going a little fast. " + retryLine(sig.retryAfterSec) };
     if (st === 403 && err === 'Unavailable') return { message: "You can't connect with this person." };
     if (st === 403 && isSentence(err)) return { message: err.trim() };
