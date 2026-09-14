@@ -8,6 +8,7 @@ import { Drawer } from "vaul";
 import { ImageCropperModal } from "@/components/ImageCropperModal";
 import { LoadFailed, asLoadFailure, type LoadFailure } from "@/components/feedback/LoadFailed";
 import { CampusSearchOverlay } from "@/components/mobile/CampusMobile";
+import { MutualsSheet } from "@/components/mobile/MutualsSheet";
 import { PostComposerMobile } from "@/components/mobile/PostComposerMobile";
 import { PostViewerMobile } from "@/components/mobile/PostViewerMobile";
 import { ResumeViewerMobile } from "@/components/mobile/ResumeViewerMobile";
@@ -106,6 +107,11 @@ type VibeUser = {
     followers?: string | number;
     following?: string | number;
     connections?: string | number;
+    /** Viewer-relative, and only on the visitor bootstrap: people the
+     *  visited user follows whom the viewer also follows (the directed
+     *  intersection `getMutualCount` counts). Sent as a STRING, and
+     *  always "0" on your own profile. */
+    mutual?: string | number;
   };
   /** Set by /api/users/[handle]/bootstrap. true = this payload is for a
    *  visited user, not the signed-in viewer. */
@@ -252,6 +258,24 @@ export function ProfileMobile({ targetHandle }: Props = {}) {
   const [searchOpen, setSearchOpen] = useState(false);
   // Visitor ⋯ menu (Report / Mute / Block). Mounted only while open.
   const [safetyOpen, setSafetyOpen] = useState(false);
+  // "You both follow" list, opened from the pill above the Connect button.
+  // Mounted only while open, like every other sheet on this screen.
+  const [mutualsOpen, setMutualsOpen] = useState(false);
+  // The live size of that set, once the sheet has actually counted it (and as
+  // the viewer unfollows people from inside it). Stamped with the handle it was
+  // measured on, so a client navigation to another profile falls back to that
+  // profile's own bootstrap number instead of carrying the last one over.
+  const [mutualLive, setMutualLive] = useState<{
+    handle: string;
+    count: number;
+  } | null>(null);
+  const onMutualCount = useCallback(
+    (count: number) => {
+      if (!targetHandle) return;
+      setMutualLive({ handle: targetHandle, count });
+    },
+    [targetHandle],
+  );
   // Which portfolio sub-section the owner is currently editing.
   // `null` = read-only. Sheets are full-screen vaul drawers.
   const [editingPortfolio, setEditingPortfolio] = useState<
@@ -1056,6 +1080,19 @@ export function ProfileMobile({ targetHandle }: Props = {}) {
   const counts = user.counts ?? {};
   const followers = String(counts.followers ?? "0");
   const connections = String(counts.connections ?? "0");
+  // Viewer-relative, so it belongs beside the Connect button rather than in
+  // the stats row (those are the visited user's own numbers). The bootstrap
+  // sends it as a string; a missing or unparseable value means "unknown", and
+  // an unknown count hides the pill rather than painting "0 you both follow".
+  const mutualRaw = Number(counts.mutual ?? 0);
+  const mutualCount = Number.isFinite(mutualRaw) ? mutualRaw : 0;
+  // The sheet recounts the same set from the same server function, so once it
+  // has answered its number wins — including after an unfollow performed inside
+  // it, which really does remove that person from "people you both follow".
+  const mutualShown =
+    mutualLive && mutualLive.handle === targetHandle
+      ? mutualLive.count
+      : mutualCount;
   const resumePortfolio = (user.resumePortfolio ?? []).filter(
     (r) => !!r?.url,
   );
@@ -1678,11 +1715,31 @@ export function ProfileMobile({ targetHandle }: Props = {}) {
             prominent (the primary call-to-action on someone else's
             profile). */}
         {isVisitor ? (
-          <FollowButton
-            state={followState}
-            busy={followBusy}
-            onTap={toggleFollow}
-          />
+          <>
+            {/* "N you both follow" — the phone twin of profile.html's
+                .profile-mutual-pill. Hidden at 0 (a "0 you both follow" pill
+                is what S55 removed, and it is what a failed count would
+                otherwise paint) and absent on your own profile, where the
+                owner bootstrap always sends "0". Tapping opens the list of
+                exactly the people this number counts. */}
+            {mutualShown > 0 && targetHandle ? (
+              <button
+                type="button"
+                onClick={() => setMutualsOpen(true)}
+                style={mutualPillStyle}
+              >
+                <span style={{ fontWeight: 800, color: "#1C1C1E" }}>
+                  {mutualShown}
+                </span>{" "}
+                you both follow
+              </button>
+            ) : null}
+            <FollowButton
+              state={followState}
+              busy={followBusy}
+              onTap={toggleFollow}
+            />
+          </>
         ) : null}
       </div>
 
@@ -1935,6 +1992,17 @@ export function ProfileMobile({ targetHandle }: Props = {}) {
           onClose={() => setOpenPostId(null)}
           canDelete={!isVisitor}
           onDeleted={() => void refetchPosts()}
+        />
+      ) : null}
+      {mutualsOpen && targetHandle ? (
+        // Keyed on the handle: the sheet holds a whole person's list in state,
+        // and a client navigation that reuses this component would otherwise
+        // leave the previous profile's rows painted under the new heading.
+        <MutualsSheet
+          key={targetHandle}
+          handle={targetHandle}
+          onClose={() => setMutualsOpen(false)}
+          onCount={onMutualCount}
         />
       ) : null}
       {pendingCrop ? (
@@ -5186,6 +5254,32 @@ const sheetNoteStyle: React.CSSProperties = {
   fontSize: 12.5,
   lineHeight: 1.5,
   color: "#8A8580",
+};
+
+/** Matches profile.html's .profile-mutual-pill: a quiet, lowercase count that
+ *  reads as information, not as the screen's call to action — the Connect
+ *  button directly under it is that. */
+const mutualPillStyle: React.CSSProperties = {
+  display: "inline-flex",
+  alignItems: "center",
+  gap: 6,
+  marginBottom: 10,
+  // 36px tall with the 11px type: the smallest this can be and still be aimed
+  // at with a thumb, given the full-width Connect button 10px underneath it.
+  minHeight: 36,
+  padding: "9px 14px",
+  borderRadius: 999,
+  background: "rgba(28,28,30,0.05)",
+  border: "1px solid rgba(28,28,30,0.10)",
+  fontFamily: "DM Sans, sans-serif",
+  fontSize: 11,
+  fontWeight: 600,
+  letterSpacing: "0.2px",
+  textTransform: "lowercase",
+  whiteSpace: "nowrap",
+  color: "#8A8580",
+  cursor: "pointer",
+  WebkitTapHighlightColor: "transparent",
 };
 
 const sheetGhostButtonStyle: React.CSSProperties = {

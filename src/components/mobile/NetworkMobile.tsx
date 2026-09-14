@@ -24,9 +24,9 @@ import { vibeRequest } from "@/lib/feedback/request";
  *   - /api/me/follow                 → POST/DELETE for Connect / Unfollow
  */
 
-type FollowState = "none" | "following" | "followed_by" | "connected" | "self";
+export type FollowState = "none" | "following" | "followed_by" | "connected" | "self";
 
-type ListUser = {
+export type ListUser = {
   id: string;
   name: string | null;
   handle: string | null;
@@ -798,7 +798,7 @@ function SearchPane({
   );
 }
 
-function UserRow({
+export function UserRow({
   user,
   onStateChange,
   variant = "relationship",
@@ -893,7 +893,7 @@ function UserRow({
                 user.handle ? `@${user.handle}` : null,
                 user.major,
                 user.mutual_count
-                  ? `${user.mutual_count} mutual${user.mutual_count === 1 ? "" : "s"}`
+                  ? `${user.mutual_count} you both follow`
                   : user.reason,
               ]
                 .filter(Boolean)
@@ -948,7 +948,7 @@ function SuggestionReason({ user }: { user: ListUser }) {
   const category = categorizeSuggestion(user);
   const text =
     category === "mutuals"
-      ? `${user.mutual_count} mutual${user.mutual_count === 1 ? "" : "s"}`
+      ? `${user.mutual_count} you both follow`
       : category === "org"
         ? user.shared_org_count === 1
           ? "In your org"
@@ -1170,7 +1170,7 @@ function EmptyState({ title, body }: { title: string; body: string }) {
 
 // ---------------------------------------------------------------------------
 
-const listStyle: React.CSSProperties = {
+export const listStyle: React.CSSProperties = {
   listStyle: "none",
   padding: 0,
   margin: 0,
