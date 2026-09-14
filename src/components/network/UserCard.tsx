@@ -27,6 +27,23 @@ export type UserCardProps = {
   follow_state: "self" | "none" | "following" | "followed_by" | "connected";
   /** Called after a successful follow/unfollow/message so the parent can refresh. */
   onStateChange?: (next: UserCardProps["follow_state"]) => void;
+  /**
+   * Narrow-column variant: no banner, smaller avatar, tighter padding. The
+   * full card carries a fixed 360px banner, which is wider than the whole
+   * profile-views column on /otto?tab=stats and wider than the phone. Same
+   * card, same action button, same follow state — just the part that can't
+   * fit removed.
+   */
+  compact?: boolean;
+  /**
+   * Extra slot — the day label on "Who viewed you". Kept as a slot so the card
+   * stays ignorant of metrics: it renders whatever the list hands it.
+   *
+   * Full card: right-aligned column before the action button. `compact`: its
+   * own line under the meta line, because a narrow row has no horizontal space
+   * to spare and the name loses every pixel this column would take.
+   */
+  trailing?: React.ReactNode;
 };
 
 const META_DOT = " · ";
@@ -58,7 +75,11 @@ function metaLine(
   const parts: string[] = [];
   if (major) parts.push(major);
   if (year) parts.push(String(year));
-  if (mutuals > 0) parts.push(`${mutuals} mutual${mutuals === 1 ? "" : "s"}`);
+  // "N mutuals" read as "you two are connected"; the number is actually the
+  // people you BOTH follow (getMutualIds, a directed intersection), so the
+  // words now say that. Reads the same singular or plural: "1 you both
+  // follow", "12 you both follow".
+  if (mutuals > 0) parts.push(`${mutuals} you both follow`);
   if (sharedOrgs > 0)
     parts.push(sharedOrgs === 1 ? "1 shared org" : `${sharedOrgs} shared orgs`);
   return parts.join(META_DOT);
@@ -167,6 +188,8 @@ export function UserCard(props: UserCardProps) {
     reason,
     follow_state,
     onStateChange,
+    compact = false,
+    trailing,
   } = props;
 
   const profileHref = handle ? `/profile/${encodeURIComponent(handle)}` : null;
@@ -176,6 +199,7 @@ export function UserCard(props: UserCardProps) {
     () => bannerStyleFor(id, banner_url, banner_gradient),
     [id, banner_url, banner_gradient],
   );
+  const avatarSize = compact ? 44 : 56;
   const [hovered, setHovered] = useState(false);
 
   return (
@@ -186,8 +210,8 @@ export function UserCard(props: UserCardProps) {
         position: "relative",
         display: "flex",
         alignItems: "center",
-        gap: 14,
-        padding: "12px 16px",
+        gap: compact ? 10 : 14,
+        padding: compact ? "10px 12px" : "12px 16px",
         background:
           "linear-gradient(180deg, rgba(255,253,248,0.78) 0%, rgba(255,250,240,0.66) 100%)",
         backdropFilter: "blur(28px) saturate(180%)",
@@ -195,7 +219,8 @@ export function UserCard(props: UserCardProps) {
         border: hovered
           ? "1px solid rgba(255,180,150,0.55)"
           : "1px solid rgba(255,255,255,0.7)",
-        borderRadius: 18,
+        borderRadius: compact ? 14 : 18,
+        minWidth: 0,
         boxShadow: hovered
           ? [
               "inset 0 1px 0 rgba(255,255,255,0.9)",
@@ -218,8 +243,8 @@ export function UserCard(props: UserCardProps) {
         aria-label={name || handle || "Profile"}
         style={{
           display: "block",
-          width: 56,
-          height: 56,
+          width: avatarSize,
+          height: avatarSize,
           borderRadius: 999,
           background: avatar_url
             ? `url(${avatar_url}) center/cover`
@@ -231,8 +256,8 @@ export function UserCard(props: UserCardProps) {
           textDecoration: "none",
           fontFamily: "Fraunces, serif",
           fontWeight: 800,
-          fontSize: 18,
-          lineHeight: "54px",
+          fontSize: compact ? 15 : 18,
+          lineHeight: `${avatarSize - 2}px`,
           textAlign: "center",
         }}
       >
@@ -251,7 +276,7 @@ export function UserCard(props: UserCardProps) {
           <div
             style={{
               fontFamily: "Fraunces, serif",
-              fontSize: 16,
+              fontSize: compact ? 14.5 : 16,
               fontWeight: 800,
               color: "#1C1C1E",
               letterSpacing: "-0.01em",
@@ -291,26 +316,68 @@ export function UserCard(props: UserCardProps) {
             </div>
           ) : null}
         </Link>
+        {/* Compact rows put the trailing slot INSIDE the name column, on its
+            own line. As a sibling column it was unshrinkable next to an
+            unshrinkable avatar and action button, so on a 375px phone flexbox
+            took the whole shortfall out of the name — the one thing "Who
+            viewed you" exists to show — leaving about two characters before
+            the ellipsis. */}
+        {compact && trailing ? (
+          <div
+            style={{
+              fontFamily: "DM Sans, sans-serif",
+              fontSize: 11.5,
+              fontWeight: 600,
+              color: "#8A8580",
+              marginTop: 2,
+              overflow: "hidden",
+              textOverflow: "ellipsis",
+              whiteSpace: "nowrap",
+            }}
+          >
+            {trailing}
+          </div>
+        ) : null}
       </div>
 
       {/* Banner anchored to the right, just before the action button — name
-          can grow into the available space without pushing the banner around. */}
-      <Link
-        href={profileHref ?? "#"}
-        aria-hidden
-        tabIndex={-1}
-        style={{
-          display: "block",
-          height: 88,
-          width: 360,
-          borderRadius: 14,
-          flexShrink: 0,
-          ...bannerStyle,
-          border: "1px solid rgba(255,255,255,0.7)",
-          boxShadow:
-            "inset 0 1px 0 rgba(255,255,255,0.4), 0 2px 8px rgba(28,28,30,0.08)",
-        }}
-      />
+          can grow into the available space without pushing the banner around.
+          Its 360px are fixed, so the compact variant drops it rather than
+          overflowing a narrow column. */}
+      {compact ? null : (
+        <Link
+          href={profileHref ?? "#"}
+          aria-hidden
+          tabIndex={-1}
+          style={{
+            display: "block",
+            height: 88,
+            width: 360,
+            borderRadius: 14,
+            flexShrink: 0,
+            ...bannerStyle,
+            border: "1px solid rgba(255,255,255,0.7)",
+            boxShadow:
+              "inset 0 1px 0 rgba(255,255,255,0.4), 0 2px 8px rgba(28,28,30,0.08)",
+          }}
+        />
+      )}
+
+      {trailing && !compact ? (
+        <div
+          style={{
+            flexShrink: 0,
+            textAlign: "right",
+            fontFamily: "DM Sans, sans-serif",
+            fontSize: 11.5,
+            fontWeight: 600,
+            color: "#8A8580",
+            whiteSpace: "nowrap",
+          }}
+        >
+          {trailing}
+        </div>
+      ) : null}
 
       {follow_state !== "self" ? (
         <ActionButton

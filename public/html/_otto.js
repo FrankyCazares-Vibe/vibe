@@ -625,7 +625,9 @@
       _ottoSectionFailed('#ottoMetricsGrid', pvr.ok ? csr : pvr, line, _ottoLoadMetrics);
       return null;
     }
-    return { pv, cs };
+    // The failed half's result rides along so the grid can say which half
+    // refused, instead of painting its tiles as 0.
+    return { pv, cs, pvr, csr };
   }
 
   function _ottoLoadMetrics() {
@@ -646,20 +648,36 @@
     // Retry, in the grid. Painting "not available yet" over it would turn a
     // failed load back into a shrug.
     if (!data) return;
-    const pvc = data.pv ? data.pv.counts : { thirty_days: 0 };
-    const cst = data.cs ? data.cs.totals : { views: 0, likes: 0, reposts: 0 };
-    const tiles = [
-      { n: pvc.thirty_days || 0, label: 'Profile views (30d)', accent: true },
-      { n: cst.views || 0,       label: 'Post views' },
-      { n: cst.likes || 0,       label: 'Likes' },
-      { n: cst.reposts || 0,     label: 'Reposts' },
-    ];
+    // One half failed: its tiles are NOT painted as 0 — a refused read is not
+    // a zero. The half that loaded renders, and the failed half says so in
+    // the same grid with its own Retry.
+    const tiles = [];
+    if (data.pv) {
+      const pvc = data.pv.counts || {};
+      tiles.push({ n: pvc.thirty_days || 0, label: 'Profile views (30d)', accent: true });
+    }
+    if (data.cs) {
+      const cst = data.cs.totals || {};
+      tiles.push(
+        { n: cst.views || 0,   label: 'Post views' },
+        { n: cst.likes || 0,   label: 'Likes' },
+        { n: cst.reposts || 0, label: 'Reposts' },
+      );
+    }
     grid.innerHTML = tiles.map(t => (
       '<div class="otto-stat-tile' + (t.accent ? ' otto-stat-tile--accent' : '') + '">' +
         '<div class="otto-stat-num">' + _ottoFormatN(t.n) + '</div>' +
         '<div class="otto-stat-label">' + t.label + '</div>' +
       '</div>'
     )).join('');
+    if (!data.pv || !data.cs) {
+      const box = document.createElement('div');
+      grid.appendChild(box);
+      const failed = data.pv ? data.csr : data.pvr;
+      const half = data.pv ? "Couldn't load your post stats." : "Couldn't load your profile views.";
+      window.vibeLoadFailed(box, window.vibeLoadFailure(failed, half), _ottoLoadMetrics,
+        { tone: 'dark', compact: true });
+    }
   }
 
   async function _ottoFetchUnreadCount() {
