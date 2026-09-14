@@ -5,7 +5,9 @@ import { useEffect, useRef, useState } from "react";
 import { Drawer } from "vaul";
 
 import { asLoadFailure, LoadFailed, type LoadFailure } from "@/components/feedback/LoadFailed";
+import { PostAudienceSheet } from "@/components/mobile/PostAudienceSheet";
 import { SharePostSheet } from "@/components/mobile/SharePostSheet";
+import type { PostAudienceKind } from "@/components/posts/PostAudienceList";
 import { copyText, vibeRequest } from "@/lib/feedback/request";
 
 /**
@@ -18,7 +20,9 @@ import { copyText, vibeRequest } from "@/lib/feedback/request";
  *   - Scrollable body: image or video (if any), content with @handle / #tag
  *     linkified, tag chips, then the engagement bar.
  *   - Engagement bar: Like (heart + count), Comment (chat + count),
- *     Repost (loop + count), Save (bookmark), Share. Hits the same
+ *     Repost (loop + count), Views (eye + count — public, and for the
+ *     author a tap through to who they were), Saves (author only, when
+ *     the count could be read), Save (bookmark), Share. Hits the same
  *     /api/posts/[id]/{like,repost,save,comments,view} endpoints the
  *     desktop FeedRow uses, so all the counts stay consistent across
  *     surfaces.
@@ -63,8 +67,28 @@ type Comment = {
   author: { id: string; name: string | null; handle: string | null; avatar_url: string | null } | null;
 };
 
-type Counts = { likes: number; comments: number };
+/**
+ * `saves` is OPTIONAL because the server omits the key rather than sending 0
+ * when the bookmarks count can't be read (/api/posts/[id]): "nobody saved it"
+ * and "we couldn't count" are different claims, and absent means no number is
+ * shown at all. `views` is the honest ledger tally with the author's own rows
+ * dropped — never `posts.view_count`.
+ */
+type Counts = {
+  likes: number;
+  comments: number;
+  views: number;
+  reposts: number;
+  saves?: number;
+};
 type Viewer = { liked: boolean; saved: boolean };
+
+/** A count we can't read as a finite number renders as 0, never as the word
+ *  "undefined". Deliberately NOT applied to `saves`, whose absence is a claim
+ *  of its own ("we couldn't count") and hides the entry instead. */
+function num(v: unknown): number {
+  return typeof v === "number" && Number.isFinite(v) ? v : 0;
+}
 
 export function PostViewerMobile({
   postId,
@@ -82,8 +106,21 @@ export function PostViewerMobile({
   onDeleted?: () => void;
 }) {
   const [post, setPost] = useState<PostDetail | null>(null);
-  const [counts, setCounts] = useState<Counts>({ likes: 0, comments: 0 });
+  const [counts, setCounts] = useState<Counts>({
+    likes: 0,
+    comments: 0,
+    views: 0,
+    reposts: 0,
+  });
   const [viewer, setViewer] = useState<Viewer>({ liked: false, saved: false });
+  // Server-computed (`is_owner` from /api/posts/[id]), not the `canDelete`
+  // prop: only ProfileMobile passes that one, so on the feed and on a shared
+  // link the author was treated as a stranger. The owner-only audience sheets
+  // hang off this, and the routes behind them re-check ownership themselves.
+  const [isOwner, setIsOwner] = useState(false);
+  // Which audience sheet is up, if any. Mounted only while open, so the
+  // owner-only fetch never fires for a sheet nobody asked for.
+  const [audienceKind, setAudienceKind] = useState<PostAudienceKind | null>(null);
   // Why the post didn't load; the body shows LoadFailed in its place.
   const [loadErr, setLoadErr] = useState<LoadFailure | null>(null);
   // Bumped by Retry to run the post load again.
@@ -158,10 +195,16 @@ export function PostViewerMobile({
   useEffect(() => {
     let cancelled = false;
     (async () => {
-      const r = await vibeRequest<{ post?: PostDetail; counts?: Counts; viewer?: Viewer }>(
-        `/api/posts/${postId}`,
-        { cache: "no-store", quiet: true, failure: "Couldn't load this post." },
-      );
+      const r = await vibeRequest<{
+        post?: PostDetail;
+        counts?: Counts;
+        viewer?: Viewer;
+        is_owner?: boolean;
+      }>(`/api/posts/${postId}`, {
+        cache: "no-store",
+        quiet: true,
+        failure: "Couldn't load this post.",
+      });
       if (cancelled) return;
       if (!r.ok || !r.data.post) {
         setLoadErr(asLoadFailure(r, "Couldn't load this post."));
@@ -169,8 +212,29 @@ export function PostViewerMobile({
       }
       setLoadErr(null);
       setPost(r.data.post);
-      if (r.data.counts) setCounts(r.data.counts);
+      // `vibeRequest` casts the parsed body to the declared type without
+      // checking it (src/lib/feedback/request.ts: `(parsed ?? {}) as T`), so a
+      // payload missing a key — a cached pre-wave-A response, a rollback —
+      // would print the literal word "undefined" beside an icon. Coerce here,
+      // once, rather than at each call site. `saves` keeps its three-way
+      // meaning: a number, or absent = "we couldn't count", which shows as
+      // nothing at all rather than as 0.
+      if (r.data.counts) {
+        const c = r.data.counts as Partial<Counts>;
+        setCounts({
+          likes: num(c.likes),
+          comments: num(c.comments),
+          views: num(c.views),
+          reposts: num(c.reposts),
+          ...(typeof c.saves === "number" && Number.isFinite(c.saves)
+            ? { saves: c.saves }
+            : {}),
+        });
+      }
       if (r.data.viewer) setViewer(r.data.viewer);
+      // Fails closed: anything but an explicit true leaves the owner-only
+      // affordances off.
+      setIsOwner(r.data.is_owner === true);
     })();
     return () => {
       cancelled = true;
@@ -293,6 +357,14 @@ export function PostViewerMobile({
 
   const author = post?.author ?? null;
   const authorHandle = author?.handle ?? null;
+  // ONE owner flag for the whole screen. The engagement bar keys on the
+  // server's `is_owner`, so keying the ⋯ menu on the caller-supplied
+  // `canDelete` alone would offer the author "Report post" on their own post
+  // while the bar right above it shows them their own viewers — CampusMobile
+  // and PostPageClient both omit the prop. `canDelete` stays in the OR so
+  // ProfileMobile's optimistic-removal path is untouched, and deleting still
+  // fails closed server-side (DELETE /api/posts/[id] re-checks ownership).
+  const owner = canDelete || isOwner;
   // media_url is a /api/posts/[id]/media proxy path, so a `clips/` sniff
   // would call every video an image — trust the server's media_kind.
   const isImage =
@@ -539,7 +611,7 @@ export function PostViewerMobile({
                     );
                   }}
                 />
-                {!canDelete ? (
+                {!owner ? (
                   <ViewerMenuItem
                     label="Report post"
                     tone="danger"
@@ -561,7 +633,7 @@ export function PostViewerMobile({
                     }}
                   />
                 ) : null}
-                {canDelete ? (
+                {owner ? (
                   <ViewerMenuItem
                     label={deleting ? "Deleting…" : "Delete post"}
                     tone="danger"
@@ -676,12 +748,20 @@ export function PostViewerMobile({
               </div>
             ) : null}
 
-            {/* Engagement bar */}
+            {/* Engagement bar. Spacing is tighter than the four-item bar it
+                grew out of: with Views — and, on the author's own post, the
+                saves count — this carries six items, and at the old
+                18px + 8px-a-side it pushed Save off a 375px screen, which
+                (the body scrolls vertically) would have let the whole post
+                slide sideways. It wraps rather than overflowing if a count
+                ever runs to four digits. */}
             <div
               style={{
                 display: "flex",
                 alignItems: "center",
-                gap: 18,
+                flexWrap: "wrap",
+                columnGap: 12,
+                rowGap: 8,
                 paddingTop: 8,
                 borderTop: "1px solid rgba(28,28,30,0.06)",
               }}
@@ -703,14 +783,59 @@ export function PostViewerMobile({
                 onTap={repost}
                 icon={<RepostIcon />}
               />
-              <div style={{ flex: 1 }} />
-              <EngagementButton
-                label=""
-                active={viewer.saved}
-                onTap={toggleSave}
-                activeColor="#1C1C1E"
-                icon={<BookmarkIcon filled={viewer.saved} />}
-              />
+              {/* Views. The number is public — the feed card shows it to
+                  everyone — so it renders on every viewport for every
+                  reader. Only the author can tap through to the people
+                  behind it: counts are public, identities are private. */}
+              {isOwner ? (
+                <EngagementButton
+                  label={String(counts.views)}
+                  ariaLabel={`${counts.views} views — see who saw this`}
+                  onTap={() => setAudienceKind("viewers")}
+                  icon={<EyeIcon />}
+                />
+              ) : (
+                <EngagementStat label={String(counts.views)} icon={<EyeIcon />} />
+              )}
+              {/* Saves, author only. Absent means the count couldn't be read,
+                  and an unread count shows as nothing rather than as 0. It
+                  counts OTHER people (the author's own bookmark is excluded),
+                  which is why tapping Save below never moves it. It sits with
+                  Views, on the left: both are the author's own numbers, it
+                  keeps the bar's icon-then-count pattern (a bare trailing
+                  number reads as belonging to the eye beside it), and it puts
+                  a gap between it and the Save toggle — two adjacent small
+                  targets, one of which writes a bookmark. */}
+              {isOwner && typeof counts.saves === "number" && counts.saves > 0 ? (
+                <EngagementButton
+                  label={String(counts.saves)}
+                  ariaLabel={`${counts.saves} saves — see who saved this`}
+                  onTap={() => setAudienceKind("savers")}
+                  icon={<BookmarkIcon />}
+                />
+              ) : null}
+              {/* `margin-left:auto` rather than a `flex:1` spacer element: the
+                  spacer only grows AFTER lines are formed, so when the bar
+                  wraps it would strand Save at the far left of line 2 while
+                  pushing the last left-hand item to the far right of line 1.
+                  An auto margin is resolved per line, so Save keeps the right
+                  edge of whichever line it lands on. */}
+              <div
+                style={{
+                  marginLeft: "auto",
+                  display: "inline-flex",
+                  alignItems: "center",
+                  columnGap: 12,
+                }}
+              >
+                <EngagementButton
+                  label=""
+                  active={viewer.saved}
+                  onTap={toggleSave}
+                  activeColor="#1C1C1E"
+                  icon={<BookmarkIcon filled={viewer.saved} />}
+                />
+              </div>
             </div>
 
             {/* Comments drawer */}
@@ -849,6 +974,18 @@ export function PostViewerMobile({
           onClose={() => setShareOpen(false)}
         />
       ) : null}
+
+      {/* Who saw / who saved. Mounted only while open — the owner-only fetch
+          behind it should never run for a sheet nobody asked for — and
+          `nested` for the same vaul body-lock reason as the share sheet. */}
+      {audienceKind ? (
+        <PostAudienceSheet
+          postId={postId}
+          kind={audienceKind}
+          nested
+          onClose={() => setAudienceKind(null)}
+        />
+      ) : null}
     </Drawer.Root>
   );
 }
@@ -934,40 +1071,66 @@ function CommentRow({ c }: { c: Comment }) {
   );
 }
 
+/** One item in the engagement bar, so the tappable and the static entries
+ *  (below) can't drift apart. `cursor` is the only difference. */
+function engagementItemStyle(color: string, tappable: boolean): React.CSSProperties {
+  return {
+    display: "inline-flex",
+    alignItems: "center",
+    gap: 5,
+    // 4px a side, not 8: see the bar's own note — six items have to fit a
+    // 375px phone without the post being able to scroll sideways.
+    padding: "6px 4px",
+    background: "transparent",
+    border: "none",
+    color,
+    fontFamily: "DM Sans, sans-serif",
+    fontSize: 13,
+    fontWeight: 600,
+    cursor: tappable ? "pointer" : "default",
+  };
+}
+
 function EngagementButton({
   label,
   icon,
   onTap,
   active,
   activeColor,
+  ariaLabel,
 }: {
   label: string;
   icon: React.ReactNode;
   onTap: () => void;
   active?: boolean;
   activeColor?: string;
+  /** For a button whose visible text is only a number — "12" says nothing
+   *  about what tapping it does. */
+  ariaLabel?: string;
 }) {
   return (
     <button
       type="button"
       onClick={onTap}
-      style={{
-        display: "inline-flex",
-        alignItems: "center",
-        gap: 5,
-        padding: "6px 8px",
-        background: "transparent",
-        border: "none",
-        color: active && activeColor ? activeColor : "#5C5853",
-        fontFamily: "DM Sans, sans-serif",
-        fontSize: 13,
-        fontWeight: 600,
-        cursor: "pointer",
-      }}
+      aria-label={ariaLabel}
+      style={engagementItemStyle(active && activeColor ? activeColor : "#5C5853", true)}
     >
       {icon}
       {label ? <span>{label}</span> : null}
     </button>
+  );
+}
+
+/** The non-interactive twin: a number that is worth reading but leads
+ *  nowhere. Not a disabled <button> — there is no action to disable, and a
+ *  disabled control is skipped by the screen reader that should still hear
+ *  the count. */
+function EngagementStat({ label, icon }: { label: string; icon: React.ReactNode }) {
+  return (
+    <span style={engagementItemStyle("#5C5853", false)}>
+      {icon}
+      {label ? <span>{label}</span> : null}
+    </span>
   );
 }
 
@@ -1000,6 +1163,22 @@ function BookmarkIcon({ filled }: { filled?: boolean }) {
   return (
     <svg width="18" height="18" viewBox="0 0 24 24" fill={filled ? "#1C1C1E" : "none"} stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" aria-hidden>
       <path d="M19 21l-7-5-7 5V5a2 2 0 0 1 2-2h10a2 2 0 0 1 2 2z" />
+    </svg>
+  );
+}
+/** The same eye the desktop feed row draws (campus-home.tsx EyeIcon), at this
+ *  bar's 18px so it sits level with the heart and the bookmark beside it. Its
+ *  own 16-unit viewBox comes along, so the shape is identical, not a redraw. */
+function EyeIcon() {
+  return (
+    <svg width="18" height="18" viewBox="0 0 16 16" fill="none" aria-hidden>
+      <path
+        d="M1.5 8s2.5-4.5 6.5-4.5S14.5 8 14.5 8s-2.5 4.5-6.5 4.5S1.5 8 1.5 8z"
+        stroke="currentColor"
+        strokeWidth="1.4"
+        strokeLinejoin="round"
+      />
+      <circle cx="8" cy="8" r="2" stroke="currentColor" strokeWidth="1.4" />
     </svg>
   );
 }

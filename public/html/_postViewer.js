@@ -10,6 +10,11 @@
 //
 // Unsigned visitors (share links): modal still opens but Like/Save/Comment
 // surface a "Sign in" toast instead of hitting the API.
+//
+// The engagement bar also carries the view count (free, everyone sees it) and,
+// for the author only, the way into "Who saw this" / "Who saved this" — the
+// paid audience sheet this file builds at the bottom. Counts are public,
+// identities are private (handoffs/2026-09-14-wave-plan-metrics-screens.md).
 // ══════════════════════════════════════════════════════════════════════════
 
 (function () {
@@ -127,12 +132,16 @@
   .vpv-mention { color: #7B5FE0; font-weight: 600; text-decoration: none; }
   .vpv-mention:hover { text-decoration: underline; }
 
+  /* Six items now live on this row (the author sees all of them), and the
+     counts render unabbreviated — "1203" is as wide as it reads. In a narrow
+     window, or inside the app shell's iframe, the row wraps to a second line
+     instead of squeezing the buttons into each other. */
   .vpv-actions {
-    display: flex; align-items: center; gap: 4px;
+    display: flex; flex-wrap: wrap; align-items: center; gap: 4px;
     padding: 10px 14px; border-top: 1px solid rgba(28,28,30,.08);
   }
   .vpv-act {
-    background: transparent; border: none;
+    background: transparent; border: none; flex-shrink: 0;
     font-family: inherit; font-size: 13px; font-weight: 600;
     color: #1C1C1E; padding: 8px 12px; border-radius: 999px;
     cursor: none; display: inline-flex; align-items: center; gap: 6px;
@@ -144,6 +153,13 @@
   .vpv-act.on .vpv-heart { fill: #FF5C35; stroke: #FF5C35; }
   .vpv-act.on .vpv-bookmark { fill: #1C1C1E; stroke: #1C1C1E; }
   .vpv-act svg { display: block; }
+  /* A count nobody can act on is a label, not a button: the Views entry is
+     disabled for everyone but the author, so it must stop pretending. */
+  .vpv-act[disabled] { cursor: inherit; }
+  .vpv-act[disabled]:hover { background: transparent; }
+  .vpv-act[disabled]:active { transform: none; }
+  /* The saves number hugs the bookmark so the pair reads as one control. */
+  .vpv-act-count { padding-left: 2px; }
   .vpv-spacer { flex: 1; }
 
   .vpv-comments {
@@ -220,6 +236,84 @@
   }
   .vpv-composer button[disabled] { opacity: .4; cursor: default; }
 
+  /* ── Audience sheet ("Who saw this" / "Who saved this") ─────────────
+     Its own overlay rather than the post modal's, because it opens ON TOP of
+     an already-open post: z 10000 sits above .vpv-overlay (9999) and below
+     .vpv-toast (10001), so a failure line is still readable over it. */
+  .vpv-aud-overlay {
+    position: fixed; inset: 0; z-index: 10000;
+    background: rgba(28,28,30,.55);
+    display: none; align-items: center; justify-content: center;
+    padding: 24px; box-sizing: border-box;
+    opacity: 0; transition: opacity .16s ease;
+  }
+  html.vpv-iframe .vpv-aud-overlay { background: rgba(28,28,30,.32); }
+  .vpv-aud-overlay.show { display: flex; opacity: 1; }
+  .vpv-aud-card {
+    background: #FAF7F2; color: #1C1C1E;
+    border-radius: 18px; box-shadow: 0 20px 60px rgba(0,0,0,.35);
+    width: min(420px, 100%); max-height: min(560px, calc(100vh - 48px));
+    display: flex; flex-direction: column; overflow: hidden;
+    font-family: 'DM Sans', system-ui, -apple-system, sans-serif;
+  }
+  .vpv-aud-head {
+    display: flex; align-items: flex-start; gap: 12px;
+    padding: 18px 20px 12px; border-bottom: 1px solid rgba(28,28,30,.08);
+  }
+  .vpv-aud-headtext { flex: 1; min-width: 0; }
+  .vpv-aud-title { font-size: 15px; font-weight: 700; line-height: 1.2; }
+  .vpv-aud-sub { font-size: 12px; color: #8A8580; margin-top: 3px; line-height: 1.2; }
+  .vpv-aud-close {
+    background: transparent; border: none; padding: 0 2px;
+    font-size: 20px; line-height: 1; color: #8A8580; cursor: none;
+  }
+  .vpv-aud-body { flex: 1; overflow-y: auto; padding: 4px 20px 18px; }
+  .vpv-aud-day {
+    font-size: 11px; font-weight: 700; letter-spacing: .06em;
+    text-transform: uppercase; color: #8A8580; padding: 12px 0 4px;
+  }
+  .vpv-aud-row {
+    display: flex; align-items: center; gap: 10px;
+    padding: 8px 0; text-decoration: none; color: inherit;
+  }
+  .vpv-aud-av {
+    width: 36px; height: 36px; border-radius: 50%;
+    background: #1C1C1E; color: white;
+    display: flex; align-items: center; justify-content: center;
+    font-weight: 700; font-size: 12px; overflow: hidden; flex-shrink: 0;
+  }
+  .vpv-aud-av img { width: 100%; height: 100%; object-fit: cover; display: block; }
+  .vpv-aud-info { flex: 1; min-width: 0; }
+  .vpv-aud-name {
+    font-size: 13.5px; font-weight: 700; line-height: 1.25;
+    white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
+  }
+  .vpv-aud-h { color: #8A8580; font-weight: 500; font-size: 12px; margin-left: 6px; }
+  .vpv-aud-meta {
+    font-size: 11.5px; color: #8A8580; margin-top: 2px;
+    white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
+  }
+  .vpv-aud-empty, .vpv-aud-loading {
+    padding: 26px 0; text-align: center; color: #8A8580; font-size: 13px;
+  }
+  .vpv-aud-more {
+    display: block; width: 100%; margin-top: 12px;
+    background: transparent; border: 1px solid rgba(28,28,30,.14);
+    border-radius: 999px; padding: 8px 0;
+    font-family: inherit; font-size: 12.5px; font-weight: 700;
+    color: #1C1C1E; cursor: none;
+  }
+  .vpv-aud-lock { padding: 28px 6px 12px; text-align: center; }
+  .vpv-aud-lock-n { font-size: 34px; font-weight: 800; line-height: 1; }
+  .vpv-aud-lock-label { font-size: 13px; color: #8A8580; margin-top: 6px; }
+  .vpv-aud-lock-line { font-size: 14px; font-weight: 600; margin-top: 16px; }
+  .vpv-aud-cta {
+    display: inline-block; margin-top: 14px;
+    background: #FF5C35; color: #FAF7F2; text-decoration: none;
+    font-size: 12.5px; font-weight: 700; letter-spacing: .02em;
+    padding: 8px 18px; border-radius: 999px;
+  }
+
   .vpv-toast {
     position: fixed; left: 50%; bottom: 32px; transform: translateX(-50%) translateY(20px);
     background: #1C1C1E; color: white;
@@ -286,12 +380,34 @@
             </svg>
           </button>
           <div class="vpv-spacer"></div>
+          <!-- Views: the count is free and everyone sees it. Only the author
+               gets a click, and only because the server said so (is_owner) —
+               the route re-checks ownership anyway. Disabled until then.
+               Hidden until a real counts.views arrives: on a public share link
+               the API is never called, and an eye next to "0" would be a wrong
+               number stated confidently. Unknown shows nothing, like saves. -->
+          <button class="vpv-act" id="vpvViews" onclick="window.__vpvOpenViewers()"
+            disabled style="display:none">
+            <svg width="16" height="16" viewBox="0 0 16 16" fill="none">
+              <path d="M1.5 8s2.5-4.5 6.5-4.5S14.5 8 14.5 8s-2.5 4.5-6.5 4.5S1.5 8 1.5 8z"
+                stroke="#1C1C1E" stroke-width="1.4" fill="none" stroke-linejoin="round"/>
+              <circle cx="8" cy="8" r="2" stroke="#1C1C1E" stroke-width="1.4" fill="none"/>
+            </svg>
+            <span id="vpvViewCount"></span>
+          </button>
           <button class="vpv-act" id="vpvSave" onclick="window.__vpvToggleSave()" title="Save">
             <svg width="16" height="16" viewBox="0 0 16 16" fill="none">
               <path class="vpv-bookmark" d="M3.5 2.5h9v11l-4.5-3-4.5 3v-11z"
                 stroke="#1C1C1E" stroke-width="1.4" fill="none" stroke-linejoin="round"/>
             </svg>
           </button>
+          <!-- The author's saves number, a sibling of the Save button rather
+               than a span inside it: a button inside a button is invalid
+               markup and unreachable by keyboard, and this one has its own job
+               (open "Who saved this") while Save keeps toggling the author's
+               own bookmark. Hidden entirely when the count is unknown. -->
+          <button class="vpv-act vpv-act-count" id="vpvSaveCount" onclick="window.__vpvOpenSavers()"
+            title="Who saved this" aria-label="Who saved this" style="display:none"></button>
         </div>
         <div class="vpv-comments" id="vpvComments"></div>
         <div class="vpv-composer">
@@ -308,11 +424,20 @@
       if (e.target === overlay) window.__vpvClose();
     });
     document.addEventListener("keydown", (e) => {
-      if (state.openId && e.key === "Escape") window.__vpvClose();
+      if (e.key !== "Escape") return;
+      // The audience sheet sits on top of the post, so Escape closes it first
+      // and leaves the post where it was. One handler, not two, because a
+      // second listener registered later would fire after this one and shut
+      // the post underneath.
+      if (aud.open) { closeAudience(); return; }
+      if (state.openId) window.__vpvClose();
     });
     window.addEventListener("popstate", () => {
       // Browser back / phone back gesture closes the modal instead of
-      // navigating away from the page.
+      // navigating away from the page. The audience sheet pushed no history
+      // entry of its own, so it goes with the post rather than being left
+      // floating over the page.
+      if (aud.open) closeAudience();
       if (state.openId) window.__vpvClose(/*viaPopstate=*/ true);
     });
   }
@@ -330,13 +455,17 @@
     saved:  false,
     likes:  0,
     comments: 0,
+    // counts.views — the honest ledger tally, free to all. Null means the
+    // number is unknown (the public share-link path never calls the API, and
+    // a failed call leaves it unknown too); unknown hides the whole entry.
+    views:  null,
+    // counts.saves, or null when the server could not read it. Null is not 0:
+    // an unknown number must never paint as "nobody saved this", so the
+    // author's saves affordance hides instead of showing a zero.
+    saves:  null,
+    isOwner: false,         // the SERVER's is_owner, not a localStorage guess
     inflight: false,        // any toggle/post in progress
   };
-
-  function viewerUserId() {
-    const u = (typeof vibeLoad === "function") ? vibeLoad("vibe_user_v1") : null;
-    return (u && u.id) || null;
-  }
 
   // ── Helpers ───────────────────────────────────────────────────────────
   function isAppShell() {
@@ -391,6 +520,17 @@
     // Push a history entry so back gesture closes the modal — only when
     // not already in a popstate handler so we don't double-stack.
     try { history.pushState({ vpv: state.openId }, ""); } catch {}
+
+    // Counts and ownership belong to the post being opened, not the last one.
+    // renderFromPrefill() is a partial paint — it never touches the bar — so
+    // without this a prefilled open would carry the previous post's view count
+    // and, worse, its owner affordances until the server answered.
+    if (aud.open) closeAudience();
+    state.isOwner = false;
+    state.views = null;
+    state.saves = null;
+    resetCounts();
+    paintOwnerAffordances();
 
     if (prefill) renderFromPrefill(prefill);
     else renderLoading();
@@ -450,6 +590,8 @@
   window.openPostViewer = openPostViewer;
 
   function closeViewer(viaPopstate) {
+    // Never leave the audience sheet floating over a closed post.
+    if (aud.open) closeAudience();
     state.openId = null;
     const overlay = document.getElementById("vpvOverlay");
     if (overlay) overlay.classList.remove("show");
@@ -471,16 +613,33 @@
   window.__vpvClose = closeViewer;
 
   // ── Render paths ──────────────────────────────────────────────────────
+  // The engagement bar belongs to the post being opened. Both entry paths
+  // need this: renderLoading() runs it, and so does the prefill path, which
+  // paints only header and body — without it post B would wear post A's like
+  // and comment counts until the server answered. The view and saves numbers
+  // are not reset here: they are unknown until the server speaks, and
+  // paintOwnerAffordances() hides them for exactly that reason.
+  function resetCounts() {
+    document.getElementById("vpvLikeCount").textContent = "0";
+    document.getElementById("vpvCommentCount").textContent = "0";
+    document.getElementById("vpvLike").classList.remove("on");
+    document.getElementById("vpvSave").classList.remove("on");
+  }
+
   function renderLoading() {
     document.getElementById("vpvAvatar").textContent = "·";
     document.getElementById("vpvName").textContent = "Loading…";
     document.getElementById("vpvSub").textContent = "";
     document.getElementById("vpvBody").innerHTML = "";
-    document.getElementById("vpvLikeCount").textContent = "0";
-    document.getElementById("vpvCommentCount").textContent = "0";
-    document.getElementById("vpvLike").classList.remove("on");
-    document.getElementById("vpvSave").classList.remove("on");
+    resetCounts();
     document.getElementById("vpvComments").innerHTML = "";
+    // Ownership and the two server-only numbers are unknown again until the
+    // next answer, so the bar's owner-only affordances go back to their closed
+    // state and the view count goes back to showing nothing at all.
+    state.isOwner = false;
+    state.views = null;
+    state.saves = null;
+    paintOwnerAffordances();
     const more = document.getElementById("vpvMore");
     const menu = document.getElementById("vpvMenu");
     if (more) more.classList.remove("show");
@@ -528,13 +687,29 @@
     state.saved = !!(j.viewer && j.viewer.saved);
     state.likes = (j.counts && j.counts.likes) || 0;
     state.comments = (j.counts && j.counts.comments) || 0;
+    // counts.views is the honest ledger tally with the author's own rows
+    // dropped (src/app/api/posts/[id]/route.ts) — not posts.view_count.
+    // Anything that isn't a number stays unknown, and unknown hides the entry
+    // rather than painting a 0 nobody measured.
+    state.views = (j.counts && typeof j.counts.views === "number") ? j.counts.views : null;
+    // counts.saves is OPTIONAL: the server omits the key rather than sending 0
+    // when it could not read the count, so `absent` has to stay distinguishable
+    // from `zero` all the way to the screen.
+    state.saves = (j.counts && typeof j.counts.saves === "number") ? j.counts.saves : null;
+    // The server decides who the author is — here and for the "..." menu
+    // below. vibe_user_v1 is a localStorage blob the app shell writes, not the
+    // session, so on a shared browser it can still hold the previous account
+    // and would offer B a Delete on A's post (or hide it from the real
+    // author). The routes re-check ownership either way.
+    state.isOwner = j.is_owner === true;
     document.getElementById("vpvLikeCount").textContent = String(state.likes);
     document.getElementById("vpvCommentCount").textContent = String(state.comments);
     document.getElementById("vpvLike").classList.toggle("on", state.liked);
     document.getElementById("vpvSave").classList.toggle("on", state.saved);
+    paintOwnerAffordances();
 
     // "..." menu — owner sees Delete; everyone else sees Report/Mute/Block.
-    const isOwner = state.authorId && viewerUserId() === state.authorId;
+    const isOwner = state.isOwner;
     const more = document.getElementById("vpvMore");
     const menu = document.getElementById("vpvMenu");
     if (more) more.classList.add("show");
@@ -556,6 +731,50 @@
           ${authorId ? `<button type="button" class="danger" onclick="window.__vpvCloseMenu();window.vibeBlock(${safeAuthor},${safeName}, () => window.__vpvClose())">Block ${firstName}</button>` : ''}
         `;
       }
+    }
+  }
+
+  // The two owner-only bits of the engagement bar, painted from state:
+  // the Views entry becomes clickable, and the saves number appears next to
+  // Save. Everyone else keeps the view count as a plain label and sees no
+  // saves number at all — counts are public, identities are private, and how
+  // many people saved YOUR post is part of your own metrics.
+  function paintOwnerAffordances() {
+    const viewsBtn = document.getElementById("vpvViews");
+    const viewsCount = document.getElementById("vpvViewCount");
+    if (viewsBtn && viewsCount) {
+      // Unknown is not zero. A public share link never calls /api/posts/:id,
+      // so without this the eye would sit next to a "0" on a post with 500
+      // real views — a wrong number, stated silently.
+      const known = typeof state.views === "number";
+      viewsBtn.style.display = known ? "" : "none";
+      viewsCount.textContent = known ? String(state.views) : "";
+      viewsBtn.disabled = !state.isOwner;
+      // The name changes with the job, it never disappears: a screen reader
+      // promising "Who saw this" on a dead button lies, but a bare "1,203,
+      // button" says nothing at all. Owners get the action, everyone else
+      // gets what the number means.
+      if (state.isOwner) {
+        viewsBtn.setAttribute("title", "Who saw this");
+        viewsBtn.setAttribute("aria-label", "Who saw this");
+      } else {
+        viewsBtn.removeAttribute("title");
+        if (known) {
+          viewsBtn.setAttribute("aria-label",
+            state.views === 1 ? "1 view" : String(state.views) + " views");
+        } else {
+          viewsBtn.removeAttribute("aria-label");
+        }
+      }
+    }
+    const savesBtn = document.getElementById("vpvSaveCount");
+    if (savesBtn) {
+      // Absent still means unknown; 0 now means "nothing to show". A naked
+      // "0" beside the bookmark is the one unexplained number in the row, and
+      // tapping it only ever opened a sheet that said "No one yet."
+      const show = state.isOwner && typeof state.saves === "number" && state.saves > 0;
+      savesBtn.style.display = show ? "" : "none";
+      savesBtn.textContent = show ? String(state.saves) : "";
     }
   }
 
@@ -692,6 +911,10 @@
     state.inflight = true;
     const wasSaved = state.saved;
     state.saved = !wasSaved;
+    // state.saves is deliberately NOT bumped: counts.saves excludes the
+    // author's own bookmark, so an author saving their own post moves
+    // `viewer.saved` and nothing else. Optimistically adding one here would be
+    // contradicted by the very next fetch.
     document.getElementById("vpvSave").classList.toggle("on", state.saved);
     try {
       const method = state.saved ? "POST" : "DELETE";
@@ -930,5 +1153,346 @@
     } finally {
       if (submit) submit.disabled = false;
     }
+  };
+
+  // ══════════════════════════════════════════════════════════════════════
+  // Audience sheet — "Who saw this" / "Who saved this"
+  //
+  // Screen C of the metrics wave, static twin of the React sheet
+  // (handoffs/2026-09-14-wave-plan-metrics-screens.md). The author opens it
+  // from the Views entry or from the saves number; everyone else never sees a
+  // way in. Reads GET /api/me/posts/[id]/viewers and /savers, which answer a
+  // free owner with a count and NO names at all, and a Vibe+ owner with rows.
+  // So this file has two bodies: a lock over the number, or the people.
+  //
+  // Nothing here is a permission check. The routes 404 a post that is not
+  // yours whatever this client believes.
+  // ══════════════════════════════════════════════════════════════════════
+
+  const AUD_LIMIT = 25;         // the routes' own default page size
+
+  const aud = {
+    open: false,
+    kind: null,       // 'viewers' | 'savers'
+    postId: null,
+    rows: [],
+    total: null,      // people, from the server — never counted off `rows`
+    nextOffset: 0,
+    hasMore: false,
+    failed: false,    // a refused read is not "No one yet."
+    seq: 0,           // the newest load owns the sheet
+  };
+
+  // ── Day labels (JS twin of src/lib/metrics/day-label.ts) ──────────────
+  // Two clocks on purpose. `post_views.viewed_on` is a DATE written on the UTC
+  // calendar, so reading it in local time drags a Tuesday view back to Monday
+  // for anyone west of Greenwich; `bookmarks.created_at` is a real instant and
+  // belongs on the reader's own clock. And the view ledger keeps one row per
+  // person per day, so a day name is the finest honest grain there is —
+  // never "2 hours ago".
+  const AUD_LOCALE = "en-US";   // one campus, one voice
+  const AUD_DAY_MS = 86400000;
+  const AUD_WEEKDAY_DAYS = 6;   // past six days a weekday name stops being a date
+  const AUD_DATE_RE = /^(\d{4})-(\d{2})-(\d{2})$/;
+
+  function audUtcMidnight(s) {
+    const m = AUD_DATE_RE.exec(String(s || ""));
+    if (!m) return null;
+    const y = Number(m[1]), mo = Number(m[2]), d = Number(m[3]);
+    const at = Date.UTC(y, mo - 1, d);
+    const back = new Date(at);
+    // Round-trip rejects "2026-02-31", which Date.UTC would roll into March.
+    if (back.getUTCFullYear() !== y || back.getUTCMonth() !== mo - 1 || back.getUTCDate() !== d) {
+      return null;
+    }
+    return at;
+  }
+
+  // "" for anything that isn't a YYYY-MM-DD — the row then carries no day
+  // header rather than the words "Invalid Date".
+  function dayLabelFromDate(yyyyMmDd) {
+    const then = audUtcMidnight(yyyyMmDd);
+    const today = audUtcMidnight(new Date().toISOString().slice(0, 10));
+    if (then === null || today === null) return "";
+    const days = Math.round((today - then) / AUD_DAY_MS);
+    if (days <= 0) return "Today";
+    if (days === 1) return "Yesterday";
+    const at = new Date(then);
+    if (days <= AUD_WEEKDAY_DAYS) {
+      return at.toLocaleDateString(AUD_LOCALE, { weekday: "long", timeZone: "UTC" });
+    }
+    if (at.getUTCFullYear() === new Date(today).getUTCFullYear()) {
+      return at.toLocaleDateString(AUD_LOCALE, { month: "short", day: "numeric", timeZone: "UTC" });
+    }
+    return at.toLocaleDateString(AUD_LOCALE,
+      { month: "short", day: "numeric", year: "numeric", timeZone: "UTC" });
+  }
+
+  function audStartOfLocalDay(d) {
+    return new Date(d.getFullYear(), d.getMonth(), d.getDate()).getTime();
+  }
+
+  function dayLabelFromTimestamp(iso) {
+    const then = new Date(iso);
+    if (isNaN(then.getTime())) return "";
+    const now = new Date();
+    const days = Math.round((audStartOfLocalDay(now) - audStartOfLocalDay(then)) / AUD_DAY_MS);
+    // A timestamp from the future (clock skew) reads as Today, not as "-1 days".
+    if (days <= 0) return "Today";
+    if (days === 1) return "Yesterday";
+    if (days <= AUD_WEEKDAY_DAYS) return then.toLocaleDateString(AUD_LOCALE, { weekday: "long" });
+    if (then.getFullYear() === now.getFullYear()) {
+      return then.toLocaleDateString(AUD_LOCALE, { month: "short", day: "numeric" });
+    }
+    return then.toLocaleDateString(AUD_LOCALE, { month: "short", day: "numeric", year: "numeric" });
+  }
+
+  function audDayLabel(u) {
+    return aud.kind === "savers"
+      ? dayLabelFromTimestamp(u.saved_at)
+      : dayLabelFromDate(u.viewed_on);
+  }
+
+  // ── Sheet shell ───────────────────────────────────────────────────────
+  function ensureAudienceModal() {
+    if (document.getElementById("vpvAudOverlay")) return;
+    const overlay = document.createElement("div");
+    overlay.className = "vpv-aud-overlay";
+    overlay.id = "vpvAudOverlay";
+    overlay.innerHTML = `
+      <div class="vpv-aud-card" role="dialog" aria-modal="true" aria-labelledby="vpvAudTitle">
+        <div class="vpv-aud-head">
+          <div class="vpv-aud-headtext">
+            <div class="vpv-aud-title" id="vpvAudTitle">Who saw this</div>
+            <div class="vpv-aud-sub" id="vpvAudSub"></div>
+          </div>
+          <button class="vpv-aud-close" aria-label="Close" onclick="window.__vpvCloseAudience()">&times;</button>
+        </div>
+        <div class="vpv-aud-body">
+          <div id="vpvAudRows"></div>
+          <div id="vpvAudMore"></div>
+          <div id="vpvAudErr"></div>
+        </div>
+      </div>
+    `;
+    document.body.appendChild(overlay);
+    overlay.addEventListener("click", (e) => {
+      if (e.target === overlay) closeAudience();
+    });
+    // Escape is handled by the post modal's one keydown listener, which closes
+    // this sheet first — see ensureModal().
+  }
+
+  function openAudience(kind) {
+    // Client-side gate on the server's own answer. The affordances are hidden
+    // for everyone else, so this only catches a stale click mid-close.
+    if (!state.openId || !state.isOwner) return;
+    if (!isAppShell()) { toast("Sign in to see this"); return; }
+    if (!isRealPostId(state.openId)) { toast("This post has no stats yet"); return; }
+    ensureAudienceModal();
+    aud.open = true;
+    aud.kind = kind;
+    aud.postId = state.openId;
+    aud.rows = [];
+    aud.total = null;
+    aud.nextOffset = 0;
+    aud.hasMore = false;
+    aud.failed = false;
+    aud.seq++;
+    document.getElementById("vpvAudTitle").textContent =
+      kind === "savers" ? "Who saved this" : "Who saw this";
+    document.getElementById("vpvAudSub").textContent = "";
+    document.getElementById("vpvAudRows").innerHTML = `<div class="vpv-aud-loading">loading…</div>`;
+    document.getElementById("vpvAudMore").innerHTML = "";
+    document.getElementById("vpvAudErr").textContent = "";
+    document.getElementById("vpvAudOverlay").classList.add("show");
+    loadAudience(0);
+  }
+
+  function closeAudience() {
+    aud.open = false;
+    aud.seq++;   // any request still in flight stops owning the sheet
+    const overlay = document.getElementById("vpvAudOverlay");
+    if (overlay) overlay.classList.remove("show");
+    // Identities are the private half, so they do not outlive the sheet that
+    // was gated to show them: names, handles and avatars come straight back
+    // out of the hidden DOM. openAudience() repaints from scratch anyway.
+    aud.rows = [];
+    const rowsEl = document.getElementById("vpvAudRows");
+    if (rowsEl) rowsEl.innerHTML = "";
+  }
+
+  // ── Rows ──────────────────────────────────────────────────────────────
+  // Same wording as the connections modal (public/html/profile.html): the
+  // number is a DIRECTED intersection — people they follow whom you follow
+  // too — so it says "you both follow" and never claims "mutuals".
+  function audMetaLine(u) {
+    const parts = [];
+    if (u.major) parts.push(u.major);
+    if (u.year) parts.push(String(u.year));
+    if (u.mutual_count > 0) parts.push(u.mutual_count + " you both follow");
+    return parts.join(" · ");
+  }
+
+  function audRowHTML(u) {
+    const av = u.avatar_url
+      ? `<div class="vpv-aud-av"><img src="${esc(u.avatar_url)}" alt=""></div>`
+      : `<div class="vpv-aud-av">${esc(initials(u.name || u.handle))}</div>`;
+    const handle = u.handle ? `<span class="vpv-aud-h">@${esc(u.handle)}</span>` : "";
+    const meta = audMetaLine(u);
+    const inner = `${av}
+        <div class="vpv-aud-info">
+          <div class="vpv-aud-name">${esc(u.name || u.handle || "Member")}${handle}</div>
+          ${meta ? `<div class="vpv-aud-meta">${esc(meta)}</div>` : ""}
+        </div>`;
+    if (!u.handle) return `<div class="vpv-aud-row">${inner}</div>`;
+    // Through __vibeTopNav for the same reason mentions are: inside the
+    // /messages or /otto iframe a plain link loads the profile in the frame.
+    const href = `/profile/${encodeURIComponent(u.handle)}`;
+    return `<a class="vpv-aud-row" href="${esc(href)}"
+      onclick="event.preventDefault();window.__vibeTopNav(this.getAttribute('href'))">${inner}</a>`;
+  }
+
+  function audPeopleLine(n) {
+    return n === 1 ? "1 person" : String(n) + " people";
+  }
+
+  function paintAudience() {
+    const rowsEl = document.getElementById("vpvAudRows");
+    const moreEl = document.getElementById("vpvAudMore");
+    const subEl  = document.getElementById("vpvAudSub");
+    if (!rowsEl || !moreEl || !subEl) return;
+    if (aud.rows.length === 0) {
+      // A read that failed says so in the error box below; it must never
+      // render as "No one yet.", which is a claim we cannot make.
+      rowsEl.innerHTML = aud.failed ? "" : `<div class="vpv-aud-empty">No one yet.</div>`;
+    } else {
+      let html = "";
+      let lastDay = null;
+      aud.rows.forEach((u) => {
+        const day = audDayLabel(u);
+        if (day && day !== lastDay) {
+          html += `<div class="vpv-aud-day">${esc(day)}</div>`;
+          lastDay = day;
+        }
+        html += audRowHTML(u);
+      });
+      rowsEl.innerHTML = html;
+    }
+    // People, not views: `total` is distinct people after the author's own
+    // rows and blocked/muted people come out, so it can sit below the number
+    // on the Views entry. The two answer different questions; this line never
+    // borrows the other one.
+    subEl.textContent = aud.total === null ? "" : audPeopleLine(aud.total);
+    moreEl.innerHTML = (!aud.failed && aud.hasMore)
+      ? `<button class="vpv-aud-more" onclick="window.__vpvAudMore()">Show more</button>`
+      : "";
+  }
+
+  function paintAudienceLock(total) {
+    const rowsEl = document.getElementById("vpvAudRows");
+    const moreEl = document.getElementById("vpvAudMore");
+    const subEl  = document.getElementById("vpvAudSub");
+    if (!rowsEl || !moreEl || !subEl) return;
+    subEl.textContent = "";
+    moreEl.innerHTML = "";
+    if (total <= 0) {
+      // A lock over nobody is a worse ad than no lock (OttoMetrics precedent).
+      rowsEl.innerHTML = `<div class="vpv-aud-empty">No one yet.</div>`;
+      return;
+    }
+    const label = aud.kind === "savers"
+      ? (total === 1 ? "person saved this" : "people saved this")
+      : (total === 1 ? "person saw this"   : "people saw this");
+    // The top-level path, so /plus sends the student back to the page they
+    // were on and not to /html/campus.html inside the shell's iframe.
+    const here = (typeof _vibeTopHere === "function")
+      ? _vibeTopHere()
+      : location.pathname + location.search;
+    const next = esc(encodeURIComponent(here));
+    rowsEl.innerHTML = `<div class="vpv-aud-lock">
+      <div class="vpv-aud-lock-n">${esc(String(total))}</div>
+      <div class="vpv-aud-lock-label">${esc(label)}</div>
+      <div class="vpv-aud-lock-line">Vibe+ shows you who.</div>
+      <a class="vpv-aud-cta" href="/plus?next=${next}"
+        onclick="event.preventDefault();window.__vibeTopNav(this.getAttribute('href'))">See Vibe+</a>
+    </div>`;
+  }
+
+  // ── Load ──────────────────────────────────────────────────────────────
+  // Quiet: a failure belongs in the sheet, next to the rows it is about, not
+  // in a toast behind it. One vibeLoadFailed for the whole block, in its own
+  // slot under the rows, so a failed "Show more" keeps what is already painted.
+  async function loadAudience(offset) {
+    const seq = ++aud.seq;
+    const id = aud.postId;
+    const kind = aud.kind;
+    const line = kind === "savers"
+      ? "Couldn't load who saved this."
+      : "Couldn't load who saw this.";
+    const errEl = document.getElementById("vpvAudErr");
+    if (errEl) errEl.textContent = "";
+    // A first page is the whole sheet, so a retry has to look like the first
+    // open did: clearing the error box alone leaves an empty card for the
+    // length of the round trip. Later pages keep the rows they already have.
+    if (offset === 0) {
+      const rowsEl = document.getElementById("vpvAudRows");
+      if (rowsEl) rowsEl.innerHTML = `<div class="vpv-aud-loading">loading…</div>`;
+    }
+    const r = await window.vibeRequest(
+      `/api/me/posts/${encodeURIComponent(id)}/${kind}?limit=${AUD_LIMIT}&offset=${offset}`,
+      { failure: line, quiet: true },
+    );
+    // Closed the sheet, switched lists, or opened another post mid-flight.
+    if (seq !== aud.seq || !aud.open) return;
+
+    if (r.ok && r.data && r.data.ok) {
+      if (r.data.premium === false || r.data.viewer_identities === "locked") {
+        // Free: a count and nothing else came back — there are no names in
+        // this response to leak, and there is nothing to page through.
+        aud.failed = false;
+        aud.rows = [];
+        aud.hasMore = false;
+        aud.total = Number(r.data.total) || 0;
+        paintAudienceLock(aud.total);
+        return;
+      }
+      // A paid answer with no `users` array is a shape we don't recognise, and
+      // an unrecognised body is closer to a refused read than to an empty
+      // list — so it falls through to the failure branch rather than painting
+      // "No one yet." (same test the connections modal makes in profile.html).
+      const users = Array.isArray(r.data.users) ? r.data.users : null;
+      if (users) {
+        aud.failed = false;
+        aud.rows = offset === 0 ? users : aud.rows.concat(users);
+        aud.total = Number(r.data.total) || 0;
+        aud.hasMore = !!r.data.has_more;
+        // next_offset counts ENTRIES the server consumed, not rows it sent:
+        // people with no readable profile are dropped during hydration, so
+        // paging on rows.length would re-ask for ids we already have — or, on
+        // a page where every id was dropped, never advance at all.
+        aud.nextOffset = typeof r.data.next_offset === "number"
+          ? r.data.next_offset
+          : offset + AUD_LIMIT;
+        paintAudience();
+        return;
+      }
+    }
+
+    // Keep every row already on screen and say what failed underneath them.
+    aud.failed = true;
+    paintAudience();
+    if (errEl) {
+      window.vibeLoadFailed(errEl, window.vibeLoadFailure(r, line),
+        () => loadAudience(offset), { compact: true });
+    }
+  }
+
+  window.__vpvOpenViewers = function () { openAudience("viewers"); };
+  window.__vpvOpenSavers  = function () { openAudience("savers"); };
+  window.__vpvCloseAudience = closeAudience;
+  window.__vpvAudMore = function () {
+    if (!aud.open || aud.failed) return;
+    loadAudience(aud.nextOffset);
   };
 })();

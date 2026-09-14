@@ -4,12 +4,18 @@ import { motion } from "framer-motion";
 import Link from "next/link";
 import { useSearchParams } from "next/navigation";
 import { Fragment, useCallback, useEffect, useMemo, useRef, useState } from "react";
+import { createPortal } from "react-dom";
 
 import { CampusAppShell } from "@/components/campus-app-shell";
 import { asLoadFailure, LoadFailed, type LoadFailure } from "@/components/feedback/LoadFailed";
 import { ImageCropperModal } from "@/components/ImageCropperModal";
 import { emitCalendarChanged } from "@/components/LeftNav";
 import { SharePostSheet } from "@/components/mobile/SharePostSheet";
+import { UserCard, type UserCardProps } from "@/components/network/UserCard";
+import {
+  PostAudienceList,
+  type PostAudienceUser,
+} from "@/components/posts/PostAudienceList";
 import { MouseSpotlight } from "@/components/ui/mouse-spotlight";
 import {
   bindMentionPicker,
@@ -5191,6 +5197,9 @@ function FeedRow({
   const [showMoreMenu, setShowMoreMenu] = useState(false);
   // "Send to chats" picker (in-app share to DMs/groups/channels).
   const [shareOpen, setShareOpen] = useState(false);
+  // Owner-only "Who saw this" modal, opened from the Views chip below.
+  const [showViewers, setShowViewers] = useState(false);
+  const closeViewers = useCallback(() => setShowViewers(false), []);
   const [deleting, setDeleting] = useState(false);
 
   const onDeletePost = useCallback(async () => {
@@ -5722,10 +5731,25 @@ function FeedRow({
             activeColor="#1A8754"
           />
           <div style={{ flex: 1 }} />
+          {/* Views is the one chip whose audience the author is allowed to
+              ask about, so it is a button for them and stays the plain
+              read-out it has always been for everyone else. The server is
+              the gate either way (404 for a non-owner): this only decides
+              whether there is anything to click. */}
           <EngagementAction
             icon={<EyeIcon />}
             count={viewCount}
-            label="Views"
+            label={
+              viewerOwnsPost
+                ? viewsLabelForOwner(viewCount)
+                : "Views"
+            }
+            onClick={viewerOwnsPost ? () => setShowViewers(true) : undefined}
+            // Not a toggle: this opens a dialog. `expanded` emits
+            // aria-haspopup="dialog" + aria-expanded instead of the
+            // aria-pressed that Like/Repost use, where pressed means
+            // "you did this to the post".
+            expanded={viewerOwnsPost ? showViewers : undefined}
           />
           <EngagementAction
             icon={<BookmarkIcon filled={saved} />}
@@ -5775,7 +5799,177 @@ function FeedRow({
           onClose={() => setShareOpen(false)}
         />
       ) : null}
+
+      {/* Mounted only while open, so the owner-only fetch never fires for a
+          modal nobody asked for, and keyed by post id so two rows can never
+          share one list. */}
+      {showViewers ? (
+        <PostViewersModal key={post.id} postId={post.id} onClose={closeViewers} />
+      ) : null}
     </article>
+  );
+}
+
+/**
+ * "Who saw this" — the desktop feed's owner-only audience modal (Screen C of
+ * the metrics wave, handoffs/2026-09-14-wave-plan-metrics-screens.md, batch
+ * B9).
+ *
+ * The desktop row has always been the one surface showing a view count, and
+ * that chip was a dead button: the author could see how many, never who. This
+ * is the smallest honest answer to the second question.
+ *
+ * NOTHING ABOUT THE DATA LIVES HERE. The free/paid split, the paging, the day
+ * grouping and the rule that a refused read never paints a 0 are all inside
+ * <PostAudienceList> (src/components/posts/PostAudienceList.tsx), shared with
+ * the phone's sheet (src/components/mobile/PostAudienceSheet.tsx), so the two
+ * viewports cannot drift apart. This file owns the chrome and the people row
+ * and nothing else — in particular it never decides who may see a name: the
+ * route sends a free owner no `users` key at all
+ * (src/app/api/me/posts/[id]/viewers/route.ts).
+ *
+ * Rows go through <UserCard compact>, the same card /otto?tab=stats uses for
+ * "Who viewed you", so the meta line and the Connect / Following button behave
+ * the way they do everywhere else. `compact` because the full card carries a
+ * fixed 360px banner, wider than this column.
+ *
+ * Chrome follows AttendeesModal further down this file: a fixed backdrop that
+ * closes on click, role="dialog" + aria-modal, zIndex 1000. Escape closes it
+ * too. No body scroll lock — no other modal in this file takes one, and the
+ * one that did would read as the page having frozen.
+ *
+ * PORTALLED TO <body>, and it has to be. The feed column (`feedGlass`) sets
+ * `backdrop-filter`, and a computed backdrop-filter other than `none` makes
+ * that element the containing block for fixed-position descendants — so an
+ * inline `position: fixed; inset: 0` would resolve against the whole scroll
+ * height of the posts column (and then be clipped by its `overflow: hidden`),
+ * putting the surface thousands of pixels below the viewport. ImageCropperModal
+ * escapes the same column the same way (src/components/ImageCropperModal.tsx).
+ * AttendeesModal is NOT a safe template for that part: it mounts from an event
+ * card outside this container.
+ */
+function PostViewersModal({
+  postId,
+  onClose,
+}: {
+  postId: string;
+  onClose: () => void;
+}) {
+  // Follow taps land here, keyed by user id, and are laid over the fetched row
+  // on the way into <UserCard>. Kept out of the list on purpose:
+  // <PostAudienceList> owns the rows it fetched, so the way a caller reacts to
+  // a tap is to re-render with a different `renderRow` (same shape as the
+  // phone sheet's override map).
+  const [followOverrides, setFollowOverrides] = useState<
+    Record<string, UserCardProps["follow_state"]>
+  >({});
+
+  useEffect(() => {
+    const onKey = (e: KeyboardEvent) => {
+      if (e.key === "Escape") onClose();
+    };
+    document.addEventListener("keydown", onKey);
+    return () => document.removeEventListener("keydown", onKey);
+  }, [onClose]);
+
+  const renderRow = useCallback(
+    (user: PostAudienceUser, key: string) => (
+      // The list renders rows inside its own <ul>, so a row must be an <li>.
+      // Spread rather than field-by-field so a column added to UserCardData
+      // reaches the card instead of being quietly dropped here; the override
+      // comes after it so a just-tapped Follow wins over the fetched state.
+      <li key={key} style={{ minWidth: 0 }}>
+        <UserCard
+          {...user}
+          compact
+          follow_state={followOverrides[user.id] ?? user.follow_state}
+          onStateChange={(next) =>
+            setFollowOverrides((prev) => ({ ...prev, [user.id]: next }))
+          }
+        />
+      </li>
+    ),
+    [followOverrides],
+  );
+
+  if (typeof document === "undefined") return null;
+
+  return createPortal(
+    <div
+      role="dialog"
+      aria-modal="true"
+      aria-label="Who saw this"
+      onClick={onClose}
+      style={{
+        position: "fixed",
+        inset: 0,
+        background: "rgba(8,6,12,0.55)",
+        backdropFilter: "blur(8px)",
+        WebkitBackdropFilter: "blur(8px)",
+        zIndex: 1000,
+        display: "flex",
+        alignItems: "center",
+        justifyContent: "center",
+        padding: 20,
+      }}
+    >
+      <div
+        onClick={(e) => e.stopPropagation()}
+        style={{
+          width: "min(520px, 92vw)",
+          maxHeight: "82vh",
+          overflowY: "auto",
+          background: COLORS.bg,
+          border: `1px solid ${COLORS.border}`,
+          borderRadius: 20,
+          boxShadow: "0 24px 64px rgba(28,28,30,0.28)",
+          padding: 20,
+          display: "flex",
+          flexDirection: "column",
+          gap: 14,
+        }}
+      >
+        <div
+          style={{
+            display: "flex",
+            alignItems: "center",
+            justifyContent: "space-between",
+            gap: 12,
+          }}
+        >
+          <div
+            style={{
+              fontFamily: "Fraunces, serif",
+              fontWeight: 800,
+              fontSize: 18,
+              color: COLORS.text,
+            }}
+          >
+            Who saw this
+          </div>
+          <button
+            type="button"
+            onClick={onClose}
+            aria-label="Close"
+            style={{
+              border: "none",
+              background: "transparent",
+              padding: 4,
+              margin: 0,
+              cursor: "pointer",
+              color: COLORS.faint,
+              fontFamily: "DM Sans, sans-serif",
+              fontSize: 18,
+              lineHeight: 1,
+            }}
+          >
+            &times;
+          </button>
+        </div>
+        <PostAudienceList postId={postId} kind="viewers" renderRow={renderRow} />
+      </div>
+    </div>,
+    document.body,
   );
 }
 
@@ -6602,6 +6796,7 @@ function EngagementAction({
   onClick,
   active = false,
   activeColor,
+  expanded,
 }: {
   icon: React.ReactNode;
   count?: number;
@@ -6609,6 +6804,11 @@ function EngagementAction({
   onClick?: () => void;
   active?: boolean;
   activeColor?: string;
+  /** Set only by chips that OPEN A DIALOG rather than toggle a state on the
+   *  post. When present the button announces aria-haspopup="dialog" +
+   *  aria-expanded and drops aria-pressed, so assistive tech does not read it
+   *  as "you liked/reposted this". */
+  expanded?: boolean;
 }) {
   const interactive = typeof onClick === "function";
   const color = active && activeColor ? activeColor : undefined;
@@ -6618,7 +6818,11 @@ function EngagementAction({
       type="button"
       onClick={onClick}
       aria-label={label}
-      aria-pressed={interactive ? active : undefined}
+      aria-pressed={
+        interactive && expanded === undefined ? active : undefined
+      }
+      aria-haspopup={expanded === undefined ? undefined : "dialog"}
+      aria-expanded={expanded}
       disabled={!interactive}
       style={{
         display: "inline-flex",
@@ -6638,6 +6842,15 @@ function EngagementAction({
       {formatted ? <span>{formatted}</span> : null}
     </button>
   );
+}
+
+/** The owner's Views chip is a button, and `label` becomes its aria-label,
+ *  which overrides the rendered number. Fold the count back in so a screen
+ *  reader hears it; a 0 stays "See who saw this" (view ROWS being 0 is not
+ *  proof the audience is empty — the sheet states its own number). */
+function viewsLabelForOwner(count: number | undefined): string {
+  const formatted = formatEngagementCount(count);
+  return formatted ? `See who saw this — ${formatted} views` : "See who saw this";
 }
 
 function formatEngagementCount(n: number | undefined): string | null {
