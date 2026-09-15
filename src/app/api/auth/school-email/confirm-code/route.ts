@@ -40,7 +40,7 @@ function denied(result: RateLimitResult, windowSec: number, limitCopy: string) {
 }
 
 /**
- * P1-006 — verify the IU email with the 8-digit code from the email instead of
+ * P1-006 — verify the school email with the 8-digit code from the email instead of
  * the link, for students who read the email on another device or in an app
  * browser that isn't signed in to Vibe.
  *
@@ -91,7 +91,7 @@ export async function POST(req: Request) {
       : null;
   if (!schoolEmail) {
     return NextResponse.json(
-      { ok: false, error: "Enter the IU email you sent the code to." },
+      { ok: false, error: "Enter the school email you sent the code to." },
       { status: 400 },
     );
   }

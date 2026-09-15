@@ -2,14 +2,13 @@ import { NextResponse } from "next/server";
 
 import { getSiteOriginForRequest } from "@/lib/auth/site-url";
 import { isOttoOnboardingComplete } from "@/lib/auth/post-login";
+import { schoolEmailRejection } from "@/lib/auth/school-email-domains";
 import {
-  isSchoolEmail,
   isSchoolVerifySecretConfigured,
   normalizeSchoolEmail,
   SCHOOL_CODE_LENGTH,
   SCHOOL_CODE_WINDOW_SEC,
   schoolEmailCode,
-  schoolEmailDomainsLabel,
   signSchoolEmailToken,
 } from "@/lib/auth/school-email-token";
 import { sendSchoolVerificationEmail } from "@/lib/email/resend-transactional";
@@ -24,10 +23,16 @@ import {
 type Body = { schoolEmail?: string };
 
 /**
- * P1-006 — request campus email verification (signed link + typed code, Resend).
- * Only addresses on the SCHOOL_EMAIL_DOMAINS allowlist (default IU: iu.edu,
- * iupui.edu + subdomains) are accepted; other .edu domains get a clear 400.
+ * P1-006 — request school email verification (signed link + typed code, Resend).
+ * Only addresses in the code allowlist (school-email-domains.ts: @iu.edu, plus
+ * Purdue's domains once PURDUE_SIGNUPS_ENABLED flips; subdomains included,
+ * optionally narrowed by SCHOOL_EMAIL_DOMAINS) are accepted. Retired IU
+ * domains (@iupui.edu, …) and everything else get a clear 400 with a `code`.
  * Caller must be logged in; does not mutate DB until confirm / confirm-code.
+ *
+ * A verified student may request a DIFFERENT address, including one from the
+ * other university (Franky Q1); only a resubmit of the same verified address
+ * short-circuits. The apply helper handles the system change.
  */
 export async function POST(req: Request) {
   if (!isSchoolVerifySecretConfigured()) {
@@ -85,12 +90,13 @@ export async function POST(req: Request) {
     );
   }
 
-  if (!isSchoolEmail(schoolEmail)) {
+  // Retired IU domain → "IU retired @iupui.edu addresses…"; anything else off
+  // the allowlist → "Use your school email (@iu.edu)." (no Purdue mention
+  // until PURDUE_SIGNUPS_ENABLED flips, critic B4).
+  const rejection = schoolEmailRejection(schoolEmail);
+  if (rejection) {
     return NextResponse.json(
-      {
-        ok: false,
-        error: `Use your IU email address (${schoolEmailDomainsLabel()}).`,
-      },
+      { ok: false, code: rejection.code, error: rejection.error },
       { status: 400 },
     );
   }
@@ -134,7 +140,7 @@ export async function POST(req: Request) {
   //
   // These MUST stay above the "linked to another account" lookup below:
   // without a limit in front of it, that 409 is an unlimited oracle for
-  // which IU addresses already have a Vibe account.
+  // which school addresses already have a Vibe account.
   const perUser = await rateLimit(`school-email:${user.id}`, {
     limit: 3,
     windowSec: 3600,
@@ -210,7 +216,7 @@ export async function POST(req: Request) {
 
   return NextResponse.json({
     ok: true,
-    message: "Check your IU inbox for a code and a link.",
+    message: "Check your school inbox for a code and a link.",
     sentTo: schoolEmail,
     codeLength: SCHOOL_CODE_LENGTH,
     codeMinutes: SCHOOL_CODE_WINDOW_SEC / 60,

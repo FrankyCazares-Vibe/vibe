@@ -8,7 +8,8 @@ import { isSupabaseServiceConfigured } from "@/lib/supabase/service";
 type Body = { token?: string };
 
 /**
- * P1-006 — consume signed token; set users.school_email + school_verified (service role).
+ * P1-006 — consume signed token; set users.school_email + school_verified
+ * (+ school_system from the domain) with the service role.
  *
  * The token alone is not enough: the caller must be signed in as the account
  * that requested the link. Otherwise an attacker could request a link for a
@@ -52,7 +53,7 @@ export async function POST(req: Request) {
       {
         ok: false,
         error:
-          "This IU verification link has expired or is broken. Send a new one from the verify page.",
+          "This verification link has expired or is broken. Send a new one from the verify page.",
       },
       { status: 400 },
     );
