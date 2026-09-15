@@ -218,13 +218,16 @@ enable_signup = true
 # addresses. If disabled, only the new email is required to confirm.
 double_confirm_changes = true
 # If enabled, users need to confirm their email address before signing in.
+# Production has this set to true. Local stays false, which is why dev never
+# exercised /auth/callback or /auth/confirm after signup.
 enable_confirmations = false
 # If enabled, users will need to reauthenticate or have logged in recently to change their password.
 secure_password_change = false
 # Controls the minimum amount of time that must pass before sending another signup confirmation or password reset email.
 max_frequency = "1s"
-# Number of characters used in the email OTP.
-otp_length = 6
+# Number of characters used in the email OTP. Matches production (8): the
+# confirmation email and the code boxes say "8-digit".
+otp_length = 8
 # Number of seconds before the email OTP expires (defaults to 1 hour).
 otp_expiry = 3600
 
@@ -237,6 +240,15 @@ otp_expiry = 3600
 # pass = "env(SENDGRID_API_KEY)"
 # admin_email = "admin@email.com"
 # sender_name = "Admin"
+
+# "Confirm your Vibe account". Links to the tap-to-confirm /auth/confirm page
+# with {{ .TokenHash }} and prints the 8-digit {{ .Token }}; it must never use
+# {{ .ConfirmationURL }}, which a link scanner's GET burns. Production's copy
+# is pasted into the dashboard from this file; the version it replaced is
+# kept in confirmation.previous.html for rollback.
+[auth.email.template.confirmation]
+subject = "Confirm your Vibe account"
+content_path = "./supabase/templates/confirmation.html"
 
 # Uncomment to customize email template
 # [auth.email.template.invite]

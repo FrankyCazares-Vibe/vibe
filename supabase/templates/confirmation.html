@@ -1,0 +1,81 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<meta name="color-scheme" content="light only">
+<meta name="supported-color-schemes" content="light only">
+<meta name="format-detection" content="telephone=no,date=no,address=no,email=no">
+<title>Confirm your Vibe account</title>
+<link href="https://fonts.googleapis.com/css2?family=Fraunces:wght@700;800&family=DM+Sans:wght@400;600;700&display=swap" rel="stylesheet">
+<style>
+  :root { color-scheme: light only; }
+  body { margin: 0; padding: 0; background: #FAF7F2; }
+  a { color: #FF5C35; }
+  a[x-apple-data-detectors] { color: inherit !important; text-decoration: none !important; font: inherit !important; }
+  @media (max-width: 520px) {
+    .vibe-card { padding: 30px 22px 26px !important; border-radius: 20px !important; }
+    .vibe-headline { font-size: 28px !important; line-height: 32px !important; }
+    .vibe-code { font-size: 26px !important; letter-spacing: 4px !important; padding: 12px 16px !important; }
+    .vibe-btn a { display: block !important; }
+  }
+</style>
+</head>
+<body style="margin:0;padding:0;background:#FAF7F2;">
+<div style="display:none;max-height:0;overflow:hidden;opacity:0;color:#FAF7F2;">Tap Confirm, or type the 8-digit code from this email. Expires in 1 hour.&#847;&zwnj;&nbsp;&#847;&zwnj;&nbsp;&#847;&zwnj;&nbsp;&#847;&zwnj;&nbsp;&#847;&zwnj;&nbsp;&#847;&zwnj;&nbsp;&#847;&zwnj;&nbsp;&#847;&zwnj;&nbsp;&#847;&zwnj;&nbsp;&#847;&zwnj;&nbsp;&#847;&zwnj;&nbsp;&#847;&zwnj;&nbsp;&#847;&zwnj;&nbsp;&#847;&zwnj;&nbsp;&#847;&zwnj;&nbsp;&#847;&zwnj;&nbsp;&#847;&zwnj;&nbsp;&#847;&zwnj;&nbsp;&#847;&zwnj;&nbsp;&#847;&zwnj;&nbsp;&#847;&zwnj;&nbsp;&#847;&zwnj;&nbsp;&#847;&zwnj;&nbsp;&#847;&zwnj;&nbsp;&#847;&zwnj;&nbsp;&#847;&zwnj;&nbsp;&#847;&zwnj;&nbsp;&#847;&zwnj;&nbsp;&#847;&zwnj;&nbsp;&#847;&zwnj;&nbsp;&#847;&zwnj;&nbsp;&#847;&zwnj;&nbsp;&#847;&zwnj;&nbsp;&#847;&zwnj;&nbsp;&#847;&zwnj;&nbsp;&#847;&zwnj;&nbsp;&#847;&zwnj;&nbsp;&#847;&zwnj;&nbsp;&#847;&zwnj;&nbsp;&#847;&zwnj;&nbsp;&#847;&zwnj;&nbsp;&#847;&zwnj;&nbsp;&#847;&zwnj;&nbsp;&#847;&zwnj;&nbsp;&#847;&zwnj;&nbsp;&#847;&zwnj;&nbsp;&#847;&zwnj;&nbsp;&#847;&zwnj;&nbsp;&#847;&zwnj;&nbsp;&#847;&zwnj;&nbsp;&#847;&zwnj;&nbsp;&#847;&zwnj;&nbsp;&#847;&zwnj;&nbsp;&#847;&zwnj;&nbsp;&#847;&zwnj;&nbsp;&#847;&zwnj;&nbsp;&#847;&zwnj;&nbsp;&#847;&zwnj;&nbsp;&#847;&zwnj;&nbsp;&#847;&zwnj;&nbsp;&#847;&zwnj;&nbsp;&#847;&zwnj;&nbsp;&#847;&zwnj;&nbsp;&#847;&zwnj;&nbsp;&#847;&zwnj;&nbsp;&#847;&zwnj;&nbsp;&#847;&zwnj;&nbsp;&#847;&zwnj;&nbsp;&#847;&zwnj;&nbsp;&#847;&zwnj;&nbsp;&#847;&zwnj;&nbsp;&#847;&zwnj;&nbsp;&#847;&zwnj;&nbsp;&#847;&zwnj;&nbsp;&#847;&zwnj;&nbsp;&#847;&zwnj;&nbsp;&#847;&zwnj;&nbsp;&#847;&zwnj;&nbsp;&#847;&zwnj;&nbsp;&#847;&zwnj;&nbsp;&#847;&zwnj;&nbsp;&#847;&zwnj;&nbsp;&#847;&zwnj;&nbsp;&#847;&zwnj;&nbsp;&#847;&zwnj;&nbsp;&#847;&zwnj;&nbsp;&#847;&zwnj;&nbsp;&#847;&zwnj;&nbsp;&#847;&zwnj;&nbsp;&#847;&zwnj;&nbsp;</div>
+<table role="presentation" width="100%" cellpadding="0" cellspacing="0" border="0" bgcolor="#FAF7F2" style="background:#FAF7F2;">
+  <tr>
+    <td align="center" style="padding:32px 14px 28px;">
+      <table role="presentation" width="100%" cellpadding="0" cellspacing="0" border="0" style="max-width:480px;">
+        <tr>
+          <td class="vibe-card" bgcolor="#FFFFFF" style="background:#FFFFFF;border:1px solid #EEE8DF;border-radius:24px;padding:40px 36px 34px;font-family:'DM Sans',-apple-system,BlinkMacSystemFont,'Segoe UI',Helvetica,Arial,sans-serif;color:#1C1C1E;">
+
+            <!-- wordmark pill, same as the sign-in card -->
+            <table role="presentation" cellpadding="0" cellspacing="0" border="0">
+              <tr>
+                <td bgcolor="#F4F2EF" style="background:#F4F2EF;border-radius:999px;padding:5px 12px;font-family:'Fraunces',Georgia,'Times New Roman',serif;font-size:18px;line-height:22px;font-weight:800;letter-spacing:-0.5px;color:#1C1C1E;">
+                  <a href="{{ .SiteURL }}" style="color:#1C1C1E;text-decoration:none;">vibe<span style="color:#FF5C35;">.</span></a>
+                </td>
+              </tr>
+            </table>
+
+            <h1 class="vibe-headline" style="margin:22px 0 12px;font-family:'Fraunces',Georgia,'Times New Roman',serif;font-size:34px;line-height:38px;font-weight:700;letter-spacing:-1px;color:#1C1C1E;">Confirm your account<span style="color:#FF5C35;">.</span></h1>
+
+            <p style="margin:0 0 26px;font-size:15px;line-height:23px;color:#5A564F;">This is Vibe, the campus app for IU Indianapolis. You signed up with <strong style="color:#1C1C1E;">{{ .Email }}</strong> &mdash; tap below to confirm it's yours.</p>
+
+            <!-- bulletproof button -->
+            <table role="presentation" width="100%" cellpadding="0" cellspacing="0" border="0" class="vibe-btn">
+              <tr>
+                <td align="center" bgcolor="#FF5C35" style="background:#FF5C35;border-radius:12px;">
+                  <a href="{{ .SiteURL }}/auth/confirm?token_hash={{ .TokenHash }}&amp;type=email" style="display:block;padding:16px 22px;font-family:'DM Sans',-apple-system,BlinkMacSystemFont,'Segoe UI',Helvetica,Arial,sans-serif;font-size:16px;line-height:20px;font-weight:700;color:#FFFFFF;text-decoration:none;border-radius:12px;">Confirm my account &rarr;</a>
+                </td>
+              </tr>
+            </table>
+
+            <p style="margin:28px 0 10px;font-size:11px;line-height:16px;font-weight:600;letter-spacing:0.08em;text-transform:uppercase;color:#FF5C35;">Or type this code in Vibe</p>
+            <table role="presentation" cellpadding="0" cellspacing="0" border="0">
+              <tr>
+                <td class="vibe-code" bgcolor="#FFEEE8" style="background:#FFEEE8;border:1px solid #FFD6C8;border-radius:12px;padding:12px 20px;font-family:ui-monospace,'SF Mono',Menlo,Consolas,'Courier New',monospace;font-size:30px;line-height:36px;font-weight:700;letter-spacing:6px;color:#1C1C1E;">{{ .Token }}</td>
+              </tr>
+            </table>
+            <p style="margin:10px 0 0;font-size:13px;line-height:20px;color:#8A8580;">On the Vibe screen that asked you to check your email.</p>
+
+            <p style="margin:26px 0 0;padding-top:20px;border-top:1px solid #F0EBE4;font-size:13px;line-height:20px;color:#5A564F;">This link and code expire in 1 hour. Any browser or phone works. If you asked for more than one email, use the newest one.</p>
+
+            <p style="margin:14px 0 0;font-size:12px;line-height:18px;color:#8A8580;">Button not working? Copy this link:<br><a href="{{ .SiteURL }}/auth/confirm?token_hash={{ .TokenHash }}&amp;type=email" style="color:#FF5C35;word-break:break-all;">{{ .SiteURL }}/auth/confirm?token_hash={{ .TokenHash }}&amp;type=email</a></p>
+
+          </td>
+        </tr>
+        <tr>
+          <td align="center" style="padding:20px 12px 0;font-family:'DM Sans',-apple-system,BlinkMacSystemFont,'Segoe UI',Helvetica,Arial,sans-serif;font-size:12px;line-height:18px;color:#8A8580;">
+            <span style="font-family:'Fraunces',Georgia,'Times New Roman',serif;font-weight:800;color:#1C1C1E;">vibe<span style="color:#FF5C35;">.</span></span> &middot; IU Indianapolis<br>
+            Didn't sign up? You can ignore this email &mdash; nothing happens without a tap.<br>
+            <a href="https://www.connectvibe.app/legal/privacy" style="color:#8A8580;">Privacy policy</a>
+          </td>
+        </tr>
+      </table>
+    </td>
+  </tr>
+</table>
+</body>
+</html>

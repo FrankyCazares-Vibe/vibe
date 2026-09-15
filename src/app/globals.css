@@ -1122,6 +1122,12 @@
     border-color 200ms ease,
     transform 200ms cubic-bezier(0.22, 1, 0.36, 1);
 }
+/* Invisible hit area: the pill is ~26px tall, the tap target needs 44px. */
+.vibe-auth-back::after {
+  content: "";
+  position: absolute;
+  inset: -10px -6px;
+}
 .vibe-auth-back:hover {
   color: #1c1c1e;
   border-color: rgba(28, 28, 30, 0.25);
@@ -1198,6 +1204,8 @@
   padding: 12px 14px;
   border-radius: 12px;
   margin: 0 0 18px;
+  /* Long addresses wrap instead of pushing a phone-width card sideways. */
+  overflow-wrap: anywhere;
 }
 .vibe-auth-banner--success {
   color: #1c5c2e;
@@ -1251,7 +1259,9 @@
   border-radius: 12px;
   border: 1px solid rgba(28, 28, 30, 0.12);
   font-family: "DM Sans", sans-serif;
-  font-size: 15px;
+  /* 16px minimum: iOS Safari (and in-app browsers) zoom the page on focus
+     for anything smaller. */
+  font-size: 16px;
   background: #fff;
   color: #1c1c1e;
   transition:
@@ -1517,6 +1527,139 @@ button.vibe-auth-link {
   cursor: pointer;
 }
 
+/* —— Auth: email-link recovery (/auth/confirm, /auth/callback cards, resend,
+   typed code). Shared by EmailLinkProblemCard, ResendConfirmation and
+   ConfirmCodeForm, plus the signup / login surfaces that embed them. —— */
+.vibe-auth-banner--info {
+  color: #3d3a35;
+  background: rgba(28, 28, 30, 0.04);
+  border: 1px solid rgba(28, 28, 30, 0.12);
+}
+.vibe-auth-banner--info strong {
+  color: #1c1c1e;
+}
+/* Banners inside the embedded resend / code stacks take their spacing from
+   the stack's gap. Scoped to those components so the banners in the
+   signup, forgot-password and school-email forms keep their margin. */
+.vibe-auth-embed > .vibe-auth-banner {
+  margin: 0;
+}
+/* A 44px tap target for a tail link on a phone-first card, without
+   changing how the link or its line look. */
+.vibe-auth-link--tap {
+  position: relative;
+}
+.vibe-auth-link--tap::after {
+  content: "";
+  position: absolute;
+  inset: -14px -8px;
+}
+/* "Forgot?" beside a field label: a fixed 16px line so the target is a
+   known 45px tall, reaching up into the 18px gap above the field and only
+   1-2px into the inputs around it. The label beside it sets the row's
+   height, so nothing moves. */
+.vibe-auth-label-link.vibe-auth-link--tap {
+  line-height: 16px;
+}
+.vibe-auth-label-link.vibe-auth-link--tap::after {
+  inset: -19px -12px -10px;
+}
+/* The primary and secondary actions also render as links. */
+a.vibe-auth-submit,
+a.vibe-auth-secondary {
+  text-decoration: none;
+}
+.vibe-auth-secondary {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  min-height: 48px;
+  padding: 12px 20px;
+  border-radius: 12px;
+  border: 1px solid rgba(28, 28, 30, 0.18);
+  background: #fff;
+  color: #1c1c1e;
+  font-family: "DM Sans", sans-serif;
+  font-size: 15px;
+  font-weight: 600;
+  cursor: pointer;
+  transition:
+    border-color 200ms ease,
+    color 200ms ease,
+    opacity 200ms ease;
+}
+.vibe-auth-secondary:hover:not(:disabled) {
+  border-color: #ff5c35;
+  color: #ff5c35;
+}
+.vibe-auth-secondary:focus-visible {
+  outline: 2px solid #ff5c35;
+  outline-offset: 2px;
+}
+/* A cooldown is a "not yet", not a "busy". */
+.vibe-auth-secondary:disabled {
+  opacity: 0.6;
+  cursor: not-allowed;
+}
+.vibe-auth-code-input {
+  font-family: ui-monospace, "SF Mono", Menlo, Monaco, monospace;
+  font-size: 22px;
+  font-variant-numeric: tabular-nums;
+  letter-spacing: 0.3em;
+  /* letter-spacing trails the last digit; indent by the same amount so the
+     code sits visually centered. */
+  text-indent: 0.3em;
+  text-align: center;
+}
+.vibe-auth-tip {
+  margin: 0;
+  font-size: 13px;
+  line-height: 1.5;
+  color: #8a8580;
+  overflow-wrap: anywhere;
+}
+.vibe-auth-tip strong {
+  color: #1c1c1e;
+  font-weight: 600;
+}
+.vibe-auth-disclosure {
+  display: inline-flex;
+  align-items: center;
+  min-height: 44px;
+  padding: 0;
+  background: none;
+  border: 0;
+  font-family: "DM Sans", sans-serif;
+  font-size: 13.5px;
+  font-weight: 600;
+  color: #ff5c35;
+  cursor: pointer;
+  vertical-align: middle;
+}
+.vibe-auth-disclosure:hover {
+  opacity: 0.7;
+}
+.vibe-auth-disclosure:focus-visible {
+  outline: 2px solid #ff5c35;
+  outline-offset: 2px;
+  border-radius: 4px;
+}
+/* Longer sentence headlines on the email-link cards. */
+.vibe-auth-headline--compact {
+  font-size: 30px;
+  letter-spacing: -0.8px;
+  line-height: 1.12;
+  overflow-wrap: anywhere;
+}
+.vibe-auth-recovery {
+  display: flex;
+  flex-direction: column;
+  gap: 14px;
+  margin-top: 24px;
+  padding-top: 20px;
+  border-top: 1px solid rgba(28, 28, 30, 0.08);
+}
+
 @media (max-width: 540px) {
   /* Auth cards: tight padding + lift the back button into a smaller corner
      so it doesn't kiss the card edge on phone widths. */
@@ -1540,6 +1683,10 @@ button.vibe-auth-link {
   .vibe-auth-sub {
     font-size: 13.5px;
     margin: 0 0 20px;
+  }
+  .vibe-auth-headline--compact {
+    font-size: 24px;
+    letter-spacing: -0.5px;
   }
 }
 
