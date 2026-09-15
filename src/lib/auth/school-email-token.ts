@@ -87,6 +87,77 @@ export function verifySchoolEmailToken(
   return payload;
 }
 
+/**
+ * Typed code for the IU step — the cross-device companion to the link.
+ *
+ * The link only verifies in a browser signed in as the requesting account
+ * (see confirm/route.ts), which fails when the student reads the email in
+ * Outlook's in-app browser. The code proves the same thing — the person can
+ * read the inbox — and is typed where they are already signed in.
+ *
+ * Stateless (no table): HMAC over user id + canonical address + a 30-minute
+ * window. Verification accepts the current and previous window, so a code
+ * lives at least 30 minutes, and a resend inside a window repeats the same
+ * code instead of invalidating the old email. Brute force is bounded by the
+ * fail-closed limiters on the confirm-code route, not here.
+ */
+export const SCHOOL_CODE_LENGTH = 8;
+export const SCHOOL_CODE_WINDOW_SEC = 1800;
+
+const SCHOOL_CODE_RE = /^\d{8}$/;
+
+function schoolEmailCodeForWindow(
+  userId: string,
+  email: string,
+  windowIndex: number,
+): string {
+  const digest = createHmac("sha256", getSecret())
+    .update(`vibe-school-code-v1|${userId}|${email.toLowerCase().trim()}|${windowIndex}`)
+    .digest();
+  // 40 bits mod 1e8: the modulo bias is ~1e-4 relative, irrelevant here.
+  return String(digest.readUIntBE(0, 5) % 10 ** SCHOOL_CODE_LENGTH).padStart(
+    SCHOOL_CODE_LENGTH,
+    "0",
+  );
+}
+
+function currentSchoolCodeWindow(nowSec?: number): number {
+  const now = nowSec ?? Math.floor(Date.now() / 1000);
+  return Math.floor(now / SCHOOL_CODE_WINDOW_SEC);
+}
+
+export function schoolEmailCode(
+  userId: string,
+  email: string,
+  nowSec?: number,
+): string {
+  return schoolEmailCodeForWindow(userId, email, currentSchoolCodeWindow(nowSec));
+}
+
+/** Digits only, exactly 8 — callers strip spaces/dashes first. Constant-time compare. */
+export function verifySchoolEmailCode(
+  userId: string,
+  email: string,
+  code: string,
+  nowSec?: number,
+): boolean {
+  if (!SCHOOL_CODE_RE.test(code)) return false;
+  const w = currentSchoolCodeWindow(nowSec);
+  const given = Buffer.from(code, "utf8");
+  // Check both windows without short-circuiting so timing doesn't say which matched.
+  let ok = false;
+  for (const windowIndex of [w, w - 1]) {
+    const expected = Buffer.from(
+      schoolEmailCodeForWindow(userId, email, windowIndex),
+      "utf8",
+    );
+    if (expected.length === given.length && timingSafeEqual(expected, given)) {
+      ok = true;
+    }
+  }
+  return ok;
+}
+
 // Campus allowlist (SCHOOL_EMAIL_DOMAINS, default iu.edu + iupui.edu). The
 // helpers live in a client-safe module; re-exported here so server callers
 // keep a single import.

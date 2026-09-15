@@ -6,12 +6,15 @@ import {
   isSchoolEmail,
   isSchoolVerifySecretConfigured,
   normalizeSchoolEmail,
+  SCHOOL_CODE_LENGTH,
+  SCHOOL_CODE_WINDOW_SEC,
+  schoolEmailCode,
   schoolEmailDomainsLabel,
   signSchoolEmailToken,
 } from "@/lib/auth/school-email-token";
 import { sendSchoolVerificationEmail } from "@/lib/email/resend-transactional";
 import { requireTermsAccepted } from "@/lib/legal/require-terms";
-import { clientIp, rateLimit, tooManyRequests } from "@/lib/rate-limit";
+import { clientNetworkKey, rateLimit, tooManyRequests } from "@/lib/rate-limit";
 import { createSupabaseServerClient } from "@/lib/supabase/server";
 import {
   createSupabaseServiceClient,
@@ -21,10 +24,10 @@ import {
 type Body = { schoolEmail?: string };
 
 /**
- * P1-006 — request campus email verification (signed token, Resend).
+ * P1-006 — request campus email verification (signed link + typed code, Resend).
  * Only addresses on the SCHOOL_EMAIL_DOMAINS allowlist (default IU: iu.edu,
  * iupui.edu + subdomains) are accepted; other .edu domains get a clear 400.
- * Caller must be logged in; does not mutate DB until confirm.
+ * Caller must be logged in; does not mutate DB until confirm / confirm-code.
  */
 export async function POST(req: Request) {
   if (!isSchoolVerifySecretConfigured()) {
@@ -92,24 +95,6 @@ export async function POST(req: Request) {
     );
   }
 
-  // Rate limit ONLY requests that will actually send mail. Placing these
-  // above the validation above meant a typo — a malformed address, or a
-  // non-IU domain, which A3 made the common rejection — spent the same
-  // budget as a real send. Three typos locked a student out of the signup
-  // gate for an hour having received zero emails. Outbound email is still
-  // the expensive part; it just costs nothing to reject a bad address.
-  const perUser = await rateLimit(`school-email:${user.id}`, {
-    limit: 3,
-    windowSec: 3600,
-  });
-  if (!perUser.allowed) return tooManyRequests(perUser);
-
-  const perIp = await rateLimit(`school-email-ip:${clientIp(req)}`, {
-    limit: 10,
-    windowSec: 3600,
-  });
-  if (!perIp.allowed) return tooManyRequests(perIp);
-
   // `school_email` / `otto_answers` are private columns the RLS role cannot
   // select; read them with the service client scoped to the session's user id.
   const admin = createSupabaseServiceClient();
@@ -134,8 +119,46 @@ export async function POST(req: Request) {
   ) {
     return NextResponse.json({
       ok: true,
+      alreadyVerified: true,
       message: "This school email is already verified on your account.",
     });
+  }
+
+  // Rate limit ONLY requests that will actually send mail. Placing these
+  // above the validation above meant a typo — a malformed address, or a
+  // non-IU domain, which A3 made the common rejection — spent the same
+  // budget as a real send. Three typos locked a student out of the signup
+  // gate for an hour having received zero emails. The already-verified
+  // resubmit above sends nothing, so it is free too. Outbound email is still
+  // the expensive part; it just costs nothing to reject a bad address.
+  //
+  // These MUST stay above the "linked to another account" lookup below:
+  // without a limit in front of it, that 409 is an unlimited oracle for
+  // which IU addresses already have a Vibe account.
+  const perUser = await rateLimit(`school-email:${user.id}`, {
+    limit: 3,
+    windowSec: 3600,
+  });
+  if (!perUser.allowed) {
+    return tooManyRequests(
+      perUser,
+      "You've asked for 3 emails this hour. Use the code or link from the newest one, or try again later this hour.",
+    );
+  }
+
+  // Per network, sized for a signup table on shared campus Wi-Fi, where one
+  // IPv4 address can be a whole room. IPv6 counts by /64, so rotating
+  // addresses doesn't buy more sends; the per-user limit above still caps
+  // each account at 3.
+  const perIp = await rateLimit(`school-email-ip:${clientNetworkKey(req)}`, {
+    limit: 60,
+    windowSec: 3600,
+  });
+  if (!perIp.allowed) {
+    return tooManyRequests(
+      perIp,
+      "Lots of verification emails from this network right now. Try again later this hour.",
+    );
   }
 
   const { data: row, error: lookupErr } = await admin
@@ -163,6 +186,9 @@ export async function POST(req: Request) {
   }
 
   const token = signSchoolEmailToken(user.id, schoolEmail);
+  // Same code for every send inside a 30-minute window, so a resend never
+  // invalidates the email the student is already reading.
+  const code = schoolEmailCode(user.id, schoolEmail);
   const site = getSiteOriginForRequest(req);
 
   const afterVerify = isOttoOnboardingComplete(profile?.otto_answers)
@@ -171,14 +197,22 @@ export async function POST(req: Request) {
   const verifyUrl = `${site}/auth/verify-school?token=${encodeURIComponent(token)}&next=${encodeURIComponent(afterVerify)}`;
 
   try {
-    await sendSchoolVerificationEmail(schoolEmail, verifyUrl);
+    await sendSchoolVerificationEmail(schoolEmail, verifyUrl, code);
   } catch (err) {
+    // Never surface provider/config messages to the caller.
     const message = err instanceof Error ? err.message : String(err);
-    return NextResponse.json({ ok: false, error: message }, { status: 503 });
+    console.error("[school-email/request] send", message);
+    return NextResponse.json(
+      { ok: false, error: "We couldn't send the email right now. Try again in a minute." },
+      { status: 503 },
+    );
   }
 
   return NextResponse.json({
     ok: true,
-    message: "Check your school inbox for a verification link.",
+    message: "Check your IU inbox for a code and a link.",
+    sentTo: schoolEmail,
+    codeLength: SCHOOL_CODE_LENGTH,
+    codeMinutes: SCHOOL_CODE_WINDOW_SEC / 60,
   });
 }

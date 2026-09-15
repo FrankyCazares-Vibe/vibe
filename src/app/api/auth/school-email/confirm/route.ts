@@ -1,15 +1,9 @@
 import { NextResponse } from "next/server";
 
-import {
-  isSchoolEmail,
-  schoolEmailDomainsLabel,
-  verifySchoolEmailToken,
-} from "@/lib/auth/school-email-token";
+import { applySchoolEmailVerification } from "@/lib/auth/school-email-apply";
+import { verifySchoolEmailToken } from "@/lib/auth/school-email-token";
 import { createSupabaseServerClient } from "@/lib/supabase/server";
-import {
-  createSupabaseServiceClient,
-  isSupabaseServiceConfigured,
-} from "@/lib/supabase/service";
+import { isSupabaseServiceConfigured } from "@/lib/supabase/service";
 
 type Body = { token?: string };
 
@@ -19,6 +13,8 @@ type Body = { token?: string };
  * The token alone is not enough: the caller must be signed in as the account
  * that requested the link. Otherwise an attacker could request a link for a
  * victim's .edu address and have the victim's click verify the attacker's row.
+ * The write itself (idempotent / allowlist / 409 / update) is shared with the
+ * typed-code route in school-email-apply.ts.
  */
 export async function POST(req: Request) {
   if (!isSupabaseServiceConfigured()) {
@@ -53,7 +49,11 @@ export async function POST(req: Request) {
   const payload = verifySchoolEmailToken(token);
   if (!payload) {
     return NextResponse.json(
-      { ok: false, error: "Invalid or expired verification link." },
+      {
+        ok: false,
+        error:
+          "This IU verification link has expired or is broken. Send a new one from the verify page.",
+      },
       { status: 400 },
     );
   }
@@ -69,73 +69,6 @@ export async function POST(req: Request) {
     );
   }
 
-  const admin = createSupabaseServiceClient();
-
-  // Idempotent: a re-click of an already-consumed link is a no-op.
-  const { data: current } = await admin
-    .from("users")
-    .select("school_email, school_verified")
-    .eq("id", user.id)
-    .maybeSingle();
-
-  if (
-    current?.school_verified === true &&
-    typeof current.school_email === "string" &&
-    current.school_email.toLowerCase() === payload.email
-  ) {
-    return NextResponse.json({
-      ok: true,
-      message: "School email verified.",
-    });
-  }
-
-  // Re-check the allowlist before writing: a token minted before the list
-  // changed (48h TTL) must not verify an address that is no longer allowed.
-  // Sits after the idempotent branch so already-verified rows are untouched.
-  if (!isSchoolEmail(payload.email)) {
-    return NextResponse.json(
-      {
-        ok: false,
-        error: `That address isn't an IU email (${schoolEmailDomainsLabel()}). Request a new link with your IU address.`,
-      },
-      { status: 400 },
-    );
-  }
-
-  const { data: taken } = await admin
-    .from("users")
-    .select("id")
-    .eq("school_email", payload.email)
-    .maybeSingle();
-
-  if (taken && taken.id !== user.id) {
-    return NextResponse.json(
-      {
-        ok: false,
-        error: "That school email was claimed by another account.",
-      },
-      { status: 409 },
-    );
-  }
-
-  const { error } = await admin
-    .from("users")
-    .update({
-      school_email: payload.email,
-      school_verified: true,
-    })
-    .eq("id", user.id);
-
-  if (error) {
-    console.error("[school-email/confirm]", error);
-    return NextResponse.json(
-      { ok: false, error: "Could not update profile." },
-      { status: 500 },
-    );
-  }
-
-  return NextResponse.json({
-    ok: true,
-    message: "School email verified.",
-  });
+  const r = await applySchoolEmailVerification(user.id, payload.email);
+  return NextResponse.json(r.body, { status: r.status });
 }
