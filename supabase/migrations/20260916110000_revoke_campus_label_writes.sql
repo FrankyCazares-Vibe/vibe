@@ -1,0 +1,117 @@
+-- Plan 2026-09-15 (handoffs/2026-09-15-indy-campus-onboarding-plan.md) §5.2,
+-- migration M2: students stop writing the legacy campus label.
+--
+-- users.school and orgs.school are still UPDATE-granted to `authenticated`
+-- (20260903100000_security_hardening.sql:53-54 and :71-73). The browser holds
+-- the anon key, so today
+--   PATCH /rest/v1/users?id=eq.<me> {"school":"IU Bloomington"}
+-- lets a student write any label, bypassing the campus picker, the university
+-- rule and the 30-day clock. An org owner/admin can do the same to
+-- orgs.school. After wave 2 every campus write goes through a server route
+-- that dual-writes campus_id + school with the service role, so the column
+-- grant can go.
+--
+-- The new columns (users.school_system / campus_id / campus_set_at,
+-- orgs.campus_id / system) never had an UPDATE grant (M1). This file doesn't
+-- touch SELECT: users.school stays readable by `authenticated` for the badge
+-- until M3 drops the column.
+--
+-- LIVE STATE BEFORE THIS MIGRATION (read-only, 2026-09-15):
+--   * has_column_privilege('authenticated','public.users','school','UPDATE') = true
+--     has_column_privilege('authenticated','public.orgs','school','UPDATE')  = true
+--     has_column_privilege('authenticated', ... 'school','SELECT') = true for both
+--     has_column_privilege('anon', ... 'school','SELECT') = false for both
+--   * Table ACLs: users authenticated=dDxtm, orgs authenticated=rdDxtm.
+--     Neither has a table-wide UPDATE (`w`), so the column grants are the ONLY
+--     UPDATE path and revoking them is a real boundary (critic D3).
+--
+-- DEPLOY ORDER: apply ONLY after wave 2 is live in production (its Vercel
+-- deploy is READY), and after M1. Old code writes `school` with the USER
+-- client in three places. Applied early, PostgREST rejects the WHOLE update
+-- with 42501 "permission denied for table users/orgs", not just the school
+-- field:
+--   * every profile save from old phone/desktop bundles. ProfileMobile.tsx
+--     and profile.html send `school` on every profile-sync save; Settings
+--     sends `school: next` (critic A4). A bio edit would fail.
+--   * org edits: orgs/[slug]/route.ts:214 writes the patch, including
+--     school, with the user client (critic A3).
+--   * whatever profile-sync/route.ts:89-91 still treats as "self-updatable".
+--
+-- PRE-CHECK (all must pass; read-only):
+--   1. Every writer of `school` uses the service-role client:
+--        rg -n "from\(['\"](users|orgs)['\"]\)\s*\.update" src public/html
+--        rg -n -U "from\(['\"](users|orgs)['\"]\)[\s\S]{0,300}?\.(update|upsert)\(" src public/html
+--      For each hit whose patch can contain `school`, confirm the client is
+--      the service client, not the request/user client. Read these in full:
+--        src/app/api/me/profile/route.ts
+--        src/app/api/me/profile-sync/route.ts   (the :89-91 "self-updatable" comment)
+--        src/app/api/orgs/[slug]/route.ts       (critic A3: campus fields via service role
+--                                                after the owner/admin check)
+--        src/app/api/me/onboarding-complete/route.ts
+--        src/app/api/me/onboarding-step/route.ts
+--   2. No browser code writes users/orgs directly:
+--        rg -n "\.from\(['\"](users|orgs)['\"]\)" public/html src/components
+--      Any .update/.upsert naming `school` is a blocker.
+--   3. Wave 2 is the production deploy:
+--        gh api repos/{owner}/{repo}/deployments --jq '.[0] | {sha, environment, created_at}'
+--      The sha must be at or after the wave 2 commit.
+--   4. Grants are still in the pre-migration state (expect true, true):
+--        SELECT has_column_privilege('authenticated','public.users','school','UPDATE'),
+--               has_column_privilege('authenticated','public.orgs','school','UPDATE');
+--
+-- HOW TO APPLY BY HAND. The Supabase MCP execute_sql is read-only, and
+-- `supabase db push` needs the DB password, which is not on this machine.
+--   1. From the repo root, with SUPABASE_ACCESS_TOKEN exported from
+--      .env.local (the project ref is in supabase/.temp/project-ref). Use
+--      curl, not Python: urllib gets a Cloudflare 1010 block.
+--        export SUPABASE_ACCESS_TOKEN="$(grep '^SUPABASE_ACCESS_TOKEN=' .env.local | cut -d= -f2-)"
+--        curl -sS -X POST "https://api.supabase.com/v1/projects/$(cat supabase/.temp/project-ref)/database/query" \
+--          -H "Authorization: Bearer $SUPABASE_ACCESS_TOKEN" \
+--          -H "Content-Type: application/json" \
+--          --data "$(jq -n --rawfile q supabase/migrations/20260916110000_revoke_campus_label_writes.sql '{query:$q}')"
+--   2. Record it so `db push` stays in sync. Send the same way: save to a
+--      scratch .sql file and point --rawfile at it:
+--        INSERT INTO supabase_migrations.schema_migrations (version, name)
+--        VALUES ('20260916110000', 'revoke_campus_label_writes');
+--
+-- POST-CHECK (read-only). Plan §5.2 names information_schema.column_privileges,
+-- but that view shows the MCP role (supabase_read_only_user) 0 rows for these
+-- tables (checked 2026-09-15, while the grants existed). Use
+-- has_column_privilege instead. `authenticated` must be SELECT-only on the
+-- school, campus_id and school_system columns:
+--   SELECT t.tbl, t.col,
+--          has_column_privilege('authenticated', t.tbl, t.col, 'SELECT') AS sel,
+--          has_column_privilege('authenticated', t.tbl, t.col, 'UPDATE') AS upd,
+--          has_column_privilege('authenticated', t.tbl, t.col, 'INSERT') AS ins,
+--          has_column_privilege('anon',          t.tbl, t.col, 'SELECT') AS anon_sel
+--     FROM (VALUES ('public.users','school'), ('public.users','campus_id'),
+--                  ('public.users','school_system'), ('public.users','campus_set_at'),
+--                  ('public.orgs','school'), ('public.orgs','campus_id'),
+--                  ('public.orgs','system')) AS t(tbl, col);
+--   -- expect:
+--   --   public.users school         t f f f
+--   --   public.users campus_id      t f f f
+--   --   public.users school_system  t f f f
+--   --   public.users campus_set_at  f f f f
+--   --   public.orgs  school         t f f f
+--   --   public.orgs  campus_id      t f f f
+--   --   public.orgs  system         t f f f
+--   SELECT max(version) FROM supabase_migrations.schema_migrations;
+--   -- expect 20260916110000
+-- Live, on the Vercel prod deploy: (a) edit your bio on the phone and hard
+-- refresh, it persists; (b) change nothing but save Settings, no error;
+-- (c) as an org owner, edit the org description, it persists; (d) pick a
+-- campus in Settings, it persists and the badge updates.
+--
+-- ROLLBACK (safe at any time, restores today's grants):
+--   GRANT UPDATE (school) ON public.users TO authenticated;
+--   GRANT UPDATE (school) ON public.orgs  TO authenticated;
+--   DELETE FROM supabase_migrations.schema_migrations WHERE version = '20260916110000';
+-- ---------------------------------------------------------------------------
+
+begin;
+
+revoke update (school) on public.users from authenticated;
+revoke update (school) on public.orgs  from authenticated;
+
+commit;
