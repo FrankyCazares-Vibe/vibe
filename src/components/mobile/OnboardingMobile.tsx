@@ -13,8 +13,18 @@ import {
 import { isSafeRelativePath } from "@/lib/auth/login-next";
 import { vibeRequest } from "@/lib/feedback/request";
 import { toast } from "@/lib/feedback/toast";
-import { DEFAULT_CAMPUS_ID, IU_CAMPUSES } from "@/lib/iu/campuses";
-import { IU_MAJORS_BY_SCHOOL } from "@/lib/iu/majors";
+import {
+  DEFAULT_CAMPUS_ID,
+  IU_CAMPUSES,
+  SYSTEM_LABEL,
+  campusPickerSub,
+  campusesForSystem,
+  isCampusAllowed,
+  isSchoolSystem,
+  type SchoolSystem,
+} from "@/lib/iu/campuses";
+import { IU_MAJORS_BY_SCHOOL, majorsForCampus } from "@/lib/iu/majors";
+import type { OnboardingBoot } from "@/lib/onboarding/boot";
 
 /**
  * Mobile-native Otto onboarding. Mirrors the 4-step desktop flow
@@ -26,6 +36,17 @@ import { IU_MAJORS_BY_SCHOOL } from "@/lib/iu/majors";
  * Desktop continues to serve the static HTML at `/onboarding/classic`
  * inside an iframe via `OnboardingSwitch` — this component only paints
  * on mobile viewports.
+ *
+ * THE CAMPUS FIELD IS SYSTEM-AWARE (plan 2026-09-15 §3.4 step 2 / §3.5).
+ * The choices are the allowed set for the university the student's school
+ * email proved — `boot.system`, stamped server-side at verification — with
+ * the shared communities first (Indianapolis, then Fort Wayne). Purdue
+ * signups are on, so a hardcoded IU list would offer a @purdue.edu student
+ * only IU campuses and land them campus-less with the wrong university's
+ * label. Nothing is preselected except the visible single-campus preselect
+ * the boot data names (@pfw.edu / @pnw.edu), which the student still
+ * confirms. A student with no stamped system (a pre-migration row) keeps the
+ * legacy IU list exactly as it was.
  */
 
 const TOTAL_STEPS = 4;
@@ -82,12 +103,19 @@ const ALL_IU_MAJORS = (() => {
 const ALL_IU_SCHOOLS = IU_MAJORS_BY_SCHOOL.map((g) => g.school.label);
 
 /**
- * Campus is self-declared — an @iu.edu address proves IU membership, not
- * which campus — so we store the canonical label and default to the pilot
- * campus. Never blocking: an empty value just means "show me everything".
+ * The legacy fallback, used ONLY when no school system is stamped: campus is
+ * self-declared, an @iu.edu address proves IU membership and not which
+ * campus, so the old picker stored the canonical label and defaulted to the
+ * pilot campus. A student whose system IS known never sees this — they get
+ * their own university's campuses, with nothing defaulted.
  */
 const DEFAULT_CAMPUS_LABEL =
   IU_CAMPUSES.find((c) => c.id === DEFAULT_CAMPUS_ID)?.label ?? "";
+
+/** Client copy for the campus field (plan §3.5, "Step 2 errors"). */
+const CAMPUS_REQUIRED_COPY = "Pick your campus to continue.";
+/** Mirrors the server's `campus_invalid` line, used when the pick can't stand. */
+const CAMPUS_INVALID_COPY = "Pick one of your university's campuses.";
 
 function splitLinesToArray(
   raw: string,
@@ -165,8 +193,53 @@ function OttoOrb({ size }: { size: "big" | "small" }) {
 }
 
 // ── Component ───────────────────────────────────────────────────────────────
-export function OnboardingMobile({ replay }: { replay: boolean }) {
+
+/**
+ * What `/onboarding` hands the phone tree. Every boot field is OPTIONAL and
+ * the flow still works without it (a caller that only knows `replay` gets
+ * today's behaviour), which is the shape `OnboardingSwitch` already types.
+ */
+export type OnboardingMobileProps = { replay: boolean } & Partial<
+  Omit<OnboardingBoot, "replay">
+>;
+
+export function OnboardingMobile({
+  replay,
+  system: systemProp,
+  prefill,
+  singleCampusId,
+}: OnboardingMobileProps) {
   const [step, setStep] = useState(1);
+
+  // ── Campus (boot data) ───────────────────────────────────────────────────
+  // The verified university. Null when nothing is stamped yet: that student
+  // keeps the legacy IU list and its "IU Indianapolis" default.
+  const system: SchoolSystem | null = isSchoolSystem(systemProp)
+    ? systemProp
+    : null;
+
+  /** The allowed set as picker cards — shared communities first (§2.4). */
+  const campusOptions = useMemo(() => {
+    if (!system) return [];
+    return campusesForSystem(system).map((c) => ({
+      id: c.id,
+      title: c.shortName,
+      sub: campusPickerSub(c, system),
+      isOpen: c.isOpen,
+    }));
+  }, [system]);
+
+  /** True when we can ask the real question instead of the legacy IU list. */
+  const systemAware = campusOptions.length > 0;
+
+  /**
+   * The one campus that may start selected: the @pfw.edu / @pnw.edu single-
+   * campus preselect, which is VISIBLE and still confirmed by the student.
+   * Re-checked against the system here — the server already did (§3.4).
+   */
+  const preselectId = isCampusAllowed(singleCampusId, system)
+    ? (singleCampusId ?? null)
+    : null;
 
   // Step 2 — Profile draft
   const [name, setName] = useState("");
@@ -176,13 +249,79 @@ export function OnboardingMobile({ replay }: { replay: boolean }) {
     color: string;
   } | null>(null);
   const [bio, setBio] = useState("");
-  const [campus, setCampus] = useState(DEFAULT_CAMPUS_LABEL);
+  /** Legacy label, only ever sent when the system is unknown. */
+  const [campus, setCampus] = useState(() =>
+    isSchoolSystem(systemProp) ? "" : DEFAULT_CAMPUS_LABEL,
+  );
+  /**
+   * The system-aware pick. Starts empty — nothing is chosen for the student —
+   * except the visible single-campus preselect, or a campus they have already
+   * chosen and confirmed (`campus_set_at` is stamped). A campus that was
+   * backfilled silently is deliberately NOT preselected: that would be the
+   * same silent default again, and the student is meant to confirm it.
+   */
+  const [campusId, setCampusId] = useState(() => {
+    if (!isSchoolSystem(systemProp)) return "";
+    if (isCampusAllowed(singleCampusId, systemProp)) return singleCampusId ?? "";
+    if (prefill?.campusConfirmed && isCampusAllowed(prefill.campusId, systemProp)) {
+      return prefill.campusId ?? "";
+    }
+    return "";
+  });
+  const [campusError, setCampusError] = useState<string | null>(null);
+  const campusGroupRef = useRef<HTMLDivElement | null>(null);
   const [major, setMajor] = useState("");
   const [department, setDepartment] = useState("");
   const [year, setYear] = useState("");
   const [interests, setInterests] = useState("");
   const [skills, setSkills] = useState("");
   const [lookingFor, setLookingFor] = useState<string[]>([]);
+
+  // ── Majors follow the campus ─────────────────────────────────────────────
+  // IU Indianapolis for IU in Indianapolis, Purdue Indianapolis for Purdue in
+  // the same community, Bloomington for IU Bloomington; anywhere else there is
+  // no curated list and the field is plain free text (§3.4 step 3). Both
+  // fields stay free text regardless — the list is a suggestion, never a gate.
+  const majorList = useMemo(
+    () => (system && campusId ? majorsForCampus(campusId, system) : null),
+    [system, campusId],
+  );
+  const majorOptions = majorList
+    ? majorList.majors
+    : systemAware
+      ? []
+      : ALL_IU_MAJORS;
+  const schoolOptions = majorList
+    ? majorList.schools
+    : systemAware
+      ? []
+      : ALL_IU_SCHOOLS;
+  const majorHint = majorList
+    ? `from the ${majorList.label} list, or type your own`
+    : systemAware
+      ? "type your own"
+      : "start typing — IU Indianapolis list";
+
+  /** §3.5: "Your school email shows you're at IU…" (Purdue variant mirrored). */
+  const campusNote = system
+    ? `Your school email shows you're at ${SYSTEM_LABEL[system]}. You can move to another ${SYSTEM_LABEL[system]} campus later in Settings.`
+    : "";
+
+  /**
+   * Bring the campus cards into view when they're the reason the flow stopped.
+   * The delay is for the bounce back from Finish: the step-change effect
+   * scrolls to the top and focuses the name field first, so this waits until
+   * that has settled rather than fighting it.
+   */
+  const revealCampusField = useCallback((delayMs = 0) => {
+    const run = () =>
+      campusGroupRef.current?.scrollIntoView({
+        block: "center",
+        behavior: "smooth",
+      });
+    if (delayMs > 0) setTimeout(run, delayMs);
+    else run();
+  }, []);
 
   // Step 3 — Work experience
   const [exp1, setExp1] = useState<WorkRow>({ ...EMPTY_ROW });
@@ -327,8 +466,14 @@ export function OnboardingMobile({ replay }: { replay: boolean }) {
     const profile: Record<string, unknown> = {};
     const n = name.trim();
     if (n) profile.name = n.slice(0, 120);
-    const c = campus.trim();
-    if (c) profile.school = c;
+    // The campus only rides along as a legacy label when the system is
+    // unknown; a known system saves it through the campus step below, which
+    // is the only writer that understands the campus model (a new id or a
+    // Purdue label in `profile.school` would be refused outright).
+    if (!systemAware) {
+      const c = campus.trim();
+      if (c) profile.school = c;
+    }
     const m = major.trim();
     if (m) profile.major = m.slice(0, 80);
     const d = department.trim();
@@ -374,6 +519,65 @@ export function OnboardingMobile({ replay }: { replay: boolean }) {
         window.location.href = "/profile";
       }, 700);
       return;
+    }
+
+    // ── Campus, for a student whose university we know ─────────────────────
+    // POST /api/me/onboarding-step is the only route that writes the campus
+    // model, and it refuses a campus outside the student's system. So the
+    // campus goes here, first: Finish can never write one that isn't theirs,
+    // and a refusal comes back to the field instead of saving silently.
+    if (systemAware) {
+      const chosen = campusId.trim();
+      if (!chosen || !isCampusAllowed(chosen, system)) {
+        const message = chosen ? CAMPUS_INVALID_COPY : CAMPUS_REQUIRED_COPY;
+        setCampusError(message);
+        toast({ message, tone: "error" });
+        setStep(2);
+        revealCampusField(360);
+        setSubmitting(false);
+        return;
+      }
+      const savedCampus = await vibeRequest("/api/me/onboarding-step", {
+        method: "POST",
+        json: { step: "campus", campus_id: chosen },
+        failure: "Couldn't save your campus.",
+        quiet: true,
+      });
+      if (!savedCampus.ok) {
+        const code = savedCampus.code;
+        // The server won't take this campus: say so on the field, in the
+        // server's own words ("Pick one of your university's campuses.", "You
+        // changed your campus recently."). The generic mapped line would send
+        // them to retry a request that will be refused again.
+        if (code === "campus_invalid" || code === "campus_change_too_soon") {
+          const line = savedCampus.error ?? CAMPUS_INVALID_COPY;
+          setCampusError(line);
+          toast({ message: line, tone: "error" });
+          setStep(2);
+          revealCampusField(360);
+          setSubmitting(false);
+          return;
+        }
+        // The campus columns aren't there yet, or the row carries no system:
+        // nothing the student can fix, and finishing without a campus is
+        // recoverable (Settings asks again). Everything else — offline, a
+        // 500, a rate limit — keeps their answers on screen so Finish retries.
+        if (code !== "campus_not_ready" && code !== "system_missing") {
+          toast({
+            message: savedCampus.message,
+            tone: "error",
+            action: savedCampus.action,
+          });
+          setSubmitting(false);
+          return;
+        }
+        // Finishing without a campus is recoverable, but not silent: say what
+        // didn't save before carrying on.
+        toast({
+          message: "We couldn't set your campus yet. You can pick it in Settings.",
+          tone: "info",
+        });
+      }
     }
 
     // The warp waits for the save. A refusal keeps every answer on screen
@@ -443,6 +647,10 @@ export function OnboardingMobile({ replay }: { replay: boolean }) {
     handle,
     bio,
     campus,
+    campusId,
+    system,
+    systemAware,
+    revealCampusField,
     major,
     department,
     year,
@@ -486,6 +694,21 @@ export function OnboardingMobile({ replay }: { replay: boolean }) {
     }
     window.location.href = dest;
   }, [submitting, replay]);
+
+  /**
+   * Leaving step 2 with the campus question unanswered. Same rule Finish
+   * enforces, said early so the student isn't bounced back from the last
+   * screen. Always true when the system is unknown — that student sees the
+   * legacy picker, which is never empty.
+   */
+  const campusAnswered = useCallback(() => {
+    if (!systemAware) return true;
+    const chosen = campusId.trim();
+    if (chosen && isCampusAllowed(chosen, system)) return true;
+    setCampusError(chosen ? CAMPUS_INVALID_COPY : CAMPUS_REQUIRED_COPY);
+    revealCampusField();
+    return false;
+  }, [systemAware, campusId, system, revealCampusField]);
 
   // ── Render helpers ────────────────────────────────────────────────────────
   const progressDots = (
@@ -621,41 +844,99 @@ export function OnboardingMobile({ replay }: { replay: boolean }) {
                 />
               </Field>
 
-              <Field
-                label="Which campus are you at?"
-                hint="not verified; you can change this any time in settings"
-              >
-                <select
-                  value={campus}
-                  onChange={(e) => setCampus(e.target.value)}
-                  style={inputStyle}
+              {systemAware ? (
+                <Field label="Which campus is yours?">
+                  <div
+                    ref={campusGroupRef}
+                    role="radiogroup"
+                    aria-label="Which campus is yours?"
+                    aria-invalid={campusError ? true : undefined}
+                    aria-describedby={
+                      campusError ? "onbCampusError" : "onbCampusNote"
+                    }
+                    style={campusListStyle}
+                  >
+                    {campusOptions.map((opt) => {
+                      const selected = campusId === opt.id;
+                      return (
+                        <label key={opt.id} style={campusCardStyle(selected)}>
+                          <input
+                            type="radio"
+                            name="onb-campus"
+                            value={opt.id}
+                            checked={selected}
+                            onChange={() => {
+                              setCampusId(opt.id);
+                              setCampusError(null);
+                            }}
+                            style={campusRadioStyle}
+                          />
+                          <span style={campusTextStyle}>
+                            <span style={campusTitleRowStyle}>
+                              <span style={campusTitleStyle}>{opt.title}</span>
+                              {opt.id === preselectId && (
+                                <span style={campusTagStyle}>
+                                  from your school email
+                                </span>
+                              )}
+                              {!opt.isOpen && (
+                                <span style={campusSoonStyle}>not open yet</span>
+                              )}
+                            </span>
+                            <span style={campusSubStyle}>{opt.sub}</span>
+                          </span>
+                        </label>
+                      );
+                    })}
+                  </div>
+                  {campusError && (
+                    <p id="onbCampusError" role="alert" style={fieldErrorStyle}>
+                      {campusError}
+                    </p>
+                  )}
+                  <p id="onbCampusNote" style={hintBelowStyle}>
+                    {campusNote}
+                  </p>
+                </Field>
+              ) : (
+                <Field
+                  label="Which campus are you at?"
+                  hint="not verified; you can change this any time in settings"
                 >
-                  {IU_CAMPUSES.map((c) => (
-                    <option key={c.id} value={c.label}>
-                      {c.city && c.city !== c.label.replace(/^IU /, "")
-                        ? `${c.label} — ${c.city}`
-                        : c.label}
-                    </option>
-                  ))}
-                </select>
-              </Field>
+                  <select
+                    value={campus}
+                    onChange={(e) => setCampus(e.target.value)}
+                    style={inputStyle}
+                  >
+                    {IU_CAMPUSES.map((c) => (
+                      <option key={c.id} value={c.label}>
+                        {c.city && c.city !== c.label.replace(/^IU /, "")
+                          ? `${c.label} — ${c.city}`
+                          : c.label}
+                      </option>
+                    ))}
+                  </select>
+                </Field>
+              )}
 
-              <Field label="Major" hint="start typing — IU Indianapolis list">
+              <Field label="Major" hint={majorHint}>
                 <input
                   type="text"
                   value={major}
                   onChange={(e) => setMajor(e.target.value)}
                   maxLength={80}
-                  list="onbIuMajors"
+                  list={majorOptions.length ? "onbIuMajors" : undefined}
                   autoComplete="off"
                   placeholder="e.g. Informatics"
                   style={inputStyle}
                 />
-                <datalist id="onbIuMajors">
-                  {ALL_IU_MAJORS.map((m) => (
-                    <option key={m} value={m} />
-                  ))}
-                </datalist>
+                {majorOptions.length > 0 && (
+                  <datalist id="onbIuMajors">
+                    {majorOptions.map((m) => (
+                      <option key={m} value={m} />
+                    ))}
+                  </datalist>
+                )}
               </Field>
 
               <Field label="Department / school" hint="optional">
@@ -664,16 +945,18 @@ export function OnboardingMobile({ replay }: { replay: boolean }) {
                   value={department}
                   onChange={(e) => setDepartment(e.target.value)}
                   maxLength={120}
-                  list="onbIuSchools"
+                  list={schoolOptions.length ? "onbIuSchools" : undefined}
                   autoComplete="off"
                   placeholder="e.g. Luddy School of Informatics…"
                   style={inputStyle}
                 />
-                <datalist id="onbIuSchools">
-                  {ALL_IU_SCHOOLS.map((s) => (
-                    <option key={s} value={s} />
-                  ))}
-                </datalist>
+                {schoolOptions.length > 0 && (
+                  <datalist id="onbIuSchools">
+                    {schoolOptions.map((s) => (
+                      <option key={s} value={s} />
+                    ))}
+                  </datalist>
+                )}
               </Field>
 
               <Field label="Year">
@@ -867,14 +1150,18 @@ export function OnboardingMobile({ replay }: { replay: boolean }) {
             <button
               type="button"
               style={primaryCtaStyle}
-              onClick={() => setStep(3)}
+              onClick={() => {
+                if (campusAnswered()) setStep(3);
+              }}
             >
               Continue →
             </button>
             <button
               type="button"
               style={secondaryLinkStyle}
-              onClick={() => setStep(4)}
+              onClick={() => {
+                if (campusAnswered()) setStep(4);
+              }}
             >
               Skip to resume →
             </button>
@@ -1352,6 +1639,87 @@ const handleAtStyle: CSSProperties = {
   color: "rgba(255,255,255,.55)",
   fontWeight: 600,
   fontSize: 16,
+};
+
+// ── Campus cards ──────────────────────────────────────────────────────────
+// One radio card per campus the student may call home: title = short name,
+// sub-line = the shared-community copy ("IU Indianapolis · one community with
+// Purdue Indianapolis (formerly IUPUI)") or the full name. Cards clear 44 px
+// so they're a comfortable tap, and the whole card is the label.
+const campusListStyle: CSSProperties = {
+  display: "flex",
+  flexDirection: "column",
+  gap: 8,
+};
+function campusCardStyle(selected: boolean): CSSProperties {
+  return {
+    display: "flex",
+    alignItems: "flex-start",
+    gap: 12,
+    minHeight: 56,
+    padding: "12px 14px",
+    borderRadius: 12,
+    background: selected ? "rgba(255,92,53,.12)" : COLORS.fieldBg,
+    border: `1px solid ${selected ? "rgba(255,92,53,.45)" : COLORS.fieldBorder}`,
+    color: "white",
+    cursor: "pointer",
+    transition: "background .15s, border-color .15s",
+  };
+}
+const campusRadioStyle: CSSProperties = {
+  accentColor: COLORS.accent,
+  width: 18,
+  height: 18,
+  marginTop: 2,
+  flexShrink: 0,
+};
+const campusTextStyle: CSSProperties = {
+  display: "flex",
+  flexDirection: "column",
+  gap: 3,
+  minWidth: 0,
+};
+const campusTitleRowStyle: CSSProperties = {
+  display: "flex",
+  alignItems: "center",
+  flexWrap: "wrap",
+  gap: 6,
+};
+const campusTitleStyle: CSSProperties = {
+  fontSize: 15,
+  fontWeight: 600,
+};
+const campusSubStyle: CSSProperties = {
+  fontSize: 12,
+  lineHeight: 1.4,
+  color: "rgba(255,255,255,.55)",
+};
+const campusPillBase: CSSProperties = {
+  fontSize: 10,
+  fontWeight: 700,
+  letterSpacing: "0.04em",
+  textTransform: "uppercase",
+  borderRadius: 999,
+  padding: "2px 7px",
+  whiteSpace: "nowrap",
+};
+const campusTagStyle: CSSProperties = {
+  ...campusPillBase,
+  color: COLORS.lavender,
+  background: "rgba(200,184,255,.12)",
+  border: "1px solid rgba(200,184,255,.30)",
+};
+const campusSoonStyle: CSSProperties = {
+  ...campusPillBase,
+  color: "rgba(255,255,255,.55)",
+  background: "rgba(255,255,255,.06)",
+  border: `1px solid ${COLORS.faintBorder}`,
+};
+const fieldErrorStyle: CSSProperties = {
+  fontSize: 12,
+  fontWeight: 600,
+  color: COLORS.red,
+  marginTop: 8,
 };
 
 const lookingForWrapStyle: CSSProperties = {

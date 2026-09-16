@@ -12,6 +12,10 @@
 <title>Meet Otto — Vibe</title>
 <link href="https://fonts.googleapis.com/css2?family=Fraunces:ital,wght@0,400;0,700;0,900;1,400;1,700&family=DM+Sans:wght@300;400;500;600;700&display=swap" rel="stylesheet">
 <script src="/html/_persistence.js"></script>
+<!-- window.vibeMajorsForCampus: the curated majors list for the campus the
+     student picks, generated from src/lib/iu/majors.ts (same include as
+     profile.html). -->
+<script src="/html/_iu-majors.js"></script>
 <style>
 :root { --cream:#FAF7F2; --charcoal:#1C1C1E; --accent:#FF5C35; --purple:#7C5CFC; --lavender:#C8B8FF; --green:#1A9E5B; }
 * { margin: 0; padding: 0; box-sizing: border-box; }
@@ -177,6 +181,11 @@ input, textarea, [contenteditable="true"] { cursor:text!important; }
   font-size: 11px; font-weight: 600; color: rgba(255,255,255,.5);
   letter-spacing: .4px; text-transform: uppercase;
 }
+/* A field Finish couldn't use. Same coral as the resume-link note. */
+.pf-error {
+  font-size: 11px; font-weight: 600; color: var(--accent);
+  line-height: 1.45; margin-top: 5px;
+}
 .pf-input, .pf-select, .pf-textarea {
   width: 100%; background: rgba(255,255,255,.07);
   border: 0.5px solid rgba(255,255,255,.12); border-radius: 12px;
@@ -188,7 +197,8 @@ input, textarea, [contenteditable="true"] { cursor:text!important; }
 }
 .pf-input::placeholder, .pf-textarea::placeholder { color: rgba(255,255,255,.35); }
 .pf-textarea { min-height: 72px; resize: vertical; }
-.pf-select { cursor: pointer; }
+/* min-height: a 44 px tap target for the campus and year pickers. */
+.pf-select { cursor: pointer; min-height: 44px; }
 .pf-looking-wrap {
   display: flex; flex-direction: column; gap: 8px;
   margin-top: 4px;
@@ -392,17 +402,19 @@ body.ott-warping .progress-dots {
         <textarea id="pfBio" class="pf-textarea" rows="3" maxlength="600" placeholder="A few lines about you — what you're into, what you're building."></textarea>
       </div>
       <div>
-        <label class="pf-label" for="pfCampus">Which campus are you at? <span style="font-weight:400;color:#8A8580">— not verified, just how we scope what you see</span></label>
-        <select id="pfCampus" class="pf-select"></select>
-        <p class="pf-hint">You can change this any time in settings.</p>
+        <label class="pf-label" for="pfCampus">Which campus are you at? <span id="pfCampusNote" style="font-weight:400;color:#8A8580">— not verified, just how we scope what you see</span></label>
+        <select id="pfCampus" class="pf-select" aria-describedby="pfCampusError pfCampusSub pfCampusHint" onchange="onCampusChange()"></select>
+        <p class="pf-error" id="pfCampusError" hidden></p>
+        <p class="pf-hint" id="pfCampusSub" hidden></p>
+        <p class="pf-hint" id="pfCampusHint">You can change this any time in settings.</p>
       </div>
       <div>
-        <label class="pf-label" for="pfMajor">Major <span style="font-weight:400;color:#8A8580">— start typing to filter the IU list</span></label>
+        <label class="pf-label" for="pfMajor">Major <span id="pfMajorNote" style="font-weight:400;color:#8A8580">— start typing to filter the IU list</span></label>
         <input type="text" id="pfMajor" class="pf-input" maxlength="80" list="iuMajors" autocomplete="off" placeholder="Start typing — e.g. Informatics">
         <datalist id="iuMajors"></datalist>
       </div>
       <div>
-        <label class="pf-label" for="pfDepartment">Department / school <span style="font-weight:400;color:#8A8580">— optional, start typing to pick from IU</span></label>
+        <label class="pf-label" for="pfDepartment">Department / school <span id="pfDepartmentNote" style="font-weight:400;color:#8A8580">— optional, start typing to pick from IU</span></label>
         <input type="text" id="pfDepartment" class="pf-input" maxlength="120" list="iuSchools" autocomplete="off" placeholder="e.g. Luddy School of Informatics…">
         <datalist id="iuSchools"></datalist>
       </div>
@@ -554,10 +566,108 @@ const state = {
 
 const TOTAL_STEPS = 4;
 
+// ── Boot payload (plan §3.3) ─────────────────────────────────────────────
+// /onboarding/classic injects <script id="onbBoot" type="application/json">
+// with the university the student's school email PROVED (`system`), the
+// campus their address points at on its own (`singleCampusId`) and the
+// prefill, which says whether they already chose a campus. A page served
+// without the tag (the raw static file) keeps today's IU-only behaviour.
+function readOnbBoot() {
+  try {
+    const el = document.getElementById('onbBoot');
+    if (!el) return null;
+    const parsed = JSON.parse(el.textContent || 'null');
+    return parsed && typeof parsed === 'object' && !Array.isArray(parsed) ? parsed : null;
+  } catch (e) {
+    return null;
+  }
+}
+const ONB_BOOT = readOnbBoot() || {};
+const ONB_PREFILL = ONB_BOOT.prefill && typeof ONB_BOOT.prefill === 'object' ? ONB_BOOT.prefill : {};
+
+// ── Campus model (plan §2.3) ─────────────────────────────────────────────
+// Mirrors CAMPUS_ROWS in src/lib/iu/campuses.ts — that file is the source of
+// truth; this page is static (no build step) so it cannot import it. Keep in
+// sync. Drift can only mis-OFFER a campus: the campus step validates every
+// pick against the system the server stamped, and `users_campus_in_system`
+// refuses the rest, so nothing here can write a campus into the wrong
+// university.
+const SYSTEM_LABEL = { iu: 'IU', purdue: 'Purdue' };
+const CAMPUS_ROWS = [
+  // Shared: one community for both universities.
+  { id: 'indianapolis', name: 'Indianapolis', shortName: 'Indianapolis', systems: ['iu', 'purdue'], sort: 0, isOpen: true },
+  { id: 'fort-wayne', name: 'Fort Wayne', shortName: 'Fort Wayne', systems: ['iu', 'purdue'], sort: 10, isOpen: false },
+  // IU
+  { id: 'iu-bloomington', name: 'IU Bloomington', shortName: 'Bloomington', systems: ['iu'], sort: 20, isOpen: false },
+  { id: 'iu-columbus', name: 'IU Columbus', shortName: 'Columbus', systems: ['iu'], sort: 30, isOpen: false },
+  { id: 'iu-east', name: 'IU East', shortName: 'East', systems: ['iu'], sort: 30, isOpen: false },
+  { id: 'iu-kokomo', name: 'IU Kokomo', shortName: 'Kokomo', systems: ['iu'], sort: 30, isOpen: false },
+  { id: 'iu-northwest', name: 'IU Northwest', shortName: 'Northwest', systems: ['iu'], sort: 30, isOpen: false },
+  { id: 'iu-south-bend', name: 'IU South Bend', shortName: 'South Bend', systems: ['iu'], sort: 30, isOpen: false },
+  { id: 'iu-southeast', name: 'IU Southeast', shortName: 'Southeast', systems: ['iu'], sort: 30, isOpen: false },
+  // Purdue
+  { id: 'purdue-west-lafayette', name: 'Purdue West Lafayette', shortName: 'West Lafayette', systems: ['purdue'], sort: 20, isOpen: false },
+  { id: 'purdue-northwest', name: 'Purdue Northwest', shortName: 'Northwest', systems: ['purdue'], sort: 30, isOpen: false },
+];
+/** Former names, said once and only in the picker (plan §2.5 copy rules). */
+const CAMPUS_FORMERLY = { indianapolis: 'IUPUI' };
+
+function campusRowById(id) {
+  const key = String(id == null ? '' : id).trim().toLowerCase();
+  if (!key) return null;
+  for (let i = 0; i < CAMPUS_ROWS.length; i++) {
+    if (CAMPUS_ROWS[i].id === key) return CAMPUS_ROWS[i];
+  }
+  return null;
+}
+
+/** The allowed set for a system, shared communities first, then sort, then name. */
+function campusesForSystem(system) {
+  if (system !== 'iu' && system !== 'purdue') return [];
+  return CAMPUS_ROWS.filter(function (c) { return c.systems.indexOf(system) >= 0; })
+    .sort(function (a, b) {
+      const shared = Number(b.systems.length > 1) - Number(a.systems.length > 1);
+      if (shared !== 0) return shared;
+      if (a.sort !== b.sort) return a.sort - b.sort;
+      return a.name < b.name ? -1 : a.name > b.name ? 1 : 0;
+    });
+}
+
+/**
+ * The sub-line under the picker, seen from the student's own side (plan §3.5):
+ *   IU:     "IU Indianapolis · one community with Purdue Indianapolis (formerly IUPUI)"
+ *   Purdue: "Purdue Indianapolis · one community with IU Indianapolis (formerly IUPUI)"
+ * A single-system campus just says its full name ("IU Bloomington").
+ */
+function campusPickerSub(c, system) {
+  if (!c || !SYSTEM_LABEL[system] || c.systems.indexOf(system) < 0) return '';
+  if (c.systems.length < 2) return c.name;
+  const others = c.systems
+    .filter(function (s) { return s !== system; })
+    .map(function (s) { return SYSTEM_LABEL[s] + ' ' + c.shortName; });
+  const formerly = CAMPUS_FORMERLY[c.id];
+  return SYSTEM_LABEL[system] + ' ' + c.shortName + ' · one community with ' + others.join(' and ')
+    + (formerly ? ' (formerly ' + formerly + ')' : '');
+}
+
+// ── The campus picker ────────────────────────────────────────────────────
+// `system` is the university the school email proved; with one, the picker
+// offers exactly that university's campuses and Finish saves the campus id
+// through /api/me/onboarding-step. Without one (no boot payload, or a row
+// with no `school_system` yet) the page keeps today's IU list and today's
+// legacy `school` label — see `campusPicker.legacy`.
+const campusPicker = {
+  system: ONB_BOOT.system === 'iu' || ONB_BOOT.system === 'purdue' ? ONB_BOOT.system : null,
+  options: [],
+  /** The visible @pfw.edu / @pnw.edu preselect the student still confirms. */
+  preselectId: null,
+  legacy: true,
+};
+
 // ── IU campuses (self-declared, never verified) ─────────────────────────
-// Mirrors src/lib/iu/campuses.ts — that file is the source of truth; this
-// page is static (no build step) so it cannot import it. Keep in sync.
-// We store the canonical LABEL in users.school, not the id.
+// The pre-campus-model list, kept for the legacy path only. Mirrors the
+// deprecated IU_CAMPUSES in src/lib/iu/campuses.ts; we store the canonical
+// LABEL in users.school, not the id.
 const IU_CAMPUSES = [
   { id: "indianapolis", label: "IU Indianapolis", city: "Indianapolis" },
   { id: "bloomington", label: "IU Bloomington", city: "Bloomington" },
@@ -570,20 +680,101 @@ const IU_CAMPUSES = [
   { id: "online", label: "IU Online", city: "Online" },
 ];
 const DEFAULT_CAMPUS_ID = "indianapolis";
-(function populateIuCampuses() {
+
+function campusPickValue() {
+  const sel = document.getElementById('pfCampus');
+  return sel ? String(sel.value || '').trim() : '';
+}
+
+function setCampusError(message) {
+  const el = document.getElementById('pfCampusError');
+  const sel = document.getElementById('pfCampus');
+  if (el) { el.textContent = message || ''; el.hidden = !message; }
+  if (sel) {
+    if (message) sel.setAttribute('aria-invalid', 'true');
+    else sel.removeAttribute('aria-invalid');
+  }
+}
+
+/** The sub-line and the major list follow the pick. */
+function onCampusChange() {
+  const sub = document.getElementById('pfCampusSub');
+  if (sub) {
+    let text = '';
+    if (!campusPicker.legacy) {
+      const row = campusRowById(campusPickValue());
+      text = row ? campusPickerSub(row, campusPicker.system) : '';
+      // Same words as the phone twin. The boot payload carries only the campus
+      // id, never the address, so the page doesn't guess which domain it was.
+      if (text && row && row.id === campusPicker.preselectId) text += ' · from your school email';
+    }
+    sub.textContent = text;
+    sub.hidden = !text;
+  }
+  setCampusError('');
+  refreshMajorList();
+}
+
+(function populateCampuses() {
   const sel = document.getElementById('pfCampus');
   if (!sel) return;
+
+  campusPicker.options = campusesForSystem(campusPicker.system);
+  // No verified system (and the impossible empty allowed set): today's page,
+  // unchanged — the IU list, Indianapolis preselected, saved as a label.
+  if (!campusPicker.options.length) {
+    const legacyFrag = document.createDocumentFragment();
+    IU_CAMPUSES.forEach(function (c) {
+      const opt = document.createElement('option');
+      opt.value = c.label;
+      opt.textContent = c.city && c.city !== c.label.replace(/^IU /, '')
+        ? c.label + ' — ' + c.city
+        : c.label;
+      if (c.id === DEFAULT_CAMPUS_ID) opt.selected = true;
+      legacyFrag.appendChild(opt);
+    });
+    sel.appendChild(legacyFrag);
+    return;
+  }
+  campusPicker.legacy = false;
+
+  const preselect = typeof ONB_BOOT.singleCampusId === 'string' ? ONB_BOOT.singleCampusId : '';
+  const allowed = function (id) {
+    return !!id && campusPicker.options.some(function (c) { return c.id === id; });
+  };
+  campusPicker.preselectId = allowed(preselect) ? preselect : null;
+  // A campus they already CHOSE paints as chosen; a backfilled or
+  // label-derived one (campusConfirmed false) still gets asked.
+  const chosen = ONB_PREFILL.campusConfirmed === true && typeof ONB_PREFILL.campusId === 'string'
+    && allowed(ONB_PREFILL.campusId) ? ONB_PREFILL.campusId : '';
+
   const frag = document.createDocumentFragment();
-  IU_CAMPUSES.forEach(function (c) {
+  const blank = document.createElement('option');
+  blank.value = '';
+  blank.textContent = 'Pick your campus';
+  frag.appendChild(blank);
+  campusPicker.options.forEach(function (c) {
     const opt = document.createElement('option');
-    opt.value = c.label;
-    opt.textContent = c.city && c.city !== c.label.replace(/^IU /, '')
-      ? c.label + ' — ' + c.city
-      : c.label;
-    if (c.id === DEFAULT_CAMPUS_ID) opt.selected = true;
+    opt.value = c.id;
+    // Closed campuses stay selectable (plan §2.3); say so, like the phone's pill.
+    opt.textContent = c.isOpen ? c.shortName : c.shortName + ' — not open yet';
     frag.appendChild(opt);
   });
   sel.appendChild(frag);
+  // Nothing is preselected except the campus their own address names — which
+  // they still confirm — and a campus they already chose (plan §3.4 step 2).
+  sel.value = chosen || campusPicker.preselectId || '';
+
+  const note = document.getElementById('pfCampusNote');
+  // The university is verified now; only the campus is self-declared.
+  if (note) note.textContent = '';
+  const hint = document.getElementById('pfCampusHint');
+  if (hint) {
+    const label = SYSTEM_LABEL[campusPicker.system];
+    hint.textContent = 'Your school email shows you’re at ' + label
+      + '. You can move to another ' + label + ' campus later in Settings.';
+  }
+  onCampusChange();
 })();
 
 // ── IU Bloomington major list (curated; users can also type freely) ──────
@@ -609,16 +800,57 @@ const IU_MAJORS = [
   "Spanish","Speech and Hearing Sciences","Sport Marketing and Management","Statistics","Studio Art","Supply Chain Management","Sustainable Business",
   "Telecommunications","Theatre and Drama","Therapeutic Recreation","Tourism, Hospitality and Event Management","Urban Planning and Community Development","Voice (Music)","Women's Studies","Youth Development"
 ];
-(function populateIuMajors() {
-  const dl = document.getElementById('iuMajors');
+/** Refill a <datalist> from a list of strings. */
+function fillDatalist(id, values) {
+  const dl = document.getElementById(id);
   if (!dl) return;
   const frag = document.createDocumentFragment();
-  IU_MAJORS.forEach(function (m) {
+  values.forEach(function (v) {
     const opt = document.createElement('option');
-    opt.value = m;
+    opt.value = v;
     frag.appendChild(opt);
   });
+  dl.innerHTML = '';
   dl.appendChild(frag);
+}
+
+/**
+ * The major and department lists follow the campus and the system (plan §3.4
+ * step 3): window.vibeMajorsForCampus (from _iu-majors.js, generated from
+ * src/lib/iu/majors.ts) serves the IU Indianapolis, Purdue Indianapolis and
+ * IU Bloomington lists and answers null everywhere else — which is free text,
+ * not an error. Both fields accept anything typed either way.
+ */
+function refreshMajorList() {
+  // No verified system: today's lists and today's hints stand.
+  if (campusPicker.legacy) return;
+  const list = typeof window.vibeMajorsForCampus === 'function'
+    ? window.vibeMajorsForCampus(campusPickValue(), campusPicker.system)
+    : null;
+  const majors = list && Array.isArray(list.majors) ? list.majors : [];
+  const schools = list && Array.isArray(list.schools) ? list.schools : [];
+  fillDatalist('iuMajors', majors);
+  fillDatalist('iuSchools', schools);
+  const note = document.getElementById('pfMajorNote');
+  if (note) {
+    note.textContent = majors.length && list.label
+      ? '— from the ' + list.label + ' list, or type your own'
+      : '— type your own';
+  }
+  const deptNote = document.getElementById('pfDepartmentNote');
+  if (deptNote) deptNote.textContent = '— optional';
+  // The legacy placeholders name IU examples (Informatics, Luddy); a Purdue or
+  // free-text campus gets neutral ones instead.
+  const majorInput = document.getElementById('pfMajor');
+  if (majorInput) majorInput.placeholder = majors.length ? 'Start typing to pick from the list' : 'Your major';
+  const deptInput = document.getElementById('pfDepartment');
+  if (deptInput) deptInput.placeholder = schools.length ? 'Start typing to pick your school' : 'Your school or department';
+}
+
+(function populateIuMajors() {
+  // The campus-aware list drives the field once the system is known.
+  if (!campusPicker.legacy) return;
+  fillDatalist('iuMajors', IU_MAJORS);
 })();
 
 // ── IU Bloomington schools/colleges + flagship departments ──────────────
@@ -686,15 +918,9 @@ const IU_SCHOOLS = [
   "Department of Theatre, Drama, and Contemporary Dance"
 ];
 (function populateIuSchools() {
-  const dl = document.getElementById('iuSchools');
-  if (!dl) return;
-  const frag = document.createDocumentFragment();
-  IU_SCHOOLS.forEach(function (s) {
-    const opt = document.createElement('option');
-    opt.value = s;
-    frag.appendChild(opt);
-  });
-  dl.appendChild(frag);
+  // The campus-aware list drives the field once the system is known.
+  if (!campusPicker.legacy) return;
+  fillDatalist('iuSchools', IU_SCHOOLS);
 })();
 
 // ── Cursor (matches the rest of vibe) ─────────────────────────────────────
@@ -821,8 +1047,7 @@ function onHandleInput(input) {
 
 function collectProfileDraft() {
   const name = (document.getElementById('pfName') || {}).value?.trim() || '';
-  const campusSel = document.getElementById('pfCampus');
-  const campus = campusSel ? String(campusSel.value || '').trim() : '';
+  const campus = campusPickValue();
   const major = (document.getElementById('pfMajor') || {}).value?.trim() || '';
   const department = (document.getElementById('pfDepartment') || {}).value?.trim() || '';
   const yearSel = document.getElementById('pfYear');
@@ -843,8 +1068,12 @@ function collectProfileDraft() {
   );
   const out = {};
   if (name) out.name = name;
-  // Campus label — self-declared, never blocking. Empty means "no campus".
-  if (campus) out.school = campus;
+  // Campus. With a verified system the pick is a campus id, saved through the
+  // campus step (which checks it against that system and writes the label
+  // itself), so it never rides along here as a legacy label the server would
+  // have to guess a university for. Without one, today's behaviour: the
+  // self-declared label, empty meaning "no campus".
+  if (campusPicker.legacy && campus) out.school = campus;
   if (major) out.major = major;
   if (department) out.department = department;
   if (yearRaw) {
@@ -1045,6 +1274,30 @@ function sendBackToHandle(statusText, message) {
   setTimeout(() => { const i = document.getElementById('pfHandle'); if (i) i.focus(); }, 300);
 }
 
+// A campus Finish couldn't use: back to step 2 with the field marked, so the
+// student can pick one of their own university's campuses and Finish again.
+function sendBackToCampus(message, action) {
+  goToStep(2);
+  setCampusError(message);
+  // Like sendBackToHandle: without a toast, Finish reads as doing nothing.
+  window.vibeToast(message, action ? { tone: 'error', action: action } : { tone: 'error' });
+  // After goToStep's own focus on the name field (250ms).
+  setTimeout(() => { const i = document.getElementById('pfCampus'); if (i) i.focus(); }, 300);
+}
+
+/**
+ * The campus step's own words when it has them ("Pick one of your
+ * university's campuses.", the 30-day line, "Campus setup isn't available
+ * yet."), which say more than the generic failure copy vibeRequest falls back
+ * to on a 400. Anything else — signed out, Terms, offline — keeps
+ * vibeRequest's message and its action link.
+ */
+function campusRefusalCopy(r) {
+  const err = typeof r.error === 'string' ? r.error.trim() : '';
+  const ownStatus = r.status === 400 || r.status === 429 || r.status === 503;
+  return ownStatus && /[.!?]$/.test(err) ? err : '';
+}
+
 async function completeOnboarding() {
   const finishBtn = document.getElementById('btnFinish');
   if (finishBtn && finishBtn.disabled) return; // a save is already in flight
@@ -1093,7 +1346,45 @@ async function completeOnboarding() {
     return;
   }
 
+  // Campus (plan §2.4). Once the school email has proved a university, the
+  // pick has to be one of THAT university's campuses. The picker only offers
+  // those, so this catches a stale or hand-edited value before anything is
+  // sent — a campus outside the student's system is never saved silently.
+  const campusId = campusPickValue();
+  if (!campusPicker.legacy) {
+    if (!campusId) {
+      sendBackToCampus('Pick your campus to continue.');
+      return;
+    }
+    if (!campusPicker.options.some(function (c) { return c.id === campusId; })) {
+      sendBackToCampus('Pick one of your university’s campuses.');
+      return;
+    }
+  }
+
   setFinishBusy(true);
+
+  // The campus goes first, on its own: /api/me/onboarding-step checks the pick
+  // against the `school_system` the SERVER stamped and dual-writes the legacy
+  // label, so the campus is saved by the one writer that can't put a student
+  // in the other university. A refusal keeps every answer on screen, marks the
+  // field and never marks onboarding done.
+  if (!campusPicker.legacy) {
+    const savedCampus = await window.vibeRequest('/api/me/onboarding-step', {
+      method: 'POST',
+      json: { step: 'campus', campus_id: campusId },
+      failure: "Couldn't save your campus.",
+      quiet: true,
+    });
+    if (!savedCampus.ok) {
+      setFinishBusy(false);
+      const own = campusRefusalCopy(savedCampus);
+      // Signed out / Terms / offline keep the action link that fixes them;
+      // the campus step's own refusals speak in their own words. One toast.
+      sendBackToCampus(own || savedCampus.message, own ? null : savedCampus.action);
+      return;
+    }
+  }
 
   // The warp waits for the save. A refusal keeps every answer on screen and
   // the toast says why: Review Terms for the consent gate (S53 A4), Sign in
