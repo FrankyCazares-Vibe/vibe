@@ -10,6 +10,14 @@
 
   const VIEWPORT_MAX = 540;
 
+  /**
+   * Shown through `opts.onError` when Save can't produce a blob. Identical to
+   * CROP_FAILED_MESSAGE in src/components/ImageCropperModal.tsx and to
+   * PHOTO_ERROR_COPY.processFailed in src/lib/profile/avatar-upload.ts
+   * (onboarding plan §3.5, step 4) — change all three together.
+   */
+  const CROP_FAILED_MESSAGE = "Couldn't process that photo. Try a different one.";
+
   // Inject styles once.
   if (!document.getElementById("vibe-cropper-styles")) {
     const css = `
@@ -19,7 +27,12 @@
         padding: 20px; font-family: 'DM Sans', system-ui, sans-serif; }
       .vc-modal { width: 100%; max-width: 620px; background: #fff; border-radius: 18px;
         padding: 18px; box-shadow: 0 24px 80px rgba(0,0,0,0.4);
-        display: flex; flex-direction: column; gap: 14px; }
+        display: flex; flex-direction: column; gap: 14px;
+        /* A tall card used to run off a short screen with Save unreachable.
+           40px = the backdrop's 20px top + bottom padding. The vh line is the
+           fallback for browsers without dvh (Safari < 15.4). */
+        max-height: calc(100vh - 40px);
+        max-height: calc(100dvh - 40px); overflow-y: auto; }
       .vc-title { font-family: 'Fraunces', serif; font-weight: 800; font-size: 18px; color: #1C1C1E; }
       .vc-stage { position: relative; margin: 0 auto; background: #000; overflow: hidden;
         border-radius: 12px; touch-action: none; user-select: none; cursor: grab; }
@@ -30,7 +43,7 @@
         letter-spacing: 0.4px; text-transform: uppercase; }
       .vc-zoom-slider { flex: 1; accent-color: #FF5C35; }
       .vc-actions { display: flex; justify-content: flex-end; gap: 8px; }
-      .vc-btn { padding: 8px 14px; border-radius: 999px; font-family: inherit;
+      .vc-btn { padding: 8px 14px; min-height: 44px; border-radius: 999px; font-family: inherit;
         font-size: 12px; font-weight: 700; cursor: pointer; border: 1px solid rgba(28,28,30,0.12);
         background: transparent; color: #1C1C1E; }
       .vc-btn-primary { padding: 8px 18px; border: none; background: #FF5C35; color: #fff;
@@ -58,6 +71,12 @@
    *   safeAreaGuides: Array<{label, containerAspect, color}> — optional;
    *     draws dashed outlines inside the crop frame for each destination
    *     surface (e.g. desktop banner 6:1, phone banner 2:1).
+   *   onError: (message, cause) => void — optional; called when the crop
+   *     can't be produced (the image didn't decode, no canvas, encode
+   *     failed). The promise still resolves null right after, so callers
+   *     that don't pass it behave exactly as before.
+   *   dismissOnBackdrop: boolean — default true; pass false to stop a tap
+   *     on the dimmed backdrop from cancelling (onboarding's photo step).
    */
   window.openImageCropper = function openImageCropper(file, opts) {
     opts = opts || {};
@@ -68,10 +87,18 @@
     const outputType = opts.outputType || "image/jpeg";
     const outputQuality = typeof opts.outputQuality === "number" ? opts.outputQuality : 0.92;
     const safeAreaGuides = Array.isArray(opts.safeAreaGuides) ? opts.safeAreaGuides : [];
+    const onError = typeof opts.onError === "function" ? opts.onError : null;
+    // Default true — how every caller written before wave 2 closes.
+    const dismissOnBackdrop = opts.dismissOnBackdrop !== false;
 
-    // Viewport sized from aspect.
-    const vw = aspect >= 1 ? VIEWPORT_MAX : VIEWPORT_MAX * aspect;
-    const vh = aspect >= 1 ? VIEWPORT_MAX / aspect : VIEWPORT_MAX;
+    // Viewport sized from aspect, then capped to the screen. `overflow-y:
+    // auto` on the card makes the browser compute overflow-x as auto too, so
+    // a frame wider than the phone would scroll in BOTH directions. 76px is
+    // the backdrop's 20px plus the card's 18px padding, doubled — the same
+    // cap ImageCropperModal.tsx applies.
+    const cap = Math.max(220, Math.min(VIEWPORT_MAX, (window.innerWidth || VIEWPORT_MAX) - 76));
+    const vw = aspect >= 1 ? cap : cap * aspect;
+    const vh = aspect >= 1 ? cap / aspect : cap;
 
     return new Promise((resolve) => {
       // Backdrop + modal markup.
@@ -210,7 +237,9 @@
         saveBtn.disabled = false;
       };
       img.onerror = function () {
-        // Fail silently — close and resolve null so the caller can recover.
+        // Close and resolve null so the caller can recover. `onError` gives
+        // it a line to show; without one this stays as silent as it was.
+        if (onError) onError(CROP_FAILED_MESSAGE, null);
         cleanup(null);
       };
 
@@ -278,9 +307,9 @@
         applyTransform();
       }, { passive: false });
 
-      // Click-outside closes (cancel).
+      // Click-outside closes (cancel), unless the caller turned that off.
       backdrop.addEventListener("click", function (e) {
-        if (e.target === backdrop) cleanup(null);
+        if (dismissOnBackdrop && e.target === backdrop) cleanup(null);
       });
       cancelBtn.addEventListener("click", function () { cleanup(null); });
 
@@ -292,7 +321,8 @@
         try {
           const blob = await renderCrop();
           cleanup(blob);
-        } catch (_e) {
+        } catch (err) {
+          if (onError) onError(CROP_FAILED_MESSAGE, err);
           cleanup(null);
         }
       });

@@ -40,6 +40,14 @@ export type SafeAreaGuide = {
   color: string;
 };
 
+/**
+ * What a caller shows when Save can't produce a blob. Kept identical to the
+ * onboarding plan §3.5 step-4 line `PHOTO_ERROR_COPY.processFailed`
+ * (src/lib/profile/avatar-upload.ts) and to the same literal in the vanilla
+ * twin, public/html/_imageCropper.js — change all three together.
+ */
+export const CROP_FAILED_MESSAGE = "Couldn't process that photo. Try a different one.";
+
 type Props = {
   src: File | string;
   /** When `aspect` is fixed, the user can't change it. When `aspectChoices`
@@ -55,8 +63,23 @@ type Props = {
   /** Outlined preview rectangles drawn on top of the crop frame so the
    *  user can see what each display surface will actually show. */
   safeAreaGuides?: SafeAreaGuide[];
+  /** A tap on the dimmed backdrop cancels. Defaults to `true`, which is what
+   *  every caller written before wave 2 relies on. Onboarding's photo step
+   *  passes `false` so a stray tap can't throw away the crop. */
+  dismissOnBackdrop?: boolean;
   onCancel: () => void;
   onConfirm: (blob: Blob, info: { width: number; height: number; aspect: number }) => void;
+  /** Save couldn't produce a blob: no canvas, the image didn't decode, or
+   *  the encoder returned nothing. Without this the failure is silent — the
+   *  spinner just stops and the student is left looking at the crop frame.
+   *  Also fires when the picked file never decodes at all, which otherwise
+   *  leaves the frame black with Save disabled forever (the vanilla twin
+   *  reports the same case from `img.onerror`).
+   *
+   *  The modal stays open either way, so a caller that wants the failure to
+   *  close it calls its own cancel from here. Callers that don't pass this
+   *  behave exactly as they did before wave 2. */
+  onError?: (message: string, cause?: unknown) => void;
 };
 
 export function ImageCropperModal({
@@ -69,8 +92,10 @@ export function ImageCropperModal({
   outputQuality = 0.92,
   title = "Adjust image",
   safeAreaGuides,
+  dismissOnBackdrop = true,
   onCancel,
   onConfirm,
+  onError,
 }: Props) {
   // Resolve the source to a URL the <img> can render. We deliberately
   // don't revoke the object URL on unmount — React 19 strict mode
@@ -169,6 +194,13 @@ export function ImageCropperModal({
     [activeAspect, fitImage],
   );
 
+  // The picked file never decoded (a corrupt JPEG, a HEIC this browser
+  // can't read). `imgDims` stays null, so Save is disabled for good; without
+  // a line here the student just sees a black frame and no reason.
+  const onImgError = useCallback(() => {
+    onError?.(CROP_FAILED_MESSAGE, new Error("Image decode failed"));
+  }, [onError]);
+
   // User picks a new aspect ratio: recenter against the new frame.
   const pickAspect = (next: number) => {
     setActiveAspect(next);
@@ -264,6 +296,10 @@ export function ImageCropperModal({
   const confirm = useCallback(async () => {
     if (!imgDims || !imgUrl || busy) return;
     setBusy(true);
+    // The blob is handed to `onConfirm` AFTER this try/catch: a caller that
+    // throws from its own handler must not be reported to the student as a
+    // crop failure (and must not be swallowed the way it was before).
+    let out: { blob: Blob; width: number; height: number } | null = null;
     try {
       // Compute crop region in source-image pixels.
       const srcX = -pos.x / scale;
@@ -302,12 +338,14 @@ export function ImageCropperModal({
         canvas.toBlob(resolve, outputType, outputQuality),
       );
       if (!blob) throw new Error("Could not encode image");
-      onConfirm(blob, { width: outW, height: outH, aspect: activeAspect });
+      out = { blob, width: outW, height: outH };
     } catch (e) {
       console.error("[cropper]", e);
+      onError?.(CROP_FAILED_MESSAGE, e);
     } finally {
       setBusy(false);
     }
+    if (out) onConfirm(out.blob, { width: out.width, height: out.height, aspect: activeAspect });
   }, [
     imgDims,
     imgUrl,
@@ -320,6 +358,7 @@ export function ImageCropperModal({
     outputQuality,
     activeAspect,
     onConfirm,
+    onError,
   ]);
 
   if (typeof document === "undefined" || !imgUrl) return null;
@@ -328,7 +367,7 @@ export function ImageCropperModal({
     <div
       role="dialog"
       aria-modal="true"
-      onClick={onCancel}
+      onClick={dismissOnBackdrop ? onCancel : undefined}
       style={{
         position: "fixed",
         inset: 0,
@@ -347,6 +386,12 @@ export function ImageCropperModal({
         style={{
           width: "100%",
           maxWidth: 620,
+          // Short phone landscape (and a 1:1 frame on a small laptop) made
+          // the card taller than the screen, putting Save out of reach with
+          // no way to scroll to it. 40px = the backdrop's 20px top + bottom
+          // padding, so the card stops exactly inside it.
+          maxHeight: "calc(100dvh - 40px)",
+          overflowY: "auto",
           background: "#FFFFFF",
           borderRadius: 18,
           padding: 18,
@@ -425,6 +470,7 @@ export function ImageCropperModal({
             src={imgUrl}
             alt=""
             onLoad={onImgLoad}
+            onError={onImgError}
             draggable={false}
             style={{
               position: "absolute",
@@ -534,6 +580,9 @@ export function ImageCropperModal({
             disabled={busy}
             style={{
               padding: "8px 14px",
+              // 44px is the minimum comfortable touch target; these were 29px
+              // tall, which is a miss-and-lose-your-crop on a phone.
+              minHeight: 44,
               borderRadius: 999,
               border: "1px solid rgba(28,28,30,0.12)",
               background: "transparent",
@@ -552,6 +601,7 @@ export function ImageCropperModal({
             disabled={busy || !imgDims}
             style={{
               padding: "8px 18px",
+              minHeight: 44,
               borderRadius: 999,
               border: "none",
               background:
