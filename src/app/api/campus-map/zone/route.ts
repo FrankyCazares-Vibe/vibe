@@ -1,5 +1,9 @@
 import { NextResponse } from "next/server";
 
+import { isMissingColumnError } from "@/lib/db/missing-column";
+import { resolveCampusRequest, scopeViewerFromRow } from "@/lib/iu/campus-request";
+import { scopeCampusIds } from "@/lib/iu/campus-scope";
+import { campusScopeError } from "@/lib/iu/community-scope";
 import { createSupabaseServerClient } from "@/lib/supabase/server";
 
 const MAX_BUCKET = 60;
@@ -23,7 +27,28 @@ type UserRow = {
  *
  * Each bucket is capped at MAX_BUCKET. Discover is the v1 hero — that's
  * where users find people they'd never bump into otherwise.
+ *
+ * SCOPE (plan wave 2 B10, §2.4). The major zone is filtered on `campus_id`,
+ * never on the legacy `users.school` label: same campus as `/api/campus-map`,
+ * so a bubble's drill-in matches the bubble's count. `?campus=<id>` is honored
+ * on the same terms as the summary (allowed set only, and only for a viewer
+ * who has a university at all; 403 `campus_not_in_system` otherwise — the
+ * clamp lives in `resolveCampusRequest`).
+ *
+ * The ORG zone lists that org's members, which is not a campus question — an
+ * org's members are its members. What IS checked is the org itself: an org on
+ * another campus isn't part of this map, so it answers empty buckets rather
+ * than rostering strangers. Campus-less orgs (every live org until M1b)
+ * likewise belong to no map.
+ *
+ * A viewer with no campus keeps today's answer: empty buckets.
  */
+
+/** Nobody to show. Same shape the client already handles for an empty zone. */
+function emptyBuckets() {
+  return NextResponse.json({ ok: true, connected: [], mutuals: [], discover: [] });
+}
+
 export async function GET(req: Request) {
   const supabase = await createSupabaseServerClient();
   const {
@@ -44,15 +69,37 @@ export async function GET(req: Request) {
     );
   }
 
-  const { data: me } = await supabase
+  // `maybeSingle`, not `single`: a viewer with no `users` row answered empty
+  // buckets before this change, not a 500 (plan §6 compatibility). A missing
+  // row then reads as "no campus" below, which is the same empty answer.
+  const { data: me, error: meErr } = await supabase
     .from("users")
-    .select("id,school")
+    .select("id,campus_id,school_system")
     .eq("id", user.id)
-    .single();
-  const school = (me?.school ?? "").trim();
-  if (!school) {
-    return NextResponse.json({ ok: true, connected: [], mutuals: [], discover: [] });
+    .maybeSingle();
+  // M1 unapplied: the legacy-label scope is retired, so show nothing rather
+  // than everyone. Narrow on purpose — any other error is a real failure.
+  if (meErr && isMissingColumnError(meErr)) {
+    console.error("[campus-map/zone] campus columns missing; M1 not applied");
+    return emptyBuckets();
   }
+  if (meErr) {
+    console.error("[campus-map/zone me]", meErr);
+    return NextResponse.json({ ok: false, error: "Request failed" }, { status: 500 });
+  }
+
+  const scope = resolveCampusRequest(
+    url.searchParams.get("campus"),
+    scopeViewerFromRow(me as Record<string, unknown> | null),
+  );
+  if (scope.kind === "forbidden") {
+    const { status, body } = campusScopeError(scope);
+    return NextResponse.json(body, { status });
+  }
+  if (scope.kind === "none") {
+    return emptyBuckets();
+  }
+  const campusIds = scopeCampusIds(scope);
 
   // Resolve candidate ids.
   let candidateIds: string[] = [];
@@ -60,7 +107,7 @@ export async function GET(req: Request) {
     const { data, error } = await supabase
       .from("users")
       .select("id")
-      .eq("school", school)
+      .in("campus_id", campusIds)
       .eq("major", major)
       .neq("id", user.id);
     if (error) {
@@ -71,11 +118,16 @@ export async function GET(req: Request) {
   } else {
     const { data: org } = await supabase
       .from("orgs")
-      .select("id")
+      .select("id,campus_id")
       .eq("handle", orgHandle)
       .maybeSingle();
     if (!org) {
       return NextResponse.json({ ok: false, error: "Org not found" }, { status: 404 });
+    }
+    // An org on another campus (or none at all) is not a zone of this map.
+    const orgCampus = (org as { campus_id?: unknown }).campus_id;
+    if (typeof orgCampus !== "string" || !campusIds.includes(orgCampus)) {
+      return emptyBuckets();
     }
     const { data: members } = await supabase
       .from("org_members")
@@ -89,10 +141,11 @@ export async function GET(req: Request) {
   if (candidateIds.length === 0) {
     // Nobody in this zone yet. Empty buckets — the client says so. (Until
     // S55 this returned a seeded roster of fake people with fake handles.)
-    return NextResponse.json({ ok: true, connected: [], mutuals: [], discover: [] });
+    return emptyBuckets();
   }
 
-  // Viewer's connections (mutual follows).
+  // Viewer's connections (mutual follows). Follows are global (plan §2.4), so
+  // this set isn't campus-filtered; the candidate pool above already is.
   const [outRes, inRes] = await Promise.all([
     supabase.from("connections").select("following_id").eq("follower_id", user.id),
     supabase.from("connections").select("follower_id").eq("following_id", user.id),

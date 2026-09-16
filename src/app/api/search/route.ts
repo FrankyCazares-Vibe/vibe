@@ -1,5 +1,9 @@
 import { NextResponse } from "next/server";
 
+import { isMissingColumnError } from "@/lib/db/missing-column";
+import { resolveCampusRequest, scopeViewerFromRow } from "@/lib/iu/campus-request";
+import { scopeCampusIds } from "@/lib/iu/campus-scope";
+import { DISCOVERABLE_USER_COLUMNS, isDiscoverableAccount } from "@/lib/iu/community-scope";
 import { orgAssetProxyUrl } from "@/lib/org-asset-url";
 import { ilikeOrFilter, ilikePrefixOrFilter } from "@/lib/pgrest";
 import { createSupabaseServerClient } from "@/lib/supabase/server";
@@ -7,6 +11,23 @@ import { createSupabaseServiceClient } from "@/lib/supabase/service";
 
 const DEFAULT_LIMIT = 6;
 const MAX_LIMIT = 20;
+/**
+ * Cap on the campus org-id list fed into `org_id=in.(…)`. Every uuid costs
+ * ~37 characters of URL and PostgREST takes the whole query in the URL, so
+ * `/api/events`' 1000 would be a ~37 KB request line that no proxy accepts —
+ * the search would fail outright rather than degrade. At the cap, events on
+ * the orgs past it are missed; a campus would need 200 clubs to reach it
+ * (live: 5 orgs in total), and B8 owns the matching constant in
+ * `/api/events`.
+ */
+const MAX_CAMPUS_ORGS = 200;
+/**
+ * Extra user rows to pull so the stranded/unfinished accounts dropped below
+ * don't eat into the page the caller asked for (same reasoning and value as
+ * `/api/users/search`). Small on purpose: the filter removes a handful of
+ * rows, not a proportion of the table.
+ */
+const FILTER_HEADROOM = 10;
 
 /**
  * Unified typeahead search across people, orgs, and events. Powers the
@@ -17,8 +38,26 @@ const MAX_LIMIT = 20;
  * - `kinds=` optional CSV; defaults to "users,orgs,events". Lets a caller
  *   restrict the fan-out (e.g. mention pickers).
  * - Each kind capped at `limit` (default 6) so the dropdown stays short.
- * - Events scoped to the viewer's school via creator.school (mirrors
- *   /api/feed + /api/events). Past events are excluded.
+ * - People and orgs are GLOBAL (plan §2.4, Franky's Q2: profiles, people
+ *   search, follows and DMs stay open across both universities).
+ * - What people search DOES drop is accounts that aren't real people yet:
+ *   unverified, not-onboarded, or still carrying the `u<32hex>` handle the
+ *   signup trigger hands out (plan §2.7 line 149, "filter out of suggestions
+ *   and search; don't delete" — 5 such rows live today, and typing a single
+ *   "u" filled this dropdown with them). Same test and same helper as
+ *   `/api/users/search` and the people rail, so the three discovery surfaces
+ *   can't disagree about who exists. `otto_answers` is a private column, so
+ *   the test runs through the service role on the ids this query already
+ *   found — never as a way to widen the search — and none of those columns
+ *   are echoed back.
+ * - Events are scoped to the viewer's campus via the ORG's `campus_id`
+ *   (plan wave 2 B10, §2.6) rather than the event creator's legacy school
+ *   label: an event belongs to the org that runs it, so a club officer who
+ *   moves campus doesn't drag the club's events with them. Events with no
+ *   org — and orgs with no campus, which is every live org until M1b —
+ *   therefore match no campus and don't appear (plan §2.8 row 4). Past events
+ *   are excluded. Search always uses the viewer's HOME campus; there is no
+ *   `?campus=` switch on a typeahead.
  * - Orgs returned via service role so private orgs the viewer isn't a
  *   member of still surface (matches /api/orgs?filter=discover).
  */
@@ -63,59 +102,120 @@ export async function GET(req: Request) {
 
   const service = createSupabaseServiceClient();
 
+  /**
+   * Events, campus-scoped through their org. Two reads have to land before
+   * the event query can be built (the viewer's campus, then that campus's org
+   * ids), so this branch is its own chain and still runs beside the others.
+   *
+   * ORG IDS COME FROM THE SERVICE ROLE ON PURPOSE, exactly as `/api/events`
+   * resolves them: `orgs` RLS hides a private org from non-members, so an
+   * `!inner` join under the viewer's own client would drop every private
+   * org's events from search — 6 of the 9 live events, including the only
+   * upcoming one. Just the ids leave that query. The events themselves are
+   * still read under the viewer's RLS, and the org embed stays a plain (outer)
+   * join, so a private org's name and logo are still withheld exactly as they
+   * are today.
+   *
+   * A null id list means "don't filter": a pre-M1 database, or a read that
+   * failed. That is the same widest answer those cases give today, and campus
+   * scope is relevance, not secrecy (plan §2.4).
+   *
+   * COST, MEASURED AND ACCEPTED. This branch is 3 serial round trips where the
+   * old label version was 1 (it fetched `limit` events and compared the
+   * creator's label in JS afterwards). The alternatives were weighed and both
+   * are worse: filtering after the fact would silently return fewer than
+   * `limit` events for the viewer's campus whenever other campuses fill the
+   * page, and resolving org ids in parallel with the viewer read means
+   * fetching every org on Vibe on every keystroke. The other branches still
+   * run beside this one, and `kinds=users,orgs` (the phone overlay) skips it
+   * entirely.
+   */
+  const searchEvents = async () => {
+    let orgIds: string[] | null = null;
+    const { data: me, error: meErr } = await supabase
+      .from("users")
+      .select("campus_id,school_system")
+      .eq("id", user.id)
+      .maybeSingle();
+    if (meErr) {
+      if (!isMissingColumnError(meErr)) console.error("[search viewer]", meErr);
+    } else {
+      const scope = resolveCampusRequest(null, scopeViewerFromRow(me as Record<string, unknown>));
+      if (scope.kind !== "forbidden") {
+        const { data: campusOrgs, error: orgErr } = await service
+          .from("orgs")
+          .select("id")
+          .in("campus_id", scopeCampusIds(scope))
+          .limit(MAX_CAMPUS_ORGS);
+        if (orgErr) {
+          if (!isMissingColumnError(orgErr)) console.error("[search campus orgs]", orgErr);
+        } else {
+          orgIds = (campusOrgs ?? []).map((o) => (o as { id: string }).id);
+        }
+      }
+    }
+    // No org on this campus yet (true for every campus until M1b): no event
+    // can be on it either, so don't ask.
+    if (orgIds && orgIds.length === 0) {
+      return { data: [], error: null } as const;
+    }
+    let eventsQuery = supabase
+      .from("events")
+      .select(
+        "id,title,description,starts_at,ends_at,location," +
+          "org:orgs(id,handle,name,logo_url,verified)",
+      )
+      .gte("ends_at", new Date().toISOString())
+      .or(eventsContains)
+      .order("starts_at", { ascending: true })
+      .limit(limit);
+    if (orgIds) eventsQuery = eventsQuery.in("org_id", orgIds);
+    return await eventsQuery;
+  };
+
   // Fan out everything in parallel. Each branch is independently typed so
-  // a failure in one doesn't poison the others.
-  const [usersPrefixRes, usersContainsRes, orgsRes, eventsRes, blockRowsRes, viewerRes] =
-    await Promise.all([
-      wantUsers
-        ? supabase
-            .from("users")
-            .select("id,name,handle,school,major,year,avatar_url")
-            .neq("id", user.id)
-            .or(usersPrefix)
-            .limit(limit)
-        : Promise.resolve({ data: [], error: null } as const),
-      wantUsers
-        ? supabase
-            .from("users")
-            .select("id,name,handle,school,major,year,avatar_url")
-            .neq("id", user.id)
-            .or(usersContains)
-            .limit(limit)
-        : Promise.resolve({ data: [], error: null } as const),
-      wantOrgs
-        ? service
-            .from("orgs")
-            .select(
-              "id,handle,name,description,logo_url,banner_url,is_public,verified,members:org_members(count)",
-            )
-            .or(orgsContains)
-            .order("verified", { ascending: false })
-            .limit(limit)
-        : Promise.resolve({ data: [], error: null } as const),
-      wantEvents
-        ? supabase
-            .from("events")
-            .select(
-              "id,title,description,starts_at,ends_at,location," +
-                "creator:users!events_creator_id_fkey!inner(id,school)," +
-                "org:orgs(id,handle,name,logo_url,verified)",
-            )
-            .gte("ends_at", new Date().toISOString())
-            .or(eventsContains)
-            .order("starts_at", { ascending: true })
-            .limit(limit)
-        : Promise.resolve({ data: [], error: null } as const),
-      wantUsers
-        ? supabase
-            .from("blocks")
-            .select("blocker_id, blocked_id")
-            .or(`blocker_id.eq.${user.id},blocked_id.eq.${user.id}`)
-        : Promise.resolve({ data: [], error: null } as const),
-      wantEvents
-        ? supabase.from("users").select("school").eq("id", user.id).maybeSingle()
-        : Promise.resolve({ data: null, error: null } as const),
-    ]);
+  // a failure in one doesn't poison the others. The two people queries pull
+  // `limit + FILTER_HEADROOM` because the discoverable filter below removes
+  // rows; `school_verified` is filtered here because it's cheap and granted,
+  // while the rest of that test needs a private column.
+  const fetchLimit = limit + FILTER_HEADROOM;
+  const [usersPrefixRes, usersContainsRes, orgsRes, eventsRes, blockRowsRes] = await Promise.all([
+    wantUsers
+      ? supabase
+          .from("users")
+          .select("id,name,handle,school,major,year,avatar_url")
+          .neq("id", user.id)
+          .eq("school_verified", true)
+          .or(usersPrefix)
+          .limit(fetchLimit)
+      : Promise.resolve({ data: [], error: null } as const),
+    wantUsers
+      ? supabase
+          .from("users")
+          .select("id,name,handle,school,major,year,avatar_url")
+          .neq("id", user.id)
+          .eq("school_verified", true)
+          .or(usersContains)
+          .limit(fetchLimit)
+      : Promise.resolve({ data: [], error: null } as const),
+    wantOrgs
+      ? service
+          .from("orgs")
+          .select(
+            "id,handle,name,description,logo_url,banner_url,is_public,verified,members:org_members(count)",
+          )
+          .or(orgsContains)
+          .order("verified", { ascending: false })
+          .limit(limit)
+      : Promise.resolve({ data: [], error: null } as const),
+    wantEvents ? searchEvents() : Promise.resolve({ data: [], error: null } as const),
+    wantUsers
+      ? supabase
+          .from("blocks")
+          .select("blocker_id, blocked_id")
+          .or(`blocker_id.eq.${user.id},blocked_id.eq.${user.id}`)
+      : Promise.resolve({ data: [], error: null } as const),
+  ]);
 
   // ── USERS ──────────────────────────────────────────────────────────
   type UserRow = {
@@ -130,19 +230,20 @@ export async function GET(req: Request) {
   };
   const users: UserRow[] = [];
   if (wantUsers) {
+    // Merge prefix-then-contains, de-duplicated, WITHOUT capping at `limit`
+    // yet: the discoverable filter below removes rows, and capping first would
+    // let one stranded account cost a real person their slot.
     const seen = new Set<string>();
-    const lists = [
+    const candidates: UserRow[] = [];
+    for (const list of [
       (usersPrefixRes.data ?? []) as UserRow[],
       (usersContainsRes.data ?? []) as UserRow[],
-    ];
-    for (const list of lists) {
+    ]) {
       for (const u of list) {
         if (seen.has(u.id)) continue;
         seen.add(u.id);
-        users.push(u);
-        if (users.length >= limit) break;
+        candidates.push(u);
       }
-      if (users.length >= limit) break;
     }
 
     // Filter out blocked-either-way users.
@@ -155,14 +256,16 @@ export async function GET(req: Request) {
       if (b.blocker_id === user.id) hidden.add(b.blocked_id);
       else if (b.blocked_id === user.id) hidden.add(b.blocker_id);
     }
-    for (let i = users.length - 1; i >= 0; i--) {
-      if (hidden.has(users[i]!.id)) users.splice(i, 1);
-    }
+    const visible = candidates.filter((u) => !hidden.has(u.id));
 
-    // Annotate each result with the viewer's relationship state.
-    if (users.length > 0) {
-      const ids = users.map((u) => u.id);
-      const [outRes, inRes] = await Promise.all([
+    if (visible.length > 0) {
+      // One round trip for all three follow-ups: who is a finished person
+      // (service role — `otto_answers` has no `authenticated` grant), and the
+      // viewer's relationship state. The relationship reads run on the
+      // pre-filter ids, which is a superset, so they don't have to wait.
+      const ids = visible.map((u) => u.id);
+      const [statusRes, outRes, inRes] = await Promise.all([
+        service.from("users").select(DISCOVERABLE_USER_COLUMNS).in("id", ids),
         supabase
           .from("connections")
           .select("following_id")
@@ -174,12 +277,25 @@ export async function GET(req: Request) {
           .eq("following_id", user.id)
           .in("follower_id", ids),
       ]);
-      const outgoing = new Set((outRes.data ?? []).map((r) => r.following_id as string));
-      const incoming = new Set((inRes.data ?? []).map((r) => r.follower_id as string));
-      for (const u of users) {
-        const a = outgoing.has(u.id);
-        const b = incoming.has(u.id);
-        u.rel = a && b ? "connected" : a ? "following" : b ? "followed_by" : "none";
+      if (statusRes.error) {
+        // We can't tell the stranded accounts from the real ones, so show
+        // nobody rather than show them. Orgs and events still answer.
+        console.error("[search discoverable]", statusRes.error);
+      } else {
+        const discoverable = new Set<string>();
+        for (const row of statusRes.data ?? []) {
+          if (isDiscoverableAccount(row)) discoverable.add((row as { id: string }).id);
+        }
+        const outgoing = new Set((outRes.data ?? []).map((r) => r.following_id as string));
+        const incoming = new Set((inRes.data ?? []).map((r) => r.follower_id as string));
+        for (const u of visible) {
+          if (!discoverable.has(u.id)) continue;
+          const a = outgoing.has(u.id);
+          const b = incoming.has(u.id);
+          u.rel = a && b ? "connected" : a ? "following" : b ? "followed_by" : "none";
+          users.push(u);
+          if (users.length >= limit) break;
+        }
       }
     }
   }
@@ -232,7 +348,6 @@ export async function GET(req: Request) {
     starts_at: string;
     ends_at: string;
     location: string;
-    creator: { id: string; school: string | null } | null;
     org: {
       id: string;
       handle: string;
@@ -257,12 +372,10 @@ export async function GET(req: Request) {
     } | null;
   }> = [];
   if (wantEvents) {
-    const viewerSchool = ((viewerRes.data as { school?: string | null } | null)?.school ?? "").trim();
     const rows = (eventsRes.data ?? []) as unknown as EventRow[];
     for (const r of rows) {
-      // Inner-join above already required `creator.school` to exist; if
-      // the viewer has a school, restrict to peers at the same school.
-      if (viewerSchool && r.creator?.school !== viewerSchool) continue;
+      // The campus filter ran in the query (`org_id in (campus org ids)`), so
+      // every row here is already on a campus in scope.
       eventsOut.push({
         id: r.id,
         title: r.title,
@@ -272,8 +385,11 @@ export async function GET(req: Request) {
         location: r.location,
         org: r.org
           ? {
-              ...r.org,
+              id: r.org.id,
+              handle: r.org.handle,
+              name: r.org.name,
               logo_url: orgAssetProxyUrl(r.org.handle, r.org.logo_url, "logo"),
+              verified: r.org.verified,
             }
           : null,
       });
