@@ -11,10 +11,23 @@
 -- that dual-writes campus_id + school with the service role, so the column
 -- grant can go.
 --
--- The new columns (users.school_system / campus_id / campus_set_at,
--- orgs.campus_id / system) never had an UPDATE grant (M1). This file doesn't
--- touch SELECT: users.school stays readable by `authenticated` for the badge
--- until M3 drops the column.
+-- The new columns (users.school_system / campus_id / campus_set_at from M1,
+-- orgs.campus_id from M1, orgs.join_policy / audience / hidden_at from M1c)
+-- never had an UPDATE grant. This file doesn't touch SELECT: users.school
+-- stays readable by `authenticated` for the badge until M3 drops the column.
+--
+-- It also revokes the last legacy org write, UPDATE (is_public) on orgs. M1c
+-- added orgs.join_policy and the orgs_sync_join_policy trigger, which mirrors
+-- is_public = (join_policy = 'open'). Until wave 2 is live, deployed bundles
+-- still PATCH is_public with the USER client, which is why that revoke waits
+-- for this file rather than landing in M1c.
+--
+-- DO NOT RE-ADD orgs.system ANYWHERE IN THIS FILE. M1c dropped that column
+-- (spec critic A1/A2). This mention and the one in the POST-CHECK are the only
+-- two left, and both exist to stop someone restoring what they explain:
+-- has_column_privilege on a column that does not exist RAISES rather than
+-- returning false, so a single ('public.orgs','system') row would fail the
+-- entire post-check query, not just its own line.
 --
 -- LIVE STATE BEFORE THIS MIGRATION (read-only, 2026-09-15):
 --   * has_column_privilege('authenticated','public.users','school','UPDATE') = true
@@ -25,8 +38,12 @@
 --     Neither has a table-wide UPDATE (`w`), so the column grants are the ONLY
 --     UPDATE path and revoking them is a real boundary (critic D3).
 --
--- DEPLOY ORDER: apply ONLY after wave 2 is live in production (its Vercel
--- deploy is READY), and after M1. Old code writes `school` with the USER
+-- DEPLOY ORDER: apply ONLY after wave 2 (and wave 2b) is live in production
+-- (its Vercel deploy is READY), and after M1 [applied 2026-09-15] and M1c
+-- (20260916103000_org_join_policy_invites.sql). Wave 2's PATCH
+-- /api/orgs/[slug] writes join_policy and is_public with the SERVICE role
+-- after an owner/admin check (critic A3), which is what makes the is_public
+-- revoke below safe. Old code writes `school` with the USER
 -- client in three places. Applied early, PostgREST rejects the WHOLE update
 -- with 42501 "permission denied for table users/orgs", not just the school
 -- field:
@@ -38,7 +55,14 @@
 --   * whatever profile-sync/route.ts:89-91 still treats as "self-updatable".
 --
 -- PRE-CHECK (all must pass; read-only):
---   1. Every writer of `school` uses the service-role client:
+--   1. Every writer of `school` AND of `is_public` uses the service-role
+--      client. is_public is sent by desktop settings on every org save
+--      (campus-home.tsx:1428) and by the create form (campus-home.tsx:899),
+--      and today the PATCH route writes the patch with the USER client
+--      (orgs/[slug]/route.ts:214-215). Wave 2 moves that write to the service
+--      client; until it is live in prod, this revoke breaks every org edit.
+--      Same greps, plus:
+--        rg -n "is_public" src/app/api/orgs src/components public/html
 --        rg -n "from\(['\"](users|orgs)['\"]\)\s*\.update" src public/html
 --        rg -n -U "from\(['\"](users|orgs)['\"]\)[\s\S]{0,300}?\.(update|upsert)\(" src public/html
 --      For each hit whose patch can contain `school`, confirm the client is
@@ -87,7 +111,8 @@
 --     FROM (VALUES ('public.users','school'), ('public.users','campus_id'),
 --                  ('public.users','school_system'), ('public.users','campus_set_at'),
 --                  ('public.orgs','school'), ('public.orgs','campus_id'),
---                  ('public.orgs','system')) AS t(tbl, col);
+--                  ('public.orgs','is_public'), ('public.orgs','join_policy'),
+--                  ('public.orgs','audience'), ('public.orgs','hidden_at')) AS t(tbl, col);
 --   -- expect:
 --   --   public.users school         t f f f
 --   --   public.users campus_id      t f f f
@@ -95,7 +120,17 @@
 --   --   public.users campus_set_at  f f f f
 --   --   public.orgs  school         t f f f
 --   --   public.orgs  campus_id      t f f f
---   --   public.orgs  system         t f f f
+--   --   public.orgs  is_public      t f f f
+--   --   public.orgs  join_policy    t f f f
+--   --   public.orgs  audience       t f f f
+--   --   public.orgs  hidden_at      t f f f
+--   -- DO NOT RE-ADD: there is deliberately no ('public.orgs','system') row in
+--   -- the VALUES list above. M1c dropped that column, and has_column_privilege
+--   -- RAISES on a missing column instead of returning false, so adding the row
+--   -- back would fail this whole query (critic A1).
+--   -- The trigger that mirrors is_public stays until the M3 cleanup:
+--   SELECT count(*) FROM public.orgs WHERE is_public <> (join_policy = 'open');
+--   -- expect 0
 --   SELECT max(version) FROM supabase_migrations.schema_migrations;
 --   -- expect 20260916110000
 -- Live, on the Vercel prod deploy: (a) edit your bio on the phone and hard
@@ -104,8 +139,9 @@
 -- campus in Settings, it persists and the badge updates.
 --
 -- ROLLBACK (safe at any time, restores today's grants):
---   GRANT UPDATE (school) ON public.users TO authenticated;
---   GRANT UPDATE (school) ON public.orgs  TO authenticated;
+--   GRANT UPDATE (school)    ON public.users TO authenticated;
+--   GRANT UPDATE (school)    ON public.orgs  TO authenticated;
+--   GRANT UPDATE (is_public) ON public.orgs  TO authenticated;
 --   DELETE FROM supabase_migrations.schema_migrations WHERE version = '20260916110000';
 -- ---------------------------------------------------------------------------
 
@@ -113,5 +149,12 @@ begin;
 
 revoke update (school) on public.users from authenticated;
 revoke update (school) on public.orgs  from authenticated;
+
+-- Wave 2's PATCH /api/orgs/[slug] writes join_policy (and is_public) with the
+-- service role after an owner/admin check (critic A3), so the legacy
+-- is_public column grant goes. The orgs_sync_join_policy trigger from M1c
+-- stays until the M3 cleanup, so is_public keeps mirroring join_policy for
+-- the three live policies that still read it.
+revoke update (is_public) on public.orgs from authenticated;
 
 commit;
