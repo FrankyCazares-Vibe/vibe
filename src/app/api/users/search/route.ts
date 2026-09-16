@@ -1,10 +1,18 @@
 import { NextResponse } from "next/server";
 
+import { DISCOVERABLE_USER_COLUMNS, isDiscoverableAccount } from "@/lib/iu/community-scope";
 import { createSupabaseServerClient } from "@/lib/supabase/server";
+import { createSupabaseServiceClient, isSupabaseServiceConfigured } from "@/lib/supabase/service";
 import { ilikeOrFilter, ilikePrefixOrFilter, isUuid } from "@/lib/pgrest";
 
 const DEFAULT_LIMIT = 10;
 const MAX_LIMIT = 50;
+/**
+ * Extra rows to pull per query so the stranded/unfinished accounts dropped
+ * below don't eat into the page the caller asked for. Small on purpose: the
+ * filter removes a handful of rows, not a proportion of the table.
+ */
+const FILTER_HEADROOM = 10;
 
 /**
  * Typeahead user search by name or handle. Powers the profile/campus search
@@ -15,6 +23,18 @@ const MAX_LIMIT = 50;
  * - ILIKE on name OR handle, prefix-biased so "ja" matches "James" first.
  * - Excludes the viewer's own row (you don't search for yourself).
  * - Returns only public columns — no email, no school_email.
+ *
+ * SEARCH STAYS GLOBAL (Franky's Q2, plan §2.4). Campus scoping covers clubs,
+ * events, the map, trending and the feed's campus lane; profiles, people
+ * search, follows and DMs reach every campus and both universities, so a
+ * student can find a friend at Purdue West Lafayette and follow them.
+ *
+ * What search DOES drop is accounts that aren't real people yet: unverified
+ * or not-onboarded (plan §2.4). That covers the 5 stranded `u<32hex>` rows
+ * live today (plan §2.7 — none of them finished onboarding) without ever
+ * hiding a student who did finish. `otto_answers` is a private column, so
+ * that test runs through the service role on the ids this query already
+ * found, never as a way to widen the search.
  */
 export async function GET(req: Request) {
   const supabase = await createSupabaseServerClient();
@@ -77,20 +97,25 @@ export async function GET(req: Request) {
 
   // Two-phase ranking: prefix matches first (better signal), then
   // contains-anywhere as a fallback. Easier than a custom sort and keeps
-  // the round-trip count at one query each.
+  // the round-trip count at one query each. `school_verified` is filtered
+  // here because it's cheap and granted; the rest of the discoverable test
+  // needs a private column and runs once, below, on the ids we found.
+  const fetchLimit = limit + FILTER_HEADROOM;
   const [prefixRes, containsRes] = await Promise.all([
     supabase
       .from("users")
       .select("id,name,handle,school,major,year,avatar_url")
       .neq("id", user.id)
+      .eq("school_verified", true)
       .or(prefixFilter)
-      .limit(limit),
+      .limit(fetchLimit),
     supabase
       .from("users")
       .select("id,name,handle,school,major,year,avatar_url")
       .neq("id", user.id)
+      .eq("school_verified", true)
       .or(containsFilter)
-      .limit(limit),
+      .limit(fetchLimit),
   ]);
 
   if (prefixRes.error || containsRes.error) {
@@ -101,18 +126,52 @@ export async function GET(req: Request) {
     );
   }
 
+  // Merge prefix-then-contains, de-duplicated, WITHOUT capping at `limit`
+  // yet: the discoverable filter below removes rows, and capping first would
+  // let one stranded account cost a real person their slot.
   const seen = new Set<string>();
-  const users: Array<Record<string, unknown>> = [];
+  const merged: Array<Record<string, unknown>> = [];
   for (const list of [prefixRes.data ?? [], containsRes.data ?? []]) {
     for (const u of list) {
       if (seen.has(u.id)) continue;
       // Channel scope filter — only members of the requested channel.
       if (allowedIds && !allowedIds.has(u.id as string)) continue;
       seen.add(u.id);
+      merged.push(u);
+    }
+  }
+
+  // Drop accounts that aren't finished people yet. The service role is the
+  // only role that can read `otto_answers`; if it isn't available we'd be
+  // choosing between showing the stranded accounts and showing nothing, so
+  // say the request failed instead.
+  const users: Array<Record<string, unknown>> = [];
+  if (merged.length > 0) {
+    if (!isSupabaseServiceConfigured()) {
+      console.error("[users/search] service role not configured");
+      return NextResponse.json({ ok: false, error: "Request failed" }, { status: 500 });
+    }
+    const { data: statusRows, error: statusErr } = await createSupabaseServiceClient()
+      .from("users")
+      .select(DISCOVERABLE_USER_COLUMNS)
+      .in(
+        "id",
+        merged.map((u) => String(u.id)),
+      );
+    if (statusErr) {
+      console.error("[users/search discoverable]", statusErr);
+      return NextResponse.json({ ok: false, error: "Request failed" }, { status: 500 });
+    }
+    const discoverable = new Set<string>();
+    for (const row of statusRows ?? []) {
+      const r = row as { id: string };
+      if (isDiscoverableAccount(row)) discoverable.add(r.id);
+    }
+    for (const u of merged) {
+      if (!discoverable.has(String(u.id))) continue;
       users.push(u);
       if (users.length >= limit) break;
     }
-    if (users.length >= limit) break;
   }
 
   // Filter blocked-either-way users out of search results so neither

@@ -1,6 +1,15 @@
 import { NextResponse } from "next/server";
 
-import { campusByLabel } from "@/lib/iu/campuses";
+import { isSchoolSystem, legacyLabel, type SchoolSystem } from "@/lib/iu/campuses";
+import { resolveScopeV2, scopeCampusIds } from "@/lib/iu/campus-scope";
+import {
+  campusScopeError,
+  feedLaneFor,
+  feedLaneOrFilter,
+  homeCampusIdFor,
+  postInFeedLane,
+  scoreFeedRow,
+} from "@/lib/iu/community-scope";
 import { orgAssetProxyUrl } from "@/lib/org-asset-url";
 import { withPostMediaUrls } from "@/lib/post-media-url";
 import { loadHonestViewRows, tallyViews } from "@/lib/posts/honest-views";
@@ -14,7 +23,10 @@ type AuthorEmbed = {
   id: string;
   name: string | null;
   handle: string | null;
+  /** Legacy label, dual-written until M3. Display only — never scoping. */
   school: string | null;
+  campus_id: string | null;
+  school_system: string | null;
   major: string | null;
   year: number | null;
   avatar_url: string | null;
@@ -40,6 +52,10 @@ type PostRow = {
   media_thumbnail_url: string | null;
   view_count: number | null;
   created_at: string;
+  /** Stamped by the `posts_stamp_campus` trigger (M1); null on legacy rows. */
+  campus_id: string | null;
+  /** Same trigger. Lets campus-less legacy posts be scoped by university. */
+  school_system: string | null;
   author: AuthorEmbed | null;
   org: OrgEmbed;
 };
@@ -60,7 +76,7 @@ type EngagementCounts = {
 };
 
 /**
- * Campus feed — posts from every user (global), newest first.
+ * Campus feed — the viewer's campus lane (see THE CAMPUS LANE below), ranked.
  *
  * Clips (`type='clip'`) are backlogged — the query filters to `type='post'`
  * only. Existing clip rows stay in the table; see DOCS/BACKLOG_CLIPS.md.
@@ -69,18 +85,33 @@ type EngagementCounts = {
  * like/repost state, so the client can render the engagement bar without a
  * second roundtrip per card.
  *
- * CAMPUS IS A RANKING SIGNAL, NOT A FILTER. `users.school` holds a
- * self-declared IU campus label (see lib/iu/campuses.ts) that nothing
- * verifies, so it is never a privacy or access boundary — orgs and events
- * scope hard, the feed does not. The query stays global and the ranking
- * pass floats same-campus posts to the top while everything else stays
- * reachable below it. That matters most at cold start: with a handful of
- * live users, a hard campus filter would hand the first student from any
- * other campus an empty app.
+ * THE CAMPUS LANE (plan §2.4, Franky's Q2, critic A7). This is no longer a
+ * global feed. It carries, all on `campus_id` — never a label, so shared
+ * Indianapolis is ONE community for IU and Purdue students:
  *
- * The response echoes both `viewerSchool` (raw stored string, kept for
- * existing clients) and `viewerCampus` (canonical campus label, or null
- * when the viewer has not picked one / stored junk).
+ *   - posts on the viewer's home campus;
+ *   - campus-less posts: the legacy rows that belong to the viewer's
+ *     university (critic A7 — otherwise those 10 rows stay visible to every
+ *     university forever) plus any post stamped with no university at all,
+ *     which the trigger pins forever and which would otherwise reach nobody,
+ *     its own author included;
+ *   - posts by people the viewer follows, wherever they are, because follows
+ *     are global.
+ *
+ * `?campus=<id>` switches to another campus in the viewer's allowed set (403
+ * `campus_not_in_system` otherwise, 400 for an id that isn't a campus at
+ * all); that browse view is that campus only. A viewer with no home campus
+ * sees their whole university, and one with no university at all still sees
+ * everything — an empty app is the worse failure. The ×1.35 ranking boost
+ * floats the home campus inside whatever the lane contains.
+ *
+ * Still relevance, not secrecy: `posts_select_authenticated` is
+ * `status = 'published' OR mine`, so any signed-in user can read another
+ * campus's rows directly (plan §2.4 honesty note).
+ *
+ * The response keeps `viewerSchool` (raw stored string) and `viewerCampus`
+ * (canonical label, now derived from `campus_id`) for existing clients, and
+ * adds `viewerCampusId`, `viewerSystem` and `feedScope`.
  */
 export async function GET(req: Request) {
   const supabase = await createSupabaseServerClient();
@@ -115,12 +146,19 @@ export async function GET(req: Request) {
     ? Math.min(MAX_LIMIT, Math.max(limit * 4, 80))
     : limit;
 
-  // The viewer's campus and the people they shouldn't see (blocked either
-  // way, muted right now) load together, so the hidden list costs no extra
-  // round trip.
-  const [meRes, hiddenRes] = await Promise.all([
-    supabase.from("users").select("school").eq("id", user.id).single(),
+  // The viewer's campus, the people they shouldn't see (blocked either way,
+  // muted right now) and who they follow load together. The follow set is
+  // needed EARLY now — it's part of the lane filter below, not just the
+  // ranking pass — so it moved into this round trip.
+  const [meRes, hiddenRes, followingRes] = await Promise.all([
+    // `maybeSingle`, not `single`: a viewer whose `public.users` row is
+    // missing gets the same feed they get today (no campus, no university →
+    // the global lane below), not a hard 500 on the app's home screen. A
+    // genuine read error still fails closed — the lane depends on this row,
+    // so a silent null would quietly widen the feed to every university.
+    supabase.from("users").select("school,campus_id,school_system").eq("id", user.id).maybeSingle(),
     loadHiddenUsers(supabase, user.id),
+    loadViewerFollowings(supabase, user.id),
   ]);
   const { data: me, error: meErr } = meRes;
   if (meErr) {
@@ -133,30 +171,65 @@ export async function GET(req: Request) {
     console.error("[feed hidden-users]", hiddenRes.error);
     return NextResponse.json({ ok: false, error: "Request failed" }, { status: 500 });
   }
+  // Same rule for the follow set, which now decides VISIBILITY and not just
+  // ranking: it is half the lane filter. Swallowing the error would drop
+  // every followed friend's off-campus post while still answering ok:true —
+  // an empty-looking feed with nothing but a console line to explain it.
+  if (!followingRes.ok) {
+    console.error("[feed followings]", followingRes.error);
+    return NextResponse.json({ ok: false, error: "Request failed" }, { status: 500 });
+  }
+  const viewerFollowingIds = followingRes.ids;
   const hiddenIds = hiddenRes.hidden.ids;
+  // Mute doesn't unfollow, so a muted (or not-yet-torn-down blocked) person
+  // can still be in this set. Drop them so their posts never ride into the
+  // lane on the follow clause, their repost never surfaces as "X reposted
+  // this", and they never get the follow boost.
+  for (const id of hiddenIds) viewerFollowingIds.delete(id);
 
   const school = (me?.school ?? "").trim();
-  // Canonical campus label, or null when the viewer never picked one (or
-  // `school` holds a legacy/unknown string). Null makes the same-campus
-  // ranking boost inert, so the feed behaves exactly as it did before.
-  const viewerCampus = campusByLabel(school)?.label ?? null;
+  const viewer = {
+    campusId: (me?.campus_id as string | null) ?? null,
+    system: isSchoolSystem(me?.school_system) ? (me.school_system as SchoolSystem) : null,
+  };
+  // The home campus, validated against the viewer's university (a campus
+  // outside it could only come from a trigger bypass). Null makes the
+  // home-campus boost inert.
+  const homeCampusId = homeCampusIdFor(viewer);
+  // Legacy field: the canonical label, now derived from `campus_id` instead
+  // of the `school` string. Same value for every backfilled row, and finally
+  // correct for a Purdue student ("Purdue Indianapolis", not "IU …").
+  const viewerCampus = legacyLabel(homeCampusId, viewer.system) || null;
+
+  const scope = resolveScopeV2(url.searchParams.get("campus"), viewer);
+  if (scope.kind === "forbidden") {
+    const { status, body } = campusScopeError(scope);
+    return NextResponse.json(body, { status });
+  }
+  const lane = feedLaneFor(scope, viewer);
+  const laneFilter = feedLaneOrFilter(lane, Array.from(viewerFollowingIds));
 
   // Name the FK constraint explicitly (`posts_user_id_fkey`) — the implicit
   // form ambiguates in PostgREST when more than one relationship exists. The
-  // `!inner` modifier upgrades the LEFT JOIN to an INNER JOIN so the
-  // `eq("author.school", school)` clause actually filters posts.
+  // `!inner` modifier upgrades the LEFT JOIN to an INNER JOIN.
   let postsQuery = supabase
     .from("posts")
     .select(
       "id,user_id,org_id,type,content,tags,media_url,media_thumbnail_url,view_count,created_at," +
-        "author:users!posts_user_id_fkey!inner(id,name,handle,school,major,year,avatar_url)," +
+        "campus_id,school_system," +
+        "author:users!posts_user_id_fkey!inner(id,name,handle,school,campus_id,school_system,major,year,avatar_url)," +
         "org:orgs(id,handle,name,logo_url,verified,is_public)",
     )
     .eq("type", "post")
     .order("created_at", { ascending: false })
     .limit(candidatePoolSize);
 
-  // Global feed for now — no school filter. See the route docblock above.
+  // The campus lane (see the route docblock). Applied before the limit, so a
+  // post from another university never costs a slot on the page. Null means
+  // "nothing to scope to" — a viewer with no verified university.
+  if (laneFilter) {
+    postsQuery = postsQuery.or(laneFilter);
+  }
   if (tagFilter) {
     postsQuery = postsQuery.contains("tags", [tagFilter]);
   }
@@ -195,7 +268,8 @@ export async function GET(req: Request) {
       .notIn("post.user_id", hiddenIds);
   }
 
-  // Global feed for now — see above. `school` is still returned in the
+  // Reposts are hydration-only (see `void repostRows` below) — they emit no
+  // feed row, so they take no lane filter. `school` is still returned in the
   // response payload (`viewerSchool`) for clients that surface it.
 
   // Tag filter focuses the view on original posts with that hashtag. We
@@ -214,7 +288,12 @@ export async function GET(req: Request) {
     console.error("[feed reposts]", repostsRes.error);
   }
 
-  const postRows = (postsRes.data as unknown as PostRow[]) ?? [];
+  // Belt and braces: the query already applied the lane, and this drops
+  // anything that got past the filter grammar anyway. A mistake here should
+  // show fewer posts, never another university's.
+  const postRows = ((postsRes.data as unknown as PostRow[]) ?? []).filter((p) =>
+    postInFeedLane(p, lane, viewerFollowingIds),
+  );
   const repostRows =
     !repostsRes.error && Array.isArray(repostsRes.data)
       ? ((repostsRes.data as unknown) as RepostRow[])
@@ -250,14 +329,8 @@ export async function GET(req: Request) {
   // call: there the number IS the product, so creator-stats fails loudly.
   const honestViews = viewRows === null ? null : tallyViews(viewRows, renderedPostIds);
 
-  // Viewer's outgoing followings — used both for the friend-repost
-  // social-proof query AND for the ranking pass below (posts by people
-  // you follow get a meaningful score boost).
-  const viewerFollowingIds = await loadViewerFollowings(supabase, user.id);
-  // Mute doesn't unfollow, so a muted (or not-yet-torn-down blocked) person
-  // can still be in this set. Drop them so their repost never surfaces as
-  // "X reposted this" and they never get the follow boost.
-  for (const id of hiddenIds) viewerFollowingIds.delete(id);
+  // `viewerFollowingIds` loaded with the viewer's row above (it gates the
+  // lane), and muted/blocked people are already out of it.
 
   // Social-proof signal: for each post in this batch, find up to 3
   // reposters who are FOLLOWED BY the viewer (Instagram-style "X and N
@@ -318,13 +391,14 @@ export async function GET(req: Request) {
   // friend-of-friend posts above the strict recency cut. See
   // scoreFeedRow for the formula. When `sort=recent` or a tag filter is
   // active we keep the original chronological order — `sort=recent` is a
-  // pure chronological escape hatch with zero campus influence.
+  // pure chronological escape hatch with no campus RANKING. (The lane still
+  // applies: it decides what is in the feed at all, not what floats.)
   const now = Date.now();
   const sorted = useRanking
     ? postRowsOut
         .map((entry) => ({
           entry,
-          score: scoreFeedRow(entry.post, now, viewerFollowingIds, viewerCampus),
+          score: scoreFeedRow(entry.post, now, viewerFollowingIds, homeCampusId),
         }))
         .sort((a, b) => b.score - a.score)
         .map((s) => s.entry)
@@ -362,8 +436,17 @@ export async function GET(req: Request) {
     viewerSchool: school,
     // Canonical campus label (null when unset/unknown). `viewerSchool` is
     // the raw stored string and stays for existing clients; new clients
-    // should label the feed off `viewerCampus`.
+    // should label the feed off `viewerCampusId`.
     viewerCampus,
+    // The campus model: the ids wave-3 clients label the lane with.
+    viewerCampusId: homeCampusId,
+    viewerSystem: viewer.system,
+    feedScope: {
+      kind: scope.kind,
+      campusIds: scopeCampusIds(scope),
+      /** True when `?campus=` asked for this scope rather than defaulting. */
+      explicit: !!(url.searchParams.get("campus") || "").trim(),
+    },
     // Echo the viewer's id so the client can gate per-row owner-only
     // affordances (delete menu, etc.) without a separate roundtrip.
     viewerId: user.id,
@@ -469,116 +552,27 @@ type FriendReposterSample = {
  *   3. users for the (up to 3 × N) reposter ids we'll actually surface.
  */
 /**
- * Tier-1 feed ranking score. Hand-tuned heuristic — no ML. The shape
- * is the same Hacker-News-style decay, plus additive boosts from the
- * viewer's social graph:
+ * Single fetch of who-the-viewer-follows — used by the LANE (a followed
+ * author's post rides into the feed from any campus), the ranking pass and
+ * loadFriendReposters. Returns a Set for O(1) membership checks.
  *
- *     engagement = 1 + likes + 2*reposts + comments
- *     base       = engagement / (age_hours + 2)^1.5
- *     score      = base
- *                  * (1.6  if the viewer follows the author, else 1.0)
- *                  * (1.35 if the author is on the viewer's campus, else 1.0)
- *                  + 3 * friend_reposter_count
- *
- * Why these numbers (subject to tuning once we have engagement data):
- *   - Baseline +1 keeps brand-new no-engagement posts from scoring 0
- *     and dropping out of the candidate pool entirely.
- *   - Reposts > comments > likes — reposts spend "social capital" and
- *     show up on someone's profile, so they're the strongest signal.
- *   - Decay exponent 1.5 is gentler than HN's 1.8 so good content can
- *     live ~24h on the feed before being aged out.
- *   - Follow boost is multiplicative so a stale post from a friend
- *     doesn't beat a fresh popular one purely from the additive +5
- *     trap. Friend-repost boost is additive and per-reposter (max 3)
- *     since each fresh reposter is a separate endorsement.
- *
- * SAME-CAMPUS BOOST (1.35, multiplicative). Campus is never a filter here
- * — the query is global and cross-campus posts stay reachable — so the
- * whole scoping job falls on this coefficient. Sizing, relative to the
- * existing weights:
- *   - Multiplicative for the same reason the follow boost is: an additive
- *     bonus would let a dead same-campus post from last week float above
- *     a fresh popular one, which is exactly the "empty-feeling feed"
- *     failure we're trying to avoid from the other direction.
- *   - 1.35 sits deliberately BELOW the 1.6 follow boost. Following someone
- *     is an explicit, deliberate act; campus is self-declared, unverified,
- *     and often just a dropdown someone skipped past. A person you chose
- *     to follow on another campus should still outrank a stranger on
- *     yours, and at 1.35 they do. (ln 1.35 / ln 1.6 ≈ 0.64, so campus
- *     carries roughly two-thirds the pull of a follow. They compound to
- *     2.16x for a followed same-campus author, which is the right ceiling.)
- *   - Translated through the 1.5 decay exponent, 1.35 buys an effective
- *     recency head start of 1.35^(1/1.5) ≈ 1.22 — a same-campus post beats
- *     an equally-engaged post from elsewhere that is up to ~22% fresher,
- *     and needs only ~74% of its engagement at equal age. So at similar
- *     recency/engagement same-campus content sweeps the page, while a
- *     stale same-campus post loses decisively to a fresh, well-engaged
- *     one from another campus (e.g. 24h old with 10 likes scores 0.11 vs
- *     0.25 for a 2h-old cross-campus post with a single like).
- *   - Inert when the viewer has no campus (`viewerCampus === null`) or the
- *     author has none: the multiplier stays 1.0 and ranking is unchanged.
- *   - Compared against the canonical label via `campusByLabel` on both
- *     sides, so casing/legacy strings can't produce a false match.
- *
- * @param post A post already rendered by `renderPost` — carries
- *   like/comment/repost counts, friend_reposter_count, author, etc.
- * @param nowMs Date.now() snapshot for the whole batch (consistency).
- * @param viewerFollowingIds The viewer's outgoing follows set.
- * @param viewerCampus Canonical campus label, or null to disable the boost.
+ * Reports failure instead of degrading to an empty set: this set gates who
+ * the viewer can see now, so an unreadable `connections` table has to fail
+ * the request, the way the hidden-users read already does.
  */
-const SAME_CAMPUS_BOOST = 1.35;
-
-function scoreFeedRow(
-  post: {
-    user_id: string;
-    created_at: string;
-    like_count: number;
-    comment_count: number;
-    repost_count: number;
-    friend_reposter_count?: number;
-    author?: { school: string | null } | null;
-  },
-  nowMs: number,
-  viewerFollowingIds: Set<string>,
-  viewerCampus: string | null,
-): number {
-  const ageHours = Math.max(
-    0,
-    (nowMs - new Date(post.created_at).getTime()) / 3_600_000,
-  );
-  const engagement =
-    1 +
-    (post.like_count ?? 0) +
-    2 * (post.repost_count ?? 0) +
-    (post.comment_count ?? 0);
-  let score = engagement / Math.pow(ageHours + 2, 1.5);
-  if (viewerFollowingIds.has(post.user_id)) score *= 1.6;
-  if (viewerCampus) {
-    const authorCampus = campusByLabel(post.author?.school)?.label ?? null;
-    if (authorCampus === viewerCampus) score *= SAME_CAMPUS_BOOST;
-  }
-  score += 3 * (post.friend_reposter_count ?? 0);
-  return score;
-}
-
-/** Single fetch of who-the-viewer-follows — used by both
- *  loadFriendReposters and the ranking pass. Returns a Set for O(1)
- *  membership checks. */
 async function loadViewerFollowings(
   supabase: Awaited<ReturnType<typeof createSupabaseServerClient>>,
   viewerId: string,
-): Promise<Set<string>> {
+): Promise<{ ok: true; ids: Set<string> } | { ok: false; error: unknown }> {
   const { data, error } = await supabase
     .from("connections")
     .select("following_id")
     .eq("follower_id", viewerId);
-  if (error) {
-    console.error("[feed.loadViewerFollowings]", error);
-    return new Set();
-  }
-  return new Set(
-    (data ?? []).map((r) => (r as { following_id: string }).following_id),
-  );
+  if (error) return { ok: false, error };
+  return {
+    ok: true,
+    ids: new Set((data ?? []).map((r) => (r as { following_id: string }).following_id)),
+  };
 }
 
 async function loadFriendReposters(
