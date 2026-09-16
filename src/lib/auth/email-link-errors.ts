@@ -138,7 +138,7 @@ export function parseRetryAfterSeconds(
 }
 
 export const INBOX_TIP =
-  "Not there after a minute? Check Spam or Junk. On IU Outlook, also check Quarantine.";
+  "Not there after a minute? Check Spam or Junk. On your school's Outlook, also check Quarantine.";
 
 /** Where a copy string puts the account's address (rendered in bold). */
 export const EMAIL_SLOT = "{email}";

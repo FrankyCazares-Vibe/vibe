@@ -8,7 +8,7 @@
  * the student confirms, never a silent write.
  *
  * THE CODE MAP IS THE CEILING. `SYSTEM_DOMAINS` (+ subdomains) is everything
- * Vibe will ever accept, and Purdue's half stays off until
+ * Vibe will ever accept, and Purdue is on (Franky, 2026-09-16); @pfw.edu / @pnw.edu stay held back.
  * `PURDUE_SIGNUPS_ENABLED` flips in a one-line launch commit (§5.5 step 6).
  * Operators may NARROW the list with SCHOOL_EMAIL_DOMAINS (comma-separated),
  * but never widen it: an entry outside the enabled code map is dropped, so
@@ -31,12 +31,17 @@ import {
 } from "../iu/campuses";
 
 /**
- * Purdue signups are off until launch. Flipping this to `true` is the whole
- * Purdue launch commit (plan §5.5 step 6): the allowlist, the user-facing
- * domain label and the server copy all follow it. While it is `false`, no
- * server copy mentions Purdue (critic B4).
+ * Purdue signups are ON (Franky, 2026-09-16: the school-email step must read
+ * "@iu.edu or @purdue.edu" — IU retired @iupui.edu on Jan 1 2026 and Purdue
+ * Indianapolis students share our campus). The allowlist, the user-facing
+ * domain label and the server copy all follow this flag, so flipping it back
+ * to `false` retracts Purdue everywhere in one line.
+ *
+ * @pfw.edu and @pnw.edu (Purdue Fort Wayne / Northwest) stay in the map: they
+ * cost nothing while nobody holds one, and each visibly preselects its campus.
+ * Their student address format is unverified — confirm before advertising them.
  */
-export const PURDUE_SIGNUPS_ENABLED = false;
+export const PURDUE_SIGNUPS_ENABLED = true;
 
 /** Per-call override of {@link PURDUE_SIGNUPS_ENABLED} (tests, previews). */
 export type SchoolDomainOptions = { purdueEnabled?: boolean };
@@ -49,7 +54,11 @@ export type SchoolDomainOptions = { purdueEnabled?: boolean };
 export const SYSTEM_DOMAINS: Readonly<Record<SchoolSystem, readonly string[]>> =
   Object.freeze({
     iu: Object.freeze(["iu.edu"]),
-    purdue: Object.freeze(["purdue.edu", "pfw.edu", "pnw.edu"]),
+    // @pfw.edu / @pnw.edu (Purdue Fort Wayne / Northwest) stay OUT until their
+    // student address format is confirmed: accepting an address no copy
+    // advertises, for campuses that are not open, helps nobody. They keep
+    // their single-campus preselect entry below for the day they return.
+    purdue: Object.freeze(["purdue.edu"]),
   });
 
 /**
@@ -261,6 +270,18 @@ export function schoolEmailDomainsLabel(
 }
 
 /**
+ * The headline domains from the CODE map only ("@iu.edu or @purdue.edu"),
+ * with no env read — safe in a client bundle, where
+ * `process.env.SCHOOL_EMAIL_DOMAINS` is undefined and reading it would make
+ * the server-rendered copy and the hydrated copy disagree. Client components
+ * use this; the server uses {@link schoolEmailDomainsLabel}, which follows
+ * env narrowing.
+ */
+export const SCHOOL_DOMAINS_HEADLINE_LABEL: string = joinDomainLabel(
+  enabledSchoolSystems().map((s) => SYSTEM_DOMAINS[s][0]),
+);
+
+/**
  * Canonical form for storage and matching: trimmed, lowercased, trailing host
  * dot removed. Null when malformed (same rules as `schoolEmailHost`).
  */
@@ -285,7 +306,8 @@ export type SchoolEmailRejection = {
  * - @iupui.edu: "IU retired @iupui.edu addresses on Jan 1, 2026. Use your
  *   @iu.edu address." Other retired domains get the same without the date.
  * - request, Purdue off: "Use your school email (@iu.edu)."
- * - request, Purdue on: "Use your IU or Purdue school email."
+ * - request, Purdue on: "Use your IU or Purdue school email (@iu.edu or
+ *   @purdue.edu)." Both name the domains, so a typo is comparable.
  */
 export function schoolEmailRejection(
   email: string,
@@ -313,10 +335,10 @@ export function schoolEmailRejection(
   const error =
     opts?.context === "verify"
       ? purdue
-        ? "That address isn't an IU or Purdue school email. Request a new code with your school email."
+        ? `That address isn't an IU or Purdue school email (${label}). Request a new code with your school email.`
         : `That address isn't an IU school email (${label}). Request a new code with your school email.`
       : purdue
-        ? "Use your IU or Purdue school email."
+        ? `Use your IU or Purdue school email (${label}).`
         : `Use your school email (${label}).`;
   return { code: "domain_not_allowed", error };
 }

@@ -352,7 +352,7 @@ function VerifySchoolInner() {
             vibe<span className="vibe-auth-dot">.</span>
           </div>
           <h1 className="vibe-auth-headline vibe-auth-headline--compact">
-            Couldn&apos;t verify your IU email
+            Couldn&apos;t verify your school email
           </h1>
           <p className="vibe-auth-sub" style={{ overflowWrap: "anywhere" }}>
             {message}

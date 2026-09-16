@@ -158,7 +158,7 @@ export function verifySchoolEmailCode(
   return ok;
 }
 
-// Campus allowlist (SCHOOL_EMAIL_DOMAINS, default iu.edu + iupui.edu). The
+// Campus allowlist (SCHOOL_EMAIL_DOMAINS, default iu.edu + purdue.edu). The
 // helpers live in a client-safe module; re-exported here so server callers
 // keep a single import.
 export {

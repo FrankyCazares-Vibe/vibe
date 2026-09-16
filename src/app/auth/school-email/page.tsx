@@ -4,7 +4,15 @@ import Link from "next/link";
 import { useRouter, useSearchParams } from "next/navigation";
 import { Suspense, useEffect, useRef, useState } from "react";
 
+import { SCHOOL_DOMAINS_HEADLINE_LABEL } from "@/lib/auth/school-email-domains";
 import { getSupabaseBrowserClient } from "@/lib/supabase/browser";
+
+/**
+ * "@iu.edu or @purdue.edu", from the code map. Never the env-aware label:
+ * this is a client bundle, so an env read would render one thing on the
+ * server and another after hydration.
+ */
+const SCHOOL_DOMAINS_LABEL = SCHOOL_DOMAINS_HEADLINE_LABEL;
 
 const CODE_LENGTH = 8;
 const RESEND_COOLDOWN_SEC = 60;
@@ -15,7 +23,7 @@ const ONBOARDING_PATH = "/onboarding";
 const OFFLINE = "We couldn't reach Vibe. Check your connection and try again.";
 const SIGNED_OUT =
   "You were signed out. Sign in, then type the same code again. It works for at least 30 minutes after we sent it.";
-const SIGNED_OUT_SEND = "You were signed out. Sign in to send your IU email.";
+const SIGNED_OUT_SEND = "You were signed out. Sign in to send your school email.";
 // The one 5xx body from /request written for students (a failed send). Any
 // other 5xx text can name server config, so it shows OFFLINE instead.
 const SEND_FAILED = "We couldn't send the email right now. Try again in a minute.";
@@ -428,8 +436,8 @@ function SchoolEmailInner() {
         {justVerifiedAccount ? (
           <div className="vibe-auth-banner vibe-auth-banner--success">
             <strong>You&apos;re confirmed.</strong> Your login email is set.
-            One last verification: add your <strong>IU email</strong> (@iu.edu
-            or @iupui.edu) so we know you&apos;re actually on campus.
+            One last verification: add your <strong>school email</strong> (
+            {SCHOOL_DOMAINS_LABEL}) so we know you&apos;re actually on campus.
           </div>
         ) : null}
 
@@ -441,14 +449,14 @@ function SchoolEmailInner() {
             className="vibe-auth-sub"
             style={{ marginBottom: 10, overflowWrap: "anywhere" }}
           >
-            Adding an IU email to <strong>{accountEmail}</strong>.
+            Adding a school email to <strong>{accountEmail}</strong>.
           </p>
         ) : null}
         <p className="vibe-auth-sub">
-          Drop in your <strong>IU email</strong> — the{" "}
-          <code className="vibe-auth-code vibe-auth-code--edu">@iu.edu</code>{" "}
-          or{" "}
-          <code className="vibe-auth-code vibe-auth-code--edu">@iupui.edu</code>{" "}
+          Drop in your <strong>school email</strong> — the{" "}
+          <code className="vibe-auth-code vibe-auth-code--edu">
+            {SCHOOL_DOMAINS_LABEL}
+          </code>{" "}
           one, not the one you signed up with. We&apos;ll email a code and link
           to <em>that</em> inbox.
         </p>
@@ -553,8 +561,9 @@ function SchoolEmailInner() {
             </button>
 
             <p className="vibe-auth-tip">
-              Not there after a minute? Check Junk, and IU Outlook&apos;s
-              Quarantine. Opened it on your phone? Just type the code here.
+              Not there after a minute? Check Junk, and your school
+              Outlook&apos;s Quarantine. Opened it on your phone? Just type the
+              code here.
             </p>
           </form>
         ) : (
@@ -563,14 +572,14 @@ function SchoolEmailInner() {
               <span className="vibe-auth-label-row">
                 <span className="vibe-auth-label">School email</span>
                 <span className="vibe-auth-label-hint vibe-auth-label-hint--edu">
-                  @iu.edu or @iupui.edu
+                  {SCHOOL_DOMAINS_LABEL}
                 </span>
               </span>
               <input
                 type="email"
                 autoComplete="email"
                 required
-                placeholder="you@iu.edu"
+                placeholder="you@school.edu"
                 value={schoolEmail}
                 onChange={(e) => setSchoolEmail(e.target.value)}
                 className="vibe-auth-input"

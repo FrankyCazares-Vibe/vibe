@@ -215,7 +215,7 @@ function LoginForm() {
   } else if (nextPath === "/auth/verify-school") {
     contextBanner = (
       <div className="vibe-auth-banner vibe-auth-banner--info">
-        Sign in to finish verifying your IU email. Use the email you log in
+        Sign in to finish verifying your school email. Use the email you log in
         with.
       </div>
     );

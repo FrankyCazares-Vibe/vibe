@@ -61,6 +61,7 @@ const {
 } = await import("./school-email-domains");
 
 const PURDUE = { purdueEnabled: true } as const;
+const NO_PURDUE = { purdueEnabled: false } as const;
 
 /** Run `fn` with SCHOOL_EMAIL_DOMAINS set to `value`, then restore it. */
 function withEnv(value: string | undefined, fn: () => void) {
@@ -85,10 +86,10 @@ test("acceptance: a subdomain of iu.edu is IU", () => {
   assert.equal(schoolSystemForEmail("a@mail.iu.edu"), "iu");
 });
 
-test("acceptance: purdue.edu is null while the flag is off, purdue when enabled", () => {
-  assert.equal(PURDUE_SIGNUPS_ENABLED, false);
-  assert.equal(schoolSystemForEmail("a@purdue.edu"), null);
-  assert.equal(schoolSystemForEmail("a@purdue.edu", PURDUE), "purdue");
+test("acceptance: purdue.edu is purdue while the flag is on, null when disabled", () => {
+  assert.equal(PURDUE_SIGNUPS_ENABLED, true);
+  assert.equal(schoolSystemForEmail("a@purdue.edu"), "purdue");
+  assert.equal(schoolSystemForEmail("a@purdue.edu", NO_PURDUE), null);
 });
 
 test("acceptance: iupui.edu is a retired IU domain", () => {
@@ -101,7 +102,7 @@ test("acceptance: pfw.edu points at the shared Fort Wayne campus", () => {
 
 test("acceptance: SCHOOL_EMAIL_DOMAINS can't add iupui.edu", () => {
   assert.deepEqual(parseSchoolEmailDomains("iu.edu,iupui.edu"), ["iu.edu"]);
-  assert.deepEqual(parseSchoolEmailDomains("iupui.edu"), ["iu.edu"]);
+  assert.deepEqual(parseSchoolEmailDomains("iupui.edu"), ["iu.edu", "purdue.edu"]);
   withEnv("iu.edu, iupui.edu", () => {
     assert.deepEqual(schoolEmailDomains(), ["iu.edu"]);
     assert.equal(isSchoolEmail("a@iupui.edu"), false);
@@ -113,15 +114,23 @@ test("acceptance: SCHOOL_EMAIL_DOMAINS can't add iupui.edu", () => {
 
 test("system map: the code domains", () => {
   assert.deepEqual([...SYSTEM_DOMAINS.iu], ["iu.edu"]);
-  assert.deepEqual([...SYSTEM_DOMAINS.purdue], ["purdue.edu", "pfw.edu", "pnw.edu"]);
-  assert.deepEqual([...DEFAULT_SCHOOL_EMAIL_DOMAINS], ["iu.edu"]);
-  assert.deepEqual(codeSchoolEmailDomains(PURDUE), ["iu.edu", "purdue.edu", "pfw.edu", "pnw.edu"]);
+  // @pfw.edu / @pnw.edu are held back until their student address format is
+  // confirmed: in the single-campus map, out of the allowlist.
+  assert.deepEqual([...SYSTEM_DOMAINS.purdue], ["purdue.edu"]);
+  assert.deepEqual([...DEFAULT_SCHOOL_EMAIL_DOMAINS], ["iu.edu", "purdue.edu"]);
+  assert.deepEqual(codeSchoolEmailDomains(PURDUE), ["iu.edu", "purdue.edu"]);
+  assert.deepEqual(codeSchoolEmailDomains(NO_PURDUE), ["iu.edu"]);
 });
 
-test("system map: every Purdue domain and subdomain maps to purdue only when enabled", () => {
-  for (const email of ["a@purdue.edu", "a@pfw.edu", "a@pnw.edu", "a@mail.purdue.edu", "A@PFW.EDU"]) {
+test("system map: every Purdue domain and subdomain maps to purdue, and to null when disabled", () => {
+  for (const email of ["a@purdue.edu", "a@mail.purdue.edu", "A@PURDUE.EDU", "a@alumni.purdue.edu"]) {
+    assert.equal(schoolSystemForEmail(email), "purdue", email);
+    assert.equal(schoolSystemForEmail(email, NO_PURDUE), null, email);
+  }
+  // Held back on purpose, in both modes.
+  for (const email of ["a@pfw.edu", "A@PFW.EDU", "a@pnw.edu", "a@mail.pnw.edu"]) {
     assert.equal(schoolSystemForEmail(email), null, email);
-    assert.equal(schoolSystemForEmail(email, PURDUE), "purdue", email);
+    assert.equal(schoolSystemForEmail(email, PURDUE), null, email);
   }
 });
 
@@ -167,9 +176,15 @@ test("retired: isSchoolEmail rejects them even from an explicit list", () => {
 
 // ── Env narrowing (critic C2) ──────────────────────────────────────────────
 
-test("env: can't enable Purdue while the flag is off", () => {
-  assert.deepEqual(parseSchoolEmailDomains("purdue.edu,pfw.edu"), ["iu.edu"]);
-  withEnv("iu.edu,purdue.edu", () => {
+test("env: narrows only, and can't widen past the code map", () => {
+  // pfw.edu is outside the code ceiling, so it is dropped rather than added.
+  assert.deepEqual(parseSchoolEmailDomains("purdue.edu,pfw.edu"), ["purdue.edu"]);
+  // A mixed list keeps only the entries inside the ceiling.
+  assert.deepEqual(parseSchoolEmailDomains("iu.edu,purdue.edu", NO_PURDUE), ["iu.edu"]);
+  // With Purdue disabled the same env value has nothing valid left, so the
+  // code map wins rather than the env widening it.
+  assert.deepEqual(parseSchoolEmailDomains("purdue.edu,pfw.edu", NO_PURDUE), ["iu.edu"]);
+  withEnv("iu.edu", () => {
     assert.deepEqual(schoolEmailDomains(), ["iu.edu"]);
     assert.equal(isSchoolEmail("a@purdue.edu"), false);
     assert.notEqual(schoolEmailRejection("a@purdue.edu"), null);
@@ -186,17 +201,18 @@ test("env: narrows to a subset or a subdomain of the code map", () => {
     assert.equal(allowedSchoolSystemForEmail("a@x.mail.iu.edu"), "iu");
     assert.equal(schoolEmailDomainsLabel(), "@mail.iu.edu");
   });
-  withEnv("pfw.edu", () => {
-    assert.equal(allowedSchoolSystemForEmail("a@pfw.edu", PURDUE), "purdue");
-    assert.equal(allowedSchoolSystemForEmail("a@purdue.edu", PURDUE), null);
+  withEnv("purdue.edu", () => {
+    assert.equal(allowedSchoolSystemForEmail("a@purdue.edu", PURDUE), "purdue");
+    assert.equal(allowedSchoolSystemForEmail("a@iu.edu", PURDUE), null);
+    assert.deepEqual(schoolEmailDomains(NO_PURDUE), ["iu.edu"]);
   });
 });
 
 test("env: blank or unset falls back to the code map", () => {
-  assert.deepEqual(parseSchoolEmailDomains(undefined), ["iu.edu"]);
-  assert.deepEqual(parseSchoolEmailDomains(" , ,"), ["iu.edu"]);
+  assert.deepEqual(parseSchoolEmailDomains(undefined), ["iu.edu", "purdue.edu"]);
+  assert.deepEqual(parseSchoolEmailDomains(" , ,"), ["iu.edu", "purdue.edu"]);
   withEnv(undefined, () => {
-    assert.deepEqual(schoolEmailDomains(), ["iu.edu"]);
+    assert.deepEqual(schoolEmailDomains(), ["iu.edu", "purdue.edu"]);
     assert.equal(allowedSchoolSystemForEmail("a@iu.edu"), "iu");
   });
 });
@@ -216,8 +232,8 @@ test("single campus: pnw.edu, subdomains, and everything else", () => {
 
 test("label: flag-aware headline domains, explicit lists keep the old join", () => {
   withEnv(undefined, () => {
-    assert.equal(schoolEmailDomainsLabel(), "@iu.edu");
-    assert.equal(schoolEmailDomainsLabel(PURDUE), "@iu.edu or @purdue.edu");
+    assert.equal(schoolEmailDomainsLabel(), "@iu.edu or @purdue.edu");
+    assert.equal(schoolEmailDomainsLabel(NO_PURDUE), "@iu.edu");
   });
   assert.equal(schoolEmailDomainsLabel(["iu.edu"]), "@iu.edu");
   assert.equal(schoolEmailDomainsLabel(["a.edu", "b.edu"]), "@a.edu or @b.edu");
@@ -235,11 +251,11 @@ test("copy: retired domains point to @iu.edu", () => {
   });
 });
 
-test("copy: never mentions Purdue while the flag is off", () => {
+test("copy: never mentions Purdue while Purdue is disabled", () => {
   withEnv(undefined, () => {
     for (const email of ["a@purdue.edu", "a@pfw.edu", "a@gmail.com", "a@uindy.edu"]) {
-      const request = schoolEmailRejection(email);
-      const verify = schoolEmailRejection(email, { context: "verify" });
+      const request = schoolEmailRejection(email, NO_PURDUE);
+      const verify = schoolEmailRejection(email, { ...NO_PURDUE, context: "verify" });
       assert.equal(request?.code, "domain_not_allowed", email);
       assert.equal(request?.error, "Use your school email (@iu.edu).");
       assert.doesNotMatch(request?.error ?? "", /purdue/i);
@@ -250,7 +266,10 @@ test("copy: never mentions Purdue while the flag is off", () => {
 });
 
 test("copy: names both universities once Purdue is on", () => {
-  assert.equal(schoolEmailRejection("a@gmail.com", PURDUE)?.error, "Use your IU or Purdue school email.");
+  assert.equal(
+    schoolEmailRejection("a@gmail.com", PURDUE)?.error,
+    "Use your IU or Purdue school email (@iu.edu or @purdue.edu).",
+  );
   assert.match(schoolEmailRejection("a@gmail.com", { ...PURDUE, context: "verify" })?.error ?? "", /IU or Purdue/);
   assert.equal(schoolEmailRejection("a@purdue.edu", PURDUE), null);
 });

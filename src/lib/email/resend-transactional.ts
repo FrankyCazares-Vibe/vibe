@@ -121,7 +121,7 @@ function brandedEmailHtml(e: BrandedEmail): string {
         </tr>
         <tr>
           <td align="center" style="padding:20px 12px 0;font-family:${SANS};font-size:12px;line-height:18px;color:${MUTED};">
-            <span style="font-family:${SERIF};font-weight:800;color:${CHARCOAL};">vibe<span style="color:${ACCENT};">.</span></span> &middot; IU Indianapolis<br>
+            <span style="font-family:${SERIF};font-weight:800;color:${CHARCOAL};">vibe<span style="color:${ACCENT};">.</span></span> &middot; Indianapolis<br>
             <a href="https://www.connectvibe.app/legal/privacy" style="color:${MUTED};">Privacy policy</a>
           </td>
         </tr>
@@ -190,11 +190,11 @@ export async function sendSchoolVerificationEmail(
   const { error } = await resend.emails.send({
     from: getFrom(),
     to: [to],
-    subject: "Verify your IU email on Vibe",
+    subject: "Verify your school email on Vibe",
     html: brandedEmailHtml({
-      title: "Verify your IU email on Vibe",
+      title: "Verify your school email on Vibe",
       preheader: `Your Vibe code is ${code}. It works for 30 minutes.`,
-      headline: "Verify your IU email",
+      headline: "Verify your school email",
       intro: "Type this code on the Vibe page where you asked for this email.",
       code: {
         label: "Your verification code",
@@ -204,7 +204,7 @@ export async function sendSchoolVerificationEmail(
       button: {
         lead: "Or tap below while you're signed in to Vibe on this device. The link works for 48 hours.",
         href: verifyUrl,
-        label: "Verify IU email",
+        label: "Verify school email",
       },
       notes: [
         "Opened this in the Outlook app? Typing the code is the easiest way.",
@@ -216,8 +216,8 @@ export async function sendSchoolVerificationEmail(
       "",
       "Type it on the Vibe page where you asked for this email. It works for 30 minutes.",
       "",
-      "Or tap Verify IU email while you're signed in to Vibe on this device. The link works for 48 hours.",
-      `Verify IU email: ${verifyUrl}`,
+      "Or tap Verify school email while you're signed in to Vibe on this device. The link works for 48 hours.",
+      `Verify school email: ${verifyUrl}`,
       "",
       "Never share this code. Vibe will never ask you for it.",
       "",

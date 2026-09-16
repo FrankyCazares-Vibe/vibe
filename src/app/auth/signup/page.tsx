@@ -383,7 +383,7 @@ export default function SignupPage() {
               className="vibe-auth-tip"
               style={{ marginTop: -8 }}
             >
-              Heads up: use a personal email here — you&apos;ll add your IU
+              Heads up: use a personal email here — you&apos;ll add your school
               email in the next step.
             </p>
           ) : null}
