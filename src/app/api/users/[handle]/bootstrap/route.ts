@@ -2,8 +2,10 @@ import { NextResponse } from "next/server";
 import type { SupabaseClient } from "@supabase/supabase-js";
 
 import { getCountsFor, getFollowState, getMutualCount } from "@/lib/connections/queries";
+import { isMissingColumnError } from "@/lib/db/missing-column";
 import { buildVibeUserV1FromProfile } from "@/lib/profile/build-vibe-user-v1";
 import { normalizeProfileView } from "@/lib/profile/normalize-profile-view";
+import { PUBLIC_PROFILE_CAMPUS_COLUMNS } from "@/lib/profile/profile-campus-write";
 import { parseResumeDocRef } from "@/lib/profile/resume-doc-url";
 import { createSupabaseServerClient } from "@/lib/supabase/server";
 import { createSupabaseServiceClient } from "@/lib/supabase/service";
@@ -14,8 +16,20 @@ import { createSupabaseServiceClient } from "@/lib/supabase/service";
 // stay off this list by default.
 // pinned_post_id is fetched in a split try/catch below so a column-
 // missing situation (migration deploy lag) can't 404 the whole route.
-const PUBLIC_PROFILE_SELECT =
+const BASE_PUBLIC_PROFILE_SELECT =
   "id,name,handle,school,school_verified,year,major,department,bio,tagline,website,headline,location_text,banner_gradient,avatar_url,banner_url,resume_url,resume_docs,interests,skills,looking_for,work_experience,work_order_manual,recruiter_snapshot,current_on,resume_redactions";
+
+// The badge on someone ELSE's profile now comes from `school_system` +
+// `campus_id` (critic C1): without these two columns every visited profile
+// would silently lose its "IU Indianapolis" badge the moment B6 stopped
+// deriving it from the legacy `school` label. `campus_set_at` is NOT here —
+// when a student last changed campus is nobody else's business.
+const PUBLIC_PROFILE_SELECT = `${BASE_PUBLIC_PROFILE_SELECT},${PUBLIC_PROFILE_CAMPUS_COLUMNS}`;
+
+type PublicProfileRead = {
+  data: Record<string, unknown> | null;
+  error: { code?: string | null; message?: string | null } | null;
+};
 
 type RouteContext = { params: Promise<{ handle: string }> };
 
@@ -63,11 +77,21 @@ export async function GET(_req: Request, ctx: RouteContext) {
   }
   const reader: SupabaseClient = viewer ? supabase : service;
 
-  const { data: row, error } = await service
+  // Before migration M1 the campus columns don't exist; a missing-column
+  // error (and only that) falls back to the legacy label, which still
+  // renders a badge.
+  let { data: row, error } = (await service
     .from("users")
     .select(PUBLIC_PROFILE_SELECT)
     .eq("handle", handle)
-    .maybeSingle();
+    .maybeSingle()) as PublicProfileRead;
+  if (error && isMissingColumnError(error)) {
+    ({ data: row, error } = (await service
+      .from("users")
+      .select(BASE_PUBLIC_PROFILE_SELECT)
+      .eq("handle", handle)
+      .maybeSingle()) as PublicProfileRead);
+  }
 
   if (error) {
     console.error("[users/:handle/bootstrap]", error);

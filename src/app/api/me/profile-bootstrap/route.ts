@@ -1,19 +1,36 @@
 import { NextResponse } from "next/server";
 
 import { getCountsFor } from "@/lib/connections/queries";
-import { campusByLabel } from "@/lib/iu/campuses";
+import { isMissingColumnError } from "@/lib/db/missing-column";
 import { termsRequiredResponse } from "@/lib/legal/require-terms";
 import { hasRecordedConsent } from "@/lib/legal/terms";
 import { buildVibeUserV1FromProfile } from "@/lib/profile/build-vibe-user-v1";
 import { normalizeProfileView } from "@/lib/profile/normalize-profile-view";
+import {
+  PROFILE_CAMPUS_COLUMNS,
+  legacyCampusLabelForProfile,
+  ownCampusFields,
+} from "@/lib/profile/profile-campus-write";
 import { createSupabaseServerClient } from "@/lib/supabase/server";
 import { createSupabaseServiceClient } from "@/lib/supabase/service";
 
 // pinned_post_id is fetched in a separate try/catch below so a
 // migration-lag situation (column doesn't exist yet) can't 404 the
 // whole bootstrap and lock the user out of their profile.
-const PROFILE_SELECT =
-  "id,email,name,handle,handle_changed_at,school,school_email,school_verified,year,major,department,bio,tagline,website,headline,location_text,banner_gradient,avatar_url,banner_url,resume_url,resume_docs,interests,skills,looking_for,work_experience,work_order_manual,recruiter_snapshot,current_on,resume_redactions,terms_accepted_at,terms_version,age_attested_at";
+//
+// `school_email` is deliberately NOT selected: this route never returns it
+// (plan wave 2 B6), and the campus fields below replace what it was once
+// needed for.
+const BASE_PROFILE_SELECT =
+  "id,email,name,handle,handle_changed_at,school,school_verified,year,major,department,bio,tagline,website,headline,location_text,banner_gradient,avatar_url,banner_url,resume_url,resume_docs,interests,skills,looking_for,work_experience,work_order_manual,recruiter_snapshot,current_on,resume_redactions,terms_accepted_at,terms_version,age_attested_at";
+
+/** The campus columns arrive with migration M1 (plan §5.1). */
+const PROFILE_SELECT = `${BASE_PROFILE_SELECT},${PROFILE_CAMPUS_COLUMNS}`;
+
+type ProfileRowRead = {
+  data: Record<string, unknown> | null;
+  error: { code?: string | null; message?: string | null } | null;
+};
 
 /**
  * Returns `vibe_user_v1`-shaped JSON for `public/html/profile.html`.
@@ -36,14 +53,24 @@ export async function GET() {
     return NextResponse.json({ ok: false, error: "Unauthorized" }, { status: 401 });
   }
 
-  // PROFILE_SELECT includes email / school_email, which are private
+  // PROFILE_SELECT includes email and `campus_set_at`, which are private
   // columns (no RLS read). Self-read via the service role scoped to the
-  // signed-in user's id.
-  const { data: row, error } = await createSupabaseServiceClient()
+  // signed-in user's id. Before migration M1 the campus columns don't exist,
+  // and a 404 here would lock the user out of their own profile — so a
+  // missing-column error (and only that) retries without them.
+  const service = createSupabaseServiceClient();
+  let { data: row, error } = (await service
     .from("users")
     .select(PROFILE_SELECT)
     .eq("id", user.id)
-    .single();
+    .single()) as ProfileRowRead;
+  if (error && isMissingColumnError(error)) {
+    ({ data: row, error } = (await service
+      .from("users")
+      .select(BASE_PROFILE_SELECT)
+      .eq("id", user.id)
+      .single()) as ProfileRowRead);
+  }
 
   if (error || !row) {
     console.error("[profile-bootstrap GET]", error);
@@ -117,17 +144,32 @@ export async function GET() {
   // Pinned post id (from the optional split query above).
   vibeUser.pinnedPostId = pinnedPostId;
 
-  // Self-declared campus, surfaced TOP-LEVEL (not on `vibeUser`, whose
-  // shape profile.html already depends on) so the campus pickers can
-  // prefill the current selection. Canonical label, or null when the user
-  // never picked one / the stored value isn't a known IU campus — the
-  // badge inside `vibeUser` degrades to "IU verified" in the same case.
-  const campus = campusByLabel(profile.school)?.label ?? null;
+  // Campus, surfaced TOP-LEVEL (not on `vibeUser`, whose shape profile.html
+  // already depends on) so the pickers can prefill.
+  //
+  // `campus` is the LEGACY label the deployed bundles read and send straight
+  // back ("IU Indianapolis"); they keep working because that label maps to
+  // the same campus, which makes their next save a no-op. Wave-3 clients use
+  // the five fields next to it: `schoolSystem`, `campusId`, `campusBadge`,
+  // `campusChangeAvailableAt` (null when a change is allowed now) and
+  // `campusConfirmed` (false for the backfilled rows that never chose, which
+  // is what drives the "Confirm your campus" card). `school_email` is never
+  // part of this response.
+  const campus = legacyCampusLabelForProfile(profile);
+  const campusFields = ownCampusFields({
+    school: profile.school,
+    school_verified: profile.school_verified,
+    school_system: profile.school_system,
+    campus_id: profile.campus_id,
+    campus_set_at:
+      typeof row.campus_set_at === "string" ? row.campus_set_at : null,
+  });
 
   return NextResponse.json({
     ok: true,
     vibeUser,
     campus,
+    ...campusFields,
     isPlatformAdmin,
     termsAccepted,
     termsVersion,

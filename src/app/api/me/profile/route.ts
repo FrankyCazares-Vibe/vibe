@@ -1,8 +1,16 @@
 import { NextResponse } from "next/server";
 
-import { normalizeCampusLabel } from "@/lib/iu/campuses";
+import { isOttoOnboardingComplete } from "@/lib/auth/post-login";
 import { isSupabaseHttpsUrl } from "@/lib/org-asset-url";
 import { normalizeCoverThemeInput } from "@/lib/profile/cover-themes";
+import {
+  campusReadUnavailable,
+  campusWriteFailed,
+  decideProfileCampusWrite,
+  readCampusIntent,
+  readCampusWriteRow,
+  type CampusWriteDecision,
+} from "@/lib/profile/profile-campus-write";
 import { sanitizeRecruiterSnapshot } from "@/lib/profile/recruiter-snapshot";
 import { changeHandleForUser } from "@/lib/profile/handle-change";
 import { requireTermsAccepted } from "@/lib/legal/require-terms";
@@ -203,21 +211,33 @@ export async function PATCH(req: Request) {
   const department = trimStr(body.department, 200);
   if (department !== null) patch.department = department;
 
-  // Self-declared IU campus → users.school (canonical label). Accepts a
-  // campus id or a label; an explicit empty value un-sets it; anything else
-  // is a 400, matching this route's convention for invalid fields. Campus is
-  // never verified and never gates access — it only scopes feeds and search.
-  if ("school" in body || "campus" in body) {
-    const raw = "school" in body ? body.school : body.campus;
-    if (raw === null || (typeof raw === "string" && !raw.trim())) {
-      patch.school = "";
-    } else {
-      const label = normalizeCampusLabel(raw);
-      if (label === null) {
-        return NextResponse.json({ ok: false, error: "Invalid campus" }, { status: 400 });
-      }
-      patch.school = label;
-    }
+  // Self-declared campus. TWO BODY SHAPES while the wave-3 clients ship
+  // (critic A4): `campus_id` is an explicit choice, while the legacy
+  // `school` / `campus` label is what every DEPLOYED bundle sends on every
+  // save. So a label naming the campus already on the row — and "" / null —
+  // changes nothing: no write, no 400, no 429, no `campus_set_at` touch.
+  // Only a DIFFERENT campus is a change, and goes through the allowed set
+  // (400 `campus_not_in_system`) and the 30-day rule (429
+  // `campus_change_too_soon`). All of that is decided in
+  // `decideProfileCampusWrite`.
+  //
+  // `campus_id` / `campus_set_at` have no UPDATE grant (and `school` loses
+  // its own in M2), so the write goes through the service role scoped to
+  // this user, below, and dual-writes the legacy label (plan §5.5).
+  //
+  // A campus rule NEVER fails the rest of the patch: every other field is
+  // applied either way and the campus outcome is reported separately.
+  const campusTouched = readCampusIntent(body).kind !== "absent";
+  let campusDecision: CampusWriteDecision = { kind: "absent" };
+  if (campusTouched) {
+    const read = await readCampusWriteRow(createSupabaseServiceClient(), user.id);
+    campusDecision = read.ok
+      ? decideProfileCampusWrite({
+          body,
+          row: read.row,
+          onboarded: isOttoOnboardingComplete(read.row.otto_answers),
+        })
+      : campusReadUnavailable();
   }
 
   if ("year" in body) {
@@ -290,7 +310,8 @@ export async function PATCH(req: Request) {
     Object.keys(patch).length === 0 &&
     Object.keys(mediaPatch).length === 0 &&
     coverThemePatch === undefined &&
-    !handleTouched
+    !handleTouched &&
+    !campusTouched
   ) {
     return NextResponse.json({ ok: false, error: "No valid fields to update" }, { status: 400 });
   }
@@ -327,8 +348,48 @@ export async function PATCH(req: Request) {
     }
   }
 
+  // Campus, its 30-day stamp and the dual-written legacy label go together in
+  // one service-role statement so they can never half-apply against each
+  // other. A rejection here is still only a campus failure (see below).
+  if (campusDecision.kind === "write") {
+    const { error: campusErr } = await createSupabaseServiceClient()
+      .from("users")
+      .update(campusDecision.patch)
+      .eq("id", user.id);
+    if (campusErr) {
+      console.error("[me/profile PATCH campus]", campusErr);
+      campusDecision = campusWriteFailed(campusErr);
+    }
+  }
+
+  // A campus rule never blocks the fields that did save. When something else
+  // was written the request SUCCEEDS and carries `campusError`, so a
+  // deployed bundle adopts the server's campus on its next bootstrap instead
+  // of failing every later save on the same rejected label (critic A4). A
+  // campus-only body has nothing else to report, so the rule's own status is
+  // the answer.
+  const campusError = campusDecision.kind === "reject" ? campusDecision.rejection : null;
+  const wroteOtherFields =
+    Object.keys(patch).length > 0 || Object.keys(servicePatch).length > 0 || handleTouched;
+  if (campusError && !wroteOtherFields) {
+    return NextResponse.json(
+      {
+        ok: false,
+        code: campusError.code,
+        error: campusError.error,
+        ...(campusError.availableAt ? { availableAt: campusError.availableAt } : {}),
+      },
+      { status: campusError.status },
+    );
+  }
+
   // email / school_email are private columns (no RLS read); self-read via
   // the service role scoped to the caller's id.
+  //
+  // This echo is the RAW row and stays campus-blind on purpose: it carries the
+  // dual-written `school` label and no campus columns at all, so a client can't
+  // mistake an unasked-for column for "no campus". GET /api/me/profile-bootstrap
+  // is the campus source (`campusId`, `campusBadge`, `campusConfirmed`).
   const { data: row, error: selErr } = await createSupabaseServiceClient()
     .from("users")
     .select(
@@ -338,11 +399,12 @@ export async function PATCH(req: Request) {
     .single();
 
   if (selErr || !row) {
-    return NextResponse.json({ ok: true, profile: null });
+    return NextResponse.json({ ok: true, profile: null, ...(campusError ? { campusError } : {}) });
   }
 
   return NextResponse.json({
     ok: true,
     profile: row,
+    ...(campusError ? { campusError } : {}),
   });
 }

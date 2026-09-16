@@ -1,6 +1,18 @@
-import { campusBadgeLabel, campusByLabel } from "@/lib/iu/campuses";
+import type { ProfileCampusColumns } from "@/lib/profile/normalize-profile-view";
+import {
+  campusBadgeForProfile,
+  legacyCampusLabelForProfile,
+} from "@/lib/profile/profile-campus-write";
 import type { ProfileView } from "@/lib/profile/types";
 import { workExperienceForVibeHtml } from "@/lib/profile/work-experience";
+
+/**
+ * A profile row plus, when the select asked for them, the campus columns.
+ * They stay optional so a caller that reads only the legacy `school` label
+ * still compiles and still gets a badge (the fallback in
+ * `campusBadgeForProfile`).
+ */
+type ProfileForVibeUser = ProfileView & Partial<ProfileCampusColumns>;
 
 const TAG_COLORS = ["coral", "purple", "sky", "gold", "mint", "lavender"] as const;
 
@@ -13,16 +25,18 @@ function taglineFromBio(bio: string): string {
 }
 
 /**
- * The user's self-declared campus, or "" when they never picked one (or the
- * stored value is legacy / not a known IU campus). `users.school` is directly
- * self-updatable through PostgREST, so every render of it goes through the
- * campus table first — never trust the raw column for display.
+ * The user's campus, or "" when they never picked one (or the stored value
+ * names no campus in their university). Derived from `campus_id` +
+ * `school_system`, falling back to the legacy `school` label for a row read
+ * without the campus columns. `users.school` is still directly self-updatable
+ * through PostgREST, so every render of it goes through the campus table
+ * first — never trust the raw column for display.
  */
-function campusLabelForDisplay(p: ProfileView): string {
-  return campusByLabel(p.school)?.label ?? "";
+function campusLabelForDisplay(p: ProfileForVibeUser): string {
+  return legacyCampusLabelForProfile(p) ?? "";
 }
 
-function headlineFromProfileParts(p: ProfileView): string {
+function headlineFromProfileParts(p: ProfileForVibeUser): string {
   // Major + year only. The campus badge already surfaces the campus on
   // the profile header, so injecting it here too was redundant
   // ("accounting · Kelley · Year 2"). Keep the chip tight.
@@ -52,7 +66,7 @@ function preferredFromLookingFor(tokens: string[]): string {
  * Shape expected by `public/html/profile.html` (`vibe_user_v1` in localStorage).
  */
 export function buildVibeUserV1FromProfile(
-  profile: ProfileView,
+  profile: ProfileForVibeUser,
   opts?: { appShell?: boolean },
 ): Record<string, unknown> {
   const vibeTags = profile.interests.map((label, i) => ({
@@ -102,10 +116,12 @@ export function buildVibeUserV1FromProfile(
   if (profile.school_verified) {
     u.studentVerification = {
       status: "verified",
-      // Campus label when the user picked one, else "IU verified". The old
-      // fallback used the school_email domain, which rendered the literal
-      // string "iu.edu" on every profile (nobody had a campus set).
-      school: campusBadgeLabel(profile.school),
+      // Badge from the campus model (plan §2.5): "IU Indianapolis" /
+      // "Purdue Indianapolis" at a shared campus, the campus name elsewhere,
+      // and "IU verified" / "Purdue verified" with no campus. The `??` is
+      // unreachable here (campusBadgeForProfile only returns null for an
+      // unverified row) and keeps the field a string for old clients.
+      school: campusBadgeForProfile(profile) ?? "IU verified",
     };
   }
 

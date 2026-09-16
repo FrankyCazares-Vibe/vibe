@@ -1,10 +1,20 @@
 import { NextResponse } from "next/server";
 
-import { normalizeCampusLabel } from "@/lib/iu/campuses";
+import { isOttoOnboardingComplete } from "@/lib/auth/post-login";
+import { isMissingColumnError } from "@/lib/db/missing-column";
 import { isSupabaseHttpsUrl } from "@/lib/org-asset-url";
 import { normalizeCoverThemeInput } from "@/lib/profile/cover-themes";
 import { sanitizeCurrentOn } from "@/lib/profile/current-on";
 import { normalizeProfileView } from "@/lib/profile/normalize-profile-view";
+import {
+  PUBLIC_PROFILE_CAMPUS_COLUMNS,
+  campusReadUnavailable,
+  campusWriteFailed,
+  decideProfileCampusWrite,
+  readCampusIntent,
+  readCampusWriteRow,
+  type CampusWriteDecision,
+} from "@/lib/profile/profile-campus-write";
 import { sanitizeRecruiterSnapshot } from "@/lib/profile/recruiter-snapshot";
 import { normalizeResumeRef, resumeKeyOwnerId } from "@/lib/profile/resume-doc-url";
 import { sanitizeResumeDocs } from "@/lib/profile/resume-docs";
@@ -21,6 +31,15 @@ import { requireTermsAccepted } from "@/lib/legal/require-terms";
 import { rateLimit, tooManyRequests } from "@/lib/rate-limit";
 import { createSupabaseServerClient } from "@/lib/supabase/server";
 import { createSupabaseServiceClient } from "@/lib/supabase/service";
+
+/** The profile echoed back to the client, without the campus columns. */
+const SYNC_PROFILE_SELECT =
+  "id,email,name,handle,school,school_email,school_verified,year,major,department,bio,tagline,website,headline,location_text,banner_gradient,avatar_url,banner_url,resume_url,resume_docs,interests,skills,looking_for,work_experience,work_order_manual,recruiter_snapshot,current_on,resume_redactions";
+
+type ProfileRowRead = {
+  data: Record<string, unknown> | null;
+  error: { code?: string | null; message?: string | null } | null;
+};
 
 /**
  * Full profile sync from `public/html/profile.html` (authenticated, same-origin).
@@ -84,24 +103,23 @@ export async function POST(req: Request) {
     patch.major = body.major.trim().slice(0, 200);
   }
 
-  // Self-declared IU campus, stored as the canonical label in users.school.
-  // Accepts a campus id or a label; an explicit empty value un-sets it.
-  // Never a privacy boundary (users.school is self-updatable through
-  // PostgREST anyway) — this just keeps junk out of the column.
-  if ("school" in body || "campus" in body) {
-    const raw = "school" in body ? body.school : body.campus;
-    if (raw === null || (typeof raw === "string" && !raw.trim())) {
-      patch.school = "";
-    } else {
-      const label = normalizeCampusLabel(raw);
-      if (label === null) {
-        return NextResponse.json(
-          { ok: false, error: "Invalid campus" },
-          { status: 400 },
-        );
-      }
-      patch.school = label;
-    }
+  // Self-declared campus — the same two shapes, and the same rules, as
+  // PATCH /api/me/profile (see the long comment there and critic A4).
+  // profile.html and ProfileMobile send the legacy `school` label on EVERY
+  // save, so re-sending the current campus (or "") must change nothing: it
+  // must never re-arm the 30-day clock, never confirm a backfilled campus,
+  // and never fail the save. The write goes through the service role below.
+  const campusTouched = readCampusIntent(body).kind !== "absent";
+  let campusDecision: CampusWriteDecision = { kind: "absent" };
+  if (campusTouched) {
+    const read = await readCampusWriteRow(createSupabaseServiceClient(), user.id);
+    campusDecision = read.ok
+      ? decideProfileCampusWrite({
+          body,
+          row: read.row,
+          onboarded: isOttoOnboardingComplete(read.row.otto_answers),
+        })
+      : campusReadUnavailable();
   }
 
   if ("year" in body) {
@@ -298,7 +316,8 @@ export async function POST(req: Request) {
   if (
     Object.keys(patch).length === 0 &&
     Object.keys(mediaPatch).length === 0 &&
-    coverThemePatch === undefined
+    coverThemePatch === undefined &&
+    !campusTouched
   ) {
     return NextResponse.json({ ok: false, error: "No valid fields to update" }, { status: 400 });
   }
@@ -332,6 +351,39 @@ export async function POST(req: Request) {
       console.error("[profile-sync POST avatar/cover]", svcErr);
       return NextResponse.json({ ok: false, error: "Request failed" }, { status: 500 });
     }
+  }
+
+  // Campus + its stamp + the dual-written legacy label, in one service-role
+  // statement (no UPDATE grant on the campus columns).
+  if (campusDecision.kind === "write") {
+    const { error: campusErr } = await createSupabaseServiceClient()
+      .from("users")
+      .update(campusDecision.patch)
+      .eq("id", user.id);
+    if (campusErr) {
+      console.error("[profile-sync POST campus]", campusErr);
+      campusDecision = campusWriteFailed(campusErr);
+    }
+  }
+
+  // Same rule as PATCH /api/me/profile: a campus rejection never fails the
+  // fields that saved. With other fields written the response stays ok and
+  // carries `campusError` — desktop skips the bootstrap adoption on a failed
+  // sync, so a non-ok here would leave the stale campus in its payload and
+  // fail every later save (critic A4).
+  const campusError = campusDecision.kind === "reject" ? campusDecision.rejection : null;
+  const wroteOtherFields =
+    Object.keys(patch).length > 0 || Object.keys(servicePatch).length > 0;
+  if (campusError && !wroteOtherFields) {
+    return NextResponse.json(
+      {
+        ok: false,
+        code: campusError.code,
+        error: campusError.error,
+        ...(campusError.availableAt ? { availableAt: campusError.availableAt } : {}),
+      },
+      { status: campusError.status },
+    );
   }
 
   // Best-effort orphan cleanup: keys referenced before the update but not
@@ -395,21 +447,32 @@ export async function POST(req: Request) {
   }
 
   // email / school_email are private columns (no RLS read); self-read via
-  // the service role scoped to the caller's id.
-  const { data: row, error: selErr } = await createSupabaseServiceClient()
+  // the service role scoped to the caller's id. The campus columns are asked
+  // for too, so the echoed `profile` reports the campus this request just
+  // wrote instead of a flat null (normalizeProfileView always emits both
+  // fields); before migration M1 they don't exist, so a missing-column error
+  // — and only that — retries without them.
+  const echoService = createSupabaseServiceClient();
+  let { data: row, error: selErr } = (await echoService
     .from("users")
-    .select(
-      "id,email,name,handle,school,school_email,school_verified,year,major,department,bio,tagline,website,headline,location_text,banner_gradient,avatar_url,banner_url,resume_url,resume_docs,interests,skills,looking_for,work_experience,work_order_manual,recruiter_snapshot,current_on,resume_redactions",
-    )
+    .select(`${SYNC_PROFILE_SELECT},${PUBLIC_PROFILE_CAMPUS_COLUMNS}`)
     .eq("id", user.id)
-    .single();
+    .single()) as ProfileRowRead;
+  if (selErr && isMissingColumnError(selErr)) {
+    ({ data: row, error: selErr } = (await echoService
+      .from("users")
+      .select(SYNC_PROFILE_SELECT)
+      .eq("id", user.id)
+      .single()) as ProfileRowRead);
+  }
 
   if (selErr || !row) {
-    return NextResponse.json({ ok: true, profile: null });
+    return NextResponse.json({ ok: true, profile: null, ...(campusError ? { campusError } : {}) });
   }
 
   return NextResponse.json({
     ok: true,
     profile: normalizeProfileView(row as Record<string, unknown>),
+    ...(campusError ? { campusError } : {}),
   });
 }

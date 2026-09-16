@@ -1,3 +1,4 @@
+import { isSchoolSystem, type SchoolSystem } from "@/lib/iu/campuses";
 import { sanitizeCurrentOn } from "@/lib/profile/current-on";
 import { normalizeResumeRef } from "@/lib/profile/resume-doc-url";
 import { sanitizeResumeDocs } from "@/lib/profile/resume-docs";
@@ -15,8 +16,23 @@ function recruiterSnapshotFromRow(v: unknown): Record<string, string> {
   return out;
 }
 
+/**
+ * The campus model's columns (migration M1), carried next to the legacy
+ * `school` label until M3 drops it. Both are null when the select didn't ask
+ * for them, when the student never picked a campus, or when the stored value
+ * isn't a string — every reader treats that as "no campus" and falls back to
+ * the legacy label.
+ */
+export type ProfileCampusColumns = {
+  school_system: SchoolSystem | null;
+  campus_id: string | null;
+};
+
+/** {@link ProfileView} plus the campus columns {@link normalizeProfileView} adds. */
+export type ProfileViewWithCampus = ProfileView & ProfileCampusColumns;
+
 /** Coerce a DB row into ProfileView so the UI never calls .join on null/invalid fields. */
-export function normalizeProfileView(row: Record<string, unknown>): ProfileView {
+export function normalizeProfileView(row: Record<string, unknown>): ProfileViewWithCampus {
   const strArr = (v: unknown): string[] => {
     if (!Array.isArray(v)) return [];
     return v.filter((x): x is string => typeof x === "string");
@@ -45,6 +61,14 @@ export function normalizeProfileView(row: Record<string, unknown>): ProfileView 
     // campusByLabel), which degrades an unknown or crafted value to
     // "IU verified" / "".
     school: String(row.school ?? ""),
+    // Campus model (plan §2.1). The badge and every campus read prefer these
+    // two over `school`; an unknown value degrades to null rather than being
+    // trusted, the same rule `school` has above.
+    school_system: isSchoolSystem(row.school_system) ? row.school_system : null,
+    campus_id:
+      typeof row.campus_id === "string" && row.campus_id.trim() !== ""
+        ? row.campus_id.trim()
+        : null,
     school_email:
       row.school_email != null && row.school_email !== ""
         ? String(row.school_email)
