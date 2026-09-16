@@ -2,6 +2,7 @@ import { NextResponse } from "next/server";
 
 import { isSupabaseHttpsUrl } from "@/lib/org-asset-url";
 import { ORG_ASSET_KEY_PREFIX, signOrgAssetGetUrl } from "@/lib/r2";
+import { createSupabaseServerClient } from "@/lib/supabase/server";
 import { createSupabaseServiceClient } from "@/lib/supabase/service";
 
 type Params = { params: Promise<{ slug: string; kind: string }> };
@@ -14,7 +15,19 @@ const VALID_KINDS = new Set(["banner", "logo"]);
  * to a stable public path (e.g. `/api/orgs/sae/asset/banner`) without
  * needing to sign URLs everywhere they're rendered.
  *
- * No auth required — org banners and logos are part of the public profile.
+ * No auth required for a visible org — banners and logos are part of the
+ * public profile.
+ *
+ * HIDDEN ORGS ARE THE EXCEPTION (critic B6). This route reads with the
+ * service role, so RLS never saw it and a hidden org kept serving its logo
+ * and banner to anyone who knew the handle — the one surface left that could
+ * confirm a hidden org exists, and the reason the four test orgs' handles had
+ * to be renamed at all. It now costs an auth round trip ONLY when the org is
+ * actually hidden, so the common path is unchanged, and members still get
+ * their assets: a hidden org keeps its page for the people already in it
+ * (spec §3.4), and a page with a missing logo would look broken rather than
+ * hidden. Platform admins see them too, because /admin renders the logo of
+ * every org it lists, hidden ones included.
  *
  * Falls back to passing through any non-R2 stored value (legacy http(s) URL
  * direct-set) for forward compatibility.
@@ -29,11 +42,20 @@ export async function GET(_req: Request, { params }: Params) {
   const column = kind === "banner" ? "banner_url" : "logo_url";
   const { data: org } = await service
     .from("orgs")
-    .select(`id, ${column}`)
+    .select(`id, hidden_at, ${column}`)
     .eq("handle", slug)
     .maybeSingle();
   if (!org) {
     return NextResponse.json({ ok: false, error: "Not found" }, { status: 404 });
+  }
+
+  if ((org as { hidden_at?: string | null }).hidden_at) {
+    const allowed = await viewerMaySeeHiddenOrg(service, org.id as string);
+    if (!allowed) {
+      // The same answer a handle that was never registered gets: an asset 404
+      // that differed from a missing-org 404 would itself be the leak.
+      return NextResponse.json({ ok: false, error: "Not found" }, { status: 404 });
+    }
   }
 
   const stored = (org as Record<string, unknown>)[column] as string | null;
@@ -66,4 +88,48 @@ export async function GET(_req: Request, { params }: Params) {
   }
 
   return NextResponse.json({ ok: false, error: "Unrecognized asset" }, { status: 404 });
+}
+
+/**
+ * May the person making this request see a HIDDEN org's assets? True for its
+ * members and for platform admins; false for everyone else, including
+ * signed-out callers.
+ *
+ * Only ever called when the org is hidden, so an ordinary logo request still
+ * costs exactly one query. Fails CLOSED on any error — the whole point of
+ * hidden is that a bad day for the database does not put the org back on the
+ * internet.
+ */
+async function viewerMaySeeHiddenOrg(
+  service: ReturnType<typeof createSupabaseServiceClient>,
+  orgId: string,
+): Promise<boolean> {
+  try {
+    const supabase = await createSupabaseServerClient();
+    const { data: { user } } = await supabase.auth.getUser();
+    if (!user) return false;
+
+    const [memberRes, viewerRes] = await Promise.all([
+      service
+        .from("org_members")
+        .select("user_id")
+        .eq("org_id", orgId)
+        .eq("user_id", user.id)
+        .maybeSingle(),
+      service
+        .from("users")
+        .select("is_platform_admin")
+        .eq("id", user.id)
+        .maybeSingle(),
+    ]);
+    if (memberRes.error || viewerRes.error) {
+      console.error("[orgs/[slug]/asset hidden check]", memberRes.error ?? viewerRes.error);
+      return false;
+    }
+    if (memberRes.data) return true;
+    return (viewerRes.data as { is_platform_admin?: unknown } | null)?.is_platform_admin === true;
+  } catch (e) {
+    console.error("[orgs/[slug]/asset hidden check]", e);
+    return false;
+  }
 }
