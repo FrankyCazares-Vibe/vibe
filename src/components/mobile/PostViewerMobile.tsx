@@ -5,10 +5,12 @@ import { useEffect, useRef, useState } from "react";
 import { Drawer } from "vaul";
 
 import { asLoadFailure, LoadFailed, type LoadFailure } from "@/components/feedback/LoadFailed";
+import { EditPostSheet } from "@/components/mobile/EditPostSheet";
 import { PostAudienceSheet } from "@/components/mobile/PostAudienceSheet";
 import { SharePostSheet } from "@/components/mobile/SharePostSheet";
 import type { PostAudienceKind } from "@/components/posts/PostAudienceList";
 import { copyText, vibeRequest } from "@/lib/feedback/request";
+import { EDITED_LABEL, type EditedPost } from "@/lib/posts/edit";
 
 /**
  * iOS-native mobile post viewer. Opens as a full-screen sheet from the
@@ -29,6 +31,13 @@ import { copyText, vibeRequest } from "@/lib/feedback/request";
  *   - Comments drawer: collapsed by default; expand to render a flat
  *     list of comments + a sticky composer at the bottom. Replies are
  *     flattened into the same list (v1 — no nesting).
+ *   - Owner ⋯ menu: Send to chats, Copy link, Edit post (EditPostSheet,
+ *     plan §8 E2; shown only when the server says `is_owner`), Delete
+ *     post. A saved edit patches the body, the #tag chips and the
+ *     " · Edited" marker here, then tells the caller through `onEdited`.
+ *     Until wave 4 wires `onEdited` into CampusMobile and ProfileMobile,
+ *     the card underneath keeps its old text until the next load (critic
+ *     W3 L9).
  *
  * Hit the single-post endpoint /api/posts/[id] on mount so we get the
  * server-side counts + viewer state in one roundtrip; rolls back
@@ -56,6 +65,9 @@ type PostDetail = {
    *  proxy path, so it can't tell an image from a video. */
   media_kind?: "video" | "image" | null;
   created_at: string;
+  /** Set when a published post's text was edited (stamped by the database);
+   *  null or absent = never edited. Drives the " · Edited" marker. */
+  edited_at?: string | null;
   author: Author | null;
 };
 
@@ -95,6 +107,7 @@ export function PostViewerMobile({
   onClose,
   canDelete = false,
   onDeleted,
+  onEdited,
 }: {
   postId: string;
   onClose: () => void;
@@ -104,6 +117,10 @@ export function PostViewerMobile({
   /** Fired after a successful delete; viewer auto-closes. Parent
    *  typically uses this to refresh its post grid. */
   onDeleted?: () => void;
+  /** Fired after a saved edit, with the post's new text, tags and
+   *  `edited_at`. The viewer has already updated itself; the caller patches
+   *  its own list in place. No caller passes it yet (wave 4: CM, PM). */
+  onEdited?: (p: EditedPost) => void;
 }) {
   const [post, setPost] = useState<PostDetail | null>(null);
   const [counts, setCounts] = useState<Counts>({
@@ -137,6 +154,7 @@ export function PostViewerMobile({
   const [menuOpen, setMenuOpen] = useState(false);
   const [deleting, setDeleting] = useState(false);
   const [shareOpen, setShareOpen] = useState(false);
+  const [editOpen, setEditOpen] = useState(false);
   // Whether the latest pointerdown landed on the app toast; the drawer's
   // onPointerDownOutside reads it (see the effect below).
   const toastTapRef = useRef(false);
@@ -522,7 +540,9 @@ export function PostViewerMobile({
                 }}
               >
                 {author.handle ? `@${author.handle}` : ""}
-                {post?.created_at ? `${author.handle ? " · " : ""}${relTime(post.created_at)}` : ""}
+                {post?.created_at
+                  ? `${author.handle ? " · " : ""}${relTime(post.created_at)}${post.edited_at ? ` · ${EDITED_LABEL}` : ""}`
+                  : ""}
               </div>
             </div>
           </Link>
@@ -630,6 +650,19 @@ export function PostViewerMobile({
                         failure: "Couldn't report this post.",
                         success: "Reported. Thanks for letting us know.",
                       });
+                    }}
+                  />
+                ) : null}
+                {/* The server's `is_owner` only, never `canDelete`: ProfileMobile
+                    passes canDelete on your own profile, where the Saved and
+                    Reposts tabs open OTHER people's posts in this viewer. */}
+                {isOwner ? (
+                  <ViewerMenuItem
+                    label="Edit post"
+                    disabled={!post}
+                    onClick={() => {
+                      setMenuOpen(false);
+                      setEditOpen(true);
                     }}
                   />
                 ) : null}
@@ -972,6 +1005,28 @@ export function PostViewerMobile({
           // iOS Safari only. See the Nesting note in SharePostSheet.
           nested
           onClose={() => setShareOpen(false)}
+        />
+      ) : null}
+
+      {/* Edit post, author only (the menu item keys on `is_owner`). Mounted
+          only while open, `nested` for the same vaul body-lock reason as the
+          share sheet. The PATCH route re-checks ownership (and club officer
+          role). */}
+      {editOpen && post ? (
+        <EditPostSheet
+          nested
+          postId={postId}
+          initialContent={post.content ?? ""}
+          hasMedia={!!post.media_url}
+          onClose={() => setEditOpen(false)}
+          onSaved={(p) => {
+            setPost((prev) =>
+              prev
+                ? { ...prev, content: p.content, tags: p.tags, edited_at: p.edited_at }
+                : prev,
+            );
+            onEdited?.(p);
+          }}
         />
       ) : null}
 
