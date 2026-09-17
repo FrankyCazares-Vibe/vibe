@@ -3,7 +3,15 @@
 import { motion } from "framer-motion";
 import Link from "next/link";
 import { useSearchParams } from "next/navigation";
-import { Fragment, useCallback, useEffect, useMemo, useRef, useState } from "react";
+import {
+  Fragment,
+  useCallback,
+  useEffect,
+  useMemo,
+  useRef,
+  useState,
+  useSyncExternalStore,
+} from "react";
 import { createPortal } from "react-dom";
 
 import { CampusAppShell } from "@/components/campus-app-shell";
@@ -24,7 +32,23 @@ import {
 } from "@/lib/composer/helpers";
 import { copyText, vibeRequest } from "@/lib/feedback/request";
 import { toast } from "@/lib/feedback/toast";
-import { IU_SCHOOLS, schoolForMajor } from "@/lib/iu/majors";
+import {
+  allowedCampusId,
+  type Campus,
+  campusRowById,
+  isSchoolSystem,
+  isSharedCampus,
+  type SchoolSystem,
+} from "@/lib/iu/campuses";
+import { IU_SCHOOLS, schoolForMajorIn } from "@/lib/iu/majors";
+import { PURDUE_INDIANAPOLIS_SCHOOLS } from "@/lib/iu/majors-purdue-indianapolis";
+import {
+  checkPostEdit,
+  EDITED_LABEL,
+  type EditedPost,
+  editedPostFrom,
+  POST_MAX_CHARS,
+} from "@/lib/posts/edit";
 
 declare global {
   interface Window {
@@ -287,13 +311,14 @@ const TABS: { key: CampusTab; label: string }[] = [
   { key: "map", label: "Campus Map" },
 ];
 
-// Static identity for the campus banner header. The "on Vibe" + "active
-// now" stats line is now derived live from /api/stats/campus — no
-// hardcoded student count or fake on-Vibe count anymore.
-const SCHOOL = {
-  initials: "IU",
-  name: "Indiana University",
-};
+// The campus banner's identity (title, monogram, colour) comes from the
+// viewer's own campus via `useViewerCampus` (next to `CampusBanner`), and its
+// stats line from /api/stats/campus. There is no hardcoded school anymore.
+
+/** A scene eyebrow: "Feed · Indianapolis", or just "Feed" with no campus. */
+function campusEyebrow(tab: string, label: string | null): string {
+  return label ? `${tab} · ${label}` : tab;
+}
 
 export function CampusHome({
   showSchoolVerifiedBanner,
@@ -381,7 +406,8 @@ export function CampusHome({
   // Campus tour: triggered by `?welcome=1` (post-onboarding) or by a
   // `vibe_tour_pending=campus` localStorage flag (handed off from the
   // profile leg; survives redirects that strip the URL param). Walks the
-  // user through feed, tabs, and search, then hands off to /network.
+  // user through feed, tabs, and search, and ends here on /campus with
+  // "Got it" (no hand-off to /network; the phone tour ends the same way).
   useEffect(() => {
     // Desktop-only tour. The mobile equivalent lives in `useMobileTour`
     // and targets the mobile-specific element IDs in `CampusMobile`. If
@@ -404,8 +430,24 @@ export function CampusHome({
       return;
     }
     let cancelled = false;
-    loadOttoTourScript().then(() => {
+    // The feed bubble names the viewer's campus. Wait for it (the banner
+    // shares this cached request) but never longer than 1.5 s; `label` is
+    // deliberately NOT an effect dep, so an already-started tour never
+    // starts twice.
+    Promise.all([
+      loadOttoTourScript(),
+      Promise.race([
+        viewerCampusPromise(),
+        new Promise<null>((resolve) => window.setTimeout(() => resolve(null), 1500)),
+      ]),
+    ]).then(([, viewer]) => {
       if (cancelled) return;
+      // From the fixed campus table (never the URL or a server string), so
+      // it's safe inside the tour bubble's HTML.
+      const campusName = viewer?.campus?.shortName ?? null;
+      const feedBody = campusName
+        ? `What students at ${campusName} are posting. People and clubs you follow rise to the top.`
+        : "What students on your campus are posting. People and clubs you follow rise to the top.";
       window.OttoTour?.start(
         [
           {
@@ -420,7 +462,7 @@ export function CampusHome({
           {
             selector: "#campus-feed",
             title: "Your campus <span class=\"accent\">pulse</span>.",
-            body: "Live posts from your school. Otto surfaces what's loud and what's just dropped.",
+            body: feedBody,
           },
           {
             selector: "#campus-tabs",
@@ -431,17 +473,17 @@ export function CampusHome({
             selector: "#campus-search",
             title: "Find your <span class=\"accent\">people</span>.",
             body: "Search students, clubs, or events. Otto threads the right matches in.",
-            endLabel: "Take me to network →",
+            endLabel: "Got it",
           },
         ],
         {
+          // The tour ends where it is: seen, nothing pending, no redirect.
           onDone: () => {
             try {
               localStorage.setItem(seenKey, "1");
-              localStorage.setItem("vibe_tour_pending", "network");
+              localStorage.removeItem("vibe_tour_pending");
             } catch {}
             stripWelcomeParam();
-            window.location.href = "/network?welcome=1";
           },
           onSkip: () => {
             try {
@@ -452,6 +494,8 @@ export function CampusHome({
           },
         },
       );
+    }).catch(() => {
+      /* the tour script didn't load; the page works without it */
     });
     return () => {
       cancelled = true;
@@ -656,6 +700,11 @@ export function CampusHome({
 
   const showThreeColumn = tab === "chat" && !isEmpty && !isLoading;
   const scene = getTabScene(tab);
+  // A verified student with no campus yet gets the "Pick your campus" strip
+  // under the banner (never inside it: the phone shares the banner).
+  const viewerCampus = useViewerCampus();
+  const needsCampusPick =
+    viewerCampus.ready && viewerCampus.system !== null && viewerCampus.campusId === null;
 
   return (
     <CampusAppShell>
@@ -679,6 +728,7 @@ export function CampusHome({
         }}
       >
         <CampusBanner />
+        {needsCampusPick ? <PickCampusStrip /> : null}
         <CampusTabs active={tab} onChange={setTab} />
 
         {orgsLoadErr && tab === "chat" ? (
@@ -3322,6 +3372,282 @@ const SHEEN_KEYFRAMES = `
   }
 `;
 
+/**
+ * The viewer's own campus, for the banner, the scene eyebrows, the tour and
+ * the map. Read from `GET /api/campuses` (the student's verified university
+ * and saved campus), then looked up in the fixed campus table, so every name
+ * here comes from `src/lib/iu/campuses.ts`, never from a request.
+ *
+ * `label` is the campus's full name ("Indianapolis", "IU Bloomington",
+ * "Purdue West Lafayette"): never "IU", "IUI", "PUI" or a mascot. A failed
+ * read, or no campus, is `label: null`, and callers drop the campus from their
+ * copy instead of guessing one. `ready` is false only until the first answer.
+ */
+export type ViewerCampus = {
+  system: SchoolSystem | null;
+  campusId: string | null;
+  campus: Campus | null;
+  label: string | null;
+  ready: boolean;
+};
+
+const VIEWER_CAMPUS_LOADING: ViewerCampus = {
+  system: null,
+  campusId: null,
+  campus: null,
+  label: null,
+  ready: false,
+};
+const VIEWER_CAMPUS_UNKNOWN: ViewerCampus = { ...VIEWER_CAMPUS_LOADING, ready: true };
+
+// One request per page, shared by every consumer. It goes stale on purpose:
+// after 30 s, when the last consumer unmounts (so a campus picked in
+// Settings shows on the next client-side visit to /campus), and on a
+// back-forward restore or a return to the tab (via the TTL).
+const VIEWER_CAMPUS_TTL_MS = 30_000;
+let viewerCampusCache: { at: number; promise: Promise<ViewerCampus> } | null = null;
+let viewerCampusConsumers = 0;
+// The last answer every consumer paints (stale-while-revalidate), so a tab
+// body or a return to /campus shows the campus at once instead of blanking
+// while it re-reads. Kept across a full unmount only when it names a campus:
+// a "no campus" or failed answer is exactly what Settings changes, so a later
+// visit waits for a fresh read rather than flashing the Pick-campus strip.
+let viewerCampusLast: ViewerCampus | null = null;
+let viewerCampusLoadSeq = 0;
+const viewerCampusListeners = new Set<() => void>();
+
+function viewerCampusFrom(raw: unknown): ViewerCampus {
+  if (!raw || typeof raw !== "object") return VIEWER_CAMPUS_UNKNOWN;
+  const j = raw as { system?: unknown; currentCampusId?: unknown };
+  const system = isSchoolSystem(j.system) ? j.system : null;
+  // Only a campus the student's own university may call home.
+  const campus = campusRowById(allowedCampusId(j.currentCampusId, system));
+  return {
+    system,
+    campusId: campus?.id ?? null,
+    campus,
+    label: campus?.name ?? null,
+    ready: true,
+  };
+}
+
+/**
+ * The shared request behind {@link useViewerCampus}. The desktop tour awaits
+ * it directly (with its own timeout) so its feed bubble can name the campus.
+ * Never rejects: any failure resolves to "no campus".
+ */
+export function viewerCampusPromise(): Promise<ViewerCampus> {
+  if (typeof window === "undefined") return Promise.resolve(VIEWER_CAMPUS_UNKNOWN);
+  const now = Date.now();
+  if (viewerCampusCache && now - viewerCampusCache.at < VIEWER_CAMPUS_TTL_MS) {
+    return viewerCampusCache.promise;
+  }
+  const promise = vibeRequest<Record<string, unknown>>("/api/campuses", {
+    cache: "no-store",
+    credentials: "include",
+    quiet: true,
+    failure: "Couldn't load your campus.",
+  }).then(
+    (r) => (r.ok ? viewerCampusFrom(r.data) : VIEWER_CAMPUS_UNKNOWN),
+    () => VIEWER_CAMPUS_UNKNOWN,
+  );
+  viewerCampusCache = { at: now, promise };
+  return promise;
+}
+
+function sameViewerCampus(a: ViewerCampus, b: ViewerCampus): boolean {
+  return a.ready === b.ready && a.system === b.system && a.campusId === b.campusId;
+}
+
+/**
+ * Re-read (or reuse, inside the TTL) and publish to every consumer. Only the
+ * newest load publishes, so an older request can't land over a newer one; an
+ * unchanged answer keeps its object, so nothing re-renders or regroups; and a
+ * failed re-read never replaces an answer we already have.
+ */
+function loadViewerCampus(): void {
+  const seq = ++viewerCampusLoadSeq;
+  void viewerCampusPromise().then((next) => {
+    if (seq !== viewerCampusLoadSeq) return;
+    const prev = viewerCampusLast;
+    if (prev && sameViewerCampus(prev, next)) return;
+    if (prev && next === VIEWER_CAMPUS_UNKNOWN) return;
+    viewerCampusLast = next;
+    viewerCampusListeners.forEach((notify) => notify());
+  });
+}
+
+// One pair of window listeners for the whole page, not one per consumer.
+// Back-forward restore: drop the cached answer and re-read once. Coming back
+// to the tab: re-read once the cached answer is past its TTL.
+function onViewerCampusPageShow(e: PageTransitionEvent): void {
+  if (e.persisted) viewerCampusCache = null;
+  loadViewerCampus();
+}
+function onViewerCampusVisible(): void {
+  if (document.visibilityState === "visible") loadViewerCampus();
+}
+
+function subscribeViewerCampus(notify: () => void): () => void {
+  viewerCampusListeners.add(notify);
+  viewerCampusConsumers += 1;
+  if (viewerCampusConsumers === 1) {
+    window.addEventListener("pageshow", onViewerCampusPageShow);
+    document.addEventListener("visibilitychange", onViewerCampusVisible);
+    // First consumer of this visit: always re-read (the cache was dropped
+    // when the last one left), painting the kept answer meanwhile.
+    loadViewerCampus();
+  }
+  return () => {
+    viewerCampusListeners.delete(notify);
+    viewerCampusConsumers = Math.max(0, viewerCampusConsumers - 1);
+    if (viewerCampusConsumers > 0) return;
+    window.removeEventListener("pageshow", onViewerCampusPageShow);
+    document.removeEventListener("visibilitychange", onViewerCampusVisible);
+    viewerCampusCache = null;
+    // A read still in flight belongs to the visit that just ended; the next
+    // visit re-reads, so it must not land (a late "no campus" would be kept).
+    viewerCampusLoadSeq += 1;
+    if (!viewerCampusLast?.campus) viewerCampusLast = null;
+  };
+}
+
+function viewerCampusSnapshot(): ViewerCampus {
+  return viewerCampusLast ?? VIEWER_CAMPUS_LOADING;
+}
+
+// The server render and the hydrating render both paint "loading"; React
+// then switches to the kept answer, so there is no hydration mismatch.
+function viewerCampusServerSnapshot(): ViewerCampus {
+  return VIEWER_CAMPUS_LOADING;
+}
+
+export function useViewerCampus(): ViewerCampus {
+  return useSyncExternalStore(
+    subscribeViewerCampus,
+    viewerCampusSnapshot,
+    viewerCampusServerSnapshot,
+  );
+}
+
+/** Two letters for the banner tile: "IN", "BL"; "WL" for two words. */
+function campusMonogram(shortName: string | null | undefined): string {
+  const words = (shortName ?? "").trim().split(/\s+/).filter(Boolean);
+  if (words.length === 0) return "V";
+  if (words.length === 1) return words[0].slice(0, 2).toUpperCase();
+  return words
+    .slice(0, 2)
+    .map((w) => w[0])
+    .join("")
+    .toUpperCase();
+}
+
+type BannerPalette = {
+  background: string;
+  border: string;
+  shadow: string;
+  tileBg: string;
+  tileInk: string;
+};
+
+/**
+ * Plan Q15: IU crimson only for an IU-only campus, black and gold for a
+ * Purdue-only campus, and neutral Vibe ink for a shared campus (Indianapolis
+ * is one community for both) or no campus at all.
+ */
+function bannerPalette(campus: Campus | null): BannerPalette {
+  const only = campus && campus.systems.length === 1 ? campus.systems[0] : null;
+  if (only === "iu") {
+    return {
+      background: "linear-gradient(135deg, #8B0E18 0%, #6A0A12 50%, #3F050B 100%)",
+      border: "1px solid rgba(255,255,255,0.12)",
+      shadow: "0 8px 24px rgba(80,5,15,0.25)",
+      tileBg: "rgba(255,255,255,0.95)",
+      tileInk: "#7A0E0E",
+    };
+  }
+  if (only === "purdue") {
+    return {
+      background: "linear-gradient(135deg, #2A2A2A 0%, #141414 50%, #000000 100%)",
+      border: "1px solid rgba(207,185,145,0.45)",
+      shadow: "0 8px 24px rgba(0,0,0,0.3)",
+      tileBg: "#CFB991",
+      tileInk: "#000000",
+    };
+  }
+  return {
+    background: "linear-gradient(135deg, #2E2E32 0%, #1C1C1E 50%, #0E0E10 100%)",
+    border: "1px solid rgba(255,255,255,0.12)",
+    shadow: "0 8px 24px rgba(0,0,0,0.22)",
+    tileBg: "rgba(255,255,255,0.95)",
+    tileInk: "#1C1C1E",
+  };
+}
+
+type BannerStats = {
+  totalUsers: number;
+  activeNow: number;
+  campusUsers: number | null;
+  campusActiveNow: number | null;
+  /** The campus the stats route counted (null when it counted none). */
+  campusId: string | null;
+};
+
+/**
+ * "{n} at Indianapolis · {m} active now", or "{total} on Vibe · …" with no
+ * campus. The two answers come from different requests on different clocks
+ * (a campus switched on another device shows up in the 30 s stats poll before
+ * the campus re-read), so the campus count is only printed under the name of
+ * the campus it actually counted.
+ */
+function bannerStatsLine(
+  stats: BannerStats | null,
+  label: string | null,
+  campusId: string | null,
+): string {
+  if (!stats) return "";
+  if (label && campusId && stats.campusId === campusId && stats.campusUsers !== null) {
+    const active = stats.campusActiveNow ?? 0;
+    return `${stats.campusUsers.toLocaleString()} at ${label} · ${active.toLocaleString()} active now`;
+  }
+  return `${stats.totalUsers.toLocaleString()} on Vibe · ${stats.activeNow.toLocaleString()} active now`;
+}
+
+function countOrNull(v: unknown): number | null {
+  return typeof v === "number" && Number.isFinite(v) ? v : null;
+}
+
+/** Under the banner on /campus for a verified student with no campus yet. */
+function PickCampusStrip() {
+  return (
+    <div
+      role="status"
+      style={{
+        display: "flex",
+        alignItems: "center",
+        justifyContent: "center",
+        flexWrap: "wrap",
+        gap: "4px 12px",
+        padding: "8px 24px",
+        background: "#FFF1E8",
+        borderBottom: "1px solid rgba(255,92,53,0.25)",
+        fontFamily: "DM Sans, sans-serif",
+        fontSize: 13,
+        lineHeight: 1.4,
+        color: "#1C1C1E",
+      }}
+    >
+      <span>Pick your campus to see its clubs, events and map.</span>
+      <Link
+        href="/settings#campus"
+        style={{ color: "#C84A20", fontWeight: 700, textDecoration: "none" }}
+      >
+        Pick campus →
+      </Link>
+    </div>
+  );
+}
+
 export function CampusBanner({
   compactSearch = false,
   onSearchTap,
@@ -3331,13 +3657,26 @@ export function CampusBanner({
   compactSearch?: boolean;
   onSearchTap?: () => void;
 } = {}) {
+  // Whose campus this is: the title, the tile, the colour and the stats
+  // label all follow the viewer's own campus (plan Q15). Until the first
+  // answer the banner paints neutral and blank, so it never guesses a name;
+  // after that it keeps the last answer while it re-reads.
+  const viewer = useViewerCampus();
+  const { campus, label } = viewer;
+  const palette = bannerPalette(campus);
+  const title = viewer.ready ? (label ?? "Vibe") : "\u00A0";
+  const monogram = viewer.ready ? campusMonogram(campus?.shortName) : "";
+  const sharedSub =
+    campus && isSharedCampus(campus) ? "IU + Purdue · one community" : null;
+
   // Live stats for the campus header line. The heartbeat updates the
   // viewer's `users.last_active_at` so the active-now count includes
   // them; the stats endpoint counts everyone with a fresh timestamp
   // (5-minute window). Both refresh every 30s while the tab is visible.
-  const [stats, setStats] = useState<{ totalUsers: number; activeNow: number } | null>(
-    null,
-  );
+  // The campus numbers (`campusUsers` / `campusActiveNow`) are read when the
+  // viewer has a campus; with none, the line falls back to everyone on Vibe.
+  // No answer yet, or a failed first read, renders no line at all.
+  const [stats, setStats] = useState<BannerStats | null>(null);
   useEffect(() => {
     let cancelled = false;
     const beat = async () => {
@@ -3352,14 +3691,17 @@ export function CampusBanner({
         const r = await fetch("/api/stats/campus", { cache: "no-store" });
         const j = await r.json();
         if (cancelled) return;
-        if (j?.ok) {
+        if (r.ok && j?.ok) {
           setStats({
-            totalUsers: typeof j.totalUsers === "number" ? j.totalUsers : 0,
-            activeNow: typeof j.activeNow === "number" ? j.activeNow : 0,
+            totalUsers: countOrNull(j.totalUsers) ?? 0,
+            activeNow: countOrNull(j.activeNow) ?? 0,
+            campusUsers: countOrNull(j.campusUsers),
+            campusActiveNow: countOrNull(j.campusActiveNow),
+            campusId: typeof j.campusId === "string" ? j.campusId : null,
           });
         }
       } catch {
-        /* keep prior value on error */
+        /* keep the last good line; never "loading…" */
       }
     };
     void (async () => {
@@ -3376,12 +3718,22 @@ export function CampusBanner({
       window.clearInterval(tick);
     };
   }, []);
-  const onVibeLabel = stats
-    ? `${stats.totalUsers.toLocaleString()} on Vibe`
-    : "loading…";
-  const activeLabel = stats
-    ? `${stats.activeNow.toLocaleString()} active now`
-    : "";
+  const statsLine = viewer.ready ? bannerStatsLine(stats, label, viewer.campusId) : "";
+
+  const ellipsis: React.CSSProperties = {
+    minWidth: 0,
+    overflow: "hidden",
+    textOverflow: "ellipsis",
+    whiteSpace: "nowrap",
+  };
+  const subStyle: React.CSSProperties = {
+    ...ellipsis,
+    fontFamily: "DM Sans, sans-serif",
+    fontSize: 11,
+    fontWeight: 600,
+    color: "rgba(255,255,255,0.62)",
+    lineHeight: 1.2,
+  };
 
   return (
     <header
@@ -3393,24 +3745,25 @@ export function CampusBanner({
         alignItems: "center",
         gap: 14,
         padding: "0 24px",
-        // Solid IU crimson — reads identical on every tab regardless of backdrop
-        background:
-          "linear-gradient(135deg, #8B0E18 0%, #6A0A12 50%, #3F050B 100%)",
-        borderBottom: "1px solid rgba(255,255,255,0.12)",
+        // Solid campus colour — reads identical on every tab regardless of backdrop
+        background: palette.background,
+        borderBottom: palette.border,
         boxShadow: [
           "inset 0 1px 0 rgba(255,255,255,0.16)",
-          "0 8px 24px rgba(80,5,15,0.25)",
+          palette.shadow,
         ].join(", "),
         overflow: "hidden",
       }}
     >
       <div
+        aria-hidden
         style={{
           width: 44,
           height: 44,
+          flexShrink: 0,
           borderRadius: 12,
-          background: "rgba(255,255,255,0.95)",
-          color: "#7A0E0E",
+          background: palette.tileBg,
+          color: palette.tileInk,
           display: "flex",
           alignItems: "center",
           justifyContent: "center",
@@ -3421,32 +3774,40 @@ export function CampusBanner({
           boxShadow: "0 4px 12px rgba(0,0,0,0.2)",
         }}
       >
-        {SCHOOL.initials}
+        {monogram}
       </div>
       <div style={{ display: "flex", flexDirection: "column", gap: 1, minWidth: 0 }}>
-        <div
-          style={{
-            fontFamily: "Fraunces, serif",
-            fontWeight: 800,
-            fontSize: 18,
-            color: "#fff",
-            letterSpacing: "-0.01em",
-            lineHeight: 1.1,
-          }}
-        >
-          {SCHOOL.name}
+        <div style={{ display: "flex", alignItems: "baseline", gap: 8, minWidth: 0 }}>
+          <div
+            style={{
+              ...ellipsis,
+              fontFamily: "Fraunces, serif",
+              fontWeight: 800,
+              fontSize: 18,
+              color: "#fff",
+              letterSpacing: "-0.01em",
+              lineHeight: 1.1,
+            }}
+          >
+            {title}
+          </div>
+          {sharedSub && !compactSearch ? <div style={subStyle}>{sharedSub}</div> : null}
         </div>
-        <div
-          style={{
-            fontFamily: "DM Sans, sans-serif",
-            fontSize: 12,
-            color: "rgba(255,255,255,0.7)",
-            lineHeight: 1.2,
-          }}
-        >
-          {onVibeLabel}
-          {activeLabel ? ` · ${activeLabel}` : ""}
-        </div>
+        {/* The phone banner is narrow: the shared-campus line gets its own row. */}
+        {sharedSub && compactSearch ? <div style={subStyle}>{sharedSub}</div> : null}
+        {statsLine ? (
+          <div
+            style={{
+              ...ellipsis,
+              fontFamily: "DM Sans, sans-serif",
+              fontSize: 12,
+              color: "rgba(255,255,255,0.7)",
+              lineHeight: 1.2,
+            }}
+          >
+            {statsLine}
+          </div>
+        ) : null}
       </div>
       <div style={{ flex: 1 }} />
       {/* Phone-only quick-access to /messages — Instagram's DM-in-header
@@ -4339,6 +4700,8 @@ export type FeedPost = {
   /** Total count of friends who reposted (≥ friend_reposters.length). */
   friend_reposter_count?: number;
   created_at: string;
+  /** Set when the author edited the post after publishing (" · Edited"). */
+  edited_at?: string | null;
   author: FeedAuthor | null;
   org: FeedOrg;
 };
@@ -4389,9 +4752,27 @@ function FeedTabBody({
   const [loadErr, setLoadErr] = useState<LoadFailure | null>(null);
   const [loadKey, setLoadKey] = useState(0);
 
+  const { label: campusLabel } = useViewerCampus();
+
   const feedUrl = tagFilter
     ? `/api/feed?limit=50&tag=${encodeURIComponent(tagFilter)}`
     : "/api/feed?limit=50";
+
+  // A saved edit patches every row showing that post (the post itself and
+  // any repost of it) in place, with no refetch.
+  const applyPostEdit = useCallback(
+    (p: EditedPost) =>
+      setEntries((prev) =>
+        prev
+          ? prev.map((e) =>
+              e.post.id === p.id
+                ? { ...e, post: { ...e.post, content: p.content, tags: p.tags, edited_at: p.edited_at } }
+                : e,
+            )
+          : prev,
+      ),
+    [],
+  );
 
   // After a post or a row change. The student started it, so a refusal
   // toasts (vibeRequest's, or ours for a bad body) and the feed stays put.
@@ -4520,7 +4901,7 @@ function FeedTabBody({
         >
           <div style={{ flex: "0 1 360px", minWidth: 240, maxWidth: 480 }}>
             <SceneHeader
-              eyebrow="Feed · IU"
+              eyebrow={campusEyebrow("Feed", campusLabel)}
               title="What’s on campus today"
               subtitle="Posts from clubs, orgs, and your network."
               tone="dark"
@@ -4610,6 +4991,7 @@ function FeedTabBody({
               entry={entry}
               hairline={idx < entries.length - 1 ? hairline : "none"}
               onMutate={refresh}
+              onEdited={applyPostEdit}
               onPickTag={onPickTag}
               viewerId={viewerId}
             />
@@ -5137,12 +5519,15 @@ function FeedRow({
   entry,
   hairline,
   onMutate,
+  onEdited,
   onPickTag,
   viewerId,
 }: {
   entry: FeedEntry;
   hairline: string;
   onMutate: () => void;
+  /** A saved edit; the feed patches its own rows with it. */
+  onEdited: (p: EditedPost) => void;
   onPickTag: (tag: string) => void;
   viewerId: string | null;
 }) {
@@ -5201,6 +5586,71 @@ function FeedRow({
   const [showViewers, setShowViewers] = useState(false);
   const closeViewers = useCallback(() => setShowViewers(false), []);
   const [deleting, setDeleting] = useState(false);
+  // Owner-only inline editor ("Edit post" in the ⋯ menu). Only the words
+  // change: the server keeps the photo or video and re-derives the #tags.
+  // On a repost row this edits the ORIGINAL (and only when the viewer wrote
+  // it); a repost's quote isn't editable.
+  const [editing, setEditing] = useState(false);
+  const [editDraft, setEditDraft] = useState("");
+  const [savingEdit, setSavingEdit] = useState(false);
+  const editTextareaRef = useRef<HTMLTextAreaElement | null>(null);
+  const postHasMedia = !!post.media_url;
+  const editCheck = checkPostEdit(editDraft, postHasMedia);
+  // Same dirty rule as the phone sheet (E2) and the desktop viewer (E6).
+  const editDirty = editDraft.trim() !== (post.content ?? "").trim();
+  const canSaveEdit = editing && editDirty && editCheck.ok && !savingEdit;
+
+  const cancelEdit = useCallback(() => {
+    if (savingEdit) return;
+    if (
+      editDirty &&
+      typeof window !== "undefined" &&
+      !window.confirm("Discard your changes?")
+    ) {
+      return;
+    }
+    setEditing(false);
+    setEditDraft("");
+  }, [editDirty, savingEdit]);
+
+  const saveEdit = useCallback(async () => {
+    if (!canSaveEdit) return;
+    setSavingEdit(true);
+    // Never `tags` or `status`: the route derives tags from the text.
+    const r = await vibeRequest<{ post?: unknown }>(`/api/posts/${post.id}`, {
+      method: "PATCH",
+      json: { content: editDraft },
+      failure: "Couldn't save your changes.",
+    });
+    setSavingEdit(false);
+    // A refusal already toasted (with Review Terms / Sign in where it
+    // applies); the editor stays open with the draft.
+    if (!r.ok) return;
+    const edited = editedPostFrom(r.data.post);
+    if (!edited) {
+      toast({ message: "Couldn't save your changes.", tone: "error" });
+      return;
+    }
+    onEdited(edited);
+    setEditing(false);
+    setEditDraft("");
+    toast({ message: "Post updated", tone: "info" });
+  }, [canSaveEdit, editDraft, onEdited, post.id]);
+
+  // The editor's textarea is new each time it opens: bind the @mention
+  // picker to it, put the caret after the text, and grow it to fit.
+  useEffect(() => {
+    const ta = editTextareaRef.current;
+    if (!editing || !ta) return;
+    bindMentionPicker(ta);
+    ta.setSelectionRange(ta.value.length, ta.value.length);
+  }, [editing]);
+  useEffect(() => {
+    const ta = editTextareaRef.current;
+    if (!editing || !ta) return;
+    ta.style.height = "auto";
+    ta.style.height = `${ta.scrollHeight}px`;
+  }, [editing, editDraft]);
 
   const onDeletePost = useCallback(async () => {
     if (deleting) return;
@@ -5472,25 +5922,47 @@ function FeedRow({
               </button>
             ) : null}
             {viewerOwnsPost ? (
-              <button
-                type="button"
-                role="menuitem"
-                onClick={onDeletePost}
-                disabled={deleting}
-                style={{
-                  ...feedRowMenuItemStyle("danger"),
-                  opacity: deleting ? 0.6 : 1,
-                  cursor: deleting ? "default" : "pointer",
-                }}
-                onMouseEnter={(e) => {
-                  if (!deleting) e.currentTarget.style.background = "#FAF7F2";
-                }}
-                onMouseLeave={(e) => {
-                  e.currentTarget.style.background = "transparent";
-                }}
-              >
-                {deleting ? "Deleting…" : "Delete post"}
-              </button>
+              <>
+                <button
+                  type="button"
+                  role="menuitem"
+                  onClick={() => {
+                    setShowMoreMenu(false);
+                    // Already open: keep the draft in progress.
+                    if (editing) return;
+                    setEditDraft(post.content ?? "");
+                    setEditing(true);
+                  }}
+                  style={feedRowMenuItemStyle()}
+                  onMouseEnter={(e) => {
+                    e.currentTarget.style.background = "#FAF7F2";
+                  }}
+                  onMouseLeave={(e) => {
+                    e.currentTarget.style.background = "transparent";
+                  }}
+                >
+                  Edit post
+                </button>
+                <button
+                  type="button"
+                  role="menuitem"
+                  onClick={onDeletePost}
+                  disabled={deleting}
+                  style={{
+                    ...feedRowMenuItemStyle("danger"),
+                    opacity: deleting ? 0.6 : 1,
+                    cursor: deleting ? "default" : "pointer",
+                  }}
+                  onMouseEnter={(e) => {
+                    if (!deleting) e.currentTarget.style.background = "#FAF7F2";
+                  }}
+                  onMouseLeave={(e) => {
+                    e.currentTarget.style.background = "transparent";
+                  }}
+                >
+                  {deleting ? "Deleting…" : "Delete post"}
+                </button>
+              </>
             ) : null}
           </div>
         ) : null}
@@ -5622,6 +6094,11 @@ function FeedRow({
           >
             {displayHandle ? "· " : ""}
             {relativeTime(post.created_at)}
+            {post.edited_at ? (
+              <span title={`Edited ${new Date(post.edited_at).toLocaleString()}`}>
+                {` · ${EDITED_LABEL}`}
+              </span>
+            ) : null}
           </span>
           {fromOrg && post.author?.handle ? (
             <Link
@@ -5637,7 +6114,112 @@ function FeedRow({
             </Link>
           ) : null}
         </div>
-        {post.content ? (
+        {editing ? (
+          <div style={{ display: "flex", flexDirection: "column", gap: 8 }}>
+            <textarea
+              ref={editTextareaRef}
+              autoFocus
+              aria-label="Edit post"
+              value={editDraft}
+              maxLength={POST_MAX_CHARS}
+              // Frozen while the save is in flight: success closes the
+              // editor with the saved text, so a keystroke now would vanish.
+              readOnly={savingEdit}
+              aria-busy={savingEdit || undefined}
+              onChange={(e) => setEditDraft(e.target.value)}
+              onKeyDown={(e) => {
+                // The @mention picker handles its own Escape / Enter first.
+                if (e.nativeEvent.defaultPrevented) return;
+                if (e.key === "Escape") {
+                  e.preventDefault();
+                  cancelEdit();
+                } else if (e.key === "Enter" && (e.metaKey || e.ctrlKey)) {
+                  e.preventDefault();
+                  void saveEdit();
+                }
+              }}
+              rows={3}
+              style={{
+                width: "100%",
+                boxSizing: "border-box",
+                resize: "none",
+                overflow: "hidden",
+                margin: 0,
+                padding: "10px 12px",
+                borderRadius: 12,
+                border: "1px solid rgba(28,28,30,0.12)",
+                background: "#fff",
+                color: COLORS.text,
+                fontFamily: "DM Sans, sans-serif",
+                fontSize: 15,
+                lineHeight: 1.45,
+                outline: "none",
+              }}
+            />
+            <div
+              style={{
+                display: "flex",
+                alignItems: "center",
+                gap: 12,
+                flexWrap: "wrap",
+                fontFamily: "DM Sans, sans-serif",
+                fontSize: 12,
+              }}
+            >
+              <div style={{ display: "flex", flexDirection: "column", gap: 2, minWidth: 0, flex: 1 }}>
+                <span style={{ color: COLORS.faint }}>
+                  {editDraft.length}/{POST_MAX_CHARS}
+                </span>
+                {postHasMedia ? (
+                  <span style={{ color: COLORS.muted }}>
+                    You can change the words. The photo or video stays.
+                  </span>
+                ) : !editDraft.trim() ? (
+                  <span style={{ color: "#C0392B" }}>Your post can&apos;t be empty.</span>
+                ) : null}
+              </div>
+              <button
+                type="button"
+                onClick={cancelEdit}
+                disabled={savingEdit}
+                style={{
+                  padding: "7px 14px",
+                  borderRadius: 999,
+                  border: "1px solid rgba(28,28,30,0.12)",
+                  background: "transparent",
+                  color: COLORS.text,
+                  fontFamily: "inherit",
+                  fontSize: 13,
+                  fontWeight: 600,
+                  cursor: savingEdit ? "default" : "pointer",
+                  opacity: savingEdit ? 0.6 : 1,
+                }}
+              >
+                Cancel
+              </button>
+              <button
+                type="button"
+                onClick={() => void saveEdit()}
+                disabled={!canSaveEdit}
+                aria-busy={savingEdit || undefined}
+                style={{
+                  padding: "7px 16px",
+                  borderRadius: 999,
+                  border: "none",
+                  background: "#1C1C1E",
+                  color: "#fff",
+                  fontFamily: "inherit",
+                  fontSize: 13,
+                  fontWeight: 700,
+                  cursor: canSaveEdit ? "pointer" : "default",
+                  opacity: canSaveEdit || savingEdit ? 1 : 0.45,
+                }}
+              >
+                {savingEdit ? "Saving…" : "Save"}
+              </button>
+            </div>
+          </div>
+        ) : post.content ? (
           <p
             onClick={(e) => {
               // Tapping the post body opens its comments — analog to
@@ -6945,6 +7527,7 @@ export type CampusEvent = {
 };
 
 function EventsTabBody() {
+  const { label: campusLabel } = useViewerCampus();
   const [events, setEvents] = useState<CampusEvent[] | null>(null);
   // First-load failure only; a failed refresh keeps the events on screen.
   const [loadErr, setLoadErr] = useState<LoadFailure | null>(null);
@@ -7025,7 +7608,7 @@ function EventsTabBody() {
     >
       <div style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-end", gap: 12 }}>
         <SceneHeader
-          eyebrow="Events · IU"
+          eyebrow={campusEyebrow("Events", campusLabel)}
           title="What's coming up"
           subtitle="RSVP early — events on campus, in space, and online."
           tone="dark"
@@ -8180,6 +8763,7 @@ function discoverJoinLabel(
 }
 
 function OrgsTabBody({ onCreateOrg }: { onCreateOrg: () => void }) {
+  const { label: campusLabel } = useViewerCampus();
   const [results, setResults] = useState<DiscoverOrg[] | null>(null);
   const [pending, setPending] = useState<Record<string, "joined" | "pending">>({});
   const [busy, setBusy] = useState<string | null>(null);
@@ -8294,9 +8878,9 @@ function OrgsTabBody({ onCreateOrg }: { onCreateOrg: () => void }) {
       }}
     >
       <SceneHeader
-        eyebrow="Organizations · IU"
+        eyebrow={campusEyebrow("Organizations", campusLabel)}
         title="Find your communities"
-        subtitle="Browse clubs and orgs at IU. Public ones you can join instantly, private ones you can request."
+        subtitle={campusLabel ? `Browse clubs and orgs at ${campusLabel}.` : "Browse clubs and orgs."}
         tone="dark"
       />
 
@@ -8414,7 +8998,11 @@ function OrgsTabBody({ onCreateOrg }: { onCreateOrg: () => void }) {
               {verifiedOrgs.length > 0 ? (
                 <DiscoverGroup
                   title="Verified"
-                  hint="Officially recognized orgs at IU."
+                  hint={
+                    campusLabel
+                      ? `Officially recognized clubs at ${campusLabel}.`
+                      : "Officially recognized clubs."
+                  }
                   orgs={verifiedOrgs}
                   pending={pending}
                   busy={busy}
@@ -9433,6 +10021,9 @@ type MapSummary = {
   ok: boolean;
   // Set by the server when users.school is empty; majors/orgs are [] in that case.
   reason?: "no_school";
+  // The campus the map is for; schoolForMajorIn groups majors only on a
+  // campus with a school taxonomy (Indianapolis), everything else is "Other".
+  campus_id?: string | null;
   you: { id: string; name: string | null; handle: string | null; major: string | null; avatar_url: string | null };
   majors: MapMajor[];
   orgs: MapOrg[];
@@ -9451,6 +10042,10 @@ type ZoneSelection =
 // Taxonomy + lookup live in src/lib/iu/majors.ts so the profile editor
 // uses the same source of truth (a user picking "Computer Science"
 // there will always land in the Luddy halo here).
+//
+// Indianapolis is one campus for IU and Purdue students, so the map draws
+// both universities' schools: every halo, label and legend reads this list.
+const HALO_SCHOOLS = [...IU_SCHOOLS, ...PURDUE_INDIANAPOLIS_SCHOOLS];
 
 // Bubble size scaling — clear min/max, modest range so a tiny major
 // doesn't disappear and a huge one doesn't dwarf the rest.
@@ -9464,6 +10059,9 @@ function bubbleRadiusFor(total: number): number {
 // imported below.)
 
 export function MapTabBody() {
+  // The viewer's university decides which taxonomy wins for a major both
+  // Indianapolis universities teach (schoolForMajorIn).
+  const { label: campusLabel, system: viewerSystem } = useViewerCampus();
   const [data, setData] = useState<MapSummary | null>(null);
   // Set when the map fails to load; data stays null, never a fake summary.
   const [loadErr, setLoadErr] = useState<LoadFailure | null>(null);
@@ -9525,7 +10123,7 @@ export function MapTabBody() {
   //   1. Bucket majors by school.
   //   2. Estimate each school's cluster radius from the actual bubble
   //      sizes it contains.
-  //   3. Distribute active schools evenly around 360° (in IU_SCHOOLS
+  //   3. Distribute active schools evenly around 360° (in HALO_SCHOOLS
   //      order so thematic neighbors stay near each other).
   //   4. For each consecutive school pair, the anchor distance r must
   //      satisfy `2 r sin(wedge/2) ≥ clusterA + clusterB + padding`.
@@ -9550,14 +10148,14 @@ export function MapTabBody() {
 
     const grouped = new Map<string, MapMajor[]>();
     for (const m of data.majors) {
-      const school = schoolForMajor(m.name);
+      const school = schoolForMajorIn(data.campus_id ?? null, viewerSystem, m.name);
       const list = grouped.get(school.id) ?? [];
       list.push(m);
       grouped.set(school.id, list);
     }
 
-    // Active schools, preserving IU_SCHOOLS order.
-    const active = IU_SCHOOLS.filter((s) => grouped.has(s.id));
+    // Active schools, preserving HALO_SCHOOLS order.
+    const active = HALO_SCHOOLS.filter((s) => grouped.has(s.id));
     if (active.length === 0) {
       return { majors: positions, schools: placements };
     }
@@ -9688,7 +10286,7 @@ export function MapTabBody() {
     }
 
     return { majors: positions, schools: placements };
-  }, [data]);
+  }, [data, viewerSystem]);
 
   // Jump to a major bubble: pan so the bubble's cluster coordinate
   // lands at the viewport center, zoom in for emphasis, and open the
@@ -9816,7 +10414,7 @@ export function MapTabBody() {
       }}
     >
       <SceneHeader
-        eyebrow="Campus · IU"
+        eyebrow={campusEyebrow("Campus", campusLabel)}
         title="Find your people"
         subtitle="Majors grouped by school, plus an org center — laid out by how close you already are. Search to jump, or wheel to zoom."
         tone="dark"
@@ -9879,7 +10477,7 @@ export function MapTabBody() {
               Pick your campus in Settings to see your map
             </div>
             <div style={{ color: "rgba(255,255,255,0.55)", fontSize: 13, maxWidth: 320, textAlign: "center", lineHeight: 1.5 }}>
-              The map groups people by major at your campus. Nothing here is verified — you can change it any time.
+              The map groups people by major at your campus. Pick yours in Settings.
             </div>
             <Link
               href="/settings#campus"
@@ -9994,6 +10592,8 @@ export function MapTabBody() {
                 <MajorNode
                   key={m.name}
                   major={m}
+                  campusId={data?.campus_id ?? null}
+                  system={viewerSystem}
                   x={pos.x}
                   y={pos.y}
                   radius={pos.r}
@@ -10088,7 +10688,7 @@ export function MapTabBody() {
               }}
             >
               {searchResults.map((m, i) => {
-                const school = schoolForMajor(m.name);
+                const school = schoolForMajorIn(data?.campus_id ?? null, viewerSystem, m.name);
                 return (
                   <button
                     key={m.name}
@@ -10325,7 +10925,7 @@ type SchoolPlacementForRender = {
   clusterR: number;
 };
 
-// Soft tinted halo per IU school. Painted BEFORE the bubbles so the
+// Soft tinted halo per school (IU or Purdue). Painted BEFORE the bubbles so the
 // region color reads as background territory. Halo size scales with
 // the school's actual cluster radius — packed regions get bigger
 // halos, sparse regions stay compact. Decorative; pointerEvents none.
@@ -10336,7 +10936,7 @@ function SchoolHalos({
 }) {
   return (
     <>
-      {IU_SCHOOLS.map((s) => {
+      {HALO_SCHOOLS.map((s) => {
         const p = placements.get(s.id);
         if (!p) return null;
         // Halo extends a bit past the cluster so the tint fades out
@@ -10381,7 +10981,7 @@ function SchoolLabels({
 }) {
   return (
     <>
-      {IU_SCHOOLS.map((s) => {
+      {HALO_SCHOOLS.map((s) => {
         const p = placements.get(s.id);
         if (!p) return null;
         const angleRad = (p.angleDeg * Math.PI) / 180;
@@ -10547,6 +11147,8 @@ function YouHereNode({
 
 function MajorNode({
   major,
+  campusId,
+  system,
   x,
   y,
   radius,
@@ -10554,6 +11156,10 @@ function MajorNode({
   onClick,
 }: {
   major: MapMajor;
+  /** The map's campus (`MapSummary.campus_id`) and the viewer's university,
+   *  so a bubble's colour matches its halo. */
+  campusId: string | null;
+  system: SchoolSystem | null;
   x: number;
   y: number;
   radius: number;
@@ -10568,7 +11174,7 @@ function MajorNode({
   //              mutuals, blue = strangers). Drives the outline ring +
   //              the side-tag so you can still tell at a glance "do I
   //              have a way in here?"
-  const school = schoolForMajor(major.name);
+  const school = schoolForMajorIn(campusId, system, major.name);
   const accent =
     major.mutuals > 0
       ? "#FFB85A"
@@ -13518,6 +14124,7 @@ function EmptyState({
   // changes the URL without changing the view. Switch the tab in state.
   onBrowseOrgs: () => void;
 }) {
+  const { label: campusLabel } = useViewerCampus();
   return (
     <main style={{ padding: "48px 32px" }}>
       {showSchoolVerifiedBanner ? (
@@ -13549,7 +14156,7 @@ function EmptyState({
           marginBottom: 12,
         }}
       >
-        Campus · IU
+        {campusEyebrow("Campus", campusLabel)}
       </p>
       <h1
         style={{
@@ -13622,8 +14229,7 @@ function EmptyState({
               lineHeight: 1.5,
             }}
           >
-            Browse clubs and orgs at IU. Public ones you can join instantly,
-            private ones you can request to join.
+            {campusLabel ? `Browse clubs and orgs at ${campusLabel}.` : "Browse clubs and orgs."}
           </p>
         </button>
         <button

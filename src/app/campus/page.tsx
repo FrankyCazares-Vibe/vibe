@@ -4,7 +4,7 @@ import { CampusSwitch } from "./CampusSwitch";
 
 export const metadata = {
   title: "Campus · Vibe",
-  description: "Campus home — IU wedge.",
+  description: "Your campus on Vibe: clubs, events, people and the map.",
 };
 
 export default async function CampusPage({
