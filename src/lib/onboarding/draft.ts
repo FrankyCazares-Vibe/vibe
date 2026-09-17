@@ -22,6 +22,17 @@
  *          time in epoch milliseconds
  *   TTL    14 days from `at`; an expired or unreadable draft is removed when
  *          it is loaded
+ *   fields the ten keys of {@link ONBOARDING_DRAFT_FIELD_KEYS}, in that order:
+ *          `campus_id`, `name`, `handle`, `bio`, `major`, `department`,
+ *          `year` ("" | "1".."5"), `interests` and `skills` (the RAW textarea
+ *          text, not arrays), `looking_for` (string[]). The phone reads them
+ *          back through {@link typedDraftFields} ({@link OnboardingTypedFields});
+ *          anything else in `fields` is ignored on restore. A key or type
+ *          change here is a change in `onboarding.html` too (wave plan
+ *          2026-09-16 §9 B12 item 2, mirrored by B13).
+ *   step   {@link onboardingResumeStep} is the step a restore opens on: the
+ *          draft's step, pulled back to the campus screen while no campus is
+ *          saved and to the profile screen while no handle is claimed.
  *
  * Client-safe: no React, no server-only imports. Every storage touch is in
  * try/catch, because the accessor itself throws in some contexts (blocked site
@@ -58,6 +69,43 @@ const MAX_FIELDS = 64;
 const MAX_STRING = 8000;
 const MAX_LIST = 100;
 const UNSAFE_KEYS = new Set(["__proto__", "constructor", "prototype"]);
+
+/**
+ * The typed keys the onboarding steps keep in a draft's `fields`, in order
+ * (wave plan 2026-09-16 §9 B12 item 2). Frozen: the desktop page mirrors this
+ * exact list.
+ */
+export const ONBOARDING_DRAFT_FIELD_KEYS = Object.freeze([
+  "campus_id",
+  "name",
+  "handle",
+  "bio",
+  "major",
+  "department",
+  "year",
+  "interests",
+  "skills",
+  "looking_for",
+] as const);
+export type OnboardingDraftFieldKey = (typeof ONBOARDING_DRAFT_FIELD_KEYS)[number];
+
+/** The year select's values: "" is "Prefer not to say", "5" is "5th+ / grad". */
+export type OnboardingYear = "" | "1" | "2" | "3" | "4" | "5";
+const ONBOARDING_YEARS: readonly string[] = Object.freeze(["", "1", "2", "3", "4", "5"]);
+
+/** interests / skills are the RAW textarea text, not arrays. */
+export type OnboardingTypedFields = {
+  campus_id: string;
+  name: string;
+  handle: string;
+  bio: string;
+  major: string;
+  department: string;
+  year: OnboardingYear;
+  interests: string;
+  skills: string;
+  looking_for: string[];
+};
 
 /** What one draft field may hold: text inputs, numbers, checkboxes, tag lists. */
 export type OnboardingDraftValue = string | number | boolean | null | string[];
@@ -370,4 +418,57 @@ export function onboardingStartStep(
   if (campusSaved && saved.hasRealHandle) return ONBOARDING_STEPS.photo;
   if (campusSaved) return ONBOARDING_STEPS.profile;
   return ONBOARDING_STEPS.hello;
+}
+
+/**
+ * The draft's typed fields, for the restore (§9 B12 item 2). Keeps only the
+ * ten {@link ONBOARDING_DRAFT_FIELD_KEYS}:
+ *   - a text key when its value is a string
+ *   - `year` only when it is one of "" "1" "2" "3" "4" "5"
+ *   - `looking_for` when it is an array: strings only, deduplicated, in
+ *     first-seen order
+ * Everything else is dropped (a number `year`, an array `interests`, unknown
+ * keys). A missing key stays missing, so the caller's prefill fills it.
+ */
+export function typedDraftFields(
+  fields: OnboardingDraftFields | null | undefined,
+): Partial<OnboardingTypedFields> {
+  const out: Partial<OnboardingTypedFields> = {};
+  if (!fields || typeof fields !== "object" || Array.isArray(fields)) return out;
+  for (const key of ONBOARDING_DRAFT_FIELD_KEYS) {
+    if (!Object.prototype.hasOwnProperty.call(fields, key)) continue;
+    const value = fields[key];
+    if (key === "looking_for") {
+      if (Array.isArray(value)) {
+        out.looking_for = [...new Set(value.filter((item): item is string => typeof item === "string"))];
+      }
+    } else if (key === "year") {
+      if (typeof value === "string" && ONBOARDING_YEARS.includes(value)) {
+        out.year = value as OnboardingYear;
+      }
+    } else if (typeof value === "string") {
+      out[key] = value;
+    }
+  }
+  return out;
+}
+
+/**
+ * The step a restore opens on (§9 B12 item 2): {@link onboardingStartStep},
+ * then pulled back so no screen past a missing save shows.
+ *   - Past the campus screen with no CONFIRMED campus saved → the campus
+ *     screen (2), unless the university is known to be missing
+ *     (`systemKnown === false`), where there is no campus to pick.
+ *   - Past the profile screen with no claimed handle → the profile screen (3).
+ * With no draft this equals {@link onboardingStartStep}.
+ */
+export function onboardingResumeStep(
+  draft: Pick<OnboardingDraft, "step" | "maxStep"> | null | undefined,
+  saved: { campusId?: string | null; campusConfirmed?: boolean; hasRealHandle?: boolean; systemKnown?: boolean },
+): number {
+  let s = onboardingStartStep(draft, saved);
+  const campusSaved = !!saved.campusId && saved.campusConfirmed === true;
+  if (saved.systemKnown !== false && s > ONBOARDING_STEPS.campus && !campusSaved) s = ONBOARDING_STEPS.campus;
+  if (s > ONBOARDING_STEPS.profile && !saved.hasRealHandle) s = ONBOARDING_STEPS.profile;
+  return s;
 }

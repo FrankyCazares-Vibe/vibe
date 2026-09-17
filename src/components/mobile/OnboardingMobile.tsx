@@ -7,137 +7,112 @@ import {
   useRef,
   useState,
   type CSSProperties,
-  type ChangeEvent,
+  type ReactNode,
 } from "react";
 
+import { OnbHeader } from "@/components/mobile/onboarding/OnbHeader";
+import { SkipSheet } from "@/components/mobile/onboarding/SkipSheet";
+import { StepCampus } from "@/components/mobile/onboarding/StepCampus";
+import {
+  StepClubs,
+  initialClubsState,
+  type ClubsState,
+} from "@/components/mobile/onboarding/StepClubs";
+import {
+  StepPeople,
+  initialPeopleState,
+  type PeopleState,
+} from "@/components/mobile/onboarding/StepPeople";
+import { StepPhoto } from "@/components/mobile/onboarding/StepPhoto";
+import {
+  HANDLE_RE,
+  LOOKING_FOR_OPTIONS,
+  StepProfile,
+  asOnboardingYear,
+  identityProblem,
+  profileFieldForCode,
+  profileStepBody,
+  useHandleCheck,
+  type ProfileFields,
+} from "@/components/mobile/onboarding/StepProfile";
+import { ONB_COPY } from "@/components/mobile/onboarding/onb-copy";
+import {
+  COLORS,
+  primaryCtaStyle,
+  secondaryLinkStyle,
+  stepSectionStyle,
+} from "@/components/mobile/onboarding/onb-theme";
 import { isSafeRelativePath } from "@/lib/auth/login-next";
-import { vibeRequest } from "@/lib/feedback/request";
+import { vibeRequest, type VibeFailure } from "@/lib/feedback/request";
 import { toast } from "@/lib/feedback/toast";
 import {
-  DEFAULT_CAMPUS_ID,
-  IU_CAMPUSES,
-  SYSTEM_LABEL,
-  campusPickerSub,
-  campusesForSystem,
+  allowedCampusId,
+  campusRowById,
   isCampusAllowed,
   isSchoolSystem,
   type SchoolSystem,
 } from "@/lib/iu/campuses";
-import { IU_MAJORS_BY_SCHOOL, majorsForCampus } from "@/lib/iu/majors";
+import { majorsForCampus } from "@/lib/iu/majors";
 import type { OnboardingBoot } from "@/lib/onboarding/boot";
+import {
+  ONBOARDING_TOTAL_STEPS,
+  clearDraft,
+  createDraftSaver,
+  flushDraftOnHide,
+  loadDraft,
+  onboardingResumeStep,
+  onboardingStartStep,
+  typedDraftFields,
+  type DraftSaver,
+} from "@/lib/onboarding/draft";
+import { anyClubFollowed } from "@/lib/onboarding/social-steps";
 
 /**
- * Mobile-native Otto onboarding. Mirrors the 4-step desktop flow
- * served from `public/html/onboarding.html` (Otto intro → quick
- * profile → work experience → resume / portfolio) but laid out
- * single-column with a sticky bottom CTA so it fits cleanly on a
- * phone screen. Same field set, same APIs, same submit payload.
+ * Mobile-native Otto onboarding, six steps (wave plan
+ * `handoffs/2026-09-16-wave-plan-follow-onboarding-edit.md` §9 B12):
  *
- * Desktop continues to serve the static HTML at `/onboarding/classic`
- * inside an iframe via `OnboardingSwitch` — this component only paints
- * on mobile viewports.
+ *   1 hello → 2 campus → 3 profile → 4 photo → 5 follow clubs → 6 people
  *
- * THE CAMPUS FIELD IS SYSTEM-AWARE (plan 2026-09-15 §3.4 step 2 / §3.5).
- * The choices are the allowed set for the university the student's school
- * email proved — `boot.system`, stamped server-side at verification — with
- * the shared communities first (Indianapolis, then Fort Wayne). Purdue
- * signups are on, so a hardcoded IU list would offer a @purdue.edu student
- * only IU campuses and land them campus-less with the wrong university's
- * label. Nothing is preselected except the visible single-campus preselect
- * the boot data names (@pfw.edu / @pnw.edu), which the student still
- * confirms. A student with no stamped system (a pre-migration row) keeps the
- * legacy IU list exactly as it was.
+ * Desktop serves the static page at `/onboarding/classic` inside an iframe
+ * via `OnboardingSwitch`, and mirrors this flow step for step (B13).
+ *
+ * SAVES AS YOU GO. Continue on the campus and profile steps writes that step
+ * through `POST /api/me/onboarding-step`; the photo saves the moment it is
+ * cropped; club and person follows save on tap. Finish (and Skip) only marks
+ * onboarding done, after catching up any campus or profile change that
+ * didn't go through a Continue (browser Forward, for one). Everything typed
+ * is also kept in a localStorage draft (`draft.ts`), so a reload, an app
+ * switch or iOS reloading the tab after "Take Photo" comes back to the same
+ * step with the same text. Replay (`?replay=1`) reads live data but never
+ * loads, saves or clears a draft and never writes anything.
+ *
+ * THE CAMPUS FOLLOWS THE UNIVERSITY THE SCHOOL EMAIL PROVED (ac014a3): the
+ * cards are that system's campuses, shared communities first, and nothing
+ * is picked unless the email names one campus or the student already
+ * confirmed one (or picked one earlier, from the draft).
+ *
+ * ONE BACK. The header's Back, the browser's Back and the iOS swipe are the
+ * same thing: every step change is a same-URL history entry carrying
+ * `onbStep`, and a `popstate` listener shows that step. While something is
+ * saving, a Back is undone instead of honoured.
+ *
+ * The header (Back, logo, "n of 6", Skip) is pinned on every step. The shell
+ * is deliberately NOT a scroll container, which is what used to scroll the
+ * sticky header away, and nothing is focused on step entry.
  */
 
-const TOTAL_STEPS = 4;
-const HANDLE_RE = /^[a-z0-9_]{3,20}$/;
+const CAMPUS_SAVE_FAILED = "Couldn't save your campus.";
+const PROFILE_SAVE_FAILED = "Couldn't save your profile.";
 
-const LOOKING_FOR_OPTIONS = [
-  { value: "meeting-people", label: "Meeting people" },
-  { value: "showing-work", label: "Showing my work" },
-  { value: "finding-clubs", label: "Finding clubs" },
-  { value: "exploring", label: "Just exploring" },
-] as const;
+/** Step-route refusals that belong on the campus cards, not in a toast. */
+const CAMPUS_FIELD_CODES: ReadonlySet<string> = new Set([
+  "campus_invalid",
+  "campus_change_too_soon",
+  "system_missing",
+  "campus_not_ready",
+]);
 
-const COLORS = {
-  charcoal: "#1C1C1E",
-  charcoalSoft: "#26252A",
-  cream: "#FAF7F2",
-  accent: "#FF5C35",
-  purple: "#7C5CFC",
-  lavender: "#C8B8FF",
-  green: "#1A9E5B",
-  red: "#C54323",
-  mutedText: "rgba(255,255,255,.55)",
-  faintBorder: "rgba(255,255,255,.10)",
-  fieldBg: "rgba(255,255,255,.04)",
-  fieldBorder: "rgba(255,255,255,.10)",
-  fieldFocusBorder: "rgba(255,92,53,.55)",
-};
-
-type WorkRow = {
-  company: string;
-  title: string;
-  dates: string;
-  location: string;
-  description: string;
-};
-
-const EMPTY_ROW: WorkRow = {
-  company: "",
-  title: "",
-  dates: "",
-  location: "",
-  description: "",
-};
-
-/** Flatten the IU-Indianapolis grouped majors list into a sorted array. */
-const ALL_IU_MAJORS = (() => {
-  const set = new Set<string>();
-  for (const group of IU_MAJORS_BY_SCHOOL) {
-    for (const m of group.majors) set.add(m);
-  }
-  return [...set].sort((a, b) => a.localeCompare(b));
-})();
-
-const ALL_IU_SCHOOLS = IU_MAJORS_BY_SCHOOL.map((g) => g.school.label);
-
-/**
- * The legacy fallback, used ONLY when no school system is stamped: campus is
- * self-declared, an @iu.edu address proves IU membership and not which
- * campus, so the old picker stored the canonical label and defaulted to the
- * pilot campus. A student whose system IS known never sees this — they get
- * their own university's campuses, with nothing defaulted.
- */
-const DEFAULT_CAMPUS_LABEL =
-  IU_CAMPUSES.find((c) => c.id === DEFAULT_CAMPUS_ID)?.label ?? "";
-
-/** Client copy for the campus field (plan §3.5, "Step 2 errors"). */
-const CAMPUS_REQUIRED_COPY = "Pick your campus to continue.";
-/** Mirrors the server's `campus_invalid` line, used when the pick can't stand. */
-const CAMPUS_INVALID_COPY = "Pick one of your university's campuses.";
-
-function splitLinesToArray(
-  raw: string,
-  maxItems: number,
-  maxLen: number,
-): string[] | undefined {
-  const parts = raw
-    .split(/\n|,/)
-    .map((s) => s.trim().slice(0, maxLen))
-    .filter(Boolean);
-  if (!parts.length) return undefined;
-  return parts.slice(0, maxItems);
-}
-
-function isHttpUrl(raw: string): boolean {
-  try {
-    const u = new URL(raw);
-    return u.protocol === "http:" || u.protocol === "https:";
-  } catch {
-    return false;
-  }
-}
+const LOOKING_FOR_VALUES: readonly string[] = LOOKING_FOR_OPTIONS.map((o) => o.value);
 
 /**
  * Otto's saved config. Finish and Skip both send it: any non-empty
@@ -151,6 +126,121 @@ function buildOttoConfig() {
     leash: "ask",
     setupAt: new Date().toISOString(),
   };
+}
+
+/** The one place this flow navigates away. */
+function leave(dest: string): void {
+  window.location.href = dest;
+}
+
+/*
+ * HISTORY ENTRIES. Every `pushState` / `replaceState` below passes
+ * `{ ...window.history.state, onbStep: n }` and "" with NO url. Next's app
+ * router reloads the page on a popstate whose state lacks its own `__NA` key;
+ * spreading the current state keeps that key and the router tree, so the
+ * router only restores the same URL and this component shows the step.
+ *
+ * ONE ENTRY PER STEP. The onboarding entries are always steps 1, 2, 3, … in
+ * order, so an entry's `onbStep` is also its depth: the distance between two
+ * steps is their difference. `sendBack` and every undo below rely on that, so
+ * nothing may leave two entries for one step. Moves that must not happen are
+ * undone with `history.go` back to where the student was, never by rewriting
+ * the entry they landed on.
+ */
+
+type Prefill = OnboardingMobileProps["prefill"];
+
+/** Profile fields from the server prefill alone: the base layer of the restore. */
+function prefillFields(prefill: Prefill): ProfileFields {
+  return {
+    name: prefill?.name ?? "",
+    handle: prefill?.hasRealHandle ? prefill.handle : "",
+    bio: prefill?.bio ?? "",
+    major: prefill?.major ?? "",
+    department: prefill?.department ?? "",
+    // The select tops out at "5th+ / grad"; the server accepts 1–12.
+    year: prefill?.year ? asOnboardingYear(String(Math.min(5, prefill.year))) : "",
+    interests: (prefill?.interests ?? []).join(", "),
+    skills: (prefill?.skills ?? []).join(", "),
+    looking_for: (prefill?.looking_for ?? []).filter((v) => LOOKING_FOR_VALUES.includes(v)),
+  };
+}
+
+function sameField(a: ProfileFields[keyof ProfileFields], b: ProfileFields[keyof ProfileFields]): boolean {
+  if (Array.isArray(a) || Array.isArray(b)) {
+    return Array.isArray(a) && Array.isArray(b) && a.length === b.length && a.every((v, i) => v === b[i]);
+  }
+  return a === b;
+}
+
+type Boot = {
+  fields: ProfileFields;
+  campusId: string;
+  step: number;
+  maxStep: number;
+  /** The draft restored a profile value the server doesn't have yet. */
+  profileDirty: boolean;
+};
+
+/**
+ * The restore, computed once (§9 B12 item 4). The prefill is the base; the
+ * draft overrides typed fields; the server wins for a claimed handle and a
+ * confirmed campus. Replay neither loads nor saves a draft.
+ */
+function computeBoot(p: {
+  replay: boolean;
+  userId: string | undefined;
+  system: SchoolSystem | null;
+  prefill: Prefill;
+  singleCampusId: string | null | undefined;
+}): Boot {
+  const { replay, userId, system, prefill, singleCampusId } = p;
+  const draft = !replay && userId ? loadDraft(userId) : null;
+  const d = typedDraftFields(draft?.fields);
+  const base = prefillFields(prefill);
+
+  const fields: ProfileFields = {
+    name: d.name ?? base.name,
+    handle: prefill?.hasRealHandle ? base.handle : (d.handle ?? ""),
+    bio: d.bio ?? base.bio,
+    major: d.major ?? base.major,
+    department: d.department ?? base.department,
+    year: d.year ?? base.year,
+    interests: d.interests ?? base.interests,
+    skills: d.skills ?? base.skills,
+    looking_for: (d.looking_for ?? base.looking_for).filter((v) => LOOKING_FOR_VALUES.includes(v)),
+  };
+
+  // Nothing preselects a campus except the student's own earlier pick (from
+  // the draft, while none is confirmed), a campus they already confirmed, or
+  // the visible single-campus preselect from the email. The confirmed campus
+  // outranks the preselect: Finish and Skip save any pick that differs from
+  // it, so the email's campus must never replace it unseen.
+  let campusId = "";
+  const draftPick = prefill?.campusConfirmed ? null : allowedCampusId(d.campus_id, system);
+  if (draftPick) campusId = draftPick;
+  else if (system) {
+    campusId =
+      (prefill?.campusConfirmed ? allowedCampusId(prefill.campusId, system) : null) ??
+      allowedCampusId(singleCampusId, system) ??
+      "";
+  }
+
+  const saved = {
+    campusId: prefill?.campusId,
+    campusConfirmed: prefill?.campusConfirmed,
+    hasRealHandle: prefill?.hasRealHandle,
+    systemKnown: !!system,
+  };
+  const step = replay ? 1 : onboardingResumeStep(draft, saved);
+  const start = replay ? 1 : onboardingStartStep(draft, saved);
+  // Pulled back past an unsaved step: nothing above it is reachable yet.
+  const maxStep = step < start ? step : Math.max(step, draft?.maxStep ?? step);
+
+  const keys = Object.keys(fields) as (keyof ProfileFields)[];
+  const profileDirty = keys.some((k) => !sameField(fields[k], base[k]));
+
+  return { fields, campusId, step, maxStep, profileDirty };
 }
 
 // ── Otto orb ────────────────────────────────────────────────────────────────
@@ -196,8 +286,8 @@ function OttoOrb({ size }: { size: "big" | "small" }) {
 
 /**
  * What `/onboarding` hands the phone tree. Every boot field is OPTIONAL and
- * the flow still works without it (a caller that only knows `replay` gets
- * today's behaviour), which is the shape `OnboardingSwitch` already types.
+ * the flow still works without it, which is the shape `OnboardingSwitch`
+ * already types.
  */
 export type OnboardingMobileProps = { replay: boolean } & Partial<
   Omit<OnboardingBoot, "replay">
@@ -205,1031 +295,844 @@ export type OnboardingMobileProps = { replay: boolean } & Partial<
 
 export function OnboardingMobile({
   replay,
+  userId,
   system: systemProp,
   prefill,
   singleCampusId,
 }: OnboardingMobileProps) {
-  const [step, setStep] = useState(1);
-
-  // ── Campus (boot data) ───────────────────────────────────────────────────
-  // The verified university. Null when nothing is stamped yet: that student
-  // keeps the legacy IU list and its "IU Indianapolis" default.
-  const system: SchoolSystem | null = isSchoolSystem(systemProp)
-    ? systemProp
-    : null;
-
-  /** The allowed set as picker cards — shared communities first (§2.4). */
-  const campusOptions = useMemo(() => {
-    if (!system) return [];
-    return campusesForSystem(system).map((c) => ({
-      id: c.id,
-      title: c.shortName,
-      sub: campusPickerSub(c, system),
-      isOpen: c.isOpen,
-    }));
-  }, [system]);
-
-  /** True when we can ask the real question instead of the legacy IU list. */
-  const systemAware = campusOptions.length > 0;
-
-  /**
-   * The one campus that may start selected: the @pfw.edu / @pnw.edu single-
-   * campus preselect, which is VISIBLE and still confirmed by the student.
-   * Re-checked against the system here — the server already did (§3.4).
-   */
-  const preselectId = isCampusAllowed(singleCampusId, system)
-    ? (singleCampusId ?? null)
-    : null;
-
-  // Step 2 — Profile draft
-  const [name, setName] = useState("");
-  const [handle, setHandle] = useState("");
-  const [handleStatus, setHandleStatus] = useState<{
-    text: string;
-    color: string;
-  } | null>(null);
-  const [bio, setBio] = useState("");
-  /** Legacy label, only ever sent when the system is unknown. */
-  const [campus, setCampus] = useState(() =>
-    isSchoolSystem(systemProp) ? "" : DEFAULT_CAMPUS_LABEL,
+  // ── University and restore ───────────────────────────────────────────────
+  // The verified university; null when nothing is stamped yet. The Purdue
+  // switch on the campus step can change it.
+  const [system, setSystem] = useState<SchoolSystem | null>(() =>
+    isSchoolSystem(systemProp) ? systemProp : null,
   );
-  /**
-   * The system-aware pick. Starts empty — nothing is chosen for the student —
-   * except the visible single-campus preselect, or a campus they have already
-   * chosen and confirmed (`campus_set_at` is stamped). A campus that was
-   * backfilled silently is deliberately NOT preselected: that would be the
-   * same silent default again, and the student is meant to confirm it.
-   */
-  const [campusId, setCampusId] = useState(() => {
-    if (!isSchoolSystem(systemProp)) return "";
-    if (isCampusAllowed(singleCampusId, systemProp)) return singleCampusId ?? "";
-    if (prefill?.campusConfirmed && isCampusAllowed(prefill.campusId, systemProp)) {
-      return prefill.campusId ?? "";
-    }
-    return "";
-  });
+  const [boot] = useState<Boot>(() =>
+    computeBoot({
+      replay,
+      userId,
+      system: isSchoolSystem(systemProp) ? systemProp : null,
+      prefill,
+      singleCampusId,
+    }),
+  );
+
+  /** The @pfw.edu / @pnw.edu single-campus preselect: visible, still confirmed by the student. */
+  const preselectId = isCampusAllowed(singleCampusId, system) ? (singleCampusId ?? null) : null;
+
+  const [step, setStep] = useState(boot.step);
+  const [maxStep, setMaxStep] = useState(boot.maxStep);
+
+  // ── Step 2: campus ───────────────────────────────────────────────────────
+  const [campusId, setCampusId] = useState(boot.campusId);
   const [campusError, setCampusError] = useState<string | null>(null);
   const campusGroupRef = useRef<HTMLDivElement | null>(null);
-  const [major, setMajor] = useState("");
-  const [department, setDepartment] = useState("");
-  const [year, setYear] = useState("");
-  const [interests, setInterests] = useState("");
-  const [skills, setSkills] = useState("");
-  const [lookingFor, setLookingFor] = useState<string[]>([]);
-
-  // ── Majors follow the campus ─────────────────────────────────────────────
-  // IU Indianapolis for IU in Indianapolis, Purdue Indianapolis for Purdue in
-  // the same community, Bloomington for IU Bloomington; anywhere else there is
-  // no curated list and the field is plain free text (§3.4 step 3). Both
-  // fields stay free text regardless — the list is a suggestion, never a gate.
-  const majorList = useMemo(
-    () => (system && campusId ? majorsForCampus(campusId, system) : null),
-    [system, campusId],
+  /** The campus the server has CONFIRMED (`campus_set_at` stamped), else null. */
+  const [savedCampusId, setSavedCampusId] = useState<string | null>(() =>
+    prefill?.campusConfirmed
+      ? allowedCampusId(prefill.campusId, isSchoolSystem(systemProp) ? systemProp : null)
+      : null,
   );
-  const majorOptions = majorList
-    ? majorList.majors
-    : systemAware
-      ? []
-      : ALL_IU_MAJORS;
-  const schoolOptions = majorList
-    ? majorList.schools
-    : systemAware
-      ? []
-      : ALL_IU_SCHOOLS;
-  const majorHint = majorList
-    ? `from the ${majorList.label} list, or type your own`
-    : systemAware
-      ? "type your own"
-      : "start typing — IU Indianapolis list";
 
-  /** §3.5: "Your school email shows you're at IU…" (Purdue variant mirrored). */
-  const campusNote = system
-    ? `Your school email shows you're at ${SYSTEM_LABEL[system]}. You can move to another ${SYSTEM_LABEL[system]} campus later in Settings.`
-    : "";
-
-  /**
-   * Bring the campus cards into view when they're the reason the flow stopped.
-   * The delay is for the bounce back from Finish: the step-change effect
-   * scrolls to the top and focuses the name field first, so this waits until
-   * that has settled rather than fighting it.
-   */
-  const revealCampusField = useCallback((delayMs = 0) => {
-    const run = () =>
-      campusGroupRef.current?.scrollIntoView({
-        block: "center",
-        behavior: "smooth",
-      });
-    if (delayMs > 0) setTimeout(run, delayMs);
-    else run();
-  }, []);
-
-  // Step 3 — Work experience
-  const [exp1, setExp1] = useState<WorkRow>({ ...EMPTY_ROW });
-  const [exp2, setExp2] = useState<WorkRow>({ ...EMPTY_ROW });
-
-  // Step 4 — Resume
-  const [resumeUploadedUrl, setResumeUploadedUrl] = useState<string | null>(
-    null,
+  // ── Step 3: profile ──────────────────────────────────────────────────────
+  const [fields, setFields] = useState<ProfileFields>(boot.fields);
+  const [nameError, setNameError] = useState<string | null>(null);
+  const [handleError, setHandleError] = useState<string | null>(null);
+  const nameRef = useRef<HTMLInputElement | null>(null);
+  const handleRef = useRef<HTMLInputElement | null>(null);
+  const {
+    status: handleStatus,
+    setStatus: setHandleStatus,
+    onHandleInput: checkHandle,
+  } = useHandleCheck();
+  /** A real name and a claimed handle are on the row. */
+  const [identitySaved, setIdentitySaved] = useState(
+    () => !!prefill?.hasRealHandle && !!prefill?.name,
   );
-  const [resumeUploadStatus, setResumeUploadStatus] = useState("");
-  const [resumeLink, setResumeLink] = useState("");
-  const resumeFileInputRef = useRef<HTMLInputElement | null>(null);
+  /** Some profile value on screen isn't saved yet. */
+  const profileDirty = useRef(boot.profileDirty);
 
-  // Submit + warp
-  const [submitting, setSubmitting] = useState(false);
+  // ── Step 4: photo ────────────────────────────────────────────────────────
+  const [avatarUrl, setAvatarUrl] = useState<string | null>(prefill?.avatarUrl ?? null);
+  const [photoError, setPhotoError] = useState<string | null>(null);
+  const fileInputRef = useRef<HTMLInputElement | null>(null);
+  /** Replay's local crop preview, revoked when replaced and on unmount. */
+  const blobUrlRef = useRef<string | null>(null);
+
+  // ── Steps 5–6: cached for the session, reset on a saved-campus or university change ──
+  const [clubs, setClubs] = useState<ClubsState>(initialClubsState);
+  const [people, setPeople] = useState<PeopleState>(initialPeopleState);
+
+  // ── Busy, finish, skip ───────────────────────────────────────────────────
+  const [savingCampus, setSavingCampus] = useState(false);
+  const [savingProfile, setSavingProfile] = useState(false);
+  const [uploading, setUploading] = useState(false);
+  /** The Purdue switch panel has a request out. */
+  const [switching, setSwitching] = useState(false);
+  const [finishing, setFinishing] = useState(false);
+  const [skipping, setSkipping] = useState(false);
+  const busy = savingCampus || savingProfile || uploading || switching || finishing || skipping;
+
   const [warping, setWarping] = useState(false);
   const [skipOpen, setSkipOpen] = useState(false);
+  /** The sheet's variant as it opened; `forceIdentity` overrides it after a refused save. */
+  const [skipBase, setSkipBase] = useState<"saved" | "identity">("identity");
+  const [forceIdentity, setForceIdentity] = useState(false);
+  const skipVariant = forceIdentity ? "identity" : skipBase;
 
-  // Refs for step-change focus
-  const step2NameRef = useRef<HTMLInputElement | null>(null);
-  const step3CompanyRef = useRef<HTMLInputElement | null>(null);
-  const step4LinkRef = useRef<HTMLInputElement | null>(null);
-
-  // Reset scroll + focus first input on step change.
+  // Mirrors for the history listener, which outlives any one render.
+  const busyRef = useRef(busy);
+  const stepRef = useRef(boot.step);
+  const maxStepRef = useRef(boot.maxStep);
   useEffect(() => {
-    window.scrollTo({ top: 0, behavior: "smooth" });
-    const t = setTimeout(() => {
-      if (step === 2) step2NameRef.current?.focus();
-      else if (step === 3) step3CompanyRef.current?.focus();
-      else if (step === 4) step4LinkRef.current?.focus();
-    }, 280);
-    return () => clearTimeout(t);
-  }, [step]);
+    busyRef.current = busy;
+    stepRef.current = step;
+    maxStepRef.current = maxStep;
+  }, [busy, step, maxStep]);
 
-  // ── Handle availability check (debounced) ────────────────────────────────
-  // Driven by `onHandleChange` rather than a `useEffect([handle])` so the
-  // status updates don't trigger a `set-state-in-effect` lint warning.
-  const handleSeq = useRef(0);
-  const handleTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
+  /** Set on Finish / Skip success: nothing may write the draft back after it's cleared. */
+  const doneRef = useRef(false);
+  const saverRef = useRef<DraftSaver | null>(null);
 
-  const onHandleChange = useCallback((e: ChangeEvent<HTMLInputElement>) => {
-    const v = e.target.value.trim().toLowerCase().slice(0, 20);
-    setHandle(v);
-    if (handleTimer.current) clearTimeout(handleTimer.current);
-    if (!v) {
-      setHandleStatus(null);
-      return;
-    }
-    if (v.length < 3) {
-      setHandleStatus({ text: "too short", color: COLORS.red });
-      return;
-    }
-    if (!HANDLE_RE.test(v)) {
-      setHandleStatus({ text: "letters / numbers / _", color: COLORS.red });
-      return;
-    }
-    setHandleStatus({ text: "checking…", color: "rgba(255,255,255,.55)" });
-    const seq = ++handleSeq.current;
-    handleTimer.current = setTimeout(() => {
-      fetch(`/api/handle/check?h=${encodeURIComponent(v)}`, {
-        credentials: "include",
-      })
-        .then((r) => r.json())
-        .then((j) => {
-          if (seq !== handleSeq.current) return;
-          if (j && j.ok && j.available) {
-            setHandleStatus({ text: "✓ available", color: COLORS.green });
-          } else {
-            const reason = (j && (j.reason as string)) || "taken";
-            setHandleStatus({
-              text: `✗ ${String(reason).toLowerCase()}`,
-              color: COLORS.red,
-            });
-          }
-        })
-        .catch(() => {
-          if (seq === handleSeq.current) setHandleStatus(null);
-        });
-    }, 280);
-  }, []);
-
-  // Clear any pending debounce on unmount.
+  // ── Draft (never in replay, and only with a user id) ─────────────────────
   useEffect(() => {
+    if (replay || !userId) return;
+    const saver = createDraftSaver(userId);
+    saverRef.current = saver;
+    const off = flushDraftOnHide(saver);
     return () => {
-      if (handleTimer.current) clearTimeout(handleTimer.current);
+      off();
+      // After Finish / Skip the clear made this a no-op.
+      saver.flush();
+      if (saverRef.current === saver) saverRef.current = null;
     };
-  }, []);
+  }, [replay, userId]);
 
-  // ── Resume upload ─────────────────────────────────────────────────────────
-  const onResumeFilePick = useCallback(
-    async (e: ChangeEvent<HTMLInputElement>) => {
-      const f = e.target.files?.[0];
-      if (!f) return;
-      setResumeUploadStatus("Uploading…");
-      try {
-        const fd = new FormData();
-        fd.append("file", f);
-        fd.append("kind", "resume");
-        const r = await fetch("/api/me/profile-upload", {
-          method: "POST",
-          credentials: "same-origin",
-          body: fd,
-        });
-        const j = await r.json();
-        if (!r.ok || !j.ok) {
-          setResumeUploadStatus(j?.error ? String(j.error) : "Upload failed");
-          return;
-        }
-        setResumeUploadedUrl(j.url);
-        setResumeUploadStatus("Uploaded");
-      } catch {
-        setResumeUploadStatus("Network error");
-      }
-      // reset the input so the same file can be reselected
-      if (resumeFileInputRef.current) resumeFileInputRef.current.value = "";
+  useEffect(() => {
+    if (doneRef.current) return;
+    // The photo is never in the draft: the server holds it.
+    saverRef.current?.schedule({
+      step,
+      maxStep,
+      fields: { campus_id: campusId, ...fields },
+    });
+  }, [step, maxStep, campusId, fields]);
+
+  // ── Photo preview cleanup ────────────────────────────────────────────────
+  useEffect(
+    () => () => {
+      const url = blobUrlRef.current;
+      if (url) URL.revokeObjectURL(url);
     },
     [],
   );
 
-  // Preview URL + mime guess
-  const resumePreview = useMemo(() => {
-    const url = resumeUploadedUrl ?? (resumeLink.trim() || "");
-    if (!url) return null;
-    if (resumeUploadedUrl) {
-      const isPdf = /\.pdf(\?|#|$)/i.test(url);
-      return { url, isPdf };
-    }
-    if (!isHttpUrl(url)) return null;
-    const lower = url.toLowerCase();
-    if (/\.pdf(\?|#|$)/i.test(lower)) return { url, isPdf: true };
-    if (/\.(png|jpe?g|gif|webp)(\?|#|$)/i.test(lower)) {
-      return { url, isPdf: false };
-    }
-    return null;
-  }, [resumeUploadedUrl, resumeLink]);
+  // ── Shared helpers ───────────────────────────────────────────────────────
+  const resetSocial = useCallback(() => {
+    setClubs(initialClubsState);
+    setPeople(initialPeopleState);
+  }, []);
 
-  // ── Submit ────────────────────────────────────────────────────────────────
-  const completeOnboarding = useCallback(async () => {
-    if (submitting) return;
-    setSubmitting(true);
+  /** The server confirmed this campus. A new one means new clubs and people. */
+  const markCampusSaved = (id: string) => {
+    if (id === savedCampusId) return;
+    setSavedCampusId(id);
+    resetSocial();
+  };
 
-    const profile: Record<string, unknown> = {};
-    const n = name.trim();
-    if (n) profile.name = n.slice(0, 120);
-    // The campus only rides along as a legacy label when the system is
-    // unknown; a known system saves it through the campus step below, which
-    // is the only writer that understands the campus model (a new id or a
-    // Purdue label in `profile.school` would be refused outright).
-    if (!systemAware) {
-      const c = campus.trim();
-      if (c) profile.school = c;
-    }
-    const m = major.trim();
-    if (m) profile.major = m.slice(0, 80);
-    const d = department.trim();
-    if (d) profile.department = d.slice(0, 120);
-    if (year) {
-      const y = parseInt(year, 10);
-      if (Number.isInteger(y) && y >= 1 && y <= 12) profile.year = y;
-    }
-    const b = bio.trim();
-    if (b) profile.bio = b.slice(0, 600);
-    const ints = splitLinesToArray(interests, 10, 40);
-    if (ints) profile.interests = ints;
-    const sks = splitLinesToArray(skills, 12, 30);
-    if (sks) profile.skills = sks;
-    if (lookingFor.length) profile.looking_for = lookingFor;
-
-    const workRows: WorkRow[] = [];
-    for (const row of [exp1, exp2]) {
-      const company = row.company.trim();
-      const title = row.title.trim();
-      if (!company && !title) continue;
-      workRows.push({
-        company: company.slice(0, 200),
-        title: title.slice(0, 200),
-        dates: row.dates.trim().slice(0, 120),
-        location: row.location.trim().slice(0, 200),
-        description: row.description.trim().slice(0, 4000),
-      });
-    }
-    if (workRows.length) profile.work_experience = workRows;
-
-    const linkResume = resumeLink.trim();
-    const resumeFinal =
-      resumeUploadedUrl || (linkResume ? linkResume.slice(0, 2048) : "");
-    if (resumeFinal) profile.resume_url = resumeFinal;
-
-    const ottoConfig = buildOttoConfig();
-
-    // Replay mode: skip the server save (returning user re-viewing the flow)
-    if (replay) {
-      setWarping(true);
-      setTimeout(() => {
-        window.location.href = "/profile";
-      }, 700);
-      return;
-    }
-
-    // ── Campus, for a student whose university we know ─────────────────────
-    // POST /api/me/onboarding-step is the only route that writes the campus
-    // model, and it refuses a campus outside the student's system. So the
-    // campus goes here, first: Finish can never write one that isn't theirs,
-    // and a refusal comes back to the field instead of saving silently.
-    if (systemAware) {
-      const chosen = campusId.trim();
-      if (!chosen || !isCampusAllowed(chosen, system)) {
-        const message = chosen ? CAMPUS_INVALID_COPY : CAMPUS_REQUIRED_COPY;
-        setCampusError(message);
-        toast({ message, tone: "error" });
-        setStep(2);
-        revealCampusField(360);
-        setSubmitting(false);
-        return;
-      }
-      const savedCampus = await vibeRequest("/api/me/onboarding-step", {
-        method: "POST",
-        json: { step: "campus", campus_id: chosen },
-        failure: "Couldn't save your campus.",
-        quiet: true,
-      });
-      if (!savedCampus.ok) {
-        const code = savedCampus.code;
-        // The server won't take this campus: say so on the field, in the
-        // server's own words ("Pick one of your university's campuses.", "You
-        // changed your campus recently."). The generic mapped line would send
-        // them to retry a request that will be refused again.
-        if (code === "campus_invalid" || code === "campus_change_too_soon") {
-          const line = savedCampus.error ?? CAMPUS_INVALID_COPY;
-          setCampusError(line);
-          toast({ message: line, tone: "error" });
-          setStep(2);
-          revealCampusField(360);
-          setSubmitting(false);
-          return;
-        }
-        // The campus columns aren't there yet, or the row carries no system:
-        // nothing the student can fix, and finishing without a campus is
-        // recoverable (Settings asks again). Everything else — offline, a
-        // 500, a rate limit — keeps their answers on screen so Finish retries.
-        if (code !== "campus_not_ready" && code !== "system_missing") {
-          toast({
-            message: savedCampus.message,
-            tone: "error",
-            action: savedCampus.action,
-          });
-          setSubmitting(false);
-          return;
-        }
-        // Finishing without a campus is recoverable, but not silent: say what
-        // didn't save before carrying on.
-        toast({
-          message: "We couldn't set your campus yet. You can pick it in Settings.",
-          tone: "info",
-        });
-      }
-    }
-
-    // The warp waits for the save. A refusal keeps every answer on screen
-    // and the toast says why, with Review Terms for the consent gate (S53
-    // A4) and Sign in for a 401, so there's no blind fall-through to login.
-    const saved = await vibeRequest<{ next?: unknown }>(
-      "/api/me/onboarding-complete",
-      {
-        method: "POST",
-        json: {
-          otto_answers: ottoConfig,
-          profile: Object.keys(profile).length ? profile : undefined,
-        },
-        failure: "Couldn't save your profile.",
-      },
-    );
-    if (!saved.ok) {
-      setSubmitting(false);
-      return;
-    }
-
-    // Handle claim (separate route — has own validation). The profile is
-    // saved by now, but a handle that didn't stick is said before leaving:
-    // taken (409) or rejected (400, e.g. reserved) goes back to step 2 to
-    // pick another; anything else stays here so Finish can try again.
-    const claimed = handle.trim().toLowerCase();
-    if (claimed && HANDLE_RE.test(claimed)) {
-      const claim = await vibeRequest("/api/me/handle", {
-        method: "PATCH",
-        json: { handle: claimed },
-        failure: "Couldn't save your handle.",
-        quiet: true,
-      });
-      if (!claim.ok) {
-        if (claim.status === 409 || claim.status === 400) {
-          const taken = claim.status === 409;
-          setHandleStatus({
-            text: `✗ ${taken ? "taken" : (claim.error ?? "not allowed").toLowerCase()}`,
-            color: COLORS.red,
-          });
-          toast({
-            message: taken
-              ? "That handle is taken. Pick another one."
-              : "That handle won't work. Pick another one.",
-            tone: "error",
-          });
-          setStep(2);
-        } else {
-          toast({ message: claim.message, tone: "error", action: claim.action });
-        }
-        setSubmitting(false);
-        return;
-      }
-    }
-
-    const next = typeof saved.data.next === "string" ? saved.data.next : null;
-    const nextHref = isSafeRelativePath(next)
-      ? `${next}${next.includes("?") ? "&" : "?"}welcome=1`
-      : "/profile?welcome=1";
-    setWarping(true);
-    setTimeout(() => {
-      window.location.href = nextHref;
-    }, 700);
-  }, [
-    submitting,
-    name,
-    handle,
-    bio,
-    campus,
-    campusId,
-    system,
-    systemAware,
-    revealCampusField,
-    major,
-    department,
-    year,
-    interests,
-    skills,
-    lookingFor,
-    exp1,
-    exp2,
-    resumeUploadedUrl,
-    resumeLink,
-    replay,
-  ]);
-
-  // ── Skip ──────────────────────────────────────────────────────────────────
-  // Every app page sends a student back here until otto_answers is saved,
-  // so leaving without saving reloads this page at step 1 with the answers
-  // gone. Skip saves Otto's config and no profile, then goes where the
-  // server says. A refusal keeps the sheet open and the toast says why.
-  const skipOnboarding = useCallback(async () => {
-    if (submitting) return;
-    setSubmitting(true);
-
-    // Replay mode never saves, same as Finish.
-    let dest = "/profile";
-    if (!replay) {
-      const skipped = await vibeRequest<{ next?: unknown }>(
-        "/api/me/onboarding-complete",
-        {
-          method: "POST",
-          json: { otto_answers: buildOttoConfig() },
-          failure: "Couldn't skip onboarding.",
-        },
-      );
-      if (!skipped.ok) {
-        setSubmitting(false);
-        return;
-      }
-      const next =
-        typeof skipped.data.next === "string" ? skipped.data.next : null;
-      if (isSafeRelativePath(next)) dest = next;
-    }
-    window.location.href = dest;
-  }, [submitting, replay]);
+  /** Always the next step (`n` is the current step + 1), so each step keeps one entry. */
+  const goForward = (n: number) => {
+    window.history.pushState({ ...window.history.state, onbStep: n }, "");
+    // The listener reads these before the next render's effect would.
+    stepRef.current = n;
+    maxStepRef.current = Math.max(maxStepRef.current, n);
+    setStep(n);
+    setMaxStep((m) => Math.max(m, n));
+    window.scrollTo({ top: 0 });
+  };
 
   /**
-   * Leaving step 2 with the campus question unanswered. Same rule Finish
-   * enforces, said early so the student isn't bounced back from the last
-   * screen. Always true when the system is unknown — that student sees the
-   * legacy picker, which is never empty.
+   * Back to an earlier step from Finish, through history so the stack stays
+   * true: one entry per step, so the distance is the step difference. Busy is
+   * cleared FIRST, or the popstate listener would undo the move.
    */
-  const campusAnswered = useCallback(() => {
-    if (!systemAware) return true;
-    const chosen = campusId.trim();
-    if (chosen && isCampusAllowed(chosen, system)) return true;
-    setCampusError(chosen ? CAMPUS_INVALID_COPY : CAMPUS_REQUIRED_COPY);
-    revealCampusField();
-    return false;
-  }, [systemAware, campusId, system, revealCampusField]);
+  const sendBack = (target: number) => {
+    busyRef.current = false;
+    const delta = target - stepRef.current;
+    if (delta < 0) window.history.go(delta);
+  };
 
-  // ── Render helpers ────────────────────────────────────────────────────────
-  const progressDots = (
-    <div style={progressDotsStyle}>
-      {Array.from({ length: TOTAL_STEPS }).map((_, i) => {
-        const idx = i + 1;
-        const state =
-          idx < step ? "done" : idx === step ? "now" : "pending";
-        return <span key={i} style={dotStyle(state)} />;
-      })}
-      <span style={progressTextStyle}>
-        {step} of {TOTAL_STEPS}
-      </span>
-    </div>
+  const revealCampus = () => {
+    campusGroupRef.current?.scrollIntoView({ block: "center", behavior: "smooth" });
+  };
+
+  /** Puts a refusal's line under the name or handle field; returns that field, or null when it isn't a field refusal. */
+  const showProfileFieldError = (r: VibeFailure): "name" | "handle" | null => {
+    const field = profileFieldForCode(r.code);
+    if (field === "name") {
+      setNameError(r.error ?? ONB_COPY.profile.errors.nameRequired);
+    } else if (field === "handle") {
+      setHandleError(r.error ?? ONB_COPY.profile.errors.handleInvalid);
+      if (r.code === "handle_taken") {
+        setHandleStatus({ kind: "taken", text: ONB_COPY.profile.handleTaken });
+      }
+    }
+    return field;
+  };
+
+  /** The step-3 client checks; errors go under the fields. */
+  const checkIdentity = (): "name" | "handle" | null => {
+    const problem = identityProblem(fields);
+    setNameError(problem?.field === "name" ? problem.message : null);
+    setHandleError(problem?.field === "handle" ? problem.message : null);
+    return problem?.field ?? null;
+  };
+
+  const postCampus = (id: string) =>
+    vibeRequest("/api/me/onboarding-step", {
+      method: "POST",
+      json: { step: "campus", campus_id: id },
+      quiet: true,
+      failure: CAMPUS_SAVE_FAILED,
+    });
+
+  const postProfile = () =>
+    vibeRequest("/api/me/onboarding-step", {
+      method: "POST",
+      json: { step: "profile", ...profileStepBody(fields) },
+      quiet: true,
+      failure: PROFILE_SAVE_FAILED,
+    });
+
+  /** A profile refusal that isn't about one field. */
+  const toastProfileFailure = (r: VibeFailure) => {
+    if (r.code === "profile_invalid") {
+      toast({ message: r.error ?? r.message, tone: "error" });
+    } else {
+      toast({ message: r.message, tone: "error", action: r.action });
+    }
+  };
+
+  // ── Field handlers ───────────────────────────────────────────────────────
+  const onField = <K extends keyof ProfileFields>(k: K, v: ProfileFields[K]) => {
+    setFields((f) => ({ ...f, [k]: v }));
+    profileDirty.current = true;
+    if (k === "name") setNameError(null);
+  };
+
+  const onHandleInput = (raw: string) => {
+    const v = checkHandle(raw);
+    setFields((f) => ({ ...f, handle: v }));
+    profileDirty.current = true;
+    setHandleError(null);
+  };
+
+  const onPickCampus = (id: string) => {
+    setCampusId(id);
+    setCampusError(null);
+  };
+
+  const onSwitchBusy = (b: boolean) => {
+    busyRef.current = b;
+    setSwitching(b);
+  };
+
+  /** The Purdue switch verified a new university (§9 B12 item 8). */
+  const onSystemChanged = (next: { system: SchoolSystem; currentCampusId: string | null }) => {
+    setSystem(next.system);
+    setCampusId((c) => (isCampusAllowed(c, next.system) ? c : ""));
+    // A kept shared campus isn't confirmed by the switch (it keeps the campus
+    // without stamping it), so it stays saved only when the server still has
+    // exactly this campus and it's allowed in the new university.
+    setSavedCampusId((s) =>
+      s !== null && isCampusAllowed(s, next.system) && s === next.currentCampusId ? s : null,
+    );
+    setCampusError(null);
+    resetSocial();
+  };
+
+  const onUploading = (b: boolean) => {
+    busyRef.current = b;
+    setUploading(b);
+  };
+
+  const onPhotoSaved = (url: string) => {
+    const prev = blobUrlRef.current;
+    if (prev && prev !== url) URL.revokeObjectURL(prev);
+    blobUrlRef.current = url.startsWith("blob:") ? url : null;
+    setAvatarUrl(url);
+    setPhotoError(null);
+  };
+
+  const openPhotoPicker = () => {
+    fileInputRef.current?.click();
+  };
+
+  // ── Step 2 Continue ──────────────────────────────────────────────────────
+  const continueCampus = async () => {
+    if (busyRef.current) return;
+    // No university on record: there's nothing to pick yet.
+    if (system === null) {
+      goForward(3);
+      return;
+    }
+    if (!campusId || !isCampusAllowed(campusId, system)) {
+      setCampusError(campusId ? ONB_COPY.campus.invalid : ONB_COPY.campus.required);
+      revealCampus();
+      return;
+    }
+    // Nothing to save: replay writes nothing, and an unchanged pick would only
+    // spend the step route's limiter (shared with profile saves).
+    if (replay || campusId === savedCampusId) {
+      goForward(3);
+      return;
+    }
+    const picked = campusId;
+    busyRef.current = true;
+    setSavingCampus(true);
+    const r = await postCampus(picked);
+    busyRef.current = false;
+    setSavingCampus(false);
+    if (r.ok) {
+      markCampusSaved(picked);
+      goForward(3);
+      return;
+    }
+    if (CAMPUS_FIELD_CODES.has(r.code ?? "")) {
+      setCampusError(r.error ?? ONB_COPY.campus.invalid);
+      revealCampus();
+      return;
+    }
+    toast({ message: r.message, tone: "error", action: r.action });
+  };
+
+  // ── Step 3 Continue ──────────────────────────────────────────────────────
+  const continueProfile = async () => {
+    if (busyRef.current) return;
+    const bad = checkIdentity();
+    if (bad) {
+      // Focusing answers the tap; it isn't focus on step entry.
+      (bad === "name" ? nameRef : handleRef).current?.focus();
+      return;
+    }
+    if (replay) {
+      goForward(4);
+      return;
+    }
+    busyRef.current = true;
+    setSavingProfile(true);
+    const r = await postProfile();
+    busyRef.current = false;
+    setSavingProfile(false);
+    if (r.ok) {
+      setIdentitySaved(true);
+      profileDirty.current = false;
+      goForward(4);
+      return;
+    }
+    const field = showProfileFieldError(r);
+    if (field) {
+      (field === "name" ? nameRef : handleRef).current?.focus();
+      return;
+    }
+    toastProfileFailure(r);
+  };
+
+  // ── Finish and Skip ──────────────────────────────────────────────────────
+  /** Onboarding is done: drop the draft, queue the campus tour, land where the server says. */
+  const succeed = (next: unknown) => {
+    doneRef.current = true;
+    saverRef.current?.cancel();
+    clearDraft(userId);
+    try {
+      window.localStorage.setItem("vibe_tour_pending", "campus");
+    } catch {
+      /* storage blocked: the campus page still starts the tour from its URL */
+    }
+    // Used verbatim: the server's path already carries the welcome flag.
+    const dest = typeof next === "string" && isSafeRelativePath(next) ? next : "/campus?welcome=1";
+    setWarping(true);
+    window.setTimeout(() => leave(dest), 700);
+  };
+
+  const finish = async () => {
+    if (busyRef.current) return;
+    if (replay) {
+      setWarping(true);
+      window.setTimeout(() => leave("/campus"), 700);
+      return;
+    }
+    busyRef.current = true;
+    setFinishing(true);
+    const stop = () => {
+      busyRef.current = false;
+      setFinishing(false);
+    };
+
+    // Catch up a campus pick that never went through Continue (browser
+    // Forward, for one), so Finish can't succeed on the old campus.
+    if (system !== null && campusId !== savedCampusId) {
+      if (!campusId || !isCampusAllowed(campusId, system)) {
+        stop();
+        setCampusError(campusId ? ONB_COPY.campus.invalid : ONB_COPY.campus.required);
+        sendBack(2);
+        return;
+      }
+      const picked = campusId;
+      const rc = await postCampus(picked);
+      if (!rc.ok) {
+        stop();
+        if (CAMPUS_FIELD_CODES.has(rc.code ?? "")) {
+          setCampusError(rc.error ?? ONB_COPY.campus.invalid);
+          sendBack(2);
+        } else {
+          toast({ message: rc.message, tone: "error", action: rc.action });
+        }
+        return;
+      }
+      markCampusSaved(picked);
+    }
+
+    // The same for profile edits that were never saved.
+    if (profileDirty.current || !identitySaved) {
+      if (checkIdentity()) {
+        stop();
+        sendBack(3);
+        return;
+      }
+      const rp = await postProfile();
+      if (!rp.ok) {
+        stop();
+        if (showProfileFieldError(rp)) sendBack(3);
+        else toastProfileFailure(rp);
+        return;
+      }
+      setIdentitySaved(true);
+      profileDirty.current = false;
+    }
+
+    // No university on record means no campus can ever be allowed, so that
+    // student finishes the way Skip does (the campus rule is waived) instead
+    // of meeting a Finish that can never work. Settings asks again later.
+    const r = await vibeRequest<{ next?: unknown }>("/api/me/onboarding-complete", {
+      method: "POST",
+      json: {
+        v: 2,
+        otto_answers: buildOttoConfig(),
+        ...(system === null ? { skip: true } : {}),
+      },
+      quiet: true,
+      failure: ONB_COPY.people.finishFailed,
+    });
+    if (r.ok) {
+      succeed(r.data.next);
+      return;
+    }
+    stop();
+    if (r.code === "name_required") {
+      setNameError(r.error ?? ONB_COPY.profile.errors.nameRequired);
+      sendBack(3);
+      return;
+    }
+    if (r.code === "handle_required") {
+      setHandleError(r.error ?? ONB_COPY.profile.errors.handleRequired);
+      sendBack(3);
+      return;
+    }
+    if (r.code === "campus_required" || r.code === "campus_invalid") {
+      if (system !== null) {
+        setCampusError(r.error ?? ONB_COPY.campus.required);
+        sendBack(2);
+      } else {
+        toast({ message: r.error ?? r.message, tone: "error" });
+      }
+      return;
+    }
+    // terms_required keeps Review Terms; a 429 shows the mapped line.
+    toast({ message: r.message, tone: "error", action: r.action });
+  };
+
+  const openSkip = () => {
+    if (busyRef.current) return;
+    // In replay nothing is saved, so what's typed decides the variant.
+    const hasIdentity = replay
+      ? !!fields.name.trim() && HANDLE_RE.test(fields.handle)
+      : identitySaved;
+    setSkipBase(hasIdentity ? "saved" : "identity");
+    setForceIdentity(false);
+    setSkipOpen(true);
+  };
+
+  const closeSkip = useCallback(() => {
+    setSkipOpen(false);
+    setForceIdentity(false);
+  }, []);
+
+  /** Skip anyway / Save & skip (§9 B12 item 13). */
+  const runSkip = async () => {
+    if (busyRef.current) return;
+    const variant = skipVariant;
+    if (replay) {
+      if (variant === "identity" && checkIdentity()) return;
+      leave("/campus");
+      return;
+    }
+    busyRef.current = true;
+    setSkipping(true);
+    const stop = () => {
+      busyRef.current = false;
+      setSkipping(false);
+    };
+
+    // A campus is optional on skip, so a refused save is ignored. Only a pick
+    // the student could have seen is sent: never the preselect from step 1.
+    if (maxStep >= 2 && isCampusAllowed(campusId, system) && campusId !== savedCampusId) {
+      const picked = campusId;
+      const rc = await postCampus(picked);
+      if (rc.ok) markCampusSaved(picked);
+    }
+
+    if (variant === "identity" || profileDirty.current) {
+      if (checkIdentity()) {
+        setForceIdentity(true);
+        stop();
+        return;
+      }
+      const rp = await postProfile();
+      if (!rp.ok) {
+        if (showProfileFieldError(rp)) setForceIdentity(true);
+        else toastProfileFailure(rp);
+        stop();
+        return;
+      }
+      setIdentitySaved(true);
+      profileDirty.current = false;
+    }
+
+    const r = await vibeRequest<{ next?: unknown }>("/api/me/onboarding-complete", {
+      method: "POST",
+      json: { v: 2, otto_answers: buildOttoConfig(), skip: true },
+      quiet: true,
+      failure: ONB_COPY.skip.failed,
+    });
+    if (r.ok) {
+      succeed(r.data.next);
+      return;
+    }
+    stop();
+    if (r.code === "name_required") {
+      setForceIdentity(true);
+      setNameError(r.error ?? ONB_COPY.profile.errors.nameRequired);
+      return;
+    }
+    if (r.code === "handle_required") {
+      setForceIdentity(true);
+      setHandleError(r.error ?? ONB_COPY.profile.errors.handleRequired);
+      return;
+    }
+    toast({ message: r.message, tone: "error", action: r.action });
+  };
+
+  // ── History: header Back = browser Back = iOS swipe ──────────────────────
+  /** A Forward undone past unsaved changes: run this step's Continue once the undo lands. */
+  const continueOnLandRef = useRef<number | null>(null);
+
+  const onPopState = (e: PopStateEvent) => {
+    const raw = (e.state as { onbStep?: unknown } | null)?.onbStep;
+    const at = typeof raw === "number" && Number.isInteger(raw) && raw >= 1 ? raw : null;
+    const current = stepRef.current;
+    const pending = continueOnLandRef.current;
+    continueOnLandRef.current = null;
+
+    // Not an onboarding entry: Back from step 1, on the way out. Nothing to
+    // stamp; the page it belongs to isn't this flow's.
+    if (at === null) {
+      if (!busyRef.current) {
+        if (skipOpen) closeSkip();
+        setStep(1);
+      }
+      return;
+    }
+
+    // The undo of a Forward past unsaved changes (below) has landed.
+    if (pending !== null && at === pending && current === pending) {
+      if (!busyRef.current) void (pending === 2 ? continueCampus() : continueProfile());
+      return;
+    }
+
+    // Any other landing back on this step (an undo below): nothing moved.
+    if (at === current) return;
+
+    // Mid-save: undo the move and stay put. A Back re-adds the steps it left,
+    // synchronously, so a save that finishes right after still stacks on top.
+    // A Forward goes back to where it came from.
+    if (busyRef.current) {
+      if (at < current) {
+        for (let s = at + 1; s <= current; s++) {
+          window.history.pushState({ ...window.history.state, onbStep: s }, "");
+        }
+      } else if (at > current) {
+        window.history.go(current - at);
+      }
+      return;
+    }
+
+    // Past every step reached so far: an entry left above a step the restore
+    // pulled back to. Go back to where the student is.
+    if (at > maxStepRef.current) {
+      window.history.go(current - at);
+      return;
+    }
+
+    // Forward past a campus or profile step with changes that aren't saved:
+    // go back to that step, then run its Continue, so nothing is skipped
+    // unsaved. Its own push replaces the forward entries.
+    if (!replay && at > current) {
+      const campusUnsaved = current === 2 && system !== null && campusId !== savedCampusId;
+      const profileUnsaved = current === 3 && (profileDirty.current || !identitySaved);
+      if (campusUnsaved || profileUnsaved) {
+        continueOnLandRef.current = current;
+        window.history.go(current - at);
+        return;
+      }
+    }
+
+    if (skipOpen) closeSkip();
+    stepRef.current = at;
+    setStep(at);
+    window.scrollTo({ top: 0 });
+  };
+
+  const popRef = useRef<(e: PopStateEvent) => void>(() => {});
+  useEffect(() => {
+    popRef.current = onPopState;
+  });
+
+  /** Once per mount: StrictMode's second effect run must not move history twice. */
+  const stackBuiltRef = useRef(false);
+  useEffect(() => {
+    if (!stackBuiltRef.current) {
+      stackBuiltRef.current = true;
+      const target = boot.step;
+      const raw: unknown = window.history.state?.onbStep;
+      const at = typeof raw === "number" && Number.isInteger(raw) && raw >= 1 ? raw : null;
+      if (at === null) {
+        // A fresh load: this entry becomes step 1, with one entry per step up
+        // to the restored step.
+        window.history.replaceState({ ...window.history.state, onbStep: 1 }, "");
+        for (let s = 2; s <= target; s++) {
+          window.history.pushState({ ...window.history.state, onbStep: s }, "");
+        }
+      } else if (at > target) {
+        // A reload that restores an earlier step than this entry (the restore
+        // pulled back): that step's own entry is below this one, so go there.
+        // A Forward onto an entry above it that's past maxStep is undone.
+        window.history.go(target - at);
+      } else {
+        // A reload on this step or below it: keep the entries under it.
+        for (let s = at + 1; s <= target; s++) {
+          window.history.pushState({ ...window.history.state, onbStep: s }, "");
+        }
+      }
+    }
+    const listener = (e: PopStateEvent) => popRef.current(e);
+    window.addEventListener("popstate", listener);
+    return () => window.removeEventListener("popstate", listener);
+  }, [boot.step]);
+
+  // ── Derived for render ───────────────────────────────────────────────────
+  // Majors follow the campus: a curated list where one exists, else free text.
+  const majorList = useMemo(
+    () => (system && campusId ? majorsForCampus(campusId, system) : null),
+    [system, campusId],
   );
+
+  const campusForSteps = savedCampusId ?? (isCampusAllowed(campusId, system) ? campusId : null);
+  const campusRow = campusRowById(campusForSteps);
+  const campusShortName = campusRow?.shortName ?? null;
+  const campusShared = (campusRow?.systems.length ?? 0) > 1;
+
+  const initial = (fields.name.trim().charAt(0) || "?").toUpperCase();
+
+  let body: ReactNode = null;
+  if (step === 2) {
+    body = (
+      <StepCampus
+        system={system}
+        campusId={campusId}
+        preselectId={preselectId}
+        error={campusError}
+        replay={replay}
+        busy={busy}
+        groupRef={campusGroupRef}
+        onPick={onPickCampus}
+        onBusy={onSwitchBusy}
+        onSystemChanged={onSystemChanged}
+      />
+    );
+  } else if (step === 3) {
+    body = (
+      <StepProfile
+        fields={fields}
+        onField={onField}
+        onHandleInput={onHandleInput}
+        handleStatus={handleStatus}
+        errors={{ name: nameError, handle: handleError }}
+        nameRef={nameRef}
+        handleRef={handleRef}
+        majorList={majorList}
+      />
+    );
+  } else if (step === 4) {
+    body = (
+      <StepPhoto
+        replay={replay}
+        avatarUrl={avatarUrl}
+        initial={initial}
+        fileInputRef={fileInputRef}
+        error={photoError}
+        onError={setPhotoError}
+        onUploading={onUploading}
+        onSaved={onPhotoSaved}
+      />
+    );
+  } else if (step === 5) {
+    body = (
+      <StepClubs
+        replay={replay}
+        campusShortName={campusShortName}
+        state={clubs}
+        setState={setClubs}
+      />
+    );
+  } else if (step === 6) {
+    body = (
+      <StepPeople
+        replay={replay}
+        campusShortName={campusShortName}
+        campusShared={campusShared}
+        system={system}
+        state={people}
+        setState={setPeople}
+      />
+    );
+  }
+
+  let footer: ReactNode = null;
+  if (step === 1) {
+    footer = (
+      <button type="button" style={cta(busy)} disabled={busy} onClick={() => goForward(2)}>
+        {ONB_COPY.hello.cta}
+      </button>
+    );
+  } else if (step === 2) {
+    footer = (
+      <button type="button" style={cta(busy)} disabled={busy} onClick={() => void continueCampus()}>
+        {savingCampus ? ONB_COPY.campus.saving : ONB_COPY.campus.continue}
+      </button>
+    );
+  } else if (step === 3) {
+    footer = (
+      <button type="button" style={cta(busy)} disabled={busy} onClick={() => void continueProfile()}>
+        {savingProfile ? ONB_COPY.profile.saving : ONB_COPY.profile.continue}
+      </button>
+    );
+  } else if (step === 4) {
+    footer = uploading ? (
+      <button type="button" style={cta(true)} disabled>
+        {ONB_COPY.photo.uploading}
+      </button>
+    ) : avatarUrl ? (
+      <>
+        <button type="button" style={cta(busy)} disabled={busy} onClick={() => goForward(5)}>
+          {ONB_COPY.photo.continue}
+        </button>
+        <button type="button" style={secondaryTapStyle} disabled={busy} onClick={openPhotoPicker}>
+          {ONB_COPY.photo.change}
+        </button>
+      </>
+    ) : (
+      <>
+        <button type="button" style={cta(busy)} disabled={busy} onClick={openPhotoPicker}>
+          {ONB_COPY.photo.choose}
+        </button>
+        <button type="button" style={secondaryTapStyle} disabled={busy} onClick={() => goForward(5)}>
+          {ONB_COPY.photo.skip}
+        </button>
+      </>
+    );
+  } else if (step === 5) {
+    footer = (
+      <button type="button" style={cta(busy)} disabled={busy} onClick={() => goForward(6)}>
+        {anyClubFollowed(clubs.rows, clubs.local) ? ONB_COPY.clubs.continue : ONB_COPY.clubs.skipForNow}
+      </button>
+    );
+  } else if (step === 6) {
+    footer = (
+      <button type="button" style={cta(busy)} disabled={busy} onClick={() => void finish()}>
+        {finishing ? ONB_COPY.people.finishing : ONB_COPY.people.finish}
+      </button>
+    );
+  }
 
   return (
     <div style={shellStyle}>
       <StyleTag />
 
-      {/* Soft glow accents in the background */}
-      <span style={bg1Style} />
-      <span style={bg2Style} />
+      {/* Soft glow accents, clipped by their own fixed layer (not the shell) */}
+      <div style={glowLayerStyle} aria-hidden="true">
+        <span style={bg1Style} />
+        <span style={bg2Style} />
+      </div>
 
-      {/* Top bar */}
-      <header style={topBarStyle}>
-        <div style={logoStyle}>
-          vibe<span style={{ color: COLORS.accent }}>.</span>
-        </div>
-        {progressDots}
-        {step > 1 && (
-          <button
-            type="button"
-            style={skipBtnStyle}
-            disabled={submitting}
-            onClick={() => setSkipOpen(true)}
-          >
-            Skip
-          </button>
-        )}
-        {step === 1 && <span style={{ width: 44 }} />}
-      </header>
+      <OnbHeader
+        step={step}
+        total={ONBOARDING_TOTAL_STEPS}
+        backDisabled={busy}
+        skipDisabled={busy || skipOpen}
+        onBack={() => window.history.back()}
+        onSkip={openSkip}
+      />
 
-      {replay && <div style={replayPillStyle}>REPLAY MODE</div>}
+      {replay && <div style={replayPillStyle}>{ONB_COPY.header.replay}</div>}
 
       <main style={mainStyle}>
-        {/* ── Step 1 — Otto intro ──────────────────────────────────────── */}
-        {step === 1 && (
-          <section style={stepSectionStyle}>
-            <OttoOrb size="big" />
-            <h1 style={h1Style}>
-              {"i'm "}<em style={emStyle}>otto</em>.
-            </h1>
-            <p style={introStyle}>
-              {"“think of me as your campus compass. i'll point you to what's loud, what's tonight, and who's on your wavelength — your guide while you build out your home on vibe.”"}
-            </p>
-            <p style={noteStyle}>
-              about two minutes — profile, experience, then your documents
-            </p>
-          </section>
-        )}
-
-        {/* ── Step 2 — Quick profile ───────────────────────────────────── */}
-        {step === 2 && (
-          <section style={stepSectionStyle}>
-            <OttoOrb size="small" />
-            <h2 style={h2Style}>{"let's pin down your profile"}</h2>
-            <p style={subIntroStyle}>
-              {"“same fields as your Vibe profile — a quick pass now; photo, banner, and fine-tuning on the next screen.”"}
-            </p>
-
-            <div style={formStyle}>
-              <Field label="Name">
-                <input
-                  ref={step2NameRef}
-                  type="text"
-                  value={name}
-                  onChange={(e) => setName(e.target.value)}
-                  maxLength={120}
-                  placeholder="How you want to appear on Vibe"
-                  autoComplete="name"
-                  style={inputStyle}
-                />
-              </Field>
-
-              <Field
-                label="Handle"
-                hint="how friends find you (3-20, letters/numbers/_)"
-              >
-                <div style={handleWrapStyle}>
-                  <span style={handleAtStyle}>@</span>
-                  <input
-                    type="text"
-                    value={handle}
-                    onChange={onHandleChange}
-                    maxLength={20}
-                    placeholder="yourhandle"
-                    autoComplete="off"
-                    spellCheck={false}
-                    autoCapitalize="off"
-                    style={{
-                      flex: 1,
-                      border: "none",
-                      background: "none",
-                      color: "white",
-                      fontSize: 16,
-                      outline: "none",
-                      fontFamily: "inherit",
-                    }}
-                  />
-                  {handleStatus && (
-                    <span
-                      style={{
-                        fontSize: 12,
-                        fontWeight: 600,
-                        color: handleStatus.color,
-                      }}
-                    >
-                      {handleStatus.text}
-                    </span>
-                  )}
-                </div>
-              </Field>
-
-              <Field label="Bio" hint="up to 600 characters">
-                <textarea
-                  value={bio}
-                  onChange={(e) => setBio(e.target.value)}
-                  maxLength={600}
-                  rows={3}
-                  placeholder="A few lines about you — what you're into, what you're building."
-                  style={textareaStyle}
-                />
-              </Field>
-
-              {systemAware ? (
-                <Field label="Which campus is yours?">
-                  <div
-                    ref={campusGroupRef}
-                    role="radiogroup"
-                    aria-label="Which campus is yours?"
-                    aria-invalid={campusError ? true : undefined}
-                    aria-describedby={
-                      campusError ? "onbCampusError" : "onbCampusNote"
-                    }
-                    style={campusListStyle}
-                  >
-                    {campusOptions.map((opt) => {
-                      const selected = campusId === opt.id;
-                      return (
-                        <label key={opt.id} style={campusCardStyle(selected)}>
-                          <input
-                            type="radio"
-                            name="onb-campus"
-                            value={opt.id}
-                            checked={selected}
-                            onChange={() => {
-                              setCampusId(opt.id);
-                              setCampusError(null);
-                            }}
-                            style={campusRadioStyle}
-                          />
-                          <span style={campusTextStyle}>
-                            <span style={campusTitleRowStyle}>
-                              <span style={campusTitleStyle}>{opt.title}</span>
-                              {opt.id === preselectId && (
-                                <span style={campusTagStyle}>
-                                  from your school email
-                                </span>
-                              )}
-                              {!opt.isOpen && (
-                                <span style={campusSoonStyle}>not open yet</span>
-                              )}
-                            </span>
-                            <span style={campusSubStyle}>{opt.sub}</span>
-                          </span>
-                        </label>
-                      );
-                    })}
-                  </div>
-                  {campusError && (
-                    <p id="onbCampusError" role="alert" style={fieldErrorStyle}>
-                      {campusError}
-                    </p>
-                  )}
-                  <p id="onbCampusNote" style={hintBelowStyle}>
-                    {campusNote}
-                  </p>
-                </Field>
-              ) : (
-                <Field
-                  label="Which campus are you at?"
-                  hint="not verified; you can change this any time in settings"
-                >
-                  <select
-                    value={campus}
-                    onChange={(e) => setCampus(e.target.value)}
-                    style={inputStyle}
-                  >
-                    {IU_CAMPUSES.map((c) => (
-                      <option key={c.id} value={c.label}>
-                        {c.city && c.city !== c.label.replace(/^IU /, "")
-                          ? `${c.label} — ${c.city}`
-                          : c.label}
-                      </option>
-                    ))}
-                  </select>
-                </Field>
-              )}
-
-              <Field label="Major" hint={majorHint}>
-                <input
-                  type="text"
-                  value={major}
-                  onChange={(e) => setMajor(e.target.value)}
-                  maxLength={80}
-                  list={majorOptions.length ? "onbIuMajors" : undefined}
-                  autoComplete="off"
-                  placeholder="e.g. Informatics"
-                  style={inputStyle}
-                />
-                {majorOptions.length > 0 && (
-                  <datalist id="onbIuMajors">
-                    {majorOptions.map((m) => (
-                      <option key={m} value={m} />
-                    ))}
-                  </datalist>
-                )}
-              </Field>
-
-              <Field label="Department / school" hint="optional">
-                <input
-                  type="text"
-                  value={department}
-                  onChange={(e) => setDepartment(e.target.value)}
-                  maxLength={120}
-                  list={schoolOptions.length ? "onbIuSchools" : undefined}
-                  autoComplete="off"
-                  placeholder="e.g. Luddy School of Informatics…"
-                  style={inputStyle}
-                />
-                {schoolOptions.length > 0 && (
-                  <datalist id="onbIuSchools">
-                    {schoolOptions.map((s) => (
-                      <option key={s} value={s} />
-                    ))}
-                  </datalist>
-                )}
-              </Field>
-
-              <Field label="Year">
-                <select
-                  value={year}
-                  onChange={(e) => setYear(e.target.value)}
-                  style={inputStyle}
-                >
-                  <option value="">Prefer not to say</option>
-                  <option value="1">1st year</option>
-                  <option value="2">2nd year</option>
-                  <option value="3">3rd year</option>
-                  <option value="4">4th year</option>
-                  <option value="5">5th+ / grad</option>
-                </select>
-              </Field>
-
-              <Field
-                label="Interests & projects"
-                hint="up to 10 items — comma or new-line separated"
-              >
-                <textarea
-                  value={interests}
-                  onChange={(e) => setInterests(e.target.value)}
-                  maxLength={600}
-                  rows={3}
-                  placeholder="Clubs, side projects, topics"
-                  style={textareaStyle}
-                />
-              </Field>
-
-              <Field
-                label="Skills"
-                hint="up to 12 items, 30 chars each"
-              >
-                <textarea
-                  value={skills}
-                  onChange={(e) => setSkills(e.target.value)}
-                  maxLength={600}
-                  rows={3}
-                  placeholder="e.g. Figma, Python, public speaking"
-                  style={textareaStyle}
-                />
-              </Field>
-
-              <Field label="What are you here for?">
-                <div style={lookingForWrapStyle}>
-                  {LOOKING_FOR_OPTIONS.map((opt) => {
-                    const checked = lookingFor.includes(opt.value);
-                    return (
-                      <label key={opt.value} style={lookingForRowStyle(checked)}>
-                        <input
-                          type="checkbox"
-                          checked={checked}
-                          onChange={(e) => {
-                            setLookingFor((prev) =>
-                              e.target.checked
-                                ? [...prev, opt.value]
-                                : prev.filter((v) => v !== opt.value),
-                            );
-                          }}
-                          style={{ accentColor: COLORS.accent }}
-                        />
-                        <span>{opt.label}</span>
-                      </label>
-                    );
-                  })}
-                </div>
-              </Field>
-            </div>
-            <p style={changeLaterNoteStyle}>you can change anything later</p>
-          </section>
-        )}
-
-        {/* ── Step 3 — Work experience ─────────────────────────────────── */}
-        {step === 3 && (
-          <section style={stepSectionStyle}>
-            <OttoOrb size="small" />
-            <h2 style={h2Style}>
-              where have you <em style={emStyle}>worked</em>?
-            </h2>
-            <p style={subIntroStyle}>
-              {"“internships, campus jobs, freelance — whatever counts. Skip if you'd rather add this on your profile.”"}
-            </p>
-
-            <div style={formStyle}>
-              <ExperienceRow
-                label="Role 1"
-                value={exp1}
-                onChange={setExp1}
-                companyRef={step3CompanyRef}
-              />
-              <ExperienceRow
-                label="Role 2"
-                optional
-                value={exp2}
-                onChange={setExp2}
-              />
-            </div>
-            <p style={changeLaterNoteStyle}>
-              {"We'll show this in your profile's work section — same layout as the full editor."}
-            </p>
-          </section>
-        )}
-
-        {/* ── Step 4 — Resume / portfolio ──────────────────────────────── */}
-        {step === 4 && (
-          <section style={stepSectionStyle}>
-            <OttoOrb size="small" />
-            <h2 style={h2Style}>
-              resume or <em style={emStyle}>portfolio</em>
-            </h2>
-            <p style={subIntroStyle}>
-              {"“upload a PDF or image, or paste a link — preview below, same idea as on your profile.”"}
-            </p>
-
-            <div style={formStyle}>
-              <input
-                ref={resumeFileInputRef}
-                type="file"
-                accept=".pdf,image/jpeg,image/png,image/webp,image/gif"
-                onChange={onResumeFilePick}
-                style={{ display: "none" }}
-              />
-              <button
-                type="button"
-                style={uploadBtnStyle}
-                onClick={() => resumeFileInputRef.current?.click()}
-              >
-                Upload PDF or image
-              </button>
-              {resumeUploadStatus && (
-                <span style={uploadStatusStyle}>{resumeUploadStatus}</span>
-              )}
-
-              <Field label="Or paste a link">
-                <input
-                  ref={step4LinkRef}
-                  type="url"
-                  value={resumeLink}
-                  onChange={(e) => setResumeLink(e.target.value)}
-                  maxLength={2048}
-                  placeholder="https://… — optional"
-                  inputMode="url"
-                  autoCapitalize="off"
-                  autoCorrect="off"
-                  style={inputStyle}
-                />
-                <p style={hintBelowStyle}>
-                  {"https:// or http:// — if you upload a file, we'll use that unless you clear it."}
-                </p>
-              </Field>
-
-              {resumePreview && (
-                <div style={previewWrapStyle}>
-                  <div style={previewLabelStyle}>Preview</div>
-                  {resumePreview.isPdf ? (
-                    <iframe
-                      src={`${resumePreview.url}${resumePreview.url.includes("#") ? "" : "#view=FitH"}`}
-                      title="Resume preview"
-                      style={previewFrameStyle}
-                    />
-                  ) : (
-                    // eslint-disable-next-line @next/next/no-img-element
-                    <img
-                      src={resumePreview.url}
-                      alt="Resume preview"
-                      style={previewImgStyle}
-                    />
-                  )}
-                </div>
-              )}
-            </div>
-          </section>
-        )}
+        <section key={step} style={stepSectionStyle}>
+          {step === 1 ? (
+            <>
+              <OttoOrb size="big" />
+              <h1 style={h1Style}>
+                {"i'm "}<em style={emStyle}>otto</em>.
+              </h1>
+              <p style={introStyle}>{ONB_COPY.hello.intro}</p>
+              <p style={noteStyle}>{ONB_COPY.hello.note}</p>
+            </>
+          ) : (
+            <>
+              <OttoOrb size="small" />
+              {body}
+            </>
+          )}
+        </section>
       </main>
 
       {/* Sticky bottom CTA */}
-      <footer style={bottomBarStyle}>
-        {step === 1 && (
-          <button
-            type="button"
-            style={primaryCtaStyle}
-            onClick={() => setStep(2)}
-          >
-            {"Let's go →"}
-          </button>
-        )}
-        {step === 2 && (
-          <>
-            <button
-              type="button"
-              style={primaryCtaStyle}
-              onClick={() => {
-                if (campusAnswered()) setStep(3);
-              }}
-            >
-              Continue →
-            </button>
-            <button
-              type="button"
-              style={secondaryLinkStyle}
-              onClick={() => {
-                if (campusAnswered()) setStep(4);
-              }}
-            >
-              Skip to resume →
-            </button>
-          </>
-        )}
-        {step === 3 && (
-          <>
-            <button
-              type="button"
-              style={primaryCtaStyle}
-              onClick={() => setStep(4)}
-            >
-              Continue →
-            </button>
-            <button
-              type="button"
-              style={secondaryLinkStyle}
-              onClick={() => setStep(4)}
-            >
-              Skip
-            </button>
-          </>
-        )}
-        {step === 4 && (
-          <button
-            type="button"
-            style={primaryCtaStyle}
-            disabled={submitting}
-            onClick={completeOnboarding}
-          >
-            {submitting ? "Saving…" : "Finish & open my profile →"}
-          </button>
-        )}
-      </footer>
+      <footer style={bottomBarStyle}>{footer}</footer>
 
-      {/* Skip confirm overlay */}
-      {skipOpen && (
-        <div
-          style={skipOverlayStyle}
-          onClick={(e) => {
-            if (e.target === e.currentTarget) setSkipOpen(false);
-          }}
-        >
-          <div style={skipCardStyle}>
-            <div style={skipTitleStyle}>Skip onboarding?</div>
-            <div style={skipBodyStyle}>
-              {"What you've typed here won't be saved. You can fill in your profile any time from your profile page."}
-            </div>
-            <div style={skipRowStyle}>
-              <button
-                type="button"
-                style={primaryCtaStyle}
-                onClick={() => setSkipOpen(false)}
-              >
-                Keep going
-              </button>
-              <button
-                type="button"
-                style={secondaryLinkStyle}
-                disabled={submitting}
-                onClick={skipOnboarding}
-              >
-                {submitting ? "Skipping…" : "Skip anyway"}
-              </button>
-            </div>
-          </div>
-        </div>
-      )}
+      <SkipSheet
+        open={skipOpen}
+        variant={skipVariant}
+        busy={busy}
+        name={fields.name}
+        handle={fields.handle}
+        handleStatus={handleStatus}
+        nameError={nameError}
+        handleError={handleError}
+        onName={(v) => onField("name", v)}
+        onHandleInput={onHandleInput}
+        onKeepGoing={closeSkip}
+        onSkipAnyway={() => void runSkip()}
+        onSaveAndSkip={() => void runSkip()}
+      />
 
       {/* Warp overlay (simplified mobile version of the desktop hyperdrive) */}
       {warping && <div style={warpOverlayStyle} />}
@@ -1237,94 +1140,9 @@ export function OnboardingMobile({
   );
 }
 
-// ── Sub-components ────────────────────────────────────────────────────────────
-
-function Field({
-  label,
-  hint,
-  children,
-}: {
-  label: string;
-  hint?: string;
-  children: React.ReactNode;
-}) {
-  return (
-    <div>
-      <label style={labelStyle}>
-        {label}
-        {hint && <span style={hintInlineStyle}>{` — ${hint}`}</span>}
-      </label>
-      {children}
-    </div>
-  );
-}
-
-function ExperienceRow({
-  label,
-  optional,
-  value,
-  onChange,
-  companyRef,
-}: {
-  label: string;
-  optional?: boolean;
-  value: WorkRow;
-  onChange: (next: WorkRow) => void;
-  companyRef?: React.Ref<HTMLInputElement>;
-}) {
-  const set = <K extends keyof WorkRow>(k: K, v: WorkRow[K]) =>
-    onChange({ ...value, [k]: v });
-  return (
-    <div style={expRowStyle}>
-      <div style={labelStyle}>
-        {label}
-        {optional && <span style={hintInlineStyle}> — optional</span>}
-      </div>
-      <input
-        ref={companyRef}
-        type="text"
-        value={value.company}
-        onChange={(e) => set("company", e.target.value)}
-        maxLength={200}
-        placeholder="Company or org"
-        autoComplete="organization"
-        style={inputStyle}
-      />
-      <input
-        type="text"
-        value={value.title}
-        onChange={(e) => set("title", e.target.value)}
-        maxLength={200}
-        placeholder="Title or role"
-        autoComplete="organization-title"
-        style={inputStyle}
-      />
-      <input
-        type="text"
-        value={value.dates}
-        onChange={(e) => set("dates", e.target.value)}
-        maxLength={120}
-        placeholder="Dates (e.g. Jun 2024 — Aug 2024)"
-        style={inputStyle}
-      />
-      <input
-        type="text"
-        value={value.location}
-        onChange={(e) => set("location", e.target.value)}
-        maxLength={200}
-        placeholder="Location (optional)"
-        style={inputStyle}
-      />
-      <textarea
-        value={value.description}
-        onChange={(e) => set("description", e.target.value)}
-        maxLength={4000}
-        rows={2}
-        placeholder="What you did (optional)"
-        style={textareaStyle}
-      />
-    </div>
-  );
+/** The primary button, dimmed while it can't be tapped. */
+function cta(disabled: boolean): CSSProperties {
+  return disabled ? { ...primaryCtaStyle, opacity: 0.6 } : primaryCtaStyle;
 }
 
 function StyleTag() {
@@ -1382,6 +1200,8 @@ function StyleTag() {
 
 // ── Styles ─────────────────────────────────────────────────────────────────────
 
+// Not a scroll container (no overflow clip): that is what lets the header's
+// `position: sticky` hold while the page scrolls.
 const shellStyle: CSSProperties = {
   position: "relative",
   minHeight: "100dvh",
@@ -1391,8 +1211,15 @@ const shellStyle: CSSProperties = {
     "'DM Sans', -apple-system, BlinkMacSystemFont, 'Helvetica Neue', sans-serif",
   display: "flex",
   flexDirection: "column",
-  overflow: "hidden",
   paddingBottom: "calc(140px + env(safe-area-inset-bottom, 0px))",
+};
+
+const glowLayerStyle: CSSProperties = {
+  position: "fixed",
+  inset: 0,
+  overflow: "hidden",
+  pointerEvents: "none",
+  zIndex: 0,
 };
 
 const bg1Style: CSSProperties = {
@@ -1418,80 +1245,6 @@ const bg2Style: CSSProperties = {
     "radial-gradient(circle, rgba(124,92,252,.16) 0%, transparent 70%)",
   pointerEvents: "none",
   zIndex: 0,
-};
-
-const topBarStyle: CSSProperties = {
-  position: "sticky",
-  top: 0,
-  zIndex: 5,
-  display: "flex",
-  alignItems: "center",
-  justifyContent: "space-between",
-  gap: 8,
-  padding:
-    "calc(env(safe-area-inset-top, 0px) + 12px) 16px 12px",
-  background:
-    "linear-gradient(to bottom, rgba(28,28,30,.95) 60%, rgba(28,28,30,.0))",
-  backdropFilter: "blur(8px)",
-};
-
-const logoStyle: CSSProperties = {
-  fontFamily: "'Fraunces', Georgia, serif",
-  fontSize: 18,
-  fontWeight: 900,
-  letterSpacing: "-0.5px",
-  color: "white",
-};
-
-const progressDotsStyle: CSSProperties = {
-  display: "flex",
-  alignItems: "center",
-  gap: 6,
-  padding: "6px 12px",
-  background: "rgba(255,255,255,.06)",
-  border: "0.5px solid rgba(255,255,255,.08)",
-  borderRadius: 100,
-  backdropFilter: "blur(8px)",
-};
-function dotStyle(state: "done" | "now" | "pending"): CSSProperties {
-  const base: CSSProperties = {
-    width: 6,
-    height: 6,
-    borderRadius: "50%",
-    transition: "all .35s",
-  };
-  if (state === "done")
-    return {
-      ...base,
-      background: COLORS.accent,
-      boxShadow: `0 0 6px rgba(255,92,53,.4)`,
-    };
-  if (state === "now")
-    return {
-      ...base,
-      background: COLORS.accent,
-      transform: "scale(1.5)",
-      boxShadow: `0 0 8px ${COLORS.accent}`,
-    };
-  return { ...base, background: "rgba(255,255,255,.15)" };
-}
-const progressTextStyle: CSSProperties = {
-  fontSize: 10,
-  color: "rgba(255,255,255,.55)",
-  marginLeft: 6,
-  fontWeight: 500,
-  letterSpacing: "0.3px",
-};
-
-const skipBtnStyle: CSSProperties = {
-  fontSize: 12,
-  fontWeight: 500,
-  color: "rgba(255,255,255,.5)",
-  background: "none",
-  border: "none",
-  padding: "8px 4px",
-  minWidth: 44,
-  textAlign: "right",
 };
 
 const replayPillStyle: CSSProperties = {
@@ -1520,16 +1273,6 @@ const mainStyle: CSSProperties = {
   padding: "20px 18px 24px",
 };
 
-const stepSectionStyle: CSSProperties = {
-  width: "100%",
-  maxWidth: 520,
-  display: "flex",
-  flexDirection: "column",
-  alignItems: "center",
-  textAlign: "center",
-  animation: "onb-step-in .35s cubic-bezier(.2,.8,.2,1)",
-};
-
 const h1Style: CSSProperties = {
   fontFamily: "'Fraunces', Georgia, serif",
   fontSize: 34,
@@ -1537,15 +1280,6 @@ const h1Style: CSSProperties = {
   letterSpacing: "-1px",
   lineHeight: 1.1,
   marginBottom: 14,
-};
-const h2Style: CSSProperties = {
-  fontFamily: "'Fraunces', Georgia, serif",
-  fontSize: 24,
-  fontWeight: 900,
-  letterSpacing: "-0.8px",
-  lineHeight: 1.15,
-  marginBottom: 10,
-  color: "white",
 };
 const emStyle: CSSProperties = {
   color: COLORS.accent,
@@ -1560,251 +1294,14 @@ const introStyle: CSSProperties = {
   maxWidth: 460,
   marginBottom: 18,
 };
-const subIntroStyle: CSSProperties = {
-  fontFamily: "'Fraunces', Georgia, serif",
-  fontStyle: "italic",
-  fontSize: 13,
-  color: "rgba(255,255,255,.55)",
-  marginBottom: 22,
-  maxWidth: 460,
-  lineHeight: 1.5,
-};
 const noteStyle: CSSProperties = {
   fontSize: 12,
   color: "rgba(255,255,255,.45)",
   marginTop: 16,
 };
-const changeLaterNoteStyle: CSSProperties = {
-  fontFamily: "'Fraunces', Georgia, serif",
-  fontStyle: "italic",
-  fontSize: 12,
-  color: "rgba(255,255,255,.5)",
-  marginTop: 18,
-  textAlign: "center",
-};
 
-const formStyle: CSSProperties = {
-  width: "100%",
-  display: "flex",
-  flexDirection: "column",
-  gap: 18,
-  textAlign: "left",
-  marginTop: 4,
-};
-
-const labelStyle: CSSProperties = {
-  display: "block",
-  fontSize: 13,
-  fontWeight: 600,
-  color: "rgba(255,255,255,.85)",
-  marginBottom: 6,
-};
-const hintInlineStyle: CSSProperties = {
-  fontWeight: 400,
-  color: "rgba(255,255,255,.45)",
-};
-const hintBelowStyle: CSSProperties = {
-  fontSize: 12,
-  color: "rgba(255,255,255,.45)",
-  marginTop: 6,
-};
-
-const inputStyle: CSSProperties = {
-  width: "100%",
-  background: COLORS.fieldBg,
-  border: `1px solid ${COLORS.fieldBorder}`,
-  borderRadius: 12,
-  padding: "12px 14px",
-  fontSize: 16, // 16px avoids iOS auto-zoom on focus
-  color: "white",
-  fontFamily: "inherit",
-  outline: "none",
-};
-const textareaStyle: CSSProperties = {
-  ...inputStyle,
-  resize: "vertical",
-  lineHeight: 1.45,
-  minHeight: 80,
-};
-const handleWrapStyle: CSSProperties = {
-  display: "flex",
-  alignItems: "center",
-  gap: 8,
-  background: COLORS.fieldBg,
-  border: `1px solid ${COLORS.fieldBorder}`,
-  borderRadius: 12,
-  padding: "10px 12px",
-};
-const handleAtStyle: CSSProperties = {
-  color: "rgba(255,255,255,.55)",
-  fontWeight: 600,
-  fontSize: 16,
-};
-
-// ── Campus cards ──────────────────────────────────────────────────────────
-// One radio card per campus the student may call home: title = short name,
-// sub-line = the shared-community copy ("IU Indianapolis · one community with
-// Purdue Indianapolis (formerly IUPUI)") or the full name. Cards clear 44 px
-// so they're a comfortable tap, and the whole card is the label.
-const campusListStyle: CSSProperties = {
-  display: "flex",
-  flexDirection: "column",
-  gap: 8,
-};
-function campusCardStyle(selected: boolean): CSSProperties {
-  return {
-    display: "flex",
-    alignItems: "flex-start",
-    gap: 12,
-    minHeight: 56,
-    padding: "12px 14px",
-    borderRadius: 12,
-    background: selected ? "rgba(255,92,53,.12)" : COLORS.fieldBg,
-    border: `1px solid ${selected ? "rgba(255,92,53,.45)" : COLORS.fieldBorder}`,
-    color: "white",
-    cursor: "pointer",
-    transition: "background .15s, border-color .15s",
-  };
-}
-const campusRadioStyle: CSSProperties = {
-  accentColor: COLORS.accent,
-  width: 18,
-  height: 18,
-  marginTop: 2,
-  flexShrink: 0,
-};
-const campusTextStyle: CSSProperties = {
-  display: "flex",
-  flexDirection: "column",
-  gap: 3,
-  minWidth: 0,
-};
-const campusTitleRowStyle: CSSProperties = {
-  display: "flex",
-  alignItems: "center",
-  flexWrap: "wrap",
-  gap: 6,
-};
-const campusTitleStyle: CSSProperties = {
-  fontSize: 15,
-  fontWeight: 600,
-};
-const campusSubStyle: CSSProperties = {
-  fontSize: 12,
-  lineHeight: 1.4,
-  color: "rgba(255,255,255,.55)",
-};
-const campusPillBase: CSSProperties = {
-  fontSize: 10,
-  fontWeight: 700,
-  letterSpacing: "0.04em",
-  textTransform: "uppercase",
-  borderRadius: 999,
-  padding: "2px 7px",
-  whiteSpace: "nowrap",
-};
-const campusTagStyle: CSSProperties = {
-  ...campusPillBase,
-  color: COLORS.lavender,
-  background: "rgba(200,184,255,.12)",
-  border: "1px solid rgba(200,184,255,.30)",
-};
-const campusSoonStyle: CSSProperties = {
-  ...campusPillBase,
-  color: "rgba(255,255,255,.55)",
-  background: "rgba(255,255,255,.06)",
-  border: `1px solid ${COLORS.faintBorder}`,
-};
-const fieldErrorStyle: CSSProperties = {
-  fontSize: 12,
-  fontWeight: 600,
-  color: COLORS.red,
-  marginTop: 8,
-};
-
-const lookingForWrapStyle: CSSProperties = {
-  display: "flex",
-  flexDirection: "column",
-  gap: 8,
-};
-function lookingForRowStyle(checked: boolean): CSSProperties {
-  return {
-    display: "flex",
-    alignItems: "center",
-    gap: 10,
-    padding: "12px 14px",
-    borderRadius: 12,
-    background: checked
-      ? "rgba(255,92,53,.12)"
-      : COLORS.fieldBg,
-    border: `1px solid ${checked ? "rgba(255,92,53,.45)" : COLORS.fieldBorder}`,
-    color: "white",
-    fontSize: 15,
-    cursor: "pointer",
-    transition: "background .15s, border-color .15s",
-  };
-}
-
-const expRowStyle: CSSProperties = {
-  display: "flex",
-  flexDirection: "column",
-  gap: 8,
-  padding: 14,
-  background: "rgba(255,255,255,.03)",
-  border: `1px solid ${COLORS.fieldBorder}`,
-  borderRadius: 14,
-};
-
-const uploadBtnStyle: CSSProperties = {
-  display: "block",
-  width: "100%",
-  background: COLORS.accent,
-  color: "white",
-  fontFamily: "inherit",
-  fontWeight: 700,
-  fontSize: 16,
-  border: "none",
-  borderRadius: 12,
-  padding: "14px 18px",
-  textAlign: "center",
-};
-const uploadStatusStyle: CSSProperties = {
-  fontSize: 12,
-  color: "rgba(255,255,255,.6)",
-  marginTop: -8,
-  textAlign: "center",
-};
-
-const previewWrapStyle: CSSProperties = {
-  marginTop: 4,
-  border: `1px solid ${COLORS.fieldBorder}`,
-  borderRadius: 14,
-  overflow: "hidden",
-  background: "rgba(0,0,0,.25)",
-};
-const previewLabelStyle: CSSProperties = {
-  fontSize: 11,
-  color: "rgba(255,255,255,.55)",
-  padding: "8px 12px",
-  fontWeight: 600,
-  letterSpacing: "0.5px",
-  textTransform: "uppercase",
-  background: "rgba(255,255,255,.04)",
-};
-const previewFrameStyle: CSSProperties = {
-  display: "block",
-  width: "100%",
-  height: 360,
-  border: 0,
-  background: "#0b0b0d",
-};
-const previewImgStyle: CSSProperties = {
-  display: "block",
-  width: "100%",
-  maxHeight: 360,
-  objectFit: "contain",
-  background: "#0b0b0d",
-};
+/** The theme's text button, at least 44px tall to tap. */
+const secondaryTapStyle: CSSProperties = { ...secondaryLinkStyle, minHeight: 44 };
 
 const bottomBarStyle: CSSProperties = {
   position: "fixed",
@@ -1820,73 +1317,6 @@ const bottomBarStyle: CSSProperties = {
   background:
     "linear-gradient(to top, rgba(28,28,30,.95) 60%, rgba(28,28,30,.0))",
   backdropFilter: "blur(10px)",
-};
-
-const primaryCtaStyle: CSSProperties = {
-  display: "block",
-  width: "100%",
-  background: COLORS.accent,
-  color: "white",
-  fontFamily: "inherit",
-  fontWeight: 700,
-  fontSize: 16,
-  border: "none",
-  borderRadius: 14,
-  padding: "14px 18px",
-  textAlign: "center",
-  boxShadow: "0 6px 20px rgba(255,92,53,.35)",
-};
-const secondaryLinkStyle: CSSProperties = {
-  display: "block",
-  width: "100%",
-  background: "transparent",
-  color: "rgba(255,255,255,.55)",
-  fontFamily: "inherit",
-  fontWeight: 500,
-  fontSize: 14,
-  border: "none",
-  padding: "6px 18px 4px",
-  textAlign: "center",
-};
-
-const skipOverlayStyle: CSSProperties = {
-  position: "fixed",
-  inset: 0,
-  zIndex: 50,
-  background: "rgba(10,10,12,.78)",
-  backdropFilter: "blur(6px)",
-  display: "flex",
-  alignItems: "center",
-  justifyContent: "center",
-  padding: 20,
-};
-const skipCardStyle: CSSProperties = {
-  width: "100%",
-  maxWidth: 360,
-  background: COLORS.charcoalSoft,
-  border: `1px solid ${COLORS.faintBorder}`,
-  borderRadius: 20,
-  padding: 22,
-  display: "flex",
-  flexDirection: "column",
-  gap: 14,
-};
-const skipTitleStyle: CSSProperties = {
-  fontFamily: "'Fraunces', Georgia, serif",
-  fontSize: 20,
-  fontWeight: 900,
-  color: "white",
-};
-const skipBodyStyle: CSSProperties = {
-  fontSize: 14,
-  color: "rgba(255,255,255,.7)",
-  lineHeight: 1.5,
-};
-const skipRowStyle: CSSProperties = {
-  display: "flex",
-  flexDirection: "column",
-  gap: 8,
-  marginTop: 4,
 };
 
 const warpOverlayStyle: CSSProperties = {

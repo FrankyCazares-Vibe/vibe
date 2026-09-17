@@ -40,6 +40,7 @@ registerHooks({
 });
 
 const {
+  ONBOARDING_DRAFT_FIELD_KEYS,
   ONBOARDING_DRAFT_KEY_PREFIX,
   ONBOARDING_DRAFT_SAVE_DELAY_MS,
   ONBOARDING_DRAFT_TTL_MS,
@@ -48,8 +49,10 @@ const {
   flushDraftOnHide,
   loadDraft,
   onboardingDraftKey,
+  onboardingResumeStep,
   onboardingStartStep,
   saveDraft,
+  typedDraftFields,
 } = await import("./draft");
 
 const T0 = Date.UTC(2026, 8, 15, 12, 0, 0);
@@ -313,4 +316,99 @@ test("start step: a backfilled (unconfirmed) campus doesn't skip the campus scre
   assert.equal(onboardingStartStep(null, { campusId: "indianapolis", hasRealHandle: true }), 1);
   // A stamp kept across a system change with the campus cleared isn't a saved campus.
   assert.equal(onboardingStartStep(null, { campusId: null, campusConfirmed: true, hasRealHandle: true }), 1);
+});
+
+test("resume step: the draft's step, pulled back to an unsaved campus or handle", () => {
+  assert.equal(onboardingResumeStep({ step: 5, maxStep: 5 }, {}), 2);
+  assert.equal(
+    onboardingResumeStep({ step: 5, maxStep: 5 }, { campusId: "indianapolis", campusConfirmed: true }),
+    3,
+  );
+  assert.equal(
+    onboardingResumeStep(
+      { step: 6, maxStep: 6 },
+      { campusId: "indianapolis", campusConfirmed: true, hasRealHandle: true },
+    ),
+    6,
+  );
+  assert.equal(onboardingResumeStep({ step: 4, maxStep: 4 }, { systemKnown: false, hasRealHandle: true }), 4);
+  assert.equal(onboardingResumeStep({ step: 4, maxStep: 4 }, { systemKnown: false }), 3);
+  assert.equal(
+    onboardingResumeStep(
+      { step: 5, maxStep: 3 },
+      { campusId: "indianapolis", campusConfirmed: true, hasRealHandle: true },
+    ),
+    3,
+  );
+  // An unconfirmed (backfilled) campus isn't a saved one.
+  assert.equal(
+    onboardingResumeStep({ step: 4, maxStep: 4 }, { campusId: "indianapolis", campusConfirmed: false, hasRealHandle: true }),
+    2,
+  );
+  // Nothing to pull back from on the first two screens.
+  assert.equal(onboardingResumeStep({ step: 2, maxStep: 5 }, {}), 2);
+  assert.equal(onboardingResumeStep({ step: 1, maxStep: 1 }, {}), 1);
+});
+
+test("resume step: with no draft it equals the start step, for every saved combination", () => {
+  for (const campusId of [null, "indianapolis"]) {
+    for (const campusConfirmed of [true, false, undefined]) {
+      for (const hasRealHandle of [true, false]) {
+        for (const systemKnown of [true, false, undefined]) {
+          const saved = { campusId, campusConfirmed, hasRealHandle, systemKnown };
+          assert.equal(
+            onboardingResumeStep(null, saved),
+            onboardingStartStep(null, saved),
+            JSON.stringify(saved),
+          );
+        }
+      }
+    }
+  }
+});
+
+test("draft field keys: the exact ten, in order, frozen", () => {
+  assert.deepEqual(
+    [...ONBOARDING_DRAFT_FIELD_KEYS],
+    ["campus_id", "name", "handle", "bio", "major", "department", "year", "interests", "skills", "looking_for"],
+  );
+  assert.equal(Object.isFrozen(ONBOARDING_DRAFT_FIELD_KEYS), true);
+});
+
+test("typedDraftFields keeps only well-typed known keys", () => {
+  assert.deepEqual(typedDraftFields(null), {});
+  assert.deepEqual(typedDraftFields(undefined), {});
+  assert.deepEqual(typedDraftFields({ name: "Ana", year: "3" }), { name: "Ana", year: "3" });
+  assert.deepEqual(typedDraftFields({ name: "Ana", year: 3 }), { name: "Ana" });
+  assert.deepEqual(typedDraftFields({ year: "7" }), {});
+  assert.deepEqual(typedDraftFields({ year: "" }), { year: "" });
+  assert.deepEqual(typedDraftFields({ interests: ["a"], skills: "Figma, Python" }), { skills: "Figma, Python" });
+  assert.deepEqual(typedDraftFields({ work_experience: "x", resume_url: "https://x" }), {});
+  assert.deepEqual(typedDraftFields({ campus_id: null, handle: 7, bio: true }), {});
+  assert.deepEqual(
+    typedDraftFields({ looking_for: ["exploring", "exploring", "finding-clubs"] }),
+    { looking_for: ["exploring", "finding-clubs"] },
+  );
+  assert.deepEqual(typedDraftFields({ looking_for: "exploring" }), {});
+});
+
+test("typedDraftFields: a saveDraft → loadDraft round trip of all ten keys comes back unchanged", () => {
+  const storage = memoryStorage();
+  const fields = {
+    campus_id: "indianapolis",
+    name: "Ana Ruiz",
+    handle: "ana_r",
+    bio: "Line one\nline two",
+    major: "Informatics",
+    department: "Luddy School of Informatics",
+    year: "5",
+    interests: "robots, film\nclimbing",
+    skills: "Figma, Python",
+    looking_for: ["meeting-people", "exploring"],
+  };
+  assert.equal(saveDraft(USER, { step: 3, maxStep: 4, fields }, { storage, now: () => T0 }), true);
+  const loaded = loadDraft(USER, { storage, now: () => T0 + 1000 });
+  assert.ok(loaded);
+  assert.deepEqual(typedDraftFields(loaded.fields), fields);
+  assert.deepEqual(Object.keys(typedDraftFields(loaded.fields)), [...ONBOARDING_DRAFT_FIELD_KEYS]);
 });
