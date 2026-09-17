@@ -1,7 +1,7 @@
 // ══════════════════════════════════════════════════════════════════════════
 // Vibe — shared post viewer modal (P1-015)
 //
-// Loaded on profile.html + campus.html. Injects its own CSS + markup once,
+// Loaded on profile.html + messages.html. Injects its own CSS + markup once,
 // then exposes window.openPostViewer(postId, prefill?) for callers to wire
 // to .post-thumb-cell, .profile-post-card, and campus .post click handlers.
 //
@@ -314,6 +314,31 @@
     padding: 8px 18px; border-radius: 999px;
   }
 
+  /* ── Inline post editor (the owner's "Edit post") ──────────────────
+     Same tokens as the comment composer above. It takes the place of
+     .vpv-text only; the photo, video and tag chips stay where they are. */
+  .vpv-edit {
+    display: block; width: 100%; box-sizing: border-box;
+    min-height: 120px; max-height: 360px; resize: vertical;
+    border: 1px solid rgba(28,28,30,.14); border-radius: 12px;
+    padding: 10px 12px; font-family: inherit; font-size: 15px; line-height: 1.55;
+    background: white; color: #1C1C1E; outline: none;
+  }
+  .vpv-edit:focus { border-color: rgba(28,28,30,.35); }
+  .vpv-edit-row {
+    display: flex; align-items: center; justify-content: space-between;
+    gap: 8px; margin-top: 8px;
+  }
+  .vpv-edit-hint { font-size: 12px; color: #8A8580; min-width: 0; }
+  .vpv-edit-actions { display: flex; gap: 6px; flex-shrink: 0; }
+  .vpv-edit-btn {
+    background: transparent; color: #1C1C1E; border: 1px solid rgba(28,28,30,.14);
+    font-family: inherit; font-size: 12px; font-weight: 700;
+    padding: 7px 14px; border-radius: 999px; cursor: none;
+  }
+  .vpv-edit-btn.primary { background: #1C1C1E; color: white; border-color: #1C1C1E; }
+  .vpv-edit-btn[disabled] { opacity: .4; cursor: default; }
+
   .vpv-toast {
     position: fixed; left: 50%; bottom: 32px; transform: translateX(-50%) translateY(20px);
     background: #1C1C1E; color: white;
@@ -465,6 +490,20 @@
     saves:  null,
     isOwner: false,         // the SERVER's is_owner, not a localStorage guess
     inflight: false,        // any toggle/post in progress
+    // The owner's inline editor. editSaving is its OWN flag, never inflight:
+    // a like still in flight would otherwise make Save return silently. It
+    // belongs to the editor that is open, so opening or closing the viewer
+    // clears it: a PATCH that never settles must not leave the next editor
+    // frozen ("Saving…", read-only) for the rest of the page's life. What
+    // keeps two saves of the SAME post from overlapping is editSavesInFlight,
+    // not this flag — the same split as the phone sheet (E2).
+    editing: false,
+    editSaving: false,
+    tags: [],               // the server's tags, repainted after a save
+    hasMedia: false,        // media THIS viewer paints (see renderFromServer)
+    authorHandle: "",       // for repainting the sub-line after a save
+    createdAt: null,
+    editedAt: null,
   };
 
   // ── Helpers ───────────────────────────────────────────────────────────
@@ -527,10 +566,23 @@
     // and, worse, its owner affordances until the server answered.
     if (aud.open) closeAudience();
     state.isOwner = false;
+    state.editing = false;
+    // The editor that owned this flag is gone, so the next one starts live.
+    // A save still on its way lands either way (it only repaints the editor
+    // that is open for its own post), and editSavesInFlight still serialises
+    // two saves of the same post.
+    state.editSaving = false;
     state.views = null;
     state.saves = null;
     resetCounts();
     paintOwnerAffordances();
+    // Only renderLoading() hid the ⋯ menu, and every profile card passes a
+    // prefill, so post A's owner menu (Edit / Delete) stayed on screen over
+    // post B until B's GET answered. renderFromServer() shows it again.
+    const moreBtn = document.getElementById("vpvMore");
+    const moreMenu = document.getElementById("vpvMenu");
+    if (moreBtn) moreBtn.classList.remove("show");
+    if (moreMenu) moreMenu.classList.remove("show");
 
     if (prefill) renderFromPrefill(prefill);
     else renderLoading();
@@ -554,8 +606,12 @@
       `/api/posts/${encodeURIComponent(state.openId)}`, { failure: postLine }
     );
     if (pr.ok && pr.data.ok && pr.data.post) {
-      // Race guard: user may have closed and opened a different post.
-      if (String(pr.data.post.id) !== state.openId) return;
+      // Race guard: user may have closed and opened a different post. Letter
+      // case is ignored, as in the save below and on the phone sheet: the ids
+      // are Postgres uuids, so a /profile?post=<ID IN CAPITALS> link is the
+      // same post the route answers with in lowercase. Comparing raw left that
+      // link stuck on "Loading…" for ever.
+      if (String(pr.data.post.id).toLowerCase() !== String(state.openId).toLowerCase()) return;
       renderFromServer(pr.data);
     } else if (pr.ok) {
       // A 2xx with no post: no copy rule maps a 2xx, so say it here.
@@ -593,6 +649,13 @@
     // Never leave the audience sheet floating over a closed post.
     if (aud.open) closeAudience();
     state.openId = null;
+    state.editing = false;
+    // Same reason as the reset in openPostViewer: a stalled PATCH must not
+    // freeze the editor the student opens next.
+    state.editSaving = false;
+    // The @mention popover lives on document.body, outside #vpvOverlay, so
+    // hiding the modal would leave the suggestion list floating over the page.
+    if (typeof window.vibeMentionPickerClose === "function") window.vibeMentionPickerClose();
     const overlay = document.getElementById("vpvOverlay");
     if (overlay) overlay.classList.remove("show");
     // Hiding the overlay doesn't stop a playing <video>; pause it so the
@@ -610,7 +673,13 @@
       }
     }
   }
-  window.__vpvClose = closeViewer;
+  // The X button, an overlay click and Escape outside the editor ask before
+  // throwing away a changed draft. Back (popstate) has already popped the
+  // history entry, so it discards silently. Delete calls closeViewer itself.
+  window.__vpvClose = function (viaPopstate) {
+    if (!viaPopstate && !confirmDiscardEdit()) return;
+    closeViewer(viaPopstate);
+  };
 
   // ── Render paths ──────────────────────────────────────────────────────
   // The engagement bar belongs to the post being opened. Both entry paths
@@ -627,9 +696,11 @@
   }
 
   function renderLoading() {
+    state.editing = false;
     document.getElementById("vpvAvatar").textContent = "·";
     document.getElementById("vpvName").textContent = "Loading…";
     document.getElementById("vpvSub").textContent = "";
+    document.getElementById("vpvSub").removeAttribute("title");
     document.getElementById("vpvBody").innerHTML = "";
     resetCounts();
     document.getElementById("vpvComments").innerHTML = "";
@@ -654,6 +725,7 @@
     paintHeader({
       author:    p.author || { name: p.authorName, handle: p.authorHandle, avatar_url: p.authorAvatar },
       created_at: p.created_at || p.createdAt,
+      edited_at:  p.edited_at || p.editedAt || null,
     });
     paintBody({
       content:             p.content || p.body || "",
@@ -667,7 +739,13 @@
 
   function renderFromServer(j) {
     const p = j.post;
-    paintHeader({ author: p.author, created_at: p.created_at });
+    paintHeader({
+      author: p.author,
+      created_at: p.created_at,
+      edited_at: typeof p.edited_at === "string" ? p.edited_at : null,
+    });
+    // paintBody wipes any open editor, so the editing flag goes first.
+    state.editing = false;
     paintBody({
       content:             p.content,
       tags:                p.tags || [],
@@ -681,6 +759,18 @@
     state.type     = p.type || "post";
     state.content = p.content || "";
     state.mediaUrl = p.media_url || null;
+    // What the owner's editor and its save repaint from. hasMedia means media
+    // THIS viewer painted — the same condition paintBody just used above, so
+    // the two can't disagree. A legacy `clip` has a media_url and no player on
+    // screen, so promising there that its photo or video is kept, and letting
+    // the caption be emptied, would leave a post with no text, no player and
+    // no chips. The route's rule (!!prior.media_url) is looser, so nothing
+    // this editor lets the student send can be refused for being empty.
+    state.tags = Array.isArray(p.tags) ? p.tags.filter(t => typeof t === "string") : [];
+    state.hasMedia = !!p.media_url && p.type === "post";
+    state.authorHandle = (p.author && p.author.handle) || "";
+    state.createdAt = p.created_at || null;
+    state.editedAt = typeof p.edited_at === "string" ? p.edited_at : null;
     // A video URL is no <img> poster for the share card; fall back to none.
     state.posterUrl = p.media_thumbnail_url || (p.media_kind === "video" ? null : p.media_url) || null;
     state.liked = !!(j.viewer && j.viewer.liked);
@@ -708,14 +798,14 @@
     document.getElementById("vpvSave").classList.toggle("on", state.saved);
     paintOwnerAffordances();
 
-    // "..." menu — owner sees Delete; everyone else sees Report/Mute/Block.
+    // "..." menu — owner sees Edit + Delete; everyone else sees Report/Mute/Block.
     const isOwner = state.isOwner;
     const more = document.getElementById("vpvMore");
     const menu = document.getElementById("vpvMenu");
     if (more) more.classList.add("show");
     if (menu) {
       if (isOwner) {
-        menu.innerHTML = `<button type="button" class="danger" onclick="window.__vpvDeletePost()">Delete post</button>`;
+        menu.innerHTML = `<button type="button" onclick="window.__vpvCloseMenu();window.__vpvStartEdit()">Edit post</button><button type="button" class="danger" onclick="window.__vpvDeletePost()">Delete post</button>`;
       } else {
         // Attribute-safe JS literals: JSON.stringify builds the JS string,
         // esc() makes it safe inside onclick="..." (decoded before eval).
@@ -778,7 +868,7 @@
     }
   }
 
-  function paintHeader({ author, created_at }) {
+  function paintHeader({ author, created_at, edited_at }) {
     const a = author || {};
     const av = document.getElementById("vpvAvatar");
     if (a.avatar_url) {
@@ -788,10 +878,18 @@
     }
     const name = a.name || a.handle || "Unknown";
     document.getElementById("vpvName").textContent = name;
-    const handle = a.handle ? `@${a.handle}` : "";
-    const when = relTime(created_at);
-    const sub = [handle, when].filter(Boolean).join(" · ");
-    document.getElementById("vpvSub").textContent = sub;
+    paintSub(a.handle, created_at, edited_at);
+  }
+
+  // "@handle · 3d · Edited". The marker shows on every edited post (no time
+  // window); hovering it gives the exact time of the last edit.
+  function paintSub(handle, created_at, edited_at) {
+    const sub = document.getElementById("vpvSub");
+    if (!sub) return;
+    sub.textContent = [handle ? "@" + handle : "", relTime(created_at), edited_at ? "Edited" : ""]
+      .filter(Boolean).join(" · ");
+    if (edited_at) sub.setAttribute("title", "Edited " + new Date(edited_at).toLocaleString());
+    else sub.removeAttribute("title");
   }
 
   // Escape, then style @handles as orange links so mentions are visible
@@ -808,6 +906,47 @@
     );
   }
 
+  // The tag chips, shared by paintBody and the post-edit repaint so the two
+  // can't drift.
+  function tagChipsHtml(tags) {
+    return tags.map(t => `<span class="vpv-tag">#${esc(t)}</span>`).join("");
+  }
+
+  // Mirror of editedPostFrom in src/lib/posts/edit.ts — change both together.
+  // Reads an edited post out of an untrusted PATCH answer. Null when there is
+  // no usable id, so a malformed success is treated like a failure.
+  function editedPostFromWire(raw) {
+    if (!raw || typeof raw !== "object" || Array.isArray(raw)) return null;
+    if (typeof raw.id !== "string" || !raw.id) return null;
+    return {
+      id: raw.id,
+      content: typeof raw.content === "string" ? raw.content : "",
+      tags: Array.isArray(raw.tags) ? raw.tags.filter(t => typeof t === "string") : [],
+      edited_at: typeof raw.edited_at === "string" ? raw.edited_at : null,
+    };
+  }
+
+  // Same dirty rule as the phone sheet (E2) and the desktop feed (CH1).
+  function editDirty() {
+    const ta = document.getElementById("vpvEditInput");
+    return !!(state.editing && ta && ta.value.trim() !== (state.content || "").trim());
+  }
+
+  // 2000 is POST_MAX_CHARS in src/lib/posts/edit.ts. A photo or video post
+  // may lose its caption; a text post can't be emptied.
+  function editCanSave() {
+    const ta = document.getElementById("vpvEditInput");
+    return !!(ta && !state.editSaving && editDirty() && ta.value.length <= 2000
+      && (state.hasMedia || ta.value.trim() !== ""));
+  }
+
+  // True when it's fine to drop the editor: nothing changed, the student
+  // agreed, or a save is already on its way (it carries on either way, as on
+  // the phone sheet, so "Discard" would be the wrong question).
+  function confirmDiscardEdit() {
+    return state.editSaving || !editDirty() || window.confirm("Discard your changes?");
+  }
+
   function paintBody({ content, tags, media_url, type, media_kind, media_thumbnail_url }) {
     const body = document.getElementById("vpvBody");
     const text = content ? `<div class="vpv-text">${formatBodyText(content)}</div>` : "";
@@ -822,7 +961,7 @@
       media = `<img class="vpv-image" src="${esc(media_url)}" alt="">`;
     }
     const tagBlock = (tags && tags.length)
-      ? `<div class="vpv-tags">${tags.map(t => `<span class="vpv-tag">#${esc(t)}</span>`).join("")}</div>`
+      ? `<div class="vpv-tags">${tagChipsHtml(tags)}</div>`
       : "";
     body.innerHTML = text + media + tagBlock;
   }
@@ -975,6 +1114,229 @@
   window.__vpvCloseMenu = function () {
     const menu = document.getElementById("vpvMenu");
     if (menu) menu.classList.remove("show");
+  };
+
+  // ── Edit post (owner only) ────────────────────────────────────────────
+  // An inline editor takes the place of the post's text. Only the words
+  // change: the photo or video node and the tag chips are never re-rendered
+  // while editing, so a playing video keeps playing. The PATCH sends only
+  // {content}; the server derives tags and stamps edited_at. After a save
+  // the viewer fires the vibe:post-edited event on window so the page can
+  // update its own cards; this file never touches page DOM outside
+  // #vpvOverlay for an edit (compare _vpvScrubPostFromPage for delete).
+  window.__vpvStartEdit = function () {
+    if (!state.openId || state.editing) return;
+    if (!state.isOwner) return;
+    if (!isAppShell()) { toast("Sign in to edit"); return; }
+    if (!isRealPostId(state.openId)) { toast("This post can't be edited"); return; }
+    const body = document.getElementById("vpvBody");
+    if (!body) return;
+    state.editing = true;
+
+    const wrap = document.createElement("div");
+    wrap.id = "vpvEditWrap";
+    wrap.className = "vpv-edit-wrap";
+    const ta = document.createElement("textarea");
+    ta.id = "vpvEditInput";
+    ta.className = "vpv-edit";
+    ta.maxLength = 2000;
+    ta.rows = 4;
+    ta.setAttribute("aria-label", "Edit post text");
+    ta.placeholder = state.hasMedia ? "Write a caption…" : "Say something…";
+    ta.value = state.content || "";
+    const row = document.createElement("div");
+    row.className = "vpv-edit-row";
+    const hint = document.createElement("span");
+    hint.id = "vpvEditHint";
+    hint.className = "vpv-edit-hint";
+    const actions = document.createElement("div");
+    actions.className = "vpv-edit-actions";
+    const cancel = document.createElement("button");
+    cancel.type = "button";
+    cancel.id = "vpvEditCancel";
+    cancel.className = "vpv-edit-btn";
+    cancel.textContent = "Cancel";
+    const save = document.createElement("button");
+    save.type = "button";
+    save.id = "vpvEditSave";
+    save.className = "vpv-edit-btn primary";
+    save.textContent = "Save";
+    cancel.addEventListener("click", () => window.__vpvCancelEdit());
+    save.addEventListener("click", () => window.__vpvSaveEdit());
+    actions.append(cancel, save);
+    row.append(hint, actions);
+    wrap.append(ta, row);
+
+    const text = body.querySelector(":scope > .vpv-text");
+    if (text) text.replaceWith(wrap);
+    else body.prepend(wrap);
+
+    // The picker is bound FIRST on purpose. It marks the keys it used (Escape
+    // closing its popover, Enter picking a handle) with preventDefault, and
+    // the keydown listener below checks that. Its listener is a capture one,
+    // but the textarea is also the event's target, and at the target both
+    // capture and bubble listeners run in registration order — so registering
+    // ours first would have let one Escape close the popover AND cancel the
+    // editor. Binding earlier makes ours last under either rule.
+    if (window.vibeBindMentionPicker) window.vibeBindMentionPicker(ta);
+
+    ta.addEventListener("input", () => {
+      ta.style.height = "auto";
+      ta.style.height = Math.min(ta.scrollHeight, 360) + "px";
+      paintEditControls();
+    });
+    ta.addEventListener("keydown", (e) => {
+      // Escape inside the editor never reaches the document listener that
+      // closes the whole post, not even the one that cancels an IME
+      // composition.
+      if (e.key === "Escape") e.stopPropagation();
+      if (e.isComposing) return;
+      if (e.key === "Escape") {
+        if (e.defaultPrevented) return;
+        window.__vpvCancelEdit();
+        return;
+      }
+      if ((e.metaKey || e.ctrlKey) && e.key === "Enter") {
+        if (e.defaultPrevented) return;
+        e.preventDefault();
+        window.__vpvSaveEdit();
+      }
+    });
+
+    ta.style.height = "auto";
+    ta.style.height = Math.min(ta.scrollHeight, 360) + "px";
+    ta.focus();
+    const len = ta.value.length;
+    try { ta.setSelectionRange(len, len); } catch {}
+    paintEditControls();
+  };
+
+  function paintEditControls() {
+    const ta = document.getElementById("vpvEditInput");
+    if (!ta) return;
+    const hint = document.getElementById("vpvEditHint");
+    const save = document.getElementById("vpvEditSave");
+    const cancel = document.getElementById("vpvEditCancel");
+    if (hint) {
+      let line = `${ta.value.length}/2000`;
+      if (state.hasMedia) line += " · You can change the words. The photo or video stays.";
+      else if (ta.value.trim() === "") line += " · Your post can't be empty.";
+      hint.textContent = line;
+    }
+    if (save) {
+      save.disabled = !editCanSave();
+      save.textContent = state.editSaving ? "Saving…" : "Save";
+    }
+    if (cancel) cancel.disabled = state.editSaving;
+    ta.readOnly = state.editSaving;
+  }
+
+  // Puts the post's text back where the editor was, from state.content
+  // (escaped by formatBodyText). An empty caption leaves no text node.
+  function restoreText() {
+    const wrap = document.getElementById("vpvEditWrap");
+    if (typeof window.vibeMentionPickerClose === "function") window.vibeMentionPickerClose();
+    if (!wrap) return;
+    if (state.content) {
+      const div = document.createElement("div");
+      div.className = "vpv-text";
+      div.innerHTML = formatBodyText(state.content);
+      wrap.replaceWith(div);
+    } else {
+      wrap.remove();
+    }
+  }
+
+  // The chips after a save, in the place paintBody puts them (last in the body).
+  function repaintTags() {
+    const body = document.getElementById("vpvBody");
+    if (!body) return;
+    let block = body.querySelector(":scope > .vpv-tags");
+    if (!state.tags.length) {
+      if (block) block.remove();
+      return;
+    }
+    if (!block) {
+      block = document.createElement("div");
+      block.className = "vpv-tags";
+      body.appendChild(block);
+    }
+    block.innerHTML = tagChipsHtml(state.tags);
+  }
+
+  window.__vpvCancelEdit = function (force) {
+    if (!state.editing || state.editSaving) return;
+    if (!force && !confirmDiscardEdit()) return;
+    restoreText();
+    state.editing = false;
+  };
+
+  // One PATCH per post at a time, across editors too — the same rule, and the
+  // same shape, as savesInFlight in src/components/mobile/EditPostSheet.tsx.
+  // E1's mention-once check is check-then-insert with no unique index behind
+  // it, so two saves of one post landing together could notify the same
+  // @handle twice. Keyed by the lowercased id (Postgres uuids).
+  const editSavesInFlight = new Map();
+  // Which save owns state.editSaving — see the flag's note in state.
+  let editSaveSeq = 0;
+
+  window.__vpvSaveEdit = async function () {
+    const id = state.openId;
+    const ta = document.getElementById("vpvEditInput");
+    if (!id || !state.editing || !ta || !editCanSave()) return;
+    const value = ta.value;
+    const key = String(id).toLowerCase();
+    const seq = ++editSaveSeq;
+    state.editSaving = true;
+    paintEditControls();
+    try {
+      // Only {content}: never tags (the server derives them from the text)
+      // and never status (PATCH still turns a published post into a draft).
+      const earlier = editSavesInFlight.get(key);
+      const request = (async () => {
+        if (earlier) { try { await earlier; } catch {} }
+        return window.vibeRequest("/api/posts/" + encodeURIComponent(id),
+          { method: "PATCH", json: { content: value }, failure: "Couldn't save your changes." });
+      })();
+      editSavesInFlight.set(key, request);
+      const r = await request;
+      if (editSavesInFlight.get(key) === request) editSavesInFlight.delete(key);
+      if (!r.ok) return; // vibeRequest already toasted the mapped line
+      const p = editedPostFromWire(r.data && r.data.post);
+      if (!p || p.id.toLowerCase() !== key) {
+        window.vibeToast("Couldn't save your changes. Try again.", { tone: "error" });
+        return;
+      }
+      // The server's values (trimmed text, derived tags), never the draft.
+      // Fires even when the viewer was closed or switched mid-save: the save
+      // happened, and the page's card still has to catch up.
+      window.dispatchEvent(new CustomEvent("vibe:post-edited",
+        { detail: { id: p.id, content: p.content, tags: p.tags, edited_at: p.edited_at } }));
+      window.vibeToast("Post updated", { tone: "info" });
+      // Closed or switched mid-save: leave the screen to whoever owns it now
+      // (PH's card listener already has the server's text). The node check is
+      // the third case: the student closed the viewer while this save was out,
+      // reopened the same post and started typing again. That second editor's
+      // draft is theirs — this answer must not replace it.
+      if (String(state.openId).toLowerCase() !== key || !state.editing) return;
+      if (document.getElementById("vpvEditInput") !== ta) return;
+      state.content = p.content;
+      state.tags = p.tags;
+      state.editedAt = p.edited_at;
+      state.editing = false;
+      restoreText();
+      repaintTags();
+      paintSub(state.authorHandle, state.createdAt, state.editedAt);
+    } finally {
+      // Only the newest save owns the flag. A save the student walked away
+      // from (closed the viewer, opened another post, saved that one) must not
+      // unfreeze an editor whose own PATCH is still out when it finally
+      // settles, and must not repaint an editor that isn't its post's.
+      if (editSaveSeq === seq) {
+        state.editSaving = false;
+        if (state.editing && String(state.openId).toLowerCase() === key) paintEditControls();
+      }
+    }
   };
 
   window.__vpvDeletePost = async function () {
