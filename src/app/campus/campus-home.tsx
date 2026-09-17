@@ -20,6 +20,7 @@ import { ImageCropperModal } from "@/components/ImageCropperModal";
 import { emitCalendarChanged } from "@/components/LeftNav";
 import { SharePostSheet } from "@/components/mobile/SharePostSheet";
 import { UserCard, type UserCardProps } from "@/components/network/UserCard";
+import { OrgInviteSheet } from "@/components/orgs/OrgInviteSheet";
 import { OrgJoinControl } from "@/components/orgs/OrgJoinControl";
 import {
   PostAudienceList,
@@ -45,13 +46,25 @@ import { IU_SCHOOLS, schoolForMajorIn } from "@/lib/iu/majors";
 import { PURDUE_INDIANAPOLIS_SCHOOLS } from "@/lib/iu/majors-purdue-indianapolis";
 import { orgAssetProxyUrl } from "@/lib/org-asset-url";
 import {
+  AUDIENCE_HELP,
   audienceChip,
+  fillCopy,
+  followerCountText,
+  followsSinceText,
   inviteSubText,
   memberCountText,
+  MOD_READONLY,
+  OFFICER_FOLLOW_HELP,
+  ORG_COPY,
+  openToFact,
+  openToOptions,
   type OrgControlChange,
+  orgErrorCopy,
   type OrgRelation,
   orgRowView,
   policyChip,
+  WHO_CAN_JOIN_OPTIONS,
+  whoCanJoinFact,
 } from "@/lib/orgs/join-copy";
 import type { JoinPolicy, JoinState, OrgAudience } from "@/lib/orgs/join-state";
 import {
@@ -141,15 +154,14 @@ type Org = {
   description: string;
   logo_url: string | null;
   banner_url: string | null;
-  is_public: boolean;
   backdrop_preset: BackdropKey;
   role: Role;
   verified?: boolean;
   last_activity_at?: string | null;
   links?: Array<{ label: string; url: string }>;
   philanthropy?: string;
-  // Sent by the membership list the rail loads. `is_public` stays for the
-  // settings modal; the rail header reads `join_policy` and `hidden`.
+  // Sent by the membership list the rail loads, the create 201 and the
+  // settings PATCH. The rail header and the settings modal read these.
   join_policy?: JoinPolicy;
   audience?: OrgAudience;
   hidden?: boolean;
@@ -933,10 +945,27 @@ function CreateOrgModal({
   const [name, setName] = useState("");
   const [handle, setHandle] = useState("");
   const [description, setDescription] = useState("");
-  const [isPublic, setIsPublic] = useState(true);
+  const [joinPolicy, setJoinPolicy] = useState<JoinPolicy>("open");
+  const [audience, setAudience] = useState<OrgAudience>("both");
   const [backdrop, setBackdrop] = useState<BackdropKey>("sand-purple");
   const [error, setError] = useState<string | null>(null);
   const [busy, setBusy] = useState(false);
+
+  // The POST stamps the creator's own campus, so "Open to" names it. It also
+  // refuses (400 `audience_excludes_owner`) any audience that would lock the
+  // creator out of their own org, so the other university's option is
+  // disabled here. Only on a KNOWN university: a null system is also what a
+  // failed `/api/campuses` read looks like, and disabling both narrow options
+  // then would leave an IU student unable to make an IU-only club with
+  // nothing on screen saying why. With the system unknown the server's 400
+  // says it instead, the same way officer settings leaves the check to it.
+  const { system, campus } = useViewerCampus();
+  const openToCampus = campus ? { name: campus.name, shared: isSharedCampus(campus) } : null;
+  const openToChoices = openToOptions(openToCampus).map((o) => ({
+    value: o.value,
+    label: o.label,
+    disabled: o.value !== "both" && system !== null && o.value !== system,
+  }));
 
   // Auto-derive handle from name until the user explicitly edits the handle field.
   const [handleTouched, setHandleTouched] = useState(false);
@@ -964,16 +993,22 @@ function CreateOrgModal({
           name: name.trim(),
           handle: handle.trim().toLowerCase(),
           description: description.trim(),
-          is_public: isPublic,
+          join_policy: joinPolicy,
+          audience,
           backdrop_preset: backdrop,
         }),
       });
+      // A 429 from the rate limiter carries no `code` (and may not be JSON).
+      if (res.status === 429) {
+        setError("Too many tries. Try again in a minute.");
+        return;
+      }
       const data = await res.json();
       if (!data?.ok) {
         setError(data?.error || "Failed to create org");
         return;
       }
-      onCreated({ ...data.org, role: "owner" } as Org);
+      onCreated({ ...data.org, role: "owner", hidden: false } as Org);
     } catch (err) {
       console.error("[campus] create org", err);
       setError("Network error");
@@ -1070,41 +1105,24 @@ function CreateOrgModal({
           />
         </Field>
 
-        <Field label="Visibility">
-          <div style={{ display: "flex", gap: 8 }}>
-            {[
-              { v: true, label: "Public", sub: "Anyone can join" },
-              { v: false, label: "Private", sub: "Request to join" },
-            ].map((opt) => {
-              const on = isPublic === opt.v;
-              return (
-                <button
-                  key={opt.label}
-                  type="button"
-                  onClick={() => setIsPublic(opt.v)}
-                  style={{
-                    flex: 1,
-                    padding: "10px 12px",
-                    borderRadius: 10,
-                    border: on
-                      ? "1px solid rgba(255,180,150,0.55)"
-                      : "1px solid rgba(255,255,255,0.12)",
-                    background: on
-                      ? "linear-gradient(180deg, rgba(255,92,53,0.32) 0%, rgba(255,92,53,0.14) 100%)"
-                      : "rgba(255,255,255,0.04)",
-                    color: "#fff",
-                    fontFamily: "inherit",
-                    cursor: "pointer",
-                    textAlign: "left",
-                  }}
-                >
-                  <div style={{ fontWeight: 700, fontSize: 13 }}>{opt.label}</div>
-                  <div style={{ fontSize: 11, color: COLORS.glassMuted }}>{opt.sub}</div>
-                </button>
-              );
-            })}
-          </div>
-        </Field>
+        <ChoiceField
+          label="Who can join"
+          options={WHO_CAN_JOIN_OPTIONS}
+          value={joinPolicy}
+          onChange={(v) => setJoinPolicy(v as JoinPolicy)}
+        />
+
+        <ChoiceField
+          label="Open to"
+          hint={AUDIENCE_HELP}
+          options={openToChoices}
+          value={audience}
+          onChange={(v) => setAudience(v as OrgAudience)}
+        />
+
+        <div style={{ fontSize: 11, color: "rgba(255,255,255,0.4)", marginTop: -6 }}>
+          {OFFICER_FOLLOW_HELP}
+        </div>
 
         <Field label="Backdrop" hint="Admins can change later.">
           <div style={{ display: "flex", gap: 6 }}>
@@ -1317,7 +1335,14 @@ function CreateChannelModal({
   );
 }
 
-type SettingsTab = "overview" | "channels" | "members" | "requests" | "danger";
+type SettingsTab =
+  | "overview"
+  | "channels"
+  | "members"
+  | "followers"
+  | "invites"
+  | "requests"
+  | "danger";
 
 function OrgSettingsModal({
   org,
@@ -1345,12 +1370,21 @@ function OrgSettingsModal({
   const canManage = org.role === "owner" || org.role === "admin";
   const isStaff = canManage || org.role === "mod";
   const isOwner = org.role === "owner";
+  // Invites are refused for a hidden club (the org page's officer bar drops
+  // "Invite people" too), so the tab and the Followers button go with it.
+  const canInvite = canManage && !org.hidden;
+  const baseAudience: OrgAudience = org.audience ?? "both";
 
+  // Followers: owner/admin only, the same roles the followers route allows
+  // (mods get 403). Requests: every staff role under every policy, because a
+  // visiting student can still request an open club.
   const tabs: { key: SettingsTab; label: string; show: boolean }[] = [
     { key: "overview", label: "Overview", show: true },
     { key: "channels", label: "Channels", show: canManage },
     { key: "members", label: "Members", show: true },
-    { key: "requests", label: "Requests", show: isStaff && !org.is_public },
+    { key: "followers", label: "Followers", show: canManage },
+    { key: "invites", label: "Invites", show: canInvite },
+    { key: "requests", label: "Requests", show: isStaff },
     { key: "danger", label: "Danger", show: true },
   ];
   const visibleTabs = tabs.filter((t) => t.show);
@@ -1439,6 +1473,23 @@ function OrgSettingsModal({
           {tab === "members" ? (
             <SettingsMembers org={org} canManage={canManage} isOwner={isOwner} />
           ) : null}
+          {tab === "followers" ? (
+            <SettingsFollowers
+              org={org}
+              canInvite={canInvite}
+              onInvite={() => setTab("invites")}
+            />
+          ) : null}
+          {/* Mounted per visit, so its followers list refetches after a Remove.
+              `inline` is the sheet's dark-glass variant: no panel around it. */}
+          {tab === "invites" ? (
+            <OrgInviteSheet
+              handle={org.handle}
+              orgName={org.name}
+              audience={baseAudience}
+              presentation="inline"
+            />
+          ) : null}
           {tab === "requests" ? <SettingsRequests org={org} /> : null}
           {tab === "danger" ? (
             <SettingsDanger
@@ -1462,9 +1513,12 @@ function SettingsOverview({
   canManage: boolean;
   onOrgUpdated: (org: Org) => void;
 }) {
+  const basePolicy: JoinPolicy = org.join_policy ?? "open";
+  const baseAudience: OrgAudience = org.audience ?? "both";
   const [name, setName] = useState(org.name);
   const [description, setDescription] = useState(org.description ?? "");
-  const [isPublic, setIsPublic] = useState(org.is_public);
+  const [joinPolicy, setJoinPolicy] = useState<JoinPolicy>(basePolicy);
+  const [audience, setAudience] = useState<OrgAudience>(baseAudience);
   const [backdrop, setBackdrop] = useState<BackdropKey>(org.backdrop_preset);
   const [philanthropy, setPhilanthropy] = useState(org.philanthropy ?? "");
   const [links, setLinks] = useState<Array<{ label: string; url: string }>>(
@@ -1478,57 +1532,137 @@ function SettingsOverview({
   const dirty =
     name.trim() !== org.name ||
     description.trim() !== (org.description ?? "") ||
-    isPublic !== org.is_public ||
+    joinPolicy !== basePolicy ||
+    audience !== baseAudience ||
     backdrop !== org.backdrop_preset ||
     philanthropy.trim() !== (org.philanthropy ?? "") ||
     initialLinksKey !== currentLinksKey;
 
+  const aliveRef = useRef(true);
+  useEffect(() => {
+    aliveRef.current = true;
+    return () => {
+      aliveRef.current = false;
+    };
+  }, []);
+
+  // Switching a club to invite-only leaves any pending requests in place.
+  // Say how many, read once, the first time the switch is picked. A failed
+  // read (or none pending) says nothing.
+  const showPendingLine = canManage && !org.hidden && joinPolicy === "invite" && basePolicy !== "invite";
+  const pendingAskedRef = useRef(false);
+  const [pendingCount, setPendingCount] = useState<number | null>(null);
+  useEffect(() => {
+    if (!showPendingLine || pendingAskedRef.current) return;
+    pendingAskedRef.current = true;
+    void vibeRequest<{ requests?: unknown[] }>(`/api/orgs/${org.handle}/requests`, {
+      cache: "no-store",
+      quiet: true,
+      failure: "Couldn't load join requests.",
+    }).then((r) => {
+      if (!aliveRef.current) return;
+      setPendingCount(r.ok && Array.isArray(r.data.requests) ? r.data.requests.length : null);
+    });
+  }, [showPendingLine, org.handle]);
+  const pendingLine =
+    !showPendingLine || !pendingCount
+      ? null
+      : pendingCount === 1
+        ? "1 pending request stays in Requests until you approve or deny it."
+        : `${pendingCount} pending requests stay in Requests until you approve or deny them.`;
+
+  // The read-only view's "Followers" row: the club route already floors the
+  // count for anyone who isn't an owner or admin. Failure means no row.
+  const [readOnlyFollowers, setReadOnlyFollowers] = useState<number | null>(null);
+  useEffect(() => {
+    if (canManage) return;
+    let cancelled = false;
+    void vibeRequest<{ org?: { follower_count?: number | null } }>(`/api/orgs/${org.handle}`, {
+      cache: "no-store",
+      quiet: true,
+      failure: "Couldn't load this club.",
+    }).then((r) => {
+      if (cancelled) return;
+      const n = r.ok ? r.data.org?.follower_count : null;
+      setReadOnlyFollowers(typeof n === "number" ? n : null);
+    });
+    return () => {
+      cancelled = true;
+    };
+  }, [canManage, org.handle]);
+
   const save = async () => {
     setBusy(true);
     setMsg(null);
-    try {
-      const res = await fetch(`/api/orgs/${org.handle}`, {
-        method: "PATCH",
-        headers: { "content-type": "application/json" },
-        body: JSON.stringify({
-          name: name.trim(),
-          description: description.trim(),
-          is_public: isPublic,
-          backdrop_preset: backdrop,
-          philanthropy: philanthropy.trim(),
-          links: links
-            .map((l) => ({ label: l.label.trim(), url: l.url.trim() }))
-            .filter((l) => l.label && l.url),
-        }),
-      });
-      const data = await res.json();
-      if (!data?.ok) {
-        setMsg({ tone: "err", text: data?.error || "Failed to save" });
-        return;
-      }
-      onOrgUpdated({ ...org, ...data.org });
-      setMsg({ tone: "ok", text: "Saved." });
-    } catch (e) {
-      console.error("[campus] save org", e);
-      setMsg({ tone: "err", text: "Network error" });
-    } finally {
-      setBusy(false);
+    const json: Record<string, unknown> = {
+      name: name.trim(),
+      description: description.trim(),
+      backdrop_preset: backdrop,
+      philanthropy: philanthropy.trim(),
+      links: links
+        .map((l) => ({ label: l.label.trim(), url: l.url.trim() }))
+        .filter((l) => l.label && l.url),
+    };
+    // Only what changed, and never on a hidden club (the PATCH refuses it).
+    // Never the legacy public flag: the PATCH maps a stray one into a join policy.
+    if (!org.hidden) {
+      if (joinPolicy !== basePolicy) json.join_policy = joinPolicy;
+      if (audience !== baseAudience) json.audience = audience;
     }
+    const r = await vibeRequest<{ org?: Partial<Org> }>(`/api/orgs/${org.handle}`, {
+      method: "PATCH",
+      json,
+      quiet: true,
+      failure: "Couldn't save your changes.",
+    });
+    if (!aliveRef.current) return;
+    setBusy(false);
+    if (r.ok) {
+      // The response has join_policy, audience and hidden, but no role.
+      onOrgUpdated({ ...org, ...r.data.org });
+      setMsg({ tone: "ok", text: "Saved." });
+      return;
+    }
+    setMsg({
+      tone: "err",
+      text: r.status === 429 ? "Too many tries. Try again in a minute." : (r.error ?? r.message),
+    });
+    if (r.action) toast({ message: r.message, tone: "error", action: r.action });
   };
 
   if (!canManage) {
-    // Members get a read-only view.
+    // Mods and members get a read-only view.
+    const whoCanJoin = whoCanJoinFact(org.join_policy);
+    const openTo = openToFact(org.audience);
     return (
       <div style={{ display: "flex", flexDirection: "column", gap: 14, color: "#fff" }}>
         <PermissionsCard role={org.role} />
+        <div style={{ fontSize: 12, color: COLORS.glassMuted, marginTop: -6 }}>{MOD_READONLY}</div>
         <ReadOnlyRow label="Name" value={org.name} />
         <ReadOnlyRow label="Handle" value={`@${org.handle}`} />
         <ReadOnlyRow label="Description" value={org.description || "—"} />
-        <ReadOnlyRow label="Visibility" value={org.is_public ? "Public" : "Private"} />
+        {whoCanJoin ? <ReadOnlyRow label="Who can join" value={whoCanJoin} /> : null}
+        {openTo ? <ReadOnlyRow label="Open to" value={openTo} /> : null}
+        {/* Without this, a member of a hidden club reads "Who can join:
+            Anyone" with nothing saying nobody can find the club to join it.
+            The manager view has its own hidden line. */}
+        {org.hidden ? (
+          <div style={{ fontSize: 12, color: COLORS.glassMuted, marginTop: -6 }}>
+            {ORG_COPY.notices.hidden}
+          </div>
+        ) : null}
+        {followerCountText(readOnlyFollowers) ? (
+          <ReadOnlyRow label="Followers" value={String(readOnlyFollowers)} />
+        ) : null}
         <ReadOnlyRow label="Backdrop" value={BACKDROP_PRESETS[org.backdrop_preset].label} />
       </div>
     );
   }
+
+  const openToRow = campusRowById(org.campus_id);
+  const openToCampus = openToRow
+    ? { name: openToRow.name, shared: isSharedCampus(openToRow) }
+    : null;
 
   return (
     <div style={{ display: "flex", flexDirection: "column", gap: 14 }}>
@@ -1551,26 +1685,41 @@ function SettingsOverview({
           style={{ ...inputStyle, resize: "vertical", minHeight: 70 }}
         />
       </Field>
-      <Field label="Visibility">
-        <div style={{ display: "flex", gap: 8 }}>
-          {[
-            { v: true, label: "Public", sub: "Anyone can join" },
-            { v: false, label: "Private", sub: "Request to join" },
-          ].map((opt) => (
-            <button
-              key={opt.label}
-              type="button"
-              onClick={() => setIsPublic(opt.v)}
-              style={modalSegmentStyle(isPublic === opt.v)}
-            >
-              <div style={{ fontWeight: 700 }}>{opt.label}</div>
-              <div style={{ fontSize: 11, color: COLORS.glassMuted, marginTop: 2 }}>
-                {opt.sub}
-              </div>
-            </button>
-          ))}
-        </div>
-      </Field>
+      {org.hidden ? (
+        <>
+          <ReadOnlyRow label="Who can join" value={whoCanJoinFact(basePolicy) ?? "—"} />
+          <ReadOnlyRow label="Open to" value={openToFact(baseAudience) ?? "—"} />
+          <div style={{ fontSize: 11, color: "rgba(255,255,255,0.4)", marginTop: -6 }}>
+            {"This org is hidden, so its join settings can't change."}
+          </div>
+        </>
+      ) : (
+        <>
+          <ChoiceField
+            label="Who can join"
+            options={WHO_CAN_JOIN_OPTIONS}
+            value={joinPolicy}
+            onChange={(v) => setJoinPolicy(v as JoinPolicy)}
+          />
+          {pendingLine ? (
+            <div style={{ fontSize: 12, color: COLORS.glassMuted, marginTop: -6 }}>
+              {pendingLine}
+            </div>
+          ) : null}
+          {/* No disabled options: an admin can't know the owner's university,
+              so the PATCH's 400 `audience_excludes_owner` is the check. */}
+          <ChoiceField
+            label="Open to"
+            hint={AUDIENCE_HELP}
+            options={openToOptions(openToCampus)}
+            value={audience}
+            onChange={(v) => setAudience(v as OrgAudience)}
+          />
+          <div style={{ fontSize: 11, color: "rgba(255,255,255,0.4)", marginTop: -6 }}>
+            {OFFICER_FOLLOW_HELP}
+          </div>
+        </>
+      )}
       <Field label="Backdrop">
         <div style={{ display: "flex", gap: 6 }}>
           {(Object.keys(BACKDROP_PRESETS) as BackdropKey[]).map((key) => {
@@ -2079,6 +2228,350 @@ function SettingsMembers({
   );
 }
 
+/**
+ * One row of the officer followers list (plan §4.2). The route also sends the
+ * person-follow state, mutuals, banners, major and year; this list shows none
+ * of them.
+ */
+type FollowerRow = {
+  id: string;
+  name: string | null;
+  handle: string;
+  avatar_url: string | null;
+  follows_since: string;
+  org_follow_source: string | null;
+  member_role: Role | null;
+};
+
+type FollowersPage = {
+  followers?: FollowerRow[];
+  next_cursor?: string | null;
+  follower_count?: number | null;
+};
+
+/** The rows of `more` whose id isn't already listed, appended in the server's order. */
+function appendNewFollowers(rows: FollowerRow[], more: FollowerRow[]): FollowerRow[] {
+  const seen = new Set(rows.map((r) => r.id));
+  const out = rows.slice();
+  for (const r of more) {
+    if (seen.has(r.id)) continue;
+    seen.add(r.id);
+    out.push(r);
+  }
+  return out;
+}
+
+function SettingsFollowers({
+  org,
+  canInvite,
+  onInvite,
+}: {
+  org: Org;
+  canInvite: boolean;
+  onInvite: () => void;
+}) {
+  const [rows, setRows] = useState<FollowerRow[] | null>(null);
+  const [cursor, setCursor] = useState<string | null>(null);
+  const [count, setCount] = useState<number | null>(null);
+  const [loadErr, setLoadErr] = useState<LoadFailure | null>(null);
+  const [loadingMore, setLoadingMore] = useState(false);
+  const [busyId, setBusyId] = useState<string | null>(null);
+  const [reloadKey, setReloadKey] = useState(0);
+  const loadedRef = useRef(false);
+  const aliveRef = useRef(true);
+
+  useEffect(() => {
+    aliveRef.current = true;
+    return () => {
+      aliveRef.current = false;
+    };
+  }, []);
+
+  useEffect(() => {
+    let cancelled = false;
+    (async () => {
+      const r = await vibeRequest<FollowersPage>(`/api/orgs/${org.handle}/followers?limit=30`, {
+        cache: "no-store",
+        quiet: true,
+        failure: "Couldn't load followers.",
+      });
+      if (cancelled) return;
+      if (r.ok && Array.isArray(r.data.followers)) {
+        loadedRef.current = true;
+        setLoadErr(null);
+        // The server's order (first followed, newest first). Never re-sorted here.
+        setRows(r.data.followers);
+        setCursor(r.data.next_cursor ?? null);
+        setCount(r.data.follower_count ?? null);
+        return;
+      }
+      const failure = asLoadFailure(r, "Couldn't load followers.");
+      // A failure never reads as "0 followers": a first load shows it in place
+      // of the list; a later one keeps the rows and toasts.
+      if (loadedRef.current) toast({ message: failure.message, tone: "error", action: failure.action });
+      else setLoadErr(failure);
+    })();
+    return () => {
+      cancelled = true;
+    };
+  }, [org.handle, reloadKey]);
+
+  const loadMore = async () => {
+    if (!cursor || loadingMore) return;
+    setLoadingMore(true);
+    const r = await vibeRequest<FollowersPage>(
+      `/api/orgs/${org.handle}/followers?limit=30&cursor=${encodeURIComponent(cursor)}`,
+      { cache: "no-store", quiet: true, failure: "Couldn't load followers." },
+    );
+    if (!aliveRef.current) return;
+    setLoadingMore(false);
+    if (r.ok && Array.isArray(r.data.followers)) {
+      const more = r.data.followers;
+      setRows((prev) => appendNewFollowers(prev ?? [], more));
+      setCursor(r.data.next_cursor ?? null);
+      const n = r.data.follower_count;
+      if (typeof n === "number") setCount(n);
+      return;
+    }
+    // Rows and cursor stay, so "Show more" can be tried again.
+    const failure = asLoadFailure(r, "Couldn't load followers.");
+    toast({ message: failure.message, tone: "error", action: failure.action });
+  };
+
+  // A mute, not a ban: they stop getting the club's posts and can follow
+  // again. Nothing leaves the list until the server says so, and nothing is
+  // refetched after.
+  const remove = async (row: FollowerRow) => {
+    const who = row.name || "@" + row.handle;
+    if (
+      !window.confirm(
+        `Remove ${who} from ${org.name}'s followers? They'll stop getting its posts. They can follow again.`,
+      )
+    ) {
+      return;
+    }
+    setBusyId(row.id);
+    const r = await vibeRequest<{ removed?: boolean; follower_count?: number | null }>(
+      `/api/orgs/${org.handle}/followers/${encodeURIComponent(row.id)}`,
+      { method: "DELETE", quiet: true, failure: "Couldn't remove this follower." },
+    );
+    if (!aliveRef.current) return;
+    setBusyId(null);
+    if (r.ok) {
+      setRows((prev) => (prev ?? []).filter((x) => x.id !== row.id));
+      const n = r.data.follower_count;
+      // No number means the count read failed on the way back. Keeping the
+      // old one would leave the header one too high AND turn on the
+      // blocks-and-mutes line for a gap this removal just made, so the header
+      // falls back to "Followers" until the tab is reopened.
+      setCount(typeof n === "number" ? n : null);
+      // removed:false means they had already unfollowed; the row just goes.
+      if (r.data.removed === true) toast({ message: "Follower removed", tone: "info" });
+      return;
+    }
+    if (r.code === "member_follows") {
+      setRows((prev) =>
+        (prev ?? []).map((x) =>
+          x.id === row.id && x.member_role == null ? { ...x, member_role: "member" } : x,
+        ),
+      );
+      toast({ message: orgErrorCopy("member_follows") ?? r.message, tone: "error" });
+      return;
+    }
+    if (r.code === "not_found") {
+      toast({ message: orgErrorCopy("not_found") ?? r.message, tone: "error" });
+      return;
+    }
+    if (r.status === 429) {
+      toast({ message: "Too many tries. Try again in a minute.", tone: "error" });
+      return;
+    }
+    toast({ message: r.message, tone: "error", action: r.action });
+  };
+
+  if (rows === null) {
+    if (loadErr) {
+      return (
+        <LoadFailed
+          tone="dark"
+          failure={loadErr}
+          onRetry={() => {
+            setLoadErr(null);
+            setReloadKey((k) => k + 1);
+          }}
+        />
+      );
+    }
+    return <div style={{ color: COLORS.glassMuted, fontSize: 14 }}>Loading followers…</div>;
+  }
+
+  // Exact, with no floor: only owners and admins reach this tab.
+  const heading = count === null ? "Followers" : count === 1 ? "1 follower" : `${count} followers`;
+  // The count includes people the list leaves out for blocks and mutes.
+  const someUnlisted = cursor === null && count !== null && rows.length < count;
+
+  return (
+    <div style={{ display: "flex", flexDirection: "column", gap: 8 }}>
+      <div>
+        <div
+          style={{
+            display: "flex",
+            alignItems: "center",
+            justifyContent: "space-between",
+            gap: 12,
+          }}
+        >
+          <div style={{ fontFamily: "Fraunces, serif", fontWeight: 800, fontSize: 16, color: "#fff" }}>
+            {heading}
+          </div>
+          {canInvite ? (
+            <button type="button" onClick={onInvite} style={modalSubmitStyle(true)}>
+              Invite followers
+            </button>
+          ) : null}
+        </div>
+        <div style={{ fontSize: 12, color: COLORS.glassMuted, marginTop: 4 }}>
+          Only owners and admins can see this list.
+        </div>
+        {someUnlisted ? (
+          <div style={{ fontSize: 12, color: COLORS.glassMuted, marginTop: 2 }}>
+            {"Some followers aren't listed because of blocks or mutes."}
+          </div>
+        ) : null}
+      </div>
+
+      {rows.length === 0 && cursor === null ? (
+        <div style={{ color: COLORS.glassMuted, fontSize: 14 }}>
+          {fillCopy(ORG_COPY.inviteSheet.noFollowers, { org: org.name })}
+        </div>
+      ) : null}
+
+      {rows.map((row) => (
+        <FollowerListRow
+          key={row.id}
+          row={row}
+          busy={busyId === row.id}
+          onRemove={() => void remove(row)}
+        />
+      ))}
+
+      {cursor !== null ? (
+        <div style={{ display: "flex", justifyContent: "center", marginTop: 4 }}>
+          <button
+            type="button"
+            disabled={loadingMore}
+            onClick={() => void loadMore()}
+            style={modalCancelStyle}
+          >
+            {loadingMore ? "Loading…" : "Show more"}
+          </button>
+        </div>
+      ) : null}
+    </div>
+  );
+}
+
+/** A followers-list row. A member can't be removed: members follow automatically. */
+function FollowerListRow({
+  row,
+  busy,
+  onRemove,
+}: {
+  row: FollowerRow;
+  busy: boolean;
+  onRemove: () => void;
+}) {
+  const since = followsSinceText(row.follows_since);
+  return (
+    <div
+      style={{
+        display: "flex",
+        alignItems: "center",
+        gap: 10,
+        padding: "8px 10px",
+        borderRadius: 10,
+        background: "rgba(255,255,255,0.04)",
+        border: "1px solid rgba(255,255,255,0.08)",
+      }}
+    >
+      <div
+        style={{
+          width: 32,
+          height: 32,
+          borderRadius: 999,
+          background: row.avatar_url
+            ? `url(${JSON.stringify(row.avatar_url)}) center/cover`
+            : "rgba(255,255,255,0.1)",
+          color: "#fff",
+          display: "flex",
+          alignItems: "center",
+          justifyContent: "center",
+          fontFamily: "Fraunces, serif",
+          fontWeight: 700,
+          fontSize: 12,
+          flexShrink: 0,
+        }}
+      >
+        {!row.avatar_url ? initialsForOrg(row.name || row.handle || "?") : null}
+      </div>
+      <div style={{ flex: 1, minWidth: 0 }}>
+        <Link
+          href={`/profile/${encodeURIComponent(row.handle)}`}
+          style={{
+            display: "block",
+            fontFamily: "DM Sans, sans-serif",
+            fontSize: 14,
+            fontWeight: 600,
+            color: "#fff",
+            textDecoration: "none",
+            whiteSpace: "nowrap",
+            overflow: "hidden",
+            textOverflow: "ellipsis",
+          }}
+        >
+          {row.name || `@${row.handle}`}
+        </Link>
+        <div style={{ fontFamily: "DM Sans, sans-serif", fontSize: 12, color: COLORS.glassMuted }}>
+          @{row.handle}
+        </div>
+        {since ? (
+          <div
+            style={{
+              fontFamily: "DM Sans, sans-serif",
+              fontSize: 12,
+              color: "rgba(255,255,255,0.45)",
+              marginTop: 2,
+            }}
+          >
+            {since}
+          </div>
+        ) : null}
+      </div>
+      {row.member_role != null ? (
+        <span
+          style={{
+            padding: "3px 8px",
+            borderRadius: 999,
+            fontFamily: "DM Sans, sans-serif",
+            fontSize: 11,
+            fontWeight: 700,
+            color: "#fff",
+            background: "rgba(255,255,255,0.08)",
+            border: "1px solid rgba(255,255,255,0.14)",
+            flexShrink: 0,
+          }}
+        >
+          Member
+        </span>
+      ) : (
+        <button type="button" disabled={busy} onClick={onRemove} style={modalCancelStyle}>
+          {busy ? "Removing…" : "Remove"}
+        </button>
+      )}
+    </div>
+  );
+}
+
 type RequestRow = {
   id: string;
   user_id: string;
@@ -2089,6 +2582,16 @@ type RequestRow = {
   handle: string | null;
   avatar_url: string | null;
   school_verified: boolean;
+  // Eligibility is re-checked at approval: the org's audience against the
+  // requester's verified school, as of now.
+  eligible?: boolean;
+  ineligible_reason?: "audience_iu" | "audience_purdue" | "unverified" | null;
+};
+
+const REQUEST_INELIGIBLE_LABEL: Record<"audience_iu" | "audience_purdue" | "unverified", string> = {
+  audience_iu: "Not eligible (Purdue student)",
+  audience_purdue: "Not eligible (IU student)",
+  unverified: "Not eligible (no verified school email)",
 };
 
 function SettingsRequests({ org }: { org: Org }) {
@@ -2127,23 +2630,32 @@ function SettingsRequests({ org }: { org: Org }) {
 
   const refresh = () => setReloadKey((k) => k + 1);
 
-  const act = async (r: RequestRow, action: "approve" | "deny") => {
-    setBusyId(r.id);
-    try {
-      const res = await fetch(`/api/orgs/${org.handle}/requests/${r.id}`, {
+  // Through `vibeRequest`, so an infra refusal that isn't JSON (a 429 or 502
+  // HTML page) still lands in the error line instead of rejecting a floating
+  // promise and showing the officer nothing.
+  const act = async (row: RequestRow, action: "approve" | "deny") => {
+    setBusyId(row.id);
+    const r = await vibeRequest<{ request?: unknown }>(
+      `/api/orgs/${org.handle}/requests/${row.id}`,
+      {
         method: "POST",
-        headers: { "content-type": "application/json" },
-        body: JSON.stringify({ action }),
-      });
-      const data = await res.json();
-      if (!data?.ok) {
-        setErr(data?.error || `Failed to ${action}`);
-        return;
-      }
+        json: { action },
+        quiet: true,
+        failure:
+          action === "approve" ? "Couldn't approve this request." : "Couldn't deny this request.",
+      },
+    );
+    setBusyId(null);
+    if (!r.ok) {
+      // The 429 body carries no `code` and may not be JSON.
+      setErr(r.status === 429 ? "Too many tries. Try again in a minute." : (r.error ?? r.message));
+      // Re-read the list, so each row's eligibility is current (an approve
+      // can be refused because the club or the student changed since).
       refresh();
-    } finally {
-      setBusyId(null);
+      return;
     }
+    setErr(null);
+    refresh();
   };
 
   if (requests === null) {
@@ -2228,14 +2740,27 @@ function SettingsRequests({ org }: { org: Org }) {
             >
               Deny
             </button>
-            <button
-              type="button"
-              disabled={busyId === r.id}
-              onClick={() => act(r, "approve")}
-              style={modalSubmitStyle(busyId !== r.id)}
-            >
-              Approve
-            </button>
+            {r.eligible === false ? (
+              <span
+                style={{
+                  fontFamily: "DM Sans, sans-serif",
+                  fontSize: 12,
+                  color: COLORS.glassMuted,
+                  whiteSpace: "nowrap",
+                }}
+              >
+                {REQUEST_INELIGIBLE_LABEL[r.ineligible_reason ?? "unverified"]}
+              </span>
+            ) : (
+              <button
+                type="button"
+                disabled={busyId === r.id}
+                onClick={() => act(r, "approve")}
+                style={modalSubmitStyle(busyId !== r.id)}
+              >
+                Approve
+              </button>
+            )}
           </div>
         ))
       )}
@@ -2256,7 +2781,7 @@ function SettingsDanger({
   const [err, setErr] = useState<string | null>(null);
 
   const leave = async () => {
-    if (!confirm(`Leave ${org.name}? You'll lose access to its channels.`)) return;
+    if (!confirm(`Leave ${org.name}? You'll lose access to its chats. Its posts stop too, unless you followed it before joining.`)) return;
     setBusy(true);
     setErr(null);
     try {
@@ -2308,7 +2833,7 @@ function SettingsDanger({
       {!isOwner ? (
         <DangerCard
           title="Leave this org"
-          desc="You'll lose access to its channels and chat history. You can rejoin later if it's public."
+          desc="You'll lose access to its chats and chat history. Its posts stop too, unless you followed it before joining."
           actionLabel={busy ? "Leaving…" : "Leave org"}
           onClick={leave}
           disabled={busy}
@@ -3364,6 +3889,110 @@ function Field({
         <span style={{ fontSize: 11, color: "rgba(255,255,255,0.4)" }}>{hint}</span>
       ) : null}
     </label>
+  );
+}
+
+/**
+ * A row of radio buttons with `Field`'s label and hint. Not a `<label>`
+ * element: clicking a label activates the first button inside it, so the
+ * hint text would silently pick the first option.
+ *
+ * It keeps the radiogroup keyboard contract it announces: the group is one
+ * tab stop (the picked option, or the first pickable one), and the arrow
+ * keys, Home and End move the choice and the focus over the options that
+ * aren't disabled. A radio group a screen reader announces but the keyboard
+ * can't work is worse than plain buttons.
+ */
+function ChoiceField({
+  label,
+  hint,
+  options,
+  value,
+  onChange,
+}: {
+  label: string;
+  hint?: string;
+  options: ReadonlyArray<{ value: string; label: string; sub?: string; disabled?: boolean }>;
+  value: string;
+  onChange: (v: string) => void;
+}) {
+  const buttonsRef = useRef(new Map<string, HTMLButtonElement | null>());
+  const pickable = options.filter((o) => !o.disabled);
+  // The one tab stop: the picked option when it can be picked, else the first
+  // one that can (an already-saved value can be disabled here).
+  const stop = pickable.some((o) => o.value === value) ? value : (pickable[0]?.value ?? null);
+
+  const pick = (next: string) => {
+    onChange(next);
+    buttonsRef.current.get(next)?.focus();
+  };
+
+  const onKeyDown = (e: React.KeyboardEvent<HTMLDivElement>) => {
+    if (pickable.length === 0) return;
+    const at = Math.max(
+      0,
+      pickable.findIndex((o) => o.value === stop),
+    );
+    let to: number;
+    if (e.key === "ArrowRight" || e.key === "ArrowDown") to = (at + 1) % pickable.length;
+    else if (e.key === "ArrowLeft" || e.key === "ArrowUp")
+      to = (at - 1 + pickable.length) % pickable.length;
+    else if (e.key === "Home") to = 0;
+    else if (e.key === "End") to = pickable.length - 1;
+    else return;
+    e.preventDefault();
+    const next = pickable[to];
+    if (next) pick(next.value);
+  };
+
+  return (
+    <div style={{ display: "flex", flexDirection: "column", gap: 4 }}>
+      <span style={{ fontSize: 11, fontWeight: 700, letterSpacing: "0.12em", textTransform: "uppercase", color: COLORS.glassMuted }}>
+        {label}
+      </span>
+      <div
+        role="radiogroup"
+        aria-label={label}
+        onKeyDown={onKeyDown}
+        style={{
+          display: "grid",
+          gridTemplateColumns: "repeat(auto-fit, minmax(132px, 1fr))",
+          gap: 8,
+        }}
+      >
+        {options.map((o) => {
+          const on = value === o.value;
+          return (
+            <button
+              key={o.value}
+              type="button"
+              role="radio"
+              aria-checked={on}
+              disabled={o.disabled}
+              tabIndex={o.value === stop ? 0 : -1}
+              ref={(el) => {
+                buttonsRef.current.set(o.value, el);
+              }}
+              onClick={() => {
+                if (!o.disabled) onChange(o.value);
+              }}
+              style={{
+                ...modalSegmentStyle(on),
+                ...(o.disabled ? { opacity: 0.45, cursor: "not-allowed" } : null),
+              }}
+            >
+              <div style={{ fontWeight: 700, fontSize: 13 }}>{o.label}</div>
+              {o.sub ? (
+                <div style={{ fontSize: 11, color: COLORS.glassMuted, marginTop: 2 }}>{o.sub}</div>
+              ) : null}
+            </button>
+          );
+        })}
+      </div>
+      {hint ? (
+        <span style={{ fontSize: 11, color: "rgba(255,255,255,0.4)" }}>{hint}</span>
+      ) : null}
+    </div>
   );
 }
 
@@ -14318,9 +14947,10 @@ const ROLE_META: Record<
 
 const ROLE_PERMS: Record<Role, string[]> = {
   owner: [
-    "Edit org name, description, visibility, backdrop",
+    "Edit name, description, who can join, backdrop",
     "Create / rename / delete channels",
     "Promote, demote, and remove anyone",
+    "See followers, remove them, and invite people",
     "Approve or deny join requests",
     "Delete the org",
   ],
@@ -14328,6 +14958,7 @@ const ROLE_PERMS: Record<Role, string[]> = {
     "Edit org overview + backdrop",
     "Create / rename / delete channels",
     "Promote/demote mods + members; remove non-admins",
+    "See followers, remove them, and invite people",
     "Approve or deny join requests",
   ],
   mod: [
