@@ -10,7 +10,8 @@ import {
   type LoadFailure,
 } from "@/components/feedback/LoadFailed";
 import { vibeRequest } from "@/lib/feedback/request";
-import { IU_SCHOOLS, schoolForMajor } from "@/lib/iu/majors";
+import { IU_SCHOOLS, schoolForMajorIn } from "@/lib/iu/majors";
+import { PURDUE_INDIANAPOLIS_SCHOOLS } from "@/lib/iu/majors-purdue-indianapolis";
 
 /**
  * Mobile-native campus social map.
@@ -65,6 +66,7 @@ type MapSummary = {
   };
   majors: MapMajor[];
   orgs: MapOrg[];
+  campus_id?: string | null;
 };
 
 type ZoneSelection =
@@ -113,18 +115,20 @@ type Layout = {
   schools: Map<string, SchoolAnchor>;
 };
 
+const HALO_SCHOOLS = [...IU_SCHOOLS, ...PURDUE_INDIANAPOLIS_SCHOOLS];
+
 function computeLayout(data: MapSummary | null): Layout | null {
   if (!data || !data.majors) return null;
 
-  // Bucket majors by their IU school.
+  // Bucket majors by school (IU and Purdue share the Indianapolis map).
   const grouped = new Map<string, MapMajor[]>();
   for (const m of data.majors) {
-    const s = schoolForMajor(m.name).id;
+    const s = schoolForMajorIn(data.campus_id ?? null, null, m.name).id;
     if (!grouped.has(s)) grouped.set(s, []);
     grouped.get(s)!.push(m);
   }
 
-  const active = IU_SCHOOLS.filter((s) => grouped.has(s.id));
+  const active = HALO_SCHOOLS.filter((s) => grouped.has(s.id));
   const positions = new Map<string, Pos>();
   const schools = new Map<string, SchoolAnchor>();
   if (active.length === 0) return { majors: positions, schools };
@@ -294,6 +298,7 @@ export function MapMobile() {
   const layout = useMemo(() => computeLayout(data), [data]);
   const hasData = !!data?.ok && (data.majors?.length ?? 0) > 0;
   const noSchool = !!data?.ok && data.reason === "no_school";
+  const campusId = data?.campus_id ?? null;
 
   const onPointerDown = useCallback((e: React.PointerEvent<HTMLDivElement>) => {
     pointersRef.current.set(e.pointerId, { x: e.clientX, y: e.clientY });
@@ -357,9 +362,9 @@ export function MapMobile() {
       kind: "major",
       key: m.name,
       label: m.name,
-      schoolId: schoolForMajor(m.name).id,
+      schoolId: schoolForMajorIn(campusId, null, m.name).id,
     });
-  }, []);
+  }, [campusId]);
 
   return (
     <div
@@ -412,7 +417,7 @@ export function MapMobile() {
               Pick your campus in Settings to see your map
             </div>
             <div style={{ color: "rgba(255,255,255,0.55)", fontFamily: "DM Sans, sans-serif", fontSize: 13, maxWidth: 280, textAlign: "center", lineHeight: 1.55 }}>
-              The map groups people by major at your campus. Nothing here is verified — you can change it any time.
+              The map groups people by major at your campus. Pick yours in Settings.
             </div>
             <Link
               href="/settings#campus"
@@ -457,6 +462,7 @@ export function MapMobile() {
                   x={pos.x}
                   y={pos.y}
                   r={pos.r}
+                  campusId={campusId}
                   onTap={() => pickMajor(m)}
                 />
               );
@@ -546,7 +552,7 @@ function SchoolHalos({
   return (
     <>
       {Array.from(schools.values()).map((s) => {
-        const school = IU_SCHOOLS.find((x) => x.id === s.id);
+        const school = HALO_SCHOOLS.find((x) => x.id === s.id);
         if (!school) return null;
         const r = s.clusterR + 32;
         return (
@@ -618,15 +624,17 @@ function MajorBubble({
   x,
   y,
   r,
+  campusId,
   onTap,
 }: {
   major: MapMajor;
   x: number;
   y: number;
   r: number;
+  campusId: string | null;
   onTap: () => void;
 }) {
-  const school = schoolForMajor(major.name);
+  const school = schoolForMajorIn(campusId, null, major.name);
   const hasSignal = major.connected > 0 || major.mutuals > 0;
 
   return (
@@ -772,7 +780,7 @@ function ZoneSheet({
 
   const accent =
     selection.kind === "major"
-      ? IU_SCHOOLS.find((s) => s.id === selection.schoolId)?.color ?? "#78C8FF"
+      ? HALO_SCHOOLS.find((s) => s.id === selection.schoolId)?.color ?? "#78C8FF"
       : "#78C8FF";
 
   return (

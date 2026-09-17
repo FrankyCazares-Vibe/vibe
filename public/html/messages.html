@@ -1520,15 +1520,6 @@ function filterT(v){ __realDM.listQuery = String(v || ''); __dmApplyListFilter()
 
 
 const calendarEvents = {};
-(function seedEvents() {
-  const now = new Date(), y = now.getFullYear(), m = now.getMonth();
-  [
-    [new Date(y,m,now.getDate()+2),  'IU Spring Career Fair',     '10:00','IMU Alumni Hall',              'Bring resume, business casual','#1A9E5B'],
-    [new Date(y,m,now.getDate()+5),  'Goldman Sachs Info Session', '17:30','Kelley School of Business 100','',                            '#2563EB'],
-    [new Date(y,m,now.getDate()+8),  'Weekly Design Critique',     '19:00','Luddy Hall 1106',              'Bring a prototype or sketch',  '#7C5CFC'],
-    [new Date(y,m,now.getDate()+14), 'IU Hackathon 2025',          '09:00','Assembly Hall',               '$10k prizes',                  '#FF5C35'],
-  ].forEach(([d,n,t,l,o,c]) => _storeEvent(d,n,t,l,o,c));
-})();
 function _storeEvent(dateObj,name,time,location,notes,color){
   color=color||'#FF5C35';
   const key=dateKey(dateObj);
@@ -1632,7 +1623,36 @@ function renderModalSidebar(){
 // ══ CALENDAR SYNC ════════════════════════════════════════════════════════
 const CAL_KEY = 'vibe_cal_events_v1';
 function _calSave(){try{localStorage.setItem(CAL_KEY,JSON.stringify(calendarEvents));}catch(e){}}
-function _calLoad(){try{const r=localStorage.getItem(CAL_KEY);if(!r)return;Object.assign(calendarEvents,JSON.parse(r));}catch(e){}}
+// Demo events an old build seeded into every calendar. Anyone who ever added
+// or removed an event saved them under CAL_KEY, so deleting the seed alone
+// left them forever. profile.html and messages.html carry this exact block:
+// change both or neither.
+const CAL_SEED_PURGE = [
+  ['IU Spring Career Fair', 'IMU Alumni Hall'],
+  ['Goldman Sachs Info Session', 'Kelley School of Business 100'],
+  ['Weekly Design Critique', 'Luddy Hall 1106'],
+  ['IU Hackathon 2025', 'Assembly Hall'],
+];
+function _calPurgeSeed(saved) {
+  let changed = false;
+  Object.keys(saved).forEach(k => {
+    const list = Array.isArray(saved[k]) ? saved[k] : [];
+    const kept = list.filter(e => !(e && CAL_SEED_PURGE.some(([n, l]) => e.name === n && e.location === l)));
+    if (kept.length) {
+      if (kept.length !== list.length) { saved[k] = kept; changed = true; }
+    } else {
+      delete saved[k];
+      changed = true;
+    }
+  });
+  return changed;
+}
+// The purge's write-back has its own try/catch on purpose: a full quota or a
+// storage-blocking privacy mode makes setItem throw, and in the outer catch
+// that would skip Object.assign and show the student an empty calendar even
+// though their real events are still in storage. Failing to persist the purge
+// is fine — it runs again on the next load.
+function _calLoad(){try{const r=localStorage.getItem(CAL_KEY);if(!r)return;const saved=JSON.parse(r);if(!saved||typeof saved!=='object'||Array.isArray(saved))return;if(_calPurgeSeed(saved)){try{localStorage.setItem(CAL_KEY,JSON.stringify(saved));}catch(e){}}Object.assign(calendarEvents,saved);}catch(e){}}
 document.addEventListener('DOMContentLoaded',function(){
   _calLoad();
   if(typeof renderCalendar==='function')renderCalendar();

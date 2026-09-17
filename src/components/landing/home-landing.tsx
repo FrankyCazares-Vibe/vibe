@@ -1,9 +1,11 @@
 "use client";
 
 import { useRouter } from "next/navigation";
-import { useEffect, useMemo, useState } from "react";
+import { Fragment, useEffect, useMemo, useState } from "react";
 
 import { OttoOrb } from "@/components/the-map/OttoOrb";
+import { enabledSchoolSystems } from "@/lib/auth/school-email-domains";
+import { SYSTEM_LABEL } from "@/lib/iu/campuses";
 import { useIsMobile } from "@/lib/use-is-mobile";
 
 import { OrbitalRingSystem, OrbitDetail, type RingId } from "./landing-orbit";
@@ -12,6 +14,9 @@ import { TypewriterSequence } from "./landing-typewriter";
 const WARP_DURATION_MS = 750;
 const LOGIN_HREF = "/auth/login";
 const SIGNUP_HREF = "/auth/signup";
+// Reads the code flag PURDUE_SIGNUPS_ENABLED (never an env var), so the server
+// render and the hydrated page agree. Turning Purdue off removes its chip.
+const LANDING_SCHOOL_LABELS: readonly string[] = enabledSchoolSystems().map((s) => SYSTEM_LABEL[s]);
 
 // Module-level so the array reference is stable across re-renders — passing
 // an inline literal to TypewriterSequence makes its useEffect deps "change"
@@ -183,7 +188,12 @@ export function HomeLanding() {
         </p>
 
         <div className="vibe-landing-schools">
-          <span>IU</span>
+          {LANDING_SCHOOL_LABELS.map((label, i) => (
+            <Fragment key={label}>
+              {i > 0 ? <span aria-hidden="true">·</span> : null}
+              <span>{label}</span>
+            </Fragment>
+          ))}
           <span className="vibe-landing-schools-soon">live</span>
         </div>
 
