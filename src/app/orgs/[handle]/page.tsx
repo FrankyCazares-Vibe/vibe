@@ -3,6 +3,14 @@ import Link from "next/link";
 
 import { LoadFailed } from "@/components/feedback/LoadFailed";
 import { orgAssetProxyUrl } from "@/lib/org-asset-url";
+import {
+  orgJoinState,
+  SIGNED_OUT,
+  type JoinDisplayState,
+  type JoinPolicy,
+  type OrgAudience,
+} from "@/lib/orgs/join-state";
+import { loadViewerOrgContext } from "@/lib/orgs/membership";
 import { withPostMediaUrls } from "@/lib/post-media-url";
 import { createSupabaseServerClient } from "@/lib/supabase/server";
 import { createSupabaseServiceClient } from "@/lib/supabase/service";
@@ -68,10 +76,12 @@ export async function generateMetadata({ params }: Params) {
   const service = createSupabaseServiceClient();
   const { data: org } = await service
     .from("orgs")
-    .select("name, description, is_public")
+    .select("name, description, is_public, hidden_at")
     .eq("handle", handle)
     .maybeSingle();
   if (!org) return { title: "Not found · Vibe" };
+  // A hidden club's name must not reach the tab title or a link preview.
+  if (org.hidden_at) return { title: "Vibe" };
   return {
     title: `${org.name} · Vibe`,
     description:
@@ -87,7 +97,7 @@ export default async function OrgProfilePage({ params }: Params) {
   const { data: orgRaw } = await service
     .from("orgs")
     .select(
-      "id, handle, name, description, logo_url, banner_url, is_public, backdrop_preset, verified, links, philanthropy, last_activity_at, created_at"
+      "id, handle, name, description, logo_url, banner_url, is_public, backdrop_preset, verified, links, philanthropy, last_activity_at, created_at, join_policy, audience, hidden_at, campus_id"
     )
     .eq("handle", handle)
     .maybeSingle();
@@ -128,32 +138,44 @@ export default async function OrgProfilePage({ params }: Params) {
     dormant,
   };
 
-  // Viewer relationship.
+  // Viewer relationship: the one join decision every surface renders
+  // (`orgJoinState`), so the button never offers a door the join route
+  // refuses.
   const supabase = await createSupabaseServerClient();
   const {
     data: { user },
   } = await supabase.auth.getUser();
-  let viewerRole: string | null = null;
-  let pendingRequest = false;
-  if (user) {
-    const { data: m } = await service
-      .from("org_members")
-      .select("role")
-      .eq("org_id", org.id)
-      .eq("user_id", user.id)
-      .maybeSingle();
-    viewerRole = (m?.role as string | undefined) ?? null;
-    if (!viewerRole) {
-      const { data: r } = await service
-        .from("org_join_requests")
-        .select("id")
-        .eq("org_id", org.id)
-        .eq("user_id", user.id)
-        .eq("status", "pending")
-        .maybeSingle();
-      pendingRequest = !!r;
-    }
-  }
+  const joinPolicy = orgRaw.join_policy as JoinPolicy;
+  const audience = orgRaw.audience as OrgAudience;
+  const hiddenAt = (orgRaw.hidden_at as string | null) ?? null;
+  const ctx = user ? await loadViewerOrgContext(service, org.id, user.id) : null;
+  const decision = ctx
+    ? orgJoinState({
+        org: {
+          join_policy: joinPolicy,
+          audience,
+          hidden_at: hiddenAt,
+          campus_id: (orgRaw.campus_id as string | null) ?? null,
+        },
+        viewer: ctx.viewer,
+        role: ctx.role,
+        pendingInvite: ctx.pendingInvite,
+        pendingRequest: ctx.pendingRequest,
+      })
+    : null;
+
+  // A hidden club does not exist to anyone outside it: signed out, a failed
+  // membership read, or a student who isn't a member all get the same 404 as
+  // a handle that was never registered. Members and platform admins see it.
+  if (hiddenAt && (!ctx || !ctx.ok || decision?.state === "not_found")) notFound();
+
+  const viewerRole = ctx?.ok ? ctx.role : null;
+  // `not_found` can't reach here (the gate above); null means the read failed.
+  const joinState: JoinDisplayState | null = !user
+    ? SIGNED_OUT
+    : !ctx?.ok || !decision || decision.state === "not_found"
+      ? null
+      : decision.state;
 
   // Recent posts. Always fetched (even for private orgs) — the public
   // profile is meant to give visitors the context they need to decide
@@ -207,10 +229,10 @@ export default async function OrgProfilePage({ params }: Params) {
         <Header org={org}>
           <OrgProfileJoinButton
             orgHandle={org.handle}
-            isPublic={org.is_public}
-            initialRole={viewerRole}
-            initialPending={pendingRequest}
             signedIn={!!user}
+            joinState={joinState}
+            joinPolicy={joinPolicy}
+            audience={audience}
           />
         </Header>
 

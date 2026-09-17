@@ -30,8 +30,9 @@ type Channel = {
  *   before the auto-subscribe wiring or want to (re-)pick up newer
  *   public channels.
  *
- * For visitors: rows are dimmed + tap-suppressed; a "Join the org to
- *   chat" hint sits below the list.
+ * For non-members: the card shows its heading and "Chats are for members."
+ *   and never asks for the list. The route answers non-members 403
+ *   `members_only`, so fetching anyway only ever painted a red failure line.
  */
 export function ChannelsSection({
   orgHandle,
@@ -49,6 +50,7 @@ export function ChannelsSection({
   const [toast, setToast] = useState<string | null>(null);
 
   useEffect(() => {
+    if (!viewerIsMember) return;
     let cancelled = false;
     (async () => {
       const r = await vibeRequest<{ channels?: Channel[] }>(
@@ -70,7 +72,7 @@ export function ChannelsSection({
     return () => {
       cancelled = true;
     };
-  }, [orgHandle, loadKey]);
+  }, [orgHandle, loadKey, viewerIsMember]);
 
   const joinAllPublic = useCallback(async () => {
     if (subscribing) return;
@@ -182,7 +184,18 @@ export function ChannelsSection({
         </div>
       ) : null}
 
-      {channels === null && loadErr ? (
+      {!viewerIsMember ? (
+        <p
+          style={{
+            margin: 0,
+            color: "rgba(255,255,255,0.6)",
+            fontSize: 13,
+            lineHeight: 1.55,
+          }}
+        >
+          Chats are for members.
+        </p>
+      ) : channels === null && loadErr ? (
         <LoadFailed
           tone="dark"
           failure={loadErr}
@@ -210,7 +223,6 @@ export function ChannelsSection({
             <ChannelGroup
               label="Public"
               channels={publicChannels}
-              viewerIsMember={viewerIsMember}
               orgHandle={orgHandle}
             />
           ) : null}
@@ -218,25 +230,8 @@ export function ChannelsSection({
             <ChannelGroup
               label="Private"
               channels={privateChannels}
-              viewerIsMember={viewerIsMember}
               orgHandle={orgHandle}
             />
-          ) : null}
-          {!viewerIsMember ? (
-            <div
-              style={{
-                marginTop: 2,
-                padding: "8px 10px",
-                borderRadius: 10,
-                background: "rgba(255,92,53,0.08)",
-                border: "1px solid rgba(255,92,53,0.16)",
-                color: "rgba(255,255,255,0.78)",
-                fontSize: 12,
-                lineHeight: 1.5,
-              }}
-            >
-              Join the org above to chat in these channels.
-            </div>
           ) : null}
         </div>
       )}
@@ -247,12 +242,10 @@ export function ChannelsSection({
 function ChannelGroup({
   label,
   channels,
-  viewerIsMember,
   orgHandle,
 }: {
   label: string;
   channels: Channel[];
-  viewerIsMember: boolean;
   orgHandle: string;
 }) {
   return (
@@ -272,12 +265,7 @@ function ChannelGroup({
       </div>
       <div style={{ display: "flex", flexDirection: "column", gap: 6 }}>
         {channels.map((c) => (
-          <ChannelRow
-            key={c.id}
-            channel={c}
-            viewerIsMember={viewerIsMember}
-            orgHandle={orgHandle}
-          />
+          <ChannelRow key={c.id} channel={c} orgHandle={orgHandle} />
         ))}
       </div>
     </div>
@@ -286,22 +274,15 @@ function ChannelGroup({
 
 function ChannelRow({
   channel,
-  viewerIsMember,
   orgHandle,
 }: {
   channel: Channel;
-  viewerIsMember: boolean;
   orgHandle: string;
 }) {
-  const href = viewerIsMember
-    ? `/campus?tab=chat&org=${encodeURIComponent(orgHandle)}&channel=${encodeURIComponent(channel.id)}`
-    : "#";
+  const href = `/campus?tab=chat&org=${encodeURIComponent(orgHandle)}&channel=${encodeURIComponent(channel.id)}`;
   return (
     <Link
       href={href}
-      onClick={(e) => {
-        if (!viewerIsMember) e.preventDefault();
-      }}
       style={{
         padding: "10px 12px",
         borderRadius: 10,
@@ -312,8 +293,7 @@ function ChannelRow({
         display: "flex",
         alignItems: "center",
         gap: 10,
-        cursor: viewerIsMember ? "pointer" : "default",
-        opacity: viewerIsMember ? 1 : 0.65,
+        cursor: "pointer",
       }}
     >
       <span

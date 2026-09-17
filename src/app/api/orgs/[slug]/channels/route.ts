@@ -17,22 +17,69 @@ type CreateBody = {
 /**
  * GET /api/orgs/[slug]/channels — list visible channels for this org. RLS
  * filters out private channels for non-staff via can_view_org_channel().
+ *
+ * Channels are for members. The org and the viewer's role load on the SERVICE
+ * client: `orgs_select` hides a private org from non-members, so the user
+ * client answered every non-member of an invite-only club with 404 and the org
+ * page printed a red "Couldn't load" line. Non-members now get 403
+ * `members_only`, or 404 `not_found` when the org is hidden (a hidden org does
+ * not exist to anyone outside it). The channels read itself stays on the USER
+ * client so `can_view_org_channel` keeps filtering private channels.
  */
 export async function GET(_req: Request, { params }: Params) {
   const { slug } = await params;
   const supabase = await createSupabaseServerClient();
   const { data: { user } } = await supabase.auth.getUser();
   if (!user) {
-    return NextResponse.json({ ok: false, error: "Unauthorized" }, { status: 401 });
+    return NextResponse.json(
+      { ok: false, error: "Unauthorized", code: "unauthorized" },
+      { status: 401 },
+    );
   }
 
-  const { data: org } = await supabase
+  const service = createSupabaseServiceClient();
+  const { data: org, error: orgError } = await service
     .from("orgs")
-    .select("id")
+    .select("id, hidden_at")
     .eq("handle", slug)
     .maybeSingle();
+  if (orgError) {
+    console.error("[orgs/[slug]/channels GET] org", orgError);
+    return NextResponse.json(
+      { ok: false, error: "Failed to load channels", code: "load_failed" },
+      { status: 500 },
+    );
+  }
   if (!org) {
-    return NextResponse.json({ ok: false, error: "Not found" }, { status: 404 });
+    return NextResponse.json(
+      { ok: false, error: "Not found", code: "not_found" },
+      { status: 404 },
+    );
+  }
+
+  const { data: membership, error: memberError } = await service
+    .from("org_members")
+    .select("role")
+    .eq("org_id", org.id)
+    .eq("user_id", user.id)
+    .maybeSingle();
+  if (memberError) {
+    console.error("[orgs/[slug]/channels GET] membership", memberError);
+    return NextResponse.json(
+      { ok: false, error: "Failed to load channels", code: "load_failed" },
+      { status: 500 },
+    );
+  }
+  if (!membership?.role) {
+    return org.hidden_at
+      ? NextResponse.json(
+          { ok: false, error: "Not found", code: "not_found" },
+          { status: 404 },
+        )
+      : NextResponse.json(
+          { ok: false, error: "Channels are for members", code: "members_only" },
+          { status: 403 },
+        );
   }
 
   const { data, error } = await supabase
@@ -44,7 +91,10 @@ export async function GET(_req: Request, { params }: Params) {
     .order("created_at", { ascending: true });
   if (error) {
     console.error("[orgs/[slug]/channels GET]", error);
-    return NextResponse.json({ ok: false, error: "Failed to load channels" }, { status: 500 });
+    return NextResponse.json(
+      { ok: false, error: "Failed to load channels", code: "load_failed" },
+      { status: 500 },
+    );
   }
   return NextResponse.json({ ok: true, channels: data || [] });
 }

@@ -5,6 +5,7 @@ import { resolveCampusRequest, scopeViewerFromRow } from "@/lib/iu/campus-reques
 import { scopeCampusIds } from "@/lib/iu/campus-scope";
 import { DISCOVERABLE_USER_COLUMNS, isDiscoverableAccount } from "@/lib/iu/community-scope";
 import { orgAssetProxyUrl } from "@/lib/org-asset-url";
+import type { JoinPolicy, OrgAudience } from "@/lib/orgs/join-state";
 import { ilikeOrFilter, ilikePrefixOrFilter } from "@/lib/pgrest";
 import { createSupabaseServerClient } from "@/lib/supabase/server";
 import { createSupabaseServiceClient } from "@/lib/supabase/service";
@@ -202,8 +203,10 @@ export async function GET(req: Request) {
       ? service
           .from("orgs")
           .select(
-            "id,handle,name,description,logo_url,banner_url,is_public,verified,members:org_members(count)",
+            "id,handle,name,description,logo_url,banner_url,is_public,verified,join_policy,audience,members:org_members(count)",
           )
+          // The service client sees hidden clubs; search must not.
+          .is("hidden_at", null)
           .or(orgsContains)
           .order("verified", { ascending: false })
           .limit(limit)
@@ -310,6 +313,8 @@ export async function GET(req: Request) {
     banner_url: string | null;
     is_public: boolean;
     verified: boolean;
+    join_policy: JoinPolicy;
+    audience: OrgAudience;
     members?: Array<{ count: number }> | null;
   };
   const orgsOut: Array<{
@@ -321,6 +326,8 @@ export async function GET(req: Request) {
     banner_url: string | null;
     is_public: boolean;
     verified: boolean;
+    join_policy: JoinPolicy;
+    audience: OrgAudience;
     member_count: number;
   }> = [];
   if (wantOrgs) {
@@ -335,6 +342,8 @@ export async function GET(req: Request) {
         banner_url: orgAssetProxyUrl(o.handle, o.banner_url, "banner"),
         is_public: o.is_public,
         verified: o.verified,
+        join_policy: o.join_policy,
+        audience: o.audience,
         member_count: o.members?.[0]?.count ?? 0,
       });
     }

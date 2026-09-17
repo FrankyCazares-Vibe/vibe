@@ -8136,9 +8136,48 @@ type DiscoverOrg = {
   role?: Role | null;
   links?: Array<{ label: string; url: string }>;
   philanthropy?: string;
+  /** The server's `orgJoinState` answer (`/api/orgs?filter=discover`). */
+  join_state?: string;
+  join_policy?: "open" | "request" | "invite";
+  audience?: "both" | "iu" | "purdue";
 };
 
 type DiscoverFilter = "all" | "public" | "private";
+
+/**
+ * The Join button's label on a discover card and in the quick view. It
+ * renders the server's `join_state` instead of re-deriving it from
+ * `is_public`, which offered "Request to join" on invite-only clubs and got a
+ * 403 `invite_only` back. `status` is this session's own join or request.
+ */
+function discoverJoinLabel(
+  org: DiscoverOrg,
+  status: "joined" | "pending" | undefined,
+): { label: string; disabled: boolean } {
+  if (status === "joined" || org.role) return { label: "Joined", disabled: true };
+  if (status === "pending" || org.join_state === "requested") {
+    return { label: "Requested", disabled: true };
+  }
+  switch (org.join_state) {
+    case "invited":
+      return { label: "Accept invite", disabled: false };
+    case "invite_only":
+      return { label: "Invite only", disabled: true };
+    case "audience_blocked":
+      return {
+        label: org.audience === "purdue" ? "Purdue students only" : "IU students only",
+        disabled: true,
+      };
+    case "unverified":
+      return { label: "Verify school email", disabled: true };
+    case "can_join":
+      return { label: "Join", disabled: false };
+    case "can_request":
+      return { label: "Request to join", disabled: false };
+    default:
+      return { label: org.is_public ? "Join" : "Request to join", disabled: false };
+  }
+}
 
 function OrgsTabBody({ onCreateOrg }: { onCreateOrg: () => void }) {
   const [results, setResults] = useState<DiscoverOrg[] | null>(null);
@@ -8214,9 +8253,12 @@ function OrgsTabBody({ onCreateOrg }: { onCreateOrg: () => void }) {
       const r = await vibeRequest<{ joined?: boolean }>(`/api/orgs/${org.handle}/join`, {
         method: "POST",
         json: {},
-        failure: org.is_public
-          ? "Couldn't join this org."
-          : "Couldn't send your join request.",
+        failure:
+          org.join_state === "invited"
+            ? "Couldn't accept the invite."
+            : org.join_state === "can_join"
+              ? "Couldn't join this org."
+              : "Couldn't send your join request.",
       });
       // Confirm, then paint: the button only flips once the server agrees.
       if (r.ok) {
@@ -8444,14 +8486,11 @@ function OrgQuickViewModal({
 }) {
   const orgColor = colorForOrg(org.id);
   const memberCount = org.member_count ?? 0;
-  const ctaLabel = org.role
-    ? "Joined"
-    : status === "pending"
-    ? "Requested"
-    : org.is_public
-    ? "Join"
-    : "Request to join";
-  const ctaDisabled = !!org.role || !!status || busy;
+  const cta = discoverJoinLabel(org, status);
+  const ctaLabel = cta.label;
+  const ctaDisabled = !!org.role || !!status || busy || cta.disabled;
+  // Labels the server rules out ("Invite only") look muted, not orange.
+  const ctaMuted = !!status || cta.disabled;
 
   return (
     <div
@@ -8753,19 +8792,19 @@ function OrgQuickViewModal({
                   flex: 1,
                   padding: "10px 14px",
                   borderRadius: 10,
-                  border: status
+                  border: ctaMuted
                     ? "1px solid rgba(255,255,255,0.14)"
                     : "1px solid rgba(255,180,150,0.45)",
-                  background: status
+                  background: ctaMuted
                     ? "rgba(255,255,255,0.06)"
                     : "linear-gradient(180deg, rgba(255,92,53,0.55) 0%, rgba(255,92,53,0.22) 100%)",
-                  color: status ? "rgba(255,255,255,0.7)" : "#fff",
+                  color: ctaMuted ? "rgba(255,255,255,0.7)" : "#fff",
                   fontFamily: "DM Sans, sans-serif",
                   fontWeight: 700,
                   fontSize: 13,
                   cursor: ctaDisabled ? "default" : "pointer",
                   opacity: busy ? 0.6 : 1,
-                  boxShadow: status ? "none" : "inset 0 1px 0 rgba(255,255,255,0.22)",
+                  boxShadow: ctaMuted ? "none" : "inset 0 1px 0 rgba(255,255,255,0.22)",
                 }}
               >
                 {ctaLabel}
@@ -9100,15 +9139,11 @@ function DiscoverCard({
   const [hover, setHover] = useState(false);
   const orgColor = colorForOrg(org.id);
   const memberCount = org.member_count ?? 0;
-  const label =
-    status === "joined"
-      ? "Joined"
-      : status === "pending"
-      ? "Requested"
-      : org.is_public
-      ? "Join"
-      : "Request to join";
-  const disabled = !!status || busy;
+  const cta = discoverJoinLabel(org, status);
+  const label = cta.label;
+  const disabled = !!status || busy || cta.disabled;
+  // Labels the server rules out ("Invite only") look muted, not orange.
+  const muted = !!status || cta.disabled;
 
   return (
     <div
@@ -9306,19 +9341,19 @@ function DiscoverCard({
               flex: 1,
               padding: "9px 12px",
               borderRadius: 10,
-              border: status
+              border: muted
                 ? "1px solid rgba(255,255,255,0.14)"
                 : "1px solid rgba(255,180,150,0.45)",
-              background: status
+              background: muted
                 ? "rgba(255,255,255,0.06)"
                 : "linear-gradient(180deg, rgba(255,92,53,0.45) 0%, rgba(255,92,53,0.2) 100%)",
-              color: status ? "rgba(255,255,255,0.7)" : "#fff",
+              color: muted ? "rgba(255,255,255,0.7)" : "#fff",
               fontFamily: "DM Sans, sans-serif",
               fontWeight: 700,
               fontSize: 13,
               cursor: disabled ? "default" : "pointer",
               opacity: busy ? 0.6 : 1,
-              boxShadow: status ? "none" : "inset 0 1px 0 rgba(255,255,255,0.22)",
+              boxShadow: muted ? "none" : "inset 0 1px 0 rgba(255,255,255,0.22)",
             }}
           >
             {label}
