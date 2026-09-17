@@ -293,6 +293,20 @@ export function compareSuggestions(a: SuggestionSignals, b: SuggestionSignals): 
  */
 export const FOLLOWED_AUTHOR_FILTER_CAP = 300;
 
+/**
+ * How many followed CLUBS ride along in the same `.or()` filter (wave plan
+ * batch F4, critic C20). The URL budget is shared with the author list: 300
+ * author uuids cost about 11.1 KB, 50 club uuids add about 1.9 KB, and the
+ * route's blocked/muted `not.in` list comes on top of both. The caller passes
+ * its follows newest first, so the newest 50 are the ones kept; the feed
+ * route logs when it has to truncate. A club past the cap still reaches the
+ * viewer through the campus rule, and still gets the follow boost in ranking.
+ */
+export const FOLLOWED_ORG_FILTER_CAP = 50;
+
+/** Default for the optional followed-club sets below, so 3- and 4-argument callers are unchanged. */
+const EMPTY_SET: ReadonlySet<string> = new Set<string>();
+
 export type FeedLane =
   /** No university to scope to (critic A7) — the feed stays global. */
   | { kind: "everything" }
@@ -354,8 +368,20 @@ export function feedLaneFor(scope: CampusScopeV2, viewer: ScopeViewer): FeedLane
  * minus hidden users); non-uuid values are dropped rather than trusted into
  * the filter grammar, and the list is capped (see
  * {@link FOLLOWED_AUTHOR_FILTER_CAP}).
+ *
+ * `followedOrgIds` are the clubs the viewer follows, newest first and already
+ * minus hidden clubs (the caller resolves those with the service client).
+ * Posts made AS one of those clubs join the lane wherever the club is, on the
+ * same terms as a followed author: home lane only, never a browse view. Same
+ * uuid screen, deduped, capped at {@link FOLLOWED_ORG_FILTER_CAP}. It is a
+ * parameter rather than a `FeedLane` field (critic C10), so the lane itself
+ * and every existing caller stay as they were.
  */
-export function feedLaneOrFilter(lane: FeedLane, followedAuthorIds: string[] = []): string | null {
+export function feedLaneOrFilter(
+  lane: FeedLane,
+  followedAuthorIds: string[] = [],
+  followedOrgIds: string[] = [],
+): string | null {
   if (lane.kind === "everything") return null;
 
   const parts: string[] = [];
@@ -369,6 +395,8 @@ export function feedLaneOrFilter(lane: FeedLane, followedAuthorIds: string[] = [
   if (lane.includeFollowed) {
     const ids = followedAuthorIds.filter(isUuid).slice(0, FOLLOWED_AUTHOR_FILTER_CAP);
     if (ids.length > 0) parts.push(`user_id.in.(${ids.join(",")})`);
+    const orgIds = Array.from(new Set(followedOrgIds.filter(isUuid))).slice(0, FOLLOWED_ORG_FILTER_CAP);
+    if (orgIds.length > 0) parts.push(`org_id.in.(${orgIds.join(",")})`);
   }
   // An empty lane must match nothing, not everything. `posts.id` is the
   // primary key, so `id.is.null` is always false.
@@ -380,11 +408,20 @@ export function feedLaneOrFilter(lane: FeedLane, followedAuthorIds: string[] = [
  * what comes back; this is the belt-and-braces check on what goes out, so a
  * mistake in the filter grammar can't put another university's post on the
  * page.
+ *
+ * `followedOrgIds` is the viewer's followed, NOT hidden clubs: a post made as
+ * one of them passes wherever `includeFollowed` would pass a followed author.
  */
 export function postInFeedLane(
-  post: { user_id?: string | null; campus_id?: string | null; school_system?: string | null },
+  post: {
+    user_id?: string | null;
+    org_id?: string | null;
+    campus_id?: string | null;
+    school_system?: string | null;
+  },
   lane: FeedLane,
   followedAuthorIds: ReadonlySet<string>,
+  followedOrgIds: ReadonlySet<string> = EMPTY_SET,
 ): boolean {
   if (lane.kind === "everything") return true;
   const campusId = post?.campus_id ?? null;
@@ -396,7 +433,8 @@ export function postInFeedLane(
     if (system === lane.legacySystem || system === null) return true;
   }
   return (
-    lane.includeFollowed && typeof post?.user_id === "string" && followedAuthorIds.has(post.user_id)
+    (lane.includeFollowed && typeof post?.user_id === "string" && followedAuthorIds.has(post.user_id)) ||
+    (lane.includeFollowed && typeof post?.org_id === "string" && followedOrgIds.has(post.org_id))
   );
 }
 
@@ -429,7 +467,8 @@ export function campusScopeError(scope: CampusScopeForbidden): {
  *     engagement = 1 + likes + 2*reposts + comments
  *     base       = engagement / (age_hours + 2)^1.5
  *     score      = base
- *                  * (1.6  if the viewer follows the author, else 1.0)
+ *                  * (1.6  if the viewer follows the author OR the club the
+ *                           post was made as, else 1.0 — once, never 1.6²)
  *                  * (1.35 if the post is on the viewer's home campus, else 1.0)
  *                  + 3 * friend_reposter_count
  *
@@ -444,6 +483,11 @@ export function campusScopeError(scope: CampusScopeForbidden): {
  *     beat a fresh popular one purely from an additive trap. The
  *     friend-repost boost is additive and per-reposter (max 3) since each
  *     fresh reposter is a separate endorsement.
+ *   - Following a club is the same deliberate act as following a person, so
+ *     a post made as a followed club gets the same 1.6 (wave plan F4). An
+ *     officer you follow posting as a club you follow still gets one 1.6,
+ *     not 2.56: it is one post you asked to see, not two. `followedOrgIds`
+ *     must already be minus hidden clubs.
  *
  * HOME-CAMPUS BOOST (1.35, multiplicative). The lane already decides WHAT is
  * in the pool; this decides what floats. Inside a lane that mixes the home
@@ -473,17 +517,34 @@ export function scoreFeedRow(
     repost_count: number;
     friend_reposter_count?: number;
     campus_id?: string | null;
+    org_id?: string | null;
   },
   nowMs: number,
   viewerFollowingIds: ReadonlySet<string>,
   homeCampusId: string | null,
+  followedOrgIds: ReadonlySet<string> = EMPTY_SET,
 ): number {
   const ageHours = Math.max(0, (nowMs - new Date(post.created_at).getTime()) / 3_600_000);
   const engagement =
     1 + (post.like_count ?? 0) + 2 * (post.repost_count ?? 0) + (post.comment_count ?? 0);
   let score = engagement / Math.pow(ageHours + 2, 1.5);
-  if (viewerFollowingIds.has(post.user_id)) score *= 1.6;
+  if (viewerFollowingIds.has(post.user_id) || (post.org_id != null && followedOrgIds.has(post.org_id))) {
+    score *= 1.6;
+  }
   if (homeCampusId && post.campus_id === homeCampusId) score *= SAME_CAMPUS_BOOST;
   score += 3 * (post.friend_reposter_count ?? 0);
   return score;
+}
+
+/**
+ * The bucket the feed's diversity cap counts a post in (critic C1). A post
+ * made as a club counts against the CLUB, so two officers posting for one
+ * club share one cap and a club can't carpet the page. A personal post counts
+ * against its author. Keyed on `org_id`, never on an embedded org object: the
+ * embed was null for anyone `orgs_select` hid the club from, which silently
+ * put every club post back in its officer's bucket. Pass a row whose `org_id`
+ * is already null for a hidden club, so that post reads as the author's own.
+ */
+export function feedDiversityKey(post: { user_id: string; org_id?: string | null }): string {
+  return post.org_id ? `org:${post.org_id}` : `user:${post.user_id}`;
 }

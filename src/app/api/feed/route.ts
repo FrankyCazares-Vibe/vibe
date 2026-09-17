@@ -3,7 +3,9 @@ import { NextResponse } from "next/server";
 import { isSchoolSystem, legacyLabel, type SchoolSystem } from "@/lib/iu/campuses";
 import { resolveScopeV2, scopeCampusIds } from "@/lib/iu/campus-scope";
 import {
+  FOLLOWED_ORG_FILTER_CAP,
   campusScopeError,
+  feedDiversityKey,
   feedLaneFor,
   feedLaneOrFilter,
   homeCampusIdFor,
@@ -11,13 +13,25 @@ import {
   scoreFeedRow,
 } from "@/lib/iu/community-scope";
 import { orgAssetProxyUrl } from "@/lib/org-asset-url";
+import {
+  loadViewerFollowedOrgIds,
+  loadVisibleOrgCards,
+  type OrgCard,
+} from "@/lib/orgs/following";
 import { withPostMediaUrls } from "@/lib/post-media-url";
 import { loadHonestViewRows, tallyViews } from "@/lib/posts/honest-views";
 import { loadHiddenUsers } from "@/lib/safety/hidden-users";
 import { createSupabaseServerClient } from "@/lib/supabase/server";
+import { createSupabaseServiceClient } from "@/lib/supabase/service";
 
 const DEFAULT_LIMIT = 50;
 const MAX_LIMIT = 200;
+/**
+ * How many of the viewer's club follows are read, newest first (critic M-6).
+ * Hidden clubs are dropped from these with one `.in("id", …)` read, so this
+ * bounds that URL; the lane filter then keeps `FOLLOWED_ORG_FILTER_CAP`.
+ */
+const FOLLOWED_ORG_READ_LIMIT = 200;
 
 type AuthorEmbed = {
   id: string;
@@ -32,15 +46,6 @@ type AuthorEmbed = {
   avatar_url: string | null;
 };
 
-type OrgEmbed = {
-  id: string;
-  handle: string;
-  name: string;
-  logo_url: string | null;
-  verified: boolean;
-  is_public: boolean;
-} | null;
-
 type PostRow = {
   id: string;
   user_id: string;
@@ -52,12 +57,16 @@ type PostRow = {
   media_thumbnail_url: string | null;
   view_count: number | null;
   created_at: string;
+  /**
+   * Set by the `posts_stamp_edited` trigger when a published post's content
+   * changes; null on a post that was never edited. Clients show "Edited".
+   */
+  edited_at?: string | null;
   /** Stamped by the `posts_stamp_campus` trigger (M1); null on legacy rows. */
   campus_id: string | null;
   /** Same trigger. Lets campus-less legacy posts be scoped by university. */
   school_system: string | null;
   author: AuthorEmbed | null;
-  org: OrgEmbed;
 };
 
 type RepostRow = {
@@ -96,7 +105,18 @@ type EngagementCounts = {
  *     which the trigger pins forever and which would otherwise reach nobody,
  *     its own author included;
  *   - posts by people the viewer follows, wherever they are, because follows
- *     are global.
+ *     are global;
+ *   - posts made as a club the viewer follows, wherever the club is (wave
+ *     plan F4). Hidden clubs never ride in on a follow, and a blocked or
+ *     muted officer's club posts stay out through the `user_id` exclusion.
+ *     A viewer with no verified university gets the global lane, so the
+ *     club clause adds nothing there, but a followed club still ranks up.
+ *
+ * CLUB NAMES come from the SERVICE client (`loadVisibleOrgCards`), never an
+ * `orgs` embed under the user client: `orgs_select` hides a club from its
+ * non-members, which made the embed null for exactly the followers this
+ * feed now serves. A hidden or unknown club's post goes out as the author's
+ * own, with `org: null` and `org_id: null` (open question Q4, critic Low 3).
  *
  * `?campus=<id>` switches to another campus in the viewer's allowed set (403
  * `campus_not_in_system` otherwise, 400 for an id that isn't a campus at
@@ -147,10 +167,10 @@ export async function GET(req: Request) {
     : limit;
 
   // The viewer's campus, the people they shouldn't see (blocked either way,
-  // muted right now) and who they follow load together. The follow set is
-  // needed EARLY now — it's part of the lane filter below, not just the
-  // ranking pass — so it moved into this round trip.
-  const [meRes, hiddenRes, followingRes] = await Promise.all([
+  // muted right now), who they follow and which clubs they follow load
+  // together. Both follow sets are needed EARLY — they're part of the lane
+  // filter below, not just the ranking pass — so they're in this round trip.
+  const [meRes, hiddenRes, followingRes, followedOrgsRes] = await Promise.all([
     // `maybeSingle`, not `single`: a viewer whose `public.users` row is
     // missing gets the same feed they get today (no campus, no university →
     // the global lane below), not a hard 500 on the app's home screen. A
@@ -159,6 +179,9 @@ export async function GET(req: Request) {
     supabase.from("users").select("school,campus_id,school_system").eq("id", user.id).maybeSingle(),
     loadHiddenUsers(supabase, user.id),
     loadViewerFollowings(supabase, user.id),
+    // The viewer's own follow rows, so the user client is enough. Newest
+    // first and bounded (critic M-6); hidden clubs are dropped below.
+    loadViewerFollowedOrgIds(supabase, user.id, { limit: FOLLOWED_ORG_READ_LIMIT }),
   ]);
   const { data: me, error: meErr } = meRes;
   if (meErr) {
@@ -177,6 +200,12 @@ export async function GET(req: Request) {
   // an empty-looking feed with nothing but a console line to explain it.
   if (!followingRes.ok) {
     console.error("[feed followings]", followingRes.error);
+    return NextResponse.json({ ok: false, error: "Request failed" }, { status: 500 });
+  }
+  // Same rule again for club follows: they decide which club posts reach the
+  // viewer from off campus.
+  if (!followedOrgsRes.ok) {
+    console.error("[feed followed-orgs]", followedOrgsRes.error);
     return NextResponse.json({ ok: false, error: "Request failed" }, { status: 500 });
   }
   const viewerFollowingIds = followingRes.ids;
@@ -206,19 +235,54 @@ export async function GET(req: Request) {
     const { status, body } = campusScopeError(scope);
     return NextResponse.json(body, { status });
   }
+
+  // Club names and hidden-club checks go through the service client (see the
+  // route docblock). Created on first use, so a feed with no club follows and
+  // no club posts never needs it.
+  let serviceClient: ReturnType<typeof createSupabaseServiceClient> | null = null;
+  const service = () => (serviceClient ??= createSupabaseServiceClient());
+
+  // Followed clubs that still exist and aren't hidden, newest follow first.
+  // A hidden club must never pull its posts in through a follow, so this set
+  // (not the raw follow rows) feeds the lane filter, the lane check and the
+  // ranking boost. Failing closed matches the reads above. It runs after the
+  // campus check, so a bad `?campus=` gets its 400/403 without a service read.
+  let followedOrgIds: string[] = [];
+  if (followedOrgsRes.ids.length > 0) {
+    const visible = await loadVisibleOrgCards(service(), followedOrgsRes.ids);
+    if (!visible.ok) {
+      console.error("[feed followed-org cards]", visible.error);
+      return NextResponse.json({ ok: false, error: "Request failed" }, { status: 500 });
+    }
+    followedOrgIds = followedOrgsRes.ids.filter((id) => visible.byId.has(id));
+    if (
+      followedOrgsRes.ids.length === FOLLOWED_ORG_READ_LIMIT ||
+      followedOrgIds.length > FOLLOWED_ORG_FILTER_CAP
+    ) {
+      // Only the newest FOLLOWED_ORG_FILTER_CAP ride in the lane filter. The
+      // rest of what was read still reaches the viewer by campus and still
+      // gets the boost; follows past the read limit get neither.
+      console.warn("[feed] followed orgs truncated", {
+        count: followedOrgIds.length,
+        readLimitHit: followedOrgsRes.ids.length === FOLLOWED_ORG_READ_LIMIT,
+      });
+    }
+  }
+  const followedOrgSet: ReadonlySet<string> = new Set(followedOrgIds);
+
   const lane = feedLaneFor(scope, viewer);
-  const laneFilter = feedLaneOrFilter(lane, Array.from(viewerFollowingIds));
+  const laneFilter = feedLaneOrFilter(lane, Array.from(viewerFollowingIds), followedOrgIds);
 
   // Name the FK constraint explicitly (`posts_user_id_fkey`) — the implicit
   // form ambiguates in PostgREST when more than one relationship exists. The
-  // `!inner` modifier upgrades the LEFT JOIN to an INNER JOIN.
+  // `!inner` modifier upgrades the LEFT JOIN to an INNER JOIN. No `orgs`
+  // embed: club names come from the service client below.
   let postsQuery = supabase
     .from("posts")
     .select(
-      "id,user_id,org_id,type,content,tags,media_url,media_thumbnail_url,view_count,created_at," +
+      "id,user_id,org_id,type,content,tags,media_url,media_thumbnail_url,view_count,created_at,edited_at," +
         "campus_id,school_system," +
-        "author:users!posts_user_id_fkey!inner(id,name,handle,school,campus_id,school_system,major,year,avatar_url)," +
-        "org:orgs(id,handle,name,logo_url,verified,is_public)",
+        "author:users!posts_user_id_fkey!inner(id,name,handle,school,campus_id,school_system,major,year,avatar_url)",
     )
     .eq("type", "post")
     .order("created_at", { ascending: false })
@@ -240,18 +304,17 @@ export async function GET(req: Request) {
     postsQuery = postsQuery.notIn("user_id", hiddenIds);
   }
 
-  // Reposts (global for now). The embedded `post` carries its own
-  // author/org joins so the client can render the original card exactly the
-  // same way it would as a top-level post.
+  // Reposts (global for now). The embedded `post` carries its own author
+  // join so the client can render the original card the same way it would
+  // as a top-level post. Like the posts query, no `orgs` embed.
   let repostsQuery = supabase
     .from("post_reposts")
     .select(
       "post_id,user_id,comment,created_at," +
         "reposter:users!post_reposts_user_id_fkey!inner(id,name,handle,school,major,year,avatar_url)," +
         "post:posts!inner(" +
-        "id,user_id,org_id,type,content,tags,media_url,media_thumbnail_url,view_count,created_at," +
-        "author:users!posts_user_id_fkey!inner(id,name,handle,school,major,year,avatar_url)," +
-        "org:orgs(id,handle,name,logo_url,verified,is_public)" +
+        "id,user_id,org_id,type,content,tags,media_url,media_thumbnail_url,view_count,created_at,edited_at," +
+        "author:users!posts_user_id_fkey!inner(id,name,handle,school,major,year,avatar_url)" +
         ")",
     )
     // Clips are backlogged — a repost of a clip must not leak into the feed
@@ -292,7 +355,7 @@ export async function GET(req: Request) {
   // anything that got past the filter grammar anyway. A mistake here should
   // show fewer posts, never another university's.
   const postRows = ((postsRes.data as unknown as PostRow[]) ?? []).filter((p) =>
-    postInFeedLane(p, lane, viewerFollowingIds),
+    postInFeedLane(p, lane, viewerFollowingIds, followedOrgSet),
   );
   const repostRows =
     !repostsRes.error && Array.isArray(repostsRes.data)
@@ -316,10 +379,26 @@ export async function GET(req: Request) {
   const authorByPostId = new Map(postRows.map((p) => [p.id, p.user_id]));
   const renderedPostIds = Array.from(authorByPostId.keys());
 
-  const [engagement, viewRows] = await Promise.all([
+  // Club attribution for the posts we render, read with the service client
+  // (see the route docblock). Only visible clubs come back, so a hidden or
+  // unknown club's post renders as its author's own. A failed read fails the
+  // feed rather than quietly stripping every club name (the same call as
+  // `events/route.ts` makes for its hidden-org read). 0 club posts live today,
+  // so this read almost never runs.
+  const attrIds = Array.from(
+    new Set(postRows.map((p) => p.org_id).filter((id): id is string => typeof id === "string")),
+  );
+  const [engagement, viewRows, attribution] = await Promise.all([
     loadEngagement(supabase, Array.from(allPostIds), user.id),
     loadHonestViewRows(renderedPostIds, authorByPostId),
+    attrIds.length > 0
+      ? loadVisibleOrgCards(service(), attrIds)
+      : Promise.resolve({ ok: true as const, byId: new Map<string, OrgCard>() }),
   ]);
+  if (!attribution.ok) {
+    console.error("[feed org attribution]", attribution.error);
+    return NextResponse.json({ ok: false, error: "Request failed" }, { status: 500 });
+  }
 
   // A per-card view count is a secondary metric on a page whose job is the
   // posts themselves, so if the ledger can't be read we keep showing the
@@ -349,13 +428,16 @@ export async function GET(req: Request) {
       repost_count: 0,
     };
     const fr = friendReposters.get(row.id) ?? { samples: [], totalFriends: 0 };
-    const org = row.org ?? null;
+    const card = row.org_id ? (attribution.byId.get(row.org_id) ?? null) : null;
     return {
       // Proxy URLs for media, plus `media_kind` so the client picks the
       // right player without re-parsing the proxy URL. A post carries video
       // when its stored media_url is an R2 key under `clips/` (legacy
       // naming — it backs regular video posts, not clips).
       ...withPostMediaUrls(row),
+      // A hidden or unknown club doesn't exist to this viewer, so its id
+      // doesn't go out either (critic Low 3). `edited_at` rides the spread.
+      org_id: card ? row.org_id : null,
       // `honestViews === null` means the ledger was unreadable, not that
       // nobody looked — hence the stored-counter fallback noted above.
       view_count: honestViews ? (honestViews.get(row.id) ?? 0) : (row.view_count ?? 0),
@@ -367,8 +449,10 @@ export async function GET(req: Request) {
       viewer_saved: engagement.savedByViewer.has(row.id),
       friend_reposters: fr.samples,
       friend_reposter_count: fr.totalFriends,
-      org: org
-        ? { ...org, logo_url: orgAssetProxyUrl(org.handle, org.logo_url, "logo") }
+      // Keys stay `{id,handle,name,logo_url,verified,is_public}`; `hidden_at`
+      // is never selected, so it can't be sent.
+      org: card
+        ? { ...card, logo_url: orgAssetProxyUrl(card.handle, card.logo_url, "logo") }
         : null,
     };
   };
@@ -398,7 +482,7 @@ export async function GET(req: Request) {
     ? postRowsOut
         .map((entry) => ({
           entry,
-          score: scoreFeedRow(entry.post, now, viewerFollowingIds, homeCampusId),
+          score: scoreFeedRow(entry.post, now, viewerFollowingIds, homeCampusId, followedOrgSet),
         }))
         .sort((a, b) => b.score - a.score)
         .map((s) => s.entry)
@@ -407,14 +491,17 @@ export async function GET(req: Request) {
       );
 
   // Diversity cap: no single author can dominate a page. Walk the
-  // ranked list in order, skip a post once we've already seen 3 from
-  // the same author. Org posts use org_id as the bucket so a single
-  // org account doesn't carpet the feed either.
+  // ranked list in order, skip a post once we've already seen 3 in the
+  // same bucket. `feedDiversityKey` buckets a post made as a club on the
+  // CLUB (two officers posting for one club share its cap) and a personal
+  // post on its author. It reads the rendered `org_id`, which is already
+  // null for a hidden club, so that post counts as its author's own. Never
+  // key on `org_id` alone: most posts have none.
   const MAX_PER_AUTHOR = 3;
   const perAuthorCount = new Map<string, number>();
   const capped: typeof sorted = [];
   for (const entry of sorted) {
-    const key = entry.post.org?.id ?? entry.post.user_id;
+    const key = feedDiversityKey(entry.post);
     const c = perAuthorCount.get(key) ?? 0;
     if (c >= MAX_PER_AUTHOR) continue;
     perAuthorCount.set(key, c + 1);

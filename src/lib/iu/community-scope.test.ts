@@ -45,10 +45,12 @@ registerHooks({
 const {
   DISCOVERABLE_USER_COLUMNS,
   FOLLOWED_AUTHOR_FILTER_CAP,
+  FOLLOWED_ORG_FILTER_CAP,
   SAME_CAMPUS_BOOST,
   campusScopeError,
   communityTraits,
   compareSuggestions,
+  feedDiversityKey,
   feedLaneFor,
   feedLaneOrFilter,
   homeCampusIdFor,
@@ -381,6 +383,122 @@ test("lane filter: an empty lane matches nothing rather than everything", () => 
   );
 });
 
+// ── Followed clubs in the lane (wave plan F4) ────────────────────────────
+
+const CLUB_A = uuid(5);
+const CLUB_B = uuid(6);
+const listedOrgIds = (filter: string) =>
+  (filter.match(/org_id\.in\.\(([^)]*)\)/)?.[1] ?? "").split(",").filter(Boolean);
+
+test("club follows: the club clause rides on the home lane only", () => {
+  const home = feedLaneOrFilter(laneFor(null, IU_INDY), [uuid(1)], [CLUB_A]) ?? "";
+  assert.match(home, new RegExp(`org_id\\.in\\.\\(${CLUB_A}\\)`));
+  assert.match(home, new RegExp(`user_id\\.in\\.\\(${uuid(1)}\\)`));
+  // A club follow with no person follows still gets its clause.
+  const clubsOnly = feedLaneOrFilter(laneFor(null, IU_INDY), [], [CLUB_A]) ?? "";
+  assert.match(clubsOnly, new RegExp(`org_id\\.in\\.\\(${CLUB_A}\\)`));
+  assert.equal(clubsOnly.includes("user_id.in."), false);
+  // Browsing another campus is that campus only: no people, no clubs.
+  assert.equal(
+    feedLaneOrFilter(laneFor("iu-bloomington", IU_INDY), [uuid(1)], [CLUB_A]),
+    "campus_id.in.(iu-bloomington)",
+  );
+});
+
+test("club follows: the global lane still filters nothing", () => {
+  assert.equal(feedLaneOrFilter({ kind: "everything" }, [uuid(1)], [CLUB_A]), null);
+  assert.equal(feedLaneOrFilter(laneFor(null, UNVERIFIED), [], [CLUB_A]), null);
+});
+
+test("club follows: the list is capped at 50, newest first kept", () => {
+  assert.equal(FOLLOWED_ORG_FILTER_CAP, 50);
+  const many = Array.from({ length: FOLLOWED_ORG_FILTER_CAP + 30 }, (_, i) =>
+    `${i.toString(16).padStart(8, "0")}-0000-4000-8000-00000000c1ab`,
+  );
+  const filter = feedLaneOrFilter(laneFor(null, IU_INDY), [], many) ?? "";
+  const listed = listedOrgIds(filter);
+  assert.equal(listed.length, FOLLOWED_ORG_FILTER_CAP);
+  assert.deepEqual(listed, many.slice(0, FOLLOWED_ORG_FILTER_CAP));
+  // The club cap is its own budget: a full author list doesn't shrink it.
+  const authors = Array.from({ length: FOLLOWED_AUTHOR_FILTER_CAP }, (_, i) =>
+    `${i.toString(16).padStart(8, "0")}-0000-4000-8000-000000000000`,
+  );
+  const both = feedLaneOrFilter(laneFor(null, IU_INDY), authors, many) ?? "";
+  assert.equal(listedOrgIds(both).length, FOLLOWED_ORG_FILTER_CAP);
+});
+
+test("club follows: non-uuid and injection strings never reach the filter", () => {
+  const filter =
+    feedLaneOrFilter(
+      laneFor(null, IU_INDY),
+      [],
+      [
+        "not-a-uuid",
+        "*",
+        "",
+        `${CLUB_A}),user_id.not.is.null`,
+        `${CLUB_A},org_id.not.is.null`,
+        "org_id.not.is.null",
+        CLUB_B,
+        CLUB_B,
+      ],
+    ) ?? "";
+  assert.equal(filter.includes("not-a-uuid"), false);
+  assert.equal(filter.includes("not.is.null"), false);
+  assert.equal(filter.includes("*"), false);
+  // Deduped, and the only club that survives is the real uuid.
+  assert.deepEqual(listedOrgIds(filter), [CLUB_B]);
+  // Junk only: no club clause at all, not an empty `org_id.in.()`.
+  const junk = feedLaneOrFilter(laneFor(null, IU_INDY), [], ["nope", `${CLUB_A};drop`]) ?? "";
+  assert.equal(junk.includes("org_id"), false);
+});
+
+test("club follows: an empty lane with no ids at all still matches nothing", () => {
+  const empty = { kind: "scoped" as const, campusIds: [], legacySystem: null, includeFollowed: true };
+  assert.equal(feedLaneOrFilter(empty, [], []), "id.is.null");
+  assert.equal(feedLaneOrFilter(empty, [], ["not-a-uuid"]), "id.is.null");
+  // …and a club follow alone is enough to make it match something.
+  assert.equal(feedLaneOrFilter(empty, [], [CLUB_A]), `org_id.in.(${CLUB_A})`);
+});
+
+test("club follows: the 2-argument call is byte-for-byte what it was", () => {
+  const lane = laneFor(null, IU_INDY);
+  const expected =
+    "campus_id.in.(indianapolis)," +
+    "and(campus_id.is.null,school_system.eq.iu)," +
+    "and(campus_id.is.null,school_system.is.null)," +
+    `user_id.in.(${uuid(1)},${uuid(2)})`;
+  assert.equal(feedLaneOrFilter(lane, [uuid(1), uuid(2)]), expected);
+  assert.equal(feedLaneOrFilter(lane, [uuid(1), uuid(2)], []), expected);
+  assert.equal(
+    feedLaneOrFilter(laneFor(null, IU_INDY)),
+    "campus_id.in.(indianapolis),and(campus_id.is.null,school_system.eq.iu),and(campus_id.is.null,school_system.is.null)",
+  );
+});
+
+test("club follows: a followed club's off-campus post passes the home lane, not a browse view", () => {
+  const home = laneFor(null, IU_INDY);
+  const clubs = new Set([CLUB_A]);
+  const none = new Set<string>();
+  const offCampus = { user_id: uuid(1), org_id: CLUB_A, campus_id: "iu-bloomington", school_system: "iu" };
+  assert.equal(postInFeedLane(offCampus, home, none, clubs), true);
+  assert.equal(postInFeedLane(offCampus, home, none), false, "the 3-argument call knows no clubs");
+  assert.equal(postInFeedLane(offCampus, home, none, new Set([CLUB_B])), false);
+  // Wherever the club is, like a followed person.
+  assert.equal(
+    postInFeedLane({ ...offCampus, campus_id: "purdue-west-lafayette", school_system: "purdue" }, home, none, clubs),
+    true,
+  );
+  // A personal post never matches on a club.
+  assert.equal(postInFeedLane({ ...offCampus, org_id: null }, home, none, clubs), false);
+
+  const browse = laneFor("iu-bloomington", IU_INDY);
+  const homeCampusClubPost = { user_id: uuid(1), org_id: CLUB_A, campus_id: "indianapolis", school_system: "iu" };
+  assert.equal(postInFeedLane(homeCampusClubPost, browse, none, clubs), false);
+  // The browse view still shows its own campus's club posts, followed or not.
+  assert.equal(postInFeedLane(offCampus, browse, none, new Set()), true);
+});
+
 test("lane predicate: agrees with the home lane's intent", () => {
   const lane = laneFor(null, IU_INDY);
   const follows = new Set([uuid(9)]);
@@ -505,4 +623,43 @@ test("ranking: engagement and decay keep their shape", () => {
   assert.ok(liked > fresh);
   const reposted = scoreFeedRow(post({ campus_id: null, friend_reposter_count: 2 }) as never, now, none, null);
   assert.ok(Math.abs(reposted - fresh - 6) < 1e-9);
+});
+
+test("boost: a followed club is the same 1.6, and following both is still one 1.6", () => {
+  const now = NOW;
+  const none = new Set<string>();
+  const clubPost = (over: Record<string, unknown> = {}) =>
+    post({ user_id: uuid(2), org_id: uuid(5), campus_id: null, ...over }) as never;
+  const base = scoreFeedRow(clubPost(), now, none, null);
+  const author = scoreFeedRow(clubPost(), now, new Set([uuid(2)]), null);
+  const club = scoreFeedRow(clubPost(), now, none, null, new Set([uuid(5)]));
+  const both = scoreFeedRow(clubPost(), now, new Set([uuid(2)]), null, new Set([uuid(5)]));
+  assert.ok(Math.abs(author / base - 1.6) < 1e-9);
+  assert.ok(Math.abs(club / base - 1.6) < 1e-9);
+  assert.ok(Math.abs(both / base - 1.6) < 1e-9, "one 1.6, never 2.56");
+  // A personal post never picks up a club boost, and the 4-argument call is unchanged.
+  const personal = scoreFeedRow(clubPost({ org_id: null }), now, none, null, new Set([uuid(5)]));
+  assert.equal(personal, base);
+  assert.equal(scoreFeedRow(clubPost(), now, none, null, new Set()), base);
+});
+
+test("diversity key: people bucket alone, a club's officers share one bucket", () => {
+  const officerA = uuid(2);
+  const officerB = uuid(3);
+  assert.notEqual(feedDiversityKey({ user_id: officerA }), feedDiversityKey({ user_id: officerB }));
+  assert.notEqual(
+    feedDiversityKey({ user_id: officerA, org_id: null }),
+    feedDiversityKey({ user_id: officerB, org_id: null }),
+  );
+  assert.equal(
+    feedDiversityKey({ user_id: officerA, org_id: uuid(5) }),
+    feedDiversityKey({ user_id: officerB, org_id: uuid(5) }),
+  );
+  // An officer's own post and their club's post are different buckets.
+  assert.notEqual(
+    feedDiversityKey({ user_id: officerA, org_id: null }),
+    feedDiversityKey({ user_id: officerA, org_id: uuid(5) }),
+  );
+  // A user id can never collide with a club id that happens to be equal.
+  assert.notEqual(feedDiversityKey({ user_id: uuid(5) }), feedDiversityKey({ user_id: officerA, org_id: uuid(5) }));
 });
