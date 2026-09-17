@@ -45,10 +45,15 @@ import { editedPostFrom, POST_MAX_CHARS, type EditedPost } from "@/lib/posts/edi
  * the toasts, and `nested` must be true whenever this opens on top of
  * another open vaul drawer or iOS Safari loses that drawer's body lock.
  *
- * CLICKS DON'T LEAK. The phone feed and profile cards that will host this
- * (CampusMobile, ProfileMobile, wave 4) are `<button onClick>`, and React
- * bubbles events through portals, so the overlay and the content both stop
- * click and pointerdown from reaching the card underneath.
+ * CLICKS. React bubbles events through portals, so a tap in this sheet also
+ * reaches the React parents that mount it. The content stops click and
+ * pointerdown there. The overlay does not: stopping its click also stops the
+ * native click at document.body, and Radix closes a sheet on an outside tap
+ * only once that click reaches the document, so a clean sheet could never be
+ * dismissed from the scrim. Hosts guard instead: CampusMobile's FeedCard
+ * ignores clicks whose target isn't inside the card, and the profile card,
+ * the post viewer and the profile Post options sheet have no click handler
+ * above this sheet.
  *
  * @MENTIONS. `bindMentionPicker` attaches the shared typeahead
  * (`public/html/_mentionPicker.js`). Its popover lives on <body>, outside
@@ -201,8 +206,6 @@ export function EditPostSheet({
     >
       <Drawer.Portal>
         <Drawer.Overlay
-          onClick={stop}
-          onPointerDown={stop}
           style={{
             position: "fixed",
             inset: 0,

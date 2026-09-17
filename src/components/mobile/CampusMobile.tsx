@@ -15,21 +15,39 @@ import {
   OttoFeedStrip,
 } from "@/app/campus/campus-home";
 import { asLoadFailure, LoadFailed, type LoadFailure } from "@/components/feedback/LoadFailed";
+import { CampusConfirmBanner } from "@/components/mobile/CampusConfirmBanner";
+import { EditPostSheet } from "@/components/mobile/EditPostSheet";
 import { MapMobile } from "@/components/mobile/MapMobile";
 import { ConversationView } from "@/components/mobile/MessagesMobile";
 import { PostComposerMobile } from "@/components/mobile/PostComposerMobile";
 import { PostViewerMobile } from "@/components/mobile/PostViewerMobile";
 import { SharePostSheet } from "@/components/mobile/SharePostSheet";
 import { useMobileTour } from "@/components/mobile/use-mobile-tour";
+import { OrgJoinControl } from "@/components/orgs/OrgJoinControl";
 import { vibeRequest } from "@/lib/feedback/request";
 import { toast } from "@/lib/feedback/toast";
+import { campusRowById } from "@/lib/iu/campuses";
+import { orgAssetProxyUrl } from "@/lib/org-asset-url";
+import {
+  audienceChip,
+  inviteSubText,
+  memberCountText,
+  orgRowView,
+  policyChip,
+  type OrgControlChange,
+  type OrgDisplayState,
+  type OrgRelation,
+} from "@/lib/orgs/join-copy";
+import type { JoinPolicy, JoinState, OrgAudience, OrgRole } from "@/lib/orgs/join-state";
+import type { EditedPost } from "@/lib/posts/edit";
 
 /**
  * iOS-native rebuild of `/campus` for mobile. Swipeable tabs:
  *
  *   - Feed       → posts (text, photo, video), vertical single column.
  *   - Events     → vertical stack of EventCard (reused from desktop).
- *   - Orgs       → list of orgs the viewer can browse/join.
+ *   - Orgs       → clubs to follow and join: your invites, the clubs you
+ *                  follow, then the rest.
  *   - Chat / Map → Discord-style org chat + the campus social map.
  *
  * Sticky header has the school greeting + live "on Vibe / active now"
@@ -50,9 +68,10 @@ type Tab = "feed" | "events" | "orgs" | "chat" | "map";
 const TAB_ORDER: Tab[] = ["feed", "events", "orgs", "chat", "map"];
 
 // Reuse the desktop FeedPost shape so shared card components accept our
-// posts without any mapping.
-type FeedPost = DesktopFeedPost;
+// posts without any mapping. `edited_at` drives the " · Edited" marker.
+type FeedPost = DesktopFeedPost & { edited_at?: string | null };
 
+/** One row of GET /api/orgs?filter=discover|following (plan §4.2 fields). */
 type Org = {
   id: string;
   handle: string;
@@ -60,9 +79,53 @@ type Org = {
   logo_url: string | null;
   banner_url: string | null;
   description?: string | null;
-  member_count?: number | null;
+  /** Null when the count couldn't be read. */
+  member_count: number | null;
   verified?: boolean;
+  join_policy: JoinPolicy;
+  audience: OrgAudience;
+  role: OrgRole | null;
+  join_state: JoinState;
+  join_reason: "policy" | "visiting" | null;
+  pending_invite: { id: string; expires_at: string; invited_by_name: string | null } | null;
+  org_follow_state?: "following" | "not_following";
 };
+
+/** One row of GET /api/me/org-invites. logo_url is the RAW stored key. */
+type InviteRow = {
+  id: string;
+  created_at: string;
+  expires_at: string;
+  org: {
+    id: string;
+    handle: string;
+    name: string | null;
+    logo_url: string | null;
+    verified: boolean;
+    audience: OrgAudience;
+  };
+  invited_by: { name: string } | null;
+};
+type OrgLocal = { state: OrgDisplayState; following: boolean; role: OrgRole | null };
+type OrgLists = {
+  discover: Org[] | null;
+  following: Org[] | null;
+  invites: InviteRow[] | null;
+  campusId: string | null;
+};
+type OrgErrs = {
+  discover: LoadFailure | null;
+  following: LoadFailure | null;
+  invites: LoadFailure | null;
+};
+/** A row's control answered: the club, its state when tapped, and the answer. */
+type OrgChangeHandler = (
+  orgId: string,
+  prevState: OrgDisplayState,
+  next: OrgControlChange,
+) => void;
+const EMPTY_ORG_LISTS: OrgLists = { discover: null, following: null, invites: null, campusId: null };
+const NO_ORG_ERRS: OrgErrs = { discover: null, following: null, invites: null };
 
 // ---------- Component ----------
 
@@ -82,13 +145,19 @@ export function CampusMobile() {
       : "feed";
   });
   const [feed, setFeed] = useState<FeedPost[] | null>(null);
+  // Who's signed in, echoed by /api/feed: your own cards offer Edit post.
+  const [viewerId, setViewerId] = useState<string | null>(null);
   const [events, setEvents] = useState<CampusEvent[] | null>(null);
-  const [orgs, setOrgs] = useState<Org[] | null>(null);
+  const [orgLists, setOrgLists] = useState<OrgLists>(EMPTY_ORG_LISTS);
   // Why a list's first load failed: its pane shows LoadFailed instead of
   // the skeleton or the empty copy. Cleared by Retry and by any success.
   const [feedErr, setFeedErr] = useState<LoadFailure | null>(null);
   const [eventsErr, setEventsErr] = useState<LoadFailure | null>(null);
-  const [orgsErr, setOrgsErr] = useState<LoadFailure | null>(null);
+  const [orgErrs, setOrgErrs] = useState<OrgErrs>(NO_ORG_ERRS);
+  // What a row's control reported, painted until the next full reload answers.
+  const [orgLocal, setOrgLocal] = useState<Record<string, OrgLocal>>({});
+  // Bumped after a join so ChatPane remounts and reloads its own club list.
+  const [chatKey, setChatKey] = useState(0);
   const [openPostId, setOpenPostId] = useState<string | null>(null);
   const [composerOpen, setComposerOpen] = useState(false);
   const [composerOrigin, setComposerOrigin] = useState<
@@ -219,6 +288,7 @@ export function CampusMobile() {
       feedLoadedRef.current = true;
       setFeedErr(null);
       setFeed(posts);
+      if (r.ok && typeof r.data.viewerId === "string") setViewerId(r.data.viewerId);
     } else if (!feedLoadedRef.current) {
       setFeedErr(asLoadFailure(r, "Couldn't load the feed."));
     } else if (r.ok && mode === "refresh") {
@@ -248,30 +318,107 @@ export function CampusMobile() {
     }
   }, []);
 
-  // Loads once; the only refetch is Retry after a failed first load.
-  const refetchOrgs = useCallback(async () => {
+  // Loads when the Orgs tab first opens (below), on Retry, and after a row's
+  // Join / Request / Accept. A Follow or Unfollow reloads nothing; it repaints
+  // its own row.
+  const orgsSeqRef = useRef(0);
+  const orgsLoadedRef = useRef({ discover: false, following: false, invites: false });
+  // The load each row's local answer was painted during (see `onOrgChange`).
+  const orgLocalSeqRef = useRef<Record<string, number>>({});
+  const refetchOrgs = useCallback(async (mode: "first" | "refresh") => {
+    const seq = ++orgsSeqRef.current;
     // `filter=discover` is the club directory; without it the route
     // defaults to "mine", so every student who has not joined an org yet
     // saw an empty Orgs tab and concluded the app had no clubs. Desktop
     // has always asked for discover (campus-home.tsx).
-    const r = await vibeRequest<{ orgs?: unknown }>("/api/orgs?filter=discover", {
-      cache: "no-store",
-      quiet: true,
-      failure: "Couldn't load orgs.",
+    const [d, f, i] = await Promise.all([
+      vibeRequest<{ orgs?: unknown; viewerCampusId?: unknown }>("/api/orgs?filter=discover", {
+        cache: "no-store",
+        quiet: mode !== "refresh",
+        failure: "Couldn't load orgs.",
+      }),
+      vibeRequest<{ orgs?: unknown }>("/api/orgs?filter=following", {
+        cache: "no-store",
+        quiet: true,
+        failure: "Couldn't load the clubs you follow.",
+      }),
+      vibeRequest<{ invites?: unknown }>("/api/me/org-invites", {
+        cache: "no-store",
+        quiet: true,
+        failure: "Couldn't load your invites.",
+      }),
+    ]);
+    // A newer load has started; its answer is the one to show.
+    if (seq !== orgsSeqRef.current) return;
+    const discover = d.ok ? orgRowsFrom(d.data.orgs) : null;
+    const following = f.ok ? orgRowsFrom(f.data.orgs) : null;
+    const invites = i.ok ? inviteRowsFrom(i.data.invites) : null;
+    const loaded = orgsLoadedRef.current;
+    if (discover) loaded.discover = true;
+    if (following) loaded.following = true;
+    if (invites) loaded.invites = true;
+    const discoverCampusId =
+      d.ok && typeof d.data.viewerCampusId === "string" ? d.data.viewerCampusId : null;
+    // A failed refresh never wipes a loaded list.
+    setOrgLists((prev) => ({
+      discover: discover ?? prev.discover,
+      following: following ?? prev.following,
+      invites: invites ?? prev.invites,
+      campusId: discover ? discoverCampusId : prev.campusId,
+    }));
+    setOrgErrs({
+      discover: loaded.discover ? null : asLoadFailure(d, "Couldn't load orgs."),
+      following: loaded.following ? null : asLoadFailure(f, "Couldn't load the clubs you follow."),
+      invites: loaded.invites ? null : asLoadFailure(i, "Couldn't load your invites."),
     });
-    if (r.ok && Array.isArray(r.data.orgs)) {
-      setOrgsErr(null);
-      setOrgs(r.data.orgs as Org[]);
-    } else {
-      setOrgsErr(asLoadFailure(r, "Couldn't load orgs."));
+    if (!discover && d.ok && mode === "refresh" && loaded.discover) {
+      // A 2xx without the list, which vibeRequest had no reason to toast.
+      toast({ message: asLoadFailure(d, "Couldn't load orgs.").message, tone: "error" });
+    }
+    if (discover && following && invites) {
+      // The server lists are the truth now. A row tapped while this load was
+      // out keeps its painted answer: this read may predate that tap.
+      const paintedDuring = orgLocalSeqRef.current;
+      setOrgLocal((prev) => {
+        const kept: Record<string, OrgLocal> = {};
+        for (const [id, v] of Object.entries(prev)) {
+          if ((paintedDuring[id] ?? 0) >= seq) kept[id] = v;
+        }
+        return kept;
+      });
     }
   }, []);
+
+  // A row's control answered. Follow and Unfollow repaint that row only, so
+  // it never jumps between sections under the thumb. Join, Request, Accept
+  // and Decline change what the lists say, so they reload all three.
+  const onOrgChange = useCallback(
+    (orgId: string, prevState: OrgDisplayState, next: OrgControlChange) => {
+      orgLocalSeqRef.current[orgId] = orgsSeqRef.current;
+      setOrgLocal((prev) => ({
+        ...prev,
+        [orgId]: { state: next.state, following: next.following, role: next.role },
+      }));
+      if (prevState !== "member" && next.state === "member") setChatKey((k) => k + 1);
+      if (next.state !== prevState || next.declined) void refetchOrgs("refresh");
+    },
+    [refetchOrgs],
+  );
 
   useEffect(() => {
     void refetchFeed("first");
     void refetchEvents("first");
-    void refetchOrgs();
-  }, [refetchFeed, refetchEvents, refetchOrgs]);
+  }, [refetchFeed, refetchEvents]);
+
+  // The Orgs lists load the first time the Orgs tab opens (a ?tab=orgs link
+  // included), not on every /campus visit: three GETs, and the invites one
+  // also expires stale invites on the server.
+  const orgsRequestedRef = useRef(false);
+  useEffect(() => {
+    if (tab !== "orgs" || orgsRequestedRef.current) return;
+    orgsRequestedRef.current = true;
+    void refetchOrgs("first");
+  }, [tab, refetchOrgs]);
 
   // The loaded feed is only the 50 top-ranked posts, so a tag's posts can
   // sit past it; /api/feed?tag= returns the newest 50 with that tag (what
@@ -287,6 +434,16 @@ export function CampusMobile() {
     posts: FeedPost[] | null;
     failure: LoadFailure | null;
   } | null>(null);
+  // A saved edit (from a card's ⋯ menu or the post viewer) patches the card
+  // in place: text, tags and the " · Edited" marker, with no feed refetch.
+  // `setFeed` re-runs the #tag effect below, so with a tag filter on, the
+  // tag list is asked for once more.
+  const applyPostEdit = useCallback((p: EditedPost) => {
+    const patch = (x: FeedPost): FeedPost =>
+      x.id === p.id ? { ...x, content: p.content, tags: p.tags, edited_at: p.edited_at } : x;
+    setFeed((prev) => (prev ? prev.map(patch) : prev));
+    setTagFeed((prev) => (prev && prev.posts ? { ...prev, posts: prev.posts.map(patch) } : prev));
+  }, []);
   // `tagFeed` for the effect below, which decides before it asks whether a
   // failure has rows to keep; reading the state there would re-run it on
   // every answer. Declared first, so it has caught up when that effect runs.
@@ -320,6 +477,8 @@ export function CampusMobile() {
       if (cancelled) return;
       const posts = r.ok ? feedPostsFrom(r.data) : null;
       if (posts) {
+        // A viewer whose main feed failed still gets Edit on their own cards.
+        if (r.ok && typeof r.data.viewerId === "string") setViewerId(r.data.viewerId);
         setTagFeed({ tag: feedTag, posts, failure: null });
         return;
       }
@@ -413,8 +572,7 @@ export function CampusMobile() {
         position: "relative",
       }}
     >
-      {/* IU crimson banner — school identity, live stats line, search bar,
-          mobile-only Messages quick-link. Reused from desktop. */}
+      {/* Campus banner (shared with desktop): campus identity, live stats line, search icon. */}
       <div
         style={{
           paddingTop: "env(safe-area-inset-top, 0px)",
@@ -461,6 +619,15 @@ export function CampusMobile() {
         >
           <OttoFeedStrip onPickTag={pickFeedTag} />
         </div>
+      </div>
+
+      {/* Mounted on every tab so its answer survives a swipe. The wrapper
+          has no padding, so a banner that renders nothing adds no height.
+          Hidden on Map: the map's height assumes nothing sits between the
+          campus banner and the tab strip, and the card would push its
+          Recenter button under the tab bar. */}
+      <div hidden={tab === "map"}>
+        <CampusConfirmBanner />
       </div>
 
       <header
@@ -512,6 +679,8 @@ export function CampusMobile() {
             onOpenPost={(id) => setOpenPostId(id)}
             onPickTag={pickFeedTag}
             onClearTag={() => setFeedTag(null)}
+            viewerId={viewerId}
+            onEdited={applyPostEdit}
           />
         </section>
         <section style={paneStyle}>
@@ -527,16 +696,20 @@ export function CampusMobile() {
         </section>
         <section style={paneStyle}>
           <OrgsPane
-            orgs={orgs}
-            loadErr={orgsErr}
+            lists={orgLists}
+            errs={orgErrs}
+            local={orgLocal}
             onRetry={() => {
-              setOrgsErr(null);
-              void refetchOrgs();
+              setOrgErrs(NO_ORG_ERRS);
+              void refetchOrgs("first");
             }}
+            onChange={onOrgChange}
           />
         </section>
         <section style={paneStyle}>
-          <ChatPane onSelectOrg={(o) => setSelectedOrgForChat(o)} />
+          {/* Keyed so a club joined on the Orgs tab remounts it, and it
+              reloads its own club list. */}
+          <ChatPane key={chatKey} onSelectOrg={(o) => setSelectedOrgForChat(o)} />
         </section>
         <section style={mapPaneStyle}>
           <MapPane />
@@ -604,6 +777,8 @@ export function CampusMobile() {
             void refetchFeed("refresh");
             setOpenPostId(null);
           }}
+          // An edit made in the viewer updates the card under it.
+          onEdited={applyPostEdit}
         />
       ) : null}
     </main>
@@ -697,7 +872,8 @@ function normalizeFeedTag(raw: string | null | undefined): string | null {
   return /^[\p{L}\p{N}_]{1,32}$/u.test(t) ? t : null;
 }
 
-type FeedBody = { feed?: unknown; posts?: unknown };
+/** `viewerId` is echoed on every 200, so a card knows which posts are yours. */
+type FeedBody = { feed?: unknown; posts?: unknown; viewerId?: unknown };
 
 /** The posts in an /api/feed answer. `feed` entries carry theirs under
  *  `.post` (a repost is the "X reposted this" signal on the original, not a
@@ -720,6 +896,8 @@ function FeedPane({
   onOpenPost,
   onPickTag,
   onClearTag,
+  viewerId,
+  onEdited,
 }: {
   posts: FeedPost[] | null;
   /** Why `posts` is null once its load has failed; null while loading. */
@@ -730,6 +908,9 @@ function FeedPane({
   onOpenPost: (id: string) => void;
   onPickTag: (tag: string) => void;
   onClearTag: () => void;
+  /** The signed-in viewer, from the feed answer; null until it lands. */
+  viewerId: string | null;
+  onEdited: (p: EditedPost) => void;
 }) {
   const chip = tag ? <FeedTagChip tag={tag} onClear={onClearTag} /> : null;
   if (posts === null) {
@@ -767,6 +948,9 @@ function FeedPane({
           post={p}
           onOpen={() => onOpenPost(p.id)}
           onPickTag={onPickTag}
+          // Owner means author, the same rule as the edit route and desktop.
+          isOwner={!!viewerId && p.user_id === viewerId}
+          onEdited={onEdited}
         />
       ))}
     </>
@@ -844,11 +1028,17 @@ function FeedCard({
   post,
   onOpen,
   onPickTag,
+  isOwner,
+  onEdited,
 }: {
   post: FeedPost;
   onOpen: () => void;
   /** A #chip on the card filters the feed to that tag. */
   onPickTag: (tag: string) => void;
+  /** The viewer wrote this post (its author, club posts included). */
+  isOwner: boolean;
+  /** An edit saved from the card's ⋯ menu. */
+  onEdited: (p: EditedPost) => void;
 }) {
   const author = post.author;
   const initials = (author?.name ?? author?.handle ?? "?")
@@ -973,7 +1163,15 @@ function FeedCard({
   return (
     <button
       type="button"
-      onClick={handleCardClick}
+      // Taps in this card's sheets (Post options, Send to chats, Edit post)
+      // reach here through their portals in React's tree, but aren't inside
+      // the card on the page: they neither open nor like the post. Checked
+      // here rather than stopped in the sheets, so their clicks still reach
+      // the document, where a phone's tap outside a sheet closes it.
+      onClick={(e) => {
+        if (!e.currentTarget.contains(e.target as Node)) return;
+        handleCardClick();
+      }}
       style={{
         width: "100%",
         background: "rgba(255,253,248,0.78)",
@@ -1044,12 +1242,11 @@ function FeedCard({
           >
             {author?.handle ? `@${author.handle} · ` : ""}
             {time}
+            {post.edited_at ? " · Edited" : ""}
             {post.org ? ` · ${post.org.name}` : ""}
           </div>
         </div>
-        {/* 3-dot menu — top right of the card. Holds Report / Copy
-            link / Hide for now; owner-only Delete lives in the post
-            viewer (kept off the card to avoid clutter). */}
+        {/* 3-dot menu: Send to chats, Copy link, and Report (others' posts) or Edit post (your own). Delete stays in the post viewer. */}
         <button
           type="button"
           onClick={(e) => {
@@ -1454,6 +1651,10 @@ function FeedCard({
             post.author?.name ||
             (post.author?.handle ? `@${post.author.handle}` : null)
           }
+          isOwner={isOwner}
+          initialContent={post.content ?? ""}
+          hasMedia={!!post.media_url}
+          onEdited={onEdited}
           onClose={() => setMenuOpen(false)}
         />
       ) : null}
@@ -1481,7 +1682,7 @@ function EventsPane({
     return (
       <EmptyTab
         title="Nothing scheduled"
-        body="When orgs or classmates create events, they'll surface here. Pull to refresh later."
+        body="When orgs or classmates create events, they'll surface here."
       />
     );
   }
@@ -2308,59 +2509,248 @@ function MapPane() {
 
 // ---------- Orgs pane ----------
 
+/** §4.2: following = role != null || org_follow_state === "following". A member always follows (join trigger). */
+function orgRelationFor(o: Org, local: OrgLocal | undefined): OrgRelation {
+  const state: OrgDisplayState = local ? local.state : o.join_state;
+  // A local answer without a role keeps the server's (B12S relationFor does the same).
+  const role = local?.role ?? o.role ?? null;
+  const following =
+    state === "member" ||
+    (local ? local.following : o.role != null || o.org_follow_state === "following");
+  return {
+    handle: o.handle,
+    orgName: o.name,
+    state,
+    following,
+    role,
+    reason: o.join_reason ?? null,
+    audience: o.audience,
+    joinPolicy: o.join_policy,
+  };
+}
+
+/** Invite inbox rows carry no join_policy. joinPolicy null → the disclosure
+ *  shows wherever a Follow control renders (F5a errs toward telling); an
+ *  invite row renders Accept only, so nothing shows today. */
+function inviteRelationFor(row: InviteRow, local: OrgLocal | undefined): OrgRelation {
+  const state: OrgDisplayState = local ? local.state : "invited";
+  return {
+    handle: row.org.handle,
+    orgName: row.org.name ?? row.org.handle,
+    state,
+    following: state === "member" || (local?.following ?? false),
+    role: local?.role ?? null,
+    reason: null,
+    audience: row.org.audience,
+    joinPolicy: null,
+  };
+}
+
+/** What `orgJoinState` ranks above a live invite (join-state.ts steps 1-4). */
+const OUTRANKS_INVITE: ReadonlySet<JoinState> = new Set<JoinState>([
+  "member",
+  "hidden",
+  "unverified",
+  "audience_blocked",
+]);
+
+/** The invites that still get their own "Accept" row. The club's discover or
+ *  following row already weighs its invite: when that row says the viewer is
+ *  a member, unverified, or outside the club's audience, the invite can't be
+ *  accepted (the join route refuses it), so that row renders instead. Any
+ *  other state beside a live invite is an older read, and the invite stands. */
+function acceptableInviteRows(
+  invites: InviteRow[],
+  discover: Org[] | null,
+  following: Org[] | null,
+): InviteRow[] {
+  const outranked = new Set(
+    [...(discover ?? []), ...(following ?? [])]
+      .filter((o) => OUTRANKS_INVITE.has(o.join_state))
+      .map((o) => o.id),
+  );
+  return invites.filter((r) => !outranked.has(r.org.id));
+}
+
+function isRecord(value: unknown): value is Record<string, unknown> {
+  return typeof value === "object" && value !== null && !Array.isArray(value);
+}
+
+/** The rows of an `/api/orgs` list answer, or null when it isn't a list. A
+ *  row without a string id, handle and name is dropped. */
+function orgRowsFrom(raw: unknown): Org[] | null {
+  if (!Array.isArray(raw)) return null;
+  return raw.filter(
+    (r: unknown): r is Org =>
+      isRecord(r) &&
+      typeof r.id === "string" &&
+      typeof r.handle === "string" &&
+      typeof r.name === "string",
+  );
+}
+
+/** The rows of a `/api/me/org-invites` answer, or null when it isn't a list.
+ *  A row needs a string id and expires_at, and an org with a string id and
+ *  handle. */
+function inviteRowsFrom(raw: unknown): InviteRow[] | null {
+  if (!Array.isArray(raw)) return null;
+  return raw.filter(
+    (r: unknown): r is InviteRow =>
+      isRecord(r) &&
+      typeof r.id === "string" &&
+      typeof r.expires_at === "string" &&
+      isRecord(r.org) &&
+      typeof r.org.id === "string" &&
+      typeof r.org.handle === "string",
+  );
+}
+
+/** The Orgs tab: invites first, then the clubs you follow, then every other
+ *  club (verified first). Each club shows once, with Follow and Join on the
+ *  row. The lists come from the parent, which reloads them. */
 function OrgsPane({
-  orgs,
-  loadErr,
+  lists,
+  errs,
+  local,
   onRetry,
+  onChange,
 }: {
-  orgs: Org[] | null;
-  loadErr: LoadFailure | null;
+  lists: OrgLists;
+  errs: OrgErrs;
+  /** What each tapped row's control reported, by org id. */
+  local: Record<string, OrgLocal>;
   onRetry: () => void;
+  onChange: OrgChangeHandler;
 }) {
-  if (orgs === null) {
-    return loadErr ? <LoadFailed failure={loadErr} onRetry={onRetry} /> : <PaneSkeleton />;
+  // The three loads settle together: all null with no error is loading, and
+  // all null after a failure shows discover's line.
+  if (lists.discover === null && lists.following === null && lists.invites === null) {
+    return errs.discover ? <LoadFailed failure={errs.discover} onRetry={onRetry} /> : <PaneSkeleton />;
   }
-  if (orgs.length === 0) {
-    return (
-      <EmptyTab
-        title="No orgs here yet"
-        body="Once orgs spin up on campus, you'll find them here."
-      />
+
+  const inviteRows = acceptableInviteRows(lists.invites ?? [], lists.discover, lists.following);
+  const inviteIds = new Set(inviteRows.map((r) => r.org.id));
+  // Newest follow first, as the server sends them. Never re-sorted.
+  const followingRows = (lists.following ?? []).filter((o) => !inviteIds.has(o.id));
+  const taken = new Set([...inviteIds, ...followingRows.map((o) => o.id)]);
+  // If the following or invite list failed, those clubs stay here, still
+  // with the right control and chip.
+  const rest = (lists.discover ?? []).filter((o) => !taken.has(o.id));
+  // Verified accounts surface first; alphabetical within each bucket.
+  const byName = (a: Org, b: Org) => a.name.localeCompare(b.name);
+  const verified = rest.filter((o) => !!o.verified).sort(byName);
+  const others = rest.filter((o) => !o.verified).sort(byName);
+
+  const invitesFailed = lists.invites === null ? errs.invites : null;
+  const followingFailed = lists.following === null ? errs.following : null;
+  const discoverFailed = lists.discover === null ? errs.discover : null;
+  const failedAny = !!(invitesFailed || followingFailed || discoverFailed);
+  // A list with no rows and no error is being asked for again (Retry clears
+  // the errors first), so it isn't known to be empty yet.
+  const retryingAny =
+    (lists.invites === null && !errs.invites) ||
+    (lists.following === null && !errs.following) ||
+    (lists.discover === null && !errs.discover);
+
+  const campus = campusRowById(lists.campusId)?.shortName ?? null;
+  const line = campus
+    ? `Clubs are just getting started at ${campus}. Follow the ones you like — posts land in your feed.`
+    : "Clubs are just getting started here. Follow the ones you like — posts land in your feed.";
+  const total = inviteRows.length + followingRows.length + verified.length + others.length;
+  // While any list has failed, or is still being retried, an empty pane is
+  // not "no clubs".
+  if (total === 0 && !failedAny) {
+    return retryingAny ? <PaneSkeleton /> : <EmptyTab title="No clubs here yet" body={line} />;
+  }
+
+  const blocks: React.ReactNode[] = [];
+  const header = (key: string, label: string) => {
+    if (blocks.length > 0) blocks.push(<div key={`${key}:gap`} style={{ height: 6 }} />);
+    blocks.push(<OrgSectionHeader key={`${key}:header`} label={label} />);
+  };
+  const orgRow = (o: Org) => (
+    <OrgRow
+      key={o.id}
+      orgId={o.id}
+      handle={o.handle}
+      name={o.name}
+      logoUrl={o.logo_url}
+      verified={!!o.verified}
+      relation={orgRelationFor(o, local[o.id])}
+      pendingInviteId={o.pending_invite?.id ?? null}
+      memberCount={o.member_count ?? null}
+      inviteSub={null}
+      onChange={onChange}
+    />
+  );
+
+  // A failed list shows its line with Retry and no header: a header over a
+  // failure would claim the section has rows.
+  if (invitesFailed) {
+    blocks.push(<LoadFailed key="invites:failed" failure={invitesFailed} onRetry={onRetry} />);
+  } else if (inviteRows.length > 0) {
+    header("invites", "You're invited");
+    for (const r of inviteRows) {
+      blocks.push(
+        <OrgRow
+          key={`invite:${r.id}`}
+          orgId={r.org.id}
+          handle={r.org.handle}
+          name={r.org.name ?? r.org.handle}
+          // The inbox sends the stored key, not a proxied URL.
+          logoUrl={orgAssetProxyUrl(r.org.handle, r.org.logo_url, "logo")}
+          verified={r.org.verified === true}
+          relation={inviteRelationFor(r, local[r.org.id])}
+          pendingInviteId={r.id}
+          memberCount={null}
+          inviteSub={inviteSubText(r.invited_by?.name ?? null, r.expires_at)}
+          onChange={onChange}
+        />,
+      );
+    }
+  }
+
+  // Member clubs sit here too and read "Joined ✓" (desktop's filter says the same).
+  if (followingFailed) {
+    blocks.push(<LoadFailed key="following:failed" failure={followingFailed} onRetry={onRetry} />);
+  } else if (followingRows.length > 0) {
+    header("following", "Following");
+    for (const o of followingRows) blocks.push(orgRow(o));
+  }
+
+  if (discoverFailed) {
+    blocks.push(<LoadFailed key="discover:failed" failure={discoverFailed} onRetry={onRetry} />);
+  } else {
+    if (verified.length > 0) {
+      header("verified", "Verified");
+      for (const o of verified) blocks.push(orgRow(o));
+    }
+    if (others.length > 0) {
+      header("all", "All clubs");
+      for (const o of others) blocks.push(orgRow(o));
+    }
+  }
+
+  // One or two clubs: say it's early, under the rows.
+  if (total <= 2 && !failedAny && !retryingAny) {
+    blocks.push(
+      <p
+        key="sparse"
+        style={{
+          margin: "6px 4px 0",
+          fontFamily: "DM Sans, sans-serif",
+          fontSize: 12.5,
+          color: "#8A8580",
+          lineHeight: 1.45,
+          textAlign: "center",
+        }}
+      >
+        {line}
+      </p>,
     );
   }
-  // Partition into verified + unverified so the trusted accounts surface
-  // first. Within each bucket sort alphabetically.
-  const verified = orgs
-    .filter((o) => !!o.verified)
-    .slice()
-    .sort((a, b) => a.name.localeCompare(b.name));
-  const others = orgs
-    .filter((o) => !o.verified)
-    .slice()
-    .sort((a, b) => a.name.localeCompare(b.name));
-  return (
-    <>
-      {verified.length > 0 ? (
-        <>
-          <OrgSectionHeader label="Verified" />
-          {verified.map((o) => (
-            <OrgRow key={o.id} org={o} />
-          ))}
-        </>
-      ) : null}
-      {others.length > 0 ? (
-        <>
-          {verified.length > 0 ? (
-            <div style={{ height: 6 }} />
-          ) : null}
-          <OrgSectionHeader label="All orgs" />
-          {others.map((o) => (
-            <OrgRow key={o.id} org={o} />
-          ))}
-        </>
-      ) : null}
-    </>
-  );
+
+  return <>{blocks}</>;
 }
 
 function OrgSectionHeader({ label }: { label: string }) {
@@ -2381,134 +2771,207 @@ function OrgSectionHeader({ label }: { label: string }) {
   );
 }
 
-function OrgRow({ org }: { org: Org }) {
+/** One club on the Orgs tab. The logo and name link to the club; the Follow /
+ *  Join control sits beside them (or on its own full-width line for an open
+ *  club) and never inside the link, so a tap on a button can't navigate.
+ *  Buttons, chip, meta labels and the disclosure all come from `orgRowView`. */
+function OrgRow({
+  orgId,
+  handle,
+  name,
+  logoUrl,
+  verified,
+  relation,
+  pendingInviteId,
+  memberCount,
+  inviteSub,
+  onChange,
+}: {
+  orgId: string;
+  handle: string;
+  name: string;
+  logoUrl: string | null;
+  verified: boolean;
+  relation: OrgRelation;
+  pendingInviteId: string | null;
+  memberCount: number | null;
+  /** "Invited by … · Expires …" on an invite row; null on every other row. */
+  inviteSub: string | null;
+  onChange: OrgChangeHandler;
+}) {
+  const view = orgRowView(relation, "phone_row");
+  const meta = (
+    inviteSub !== null
+      ? [`@${handle}`, inviteSub]
+      : [`@${handle}`, ...view.meta, memberCountText(memberCount)]
+  )
+    .filter((s): s is string => !!s)
+    .join(" · ");
+  const control = (
+    <OrgJoinControl
+      relation={relation}
+      variant="phone_row"
+      source="discover"
+      pendingInviteId={pendingInviteId}
+      onChange={(next) => onChange(orgId, relation.state, next)}
+    />
+  );
   return (
-    <Link
-      href={`/orgs/${encodeURIComponent(org.handle)}`}
+    <div
       style={{
-        textDecoration: "none",
-        color: "inherit",
-        display: "block",
+        display: "flex",
+        flexDirection: "column",
+        gap: 10,
+        padding: 14,
+        borderRadius: 18,
+        background: "rgba(255,253,248,0.78)",
+        border: "1px solid rgba(255,255,255,0.7)",
+        boxShadow: "inset 0 1px 0 rgba(255,255,255,0.85), 0 4px 14px rgba(180,120,60,0.08)",
       }}
     >
-      <div
-        style={{
-          display: "flex",
-          alignItems: "center",
-          gap: 12,
-          padding: 14,
-          borderRadius: 18,
-          background: "rgba(255,253,248,0.78)",
-          border: "1px solid rgba(255,255,255,0.7)",
-          boxShadow: "inset 0 1px 0 rgba(255,255,255,0.85), 0 4px 14px rgba(180,120,60,0.08)",
-        }}
-      >
-        <div
+      <div style={{ display: "flex", alignItems: "center", gap: 12 }}>
+        <Link
+          href={`/orgs/${encodeURIComponent(handle)}`}
           style={{
-            width: 52,
-            height: 52,
-            borderRadius: 14,
-            background: org.logo_url
-              ? `url(${org.logo_url}) center/cover`
-              : "linear-gradient(135deg,#FFD3C2 0%,#FF9D7E 100%)",
             display: "flex",
             alignItems: "center",
-            justifyContent: "center",
-            color: "#1C1C1E",
-            fontFamily: "Fraunces, serif",
-            fontWeight: 800,
-            fontSize: 18,
-            flexShrink: 0,
-            border: "1px solid rgba(255,255,255,0.6)",
+            gap: 12,
+            flex: 1,
+            minWidth: 0,
+            textDecoration: "none",
+            color: "inherit",
           }}
         >
-          {!org.logo_url
-            ? org.name
-                .split(/\s+/)
-                .slice(0, 2)
-                .map((p) => p[0]?.toUpperCase() ?? "")
-                .join("")
-            : null}
-        </div>
-        <div style={{ flex: 1, minWidth: 0 }}>
           <div
             style={{
+              width: 52,
+              height: 52,
+              borderRadius: 14,
+              background: logoUrl
+                ? `url(${logoUrl}) center/cover`
+                : "linear-gradient(135deg,#FFD3C2 0%,#FF9D7E 100%)",
               display: "flex",
               alignItems: "center",
-              gap: 6,
+              justifyContent: "center",
+              color: "#1C1C1E",
+              fontFamily: "Fraunces, serif",
+              fontWeight: 800,
+              fontSize: 18,
+              flexShrink: 0,
+              border: "1px solid rgba(255,255,255,0.6)",
             }}
           >
-            <span
+            {!logoUrl
+              ? name
+                  .split(/\s+/)
+                  .slice(0, 2)
+                  .map((p) => p[0]?.toUpperCase() ?? "")
+                  .join("")
+              : null}
+          </div>
+          <div style={{ flex: 1, minWidth: 0 }}>
+            <div
               style={{
-                fontFamily: "Fraunces, serif",
-                fontSize: 16,
-                fontWeight: 800,
-                color: "#1C1C1E",
+                display: "flex",
+                alignItems: "center",
+                gap: 6,
+              }}
+            >
+              <span
+                style={{
+                  minWidth: 0,
+                  fontFamily: "Fraunces, serif",
+                  fontSize: 16,
+                  fontWeight: 800,
+                  color: "#1C1C1E",
+                  whiteSpace: "nowrap",
+                  overflow: "hidden",
+                  textOverflow: "ellipsis",
+                }}
+              >
+                {name}
+              </span>
+              {verified ? (
+                <span
+                  aria-label="Verified"
+                  title="Verified"
+                  style={{
+                    display: "inline-flex",
+                    width: 14,
+                    height: 14,
+                    borderRadius: "50%",
+                    background: "#5BD18C",
+                    alignItems: "center",
+                    justifyContent: "center",
+                    color: "#fff",
+                    fontSize: 9,
+                    fontWeight: 900,
+                    flexShrink: 0,
+                  }}
+                >
+                  ✓
+                </span>
+              ) : null}
+              {view.chip ? (
+                <span
+                  style={{
+                    flexShrink: 0,
+                    padding: "2px 8px",
+                    borderRadius: 999,
+                    fontFamily: "DM Sans, sans-serif",
+                    fontSize: 11,
+                    fontWeight: 800,
+                    whiteSpace: "nowrap",
+                    background:
+                      view.chip === "Invited you" ? "rgba(255,92,53,0.12)" : "rgba(28,28,30,0.06)",
+                    color: view.chip === "Invited you" ? "#B83A1A" : "#5C5853",
+                  }}
+                >
+                  {view.chip}
+                </span>
+              ) : null}
+            </div>
+            <div
+              style={{
+                marginTop: 2,
+                fontFamily: "DM Sans, sans-serif",
+                fontSize: 12,
+                color: "#8A8580",
+                fontWeight: 600,
+                letterSpacing: "0.02em",
                 whiteSpace: "nowrap",
                 overflow: "hidden",
                 textOverflow: "ellipsis",
               }}
             >
-              {org.name}
-            </span>
-            {org.verified ? (
-              <span
-                aria-label="Verified"
-                title="Verified"
-                style={{
-                  display: "inline-flex",
-                  width: 14,
-                  height: 14,
-                  borderRadius: "50%",
-                  background: "#5BD18C",
-                  alignItems: "center",
-                  justifyContent: "center",
-                  color: "#fff",
-                  fontSize: 9,
-                  fontWeight: 900,
-                }}
-              >
-                ✓
-              </span>
-            ) : null}
+              {meta}
+            </div>
           </div>
-          <div
-            style={{
-              marginTop: 2,
-              fontFamily: "DM Sans, sans-serif",
-              fontSize: 12,
-              color: "#8A8580",
-              fontWeight: 600,
-              letterSpacing: "0.02em",
-              whiteSpace: "nowrap",
-              overflow: "hidden",
-              textOverflow: "ellipsis",
-            }}
-          >
-            @{org.handle}
-            {typeof org.member_count === "number"
-              ? ` · ${org.member_count} member${org.member_count === 1 ? "" : "s"}`
-              : ""}
-          </div>
-        </div>
-        <svg
-          width="14"
-          height="14"
-          viewBox="0 0 14 14"
-          fill="none"
-          aria-hidden
-          style={{ flexShrink: 0, color: "#8A8580" }}
-        >
-          <path
-            d="M5 2l5 5-5 5"
-            stroke="currentColor"
-            strokeWidth="1.6"
-            strokeLinecap="round"
-            strokeLinejoin="round"
-          />
-        </svg>
+        </Link>
+        {view.layout === "slot" ? <div style={{ flexShrink: 0 }}>{control}</div> : null}
       </div>
-    </Link>
+      {/* Open clubs: Follow and Join share their own full-width line, so the
+          name never gives up its width to two pills at 375px. */}
+      {view.layout === "line" ? <div style={{ width: "100%" }}>{control}</div> : null}
+      {/* Outside the link: next to Follow, and not part of the link's name. */}
+      {view.disclosure ? (
+        <p
+          style={{
+            margin: 0,
+            fontFamily: "DM Sans, sans-serif",
+            fontSize: 11.5,
+            color: "#8A8580",
+            lineHeight: 1.35,
+            display: "-webkit-box",
+            WebkitLineClamp: 2,
+            WebkitBoxOrient: "vertical",
+            overflow: "hidden",
+          }}
+        >
+          {view.disclosure}
+        </p>
+      ) : null}
+    </div>
   );
 }
 
@@ -2570,9 +3033,9 @@ function EmptyTab({ title, body }: { title: string; body: string }) {
   );
 }
 
-/** 3-dot menu sheet — slides up from the bottom. Holds Report, Copy
- *  link, and Hide. Owner-only Delete still lives in the post viewer
- *  (we'd rather not clutter the feed card with delete affordances).
+/** 3-dot menu sheet: slides up from the bottom. Send to chats, Copy link,
+ *  then Edit post on your own post or Report post on anyone else's. Delete
+ *  lives in the post viewer.
  *
  *  Implemented as a portaled vaul Drawer so it doesn't inherit the
  *  feed card's button cursor / hover styles, and so the tap on the
@@ -2582,20 +3045,33 @@ function PostActionsSheet({
   postTitle,
   postPosterUrl,
   authorName,
+  isOwner,
+  initialContent,
+  hasMedia,
+  onEdited,
   onClose,
 }: {
   postId: string;
   postTitle?: string;
   postPosterUrl?: string | null;
   authorName?: string | null;
+  /** The viewer wrote this post: Edit post replaces Report post. */
+  isOwner: boolean;
+  initialContent: string;
+  hasMedia: boolean;
+  onEdited: (p: EditedPost) => void;
   onClose: () => void;
 }) {
   const [reporting, setReporting] = useState(false);
+  // Shadows the imported `toast` inside this sheet: add no `toast({…})` call
+  // here (EditPostSheet toasts its own save).
   const [toast, setToast] = useState<string | null>(null);
   // "Send to chats" launches the in-app share picker. Stays mounted
   // while the picker is open so an unrelated dismiss of the picker
   // doesn't also close the surrounding 3-dot sheet.
   const [shareOpen, setShareOpen] = useState(false);
+  // "Edit post" opens EditPostSheet on top, the same way.
+  const [editOpen, setEditOpen] = useState(false);
 
   const report = useCallback(
     async (reasonCode: string) => {
@@ -2646,7 +3122,12 @@ function PostActionsSheet({
             with the bar on screen and no vibe-composer-open, so at 1201 the
             bar painted over its bottom row. Below SharePostSheet
             (10400/10401), which "Send to chats" opens from here, and below
-            the toasts, so a refusal still shows over both. */}
+            the toasts, so a refusal still shows over both.
+            The feed card that renders this is a <button>, and React bubbles
+            clicks through portals; the card ignores clicks from outside its
+            own box (see FeedCard), so a tap on the scrim closes this sheet
+            without opening the post. Don't stop clicks here: on a phone vaul
+            closes on an outside tap only once its click reaches the document. */}
         <Drawer.Overlay
           style={{
             position: "fixed",
@@ -2718,12 +3199,16 @@ function PostActionsSheet({
             onClick={() => setShareOpen(true)}
           />
           <ActionSheetRow label="Copy link" onClick={copyLink} />
-          <ActionSheetRow
-            label="Report post"
-            tone="danger"
-            onClick={() => void report("other")}
-            disabled={reporting}
-          />
+          {isOwner ? (
+            <ActionSheetRow label="Edit post" onClick={() => setEditOpen(true)} />
+          ) : (
+            <ActionSheetRow
+              label="Report post"
+              tone="danger"
+              onClick={() => void report("other")}
+              disabled={reporting}
+            />
+          )}
           <ActionSheetRow
             label="Cancel"
             onClick={onClose}
@@ -2734,6 +3219,11 @@ function PostActionsSheet({
       </Drawer.Portal>
 
       {shareOpen ? (
+        // The picker's taps bubble through its portal to the feed card's
+        // <button>, which ignores clicks from outside its own box (see
+        // FeedCard). No wrapper stops them here: a stopped click never
+        // reaches the document, and a tap outside the picker on a phone
+        // closes it only once that click does.
         <SharePostSheet
           // Opens inside this sheet's own Drawer.Root: without `nested`,
           // closing it tears down the scroll lock this one still needs.
@@ -2747,6 +3237,23 @@ function PostActionsSheet({
             setShareOpen(false);
             setToast(`Sent to ${count} chat${count === 1 ? "" : "s"}.`);
             setTimeout(onClose, 900);
+          }}
+        />
+      ) : null}
+
+      {editOpen ? (
+        <EditPostSheet
+          // Nested for the same reason as SharePostSheet above.
+          nested
+          postId={postId}
+          initialContent={initialContent}
+          hasMedia={hasMedia}
+          onClose={() => setEditOpen(false)}
+          // EditPostSheet toasts "Post updated" itself; closing this sheet
+          // too takes both down in the same tick.
+          onSaved={(p) => {
+            onEdited(p);
+            onClose();
           }}
         />
       ) : null}
@@ -2902,6 +3409,9 @@ type SearchOrg = {
   name: string;
   logo_url: string | null;
   verified: boolean;
+  /** `/api/search` returns both, so a result says "Invite only" before the tap. */
+  join_policy?: JoinPolicy;
+  audience?: OrgAudience;
 };
 
 export function CampusSearchOverlay({ onClose }: { onClose: () => void }) {
@@ -3332,7 +3842,13 @@ function SearchOrgRow({ o, onPick }: { o: SearchOrg; onPick: () => void }) {
             fontWeight: 600,
           }}
         >
-          @{o.handle}
+          {[
+            `@${o.handle}`,
+            o.join_policy && o.join_policy !== "open" ? policyChip(o.join_policy) : null,
+            o.audience ? audienceChip(o.audience) : null,
+          ]
+            .filter(Boolean)
+            .join(" · ")}
         </div>
       </div>
     </button>
