@@ -16,6 +16,9 @@
      student picks, generated from src/lib/iu/majors.ts (same include as
      profile.html). -->
 <script src="/html/_iu-majors.js"></script>
+<!-- window.openImageCropper: the photo step's circle cropper (same include as
+     profile.html). Read at tap time, never at load. -->
+<script src="/html/_imageCropper.js" defer></script>
 <style>
 :root { --cream:#FAF7F2; --charcoal:#1C1C1E; --accent:#FF5C35; --purple:#7C5CFC; --lavender:#C8B8FF; --green:#1A9E5B; }
 * { margin: 0; padding: 0; box-sizing: border-box; }
@@ -39,20 +42,36 @@ input, textarea, [contenteditable="true"] { cursor:text!important; }
 .onb-bg-1 { position: absolute; top: -200px; right: -200px; width: 700px; height: 700px; border-radius: 50%; background: radial-gradient(circle, rgba(255,92,53,.16) 0%, transparent 70%); pointer-events: none; }
 .onb-bg-2 { position: absolute; bottom: -150px; left: 10%; width: 540px; height: 540px; border-radius: 50%; background: radial-gradient(circle, rgba(124,92,252,.13) 0%, transparent 70%); pointer-events: none; transition: all .8s ease; }
 
-/* Top bar */
-.onb-top { position: fixed; top: 22px; left: 24px; right: 24px; display: flex; align-items: center; justify-content: space-between; z-index: 10; }
+/* Top bar: pinned full width on every step (Back, logo, Skip). The fade
+   keeps a scrolled step readable under it. */
+.onb-top {
+  position: fixed; top: 0; left: 0; right: 0; z-index: 10;
+  padding: 22px 24px 18px;
+  background: linear-gradient(to bottom, rgba(28,28,30,.96) 60%, rgba(28,28,30,0));
+  display: grid; grid-template-columns: 44px auto 1fr auto; align-items: center; gap: 8px;
+}
+.onb-back {
+  width: 44px; height: 44px; min-height: 44px; border-radius: 50%;
+  display: flex; align-items: center; justify-content: center;
+  font-family: 'DM Sans', sans-serif; font-size: 18px; line-height: 1; color: white;
+  background: rgba(255,255,255,.06); border: 0.5px solid rgba(255,255,255,.12);
+  transition: background .15s, opacity .15s;
+}
+.onb-back:hover:not(:disabled) { background: rgba(255,255,255,.12); }
+.onb-back:disabled { opacity: .4; }
 .onb-logo { font-family: 'Fraunces', serif; font-size: 22px; font-weight: 900; color: white; letter-spacing: -1px; text-decoration: none; }
 .onb-logo span { color: var(--accent); }
 .onb-skip {
+  justify-self: end; min-height: 44px; min-width: 44px;
   font-family: 'DM Sans', sans-serif; font-size: 12px; font-weight: 500;
-  color: rgba(255,255,255,.45); background: none; border: none;
-  padding: 8px 12px; transition: color .15s; cursor: none;
+  color: rgba(255,255,255,.55); background: none; border: none;
+  padding: 8px 12px; border-radius: 100px; transition: color .15s, opacity .15s;
 }
-.onb-skip:hover { color: white; }
-.onb-skip[disabled] { display: none; }
+.onb-skip:hover:not(:disabled) { color: white; }
+.onb-skip:disabled { opacity: .4; }
 
 .replay-pill {
-  position: absolute; top: 22px; left: 50%; transform: translate(-50%, 38px);
+  position: fixed; top: 70px; left: 50%; transform: translateX(-50%); z-index: 11;
   font-family: 'DM Sans', sans-serif; font-size: 10px; font-weight: 700;
   letter-spacing: .18em; text-transform: uppercase;
   color: #F5C842;
@@ -62,10 +81,10 @@ input, textarea, [contenteditable="true"] { cursor:text!important; }
   pointer-events: none; white-space: nowrap;
 }
 
-/* Progress dots */
+/* Progress dots: the fixed centre spot, drawn on top of the bar */
 .progress-dots {
-  position: fixed; top: 22px; left: 50%; transform: translateX(-50%);
-  display: flex; gap: 9px; align-items: center; z-index: 10;
+  position: fixed; top: 33px; left: 50%; transform: translateX(-50%);
+  display: flex; gap: 9px; align-items: center; z-index: 11;
   padding: 8px 16px; background: rgba(0,0,0,.25); border: 0.5px solid rgba(255,255,255,.06);
   border-radius: 100px; backdrop-filter: blur(10px);
 }
@@ -78,7 +97,7 @@ input, textarea, [contenteditable="true"] { cursor:text!important; }
 .onb-step {
   display: none; flex-direction: column; align-items: center; justify-content: center;
   text-align: center; max-width: 600px; width: 100%; position: relative; z-index: 1;
-  padding: 70px 20px 40px;
+  padding: 96px 20px 48px;
   animation: stepIn .42s cubic-bezier(.2,.8,.2,1);
 }
 .onb-step.active { display: flex; }
@@ -145,30 +164,8 @@ input, textarea, [contenteditable="true"] { cursor:text!important; }
 .note { font-size: 11px; color: rgba(255,255,255,.4); margin-top: 22px; letter-spacing: .2px; }
 .note.italic { font-style: italic; }
 
-/* Step 2 — name input */
-.name-input-wrap {
-  background: rgba(255,255,255,.05); border: 0.5px solid var(--accent);
-  border-radius: 14px; padding: 16px 22px; min-width: 340px;
-  display: flex; align-items: center; gap: 8px;
-  box-shadow: 0 0 0 4px rgba(255,92,53,.08);
-}
-.name-input {
-  font-family: 'Fraunces', serif; font-size: 24px; font-weight: 700;
-  color: white; background: none; border: none; outline: none;
-  letter-spacing: -.5px; min-width: 0; flex: 1; text-align: center;
-}
-.name-input::placeholder { color: rgba(255,255,255,.3); }
-.suggest-chips { display: flex; gap: 8px; margin-top: 18px; flex-wrap: wrap; justify-content: center; max-width: 460px; }
-.suggest-chip {
-  font-size: 11px; padding: 7px 14px; background: rgba(255,255,255,.05);
-  color: rgba(255,255,255,.65); border: 0.5px solid rgba(255,255,255,.1);
-  border-radius: 100px; cursor: none; transition: all .15s;
-  font-family: 'DM Sans', sans-serif; font-weight: 500;
-}
-.suggest-chip:hover { background: rgba(255,255,255,.1); border-color: rgba(255,255,255,.25); color: white; }
-
-/* Step 2 — quick profile (pre-fill Supabase; banner/photos later) */
-.onb-step[data-step="2"] { max-width: 560px; }
+/* Step 3 — profile (the same fields as the Vibe profile) */
+.onb-step[data-step="3"] { max-width: 560px; }
 .pf-form {
   width: 100%; max-width: 480px; text-align: left;
   display: flex; flex-direction: column; gap: 14px; margin-bottom: 22px;
@@ -178,10 +175,11 @@ input, textarea, [contenteditable="true"] { cursor:text!important; }
   line-height: 1.45; margin-top: 5px; font-style: italic;
 }
 .pf-label {
+  display: block; margin-bottom: 6px;
   font-size: 11px; font-weight: 600; color: rgba(255,255,255,.5);
   letter-spacing: .4px; text-transform: uppercase;
 }
-/* A field Finish couldn't use. Same coral as the resume-link note. */
+/* A field a save or Finish couldn't use. */
 .pf-error {
   font-size: 11px; font-weight: 600; color: var(--accent);
   line-height: 1.45; margin-top: 5px;
@@ -192,63 +190,41 @@ input, textarea, [contenteditable="true"] { cursor:text!important; }
   padding: 12px 14px; font-family: 'DM Sans', sans-serif; font-size: 14px;
   color: white; outline: none; transition: border-color .15s;
 }
+.pf-input { min-height: 44px; }
 .pf-input:focus, .pf-select:focus, .pf-textarea:focus {
   border-color: var(--accent);
 }
 .pf-input::placeholder, .pf-textarea::placeholder { color: rgba(255,255,255,.35); }
 .pf-textarea { min-height: 72px; resize: vertical; }
-/* min-height: a 44 px tap target for the campus and year pickers. */
+/* min-height: a 44 px tap target for the year picker. */
 .pf-select { cursor: pointer; min-height: 44px; }
+.pf-select option { color: #1C1C1E; }
+.pf-handle-box {
+  display: flex; align-items: center; gap: 8px; min-height: 44px;
+  background: rgba(255,255,255,.07); border: 0.5px solid rgba(255,255,255,.12);
+  border-radius: 12px; padding: 0 14px; transition: border-color .15s;
+}
+.pf-handle-box:focus-within { border-color: var(--accent); }
+.pf-handle-at { color: rgba(255,255,255,.45); font-weight: 600; font-size: 14px; }
+.pf-handle-input {
+  flex: 1; min-width: 80px; min-height: 42px; border: none; background: none; outline: none;
+  font-family: 'DM Sans', sans-serif; font-size: 14px; color: white;
+}
+.pf-handle-input::placeholder { color: rgba(255,255,255,.35); }
+/* Wraps rather than squeezing the input: the skip card's box is ~250 px, and
+   "couldn't check. we'll check when you continue" is wider than that. */
+.pf-handle-status { font-size: 12px; font-weight: 600; line-height: 1.3; text-align: right; }
+.pf-fieldset { border: none; margin: 0; padding: 0; min-width: 0; }
 .pf-looking-wrap {
   display: flex; flex-direction: column; gap: 8px;
   margin-top: 4px;
 }
 .pf-looking-row {
-  display: flex; align-items: center; gap: 10px;
+  display: flex; align-items: center; gap: 10px; min-height: 44px;
   font-size: 13px; color: rgba(255,255,255,.82);
   cursor: pointer;
 }
 .pf-looking-row input { accent-color: var(--accent); width: 15px; height: 15px; }
-
-.wx-list {
-  width: 100%;
-  max-width: 480px;
-  display: flex;
-  flex-direction: column;
-  gap: 22px;
-  text-align: left;
-  margin-bottom: 8px;
-}
-.wx-row { display: flex; flex-direction: column; gap: 10px; }
-.wx-row-spaced { padding-top: 10px; border-top: 0.5px solid rgba(255,255,255,.08); }
-.wx-optional {
-  font-weight: 500; text-transform: none; color: rgba(255,255,255,.35);
-  font-size: 10px; letter-spacing: 0;
-}
-
-.resume-upload-row {
-  display: flex; flex-wrap: wrap; align-items: center; gap: 12px;
-  justify-content: center; margin-bottom: 16px;
-}
-.resume-upload-meta { font-size: 12px; color: rgba(255,255,255,.45); }
-
-.resume-mini-wrap {
-  width: 100%; max-width: 480px; margin: 0 auto 8px; text-align: left;
-}
-.resume-mini-label {
-  font-size: 10px; font-weight: 600; color: rgba(255,255,255,.45);
-  letter-spacing: .35px; text-transform: uppercase; margin-bottom: 8px;
-}
-.resume-mini-frame {
-  display: none; width: 100%; height: 260px;
-  border: 0.5px solid rgba(255,255,255,.12); border-radius: 12px;
-  background: rgba(0,0,0,.35);
-}
-.resume-mini-img {
-  display: none; width: 100%; max-height: 260px; object-fit: contain;
-  border-radius: 12px; border: 0.5px solid rgba(255,255,255,.12);
-  background: rgba(0,0,0,.2);
-}
 
 /* Confirm dialog (close button on top) */
 .confirm-overlay {
@@ -266,12 +242,138 @@ input, textarea, [contenteditable="true"] { cursor:text!important; }
 .confirm-body { font-size: 13px; color: rgba(255,255,255,.65); line-height: 1.55; margin-bottom: 18px; }
 .confirm-row { display: flex; gap: 8px; justify-content: center; }
 
+.confirm-card .btn-coral, .confirm-card .btn-skip-step { min-height: 44px; }
+.confirm-card .btn-coral:disabled { opacity: .7; }
+/* The identity variant asks for a name and handle before skipping. */
+.skip-identity {
+  display: flex; flex-direction: column; gap: 12px;
+  text-align: left; margin: 0 0 18px;
+}
+
+/* Shared step pieces: every tappable control is at least 44 px tall. */
+.cta-row { flex-wrap: wrap; justify-content: center; }
+.btn-coral, .btn-skip-step { min-height: 44px; }
+.onb-step[data-step="2"], .onb-step[data-step="5"], .onb-step[data-step="6"] { max-width: 560px; }
+.onb-list { width: 100%; text-align: left; }
+[hidden] { display: none !important; }
+
+/* Step 2 — campus radio cards */
+.campus-list { display: flex; flex-direction: column; gap: 8px; width: 100%; text-align: left; }
+.campus-card {
+  display: flex; align-items: flex-start; gap: 12px; min-height: 56px;
+  padding: 12px 14px; border-radius: 12px; cursor: pointer;
+  background: rgba(255,255,255,.04); border: 1px solid rgba(255,255,255,.10); color: white;
+  transition: background .15s, border-color .15s;
+}
+.campus-card:hover { background: rgba(255,255,255,.07); }
+.campus-card.selected { background: rgba(255,92,53,.12); border-color: var(--accent); }
+.campus-card input { accent-color: var(--accent); width: 18px; height: 18px; margin-top: 2px; flex-shrink: 0; }
+.campus-text { display: flex; flex-direction: column; gap: 3px; min-width: 0; }
+.campus-title-row { display: flex; align-items: center; flex-wrap: wrap; gap: 6px; }
+.campus-title { font-size: 15px; font-weight: 600; }
+.campus-sub { font-size: 12px; line-height: 1.4; color: rgba(255,255,255,.55); }
+.campus-tag, .campus-soon {
+  font-size: 10px; font-weight: 700; letter-spacing: .04em; text-transform: uppercase;
+  border-radius: 999px; padding: 2px 7px; white-space: nowrap;
+}
+.campus-tag { color: var(--lavender); background: rgba(200,184,255,.12); border: 1px solid rgba(200,184,255,.30); }
+.campus-soon { color: rgba(255,255,255,.55); background: rgba(255,255,255,.06); border: 1px solid rgba(255,255,255,.10); }
+.onb-campus-wrap { width: 100%; text-align: left; margin-top: 4px; }
+.onb-campus-wrap .pf-hint { font-style: normal; }
+.onb-text-btn {
+  min-height: 44px; margin-top: 10px; padding: 10px 4px; background: none; border: none;
+  font-family: 'DM Sans', sans-serif; font-size: 13px; font-weight: 500; line-height: 1.4; text-align: left;
+  color: var(--lavender); text-decoration: underline; text-underline-offset: 3px;
+}
+.onb-text-btn:disabled { opacity: .5; }
+.purdue-panel {
+  display: flex; flex-direction: column; gap: 8px; margin-top: 14px; padding: 14px;
+  border-radius: 14px; background: rgba(255,255,255,.03); border: 1px solid rgba(255,255,255,.10);
+}
+.purdue-panel .btn-coral { align-self: flex-start; }
+.purdue-panel .btn-skip-step { align-self: flex-start; padding-left: 4px; }
+.purdue-panel .pf-hint { font-style: normal; }
+
+/* Steps 5–6 — club and people rows */
+.pick-list { list-style: none; display: flex; flex-direction: column; gap: 10px; width: 100%; text-align: left; }
+.pick-row {
+  display: flex; flex-direction: column; gap: 12px; padding: 12px 14px; border-radius: 14px;
+  background: rgba(255,255,255,.04); border: 1px solid rgba(255,255,255,.10); color: white;
+}
+.pick-top { display: flex; align-items: center; gap: 12px; min-width: 0; }
+.pick-logo {
+  width: 40px; height: 40px; border-radius: 50%; flex-shrink: 0; overflow: hidden;
+  display: flex; align-items: center; justify-content: center;
+  background: #26252A; border: 1px solid rgba(255,255,255,.10); color: rgba(255,255,255,.85);
+  font-family: 'Fraunces', serif; font-size: 17px; font-weight: 800;
+}
+.pick-logo img { width: 100%; height: 100%; object-fit: cover; display: block; }
+.pick-text { flex: 1; min-width: 0; display: flex; flex-direction: column; gap: 3px; }
+.pick-name-line { display: flex; align-items: center; gap: 6px; min-width: 0; }
+.pick-name { font-size: 15px; font-weight: 700; line-height: 1.3; min-width: 0; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.pick-verified {
+  display: inline-flex; align-items: center; justify-content: center; flex-shrink: 0;
+  width: 14px; height: 14px; border-radius: 50%; background: var(--green); color: #fff; font-size: 9px; font-weight: 900;
+}
+.pick-chip {
+  flex-shrink: 0; font-size: 10px; font-weight: 700; letter-spacing: .04em; text-transform: uppercase;
+  border-radius: 999px; padding: 2px 7px; white-space: nowrap;
+  color: var(--lavender); background: rgba(200,184,255,.12); border: 1px solid rgba(200,184,255,.30);
+}
+.pick-meta { font-size: 12px; line-height: 1.4; color: rgba(255,255,255,.55); overflow-wrap: anywhere; }
+.pick-sub { font-size: 12px; line-height: 1.4; color: rgba(255,255,255,.5); }
+.pick-sub.invite { color: rgba(255,255,255,.7); }
+.pick-actions { display: flex; align-items: center; gap: 8px; flex-shrink: 0; }
+.pick-actions.line { width: 100%; }
+.pick-actions.line .pick-btn { flex: 1 1 0; min-width: 0; }
+.pick-btn {
+  display: inline-flex; align-items: center; justify-content: center; gap: 6px;
+  min-height: 44px; padding: 0 16px; border-radius: 999px;
+  font-family: 'DM Sans', sans-serif; font-size: 13.5px; font-weight: 700; line-height: 1.2;
+  text-align: center; text-decoration: none; white-space: nowrap; transition: opacity .15s, background .15s;
+}
+.pick-btn.filled { color: #fff; background: var(--accent); border: 1px solid var(--accent); }
+.pick-btn.outline { color: #fff; background: transparent; border: 1px solid rgba(255,255,255,.28); }
+.pick-btn.quiet { color: rgba(255,255,255,.85); background: rgba(255,255,255,.06); border: 1px solid rgba(255,255,255,.12); }
+.pick-btn.locked { opacity: .6; }
+.pick-search { margin-bottom: 12px; }
+.pick-sparse { font-size: 13px; line-height: 1.5; color: rgba(255,255,255,.6); margin: 0 0 14px; text-align: center; }
+.skel { display: block; border-radius: 6px; background: rgba(255,255,255,.08); }
+.pick-row.skel-row { opacity: .6; }
+.group-label {
+  font-size: 11px; font-weight: 700; letter-spacing: .06em; text-transform: uppercase;
+  color: rgba(255,255,255,.5); margin: 18px 0 8px;
+}
+.people-group:first-child .group-label { margin-top: 0; }
+.onb-empty {
+  width: 100%; padding: 22px 18px; border-radius: 16px; text-align: center;
+  border: 1px dashed rgba(255,255,255,.14);
+}
+.onb-empty-title { font-family: 'Fraunces', serif; font-size: 18px; font-weight: 900; color: white; margin: 0 0 8px; }
+.onb-empty .sub-intro { margin: 0 auto 16px; }
+.people-top { width: 100%; text-align: center; margin-bottom: 16px; }
+.people-top .sub-intro { margin: 0 auto 12px; }
+.btn-share {
+  min-height: 44px; padding: 0 18px; border-radius: 999px;
+  font-family: 'DM Sans', sans-serif; font-size: 13px; font-weight: 700;
+  color: #fff; background: transparent; border: 1px solid rgba(255,255,255,.28);
+}
+
+/* Step 4 — photo */
+.photo-circle {
+  width: 132px; height: 132px; border-radius: 50%; overflow: hidden; flex-shrink: 0;
+  display: flex; align-items: center; justify-content: center; margin: 6px auto 0;
+  background: rgba(255,255,255,.08); border: 1px solid rgba(255,255,255,.10);
+}
+.photo-circle img { width: 100%; height: 100%; object-fit: cover; display: block; }
+.photo-initial { font-family: 'Fraunces', serif; font-size: 52px; font-weight: 900; color: rgba(255,255,255,.8); line-height: 1; }
+#onbPhotoError { text-align: center; margin-top: 14px; }
+
 /* Responsive */
 @media (max-width: 540px) {
   .h1 { font-size: 30px; }
   .h2 { font-size: 24px; }
   .pf-form { max-width: 100%; }
-  .name-input-wrap { min-width: 0; width: 100%; max-width: 320px; }
   .progress-dots { padding: 6px 12px; }
   .progress-text { display: none; }
 }
@@ -335,9 +437,13 @@ body.ott-warping .progress-dots {
 <div class="cursor" id="cursor"></div>
 <div class="cursor-ring" id="cursorRing"></div>
 
+<!-- Every word below comes from the copy tables in the script: `data-copy` is a
+     dotted path into ONB_COPY, `data-local` into ONB_LOCAL_COPY (applyCopy). -->
 <header class="onb-top">
-  <a href="/campus" class="onb-logo" onclick="event.preventDefault();leaveViaLogo()">vibe<span>.</span></a>
-  <button class="onb-skip" id="onbSkip" onclick="confirmSkip()">Skip onboarding</button>
+  <button type="button" class="onb-back" id="onbBack"><span aria-hidden="true">←</span></button>
+  <a href="/campus" class="onb-logo" id="onbLogo">vibe<span>.</span></a>
+  <span></span>
+  <button type="button" class="onb-skip" id="onbSkip" data-copy="header.skip"></button>
 </header>
 
 <div class="progress-dots" id="progressDots">
@@ -345,10 +451,12 @@ body.ott-warping .progress-dots {
   <div class="dot"></div>
   <div class="dot"></div>
   <div class="dot"></div>
-  <span class="progress-text" id="progressText">1 of 4</span>
+  <div class="dot"></div>
+  <div class="dot"></div>
+  <span class="progress-text" id="progressText"></span>
 </div>
 
-<div class="replay-pill" id="replayPill" hidden>preview · your saved answers won't change</div>
+<div class="replay-pill" id="replayPill" data-copy="header.replay" hidden></div>
 
 <main class="onb-shell">
   <div class="onb-bg-1" id="onbBg1"></div>
@@ -364,168 +472,188 @@ body.ott-warping .progress-dots {
       <div class="core"></div>
     </div>
     <div class="h1">i'm <em>otto</em>.</div>
-    <div class="intro">"think of me as your campus compass. i'll point you to what's loud, what's tonight, and who's on your wavelength — your guide while you build out your home on vibe."</div>
+    <div class="intro" data-copy="hello.intro"></div>
     <div class="cta-row">
-      <button class="btn-coral" onclick="goToStep(2)">Let's go &rarr;</button>
-      <button class="btn-skip-step" onclick="confirmSkip()">Maybe later</button>
+      <button type="button" class="btn-coral onb-cta" id="onbHelloContinue" data-copy="hello.cta"></button>
     </div>
-    <div class="note">about two minutes — profile, experience, then your documents</div>
+    <div class="note" data-copy="hello.note"></div>
   </section>
 
-  <!-- ─────────── STEP 2 — Quick profile (pre-fill DB; photos later) ─────────── -->
+  <!-- ─────────── STEP 2 — Campus ─────────── -->
   <section class="onb-step" data-step="2">
     <div class="otto-sm">
       <div class="pulse-1"></div>
       <div class="orbit-out"><div class="d"></div></div>
       <div class="core"></div>
     </div>
-    <div class="h2">let's pin down your profile</div>
-    <div class="sub-intro">"same fields as your Vibe profile — a quick pass now; photo, banner, and fine-tuning on the next screen."</div>
+    <h2 class="h2" id="onbCampusTitle" data-copy="campus.title"></h2>
+    <div class="sub-intro" id="onbCampusOtto"></div>
 
-    <div class="pf-form">
-      <div>
-        <label class="pf-label" for="pfName">Name</label>
-        <input type="text" id="pfName" class="pf-input" maxlength="120" placeholder="How you want to appear on Vibe" autocomplete="name">
-      </div>
-      <div>
-        <label class="pf-label" for="pfHandle">Handle <span style="font-weight:400;color:#8A8580">— how friends find you (3-20 chars, letters/numbers/_)</span></label>
-        <div style="display:flex;align-items:center;gap:8px;background:white;border:1.5px solid rgba(28,28,30,.12);border-radius:12px;padding:9px 14px;">
-          <span style="color:#8A8580;font-weight:600">@</span>
-          <input type="text" id="pfHandle" maxlength="20" placeholder="yourhandle" autocomplete="off" spellcheck="false" autocapitalize="off"
-            style="flex:1;border:none;background:none;font-family:inherit;font-size:14px;outline:none;color:#1C1C1E"
-            oninput="onHandleInput(this)">
-          <span id="pfHandleStatus" style="font-size:12px;font-weight:600;min-width:90px;text-align:right;"></span>
+    <div class="onb-campus-wrap">
+      <p class="sub-intro" id="onbSystemMissing" role="status" data-local="systemMissing" hidden></p>
+      <div id="onbCampusGroup" class="campus-list" role="radiogroup" aria-labelledby="onbCampusTitle" aria-describedby="onbCampusNote"></div>
+      <p class="pf-error" id="onbCampusError" role="alert" hidden></p>
+      <p class="pf-hint" id="onbCampusNote"></p>
+
+      <!-- Purdue student with an IU email (Q8): only while an IU student has
+           Indianapolis picked. Replay checks the domain but sends nothing. -->
+      <button type="button" class="onb-text-btn" id="onbPurdueLink" data-copy="campus.purdueLink" hidden></button>
+      <div class="purdue-panel" id="onbPurdueSwitch" hidden>
+        <label class="pf-label" for="onbPurdueEmail" data-copy="campus.switchLabel"></label>
+        <input type="email" id="onbPurdueEmail" class="pf-input" autocomplete="off" autocapitalize="off" spellcheck="false">
+        <button type="button" class="btn-coral" id="onbPurdueSend"></button>
+        <div id="onbPurdueCodeRow" hidden>
+          <p class="pf-hint" role="status" data-copy="campus.switchSent"></p>
+          <label class="pf-label" for="onbPurdueCode" data-copy="campus.switchCodeLabel" style="margin-top:6px"></label>
+          <input type="text" id="onbPurdueCode" class="pf-input" inputmode="numeric" autocomplete="one-time-code" maxlength="8">
+          <button type="button" class="btn-coral" id="onbPurdueVerify" style="margin-top:8px"></button>
         </div>
-      </div>
-      <div>
-        <label class="pf-label" for="pfBio">Bio <span style="font-weight:400;color:#8A8580">— up to 600 characters</span></label>
-        <textarea id="pfBio" class="pf-textarea" rows="3" maxlength="600" placeholder="A few lines about you — what you're into, what you're building."></textarea>
-      </div>
-      <div>
-        <label class="pf-label" for="pfCampus">Which campus are you at? <span id="pfCampusNote" style="font-weight:400;color:#8A8580">— not verified, just how we scope what you see</span></label>
-        <select id="pfCampus" class="pf-select" aria-describedby="pfCampusError pfCampusSub pfCampusHint" onchange="onCampusChange()"></select>
-        <p class="pf-error" id="pfCampusError" hidden></p>
-        <p class="pf-hint" id="pfCampusSub" hidden></p>
-        <p class="pf-hint" id="pfCampusHint">You can change this any time in settings.</p>
-      </div>
-      <div>
-        <label class="pf-label" for="pfMajor">Major <span id="pfMajorNote" style="font-weight:400;color:#8A8580">— start typing to filter the IU list</span></label>
-        <input type="text" id="pfMajor" class="pf-input" maxlength="80" list="iuMajors" autocomplete="off" placeholder="Start typing — e.g. Informatics">
-        <datalist id="iuMajors"></datalist>
-      </div>
-      <div>
-        <label class="pf-label" for="pfDepartment">Department / school <span id="pfDepartmentNote" style="font-weight:400;color:#8A8580">— optional, start typing to pick from IU</span></label>
-        <input type="text" id="pfDepartment" class="pf-input" maxlength="120" list="iuSchools" autocomplete="off" placeholder="e.g. Luddy School of Informatics…">
-        <datalist id="iuSchools"></datalist>
-      </div>
-      <div>
-        <label class="pf-label" for="pfYear">Year</label>
-        <select id="pfYear" class="pf-select">
-          <option value="">Prefer not to say</option>
-          <option value="1">1st year</option>
-          <option value="2">2nd year</option>
-          <option value="3">3rd year</option>
-          <option value="4">4th year</option>
-          <option value="5">5th+ / grad</option>
-        </select>
-      </div>
-      <div>
-        <label class="pf-label" for="pfInterests">Interests &amp; projects <span style="font-weight:400;color:#8A8580">— up to 10 items</span></label>
-        <textarea id="pfInterests" class="pf-textarea" rows="3" maxlength="600" placeholder="Clubs, side projects, topics — one per line or comma-separated"></textarea>
-        <p class="pf-hint">Saved as profile interests, same as the profile page.</p>
-      </div>
-      <div>
-        <label class="pf-label" for="pfSkills">Skills <span style="font-weight:400;color:#8A8580">— up to 12 items, 30 chars each</span></label>
-        <textarea id="pfSkills" class="pf-textarea" rows="3" maxlength="600" placeholder="e.g. Figma, Python, public speaking — one per line or comma-separated"></textarea>
-      </div>
-      <div>
-        <div class="pf-label">What are you here for?</div>
-        <div class="pf-looking-wrap">
-          <label class="pf-looking-row"><input type="checkbox" class="pf-looking" value="meeting-people"> Meeting people</label>
-          <label class="pf-looking-row"><input type="checkbox" class="pf-looking" value="showing-work"> Showing my work</label>
-          <label class="pf-looking-row"><input type="checkbox" class="pf-looking" value="finding-clubs"> Finding clubs</label>
-          <label class="pf-looking-row"><input type="checkbox" class="pf-looking" value="exploring"> Just exploring</label>
-        </div>
+        <p class="pf-error" id="onbPurdueMsg" role="alert" hidden></p>
+        <button type="button" class="btn-skip-step" id="onbPurdueCancel" data-copy="campus.switchCancel"></button>
       </div>
     </div>
 
     <div class="cta-row" style="margin-top: 28px;">
-      <button class="btn-coral" onclick="goToStep(3)">Continue &rarr;</button>
-      <button class="btn-skip-step" onclick="goToStep(4)">Skip to resume &rarr;</button>
+      <button type="button" class="btn-coral onb-cta" id="onbCampusContinue"></button>
     </div>
-    <div class="note italic" style="margin-top: 14px;">you can change anything later</div>
   </section>
 
-  <!-- ─────────── STEP 3 — Work experience ─────────── -->
+  <!-- ─────────── STEP 3 — Profile ─────────── -->
   <section class="onb-step" data-step="3">
     <div class="otto-sm">
       <div class="pulse-1"></div>
       <div class="orbit-out"><div class="d"></div></div>
       <div class="core"></div>
     </div>
-    <div class="h2">where have you <em>worked</em>?</div>
-    <div class="sub-intro">"internships, campus jobs, freelance — whatever counts. Skip if you’d rather add this on your profile."</div>
+    <h2 class="h2" data-copy="profile.title"></h2>
+    <div class="sub-intro" data-copy="profile.sub"></div>
 
-    <div class="wx-list">
-      <div class="wx-row">
-        <div class="pf-label">Role 1</div>
-        <input type="text" class="pf-input wx-company" maxlength="200" placeholder="Company or org" autocomplete="organization">
-        <input type="text" class="pf-input wx-title" maxlength="200" placeholder="Title or role" autocomplete="organization-title">
-        <input type="text" class="pf-input wx-dates" maxlength="120" placeholder="Dates (e.g. Jun 2024 — Aug 2024)">
-        <input type="text" class="pf-input wx-location" maxlength="200" placeholder="Location (optional)">
-        <textarea class="pf-textarea wx-desc" rows="2" maxlength="4000" placeholder="What you did (optional)"></textarea>
+    <div class="pf-form">
+      <div>
+        <label class="pf-label" for="pfName" data-copy="profile.labels.name"></label>
+        <input type="text" id="pfName" class="pf-input" maxlength="120" autocomplete="name" data-placeholder="placeholders.name">
+        <p class="pf-error" id="pfNameError" role="alert" hidden></p>
       </div>
-      <div class="wx-row wx-row-spaced">
-        <div class="pf-label">Role 2 <span class="wx-optional">optional</span></div>
-        <input type="text" class="pf-input wx-company" maxlength="200" placeholder="Company">
-        <input type="text" class="pf-input wx-title" maxlength="200" placeholder="Title">
-        <input type="text" class="pf-input wx-dates" maxlength="120" placeholder="Dates">
-        <input type="text" class="pf-input wx-location" maxlength="200" placeholder="Location (optional)">
-        <textarea class="pf-textarea wx-desc" rows="2" maxlength="4000" placeholder="Description (optional)"></textarea>
+      <div>
+        <label class="pf-label" for="pfHandle" data-copy="profile.labels.handle"></label>
+        <div class="pf-handle-box">
+          <span class="pf-handle-at" aria-hidden="true">@</span>
+          <input type="text" id="pfHandle" class="pf-handle-input" maxlength="20" autocomplete="off" spellcheck="false" autocapitalize="off" data-placeholder="placeholders.handle">
+          <span id="pfHandleStatus" class="pf-handle-status" aria-live="polite"></span>
+        </div>
+        <p class="pf-hint" data-local="hintHandle"></p>
+        <p class="pf-error" id="pfHandleError" role="alert" hidden></p>
       </div>
+      <div>
+        <label class="pf-label" for="pfBio" data-copy="profile.labels.bio"></label>
+        <textarea id="pfBio" class="pf-textarea" rows="3" maxlength="600" data-placeholder="placeholders.bio"></textarea>
+        <p class="pf-hint" data-local="hintBio"></p>
+      </div>
+      <div>
+        <label class="pf-label" for="pfMajor" data-copy="profile.labels.major"></label>
+        <input type="text" id="pfMajor" class="pf-input" maxlength="80" autocomplete="off" data-placeholder="placeholders.major">
+        <datalist id="iuMajors"></datalist>
+        <p class="pf-hint" id="pfMajorHint"></p>
+      </div>
+      <div>
+        <label class="pf-label" for="pfDepartment" data-copy="profile.labels.department"></label>
+        <input type="text" id="pfDepartment" class="pf-input" maxlength="120" autocomplete="off" data-placeholder="placeholders.department">
+        <datalist id="iuSchools"></datalist>
+      </div>
+      <div>
+        <label class="pf-label" for="pfYear" data-copy="profile.labels.year"></label>
+        <!-- Options come from ONB_LOCAL_COPY.yearOptions ("" … "5"). -->
+        <select id="pfYear" class="pf-select"></select>
+      </div>
+      <div>
+        <label class="pf-label" for="pfInterests" data-copy="profile.labels.interests"></label>
+        <textarea id="pfInterests" class="pf-textarea" rows="3" maxlength="600" data-placeholder="placeholders.interests"></textarea>
+        <p class="pf-hint" data-local="hintInterests"></p>
+      </div>
+      <div>
+        <label class="pf-label" for="pfSkills" data-copy="profile.labels.skills"></label>
+        <textarea id="pfSkills" class="pf-textarea" rows="3" maxlength="600" data-placeholder="placeholders.skills"></textarea>
+        <p class="pf-hint" data-local="hintSkills"></p>
+      </div>
+      <fieldset class="pf-fieldset">
+        <legend class="pf-label" data-copy="profile.labels.lookingFor"></legend>
+        <!-- One checkbox per ONB_LOCAL_COPY.lookingFor, class .pf-looking. -->
+        <div class="pf-looking-wrap" id="pfLookingWrap"></div>
+      </fieldset>
     </div>
-    <p class="pf-hint" style="text-align:center;max-width:420px;">We’ll show this in your profile’s work section — same layout as the full editor.</p>
 
     <div class="cta-row" style="margin-top: 28px;">
-      <button class="btn-coral" onclick="goToStep(4)">Continue &rarr;</button>
-      <button class="btn-skip-step" onclick="goToStep(4)">Skip</button>
+      <button type="button" class="btn-coral onb-cta" id="onbProfileContinue"></button>
     </div>
+    <div class="note italic" style="margin-top: 14px;" data-copy="profile.changeLater"></div>
   </section>
 
-  <!-- ─────────── STEP 4 — Resume / portfolio ─────────── -->
+  <!-- ─────────── STEP 4 — Photo ─────────── -->
   <section class="onb-step" data-step="4">
     <div class="otto-sm">
       <div class="pulse-1"></div>
       <div class="orbit-out"><div class="d"></div></div>
       <div class="core"></div>
     </div>
-    <div class="h2">resume or <em>portfolio</em></div>
-    <div class="sub-intro">"upload a PDF or image, or paste a link — preview below, same idea as on your profile."</div>
-
-    <input type="file" id="pfResumeFile" accept=".pdf,image/jpeg,image/png,image/webp,image/gif" style="display:none" onchange="onResumeFilePick(event)">
-
-    <div class="resume-upload-row">
-      <button type="button" class="btn-coral" id="btnPickResume" onclick="document.getElementById('pfResumeFile').click()">Upload PDF or image</button>
-      <span class="resume-upload-meta" id="resumeUploadStatus"></span>
+    <h2 class="h2" data-copy="photo.title"></h2>
+    <div class="sub-intro" data-copy="photo.otto"></div>
+    <div class="photo-circle" id="onbPhotoCircle"></div>
+    <p class="pf-error" id="onbPhotoError" role="alert" hidden></p>
+    <!-- No `capture`: the picker offers the library and the camera. -->
+    <input type="file" id="onbPhotoInput" accept="image/jpeg,image/png,image/webp" hidden>
+    <div class="cta-row" style="margin-top: 28px;">
+      <button type="button" class="btn-coral onb-cta" id="onbPhotoPrimary"></button>
+      <button type="button" class="btn-skip-step onb-cta" id="onbPhotoSecondary"></button>
     </div>
+  </section>
 
-    <div id="resumeMiniViewer" class="resume-mini-wrap" style="display:none;" aria-live="polite">
-      <div class="resume-mini-label">Preview</div>
-      <iframe id="resumeMiniFrame" class="resume-mini-frame" title="Document preview"></iframe>
-      <img id="resumeMiniImg" class="resume-mini-img" alt="Image preview" />
+  <!-- ─────────── STEP 5 — Follow clubs ─────────── -->
+  <section class="onb-step" data-step="5">
+    <div class="otto-sm">
+      <div class="pulse-1"></div>
+      <div class="orbit-out"><div class="d"></div></div>
+      <div class="core"></div>
     </div>
-
-    <div class="pf-form" style="margin-top: 18px;">
-      <div>
-        <label class="pf-label" for="pfResumeUrl">Or paste a link</label>
-        <input type="url" id="pfResumeUrl" class="pf-input" maxlength="2048" placeholder="https://… — optional" onblur="maybePreviewResumeLink()">
-        <p class="pf-hint">https:// or http:// — if you upload a file, we’ll use that for your profile unless you clear it.</p>
-        <p class="pf-hint" id="pfResumeLinkNote" aria-live="polite" style="font-style:normal;" hidden></p>
+    <h2 class="h2" data-copy="clubs.title"></h2>
+    <div class="sub-intro" data-copy="clubs.sub"></div>
+    <div class="onb-list">
+      <p class="pick-sparse" id="onbClubsSparse" hidden></p>
+      <input type="search" id="onbClubsSearch" class="pf-input pick-search" autocomplete="off" hidden>
+      <div id="onbClubsList" class="pick-list" role="list"></div>
+      <div id="onbClubsEmpty" class="onb-empty" hidden>
+        <p class="onb-empty-title" data-copy="clubs.emptyTitle"></p>
+        <p class="sub-intro" id="onbClubsEmptyBody"></p>
       </div>
     </div>
+    <div class="cta-row" style="margin-top: 28px;">
+      <button type="button" class="btn-coral onb-cta" id="onbClubsContinue"></button>
+    </div>
+  </section>
 
-    <button class="btn-coral" id="btnFinish" style="margin-top: 8px;" onclick="completeOnboarding()">Finish &amp; open my profile &rarr;</button>
-    <div class="note italic" style="margin-top: 14px;">you can change anything later</div>
+  <!-- ─────────── STEP 6 — Follow people ─────────── -->
+  <section class="onb-step" data-step="6">
+    <div class="otto-sm">
+      <div class="pulse-1"></div>
+      <div class="orbit-out"><div class="d"></div></div>
+      <div class="core"></div>
+    </div>
+    <h2 class="h2" data-copy="people.title"></h2>
+    <div class="sub-intro" id="onbPeopleOtto"></div>
+    <div class="onb-list">
+      <div id="onbPeopleTop" class="people-top" hidden>
+        <p class="sub-intro" data-copy="people.sparse"></p>
+        <button type="button" class="btn-share onb-share" data-copy="people.share"></button>
+      </div>
+      <div id="onbPeopleList"></div>
+      <div id="onbPeopleEmpty" class="onb-empty" hidden>
+        <p class="onb-empty-title" data-copy="people.emptyTitle"></p>
+        <p class="sub-intro" id="onbPeopleEmptyBody"></p>
+        <button type="button" class="btn-share onb-share" data-copy="people.share"></button>
+      </div>
+    </div>
+    <div class="cta-row" style="margin-top: 28px;">
+      <button type="button" class="btn-coral onb-cta" id="onbFinish"></button>
+    </div>
   </section>
 
 </main>
@@ -533,45 +661,70 @@ body.ott-warping .progress-dots {
 <!-- Hyperdrive overlay (populated + activated by triggerHyperdrive) -->
 <div class="ott-warp" id="ottWarp" aria-hidden="true"></div>
 
-<!-- Skip-confirm dialog -->
+<!-- Skip sheet: "saved" (Keep going / Skip anyway) or "identity" (name and
+     handle first, then Save & skip). Its inputs mirror step 3's. -->
 <div class="confirm-overlay" id="skipOverlay">
-  <div class="confirm-card">
-    <div class="confirm-title">Skip onboarding?</div>
-    <div class="confirm-body">What you’ve typed here won’t be saved. You can fill in your profile any time from your profile page.</div>
+  <div class="confirm-card" role="dialog" aria-modal="true" aria-labelledby="skipTitle">
+    <h2 class="confirm-title" id="skipTitle" data-copy="skip.title"></h2>
+    <p class="confirm-body" id="skipBody"></p>
+    <div class="skip-identity" id="skipIdentity" hidden>
+      <div>
+        <label class="pf-label" for="skipName" data-copy="profile.labels.name"></label>
+        <input type="text" id="skipName" class="pf-input" maxlength="120" autocomplete="name">
+        <p class="pf-error" id="skipNameError" role="alert" hidden></p>
+      </div>
+      <div>
+        <label class="pf-label" for="skipHandle" data-copy="profile.labels.handle"></label>
+        <div class="pf-handle-box">
+          <span class="pf-handle-at" aria-hidden="true">@</span>
+          <input type="text" id="skipHandle" class="pf-handle-input" maxlength="20" autocomplete="off" spellcheck="false" autocapitalize="off">
+          <span id="skipHandleStatus" class="pf-handle-status" aria-live="polite"></span>
+        </div>
+        <p class="pf-error" id="skipHandleError" role="alert" hidden></p>
+      </div>
+    </div>
     <div class="confirm-row">
-      <button class="btn-coral" onclick="closeSkipConfirm()">Keep going</button>
-      <button class="btn-skip-step" id="btnSkipAnyway" onclick="bailOnboarding()">Skip anyway</button>
+      <button type="button" class="btn-coral" id="skipPrimary"></button>
+      <button type="button" class="btn-skip-step" id="skipSecondary"></button>
     </div>
   </div>
 </div>
 
 <script>
-// ── Replay mode ───────────────────────────────────────────────────────────
-// `?replay=1` lets a user revisit Otto onboarding after they've already
-// finished it. In replay mode we skip the API save on Finish so existing
-// answers aren't overwritten, and surface a small banner so it's obvious.
-const IS_REPLAY = new URLSearchParams(window.location.search).get('replay') === '1';
-if (IS_REPLAY) {
-  const pill = document.getElementById('replayPill');
-  if (pill) pill.hidden = false;
-}
-
-// ── State ─────────────────────────────────────────────────────────────────
-const state = {
-  step: 1,
-  ottoName: 'otto',
-  profileDraft: {},
-  uploadedResumeUrl: null,
-};
-
-const TOTAL_STEPS = 4;
+// ══════════════════════════════════════════════════════════════════════════
+// Desktop Otto onboarding: six steps, the same flow as the phone
+// (src/components/mobile/OnboardingMobile.tsx and ./onboarding/*.tsx; wave
+// plan handoffs/2026-09-16-wave-plan-follow-onboarding-edit.md §9 B13).
+//
+//   1 hello → 2 campus → 3 profile → 4 photo → 5 follow clubs → 6 people
+//
+// SAVES AS YOU GO. Continue on the campus and profile steps writes that step
+// through POST /api/me/onboarding-step; the photo saves the moment it's
+// cropped; club and person follows save on tap. Finish (and Skip) only mark
+// onboarding done, after catching up a campus or profile change that never
+// went through a Continue. Everything typed is also kept in the localStorage
+// draft the phone uses (same key, same schema), so a reload comes back to the
+// same step with the same text. Replay (?replay=1) reads live data but never
+// reads, writes or clears the draft and sends no non-GET request.
+//
+// ONE BACK. The header's Back and the browser's Back are the same thing:
+// every step is a same-URL history entry carrying `onbStep`, and a popstate
+// listener shows that step. While something is saving, a Back is undone.
+//
+// The page is served inside an iframe (OnboardingSwitch.tsx), so leaving goes
+// through window.__vibeTopNav, and history entries join the top window's.
+//
+// SAFETY. Server text (club and people names, handles, errors) reaches the
+// DOM only through textContent / createElement; no HTML string is ever parsed
+// (the two markup resets below only empty an element). Image sources are only
+// safeImgSrc(value) or a blob: URL this page made.
+// ══════════════════════════════════════════════════════════════════════════
 
 // ── Boot payload (plan §3.3) ─────────────────────────────────────────────
 // /onboarding/classic injects <script id="onbBoot" type="application/json">
-// with the university the student's school email PROVED (`system`), the
-// campus their address points at on its own (`singleCampusId`) and the
-// prefill, which says whether they already chose a campus. A page served
-// without the tag (the raw static file) keeps today's IU-only behaviour.
+// with the signed-in user's id (the draft key), the university the school
+// email PROVED (`system`), the campus the address points at on its own
+// (`singleCampusId`) and the server prefill.
 function readOnbBoot() {
   try {
     const el = document.getElementById('onbBoot');
@@ -585,35 +738,829 @@ function readOnbBoot() {
 const ONB_BOOT = readOnbBoot() || {};
 const ONB_PREFILL = ONB_BOOT.prefill && typeof ONB_BOOT.prefill === 'object' ? ONB_BOOT.prefill : {};
 
-// ── Campus model (plan §2.3) ─────────────────────────────────────────────
-// Mirrors CAMPUS_ROWS in src/lib/iu/campuses.ts — that file is the source of
-// truth; this page is static (no build step) so it cannot import it. Keep in
-// sync. Drift can only mis-OFFER a campus: the campus step validates every
-// pick against the system the server stamped, and `users_campus_in_system`
-// refuses the rest, so nothing here can write a campus into the wrong
-// university.
-const SYSTEM_LABEL = { iu: 'IU', purdue: 'Purdue' };
-const CAMPUS_ROWS = [
-  // Shared: one community for both universities.
-  { id: 'indianapolis', name: 'Indianapolis', shortName: 'Indianapolis', systems: ['iu', 'purdue'], sort: 0, isOpen: true },
-  { id: 'fort-wayne', name: 'Fort Wayne', shortName: 'Fort Wayne', systems: ['iu', 'purdue'], sort: 10, isOpen: false },
-  // IU
-  { id: 'iu-bloomington', name: 'IU Bloomington', shortName: 'Bloomington', systems: ['iu'], sort: 20, isOpen: false },
-  { id: 'iu-columbus', name: 'IU Columbus', shortName: 'Columbus', systems: ['iu'], sort: 30, isOpen: false },
-  { id: 'iu-east', name: 'IU East', shortName: 'East', systems: ['iu'], sort: 30, isOpen: false },
-  { id: 'iu-kokomo', name: 'IU Kokomo', shortName: 'Kokomo', systems: ['iu'], sort: 30, isOpen: false },
-  { id: 'iu-northwest', name: 'IU Northwest', shortName: 'Northwest', systems: ['iu'], sort: 30, isOpen: false },
-  { id: 'iu-south-bend', name: 'IU South Bend', shortName: 'South Bend', systems: ['iu'], sort: 30, isOpen: false },
-  { id: 'iu-southeast', name: 'IU Southeast', shortName: 'Southeast', systems: ['iu'], sort: 30, isOpen: false },
-  // Purdue
-  { id: 'purdue-west-lafayette', name: 'Purdue West Lafayette', shortName: 'West Lafayette', systems: ['purdue'], sort: 20, isOpen: false },
-  { id: 'purdue-northwest', name: 'Purdue Northwest', shortName: 'Northwest', systems: ['purdue'], sort: 30, isOpen: false },
-];
-/** Former names, said once and only in the picker (plan §2.5 copy rules). */
-const CAMPUS_FORMERLY = { indianapolis: 'IUPUI' };
+// ── Replay mode ───────────────────────────────────────────────────────────
+// `?replay=1` (or the boot's own flag) re-views onboarding after it's done:
+// nothing is saved, and a pill says so. Declared after ONB_BOOT on purpose.
+const IS_REPLAY = new URLSearchParams(window.location.search).get('replay') === '1' || ONB_BOOT.replay === true;
+if (IS_REPLAY) {
+  const pill = document.getElementById('replayPill');
+  if (pill) pill.hidden = false;
+}
 
+/* ONB-PURE-MIRROR:START */
+// ── Pure mirror of the phone's TS sources ────────────────────────────────
+// Constants and pure functions ONLY (no DOM, no storage, no requests), so a
+// parity script can evaluate this block in node and compare every export
+// with the TS it copies. Change a TS source → change this block too:
+//   ONB_COPY, fillCampus        src/components/mobile/onboarding/onb-copy.ts
+//   ORG_COPY, orgRowView, …     src/lib/orgs/join-copy.ts
+//   PHOTO_ERROR_COPY, preflight src/lib/profile/avatar-upload.ts
+//   parseClubRows … listState   src/lib/onboarding/social-steps.ts
+//   campus model                src/lib/iu/campuses.ts
+//   draft record, resume step   src/lib/onboarding/draft.ts
+//   ONB_LOCAL_COPY, profile     src/components/mobile/onboarding/Step*.tsx
+//                               and OnboardingMobile.tsx (their local strings)
+//   isSafeRelativePath          src/lib/auth/login-next.ts
+
+const ONB_COPY = Object.freeze({
+  header: Object.freeze({
+    back: "Back",
+    progress: "{n} of 6",
+    skip: "Skip",
+    replay: "REPLAY MODE",
+  }),
+  hello: Object.freeze({
+    intro: "“think of me as your campus compass. i'll point you to what's loud, what's tonight, and who's on your wavelength — your guide while you build out your home on vibe.”",
+    note: "about two minutes: your campus, your profile, a photo, then your people",
+    cta: "Let's go →",
+  }),
+  campus: Object.freeze({
+    title: "which campus is yours?",
+    ottoIu: "“your school email says IU. pick your campus. Indianapolis is shared with Purdue students.”",
+    ottoPurdue: "“your school email says Purdue. pick your campus. Indianapolis is shared with IU students.”",
+    note: "Your school email shows you're at {system}. You can move to another {system} campus later in Settings.",
+    fromEmailTag: "from your school email",
+    notOpen: "not open yet",
+    required: "Pick your campus to continue.",
+    invalid: "Pick one of your university's campuses.",
+    purdueLink: "Purdue student with an IU email? Verify your @purdue.edu instead",
+    switchLabel: "Your @purdue.edu email",
+    switchPlaceholder: "you@purdue.edu",
+    switchSend: "Send code",
+    switchSending: "Sending…",
+    switchWrongDomain: "Use your @purdue.edu address.",
+    switchSent: "Check your school inbox.",
+    switchCodeLabel: "8-digit code",
+    switchVerify: "Verify",
+    switchVerifying: "Verifying…",
+    switchDone: "You're verified as a Purdue student.",
+    switchCancel: "Never mind",
+    continue: "Continue →",
+    saving: "Saving…",
+  }),
+  profile: Object.freeze({
+    title: "let's pin down your profile",
+    sub: "“same fields as your Vibe profile. name and handle are the must-haves. a photo is next.”",
+    labels: Object.freeze({
+      name: "Name (required)",
+      handle: "Handle (required)",
+      bio: "Bio (optional)",
+      major: "Major (optional)",
+      department: "Department / school (optional)",
+      year: "Year (optional)",
+      interests: "Interests & projects (optional)",
+      skills: "Skills (optional)",
+      lookingFor: "What are you here for? (optional)",
+    }),
+    majorHintList: "From the {label} list, or type your own",
+    majorHintFree: "Type your major",
+    handleChecking: "checking…",
+    handleAvailable: "✓ available",
+    handleTaken: "✗ taken",
+    handleReason: "✗ {reason}",
+    handleFormat: "✗ 3–20 letters, numbers or _",
+    handleUnchecked: "couldn't check. we'll check when you continue",
+    errors: Object.freeze({
+      nameRequired: "Add your name. It's how people recognize you.",
+      handleRequired: "Pick a handle so friends can find you.",
+      handleInvalid: "3–20 letters, numbers or _.",
+      handleTaken: "That handle is taken. Try another.",
+      handleReserved: "That handle is reserved.",
+    }),
+    changeLater: "you can change anything later",
+    continue: "Continue →",
+    saving: "Saving…",
+  }),
+  photo: Object.freeze({
+    title: "put a face to the name",
+    otto: "“people follow faces. add a photo so classmates know it's you. swap it any time.”",
+    choose: "Choose a photo",
+    skip: "Skip for now",
+    uploading: "Uploading…",
+    change: "Change photo",
+    continue: "Continue →",
+  }),
+  clubs: Object.freeze({
+    title: "Follow clubs",
+    sub: "Their posts show up in your feed. You can join the ones that let you.",
+    search: "Search clubs by name",
+    sparse: "Clubs are just getting started at {campus}. Follow the ones you like — posts land in your feed.",
+    sparseNoCampus: "Clubs are just getting started here. Follow the ones you like — posts land in your feed.",
+    emptyTitle: "no clubs here yet",
+    emptyBody: "“you could be the first. clubs can be started from vibe on a computer, and they'll show up for everyone at {campus}.”",
+    emptyBodyNoCampus: "“you could be the first. clubs can be started from vibe on a computer, and they'll show up for everyone here.”",
+    loadFailed: "Couldn't load clubs.",
+    continue: "Continue →",
+    skipForNow: "Skip for now",
+  }),
+  people: Object.freeze({
+    title: "follow a few people",
+    ottoShared: "“students at {campus}, IU and Purdue both. follow a few and their posts rise to the top of your feed.”",
+    ottoSingle: "“students at {campus}. follow a few and their posts rise to the top of your feed.”",
+    ottoNoCampus: "“students on vibe. follow a few and their posts rise to the top of your feed.”",
+    groupClubs: "From your clubs",
+    groupCampus: "At {campus}",
+    groupCampusFallback: "On your campus",
+    groupMajor: "Same major",
+    groupSystem: "Elsewhere at {system}",
+    groupMore: "More people on Vibe",
+    follow: "Follow",
+    following: "Following ✓",
+    sparse: "“it's early here. only a few people have joined so far. bring a friend and you'll have someone to follow.”",
+    emptyTitle: "no one to follow yet",
+    emptyBody: "“you're one of the first at {campus}. share vibe with a friend and they'll show up here.”",
+    emptyBodyNoCampus: "“you're one of the first here. share vibe with a friend and they'll show up here.”",
+    share: "Share Vibe",
+    copied: "Link copied.",
+    loadFailed: "Couldn't load people.",
+    followFailed: "Couldn't follow this person.",
+    unfollowFailed: "Couldn't unfollow this person.",
+    finish: "Finish →",
+    finishing: "Saving…",
+    finishFailed: "Couldn't finish setting up.",
+  }),
+  skip: Object.freeze({
+    title: "Skip the rest?",
+    bodySaved: "Everything you've added so far is saved. You can finish your profile any time from your profile page.",
+    bodyIdentity: "Add a name and handle first. It's how people find you.",
+    keepGoing: "Keep going",
+    skipAnyway: "Skip anyway",
+    skipping: "Skipping…",
+    saveAndSkip: "Save & skip",
+    saving: "Saving…",
+    failed: "Couldn't skip onboarding.",
+  }),
+});
+
+const ORG_COPY = Object.freeze({
+  buttons: Object.freeze({
+    follow: "Follow",
+    following: "Following ✓",
+    signInToFollow: "Sign in to follow",
+    joined: "Joined ✓",
+    hidden: "Hidden",
+    acceptInvite: "Accept invite",
+    accept: "Accept",
+    decline: "Decline",
+    join: "Join",
+    requestToJoin: "Request to join",
+    request: "Request",
+    requested: "Requested",
+    inviteOnly: "Invite only",
+    iuStudentsOnly: "IU students only",
+    purdueStudentsOnly: "Purdue students only",
+    verifyToJoin: "Verify your school email to join",
+    busy: "…",
+  }),
+  subs: Object.freeze({
+    membersFollow: "Members follow automatically",
+    hidden: "Hidden by Vibe. Only members can see it.",
+    requestPolicy: "Officers approve requests",
+    requestVisiting: "You're visiting, so officers approve requests",
+    inviteOnly: "Officers invite members",
+    audienceIu: "{org} is open to IU students only.",
+    audiencePurdue: "{org} is open to Purdue students only.",
+  }),
+  chips: Object.freeze({
+    invitedYou: "Invited you",
+    following: "Following",
+  }),
+  meta: Object.freeze({
+    byRequest: "By request",
+    inviteOnly: "Invite only",
+    requested: "Requested",
+    iuOnly: "IU only",
+    purdueOnly: "Purdue only",
+    hidden: "Hidden",
+  }),
+  policyChips: Object.freeze({
+    open: "Open",
+    request: "By request",
+    invite: "Invite only",
+  }),
+  counts: Object.freeze({
+    followers: "{n} followers",
+    oneMember: "1 member",
+    members: "{n} members",
+  }),
+  followsSince: "Follows since {date}",
+  inviteSub: Object.freeze({
+    byName: "Invited by {name} · Expires {date}",
+    byOfficer: "Invited by an officer · Expires {date}",
+  }),
+  facts: Object.freeze({
+    whoCanJoin: Object.freeze({
+      open: "Anyone",
+      request: "By request",
+      invite: "By invitation",
+    }),
+    openTo: Object.freeze({
+      both: "Anyone",
+      iu: "IU students",
+      purdue: "Purdue students",
+    }),
+  }),
+  whoCanJoinOptions: Object.freeze({
+    open: Object.freeze({
+      label: "Anyone can join",
+      sub: "Join instantly",
+    }),
+    request: Object.freeze({
+      label: "Request to join",
+      sub: "Officers approve requests",
+    }),
+    invite: Object.freeze({
+      label: "Invite only",
+      sub: "Officers invite members",
+    }),
+  }),
+  openToOptions: Object.freeze({
+    bothShared: "All of {campus} (IU + Purdue)",
+    both: "IU and Purdue students",
+    iu: "IU students only",
+    purdue: "Purdue students only",
+  }),
+  notices: Object.freeze({
+    hidden: "This org is hidden. Only its members can find it. It's out of lists, search and events.",
+    audienceIu: "{org} only takes IU students as members. You can still follow.",
+    audiencePurdue: "{org} only takes Purdue students as members. You can still follow.",
+    invite: "Invite only. Anyone can follow this club — officers add members.",
+    request: "Anyone can follow this club. Officers approve members.",
+  }),
+  channels: Object.freeze({
+    canJoin: "Chats are for members. Join to start talking.",
+    approve: "Chats are for members. Officers approve who joins.",
+    inviteOnly: "Chats are for members. Officers invite members.",
+    invited: "Chats are for members. Accept the invite to start talking.",
+    unverified: "Chats are for members. Verify your school email to join.",
+    membersOnly: "Chats are for members.",
+  }),
+  errors: Object.freeze({
+    notFound: "This org isn't available.",
+    tooMany: "Too many tries. Try again in a minute.",
+    memberFollows: "Members follow automatically.",
+    orgHidden: "This org is hidden, so nobody new can join it.",
+    inviteClosed: "This invite is no longer open.",
+  }),
+  control: Object.freeze({
+    followFailed: "Couldn't follow this club.",
+    unfollowFailed: "Couldn't unfollow this club.",
+    joinFailed: "Couldn't join this org.",
+    requestFailed: "Couldn't send your join request.",
+    acceptFailed: "Couldn't accept the invite.",
+    declineFailed: "Couldn't decline the invite.",
+    welcome: "You're in. Welcome to {org}.",
+    declineConfirm: "Decline the invite to {org}? An officer can invite you again later.",
+  }),
+  banner: Object.freeze({
+    title: "You're invited to join {org}",
+  }),
+  inviteSheet: Object.freeze({
+    title: "Invite people",
+    close: "Close",
+    searchPlaceholder: "Search by name or @handle",
+    followersLabel: "Followers",
+    noFollowers: "Nobody follows {org} yet. Share the club's page — people who follow it show up here.",
+    typeMore: "Type at least 2 letters",
+    noResults: "No one found. Check the spelling of their handle.",
+    loadFailed: "Couldn't load people.",
+    loadMoreFailed: "Couldn't load more people.",
+    showMore: "Show more",
+    loadingMore: "Loading…",
+    blockedUnverified: "Get this org verified before inviting people. Message Vibe to start that.",
+    blockedHidden: "This org is hidden, so it can't invite anyone.",
+    invite: "Invite",
+    invitedDone: "Invited ✓",
+    undo: "Undo",
+    invited: "Invited",
+    member: "Member",
+    approve: "Approve request",
+    declined: "Declined",
+    capReached: "Invited enough",
+    inviteAgain: "You can invite again {date}",
+    notEligible: "Not eligible",
+    ineligibleUnverified: "They haven't verified a school email yet.",
+    inviteFailed: "Couldn't send the invite.",
+    undoFailed: "Couldn't undo the invite.",
+    revokeFailed: "Couldn't revoke the invite.",
+    approveFailed: "Couldn't approve the request.",
+    sent: "Invite sent",
+    revoked: "Invite revoked",
+    approved: "They're in. Their request was approved.",
+    tooManyInvites: "You've sent a lot of invites. Try again in an hour.",
+    pendingTitle: "Pending invites ({n})",
+    pendingByName: "Invited {relative} by {name}",
+    pendingByOfficer: "Invited {relative} by an officer",
+    pendingLoadFailed: "Couldn't load pending invites.",
+    noPending: "No pending invites.",
+    revoke: "Revoke",
+    revokeConfirm: "Revoke this invite?",
+    keep: "Keep",
+  }),
+});
+
+const PHOTO_ERROR_COPY = Object.freeze({
+  tooBig: "That photo is too big. Try another.",
+  wrongType: "Use a JPG, PNG or WebP photo.",
+  processFailed: "Couldn't process that photo. Try a different one.",
+  uploadFailed: "That photo didn't upload. Try again.",
+});
+
+
+/**
+ * The strings the phone keeps in its own step files rather than ONB_COPY,
+ * character for character: StepCampus.tsx (SYSTEM_MISSING_COPY and the
+ * switch's failure lines), OnboardingMobile.tsx (the two save failures),
+ * StepProfile.tsx (hints, placeholders, year and "here for" options, the
+ * handle check's failure line) and StepClubs.tsx (the verified check's label).
+ */
+const ONB_LOCAL_COPY = Object.freeze({
+  systemMissing: "We couldn't match your school email to a university yet. Try again later.",
+  sendFailed: "Couldn't send the code.",
+  verifyFailed: "Couldn't verify that code.",
+  campusesLoadFailed: "Couldn't load your campuses.",
+  campusSaveFailed: "Couldn't save your campus.",
+  profileSaveFailed: "Couldn't save your profile.",
+  handleCheckFailed: "Couldn't check that handle.",
+  verified: "Verified",
+  hintHandle: "how friends find you (3-20, letters/numbers/_)",
+  hintBio: "up to 600 characters",
+  hintInterests: "up to 10 items — comma or new-line separated",
+  hintSkills: "up to 12 items, 30 chars each",
+  placeholders: Object.freeze({
+    name: "How you want to appear on Vibe",
+    handle: "yourhandle",
+    bio: "A few lines about you — what you're into, what you're building.",
+    major: "e.g. Informatics",
+    department: "e.g. Luddy School of Informatics…",
+    interests: "Clubs, side projects, topics",
+    skills: "e.g. Figma, Python, public speaking",
+  }),
+  yearOptions: Object.freeze([
+    Object.freeze({ value: "", label: "Prefer not to say" }),
+    Object.freeze({ value: "1", label: "1st year" }),
+    Object.freeze({ value: "2", label: "2nd year" }),
+    Object.freeze({ value: "3", label: "3rd year" }),
+    Object.freeze({ value: "4", label: "4th year" }),
+    Object.freeze({ value: "5", label: "5th+ / grad" }),
+  ]),
+  lookingFor: Object.freeze([
+    Object.freeze({ value: "meeting-people", label: "Meeting people" }),
+    Object.freeze({ value: "showing-work", label: "Showing my work" }),
+    Object.freeze({ value: "finding-clubs", label: "Finding clubs" }),
+    Object.freeze({ value: "exploring", label: "Just exploring" }),
+  ]),
+});
+
+/** onb-copy.ts: every `{campus}` filled in one pass; a blank campus → `fallback`. */
+function fillCampus(t, campus, fallback) {
+  const name = typeof campus === "string" ? campus.trim() : "";
+  if (!name) return fallback;
+  return t.replace(/\{campus\}/g, () => name);
+}
+
+// ── Clubs: join-copy.ts (orgRowView's "onboarding" surface) ──────────────
+
+/** Said near Follow on any club not known to be open (join-copy.ts). */
+const FOLLOW_DISCLOSURE = "Officers can see who follows this club.";
+
+/** `{key}` placeholders in one pass; unknown keys stay as written. */
+function fillCopy(template, vars) {
+  return template.replace(/\{(\w+)\}/g, (whole, key) =>
+    Object.prototype.hasOwnProperty.call(vars, key) ? String(vars[key]) : whole,
+  );
+}
+
+/** 'Sep 16' in US English, or null for a missing or unparseable timestamp. */
+function shortDateText(iso, timeZone) {
+  if (!iso) return null;
+  const date = new Date(iso);
+  if (Number.isNaN(date.getTime())) return null;
+  return date.toLocaleDateString("en-US", { month: "short", day: "numeric", timeZone });
+}
+
+function orgAction(kind, label, tone, extra) {
+  return {
+    kind,
+    label,
+    sub: (extra && extra.sub) ?? null,
+    tone,
+    disabled: (extra && extra.disabled) ?? false,
+    href: (extra && extra.href) ?? null,
+  };
+}
+
+function orgFollowToggle(following, followTone) {
+  return following
+    ? orgAction("unfollow", ORG_COPY.buttons.following, "quiet")
+    : orgAction("follow", ORG_COPY.buttons.follow, followTone || "filled");
+}
+
+function orgSignInAction(handle) {
+  return orgAction("sign_in", ORG_COPY.buttons.signInToFollow, "filled", {
+    href: "/auth/login?next=" + encodeURIComponent("/orgs/" + handle),
+  });
+}
+
+/** Any club not known to be open (`joinPolicy !== "open"`) says officers see followers. */
+function orgWantsDisclosure(rel, showsFollow) {
+  return (
+    rel.joinPolicy !== "open" &&
+    showsFollow &&
+    rel.state !== "member" &&
+    rel.state !== "hidden" &&
+    rel.state !== "signed_out"
+  );
+}
+
+function orgRowMeta(rel) {
+  const meta = [];
+  if (rel.joinPolicy === "request") meta.push(ORG_COPY.meta.byRequest);
+  else if (rel.joinPolicy === "invite") meta.push(ORG_COPY.meta.inviteOnly);
+  if (rel.state === "requested") meta.push(ORG_COPY.meta.requested);
+  if (rel.audience === "iu") meta.push(ORG_COPY.meta.iuOnly);
+  else if (rel.audience === "purdue") meta.push(ORG_COPY.meta.purdueOnly);
+  if (rel.state === "hidden") meta.push(ORG_COPY.meta.hidden);
+  return meta;
+}
+
+/**
+ * orgRowView(rel, "onboarding"): one or two controls, a chip that never
+ * repeats a control, meta labels. Onboarding never offers Request, and an
+ * open club puts Follow and Join side by side (`line`).
+ */
+function orgRowViewOnboarding(rel) {
+  let actions;
+  let chip = null;
+  let layout = "slot";
+  let sub = null;
+
+  switch (rel.state) {
+    case "signed_out":
+      actions = [orgSignInAction(rel.handle)];
+      break;
+    case "member":
+      actions = [orgAction("status", ORG_COPY.buttons.joined, "quiet", { disabled: true })];
+      sub = ORG_COPY.subs.membersFollow;
+      break;
+    case "hidden":
+      actions = [orgAction("status", ORG_COPY.buttons.hidden, "quiet", { disabled: true })];
+      break;
+    case "invited":
+      chip = ORG_COPY.chips.invitedYou;
+      actions = [orgAction("accept", ORG_COPY.buttons.accept, "filled")];
+      break;
+    case "can_join":
+      actions = rel.following
+        ? [
+            orgAction("unfollow", ORG_COPY.buttons.following, "quiet"),
+            orgAction("join", ORG_COPY.buttons.join, "filled"),
+          ]
+        : [
+            orgAction("follow", ORG_COPY.buttons.follow, "filled"),
+            orgAction("join", ORG_COPY.buttons.join, "outline"),
+          ];
+      layout = "line";
+      break;
+    case "can_request":
+      actions = rel.following
+        ? [orgAction("unfollow", ORG_COPY.buttons.following, "quiet")]
+        : [orgAction("follow", ORG_COPY.buttons.follow, "filled")];
+      break;
+    case "requested":
+    case "invite_only":
+    case "audience_blocked":
+    case "unverified":
+      actions = [orgFollowToggle(rel.following)];
+      break;
+  }
+
+  const showsFollow = actions.some((a) => a.kind === "follow" || a.kind === "unfollow");
+  return {
+    chip,
+    actions,
+    layout,
+    disclosure: orgWantsDisclosure(rel, showsFollow) ? FOLLOW_DISCLOSURE : null,
+    meta: orgRowMeta(rel),
+    sub,
+  };
+}
+
+/** 'Invited by Franky · Expires Oct 16'; no inviter → "an officer"; a bad expiry drops the date. */
+function inviteSubText(firstName, expiresIso, timeZone) {
+  const name = (firstName ?? "").trim();
+  const date = shortDateText(expiresIso, timeZone);
+  const template = name ? ORG_COPY.inviteSub.byName : ORG_COPY.inviteSub.byOfficer;
+  const filled = fillCopy(template, { name, date: date ?? "" });
+  return date ? filled : filled.replace(/ · Expires $/, "");
+}
+
+/** The toast for a refused club request, by code (or 429); null → no club line. */
+function orgErrorCopy(code) {
+  switch (code) {
+    case 429:
+    case "429":
+      return ORG_COPY.errors.tooMany;
+    case "not_found":
+      return ORG_COPY.errors.notFound;
+    case "member_follows":
+      return ORG_COPY.errors.memberFollows;
+    case "org_hidden":
+      return ORG_COPY.errors.orgHidden;
+    case "invite_not_found":
+    case "invite_not_pending":
+      return ORG_COPY.errors.inviteClosed;
+    default:
+      return null;
+  }
+}
+
+/** Where a declined invite leaves them; a null policy reads as "ask". */
+function stateAfterDecline(joinPolicy) {
+  if (joinPolicy === "open") return "can_join";
+  if (joinPolicy === "invite") return "invite_only";
+  return "can_request";
+}
+
+/** The next standing for a tap that succeeded (or replay's unsent tap); null for links and labels. */
+function changeAfter(rel, kind) {
+  switch (kind) {
+    case "follow":
+      return { state: rel.state, following: true, role: rel.role };
+    case "unfollow":
+      return { state: rel.state, following: false, role: rel.role };
+    case "join":
+    case "accept":
+      return { state: "member", following: true, role: rel.role ?? "member" };
+    case "request":
+      return { state: "requested", following: rel.following, role: rel.role };
+    case "decline":
+      return {
+        state: stateAfterDecline(rel.joinPolicy),
+        following: rel.following,
+        role: rel.role,
+        declined: true,
+      };
+    default:
+      return null;
+  }
+}
+
+/** join-state.ts isOrgRole. */
+function isOrgRole(value) {
+  return value === "owner" || value === "admin" || value === "mod" || value === "member";
+}
+
+/** OrgJoinControl.tsx: `audience_mismatch` names the university only in its sentence. */
+function audienceFromRefusal(error, fallback) {
+  const text = typeof error === "string" ? error : "";
+  if (/open to Purdue students only\.?$/.test(text)) return "purdue";
+  if (/open to IU students only\.?$/.test(text)) return "iu";
+  return fallback;
+}
+
+// ── social-steps.ts: the clubs and people steps' pure half ────────────────
+
+const CLUB_JOIN_STATES = Object.freeze([
+  "member", "invited", "requested", "can_join", "can_request",
+  "invite_only", "audience_blocked", "unverified", "hidden",
+]);
+const CLUB_ORG_ROLES = Object.freeze(["owner", "admin", "mod", "member"]);
+
+function asRecord(value) {
+  return value !== null && typeof value === "object" && !Array.isArray(value) ? value : null;
+}
+
+/** A trimmed, non-empty string, or null. */
+function trimmedText(value) {
+  if (typeof value !== "string") return null;
+  const trimmed = value.trim();
+  return trimmed ? trimmed : null;
+}
+
+function oneOf(value, allowed) {
+  return typeof value === "string" && allowed.includes(value) ? value : null;
+}
+
+/** Discover rows, typed; drops rows missing id/handle/name/join_state and repeats. */
+function parseClubRows(raw) {
+  if (!Array.isArray(raw)) return [];
+  const seen = [];
+  const rows = [];
+  for (const item of raw) {
+    const r = asRecord(item);
+    if (!r) continue;
+    const id = trimmedText(r.id);
+    const handle = trimmedText(r.handle);
+    const name = trimmedText(r.name);
+    const joinState = oneOf(r.join_state, CLUB_JOIN_STATES);
+    if (!id || !handle || !name || !joinState || seen.includes(id)) continue;
+    seen.push(id);
+
+    const invite = asRecord(r.pending_invite);
+    const inviteId = invite ? trimmedText(invite.id) : null;
+    const inviteExpires = invite ? trimmedText(invite.expires_at) : null;
+    const followState = oneOf(r.org_follow_state, ["following", "not_following"]);
+
+    const row = {
+      id,
+      handle,
+      name,
+      logo_url: trimmedText(r.logo_url),
+      verified: r.verified === true,
+      join_policy: oneOf(r.join_policy, ["open", "request", "invite"]) ?? "request",
+      audience: oneOf(r.audience, ["both", "iu", "purdue"]) ?? "both",
+      join_state: joinState,
+      join_reason: oneOf(r.join_reason, ["policy", "visiting"]),
+      role: oneOf(r.role, CLUB_ORG_ROLES),
+      pending_invite:
+        invite && inviteId && inviteExpires
+          ? { id: inviteId, expires_at: inviteExpires, invited_by_name: trimmedText(invite.invited_by_name) }
+          : null,
+    };
+    if (followState) row.org_follow_state = followState;
+    rows.push(row);
+  }
+  return rows;
+}
+
+/** Plan §4.2: following (org_follow_state), or a member (members always follow). */
+function isFollowingOrg(r) {
+  return r.org_follow_state === "following" || r.role != null || r.join_state === "member";
+}
+
+/** Invite first, then open, by request, invite-only; followed or joined last. */
+function clubBand(r) {
+  if (r.join_state === "invited") return 0;
+  if (isFollowingOrg(r)) return 4;
+  if (r.join_policy === "open") return 1;
+  if (r.join_policy === "request") return 2;
+  return 3;
+}
+
+/** Stable sort by clubBand, once on load: a row never jumps away from a tap. */
+function orderClubRows(rows) {
+  return rows
+    .map((row, index) => ({ row, index, band: clubBand(row) }))
+    .sort((a, b) => a.band - b.band || a.index - b.index)
+    .map((entry) => entry.row);
+}
+
+/** The OrgRelation the row renders, with this step's own answers on top. */
+function relationFor(r, local) {
+  const state = (local && local.state) ?? r.join_state;
+  return {
+    handle: r.handle,
+    orgName: r.name,
+    state,
+    following: state === "member" ? true : ((local && local.following) ?? isFollowingOrg(r)),
+    role: (local && local.role) ?? r.role,
+    reason: r.join_reason,
+    audience: r.audience,
+    joinPolicy: r.join_policy,
+  };
+}
+
+/** True when any row, with this step's taps applied, is followed or joined. */
+function anyClubFollowed(rows, local) {
+  return rows.some((r) => relationFor(r, local[r.id]).following);
+}
+
+/** Mirrors ONB_COPY.people.group* (social-steps.ts keeps its own copy too). */
+const PEOPLE_GROUP_LABELS = Object.freeze({
+  clubs: "From your clubs",
+  campus: "At {campus}",
+  campusFallback: "On your campus",
+  major: "Same major",
+  system: "Elsewhere at {system}",
+  more: "More people on Vibe",
+});
+const PEOPLE_GROUP_ORDER = Object.freeze(["clubs", "campus", "major", "system", "more"]);
+
+/** `{ suggestions }` rows, typed; drops rows with no id, no name and no handle, and repeats. */
+function parseSuggestions(raw) {
+  if (!Array.isArray(raw)) return [];
+  const seen = [];
+  const people = [];
+  for (const item of raw) {
+    const r = asRecord(item);
+    if (!r) continue;
+    const id = trimmedText(r.id);
+    const name = trimmedText(r.name);
+    const handle = trimmedText(r.handle);
+    if (!id || (!name && !handle) || seen.includes(id)) continue;
+    seen.push(id);
+    const person = {
+      id,
+      name,
+      handle,
+      avatar_url: trimmedText(r.avatar_url),
+      major: trimmedText(r.major),
+      campus_id: trimmedText(r.campus_id),
+      school_system: oneOf(r.school_system, ["iu", "purdue"]),
+    };
+    const reason = trimmedText(r.reason_v2);
+    if (reason) person.reason_v2 = reason;
+    people.push(person);
+  }
+  return people;
+}
+
+/**
+ * Buckets suggestions by `reason_v2` in the order clubs, campus, major,
+ * system, more; server order inside a group; empty groups dropped.
+ */
+function groupPeople(list, o) {
+  const buckets = { clubs: [], campus: [], major: [], system: [], more: [] };
+  for (const person of list) {
+    switch (person.reason_v2) {
+      case "from_your_clubs":
+        buckets.clubs.push(person);
+        break;
+      case "same_campus":
+        buckets.campus.push(person);
+        break;
+      case "same_major":
+        buckets.major.push(person);
+        break;
+      case "same_system":
+        if (o.system ?? person.school_system) buckets.system.push(person);
+        else buckets.more.push(person);
+        break;
+      default:
+        buckets.more.push(person);
+    }
+  }
+
+  const labelFor = (key, people) => {
+    const first = people[0];
+    switch (key) {
+      case "clubs":
+        return PEOPLE_GROUP_LABELS.clubs;
+      case "campus": {
+        const row = campusRowById(first ? first.campus_id : undefined);
+        const campus = (o.campusShortName ?? "").trim() || (row ? row.shortName : "") || "";
+        return campus
+          ? PEOPLE_GROUP_LABELS.campus.replace("{campus}", () => campus)
+          : PEOPLE_GROUP_LABELS.campusFallback;
+      }
+      case "major":
+        return PEOPLE_GROUP_LABELS.major;
+      case "system": {
+        const system = o.system ?? (first ? first.school_system : undefined) ?? "iu";
+        return PEOPLE_GROUP_LABELS.system.replace("{system}", SYSTEM_LABEL[system]);
+      }
+      case "more":
+        return PEOPLE_GROUP_LABELS.more;
+    }
+  };
+
+  return PEOPLE_GROUP_ORDER.filter((key) => buckets[key].length > 0).map((key) => ({
+    key,
+    label: labelFor(key, buckets[key]),
+    people: buckets[key],
+  }));
+}
+
+/** 0 → "empty", 1–2 → "sparse", 3 or more → "full". */
+function listState(n) {
+  if (!(n >= 1)) return "empty";
+  return n < 3 ? "sparse" : "full";
+}
+
+// ── campuses.ts: the campus model ────────────────────────────────────────
+// Drift can only mis-OFFER a campus: the step route checks every pick against
+// the system the server stamped, and `users_campus_in_system` refuses the
+// rest, so nothing here can write a campus into the wrong university.
+
+const SYSTEM_LABEL = Object.freeze({ iu: "IU", purdue: "Purdue" });
+const CAMPUS_ROWS = Object.freeze([
+  // Shared: one community for both universities.
+  Object.freeze({ id: "indianapolis", name: "Indianapolis", shortName: "Indianapolis", systems: Object.freeze(["iu", "purdue"]), sort: 0, isOpen: true }),
+  Object.freeze({ id: "fort-wayne", name: "Fort Wayne", shortName: "Fort Wayne", systems: Object.freeze(["iu", "purdue"]), sort: 10, isOpen: false }),
+  // IU
+  Object.freeze({ id: "iu-bloomington", name: "IU Bloomington", shortName: "Bloomington", systems: Object.freeze(["iu"]), sort: 20, isOpen: false }),
+  Object.freeze({ id: "iu-columbus", name: "IU Columbus", shortName: "Columbus", systems: Object.freeze(["iu"]), sort: 30, isOpen: false }),
+  Object.freeze({ id: "iu-east", name: "IU East", shortName: "East", systems: Object.freeze(["iu"]), sort: 30, isOpen: false }),
+  Object.freeze({ id: "iu-kokomo", name: "IU Kokomo", shortName: "Kokomo", systems: Object.freeze(["iu"]), sort: 30, isOpen: false }),
+  Object.freeze({ id: "iu-northwest", name: "IU Northwest", shortName: "Northwest", systems: Object.freeze(["iu"]), sort: 30, isOpen: false }),
+  Object.freeze({ id: "iu-south-bend", name: "IU South Bend", shortName: "South Bend", systems: Object.freeze(["iu"]), sort: 30, isOpen: false }),
+  Object.freeze({ id: "iu-southeast", name: "IU Southeast", shortName: "Southeast", systems: Object.freeze(["iu"]), sort: 30, isOpen: false }),
+  // Purdue
+  Object.freeze({ id: "purdue-west-lafayette", name: "Purdue West Lafayette", shortName: "West Lafayette", systems: Object.freeze(["purdue"]), sort: 20, isOpen: false }),
+  Object.freeze({ id: "purdue-northwest", name: "Purdue Northwest", shortName: "Northwest", systems: Object.freeze(["purdue"]), sort: 30, isOpen: false }),
+]);
+/** Former names, said once and only in the picker (plan §2.5 copy rules). */
+const CAMPUS_FORMERLY = Object.freeze({ indianapolis: "IUPUI" });
+
+function isSchoolSystem(value) {
+  return value === "iu" || value === "purdue";
+}
+
+/** A campus row by id (trimmed, any casing), or null. */
 function campusRowById(id) {
-  const key = String(id == null ? '' : id).trim().toLowerCase();
+  if (typeof id !== "string") return null;
+  const key = id.trim().toLowerCase();
   if (!key) return null;
   for (let i = 0; i < CAMPUS_ROWS.length; i++) {
     if (CAMPUS_ROWS[i].id === key) return CAMPUS_ROWS[i];
@@ -623,305 +1570,529 @@ function campusRowById(id) {
 
 /** The allowed set for a system, shared communities first, then sort, then name. */
 function campusesForSystem(system) {
-  if (system !== 'iu' && system !== 'purdue') return [];
-  return CAMPUS_ROWS.filter(function (c) { return c.systems.indexOf(system) >= 0; })
-    .sort(function (a, b) {
-      const shared = Number(b.systems.length > 1) - Number(a.systems.length > 1);
-      if (shared !== 0) return shared;
-      if (a.sort !== b.sort) return a.sort - b.sort;
-      return a.name < b.name ? -1 : a.name > b.name ? 1 : 0;
-    });
+  if (!isSchoolSystem(system)) return [];
+  return CAMPUS_ROWS.filter((c) => c.systems.includes(system)).sort((a, b) => {
+    const shared = Number(b.systems.length > 1) - Number(a.systems.length > 1);
+    if (shared !== 0) return shared;
+    if (a.sort !== b.sort) return a.sort - b.sort;
+    return a.name < b.name ? -1 : a.name > b.name ? 1 : 0;
+  });
+}
+
+/** The canonical id when `id` names a campus in `system`'s allowed set, else null. */
+function allowedCampusId(id, system) {
+  if (!isSchoolSystem(system) || typeof id !== "string") return null;
+  const row = campusRowById(id);
+  return row && row.systems.includes(system) ? row.id : null;
+}
+
+/** Whether `id` is one of `system`'s campuses (a null system allows nothing). */
+function campusAllowed(id, system) {
+  return allowedCampusId(id, system) !== null;
 }
 
 /**
- * The sub-line under the picker, seen from the student's own side (plan §3.5):
+ * The card's sub-line, seen from the student's own side:
  *   IU:     "IU Indianapolis · one community with Purdue Indianapolis (formerly IUPUI)"
  *   Purdue: "Purdue Indianapolis · one community with IU Indianapolis (formerly IUPUI)"
  * A single-system campus just says its full name ("IU Bloomington").
  */
 function campusPickerSub(c, system) {
-  if (!c || !SYSTEM_LABEL[system] || c.systems.indexOf(system) < 0) return '';
+  if (!c || !SYSTEM_LABEL[system] || !c.systems.includes(system)) return c ? c.name : "";
   if (c.systems.length < 2) return c.name;
   const others = c.systems
-    .filter(function (s) { return s !== system; })
-    .map(function (s) { return SYSTEM_LABEL[s] + ' ' + c.shortName; });
+    .filter((s) => s !== system)
+    .map((s) => SYSTEM_LABEL[s] + " " + c.shortName);
   const formerly = CAMPUS_FORMERLY[c.id];
-  return SYSTEM_LABEL[system] + ' ' + c.shortName + ' · one community with ' + others.join(' and ')
-    + (formerly ? ' (formerly ' + formerly + ')' : '');
+  return SYSTEM_LABEL[system] + " " + c.shortName + " · one community with " + others.join(" and ")
+    + (formerly ? " (formerly " + formerly + ")" : "");
 }
 
-// ── The campus picker ────────────────────────────────────────────────────
-// `system` is the university the school email proved; with one, the picker
-// offers exactly that university's campuses and Finish saves the campus id
-// through /api/me/onboarding-step. Without one (no boot payload, or a row
-// with no `school_system` yet) the page keeps today's IU list and today's
-// legacy `school` label — see `campusPicker.legacy`.
-const campusPicker = {
-  system: ONB_BOOT.system === 'iu' || ONB_BOOT.system === 'purdue' ? ONB_BOOT.system : null,
-  options: [],
-  /** The visible @pfw.edu / @pnw.edu preselect the student still confirms. */
-  preselectId: null,
-  legacy: true,
-};
+// ── draft.ts: the storage contract shared with the phone ─────────────────
+//   key    `vibe_onb_draft_v1:<userId>`
+//   value  JSON `{ v: 1, step, maxStep, fields, at }` (`at` = epoch ms)
+//   TTL    14 days from `at`; an expired or unreadable draft is removed
+//   fields the ten DRAFT_FIELD_KEYS; interests / skills are the RAW text
 
-// ── IU campuses (self-declared, never verified) ─────────────────────────
-// The pre-campus-model list, kept for the legacy path only. Mirrors the
-// deprecated IU_CAMPUSES in src/lib/iu/campuses.ts; we store the canonical
-// LABEL in users.school, not the id.
-const IU_CAMPUSES = [
-  { id: "indianapolis", label: "IU Indianapolis", city: "Indianapolis" },
-  { id: "bloomington", label: "IU Bloomington", city: "Bloomington" },
-  { id: "east", label: "IU East", city: "Richmond" },
-  { id: "fort-wayne", label: "IU Fort Wayne", city: "Fort Wayne" },
-  { id: "kokomo", label: "IU Kokomo", city: "Kokomo" },
-  { id: "northwest", label: "IU Northwest", city: "Gary" },
-  { id: "south-bend", label: "IU South Bend", city: "South Bend" },
-  { id: "southeast", label: "IU Southeast", city: "New Albany" },
-  { id: "online", label: "IU Online", city: "Online" },
-];
-const DEFAULT_CAMPUS_ID = "indianapolis";
+const DRAFT_KEY_PREFIX = "vibe_onb_draft_v1:";
+const DRAFT_VERSION = 1;
+const DRAFT_TTL_MS = 14 * 24 * 60 * 60 * 1000;
+const DRAFT_SAVE_DELAY_MS = 300;
+const DRAFT_TOTAL_STEPS = 6;
+const DRAFT_FUTURE_SKEW_MS = 24 * 60 * 60 * 1000;
+const DRAFT_MAX_FIELDS = 64;
+const DRAFT_MAX_STRING = 8000;
+const DRAFT_MAX_LIST = 100;
+const DRAFT_UNSAFE_KEYS = Object.freeze(["__proto__", "constructor", "prototype"]);
+const DRAFT_FIELD_KEYS = Object.freeze([
+  "campus_id",
+  "name",
+  "handle",
+  "bio",
+  "major",
+  "department",
+  "year",
+  "interests",
+  "skills",
+  "looking_for",
+]);
+const DRAFT_YEARS = Object.freeze(["", "1", "2", "3", "4", "5"]);
 
-function campusPickValue() {
-  const sel = document.getElementById('pfCampus');
-  return sel ? String(sel.value || '').trim() : '';
+/** The storage key for a user's draft, or null for a missing / blank id. */
+function draftKey(userId) {
+  if (typeof userId !== "string") return null;
+  const id = userId.trim();
+  if (!id || id.length > 200) return null;
+  return DRAFT_KEY_PREFIX + id;
 }
 
-function setCampusError(message) {
-  const el = document.getElementById('pfCampusError');
-  const sel = document.getElementById('pfCampus');
-  if (el) { el.textContent = message || ''; el.hidden = !message; }
-  if (sel) {
-    if (message) sel.setAttribute('aria-invalid', 'true');
-    else sel.removeAttribute('aria-invalid');
-  }
+function draftStep(value) {
+  return typeof value === "number" && Number.isInteger(value) && value >= 1 && value <= DRAFT_TOTAL_STEPS
+    ? value
+    : null;
 }
 
-/** The sub-line and the major list follow the pick. */
-function onCampusChange() {
-  const sub = document.getElementById('pfCampusSub');
-  if (sub) {
-    let text = '';
-    if (!campusPicker.legacy) {
-      const row = campusRowById(campusPickValue());
-      text = row ? campusPickerSub(row, campusPicker.system) : '';
-      // Same words as the phone twin. The boot payload carries only the campus
-      // id, never the address, so the page doesn't guess which domain it was.
-      if (text && row && row.id === campusPicker.preselectId) text += ' · from your school email';
+/** JSON-safe values of the allowed shapes, capped; a non-object is null. */
+function sanitizeDraftFields(raw) {
+  if (!raw || typeof raw !== "object" || Array.isArray(raw)) return null;
+  const out = {};
+  let count = 0;
+  for (const [key, value] of Object.entries(raw)) {
+    if (count >= DRAFT_MAX_FIELDS) break;
+    if (DRAFT_UNSAFE_KEYS.includes(key)) continue;
+    if (typeof value === "string") {
+      out[key] = value.slice(0, DRAFT_MAX_STRING);
+    } else if (typeof value === "number") {
+      if (!Number.isFinite(value)) continue;
+      out[key] = value;
+    } else if (typeof value === "boolean" || value === null) {
+      out[key] = value;
+    } else if (Array.isArray(value)) {
+      out[key] = value
+        .filter((item) => typeof item === "string")
+        .slice(0, DRAFT_MAX_LIST)
+        .map((item) => item.slice(0, DRAFT_MAX_STRING));
+    } else {
+      continue;
     }
-    sub.textContent = text;
-    sub.hidden = !text;
+    count++;
   }
-  setCampusError('');
-  refreshMajorList();
+  return out;
 }
 
-(function populateCampuses() {
-  const sel = document.getElementById('pfCampus');
-  if (!sel) return;
-
-  campusPicker.options = campusesForSystem(campusPicker.system);
-  // No verified system (and the impossible empty allowed set): today's page,
-  // unchanged — the IU list, Indianapolis preselected, saved as a label.
-  if (!campusPicker.options.length) {
-    const legacyFrag = document.createDocumentFragment();
-    IU_CAMPUSES.forEach(function (c) {
-      const opt = document.createElement('option');
-      opt.value = c.label;
-      opt.textContent = c.city && c.city !== c.label.replace(/^IU /, '')
-        ? c.label + ' — ' + c.city
-        : c.label;
-      if (c.id === DEFAULT_CAMPUS_ID) opt.selected = true;
-      legacyFrag.appendChild(opt);
-    });
-    sel.appendChild(legacyFrag);
-    return;
+/** loadDraft's rules on a raw stored value: the record, or null (the caller removes it). */
+function readDraftRecord(raw, now) {
+  if (raw === null || raw === undefined) return null;
+  let parsed;
+  try {
+    parsed = JSON.parse(raw);
+  } catch (e) {
+    return null;
   }
-  campusPicker.legacy = false;
+  if (!parsed || typeof parsed !== "object" || Array.isArray(parsed)) return null;
+  if (parsed.v !== DRAFT_VERSION) return null;
+  const at = parsed.at;
+  if (typeof at !== "number" || !Number.isFinite(at)) return null;
+  if (now - at >= DRAFT_TTL_MS || at - now > DRAFT_FUTURE_SKEW_MS) return null;
+  const step = draftStep(parsed.step);
+  if (step === null) return null;
+  const fields = sanitizeDraftFields(parsed.fields);
+  if (fields === null) return null;
+  return { v: DRAFT_VERSION, step, maxStep: Math.max(step, draftStep(parsed.maxStep) ?? step), fields, at };
+}
 
-  const preselect = typeof ONB_BOOT.singleCampusId === 'string' ? ONB_BOOT.singleCampusId : '';
-  const allowed = function (id) {
-    return !!id && campusPicker.options.some(function (c) { return c.id === id; });
+/** saveDraft's record for `{ step, maxStep, fields }` at `now`, or null when it can't be saved. */
+function buildDraftRecord(draft, now) {
+  if (!draft || typeof draft !== "object") return null;
+  const step = draftStep(draft.step);
+  if (step === null) return null;
+  const fields = sanitizeDraftFields(draft.fields);
+  if (fields === null) return null;
+  return { v: DRAFT_VERSION, step, maxStep: Math.max(step, draftStep(draft.maxStep) ?? step), fields, at: now };
+}
+
+/** The step to open on: the draft's, else photo / profile / hello by what's saved. */
+function onboardingStartStep(draft, saved) {
+  if (draft) return Math.min(draft.step, draft.maxStep);
+  const campusSaved = Boolean(saved.campusId) && saved.campusConfirmed === true;
+  if (campusSaved && saved.hasRealHandle) return 4;
+  if (campusSaved) return 3;
+  return 1;
+}
+
+/** The draft's typed fields: text keys as strings, a valid year, a deduplicated looking_for. */
+function typedDraftFields(fields) {
+  const out = {};
+  if (!fields || typeof fields !== "object" || Array.isArray(fields)) return out;
+  for (const key of DRAFT_FIELD_KEYS) {
+    if (!Object.prototype.hasOwnProperty.call(fields, key)) continue;
+    const value = fields[key];
+    if (key === "looking_for") {
+      if (Array.isArray(value)) {
+        const seen = [];
+        for (const item of value) if (typeof item === "string" && !seen.includes(item)) seen.push(item);
+        out.looking_for = seen;
+      }
+    } else if (key === "year") {
+      if (typeof value === "string" && DRAFT_YEARS.includes(value)) out.year = value;
+    } else if (typeof value === "string") {
+      out[key] = value;
+    }
+  }
+  return out;
+}
+
+/** onboardingStartStep, pulled back to campus (2) while none is saved and to profile (3) while no handle is. */
+function onboardingResumeStep(draft, saved) {
+  let s = onboardingStartStep(draft, saved);
+  const campusSaved = !!saved.campusId && saved.campusConfirmed === true;
+  if (saved.systemKnown !== false && s > 2 && !campusSaved) s = 2;
+  if (s > 3 && !saved.hasRealHandle) s = 3;
+  return s;
+}
+
+// ── StepProfile.tsx / OnboardingMobile.tsx: the profile step's pure half ──
+
+/** 3–20 lowercase letters, numbers or _ (the server's HANDLE_FORMAT_RE). */
+const HANDLE_RE = /^[a-z0-9_]{3,20}$/;
+const LOOKING_FOR_VALUES = Object.freeze(["meeting-people", "showing-work", "finding-clubs", "exploring"]);
+const PROFILE_FIELD_KEYS = Object.freeze([
+  "name", "handle", "bio", "major", "department", "year", "interests", "skills", "looking_for",
+]);
+
+/** A select value narrowed to a year the draft and the server accept ("" when not one). */
+function asOnboardingYear(value) {
+  return DRAFT_YEARS.includes(value) ? value : "";
+}
+
+function splitLinesToArray(raw, maxItems, maxLen) {
+  const parts = String(raw || "")
+    .split(/\n|,/)
+    .map((s) => s.trim().slice(0, maxLen))
+    .filter(Boolean);
+  if (!parts.length) return undefined;
+  return parts.slice(0, maxItems);
+}
+
+/** POST /api/me/onboarding-step {step:"profile"}: every key, always (an empty value clears it). */
+function profileStepBody(f) {
+  return {
+    name: f.name.trim(),
+    handle: f.handle,
+    bio: f.bio,
+    major: f.major,
+    department: f.department,
+    year: f.year === "" ? null : Number(f.year),
+    interests: splitLinesToArray(f.interests, 10, 40) ?? [],
+    skills: splitLinesToArray(f.skills, 12, 30) ?? [],
+    looking_for: f.looking_for,
   };
-  campusPicker.preselectId = allowed(preselect) ? preselect : null;
-  // A campus they already CHOSE paints as chosen; a backfilled or
-  // label-derived one (campusConfirmed false) still gets asked.
-  const chosen = ONB_PREFILL.campusConfirmed === true && typeof ONB_PREFILL.campusId === 'string'
-    && allowed(ONB_PREFILL.campusId) ? ONB_PREFILL.campusId : '';
+}
 
-  const frag = document.createDocumentFragment();
-  const blank = document.createElement('option');
-  blank.value = '';
-  blank.textContent = 'Pick your campus';
-  frag.appendChild(blank);
-  campusPicker.options.forEach(function (c) {
-    const opt = document.createElement('option');
-    opt.value = c.id;
-    // Closed campuses stay selectable (plan §2.3); say so, like the phone's pill.
-    opt.textContent = c.isOpen ? c.shortName : c.shortName + ' — not open yet';
-    frag.appendChild(opt);
-  });
-  sel.appendChild(frag);
-  // Nothing is preselected except the campus their own address names — which
-  // they still confirm — and a campus they already chose (plan §3.4 step 2).
-  sel.value = chosen || campusPicker.preselectId || '';
+/** The step-3 client checks, in order: a name, a handle, a well-formed handle. */
+function identityProblem(f) {
+  const e = ONB_COPY.profile.errors;
+  if (!f.name.trim()) return { field: "name", message: e.nameRequired };
+  if (!f.handle) return { field: "handle", message: e.handleRequired };
+  if (!HANDLE_RE.test(f.handle)) return { field: "handle", message: e.handleInvalid };
+  return null;
+}
 
-  const note = document.getElementById('pfCampusNote');
-  // The university is verified now; only the campus is self-declared.
-  if (note) note.textContent = '';
-  const hint = document.getElementById('pfCampusHint');
-  if (hint) {
-    const label = SYSTEM_LABEL[campusPicker.system];
-    hint.textContent = 'Your school email shows you’re at ' + label
-      + '. You can move to another ' + label + ' campus later in Settings.';
+/** Which step-3 field a refusal belongs to, by code (the static twin carries no `field`). */
+function profileFieldForCode(code) {
+  if (code === "name_required") return "name";
+  if (
+    code === "handle_required" ||
+    code === "handle_invalid" ||
+    code === "handle_reserved" ||
+    code === "handle_taken" ||
+    code === "handle_cooldown"
+  ) {
+    return "handle";
   }
-  onCampusChange();
-})();
+  return null;
+}
 
-// ── IU Bloomington major list (curated; users can also type freely) ──────
-const IU_MAJORS = [
-  "Undecided / Exploratory",
-  "Accounting",
-  "Adaptive Sport","African American and African Diaspora Studies","African Studies","American Studies","Animal Behavior","Anthropology","Apparel Merchandising","Applied Sciences",
-  "Arabic","Architectural Studies","Art History","Asian American Studies","Astronomy and Astrophysics","Audio Engineering and Sound Production","Ballet",
-  "Biochemistry","Biology","Biophysics","Biotechnology","Business Analytics","Business Management","Business Marketing","Business of Music",
-  "Central Eurasian Studies","Chemistry","Chinese","Cinema and Media Arts","Classical Civilization","Cognitive Science","Communication and Public Advocacy","Communication Sciences and Disorders",
-  "Comparative Literature","Composition (Music)","Computer Engineering","Computer Science","Contemporary Dance","Criminal Justice","Cybersecurity and Global Policy",
-  "Data Science","Direct Admit Kelley","East Asian Languages and Cultures","Earth and Atmospheric Sciences","Economic Consulting","Economics","Education (Elementary)","Education (Secondary)","Education (Special)",
-  "English","Entrepreneurship and Corporate Innovation","Environmental and Sustainability Studies","Environmental Science","Epidemiology","Exercise Science","Fashion Design","Finance",
-  "Folklore and Ethnomusicology","French","Game Design","Gender Studies","Geography","Geological Sciences","Germanic Studies","Graphic Design",
-  "Health and Wellness Design","Hebrew","Hispanic Linguistics","Historic Preservation","History","History of Art","Human Biology","Human-Centered Computing","Human Development and Family Studies",
-  "Individualized Major","Informatics","Information Systems","Intelligent Systems Engineering","International Business","International Law and Institutions","International Studies","Italian",
-  "Japanese","Jazz Studies","Jewish Studies","Journalism","Kelley Honors","Kinesiology","Korean","Labor Studies","Latin","Latin American and Caribbean Studies","Latino Studies","Law and Public Policy","Linguistics",
-  "Liberal Studies","Management","Marketing","Mathematics","Media (Advertising)","Media (Game Design)","Media (Production)","Media (Sports Reporting)",
-  "Medieval Studies","Microbiology","Middle Eastern Languages and Cultures","Music (BM)","Music Composition","Music Education","Music Performance","Music Theory","Musical Theatre",
-  "Neuroscience","Nonprofit Management","Nursing (BSN)","Nutrition and Dietetics","Operations Management","Painting","Philosophy","Photography","Physics","Piano","Political Science","Polish Studies",
-  "Portuguese","Pre-Dentistry","Pre-Law","Pre-Medicine","Pre-Optometry","Pre-Pharmacy","Pre-Physical Therapy","Pre-Veterinary","Professional Sales","Psychology","Public Affairs","Public Financial Management","Public Health (BSPH)","Public Policy Analysis",
-  "Real Estate","Recreational Sport Management","Religious Studies","Russian and Eastern European Studies","Russian Language","Sculpture","Slavic Languages and Literatures","Social Studies Education","Social Work","Sociology",
-  "Spanish","Speech and Hearing Sciences","Sport Marketing and Management","Statistics","Studio Art","Supply Chain Management","Sustainable Business",
-  "Telecommunications","Theatre and Drama","Therapeutic Recreation","Tourism, Hospitality and Event Management","Urban Planning and Community Development","Voice (Music)","Women's Studies","Youth Development"
-];
-/** Refill a <datalist> from a list of strings. */
-function fillDatalist(id, values) {
-  const dl = document.getElementById(id);
-  if (!dl) return;
-  const frag = document.createDocumentFragment();
-  values.forEach(function (v) {
-    const opt = document.createElement('option');
-    opt.value = v;
-    frag.appendChild(opt);
-  });
-  dl.innerHTML = '';
-  dl.appendChild(frag);
+/** Profile fields from the server prefill alone: the base layer of the restore. */
+function prefillFields(prefill) {
+  const p = prefill || {};
+  const list = (v) => (Array.isArray(v) ? v.filter((x) => typeof x === "string") : []);
+  return {
+    name: typeof p.name === "string" ? p.name : "",
+    handle: p.hasRealHandle && typeof p.handle === "string" ? p.handle : "",
+    bio: typeof p.bio === "string" ? p.bio : "",
+    major: typeof p.major === "string" ? p.major : "",
+    department: typeof p.department === "string" ? p.department : "",
+    year: typeof p.year === "number" && p.year ? asOnboardingYear(String(Math.min(5, p.year))) : "",
+    interests: list(p.interests).join(", "),
+    skills: list(p.skills).join(", "),
+    looking_for: list(p.looking_for).filter((v) => LOOKING_FOR_VALUES.includes(v)),
+  };
+}
+
+function sameProfileValue(a, b) {
+  if (Array.isArray(a) || Array.isArray(b)) {
+    return Array.isArray(a) && Array.isArray(b) && a.length === b.length && a.every((v, i) => v === b[i]);
+  }
+  return a === b;
 }
 
 /**
- * The major and department lists follow the campus and the system (plan §3.4
- * step 3): window.vibeMajorsForCampus (from _iu-majors.js, generated from
- * src/lib/iu/majors.ts) serves the IU Indianapolis, Purdue Indianapolis and
- * IU Bloomington lists and answers null everywhere else — which is free text,
- * not an error. Both fields accept anything typed either way.
+ * The restore (OnboardingMobile.tsx computeBoot): the prefill is the base,
+ * the draft overrides typed fields, the server wins for a claimed handle and
+ * a confirmed campus. Nothing preselects a campus except the student's own
+ * draft pick (while none is confirmed), a confirmed campus, or the visible
+ * single-campus preselect from the email (ac014a3).
  */
-function refreshMajorList() {
-  // No verified system: today's lists and today's hints stand.
-  if (campusPicker.legacy) return;
-  const list = typeof window.vibeMajorsForCampus === 'function'
-    ? window.vibeMajorsForCampus(campusPickValue(), campusPicker.system)
-    : null;
-  const majors = list && Array.isArray(list.majors) ? list.majors : [];
-  const schools = list && Array.isArray(list.schools) ? list.schools : [];
-  fillDatalist('iuMajors', majors);
-  fillDatalist('iuSchools', schools);
-  const note = document.getElementById('pfMajorNote');
-  if (note) {
-    note.textContent = majors.length && list.label
-      ? '— from the ' + list.label + ' list, or type your own'
-      : '— type your own';
+function restoreOnboarding(input) {
+  const replay = input.replay === true;
+  const system = isSchoolSystem(input.system) ? input.system : null;
+  const p = input.prefill || {};
+  const draft = replay ? null : input.draft || null;
+  const d = typedDraftFields(draft ? draft.fields : null);
+  const base = prefillFields(p);
+
+  const fields = {
+    name: d.name ?? base.name,
+    handle: p.hasRealHandle ? base.handle : (d.handle ?? ""),
+    bio: d.bio ?? base.bio,
+    major: d.major ?? base.major,
+    department: d.department ?? base.department,
+    year: d.year ?? base.year,
+    interests: d.interests ?? base.interests,
+    skills: d.skills ?? base.skills,
+    looking_for: (d.looking_for ?? base.looking_for).filter((v) => LOOKING_FOR_VALUES.includes(v)),
+  };
+
+  let campusId = "";
+  const draftPick = p.campusConfirmed ? null : allowedCampusId(d.campus_id, system);
+  if (draftPick) campusId = draftPick;
+  else if (system) {
+    campusId =
+      (p.campusConfirmed ? allowedCampusId(p.campusId, system) : null) ??
+      allowedCampusId(input.singleCampusId, system) ??
+      "";
   }
-  const deptNote = document.getElementById('pfDepartmentNote');
-  if (deptNote) deptNote.textContent = '— optional';
-  // The legacy placeholders name IU examples (Informatics, Luddy); a Purdue or
-  // free-text campus gets neutral ones instead.
-  const majorInput = document.getElementById('pfMajor');
-  if (majorInput) majorInput.placeholder = majors.length ? 'Start typing to pick from the list' : 'Your major';
-  const deptInput = document.getElementById('pfDepartment');
-  if (deptInput) deptInput.placeholder = schools.length ? 'Start typing to pick your school' : 'Your school or department';
+
+  const saved = {
+    campusId: p.campusId,
+    campusConfirmed: p.campusConfirmed,
+    hasRealHandle: p.hasRealHandle,
+    systemKnown: !!system,
+  };
+  const step = replay ? 1 : onboardingResumeStep(draft, saved);
+  const start = replay ? 1 : onboardingStartStep(draft, saved);
+  // Pulled back past an unsaved step: nothing above it is reachable yet.
+  const maxStep = step < start ? step : Math.max(step, (draft ? draft.maxStep : null) ?? step);
+
+  return {
+    system,
+    fields,
+    campusId,
+    savedCampusId: p.campusConfirmed ? allowedCampusId(p.campusId, system) : null,
+    identitySaved: !!p.hasRealHandle && !!p.name,
+    profileDirty: PROFILE_FIELD_KEYS.some((k) => !sameProfileValue(fields[k], base[k])),
+    step,
+    maxStep,
+  };
 }
 
-(function populateIuMajors() {
-  // The campus-aware list drives the field once the system is known.
-  if (!campusPicker.legacy) return;
-  fillDatalist('iuMajors', IU_MAJORS);
-})();
+// ── avatar-upload.ts: the local check before any request ─────────────────
+const AVATAR_CONTENT_TYPES = Object.freeze(["image/jpeg", "image/png", "image/webp"]);
+const AVATAR_CLIENT_MAX_BYTES = 4 * 1024 * 1024;
+const AVATAR_EXT_FOR_TYPE = Object.freeze({ "image/jpeg": "jpg", "image/png": "png", "image/webp": "webp" });
 
-// ── IU Bloomington schools/colleges + flagship departments ──────────────
-const IU_SCHOOLS = [
-  // Schools and colleges first — most students identify with these.
-  "College of Arts and Sciences",
-  "Eskenazi School of Art, Architecture + Design",
-  "Hamilton Lugar School of Global and International Studies",
-  "Hutton Honors College",
-  "Jacobs School of Music",
-  "Kelley School of Business",
-  "Luddy School of Informatics, Computing, and Engineering",
-  "Maurer School of Law",
-  "O'Neill School of Public and Environmental Affairs",
-  "School of Education",
-  "School of Nursing",
-  "School of Optometry",
-  "School of Public Health",
-  "School of Social Work",
-  "The Media School",
-  "University Graduate School",
-  // Common departments (mostly under the College of Arts and Sciences).
-  "Department of African American and African Diaspora Studies",
-  "Department of American Studies",
-  "Department of Anthropology",
-  "Department of Astronomy",
-  "Department of Biology",
-  "Department of Central Eurasian Studies",
-  "Department of Chemistry",
-  "Department of Classical Studies",
-  "Department of Cognitive Science",
-  "Department of Communication Sciences and Disorders",
-  "Department of Comparative Literature",
-  "Department of Computer Science",
-  "Department of Criminal Justice",
-  "Department of Earth and Atmospheric Sciences",
-  "Department of East Asian Languages and Cultures",
-  "Department of Economics",
-  "Department of English",
-  "Department of Folklore and Ethnomusicology",
-  "Department of French and Italian",
-  "Department of Gender Studies",
-  "Department of Geography",
-  "Department of Germanic Studies",
-  "Department of History",
-  "Department of History and Philosophy of Science and Medicine",
-  "Department of History of Art",
-  "Department of International Studies",
-  "Department of Kinesiology",
-  "Department of Linguistics",
-  "Department of Mathematics",
-  "Department of Middle Eastern Languages and Cultures",
-  "Department of Near Eastern Languages and Cultures",
-  "Department of Philosophy",
-  "Department of Physics",
-  "Department of Political Science",
-  "Department of Psychological and Brain Sciences",
-  "Department of Religious Studies",
-  "Department of Second Language Studies",
-  "Department of Slavic and East European Languages and Cultures",
-  "Department of Sociology",
-  "Department of Spanish and Portuguese",
-  "Department of Speech, Language and Hearing Sciences",
-  "Department of Statistics",
-  "Department of Theatre, Drama, and Contemporary Dance"
-];
-(function populateIuSchools() {
-  // The campus-aware list drives the field once the system is known.
-  if (!campusPicker.legacy) return;
-  fillDatalist('iuSchools', IU_SCHOOLS);
-})();
+/** `image/JPG; charset=x` → `image/jpeg`; an untyped blob is taken as JPEG. */
+function normalizeAvatarContentType(type) {
+  const t = typeof type === "string" ? type.split(";")[0].trim().toLowerCase() : "";
+  if (t === "" || t === "image/jpg") return "image/jpeg";
+  return t;
+}
+
+/** A readable size, an allowed type, under the cap. */
+function preflightAvatarBlob(blob) {
+  const size = blob ? blob.size : undefined;
+  if (typeof size !== "number" || !Number.isFinite(size) || size <= 0) {
+    return { ok: false, message: PHOTO_ERROR_COPY.processFailed };
+  }
+  const contentType = normalizeAvatarContentType(blob ? blob.type : undefined);
+  if (!AVATAR_CONTENT_TYPES.includes(contentType)) {
+    return { ok: false, message: PHOTO_ERROR_COPY.wrongType };
+  }
+  if (size > AVATAR_CLIENT_MAX_BYTES) {
+    return { ok: false, message: PHOTO_ERROR_COPY.tooBig };
+  }
+  return { ok: true, contentType };
+}
+
+// ── Small safety helpers ──────────────────────────────────────────────────
+
+/** login-next.ts: a same-origin relative path only (the open-redirect gate). */
+function isSafeRelativePath(next) {
+  if (typeof next !== "string" || next.length === 0) return false;
+  if (next[0] !== "/") return false;
+  if (next[1] === "/" || next[1] === "\\") return false;
+  if (next.includes("\\")) return false;
+  if (/[\s\x00-\x1f\x7f]/.test(next)) return false;
+  try {
+    return new URL(next, "https://x.invalid").origin === "https://x.invalid";
+  } catch (e) {
+    return false;
+  }
+}
+
+/** An image source this page may set: https://…, or a same-origin /path (never //host or /\host). */
+function safeImgSrc(v) {
+  if (typeof v !== "string") return null;
+  if (v.startsWith("https://")) return v;
+  if (v.startsWith("/") && !v.startsWith("//") && !v.startsWith("/\\")) return v;
+  return null;
+}
+
+/** "Franky" from "Franky Cazares"; null when there's no name to show. */
+function firstName(full) {
+  const trimmed = typeof full === "string" ? full.trim() : "";
+  return trimmed ? trimmed.split(/\s+/)[0] || null : null;
+}
+/* ONB-PURE-MIRROR:END */
+
+// ── Page state ────────────────────────────────────────────────────────────
+const ONB_USER_ID = draftKey(ONB_BOOT.userId) ? ONB_BOOT.userId : null;
+
+/** The stored draft, or null; an unreadable or expired one is removed. Never in replay. */
+function loadStoredDraft() {
+  if (IS_REPLAY || !ONB_USER_ID) return null;
+  const key = draftKey(ONB_USER_ID);
+  let raw = null;
+  try {
+    raw = localStorage.getItem(key);
+  } catch (e) {
+    return null;
+  }
+  if (raw === null) return null;
+  const record = readDraftRecord(raw, Date.now());
+  if (!record) {
+    try { localStorage.removeItem(key); } catch (e) { /* storage blocked */ }
+  }
+  return record;
+}
+
+const ONB_RESTORE = restoreOnboarding({
+  replay: IS_REPLAY,
+  draft: loadStoredDraft(),
+  system: ONB_BOOT.system,
+  prefill: ONB_PREFILL,
+  singleCampusId: ONB_BOOT.singleCampusId,
+});
+
+const onb = {
+  /** The verified university; the Purdue switch can change it. */
+  system: ONB_RESTORE.system,
+  campusId: ONB_RESTORE.campusId,
+  /** The campus the server has CONFIRMED (`campus_set_at` stamped), else null. */
+  savedCampusId: ONB_RESTORE.savedCampusId,
+  /** A real name and a claimed handle are on the row. */
+  identitySaved: ONB_RESTORE.identitySaved,
+  /** Some profile value on screen isn't saved yet. */
+  profileDirty: ONB_RESTORE.profileDirty,
+  lookingFor: ONB_RESTORE.fields.looking_for.slice(),
+  handleStatus: null,
+  avatarUrl: safeImgSrc(ONB_PREFILL.avatarUrl),
+  /** Replay's local crop preview, revoked when replaced and on pagehide. */
+  blobUrl: null,
+  step: ONB_RESTORE.step,
+  maxStep: ONB_RESTORE.maxStep,
+  savingCampus: false,
+  savingProfile: false,
+  switching: false,
+  uploading: false,
+  finishing: false,
+  skipping: false,
+  /** Set on Finish / Skip success: nothing may write the draft back after it's cleared. */
+  done: false,
+  skipOpen: false,
+  skipBase: 'identity',
+  forceIdentity: false,
+  /** A Forward undone past unsaved changes: run this step's Continue once the undo lands. */
+  continueOnLand: null,
+  purdue: { open: false, sent: false, sending: false, verifying: false },
+  clubs: freshClubs(),
+  people: freshPeople(),
+};
+
+function freshClubs() {
+  return { status: 'idle', rows: [], failure: null, local: {}, audience: {}, disabled: {}, busy: {} };
+}
+function freshPeople() {
+  return { status: 'idle', list: [], failure: null, followed: {}, busy: {}, removed: {} };
+}
+
+function $(id) { return document.getElementById(id); }
+
+function isBusy() {
+  return onb.savingCampus || onb.savingProfile || onb.switching || onb.uploading || onb.finishing || onb.skipping;
+}
+
+/** The single-campus preselect from the email, when it's one of this university's campuses. */
+function preselectId() {
+  return allowedCampusId(ONB_BOOT.singleCampusId, onb.system);
+}
+
+/** The campus the social steps talk about: the saved one, else a valid pick. */
+function campusForSteps() {
+  return onb.savedCampusId ?? (campusAllowed(onb.campusId, onb.system) ? onb.campusId : null);
+}
+function campusShortName() {
+  const row = campusRowById(campusForSteps());
+  return row ? row.shortName : null;
+}
+
+// ── Copy ──────────────────────────────────────────────────────────────────
+function copyAt(root, path) {
+  return String(path || '').split('.').reduce((o, k) => (o && typeof o === 'object' ? o[k] : undefined), root);
+}
+
+/** Every static string on the page, from the copy tables (textContent only). */
+function applyCopy() {
+  document.querySelectorAll('[data-copy]').forEach((el) => {
+    const t = copyAt(ONB_COPY, el.getAttribute('data-copy'));
+    if (typeof t === 'string') el.textContent = t;
+  });
+  document.querySelectorAll('[data-local]').forEach((el) => {
+    const t = copyAt(ONB_LOCAL_COPY, el.getAttribute('data-local'));
+    if (typeof t === 'string') el.textContent = t;
+  });
+  document.querySelectorAll('[data-placeholder]').forEach((el) => {
+    const t = copyAt(ONB_LOCAL_COPY, el.getAttribute('data-placeholder'));
+    if (typeof t === 'string') el.placeholder = t;
+  });
+  $('onbBack').setAttribute('aria-label', ONB_COPY.header.back);
+  $('onbPurdueEmail').placeholder = ONB_COPY.campus.switchPlaceholder;
+  $('onbClubsSearch').placeholder = ONB_COPY.clubs.search;
+  $('onbClubsSearch').setAttribute('aria-label', ONB_COPY.clubs.search);
+
+  const year = $('pfYear');
+  ONB_LOCAL_COPY.yearOptions.forEach((o) => {
+    const opt = document.createElement('option');
+    opt.value = o.value;
+    opt.textContent = o.label;
+    year.appendChild(opt);
+  });
+  const looking = $('pfLookingWrap');
+  ONB_LOCAL_COPY.lookingFor.forEach((o) => {
+    const row = document.createElement('label');
+    row.className = 'pf-looking-row';
+    const box = document.createElement('input');
+    box.type = 'checkbox';
+    box.className = 'pf-looking';
+    box.value = o.value;
+    const text = document.createElement('span');
+    text.textContent = o.label;
+    row.appendChild(box);
+    row.appendChild(text);
+    looking.appendChild(row);
+  });
+}
 
 // ── Cursor (matches the rest of vibe) ─────────────────────────────────────
 // Dot written straight from mousemove; ring on a time-based curve (90% of a
@@ -941,311 +2112,260 @@ function animateRing(t) {
 }
 ring.style.transform = `translate3d(${rx-14}px, ${ry-14}px, 0)`;
 document.addEventListener('mousemove', e => { mx = e.clientX; my = e.clientY; cur.style.transform = `translate3d(${mx-4}px, ${my-4}px, 0)`; if (!ringRaf) ringRaf = requestAnimationFrame(animateRing); });
+let cursorHoverEl = null;
 function bindCursorHover() {
-  document.querySelectorAll('button, a, input, select, textarea, .suggest-chip, .pf-looking-row').forEach(el => {
+  document.querySelectorAll('button, a, input, select, textarea, .pf-looking-row, .campus-card').forEach(el => {
     if (el.dataset.cursorBound) return;
     el.dataset.cursorBound = '1';
-    el.addEventListener('mouseenter', () => { cur.classList.add('hover'); ring.classList.add('hover'); });
-    el.addEventListener('mouseleave', () => { cur.classList.remove('hover'); ring.classList.remove('hover'); });
+    el.addEventListener('mouseenter', () => { cursorHoverEl = el; cur.classList.add('hover'); ring.classList.add('hover'); });
+    el.addEventListener('mouseleave', () => { if (cursorHoverEl === el) cursorHoverEl = null; cur.classList.remove('hover'); ring.classList.remove('hover'); });
   });
+  // A re-render can remove the element under the pointer, which never gets
+  // its mouseleave: drop the hover look (the next element entered sets it again).
+  if (cursorHoverEl && !cursorHoverEl.isConnected) {
+    cursorHoverEl = null;
+    cur.classList.remove('hover');
+    ring.classList.remove('hover');
+  }
 }
-bindCursorHover();
 
-// ── Step navigation ───────────────────────────────────────────────────────
-function goToStep(n) {
-  if (n < 1 || n > TOTAL_STEPS) return;
 
-  state.step = n;
+// ── Steps, history and busy ───────────────────────────────────────────────
+// Every pushState / replaceState keeps the entry's own state and adds
+// `onbStep`, with NO url: the iframe's URL never changes. The onboarding
+// entries are always steps 1, 2, 3, … in order, so an entry's `onbStep` is
+// also its depth, and the distance between two steps is their difference.
+// Moves that must not happen are undone with history.go back to where the
+// student was, never by rewriting the entry they landed on.
 
-  document.querySelectorAll('.onb-step').forEach(el => {
-    el.classList.toggle('active', Number(el.dataset.step) === n);
-  });
-
-  const curStep = document.querySelector('.onb-step.active');
-  if (curStep) { curStep.style.animation = 'none'; curStep.offsetHeight; curStep.style.animation = ''; }
-
-  updateProgress();
-  bindCursorHover();
-  window.scrollTo({ top: 0, behavior: 'smooth' });
-
-  document.getElementById('onbSkip').disabled = false;
-
-  if (n === 2) setTimeout(() => { const i = document.getElementById('pfName'); if (i) i.focus(); }, 250);
-  if (n === 3) setTimeout(() => { const i = document.querySelector('.wx-list .wx-row .wx-company'); if (i) i.focus(); }, 250);
-  if (n === 4) setTimeout(() => { const i = document.getElementById('pfResumeUrl'); if (i) i.focus(); }, 250);
+function stepState(n) {
+  return Object.assign({}, history.state, { onbStep: n });
 }
+function pushStep(n) { history.pushState(stepState(n), ''); }
+function replaceStep(n) { history.replaceState(stepState(n), ''); }
 
 function updateProgress() {
-  const dots = document.querySelectorAll('#progressDots .dot');
-  dots.forEach((d, i) => {
+  document.querySelectorAll('#progressDots .dot').forEach((d, i) => {
     d.classList.remove('done', 'now');
-    if (i + 1 < state.step) d.classList.add('done');
-    else if (i + 1 === state.step) d.classList.add('now');
+    if (i + 1 < onb.step) d.classList.add('done');
+    else if (i + 1 === onb.step) d.classList.add('now');
   });
-  document.getElementById('progressText').textContent = state.step + ' of ' + TOTAL_STEPS;
+  $('progressText').textContent = ONB_COPY.header.progress.replace('{n}', String(onb.step));
 }
 
-// ── Step 2 — Quick profile draft (server: sanitizeOnboardingProfile) ─────
-function collectWorkExperience() {
-  const rows = [];
-  document.querySelectorAll('.wx-list .wx-row').forEach(function (row) {
-    const company = (row.querySelector('.wx-company') || {}).value?.trim() || '';
-    const title = (row.querySelector('.wx-title') || {}).value?.trim() || '';
-    if (!company && !title) return;
-    rows.push({
-      company: company.slice(0, 200),
-      title: title.slice(0, 200),
-      dates: ((row.querySelector('.wx-dates') || {}).value || '').trim().slice(0, 120),
-      location: ((row.querySelector('.wx-location') || {}).value || '').trim().slice(0, 200),
-      description: ((row.querySelector('.wx-desc') || {}).value || '').trim().slice(0, 4000),
-    });
+/** Show step `n`. Never focuses anything: focus on step entry scrolls the header away. */
+function showStep(n) {
+  onb.step = n;
+  document.querySelectorAll('.onb-step').forEach((el) => {
+    el.classList.toggle('active', Number(el.dataset.step) === n);
   });
-  return rows.length ? rows : undefined;
-}
-
-function splitLinesToArray(raw, maxItems, maxLen) {
-  const parts = String(raw || '')
-    .split(/\n|,/)
-    .map(function (s) { return s.trim().slice(0, maxLen); })
-    .filter(Boolean);
-  if (!parts.length) return undefined;
-  return parts.slice(0, maxItems);
-}
-
-// Live availability check for the onboarding handle field. Mirrors the
-// debounce / status pattern used in the profile editor so the user sees
-// the same affordances in both places.
-const _ONB_HANDLE_RE = /^[a-z0-9_]{3,20}$/;
-let _onbHandleSeq = 0;
-let _onbHandleTimer = null;
-function onHandleInput(input) {
-  const s = document.getElementById('pfHandleStatus');
-  if (!s) return;
-  const v = (input.value || '').trim().toLowerCase();
-  input.value = v;
-  // Every keystroke retires the pending check, so an answer for "abc"
-  // can't land after the field already says "too short" for "ab".
-  const seq = ++_onbHandleSeq;
-  clearTimeout(_onbHandleTimer);
-  if (!v) { s.textContent = ''; s.style.color = ''; return; }
-  if (v.length < 3) { s.textContent = 'too short'; s.style.color = '#C54323'; return; }
-  if (!_ONB_HANDLE_RE.test(v)) { s.textContent = 'letters / numbers / _'; s.style.color = '#C54323'; return; }
-  s.textContent = 'checking…'; s.style.color = '#8A8580';
-  _onbHandleTimer = setTimeout(async () => {
-    const r = await window.vibeRequest('/api/handle/check?h=' + encodeURIComponent(v), {
-      failure: "Couldn't check that handle.",
-      quiet: true,
-    });
-    if (seq !== _onbHandleSeq) return;
-    // Signed out, a server error or offline: the check didn't run, so
-    // don't call the handle taken. Finish still has the final say.
-    if (!r.ok) { s.textContent = "couldn't check"; s.style.color = '#8A8580'; return; }
-    if (r.data.available) { s.textContent = '✓ available'; s.style.color = '#1A9E5B'; }
-    else { s.textContent = '✗ ' + (r.data.reason || 'taken').toLowerCase(); s.style.color = '#C54323'; }
-  }, 280);
-}
-
-function collectProfileDraft() {
-  const name = (document.getElementById('pfName') || {}).value?.trim() || '';
-  const campus = campusPickValue();
-  const major = (document.getElementById('pfMajor') || {}).value?.trim() || '';
-  const department = (document.getElementById('pfDepartment') || {}).value?.trim() || '';
-  const yearSel = document.getElementById('pfYear');
-  const yearRaw = yearSel ? String(yearSel.value || '').trim() : '';
-  const bio = (document.getElementById('pfBio') || {}).value?.trim() || '';
-  const interests = splitLinesToArray(
-    (document.getElementById('pfInterests') || {}).value,
-    10,  // max items
-    40,  // max chars per item
-  );
-  const skills = splitLinesToArray(
-    (document.getElementById('pfSkills') || {}).value,
-    12,  // max items
-    30,  // max chars per item
-  );
-  const looking = [...document.querySelectorAll('.pf-looking:checked')].map(
-    (el) => el.value,
-  );
-  const out = {};
-  if (name) out.name = name;
-  // Campus. With a verified system the pick is a campus id, saved through the
-  // campus step (which checks it against that system and writes the label
-  // itself), so it never rides along here as a legacy label the server would
-  // have to guess a university for. Without one, today's behaviour: the
-  // self-declared label, empty meaning "no campus".
-  if (campusPicker.legacy && campus) out.school = campus;
-  if (major) out.major = major;
-  if (department) out.department = department;
-  if (yearRaw) {
-    const y = parseInt(yearRaw, 10);
-    if (Number.isInteger(y) && y >= 1 && y <= 12) out.year = y;
+  const curStep = document.querySelector('.onb-step.active');
+  if (curStep) { curStep.style.animation = 'none'; curStep.offsetHeight; curStep.style.animation = ''; }
+  updateProgress();
+  $('onbBack').style.visibility = n <= 1 ? 'hidden' : 'visible';
+  bindCursorHover();
+  window.scrollTo({ top: 0 });
+  scheduleDraft();
+  if (n === 3) refreshMajorList();
+  if (n === 5 && onb.clubs.status === 'idle') loadClubs();
+  if (n === 6) {
+    renderPeopleOtto();
+    if (onb.people.status === 'idle') loadPeople();
   }
-  if (bio) out.bio = bio;
-  if (interests) out.interests = interests;
-  if (skills) out.skills = skills;
-  if (looking.length) out.looking_for = looking;
-  return out;
 }
 
-async function onResumeFilePick(ev) {
-  const input = ev.target;
-  const f = input.files && input.files[0];
-  const st = document.getElementById('resumeUploadStatus');
-  if (!f) {
-    if (st) st.textContent = '';
-    return;
-  }
-  if (st) st.textContent = 'Uploading…';
-  try {
-    const fd = new FormData();
-    fd.append('file', f);
-    fd.append('kind', 'resume');
-    const r = await fetch('/api/me/profile-upload', {
-      method: 'POST',
-      credentials: 'same-origin',
-      body: fd,
-    });
-    const j = await r.json();
-    if (!r.ok || !j.ok) {
-      if (st) st.textContent = (j && j.error) ? String(j.error) : 'Upload failed';
-      return;
+/** Always the next step, so each step keeps one entry. */
+function goForward(n) {
+  pushStep(n);
+  onb.maxStep = Math.max(onb.maxStep, n);
+  showStep(n);
+}
+
+/** Back to an earlier step from Finish, through history (busy is already cleared). */
+function sendBack(target) {
+  const delta = target - onb.step;
+  if (delta < 0) history.go(delta);
+}
+
+function setBusy(flag, value) {
+  onb[flag] = value;
+  renderBusy();
+}
+
+/** Back, Skip, the logo's leave and every footer button hold still while anything saves. */
+function renderBusy() {
+  const busy = isBusy();
+  $('onbBack').disabled = busy;
+  $('onbSkip').disabled = busy || onb.skipOpen;
+  document.querySelectorAll('.onb-cta').forEach((b) => { b.disabled = busy; });
+  document.querySelectorAll('#onbCampusGroup input').forEach((r) => { r.disabled = busy; });
+  $('onbCampusContinue').textContent = onb.savingCampus ? ONB_COPY.campus.saving : ONB_COPY.campus.continue;
+  $('onbProfileContinue').textContent = onb.savingProfile ? ONB_COPY.profile.saving : ONB_COPY.profile.continue;
+  $('onbFinish').textContent = onb.finishing ? ONB_COPY.people.finishing : ONB_COPY.people.finish;
+  renderPurdue();
+  renderPhoto();
+  renderClubsFooter();
+  renderSkip();
+}
+
+function onPopState(e) {
+  const raw = e.state && e.state.onbStep;
+  const at = typeof raw === 'number' && Number.isInteger(raw) && raw >= 1 ? raw : null;
+  const current = onb.step;
+  const pending = onb.continueOnLand;
+  onb.continueOnLand = null;
+
+  // Not an onboarding entry: Back from step 1, on the way out.
+  if (at === null) {
+    if (!isBusy()) {
+      if (onb.skipOpen) closeSkip();
+      if (current !== 1) showStep(1);
     }
-    state.uploadedResumeUrl = j.url;
-    if (st) st.textContent = 'Uploaded';
-    showResumeMiniPreview(j.url, f.type || '');
-    // The upload now wins over any pasted link at Finish; retell the note.
-    maybePreviewResumeLink();
-  } catch (e) {
-    if (st) st.textContent = 'Network error';
-  }
-  input.value = '';
-}
-
-function showResumeMiniPreview(url, mimeHint) {
-  if (!url) return;
-  const wrap = document.getElementById('resumeMiniViewer');
-  const fr = document.getElementById('resumeMiniFrame');
-  const im = document.getElementById('resumeMiniImg');
-  if (!wrap || !fr || !im) return;
-  wrap.style.display = 'block';
-  var isPdf = mimeHint === 'application/pdf' || /\.pdf(\?|#|$)/i.test(url);
-  if (isPdf) {
-    im.style.display = 'none';
-    im.removeAttribute('src');
-    fr.style.display = 'block';
-    fr.src = url + (url.indexOf('#') >= 0 ? '' : '#view=FitH');
-  } else {
-    fr.style.display = 'none';
-    fr.removeAttribute('src');
-    im.style.display = 'block';
-    im.src = url;
-  }
-}
-
-function hideResumeMiniPreview() {
-  const wrap = document.getElementById('resumeMiniViewer');
-  const fr = document.getElementById('resumeMiniFrame');
-  const im = document.getElementById('resumeMiniImg');
-  if (wrap) wrap.style.display = 'none';
-  if (fr) fr.removeAttribute('src');
-  if (im) im.removeAttribute('src');
-}
-
-// Only http(s) links are stored. The server (normalizeResumeRef) turns
-// anything else into a 400 that fails the whole Finish, so say it here.
-function resumeLinkProblem(raw) {
-  if (!/^https?:\/\//i.test(raw)) return 'Links need to start with https:// so we can save them.';
-  try {
-    new URL(raw);
-  } catch (e) {
-    return 'That link doesn’t look right. Check it and paste it again.';
-  }
-  return '';
-}
-
-// One line under "Or paste a link" saying what Finish will do with it.
-function setResumeLinkNote(text, isError) {
-  const el = document.getElementById('pfResumeLinkNote');
-  if (!el) return;
-  el.textContent = text || '';
-  el.hidden = !text;
-  el.style.color = isError ? 'var(--accent)' : 'rgba(255,255,255,.62)';
-}
-
-function maybePreviewResumeLink() {
-  var raw = ((document.getElementById('pfResumeUrl') || {}).value || '').trim();
-  if (!raw) {
-    setResumeLinkNote('');
-    if (!state.uploadedResumeUrl) hideResumeMiniPreview();
     return;
   }
-  // Finish saves an upload over a link, so say which one wins and leave
-  // the upload's preview up.
-  if (state.uploadedResumeUrl) {
-    setResumeLinkNote('You uploaded a file, so we’ll save that instead of this link.');
-    return;
-  }
-  var problem = resumeLinkProblem(raw);
-  if (problem) {
-    hideResumeMiniPreview();
-    setResumeLinkNote(problem, true);
-    return;
-  }
-  if (/\.pdf(\?|#|$)/i.test(raw)) {
-    setResumeLinkNote('');
-    showResumeMiniPreview(raw, 'application/pdf');
-  } else if (/\.(png|jpe?g|gif|webp)(\?|#|$)/i.test(raw)) {
-    setResumeLinkNote('');
-    showResumeMiniPreview(raw, 'image/jpeg');
-  } else {
-    // Drive, Notion, a portfolio site: Finish still saves it as the
-    // resume link, there's just no file here to draw.
-    hideResumeMiniPreview();
-    setResumeLinkNote('We’ll save this as a link. Previews only work for direct PDF or image links.');
-  }
-}
 
-// ── Skip flow ─────────────────────────────────────────────────────────────
-function confirmSkip() { document.getElementById('skipOverlay').classList.add('open'); }
-function closeSkipConfirm() { document.getElementById('skipOverlay').classList.remove('open'); }
-// Every app page sends a student back here until otto_answers is saved
-// (enforceCampusAccess), so a bare jump to /campus would land right back
-// on step 1. Skip saves Otto's config and no profile (same as mobile),
-// then leaves the iframe for the app. Replay never saves: onboarding is
-// already done, so it just leaves.
-async function bailOnboarding() {
-  const btn = document.getElementById('btnSkipAnyway');
-  if (btn && btn.disabled) return;
-  if (!IS_REPLAY) {
-    if (btn) { btn.disabled = true; btn.textContent = 'Skipping…'; }
-    const r = await window.vibeRequest('/api/me/onboarding-complete', {
-      method: 'POST',
-      json: { otto_answers: buildOttoConfig() },
-      failure: "Couldn't skip onboarding.",
-    });
-    if (!r.ok) {
-      if (btn) { btn.disabled = false; btn.textContent = 'Skip anyway'; }
+  // The undo of a Forward past unsaved changes (below) has landed.
+  if (pending !== null && at === pending && current === pending) {
+    if (!isBusy()) void (pending === 2 ? continueCampus() : continueProfile());
+    return;
+  }
+
+  // Any other landing back on this step (an undo below): nothing moved.
+  if (at === current) return;
+
+  // Mid-save: undo the move and stay put. A Back re-adds the steps it left.
+  if (isBusy()) {
+    if (at < current) {
+      for (let s = at + 1; s <= current; s++) pushStep(s);
+    } else {
+      history.go(current - at);
+    }
+    return;
+  }
+
+  // Past every step reached so far: go back to where the student is.
+  if (at > onb.maxStep) {
+    history.go(current - at);
+    return;
+  }
+
+  // Forward past a campus or profile step with unsaved changes: go back to
+  // that step and run its Continue, so nothing is skipped unsaved.
+  if (!IS_REPLAY && at > current) {
+    const campusUnsaved = current === 2 && onb.system !== null && onb.campusId !== onb.savedCampusId;
+    const profileUnsaved = current === 3 && (onb.profileDirty || !onb.identitySaved);
+    if (campusUnsaved || profileUnsaved) {
+      onb.continueOnLand = current;
+      history.go(current - at);
       return;
     }
   }
-  window.__vibeTopNav('/campus');
+
+  if (onb.skipOpen) closeSkip();
+  showStep(at);
 }
 
-// Header logo. In replay it's a plain jump to the app. On a first run
-// /campus would bounce straight back here, so leaving asks first.
-function leaveViaLogo() {
-  if (IS_REPLAY) window.__vibeTopNav('/campus');
-  else confirmSkip();
+/** Once per load: a back stack down to step 1 (or the reload's own entries). */
+function buildHistoryStack() {
+  const target = onb.step;
+  const raw = history.state && history.state.onbStep;
+  const at = typeof raw === 'number' && Number.isInteger(raw) && raw >= 1 ? raw : null;
+  if (at === null) {
+    replaceStep(1);
+    for (let s = 2; s <= target; s++) pushStep(s);
+  } else if (at > target) {
+    // A reload that restores an earlier step than this entry: its own entry is below.
+    history.go(target - at);
+  } else {
+    for (let s = at + 1; s <= target; s++) pushStep(s);
+  }
 }
 
-document.addEventListener('keydown', e => {
-  if (e.key === 'Escape' && document.getElementById('skipOverlay').classList.contains('open')) closeSkipConfirm();
-});
+// ── Draft (never in replay, only with a user id, never after Finish/Skip) ──
+let draftTimer = null;
+let draftPending = null;
 
-// ── Completion ────────────────────────────────────────────────────────────
+function scheduleDraft() {
+  if (IS_REPLAY || !ONB_USER_ID || onb.done) return;
+  const f = readFields();
+  // The photo is never in the draft: the server holds it.
+  draftPending = {
+    step: onb.step,
+    maxStep: onb.maxStep,
+    fields: {
+      campus_id: onb.campusId,
+      name: f.name,
+      handle: f.handle,
+      bio: f.bio,
+      major: f.major,
+      department: f.department,
+      year: f.year,
+      interests: f.interests,
+      skills: f.skills,
+      looking_for: f.looking_for,
+    },
+  };
+  clearTimeout(draftTimer);
+  draftTimer = setTimeout(flushDraft, DRAFT_SAVE_DELAY_MS);
+}
+
+function flushDraft() {
+  clearTimeout(draftTimer);
+  draftTimer = null;
+  const pending = draftPending;
+  draftPending = null;
+  if (!pending || IS_REPLAY || !ONB_USER_ID || onb.done) return;
+  const record = buildDraftRecord(pending, Date.now());
+  if (!record) return;
+  try {
+    localStorage.setItem(draftKey(ONB_USER_ID), JSON.stringify(record));
+  } catch (e) {
+    /* storage blocked or full: the server copies still hold what was saved */
+  }
+}
+
+function clearDraftNow() {
+  clearTimeout(draftTimer);
+  draftTimer = null;
+  draftPending = null;
+  onb.done = true;
+  if (!ONB_USER_ID) return;
+  try {
+    localStorage.removeItem(draftKey(ONB_USER_ID));
+  } catch (e) {
+    /* storage blocked: nothing to remove */
+  }
+}
+
+// ── Shared requests ───────────────────────────────────────────────────────
+const CAMPUS_FIELD_CODES = Object.freeze(['campus_invalid', 'campus_change_too_soon', 'system_missing', 'campus_not_ready']);
+
+function postCampus(id) {
+  return window.vibeRequest('/api/me/onboarding-step', {
+    method: 'POST',
+    json: { step: 'campus', campus_id: id },
+    quiet: true,
+    failure: ONB_LOCAL_COPY.campusSaveFailed,
+  });
+}
+
+function postProfile() {
+  return window.vibeRequest('/api/me/onboarding-step', {
+    method: 'POST',
+    json: Object.assign({ step: 'profile' }, profileStepBody(readFields())),
+    quiet: true,
+    failure: ONB_LOCAL_COPY.profileSaveFailed,
+  });
+}
+
+function toastFailure(r) {
+  window.vibeToast(r.message, { tone: 'error', action: r.action });
+}
+
+/** Otto's saved config. Any non-empty otto_answers marks onboarding done. */
 function buildOttoConfig() {
   return {
-    name: state.ottoName,
+    name: 'otto',
     platforms: [],
     voiceSamples: [],
     leash: 'ask',
@@ -1253,195 +2373,1628 @@ function buildOttoConfig() {
   };
 }
 
-const FINISH_LABEL = 'Finish &amp; open my profile &rarr;';
-function setFinishBusy(busy) {
-  const btn = document.getElementById('btnFinish');
-  if (!btn) return;
-  btn.disabled = busy;
-  btn.innerHTML = busy ? 'Saving…' : FINISH_LABEL;
+// ── Step 2: campus ────────────────────────────────────────────────────────
+/** Cards for the current university (rebuilt when the Purdue switch changes it). */
+function renderCampusCards() {
+  const system = onb.system;
+  const group = $('onbCampusGroup');
+  group.textContent = '';
+  $('onbCampusOtto').textContent = system === 'purdue' ? ONB_COPY.campus.ottoPurdue : ONB_COPY.campus.ottoIu;
+  // No university yet: the phone shows only the title and the missing line.
+  $('onbCampusOtto').hidden = system === null;
+  $('onbSystemMissing').hidden = system !== null;
+  group.hidden = system === null;
+  $('onbCampusNote').hidden = system === null;
+  if (system === null) {
+    renderPurdue();
+    return;
+  }
+  const label = SYSTEM_LABEL[system];
+  $('onbCampusNote').textContent = ONB_COPY.campus.note.replace(/\{system\}/g, () => label);
+  const pre = preselectId();
+  campusesForSystem(system).forEach((c) => {
+    const card = document.createElement('label');
+    card.className = 'campus-card';
+    const radio = document.createElement('input');
+    radio.type = 'radio';
+    radio.name = 'onb-campus';
+    radio.value = c.id;
+    radio.addEventListener('change', () => onPickCampus(c.id));
+    const text = document.createElement('span');
+    text.className = 'campus-text';
+    const titleRow = document.createElement('span');
+    titleRow.className = 'campus-title-row';
+    const title = document.createElement('span');
+    title.className = 'campus-title';
+    title.textContent = c.shortName;
+    titleRow.appendChild(title);
+    if (c.id === pre) {
+      const tag = document.createElement('span');
+      tag.className = 'campus-tag';
+      tag.textContent = ONB_COPY.campus.fromEmailTag;
+      titleRow.appendChild(tag);
+    }
+    if (!c.isOpen) {
+      const soon = document.createElement('span');
+      soon.className = 'campus-soon';
+      soon.textContent = ONB_COPY.campus.notOpen;
+      titleRow.appendChild(soon);
+    }
+    const sub = document.createElement('span');
+    sub.className = 'campus-sub';
+    sub.textContent = campusPickerSub(c, system);
+    text.appendChild(titleRow);
+    text.appendChild(sub);
+    card.appendChild(radio);
+    card.appendChild(text);
+    group.appendChild(card);
+  });
+  syncCampusCards();
+  bindCursorHover();
 }
 
-// A handle Finish couldn't use: back to step 2 with the field marked, so
-// the student can pick another (or clear it) and Finish again.
-function sendBackToHandle(statusText, message) {
-  _onbHandleSeq++; // a late live check must not paint over this
-  clearTimeout(_onbHandleTimer);
-  goToStep(2);
-  const s = document.getElementById('pfHandleStatus');
-  if (s) { s.textContent = statusText; s.style.color = '#C54323'; }
-  window.vibeToast(message, { tone: 'error' });
-  // After goToStep's own focus on the name field (250ms).
-  setTimeout(() => { const i = document.getElementById('pfHandle'); if (i) i.focus(); }, 300);
+function syncCampusCards() {
+  const busy = isBusy();
+  document.querySelectorAll('#onbCampusGroup .campus-card').forEach((card) => {
+    const radio = card.querySelector('input');
+    const selected = radio.value === onb.campusId;
+    radio.checked = selected;
+    radio.disabled = busy;
+    card.classList.toggle('selected', selected);
+  });
+  renderPurdue();
 }
 
-// A campus Finish couldn't use: back to step 2 with the field marked, so the
-// student can pick one of their own university's campuses and Finish again.
-function sendBackToCampus(message, action) {
-  goToStep(2);
-  setCampusError(message);
-  // Like sendBackToHandle: without a toast, Finish reads as doing nothing.
-  window.vibeToast(message, action ? { tone: 'error', action: action } : { tone: 'error' });
-  // After goToStep's own focus on the name field (250ms).
-  setTimeout(() => { const i = document.getElementById('pfCampus'); if (i) i.focus(); }, 300);
+function setCampusError(text) {
+  const el = $('onbCampusError');
+  const group = $('onbCampusGroup');
+  el.textContent = text || '';
+  el.hidden = !text;
+  if (text) {
+    group.setAttribute('aria-invalid', 'true');
+    group.setAttribute('aria-describedby', 'onbCampusError');
+  } else {
+    group.removeAttribute('aria-invalid');
+    group.setAttribute('aria-describedby', 'onbCampusNote');
+  }
+}
+
+function revealCampus() {
+  $('onbCampusGroup').scrollIntoView({ block: 'center', behavior: 'smooth' });
+}
+
+function onPickCampus(id) {
+  if (isBusy()) return;
+  onb.campusId = id;
+  setCampusError('');
+  syncCampusCards();
+  refreshMajorList();
+  scheduleDraft();
+}
+
+/** A new confirmed campus means new clubs and people. */
+function markCampusSaved(id) {
+  if (id === onb.savedCampusId) return;
+  onb.savedCampusId = id;
+  resetSocial();
+}
+
+async function continueCampus() {
+  if (isBusy()) return;
+  // No university on record: there's nothing to pick yet.
+  if (onb.system === null) {
+    goForward(3);
+    return;
+  }
+  if (!onb.campusId || !campusAllowed(onb.campusId, onb.system)) {
+    setCampusError(onb.campusId ? ONB_COPY.campus.invalid : ONB_COPY.campus.required);
+    revealCampus();
+    return;
+  }
+  // Replay writes nothing, and an unchanged pick would only spend the step
+  // route's limiter (shared with profile saves).
+  if (IS_REPLAY || onb.campusId === onb.savedCampusId) {
+    goForward(3);
+    return;
+  }
+  const picked = onb.campusId;
+  setBusy('savingCampus', true);
+  const r = await postCampus(picked);
+  setBusy('savingCampus', false);
+  if (r.ok) {
+    markCampusSaved(picked);
+    goForward(3);
+    return;
+  }
+  if (CAMPUS_FIELD_CODES.includes(r.code)) {
+    setCampusError(r.error || ONB_COPY.campus.invalid);
+    revealCampus();
+    return;
+  }
+  toastFailure(r);
+}
+
+// ── The @purdue.edu switch (Q8) ───────────────────────────────────────────
+const PURDUE_EMAIL_RE = /^[^\s@]+@purdue\.edu$/i;
+
+function setPurdueMsg(text) {
+  const el = $('onbPurdueMsg');
+  el.textContent = text || '';
+  el.hidden = !text;
+}
+
+function renderPurdue() {
+  const show = onb.system === 'iu' && onb.campusId === 'indianapolis';
+  // The panel belongs to the link: once Indianapolis isn't picked, it closes.
+  if (!show && onb.purdue.open && !onb.purdue.sending && !onb.purdue.verifying) closePurdue();
+  const p = onb.purdue;
+  const working = p.sending || p.verifying;
+  $('onbPurdueLink').hidden = !show || p.open;
+  $('onbPurdueSwitch').hidden = !show || !p.open;
+  $('onbPurdueEmail').disabled = working || p.sent;
+  const send = $('onbPurdueSend');
+  send.hidden = p.sent;
+  send.disabled = working;
+  send.textContent = p.sending ? ONB_COPY.campus.switchSending : ONB_COPY.campus.switchSend;
+  $('onbPurdueCodeRow').hidden = !p.sent;
+  const code = $('onbPurdueCode');
+  code.disabled = working;
+  const verify = $('onbPurdueVerify');
+  verify.disabled = working || code.value.length !== 8;
+  verify.textContent = p.verifying ? ONB_COPY.campus.switchVerifying : ONB_COPY.campus.switchVerify;
+  $('onbPurdueCancel').disabled = working;
+}
+
+function closePurdue() {
+  onb.purdue = { open: false, sent: false, sending: false, verifying: false };
+  $('onbPurdueEmail').value = '';
+  $('onbPurdueCode').value = '';
+  setPurdueMsg('');
+}
+
+/** The university the new code proved: new cards, and a campus pick only if it's still allowed. */
+function onSystemChanged(next) {
+  onb.system = next.system;
+  if (!campusAllowed(onb.campusId, next.system)) onb.campusId = '';
+  // A kept shared campus isn't confirmed by the switch, so it stays saved only
+  // when the server still has exactly this campus.
+  const saved = onb.savedCampusId;
+  onb.savedCampusId =
+    saved !== null && campusAllowed(saved, next.system) && saved === next.currentCampusId ? saved : null;
+  setCampusError('');
+  resetSocial();
+  renderCampusCards();
+  refreshMajorList();
+  scheduleDraft();
+}
+
+function setPurdueWorking(key, value) {
+  onb.purdue[key] = value;
+  setBusy('switching', onb.purdue.sending || onb.purdue.verifying);
+}
+
+/** After a verified code: read the university back, else reload into the new boot. */
+async function rereadCampuses() {
+  const r = await window.vibeRequest('/api/campuses', {
+    quiet: true,
+    failure: ONB_LOCAL_COPY.campusesLoadFailed,
+  });
+  if (r.ok && isSchoolSystem(r.data.system)) {
+    onSystemChanged({
+      system: r.data.system,
+      currentCampusId: typeof r.data.currentCampusId === 'string' ? r.data.currentCampusId : null,
+    });
+    window.vibeToast(ONB_COPY.campus.switchDone);
+    closePurdue();
+    return;
+  }
+  // Verified, but this page can't see it yet: the new boot carries the new university.
+  window.vibeToast(ONB_COPY.campus.switchDone);
+  flushDraft();
+  location.reload();
+}
+
+async function purdueSend() {
+  const p = onb.purdue;
+  if (p.sending || p.verifying) return;
+  const schoolEmail = $('onbPurdueEmail').value.trim();
+  if (!PURDUE_EMAIL_RE.test(schoolEmail)) {
+    setPurdueMsg(ONB_COPY.campus.switchWrongDomain);
+    return;
+  }
+  setPurdueMsg('');
+  if (IS_REPLAY) {
+    p.sent = true;
+    renderPurdue();
+    return;
+  }
+  setPurdueWorking('sending', true);
+  const r = await window.vibeRequest('/api/auth/school-email/request', {
+    method: 'POST',
+    json: { schoolEmail },
+    quiet: true,
+    failure: ONB_LOCAL_COPY.sendFailed,
+  });
+  if (r.ok && r.data.alreadyVerified === true) {
+    await rereadCampuses();
+    setPurdueWorking('sending', false);
+    return;
+  }
+  setPurdueWorking('sending', false);
+  if (!r.ok) {
+    // A 429 carries its own line in `error` ("You've asked for 3 emails…").
+    setPurdueMsg(r.error || r.message);
+    return;
+  }
+  onb.purdue.sent = true;
+  renderPurdue();
+}
+
+async function purdueVerify() {
+  const p = onb.purdue;
+  const code = $('onbPurdueCode').value;
+  if (p.sending || p.verifying || code.length !== 8) return;
+  setPurdueMsg('');
+  if (IS_REPLAY) {
+    window.vibeToast(ONB_COPY.campus.switchDone);
+    closePurdue();
+    renderPurdue();
+    return;
+  }
+  setPurdueWorking('verifying', true);
+  const r = await window.vibeRequest('/api/auth/school-email/confirm-code', {
+    method: 'POST',
+    json: { schoolEmail: $('onbPurdueEmail').value.trim(), code },
+    quiet: true,
+    failure: ONB_LOCAL_COPY.verifyFailed,
+  });
+  if (r.ok) await rereadCampuses();
+  setPurdueWorking('verifying', false);
+  if (!r.ok) setPurdueMsg(r.error || r.message);
+}
+
+// ── Step 3: profile ───────────────────────────────────────────────────────
+function readFields() {
+  return {
+    name: $('pfName').value,
+    handle: $('pfHandle').value,
+    bio: $('pfBio').value,
+    major: $('pfMajor').value,
+    department: $('pfDepartment').value,
+    year: asOnboardingYear($('pfYear').value),
+    interests: $('pfInterests').value,
+    skills: $('pfSkills').value,
+    looking_for: onb.lookingFor.slice(),
+  };
+}
+
+/** Fills the step-3 inputs (and the skip sheet's two) from restored values. */
+function writeFields(f) {
+  $('pfName').value = f.name;
+  $('pfHandle').value = f.handle;
+  $('pfBio').value = f.bio;
+  $('pfMajor').value = f.major;
+  $('pfDepartment').value = f.department;
+  $('pfYear').value = f.year;
+  $('pfInterests').value = f.interests;
+  $('pfSkills').value = f.skills;
+  onb.lookingFor = f.looking_for.slice();
+  document.querySelectorAll('.pf-looking').forEach((box) => { box.checked = onb.lookingFor.includes(box.value); });
+  $('skipName').value = f.name;
+  $('skipHandle').value = f.handle;
+}
+
+/** Majors follow the campus: a curated list where one exists, else free text. */
+function refreshMajorList() {
+  const list = onb.system && onb.campusId && typeof window.vibeMajorsForCampus === 'function'
+    ? window.vibeMajorsForCampus(onb.campusId, onb.system)
+    : null;
+  fillDatalist('iuMajors', list && Array.isArray(list.majors) ? list.majors : []);
+  fillDatalist('iuSchools', list && Array.isArray(list.schools) ? list.schools : []);
+  if (list) {
+    $('pfMajor').setAttribute('list', 'iuMajors');
+    $('pfDepartment').setAttribute('list', 'iuSchools');
+  } else {
+    $('pfMajor').removeAttribute('list');
+    $('pfDepartment').removeAttribute('list');
+  }
+  $('pfMajorHint').textContent = list
+    ? ONB_COPY.profile.majorHintList.replace('{label}', () => String(list.label || ''))
+    : ONB_COPY.profile.majorHintFree;
+}
+
+/** Refill a <datalist> from a list of strings. */
+function fillDatalist(id, values) {
+  const dl = document.getElementById(id);
+  if (!dl) return;
+  const frag = document.createDocumentFragment();
+  values.forEach(function (v) {
+    const opt = document.createElement('option');
+    opt.value = v;
+    frag.appendChild(opt);
+  });
+  dl.innerHTML = '';
+  dl.appendChild(frag);
+}
+
+// The live handle check. The static vibeRequest can't abort, so a sequence
+// number retires every earlier check: an answer for "abc" can't land after
+// the field already says something about "ab".
+let handleSeq = 0;
+let handleTimer = null;
+
+function handleStatusColor(status) {
+  if (!status) return '#8A8580';
+  if (status.kind === 'available') return '#1A9E5B';
+  if (status.kind === 'taken' || status.kind === 'reason' || status.kind === 'format') return '#C54323';
+  return '#8A8580';
+}
+
+function setHandleStatus(status) {
+  onb.handleStatus = status;
+  ['pfHandleStatus', 'skipHandleStatus'].forEach((id) => {
+    const el = $(id);
+    el.textContent = status ? status.text : '';
+    el.style.color = handleStatusColor(status);
+  });
+}
+
+/** Normalizes the handle, retires any pending check, sets the status; returns the value to store. */
+function checkHandle(raw) {
+  const v = String(raw || '').trim().toLowerCase().slice(0, 20);
+  const seq = ++handleSeq;
+  clearTimeout(handleTimer);
+  handleTimer = null;
+  const copy = ONB_COPY.profile;
+  if (v === '') {
+    setHandleStatus(null);
+    return v;
+  }
+  if (!HANDLE_RE.test(v)) {
+    setHandleStatus({ kind: 'format', text: copy.handleFormat });
+    return v;
+  }
+  setHandleStatus({ kind: 'checking', text: copy.handleChecking });
+  handleTimer = setTimeout(async () => {
+    handleTimer = null;
+    const r = await window.vibeRequest('/api/handle/check?h=' + encodeURIComponent(v), {
+      quiet: true,
+      failure: ONB_LOCAL_COPY.handleCheckFailed,
+    });
+    if (seq !== handleSeq) return;
+    // A check that didn't run never reads "taken" (critic D5).
+    if (!r.ok) {
+      setHandleStatus({ kind: 'unchecked', text: copy.handleUnchecked });
+    } else if (r.data.available === true) {
+      setHandleStatus({ kind: 'available', text: copy.handleAvailable });
+    } else {
+      const reason = String(r.data.reason ?? 'taken').toLowerCase();
+      setHandleStatus(
+        reason === 'taken'
+          ? { kind: 'taken', text: copy.handleTaken }
+          : { kind: 'reason', text: copy.handleReason.replace('{reason}', () => reason) },
+      );
+    }
+  }, 280);
+  return v;
+}
+
+/** Name or handle error under step 3's field AND the skip sheet's (one state, two views). */
+function setFieldError(field, text) {
+  const pairs = field === 'name'
+    ? [['pfName', 'pfNameError'], ['skipName', 'skipNameError']]
+    : [['pfHandle', 'pfHandleError'], ['skipHandle', 'skipHandleError']];
+  pairs.forEach(([inputId, errorId]) => {
+    const input = $(inputId);
+    const el = $(errorId);
+    el.textContent = text || '';
+    el.hidden = !text;
+    if (text) {
+      input.setAttribute('aria-invalid', 'true');
+      input.setAttribute('aria-describedby', errorId);
+    } else {
+      input.removeAttribute('aria-invalid');
+      input.removeAttribute('aria-describedby');
+    }
+  });
+}
+
+/** The step-3 client checks; errors go under the fields. Returns the failing field, or null. */
+function checkIdentity() {
+  const problem = identityProblem(readFields());
+  setFieldError('name', problem && problem.field === 'name' ? problem.message : '');
+  setFieldError('handle', problem && problem.field === 'handle' ? problem.message : '');
+  return problem ? problem.field : null;
+}
+
+/** A refusal's line under the name or handle field; returns that field, or null. */
+function showProfileFieldError(r) {
+  const field = profileFieldForCode(r.code);
+  if (field === 'name') {
+    setFieldError('name', r.error || ONB_COPY.profile.errors.nameRequired);
+  } else if (field === 'handle') {
+    setFieldError('handle', r.error || ONB_COPY.profile.errors.handleInvalid);
+    if (r.code === 'handle_taken') {
+      handleSeq++; // a late live check must not paint over the server's answer
+      clearTimeout(handleTimer);
+      setHandleStatus({ kind: 'taken', text: ONB_COPY.profile.handleTaken });
+    }
+  }
+  return field;
+}
+
+/** A profile refusal that isn't about one field. */
+function toastProfileFailure(r) {
+  if (r.code === 'profile_invalid') window.vibeToast(r.error || r.message, { tone: 'error' });
+  else toastFailure(r);
+}
+
+function onProfileInput(key) {
+  onb.profileDirty = true;
+  if (key === 'name') {
+    setFieldError('name', '');
+    $('skipName').value = $('pfName').value;
+    renderPhoto();
+  }
+  scheduleDraft();
+}
+
+function onHandleInput(raw) {
+  const v = checkHandle(raw);
+  $('pfHandle').value = v;
+  $('skipHandle').value = v;
+  onb.profileDirty = true;
+  setFieldError('handle', '');
+  scheduleDraft();
+}
+
+async function continueProfile() {
+  if (isBusy()) return;
+  const bad = checkIdentity();
+  if (bad) {
+    // Focusing answers the tap; it isn't focus on step entry.
+    $(bad === 'name' ? 'pfName' : 'pfHandle').focus();
+    return;
+  }
+  if (IS_REPLAY) {
+    goForward(4);
+    return;
+  }
+  setBusy('savingProfile', true);
+  const r = await postProfile();
+  setBusy('savingProfile', false);
+  if (r.ok) {
+    onb.identitySaved = true;
+    onb.profileDirty = false;
+    goForward(4);
+    return;
+  }
+  const field = showProfileFieldError(r);
+  if (field) {
+    $(field === 'name' ? 'pfName' : 'pfHandle').focus();
+    return;
+  }
+  toastProfileFailure(r);
+}
+
+// ── Step 4: photo ─────────────────────────────────────────────────────────
+// Pick, crop to a circle, and it saves right away (upload, then
+// users.avatar_url), so the step can't be left with a half-saved photo.
+
+let photoError = null;
+
+function setPhotoError(text) {
+  photoError = text || null;
+  const el = $('onbPhotoError');
+  el.textContent = photoError || '';
+  el.hidden = !photoError;
+}
+
+function renderPhoto() {
+  const circle = $('onbPhotoCircle');
+  const src = onb.avatarUrl;
+  const img = circle.querySelector('img');
+  if (src) {
+    if (!img || img.getAttribute('src') !== src) {
+      circle.textContent = '';
+      const next = document.createElement('img');
+      next.alt = '';
+      next.src = src;
+      circle.appendChild(next);
+    }
+  } else {
+    const initial = ($('pfName').value.trim().charAt(0) || '?').toUpperCase();
+    let span = circle.querySelector('.photo-initial');
+    if (!span) {
+      circle.textContent = '';
+      span = document.createElement('span');
+      span.className = 'photo-initial';
+      span.setAttribute('aria-hidden', 'true');
+      circle.appendChild(span);
+    }
+    span.textContent = initial;
+  }
+
+  const busy = isBusy();
+  const primary = $('onbPhotoPrimary');
+  const secondary = $('onbPhotoSecondary');
+  if (onb.uploading) {
+    primary.textContent = ONB_COPY.photo.uploading;
+    primary.disabled = true;
+    secondary.hidden = true;
+  } else {
+    primary.textContent = src ? ONB_COPY.photo.continue : ONB_COPY.photo.choose;
+    primary.disabled = busy;
+    secondary.hidden = false;
+    secondary.textContent = src ? ONB_COPY.photo.change : ONB_COPY.photo.skip;
+    secondary.disabled = busy;
+  }
+}
+
+function openPhotoPicker() {
+  if (isBusy()) return;
+  $('onbPhotoInput').click();
+}
+
+function onPhotoSaved(url) {
+  const prev = onb.blobUrl;
+  if (prev && prev !== url) URL.revokeObjectURL(prev);
+  const isBlob = url.startsWith('blob:');
+  onb.blobUrl = isBlob ? url : null;
+  onb.avatarUrl = isBlob ? url : safeImgSrc(url);
+  setPhotoError(null);
+  renderPhoto();
+}
+
+/** The upload route's refusal → the student's line (avatar-upload.ts avatarFailureMessage). */
+function avatarRefusal(stage, r) {
+  if (r.status === 401 || r.status === 429 || (r.status === 403 && r.code === 'terms_required')) {
+    return { ok: false, message: r.message, action: r.action };
+  }
+  if (stage === 'upload') {
+    if (r.status === 413) return { ok: false, message: PHOTO_ERROR_COPY.tooBig };
+    if (r.status === 400 && r.error === 'Invalid file size') return { ok: false, message: PHOTO_ERROR_COPY.tooBig };
+    if (r.status === 400 && r.error === 'Unsupported file type') return { ok: false, message: PHOTO_ERROR_COPY.wrongType };
+  }
+  return { ok: false, message: PHOTO_ERROR_COPY.uploadFailed };
+}
+
+/** uploadAvatar (avatar-upload.ts), through the static vibeRequest. */
+async function uploadAvatarStatic(blob) {
+  const pre = preflightAvatarBlob(blob);
+  if (!pre.ok) return { ok: false, message: pre.message };
+  // Re-typed so the part carries the normalized type (an untyped blob would be refused).
+  const typed = blob.type === pre.contentType ? blob : new Blob([blob], { type: pre.contentType });
+  const fd = new FormData();
+  fd.set('file', typed, 'avatar.' + (AVATAR_EXT_FOR_TYPE[pre.contentType] || 'jpg'));
+  fd.set('kind', 'avatar');
+  const up = await window.vibeRequest('/api/me/profile-upload', {
+    method: 'POST',
+    body: fd,
+    quiet: true,
+    failure: PHOTO_ERROR_COPY.uploadFailed,
+  });
+  if (!up.ok) return avatarRefusal('upload', up);
+  const url = typeof up.data.url === 'string' ? up.data.url.trim() : '';
+  if (!url) return { ok: false, message: PHOTO_ERROR_COPY.uploadFailed };
+
+  const saved = await window.vibeRequest('/api/me/profile', {
+    method: 'PATCH',
+    json: { avatar_url: url },
+    quiet: true,
+    failure: PHOTO_ERROR_COPY.uploadFailed,
+  });
+  if (!saved.ok) return avatarRefusal('save', saved);
+  // The route echoes the stored row; a different avatar means the write didn't land.
+  const profile = saved.data.profile;
+  if (profile !== null && typeof profile === 'object' && !Array.isArray(profile) && profile.avatar_url !== url) {
+    return { ok: false, message: PHOTO_ERROR_COPY.uploadFailed };
+  }
+  return { ok: true, url };
+}
+
+async function onPhotoPicked(e) {
+  const file = e.target.files && e.target.files[0];
+  if (!file) return;
+  // Any image the browser can decode reaches the cropper (HEIC included); the
+  // cropper's JPEG output is what gets checked and sent.
+  if (file.type && !file.type.startsWith('image/')) {
+    setPhotoError(PHOTO_ERROR_COPY.wrongType);
+    return;
+  }
+  setPhotoError(null);
+  if (typeof window.openImageCropper !== 'function') {
+    setPhotoError(PHOTO_ERROR_COPY.processFailed);
+    return;
+  }
+  const blob = await window.openImageCropper(file, {
+    aspect: 1,
+    shape: 'circle',
+    outputMaxSize: 768,
+    outputQuality: 0.92,
+    dismissOnBackdrop: false,
+    onError: (m) => setPhotoError(m),
+  });
+  if (!blob) return;
+  if (IS_REPLAY) {
+    onPhotoSaved(URL.createObjectURL(blob));
+    return;
+  }
+  setBusy('uploading', true);
+  const r = await uploadAvatarStatic(blob);
+  setBusy('uploading', false);
+  if (r.ok) {
+    onPhotoSaved(r.url);
+    return;
+  }
+  setPhotoError(r.message);
+  if (r.action) window.vibeToast(r.message, { tone: 'error', action: r.action });
+}
+
+// ── Step 5: follow clubs ──────────────────────────────────────────────────
+// The student's campus clubs from discover, Follow first. Which buttons a row
+// shows and every word on them come from orgRowViewOnboarding / ORG_COPY, the
+// same table as every other club surface. Club controls wait for the server
+// ('…', aria-busy); nothing flips optimistically. Replay sends nothing.
+
+const CLUBS_SEARCH_THRESHOLD = 8;
+let clubsSeq = 0;
+let peopleSeq = 0;
+const clubRowEls = {};
+/** Each row's lasting parts, so a tap repaints the row instead of rebuilding it. */
+const clubRowParts = new WeakMap();
+/** What a club control does right now; its one click listener reads this at click time. */
+const clubControlAction = new WeakMap();
+
+/** A new saved campus or university: both lists load again, and any late answer is dropped. */
+function resetSocial() {
+  clubsSeq++;
+  peopleSeq++;
+  onb.clubs = freshClubs();
+  onb.people = freshPeople();
+  Object.keys(clubRowEls).forEach((id) => { delete clubRowEls[id]; });
+  $('onbClubsList').textContent = '';
+  $('onbClubsSearch').value = '';
+  $('onbPeopleList').textContent = '';
+  renderClubs();
+  renderPeople();
+  if (onb.step === 5) loadClubs();
+  if (onb.step === 6) loadPeople();
+}
+
+function loadClubs() {
+  if (onb.clubs.status !== 'idle') return;
+  const seq = ++clubsSeq;
+  onb.clubs.status = 'loading';
+  onb.clubs.failure = null;
+  renderClubs();
+  // Never with a search term: discover's search widens to the whole university.
+  window.vibeRequest('/api/orgs?filter=discover', {
+    quiet: true,
+    failure: ONB_COPY.clubs.loadFailed,
+  }).then((r) => {
+    const c = onb.clubs;
+    if (seq !== clubsSeq || c.status !== 'loading') return;
+    // A 2xx without the list is a failed read, never "no clubs here yet".
+    if (r.ok && Array.isArray(r.data.orgs)) {
+      c.status = 'ready';
+      c.rows = orderClubRows(parseClubRows(r.data.orgs));
+    } else {
+      c.status = 'failed';
+      c.failure = window.vibeLoadFailure(r, ONB_COPY.clubs.loadFailed);
+    }
+    renderClubs();
+  });
+}
+
+function retryClubs() {
+  onb.clubs.status = 'idle';
+  onb.clubs.failure = null;
+  loadClubs();
+}
+
+function clubRelation(row) {
+  const c = onb.clubs;
+  const rel = relationFor(row, c.local[row.id]);
+  if (c.audience[row.id]) rel.audience = c.audience[row.id];
+  return rel;
+}
+
+function renderClubsFooter() {
+  const c = onb.clubs;
+  $('onbClubsContinue').textContent = anyClubFollowed(c.rows, c.local)
+    ? ONB_COPY.clubs.continue
+    : ONB_COPY.clubs.skipForNow;
+}
+
+function skeletonRow() {
+  const row = document.createElement('div');
+  row.className = 'pick-row skel-row';
+  row.setAttribute('aria-hidden', 'true');
+  const top = document.createElement('div');
+  top.className = 'pick-top';
+  const logo = document.createElement('span');
+  logo.className = 'pick-logo';
+  const text = document.createElement('div');
+  text.className = 'pick-text';
+  const a = document.createElement('span');
+  a.className = 'skel';
+  a.style.cssText = 'width:55%;height:14px';
+  const b = document.createElement('span');
+  b.className = 'skel';
+  b.style.cssText = 'width:35%;height:11px;margin-top:8px';
+  text.appendChild(a);
+  text.appendChild(b);
+  const btn = document.createElement('span');
+  btn.className = 'skel';
+  btn.style.cssText = 'width:84px;height:44px;border-radius:999px;flex-shrink:0';
+  top.appendChild(logo);
+  top.appendChild(text);
+  top.appendChild(btn);
+  row.appendChild(top);
+  return row;
+}
+
+function renderClubs() {
+  const c = onb.clubs;
+  const list = $('onbClubsList');
+  const empty = $('onbClubsEmpty');
+  const sparse = $('onbClubsSparse');
+  const search = $('onbClubsSearch');
+  empty.hidden = true;
+  sparse.hidden = true;
+  search.hidden = true;
+  renderClubsFooter();
+
+  if (c.status === 'failed') {
+    list.textContent = '';
+    window.vibeLoadFailed(list, c.failure || { message: ONB_COPY.clubs.loadFailed }, retryClubs, { tone: 'dark' });
+    return;
+  }
+  if (c.status !== 'ready') {
+    list.textContent = '';
+    for (let i = 0; i < 3; i++) list.appendChild(skeletonRow());
+    return;
+  }
+  if (c.rows.length === 0) {
+    list.textContent = '';
+    empty.hidden = false;
+    $('onbClubsEmptyBody').textContent = fillCampus(ONB_COPY.clubs.emptyBody, campusShortName(), ONB_COPY.clubs.emptyBodyNoCampus);
+    return;
+  }
+  if (listState(c.rows.length) === 'sparse') {
+    sparse.hidden = false;
+    sparse.textContent = fillCampus(ONB_COPY.clubs.sparse, campusShortName(), ONB_COPY.clubs.sparseNoCampus);
+  }
+  search.hidden = c.rows.length <= CLUBS_SEARCH_THRESHOLD;
+  // Rows are built once per load and repainted in place after each tap.
+  if (!c.rows.every((row) => clubRowEls[row.id] && clubRowEls[row.id].parentNode === list)) {
+    list.textContent = '';
+    c.rows.forEach((row) => {
+      const el = document.createElement('div');
+      el.className = 'pick-row';
+      el.setAttribute('role', 'listitem');
+      clubRowEls[row.id] = el;
+      list.appendChild(el);
+    });
+  }
+  c.rows.forEach(renderClubRow);
+  filterClubs();
+  bindCursorHover();
+}
+
+function filterClubs() {
+  const c = onb.clubs;
+  const searchable = c.rows.length > CLUBS_SEARCH_THRESHOLD;
+  const needle = searchable ? $('onbClubsSearch').value.trim().toLowerCase().replace(/^@/, '') : '';
+  c.rows.forEach((row) => {
+    const el = clubRowEls[row.id];
+    if (!el) return;
+    el.hidden = !!needle && !row.name.toLowerCase().includes(needle) && !row.handle.toLowerCase().includes(needle);
+  });
+}
+
+/** 40 px round logo or avatar; the first letter when there's no safe image or it fails to load. */
+function roundImage(className, url, label) {
+  const box = document.createElement('div');
+  box.className = className;
+  box.setAttribute('aria-hidden', 'true');
+  const initial = String(label || '').replace(/^@/, '').trim().charAt(0).toUpperCase() || '?';
+  const src = safeImgSrc(url);
+  if (src) {
+    const img = document.createElement('img');
+    img.alt = '';
+    img.loading = 'lazy';
+    img.addEventListener('error', () => { box.textContent = initial; });
+    img.src = src;
+    box.appendChild(img);
+  } else {
+    box.textContent = initial;
+  }
+  return box;
+}
+
+function createClubControl(a) {
+  const node = document.createElement(a.href ? 'a' : 'button');
+  if (a.href) {
+    node.addEventListener('click', (e) => {
+      e.preventDefault();
+      const s = clubControlAction.get(node);
+      if (s) window.__vibeTopNav(s.a.href);
+    });
+  } else {
+    node.type = 'button';
+    node.addEventListener('click', () => {
+      const s = clubControlAction.get(node);
+      if (s) void pressClub(s.row, s.a, s.i);
+    });
+  }
+  return node;
+}
+
+function paintClubControl(node, a, busy, locked) {
+  if (a.href) {
+    node.className = 'pick-btn ' + a.tone;
+    node.href = a.href;
+    node.textContent = a.label;
+    return;
+  }
+  node.className = 'pick-btn ' + a.tone + (!a.disabled && locked && !busy ? ' locked' : '');
+  node.textContent = busy ? ORG_COPY.buttons.busy : a.label;
+  node.disabled = a.disabled || locked;
+  if (busy) {
+    node.setAttribute('aria-busy', 'true');
+    node.setAttribute('aria-label', a.label);
+  } else {
+    node.removeAttribute('aria-busy');
+    node.removeAttribute('aria-label');
+  }
+  if (a.kind === 'follow' || a.kind === 'unfollow') node.setAttribute('aria-pressed', a.kind === 'unfollow' ? 'true' : 'false');
+  else node.removeAttribute('aria-pressed');
 }
 
 /**
- * The campus step's own words when it has them ("Pick one of your
- * university's campuses.", the 30-day line, "Campus setup isn't available
- * yet."), which say more than the generic failure copy vibeRequest falls back
- * to on a 400. Anything else — signed out, Terms, offline — keeps
- * vibeRequest's message and its action link.
+ * One club row. The text column is rebuilt; the controls are repainted in
+ * place, index by index, like OrgJoinControl's keyed buttons on the phone, so
+ * the button that was tapped keeps keyboard focus and the pointer's hover.
+ * Only a control whose element type changes, or a surplus one, is replaced.
  */
-function campusRefusalCopy(r) {
-  const err = typeof r.error === 'string' ? r.error.trim() : '';
-  const ownStatus = r.status === 400 || r.status === 429 || r.status === 503;
-  return ownStatus && /[.!?]$/.test(err) ? err : '';
+function renderClubRow(row) {
+  const el = clubRowEls[row.id];
+  if (!el) return;
+  const c = onb.clubs;
+  const rel = clubRelation(row);
+  const view = orgRowViewOnboarding(rel);
+  const sub = view.sub ?? (rel.state === 'invited' && row.pending_invite
+    ? inviteSubText(firstName(row.pending_invite.invited_by_name), row.pending_invite.expires_at)
+    : null);
+
+  const logoKey = String(row.logo_url) + '\n' + row.name;
+  let parts = clubRowParts.get(el);
+  if (!parts || parts.logoKey !== logoKey) {
+    el.textContent = '';
+    const top = document.createElement('div');
+    top.className = 'pick-top';
+    top.appendChild(roundImage('pick-logo', row.logo_url, row.name));
+    const text = document.createElement('div');
+    text.className = 'pick-text';
+    top.appendChild(text);
+    el.appendChild(top);
+    parts = { logoKey, top, text, actions: document.createElement('div') };
+    clubRowParts.set(el, parts);
+  }
+  const { top, text, actions } = parts;
+
+  text.textContent = '';
+  const nameLine = document.createElement('div');
+  nameLine.className = 'pick-name-line';
+  const name = document.createElement('span');
+  name.className = 'pick-name';
+  name.textContent = row.name;
+  nameLine.appendChild(name);
+  if (row.verified) {
+    const check = document.createElement('span');
+    check.className = 'pick-verified';
+    check.setAttribute('aria-label', ONB_LOCAL_COPY.verified);
+    check.title = ONB_LOCAL_COPY.verified;
+    check.textContent = '✓';
+    nameLine.appendChild(check);
+  }
+  if (view.chip) {
+    const chip = document.createElement('span');
+    chip.className = 'pick-chip';
+    chip.textContent = view.chip;
+    nameLine.appendChild(chip);
+  }
+  text.appendChild(nameLine);
+  const meta = document.createElement('div');
+  meta.className = 'pick-meta';
+  meta.textContent = ['@' + row.handle].concat(view.meta).join(' · ');
+  text.appendChild(meta);
+  if (sub) {
+    const subEl = document.createElement('div');
+    subEl.className = 'pick-sub invite';
+    subEl.textContent = sub;
+    text.appendChild(subEl);
+  }
+  if (view.disclosure) {
+    const disc = document.createElement('p');
+    disc.className = 'pick-sub';
+    disc.textContent = view.disclosure;
+    text.appendChild(disc);
+  }
+
+  actions.className = 'pick-actions ' + view.layout;
+  const home = view.layout === 'line' ? el : top;
+  if (actions.parentNode !== home) home.appendChild(actions);
+  const busyIndex = c.busy[row.id];
+  const locked = busyIndex !== undefined || !!c.disabled[row.id];
+  const old = Array.from(actions.children);
+  const wanted = view.actions;
+  let keep = 0;
+  while (keep < old.length && keep < wanted.length && old[keep].tagName === (wanted[keep].href ? 'A' : 'BUTTON')) keep++;
+  old.slice(keep).forEach((node) => node.remove());
+  wanted.forEach((a, i) => {
+    let node = old[i];
+    if (i >= keep) {
+      node = createClubControl(a);
+      actions.appendChild(node);
+    }
+    clubControlAction.set(node, { row, a, i });
+    paintClubControl(node, a, busyIndex === i, locked);
+  });
+  if (keep < old.length || keep < wanted.length) bindCursorHover();
 }
 
-async function completeOnboarding() {
-  const finishBtn = document.getElementById('btnFinish');
-  if (finishBtn && finishBtn.disabled) return; // a save is already in flight
-  const profile = { ...state.profileDraft, ...collectProfileDraft() };
-  const wx = collectWorkExperience();
-  if (wx) profile.work_experience = wx;
-  var linkResume = ((document.getElementById('pfResumeUrl') || {}).value || '').trim();
-  var resumeFinal = state.uploadedResumeUrl || (linkResume ? linkResume.slice(0, 2048) : '');
-  if (resumeFinal) profile.resume_url = resumeFinal;
+/** A tap's answer: kept for this row until the list reloads. */
+function applyClub(row, next, audience) {
+  const c = onb.clubs;
+  c.local[row.id] = { state: next.state, following: next.following, role: next.role };
+  if (audience) c.audience[row.id] = audience;
+  renderClubRow(row);
+  renderClubsFooter();
+}
 
-  const user = {
-    name: profile.name || '',
-    tagline: '',
-    headline: '',
-    location: '',
-    vibeTags: [],
-    _onboarded: true,
-  };
+function setClubBusy(row, index) {
+  const c = onb.clubs;
+  if (index === null) delete c.busy[row.id];
+  else c.busy[row.id] = index;
+  renderClubRow(row);
+}
 
-  const ottoConfig = buildOttoConfig();
+/** OrgJoinControl's refuse(): 429, a gone club, a club code, else the mapped line with its action. */
+function refuseClub(row, r) {
+  if (r.status === 429) {
+    window.vibeToast(ORG_COPY.errors.tooMany, { tone: 'error' });
+    return;
+  }
+  if (r.code === 'not_found') {
+    window.vibeToast(ORG_COPY.errors.notFound, { tone: 'error' });
+    onb.clubs.disabled[row.id] = true;
+    renderClubRow(row);
+    return;
+  }
+  const known = orgErrorCopy(r.code);
+  window.vibeToast(known ?? r.message, { tone: 'error', action: known ? undefined : r.action });
+}
 
-  // Replay mode: skip the server save entirely (a returning user is just
-  // re-viewing the flow) and warp straight back to their profile.
+/** One club control tap (OrgJoinControl.tsx press(), variant "onboarding"). */
+async function pressClub(row, a, index) {
+  const c = onb.clubs;
+  if (c.busy[row.id] !== undefined || c.disabled[row.id] || a.disabled) return;
+  const rel = clubRelation(row);
+  const next = changeAfter(rel, a.kind);
+  if (!next) return;
   if (IS_REPLAY) {
-    vibeSave('vibe_user_v1', user);
-    vibeSave('vibe_otto_v1', ottoConfig);
-    if (finishBtn) finishBtn.disabled = true;
-    triggerHyperdrive(function () { window.__vibeTopNav('/profile'); });
+    applyClub(row, next);
+    return;
+  }
+  // Onboarding never offers Decline (it needs the invite sheet's confirm).
+  if (a.kind === 'decline') return;
+
+  const handle = encodeURIComponent(rel.handle);
+  const orgName = rel.orgName.trim() || 'this org';
+  // A reset (new campus) while this was out makes the answer stale.
+  const stale = () => onb.clubs !== c;
+
+  if (a.kind === 'follow' || a.kind === 'unfollow') {
+    const following = a.kind === 'follow';
+    setClubBusy(row, index);
+    const r = await window.vibeRequest('/api/orgs/' + handle + '/follow', following
+      ? { method: 'POST', json: { source: 'onboarding' }, quiet: true, failure: ORG_COPY.control.followFailed }
+      : { method: 'DELETE', quiet: true, failure: ORG_COPY.control.unfollowFailed });
+    if (stale()) return;
+    setClubBusy(row, null);
+    if (r.ok) {
+      applyClub(row, next);
+    } else if (!following && r.code === 'member_follows') {
+      // They joined somewhere else since this rendered. Members follow.
+      window.vibeToast(ORG_COPY.errors.memberFollows);
+      applyClub(row, { state: 'member', following: true, role: rel.role ?? 'member' });
+    } else {
+      refuseClub(row, r);
+    }
     return;
   }
 
-  // Said before anything is sent: a link the server can't store 400s the
-  // whole save, and a malformed handle used to be skipped without a word.
-  if (!state.uploadedResumeUrl && linkResume) {
-    const problem = resumeLinkProblem(linkResume);
-    if (problem) {
-      setResumeLinkNote(problem, true);
-      const i = document.getElementById('pfResumeUrl');
-      if (i) i.focus();
-      return;
-    }
-  }
-  const claimedHandle = ((document.getElementById('pfHandle') || {}).value || '').trim().toLowerCase();
-  if (claimedHandle && !_ONB_HANDLE_RE.test(claimedHandle)) {
-    sendBackToHandle('letters / numbers / _', 'Handles are 3–20 letters, numbers or _. Fix it or clear it.');
-    return;
-  }
-
-  // Campus (plan §2.4). Once the school email has proved a university, the
-  // pick has to be one of THAT university's campuses. The picker only offers
-  // those, so this catches a stale or hand-edited value before anything is
-  // sent — a campus outside the student's system is never saved silently.
-  const campusId = campusPickValue();
-  if (!campusPicker.legacy) {
-    if (!campusId) {
-      sendBackToCampus('Pick your campus to continue.');
-      return;
-    }
-    if (!campusPicker.options.some(function (c) { return c.id === campusId; })) {
-      sendBackToCampus('Pick one of your university’s campuses.');
-      return;
-    }
-  }
-
-  setFinishBusy(true);
-
-  // The campus goes first, on its own: /api/me/onboarding-step checks the pick
-  // against the `school_system` the SERVER stamped and dual-writes the legacy
-  // label, so the campus is saved by the one writer that can't put a student
-  // in the other university. A refusal keeps every answer on screen, marks the
-  // field and never marks onboarding done.
-  if (!campusPicker.legacy) {
-    const savedCampus = await window.vibeRequest('/api/me/onboarding-step', {
-      method: 'POST',
-      json: { step: 'campus', campus_id: campusId },
-      failure: "Couldn't save your campus.",
-      quiet: true,
-    });
-    if (!savedCampus.ok) {
-      setFinishBusy(false);
-      const own = campusRefusalCopy(savedCampus);
-      // Signed out / Terms / offline keep the action link that fixes them;
-      // the campus step's own refusals speak in their own words. One toast.
-      sendBackToCampus(own || savedCampus.message, own ? null : savedCampus.action);
-      return;
-    }
-  }
-
-  // The warp waits for the save. A refusal keeps every answer on screen and
-  // the toast says why: Review Terms for the consent gate (S53 A4), Sign in
-  // for a 401. Both actions leave the iframe through __vibeTopNav, so there
-  // is no blind fall-through to login inside the frame.
-  const saved = await window.vibeRequest('/api/me/onboarding-complete', {
+  // join, request and accept all go through the one door (join/route.ts).
+  const failure = a.kind === 'accept'
+    ? ORG_COPY.control.acceptFailed
+    : a.kind === 'request'
+      ? ORG_COPY.control.requestFailed
+      : ORG_COPY.control.joinFailed;
+  setClubBusy(row, index);
+  const r = await window.vibeRequest('/api/orgs/' + handle + '/join', {
     method: 'POST',
-    json: {
-      otto_answers: ottoConfig,
-      profile: Object.keys(profile).length ? profile : undefined,
-    },
-    failure: "Couldn't save your profile.",
+    json: {},
+    quiet: true,
+    failure,
   });
-  if (!saved.ok) {
-    setFinishBusy(false);
+  if (stale()) return;
+  setClubBusy(row, null);
+  if (r.ok) {
+    if (r.data.joined === true) {
+      applyClub(row, { state: 'member', following: true, role: isOrgRole(r.data.role) ? r.data.role : 'member' });
+      if (a.kind === 'accept') window.vibeToast(fillCopy(ORG_COPY.control.welcome, { org: orgName }));
+    } else if (r.data.pending === true) {
+      applyClub(row, { state: 'requested', following: rel.following, role: rel.role });
+    } else {
+      // A 2xx that says neither: nothing is known to have changed.
+      window.vibeToast(failure + ' Try again.', { tone: 'error' });
+    }
     return;
   }
-  // Only a confirmed save rewrites the cached user.
-  vibeSave('vibe_user_v1', user);
-  vibeSave('vibe_otto_v1', ottoConfig);
-
-  // Handle claim (separate route: its own format / cooldown / uniqueness
-  // checks). The profile is saved by now, but a handle that didn't stick
-  // is said before leaving: taken (409), rejected (400, e.g. reserved) or
-  // inside the 14-day cooldown (429 with its own line) goes back to step
-  // 2; anything else stays here so Finish can try again.
-  if (claimedHandle) {
-    const claim = await window.vibeRequest('/api/me/handle', {
-      method: 'PATCH',
-      json: { handle: claimedHandle },
-      failure: "Couldn't save your handle.",
-      quiet: true,
-    });
-    if (!claim.ok) {
-      const cooldown = claim.status === 429 && /^You can change your handle/.test(claim.error || '');
-      if (claim.status === 409) {
-        sendBackToHandle('✗ taken', 'That handle is taken. Pick another one.');
-      } else if (claim.status === 400) {
-        sendBackToHandle('✗ ' + (claim.error || 'not allowed').toLowerCase(), 'That handle won’t work. Pick another one.');
-      } else if (cooldown) {
-        sendBackToHandle('✗ can’t change yet', claim.error.replace(/[.!?]?$/, '.') + ' Clear the handle to finish without changing it.');
-      } else {
-        window.vibeToast(claim.message, { tone: 'error', action: claim.action });
-      }
-      setFinishBusy(false);
+  switch (r.code) {
+    case 'invite_only':
+      applyClub(row, { state: 'invite_only', following: rel.following, role: rel.role });
       return;
+    case 'audience_mismatch':
+      applyClub(
+        row,
+        { state: 'audience_blocked', following: rel.following, role: rel.role },
+        audienceFromRefusal(r.error, rel.audience),
+      );
+      return;
+    case 'school_unverified':
+      applyClub(row, { state: 'unverified', following: rel.following, role: rel.role });
+      return;
+    default:
+      refuseClub(row, r);
+  }
+}
+
+// ── Step 6: follow people ─────────────────────────────────────────────────
+// Suggestions grouped by the server's reason. Person follows are optimistic
+// (unlike club controls): the button flips at once, and a refusal rolls it
+// back. A 403 that isn't the Terms gate is a block in either direction, so
+// that row just disappears, with no toast. Replay flips locally only.
+
+function renderPeopleOtto() {
+  const copy = ONB_COPY.people;
+  const name = campusShortName();
+  const row = campusRowById(campusForSteps());
+  const shared = (row ? row.systems.length : 0) > 1;
+  $('onbPeopleOtto').textContent = name === null
+    ? copy.ottoNoCampus
+    : fillCampus(shared ? copy.ottoShared : copy.ottoSingle, name, copy.ottoNoCampus);
+}
+
+function loadPeople() {
+  if (onb.people.status !== 'idle') return;
+  const seq = ++peopleSeq;
+  onb.people.status = 'loading';
+  onb.people.failure = null;
+  renderPeople();
+  window.vibeRequest('/api/me/suggested-connections?limit=25', {
+    quiet: true,
+    failure: ONB_COPY.people.loadFailed,
+  }).then((r) => {
+    const p = onb.people;
+    if (seq !== peopleSeq || p.status !== 'loading') return;
+    // A 2xx without the list is a failed read, never "no one to follow yet".
+    if (r.ok && Array.isArray(r.data.suggestions)) {
+      p.status = 'ready';
+      p.list = parseSuggestions(r.data.suggestions);
+    } else {
+      p.status = 'failed';
+      p.failure = window.vibeLoadFailure(r, ONB_COPY.people.loadFailed);
+    }
+    renderPeople();
+  });
+}
+
+function retryPeople() {
+  onb.people.status = 'idle';
+  onb.people.failure = null;
+  loadPeople();
+}
+
+function renderPeople() {
+  const p = onb.people;
+  const copy = ONB_COPY.people;
+  const list = $('onbPeopleList');
+  const top = $('onbPeopleTop');
+  const empty = $('onbPeopleEmpty');
+  top.hidden = true;
+  empty.hidden = true;
+  list.textContent = '';
+  renderPeopleOtto();
+
+  if (p.status === 'failed') {
+    window.vibeLoadFailed(list, p.failure || { message: copy.loadFailed }, retryPeople, { tone: 'dark' });
+    return;
+  }
+  if (p.status !== 'ready') {
+    for (let i = 0; i < 3; i++) list.appendChild(skeletonRow());
+    return;
+  }
+  const visible = p.list.filter((person) => !p.removed[person.id]);
+  const shape = listState(visible.length);
+  if (shape === 'empty') {
+    empty.hidden = false;
+    $('onbPeopleEmptyBody').textContent = fillCampus(copy.emptyBody, campusShortName(), copy.emptyBodyNoCampus);
+    bindCursorHover();
+    return;
+  }
+  if (shape === 'sparse') top.hidden = false;
+
+  groupPeople(visible, { system: onb.system, campusShortName: campusShortName() }).forEach((group) => {
+    const wrap = document.createElement('div');
+    wrap.className = 'people-group';
+    wrap.setAttribute('role', 'group');
+    wrap.setAttribute('aria-label', group.label);
+    const label = document.createElement('div');
+    label.className = 'group-label';
+    label.textContent = group.label;
+    wrap.appendChild(label);
+    const rows = document.createElement('div');
+    rows.className = 'pick-list';
+    group.people.forEach((person) => rows.appendChild(personRow(person)));
+    wrap.appendChild(rows);
+    list.appendChild(wrap);
+  });
+  bindCursorHover();
+}
+
+function personRow(person) {
+  const handle = person.handle ? '@' + person.handle : null;
+  const title = person.name ?? handle ?? '';
+  const row = document.createElement('div');
+  row.className = 'pick-row';
+  const top = document.createElement('div');
+  top.className = 'pick-top';
+  top.appendChild(roundImage('pick-logo', person.avatar_url, title));
+  const text = document.createElement('div');
+  text.className = 'pick-text';
+  const name = document.createElement('span');
+  name.className = 'pick-name';
+  name.textContent = title;
+  text.appendChild(name);
+  const metaText = [handle, person.major].filter(Boolean).join(' · ');
+  if (metaText) {
+    const meta = document.createElement('span');
+    meta.className = 'pick-meta';
+    meta.textContent = metaText;
+    text.appendChild(meta);
+  }
+  top.appendChild(text);
+  const btn = document.createElement('button');
+  btn.type = 'button';
+  btn.dataset.personId = person.id;
+  btn.addEventListener('click', () => { void togglePerson(person); });
+  paintPersonButton(btn, person.id);
+  const actions = document.createElement('div');
+  actions.className = 'pick-actions slot';
+  actions.appendChild(btn);
+  top.appendChild(actions);
+  row.appendChild(top);
+  return row;
+}
+
+function paintPersonButton(btn, id) {
+  const p = onb.people;
+  const following = p.followed[id] === true;
+  btn.className = 'pick-btn ' + (following ? 'quiet' : 'filled');
+  btn.textContent = following ? ONB_COPY.people.following : ONB_COPY.people.follow;
+  btn.setAttribute('aria-pressed', following ? 'true' : 'false');
+  if (p.busy[id]) btn.setAttribute('aria-busy', 'true');
+  else btn.removeAttribute('aria-busy');
+}
+
+function repaintPerson(id) {
+  document.querySelectorAll('#onbPeopleList button[data-person-id]').forEach((btn) => {
+    if (btn.dataset.personId === id) paintPersonButton(btn, id);
+  });
+}
+
+async function togglePerson(person) {
+  const p = onb.people;
+  const id = person.id;
+  if (p.busy[id]) return;
+  const was = p.followed[id] === true;
+  p.followed[id] = !was;
+  if (!IS_REPLAY) p.busy[id] = true;
+  repaintPerson(id);
+  if (IS_REPLAY) return;
+
+  const r = await window.vibeRequest('/api/me/follow', {
+    method: was ? 'DELETE' : 'POST',
+    json: { target_id: id },
+    quiet: true,
+    failure: was ? ONB_COPY.people.unfollowFailed : ONB_COPY.people.followFailed,
+  });
+  if (onb.people !== p) return;
+  delete p.busy[id];
+  if (r.ok) {
+    repaintPerson(id);
+    return;
+  }
+  p.followed[id] = was;
+  // A 403 that isn't the Terms gate is a block, in either direction.
+  if (r.status === 403 && r.code !== 'terms_required') {
+    p.removed[id] = true;
+    renderPeople();
+    return;
+  }
+  repaintPerson(id);
+  toastFailure(r);
+}
+
+async function shareVibe() {
+  const url = location.origin;
+  if (typeof navigator.share === 'function') {
+    try {
+      await navigator.share({ title: 'Vibe', url });
+      return;
+    } catch (err) {
+      // The student closed the share sheet: nothing to say.
+      if (err && err.name === 'AbortError') return;
     }
   }
+  await window.vibeCopy(url, ONB_COPY.people.copied);
+}
 
-  const next = saved.data.next;
-  const safeNext = typeof next === 'string' && next.startsWith('/') && !next.startsWith('//') ? next : '/profile';
-  // Tag the destination with ?welcome=1 so the landing surface can fire
-  // a one-time welcome overlay. Preserves any existing query string.
-  const dest = safeNext + (safeNext.includes('?') ? '&' : '?') + 'welcome=1';
-  // Out of the iframe: the app replaces the whole onboarding shell.
+// ── Finish and Skip ───────────────────────────────────────────────────────
+
+/** Onboarding is done: drop the draft, queue the campus tour, land where the server says. */
+function succeed(next, ottoConfig) {
+  clearDraftNow();
+  try { localStorage.setItem('vibe_tour_pending', 'campus'); } catch (e) { /* the campus page still starts the tour from its URL */ }
+  // _otto.js and profile.html read these caches; desktop only.
+  vibeSave('vibe_otto_v1', ottoConfig);
+  vibeSave('vibe_user_v1', { name: $('pfName').value.trim(), tagline: '', headline: '', location: '', vibeTags: [], _onboarded: true });
+  // Used verbatim: the server's path already carries the welcome flag.
+  const dest = typeof next === 'string' && isSafeRelativePath(next) ? next : '/campus?welcome=1';
   triggerHyperdrive(function () { window.__vibeTopNav(dest); });
 }
+
+async function finish() {
+  if (isBusy()) return;
+  if (IS_REPLAY) {
+    $('onbFinish').disabled = true;
+    triggerHyperdrive(function () { window.__vibeTopNav('/campus'); });
+    return;
+  }
+  setBusy('finishing', true);
+  const stop = () => setBusy('finishing', false);
+
+  // Catch up a campus pick that never went through Continue (browser
+  // Forward, for one), so Finish can't succeed on the old campus.
+  if (onb.system !== null && onb.campusId !== onb.savedCampusId) {
+    if (!onb.campusId || !campusAllowed(onb.campusId, onb.system)) {
+      stop();
+      setCampusError(onb.campusId ? ONB_COPY.campus.invalid : ONB_COPY.campus.required);
+      sendBack(2);
+      return;
+    }
+    const picked = onb.campusId;
+    const rc = await postCampus(picked);
+    if (!rc.ok) {
+      stop();
+      if (CAMPUS_FIELD_CODES.includes(rc.code)) {
+        setCampusError(rc.error || ONB_COPY.campus.invalid);
+        sendBack(2);
+      } else {
+        toastFailure(rc);
+      }
+      return;
+    }
+    markCampusSaved(picked);
+  }
+
+  // The same for profile edits that were never saved.
+  if (onb.profileDirty || !onb.identitySaved) {
+    if (checkIdentity()) {
+      stop();
+      sendBack(3);
+      return;
+    }
+    const rp = await postProfile();
+    if (!rp.ok) {
+      stop();
+      if (showProfileFieldError(rp)) sendBack(3);
+      else toastProfileFailure(rp);
+      return;
+    }
+    onb.identitySaved = true;
+    onb.profileDirty = false;
+  }
+
+  // No university on record means no campus can ever be allowed, so that
+  // student finishes the way Skip does instead of meeting a Finish that can
+  // never work (critic L8).
+  const ottoConfig = buildOttoConfig();
+  const r = await window.vibeRequest('/api/me/onboarding-complete', {
+    method: 'POST',
+    json: Object.assign({ v: 2, otto_answers: ottoConfig }, onb.system === null ? { skip: true } : {}),
+    quiet: true,
+    failure: ONB_COPY.people.finishFailed,
+  });
+  if (r.ok) {
+    succeed(r.data.next, ottoConfig);
+    return;
+  }
+  stop();
+  if (r.code === 'name_required') {
+    setFieldError('name', r.error || ONB_COPY.profile.errors.nameRequired);
+    sendBack(3);
+    return;
+  }
+  if (r.code === 'handle_required') {
+    setFieldError('handle', r.error || ONB_COPY.profile.errors.handleRequired);
+    sendBack(3);
+    return;
+  }
+  if (r.code === 'campus_required' || r.code === 'campus_invalid') {
+    if (onb.system !== null) {
+      setCampusError(r.error || ONB_COPY.campus.required);
+      sendBack(2);
+    } else {
+      window.vibeToast(r.error || r.message, { tone: 'error' });
+    }
+    return;
+  }
+  // terms_required keeps Review Terms; a 429 shows the mapped line.
+  toastFailure(r);
+}
+
+// The skip sheet. `saved`: a name and handle are already saved, so skipping
+// keeps everything. `identity`: nobody can find a student without them, so
+// the sheet asks for both first (bound to step 3's inputs).
+
+function skipVariant() {
+  return onb.forceIdentity ? 'identity' : onb.skipBase;
+}
+
+let skipShownVariant = null;
+
+function renderSkip() {
+  const overlay = $('skipOverlay');
+  overlay.classList.toggle('open', onb.skipOpen);
+  $('onbSkip').disabled = isBusy() || onb.skipOpen;
+  if (!onb.skipOpen) {
+    skipShownVariant = null;
+    return;
+  }
+  const busy = isBusy();
+  const variant = skipVariant();
+  const copy = ONB_COPY.skip;
+  const primary = $('skipPrimary');
+  const secondary = $('skipSecondary');
+  $('skipIdentity').hidden = variant !== 'identity';
+  if (variant === 'saved') {
+    $('skipBody').textContent = copy.bodySaved;
+    primary.textContent = copy.keepGoing;
+    secondary.textContent = busy ? copy.skipping : copy.skipAnyway;
+  } else {
+    $('skipBody').textContent = copy.bodyIdentity;
+    primary.textContent = busy ? copy.saving : copy.saveAndSkip;
+    secondary.textContent = copy.keepGoing;
+  }
+  primary.disabled = busy;
+  secondary.disabled = busy;
+  $('skipName').disabled = busy;
+  $('skipHandle').disabled = busy;
+  // On open (and when a refused save switches the variant), focus the primary
+  // button, never an input.
+  if (skipShownVariant !== variant) {
+    skipShownVariant = variant;
+    primary.focus();
+  }
+  bindCursorHover();
+}
+
+function openSkip() {
+  if (isBusy() || onb.skipOpen) return;
+  // In replay nothing is saved, so what's typed decides the variant.
+  const f = readFields();
+  const hasIdentity = IS_REPLAY ? !!f.name.trim() && HANDLE_RE.test(f.handle) : onb.identitySaved;
+  onb.skipBase = hasIdentity ? 'saved' : 'identity';
+  onb.forceIdentity = false;
+  $('skipName').value = f.name;
+  $('skipHandle').value = f.handle;
+  onb.skipOpen = true;
+  renderSkip();
+}
+
+function closeSkip() {
+  if (!onb.skipOpen) return;
+  onb.skipOpen = false;
+  onb.forceIdentity = false;
+  renderSkip();
+  $('onbSkip').focus();
+}
+
+function onSkipPrimary() {
+  if (skipVariant() === 'saved') closeSkip();
+  else void runSkip();
+}
+function onSkipSecondary() {
+  if (skipVariant() === 'saved') void runSkip();
+  else closeSkip();
+}
+
+/** Skip anyway / Save & skip. */
+async function runSkip() {
+  if (isBusy()) return;
+  const variant = skipVariant();
+  if (IS_REPLAY) {
+    if (variant === 'identity' && checkIdentity()) return;
+    window.__vibeTopNav('/campus');
+    return;
+  }
+  setBusy('skipping', true);
+  const stop = () => setBusy('skipping', false);
+
+  // A campus is optional on skip, so a refused save is ignored. Only a pick
+  // the student could have seen is sent: never the preselect from step 1.
+  if (onb.maxStep >= 2 && campusAllowed(onb.campusId, onb.system) && onb.campusId !== onb.savedCampusId) {
+    const picked = onb.campusId;
+    const rc = await postCampus(picked);
+    if (rc.ok) markCampusSaved(picked);
+  }
+
+  if (variant === 'identity' || onb.profileDirty) {
+    if (checkIdentity()) {
+      onb.forceIdentity = true;
+      stop();
+      return;
+    }
+    const rp = await postProfile();
+    if (!rp.ok) {
+      if (showProfileFieldError(rp)) onb.forceIdentity = true;
+      else toastProfileFailure(rp);
+      stop();
+      return;
+    }
+    onb.identitySaved = true;
+    onb.profileDirty = false;
+  }
+
+  const ottoConfig = buildOttoConfig();
+  const r = await window.vibeRequest('/api/me/onboarding-complete', {
+    method: 'POST',
+    json: { v: 2, otto_answers: ottoConfig, skip: true },
+    quiet: true,
+    failure: ONB_COPY.skip.failed,
+  });
+  if (r.ok) {
+    succeed(r.data.next, ottoConfig);
+    return;
+  }
+  if (r.code === 'name_required') {
+    onb.forceIdentity = true;
+    setFieldError('name', r.error || ONB_COPY.profile.errors.nameRequired);
+  } else if (r.code === 'handle_required') {
+    onb.forceIdentity = true;
+    setFieldError('handle', r.error || ONB_COPY.profile.errors.handleRequired);
+  } else {
+    toastFailure(r);
+  }
+  stop();
+}
+
+/** Header logo: replay just leaves; a first run asks first (the app would bounce back here). */
+function leaveViaLogo() {
+  if (isBusy()) return;
+  if (IS_REPLAY) window.__vibeTopNav('/campus');
+  else openSkip();
+}
+
+// ── Wiring ────────────────────────────────────────────────────────────────
+function bindEvents() {
+  $('onbBack').addEventListener('click', () => { if (!isBusy()) history.back(); });
+  $('onbSkip').addEventListener('click', openSkip);
+  $('onbLogo').addEventListener('click', (e) => { e.preventDefault(); leaveViaLogo(); });
+  window.addEventListener('popstate', onPopState);
+
+  $('onbHelloContinue').addEventListener('click', () => { if (!isBusy()) goForward(2); });
+  $('onbCampusContinue').addEventListener('click', () => { void continueCampus(); });
+  $('onbProfileContinue').addEventListener('click', () => { void continueProfile(); });
+  $('onbClubsContinue').addEventListener('click', () => { if (!isBusy()) goForward(6); });
+  $('onbFinish').addEventListener('click', () => { void finish(); });
+
+  $('onbPurdueLink').addEventListener('click', () => {
+    if (isBusy()) return;
+    onb.purdue.open = true;
+    renderPurdue();
+  });
+  $('onbPurdueSend').addEventListener('click', () => { void purdueSend(); });
+  $('onbPurdueVerify').addEventListener('click', () => { void purdueVerify(); });
+  $('onbPurdueCancel').addEventListener('click', () => {
+    if (onb.purdue.sending || onb.purdue.verifying) return;
+    closePurdue();
+    renderPurdue();
+  });
+  $('onbPurdueCode').addEventListener('input', (e) => {
+    e.target.value = e.target.value.replace(/\D/g, '').slice(0, 8);
+    renderPurdue();
+  });
+
+  ['pfName', 'pfBio', 'pfMajor', 'pfDepartment', 'pfYear', 'pfInterests', 'pfSkills'].forEach((id) => {
+    $(id).addEventListener(id === 'pfYear' ? 'change' : 'input', () => onProfileInput(id === 'pfName' ? 'name' : id));
+  });
+  $('pfHandle').addEventListener('input', (e) => onHandleInput(e.target.value));
+  document.querySelectorAll('.pf-looking').forEach((box) => {
+    box.addEventListener('change', () => {
+      const without = onb.lookingFor.filter((v) => v !== box.value);
+      onb.lookingFor = box.checked ? without.concat(box.value) : without;
+      onProfileInput('looking_for');
+    });
+  });
+
+  $('onbPhotoPrimary').addEventListener('click', () => {
+    if (isBusy()) return;
+    if (onb.avatarUrl) goForward(5);
+    else openPhotoPicker();
+  });
+  $('onbPhotoSecondary').addEventListener('click', () => {
+    if (isBusy()) return;
+    if (onb.avatarUrl) openPhotoPicker();
+    else goForward(5);
+  });
+  $('onbPhotoInput').addEventListener('click', (e) => { e.target.value = ''; });
+  $('onbPhotoInput').addEventListener('change', (e) => { void onPhotoPicked(e); });
+
+  $('onbClubsSearch').addEventListener('input', filterClubs);
+  document.querySelectorAll('.onb-share').forEach((b) => b.addEventListener('click', () => { void shareVibe(); }));
+
+  $('skipPrimary').addEventListener('click', onSkipPrimary);
+  $('skipSecondary').addEventListener('click', onSkipSecondary);
+  $('skipName').addEventListener('input', (e) => {
+    $('pfName').value = e.target.value;
+    onProfileInput('name');
+  });
+  $('skipHandle').addEventListener('input', (e) => onHandleInput(e.target.value));
+  $('skipOverlay').addEventListener('click', (e) => {
+    if (e.target === e.currentTarget && !isBusy()) closeSkip();
+  });
+  document.addEventListener('keydown', (e) => {
+    if (e.key === 'Escape' && onb.skipOpen && !isBusy()) closeSkip();
+  });
+
+  document.addEventListener('visibilitychange', () => {
+    if (document.visibilityState === 'hidden') flushDraft();
+  });
+  window.addEventListener('pagehide', () => {
+    flushDraft();
+    if (onb.blobUrl) URL.revokeObjectURL(onb.blobUrl);
+  });
+}
+
+// ── Boot ──────────────────────────────────────────────────────────────────
+(function bootOnboarding() {
+  applyCopy();
+  writeFields(ONB_RESTORE.fields);
+  renderCampusCards();
+  refreshMajorList();
+  renderClubs();
+  renderPeople();
+  bindEvents();
+  renderBusy();
+  buildHistoryStack();
+  showStep(onb.step);
+})();
 
 // ── Hyperdrive: streak the screen out, then call `onDone`. ────────────────
 function triggerHyperdrive(onDone) {
