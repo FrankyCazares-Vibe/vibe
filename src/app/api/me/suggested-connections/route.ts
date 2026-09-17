@@ -12,6 +12,7 @@ import {
   type SuggestionReasonV2,
 } from "@/lib/iu/community-scope";
 import { isSchoolSystem, type SchoolSystem } from "@/lib/iu/campuses";
+import { loadHiddenUsers } from "@/lib/safety/hidden-users";
 import { createSupabaseServerClient } from "@/lib/supabase/server";
 import { createSupabaseServiceClient, isSupabaseServiceConfigured } from "@/lib/supabase/service";
 
@@ -120,9 +121,15 @@ type Suggestion = {
  * Campus comparison is `campus_id` equality, never a label — that is the
  * whole point of one shared Indianapolis row.
  *
- * Filters out: self, already-connected (one-way OR mutual), blocked-either-
- * way (when the blocks table exists), previously dismissed. Capped at
- * `limit` (default 5).
+ * Filters out: self, already-connected (one-way OR mutual), blocked either
+ * way, muted, previously dismissed. Capped at `limit` (default 5).
+ *
+ * FAILS CLOSED (wave plan critic `critic-W3.md` M6). The block/mute read and
+ * the profile read are the ones that decide who may appear, so if either
+ * fails this answers 500, never a list: a list built without the block read
+ * would show people who blocked the viewer, and one built without profiles
+ * would read as "no one to follow yet". The onboarding people step and the
+ * phone People screen both render a 500 as their load-failed state.
  */
 export async function GET(req: Request) {
   const supabase = await createSupabaseServerClient();
@@ -196,7 +203,10 @@ export async function GET(req: Request) {
     for (const row of hop ?? []) {
       const id = (row as { following_id: string }).following_id;
       if (id === user.id) continue;
-      if (myConnections.has(id)) continue;
+      // `outIds` covers mutuals too: anyone the viewer already follows, one
+      // way or both, is not a suggestion (the same skip as the org peers and
+      // the fallback pool below).
+      if (outIds.has(id)) continue;
       mutualCount.set(id, (mutualCount.get(id) ?? 0) + 1);
     }
   }
@@ -298,16 +308,14 @@ export async function GET(req: Request) {
     fallbackPool.push(r.id);
   }
 
-  // Block list — exclude either direction.
-  const { data: blocks } = await supabase
-    .from("blocks")
-    .select("blocker_id,blocked_id")
-    .or(`blocker_id.eq.${user.id},blocked_id.eq.${user.id}`);
-  const blockedIds = new Set<string>();
-  for (const row of blocks ?? []) {
-    const r = row as { blocker_id: string; blocked_id: string };
-    blockedIds.add(r.blocker_id === user.id ? r.blocked_id : r.blocker_id);
+  // Blocks (either direction) and the viewer's active mutes. Fail closed: an
+  // unreadable block list must never turn into "nobody is blocked".
+  const hiddenRes = await loadHiddenUsers(supabase, user.id);
+  if (!hiddenRes.ok) {
+    console.error("[suggested-connections blocks]", hiddenRes.error);
+    return NextResponse.json({ ok: false, error: "Request failed" }, { status: 500 });
   }
+  const blockedIds = new Set<string>(hiddenRes.hidden.ids);
 
   // Dismissed list — viewer has hit × on these before; don't resurface.
   const { data: dismissals } = await supabase
@@ -373,13 +381,19 @@ export async function GET(req: Request) {
     return NextResponse.json({ ok: true, suggestions: [] });
   }
 
-  const { data: profiles } = await supabase
+  const { data: profiles, error: profilesErr } = await supabase
     .from("users")
     .select("id,name,handle,avatar_url,banner_url,banner_gradient,major,year")
     .in(
       "id",
       merged.map((m) => m.id),
     );
+  // Without profiles every row maps to null and the list comes back empty,
+  // which would read as "no one to follow yet". Say the read failed instead.
+  if (profilesErr) {
+    console.error("[suggested-connections profiles]", profilesErr);
+    return NextResponse.json({ ok: false, error: "Request failed" }, { status: 500 });
+  }
   type ProfileBase = Omit<
     Suggestion,
     | "mutual_count"
