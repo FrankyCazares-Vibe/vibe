@@ -380,8 +380,7 @@ body.edit-mode .profile-handle:hover { color:var(--charcoal); cursor:none; }
   text-transform:uppercase; letter-spacing:.5px; margin-right:4px;
 }
 
-/* Major picker — display text in normal mode, IU-grouped select in
-   edit mode. Hidden visibility flips on body.edit-mode. */
+/* Major picker: display text in normal mode; in edit mode the student's campus list (grouped when it has schools) or a free-text box. */
 body.edit-mode #metaMajor [data-major-display] { display:none; }
 body.edit-mode #metaMajor .meta-major-edit { display:inline-flex !important; }
 .meta-major-select, .meta-year-select, .meta-campus-select {
@@ -393,10 +392,7 @@ body.edit-mode #metaMajor .meta-major-edit { display:inline-flex !important; }
 .meta-major-select { max-width:200px; }
 .meta-year-select  { max-width:120px; }
 
-/* Campus picker — self-declared, never verified (an @iu.edu address
-   proves IU membership, not which campus). Same display/edit flip as
-   the major picker; the hint takes its own line inside .profile-meta
-   so the caveat is impossible to miss while editing. */
+/* Campus picker: the university comes from the verified school email; the campus is chosen within it (GET /api/campuses). Same display/edit flip as the major picker. */
 body.edit-mode #metaCampus [data-campus-display] { display:none; }
 body.edit-mode #metaCampus .meta-campus-edit { display:inline-flex !important; }
 body.edit-mode .meta-campus-hint { display:block !important; }
@@ -405,6 +401,10 @@ body.edit-mode .meta-campus-hint { display:block !important; }
   flex-basis:100%; font-size:11.5px; color:var(--muted); line-height:1.4;
   margin-top:-6px;
 }
+.meta-campus-hint [data-campus-sub]:not(:empty), .meta-campus-hint [data-campus-note]:not(:empty) { display:block; margin-top:2px; }
+.meta-campus-hint [data-campus-note] { color:#C0392B; }
+.meta-campus-static { font-size:12.5px; color:var(--muted); }
+.meta-campus-static a { color:var(--accent); font-weight:700; text-decoration:none; }
 
 /* Vibe tags */
 .vibe-tags { display:flex;flex-wrap:wrap;gap:8px;margin-bottom:24px; }
@@ -3361,10 +3361,10 @@ body.empty-profile-mode #profileEmpty { display: flex !important; }
     <p class="profile-tagline" data-edit="true" data-user-field="tagline" data-placeholder="A line that captures how you work" contenteditable="false"></p>
     <div class="profile-meta">
       <span class="meta-item"><span class="meta-label">Location</span><span data-edit="true" data-user-field="location" data-placeholder="City, country" contenteditable="false"></span></span>
-      <span class="meta-item" id="metaMajor"><span class="meta-label">Major</span><span data-user-field="headline" data-major-display data-placeholder="Pick a major"></span><span class="meta-major-edit" style="display:none;gap:6px;align-items:center;flex-wrap:wrap"><select id="majorSelect" class="meta-major-select" onchange="_onMajorYearChange()" aria-label="Major"></select><select id="yearSelect" class="meta-year-select" onchange="_onMajorYearChange()" aria-label="Year"><option value="">Year</option><option value="1">Year 1</option><option value="2">Year 2</option><option value="3">Year 3</option><option value="4">Year 4</option><option value="5">Year 5</option><option value="6">Grad</option></select></span></span>
-      <span class="meta-item" id="metaCampus"><span class="meta-label">Campus</span><span data-campus-display>Not set</span><span class="meta-campus-edit" style="display:none;gap:6px;align-items:center;flex-wrap:wrap"><select id="campusSelect" class="meta-campus-select" onchange="_onCampusChange()" aria-label="Campus"></select></span></span>
+      <span class="meta-item" id="metaMajor"><span class="meta-label">Major</span><span data-user-field="headline" data-major-display data-placeholder="Pick a major"></span><span class="meta-major-edit" style="display:none;gap:6px;align-items:center;flex-wrap:wrap"><select id="majorSelect" class="meta-major-select" onchange="_onMajorYearChange()" aria-label="Major"></select><input type="text" id="majorInput" class="meta-major-select" maxlength="200" placeholder="Your major" aria-label="Major" onchange="_onMajorYearChange()" style="display:none;cursor:text"><select id="yearSelect" class="meta-year-select" onchange="_onMajorYearChange()" aria-label="Year"><option value="">Year</option><option value="1">Year 1</option><option value="2">Year 2</option><option value="3">Year 3</option><option value="4">Year 4</option><option value="5">Year 5</option><option value="6">Grad</option></select></span></span>
+      <span class="meta-item" id="metaCampus"><span class="meta-label">Campus</span><span data-campus-display></span><span class="meta-campus-edit" style="display:none;gap:6px;align-items:center;flex-wrap:wrap"><span class="meta-campus-static" data-campus-static></span><select id="campusSelect" class="meta-campus-select" onchange="_onCampusChange()" aria-label="Campus"></select></span></span>
       <span class="meta-item"><span class="meta-label">Web</span><span data-edit="true" data-user-field="website" data-placeholder="yourname.com" contenteditable="false" style="color:var(--accent)"></span></span>
-      <span class="meta-campus-hint" style="display:none">Sets which campus's clubs and events you see first. Not verified — change it any time.</span>
+      <span class="meta-campus-hint" style="display:none"><span data-campus-hint-copy>Your campus community: its clubs, events and map. Indianapolis is one community for IU and Purdue students.</span><span data-campus-sub></span><span data-campus-note></span></span>
     </div>
     <div class="vibe-tags" id="vibeTags">
       <button class="tag-add" onclick="addTag()">+ Add tag</button>
@@ -3996,6 +3996,9 @@ function toggleEdit(){
   // starts a fresh tally, leaving flushes whatever is still pending.
   if (editMode) _profileSyncLastOk = null;
   else _confirmProfileSaveOnExit();
+  // Campus + major pickers need the student's university and campus list
+  // (GET /api/campuses). Loaded once; a failed load retries on the next entry.
+  if (editMode && typeof _ensureCampusContext === 'function') _ensureCampusContext();
   // Refresh pin button visibility
   if(typeof refreshPinButtons === 'function') refreshPinButtons();
 }
@@ -5781,6 +5784,95 @@ function _profilePrefillFromCard(card) {
     author:    me ? { name: me.name, handle: me.handle, avatar_url: me.avatarPhoto } : null,
   };
 }
+// ── Post edits saved in the post viewer ─────────────────────────────────
+// _postViewer.js dispatches the edited event on window after a successful
+// save: detail { id, content, tags, edited_at }, all from the server's
+// answer. The viewer never touches page DOM for an edit, so the Posts card,
+// its All-feed clone and the pinned slot catch up here, in place, with no
+// reload and no profile-sync. `content` and each tag are raw text: always
+// escaped with _esc, never inserted as-is.
+function _applyPostEditToCard(card, content, tags, edited) {
+  const body = card.querySelector('.ppost-body');
+  const textHTML = _esc(content).replace(/\n/g, '<br>');
+  if (body) {
+    const span = body.querySelector(':scope > .ppost-text');
+    if (span) {
+      span.innerHTML = textHTML;
+    } else {
+      // A card cached before the text had its own span: keep its media.
+      const media = Array.from(body.children)
+        .filter(el => el.tagName === 'IMG' || el.tagName === 'VIDEO')
+        .map(el => el.outerHTML)
+        .join('');
+      body.innerHTML = '<span class="ppost-text">' + textHTML + '</span>' + media;
+    }
+  }
+  let tagsEl = card.querySelector('.ppost-tags');
+  if (tags.length) {
+    if (!tagsEl) {
+      tagsEl = document.createElement('div');
+      tagsEl.className = 'ppost-tags';
+      const anchor = card.querySelector('.ppost-readmore') || body;
+      if (anchor) anchor.after(tagsEl); else card.appendChild(tagsEl);
+    }
+    tagsEl.innerHTML = tags.map(t => '<span class="ppost-tag">#' + _esc(t) + '</span>').join('');
+  } else if (tagsEl) {
+    tagsEl.remove();
+  }
+  // Only an answer that says the post was edited marks it (an empty patch
+  // echoes the row unchanged), and never twice.
+  const dateEl = card.querySelector('.ppost-date');
+  if (edited && dateEl) {
+    const dateText = (dateEl.textContent || '').trim();
+    if (!dateText.endsWith(' · Edited')) dateEl.textContent = dateText + ' · Edited';
+  }
+  _measureReadMore(card);
+}
+window.addEventListener('vibe:post-edited', (ev) => {
+  const d = ev && ev.detail;
+  if (!d || typeof d.id !== 'string' || !d.id) return;
+  const content = typeof d.content === 'string' ? d.content : '';
+  const tags = Array.isArray(d.tags) ? d.tags.filter(t => typeof t === 'string') : [];
+  const edited = typeof d.edited_at === 'string' && !!d.edited_at;
+  // The Saved grid is its own surface (an owner can bookmark their own post),
+  // and its thumbs would keep the pre-edit text until a reload — the same
+  // honesty the viewer's delete path gives it. textContent, so there's no
+  // escaping question. It can't add " · Edited": /api/me/bookmarks doesn't
+  // return edited_at. Before the Posts-card guard below, because the Saved
+  // grid is populated independently of #profilePostsList.
+  document
+    .querySelectorAll('.post-thumb-cell[data-source-post-id="' + CSS.escape(d.id) + '"] .post-thumb-body')
+    .forEach(el => { el.textContent = content.slice(0, 240); });
+  const cards = document.querySelectorAll('#profilePostsList .profile-post-card[data-post-id="' + CSS.escape(d.id) + '"]');
+  if (!cards.length) return;
+  cards.forEach(card => _applyPostEditToCard(card, content, tags, edited));
+  // Rebuilds the All feed's clones from the updated Posts cards.
+  populateAllGrid();
+  // The pinned slot, in place. Not through the pin function: its
+  // programmatic path saves the profile and queues a full profile-sync POST
+  // on every edit, and the pinned id didn't change.
+  if (profilePinnedId === d.id) {
+    const pinCard = document.querySelector('#pinnedContent .pinned-post-card[data-pin-id="' + CSS.escape(d.id) + '"]');
+    if (pinCard) {
+      const pinBody = pinCard.querySelector('.pin-post-body');
+      const cardBody = cards[0].querySelector('.ppost-body');
+      if (pinBody && cardBody) pinBody.innerHTML = cardBody.innerHTML; // already escaped
+      const cardTags = cards[0].querySelector('.ppost-tags');
+      let pinTags = pinCard.querySelector('.pin-post-tags');
+      if (cardTags && cardTags.innerHTML) {
+        if (!pinTags) {
+          pinTags = document.createElement('div');
+          pinTags.className = 'pin-post-tags';
+          if (pinBody) pinBody.after(pinTags); else pinCard.appendChild(pinTags);
+        }
+        pinTags.innerHTML = cardTags.innerHTML;
+      } else if (pinTags) {
+        pinTags.remove();
+      }
+    }
+  }
+  savePostsToStorage();
+});
 // Toggle the per-pane empty state (Posts). Run after every
 // hydration / publish / delete so they reflect reality. The body text
 // swaps based on owner vs viewer mode so visitors see "they haven't
@@ -6011,7 +6103,7 @@ function _publishProfilePostLocal(text, serverPost) {
       id:       (serverPost && serverPost.id) || 'p' + Date.now() + Math.random().toString(36).slice(2,5),
       ottoType: '',
       date:     'Just now',
-      bodyHTML: bodyText + imageHTML,
+      bodyHTML: '<span class="ppost-text">' + bodyText + '</span>' + imageHTML,
       ottoBadgeHTML:     '',
       tagsHTML,
       platformStatsHTML: '',
@@ -6392,11 +6484,22 @@ function _profSearchUserToRow(u) {
     real:    true,
   };
 }
-// Map an org row to the dropdown shape. Action button reads "View"
-// (orgs don't have a public follow API yet — joining is gated on the
-// org page itself).
+// Map an org row to the dropdown shape.
+// Org rows navigate (View); following and joining live on the org page.
+// Meta takes its order and wording from join-copy.ts: memberCountText, then
+// Verified, then the request/invite half of policyChip, then audienceChip.
+// There's no follower count, and an OPEN join policy is deliberately silent
+// here (policyChip would say "Open"): a search row says what it takes to get
+// in only when that's something to know. A missing field renders nothing.
 function _profSearchOrgToRow(o) {
-  var meta = (o.member_count || 0) + ' members' + (o.verified ? ' · Verified' : '');
+  var meta = [
+    (typeof o.member_count === 'number' && Number.isFinite(o.member_count))
+      ? (o.member_count === 1 ? '1 member' : o.member_count + ' members')
+      : null,
+    o.verified ? 'Verified' : null,
+    o.join_policy === 'invite' ? 'Invite only' : o.join_policy === 'request' ? 'By request' : null,
+    o.audience === 'iu' ? 'IU only' : o.audience === 'purdue' ? 'Purdue only' : null,
+  ].filter(Boolean).join(' · ');
   var initials = (o.name || o.handle || '?').split(/\s+/)
     .map(function(p){ return p[0]; }).filter(Boolean).join('').slice(0,2).toUpperCase();
   return {
@@ -6726,15 +6829,6 @@ let calYear=new Date().getFullYear(),calMonth=new Date().getMonth(),calSelectedK
 const MONTHS=['January','February','March','April','May','June','July','August','September','October','November','December'];
 const DAYS=['Su','Mo','Tu','We','Th','Fr','Sa'];
 const calendarEvents = {};
-(function seedEvents() {
-  const now = new Date(), y = now.getFullYear(), m = now.getMonth();
-  [
-    [new Date(y,m,now.getDate()+2),  'IU Spring Career Fair',     '10:00','IMU Alumni Hall',              'Bring resume, business casual','#1A9E5B'],
-    [new Date(y,m,now.getDate()+5),  'Goldman Sachs Info Session', '17:30','Kelley School of Business 100','',                            '#2563EB'],
-    [new Date(y,m,now.getDate()+8),  'Weekly Design Critique',     '19:00','Luddy Hall 1106',              'Bring a prototype or sketch',  '#7C5CFC'],
-    [new Date(y,m,now.getDate()+14), 'IU Hackathon 2025',          '09:00','Assembly Hall',               '$10k prizes',                  '#FF5C35'],
-  ].forEach(([d,n,t,l,o,c]) => _storeEvent(d,n,t,l,o,c));
-})();
 function _storeEvent(dateObj,name,time,location,notes,color){
   color=color||'#FF5C35';
   const key=dateKey(dateObj);
@@ -6878,11 +6972,39 @@ function _calSave() {
   } catch(e) {}
 }
 
+// Demo events an old build seeded into every calendar. Anyone who ever added
+// or removed an event saved them under CAL_KEY, so deleting the seed alone
+// left them forever. profile.html and messages.html carry this exact block:
+// change both or neither.
+const CAL_SEED_PURGE = [
+  ['IU Spring Career Fair', 'IMU Alumni Hall'],
+  ['Goldman Sachs Info Session', 'Kelley School of Business 100'],
+  ['Weekly Design Critique', 'Luddy Hall 1106'],
+  ['IU Hackathon 2025', 'Assembly Hall'],
+];
+function _calPurgeSeed(saved) {
+  let changed = false;
+  Object.keys(saved).forEach(k => {
+    const list = Array.isArray(saved[k]) ? saved[k] : [];
+    const kept = list.filter(e => !(e && CAL_SEED_PURGE.some(([n, l]) => e.name === n && e.location === l)));
+    if (kept.length) {
+      if (kept.length !== list.length) { saved[k] = kept; changed = true; }
+    } else {
+      delete saved[k];
+      changed = true;
+    }
+  });
+  return changed;
+}
+
 function _calLoad() {
   try {
     const raw = localStorage.getItem(CAL_KEY);
     if (!raw) return;
     const saved = JSON.parse(raw);
+    if (!saved || typeof saved !== 'object' || Array.isArray(saved)) return;
+    // Runs on every load (idempotent): writes back only when it dropped one.
+    if (_calPurgeSeed(saved)) localStorage.setItem(CAL_KEY, JSON.stringify(saved));
     Object.keys(saved).forEach(k => {
       calendarEvents[k] = saved[k];
     });
@@ -7048,116 +7170,269 @@ function _sortWorkExperienceByRecency(rows) {
 }
 
 // ── Campus picker ───────────────────────────────────────────────────────
-// Campus is SELF-DECLARED: IU issues @iu.edu addresses university-wide, so
-// verifying the address proves IU membership but not which campus. It's a
-// filtering preference, never a privacy boundary — nothing sensitive may
-// be gated on it.
+// The student's university comes from their verified school email, and the
+// campus is chosen within it. The options, the university and the saved
+// campus all come from GET /api/campuses; this page keeps no static mirror.
+// Indianapolis is one community for IU and Purdue students. The 30-day
+// cooldown comes from the own bootstrap (`campusChangeAvailableAt`), since
+// /api/campuses has none. A save sends `campus_id` only when the student
+// picked a DIFFERENT campus here: re-sending the current one would confirm a
+// backfilled campus and start the 30-day lock (profile-campus-write.ts).
+// Rules and copy match src/lib/profile/settings-campus-card.ts, which
+// Settings and the phone profile share, with ONE rule this page can't
+// evaluate: there the 30-day lock also needs `onboarded` (a campus picked
+// mid-onboarding doesn't lock yet), and neither /api/campuses nor the own
+// bootstrap sends that flag. So this page never manufactures a lock — it
+// only shows the bootstrap's own `campusChangeAvailableAt` — and lets the
+// server's `campusError` refuse a change it really can't allow. Nothing
+// campus-related is stored in vibe_user_v1.
 //
-// MIRROR of IU_CAMPUSES in src/lib/iu/campuses.ts — that module is the
-// source of truth (the server validates every write against it). This page
-// is static with no build step, so it can't import the TS module; keep the
-// labels below in sync by hand, the same way HANDLE_FORMAT_RE mirrors
-// src/lib/profile/handle.ts. Stored value is the LABEL, not the id.
-//
-// Lives ABOVE initProfilePage() on purpose: that IIFE runs the moment the
-// script is parsed and hydrates this picker, so the same `const` further
-// down the file would still be in its temporal dead zone.
-const IU_CAMPUSES = [
-  { id: 'indianapolis', label: 'IU Indianapolis', city: 'Indianapolis' },
-  { id: 'bloomington',  label: 'IU Bloomington',  city: 'Bloomington' },
-  { id: 'east',         label: 'IU East',         city: 'Richmond' },
-  { id: 'fort-wayne',   label: 'IU Fort Wayne',   city: 'Fort Wayne' },
-  { id: 'kokomo',       label: 'IU Kokomo',       city: 'Kokomo' },
-  { id: 'northwest',    label: 'IU Northwest',    city: 'Gary' },
-  { id: 'south-bend',   label: 'IU South Bend',   city: 'South Bend' },
-  { id: 'southeast',    label: 'IU Southeast',    city: 'New Albany' },
-  { id: 'online',       label: 'IU Online',       city: 'Online' },
-];
+// The state is `var` and lives ABOVE initProfilePage() on purpose: that IIFE
+// runs the moment the script is parsed and hydrates this picker, so a
+// `let`/`const` further down would still be in its temporal dead zone.
+//   _campusCtx         { system, campuses, currentCampusId, availableAt }, or
+//                      null while loading, after a failed load, or outside
+//                      the app shell
+//   _campusCtxPromise  the context load (in flight or done); null = not
+//                      started, or failed (the next edit-mode entry retries)
+//   _campusPick        a different campus picked here that no sync has
+//                      answered yet
+var _campusCtx = null;
+var _campusCtxPromise = null;
+var _campusPick = null;
 
-// Option text — matches onboarding.html's picker, which disambiguates the
-// campuses whose name isn't the city ("IU East — Richmond").
-function _campusOptionText(c) {
-  return (c.city && c.city !== c.label.replace(/^IU /, ''))
-    ? c.label + ' \u2014 ' + c.city
-    : c.label;
+// Settings' warning before a campus save (CAMPUS_SWITCH_LOCK_COPY in
+// settings-campus-card.ts).
+const _CAMPUS_SWITCH_LOCK_COPY = "You can't change your campus again for 30 days.";
+
+function _campusUser() {
+  return ((typeof vibeLoad === 'function') ? vibeLoad('vibe_user_v1') : null) || {};
 }
 
-// Coerce anything (a stored label, a badge string, junk) to a canonical
-// campus label, or '' when it matches no known campus. Mirrors
-// normalizeCampusLabel() / campusByLabel() on the server.
-function _canonicalCampusLabel(value) {
-  const v = (typeof value === 'string' ? value : '').trim().toLowerCase();
-  if (!v) return '';
-  const hit = IU_CAMPUSES.find(c => c.label.toLowerCase() === v || c.id === v);
-  return hit ? hit.label : '';
+// The server-rendered campus badge ("IU Indianapolis", "Bloomington"), or ''
+// when there is none or it only names the university ("IU verified").
+// build-vibe-user-v1.ts renders it (campusBadgeForProfile) for owners and
+// visitors alike.
+function _campusBadgeText(user) {
+  const s = user && user.studentVerification && user.studentVerification.school;
+  return typeof s === 'string' && s && !/^(IU|Purdue) verified$/.test(s) ? s : '';
 }
 
-// The user's current campus. `campus` is the authoritative copy that
-// /api/me/profile-bootstrap sends top-level and flushProfileServerSync
-// stores; the student badge is the fallback for storage written before
-// this shipped (build-vibe-user renders the campus label there, and
-// "IU verified" — which matches no campus — when it's unset).
-function _currentCampusLabel(u) {
-  if (!u) return '';
-  const stored = _canonicalCampusLabel(u.campus);
-  if (stored) return stored;
-  return _canonicalCampusLabel(u.studentVerification && u.studentVerification.school);
+// Word for word campusChangeTooSoonCopy (profile-campus-write.ts).
+function _campusTooSoonCopy(iso) {
+  const ms = Date.parse(iso);
+  if (!Number.isFinite(ms)) return 'You changed your campus recently. Try again later.';
+  const day = new Date(ms).toLocaleDateString('en-US', {
+    month: 'long',
+    day: 'numeric',
+    timeZone: 'America/Indiana/Indianapolis',
+  });
+  return `You can change your campus again on ${day}.`;
 }
 
-function _populateCampusPicker() {
-  const sel = document.getElementById('campusSelect');
-  if (!sel) return;
-  if (sel.dataset.populated === '1') return;
-  sel.innerHTML = '';
-  // "Not set" stays a legitimate choice — the server reads an empty
-  // school as "show everything", so nobody is forced to pick.
-  const blank = document.createElement('option');
-  blank.value = '';
-  blank.textContent = 'Not set';
-  sel.appendChild(blank);
-  for (const c of IU_CAMPUSES) {
-    const o = document.createElement('option');
-    o.value = c.label;
-    o.textContent = _campusOptionText(c);
-    sel.appendChild(o);
-  }
-  sel.dataset.populated = '1';
+// Loads the campus context once (owner, app shell). Called on every
+// edit-mode entry from toggleEdit; a failed load clears the promise so the
+// next entry retries.
+function _ensureCampusContext() {
+  if (window.viewingRealUser || !_isAppShell()) return null;
+  if (_campusCtxPromise) return _campusCtxPromise;
+  const campusesReq = fetch('/api/campuses', { credentials: 'include' })
+    .then(r => (r.ok ? r.json() : null));
+  // Optional: it only carries the cooldown, so its failure must never
+  // discard a good /api/campuses answer. Without it the server's
+  // campusError is the backstop.
+  const bootReq = fetch('/api/me/profile-bootstrap', { credentials: 'include' })
+    .then(r => (r.ok ? r.json() : null))
+    .catch(() => null);
+  const run = Promise.all([campusesReq, bootReq])
+    .then(([c, b]) => {
+      if (!c || c.ok !== true || !Array.isArray(c.campuses)) {
+        throw new Error('campus context unavailable');
+      }
+      const campuses = c.campuses.filter(row =>
+        row && typeof row.id === 'string' && row.id && typeof row.shortName === 'string');
+      const current = (typeof c.currentCampusId === 'string' && campuses.some(row => row.id === c.currentCampusId))
+        ? c.currentCampusId
+        : null;
+      _campusCtx = {
+        system: (c.system === 'iu' || c.system === 'purdue') ? c.system : null,
+        campuses,
+        currentCampusId: current,
+        availableAt: (b && typeof b.campusChangeAvailableAt === 'string') ? b.campusChangeAvailableAt : null,
+      };
+    })
+    .catch(() => {
+      // 503 campus_not_ready, a non-2xx, or the network.
+      _campusCtx = null;
+      if (_campusCtxPromise === run) _campusCtxPromise = null;
+    })
+    .then(() => {
+      _renderCampusPicker();
+      _hydrateMajorPicker(_campusUser());
+    });
+  _campusCtxPromise = run;
+  // Pending: the major select shows empty and disabled, so the free-text
+  // box from first paint never flashes before the list arrives.
+  _hydrateMajorPicker(_campusUser());
+  return run;
 }
 
+// What the owner's Campus row reads when there is no select to read instead:
+// the server-rendered badge, else the prompt their state earns. Shared by the
+// display chip (normal mode) and the static span (edit mode with no campus
+// context), so the row never goes blank on them.
+function _campusOwnerText(user) {
+  return _campusBadgeText(user)
+    || ((user && user.studentVerification) ? 'Pick your campus' : 'Not set');
+}
+
+// The chip's display text (normal mode), then the edit-mode picker.
 function _hydrateCampusPicker(user) {
-  _populateCampusPicker();
-  const label = _currentCampusLabel(user);
+  const badge = _campusBadgeText(user);
   const item = document.getElementById('metaCampus');
   const disp = item ? item.querySelector('[data-campus-display]') : null;
-  const sel = document.getElementById('campusSelect');
-  if (disp) disp.textContent = label || 'Not set';
-  if (sel) sel.value = label;
-  // On someone else's profile there's no picker and no owner to prompt,
-  // so an empty campus is just noise — drop the whole chip.
   const isVisitor = !!window.viewingRealUser;
-  if (item) item.style.display = (isVisitor && !label) ? 'none' : '';
+  if (disp) {
+    disp.textContent = isVisitor ? badge : _campusOwnerText(user);
+  }
+  // On someone else's profile there's no picker and no owner to prompt,
+  // so a missing campus is just noise: drop the whole chip.
+  if (item) item.style.display = (isVisitor && !badge) ? 'none' : '';
   const hint = document.querySelector('.meta-campus-hint');
   if (hint && isVisitor) hint.style.display = 'none';
+  _renderCampusPicker(user);
 }
 
-function _onCampusChange() {
-  if (typeof vibeLoad !== 'function' || typeof vibeSave !== 'function') return;
+// The edit-mode picker, owner only. Safe before the context exists: with no
+// context (loading, failed, outside the app shell) there is no select, just
+// the text the chip already shows, and never a static list or a "Not set"
+// option.
+function _renderCampusPicker(user) {
+  if (window.viewingRealUser) return;
   const sel = document.getElementById('campusSelect');
   if (!sel) return;
-  const u = vibeLoad('vibe_user_v1') || {};
-  const label = _canonicalCampusLabel(sel.value);
-  u.campus = label;
-  // Local-only flag (never sent as-is). buildProfileSyncPayload omits
-  // `school` when we don't have a campus, so a stale cache can't blank a
-  // campus set on another device; this records that the user *meant* to
-  // clear it, which is the one case where sending '' is correct.
-  if (label) delete u._campusCleared; else u._campusCleared = true;
-  vibeSave('vibe_user_v1', u);
-  const disp = document.querySelector('#metaCampus [data-campus-display]');
-  if (disp) disp.textContent = label || 'Not set';
+  const stat = document.querySelector('#metaCampus [data-campus-static]');
+  const sub = document.querySelector('.meta-campus-hint [data-campus-sub]');
+  const note = document.querySelector('.meta-campus-hint [data-campus-note]');
+  const ctx = _campusCtx;
+  if (!ctx || ctx.system === null) {
+    sel.style.display = 'none';
+    sel.disabled = false;
+    sel.innerHTML = '';
+    // The options are gone, so the next render with a context must rebuild
+    // them even if its key is the one this select last carried.
+    sel.dataset.renderedFor = '';
+    if (stat) {
+      if (!ctx) {
+        // The same text the chip shows in normal mode, not just the badge:
+        // a verified student with no campus yet has no badge, and the edit
+        // row would otherwise read "Campus" and nothing at all.
+        stat.textContent = _campusOwnerText(user || _campusUser());
+      } else {
+        // No university proved yet: nothing to pick from (Settings' copy).
+        stat.textContent = 'Verify your school email to pick your campus. ';
+        const link = document.createElement('a');
+        link.href = '/auth/school-email';
+        link.textContent = 'Verify now →';
+        stat.appendChild(link);
+      }
+    }
+    if (sub) sub.textContent = '';
+    if (note) note.textContent = '';
+    return;
+  }
+  if (stat) stat.textContent = '';
+  sel.style.display = '';
+  const value = _campusPick || ctx.currentCampusId || '';
+  // The OPTIONS are rebuilt only when their own inputs changed. Every render
+  // below this still re-reads the value, the sub-line and the lock, because a
+  // pick, a sync answer or an adopted bootstrap can each change those. The
+  // guard matters because a profile sync (queued by any keystroke in edit
+  // mode) adopts the bootstrap ~1.5s later and repaints this picker: wiping
+  // the options snaps an open campus dropdown shut under the student's
+  // cursor. Same shape as _populateMajorPicker's `populatedFor`.
+  const optionsKey = ctx.system + '|' + (value === '' ? 'blank' : 'set') + '|'
+    + ctx.campuses.map(c => c.id + (c.isOpen ? ':1' : ':0')).join(',');
+  if (sel.dataset.renderedFor !== optionsKey) {
+    sel.innerHTML = '';
+    if (value === '') {
+      const blank = document.createElement('option');
+      blank.value = '';
+      blank.disabled = true;
+      blank.selected = true;
+      blank.textContent = 'Pick your campus';
+      sel.appendChild(blank);
+    }
+    for (const c of ctx.campuses) {
+      const o = document.createElement('option');
+      o.value = c.id;
+      // campusOptionLabel (settings-campus-card.ts).
+      o.textContent = c.isOpen ? c.shortName : c.shortName + ' — not open yet';
+      sel.appendChild(o);
+    }
+    sel.dataset.renderedFor = optionsKey;
+  }
+  sel.value = value;
+  const row = value ? ctx.campuses.find(c => c.id === value) : null;
+  if (sub) sub.textContent = row ? (row.sharedWith || row.name || '') : '';
+  const availableMs = ctx.availableAt ? Date.parse(ctx.availableAt) : NaN;
+  const locked = Number.isFinite(availableMs) && availableMs > Date.now();
+  sel.disabled = locked;
+  if (note) note.textContent = locked ? _campusTooSoonCopy(ctx.availableAt) : '';
+}
+
+// A pick from the select. Once saved, a campus locks for 30 days, so a
+// different campus asks first with Settings' prompt (campusPickStep):
+// "Switch to Fort Wayne?" / "Make Indianapolis your campus?". Cancel puts
+// the select back and saves nothing. The pick rides the next profile sync
+// as `campus_id`; nothing is written to vibe_user_v1.
+function _onCampusChange() {
+  const ctx = _campusCtx;
+  if (!ctx) return;
+  const sel = document.getElementById('campusSelect');
+  if (!sel) return;
+  const v = sel.value;
+  const row = v ? ctx.campuses.find(c => c.id === v) : null;
+  if (!row) return;
+  if (v !== ctx.currentCampusId) {
+    const title = ctx.currentCampusId ? `Switch to ${row.shortName}?` : `Make ${row.shortName} your campus?`;
+    const body = row.isOpen
+      ? _CAMPUS_SWITCH_LOCK_COPY
+      : `${row.shortName} isn't open yet. ${_CAMPUS_SWITCH_LOCK_COPY}`;
+    if (!window.confirm(title + '\n' + body)) {
+      _renderCampusPicker();
+      return;
+    }
+  }
+  _campusPick = (v === ctx.currentCampusId) ? null : v;
+  _renderCampusPicker();
+  _hydrateMajorPicker(_campusUser());
   if (typeof scheduleProfileServerSync === 'function') {
     scheduleProfileServerSync();
   }
+}
+
+// The campus half of a profile-sync answer (called before the adoption's
+// early return, so an edit made mid-flight can't swallow it). `err` is the
+// server's campusError: its `error` is already the student's line.
+function _afterCampusSync(sent, err) {
+  if (err && typeof err.error === 'string') {
+    if (typeof window.vibeToast === 'function') window.vibeToast(err.error, { tone: 'error' });
+    if (_campusCtx && typeof err.availableAt === 'string') _campusCtx.availableAt = err.availableAt;
+  } else if (_campusCtx) {
+    _campusCtx.currentCampusId = sent;
+    // The lock is NOT stamped here. nextAvailableAfterWrite() only starts the
+    // 30-day clock once onboarding is done, and this page has no `onboarded`
+    // flag to check (neither /api/campuses nor the own bootstrap sends one),
+    // so a local stamp would disable the select for a student the server
+    // would still let change campus. The bootstrap adoption below brings the
+    // server's own date, and a campus the rule really refuses comes back as
+    // `campusError` (`campus_change_too_soon`) with its `availableAt`.
+  }
+  // A newer pick made during the flight stays staged for its own sync.
+  if (_campusPick === sent) _campusPick = null;
+  _renderCampusPicker();
+  _hydrateMajorPicker(_campusUser());
 }
 
 (function initProfilePage(){
@@ -7296,9 +7571,6 @@ function _onCampusChange() {
         if (!j || !j.ok || !j.vibeUser) { _emptyFail(); return; }
         const nu = Object.assign({}, j.vibeUser);
         nu._appShell = true;
-        // Top-level on the bootstrap, not inside vibeUser — carry it over
-        // so the campus picker prefills on the very first paint.
-        nu.campus = (typeof j.campus === 'string') ? j.campus : '';
         if (typeof vibeSave === 'function') vibeSave('vibe_user_v1', nu);
         // Strip ?clear=1 so the reload doesn't loop the wipe.
         const url = new URL(window.location.href);
@@ -7540,52 +7812,95 @@ function hydrateProfileFields(user) {
 }
 
 // ── Major + year edit controls ──────────────────────────────────────────
-// Replaces the legacy free-text "Role" field with IU-Indianapolis-grouped
-// dropdowns so the campus map can reliably group people by school. The
-// display span (data-major-display) shows the derived headline; the
-// selects appear in edit mode and write back to vibe_user_v1 + the
-// /api/me/profile-sync flow on change.
-function _populateMajorPicker() {
+// The display span (data-major-display) shows the derived headline. In edit
+// mode the major list comes from window.vibeMajorsForCampus(campusId, system)
+// (_iu-majors.js, generated from src/lib/iu/majors.ts) for the student's
+// campus and university, grouped by school when the list has schools. A
+// campus with no curated list gets a free-text box (#majorInput), the same
+// as onboarding. Changes write back to vibe_user_v1 + the
+// /api/me/profile-sync flow.
+function _populateMajorPicker(campusId, system) {
   const sel = document.getElementById('majorSelect');
-  if (!sel || !window.IU_MAJORS_BY_SCHOOL) return;
-  // Don't repopulate if already done (idempotent for re-hydrate).
-  if (sel.dataset.populated === '1') return;
+  const input = document.getElementById('majorInput');
+  if (!sel) return;
+  // Idempotent for re-hydrate; a campus change gives a new key, so the list
+  // re-populates.
+  const key = (campusId || '') + '|' + (system || '');
+  if (sel.dataset.populatedFor === key) return;
+  const list = typeof window.vibeMajorsForCampus === 'function'
+    ? window.vibeMajorsForCampus(campusId, system)
+    : null;
+  if (!list) {
+    sel.style.display = 'none';
+    if (input) input.style.display = '';
+    sel.dataset.populatedFor = key;
+    return;
+  }
+  sel.style.display = '';
+  sel.disabled = false;
+  if (input) input.style.display = 'none';
   sel.innerHTML = '';
   const blank = document.createElement('option');
   blank.value = '';
   blank.textContent = 'Major';
   sel.appendChild(blank);
-  for (const g of window.IU_MAJORS_BY_SCHOOL) {
-    const og = document.createElement('optgroup');
-    og.label = g.school.shortLabel;
-    for (const m of g.majors) {
-      const o = document.createElement('option');
-      o.value = m;
-      o.textContent = m;
-      og.appendChild(o);
+  const addOption = (parent, m) => {
+    const o = document.createElement('option');
+    o.value = m;
+    o.textContent = m;
+    parent.appendChild(o);
+  };
+  const groups = Array.isArray(list.groups) ? list.groups : [];
+  if (groups.length) {
+    for (const g of groups) {
+      const og = document.createElement('optgroup');
+      og.label = g.school.shortLabel;
+      for (const m of g.majors) addOption(og, m);
+      sel.appendChild(og);
     }
-    sel.appendChild(og);
+  } else {
+    for (const m of (Array.isArray(list.majors) ? list.majors : [])) addOption(sel, m);
   }
-  sel.dataset.populated = '1';
+  sel.dataset.populatedFor = key;
 }
 
 function _hydrateMajorPicker(user) {
-  _populateMajorPicker();
   const sel = document.getElementById('majorSelect');
+  const input = document.getElementById('majorInput');
   const yr  = document.getElementById('yearSelect');
-  if (sel) {
-    const cur = ((user && user.major) || '').toString().trim();
-    if (cur && !Array.from(sel.querySelectorAll('option')).some(o => o.value === cur)) {
-      // Saved major doesn't match any taxonomy option (legacy free-text
-      // from before this picker shipped) — surface it as a top-of-list
-      // option so the dropdown doesn't reset to blank.
-      const extra = document.createElement('option');
-      extra.value = cur;
-      extra.textContent = cur;
-      const firstGroup = sel.querySelector('optgroup');
-      if (firstGroup) sel.insertBefore(extra, firstGroup); else sel.appendChild(extra);
+  const cur = ((user && user.major) || '').toString().trim();
+  // The campus context is loading: an empty, disabled select until the list
+  // for the student's campus is known.
+  const pending = _campusCtxPromise !== null && _campusCtx === null;
+  if (pending) {
+    if (sel) {
+      sel.innerHTML = '';
+      sel.style.display = '';
+      sel.disabled = true;
+      sel.dataset.populatedFor = '';
     }
-    sel.value = cur;
+    if (input) input.style.display = 'none';
+  } else {
+    // A failed or absent context gives (null, null): free text.
+    _populateMajorPicker(
+      _campusPick || (_campusCtx && _campusCtx.currentCampusId) || null,
+      _campusCtx ? _campusCtx.system : null,
+    );
+    if (sel && sel.style.display !== 'none') {
+      if (cur && !Array.from(sel.querySelectorAll('option')).some(o => o.value === cur)) {
+        // Saved major doesn't match any option for this campus (legacy
+        // free text, or a major from another list): surface it at the top
+        // so the dropdown doesn't reset to blank.
+        const extra = document.createElement('option');
+        extra.value = cur;
+        extra.textContent = cur;
+        const anchor = sel.querySelector('optgroup') || sel.options[1] || null;
+        sel.insertBefore(extra, anchor);
+      }
+      sel.value = cur;
+    }
+    // Never overwrite what the student is typing right now.
+    if (input && document.activeElement !== input) input.value = cur;
   }
   if (yr) {
     yr.value = (user && typeof user.year === 'number') ? String(user.year) : '';
@@ -7596,8 +7911,12 @@ function _onMajorYearChange() {
   if (typeof vibeLoad !== 'function' || typeof vibeSave !== 'function') return;
   const u = vibeLoad('vibe_user_v1') || {};
   const sel = document.getElementById('majorSelect');
+  const input = document.getElementById('majorInput');
   const yr  = document.getElementById('yearSelect');
-  if (sel) u.major = sel.value;
+  // The free-text box when it's showing; the select otherwise. A disabled
+  // (still loading, empty) select leaves the saved major alone.
+  if (input && input.style.display !== 'none') u.major = input.value.trim().slice(0, 200);
+  else if (sel && !sel.disabled) u.major = sel.value;
   if (yr)  u.year  = yr.value ? parseInt(yr.value, 10) : null;
   // Clear the stored headline so the next bootstrap re-derives it from
   // the fresh major + year (same fix as the mobile flow on the server
@@ -7859,17 +8178,12 @@ function buildProfileSyncPayload() {
     // in 0-100 page-percentage coordinates.
     resume_redactions: Array.isArray(u.resumeRedactions) ? u.resumeRedactions : [],
   };
-  // Self-declared campus → users.school. Only sent when we actually know
-  // the value: profile-sync leaves the column alone when the key is
-  // absent, so omitting it keeps a stale desktop cache from wiping a
-  // campus the user set on mobile. The one exception is an explicit
-  // "Not set" pick in this browser, which must be able to clear it.
-  const campusLabel = _currentCampusLabel(u);
-  if (campusLabel) {
-    payload.school = campusLabel;
-  } else if (u._campusCleared) {
-    payload.school = '';
-  }
+  // Campus: `campus_id` goes out only when the student picked a DIFFERENT
+  // campus from their university in this browser (the campus picker). The
+  // legacy label key is never sent, and neither is the current id:
+  // re-sending an unconfirmed campus would confirm it and start the 30-day
+  // lock (profile-campus-write.ts). Absent, profile-sync leaves it alone.
+  if (_campusPick && _campusCtx && _campusPick !== _campusCtx.currentCampusId && _campusCtx.campuses.some(c => c.id === _campusPick)) payload.campus_id = _campusPick;
   if (bannerUrl) {
     payload.banner_url = bannerUrl;
   } else if (coverThemeKey) {
@@ -8177,6 +8491,10 @@ async function _runProfileServerSync(failure) {
     return false;
   }
   _profileSyncLastOk = true;
+  // The campus answer first, before the localIsNewer() return below: an
+  // edit made during this flight must not swallow a refused campus.
+  const sentCampusId = payload.campus_id;
+  if (typeof sentCampusId === 'string') _afterCampusSync(sentCampusId, r.data && r.data.campusError);
   // Adopt the server's copy below only while nothing newer is on this
   // device. An edit made during this flight has either marked the profile
   // dirty again (its flush is queued behind this one) or is still inside
@@ -8195,13 +8513,18 @@ async function _runProfileServerSync(failure) {
       const prev = (typeof vibeLoad === 'function') ? vibeLoad('vibe_user_v1') : {};
       const nu = Object.assign({}, jb.vibeUser);
       nu._appShell = true;
-      // Campus rides top-level on the bootstrap (not inside vibeUser,
-      // which only carries the rendered badge text), so carry it across
-      // by hand. Server is source of truth: adopting a real campus also
-      // retires the local "user cleared it" flag.
-      nu.campus = (typeof jb.campus === 'string') ? jb.campus : '';
-      if (nu.campus) delete nu._campusCleared;
-      else if (prev && prev._campusCleared) nu._campusCleared = true;
+      // Campus rides top-level on the bootstrap (vibeUser carries only the
+      // rendered badge). It updates the picker's context, never
+      // vibe_user_v1. A pick still waiting on its own sync keeps the select
+      // where the student put it; hydrateProfileFields below repaints.
+      if (_campusCtx) {
+        if (!_campusPick) {
+          _campusCtx.currentCampusId = (typeof jb.campusId === 'string' && _campusCtx.campuses.some(c => c.id === jb.campusId))
+            ? jb.campusId
+            : null;
+        }
+        _campusCtx.availableAt = (typeof jb.campusChangeAvailableAt === 'string') ? jb.campusChangeAvailableAt : null;
+      }
       if (prev && prev.counts) nu.counts = prev.counts;
       if (prev && prev.glance) nu.glance = prev.glance;
       if (prev && prev.pinnedId != null) nu.pinnedId = prev.pinnedId;
@@ -8444,8 +8767,11 @@ function _profileMapDbRow(row) {
   return {
     id: row.id,
     ottoType: '',
-    date: _formatRelativeDate(row.created_at),
-    bodyHTML: bodyText + mediaHTML,
+    // `edited_at` (null = never edited) marks an edited post.
+    date: _formatRelativeDate(row.created_at) + (row.edited_at ? ' · Edited' : ''),
+    // The text sits in its own span so an edit saved in the post viewer can
+    // swap it without touching the media under it.
+    bodyHTML: '<span class="ppost-text">' + bodyText + '</span>' + mediaHTML,
     ottoBadgeHTML: '',
     tagsHTML: tags,
     platformStatsHTML: '',
@@ -9185,7 +9511,7 @@ function showWelcomeBanner() {
     <div class="create-event-body">
       <div class="form-field">
         <label class="form-label">Event name</label>
-        <input class="form-input" id="evtName" type="text" placeholder="e.g. Goldman Sachs Info Session">
+        <input class="form-input" id="evtName" type="text" placeholder="e.g. Club info session">
       </div>
       <div class="form-row">
         <div class="form-field">
@@ -9199,7 +9525,7 @@ function showWelcomeBanner() {
       </div>
       <div class="form-field">
         <label class="form-label">Location</label>
-        <input class="form-input" id="evtLocation" type="text" placeholder="e.g. Kelley School of Business 100">
+        <input class="form-input" id="evtLocation" type="text" placeholder="e.g. Library, room 200">
       </div>
       <div class="form-field">
         <label class="form-label">Notes</label>
