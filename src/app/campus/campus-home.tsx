@@ -20,6 +20,7 @@ import { ImageCropperModal } from "@/components/ImageCropperModal";
 import { emitCalendarChanged } from "@/components/LeftNav";
 import { SharePostSheet } from "@/components/mobile/SharePostSheet";
 import { UserCard, type UserCardProps } from "@/components/network/UserCard";
+import { OrgJoinControl } from "@/components/orgs/OrgJoinControl";
 import {
   PostAudienceList,
   type PostAudienceUser,
@@ -42,6 +43,17 @@ import {
 } from "@/lib/iu/campuses";
 import { IU_SCHOOLS, schoolForMajorIn } from "@/lib/iu/majors";
 import { PURDUE_INDIANAPOLIS_SCHOOLS } from "@/lib/iu/majors-purdue-indianapolis";
+import { orgAssetProxyUrl } from "@/lib/org-asset-url";
+import {
+  audienceChip,
+  inviteSubText,
+  memberCountText,
+  type OrgControlChange,
+  type OrgRelation,
+  orgRowView,
+  policyChip,
+} from "@/lib/orgs/join-copy";
+import type { JoinPolicy, JoinState, OrgAudience } from "@/lib/orgs/join-state";
 import {
   checkPostEdit,
   EDITED_LABEL,
@@ -136,6 +148,12 @@ type Org = {
   last_activity_at?: string | null;
   links?: Array<{ label: string; url: string }>;
   philanthropy?: string;
+  // Sent by the membership list the rail loads. `is_public` stays for the
+  // settings modal; the rail header reads `join_policy` and `hidden`.
+  join_policy?: JoinPolicy;
+  audience?: OrgAudience;
+  hidden?: boolean;
+  campus_id?: string | null;
 };
 
 export type BackdropKey = "cream" | "sand-purple" | "ember" | "deep-violet" | "forest" | "midnight";
@@ -3907,9 +3925,12 @@ type SearchOrg = {
   name: string;
   description: string;
   logo_url: string | null;
+  // No longer read: the row's meta comes from `join_policy` and `audience`.
   is_public: boolean;
   verified: boolean;
   member_count: number;
+  join_policy?: JoinPolicy;
+  audience?: OrgAudience;
 };
 type SearchEvent = {
   id: string;
@@ -4287,7 +4308,14 @@ function CampusSearchBar() {
                     <EntityRow
                       key={o.id}
                       name={o.name}
-                      role={`${o.member_count} members${o.verified ? " · Verified" : ""}`}
+                      role={[
+                        memberCountText(o.member_count),
+                        o.verified ? "Verified" : null,
+                        o.join_policy && o.join_policy !== "open" ? policyChip(o.join_policy) : null,
+                        o.audience ? audienceChip(o.audience) : null,
+                      ]
+                        .filter(Boolean)
+                        .join(" · ")}
                       avatar={o.logo_url || ""}
                       av={initials(o.name || o.handle)}
                       action="View"
@@ -8710,72 +8738,185 @@ type DiscoverOrg = {
   description: string;
   logo_url: string | null;
   banner_url?: string | null;
-  is_public: boolean;
   backdrop_preset: BackdropKey;
   verified: boolean;
   dormant: boolean;
-  pending_request?: boolean;
-  member_count?: number;
+  /** Null when the count couldn't be read: never shown as "0 members" (C27). */
+  member_count: number | null;
   role?: Role | null;
+  /** Null only on a row built from `/api/me/org-invites`, which doesn't carry it. */
+  join_policy: JoinPolicy | null;
+  audience: OrgAudience;
+  join_state: JoinState;
+  join_reason?: "policy" | "visiting" | null;
+  pending_invite?: { id: string; expires_at: string; invited_by_name: string | null } | null;
+  org_follow_state?: "following" | "not_following";
+  /** Typed only. Never rendered on a student surface (C13, no vanity metrics). */
+  follower_count?: number | null;
   links?: Array<{ label: string; url: string }>;
   philanthropy?: string;
-  /** The server's `orgJoinState` answer (`/api/orgs?filter=discover`). */
-  join_state?: string;
-  join_policy?: "open" | "request" | "invite";
-  audience?: "both" | "iu" | "purdue";
 };
 
-type DiscoverFilter = "all" | "public" | "private";
+type DiscoverFilter = "all" | "following" | "open" | "request" | "invite";
+
+/** One row of `/api/me/org-invites`. `logo_url` is the RAW stored key. */
+type MeInvite = {
+  id: string;
+  created_at: string;
+  expires_at: string;
+  org: {
+    id: string;
+    handle: string;
+    name: string | null;
+    logo_url: string | null;
+    verified: boolean;
+    audience: OrgAudience;
+  };
+  invited_by: { name: string } | null;
+};
 
 /**
- * The Join button's label on a discover card and in the quick view. It
- * renders the server's `join_state` instead of re-deriving it from
- * `is_public`, which offered "Request to join" on invite-only clubs and got a
- * 403 `invite_only` back. `status` is this session's own join or request.
+ * The latest standing the server confirmed for one club, from a tap on its
+ * control. It wins over row data for the life of the tab. `approx` marks a
+ * declined invite: the control can only guess what the club offers next.
+ * `at` is the tab's request count at the decline; the guess stands until the
+ * lists answer requests sent after it (`settledGuesses`).
  */
-function discoverJoinLabel(
-  org: DiscoverOrg,
-  status: "joined" | "pending" | undefined,
-): { label: string; disabled: boolean } {
-  if (status === "joined" || org.role) return { label: "Joined", disabled: true };
-  if (status === "pending" || org.join_state === "requested") {
-    return { label: "Requested", disabled: true };
+type OrgOverride = {
+  state: JoinState;
+  following: boolean;
+  role: Role | null;
+  approx?: true;
+  at?: number;
+};
+
+/** The request count each list's rows answer (0 before its first answer). */
+type AnsweredAt = { discover: number; following: number; invites: number };
+
+/** How many followed clubs "Yours" shows before "See all clubs you follow →". */
+const YOURS_PREVIEW = 6;
+
+/**
+ * The declined clubs whose guess is done, so their rows speak for the join
+ * state again. Every loaded list that carries the club must answer a request
+ * sent after the decline: a stale row would say "Invited you" again. And one
+ * list must carry it: a club only the old inbox knew keeps its guess, unless a
+ * fresh inbox lists it again (a new invite).
+ */
+function settledGuesses(
+  overrides: Record<string, OrgOverride>,
+  discover: ReadonlyArray<{ id: string }> | null,
+  following: ReadonlyArray<{ id: string }> | null,
+  invites: ReadonlyArray<{ org: { id: string } }> | null,
+  answeredAt: AnsweredAt,
+): Set<string> {
+  const settled = new Set<string>();
+  for (const [id, ov] of Object.entries(overrides)) {
+    if (!ov.approx) continue;
+    const at = ov.at ?? 0;
+    const inDiscover = discover?.some((o) => o.id === id) ?? false;
+    const inFollowing = following?.some((o) => o.id === id) ?? false;
+    if (inDiscover && answeredAt.discover <= at) continue;
+    if (inFollowing && answeredAt.following <= at) continue;
+    const reinvited = answeredAt.invites > at && (invites?.some((i) => i.org.id === id) ?? false);
+    if (inDiscover || inFollowing || reinvited) settled.add(id);
   }
-  switch (org.join_state) {
-    case "invited":
-      return { label: "Accept invite", disabled: false };
-    case "invite_only":
-      return { label: "Invite only", disabled: true };
-    case "audience_blocked":
-      return {
-        label: org.audience === "purdue" ? "Purdue students only" : "IU students only",
-        disabled: true,
-      };
-    case "unverified":
-      return { label: "Verify school email", disabled: true };
-    case "can_join":
-      return { label: "Join", disabled: false };
-    case "can_request":
-      return { label: "Request to join", disabled: false };
-    default:
-      return { label: org.is_public ? "Join" : "Request to join", disabled: false };
+  return settled;
+}
+
+/**
+ * Clubs a tap here just joined that the following list doesn't carry yet.
+ * They sit at the top of "Yours" (newest first) instead of under Verified
+ * until that reload lands, or for the tab's life if it fails.
+ */
+function joinedRowsFrom(
+  overrides: Record<string, OrgOverride>,
+  invites: MeInvite[] | null,
+  results: DiscoverOrg[] | null,
+  followingRows: DiscoverOrg[] | null,
+): DiscoverOrg[] {
+  const rows: DiscoverOrg[] = [];
+  for (const [id, ov] of Object.entries(overrides).reverse()) {
+    if (ov.approx || ov.state !== "member") continue;
+    if (followingRows?.some((o) => o.id === id)) continue;
+    const inv = invites?.find((i) => i.org.id === id);
+    const row = results?.find((o) => o.id === id) ?? (inv ? orgFromInvite(inv) : null);
+    if (row) rows.push(row);
   }
+  return rows;
+}
+
+/**
+ * A card for an invite whose club no loaded list carries. The logo goes
+ * through the asset proxy HERE only: the proxy isn't idempotent, and list
+ * rows arrive already proxied.
+ */
+function orgFromInvite(inv: MeInvite): DiscoverOrg {
+  return {
+    id: inv.org.id,
+    handle: inv.org.handle,
+    name: inv.org.name ?? inv.org.handle,
+    description: "",
+    logo_url: orgAssetProxyUrl(inv.org.handle, inv.org.logo_url, "logo"),
+    banner_url: null,
+    backdrop_preset: DEFAULT_BACKDROP,
+    verified: inv.org.verified,
+    dormant: false,
+    member_count: null,
+    role: null,
+    join_policy: null,
+    audience: inv.org.audience,
+    join_state: "invited",
+    join_reason: null,
+    pending_invite: {
+      id: inv.id,
+      expires_at: inv.expires_at,
+      invited_by_name: inv.invited_by?.name ?? null,
+    },
+    // A club they already follow self-corrects: the follow POST answers `already`.
+    org_follow_state: "not_following",
+  };
 }
 
 function OrgsTabBody({ onCreateOrg }: { onCreateOrg: () => void }) {
   const { label: campusLabel } = useViewerCampus();
   const [results, setResults] = useState<DiscoverOrg[] | null>(null);
-  const [pending, setPending] = useState<Record<string, "joined" | "pending">>({});
-  const [busy, setBusy] = useState<string | null>(null);
   const [searchInput, setSearchInput] = useState("");
   const [debouncedQ, setDebouncedQ] = useState("");
   const [filter, setFilter] = useState<DiscoverFilter>("all");
   const [showDormant, setShowDormant] = useState(false);
+  // The club as tapped. Each render re-reads it from the lists by id, so the
+  // quick view repaints when a refetch answers after a tap inside it.
   const [previewOrg, setPreviewOrg] = useState<DiscoverOrg | null>(null);
   // First-load failure only; once orgs are shown a failed refetch keeps them.
   const [loadErr, setLoadErr] = useState<LoadFailure | null>(null);
   const [loadKey, setLoadKey] = useState(0);
   const loadedRef = useRef(false);
+  // What a tap on a club's control confirmed, by org id.
+  const [overrides, setOverrides] = useState<Record<string, OrgOverride>>({});
+  // "Yours" and the Following chip: every club they follow, joined ones included.
+  const [followingOrgs, setFollowingOrgs] = useState<DiscoverOrg[] | null>(null);
+  const [followingHasMore, setFollowingHasMore] = useState(false);
+  // A first-load failure, with the query it was for and the `sideKey` of its
+  // request. A later key means a reload is on its way, so it shows as loading.
+  const [followingErr, setFollowingErr] = useState<{
+    failure: LoadFailure;
+    q: string;
+    key: number;
+  } | null>(null);
+  // The query `followingOrgs` answers. Rows for another query aren't shown.
+  const [followingListQ, setFollowingListQ] = useState<string | null>(null);
+  // The same query, for the effect: null until the first list lands.
+  const followingLoadedRef = useRef<string | null>(null);
+  const [invites, setInvites] = useState<MeInvite[] | null>(null);
+  const [invitesErr, setInvitesErr] = useState<{ failure: LoadFailure; key: number } | null>(null);
+  const invitesLoadedRef = useRef(false);
+  // Bumped to reload the following list and the invite inbox.
+  const [sideKey, setSideKey] = useState(0);
+  // Counts requests and declines, so a decline's guess knows which answers
+  // came after it. Each list records the count its rows answer.
+  const seqRef = useRef(0);
+  const [answeredAt, setAnsweredAt] = useState<AnsweredAt>({ discover: 0, following: 0, invites: 0 });
 
   // Debounce the search input → debouncedQ. The fetch effect below depends
   // on debouncedQ, so it only refires after the user pauses typing.
@@ -8786,6 +8927,7 @@ function OrgsTabBody({ onCreateOrg }: { onCreateOrg: () => void }) {
 
   useEffect(() => {
     let cancelled = false;
+    const seq = ++seqRef.current;
     (async () => {
       const params = new URLSearchParams({ filter: "discover" });
       if (debouncedQ) params.set("q", debouncedQ);
@@ -8810,60 +8952,203 @@ function OrgsTabBody({ onCreateOrg }: { onCreateOrg: () => void }) {
       loadedRef.current = true;
       setLoadErr(null);
       setResults(orgs);
-      const seeded: Record<string, "joined" | "pending"> = {};
-      for (const o of orgs) {
-        if (o.role) seeded[o.handle] = "joined";
-        else if (o.pending_request) seeded[o.handle] = "pending";
-      }
-      // Merge with any in-session "joined" states so a successful join
-      // earlier doesn't get reverted by the next fetch (this matters
-      // less now that the API returns role, but kept defensively).
-      setPending((prev) => {
-        const next = { ...seeded };
-        for (const [handle, status] of Object.entries(prev)) {
-          if (status === "joined") next[handle] = "joined";
-        }
-        return next;
-      });
+      setAnsweredAt((a) => ({ ...a, discover: seq }));
     })();
     return () => {
       cancelled = true;
     };
   }, [debouncedQ, showDormant, loadKey]);
 
-  const handleJoin = async (org: DiscoverOrg) => {
-    setBusy(org.handle);
-    try {
-      const r = await vibeRequest<{ joined?: boolean }>(`/api/orgs/${org.handle}/join`, {
-        method: "POST",
-        json: {},
-        failure:
-          org.join_state === "invited"
-            ? "Couldn't accept the invite."
-            : org.join_state === "can_join"
-              ? "Couldn't join this org."
-              : "Couldn't send your join request.",
-      });
-      // Confirm, then paint: the button only flips once the server agrees.
-      if (r.ok) {
-        const joined = r.data.joined === true;
-        setPending((p) => ({
-          ...p,
-          [org.handle]: joined ? "joined" : "pending",
-        }));
+  // The following list takes the query only under the Following chip. "Yours"
+  // shows only with no query, so typing under All doesn't refetch it.
+  const followingQ = filter === "following" ? debouncedQ : "";
+
+  useEffect(() => {
+    let cancelled = false;
+    const seq = ++seqRef.current;
+    const key = sideKey;
+    (async () => {
+      const q = followingQ;
+      const r = await vibeRequest<{ orgs?: DiscoverOrg[]; has_more?: boolean }>(
+        `/api/orgs?${new URLSearchParams(q ? { filter: "following", q } : { filter: "following" })}`,
+        { cache: "no-store", quiet: true, failure: "Couldn't load the clubs you follow." },
+      );
+      if (cancelled) return;
+      if (!r.ok || !Array.isArray(r.data.orgs)) {
+        const failure = asLoadFailure(r, "Couldn't load the clubs you follow.");
+        // No list for this query yet: the failure takes its place. Otherwise
+        // the rows stay and it toasts. A ref, not state, so the deps stay put.
+        if (followingLoadedRef.current !== q) setFollowingErr({ failure, q, key });
+        else toast({ message: failure.message, tone: "error", action: failure.action });
+        return;
       }
-    } finally {
-      setBusy(null);
+      followingLoadedRef.current = q;
+      setFollowingErr(null);
+      // Newest follow first, member clubs included. Never re-sorted.
+      setFollowingOrgs(r.data.orgs);
+      setFollowingHasMore(r.data.has_more === true);
+      setFollowingListQ(q);
+      setAnsweredAt((a) => ({ ...a, following: seq }));
+    })();
+    return () => {
+      cancelled = true;
+    };
+  }, [followingQ, sideKey]);
+
+  useEffect(() => {
+    let cancelled = false;
+    const seq = ++seqRef.current;
+    const key = sideKey;
+    (async () => {
+      const r = await vibeRequest<{ invites?: MeInvite[] }>("/api/me/org-invites", {
+        cache: "no-store",
+        quiet: true,
+        failure: "Couldn't load your invites.",
+      });
+      if (cancelled) return;
+      if (!r.ok || !Array.isArray(r.data.invites)) {
+        const failure = asLoadFailure(r, "Couldn't load your invites.");
+        if (!invitesLoadedRef.current) setInvitesErr({ failure, key });
+        else toast({ message: failure.message, tone: "error", action: failure.action });
+        return;
+      }
+      invitesLoadedRef.current = true;
+      setInvitesErr(null);
+      setInvites(r.data.invites);
+      setAnsweredAt((a) => ({ ...a, invites: seq }));
+    })();
+    return () => {
+      cancelled = true;
+    };
+  }, [sideKey]);
+
+  const settled = useMemo(
+    () => settledGuesses(overrides, results, followingOrgs, invites, answeredAt),
+    [overrides, results, followingOrgs, invites, answeredAt],
+  );
+
+  // One relation per club, for its card and its quick view alike. An override
+  // is the latest answer the server confirmed, so it wins over row data. A
+  // decline's settled guess hands the join state back to the row; the tab's
+  // own follow answer still stands.
+  const relationOf = useCallback(
+    (o: DiscoverOrg): OrgRelation => {
+      const ov = overrides[o.id];
+      const standing = ov && !(ov.approx && settled.has(o.id)) ? ov : null;
+      const state = standing?.state ?? o.join_state;
+      const role = standing ? standing.role : (o.role ?? null);
+      // Members follow automatically.
+      const following =
+        state === "member" || role != null || (ov ? ov.following : o.org_follow_state === "following");
+      return {
+        handle: o.handle,
+        orgName: o.name,
+        state,
+        following,
+        role,
+        reason: o.join_reason ?? null,
+        audience: o.audience,
+        joinPolicy: o.join_policy,
+      };
+    },
+    [overrides, settled],
+  );
+
+  // OrgJoinControl owns every toast; this only records what changed and
+  // reloads the lists a membership change moves the club between.
+  const handleChange = (org: DiscoverOrg, prev: OrgRelation, next: OrgControlChange) => {
+    const state = next.state;
+    if (state === "signed_out") return;
+    if (next.declined) {
+      // The control can't know what the club offers after a decline, so the
+      // reloads below replace this guess once they all answer.
+      const at = ++seqRef.current;
+      setOverrides((p) => ({
+        ...p,
+        [org.id]: { state, following: next.following, role: next.role, approx: true, at },
+      }));
+      setLoadKey((k) => k + 1);
+      setSideKey((k) => k + 1);
+      return;
     }
+    const guessStands = !settled.has(org.id);
+    setOverrides((p) => {
+      const old = p[org.id];
+      // A follow tap on a declined club whose guess still stands keeps it a
+      // guess, so the lists can still replace its join state.
+      const guess =
+        old?.approx && state === prev.state && guessStands ? { approx: true as const, at: old.at } : {};
+      return { ...p, [org.id]: { state, following: next.following, role: next.role, ...guess } };
+    });
+    // Join, request or accept: the inbox drops the invite and "Yours" gains
+    // the club. A follow or unfollow reloads nothing, so the card stays put.
+    if (state !== prev.state) setSideKey((k) => k + 1);
   };
 
-  // Filter chips operate on the already-loaded result set — keeps
-  // interaction snappy and avoids extra API churn while typing.
-  const filtered = (results ?? []).filter((o) => {
-    if (filter === "public") return o.is_public;
-    if (filter === "private") return !o.is_public;
-    return true;
+  // Choosing Following reloads that list, so it's fresh. Tapping it again doesn't.
+  const selectFilter = (f: DiscoverFilter) => {
+    if (f === "following" && filter !== "following") setSideKey((k) => k + 1);
+    setFilter(f);
+  };
+
+  // A retry keeps the failure until its answer: the group shows loading in
+  // the meantime, and the rest of the tab stays on screen.
+  const retryFollowing = () => setSideKey((k) => k + 1);
+  const retryInvites = () => setSideKey((k) => k + 1);
+
+  const showSide = filter === "all" && !debouncedQ;
+  const followingRows = followingOrgs !== null && followingListQ === followingQ ? followingOrgs : null;
+  // A failure only speaks while there is no list for its query on screen.
+  const followingFailed =
+    followingRows === null && followingErr !== null && followingErr.q === followingQ
+      ? followingErr.failure
+      : null;
+  // A newer request for the failed list is on its way.
+  const followingRetrying = followingFailed !== null && followingErr?.key !== sideKey;
+  const invitesRetrying = invitesErr !== null && invitesErr.key !== sideKey;
+  // Where both lists carry a club, the one that answered later speaks for it.
+  const loadedRows =
+    answeredAt.following > answeredAt.discover
+      ? [...(followingRows ?? []), ...(results ?? [])]
+      : [...(results ?? []), ...(followingRows ?? [])];
+  const invitedRows = invitedRowsFrom(invites, loadedRows, relationOf);
+  const invitedIds = new Set(invitedRows.map((o) => o.id));
+  const yoursRows = [
+    ...joinedRowsFrom(overrides, invites, results, followingRows),
+    ...(followingRows ?? []),
+  ].filter((o) => !invitedIds.has(o.id));
+  const shownIds = new Set([...invitedIds, ...yoursRows.map((o) => o.id)]);
+  // The policy chips narrow by `join_policy`, never by the legacy public flag.
+  const splitRows = (results ?? []).filter((o) => {
+    if (filter === "open" || filter === "request" || filter === "invite") {
+      return o.join_policy === filter;
+    }
+    return !(showSide && shownIds.has(o.id));
   });
+  const previewLive = previewOrg
+    ? (invitedRows.find((o) => o.id === previewOrg.id) ??
+      followingRows?.find((o) => o.id === previewOrg.id) ??
+      results?.find((o) => o.id === previewOrg.id) ??
+      previewOrg)
+    : null;
+
+  const loadingLine = (
+    <div
+      style={{
+        color: COLORS.glassMuted,
+        fontFamily: "DM Sans, sans-serif",
+        fontSize: 14,
+      }}
+    >
+      Loading orgs…
+    </div>
+  );
+  const emptyCard = (text: string) => (
+    <DarkGlassCard>
+      <div style={{ color: "#fff", fontFamily: "DM Sans, sans-serif", fontSize: 14 }}>{text}</div>
+    </DarkGlassCard>
+  );
+  const groupProps = { relationOf, onChange: handleChange, onPreview: setPreviewOrg };
 
   return (
     <section
@@ -8880,7 +9165,7 @@ function OrgsTabBody({ onCreateOrg }: { onCreateOrg: () => void }) {
       <SceneHeader
         eyebrow={campusEyebrow("Organizations", campusLabel)}
         title="Find your communities"
-        subtitle={campusLabel ? `Browse clubs and orgs at ${campusLabel}.` : "Browse clubs and orgs."}
+        subtitle="Follow any club to get its posts. Join to get its chats."
         tone="dark"
       />
 
@@ -8895,7 +9180,7 @@ function OrgsTabBody({ onCreateOrg }: { onCreateOrg: () => void }) {
           flexWrap: "wrap",
         }}
       >
-        <DiscoverFilterChips value={filter} onChange={setFilter} />
+        <DiscoverFilterChips value={filter} onChange={selectFilter} />
         <button
           type="button"
           onClick={() => setShowDormant((v) => !v)}
@@ -8957,7 +9242,40 @@ function OrgsTabBody({ onCreateOrg }: { onCreateOrg: () => void }) {
         </button>
       </div>
 
-      {results === null && loadErr ? (
+      {filter === "following" ? (
+        followingFailed && !followingRetrying ? (
+          <DarkGlassCard>
+            <LoadFailed tone="dark" failure={followingFailed} onRetry={retryFollowing} />
+          </DarkGlassCard>
+        ) : followingRows === null ? (
+          loadingLine
+        ) : followingRows.length === 0 ? (
+          emptyCard(
+            debouncedQ ? `No clubs you follow match “${debouncedQ}”.` : "You don't follow any clubs yet.",
+          )
+        ) : (
+          <DiscoverGroup
+            title="Following"
+            hint="Every club you follow, including the ones you joined."
+            orgs={followingRows}
+            {...groupProps}
+            footer={
+              followingHasMore ? (
+                <div
+                  style={{
+                    marginTop: 10,
+                    fontFamily: "DM Sans, sans-serif",
+                    fontSize: 12,
+                    color: "rgba(28,28,30,0.55)",
+                  }}
+                >
+                  Showing the 100 clubs you followed most recently.
+                </div>
+              ) : null
+            }
+          />
+        )
+      ) : results === null && loadErr ? (
         <DarkGlassCard>
           <LoadFailed
             tone="dark"
@@ -8968,33 +9286,89 @@ function OrgsTabBody({ onCreateOrg }: { onCreateOrg: () => void }) {
             }}
           />
         </DarkGlassCard>
-      ) : results === null ? (
-        <div
-          style={{
-            color: COLORS.glassMuted,
-            fontFamily: "DM Sans, sans-serif",
-            fontSize: 14,
-          }}
-        >
-          Loading orgs…
-        </div>
-      ) : filtered.length === 0 ? (
-        <DarkGlassCard>
-          <div style={{ color: "#fff", fontFamily: "DM Sans, sans-serif", fontSize: 14 }}>
-            {debouncedQ
-              ? `No orgs match “${debouncedQ}”${filter !== "all" ? ` in ${filter}` : ""}.`
-              : filter !== "all"
-              ? `No ${filter} orgs to discover yet.`
-              : "No orgs to discover yet — be the first to create one."}
-          </div>
-        </DarkGlassCard>
+      ) : results === null ||
+        // With the side groups on, wait for both side lists' first answer too:
+        // a followed club must not paint under Verified and then jump to "Yours".
+        (showSide &&
+          ((followingRows === null && !followingFailed) || (invites === null && !invitesErr))) ? (
+        loadingLine
       ) : (
         (() => {
-          const verifiedOrgs = filtered.filter((o) => o.verified);
-          const communityOrgs = filtered.filter((o) => !o.verified && !o.dormant);
-          const dormantOrgs = filtered.filter((o) => o.dormant);
+          const verifiedOrgs = splitRows.filter((o) => o.verified);
+          const communityOrgs = splitRows.filter((o) => !o.verified && !o.dormant);
+          const dormantOrgs = splitRows.filter((o) => o.dormant);
+          const showInvited = showSide && (invitedRows.length > 0 || !!invitesErr);
+          const showYours = showSide && (yoursRows.length > 0 || !!followingFailed);
+          if (
+            !showInvited &&
+            !showYours &&
+            verifiedOrgs.length === 0 &&
+            communityOrgs.length === 0 &&
+            dormantOrgs.length === 0
+          ) {
+            return emptyCard(
+              debouncedQ
+                ? `No clubs match “${debouncedQ}”.`
+                : filter === "open"
+                  ? "No open clubs here yet."
+                  : filter === "request"
+                    ? "No clubs here take requests yet."
+                    : filter === "invite"
+                      ? "No invite-only clubs here yet."
+                      : "No orgs to discover yet — be the first to create one.",
+            );
+          }
           return (
             <div style={{ display: "flex", flexDirection: "column", gap: 24 }}>
+              {showInvited ? (
+                <DiscoverGroup
+                  title="You're invited"
+                  hint="Accept to become a member and get the chats."
+                  orgs={invitedRows}
+                  {...groupProps}
+                  error={
+                    invitesErr && !invitesRetrying ? { failure: invitesErr.failure, onRetry: retryInvites } : null
+                  }
+                  loading={invitesRetrying}
+                  titleStyle={{ color: "#FF5C35" }}
+                />
+              ) : null}
+              {showYours ? (
+                <DiscoverGroup
+                  title="Yours"
+                  hint="Clubs you follow or belong to."
+                  orgs={yoursRows.slice(0, YOURS_PREVIEW)}
+                  count={yoursRows.length}
+                  {...groupProps}
+                  error={
+                    followingFailed && !followingRetrying
+                      ? { failure: followingFailed, onRetry: retryFollowing }
+                      : null
+                  }
+                  loading={followingRetrying}
+                  footer={
+                    followingRows !== null && (yoursRows.length > YOURS_PREVIEW || followingHasMore) ? (
+                      <button
+                        type="button"
+                        onClick={() => selectFilter("following")}
+                        style={{
+                          marginTop: 10,
+                          padding: "6px 0",
+                          border: "none",
+                          background: "none",
+                          color: "#C84A20",
+                          fontFamily: "DM Sans, sans-serif",
+                          fontSize: 13,
+                          fontWeight: 700,
+                          cursor: "pointer",
+                        }}
+                      >
+                        See all clubs you follow →
+                      </button>
+                    ) : null
+                  }
+                />
+              ) : null}
               {verifiedOrgs.length > 0 ? (
                 <DiscoverGroup
                   title="Verified"
@@ -9004,10 +9378,7 @@ function OrgsTabBody({ onCreateOrg }: { onCreateOrg: () => void }) {
                       : "Officially recognized clubs."
                   }
                   orgs={verifiedOrgs}
-                  pending={pending}
-                  busy={busy}
-                  onJoin={handleJoin}
-                  onPreview={setPreviewOrg}
+                  {...groupProps}
                   // Gold gradient — matches the verified ✓ badge palette.
                   titleStyle={{
                     background:
@@ -9021,12 +9392,9 @@ function OrgsTabBody({ onCreateOrg }: { onCreateOrg: () => void }) {
               {communityOrgs.length > 0 ? (
                 <DiscoverGroup
                   title="Student communities"
-                  hint="Groups created by verified students. Anyone can join the public ones."
+                  hint="Groups created by verified students. Anyone can follow them."
                   orgs={communityOrgs}
-                  pending={pending}
-                  busy={busy}
-                  onJoin={handleJoin}
-                  onPreview={setPreviewOrg}
+                  {...groupProps}
                   titleStyle={{ color: "#FF5C35" }}
                 />
               ) : null}
@@ -9035,10 +9403,7 @@ function OrgsTabBody({ onCreateOrg }: { onCreateOrg: () => void }) {
                   title="Dormant"
                   hint="No activity in the last 60 days. Verified orgs are never listed here."
                   orgs={dormantOrgs}
-                  pending={pending}
-                  busy={busy}
-                  onJoin={handleJoin}
-                  onPreview={setPreviewOrg}
+                  {...groupProps}
                 />
               ) : null}
             </div>
@@ -9046,39 +9411,75 @@ function OrgsTabBody({ onCreateOrg }: { onCreateOrg: () => void }) {
         })()
       )}
 
-      {previewOrg ? (
+      {previewLive ? (
         <OrgQuickViewModal
-          org={previewOrg}
-          status={pending[previewOrg.handle]}
-          busy={busy === previewOrg.handle}
+          org={previewLive}
+          relation={relationOf(previewLive)}
           onClose={() => setPreviewOrg(null)}
-          onJoin={() => handleJoin(previewOrg)}
+          // The modal stays open after a change and repaints from the override.
+          onChange={(prev, next) => handleChange(previewLive, prev, next)}
         />
       ) : null}
     </section>
   );
 }
 
+/**
+ * The "You're invited" rows: the inbox's invites in its order, each on the
+ * loaded row for its club when a list carries one (else a row built from the
+ * invite), then any other loaded row that says invited. Only rows whose
+ * relation still says invited stay, so an accepted card leaves at once.
+ * `loaded` is the discover and following rows, the fresher list first.
+ */
+function invitedRowsFrom(
+  invites: MeInvite[] | null,
+  loaded: DiscoverOrg[],
+  relationOf: (o: DiscoverOrg) => OrgRelation,
+): DiscoverOrg[] {
+  const rows: DiscoverOrg[] = [];
+  const seen = new Set<string>();
+  for (const inv of invites ?? []) {
+    if (seen.has(inv.org.id)) continue;
+    seen.add(inv.org.id);
+    const row = loaded.find((o) => o.id === inv.org.id);
+    rows.push(
+      row
+        ? {
+            ...row,
+            pending_invite: row.pending_invite ?? {
+              id: inv.id,
+              expires_at: inv.expires_at,
+              invited_by_name: inv.invited_by?.name ?? null,
+            },
+          }
+        : orgFromInvite(inv),
+    );
+  }
+  // The first loaded row for a club decides, so a second, older copy of it
+  // can't put it back in the group.
+  for (const o of loaded) {
+    if (seen.has(o.id)) continue;
+    seen.add(o.id);
+    if (relationOf(o).state === "invited") rows.push(o);
+  }
+  return rows.filter((o) => relationOf(o).state === "invited");
+}
+
 function OrgQuickViewModal({
   org,
-  status,
-  busy,
+  relation,
   onClose,
-  onJoin,
+  onChange,
 }: {
   org: DiscoverOrg;
-  status: "joined" | "pending" | undefined;
-  busy: boolean;
+  /** The same relation the club's card renders, so both show one state. */
+  relation: OrgRelation;
   onClose: () => void;
-  onJoin: () => void;
+  onChange: (prev: OrgRelation, next: OrgControlChange) => void;
 }) {
   const orgColor = colorForOrg(org.id);
-  const memberCount = org.member_count ?? 0;
-  const cta = discoverJoinLabel(org, status);
-  const ctaLabel = cta.label;
-  const ctaDisabled = !!org.role || !!status || busy || cta.disabled;
-  // Labels the server rules out ("Invite only") look muted, not orange.
-  const ctaMuted = !!status || cta.disabled;
+  const view = orgRowView(relation, "card");
+  const inviteLine = discoverInviteLine(org, relation);
 
   return (
     <div
@@ -9220,6 +9621,7 @@ function OrgQuickViewModal({
                   {org.name}
                 </span>
                 {org.verified ? <VerifiedBadge size={14} /> : null}
+                {view.chip ? <DiscoverChip label={view.chip} /> : null}
               </div>
               <div
                 style={{
@@ -9232,25 +9634,7 @@ function OrgQuickViewModal({
                   alignItems: "center",
                 }}
               >
-                <span>@{org.handle}</span>
-                <span style={{ opacity: 0.4 }}>·</span>
-                {!org.is_public ? (
-                  <span style={{ display: "inline-flex", alignItems: "center", gap: 4 }}>
-                    <LockIcon size={10} /> Private
-                  </span>
-                ) : (
-                  <span>Public</span>
-                )}
-                <span style={{ opacity: 0.4 }}>·</span>
-                <span>
-                  {memberCount} {memberCount === 1 ? "member" : "members"}
-                </span>
-                {org.role ? (
-                  <>
-                    <span style={{ opacity: 0.4 }}>·</span>
-                    <RoleChip role={org.role} />
-                  </>
-                ) : null}
+                {discoverMetaLine(org, relation, view.meta)}
               </div>
             </div>
           </div>
@@ -9348,56 +9732,42 @@ function OrgQuickViewModal({
             </div>
           ) : null}
 
+          {inviteLine ? (
+            <div
+              style={{
+                marginTop: 6,
+                fontSize: 12,
+                lineHeight: 1.4,
+                color: COLORS.glassMuted,
+              }}
+            >
+              {inviteLine}
+            </div>
+          ) : null}
+
           {/* CTAs */}
-          <div style={{ display: "flex", gap: 8, marginTop: 6 }}>
-            {org.role ? (
-              <div
-                style={{
-                  flex: 1,
-                  padding: "10px 14px",
-                  borderRadius: 10,
-                  border: "1px solid rgba(120,220,150,0.35)",
-                  background:
-                    "linear-gradient(180deg, rgba(120,220,150,0.18) 0%, rgba(120,220,150,0.06) 100%)",
-                  color: "#D7F5DD",
-                  fontWeight: 700,
-                  fontSize: 13,
-                  display: "flex",
-                  alignItems: "center",
-                  justifyContent: "center",
-                  gap: 8,
-                }}
-              >
-                <CheckIcon />
-                {ctaLabel}
-              </div>
-            ) : (
-              <button
-                type="button"
-                disabled={ctaDisabled}
-                onClick={onJoin}
-                style={{
-                  flex: 1,
-                  padding: "10px 14px",
-                  borderRadius: 10,
-                  border: ctaMuted
-                    ? "1px solid rgba(255,255,255,0.14)"
-                    : "1px solid rgba(255,180,150,0.45)",
-                  background: ctaMuted
-                    ? "rgba(255,255,255,0.06)"
-                    : "linear-gradient(180deg, rgba(255,92,53,0.55) 0%, rgba(255,92,53,0.22) 100%)",
-                  color: ctaMuted ? "rgba(255,255,255,0.7)" : "#fff",
-                  fontFamily: "DM Sans, sans-serif",
-                  fontWeight: 700,
-                  fontSize: 13,
-                  cursor: ctaDisabled ? "default" : "pointer",
-                  opacity: busy ? 0.6 : 1,
-                  boxShadow: ctaMuted ? "none" : "inset 0 1px 0 rgba(255,255,255,0.22)",
-                }}
-              >
-                {ctaLabel}
-              </button>
-            )}
+          <div
+            style={{
+              display: "flex",
+              gap: 8,
+              flexWrap: "wrap",
+              marginTop: inviteLine ? 0 : 6,
+            }}
+          >
+            {/* The modal content already stops click propagation. */}
+            <div
+              onClick={(e) => e.stopPropagation()}
+              onKeyDown={(e) => e.stopPropagation()}
+              style={{ flex: "1 1 auto", minWidth: 0 }}
+            >
+              <OrgJoinControl
+                relation={relation}
+                variant="card"
+                source="discover"
+                pendingInviteId={org.pending_invite?.id ?? null}
+                onChange={(next) => onChange(relation, next)}
+              />
+            </div>
             <Link
               href={`/orgs/${org.handle}`}
               style={{
@@ -9418,6 +9788,11 @@ function OrgQuickViewModal({
               Open profile →
             </Link>
           </div>
+          {view.disclosure ? (
+            <div style={{ fontSize: 12, lineHeight: 1.4, color: COLORS.glassMuted }}>
+              {view.disclosure}
+            </div>
+          ) : null}
         </div>
       </div>
     </div>
@@ -9510,21 +9885,32 @@ function DiscoverGroup({
   title,
   hint,
   orgs,
-  pending,
-  busy,
-  onJoin,
+  count,
+  relationOf,
+  onChange,
   onPreview,
+  error,
+  loading = false,
+  footer,
   titleStyle,
 }: {
   title: string;
   hint: string;
   orgs: DiscoverOrg[];
-  pending: Record<string, "joined" | "pending">;
-  busy: string | null;
-  onJoin: (org: DiscoverOrg) => void;
-  onPreview: (org: DiscoverOrg) => void;
+  /** The badge number when the grid shows only some of the group. */
+  count?: number;
+  relationOf: (o: DiscoverOrg) => OrgRelation;
+  onChange: (o: DiscoverOrg, prev: OrgRelation, next: OrgControlChange) => void;
+  onPreview: (o: DiscoverOrg) => void;
+  /** The group's own list failed: shown between the header and any cards. */
+  error?: { failure: LoadFailure; onRetry: () => void } | null;
+  /** A retry of the group's failed list is on its way: shown in the error's place. */
+  loading?: boolean;
+  footer?: React.ReactNode;
   titleStyle?: React.CSSProperties;
 }) {
+  // A failed or reloading list with nothing to show has no honest number.
+  const badge = (error || loading) && orgs.length === 0 ? null : (count ?? orgs.length);
   return (
     <div>
       <div
@@ -9548,20 +9934,22 @@ function DiscoverGroup({
           }}
         >
           {title}
-          <span
-            style={{
-              marginLeft: 8,
-              fontSize: 13,
-              fontWeight: 500,
-              color: "rgba(28,28,30,0.55)",
-              // Reset any inherited gradient from the title.
-              background: "none",
-              WebkitBackgroundClip: "border-box",
-              WebkitTextFillColor: "rgba(28,28,30,0.55)",
-            }}
-          >
-            {orgs.length}
-          </span>
+          {badge !== null ? (
+            <span
+              style={{
+                marginLeft: 8,
+                fontSize: 13,
+                fontWeight: 500,
+                color: "rgba(28,28,30,0.55)",
+                // Reset any inherited gradient from the title.
+                background: "none",
+                WebkitBackgroundClip: "border-box",
+                WebkitTextFillColor: "rgba(28,28,30,0.55)",
+              }}
+            >
+              {badge}
+            </span>
+          ) : null}
         </div>
         <div
           style={{
@@ -9573,24 +9961,50 @@ function DiscoverGroup({
           {hint}
         </div>
       </div>
-      <div
-        style={{
-          display: "grid",
-          gridTemplateColumns: "repeat(auto-fill, minmax(280px, 1fr))",
-          gap: 14,
-        }}
-      >
-        {orgs.map((o) => (
-          <DiscoverCard
-            key={o.id}
-            org={o}
-            status={pending[o.handle]}
-            busy={busy === o.handle}
-            onJoin={() => onJoin(o)}
-            onPreview={() => onPreview(o)}
-          />
-        ))}
-      </div>
+      {error ? (
+        // Dark glass under the dark-tone box, so it reads on the cream page.
+        <div
+          style={{
+            ...DARK_GLASS_SURFACE,
+            borderRadius: 12,
+            marginBottom: orgs.length > 0 ? 10 : 0,
+          }}
+        >
+          <LoadFailed tone="dark" compact failure={error.failure} onRetry={error.onRetry} />
+        </div>
+      ) : loading ? (
+        <div
+          role="status"
+          style={{
+            marginBottom: orgs.length > 0 ? 10 : 0,
+            fontFamily: "DM Sans, sans-serif",
+            fontSize: 13,
+            color: "rgba(28,28,30,0.55)",
+          }}
+        >
+          Loading…
+        </div>
+      ) : null}
+      {orgs.length > 0 ? (
+        <div
+          style={{
+            display: "grid",
+            gridTemplateColumns: "repeat(auto-fill, minmax(280px, 1fr))",
+            gap: 14,
+          }}
+        >
+          {orgs.map((o) => (
+            <DiscoverCard
+              key={o.id}
+              org={o}
+              relation={relationOf(o)}
+              onChange={(prev, next) => onChange(o, prev, next)}
+              onPreview={() => onPreview(o)}
+            />
+          ))}
+        </div>
+      ) : null}
+      {footer}
     </div>
   );
 }
@@ -9663,12 +10077,21 @@ function DiscoverFilterChips({
 }) {
   const opts: { key: DiscoverFilter; label: React.ReactNode }[] = [
     { key: "all", label: "All" },
-    { key: "public", label: "Public" },
+    { key: "following", label: "Following" },
+    { key: "open", label: policyChip("open") },
     {
-      key: "private",
+      key: "request",
       label: (
         <span style={{ display: "inline-flex", alignItems: "center", gap: 4 }}>
-          <LockIcon size={11} /> Private
+          <LockIcon size={11} /> {policyChip("request")}
+        </span>
+      ),
+    },
+    {
+      key: "invite",
+      label: (
+        <span style={{ display: "inline-flex", alignItems: "center", gap: 4 }}>
+          <LockIcon size={11} /> {policyChip("invite")}
         </span>
       ),
     },
@@ -9681,6 +10104,7 @@ function DiscoverFilterChips({
           <button
             key={o.key}
             type="button"
+            aria-pressed={on}
             onClick={() => onChange(o.key)}
             style={{
               padding: "6px 14px",
@@ -9713,25 +10137,19 @@ function DiscoverFilterChips({
 
 function DiscoverCard({
   org,
-  status,
-  busy,
-  onJoin,
+  relation,
+  onChange,
   onPreview,
 }: {
   org: DiscoverOrg;
-  status: "joined" | "pending" | undefined;
-  busy: boolean;
-  onJoin: () => void;
+  relation: OrgRelation;
+  onChange: (prev: OrgRelation, next: OrgControlChange) => void;
   onPreview: () => void;
 }) {
   const [hover, setHover] = useState(false);
   const orgColor = colorForOrg(org.id);
-  const memberCount = org.member_count ?? 0;
-  const cta = discoverJoinLabel(org, status);
-  const label = cta.label;
-  const disabled = !!status || busy || cta.disabled;
-  // Labels the server rules out ("Invite only") look muted, not orange.
-  const muted = !!status || cta.disabled;
+  const view = orgRowView(relation, "card");
+  const inviteLine = discoverInviteLine(org, relation);
 
   return (
     <div
@@ -9741,6 +10159,9 @@ function DiscoverCard({
       role="button"
       tabIndex={0}
       onKeyDown={(e) => {
+        // The card's own keys only. Enter or Space on an inner control must
+        // stay that control's tap, not open the preview.
+        if (e.target !== e.currentTarget) return;
         if (e.key === "Enter" || e.key === " ") {
           e.preventDefault();
           onPreview();
@@ -9830,6 +10251,7 @@ function DiscoverCard({
                 dormant
               </span>
             ) : null}
+            {view.chip ? <DiscoverChip label={view.chip} /> : null}
           </div>
           <div
             style={{
@@ -9842,20 +10264,21 @@ function DiscoverCard({
               flexWrap: "wrap",
             }}
           >
-            <span style={{ opacity: 0.75 }}>@{org.handle}</span>
-            <span style={{ opacity: 0.4 }}>·</span>
-            {!org.is_public ? (
-              <span style={{ display: "inline-flex", alignItems: "center", gap: 4 }}>
-                <LockIcon size={10} /> Private
-              </span>
-            ) : (
-              <span>Public</span>
-            )}
-            <span style={{ opacity: 0.4 }}>·</span>
-            <span>
-              {memberCount} {memberCount === 1 ? "member" : "members"}
-            </span>
+            {discoverMetaLine(org, relation, view.meta, { opacity: 0.75 })}
           </div>
+          {inviteLine ? (
+            <div
+              style={{
+                marginTop: 2,
+                fontFamily: "DM Sans, sans-serif",
+                fontSize: 12,
+                lineHeight: 1.4,
+                color: COLORS.glassMuted,
+              }}
+            >
+              {inviteLine}
+            </div>
+          ) : null}
         </div>
       </div>
 
@@ -9890,63 +10313,20 @@ function DiscoverCard({
         </p>
       )}
 
-      <div style={{ display: "flex", gap: 8, marginTop: "auto" }}>
-        {org.role ? (
-          // Already a member — show a static "Joined" affordance with a
-          // role chip; no rejoin button needed.
-          <div
-            style={{
-              flex: 1,
-              padding: "9px 12px",
-              borderRadius: 10,
-              border: "1px solid rgba(120,220,150,0.35)",
-              background:
-                "linear-gradient(180deg, rgba(120,220,150,0.18) 0%, rgba(120,220,150,0.06) 100%)",
-              color: "#D7F5DD",
-              fontFamily: "DM Sans, sans-serif",
-              fontWeight: 700,
-              fontSize: 13,
-              display: "flex",
-              alignItems: "center",
-              justifyContent: "center",
-              gap: 8,
-              boxShadow: "inset 0 1px 0 rgba(255,255,255,0.18)",
-            }}
-          >
-            <CheckIcon />
-            <span>Joined</span>
-            <RoleChip role={org.role} />
-          </div>
-        ) : (
-          <button
-            type="button"
-            disabled={disabled}
-            onClick={(e) => {
-              e.stopPropagation();
-              onJoin();
-            }}
-            style={{
-              flex: 1,
-              padding: "9px 12px",
-              borderRadius: 10,
-              border: muted
-                ? "1px solid rgba(255,255,255,0.14)"
-                : "1px solid rgba(255,180,150,0.45)",
-              background: muted
-                ? "rgba(255,255,255,0.06)"
-                : "linear-gradient(180deg, rgba(255,92,53,0.45) 0%, rgba(255,92,53,0.2) 100%)",
-              color: muted ? "rgba(255,255,255,0.7)" : "#fff",
-              fontFamily: "DM Sans, sans-serif",
-              fontWeight: 700,
-              fontSize: 13,
-              cursor: disabled ? "default" : "pointer",
-              opacity: busy ? 0.6 : 1,
-              boxShadow: muted ? "none" : "inset 0 1px 0 rgba(255,255,255,0.22)",
-            }}
-          >
-            {label}
-          </button>
-        )}
+      <div style={{ display: "flex", gap: 8, marginTop: "auto", flexWrap: "wrap" }}>
+        <div
+          onClick={(e) => e.stopPropagation()}
+          onKeyDown={(e) => e.stopPropagation()}
+          style={{ flex: "1 1 auto", minWidth: 0 }}
+        >
+          <OrgJoinControl
+            relation={relation}
+            variant="card"
+            source="discover"
+            pendingInviteId={org.pending_invite?.id ?? null}
+            onChange={(next) => onChange(relation, next)}
+          />
+        </div>
         <Link
           href={`/orgs/${org.handle}`}
           onClick={(e) => e.stopPropagation()}
@@ -9968,23 +10348,88 @@ function DiscoverCard({
           Profile
         </Link>
       </div>
+      {view.disclosure ? (
+        <div
+          style={{
+            fontFamily: "DM Sans, sans-serif",
+            fontSize: 12,
+            lineHeight: 1.4,
+            color: COLORS.glassMuted,
+          }}
+        >
+          {view.disclosure}
+        </div>
+      ) : null}
     </div>
   );
 }
 
-function CheckIcon() {
+/** The name-line pill for `orgRowView`'s chip ("Invited you" on cards), styled like the dormant pill. */
+function DiscoverChip({ label }: { label: string }) {
   return (
-    <svg width="12" height="12" viewBox="0 0 16 16" aria-hidden style={{ flexShrink: 0 }}>
-      <path
-        fill="none"
-        stroke="currentColor"
-        strokeWidth="2.2"
-        strokeLinecap="round"
-        strokeLinejoin="round"
-        d="M3 8.5L6.5 12 13 4.5"
-      />
-    </svg>
+    <span
+      style={{
+        display: "inline-flex",
+        padding: "1px 6px",
+        borderRadius: 999,
+        fontSize: 9,
+        fontWeight: 700,
+        letterSpacing: "0.08em",
+        textTransform: "uppercase",
+        color: "#FFD9CC",
+        background: "rgba(255,92,53,0.18)",
+        border: "1px solid rgba(255,92,53,0.4)",
+        flexShrink: 0,
+      }}
+    >
+      {label}
+    </span>
   );
+}
+
+/**
+ * A discover card's meta line, shared with the quick view: @handle, then the
+ * policy / requested / audience / hidden labels, the member count when it
+ * could be read, and the viewer's role, with a dot only between parts that
+ * are there. No follower count on a student surface (C13).
+ */
+function discoverMetaLine(
+  org: DiscoverOrg,
+  relation: OrgRelation,
+  meta: readonly string[],
+  handleStyle?: React.CSSProperties,
+): React.ReactNode[] {
+  const parts: Array<{ key: string; node: React.ReactNode }> = [
+    { key: "handle", node: <span style={handleStyle}>@{org.handle}</span> },
+  ];
+  for (const label of meta) {
+    const locked = label === policyChip("request") || label === policyChip("invite");
+    parts.push({
+      key: `meta-${label}`,
+      node: locked ? (
+        <span style={{ display: "inline-flex", alignItems: "center", gap: 4 }}>
+          <LockIcon size={10} /> {label}
+        </span>
+      ) : (
+        <span>{label}</span>
+      ),
+    });
+  }
+  const members = memberCountText(org.member_count);
+  if (members) parts.push({ key: "members", node: <span>{members}</span> });
+  if (relation.role) parts.push({ key: "role", node: <RoleChip role={relation.role} /> });
+  return parts.map((part, i) => (
+    <Fragment key={part.key}>
+      {i > 0 ? <span style={{ opacity: 0.4 }}>·</span> : null}
+      {part.node}
+    </Fragment>
+  ));
+}
+
+/** "Invited by Franky · Expires Oct 16", while the invite is still open. */
+function discoverInviteLine(org: DiscoverOrg, relation: OrgRelation): string | null {
+  if (relation.state !== "invited" || !org.pending_invite) return null;
+  return inviteSubText(org.pending_invite.invited_by_name, org.pending_invite.expires_at);
 }
 
 function SearchIcon() {
@@ -12743,15 +13188,28 @@ function ChannelRail({
             gap: 6,
           }}
         >
-          {!org.is_public ? (
-            <span style={{ display: "inline-flex", alignItems: "center", gap: 4 }}>
-              <LockIcon size={11} /> Private
-            </span>
-          ) : (
-            "Public"
-          )}
-          {/* No count while the list failed: "0 channels" would be a guess. */}
-          {loadErr ? null : ` · ${channels.length} channels`}
+          {/* One inline run, so " · " reads the same between every pair of parts. */}
+          <span style={{ minWidth: 0 }}>
+            {[
+              org.hidden ? "Hidden" : null,
+              // An old cached row without `join_policy` simply leaves this out.
+              org.join_policy ? (
+                <>
+                  {org.join_policy !== "open" ? <LockIcon size={11} style={{ marginRight: 4 }} /> : null}
+                  {policyChip(org.join_policy)}
+                </>
+              ) : null,
+              // No count while the list failed: "0 channels" would be a guess.
+              loadErr ? null : `${channels.length} ${channels.length === 1 ? "channel" : "channels"}`,
+            ]
+              .filter((part) => part !== null)
+              .map((part, i) => (
+                <Fragment key={i}>
+                  {i > 0 ? " · " : null}
+                  {part}
+                </Fragment>
+              ))}
+          </span>
         </div>
       </header>
       <div style={{ flex: 1, overflowY: "auto", padding: "12px 8px", position: "relative", zIndex: 1 }}>
