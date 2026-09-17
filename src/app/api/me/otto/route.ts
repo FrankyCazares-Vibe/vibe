@@ -1,5 +1,6 @@
 import { NextResponse } from "next/server";
 
+import { attachNotificationOrgs, type NotificationOrg } from "@/lib/orgs/notification-orgs";
 import { loadHiddenUsers } from "@/lib/safety/hidden-users";
 import { createSupabaseServerClient } from "@/lib/supabase/server";
 import { createSupabaseServiceClient } from "@/lib/supabase/service";
@@ -60,6 +61,12 @@ export type ActivityRow = {
   post_id: string | null;
   post_excerpt: string | null;
   comment_excerpt: string | null;
+  /**
+   * The club behind an `org_invite` / `org_request_approved` row, resolved
+   * with the service client; null for every other type, and for a club row
+   * whose club couldn't be read (it renders "a club").
+   */
+  org: NotificationOrg | null;
 };
 
 export type UpcomingEvent = {
@@ -193,8 +200,10 @@ export async function GET() {
   const hidden = new Set(hiddenIds);
 
   // ── Activity (notifications) ────────────────────────────────────────
+  // `org_id` is selected bare and never embedded: the invitee usually can't
+  // read the club's row under their own client (see attachNotificationOrgs).
   const ACTIVITY_SELECT =
-    "id,type,created_at,post_id,read_at," +
+    "id,type,created_at,post_id,org_id,read_at," +
     "actor:users!notifications_actor_id_fkey(id,name,handle,avatar_url)," +
     "post:posts!notifications_post_id_fkey(id,content)," +
     "comment:post_comments!notifications_comment_id_fkey(id,content)";
@@ -216,12 +225,19 @@ export async function GET() {
     type: string;
     created_at: string;
     post_id: string | null;
+    org_id: string | null;
     read_at: string | null;
     actor: ActivityRow["actor"];
     post: { id: string; content: string | null } | null;
     comment: { id: string; content: string | null } | null;
   };
-  const activity: ActivityRow[] = ((activityRes.data ?? []) as unknown as RawActivity[]).map((n) => ({
+  // Club rows gain their club here; a row about a club that has since been
+  // hidden or deleted drops, so it neither renders nor counts as a nudge.
+  const activityRows = await attachNotificationOrgs(
+    createSupabaseServiceClient(),
+    (activityRes.data ?? []) as unknown as RawActivity[],
+  );
+  const activity: ActivityRow[] = activityRows.map((n) => ({
     id: n.id,
     type: n.type,
     created_at: n.created_at,
@@ -229,11 +245,10 @@ export async function GET() {
     post_id: n.post_id,
     post_excerpt: n.post?.content?.slice(0, 120) ?? null,
     comment_excerpt: n.comment?.content?.slice(0, 120) ?? null,
+    org: n.org,
   }));
 
-  const unreadActivityCount = ((activityRes.data ?? []) as unknown as RawActivity[]).filter(
-    (n) => n.read_at === null,
-  ).length;
+  const unreadActivityCount = activityRows.filter((n) => n.read_at === null).length;
 
   // ── Upcoming (RSVPs + dated reminders) ──────────────────────────────
   const [rsvpsRes, datedRemRes] = await Promise.all([

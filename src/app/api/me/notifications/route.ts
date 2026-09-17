@@ -1,16 +1,19 @@
 import { NextResponse } from "next/server";
 
+import { attachNotificationOrgs } from "@/lib/orgs/notification-orgs";
 import { withPostMediaUrls } from "@/lib/post-media-url";
 import { loadHiddenUsers } from "@/lib/safety/hidden-users";
 import { createSupabaseServerClient } from "@/lib/supabase/server";
+import { createSupabaseServiceClient } from "@/lib/supabase/service";
 
 const DEFAULT_LIMIT = 30;
 const MAX_LIMIT = 100;
 
 /**
  * Returns the signed-in user's notifications, newest first. Joins each
- * row with the actor (who did the thing) and the post excerpt (when
- * relevant) so Otto can render readable rows without follow-up fetches.
+ * row with the actor (who did the thing), the post excerpt (when
+ * relevant) and the club (for invites and approvals) so Otto can render
+ * readable rows without follow-up fetches.
  *
  * "Recent" includes both unread and recently-read so the user can scan
  * what just happened. Marking-as-read happens via POST mark-read.
@@ -39,8 +42,12 @@ export async function GET(req: Request) {
   // Try the full select first (includes message_id from the mention
   // migration). If that column isn't in the DB yet (deploy lag), fall
   // back to the older shape so the panel still renders.
+  //
+  // `org_id` is selected bare, never embedded: the club behind an invite or
+  // an approval is resolved below with the service client (see
+  // attachNotificationOrgs for why the user client can't read it).
   const FULL_SELECT =
-    "id,type,post_id,comment_id,message_id,read_at,created_at," +
+    "id,type,post_id,comment_id,message_id,org_id,read_at,created_at," +
     "actor:users!notifications_actor_id_fkey(id,name,handle,avatar_url)," +
     "post:posts!notifications_post_id_fkey(id,type,content,media_thumbnail_url,author:users!posts_user_id_fkey(handle))," +
     "comment:post_comments!notifications_comment_id_fkey(id,content)";
@@ -91,10 +98,23 @@ export async function GET(req: Request) {
     return NextResponse.json({ ok: false, error: "Request failed" }, { status: 500 });
   }
 
+  // Every row gains `org` ({handle, name, logo_url} or null). Invites and
+  // approvals for a club that has since been hidden or deleted drop here;
+  // no other type ever drops. The fallback
+  // select has no org_id, so its rows all come back with `org: null`.
+  type NotificationRow = Record<string, unknown> & {
+    type?: string;
+    org_id?: string | null;
+    post?: { id: string } | null;
+  };
+  const withOrgs = await attachNotificationOrgs(
+    createSupabaseServiceClient(),
+    (data ?? []) as unknown as NotificationRow[],
+  );
+
   // The embedded post's thumbnail goes out as a proxy URL, never a raw
   // R2 key (see withPostMediaUrls).
-  type NotificationRow = Record<string, unknown> & { post?: { id: string } | null };
-  const notifications = ((data ?? []) as unknown as NotificationRow[]).map((n) =>
+  const notifications = withOrgs.map((n) =>
     n.post ? { ...n, post: withPostMediaUrls(n.post) } : n,
   );
 

@@ -1,5 +1,6 @@
 "use client";
 
+import Link from "next/link";
 
 import type { ActivityRow } from "@/app/api/me/otto/route";
 import { LoadFailed } from "@/components/feedback/LoadFailed";
@@ -56,10 +57,33 @@ function describe(n: ActivityRow): string {
     case "save":
     case "post_save":
       return `${actor} saved your post`;
+    // The club comes from the route's service-role read; null means it
+    // couldn't be read, never that the row is about no club.
+    case "org_invite":
+      return `${actor} invited you to join ${n.org?.name ?? "a club"}`;
+    case "org_request_approved":
+      return `${actor} approved your request to join ${n.org?.name ?? "a club"}`;
     default:
       return `${actor} did something`;
   }
 }
+
+/**
+ * Where tapping a row goes. A club row opens the club, or the Orgs tab when
+ * the club couldn't be read. A post row opens the post page, the same place
+ * the desktop Otto panel sends it. Every other row stays a plain line.
+ */
+function hrefFor(n: ActivityRow): string | null {
+  if (n.type === "org_invite" || n.type === "org_request_approved") {
+    return n.org ? `/orgs/${encodeURIComponent(n.org.handle)}` : "/campus?tab=orgs";
+  }
+  if (n.post_id) return `/posts/${encodeURIComponent(n.post_id)}`;
+  return null;
+}
+
+// A linked row carries the row's grid itself, so the whole line is the tap
+// target; this keeps it looking like the plain rows beside it.
+const ROW_LINK_STYLE = { color: "inherit", textDecoration: "none" } as const;
 
 export function OttoActivity({ rows, failed }: Props) {
   return (
@@ -75,24 +99,38 @@ export function OttoActivity({ rows, failed }: Props) {
         <p className="otto-room-empty">nothing new on campus yet.</p>
       ) : (
         <ul className="otto-room-list">
-          {rows.map((n) => (
-            <li key={n.id} className="otto-room-row">
-              <span className="otto-room-row-dot" aria-hidden />
-              <div className="otto-room-row-body">
-                <p className="otto-room-row-line">
-                  {describe(n)}
-                  {n.post_excerpt ? (
-                    <span className="otto-room-row-excerpt"> — {n.post_excerpt}</span>
-                  ) : n.comment_excerpt ? (
-                    <span className="otto-room-row-excerpt"> — {n.comment_excerpt}</span>
-                  ) : null}
-                </p>
-              </div>
-              <time className="otto-room-row-time" dateTime={n.created_at}>
-                {relative(n.created_at)}
-              </time>
-            </li>
-          ))}
+          {rows.map((n) => {
+            const href = hrefFor(n);
+            const body = (
+              <>
+                <span className="otto-room-row-dot" aria-hidden />
+                <div className="otto-room-row-body">
+                  <p className="otto-room-row-line">
+                    {describe(n)}
+                    {n.post_excerpt ? (
+                      <span className="otto-room-row-excerpt"> — {n.post_excerpt}</span>
+                    ) : n.comment_excerpt ? (
+                      <span className="otto-room-row-excerpt"> — {n.comment_excerpt}</span>
+                    ) : null}
+                  </p>
+                </div>
+                <time className="otto-room-row-time" dateTime={n.created_at}>
+                  {relative(n.created_at)}
+                </time>
+              </>
+            );
+            return href ? (
+              <li key={n.id}>
+                <Link href={href} className="otto-room-row" style={ROW_LINK_STYLE}>
+                  {body}
+                </Link>
+              </li>
+            ) : (
+              <li key={n.id} className="otto-room-row">
+                {body}
+              </li>
+            );
+          })}
         </ul>
       )}
     </OttoSection>

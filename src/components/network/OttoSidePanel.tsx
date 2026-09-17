@@ -5,7 +5,14 @@ import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { asLoadFailure, LoadFailed, type LoadFailure } from "@/components/feedback/LoadFailed";
 import { vibeRequest } from "@/lib/feedback/request";
 
-type NotifType = "follow" | "connection" | "like" | "comment" | "mention";
+type NotifType =
+  | "follow"
+  | "connection"
+  | "like"
+  | "comment"
+  | "mention"
+  | "org_invite"
+  | "org_request_approved";
 
 type NotifActor = {
   id: string;
@@ -41,6 +48,10 @@ type NotifRow = {
   actor: NotifActor;
   post: NotifPost;
   comment: NotifComment;
+  // The club behind an invite or an approval. The notifications GET reads it
+  // with the service client; null when it couldn't, so the copy says "a club".
+  org_id?: string | null;
+  org?: { handle: string; name: string; logo_url: string | null } | null;
 };
 
 type CountPayload = {
@@ -160,7 +171,11 @@ export function OttoSidePanel({
       setList(rows);
       setListErr(null);
       loadedRef.current = true;
-      if (rows.some((n) => !n.read_at)) void markAllRead();
+      // The count can hold unread rows the list leaves out (an invite or an
+      // approval for a club hidden since), and mark-read {all} clears those
+      // too. Going by the list alone would leave the badge lit for good.
+      const countUnread = countRes.ok ? (countRes.data.unread ?? 0) : 0;
+      if (rows.some((n) => !n.read_at) || countUnread > 0) void markAllRead();
     } else {
       setListErr(asLoadFailure(listRes, LIST_FAILURE));
     }
@@ -542,7 +557,9 @@ function StatsGrid({
       </div>
     );
   }
-  const tiles: Array<{ key: NotifType; label: string }> = [
+  // Keyed by the count route's totals, not NotifType: club invites and
+  // approvals have no tile or total of their own.
+  const tiles: Array<{ key: keyof CountPayload["totals"]; label: string }> = [
     { key: "follow", label: "Follows" },
     { key: "connection", label: "Connections" },
     { key: "like", label: "Likes" },
@@ -843,6 +860,10 @@ function verbFor(n: NotifRow): string {
       return "commented on your post";
     case "mention":
       return n.message_id ? "mentioned you in a chat" : "mentioned you";
+    case "org_invite":
+      return `invited you to join ${n.org?.name ?? "a club"}`;
+    case "org_request_approved":
+      return `approved your request to join ${n.org?.name ?? "a club"}`;
     default:
       return "";
   }
@@ -900,6 +921,13 @@ function NotifRowView({ n, onClose }: { n: NotifRow; onClose: () => void }) {
     onClose();
   };
   const openRow = () => {
+    // Club rows open the club, not the officer who sent them. Without the
+    // club (it couldn't be read) the Orgs tab is the closest place.
+    if (n.type === "org_invite" || n.type === "org_request_approved") {
+      window.location.href = n.org ? `/orgs/${encodeURIComponent(n.org.handle)}` : "/campus?tab=orgs";
+      onClose();
+      return;
+    }
     if (n.type === "mention" && n.message_id && !n.post) {
       window.location.href = "/messages";
       onClose();

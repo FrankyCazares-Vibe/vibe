@@ -606,7 +606,11 @@
     return _ottoFetchNotifications().then(list => {
       if (!list) return;            // the section already says it failed
       _ottoRenderNotifications(list);
-      if (list.some(n => !n.read_at)) _ottoMarkAllRead();
+      // The badge's count can hold unread rows the list leaves out (an
+      // invite or an approval for a club hidden since); mark-read {all}
+      // clears those too, so an unread count is reason enough.
+      const countUnread = _ottoLastCount ? _ottoLastCount.unread : 0;
+      if (list.some(n => !n.read_at) || countUnread > 0) _ottoMarkAllRead();
     }).catch(() => {});
   }
 
@@ -779,6 +783,14 @@
       case 'like':       verb = 'liked your post';              break;
       case 'comment':    verb = 'commented on your post';       break;
       case 'mention':    verb = n.message_id ? 'mentioned you in a chat' : 'mentioned you'; break;
+      // The club name is free text an officer typed, and the verb lands in
+      // innerHTML below, so it's escaped here (the other verbs are fixed).
+      case 'org_invite':
+        verb = 'invited you to join ' + _ottoEsc((n.org && n.org.name) || 'a club');
+        break;
+      case 'org_request_approved':
+        verb = 'approved your request to join ' + _ottoEsc((n.org && n.org.name) || 'a club');
+        break;
       default:           verb = '';
     }
     // Snippet content varies by type — for comments we want to show
@@ -815,6 +827,14 @@
     const n = (_ottoLastList || []).find(x => x.id === notifId);
     if (!n) return;
     closeOttoPanel();
+    // Club rows open the club, not the officer who sent them. Without the
+    // club (it couldn't be read) the Orgs tab is the closest place.
+    if (n.type === 'org_invite' || n.type === 'org_request_approved') {
+      window.location.href = (n.org && n.org.handle)
+        ? '/orgs/' + encodeURIComponent(n.org.handle)
+        : '/campus?tab=orgs';
+      return;
+    }
     // Mention in a chat → jump to /messages (the channel is found
      // via the message's channel_id). Mention in a post → open the post.
     if (n.type === 'mention' && n.message_id && !n.post) {
