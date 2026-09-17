@@ -1,17 +1,36 @@
 import { notFound } from "next/navigation";
 import Link from "next/link";
 
+import type { SupabaseClient } from "@supabase/supabase-js";
+
 import { LoadFailed } from "@/components/feedback/LoadFailed";
+import { OrgInviteBanner } from "@/components/orgs/OrgInviteBanner";
+import { campusRowById, isSharedCampus } from "@/lib/iu/campuses";
 import { orgAssetProxyUrl } from "@/lib/org-asset-url";
+import { loadFollowerCount, loadViewerFollow } from "@/lib/orgs/following";
 import {
+  ORG_COPY,
+  audienceChip,
+  followerCountText,
+  joinPolicyNotice,
+  memberCountText,
+  openToFact,
+  policyChip,
+  whoCanJoinFact,
+  type OrgDisplayState,
+  type OrgRelation,
+} from "@/lib/orgs/join-copy";
+import {
+  isSettingsOfficer,
   orgJoinState,
   SIGNED_OUT,
-  type JoinDisplayState,
+  visibleInviterFirstName,
   type JoinPolicy,
   type OrgAudience,
 } from "@/lib/orgs/join-state";
 import { loadViewerOrgContext } from "@/lib/orgs/membership";
 import { withPostMediaUrls } from "@/lib/post-media-url";
+import { loadHiddenUsers } from "@/lib/safety/hidden-users";
 import { createSupabaseServerClient } from "@/lib/supabase/server";
 import { createSupabaseServiceClient } from "@/lib/supabase/service";
 
@@ -51,13 +70,23 @@ type OrgProfile = {
   description: string;
   logo_url: string | null;
   banner_url: string | null;
-  is_public: boolean;
+  join_policy: JoinPolicy;
+  audience: OrgAudience;
+  hidden: boolean;
+  campus_id: string | null;
   verified: boolean;
   backdrop_preset: string;
   links: Array<{ label: string; url: string }> | null;
   philanthropy: string;
   last_activity_at: string | null;
-  member_count: number;
+  /** Null when the count read failed: omitted, never rendered as 0 (C27). */
+  member_count: number | null;
+  /**
+   * The raw count, null when the read failed. Rendered only through
+   * `followerCountText`, which applies the floor of 5 to EVERY viewer here;
+   * officers see the exact number in the desktop Followers tab (CH3).
+   */
+  follower_count: number | null;
   dormant: boolean;
 };
 
@@ -68,6 +97,8 @@ type PostRow = {
   media_url: string | null;
   media_thumbnail_url: string | null;
   created_at: string;
+  /** Stamped by the database when a published post's text changes. */
+  edited_at: string | null;
   user: { id: string; handle: string; name: string; avatar_url: string | null } | null;
 };
 
@@ -97,65 +128,38 @@ export default async function OrgProfilePage({ params }: Params) {
   const { data: orgRaw } = await service
     .from("orgs")
     .select(
-      "id, handle, name, description, logo_url, banner_url, is_public, backdrop_preset, verified, links, philanthropy, last_activity_at, created_at, join_policy, audience, hidden_at, campus_id"
+      "id, handle, name, description, logo_url, banner_url, backdrop_preset, verified, links, philanthropy, last_activity_at, created_at, join_policy, audience, hidden_at, campus_id"
     )
     .eq("handle", handle)
     .maybeSingle();
   if (!orgRaw) notFound();
 
-  const { count: memberCount } = await service
-    .from("org_members")
-    .select("user_id", { count: "exact", head: true })
-    .eq("org_id", orgRaw.id);
-
-  const lastMs = orgRaw.last_activity_at ? Date.parse(orgRaw.last_activity_at) : null;
-  // Server-rendered per request; intentional Date.now() read.
-  const nowMs = Date.now(); // eslint-disable-line react-hooks/purity
-  const dormant =
-    !orgRaw.verified && lastMs !== null && nowMs - lastMs > DORMANT_MS;
-
-  const orgHandle = orgRaw.handle as string;
-  const org: OrgProfile = {
-    id: orgRaw.id as string,
-    handle: orgHandle,
-    name: orgRaw.name as string,
-    description: (orgRaw.description as string) ?? "",
-    logo_url: orgAssetProxyUrl(orgHandle, orgRaw.logo_url as string | null, "logo"),
-    banner_url: orgAssetProxyUrl(
-      orgHandle,
-      orgRaw.banner_url as string | null,
-      "banner",
-    ),
-    is_public: !!orgRaw.is_public,
-    verified: !!orgRaw.verified,
-    backdrop_preset: (orgRaw.backdrop_preset as string) ?? "sand-purple",
-    links: Array.isArray(orgRaw.links)
-      ? (orgRaw.links as Array<{ label: string; url: string }>)
-      : [],
-    philanthropy: (orgRaw.philanthropy as string) ?? "",
-    last_activity_at: (orgRaw.last_activity_at as string | null) ?? null,
-    member_count: memberCount ?? 0,
-    dormant,
-  };
+  const orgId = orgRaw.id as string;
+  const joinPolicy = orgRaw.join_policy as JoinPolicy;
+  const audience = orgRaw.audience as OrgAudience;
+  const hiddenAt = (orgRaw.hidden_at as string | null) ?? null;
+  const campusId = (orgRaw.campus_id as string | null) ?? null;
 
   // Viewer relationship: the one join decision every surface renders
   // (`orgJoinState`), so the button never offers a door the join route
-  // refuses.
+  // refuses. Their follow row is read alongside it.
   const supabase = await createSupabaseServerClient();
   const {
     data: { user },
   } = await supabase.auth.getUser();
-  const joinPolicy = orgRaw.join_policy as JoinPolicy;
-  const audience = orgRaw.audience as OrgAudience;
-  const hiddenAt = (orgRaw.hidden_at as string | null) ?? null;
-  const ctx = user ? await loadViewerOrgContext(service, org.id, user.id) : null;
+  const [ctx, followRes] = user
+    ? await Promise.all([
+        loadViewerOrgContext(service, orgId, user.id),
+        loadViewerFollow(service, orgId, user.id),
+      ])
+    : [null, null];
   const decision = ctx
     ? orgJoinState({
         org: {
           join_policy: joinPolicy,
           audience,
           hidden_at: hiddenAt,
-          campus_id: (orgRaw.campus_id as string | null) ?? null,
+          campus_id: campusId,
         },
         viewer: ctx.viewer,
         role: ctx.role,
@@ -170,28 +174,108 @@ export default async function OrgProfilePage({ params }: Params) {
   if (hiddenAt && (!ctx || !ctx.ok || decision?.state === "not_found")) notFound();
 
   const viewerRole = ctx?.ok ? ctx.role : null;
-  // `not_found` can't reach here (the gate above); null means the read failed.
-  const joinState: JoinDisplayState | null = !user
-    ? SIGNED_OUT
-    : !ctx?.ok || !decision || decision.state === "not_found"
+  // `not_found` can't reach here (the gate above). A failed membership read
+  // has no standing to show, so the page then speaks only about the club
+  // itself, the way it does to a signed-out visitor.
+  const displayState: OrgDisplayState =
+    ctx?.ok && decision && decision.state !== "not_found" ? decision.state : SIGNED_OUT;
+  // What the header, chips, banner and channels card render. Null when the
+  // membership read failed: a member must never be shown the door. A failed
+  // FOLLOW read renders Follow, which is safe because POST /follow is
+  // idempotent.
+  const relation: OrgRelation | null =
+    user && !ctx?.ok
       ? null
-      : decision.state;
+      : {
+          handle: orgRaw.handle as string,
+          orgName: orgRaw.name as string,
+          state: displayState,
+          following:
+            !!viewerRole || (!!followRes && followRes.ok && followRes.row !== null),
+          role: viewerRole,
+          reason: decision?.reason ?? null,
+          audience,
+          joinPolicy,
+        };
+  const invite =
+    relation?.state === "invited" && ctx?.pendingInvite ? ctx.pendingInvite : null;
 
-  // Recent posts. Always fetched (even for private orgs) — the public
+  // Recent posts. Always fetched, whatever the join policy: the public
   // profile is meant to give visitors the context they need to decide
-  // whether to request access. Channel content stays gated by RLS.
+  // whether to follow or join. Channel content stays members-only.
   // Clips are backlogged, so `type='clip'` rows are filtered out.
   // A query error is not an empty org: it renders as the failure line below,
   // never as "Nothing posted to the org yet."
-  const { data: postsData, error: postsErr } = await service
-    .from("posts")
-    .select(
-      "id, type, content, media_url, media_thumbnail_url, created_at, user:user_id(id, handle, name, avatar_url)"
-    )
-    .eq("org_id", org.id)
-    .eq("type", "post")
-    .order("created_at", { ascending: false })
-    .limit(24);
+  const [memberRes, followerCount, postsRes, invitedByName] = await Promise.all([
+    service
+      .from("org_members")
+      .select("user_id", { count: "exact", head: true })
+      .eq("org_id", orgId),
+    loadFollowerCount(service, orgId),
+    service
+      .from("posts")
+      .select(
+        "id, type, content, media_url, media_thumbnail_url, created_at, edited_at, user:user_id(id, handle, name, avatar_url)"
+      )
+      .eq("org_id", orgId)
+      .eq("type", "post")
+      .order("created_at", { ascending: false })
+      .limit(24),
+    user && invite?.invited_by
+      ? loadInviterFirstName(service, supabase, invite.invited_by, user.id)
+      : Promise.resolve(null),
+  ]);
+  if (memberRes.error) {
+    console.error("[orgs/[handle] page member count]", memberRes.error);
+  }
+
+  const lastMs = orgRaw.last_activity_at ? Date.parse(orgRaw.last_activity_at) : null;
+  // Server-rendered per request; intentional Date.now() read.
+  const nowMs = Date.now(); // eslint-disable-line react-hooks/purity
+  const dormant =
+    !orgRaw.verified && lastMs !== null && nowMs - lastMs > DORMANT_MS;
+
+  const orgHandle = orgRaw.handle as string;
+  const org: OrgProfile = {
+    id: orgId,
+    handle: orgHandle,
+    name: orgRaw.name as string,
+    description: (orgRaw.description as string) ?? "",
+    logo_url: orgAssetProxyUrl(orgHandle, orgRaw.logo_url as string | null, "logo"),
+    banner_url: orgAssetProxyUrl(
+      orgHandle,
+      orgRaw.banner_url as string | null,
+      "banner",
+    ),
+    join_policy: joinPolicy,
+    audience,
+    hidden: !!hiddenAt,
+    campus_id: campusId,
+    verified: !!orgRaw.verified,
+    backdrop_preset: (orgRaw.backdrop_preset as string) ?? "sand-purple",
+    links: Array.isArray(orgRaw.links)
+      ? (orgRaw.links as Array<{ label: string; url: string }>)
+      : [],
+    philanthropy: (orgRaw.philanthropy as string) ?? "",
+    last_activity_at: (orgRaw.last_activity_at as string | null) ?? null,
+    member_count: memberRes.error ? null : (memberRes.count ?? null),
+    follower_count: followerCount,
+    dormant,
+  };
+
+  const campusRow = campusRowById(org.campus_id);
+  const openToCampus = campusRow
+    ? { name: campusRow.name, shared: isSharedCampus(campusRow) }
+    : null;
+  const notice = joinPolicyNotice({
+    state: displayState,
+    joinPolicy: org.join_policy,
+    audience: org.audience,
+    orgName: org.name,
+    hidden: org.hidden,
+  });
+
+  const { data: postsData, error: postsErr } = postsRes;
   const allPostRows = ((postsData || []) as unknown as PostRow[]).map((p) =>
     withPostMediaUrls(p),
   );
@@ -216,9 +300,14 @@ export default async function OrgProfilePage({ params }: Params) {
       >
         <TopNav signedIn={!!user} />
 
-        {viewerRole === "owner" || viewerRole === "admin" ? (
+        {isSettingsOfficer(viewerRole) ? (
           <OrgProfileAdminBar
             orgHandle={org.handle}
+            orgName={org.name}
+            joinPolicy={org.join_policy}
+            audience={org.audience}
+            hidden={org.hidden}
+            openToCampus={openToCampus}
             initialDescription={org.description}
             initialLinks={org.links ?? []}
             initialPhilanthropy={org.philanthropy}
@@ -226,20 +315,33 @@ export default async function OrgProfilePage({ params }: Params) {
         ) : null}
 
         <Banner org={org} />
-        <Header org={org}>
-          <OrgProfileJoinButton
-            orgHandle={org.handle}
-            signedIn={!!user}
-            joinState={joinState}
-            joinPolicy={joinPolicy}
-            audience={audience}
-          />
+        <Header org={org} invited={relation?.state === "invited"}>
+          {relation ? (
+            <OrgProfileJoinButton
+              relation={relation}
+              pendingInviteId={ctx?.pendingInvite?.id ?? null}
+            />
+          ) : (
+            <LoadFailed
+              tone="dark"
+              failure={{ message: "Couldn't load your membership. Try again." }}
+            />
+          )}
         </Header>
 
-        {/* Private orgs gate channel content, not the public profile.
-            Description, posts, links, and philanthropy all show so a
-            visitor can decide whether to request access. */}
-        {!org.is_public ? <PrivateOrgNotice /> : null}
+        {/* Membership gates the chats, not the public profile. Description,
+            posts, links, and philanthropy all show so a visitor can decide
+            whether to follow or join. */}
+        {notice ? <JoinPolicyNotice text={notice} /> : null}
+        {invite ? (
+          <div style={{ marginTop: 16 }}>
+            <OrgInviteBanner
+              orgName={org.name}
+              inviterFirstName={invitedByName}
+              expiresAt={invite.expires_at}
+            />
+          </div>
+        ) : null}
         {org.description ? <Description text={org.description} /> : null}
 
         <OrgContent
@@ -265,10 +367,7 @@ export default async function OrgProfilePage({ params }: Params) {
           }
           aboutColumn={
             <>
-              <ChannelsSection
-                orgHandle={org.handle}
-                viewerIsMember={!!viewerRole}
-              />
+              <ChannelsSection orgHandle={org.handle} relation={relation} />
               {org.links && org.links.length > 0 ? <LinksSection links={org.links} /> : null}
               {org.philanthropy ? <PhilanthropySection text={org.philanthropy} /> : null}
               <FactsSection org={org} />
@@ -277,6 +376,28 @@ export default async function OrgProfilePage({ params }: Params) {
         />
       </div>
     </main>
+  );
+}
+
+/**
+ * The inviter's first name for the invite banner, exactly as
+ * `GET /api/orgs/[slug]` reads it: null when their account is gone, when the
+ * viewer has them blocked or muted (critic A7), or when the blocked/muted read
+ * failed (the banner then says "an officer" rather than risk the name).
+ */
+async function loadInviterFirstName(
+  service: SupabaseClient,
+  supabase: SupabaseClient,
+  inviterId: string,
+  viewerId: string,
+): Promise<string | null> {
+  const [inviterRes, hiddenRes] = await Promise.all([
+    service.from("users").select("id, name").eq("id", inviterId).maybeSingle(),
+    loadHiddenUsers(supabase, viewerId),
+  ]);
+  return visibleInviterFirstName(
+    (inviterRes.data as { id: string; name: string | null } | null) ?? null,
+    hiddenRes.ok ? new Set(hiddenRes.hidden.ids) : [inviterId],
   );
 }
 
@@ -382,11 +503,21 @@ function Banner({ org }: { org: OrgProfile }) {
 
 function Header({
   org,
+  invited,
   children,
 }: {
   org: OrgProfile;
+  /** The viewer has a live invite: the "Invited you" chip. */
+  invited: boolean;
   children?: React.ReactNode;
 }) {
+  const policy = policyChip(org.join_policy);
+  const audience = audienceChip(org.audience);
+  // '@handle · 12 followers · 3 members': a count that is unknown (or below
+  // the follower floor) is left out along with its separator.
+  const counts = [followerCountText(org.follower_count), memberCountText(org.member_count)].filter(
+    (text): text is string => !!text,
+  );
   return (
     <div
       className="vibe-org-header"
@@ -463,9 +594,9 @@ function Header({
         >
           {org.name}
         </h1>
-        {/* Chip row: Verified · Public/Private · Dormant?
-            flex-wrap so the row breaks AFTER chips overflow, not in
-            the middle of a chip. */}
+        {/* Chip row: Verified · policy · audience? · Hidden? · Invited you?
+            · Dormant? flex-wrap so the row breaks AFTER chips overflow,
+            not in the middle of a chip. */}
         <div
           style={{
             display: "flex",
@@ -475,15 +606,21 @@ function Header({
           }}
         >
           {org.verified ? <VerifiedBadge /> : null}
-          {!org.is_public ? (
-            <Chip color="#9B7BFF">Private</Chip>
-          ) : (
-            <Chip color="#9DD8FF">Public</Chip>
-          )}
+          {policy ? (
+            <Chip
+              color={org.join_policy === "open" ? "#9DD8FF" : "#9B7BFF"}
+              icon={org.join_policy === "open" ? null : <LockGlyph size={9} />}
+            >
+              {policy}
+            </Chip>
+          ) : null}
+          {audience ? <Chip color="#FFC48A">{audience}</Chip> : null}
+          {org.hidden ? <Chip color="#C9C9D6">{ORG_COPY.meta.hidden}</Chip> : null}
+          {invited ? <Chip color="#FF8A66">{ORG_COPY.chips.invitedYou}</Chip> : null}
           {org.dormant ? <Chip color="#E84D4D">Dormant</Chip> : null}
         </div>
-        {/* Handle + member count on their own line so they never get
-            pushed onto a chip's row or under the join button. */}
+        {/* Handle + counts on their own line so they never get pushed onto
+            a chip's row or under the join button. */}
         <div
           style={{
             fontSize: 13,
@@ -504,10 +641,16 @@ function Header({
           >
             @{org.handle}
           </span>
-          <span style={{ opacity: 0.4 }}>·</span>
-          <span style={{ whiteSpace: "nowrap" }}>
-            {org.member_count} {org.member_count === 1 ? "member" : "members"}
-          </span>
+          {counts.map((text) => (
+            // Each separator travels with its count, so a wrap never strands a '·'.
+            <span
+              key={text}
+              style={{ display: "inline-flex", alignItems: "center", gap: 8 }}
+            >
+              <span style={{ opacity: 0.4 }}>·</span>
+              <span style={{ whiteSpace: "nowrap" }}>{text}</span>
+            </span>
+          ))}
         </div>
       </div>
 
@@ -558,7 +701,15 @@ function VerifiedBadge() {
   );
 }
 
-function Chip({ color, children }: { color: string; children: React.ReactNode }) {
+function Chip({
+  color,
+  icon,
+  children,
+}: {
+  color: string;
+  icon?: React.ReactNode;
+  children: React.ReactNode;
+}) {
   const tint = color
     .replace("#", "")
     .match(/.{2}/g)
@@ -569,6 +720,7 @@ function Chip({ color, children }: { color: string; children: React.ReactNode })
       style={{
         display: "inline-flex",
         alignItems: "center",
+        gap: 4,
         padding: "3px 8px",
         borderRadius: 999,
         fontSize: 10.5,
@@ -581,8 +733,21 @@ function Chip({ color, children }: { color: string; children: React.ReactNode })
         flexShrink: 0,
       }}
     >
+      {icon}
       {children}
     </span>
+  );
+}
+
+/** The padlock the join-policy chip and notice share. */
+function LockGlyph({ size }: { size: number }) {
+  return (
+    <svg width={size} height={size} viewBox="0 0 16 16" aria-hidden>
+      <path
+        fill="currentColor"
+        d="M8 1a3 3 0 0 0-3 3v2H4.25A1.25 1.25 0 0 0 3 7.25v6.5C3 14.44 3.56 15 4.25 15h7.5c.69 0 1.25-.56 1.25-1.25v-6.5C13 6.56 12.44 6 11.75 6H11V4a3 3 0 0 0-3-3zm0 1.5A1.5 1.5 0 0 1 9.5 4v2h-3V4A1.5 1.5 0 0 1 8 2.5z"
+      />
+    </svg>
   );
 }
 
@@ -606,7 +771,12 @@ function Description({ text }: { text: string }) {
   );
 }
 
-function PrivateOrgNotice() {
+/**
+ * The line under the header: who can join and that anyone can follow, or
+ * that the club is hidden. The text is `joinPolicyNotice`'s; open clubs and
+ * members get none, so the caller renders nothing on null.
+ */
+function JoinPolicyNotice({ text }: { text: string }) {
   return (
     <div
       style={{
@@ -639,18 +809,9 @@ function PrivateOrgNotice() {
           flexShrink: 0,
         }}
       >
-        <svg width="13" height="13" viewBox="0 0 16 16" aria-hidden>
-          <path
-            fill="currentColor"
-            d="M8 1a3 3 0 0 0-3 3v2H4.25A1.25 1.25 0 0 0 3 7.25v6.5C3 14.44 3.56 15 4.25 15h7.5c.69 0 1.25-.56 1.25-1.25v-6.5C13 6.56 12.44 6 11.75 6H11V4a3 3 0 0 0-3-3zm0 1.5A1.5 1.5 0 0 1 9.5 4v2h-3V4A1.5 1.5 0 0 1 8 2.5z"
-          />
-        </svg>
+        <LockGlyph size={13} />
       </span>
-      <div>
-        <strong style={{ color: "#fff" }}>This community is private.</strong>{" "}
-        Profile is public — request access above to see the channels and join
-        the chat.
-      </div>
+      <div>{text}</div>
     </div>
   );
 }
@@ -713,6 +874,8 @@ function PostsSection({ posts, org }: { posts: PostRow[]; org: OrgProfile }) {
               </div>
               <div style={{ fontSize: 11, color: "rgba(255,255,255,0.5)" }}>
                 {fmtDate(p.created_at)}
+                {/* Every edited published post says so (founder decision). */}
+                {p.edited_at ? " · Edited" : null}
               </div>
             </div>
             <p
@@ -848,10 +1011,19 @@ function PhilanthropySection({ text }: { text: string }) {
 }
 
 function FactsSection({ org }: { org: OrgProfile }) {
+  // The same floor as the header: no 'Followers' row below 5 (critic C13).
+  const followers =
+    followerCountText(org.follower_count) !== null ? String(org.follower_count) : null;
+  const whoCanJoin = whoCanJoinFact(org.join_policy);
+  const openTo = openToFact(org.audience);
   return (
     <SectionCard title="About">
-      <Fact label="Members" value={String(org.member_count)} />
-      <Fact label="Visibility" value={org.is_public ? "Public" : "Private"} />
+      {followers !== null ? <Fact label="Followers" value={followers} /> : null}
+      {org.member_count !== null ? (
+        <Fact label="Members" value={String(org.member_count)} />
+      ) : null}
+      {whoCanJoin ? <Fact label="Who can join" value={whoCanJoin} /> : null}
+      {openTo ? <Fact label="Open to" value={openTo} /> : null}
       <Fact
         label="Status"
         value={org.verified ? "Verified" : org.dormant ? "Dormant" : "Community"}

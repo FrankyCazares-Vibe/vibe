@@ -1,6 +1,7 @@
 "use client";
 
 import Link from "next/link";
+import { useRouter } from "next/navigation";
 import { useCallback, useEffect, useState } from "react";
 
 import {
@@ -8,7 +9,9 @@ import {
   LoadFailed,
   type LoadFailure,
 } from "@/components/feedback/LoadFailed";
+import { OrgJoinControl } from "@/components/orgs/OrgJoinControl";
 import { vibeRequest } from "@/lib/feedback/request";
+import { channelsGateCopy, type OrgRelation } from "@/lib/orgs/join-copy";
 
 type Channel = {
   id: string;
@@ -30,17 +33,26 @@ type Channel = {
  *   before the auto-subscribe wiring or want to (re-)pick up newer
  *   public channels.
  *
- * For non-members: the card shows its heading and "Chats are for members."
- *   and never asks for the list. The route answers non-members 403
- *   `members_only`, so fetching anyway only ever painted a red failure line.
+ * For non-members: the card shows its heading and one line from
+ *   `channelsGateCopy` ("Chats are for members." plus what they can do about
+ *   it), with the one membership control worth offering inline (Join on an
+ *   open club, Request to join on a request club). It never asks for the list:
+ *   the route answers non-members 403 `members_only`, so fetching anyway only
+ *   ever painted a red failure line.
+ *
+ * `relation` null means the page couldn't load the viewer's membership. That
+ *   is a failure, not a non-member, so it renders LoadFailed and still never
+ *   fetches.
  */
 export function ChannelsSection({
   orgHandle,
-  viewerIsMember,
+  relation,
 }: {
   orgHandle: string;
-  viewerIsMember: boolean;
+  relation: OrgRelation | null;
 }) {
+  const router = useRouter();
+  const viewerIsMember = relation?.state === "member";
   const [channels, setChannels] = useState<Channel[] | null>(null);
   // A failed read is not an org without channels: it renders as the failure
   // line, never "No channels here yet."
@@ -108,6 +120,9 @@ export function ChannelsSection({
     channels?.filter((c) => !c.is_private).sort(sortChannels) ?? [];
   const privateChannels =
     channels?.filter((c) => c.is_private).sort(sortChannels) ?? [];
+
+  // Null for a member (and for a failed relation, handled first below).
+  const gate = relation ? channelsGateCopy(relation) : null;
 
   return (
     <section
@@ -184,17 +199,34 @@ export function ChannelsSection({
         </div>
       ) : null}
 
-      {!viewerIsMember ? (
-        <p
-          style={{
-            margin: 0,
-            color: "rgba(255,255,255,0.6)",
-            fontSize: 13,
-            lineHeight: 1.55,
-          }}
-        >
-          Chats are for members.
-        </p>
+      {relation === null ? (
+        <LoadFailed
+          tone="dark"
+          failure={{ message: "Couldn't load this org's channels." }}
+          onRetry={() => router.refresh()}
+        />
+      ) : !viewerIsMember ? (
+        <div style={{ display: "flex", flexDirection: "column", gap: 10 }}>
+          <p
+            style={{
+              margin: 0,
+              color: "rgba(255,255,255,0.6)",
+              fontSize: 13,
+              lineHeight: 1.55,
+            }}
+          >
+            {gate?.line}
+          </p>
+          {gate?.inline ? (
+            <OrgJoinControl
+              variant="header"
+              axis="membership"
+              source="profile"
+              relation={relation}
+              onChange={() => router.refresh()}
+            />
+          ) : null}
+        </div>
       ) : channels === null && loadErr ? (
         <LoadFailed
           tone="dark"

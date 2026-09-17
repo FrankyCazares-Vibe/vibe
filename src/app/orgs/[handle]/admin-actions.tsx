@@ -4,8 +4,22 @@ import { useRouter } from "next/navigation";
 import { useState } from "react";
 
 import { ImageCropperModal } from "@/components/ImageCropperModal";
+import { OrgInviteSheet } from "@/components/orgs/OrgInviteSheet";
+import {
+  AUDIENCE_HELP,
+  OFFICER_FOLLOW_HELP,
+  WHO_CAN_JOIN_OPTIONS,
+  openToOptions,
+} from "@/lib/orgs/join-copy";
+import type { JoinPolicy, OrgAudience } from "@/lib/orgs/join-state";
 
 type Link = { label: string; url: string };
+
+/** The club's campus, for the "Open to" option that names a shared campus. */
+type OpenToCampus = { name: string; shared: boolean } | null;
+
+/** Same breakpoint as the org page's phone layout (`globals.css` `.vibe-org-header`). */
+const PHONE_QUERY = "(max-width: 720px)";
 
 const MAX_DESC = 400;
 const MAX_PHILANTHROPY = 500;
@@ -47,27 +61,64 @@ const buttonStyle = (variant: "primary" | "ghost" | "danger"): React.CSSProperti
     variant === "primary" ? "inset 0 1px 0 rgba(255,255,255,0.22)" : "none",
 });
 
+/**
+ * The officer bar on the org page. The page renders it for owners and admins
+ * only (`isSettingsOfficer`), which is also who may invite (critic C2) and
+ * change who can join.
+ *
+ * A hidden club keeps "Edit details" and nothing else (plan §7 F6): it is out
+ * of every list and nobody new can join it, so inviting, new posts and the
+ * join fields would all be doors to nowhere (the invite POST, the posts route
+ * and the PATCH's join fields refuse `org_hidden` anyway). Banner and Logo go
+ * too, by the same plan line, although the PATCH still accepts `banner_url` /
+ * `logo_url` on a hidden club — restoring them is a one-line change here if
+ * hidden-club officers should keep them.
+ */
 export function OrgProfileAdminBar({
   orgHandle,
+  orgName,
+  joinPolicy,
+  audience,
+  hidden,
+  openToCampus,
   initialDescription,
   initialLinks,
   initialPhilanthropy,
 }: {
   orgHandle: string;
+  orgName: string;
+  joinPolicy: JoinPolicy;
+  audience: OrgAudience;
+  hidden: boolean;
+  openToCampus: OpenToCampus;
   initialDescription: string;
   initialLinks: Link[];
   initialPhilanthropy: string;
 }) {
   const [openModal, setOpenModal] = useState<
-    null | "edit" | "banner" | "logo" | "post"
+    null | "invite" | "edit" | "banner" | "logo" | "post"
   >(null);
+  // Picked when the sheet opens, never during render: `window` doesn't exist
+  // on the server, and a rotated phone gets the right shape on the next open.
+  const [invitePresentation, setInvitePresentation] = useState<"sheet" | "modal">("modal");
 
-  const buttons: { key: typeof openModal; label: string; icon: React.ReactNode }[] = [
-    { key: "banner", label: "Banner", icon: <BannerIcon /> },
-    { key: "logo", label: "Logo", icon: <LogoIcon /> },
-    { key: "edit", label: "Edit details", icon: <PencilIcon /> },
-    { key: "post", label: "New post", icon: <PlusIcon /> },
-  ];
+  const buttons: { key: Exclude<typeof openModal, null>; label: string; icon: React.ReactNode }[] =
+    hidden
+      ? [{ key: "edit", label: "Edit details", icon: <PencilIcon /> }]
+      : [
+          { key: "invite", label: "Invite people", icon: <PersonPlusIcon /> },
+          { key: "banner", label: "Banner", icon: <BannerIcon /> },
+          { key: "logo", label: "Logo", icon: <LogoIcon /> },
+          { key: "edit", label: "Edit details", icon: <PencilIcon /> },
+          { key: "post", label: "New post", icon: <PlusIcon /> },
+        ];
+
+  const open = (key: Exclude<typeof openModal, null>) => {
+    if (key === "invite") {
+      setInvitePresentation(window.matchMedia(PHONE_QUERY).matches ? "sheet" : "modal");
+    }
+    setOpenModal(key);
+  };
 
   return (
     <>
@@ -95,13 +146,13 @@ export function OrgProfileAdminBar({
             marginRight: "auto",
           }}
         >
-          Owner / admin tools
+          {hidden ? "Hidden org" : "Officer tools"}
         </span>
         {buttons.map((b) => (
           <button
             key={b.key}
             type="button"
-            onClick={() => setOpenModal(b.key)}
+            onClick={() => open(b.key)}
             style={{
               ...buttonStyle("ghost"),
               display: "inline-flex",
@@ -115,9 +166,23 @@ export function OrgProfileAdminBar({
         ))}
       </div>
 
+      {openModal === "invite" && !hidden ? (
+        <OrgInviteSheet
+          handle={orgHandle}
+          orgName={orgName}
+          audience={audience}
+          presentation={invitePresentation}
+          onClose={() => setOpenModal(null)}
+        />
+      ) : null}
+
       {openModal === "edit" ? (
         <EditDetailsModal
           orgHandle={orgHandle}
+          hidden={hidden}
+          openToCampus={openToCampus}
+          initialJoinPolicy={joinPolicy}
+          initialAudience={audience}
           initialDescription={initialDescription}
           initialLinks={initialLinks}
           initialPhilanthropy={initialPhilanthropy}
@@ -143,16 +208,24 @@ export function OrgProfileAdminBar({
   );
 }
 
-// ─── Edit details (description, links, philanthropy) ──────────────────────
+// ─── Edit details (description, links, philanthropy, who can join) ────────
 
 function EditDetailsModal({
   orgHandle,
+  hidden,
+  openToCampus,
+  initialJoinPolicy,
+  initialAudience,
   initialDescription,
   initialLinks,
   initialPhilanthropy,
   onClose,
 }: {
   orgHandle: string;
+  hidden: boolean;
+  openToCampus: OpenToCampus;
+  initialJoinPolicy: JoinPolicy;
+  initialAudience: OrgAudience;
   initialDescription: string;
   initialLinks: Link[];
   initialPhilanthropy: string;
@@ -162,6 +235,8 @@ function EditDetailsModal({
   const [description, setDescription] = useState(initialDescription);
   const [links, setLinks] = useState<Link[]>(initialLinks);
   const [philanthropy, setPhilanthropy] = useState(initialPhilanthropy);
+  const [joinPolicy, setJoinPolicy] = useState<JoinPolicy>(initialJoinPolicy);
+  const [audience, setAudience] = useState<OrgAudience>(initialAudience);
   const [busy, setBusy] = useState(false);
   const [err, setErr] = useState<string | null>(null);
 
@@ -169,16 +244,22 @@ function EditDetailsModal({
     setBusy(true);
     setErr(null);
     try {
+      const body: Record<string, unknown> = {
+        description: description.trim(),
+        philanthropy: philanthropy.trim(),
+        links: links
+          .map((l) => ({ label: l.label.trim(), url: l.url.trim() }))
+          .filter((l) => l.label && l.url),
+      };
+      // Only what the officer changed: narrowing the audience revokes invites
+      // on the server, and a hidden club refuses any join-field change with
+      // 409 `org_hidden`, so an untouched field must never ride along.
+      if (!hidden && joinPolicy !== initialJoinPolicy) body.join_policy = joinPolicy;
+      if (!hidden && audience !== initialAudience) body.audience = audience;
       const res = await fetch(`/api/orgs/${orgHandle}`, {
         method: "PATCH",
         headers: { "content-type": "application/json" },
-        body: JSON.stringify({
-          description: description.trim(),
-          philanthropy: philanthropy.trim(),
-          links: links
-            .map((l) => ({ label: l.label.trim(), url: l.url.trim() }))
-            .filter((l) => l.label && l.url),
-        }),
+        body: JSON.stringify(body),
       });
       const data = await res.json();
       if (!data?.ok) {
@@ -222,6 +303,28 @@ function EditDetailsModal({
         style={{ ...inputStyle, resize: "vertical", minHeight: 70 }}
       />
       <Hint>{`${philanthropy.length} / ${MAX_PHILANTHROPY}`}</Hint>
+
+      {!hidden ? (
+        <>
+          <FieldLabel id="org-edit-who-can-join">Who can join</FieldLabel>
+          <ChoiceGroup
+            labelledBy="org-edit-who-can-join"
+            value={joinPolicy}
+            onChange={setJoinPolicy}
+            options={WHO_CAN_JOIN_OPTIONS}
+          />
+
+          <FieldLabel id="org-edit-open-to">Open to</FieldLabel>
+          <ChoiceGroup
+            labelledBy="org-edit-open-to"
+            value={audience}
+            onChange={setAudience}
+            options={openToOptions(openToCampus)}
+          />
+          <Hint>{AUDIENCE_HELP}</Hint>
+          <Hint>{OFFICER_FOLLOW_HELP}</Hint>
+        </>
+      ) : null}
 
       {err ? <ErrorBanner text={err} /> : null}
 
@@ -704,9 +807,10 @@ function ModalFooter({ children }: { children: React.ReactNode }) {
   );
 }
 
-function FieldLabel({ children }: { children: React.ReactNode }) {
+function FieldLabel({ id, children }: { id?: string; children: React.ReactNode }) {
   return (
     <div
+      id={id}
       style={{
         fontSize: 11,
         fontWeight: 700,
@@ -725,6 +829,75 @@ function Hint({ children }: { children: React.ReactNode }) {
   return (
     <div style={{ fontSize: 11, color: "rgba(255,255,255,0.45)" }}>
       {children}
+    </div>
+  );
+}
+
+/**
+ * A segmented single choice: one pill per option, label plus an optional
+ * sub. A radiogroup, so a screen reader hears which one is picked.
+ */
+function ChoiceGroup<V extends string>({
+  labelledBy,
+  value,
+  onChange,
+  options,
+}: {
+  labelledBy: string;
+  value: V;
+  onChange: (next: V) => void;
+  options: readonly { value: V; label: string; sub?: string }[];
+}) {
+  return (
+    <div
+      role="radiogroup"
+      aria-labelledby={labelledBy}
+      style={{
+        display: "grid",
+        gridTemplateColumns: "repeat(auto-fit, minmax(150px, 1fr))",
+        gap: 6,
+      }}
+    >
+      {options.map((o) => {
+        const selected = o.value === value;
+        return (
+          <button
+            key={o.value}
+            type="button"
+            role="radio"
+            aria-checked={selected}
+            onClick={() => onChange(o.value)}
+            style={{
+              display: "flex",
+              flexDirection: "column",
+              alignItems: "flex-start",
+              justifyContent: "center",
+              gap: 2,
+              minHeight: 44,
+              padding: "8px 12px",
+              borderRadius: 10,
+              textAlign: "left",
+              fontFamily: "DM Sans, sans-serif",
+              cursor: "pointer",
+              color: "#fff",
+              border: selected
+                ? "1px solid rgba(255,180,150,0.6)"
+                : "1px solid rgba(255,255,255,0.14)",
+              background: selected
+                ? "linear-gradient(180deg, rgba(255,92,53,0.42) 0%, rgba(255,92,53,0.16) 100%)"
+                : "rgba(255,255,255,0.04)",
+              boxShadow: selected ? "inset 0 1px 0 rgba(255,255,255,0.22)" : "none",
+            }}
+          >
+            <span style={{ fontSize: 13, fontWeight: 700, lineHeight: 1.3 }}>{o.label}</span>
+            {o.sub ? (
+              <span style={{ fontSize: 11.5, lineHeight: 1.35, color: "rgba(255,255,255,0.6)" }}>
+                {o.sub}
+              </span>
+            ) : null}
+          </button>
+        );
+      })}
     </div>
   );
 }
@@ -921,6 +1094,28 @@ function LogoIcon() {
         strokeWidth="1.4"
       />
       <circle cx="8" cy="8" r="2.5" fill="currentColor" />
+    </svg>
+  );
+}
+
+function PersonPlusIcon() {
+  return (
+    <svg width="13" height="13" viewBox="0 0 16 16" aria-hidden>
+      <circle
+        cx="6"
+        cy="5"
+        r="2.75"
+        fill="none"
+        stroke="currentColor"
+        strokeWidth="1.4"
+      />
+      <path
+        d="M1.5 14c0-2.5 2-4.25 4.5-4.25S10.5 11.5 10.5 14M13 5.5v4M11 7.5h4"
+        fill="none"
+        stroke="currentColor"
+        strokeWidth="1.4"
+        strokeLinecap="round"
+      />
     </svg>
   );
 }
