@@ -2,6 +2,9 @@ import { redirect } from "next/navigation";
 
 import { CampusAppShell } from "@/components/campus-app-shell";
 import { SettingsClient } from "@/components/settings/SettingsClient";
+import { isOttoOnboardingComplete } from "@/lib/auth/post-login";
+import { ownCampusFields } from "@/lib/profile/profile-campus-write";
+import type { SettingsCampusInput } from "@/lib/profile/settings-campus-card";
 import { createSupabaseServerClient } from "@/lib/supabase/server";
 import { createSupabaseServiceClient } from "@/lib/supabase/service";
 
@@ -20,14 +23,39 @@ export default async function SettingsPage() {
   }
 
   // email / school_email are private columns (no RLS read); the self-read
-  // goes through the service role scoped to the signed-in user's id.
-  const { data: profile } = await createSupabaseServiceClient()
+  // goes through the service role scoped to the signed-in user's id. So do
+  // campus_set_at and otto_answers (no `authenticated` SELECT grant): they
+  // only feed the campus card's derived fields below and never reach the
+  // client raw.
+  const { data: profile, error: profileErr } = await createSupabaseServiceClient()
     .from("users")
     .select(
-      "id,email,name,handle,handle_changed_at,school,school_email,school_verified,year,major,created_at",
+      "id,email,name,handle,handle_changed_at,school,school_email,school_verified,school_system,campus_id,campus_set_at,otto_answers,year,major,created_at",
     )
     .eq("id", user.id)
     .maybeSingle();
+  if (profileErr) console.error("[settings profile read]", profileErr);
+
+  // Campus card (plan wave 3 B15). A failed read passes null, which the card
+  // renders as a load failure instead of "Verify your school email".
+  let campus: SettingsCampusInput | null = null;
+  if (profile && !profileErr) {
+    const own = ownCampusFields({
+      school: (profile.school as string | null) ?? null,
+      school_verified: Boolean(profile.school_verified),
+      school_system: (profile.school_system as string | null) ?? null,
+      campus_id: (profile.campus_id as string | null) ?? null,
+      campus_set_at: (profile.campus_set_at as string | null) ?? null,
+    });
+    campus = {
+      schoolVerified: Boolean(profile.school_verified),
+      schoolSystem: own.schoolSystem,
+      campusId: own.campusId,
+      campusConfirmed: own.campusConfirmed,
+      campusChangeAvailableAt: own.campusChangeAvailableAt,
+      onboarded: isOttoOnboardingComplete(profile.otto_answers),
+    };
+  }
 
   // No consent gate here on purpose (S53 A4): someone who declines the
   // Terms must still be able to reach account deletion. The page's own
@@ -43,13 +71,13 @@ export default async function SettingsPage() {
           handle_changed_at:
             (profile?.handle_changed_at as string | null) ?? null,
           email: (profile?.email as string | null) ?? user.email ?? null,
-          school: (profile?.school as string | null) ?? null,
           school_email: (profile?.school_email as string | null) ?? null,
           school_verified: Boolean(profile?.school_verified),
           year: (profile?.year as number | null) ?? null,
           major: (profile?.major as string | null) ?? null,
           created_at: (profile?.created_at as string | null) ?? null,
         }}
+        campus={campus}
       />
     </CampusAppShell>
   );

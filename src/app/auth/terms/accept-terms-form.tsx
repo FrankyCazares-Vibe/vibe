@@ -5,6 +5,7 @@ import { useRouter } from "next/navigation";
 import { useState } from "react";
 
 import { MIN_AGE, TERMS_VERSION } from "@/lib/legal/terms";
+import { clearDraft } from "@/lib/onboarding/draft";
 
 const GENERIC_ERROR = "Couldn't save your agreement. Please try again.";
 
@@ -69,8 +70,10 @@ export function AcceptTermsForm({ next }: { next: string }) {
     } catch {
       // Best-effort; the login page copes with a lingering session.
     }
-    // Hard reload (same as Settings) so the cookie clear is reflected
-    // everywhere and the next nav lands on /auth/login.
+    // Drop every onboarding draft on this browser (no id), same as the
+    // Settings sign-out. Hard reload (same as Settings) so the cookie clear
+    // is reflected everywhere and the next nav lands on /auth/login.
+    clearDraft();
     window.location.href = "/auth/login";
   }
 

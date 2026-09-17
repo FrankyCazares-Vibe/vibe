@@ -1,7 +1,7 @@
 "use client";
 
 import Link from "next/link";
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 
 import {
   asLoadFailure,
@@ -9,7 +9,16 @@ import {
   type LoadFailure,
 } from "@/components/feedback/LoadFailed";
 import { vibeRequest } from "@/lib/feedback/request";
-import { IU_CAMPUSES, campusByLabel } from "@/lib/iu/campuses";
+import { clearDraft } from "@/lib/onboarding/draft";
+import {
+  CAMPUS_CONFIRM_LOCK_COPY,
+  CAMPUS_SAVE_FAILURE_COPY,
+  campusPickStep,
+  campusSaveFailure,
+  nextAvailableAfterWrite,
+  settingsCampusCardView,
+  type SettingsCampusInput,
+} from "@/lib/profile/settings-campus-card";
 import { MOBILE_BREAKPOINT_PX } from "@/lib/use-is-mobile";
 
 type Profile = {
@@ -21,7 +30,6 @@ type Profile = {
    *  first-time claim, no cooldown applies. */
   handle_changed_at: string | null;
   email: string | null;
-  school: string | null;
   school_email: string | null;
   school_verified: boolean;
   year: number | null;
@@ -48,7 +56,14 @@ const CARD_GLASS: React.CSSProperties = {
   ].join(", "),
 };
 
-export function SettingsClient({ profile }: { profile: Profile }) {
+export function SettingsClient({
+  profile,
+  campus,
+}: {
+  profile: Profile;
+  /** Derived on the server (settings/page.tsx); null when the read failed. */
+  campus: SettingsCampusInput | null;
+}) {
   return (
     <main
       className="vibe-settings-main"
@@ -98,7 +113,7 @@ export function SettingsClient({ profile }: { profile: Profile }) {
       </header>
 
       <AccountCard profile={profile} />
-      <CampusCard initialSchool={profile.school} />
+      <CampusCard initial={campus} />
       <HandleCard
         currentHandle={profile.handle}
         handleChangedAt={profile.handle_changed_at}
@@ -147,8 +162,7 @@ function CampusTourCard({ handle }: { handle: string | null }) {
           lineHeight: 1.55,
         }}
       >
-        Walk through vibe again with Otto — profile, campus, and network in
-        order. Takes about a minute.
+        Walk through vibe again with Otto. Takes about a minute.
       </p>
       <button
         type="button"
@@ -487,51 +501,155 @@ function AccountCard({ profile }: { profile: Profile }) {
   );
 }
 
-// Campus — self-declared, and the thing that scopes what the whole app
-// shows you first, so it lives in Settings rather than only inside the
-// profile editor. IU issues @iu.edu addresses university-wide, so
-// verifying the address proves IU membership, NOT which campus: nothing
-// here is verified and nothing sensitive may be gated on it.
+// Campus: the community whose clubs, events and map the app shows first.
+// It's chosen within the university the student's verified school email
+// proved (IU or Purdue), and Indianapolis is one community for both. The
+// rules and the option labels live in src/lib/profile/settings-campus-card.ts,
+// shared with the phone profile editor.
 //
-// Writes a single field through PATCH /api/me/profile, which normalizes
-// the value against src/lib/iu/campuses.ts and accepts "" as "not set".
-// Saves on change (it's a preference, not a claim) — no Save button.
-function CampusCard({ initialSchool }: { initialSchool: string | null }) {
-  // Anything stored that isn't a known campus (legacy free text) reads as
-  // "not set" here rather than being offered back as a bogus option.
-  const [value, setValue] = useState(
-    () => campusByLabel(initialSchool)?.label ?? "",
-  );
+// Writes `campus_id` through PATCH /api/me/profile, which checks the
+// university's allowed set and the 30-day rule and stamps `campus_set_at`.
+// Once onboarding is done every save starts the 30-day rule, so a pick in the
+// select is only staged behind "Switch to {campus}? You can't change your
+// campus again for 30 days." with Yes / Cancel (campusPickStep); before that
+// a pick saves straight away. "Yes" on the confirm callout re-sends the
+// campus already on the row, which stamps it: that is the confirmation, and it
+// starts the 30-day rule (the callout says so).
+//
+// The card's mode always comes from the SAVED row. A staged or in-flight pick
+// only changes what the select shows, so picking a campus never flips the
+// card into "Confirm your campus" while the request runs.
+function CampusCard({ initial }: { initial: SettingsCampusInput | null }) {
+  const [campus, setCampus] = useState<SettingsCampusInput | null>(initial);
+  const [now] = useState(() => Date.now());
+  // A campus picked in the select and not saved yet: waiting on the prompt's
+  // Yes (title/body set), or in flight. Null = the select shows the saved row.
+  const [pending, setPending] = useState<{
+    id: string;
+    title: string | null;
+    body: string | null;
+  } | null>(null);
   const [saving, setSaving] = useState(false);
   const [saved, setSaved] = useState(false);
-  const [error, setError] = useState<string | null>(null);
+  const [error, setError] = useState<{
+    text: string;
+    action?: { label: string; href: string };
+  } | null>(null);
+  // The server refused a change as too soon. vibeRequest drops `availableAt`,
+  // so this locks the select without a date; the error line carries the
+  // server's dated sentence.
+  const [refusedTooSoon, setRefusedTooSoon] = useState(false);
+  const selectRef = useRef<HTMLSelectElement>(null);
 
-  const onPick = async (next: string) => {
-    if (saving || next === value) return;
-    const prev = value;
-    setValue(next);
+  const view = campus ? settingsCampusCardView(campus, now) : null;
+  const locked = Boolean(view?.locked) || refusedTooSoon;
+  const shownValue = pending?.id ?? view?.value ?? "";
+  // The sub-line follows what the select shows, staged pick included.
+  const shownSub =
+    campus && pending
+      ? settingsCampusCardView({ ...campus, campusId: pending.id, campusConfirmed: true }, now).sub
+      : (view?.sub ?? null);
+
+  const save = async (next: string) => {
+    if (!campus || saving || !next) return;
+    const prev = campus;
     setSaving(true);
     setSaved(false);
     setError(null);
-    try {
-      const r = await fetch("/api/me/profile", {
-        method: "PATCH",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ school: next }),
+    const r = await vibeRequest("/api/me/profile", {
+      method: "PATCH",
+      json: { campus_id: next },
+      quiet: true,
+      failure: CAMPUS_SAVE_FAILURE_COPY,
+    });
+    if (r.ok) {
+      setCampus({
+        ...prev,
+        campusId: next,
+        campusConfirmed: true,
+        campusChangeAvailableAt: nextAvailableAfterWrite(prev.onboarded),
       });
-      const j = await r.json().catch(() => ({}));
-      if (!r.ok || !j?.ok) {
-        throw new Error(j?.error ?? `HTTP ${r.status}`);
-      }
       setSaved(true);
-    } catch (e) {
-      // Put the select back where it was so the UI never claims a
-      // campus the server didn't take.
-      setValue(prev);
-      setError(e instanceof Error ? e.message : "Could not save");
-    } finally {
-      setSaving(false);
+    } else {
+      const failure = campusSaveFailure(r);
+      setError(failure.action ? { text: failure.text, action: failure.action } : { text: failure.text });
+      if (failure.locked) setRefusedTooSoon(true);
     }
+    // Either way the select goes back to the saved row: the new campus on
+    // success, the old one on failure, so the card never claims a campus the
+    // server didn't take.
+    setPending(null);
+    setSaving(false);
+  };
+
+  const onPick = (next: string) => {
+    if (!view || !campus || saving || locked) return;
+    const step = campusPickStep(view, campus.onboarded, next);
+    if (step.kind === "ignore") return;
+    if (step.kind === "unstage") {
+      setPending(null);
+      return;
+    }
+    setSaved(false);
+    setError(null);
+    if (step.kind === "save") {
+      setPending({ id: next, title: null, body: null });
+      void save(next);
+      return;
+    }
+    setPending({ id: next, title: step.title, body: step.body });
+  };
+
+  // "Change" on the confirm callout. Phones don't open a native picker on a
+  // programmatic focus, so ask for the picker where the browser has one.
+  const openPicker = () => {
+    const el = selectRef.current;
+    if (!el) return;
+    el.focus();
+    try {
+      (el as HTMLSelectElement & { showPicker?: () => void }).showPicker?.();
+    } catch {
+      // Not supported or not allowed here: the focused select is the fallback.
+    }
+  };
+
+  const hintStyle: React.CSSProperties = {
+    fontFamily: "DM Sans, sans-serif",
+    fontSize: 12,
+    color: "#8A8580",
+    marginTop: 8,
+    lineHeight: 1.5,
+  };
+  // 44px tall: these are phone tap targets too.
+  const pillStyle: React.CSSProperties = {
+    minHeight: 44,
+    padding: "10px 20px",
+    borderRadius: 999,
+    fontFamily: "DM Sans, sans-serif",
+    fontSize: 13,
+    fontWeight: 700,
+  };
+  const yesStyle: React.CSSProperties = {
+    ...pillStyle,
+    appearance: "none",
+    border: "none",
+    background: "#FF5C35",
+    color: "#FAF7F2",
+    cursor: saving ? "wait" : "pointer",
+    opacity: saving ? 0.7 : 1,
+  };
+  const secondaryStyle: React.CSSProperties = {
+    ...pillStyle,
+    border: "1px solid rgba(28,28,30,0.14)",
+    background: "rgba(28,28,30,0.04)",
+    color: "#1C1C1E",
+    cursor: saving ? "default" : "pointer",
+  };
+  const calloutStyle: React.CSSProperties = {
+    padding: "14px 16px",
+    borderRadius: 14,
+    background: "rgba(255,92,53,0.07)",
+    border: "1px solid rgba(255,92,53,0.22)",
   };
 
   return (
@@ -546,54 +664,174 @@ function CampusCard({ initialSchool }: { initialSchool: string | null }) {
           lineHeight: 1.55,
         }}
       >
-        Sets which campus&apos;s clubs and events you see first.{" "}
-        <strong style={{ color: "#1C1C1E", fontWeight: 700 }}>
-          Not verified — change it any time.
-        </strong>{" "}
-        Leave it unset to see everything across IU.
+        {"Your campus community: its clubs, events and map. Indianapolis is one community for IU and Purdue students."}
       </p>
 
-      <div style={{ display: "flex", gap: 10, alignItems: "center", flexWrap: "wrap" }}>
-        <select
-          value={value}
-          onChange={(e) => onPick(e.target.value)}
-          disabled={saving}
-          aria-label="Campus"
+      {!view ? (
+        <LoadFailed compact failure={{ message: "Couldn't load your campus. Try again." }} />
+      ) : view.mode === "unverified" ? (
+        <p
           style={{
-            padding: "10px 12px",
-            borderRadius: 10,
-            border: "1px solid rgba(28,28,30,0.12)",
-            background: "#fff",
-            outline: "none",
             fontFamily: "DM Sans, sans-serif",
-            fontSize: 14,
-            fontWeight: 600,
+            fontSize: 13.5,
             color: "#1C1C1E",
-            minWidth: 240,
-            maxWidth: "100%",
-            opacity: saving ? 0.6 : 1,
+            margin: 0,
+            lineHeight: 1.55,
           }}
         >
-          <option value="">Not set — show everything</option>
-          {IU_CAMPUSES.map((c) => (
-            <option key={c.id} value={c.label}>
-              {c.city && c.city !== c.shortLabel
-                ? `${c.label} — ${c.city}`
-                : c.label}
-            </option>
-          ))}
-        </select>
-        <span style={{ fontFamily: "DM Sans, sans-serif", fontSize: 12 }}>
-          {saving ? (
-            <span style={{ color: "#8A8580" }}>Saving…</span>
-          ) : saved ? (
-            <span style={{ color: "#1A9E5B", fontWeight: 700 }}>Saved ✓</span>
+          {"Verify your school email to pick your campus."}{" "}
+          <Link
+            href="/auth/school-email"
+            style={{ color: "#FF5C35", fontWeight: 700, textDecoration: "none" }}
+          >
+            Verify now →
+          </Link>
+        </p>
+      ) : (
+        <>
+          {view.mode === "confirm" && !pending ? (
+            <div
+              role="group"
+              aria-label="Confirm your campus"
+              style={{ ...calloutStyle, marginBottom: 14 }}
+            >
+              <div
+                style={{
+                  fontFamily: "Fraunces, serif",
+                  fontSize: 15,
+                  fontWeight: 800,
+                  color: "#1C1C1E",
+                }}
+              >
+                Confirm your campus
+              </div>
+              <p
+                style={{
+                  fontFamily: "DM Sans, sans-serif",
+                  fontSize: 13.5,
+                  color: "#5C5853",
+                  margin: "4px 0 12px",
+                  lineHeight: 1.5,
+                }}
+              >
+                Is {view.shortName} still right?
+              </p>
+              <div style={{ display: "flex", gap: 8, flexWrap: "wrap" }}>
+                <button
+                  type="button"
+                  onClick={() => void save(view.value)}
+                  disabled={saving}
+                  style={yesStyle}
+                >
+                  Yes
+                </button>
+                <button type="button" onClick={openPicker} disabled={saving} style={secondaryStyle}>
+                  Change
+                </button>
+              </div>
+              <div style={{ ...hintStyle, marginTop: 10 }}>{CAMPUS_CONFIRM_LOCK_COPY}</div>
+            </div>
           ) : null}
-        </span>
-      </div>
+
+          <div style={{ display: "flex", gap: 10, alignItems: "center", flexWrap: "wrap" }}>
+            <select
+              ref={selectRef}
+              value={shownValue}
+              onChange={(e) => onPick(e.target.value)}
+              disabled={saving || locked}
+              aria-label="Campus"
+              style={{
+                padding: "10px 12px",
+                borderRadius: 10,
+                border: "1px solid rgba(28,28,30,0.12)",
+                background: "#fff",
+                outline: "none",
+                fontFamily: "DM Sans, sans-serif",
+                fontSize: 14,
+                fontWeight: 600,
+                color: "#1C1C1E",
+                minWidth: 240,
+                maxWidth: "100%",
+                opacity: saving || locked ? 0.6 : 1,
+              }}
+            >
+              {view.value === "" ? (
+                <option value="" disabled>
+                  Pick your campus
+                </option>
+              ) : null}
+              {view.options.map((o) => (
+                <option key={o.id} value={o.id}>
+                  {o.label}
+                </option>
+              ))}
+            </select>
+            <span style={{ fontFamily: "DM Sans, sans-serif", fontSize: 12 }}>
+              {saving ? (
+                <span style={{ color: "#8A8580" }}>Saving…</span>
+              ) : saved ? (
+                <span style={{ color: "#1A9E5B", fontWeight: 700 }}>Saved ✓</span>
+              ) : null}
+            </span>
+          </div>
+
+          {shownSub ? <div style={hintStyle}>{shownSub}</div> : null}
+
+          {pending?.title ? (
+            <div
+              role="group"
+              aria-label={pending.title}
+              style={{ ...calloutStyle, marginTop: 12 }}
+            >
+              <div
+                style={{
+                  fontFamily: "DM Sans, sans-serif",
+                  fontSize: 14,
+                  fontWeight: 700,
+                  color: "#1C1C1E",
+                }}
+              >
+                {pending.title}
+              </div>
+              <p
+                style={{
+                  fontFamily: "DM Sans, sans-serif",
+                  fontSize: 13,
+                  color: "#5C5853",
+                  margin: "4px 0 12px",
+                  lineHeight: 1.5,
+                }}
+              >
+                {pending.body}
+              </p>
+              <div style={{ display: "flex", gap: 8, flexWrap: "wrap" }}>
+                <button
+                  type="button"
+                  onClick={() => void save(pending.id)}
+                  disabled={saving}
+                  style={yesStyle}
+                >
+                  Yes
+                </button>
+                <button
+                  type="button"
+                  onClick={() => setPending(null)}
+                  disabled={saving}
+                  style={secondaryStyle}
+                >
+                  Cancel
+                </button>
+              </div>
+            </div>
+          ) : null}
+
+          {view.note && view.note !== error?.text ? <div style={hintStyle}>{view.note}</div> : null}
+        </>
+      )}
 
       {error ? (
         <div
+          role="alert"
           style={{
             marginTop: 10,
             fontFamily: "DM Sans, sans-serif",
@@ -601,7 +839,18 @@ function CampusCard({ initialSchool }: { initialSchool: string | null }) {
             color: "#C0392B",
           }}
         >
-          {error}
+          {error.text}
+          {error.action ? (
+            <>
+              {" "}
+              <Link
+                href={error.action.href}
+                style={{ color: "#FF5C35", fontWeight: 700, textDecoration: "none" }}
+              >
+                {error.action.label} →
+              </Link>
+            </>
+          ) : null}
         </div>
       ) : null}
     </section>
@@ -932,8 +1181,11 @@ function SignOutCard() {
       setBusy(false);
       return;
     }
+    // Drop every onboarding draft on this browser (no id: the next person
+    // to sign in here must not inherit this one's half-typed answers).
     // Hard reload so the cookie clear is reflected in any cached
     // bootstrap fetches and the next nav lands on /auth/login.
+    clearDraft();
     window.location.href = "/auth/login";
   };
 
@@ -998,6 +1250,8 @@ function DangerZone({ handle }: { handle: string | null }) {
       if (!res.ok || !data?.ok) {
         throw new Error(data?.error || `HTTP ${res.status}`);
       }
+      // The account is gone: drop every onboarding draft on this browser.
+      clearDraft();
       window.location.href = "/";
     } catch (e) {
       setError(e instanceof Error ? e.message : "Could not delete account");
