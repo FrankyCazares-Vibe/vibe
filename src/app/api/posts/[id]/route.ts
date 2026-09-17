@@ -6,8 +6,12 @@ import {
   insertMentionNotifications,
   resolveMentionedUserIds,
 } from "@/lib/mentions";
+import { loadOrgRole } from "@/lib/orgs/following";
+import type { OrgRole } from "@/lib/orgs/join-state";
 import { withPostMediaUrls } from "@/lib/post-media-url";
+import { addedHandles, checkPostEdit, extractPostTags } from "@/lib/posts/edit";
 import { loadHonestViewRows } from "@/lib/posts/honest-views";
+import { rateLimit, tooManyRequests } from "@/lib/rate-limit";
 import { CLIP_KEY_PREFIX, getR2S3Client, isR2Configured } from "@/lib/r2";
 import { createSupabaseServerClient } from "@/lib/supabase/server";
 import {
@@ -15,7 +19,21 @@ import {
   isSupabaseServiceConfigured,
 } from "@/lib/supabase/service";
 
-const MAX_CONTENT_CHARS = 2000;
+/**
+ * The columns PATCH reads before an edit and returns after one. `edited_at`
+ * is written only by the `posts_stamp_edited` trigger (migration
+ * 20260916130000); this route reads it and never sends it. `org_id` marks a
+ * club post, which only a current owner / admin of that club may edit.
+ */
+const EDIT_COLS =
+  "id,user_id,org_id,type,status,content,tags,media_url,media_thumbnail_url,created_at,edited_at";
+
+/**
+ * Who may edit a club post: the same roles that may publish one as the club
+ * (`POST_AS_ORG_ROLES` in orgs/[slug]/posts/route.ts). Editing a club post
+ * puts words in the club's mouth just as publishing one does.
+ */
+const EDIT_AS_ORG_ROLES: readonly OrgRole[] = Object.freeze(["owner", "admin"]);
 
 type RouteContext = { params: Promise<{ id: string }> };
 
@@ -72,7 +90,8 @@ export async function GET(_req: Request, ctx: RouteContext) {
     .select(
       // `view_count` is read only as the fallback below and is stripped off
       // the post before it ships — nothing should render the inflated counter.
-      "id,user_id,type,content,tags,media_url,media_thumbnail_url,view_count,created_at," +
+      // `edited_at` (null = never edited) drives the "Edited" marker.
+      "id,user_id,type,content,tags,media_url,media_thumbnail_url,view_count,created_at,edited_at," +
         // Explicit FK name disambiguates the posts→users embed; see /api/feed for context.
         "author:users!posts_user_id_fkey!inner(id,name,handle,school,major,year,avatar_url)",
     )
@@ -269,13 +288,82 @@ export async function DELETE(_req: Request, ctx: RouteContext) {
   return NextResponse.json({ ok: true });
 }
 
+/** A post row as PATCH reads and returns it ({@link EDIT_COLS}). */
+type EditRow = {
+  id: string;
+  user_id: string;
+  org_id: string | null;
+  type: string;
+  status: string;
+  content: string | null;
+  tags: string[] | null;
+  media_url: string | null;
+  media_thumbnail_url: string | null;
+  created_at: string;
+  edited_at: string | null;
+};
+
 /**
- * PATCH a post — used for re-saving + publishing drafts. The author can
- * update: content, status (draft → published). Missing fields are left
- * alone.
+ * PATCH a post: edit its caption text, or publish a draft. Missing fields are
+ * left alone. Plan `handoffs/2026-09-16-wave-plan-follow-onboarding-edit.md`
+ * §7 E1.
  *
- * If the status flips from draft → published, we fan out @mention
- * notifications just like publish-post does on the initial publish.
+ * EDITS CHANGE CAPTION TEXT ONLY. `content` is trimmed, at most 2000
+ * characters, and may be emptied only on a post with a photo or video
+ * (`checkPostEdit`). Tags are NOT accepted from the client: whenever the text
+ * changes they are re-derived server-side with `extractPostTags`, the same
+ * function the composers use, so a `tags` field in the body is ignored. The
+ * database limits which columns change, not their values: `authenticated`
+ * may UPDATE only content, tags and status (migration 20260916130000), but
+ * nothing there caps the text at 2000 characters, checks tag format or rate
+ * limits. An author writing to PostgREST directly skips this route's rules;
+ * CHECK constraints would close that (follow-up).
+ *
+ * CLUB POSTS (`org_id` set). Being the author isn't enough: the caller must
+ * still be an owner / admin of the club, the same roles orgs/[slug]/posts
+ * lets publish as the club. Anyone else gets 403 `owner_admin_only`, with
+ * that route's message. A hidden club's post can still be edited by its
+ * current owner / admin (it shows as the author's own post, plan Q4);
+ * whether hiding should also freeze edits is Franky's call. Club posts never
+ * send mention notifications, matching the org route, which sends none.
+ *
+ * "EDITED" IS STAMPED BY THE DATABASE, NOT HERE. The `posts_stamp_edited`
+ * trigger sets `edited_at` when a PUBLISHED post's content actually changes.
+ * Saving the same text writes nothing at all, and editing a draft doesn't
+ * stamp. The row comes back with `edited_at` so a client can show the marker
+ * straight away.
+ *
+ * STATUS. draft -> published publishes the post and fans out every @mention
+ * in its final text, as publish-post does on a first publish. A published
+ * post can't go back to draft: the same trigger refuses it (42501), so this
+ * route answers 400 `already_published` before the UPDATE rather than letting
+ * that surface as a 500.
+ *
+ * NEWLY ADDED MENTIONS NOTIFY ONCE. On a published post only the @handles an
+ * edit adds are considered, and a person who already has a mention
+ * notification from this author for this post is skipped, so removing a
+ * handle and adding it back never re-notifies (plan Q17). That check reads
+ * other people's notifications, which RLS (`notifications_select_own`) hides
+ * from the author, so it uses the service role; if the service role isn't
+ * configured or the read fails, nobody is notified. A missed mention beats a
+ * duplicate one.
+ *
+ * KNOWN GAPS in mention-once. It is check-then-insert with no unique index on
+ * notifications behind it, so two PATCHes landing together that add the same
+ * handle can both notify (clients should disable Save while a PATCH is in
+ * flight). And a recipient who deleted their mention notification is
+ * notified again if the handle is removed and re-added. A unique partial
+ * index on notifications(user_id, actor_id, post_id) where type = 'mention',
+ * with the insert ignoring duplicates, would close the race (follow-up
+ * migration); the deleted case stays open, since the row it checks is gone.
+ *
+ * Rate limit: 30 PATCHes per author per 10 minutes (429 with Retry-After).
+ *
+ * KNOWN GAP (critic W2 Low 8): this route's GET, /api/me/posts and
+ * /api/users/[handle]/posts return `edited_at`. Readers that aren't edit
+ * surfaces (club posts on /api/orgs/[slug]/profile, shared posts in DMs, the
+ * /posts/[id] share page) don't select it yet, so an edited post shows no
+ * marker there.
  */
 export async function PATCH(req: Request, ctx: RouteContext) {
   const { id } = await ctx.params;
@@ -292,47 +380,86 @@ export async function PATCH(req: Request, ctx: RouteContext) {
     return NextResponse.json({ ok: false, error: "Unauthorized" }, { status: 401 });
   }
 
+  // Same order as publish-post: the limiter runs before the consent read.
+  const rl = await rateLimit(`post-edit:${user.id}`, { limit: 30, windowSec: 600 });
+  if (!rl.allowed) return tooManyRequests(rl);
+
   const termsGate = await requireTermsAccepted(user.id);
   if (termsGate) return termsGate;
 
-  let body: {
-    content?: unknown;
-    status?: unknown;
-  };
+  let parsed: unknown;
   try {
-    body = await req.json();
+    parsed = await req.json();
   } catch {
     return NextResponse.json({ ok: false, error: "Invalid JSON" }, { status: 400 });
   }
+  // `"content" in body` throws on null or a primitive, so anything that isn't
+  // a JSON object gets the same answer as JSON that doesn't parse.
+  if (!parsed || typeof parsed !== "object" || Array.isArray(parsed)) {
+    return NextResponse.json({ ok: false, error: "Invalid JSON" }, { status: 400 });
+  }
+  // `tags` is deliberately not read: tags are re-derived from the text.
+  const body = parsed as { content?: unknown; status?: unknown };
 
-  // Read the row first to confirm ownership + capture the prior status.
-  const { data: prior, error: readErr } = await supabase
+  // Read the row first: ownership, the prior status and text (for the mention
+  // diff), and whether it has media (a media post may lose its caption).
+  const { data: priorRow, error: readErr } = await supabase
     .from("posts")
-    .select("id,user_id,status,content")
+    .select(EDIT_COLS)
     .eq("id", id)
     .maybeSingle();
   if (readErr) {
     console.error("[posts/:id PATCH read]", readErr);
     return NextResponse.json({ ok: false, error: "Request failed" }, { status: 500 });
   }
-  if (!prior) {
+  if (!priorRow) {
     return NextResponse.json({ ok: false, error: "Post not found" }, { status: 404 });
   }
+  const prior = priorRow as unknown as EditRow;
   if (prior.user_id !== user.id) {
     return NextResponse.json({ ok: false, error: "Not your post" }, { status: 403 });
   }
 
-  const patch: Record<string, unknown> = {};
-
-  if (typeof body.content === "string") {
-    const trimmed = body.content.trim();
-    if (trimmed.length > MAX_CONTENT_CHARS) {
+  // A club post speaks as the club, so writing it isn't enough: the author
+  // must still be an owner / admin of that club (the org posts route's rule).
+  // An officer who was removed or demoted can't reword the club's post. The
+  // roster read needs the service role (RLS hides a club's members from
+  // non-members); without it the role can't be checked, so refuse.
+  if (prior.org_id) {
+    if (!isSupabaseServiceConfigured()) {
+      console.error("[posts/:id PATCH role] service role not configured");
+      return NextResponse.json({ ok: false, error: "Request failed" }, { status: 500 });
+    }
+    const roleRes = await loadOrgRole(createSupabaseServiceClient(), prior.org_id, user.id);
+    if (!roleRes.ok) {
+      return NextResponse.json({ ok: false, error: "Request failed" }, { status: 500 });
+    }
+    if (!roleRes.role || !EDIT_AS_ORG_ROLES.includes(roleRes.role)) {
       return NextResponse.json(
-        { ok: false, error: `Caption exceeds ${MAX_CONTENT_CHARS} characters` },
-        { status: 400 },
+        {
+          ok: false,
+          error: "Only owner / admin can post as the org",
+          code: "owner_admin_only",
+        },
+        { status: 403 },
       );
     }
-    patch.content = trimmed;
+  }
+
+  const patch: { content?: string; tags?: string[]; status?: "draft" | "published" } = {};
+
+  if ("content" in body) {
+    const c = checkPostEdit(body.content, !!prior.media_url);
+    if (!c.ok) {
+      return NextResponse.json({ ok: false, error: c.error }, { status: 400 });
+    }
+    // Unchanged text writes nothing, so a same-text save moves neither the
+    // tags nor the trigger's "Edited" stamp. A legacy null caption counts as
+    // "" here, so clearing an already-empty caption isn't an edit either.
+    if (c.content !== (prior.content ?? "")) {
+      patch.content = c.content;
+      patch.tags = extractPostTags(c.content);
+    }
   }
 
   let didPublish = false;
@@ -343,6 +470,19 @@ export async function PATCH(req: Request, ctx: RouteContext) {
         { status: 400 },
       );
     }
+    // The `posts_stamp_edited` trigger refuses any status change on a
+    // published post (42501). Answer it here, before the UPDATE, so the
+    // client gets a 400 it can map instead of a 500.
+    if (body.status === "draft" && prior.status === "published") {
+      return NextResponse.json(
+        {
+          ok: false,
+          error: "A published post can't go back to draft.",
+          code: "already_published",
+        },
+        { status: 400 },
+      );
+    }
     patch.status = body.status;
     if (body.status === "published" && prior.status === "draft") {
       didPublish = true;
@@ -350,28 +490,39 @@ export async function PATCH(req: Request, ctx: RouteContext) {
   }
 
   if (Object.keys(patch).length === 0) {
-    return NextResponse.json({ ok: true, post: prior });
+    // Through the serializer: `prior.media_url` is a raw R2 key or URL.
+    return NextResponse.json({ ok: true, post: withPostMediaUrls(prior) });
   }
 
-  const { data: row, error: upErr } = await supabase
+  // `edited_at` is never in `patch`; the trigger owns it and the select
+  // returns whatever it set.
+  const { data: updated, error: upErr } = await supabase
     .from("posts")
     .update(patch)
     .eq("id", id)
-    .select(
-      "id,user_id,type,content,tags,media_url,media_thumbnail_url,status,created_at",
-    )
+    .eq("user_id", user.id)
+    .select(EDIT_COLS)
     .single();
-  if (upErr || !row) {
+  if (upErr || !updated) {
     console.error("[posts/:id PATCH]", upErr);
     return NextResponse.json({ ok: false, error: "Request failed" }, { status: 500 });
   }
+  const row = updated as unknown as EditRow;
 
-  // First-publish mention fan-out — only fires when the draft is being
-  // promoted to published this very PATCH. Subsequent edits to a
-  // published post don't re-notify anyone.
-  if (didPublish) {
+  // Club posts send no mentions, on publish or on edit: orgs/[slug]/posts
+  // fans out none when a club post goes up, so an edit adding @handles to one
+  // stays quiet too (otherwise a handle added later would notify while one in
+  // the original text never did). Club posts can't be drafts (the org route
+  // inserts with the `published` default), so this only ever skips the edit
+  // branch.
+  const sendsMentions = prior.org_id == null;
+
+  if (didPublish && sendsMentions) {
+    // First-publish fan-out: the draft is being promoted to published this
+    // very PATCH, so every @mention in its final text notifies, as
+    // publish-post does. A draft was never visible, so none were sent before.
     const finalContent =
-      typeof patch.content === "string" ? (patch.content as string) : (prior.content ?? "");
+      typeof patch.content === "string" ? patch.content : (prior.content ?? "");
     if (finalContent) {
       const handles = extractMentionHandles(finalContent);
       if (handles.length > 0) {
@@ -382,13 +533,57 @@ export async function PATCH(req: Request, ctx: RouteContext) {
               actorId: user.id,
               targetUserIds: ids,
               kind: "post",
-              postId: row.id as string,
+              postId: row.id,
             });
           }
         } catch (e) {
           console.error("[posts/:id PATCH mentions]", e);
         }
       }
+    }
+  } else if (
+    sendsMentions &&
+    prior.status === "published" &&
+    typeof patch.content === "string"
+  ) {
+    // An edit to a published post: only handles this edit ADDED, and only
+    // people who don't already hold a mention notification from this author
+    // for this post (so remove + re-add stays quiet).
+    try {
+      const handles = addedHandles(
+        extractMentionHandles(prior.content ?? ""),
+        extractMentionHandles(patch.content),
+      );
+      const ids = await resolveMentionedUserIds(supabase, handles, user.id);
+      // No service role means the "already notified" check can't run, and
+      // notifying without it could repeat a mention. Notify nobody instead.
+      if (ids.length > 0 && isSupabaseServiceConfigured()) {
+        const { data: existing, error: seenErr } = await createSupabaseServiceClient()
+          .from("notifications")
+          .select("user_id")
+          .eq("type", "mention")
+          .eq("post_id", id)
+          .eq("actor_id", user.id)
+          .in("user_id", ids);
+        if (seenErr) {
+          console.error("[posts/:id PATCH mentions]", seenErr);
+        } else {
+          const already = new Set(
+            ((existing ?? []) as { user_id: string | null }[]).map((n) => String(n.user_id)),
+          );
+          const fresh = ids.filter((uid) => !already.has(uid));
+          if (fresh.length > 0) {
+            await insertMentionNotifications(supabase, {
+              actorId: user.id,
+              targetUserIds: fresh,
+              kind: "post",
+              postId: row.id,
+            });
+          }
+        }
+      }
+    } catch (e) {
+      console.error("[posts/:id PATCH mentions]", e);
     }
   }
 

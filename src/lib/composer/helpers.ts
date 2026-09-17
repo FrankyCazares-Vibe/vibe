@@ -2,6 +2,8 @@
 // /campus and the mobile PostComposerMobile sheet. Both surfaces share
 // the same publish APIs, so the upload + classification math lives here.
 
+import { extractPostTags } from "@/lib/posts/edit";
+
 export type CapturedFrame = {
   blob: Blob | null;
   duration: number | null;
@@ -77,20 +79,14 @@ export function capturePosterFrame(file: File): Promise<CapturedFrame> {
 /**
  * Pull all #hashtags out of post body, normalized to lowercase,
  * deduped, capped at 10. Matches what the publish APIs accept.
+ *
+ * One algorithm for publish and edit: this calls `extractPostTags`
+ * (src/lib/posts/edit.ts), the same function the edit route uses to
+ * re-derive tags server-side, so a tag written at publish time and the
+ * same tag after an edit can never differ.
  */
 export function extractHashtags(text: string): string[] {
-  const matches = text.match(/#[A-Za-z0-9_]{1,32}/g);
-  if (!matches) return [];
-  const seen = new Set<string>();
-  const out: string[] = [];
-  for (const m of matches) {
-    const t = m.replace(/^#+/, "").toLowerCase();
-    if (!t || seen.has(t)) continue;
-    seen.add(t);
-    out.push(t);
-    if (out.length >= 10) break;
-  }
-  return out;
+  return extractPostTags(text);
 }
 
 /**

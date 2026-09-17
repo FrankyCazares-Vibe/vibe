@@ -35,7 +35,8 @@ export async function GET(req: Request) {
   const { data, error } = await supabase
     .from("posts")
     .select(
-      "id,user_id,type,content,tags,media_url,media_thumbnail_url,created_at",
+      // `edited_at` (null = never edited) drives the "Edited" marker.
+      "id,user_id,type,content,tags,media_url,media_thumbnail_url,created_at,edited_at",
     )
     .eq("user_id", user.id)
     .eq("type", "post")
