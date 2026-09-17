@@ -8,6 +8,7 @@ import { Drawer } from "vaul";
 import { ImageCropperModal } from "@/components/ImageCropperModal";
 import { LoadFailed, asLoadFailure, type LoadFailure } from "@/components/feedback/LoadFailed";
 import { CampusSearchOverlay } from "@/components/mobile/CampusMobile";
+import { EditPostSheet } from "@/components/mobile/EditPostSheet";
 import { MutualsSheet } from "@/components/mobile/MutualsSheet";
 import { PostComposerMobile } from "@/components/mobile/PostComposerMobile";
 import { PostViewerMobile } from "@/components/mobile/PostViewerMobile";
@@ -15,10 +16,12 @@ import { ResumeViewerMobile } from "@/components/mobile/ResumeViewerMobile";
 import { useMobileTour } from "@/components/mobile/use-mobile-tour";
 import { vibeRequest } from "@/lib/feedback/request";
 import { toast } from "@/lib/feedback/toast";
-import { IU_CAMPUSES, campusByLabel } from "@/lib/iu/campuses";
-import { IU_MAJORS_BY_SCHOOL } from "@/lib/iu/majors";
+import { allowedCampusId, isSchoolSystem, type SchoolSystem } from "@/lib/iu/campuses";
+import { majorsForCampus } from "@/lib/iu/majors";
+import type { EditedPost } from "@/lib/posts/edit";
 import { DEFAULT_COVER_THEME_CSS, resolveCoverThemeCss } from "@/lib/profile/cover-themes";
 import type { RedactionBar } from "@/lib/profile/resume-redactions";
+import { campusPickStep, settingsCampusCardView } from "@/lib/profile/settings-campus-card";
 import { sortWorkExperienceByRecency } from "@/lib/profile/work-experience";
 
 /**
@@ -145,6 +148,9 @@ type PostRow = {
   media_url?: string | null;
   media_thumbnail_url?: string | null;
   created_at?: string | null;
+  tags?: string[] | null;
+  /** Stamped by the database on every edit; the card adds " · Edited". */
+  edited_at?: string | null;
 };
 
 type ProfileTab = "posts" | "portfolio";
@@ -213,8 +219,8 @@ type EditDraft = {
   location: string;
   major: string;
   year: number | null;
-  /** Self-declared IU campus — the canonical label from IU_CAMPUSES, or
-   *  "" for "not set". Sent to profile-sync as `school`. */
+  /** Campus id from the student's university, or "" before a pick. Sent as
+   *  `campus_id` only when it differs from the bootstrap's `campusId`. */
   campus: string;
   vibeTagsList: string[];
 };
@@ -225,6 +231,44 @@ function pick<T>(...vals: (T | null | undefined)[]): T | null {
   }
   return null;
 }
+
+/** The owner's campus, from the top-level fields of /api/me/profile-bootstrap
+ *  (`ownCampusFields` in profile-campus-write.ts). */
+type OwnCampus = {
+  schoolSystem: SchoolSystem | null;
+  campusId: string | null;
+  campusChangeAvailableAt: string | null;
+  campusConfirmed: boolean;
+};
+
+const NO_OWN_CAMPUS: OwnCampus = {
+  schoolSystem: null,
+  campusId: null,
+  campusChangeAvailableAt: null,
+  campusConfirmed: false,
+};
+
+/** Narrow a bootstrap body to {@link OwnCampus}. Anything malformed reads as unset. */
+function readOwnCampus(d: Record<string, unknown> | null | undefined): OwnCampus {
+  const raw = d?.schoolSystem;
+  const schoolSystem = isSchoolSystem(raw) ? raw : null;
+  return {
+    schoolSystem,
+    campusId: allowedCampusId(d?.campusId, schoolSystem),
+    campusChangeAvailableAt:
+      typeof d?.campusChangeAvailableAt === "string" ? d.campusChangeAvailableAt : null,
+    campusConfirmed: d?.campusConfirmed === true,
+  };
+}
+
+/** The small grey line under the edit-mode campus picker. */
+const campusHintStyle: React.CSSProperties = {
+  fontFamily: "DM Sans, sans-serif",
+  fontSize: 11,
+  lineHeight: 1.4,
+  color: "#8A8580",
+  margin: "-2px 4px 0",
+};
 
 const DEFAULT_BANNER_GRADIENT = DEFAULT_COVER_THEME_CSS;
 
@@ -328,8 +372,11 @@ export function ProfileMobile({ targetHandle }: Props = {}) {
   const [viewerItem, setViewerItem] = useState<
     { item: ResumeItem; index: number } | null
   >(null);
-  /** Post id for the full-screen post viewer. null = closed. */
-  const [openPostId, setOpenPostId] = useState<string | null>(null);
+  /** The post open in the full-screen viewer. null = closed. `mine` is
+   *  true only for a card in your own Posts grid: Saved and Reposts hold
+   *  other people's posts, so they never pass `canDelete` (the viewer's
+   *  server-computed `is_owner` still covers your own post there). */
+  const [openPost, setOpenPost] = useState<{ id: string; mine: boolean } | null>(null);
   /** Visitor-mode follow state; mirrors the server value initially then
    *  flips optimistically when the user taps Connect / Follow. */
   const [followState, setFollowState] = useState<FollowState>("none");
@@ -344,16 +391,12 @@ export function ProfileMobile({ targetHandle }: Props = {}) {
     () => !isVisitor && searchParams.get("edit") === "1",
   );
   const [draft, setDraft] = useState<EditDraft | null>(null);
-  // Self-declared campus, delivered TOP-LEVEL by /api/me/profile-bootstrap
-  // (not on `vibeUser`, which only carries the rendered badge text). Null
-  // when the user never picked one. Owner-only — the visitor bootstrap
-  // doesn't send it, and visitors can't edit anyway.
-  const [campus, setCampus] = useState<string | null>(null);
-  // Set once the user actually touches the campus picker. Until then the
-  // save payload omits `school` entirely — profile-sync leaves the column
-  // alone when the key is absent, so a client that never learned the
-  // current campus can't blank one set on another device.
-  const [campusTouched, setCampusTouched] = useState(false);
+  // The owner's campus: `schoolSystem`, `campusId`,
+  // `campusChangeAvailableAt` and `campusConfirmed`, delivered TOP-LEVEL by
+  // /api/me/profile-bootstrap (`ownCampusFields`, not on `vibeUser`, which
+  // only carries the rendered badge text). Owner only: the visitor bootstrap
+  // sends none of them, and visitors can't edit anyway.
+  const [ownCampus, setOwnCampus] = useState<OwnCampus>(NO_OWN_CAMPUS);
   const [savingEdit, setSavingEdit] = useState(false);
   const [editError, setEditError] = useState<string | null>(null);
 
@@ -368,7 +411,13 @@ export function ProfileMobile({ targetHandle }: Props = {}) {
     (async () => {
       // Quiet: a failure renders LoadFailed in the page's place, with
       // Sign in / Review Terms instead of Retry when that's the fix.
-      const r = await vibeRequest<{ vibeUser?: VibeUser; campus?: unknown }>(
+      const r = await vibeRequest<{
+        vibeUser?: VibeUser;
+        schoolSystem?: unknown;
+        campusId?: unknown;
+        campusChangeAvailableAt?: unknown;
+        campusConfirmed?: unknown;
+      }>(
         endpoint,
         { cache: "no-store", failure: line, quiet: true },
       );
@@ -379,9 +428,7 @@ export function ProfileMobile({ targetHandle }: Props = {}) {
       }
       const u = r.data.vibeUser;
       setUser(u);
-      setCampus(
-        typeof r.data.campus === "string" && r.data.campus ? r.data.campus : null,
-      );
+      setOwnCampus(isVisitor ? NO_OWN_CAMPUS : readOwnCampus(r.data));
       if (isVisitor && u._viewerFollowState) {
         setFollowState(u._viewerFollowState);
       }
@@ -471,6 +518,36 @@ export function ProfileMobile({ targetHandle }: Props = {}) {
     [isVisitor, targetHandle],
   );
   const refetchPosts = useCallback(() => loadPosts("refresh"), [loadPosts]);
+
+  // A saved edit ("Edit post" on a card's ⋯ or in the viewer) patches every
+  // copy of that post on this screen in place, with no refetch. Saved and
+  // Reposts cards don't show " · Edited" (their routes don't send
+  // `edited_at`), so only the Posts grid takes the stamp.
+  const applyPostEdit = useCallback((p: EditedPost) => {
+    setPosts((prev) =>
+      prev
+        ? prev.map((x) =>
+            x.id === p.id
+              ? { ...x, content: p.content, tags: p.tags, edited_at: p.edited_at }
+              : x,
+          )
+        : prev,
+    );
+    setSavedPosts((prev) =>
+      prev
+        ? prev.map((x) => (x.id === p.id ? { ...x, content: p.content, tags: p.tags } : x))
+        : prev,
+    );
+    setReposts((prev) =>
+      prev
+        ? prev.map((r) =>
+            r.post.id === p.id
+              ? { ...r, post: { ...r.post, content: p.content, tags: p.tags } }
+              : r,
+          )
+        : prev,
+    );
+  }, []);
 
   useEffect(() => {
     void loadPosts("first");
@@ -583,12 +660,7 @@ export function ProfileMobile({ targetHandle }: Props = {}) {
     location: (u.location ?? "").toString(),
     major: (u.major ?? "").toString(),
     year: typeof u.year === "number" ? u.year : null,
-    // Falls back to the badge text, which build-vibe-user renders from
-    // the same column ("IU verified" when unset — matches no campus, so
-    // it resolves to ""). Keeps the picker honest on a client whose
-    // bootstrap predates the top-level `campus` field.
-    campus:
-      campus ?? campusByLabel(u.studentVerification?.school)?.label ?? "",
+    campus: ownCampus.campusId ?? "",
     vibeTagsList: (u.vibeTags ?? [])
       .map((t) => t?.label ?? "")
       .filter((s): s is string => !!s),
@@ -916,7 +988,6 @@ export function ProfileMobile({ targetHandle }: Props = {}) {
   const cancelEdit = () => {
     setEditMode(false);
     setDraft(null);
-    setCampusTouched(false);
     setEditError(null);
   };
   const commitEdit = async () => {
@@ -927,6 +998,38 @@ export function ProfileMobile({ targetHandle }: Props = {}) {
       setEditMode(false);
       setEditError(null);
       return;
+    }
+    // Only a DIFFERENT campus picked in this edit session goes out. Never ""
+    // and never the current id: re-sending an unconfirmed campus confirms it
+    // and starts the 30-day lock (profile-campus-write.ts:14-18).
+    const sentCampusId =
+      snapshot.campus && snapshot.campus !== (ownCampus.campusId ?? "") ? snapshot.campus : null;
+    if (sentCampusId) {
+      // Any campus save starts the 30-day rule, so ask first with Settings'
+      // prompt ("Switch to Bloomington?" / "Make Indianapolis your campus?"
+      // over "You can't change your campus again for 30 days."):
+      // `campusPickStep` on the SAVED view. Cancel puts the picker back on
+      // the saved campus and saves nothing; edit mode stays open.
+      const step = campusPickStep(
+        settingsCampusCardView({
+          schoolVerified: user?.studentVerification?.status === "verified",
+          schoolSystem: ownCampus.schoolSystem,
+          campusId: ownCampus.campusId,
+          campusConfirmed: ownCampus.campusConfirmed,
+          campusChangeAvailableAt: ownCampus.campusChangeAvailableAt,
+          onboarded: true,
+        }),
+        true,
+        sentCampusId,
+      );
+      if (
+        step.kind === "stage" &&
+        typeof window !== "undefined" &&
+        !window.confirm(`${step.title}\n${step.body}`)
+      ) {
+        setDraft((prev) => (prev ? { ...prev, campus: ownCampus.campusId ?? "" } : prev));
+        return;
+      }
     }
     setSavingEdit(true);
     setEditError(null);
@@ -947,16 +1050,7 @@ export function ProfileMobile({ targetHandle }: Props = {}) {
         ),
       ),
     };
-    // Self-declared campus → users.school. Only sent when we know the
-    // value: profile-sync skips the column when the key is absent, so a
-    // client that never learned the current campus can't blank it. An
-    // explicit "Not set" pick in this session is the one case where the
-    // empty string is what the user meant.
-    if (snapshot.campus) {
-      body.school = snapshot.campus;
-    } else if (campusTouched) {
-      body.school = "";
-    }
+    if (sentCampusId) body.campus_id = sentCampusId;
     try {
       const r = await fetch("/api/me/profile-sync", {
         method: "POST",
@@ -973,6 +1067,7 @@ export function ProfileMobile({ targetHandle }: Props = {}) {
       // Re-bootstrap so all derived fields (headline, tagline fallback,
       // etc.) come back fresh. Re-use the existing fetch endpoint that
       // initial-mount uses.
+      let freshCampus: OwnCampus | null = null;
       const rb = await fetch("/api/me/profile-bootstrap", {
         cache: "no-store",
         credentials: "include",
@@ -981,9 +1076,8 @@ export function ProfileMobile({ targetHandle }: Props = {}) {
       if (rb.ok && jb?.ok && jb.vibeUser) {
         const fresh = jb.vibeUser as VibeUser;
         setUser(fresh);
-        const freshCampus =
-          typeof jb.campus === "string" && jb.campus ? jb.campus : null;
-        setCampus(freshCampus);
+        freshCampus = readOwnCampus(jb);
+        setOwnCampus(freshCampus);
         // Confirm major + year actually landed in the DB — same
         // silent-failure guard as the avatar upload. If the round-trip
         // returns something other than what we just sent, surface a
@@ -1001,15 +1095,26 @@ export function ProfileMobile({ targetHandle }: Props = {}) {
             `Year didn't save (sent ${snapshot.year ?? "(blank)"}, got ${gotYear ?? "(blank)"}).`,
           );
         }
-        if ("school" in body && snapshot.campus !== (freshCampus ?? "")) {
-          throw new Error(
-            `Campus didn't save (sent "${snapshot.campus || "(not set)"}", got "${freshCampus ?? "(not set)"}").`,
-          );
-        }
+      }
+      // profile-sync saves the other fields and reports a refused campus
+      // beside them as `campusError` (200). Its `error` is already the
+      // student's line ("That campus isn't part of your university.", "You
+      // can change your campus again on October 15."). Edit mode stays open
+      // and the picker goes back to the saved campus.
+      const campusError =
+        typeof j?.campusError?.error === "string" ? (j.campusError.error as string) : null;
+      if (campusError) {
+        setDraft((prev) =>
+          prev ? { ...prev, campus: (freshCampus ?? ownCampus).campusId ?? "" } : prev,
+        );
+        setEditError(campusError);
+        return;
+      }
+      if (sentCampusId && freshCampus && freshCampus.campusId !== sentCampusId) {
+        throw new Error("Couldn't save your campus. Try again.");
       }
       setEditMode(false);
       setDraft(null);
-      setCampusTouched(false);
     } catch (e) {
       setEditError(
         e instanceof Error ? e.message : "Could not save",
@@ -1108,6 +1213,30 @@ export function ProfileMobile({ targetHandle }: Props = {}) {
     : (user.resumeRedactions ?? []);
 
   const feedPosts = posts ?? [];
+
+  // Edit mode's campus and major pickers. Plain calls, not hooks; the JSX
+  // reads them only inside `editMode && effectiveDraft`. `campusId` is the
+  // draft pick, so the sub-line follows what the student just chose.
+  // `onboarded: true`: this editor is past onboarding, so the 30-day rule
+  // applies. A backfilled campus waiting on "Confirm your campus" ("confirm"
+  // mode) edits like a set one; the confirm tap lives in Settings and on the
+  // /campus banner.
+  const campusView =
+    !isVisitor && effectiveDraft
+      ? settingsCampusCardView({
+          schoolVerified: user.studentVerification?.status === "verified",
+          schoolSystem: ownCampus.schoolSystem,
+          campusId: effectiveDraft.campus || null,
+          campusConfirmed: ownCampus.campusConfirmed,
+          campusChangeAvailableAt: ownCampus.campusChangeAvailableAt,
+          onboarded: true,
+        })
+      : null;
+  // The curated majors for the picked campus, or null (no university, or a
+  // campus without a list, e.g. Fort Wayne or Columbus): a free-text box.
+  const majors = effectiveDraft
+    ? majorsForCampus(effectiveDraft.campus || null, ownCampus.schoolSystem)
+    : null;
 
   return (
     <div style={{ minHeight: "100dvh", background: "#FAF7F2", color: "#1C1C1E" }}>
@@ -1530,56 +1659,83 @@ export function ProfileMobile({ targetHandle }: Props = {}) {
               }}
             />
             <div style={{ display: "flex", gap: 8 }}>
-              <select
-                value={effectiveDraft.major}
-                onChange={(e) => updateDraft({ major: e.target.value })}
-                style={{
-                  flex: 1,
-                  fontFamily: "DM Sans, sans-serif",
-                  fontSize: 13,
-                  color: "#1C1C1E",
-                  background: "rgba(255,255,255,0.7)",
-                  border: "1px solid rgba(28,28,30,0.10)",
-                  borderRadius: 999,
-                  padding: "8px 14px",
-                  outline: "none",
-                  appearance: "none",
-                  WebkitAppearance: "none",
-                  // The major dropdown can hold longer labels than the
-                  // year picker — let it ellipsize gracefully when the
-                  // chosen major (e.g. Visual Communication Design)
-                  // would otherwise wrap into the year cell.
-                  textOverflow: "ellipsis",
-                  minWidth: 0,
-                }}
-              >
-                <option value="">Major</option>
-                {/* If the user's saved major doesn't match any
-                    onboarding option (legacy free-text from the old
-                    inline editor, or a major we don't list yet),
-                    surface it at the top so the select doesn't appear
-                    to reset to blank. */}
-                {effectiveDraft.major &&
-                !IU_MAJORS_BY_SCHOOL.some((g) =>
-                  g.majors.includes(effectiveDraft.major),
-                ) ? (
-                  <option value={effectiveDraft.major}>
-                    {effectiveDraft.major}
-                  </option>
-                ) : null}
-                {IU_MAJORS_BY_SCHOOL.map((group) => (
-                  <optgroup
-                    key={group.school.id}
-                    label={group.school.shortLabel}
-                  >
-                    {group.majors.map((m) => (
-                      <option key={m} value={m}>
-                        {m}
-                      </option>
-                    ))}
-                  </optgroup>
-                ))}
-              </select>
+              {majors === null ? (
+                // No curated list for this campus (or no university yet):
+                // free text, capped where profile-sync trims (200).
+                <input
+                  value={effectiveDraft.major}
+                  onChange={(e) => updateDraft({ major: e.target.value.slice(0, 200) })}
+                  placeholder="Your major"
+                  maxLength={200}
+                  style={{
+                    flex: 1,
+                    fontFamily: "DM Sans, sans-serif",
+                    fontSize: 13,
+                    color: "#1C1C1E",
+                    background: "rgba(255,255,255,0.7)",
+                    border: "1px solid rgba(28,28,30,0.10)",
+                    borderRadius: 999,
+                    padding: "8px 14px",
+                    outline: "none",
+                    minWidth: 0,
+                  }}
+                />
+              ) : (
+                <select
+                  value={effectiveDraft.major}
+                  onChange={(e) => updateDraft({ major: e.target.value })}
+                  style={{
+                    flex: 1,
+                    fontFamily: "DM Sans, sans-serif",
+                    fontSize: 13,
+                    color: "#1C1C1E",
+                    background: "rgba(255,255,255,0.7)",
+                    border: "1px solid rgba(28,28,30,0.10)",
+                    borderRadius: 999,
+                    padding: "8px 14px",
+                    outline: "none",
+                    appearance: "none",
+                    WebkitAppearance: "none",
+                    // The major dropdown can hold longer labels than the
+                    // year picker — let it ellipsize gracefully when the
+                    // chosen major (e.g. Visual Communication Design)
+                    // would otherwise wrap into the year cell.
+                    textOverflow: "ellipsis",
+                    minWidth: 0,
+                  }}
+                >
+                  <option value="">Major</option>
+                  {/* If the user's saved major doesn't match any
+                      onboarding option (legacy free-text from the old
+                      inline editor, or a major we don't list yet),
+                      surface it at the top so the select doesn't appear
+                      to reset to blank. */}
+                  {effectiveDraft.major &&
+                  !majors.majors.includes(effectiveDraft.major) ? (
+                    <option value={effectiveDraft.major}>
+                      {effectiveDraft.major}
+                    </option>
+                  ) : null}
+                  {majors.groups.length > 0
+                    ? majors.groups.map((group) => (
+                        <optgroup
+                          key={group.school.id}
+                          label={group.school.shortLabel}
+                        >
+                          {group.majors.map((m) => (
+                            <option key={m} value={m}>
+                              {m}
+                            </option>
+                          ))}
+                        </optgroup>
+                      ))
+                    : majors.majors.map((m) => (
+                        <option key={m} value={m}>
+                          {m}
+                        </option>
+                      ))}
+                </select>
+              )}
               <select
                 value={effectiveDraft.year ?? ""}
                 onChange={(e) => {
@@ -1609,51 +1765,70 @@ export function ProfileMobile({ targetHandle }: Props = {}) {
                 <option value="6">Grad</option>
               </select>
             </div>
-            {/* Campus — self-declared, never verified. An @iu.edu address
-                proves IU membership university-wide, not which campus, so
-                this is a preference, not a credential. "Not set" is a
-                valid choice: the server reads an empty school as
-                "show everything". */}
-            <select
-              value={effectiveDraft.campus}
-              onChange={(e) => {
-                setCampusTouched(true);
-                updateDraft({ campus: e.target.value });
-              }}
-              style={{
-                fontFamily: "DM Sans, sans-serif",
-                fontSize: 13,
-                color: "#1C1C1E",
-                background: "rgba(255,255,255,0.7)",
-                border: "1px solid rgba(28,28,30,0.10)",
-                borderRadius: 999,
-                padding: "8px 14px",
-                width: "100%",
-                outline: "none",
-                appearance: "none",
-                WebkitAppearance: "none",
-                textOverflow: "ellipsis",
-                minWidth: 0,
-              }}
-            >
-              <option value="">Campus — not set</option>
-              {IU_CAMPUSES.map((c) => (
-                <option key={c.id} value={c.label}>
-                  {c.label}
-                </option>
-              ))}
-            </select>
-            <p
-              style={{
-                fontFamily: "DM Sans, sans-serif",
-                fontSize: 11,
-                lineHeight: 1.4,
-                color: "#8A8580",
-                margin: "-2px 4px 0",
-              }}
-            >
-              Sets which campus&apos;s clubs and events you see first. Not
-              verified — change it any time.
+            {/* Campus, chosen within the university your verified school
+                email proved. Same rules and copy as Settings
+                (settings-campus-card.ts). */}
+            {!campusView || campusView.mode === "unverified" ? (
+              <p
+                style={{
+                  fontFamily: "DM Sans, sans-serif",
+                  fontSize: 12,
+                  lineHeight: 1.4,
+                  color: "#5C5853",
+                  margin: "-2px 4px 0",
+                }}
+              >
+                {"Verify your school email to pick your campus."}{" "}
+                <Link
+                  href="/auth/school-email"
+                  style={{ color: "#FF5C35", fontWeight: 700, textDecoration: "none" }}
+                >
+                  Verify now →
+                </Link>
+              </p>
+            ) : (
+              <select
+                value={effectiveDraft.campus}
+                onChange={(e) => updateDraft({ campus: e.target.value })}
+                disabled={savingEdit || campusView.locked}
+                aria-label="Campus"
+                style={{
+                  fontFamily: "DM Sans, sans-serif",
+                  fontSize: 13,
+                  color: "#1C1C1E",
+                  background: "rgba(255,255,255,0.7)",
+                  border: "1px solid rgba(28,28,30,0.10)",
+                  borderRadius: 999,
+                  padding: "8px 14px",
+                  width: "100%",
+                  outline: "none",
+                  appearance: "none",
+                  WebkitAppearance: "none",
+                  textOverflow: "ellipsis",
+                  minWidth: 0,
+                  opacity: savingEdit || campusView.locked ? 0.6 : 1,
+                }}
+              >
+                {effectiveDraft.campus === "" ? (
+                  <option value="" disabled>
+                    Pick your campus
+                  </option>
+                ) : null}
+                {campusView.options.map((o) => (
+                  <option key={o.id} value={o.id}>
+                    {o.label}
+                  </option>
+                ))}
+              </select>
+            )}
+            {campusView && campusView.mode !== "unverified" && campusView.sub ? (
+              <p style={campusHintStyle}>{campusView.sub}</p>
+            ) : null}
+            {campusView && campusView.mode !== "unverified" && campusView.locked && campusView.note ? (
+              <p style={{ ...campusHintStyle, color: "#C0392B" }}>{campusView.note}</p>
+            ) : null}
+            <p style={campusHintStyle}>
+              {"Your campus community: its clubs, events and map. Indianapolis is one community for IU and Purdue students."}
             </p>
           </div>
         ) : (location || headline) ? (
@@ -1826,7 +2001,9 @@ export function ProfileMobile({ targetHandle }: Props = {}) {
               }}
               isVisitor={isVisitor}
               ownerName={name}
-              onOpenPost={setOpenPostId}
+              onOpenPost={(id) => setOpenPost({ id, mine: !isVisitor })}
+              onEdited={applyPostEdit}
+              onDeleted={() => void refetchPosts()}
             />
           ) : postsSubTab === "reposts" ? (
             <RepostsList
@@ -1838,7 +2015,7 @@ export function ProfileMobile({ targetHandle }: Props = {}) {
               }}
               isVisitor={isVisitor}
               ownerName={name}
-              onOpenPost={(p) => setOpenPostId(p.id)}
+              onOpenPost={(p) => setOpenPost({ id: p.id, mine: false })}
             />
           ) : (
             <SavedGrid
@@ -1848,7 +2025,7 @@ export function ProfileMobile({ targetHandle }: Props = {}) {
                 setSavedErr(null);
                 setSavedTry((n) => n + 1);
               }}
-              onOpenPost={(p) => setOpenPostId(p.id)}
+              onOpenPost={(p) => setOpenPost({ id: p.id, mine: false })}
             />
           )}
         </div>
@@ -1986,12 +2163,13 @@ export function ProfileMobile({ targetHandle }: Props = {}) {
           }}
         />
       ) : null}
-      {openPostId ? (
+      {openPost ? (
         <PostViewerMobile
-          postId={openPostId}
-          onClose={() => setOpenPostId(null)}
-          canDelete={!isVisitor}
+          postId={openPost.id}
+          onClose={() => setOpenPost(null)}
+          canDelete={openPost.mine}
           onDeleted={() => void refetchPosts()}
+          onEdited={applyPostEdit}
         />
       ) : null}
       {mutualsOpen && targetHandle ? (
@@ -2207,6 +2385,8 @@ function PostsGrid({
   isVisitor,
   ownerName,
   onOpenPost,
+  onEdited,
+  onDeleted,
 }: {
   posts: PostRow[];
   loading: boolean;
@@ -2217,6 +2397,10 @@ function PostsGrid({
   isVisitor: boolean;
   ownerName: string;
   onOpenPost: (id: string) => void;
+  /** A card's "Edit post" saved: patch that post in place. */
+  onEdited: (p: EditedPost) => void;
+  /** A card's "Delete post" went through: reload the grid. */
+  onDeleted: () => void;
 }) {
   if (loading) {
     return failure ? (
@@ -2249,7 +2433,14 @@ function PostsGrid({
       }}
     >
       {posts.map((p) => (
-        <PostFeedCard key={p.id} post={p} onTap={() => onOpenPost(p.id)} />
+        <PostFeedCard
+          key={p.id}
+          post={p}
+          isOwner={!isVisitor}
+          onTap={() => onOpenPost(p.id)}
+          onEdited={onEdited}
+          onDeleted={onDeleted}
+        />
       ))}
     </div>
   );
@@ -2257,86 +2448,161 @@ function PostsGrid({
 
 function PostFeedCard({
   post,
+  isOwner,
   onTap,
+  onEdited,
+  onDeleted,
 }: {
   post: PostRow;
+  /** Your own profile: the card gets a ⋯ with Edit post / Delete post. */
+  isOwner: boolean;
   onTap: () => void;
+  onEdited: (p: EditedPost) => void;
+  onDeleted: () => void;
 }) {
+  const [actionsOpen, setActionsOpen] = useState(false);
   const thumb = post.media_thumbnail_url || post.media_url || "";
   const isImage = !!thumb;
+  // The ⋯ is a SIBLING of the card button, never inside it (a button in a
+  // button is invalid and its tap would also open the viewer). The sheet
+  // mounts in this wrapper, outside the card button too: React bubbles a
+  // tap inside its portal up to this div, which has no handler.
   return (
-    <button
-      type="button"
-      onClick={onTap}
-      style={{
-        display: "flex",
-        flexDirection: "column",
-        gap: 10,
-        padding: 14,
-        borderRadius: 16,
-        // Liquid-glass card — a darker warm-tinted overlay on the cream
-        // backdrop. Backdrop-blur lets the page color show through but
-        // the dark tint + stronger shadow gives the card real
-        // separation from the page instead of blending in.
-        // Light liquid-glass fill matches the desktop campus feed
-        // (rgba 0.55 → 0.38 white-warm). Card edge gets a lavender
-        // hairline (Vibe palette accent — #C8B8FF) instead of plain
-        // charcoal, so the card has personality + ties back to the
-        // brand color set. Drop shadow tints faintly lavender to
-        // match.
-        background:
-          "linear-gradient(180deg, rgba(255,255,255,0.55) 0%, rgba(255,253,248,0.38) 100%)",
-        backdropFilter: "blur(20px) saturate(160%)",
-        WebkitBackdropFilter: "blur(20px) saturate(160%)",
-        border: "1px solid rgba(124,92,252,0.28)",
-        boxShadow: [
-          "inset 0 1px 0 rgba(255,255,255,0.7)",
-          "0 6px 18px rgba(124,92,252,0.10)",
-        ].join(", "),
-        textAlign: "left",
-        cursor: "pointer",
-        fontFamily: "DM Sans, sans-serif",
-        color: "#1C1C1E",
-      }}
-    >
-      {post.content ? (
-        <p
-          style={{
-            margin: 0,
-            fontSize: 14.5,
-            lineHeight: 1.5,
-            whiteSpace: "pre-wrap",
-            wordBreak: "break-word",
-            display: "-webkit-box",
-            WebkitLineClamp: 6,
-            WebkitBoxOrient: "vertical",
-            overflow: "hidden",
-          }}
-        >
-          {renderInlineContentInline(post.content)}
-        </p>
-      ) : null}
-      {isImage ? (
-        <div
-          style={{
-            borderRadius: 10,
-            overflow: "hidden",
-            background: `url(${thumb}) center/cover, #EFEAE2`,
-            aspectRatio: "1 / 1",
-            border: "1px solid rgba(28,28,30,0.06)",
-          }}
-        />
-      ) : null}
-      <div
+    <div style={{ position: "relative" }}>
+      <button
+        type="button"
+        onClick={onTap}
         style={{
-          fontSize: 11,
-          color: "#8A8580",
-          letterSpacing: "0.04em",
+          width: "100%",
+          display: "flex",
+          flexDirection: "column",
+          gap: 10,
+          padding: 14,
+          borderRadius: 16,
+          // Liquid-glass card — a darker warm-tinted overlay on the cream
+          // backdrop. Backdrop-blur lets the page color show through but
+          // the dark tint + stronger shadow gives the card real
+          // separation from the page instead of blending in.
+          // Light liquid-glass fill matches the desktop campus feed
+          // (rgba 0.55 → 0.38 white-warm). Card edge gets a lavender
+          // hairline (Vibe palette accent — #C8B8FF) instead of plain
+          // charcoal, so the card has personality + ties back to the
+          // brand color set. Drop shadow tints faintly lavender to
+          // match.
+          background:
+            "linear-gradient(180deg, rgba(255,255,255,0.55) 0%, rgba(255,253,248,0.38) 100%)",
+          backdropFilter: "blur(20px) saturate(160%)",
+          WebkitBackdropFilter: "blur(20px) saturate(160%)",
+          border: "1px solid rgba(124,92,252,0.28)",
+          boxShadow: [
+            "inset 0 1px 0 rgba(255,255,255,0.7)",
+            "0 6px 18px rgba(124,92,252,0.10)",
+          ].join(", "),
+          textAlign: "left",
+          cursor: "pointer",
+          fontFamily: "DM Sans, sans-serif",
+          color: "#1C1C1E",
         }}
       >
-        {post.created_at ? relTimeForCard(post.created_at) : ""}
-      </div>
-    </button>
+        {post.content ? (
+          <p
+            style={{
+              margin: 0,
+              fontSize: 14.5,
+              lineHeight: 1.5,
+              whiteSpace: "pre-wrap",
+              wordBreak: "break-word",
+              display: "-webkit-box",
+              WebkitLineClamp: 6,
+              WebkitBoxOrient: "vertical",
+              overflow: "hidden",
+              // Keeps the text clear of the ⋯ in the top-right corner.
+              paddingRight: isOwner ? 34 : undefined,
+            }}
+          >
+            {renderInlineContentInline(post.content)}
+          </p>
+        ) : null}
+        {isImage ? (
+          <div
+            style={{
+              borderRadius: 10,
+              overflow: "hidden",
+              background: `url(${thumb}) center/cover, #EFEAE2`,
+              aspectRatio: "1 / 1",
+              border: "1px solid rgba(28,28,30,0.06)",
+            }}
+          />
+        ) : null}
+        <div
+          style={{
+            fontSize: 11,
+            color: "#8A8580",
+            letterSpacing: "0.04em",
+          }}
+        >
+          {post.created_at
+            ? relTimeForCard(post.created_at) + (post.edited_at ? " · Edited" : "")
+            : ""}
+        </div>
+      </button>
+      {isOwner ? (
+        <button
+          type="button"
+          aria-label="Post actions"
+          onClick={() => setActionsOpen(true)}
+          // A 44×44 hit area (the phone tap-target floor) around the 30px
+          // circle, centred where the circle sat at top/right 8, so a near
+          // miss doesn't land on the card and open the viewer.
+          style={{
+            position: "absolute",
+            top: 1,
+            right: 1,
+            width: 44,
+            height: 44,
+            border: "none",
+            background: "transparent",
+            display: "flex",
+            alignItems: "center",
+            justifyContent: "center",
+            padding: 0,
+            cursor: "pointer",
+            WebkitTapHighlightColor: "transparent",
+          }}
+        >
+          <span
+            aria-hidden
+            style={{
+              width: 30,
+              height: 30,
+              borderRadius: 999,
+              border: "1px solid rgba(28,28,30,0.06)",
+              background: "rgba(255,255,255,0.62)",
+              color: "#5C5853",
+              display: "inline-flex",
+              alignItems: "center",
+              justifyContent: "center",
+            }}
+          >
+            <svg width="16" height="16" viewBox="0 0 16 16" fill="currentColor" aria-hidden>
+              <circle cx="3" cy="8" r="1.6" />
+              <circle cx="8" cy="8" r="1.6" />
+              <circle cx="13" cy="8" r="1.6" />
+            </svg>
+          </span>
+        </button>
+      ) : null}
+      {actionsOpen ? (
+        <OwnPostActionsSheet
+          postId={post.id}
+          content={post.content ?? ""}
+          hasMedia={!!post.media_url}
+          onClose={() => setActionsOpen(false)}
+          onEdited={onEdited}
+          onDeleted={onDeleted}
+        />
+      ) : null}
+    </div>
   );
 }
 
@@ -5144,6 +5410,106 @@ function MuteUserSheet({
         </Drawer.Content>
       </Drawer.Portal>
     </Drawer.NestedRoot>
+  );
+}
+
+/**
+ * The ⋯ on your own post card in the Posts grid: Edit post, Delete post,
+ * Cancel. No Report row, since it only opens on your own posts. The same
+ * chrome as ProfileSafetySheet.
+ *
+ * "Edit post" opens EditPostSheet nested inside this drawer (the
+ * PostActionsSheet + SharePostSheet pattern in CampusMobile). The edit sheet
+ * sends only `{content}`, toasts "Post updated" and closes itself after
+ * `onSaved`, and a save then closes this sheet too. Cancel, or dismissing a
+ * clean edit sheet, closes only the edit sheet.
+ *
+ * "Delete post" is PostViewerMobile's `handleDelete` word for word: confirm,
+ * DELETE, and on a refusal (already toasted) the sheet stays open.
+ */
+function OwnPostActionsSheet({
+  postId,
+  content,
+  hasMedia,
+  onClose,
+  onEdited,
+  onDeleted,
+}: {
+  postId: string;
+  content: string;
+  hasMedia: boolean;
+  onClose: () => void;
+  onEdited: (p: EditedPost) => void;
+  onDeleted: () => void;
+}) {
+  const [editOpen, setEditOpen] = useState(false);
+  const [deleting, setDeleting] = useState(false);
+  // Set by a save, so closing the edit sheet afterwards closes this one too.
+  const savedRef = useRef(false);
+
+  const handleDelete = async () => {
+    if (deleting) return;
+    if (typeof window !== "undefined" && !window.confirm("Delete this post?")) {
+      return;
+    }
+    setDeleting(true);
+    const r = await vibeRequest(`/api/posts/${postId}`, {
+      method: "DELETE",
+      credentials: "include",
+      failure: "Couldn't delete this post.",
+    });
+    if (!r.ok) {
+      setDeleting(false);
+      return;
+    }
+    onDeleted();
+    onClose();
+  };
+
+  return (
+    <Drawer.Root open onOpenChange={(o) => { if (!o) onClose(); }}>
+      <Drawer.Portal>
+        <Drawer.Overlay style={sheetOverlayStyle} />
+        <Drawer.Content style={sheetContentStyle} aria-describedby={undefined}>
+          <Drawer.Title style={sheetHiddenTitleStyle}>Post options</Drawer.Title>
+          <Drawer.Handle style={sheetHandleStyle} />
+          <div style={{ padding: "4px 0 12px" }}>
+            <SafetySheetRow
+              label="Edit post"
+              onClick={() => {
+                // A Cancel mid-save leaves this sheet open and the late save
+                // then sets the flag; clear it so this edit starts clean.
+                savedRef.current = false;
+                setEditOpen(true);
+              }}
+              disabled={deleting}
+            />
+            <SafetySheetRow
+              label={deleting ? "Deleting…" : "Delete post"}
+              onClick={() => void handleDelete()}
+              danger
+              disabled={deleting}
+            />
+            <SafetySheetRow label="Cancel" onClick={onClose} bold />
+          </div>
+        </Drawer.Content>
+      </Drawer.Portal>
+
+      {/* Opens inside this sheet's own Drawer.Root: without `nested`,
+          closing it tears down the scroll lock this one still needs. */}
+      {editOpen ? (
+        <EditPostSheet nested postId={postId} initialContent={content} hasMedia={hasMedia}
+          onClose={() => {
+            setEditOpen(false);
+            if (savedRef.current) onClose();
+          }}
+          onSaved={(p) => {
+            savedRef.current = true;
+            onEdited(p);
+          }}
+        />
+      ) : null}
+    </Drawer.Root>
   );
 }
 
