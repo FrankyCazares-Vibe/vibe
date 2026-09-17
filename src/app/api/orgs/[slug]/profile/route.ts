@@ -2,6 +2,12 @@ import { NextResponse } from "next/server";
 
 import { orgAssetProxyUrl } from "@/lib/org-asset-url";
 import {
+  loadFollowerCount,
+  loadViewerFollow,
+  publicFollowerCount,
+  type OrgFollowState,
+} from "@/lib/orgs/following";
+import {
   isJoinPolicy,
   isOrgAudience,
   orgJoinState,
@@ -38,6 +44,14 @@ type Params = { params: Promise<{ slug: string }> };
  * button the server answers with 403. `viewer.role` and
  * `viewer.pending_request` keep their old shape and meaning for callers that
  * predate it.
+ *
+ * Club following (wave plan §4.2): `org.follower_count` (null below
+ * `FOLLOWER_COUNT_FLOOR` unless the viewer is this club's owner or admin, so
+ * always null below it when signed out, and null when the count couldn't be
+ * read), `viewer.org_follow_state` ("following" | "not_following", null when
+ * signed out) and `viewer.org_follow_source`. `org.member_count` is null,
+ * never a fake 0, when its read failed. Every one of these reads runs AFTER
+ * the hidden gate (critic C12), so a hidden club leaks no count.
  */
 export async function GET(_req: Request, { params }: Params) {
   const { slug } = await params;
@@ -71,6 +85,15 @@ export async function GET(_req: Request, { params }: Params) {
 
   const ctx = user ? await loadViewerOrgContext(service, org.id as string, user.id) : null;
   if (ctx && !ctx.ok) {
+    // A hidden club answers what a missing handle answers, even when the read
+    // that would say "you're a member" failed: a 500 here would tell a
+    // non-member the club exists.
+    if (hiddenAt) {
+      return NextResponse.json(
+        { ok: false, error: "Not found", code: "not_found" },
+        { status: 404 },
+      );
+    }
     // A failed context read would render a member as an unverified stranger
     // and tell them to go verify a school email they verified months ago.
     // Say the request failed instead of quietly lying about who they are.
@@ -105,10 +128,31 @@ export async function GET(_req: Request, { params }: Params) {
     );
   }
 
-  const { count: memberCount } = await service
-    .from("org_members")
-    .select("user_id", { count: "exact", head: true })
-    .eq("org_id", org.id);
+  const [memberCountRes, rawFollowerCount, followRes] = await Promise.all([
+    service
+      .from("org_members")
+      .select("user_id", { count: "exact", head: true })
+      .eq("org_id", org.id),
+    loadFollowerCount(service, org.id as string),
+    user ? loadViewerFollow(service, org.id as string, user.id) : null,
+  ]);
+  if (memberCountRes.error) {
+    console.error("[orgs/[slug]/profile GET member count]", memberCountRes.error);
+  }
+  if (followRes && !followRes.ok) {
+    // A guessed follow state would offer "Follow" on a club the viewer
+    // already follows. Same answer as a failed context read above.
+    return NextResponse.json(
+      { ok: false, error: "Request failed", code: "load_failed" },
+      { status: 500 },
+    );
+  }
+  const followRow = followRes?.ok ? followRes.row : null;
+  const orgFollowState: OrgFollowState | null = user
+    ? followRow
+      ? "following"
+      : "not_following"
+    : null;
 
   // Public *profile* surfaces the same shape regardless of the join policy.
   // The privacy boundary is on the channels (RLS), not on the org's
@@ -164,11 +208,15 @@ export async function GET(_req: Request, { params }: Params) {
       join_policy: joinPolicy,
       audience,
       hidden: !!hiddenAt,
-      member_count: memberCount ?? 0,
+      // Null, never 0, when the count couldn't be read (critic C27).
+      member_count: memberCountRes.error ? null : (memberCountRes.count ?? null),
+      follower_count: publicFollowerCount(rawFollowerCount, ctx?.role ?? null),
     },
     viewer: {
       role: ctx?.role ?? null,
       pending_request: !!ctx?.pendingRequest,
+      org_follow_state: orgFollowState,
+      org_follow_source: followRow?.source ?? null,
       join_state: decision?.state ?? null,
       join_reason: decision?.reason ?? null,
       // `audience` on the decision is only set when it is the REASON they are

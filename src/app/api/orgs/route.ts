@@ -18,6 +18,12 @@ import { campusScopeError, homeCampusIdFor } from "@/lib/iu/community-scope";
 import { requireTermsAccepted } from "@/lib/legal/require-terms";
 import { normalizeOrgAssetInput, orgAssetProxyUrl } from "@/lib/org-asset-url";
 import {
+  flattenCountEmbed,
+  loadViewerFollowedOrgIds,
+  publicFollowerCount,
+  type OrgFollowState,
+} from "@/lib/orgs/following";
+import {
   INVITE_ONLY_ORGS_IN_DISCOVERY,
   isJoinPolicy,
   isOrgAudience,
@@ -44,6 +50,21 @@ const VALID_BACKDROPS = [
   "midnight",
 ] as const;
 type BackdropKey = (typeof VALID_BACKDROPS)[number];
+
+/**
+ * The most follow rows `filter=following` reads (one more is read to set
+ * `has_more`). The ids go into one `.in("id", …)` URL, so this also bounds
+ * that URL (about 3.7 KB at 100 uuids).
+ */
+const FOLLOWING_FILTER_CAP = 100;
+
+/**
+ * The org columns a Discover or Following row carries, with both count
+ * embeds (`relation(count)` comes back as `[{ count: N }]`). A failed embed
+ * fails the whole query into a 500, never a silent 0.
+ */
+const LIST_ORG_SELECT =
+  "id, handle, name, description, logo_url, banner_url, is_public, backdrop_preset, verified, last_activity_at, links, philanthropy, school, campus_id, join_policy, audience, members:org_members(count), followers:org_followers(count)";
 
 type CreateBody = {
   handle?: unknown;
@@ -89,18 +110,40 @@ function audienceExcludesOwnerMessage(system: SchoolSystem | null): string {
 }
 
 /**
- * GET /api/orgs?filter=mine|discover&q=<search>&campus=<id|all>
+ * GET /api/orgs?filter=mine|discover|following&q=<search>&campus=<id|all>
  *
  * - filter=mine (default): orgs the viewer is a member of, with their role.
  *   Never campus-filtered — membership beats geography — and hidden orgs are
  *   INCLUDED with `hidden: true`, because their members keep the page, the
- *   chats and the rail entry (spec §3.4).
+ *   chats and the rail entry (spec §3.4). Its response is deliberately
+ *   untouched by club following: the chat rail, the post-as-club picker and
+ *   the phone chats list read it, and a followed club has no chats for you.
  * - filter=discover: every VISIBLE org on the scoped campus, whether or not
  *   the viewer is in it, each carrying the one join decision (§3.2) the
- *   button renders from.
+ *   button renders from, plus `org_follow_state` and `follower_count`.
+ * - filter=following: the VISIBLE clubs the viewer follows, newest follow
+ *   first, member clubs included (a member follows automatically). Same row
+ *   shape as discover, `org_follow_state` always "following". Never
+ *   campus-scoped (a club you follow on another campus is still followed) and
+ *   never filtered for dormancy or `INVITE_ONLY_ORGS_IN_DISCOVERY`, but a
+ *   `?campus=` outside the viewer's university is still refused the same way.
+ *   `q` narrows by handle/name. At most `FOLLOWING_FILTER_CAP` follow rows are
+ *   read; `has_more: true` means more follow rows exist beyond them (hidden
+ *   clubs count toward the cap and are then dropped, so a page can be shorter
+ *   than the cap and still say `has_more`). There is no cursor, and `q` only
+ *   searches those newest `FOLLOWING_FILTER_CAP` follows: a club followed
+ *   before them won't match. Fine while nobody is near the cap; past it, run
+ *   `q` inside the follow read instead.
  *
- * Both return `viewerCampus` (legacy label, now derived from `campus_id`),
- * `viewerCampusId`, `viewerSystem` and `campusScope`.
+ * Org follow fields (wave plan §4.2): `org_follow_state` ("following" |
+ * "not_following"; never the PERSON `follow_state`), `follower_count` (null
+ * below `FOLLOWER_COUNT_FLOOR` unless the viewer is that club's owner or
+ * admin, and null when the count couldn't be read — never a fake 0), and
+ * `member_count` (null when the count couldn't be read).
+ *
+ * All return `viewerCampus` (legacy label, now derived from `campus_id`),
+ * `viewerCampusId`, `viewerSystem` and `campusScope` (always "all" for mine
+ * and following); following also returns `has_more`.
  *
  * CAMPUS SCOPING IS ON `campus_id` NOW (plan §2.4, wave 2 B8), not the legacy
  * `orgs.school` label:
@@ -119,9 +162,9 @@ function audienceExcludesOwnerMessage(system: SchoolSystem | null): string {
  * but widening past their own university would offer a Purdue West Lafayette
  * club to an IU student who can never join it. `?campus=` pins the search.
  *
- * HIDDEN ORGS ARE GONE FROM DISCOVER for everyone, members included (§3.4),
- * and `include_dormant=true` cannot bring them back: the filter is in the
- * query, not in the dormancy pass.
+ * HIDDEN ORGS ARE GONE FROM DISCOVER AND FOLLOWING for everyone, members and
+ * followers included (§3.4), and `include_dormant=true` cannot bring them
+ * back: the filter is in the query, not in the dormancy pass.
  */
 export async function GET(req: Request) {
   const supabase = await createSupabaseServerClient();
@@ -131,7 +174,9 @@ export async function GET(req: Request) {
   }
 
   const url = new URL(req.url);
-  const filter = url.searchParams.get("filter") === "discover" ? "discover" : "mine";
+  const rawFilter = url.searchParams.get("filter");
+  const filter =
+    rawFilter === "discover" ? "discover" : rawFilter === "following" ? "following" : "mine";
   const q = (url.searchParams.get("q") || "").trim().toLowerCase();
   const includeDormant = url.searchParams.get("include_dormant") === "true";
 
@@ -149,9 +194,10 @@ export async function GET(req: Request) {
     // school email on every club while the join route (which reads the viewer
     // with the service role) admits them. That is the silent degradation
     // `loadViewerOrgContext`'s `ok` flag exists to stop, so say the read
-    // failed. `filter=mine` doesn't decide anything from them — the columns
-    // only label the campus — so it still answers.
-    if (filter === "discover") {
+    // failed. Following renders the same join buttons, so the same rule.
+    // `filter=mine` doesn't decide anything from them — the columns only
+    // label the campus — so it still answers.
+    if (filter !== "mine") {
       return fail(500, "load_failed", "Failed to load orgs");
     }
   }
@@ -230,15 +276,46 @@ export async function GET(req: Request) {
     });
   }
 
-  // ── Discover ─────────────────────────────────────────────────────────────
-  // Lists ALL visible orgs, including ones the viewer is already in, so the
-  // page serves double duty as "find new" + "your clubs". The service role is
-  // deliberate: `orgs_select` hides private orgs from non-members, and a
-  // private club has to be listed for anyone to request it (critic A2's twin).
-  // Every row's visibility is decided HERE, in this route, not by RLS.
+  // ── Discover and Following ───────────────────────────────────────────────
+  // Discover lists ALL visible orgs, including ones the viewer is already in,
+  // so the page serves double duty as "find new" + "your clubs". The service
+  // role is deliberate: `orgs_select` hides private orgs from non-members, and
+  // a private club has to be listed for anyone to request it (critic A2's
+  // twin). Every row's visibility is decided HERE, in this route, not by RLS.
+  // Following shares every read and the row shape below; only WHICH org rows
+  // are loaded (and their order) differs.
   const service = createSupabaseServiceClient();
 
-  const [myMembershipsRes, myPendingRes, myInvitesRes] = await Promise.all([
+  // Every `filter=following` answer, empty ones included, has the same keys.
+  const followingResponse = (orgs: unknown[], hasMore: boolean) =>
+    NextResponse.json({
+      ok: true,
+      orgs,
+      has_more: hasMore,
+      viewerCampus,
+      viewerCampusId: homeCampusId,
+      viewerSystem,
+      campusScope: ALL_CAMPUSES,
+    });
+
+  // Following reads its ids FIRST: they decide which org rows to load, a
+  // failed read has nothing honest to show, and a student who follows nothing
+  // shouldn't pay for the reads below.
+  let followingIds: string[] = [];
+  let followingHasMore = false;
+  if (filter === "following") {
+    const idsRes = await loadViewerFollowedOrgIds(supabase, user.id, {
+      limit: FOLLOWING_FILTER_CAP + 1,
+    });
+    if (!idsRes.ok) {
+      return fail(500, "load_failed", "Failed to load orgs");
+    }
+    followingHasMore = idsRes.ids.length > FOLLOWING_FILTER_CAP;
+    followingIds = idsRes.ids.slice(0, FOLLOWING_FILTER_CAP);
+    if (followingIds.length === 0) return followingResponse([], followingHasMore);
+  }
+
+  const [myMembershipsRes, myPendingRes, myInvitesRes, discoverFollowsRes] = await Promise.all([
     supabase.from("org_members").select("org_id, role").eq("user_id", user.id),
     // Pending join requests block re-requesting; they render as "Requested".
     supabase
@@ -254,14 +331,28 @@ export async function GET(req: Request) {
       .select("id, org_id, expires_at, invited_by")
       .eq("invitee_id", user.id)
       .eq("status", "pending"),
+    // Discover's Follow buttons (the user client may read the viewer's own
+    // follow rows). Following doesn't need it: every row it returns is one.
+    filter === "discover" ? loadViewerFollowedOrgIds(supabase, user.id) : null,
   ]);
 
   // A failed read here doesn't empty the page, it mislabels buttons: a joined
-  // org would render "Join", a filed request would render "Request". Both are
-  // recoverable (the server re-decides on the tap) and neither is worth a 500,
-  // so they are logged and the page still answers.
-  if (myMembershipsRes.error) console.error("[orgs GET discover memberships]", myMembershipsRes.error);
-  if (myPendingRes.error) console.error("[orgs GET discover requests]", myPendingRes.error);
+  // org would render "Join", a filed request would render "Request", a
+  // followed club would render "Follow". All are recoverable (the server
+  // re-decides on the tap, and POST /follow answers `already: true`) and none
+  // is worth a 500, so they are logged and the page still answers.
+  if (myMembershipsRes.error) console.error(`[orgs GET ${filter} memberships]`, myMembershipsRes.error);
+  if (myPendingRes.error) console.error(`[orgs GET ${filter} requests]`, myPendingRes.error);
+  if (discoverFollowsRes && !discoverFollowsRes.ok) {
+    console.error("[orgs GET discover follows]", discoverFollowsRes.error);
+  }
+  const followedOrgIds = new Set<string>(
+    filter === "following"
+      ? followingIds
+      : discoverFollowsRes?.ok
+        ? discoverFollowsRes.ids
+        : [],
+  );
 
   const roleByOrg = new Map<string, OrgRole>();
   for (const m of myMembershipsRes.data || []) {
@@ -286,7 +377,7 @@ export async function GET(req: Request) {
     // An invite we can't read renders as "no invite", which understates what
     // the student may do. Logged, not fatal: the rest of Discover is still
     // right, and the org page re-decides from the same source.
-    console.error("[orgs GET discover invites]", myInvitesRes.error);
+    console.error(`[orgs GET ${filter} invites]`, myInvitesRes.error);
   }
   const inviteByOrg = new Map<string, InviteRow>();
   for (const row of inviteRows) inviteByOrg.set(row.org_id, row);
@@ -314,13 +405,14 @@ export async function GET(req: Request) {
     } else {
       // Fail closed on the NAME only: an unreadable block list means every
       // inviter renders as "an officer", never as a person the viewer blocked.
-      console.error("[orgs GET discover hidden-users]", hiddenRes.error);
+      console.error(`[orgs GET ${filter} hidden-users]`, hiddenRes.error);
       hiddenUserIds = new Set(inviterIds);
     }
   }
 
   // Browsing is scoped to one campus; an explicit text search widens to the
-  // viewer's own university (see the docblock).
+  // viewer's own university (see the docblock). Following is never
+  // campus-scoped, so none of this applies to it.
   const param = (rawCampusParam ?? "").trim();
   const pinnedCampus = param.length > 0 && param.toLowerCase() !== CAMPUS_PARAM_ALL;
   const searchWidens = q !== "" && !pinnedCampus;
@@ -331,30 +423,33 @@ export async function GET(req: Request) {
     !searchWidens && scope.kind === "campus" ? scope.campusId : ALL_CAMPUSES;
 
   const emptyList = () =>
-    NextResponse.json({
-      ok: true,
-      orgs: [],
-      viewerCampus,
-      viewerCampusId: homeCampusId,
-      viewerSystem,
-      campusScope,
-    });
+    filter === "following"
+      ? followingResponse([], followingHasMore)
+      : NextResponse.json({
+          ok: true,
+          orgs: [],
+          viewerCampus,
+          viewerCampusId: homeCampusId,
+          viewerSystem,
+          campusScope,
+        });
 
-  if (campusIds.length === 0) return emptyList();
+  if (filter === "discover" && campusIds.length === 0) return emptyList();
 
-  // Discover ordering: verified first (top of the feed), then most-recently
-  // active. Embed an aggregate org_members count for the card meta. The
-  // `relation(count)` shape returns `[{ count: N }]`, flattened below.
-  let query = service
-    .from("orgs")
-    .select(
-      "id, handle, name, description, logo_url, banner_url, is_public, backdrop_preset, verified, last_activity_at, links, philanthropy, school, campus_id, join_policy, audience, members:org_members(count)"
-    )
-    .is("hidden_at", null)
-    .in("campus_id", campusIds)
-    .order("verified", { ascending: false })
-    .order("last_activity_at", { ascending: false, nullsFirst: false })
-    .limit(120);
+  let query = service.from("orgs").select(LIST_ORG_SELECT).is("hidden_at", null);
+  if (filter === "following") {
+    // No campus, invite-only or dormancy filter: a club you follow is listed
+    // wherever it is. Order is restored from `followingIds` below.
+    query = query.in("id", followingIds);
+  } else {
+    // Discover ordering: verified first (top of the feed), then
+    // most-recently active.
+    query = query
+      .in("campus_id", campusIds)
+      .order("verified", { ascending: false })
+      .order("last_activity_at", { ascending: false, nullsFirst: false })
+      .limit(120);
+  }
 
   if (q) {
     const searchFilter = ilikeOrFilter(["handle", "name"], q);
@@ -363,7 +458,7 @@ export async function GET(req: Request) {
   }
   const { data, error } = await query;
   if (error) {
-    console.error("[orgs GET discover]", error);
+    console.error(`[orgs GET ${filter}]`, error);
     return fail(500, "load_failed", "Failed to load orgs");
   }
   type DiscoverRow = {
@@ -384,12 +479,15 @@ export async function GET(req: Request) {
     join_policy: JoinPolicy;
     audience: OrgAudience;
     members?: Array<{ count: number }> | null;
+    followers?: unknown;
   };
   const DORMANT_MS = 60 * 24 * 60 * 60 * 1000; // 60 days; mirror migration
   const now = Date.now();
   const allRows = (data as DiscoverRow[] | null) || [];
-  const enriched = allRows.map((o) => {
-    const { members, ...rest } = o;
+  // ONE row shape for Discover and Following, so a card renders the same
+  // buttons whichever list it came from.
+  const toListRow = (o: DiscoverRow) => {
+    const { members, followers, ...rest } = o;
     const lastMs = o.last_activity_at ? Date.parse(o.last_activity_at) : null;
     // NULL last_activity_at means we have no signal yet — treat that as
     // "fresh" rather than "dormant". A brand-new org with no messages
@@ -419,11 +517,19 @@ export async function GET(req: Request) {
       pendingInvite: invite,
       pendingRequest: request,
     });
+    // Following's rows are all in the set by construction.
+    const orgFollowState: OrgFollowState = followedOrgIds.has(o.id)
+      ? "following"
+      : "not_following";
     return {
       ...rest,
       logo_url: orgAssetProxyUrl(o.handle, o.logo_url, "logo"),
       banner_url: orgAssetProxyUrl(o.handle, o.banner_url, "banner"),
-      member_count: members?.[0]?.count ?? 0,
+      // Null, never 0, when the count couldn't be read (critic C27).
+      member_count: members?.[0]?.count ?? null,
+      // Officers see the raw number; everyone else sees null below the floor.
+      follower_count: publicFollowerCount(flattenCountEmbed(followers), role),
+      org_follow_state: orgFollowState,
       pending_request: !!request,
       dormant,
       // Viewer's role on this org (null if not a member). Drives the
@@ -443,7 +549,20 @@ export async function GET(req: Request) {
             }
           : null,
     };
-  });
+  };
+
+  if (filter === "following") {
+    // Newest follow first: the order `loadViewerFollowedOrgIds` read them in.
+    // Member clubs stay (they render "Joined ✓"); hidden clubs were already
+    // dropped by the query.
+    const rank = new Map(followingIds.map((id, i) => [id, i]));
+    const rows = allRows
+      .map(toListRow)
+      .sort((a, b) => (rank.get(a.id) ?? 0) - (rank.get(b.id) ?? 0));
+    return followingResponse(rows, followingHasMore);
+  }
+
+  const enriched = allRows.map(toListRow);
 
   // Invite-only orgs stay listed, labelled, with no join button (spec Q1).
   // ONE constant decides it — `INVITE_ONLY_ORGS_IN_DISCOVERY` in
@@ -456,9 +575,10 @@ export async function GET(req: Request) {
       );
 
   // Invited first (an invite is the strongest thing on this page), then the
-  // query's verified/recent order, with orgs the viewer cannot join at all
-  // last. Array#sort is stable, so the query order survives inside each band.
-  const band = (state: string) => (state === "invited" ? 0 : state === "audience_blocked" ? 2 : 1);
+  // query's verified/recent order. Clubs the viewer can't join
+  // (`audience_blocked`) no longer sink to the bottom: anyone can follow them.
+  // Array#sort is stable, so the query order survives inside each band.
+  const band = (state: string) => (state === "invited" ? 0 : 1);
   const ordered = [...listed].sort((a, b) => band(a.join_state) - band(b.join_state));
 
   const visible = includeDormant ? ordered : ordered.filter((o) => !o.dormant);

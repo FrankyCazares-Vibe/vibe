@@ -11,6 +11,12 @@ import { campusScopeError } from "@/lib/iu/community-scope";
 import { requireTermsAccepted } from "@/lib/legal/require-terms";
 import { normalizeOrgAssetInput, orgAssetProxyUrl } from "@/lib/org-asset-url";
 import {
+  loadFollowerCount,
+  loadViewerFollow,
+  publicFollowerCount,
+  type OrgFollowState,
+} from "@/lib/orgs/following";
+import {
   isJoinPolicy,
   isOrgAudience,
   isSettingsOfficer,
@@ -204,8 +210,19 @@ async function revokeAudienceIneligibleInvites(
  * /admin renders the unhide control.
  *
  * Adds `join_policy`, `audience`, `hidden`, `join_state`, `join_reason` and
- * `pending_invite`; `viewer_role`, `pending_request` and `member_count` are
- * unchanged.
+ * `pending_invite`; `viewer_role` and `pending_request` are unchanged.
+ *
+ * Club following (wave plan §4.2): `org_follow_state` ("following" |
+ * "not_following"), `org_follow_source` (how the viewer's follow was made, or
+ * null) and `follower_count` (null below `FOLLOWER_COUNT_FLOOR` unless the
+ * viewer is this club's owner or admin, and null when the count couldn't be
+ * read). `member_count` is null, never a fake 0, when its read failed.
+ *
+ * The follow reads run alongside the context read, but a failed follow read
+ * is only reported AFTER the hidden-club 404: otherwise a DB hiccup would
+ * answer a non-member 500 for a hidden club and 404 for a missing handle,
+ * telling the two apart. For the same reason a failed context read answers a
+ * hidden club with 404, not 500.
  */
 export async function GET(_req: Request, { params }: Params) {
   const { slug } = await params;
@@ -243,14 +260,26 @@ export async function GET(_req: Request, { params }: Params) {
     campus_id: string | null;
   } & Record<string, unknown>;
 
-  const [ctx, { count }] = await Promise.all([
+  const [ctx, memberCountRes, followRes, rawFollowerCount] = await Promise.all([
     loadViewerOrgContext(service, org.id, user.id),
     service
       .from("org_members")
       .select("user_id", { count: "exact", head: true })
       .eq("org_id", org.id),
+    loadViewerFollow(service, org.id, user.id),
+    loadFollowerCount(service, org.id),
   ]);
+  if (memberCountRes.error) {
+    console.error("[orgs/[slug] GET member count]", memberCountRes.error);
+  }
   if (!ctx.ok) {
+    // A hidden club answers what a missing handle answers, even when the read
+    // that would say "you're a member" failed: a 500 here would tell a
+    // non-member the club exists. A member sees "not found" once; that's the
+    // safe way to be wrong.
+    if (org.hidden_at) {
+      return fail(404, "not_found", "Not found");
+    }
     // The least-privileged fallback would tell a member to verify their school
     // email. Say the read failed instead (`membership.ts` explains the flag).
     return fail(500, "load_failed", "Failed to load org");
@@ -266,6 +295,13 @@ export async function GET(_req: Request, { params }: Params) {
   if (decision.state === "not_found") {
     return fail(404, "not_found", "Not found");
   }
+  if (!followRes.ok) {
+    // A guessed follow state would offer "Follow" on a club the viewer
+    // already follows. Say the read failed, the same rule as `ctx.ok` above,
+    // but only after the 404 (see the docblock).
+    return fail(500, "load_failed", "Failed to load org");
+  }
+  const orgFollowState: OrgFollowState = followRes.row ? "following" : "not_following";
 
   // Who invited them, unless the viewer has that officer blocked or muted
   // (critic A7) — then the banner says "an officer" instead of a name.
@@ -289,7 +325,12 @@ export async function GET(_req: Request, { params }: Params) {
       ...rest,
       logo_url: orgAssetProxyUrl(org.handle, org.logo_url, "logo"),
       banner_url: orgAssetProxyUrl(org.handle, org.banner_url, "banner"),
-      member_count: count ?? 0,
+      // Null, never 0, when the count couldn't be read (critic C27).
+      member_count: memberCountRes.error ? null : (memberCountRes.count ?? null),
+      org_follow_state: orgFollowState,
+      org_follow_source: followRes.row?.source ?? null,
+      // Officers see the raw number; everyone else sees null below the floor.
+      follower_count: publicFollowerCount(rawFollowerCount, ctx.role),
       viewer_role: ctx.role,
       pending_request: ctx.pendingRequest,
       hidden: !!hidden_at,
