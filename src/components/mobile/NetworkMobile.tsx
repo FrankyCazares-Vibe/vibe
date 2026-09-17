@@ -5,6 +5,14 @@ import Link from "next/link";
 import { useCallback, useEffect, useRef, useState } from "react";
 
 import { asLoadFailure, LoadFailed, type LoadFailure } from "@/components/feedback/LoadFailed";
+import {
+  atCampusLabel,
+  bucketSuggestions,
+  categorizeSuggestion,
+  elsewhereLabel,
+  suggestionGroupOrder,
+  type SuggestionReasonV2,
+} from "@/components/mobile/people-suggestion-groups";
 import { useMobileTour } from "@/components/mobile/use-mobile-tour";
 import { vibeRequest } from "@/lib/feedback/request";
 
@@ -21,7 +29,11 @@ import { vibeRequest } from "@/lib/feedback/request";
  *   - /api/users/search?q=           → typeahead, takes over the
  *                                       content area while a query is
  *                                       in the search field
- *   - /api/me/follow                 → POST/DELETE for Connect / Unfollow
+ *   - /api/me/follow                 → POST/DELETE for Follow / Unfollow
+ *
+ * Discover groups suggestions by `reason_v2` (people-suggestion-groups.ts):
+ * From your clubs → At {campus} → Same major → Friends of friends →
+ * Elsewhere at {IU|Purdue} → New on Vibe.
  */
 
 export type FollowState = "none" | "following" | "followed_by" | "connected" | "self";
@@ -39,7 +51,14 @@ export type ListUser = {
   /** Optional — only set on suggestions. */
   shared_org_count?: number;
   same_major?: boolean;
+  /** LEGACY reason string ("same school" = campus match); `reason_v2` wins when present. */
   reason?: string;
+  /** Why this person is suggested (`community-scope.ts` `suggestionReasons`). */
+  reason_v2?: SuggestionReasonV2;
+  /** Suggestions only: their campus, for "At {campus}". */
+  campus_id?: string | null;
+  /** Suggestions only: their university, for "Elsewhere at {IU|Purdue}". */
+  school_system?: "iu" | "purdue" | null;
 };
 
 type SearchUser = {
@@ -583,7 +602,7 @@ function ListPane({
         }
         body={
           tab === "discover"
-            ? "We'll surface people once your school has more students on Vibe — or once you've joined a club or two."
+            ? "We'll suggest people once more students on your campus join Vibe, or once you've joined a club or two."
             : tab === "connections"
               ? "Connections are people who follow you back. Follow some folks and they may follow you back."
               : tab === "following"
@@ -618,18 +637,6 @@ function ListPane({
   );
 }
 
-const SUGGESTION_GROUP_ORDER: Array<{
-  key: SuggestionCategory;
-  label: string;
-  blurb: string;
-}> = [
-  { key: "mutuals", label: "Friends of friends",  blurb: "People your connections know" },
-  { key: "org",     label: "From your clubs",     blurb: "Members of orgs you're already in" },
-  { key: "major",   label: "Same major",          blurb: "Other students studying what you study" },
-  { key: "school",  label: "Around your school",  blurb: "On campus, not yet in your circle" },
-  { key: "new",     label: "New on Vibe",         blurb: "Just joined" },
-];
-
 function SuggestionGroups({
   users,
   onStateChange,
@@ -646,18 +653,13 @@ function SuggestionGroups({
 
   // Bucket users by category; the API already pre-sorts by strength
   // (mutuals desc → shared_orgs desc) so within-group order is honored.
-  const buckets: Record<SuggestionCategory, ListUser[]> = {
-    mutuals: [],
-    org: [],
-    major: [],
-    school: [],
-    new: [],
-  };
-  for (const u of users) buckets[categorizeSuggestion(u)].push(u);
+  // Group labels depend on the buckets ("At Indianapolis"), so they're
+  // computed per render.
+  const buckets = bucketSuggestions(users);
 
   return (
     <div style={{ display: "flex", flexDirection: "column", gap: 18 }}>
-      {SUGGESTION_GROUP_ORDER.map(({ key, label, blurb }) => {
+      {suggestionGroupOrder(buckets).map(({ key, label, blurb }) => {
         const bucket = buckets[key];
         if (bucket.length === 0) return null;
         return (
@@ -798,6 +800,13 @@ function SearchPane({
   );
 }
 
+/**
+ * One person with a follow button. An unfollowed row says "Follow" (a follow
+ * is one-way); "Follow back" and "Following ✓" as before, and "Connected ✓"
+ * stays for mutuals. Also rendered by MutualsSheet and PostAudienceSheet,
+ * which pick up the same labels. Desktop still says Connect (UserCard,
+ * campus-home search, profile.html) until its own batches change it.
+ */
 export function UserRow({
   user,
   onStateChange,
@@ -823,7 +832,7 @@ export function UserRow({
       : "Following ✓"
     : state === "followed_by"
       ? "Follow back"
-      : "Connect";
+      : "Follow";
 
   const toggle = async () => {
     if (busy || !user.handle) return;
@@ -934,30 +943,26 @@ export function UserRow({
   );
 }
 
-type SuggestionCategory = "mutuals" | "org" | "major" | "school" | "new";
-
-function categorizeSuggestion(u: ListUser): SuggestionCategory {
-  if ((u.mutual_count ?? 0) > 0) return "mutuals";
-  if ((u.shared_org_count ?? 0) > 0) return "org";
-  if (u.same_major) return "major";
-  if (u.reason === "same school") return "school";
-  return "new";
-}
-
 function SuggestionReason({ user }: { user: ListUser }) {
   const category = categorizeSuggestion(user);
+  const mutuals = user.mutual_count ?? 0;
+  const sharedOrgs = user.shared_org_count ?? 0;
   const text =
     category === "mutuals"
-      ? `${user.mutual_count} you both follow`
+      ? mutuals > 0
+        ? `${mutuals} you both follow`
+        : "Friends of friends"
       : category === "org"
-        ? user.shared_org_count === 1
-          ? "In your org"
-          : `${user.shared_org_count} shared orgs`
+        ? sharedOrgs > 1
+          ? `${sharedOrgs} shared orgs`
+          : "In your org"
         : category === "major"
           ? "Same major as you"
-          : category === "school"
-            ? "Same school"
-            : "New on Vibe";
+          : category === "campus"
+            ? atCampusLabel(user.campus_id)
+            : category === "system"
+              ? elsewhereLabel(user.school_system)
+              : "New on Vibe";
   const accent =
     category === "mutuals"
       ? "#FF5C35"
@@ -965,9 +970,11 @@ function SuggestionReason({ user }: { user: ListUser }) {
         ? "#C6A0FF"
         : category === "major"
           ? "#FFD23F"
-          : category === "school"
+          : category === "campus"
             ? "#5BE3B9"
-            : "#8A8580";
+            : category === "system"
+              ? "#6FA8FF"
+              : "#8A8580";
   return (
     <div
       style={{
@@ -1011,11 +1018,16 @@ function SuggestionReason({ user }: { user: ListUser }) {
             <path d="M1 5L6 2.5l5 2.5-5 2.5z" stroke="currentColor" strokeWidth="1.3" strokeLinejoin="round" fill="none" />
             <path d="M3 6.5v2.2c0 .8 1.3 1.6 3 1.6s3-.8 3-1.6V6.5" stroke="currentColor" strokeWidth="1.3" fill="none" strokeLinecap="round" />
           </svg>
-        ) : category === "school" ? (
+        ) : category === "campus" ? (
           <svg width="11" height="11" viewBox="0 0 12 12" fill="none">
             <path d="M2 5l4-2.5L10 5v.4H2z" stroke="currentColor" strokeWidth="1.3" fill="none" strokeLinejoin="round" />
             <rect x="3" y="5.6" width="6" height="4.4" stroke="currentColor" strokeWidth="1.3" fill="none" />
             <rect x="5" y="7.6" width="2" height="2.4" stroke="currentColor" strokeWidth="1.1" fill="none" />
+          </svg>
+        ) : category === "system" ? (
+          <svg width="11" height="11" viewBox="0 0 12 12" fill="none">
+            <path d="M6 10.6s-3.4-3.1-3.4-5.6a3.4 3.4 0 1 1 6.8 0c0 2.5-3.4 5.6-3.4 5.6z" stroke="currentColor" strokeWidth="1.3" fill="none" strokeLinejoin="round" />
+            <circle cx="6" cy="5" r="1.2" fill="currentColor" />
           </svg>
         ) : (
           <svg width="11" height="11" viewBox="0 0 12 12" fill="none">

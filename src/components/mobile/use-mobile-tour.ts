@@ -2,6 +2,8 @@
 
 import { useEffect } from "react";
 
+import { campusRowById } from "@/lib/iu/campuses";
+
 /**
  * Hook that runs the Otto spotlight tour on mobile surfaces.
  *
@@ -16,9 +18,15 @@ import { useEffect } from "react";
  *   campus   → CampusMobile  (tabs → feed → composer FAB)
  *   network  → NetworkMobile (tabs → otto tab in bottom bar)
  *
- * Each leg hands off to the next via the same `vibe_tour_pending`
- * localStorage flag the desktop tour uses, so Settings → Replay tour
- * still works as the entry point.
+ * Settings → Replay tour sets `vibe_tour_pending=profile`; the profile leg
+ * hands off to campus through the same flag the desktop tour uses. The
+ * campus leg is where the phone tour ENDS ("Got it", no navigation): the
+ * network leg still runs when its own pending flag is set, but nothing
+ * hands off to it any more (wave plan B14t).
+ *
+ * The campus leg also starts on `/campus?welcome=1` (where onboarding
+ * lands) when its seen key isn't set, so a fresh student gets it without
+ * a pending flag.
  */
 
 // The `window.OttoTour` global is also declared by `campus-home.tsx` and
@@ -84,24 +92,40 @@ const PROFILE_STEPS: TourStep[] = [
   },
 ];
 
-const CAMPUS_STEPS: TourStep[] = [
-  {
-    selector: "#otto-mobile-tour-tabs",
-    title: "Swipe between everything.",
-    body: "Feed, Events, Orgs, Chat, and the campus Map all live here. Swipe or tap to switch.",
-  },
-  {
-    selector: "#otto-mobile-tour-feed",
-    title: "Your feed.",
-    body: "Posts from people you follow, ranked by who's actually engaging — friends' reposts get a boost.",
-  },
-  {
-    selector: "#otto-mobile-tour-compose",
-    title: "Share what you're up to.",
-    body: "The + opens the composer — text, photos, and video all go here.",
-    endLabel: "Next: network →",
-  },
-];
+/** Feed bubble body. `campus` is a `shortName` from the static campus table. */
+export function campusFeedBody(campus: string | null): string {
+  return campus
+    ? `What students at ${campus} are posting. People and clubs you follow rise to the top.`
+    : "What students on your campus are posting. People and clubs you follow rise to the top.";
+}
+
+/**
+ * The campus leg's bubbles. The engine renders `title` / `body` as HTML, so
+ * the campus name only ever comes from `campusRowById(...).shortName` (our
+ * own table), never from the URL or a server string.
+ */
+export function campusTourSteps(campus: string | null): TourStep[] {
+  return [
+    {
+      selector: "#otto-mobile-tour-tabs",
+      title: "Everything's one swipe away.",
+      body: "Feed, Events, Orgs, Chat, and the Map. Swipe or tap to switch.",
+    },
+    {
+      selector: "#otto-mobile-tour-feed",
+      title: "The campus feed.",
+      body: campusFeedBody(campus),
+    },
+    {
+      selector: "#otto-mobile-tour-compose",
+      title: "Your turn.",
+      body: "Tap + to post text, photos, or video.",
+      endLabel: "Got it",
+    },
+  ];
+}
+
+const CAMPUS_STEPS: TourStep[] = campusTourSteps(null);
 
 const NETWORK_STEPS: TourStep[] = [
   {
@@ -126,7 +150,7 @@ const STEPS_BY_LEG: Record<Leg, TourStep[]> = {
 // Where this leg hands off (or null = done).
 const HANDOFFS: Record<Leg, { next: Leg | null; dest: string | null }> = {
   profile: { next: "campus", dest: "/campus" },
-  campus: { next: "network", dest: "/network" },
+  campus: { next: null, dest: null },
   network: { next: null, dest: null },
 };
 
@@ -159,28 +183,101 @@ function loadTourScript(): Promise<void> {
   return scriptPromise;
 }
 
+// ── Start rule ─────────────────────────────────────────────────────────────
+export type TourStartInput = {
+  leg: Leg;
+  /** `localStorage.vibe_tour_pending`; null when unset or storage failed. */
+  pending: string | null;
+  /** This leg's seen key is "1"; false when unset or storage failed. */
+  seen: boolean;
+  /** `?welcome=1` is on the URL. */
+  welcome: boolean;
+};
+
+/**
+ * What the hook does on mount:
+ * - "start": the pending flag names this leg, or it's the campus leg on
+ *   `?welcome=1` and the student hasn't seen it.
+ * - "strip": campus leg on `?welcome=1` that was already seen, with no
+ *   pending flag for it: drop the param so a refresh stays quiet.
+ * - "none": nothing to do.
+ */
+export function tourStartDecision(i: TourStartInput): "start" | "strip" | "none" {
+  if (i.pending === i.leg) return "start";
+  if (i.leg !== "campus" || !i.welcome) return "none";
+  return i.seen ? "strip" : "start";
+}
+
+/** How long the campus leg waits for the campus name before using the fallback. */
+const CAMPUS_NAME_TIMEOUT_MS = 1500;
+
+/**
+ * The student's campus `shortName` for the feed bubble, or null on any
+ * failure (timeout, non-2xx, bad body, unknown id). Never read from the URL.
+ */
+async function loadCampusShortName(signal: AbortSignal): Promise<string | null> {
+  const ctrl = new AbortController();
+  const abort = () => ctrl.abort();
+  if (signal.aborted) return null;
+  signal.addEventListener("abort", abort);
+  const timer = setTimeout(abort, CAMPUS_NAME_TIMEOUT_MS);
+  try {
+    const res = await fetch("/api/me/onboarding-state", {
+      cache: "no-store",
+      credentials: "same-origin",
+      signal: ctrl.signal,
+    });
+    if (!res.ok) return null;
+    const j = (await res.json().catch(() => null)) as { campus_id?: unknown } | null;
+    const id = typeof j?.campus_id === "string" ? j.campus_id : null;
+    return campusRowById(id)?.shortName ?? null;
+  } catch {
+    return null;
+  } finally {
+    clearTimeout(timer);
+    signal.removeEventListener("abort", abort);
+  }
+}
+
 // ── Hook ───────────────────────────────────────────────────────────────────
 /**
  * Mount this in a mobile route component. When the matching
- * `vibe_tour_pending` flag is set, the spotlight fires after the
- * targets have rendered. Caller is responsible for the underlying
- * elements existing — see `STEPS_BY_LEG` selectors.
+ * `vibe_tour_pending` flag is set (or, for the campus leg, `?welcome=1`
+ * on a first visit), the spotlight fires after the targets have rendered.
+ * Caller is responsible for the underlying elements existing — see
+ * `STEPS_BY_LEG` selectors.
  *
- * Safe to mount unconditionally; the hook is a no-op when no flag is
- * present or the flag doesn't match this leg.
+ * Safe to mount unconditionally; the hook is a no-op when nothing asks for
+ * this leg.
  */
 export function useMobileTour(leg: Leg) {
   useEffect(() => {
     if (typeof window === "undefined") return;
     let cancelled = false;
 
+    // A storage failure reads as "no flag, not seen", so `?welcome=1` can
+    // still start the campus leg.
     let pending: string | null = null;
+    let seen = false;
     try {
       pending = localStorage.getItem(PENDING_KEY);
+      seen = localStorage.getItem(SEEN_KEYS[leg]) === "1";
     } catch {
+      pending = null;
+      seen = false;
+    }
+    let welcome = false;
+    try {
+      welcome = new URLSearchParams(window.location.search).get("welcome") === "1";
+    } catch {
+      welcome = false;
+    }
+    const decision = tourStartDecision({ leg, pending, seen, welcome });
+    if (decision === "strip") {
+      stripWelcomeParam();
       return;
     }
-    if (pending !== leg) return;
+    if (decision !== "start") return;
 
     // If a tour is already running (e.g., the desktop effect briefly
     // mounted before the viewport-switch swapped to the mobile tree),
@@ -190,9 +287,17 @@ export function useMobileTour(leg: Leg) {
     const MAX_POLL_MS = 8000;
     const POLL_INTERVAL_MS = 250;
     const startedAt = Date.now();
+    const aborter = new AbortController();
 
     void loadTourScript()
-      .then(() => {
+      .then(async () => {
+        if (cancelled) return;
+        // Campus leg: resolve the campus name (≤1.5 s) before starting, so
+        // the feed bubble can say where the posts come from.
+        const steps =
+          leg === "campus"
+            ? campusTourSteps(await loadCampusShortName(aborter.signal))
+            : STEPS_BY_LEG[leg];
         if (cancelled) return;
         // Wait for the first target to render. ProfileMobile / CampusMobile
         // do their own data fetches and mount the anchored elements only
@@ -200,7 +305,7 @@ export function useMobileTour(leg: Leg) {
         // hit a max so we don't spin forever on a busted route.
         const start = () => {
           if (cancelled || !window.OttoTour) return;
-          const firstSel = STEPS_BY_LEG[leg][0]?.selector;
+          const firstSel = steps[0]?.selector;
           if (firstSel && !document.querySelector(firstSel)) {
             if (Date.now() - startedAt > MAX_POLL_MS) {
               // Restore the flag so a refresh / next visit can retry.
@@ -212,13 +317,17 @@ export function useMobileTour(leg: Leg) {
           // Clear the pending flag NOW — right before starting — so a
           // failed start (target never appeared) keeps the flag for a
           // retry, but a successful start doesn't re-fire on refresh.
-          try {
-            localStorage.removeItem(PENDING_KEY);
-          } catch {
-            /* non-fatal */
+          // Only this leg's flag: a `?welcome=1` start leaves another
+          // leg's flag alone.
+          if (pending === leg) {
+            try {
+              localStorage.removeItem(PENDING_KEY);
+            } catch {
+              /* non-fatal */
+            }
           }
           stripWelcomeParam();
-          window.OttoTour.start(STEPS_BY_LEG[leg], {
+          window.OttoTour.start(steps, {
             onDone: () => handleDone(leg, "done"),
             onSkip: () => handleDone(leg, "skip"),
           });
@@ -231,6 +340,7 @@ export function useMobileTour(leg: Leg) {
 
     return () => {
       cancelled = true;
+      aborter.abort();
     };
   }, [leg]);
 }
