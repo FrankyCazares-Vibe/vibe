@@ -723,9 +723,19 @@ alter table public.orgs drop column system;
 -- Club can take them (critic B5); 'test-<id8>' satisfies the create route's
 -- HANDLE_RE (/^[a-z0-9][a-z0-9_-]{2,30}$/, orgs/route.ts:12) and no live
 -- handle starts with 'test-'.
+--
+-- Production-data step: it names five real rows by id. On a database that
+-- does not hold them (a fresh `supabase start`, a preview branch) it is
+-- skipped; wherever SAE exists, the strict row-count checks below run
+-- exactly as they did on the hosted project (applied 2026-09-16).
 do $$
 declare n int;
 begin
+  if not exists (select 1 from public.orgs where left(id::text, 8) = '923896fb') then
+    raise notice 'M1c org list: production rows not present, skipping';
+    return;
+  end if;
+
   update public.orgs
      set join_policy = 'invite', audience = 'both', campus_id = 'indianapolis'
    where left(id::text, 8) = '923896fb';                        -- SAE

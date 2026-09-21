@@ -261,7 +261,16 @@ REVOKE EXECUTE ON FUNCTION public.notify_on_like_insert() FROM anon, PUBLIC;
 REVOKE EXECUTE ON FUNCTION public.org_member_role(uuid, uuid) FROM anon, PUBLIC;
 REVOKE EXECUTE ON FUNCTION public.record_post_view(uuid) FROM anon, PUBLIC;
 REVOKE EXECUTE ON FUNCTION public.record_profile_view(uuid, text) FROM anon, PUBLIC;
-REVOKE EXECUTE ON FUNCTION public.rls_auto_enable() FROM anon, PUBLIC, authenticated;
+-- rls_auto_enable() is created by Supabase's hosted platform, not by any
+-- migration here, so a fresh local stack (`supabase start`) does not have it.
+-- Guarded so the migration history replays from scratch; on the hosted
+-- project the function exists and the revoke runs exactly as before.
+DO $$
+BEGIN
+  IF to_regprocedure('public.rls_auto_enable()') IS NOT NULL THEN
+    REVOKE EXECUTE ON FUNCTION public.rls_auto_enable() FROM anon, PUBLIC, authenticated;
+  END IF;
+END $$;
 
 -- ---------------------------------------------------------------------------
 -- 6. Rate limiting (fixed window). Called only from the service role via
