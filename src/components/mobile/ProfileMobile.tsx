@@ -1043,41 +1043,56 @@ export function ProfileMobile({ targetHandle }: Props = {}) {
         return;
       }
     }
-    setSavingEdit(true);
-    setEditError(null);
-    const body: Record<string, unknown> = {
-      name: snapshot.name.trim(),
-      bio: snapshot.bio.trim(),
-      major: snapshot.major.trim(),
-      year: snapshot.year,
-      // `interests` is the server-side name for vibe tags. We
-      // strip empties + dedupe here so the column stays clean.
-      interests: Array.from(
-        new Set(
-          snapshot.vibeTagsList
-            .map((s) => s.trim())
-            .filter((s) => s.length > 0),
-        ),
-      ),
-    };
-    if (sentCampusId) body.campus_id = sentCampusId;
-    // tagline and location show a fallback when blank (the bio's first line,
-    // the campus), and the draft starts from what is shown. They go out only
-    // when the student changed them, so a Save never stores the fallback as
-    // if they had typed it.
+    // Only what the student changed in this edit session goes out. The draft
+    // starts from the profile loaded when the page opened, which can be
+    // hours old: re-sending an untouched bio or tag list from it would
+    // overwrite a newer edit made on the desktop since. tagline and
+    // location also show a fallback when blank (the bio's first line, the
+    // campus), and re-sending it would store it as if the student had
+    // typed it.
     const shown = user ? seedDraftFromUser(user) : null;
-    if (!shown || snapshot.tagline.trim() !== shown.tagline.trim()) {
-      body.tagline = snapshot.tagline.trim();
-    }
-    if (!shown || snapshot.location.trim() !== shown.location.trim()) {
+    const body: Record<string, unknown> = {};
+    const changed = (next: string, before: string | undefined) =>
+      !shown || next.trim() !== (before ?? "").trim();
+    if (changed(snapshot.name, shown?.name)) body.name = snapshot.name.trim();
+    if (changed(snapshot.bio, shown?.bio)) body.bio = snapshot.bio.trim();
+    if (changed(snapshot.tagline, shown?.tagline)) body.tagline = snapshot.tagline.trim();
+    if (changed(snapshot.location, shown?.location)) {
       body.location_text = snapshot.location.trim();
     }
+    // Major and year go together: the server rebuilds the headline from
+    // both whenever either one arrives.
+    const sentMajorYear =
+      changed(snapshot.major, shown?.major) || !shown || snapshot.year !== shown.year;
+    if (sentMajorYear) {
+      body.major = snapshot.major.trim();
+      body.year = snapshot.year;
+    }
+    // `interests` is the server-side name for vibe tags. We strip empties +
+    // dedupe here so the column stays clean.
+    const cleanTags = (tags: string[]) =>
+      Array.from(new Set(tags.map((s) => s.trim()).filter((s) => s.length > 0)));
+    const interests = cleanTags(snapshot.vibeTagsList);
+    if (!shown || JSON.stringify(interests) !== JSON.stringify(cleanTags(shown.vibeTagsList))) {
+      body.interests = interests;
+    }
+    if (sentCampusId) body.campus_id = sentCampusId;
     // "Here for" goes out only when it changed in this edit session, so a
     // save never rewrites the onboarding answer untouched. Both lists are in
     // canonical order, so joining them compares them.
     if (shown && snapshot.lookingFor.join(",") !== shown.lookingFor.join(",")) {
       body.looking_for = snapshot.lookingFor;
     }
+    if (Object.keys(body).length === 0) {
+      // Edited and put back: nothing to send (profile-sync refuses an empty
+      // save), so it closes like an untouched edit.
+      setEditMode(false);
+      setDraft(null);
+      setEditError(null);
+      return;
+    }
+    setSavingEdit(true);
+    setEditError(null);
     try {
       const r = await fetch("/api/me/profile-sync", {
         method: "POST",
@@ -1108,16 +1123,17 @@ export function ProfileMobile({ targetHandle }: Props = {}) {
         // Confirm major + year actually landed in the DB — same
         // silent-failure guard as the avatar upload. If the round-trip
         // returns something other than what we just sent, surface a
-        // visible error instead of pretending all is well.
+        // visible error instead of pretending all is well. Only when they
+        // were sent: an untouched major may have changed on the desktop.
         const sentMajor = snapshot.major.trim();
         const gotMajor = (fresh.major ?? "").toString().trim();
-        if (sentMajor !== gotMajor) {
+        if (sentMajorYear && sentMajor !== gotMajor) {
           throw new Error(
             `Major didn't save (sent "${sentMajor || "(blank)"}", got "${gotMajor || "(blank)"}").`,
           );
         }
         const gotYear = typeof fresh.year === "number" ? fresh.year : null;
-        if (snapshot.year !== gotYear) {
+        if (sentMajorYear && snapshot.year !== gotYear) {
           throw new Error(
             `Year didn't save (sent ${snapshot.year ?? "(blank)"}, got ${gotYear ?? "(blank)"}).`,
           );

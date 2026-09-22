@@ -43,8 +43,43 @@ type ProfileRowRead = {
 };
 
 /**
- * Full profile sync from `public/html/profile.html` (authenticated, same-origin).
- * Accepts vibe-shaped fields; uploads `data:` images to Supabase Storage.
+ * The only way to clear a photo, the cover photo or the single resume link.
+ * A client that caches the profile (the desktop page keeps a copy in
+ * localStorage) sends `null` or "" for whatever its copy lacks, and that
+ * copy can predate a photo added on the phone. So an absent, null or empty
+ * `avatar_url` / `banner_url` / `resume_url` now leaves the column alone,
+ * and the deliberate remove flows name what they clear:
+ * `remove: ["banner"]`. Clearing `resume_url` also deletes the stored file
+ * (the orphan cleanup below), so it must never happen by accident.
+ */
+const REMOVABLE_MEDIA = ["avatar", "banner", "resume"] as const;
+type RemovableMedia = (typeof REMOVABLE_MEDIA)[number];
+
+/** Absent → nothing removed; anything but a list of known names → null. */
+function parseRemoveList(value: unknown): Set<RemovableMedia> | null {
+  if (value === undefined) return new Set();
+  if (!Array.isArray(value) || value.length > REMOVABLE_MEDIA.length) return null;
+  const out = new Set<RemovableMedia>();
+  for (const x of value) {
+    if (typeof x !== "string" || !(REMOVABLE_MEDIA as readonly string[]).includes(x)) return null;
+    out.add(x as RemovableMedia);
+  }
+  return out;
+}
+
+/** A value that asks to set the field: a non-empty string. */
+function isNonEmptyString(value: unknown): value is string {
+  return typeof value === "string" && value.trim() !== "";
+}
+
+/**
+ * Profile sync from `public/html/profile.html` and the phone profile
+ * (authenticated, same-origin). Accepts vibe-shaped fields, each optional:
+ * an absent field is left alone. The profile edit forms send only what the
+ * student changed; a list save (the phone's resume docs, work, "Working on")
+ * sends the whole list as that page has it. Uploads `data:` images to
+ * Supabase Storage. Photo, cover photo and resume link are cleared only
+ * through `remove` (REMOVABLE_MEDIA).
  *
  * Every column is validated here and written with the SERVICE role, scoped to
  * the caller's own id, in one statement guarded by the closed column list in
@@ -76,6 +111,25 @@ export async function POST(req: Request) {
     body = (await req.json()) as Record<string, unknown>;
   } catch {
     return NextResponse.json({ ok: false, error: "Invalid JSON" }, { status: 400 });
+  }
+  if (!body || typeof body !== "object" || Array.isArray(body)) {
+    return NextResponse.json({ ok: false, error: "Invalid JSON" }, { status: 400 });
+  }
+
+  const removing = parseRemoveList(body.remove);
+  if (removing === null) {
+    return NextResponse.json({ ok: false, error: "Invalid remove" }, { status: 400 });
+  }
+  // A new value and a removal of the same field in one request can't both
+  // be meant; no client sends that, so it is a slip, not a guess to make.
+  for (const [kind, key] of [
+    ["avatar", "avatar_url"],
+    ["banner", "banner_url"],
+    ["resume", "resume_url"],
+  ] as const) {
+    if (removing.has(kind) && isNonEmptyString(body[key])) {
+      return NextResponse.json({ ok: false, error: "Invalid remove" }, { status: 400 });
+    }
   }
 
   // Only inline `data:` payloads hit Storage (avatar / banner → `profiles`,
@@ -250,20 +304,28 @@ export async function POST(req: Request) {
   // Supabase host; a plain http(s) string is passed straight through by
   // inlineOrUploadProfileUrl, which accepts ANY host. That value is rendered
   // into a CSS `url()` on other students' screens, so it is pinned to our
-  // host here — the same pin org assets already use. `null` still clears.
-  const avatar = await inlineOrUploadProfileUrl(user.id, body.avatar_url, "avatar");
-  if (avatar !== undefined) {
-    if (typeof avatar === "string" && !isSupabaseHttpsUrl(avatar)) {
+  // host here — the same pin org assets already use. Only a non-empty
+  // string sets the photo: inlineOrUploadProfileUrl answers null for null,
+  // "", garbage AND a failed upload, and none of those may clear a real
+  // photo. Clearing takes `remove: ["avatar"]` (see REMOVABLE_MEDIA).
+  if (isNonEmptyString(body.avatar_url)) {
+    const avatar = await inlineOrUploadProfileUrl(user.id, body.avatar_url, "avatar");
+    if (typeof avatar !== "string" || !isSupabaseHttpsUrl(avatar)) {
       return NextResponse.json({ ok: false, error: "Invalid avatar_url" }, { status: 400 });
     }
     mediaPatch.avatar_url = avatar;
+  } else if (removing.has("avatar")) {
+    mediaPatch.avatar_url = null;
   }
 
   // Resume objects live in the PRIVATE `resumes` bucket and are stored as
   // `/api/resume/<key>` proxy paths. Snapshot the current refs BEFORE the
   // update so we can delete objects this request un-references: repeated
   // uploads left 37 orphaned, un-redacted PDFs in prod in one month.
-  const touchesResume = "resume_url" in body || "resume_docs" in body;
+  // resume_url counts as touched only when this request sets or removes
+  // it; a stale `resume_url: null` changes nothing, so it deletes nothing.
+  const setsResumeUrl = isNonEmptyString(body.resume_url);
+  const touchesResume = setsResumeUrl || removing.has("resume") || "resume_docs" in body;
   // Redaction bars change which DERIVATIVE viewers must be served, so the
   // pre-read also snapshots them (see the derivative purge below).
   const touchesRedactions = "resume_redactions" in patch;
@@ -285,8 +347,22 @@ export async function POST(req: Request) {
 
   // data: URL → uploaded to `resumes`; proxy / legacy / external refs are
   // re-validated against user.id (own-bucket keys must carry our prefix).
-  const resume = await resolveResumeUrlInput(user.id, body.resume_url);
-  if (resume !== undefined) patch.resume_url = resume;
+  // resolveResumeUrlInput answers null for a failed upload or a ref that
+  // isn't ours, which used to clear the column and then delete the stored
+  // file. A failed upload is now a refusal (the student has to know it
+  // didn't save); any other ref we can't vouch for leaves the column as it
+  // is, since a cached copy may simply be echoing an old link back. Only
+  // `remove: ["resume"]` clears.
+  if (setsResumeUrl) {
+    const resume = await resolveResumeUrlInput(user.id, body.resume_url);
+    if (typeof resume === "string") {
+      patch.resume_url = resume;
+    } else if (/^data:/i.test(String(body.resume_url).trim())) {
+      return NextResponse.json({ ok: false, error: "Invalid resume_url" }, { status: 400 });
+    }
+  } else if (removing.has("resume")) {
+    patch.resume_url = null;
+  }
 
   // Multi-doc resume array — preferred over the single resume_url.
   // Pure data field; uploads already happened client-side via
@@ -301,35 +377,40 @@ export async function POST(req: Request) {
   // so it is written with the service role further down and a raw CSS value
   // from an older client is accepted only when it is exactly one of the
   // presets.
+  //
+  // A theme key on its own no longer clears the photo: the desktop page
+  // used to send its cached theme with every save, so one save from a
+  // stale copy wiped a cover photo added on the phone. The theme is stored
+  // either way (a photo still wins on screen), and the photo goes only with
+  // `remove: ["banner"]`, which the desktop sends when the student picks a
+  // theme. Removing with no theme leaves the default cover, as `null` did.
   let coverThemePatch: string | undefined;
-  if ("banner_url" in body || "banner_gradient" in body) {
-    const bu = body.banner_url;
+  const bu = body.banner_url;
+  if (isNonEmptyString(bu)) {
+    const resolved = await inlineOrUploadProfileUrl(user.id, bu, "banner");
+    // Same host pin as the avatar above: an uploaded photo resolves to our
+    // own Supabase host, and an arbitrary http(s) link must not become a
+    // CSS `url()` fetch on every viewer's screen.
+    if (resolved === undefined || resolved === null || !isSupabaseHttpsUrl(resolved)) {
+      return NextResponse.json({ ok: false, error: "Invalid banner" }, { status: 400 });
+    }
+    mediaPatch.banner_url = resolved;
+    coverThemePatch = "";
+  } else {
     const bgKey =
       typeof body.banner_gradient === "string"
         ? normalizeCoverThemeInput(body.banner_gradient)
         : "";
-
-    if (typeof bu === "string" && bu.trim()) {
-      const resolved = await inlineOrUploadProfileUrl(user.id, bu, "banner");
-      // Same host pin as the avatar above: an uploaded photo resolves to our
-      // own Supabase host, and an arbitrary http(s) link must not become a
-      // CSS `url()` fetch on every viewer's screen.
-      if (resolved === undefined || resolved === null || !isSupabaseHttpsUrl(resolved)) {
-        return NextResponse.json({ ok: false, error: "Invalid banner" }, { status: 400 });
-      }
-      mediaPatch.banner_url = resolved;
-      coverThemePatch = "";
-    } else if (bgKey === null) {
+    if (bgKey === null) {
       return NextResponse.json(
         { ok: false, error: "Invalid banner_gradient" },
         { status: 400 },
       );
-    } else if (bgKey !== "") {
+    }
+    if (bgKey !== "") coverThemePatch = bgKey;
+    if (removing.has("banner")) {
       mediaPatch.banner_url = null;
-      coverThemePatch = bgKey;
-    } else if (bu === null && "banner_url" in body) {
-      mediaPatch.banner_url = null;
-      coverThemePatch = "";
+      if (coverThemePatch === undefined) coverThemePatch = "";
     }
   }
 

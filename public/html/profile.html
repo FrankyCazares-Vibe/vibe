@@ -3941,6 +3941,9 @@ function clearField(){
   if(!activeEdit) return;
   activeEdit.textContent='';
   _markUserFieldEdited(activeEdit);
+  // Setting textContent fires no input event, so nothing else would
+  // snapshot the cleared field or queue its save.
+  saveProfileToStorage();
 }
 
 // ── "Here for" ─────────────────────────────────────────────────────
@@ -3972,10 +3975,37 @@ function _paintHereFor(tokens) {
   row.classList.toggle('has-any', any);
 }
 
-// The server's answer, from the bootstrap _ensureCampusContext fetches on
-// edit entry. It goes into the cache (so the next edit entry reads it) and
-// onto the chips, unless the student already changed them on this page.
-// Painting never saves: looking_for goes out only after a chip click.
+// The owner's own bootstrap (GET /api/me/profile-bootstrap), fetched once
+// and shared: the first paint reads the "Here for" answer and the server's
+// profile from it (_adoptOwnProfileOnLoad), and the first edit entry reads
+// the campus cooldown (_ensureCampusContext). maxAgeMs asks for a fresh
+// read when the shared one is older, so a cooldown checked long after the
+// page opened isn't hours old. A failed read is forgotten so the next
+// caller tries again. Reading it never saves anything.
+var _ownBootstrapReq = null;
+var _ownBootstrapAt = 0;
+function _ownProfileBootstrap(maxAgeMs) {
+  const fresh = !(maxAgeMs >= 0) || Date.now() - _ownBootstrapAt <= maxAgeMs;
+  if (_ownBootstrapReq && fresh) return _ownBootstrapReq;
+  _ownBootstrapAt = Date.now();
+  const req = fetch('/api/me/profile-bootstrap', { credentials: 'include' })
+    .then(r => (r.ok ? r.json() : null))
+    .catch(() => null)
+    .then(b => {
+      if (b && b.ok === true) return b;
+      if (_ownBootstrapReq === req) _ownBootstrapReq = null;
+      return null;
+    });
+  _ownBootstrapReq = req;
+  return req;
+}
+
+// The server's answer, from the owner's bootstrap: on the first paint (a
+// cached copy from before the row existed has no answer, so without this
+// the row stayed empty until the second load) and again on edit entry. It
+// goes into the cache (so the next edit entry reads it) and onto the
+// chips, unless the student already changed them on this page. Painting
+// never saves: looking_for goes out only after a chip click.
 function _hereForFreshAnswer(tokens) {
   if (!Array.isArray(tokens) || _lookingForDirty || window.viewingRealUser) return;
   const clean = LOOKING_FOR_VALUES.filter(v => tokens.includes(v));
@@ -3985,6 +4015,75 @@ function _hereForFreshAnswer(tokens) {
     vibeSave('vibe_user_v1', u);
   }
   _paintHereFor(clean);
+}
+
+// The owner's first paint comes from the copy cached on this device, which
+// can predate edits made on the phone. A save sends only what the student
+// changed, but changing one item of a list sends the whole list as this
+// page shows it: one bar drawn over a stale set of redaction bars would
+// wipe the bars added on the phone and serve viewers those regions
+// un-redacted (the same goes for work, "Working on", tags and skills). So
+// once the server's copy arrives, and only while nothing has been edited
+// on this page yet, the profile is repainted from it. Painting never
+// saves: opening the profile writes nothing to the server.
+function _adoptOwnProfileOnLoad(serverUser) {
+  if (!serverUser || typeof serverUser !== 'object' || window.viewingRealUser) return;
+  // Any edit on this page (saved or not), a "Here for" click, a campus pick
+  // or a snapshot still waiting: the page is newer than this read.
+  if (_profileEditSeq > 0 || _lookingForDirty || saveTimer || _campusPick) return;
+  const prev = vibeLoad('vibe_user_v1') || {};
+  const nu = Object.assign({}, prev, serverUser);
+  nu._appShell = true;
+  // The bootstrap leaves these out when the server has none, so absent
+  // means empty (removed on the phone), not "keep this device's copy".
+  ['workExperience', 'currentlyOn', 'resumeRedactions'].forEach(k => {
+    if (!Array.isArray(serverUser[k])) nu[k] = [];
+  });
+  if (!serverUser._workOrderManual) delete nu._workOrderManual;
+  // Resume docs: the server's list, keeping what this device rendered for
+  // a doc it already had (its rasterized pages), so the viewer needn't redo it.
+  const prevDocs = Array.isArray(prev.resumePortfolio) ? prev.resumePortfolio : [];
+  nu.resumePortfolio = (Array.isArray(serverUser.resumePortfolio) ? serverUser.resumePortfolio : []).map(d => {
+    const mine = prevDocs.find(p => p && d && p.url === d.url);
+    return mine ? Object.assign({}, mine, d) : d;
+  });
+  // A photo and a theme exclude each other. With neither on the server the
+  // page keeps what it shows: nothing on any device removes them.
+  if (serverUser.coverPhoto) delete nu.coverGradient;
+  else if (serverUser.coverGradient) delete nu.coverPhoto;
+  // This device's own bookkeeping, kept as the post-save refresh keeps it.
+  if (prev.counts) nu.counts = prev.counts;
+  if (prev.glance) nu.glance = prev.glance;
+  if (prev.pinnedId != null) nu.pinnedId = prev.pinnedId;
+  vibeSave('vibe_user_v1', nu);
+
+  // Repaint, except what the student is in the middle of: with the focus in
+  // an editable field the text and lists stay put (re-rendering them would
+  // pull the field out from under the cursor), and with the document viewer
+  // open the resume and its bars do (the open page would stop matching).
+  // A drag in progress (_reorderState) counts too: it holds a list item.
+  const focus = document.activeElement;
+  const typing = !!(focus && typeof focus.closest === 'function' && focus.closest('[data-edit]')) ||
+    (typeof _reorderState !== 'undefined' && !!_reorderState);
+  const viewerOpen = !!document.getElementById('docModal')?.classList.contains('open');
+  const view = { name: nu.name };
+  if (!typing) {
+    hydrateProfileFields(nu);
+    ['bio', 'vibeTags', 'skills', 'currentlyOn', 'workExperience', '_workOrderManual'].forEach(k => {
+      if (k in nu) view[k] = nu[k];
+    });
+  }
+  if (nu.avatarPhoto) view.avatarPhoto = nu.avatarPhoto;
+  if (nu.coverPhoto) view.coverPhoto = nu.coverPhoto;
+  else if (nu.coverGradient) view.coverGradient = nu.coverGradient;
+  if (!viewerOpen) {
+    view.resumePortfolio = nu.resumePortfolio;
+    view.resumeRedactions = nu.resumeRedactions;
+  } else {
+    // renderUserSections always resets the bars; hand it the ones on screen.
+    view.resumeRedactions = Array.isArray(redactionBars) ? redactionBars.slice() : [];
+  }
+  renderUserSections(view, { sectionsOnly: true });
 }
 
 // The picked chips, in LOOKING_FOR_VALUES order.
@@ -4071,7 +4170,7 @@ async function _applyAvatarAndSave(url) {
   const prevEmojiDisplay = avatarEmoji.style.display;
   const prevStored = (vibeLoad('vibe_user_v1') || {}).avatarPhoto;
   applyAvatarPhoto(url);
-  saveProfileToStorage();
+  saveProfileToStorage({ edited: 'avatar' });
   const ok = await _saveProfileNow("Couldn't update your profile photo.");
   if (ok !== false) { showToast('Profile photo updated'); return; }
   // Leave it if a newer photo went up while this save ran.
@@ -4082,6 +4181,9 @@ async function _applyAvatarAndSave(url) {
   document.querySelectorAll('#avatarPreviewStrip img').forEach(i =>
     i.classList.toggle('selected', !!prevSrc && i.getAttribute('src') === prevSrc));
   _restoreStoredUserFields({ avatarPhoto: prevStored });
+  // The pick is undone, so the photo is no longer an edit to send: the
+  // server keeps whatever it has (possibly a newer photo from the phone).
+  if (_editedUserFields) delete _editedUserFields.avatar;
 }
 
 // Put vibe_user_v1 fields back to a snapshot (undefined → removed). Not
@@ -4259,7 +4361,7 @@ async function _applyCoverAndSave(paint, success, failure) {
   const prevStored = { coverPhoto: stored.coverPhoto, coverGradient: stored.coverGradient };
   paint();
   const paintedStyle = cover.getAttribute('style');
-  saveProfileToStorage();
+  saveProfileToStorage({ edited: 'banner' });
   const ok = await _saveProfileNow(failure);
   if (ok !== false) { showToast(success); return; }
   // Leave it if a newer cover went up while this save ran.
@@ -4269,6 +4371,9 @@ async function _applyCoverAndSave(paint, success, failure) {
   document.body.classList.toggle('has-cover-photo', prevHasPhoto);
   currentCoverTheme = prevCoverTheme;
   _restoreStoredUserFields(prevStored);
+  // Undone, so no longer an edit: a later save must not send the restored
+  // theme as a fresh pick, which would remove a cover photo the phone added.
+  if (_editedUserFields) delete _editedUserFields.banner;
 }
 
 // Drag-and-drop on cover drop zone
@@ -4285,7 +4390,7 @@ if(dropZone){
 }
 
 // ── Tag management ────────────────────────────────────────────────
-function removeTag(btn){ btn.closest('.vibe-tag').remove(); showToast('Tag removed'); saveProfileToStorage(); }
+function removeTag(btn){ btn.closest('.vibe-tag').remove(); showToast('Tag removed'); saveProfileToStorage({ edited: 'interests' }); }
 function addTag(){ openModal('tagModal'); }
 function saveTag(){
   const text = document.getElementById('tag-text').value.trim();
@@ -4302,7 +4407,7 @@ function saveTag(){
   document.getElementById('tag-text').value='';
   closeModal('tagModal');
   showToast('Tag added');
-  saveProfileToStorage();
+  saveProfileToStorage({ edited: 'interests' });
 }
 
 // ── Skill management ─────────────────────────────────────────────
@@ -4334,9 +4439,9 @@ function saveSkillModal(){
   wrap.appendChild(pill);
   closeModal('skillModal');
   showToast('Skill added');
-  saveProfileToStorage();
+  saveProfileToStorage({ edited: 'skills' });
 }
-function removeSkill(btn){ btn.closest('.skill-pill').remove(); showToast('Skill removed'); saveProfileToStorage(); }
+function removeSkill(btn){ btn.closest('.skill-pill').remove(); showToast('Skill removed'); saveProfileToStorage({ edited: 'skills' }); }
 
 // ── Work experience ───────────────────────────────────────────────
 // Work logo system — see saveWork() and triggerLogoUpload()
@@ -4390,7 +4495,7 @@ async function applyLogoFromInput(input) {
     const url = await _uploadWorkLogo(file);
     applyLogoToWrap(wrap, url);
     showToast('Logo updated');
-    saveProfileToStorage();
+    saveProfileToStorage({ edited: 'work' });
   } catch (e) {
     // Upload failed (likely network / size / mime). Roll back the
     // optimistic preview so we don't leave a data: URI that the
@@ -4446,7 +4551,7 @@ async function applyCurrentLogoFromInput(input) {
     img.style.cssText = 'width:20px;height:20px;border-radius:999px;object-fit:cover;display:inline-block;vertical-align:middle;';
     wrap.insertBefore(img, input);
     if (typeof showToast === 'function') showToast('Logo updated');
-    if (typeof saveProfileToStorage === 'function') saveProfileToStorage();
+    if (typeof saveProfileToStorage === 'function') saveProfileToStorage({ edited: 'current' });
   } catch (e) {
     if (typeof showToast === 'function') showToast(e && e.message ? e.message : 'Could not upload logo');
   }
@@ -4543,9 +4648,9 @@ function saveWork(){
   closeModal('workModal');
   showToast('Role added');
   refreshHoverTargets();
-  saveProfileToStorage();
+  saveProfileToStorage({ edited: 'work' });
 }
-function deleteWork(btn){ btn.closest('.work-item').remove(); showToast('Role removed'); saveProfileToStorage(); }
+function deleteWork(btn){ btn.closest('.work-item').remove(); showToast('Role removed'); saveProfileToStorage({ edited: 'work' }); }
 
 // ── Currently into ───────────────────────────────────────────────
 const currentIcons=['📱','📖','🍞','✈️','🎵','🎮','🏋️','🧪','🌿','🎨','🐕','🤿','🏄','🍳','🎸','✍️','🧵','📷'];
@@ -4573,9 +4678,9 @@ function saveCurrent(){
   document.getElementById('c-text').value='';
   closeModal('currentModal');
   showToast('Added!');
-  saveProfileToStorage();
+  saveProfileToStorage({ edited: 'current' });
 }
-function deleteCurrent(btn){ btn.closest('.current-item').remove(); saveProfileToStorage(); }
+function deleteCurrent(btn){ btn.closest('.current-item').remove(); saveProfileToStorage({ edited: 'current' }); }
 
 
 // ── Resume / portfolio viewer ───────────────────────────────────
@@ -4767,7 +4872,7 @@ async function handleResumeUpload(input) {
     showToast('Attachment added');
   }
   input.value = '';
-  saveProfileToStorage();
+  saveProfileToStorage({ edited: 'resume' });
 }
 
 function removeResumeDoc(idx) {
@@ -4784,7 +4889,7 @@ function removeResumeDoc(idx) {
   renderResumeCard();
   const modal = document.getElementById('docModal');
   if (modal && modal.classList.contains('open')) renderDocViewer();
-  saveProfileToStorage();
+  saveProfileToStorage({ edited: ['resume', 'redactions'] });
   showToast('Attachment removed');
 }
 
@@ -4793,7 +4898,7 @@ function clearResumePortfolio() {
   activeDocIndex = 0;
   renderResumeCard();
   showToast('Attachment cleared');
-  saveProfileToStorage();
+  saveProfileToStorage({ edited: 'resume' });
 }
 
 function renderResumeCard() {
@@ -5032,7 +5137,7 @@ function deleteRedactionBar(absoluteIdx) {
   if (selectedBarIdx === absoluteIdx) selectedBarIdx = null;
   else if (selectedBarIdx !== null && selectedBarIdx > absoluteIdx) selectedBarIdx -= 1;
   renderRedactionBars();
-  saveProfileToStorage();
+  saveProfileToStorage({ edited: 'redactions' });
 }
 
 function clearRedactions() {
@@ -5044,7 +5149,7 @@ function clearRedactions() {
   redactionBars = redactionBars.filter(b => b.docIndex !== activeDocIndex);
   selectedBarIdx = null;
   renderRedactionBars();
-  saveProfileToStorage();
+  saveProfileToStorage({ edited: 'redactions' });
   showToast('Bars on this attachment cleared');
 }
 
@@ -5097,7 +5202,7 @@ function startDrawing(e, wrap) {
       renderRedactionBars();
       return;
     }
-    saveProfileToStorage();
+    saveProfileToStorage({ edited: 'redactions' });
   };
   window.addEventListener('pointermove', move);
   window.addEventListener('pointerup', up);
@@ -5130,7 +5235,9 @@ function onBarPointerDown(e) {
   const up = () => {
     window.removeEventListener('pointermove', move);
     window.removeEventListener('pointerup', up);
-    saveProfileToStorage();
+    // A tap only selects the bar: it goes out as an edit once it moved.
+    const moved = bar.x !== origin.x || bar.y !== origin.y;
+    saveProfileToStorage(moved ? { edited: 'redactions' } : undefined);
   };
   window.addEventListener('pointermove', move);
   window.addEventListener('pointerup', up);
@@ -5174,7 +5281,8 @@ function onHandlePointerDown(e, absoluteIdx, dir) {
   const up = () => {
     window.removeEventListener('pointermove', move);
     window.removeEventListener('pointerup', up);
-    saveProfileToStorage();
+    const resized = bar.x !== origin.x || bar.y !== origin.y || bar.w !== origin.w || bar.h !== origin.h;
+    saveProfileToStorage(resized ? { edited: 'redactions' } : undefined);
   };
   window.addEventListener('pointermove', move);
   window.addEventListener('pointerup', up);
@@ -5513,8 +5621,9 @@ function _currentUserIdentity() {
   return { name, headline, initials, photo };
 }
 
-// Record a pin change. A click is an edit: the full snapshot and profile
-// sync, as before (the pin itself goes out through _syncPinToServer). The
+// Record a pin change. A click is an edit: the full snapshot on this
+// device, plus any profile edits still waiting to sync (the pin itself goes
+// out through _syncPinToServer, never in the profile sync). The
 // programmatic path (restoring the pin while the page renders, putting a
 // refused pin back) only notes the id on this device: rendering the
 // profile must never write it back to the server.
@@ -6997,10 +7106,10 @@ document.addEventListener('DOMContentLoaded', function() {
         u._workOrderManual = true;
         vibeSave('vibe_user_v1', u);
       }
-      if (typeof saveProfileToStorage === 'function') saveProfileToStorage();
+      if (typeof saveProfileToStorage === 'function') saveProfileToStorage({ edited: 'work' });
     });
     setupReorderable('#currentList', '.current-item', function() {
-      if (typeof saveProfileToStorage === 'function') saveProfileToStorage();
+      if (typeof saveProfileToStorage === 'function') saveProfileToStorage({ edited: 'current' });
     });
   }
 });
@@ -7208,10 +7317,9 @@ function _ensureCampusContext() {
     .then(r => (r.ok ? r.json() : null));
   // Optional: it only carries the cooldown, so its failure must never
   // discard a good /api/campuses answer. Without it the server's
-  // campusError is the backstop.
-  const bootReq = fetch('/api/me/profile-bootstrap', { credentials: 'include' })
-    .then(r => (r.ok ? r.json() : null))
-    .catch(() => null);
+  // campusError is the backstop. Shared with the first paint, which has
+  // usually fetched it already, unless that read is over a minute old.
+  const bootReq = _ownProfileBootstrap(60 * 1000);
   // The same answer carries the stored "Here for" tokens, which enable the
   // chips when the cache predates the row. Independent of the campus list.
   bootReq.then(b => {
@@ -7575,8 +7683,20 @@ function _afterCampusSync(sent, err) {
     // Opening the profile never writes it back: only an edit or a Save
     // schedules a profile sync. (A one-shot backfill used to sync on every
     // load, sending the whole profile, fallbacks included, with no edit.)
-    // A leftover data: logo still goes up with the next real edit:
-    // flushProfileServerSync runs _migrateDataUriLogos() first.
+    // A leftover data: logo still goes up with the next edit of the work
+    // list: flushProfileServerSync runs _migrateDataUriLogos() first.
+    //
+    // The server's copy, once it arrives: the profile repaints from it
+    // before any edit can send a stale list (_adoptOwnProfileOnLoad), and
+    // the owner-only "Here for" row gets its answer (a cached copy from
+    // before the row existed has none). Reading the bootstrap only repaints
+    // the page and the cache, never saves.
+    _ownProfileBootstrap().then(b => {
+      if (!b || !b.vibeUser) return;
+      try { _adoptOwnProfileOnLoad(b.vibeUser); }
+      catch (e) { console.warn('[profile] repaint from the server failed', e); }
+      _hereForFreshAnswer(b.vibeUser.lookingFor);
+    });
   }
 
   // First-time-only: welcome banner + auto-edit mode while name is still empty.
@@ -7892,7 +8012,7 @@ function _onMajorYearChange() {
   // text until the round-trip completes).
   u.headline = '';
   vibeSave('vibe_user_v1', u);
-  _editedUserFields.majorYear = true;
+  _markProfileEdited('majorYear');
   if (typeof scheduleProfileServerSync === 'function') {
     scheduleProfileServerSync();
   }
@@ -7911,10 +8031,15 @@ function _urlFromCssBackgroundImage(bgImg) {
   return m ? m[1].trim() : '';
 }
 
+// opts.edited names what the caller's edit changed (a key or a list of
+// keys, see _editedUserFields): only those go out with the profile sync.
+// A call without it saves the snapshot on this device and syncs only what
+// was already marked.
 function saveProfileToStorage(opts) {
   // Never write when viewing someone else's profile — the DOM is showing
   // their data and capturing it would overwrite the owner's vibe_user_v1.
   if (window.viewingRealUser) return;
+  if (opts && opts.edited) [].concat(opts.edited).forEach(_markProfileEdited);
   const user = vibeLoad('vibe_user_v1') || {};
 
   // Identity fields (data-user-field on each)
@@ -8076,21 +8201,51 @@ var profileServerSyncTimer = null;
 //   _profileSyncLastOk    how the last flush went; reset on entering edit
 //   _lookingForDirty      the student toggled a "Here for" chip on this
 //                         page; only then does looking_for go out
-//   _editedUserFields     fields shown with a fallback (tagline, location,
-//                         major + year) that the student edited since the
-//                         server's copy was last adopted; only those go out
+//   _editedUserFields     what the student changed on this page that the
+//                         server hasn't confirmed yet; only those go out
+//                         (buildProfileSyncPayload). Keys: the
+//                         [data-user-field] names, majorYear, bio,
+//                         interests, skills, work, current, redactions,
+//                         avatar, banner, resume. Each value is the edit's
+//                         sequence number, so a save only settles the edits
+//                         it carried, never one made while it was in flight.
+//
+// Why only edits: the page paints from the copy cached in vibe_user_v1,
+// and that copy can be days old. Sending the whole profile rebuilt from it
+// on every save let a stale copy wipe a photo, a resume or redaction bars
+// the student had added on their phone since.
 var _profileSyncDirty = false;
 var _profileSyncInflight = null;
 var _profileSyncLastOk = null;
 var _lookingForDirty = false;
 var _editedUserFields = {};
-// An inline edit of a [data-user-field] (the debounced input listener,
-// the toolbar's clear) marks that field edited.
-function _markUserFieldEdited(el) {
-  const k = el && el.dataset ? el.dataset.userField : '';
-  if (!k) return;
+var _profileEditSeq = 0;
+function _markProfileEdited(key) {
+  if (!key) return;
   if (!_editedUserFields) _editedUserFields = {};
-  _editedUserFields[k] = true;
+  _profileEditSeq = (_profileEditSeq || 0) + 1;
+  _editedUserFields[key] = _profileEditSeq;
+}
+// A save went through: the edits it carried are settled. An edit of the
+// same thing made during the flight has a newer number and stays pending.
+function _settleProfileEdits(sent) {
+  if (!_editedUserFields) return;
+  Object.keys(sent || {}).forEach(k => {
+    if (_editedUserFields[k] === sent[k]) delete _editedUserFields[k];
+  });
+}
+// An inline edit (the debounced input listener, the toolbar's clear) marks
+// what it edited: a [data-user-field] by name, otherwise the section the
+// editable text sits in.
+function _markUserFieldEdited(el) {
+  if (!el || !el.dataset) return;
+  let k = el.dataset.userField || '';
+  if (!k && typeof el.closest === 'function') {
+    if (el.closest('.bio-text')) k = 'bio';
+    else if (el.closest('#workList')) k = 'work';
+    else if (el.closest('#currentList')) k = 'current';
+  }
+  _markProfileEdited(k);
 }
 function scheduleProfileServerSync() {
   if (window.viewingRealUser) return;
@@ -8104,7 +8259,8 @@ function scheduleProfileServerSync() {
 // Run the sync that's waiting out its debounce now, and report how it
 // went: true (the server has it), false (refused; vibeRequest already said
 // why) or null (nothing went to the server: a local-only session, or
-// nothing to save). `failure` is the caller's own line for a refusal.
+// nothing saved since entering edit mode). With nothing new to send it
+// reports the last save. `failure` is the caller's own line for a refusal.
 // retryFailed re-sends when the last flush was refused and nothing newer
 // is queued (leaving edit mode); otherwise a refusal isn't re-sent here.
 async function _saveProfileNow(failure, retryFailed) {
@@ -8118,55 +8274,51 @@ async function _saveProfileNow(failure, retryFailed) {
 }
 
 function buildProfileSyncPayload() {
-  const u = (typeof vibeLoad === 'function') ? vibeLoad('vibe_user_v1') : {};
-  const bannerUrl = (typeof u.coverPhoto === 'string' && u.coverPhoto.trim()) ? u.coverPhoto.trim() : null;
-  // coverGradient is a cover-theme preset key. Normalize it (a cached
-  // vibe_user_v1 from before this change may still hold the preset's CSS)
-  // so the payload only ever carries a key the server will accept.
-  const coverThemeKey = (typeof window.vibeCoverThemeKey === 'function')
-    ? window.vibeCoverThemeKey(u.coverGradient)
-    : '';
-  let resumeUrl = null;
-  if (Array.isArray(u.resumePortfolio) && u.resumePortfolio.length && u.resumePortfolio[0].url) {
-    resumeUrl = u.resumePortfolio[0].url;
-  }
-  const payload = {
-    name: (u.name || '').trim(),
-    website: (u.website || '').trim(),
-    bio: (u.bio || '').trim(),
-    interests: Array.isArray(u.vibeTags) ? u.vibeTags.map(t => String((t && t.label) || '').trim()).filter(Boolean) : [],
-    skills: Array.isArray(u.skills) ? u.skills.map(s => String(s).trim()).filter(Boolean) : [],
-    avatar_url: u.avatarPhoto || null,
-    resume_url: resumeUrl || null,
-    work_experience: Array.isArray(u.workExperience) ? u.workExperience : [],
-    // Cross-device sync for the manual-drag order. profile.html's
-    // setupReorderable handler flips `_workOrderManual` to true on
-    // every drag; passing it through here persists that pin into
-    // users.work_order_manual so mobile + a fresh desktop session
-    // both keep the order.
-    work_order_manual: !!u._workOrderManual,
-    // "Working on" — persisted server-side as users.current_on. Payload
-    // shape matches the localStorage shape ({icon, text}); the server
-    // sanitizer enforces caps + drops items missing text.
-    current_on: Array.isArray(u.currentlyOn) ? u.currentlyOn : [],
-    // Redaction bars — persisted as users.resume_redactions. Shape
-    // matches what the viewer renders: {docIndex, pageNumber, x, y, w, h}
-    // in 0-100 page-percentage coordinates.
-    resume_redactions: Array.isArray(u.resumeRedactions) ? u.resumeRedactions : [],
-  };
-  // Shown with a fallback when blank (tagline: the bio's first line;
-  // location: the campus; headline: major · year), so the page always holds
-  // a value for them. Only what the student edited on this page goes out:
-  // re-sending the fallback would store it as if they had typed it.
+  const u = ((typeof vibeLoad === 'function') ? vibeLoad('vibe_user_v1') : null) || {};
+  // Only what the student changed on this page goes out (_editedUserFields).
+  // vibe_user_v1 is rebuilt from what the page shows, and the page shows a
+  // cached copy that can predate edits made on the phone: re-sending an
+  // untouched photo, list or bar set from it would overwrite the newer one.
+  // Some fields are also shown with a fallback when blank (tagline: the
+  // bio's first line; location: the campus; headline: major · year), and
+  // re-sending the fallback would store it as if the student had typed it.
   // headline is never sent: nothing here edits it, and the server clears
   // the stored one when major or year change.
   const edited = _editedUserFields || {};
+  const payload = {};
+  if (edited.name) payload.name = (u.name || '').trim();
+  if (edited.website) payload.website = (u.website || '').trim();
+  if (edited.bio) payload.bio = (u.bio || '').trim();
   if (edited.tagline) payload.tagline = (u.tagline || '').trim();
   if (edited.location) payload.location_text = (u.location || '').trim();
   if (edited.majorYear) {
     payload.major = (typeof u.major === 'string' ? u.major.trim() : '');
     payload.year = (typeof u.year === 'number' && u.year >= 1 && u.year <= 12) ? u.year : null;
   }
+  if (edited.interests) {
+    payload.interests = Array.isArray(u.vibeTags) ? u.vibeTags.map(t => String((t && t.label) || '').trim()).filter(Boolean) : [];
+  }
+  if (edited.skills) {
+    payload.skills = Array.isArray(u.skills) ? u.skills.map(s => String(s).trim()).filter(Boolean) : [];
+  }
+  if (edited.work) {
+    payload.work_experience = Array.isArray(u.workExperience) ? u.workExperience : [];
+    // Cross-device sync for the manual-drag order. profile.html's
+    // setupReorderable handler flips `_workOrderManual` to true on
+    // every drag; passing it through here persists that pin into
+    // users.work_order_manual so mobile + a fresh desktop session
+    // both keep the order. It travels with the list it orders.
+    payload.work_order_manual = !!u._workOrderManual;
+  }
+  // "Working on" — persisted server-side as users.current_on. Payload
+  // shape matches the localStorage shape ({icon, text}); the server
+  // sanitizer enforces caps + drops items missing text.
+  if (edited.current) payload.current_on = Array.isArray(u.currentlyOn) ? u.currentlyOn : [];
+  // Redaction bars — persisted as users.resume_redactions. Shape
+  // matches what the viewer renders: {docIndex, pageNumber, x, y, w, h}
+  // in 0-100 page-percentage coordinates. Privacy, not just data: an
+  // empty list from a stale copy would serve viewers the un-redacted file.
+  if (edited.redactions) payload.resume_redactions = Array.isArray(u.resumeRedactions) ? u.resumeRedactions : [];
   // "Here for": only after a chip click on this page. A cached copy from
   // before the row existed has no lookingFor, and must not clear the answer.
   if (_lookingForDirty) payload.looking_for = Array.isArray(u.lookingFor) ? u.lookingFor.filter(v => LOOKING_FOR_VALUES.includes(v)) : [];
@@ -8176,15 +8328,41 @@ function buildProfileSyncPayload() {
   // re-sending an unconfirmed campus would confirm it and start the 30-day
   // lock (profile-campus-write.ts). Absent, profile-sync leaves it alone.
   if (_campusPick && _campusCtx && _campusPick !== _campusCtx.currentCampusId && _campusCtx.campuses.some(c => c.id === _campusPick)) payload.campus_id = _campusPick;
-  if (bannerUrl) {
-    payload.banner_url = bannerUrl;
-  } else if (coverThemeKey) {
-    payload.banner_url = null;
-    payload.banner_gradient = coverThemeKey;
-  } else {
-    payload.banner_url = null;
-    payload.banner_gradient = '';
+
+  // Photo, cover and resume. profile-sync ignores null and "" for these
+  // (a stale copy sends them for whatever it lacks), so clearing one is a
+  // separate, explicit `remove` entry sent only by the flows that remove.
+  const remove = [];
+  if (edited.avatar && typeof u.avatarPhoto === 'string' && u.avatarPhoto) {
+    payload.avatar_url = u.avatarPhoto;
   }
+  if (edited.banner) {
+    // coverGradient is a cover-theme preset key. Normalize it (a cached
+    // vibe_user_v1 from before keys may still hold the preset's CSS) so
+    // the payload only ever carries a key the server will accept.
+    const bannerUrl = (typeof u.coverPhoto === 'string' && u.coverPhoto.trim()) ? u.coverPhoto.trim() : null;
+    const coverThemeKey = (typeof window.vibeCoverThemeKey === 'function')
+      ? window.vibeCoverThemeKey(u.coverGradient)
+      : '';
+    if (bannerUrl) {
+      payload.banner_url = bannerUrl;
+    } else if (coverThemeKey) {
+      // Picking a theme replaces the cover photo, wherever it was added.
+      payload.banner_gradient = coverThemeKey;
+      remove.push('banner');
+    }
+  }
+  if (edited.resume) {
+    // Only the first attachment has a server counterpart from desktop
+    // (see _adoptServerResumeRefs). An empty list is the student removing
+    // it: that clears the column and deletes the stored file, so it goes
+    // out only as `remove`.
+    const doc = Array.isArray(u.resumePortfolio) ? u.resumePortfolio[0] : null;
+    const resumeUrl = (doc && typeof doc.url === 'string') ? doc.url.trim() : '';
+    if (resumeUrl) payload.resume_url = resumeUrl;
+    else remove.push('resume');
+  }
+  if (remove.length) payload.remove = remove;
   return payload;
 }
 
@@ -8442,7 +8620,8 @@ function _adoptServerMediaRefs(serverUser, sent) {
 }
 
 // Returns true when the server saved the profile, false when it refused
-// (vibeRequest shows why), null when nothing goes to the server.
+// (vibeRequest shows why), null when nothing goes to the server (not the
+// owner's app shell). With no edits to send it reports the last save.
 async function flushProfileServerSync(failure) {
   profileServerSyncTimer = null;
   if (window.viewingRealUser) return null;
@@ -8468,10 +8647,28 @@ async function _runProfileServerSync(failure) {
   // the payload — the sanitizer drops data: URIs and would otherwise wipe
   // them out of work_experience on every sync.
   await _migrateDataUriLogos();
+  // Typing marks a field on every keystroke, but the text reaches
+  // vibe_user_v1 (which the payload reads) only when the 500ms snapshot
+  // fires. Take a snapshot still waiting now: otherwise this payload would
+  // carry the older cached text, settle the mark, and the newer text would
+  // never go out (the snapshot, when it fired, would find nothing marked).
+  if (saveTimer) {
+    clearTimeout(saveTimer);
+    saveTimer = null;
+    saveProfileToStorage({ localOnly: true });
+  }
+  // Which edits this payload carries, to settle them once the server has
+  // them (_settleProfileEdits). From here to the payload nothing awaits, so
+  // the two describe the same moment.
+  const sentEdits = Object.assign({}, _editedUserFields || {});
   const payload = buildProfileSyncPayload();
   // This payload carries every edit so far; an edit from here on marks
   // the profile dirty again and gets its own flush.
   _profileSyncDirty = false;
+  // Nothing the student changed (a pin, a deleted post, an edit put back
+  // after a refused save): no request. The last save's answer stands, so a
+  // pin clicked after a saved bio still ends the edit with "Changes saved".
+  if (Object.keys(payload).length === 0) return _profileSyncLastOk;
   const r = await window.vibeRequest('/api/me/profile-sync', {
     method: 'POST',
     json: payload,
@@ -8483,6 +8680,11 @@ async function _runProfileServerSync(failure) {
     return false;
   }
   _profileSyncLastOk = true;
+  // The server has what this payload carried: a later save sends those
+  // fields again only if the student edits them again (a fallback-backed
+  // field would otherwise store the fallback, and any other field would
+  // re-send this page's copy over a newer edit from the phone).
+  _settleProfileEdits(sentEdits);
   // The campus answer first, before the localIsNewer() return below: an
   // edit made during this flight must not swallow a refused campus.
   const sentCampusId = payload.campus_id;
@@ -8523,8 +8725,9 @@ async function _runProfileServerSync(failure) {
       // currentlyOn is now server-persisted via users.current_on. Server
       // is source of truth. Fall back to localStorage ONLY when the
       // server returned nothing — covers users who entered "Working on"
-      // items before this migration shipped. flushProfileServerSync()
-      // will push the fallback to the server on the next save.
+      // items before this migration shipped. The fallback goes up only
+      // with the student's next edit of that list: a save no longer
+      // re-sends lists nobody touched (buildProfileSyncPayload).
       if (!Array.isArray(nu.currentlyOn) || nu.currentlyOn.length === 0) {
         if (prev && Array.isArray(prev.currentlyOn) && prev.currentlyOn.length) {
           nu.currentlyOn = prev.currentlyOn;
@@ -8552,10 +8755,9 @@ async function _runProfileServerSync(failure) {
       // (which already carries the echoed https URLs).
       _adoptServerMediaRefs(nu, payload);
       vibeSave('vibe_user_v1', nu);
-      // The server's copy (fallbacks included) is back on screen below, so
-      // the edits this flush carried are settled: a later save sends a
-      // fallback-backed field again only if the student edits it again.
-      _editedUserFields = {};
+      // The edits this flush carried were settled as soon as it went
+      // through (_settleProfileEdits above), and the server's copy
+      // (fallbacks included) is back on screen below.
       // Refresh the visible identity strip with the server's fresh
       // derived fields (notably `headline` — gets recomputed after
       // major / year edits via profile-sync clearing the stale stored
@@ -9116,7 +9318,7 @@ async function deleteProfilePost(btn) {
 
 // ── Hydrate persisted sections from vibe_user_v1 ─────────────────────────
 // Skips any field the user hasn't saved.
-function renderUserSections(user) {
+function renderUserSections(user, opts) {
   // @handle display: under the name. Stash the cooldown timestamp so
   // _toggleProfileHandleEdit can disable the input when the user just
   // changed their handle.
@@ -9156,7 +9358,8 @@ function renderUserSections(user) {
   // moment earlier from their localStorage user at init) would linger in
   // `redactionBars` and be drawn over the visited user's document. The
   // owner's keep-prev-bars fallback lives in flushProfileServerSync,
-  // which never routes through here, so nothing of the owner's is lost.
+  // which never routes through here. The owner's load-time repaint
+  // (_adoptOwnProfileOnLoad) does, with the server's bars on purpose.
   // If the viewer is currently open, repaint so overlays update without
   // a reopen.
   if (typeof redactionBars !== 'undefined') {
@@ -9276,6 +9479,11 @@ function renderUserSections(user) {
       });
     }
   }
+
+  // sectionsOnly: the profile sections above, nothing below. The load-time
+  // repaint from the server (_adoptOwnProfileOnLoad) must not re-render the
+  // posts from this device's copy over the ones hydrated from the database.
+  if (opts && opts.sectionsOnly) return;
 
   // "Here for" chips (owner only; the visitor bootstrap sends []).
   _paintHereFor(user.lookingFor);
