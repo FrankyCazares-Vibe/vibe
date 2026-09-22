@@ -1016,27 +1016,32 @@
     if (!isRealPostId(state.openId)) { toast("This post can't be interacted with"); return; }
     if (state.inflight) return;
     state.inflight = true;
+    const id = state.openId;
     const wasLiked = state.liked;
+    const wasLikes = state.likes;
     state.liked = !wasLiked;
-    state.likes += state.liked ? 1 : -1;
-    if (state.likes < 0) state.likes = 0;
+    state.likes = Math.max(0, wasLikes + (state.liked ? 1 : -1));
     document.getElementById("vpvLike").classList.toggle("on", state.liked);
     document.getElementById("vpvLikeCount").textContent = String(state.likes);
     try {
-      const method = state.liked ? "POST" : "DELETE";
-      const r = await fetch(`/api/posts/${encodeURIComponent(state.openId)}/like`, {
-        method, credentials: "include",
+      // Non-quiet: a refusal (Terms not accepted, liking too fast, a post
+      // that's gone) toasts the mapped line with Sign in / Review Terms
+      // where it applies, where this used to toast the raw server word
+      // ("Not found", "Unauthorized").
+      const r = await window.vibeRequest(`/api/posts/${encodeURIComponent(id)}/like`, {
+        method: state.liked ? "POST" : "DELETE",
+        failure: state.liked ? "Couldn't like this post." : "Couldn't unlike this post.",
       });
-      const j = await r.json().catch(() => ({}));
-      if (!r.ok || !j.ok) throw new Error((j && j.error) || "Could not update like");
-    } catch (e) {
-      // Revert optimistic update
-      state.liked = wasLiked;
-      state.likes += wasLiked ? 1 : -1;
-      if (state.likes < 0) state.likes = 0;
-      document.getElementById("vpvLike").classList.toggle("on", state.liked);
-      document.getElementById("vpvLikeCount").textContent = String(state.likes);
-      toast(e && e.message ? e.message : "Could not update like");
+      // Closed, or switched to another post mid-flight: that post's state
+      // came fresh from the server, so this answer must not touch it.
+      if (!r.ok && state.openId === id) {
+        // Back to exactly what it was, never a +/-1 that drifts off a
+        // count clamped at zero.
+        state.liked = wasLiked;
+        state.likes = wasLikes;
+        document.getElementById("vpvLike").classList.toggle("on", state.liked);
+        document.getElementById("vpvLikeCount").textContent = String(state.likes);
+      }
     } finally {
       state.inflight = false;
     }
@@ -1420,10 +1425,15 @@
   // ── Comment-level engagement (heart + reply) ─────────────────────────
   // Optimistic toggle for the per-comment heart. Mirrors __vpvToggleLike
   // but targets `comment_likes` and the inline button on the row.
+  // Comment ids with a like request out. A tap on the same heart while its
+  // request is out is dropped, so a fast double tap can't send two requests
+  // whose rollbacks fight; other comments' hearts stay tappable.
+  const commentLikesInFlight = new Set();
   window.__vpvToggleCommentLike = async function (commentId) {
     if (!isAppShell()) { toast("Sign in to like comments"); return; }
     const btn = document.getElementById("vpv-like-" + commentId);
     if (!btn) return;
+    if (commentLikesInFlight.has(commentId)) return;
     const wasLiked = btn.classList.contains("on");
     const countEl = btn.querySelector(".vpv-clikec");
     const heartPath = btn.querySelector("svg path");
@@ -1435,21 +1445,22 @@
     if (heartPath) {
       heartPath.setAttribute("fill", next ? "currentColor" : "none");
     }
+    commentLikesInFlight.add(commentId);
     try {
-      const r = await fetch("/api/comments/" + encodeURIComponent(commentId) + "/like", {
+      // Non-quiet: vibeRequest toasts the mapped line itself, where this
+      // used to toast the raw server word ("Not found", "Unauthorized").
+      const r = await window.vibeRequest("/api/comments/" + encodeURIComponent(commentId) + "/like", {
         method: next ? "POST" : "DELETE",
-        credentials: "include",
+        failure: next ? "Couldn't like this comment." : "Couldn't unlike this comment.",
       });
       if (!r.ok) {
-        const j = await r.json().catch(() => ({}));
-        throw new Error((j && j.error) || "Could not update");
+        // Back to the captured heart and count.
+        btn.classList.toggle("on", wasLiked);
+        if (countEl) countEl.textContent = cur > 0 ? String(cur) : "";
+        if (heartPath) heartPath.setAttribute("fill", wasLiked ? "currentColor" : "none");
       }
-    } catch (e) {
-      // Rollback
-      btn.classList.toggle("on", wasLiked);
-      if (countEl) countEl.textContent = cur > 0 ? String(cur) : "";
-      if (heartPath) heartPath.setAttribute("fill", wasLiked ? "currentColor" : "none");
-      toast(e && e.message ? e.message : "Could not update like");
+    } finally {
+      commentLikesInFlight.delete(commentId);
     }
   };
 

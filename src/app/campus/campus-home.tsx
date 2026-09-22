@@ -6392,22 +6392,32 @@ function FeedRow({
     };
   }, [post.id]);
 
+  // One like request at a time: a second tap while the first is out is
+  // dropped, so a fast double tap can't send two requests that each roll
+  // the count back by one.
+  const likingRef = useRef(false);
   const toggleLike = useCallback(async () => {
+    if (likingRef.current) return;
+    likingRef.current = true;
     const nextLiked = !liked;
+    const prevLiked = liked;
+    const prevCount = likeCount;
     setLiked(nextLiked);
-    setLikeCount((c) => c + (nextLiked ? 1 : -1));
-    try {
-      const res = await fetch(`/api/posts/${post.id}/like`, {
-        method: nextLiked ? "POST" : "DELETE",
-      });
-      if (!res.ok) throw new Error(`like ${res.status}`);
-    } catch (e) {
-      console.error("[feed] like", e);
-      // Roll back.
-      setLiked(!nextLiked);
-      setLikeCount((c) => c + (nextLiked ? -1 : 1));
+    setLikeCount((c) => Math.max(0, c + (nextLiked ? 1 : -1)));
+    // The heart flips first. A refusal (Terms not accepted, liking too fast,
+    // a post that's gone) used to flip it back without a word; now it goes
+    // back to exactly what it was and the toast says why, the same as the
+    // phone feed card (CampusMobile).
+    const r = await vibeRequest(`/api/posts/${post.id}/like`, {
+      method: nextLiked ? "POST" : "DELETE",
+      failure: nextLiked ? "Couldn't like this post." : "Couldn't unlike this post.",
+    });
+    if (!r.ok) {
+      setLiked(prevLiked);
+      setLikeCount(prevCount);
     }
-  }, [liked, post.id]);
+    likingRef.current = false;
+  }, [liked, likeCount, post.id]);
 
   // Save (bookmark) state — seeded from the feed payload's
   // viewer_saved so saves survive page reloads. Same
@@ -7706,21 +7716,27 @@ function CommentRow({
     textDecoration: "none",
   };
 
+  // Same shape as the post like above: one request at a time, and a refusal
+  // restores the captured heart and count and says why in a toast.
+  const likingRef = useRef(false);
   const toggleLike = useCallback(async () => {
+    if (likingRef.current) return;
+    likingRef.current = true;
     const next = !liked;
+    const prevLiked = liked;
+    const prevCount = likeCount;
     setLiked(next);
-    setLikeCount((c) => c + (next ? 1 : -1));
-    try {
-      const res = await fetch(`/api/comments/${comment.id}/like`, {
-        method: next ? "POST" : "DELETE",
-      });
-      if (!res.ok) throw new Error(`like ${res.status}`);
-    } catch (e) {
-      console.error("[feed] comment like", e);
-      setLiked(!next);
-      setLikeCount((c) => c + (next ? -1 : 1));
+    setLikeCount((c) => Math.max(0, c + (next ? 1 : -1)));
+    const r = await vibeRequest(`/api/comments/${comment.id}/like`, {
+      method: next ? "POST" : "DELETE",
+      failure: next ? "Couldn't like this comment." : "Couldn't unlike this comment.",
+    });
+    if (!r.ok) {
+      setLiked(prevLiked);
+      setLikeCount(prevCount);
     }
-  }, [comment.id, liked]);
+    likingRef.current = false;
+  }, [comment.id, liked, likeCount]);
 
   const openReply = () => {
     setReplyOpen(true);

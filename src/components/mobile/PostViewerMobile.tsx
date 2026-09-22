@@ -158,6 +158,8 @@ export function PostViewerMobile({
   // Whether the latest pointerdown landed on the app toast; the drawer's
   // onPointerDownOutside reads it (see the effect below).
   const toastTapRef = useRef(false);
+  // A like request is out; toggleLike drops taps until it settles.
+  const likingRef = useRef(false);
 
   const handleDelete = async () => {
     if (deleting) return;
@@ -297,19 +299,28 @@ export function PostViewerMobile({
     };
   }, [commentsOpen, comments, commentsErr, postId]);
 
+  // The heart flips first. A refusal (Terms not accepted, liking too fast, a
+  // post that's gone) used to flip it back without a word; now it goes back
+  // to exactly what it was and the toast says why, the same as the feed card
+  // (CampusMobile). One request at a time, so a fast double tap can't send
+  // two requests that each roll the count back by one.
   const toggleLike = async () => {
+    if (likingRef.current) return;
+    likingRef.current = true;
     const next = !viewer.liked;
+    const prevLiked = viewer.liked;
+    const prevLikes = counts.likes;
     setViewer((v) => ({ ...v, liked: next }));
-    setCounts((c) => ({ ...c, likes: c.likes + (next ? 1 : -1) }));
-    try {
-      const r = await fetch(`/api/posts/${postId}/like`, {
-        method: next ? "POST" : "DELETE",
-      });
-      if (!r.ok) throw new Error("like");
-    } catch {
-      setViewer((v) => ({ ...v, liked: !next }));
-      setCounts((c) => ({ ...c, likes: c.likes + (next ? -1 : 1) }));
+    setCounts((c) => ({ ...c, likes: Math.max(0, c.likes + (next ? 1 : -1)) }));
+    const r = await vibeRequest(`/api/posts/${postId}/like`, {
+      method: next ? "POST" : "DELETE",
+      failure: next ? "Couldn't like this post." : "Couldn't unlike this post.",
+    });
+    if (!r.ok) {
+      setViewer((v) => ({ ...v, liked: prevLiked }));
+      setCounts((c) => ({ ...c, likes: prevLikes }));
     }
+    likingRef.current = false;
   };
   const toggleSave = async () => {
     const next = !viewer.saved;
