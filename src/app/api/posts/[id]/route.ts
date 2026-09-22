@@ -7,6 +7,7 @@ import {
   resolveMentionedUserIds,
 } from "@/lib/mentions";
 import { loadOrgRole } from "@/lib/orgs/following";
+import { orgContentAccessAsService } from "@/lib/orgs/hidden-org-access";
 import type { OrgRole } from "@/lib/orgs/join-state";
 import { withPostMediaUrls } from "@/lib/post-media-url";
 import { addedHandles, checkPostEdit, extractPostTags } from "@/lib/posts/edit";
@@ -84,6 +85,14 @@ type RouteContext = { params: Promise<{ id: string }> };
  * author; everyone else gets the same 404 as a missing post. `org_id` is read
  * for that check only and never sent. `/api/feed` leaves the same posts out
  * for the same people, so no feed card opens to this 404.
+ *
+ * The check is `orgContentAccess` (src/lib/orgs/hidden-org-access.ts), the
+ * same one the like, comment and media routes ask. It fails CLOSED: when the
+ * club can't be read, or the service role isn't configured, the post is that
+ * same 404 rather than a 500. A bad minute for the database shows a club post
+ * as missing, never a hidden one as visible. An answer that was allowed only
+ * because the caller is in a hidden club carries `Cache-Control: private,
+ * no-store`, like the media route's.
  */
 export async function GET(_req: Request, ctx: RouteContext) {
   const { id } = await ctx.params;
@@ -140,15 +149,16 @@ export async function GET(_req: Request, ctx: RouteContext) {
 
   // A hidden club's post answers exactly like a missing one (rulings H7).
   // Checked before any count is read. The author is never locked out of their
-  // own words, even after leaving the club.
+  // own words, even after leaving the club, so orgContentAccess (which knows
+  // nothing about authors) is only asked about other people's club posts. It
+  // fails closed: a failed read counts as hidden, and gets the same 404.
+  let hiddenClub = false;
   if (orgId && authorId !== user.id) {
-    const access = await clubPostAccess(orgId, user.id);
-    if (access === "error") {
-      return NextResponse.json({ ok: false, error: "Request failed" }, { status: 500 });
-    }
-    if (access === "hidden") {
+    const access = await orgContentAccessAsService(orgId, "[posts/:id GET club]");
+    if (!access.allowed) {
       return NextResponse.json({ ok: false, error: "Post not found" }, { status: 404 });
     }
+    hiddenClub = access.hidden;
   }
 
   // Counts + viewer state in parallel — small queries, cheap to fan out.
@@ -198,7 +208,7 @@ export async function GET(_req: Request, ctx: RouteContext) {
   }
   const postCounts = engagement?.get(id) ?? { likes: 0, reposts: 0 };
 
-  return NextResponse.json({
+  const res = NextResponse.json({
     ok: true,
     post: withPostMediaUrls(post),
     is_owner: authorId === user.id,
@@ -215,6 +225,10 @@ export async function GET(_req: Request, ctx: RouteContext) {
       saved: (viewerSaveRes.count ?? 0) > 0,
     },
   });
+  // A hidden club's post was served only because of who is asking, so the
+  // answer stays out of any shared cache (the same header as the media route).
+  if (hiddenClub) res.headers.set("Cache-Control", "private, no-store");
+  return res;
 }
 
 /**
@@ -247,70 +261,27 @@ async function loadSaveCount(postId: string, authorId: string): Promise<number |
 }
 
 /**
- * May `viewerId` open a post made as the club `orgId`? "visible" for a club
- * that isn't hidden, and for a hidden one when the viewer is its member or a
- * platform admin. "hidden" otherwise, and for a club that no longer exists.
- * "error" when a read fails: the caller answers 500, never the post.
- *
- * Service role, because `orgs_select` hides a private club from its
- * non-members, so the viewer's own client can't tell "private" (the post is
- * public: private clubs' posts reach the feed) from "hidden". Only a club
- * post pays for this: one primary-key read, two more when the club is hidden.
- *
- * The member / admin rule is a copy of `viewerMaySeeHiddenOrg` in
- * orgs/[slug]/asset/[kind]/route.ts, which T2 is moving to
- * `src/lib/orgs/hidden-org-access.ts` this same week. It is copied rather than
- * imported because batches in one stage can't import each other's new files.
- * Switch to that module once it has landed.
+ * The answer for someone who isn't the post's author: 403 "Not your post",
+ * unless the post belongs to a hidden club they may not see. That one gets
+ * the same 404 as a missing post, as GET gives, so an edit or delete attempt
+ * can't confirm a hidden club's post still exists. Only callers who aren't
+ * the author pay for the club read.
  */
-async function clubPostAccess(
-  orgId: string,
-  viewerId: string,
-): Promise<"visible" | "hidden" | "error"> {
-  if (!isSupabaseServiceConfigured()) {
-    console.error("[posts/:id GET club] service role not configured");
-    return "error";
+async function notYourPost(orgId: unknown, logTag: string): Promise<NextResponse> {
+  if (typeof orgId === "string" && orgId) {
+    const access = await orgContentAccessAsService(orgId, logTag);
+    if (!access.allowed) {
+      return NextResponse.json({ ok: false, error: "Post not found" }, { status: 404 });
+    }
   }
-  const service = createSupabaseServiceClient();
-  const { data: org, error: orgErr } = await service
-    .from("orgs")
-    .select("hidden_at")
-    .eq("id", orgId)
-    .maybeSingle();
-  if (orgErr) {
-    console.error("[posts/:id GET club]", orgErr);
-    return "error";
-  }
-  if (!org) return "hidden";
-  if ((org as { hidden_at: string | null }).hidden_at == null) return "visible";
-
-  const [memberRes, viewerRes] = await Promise.all([
-    service
-      .from("org_members")
-      .select("user_id")
-      .eq("org_id", orgId)
-      .eq("user_id", viewerId)
-      .maybeSingle(),
-    service
-      .from("users")
-      .select("is_platform_admin")
-      .eq("id", viewerId)
-      .maybeSingle(),
-  ]);
-  if (memberRes.error || viewerRes.error) {
-    console.error("[posts/:id GET club]", memberRes.error ?? viewerRes.error);
-    return "error";
-  }
-  if (memberRes.data) return "visible";
-  return (viewerRes.data as { is_platform_admin?: unknown } | null)?.is_platform_admin === true
-    ? "visible"
-    : "hidden";
+  return NextResponse.json({ ok: false, error: "Not your post" }, { status: 403 });
 }
 
 /**
- * Delete a post or clip. RLS (`posts_delete_own`) enforces author-only —
- * a non-owner DELETE returns 0 rows affected, which we treat as 404 to
- * avoid leaking existence.
+ * Delete a post or clip. RLS (`posts_delete_own`) enforces author-only, and
+ * the route checks first: someone else's post answers 403 "Not your post",
+ * except a hidden club's post the caller may not see, which answers the same
+ * 404 as a missing post (notYourPost).
  *
  * Side-effects:
  *  - post_likes / post_comments / bookmarks rows cascade automatically
@@ -339,9 +310,10 @@ export async function DELETE(_req: Request, ctx: RouteContext) {
   // posts here — but the public read policy (posts_select_authenticated)
   // means any signed-in user CAN see them, so we re-check ownership
   // explicitly before issuing the delete.
+  // `org_id` is read only so a stranger to a hidden club gets "not found".
   const { data: row, error: readErr } = await supabase
     .from("posts")
-    .select("id,user_id,type,media_url")
+    .select("id,user_id,org_id,type,media_url")
     .eq("id", id)
     .maybeSingle();
   if (readErr) {
@@ -352,7 +324,7 @@ export async function DELETE(_req: Request, ctx: RouteContext) {
     return NextResponse.json({ ok: false, error: "Post not found" }, { status: 404 });
   }
   if (row.user_id !== user.id) {
-    return NextResponse.json({ ok: false, error: "Not your post" }, { status: 403 });
+    return notYourPost(row.org_id, "[posts/:id DELETE club]");
   }
 
   const { error: delErr } = await supabase.from("posts").delete().eq("id", id);
@@ -520,7 +492,7 @@ export async function PATCH(req: Request, ctx: RouteContext) {
   }
   const prior = priorRow as unknown as EditRow;
   if (prior.user_id !== user.id) {
-    return NextResponse.json({ ok: false, error: "Not your post" }, { status: 403 });
+    return notYourPost(prior.org_id, "[posts/:id PATCH club]");
   }
 
   // A club post speaks as the club, so writing it isn't enough: the author

@@ -1,12 +1,23 @@
 import { NextResponse } from "next/server";
 
 import { requireTermsAccepted } from "@/lib/legal/require-terms";
+import { postAccessForCaller } from "@/lib/orgs/hidden-org-access";
 import { rateLimit, tooManyRequests } from "@/lib/rate-limit";
 import { createSupabaseServerClient } from "@/lib/supabase/server";
 
 const MAX_CONTENT = 1000;
 const DEFAULT_LIMIT = 200;
 const MAX_LIMIT = 500;
+
+const requestFailed = () =>
+  NextResponse.json({ ok: false, error: "Request failed" }, { status: 500 });
+const postNotFound = () =>
+  NextResponse.json({ ok: false, error: "Post not found" }, { status: 404 });
+
+/** The insert hit `post_comments_post_id_fkey`: the post was deleted after
+ *  the check. That is a missing post, and answers like one. */
+const isMissingPostFk = (e: { code?: string; message?: string } | null) =>
+  e?.code === "23503" && /post_id_fkey/.test(e.message ?? "");
 
 type RouteContext = { params: Promise<{ id: string }> };
 type CommentBody = { content?: unknown; parent_comment_id?: unknown };
@@ -34,6 +45,13 @@ type CommentRow = {
  *
  * Threading is one level deep — replies of replies are flattened into the
  * same parent's reply list. Matches Instagram/Twitter conventions.
+ *
+ * A HIDDEN CLUB'S POST HAS NO COMMENTS for anyone but its author, the club's
+ * members and platform admins (postAccessForCaller). Everyone else gets
+ * exactly what a missing post gets, `{ ok: true, comments: [] }`, so the
+ * thread shows as empty and the answer can't confirm the post exists.
+ * `post_comments_select_authenticated` lets any student read any comment, so
+ * this route has to check the post itself.
  */
 export async function GET(req: Request, ctx: RouteContext) {
   const { id } = await ctx.params;
@@ -59,20 +77,30 @@ export async function GET(req: Request, ctx: RouteContext) {
   // Fetch ALL comments for the post in one query (top-level + replies),
   // then build the tree client-side. Cheaper than two queries when threads
   // are small (<200 comments per post is the v1 working assumption).
-  const { data, error } = await supabase
-    .from("post_comments")
-    .select(
-      "id,post_id,user_id,parent_comment_id,content,created_at," +
-        // Explicit FK name disambiguates the post_comments→users embed.
-        "author:users!post_comments_user_id_fkey!inner(id,name,handle,avatar_url)",
-    )
-    .eq("post_id", id)
-    .order("created_at", { ascending: true })
-    .limit(limit);
+  // The post check runs alongside it, so a personal post waits no longer
+  // than it did; nothing read here is sent until the check has passed.
+  const [access, { data, error }] = await Promise.all([
+    postAccessForCaller(supabase, id, user.id, "[posts/:id/comments GET post check]"),
+    supabase
+      .from("post_comments")
+      .select(
+        "id,post_id,user_id,parent_comment_id,content,created_at," +
+          // Explicit FK name disambiguates the post_comments→users embed.
+          "author:users!post_comments_user_id_fkey!inner(id,name,handle,avatar_url)",
+      )
+      .eq("post_id", id)
+      .order("created_at", { ascending: true })
+      .limit(limit),
+  ]);
 
+  if (!access.ok) {
+    if (access.reason === "error") return requestFailed();
+    // Missing, not a post id, or a hidden club's post: the missing-post answer.
+    return NextResponse.json({ ok: true, comments: [] });
+  }
   if (error) {
     console.error("[posts/:id/comments GET]", error);
-    return NextResponse.json({ ok: false, error: "Request failed" }, { status: 500 });
+    return requestFailed();
   }
 
   const rows = (data as unknown as CommentRow[]) ?? [];
@@ -148,10 +176,21 @@ export async function GET(req: Request, ctx: RouteContext) {
 
   const comments = Array.from(rootById.values());
 
-  return NextResponse.json({ ok: true, comments });
+  const res = NextResponse.json({ ok: true, comments });
+  // Served only because the caller is in the hidden club: keep it out of
+  // shared caches, as GET /api/posts/[id] and the media route do.
+  if (access.hidden) res.headers.set("Cache-Control", "private, no-store");
+  return res;
 }
 
-/** Insert a comment or reply. */
+/**
+ * Insert a comment or reply.
+ *
+ * Only on a post the caller can see: published or their own, and not a
+ * hidden club's post they may not see (postAccessForCaller). Anything else,
+ * including a post deleted mid-request, is 404 "Post not found", so a
+ * comment can't confirm a hidden post exists or land on one.
+ */
 export async function POST(req: Request, ctx: RouteContext) {
   const { id } = await ctx.params;
   if (!id) {
@@ -172,6 +211,16 @@ export async function POST(req: Request, ctx: RouteContext) {
 
   const termsGate = await requireTermsAccepted(user.id);
   if (termsGate) return termsGate;
+
+  // Checked before the body and the parent lookup, so neither can answer
+  // differently for a hidden post than for a missing one.
+  const access = await postAccessForCaller(
+    supabase,
+    id,
+    user.id,
+    "[posts/:id/comments POST post check]",
+  );
+  if (!access.ok) return access.reason === "error" ? requestFailed() : postNotFound();
 
   let body: CommentBody;
   try {
@@ -235,9 +284,10 @@ export async function POST(req: Request, ctx: RouteContext) {
     )
     .single();
 
+  if (isMissingPostFk(error)) return postNotFound();
   if (error || !row) {
     console.error("[posts/:id/comments POST]", error);
-    return NextResponse.json({ ok: false, error: "Request failed" }, { status: 500 });
+    return requestFailed();
   }
 
   const inserted = row as unknown as CommentRow;

@@ -611,9 +611,9 @@ async function loadEngagement(
 
 /**
  * Which of these HIDDEN clubs may the viewer see? Their own memberships, or
- * every one of them for a platform admin: the rule `clubPostAccess` applies
- * in `GET /api/posts/[id]` (and `viewerMaySeeHiddenOrg`), read for a batch of
- * clubs at once.
+ * every one of them for a platform admin: the rule `orgContentAccess` and
+ * `viewerMaySeeHiddenOrg` apply (src/lib/orgs/hidden-org-access.ts), read for
+ * a batch of clubs at once.
  *
  * Service role, filtered to the viewer's own id: `users.is_platform_admin`
  * is readable only with the service role. Selects only the club ids and the

@@ -1,5 +1,6 @@
 import { NextResponse } from "next/server";
 
+import { postAccessForCaller } from "@/lib/orgs/hidden-org-access";
 import { createSupabaseServerClient } from "@/lib/supabase/server";
 
 type RouteContext = { params: Promise<{ id: string }> };
@@ -15,6 +16,11 @@ type RouteContext = { params: Promise<{ id: string }> };
  * looking at their own post. Clients must not treat it as an error; the
  * campus post viewer uses it to decide whether to tick its local number,
  * which is exactly why an author's own view must answer false.
+ *
+ * A hidden club's post the caller may not see is one more `counted: false`
+ * (postAccessForCaller): the RPC is never called, so no view row is written
+ * and no counter moves, and the answer is the one a missing post gets. The
+ * RPC itself doesn't know about hidden clubs, so this route has to check.
  *
  * Fire-and-forget from the client — failures are non-fatal.
  */
@@ -32,6 +38,14 @@ export async function POST(_req: Request, ctx: RouteContext) {
   if (authErr || !user) {
     // Anonymous viewers don't count yet — don't 401, just no-op so the
     // client doesn't have to special-case signed-out paths.
+    return NextResponse.json({ ok: true, counted: false });
+  }
+
+  const access = await postAccessForCaller(supabase, id, user.id, "[posts/:id/view POST post check]");
+  if (!access.ok) {
+    if (access.reason === "error") {
+      return NextResponse.json({ ok: false, error: "Request failed" }, { status: 500 });
+    }
     return NextResponse.json({ ok: true, counted: false });
   }
 

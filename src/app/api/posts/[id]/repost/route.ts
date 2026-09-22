@@ -1,9 +1,15 @@
 import { NextResponse } from "next/server";
 
 import { requireTermsAccepted } from "@/lib/legal/require-terms";
+import { postAccessForCaller } from "@/lib/orgs/hidden-org-access";
 import { createSupabaseServerClient } from "@/lib/supabase/server";
 
 const MAX_COMMENT = 500;
+
+const requestFailed = () =>
+  NextResponse.json({ ok: false, error: "Request failed" }, { status: 500 });
+const postNotFound = () =>
+  NextResponse.json({ ok: false, error: "Post not found" }, { status: 404 });
 
 type RouteContext = { params: Promise<{ id: string }> };
 type RepostBody = { comment?: unknown };
@@ -51,8 +57,27 @@ function readComment(body: RepostBody): { ok: true; comment: string | null } | {
 }
 
 /**
+ * Is this a post the caller may repost, or edit the quote on? Published or
+ * their own, and not a hidden club's post they may not see
+ * (postAccessForCaller). `null` means go ahead; otherwise the response to
+ * send: 404 "Post not found" for anything not visible, the same as a post
+ * that doesn't exist, so a repost can't confirm a hidden post exists.
+ */
+async function gatePost(
+  auth: { userId: string; supabase: Awaited<ReturnType<typeof createSupabaseServerClient>> },
+  id: string,
+  logTag: string,
+): Promise<NextResponse | null> {
+  const access = await postAccessForCaller(auth.supabase, id, auth.userId, logTag);
+  if (access.ok) return null;
+  return access.reason === "error" ? requestFailed() : postNotFound();
+}
+
+/**
  * Repost (with optional quote comment). Idempotent on (post_id, user_id):
  * a second POST overwrites the comment. To remove the repost, call DELETE.
+ * Only on a post the caller can see (gatePost); a post deleted mid-request is
+ * the same 404.
  */
 export async function POST(req: Request, ctx: RouteContext) {
   const { id } = await ctx.params;
@@ -64,6 +89,9 @@ export async function POST(req: Request, ctx: RouteContext) {
 
   const termsGate = await requireTermsAccepted(auth.userId);
   if (termsGate) return termsGate;
+
+  const gate = await gatePost(auth, id, "[posts/:id/repost POST post check]");
+  if (gate) return gate;
 
   let body: RepostBody = {};
   try {
@@ -82,13 +110,18 @@ export async function POST(req: Request, ctx: RouteContext) {
     );
 
   if (error) {
+    // The post was deleted after the check: a missing post, answered as one.
+    if (error.code === "23503" && /post_id_fkey/.test(error.message ?? "")) {
+      return postNotFound();
+    }
     console.error("[posts/:id/repost POST]", error);
-    return NextResponse.json({ ok: false, error: "Request failed" }, { status: 500 });
+    return requestFailed();
   }
   return NextResponse.json({ ok: true });
 }
 
-/** Edit your existing quote comment without changing the timestamp. */
+/** Edit your existing quote comment without changing the timestamp. Same
+ *  post check as POST, so a hidden or missing post is 404 here too. */
 export async function PATCH(req: Request, ctx: RouteContext) {
   const { id } = await ctx.params;
   if (!id) {
@@ -99,6 +132,9 @@ export async function PATCH(req: Request, ctx: RouteContext) {
 
   const termsGate = await requireTermsAccepted(auth.userId);
   if (termsGate) return termsGate;
+
+  const gate = await gatePost(auth, id, "[posts/:id/repost PATCH post check]");
+  if (gate) return gate;
 
   let body: RepostBody;
   try {
@@ -122,7 +158,9 @@ export async function PATCH(req: Request, ctx: RouteContext) {
   return NextResponse.json({ ok: true });
 }
 
-/** Un-repost. Idempotent — deleting zero rows is success. */
+/** Un-repost. Idempotent — deleting zero rows is success. Never checks the
+ *  post, like unlike and unsave: taking your own repost back always works,
+ *  even on a club that has since been hidden. */
 export async function DELETE(_req: Request, ctx: RouteContext) {
   const { id } = await ctx.params;
   if (!id) {
