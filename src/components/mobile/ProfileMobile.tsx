@@ -20,6 +20,12 @@ import { allowedCampusId, isSchoolSystem, type SchoolSystem } from "@/lib/iu/cam
 import { majorsForCampus } from "@/lib/iu/majors";
 import type { EditedPost } from "@/lib/posts/edit";
 import { DEFAULT_COVER_THEME_CSS, resolveCoverThemeCss } from "@/lib/profile/cover-themes";
+import {
+  LOOKING_FOR_PROFILE_COPY,
+  LOOKING_FOR_VALUES,
+  lookingForForDisplay,
+  type LookingFor,
+} from "@/lib/profile/looking-for";
 import type { RedactionBar } from "@/lib/profile/resume-redactions";
 import { campusPickStep, settingsCampusCardView } from "@/lib/profile/settings-campus-card";
 import { sortWorkExperienceByRecency } from "@/lib/profile/work-experience";
@@ -31,8 +37,7 @@ import { sortWorkExperienceByRecency } from "@/lib/profile/work-experience";
  * a tab strip with two panes:
  *
  *   - Posts      — feed posts as a 1:1 grid
- *   - Portfolio  — recruiter-facing pane: "Working on" (currentlyOn)
- *                  + work experience + resume / portfolio file
+ *   - Portfolio  — "Working on" (currentlyOn) + work experience + resume / portfolio file
  *
  * A Clips tab used to sit between them; clips are backlogged, see
  * DOCS/BACKLOG_CLIPS.md.
@@ -97,6 +102,9 @@ type VibeUser = {
    *  profile.html already uses. */
   _workOrderManual?: boolean;
   resumePortfolio?: ResumeItem[];
+  /** "What are you here for?" tokens (lib/profile/looking-for). Only the
+   *  owner's bootstrap carries them; the visitor one sends [] (ruling H6). */
+  lookingFor?: string[];
   /** "Currently working on" items — short text/icon pairs the user
    *  enters in their profile editor. Persisted to Supabase as
    *  users.current_on; this field is the camelCase mirror that the
@@ -223,6 +231,9 @@ type EditDraft = {
    *  `campus_id` only when it differs from the bootstrap's `campusId`. */
   campus: string;
   vibeTagsList: string[];
+  /** "Here for" answers, canonical order. Sent as `looking_for` only when
+   *  they differ from the bootstrap's. */
+  lookingFor: LookingFor[];
 };
 
 function pick<T>(...vals: (T | null | undefined)[]): T | null {
@@ -664,6 +675,7 @@ export function ProfileMobile({ targetHandle }: Props = {}) {
     vibeTagsList: (u.vibeTags ?? [])
       .map((t) => t?.label ?? "")
       .filter((s): s is string => !!s),
+    lookingFor: lookingForForDisplay(u.lookingFor),
   });
   const effectiveDraft: EditDraft | null = draft ?? (user ? seedDraftFromUser(user) : null);
   const updateDraft = (patch: Partial<EditDraft>) => {
@@ -1035,9 +1047,7 @@ export function ProfileMobile({ targetHandle }: Props = {}) {
     setEditError(null);
     const body: Record<string, unknown> = {
       name: snapshot.name.trim(),
-      tagline: snapshot.tagline.trim(),
       bio: snapshot.bio.trim(),
-      location_text: snapshot.location.trim(),
       major: snapshot.major.trim(),
       year: snapshot.year,
       // `interests` is the server-side name for vibe tags. We
@@ -1051,6 +1061,23 @@ export function ProfileMobile({ targetHandle }: Props = {}) {
       ),
     };
     if (sentCampusId) body.campus_id = sentCampusId;
+    // tagline and location show a fallback when blank (the bio's first line,
+    // the campus), and the draft starts from what is shown. They go out only
+    // when the student changed them, so a Save never stores the fallback as
+    // if they had typed it.
+    const shown = user ? seedDraftFromUser(user) : null;
+    if (!shown || snapshot.tagline.trim() !== shown.tagline.trim()) {
+      body.tagline = snapshot.tagline.trim();
+    }
+    if (!shown || snapshot.location.trim() !== shown.location.trim()) {
+      body.location_text = snapshot.location.trim();
+    }
+    // "Here for" goes out only when it changed in this edit session, so a
+    // save never rewrites the onboarding answer untouched. Both lists are in
+    // canonical order, so joining them compares them.
+    if (shown && snapshot.lookingFor.join(",") !== shown.lookingFor.join(",")) {
+      body.looking_for = snapshot.lookingFor;
+    }
     try {
       const r = await fetch("/api/me/profile-sync", {
         method: "POST",
@@ -1171,6 +1198,7 @@ export function ProfileMobile({ targetHandle }: Props = {}) {
   const verified = user.studentVerification?.status === "verified";
   const school = pick(user.studentVerification?.school);
   const skills = (user.skills ?? []).filter(Boolean).slice(0, 6);
+  const lookingFor = lookingForForDisplay(user.lookingFor);
   const tagsFromVibeTags = (user.vibeTags ?? [])
     .map((t) => t?.label)
     .filter((s): s is string => !!s)
@@ -1845,6 +1873,18 @@ export function ProfileMobile({ targetHandle }: Props = {}) {
           </div>
         ) : null}
 
+        {/* "Here for" — the onboarding answer to "What are you here for?".
+            Owner only (ruling H6): the visitor bootstrap blanks it, and this
+            row is never drawn on someone else's profile. */}
+        {!isVisitor ? (
+          <HereForRow
+            value={editMode && effectiveDraft ? effectiveDraft.lookingFor : lookingFor}
+            editing={editMode && !!effectiveDraft}
+            disabled={savingEdit}
+            onChange={(next) => updateDraft({ lookingFor: next })}
+          />
+        ) : null}
+
         {/* Vibe tags — editable chip list when editMode is on. */}
         {editMode && effectiveDraft ? (
           <EditableVibeTags
@@ -1950,8 +1990,8 @@ export function ProfileMobile({ targetHandle }: Props = {}) {
         </Section>
       ) : null}
 
-      {/* Tab strip — Instagram-style. Posts + a Portfolio tab aimed at
-          recruiters (experience + portfolio + resume PDF). */}
+      {/* Tab strip — Instagram-style. Posts + Portfolio (experience +
+          portfolio + resume PDF). */}
       <ProfileTabs active={tab} onChange={setTab} />
 
       <div
@@ -3208,8 +3248,8 @@ function PortfolioPane({
     }
     return (
       <EmptyTab
-        title="Nothing for recruiters yet"
-        body="Show what you're working on, where you've worked, or upload a resume — recruiters land here when they vet candidates."
+        title="Nothing here yet"
+        body="Show what you're working on, where you've worked, or add a resume."
         cta={{ href: "/profile?edit=1", label: "Edit profile →" }}
       />
     );
@@ -3229,7 +3269,7 @@ function PortfolioPane({
           }
         >
           {coItems.length === 0 ? (
-            <SubsectionEmpty body="Show what you're building, learning, or planning. Adds context for recruiters and connections." />
+            <SubsectionEmpty body="Show what you're building, learning or planning." />
           ) : (
             <div
               ref={currentOnListRef}
@@ -3398,7 +3438,7 @@ function PortfolioPane({
         }
       >
         {resumePortfolio.length === 0 ? (
-          <SubsectionEmpty body="Upload a PDF or portfolio image to give recruiters a quick reference document." />
+          <SubsectionEmpty body="Add a PDF or an image of your work." />
         ) : (
           <div style={{ display: "flex", flexDirection: "column", gap: 8 }}>
             {resumePortfolio.map((r, i) => (
@@ -5812,6 +5852,102 @@ const vibeTagStyle: React.CSSProperties = {
   borderRadius: 999,
   background: "#FFF0EC",
   color: "#FF5C35",
+};
+
+// "Here for" row. View mode: the picked answers, and no row at all when
+// there are none. Edit mode: all four as toggles, in LOOKING_FOR_VALUES
+// order, with the hint under them. Both say who can see it (ruling H6).
+function HereForRow({
+  value,
+  editing,
+  disabled,
+  onChange,
+}: {
+  value: LookingFor[];
+  editing: boolean;
+  disabled: boolean;
+  onChange: (next: LookingFor[]) => void;
+}) {
+  if (!editing && value.length === 0) return null;
+  const toggle = (token: LookingFor) => {
+    const next = value.includes(token) ? value.filter((t) => t !== token) : [...value, token];
+    onChange(LOOKING_FOR_VALUES.filter((t) => next.includes(t)));
+  };
+  return (
+    <div style={{ marginBottom: 14 }}>
+      <div
+        role="group"
+        aria-label={LOOKING_FOR_PROFILE_COPY.rowLabel}
+        style={{ display: "flex", flexWrap: "wrap", gap: 6, alignItems: "center" }}
+      >
+        <span style={hereForLabelStyle}>{LOOKING_FOR_PROFILE_COPY.rowLabel}</span>
+        {editing
+          ? LOOKING_FOR_VALUES.map((token) => {
+              const on = value.includes(token);
+              return (
+                <button
+                  key={token}
+                  type="button"
+                  aria-pressed={on}
+                  disabled={disabled}
+                  onClick={() => toggle(token)}
+                  style={{
+                    minHeight: 44,
+                    padding: "0 14px",
+                    borderRadius: 999,
+                    fontFamily: "DM Sans, sans-serif",
+                    fontSize: 13,
+                    fontWeight: 600,
+                    cursor: disabled ? "default" : "pointer",
+                    opacity: disabled ? 0.6 : 1,
+                    background: on ? "#FFF0EC" : "transparent",
+                    border: on ? "1px solid rgba(255,92,53,0.3)" : "1px dashed rgba(28,28,30,0.18)",
+                    color: on ? "#FF5C35" : "rgba(28,28,30,0.55)",
+                  }}
+                >
+                  {LOOKING_FOR_PROFILE_COPY.labels[token]}
+                </button>
+              );
+            })
+          : value.map((token) => (
+              <span key={token} style={hereForChipStyle}>
+                {LOOKING_FOR_PROFILE_COPY.labels[token]}
+              </span>
+            ))}
+        <span style={hereForNoteStyle}>{LOOKING_FOR_PROFILE_COPY.ownerOnlyNote}</span>
+      </div>
+      {editing ? (
+        <p style={{ ...hereForNoteStyle, fontStyle: "normal", margin: "6px 0 0" }}>
+          {LOOKING_FOR_PROFILE_COPY.editHint}
+        </p>
+      ) : null}
+    </div>
+  );
+}
+
+const hereForLabelStyle: React.CSSProperties = {
+  fontFamily: "DM Sans, sans-serif",
+  fontSize: 12,
+  fontWeight: 600,
+  color: "rgba(28,28,30,0.5)",
+};
+
+const hereForChipStyle: React.CSSProperties = {
+  fontFamily: "DM Sans, sans-serif",
+  fontSize: 12,
+  fontWeight: 600,
+  padding: "5px 11px",
+  borderRadius: 999,
+  background: "rgba(28,28,30,0.05)",
+  border: "1px solid rgba(28,28,30,0.08)",
+  color: "#1C1C1E",
+};
+
+const hereForNoteStyle: React.CSSProperties = {
+  fontFamily: "DM Sans, sans-serif",
+  fontSize: 12,
+  fontStyle: "italic",
+  color: "rgba(28,28,30,0.5)",
 };
 
 // Tag list editor — chip with × per tag + an "add" input at the end.

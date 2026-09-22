@@ -114,7 +114,6 @@ nav {
   gap: 8px;
   flex-wrap: wrap;
 }
-body.recruiter-mode .profile-subnav { top: 128px; }
 .profile-subnav a {
   text-decoration: none;
   color: var(--muted);
@@ -133,7 +132,6 @@ body.recruiter-mode .profile-subnav { top: 128px; }
 [id="overview"], [id="experience"], [id="skills"], [id="vibes"] { scroll-margin-top: 160px; }
 @media (max-width: 768px) {
   .profile-subnav { top: 70px; overflow-x: auto; flex-wrap: nowrap; }
-  body.recruiter-mode .profile-subnav { top: 120px; }
 }
 
 
@@ -161,25 +159,6 @@ body.recruiter-mode .profile-subnav { top: 128px; }
 .btn-nav.dark:hover { background:var(--accent);transform:translateY(-1px); }
 .btn-nav.ghost { background:none;color:var(--muted);border:1px solid var(--border); }
 .btn-nav.ghost:hover { color:var(--charcoal);border-color:rgba(28,28,30,.2); }
-
-/* Recruiter mode banner */
-.recruiter-banner {
-  position:fixed;top:60px;left:0;right:0;z-index:190;
-  background:var(--charcoal);color:white;
-  padding:10px 40px;
-  display:none;align-items:center;justify-content:space-between;
-  font-size:13px;font-weight:500;
-  transform:translateY(-100%);
-  transition:transform .3s cubic-bezier(.34,1.56,.64,1);
-}
-.recruiter-banner.visible { transform:translateY(0); }
-.recruiter-banner span { color:var(--lavender); }
-.rec-badge {
-  display:inline-flex;align-items:center;gap:6px;
-  background:rgba(200,184,255,.15);border:1px solid rgba(200,184,255,.3);
-  padding:4px 12px;border-radius:100px;font-size:11px;font-weight:700;
-  color:var(--lavender);letter-spacing:.5px;
-}
 
 /* ── EDIT MODE STYLES ── */
 body.edit-mode [data-edit] {
@@ -405,6 +384,36 @@ body.edit-mode .meta-campus-hint { display:block !important; }
 .meta-campus-hint [data-campus-note] { color:#C0392B; }
 .meta-campus-static { font-size:12.5px; color:var(--muted); }
 .meta-campus-static a { color:var(--accent); font-weight:700; text-decoration:none; }
+
+/* "Here for": the onboarding answer to "What are you here for?". Owner
+   only (ruling H6): the bootstrap blanks it for every other viewer, and
+   the "View as visitor" preview hides the row. View mode shows the
+   picked chips; edit mode turns all four into toggles. */
+.here-for-row { display:none;flex-wrap:wrap;align-items:center;gap:6px;margin:0 0 16px; }
+.here-for-row.has-any,
+body.edit-mode:not(.viewer-mode) .here-for-row { display:flex; }
+body.viewer-mode .here-for-row,
+body.empty-profile-mode .here-for-row { display:none !important; }
+.here-chip {
+  display:none;align-items:center;padding:5px 12px;border-radius:100px;
+  font-family:inherit;font-size:12px;font-weight:600;line-height:1.3;
+  background:var(--cream);color:var(--charcoal);border:1px solid var(--border);
+  cursor:none;
+}
+.here-chip.on { display:inline-flex; }
+.here-chip:disabled { opacity:1; }
+body.edit-mode:not(.viewer-mode) .here-chip {
+  display:inline-flex;background:none;color:var(--muted);
+  border:1px dashed rgba(28,28,30,.18);transition:color .15s,border-color .15s,background .15s;
+}
+body.edit-mode:not(.viewer-mode) .here-chip:hover { color:var(--accent);border-color:rgba(255,92,53,.3); }
+body.edit-mode:not(.viewer-mode) .here-chip:disabled { opacity:.5;pointer-events:none; }
+body.edit-mode:not(.viewer-mode) .here-chip.on {
+  background:#FFF0EC;color:var(--accent);border:1px solid rgba(255,92,53,.3);
+}
+.here-for-hint { display:none;font-size:12px;color:var(--muted); }
+body.edit-mode:not(.viewer-mode) .here-for-hint { display:inline; }
+.here-for-note { font-size:11.5px;color:var(--muted);font-style:italic; }
 
 /* Vibe tags */
 .vibe-tags { display:flex;flex-wrap:wrap;gap:8px;margin-bottom:24px; }
@@ -692,27 +701,6 @@ body.edit-mode .vibe-add-thumb { display:flex; }
 }
 .connect-full:hover { background:#ff7055;transform:translateY(-1px);box-shadow:0 10px 24px rgba(255,92,53,.3); }
 
-/* Recruiter quick-view card */
-.recruiter-card {
-  background:var(--charcoal);border-radius:24px;padding:24px;
-  margin-bottom:16px;display:block;
-}
-.recruiter-card.visible { display:block; }
-.recruiter-card-title { font-family:'Fraunces',serif;font-size:15px;font-weight:700;color:white;margin-bottom:14px; }
-/* Two-column grid so long values (Preferred = "Meeting people · Showing
-   work · …", Top skills = comma-joined list) wrap inside their column
-   instead of bleeding into the label. */
-.rec-stat-row {
-  display:grid; grid-template-columns: 90px 1fr; gap:14px;
-  align-items:start; padding:8px 0;
-  border-bottom:1px solid rgba(255,255,255,.08); font-size:13px;
-}
-.rec-stat-row:last-child { border:none;padding-bottom:0; }
-.rec-stat-label { color:rgba(255,255,255,.45); line-height:1.4; }
-.rec-stat-val   { color:white; font-weight:600; line-height:1.4;
-                  text-align:right; word-wrap:break-word;
-                  overflow-wrap:break-word; min-width:0; }
-
 /* People also viewed */
 .pav-list { display:flex;flex-direction:column;gap:12px; }
 .pav-item {
@@ -861,80 +849,6 @@ body.edit-mode .vibe-add-thumb { display:flex; }
   cursor:none;
   white-space:nowrap;
 }
-
-/* ── RECRUITER VIEW OVERLAY ── */
-/* In recruiter mode, dim personality sections */
-body.recruiter-mode .personality-section { opacity:.35; }
-body.recruiter-mode .personality-section .content-tabs,
-body.recruiter-mode .personality-section .layout-toggle,
-body.recruiter-mode .personality-section .content-tab,
-body.recruiter-mode .personality-section .layout-btn,
-body.recruiter-mode .personality-section .composer-publish {
-  pointer-events:auto;
-}
-body.recruiter-mode .personality-section .content-tabs {
-  opacity:1;
-}
-
-body.recruiter-mode .recruiter-highlight { outline:2px solid var(--lavender);outline-offset:4px;border-radius:16px; }
-
-
-/* Stronger recruiter emphasis */
-body.recruiter-mode .recruiter-highlight {
-  background:linear-gradient(180deg,#FFF8F4 0%,#FFFFFF 100%);
-  border-color:rgba(255,92,53,.14);
-  box-shadow:0 18px 50px rgba(255,92,53,.06), 0 10px 28px rgba(0,0,0,.04);
-  position:relative;
-  overflow:hidden;
-}
-body.recruiter-mode .recruiter-highlight::before {
-  content:'Recruiter spotlight';
-  position:absolute;top:18px;right:18px;
-  font-size:10px;font-weight:800;letter-spacing:1px;text-transform:uppercase;
-  color:var(--accent);background:#FFF0EC;border-radius:999px;
-  padding:6px 10px;z-index:1;
-}
-body.recruiter-mode .recruiter-highlight .card-title {
-  font-size:22px;
-  margin-bottom:18px;
-}
-body.recruiter-mode #experience .work-item {
-  padding:18px 0;
-  border-bottom-color:rgba(255,92,53,.10);
-}
-body.recruiter-mode #experience .work-title { font-size:15px; }
-body.recruiter-mode #experience .work-desc {
-  color:#383432;
-  line-height:1.7;
-}
-body.recruiter-mode #experience .work-logo-wrap {
-  box-shadow:0 10px 22px rgba(0,0,0,.05);
-}
-body.recruiter-mode #skills .skill-pill {
-  background:white;
-  border-color:rgba(28,28,30,.08);
-  box-shadow:0 10px 24px rgba(0,0,0,.03);
-  padding:7px 14px;
-}
-body.recruiter-mode #skills .skills-wrap { gap:10px; }
-body.recruiter-mode #skills .card-title {
-  font-size:19px;
-}
-
-body.recruiter-mode #experience::after {
-  content:'';
-  position:absolute;left:0;top:0;bottom:0;width:4px;
-  background:linear-gradient(180deg,var(--accent),var(--lavender));
-  border-radius:24px 0 0 24px;
-}
-body.recruiter-mode #skills::after {
-  content:'';
-  position:absolute;left:0;top:0;bottom:0;width:4px;
-  background:linear-gradient(180deg,var(--accent),var(--lavender));
-  border-radius:24px 0 0 24px;
-}
-
-
 
 /* Resume / portfolio compact viewer */
 .resume-card {
@@ -1235,13 +1149,6 @@ body.doc-modal-open { overflow:hidden; }
 .doc-nav-btn.primary:hover { background:var(--accent); }
 .doc-counter {
   font-size:12px;color:var(--muted);font-weight:700;
-}
-body.recruiter-mode .resume-card {
-  border-color:rgba(255,92,53,.12);
-  box-shadow:0 14px 36px rgba(255,92,53,.06), var(--shadow);
-}
-body.recruiter-mode .resume-preview {
-  background:linear-gradient(180deg,#FFF8F4 0%, #FFFFFF 100%);
 }
 
 
@@ -1568,10 +1475,9 @@ body.edit-mode .profile-cover:hover .cover-panel { opacity:1;pointer-events:all;
   padding:5px 12px;border-radius:100px;cursor:none;transition:all .15s;
   display:none;
 }
-body.edit-mode:not(.viewer-mode):not(.recruiter-mode) .pin-unpin-btn { display:block; }
+body.edit-mode:not(.viewer-mode) .pin-unpin-btn { display:block; }
 .pin-unpin-btn:hover { color:var(--accent);border-color:rgba(255,92,53,.3); }
-body.viewer-mode .pin-unpin-btn,
-body.recruiter-mode .pin-unpin-btn { display:none !important; }
+body.viewer-mode .pin-unpin-btn { display:none !important; }
 .pin-post-body { font-size:14px;line-height:1.75;color:var(--soft);margin-bottom:12px; }
 .pin-post-body strong { color:var(--charcoal); }
 .pin-post-tags { display:flex;gap:6px;flex-wrap:wrap;margin-bottom:14px; }
@@ -1660,11 +1566,6 @@ body:not(.edit-mode) .meta-item:has(> [data-user-field]:empty) { display: none; 
 .preview-edit-pill .pep-cta:hover { background: #FF7B4A; }
 body.owner-mode .shared-section { display:block !important; opacity:1 !important; }
 body.owner-mode .shared-section .current-delete { display:none; }
-body.recruiter-mode .recruiter-card {
-  box-shadow:0 18px 50px rgba(0,0,0,.18), 0 8px 24px rgba(255,92,53,.08);
-  border:1px solid rgba(255,255,255,.08);
-}
-body.recruiter-mode .recruiter-card .rec-stat-row:last-child { border-bottom:none; }
 
 /* ── Content tabs (Vibes / Posts) ── */
 .content-tabs {
@@ -1899,8 +1800,7 @@ body.viewer-mode .avatar-row-actions .action-btn {
   transition:background .15s,color .15s;z-index:2;
 }
 body.edit-mode .ppost-delete { display:flex; }
-body.viewer-mode .ppost-delete,
-body.recruiter-mode .ppost-delete { display:none !important; }
+body.viewer-mode .ppost-delete { display:none !important; }
 .ppost-delete:hover { background:var(--accent);color:white; }
 .ppost-pin {
   position:absolute;top:10px;right:42px;
@@ -1911,8 +1811,7 @@ body.recruiter-mode .ppost-delete { display:none !important; }
   transition:background .15s,color .15s;
 }
 body.edit-mode .ppost-pin { display:inline-block; }
-body.viewer-mode .ppost-pin,
-body.recruiter-mode .ppost-pin { display:none !important; }
+body.viewer-mode .ppost-pin { display:none !important; }
 .ppost-pin:hover { background:var(--charcoal);color:white; }
 .ppost-pin.pinned { background:var(--charcoal);color:white; }
 .ppost-date { font-size:11px;font-weight:700;color:var(--muted);text-transform:uppercase;letter-spacing:.5px;margin-bottom:8px; }
@@ -1952,8 +1851,7 @@ body.recruiter-mode .ppost-pin { display:none !important; }
   display:none;align-items:center;gap:6px;margin-left:auto;
   background:var(--cream);border-radius:100px;padding:3px;border:1px solid var(--border);
 }
-body.viewer-mode .layout-toggle,
-body.recruiter-mode .layout-toggle { display:flex; }
+body.viewer-mode .layout-toggle { display:flex; }
 .layout-btn {
   font-size:11px;font-weight:600;padding:5px 12px;border-radius:100px;
   border:none;background:none;color:var(--muted);cursor:none;transition:all .15s;
@@ -1970,7 +1868,7 @@ body.recruiter-mode .layout-toggle { display:flex; }
 .ppost-pin-btn { font-size:11px;font-weight:700;color:var(--muted);background:none;border:none;cursor:none;transition:color .15s;display:none; }
 .ppost-pin-btn:hover { color:var(--accent); }
 .ppost-pin-btn.pinned-active { color:var(--accent);font-weight:800; }
-body.edit-mode:not(.viewer-mode):not(.recruiter-mode) .ppost-pin-btn { display:block; }
+body.edit-mode:not(.viewer-mode) .ppost-pin-btn { display:block; }
 
 /* ── Smart Connect Button ── */
 .vibe-connect-btn {
@@ -2753,8 +2651,7 @@ body.edit-mode:not(.viewer-mode):not(.recruiter-mode) .ppost-pin-btn { display:b
 /* ── Empty state (Session 23: shown when vibe_user_v1 is absent) ─── */
 body.empty-profile-mode .profile-cover,
 body.empty-profile-mode .profile-wrap,
-body.empty-profile-mode #profileActionBtns,
-body.empty-profile-mode .recruiter-banner { display: none !important; }
+body.empty-profile-mode #profileActionBtns { display: none !important; }
 body.empty-profile-mode #profileEmpty { display: flex !important; }
 
 #profileEmpty {
@@ -3215,12 +3112,6 @@ body.empty-profile-mode #profileEmpty { display: flex !important; }
   </div>
 </nav>
 
-<!-- Recruiter banner -->
-<div class="recruiter-banner" id="recBanner">
-  <div><span class="rec-badge">RECRUITER VIEW</span> &nbsp;Showing professional snapshot — <span>personality layer one click away</span></div>
-  <button onclick="toggleViewerMode()" style="background:none;border:none;color:rgba(255,255,255,.5);cursor:none;font-size:13px">✕ Exit</button>
-</div>
-
 <!-- Hidden file inputs -->
 <input type="file" id="coverFileInput" accept="image/*" onchange="handleCoverUpload(this)">
 <input type="file" id="avatarFileInput" accept="image/*" onchange="handleAvatarUpload(this)">
@@ -3366,6 +3257,18 @@ body.empty-profile-mode #profileEmpty { display: flex !important; }
       <span class="meta-item"><span class="meta-label">Web</span><span data-edit="true" data-user-field="website" data-placeholder="yourname.com" contenteditable="false" style="color:var(--accent)"></span></span>
       <span class="meta-campus-hint" style="display:none"><span data-campus-hint-copy>Your campus community: its clubs, events and map. Indianapolis is one community for IU and Purdue students.</span><span data-campus-sub></span><span data-campus-note></span></span>
     </div>
+    <!-- "Here for": owner only (ruling H6). Static markup: the labels
+         mirror LOOKING_FOR_PROFILE_COPY in src/lib/profile/looking-for.ts
+         (looking-for.test.ts pins them), so no stored text is injected. -->
+    <div class="here-for-row" id="hereForRow" role="group" aria-label="Here for">
+      <span class="meta-label">Here for</span>
+      <button type="button" class="here-chip" data-looking-for="meeting-people" aria-pressed="false" disabled>Meeting people</button>
+      <button type="button" class="here-chip" data-looking-for="showing-work" aria-pressed="false" disabled>Showing work</button>
+      <button type="button" class="here-chip" data-looking-for="finding-clubs" aria-pressed="false" disabled>Finding clubs</button>
+      <button type="button" class="here-chip" data-looking-for="exploring" aria-pressed="false" disabled>Just exploring</button>
+      <span class="here-for-hint">Pick all that fit.</span>
+      <span class="here-for-note">Only you can see this</span>
+    </div>
     <div class="vibe-tags" id="vibeTags">
       <button class="tag-add" onclick="addTag()">+ Add tag</button>
     </div>
@@ -3432,8 +3335,7 @@ body.empty-profile-mode #profileEmpty { display: flex !important; }
       .otto-profile-hero .op-review { order: 4; margin-left: auto; }
     }
 
-    /* Hide in recruiter / viewer view — Otto is the user's tool */
-    body.recruiter-mode .otto-profile-hero,
+    /* Hide in viewer view — Otto is the user's tool */
     body.viewer-mode    .otto-profile-hero { display: none; }
 
     /* ── Per-post Otto badges ─────────────────────────────────────────── */
@@ -3479,9 +3381,7 @@ body.empty-profile-mode #profileEmpty { display: flex !important; }
     .op-platform-stats .op-ps-tile { width: 12px; height: 12px; border-radius: 3px; flex-shrink: 0; }
     .op-platform-stats .op-ps strong { color: var(--charcoal); font-weight: 600; }
 
-    /* Hide all per-post Otto chrome in recruiter / viewer view */
-    body.recruiter-mode .op-badge,
-    body.recruiter-mode .op-platform-stats,
+    /* Hide all per-post Otto chrome in viewer view */
     body.viewer-mode    .op-badge,
     body.viewer-mode    .op-platform-stats { display: none; }
 
@@ -3547,7 +3447,7 @@ body.empty-profile-mode #profileEmpty { display: flex !important; }
       </div>
 
       <!-- Experience -->
-      <div class="card fade-in recruiter-highlight" id="experience" style="animation-delay:.15s">
+      <div class="card fade-in" id="experience" style="animation-delay:.15s">
         <div class="card-title">
           Experience
           <button class="card-add-btn" onclick="openWorkModal()">+ Add role</button>
@@ -3556,7 +3456,7 @@ body.empty-profile-mode #profileEmpty { display: flex !important; }
       </div>
 
       <!-- Skills -->
-      <div class="card fade-in recruiter-highlight" id="skills" style="animation-delay:.2s">
+      <div class="card fade-in" id="skills" style="animation-delay:.2s">
         <div class="card-title">
           Skills
           <button class="card-add-btn" onclick="addSkill()">+ Add skill</button>
@@ -3657,21 +3557,6 @@ body.empty-profile-mode #profileEmpty { display: flex !important; }
 
     <!-- RIGHT -->
     <div class="profile-right">
-    <!-- Professional snapshot -->
-    <div class="recruiter-card" id="recruiterCard">
-      <div class="recruiter-card-title" style="display:flex;align-items:center;gap:8px">
-        <span class="rec-badge">PROFESSIONAL SNAPSHOT</span>
-      </div>
-      <div class="rec-stat-row"><span class="rec-stat-label">Role</span><span class="rec-stat-val" data-edit="true" data-snapshot-key="role" data-placeholder="Add role" contenteditable="false"></span></div>
-      <div class="rec-stat-row"><span class="rec-stat-label">Seniority</span><span class="rec-stat-val" data-edit="true" data-snapshot-key="seniority" data-placeholder="Add seniority" contenteditable="false"></span></div>
-      <div class="rec-stat-row"><span class="rec-stat-label">Location</span><span class="rec-stat-val" data-edit="true" data-snapshot-key="locationSnap" data-placeholder="Add location" contenteditable="false"></span></div>
-      <div class="rec-stat-row"><span class="rec-stat-label">Availability</span><span class="rec-stat-val" data-edit="true" data-snapshot-key="availability" data-placeholder="Add availability" contenteditable="false"></span></div>
-      <div class="rec-stat-row"><span class="rec-stat-label">Preferred</span><span class="rec-stat-val" data-edit="true" data-snapshot-key="preferred" data-placeholder="Add preferences" contenteditable="false"></span></div>
-      <div class="rec-stat-row"><span class="rec-stat-label">Top skills</span><span class="rec-stat-val" data-edit="true" data-snapshot-key="topSkills" data-placeholder="Add top skills" contenteditable="false"></span></div>
-
-
-    </div>
-
     <div class="resume-card fade-in" id="resumeCard" style="animation-delay:.06s;margin:0 0 16px 0;padding:18px;">
       <div class="resume-card-top">
         <div>
@@ -3999,6 +3884,12 @@ function toggleEdit(){
   // Campus + major pickers need the student's university and campus list
   // (GET /api/campuses). Loaded once; a failed load retries on the next entry.
   if (editMode && typeof _ensureCampusContext === 'function') _ensureCampusContext();
+  // "Here for" chips become toggles in edit mode. Entering edit repaints
+  // them from the stored answer unless the student already changed them on
+  // this page. A cache with no answer leaves them disabled until the
+  // bootstrap _ensureCampusContext fetched brings one (_hereForFreshAnswer).
+  if (editMode && !_lookingForDirty) _paintHereFor((vibeLoad('vibe_user_v1') || {}).lookingFor);
+  else _paintHereFor(_hereForChipState());
   // Refresh pin button visibility
   if(typeof refreshPinButtons === 'function') refreshPinButtons();
 }
@@ -4046,17 +3937,78 @@ function positionToolbar(el){
   toolbar.style.top = (r.top - 44 + window.scrollY) + 'px';
   toolbar.style.left = r.left + 'px';
 }
-function clearField(){ if(activeEdit) activeEdit.textContent=''; }
-
-// ── Recruiter mode ────────────────────────────────────────────────
-let recruiterMode = false;
-// Recruiter-specific styling (banner, dimmed personality section, recruiter
-// card visibility) is parked until a later phase brings recruiter accounts
-// online. The toggle now just delegates to viewer mode so any stale callers
-// (or the hidden recruiter-banner exit button) keep working.
-function toggleRecruiter(){
-  toggleViewerMode();
+function clearField(){
+  if(!activeEdit) return;
+  activeEdit.textContent='';
+  _markUserFieldEdited(activeEdit);
 }
+
+// ── "Here for" ─────────────────────────────────────────────────────
+// The onboarding question "What are you here for?", on the profile for its
+// owner only (ruling H6): the bootstrap blanks it for every other viewer
+// and the "View as visitor" preview hides the row. The tokens mirror
+// LOOKING_FOR_VALUES in src/lib/profile/looking-for.ts; looking-for.test.ts
+// pins this line. Declared above initProfilePage, which paints the row.
+const LOOKING_FOR_VALUES = Object.freeze(["meeting-people","showing-work","finding-clubs","exploring"]);
+
+// Paint the chips from a token list. Toggles only in the owner's edit mode;
+// everywhere else they are disabled labels and only the picked ones show.
+// No list (a cache from before the row existed) means the answer is not
+// known yet: the chips stay disabled until _hereForFreshAnswer brings it, so
+// one click can never save a single chip over the rest of the answer.
+function _paintHereFor(tokens) {
+  const row = document.getElementById('hereForRow');
+  if (!row) return;
+  const own = !window.viewingRealUser;
+  const known = Array.isArray(tokens);
+  let any = false;
+  row.querySelectorAll('.here-chip').forEach(btn => {
+    const on = own && known && tokens.includes(btn.dataset.lookingFor);
+    btn.classList.toggle('on', on);
+    btn.setAttribute('aria-pressed', on ? 'true' : 'false');
+    btn.disabled = !(editMode && own && known);
+    if (on) any = true;
+  });
+  row.classList.toggle('has-any', any);
+}
+
+// The server's answer, from the bootstrap _ensureCampusContext fetches on
+// edit entry. It goes into the cache (so the next edit entry reads it) and
+// onto the chips, unless the student already changed them on this page.
+// Painting never saves: looking_for goes out only after a chip click.
+function _hereForFreshAnswer(tokens) {
+  if (!Array.isArray(tokens) || _lookingForDirty || window.viewingRealUser) return;
+  const clean = LOOKING_FOR_VALUES.filter(v => tokens.includes(v));
+  const u = vibeLoad('vibe_user_v1');
+  if (u && typeof u === 'object') {
+    u.lookingFor = clean;
+    vibeSave('vibe_user_v1', u);
+  }
+  _paintHereFor(clean);
+}
+
+// The picked chips, in LOOKING_FOR_VALUES order.
+function _hereForChipState() {
+  return LOOKING_FOR_VALUES.filter(v =>
+    document.querySelector('#hereForRow .here-chip.on[data-looking-for="' + v + '"]'));
+}
+
+// A chip click is an edit: it marks the answer dirty (only then does
+// looking_for go out with the profile sync) and saves.
+(function wireHereForRow() {
+  const row = document.getElementById('hereForRow');
+  if (!row) return;
+  row.addEventListener('click', e => {
+    const btn = e.target.closest('.here-chip');
+    if (!btn || btn.disabled || !editMode || window.viewingRealUser) return;
+    const on = !btn.classList.contains('on');
+    btn.classList.toggle('on', on);
+    btn.setAttribute('aria-pressed', on ? 'true' : 'false');
+    row.classList.toggle('has-any', !!row.querySelector('.here-chip.on'));
+    _lookingForDirty = true;
+    saveProfileToStorage();
+  });
+})();
 
 // ── Avatar picker ─────────────────────────────────────────────────
 const avatarEl = document.getElementById('avatarEl');
@@ -5266,7 +5218,9 @@ async function _backfillRasterIfNeeded() {
       }
     }
     if (dirty) {
-      saveProfileToStorage();
+      // The rasterized pages are a cache on this device (the sync never
+      // sends them), so opening the viewer writes nothing to the server.
+      saveProfileToStorage({ localOnly: true });
       renderDocViewer();
     }
   } finally {
@@ -5559,11 +5513,25 @@ function _currentUserIdentity() {
   return { name, headline, initials, photo };
 }
 
+// Record a pin change. A click is an edit: the full snapshot and profile
+// sync, as before (the pin itself goes out through _syncPinToServer). The
+// programmatic path (restoring the pin while the page renders, putting a
+// refused pin back) only notes the id on this device: rendering the
+// profile must never write it back to the server.
+function _persistPinChange(fromClick) {
+  if (fromClick) { saveProfileToStorage(); return; }
+  if (window.viewingRealUser || typeof vibeLoad !== 'function') return;
+  const u = vibeLoad('vibe_user_v1');
+  if (!u) return;
+  u.pinnedId = profilePinnedId;
+  vibeSave('vibe_user_v1', u);
+}
+
 function pinFromProfile(contentId, btn) {
   // Allow programmatic restore (no btn arg) to bypass the edit-mode gate.
   // User-facing clicks always pass the button as the second argument.
   if (btn !== undefined) {
-    if (!document.body.classList.contains('edit-mode') || document.body.classList.contains('viewer-mode') || document.body.classList.contains('recruiter-mode')) {
+    if (!document.body.classList.contains('edit-mode') || document.body.classList.contains('viewer-mode')) {
       showToast('Pinning is only available in your edit mode');
       return;
     }
@@ -5580,7 +5548,7 @@ function pinFromProfile(contentId, btn) {
     profilePinnedId = null;
     pinnedEl.classList.remove('has-pin');
     contentEl.innerHTML = '';
-    if (typeof saveProfileToStorage === 'function') saveProfileToStorage();
+    _persistPinChange(btn !== undefined);
     if (typeof refreshPinButtons === 'function') refreshPinButtons();
     // Sync to server when this is a real user-driven action on a real
     // post (programmatic restore reuses the same function but doesn't
@@ -5621,7 +5589,7 @@ function pinFromProfile(contentId, btn) {
   if (btn !== undefined) {
     pinnedEl.scrollIntoView({ behavior: 'smooth', block: 'start' });
   }
-  if (typeof saveProfileToStorage === 'function') saveProfileToStorage();
+  _persistPinChange(btn !== undefined);
   if (typeof refreshPinButtons === 'function') refreshPinButtons();
   // Sync to server when this is a real user-driven action on a real
   // post (UUID id). Non-UUID pins skip the API. The toast waits for it.
@@ -5671,7 +5639,7 @@ function _openPinnedItem(contentId) {
 // Reads ids from the parent post card so any number of posts can show
 // their own pin button without per-button wiring.
 function refreshPinButtons() {
-  const showState = editMode && !viewerMode && !recruiterMode;
+  const showState = editMode && !viewerMode;
 
   document.querySelectorAll('.ppost-pin').forEach(btn => {
     btn.style.display = showState ? 'inline-block' : 'none';
@@ -7244,6 +7212,11 @@ function _ensureCampusContext() {
   const bootReq = fetch('/api/me/profile-bootstrap', { credentials: 'include' })
     .then(r => (r.ok ? r.json() : null))
     .catch(() => null);
+  // The same answer carries the stored "Here for" tokens, which enable the
+  // chips when the cache predates the row. Independent of the campus list.
+  bootReq.then(b => {
+    if (b && b.ok === true && b.vibeUser) _hereForFreshAnswer(b.vibeUser.lookingFor);
+  });
   const run = Promise.all([campusesReq, bootReq])
     .then(([c, b]) => {
       if (!c || c.ok !== true || !Array.isArray(c.campuses)) {
@@ -7599,16 +7572,11 @@ function _afterCampusSync(sent, err) {
   // hydrated.
   if (user._appShell) {
     hydrateProfilePostsFromAPI();
-    // One-shot backfill: push localStorage state that never made it to
-    // the server. Catches users who entered "Working on" items, drew
-    // redaction bars, or uploaded data: URI logos *before* the
-    // corresponding server-persistence flow shipped. The 1.2s debounce
-    // collapses with any subsequent edit. flushProfileServerSync runs
-    // _migrateDataUriLogos() first, so data: URI logos in this run get
-    // uploaded to Storage before the payload goes out.
-    if (typeof scheduleProfileServerSync === 'function') {
-      scheduleProfileServerSync();
-    }
+    // Opening the profile never writes it back: only an edit or a Save
+    // schedules a profile sync. (A one-shot backfill used to sync on every
+    // load, sending the whole profile, fallbacks included, with no edit.)
+    // A leftover data: logo still goes up with the next real edit:
+    // flushProfileServerSync runs _migrateDataUriLogos() first.
   }
 
   // First-time-only: welcome banner + auto-edit mode while name is still empty.
@@ -7924,6 +7892,7 @@ function _onMajorYearChange() {
   // text until the round-trip completes).
   u.headline = '';
   vibeSave('vibe_user_v1', u);
+  _editedUserFields.majorYear = true;
   if (typeof scheduleProfileServerSync === 'function') {
     scheduleProfileServerSync();
   }
@@ -7942,7 +7911,7 @@ function _urlFromCssBackgroundImage(bgImg) {
   return m ? m[1].trim() : '';
 }
 
-function saveProfileToStorage() {
+function saveProfileToStorage(opts) {
   // Never write when viewing someone else's profile — the DOM is showing
   // their data and capturing it would overwrite the owner's vibe_user_v1.
   if (window.viewingRealUser) return;
@@ -8054,15 +8023,11 @@ function saveProfileToStorage() {
     };
   }).filter(w => w.title);
 
-  // Professional snapshot — { role, seniority, locationSnap, availability,
-  // preferred, topSkills }. Walks every [data-snapshot-key] in #recruiterCard.
-  // Stored separately from identity location/headline so recruiters can see
-  // a curated "open to work" snapshot independent of profile metadata.
-  const snapshot = {};
-  document.querySelectorAll('#recruiterCard [data-snapshot-key]').forEach(el => {
-    snapshot[el.dataset.snapshotKey] = (el.textContent || '').trim();
-  });
-  user.snapshot = snapshot;
+  // "Here for": read off the chips only once the student changed them on
+  // this page. Until then the stored answer stands, so a cached copy from
+  // before the row existed can never overwrite it with empty chips.
+  delete user.snapshot;
+  if (_lookingForDirty) user.lookingFor = _hereForChipState();
 
   // At-a-glance — { profileViews, vibeViews, status, responseTime }. Status
   // is the avail-badge inline structure; we capture innerHTML so the badge
@@ -8093,13 +8058,15 @@ function saveProfileToStorage() {
   user.pinnedId = (typeof profilePinnedId !== 'undefined') ? profilePinnedId : null;
 
   vibeSave('vibe_user_v1', user);
-  scheduleProfileServerSync();
+  // localOnly: a cache refresh on this device, not an edit (no sync).
+  if (!(opts && opts.localOnly)) scheduleProfileServerSync();
 }
 
-// var (not let) so the declaration is hoisted — initProfilePage runs
-// synchronously before this line is reached, and renderUserSections →
-// pinFromProfile → saveProfileToStorage → scheduleProfileServerSync
-// would otherwise hit a TDZ ReferenceError and blank the page.
+// var (not let) so the declaration is hoisted: initProfilePage runs
+// synchronously before this line is reached, and anything it calls that
+// reads these would otherwise hit a TDZ ReferenceError and blank the page.
+// Rendering never schedules a sync (only an edit or a Save does), but the
+// hoisting stays as the guard.
 var profileServerSyncTimer = null;
 // Sync bookkeeping, var for the same reason. The toasts that describe a
 // save (avatar, cover, "Auto-saved", "Changes saved") wait on these
@@ -8107,9 +8074,24 @@ var profileServerSyncTimer = null;
 //   _profileSyncDirty     local edits the server hasn't confirmed yet
 //   _profileSyncInflight  the flush running now (resolves true / false)
 //   _profileSyncLastOk    how the last flush went; reset on entering edit
+//   _lookingForDirty      the student toggled a "Here for" chip on this
+//                         page; only then does looking_for go out
+//   _editedUserFields     fields shown with a fallback (tagline, location,
+//                         major + year) that the student edited since the
+//                         server's copy was last adopted; only those go out
 var _profileSyncDirty = false;
 var _profileSyncInflight = null;
 var _profileSyncLastOk = null;
+var _lookingForDirty = false;
+var _editedUserFields = {};
+// An inline edit of a [data-user-field] (the debounced input listener,
+// the toolbar's clear) marks that field edited.
+function _markUserFieldEdited(el) {
+  const k = el && el.dataset ? el.dataset.userField : '';
+  if (!k) return;
+  if (!_editedUserFields) _editedUserFields = {};
+  _editedUserFields[k] = true;
+}
 function scheduleProfileServerSync() {
   if (window.viewingRealUser) return;
   const u = (typeof vibeLoad === 'function') ? vibeLoad('vibe_user_v1') : null;
@@ -8150,11 +8132,6 @@ function buildProfileSyncPayload() {
   }
   const payload = {
     name: (u.name || '').trim(),
-    tagline: (u.tagline || '').trim(),
-    headline: (u.headline || '').trim(),
-    location_text: (u.location || '').trim(),
-    major: (typeof u.major === 'string' ? u.major.trim() : ''),
-    year: (typeof u.year === 'number' && u.year >= 1 && u.year <= 12) ? u.year : null,
     website: (u.website || '').trim(),
     bio: (u.bio || '').trim(),
     interests: Array.isArray(u.vibeTags) ? u.vibeTags.map(t => String((t && t.label) || '').trim()).filter(Boolean) : [],
@@ -8168,7 +8145,6 @@ function buildProfileSyncPayload() {
     // users.work_order_manual so mobile + a fresh desktop session
     // both keep the order.
     work_order_manual: !!u._workOrderManual,
-    recruiter_snapshot: (u.snapshot && typeof u.snapshot === 'object') ? u.snapshot : {},
     // "Working on" — persisted server-side as users.current_on. Payload
     // shape matches the localStorage shape ({icon, text}); the server
     // sanitizer enforces caps + drops items missing text.
@@ -8178,6 +8154,22 @@ function buildProfileSyncPayload() {
     // in 0-100 page-percentage coordinates.
     resume_redactions: Array.isArray(u.resumeRedactions) ? u.resumeRedactions : [],
   };
+  // Shown with a fallback when blank (tagline: the bio's first line;
+  // location: the campus; headline: major · year), so the page always holds
+  // a value for them. Only what the student edited on this page goes out:
+  // re-sending the fallback would store it as if they had typed it.
+  // headline is never sent: nothing here edits it, and the server clears
+  // the stored one when major or year change.
+  const edited = _editedUserFields || {};
+  if (edited.tagline) payload.tagline = (u.tagline || '').trim();
+  if (edited.location) payload.location_text = (u.location || '').trim();
+  if (edited.majorYear) {
+    payload.major = (typeof u.major === 'string' ? u.major.trim() : '');
+    payload.year = (typeof u.year === 'number' && u.year >= 1 && u.year <= 12) ? u.year : null;
+  }
+  // "Here for": only after a chip click on this page. A cached copy from
+  // before the row existed has no lookingFor, and must not clear the answer.
+  if (_lookingForDirty) payload.looking_for = Array.isArray(u.lookingFor) ? u.lookingFor.filter(v => LOOKING_FOR_VALUES.includes(v)) : [];
   // Campus: `campus_id` goes out only when the student picked a DIFFERENT
   // campus from their university in this browser (the campus picker). The
   // legacy label key is never sent, and neither is the current id:
@@ -8560,6 +8552,10 @@ async function _runProfileServerSync(failure) {
       // (which already carries the echoed https URLs).
       _adoptServerMediaRefs(nu, payload);
       vibeSave('vibe_user_v1', nu);
+      // The server's copy (fallbacks included) is back on screen below, so
+      // the edits this flush carried are settled: a later save sends a
+      // fallback-backed field again only if the student edits it again.
+      _editedUserFields = {};
       // Refresh the visible identity strip with the server's fresh
       // derived fields (notably `headline` — gets recomputed after
       // major / year edits via profile-sync clearing the stale stored
@@ -9281,13 +9277,8 @@ function renderUserSections(user) {
     }
   }
 
-  // Professional snapshot — overwrite hardcoded values
-  if (user.snapshot && typeof user.snapshot === 'object') {
-    Object.entries(user.snapshot).forEach(([key, val]) => {
-      const el = document.querySelector(`#recruiterCard [data-snapshot-key="${key}"]`);
-      if (el) el.textContent = val || '';
-    });
-  }
+  // "Here for" chips (owner only; the visitor bootstrap sends []).
+  _paintHereFor(user.lookingFor);
 
   // At-a-glance — overwrite hardcoded values; status row is innerHTML
   if (user.glance && typeof user.glance === 'object') {
@@ -9335,6 +9326,7 @@ function renderUserSections(user) {
 // catches bio, work-title, work-sub spans, work-desc, current-text edits.
 document.addEventListener('input', e => {
   if (e.target.hasAttribute('data-edit') && editMode) {
+    _markUserFieldEdited(e.target);
     clearTimeout(saveTimer);
     // Nulled when it fires, so leaving edit mode can tell whether a
     // snapshot is still waiting (_confirmProfileSaveOnExit).
@@ -9392,11 +9384,8 @@ function clearFreshUserExtras() {
   const currentList = document.getElementById('currentList');
   if (currentList) currentList.querySelectorAll('.current-item').forEach(c => c.remove());
 
-  // ── Professional snapshot: clear all values, leave labels with em-dash
-  document.querySelectorAll('#recruiterCard .rec-stat-row').forEach(row => {
-    const val = row.querySelector('.rec-stat-val');
-    if (val) val.innerHTML = '<span style="color:var(--muted)">—</span>';
-  });
+  // ── "Here for": no chips until the stored answer is painted
+  _paintHereFor([]);
 
   // ── At-a-glance stats: zero everything out ────────────────────────────
   document.querySelectorAll('.stat-card .stat-row .stat-val').forEach(v => {
