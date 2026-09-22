@@ -1,6 +1,7 @@
 import { after, NextResponse } from "next/server";
 
 import { getSiteUrl } from "@/lib/auth/site-url";
+import { recipientRateKey } from "@/lib/email/send-log-core";
 import { sendPasswordResetEmail } from "@/lib/email/resend-transactional";
 import { clientIp, rateLimit, tooManyRequests } from "@/lib/rate-limit";
 import {
@@ -50,7 +51,10 @@ export async function POST(req: Request) {
     return NextResponse.json(generic);
   }
 
-  const perEmail = await rateLimit(`pw-reset-email:${email}`, {
+  // Keyed on a hash, never the address: public.rate_limits used to hold
+  // every reset address in plaintext (the E1 migration deleted those rows).
+  const emailKey = recipientRateKey(email, process.env.SCHOOL_EMAIL_VERIFY_SECRET);
+  const perEmail = await rateLimit(`pw-reset-email:${emailKey}`, {
     limit: 3,
     windowSec: 3600,
   });
@@ -89,7 +93,9 @@ export async function POST(req: Request) {
       }
 
       const resetUrl = `${getSiteUrl()}/auth/update-password?token_hash=${encodeURIComponent(hashedToken)}&type=recovery`;
-      await sendPasswordResetEmail(email, resetUrl);
+      // The user id goes into the send log (src/lib/email/send-log.ts). An
+      // address with no account never gets here, so it never gets a row.
+      await sendPasswordResetEmail(email, resetUrl, data?.user?.id ?? null);
     } catch (err) {
       // Logged only; the response has already gone out.
       const message = err instanceof Error ? err.message : String(err);

@@ -17,6 +17,13 @@ import {
 } from "@/lib/auth/email-confirm-redirect";
 import { parseRetryAfterSeconds } from "@/lib/auth/email-link-errors";
 import {
+  isPasswordTooLongError,
+  MIN_PASSWORD_LENGTH,
+  PASSWORD_HINT,
+  PASSWORD_TOO_LONG,
+  passwordLengthProblem,
+} from "@/lib/auth/password-rules";
+import {
   clearPendingSignup,
   rememberPendingSignup,
 } from "@/lib/auth/pending-signup";
@@ -27,9 +34,6 @@ import {
   TERMS_VERSION,
 } from "@/lib/legal/terms";
 import { getSupabaseBrowserClient } from "@/lib/supabase/browser";
-
-/** Cap enforced on submit, never via maxLength (which truncates silently). */
-const MAX_PASSWORD_LENGTH = 20;
 
 /** GoTrue's per-address resend cooldown. */
 const RESEND_COOLDOWN_SEC = 60;
@@ -42,8 +46,8 @@ const TOO_MANY_TRIES =
 const BAD_ADDRESS =
   "That email address doesn't look right. Check it for typos.";
 const WEAK_PASSWORD =
-  "Pick a stronger password — 8 to 20 characters, and not an easy one to guess.";
-const PASSWORD_LENGTH = "Use 8 to 20 characters.";
+  "Pick a stronger password — 8 to 72 characters, and not an easy one to guess.";
+const PASSWORD_LENGTH = "Use 8 to 72 characters.";
 const PASSWORD_CHARACTERS = "Mix in letters and numbers.";
 const PASSWORD_PWNED =
   "That password has shown up in a data breach. Pick a different one.";
@@ -68,6 +72,9 @@ function signUpErrorMessage(err: AuthError): string {
     ].filter((fix): fix is string => fix !== null);
     return fixes.length ? fixes.join(" ") : WEAK_PASSWORD;
   }
+  // GoTrue's 72-byte refusal is also `validation_failed` + "password": say
+  // it's too long, not "pick a stronger one".
+  if (isPasswordTooLongError(err)) return PASSWORD_TOO_LONG;
   if (
     err.code === "weak_password" ||
     (err.code === "validation_failed" && /password/i.test(message))
@@ -154,12 +161,13 @@ export default function SignupPage() {
       );
       return;
     }
-    // Validate the length cap instead of letting the input truncate. A
-    // maxLength here silently cut a pasted password down to 20 characters,
-    // so a password manager could create (or reset to) a credential the
-    // user never saw and could not reproduce at login.
-    if (password.length > MAX_PASSWORD_LENGTH) {
-      setError(`Password must be ${MAX_PASSWORD_LENGTH} characters or fewer.`);
+    // Validate the 8–72 rule instead of letting the input truncate. A
+    // maxLength here silently cut a pasted password down to the cap (20
+    // then), so a password manager could create (or reset to) a credential
+    // the user never saw and could not reproduce at login. Never add one.
+    const lengthProblem = passwordLengthProblem(password);
+    if (lengthProblem) {
+      setError(lengthProblem.message);
       return;
     }
     const address = email.trim();
@@ -391,13 +399,13 @@ export default function SignupPage() {
           <label className="vibe-auth-field">
             <span className="vibe-auth-label-row">
               <span className="vibe-auth-label">Password</span>
-              <span className="vibe-auth-label-hint">8–20 characters</span>
+              <span className="vibe-auth-label-hint">{PASSWORD_HINT}</span>
             </span>
             <input
               type="password"
               autoComplete="new-password"
               required
-              minLength={8}
+              minLength={MIN_PASSWORD_LENGTH}
               value={password}
               onChange={(e) => setPassword(e.target.value)}
               className="vibe-auth-input"

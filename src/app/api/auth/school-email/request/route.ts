@@ -203,13 +203,23 @@ export async function POST(req: Request) {
   const verifyUrl = `${site}/auth/verify-school?token=${encodeURIComponent(token)}&next=${encodeURIComponent(afterVerify)}`;
 
   try {
-    await sendSchoolVerificationEmail(schoolEmail, verifyUrl, code);
+    await sendSchoolVerificationEmail(schoolEmail, verifyUrl, code, user.id);
   } catch (err) {
-    // Never surface provider/config messages to the caller.
+    // Never surface provider/config messages to the caller. The attempt and
+    // what Resend said are in the send log (src/lib/email/send-log.ts).
     const message = err instanceof Error ? err.message : String(err);
     console.error("[school-email/request] send", message);
+    // `error` stays byte-identical: onboarding (StepCampus, onboarding.html)
+    // shows it as-is and older /auth/school-email bundles match on it.
+    // `attemptedTo` is the address this signed-in caller just typed, the
+    // same value a success echoes as `sentTo`, so the page can name it.
     return NextResponse.json(
-      { ok: false, error: "We couldn't send the email right now. Try again in a minute." },
+      {
+        ok: false,
+        code: "send_failed",
+        error: "We couldn't send the email right now. Try again in a minute.",
+        attemptedTo: schoolEmail,
+      },
       { status: 503 },
     );
   }

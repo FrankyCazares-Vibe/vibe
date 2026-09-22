@@ -1,6 +1,7 @@
 import "server-only";
 import { createResendClient } from "@/lib/resend";
 import { getSiteUrl } from "@/lib/auth/site-url";
+import { sendLogged } from "@/lib/email/send-log";
 
 function getFrom(): string {
   const from = process.env.RESEND_FROM?.trim();
@@ -133,40 +134,47 @@ function brandedEmailHtml(e: BrandedEmail): string {
 </html>`;
 }
 
+/**
+ * Every attempt goes into the send log (send-log.ts); the log never
+ * changes the outcome. A missing RESEND_API_KEY / RESEND_FROM throws inside
+ * the send, so it is logged as `exception` and thrown here as before.
+ */
 export async function sendPasswordResetEmail(
   to: string,
   recoveryActionLink: string,
+  userId: string | null = null,
 ): Promise<void> {
-  const resend = createResendClient();
   const site = getSiteUrl();
-  const { error } = await resend.emails.send({
-    from: getFrom(),
-    to: [to],
-    subject: "Reset your Vibe password",
-    html: brandedEmailHtml({
-      title: "Reset your Vibe password",
-      preheader: "Tap to choose a new Vibe password. Only the newest reset email works.",
-      headline: "Reset your password",
-      intro: "You asked to reset your Vibe password. Tap below to choose a new one.",
-      button: { href: recoveryActionLink, label: "Set a new password" },
-      notes: [
+  const outcome = await sendLogged("password_reset", to, userId, () =>
+    createResendClient().emails.send({
+      from: getFrom(),
+      to: [to],
+      subject: "Reset your Vibe password",
+      html: brandedEmailHtml({
+        title: "Reset your Vibe password",
+        preheader: "Tap to choose a new Vibe password. Only the newest reset email works.",
+        headline: "Reset your password",
+        intro: "You asked to reset your Vibe password. Tap below to choose a new one.",
+        button: { href: recoveryActionLink, label: "Set a new password" },
+        notes: [
+          "Only the newest reset email works. Any browser or phone is fine.",
+          "Didn't ask for this? You can ignore this email &mdash; your password won't change.",
+        ],
+      }),
+      text: [
+        "You asked to reset your Vibe password.",
+        "",
+        `Set a new password: ${recoveryActionLink}`,
+        "",
         "Only the newest reset email works. Any browser or phone is fine.",
-        "Didn't ask for this? You can ignore this email &mdash; your password won't change.",
-      ],
+        "Didn't ask for this? You can ignore this email. Your password won't change.",
+        "",
+        site,
+      ].join("\n"),
     }),
-    text: [
-      "You asked to reset your Vibe password.",
-      "",
-      `Set a new password: ${recoveryActionLink}`,
-      "",
-      "Only the newest reset email works. Any browser or phone is fine.",
-      "Didn't ask for this? You can ignore this email. Your password won't change.",
-      "",
-      site,
-    ].join("\n"),
-  });
-  if (error) {
-    throw new Error(error.message);
+  );
+  if (!outcome.ok) {
+    throw new Error(outcome.errorMessage || outcome.errorCode);
   }
 }
 
@@ -180,53 +188,56 @@ export async function sendSchoolVerificationEmail(
   to: string,
   verifyUrl: string,
   code: string,
+  userId: string | null = null,
 ): Promise<void> {
   // Interpolated unescaped below; the caller passes schoolEmailCode() output.
+  // A programming error, not a send attempt, so it is not logged.
   if (!/^\d+$/.test(code)) {
     throw new Error("School verification code must be digits only.");
   }
-  const resend = createResendClient();
   const site = getSiteUrl();
-  const { error } = await resend.emails.send({
-    from: getFrom(),
-    to: [to],
-    subject: "Verify your school email on Vibe",
-    html: brandedEmailHtml({
-      title: "Verify your school email on Vibe",
-      preheader: `Your Vibe code is ${code}. It works for 30 minutes.`,
-      headline: "Verify your school email",
-      intro: "Type this code on the Vibe page where you asked for this email.",
-      code: {
-        label: "Your verification code",
-        value: code,
-        note: "It works for 30 minutes. Never share it &mdash; Vibe will never ask you for it.",
-      },
-      button: {
-        lead: "Or tap below while you're signed in to Vibe on this device. The link works for 48 hours.",
-        href: verifyUrl,
-        label: "Verify school email",
-      },
-      notes: [
-        "Opened this in the Outlook app? Typing the code is the easiest way.",
-        "Didn't start this? You can ignore this email.",
-      ],
+  const outcome = await sendLogged("school_verification", to, userId, () =>
+    createResendClient().emails.send({
+      from: getFrom(),
+      to: [to],
+      subject: "Verify your school email on Vibe",
+      html: brandedEmailHtml({
+        title: "Verify your school email on Vibe",
+        preheader: `Your Vibe code is ${code}. It works for 30 minutes.`,
+        headline: "Verify your school email",
+        intro: "Type this code on the Vibe page where you asked for this email.",
+        code: {
+          label: "Your verification code",
+          value: code,
+          note: "It works for 30 minutes. Never share it &mdash; Vibe will never ask you for it.",
+        },
+        button: {
+          lead: "Or tap below while you're signed in to Vibe on this device. The link works for 48 hours.",
+          href: verifyUrl,
+          label: "Verify school email",
+        },
+        notes: [
+          "Opened this in the Outlook app? Typing the code is the easiest way.",
+          "Didn't start this? You can ignore this email.",
+        ],
+      }),
+      text: [
+        `Your Vibe verification code: ${code}`,
+        "",
+        "Type it on the Vibe page where you asked for this email. It works for 30 minutes.",
+        "",
+        "Or tap Verify school email while you're signed in to Vibe on this device. The link works for 48 hours.",
+        `Verify school email: ${verifyUrl}`,
+        "",
+        "Never share this code. Vibe will never ask you for it.",
+        "",
+        "If you didn't start this, ignore this email.",
+        "",
+        site,
+      ].join("\n"),
     }),
-    text: [
-      `Your Vibe verification code: ${code}`,
-      "",
-      "Type it on the Vibe page where you asked for this email. It works for 30 minutes.",
-      "",
-      "Or tap Verify school email while you're signed in to Vibe on this device. The link works for 48 hours.",
-      `Verify school email: ${verifyUrl}`,
-      "",
-      "Never share this code. Vibe will never ask you for it.",
-      "",
-      "If you didn't start this, ignore this email.",
-      "",
-      site,
-    ].join("\n"),
-  });
-  if (error) {
-    throw new Error(error.message);
+  );
+  if (!outcome.ok) {
+    throw new Error(outcome.errorMessage || outcome.errorCode);
   }
 }

@@ -25,7 +25,9 @@ const SIGNED_OUT =
   "You were signed out. Sign in, then type the same code again. It works for at least 30 minutes after we sent it.";
 const SIGNED_OUT_SEND = "You were signed out. Sign in to send your school email.";
 // The one 5xx body from /request written for students (a failed send). Any
-// other 5xx text can name server config, so it shows OFFLINE instead.
+// other 5xx text can name server config, so it shows OFFLINE instead. Newer
+// servers also send `code: "send_failed"` and `attemptedTo`; this exact text
+// stays the fallback match for a server that predates them.
 const SEND_FAILED = "We couldn't send the email right now. Try again in a minute.";
 
 /**
@@ -89,6 +91,32 @@ async function readJson<T extends object>(res: Response): Promise<T | null> {
 }
 
 /**
+ * The provider refused a send. Prominent and names the address, so a typo in
+ * the name before "@" is visible at a glance. On the code panel it replaces
+ * the green "We sent" banner, which it would contradict.
+ */
+function SendFailureLine({ failure }: { failure: { to: string; resend: boolean } }) {
+  return (
+    <div
+      role="alert"
+      className="vibe-auth-error"
+      style={{ fontSize: 14, lineHeight: 1.5, padding: "12px 14px", overflowWrap: "anywhere" }}
+    >
+      <strong>
+        {failure.resend ? (
+          <>We couldn&apos;t send another email to {failure.to}.</>
+        ) : (
+          <>We couldn&apos;t send to {failure.to}.</>
+        )}
+      </strong>{" "}
+      {failure.resend
+        ? "The code in the last one works for 30 minutes after it was sent. Try sending again in a minute."
+        : "Check the address for typos. If it's right, try again in a minute."}
+    </div>
+  );
+}
+
+/**
  * True when the previous history entry is a Vibe page, so "← back" can step
  * back to it instead of leaving the app.
  */
@@ -110,6 +138,11 @@ function SchoolEmailInner() {
   const searchParams = useSearchParams();
   const [schoolEmail, setSchoolEmail] = useState("");
   const [error, setError] = useState<string | null>(null);
+  // A send the provider refused, named with the address it went to. `resend`
+  // is true when it was "Send again" from the code panel.
+  const [sendFailure, setSendFailure] = useState<{ to: string; resend: boolean } | null>(
+    null,
+  );
   const [loading, setLoading] = useState(false);
   const [authChecked, setAuthChecked] = useState(false);
   const [userId, setUserId] = useState<string | null>(null);
@@ -260,6 +293,7 @@ function SchoolEmailInner() {
     // and link already in the inbox keep working, so never strand them.
     const fromPanel = sentTo !== null;
     setError(null);
+    setSendFailure(null);
     if (!fromPanel) setSignedOut(false);
     setLoading(true);
     let leaving = false;
@@ -282,10 +316,19 @@ function SchoolEmailInner() {
         message?: string;
         alreadyVerified?: boolean;
         sentTo?: string;
+        attemptedTo?: string;
       }>(res);
       // A Vercel HTML error page, an empty body, or a server failure.
       if (!data || res.status >= 500) {
-        setError(data?.error === SEND_FAILED ? SEND_FAILED : OFFLINE);
+        if (data && (data.code === "send_failed" || data.error === SEND_FAILED)) {
+          const to =
+            typeof data.attemptedTo === "string" && data.attemptedTo
+              ? data.attemptedTo
+              : address;
+          setSendFailure({ to, resend: fromPanel });
+        } else {
+          setError(OFFLINE);
+        }
         return;
       }
       if (res.status === 403 && data.code === "terms_required") {
@@ -325,6 +368,7 @@ function SchoolEmailInner() {
       const sent = typeof data.sentTo === "string" ? data.sentTo : address;
       const at = Date.now();
       setSentTo(sent);
+      setSendFailure(null);
       setLimitedNote(null);
       setSignedOut(false);
       setCodeError(null);
@@ -407,6 +451,7 @@ function SchoolEmailInner() {
     setCodeError(null);
     setSignedOut(false);
     setError(null);
+    setSendFailure(null);
     cooldownEndsAt.current = null;
     setSecondsLeft(0);
   }
@@ -482,7 +527,9 @@ function SchoolEmailInner() {
 
         {sentTo ? (
           <form onSubmit={onVerifyCode} className="vibe-auth-form">
-            {limitedNote ? (
+            {sendFailure ? (
+              <SendFailureLine failure={sendFailure} />
+            ) : limitedNote ? (
               <div
                 role="status"
                 className="vibe-auth-banner vibe-auth-banner--info"
@@ -568,6 +615,7 @@ function SchoolEmailInner() {
           </form>
         ) : (
           <form onSubmit={onSubmit} className="vibe-auth-form">
+            {sendFailure ? <SendFailureLine failure={sendFailure} /> : null}
             <label className="vibe-auth-field">
               <span className="vibe-auth-label-row">
                 <span className="vibe-auth-label">School email</span>
@@ -581,7 +629,11 @@ function SchoolEmailInner() {
                 required
                 placeholder="you@school.edu"
                 value={schoolEmail}
-                onChange={(e) => setSchoolEmail(e.target.value)}
+                onChange={(e) => {
+                  setSchoolEmail(e.target.value);
+                  // Never leave the line next to an address that has changed.
+                  setSendFailure(null);
+                }}
                 className="vibe-auth-input"
               />
             </label>

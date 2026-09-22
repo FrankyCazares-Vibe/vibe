@@ -11,12 +11,17 @@ import {
 import Link from "next/link";
 import { useEffect, useRef, useState } from "react";
 
+// Same 8–72 rule as signup (`@/lib/auth/password-rules`). The cap is enforced
+// on submit, never via maxLength (which truncates silently).
+import {
+  isPasswordTooLongError,
+  MIN_PASSWORD_LENGTH,
+  PASSWORD_HINT,
+  PASSWORD_TOO_LONG,
+  passwordLengthProblem,
+} from "@/lib/auth/password-rules";
 import { getPostLoginDestination } from "@/lib/auth/post-login";
 import { getSupabaseBrowserClient } from "@/lib/supabase/browser";
-
-/** Same 8–20 rule as signup. The cap is enforced on submit, never via maxLength (which truncates silently). */
-const MIN_PASSWORD_LENGTH = 8;
-const MAX_PASSWORD_LENGTH = 20;
 
 /** How long "Password updated for …" stays up before we move on: long enough to read which account it was. */
 const SUCCESS_PAUSE_MS = 1500;
@@ -193,6 +198,10 @@ function classifyPasswordFailure(error: AuthError): AuthFailure {
   if (common) return common;
   if (error.code === "same_password") {
     return { kind: "message", message: SAME_PASSWORD_COPY };
+  }
+  // GoTrue's 72-byte refusal; without this it falls through to SAVE_FAILED_COPY.
+  if (isPasswordTooLongError(error)) {
+    return { kind: "message", message: PASSWORD_TOO_LONG };
   }
   if (isAuthWeakPasswordError(error)) {
     return { kind: "message", message: weakPasswordCopy(error.reasons) };
@@ -510,16 +519,13 @@ export default function UpdatePasswordPage() {
     e.preventDefault();
     if (submittingRef.current) return;
     setError(null);
-    if (password.length < MIN_PASSWORD_LENGTH) {
-      setError(`Password must be at least ${MIN_PASSWORD_LENGTH} characters.`);
-      return;
-    }
-    // Validate the length cap instead of letting the input truncate. A
-    // maxLength here silently cut a pasted password down to 20 characters,
-    // so a password manager could create (or reset to) a credential the
-    // user never saw and could not reproduce at login.
-    if (password.length > MAX_PASSWORD_LENGTH) {
-      setError(`Password must be ${MAX_PASSWORD_LENGTH} characters or fewer.`);
+    // Validate the 8–72 rule instead of letting the input truncate. A
+    // maxLength here silently cut a pasted password down to the cap (20
+    // then), so a password manager could create (or reset to) a credential
+    // the user never saw and could not reproduce at login. Never add one.
+    const lengthProblem = passwordLengthProblem(password);
+    if (lengthProblem) {
+      setError(lengthProblem.message);
       return;
     }
     submittingRef.current = true;
@@ -612,7 +618,7 @@ export default function UpdatePasswordPage() {
                   <label htmlFor="new-password" className="vibe-auth-label">
                     New password
                   </label>
-                  <span className="vibe-auth-label-hint">8–20 characters</span>
+                  <span className="vibe-auth-label-hint">{PASSWORD_HINT}</span>
                 </span>
                 <div style={{ position: "relative" }}>
                   <input
