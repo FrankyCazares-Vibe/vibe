@@ -68,3 +68,6 @@ next-env.d.ts
 /handoffs/
 /otto_mockups/
 .gstack/
+
+# Supabase CLI local branch metadata (created by `supabase start`)
+supabase/.branches/
