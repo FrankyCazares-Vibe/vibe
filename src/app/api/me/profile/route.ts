@@ -11,26 +11,15 @@ import {
   readCampusWriteRow,
   type CampusWriteDecision,
 } from "@/lib/profile/profile-campus-write";
-import { sanitizeRecruiterSnapshot } from "@/lib/profile/recruiter-snapshot";
 import { changeHandleForUser } from "@/lib/profile/handle-change";
 import { requireTermsAccepted } from "@/lib/legal/require-terms";
+import { parseLookingForBody } from "@/lib/profile/looking-for";
 import { normalizeResumeRef } from "@/lib/profile/resume-doc-url";
+import { unexpectedSelfWriteKeys } from "@/lib/profile/self-write-columns";
 import { sanitizeWorkExperience } from "@/lib/profile/work-experience";
+import { rateLimit, tooManyRequests } from "@/lib/rate-limit";
 import { createSupabaseServerClient } from "@/lib/supabase/server";
 import { createSupabaseServiceClient } from "@/lib/supabase/service";
-
-const LOOKING_FOR_OPTIONS = [
-  "meeting-people",
-  "showing-work",
-  "finding-clubs",
-  "exploring",
-] as const;
-
-type LookingFor = (typeof LOOKING_FOR_OPTIONS)[number];
-
-function isLookingForToken(s: string): s is LookingFor {
-  return (LOOKING_FOR_OPTIONS as readonly string[]).includes(s);
-}
 
 function trimStr(s: unknown, max: number): string | null {
   if (typeof s !== "string") return null;
@@ -98,20 +87,15 @@ function stringArray(val: unknown, maxItems: number, maxEach: number): string[] 
   return out;
 }
 
-function lookingForArray(val: unknown): string[] | undefined {
-  if (val === undefined) return undefined;
-  if (!Array.isArray(val)) return undefined;
-  const out = new Set<string>();
-  for (const item of val) {
-    if (typeof item !== "string") continue;
-    const t = item.trim();
-    if (isLookingForToken(t)) out.add(t);
-  }
-  return [...out];
-}
-
 /**
- * Update the signed-in user's `public.users` row. Only whitelisted columns; RLS enforces self-only.
+ * Update the signed-in user's `public.users` row.
+ *
+ * Every column is validated here and written with the SERVICE role, scoped to
+ * the caller's own id, in one statement guarded by the closed column list in
+ * `self-write-columns.ts`: migration 20260922130000 takes skills, interests,
+ * work_experience and looking_for off the `authenticated` UPDATE grant, so
+ * PostgREST can no longer skip these validators. The cookie client is used
+ * for `getUser` only.
  */
 export async function PATCH(req: Request) {
   const supabase = await createSupabaseServerClient();
@@ -122,6 +106,11 @@ export async function PATCH(req: Request) {
   if (userErr || !user) {
     return NextResponse.json({ ok: false, error: "Unauthorized" }, { status: 401 });
   }
+
+  // One limiter for every caller (avatar save, campus card, onboarding's
+  // avatar step): rulings B3.
+  const rl = await rateLimit(`me-profile:${user.id}`, { limit: 60, windowSec: 600 });
+  if (!rl.allowed) return tooManyRequests(rl);
 
   const termsGate = await requireTermsAccepted(user.id);
   if (termsGate) return termsGate;
@@ -260,8 +249,10 @@ export async function PATCH(req: Request) {
   const skills = stringArray(body.skills, 60, 80);
   if (skills !== undefined) patch.skills = skills;
 
-  const looking_for = lookingForArray(body.looking_for);
-  if (looking_for !== undefined) patch.looking_for = looking_for;
+  // "What are you here for?" tokens. A non-array stays silently ignored, as
+  // it always was on this route; `null` clears the answer.
+  const lookingFor = parseLookingForBody(body.looking_for);
+  if (Array.isArray(lookingFor)) patch.looking_for = lookingFor;
 
   // Resume refs: own-bucket proxy paths (`/api/resume/<key>`, key owner
   // must be this user) or external http(s) links. Anything else is 400.
@@ -298,13 +289,8 @@ export async function PATCH(req: Request) {
     patch.work_experience = sanitizeWorkExperience(body.work_experience);
   }
 
-  if ("recruiter_snapshot" in body) {
-    const snap = sanitizeRecruiterSnapshot(body.recruiter_snapshot);
-    if (snap === undefined) {
-      return NextResponse.json({ ok: false, error: "Invalid recruiter_snapshot" }, { status: 400 });
-    }
-    patch.recruiter_snapshot = snap;
-  }
+  // The professional snapshot card is gone; a body that still carries its
+  // field is ignored, never written.
 
   if (
     Object.keys(patch).length === 0 &&
@@ -316,34 +302,30 @@ export async function PATCH(req: Request) {
     return NextResponse.json({ ok: false, error: "No valid fields to update" }, { status: 400 });
   }
 
-  const { error: upErr } =
-    Object.keys(patch).length > 0
-      ? await supabase.from("users").update(patch).eq("id", user.id)
-      : { error: null };
+  // ONE service-role statement for every profile column, scoped to the
+  // caller's own id (the shape changeHandleForUser uses for users.handle).
+  // Several of these columns are no longer UPDATE-granted to `authenticated`
+  // (banner_gradient: 20260912100000; avatar_url / banner_url: 20260912102000;
+  // skills, interests, work_experience, looking_for: 20260922130000), and one
+  // statement means the fields can never half-apply against each other. The
+  // service role passes every grant, so the closed list in
+  // `self-write-columns.ts` stands in front of it: a key outside the list is
+  // a coding slip and fails the save instead of writing.
+  const writePatch: Record<string, unknown> = { ...patch, ...mediaPatch };
+  if (coverThemePatch !== undefined) writePatch.banner_gradient = coverThemePatch;
 
-  if (upErr) {
-    console.error("[me/profile PATCH]", upErr);
-    return NextResponse.json({ ok: false, error: "Could not save profile" }, { status: 500 });
-  }
-
-  // banner_gradient (migration 20260912100000) and avatar_url / banner_url
-  // (migration 20260912102000) are no longer UPDATE-granted to
-  // `authenticated`, so they are written with the service role, scoped to
-  // the caller's own id — the same shape changeHandleForUser uses for
-  // users.handle. These three columns go in ONE statement so they cannot
-  // half-apply against each other; the `patch` update above is still a
-  // separate statement, so a failure here leaves that one applied (the
-  // pre-existing shape — the response below reports what actually stuck).
-  const servicePatch: Record<string, unknown> = { ...mediaPatch };
-  if (coverThemePatch !== undefined) servicePatch.banner_gradient = coverThemePatch;
-
-  if (Object.keys(servicePatch).length > 0) {
-    const { error: svcErr } = await createSupabaseServiceClient()
+  if (Object.keys(writePatch).length > 0) {
+    const bad = unexpectedSelfWriteKeys(writePatch);
+    if (bad.length > 0) {
+      console.error("[me/profile PATCH] unexpected columns", bad);
+      return NextResponse.json({ ok: false, error: "Could not save profile" }, { status: 500 });
+    }
+    const { error: upErr } = await createSupabaseServiceClient()
       .from("users")
-      .update(servicePatch)
+      .update(writePatch)
       .eq("id", user.id);
-    if (svcErr) {
-      console.error("[me/profile PATCH avatar/cover]", svcErr);
+    if (upErr) {
+      console.error("[me/profile PATCH]", upErr);
       return NextResponse.json({ ok: false, error: "Could not save profile" }, { status: 500 });
     }
   }
@@ -369,8 +351,7 @@ export async function PATCH(req: Request) {
   // campus-only body has nothing else to report, so the rule's own status is
   // the answer.
   const campusError = campusDecision.kind === "reject" ? campusDecision.rejection : null;
-  const wroteOtherFields =
-    Object.keys(patch).length > 0 || Object.keys(servicePatch).length > 0 || handleTouched;
+  const wroteOtherFields = Object.keys(writePatch).length > 0 || handleTouched;
   if (campusError && !wroteOtherFields) {
     return NextResponse.json(
       {
@@ -393,7 +374,7 @@ export async function PATCH(req: Request) {
   const { data: row, error: selErr } = await createSupabaseServiceClient()
     .from("users")
     .select(
-      "id,email,name,handle,school,school_email,school_verified,year,major,department,bio,tagline,website,headline,location_text,banner_gradient,avatar_url,banner_url,resume_url,interests,skills,looking_for,work_experience,recruiter_snapshot",
+      "id,email,name,handle,school,school_email,school_verified,year,major,department,bio,tagline,website,headline,location_text,banner_gradient,avatar_url,banner_url,resume_url,interests,skills,looking_for,work_experience",
     )
     .eq("id", user.id)
     .single();

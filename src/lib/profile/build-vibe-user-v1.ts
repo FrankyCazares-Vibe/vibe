@@ -1,3 +1,4 @@
+import { lookingForForDisplay } from "@/lib/profile/looking-for";
 import type { ProfileCampusColumns } from "@/lib/profile/normalize-profile-view";
 import {
   campusBadgeForProfile,
@@ -48,20 +49,6 @@ function headlineFromProfileParts(p: ProfileForVibeUser): string {
   return h;
 }
 
-const LOOKING_LABELS: Record<string, string> = {
-  "meeting-people": "Meeting people",
-  "showing-work": "Showing work",
-  "finding-clubs": "Finding clubs",
-  exploring: "Exploring",
-};
-
-function preferredFromLookingFor(tokens: string[]): string {
-  return tokens
-    .map((t) => LOOKING_LABELS[t] ?? t)
-    .filter(Boolean)
-    .join(" · ");
-}
-
 /**
  * Shape expected by `public/html/profile.html` (`vibe_user_v1` in localStorage).
  */
@@ -86,18 +73,6 @@ export function buildVibeUserV1FromProfile(
   const campusLabel = campusLabelForDisplay(profile);
   const location = profile.location_text.trim() || campusLabel;
 
-  const baseSnap: Record<string, string> = {
-    role: profile.major || "",
-    seniority: profile.year != null ? `Year ${profile.year}` : "",
-    locationSnap: campusLabel,
-    availability: "",
-    preferred: preferredFromLookingFor(profile.looking_for),
-    // Cap the joined string visually — the snapshot card has limited
-    // horizontal real estate and 8 long skills overflow even with grid wrap.
-    topSkills: profile.skills.slice(0, 5).join(", "),
-  };
-  const snapshot = { ...baseSnap, ...profile.recruiter_snapshot };
-
   const u: Record<string, unknown> = {
     id: profile.id,
     name: profile.name,
@@ -109,7 +84,10 @@ export function buildVibeUserV1FromProfile(
     bio: profile.bio,
     vibeTags,
     skills: profile.skills.slice(),
-    snapshot,
+    // "What are you here for?" — known tokens only, canonical order, always
+    // present (`[]` when none). Routes that serve someone else's profile
+    // blank `looking_for` before this runs (ruling H6: owner only).
+    lookingFor: lookingForForDisplay(profile.looking_for),
     _onboarded: true,
   };
 

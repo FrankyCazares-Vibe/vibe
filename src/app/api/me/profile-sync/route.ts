@@ -15,7 +15,7 @@ import {
   readCampusWriteRow,
   type CampusWriteDecision,
 } from "@/lib/profile/profile-campus-write";
-import { sanitizeRecruiterSnapshot } from "@/lib/profile/recruiter-snapshot";
+import { parseLookingForBody } from "@/lib/profile/looking-for";
 import { normalizeResumeRef, resumeKeyOwnerId } from "@/lib/profile/resume-doc-url";
 import { sanitizeResumeDocs } from "@/lib/profile/resume-docs";
 import { sanitizeResumeRedactions } from "@/lib/profile/resume-redactions";
@@ -25,6 +25,7 @@ import {
   resolveResumeUrlInput,
   resumeKeysReferenced,
 } from "@/lib/profile/resume-storage";
+import { unexpectedSelfWriteKeys } from "@/lib/profile/self-write-columns";
 import { inlineOrUploadProfileUrl } from "@/lib/profile/storage-upload";
 import { sanitizeWorkExperience } from "@/lib/profile/work-experience";
 import { requireTermsAccepted } from "@/lib/legal/require-terms";
@@ -34,7 +35,7 @@ import { createSupabaseServiceClient } from "@/lib/supabase/service";
 
 /** The profile echoed back to the client, without the campus columns. */
 const SYNC_PROFILE_SELECT =
-  "id,email,name,handle,school,school_email,school_verified,year,major,department,bio,tagline,website,headline,location_text,banner_gradient,avatar_url,banner_url,resume_url,resume_docs,interests,skills,looking_for,work_experience,work_order_manual,recruiter_snapshot,current_on,resume_redactions";
+  "id,email,name,handle,school,school_email,school_verified,year,major,department,bio,tagline,website,headline,location_text,banner_gradient,avatar_url,banner_url,resume_url,resume_docs,interests,skills,looking_for,work_experience,work_order_manual,current_on,resume_redactions";
 
 type ProfileRowRead = {
   data: Record<string, unknown> | null;
@@ -44,6 +45,12 @@ type ProfileRowRead = {
 /**
  * Full profile sync from `public/html/profile.html` (authenticated, same-origin).
  * Accepts vibe-shaped fields; uploads `data:` images to Supabase Storage.
+ *
+ * Every column is validated here and written with the SERVICE role, scoped to
+ * the caller's own id, in one statement guarded by the closed column list in
+ * `self-write-columns.ts` (migration 20260922130000 takes skills, interests,
+ * work_experience and looking_for off the `authenticated` UPDATE grant). The
+ * cookie client is used for `getUser` only.
  */
 export async function POST(req: Request) {
   const supabase = await createSupabaseServerClient();
@@ -54,6 +61,12 @@ export async function POST(req: Request) {
   if (userErr || !user) {
     return NextResponse.json({ ok: false, error: "Unauthorized" }, { status: 401 });
   }
+
+  // Every request. Desktop autosave debounces 1.2 s and mobile posts on Save
+  // only, so 300 per 10 minutes is far above real use. The upload limiter
+  // below still applies on top.
+  const rl = await rateLimit(`profile-sync:${user.id}`, { limit: 300, windowSec: 600 });
+  if (!rl.allowed) return tooManyRequests(rl);
 
   const termsGate = await requireTermsAccepted(user.id);
   if (termsGate) return termsGate;
@@ -72,8 +85,11 @@ export async function POST(req: Request) {
     (v) => typeof v === "string" && /^data:/i.test(v.trim()),
   );
   if (hasInlineUpload) {
-    const rl = await rateLimit(`upload:profile-sync:${user.id}`, { limit: 20, windowSec: 600 });
-    if (!rl.allowed) return tooManyRequests(rl);
+    const uploadRl = await rateLimit(`upload:profile-sync:${user.id}`, {
+      limit: 20,
+      windowSec: 600,
+    });
+    if (!uploadRl.allowed) return tooManyRequests(uploadRl);
   }
 
   const patch: Record<string, unknown> = {};
@@ -180,6 +196,17 @@ export async function POST(req: Request) {
     patch.skills = skills;
   }
 
+  // "What are you here for?" tokens. Absent key = column untouched: the
+  // desktop sends it only after a chip click, so a cached profile that
+  // predates the field can never wipe the stored answer. `null` clears it.
+  if ("looking_for" in body) {
+    const lookingFor = parseLookingForBody(body.looking_for);
+    if (lookingFor === null) {
+      return NextResponse.json({ ok: false, error: "Invalid looking_for" }, { status: 400 });
+    }
+    if (lookingFor !== undefined) patch.looking_for = lookingFor;
+  }
+
   if ("work_experience" in body) {
     patch.work_experience = sanitizeWorkExperience(body.work_experience);
   }
@@ -215,16 +242,9 @@ export async function POST(req: Request) {
     patch.resume_redactions = sanitizeResumeRedactions(raw);
   }
 
-  if ("recruiter_snapshot" in body) {
-    const snap = sanitizeRecruiterSnapshot(body.recruiter_snapshot);
-    if (snap === undefined) {
-      return NextResponse.json(
-        { ok: false, error: "Invalid recruiter_snapshot" },
-        { status: 400 },
-      );
-    }
-    patch.recruiter_snapshot = snap;
-  }
+  // The professional snapshot card is gone. Desktop bundles cached before
+  // that still send its field on every save, so the field is ignored: never
+  // written and never a 400.
 
   // An uploaded `data:` payload comes back as a public URL on our own
   // Supabase host; a plain http(s) string is passed straight through by
@@ -322,33 +342,29 @@ export async function POST(req: Request) {
     return NextResponse.json({ ok: false, error: "No valid fields to update" }, { status: 400 });
   }
 
-  const { error: upErr } =
-    Object.keys(patch).length > 0
-      ? await supabase.from("users").update(patch).eq("id", user.id)
-      : { error: null };
+  // ONE service-role statement for every profile column, scoped to the
+  // caller's own id. Several of these columns are no longer UPDATE-granted
+  // to `authenticated` (banner_gradient: 20260912100000; avatar_url /
+  // banner_url: 20260912102000; skills, interests, work_experience,
+  // looking_for: 20260922130000), and one statement means the fields can
+  // never half-apply against each other. The service role passes every
+  // grant, so the closed list in `self-write-columns.ts` stands in front of
+  // it: a key outside the list is a coding slip and fails the save.
+  const writePatch: Record<string, unknown> = { ...patch, ...mediaPatch };
+  if (coverThemePatch !== undefined) writePatch.banner_gradient = coverThemePatch;
 
-  if (upErr) {
-    console.error("[profile-sync POST]", upErr);
-    return NextResponse.json({ ok: false, error: "Request failed" }, { status: 500 });
-  }
-
-  // banner_gradient (migration 20260912100000) and avatar_url / banner_url
-  // (migration 20260912102000) are no longer UPDATE-granted to
-  // `authenticated` — write them with the service role, scoped to the
-  // caller's own id. These three columns go in ONE statement so they cannot
-  // half-apply against each other; the `patch` update above is still a
-  // separate statement, so a failure here leaves that one applied (the
-  // pre-existing shape — the response below reports what actually stuck).
-  const servicePatch: Record<string, unknown> = { ...mediaPatch };
-  if (coverThemePatch !== undefined) servicePatch.banner_gradient = coverThemePatch;
-
-  if (Object.keys(servicePatch).length > 0) {
-    const { error: svcErr } = await createSupabaseServiceClient()
+  if (Object.keys(writePatch).length > 0) {
+    const bad = unexpectedSelfWriteKeys(writePatch);
+    if (bad.length > 0) {
+      console.error("[profile-sync POST] unexpected columns", bad);
+      return NextResponse.json({ ok: false, error: "Request failed" }, { status: 500 });
+    }
+    const { error: upErr } = await createSupabaseServiceClient()
       .from("users")
-      .update(servicePatch)
+      .update(writePatch)
       .eq("id", user.id);
-    if (svcErr) {
-      console.error("[profile-sync POST avatar/cover]", svcErr);
+    if (upErr) {
+      console.error("[profile-sync POST]", upErr);
       return NextResponse.json({ ok: false, error: "Request failed" }, { status: 500 });
     }
   }
@@ -372,8 +388,7 @@ export async function POST(req: Request) {
   // sync, so a non-ok here would leave the stale campus in its payload and
   // fail every later save (critic A4).
   const campusError = campusDecision.kind === "reject" ? campusDecision.rejection : null;
-  const wroteOtherFields =
-    Object.keys(patch).length > 0 || Object.keys(servicePatch).length > 0;
+  const wroteOtherFields = Object.keys(writePatch).length > 0;
   if (campusError && !wroteOtherFields) {
     return NextResponse.json(
       {

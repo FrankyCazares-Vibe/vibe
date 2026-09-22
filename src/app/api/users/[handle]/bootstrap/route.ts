@@ -18,7 +18,7 @@ import { createSupabaseServiceClient } from "@/lib/supabase/service";
 // pinned_post_id is fetched in a split try/catch below so a column-
 // missing situation (migration deploy lag) can't 404 the whole route.
 const BASE_PUBLIC_PROFILE_SELECT =
-  "id,name,handle,school,school_verified,year,major,department,bio,tagline,website,headline,location_text,banner_gradient,avatar_url,banner_url,resume_url,resume_docs,interests,skills,looking_for,work_experience,work_order_manual,recruiter_snapshot,current_on,resume_redactions";
+  "id,name,handle,school,school_verified,year,major,department,bio,tagline,website,headline,location_text,banner_gradient,avatar_url,banner_url,resume_url,resume_docs,interests,skills,looking_for,work_experience,work_order_manual,current_on,resume_redactions";
 
 // The badge on someone ELSE's profile now comes from `school_system` +
 // `campus_id` (critic C1): without these two columns every visited profile
@@ -153,6 +153,9 @@ export async function GET(_req: Request, ctx: RouteContext) {
   // only reachable through GET /api/resume/<key>, which itself 401s
   // anonymous callers — this strip stays as defense in depth (and keeps
   // external-link resumes + redaction geometry off the anonymous payload).
+  // "What are you here for?" is blanked too (ruling H6): students answered
+  // it in onboarding without being told it would show on their profile, so
+  // only its owner sees it (`vibeUser.lookingFor` is `[]` here).
   const rowForViewer = viewer
     ? (row as Record<string, unknown>)
     : {
@@ -160,7 +163,7 @@ export async function GET(_req: Request, ctx: RouteContext) {
         resume_url: null,
         resume_docs: [],
         resume_redactions: [],
-        recruiter_snapshot: {},
+        looking_for: [],
       };
 
   const profile = normalizeProfileView(rowForViewer);
@@ -191,6 +194,10 @@ export async function GET(_req: Request, ctx: RouteContext) {
       profile.resume_url = null;
     }
     profile.resume_redactions = [];
+    // Ruling H6: the "Here for" answer is shown to its owner only, until
+    // Franky decides whether it becomes public. Blanked for every other
+    // signed-in viewer, the same as for the signed-out branch above.
+    profile.looking_for = [];
   }
 
   // `appShell: true` is for OWNER bootstrap; viewer bootstrap stays

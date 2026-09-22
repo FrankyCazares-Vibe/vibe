@@ -22,7 +22,7 @@ import { createSupabaseServiceClient } from "@/lib/supabase/service";
 // (plan wave 2 B6), and the campus fields below replace what it was once
 // needed for.
 const BASE_PROFILE_SELECT =
-  "id,email,name,handle,handle_changed_at,school,school_verified,year,major,department,bio,tagline,website,headline,location_text,banner_gradient,avatar_url,banner_url,resume_url,resume_docs,interests,skills,looking_for,work_experience,work_order_manual,recruiter_snapshot,current_on,resume_redactions,terms_accepted_at,terms_version,age_attested_at";
+  "id,email,name,handle,handle_changed_at,school,school_verified,year,major,department,bio,tagline,website,headline,location_text,banner_gradient,avatar_url,banner_url,resume_url,resume_docs,interests,skills,looking_for,work_experience,work_order_manual,current_on,resume_redactions,terms_accepted_at,terms_version,age_attested_at";
 
 /** The campus columns arrive with migration M1 (plan §5.1). */
 const PROFILE_SELECT = `${BASE_PROFILE_SELECT},${PROFILE_CAMPUS_COLUMNS}`;

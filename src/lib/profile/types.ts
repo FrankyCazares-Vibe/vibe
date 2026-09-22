@@ -29,12 +29,14 @@ export type ProfileView = {
   resume_docs: ResumeDocRow[];
   interests: string[];
   skills: string[];
+  /** Raw "what are you here for?" tokens as stored. Display goes through
+   *  `lookingForForDisplay` (lib/profile/looking-for), which drops unknown
+   *  tokens; only the owner is shown them (ruling H6). */
   looking_for: string[];
   work_experience: WorkExperienceRow[];
   /** When true, preserve the stored array order of work_experience instead of
    *  auto-sorting by parsed end date. Flipped by drag/up-down reorder editors. */
   work_order_manual: boolean;
-  recruiter_snapshot: Record<string, string>;
   current_on: CurrentOnItem[];
   resume_redactions: RedactionBar[];
 };

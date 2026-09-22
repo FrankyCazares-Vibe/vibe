@@ -6,16 +6,6 @@ import { sanitizeResumeRedactions } from "@/lib/profile/resume-redactions";
 import type { ProfileView } from "@/lib/profile/types";
 import { sanitizeWorkExperience } from "@/lib/profile/work-experience";
 
-function recruiterSnapshotFromRow(v: unknown): Record<string, string> {
-  if (!v || typeof v !== "object" || Array.isArray(v)) return {};
-  const o = v as Record<string, unknown>;
-  const out: Record<string, string> = {};
-  for (const [k, val] of Object.entries(o)) {
-    if (typeof val === "string") out[k] = val;
-  }
-  return out;
-}
-
 /**
  * The campus model's columns (migration M1), carried next to the legacy
  * `school` label until M3 drops it. Both are null when the select didn't ask
@@ -98,7 +88,6 @@ export function normalizeProfileView(row: Record<string, unknown>): ProfileViewW
     looking_for: strArr(row.looking_for),
     work_experience: sanitizeWorkExperience(row.work_experience),
     work_order_manual: row.work_order_manual === true,
-    recruiter_snapshot: recruiterSnapshotFromRow(row.recruiter_snapshot),
     current_on: sanitizeCurrentOn(row.current_on),
     resume_redactions: sanitizeResumeRedactions(row.resume_redactions),
   };
