@@ -7,6 +7,7 @@ import {
   signOrgAssetGetUrl,
 } from "@/lib/r2";
 import { isSupabaseHttpsUrl } from "@/lib/org-asset-url";
+import { orgContentAccess } from "@/lib/orgs/hidden-org-access";
 import { createSupabaseServerClient } from "@/lib/supabase/server";
 import { createSupabaseServiceClient } from "@/lib/supabase/service";
 
@@ -29,6 +30,13 @@ type Variant = "media" | "thumbnail";
  * posts.user_id), because the author can open their own draft through
  * /api/posts/[id] and its media has to render there. Everyone else —
  * signed out or another student — gets the same 404 as a missing post.
+ *
+ * Hidden clubs are the other exception (T2 D). A club post's media key is
+ * `orgs/<org_id>/posts/...`, so a 307 here would hand out the hidden club's
+ * id and its media to anyone holding the post id. A hidden club's post
+ * answers only its members and platform admins (orgContentAccess); everyone
+ * else gets the same 404 as a missing post, with no Location header. Visible
+ * clubs and personal posts cost one extra primary-key read at most.
  */
 export async function GET(req: Request, { params }: Params) {
   const { id } = await params;
@@ -41,7 +49,7 @@ export async function GET(req: Request, { params }: Params) {
 
   const { data } = await service
     .from("posts")
-    .select(`id, user_id, status, ${column}`)
+    .select(`id, user_id, status, org_id, ${column}`)
     .eq("id", id)
     .maybeSingle();
   const row = data as Record<string, unknown> | null;
@@ -63,11 +71,23 @@ export async function GET(req: Request, { params }: Params) {
     }
   }
 
-  // An author-only answer depends on the session cookie — keep it out of
-  // any shared cache.
+  // A hidden club's post is served to its members and platform admins only.
+  // Fails closed: a read error or a missing club row is the same 404.
+  let hiddenClub = false;
+  if (typeof row.org_id === "string" && row.org_id) {
+    const access = await orgContentAccess(service, row.org_id, "[posts/[id]/media org check]");
+    if (!access.allowed) {
+      return NextResponse.json({ ok: false, error: "Not found" }, { status: 404 });
+    }
+    hiddenClub = access.hidden;
+  }
+
+  // An answer that depended on the session cookie (a draft, or a hidden
+  // club's post) stays out of any shared cache.
+  const privateAnswer = !isPublished || hiddenClub;
   const redirect = (target: string) => {
     const res = NextResponse.redirect(target, 307);
-    if (!isPublished) res.headers.set("Cache-Control", "private, no-store");
+    if (privateAnswer) res.headers.set("Cache-Control", "private, no-store");
     return res;
   };
 

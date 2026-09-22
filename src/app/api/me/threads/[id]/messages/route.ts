@@ -13,7 +13,12 @@ import {
 import { postMediaProxyUrl } from "@/lib/post-media-url";
 import { requireTermsAccepted } from "@/lib/legal/require-terms";
 import { rateLimit, tooManyRequests } from "@/lib/rate-limit";
+import { dmSendBlocked } from "@/lib/safety/pair-block";
 import { createSupabaseServerClient } from "@/lib/supabase/server";
+import {
+  createSupabaseServiceClient,
+  isSupabaseServiceConfigured,
+} from "@/lib/supabase/service";
 
 const MAX_CONTENT = 4000;
 const DEFAULT_LIMIT = 50;
@@ -494,31 +499,22 @@ export async function POST(req: Request, ctx: RouteCtx) {
   // Block guard: in DM/group channels, if any peer blocks the sender (or
   // vice versa), reject the send. Skipped on org channels — orgs are larger
   // groups where one block shouldn't silence a whole community channel.
+  // Fails CLOSED (T2 E): if the check can't run, nothing is sent. The
+  // messages_insert_member policy refuses the same sends in the database.
   if (!member.isOrgChannel) {
-    try {
-      const { data: others } = await supabase
-        .from("channel_members")
-        .select("user_id")
-        .eq("channel_id", channelId)
-        .neq("user_id", user.id);
-      for (const o of others ?? []) {
-        const { data: blocked } = await supabase.rpc("is_blocked_either_way", {
-          viewer_id: user.id,
-          other_id: o.user_id as string,
-        });
-        if (blocked === true) {
-          return NextResponse.json(
-            { ok: false, error: "Couldn't send this message" },
-            { status: 403 },
-          );
-        }
-      }
-    } catch (e) {
-      // If the helper isn't installed yet (migration lag), don't block
-      // sends — the safety net is a polish, not a correctness gate.
-      if (process.env.NODE_ENV !== "production") {
-        console.warn("[messages.POST block-check]", e);
-      }
+    const check = await dmSendBlocked(supabase, channelId, user.id);
+    if (!check.ok) {
+      console.error("[messages.POST block-check]", check.error);
+      return NextResponse.json(
+        { ok: false, error: "Request failed", code: "block_check_failed" },
+        { status: 500 },
+      );
+    }
+    if (check.blocked) {
+      return NextResponse.json(
+        { ok: false, error: "Couldn't send this message" },
+        { status: 403 },
+      );
     }
   }
 
@@ -604,12 +600,19 @@ export async function POST(req: Request, ctx: RouteCtx) {
           }
           const insertedRow = inserted as { id?: string } | null;
           if (validTargets.length > 0 && insertedRow?.id) {
-            await insertMentionNotifications(supabase, {
-              actorId: user.id,
-              targetUserIds: validTargets,
-              kind: "message",
-              messageId: insertedRow.id,
-            });
+            // Students can't insert notifications; the service role writes
+            // them, only after the send above succeeded. actorId is the
+            // session user.
+            if (!isSupabaseServiceConfigured()) {
+              console.error("[messages.POST mentions] service role not configured");
+            } else {
+              await insertMentionNotifications(createSupabaseServiceClient(), {
+                actorId: user.id,
+                targetUserIds: validTargets,
+                kind: "message",
+                messageId: insertedRow.id,
+              });
+            }
           }
         }
       } catch (e) {

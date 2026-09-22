@@ -47,14 +47,28 @@ export async function resolveMentionedUserIds(
 
 type NotificationKind = "post" | "message";
 
+/** The most people one post, edit or message can notify with @mentions. */
+export const MAX_MENTION_NOTIFICATIONS = 20;
+
 /**
  * Insert mention notifications. Best-effort: errors are logged but not
  * thrown — failing to notify a mentionee shouldn't block the underlying
  * publish/send action. Skips if the notifications schema doesn't yet
  * include 'mention' (returns false in that case so callers can decide).
+ *
+ * `writer` MUST be the service-role client. Students can't insert into
+ * `notifications` (T2 migration 20260922120000), so a user client here fails
+ * with 42501 and nobody is notified. Call this only after your own
+ * authorization succeeded (the post, edit or message write went through),
+ * and take `actorId` from the session, never from the request body: the
+ * service role skips RLS, so nothing else checks who the actor is.
+ *
+ * Before any row is built, the targets are de-duplicated, the actor is
+ * dropped, and the list is cut to MAX_MENTION_NOTIFICATIONS. An empty list
+ * returns without a query.
  */
 export async function insertMentionNotifications(
-  supabase: SupabaseClient,
+  writer: SupabaseClient,
   args: {
     actorId: string;
     targetUserIds: string[];
@@ -63,15 +77,18 @@ export async function insertMentionNotifications(
     messageId?: string | null;
   },
 ): Promise<{ inserted: number; skipped: boolean }> {
-  if (args.targetUserIds.length === 0) return { inserted: 0, skipped: false };
-  const rows = args.targetUserIds.map((uid) => ({
+  const targets = Array.from(new Set(args.targetUserIds))
+    .filter((uid) => Boolean(uid) && uid !== args.actorId)
+    .slice(0, MAX_MENTION_NOTIFICATIONS);
+  if (targets.length === 0) return { inserted: 0, skipped: false };
+  const rows = targets.map((uid) => ({
     user_id: uid,
     actor_id: args.actorId,
     type: "mention" as const,
     post_id: args.kind === "post" ? args.postId ?? null : null,
     message_id: args.kind === "message" ? args.messageId ?? null : null,
   }));
-  const { error, count } = await supabase
+  const { error, count } = await writer
     .from("notifications")
     .insert(rows, { count: "exact" });
   if (error) {

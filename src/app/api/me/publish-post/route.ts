@@ -11,6 +11,10 @@ import { CLIP_KEY_PREFIX } from "@/lib/r2";
 import { requireTermsAccepted } from "@/lib/legal/require-terms";
 import { rateLimit, tooManyRequests } from "@/lib/rate-limit";
 import { createSupabaseServerClient } from "@/lib/supabase/server";
+import {
+  createSupabaseServiceClient,
+  isSupabaseServiceConfigured,
+} from "@/lib/supabase/service";
 
 const MAX_CONTENT_CHARS = 2000;
 const MAX_TAGS = 10;
@@ -191,18 +195,24 @@ export async function POST(req: Request) {
   }
 
   // @mention fan-out — best-effort; failures don't block the publish.
+  // Students can't insert notifications, so the service role writes them,
+  // only after the post insert above succeeded; actorId is the session user.
   if (content) {
     const handles = extractMentionHandles(content);
     if (handles.length > 0) {
       try {
         const ids = await resolveMentionedUserIds(supabase, handles, user.id);
         if (ids.length > 0) {
-          await insertMentionNotifications(supabase, {
-            actorId: user.id,
-            targetUserIds: ids,
-            kind: "post",
-            postId: row.id as string,
-          });
+          if (!isSupabaseServiceConfigured()) {
+            console.error("[publish-post mentions] service role not configured");
+          } else {
+            await insertMentionNotifications(createSupabaseServiceClient(), {
+              actorId: user.id,
+              targetUserIds: ids,
+              kind: "post",
+              postId: row.id as string,
+            });
+          }
         }
       } catch (e) {
         console.error("[publish-post mentions]", e);

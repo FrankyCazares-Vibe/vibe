@@ -1,8 +1,8 @@
 import { NextResponse } from "next/server";
 
 import { isSupabaseHttpsUrl } from "@/lib/org-asset-url";
+import { viewerMaySeeHiddenOrg } from "@/lib/orgs/hidden-org-access";
 import { ORG_ASSET_KEY_PREFIX, signOrgAssetGetUrl } from "@/lib/r2";
-import { createSupabaseServerClient } from "@/lib/supabase/server";
 import { createSupabaseServiceClient } from "@/lib/supabase/service";
 
 type Params = { params: Promise<{ slug: string; kind: string }> };
@@ -88,48 +88,4 @@ export async function GET(_req: Request, { params }: Params) {
   }
 
   return NextResponse.json({ ok: false, error: "Unrecognized asset" }, { status: 404 });
-}
-
-/**
- * May the person making this request see a HIDDEN org's assets? True for its
- * members and for platform admins; false for everyone else, including
- * signed-out callers.
- *
- * Only ever called when the org is hidden, so an ordinary logo request still
- * costs exactly one query. Fails CLOSED on any error — the whole point of
- * hidden is that a bad day for the database does not put the org back on the
- * internet.
- */
-async function viewerMaySeeHiddenOrg(
-  service: ReturnType<typeof createSupabaseServiceClient>,
-  orgId: string,
-): Promise<boolean> {
-  try {
-    const supabase = await createSupabaseServerClient();
-    const { data: { user } } = await supabase.auth.getUser();
-    if (!user) return false;
-
-    const [memberRes, viewerRes] = await Promise.all([
-      service
-        .from("org_members")
-        .select("user_id")
-        .eq("org_id", orgId)
-        .eq("user_id", user.id)
-        .maybeSingle(),
-      service
-        .from("users")
-        .select("is_platform_admin")
-        .eq("id", user.id)
-        .maybeSingle(),
-    ]);
-    if (memberRes.error || viewerRes.error) {
-      console.error("[orgs/[slug]/asset hidden check]", memberRes.error ?? viewerRes.error);
-      return false;
-    }
-    if (memberRes.data) return true;
-    return (viewerRes.data as { is_platform_admin?: unknown } | null)?.is_platform_admin === true;
-  } catch (e) {
-    console.error("[orgs/[slug]/asset hidden check]", e);
-    return false;
-  }
 }
