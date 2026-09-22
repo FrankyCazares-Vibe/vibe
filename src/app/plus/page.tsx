@@ -1,6 +1,7 @@
 import Link from "next/link";
 import type { ReactNode } from "react";
 
+import { MobileTabBar } from "@/components/mobile/MobileTabBar";
 import { isSafeRelativePath } from "@/lib/auth/login-next";
 import { getEntitlement } from "@/lib/premium/require-plus";
 import { createSupabaseServerClient } from "@/lib/supabase/server";
@@ -117,7 +118,12 @@ export default async function PlusPage({
 
   return (
     <main style={{ minHeight: "100vh", background: PAGE_BG, padding: "48px 24px 80px" }}>
-      <div style={{ maxWidth: 720, margin: "0 auto" }}>
+      {/* The classes go on this div, not <main>: main's inline padding
+          would override a class, while this div's stacks on top of it. */}
+      <div
+        className={user ? "vibe-tabbar-page vibe-mobile-safe-top" : "vibe-mobile-safe-top"}
+        style={{ maxWidth: 720, margin: "0 auto" }}
+      >
         <p style={{ marginBottom: 24 }}>
           <Link
             href={back ?? "/campus"}
@@ -313,6 +319,10 @@ export default async function PlusPage({
             Questions
           </a>
         </p>
+
+        {/* The phone tab bar, signed in only (every tab is a signed-in
+            surface). It is hidden above 899px. */}
+        {user ? <MobileTabBar /> : null}
       </div>
     </main>
   );

@@ -2760,6 +2760,21 @@ html {
   }
 }
 
+/* Server-rendered pages that carry the phone tab bar without a
+   MobileShell (/orgs/[handle], /plus). The page renders <MobileTabBar />
+   inside the element with this class. Below 900px the element reserves
+   the bar's height, and an open modal dialog inside it hides the bar:
+   the org page's dialogs are inline at z-index 1000, under the bar's
+   9988, and their footers would sit behind it. No effect above 899px. */
+@media (max-width: 899px) {
+  .vibe-tabbar-page {
+    padding-bottom: calc(64px + env(safe-area-inset-bottom, 0px));
+  }
+  .vibe-tabbar-page:has([aria-modal="true"]) .vibe-mobile-tabbar {
+    display: none !important;
+  }
+}
+
 .vibe-mobile-tab {
   display: flex;
   flex-direction: column;

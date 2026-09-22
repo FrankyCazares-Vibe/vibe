@@ -3,6 +3,8 @@
 import Link from "next/link";
 import { usePathname } from "next/navigation";
 
+import { activeMobileTab, type MobileTabHref } from "@/components/mobile/mobile-tab-active";
+
 /**
  * Bottom tab bar — the only mobile chrome. Renders from any mobile page
  * (MobileShell wraps every forked route; CampusAppShell also renders it
@@ -17,11 +19,17 @@ import { usePathname } from "next/navigation";
  *
  * Visibility is owned by the `.vibe-mobile-tabbar` class — `display:
  * none` by default, `display: grid` only inside @media (max-width:
- * 899px). Desktop never renders it.
+ * 899px). Desktop never shows it. Server pages can render it
+ * directly: it is `display: none` above 899px, so it needs no
+ * useIsMobile fork (see /orgs/[handle], /plus).
+ *
+ * Which tab lights lives in `mobile-tab-active.ts`: the five tabs by
+ * exact match or subpath, plus the routes filed under one of them (a
+ * club page under Campus, /plus under Profile).
  */
 
 type MobileTab = {
-  href: string;
+  href: MobileTabHref;
   label: string;
   icon: React.ReactNode;
 };
@@ -122,14 +130,12 @@ const MOBILE_TABS: MobileTab[] = [
 
 export function MobileTabBar() {
   const pathname = usePathname() ?? "";
-
-  const isActive = (href: string) =>
-    pathname === href || (href !== "/" && pathname.startsWith(`${href}/`));
+  const activeHref = activeMobileTab(pathname);
 
   return (
     <nav className="vibe-mobile-tabbar" aria-label="Primary">
       {MOBILE_TABS.map((item) => {
-        const active = isActive(item.href);
+        const active = item.href === activeHref;
         // The Otto tab is the final spotlight target on the network leg
         // of the Otto tour — anchor it with a stable id so the engine
         // can find it.
@@ -144,7 +150,10 @@ export function MobileTabBar() {
                 ? "vibe-mobile-tab vibe-mobile-tab--active"
                 : "vibe-mobile-tab"
             }
-            aria-current={active ? "page" : undefined}
+            // "page" only on the tab's own page. A club page sits inside
+            // Campus, and /profile/<handle> inside Profile, without being
+            // that page, so there the lit tab is just "true".
+            aria-current={active ? (pathname === item.href ? "page" : "true") : undefined}
           >
             <span className="vibe-mobile-tab-icon">{item.icon}</span>
             {item.label}

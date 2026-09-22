@@ -4,6 +4,7 @@ import Link from "next/link";
 import type { SupabaseClient } from "@supabase/supabase-js";
 
 import { LoadFailed } from "@/components/feedback/LoadFailed";
+import { MobileTabBar } from "@/components/mobile/MobileTabBar";
 import { OrgInviteBanner } from "@/components/orgs/OrgInviteBanner";
 import { campusRowById, isSharedCampus } from "@/lib/iu/campuses";
 import { orgAssetProxyUrl } from "@/lib/org-asset-url";
@@ -286,6 +287,7 @@ export default async function OrgProfilePage({ params }: Params) {
 
   return (
     <main
+      className={user ? "vibe-tabbar-page vibe-mobile-safe-top" : "vibe-mobile-safe-top"}
       style={{
         minHeight: "100vh",
         background: backdrop,
@@ -375,6 +377,13 @@ export default async function OrgProfilePage({ params }: Params) {
           }
         />
       </div>
+
+      {/* The phone tab bar, for signed-in viewers only: every tab is a
+          signed-in surface, and a visitor keeps the page's own "Sign in".
+          It is hidden above 899px, and it sits inside <main> so the
+          `.vibe-tabbar-page:has([aria-modal])` rule can hide it while one
+          of this page's inline dialogs is open. */}
+      {user ? <MobileTabBar /> : null}
     </main>
   );
 }
