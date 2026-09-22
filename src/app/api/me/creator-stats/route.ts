@@ -1,6 +1,7 @@
 import { NextResponse } from "next/server";
 
 import { loadPostSaveRows } from "@/lib/metrics/post-audience";
+import { loadPostEngagementCounts, type PostEngagement } from "@/lib/posts/engagement-counts";
 import { loadHonestViewRows, tallyViews } from "@/lib/posts/honest-views";
 import { createSupabaseServerClient } from "@/lib/supabase/server";
 
@@ -18,8 +19,13 @@ import { createSupabaseServerClient } from "@/lib/supabase/server";
  * deliberately left untouched, so any surface still reading it will show a
  * bigger number than this route until it is backfilled.
  *
- * Computed live on each call (no materialized rollup table yet). Likes,
- * comments and reposts are head-only COUNT(*) queries with index hits. Views
+ * Computed live on each call (no materialized rollup table yet). Comments
+ * are head-only COUNT(*) queries with index hits. Likes and reposts come from
+ * the `post_engagement_counts` RPC (T1), once per window: once T1's policy
+ * file lands, `post_likes` and `post_reposts` return only the caller's own
+ * rows, so a direct count would read only the author's own likes. The RPC
+ * returns numbers only, never who liked. A failed call is a 500, like views
+ * and saves below. Views
  * are NOT a count — the helper reads the ledger rows so it can drop the
  * author's own, which means it pages (PostgREST truncates a big response
  * without erroring) and returns null rather than a short number if the scan
@@ -112,32 +118,29 @@ export async function GET() {
     });
   }
 
-  // 2. Engagement totals + per-window. Nine small head-only counts plus two
-  //    row reads — the view ledger and the bookmarks table — each of which
-  //    feeds all-time, 7d, 30d AND the per-post numbers in the top-posts list
-  //    below.
+  // 2. Engagement totals + per-window. Three head-only comment counts, three
+  //    like/repost RPC calls (all-time, 7d, 30d: the same ISO boundaries the
+  //    comment counts use), plus two row reads — the view ledger and the
+  //    bookmarks table. The all-time RPC map, the ledger and the bookmarks
+  //    also feed the per-post numbers in the top-posts list below.
+  //    Every id in `postIds` is the caller's own post, drafts included, and
+  //    the RPC counts drafts for their author, so no total moves.
   const [
-    likesAllRes,
-    likes7Res,
-    likes30Res,
+    engagementAll,
+    engagement7,
+    engagement30,
     commentsAllRes,
     comments7Res,
     comments30Res,
-    repostsAllRes,
-    reposts7Res,
-    reposts30Res,
     viewRows,
     saveRows,
   ] = await Promise.all([
-    supabase.from("post_likes").select("post_id", { count: "exact", head: true }).in("post_id", postIds),
-    supabase.from("post_likes").select("post_id", { count: "exact", head: true }).in("post_id", postIds).gte("created_at", sevenAgo),
-    supabase.from("post_likes").select("post_id", { count: "exact", head: true }).in("post_id", postIds).gte("created_at", thirtyAgo),
+    loadPostEngagementCounts(supabase, postIds),
+    loadPostEngagementCounts(supabase, postIds, sevenAgo),
+    loadPostEngagementCounts(supabase, postIds, thirtyAgo),
     supabase.from("post_comments").select("post_id", { count: "exact", head: true }).in("post_id", postIds),
     supabase.from("post_comments").select("post_id", { count: "exact", head: true }).in("post_id", postIds).gte("created_at", sevenAgo),
     supabase.from("post_comments").select("post_id", { count: "exact", head: true }).in("post_id", postIds).gte("created_at", thirtyAgo),
-    supabase.from("post_reposts").select("post_id", { count: "exact", head: true }).in("post_id", postIds),
-    supabase.from("post_reposts").select("post_id", { count: "exact", head: true }).in("post_id", postIds).gte("created_at", sevenAgo),
-    supabase.from("post_reposts").select("post_id", { count: "exact", head: true }).in("post_id", postIds).gte("created_at", thirtyAgo),
     // Views come from the dedupe ledger (per-user-per-day rows) with the
     // caller's own views on their own posts left out — this screen has to
     // answer "how many people looked", not "how many times did I reload".
@@ -169,6 +172,25 @@ export async function GET() {
     return NextResponse.json({ ok: false, error: "Request failed" }, { status: 500 });
   }
 
+  // And for likes and reposts: `null` from the RPC helper means "we do not
+  // know" (it has logged why), never "no likes".
+  if (engagementAll === null || engagement7 === null || engagement30 === null) {
+    console.error("[creator-stats engagement]");
+    return NextResponse.json({ ok: false, error: "Request failed" }, { status: 500 });
+  }
+  const sumEngagement = (m: Map<string, PostEngagement>) => {
+    let likes = 0;
+    let reposts = 0;
+    for (const e of m.values()) {
+      likes += e.likes;
+      reposts += e.reposts;
+    }
+    return { likes, reposts };
+  };
+  const engagementTotalAll = sumEngagement(engagementAll);
+  const engagementTotal7 = sumEngagement(engagement7);
+  const engagementTotal30 = sumEngagement(engagement30);
+
   const viewsByPost = tallyViews(viewRows, postIds);
   const allTimeViews = viewRows.length;
   const views7 = viewRows.filter((r) => r.viewed_on >= sevenAgoDate).length;
@@ -189,23 +211,26 @@ export async function GET() {
   const saves7 = saveRows.filter((r) => savedAtMs(r.created_at) >= sevenAgoMs).length;
   const saves30 = saveRows.filter((r) => savedAtMs(r.created_at) >= thirtyAgoMs).length;
 
-  // 3. Per-post engagement counts for the "top 5" list. Reuse the all-time
-  //    queries' rows so we don't refetch — fetch the raw post_id arrays and
-  //    aggregate in JS.
-  const [likeRowsRes, commentRowsRes, repostRowsRes] = await Promise.all([
-    supabase.from("post_likes").select("post_id").in("post_id", postIds),
-    supabase.from("post_comments").select("post_id").in("post_id", postIds),
-    supabase.from("post_reposts").select("post_id").in("post_id", postIds),
-  ]);
+  // 3. Per-post engagement counts for the "top 5" list. Likes and reposts
+  //    come from the all-time RPC map above; comments still fetch the raw
+  //    post_id array and aggregate in JS.
+  const commentRowsRes = await supabase
+    .from("post_comments")
+    .select("post_id")
+    .in("post_id", postIds);
   type IdRow = { post_id: string };
   const tally = (rows: IdRow[]) => {
     const m = new Map<string, number>();
     for (const r of rows) m.set(r.post_id, (m.get(r.post_id) ?? 0) + 1);
     return m;
   };
-  const likesByPost = tally((likeRowsRes.data ?? []) as IdRow[]);
+  const likesByPost = new Map<string, number>();
+  const repostsByPost = new Map<string, number>();
+  for (const [postId, e] of engagementAll) {
+    likesByPost.set(postId, e.likes);
+    repostsByPost.set(postId, e.reposts);
+  }
   const commentsByPost = tally((commentRowsRes.data ?? []) as IdRow[]);
-  const repostsByPost = tally((repostRowsRes.data ?? []) as IdRow[]);
 
   // Sort posts by an engagement score (views + 4*likes + 6*comments + 8*reposts)
   // so the "top posts" list isn't dominated by raw view counts. Saves ship as
@@ -239,24 +264,24 @@ export async function GET() {
     totals: {
       posts: postCount,
       views: allTimeViews,
-      likes: likesAllRes.count ?? 0,
+      likes: engagementTotalAll.likes,
       comments: commentsAllRes.count ?? 0,
-      reposts: repostsAllRes.count ?? 0,
+      reposts: engagementTotalAll.reposts,
       saves: allTimeSaves,
     },
     by_window: {
       seven_days: {
         views: views7,
-        likes: likes7Res.count ?? 0,
+        likes: engagementTotal7.likes,
         comments: comments7Res.count ?? 0,
-        reposts: reposts7Res.count ?? 0,
+        reposts: engagementTotal7.reposts,
         saves: saves7,
       },
       thirty_days: {
         views: views30,
-        likes: likes30Res.count ?? 0,
+        likes: engagementTotal30.likes,
         comments: comments30Res.count ?? 0,
-        reposts: reposts30Res.count ?? 0,
+        reposts: engagementTotal30.reposts,
         saves: saves30,
       },
     },

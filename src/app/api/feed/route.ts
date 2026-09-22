@@ -1,4 +1,5 @@
 import { NextResponse } from "next/server";
+import type { SupabaseClient } from "@supabase/supabase-js";
 
 import { isSchoolSystem, legacyLabel, type SchoolSystem } from "@/lib/iu/campuses";
 import { resolveScopeV2, scopeCampusIds } from "@/lib/iu/campus-scope";
@@ -19,10 +20,14 @@ import {
   type OrgCard,
 } from "@/lib/orgs/following";
 import { withPostMediaUrls } from "@/lib/post-media-url";
+import { loadPostEngagementCounts } from "@/lib/posts/engagement-counts";
 import { loadHonestViewRows, tallyViews } from "@/lib/posts/honest-views";
 import { loadHiddenUsers } from "@/lib/safety/hidden-users";
 import { createSupabaseServerClient } from "@/lib/supabase/server";
-import { createSupabaseServiceClient } from "@/lib/supabase/service";
+import {
+  createSupabaseServiceClient,
+  isSupabaseServiceConfigured,
+} from "@/lib/supabase/service";
 
 const DEFAULT_LIMIT = 50;
 const MAX_LIMIT = 200;
@@ -69,15 +74,6 @@ type PostRow = {
   author: AuthorEmbed | null;
 };
 
-type RepostRow = {
-  post_id: string;
-  user_id: string;
-  comment: string | null;
-  created_at: string;
-  reposter: AuthorEmbed | null;
-  post: PostRow | null;
-};
-
 type EngagementCounts = {
   like_count: number;
   comment_count: number;
@@ -115,8 +111,12 @@ type EngagementCounts = {
  * CLUB NAMES come from the SERVICE client (`loadVisibleOrgCards`), never an
  * `orgs` embed under the user client: `orgs_select` hides a club from its
  * non-members, which made the embed null for exactly the followers this
- * feed now serves. A hidden or unknown club's post goes out as the author's
- * own, with `org: null` and `org_id: null` (open question Q4, critic Low 3).
+ * feed now serves. A HIDDEN club's post reaches only its author, the club's
+ * members and platform admins, the same people `GET /api/posts/[id]` opens it
+ * for (rulings H7), and goes out to them as the author's own, with
+ * `org: null` and `org_id: null` (critic Low 3). Everyone else never sees it,
+ * so a card in the feed never opens to a 404. This replaces open question
+ * Q4's default, which showed it to everyone as the author's own post.
  *
  * `?campus=<id>` switches to another campus in the viewer's allowed set (403
  * `campus_not_in_system` otherwise, 400 for an id that isn't a campus at
@@ -304,51 +304,18 @@ export async function GET(req: Request) {
     postsQuery = postsQuery.notIn("user_id", hiddenIds);
   }
 
-  // Reposts (global for now). The embedded `post` carries its own author
-  // join so the client can render the original card the same way it would
-  // as a top-level post. Like the posts query, no `orgs` embed.
-  let repostsQuery = supabase
-    .from("post_reposts")
-    .select(
-      "post_id,user_id,comment,created_at," +
-        "reposter:users!post_reposts_user_id_fkey!inner(id,name,handle,school,major,year,avatar_url)," +
-        "post:posts!inner(" +
-        "id,user_id,org_id,type,content,tags,media_url,media_thumbnail_url,view_count,created_at,edited_at," +
-        "author:users!posts_user_id_fkey!inner(id,name,handle,school,major,year,avatar_url)" +
-        ")",
-    )
-    // Clips are backlogged — a repost of a clip must not leak into the feed
-    // through the embedded post join.
-    .eq("post.type", "post")
-    .order("created_at", { ascending: false })
-    .limit(limit);
-  // Same exclusion for reposts: drop one when the reposter OR the original
-  // post's author is hidden. `post` is an !inner embed, so the embedded
-  // filter removes the whole repost row, not just its `post`.
-  if (hiddenIds.length > 0) {
-    repostsQuery = repostsQuery
-      .notIn("user_id", hiddenIds)
-      .notIn("post.user_id", hiddenIds);
-  }
-
-  // Reposts are hydration-only (see `void repostRows` below) — they emit no
-  // feed row, so they take no lane filter. `school` is still returned in the
-  // response payload (`viewerSchool`) for clients that surface it.
-
-  // Tag filter focuses the view on original posts with that hashtag. We
-  // skip reposts in that mode — surfacing every reshare of every #foo
-  // post would dilute the signal users came here for.
-  const [postsRes, repostsRes] = tagFilter
-    ? [await postsQuery, { data: [] as unknown[], error: null as { message: string } | null }]
-    : await Promise.all([postsQuery, repostsQuery]);
+  // Reposts emit no feed row (Instagram-style: the act of reposting lives on
+  // the reposter's profile, plus the "X reposted this" pill on the original),
+  // so the feed reads no repost rows of its own. A global read of everyone's
+  // reposts used to run here only to add their originals to the count pass,
+  // and nothing it returned was ever rendered; T1 closes `post_reposts` to
+  // own rows, so it is gone. `school` is still returned in the response
+  // payload (`viewerSchool`) for clients that surface it.
+  const postsRes = await postsQuery;
 
   if (postsRes.error) {
     console.error("[feed posts]", postsRes.error);
     return NextResponse.json({ ok: false, error: postsRes.error.message }, { status: 500 });
-  }
-  // Reposts table may not exist yet on a stale deploy — degrade gracefully.
-  if (repostsRes.error) {
-    console.error("[feed reposts]", repostsRes.error);
   }
 
   // Belt and braces: the query already applied the lane, and this drops
@@ -357,39 +324,28 @@ export async function GET(req: Request) {
   const postRows = ((postsRes.data as unknown as PostRow[]) ?? []).filter((p) =>
     postInFeedLane(p, lane, viewerFollowingIds, followedOrgSet),
   );
-  const repostRows =
-    !repostsRes.error && Array.isArray(repostsRes.data)
-      ? ((repostsRes.data as unknown) as RepostRow[])
-      : [];
-
-  // Collect every post id that needs engagement counts — both top-level
-  // posts and the embedded originals inside reposts.
-  const allPostIds = new Set<string>();
-  for (const p of postRows) allPostIds.add(p.id);
-  for (const r of repostRows) {
-    if (r.post?.id) allPostIds.add(r.post.id);
-  }
 
   // The view number on a card is counted from the `post_views` ledger with
   // the post author's own views dropped. `posts.view_count` counts an author
   // refreshing their own post — `record_post_view` had no self-view guard
   // until 20260912100500 — and on the live DB 71 of 149 ledger rows were
-  // self-views. Only the posts we actually render need this: reposts no
-  // longer emit their own feed rows (see `void repostRows` below).
+  // self-views. The rendered posts are the only ones that need counts, views
+  // or friend reposters. (A hidden club's post dropped below has its counts
+  // read in the same batch and thrown away; they never leave the route.)
   const authorByPostId = new Map(postRows.map((p) => [p.id, p.user_id]));
   const renderedPostIds = Array.from(authorByPostId.keys());
 
   // Club attribution for the posts we render, read with the service client
-  // (see the route docblock). Only visible clubs come back, so a hidden or
-  // unknown club's post renders as its author's own. A failed read fails the
-  // feed rather than quietly stripping every club name (the same call as
-  // `events/route.ts` makes for its hidden-org read). 0 club posts live today,
-  // so this read almost never runs.
+  // (see the route docblock). Only visible clubs come back; a hidden club's
+  // post is dropped or kept just below. A failed read fails the feed rather
+  // than quietly stripping every club name (the same call as
+  // `events/route.ts` makes for its hidden-org read). 0 club posts live
+  // today, so this read almost never runs.
   const attrIds = Array.from(
     new Set(postRows.map((p) => p.org_id).filter((id): id is string => typeof id === "string")),
   );
   const [engagement, viewRows, attribution] = await Promise.all([
-    loadEngagement(supabase, Array.from(allPostIds), user.id),
+    loadEngagement(supabase, renderedPostIds, user.id),
     loadHonestViewRows(renderedPostIds, authorByPostId),
     attrIds.length > 0
       ? loadVisibleOrgCards(service(), attrIds)
@@ -399,6 +355,31 @@ export async function GET(req: Request) {
     console.error("[feed org attribution]", attribution.error);
     return NextResponse.json({ ok: false, error: "Request failed" }, { status: 500 });
   }
+
+  // A HIDDEN CLUB'S POST (rulings H7). A club post whose card didn't come back
+  // belongs to a hidden club. It reaches only the people `GET /api/posts/[id]`
+  // opens it for: its author, the club's members and platform admins.
+  // Everyone else never gets the card, so no card in the feed opens to a 404.
+  // Runs only when the page holds such a post. Fails closed like the reads
+  // above.
+  const hiddenClubIds = attrIds.filter((id) => !attribution.byId.has(id));
+  let seenHiddenClubs: ReadonlySet<string> = new Set();
+  if (hiddenClubIds.length > 0) {
+    const access = await loadHiddenClubAccess(service(), user.id, hiddenClubIds);
+    if (!access.ok) {
+      console.error("[feed hidden-club access]", access.error);
+      return NextResponse.json({ ok: false, error: "Request failed" }, { status: 500 });
+    }
+    seenHiddenClubs = access.orgIds;
+  }
+  const shownRows = postRows.filter(
+    (p) =>
+      !p.org_id ||
+      attribution.byId.has(p.org_id) ||
+      p.user_id === user.id ||
+      seenHiddenClubs.has(p.org_id),
+  );
+  const shownPostIds = shownRows.map((p) => p.id);
 
   // A per-card view count is a secondary metric on a page whose job is the
   // posts themselves, so if the ledger can't be read we keep showing the
@@ -415,11 +396,21 @@ export async function GET(req: Request) {
   // reposters who are FOLLOWED BY the viewer (Instagram-style "X and N
   // others reposted this"). We don't surface generic reposter counts
   // here — the value is the friend signal, not raw popularity.
-  const friendReposters = await loadFriendReposters(
-    supabase,
-    Array.from(allPostIds),
-    viewerFollowingIds,
-  );
+  // Other people's repost rows need the service role (T1 closes
+  // `post_reposts` to own rows). Without it the pill is skipped, never the
+  // feed (rulings M13). The club reads above still need the key and fail
+  // closed without it: skipping them would show club posts as personal ones.
+  let friendReposters: FriendReposters = new Map();
+  if (!isSupabaseServiceConfigured()) {
+    console.error("[feed.loadFriendReposters] service role not configured");
+  } else {
+    friendReposters = await loadFriendReposters(
+      supabase,
+      service(),
+      shownPostIds,
+      viewerFollowingIds,
+    );
+  }
 
   const renderPost = (row: PostRow) => {
     const e = engagement.counts.get(row.id) ?? {
@@ -435,8 +426,8 @@ export async function GET(req: Request) {
       // when its stored media_url is an R2 key under `clips/` (legacy
       // naming — it backs regular video posts, not clips).
       ...withPostMediaUrls(row),
-      // A hidden or unknown club doesn't exist to this viewer, so its id
-      // doesn't go out either (critic Low 3). `edited_at` rides the spread.
+      // A hidden club's card never goes out, even to its members, so its id
+      // doesn't either (critic Low 3). `edited_at` rides the spread.
       org_id: card ? row.org_id : null,
       // `honestViews === null` means the ledger was unreadable, not that
       // nobody looked — hence the stored-counter fallback noted above.
@@ -457,18 +448,11 @@ export async function GET(req: Request) {
     };
   };
 
-  const postRowsOut = postRows.map((p) => ({
+  const postRowsOut = shownRows.map((p) => ({
     kind: "post" as const,
     sort_at: p.created_at,
     post: renderPost(p),
   }));
-
-  // Reposts no longer surface as their own feed entries (Instagram-style
-  // model: the act of reposting is private to the user's profile, plus a
-  // social-proof signal on the original post). We still consume the
-  // repostRows above for engagement-count hydration; we just don't emit
-  // a separate "repost"-kind row into the feed.
-  void repostRows;
 
   // Tier-1 ranking pass. We pulled `candidatePoolSize` candidates above
   // (≥ 4× the requested page) so this can lift older-but-popular and
@@ -568,11 +552,13 @@ async function loadEngagement(
     return entry;
   };
 
-  // Three independent count queries + viewer-state queries, in parallel.
-  const [likesAll, commentsAll, repostsAll, likesMine, repostsMine, savesMine] = await Promise.all([
-    supabase.from("post_likes").select("post_id").in("post_id", postIds),
+  // Counts + viewer-state queries, in parallel. Likes and reposts come from
+  // the `post_engagement_counts` RPC (T1): once T1's policy file lands,
+  // `post_likes` and `post_reposts` return only the viewer's own rows, so
+  // counting rows would read 0 or 1. The RPC returns numbers only, never who.
+  const [likesAndReposts, commentsAll, likesMine, repostsMine, savesMine] = await Promise.all([
+    loadPostEngagementCounts(supabase, postIds),
     supabase.from("post_comments").select("post_id").in("post_id", postIds),
-    supabase.from("post_reposts").select("post_id").in("post_id", postIds),
     supabase
       .from("post_likes")
       .select("post_id")
@@ -590,17 +576,20 @@ async function loadEngagement(
       .eq("user_id", viewerId),
   ]);
 
-  for (const row of likesAll.data ?? []) {
-    ensure((row as { post_id: string }).post_id).like_count += 1;
+  // `null` means the RPC failed (the helper logged why). Cards then show 0
+  // likes and 0 reposts, what a failed count showed before; the feed itself
+  // still loads.
+  if (likesAndReposts === null) {
+    console.error("[feed engagement counts]");
+  } else {
+    for (const [postId, e] of likesAndReposts) {
+      const entry = ensure(postId);
+      entry.like_count = e.likes;
+      entry.repost_count = e.reposts;
+    }
   }
   for (const row of commentsAll.data ?? []) {
     ensure((row as { post_id: string }).post_id).comment_count += 1;
-  }
-  // post_reposts may not exist yet on stale deploys — skip silently.
-  if (!repostsAll.error) {
-    for (const row of repostsAll.data ?? []) {
-      ensure((row as { post_id: string }).post_id).repost_count += 1;
-    }
   }
   for (const row of likesMine.data ?? []) {
     likedByViewer.add((row as { post_id: string }).post_id);
@@ -620,12 +609,52 @@ async function loadEngagement(
   return { counts, likedByViewer, repostedByViewer, savedByViewer };
 }
 
+/**
+ * Which of these HIDDEN clubs may the viewer see? Their own memberships, or
+ * every one of them for a platform admin: the rule `clubPostAccess` applies
+ * in `GET /api/posts/[id]` (and `viewerMaySeeHiddenOrg`), read for a batch of
+ * clubs at once.
+ *
+ * Service role, filtered to the viewer's own id: `users.is_platform_admin`
+ * is readable only with the service role. Selects only the club ids and the
+ * one flag. A read error is `{ ok: false }`; the caller fails closed.
+ */
+async function loadHiddenClubAccess(
+  service: SupabaseClient,
+  viewerId: string,
+  orgIds: string[],
+): Promise<{ ok: true; orgIds: Set<string> } | { ok: false; error: unknown }> {
+  const [memberRes, viewerRes] = await Promise.all([
+    service
+      .from("org_members")
+      .select("org_id")
+      .eq("user_id", viewerId)
+      .in("org_id", orgIds),
+    service
+      .from("users")
+      .select("is_platform_admin")
+      .eq("id", viewerId)
+      .maybeSingle(),
+  ]);
+  if (memberRes.error) return { ok: false, error: memberRes.error };
+  if (viewerRes.error) return { ok: false, error: viewerRes.error };
+  if ((viewerRes.data as { is_platform_admin?: unknown } | null)?.is_platform_admin === true) {
+    return { ok: true, orgIds: new Set(orgIds) };
+  }
+  return {
+    ok: true,
+    orgIds: new Set((memberRes.data ?? []).map((r) => (r as { org_id: string }).org_id)),
+  };
+}
+
 type FriendReposterSample = {
   id: string;
   name: string | null;
   handle: string | null;
   avatar_url: string | null;
 };
+
+type FriendReposters = Map<string, { samples: FriendReposterSample[]; totalFriends: number }>;
 
 /**
  * For each post in `postIds`, return up to 3 most-recent friend reposters
@@ -637,6 +666,13 @@ type FriendReposterSample = {
  *   1. Viewer's followings → list of friend ids.
  *   2. post_reposts WHERE user_id IN friends AND post_id IN postIds.
  *   3. users for the (up to 3 × N) reposter ids we'll actually surface.
+ *
+ * Step 2 reads OTHER people's repost rows, which T1 closes to own rows, so it
+ * runs on the SERVICE client. It is safe because both filters are ids this
+ * route already authorized: `friendIds` are the viewer's own follow edges
+ * with blocked and muted people removed, and `postIds` are posts the viewer's
+ * RLS returned. It selects ids and a timestamp only. The `users` read in step
+ * 3 stays on the viewer's client.
  */
 /**
  * Single fetch of who-the-viewer-follows — used by the LANE (a followed
@@ -664,19 +700,17 @@ async function loadViewerFollowings(
 
 async function loadFriendReposters(
   supabase: Awaited<ReturnType<typeof createSupabaseServerClient>>,
+  service: SupabaseClient,
   postIds: string[],
   viewerFollowingIds: Set<string>,
-): Promise<Map<string, { samples: FriendReposterSample[]; totalFriends: number }>> {
-  const out = new Map<
-    string,
-    { samples: FriendReposterSample[]; totalFriends: number }
-  >();
+): Promise<FriendReposters> {
+  const out: FriendReposters = new Map();
   if (postIds.length === 0) return out;
 
   const friendIds = Array.from(viewerFollowingIds);
   if (friendIds.length === 0) return out;
 
-  const { data: friendRepostRows, error: rrErr } = await supabase
+  const { data: friendRepostRows, error: rrErr } = await service
     .from("post_reposts")
     .select("post_id, user_id, created_at")
     .in("post_id", postIds)

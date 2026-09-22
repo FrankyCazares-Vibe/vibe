@@ -82,8 +82,12 @@ export async function GET(req: Request, ctx: RouteContext) {
   const likedByViewer = new Set<string>();
 
   if (commentIds.length > 0) {
+    // Like counts come from the `comment_like_counts` RPC (T1): once T1's
+    // policy file lands, `comment_likes` returns only the viewer's own rows,
+    // so counting rows would read 0 or 1. The RPC returns numbers only, never
+    // who liked. At most MAX_LIMIT (500) ids, under the RPC's 1000.
     const [likesAll, likesMine] = await Promise.all([
-      supabase.from("comment_likes").select("comment_id").in("comment_id", commentIds),
+      supabase.rpc("comment_like_counts", { p_comment_ids: commentIds }),
       supabase
         .from("comment_likes")
         .select("comment_id")
@@ -91,13 +95,17 @@ export async function GET(req: Request, ctx: RouteContext) {
         .eq("user_id", user.id),
     ]);
 
-    // Stale deploys: tables may not exist yet — degrade silently.
-    if (!likesAll.error) {
-      for (const row of likesAll.data ?? []) {
-        const cid = (row as { comment_id: string }).comment_id;
-        counts.set(cid, (counts.get(cid) ?? 0) + 1);
+    // A failed count reads 0 (today's behavior); the thread still loads.
+    if (likesAll.error) {
+      console.error("[posts/:id/comments like counts]", likesAll.error);
+    } else {
+      for (const row of (likesAll.data ?? []) as { comment_id?: unknown; like_count?: unknown }[]) {
+        if (typeof row?.comment_id !== "string") continue;
+        const n = Number(row.like_count);
+        counts.set(row.comment_id, Number.isFinite(n) && n > 0 ? Math.trunc(n) : 0);
       }
     }
+    // Stale deploys: the table may not exist yet — degrade silently.
     if (!likesMine.error) {
       for (const row of likesMine.data ?? []) {
         likedByViewer.add((row as { comment_id: string }).comment_id);

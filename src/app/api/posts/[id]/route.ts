@@ -10,6 +10,7 @@ import { loadOrgRole } from "@/lib/orgs/following";
 import type { OrgRole } from "@/lib/orgs/join-state";
 import { withPostMediaUrls } from "@/lib/post-media-url";
 import { addedHandles, checkPostEdit, extractPostTags } from "@/lib/posts/edit";
+import { loadPostEngagementCounts } from "@/lib/posts/engagement-counts";
 import { loadHonestViewRows } from "@/lib/posts/honest-views";
 import { rateLimit, tooManyRequests } from "@/lib/rate-limit";
 import { CLIP_KEY_PREFIX, getR2S3Client, isR2Configured } from "@/lib/r2";
@@ -69,6 +70,20 @@ type RouteContext = { params: Promise<{ id: string }> };
  * means twelve other people — but it means a client MUST NOT optimistically
  * bump `counts.saves` on a Save tap when `is_owner` is true, or the number it
  * paints will be contradicted by the very next fetch.
+ *
+ * `counts.likes` / `counts.reposts` COME FROM AN RPC (`post_engagement_counts`,
+ * T1). `post_likes` and `post_reposts` return only the caller's own rows once
+ * T1's policy file lands, so counting rows would read 0 or 1. The RPC returns
+ * numbers only, for posts the caller can see. If it fails, both read 0, which
+ * is what a failed count sent before.
+ *
+ * A HIDDEN CLUB'S POST IS "NOT FOUND" (rulings H7). `posts_select_authenticated`
+ * lets any signed-in student read any published post by id, club posts
+ * included, so the club's hidden status is checked here with the service role:
+ * members of the club and platform admins still get the post, and so does its
+ * author; everyone else gets the same 404 as a missing post. `org_id` is read
+ * for that check only and never sent. `/api/feed` leaves the same posts out
+ * for the same people, so no feed card opens to this 404.
  */
 export async function GET(_req: Request, ctx: RouteContext) {
   const { id } = await ctx.params;
@@ -91,7 +106,8 @@ export async function GET(_req: Request, ctx: RouteContext) {
       // `view_count` is read only as the fallback below and is stripped off
       // the post before it ships — nothing should render the inflated counter.
       // `edited_at` (null = never edited) drives the "Edited" marker.
-      "id,user_id,type,content,tags,media_url,media_thumbnail_url,view_count,created_at,edited_at," +
+      // `org_id` is read only for the hidden-club check and stripped too.
+      "id,user_id,org_id,type,content,tags,media_url,media_thumbnail_url,view_count,created_at,edited_at," +
         // Explicit FK name disambiguates the posts→users embed; see /api/feed for context.
         "author:users!posts_user_id_fkey!inner(id,name,handle,school,major,year,avatar_url)",
     )
@@ -109,34 +125,47 @@ export async function GET(_req: Request, ctx: RouteContext) {
   // The concatenated select string defeats Supabase's row typing
   // (GenericStringError); cast through unknown. `view_count` comes off here so
   // the inflated stored counter never reaches a client — `counts.views` below
-  // is the honest number.
-  const { view_count: storedViewCount, ...postFields } = row as unknown as {
+  // is the honest number. `org_id` comes off too: the response keys stay
+  // exactly what they were before the hidden-club check needed it.
+  const {
+    view_count: storedViewCount,
+    org_id: orgId,
+    ...postFields
+  } = row as unknown as {
     view_count: number | null;
+    org_id: string | null;
   } & Record<string, unknown>;
   const post = postFields as { id: string; user_id: string } & Record<string, unknown>;
   const authorId = String(post.user_id);
 
+  // A hidden club's post answers exactly like a missing one (rulings H7).
+  // Checked before any count is read. The author is never locked out of their
+  // own words, even after leaving the club.
+  if (orgId && authorId !== user.id) {
+    const access = await clubPostAccess(orgId, user.id);
+    if (access === "error") {
+      return NextResponse.json({ ok: false, error: "Request failed" }, { status: 500 });
+    }
+    if (access === "hidden") {
+      return NextResponse.json({ ok: false, error: "Post not found" }, { status: 404 });
+    }
+  }
+
   // Counts + viewer state in parallel — small queries, cheap to fan out.
+  // Likes and reposts come from the count RPC (see the docblock): the viewer
+  // is `auth.uid()` there, so this must stay the cookie client.
   const [
-    likeCountRes,
+    engagement,
     commentCountRes,
-    repostCountRes,
     viewerLikeRes,
     viewerSaveRes,
     viewRows,
     saveCount,
   ] = await Promise.all([
-    supabase
-      .from("post_likes")
-      .select("post_id", { count: "exact", head: true })
-      .eq("post_id", id),
+    loadPostEngagementCounts(supabase, [id]),
     supabase
       .from("post_comments")
       .select("id", { count: "exact", head: true })
-      .eq("post_id", id),
-    supabase
-      .from("post_reposts")
-      .select("post_id", { count: "exact", head: true })
       .eq("post_id", id),
     supabase
       .from("post_likes")
@@ -162,15 +191,22 @@ export async function GET(_req: Request, ctx: RouteContext) {
   // the number is the product.
   const views = viewRows === null ? (storedViewCount ?? 0) : viewRows.length;
 
+  // `null` means the RPC failed (the helper logged why). Both numbers read 0,
+  // today's answer to a failed count; the post itself still opens.
+  if (engagement === null) {
+    console.error("[posts/:id GET counts]");
+  }
+  const postCounts = engagement?.get(id) ?? { likes: 0, reposts: 0 };
+
   return NextResponse.json({
     ok: true,
     post: withPostMediaUrls(post),
     is_owner: authorId === user.id,
     counts: {
-      likes:    likeCountRes.count ?? 0,
+      likes:    postCounts.likes,
       comments: commentCountRes.count ?? 0,
       views,
-      reposts:  repostCountRes.count ?? 0,
+      reposts:  postCounts.reposts,
       // Omitted, not zeroed, when the count could not be read.
       ...(saveCount === null ? {} : { saves: saveCount }),
     },
@@ -208,6 +244,67 @@ async function loadSaveCount(postId: string, authorId: string): Promise<number |
     return null;
   }
   return count ?? 0;
+}
+
+/**
+ * May `viewerId` open a post made as the club `orgId`? "visible" for a club
+ * that isn't hidden, and for a hidden one when the viewer is its member or a
+ * platform admin. "hidden" otherwise, and for a club that no longer exists.
+ * "error" when a read fails: the caller answers 500, never the post.
+ *
+ * Service role, because `orgs_select` hides a private club from its
+ * non-members, so the viewer's own client can't tell "private" (the post is
+ * public: private clubs' posts reach the feed) from "hidden". Only a club
+ * post pays for this: one primary-key read, two more when the club is hidden.
+ *
+ * The member / admin rule is a copy of `viewerMaySeeHiddenOrg` in
+ * orgs/[slug]/asset/[kind]/route.ts, which T2 is moving to
+ * `src/lib/orgs/hidden-org-access.ts` this same week. It is copied rather than
+ * imported because batches in one stage can't import each other's new files.
+ * Switch to that module once it has landed.
+ */
+async function clubPostAccess(
+  orgId: string,
+  viewerId: string,
+): Promise<"visible" | "hidden" | "error"> {
+  if (!isSupabaseServiceConfigured()) {
+    console.error("[posts/:id GET club] service role not configured");
+    return "error";
+  }
+  const service = createSupabaseServiceClient();
+  const { data: org, error: orgErr } = await service
+    .from("orgs")
+    .select("hidden_at")
+    .eq("id", orgId)
+    .maybeSingle();
+  if (orgErr) {
+    console.error("[posts/:id GET club]", orgErr);
+    return "error";
+  }
+  if (!org) return "hidden";
+  if ((org as { hidden_at: string | null }).hidden_at == null) return "visible";
+
+  const [memberRes, viewerRes] = await Promise.all([
+    service
+      .from("org_members")
+      .select("user_id")
+      .eq("org_id", orgId)
+      .eq("user_id", viewerId)
+      .maybeSingle(),
+    service
+      .from("users")
+      .select("is_platform_admin")
+      .eq("id", viewerId)
+      .maybeSingle(),
+  ]);
+  if (memberRes.error || viewerRes.error) {
+    console.error("[posts/:id GET club]", memberRes.error ?? viewerRes.error);
+    return "error";
+  }
+  if (memberRes.data) return "visible";
+  return (viewerRes.data as { is_platform_admin?: unknown } | null)?.is_platform_admin === true
+    ? "visible"
+    : "hidden";
 }
 
 /**
@@ -347,6 +444,12 @@ type EditRow = {
  * from the author, so it uses the service role; if the service role isn't
  * configured or the read fails, nobody is notified. A missed mention beats a
  * duplicate one.
+ *
+ * MENTION ROWS ARE WRITTEN WITH THE SERVICE ROLE (T2 A4), on publish and on
+ * edit, and only after the UPDATE succeeded. T2's migration takes INSERT on
+ * `notifications` away from students, so a student can't forge a mention over
+ * REST; this route is where a real one comes from. The actor is always the
+ * signed-in author, never a body field. No service role: nobody is notified.
  *
  * KNOWN GAPS in mention-once. It is check-then-insert with no unique index on
  * notifications behind it, so two PATCHes landing together that add the same
@@ -529,12 +632,19 @@ export async function PATCH(req: Request, ctx: RouteContext) {
         try {
           const ids = await resolveMentionedUserIds(supabase, handles, user.id);
           if (ids.length > 0) {
-            await insertMentionNotifications(supabase, {
-              actorId: user.id,
-              targetUserIds: ids,
-              kind: "post",
-              postId: row.id,
-            });
+            // Written with the service role (T2 A4): students can't insert
+            // notifications themselves. This runs only after the UPDATE
+            // above succeeded, and the actor is the signed-in author.
+            if (!isSupabaseServiceConfigured()) {
+              console.error("[posts/:id PATCH mentions] service role not configured");
+            } else {
+              await insertMentionNotifications(createSupabaseServiceClient(), {
+                actorId: user.id,
+                targetUserIds: ids,
+                kind: "post",
+                postId: row.id,
+              });
+            }
           }
         } catch (e) {
           console.error("[posts/:id PATCH mentions]", e);
@@ -558,7 +668,10 @@ export async function PATCH(req: Request, ctx: RouteContext) {
       // No service role means the "already notified" check can't run, and
       // notifying without it could repeat a mention. Notify nobody instead.
       if (ids.length > 0 && isSupabaseServiceConfigured()) {
-        const { data: existing, error: seenErr } = await createSupabaseServiceClient()
+        // One service client for the "already notified" read and the insert
+        // (T2 A4: the insert is service-role only).
+        const service = createSupabaseServiceClient();
+        const { data: existing, error: seenErr } = await service
           .from("notifications")
           .select("user_id")
           .eq("type", "mention")
@@ -573,7 +686,7 @@ export async function PATCH(req: Request, ctx: RouteContext) {
           );
           const fresh = ids.filter((uid) => !already.has(uid));
           if (fresh.length > 0) {
-            await insertMentionNotifications(supabase, {
+            await insertMentionNotifications(service, {
               actorId: user.id,
               targetUserIds: fresh,
               kind: "post",

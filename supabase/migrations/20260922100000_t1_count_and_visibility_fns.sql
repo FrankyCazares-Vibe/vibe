@@ -325,11 +325,19 @@ begin
       from public.posts p
      where p.id = any(p_post_ids)
        and (p.status = 'published' or p.user_id = auth.uid())
-       and (p_since is null or p.user_id = auth.uid());
+       and (p_since is null or p.user_id = auth.uid())
+       -- a hidden club's post answers only for its author and the club's
+       -- members: to everyone else the club does not exist.
+       and (p.org_id is null or p.user_id = auth.uid() or exists (
+             select 1 from public.orgs o
+              where o.id = p.org_id
+                and (o.hidden_at is null
+                     or exists (select 1 from public.org_members m
+                                 where m.org_id = o.id and m.user_id = auth.uid()))));
 end $$;
 
 comment on function public.post_engagement_counts(uuid[], timestamptz) is
-  'T1: like and repost counts per post, for posts the caller can see (published or own). With p_since, only the caller''s own posts. Numbers only. Max 1000 ids (22023). Called by src/lib/posts/engagement-counts.ts.';
+  'T1: like and repost counts per post, for posts the caller can see (published or own; a hidden club''s post only for its author and members). With p_since, only the caller''s own posts. Numbers only. Max 1000 ids (22023). Called by src/lib/posts/engagement-counts.ts.';
 
 -- Likes per comment, for comments on posts the caller can see.
 create or replace function public.comment_like_counts(p_comment_ids uuid[])
@@ -347,6 +355,12 @@ begin
       left join public.comment_likes cl on cl.comment_id = c.id
      where c.id = any(p_comment_ids)
        and (p.status = 'published' or p.user_id = auth.uid())
+       and (p.org_id is null or p.user_id = auth.uid() or exists (
+             select 1 from public.orgs o
+              where o.id = p.org_id
+                and (o.hidden_at is null
+                     or exists (select 1 from public.org_members m
+                                 where m.org_id = o.id and m.user_id = auth.uid()))))
      group by c.id;
 end $$;
 
