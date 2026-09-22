@@ -7,6 +7,7 @@ import { buildVibeUserV1FromProfile } from "@/lib/profile/build-vibe-user-v1";
 import { normalizeProfileView } from "@/lib/profile/normalize-profile-view";
 import { PUBLIC_PROFILE_CAMPUS_COLUMNS } from "@/lib/profile/profile-campus-write";
 import { parseResumeDocRef } from "@/lib/profile/resume-doc-url";
+import { loadPairBlock } from "@/lib/safety/pair-block";
 import { createSupabaseServerClient } from "@/lib/supabase/server";
 import { createSupabaseServiceClient } from "@/lib/supabase/service";
 
@@ -66,9 +67,10 @@ export async function GET(_req: Request, ctx: RouteContext) {
     data: { user: viewer },
   } = await supabase.auth.getUser();
 
-  // `service` reads the profile row (see the docblock); `reader` is the
-  // client used for counts / pinned post — the viewer's own when signed
-  // in so those reads stay RLS-scoped, the service role otherwise.
+  // `service` reads the profile row (see the docblock) and the counts;
+  // `reader` is the client used for the pinned post — the viewer's own
+  // when signed in so that read stays RLS-scoped, the service role
+  // otherwise.
   let service: SupabaseClient;
   try {
     service = createSupabaseServiceClient();
@@ -111,26 +113,23 @@ export async function GET(_req: Request, ctx: RouteContext) {
   // RLS on `blocks` allows either party to read the row (migration
   // 20260515000000_blocks_select_either_party). Posts, bio, counts are
   // NOT included in either branch — both intentionally omit content.
+  // The read goes through the one block-pair module (rulings M11), the same
+  // as the three list routes. A refused read is unknown, not "not blocked":
+  // it answers 500, because the profile, and the counts read below with the
+  // service client, must never reach a blocked viewer.
   const targetIdRaw = (row as { id: string }).id;
   if (viewer) {
-    const { data: blockRows } = await supabase
-      .from("blocks")
-      .select("blocker_id, blocked_id")
-      .or(
-        `and(blocker_id.eq.${targetIdRaw},blocked_id.eq.${viewer.id}),` +
-          `and(blocker_id.eq.${viewer.id},blocked_id.eq.${targetIdRaw})`,
-      );
-    const targetBlockedViewer = (blockRows ?? []).some(
-      (r) =>
-        (r as { blocker_id: string }).blocker_id === targetIdRaw &&
-        (r as { blocked_id: string }).blocked_id === viewer.id,
-    );
-    const viewerBlockedTarget = (blockRows ?? []).some(
-      (r) =>
-        (r as { blocker_id: string }).blocker_id === viewer.id &&
-        (r as { blocked_id: string }).blocked_id === targetIdRaw,
-    );
-    if (targetBlockedViewer || viewerBlockedTarget) {
+    const pair = await loadPairBlock(supabase, viewer.id, targetIdRaw);
+    if (!pair.ok) {
+      console.error("[users/:handle/bootstrap blocks]", pair.error);
+      return NextResponse.json({ ok: false, error: "Request failed" }, { status: 500 });
+    }
+    if (pair.blocked) {
+      const viewerBlockedTarget = pair.viewerBlockedTarget;
+      // `blocked` with neither flag set is loadPairBlock failing closed on a
+      // row it could not place. Show the neutral "Profile unavailable" copy,
+      // which offers no Unblock.
+      const targetBlockedViewer = pair.targetBlockedViewer || !viewerBlockedTarget;
       return NextResponse.json({
         ok: true,
         blockedByTarget: targetBlockedViewer,
@@ -201,7 +200,12 @@ export async function GET(_req: Request, ctx: RouteContext) {
 
   const targetId = profile.id;
   const [counts, follow, mutual] = await Promise.all([
-    getCountsFor(reader, targetId),
+    // Service client (T1): policy `connections_select_either_party` shows the
+    // viewer's own client only edges they are part of, so the target's
+    // follower / following / connection counts need service. Safe here:
+    // blocked pairs were answered above, counts are public, and only the
+    // three numbers leave (`vibeUser.counts` below).
+    getCountsFor(service, targetId),
     viewer
       ? getFollowState(supabase, viewer.id, targetId)
       : Promise.resolve("none" as const),

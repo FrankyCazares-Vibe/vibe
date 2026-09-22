@@ -1,5 +1,7 @@
 import type { SupabaseClient } from "@supabase/supabase-js";
 
+import { blockPairFilter } from "@/lib/safety/pair-block";
+
 /**
  * Counts derived from `public.connections` for a given user.
  *
@@ -29,7 +31,19 @@ const ZERO_COUNTS: ConnectionCounts = {
   connections: 0,
 };
 
-/** Read-only fetch of follower / following / connection counts for one user. */
+/**
+ * Read-only fetch of follower / following / connection counts for one user.
+ *
+ * WHICH CLIENT (T1). Policy `connections_select_either_party` (migration
+ * `20260922110000_t1_close_world_readable_selects.sql`) shows a user client
+ * only the edges it is part of. So a user client counts correctly only when
+ * `userId` IS the signed-in user (`me/connections-summary`,
+ * `me/profile-bootstrap`). For anyone else, pass the service client, or
+ * every number comes back as "edges that touch the viewer". The service
+ * client skips RLS, so the CALLER does the authorization first
+ * (`users/[handle]/bootstrap` answers blocked pairs before it gets here).
+ * Counts are public; only the three numbers may leave the route.
+ */
 export async function getCountsFor(
   supabase: SupabaseClient,
   userId: string,
@@ -151,12 +165,34 @@ const CONNECTIONS_SCAN_CAP = 20_000;
 const IN_FILTER_CHUNK = 500;
 
 /**
+ * How many peers go into one `blocks` read in `loadMutualIds` step 3. The
+ * block-pair filter lists every id twice (once per direction), so at
+ * IN_FILTER_CHUNK its URL would be about twice as long as step 2's. Half the
+ * chunk keeps it about the length of the URL step 2 already sends (~20 KB
+ * encoded, measured with node's URL).
+ */
+const BLOCK_PEER_CHUNK = IN_FILTER_CHUNK / 2;
+
+/**
  * The ids behind "you both follow": people `targetId` follows whom `viewerId`
  * also follows. Directed on purpose — it is the same math `hydrateUserCards`
- * uses for `mutual_count` (the mutual-edges query below), so the pill on a
- * profile and the list behind it (`/api/users/[handle]/mutuals`) can never
- * disagree. The strict reciprocal definition lives in `getCountsFor` and is a
- * different number on purpose.
+ * gets for `mutual_count` from the `mutual_follow_counts` RPC, so the pill on
+ * a profile, the list behind it (`/api/users/[handle]/mutuals`) and the
+ * target's card in any list can never disagree. The strict reciprocal
+ * definition lives in `getCountsFor` and is a different number on purpose.
+ *
+ * Blocks (rulings M4, M12). Anyone in a block pair with the viewer, in either
+ * direction, is dropped from the answer, and a target in a block pair with the
+ * viewer has no mutuals at all. The RPC skips the same people, which keeps the
+ * three numbers above equal.
+ *
+ * WHICH CLIENT (T1). Step 2 reads the TARGET's edges. Under policy
+ * `connections_select_either_party` a user client sees only edges it is part
+ * of, so for any target other than the viewer this must be handed the service
+ * client (the mutuals route and bootstrap both do). The service client skips
+ * RLS, so the CALLER does the authorization check (the viewer is signed in,
+ * and the viewer↔target block check has run) before calling this. Only ids
+ * leave; the caller decides what to show.
  *
  * Order is deterministic — the *target's* follow edge newest first, ties broken
  * by the connection row id — because the mutuals route pages this array with
@@ -168,14 +204,15 @@ const IN_FILTER_CHUNK = 500;
  * list — same reason `/api/feed` fails closed on `loadHiddenUsers`. The shape
  * mirrors `loadHiddenUsers` in `src/lib/safety/hidden-users.ts`.
  *
- * Neither read can truncate. Step 1 is paged (`.range()`, ordered, stop on an
- * empty page) and step 2 is chunked below the row cap, because both are ROW
- * reads and PostgREST caps those at 1000 with no error to say so. The old
- * unpaged shape — inherited from `getCountsFor`'s following-id list, which
- * still has it — would have dropped every mutual whose edge fell outside an
- * arbitrary 1000 for anyone following more than that, and, with no ORDER BY,
- * would have returned a *different* arbitrary 1000 on the route's second page
- * request: the exact double-show the ordering note above exists to prevent.
+ * No read can truncate. Step 1 is paged (`.range()`, ordered, stop on an
+ * empty page) and steps 2 and 3 are chunked at or below the row cap, because
+ * all three are ROW reads and PostgREST caps those at 1000 with no error to
+ * say so. The old unpaged shape — inherited from `getCountsFor`'s
+ * following-id list, which still has it — would have dropped every mutual
+ * whose edge fell outside an arbitrary 1000 for anyone following more than
+ * that, and, with no ORDER BY, would have returned a *different* arbitrary
+ * 1000 on the route's second page request: the exact double-show the
+ * ordering note above exists to prevent.
  */
 export async function loadMutualIds(
   supabase: SupabaseClient,
@@ -260,7 +297,46 @@ export async function loadMutualIds(
     seen.add(row.following_id);
     ids.push(row.following_id);
   }
-  return { ok: true, ids };
+  if (ids.length === 0) return { ok: true, ids };
+
+  // Step 3 — drop block pairs with the viewer (see the docblock). The target
+  // goes in the same read. `blocks` is UNIQUE (blocker_id, blocked_id), so a
+  // chunk of N peers matches at most 2N rows: 500 at BLOCK_PEER_CHUNK, under
+  // the row cap, so this read cannot truncate either, and its URL stays about
+  // as long as step 2's. The filter comes from the one block-pair module
+  // (rulings M11); it is null for a non-UUID id, which counts as a refused
+  // read, never as "not blocked".
+  const peers = [targetId, ...ids];
+  const blockedPeers = new Set<string>();
+  const viewerLower = viewerId.toLowerCase();
+  for (let i = 0; i < peers.length; i += BLOCK_PEER_CHUNK) {
+    const filter = blockPairFilter(viewerId, peers.slice(i, i + BLOCK_PEER_CHUNK));
+    if (filter === null) {
+      console.error("[connections.loadMutualIds blocks] bad id");
+      return { ok: false, error: new Error("bad id") };
+    }
+    const { data, error } = await supabase
+      .from("blocks")
+      .select("blocker_id, blocked_id")
+      .or(filter);
+    if (error || !data) {
+      console.error("[connections.loadMutualIds blocks]", error);
+      return {
+        ok: false,
+        error: error ?? new Error("blocks read returned no rows"),
+      };
+    }
+    for (const row of data as { blocker_id: string; blocked_id: string }[]) {
+      const blocker = String(row.blocker_id).toLowerCase();
+      const blocked = String(row.blocked_id).toLowerCase();
+      blockedPeers.add(blocker === viewerLower ? blocked : blocker);
+    }
+  }
+  if (blockedPeers.has(targetId.toLowerCase())) return { ok: true, ids: [] };
+  return {
+    ok: true,
+    ids: ids.filter((id) => !blockedPeers.has(id.toLowerCase())),
+  };
 }
 
 /**
@@ -315,11 +391,25 @@ export type UserCardData = {
  * Order of returned rows matches `candidateIds`. Missing/invisible profiles are
  * dropped silently.
  *
- * Three batched queries regardless of page size:
+ * NEVER PASS THE SERVICE CLIENT (rulings M3). Hand this the signed-in
+ * viewer's cookie client, and `viewerId` must be that same user.
+ * `mutual_follow_counts` keys on `auth.uid()`, which is NULL under the
+ * service role, so with the service client every card's `mutual_count`
+ * silently reads 0 (no error to say so). This is the opposite of
+ * `getCountsFor` and `loadMutualIds`, which need the service client for
+ * someone else's edges. Reviewer check: `grep -rnE
+ * 'hydrateUserCards\((service|createSupabaseServiceClient)' src` prints
+ * nothing.
+ *
+ * Four batched reads in parallel, regardless of page size:
  *   1. Profiles for the candidate slice.
  *   2. Outgoing edges (viewer → candidate) for follow_state.
- *   3. Mutual counts: for each candidate, count their followings that overlap
- *      with the viewer's followings.
+ *   3. Incoming edges (candidate → viewer) for follow_state.
+ *   4. Mutual counts from the `mutual_follow_counts` RPC: for each candidate,
+ *      how many of their followings the viewer also follows, skipping block
+ *      pairs with the viewer (rulings M4). Numbers only, never who.
+ * Steps 2 and 3 read edges the viewer is part of, which is all policy
+ * `connections_select_either_party` shows a user client.
  */
 export async function hydrateUserCards(
   supabase: SupabaseClient,
@@ -328,18 +418,7 @@ export async function hydrateUserCards(
 ): Promise<UserCardData[]> {
   if (candidateIds.length === 0) return [];
 
-  // Viewer's outgoing followings — needed for both mutual computation and
-  // follow_state (incoming side comes from the candidate set itself when
-  // applicable; we fetch it separately to stay generic).
-  const { data: viewerOut } = await supabase
-    .from("connections")
-    .select("following_id")
-    .eq("follower_id", viewerId);
-  const viewerFollowingIds = (viewerOut ?? []).map(
-    (r) => (r as { following_id: string }).following_id,
-  );
-
-  const [profilesRes, outEdgesRes, inEdgesRes, mutualEdgesRes] = await Promise.all([
+  const [profilesRes, outEdgesRes, inEdgesRes, mutualByCandidate] = await Promise.all([
     supabase
       .from("users")
       .select("id,name,handle,avatar_url,banner_url,banner_gradient,major,year")
@@ -354,13 +433,7 @@ export async function hydrateUserCards(
       .select("follower_id")
       .eq("following_id", viewerId)
       .in("follower_id", candidateIds),
-    viewerFollowingIds.length === 0
-      ? Promise.resolve({ data: [] as { follower_id: string; following_id: string }[] })
-      : supabase
-          .from("connections")
-          .select("follower_id, following_id")
-          .in("follower_id", candidateIds)
-          .in("following_id", viewerFollowingIds),
+    loadMutualFollowCounts(supabase, candidateIds),
   ]);
 
   type ProfileRow = {
@@ -385,15 +458,6 @@ export async function hydrateUserCards(
     (inEdgesRes.data ?? []).map((r) => (r as { follower_id: string }).follower_id),
   );
 
-  const mutualByCandidate = new Map<string, number>();
-  for (const row of mutualEdgesRes.data ?? []) {
-    const r = row as { follower_id: string; following_id: string };
-    mutualByCandidate.set(
-      r.follower_id,
-      (mutualByCandidate.get(r.follower_id) ?? 0) + 1,
-    );
-  }
-
   return candidateIds
     .map((id) => {
       const profile = profileById.get(id);
@@ -413,4 +477,66 @@ export async function hydrateUserCards(
       } satisfies UserCardData;
     })
     .filter((row): row is UserCardData => row !== null);
+}
+
+/** `mutual_follow_counts` refuses more ids than this (SQLSTATE 22023). */
+const MUTUAL_RPC_MAX_IDS = 1000;
+
+/** A count from the RPC as a whole number: NaN, negatives, non-finite or missing → 0. */
+function toCount(value: unknown): number {
+  const n = Number(value);
+  return Number.isFinite(n) && n > 0 ? Math.trunc(n) : 0;
+}
+
+/**
+ * `mutual_count` per candidate, from `rpc("mutual_follow_counts", { p_user_ids })`
+ * (migration `20260922100000_t1_count_and_visibility_fns.sql`). Rows are
+ * `{ user_id, mutual_count }`, only where the count is above 0, so a missing
+ * candidate reads 0. Deduped and chunked at 1000.
+ *
+ * Keys are the caller's own spelling of each id. Postgres returns uuids in
+ * lower case, so rows are matched in lower case: an id passed in upper case
+ * would otherwise always read 0.
+ *
+ * On any error: `console.error("[connections.hydrateUserCards mutual]")` and
+ * an empty map, so every card shows 0, which is what the old row read gave on
+ * a failure. It is a hint on a card, not a list, so a card still renders.
+ * The viewer is `auth.uid()`: see the service-client warning on
+ * `hydrateUserCards`.
+ */
+async function loadMutualFollowCounts(
+  supabase: SupabaseClient,
+  candidateIds: string[],
+): Promise<Map<string, number>> {
+  const ids = Array.from(new Set(candidateIds));
+  const chunks: string[][] = [];
+  for (let i = 0; i < ids.length; i += MUTUAL_RPC_MAX_IDS) {
+    chunks.push(ids.slice(i, i + MUTUAL_RPC_MAX_IDS));
+  }
+
+  const byLower = new Map<string, number>();
+  try {
+    const results = await Promise.all(
+      chunks.map((chunk) => supabase.rpc("mutual_follow_counts", { p_user_ids: chunk })),
+    );
+    for (const res of results) {
+      if (res.error) {
+        console.error("[connections.hydrateUserCards mutual]", res.error);
+        return new Map();
+      }
+      for (const row of Array.isArray(res.data) ? (res.data as unknown[]) : []) {
+        if (!row || typeof row !== "object") continue;
+        const r = row as { user_id?: unknown; mutual_count?: unknown };
+        if (typeof r.user_id !== "string") continue;
+        byLower.set(r.user_id.toLowerCase(), toCount(r.mutual_count));
+      }
+    }
+  } catch (error) {
+    console.error("[connections.hydrateUserCards mutual]", error);
+    return new Map();
+  }
+
+  const out = new Map<string, number>();
+  for (const id of ids) out.set(id, byLower.get(id.toLowerCase()) ?? 0);
+  return out;
 }

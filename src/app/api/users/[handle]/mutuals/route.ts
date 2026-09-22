@@ -1,9 +1,11 @@
 import { NextResponse } from "next/server";
+import type { SupabaseClient } from "@supabase/supabase-js";
 
 import { hydrateUserCards, loadMutualIds } from "@/lib/connections/queries";
 import { ilikeOrFilter } from "@/lib/pgrest";
 import { rateLimit, tooManyRequests } from "@/lib/rate-limit";
 import { createSupabaseServerClient } from "@/lib/supabase/server";
+import { createSupabaseServiceClient } from "@/lib/supabase/service";
 
 const DEFAULT_LIMIT = 20;
 const MAX_LIMIT = 50;
@@ -27,11 +29,12 @@ const EMPTY_PAGE = { ok: true, users: [], total: 0, has_more: false };
  * opens underneath it. "Mutual" here is the DIRECTED intersection — people you
  * both follow — not the strict reciprocal pairs `getCountsFor` counts.
  *
- * Everything reads through the cookie client. `connections` is
- * `SELECT TO authenticated USING (true)`, so the viewer's own session sees the
- * whole follow graph and there is nothing for the service role to unlock; the
- * comment at `bootstrap/route.ts` claiming otherwise is the thing this route
- * deliberately does not copy.
+ * Which client (T1). Policy `connections_select_either_party` shows a user
+ * client only the edges it is part of, so `loadMutualIds` gets the service
+ * client to read the TARGET's edges, and only after the block check below has
+ * passed. It hands back ids only, already without anyone in a block pair with
+ * the viewer. The `q` search and `hydrateUserCards` stay on the cookie client
+ * (`hydrateUserCards` must never get the service client, rulings M3).
  *
  * Auth is required (no anonymous browsing of someone else's network) and
  * `rateLimit` is keyed on the caller, because this is the first connections
@@ -107,7 +110,15 @@ export async function GET(req: Request, ctx: RouteContext) {
   const offset = Math.max(0, Number(url.searchParams.get("offset")) || 0);
   const q = (url.searchParams.get("q") ?? "").trim();
 
-  const idsRes = await loadMutualIds(supabase, viewer.id, targetId);
+  let service: SupabaseClient;
+  try {
+    service = createSupabaseServiceClient();
+  } catch (e) {
+    console.error("[users/:handle/mutuals service]", e);
+    return NextResponse.json({ ok: false, error: "Request failed" }, { status: 500 });
+  }
+
+  const idsRes = await loadMutualIds(service, viewer.id, targetId);
   if (!idsRes.ok) {
     // Never paint "no one you both follow" over a read we could not do.
     return NextResponse.json({ ok: false, error: "Request failed" }, { status: 500 });
