@@ -4,6 +4,10 @@
 
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
+<!-- This file is the desktop body of /profile and /profile/<handle>, never
+     an address of its own: search engines index those (the canonical link
+     below names the right one), not this. -->
+<meta name="robots" content="noindex">
 <link rel="icon" href="/icon.png" type="image/png" sizes="192x192">
 <link rel="icon" href="/favicon-48.png" type="image/png" sizes="48x48">
 <link rel="icon" href="/favicon.ico" sizes="48x48">
@@ -40,6 +44,30 @@
     if (user && user._onboarded) {
       document.documentElement.classList.add('vibe-pre-paint');
     }
+  } catch (e) {}
+})();
+
+// The clean address this page stands for: /profile/<handle> when it shows
+// someone (?handle=, or the legacy ?user=), /profile for your own. Worked
+// out once, here, because the address bar is put back to it at the end of
+// <body> (vibeProfileCleanAddress) and the query is gone after that. The
+// canonical link says it from the start. The address the page arrived at
+// is kept for the one reload that needs its settings back (?clear=1 with
+// an empty cache, in initProfilePage).
+(function () {
+  var clean = '/profile';
+  try {
+    window.__vibeProfileEntryHref = location.href;
+    var p = new URLSearchParams(location.search);
+    var h = (p.get('handle') || p.get('user') || '').trim().toLowerCase();
+    if (h) clean = '/profile/' + encodeURIComponent(h);
+  } catch (e) {}
+  window.__vibeProfileCleanPath = clean;
+  try {
+    var link = document.createElement('link');
+    link.rel = 'canonical';
+    link.href = location.origin + clean;
+    document.head.appendChild(link);
   } catch (e) {}
 })();
 </script>
@@ -1252,6 +1280,13 @@ body.viewer-mode .redaction-delete { display:none !important; }
   color:var(--muted);
   line-height:1.5;
   margin-top:8px;
+}
+.redaction-privacy {
+  font-size:12px;
+  font-weight:600;
+  color:var(--charcoal);
+  line-height:1.5;
+  margin-top:12px;
 }
 
 /* Edit-mode CTA banner above the doc viewer. Visible to owners who
@@ -3655,8 +3690,15 @@ body.empty-profile-mode #profileEmpty { display: flex !important; }
         <div class="doc-view" id="docView"></div>
         <div class="redaction-hint owner-only" id="docHint">Tip: in edit mode, click and drag on the document to cover personal details. Click a bar to resize or delete.</div>
         <div class="doc-redactions">
+          <!-- Who sees what: the owner is served the original with the bars
+               drawn over it; everyone else is served a copy with the bars
+               burned in (/api/resume/<key>). The chip opens that copy. A
+               link has no such copy: renderDocViewer swaps the line and
+               hides the chip for one (_renderDocPrivacy). -->
+          <div class="redaction-privacy owner-only" id="docPrivacyLine">Only you see your original. Everyone else sees the blacked-out copy.</div>
           <div class="redaction-toolbar owner-only" style="margin-top:12px">
             <button class="redaction-chip" onclick="clearRedactions()">Clear all bars</button>
+            <button class="redaction-chip" id="docViewPublicBtn" onclick="openDocAsOthersSee()">View as others see it</button>
           </div>
           <div class="redaction-hint owner-only">Click and drag anywhere on the document to add a blackout bar. Click a bar to select — drag to move, use handles to resize, or click the × to delete. Bars are saved with your profile.</div>
         </div>
@@ -4689,6 +4731,17 @@ function deleteCurrent(btn){ btn.closest('.current-item').remove(); saveProfileT
 //   PDFs always have pages[]; images have a single page = the image url.
 let resumePortfolio = [];
 let activeDocIndex = 0;
+// Attachments the server has (proxy paths, links) that were removed on this
+// page and not saved yet. The next save sends the server's own list without
+// them (resume_docs, see _serverResumeState); var so the sync code can't hit
+// a TDZ on it.
+var _removedResumeRefs = [];
+
+// An attachment the server stores under this url: a private-storage proxy
+// path or a link. A data: url is a fresh upload the server hasn't got yet.
+function _isServerDocRef(url) {
+  return typeof url === 'string' && (_isResumeProxyPath(url) || /^https?:\/\//i.test(url));
+}
 
 function guessDocType(fileName, mime) {
   if ((mime || '').includes('pdf') || fileName.toLowerCase().endsWith('.pdf')) return 'pdf';
@@ -4877,28 +4930,56 @@ async function handleResumeUpload(input) {
 
 function removeResumeDoc(idx) {
   if (idx < 0 || idx >= resumePortfolio.length) return;
-  resumePortfolio.splice(idx, 1);
+  // Name each bar's document before the list moves, so none can slide onto
+  // the attachment that takes the removed one's place.
+  _stampBarDocKeys();
+  const [gone] = resumePortfolio.splice(idx, 1);
+  _noteRemovedResumeDoc(gone);
   // Bars on the removed doc are dropped; bars on later docs shift down one
-  // docIndex so they stay attached to the right attachment.
+  // docIndex so they stay drawn on the right attachment here.
   redactionBars = redactionBars
     .filter(b => b.docIndex !== idx)
     .map(b => (b.docIndex > idx ? { ...b, docIndex: b.docIndex - 1 } : b));
+  selectedBarIdx = null;
   if (activeDocIndex >= resumePortfolio.length) {
     activeDocIndex = Math.max(0, resumePortfolio.length - 1);
   }
   renderResumeCard();
   const modal = document.getElementById('docModal');
   if (modal && modal.classList.contains('open')) renderDocViewer();
-  saveProfileToStorage({ edited: ['resume', 'redactions'] });
+  // The save carries the list change, not the bars: the server keeps each
+  // stored bar on its own document (docKey) and drops the removed one's.
+  // Exception: bars on an upload the server hasn't got yet, now first in
+  // line. That upload goes out as the first attachment, and its bars can
+  // only reach the server with it.
+  const edited = ['resume'];
+  const first = resumePortfolio[0];
+  if (first && !_isServerDocRef(first.url) && redactionBars.some(b => b.docIndex === 0)) {
+    edited.push('redactions');
+  }
+  saveProfileToStorage({ edited });
   showToast('Attachment removed');
 }
 
 function clearResumePortfolio() {
+  resumePortfolio.forEach(_noteRemovedResumeDoc);
   resumePortfolio = [];
   activeDocIndex = 0;
+  // No attachments here, no bars here: the server drops their bars with
+  // the documents. Bars named for an attachment this page doesn't show
+  // (added on the phone) stay, like that attachment does.
+  redactionBars = redactionBars.filter(b => b && b.docIndex < 0 && _isServerDocRef(b.docKey));
+  selectedBarIdx = null;
   renderResumeCard();
   showToast('Attachment cleared');
   saveProfileToStorage({ edited: 'resume' });
+}
+
+// A removed attachment the server has: the next save takes it off the
+// server's list (resume_docs). A fresh upload never reached it.
+function _noteRemovedResumeDoc(doc) {
+  const url = doc && doc.url;
+  if (_isServerDocRef(url) && !_removedResumeRefs.includes(url)) _removedResumeRefs.push(url);
 }
 
 function renderResumeCard() {
@@ -5024,10 +5105,124 @@ window.enableEditModeFromDocViewer = enableEditModeFromDocViewer;
 // viewer scrolls, bars travel WITH the page content (no drift).
 //
 // Bar entries:
-//   { docIndex, pageNumber (1-based), x, y, w, h }
+//   { docIndex, pageNumber (1-based), x, y, w, h, docKey? }
+// docIndex is the attachment's place in resumePortfolio, which is what this
+// page draws by. docKey names the attachment itself: its url exactly as the
+// server stores it (a /api/resume/<key> proxy path or a link). Positions
+// move when an attachment is removed; the name doesn't, and it is what the
+// server goes by when it decides which copy a visitor gets. A bar on a
+// fresh upload (still a data: url) has no name until the server has the file.
 // Selection is a single absolute index into redactionBars, or null.
 let redactionBars = [];
 let selectedBarIdx = null;
+
+// Name each bar's document on the bar (docKey) while its docIndex still
+// points at it here. Bars on a fresh upload stay unnamed.
+function _stampBarDocKeys() {
+  redactionBars.forEach(b => {
+    if (!b || _isServerDocRef(b.docKey)) return;
+    const doc = resumePortfolio[b.docIndex];
+    if (doc && _isServerDocRef(doc.url)) b.docKey = doc.url;
+  });
+}
+
+// Where the attachment named `key` sits in `docs`. The same file can sit in
+// two slots: a bar keeps the slot it was drawn on while that slot still
+// holds it (the server does the same).
+function _docSlot(docs, key, preferred) {
+  const at = docs[preferred];
+  if (at && at.url === key) return preferred;
+  return docs.findIndex(d => d && d.url === key);
+}
+
+// Bars from the server or the cache, placed by name: a named bar is drawn on
+// the attachment with that url wherever it sits in `docs`. One whose
+// attachment this page doesn't show isn't drawn (docIndex -1) but is kept,
+// so a save still sends it and the server keeps it on its document.
+function _anchorRedactionBars(bars, docs) {
+  const list = Array.isArray(docs) ? docs : [];
+  return (Array.isArray(bars) ? bars : []).filter(b => b && typeof b === 'object').map(b => {
+    if (!_isServerDocRef(b.docKey)) return b;
+    const at = _docSlot(list, b.docKey, b.docIndex);
+    return at === b.docIndex ? b : { ...b, docIndex: at };
+  });
+}
+
+// Bars the student deleted, cleared or moved on this page since the last
+// save, as they were ({docKey, pageNumber, x, y, w, h}). A save adds in the
+// server's own bars (_redactionsForSync) except these. var so the sync code
+// can't hit a TDZ on it.
+var _removedBarShapes = [];
+
+function _noteRemovedBar(b, shape) {
+  if (!b || typeof b !== 'object') return;
+  const g = shape || b;
+  const doc = resumePortfolio[b.docIndex];
+  const docKey = _isServerDocRef(b.docKey) ? b.docKey
+    : (doc && _isServerDocRef(doc.url)) ? doc.url : '';
+  _removedBarShapes.push({ docKey, pageNumber: b.pageNumber, x: g.x, y: g.y, w: g.w, h: g.h });
+}
+
+// Same page, same rectangle. The numbers went through JSON and the
+// database, so "same" allows a hair's difference.
+function _sameBarShape(a, b) {
+  const near = (p, q) => typeof p === 'number' && typeof q === 'number' && Math.abs(p - q) < 1e-6;
+  return a.pageNumber === b.pageNumber && near(a.x, b.x) && near(a.y, b.y) && near(a.w, b.w) && near(a.h, b.h);
+}
+
+// The bars as profile-sync takes them (users.resume_redactions). The server
+// REPLACES its whole set with what a save sends, so this is this page's
+// bars plus the server's own, read just before the save (`server`: {bars,
+// docs}). A bar the phone added since this page loaded, or one on an
+// attachment this page doesn't show, goes back as it is; only the bars
+// taken off here (_removedBarShapes) stay off. Covering too much is the
+// safe way to be wrong: a lost bar would show visitors the original.
+// Each bar names its document (docKey), so the server keeps it on that
+// document however the list is reordered or trimmed. A bar on a fresh
+// upload can't name it yet. The server puts such a bar on the first
+// document of the list it stores, so it goes out (docIndex 0) only from the
+// first slot, and only when `unkeyedOk` says that document will be this
+// upload (buildProfileSyncPayload). Otherwise it stays here.
+function _redactionsForSync(bars, docs, server, unkeyedOk) {
+  const list = Array.isArray(docs) ? docs : [];
+  const out = [];
+  (Array.isArray(bars) ? bars : []).forEach(b => {
+    if (!b || typeof b !== 'object') return;
+    let idx = Number.isInteger(b.docIndex) ? b.docIndex : -1;
+    let key = _isServerDocRef(b.docKey) ? b.docKey : '';
+    if (key) {
+      const at = _docSlot(list, key, idx);
+      if (at >= 0) idx = at;
+    } else {
+      const doc = list[idx];
+      if (!doc) return;
+      if (_isServerDocRef(doc.url)) key = doc.url;
+      else if (idx !== 0 || !unkeyedOk) return;
+    }
+    const bar = { docIndex: Math.max(0, idx), pageNumber: b.pageNumber, x: b.x, y: b.y, w: b.w, h: b.h };
+    if (key) bar.docKey = key;
+    out.push(bar);
+  });
+  const serverDocs = (server && Array.isArray(server.docs)) ? server.docs : [];
+  // An unnamed bar here is on the fresh upload in the first slot, which the
+  // server has (if at all) as the first document of its list.
+  const firstKey = (serverDocs[0] && _isServerDocRef(serverDocs[0].url)) ? serverDocs[0].url : '';
+  ((server && Array.isArray(server.bars)) ? server.bars : []).forEach(s => {
+    if (!s || typeof s !== 'object') return;
+    const idx = (Number.isInteger(s.docIndex) && s.docIndex >= 0) ? s.docIndex : 0;
+    // An older bar without a name covers the document at its place in the
+    // server's list. One that covers nothing listed is dropped by the
+    // server whatever this page sends.
+    const at = serverDocs[idx];
+    const key = _isServerDocRef(s.docKey) ? s.docKey
+      : (at && _isServerDocRef(at.url)) ? at.url : '';
+    if (!key) return;
+    const same = t => _sameBarShape(t, s) && (t.docKey || firstKey) === key;
+    if (out.some(same) || _removedBarShapes.some(same)) return;
+    out.push({ docIndex: idx, docKey: key, pageNumber: s.pageNumber, x: s.x, y: s.y, w: s.w, h: s.h });
+  });
+  return out;
+}
 
 function getDocViewEl() { return document.getElementById('docView'); }
 
@@ -5133,6 +5328,7 @@ function deselectBar() {
 }
 
 function deleteRedactionBar(absoluteIdx) {
+  _noteRemovedBar(redactionBars[absoluteIdx]);
   redactionBars.splice(absoluteIdx, 1);
   if (selectedBarIdx === absoluteIdx) selectedBarIdx = null;
   else if (selectedBarIdx !== null && selectedBarIdx > absoluteIdx) selectedBarIdx -= 1;
@@ -5146,11 +5342,50 @@ function clearRedactions() {
     return;
   }
   // Drop only bars on the active doc — bars on the OTHER doc keep their work.
+  redactionBars.filter(b => b.docIndex === activeDocIndex).forEach(b => _noteRemovedBar(b));
   redactionBars = redactionBars.filter(b => b.docIndex !== activeDocIndex);
   selectedBarIdx = null;
   renderRedactionBars();
   saveProfileToStorage({ edited: 'redactions' });
   showToast('Bars on this attachment cleared');
+}
+
+// "View as others see it": the open attachment as a visitor gets it, in a
+// new tab. /api/resume/<key>?view=public hands the owner the same copy a
+// visitor gets (bars burned in) instead of the original. Bars still waiting
+// to save go first, or the tab would show the copy from before them. The
+// tab opens on the click itself (a tab opened after an await can be
+// blocked) and is pointed at the copy once the save is through.
+async function openDocAsOthersSee() {
+  const doc = resumePortfolio[activeDocIndex];
+  const src = (doc && typeof doc.url === 'string') ? doc.url : '';
+  if (!src) { showToast('Attach a file first'); return; }
+  if (!_isResumeProxyPath(src)) {
+    showToast(/^https?:\/\//i.test(src)
+      ? "This one's a link, so everyone opens it as it is."
+      : 'Still saving this file. Try again in a moment.');
+    return;
+  }
+  const target = new URL(src, location.href);
+  target.hash = '';
+  target.searchParams.delete('json');
+  target.searchParams.set('view', 'public');
+  const tab = window.open('', '_blank');
+  if (tab) { try { tab.opener = null; } catch (_) { /* fine either way */ } }
+  // The copy depends on the bars and the attachment list. Either still
+  // marked after the save means the server hasn't got it: refused (false,
+  // vibeRequest said why) or never sent (not the app shell).
+  const unsaved = () => !!(_editedUserFields && (_editedUserFields.redactions || _editedUserFields.resume));
+  if (unsaved() || profileServerSyncTimer !== null || _profileSyncInflight) {
+    const saved = await _saveProfileNow("Couldn't save your changes, so that copy would be out of date.", true);
+    if (saved === false || unsaved()) {
+      if (tab) tab.close();
+      if (saved !== false) showToast("Your latest changes aren't saved yet, so that copy would be out of date.");
+      return;
+    }
+  }
+  if (tab) tab.location.href = target.href;
+  else window.open(target.href, '_blank', 'noopener');
 }
 
 // ── Drawing + dragging + resizing ─────────────────────────────────
@@ -5177,6 +5412,8 @@ function startDrawing(e, wrap) {
   const startY = ((e.clientY - bounds.top) / bounds.height) * 100;
 
   const bar = { docIndex: activeDocIndex, pageNumber, x: startX, y: startY, w: 0, h: 0 };
+  const doc = resumePortfolio[activeDocIndex];
+  if (doc && _isServerDocRef(doc.url)) bar.docKey = doc.url;
   redactionBars.push(bar);
   const newIdx = redactionBars.length - 1;
   selectedBarIdx = newIdx;
@@ -5237,6 +5474,7 @@ function onBarPointerDown(e) {
     window.removeEventListener('pointerup', up);
     // A tap only selects the bar: it goes out as an edit once it moved.
     const moved = bar.x !== origin.x || bar.y !== origin.y;
+    if (moved) _noteRemovedBar(bar, { x: origin.x, y: origin.y, w: bar.w, h: bar.h });
     saveProfileToStorage(moved ? { edited: 'redactions' } : undefined);
   };
   window.addEventListener('pointermove', move);
@@ -5282,6 +5520,7 @@ function onHandlePointerDown(e, absoluteIdx, dir) {
     window.removeEventListener('pointermove', move);
     window.removeEventListener('pointerup', up);
     const resized = bar.x !== origin.x || bar.y !== origin.y || bar.w !== origin.w || bar.h !== origin.h;
+    if (resized) _noteRemovedBar(bar, origin);
     saveProfileToStorage(resized ? { edited: 'redactions' } : undefined);
   };
   window.addEventListener('pointermove', move);
@@ -5380,6 +5619,7 @@ function renderDocViewer() {
     title.textContent = 'Preview';
     sub.textContent = 'Nothing attached yet.';
     counter.textContent = '0 / 0';
+    _renderDocPrivacy(null);
     return;
   }
 
@@ -5459,6 +5699,23 @@ function renderDocViewer() {
 
   view.onpointerdown = onDocViewPointerDown;
   renderRedactionBars();
+  _renderDocPrivacy(doc);
+}
+
+// The owner's line on who sees what, for the open attachment. A file
+// stored here reaches visitors only as the copy with the bars burned in. A
+// link is opened as it is by everyone: the bars cover it on this page only.
+function _renderDocPrivacy(doc) {
+  const line = document.getElementById('docPrivacyLine');
+  const chip = document.getElementById('docViewPublicBtn');
+  const url = (doc && typeof doc.url === 'string') ? doc.url : '';
+  const isLink = /^https?:\/\//i.test(url) && !_isResumeProxyPath(url);
+  if (line) {
+    line.textContent = isLink
+      ? 'This is a link, so everyone opens it as it is. Bars only cover what you see here.'
+      : 'Only you see your original. Everyone else sees the blacked-out copy.';
+  }
+  if (chip) chip.style.display = isLink ? 'none' : '';
 }
 
 function setActiveDoc(idx) {
@@ -7602,13 +7859,28 @@ function _afterCampusSync(sent, err) {
           if (v._viewerFollowState === 'connected')      setVibeRelState('connected');
           else if (v._viewerFollowState === 'following') setVibeRelState('following');
           else if (v._viewerFollowState === 'self') {
-            // Visiting your own /profile/<handle> — bounce to /profile.
-            window.location.href = '/profile';
+            // Visiting your own /profile/<handle> — bounce to /profile,
+            // keeping a ?post or ?welcome still to be acted on there.
+            const keep = new URLSearchParams();
+            if (params.get('post')) keep.set('post', params.get('post'));
+            if (params.get('welcome') === '1') keep.set('welcome', '1');
+            const kq = keep.toString();
+            window.location.href = '/profile' + (kq ? '?' + kq : '') + location.hash;
             return;
           } else                                          setVibeRelState('none');
         }
         // Pull the visited user's real posts and render them.
         hydrateVisitedUserPosts(viewingHandle);
+        // /profile/<handle>?post=<id> (a mention or notification link) opens
+        // that post, as /profile?post=<id> does on your own profile below.
+        // `params` is the query as the page arrived, read before the address
+        // was cleaned (vibeProfileCleanAddress).
+        const targetPostId = params.get('post');
+        if (targetPostId) {
+          setTimeout(() => {
+            if (typeof openPostViewer === 'function') openPostViewer(targetPostId);
+          }, 800);
+        }
       } catch (e) {
         // A render bug below, not a transport failure — vibeRequest never
         // throws. Still not grounds for saying the student doesn't exist.
@@ -7653,8 +7925,10 @@ function _afterCampusSync(sent, err) {
         const nu = Object.assign({}, j.vibeUser);
         nu._appShell = true;
         if (typeof vibeSave === 'function') vibeSave('vibe_user_v1', nu);
-        // Strip ?clear=1 so the reload doesn't loop the wipe.
-        const url = new URL(window.location.href);
+        // Strip ?clear=1 so the reload doesn't loop the wipe. From the
+        // address the page arrived at: the bar shows the clean /profile by
+        // now, which would drop a ?post or ?welcome still to be acted on.
+        const url = new URL(window.__vibeProfileEntryHref || window.location.href);
         url.searchParams.delete('clear');
         window.location.replace(url.toString());
       })
@@ -8273,7 +8547,10 @@ async function _saveProfileNow(failure, retryFailed) {
   return _profileSyncLastOk;
 }
 
-function buildProfileSyncPayload() {
+// server: the server's attachments and bars ({docs, bars}), read just
+// before this save (_serverResumeState) when it carries bars or removes an
+// attachment the server has; else null.
+function buildProfileSyncPayload(server) {
   const u = ((typeof vibeLoad === 'function') ? vibeLoad('vibe_user_v1') : null) || {};
   // Only what the student changed on this page goes out (_editedUserFields).
   // vibe_user_v1 is rebuilt from what the page shows, and the page shows a
@@ -8314,11 +8591,6 @@ function buildProfileSyncPayload() {
   // shape matches the localStorage shape ({icon, text}); the server
   // sanitizer enforces caps + drops items missing text.
   if (edited.current) payload.current_on = Array.isArray(u.currentlyOn) ? u.currentlyOn : [];
-  // Redaction bars — persisted as users.resume_redactions. Shape
-  // matches what the viewer renders: {docIndex, pageNumber, x, y, w, h}
-  // in 0-100 page-percentage coordinates. Privacy, not just data: an
-  // empty list from a stale copy would serve viewers the un-redacted file.
-  if (edited.redactions) payload.resume_redactions = Array.isArray(u.resumeRedactions) ? u.resumeRedactions : [];
   // "Here for": only after a chip click on this page. A cached copy from
   // before the row existed has no lookingFor, and must not clear the answer.
   if (_lookingForDirty) payload.looking_for = Array.isArray(u.lookingFor) ? u.lookingFor.filter(v => LOOKING_FOR_VALUES.includes(v)) : [];
@@ -8361,6 +8633,42 @@ function buildProfileSyncPayload() {
     const resumeUrl = (doc && typeof doc.url === 'string') ? doc.url.trim() : '';
     if (resumeUrl) payload.resume_url = resumeUrl;
     else remove.push('resume');
+    // An attachment the server has was removed here (removeResumeDoc,
+    // clearResumePortfolio): the server's own list, read fresh, without
+    // it. resume_url alone can't do it: once the phone has saved a list
+    // (resume_docs) the server shows that list, not resume_url. The fresh
+    // read keeps whatever the phone added since this page loaded. The
+    // server moves the stored bars along with their documents (docKey)
+    // and drops the removed one's. Nothing goes when none of the removed
+    // ones is on the server's list any more.
+    const serverDocs = (server && Array.isArray(server.docs)) ? server.docs : null;
+    if (serverDocs) {
+      const gone = new Set(_removedResumeRefs);
+      const kept = serverDocs.filter(d => d && typeof d.url === 'string' && d.url && !gone.has(d.url));
+      if (kept.length < serverDocs.length) {
+        payload.resume_docs = kept.map(d => ({ name: d.name, type: d.type, url: d.url }));
+      }
+    }
+  }
+  // Redaction bars — persisted as users.resume_redactions. Shape
+  // matches what the viewer renders: {docIndex, pageNumber, x, y, w, h}
+  // in 0-100 page-percentage coordinates, plus docKey, the url of the
+  // document each covers. Privacy, not just data: the server replaces its
+  // whole set with this one, so it is this page's bars merged with the
+  // server's fresh copy (_redactionsForSync), never a stale set alone.
+  // They go only with that copy (_runProfileServerSync reads it first).
+  if (edited.redactions && server) {
+    // A bar on a fresh upload lands on the first document of the list the
+    // server stores. That is the upload (sent as resume_url) only when the
+    // list is resume_url alone: an emptied resume_docs, or none saved. A
+    // phone-saved list of two is shown instead of resume_url. One entry
+    // can be either, and then the bar goes: at worst it covers part of the
+    // phone's file too, where leaving it here would show the upload bare.
+    const serverDocs = Array.isArray(server.docs) ? server.docs : [];
+    const unkeyedOk = Array.isArray(payload.resume_docs)
+      ? payload.resume_docs.length === 0
+      : serverDocs.length <= 1;
+    payload.resume_redactions = _redactionsForSync(u.resumeRedactions, u.resumePortfolio, server, unkeyedOk);
   }
   if (remove.length) payload.remove = remove;
   return payload;
@@ -8619,6 +8927,26 @@ function _adoptServerMediaRefs(serverUser, sent) {
   return out;
 }
 
+// The server's attachments and bars as they stand now: {docs} ({name,
+// type, url}, the order visitors see) and {bars} (users.resume_redactions),
+// for a save that carries bars or removes an attachment. Not the load-time
+// copy (_ownProfileBootstrap): the phone may have changed either since.
+// null when it couldn't be read; vibeRequest has said why (Sign in on a 401).
+async function _serverResumeState(failure) {
+  const r = await window.vibeRequest('/api/me/profile-bootstrap', {
+    failure: failure || "Couldn't save your profile changes.",
+  });
+  const v = r.ok && r.data ? r.data.vibeUser : null;
+  if (!v) {
+    if (r.ok) window.vibeToast("Couldn't save your profile changes. Try again.", { tone: 'error' });
+    return null;
+  }
+  return {
+    docs: Array.isArray(v.resumePortfolio) ? v.resumePortfolio : [],
+    bars: Array.isArray(v.resumeRedactions) ? v.resumeRedactions : [],
+  };
+}
+
 // Returns true when the server saved the profile, false when it refused
 // (vibeRequest shows why), null when nothing goes to the server (not the
 // owner's app shell). With no edits to send it reports the last save.
@@ -8647,6 +8975,24 @@ async function _runProfileServerSync(failure) {
   // the payload — the sanitizer drops data: URIs and would otherwise wipe
   // them out of work_experience on every sync.
   await _migrateDataUriLogos();
+  // A removed attachment goes out as the server's list without it, and bars
+  // go out merged with the server's own (the server replaces its whole set
+  // with what it gets), so both are read first, like the logos above: every
+  // await comes before the snapshot below. A removal made during this read
+  // is still in _removedResumeRefs when the payload is built. When they
+  // can't be read nothing is sent and nothing is settled: as resume_url
+  // alone the removal would leave the file listed for visitors, and this
+  // page's bars alone would drop the ones added on the phone.
+  const marks = _editedUserFields || {};
+  let server = null;
+  if (marks.redactions || (_removedResumeRefs.length && marks.resume)) {
+    server = await _serverResumeState(failure);
+    if (!server) {
+      _profileSyncDirty = true;
+      _profileSyncLastOk = false;
+      return false;
+    }
+  }
   // Typing marks a field on every keystroke, but the text reaches
   // vibe_user_v1 (which the payload reads) only when the 500ms snapshot
   // fires. Take a snapshot still waiting now: otherwise this payload would
@@ -8661,10 +9007,18 @@ async function _runProfileServerSync(failure) {
   // them (_settleProfileEdits). From here to the payload nothing awaits, so
   // the two describe the same moment.
   const sentEdits = Object.assign({}, _editedUserFields || {});
-  const payload = buildProfileSyncPayload();
+  // Bars go out only with the server's copy to merge them into. Nothing
+  // above awaits without reading it when bars are marked, so this is a
+  // guard: bars without it wait, marked, for the flush queued below.
+  const barsWait = !!sentEdits.redactions && !server;
+  if (barsWait) delete sentEdits.redactions;
+  const sentRemovals = _removedResumeRefs.slice();
+  const sentBarRemovals = _removedBarShapes.slice();
+  const payload = buildProfileSyncPayload(server);
   // This payload carries every edit so far; an edit from here on marks
   // the profile dirty again and gets its own flush.
   _profileSyncDirty = false;
+  if (barsWait) scheduleProfileServerSync();
   // Nothing the student changed (a pin, a deleted post, an edit put back
   // after a refused save): no request. The last save's answer stands, so a
   // pin clicked after a saved bio still ends the edit with "Changes saved".
@@ -8685,6 +9039,9 @@ async function _runProfileServerSync(failure) {
   // field would otherwise store the fallback, and any other field would
   // re-send this page's copy over a newer edit from the phone).
   _settleProfileEdits(sentEdits);
+  // The removals it carried are done (or were already done elsewhere).
+  if (sentEdits.resume) _removedResumeRefs = _removedResumeRefs.filter(r => !sentRemovals.includes(r));
+  if (sentEdits.redactions) _removedBarShapes = _removedBarShapes.filter(t => !sentBarRemovals.includes(t));
   // The campus answer first, before the localIsNewer() return below: an
   // edit made during this flight must not swallow a refused campus.
   const sentCampusId = payload.campus_id;
@@ -9362,8 +9719,10 @@ function renderUserSections(user, opts) {
   // (_adoptOwnProfileOnLoad) does, with the server's bars on purpose.
   // If the viewer is currently open, repaint so overlays update without
   // a reopen.
+  // Each bar goes on the attachment it names (docKey), wherever that sits in
+  // the list just restored (_anchorRedactionBars).
   if (typeof redactionBars !== 'undefined') {
-    redactionBars = Array.isArray(user.resumeRedactions) ? user.resumeRedactions.slice() : [];
+    redactionBars = _anchorRedactionBars(user.resumeRedactions, resumePortfolio);
     if (typeof renderRedactionBars === 'function' &&
         document.getElementById('docModal')?.classList.contains('open')) {
       renderRedactionBars();
@@ -10686,6 +11045,28 @@ function showWelcomeBanner() {
       }).catch(function(){});
     }
   } catch (e) { /* tracking never blocks */ }
+})();
+</script>
+
+<script>
+// ── Clean address ─────────────────────────────────────────────────────────
+// /profile and /profile/<handle> hop here as /html/profile.html?app=1&…
+// (profile-html-bridge.tsx, ProfileHandleSwitch.tsx), and that is what the
+// address bar used to keep showing, so it is what people copied and shared.
+// By now every script above has read its query settings (initProfilePage:
+// handle and post; vibeInit: clear and embedded; the tour: welcome; the view
+// tracker: handle), so the bar goes back to the address people share:
+// /profile/<handle> when viewing someone, /profile for your own
+// (window.__vibeProfileCleanPath, worked out in <head>). The #hash stays,
+// the query goes. Reloading the clean address hops back here the same way.
+// Inside a host frame the host owns the address: nothing to do.
+(function vibeProfileCleanAddress() {
+  try {
+    if (window.top !== window.self) return;
+    var clean = window.__vibeProfileCleanPath || '/profile';
+    if (location.pathname + location.search === clean) return;
+    history.replaceState(history.state, '', clean + location.hash);
+  } catch (e) { /* the address is cosmetic; the page works either way */ }
 })();
 </script>
 

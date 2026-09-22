@@ -60,6 +60,10 @@ function messageForKnownStatus(status: number): string {
       return "This document isn't available";
     case 429:
       return "Too many document requests — try again in a few minutes";
+    // The copy other students get isn't ready (a failed render, or bars and
+    // list out of step). Same sentence the proxy's own page shows.
+    case 503:
+      return "This document is being updated. Try again in a minute.";
     default:
       return "";
   }

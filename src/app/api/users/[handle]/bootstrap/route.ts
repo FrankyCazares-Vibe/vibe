@@ -7,6 +7,12 @@ import { buildVibeUserV1FromProfile } from "@/lib/profile/build-vibe-user-v1";
 import { normalizeProfileView } from "@/lib/profile/normalize-profile-view";
 import { PUBLIC_PROFILE_CAMPUS_COLUMNS } from "@/lib/profile/profile-campus-write";
 import { parseResumeDocRef } from "@/lib/profile/resume-doc-url";
+import {
+  hasUnmatchedRedactions,
+  redactedDocIndexes,
+  resumePortfolioRefList,
+  sanitizeResumeRedactions,
+} from "@/lib/profile/resume-redactions";
 import { loadPairBlock } from "@/lib/safety/pair-block";
 import { createSupabaseServerClient } from "@/lib/supabase/server";
 import { createSupabaseServiceClient } from "@/lib/supabase/service";
@@ -171,16 +177,28 @@ export async function GET(_req: Request, ctx: RouteContext) {
   // Signed-in NON-OWNER viewers: redaction bars are burned into the bytes
   // server-side (GET /api/resume/<key> signs a derivative), so the bar
   // geometry must never leave the server — strip it. And because we can
-  // only redact files we host, an EXTERNAL-link doc that has bars for its
-  // docIndex is hidden from viewers entirely. docIndex is computed on the
-  // sanitised portfolio order (resume_docs, or [resume_url] when empty),
-  // which is the same order the proxy route uses; indices are read BEFORE
-  // filtering so a dropped doc doesn't shift its neighbours' bars.
+  // only redact files we host, an EXTERNAL-link doc that has bars is hidden
+  // from viewers entirely. A bar covers a document by its docKey (legacy
+  // bars: by position in the sanitised portfolio — resume_docs, or
+  // [resume_url] when empty — the same list the proxy route uses), worked
+  // out BEFORE filtering so a dropped doc can't shift its neighbours' bars.
+  // Fail closed: when any bar covers no listed document the bars and the
+  // list are out of step, nobody can say which external doc a bar was for,
+  // so every external doc is hidden (the proxy refuses the hosted ones).
+  // The stored bars are read strictly (as the proxy reads them): a key that
+  // names nothing storable counts as unmatched rather than as a position.
   if (viewer && viewer.id !== profile.id) {
-    const barDocs = new Set(profile.resume_redactions.map((b) => b.docIndex));
+    const refs = resumePortfolioRefList(profile.resume_docs, profile.resume_url);
+    const storedBars = sanitizeResumeRedactions(
+      (row as Record<string, unknown>).resume_redactions,
+      { strict: true },
+    );
+    const outOfStep = hasUnmatchedRedactions(storedBars, refs);
+    const redacted = redactedDocIndexes(storedBars, refs);
+    const hideExternal = (i: number) => outOfStep || redacted.has(i);
     if (profile.resume_docs.length > 0) {
       profile.resume_docs = profile.resume_docs.filter(
-        (d, i) => parseResumeDocRef(d.url) !== null || !barDocs.has(i),
+        (d, i) => parseResumeDocRef(d.url) !== null || !hideExternal(i),
       );
       // The portfolio was docs-based; never let an emptied list fall back
       // to a resume_url the viewer was not meant to see (and which the
@@ -189,7 +207,7 @@ export async function GET(_req: Request, ctx: RouteContext) {
     } else if (
       profile.resume_url &&
       parseResumeDocRef(profile.resume_url) === null &&
-      barDocs.has(0)
+      hideExternal(0)
     ) {
       profile.resume_url = null;
     }

@@ -18,7 +18,15 @@ import {
 import { parseLookingForBody } from "@/lib/profile/looking-for";
 import { normalizeResumeRef, resumeKeyOwnerId } from "@/lib/profile/resume-doc-url";
 import { sanitizeResumeDocs } from "@/lib/profile/resume-docs";
-import { sanitizeResumeRedactions } from "@/lib/profile/resume-redactions";
+import {
+  bindRedactionsKeepingCoverage,
+  remapRedactionsToDocs,
+  repairUnlistedRedactions,
+  resumePortfolioRefList,
+  sameRedactions,
+  sanitizeResumeRedactions,
+  type RedactionBar,
+} from "@/lib/profile/resume-redactions";
 import {
   deleteResumeObjects,
   purgeRedactedDerivatives,
@@ -70,6 +78,128 @@ function parseRemoveList(value: unknown): Set<RemovableMedia> | null {
 /** A value that asks to set the field: a non-empty string. */
 function isNonEmptyString(value: unknown): value is string {
   return typeof value === "string" && value.trim() !== "";
+}
+
+/**
+ * The resume columns as stored, with the exact jsonb text of the two lists.
+ * The write compares against that text (compare-and-set): a number read into
+ * JS and written back can come out with different digits, so the parsed copy
+ * can't be used for the comparison.
+ */
+type ResumeSnapshot = {
+  found: boolean;
+  resume_url: string | null;
+  resume_docs: unknown;
+  resume_redactions: unknown;
+  docsText: string | null;
+  barsText: string | null;
+};
+
+/** Null when the read failed. A missing row reads as empty. */
+async function readResumeSnapshot(userId: string): Promise<ResumeSnapshot | null> {
+  try {
+    const { data, error } = await createSupabaseServiceClient()
+      .from("users")
+      .select("resume_url, docs_text:resume_docs::text, bars_text:resume_redactions::text")
+      .eq("id", userId)
+      .maybeSingle();
+    if (error) {
+      console.error("[profile-sync] resume read", error.message);
+      return null;
+    }
+    if (!data) {
+      return {
+        found: false,
+        resume_url: null,
+        resume_docs: [],
+        resume_redactions: [],
+        docsText: null,
+        barsText: null,
+      };
+    }
+    const row = data as { resume_url: unknown; docs_text: unknown; bars_text: unknown };
+    const docsText = typeof row.docs_text === "string" ? row.docs_text : null;
+    const barsText = typeof row.bars_text === "string" ? row.bars_text : null;
+    return {
+      found: true,
+      resume_url: typeof row.resume_url === "string" ? row.resume_url : null,
+      resume_docs: docsText === null ? [] : JSON.parse(docsText),
+      resume_redactions: barsText === null ? [] : JSON.parse(barsText),
+      docsText,
+      barsText,
+    };
+  } catch (e) {
+    console.error("[profile-sync] resume read threw", e);
+    return null;
+  }
+}
+
+/** The API gateway refuses request lines past about 8 KB, and the compare-
+ *  and-set rides in the URL. A row whose resume columns don't fit re-reads
+ *  them right before the write instead: one round trip of exposure. */
+const RESUME_GUARD_MAX_CHARS = 4000;
+const RESUME_WRITE_ATTEMPTS = 3;
+
+type ResumeGuard = { url: string | null; docs: string; bars: string };
+
+function resumeWriteGuard(s: ResumeSnapshot): ResumeGuard | null {
+  if (!s.found || s.docsText === null || s.barsText === null) return null;
+  const size = new URLSearchParams({
+    u: `eq.${s.resume_url ?? ""}`,
+    d: `eq.${s.docsText}`,
+    r: `eq.${s.barsText}`,
+  }).toString().length;
+  if (size > RESUME_GUARD_MAX_CHARS) return null;
+  return { url: s.resume_url, docs: s.docsText, bars: s.barsText };
+}
+
+/**
+ * A row whose bars cover a document it no longer lists makes the file route
+ * refuse other students every hosted document on it (fail closed). profile-
+ * sync never writes that, but another route can (PATCH /api/me/profile sets
+ * resume_url without moving bars). When the only unmatched bars are keyed to
+ * an unlisted document, they protect nothing, so the owner's next save of
+ * anything drops them (compare-and-set: skipped if the row moved meanwhile).
+ * Anything less certain stays closed. Updates `row` for the echo.
+ */
+async function repairOutOfStepRedactions(
+  row: Record<string, unknown>,
+  userId: string,
+): Promise<void> {
+  try {
+    const url = normalizeResumeRef(row.resume_url, userId);
+    const refs = resumePortfolioRefList(sanitizeResumeDocs(row.resume_docs, userId), url);
+    const fixed = repairUnlistedRedactions(
+      sanitizeResumeRedactions(row.resume_redactions, { strict: true }),
+      refs,
+      (ref) => normalizeResumeRef(ref, userId),
+    );
+    if (!fixed) return;
+    const guard = resumeWriteGuard({
+      found: true,
+      resume_url: typeof row.resume_url === "string" ? row.resume_url : null,
+      resume_docs: row.resume_docs,
+      resume_redactions: row.resume_redactions,
+      docsText: JSON.stringify(row.resume_docs ?? []),
+      barsText: JSON.stringify(row.resume_redactions ?? []),
+    });
+    if (!guard) return;
+    let q = createSupabaseServiceClient()
+      .from("users")
+      .update({ resume_redactions: fixed })
+      .eq("id", userId);
+    q = guard.url === null ? q.is("resume_url", null) : q.eq("resume_url", guard.url);
+    const { data, error } = await q
+      .eq("resume_docs", guard.docs)
+      .eq("resume_redactions", guard.bars)
+      .select("id");
+    if (error || !data || data.length === 0) return;
+    row.resume_redactions = fixed;
+    const n = await purgeRedactedDerivatives(userId);
+    console.log(`[profile-sync] repaired out-of-step redactions (purged ${n})`);
+  } catch (e) {
+    console.error("[profile-sync] redaction repair", e);
+  }
 }
 
 /**
@@ -287,13 +417,16 @@ export async function POST(req: Request) {
   }
 
   // Resume / portfolio redaction bars — same dual-key acceptance.
-  // Sanitizer enforces percentage ranges + caps bar count.
+  // Sanitizer enforces percentage ranges + caps bar count. Each bar is bound
+  // to its document further down (applyBars), once the list being stored is
+  // known; only the bound bars go into `patch`.
+  let requestBars: RedactionBar[] | null = null;
   if ("resume_redactions" in body || "resumeRedactions" in body) {
     const raw =
       "resume_redactions" in body
         ? body.resume_redactions
         : body.resumeRedactions;
-    patch.resume_redactions = sanitizeResumeRedactions(raw);
+    requestBars = sanitizeResumeRedactions(raw);
   }
 
   // The professional snapshot card is gone. Desktop bundles cached before
@@ -327,22 +460,19 @@ export async function POST(req: Request) {
   const setsResumeUrl = isNonEmptyString(body.resume_url);
   const touchesResume = setsResumeUrl || removing.has("resume") || "resume_docs" in body;
   // Redaction bars change which DERIVATIVE viewers must be served, so the
-  // pre-read also snapshots them (see the derivative purge below).
-  const touchesRedactions = "resume_redactions" in patch;
-  type ResumeRefs = { resume_url: unknown; resume_docs: unknown; resume_redactions: unknown };
-  let resumeBefore: ResumeRefs | null = null;
+  // pre-read also snapshots them (see the derivative purge below). It is no
+  // longer best-effort: binding bars to documents needs the stored list and
+  // bars, and a list change written without moving its bars is exactly how
+  // one document's bars slid onto another. No pre-read, no resume write.
+  // The write below is a compare-and-set against this snapshot, and a retry
+  // re-reads it, so it is `let`.
+  const touchesRedactions = requestBars !== null;
+  const failed = () =>
+    NextResponse.json({ ok: false, error: "Request failed" }, { status: 500 });
+  let resumeBefore: ResumeSnapshot | null = null;
   if (touchesResume || touchesRedactions) {
-    try {
-      const { data, error } = await createSupabaseServiceClient()
-        .from("users")
-        .select("resume_url, resume_docs, resume_redactions")
-        .eq("id", user.id)
-        .maybeSingle();
-      if (error) console.error("[profile-sync] resume pre-read", error.message);
-      else resumeBefore = (data as ResumeRefs | null) ?? null;
-    } catch (e) {
-      console.error("[profile-sync] resume pre-read threw", e);
-    }
+    resumeBefore = await readResumeSnapshot(user.id);
+    if (!resumeBefore) return failed();
   }
 
   // data: URL → uploaded to `resumes`; proxy / legacy / external refs are
@@ -370,6 +500,85 @@ export async function POST(req: Request) {
   if ("resume_docs" in body) {
     patch.resume_docs = sanitizeResumeDocs(body.resume_docs, user.id);
   }
+
+  // When the request carries its own list, an unkeyed bar's docIndex is a
+  // position in THAT list. The server drops entries it can't store (a data:
+  // url, a foreign key, past the cap), so each entry is sanitised on its own
+  // to line the two lists up: null marks an entry that won't be stored.
+  const clientRefs = Array.isArray(body.resume_docs)
+    ? body.resume_docs
+        .slice(0, 64)
+        .map((d: unknown) => sanitizeResumeDocs([d], user.id)[0]?.url ?? null)
+    : undefined;
+  const canonicalRef = (ref: string) => normalizeResumeRef(ref, user.id);
+
+  // Bind the bars to the documents they cover (C2). Every stored bar ends up
+  // with a `docKey` (the document's stored url) and the matching `docIndex`
+  // in the list being stored, so a reader can never pair a bar with the
+  // wrong file:
+  //   - bars sent in this request: a docKey names the document (dropped if
+  //     it is not in the list); an unkeyed bar identical to a stored one is
+  //     that bar (an old page shifts positions); otherwise its position,
+  //     in the request's own list when it sent one (bindRedactionsToDocs);
+  //   - and when ANY bar in the request names no document while more than one
+  //     document is stored, those positions can't be trusted to mean what
+  //     they say: the request may add and move bars but not take coverage
+  //     away, so every stored bar it would have dropped is kept
+  //     (bindRedactionsKeepingCoverage) — a pre-deploy desktop tab removing
+  //     a document used to leave that document listed with none of its bars,
+  //     and other students got it in the original;
+  //   - a list change WITHOUT bars (the phone's delete): the stored bars
+  //     move with their documents, and go with a removed one.
+  // A re-map lands in `patch`, so the derivative purge below sees it. Runs
+  // again against a fresh read when the compare-and-set write loses a race.
+  let mirroredResumeUrl = false;
+  const applyBars = (before: ResumeSnapshot) => {
+    const docsBefore = sanitizeResumeDocs(before.resume_docs, user.id);
+    const urlBefore = normalizeResumeRef(before.resume_url, user.id);
+    const prevRefs = resumePortfolioRefList(docsBefore, urlBefore);
+    // A list change that leaves resume_url behind (an older phone build's
+    // delete sends the list alone): resume_url follows the list's first
+    // document. Left stale, it came back as a live document once the list
+    // emptied, after its bars had gone with it, and was served in full.
+    if (mirroredResumeUrl) {
+      delete patch.resume_url;
+      mirroredResumeUrl = false;
+    }
+    if (
+      "resume_docs" in patch &&
+      !("resume_url" in patch) &&
+      docsBefore.length > 0 &&
+      urlBefore
+    ) {
+      const nextDocs = patch.resume_docs as typeof docsBefore;
+      if (!nextDocs.some((d) => d.url === urlBefore)) {
+        patch.resume_url = nextDocs[0]?.url ?? null;
+        mirroredResumeUrl = true;
+      }
+    }
+    const nextRefs = resumePortfolioRefList(
+      "resume_docs" in patch ? (patch.resume_docs as typeof docsBefore) : docsBefore,
+      "resume_url" in patch ? (patch.resume_url as string | null) : urlBefore,
+    );
+    const stored = sanitizeResumeRedactions(before.resume_redactions);
+    if (requestBars) {
+      patch.resume_redactions = bindRedactionsKeepingCoverage(
+        requestBars,
+        nextRefs,
+        prevRefs,
+        {
+          canonicalRef,
+          clientRefs,
+          storedBars: remapRedactionsToDocs(stored, prevRefs, prevRefs, canonicalRef),
+        },
+      );
+      return;
+    }
+    const moved = remapRedactionsToDocs(stored, prevRefs, nextRefs, canonicalRef);
+    if (sameRedactions(stored, moved)) delete patch.resume_redactions;
+    else patch.resume_redactions = moved;
+  };
+  if (resumeBefore) applyBars(resumeBefore);
 
   // Cover: an uploaded photo wins; otherwise a cover-theme preset KEY.
   // users.banner_gradient holds a key, never CSS (migration 20260912100000
@@ -431,23 +640,67 @@ export async function POST(req: Request) {
   // never half-apply against each other. The service role passes every
   // grant, so the closed list in `self-write-columns.ts` stands in front of
   // it: a key outside the list is a coding slip and fails the save.
-  const writePatch: Record<string, unknown> = { ...patch, ...mediaPatch };
-  if (coverThemePatch !== undefined) writePatch.banner_gradient = coverThemePatch;
+  const buildWritePatch = (): Record<string, unknown> => {
+    const w: Record<string, unknown> = { ...patch, ...mediaPatch };
+    if (coverThemePatch !== undefined) w.banner_gradient = coverThemePatch;
+    return w;
+  };
+  let writePatch = buildWritePatch();
 
-  if (Object.keys(writePatch).length > 0) {
+  // Resume writes are a compare-and-set on resume_url, resume_docs and
+  // resume_redactions as snapshotted above. The bars written were worked out
+  // from that snapshot; if another save (the phone drawing a bar while this
+  // request deletes a document) changed any of the three in between,
+  // writing anyway would put back the older bars and drop the newer one, or
+  // key a bar to a document that is gone. On a lost race: re-read, bind
+  // again, retry; after RESUME_WRITE_ATTEMPTS, 409.
+  const refresh = async (): Promise<boolean> => {
+    const fresh = await readResumeSnapshot(user.id);
+    if (!fresh) return false;
+    resumeBefore = fresh;
+    applyBars(fresh);
+    writePatch = buildWritePatch();
+    return true;
+  };
+  let guardTooLong = false;
+  for (let attempt = 1; Object.keys(writePatch).length > 0; attempt++) {
     const bad = unexpectedSelfWriteKeys(writePatch);
     if (bad.length > 0) {
       console.error("[profile-sync POST] unexpected columns", bad);
-      return NextResponse.json({ ok: false, error: "Request failed" }, { status: 500 });
+      return failed();
     }
-    const { error: upErr } = await createSupabaseServiceClient()
-      .from("users")
-      .update(writePatch)
-      .eq("id", user.id);
+    const guard = resumeBefore && !guardTooLong ? resumeWriteGuard(resumeBefore) : null;
+    if (resumeBefore?.found && !guard && attempt === 1) {
+      // Too long to compare in the URL: shrink the window to one round trip
+      // by re-reading and binding again right before an unguarded write.
+      if (!(await refresh())) return failed();
+      if (Object.keys(writePatch).length === 0) break;
+    }
+    let q = createSupabaseServiceClient().from("users").update(writePatch).eq("id", user.id);
+    if (guard) {
+      q = guard.url === null ? q.is("resume_url", null) : q.eq("resume_url", guard.url);
+      q = q.eq("resume_docs", guard.docs).eq("resume_redactions", guard.bars);
+    }
+    const { data: written, error: upErr, status } = await q.select("id");
     if (upErr) {
+      if (guard && status === 414) {
+        // The gateway's URL limit is lower than RESUME_GUARD_MAX_CHARS allows for.
+        console.error("[profile-sync POST] resume guard too long for the gateway");
+        guardTooLong = true;
+        if (!(await refresh())) return failed();
+        continue;
+      }
       console.error("[profile-sync POST]", upErr);
-      return NextResponse.json({ ok: false, error: "Request failed" }, { status: 500 });
+      return failed();
     }
+    if (!guard || (written ?? []).length > 0) break;
+    if (attempt >= RESUME_WRITE_ATTEMPTS) {
+      return NextResponse.json(
+        { ok: false, error: "Your documents changed on another device. Reload and try again." },
+        { status: 409 },
+      );
+    }
+    if (!(await refresh())) return failed();
   }
 
   // Campus + its stamp + the dual-written legacy label, in one service-role
@@ -508,7 +761,7 @@ export async function POST(req: Request) {
   // copies under `<uid>/redacted/` keyed by (source key, bars). Whenever
   // the docs, the legacy resume_url or the bars actually change, drop
   // every derivative so the next viewer request regenerates it lazily.
-  // If the pre-read failed we cannot compare, so purge conservatively.
+  // Bars moved by a list change count: their docKey / docIndex differ.
   if (touchesResume || touchesRedactions) {
     try {
       let changed = true;
@@ -565,6 +818,11 @@ export async function POST(req: Request) {
   if (selErr || !row) {
     return NextResponse.json({ ok: true, profile: null, ...(campusError ? { campusError } : {}) });
   }
+
+  // The echo already holds the resume columns: if the bars are out of step
+  // with the list (other students are being refused every hosted document),
+  // fix what can be fixed safely now instead of waiting for a resume save.
+  await repairOutOfStepRedactions(row, user.id);
 
   return NextResponse.json({
     ok: true,

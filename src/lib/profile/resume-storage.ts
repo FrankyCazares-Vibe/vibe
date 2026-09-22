@@ -12,6 +12,9 @@ import {
 import { sanitizeResumeDocs } from "@/lib/profile/resume-docs";
 import { renderRedactedDocument } from "@/lib/profile/resume-redact";
 import {
+  hasUnmatchedRedactions,
+  redactionsForRef,
+  resumePortfolioRefList,
   sanitizeResumeRedactions,
   type RedactionBar,
 } from "@/lib/profile/resume-redactions";
@@ -35,7 +38,13 @@ export { resumeKeysReferenced } from "@/lib/profile/resume-doc-url";
  * original is signed only when the document has no bars at all, and the
  * helper THROWS rather than falling back to the original on any failure.
  *
- * Residuals (intended): the owner can always fetch their own original;
+ * Bars name their document by `docKey` (its stored url) and profile-sync
+ * moves them with it when the list changes, so removing one document can no
+ * longer slide another document's bars off it. A row whose bars and list
+ * are out of step anyway fails closed: every hosted document is refused.
+ *
+ * Residuals (intended): the owner can always fetch their own original
+ * (`?view=public` on the proxy shows them the viewers' copy instead);
  * external-link docs with bars are hidden from viewers by the bootstrap
  * route because we cannot redact a file we do not host.
  */
@@ -199,13 +208,14 @@ export type ResumeOwnerRow = {
  * The document refs a viewer's profile lists, in `resumePortfolio` order.
  * Mirrors normalize-profile-view + build-vibe-user-v1: the sanitised
  * `resume_docs` array when it is non-empty, otherwise `[resume_url]`.
- * `docIndex` on a redaction bar is an index into THIS list.
+ * A redaction bar's `docKey` is one of these strings, and its `docIndex`
+ * (all a legacy bar has) is a position in THIS list.
  */
 export function resumePortfolioRefs(row: ResumeOwnerRow): string[] {
-  const docs = sanitizeResumeDocs(row.resume_docs, row.id);
-  if (docs.length > 0) return docs.map((d) => d.url);
-  const single = normalizeResumeRef(row.resume_url, row.id);
-  return single ? [single] : [];
+  return resumePortfolioRefList(
+    sanitizeResumeDocs(row.resume_docs, row.id),
+    normalizeResumeRef(row.resume_url, row.id),
+  );
 }
 
 /** Index of `key` in the row's portfolio, or -1 when it is not listed. */
@@ -215,12 +225,31 @@ export function resumeDocIndexForKey(row: ResumeOwnerRow, key: string): number {
   );
 }
 
-/** Bars whose docIndex points at the given portfolio slot. */
+/** The row's stored bars, read strictly: a key that names nothing storable
+ *  is kept as unmatchable, so the row fails closed instead of the bar
+ *  quietly covering whatever file sits at its position. */
+function storedRedactions(row: ResumeOwnerRow): RedactionBar[] {
+  return sanitizeResumeRedactions(row.resume_redactions, { strict: true });
+}
+
+/** Bars covering the document at the given portfolio slot: by docKey when
+ *  the bar has one, by position for a legacy bar. */
 export function redactionBarsForDoc(row: ResumeOwnerRow, docIndex: number): RedactionBar[] {
-  if (docIndex < 0) return [];
-  return sanitizeResumeRedactions(row.resume_redactions).filter(
-    (b) => b.docIndex === docIndex,
-  );
+  const refs = resumePortfolioRefs(row);
+  if (docIndex < 0 || docIndex >= refs.length) return [];
+  return redactionsForRef(storedRedactions(row), refs, refs[docIndex]);
+}
+
+/**
+ * Thrown by `resolveResumeKeyForViewer` when the row has a bar that covers
+ * no listed document (see `hasUnmatchedRedactions`). The proxy answers 503
+ * "being updated" for every hosted document on the row — never an original.
+ */
+export class ResumeRedactionsOutOfStepError extends Error {
+  constructor() {
+    super("Redaction bars do not match the document list");
+    this.name = "ResumeRedactionsOutOfStepError";
+  }
 }
 
 /**
@@ -253,10 +282,15 @@ function keyExtension(key: string): string {
  * owned by `ownerRow.id`.
  *
  *   - key not in the row's portfolio          → null (nothing to show)
- *   - portfolio slot has no redaction bars    → `key` (original is fine)
- *   - slot has bars                           → derivative key
+ *   - any bar on the row covers no listed doc → THROWS
+ *     ResumeRedactionsOutOfStepError (fail closed, every document)
+ *   - the document has no redaction bars      → `key` (original is fine)
+ *   - the document has bars                   → derivative key
  *     `<uid>/redacted/<sha256(key|bars)[0..20]>.<ext>`, rendered and
  *     uploaded on first use, reused afterwards.
+ *
+ * Bars are matched to the document by docKey, or by position for a legacy
+ * bar; a file listed twice gets the bars of both entries.
  *
  * THROWS when a derivative is needed but cannot be listed / rendered /
  * uploaded. Callers must surface an error — never sign the original.
@@ -266,9 +300,12 @@ export async function resolveResumeKeyForViewer(
   ownerRow: ResumeOwnerRow,
   key: string,
 ): Promise<string | null> {
-  const docIndex = resumeDocIndexForKey(ownerRow, key);
-  if (docIndex < 0) return null;
-  const bars = redactionBarsForDoc(ownerRow, docIndex);
+  const refs = resumePortfolioRefs(ownerRow);
+  const ref = refs.find((r) => parseResumeDocRef(r)?.key === key);
+  if (ref === undefined) return null;
+  const allBars = storedRedactions(ownerRow);
+  if (hasUnmatchedRedactions(allBars, refs)) throw new ResumeRedactionsOutOfStepError();
+  const bars = redactionsForRef(allBars, refs, ref);
   if (bars.length === 0) return key;
 
   const ext = keyExtension(key);

@@ -12,7 +12,14 @@ import { EditPostSheet } from "@/components/mobile/EditPostSheet";
 import { MutualsSheet } from "@/components/mobile/MutualsSheet";
 import { PostComposerMobile } from "@/components/mobile/PostComposerMobile";
 import { PostViewerMobile } from "@/components/mobile/PostViewerMobile";
-import { ResumeViewerMobile } from "@/components/mobile/ResumeViewerMobile";
+import {
+  ResumeViewerMobile,
+  barCoversDoc,
+  barsAfterChange,
+  remapBarsForDocs,
+  type BarChange,
+  type DocBar,
+} from "@/components/mobile/ResumeViewerMobile";
 import { useMobileTour } from "@/components/mobile/use-mobile-tour";
 import { vibeRequest } from "@/lib/feedback/request";
 import { toast } from "@/lib/feedback/toast";
@@ -26,7 +33,6 @@ import {
   lookingForForDisplay,
   type LookingFor,
 } from "@/lib/profile/looking-for";
-import type { RedactionBar } from "@/lib/profile/resume-redactions";
 import { campusPickStep, settingsCampusCardView } from "@/lib/profile/settings-campus-card";
 import { sortWorkExperienceByRecency } from "@/lib/profile/work-experience";
 
@@ -112,8 +118,10 @@ type VibeUser = {
   currentlyOn?: CurrentProject[];
   /** Redaction bars overlaying the user's resume / portfolio.
    *  Persisted as users.resume_redactions; mirrored here as the
-   *  camelCase key the build-vibe-user-v1 builder emits. */
-  resumeRedactions?: RedactionBar[];
+   *  camelCase key the build-vibe-user-v1 builder emits. Each bar names
+   *  its document by `docKey` (that doc's url); older bars only by
+   *  `docIndex`. */
+  resumeRedactions?: DocBar[];
   counts?: {
     followers?: string | number;
     following?: string | number;
@@ -338,6 +346,9 @@ export function ProfileMobile({ targetHandle }: Props = {}) {
   >(null);
   const resumeInputRef = useRef<HTMLInputElement | null>(null);
   const [uploadingResume, setUploadingResume] = useState(false);
+  // Redaction-bar edits save one at a time, in order (see saveBarChange).
+  const barSaveChainRef = useRef<Promise<void>>(Promise.resolve());
+  const [barSavesPending, setBarSavesPending] = useState(0);
   // Swipeable tab content. Each pane lives side-by-side in a horizontal
   // scroll-snap container; tapping a tab scrolls programmatically,
   // swiping scrolls naturally and the scroll handler syncs `tab`.
@@ -806,14 +817,17 @@ export function ProfileMobile({ targetHandle }: Props = {}) {
    *  Errors surface via setEditError so the sheet can show them.
    *  Quiet by default, since the sheets render their own inline
    *  error; the logo and resume uploads, whose controls show
-   *  nothing, pass `quiet: false` so a failure toasts too. */
+   *  nothing, pass `quiet: false` so a failure toasts too.
+   *  `onStale` runs when the save landed but the refresh didn't, so a
+   *  caller can put what it saved on screen itself. */
   const savePortfolioPatch = useCallback(
     async (
       patch: Record<string, unknown>,
       {
         failure = "Couldn't save your portfolio.",
         quiet = true,
-      }: { failure?: string; quiet?: boolean } = {},
+        onStale,
+      }: { failure?: string; quiet?: boolean; onStale?: () => void } = {},
     ): Promise<boolean> => {
       setEditError(null);
       const r = await vibeRequest("/api/me/profile-sync", {
@@ -836,6 +850,7 @@ export function ProfileMobile({ targetHandle }: Props = {}) {
         setUser(jb.vibeUser as VibeUser);
       } else {
         // The save landed; only the refresh didn't, so it isn't a failure.
+        onStale?.();
         toast("Saved. Refresh to see the change.");
       }
       return true;
@@ -908,8 +923,10 @@ export function ProfileMobile({ targetHandle }: Props = {}) {
             url,
           },
         ].filter((d) => d.url);
+        // resume_url rides along as the first doc, as the desktop keeps
+        // it (see handleResumeDocDelete for why it must never go stale).
         await savePortfolioPatch(
-          { resume_docs: next },
+          { resume_docs: next, resume_url: next[0]?.url },
           { failure: "Couldn't save your resume.", quiet: false },
         );
       } finally {
@@ -979,10 +996,29 @@ export function ProfileMobile({ targetHandle }: Props = {}) {
     ],
   );
 
-  /** Remove the doc at `index` from resume_docs and save. */
+  /** Remove the doc at `index` from resume_docs and save.
+   *
+   *  Sends the list only, never bars. The server moves each stored bar
+   *  to its document's new position by docKey and drops the removed
+   *  doc's bars, so the ones after it can't slide onto the wrong file
+   *  (which served that file's original to everyone). Leaving the bars
+   *  to the server also means this screen can't overwrite newer bars
+   *  saved from another device.
+   *
+   *  resume_url goes with the list: the first remaining doc, or cleared
+   *  with `remove: ["resume"]` when none is left. The profile falls back
+   *  to resume_url whenever the list is empty, so a stale one brought a
+   *  deleted file back as a live document with none of its bars (they
+   *  went with it), served in full to everyone. Clearing it also lets
+   *  the server delete that file.
+   *
+   *  savePortfolioPatch's re-bootstrap brings the stored bars back; if
+   *  only that refresh failed, the same re-map runs on the bars here so
+   *  the screen matches what the server stored. */
   const handleResumeDocDelete = useCallback(
     async (index: number) => {
-      const existing = user?.resumePortfolio ?? [];
+      // The list the pane rendered, so `index` is the doc that was tapped.
+      const existing = (user?.resumePortfolio ?? []).filter((r) => !!r?.url);
       if (index < 0 || index >= existing.length) return;
       const next = existing
         .filter((_, i) => i !== index)
@@ -992,9 +1028,92 @@ export function ProfileMobile({ targetHandle }: Props = {}) {
           url: r.url ?? "",
         }))
         .filter((d) => d.url);
-      await savePortfolioPatch({ resume_docs: next });
+      const first = next[0]?.url;
+      await savePortfolioPatch(
+        first
+          ? { resume_docs: next, resume_url: first }
+          : { resume_docs: next, remove: ["resume"] },
+        {
+          onStale: () =>
+            setUser((prev) =>
+              prev
+                ? {
+                    ...prev,
+                    resumePortfolio: next,
+                    resumeRedactions: remapBarsForDocs(
+                      prev.resumeRedactions ?? [],
+                      existing,
+                      next,
+                    ),
+                  }
+                : prev,
+            ),
+        },
+      );
     },
     [savePortfolioPatch, user?.resumePortfolio],
+  );
+
+  /** Save one bar edit from the viewer. Edits queue up and run one at a
+   *  time, and each re-reads the bars and list the server holds before
+   *  applying its one change (barsAfterChange). The whole bars array is
+   *  replaced on save, so building it from this screen's copy could erase
+   *  bars saved on another device since it loaded, or let an earlier save
+   *  land after a later one and drop a bar: either way part of a file
+   *  would be shown that the student had blacked out. */
+  const saveBarChange = useCallback(
+    (docUrl: string, docIndex: number, change: BarChange) => {
+      const failure = "Couldn't save your blackout bar. Try again.";
+      const run = async () => {
+        const rb = await fetch("/api/me/profile-bootstrap", {
+          cache: "no-store",
+          credentials: "include",
+        }).catch(() => null);
+        const jb = rb ? await rb.json().catch(() => ({})) : {};
+        const fresh: VibeUser | null =
+          rb?.ok && jb?.ok && jb.vibeUser ? (jb.vibeUser as VibeUser) : null;
+        if (!fresh) {
+          showPortfolioError(failure);
+          return;
+        }
+        const docs = (fresh.resumePortfolio ?? []).filter((r) => !!r?.url);
+        const bars = barsAfterChange(
+          fresh.resumeRedactions ?? [],
+          docs,
+          docUrl,
+          docIndex,
+          change,
+        );
+        if (!bars) {
+          setUser(fresh);
+          showPortfolioError("That document was removed, so the bar wasn't saved.");
+          return;
+        }
+        await savePortfolioPatch(
+          { resume_redactions: bars },
+          {
+            failure,
+            quiet: false,
+            onStale: () =>
+              setUser((prev) =>
+                prev
+                  ? {
+                      ...prev,
+                      resumePortfolio: fresh.resumePortfolio,
+                      resumeRedactions: bars,
+                    }
+                  : prev,
+              ),
+          },
+        );
+      };
+      setBarSavesPending((n) => n + 1);
+      barSaveChainRef.current = barSaveChainRef.current
+        .then(run)
+        .catch(() => showPortfolioError(failure))
+        .finally(() => setBarSavesPending((n) => n - 1));
+    },
+    [savePortfolioPatch, showPortfolioError],
   );
 
   const cancelEdit = () => {
@@ -1252,7 +1371,7 @@ export function ProfileMobile({ targetHandle }: Props = {}) {
   // the resume proxy serves a derivative with the bars burned in. The
   // isVisitor guard is belt-and-braces so a stray payload can't put
   // overlays (or the coordinates behind them) on a visitor's screen.
-  const resumeRedactions: RedactionBar[] = isVisitor
+  const resumeRedactions: DocBar[] = isVisitor
     ? []
     : (user.resumeRedactions ?? []);
 
@@ -2150,23 +2269,25 @@ export function ProfileMobile({ targetHandle }: Props = {}) {
           url={viewerItem.item.url ?? ""}
           type={viewerItem.item.type === "image" ? "image" : "pdf"}
           name={viewerItem.item.name ?? "Resume"}
-          // Filter bars to THIS doc only — fixes the bug where doc 1
-          // inherited doc 0's bars. docIndex is captured at tap time.
-          bars={resumeRedactions.filter(
-            (b) => b.docIndex === viewerItem.index,
+          // Bars for THIS doc only: by docKey (the doc's url), and for an
+          // older bar without one, by the file listed at its position (the
+          // server's rule, so the owner sees what others get). The index
+          // is captured at tap time. The viewer compares bars by content,
+          // so a fresh array each render doesn't reset its drawing.
+          bars={resumeRedactions.filter((b) =>
+            barCoversDoc(
+              b,
+              resumePortfolio.map((r) => r.url ?? ""),
+              viewerItem.item.url ?? "",
+            ),
           )}
           docIndex={viewerItem.index}
           editable={!isVisitor}
-          onBarsChange={(barsForDoc) => {
-            // Merge the editor's per-doc bars back into the full
-            // resume_redactions array: keep bars for OTHER docs as-is,
-            // replace bars for this doc with what the editor returned.
-            const others = resumeRedactions.filter(
-              (b) => b.docIndex !== viewerItem.index,
-            );
-            void savePortfolioPatch({
-              resume_redactions: [...others, ...barsForDoc],
-            });
+          saving={barSavesPending > 0}
+          onBarsChange={(_barsForDoc, change) => {
+            // Only the one edit goes up; saveBarChange applies it to the
+            // bars the server holds, pinned to this file by its url.
+            saveBarChange(viewerItem.item.url ?? "", viewerItem.index, change);
           }}
           onClose={() => setViewerItem(null)}
         />
