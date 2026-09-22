@@ -39,11 +39,17 @@ import { createSupabaseServerClient } from "@/lib/supabase/server";
  * all of them and the org ring is legitimately empty; the majors half of the
  * map is unaffected.
  *
- * The mutuals math uses one extra query: pull every connection row where
- * the follower is one of the viewer's existing connections, then count
- * how many of those land on each candidate. Cheap because the viewer's
- * connection set is small (Dunbar) and the index on `follower_id` is hot.
+ * The mutuals math is one RPC, `second_degree_follows` (T1, migration
+ * 20260922100000): the people the viewer's mutual connections follow,
+ * narrowed to this map's pool. `connections` only returns edges that touch
+ * the viewer once T1's policy file lands, so the route can no longer read
+ * its mutuals' edges itself. The RPC keys on `auth.uid()`, so it runs on the
+ * viewer's client (never the service one), returns ids and counts only, and
+ * skips anyone in a block pair with the viewer.
  */
+
+/** `second_degree_follows` refuses more ids than this in `p_among` (SQLSTATE 22023). */
+const SECOND_DEGREE_MAX_IDS = 1000;
 
 /** The viewer identity both branches return (never the school email). */
 type MapYou = {
@@ -159,18 +165,33 @@ export async function GET(req: Request) {
   const myConnections = new Set<string>();
   for (const id of outIds) if (inIds.has(id)) myConnections.add(id);
 
-  // 3. Friends-of-friends: every connection row where the follower is one
-  // of my mutuals. Their `following_id`s are users I share a mutual with.
+  // 3. Friends-of-friends: people my mutuals follow, from the RPC (see the
+  // docblock), narrowed to this campus's pool. The pool is capped at 1000
+  // rows by `max_rows`, so this is one call today; the chunks are for safety.
+  // A failed read degrades to "no mutuals" (logged), as it did before, rather
+  // than failing the whole map.
   const mutualSecondHop = new Set<string>();
-  if (myConnections.size > 0) {
-    const { data: hop } = await supabase
-      .from("connections")
-      .select("following_id")
-      .in("follower_id", Array.from(myConnections));
-    for (const row of hop ?? []) {
-      const id = (row as { following_id: string }).following_id;
-      if (id !== me.id && !myConnections.has(id) && peerIds.has(id)) {
-        mutualSecondHop.add(id);
+  if (myConnections.size > 0 && peerIds.size > 0) {
+    const pool = Array.from(peerIds);
+    const chunks: string[][] = [];
+    for (let i = 0; i < pool.length; i += SECOND_DEGREE_MAX_IDS) {
+      chunks.push(pool.slice(i, i + SECOND_DEGREE_MAX_IDS));
+    }
+    const results = await Promise.all(
+      chunks.map((chunk) => supabase.rpc("second_degree_follows", { p_among: chunk })),
+    );
+    const hopErr = results.find((res) => res.error)?.error;
+    if (hopErr) {
+      console.error("[campus-map second-degree]", hopErr);
+    } else {
+      for (const res of results) {
+        for (const row of Array.isArray(res.data) ? res.data : []) {
+          const id = (row as { user_id?: unknown }).user_id;
+          if (typeof id !== "string") continue;
+          if (id !== me.id && !myConnections.has(id) && peerIds.has(id)) {
+            mutualSecondHop.add(id);
+          }
+        }
       }
     }
   }

@@ -194,20 +194,36 @@ export async function GET(req: Request) {
 
   // Aggregate friends-of-friends (count of how many of MY connections each
   // candidate follows). Skip if I have no connections yet.
+  //
+  // One RPC, `second_degree_follows` (T1, migration 20260922100000).
+  // `connections` only returns edges that touch the viewer once T1's policy
+  // file lands, so the route can no longer read its mutuals' edges itself.
+  // The RPC keys on `auth.uid()` (viewer's client, never `service`), returns
+  // ids and counts only, and skips block pairs. It answers its top 1000 by
+  // `via_count` desc, then `user_id`: a deliberate, ordered cap, where the old
+  // read took an arbitrary first 1000 edge rows. A failed read drops the
+  // friend-of-friend signal (logged), as it did before; the block read below
+  // still fails closed.
   const mutualCount = new Map<string, number>();
   if (myConnections.size > 0) {
-    const { data: hop } = await supabase
-      .from("connections")
-      .select("following_id")
-      .in("follower_id", Array.from(myConnections));
-    for (const row of hop ?? []) {
-      const id = (row as { following_id: string }).following_id;
-      if (id === user.id) continue;
-      // `outIds` covers mutuals too: anyone the viewer already follows, one
-      // way or both, is not a suggestion (the same skip as the org peers and
-      // the fallback pool below).
-      if (outIds.has(id)) continue;
-      mutualCount.set(id, (mutualCount.get(id) ?? 0) + 1);
+    const { data: hop, error: hopErr } = await supabase.rpc("second_degree_follows", {
+      p_among: null,
+    });
+    if (hopErr) {
+      console.error("[suggested-connections second-degree]", hopErr);
+    } else {
+      for (const row of Array.isArray(hop) ? hop : []) {
+        const r = row as { user_id?: unknown; via_count?: unknown };
+        const id = r.user_id;
+        const count = Number(r.via_count);
+        if (typeof id !== "string" || !Number.isFinite(count) || count <= 0) continue;
+        if (id === user.id) continue;
+        // `outIds` covers mutuals too: anyone the viewer already follows, one
+        // way or both, is not a suggestion (the same skip as the org peers and
+        // the fallback pool below).
+        if (outIds.has(id)) continue;
+        mutualCount.set(id, Math.trunc(count));
+      }
     }
   }
 

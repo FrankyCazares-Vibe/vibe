@@ -67,12 +67,19 @@ function fail(status: number, code: string, error: string) {
   return NextResponse.json({ ok: false, error, code }, { status });
 }
 
+/** A count from an RPC row as a whole number: NaN, negatives or missing → 0. */
+function toCount(value: unknown): number {
+  const n = Number(value);
+  return Number.isFinite(n) && n > 0 ? Math.trunc(n) : 0;
+}
+
 /**
  * GET /api/events?limit=&org_id=&campus=<id|all>
  *
  * Upcoming events, hard-scoped to a campus. Each row carries:
  *   - org info (logo signed via proxy) when scoped to a community
- *   - going_count + interested_count
+ *   - going_count + interested_count (from the `event_rsvp_counts` RPC:
+ *     numbers only, never who)
  *   - viewer_status: 'going' | 'maybe' | null  (mapped to UI labels)
  *
  * The response also carries `viewerCampus` (legacy label, now derived from
@@ -237,7 +244,9 @@ export async function GET(req: Request) {
     // this runs as two queries merged in memory:
     //   (A) events whose ORG sits on one of these campuses — the normal case
     //   (B) org-less events whose CREATOR does — legacy rows only, since
-    //       POST now requires an org_id
+    //       POST now requires an org_id. Under T1's `events_select_visible`
+    //       policy (20260922110000) B returns only the viewer's own club-less
+    //       events, or ones they RSVP'd to: 0 rows live.
     // Each side is already ordered by starts_at and capped at `limit`, so
     // sorting the union and taking the first `limit` rows yields exactly what
     // a single query would have returned.
@@ -328,21 +337,32 @@ export async function GET(req: Request) {
   }
 
   if (eventIds.length > 0) {
-    const [allRsvps, mineRsvps] = await Promise.all([
-      supabase.from("rsvps").select("event_id,status").in("event_id", eventIds),
+    // Going / maybe counts come from the `event_rsvp_counts` RPC (T1,
+    // migration 20260922100000): numbers only, for events the viewer can see.
+    // Once T1's policy file lands, `rsvps` returns only the viewer's own rows
+    // (plus the RSVPs of events they manage), so counting rows here would say
+    // "0 going" or "1 going". `eventIds` is at most MAX_LIMIT = 200, under the
+    // RPC's 1000-id cap, so this is one call. A failure is fatal: "12 going"
+    // quietly turning into "0 going" is a wrong page, not a degraded one.
+    // DEPLOY ORDER: migration 20260922100000 must be live BEFORE this code
+    // ships. Without the RPC every signed-in GET here answers 500.
+    const [countsRes, mineRsvps] = await Promise.all([
+      supabase.rpc("event_rsvp_counts", { p_event_ids: eventIds }),
       supabase
         .from("rsvps")
         .select("event_id,status")
         .in("event_id", eventIds)
         .eq("user_id", user.id),
     ]);
-    for (const row of allRsvps.data ?? []) {
-      const r = row as { event_id: string; status: string };
-      if (r.status === "going") {
-        goingByEvent.set(r.event_id, (goingByEvent.get(r.event_id) ?? 0) + 1);
-      } else if (r.status === "maybe") {
-        maybeByEvent.set(r.event_id, (maybeByEvent.get(r.event_id) ?? 0) + 1);
-      }
+    if (countsRes.error) {
+      console.error("[events GET rsvp counts]", countsRes.error);
+      return failed();
+    }
+    for (const row of Array.isArray(countsRes.data) ? countsRes.data : []) {
+      const r = row as { event_id?: unknown; going_count?: unknown; maybe_count?: unknown };
+      if (typeof r.event_id !== "string") continue;
+      goingByEvent.set(r.event_id, toCount(r.going_count));
+      maybeByEvent.set(r.event_id, toCount(r.maybe_count));
     }
     for (const row of mineRsvps.data ?? []) {
       const r = row as { event_id: string; status: string };

@@ -4,9 +4,12 @@ import { isMissingColumnError } from "@/lib/db/missing-column";
 import { resolveCampusRequest, scopeViewerFromRow } from "@/lib/iu/campus-request";
 import { scopeCampusIds } from "@/lib/iu/campus-scope";
 import { campusScopeError } from "@/lib/iu/community-scope";
+import { loadHiddenUsers } from "@/lib/safety/hidden-users";
 import { createSupabaseServerClient } from "@/lib/supabase/server";
 
 const MAX_BUCKET = 60;
+/** `second_degree_follows` refuses more ids than this in `p_among` (SQLSTATE 22023). */
+const SECOND_DEGREE_MAX_IDS = 1000;
 
 type UserRow = {
   id: string;
@@ -42,6 +45,10 @@ type UserRow = {
  * likewise belong to no map.
  *
  * A viewer with no campus keeps today's answer: empty buckets.
+ *
+ * BLOCKS. Anyone in a block pair with the viewer (either direction) is left
+ * out of every bucket, the way /api/me/suggested-connections leaves them out.
+ * An unreadable block list is a 500, never "nobody is blocked".
  */
 
 /** Nobody to show. Same shape the client already handles for an empty zone. */
@@ -144,12 +151,25 @@ export async function GET(req: Request) {
     return emptyBuckets();
   }
 
-  // Viewer's connections (mutual follows). Follows are global (plan §2.4), so
-  // this set isn't campus-filtered; the candidate pool above already is.
-  const [outRes, inRes] = await Promise.all([
+  // Viewer's connections (mutual follows) and block pairs, in one round trip.
+  // Follows are global (plan §2.4), so this set isn't campus-filtered; the
+  // candidate pool above already is.
+  const [outRes, inRes, hiddenRes] = await Promise.all([
     supabase.from("connections").select("following_id").eq("follower_id", user.id),
     supabase.from("connections").select("follower_id").eq("following_id", user.id),
+    loadHiddenUsers(supabase, user.id),
   ]);
+  // Blocks in either direction never show on a zone. Fail closed: an
+  // unreadable block list must never turn into "nobody is blocked".
+  if (!hiddenRes.ok) {
+    console.error("[campus-map/zone blocks]", hiddenRes.error);
+    return NextResponse.json({ ok: false, error: "Request failed" }, { status: 500 });
+  }
+  const blocked = hiddenRes.hidden.blocked;
+  if (blocked.size > 0) {
+    candidateIds = candidateIds.filter((id) => !blocked.has(id));
+    if (candidateIds.length === 0) return emptyBuckets();
+  }
   const outIds = new Set(
     (outRes.data ?? []).map((r) => (r as { following_id: string }).following_id),
   );
@@ -159,17 +179,36 @@ export async function GET(req: Request) {
   const myConnections = new Set<string>();
   for (const id of outIds) if (inIds.has(id)) myConnections.add(id);
 
-  // Mutual count per candidate: how many of MY connections follow them.
+  // Mutual count per candidate: how many of MY connections follow them, from
+  // the `second_degree_follows` RPC (T1, migration 20260922100000) narrowed
+  // to this zone's candidates. `connections` only returns edges that touch
+  // the viewer once T1's policy file lands, so the route can no longer read
+  // its mutuals' edges itself. The RPC keys on `auth.uid()` (viewer's client,
+  // never service), returns ids and counts only, and skips block pairs. The
+  // candidate list is capped at 1000 rows by `max_rows`, so this is one call
+  // today; the chunks are for safety. A failed read degrades to "no mutuals"
+  // (logged), as it did before, rather than failing the zone.
   const mutualCount = new Map<string, number>();
   if (myConnections.size > 0) {
-    const { data: hop } = await supabase
-      .from("connections")
-      .select("following_id")
-      .in("follower_id", Array.from(myConnections))
-      .in("following_id", candidateIds);
-    for (const row of hop ?? []) {
-      const id = (row as { following_id: string }).following_id;
-      mutualCount.set(id, (mutualCount.get(id) ?? 0) + 1);
+    const chunks: string[][] = [];
+    for (let i = 0; i < candidateIds.length; i += SECOND_DEGREE_MAX_IDS) {
+      chunks.push(candidateIds.slice(i, i + SECOND_DEGREE_MAX_IDS));
+    }
+    const results = await Promise.all(
+      chunks.map((chunk) => supabase.rpc("second_degree_follows", { p_among: chunk })),
+    );
+    const hopErr = results.find((res) => res.error)?.error;
+    if (hopErr) {
+      console.error("[campus-map/zone second-degree]", hopErr);
+    } else {
+      for (const res of results) {
+        for (const row of Array.isArray(res.data) ? res.data : []) {
+          const r = row as { user_id?: unknown; via_count?: unknown };
+          const count = Number(r.via_count);
+          if (typeof r.user_id !== "string" || !Number.isFinite(count) || count <= 0) continue;
+          mutualCount.set(r.user_id, Math.trunc(count));
+        }
+      }
     }
   }
 
