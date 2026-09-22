@@ -10,6 +10,11 @@ import { createSupabaseServiceClient } from "@/lib/supabase/service";
  * Campus shell routes: require login, accepted Terms, verified school email,
  * and Otto saved to DB.
  * Prevents hitting shell routes when the static Otto page fell back without a session.
+ *
+ * `currentPath` is where the student was going, query and all (a
+ * notification's /profile?post=<id>), and EVERY redirect here carries it as
+ * `next` so passing a gate brings them back to that exact view. It used to
+ * be a bare path, and only the Terms step carried it.
  */
 export async function enforceCampusAccess(currentPath: string) {
   const supabase = await createSupabaseServerClient();
@@ -36,10 +41,10 @@ export async function enforceCampusAccess(currentPath: string) {
     redirect(`/auth/terms?next=${encodeURIComponent(currentPath)}`);
   }
   if (!row?.school_verified) {
-    redirect("/auth/school-email");
+    redirect(`/auth/school-email?next=${encodeURIComponent(currentPath)}`);
   }
   if (!isOttoOnboardingComplete(row?.otto_answers)) {
-    redirect("/onboarding");
+    redirect(`/onboarding?next=${encodeURIComponent(currentPath)}`);
   }
 }
 

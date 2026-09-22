@@ -101,8 +101,11 @@ export async function generateMetadata({ params }: Props): Promise<Metadata> {
  *
  * Mobile: renders ProfileMobile in visitor mode (Connect/Follow CTA,
  * Posts/Clips/Portfolio tabs read from the per-handle public APIs).
- * Desktop: client-side redirects to /html/profile.html?handle=<handle>
- * so the static prototype keeps handling viewer mode there.
+ * Desktop: hops client-side to /html/profile.html?app=1&handle=<handle>,
+ * carrying ?post / ?welcome, where the static page renders viewer mode
+ * and then puts /profile/<handle> back in the address bar. Old
+ * /html/profile.html?handle=<h> links redirect here (src/proxy.ts), so
+ * they unfurl with this route's preview card too.
  *
  * Intentionally not campus-gated: share links have to work from
  * iMessage's in-app browser (no cookies) and from logged-out visitors.
@@ -128,7 +131,15 @@ export default async function ProfileByHandlePage({
   }
   if (row === null) notFound();
 
+  // The whole query goes down as a string; ProfileHandleSwitch carries only
+  // the settings the static page reads (forwardedProfileParams). Reading it
+  // here, not with useSearchParams, keeps the effect keyed to a server prop.
   const sp = await searchParams;
-  const welcome = sp?.welcome === "1";
-  return <ProfileHandleSwitch handle={handle} welcome={welcome} />;
+  const query = new URLSearchParams();
+  for (const [k, v] of Object.entries(sp ?? {})) {
+    for (const one of Array.isArray(v) ? v : [v]) {
+      if (typeof one === "string") query.append(k, one);
+    }
+  }
+  return <ProfileHandleSwitch handle={handle} query={query.toString()} />;
 }

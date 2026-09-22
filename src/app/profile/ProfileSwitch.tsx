@@ -9,7 +9,10 @@ import { ProfileHtmlBridge } from "./profile-html-bridge";
 /**
  * Viewport-based fork for the `/profile` route.
  *
- * Desktop  → ProfileHtmlBridge (existing static profile.html, untouched).
+ * Desktop  → ProfileHtmlBridge, which hops to the static
+ *            public/html/profile.html?app=1 carrying the settings that page
+ *            reads (?post=<id>, ?welcome=1; see forwardedProfileParams).
+ *            The static page then puts /profile back in the address bar.
  * Mobile   → MobileShell + ProfileMobile.
  *
  * SSR renders the desktop branch by default. After hydration the hook

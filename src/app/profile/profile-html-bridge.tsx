@@ -8,6 +8,32 @@ import {
   isGlobalFeedSurfaceEnabled,
 } from "@/lib/feature-flags";
 
+import { forwardedProfileParams } from "./profile-params";
+
+// The allowlist moved to ./profile-params so the server pages can call it
+// too (the gate `next`); re-exported here for everything that already
+// imports it from this module.
+export { forwardedProfileParams };
+
+/**
+ * Where the desktop hop lands: the static page in app mode, as the viewer of
+ * `handle` when one is given, with the forwarded settings and the #hash.
+ * The static page reads them, then puts the clean address back in the bar.
+ */
+export function staticProfileHref(
+  incoming: URLSearchParams,
+  hash: string,
+  handle?: string,
+): string {
+  const out = new URLSearchParams();
+  out.set("app", "1");
+  if (handle) out.set("handle", handle.toLowerCase());
+  for (const [k, v] of forwardedProfileParams(incoming, { own: !handle })) {
+    out.set(k, v);
+  }
+  return `/html/profile.html?${out.toString()}${hash}`;
+}
+
 export function ProfileHtmlBridge() {
   const [message, setMessage] = useState("Loading your profile…");
   const [fatal, setFatal] = useState<string | null>(null);
@@ -39,8 +65,13 @@ export function ProfileHtmlBridge() {
         if (cancelled) return;
 
         if (r.status === 401) {
+          // Come back to the same post or tour after signing in.
+          const kept = forwardedProfileParams(
+            new URLSearchParams(window.location.search),
+            { own: true },
+          ).toString();
           window.location.replace(
-            `/auth/login?next=${encodeURIComponent("/profile")}`,
+            `/auth/login?next=${encodeURIComponent(kept ? `/profile?${kept}` : "/profile")}`,
           );
           return;
         }
@@ -60,15 +91,15 @@ export function ProfileHtmlBridge() {
         }
 
         localStorage.setItem("vibe_user_v1", JSON.stringify(data.vibeUser));
-        // Carry `?welcome=1` (and other passthrough params) into the static
-        // page so the Otto tour can pick them up. Without this the bridge
-        // strips the query and the tour never fires.
-        const incoming = new URLSearchParams(window.location.search);
-        const out = new URLSearchParams();
-        out.set("app", "1");
-        const welcome = incoming.get("welcome");
-        if (welcome === "1") out.set("welcome", "1");
-        window.location.replace(`/html/profile.html?${out.toString()}`);
+        // Carry the settings the static page reads (the tour's `?welcome=1`,
+        // a notification's `?post=<id>`, …) across the hop. Without this the
+        // tour never fires and /profile?post=<id> opens a bare profile.
+        window.location.replace(
+          staticProfileHref(
+            new URLSearchParams(window.location.search),
+            window.location.hash,
+          ),
+        );
       } catch {
         if (!cancelled) {
           setFatal(

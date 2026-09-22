@@ -19,7 +19,10 @@ import { isGlobalFeedSurfaceEnabled } from "@/lib/feature-flags";
  *     with `?app=1` (profile.html, messages.html), onboarding.html is served
  *     through /onboarding/classic, and the only static page a logged-out
  *     visitor may load is the public profile viewer,
- *     `/html/profile.html?handle=<h>`, which desktop share links land on.
+ *     `/html/profile.html?app=1&handle=<h>`, which /profile/<h> hops to on
+ *     desktop. Share links hand out /profile/<h> itself; an old link to
+ *     `/html/profile.html?handle=<h>` (no `app=1`) or `?user=<h>` is sent
+ *     there, so it gets the person's real preview card and the phone view.
  *  3. Two clean-URL conveniences: `/profile` bounces anonymous visitors to
  *     login, and `/feed` goes straight to /campus while the global feed flag
  *     is off.
@@ -83,8 +86,28 @@ export async function proxy(request: NextRequest) {
           `/profile/${encodeURIComponent(slug)}`,
         );
       }
-      // Public viewer mode: anyone holding a share link, signed in or not.
-      if ((searchParams.get("handle") || "").trim()) return sessionResponse;
+      const handle = (searchParams.get("handle") || "").trim();
+      if (handle) {
+        // Public viewer mode, reached from /profile/<h>: anyone may load
+        // it, signed in or not.
+        if (fromApp) return sessionResponse;
+        // An old share link or bookmark: the clean address unfurls with the
+        // person's preview card and picks the phone or desktop view. It hops
+        // back here WITH `?app=1`, so this never loops. The settings the
+        // static page acts on ride along (forwardedProfileParams) — dropped,
+        // `embedded=1` gave an old host frame its sidebar back mid-session.
+        const carried: Record<string, string> = {};
+        const post = (searchParams.get("post") || "").trim();
+        if (post && post.length <= 128) carried.post = post;
+        if (searchParams.get("welcome") === "1") carried.welcome = "1";
+        if (searchParams.get("embedded") === "1") carried.embedded = "1";
+        return redirectTo(
+          request,
+          sessionResponse,
+          `/profile/${encodeURIComponent(handle.toLowerCase())}`,
+          carried,
+        );
+      }
     }
 
     // Everything else behind the static URLs is the signed-in app or a
