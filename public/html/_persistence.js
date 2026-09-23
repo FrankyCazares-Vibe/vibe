@@ -93,7 +93,7 @@ function _vibeTopHere() {
 // vibeRequest + <ToastHost />; the static pages get the same helpers here:
 //   window.vibeToast(message, { tone: 'info'|'error', action: { label, href }, durationMs })
 //   window.vibeRequest(url, { method, json, body, headers, failure, success, quiet })
-//     → Promise<{ ok: true, status, data } | { ok: false, status, code, error, message, action? }>
+//     → Promise<{ ok: true, status, data } | { ok: false, status, code, error, message, action?, field? }>
 //     Never throws; branch on r.ok. `failure` is the caller's own line.
 //   window.vibeCopy(text, success) → Promise<boolean>
 //   window.vibeLoadFailure(r, line) → { message, action? }  (a failed first load's line)
@@ -108,6 +108,10 @@ function _vibeTopHere() {
   const GENERIC = ['unauthorized', 'forbidden', 'request failed', 'unavailable',
     'not found', 'invalid json', 'bad request', 'internal server error'];
   const PASS_400 = ['Comment is empty', 'Message too long', 'Empty message'];
+  // Where a restricted student reads what happened and how to appeal, and the
+  // address they write to (plan §5, S64). Same two values as failure-copy.ts.
+  const SUSPENDED_PAGE = '/account/suspended';
+  const SUPPORT_EMAIL = 'help@connectvibe.app';
   function sentence(line) {
     const s = String(line || '').trim() || 'Something went wrong.';
     return /[.!?]$/.test(s) ? s : s + '.';
@@ -132,6 +136,21 @@ function _vibeTopHere() {
     if (st === 0) return { message: "Couldn't reach Vibe. Check your connection and try again." };
     if (st === 401) return { message: "You've been signed out. Sign in and try again.", action: { label: 'Sign in', href: '/auth/login?next=' + next } };
     if (st === 403 && sig.code === 'terms_required') return { message: 'Accept the Terms first, then try again.', action: { label: 'Review Terms', href: '/auth/terms?next=' + next } };
+    // The moderation 403s (S64), above the generic 403 below because each one
+    // has somewhere to send the student — and none of them can reach
+    // isSentence() anyway. The page that SENDS the code is /auth/school-email;
+    // /auth/verify-school is where the emailed link lands, so never that one.
+    if (st === 403 && sig.code === 'school_email_required') return { message: 'Verify your school email to post.', action: { label: 'Verify', href: '/auth/school-email?next=' + next } };
+    // A suspension or a ban. The page says what happened, until when, and how
+    // to appeal, so this line deliberately repeats none of it.
+    if (st === 403 && sig.code === 'account_restricted') return { message: 'Your account is restricted.', action: { label: 'See details', href: SUSPENDED_PAGE } };
+    // The school ADDRESS is restricted (a banned student signing up again).
+    // No action: there is nothing they can do in the app about it. This one
+    // reaches a static page for real — onboarding.html:2612 and :2645 post to
+    // /api/auth/school-email/request and /confirm-code through vibeRequest,
+    // and the server's own sentence carries an "@", which isSentence() rejects,
+    // so without this branch it read as "You don't have access to do that."
+    if (st === 403 && sig.code === 'school_email_restricted') return { message: "This school email can't be used on Vibe. Questions: " + SUPPORT_EMAIL };
     // A Vibe+ gate, not a wrist-slap: the generic 403 line below reads as a
     // telling-off and points nowhere. Mirrors the plus_required rule in
     // src/lib/feedback/failure-copy.ts — change both together.
@@ -140,6 +159,21 @@ function _vibeTopHere() {
     if (st === 403 && err === 'Unavailable') return { message: "You can't connect with this person." };
     if (st === 403 && isSentence(err)) return { message: err.trim() };
     if (st === 403 && err) return { message: "You don't have access to do that." };
+    // The word filter (422). Without a branch of its own this landed on the
+    // caller's "Couldn't save. Try again." — wrong twice: trying again does
+    // nothing, and it doesn't say what to change. `field` rides along so a
+    // form with several inputs (profile.html: name, bio, tagline) can point at
+    // the right one. The matched word is never repeated.
+    if (st === 422 && sig.code === 'content_blocked') {
+      const blocked = { message: "That includes words that aren't allowed on Vibe. Edit it and try again." };
+      if (sig.field) blocked.field = sig.field;
+      return blocked;
+    }
+    // School-email verification couldn't reach the restriction check, so
+    // nobody verifies until it can. The server's sentence carries the useful
+    // part — waiting IS the fix — which the generic line at the bottom would
+    // throw away. Same caller as school_email_restricted above.
+    if (st === 503 && sig.code === 'restriction_check_failed' && isSentence(err)) return { message: err.trim() };
     if (st === 404) return { message: "That's no longer available." };
     if (st === 409 && isSentence(err)) return { message: err.trim() };
     if (st === 400) return { message: err && (PASS_400.indexOf(err) >= 0 || /exceeds \d+ characters/.test(err)) ? err : sentence(fallback) };
@@ -254,6 +288,9 @@ function _vibeTopHere() {
     if (!quiet) window.vibeToast(d.message, { tone: 'error', action: d.action });
     const r = { ok: false, status: sig.status, code: sig.code, error: sig.error, message: d.message };
     if (d.action) r.action = d.action;
+    // Only the refusals that name a field carry one (the word filter, today),
+    // so every other failure's shape is exactly what it was.
+    if (d.field) r.field = d.field;
     return r;
   }
   window.vibeRequest = async function(url, opts) {
@@ -289,6 +326,9 @@ function _vibeTopHere() {
         code: obj && typeof obj.code === 'string' ? obj.code : null,
         error: obj && typeof obj.error === 'string' ? obj.error : null,
         retryAfterSec: parseRetryAfter(res.headers.get('retry-after')),
+        // Which input the server refused, when it named one (contentBlocked-
+        // Response, src/lib/moderation/access.ts:134).
+        field: obj && typeof obj.field === 'string' ? obj.field : null,
       }, o.failure, o.quiet);
     }
     if (o.success) window.vibeToast(o.success);

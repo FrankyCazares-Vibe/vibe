@@ -20,6 +20,11 @@ const OFFLINE = "We couldn't reach Vibe. Check your connection and try again.";
 const TOO_MANY_TRIES =
   "Too many tries from this network. Wait a few minutes, then try again.";
 const SOMETHING_WENT_WRONG = "Something went wrong. Try again in a minute.";
+// A permanent ban (GoTrue `user_banned`). Never the reason and never a date:
+// anyone can type an email into this form, so this page says only that the
+// account can't sign in, and the appeal happens by email.
+const ACCOUNT_CLOSED =
+  "This account can't sign in. If you think this is a mistake, email help@connectvibe.app.";
 
 /**
  * What to say when sign-in fails. Never the provider's or the browser's own
@@ -31,6 +36,7 @@ function signInErrorMessage(err: AuthError): string {
   if (isAuthRetryableFetchError(err)) return OFFLINE;
   if (err.code === "email_not_confirmed") return NOT_CONFIRMED;
   if (err.code === "invalid_credentials") return WRONG_CREDENTIALS;
+  if (err.code === "user_banned") return ACCOUNT_CLOSED;
   if (err.status === 429 || err.code === "over_request_rate_limit") {
     return TOO_MANY_TRIES;
   }
