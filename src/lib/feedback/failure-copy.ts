@@ -15,9 +15,21 @@ export type FailureSignal = {
   code: string | null;
   error: string | null;
   retryAfterSec: number | null;
+  /**
+   * Which input the server refused, when a form has several (the word filter
+   * sends it with `content_blocked`: "bio", "name", "content"…). Optional, so
+   * a caller that doesn't read it off the body still typechecks.
+   */
+  field?: string | null;
 };
 
 export type ToastAction = { label: string; href: string };
+
+/** Where a restricted student reads what happened, and how to appeal. */
+const SUSPENDED_PAGE = "/account/suspended";
+
+/** The address a student writes to about a restriction (plan §5, S64). */
+const SUPPORT_EMAIL = "help@connectvibe.app";
 
 /** Server `error` tokens that say nothing to a student. */
 const GENERIC_ERRORS = new Set([
@@ -89,7 +101,7 @@ export function describeFailure(
   sig: FailureSignal,
   fallback: string,
   here: string,
-): { message: string; action?: ToastAction } {
+): { message: string; action?: ToastAction; field?: string } {
   const { status, code, error } = sig;
   const next = encodeURIComponent(here || "/");
 
@@ -106,6 +118,35 @@ export function describeFailure(
     return {
       message: "Accept the Terms first, then try again.",
       action: { label: "Review Terms", href: `/auth/terms?next=${next}` },
+    };
+  }
+  // The three moderation 403s sit here, above the generic 403 below, because
+  // each one has somewhere to send the student. None of them can fall through
+  // `isHumanSentence`: "You don't have access to do that." is a telling-off
+  // that leaves them nowhere.
+  //
+  // Posting, commenting and messaging need a verified school email (S64). The
+  // page that sends the code is /auth/school-email; /auth/verify-school is
+  // where the emailed LINK lands, so never point a student at that one.
+  if (status === 403 && code === "school_email_required") {
+    return {
+      message: "Verify your school email to post.",
+      action: { label: "Verify", href: `/auth/school-email?next=${next}` },
+    };
+  }
+  // A suspension or a ban. The page says what happened, until when, and how
+  // to appeal — this line deliberately doesn't repeat any of it.
+  if (status === 403 && code === "account_restricted") {
+    return {
+      message: "Your account is restricted.",
+      action: { label: "See details", href: SUSPENDED_PAGE },
+    };
+  }
+  // The school address itself is restricted (a banned student signing up
+  // again). No action: there is nothing they can do in the app about it.
+  if (status === 403 && code === "school_email_restricted") {
+    return {
+      message: `This school email can't be used on Vibe. Questions: ${SUPPORT_EMAIL}`,
     };
   }
   // A Vibe+ gate is not a wrist-slap: the student did nothing wrong, they just
@@ -133,6 +174,25 @@ export function describeFailure(
     // "Forbidden", "Request failed", "Admin only"… A 403 with no JSON error
     // at all falls through to the non-JSON line at the bottom.
     if (error) return { message: "You don't have access to do that." };
+  }
+  // The word filter (422). Without a branch of its own this landed on the
+  // caller's "Couldn't post your comment. Try again." — which is wrong twice:
+  // trying again does nothing, and it doesn't say what to change. `field`
+  // rides along so a form with several inputs can point at the right one.
+  // We never repeat the word that matched.
+  if (status === 422 && code === "content_blocked") {
+    return {
+      message: "That includes words that aren't allowed on Vibe. Edit it and try again.",
+      ...(sig.field ? { field: sig.field } : {}),
+    };
+  }
+  // School-email verification couldn't reach the restriction check, so nobody
+  // verifies until it can (src/lib/auth/school-email-apply.ts). The server's
+  // own sentence carries the useful part — waiting IS the fix — which the
+  // generic 5xx line at the bottom would throw away. Passed through rather
+  // than restated here, the same way the 409 below is.
+  if (status === 503 && code === "restriction_check_failed" && isHumanSentence(error)) {
+    return { message: error.trim() };
   }
   if (status === 404) return { message: "That's no longer available." };
   if (status === 409 && isHumanSentence(error)) return { message: error.trim() };

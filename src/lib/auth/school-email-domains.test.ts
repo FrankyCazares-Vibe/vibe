@@ -44,9 +44,11 @@ const {
   DEFAULT_SCHOOL_EMAIL_DOMAINS,
   PURDUE_SIGNUPS_ENABLED,
   RETIRED_IU_DOMAINS,
+  SCHOOL_IDENTITY_DOMAINS,
   SYSTEM_DOMAINS,
   allowedSchoolSystemForEmail,
   codeSchoolEmailDomains,
+  hostMatches,
   isRetiredIuDomain,
   isSchoolEmail,
   normalizeSchoolEmail,
@@ -55,6 +57,7 @@ const {
   schoolEmailDomains,
   schoolEmailDomainsLabel,
   schoolEmailRejection,
+  schoolIdentityDomainFor,
   schoolSystemForEmail,
   schoolSystemPatch,
   singleCampusForEmail,
@@ -355,4 +358,48 @@ test("patch: campus_set_at is never part of the patch", () => {
       assert.equal(patch.school_system, next);
     }
   }
+});
+
+test("hostMatches: a domain and its subdomains, nothing else", () => {
+  assert.equal(hostMatches("iu.edu", "iu.edu"), true);
+  assert.equal(hostMatches("mail.iu.edu", "iu.edu"), true);
+  assert.equal(hostMatches("a.b.iu.edu", "iu.edu"), true);
+  // The dot matters: "notiu.edu" is somebody else's domain.
+  assert.equal(hostMatches("notiu.edu", "iu.edu"), false);
+  assert.equal(hostMatches("iu.edu.example.com", "iu.edu"), false);
+});
+
+test("identity domains: the fold ceiling ignores the Purdue flag", () => {
+  // Restriction keys outlive launch flags (src/lib/moderation/identity.ts),
+  // so both systems are always in the ceiling.
+  assert.ok(SCHOOL_IDENTITY_DOMAINS.includes("iu.edu"));
+  assert.ok(SCHOOL_IDENTITY_DOMAINS.includes("purdue.edu"));
+  assert.ok(SCHOOL_IDENTITY_DOMAINS.includes("pfw.edu"));
+  assert.ok(SCHOOL_IDENTITY_DOMAINS.includes("pnw.edu"));
+  // And it never reaches past the code map.
+  for (const retired of RETIRED_IU_DOMAINS) {
+    assert.equal(SCHOOL_IDENTITY_DOMAINS.includes(retired), false, retired);
+  }
+});
+
+test("schoolIdentityDomainFor: subdomains fold, everything else is null", () => {
+  assert.equal(schoolIdentityDomainFor("a@iu.edu"), "iu.edu");
+  assert.equal(schoolIdentityDomainFor("a@mail.iu.edu"), "iu.edu");
+  assert.equal(schoolIdentityDomainFor("A@Mail.IU.EDU."), "iu.edu");
+  assert.equal(schoolIdentityDomainFor("a@purdue.edu"), "purdue.edu");
+  assert.equal(schoolIdentityDomainFor("a@mail.purdue.edu"), "purdue.edu");
+  // Retired IU domains deliver nothing, so they are not identities.
+  assert.equal(schoolIdentityDomainFor("a@iupui.edu"), null);
+  assert.equal(schoolIdentityDomainFor("a@mail.iupui.edu"), null);
+  // Personal and lookalike hosts never fold into a school domain.
+  assert.equal(schoolIdentityDomainFor("a@gmail.com"), null);
+  assert.equal(schoolIdentityDomainFor("a@notiu.edu"), null);
+  assert.equal(schoolIdentityDomainFor("a@iu.edu.example.com"), null);
+  assert.equal(schoolIdentityDomainFor("not-an-address"), null);
+});
+
+test("normalizeSchoolEmail keeps what the identity fold drops", () => {
+  // Stated out loud because the two look interchangeable and are not: this is
+  // the stored column, canonicalSchoolIdentity is the ban key.
+  assert.equal(normalizeSchoolEmail("Fra+2@Mail.IU.edu"), "fra+2@mail.iu.edu");
 });

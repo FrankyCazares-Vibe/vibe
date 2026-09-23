@@ -68,7 +68,13 @@ const RESEND_422 =
   "Invalid `to` field. The email address needs to follow the `email@example.com` or `Name <email@example.com>` format.";
 
 test("the kinds match the DB CHECK and the label is fixed", () => {
-  assert.deepEqual([...EMAIL_SEND_KINDS], ["school_verification", "password_reset"]);
+  // 'moderation_alert' joined them when the report queue started emailing the
+  // admins; the database CHECK was widened in the same migration.
+  assert.deepEqual([...EMAIL_SEND_KINDS], [
+    "school_verification",
+    "password_reset",
+    "moderation_alert",
+  ]);
   assert.equal(HASH_LABEL, "email-send-v1|");
 });
 

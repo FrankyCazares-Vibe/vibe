@@ -39,6 +39,13 @@ export type VibeFailure = {
   error: string | null;
   message: string;
   action?: ToastAction;
+  /**
+   * Which input the server refused, for a form with several: the word filter
+   * sends it with `content_blocked` ("bio", "name", "description"…). Present
+   * only when the server named one, so a caller can highlight that field
+   * instead of making the student hunt for it.
+   */
+  field?: string;
 };
 
 export type VibeResult<T> = { ok: true; status: number; data: T } | VibeFailure;
@@ -94,12 +101,17 @@ function signalFrom(res: Response, obj: Record<string, unknown> | null): Failure
     code: typeof obj?.code === "string" ? obj.code : null,
     error: typeof obj?.error === "string" ? obj.error : null,
     retryAfterSec: parseRetryAfter(res.headers.get("retry-after")),
+    // `contentBlockedResponse` (src/lib/moderation/access.ts:134) names the
+    // refused input in the body. Read here or it stops at the network
+    // boundary: failure-copy.ts already passes it through, but it only ever
+    // saw what this function built.
+    field: typeof obj?.field === "string" ? obj.field : null,
   };
 }
 
 /** Maps the signal to the student's line and, unless quiet, shows it. */
 function fail(signal: FailureSignal, failure: string, quiet: boolean): VibeFailure {
-  const { message, action } = describeFailure(signal, failure, here());
+  const { message, action, field } = describeFailure(signal, failure, here());
   if (!quiet) toast({ message, tone: "error", action });
   return {
     ok: false,
@@ -108,6 +120,10 @@ function fail(signal: FailureSignal, failure: string, quiet: boolean): VibeFailu
     error: signal.error,
     message,
     action,
+    // Only the refusals that name a field carry one (the word filter, today).
+    // Spread rather than assigned, so every other failure's shape is exactly
+    // what it was.
+    ...(field ? { field } : {}),
   };
 }
 

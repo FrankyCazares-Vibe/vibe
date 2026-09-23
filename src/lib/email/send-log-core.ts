@@ -2,9 +2,10 @@
  * Email send log, pure core (E1a, handoffs/wave-plan-week1/E1.md §A2).
  *
  * One row per transactional send attempt (school verification, password
- * reset) goes into `public.email_sends`, so "did we try, and what did the
- * provider say?" has an answer without the Resend dashboard. The only writer
- * is `send-log.ts`, which wraps {@link sendWithLog} with the service client.
+ * reset, moderation alert) goes into `public.email_sends`, so "did we try, and
+ * what did the provider say?" has an answer without the Resend dashboard. The
+ * only writer is `send-log.ts`, which wraps {@link sendWithLog} with the
+ * service client.
  *
  * NO PLAINTEXT ADDRESS, ANYWHERE. A row keeps:
  * - `recipient_hash`: HMAC-SHA256 keyed by SCHOOL_EMAIL_VERIFY_SECRET over
@@ -26,7 +27,20 @@ import { createHash, createHmac } from "node:crypto";
 
 import { RETIRED_IU_DOMAINS, SYSTEM_DOMAINS } from "../auth/school-email-domains";
 
-export const EMAIL_SEND_KINDS = ["school_verification", "password_reset"] as const;
+/**
+ * Every kind of transactional send, and the same list as
+ * `email_sends_kind_check` in the database — a kind missing there is a row the
+ * store refuses, which costs the send its log line.
+ *
+ * `moderation_alert` is the "New report on Vibe" email to the platform admins
+ * (src/lib/moderation/alerts.ts). It logs like any other: a keyed hash and a
+ * coarse domain, never an address, and never a word of what was reported.
+ */
+export const EMAIL_SEND_KINDS = [
+  "school_verification",
+  "password_reset",
+  "moderation_alert",
+] as const;
 export type EmailSendKind = (typeof EMAIL_SEND_KINDS)[number];
 
 /** Separates this use of SCHOOL_EMAIL_VERIFY_SECRET from the token and code HMACs. */

@@ -92,8 +92,12 @@ function purdueOn(opts?: SchoolDomainOptions): boolean {
   return opts?.purdueEnabled ?? PURDUE_SIGNUPS_ENABLED;
 }
 
-/** True when `host` is `domain` or a subdomain of it. */
-function hostMatches(host: string, domain: string): boolean {
+/**
+ * True when `host` is `domain` or a subdomain of it. Exported for
+ * {@link schoolIdentityDomainFor} and for `src/lib/moderation/identity.ts`,
+ * which folds a subdomain back to its school domain the same way.
+ */
+export function hostMatches(host: string, domain: string): boolean {
   return host === domain || host.endsWith(`.${domain}`);
 }
 
@@ -282,8 +286,46 @@ export const SCHOOL_DOMAINS_HEADLINE_LABEL: string = joinDomainLabel(
 );
 
 /**
+ * Every school domain in the CODE map, whatever the Purdue flag says, plus the
+ * single-campus domains held back for later. This is the ceiling a subdomain
+ * may fold into ({@link schoolIdentityDomainFor}).
+ *
+ * WHY THE FLAGS ARE IGNORED HERE, and only here: a restriction identity key is
+ * an HMAC of the folded address (src/lib/moderation/identity.ts), and once a
+ * ban row exists its key can never be recomputed differently. If the fold
+ * followed `PURDUE_SIGNUPS_ENABLED` or `SCHOOL_EMAIL_DOMAINS`, flipping either
+ * would silently change every Purdue student's canonical address and orphan
+ * the bans keyed on it. Deciding whether an address may be VERIFIED is a
+ * different question — that still goes through `schoolEmailRejection`.
+ */
+export const SCHOOL_IDENTITY_DOMAINS: readonly string[] = Object.freeze([
+  ...SCHOOL_SYSTEMS.flatMap((s) => [...SYSTEM_DOMAINS[s]]),
+  ...SINGLE_CAMPUS_DOMAINS.map(([domain]) => domain),
+]);
+
+/**
+ * The school domain an address folds into ("a@mail.iu.edu" → "iu.edu",
+ * "a@iu.edu" → "iu.edu"), or null when the host is not a school host at all.
+ * Retired IU domains are not school hosts: nothing can be verified on one, so
+ * nothing should be keyed on one either.
+ *
+ * Takes an email address, not a bare domain. Nothing folds into a domain that
+ * is not in {@link SCHOOL_IDENTITY_DOMAINS}.
+ */
+export function schoolIdentityDomainFor(email: string): string | null {
+  const host = schoolEmailHost(email);
+  if (!host || isRetiredIuDomain(email)) return null;
+  return SCHOOL_IDENTITY_DOMAINS.find((d) => hostMatches(host, d)) ?? null;
+}
+
+/**
  * Canonical form for storage and matching: trimmed, lowercased, trailing host
  * dot removed. Null when malformed (same rules as `schoolEmailHost`).
+ *
+ * NOT an identity: this keeps `+tags` and subdomains, so `a+1@iu.edu`,
+ * `a@iu.edu` and `a@mail.iu.edu` all come back different and can all be
+ * verified on different accounts. `canonicalSchoolIdentity` in
+ * src/lib/moderation/identity.ts is the form that folds those together.
  */
 export function normalizeSchoolEmail(email: string): string | null {
   const host = schoolEmailHost(email);
