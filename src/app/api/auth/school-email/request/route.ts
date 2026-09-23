@@ -2,6 +2,7 @@ import { NextResponse } from "next/server";
 
 import { getSiteOriginForRequest } from "@/lib/auth/site-url";
 import { isOttoOnboardingComplete } from "@/lib/auth/post-login";
+import { schoolIdentityRestrictionGate } from "@/lib/auth/school-email-apply";
 import { schoolEmailRejection } from "@/lib/auth/school-email-domains";
 import {
   isSchoolVerifySecretConfigured,
@@ -13,6 +14,7 @@ import {
 } from "@/lib/auth/school-email-token";
 import { sendSchoolVerificationEmail } from "@/lib/email/resend-transactional";
 import { requireTermsAccepted } from "@/lib/legal/require-terms";
+import { schoolIdentityConflict } from "@/lib/moderation/access";
 import { clientNetworkKey, rateLimit, tooManyRequests } from "@/lib/rate-limit";
 import { createSupabaseServerClient } from "@/lib/supabase/server";
 import {
@@ -33,6 +35,10 @@ type Body = { schoolEmail?: string };
  * A verified student may request a DIFFERENT address, including one from the
  * other university (Franky Q1); only a resubmit of the same verified address
  * short-circuits. The apply helper handles the system change.
+ *
+ * Two refusals sit BELOW the rate limits, never above them: an address another
+ * account already holds (409) and an address a restriction covers (403).
+ * Unmetered, either one is a free answer to "does this student have Vibe?"
  */
 export async function POST(req: Request) {
   if (!isSchoolVerifySecretConfigured()) {
@@ -167,28 +173,65 @@ export async function POST(req: Request) {
     );
   }
 
-  const { data: row, error: lookupErr } = await admin
-    .from("users")
-    .select("id")
-    .eq("school_email", schoolEmail)
-    .maybeSingle();
+  // Canonical, not exact: `name@iu.edu`, `name+2@iu.edu` and
+  // `name@mail.iu.edu` are one student, and until S64 each variant could
+  // verify its own account. Same status and same sentence as before — clients
+  // match on both — plus a `code` they can branch on.
+  const conflict = await schoolIdentityConflict(schoolEmail, user.id);
 
-  if (lookupErr) {
-    console.error("[school-email/request] lookup", lookupErr);
+  if (!conflict.ok) {
+    // Already logged where the read failed; repeating it here would put a
+    // school address in the log next to it.
     return NextResponse.json(
       { ok: false, error: "Could not verify email availability." },
       { status: 500 },
     );
   }
 
-  if (row && row.id !== user.id) {
+  // The canonical scan only reads rows that are already VERIFIED, but the
+  // unique index behind this column (`users_school_email_key`) is on the raw
+  // text and doesn't care who verified. A row holding this exact address
+  // unverified would walk past the scan and then break the UPDATE at confirm
+  // time — a 500 where the student deserves the sentence below. One indexed
+  // lookup, only when the scan found nothing.
+  let takenBy = conflict.takenBy;
+  if (!takenBy) {
+    const { data: exact, error: exactErr } = await admin
+      .from("users")
+      .select("id")
+      .eq("school_email", schoolEmail)
+      .neq("id", user.id)
+      .maybeSingle();
+    if (exactErr) {
+      // Code only: the query was filtered on a school address, and the error
+      // text can carry it back.
+      console.error("[school-email/request] address lookup", exactErr.code);
+      return NextResponse.json(
+        { ok: false, error: "Could not verify email availability." },
+        { status: 500 },
+      );
+    }
+    takenBy = exact?.id ?? null;
+  }
+
+  if (takenBy) {
     return NextResponse.json(
       {
         ok: false,
+        code: "school_email_taken",
         error: "That school email is already linked to another account.",
       },
       { status: 409 },
     );
+  }
+
+  // A suspended or banned student can delete the account and sign up again,
+  // so the address itself is what carries the restriction. Sits here, below
+  // the limits, for the same reason the lookup above does: unmetered, it
+  // would answer "is this address banned?" for anyone who asks.
+  const restricted = await schoolIdentityRestrictionGate(schoolEmail);
+  if (restricted) {
+    return NextResponse.json(restricted.body, { status: restricted.status });
   }
 
   const token = signSchoolEmailToken(user.id, schoolEmail);
