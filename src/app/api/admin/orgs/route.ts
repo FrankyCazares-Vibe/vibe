@@ -1,6 +1,11 @@
 import { NextResponse } from "next/server";
 
-import { createSupabaseServerClient } from "@/lib/supabase/server";
+import {
+  ADMIN_READ_LIMIT,
+  adminFail,
+  requirePlatformAdmin,
+} from "@/lib/auth/require-platform-admin";
+import { rateLimit, tooManyRequests } from "@/lib/rate-limit";
 import { createSupabaseServiceClient } from "@/lib/supabase/service";
 
 /**
@@ -18,30 +23,27 @@ import { createSupabaseServiceClient } from "@/lib/supabase/service";
  * `join_policy` and `audience` ride along so the dashboard says what an org
  * actually is — "Private" alone stopped being the whole story once an org
  * could be invite-only or open to one university.
+ *
+ * THE READ BYPASSES RLS (service role): `orgs_select` hides a hidden club from
+ * everyone who isn't a member, platform admin or not, so a policy-backed read
+ * would leave the one screen that can unhide a club unable to see it.
+ *
+ * The gate is the shared `requirePlatformAdmin` rather than a fourth inline
+ * copy of the same three statements.
+ *
+ * It carries the same read limit as the rest of the admin API. There is
+ * nothing to validate first, so the limiter sits right after the gate — and it
+ * is the heaviest read here, up to 500 clubs and their member counts in one
+ * unbounded scan.
  */
 export async function GET() {
-  const supabase = await createSupabaseServerClient();
-  const { data: { user } } = await supabase.auth.getUser();
-  if (!user) {
-    return NextResponse.json(
-      { ok: false, error: "Unauthorized", code: "unauthorized" },
-      { status: 401 },
-    );
-  }
+  const gate = await requirePlatformAdmin();
+  if (!gate.ok) return gate.response;
+
+  const rl = await rateLimit(`admin-orgs:${gate.userId}`, ADMIN_READ_LIMIT);
+  if (!rl.allowed) return tooManyRequests(rl, "Slow down a moment.");
 
   const service = createSupabaseServiceClient();
-
-  const { data: viewerRow } = await service
-    .from("users")
-    .select("is_platform_admin")
-    .eq("id", user.id)
-    .maybeSingle();
-  if (!viewerRow?.is_platform_admin) {
-    return NextResponse.json(
-      { ok: false, error: "Platform admin only", code: "platform_admin_only" },
-      { status: 403 }
-    );
-  }
 
   const { data, error } = await service
     .from("orgs")
@@ -53,10 +55,7 @@ export async function GET() {
     .limit(500);
   if (error) {
     console.error("[admin/orgs GET]", error);
-    return NextResponse.json(
-      { ok: false, error: "Failed to load", code: "load_failed" },
-      { status: 500 },
-    );
+    return adminFail(500, "load_failed", "Failed to load");
   }
 
   type Row = {

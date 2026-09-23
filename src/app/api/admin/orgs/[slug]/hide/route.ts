@@ -1,7 +1,11 @@
 import { NextResponse } from "next/server";
 
+import {
+  adminFail,
+  logModerationAction,
+  requirePlatformAdmin,
+} from "@/lib/auth/require-platform-admin";
 import { rateLimit, tooManyRequests } from "@/lib/rate-limit";
-import { createSupabaseServerClient } from "@/lib/supabase/server";
 import { createSupabaseServiceClient } from "@/lib/supabase/service";
 
 type Params = { params: Promise<{ slug: string }> };
@@ -42,19 +46,34 @@ type Body = { hidden?: unknown };
  * Writes go through the service role because M1c gave `hidden_at` no UPDATE
  * grant at all — the grant is the boundary, so this route is the only way the
  * column ever changes.
+ *
+ * THE GATE IS THE SHARED ONE NOW (`requirePlatformAdmin`), not a third inline
+ * copy of the same three statements. The limiter keeps its own key and its own
+ * 30 per 10 minutes — an established number for this route — and moves after
+ * validation, where the house rule puts every limiter.
+ *
+ * EVERY CHANGE IS LOGGED to `moderation_actions`: hiding a club is moderation,
+ * and until now nothing recorded who did it. The log carries the org's UUID as
+ * the target (handles can be changed; ids cannot) with the handle in `meta` so
+ * the screen can still read the row out loud.
  */
 export async function POST(req: Request, { params }: Params) {
   const { slug } = await params;
-  const supabase = await createSupabaseServerClient();
-  const { data: { user } } = await supabase.auth.getUser();
-  if (!user) {
-    return NextResponse.json(
-      { ok: false, error: "Unauthorized", code: "unauthorized" },
-      { status: 401 },
-    );
-  }
+  const gate = await requirePlatformAdmin();
+  if (!gate.ok) return gate.response;
 
-  const limit = await rateLimit(`admin-org-hide:${user.id}`, {
+  let body: Body;
+  try {
+    body = (await req.json()) as Body;
+  } catch {
+    return adminFail(400, "invalid_body", "Invalid JSON");
+  }
+  if (typeof body.hidden !== "boolean") {
+    return adminFail(400, "invalid_body", "hidden must be a boolean");
+  }
+  const hidden = body.hidden;
+
+  const limit = await rateLimit(`admin-org-hide:${gate.userId}`, {
     limit: 30,
     windowSec: 600,
   });
@@ -63,35 +82,6 @@ export async function POST(req: Request, { params }: Params) {
   }
 
   const service = createSupabaseServiceClient();
-  const { data: viewerRow } = await service
-    .from("users")
-    .select("is_platform_admin")
-    .eq("id", user.id)
-    .maybeSingle();
-  if (!viewerRow?.is_platform_admin) {
-    return NextResponse.json(
-      { ok: false, error: "Platform admin only", code: "platform_admin_only" },
-      { status: 403 }
-    );
-  }
-
-  let body: Body;
-  try {
-    body = (await req.json()) as Body;
-  } catch {
-    return NextResponse.json(
-      { ok: false, error: "Invalid JSON", code: "invalid_body" },
-      { status: 400 },
-    );
-  }
-  if (typeof body.hidden !== "boolean") {
-    return NextResponse.json(
-      { ok: false, error: "hidden must be a boolean", code: "invalid_body" },
-      { status: 400 }
-    );
-  }
-  const hidden = body.hidden;
-
   const { data: org } = await service
     .from("orgs")
     .select("id, handle, hidden_at")
@@ -113,8 +103,25 @@ export async function POST(req: Request, { params }: Params) {
     // window between two taps would otherwise survive, and the whole point is
     // that a hidden org has no live invitations.
     const revokedInvites = hidden
-      ? await revokePendingInvites(service, orgId, user.id)
+      ? await revokePendingInvites(service, orgId, gate.userId)
       : 0;
+    // A repeat that revoked nothing changed nothing, and an append-only log of
+    // no-ops is noise; a repeat that swept invites did something real, so it
+    // goes in the trail.
+    const logged =
+      revokedInvites > 0
+        ? await logModerationAction(service, {
+            actorId: gate.userId,
+            action: "org_hide",
+            targetType: "org",
+            targetId: orgId,
+            meta: {
+              handle: org.handle as string,
+              changed: false,
+              revoked_invites: revokedInvites,
+            },
+          })
+        : true;
     // Answer with the row as it stands so the dashboard settles on the truth
     // either way.
     return NextResponse.json({
@@ -123,6 +130,7 @@ export async function POST(req: Request, { params }: Params) {
       hidden: !!currentHiddenAt,
       revoked_invites: revokedInvites,
       changed: false,
+      logged,
     });
   }
 
@@ -146,8 +154,20 @@ export async function POST(req: Request, { params }: Params) {
   // would retry, see the same 500, and the officers' pending invites would be
   // gone for nothing.
   const revokedInvites = hidden
-    ? await revokePendingInvites(service, orgId, user.id)
+    ? await revokePendingInvites(service, orgId, gate.userId)
     : 0;
+
+  const logged = await logModerationAction(service, {
+    actorId: gate.userId,
+    action: hidden ? "org_hide" : "org_unhide",
+    targetType: "org",
+    targetId: orgId,
+    meta: {
+      handle: (data as { handle: string }).handle,
+      changed: true,
+      revoked_invites: revokedInvites,
+    },
+  });
 
   return NextResponse.json({
     ok: true,
@@ -155,6 +175,7 @@ export async function POST(req: Request, { params }: Params) {
     hidden: !!(data as { hidden_at: string | null }).hidden_at,
     revoked_invites: revokedInvites,
     changed: true,
+    logged,
   });
 }
 
