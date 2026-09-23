@@ -11,7 +11,8 @@ import {
   messageMediaProxyUrl,
 } from "@/lib/messages/channel-access";
 import { postMediaProxyUrl } from "@/lib/post-media-url";
-import { requireTermsAccepted } from "@/lib/legal/require-terms";
+import { contentBlockedResponse, requireCanPublish } from "@/lib/moderation/access";
+import { checkText } from "@/lib/moderation/text-filter";
 import { rateLimit, tooManyRequests } from "@/lib/rate-limit";
 import { dmSendBlocked } from "@/lib/safety/pair-block";
 import { createSupabaseServerClient } from "@/lib/supabase/server";
@@ -380,8 +381,11 @@ export async function POST(req: Request, ctx: RouteCtx) {
   const rl = await rateLimit(`message-send:${user.id}`, { limit: 60, windowSec: 60 });
   if (!rl.allowed) return tooManyRequests(rl);
 
-  const termsGate = await requireTermsAccepted(user.id);
-  if (termsGate) return termsGate;
+  // Sending a message is a publishing surface: Terms, a verified school
+  // email, no restriction in force. Same place the Terms gate held, after
+  // the limiter. GET is untouched: a restricted student can still read.
+  const gate = await requireCanPublish(user.id);
+  if (gate) return gate;
 
   let body: SendBody;
   try {
@@ -414,6 +418,7 @@ export async function POST(req: Request, ctx: RouteCtx) {
   if (content.length > MAX_CONTENT) {
     return NextResponse.json({ ok: false, error: "Message too long" }, { status: 400 });
   }
+  if (content && !checkText(content).ok) return contentBlockedResponse("content");
 
   // Validate media: only accept R2 keys we'd have signed ourselves
   // (channel-scoped path), and only known kinds.

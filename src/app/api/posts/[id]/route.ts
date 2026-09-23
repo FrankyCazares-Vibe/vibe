@@ -1,6 +1,7 @@
 import { NextResponse } from "next/server";
 
-import { requireTermsAccepted } from "@/lib/legal/require-terms";
+import { contentBlockedResponse, requireCanPublish } from "@/lib/moderation/access";
+import { checkText } from "@/lib/moderation/text-filter";
 import {
   extractMentionHandles,
   insertMentionNotifications,
@@ -459,8 +460,11 @@ export async function PATCH(req: Request, ctx: RouteContext) {
   const rl = await rateLimit(`post-edit:${user.id}`, { limit: 30, windowSec: 600 });
   if (!rl.allowed) return tooManyRequests(rl);
 
-  const termsGate = await requireTermsAccepted(user.id);
-  if (termsGate) return termsGate;
+  // Editing a post is publishing, so it takes the same gate as publish-post:
+  // Terms, a verified school email, no restriction in force. It sits where
+  // the Terms gate sat, after the limiter.
+  const gate = await requireCanPublish(user.id);
+  if (gate) return gate;
 
   let parsed: unknown;
   try {
@@ -532,6 +536,9 @@ export async function PATCH(req: Request, ctx: RouteContext) {
     // tags nor the trigger's "Edited" stamp. A legacy null caption counts as
     // "" here, so clearing an already-empty caption isn't an edit either.
     if (c.content !== (prior.content ?? "")) {
+      // Only the new text is filtered. An unchanged caption is never re-read,
+      // so a post written before the filter existed stays editable.
+      if (c.content && !checkText(c.content).ok) return contentBlockedResponse("content");
       patch.content = c.content;
       patch.tags = extractPostTags(c.content);
     }

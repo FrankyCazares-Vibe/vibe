@@ -8,7 +8,8 @@ import {
   type SchoolSystem,
 } from "@/lib/iu/campuses";
 import { campusScopeError } from "@/lib/iu/community-scope";
-import { requireTermsAccepted } from "@/lib/legal/require-terms";
+import { contentBlockedResponse, requireCanPublish } from "@/lib/moderation/access";
+import { checkChangedText } from "@/lib/moderation/text-filter";
 import { normalizeOrgAssetInput, orgAssetProxyUrl } from "@/lib/org-asset-url";
 import {
   loadFollowerCount,
@@ -388,8 +389,21 @@ export async function PATCH(req: Request, { params }: Params) {
   const rl = await rateLimit(`org-settings:${user.id}`, { limit: 30, windowSec: 600 });
   if (!rl.allowed) return tooManyRequests(rl);
 
-  const termsGate = await requireTermsAccepted(user.id);
-  if (termsGate) return termsGate;
+  // A club's name and description are the most-read published strings on the
+  // site — Discover, search, every event card — so changing them is publishing,
+  // and this save takes the publishing gate: Terms, a verified school email, no
+  // restriction in force. `requireCanPublish` refuses on Terms first, so a
+  // verified, unrestricted officer sees no change at all.
+  //
+  // THIS ROUTE IS THE ENFORCEMENT, and unlike posts it is the ONLY enforcement:
+  // the wave's migration adds no AND for `public.orgs`, and `orgs_update`
+  // (supabase/migrations/20260903100000_security_hardening.sql:77) is
+  // officer-only with no consent and no publish check. The proxy's 403 on
+  // non-GET /api/* is the fast path, not the wall — its own comment says so —
+  // and it leans on the app_metadata mirror having been written. So a banned
+  // officer has to be stopped here.
+  const gate = await requireCanPublish(user.id);
+  if (gate) return gate;
 
   let body: UpdateBody;
   try {
@@ -401,7 +415,9 @@ export async function PATCH(req: Request, { params }: Params) {
   const service = createSupabaseServiceClient();
   const { data: orgRow, error: orgErr } = await service
     .from("orgs")
-    .select("id, handle, owner_id, join_policy, audience, hidden_at, campus_id")
+    // `name` and `description` are read for the word filter below, which only
+    // judges text the officer actually changed.
+    .select("id, handle, owner_id, name, description, join_policy, audience, hidden_at, campus_id")
     .eq("handle", slug)
     .maybeSingle();
   if (orgErr) {
@@ -415,6 +431,8 @@ export async function PATCH(req: Request, { params }: Params) {
     id: string;
     handle: string;
     owner_id: string | null;
+    name: string | null;
+    description: string | null;
     join_policy: JoinPolicy;
     audience: OrgAudience;
     hidden_at: string | null;
@@ -433,18 +451,37 @@ export async function PATCH(req: Request, { params }: Params) {
     return fail(403, "settings_officers_only", "Only owners and admins can change this.");
   }
 
+  // Renaming a club republishes it everywhere its name appears, so the word
+  // filter sits on this save the same way it sits on create
+  // (src/app/api/orgs/route.ts) — length first, filter second, `field` so the
+  // settings form can point at the input, and never the matched word.
+  //
+  // ONLY WHAT CHANGED, for the reason text-filter.ts:21-26 spells out. The
+  // settings form does NOT send only the fields an officer touched: the Edit
+  // details modal puts `description` in the body on every single save
+  // (src/app/orgs/[handle]/admin-actions.tsx:248 — unconditional; only
+  // join_policy and audience are sent conditionally). With a plain `checkText`,
+  // one club whose stored description happens to trip the list — today, or
+  // after any future addition to it — could never save its links, philanthropy,
+  // join policy or audience again, refused every time over text it never
+  // touched and cannot see is the problem. `checkChangedText` waves through a
+  // value that is already stored, so the filter only ever judges new writing.
   const patch: Record<string, unknown> = {};
   if (typeof body.name === "string") {
     const v = body.name.trim();
     if (v.length < 2 || v.length > 50) {
       return fail(400, "invalid_name", "Name must be 2–50 chars");
     }
+    if (!checkChangedText(v, org.name).ok) return contentBlockedResponse("name");
     patch.name = v;
   }
   if (typeof body.description === "string") {
     const v = body.description.trim();
     if (v.length > 400) {
       return fail(400, "invalid_description", "Description too long (max 400)");
+    }
+    if (!checkChangedText(v, org.description).ok) {
+      return contentBlockedResponse("description");
     }
     patch.description = v;
   }

@@ -36,7 +36,8 @@ import {
 import { unexpectedSelfWriteKeys } from "@/lib/profile/self-write-columns";
 import { inlineOrUploadProfileUrl } from "@/lib/profile/storage-upload";
 import { sanitizeWorkExperience } from "@/lib/profile/work-experience";
-import { requireTermsAccepted } from "@/lib/legal/require-terms";
+import { contentBlockedResponse, requireNotRestricted } from "@/lib/moderation/access";
+import { blockedProfileField } from "@/lib/moderation/profile-filter";
 import { rateLimit, tooManyRequests } from "@/lib/rate-limit";
 import { createSupabaseServerClient } from "@/lib/supabase/server";
 import { createSupabaseServiceClient } from "@/lib/supabase/service";
@@ -233,8 +234,11 @@ export async function POST(req: Request) {
   const rl = await rateLimit(`profile-sync:${user.id}`, { limit: 300, windowSec: 600 });
   if (!rl.allowed) return tooManyRequests(rl);
 
-  const termsGate = await requireTermsAccepted(user.id);
-  if (termsGate) return termsGate;
+  // Terms and no restriction in force. NOT the publishing gate: this is the
+  // route onboarding saves through, and an unverified student must still be
+  // able to fill in their own profile.
+  const gate = await requireNotRestricted(user.id);
+  if (gate) return gate;
 
   let body: Record<string, unknown>;
   try {
@@ -415,6 +419,25 @@ export async function POST(req: Request) {
     const raw = "current_on" in body ? body.current_on : body.currentlyOn;
     patch.current_on = sanitizeCurrentOn(raw);
   }
+
+  // The word filter, on the free-text fields this save actually changes. It
+  // sits below every one of them and above the first thing that writes
+  // anything (the photo upload), so a refusal leaves nothing half-done. The
+  // desktop page autosaves the WHOLE profile every 1.2 s, so filtering a
+  // value that was already on the row would make the profile unsavable —
+  // see src/lib/moderation/profile-filter.ts.
+  //
+  // `resume_docs` rides along because its labels are free text on the
+  // profile too, and it is parsed further down, after the uploads it depends
+  // on — too late to refuse anything. `sanitizeResumeDocs` is pure, so
+  // reading it twice costs nothing and says the same thing both times.
+  const blocked = await blockedProfileField(createSupabaseServiceClient(), user.id, {
+    ...patch,
+    ...("resume_docs" in body
+      ? { resume_docs: sanitizeResumeDocs(body.resume_docs, user.id) }
+      : {}),
+  });
+  if (blocked) return contentBlockedResponse(blocked);
 
   // Resume / portfolio redaction bars — same dual-key acceptance.
   // Sanitizer enforces percentage ranges + caps bar count. Each bar is bound

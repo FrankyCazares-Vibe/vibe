@@ -4,7 +4,8 @@ import { resolveCampusRequest, scopeViewerFromRow } from "@/lib/iu/campus-reques
 import { scopeCampusIds } from "@/lib/iu/campus-scope";
 import { ALL_CAMPUSES, isSchoolSystem, legacyLabel, type SchoolSystem } from "@/lib/iu/campuses";
 import { campusScopeError, homeCampusIdFor } from "@/lib/iu/community-scope";
-import { requireTermsAccepted } from "@/lib/legal/require-terms";
+import { contentBlockedResponse, requireCanPublish } from "@/lib/moderation/access";
+import { checkText } from "@/lib/moderation/text-filter";
 import { orgAssetProxyUrl } from "@/lib/org-asset-url";
 import { isUuid } from "@/lib/pgrest";
 import { createSupabaseServerClient } from "@/lib/supabase/server";
@@ -410,8 +411,30 @@ export async function POST(req: Request) {
     return fail(401, "unauthorized", "Unauthorized");
   }
 
-  const termsGate = await requireTermsAccepted(user.id);
-  if (termsGate) return termsGate;
+  // Putting an event in front of a campus is publishing: Terms, a verified
+  // school email, no restriction in force. Exactly where the Terms gate stood,
+  // and `requireCanPublish` still refuses on Terms first, so nothing an
+  // unrestricted, verified officer does changes.
+  //
+  // THIS GATE TAKES SOMETHING AWAY, and it is Franky's decision 4 in
+  // handoffs/wave-plan-moderation/plan.md ("creating chats/events … require a
+  // verified school email"), not a word-filter side effect: an officer whose
+  // `users.school_verified` is false — signed up on a personal address, or a
+  // row written before the flag existed — clicks Create event and gets a 403
+  // `school_email_required` where they got a 200 yesterday. The composer
+  // (src/app/campus/campus-home.tsx:9117) still throws `data.error` raw, so
+  // until it runs `describeFailure` that 403 is a dead end with no "Verify"
+  // action. THE COMPOSER FIX SHIPS BEFORE THIS DOES.
+  //
+  // THIS ROUTE IS THE ENFORCEMENT, on purpose. The wave's migration
+  // deliberately left the `events` policies alone (see its DOES NOT /
+  // FOLLOW-UP notes, supabase/migrations/20260923090000_moderation_foundation.sql):
+  // the insert below runs on the CALLER's client, so an AND on
+  // `events_insert_authenticated` before this line existed would have turned
+  // "verify your school email" into a bare 500 with nothing a student could do
+  // about it. The one-line ALTER ships next, now that the friendly 403 is here.
+  const gate = await requireCanPublish(user.id);
+  if (gate) return gate;
 
   let body: CreateEventBody;
   try {
@@ -443,6 +466,21 @@ export async function POST(req: Request) {
   if (location.length > MAX_LOCATION) {
     return fail(400, "location_too_long", `Location exceeds ${MAX_LOCATION} characters`);
   }
+
+  // The word filter, same as posts, comments and club profiles. An event is
+  // the most public thing a club writes — it lands in the campus feed, in
+  // Otto's "Heads up" panel and in a calendar file — and it had no filter at
+  // all. Every value here is new (this route only creates), so it is the
+  // whole-value `checkText`, not the "only what changed" rule the profile
+  // forms need. `field` names the input for the composer to point at.
+  for (const [field, value] of [
+    ["title", title],
+    ["description", description],
+    ["location", location],
+  ] as const) {
+    if (!checkText(value).ok) return contentBlockedResponse(field);
+  }
+
   const start = Date.parse(startsAt);
   const end = Date.parse(endsAt);
   if (!Number.isFinite(start) || !Number.isFinite(end)) {

@@ -15,7 +15,8 @@ import {
   type SchoolSystem,
 } from "@/lib/iu/campuses";
 import { campusScopeError, homeCampusIdFor } from "@/lib/iu/community-scope";
-import { requireTermsAccepted } from "@/lib/legal/require-terms";
+import { contentBlockedResponse, requireCanPublish } from "@/lib/moderation/access";
+import { checkText } from "@/lib/moderation/text-filter";
 import { normalizeOrgAssetInput, orgAssetProxyUrl } from "@/lib/org-asset-url";
 import {
   flattenCountEmbed,
@@ -638,8 +639,18 @@ export async function POST(req: Request) {
   const rl = await rateLimit(`org-create:${user.id}`, { limit: 5, windowSec: 3600 });
   if (!rl.allowed) return tooManyRequests(rl);
 
-  const termsGate = await requireTermsAccepted(user.id);
-  if (termsGate) return termsGate;
+  // Founding a club is publishing: Terms, a verified school email, no
+  // restriction in force. This route already demanded school_verified further
+  // down (the `school_unverified` refusal below), so for an unrestricted
+  // officer `requireCanPublish` asks for nothing new — it just moves the
+  // restriction half up to where the Terms gate already stood, and matches
+  // what PATCH /api/orgs/[slug] now does.
+  //
+  // Worth stating because there is no second layer: the wave's migration adds
+  // no AND for `public.orgs`, and the proxy's 403 on non-GET /api/* is the fast
+  // path, not the wall. A banned officer is stopped here or nowhere.
+  const gate = await requireCanPublish(user.id);
+  if (gate) return gate;
 
   let body: CreateBody;
   try {
@@ -693,6 +704,10 @@ export async function POST(req: Request) {
     .select("school_verified, school, school_system, campus_id")
     .eq("id", user.id)
     .maybeSingle();
+  // Kept, though `requireCanPublish` above now refuses an unverified account
+  // first with the shared `school_email_required` code. This still guards the
+  // case the gate can't see — the row missing entirely — and it costs nothing,
+  // since the read below is needed for the campus stamp either way.
   if (!viewerRow?.school_verified) {
     return fail(
       403,
@@ -723,6 +738,16 @@ export async function POST(req: Request) {
   }
   if (description.length > 400) {
     return fail(400, "invalid_description", "Description must be 400 characters or fewer");
+  }
+  // A club's name and description are published text, read by the whole
+  // campus and carried into search, Discover and every event card — so the
+  // word filter applies here exactly as it does to a post
+  // (src/app/api/posts/[id]/comments/route.ts:245). Length first, filter
+  // second, and `field` so the create form can point at the input that was
+  // refused. The matched word is never echoed.
+  if (!checkText(name).ok) return contentBlockedResponse("name");
+  if (description && !checkText(description).ok) {
+    return contentBlockedResponse("description");
   }
 
   // Campus stamp. An explicit campus wins (an Indianapolis student may be

@@ -12,7 +12,9 @@ import {
   type CampusWriteDecision,
 } from "@/lib/profile/profile-campus-write";
 import { changeHandleForUser } from "@/lib/profile/handle-change";
-import { requireTermsAccepted } from "@/lib/legal/require-terms";
+import { contentBlockedResponse, requireNotRestricted } from "@/lib/moderation/access";
+import { blockedProfileField } from "@/lib/moderation/profile-filter";
+import { checkText } from "@/lib/moderation/text-filter";
 import { parseLookingForBody } from "@/lib/profile/looking-for";
 import { normalizeResumeRef } from "@/lib/profile/resume-doc-url";
 import { unexpectedSelfWriteKeys } from "@/lib/profile/self-write-columns";
@@ -112,8 +114,11 @@ export async function PATCH(req: Request) {
   const rl = await rateLimit(`me-profile:${user.id}`, { limit: 60, windowSec: 600 });
   if (!rl.allowed) return tooManyRequests(rl);
 
-  const termsGate = await requireTermsAccepted(user.id);
-  if (termsGate) return termsGate;
+  // Terms and no restriction in force. NOT the publishing gate: onboarding
+  // has to keep working for a student who hasn't verified a school email yet,
+  // and this route is where they fill their profile in.
+  const gate = await requireNotRestricted(user.id);
+  if (gate) return gate;
 
   let body: Record<string, unknown>;
   try {
@@ -131,6 +136,59 @@ export async function PATCH(req: Request) {
 
   const name = trimStr(body.name, 120);
   if (name !== null) patch.name = name;
+
+  const bio = trimStr(body.bio, 4000);
+  if (bio !== null) patch.bio = bio;
+
+  const tagline = trimStr(body.tagline, 500);
+  if (tagline !== null) patch.tagline = tagline;
+
+  const headline = trimStr(body.headline, 500);
+  if (headline !== null) patch.headline = headline;
+
+  const location_text = trimStr(body.location_text, 300);
+  if (location_text !== null) patch.location_text = location_text;
+
+  const major = trimStr(body.major, 200);
+  if (major !== null) patch.major = major;
+
+  const department = trimStr(body.department, 200);
+  if (department !== null) patch.department = department;
+
+  const interests = stringArray(body.interests, 40, 80);
+  if (interests !== undefined) patch.interests = interests;
+
+  const skills = stringArray(body.skills, 60, 80);
+  if (skills !== undefined) patch.skills = skills;
+
+  if ("work_experience" in body) {
+    patch.work_experience = sanitizeWorkExperience(body.work_experience);
+  }
+
+  // Every free-text field is parsed above this line so the word filter sees
+  // all of them at once, and it runs before ANYTHING is written — including
+  // the handle change below, which carries a 14-day cooldown. Letting the
+  // handle through and then refusing the bio would cost the student their
+  // next handle change.
+  const blocked = await blockedProfileField(createSupabaseServiceClient(), user.id, patch);
+  if (blocked) return contentBlockedResponse(blocked);
+
+  // The @handle too: it is the one piece of profile text that follows the
+  // student onto every post, comment and profile card, and the 14-day cooldown
+  // would leave a bad one sitting there. Whole value, not just a changed one —
+  // no client sends a handle it isn't trying to set, so there is no autosave to
+  // lock anyone out of.
+  //
+  // THIS LINE COVERS THIS ROUTE ONLY, and today no client sends a handle here:
+  // the inline profile edit (public/html/profile.html) and Settings both call
+  // PATCH /api/me/handle, and onboarding calls changeHandleForUser directly.
+  // The filter belongs one level down, in
+  // src/lib/profile/handle-change.ts:changeHandleForUser, which all three go
+  // through — that file is another batch's; the exact change is in this
+  // batch's outOfScope. Until it lands, the real handle paths are unfiltered.
+  if (typeof body.handle === "string" && !checkText(body.handle).ok) {
+    return contentBlockedResponse("handle");
+  }
 
   // Handle changes share the same validator + 14-day cooldown as
   // /api/me/handle (changeHandleForUser). `users.handle` is not
@@ -152,12 +210,6 @@ export async function PATCH(req: Request) {
     }
   }
 
-  const bio = trimStr(body.bio, 4000);
-  if (bio !== null) patch.bio = bio;
-
-  const tagline = trimStr(body.tagline, 500);
-  if (tagline !== null) patch.tagline = tagline;
-
   if ("website" in body) {
     if (body.website === "" || body.website === null) {
       patch.website = "";
@@ -169,12 +221,6 @@ export async function PATCH(req: Request) {
       }
     }
   }
-
-  const headline = trimStr(body.headline, 500);
-  if (headline !== null) patch.headline = headline;
-
-  const location_text = trimStr(body.location_text, 300);
-  if (location_text !== null) patch.location_text = location_text;
 
   // Cover theme. The column stores a preset KEY, never CSS: the old check
   // here ("starts with linear-gradient") passed
@@ -193,12 +239,6 @@ export async function PATCH(req: Request) {
     }
     coverThemePatch = key;
   }
-
-  const major = trimStr(body.major, 200);
-  if (major !== null) patch.major = major;
-
-  const department = trimStr(body.department, 200);
-  if (department !== null) patch.department = department;
 
   // Self-declared campus. TWO BODY SHAPES while the wave-3 clients ship
   // (critic A4): `campus_id` is an explicit choice, while the legacy
@@ -243,12 +283,6 @@ export async function PATCH(req: Request) {
     }
   }
 
-  const interests = stringArray(body.interests, 40, 80);
-  if (interests !== undefined) patch.interests = interests;
-
-  const skills = stringArray(body.skills, 60, 80);
-  if (skills !== undefined) patch.skills = skills;
-
   // "What are you here for?" tokens. A non-array stays silently ignored, as
   // it always was on this route; `null` clears the answer.
   const lookingFor = parseLookingForBody(body.looking_for);
@@ -283,10 +317,6 @@ export async function PATCH(req: Request) {
     } catch {
       return NextResponse.json({ ok: false, error: "Invalid banner_url" }, { status: 400 });
     }
-  }
-
-  if ("work_experience" in body) {
-    patch.work_experience = sanitizeWorkExperience(body.work_experience);
   }
 
   // The professional snapshot card is gone; a body that still carries its

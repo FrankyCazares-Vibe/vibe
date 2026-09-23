@@ -1,8 +1,10 @@
 import { NextResponse } from "next/server";
 import type { SupabaseClient } from "@supabase/supabase-js";
 
+import { requirePlatformAdmin } from "@/lib/auth/require-platform-admin";
 import { getCountsFor, getFollowState, getMutualCount } from "@/lib/connections/queries";
 import { isMissingColumnError } from "@/lib/db/missing-column";
+import { getActiveRestriction } from "@/lib/moderation/access";
 import { buildVibeUserV1FromProfile } from "@/lib/profile/build-vibe-user-v1";
 import { normalizeProfileView } from "@/lib/profile/normalize-profile-view";
 import { PUBLIC_PROFILE_CAMPUS_COLUMNS } from "@/lib/profile/profile-campus-write";
@@ -60,6 +62,11 @@ type RouteContext = { params: Promise<{ handle: string }> };
  * bar geometry must never reach a non-owner — this route strips it
  * below, and the column grant is what makes that strip unbypassable.
  * The viewer's own client is still used for the block / follow reads.
+ *
+ * Because that read is service-role, THIS ROUTE is what hides a suspended or
+ * banned student's profile from the rest of campus — RLS cannot do it here.
+ * See the restriction check below, right after the row is found and before any
+ * of it is spoken out loud.
  */
 export async function GET(_req: Request, ctx: RouteContext) {
   const { handle: rawHandle } = await ctx.params;
@@ -109,6 +116,50 @@ export async function GET(_req: Request, ctx: RouteContext) {
     return NextResponse.json({ ok: false, error: "User not found" }, { status: 404 });
   }
 
+  const targetIdRaw = (row as { id: string }).id;
+
+  // A suspended or banned student's profile is not visible to other students.
+  // /account/suspended says that in as many words ("Your profile, posts and
+  // comments aren't visible to anyone on Vibe any more"), and this is the route
+  // that makes it true: it reads with the service role, so no RLS policy stands
+  // behind it, and without this check a visitor still got the name, handle,
+  // school badge, counts and follow state of someone who had been banned.
+  //
+  // The answer is the SAME 404 an unknown handle gets, word for word. A body
+  // that said "this account is restricted" would hand every student a way to
+  // find out who a moderator has acted on, which is nobody else's business.
+  //
+  // Two people still see it. The student themselves — hiding their own profile
+  // from them would read as "you were deleted", and the notice promises the
+  // opposite. And a platform admin, because the moderation screens link
+  // straight to a profile and a moderator reviewing an appeal has to be able to
+  // look at what they acted on.
+  //
+  // THE SELF CHECK COMES FIRST, before the restriction read rather than after
+  // it, and that ordering is the whole point of the `if` below. This is the
+  // hottest read in the app — every profile card, every @mention hover
+  // (public/html/_profilePreview.js), every share link — and a restricted
+  // student loading their OWN profile must not depend on a second table being
+  // up. With the read inside the branch, your own profile costs exactly what it
+  // cost before, and the admin read costs nothing at all until the row really
+  // is restricted.
+  //
+  // A restriction read that FAILED is not "not restricted": it answers 500, the
+  // same way the block read below does, because one bad minute on the database
+  // must not put a banned student's profile back in front of the campus.
+  if (viewer?.id !== targetIdRaw) {
+    const restriction = await getActiveRestriction(targetIdRaw);
+    if (!restriction.ok) {
+      return NextResponse.json({ ok: false, error: "Request failed" }, { status: 500 });
+    }
+    if (restriction.restriction) {
+      const isAdmin = viewer ? (await requirePlatformAdmin()).ok : false;
+      if (!isAdmin) {
+        return NextResponse.json({ ok: false, error: "User not found" }, { status: 404 });
+      }
+    }
+  }
+
   // Block-aware short-circuit. One round-trip pulls every block row
   // between viewer + target (both directions) so we can answer:
   //   - target blocked viewer  → "Profile unavailable. This account has
@@ -123,7 +174,6 @@ export async function GET(_req: Request, ctx: RouteContext) {
   // as the three list routes. A refused read is unknown, not "not blocked":
   // it answers 500, because the profile, and the counts read below with the
   // service client, must never reach a blocked viewer.
-  const targetIdRaw = (row as { id: string }).id;
   if (viewer) {
     const pair = await loadPairBlock(supabase, viewer.id, targetIdRaw);
     if (!pair.ok) {

@@ -1,6 +1,7 @@
 import { NextResponse } from "next/server";
 
-import { requireTermsAccepted } from "@/lib/legal/require-terms";
+import { contentBlockedResponse, requireCanPublish } from "@/lib/moderation/access";
+import { checkText } from "@/lib/moderation/text-filter";
 import { postAccessForCaller } from "@/lib/orgs/hidden-org-access";
 import { rateLimit, tooManyRequests } from "@/lib/rate-limit";
 import { createSupabaseServerClient } from "@/lib/supabase/server";
@@ -209,8 +210,10 @@ export async function POST(req: Request, ctx: RouteContext) {
   const rl = await rateLimit(`comment:${user.id}`, { limit: 30, windowSec: 300 });
   if (!rl.allowed) return tooManyRequests(rl);
 
-  const termsGate = await requireTermsAccepted(user.id);
-  if (termsGate) return termsGate;
+  // Commenting is a publishing surface: Terms, a verified school email, no
+  // restriction in force. Same place the Terms gate held, after the limiter.
+  const gate = await requireCanPublish(user.id);
+  if (gate) return gate;
 
   // Checked before the body and the parent lookup, so neither can answer
   // differently for a hidden post than for a missing one.
@@ -239,6 +242,7 @@ export async function POST(req: Request, ctx: RouteContext) {
       { status: 400 },
     );
   }
+  if (!checkText(content).ok) return contentBlockedResponse("content");
 
   const parentId =
     typeof body.parent_comment_id === "string" && body.parent_comment_id.trim()

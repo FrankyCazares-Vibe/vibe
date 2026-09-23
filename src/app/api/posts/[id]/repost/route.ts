@@ -1,6 +1,7 @@
 import { NextResponse } from "next/server";
 
-import { requireTermsAccepted } from "@/lib/legal/require-terms";
+import { contentBlockedResponse, requireCanPublish } from "@/lib/moderation/access";
+import { checkText } from "@/lib/moderation/text-filter";
 import { postAccessForCaller } from "@/lib/orgs/hidden-org-access";
 import { createSupabaseServerClient } from "@/lib/supabase/server";
 
@@ -53,6 +54,13 @@ function readComment(body: RepostBody): { ok: true; comment: string | null } | {
       ),
     };
   }
+  // The quote renders in the feed exactly like a post caption, so it is held
+  // to the same word filter a post is — otherwise the refusal on a post is
+  // one quote-repost away from being pointless. Both POST and PATCH come
+  // through here, so editing a quote is checked too.
+  if (!checkText(trimmed).ok) {
+    return { ok: false, res: contentBlockedResponse("comment") };
+  }
   return { ok: true, comment: trimmed };
 }
 
@@ -87,8 +95,11 @@ export async function POST(req: Request, ctx: RouteContext) {
   const auth = await authorize();
   if (!auth.ok) return auth.res;
 
-  const termsGate = await requireTermsAccepted(auth.userId);
-  if (termsGate) return termsGate;
+  // Reposting puts someone else's post in front of your followers, so it is
+  // a publishing surface: Terms, a verified school email, no restriction in
+  // force. Same place the Terms gate held.
+  const publishGate = await requireCanPublish(auth.userId);
+  if (publishGate) return publishGate;
 
   const gate = await gatePost(auth, id, "[posts/:id/repost POST post check]");
   if (gate) return gate;
@@ -130,8 +141,8 @@ export async function PATCH(req: Request, ctx: RouteContext) {
   const auth = await authorize();
   if (!auth.ok) return auth.res;
 
-  const termsGate = await requireTermsAccepted(auth.userId);
-  if (termsGate) return termsGate;
+  const publishGate = await requireCanPublish(auth.userId);
+  if (publishGate) return publishGate;
 
   const gate = await gatePost(auth, id, "[posts/:id/repost PATCH post check]");
   if (gate) return gate;

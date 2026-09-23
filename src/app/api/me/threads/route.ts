@@ -1,7 +1,8 @@
 import { NextResponse } from "next/server";
 
 import { getFollowState } from "@/lib/connections/queries";
-import { requireTermsAccepted } from "@/lib/legal/require-terms";
+import { contentBlockedResponse, requireCanPublish } from "@/lib/moderation/access";
+import { checkText } from "@/lib/moderation/text-filter";
 import { GROUP_PHOTO_KEY_PREFIX, isR2Configured, signGroupPhotoGetUrl } from "@/lib/r2";
 import { rateLimit, tooManyRequests } from "@/lib/rate-limit";
 import { loadHiddenUsers } from "@/lib/safety/hidden-users";
@@ -205,8 +206,12 @@ export async function POST(req: Request) {
   const rl = await rateLimit(`thread-create:${user.id}`, { limit: 30, windowSec: 600 });
   if (!rl.allowed) return tooManyRequests(rl);
 
-  const termsGate = await requireTermsAccepted(user.id);
-  if (termsGate) return termsGate;
+  // Starting a DM or a group chat is a publishing surface: Terms, a verified
+  // school email, no restriction in force. It sits where the Terms gate sat,
+  // after the limiter. Reading threads (GET) is untouched — a student who
+  // can't start a new chat can still read the ones they are in.
+  const gate = await requireCanPublish(user.id);
+  if (gate) return gate;
 
   let body: CreateBody;
   try {
@@ -253,6 +258,10 @@ export async function POST(req: Request) {
     }
     const groupName =
       typeof body.name === "string" ? body.name.trim().slice(0, 80) : "";
+    // Everyone pulled into the chat sees this name in their inbox, and they
+    // didn't choose to be there — so it is held to the same filter as the
+    // messages inside it.
+    if (groupName && !checkText(groupName).ok) return contentBlockedResponse("name");
 
     const admin = createSupabaseServiceClient();
     const { data: chan, error: chanErr } = await admin

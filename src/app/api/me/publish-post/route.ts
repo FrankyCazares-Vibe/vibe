@@ -8,7 +8,8 @@ import {
 import { isSupabaseHttpsUrl } from "@/lib/org-asset-url";
 import { withPostMediaUrls } from "@/lib/post-media-url";
 import { CLIP_KEY_PREFIX } from "@/lib/r2";
-import { requireTermsAccepted } from "@/lib/legal/require-terms";
+import { contentBlockedResponse, requireCanPublish } from "@/lib/moderation/access";
+import { checkText } from "@/lib/moderation/text-filter";
 import { rateLimit, tooManyRequests } from "@/lib/rate-limit";
 import { createSupabaseServerClient } from "@/lib/supabase/server";
 import {
@@ -87,8 +88,11 @@ export async function POST(req: Request) {
   const rl = await rateLimit(`publish-post:${user.id}`, { limit: 20, windowSec: 600 });
   if (!rl.allowed) return tooManyRequests(rl);
 
-  const termsGate = await requireTermsAccepted(user.id);
-  if (termsGate) return termsGate;
+  // Terms, a verified school email and no restriction in force. Posting is a
+  // publishing surface, so it takes the stricter of the two gates; it sits
+  // exactly where the Terms gate used to, after the limiter.
+  const gate = await requireCanPublish(user.id);
+  if (gate) return gate;
 
   let body: PublishPostBody;
   try {
@@ -165,6 +169,7 @@ export async function POST(req: Request) {
       { status: 400 },
     );
   }
+  if (content && !checkText(content).ok) return contentBlockedResponse("content");
 
   const tags = normalizeTags(body.tags);
 
