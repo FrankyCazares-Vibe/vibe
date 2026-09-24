@@ -1,0 +1,118 @@
+<!doctype html>
+<!--
+  The store apps' error page (server.errorPath in capacitor.config.ts). It
+  shares its look with public/offline.html, the website's offline page, but it
+  shows in more situations than being offline:
+  - iOS shows it for ANY failed load, including a tap that another tap
+    cancelled and an attachment that interrupted the page.
+  - Android shows it for any page that answers 400 or above, so a deleted
+    post's 404 can land here too.
+  So the copy says the page didn't load, not "you're offline".
+
+  It's served from the app's own local origin (capacitor://localhost on iOS,
+  https://localhost on Android), never from the live site. A reload or a
+  relative link would stay on localhost, and on Android a localhost link opens
+  in Chrome, so Try again goes to the live campus by its full address.
+
+  Rules:
+  - Fully self-contained: inline CSS, the logo as inline SVG, system fonts.
+    Nothing is fetched, because this page shows exactly when fetching failed.
+  - No plugins: Android gives this page no Capacitor bridge.
+  - Neutral words, no names: it shows to whoever is holding the phone.
+-->
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<meta name="theme-color" content="#FAF7F2">
+<meta name="robots" content="noindex">
+<title>Vibe</title>
+<style>
+  html, body {
+    margin: 0;
+    background: #FAF7F2;
+    color: #1C1C1E;
+  }
+  body {
+    min-height: 100vh;
+    min-height: 100dvh;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    box-sizing: border-box;
+    padding: calc(24px + env(safe-area-inset-top, 0px)) 24px
+      calc(24px + env(safe-area-inset-bottom, 0px));
+    /* Local font names only: if the phone happens to have them installed
+       they're used, otherwise the system face. Nothing is fetched. */
+    font-family: "DM Sans", -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+    text-align: center;
+    -webkit-font-smoothing: antialiased;
+  }
+  main {
+    max-width: 320px;
+  }
+  .mark {
+    display: block;
+    width: 72px;
+    height: 72px;
+    margin: 0 auto 20px;
+  }
+  h1 {
+    margin: 0 0 8px;
+    font-family: Fraunces, Georgia, "Times New Roman", serif;
+    font-size: 26px;
+    font-weight: 800;
+    letter-spacing: -0.01em;
+  }
+  p {
+    margin: 0 0 22px;
+    font-size: 15px;
+    line-height: 1.55;
+    color: #5C5853;
+  }
+  button {
+    appearance: none;
+    -webkit-appearance: none;
+    border: none;
+    cursor: pointer;
+    font: inherit;
+    font-size: 13px;
+    font-weight: 700;
+    letter-spacing: 0.08em;
+    padding: 10px 18px;
+    border-radius: 999px;
+    background: #FF5C35;
+    color: #FAF7F2;
+    box-shadow: 0 6px 18px rgba(255, 92, 53, 0.35), inset 0 1px 0 rgba(255, 255, 255, 0.18);
+  }
+  button:focus-visible {
+    outline: 2px solid #1C1C1E;
+    outline-offset: 3px;
+  }
+</style>
+</head>
+<body>
+<main>
+  <!-- The app icon's artwork (src/app/icon.svg) without its white square. -->
+  <svg class="mark" viewBox="200 185 850 850" aria-hidden="true" focusable="false">
+    <path d="M871 903.7 A383.5 383.5 0 1 1 977.7 759.9" fill="none" stroke="#FC6B2F" stroke-width="15" stroke-linecap="round"/>
+    <circle cx="932.9" cy="838.1" r="53" fill="#FC6B2F"/>
+    <path fill="#1A1A1A" d="M426 432 H593 A16 16 0 0 1 609 448 V462 A16 16 0 0 1 593 478 H587 Q575.6 478 580.2 490 L657.2 690 Q660.3 698.1 663 690 L731 490 Q735.1 478 725 478 H709 A16 16 0 0 1 693 462 V448 A16 16 0 0 1 709 432 H827 A16 16 0 0 1 843 448 V462 A16 16 0 0 1 827 478 H821 Q810.3 478 805.8 490 L685.8 810 Q680.5 824 668 824 H590 Q577.8 824 572.4 810 L449.2 490 Q444.6 478 433 478 H426 A16 16 0 0 1 410 462 V448 A16 16 0 0 1 426 432 Z"/>
+  </svg>
+  <h1>Vibe couldn't load this page</h1>
+  <p>Check that you're connected to Wi-Fi or data, then try again.</p>
+  <button type="button" id="retry">Try again</button>
+</main>
+<script>
+  // Absolute on purpose: this page lives on the app's local origin, so
+  // location.reload() or "/campus" would only find this page again (or, on
+  // Android, open Chrome). The live campus is always a safe place to land.
+  var CAMPUS = "https://www.connectvibe.app/campus";
+  function tryAgain() {
+    location.replace(CAMPUS);
+  }
+  document.getElementById("retry").addEventListener("click", tryAgain);
+  window.addEventListener("online", tryAgain);
+</script>
+</body>
+</html>

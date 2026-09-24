@@ -17,6 +17,18 @@ const VIBE_KEYS = {
 };
 
 // ── Generic load / save / clear helpers ───────────────────────────────────
+
+/* True inside Vibe's App Store / Google Play app (the Capacitor shell), false
+   in every browser. Mirrors src/lib/native/detect.ts, which a static page
+   can't import. */
+function _vibeInStoreApp() {
+  try {
+    if (/VibeApp\/\d+\s*\((ios|android)\)/.test(navigator.userAgent)) return true;
+    var cap = window.Capacitor || (window.top && window.top.Capacitor);
+    return !!(cap && typeof cap.isNativePlatform === 'function' && cap.isNativePlatform());
+  } catch { return false; }
+}
+
 function vibeLoad(key) {
   try { const raw = localStorage.getItem(key); return raw ? JSON.parse(raw) : null; }
   catch(e) { return null; }
@@ -154,6 +166,11 @@ function _vibeTopHere() {
     // A Vibe+ gate, not a wrist-slap: the generic 403 line below reads as a
     // telling-off and points nowhere. Mirrors the plus_required rule in
     // src/lib/feedback/failure-copy.ts — change both together.
+    // Inside the App Store / Google Play app Vibe+ isn't for sale (plan §5
+    // SD1), so no plan to name and no page to send them to. The Android app
+    // reaches these static pages on wide screens (the desktop layout). Same
+    // test as src/lib/native/detect.ts; keep the regex in step with it.
+    if (st === 403 && sig.code === 'plus_required' && _vibeInStoreApp()) return { message: "That isn't available in the app." };
     if (st === 403 && sig.code === 'plus_required') return { message: "That's a Vibe+ feature.", action: { label: 'See Vibe+', href: '/plus?next=' + next } };
     if (st === 429) return { message: "You're going a little fast. " + retryLine(sig.retryAfterSec) };
     if (st === 403 && err === 'Unavailable') return { message: "You can't connect with this person." };

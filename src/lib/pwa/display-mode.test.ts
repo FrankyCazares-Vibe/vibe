@@ -6,10 +6,12 @@
  * Run with:
  *   node --test --experimental-strip-types src/lib/pwa/display-mode.test.ts
  *
- * The module has no imports at all, so it loads through a dynamic import of
- * its ".ts" path, the same pattern as `src/lib/billing/config.test.ts`. The
- * specifier goes through a variable because tsc refuses a literal ".ts"
- * specifier.
+ * WHY THE RESOLVE HOOK: display-mode.ts imports "../native/detect" with no
+ * extension (the store-app check, plan.md §6 S2A). tsc and Next resolve
+ * that; Node's type stripping doesn't, and fails with ERR_MODULE_NOT_FOUND.
+ * The hook retries a failed relative specifier with ".ts", the pattern in
+ * `src/lib/iu/campus-request.test.ts` (critic-s2s3.md item 1). The module
+ * loads through a dynamic `import()` so the hook is registered first.
  *
  * The user agents below are the shapes each browser sends (version numbers
  * are only filler). The in-app ones are as widely reported, not documented;
@@ -17,12 +19,34 @@
  */
 
 import assert from "node:assert/strict";
+import * as nodeModule from "node:module";
 import { test } from "node:test";
 
-const specifier = "./display-mode.ts";
-const { detectPlatform, isIosPlatform, isStandalone } = (await import(
-  specifier
-)) as typeof import("./display-mode");
+type NextResolve = (specifier: string, context?: unknown) => unknown;
+// `module.registerHooks` exists from Node 22.15 / 23.5; the repo's
+// @types/node is 20.x and doesn't declare it, hence the narrow cast.
+const { registerHooks } = nodeModule as unknown as {
+  registerHooks?: (hooks: {
+    resolve: (specifier: string, context: unknown, nextResolve: NextResolve) => unknown;
+  }) => void;
+};
+if (typeof registerHooks !== "function") {
+  throw new Error("display-mode.test.ts needs Node >= 22.15 (module.registerHooks)");
+}
+registerHooks({
+  resolve(specifier, context, nextResolve) {
+    try {
+      return nextResolve(specifier, context);
+    } catch (err) {
+      if (specifier.startsWith(".") && !/\.[cm]?[jt]sx?$/.test(specifier)) {
+        return nextResolve(`${specifier}.ts`, context);
+      }
+      throw err;
+    }
+  },
+});
+
+const { detectPlatform, isIosPlatform, isStandalone } = await import("./display-mode");
 
 const IOS = "Mozilla/5.0 (iPhone; CPU iPhone OS 18_6 like Mac OS X) AppleWebKit/605.1.15 (KHTML, like Gecko)";
 const MAC_WEBKIT = "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/605.1.15 (KHTML, like Gecko)";
@@ -61,6 +85,14 @@ const UA = {
   macSafari: `${MAC_WEBKIT} Version/26.0 Safari/605.1.15`,
   windowsFirefox: "Mozilla/5.0 (Windows NT 10.0; Win64; x64; rv:143.0) Gecko/20100101 Firefox/143.0",
   macFirefox: "Mozilla/5.0 (Macintosh; Intel Mac OS X 14.0; rv:143.0) Gecko/20100101 Firefox/143.0",
+  // Vibe's store apps: the web view's own user agent plus the token the
+  // shell appends (mobile/capacitor.config.ts). Capacitor 8.5 puts the space
+  // before it on both platforms (critic-s2s3.md item 13), but the detector
+  // doesn't rely on that, so the spelling without it is pinned too.
+  iphoneApp: `${IOS} Mobile/15E148 VibeApp/1 (ios)`,
+  iphoneAppNoSpace: `${IOS} Mobile/15E148VibeApp/1 (ios)`,
+  androidApp:
+    "Mozilla/5.0 (Linux; Android 14; Pixel 8 Build/AP2A.240805.005; wv) AppleWebKit/537.36 (KHTML, like Gecko) Version/4.0 Chrome/140.0.0.0 Mobile Safari/537.36 VibeApp/1 (android)",
 };
 
 /** A phone has 5 touch points; a Mac has 0. */
@@ -132,6 +164,52 @@ test("only a real true in navigator.standalone counts", () => {
 
 // ── detectPlatform ──────────────────────────────────────────────────────
 
+test("Vibe's iPhone app is ios-app, with or without the space", () => {
+  assert.equal(detectPlatform({ ua: UA.iphoneApp, maxTouchPoints: PHONE }), "ios-app");
+  assert.equal(detectPlatform({ ua: UA.iphoneAppNoSpace, maxTouchPoints: PHONE }), "ios-app");
+  // The server has no touch count (src/app/get/route.ts passes 0).
+  assert.equal(detectPlatform({ ua: UA.iphoneApp, maxTouchPoints: MAC }), "ios-app");
+  assert.equal(detectPlatform({ ua: UA.iphoneApp }), "ios-app");
+});
+
+test("Vibe's Android app is android-app, though its web view says '; wv)'", () => {
+  assert.equal(detectPlatform({ ua: UA.androidApp, maxTouchPoints: PHONE }), "android-app");
+  assert.equal(detectPlatform({ ua: UA.androidApp, maxTouchPoints: MAC }), "android-app");
+});
+
+test("the store-app check runs first, before every other rule", () => {
+  // Before the in-app markers, which were rule 1 in critic-w1.md item 11.
+  assert.equal(
+    detectPlatform({ ua: `${UA.iphoneInstagram} VibeApp/1 (ios)`, maxTouchPoints: PHONE }),
+    "ios-app",
+  );
+  assert.equal(
+    detectPlatform({ ua: `${UA.androidInstagram} VibeApp/1 (android)`, maxTouchPoints: PHONE }),
+    "android-app",
+  );
+  // Before iOS, iPadOS-as-Mac included, and before the other iOS browsers.
+  assert.equal(detectPlatform({ ua: `${UA.ipadAsMac} VibeApp/1 (ios)`, maxTouchPoints: PHONE }), "ios-app");
+  assert.equal(detectPlatform({ ua: `${UA.iphoneChrome} VibeApp/1 (ios)`, maxTouchPoints: PHONE }), "ios-app");
+  // Before Samsung Internet and Chrome on Android.
+  assert.equal(
+    detectPlatform({ ua: `${UA.androidSamsung} VibeApp/1 (android)`, maxTouchPoints: PHONE }),
+    "android-app",
+  );
+  // The token names the platform; the rest of the user agent doesn't get a say.
+  assert.equal(detectPlatform({ ua: `${UA.androidChrome} VibeApp/1 (ios)`, maxTouchPoints: PHONE }), "ios-app");
+});
+
+test("the same web views without the app's token are not the app", () => {
+  // A bare WKWebView sends no Safari token and sorts with installed Safari;
+  // a bare Android WebView is android-other. Only the token makes it the app.
+  assert.equal(detectPlatform({ ua: `${IOS} Mobile/15E148`, maxTouchPoints: PHONE }), "ios-safari");
+  assert.equal(detectPlatform({ ua: UA.androidWebView, maxTouchPoints: PHONE }), "android-other");
+  // Look-alikes: another platform, a non-numeric version, a lowercase name.
+  assert.equal(detectPlatform({ ua: `${IOS} Mobile/15E148 VibeApp/1 (windows)`, maxTouchPoints: PHONE }), "ios-safari");
+  assert.equal(detectPlatform({ ua: `${IOS} Mobile/15E148 VibeApp/x (ios)`, maxTouchPoints: PHONE }), "ios-safari");
+  assert.equal(detectPlatform({ ua: `${UA.androidChrome} vibeapp/1 (android)`, maxTouchPoints: PHONE }), "android-chrome");
+});
+
 test("iPhone Safari, in a tab and installed, is ios-safari", () => {
   assert.equal(detectPlatform({ ua: UA.iphoneSafari, maxTouchPoints: PHONE }), "ios-safari");
   assert.equal(detectPlatform({ ua: UA.iphoneInstalled, maxTouchPoints: PHONE }), "ios-safari");
@@ -162,7 +240,7 @@ test("Instagram, Facebook, TikTok, Snapchat and LinkedIn on iOS are ios-in-app",
   }
 });
 
-test("in-app markers win over everything else in the user agent", () => {
+test("in-app markers win over everything else in the user agent but Vibe's app token", () => {
   // Snapchat says "Safari"; an in-app Chrome on iOS would say "CriOS".
   assert.equal(
     detectPlatform({ ua: `${UA.iphoneChrome} Instagram 400.0`, maxTouchPoints: PHONE }),
@@ -247,4 +325,13 @@ test("isIosPlatform is true for the three iOS platforms only", () => {
   // Before the hook has read the browser (server, first render).
   assert.equal(isIosPlatform(null), false);
   assert.equal(isIosPlatform(undefined), false);
+});
+
+test("isIosPlatform is false inside Vibe's own apps, the iPhone one included", () => {
+  // The Safari / Home Screen copy (R16) must never show in the store app;
+  // app-only rules ask useAppShell() instead (critic-s2s3.md items 9, 17).
+  assert.equal(isIosPlatform("ios-app"), false);
+  assert.equal(isIosPlatform("android-app"), false);
+  // And the whole way through: a real app user agent never reads as iOS.
+  assert.equal(isIosPlatform(detectPlatform({ ua: UA.iphoneApp, maxTouchPoints: PHONE })), false);
 });

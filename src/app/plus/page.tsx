@@ -11,6 +11,7 @@ import {
 } from "@/lib/billing/config";
 import { stripeCustomerForUser } from "@/lib/billing/customers";
 import { syncCheckoutSession } from "@/lib/billing/sync";
+import { appShellFromRequest } from "@/lib/native/server";
 import { getEntitlement, type Entitlement } from "@/lib/premium/require-plus";
 import { rateLimit } from "@/lib/rate-limit";
 import { createSupabaseServerClient } from "@/lib/supabase/server";
@@ -48,6 +49,15 @@ import { PlusActions, type PlanCard } from "./PlusActions";
  * Manage subscription shows whenever Stripe is configured and the reader has
  * a Stripe customer, sales on or off: switching sales off must never trap a
  * subscriber who wants to cancel.
+ *
+ * Inside the App Store / Google Play app (handoffs/wave-plan-pwa/plan.md §5
+ * SD1) Vibe+ isn't for sale, and the page shows no price, no plan cards, no
+ * "not on sale yet" promise and none of the pitch below the plan line.
+ * Members (Vibe+ now, or a Stripe subscription still running) see their plan
+ * and Manage subscription, since stopping a subscription must work from
+ * anywhere; everyone else gets one neutral line. Checkout refuses the app
+ * too (403 store_app). Decided here on the server, so a price never paints
+ * for a frame and then vanishes.
  *
  * Back from Checkout (?checkout=success&session_id=cs_…) the page syncs that
  * session through the same function the webhook uses (at most 10 times per
@@ -243,8 +253,13 @@ function arrivalLine(arrival: SyncResult | "failed" | null, plus: boolean): stri
 
 type Status = { tone: "line" | "calm" | "coral"; body: ReactNode };
 
-/** The reader's plan, in words, for a signed-in reader. */
-function statusFor(e: Entitlement, manage: boolean): Status {
+/**
+ * The reader's plan, in words, for a signed-in reader. `inApp` drops the two
+ * nudges toward paying more (switching plans, turning renewal back on): the
+ * store apps don't sell Vibe+, and Manage subscription is there to stop or
+ * fix a plan, not to grow one.
+ */
+function statusFor(e: Entitlement, manage: boolean, inApp: boolean): Status {
   if (!e.checked) {
     // The read failed. Saying "you're on the free plan" would be asserting
     // something we did not manage to look up.
@@ -289,8 +304,8 @@ function statusFor(e: Entitlement, manage: boolean): Status {
       body: (
         <>
           <strong>{end ? `You have Vibe+ until ${end}.` : "You have Vibe+."}</strong> It
-          won&apos;t renew, so you won&apos;t be charged again. Changed your mind?
-          Manage subscription can turn renewal back on.
+          won&apos;t renew, so you won&apos;t be charged again.
+          {inApp ? null : " Changed your mind? Manage subscription can turn renewal back on."}
         </>
       ),
     };
@@ -300,8 +315,10 @@ function statusFor(e: Entitlement, manage: boolean): Status {
       tone: "calm",
       body: (
         <>
-          <strong>You have Vibe+.</strong> {end ? `It renews on ${end}. ` : null}Cancel or
-          switch plans anytime under Manage subscription.
+          <strong>You have Vibe+.</strong> {end ? `It renews on ${end}. ` : null}
+          {inApp
+            ? "Cancel anytime under Manage subscription."
+            : "Cancel or switch plans anytime under Manage subscription."}
         </>
       ),
     };
@@ -381,6 +398,9 @@ export default async function PlusPage({
 
   const enabled = billingEnabled();
   const configured = stripeConfigured();
+  // The store apps, from the user agent the shell adds. Only ever used to
+  // hide things; checkout makes the same check on its own.
+  const inApp = (await appShellFromRequest()) !== null;
 
   // Sync BEFORE reading the entitlement, so the read sees what the sync wrote.
   const arrival =
@@ -419,15 +439,31 @@ export default async function PlusPage({
     !plus &&
     (arrival === "unpaid" || arrival === "applied" || arrival === "ignored" || arrival === "failed");
 
+  // Someone Vibe+ still applies to: on it now (comp, paid, or a failed card
+  // in grace), or with a Stripe subscription still running and owed.
+  const member = plus || liveStripe;
+
   const showManage = Boolean(
-    user && entitlement?.checked && configured && (hasCustomer || viaStripe),
+    user &&
+      entitlement?.checked &&
+      configured &&
+      (hasCustomer || viaStripe) &&
+      (!inApp || member),
   );
   const showPlans = Boolean(
-    enabled && user && entitlement?.checked && !plus && !liveStripe && !awaiting,
+    enabled && !inApp && user && entitlement?.checked && !plus && !liveStripe && !awaiting,
   );
 
+  // In the app, anyone who isn't a member (signed out included) gets one
+  // neutral line instead of their plan in words: "you're on the free plan"
+  // with no way to change it reads as a pitch. Not while a payment is awaited
+  // (the arrival banner is talking), and not when the read failed (that
+  // line says so, and the reader may well be a member).
+  const appNotice = inApp && !member && !awaiting && (!entitlement || entitlement.checked);
+
   const arrivalText = user ? arrivalLine(arrival, plus) : null;
-  const status = entitlement && !awaiting ? statusFor(entitlement, showManage) : null;
+  const status =
+    entitlement && !awaiting && !appNotice ? statusFor(entitlement, showManage, inApp) : null;
 
   const yearlyPerMonth = perMonth(PLUS_PRICE_LABEL.yearly);
   const planCards: PlanCard[] = [
@@ -473,20 +509,24 @@ export default async function PlusPage({
           </Link>
         </p>
 
+        {/* In the app the heading is just the name: the tagline and the
+            line under it are the pitch. */}
         <header style={{ marginBottom: 22 }}>
-          <div
-            style={{
-              fontFamily: SERIF,
-              fontSize: 11,
-              fontWeight: 700,
-              letterSpacing: "0.18em",
-              textTransform: "uppercase",
-              color: "#C84A20",
-              marginBottom: 6,
-            }}
-          >
-            Vibe+
-          </div>
+          {inApp ? null : (
+            <div
+              style={{
+                fontFamily: SERIF,
+                fontSize: 11,
+                fontWeight: 700,
+                letterSpacing: "0.18em",
+                textTransform: "uppercase",
+                color: "#C84A20",
+                marginBottom: 6,
+              }}
+            >
+              Vibe+
+            </div>
+          )}
           <h1
             style={{
               fontFamily: SERIF,
@@ -498,12 +538,14 @@ export default async function PlusPage({
               lineHeight: 1.1,
             }}
           >
-            See who&apos;s looking.
+            {inApp ? "Vibe+" : <>See who&apos;s looking.</>}
           </h1>
-          <p style={{ fontFamily: SANS, fontSize: 15, lineHeight: 1.6, color: "#5C5853", margin: 0 }}>
-            Vibe shows everyone how many people viewed their profile and their
-            posts. Vibe+ is how you find out <em>who</em>.
-          </p>
+          {inApp ? null : (
+            <p style={{ fontFamily: SANS, fontSize: 15, lineHeight: 1.6, color: "#5C5853", margin: 0 }}>
+              Vibe shows everyone how many people viewed their profile and their
+              posts. Vibe+ is how you find out <em>who</em>.
+            </p>
+          )}
         </header>
 
         <div style={{ display: "grid", gap: 12 }}>
@@ -514,8 +556,10 @@ export default async function PlusPage({
 
           {/* The honest headline while sales are off. The reader learns that
               nothing here can take money before they read the price, not
-              after. */}
-          {!enabled ? (
+              after. Not in the app: there is no price there, and "when it
+              goes on sale, it goes on sale here" would be a promise about a
+              purchase the app doesn't offer. */}
+          {!enabled && !inApp ? (
             <Banner tone="coral">
               {showManage ? (
                 <>
@@ -536,7 +580,9 @@ export default async function PlusPage({
             </Banner>
           ) : null}
 
-          {!user ? (
+          {appNotice ? (
+            <p style={LINE_STYLE}>Vibe+ isn&apos;t available in the app.</p>
+          ) : !user ? (
             <p style={LINE_STYLE}>
               <Link href="/auth/login?next=%2Fplus" style={LINK_STYLE}>
                 Sign in
@@ -555,137 +601,142 @@ export default async function PlusPage({
           {showManage && !showPlans ? <PlusActions manage /> : null}
         </div>
 
-        <article style={{ fontFamily: SANS, fontSize: 15, lineHeight: 1.7, color: "#2A2620" }}>
-          <Section title="The price">
-            {showPlans ? (
-              <div style={{ display: "grid", gap: 14 }}>
-                {priceNote}
-                <PlusActions
-                  plans={planCards}
-                  manage={showManage}
-                  manageNote="Subscribed before? Your receipts and card are under Manage subscription."
-                >
-                  {/* The disclosure sits right under the buttons it applies
-                      to, in plain words, before anyone taps. */}
-                  <p style={{ margin: 0, fontSize: 13, lineHeight: 1.6, color: "#5C5853" }}>
-                    Cancel anytime from Manage subscription on this page and
-                    you keep Vibe+ to the end of the period you&apos;ve paid
-                    for. Deleting your Vibe account cancels it right away, with
-                    no refund for the rest of that period. Checkout and billing
-                    run on Stripe, so Vibe never sees your card. The details
-                    are in the{" "}
-                    <Link href="/legal/terms" style={LINK_STYLE}>
-                      Terms of Service
-                    </Link>
-                    .
+        {/* What Vibe+ is, what it costs and what it will never be. None of
+            it renders in the store apps: the price is the thing SD1 rules
+            out, and the rest is the pitch for it. */}
+        {inApp ? null : (
+          <article style={{ fontFamily: SANS, fontSize: 15, lineHeight: 1.7, color: "#2A2620" }}>
+            <Section title="The price">
+              {showPlans ? (
+                <div style={{ display: "grid", gap: 14 }}>
+                  {priceNote}
+                  <PlusActions
+                    plans={planCards}
+                    manage={showManage}
+                    manageNote="Subscribed before? Your receipts and card are under Manage subscription."
+                  >
+                    {/* The disclosure sits right under the buttons it applies
+                        to, in plain words, before anyone taps. */}
+                    <p style={{ margin: 0, fontSize: 13, lineHeight: 1.6, color: "#5C5853" }}>
+                      Cancel anytime from Manage subscription on this page and
+                      you keep Vibe+ to the end of the period you&apos;ve paid
+                      for. Deleting your Vibe account cancels it right away, with
+                      no refund for the rest of that period. Checkout and billing
+                      run on Stripe, so Vibe never sees your card. The details
+                      are in the{" "}
+                      <Link href="/legal/terms" style={LINK_STYLE}>
+                        Terms of Service
+                      </Link>
+                      .
+                    </p>
+                  </PlusActions>
+                </div>
+              ) : (
+                <>
+                  <p style={{ margin: "0 0 8px" }}>
+                    <strong style={{ fontFamily: SERIF, fontSize: 26, fontWeight: 900, color: "#1C1C1E" }}>
+                      {PLUS_PRICE_LABEL.monthly}
+                    </strong>{" "}
+                    {PLUS_PERIOD_LABEL.monthly}, or{" "}
+                    <strong style={{ fontFamily: SERIF, fontSize: 26, fontWeight: 900, color: "#1C1C1E" }}>
+                      {PLUS_PRICE_LABEL.yearly}
+                    </strong>{" "}
+                    {PLUS_PERIOD_LABEL.yearly}.
                   </p>
-                </PlusActions>
-              </div>
-            ) : (
-              <>
-                <p style={{ margin: "0 0 8px" }}>
-                  <strong style={{ fontFamily: SERIF, fontSize: 26, fontWeight: 900, color: "#1C1C1E" }}>
-                    {PLUS_PRICE_LABEL.monthly}
-                  </strong>{" "}
-                  {PLUS_PERIOD_LABEL.monthly}, or{" "}
-                  <strong style={{ fontFamily: SERIF, fontSize: 26, fontWeight: 900, color: "#1C1C1E" }}>
-                    {PLUS_PRICE_LABEL.yearly}
-                  </strong>{" "}
-                  {PLUS_PERIOD_LABEL.yearly}.
-                </p>
-                {priceNote}
-              </>
-            )}
-          </Section>
+                  {priceNote}
+                </>
+              )}
+            </Section>
 
-          <Section title="What Vibe+ unlocks">
-            <p style={{ margin: "0 0 10px", color: "#5C5853", fontSize: 14 }}>
-              Three things the database already keeps private from everyone,
-              including from us on the free tier:
-            </p>
-            <List
-              items={[
-                <>
-                  <strong>Who viewed your profile.</strong> You already see how
-                  many. Vibe+ puts names to the number.
-                </>,
-                <>
-                  <strong>Who viewed each of your posts.</strong> Most networks
-                  throw this away. Vibe keeps it, and only Vibe+ shows it to
-                  you.
-                </>,
-                <>
-                  <strong>Who saved your posts.</strong> The quietest signal
-                  there is, and usually the most useful one.
-                </>,
-                <>
-                  <strong>More ways to make your profile yours</strong> — more
-                  covers, an accent colour, and a mark next to your handle.
-                  Still being built; nothing here is charged for until it
-                  exists.
-                </>,
-              ]}
-            />
-          </Section>
+            <Section title="What Vibe+ unlocks">
+              <p style={{ margin: "0 0 10px", color: "#5C5853", fontSize: 14 }}>
+                Three things the database already keeps private from everyone,
+                including from us on the free tier:
+              </p>
+              <List
+                items={[
+                  <>
+                    <strong>Who viewed your profile.</strong> You already see how
+                    many. Vibe+ puts names to the number.
+                  </>,
+                  <>
+                    <strong>Who viewed each of your posts.</strong> Most networks
+                    throw this away. Vibe keeps it, and only Vibe+ shows it to
+                    you.
+                  </>,
+                  <>
+                    <strong>Who saved your posts.</strong> The quietest signal
+                    there is, and usually the most useful one.
+                  </>,
+                  <>
+                    <strong>More ways to make your profile yours</strong> — more
+                    covers, an accent colour, and a mark next to your handle.
+                    Still being built; nothing here is charged for until it
+                    exists.
+                  </>,
+                ]}
+              />
+            </Section>
 
-          <Section title="What stays free, always">
-            <List
-              items={[
-                <>
-                  <strong>Every count.</strong> Profile views, post views,
-                  likes, comments, followers. Counts are public on Vibe; we are
-                  not going to sell you your own follower number.
-                </>,
-                <>
-                  <strong>Comments and who follows whom.</strong> Any
-                  signed-in student can already read those, so charging for
-                  them would be a paywall over an open door. Who liked your
-                  post shows up in your notifications on any plan, and no plan
-                  lets anyone else see it.
-                </>,
-                <>Messages, posting, events, orgs and the campus map.</>,
-                <>
-                  <strong>Blocking, muting and reporting.</strong> Safety is
-                  never a paid feature.
-                </>,
-                <>School verification, and deleting your account.</>,
-              ]}
-            />
-          </Section>
+            <Section title="What stays free, always">
+              <List
+                items={[
+                  <>
+                    <strong>Every count.</strong> Profile views, post views,
+                    likes, comments, followers. Counts are public on Vibe; we are
+                    not going to sell you your own follower number.
+                  </>,
+                  <>
+                    <strong>Comments and who follows whom.</strong> Any
+                    signed-in student can already read those, so charging for
+                    them would be a paywall over an open door. Who liked your
+                    post shows up in your notifications on any plan, and no plan
+                    lets anyone else see it.
+                  </>,
+                  <>Messages, posting, events, orgs and the campus map.</>,
+                  <>
+                    <strong>Blocking, muting and reporting.</strong> Safety is
+                    never a paid feature.
+                  </>,
+                  <>School verification, and deleting your account.</>,
+                ]}
+              />
+            </Section>
 
-          <Section title="What Vibe+ will never include">
-            <p style={{ margin: "0 0 10px", color: "#5C5853", fontSize: 14 }}>
-              This is where paid tiers on other apps go wrong, so it is written
-              down before there is money on the table:
-            </p>
-            <List
-              items={[
-                <>
-                  <strong>No hiding that you viewed someone.</strong> Paying
-                  does not make you invisible to the exact feature you are
-                  paying to use.
-                </>,
-                <>No anonymous posting, and no seeing who blocked you.</>,
-                <>
-                  Nothing that makes a paying student harder to hold accountable
-                  to everyone else.
-                </>,
-              ]}
-            />
-          </Section>
+            <Section title="What Vibe+ will never include">
+              <p style={{ margin: "0 0 10px", color: "#5C5853", fontSize: 14 }}>
+                This is where paid tiers on other apps go wrong, so it is written
+                down before there is money on the table:
+              </p>
+              <List
+                items={[
+                  <>
+                    <strong>No hiding that you viewed someone.</strong> Paying
+                    does not make you invisible to the exact feature you are
+                    paying to use.
+                  </>,
+                  <>No anonymous posting, and no seeing who blocked you.</>,
+                  <>
+                    Nothing that makes a paying student harder to hold accountable
+                    to everyone else.
+                  </>,
+                ]}
+              />
+            </Section>
 
-          <Section title="Why the names disappeared">
-            <p style={{ margin: 0 }}>
-              Until September 12, Vibe showed every account the names of the
-              people who viewed their profile, with a caption saying that would
-              become a paid feature soon. That was the least honest arrangement
-              available: the paid feature, given away, labelled as not-yet-paid.
-              So the names went behind the lock before there was anything to
-              buy, and the counts — which were always the free part — stayed
-              untouched and exact.
-            </p>
-          </Section>
-        </article>
+            <Section title="Why the names disappeared">
+              <p style={{ margin: 0 }}>
+                Until September 12, Vibe showed every account the names of the
+                people who viewed their profile, with a caption saying that would
+                become a paid feature soon. That was the least honest arrangement
+                available: the paid feature, given away, labelled as not-yet-paid.
+                So the names went behind the lock before there was anything to
+                buy, and the counts — which were always the free part — stayed
+                untouched and exact.
+              </p>
+            </Section>
+          </article>
+        )}
 
         <p style={{ marginTop: 40, fontFamily: SANS, fontSize: 13, color: "#8A8580" }}>
           <Link href="/legal/terms" style={LINK_STYLE}>

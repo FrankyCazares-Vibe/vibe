@@ -71,3 +71,50 @@ next-env.d.ts
 
 # Supabase CLI local branch metadata (created by `supabase start`)
 supabase/.branches/
+
+# The store apps (mobile/). THE REPO IS PUBLIC, so every signing key,
+# keystore, provisioning profile and Firebase config stays out of git. These
+# rules landed before mobile/ existed so nothing could be committed by accident.
+# The keys themselves live only in the founders' password manager.
+*.p8
+*.p12
+*.pfx
+*.cer
+*.mobileprovision
+*.jks
+*.keystore
+keystore.properties
+google-services.json
+GoogleService-Info.plist
+# Play and FCM service-account keys are not named google-services.json.
+*service-account*.json
+*firebase-adminsdk*.json
+# Local Xcode overrides are where a Team ID or signing identity would go.
+*.local.xcconfig
+# xcodebuild and npm logs carry absolute paths and the environment.
+mobile/.build-logs/
+mobile/node_modules/
+# Capacitor writes these on every `cap sync`. They are rebuilt from
+# capacitor.config.ts and www/, and a synced copy can carry the dev server URL.
+mobile/ios/App/Pods/
+mobile/ios/App/App/public/
+mobile/ios/App/App/capacitor.config.json
+mobile/ios/App/App/config.xml
+mobile/ios/capacitor-cordova-ios-plugins/
+mobile/ios/DerivedData/
+mobile/ios/App/build/
+mobile/ios/App/output/
+mobile/ios/App/xcuserdata/
+mobile/ios/App/App.xcodeproj/xcuserdata/
+mobile/ios/App/App.xcodeproj/project.xcworkspace/xcuserdata/
+mobile/android/.gradle/
+mobile/android/.idea/
+mobile/android/local.properties
+mobile/android/build/
+mobile/android/app/build/
+mobile/android/app/release/
+mobile/android/capacitor-cordova-android-plugins/
+mobile/android/app/src/main/assets/public/
+mobile/android/app/src/main/assets/capacitor.config.json
+mobile/android/app/src/main/assets/capacitor.plugins.json
+mobile/android/app/src/main/res/xml/config.xml

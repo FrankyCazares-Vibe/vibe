@@ -1,0 +1,100 @@
+<?xml version="1.0" encoding="utf-8" ?>
+<manifest xmlns:android="http://schemas.android.com/apk/res/android">
+    <!-- allowBackup is off: all Vibe keeps on the phone is the web view's data,
+         sign-in cookies included. A Google Drive backup would copy the session
+         to another phone, where Supabase can take the restored (already used)
+         refresh token for a stolen one and end the session on both phones. A
+         reinstall just signs in again. -->
+    <application
+        android:allowBackup="false"
+        android:icon="@mipmap/ic_launcher"
+        android:label="@string/app_name"
+        android:roundIcon="@mipmap/ic_launcher_round"
+        android:supportsRtl="true"
+        android:theme="@style/AppTheme">
+        <!-- Portrait only, like the iPhone app. A phone turned sideways can be
+             wide enough (900 CSS px) for the site's desktop layout, which wasn't
+             built for the app. Android 16 ignores this on tablets and foldables
+             (target 36), so the desktop layout can still show up there. -->
+        <activity
+            android:configChanges="orientation|keyboardHidden|keyboard|screenSize|locale|smallestScreenSize|screenLayout|uiMode|navigation|density"
+            android:name=".MainActivity"
+            android:label="@string/title_activity_main"
+            android:theme="@style/AppTheme.NoActionBarLaunch"
+            android:launchMode="singleTask"
+            android:screenOrientation="portrait"
+            android:exported="true">
+            <intent-filter>
+                <action android:name="android.intent.action.MAIN" />
+                <category android:name="android.intent.category.LAUNCHER" />
+            </intent-filter>
+
+            <!-- App Links: these Vibe links open in the app instead of Chrome,
+                 once the site serves /.well-known/assetlinks.json with this app's
+                 signing fingerprints (S3D). Until then verification fails and
+                 the links open in the browser as they do today. The App plugin
+                 hands the link to the page (appUrlOpen, or getLaunchUrl on a
+                 cold start), and the page navigates the web view to it.
+
+                 https and www.connectvibe.app only: the bare domain redirects
+                 to www (next.config.ts), and a redirect fails verification.
+                 pathPrefix only, and never "/": the landing page's "Get the app"
+                 button has to keep working in the browser. Left out on purpose:
+                 /legal (opened in a browser tab from inside the app), /api (the
+                 .ics download and every other endpoint), /html (the static
+                 pages), /journal, /plus. The list is wrapper-tech §4.3. -->
+            <intent-filter android:autoVerify="true">
+                <action android:name="android.intent.action.VIEW" />
+                <category android:name="android.intent.category.DEFAULT" />
+                <category android:name="android.intent.category.BROWSABLE" />
+                <data android:scheme="https" />
+                <data android:host="www.connectvibe.app" />
+                <!-- Email links: confirm, password reset, school verify, sign-in link. -->
+                <data android:pathPrefix="/auth/confirm" />
+                <data android:pathPrefix="/auth/update-password" />
+                <data android:pathPrefix="/auth/verify-school" />
+                <data android:pathPrefix="/auth/callback" />
+                <!-- Shared and notification links. -->
+                <data android:pathPrefix="/campus" />
+                <data android:pathPrefix="/messages" />
+                <data android:pathPrefix="/posts/" />
+                <data android:pathPrefix="/profile/" />
+                <data android:pathPrefix="/orgs/" />
+                <data android:pathPrefix="/settings" />
+            </intent-filter>
+        </activity>
+
+        <!-- Sharing a file (the .ics calendar file) goes through this provider:
+             the Share plugin asks for "<package>.fileprovider", and the
+             Filesystem CACHE folder is the <cache-path> in xml/file_paths.xml. -->
+        <provider
+            android:name="androidx.core.content.FileProvider"
+            android:authorities="${applicationId}.fileprovider"
+            android:exported="false"
+            android:grantUriPermissions="true">
+            <meta-data android:name="android.support.FILE_PROVIDER_PATHS" android:resource="@xml/file_paths" />
+        </provider>
+
+        <!-- Read by Firebase Messaging once the push wave installs it; ignored
+             until then. The small icon is Vibe's mark as white on transparent
+             (Android draws it from the alpha channel alone), tinted with the
+             site's orange. The fallback channel is "activity"; the push sender
+             is meant to name "messages" or "activity" on every push itself. -->
+        <meta-data
+            android:name="com.google.firebase.messaging.default_notification_icon"
+            android:resource="@drawable/ic_stat_vibe" />
+        <meta-data
+            android:name="com.google.firebase.messaging.default_notification_color"
+            android:resource="@color/vibe_accent" />
+        <meta-data
+            android:name="com.google.firebase.messaging.default_notification_channel_id"
+            android:value="activity" />
+    </application>
+
+    <!-- Permissions -->
+
+    <uses-permission android:name="android.permission.INTERNET" />
+    <!-- Android 13+ asks the student before any notification shows. Declaring
+         it here doesn't ask; the page asks in context, never on first launch. -->
+    <uses-permission android:name="android.permission.POST_NOTIFICATIONS" />
+</manifest>

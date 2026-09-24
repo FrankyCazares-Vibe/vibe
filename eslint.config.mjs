@@ -12,6 +12,10 @@ const eslintConfig = defineConfig([
     "out/**",
     "build/**",
     "next-env.d.ts",
+    // The store apps' native shell has its own package.json, node_modules and
+    // generated Xcode / Gradle trees (with minified Capacitor JS inside).
+    // Relative to this file, so src/components/mobile/ is still linted.
+    "mobile/**",
   ]),
 ]);
 

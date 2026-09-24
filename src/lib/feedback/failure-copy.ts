@@ -2,13 +2,20 @@
  * Failure copy: what a student sees when a request is refused
  * (silent-failure design, handoffs/2026-09-11-silent-failure-design.md §1).
  *
- * Pure and DOM-free. `vibeRequest` (./request.ts) builds the signal from the
- * response and shows the result in a toast. The first matching rule wins, in
- * the design table's order.
+ * Pure and DOM-free, apart from one read of the user agent (is this the
+ * store app?) that is null on the server and in `node --test`. `vibeRequest`
+ * (./request.ts) builds the signal from the response and shows the result in
+ * a toast. The first matching rule wins, in the design table's order.
  *
  * The static pages can't import TS, so public/html/_persistence.js keeps a
  * copy of this table in `vibeFeedbackInit`. Change both together.
+ *
+ * The static pages mirror the store-app line under `plus_required`
+ * (public/html/_persistence.js, _vibeInStoreApp): the Android app reaches them
+ * on wide screens, where it gets the desktop layout.
  */
+
+import { appShellOnClient } from "@/lib/native/detect";
 
 export type FailureSignal = {
   status: number;
@@ -159,6 +166,12 @@ export function describeFailure(
   // attacker-shaped path lands on the page with no back link rather than off
   // the site.
   if (status === 403 && code === "plus_required") {
+    // Inside the App Store / Google Play app Vibe+ isn't for sale
+    // (handoffs/wave-plan-pwa/plan.md §5 SD1), so there is no plan to name
+    // and no page to point at: /plus there has nothing to buy. Read here
+    // rather than passed in, so every caller keeps its signature
+    // (critic-s2s3.md item 17).
+    if (appShellOnClient()) return { message: "That isn't available in the app." };
     return {
       message: "That's a Vibe+ feature.",
       action: { label: "See Vibe+", href: `/plus?next=${next}` },

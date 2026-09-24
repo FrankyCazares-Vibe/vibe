@@ -15,6 +15,8 @@ import {
   type ReportTargetRef,
 } from "@/components/safety/ReportSheet";
 import { copyText, vibeRequest } from "@/lib/feedback/request";
+import { nativeShare } from "@/lib/native/bridge";
+import { useAppShell } from "@/lib/native/use-app-shell";
 import { EDITED_LABEL, type EditedPost } from "@/lib/posts/edit";
 
 /**
@@ -29,14 +31,15 @@ import { EDITED_LABEL, type EditedPost } from "@/lib/posts/edit";
  *   - Engagement bar: Like (heart + count), Comment (chat + count),
  *     Repost (loop + count), Views (eye + count — public, and for the
  *     author a tap through to who they were), Saves (author only, when
- *     the count could be read), Save (bookmark), Share. Hits the same
+ *     the count could be read), Save (bookmark). Hits the same
  *     /api/posts/[id]/{like,repost,save,comments,view} endpoints the
  *     desktop FeedRow uses, so all the counts stay consistent across
  *     surfaces.
  *   - Comments drawer: collapsed by default; expand to render a flat
  *     list of comments + a sticky composer at the bottom. Replies are
  *     flattened into the same list (v1 — no nesting).
- *   - Owner ⋯ menu: Send to chats, Copy link, Edit post (EditPostSheet,
+ *   - Owner ⋯ menu: Send to chats, Copy link (plus "Share to other apps"
+ *     in the store apps, the system share sheet), Edit post (EditPostSheet,
  *     plan §8 E2; shown only when the server says `is_owner`), Delete
  *     post. A saved edit patches the body, the #tag chips and the
  *     " · Edited" marker here, then tells the caller through `onEdited`.
@@ -194,6 +197,8 @@ export function PostViewerMobile({
   const [deleting, setDeleting] = useState(false);
   const [shareOpen, setShareOpen] = useState(false);
   const [editOpen, setEditOpen] = useState(false);
+  // Inside the store apps the ⋯ menu also offers the system share sheet.
+  const inApp = useAppShell() !== null;
   // Whether the latest pointerdown landed on the app toast; the drawer's
   // onPointerDownOutside reads it (see the effect below).
   const toastTapRef = useRef(false);
@@ -390,20 +395,25 @@ export function PostViewerMobile({
       success: "Reposted",
     });
   };
+  // "Share to other apps", store apps only. The native share sheet first:
+  // Android's web view has no `navigator.share`, and the plugin's sheet is
+  // the same one every other app opens (plan §6 S2D). It counts as done once
+  // the sheet opens, even if the student then cancels. If it can't open, the
+  // web share sheet, then a copied link, so the tap always does something.
   const share = async () => {
-    try {
-      const url = `${window.location.origin}/posts/${encodeURIComponent(postId)}`;
-      if (navigator.share) {
-        await navigator.share({
-          url,
-          title: post?.content?.slice(0, 80) || "Vibe post",
-        });
-      } else if (navigator.clipboard) {
-        await navigator.clipboard.writeText(url);
+    const url = `${window.location.origin}/posts/${encodeURIComponent(postId)}`;
+    const title = post?.content?.slice(0, 80) || "Vibe post";
+    if (await nativeShare({ title, url })) return;
+    if (typeof navigator.share === "function") {
+      try {
+        await navigator.share({ title, url });
+        return;
+      } catch (err) {
+        // The student closed the sheet: nothing to say.
+        if ((err as { name?: unknown } | null)?.name === "AbortError") return;
       }
-    } catch {
-      /* user cancelled or unsupported */
     }
+    await copyText(url);
   };
 
   const submitComment = async () => {
@@ -711,6 +721,15 @@ export function PostViewerMobile({
                     setShareOpen(true);
                   }}
                 />
+                {inApp ? (
+                  <ViewerMenuItem
+                    label="Share to other apps"
+                    onClick={() => {
+                      setMenuOpen(false);
+                      void share();
+                    }}
+                  />
+                ) : null}
                 <ViewerMenuItem
                   label="Copy link"
                   onClick={() => {

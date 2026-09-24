@@ -6,10 +6,14 @@
  * `window` for React; wave 3 builds on the same two functions.
  *
  * No React, no `server-only` and no runtime `@/` imports, so `node --test`
- * loads this file directly (display-mode.test.ts). Only erasable TypeScript
- * here: no enum, no namespace, no parameter properties, or type stripping
- * refuses the file.
+ * can load this file (display-mode.test.ts). Its one import, the store-app
+ * check, is relative and has no extension: tsc and Next resolve it, and the
+ * test registers a resolve hook so Node does too (critic-s2s3.md item 1).
+ * Only erasable TypeScript here: no enum, no namespace, no parameter
+ * properties, or type stripping refuses the file.
  */
+
+import { detectAppShell } from "../native/detect";
 
 /** The three signals a page can read about how it was opened. */
 export type DisplayModeEnv = {
@@ -43,8 +47,14 @@ export function isStandalone(env: DisplayModeEnv): boolean {
 /**
  * Where the student is, as far as install and sign-in behave differently.
  * A union of strings, not an enum (type stripping can't run an enum).
+ *
+ * "ios-app" and "android-app" are Vibe's own App Store and Google Play apps
+ * (src/lib/native/detect.ts). They can't install anything, and they aren't
+ * the phone's browser.
  */
 export type Platform =
+  | "ios-app"
+  | "android-app"
   | "ios-safari"
   | "ios-other-browser"
   | "ios-in-app"
@@ -96,7 +106,11 @@ function isIosUa(ua: string, touchPoints: number): boolean {
 
 /**
  * Sort a user agent into a `Platform`. The order is the contract
- * (critic-w1.md item 11) and the test pins it:
+ * (critic-w1.md item 11; plan.md §6 S2A) and the test pins it:
+ *   0. Vibe's store apps → "ios-app" / "android-app", before anything else.
+ *      The iPhone app's web view sends no Safari token and the Android
+ *      app's sends "; wv)", so without this they'd read as "ios-safari" and
+ *      "android-other", and the install coach would show inside the app.
  *   1. an in-app web view (on iOS → "ios-in-app"; on Android → "android-other")
  *   2. iOS, iPadOS-as-Mac included: Chrome / Firefox / Edge → "ios-other-browser",
  *      else "ios-safari". No "Safari" token is required: the installed app's
@@ -114,6 +128,9 @@ export function detectPlatform(env: PlatformEnv): Platform {
     typeof env.maxTouchPoints === "number" && Number.isFinite(env.maxTouchPoints)
       ? env.maxTouchPoints
       : 0;
+  const appShell = detectAppShell(ua);
+  if (appShell) return appShell;
+
   const ios = isIosUa(ua, touchPoints);
   const android = /Android/.test(ua);
 
@@ -139,6 +156,11 @@ export function detectPlatform(env: PlatformEnv): Platform {
  * True for the iPhone / iPad platforms. Only there does the installed app
  * keep its own sign-in, apart from Safari's, so only there do email links
  * and new windows land somewhere signed out (critic-w1.md item 10).
+ *
+ * False for "ios-app" on purpose. What keys on this is about the Home Screen
+ * web app and Safari (R16's email-link line, the résumé "Open" rule), not
+ * the store app, which has rules of its own: ask `useAppShell()` for those
+ * (critic-s2s3.md items 9 and 17).
  */
 export function isIosPlatform(platform: Platform | null | undefined): boolean {
   return (

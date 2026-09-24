@@ -1,0 +1,15 @@
+<?xml version='1.0' encoding='utf-8'?>
+<resources>
+    <string name="app_name">Vibe</string>
+    <string name="title_activity_main">Vibe</string>
+    <string name="package_name">app.connectvibe.vibe</string>
+    <string name="custom_url_scheme">app.connectvibe.vibe</string>
+
+    <!-- Notification channels (MainActivity.createNotificationChannels). Android
+         shows these names and descriptions in the app's notification settings,
+         where a student turns each kind on or off. -->
+    <string name="channel_messages_name">Messages</string>
+    <string name="channel_messages_description">New messages and @mentions in your chats.</string>
+    <string name="channel_activity_name">Activity</string>
+    <string name="channel_activity_description">Follows, likes, comments, mentions and club invites.</string>
+</resources>

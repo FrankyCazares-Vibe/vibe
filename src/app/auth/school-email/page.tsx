@@ -6,6 +6,7 @@ import { Suspense, useEffect, useRef, useState } from "react";
 
 import { SuspendedActions, useOwnHandle } from "@/app/account/suspended/suspended-actions";
 import { SCHOOL_DOMAINS_HEADLINE_LABEL } from "@/lib/auth/school-email-domains";
+import { useAppShell } from "@/lib/native/use-app-shell";
 import { isIosPlatform } from "@/lib/pwa/display-mode";
 import { useIsStandalone, usePlatform } from "@/lib/pwa/use-standalone";
 import { getSupabaseBrowserClient } from "@/lib/supabase/browser";
@@ -168,10 +169,14 @@ function SchoolEmailInner() {
   // In the installed app the code is the way in: it verifies whoever is
   // signed in HERE. On an iPhone the email's link opens Safari, which keeps
   // its own sign-in (it may ask the student to sign in again), and this page
-  // doesn't notice when it's done there (plan R16).
+  // doesn't notice when it's done there (plan R16). The store apps are the
+  // same on both platforms until their own links are verified (plan S3D):
+  // the link opens Safari or Chrome, never the app (critic-s2s3.md item 9).
   const standalone = useIsStandalone();
   const platform = usePlatform();
-  const linksOpenSafari = standalone && isIosPlatform(platform);
+  const inApp = useAppShell() !== null;
+  const codeFirst = standalone || inApp;
+  const linksOpenBrowser = (standalone && isIosPlatform(platform)) || inApp;
   // For the delete box under the card: somebody who can't or won't verify
   // otherwise has no way off this screen but the back link, and every campus
   // page sends an unverified account straight back here
@@ -518,7 +523,7 @@ function SchoolEmailInner() {
             {SCHOOL_DOMAINS_LABEL}
           </code>{" "}
           one, not the one you signed up with.{" "}
-          {standalone ? (
+          {codeFirst ? (
             <>
               We&apos;ll email an 8-digit code to <em>that</em> inbox.
             </>
@@ -567,7 +572,7 @@ function SchoolEmailInner() {
                 className="vibe-auth-banner vibe-auth-banner--success"
                 style={{ overflowWrap: "anywhere" }}
               >
-                {standalone ? (
+                {codeFirst ? (
                   <>
                     We sent an 8-digit code to <strong>{sentTo}</strong>. Type
                     it below.
@@ -641,7 +646,7 @@ function SchoolEmailInner() {
 
             {/* Always on the code panel, whichever banner is up, so the
                 Safari line can't be pushed out by a send limit or failure. */}
-            {linksOpenSafari ? (
+            {linksOpenBrowser ? (
               <p className="vibe-auth-tip">
                 Links in the email open in your browser, not this app. Not there after a
                 minute? Check Junk, and your school Outlook&apos;s Quarantine.

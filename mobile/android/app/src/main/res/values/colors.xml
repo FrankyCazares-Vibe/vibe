@@ -1,0 +1,16 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <!-- The website's own cream and orange (src/app/globals.css: cream #FAF7F2,
+         accent #FF5C35), so the few native pieces of the app look like the site. -->
+    <color name="vibe_cream">#FAF7F2</color>
+    <color name="vibe_accent">#FF5C35</color>
+
+    <!-- These three names replace Capacitor's defaults (indigo and pink, from
+         capacitor-android's own colors.xml); styles.xml applies them. The site's
+         confirm() dialogs, <select> lists and date pickers are native Android
+         dialogs, so their buttons and highlights take colorAccent, and older
+         Android colours Vibe's card in the recent-apps screen with colorPrimary. -->
+    <color name="colorPrimary">@color/vibe_cream</color>
+    <color name="colorPrimaryDark">@color/vibe_cream</color>
+    <color name="colorAccent">@color/vibe_accent</color>
+</resources>

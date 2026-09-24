@@ -1930,12 +1930,22 @@
       ? _vibeTopHere()
       : location.pathname + location.search;
     const next = esc(encodeURIComponent(here));
+    // The count is free everywhere; the pitch under it only shows in a
+    // browser. Inside the store apps Vibe+ isn't for sale (plan §5 SD1), and
+    // the Android app reaches this page on wide screens. Same test as
+    // src/lib/native/detect.ts.
+    let inStoreApp = false;
+    try {
+      const cap = window.Capacitor || (window.top && window.top.Capacitor);
+      inStoreApp = /VibeApp\/\d+\s*\((ios|android)\)/.test(navigator.userAgent) ||
+        !!(cap && typeof cap.isNativePlatform === "function" && cap.isNativePlatform());
+    } catch { inStoreApp = false; }
     rowsEl.innerHTML = `<div class="vpv-aud-lock">
       <div class="vpv-aud-lock-n">${esc(String(total))}</div>
       <div class="vpv-aud-lock-label">${esc(label)}</div>
-      <div class="vpv-aud-lock-line">Vibe+ shows you who.</div>
+      ${inStoreApp ? "" : `<div class="vpv-aud-lock-line">Vibe+ shows you who.</div>
       <a class="vpv-aud-cta" href="/plus?next=${next}"
-        onclick="event.preventDefault();window.__vibeTopNav(this.getAttribute('href'))">See Vibe+</a>
+        onclick="event.preventDefault();window.__vibeTopNav(this.getAttribute('href'))">See Vibe+</a>`}
     </div>`;
   }
 

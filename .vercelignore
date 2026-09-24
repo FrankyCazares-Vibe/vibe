@@ -7,3 +7,8 @@ RESEARCH/
 handoffs/
 otto_mockups/
 .claude/
+# The store apps' native shell. Its own package.json, node_modules and Xcode /
+# Gradle projects have nothing to do with the website build. Anchored with the
+# leading slash: a bare "mobile/" would also drop src/components/mobile/, the
+# whole phone UI.
+/mobile/

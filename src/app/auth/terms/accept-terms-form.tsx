@@ -5,9 +5,25 @@ import { useRouter } from "next/navigation";
 import { useState } from "react";
 
 import { MIN_AGE, TERMS_VERSION } from "@/lib/legal/terms";
+import { openInBrowser } from "@/lib/native/bridge";
+import { appShellOnClient } from "@/lib/native/detect";
 import { clearDraft } from "@/lib/onboarding/draft";
 
 const GENERIC_ERROR = "Couldn't save your agreement. Please try again.";
+
+/**
+ * The Terms and Privacy links open in a new tab so the student can read them
+ * and come back to the checkbox. The store apps have no new tab: the iPhone
+ * app hands it to Safari and the Android app would load it over this page.
+ * So there the page opens in the in-app browser sheet, on top of this one
+ * (plan §6 S2D). The default is stopped first, so the app's own link handler
+ * leaves this click alone (critic-s2s3.md item 4).
+ */
+function openLegalInApp(e: React.MouseEvent<HTMLAnchorElement>) {
+  if (appShellOnClient() === null) return;
+  e.preventDefault();
+  void openInBrowser(e.currentTarget.href);
+}
 
 /**
  * Client half of the `/auth/terms` interstitial: the same 18+ / Terms /
@@ -113,6 +129,7 @@ export function AcceptTermsForm({ next }: { next: string }) {
                 target="_blank"
                 rel="noopener noreferrer"
                 className="vibe-auth-link"
+                onClick={openLegalInApp}
               >
                 Terms of Service
               </Link>{" "}
@@ -122,6 +139,7 @@ export function AcceptTermsForm({ next }: { next: string }) {
                 target="_blank"
                 rel="noopener noreferrer"
                 className="vibe-auth-link"
+                onClick={openLegalInApp}
               >
                 Privacy Policy
               </Link>

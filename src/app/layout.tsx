@@ -4,6 +4,7 @@ import { JetBrains_Mono } from "next/font/google";
 
 import { CustomCursor } from "@/components/CustomCursor";
 import { ToastHost } from "@/components/feedback/ToastHost";
+import { NativeBridge } from "@/components/native/NativeBridge";
 import { ServiceWorkerRegistrar } from "@/components/pwa/ServiceWorkerRegistrar";
 import { cn } from "@/lib/utils";
 
@@ -68,6 +69,12 @@ export default function RootLayout({
             NEXT_PUBLIC_SW_DEV=1 locally); renders nothing. The static
             /html pages register through public/html/_sw.js instead. */}
         <ServiceWorkerRegistrar />
+        {/* The App Store / Google Play apps' half of the bridge: links the
+            phone opens, new-window links, the status bar, Android back.
+            Renders nothing and does nothing in a browser. It decides on the
+            client, so this layout never reads headers() (that would make
+            every route dynamic). */}
+        <NativeBridge />
       </body>
     </html>
   );

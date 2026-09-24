@@ -2889,3 +2889,13 @@ html {
     background-color: #FAF7F2;
   }
 }
+
+/* The same cream inside the App Store and Google Play apps (plan §6 S2B).
+   Their web view reports the browser display mode, so the rule above never
+   matches there; NativeBridge puts `vibe-app` on <html> instead. It lands
+   after hydration, so the shell's own cream background covers the first
+   paint (mobile/capacitor.config.ts). */
+html.vibe-app,
+html.vibe-app body {
+  background-color: #FAF7F2;
+}

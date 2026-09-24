@@ -5,6 +5,7 @@ import { useCallback, useEffect, useRef, useState, type CSSProperties } from "re
 
 import { asLoadFailure, LoadFailed, type LoadFailure } from "@/components/feedback/LoadFailed";
 import { vibeRequest } from "@/lib/feedback/request";
+import { useAppShell } from "@/lib/native/use-app-shell";
 
 import { OttoSection } from "./OttoSection";
 import { ProfileViewersList, type ProfileViewerRow } from "./ProfileViewersList";
@@ -94,7 +95,8 @@ const CS_FAILURE = "Couldn't load your post stats.";
  * The lock link comes back to this exact pane, so a student who taps "See who"
  * and then backs out lands where they were. /plus validates `next` with
  * isSafeRelativePath, and the value carries a query string of its own, so it
- * is encoded rather than concatenated.
+ * is encoded rather than concatenated. Never shown inside the store apps,
+ * where Vibe+ isn't for sale (handoffs/wave-plan-pwa/plan.md §5 SD1).
  */
 const PLUS_HREF = `/plus?next=${encodeURIComponent("/otto?tab=stats")}`;
 
@@ -150,6 +152,10 @@ export function OttoMetrics() {
   // list's key: a reload remounts it with the new first page instead of an
   // effect copying props into its state.
   const [pvSeq, setPvSeq] = useState(0);
+  // Inside the store apps the free "See who · Vibe+" teaser doesn't render
+  // at all. The hook is null for one frame while the page hydrates, but the
+  // teaser only paints after the profile-views fetch, so it never flashes.
+  const inApp = useAppShell() !== null;
 
   // Each half fetches — and retries — on its own. They used to share one
   // load(), which meant retrying the refused Posts half also refetched profile
@@ -308,10 +314,12 @@ export function OttoMetrics() {
                         <p className="otto-room-empty">No one yet.</p>
                       )}
                     </>
-                  ) : pv.lockedCount !== null && pv.lockedCount > 0 ? (
-                    // Free account. The teaser counts PEOPLE over seven days,
-                    // while the tile beside it counts VIEWS — hence the two
-                    // different words for two different numbers.
+                  ) : pv.lockedCount !== null && pv.lockedCount > 0 && !inApp ? (
+                    // Free account, in a browser. The teaser counts PEOPLE
+                    // over seven days, while the tile beside it counts VIEWS —
+                    // hence the two different words for two different numbers.
+                    // In the app the tiles stand alone: the counts are free
+                    // everywhere, and the pitch for the names is web-only.
                     <>
                       <div className="otto-metrics-recent-label">Who viewed you</div>
                       <p className="otto-metrics-foot">

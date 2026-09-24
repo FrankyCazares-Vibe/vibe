@@ -2,6 +2,7 @@
 
 import { useEffect, useRef, useState } from "react";
 
+import { useAppShell } from "@/lib/native/use-app-shell";
 import { rasterizePdf } from "@/lib/pdfjs-cdn";
 import {
   isResumeProxyPath,
@@ -182,8 +183,8 @@ type Props = {
  * edit is saving, "Open" shows "Saving…" instead of a copy that
  * doesn't have the new bar yet.
  *
- * In the installed app on an iPhone, a hosted file shows neither "Open"
- * link (see `hideOpen`); external links keep theirs.
+ * In the installed app on an iPhone, and in both store apps, a hosted file
+ * shows neither "Open" link (see `hideOpen`); external links keep theirs.
  *
  * For PDFs we rasterize each page to JPEG via pdf.js at scale 1.6,
  * stack the page images vertically, and overlay bars as
@@ -254,9 +255,15 @@ export function ResumeViewerMobile({
   // there; the pages below already show it. External links need no
   // sign-in and keep "Open" everywhere, and Android's installed app shares
   // Chrome's sign-in, so it keeps them too (plan R16, critic-w1.md item 10).
+  // The store apps hide them on both platforms. The iPhone app sends every
+  // new window to Safari, which isn't signed in; the Android app opens a
+  // same-site link in its own web view, which has no PDF viewer. External
+  // links still open, in the in-app browser (wrapper-tech.md §4.5).
   const standalone = useIsStandalone();
   const platform = usePlatform();
-  const hideOpen = hosted && standalone && isIosPlatform(platform);
+  const inApp = useAppShell() !== null;
+  const hideOpen =
+    hosted && ((standalone && isIosPlatform(platform)) || inApp);
   const ownerNote = !hosted
     ? "Links open the original for everyone. Upload the file to black out parts of it."
     : hasBars

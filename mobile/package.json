@@ -1,0 +1,31 @@
+{
+  "name": "vibe-mobile",
+  "version": "1.0.0",
+  "private": true,
+  "description": "The Vibe store apps: a Capacitor shell around https://www.connectvibe.app",
+  "scripts": {
+    "sync": "cap sync",
+    "icon:source": "node scripts/render-icon-source.mjs",
+    "icon:generate": "capacitor-assets generate --ios --android --assetPath resources --iconBackgroundColor '#FFFFFF'",
+    "icons": "npm run icon:source && npm run icon:generate",
+    "release:check": "node scripts/check-release-config.mjs"
+  },
+  "dependencies": {
+    "@capacitor/android": "8.5.2",
+    "@capacitor/app": "8.1.1",
+    "@capacitor/browser": "8.0.4",
+    "@capacitor/core": "8.5.2",
+    "@capacitor/filesystem": "8.1.3",
+    "@capacitor/haptics": "8.0.2",
+    "@capacitor/ios": "8.5.2",
+    "@capacitor/keyboard": "8.0.5",
+    "@capacitor/share": "8.0.2",
+    "@capacitor/splash-screen": "8.0.2",
+    "@capacitor/status-bar": "8.0.3"
+  },
+  "devDependencies": {
+    "@capacitor/assets": "3.0.5",
+    "@capacitor/cli": "8.5.2",
+    "typescript": "5.9.3"
+  }
+}

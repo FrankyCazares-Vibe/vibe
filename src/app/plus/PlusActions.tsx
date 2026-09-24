@@ -5,6 +5,7 @@ import { useEffect, useRef, useState, type CSSProperties, type JSX, type ReactNo
 import type { PlusPlan } from "@/lib/billing/config";
 import { vibeRequest } from "@/lib/feedback/request";
 import { toast } from "@/lib/feedback/toast";
+import { useAppShell } from "@/lib/native/use-app-shell";
 
 /**
  * The only buttons on /plus that touch money, and all they do is hand the
@@ -28,6 +29,21 @@ import { toast } from "@/lib/feedback/toast";
  * The URL is checked before leaving: only Stripe's own checkout host for
  * Subscribe and billing host for Manage, so a bad answer can't send a student
  * anywhere else.
+ *
+ * INSIDE THE STORE APPS (handoffs/wave-plan-pwa/plan.md §5 SD1) there is
+ * nothing to buy: the page passes no plan cards there, and this file drops
+ * them (and the disclosure that goes with them) as well, in case one ever
+ * slips through. Manage subscription stays, and in the app it goes to Stripe
+ * the same way it does on the web, with a plain navigation. That's on purpose:
+ * the shell loads only Vibe's own host in place and hands every other host to
+ * the phone's default browser (mobile/capacitor.config.ts sets no
+ * allowNavigation), which is where the store research says Stripe must open
+ * (handoffs/wave-plan-pwa/research-stores/payments.md, "Answers for Apple").
+ * Don't swap it for openInBrowser: that's an in-app browser sheet, and the
+ * portal's "Return to Vibe" lands on the web /plus, with its prices and
+ * Subscribe buttons, inside that sheet. Because the navigation is cancelled
+ * and this page stays put underneath, the app frees the buttons straight
+ * away rather than leaving them greyed for a page change that never comes.
  */
 
 export type PlanCard = {
@@ -120,6 +136,8 @@ export function PlusActions({
 }): JSX.Element | null {
   const inFlight = useRef(false);
   const [pending, setPending] = useState<Target | null>(null);
+  const inApp = useAppShell() !== null;
+  const cards = inApp ? [] : plans;
 
   // Back from Stripe with the back button, the browser can restore this page
   // from its back/forward cache exactly as it was left: mid-request, every
@@ -134,7 +152,7 @@ export function PlusActions({
     return () => window.removeEventListener("pageshow", onShow);
   }, []);
 
-  if (plans.length === 0 && !manage) return null;
+  if (cards.length === 0 && !manage) return null;
 
   const release = () => {
     inFlight.current = false;
@@ -156,6 +174,14 @@ export function PlusActions({
     if (r.ok) {
       const url = typeof r.data.url === "string" ? r.data.url : "";
       if (url.startsWith(portal ? PORTAL_PREFIX : CHECKOUT_PREFIX)) {
+        if (portal && inApp) {
+          // The shell cancels this and opens the portal in the phone's own
+          // browser, so this page never leaves. Free the buttons for when
+          // the student switches back.
+          window.location.assign(url);
+          release();
+          return;
+        }
         // Leaving for Stripe. The buttons stay greyed until the page goes.
         window.location.assign(url);
         return;
@@ -191,9 +217,9 @@ export function PlusActions({
 
   return (
     <div style={{ display: "grid", gap: 14, fontFamily: SANS, color: "#2A2620" }}>
-      {plans.length > 0 ? (
+      {cards.length > 0 ? (
         <div style={GRID}>
-          {plans.map((p) => (
+          {cards.map((p) => (
             <div key={p.plan} style={CARD}>
               <div
                 style={{
@@ -230,7 +256,7 @@ export function PlusActions({
         </div>
       ) : null}
 
-      {children}
+      {inApp ? null : children}
 
       {manage ? (
         <div style={{ display: "grid", gap: 8, maxWidth: 320 }}>

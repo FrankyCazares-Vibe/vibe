@@ -1,0 +1,92 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
+<plist version="1.0">
+<dict>
+	<key>CAPACITOR_DEBUG</key>
+	<string>$(CAPACITOR_DEBUG)</string>
+	<key>CFBundleDevelopmentRegion</key>
+	<string>en</string>
+	<key>CFBundleDisplayName</key>
+	<string>Vibe</string>
+	<key>CFBundleExecutable</key>
+	<string>$(EXECUTABLE_NAME)</string>
+	<key>CFBundleIdentifier</key>
+	<string>$(PRODUCT_BUNDLE_IDENTIFIER)</string>
+	<key>CFBundleInfoDictionaryVersion</key>
+	<string>6.0</string>
+	<key>CFBundleName</key>
+	<string>$(PRODUCT_NAME)</string>
+	<key>CFBundlePackageType</key>
+	<string>APPL</string>
+	<key>CFBundleShortVersionString</key>
+	<string>$(MARKETING_VERSION)</string>
+	<key>CFBundleVersion</key>
+	<string>$(CURRENT_PROJECT_VERSION)</string>
+	<!-- The only encryption is the HTTPS built into iOS, which is exempt, so
+	     App Store Connect doesn't ask about export compliance on each upload. -->
+	<key>ITSAppUsesNonExemptEncryption</key>
+	<false/>
+	<key>LSRequiresIPhoneOS</key>
+	<true/>
+	<!-- Purpose strings. iOS shows these the first time the site's photo and
+	     video pickers need the camera, library or microphone. Without the
+	     "add" one, long-pressing a post photo and saving it to Photos makes
+	     iOS close the app. -->
+	<key>NSCameraUsageDescription</key>
+	<string>Vibe uses your camera when you take a photo or video to post, send in a message, or add to your profile.</string>
+	<key>NSMicrophoneUsageDescription</key>
+	<string>Vibe uses your microphone to record sound when you take a video to post or send in a message.</string>
+	<key>NSPhotoLibraryAddUsageDescription</key>
+	<string>Vibe adds a photo or video to your library only when you choose to save it.</string>
+	<key>NSPhotoLibraryUsageDescription</key>
+	<string>Vibe opens your photo library when you choose a photo or video to post, send in a message, or add to your profile.</string>
+	<!-- Capacitor 8.5's scene setup: SceneDelegate builds the window in code
+	     (with MainViewController). The storyboard entry stays because
+	     Capacitor's 8.5 update guide keeps it. -->
+	<key>UIApplicationSceneManifest</key>
+	<dict>
+		<key>UIApplicationSupportsMultipleScenes</key>
+		<false/>
+		<key>UISceneConfigurations</key>
+		<dict>
+			<key>UIWindowSceneSessionRoleApplication</key>
+			<array>
+				<dict>
+					<key>UISceneConfigurationName</key>
+					<string>Default Configuration</string>
+					<key>UISceneDelegateClassName</key>
+					<string>$(PRODUCT_MODULE_NAME).SceneDelegate</string>
+					<key>UISceneStoryboardFile</key>
+					<string>Main</string>
+				</dict>
+			</array>
+		</dict>
+	</dict>
+	<key>UILaunchStoryboardName</key>
+	<string>LaunchScreen</string>
+	<key>UIMainStoryboardFile</key>
+	<string>Main</string>
+	<key>UIRequiredDeviceCapabilities</key>
+	<array>
+		<string>armv7</string>
+	</array>
+	<!-- Dark text in the status bar from the first frame. Capacitor reads this
+	     key when the screen loads, before any page script runs. -->
+	<key>UIStatusBarStyle</key>
+	<string>UIStatusBarStyleDarkContent</string>
+	<!-- Portrait only: the phone layout is built for it, and a large iPhone
+	     turned sideways is wide enough (900px and up) to get the site's
+	     desktop layout. iPhone-only (TARGETED_DEVICE_FAMILY = 1), so there's
+	     no iPad list. -->
+	<key>UISupportedInterfaceOrientations</key>
+	<array>
+		<string>UIInterfaceOrientationPortrait</string>
+	</array>
+	<!-- Always light. The site is built on cream and doesn't switch for Dark
+	     Mode, so Dark Mode would only turn the status-bar text white on cream. -->
+	<key>UIUserInterfaceStyle</key>
+	<string>Light</string>
+	<key>UIViewControllerBasedStatusBarAppearance</key>
+	<true/>
+</dict>
+</plist>

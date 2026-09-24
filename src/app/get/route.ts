@@ -49,7 +49,11 @@ export function GET(request: NextRequest) {
   });
 
   let destination = "/";
-  if (isIosPlatform(platform)) {
+  if (platform === "ios-app" || platform === "android-app") {
+    // Already inside the store app: a /get link (a poster's QR code, a
+    // shared "get the app" link) shouldn't send them out to a store listing.
+    destination = "/campus";
+  } else if (isIosPlatform(platform)) {
     destination =
       storeListingUrl(process.env.NEXT_PUBLIC_APP_STORE_URL, APP_STORE_PREFIX) ?? "/campus";
   } else if (platform.startsWith("android-")) {

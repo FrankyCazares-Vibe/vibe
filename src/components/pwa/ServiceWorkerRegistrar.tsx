@@ -2,6 +2,7 @@
 
 import { useEffect } from "react";
 
+import { appShellOnClient } from "@/lib/native/detect";
 // Imported for its side effect: it attaches the beforeinstallprompt and
 // appinstalled listeners as soon as the root layout's code loads, before
 // any component that wants the install offer has mounted.
@@ -46,6 +47,16 @@ export function ServiceWorkerRegistrar(): null {
     if (process.env.NEXT_PUBLIC_SW_KILL === "1") {
       unregisterAll(container);
       deleteAllCaches();
+      return;
+    }
+
+    // Never inside the store apps (plan.md §6 S2A; critic-s2s3.md item 8).
+    // The iPhone app's web view has no service worker at all, so this is for
+    // Android's, which does: the worker would take offline over from
+    // Capacitor's own offline page. Unregister rather than just return, so a
+    // worker an earlier build registered in the app doesn't stay behind.
+    if (appShellOnClient() !== null) {
+      unregisterAll(container);
       return;
     }
 

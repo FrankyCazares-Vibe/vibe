@@ -13,6 +13,8 @@ import { LoadFailed, asLoadFailure, type LoadFailure } from "@/components/feedba
 import { copyText, vibeRequest } from "@/lib/feedback/request";
 import { toast } from "@/lib/feedback/toast";
 import type { SchoolSystem } from "@/lib/iu/campuses";
+import { nativeShare } from "@/lib/native/bridge";
+import { appShellOnClient } from "@/lib/native/detect";
 import {
   groupPeople,
   listState,
@@ -137,6 +139,11 @@ export function StepPeople(p: {
 
   const share = async () => {
     const url = window.location.origin;
+    // In the store apps, the native share sheet first: Android's web view has
+    // no `navigator.share` (plan §6 S2D). It counts as done once the sheet
+    // opens, even if the student then cancels. Browsers skip it and keep the
+    // tap's gesture for the web share sheet.
+    if (appShellOnClient() !== null && (await nativeShare({ title: "Vibe", url }))) return;
     if (typeof navigator.share === "function") {
       try {
         await navigator.share({ title: "Vibe", url });

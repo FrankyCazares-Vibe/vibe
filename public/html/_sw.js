@@ -56,6 +56,28 @@
     return;
   }
 
+  // Never inside Vibe's App Store / Google Play app, the same rule as the
+  // React registrar. src/lib/native/detect.ts has both signals; keep this
+  // regex in step with its APP_UA, since a static page can't import it.
+  // The Android app shows the desktop pages, and so these iframes, whenever
+  // the screen is 900px wide or more, and its web view does run service
+  // workers: the worker would take offline over from the app's own offline
+  // page. So drop any registration an earlier build left and stop. No
+  // optional chaining: one syntax error would stop this whole file in an
+  // older browser.
+  let inApp = false;
+  try {
+    const cap = window.Capacitor;
+    inApp =
+      /VibeApp\/\d+\s*\((ios|android)\)/.test(navigator.userAgent) ||
+      Boolean(cap && typeof cap.isNativePlatform === "function" && cap.isNativePlatform() === true);
+  } catch {}
+  if (inApp) {
+    quietly(() => sw.getRegistrations().then((regs) =>
+      Promise.all(regs.map((reg) => quietly(() => reg.unregister())))));
+    return;
+  }
+
   if (location.hostname !== "www.connectvibe.app") return;
 
   const HOUR_MS = 60 * 60 * 1000;

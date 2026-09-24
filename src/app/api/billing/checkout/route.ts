@@ -20,6 +20,7 @@ import {
   logBillingError,
 } from "@/lib/billing/stripe";
 import { requireTermsAccepted } from "@/lib/legal/require-terms";
+import { appShellFromHeaders } from "@/lib/native/server";
 import { getEntitlement } from "@/lib/premium/require-plus";
 import { rateLimit, tooManyRequests } from "@/lib/rate-limit";
 import { createSupabaseServerClient } from "@/lib/supabase/server";
@@ -35,7 +36,8 @@ type CheckoutBody = { plan?: unknown };
  * idempotent sync), never here: a session that is created isn't a session
  * that was paid.
  *
- * Refusals, in order: 401 signed out · 503 `billing_off` (BILLING_ENABLED not
+ * Refusals, in order: 403 `store_app` (the request came from the App Store or
+ * Google Play app) · 401 signed out · 503 `billing_off` (BILLING_ENABLED not
  * "true") · 400 bad plan · 403 `terms_required` · 503 `billing_unavailable`
  * (the entitlement read failed, so we can't tell whether they already pay; or
  * Stripe isn't set up as disclosed, say a price that disagrees with the page)
@@ -95,6 +97,17 @@ function integrationIdentifier(): string {
 }
 
 export async function POST(req: Request) {
+  // Vibe+ isn't sold inside the store apps at launch (handoffs/wave-plan-pwa/
+  // plan.md §5 SD1): /plus there shows no price and no Subscribe, and this is
+  // the server half of that promise. It runs first, before auth, the Terms
+  // and any Stripe call (critic-s2s3.md item 22). The user agent is the
+  // sender's word, so this only ever refuses: a browser that fakes the app's
+  // token blocks its own checkout and nobody else's. Manage subscription
+  // (/api/billing/portal) stays open in the app for existing members.
+  if (appShellFromHeaders(req.headers)) {
+    return refuse(403, "store_app", "Not available in the app");
+  }
+
   const supabase = await createSupabaseServerClient();
   const {
     data: { user },

@@ -7,6 +7,7 @@ import { asLoadFailure, LoadFailed, type LoadFailure } from "@/components/feedba
 import type { UserCardData } from "@/lib/connections/queries";
 import { vibeRequest } from "@/lib/feedback/request";
 import { dayLabelFromDate, dayLabelFromTimestamp } from "@/lib/metrics/day-label";
+import { useAppShell } from "@/lib/native/use-app-shell";
 
 /**
  * "Who saw this" / "Who saved this" — the body of Screen C (wave plan,
@@ -117,6 +118,11 @@ export function PostAudienceList({
   const [loadingMore, setLoadingMore] = useState(false);
   // Bumped by Retry to run the first page again.
   const [attempt, setAttempt] = useState(0);
+  // Inside the store apps Vibe+ isn't for sale (handoffs/wave-plan-pwa/
+  // plan.md §5 SD1), so a free owner gets the count and nothing else. Null
+  // for the one frame the page hydrates, but the lock only paints after the
+  // first page lands, so it never flashes.
+  const inApp = useAppShell() !== null;
 
   const copy = COPY[kind];
 
@@ -256,27 +262,33 @@ export function PostAudienceList({
   const peopleLine = `${total} ${total === 1 ? "person" : "people"} ${copy.verb}.`;
 
   if (!premium) {
+    // The count is free on every tier and in every shell; the line under it
+    // and the button are the pitch, which only a browser gets.
     return (
       <div style={{ display: "flex", flexDirection: "column", gap: 6 }}>
         <p style={{ ...headlineStyle, color: ink }}>{peopleLine}</p>
-        <p style={{ ...noteStyle, color: faint }}>Vibe+ shows you who.</p>
-        <Link
-          href={plusHref()}
-          style={{
-            alignSelf: "flex-start",
-            marginTop: 2,
-            padding: "7px 14px",
-            borderRadius: 999,
-            background: "#FF5C35",
-            color: "#FAF7F2",
-            fontFamily: "DM Sans, sans-serif",
-            fontSize: 13,
-            fontWeight: 700,
-            textDecoration: "none",
-          }}
-        >
-          See Vibe+
-        </Link>
+        {inApp ? null : (
+          <>
+            <p style={{ ...noteStyle, color: faint }}>Vibe+ shows you who.</p>
+            <Link
+              href={plusHref()}
+              style={{
+                alignSelf: "flex-start",
+                marginTop: 2,
+                padding: "7px 14px",
+                borderRadius: 999,
+                background: "#FF5C35",
+                color: "#FAF7F2",
+                fontFamily: "DM Sans, sans-serif",
+                fontSize: 13,
+                fontWeight: 700,
+                textDecoration: "none",
+              }}
+            >
+              See Vibe+
+            </Link>
+          </>
+        )}
       </div>
     );
   }

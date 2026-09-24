@@ -1,0 +1,26 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
+<!--
+  Push notifications and email links that open the app. Neither needs a secret
+  or the Team ID, so this file is safe in the public repo.
+
+  Only the Release build uses it (CODE_SIGN_ENTITLEMENTS in project.pbxproj):
+  a free Personal Team can't sign either capability, and Debug builds on a
+  phone are how the app gets tested before the paid Apple account exists.
+  Debug gets it once that account does (S3D or the push wave).
+
+  - aps-environment: Xcode switches "development" to "production" itself when
+    it exports for the App Store.
+  - applinks: the site must serve /.well-known/apple-app-site-association
+    first (S3D). Until then links simply open Safari, as they do today.
+-->
+<plist version="1.0">
+<dict>
+	<key>aps-environment</key>
+	<string>development</string>
+	<key>com.apple.developer.associated-domains</key>
+	<array>
+		<string>applinks:www.connectvibe.app</string>
+	</array>
+</dict>
+</plist>

@@ -1,0 +1,32 @@
+<!doctype html>
+<!--
+  www/campus/index.html exists ONLY because iOS Capacitor 8.5.2 refuses to
+  start without it: loadWebView() checks that <bundle>/public + appStartPath
+  ("/campus") is a real file or folder before it loads server.url, and calls
+  exit(1) if it isn't (CAPBridgeViewController.swift:172-174). The page itself
+  never shows; it is a copy of ../index.html so a stale config still lands on
+  Vibe. Don't delete it. scripts/check-release-config.mjs checks it's synced.
+-->
+<!--
+  Capacitor needs a webDir with an index.html, but the store apps never show
+  this page: capacitor.config.ts sets server.url, so the web view opens the
+  live site instead. It exists so a broken or stale config still lands on
+  Vibe rather than on a blank screen. The address is absolute because this
+  file is served from the app's own local origin, where "/campus" would
+  mean nothing.
+-->
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<meta name="robots" content="noindex">
+<title>Vibe</title>
+<style>
+  html, body { margin: 0; background: #FAF7F2; }
+</style>
+<script>
+  location.replace("https://www.connectvibe.app/campus");
+</script>
+</head>
+<body></body>
+</html>

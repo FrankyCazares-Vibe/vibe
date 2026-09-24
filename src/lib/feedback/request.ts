@@ -4,6 +4,8 @@ import {
   type ToastAction,
 } from "@/lib/feedback/failure-copy";
 import { toast } from "@/lib/feedback/toast";
+import { nativeShare, writeCacheFile } from "@/lib/native/bridge";
+import { appShellOnClient } from "@/lib/native/detect";
 
 /**
  * Client-side request helpers that can't fail silently (silent-failure
@@ -225,11 +227,66 @@ export async function copyText(
   return copied;
 }
 
+/** The blob's bytes as plain base64 (no `data:` prefix), or null if unreadable. */
+function blobToBase64(blob: Blob): Promise<string | null> {
+  return new Promise((resolve) => {
+    try {
+      const reader = new FileReader();
+      reader.onload = () => {
+        const result = typeof reader.result === "string" ? reader.result : "";
+        const comma = result.indexOf(",");
+        resolve(comma >= 0 ? result.slice(comma + 1) : null);
+      };
+      reader.onerror = () => resolve(null);
+      reader.readAsDataURL(blob);
+    } catch {
+      resolve(null);
+    }
+  });
+}
+
+/**
+ * The store apps' half of `downloadFile`. Neither web view saves a download:
+ * WKWebView ignores `download` on a blob link and Capacitor's Android web view
+ * has no download listener (wrapper-tech.md §4.5). So the file goes into the
+ * app's cache and out through the share sheet, where the student picks
+ * Calendar, Files or Mail. Never the blob link: in the app it does nothing,
+ * and a tap that does nothing reads as broken.
+ *
+ * No success toast: the share sheet is what the student sees, and it opens
+ * whether they go on to save the file or cancel. When the file can't be
+ * written or the sheet can't open, the caller's failure line shows instead.
+ */
+async function shareDownloadInApp(
+  blob: Blob,
+  filename: string,
+  failure: string,
+): Promise<boolean> {
+  // The name becomes a path in the cache folder, so it keeps no folders of
+  // its own.
+  const name = filename.replace(/[/\\]/g, "-").replace(/^\.+/, "") || "vibe-download";
+  let shared = false;
+  // The bridge shouldn't throw, but callers fire `downloadFile` with `void`
+  // and never catch, so a surprise here would be an unhandled rejection.
+  try {
+    const data = await blobToBase64(blob);
+    const uri = data ? await writeCacheFile(name, data) : null;
+    shared = uri ? await nativeShare({ files: [uri] }) : false;
+  } catch {
+    shared = false;
+  }
+  if (!shared) toast({ message: failure, tone: "error" });
+  return shared;
+}
+
 /**
  * Downloads `url` as `filename`, replacing a synthetic `<a download>`, which
  * saves whatever comes back. A refusal is JSON (a signed-out 401, say), and
  * that must never be saved as the file, so this requires a 2xx that isn't
  * JSON and toasts the mapped failure otherwise.
+ *
+ * Inside the store apps the file is handed to the share sheet instead of
+ * saved (`shareDownloadInApp`); the fetch and its refusals are the same.
  */
 export async function downloadFile(
   url: string,
@@ -257,6 +314,8 @@ export async function downloadFile(
     fail(NETWORK_FAILURE, opts.failure, false);
     return false;
   }
+
+  if (appShellOnClient() !== null) return shareDownloadInApp(blob, filename, opts.failure);
 
   const href = URL.createObjectURL(blob);
   const a = document.createElement("a");

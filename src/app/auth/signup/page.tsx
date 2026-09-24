@@ -33,6 +33,9 @@ import {
   TERMS_METADATA_KEYS,
   TERMS_VERSION,
 } from "@/lib/legal/terms";
+import { openInBrowser } from "@/lib/native/bridge";
+import { appShellOnClient } from "@/lib/native/detect";
+import { useAppShell } from "@/lib/native/use-app-shell";
 import { isIosPlatform } from "@/lib/pwa/display-mode";
 import { useIsStandalone, usePlatform } from "@/lib/pwa/use-standalone";
 import { getSupabaseBrowserClient } from "@/lib/supabase/browser";
@@ -99,6 +102,20 @@ function signUpErrorMessage(err: AuthError): string {
 }
 
 /**
+ * The Terms and Privacy links open in a new tab so the half-filled form stays
+ * put. The store apps have no new tab: the iPhone app hands it to Safari and
+ * the Android app would load it over this form. So there the page opens in
+ * the in-app browser sheet, on top of the form (plan §6 S2D). The default is
+ * stopped first, so the app's own link handler leaves this click alone
+ * (critic-s2s3.md item 4).
+ */
+function openLegalInApp(e: React.MouseEvent<HTMLAnchorElement>) {
+  if (appShellOnClient() === null) return;
+  e.preventDefault();
+  void openInBrowser(e.currentTarget.href);
+}
+
+/**
  * The "Check your email" view shown after signUp sends (or recently sent) a
  * confirmation email. `rateLimitedUntil` (epoch ms) is set when this submit
  * hit the per-address cooldown instead of sending.
@@ -124,10 +141,15 @@ export default function SignupPage() {
   const rateLimitedUntil = pending?.rateLimitedUntil ?? null;
   // In the installed app the code is the way in: typing it signs in THIS
   // app. On an iPhone the email's Confirm link opens Safari, which keeps its
-  // own sign-in, so the app would still be signed out (plan R16).
+  // own sign-in, so the app would still be signed out (plan R16). The store
+  // apps are the same on both platforms until their own links are verified
+  // (plan S3D): the Confirm link signs in Safari or Chrome, never the app
+  // (critic-s2s3.md item 9).
   const standalone = useIsStandalone();
   const platform = usePlatform();
-  const linksOpenSafari = standalone && isIosPlatform(platform);
+  const inApp = useAppShell() !== null;
+  const codeFirst = standalone || inApp;
+  const linksOpenBrowser = (standalone && isIosPlatform(platform)) || inApp;
 
   // "We just sent an email" points at the resend countdown below, so it goes
   // when that countdown ends. Checked against the deadline on return too:
@@ -279,11 +301,11 @@ export default function SignupPage() {
           <h1 className="vibe-auth-headline">
             Check your email<span className="vibe-auth-dot">.</span>
           </h1>
-          {standalone ? (
+          {codeFirst ? (
             <p className="vibe-auth-sub" style={{ overflowWrap: "anywhere" }}>
               We sent an 8-digit code to <strong>{pending.email}</strong> from
               noreply@connectvibe.app. Type it below to confirm your account.
-              {linksOpenSafari
+              {linksOpenBrowser
                 ? " Links in the email open in your browser, not this app."
                 : null}
             </p>
@@ -447,6 +469,7 @@ export default function SignupPage() {
                 target="_blank"
                 rel="noopener noreferrer"
                 className="vibe-auth-link"
+                onClick={openLegalInApp}
               >
                 Terms of Service
               </Link>{" "}
@@ -456,6 +479,7 @@ export default function SignupPage() {
                 target="_blank"
                 rel="noopener noreferrer"
                 className="vibe-auth-link"
+                onClick={openLegalInApp}
               >
                 Privacy Policy
               </Link>
