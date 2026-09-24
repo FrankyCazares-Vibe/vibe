@@ -120,6 +120,7 @@ export function SettingsClient({
       />
       <CampusTourCard handle={profile.handle} />
       <BlockedUsersCard />
+      <HelpAndSafetyCard />
       <SignOutCard />
       <DangerZone handle={profile.handle} />
       <LegalFooter />
@@ -1431,6 +1432,113 @@ function DangerZone({ handle }: { handle: string | null }) {
         </div>
       )}
     </section>
+  );
+}
+
+/** The rules, the child-safety page, and a human to write to. Its own
+ *  section rather than three more items in LegalFooter's one-line <p>:
+ *  at 375px that paragraph is already close to wrapping. It sits above
+ *  sign-out and the danger zone so a student looking for "how do I report
+ *  this" doesn't have to scroll past the delete-account card to find it.
+ *  `id` so a moderation notice can send someone to /settings#help-safety. */
+function HelpAndSafetyCard() {
+  return (
+    <section
+      id="help-safety"
+      style={{ ...CARD_GLASS, padding: 22, marginBottom: 16, scrollMarginTop: 24 }}
+    >
+      <SectionTitle>Help &amp; safety</SectionTitle>
+      <p
+        style={{
+          fontFamily: "DM Sans, sans-serif",
+          fontSize: 14,
+          color: "#5C5853",
+          margin: "0 0 14px",
+          maxWidth: 440,
+          lineHeight: 1.5,
+        }}
+      >
+        What belongs on Vibe, what happens when you report something, and how
+        to reach us.
+      </p>
+      <div style={{ display: "grid", gap: 10 }}>
+        <HelpLink
+          href="/legal/community"
+          label="Community Guidelines"
+          hint="What isn't allowed, and what happens after a report."
+        />
+        <HelpLink
+          href="/legal/child-safety"
+          label="Child safety"
+          hint="Our zero-tolerance standard, and how to report it."
+        />
+        <HelpLink
+          href="mailto:help@connectvibe.app"
+          external
+          label="Email help@connectvibe.app"
+          hint="Questions, appeals, or anything we got wrong."
+        />
+      </div>
+    </section>
+  );
+}
+
+function HelpLink({
+  href,
+  label,
+  hint,
+  external,
+}: {
+  href: string;
+  label: string;
+  hint: string;
+  /** mailto: and other non-app addresses — next/link is for routes. */
+  external?: boolean;
+}) {
+  const body = (
+    <>
+      <span
+        style={{
+          fontFamily: "DM Sans, sans-serif",
+          fontSize: 14,
+          fontWeight: 700,
+          color: "#1C1C1E",
+        }}
+      >
+        {label}
+      </span>
+      <span
+        style={{
+          fontFamily: "DM Sans, sans-serif",
+          fontSize: 13,
+          color: "#8A8580",
+          lineHeight: 1.45,
+        }}
+      >
+        {hint}
+      </span>
+    </>
+  );
+  const style: React.CSSProperties = {
+    display: "grid",
+    gap: 2,
+    padding: "10px 14px",
+    borderRadius: 14,
+    border: "1px solid rgba(28,28,30,0.10)",
+    background: "rgba(255,255,255,0.55)",
+    textDecoration: "none",
+  };
+  if (external) {
+    return (
+      <a href={href} style={style}>
+        {body}
+      </a>
+    );
+  }
+  return (
+    <Link href={href} style={style}>
+      {body}
+    </Link>
   );
 }
 

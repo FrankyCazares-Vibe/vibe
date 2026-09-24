@@ -1,10 +1,17 @@
 import Link from "next/link";
-import type { ReactNode } from "react";
+import type { CSSProperties, ReactNode } from "react";
 
 const PAGE_BG =
   "radial-gradient(120% 80% at 0% 0%, rgba(255,222,180,0.45) 0%, rgba(255,222,180,0) 60%), " +
   "radial-gradient(110% 80% at 100% 100%, rgba(255,200,170,0.35) 0%, rgba(255,200,170,0) 60%), " +
   "linear-gradient(180deg, #FAF7F2 0%, #F4EDE2 100%)";
+
+const LEGAL_LINK: CSSProperties = {
+  color: "#5C5853",
+  fontWeight: 700,
+  textDecoration: "none",
+  whiteSpace: "nowrap",
+};
 
 export function LegalLayout({
   eyebrow,
@@ -87,35 +94,38 @@ export function LegalLayout({
         >
           {children}
         </article>
-        <p
+        {/* Five links now, not three. A row of `·` spacers inside a <p>
+            orphans a separator at the start of a wrapped line on a 375px
+            phone, so the spacing is the layout's job: a flex-wrap row with
+            real gaps, no separator characters to strand. */}
+        <nav
+          aria-label="Legal and safety"
           style={{
             marginTop: 40,
+            display: "flex",
+            flexWrap: "wrap",
+            gap: "10px 24px",
             fontFamily: "DM Sans, sans-serif",
             fontSize: 13,
             color: "#8A8580",
           }}
         >
-          <Link
-            href="/legal/terms"
-            style={{ color: "#5C5853", fontWeight: 700, textDecoration: "none" }}
-          >
+          <Link href="/legal/terms" style={LEGAL_LINK}>
             Terms of Service
           </Link>
-          <span style={{ margin: "0 8px" }}>·</span>
-          <Link
-            href="/legal/privacy"
-            style={{ color: "#5C5853", fontWeight: 700, textDecoration: "none" }}
-          >
+          <Link href="/legal/privacy" style={LEGAL_LINK}>
             Privacy Policy
           </Link>
-          <span style={{ margin: "0 8px" }}>·</span>
-          <a
-            href="mailto:hello@connectvibe.app"
-            style={{ color: "#5C5853", fontWeight: 700, textDecoration: "none" }}
-          >
+          <Link href="/legal/community" style={LEGAL_LINK}>
+            Community Guidelines
+          </Link>
+          <Link href="/legal/child-safety" style={LEGAL_LINK}>
+            Child Safety
+          </Link>
+          <a href="mailto:hello@connectvibe.app" style={LEGAL_LINK}>
             Contact
           </a>
-        </p>
+        </nav>
       </div>
     </main>
   );
