@@ -26,7 +26,12 @@ import {
   PostAudienceList,
   type PostAudienceUser,
 } from "@/components/posts/PostAudienceList";
-import { RemovedContentCard, ReportSheet } from "@/components/safety/ReportSheet";
+import {
+  CONTENT_REPORTED_EVENT,
+  type ContentReportedDetail,
+  RemovedContentCard,
+  ReportSheet,
+} from "@/components/safety/ReportSheet";
 import { MouseSpotlight } from "@/components/ui/mouse-spotlight";
 import {
   bindMentionPicker,
@@ -75,6 +80,7 @@ import {
   editedPostFrom,
   POST_MAX_CHARS,
 } from "@/lib/posts/edit";
+import { useIsMobile } from "@/lib/use-is-mobile";
 
 declare global {
   interface Window {
@@ -5385,6 +5391,78 @@ type FeedEntry =
       post: FeedPost;
     };
 
+/**
+ * How long a reported post stays on screen after the event. The sheet that
+ * fired it lives inside the post's own row (FeedRow here, FeedCard's ⋯ menu on
+ * the phone), and vaul takes 0.5 s to close: dropping the row any sooner
+ * unmounts drawers halfway through closing and strands their scroll lock.
+ */
+const REPORTED_POST_DROP_MS = 600;
+
+/** The post id in a CONTENT_REPORTED_EVENT (ReportSheet fires it once the
+ *  sheet of a report that went through has closed), or null for anything
+ *  else. Anything on the page can dispatch a window event, so the detail is
+ *  checked rather than trusted. */
+function reportedPostIdFrom(e: Event): string | null {
+  const detail = (e as CustomEvent<Partial<ContentReportedDetail> | null>).detail;
+  if (!detail || detail.targetType !== "post") return null;
+  return typeof detail.targetId === "string" && detail.targetId ? detail.targetId : null;
+}
+
+/**
+ * A post the viewer reports leaves the list they reported it from, so they
+ * never have to look at it again (Apple 1.2 / Google UGC ask for exactly this).
+ * `drop` runs once per report, REPORTED_POST_DROP_MS later, and removes that
+ * post from the caller's state. The returned ref holds every post id reported
+ * on this visit: a list that loads again filters the answer through it, so a
+ * load already in flight when the report landed can't bring the post back.
+ * The feed route also leaves out posts the viewer reported, so a later visit
+ * doesn't need the ref.
+ */
+export function useReportedPostIds(
+  drop: (postId: string) => void,
+): React.RefObject<Set<string>> {
+  const idsRef = useRef<Set<string>>(new Set());
+  // The latest `drop`, so a caller's new function never re-subscribes the
+  // listener and throws away a drop that is still waiting on its timer.
+  const dropRef = useRef(drop);
+  useEffect(() => {
+    dropRef.current = drop;
+  }, [drop]);
+  useEffect(() => {
+    const timers = new Set<number>();
+    const onReported = (e: Event) => {
+      const id = reportedPostIdFrom(e);
+      if (!id) return;
+      idsRef.current.add(id);
+      const t = window.setTimeout(() => {
+        timers.delete(t);
+        dropRef.current(id);
+      }, REPORTED_POST_DROP_MS);
+      timers.add(t);
+    };
+    window.addEventListener(CONTENT_REPORTED_EVENT, onReported);
+    return () => {
+      window.removeEventListener(CONTENT_REPORTED_EVENT, onReported);
+      for (const t of timers) window.clearTimeout(t);
+    };
+  }, []);
+  return idsRef;
+}
+
+/** `rows` without the posts in `reported`. Hands back `rows` itself when
+ *  nothing matched, so a state update that changes nothing re-renders
+ *  nothing (and re-runs no effect that depends on the list). */
+export function withoutReportedPosts<T>(
+  rows: T[],
+  reported: ReadonlySet<string>,
+  postIdOf: (row: T) => string,
+): T[] {
+  if (reported.size === 0) return rows;
+  const kept = rows.filter((row) => !reported.has(postIdOf(row)));
+  return kept.length === rows.length ? rows : kept;
+}
+
 function relativeTime(iso: string): string {
   try {
     const ms = Date.now() - Date.parse(iso);
@@ -5442,6 +5520,17 @@ function FeedTabBody({
     [],
   );
 
+  // A post the viewer reported leaves the feed once the report sheet has
+  // closed: every row showing it, the post itself and any repost of it.
+  const dropReportedPost = useCallback(
+    (postId: string) =>
+      setEntries((prev) =>
+        prev ? withoutReportedPosts(prev, new Set([postId]), (e) => e.post.id) : prev,
+      ),
+    [],
+  );
+  const reportedPostIdsRef = useReportedPostIds(dropReportedPost);
+
   // After a post or a row change. The student started it, so a refusal
   // toasts (vibeRequest's, or ours for a bad body) and the feed stays put.
   const refresh = useCallback(async () => {
@@ -5451,12 +5540,14 @@ function FeedTabBody({
     });
     if (r.ok && Array.isArray(r.data.feed)) {
       setLoadErr(null);
-      setEntries(r.data.feed);
+      setEntries(
+        withoutReportedPosts(r.data.feed, reportedPostIdsRef.current, (e) => e.post.id),
+      );
       if (typeof r.data.viewerId === "string") setViewerId(r.data.viewerId);
     } else if (r.ok) {
       toast({ message: "Couldn't refresh the feed. Try again.", tone: "error" });
     }
-  }, [feedUrl]);
+  }, [feedUrl, reportedPostIdsRef]);
 
   useEffect(() => {
     let cancelled = false;
@@ -5469,7 +5560,9 @@ function FeedTabBody({
       if (cancelled) return;
       if (r.ok && Array.isArray(r.data.feed)) {
         setLoadErr(null);
-        setEntries(r.data.feed);
+        setEntries(
+          withoutReportedPosts(r.data.feed, reportedPostIdsRef.current, (e) => e.post.id),
+        );
         if (typeof r.data.viewerId === "string") setViewerId(r.data.viewerId);
       } else {
         setLoadErr(asLoadFailure(r, "Couldn't load the feed."));
@@ -5478,7 +5571,7 @@ function FeedTabBody({
     return () => {
       cancelled = true;
     };
-  }, [feedUrl, loadKey]);
+  }, [feedUrl, loadKey, reportedPostIdsRef]);
 
   // /campus?post=<id> deep-link from Otto mention notifications.
   // After the feed has rendered we look up the FeedRow by id, scroll it
@@ -6441,15 +6534,17 @@ function FeedRow({
   const toggleSave = useCallback(async () => {
     const nextSaved = !saved;
     setSaved(nextSaved);
-    try {
-      const res = await fetch(`/api/posts/${post.id}/save`, {
-        method: nextSaved ? "POST" : "DELETE",
-      });
-      if (!res.ok) throw new Error(`save ${res.status}`);
-    } catch (e) {
-      console.error("[feed] save", e);
-      setSaved(!nextSaved);
-    }
+    // The save route can now say no in ways worth a word (store wave S1): a
+    // 429 from its limiter, and a 404 for a post gone or across a block. A
+    // silent flip-back read as a broken button, so the toast says why, the
+    // same as the phone card's save.
+    const r = await vibeRequest(`/api/posts/${post.id}/save`, {
+      method: nextSaved ? "POST" : "DELETE",
+      failure: nextSaved
+        ? "Couldn't save this post."
+        : "Couldn't remove this from your saved posts.",
+    });
+    if (!r.ok) setSaved(!nextSaved);
   }, [saved, post.id]);
 
   const handleShare = useCallback(async () => {
@@ -8726,7 +8821,7 @@ export function EventCard({ ev, onMutate }: { ev: CampusEvent; onMutate: () => v
           disabled={busy}
         />
       </div>
-      {(status || ev.viewer_can_manage) ? (
+      {(status || ev.viewer_can_manage || !ev.is_creator) ? (
         <div
           style={{
             display: "flex",
@@ -8751,6 +8846,13 @@ export function EventCard({ ev, onMutate }: { ev: CampusEvent; onMutate: () => v
               eventTitle={ev.title}
             />
           ) : null}
+          {/* Never on an event you made: the route refuses its creator
+              ("You can't report something of your own"), and every other
+              surface keeps Report off your own things rather than letting
+              the route say no. A club officer who didn't create it still
+              gets it — there is no way to take an event down from the app,
+              so a report is how a bad one reaches anybody who can. */}
+          {!ev.is_creator ? <EventReportAction eventId={ev.id} /> : null}
         </div>
       ) : null}
       </div>
@@ -8780,6 +8882,48 @@ function CalendarIcon() {
       <rect x="2" y="3" width="12" height="11" rx="1.5" stroke="currentColor" strokeWidth="1.3" />
       <path d="M2 6h12M5 1.5v3M11 1.5v3" stroke="currentColor" strokeWidth="1.3" strokeLinecap="round" />
     </svg>
+  );
+}
+
+/**
+ * "Report event" on an event card. ReportSheet already takes `event`; before
+ * this no button sent one, and App Review / Play review look for Report on
+ * every piece of content other students make. An event has no person behind it
+ * to block, so the sheet offers none (`NO_BLOCK` in ReportSheet).
+ *
+ * EventCard renders on the desktop Events tab, the phone Events pane and club
+ * pages, and doesn't know which one it's in. This asks the viewport itself —
+ * the same `useIsMobile` split CampusSwitch makes — so a phone gets the bottom
+ * sheet and a desktop the centered dialog. It lives in its own component so
+ * only a card that shows the button subscribes to the viewport.
+ */
+function EventReportAction({ eventId }: { eventId: string }) {
+  const [open, setOpen] = useState(false);
+  const isMobile = useIsMobile();
+  return (
+    <>
+      <button
+        type="button"
+        onClick={() => setOpen(true)}
+        style={{
+          ...eventCardSubtleLink,
+          marginLeft: "auto",
+          border: "1px solid rgba(255,255,255,0.10)",
+          background: "transparent",
+          color: "rgba(255,255,255,0.6)",
+          WebkitTapHighlightColor: "transparent",
+        }}
+      >
+        Report event
+      </button>
+      {open ? (
+        <ReportSheet
+          variant={isMobile ? "sheet" : "modal"}
+          target={{ type: "event", id: eventId, noun: "event" }}
+          onClose={() => setOpen(false)}
+        />
+      ) : null}
+    </>
   );
 }
 

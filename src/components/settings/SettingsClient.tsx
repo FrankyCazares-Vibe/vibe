@@ -3,6 +3,7 @@
 import Link from "next/link";
 import { useEffect, useMemo, useRef, useState } from "react";
 
+import { AFTER_DELETE } from "@/app/account/suspended/suspended-actions";
 import {
   asLoadFailure,
   LoadFailed,
@@ -1251,9 +1252,11 @@ function DangerZone({ handle }: { handle: string | null }) {
       if (!res.ok || !data?.ok) {
         throw new Error(data?.error || `HTTP ${res.status}`);
       }
-      // The account is gone: drop every onboarding draft on this browser.
+      // The account is gone: drop every onboarding draft on this browser,
+      // then land on sign-up rather than the marketing page, the same place
+      // the suspended and verify-your-campus screens send a deleted account.
       clearDraft();
-      window.location.href = "/";
+      window.location.href = AFTER_DELETE;
     } catch (e) {
       setError(e instanceof Error ? e.message : "Could not delete account");
       setBusy(false);

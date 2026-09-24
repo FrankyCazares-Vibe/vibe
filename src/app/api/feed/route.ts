@@ -20,6 +20,7 @@ import {
   loadVisibleOrgCards,
   type OrgCard,
 } from "@/lib/orgs/following";
+import { isUuid } from "@/lib/pgrest";
 import { withPostMediaUrls } from "@/lib/post-media-url";
 import { loadPostEngagementCounts } from "@/lib/posts/engagement-counts";
 import { loadHonestViewRows, tallyViews } from "@/lib/posts/honest-views";
@@ -38,6 +39,14 @@ const MAX_LIMIT = 200;
  * bounds that URL; the lane filter then keeps `FOLLOWED_ORG_FILTER_CAP`.
  */
 const FOLLOWED_ORG_READ_LIMIT = 200;
+/**
+ * How many of the viewer's post reports are read, newest first, to leave
+ * those posts out of their feed (store wave S1B). The ids ride in the query
+ * URL like the hidden authors and the lane filter, so this bounds it. A
+ * student with more than this many reports sees the oldest reported posts
+ * again; nobody is near it.
+ */
+const REPORTED_POST_READ_LIMIT = 100;
 /**
  * What the moderation migration adds to `posts`. Production does not have them
  * yet, so every select that asks for them is built twice: once with, and — for
@@ -134,6 +143,11 @@ type EngagementCounts = {
  * so a card in the feed never opens to a 404. This replaces open question
  * Q4's default, which showed it to everyone as the author's own post.
  *
+ * A POST THE VIEWER HAS REPORTED leaves their feed from the moment the
+ * report is filed, and stays out whatever the moderators decide (store wave
+ * S1B; the report sheet tells them so). The reports are read with the
+ * service client: `reports` grants students nothing.
+ *
  * `?campus=<id>` switches to another campus in the viewer's allowed set (403
  * `campus_not_in_system` otherwise, 400 for an id that isn't a campus at
  * all); that browse view is that campus only. A viewer with no home campus
@@ -182,11 +196,18 @@ export async function GET(req: Request) {
     ? Math.min(MAX_LIMIT, Math.max(limit * 4, 80))
     : limit;
 
+  // Club names, hidden-club checks and the viewer's reports go through the
+  // service client (see the route docblock). Created on first use; the
+  // reports read below is that first use on nearly every request.
+  let serviceClient: ReturnType<typeof createSupabaseServiceClient> | null = null;
+  const service = () => (serviceClient ??= createSupabaseServiceClient());
+
   // The viewer's campus, the people they shouldn't see (blocked either way,
-  // muted right now), who they follow and which clubs they follow load
-  // together. Both follow sets are needed EARLY — they're part of the lane
-  // filter below, not just the ranking pass — so they're in this round trip.
-  const [meRes, hiddenRes, followingRes, followedOrgsRes] = await Promise.all([
+  // muted right now), the posts they reported, who they follow and which
+  // clubs they follow load together. Both follow sets are needed EARLY —
+  // they're part of the lane filter below, not just the ranking pass — so
+  // they're in this round trip.
+  const [meRes, hiddenRes, reportedRes, followingRes, followedOrgsRes] = await Promise.all([
     // `maybeSingle`, not `single`: a viewer whose `public.users` row is
     // missing gets the same feed they get today (no campus, no university →
     // the global lane below), not a hard 500 on the app's home screen. A
@@ -194,6 +215,7 @@ export async function GET(req: Request) {
     // so a silent null would quietly widen the feed to every university.
     supabase.from("users").select("school,campus_id,school_system").eq("id", user.id).maybeSingle(),
     loadHiddenUsers(supabase, user.id),
+    loadReportedPostIds(service, user.id),
     loadViewerFollowings(supabase, user.id),
     // The viewer's own follow rows, so the user client is enough. Newest
     // first and bounded (critic M-6); hidden clubs are dropped below.
@@ -210,6 +232,13 @@ export async function GET(req: Request) {
     console.error("[feed hidden-users]", hiddenRes.error);
     return NextResponse.json({ ok: false, error: "Request failed" }, { status: 500 });
   }
+  // Same rule for the posts the viewer reported: the sheet told them the post
+  // would leave their feed, and showing it again breaks that promise.
+  if (!reportedRes.ok) {
+    console.error("[feed reported-posts]", reportedRes.error);
+    return NextResponse.json({ ok: false, error: "Request failed" }, { status: 500 });
+  }
+  const reportedPostIds = reportedRes.ids;
   // Same rule for the follow set, which now decides VISIBILITY and not just
   // ranking: it is half the lane filter. Swallowing the error would drop
   // every followed friend's off-campus post while still answering ok:true —
@@ -251,12 +280,6 @@ export async function GET(req: Request) {
     const { status, body } = campusScopeError(scope);
     return NextResponse.json(body, { status });
   }
-
-  // Club names and hidden-club checks go through the service client (see the
-  // route docblock). Created on first use, so a feed with no club follows and
-  // no club posts never needs it.
-  let serviceClient: ReturnType<typeof createSupabaseServiceClient> | null = null;
-  const service = () => (serviceClient ??= createSupabaseServiceClient());
 
   // Followed clubs that still exist and aren't hidden, newest follow first.
   // A hidden club must never pull its posts in through a follow, so this set
@@ -327,6 +350,12 @@ export async function GET(req: Request) {
     // Keyed on the posting user, so it covers posts they made for an org too.
     if (hiddenIds.length > 0) {
       q = q.notIn("user_id", hiddenIds);
+    }
+    // Posts the viewer reported, excluded the same way and for the same
+    // reason: before the limit, the ranking pool, the per-author cap, `?tag=`
+    // and `sort=recent`, so a reported post never costs a slot either.
+    if (reportedPostIds.length > 0) {
+      q = q.notIn("id", reportedPostIds);
     }
     return q;
   };
@@ -678,6 +707,46 @@ async function loadHiddenClubAccess(
     ok: true,
     orgIds: new Set((memberRes.data ?? []).map((r) => (r as { org_id: string }).org_id)),
   };
+}
+
+/**
+ * The posts this viewer has reported, newest report first, at most
+ * REPORTED_POST_READ_LIMIT of them. Any status: a dismissed report still
+ * keeps the post out of its reporter's feed, because the student asked not
+ * to see it and a moderator's call doesn't change that.
+ *
+ * Service role, filtered to the viewer's own `reporter_id` (index
+ * `idx_reports_reporter`): `reports` grants `authenticated` nothing, so the
+ * user client can't read even the viewer's own rows. Selects only the target
+ * id. A missing service key or a read error is `{ ok: false }`, and the caller
+ * fails closed. Anything that isn't a uuid is dropped before it can reach
+ * the `.notIn` filter grammar.
+ */
+async function loadReportedPostIds(
+  service: () => SupabaseClient,
+  viewerId: string,
+): Promise<{ ok: true; ids: string[] } | { ok: false; error: unknown }> {
+  if (!isSupabaseServiceConfigured()) {
+    return { ok: false, error: "service role not configured" };
+  }
+  try {
+    const { data, error } = await service()
+      .from("reports")
+      .select("target_id")
+      .eq("reporter_id", viewerId)
+      .eq("target_type", "post")
+      .order("created_at", { ascending: false })
+      .limit(REPORTED_POST_READ_LIMIT);
+    if (error) return { ok: false, error };
+    const ids = new Set<string>();
+    for (const row of data ?? []) {
+      const id = (row as { target_id?: unknown }).target_id;
+      if (isUuid(id)) ids.add(id.toLowerCase());
+    }
+    return { ok: true, ids: Array.from(ids) };
+  } catch (error) {
+    return { ok: false, error };
+  }
 }
 
 type FriendReposterSample = {

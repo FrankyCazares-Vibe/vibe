@@ -41,6 +41,7 @@ import { OrgProfileAdminBar } from "./admin-actions";
 import { ChannelsSection } from "./ChannelsSection";
 import { OrgContent } from "./OrgContent";
 import { OrgEventsSection } from "./OrgEventsSection";
+import { type OrgPostItem, OrgPostsList } from "./OrgPostsList";
 import { OrgProfileJoinButton } from "./join-button";
 
 type Params = { params: Promise<{ handle: string }> };
@@ -396,7 +397,7 @@ export default async function OrgProfilePage({ params }: Params) {
               {postsErr ? (
                 <PostsFailed />
               ) : posts.length > 0 ? (
-                <PostsSection posts={posts} org={org} />
+                <PostsSection posts={posts} org={org} viewerId={user?.id ?? null} />
               ) : (
                 <EmptyContent />
               )}
@@ -936,95 +937,38 @@ function JoinPolicyNotice({ text }: { text: string }) {
   );
 }
 
-function PostsSection({ posts, org }: { posts: PostRow[]; org: OrgProfile }) {
-  const orgInitials = org.name
-    .split(/\s+/)
-    .filter(Boolean)
-    .slice(0, 2)
-    .map((s) => s[0])
-    .join("")
-    .toUpperCase();
+/**
+ * The club's recent posts. The cards are drawn by OrgPostsList, a client file,
+ * because each one carries a Report button and the list listens for
+ * `vibe:content-reported`; this server side only shapes the rows. The date is
+ * formatted here, on the server, exactly as before, so the HTML the server
+ * sends and the client's first render say the same thing.
+ */
+function PostsSection({
+  posts,
+  org,
+  viewerId,
+}: {
+  posts: PostRow[];
+  org: OrgProfile;
+  viewerId: string | null;
+}) {
+  const items: OrgPostItem[] = posts.map((p) => ({
+    id: p.id,
+    content: p.content,
+    media_url: p.media_url,
+    date_label: fmtDate(p.created_at),
+    edited: !!p.edited_at,
+    author: p.user ? { id: p.user.id, handle: p.user.handle, name: p.user.name } : null,
+  }));
   return (
     <SectionCard title="Recent posts">
-      <div style={{ display: "flex", flexDirection: "column", gap: 12 }}>
-        {posts.map((p) => (
-          <article
-            key={p.id}
-            style={{
-              padding: 14,
-              borderRadius: 12,
-              background: "rgba(255,255,255,0.04)",
-              border: "1px solid rgba(255,255,255,0.08)",
-            }}
-          >
-            {/* Posts on the org page belong to the org, not the admin who
-                hit publish. Surface the org's identity here; we still
-                surface the admin in fine print after the org name. */}
-            <div style={{ display: "flex", alignItems: "center", gap: 10, marginBottom: 10 }}>
-              <div
-                style={{
-                  width: 32,
-                  height: 32,
-                  borderRadius: 8,
-                  background: org.logo_url
-                    ? `url(${org.logo_url}) center/cover`
-                    : "linear-gradient(135deg, #FF5C35 0%, #7B5FE0 100%)",
-                  display: "flex",
-                  alignItems: "center",
-                  justifyContent: "center",
-                  fontFamily: "Fraunces, serif",
-                  fontWeight: 800,
-                  fontSize: 12,
-                  color: "#fff",
-                  flexShrink: 0,
-                  border: "1px solid rgba(255,255,255,0.18)",
-                }}
-              >
-                {!org.logo_url ? orgInitials : null}
-              </div>
-              <div style={{ flex: 1, minWidth: 0 }}>
-                <div style={{ fontSize: 14, fontWeight: 700, color: "#fff" }}>
-                  {org.name}
-                </div>
-                {p.user?.handle ? (
-                  <div style={{ fontSize: 11, color: "rgba(255,255,255,0.5)" }}>
-                    posted by @{p.user.handle}
-                  </div>
-                ) : null}
-              </div>
-              <div style={{ fontSize: 11, color: "rgba(255,255,255,0.5)" }}>
-                {fmtDate(p.created_at)}
-                {/* Every edited published post says so (founder decision). */}
-                {p.edited_at ? " · Edited" : null}
-              </div>
-            </div>
-            <p
-              style={{
-                margin: 0,
-                fontSize: 14,
-                lineHeight: 1.55,
-                whiteSpace: "pre-wrap",
-              }}
-            >
-              {p.content}
-            </p>
-            {p.media_url ? (
-              <img
-                src={p.media_url}
-                alt=""
-                style={{
-                  display: "block",
-                  width: "100%",
-                  height: "auto",
-                  marginTop: 12,
-                  borderRadius: 10,
-                  border: "1px solid rgba(255,255,255,0.08)",
-                }}
-              />
-            ) : null}
-          </article>
-        ))}
-      </div>
+      <OrgPostsList
+        posts={items}
+        orgName={org.name}
+        orgLogoUrl={org.logo_url}
+        viewerId={viewerId}
+      />
     </SectionCard>
   );
 }

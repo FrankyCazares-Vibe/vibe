@@ -4,6 +4,7 @@ import Link from "next/link";
 import { useRouter, useSearchParams } from "next/navigation";
 import { Suspense, useEffect, useRef, useState } from "react";
 
+import { SuspendedActions, useOwnHandle } from "@/app/account/suspended/suspended-actions";
 import { SCHOOL_DOMAINS_HEADLINE_LABEL } from "@/lib/auth/school-email-domains";
 import { isIosPlatform } from "@/lib/pwa/display-mode";
 import { useIsStandalone, usePlatform } from "@/lib/pwa/use-standalone";
@@ -171,6 +172,11 @@ function SchoolEmailInner() {
   const standalone = useIsStandalone();
   const platform = usePlatform();
   const linksOpenSafari = standalone && isIosPlatform(platform);
+  // For the delete box under the card: somebody who can't or won't verify
+  // otherwise has no way off this screen but the back link, and every campus
+  // page sends an unverified account straight back here
+  // (src/lib/auth/campus-access.ts). Read once the account is known.
+  const ownHandle = useOwnHandle(userId !== null, userId ?? undefined);
 
   // Strip the param after we've consumed it so the success banner doesn't
   // re-appear on refresh.
@@ -716,6 +722,12 @@ function SchoolEmailInner() {
             </>
           )}
         </p>
+
+        {/* Sign out and Delete account, the same pair the suspended notice
+            offers (App Review looks for a way to delete the account on every
+            screen a new account can be stuck on). Only once signed in: with
+            no session there is nothing to sign out of or delete. */}
+        {userId ? <SuspendedActions handle={ownHandle} /> : null}
       </div>
     </div>
   );

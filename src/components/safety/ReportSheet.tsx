@@ -59,6 +59,30 @@ export type ReportTargetRef = {
   noun?: string;
 };
 
+/**
+ * Site-wide event: a report went in and its sheet has closed, so any list
+ * showing the thing can drop it (store wave S1). The detail is exactly the
+ * `target_type` / `target_id` the sheet sent to the route, e.g. `"post"` and
+ * the post's uuid; listeners act on `"post"` only. The feed route already
+ * leaves a reported post out on the next load; this takes it off the screen
+ * now.
+ *
+ * WHY ON CLOSE AND NOT ON SUCCESS. The sheet usually lives inside the very
+ * card it would remove (the phone's FeedCard → PostActionsSheet → this;
+ * desktop's FeedRow). Dropping the card the moment the route says yes would
+ * unmount the "Thanks" panel, its Block offer, and two vaul drawers halfway
+ * through closing. So it fires once, when a sheet whose report went in is
+ * dismissed, and listeners wait out the close animation before removing
+ * anything. It never fires for a refusal or an error.
+ */
+export const CONTENT_REPORTED_EVENT = "vibe:content-reported";
+export type ContentReportedDetail = { targetType: ReportTargetType; targetId: string };
+
+function emitContentReported(detail: ContentReportedDetail) {
+  if (typeof window === "undefined") return;
+  window.dispatchEvent(new CustomEvent<ContentReportedDetail>(CONTENT_REPORTED_EVENT, { detail }));
+}
+
 const FONT = "DM Sans, sans-serif";
 const SERIF = "Fraunces, serif";
 const REASONS = reportReasonOptions();
@@ -92,6 +116,11 @@ function useReportForm(target: ReportTargetRef, onBlocked?: (userId: string) => 
   const [sent, setSent] = useState(false);
   const [blocking, setBlocking] = useState(false);
   const [blocked, setBlocked] = useState(false);
+  // What the route accepted, kept for the one CONTENT_REPORTED_EVENT, and
+  // whether that has gone out. Refs, not state: they are read on close and in
+  // an unmount cleanup, never rendered.
+  const acceptedRef = useRef<ContentReportedDetail | null>(null);
+  const announcedRef = useRef(false);
 
   const submit = useCallback(async () => {
     if (!reason || sending) return;
@@ -111,6 +140,9 @@ function useReportForm(target: ReportTargetRef, onBlocked?: (userId: string) => 
     });
     setSending(false);
     if (r.ok) {
+      // The same two values the route was just sent, so a listener matches
+      // the card by what was reported and not by a label.
+      acceptedRef.current = { targetType: target.type, targetId: target.id };
       setSent(true);
       return;
     }
@@ -137,6 +169,15 @@ function useReportForm(target: ReportTargetRef, onBlocked?: (userId: string) => 
     onBlocked?.(id);
   }, [target.authorId, target.authorName, blocking, onBlocked]);
 
+  /** Fire CONTENT_REPORTED_EVENT, at most once, and only if a report went in.
+   *  Safe to call on every close and again on unmount. */
+  const announceReported = useCallback(() => {
+    const detail = acceptedRef.current;
+    if (!detail || announcedRef.current) return;
+    announcedRef.current = true;
+    emitContentReported(detail);
+  }, []);
+
   return {
     reason,
     setReason,
@@ -150,6 +191,7 @@ function useReportForm(target: ReportTargetRef, onBlocked?: (userId: string) => 
     blocking,
     blocked,
     canBlock: !!target.authorId && !NO_BLOCK.has(target.type) && !blocked,
+    announceReported,
   };
 }
 
@@ -175,6 +217,14 @@ function ReportBody({
         <p style={{ margin: "0 0 6px", fontFamily: FONT, fontSize: 14, color: "#1C1C1E" }}>
           {"Thanks — we're on it."}
         </p>
+        {/* True from this moment: the feed route leaves a post its viewer has
+            reported out of every load, and open lists drop it when this
+            sheet closes (CONTENT_REPORTED_EVENT). Only posts are hidden. */}
+        {target.type === "post" ? (
+          <p style={{ margin: "0 0 6px", fontFamily: FONT, fontSize: 12.5, lineHeight: 1.5, color: "#8A8580" }}>
+            {"We'll hide it from your feed."}
+          </p>
+        ) : null}
         <p style={{ margin: 0, fontFamily: FONT, fontSize: 12.5, lineHeight: 1.5, color: "#8A8580" }}>
           {/* Admins DO see the reporter's handle in the queue, so this cannot
               promise anonymity from them — only from the person reported. */}
@@ -364,10 +414,19 @@ export function ReportSheet({
   const form = useReportForm(target, onBlocked);
   const heading = headingFor(target);
   const sent = form.sent;
+  const { announceReported } = form;
   const dismiss = useCallback(() => {
+    // Does nothing unless the report went in (see CONTENT_REPORTED_EVENT).
+    announceReported();
     if (sent && onCompleted) onCompleted();
     else onClose();
-  }, [sent, onCompleted, onClose]);
+  }, [sent, onCompleted, onClose, announceReported]);
+
+  // A host can also take the sheet down without a dismissal, e.g. its card
+  // leaves after the Block offer lands. If the report went in and nothing has
+  // been announced yet, announce it on the way out; the ref inside keeps it
+  // to once.
+  useEffect(() => () => announceReported(), [announceReported]);
 
   if (variant === "sheet") {
     const Root = nested ? Drawer.NestedRoot : Drawer.Root;

@@ -365,17 +365,19 @@ export function PostViewerMobile({
     }
     likingRef.current = false;
   };
+  // Same wording as the feed card's save (CampusMobile). A refusal — the
+  // post is gone or behind a block (404), or too many saves (429) — now
+  // says so instead of quietly flipping the bookmark back.
   const toggleSave = async () => {
     const next = !viewer.saved;
     setViewer((v) => ({ ...v, saved: next }));
-    try {
-      const r = await fetch(`/api/posts/${postId}/save`, {
-        method: next ? "POST" : "DELETE",
-      });
-      if (!r.ok) throw new Error("save");
-    } catch {
-      setViewer((v) => ({ ...v, saved: !next }));
-    }
+    const r = await vibeRequest(`/api/posts/${postId}/save`, {
+      method: next ? "POST" : "DELETE",
+      failure: next
+        ? "Couldn't save this post."
+        : "Couldn't remove this from your saved posts.",
+    });
+    if (!r.ok) setViewer((v) => ({ ...v, saved: !next }));
   };
   const repost = async () => {
     // Simple repost (no quote on mobile v1) — POST adds, server treats

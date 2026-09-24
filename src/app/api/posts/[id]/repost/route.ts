@@ -3,6 +3,7 @@ import { NextResponse } from "next/server";
 import { contentBlockedResponse, requireCanPublish } from "@/lib/moderation/access";
 import { checkText } from "@/lib/moderation/text-filter";
 import { postAccessForCaller } from "@/lib/orgs/hidden-org-access";
+import { loadPairBlock } from "@/lib/safety/pair-block";
 import { createSupabaseServerClient } from "@/lib/supabase/server";
 
 const MAX_COMMENT = 500;
@@ -65,11 +66,48 @@ function readComment(body: RepostBody): { ok: true; comment: string | null } | {
 }
 
 /**
+ * Is the caller in a block pair with the post's author, either way round? Run
+ * only after postAccessForCaller has passed. That check reads `user_id` but
+ * doesn't hand it back, so the author costs one more primary-key read under
+ * the caller's own RLS. For a club post the author is the officer who posted,
+ * the same person the feed hides on. A failed read fails closed.
+ */
+async function authorBlockCheck(
+  supabase: Awaited<ReturnType<typeof createSupabaseServerClient>>,
+  postId: string,
+  userId: string,
+  logTag: string,
+): Promise<"ok" | "not_found" | "error"> {
+  const { data, error } = await supabase
+    .from("posts")
+    .select("user_id")
+    .eq("id", postId)
+    .maybeSingle();
+  if (error) {
+    console.error(logTag, error);
+    return "error";
+  }
+  const authorId = (data as { user_id?: unknown } | null)?.user_id;
+  // Deleted since the access check (or no author at all): a missing post.
+  if (typeof authorId !== "string" || !authorId) return "not_found";
+  // Your own post never reads `blocks` (loadPairBlock skips yourself).
+  const pair = await loadPairBlock(supabase, userId, authorId);
+  if (!pair.ok) {
+    console.error(logTag, pair.error);
+    return "error";
+  }
+  return pair.blocked ? "not_found" : "ok";
+}
+
+/**
  * Is this a post the caller may repost, or edit the quote on? Published or
- * their own, and not a hidden club's post they may not see
- * (postAccessForCaller). `null` means go ahead; otherwise the response to
- * send: 404 "Post not found" for anything not visible, the same as a post
- * that doesn't exist, so a repost can't confirm a hidden post exists.
+ * their own, not a hidden club's post they may not see (postAccessForCaller),
+ * and not by someone in a block pair with them. `null` means go ahead;
+ * otherwise the response to send: 404 "Post not found" for anything not
+ * visible or across a block, the same as a post that doesn't exist, so a
+ * repost can't confirm a hidden post exists, can't carry a blocked person's
+ * post to the reposter's followers, and never tells anyone they were blocked
+ * (the like route's rule).
  */
 async function gatePost(
   auth: { userId: string; supabase: Awaited<ReturnType<typeof createSupabaseServerClient>> },
@@ -77,8 +115,10 @@ async function gatePost(
   logTag: string,
 ): Promise<NextResponse | null> {
   const access = await postAccessForCaller(auth.supabase, id, auth.userId, logTag);
-  if (access.ok) return null;
-  return access.reason === "error" ? requestFailed() : postNotFound();
+  if (!access.ok) return access.reason === "error" ? requestFailed() : postNotFound();
+  const block = await authorBlockCheck(auth.supabase, id, auth.userId, `${logTag} block-check`);
+  if (block === "ok") return null;
+  return block === "error" ? requestFailed() : postNotFound();
 }
 
 /**

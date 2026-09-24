@@ -5,6 +5,8 @@ import { contentBlockedResponse, requireCanPublish } from "@/lib/moderation/acce
 import { checkText } from "@/lib/moderation/text-filter";
 import { postAccessForCaller } from "@/lib/orgs/hidden-org-access";
 import { rateLimit, tooManyRequests } from "@/lib/rate-limit";
+import { loadHiddenUsers } from "@/lib/safety/hidden-users";
+import { loadPairBlock } from "@/lib/safety/pair-block";
 import { createSupabaseServerClient } from "@/lib/supabase/server";
 
 const MAX_CONTENT = 1000;
@@ -30,6 +32,48 @@ const isMissingPostFk = (e: { code?: string; message?: string } | null) =>
 
 type RouteContext = { params: Promise<{ id: string }> };
 type CommentBody = { content?: unknown; parent_comment_id?: unknown };
+type ServerClient = Awaited<ReturnType<typeof createSupabaseServerClient>>;
+
+/**
+ * Is the caller in a block pair with the post's author, either way round? Run
+ * only after postAccessForCaller has passed. That check reads `user_id` but
+ * doesn't hand it back, so the author costs one more primary-key read under
+ * the caller's own RLS. Only the post's author is checked: they are the one a
+ * comment notifies, and the thread itself already hides a blocked person's
+ * comments from the blocker (GET). A failed read fails closed.
+ */
+async function authorBlockCheck(
+  supabase: ServerClient,
+  postId: string,
+  userId: string,
+  logTag: string,
+): Promise<"ok" | "not_found" | "error"> {
+  const { data, error } = await supabase
+    .from("posts")
+    .select("user_id")
+    .eq("id", postId)
+    .maybeSingle();
+  if (error) {
+    console.error(logTag, error);
+    return "error";
+  }
+  const authorId = (data as { user_id?: unknown } | null)?.user_id;
+  // Deleted since the access check (or no author at all): a missing post.
+  if (typeof authorId !== "string" || !authorId) return "not_found";
+  // Your own post never reads `blocks` (loadPairBlock skips yourself).
+  const pair = await loadPairBlock(supabase, userId, authorId);
+  if (!pair.ok) {
+    console.error(logTag, pair.error);
+    return "error";
+  }
+  return pair.blocked ? "not_found" : "ok";
+}
+
+/** Whose comments the viewer doesn't get: anyone in a block pair with them.
+ *  Never the viewer themselves, so a stray self-block row can't hide their
+ *  own comments from them. */
+const blockedIdsFor = (blocked: ReadonlySet<string>, viewerId: string): string[] =>
+  Array.from(blocked).filter((uid) => uid !== viewerId);
 
 type CommentRow = {
   id: string;
@@ -74,6 +118,10 @@ type CommentRow = {
  * thread shows as empty and the answer can't confirm the post exists.
  * `post_comments_select_authenticated` lets any student read any comment, so
  * this route has to check the post itself.
+ *
+ * A BLOCKED PERSON'S COMMENTS aren't in the thread, whichever of the two did
+ * the blocking (store wave S1B). RLS only hides removed comments, so this
+ * route does it, in the query.
  */
 export async function GET(req: Request, ctx: RouteContext) {
   const { id } = await ctx.params;
@@ -99,15 +147,20 @@ export async function GET(req: Request, ctx: RouteContext) {
   // Fetch ALL comments for the post in one query (top-level + replies),
   // then build the tree client-side. Cheaper than two queries when threads
   // are small (<200 comments per post is the v1 working assumption).
-  // The post check runs alongside it, so a personal post waits no longer
-  // than it did; nothing read here is sent until the check has passed.
   //
   // `removed_at` / `removed_reason` come along so the author of a comment a
   // moderator took down reads the notice under it. Built twice: the columns
   // land with the moderation migration, and a deploy without it answers
   // exactly as it did before.
-  const readThread = (moderation: boolean) =>
-    supabase
+  //
+  // People in a block pair with the viewer (either way round) are left out in
+  // the query, before the limit, so they never take a slot in the thread.
+  // Blocks only, not mutes: a mute quiets a feed, it doesn't cut a
+  // conversation. So the card's `comment_count` (counted by RPC for everyone)
+  // can be higher than the rows shown here, and a reply under a hidden
+  // person's comment is dropped by the orphan rule below along with it.
+  const readThread = (moderation: boolean, blockedIds: string[]) => {
+    let q = supabase
       .from("post_comments")
       .select(
         "id,post_id,user_id,parent_comment_id,content,created_at," +
@@ -115,25 +168,44 @@ export async function GET(req: Request, ctx: RouteContext) {
           // Explicit FK name disambiguates the post_comments→users embed.
           "author:users!post_comments_user_id_fkey!inner(id,name,handle,avatar_url)",
       )
-      .eq("post_id", id)
-      .order("created_at", { ascending: true })
-      .limit(limit);
+      .eq("post_id", id);
+    if (blockedIds.length > 0) q = q.notIn("user_id", blockedIds);
+    return q.order("created_at", { ascending: true }).limit(limit);
+  };
 
-  const [access, first] = await Promise.all([
+  // The post check runs alongside the block list and the thread, which waits
+  // only for the list it filters on, so a personal post costs one round trip
+  // more than it did and a club post usually none. Nothing read here is sent
+  // until the post check has passed.
+  const hiddenLoad = loadHiddenUsers(supabase, user.id);
+  const [access, hiddenRes, first] = await Promise.all([
     postAccessForCaller(supabase, id, user.id, "[posts/:id/comments GET post check]"),
-    readThread(true),
+    hiddenLoad,
+    (async () => {
+      const hidden = await hiddenLoad;
+      if (!hidden.ok) return null;
+      return await readThread(true, blockedIdsFor(hidden.hidden.blocked, user.id));
+    })(),
   ]);
   if (!access.ok) {
     if (access.reason === "error") return requestFailed();
     // Missing, not a post id, or a hidden club's post: the missing-post answer.
     return NextResponse.json({ ok: true, comments: [] });
   }
+  // Fail closed, like the feed: a thread that quietly shows someone the
+  // viewer blocked is worse than one that asks them to try again. (`first`
+  // is null exactly when the block list failed.)
+  if (!hiddenRes.ok || !first) {
+    console.error("[posts/:id/comments GET hidden-users]", hiddenRes.ok ? null : hiddenRes.error);
+    return requestFailed();
+  }
+  const blockedIds = blockedIdsFor(hiddenRes.hidden.blocked, user.id);
 
   // The retry sits after the access check so a caller who is getting the
   // missing-post answer never costs a second query.
   let { data, error } = first;
   if (error && isMissingColumnError(error, MODERATION_COMMENT_COLUMNS)) {
-    ({ data, error } = await readThread(false));
+    ({ data, error } = await readThread(false, blockedIds));
   }
   if (error) {
     console.error("[posts/:id/comments GET]", error);
@@ -209,7 +281,7 @@ export async function GET(req: Request, ctx: RouteContext) {
   for (const r of rows) {
     if (r.parent_comment_id !== null) {
       const rootId = parentToRoot.get(r.parent_comment_id);
-      if (!rootId) continue; // orphaned — parent was deleted
+      if (!rootId) continue; // orphaned — parent was deleted, or is a blocked person's
       const root = rootById.get(rootId);
       if (root) {
         root.replies.push(decorate(r));
@@ -231,9 +303,10 @@ export async function GET(req: Request, ctx: RouteContext) {
  * Insert a comment or reply.
  *
  * Only on a post the caller can see: published or their own, and not a
- * hidden club's post they may not see (postAccessForCaller). Anything else,
- * including a post deleted mid-request, is 404 "Post not found", so a
- * comment can't confirm a hidden post exists or land on one.
+ * hidden club's post they may not see (postAccessForCaller), and not by
+ * someone in a block pair with them. Anything else, including a post deleted
+ * mid-request, is 404 "Post not found", so a comment can't confirm a hidden
+ * post exists, land on one, or tell anyone they were blocked.
  */
 export async function POST(req: Request, ctx: RouteContext) {
   const { id } = await ctx.params;
@@ -267,6 +340,18 @@ export async function POST(req: Request, ctx: RouteContext) {
     "[posts/:id/comments POST post check]",
   );
   if (!access.ok) return access.reason === "error" ? requestFailed() : postNotFound();
+
+  // A block either way round is the same 404 as a missing post, as on likes:
+  // no comment (and no notification) crosses a block, and the blocked person
+  // isn't told they were blocked. Also before the body, for the same reason.
+  const block = await authorBlockCheck(
+    supabase,
+    id,
+    user.id,
+    "[posts/:id/comments POST block-check]",
+  );
+  if (block === "error") return requestFailed();
+  if (block === "not_found") return postNotFound();
 
   let body: CommentBody;
   try {

@@ -1209,6 +1209,9 @@
         method, credentials: "include",
       });
       const j = await r.json().catch(() => ({}));
+      // 404 = the post is gone or sits behind a block; say it the way the
+      // React app does (src/lib/feedback/failure-copy.ts), not "Post not found".
+      if (r.status === 404) throw new Error("That's no longer available.");
       if (!r.ok || !j.ok) throw new Error((j && j.error) || "Could not update save");
       toast(state.saved ? "Saved" : "Removed from saved");
     } catch (e) {
@@ -1548,6 +1551,7 @@
         body: JSON.stringify({ content }),
       });
       const j = await r.json().catch(() => ({}));
+      if (r.status === 404) throw new Error("That's no longer available.");
       if (!r.ok || !j.ok || !j.comment) throw new Error((j && j.error) || "Could not post comment");
       // Append to the thread (oldest-first ordering — new ones go to bottom)
       const wrap = document.getElementById("vpvComments");

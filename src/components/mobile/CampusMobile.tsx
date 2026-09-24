@@ -13,6 +13,8 @@ import {
   EventCard,
   type FeedPost as DesktopFeedPost,
   OttoFeedStrip,
+  useReportedPostIds,
+  withoutReportedPosts,
 } from "@/app/campus/campus-home";
 import { asLoadFailure, LoadFailed, type LoadFailure } from "@/components/feedback/LoadFailed";
 import { CampusConfirmBanner } from "@/components/mobile/CampusConfirmBanner";
@@ -266,6 +268,30 @@ export function CampusMobile() {
   const tabScrollRef = useRef<HTMLDivElement | null>(null);
   const isProgrammaticScrollRef = useRef(false);
 
+  // The #tag list: /api/feed?tag= for the active filter (the effect after the
+  // fetches below says when it is asked for and what a failure keeps).
+  const [tagFeed, setTagFeed] = useState<{
+    tag: string;
+    posts: FeedPost[] | null;
+    failure: LoadFailure | null;
+  } | null>(null);
+
+  // A post the viewer reported leaves both lists once the report sheet has
+  // closed (the sheet lives inside the card's ⋯ menu, so the card waits for
+  // it; see useReportedPostIds). The post viewer is mounted from `openPostId`,
+  // not from these lists, so a report filed there leaves it open over a feed
+  // that no longer shows the card.
+  const dropReportedPost = useCallback((postId: string) => {
+    const gone = new Set([postId]);
+    setFeed((prev) => (prev ? withoutReportedPosts(prev, gone, (p) => p.id) : prev));
+    setTagFeed((prev) => {
+      if (!prev || !prev.posts) return prev;
+      const posts = withoutReportedPosts(prev.posts, gone, (p) => p.id);
+      return posts === prev.posts ? prev : { ...prev, posts };
+    });
+  }, []);
+  const reportedPostIdsRef = useReportedPostIds(dropReportedPost);
+
   // ---------- Initial fetches ----------
   //
   // "first" is the mount load and its Retry: quiet, and a failure shows
@@ -288,7 +314,8 @@ export function CampusMobile() {
     if (posts) {
       feedLoadedRef.current = true;
       setFeedErr(null);
-      setFeed(posts);
+      // A load already out when a report landed can't bring the post back.
+      setFeed(withoutReportedPosts(posts, reportedPostIdsRef.current, (p) => p.id));
       if (r.ok && typeof r.data.viewerId === "string") setViewerId(r.data.viewerId);
     } else if (!feedLoadedRef.current) {
       setFeedErr(asLoadFailure(r, "Couldn't load the feed."));
@@ -296,7 +323,7 @@ export function CampusMobile() {
       // A 2xx without the list, which vibeRequest had no reason to toast.
       toast({ message: asLoadFailure(r, "Couldn't load the feed.").message, tone: "error" });
     }
-  }, []);
+  }, [reportedPostIdsRef]);
 
   const eventsLoadedRef = useRef(false);
   const eventsSeqRef = useRef(0);
@@ -429,12 +456,10 @@ export function CampusMobile() {
   // got stays as it was, else the loaded matches show (`posts: null`), and
   // the toast says so — silently, an empty result would read as "Nothing
   // tagged #x yet" when the truth is "couldn't check". With neither to keep,
-  // `failure` is set instead and the pane shows it, with Retry.
-  const [tagFeed, setTagFeed] = useState<{
-    tag: string;
-    posts: FeedPost[] | null;
-    failure: LoadFailure | null;
-  } | null>(null);
+  // `failure` is set instead and the pane shows it, with Retry. That answer
+  // is `tagFeed`, declared with the other lists above so the reported-post
+  // listener can filter it too.
+
   // A saved edit (from a card's ⋯ menu or the post viewer) patches the card
   // in place: text, tags and the " · Edited" marker, with no feed refetch.
   // `setFeed` re-runs the #tag effect below, so with a tag filter on, the
@@ -480,7 +505,11 @@ export function CampusMobile() {
       if (posts) {
         // A viewer whose main feed failed still gets Edit on their own cards.
         if (r.ok && typeof r.data.viewerId === "string") setViewerId(r.data.viewerId);
-        setTagFeed({ tag: feedTag, posts, failure: null });
+        setTagFeed({
+          tag: feedTag,
+          posts: withoutReportedPosts(posts, reportedPostIdsRef.current, (p) => p.id),
+          failure: null,
+        });
         return;
       }
       if (r.ok && (hasTagList || hasLoadedMatches)) {
@@ -498,7 +527,7 @@ export function CampusMobile() {
     return () => {
       cancelled = true;
     };
-  }, [feedTag, feed, tagAttempt]);
+  }, [feedTag, feed, tagAttempt, reportedPostIdsRef]);
 
   // ---------- Swipeable tab scroll sync ----------
 

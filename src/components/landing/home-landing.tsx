@@ -1,11 +1,14 @@
 "use client";
 
+import Link from "next/link";
 import { useRouter } from "next/navigation";
-import { Fragment, useEffect, useMemo, useState } from "react";
+import { Fragment, useEffect, useMemo, useState, type CSSProperties } from "react";
 
 import { OttoOrb } from "@/components/the-map/OttoOrb";
 import { enabledSchoolSystems } from "@/lib/auth/school-email-domains";
 import { SYSTEM_LABEL } from "@/lib/iu/campuses";
+import { isIosPlatform, type Platform } from "@/lib/pwa/display-mode";
+import { usePlatform } from "@/lib/pwa/use-standalone";
 import { useIsMobile } from "@/lib/use-is-mobile";
 
 import { OrbitalRingSystem, OrbitDetail, type RingId } from "./landing-orbit";
@@ -37,6 +40,70 @@ const HERO_SENTENCES_MOBILE = [
   "I'm Otto.",
   "This is your campus, all in one place.",
 ];
+
+/**
+ * A store listing URL from the build, or null. Only a real listing counts:
+ * the value must start with the store's own origin, the same rule /get
+ * applies (src/app/get/route.ts), so a typo or a half-filled env var renders
+ * no link rather than a link to somewhere else. NEXT_PUBLIC_* is inlined at
+ * build time, so each process.env read below has to stay spelled out.
+ */
+function storeListingUrl(raw: string | undefined, prefix: string): string | null {
+  const value = (raw ?? "").trim();
+  if (!value.startsWith(prefix) || value.length === prefix.length) return null;
+  try {
+    return new URL(value).href;
+  } catch {
+    return null;
+  }
+}
+
+const APP_STORE_URL = storeListingUrl(
+  process.env.NEXT_PUBLIC_APP_STORE_URL,
+  "https://apps.apple.com/",
+);
+const PLAY_STORE_URL = storeListingUrl(
+  process.env.NEXT_PUBLIC_PLAY_STORE_URL,
+  "https://play.google.com/",
+);
+
+type StoreLink = { key: string; href: string; lead: string; store: string };
+
+const APP_STORE_LINK: StoreLink | null = APP_STORE_URL
+  ? { key: "app-store", href: APP_STORE_URL, lead: "Get Vibe on", store: "the App Store" }
+  : null;
+const PLAY_STORE_LINK: StoreLink | null = PLAY_STORE_URL
+  ? { key: "play-store", href: PLAY_STORE_URL, lead: "Get Vibe on", store: "Google Play" }
+  : null;
+
+/**
+ * Which store links to show. A phone sees only its own store, and nothing
+ * when that store isn't set: an iPhone shown a Google Play link is a dead
+ * button. A computer, and the server render before the platform is known,
+ * sees every store that is set. Neither set means an empty list, and the
+ * block renders nothing at all.
+ */
+function storeLinksFor(platform: Platform | null): StoreLink[] {
+  if (isIosPlatform(platform)) return APP_STORE_LINK ? [APP_STORE_LINK] : [];
+  if (platform?.startsWith("android-")) return PLAY_STORE_LINK ? [PLAY_STORE_LINK] : [];
+  return [APP_STORE_LINK, PLAY_STORE_LINK].filter((l): l is StoreLink => l !== null);
+}
+
+// Footer: who runs Vibe and the pages App Review looks for. Brighter than the
+// footer's own 0.35 text so the links read as links on the dark background.
+const FOOTER_LINKS = [
+  { href: "/legal/terms", label: "Terms" },
+  { href: "/legal/privacy", label: "Privacy" },
+  { href: "/legal/community", label: "Guidelines" },
+  { href: "/support", label: "Support" },
+] as const;
+
+const FOOTER_LINK_STYLE: CSSProperties = {
+  display: "inline-block",
+  padding: "4px 0",
+  color: "rgba(250,247,242,0.7)",
+  textDecoration: "none",
+};
 
 const RING_ORDER: RingId[] = ["pulse", "scene", "connect"];
 const RING_COLOR: Record<RingId, string> = {
@@ -223,13 +290,91 @@ export function HomeLanding() {
             Log in <span aria-hidden style={{ marginLeft: 4 }}>→</span>
           </span>
         </a>
+
+        <StoreLinks />
       </section>
 
-      <footer className="vibe-landing-footer">
-        <span>vibe · prototype</span>
-        <span>early access</span>
+      {/* No data-warp-trigger here or on anything around it: the capture
+          handler above would hijack these links through closest() and play
+          the warp before opening them (and any href not starting with "/"
+          would go to /auth/login instead). The footer rule doesn't wrap, and
+          uppercase with wide tracking overflows a 375px phone, so the row
+          wraps here. */}
+      <footer
+        className="vibe-landing-footer"
+        style={{ flexWrap: "wrap", gap: "8px 16px" }}
+      >
+        <span>© CONNECTVIBE. LLC</span>
+        <nav
+          aria-label="Legal and support"
+          style={{ display: "flex", flexWrap: "wrap", gap: "8px 16px" }}
+        >
+          {FOOTER_LINKS.map((l) => (
+            <Link key={l.href} href={l.href} style={FOOTER_LINK_STYLE}>
+              {l.label}
+            </Link>
+          ))}
+        </nav>
       </footer>
     </div>
+  );
+}
+
+/* ---------------------------------------------------------------------- */
+/* "Get Vibe on …" — the store listings, once they exist.                   */
+/* ---------------------------------------------------------------------- */
+
+/**
+ * Store links under the two doors (Franky's decision D3: install means the
+ * real store apps). Renders NOTHING while NEXT_PUBLIC_APP_STORE_URL and
+ * NEXT_PUBLIC_PLAY_STORE_URL are both unset, so the landing never shows a
+ * button that goes nowhere.
+ *
+ * Plain text links on purpose, never a drawn badge: Apple and Google each
+ * publish official badge art with rules about how it's used, and an imitation
+ * is worse than none.
+ * TODO(Franky): swap each text link for the official badge ("Download on the
+ * App Store", "Get it on Google Play") once you've downloaded the art from
+ * Apple's and Google's marketing pages, and add a QR code to /get for
+ * computers. The store app itself should never show this block (it would be
+ * an ad for the app you're already in): hide it there when the shell lands.
+ *
+ * Like the footer, nothing here carries data-warp-trigger: these links leave
+ * Vibe, and the warp would turn any href not starting with "/" into /auth/login.
+ */
+function StoreLinks() {
+  const platform = usePlatform();
+  const links = storeLinksFor(platform);
+  if (links.length === 0) return null;
+  return (
+    <nav
+      aria-label="Get the Vibe app"
+      style={{
+        display: "flex",
+        flexWrap: "wrap",
+        justifyContent: "center",
+        gap: "10px 24px",
+        marginTop: 4,
+      }}
+    >
+      {links.map((l) => (
+        <a
+          key={l.key}
+          href={l.href}
+          style={{
+            fontFamily: "DM Sans, sans-serif",
+            fontSize: 13,
+            fontWeight: 600,
+            color: "rgba(250,247,242,0.8)",
+            textDecoration: "none",
+          }}
+        >
+          {l.lead}{" "}
+          <span style={{ color: "#FF5C35", fontWeight: 700 }}>{l.store}</span>
+          <span aria-hidden style={{ marginLeft: 6 }}>→</span>
+        </a>
+      ))}
+    </nav>
   );
 }
 
