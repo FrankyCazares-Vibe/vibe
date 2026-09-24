@@ -1,5 +1,6 @@
 import { NextResponse } from "next/server";
 
+import { isMissingColumnError } from "@/lib/db/missing-column";
 import { contentBlockedResponse, requireCanPublish } from "@/lib/moderation/access";
 import { checkText } from "@/lib/moderation/text-filter";
 import { postAccessForCaller } from "@/lib/orgs/hidden-org-access";
@@ -9,6 +10,13 @@ import { createSupabaseServerClient } from "@/lib/supabase/server";
 const MAX_CONTENT = 1000;
 const DEFAULT_LIMIT = 200;
 const MAX_LIMIT = 500;
+
+/**
+ * What the moderation migration adds to `post_comments`. Production does not
+ * have them yet, so the thread select is built twice — once with, and, for a
+ * 42703 naming one of these two and nothing else, once without.
+ */
+const MODERATION_COMMENT_COLUMNS = ["removed_at", "removed_reason"] as const;
 
 const requestFailed = () =>
   NextResponse.json({ ok: false, error: "Request failed" }, { status: 500 });
@@ -30,6 +38,15 @@ type CommentRow = {
   parent_comment_id: string | null;
   content: string;
   created_at: string;
+  /**
+   * Set when a moderator took the comment down. Only its author is ever served
+   * a removed row (`post_comments_select_authenticated` is `user_id =
+   * auth.uid() OR (removed_at is null AND …)`), so the moderator's reason
+   * reaches the one person whose row turns into the notice. Optional: a deploy
+   * without the moderation migration answers without them.
+   */
+  removed_at?: string | null;
+  removed_reason?: string | null;
   author: {
     id: string;
     name: string | null;
@@ -46,6 +63,10 @@ type CommentRow = {
  *
  * Threading is one level deep — replies of replies are flattened into the
  * same parent's reply list. Matches Instagram/Twitter conventions.
+ *
+ * Every comment also carries `viewer_is_author`, and — where the moderation
+ * migration has been applied — `removed_at` / `removed_reason`, which together
+ * are the author's "Removed by Vibe moderators" notice and nobody else's.
  *
  * A HIDDEN CLUB'S POST HAS NO COMMENTS for anyone but its author, the club's
  * members and platform admins (postAccessForCaller). Everyone else gets
@@ -80,24 +101,39 @@ export async function GET(req: Request, ctx: RouteContext) {
   // are small (<200 comments per post is the v1 working assumption).
   // The post check runs alongside it, so a personal post waits no longer
   // than it did; nothing read here is sent until the check has passed.
-  const [access, { data, error }] = await Promise.all([
-    postAccessForCaller(supabase, id, user.id, "[posts/:id/comments GET post check]"),
+  //
+  // `removed_at` / `removed_reason` come along so the author of a comment a
+  // moderator took down reads the notice under it. Built twice: the columns
+  // land with the moderation migration, and a deploy without it answers
+  // exactly as it did before.
+  const readThread = (moderation: boolean) =>
     supabase
       .from("post_comments")
       .select(
         "id,post_id,user_id,parent_comment_id,content,created_at," +
+          (moderation ? "removed_at,removed_reason," : "") +
           // Explicit FK name disambiguates the post_comments→users embed.
           "author:users!post_comments_user_id_fkey!inner(id,name,handle,avatar_url)",
       )
       .eq("post_id", id)
       .order("created_at", { ascending: true })
-      .limit(limit),
-  ]);
+      .limit(limit);
 
+  const [access, first] = await Promise.all([
+    postAccessForCaller(supabase, id, user.id, "[posts/:id/comments GET post check]"),
+    readThread(true),
+  ]);
   if (!access.ok) {
     if (access.reason === "error") return requestFailed();
     // Missing, not a post id, or a hidden club's post: the missing-post answer.
     return NextResponse.json({ ok: true, comments: [] });
+  }
+
+  // The retry sits after the access check so a caller who is getting the
+  // missing-post answer never costs a second query.
+  let { data, error } = first;
+  if (error && isMissingColumnError(error, MODERATION_COMMENT_COLUMNS)) {
+    ({ data, error } = await readThread(false));
   }
   if (error) {
     console.error("[posts/:id/comments GET]", error);
@@ -142,10 +178,17 @@ export async function GET(req: Request, ctx: RouteContext) {
     }
   }
 
+  // `viewer_is_author` says out loud what `user_id` already implies, because a
+  // client can't always work it out: the static post viewer only knows who is
+  // reading when the POST belongs to them (`confirmedViewerId`), so on anyone
+  // else's post it could not tell its own comment from a stranger's — which is
+  // the one thing the "Removed by Vibe moderators" notice has to be gated on.
+  // It tells a viewer nothing about themselves they didn't bring with them.
   const decorate = (row: CommentRow) => ({
     ...row,
     like_count: counts.get(row.id) ?? 0,
     viewer_liked: likedByViewer.has(row.id),
+    viewer_is_author: row.user_id === user.id,
   });
 
   // Walk rows in chronological order; top-level (parent_comment_id null)
@@ -297,6 +340,14 @@ export async function POST(req: Request, ctx: RouteContext) {
   const inserted = row as unknown as CommentRow;
   return NextResponse.json({
     ok: true,
-    comment: { ...inserted, like_count: 0, viewer_liked: false, replies: [] },
+    // Same shape a GET row carries, so a client can paint the new comment with
+    // the renderer it already has. Freshly written, so nothing has removed it.
+    comment: {
+      ...inserted,
+      like_count: 0,
+      viewer_liked: false,
+      viewer_is_author: true,
+      replies: [],
+    },
   });
 }

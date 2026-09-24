@@ -1,6 +1,7 @@
 import { NextResponse } from "next/server";
 import type { SupabaseClient } from "@supabase/supabase-js";
 
+import { isMissingColumnError } from "@/lib/db/missing-column";
 import { isSchoolSystem, legacyLabel, type SchoolSystem } from "@/lib/iu/campuses";
 import { resolveScopeV2, scopeCampusIds } from "@/lib/iu/campus-scope";
 import {
@@ -37,6 +38,12 @@ const MAX_LIMIT = 200;
  * bounds that URL; the lane filter then keeps `FOLLOWED_ORG_FILTER_CAP`.
  */
 const FOLLOWED_ORG_READ_LIMIT = 200;
+/**
+ * What the moderation migration adds to `posts`. Production does not have them
+ * yet, so every select that asks for them is built twice: once with, and — for
+ * a 42703 naming one of these two and nothing else — once without.
+ */
+const MODERATION_POST_COLUMNS = ["removed_at", "removed_reason"] as const;
 
 type AuthorEmbed = {
   id: string;
@@ -71,6 +78,15 @@ type PostRow = {
   campus_id: string | null;
   /** Same trigger. Lets campus-less legacy posts be scoped by university. */
   school_system: string | null;
+  /**
+   * Set when a moderator took the post down. Only its author is ever served a
+   * removed row (`posts_select_authenticated` is `… removed_at is null … OR
+   * user_id = auth.uid()`), so these two reach the one person whose card turns
+   * into "Removed by Vibe moderators" and nobody else. Optional: a deploy
+   * without the moderation migration answers without them.
+   */
+  removed_at?: string | null;
+  removed_reason?: string | null;
   author: AuthorEmbed | null;
 };
 
@@ -277,32 +293,43 @@ export async function GET(req: Request) {
   // form ambiguates in PostgREST when more than one relationship exists. The
   // `!inner` modifier upgrades the LEFT JOIN to an INNER JOIN. No `orgs`
   // embed: club names come from the service client below.
-  let postsQuery = supabase
-    .from("posts")
-    .select(
-      "id,user_id,org_id,type,content,tags,media_url,media_thumbnail_url,view_count,created_at,edited_at," +
-        "campus_id,school_system," +
-        "author:users!posts_user_id_fkey!inner(id,name,handle,school,campus_id,school_system,major,year,avatar_url)",
-    )
-    .eq("type", "post")
-    .order("created_at", { ascending: false })
-    .limit(candidatePoolSize);
+  //
+  // `removed_at` / `removed_reason` ride along so the author of a post a
+  // moderator took down reads the notice instead of an ordinary card. RLS is
+  // what keeps that private: the removed row reaches its author and nobody
+  // else, so the moderator's words go to the person they were written for.
+  // Built as a function because the two columns only exist where the
+  // moderation migration has been applied (see MODERATION_POST_COLUMNS).
+  const buildPostsQuery = (moderation: boolean) => {
+    let q = supabase
+      .from("posts")
+      .select(
+        "id,user_id,org_id,type,content,tags,media_url,media_thumbnail_url,view_count,created_at,edited_at," +
+          "campus_id,school_system," +
+          (moderation ? "removed_at,removed_reason," : "") +
+          "author:users!posts_user_id_fkey!inner(id,name,handle,school,campus_id,school_system,major,year,avatar_url)",
+      )
+      .eq("type", "post")
+      .order("created_at", { ascending: false })
+      .limit(candidatePoolSize);
 
-  // The campus lane (see the route docblock). Applied before the limit, so a
-  // post from another university never costs a slot on the page. Null means
-  // "nothing to scope to" — a viewer with no verified university.
-  if (laneFilter) {
-    postsQuery = postsQuery.or(laneFilter);
-  }
-  if (tagFilter) {
-    postsQuery = postsQuery.contains("tags", [tagFilter]);
-  }
-  // Blocked and muted authors are excluded in the query itself — before the
-  // limit and the ranking pass — so they never take a slot on the page.
-  // Keyed on the posting user, so it covers posts they made for an org too.
-  if (hiddenIds.length > 0) {
-    postsQuery = postsQuery.notIn("user_id", hiddenIds);
-  }
+    // The campus lane (see the route docblock). Applied before the limit, so a
+    // post from another university never costs a slot on the page. Null means
+    // "nothing to scope to" — a viewer with no verified university.
+    if (laneFilter) {
+      q = q.or(laneFilter);
+    }
+    if (tagFilter) {
+      q = q.contains("tags", [tagFilter]);
+    }
+    // Blocked and muted authors are excluded in the query itself — before the
+    // limit and the ranking pass — so they never take a slot on the page.
+    // Keyed on the posting user, so it covers posts they made for an org too.
+    if (hiddenIds.length > 0) {
+      q = q.notIn("user_id", hiddenIds);
+    }
+    return q;
+  };
 
   // Reposts emit no feed row (Instagram-style: the act of reposting lives on
   // the reposter's profile, plus the "X reposted this" pill on the original),
@@ -311,7 +338,12 @@ export async function GET(req: Request) {
   // and nothing it returned was ever rendered; T1 closes `post_reposts` to
   // own rows, so it is gone. `school` is still returned in the response
   // payload (`viewerSchool`) for clients that surface it.
-  const postsRes = await postsQuery;
+  let postsRes = await buildPostsQuery(true);
+  if (postsRes.error && isMissingColumnError(postsRes.error, MODERATION_POST_COLUMNS)) {
+    // A deploy without the moderation migration: the feed is exactly what it
+    // was before, minus the notice nothing there can have earned yet.
+    postsRes = await buildPostsQuery(false);
+  }
 
   if (postsRes.error) {
     console.error("[feed posts]", postsRes.error);
@@ -427,7 +459,8 @@ export async function GET(req: Request) {
       // naming — it backs regular video posts, not clips).
       ...withPostMediaUrls(row),
       // A hidden club's card never goes out, even to its members, so its id
-      // doesn't either (critic Low 3). `edited_at` rides the spread.
+      // doesn't either (critic Low 3). `edited_at` rides the spread, and so do
+      // `removed_at` / `removed_reason` on the author's own removed post.
       org_id: card ? row.org_id : null,
       // `honestViews === null` means the ledger was unreadable, not that
       // nobody looked — hence the stored-counter fallback noted above.

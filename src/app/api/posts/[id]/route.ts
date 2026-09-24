@@ -1,5 +1,6 @@
 import { NextResponse } from "next/server";
 
+import { isMissingColumnError } from "@/lib/db/missing-column";
 import { contentBlockedResponse, requireCanPublish } from "@/lib/moderation/access";
 import { checkText } from "@/lib/moderation/text-filter";
 import {
@@ -37,6 +38,13 @@ const EDIT_COLS =
  * puts words in the club's mouth just as publishing one does.
  */
 const EDIT_AS_ORG_ROLES: readonly OrgRole[] = Object.freeze(["owner", "admin"]);
+
+/**
+ * What the moderation migration adds to `posts`. Production does not have them
+ * yet, so the GET select is built twice — once with, and, for a 42703 naming
+ * one of these two and nothing else, once without.
+ */
+const MODERATION_POST_COLUMNS = ["removed_at", "removed_reason"] as const;
 
 type RouteContext = { params: Promise<{ id: string }> };
 
@@ -110,19 +118,33 @@ export async function GET(_req: Request, ctx: RouteContext) {
     return NextResponse.json({ ok: false, error: "Unauthorized" }, { status: 401 });
   }
 
-  const { data: row, error } = await supabase
-    .from("posts")
-    .select(
-      // `view_count` is read only as the fallback below and is stripped off
-      // the post before it ships — nothing should render the inflated counter.
-      // `edited_at` (null = never edited) drives the "Edited" marker.
-      // `org_id` is read only for the hidden-club check and stripped too.
-      "id,user_id,org_id,type,content,tags,media_url,media_thumbnail_url,view_count,created_at,edited_at," +
-        // Explicit FK name disambiguates the posts→users embed; see /api/feed for context.
-        "author:users!posts_user_id_fkey!inner(id,name,handle,school,major,year,avatar_url)",
-    )
-    .eq("id", id)
-    .maybeSingle();
+  // `removed_at` / `removed_reason` ship so the author of a post a moderator
+  // took down opens the notice instead of an ordinary post. They cost nothing
+  // to anyone else: `posts_select_authenticated` serves a removed row to its
+  // author alone, which is what makes "Only you can see it" true. Built twice
+  // because the columns land with the moderation migration.
+  const readPost = (moderation: boolean) =>
+    supabase
+      .from("posts")
+      .select(
+        // `view_count` is read only as the fallback below and is stripped off
+        // the post before it ships — nothing should render the inflated counter.
+        // `edited_at` (null = never edited) drives the "Edited" marker.
+        // `org_id` is read only for the hidden-club check and stripped too.
+        "id,user_id,org_id,type,content,tags,media_url,media_thumbnail_url,view_count,created_at,edited_at," +
+          (moderation ? "removed_at,removed_reason," : "") +
+          // Explicit FK name disambiguates the posts→users embed; see /api/feed for context.
+          "author:users!posts_user_id_fkey!inner(id,name,handle,school,major,year,avatar_url)",
+      )
+      .eq("id", id)
+      .maybeSingle();
+
+  let { data: row, error } = await readPost(true);
+  if (error && isMissingColumnError(error, MODERATION_POST_COLUMNS)) {
+    // A deploy without the moderation migration answers exactly as it did
+    // before: a post nothing can have removed yet.
+    ({ data: row, error } = await readPost(false));
+  }
 
   if (error) {
     console.error("[posts/:id GET]", error);

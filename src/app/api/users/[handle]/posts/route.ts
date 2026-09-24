@@ -1,12 +1,20 @@
 import { NextResponse } from "next/server";
 import type { SupabaseClient } from "@supabase/supabase-js";
 
+import { isMissingColumnError } from "@/lib/db/missing-column";
 import { withPostMediaUrls } from "@/lib/post-media-url";
 import { createSupabaseServerClient } from "@/lib/supabase/server";
 import { createSupabaseServiceClient } from "@/lib/supabase/service";
 
 const DEFAULT_LIMIT = 100;
 const MAX_LIMIT = 500;
+
+/**
+ * What the moderation migration adds to `posts`. Production does not have them
+ * yet, so the grid select is built twice — once with, and, for a 42703 naming
+ * one of these two and nothing else, once without.
+ */
+const MODERATION_POST_COLUMNS = ["removed_at", "removed_reason"] as const;
 
 type RouteContext = { params: Promise<{ handle: string }> };
 
@@ -75,26 +83,49 @@ export async function GET(req: Request, ctx: RouteContext) {
   // Filter drafts even when viewer == target owner — drafts only appear
   // in the composer's Drafts box, never in the public-shaped grid.
   // Clips are backlogged, so only `type='post'` rows surface.
-  const { data, error } = await reader
-    .from("posts")
-    .select(
-      // `edited_at` (null = never edited) drives the "Edited" marker.
-      "id,user_id,type,content,tags,media_url,media_thumbnail_url,created_at,edited_at",
-    )
-    .eq("user_id", target.id)
-    .eq("type", "post")
-    .eq("status", "published")
-    .order("created_at", { ascending: false })
-    .limit(limit);
+  //
+  // REMOVED POSTS ARE DROPPED HERE, IN THE QUERY, for anyone who is not their
+  // author. Every other read route leans on RLS for that, and this one cannot:
+  // a logged-out visit reads with the SERVICE role (see `reader` above), which
+  // no policy applies to — so without this `.is("removed_at", null)` the one
+  // route that bypasses RLS would be the one that hands a stranger a post a
+  // moderator took down, with the moderator's private reason attached. The
+  // author's own grid keeps them, and carries the reason, because that notice
+  // is written to them.
+  const viewerIsAuthor = !!user && user.id === target.id;
+  const readGrid = (moderation: boolean) => {
+    let q = reader
+      .from("posts")
+      .select(
+        // `edited_at` (null = never edited) drives the "Edited" marker.
+        "id,user_id,type,content,tags,media_url,media_thumbnail_url,created_at,edited_at" +
+          (moderation ? ",removed_at,removed_reason" : ""),
+      )
+      .eq("user_id", target.id)
+      .eq("type", "post")
+      .eq("status", "published");
+    if (moderation && !viewerIsAuthor) q = q.is("removed_at", null);
+    return q.order("created_at", { ascending: false }).limit(limit);
+  };
+
+  let { data, error } = await readGrid(true);
+  if (error && isMissingColumnError(error, MODERATION_POST_COLUMNS)) {
+    // A deploy without the moderation migration: nothing can be removed there,
+    // so the grid is exactly what it was before.
+    ({ data, error } = await readGrid(false));
+  }
 
   if (error) {
     console.error("[users/:handle/posts]", error);
     return NextResponse.json({ ok: false, error: "Request failed" }, { status: 500 });
   }
 
-  // Raw R2 keys become proxy URLs — as an <img src> a bare key 404s.
+  // Raw R2 keys become proxy URLs — as an <img src> a bare key 404s. The
+  // built select string defeats Supabase's row typing (GenericStringError),
+  // the same cast /api/feed and GET /api/posts/[id] make.
+  const rows = (data ?? []) as unknown as Array<{ id: string } & Record<string, unknown>>;
   return NextResponse.json({
     ok: true,
-    posts: (data ?? []).map((p) => withPostMediaUrls(p)),
+    posts: rows.map((p) => withPostMediaUrls(p)),
   });
 }
