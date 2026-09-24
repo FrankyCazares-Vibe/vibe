@@ -3320,6 +3320,14 @@ function PostActionsSheet({
             authorName: authorName ?? null,
           }}
           onClose={() => setReportOpen(false)}
+          // Once the report is in, this menu has done its job: Done takes
+          // both sheets down and leaves the student back in the feed, rather
+          // than handing them a "Post options" sheet to dismiss as well.
+          // Cancel still lands back here, on the menu they came from.
+          onCompleted={() => {
+            setReportOpen(false);
+            onClose();
+          }}
           onBlocked={onBlocked}
         />
       ) : null}

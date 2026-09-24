@@ -342,17 +342,32 @@ export function ReportSheet({
   variant = "modal",
   nested = false,
   onClose,
+  onCompleted,
   onBlocked,
 }: {
   target: ReportTargetRef;
   variant?: "modal" | "sheet";
   nested?: boolean;
   onClose: () => void;
+  /**
+   * Dismissing the sheet once the report is IN — Done, a swipe, the scrim,
+   * Escape. A host that opened this from a menu passes a handler that closes
+   * the menu too: the menu has served its purpose, and leaving it up made
+   * Done mean "now press Cancel as well". Leave it out and every dismissal
+   * is `onClose`, which is right for a sheet opened straight from the page.
+   * Cancel and a refusal always go back the way they came.
+   */
+  onCompleted?: () => void;
   /** The block landed, with the blocked person's id: drop their content. */
   onBlocked?: (userId: string) => void;
 }) {
   const form = useReportForm(target, onBlocked);
   const heading = headingFor(target);
+  const sent = form.sent;
+  const dismiss = useCallback(() => {
+    if (sent && onCompleted) onCompleted();
+    else onClose();
+  }, [sent, onCompleted, onClose]);
 
   if (variant === "sheet") {
     const Root = nested ? Drawer.NestedRoot : Drawer.Root;
@@ -360,7 +375,7 @@ export function ReportSheet({
       <Root
         open
         onOpenChange={(open) => {
-          if (!open) onClose();
+          if (!open) dismiss();
         }}
       >
         <Drawer.Portal>
@@ -375,7 +390,7 @@ export function ReportSheet({
               }}
             >
               <Drawer.Title style={headingStyle}>{heading}</Drawer.Title>
-              <ReportBody form={form} target={target} onClose={onClose} />
+              <ReportBody form={form} target={target} onClose={dismiss} />
             </div>
           </Drawer.Content>
         </Drawer.Portal>
@@ -383,7 +398,7 @@ export function ReportSheet({
     );
   }
 
-  return <ReportModal heading={heading} form={form} target={target} onClose={onClose} />;
+  return <ReportModal heading={heading} form={form} target={target} onClose={dismiss} />;
 }
 
 /** Desktop: a centered dialog over a scrim, portaled to <body> so no feed

@@ -2471,6 +2471,13 @@ function ConversationActionSheet({
               nested
               target={reportTarget}
               onClose={() => setReportTarget(null)}
+              // Once the report is in, this menu has done its job: Done takes
+              // both sheets down and leaves the student back in the
+              // conversation. Cancel still lands back here.
+              onCompleted={() => {
+                setReportTarget(null);
+                onClose();
+              }}
               // Blocking from inside the sheet leaves this conversation
               // pointless, so it closes with the same handler Block uses.
               onBlocked={onLeftOrDeleted}
@@ -4262,6 +4269,50 @@ function MessageBubble({
     </div>
   ) : null;
 
+  // A ⋯ beside the bubble, opening the same picker the long press opens.
+  // Report lived only behind that hold: nothing on the screen named it, and
+  // holding a bubble still for half a second is the hardest thing this thread
+  // asks of a thumb. It shows on someone else's message only — which is
+  // exactly where the picker has a Report to offer (never on the viewer's
+  // own, never on a row still sending, both already decided by `onReport`).
+  const showMore = !!onReport && !message.id.startsWith("temp_");
+  const moreButton = showMore ? (
+    <button
+      type="button"
+      aria-label="Message actions"
+      aria-expanded={pickerOpen}
+      onClick={(e) => {
+        e.stopPropagation();
+        setPickerOpen(true);
+      }}
+      style={{
+        flexShrink: 0,
+        width: 32,
+        height: 32,
+        marginBottom: 2,
+        borderRadius: 999,
+        display: "inline-flex",
+        alignItems: "center",
+        justifyContent: "center",
+        // The reaction chip's own surface, so it reads as part of the thread
+        // rather than a control bolted onto it.
+        background: darkMode ? "rgba(20,16,28,0.55)" : "rgba(255,255,255,0.78)",
+        border: darkMode
+          ? "1px solid rgba(255,255,255,0.10)"
+          : "1px solid rgba(28,28,30,0.08)",
+        color: darkMode ? "rgba(255,255,255,0.72)" : "#8A8580",
+        fontFamily: "DM Sans, sans-serif",
+        fontSize: 15,
+        fontWeight: 700,
+        lineHeight: 1,
+        cursor: "pointer",
+        WebkitTapHighlightColor: "transparent",
+      }}
+    >
+      <span aria-hidden>⋯</span>
+    </button>
+  ) : null;
+
   // A moderator took this message down. Only its sender is served the row at
   // all, so this card is theirs. Unreachable today —
   // `/api/me/threads/[id]/messages` does not select `removed_at`.
@@ -4347,21 +4398,27 @@ function MessageBubble({
       >
         {/* Quote stub, photo/video, shared-post card and caption,
             stacked on the sender's side. Each piece but the video and
-            the stub carries the long-press handlers. */}
-        <div
-          style={{
-            display: "flex",
-            flexDirection: "column",
-            alignItems: isMine ? "flex-end" : "flex-start",
-            gap: 4,
-          }}
-        >
-          {quote}
-          {captionAbove ? textBubble : null}
-          {media}
-          {card}
-          {captionAbove ? null : textBubble}
-          {isEmpty ? noticeTile("Attachment") : null}
+            the stub carries the long-press handlers. The ⋯ sits beside
+            the stack, at the bottom of it, so a long message doesn't
+            push it off the far side of a 375px screen. */}
+        <div style={{ display: "flex", alignItems: "flex-end", gap: 4 }}>
+          <div
+            style={{
+              display: "flex",
+              flexDirection: "column",
+              alignItems: isMine ? "flex-end" : "flex-start",
+              gap: 4,
+              minWidth: 0,
+            }}
+          >
+            {quote}
+            {captionAbove ? textBubble : null}
+            {media}
+            {card}
+            {captionAbove ? null : textBubble}
+            {isEmpty ? noticeTile("Attachment") : null}
+          </div>
+          {moreButton}
         </div>
 
         {/* Existing reactions — tappable to toggle. Wraps below the bubble. */}
