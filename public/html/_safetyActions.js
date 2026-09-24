@@ -12,6 +12,8 @@
 //   window.vibeOpenMuteSheet(targetId, displayName, currentUntil, onAfter)
 //   window.vibeUnmute(targetId, onAfter)
 //   window.vibeOpenReportSheet(targetType, targetId, onAfter)
+//     targetType is the wire CODE POST /api/me/reports takes:
+//     post | comment | message | user | channel | org | event.
 //   window.vibeFetchRelationship(target_id_or_handle) → Promise<{blocking,muting,mute_until}>
 //
 // `onAfter` is an optional callback that fires after the API call
@@ -77,6 +79,12 @@
     .vsa-btn.danger{background:#C0392B;color:white;}
     .vsa-btn.danger:hover{filter:brightness(1.05);}
     .vsa-note{font-size:12.5px;color:#8A8580;line-height:1.5;}
+    /* A refusal the shared copy table can't speak for (see vibeOpenReportSheet
+       below): it belongs beside the button that was just pressed, not in a
+       toast that slides away while the sheet is still open. */
+    .vsa-error{margin-top:10px;font-size:12.5px;line-height:1.45;color:#C0392B;}
+    .vsa-error-act{display:inline-block;margin-left:6px;padding:0;border:none;background:none;
+      font-family:inherit;font-size:12.5px;font-weight:700;color:#C0392B;text-decoration:underline;cursor:pointer;}
   `;
   document.head.appendChild(styleEl);
 
@@ -109,6 +117,26 @@
     overlay.classList.remove("show");
   }
   window.__vsaCloseSheet = closeSheet;
+
+  // Is a sheet on screen right now? The post viewer asks before it acts on
+  // Escape or a back gesture, so the sheet closes and the post underneath it
+  // stays where it was (_postViewer.js).
+  window.__vsaSheetOpen = function () {
+    return overlay.classList.contains("show");
+  };
+
+  // Escape closes the sheet, and only the sheet. Capture phase on `document`,
+  // so it runs before any page-level Escape handler bound on the same node
+  // (the post viewer's, profile.html's modals), and stopPropagation keeps the
+  // thing underneath open — otherwise Escape shut the post and left the
+  // report sheet floating with nothing to say what it referred to.
+  document.addEventListener("keydown", (e) => {
+    if (e.key !== "Escape") return;
+    if (!overlay.classList.contains("show")) return;
+    e.stopPropagation();
+    e.preventDefault();
+    closeSheet();
+  }, true);
 
   // ── Block ──────────────────────────────────────────────────────────────
   window.vibeBlock = function (targetId, displayName, onAfter) {
@@ -253,37 +281,130 @@
   };
 
   // ── Report ─────────────────────────────────────────────────────────────
+  // The static twin of reportReasonOptions() in src/lib/moderation/reports.ts
+  // — same codes, same ORDER and the same words, because a student who
+  // reports a DM here and a post in the app must be picking from one list.
+  // Three of these used to read differently ("Hate speech", "Self-harm or
+  // violence", "Other"), which made the same queue row mean two things
+  // depending on which half of the app filed it. Change both together; only
+  // the label is cosmetic — the code is what goes on the wire.
   const REPORT_REASONS = [
     { code: "spam",       label: "Spam" },
     { code: "harassment", label: "Harassment or bullying" },
     { code: "sexual",     label: "Sexual content" },
-    { code: "hate",       label: "Hate speech" },
-    { code: "self_harm",  label: "Self-harm or violence" },
-    { code: "other",      label: "Other" },
+    { code: "hate",       label: "Hate or a slur" },
+    { code: "self_harm",  label: "Self-harm" },
+    { code: "other",      label: "Something else" },
   ];
+
+  // What each target type is called in the sheet's heading. The static twin of
+  // headingFor() in src/components/safety/ReportSheet.tsx — "Report this post",
+  // "Report this club", "Report this chat" — so a student who reports a DM here
+  // and a post in the app reads the same sentence. (The app's own sheet names
+  // the person on a `user` report; this half is never handed a name, so it says
+  // "this person".) A club still stops reading as "Report this org" and a group
+  // chat as "Report this channel": only the heading changes, and the raw CODE is
+  // what goes on the wire as target_type. Change both together.
+  //
+  // NOT reportTargetLabel() from src/lib/moderation/reports.ts — that one writes
+  // "a post" to drop into a sentence ("Someone reported a post on Vibe"), which
+  // is the admin queue's and the alert email's job, not this heading's.
+  const REPORT_HEADING_NOUNS = {
+    post: "this post",
+    comment: "this comment",
+    message: "this message",
+    user: "this person",
+    channel: "this chat",
+    org: "this club",
+    event: "this event",
+  };
+  function reportHeadingNoun(t) {
+    return Object.prototype.hasOwnProperty.call(REPORT_HEADING_NOUNS, String(t))
+      ? REPORT_HEADING_NOUNS[String(t)]
+      : "this";
+  }
+
+  // Does a server string read like a sentence a student should see? The
+  // report route answers 400 with both kinds: sentences that matter ("You
+  // can't report something of your own") and developer strings ("Invalid
+  // target_id", "Invalid JSON"). This is the SHAPE test the static copy
+  // table already applies before it passes any server string through
+  // (isSentence in _persistence.js) — no wording is copied, only the guard,
+  // because here it is the sheet and not the toast that speaks a 400.
+  function studentSentence(s) {
+    if (typeof s !== "string") return false;
+    const t = s.trim();
+    return t.length > 0 && t.length <= 160
+      && /^[A-Z]/.test(t)
+      && t.split(/\s+/).length >= 3
+      && /^[A-Za-z0-9 ,.'’"“”!?:()/&—–→…·-]+$/.test(t)
+      && !/\b(json|uuid|null|undefined|ids?)\b/i.test(t);
+  }
 
   window.vibeOpenReportSheet = function (targetType, targetId, onAfter) {
     if (!targetId) return;
     let selected = "";
+    // Kept outside render() because picking a second reason re-renders the
+    // sheet: without this, typing a paragraph and then changing your mind
+    // about the reason threw the paragraph away.
+    let note = "";
+    // { line, action } or null. Every refusal is said here rather than in a
+    // toast: the sheet is already on screen, and a toast sliding away behind
+    // it would say one thing while the sheet said another.
+    let inlineError = null;
     function render() {
       openSheet(`
         <div class="vsa-hdr">
-          <div class="vsa-title">Report this ${esc(targetType || "post")}</div>
+          <div class="vsa-title">Report ${esc(reportHeadingNoun(targetType))}</div>
           <button class="vsa-x" type="button" onclick="window.__vsaCloseSheet()">×</button>
         </div>
         <div class="vsa-body">
-          <p class="vsa-note" style="margin-bottom:10px">Reports go to admins only. The person you're reporting won't see this.</p>
+          <p class="vsa-note" style="margin-bottom:10px">Reports go to Vibe admins only. The person you're reporting won't see this.</p>
           ${REPORT_REASONS.map((r) => `<button class="vsa-row${selected === r.code ? " selected" : ""}" data-code="${r.code}">${esc(r.label)}</button>`).join("")}
           <textarea class="vsa-text" id="vsaReportNote" placeholder="More detail (optional)" maxlength="1000"></textarea>
+          <p class="vsa-error" id="vsaReportError" role="alert" style="display:none"></p>
         </div>
         <div class="vsa-foot">
           <button class="vsa-btn ghost" type="button" onclick="window.__vsaCloseSheet()">Cancel</button>
           <button class="vsa-btn danger" id="vsaReportSubmit" type="button" disabled>Submit report</button>
         </div>
       `);
+      const noteEl = document.getElementById("vsaReportNote");
+      if (noteEl) {
+        noteEl.value = note;
+        noteEl.addEventListener("input", () => { note = noteEl.value; });
+      }
+      const errEl = document.getElementById("vsaReportError");
+      function showInline(line, action) {
+        inlineError = line ? { line: String(line), action: action || null } : null;
+        if (!errEl) return;
+        errEl.textContent = "";                    // textContent: never HTML
+        if (!inlineError) { errEl.style.display = "none"; return; }
+        errEl.appendChild(document.createTextNode(inlineError.line));
+        const act = inlineError.action;
+        if (act && act.href) {
+          const btn = document.createElement("button");
+          btn.type = "button";
+          btn.className = "vsa-error-act";
+          btn.textContent = act.label || "Open";
+          btn.addEventListener("click", () => {
+            // Out of the iframe, the way the shared toast's action goes.
+            if (typeof window.__vibeTopNav === "function") window.__vibeTopNav(act.href);
+            else window.location.href = act.href;
+          });
+          errEl.appendChild(btn);
+        }
+        errEl.style.display = "block";
+      }
+      if (inlineError) showInline(inlineError.line, inlineError.action);
       Array.from(overlay.querySelectorAll(".vsa-row[data-code]")).forEach((row) => {
         row.addEventListener("click", () => {
           selected = row.dataset.code || "";
+          // A refusal belongs to the reason that was sent, not to the one
+          // being picked now: without this, changing your mind after
+          // "You can't report something of your own" repainted the same red
+          // line under the new choice, as though it had been refused too.
+          inlineError = null;
           render(); // simple re-render to update .selected
         });
       });
@@ -293,7 +414,8 @@
         submit.addEventListener("click", async () => {
           submit.disabled = true;
           submit.textContent = "Sending…";
-          const note = (document.getElementById("vsaReportNote") || {}).value || "";
+          if (noteEl) note = noteEl.value || "";
+          showInline("");
           const r = await window.vibeRequest("/api/me/reports", {
             method: "POST",
             json: {
@@ -303,15 +425,41 @@
               reason: note,
             },
             failure: "Couldn't send your report.",
+            // No toast. The sheet stays open over it, so a toast would slide
+            // away behind the thing the student is reading — and on a 400 it
+            // would say the caller's fallback ("Couldn't send your report.
+            // Try again.") beside the route's "You can't report that yet",
+            // which is the opposite advice.
+            quiet: true,
           });
           if (!r.ok) {
-            // vibeRequest's toast says why. The sheet stays open with the
-            // reason and note kept, so Submit can just be pressed again.
+            // r.message is the shared copy table's own sentence (vibeRequest
+            // applies it), so every wave-1 code — terms_required,
+            // school_email_required, account_restricted — is said here in
+            // exactly the words it is said everywhere else, with its link.
+            // The one gap is the 400: the table shows the caller's fallback
+            // for anything outside its short whitelist, and the report
+            // route's 400s are the sentences that matter ("You can't report
+            // something of your own", and until the moderation migration
+            // reaches production, "You can't report that yet. Try again after
+            // the next update."). Those get said as sent — but only when they
+            // read like a sentence, so "Invalid target_id" never lands on a
+            // student inside a safety flow.
+            const own = r.status === 400 && studentSentence(r.error) ? r.error.trim() : "";
+            showInline(own || r.message || "Couldn't send your report. Try again.",
+              own ? null : r.action);
+            // The sheet stays open with the reason and note kept, so Submit
+            // can just be pressed again.
             submit.disabled = false;
             submit.textContent = "Submit report";
             return;
           }
-          showToast("Report submitted. Thanks for telling us.");
+          // The same words the app's own sheet says on a filed report
+          // (ReportSheet.tsx) — a student who reports a DM here and a post
+          // there is told the same thing, and a second press on the same
+          // target answers 200 and writes nothing, so it reads the same then
+          // too. The sheet closes, so this is the one line there is room for.
+          showToast("Thanks — we're on it.");
           closeSheet();
           if (onAfter) onAfter({ reported: true });
         });

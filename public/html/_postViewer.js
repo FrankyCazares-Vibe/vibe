@@ -102,6 +102,26 @@
     padding: 6px 22px 18px;
     overflow-y: auto; flex: 1;
   }
+  /* "Removed by Vibe moderators" — the author is the only person who can
+     still open a removed post or read their own removed comment, so this is
+     the one place the notice ever paints. Sand, not red: it states what
+     happened, it doesn't shout at them. */
+  .vpv-removed {
+    margin: 0 22px 12px;
+    padding: 11px 14px;
+    border: 1px solid rgba(192,57,43,.22);
+    border-radius: 12px;
+    background: #FDF4F2;
+  }
+  .vpv-removed-t {
+    font-size: 13px; font-weight: 700; color: #1C1C1E;
+  }
+  .vpv-removed-d {
+    font-size: 12.5px; line-height: 1.5; color: #8A8580; margin-top: 3px;
+  }
+  .vpv-comment .vpv-removed {
+    margin: 6px 0 0; padding: 8px 11px;
+  }
   .vpv-text {
     font-size: 15px; line-height: 1.55; color: #1C1C1E;
     white-space: pre-wrap; word-wrap: break-word;
@@ -382,6 +402,7 @@
             <div class="vpv-sub" id="vpvSub"></div>
           </div>
         </div>
+        <div class="vpv-removed" id="vpvRemoved" style="display:none"></div>
         <div class="vpv-body" id="vpvBody"></div>
         <div class="vpv-actions">
           <button class="vpv-act" id="vpvLike" onclick="window.__vpvToggleLike()">
@@ -450,6 +471,12 @@
     });
     document.addEventListener("keydown", (e) => {
       if (e.key !== "Escape") return;
+      // The block / mute / report sheet paints at z 11000, above this viewer
+      // at 10000, so it is the thing Escape means. _safetyActions.js normally
+      // takes this one first (capture phase) and stops it reaching here; the
+      // check stays so the post can never be shut out from under an open
+      // sheet if that file is missing or older.
+      if (sheetOpen()) { closeSheetNow(); return; }
       // The audience sheet sits on top of the post, so Escape closes it first
       // and leaves the post where it was. One handler, not two, because a
       // second listener registered later would fire after this one and shut
@@ -459,9 +486,11 @@
     });
     window.addEventListener("popstate", () => {
       // Browser back / phone back gesture closes the modal instead of
-      // navigating away from the page. The audience sheet pushed no history
-      // entry of its own, so it goes with the post rather than being left
-      // floating over the page.
+      // navigating away from the page. Same order as Escape: a report sheet
+      // over the post is what back means, and the post stays put.
+      if (sheetOpen()) { closeSheetNow(); return; }
+      // The audience sheet pushed no history entry of its own, so it goes
+      // with the post rather than being left floating over the page.
       if (aud.open) closeAudience();
       if (state.openId) window.__vpvClose(/*viaPopstate=*/ true);
     });
@@ -542,6 +571,63 @@
     clearTimeout(el._t);
     el._t = setTimeout(() => el.classList.remove("show"), 2200);
   }
+  // The viewer's own id — but only when the SERVER has said it. GET
+  // /api/posts/[id] answers is_owner, so on your own post the author id IS
+  // yours. The vibe_user_v1 localStorage blob is NOT a session (see the
+  // is_owner assignment below): on a shared browser it can still hold the
+  // previous account, and using it here would hide Report on exactly the
+  // comments a new signer-in needs to report. Unknown answers "" and the
+  // affordance shows; the route refuses a self-report and the sheet says so.
+  function confirmedViewerId() {
+    return state.isOwner && state.authorId ? state.authorId : "";
+  }
+  // Is the shared block / mute / report sheet on screen? (_safetyActions.js;
+  // absent on a page that doesn't load it, which answers false.)
+  function sheetOpen() {
+    return typeof window.__vsaSheetOpen === "function" && window.__vsaSheetOpen() === true;
+  }
+  function closeSheetNow() {
+    if (typeof window.__vsaCloseSheet === "function") window.__vsaCloseSheet();
+  }
+  // The author's own notice on content a moderator took down. Built from
+  // OPTIONAL fields: no read route selects removed_at yet, so on today's
+  // deploy every caller passes undefined and this renders nothing at all.
+  function removedNoticeInner(removedAt, removedReason) {
+    if (!removedAt) return "";
+    const why = typeof removedReason === "string" ? removedReason.trim() : "";
+    const line = why
+      ? "Only you can see it. Reason: " + esc(why)
+      : "Only you can see it.";
+    // The same two ways out the React card offers (RemovedContentCard): the
+    // address, and the page that says what happens after a report and how to
+    // appeal. /legal/* is exempt from the restriction redirect, so it is
+    // reachable even by a student who has been suspended as well.
+    return `<div class="vpv-removed-t">Removed by Vibe moderators</div>` +
+      `<div class="vpv-removed-d">${line} Questions: help@connectvibe.app. ` +
+      `<a href="/legal/community" style="color:inherit;text-decoration:underline">Community Guidelines</a></div>`;
+  }
+  /** The same notice as its own card, for a comment row. */
+  function removedNoticeHtml(removedAt, removedReason) {
+    const inner = removedNoticeInner(removedAt, removedReason);
+    return inner ? `<div class="vpv-removed">${inner}</div>` : "";
+  }
+  // Report, from an onclick, without assuming _safetyActions.js has run.
+  // Both pages load it deferred and after this file, so in practice it is
+  // there by first paint; a fast click on a slow connection gets a short
+  // wait and then a sentence, never a thrown ReferenceError.
+  window.__vpvReport = function (targetType, targetId) {
+    if (!targetId) return;
+    let waited = 0;
+    (function attempt() {
+      if (typeof window.vibeOpenReportSheet === "function") {
+        window.vibeOpenReportSheet(targetType, targetId);
+        return;
+      }
+      if (waited >= 2000) { toast("Reporting isn't ready yet. Try again in a second."); return; }
+      waited += 100;
+      setTimeout(attempt, 100);
+    })();
+  };
 
   // ── Open / Close ──────────────────────────────────────────────────────
   async function openPostViewer(postId, prefill) {
@@ -575,6 +661,10 @@
     state.views = null;
     state.saves = null;
     resetCounts();
+    // Same reason as the counts above: a prefilled open never paints this, so
+    // without the clear, post B would wear post A's "Removed by Vibe
+    // moderators" card until B's GET answered.
+    paintRemoved(null, "");
     paintOwnerAffordances();
     // Only renderLoading() hid the ⋯ menu, and every profile card passes a
     // prefill, so post A's owner menu (Edit / Delete) stayed on screen over
@@ -702,6 +792,9 @@
     document.getElementById("vpvSub").textContent = "";
     document.getElementById("vpvSub").removeAttribute("title");
     document.getElementById("vpvBody").innerHTML = "";
+    // Whether the post on screen was removed is unknown until the server
+    // answers, and unknown paints nothing.
+    paintRemoved(null, "");
     resetCounts();
     document.getElementById("vpvComments").innerHTML = "";
     // Ownership and the two server-only numbers are unknown again until the
@@ -754,6 +847,20 @@
       media_kind:          p.media_kind,
       media_thumbnail_url: p.media_thumbnail_url,
     });
+    // Optional, and absent today: GET /api/posts/[id] selects an explicit
+    // column list that leaves removed_at / removed_reason out, so this paints
+    // nothing on the current deploy. It is here so that the day the select
+    // gains them, the author stops seeing their removed post as an ordinary
+    // live one.
+    //
+    // Gated on the SERVER's is_owner, the same way the React twin
+    // (PostViewerMobile) gates its card. RLS is what makes "only the author is
+    // served this row" true today, but the notice's own sentence is "Only you
+    // can see it" — one service-role branch added to GET /api/posts/[id] and a
+    // stranger on a shared link would be told a moderator removed this post
+    // and that nobody else can see it. Two halves of the same app must not
+    // disagree about who that card is for.
+    paintRemoved(j.is_owner === true ? p.removed_at : null, p.removed_reason);
     state.authorId = p.user_id || (p.author && p.author.id) || null;
     state.authorName = (p.author && p.author.name) || "";
     state.type     = p.type || "post";
@@ -816,7 +923,7 @@
         const safeName = esc(JSON.stringify(authorName));
         const firstName = esc(authorName.split(' ')[0] || 'author');
         menu.innerHTML = `
-          <button type="button" onclick="window.__vpvCloseMenu();window.vibeOpenReportSheet('post',${safeId})">Report post</button>
+          <button type="button" onclick="window.__vpvCloseMenu();window.__vpvReport('post',${safeId})">Report post</button>
           ${authorId ? `<button type="button" onclick="window.__vpvCloseMenu();window.vibeOpenMuteSheet(${safeAuthor},${safeName})">Mute ${firstName}</button>` : ''}
           ${authorId ? `<button type="button" class="danger" onclick="window.__vpvCloseMenu();window.vibeBlock(${safeAuthor},${safeName}, () => window.__vpvClose())">Block ${firstName}</button>` : ''}
         `;
@@ -947,6 +1054,19 @@
     return state.editSaving || !editDirty() || window.confirm("Discard your changes?");
   }
 
+  // The removed notice above the post body. Called with undefined from every
+  // path that doesn't know (the prefill, a fresh open), which clears it.
+  function paintRemoved(removedAt, removedReason) {
+    const el = document.getElementById("vpvRemoved");
+    if (!el) return;
+    // The host element already carries .vpv-removed, so it takes the inner
+    // half and one border ends up on screen, not two.
+    const inner = removedNoticeInner(removedAt, removedReason);
+    if (!inner) { el.style.display = "none"; el.innerHTML = ""; return; }
+    el.innerHTML = inner;
+    el.style.display = "block";
+  }
+
   function paintBody({ content, tags, media_url, type, media_kind, media_thumbnail_url }) {
     const body = document.getElementById("vpvBody");
     const text = content ? `<div class="vpv-text">${formatBodyText(content)}</div>` : "";
@@ -988,6 +1108,27 @@
     const repliesHtml = Array.isArray(c.replies) && c.replies.length > 0
       ? `<div class="vpv-creplies" id="vpv-replies-${esc(c.id)}">${c.replies.map(renderCommentRow).join("")}</div>`
       : `<div class="vpv-creplies" id="vpv-replies-${esc(c.id)}" style="display:none"></div>`;
+    // Report this comment. Attribute-safe JS literal, the same escaping the
+    // "..." menu uses: JSON.stringify builds the JS string, esc() makes it
+    // safe inside onclick="..." (which decodes before it evals). A raw id
+    // interpolated here would be an injection hole in a file that renders
+    // other students' content.
+    const safeCommentId = esc(JSON.stringify(String(c.id || "")));
+    // Not on your own comment, WHERE WE CAN PROVE IT: the route answers 400
+    // "You can't report something of your own", so the button is noise there.
+    // The proof is the server's is_owner on your own post; anywhere else the
+    // viewer's id is unknown and Report shows, which is the safe way round —
+    // a wrong hide would take Report off someone else's comment, and the
+    // sheet now says the refusal in words if you do press it on your own.
+    const me = confirmedViewerId();
+    const mine = !!me && ((c.user_id && c.user_id === me) || (a.id && a.id === me));
+    const reportBtn = (mine || !c.id)
+      ? ""
+      : `<button class="vpv-cact" onclick="window.__vpvReport('comment',${safeCommentId})">Report</button>`;
+    // Optional, and absent today — GET /api/posts/[id]/comments selects an
+    // explicit column list without removed_at. Only the comment's own author
+    // can load a removed comment, so this is their notice and nobody else's.
+    const removedHtml = removedNoticeHtml(c.removed_at, c.removed_reason);
     return `<div class="vpv-comment" data-comment-id="${esc(c.id)}">
       ${av}
       <div class="vpv-cw">
@@ -998,8 +1139,10 @@
             ${heartSvg}<span class="vpv-clikec">${likeCount > 0 ? likeCount : ""}</span>
           </button>
           <button class="vpv-cact" onclick="__vpvOpenReply('${esc(c.id)}', '${esc(a.handle || "")}')">Reply</button>
+          ${reportBtn}
           <span style="margin-left:auto;color:#8A8580">${esc(relTime(c.created_at))}</span>
         </div>
+        ${removedHtml}
         <div class="vpv-creply-form" id="vpv-reply-${esc(c.id)}" style="display:none">
           <input type="text" maxlength="1000" placeholder="Write a reply…" onkeydown="if(event.key==='Enter'&&!event.shiftKey){event.preventDefault();__vpvSubmitReply('${esc(c.id)}', this.parentNode)}else if(event.key==='Escape'){__vpvCancelReply('${esc(c.id)}')}">
           <button type="button" onclick="__vpvSubmitReply('${esc(c.id)}', this.parentNode)">Post</button>

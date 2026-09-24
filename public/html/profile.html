@@ -1856,6 +1856,12 @@ body.viewer-mode .ppost-pin { display:none !important; }
 
 .ppost-body { font-size:15px;line-height:1.6;color:var(--soft-black);margin-bottom:12px; }
 .ppost-body strong { color:var(--charcoal); }
+/* "Removed by Vibe moderators" — carries .owner-only, so the rule above
+   (body.viewer-mode .owner-only) keeps it off a visitor's screen. Only the
+   author can load a removed post of theirs at all, and only they see this. */
+.ppost-removed { border:1px solid rgba(192,57,43,.22);background:#FDF4F2;border-radius:12px;padding:10px 12px;margin-bottom:12px; }
+.ppost-removed-t { font-size:13px;font-weight:700;color:var(--charcoal); }
+.ppost-removed-d { font-size:12.5px;line-height:1.5;color:var(--muted);margin-top:3px; }
 /* Read more truncation (LinkedIn-style) — clamped to 6 lines until expanded. */
 .ppost-body.is-clamped { display:-webkit-box; -webkit-line-clamp:6; -webkit-box-orient:vertical; overflow:hidden; }
 .ppost-body.is-expanded { display:block; }
@@ -9146,6 +9152,11 @@ function savePostsToStorage() {
     ottoType:          card.dataset.postOtto || '',
     date:              (card.querySelector('.ppost-date')?.textContent || '').trim(),
     ottoBadgeHTML:     card.querySelector('.op-badge')?.outerHTML || '',
+    // The "Removed by Vibe moderators" notice is a SIBLING of .ppost-body, so
+    // without its own entry it never round-tripped: the cache repaints first
+    // on every load, and a removed post read as an ordinary live one until
+    // the API answered — or for good, if that hydrate failed silently.
+    removedHTML:       card.querySelector('.ppost-removed')?.outerHTML || '',
     bodyHTML:          card.querySelector('.ppost-body')?.innerHTML || '',
     tagsHTML:          card.querySelector('.ppost-tags')?.innerHTML || '',
     platformStatsHTML: card.querySelector('.op-platform-stats')?.innerHTML || '',
@@ -9305,6 +9316,37 @@ async function hydrateVisitedUserPosts(handle) {
   } catch (e) { /* silent — the rows just rendered stay */ }
 }
 
+// The author's own notice on a post a moderator took down. Built from
+// OPTIONAL fields: GET /api/me/posts and GET /api/users/[handle]/posts both
+// select an explicit column list without removed_at / removed_reason, so on
+// today's deploy this returns '' for every row. It is here so that the day
+// those selects gain the columns, the author stops reading their removed post
+// as an ordinary live one — with like and comment counts that exclude it and
+// an audience of one. `.owner-only` keeps it off a visitor's screen even if a
+// service-role read ever hands one over.
+function _profileRemovedNoticeHTML(removedAt, removedReason) {
+  // Never on someone else's profile. _profileMapDbRow is shared by the
+  // owner's own hydrate and hydrateVisitedUserPosts, and
+  // GET /api/users/[handle]/posts reads with the SERVICE role — so the day
+  // that select gains removed_reason, a moderator's private words about
+  // another student would otherwise be written into a visitor's DOM and kept
+  // off screen by a CSS class alone. `.owner-only` stays as the second belt;
+  // this is the first. (The server-side half — dropping removed rows for
+  // anyone who is not their author — is still outOfScope for this batch.)
+  if (window.viewingRealUser) return '';
+  if (!removedAt) return '';
+  const why = typeof removedReason === 'string' ? removedReason.trim() : '';
+  const line = why ? 'Only you can see it. Reason: ' + _esc(why) : 'Only you can see it.';
+  // Same two ways out as the React card (RemovedContentCard) and the other two
+  // static twins: the address, and the page that says what happens after a
+  // report and how to appeal.
+  return '<div class="ppost-removed owner-only">' +
+    '<div class="ppost-removed-t">Removed by Vibe moderators</div>' +
+    '<div class="ppost-removed-d">' + line + ' Questions: help@connectvibe.app. ' +
+    '<a href="/legal/community" style="color:inherit;text-decoration:underline">Community Guidelines</a></div>' +
+    '</div>';
+}
+
 function _profileMapDbRow(row) {
   if (!row || row.type !== 'post') return null;
   const tags = (row.tags || []).map(t => `<span class="ppost-tag">#${_esc(t)}</span>`).join('');
@@ -9327,6 +9369,7 @@ function _profileMapDbRow(row) {
     // The text sits in its own span so an edit saved in the post viewer can
     // swap it without touching the media under it.
     bodyHTML: '<span class="ppost-text">' + bodyText + '</span>' + mediaHTML,
+    removedHTML: _profileRemovedNoticeHTML(row.removed_at, row.removed_reason),
     ottoBadgeHTML: '',
     tagsHTML: tags,
     platformStatsHTML: '',
@@ -9596,6 +9639,7 @@ function _renderPostCard(p) {
       <div class="ppost-date" style="font-size:11px;font-weight:700;color:var(--muted);text-transform:uppercase;letter-spacing:.5px;">${_esc(p.date || 'Just now')}</div>
       ${headerExtras}
     </div>
+    ${p.removedHTML || ''}
     <div class="ppost-body is-clamped">${p.bodyHTML || ''}</div>
     <button type="button" class="ppost-readmore" onclick="_togglePostReadMore(this, event)">Read more</button>
     ${tagsBlock}

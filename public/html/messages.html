@@ -347,6 +347,13 @@ body{font-family:'DM Sans',sans-serif;background:var(--cream);color:var(--charco
 .dm-act-reply{background:transparent;border:none;padding:2px 6px;color:rgba(255,255,255,0.88);font-size:11.5px;font-weight:700;font-family:'DM Sans',sans-serif;cursor:none;border-radius:6px;display:inline-flex;align-items:center;gap:4px;}
 .dm-act-del{background:transparent;border:none;padding:0;width:24px;height:24px;color:rgba(255,180,180,0.85);cursor:none;border-radius:999px;display:inline-flex;align-items:center;justify-content:center;transition:background-color .14s ease, color .14s ease;}
 .dm-act-del:hover{background:rgba(255,80,80,0.18);color:#FF8A8A;}
+.dm-act-report{background:transparent;border:none;padding:2px 6px;color:rgba(255,255,255,0.88);font-size:11.5px;font-weight:700;font-family:'DM Sans',sans-serif;cursor:none;border-radius:6px;display:inline-flex;align-items:center;}
+.dm-act-report:hover{background:rgba(255,255,255,0.12);}
+/* "Removed by Vibe moderators" — only the message's own author can still
+   load a removed message, so this notice only ever paints on their side. */
+.dm-removed{border:1px solid rgba(192,57,43,.22);background:#FDF4F2;border-radius:12px;padding:9px 12px;max-width:70%;}
+.dm-removed-t{font-size:12.5px;font-weight:700;color:var(--charcoal);}
+.dm-removed-d{font-size:11.5px;line-height:1.45;color:var(--muted);margin-top:2px;}
 .dm-rxs{display:flex;flex-wrap:wrap;gap:4px;margin-top:6px;}
 .msg-row.mine .dm-rxs{justify-content:flex-end;}
 .dm-rx{display:inline-flex;align-items:center;gap:4px;padding:2px 8px;border-radius:999px;background:rgba(20,16,28,0.55);border:1px solid rgba(255,255,255,0.10);color:rgba(255,255,255,0.85);font-family:'DM Sans',sans-serif;font-size:12px;font-weight:600;cursor:none;}
@@ -921,6 +928,17 @@ input,textarea,[contenteditable="true"]{cursor:text!important;}
   *, *::before, *::after { cursor: auto !important; }
   a, button, [onclick], .nav-item, .t-new-btn { cursor: pointer !important; }
   input, textarea, [contenteditable="true"] { cursor: text !important; }
+  /* One more entry in the pill (Report) can push it past the chat's right
+     edge on a narrow window, where it would be unreachable. Under 760px every
+     pill stacks above its bubble, the way a long message's already does. */
+  .msg-row:not(.mine) .dm-actions { left:0;right:auto;top:auto;bottom:calc(100% + 6px);transform:none; }
+  .msg-row.mine .dm-actions { right:0;left:auto;top:auto;bottom:calc(100% + 6px);transform:none; }
+  /* white-space:nowrap on the pill makes max-width inert — the row can't
+     break, so it overflows instead of fitting. Let it wrap onto a second
+     line: five emoji + Reply + Report is a few pixels from the edge of a
+     375px screen, and a wider font would push the last button off it. */
+  .dm-actions { max-width:calc(100vw - 32px);flex-wrap:wrap;white-space:normal; }
+  .dm-removed { max-width:100%; }
 }
 </style>
 </head>
@@ -1278,7 +1296,33 @@ function renderMsgs(msgs,d){
     const body = (pp.content || '(media)').slice(0, 140);
     return `<div class="dm-quote"><div class="dm-quote-author">↩ ${__dmEsc(author)}</div><div class="dm-quote-body">${__dmEsc(body)}</div></div>`;
   };
-  // Build the inline action pill (5 reactions + reply) for a message.
+  // Report this message — never on your own (POST /api/me/reports answers
+  // 400 "You can't report something of your own"). Attribute-safe JS
+  // literal: JSON.stringify builds the string, __dmEsc makes it safe inside
+  // onclick="..." (decoded before it evals).
+  const reportBtnFor = (m) => {
+    if (!m || m.m === 1 || !m.id) return '';
+    const safeMsgId = __dmEsc(JSON.stringify(String(m.id)));
+    return `<button type="button" class="dm-act-report" onclick="event.stopPropagation();__dmReport('message',${safeMsgId})" aria-label="Report message" title="Report">Report</button>`;
+  };
+  // The same Report on the rows that carry no reaction picker: a photo or a
+  // video, a shared post, a shared profile. Those branches build their own
+  // stack and used to have no safety affordance at all — so the one kind of
+  // message most worth reporting was the only one that couldn't be, and Block
+  // was the whole menu. The picker itself stays off them: none of those rows
+  // paints reaction chips, so an emoji tapped there would vanish.
+  const reportPillFor = (m) => {
+    const btn = reportBtnFor(m);
+    return btn ? `<div class="dm-actions">${btn}</div>` : '';
+  };
+  // Wrap a non-bubble stack so the delegated hover in __dmInstallActionsHover
+  // (which keys on .dm-bubble-wrap) can reveal the pill beside it. Own
+  // messages get no pill and keep exactly the markup they had.
+  const withReportPill = (m, inner) => {
+    const pill = reportPillFor(m);
+    return pill ? `<div class="dm-bubble-wrap">${inner}${pill}</div>` : inner;
+  };
+  // Build the inline action pill (5 reactions + reply + report) for a message.
   // Each emoji that the viewer has already reacted with gets the `on`
   // class so it picks up the orange ring style — clear at-a-glance cue
   // for "I already reacted with this one." Clicking again removes it.
@@ -1301,7 +1345,23 @@ function renderMsgs(msgs,d){
           <svg width="13" height="13" viewBox="0 0 13 13" fill="none"><path d="M2.5 3.5h8M5 3.5V2.2c0-.4.3-.7.7-.7h1.6c.4 0 .7.3.7.7v1.3M3.7 3.5l.6 7c0 .4.4.7.8.7h3.8c.4 0 .8-.3.8-.7l.6-7" stroke="currentColor" stroke-width="1.3" stroke-linecap="round" stroke-linejoin="round"/></svg>
         </button>`
       : '';
-    return `<div class="dm-actions">${buttons}<span class="dm-act-sep"></span><button type="button" class="dm-act-reply" onclick="event.stopPropagation();__dmStartReply('${__dmEsc(m.id)}')" aria-label="Reply">↩ Reply</button>${deleteBtn}</div>`;
+    return `<div class="dm-actions">${buttons}<span class="dm-act-sep"></span><button type="button" class="dm-act-reply" onclick="event.stopPropagation();__dmStartReply('${__dmEsc(m.id)}')" aria-label="Reply">↩ Reply</button>${reportBtnFor(m)}${deleteBtn}</div>`;
+  };
+  // The author's own notice on a message a moderator took down. Built from an
+  // OPTIONAL field: GET /api/me/threads/[id]/messages selects an explicit
+  // column list without removed_at, so this renders nothing on today's deploy.
+  const removedFor = (m) => {
+    if (!m || m.m !== 1 || !m.removedAt) return '';
+    const why = typeof m.removedReason === 'string' ? m.removedReason.trim() : '';
+    const line = why ? 'Only you can see it. Reason: ' + __dmEsc(why) : 'Only you can see it.';
+    // Same two ways out as the React card (RemovedContentCard) and the other
+    // two static twins: the address, and the page that says what happens after
+    // a report and how to appeal.
+    return '<div class="msg-row mine"><div class="dm-removed">' +
+      '<div class="dm-removed-t">Removed by Vibe moderators</div>' +
+      '<div class="dm-removed-d">' + line + ' Questions: help@connectvibe.app. ' +
+      '<a href="/legal/community" style="color:inherit;text-decoration:underline">Community Guidelines</a></div>' +
+      '</div></div>';
   };
   // Reaction chips below the bubble.
   const chipsFor = (m) => {
@@ -1336,7 +1396,8 @@ function renderMsgs(msgs,d){
       const captionBubble = m.t
         ? `<div class="bubble">${__dmFormatBody(m.t)}<div class="btime">${m.ts}</div></div>`
         : `<div class="btime" style="font-size:10px;color:var(--muted);text-align:${mine?'right':'left'};">${m.ts}</div>`;
-      h += `<div class="msg-row${mine?' mine':''}${gc}">${!mine?avForMsg(m, showAv):''}<div style="display:flex;flex-direction:column;align-items:${mine?'flex-end':'flex-start'};gap:4px;">${mediaInner}${captionBubble}</div></div>`;
+      const mediaStack = `<div style="display:flex;flex-direction:column;align-items:${mine?'flex-end':'flex-start'};gap:4px;">${mediaInner}${captionBubble}</div>`;
+      h += `<div class="msg-row${mine?' mine':''}${gc}">${!mine?avForMsg(m, showAv):''}${withReportPill(m, mediaStack)}</div>`;
     } else if (m.attachment) {
       const a = m.attachment;
       let cardInner;
@@ -1374,7 +1435,7 @@ function renderMsgs(msgs,d){
         ? `<div class="msg-attach-caption">${__dmFormatBody(m.t)}</div>`
         : '';
       const stack = `<div class="msg-attach-stack">${captionBlock}<div class="msg-attach"${cardOnclick}>${cardInner}</div><div class="btime" style="font-size:10px;color:var(--muted);text-align:${mine?'right':'left'};margin-top:2px;">${m.ts}</div></div>`;
-      h += `<div class="msg-row${mine?' mine':''}${gc}">${!mine?avForMsg(m, showAv):''}${stack}</div>`;
+      h += `<div class="msg-row${mine?' mine':''}${gc}">${!mine?avForMsg(m, showAv):''}${withReportPill(m, stack)}</div>`;
     } else {
       // Profile-share message? Render a rich card (banner + avatar +
       // name + role) instead of a raw URL bubble. The card is fetched
@@ -1389,7 +1450,7 @@ function renderMsgs(msgs,d){
           ? `<div class="msg-attach-caption">${__dmFormatBody(profShare.prefix)}</div>`
           : '';
         const stack = `<div class="msg-attach-stack">${captionBlock}${card}<div class="btime" style="font-size:10px;color:var(--muted);text-align:${mine?'right':'left'};margin-top:2px;">${m.ts}</div></div>`;
-        h += `<div class="msg-row${mine?' mine':''}${gc}">${!mine?avForMsg(m, showAv):''}${stack}</div>`;
+        h += `<div class="msg-row${mine?' mine':''}${gc}">${!mine?avForMsg(m, showAv):''}${withReportPill(m, stack)}</div>`;
       } else {
         const stub = quoteStubFor(m);
         // Long messages (>60 chars or multi-line) get the picker stacked
@@ -1405,6 +1466,7 @@ function renderMsgs(msgs,d){
         h+=`<div class="msg-row${mine?' mine':''}${gc}${longCls}">${!mine?avForMsg(m, showAv):''}${stack}<div class="btime">${m.ts}</div></div>`;
       }
     }
+    h += removedFor(m);
     last=mine;
     lastSenderId=senderKey;
   });
@@ -1812,6 +1874,26 @@ function __dmRenderReplyPill() {
 }
 
 function __dmEsc(s){return String(s==null?'':s).replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));}
+// Report, from an onclick, without assuming _safetyActions.js has run yet.
+// It is loaded deferred, so on first paint it is there; a very fast click on a
+// slow connection gets a short wait and then a sentence, never a thrown
+// ReferenceError. targetType is the wire code: 'message', 'channel', 'user'.
+function __dmReport(targetType, targetId) {
+  if (!targetId) return;
+  let waited = 0;
+  (function attempt() {
+    if (typeof window.vibeOpenReportSheet === 'function') {
+      window.vibeOpenReportSheet(targetType, targetId);
+      return;
+    }
+    if (waited >= 2000) {
+      if (window.vibeToast) window.vibeToast("Reporting isn't ready yet. Try again in a second.");
+      return;
+    }
+    waited += 100;
+    setTimeout(attempt, 100);
+  })();
+}
 // Escape + style @handles. Mentions render as a styled link to that
 // user's profile. Pattern matches the same handle format the server uses
 // when fanning out notifications, so what's clickable mirrors what's
@@ -2285,6 +2367,12 @@ async function __dmLoadMessages(channelId, opts) {
         reactions,
         parentMessageId: m.parent_message_id || null,
         parentPreview,
+        // Optional, and absent today: the messages route selects an explicit
+        // column list without removed_at / removed_reason. Carried here so the
+        // author's notice lights up the day that select gains them, instead of
+        // a taken-down message reading as an ordinary one.
+        removedAt: m.removed_at || null,
+        removedReason: typeof m.removed_reason === 'string' ? m.removed_reason : '',
       };
     });
     __realDM.peerLastReadByChannel[channelId] = j.peer_last_read_at || null;
@@ -2869,13 +2957,21 @@ function __dmPanelRender() {
   const muteAction = '<button class="cp-action" onclick="__dmToggleChannelMute()">' +
     (isMuted ? 'Unmute chat' : 'Mute chat…') + '</button>';
 
-  // Block + Report (1:1 only — group safety actions can come later).
+  // Report this chat — GROUPS only. In a 1:1 the thing to report is the
+  // person, and that row is already right below; two Report buttons on the
+  // same panel would just be a guess about which one does what.
   let safetyActions = '';
+  if (d.isGroup) {
+    const chanArg = __dmEsc(JSON.stringify(String(channelId || '')));
+    safetyActions =
+      '<button class="cp-action" onclick="__dmReport(\'channel\',' + chanArg + ')">Report this chat</button>';
+  }
+  // Block + Report the person (1:1 only).
   if (!d.isGroup && d.peerId) {
     const peerArg = JSON.stringify(d.peerId).replace(/"/g, '&quot;');
     const nameArg = JSON.stringify(d.n || '').replace(/"/g, '&quot;');
     safetyActions =
-      '<button class="cp-action" onclick="window.vibeOpenReportSheet(\'user\',' + peerArg + ')">Report ' + __dmEsc(d.n) + '</button>' +
+      '<button class="cp-action" onclick="__dmReport(\'user\',' + peerArg + ')">Report ' + __dmEsc(d.n) + '</button>' +
       '<button class="cp-action danger" onclick="window.vibeBlock(' + peerArg + ',' + nameArg + ', () => { __dmPanelClose(); active = null; if (typeof __dmLoadList === \'function\') __dmLoadList(); document.getElementById(\'cContent\').style.display=\'none\'; document.getElementById(\'emptyState\').style.display=\'flex\'; })">Block ' + __dmEsc(d.n) + '</button>';
   }
 
