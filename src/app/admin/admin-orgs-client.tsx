@@ -1,7 +1,40 @@
 "use client";
 
+/**
+ * The clubs tab: verify a club, and take one out of sight.
+ *
+ * The surface, the header and the tab bar moved to admin-shell.tsx in wave 2 —
+ * this file is the list and nothing else now.
+ *
+ * HIDE IS KEYED BY THE HANDLE. `POST /api/admin/orgs/[slug]/hide` reads
+ * `[slug]` as the org's handle, not its id; an org uuid there is a 404. The
+ * same is true of /verify.
+ *
+ * THE ROW IS REPAINTED FROM THE ANSWER, not from what we hoped. Hiding revokes
+ * pending invites and says how many, and unhiding does not bring them back —
+ * neither of which an optimistic row could have known. That answer is shown
+ * INSIDE the row, because the list runs to 500 clubs and a sentence at the top
+ * of the page is off-screen by the time you have scrolled to the one you acted
+ * on — and the revoked-invite count is the part that cannot be undone.
+ *
+ * HIDE ASKS TWICE. It sits next to Verify, and below 640px both are full-width
+ * and stacked, so a mis-tap is one pixel of travel from "verify this club" to
+ * "burn its pending invites". Unhide stays one click: it destroys nothing.
+ */
+
 import Link from "next/link";
 import { useMemo, useState } from "react";
+
+import {
+  ActionButton,
+  adminPost,
+  Badge,
+  COLORS,
+  Empty,
+  fmtRelative,
+  inputStyle,
+  Notice,
+} from "./admin-shell";
 
 export type AdminOrgRow = {
   id: string;
@@ -11,55 +44,29 @@ export type AdminOrgRow = {
   logo_url: string | null;
   is_public: boolean;
   verified: boolean;
+  /** `orgs.hidden_at` is set: out of sight for everyone but its members. */
+  hidden: boolean;
   last_activity_at: string | null;
   created_at: string;
   member_count: number;
   dormant: boolean;
 };
 
-type FilterKey = "all" | "verified" | "community" | "dormant";
+type RowNote = { tone: "error" | "good"; text: string };
 
-const COLORS = {
-  bg: "#0F0D17",
-  text: "#F5F1E9",
-  muted: "rgba(245,241,233,0.6)",
-  faint: "rgba(245,241,233,0.4)",
-  panel: "rgba(255,255,255,0.04)",
-  border: "rgba(255,255,255,0.1)",
-  accent: "#FF5C35",
-  verified: "#F0C84A",
-  warn: "#E84D4D",
-};
+type FilterKey = "all" | "verified" | "community" | "dormant" | "hidden";
 
-function fmtRelative(iso: string | null): string {
-  if (!iso) return "never";
-  const ms = Date.now() - Date.parse(iso);
-  const sec = Math.floor(ms / 1000);
-  if (sec < 60) return `${sec}s ago`;
-  const min = Math.floor(sec / 60);
-  if (min < 60) return `${min}m ago`;
-  const hr = Math.floor(min / 60);
-  if (hr < 24) return `${hr}h ago`;
-  const day = Math.floor(hr / 24);
-  if (day < 30) return `${day}d ago`;
-  const mo = Math.floor(day / 30);
-  if (mo < 12) return `${mo}mo ago`;
-  const yr = Math.floor(mo / 12);
-  return `${yr}y ago`;
-}
+const FILTERS: FilterKey[] = ["all", "verified", "community", "dormant", "hidden"];
 
-export function AdminOrgsClient({
-  initialOrgs,
-  adminName,
-}: {
-  initialOrgs: AdminOrgRow[];
-  adminName: string;
-}) {
+export function AdminOrgsClient({ initialOrgs }: { initialOrgs: AdminOrgRow[] }) {
   const [orgs, setOrgs] = useState<AdminOrgRow[]>(initialOrgs);
   const [filter, setFilter] = useState<FilterKey>("all");
-  const [busyHandle, setBusyHandle] = useState<string | null>(null);
+  const [busy, setBusy] = useState<string | null>(null);
   const [search, setSearch] = useState("");
-  const [err, setErr] = useState<string | null>(null);
+  /** One notice per club, rendered in that club's own card. */
+  const [notes, setNotes] = useState<Record<string, RowNote>>({});
+  /** The club whose Hide is waiting on a second press. */
+  const [confirming, setConfirming] = useState<string | null>(null);
 
   const filtered = useMemo(() => {
     const q = search.trim().toLowerCase();
@@ -67,6 +74,7 @@ export function AdminOrgsClient({
       if (filter === "verified" && !o.verified) return false;
       if (filter === "community" && (o.verified || o.dormant)) return false;
       if (filter === "dormant" && !o.dormant) return false;
+      if (filter === "hidden" && !o.hidden) return false;
       if (q && !o.name.toLowerCase().includes(q) && !o.handle.toLowerCase().includes(q))
         return false;
       return true;
@@ -79,183 +87,86 @@ export function AdminOrgsClient({
       verified: orgs.filter((o) => o.verified).length,
       community: orgs.filter((o) => !o.verified && !o.dormant).length,
       dormant: orgs.filter((o) => o.dormant).length,
+      hidden: orgs.filter((o) => o.hidden).length,
     }),
     [orgs]
   );
 
+  const patch = (id: string, next: Partial<AdminOrgRow>) =>
+    setOrgs((prev) => prev.map((o) => (o.id === id ? { ...o, ...next } : o)));
+
+  const say = (id: string, note: RowNote | null) =>
+    setNotes((prev) => {
+      const next = { ...prev };
+      if (note) next[id] = note;
+      else delete next[id];
+      return next;
+    });
+
   const toggleVerified = async (org: AdminOrgRow) => {
-    setBusyHandle(org.handle);
-    setErr(null);
+    setBusy(org.handle);
+    say(org.id, null);
     const next = !org.verified;
-    setOrgs((prev) =>
-      prev.map((o) =>
-        o.id === org.id
-          ? { ...o, verified: next, dormant: next ? false : o.dormant }
-          : o
-      )
+    const r = await adminPost<{ org?: { verified?: boolean } }>(
+      `/api/admin/orgs/${encodeURIComponent(org.handle)}/verify`,
+      { verified: next },
+      `Couldn't ${next ? "verify" : "unverify"} ${org.name}.`
     );
-    try {
-      const res = await fetch(`/api/admin/orgs/${org.handle}/verify`, {
-        method: "POST",
-        headers: { "content-type": "application/json" },
-        body: JSON.stringify({ verified: next }),
+    if (r.ok) {
+      const verified = r.data.org?.verified ?? next;
+      patch(org.id, { verified, dormant: verified ? false : org.dormant });
+      say(org.id, {
+        tone: "good",
+        text: `${org.name} is ${verified ? "verified" : "no longer verified"}.`,
       });
-      const data = await res.json();
-      if (!data?.ok) {
-        // Roll back.
-        setOrgs((prev) =>
-          prev.map((o) =>
-            o.id === org.id ? { ...o, verified: org.verified, dormant: org.dormant } : o
-          )
-        );
-        setErr(data?.error || "Failed to update");
-      }
-    } catch (e) {
-      console.error("[admin] toggle verified", e);
-      setErr("Network error");
-      setOrgs((prev) =>
-        prev.map((o) =>
-          o.id === org.id ? { ...o, verified: org.verified, dormant: org.dormant } : o
-        )
-      );
-    } finally {
-      setBusyHandle(null);
+    } else {
+      say(org.id, { tone: "error", text: r.message });
     }
+    setBusy(null);
+  };
+
+  const toggleHidden = async (org: AdminOrgRow) => {
+    setBusy(org.handle);
+    setConfirming(null);
+    say(org.id, null);
+    const next = !org.hidden;
+    const r = await adminPost<{ hidden?: boolean; revoked_invites?: number; changed?: boolean }>(
+      `/api/admin/orgs/${encodeURIComponent(org.handle)}/hide`,
+      { hidden: next },
+      `Couldn't ${next ? "hide" : "unhide"} ${org.name}.`
+    );
+    if (r.ok) {
+      const hidden = r.data.hidden ?? next;
+      patch(org.id, { hidden });
+      const revoked = r.data.revoked_invites ?? 0;
+      say(org.id, {
+        tone: "good",
+        text: hidden
+          ? `${org.name} is hidden — only its members can see it.` +
+            (revoked > 0
+              ? ` ${revoked} pending ${revoked === 1 ? "invite" : "invites"} revoked.`
+              : "")
+          : `${org.name} is visible again. Invites revoked when it was hidden don't come back.`,
+      });
+    } else {
+      say(org.id, { tone: "error", text: r.message });
+    }
+    setBusy(null);
   };
 
   return (
-    <div
-      style={{
-        minHeight: "100vh",
-        background:
-          "radial-gradient(120% 80% at 0% 0%, rgba(40,30,60,0.55) 0%, rgba(40,30,60,0) 60%), " +
-          "linear-gradient(180deg, #0F0D17 0%, #14111E 50%, #0F0D17 100%)",
-        color: COLORS.text,
-        fontFamily: "DM Sans, sans-serif",
-        padding: "32px 24px",
-      }}
-    >
-      <div style={{ maxWidth: 1100, margin: "0 auto" }}>
-        {/* Back-out row: Admin is its own dark surface, so the LeftNav
-            doesn't render here. A small explicit "← Campus" link
-            (plus quick jumps to Profile / Network) gives the user a
-            way back without relying on the browser back button. */}
-        <div
-          style={{
-            display: "flex",
-            alignItems: "center",
-            gap: 14,
-            marginBottom: 18,
-            fontSize: 12,
-            fontFamily: "DM Sans, sans-serif",
-          }}
-        >
-          <Link
-            href="/campus"
-            style={{
-              display: "inline-flex",
-              alignItems: "center",
-              gap: 6,
-              padding: "7px 13px",
-              borderRadius: 999,
-              background: "rgba(255,255,255,0.06)",
-              border: "1px solid rgba(255,255,255,0.12)",
-              color: COLORS.text,
-              textDecoration: "none",
-              fontWeight: 600,
-            }}
-          >
-            ← Campus
-          </Link>
-          <Link
-            href="/profile"
-            style={{
-              color: COLORS.muted,
-              textDecoration: "none",
-              fontWeight: 500,
-            }}
-          >
-            Profile
-          </Link>
-          <Link
-            href="/network"
-            style={{
-              color: COLORS.muted,
-              textDecoration: "none",
-              fontWeight: 500,
-            }}
-          >
-            Network
-          </Link>
-          <Link
-            href="/settings"
-            style={{
-              color: COLORS.muted,
-              textDecoration: "none",
-              fontWeight: 500,
-            }}
-          >
-            Settings
-          </Link>
-        </div>
-        <header style={{ marginBottom: 24 }}>
-          <div
-            style={{
-              fontSize: 11,
-              fontWeight: 700,
-              letterSpacing: "0.18em",
-              textTransform: "uppercase",
-              color: "#FFB89C",
-              marginBottom: 6,
-            }}
-          >
-            Platform admin · {adminName}
-          </div>
-          <h1
-            style={{
-              fontFamily: "Fraunces, serif",
-              fontSize: 36,
-              fontWeight: 900,
-              letterSpacing: "-1px",
-              margin: 0,
-            }}
-          >
-            Org review
-          </h1>
-          <p style={{ marginTop: 6, color: COLORS.muted, fontSize: 14, lineHeight: 1.55 }}>
-            Verify legit orgs to surface them above community-created ones in
-            Discover. Verified orgs are exempt from dormancy decay.
-          </p>
-        </header>
-
-        <div
-          style={{
-            display: "flex",
-            alignItems: "center",
-            gap: 12,
-            marginBottom: 16,
-            flexWrap: "wrap",
-          }}
-        >
-          <input
-            type="text"
-            value={search}
-            onChange={(e) => setSearch(e.target.value)}
-            placeholder="Search by name or handle…"
-            style={{
-              flex: 1,
-              minWidth: 220,
-              padding: "10px 14px",
-              borderRadius: 10,
-              border: `1px solid ${COLORS.border}`,
-              background: COLORS.panel,
-              color: COLORS.text,
-              fontFamily: "inherit",
-              fontSize: 14,
-              outline: "none",
-            }}
-          />
-          {(["all", "verified", "community", "dormant"] as FilterKey[]).map((k) => {
+    <div style={{ display: "flex", flexDirection: "column", gap: 12 }}>
+      <div className="adm-fields">
+        <input
+          type="text"
+          value={search}
+          onChange={(e) => setSearch(e.target.value)}
+          placeholder="Search by name or handle…"
+          aria-label="Search clubs"
+          style={{ ...inputStyle, flex: 1, minWidth: 220 }}
+        />
+        <div className="adm-nowrap-scroll" style={{ display: "flex", gap: 8, flexWrap: "wrap" }}>
+          {FILTERS.map((k) => {
             const on = filter === k;
             return (
               <button
@@ -265,9 +176,7 @@ export function AdminOrgsClient({
                 style={{
                   padding: "8px 14px",
                   borderRadius: 999,
-                  border: on
-                    ? "1px solid rgba(255,180,150,0.55)"
-                    : `1px solid ${COLORS.border}`,
+                  border: on ? "1px solid rgba(255,180,150,0.55)" : `1px solid ${COLORS.border}`,
                   background: on
                     ? "linear-gradient(180deg, rgba(255,92,53,0.32) 0%, rgba(255,92,53,0.14) 100%)"
                     : COLORS.panel,
@@ -277,6 +186,7 @@ export function AdminOrgsClient({
                   fontWeight: on ? 700 : 500,
                   cursor: "pointer",
                   textTransform: "capitalize",
+                  whiteSpace: "nowrap",
                 }}
               >
                 {k} ({counts[k]})
@@ -284,52 +194,23 @@ export function AdminOrgsClient({
             );
           })}
         </div>
+      </div>
 
-        {err ? (
-          <div
-            style={{
-              padding: "8px 12px",
-              borderRadius: 8,
-              background: "rgba(232,77,77,0.18)",
-              border: "1px solid rgba(232,77,77,0.4)",
-              color: "#FFD0CC",
-              fontSize: 13,
-              marginBottom: 12,
-            }}
-          >
-            {err}
-          </div>
-        ) : null}
-
-        <div style={{ display: "flex", flexDirection: "column", gap: 8 }}>
-          {filtered.length === 0 ? (
+      <div style={{ display: "flex", flexDirection: "column", gap: 8 }}>
+        {filtered.length === 0 ? (
+          <Empty>
+            {orgs.length === 0
+              ? "No clubs yet. Every club a student creates shows up here."
+              : "No clubs match that search or filter."}
+          </Empty>
+        ) : (
+          filtered.map((o) => (
             <div
-              style={{
-                padding: 28,
-                background: COLORS.panel,
-                border: `1px solid ${COLORS.border}`,
-                borderRadius: 14,
-                color: COLORS.muted,
-                textAlign: "center",
-              }}
+              key={o.id}
+              className="adm-card"
+              style={{ display: "flex", flexDirection: "column", gap: 10 }}
             >
-              No orgs match.
-            </div>
-          ) : (
-            filtered.map((o) => (
-              <div
-                key={o.id}
-                style={{
-                  display: "flex",
-                  alignItems: "center",
-                  gap: 14,
-                  padding: 14,
-                  borderRadius: 14,
-                  background: COLORS.panel,
-                  border: `1px solid ${COLORS.border}`,
-                  boxShadow: "inset 0 1px 0 rgba(255,255,255,0.06)",
-                }}
-              >
+              <div className="adm-split">
                 <div
                   style={{
                     width: 44,
@@ -374,7 +255,8 @@ export function AdminOrgsClient({
                       {o.name}
                     </Link>
                     {o.verified ? <Badge color={COLORS.verified}>verified</Badge> : null}
-                    {!o.is_public ? <Badge color="#9B7BFF">private</Badge> : null}
+                    {o.hidden ? <Badge color={COLORS.warn}>hidden</Badge> : null}
+                    {!o.is_public ? <Badge color={COLORS.unknown}>private</Badge> : null}
                     {o.dormant ? <Badge color={COLORS.warn}>dormant</Badge> : null}
                   </div>
                   <div
@@ -399,66 +281,76 @@ export function AdminOrgsClient({
                   </div>
                 </div>
 
-                <button
-                  type="button"
-                  disabled={busyHandle === o.handle}
-                  onClick={() => toggleVerified(o)}
+                <div className="adm-actions" style={{ flexShrink: 0 }}>
+                  <ActionButton
+                    busy={busy === o.handle}
+                    onClick={() => toggleVerified(o)}
+                    tone={o.verified ? "primary" : "plain"}
+                  >
+                    {o.verified ? "Unverify" : "Verify"}
+                  </ActionButton>
+                  <ActionButton
+                    busy={busy === o.handle}
+                    disabled={confirming === o.id}
+                    onClick={() => {
+                      // Unhide destroys nothing, so it goes straight through.
+                      // Hide asks once more first.
+                      if (o.hidden) void toggleHidden(o);
+                      else {
+                        say(o.id, null);
+                        setConfirming(o.id);
+                      }
+                    }}
+                    tone={o.hidden ? "plain" : "danger"}
+                    title={
+                      o.hidden
+                        ? "Put this club back in front of everyone."
+                        : "Take this club out of sight for everyone but its members, and revoke its pending invites."
+                    }
+                  >
+                    {o.hidden ? "Unhide" : "Hide"}
+                  </ActionButton>
+                </div>
+              </div>
+
+              {confirming === o.id ? (
+                <div
                   style={{
-                    padding: "8px 14px",
+                    display: "flex",
+                    flexDirection: "column",
+                    gap: 10,
+                    padding: 12,
                     borderRadius: 10,
-                    border: `1px solid ${
-                      o.verified ? "rgba(240,200,74,0.5)" : "rgba(255,255,255,0.14)"
-                    }`,
-                    background: o.verified
-                      ? "linear-gradient(180deg, rgba(240,200,74,0.3) 0%, rgba(240,200,74,0.12) 100%)"
-                      : COLORS.panel,
-                    color: o.verified ? "#FFE8A8" : COLORS.text,
-                    fontFamily: "inherit",
-                    fontWeight: 700,
-                    fontSize: 12,
-                    cursor: "pointer",
-                    opacity: busyHandle === o.handle ? 0.6 : 1,
-                    flexShrink: 0,
+                    background: "rgba(255,255,255,0.03)",
+                    border: `1px solid ${COLORS.border}`,
                   }}
                 >
-                  {o.verified ? "Unverify" : "Verify"}
-                </button>
-              </div>
-            ))
-          )}
-        </div>
+                  <div style={{ fontSize: 13, lineHeight: 1.5, color: COLORS.text }}>
+                    Hide {o.name}? Only its members will be able to see it, its pending
+                    invites are revoked, and unhiding doesn&apos;t bring them back.
+                  </div>
+                  <div className="adm-actions">
+                    <ActionButton
+                      tone="danger"
+                      busy={busy === o.handle}
+                      onClick={() => void toggleHidden(o)}
+                    >
+                      Hide it
+                    </ActionButton>
+                    <ActionButton disabled={busy === o.handle} onClick={() => setConfirming(null)}>
+                      Cancel
+                    </ActionButton>
+                  </div>
+                </div>
+              ) : null}
+
+              {notes[o.id] ? (
+                <Notice tone={notes[o.id].tone}>{notes[o.id].text}</Notice>
+              ) : null}
+            </div>
+          ))
+        )}
       </div>
     </div>
   );
-}
-
-function Badge({ color, children }: { color: string; children: React.ReactNode }) {
-  return (
-    <span
-      style={{
-        display: "inline-flex",
-        alignItems: "center",
-        gap: 4,
-        padding: "2px 8px",
-        borderRadius: 999,
-        fontSize: 10,
-        fontWeight: 700,
-        letterSpacing: "0.08em",
-        textTransform: "uppercase",
-        color,
-        background: hexToRgbaLite(color, 0.18),
-        border: `1px solid ${hexToRgbaLite(color, 0.4)}`,
-      }}
-    >
-      {children}
-    </span>
-  );
-}
-
-function hexToRgbaLite(hex: string, alpha: number): string {
-  const clean = hex.replace("#", "");
-  const r = parseInt(clean.slice(0, 2), 16);
-  const g = parseInt(clean.slice(2, 4), 16);
-  const b = parseInt(clean.slice(4, 6), 16);
-  return `rgba(${r}, ${g}, ${b}, ${alpha})`;
 }
