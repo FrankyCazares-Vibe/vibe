@@ -33,6 +33,8 @@ import {
   TERMS_METADATA_KEYS,
   TERMS_VERSION,
 } from "@/lib/legal/terms";
+import { isIosPlatform } from "@/lib/pwa/display-mode";
+import { useIsStandalone, usePlatform } from "@/lib/pwa/use-standalone";
 import { getSupabaseBrowserClient } from "@/lib/supabase/browser";
 
 /** GoTrue's per-address resend cooldown. */
@@ -120,6 +122,12 @@ export default function SignupPage() {
 
   const schoolEmailTyped = isSchoolEmail(email.trim());
   const rateLimitedUntil = pending?.rateLimitedUntil ?? null;
+  // In the installed app the code is the way in: typing it signs in THIS
+  // app. On an iPhone the email's Confirm link opens Safari, which keeps its
+  // own sign-in, so the app would still be signed out (plan R16).
+  const standalone = useIsStandalone();
+  const platform = usePlatform();
+  const linksOpenSafari = standalone && isIosPlatform(platform);
 
   // "We just sent an email" points at the resend countdown below, so it goes
   // when that countdown ends. Checked against the deadline on return too:
@@ -271,11 +279,21 @@ export default function SignupPage() {
           <h1 className="vibe-auth-headline">
             Check your email<span className="vibe-auth-dot">.</span>
           </h1>
-          <p className="vibe-auth-sub" style={{ overflowWrap: "anywhere" }}>
-            We sent a link to <strong>{pending.email}</strong> from
-            noreply@connectvibe.app. Tap Confirm in that email — any browser or
-            phone works. Or type the 8-digit code from the email here.
-          </p>
+          {standalone ? (
+            <p className="vibe-auth-sub" style={{ overflowWrap: "anywhere" }}>
+              We sent an 8-digit code to <strong>{pending.email}</strong> from
+              noreply@connectvibe.app. Type it below to confirm your account.
+              {linksOpenSafari
+                ? " Links in the email open in your browser, not this app."
+                : null}
+            </p>
+          ) : (
+            <p className="vibe-auth-sub" style={{ overflowWrap: "anywhere" }}>
+              We sent a link to <strong>{pending.email}</strong> from
+              noreply@connectvibe.app. Tap Confirm in that email — any browser
+              or phone works. Or type the 8-digit code from the email here.
+            </p>
+          )}
 
           {/* No number here: the resend button below counts down live, and
               a second, static count would disagree with it. */}

@@ -1,6 +1,8 @@
 import Link from "next/link";
 import type { CSSProperties, ReactNode } from "react";
 
+import { LegalBackLink } from "@/components/legal/LegalBackLink";
+
 const PAGE_BG =
   "radial-gradient(120% 80% at 0% 0%, rgba(255,222,180,0.45) 0%, rgba(255,222,180,0) 60%), " +
   "radial-gradient(110% 80% at 100% 100%, rgba(255,200,170,0.35) 0%, rgba(255,200,170,0) 60%), " +
@@ -34,18 +36,8 @@ export function LegalLayout({
     >
       <div style={{ maxWidth: 760, margin: "0 auto" }}>
         <p style={{ marginBottom: 24 }}>
-          <Link
-            href="/"
-            style={{
-              fontFamily: "DM Sans, sans-serif",
-              fontSize: 13,
-              fontWeight: 700,
-              color: "#5C5853",
-              textDecoration: "none",
-            }}
-          >
-            ← Back to Vibe
-          </Link>
+          {/* Client island: "/" in a tab, /campus in the installed app. */}
+          <LegalBackLink />
         </p>
         <header style={{ marginBottom: 28 }}>
           <div

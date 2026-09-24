@@ -73,6 +73,27 @@ const nextConfig: NextConfig = {
         ],
       },
       {
+        // The service worker (public/sw.js) must never come from a cache: a
+        // stale copy keeps a phone on old code and holds back the kill switch
+        // (scripts/pwa/sw-killswitch.js). Browsers already skip their own HTTP
+        // cache when they check for an update; this covers the first fetch
+        // and any cache in between. No Content-Type rule: a JavaScript type is
+        // sent already, and a doubled value would stop the worker
+        // registering. No CSP either: a policy on the worker script governs
+        // the worker's own fetches, and v1 has no allow-list worked out.
+        source: "/sw.js",
+        headers: [
+          { key: "Cache-Control", value: "no-cache, no-store, must-revalidate" },
+        ],
+      },
+      {
+        // The page the service worker shows offline. The worker precaches it
+        // with `cache: "reload"`; this keeps an ordinary visit from reusing a
+        // stale copy after the page changes.
+        source: "/offline.html",
+        headers: [{ key: "Cache-Control", value: "no-cache" }],
+      },
+      {
         // The product journal is an internal document served from public/.
         // robots.txt asks crawlers not to fetch it; this tells the ones that
         // fetch anyway not to index it.

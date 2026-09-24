@@ -5,6 +5,8 @@ import { useRouter, useSearchParams } from "next/navigation";
 import { Suspense, useEffect, useRef, useState } from "react";
 
 import { SCHOOL_DOMAINS_HEADLINE_LABEL } from "@/lib/auth/school-email-domains";
+import { isIosPlatform } from "@/lib/pwa/display-mode";
+import { useIsStandalone, usePlatform } from "@/lib/pwa/use-standalone";
 import { getSupabaseBrowserClient } from "@/lib/supabase/browser";
 
 /**
@@ -162,6 +164,13 @@ function SchoolEmailInner() {
   const codeInFlight = useRef(false);
   const cooling = secondsLeft > 0;
   const justVerifiedAccount = searchParams.get("account_verified") === "1";
+  // In the installed app the code is the way in: it verifies whoever is
+  // signed in HERE. On an iPhone the email's link opens Safari, which keeps
+  // its own sign-in (it may ask the student to sign in again), and this page
+  // doesn't notice when it's done there (plan R16).
+  const standalone = useIsStandalone();
+  const platform = usePlatform();
+  const linksOpenSafari = standalone && isIosPlatform(platform);
 
   // Strip the param after we've consumed it so the success banner doesn't
   // re-appear on refresh.
@@ -502,8 +511,16 @@ function SchoolEmailInner() {
           <code className="vibe-auth-code vibe-auth-code--edu">
             {SCHOOL_DOMAINS_LABEL}
           </code>{" "}
-          one, not the one you signed up with. We&apos;ll email a code and link
-          to <em>that</em> inbox.
+          one, not the one you signed up with.{" "}
+          {standalone ? (
+            <>
+              We&apos;ll email an 8-digit code to <em>that</em> inbox.
+            </>
+          ) : (
+            <>
+              We&apos;ll email a code and link to <em>that</em> inbox.
+            </>
+          )}
         </p>
 
         <div className="vibe-auth-steps" aria-hidden>
@@ -544,7 +561,16 @@ function SchoolEmailInner() {
                 className="vibe-auth-banner vibe-auth-banner--success"
                 style={{ overflowWrap: "anywhere" }}
               >
-                We sent a code and link to <strong>{sentTo}</strong>.
+                {standalone ? (
+                  <>
+                    We sent an 8-digit code to <strong>{sentTo}</strong>. Type
+                    it below.
+                  </>
+                ) : (
+                  <>
+                    We sent a code and link to <strong>{sentTo}</strong>.
+                  </>
+                )}
               </div>
             )}
 
@@ -607,11 +633,20 @@ function SchoolEmailInner() {
                   : "Send again"}
             </button>
 
-            <p className="vibe-auth-tip">
-              Not there after a minute? Check Junk, and your school
-              Outlook&apos;s Quarantine. Opened it on your phone? Just type the
-              code here.
-            </p>
+            {/* Always on the code panel, whichever banner is up, so the
+                Safari line can't be pushed out by a send limit or failure. */}
+            {linksOpenSafari ? (
+              <p className="vibe-auth-tip">
+                Links in the email open in your browser, not this app. Not there after a
+                minute? Check Junk, and your school Outlook&apos;s Quarantine.
+              </p>
+            ) : (
+              <p className="vibe-auth-tip">
+                Not there after a minute? Check Junk, and your school
+                Outlook&apos;s Quarantine. Opened it on your phone? Just type
+                the code here.
+              </p>
+            )}
           </form>
         ) : (
           <form onSubmit={onSubmit} className="vibe-auth-form">

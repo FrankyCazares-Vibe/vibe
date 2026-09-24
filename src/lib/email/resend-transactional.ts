@@ -135,6 +135,16 @@ function brandedEmailHtml(e: BrandedEmail): string {
 }
 
 /**
+ * For students who installed Vibe (plan R16). The reset link opens a
+ * browser, and on an iPhone the Home Screen app keeps its own sign-in, so
+ * the new password is set in the browser and the app still needs it typed.
+ * Worded to hold on every phone. Goes in both the HTML notes and the text
+ * part, so it stays plain: no markup, no entities, no bare "<".
+ */
+const HOME_SCREEN_RESET_NOTE =
+  "Using Vibe from your Home Screen? Set the new password on the page that opens, then open Vibe from your Home Screen and sign in with it.";
+
+/**
  * Every attempt goes into the send log (send-log.ts); the log never
  * changes the outcome. A missing RESEND_API_KEY / RESEND_FROM throws inside
  * the send, so it is logged as `exception` and thrown here as before.
@@ -158,6 +168,7 @@ export async function sendPasswordResetEmail(
         button: { href: recoveryActionLink, label: "Set a new password" },
         notes: [
           "Only the newest reset email works. Any browser or phone is fine.",
+          HOME_SCREEN_RESET_NOTE,
           "Didn't ask for this? You can ignore this email &mdash; your password won't change.",
         ],
       }),
@@ -167,6 +178,7 @@ export async function sendPasswordResetEmail(
         `Set a new password: ${recoveryActionLink}`,
         "",
         "Only the newest reset email works. Any browser or phone is fine.",
+        HOME_SCREEN_RESET_NOTE,
         "Didn't ask for this? You can ignore this email. Your password won't change.",
         "",
         site,

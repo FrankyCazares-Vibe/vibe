@@ -8,6 +8,8 @@ import {
   resolveResumeDocUrl,
 } from "@/lib/profile/resolve-resume-url";
 import type { RedactionBar } from "@/lib/profile/resume-redactions";
+import { isIosPlatform } from "@/lib/pwa/display-mode";
+import { useIsStandalone, usePlatform } from "@/lib/pwa/use-standalone";
 
 /** A bar plus the identity of the document it covers. `docKey` is that
  *  document's `url` exactly as the portfolio lists it (an
@@ -180,6 +182,9 @@ type Props = {
  * edit is saving, "Open" shows "Saving…" instead of a copy that
  * doesn't have the new bar yet.
  *
+ * In the installed app on an iPhone, a hosted file shows neither "Open"
+ * link (see `hideOpen`); external links keep theirs.
+ *
  * For PDFs we rasterize each page to JPEG via pdf.js at scale 1.6,
  * stack the page images vertically, and overlay bars as
  * percentage-positioned absolute children of each page wrap — same
@@ -242,6 +247,16 @@ export function ResumeViewerMobile({
   const openWaits = editable && hosted && saving;
   const publicHref =
     editable && hasBars && !saving ? publicViewHref(url) : null;
+  // The installed app on an iPhone keeps its own sign-in, apart from
+  // Safari's. A new window there opens with Safari's, where /api/resume
+  // answers 401, and opening the file in the app itself would leave the
+  // student with no back button. So a hosted file has no "Open" links
+  // there; the pages below already show it. External links need no
+  // sign-in and keep "Open" everywhere, and Android's installed app shares
+  // Chrome's sign-in, so it keeps them too (plan R16, critic-w1.md item 10).
+  const standalone = useIsStandalone();
+  const platform = usePlatform();
+  const hideOpen = hosted && standalone && isIosPlatform(platform);
   const ownerNote = !hosted
     ? "Links open the original for everyone. Upload the file to black out parts of it."
     : hasBars
@@ -485,7 +500,7 @@ export function ResumeViewerMobile({
           >
             Saving…
           </span>
-        ) : (
+        ) : hideOpen ? null : (
           <a
             href={publicHref ?? url}
             target="_blank"
@@ -530,7 +545,7 @@ export function ResumeViewerMobile({
           }}
         >
           <span style={{ flex: "1 1 200px", minWidth: 0 }}>{ownerNote}</span>
-          {hosted && hasBars ? (
+          {hosted && hasBars && !hideOpen ? (
             <a
               href={url}
               target="_blank"

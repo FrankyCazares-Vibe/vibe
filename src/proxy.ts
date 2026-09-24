@@ -82,10 +82,12 @@ function restrictionInForce(user: User | null): boolean {
 }
 
 /**
- * Extensions that mean "an asset, not a page". The matcher at the bottom only
- * skips image extensions, so `/html/_postViewer.js`, `/manifest.json` and any
- * service worker we add later arrive here too — and answering a script request
- * with a redirect to an HTML page breaks the page that asked for it.
+ * Extensions that mean "an asset, not a page". The matcher at the bottom skips
+ * image extensions and exactly three root files (`/sw.js`, `/offline.html`,
+ * `/manifest.webmanifest`), so every other script — `/html/_postViewer.js`,
+ * `/html/_sw.js`, `/manifest.json` — still arrives here, and answering a
+ * script request with a redirect to an HTML page breaks the page that asked
+ * for it.
  *
  * `.html` is deliberately NOT on the list: the static shells under /html ARE
  * the desktop app, so a restricted student meets the same gate there as on any
@@ -311,8 +313,16 @@ export async function proxy(request: NextRequest) {
   return sessionResponse;
 }
 
+// The installable app's three public files skip the proxy entirely: no GoTrue
+// round trip on every service-worker update check, no session cookie on a
+// response the browser may keep, and no suspension redirect — a restricted
+// student's worker would otherwise get the notice instead of /offline.html
+// (sw.js refuses redirected responses, so its offline precache would fail).
+// The `$` makes each one an exact root path, not a prefix. Careful with this
+// line: a stray `|` is an empty alternative that matches every path, and then
+// the proxy silently never runs. `node scripts/check-pwa.mjs` tests it.
 export const config = {
   matcher: [
-    "/((?!_next/static|_next/image|favicon\\.ico|.*\\.(?:svg|png|jpg|jpeg|gif|webp)$).*)",
+    "/((?!_next/static|_next/image|favicon\\.ico|sw\\.js$|offline\\.html$|manifest\\.webmanifest$|.*\\.(?:svg|png|jpg|jpeg|gif|webp)$).*)",
   ],
 };

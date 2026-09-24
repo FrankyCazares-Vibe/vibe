@@ -2874,3 +2874,18 @@ html {
     display: none;
   }
 }
+
+/* Installed app only (plan R17): cream behind the page, not white. The
+   `@apply bg-background` in the base layer paints html/body white, which
+   shows at the edges, on overscroll bounce and in the flash as the app
+   opens. Left unlayered so it beats `@layer base` wherever it sits. Both
+   queries, because iOS reports an installed `standalone` app as
+   `fullscreen` (WebKit bug 264218). A desktop tab in F11 or a full-screen
+   video matches too; cream behind those is harmless. Browser tabs keep the
+   white: the landing page is dark and some pages rely on it. */
+@media (display-mode: standalone), (display-mode: fullscreen) {
+  html,
+  body {
+    background-color: #FAF7F2;
+  }
+}
