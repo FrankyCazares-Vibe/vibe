@@ -1,6 +1,40 @@
 "use client";
 
-import { useState } from "react";
+import { useState, useSyncExternalStore } from "react";
+
+import { ReportSheet } from "@/components/safety/ReportSheet";
+
+/**
+ * This page's own phone breakpoint — the width at which globals.css swaps the
+ * 2-column grid for the tab strip above (`@media (max-width: 720px)`). The
+ * report shell is picked off the same number, so the centered desktop dialog
+ * never opens on a screen that is already showing the phone layout. NOT
+ * `useIsMobile` (899px): 180px of viewport between the two would give a
+ * bottom sheet on a page still in its desktop grid.
+ */
+const PHONE_QUERY = "(max-width: 720px)";
+
+function subscribePhone(onChange: () => void): () => void {
+  if (typeof window === "undefined" || typeof window.matchMedia !== "function") {
+    return () => {};
+  }
+  const mq = window.matchMedia(PHONE_QUERY);
+  mq.addEventListener("change", onChange);
+  return () => mq.removeEventListener("change", onChange);
+}
+
+function isPhoneNow(): boolean {
+  if (typeof window === "undefined" || typeof window.matchMedia !== "function") {
+    return false;
+  }
+  return window.matchMedia(PHONE_QUERY).matches;
+}
+
+/** Server always renders the desktop shell; the client reads the real
+ *  viewport on the first paint after hydration. */
+function serverSnapshot(): boolean {
+  return false;
+}
 
 /**
  * Wraps the org profile's main 2-column content grid.
@@ -16,17 +50,34 @@ import { useState } from "react";
  * The two columns are passed in as ReactNode props so the server
  * page can render them with its full data context — this client
  * shell just owns the tab state.
+ *
+ * `reportable` is the one exception: the club's id and whether the viewer owns
+ * it, so the About column can end with a quiet "Report this club". It is
+ * OPTIONAL and defaults to nothing, because both live in the server page
+ * (src/app/orgs/[handle]/page.tsx) and this shell is handed ReactNodes only.
+ * Without it the row is simply absent — no half-wired button that files a
+ * report against an id nobody passed.
  */
 export function OrgContent({
   mainColumn,
   eventsColumn,
   aboutColumn,
+  reportable,
 }: {
   mainColumn: React.ReactNode;
   eventsColumn: React.ReactNode;
   aboutColumn: React.ReactNode;
+  /** The club being viewed, and whether this viewer runs it. Omit and no
+   *  Report row shows; `viewerIsOwner` hides it from the club's own officers,
+   *  who would otherwise get the route's 400 "You can't report something of
+   *  your own" — every other surface in the app keeps Report off your own
+   *  things rather than letting the route refuse it. */
+  reportable?: { id: string; viewerIsOwner?: boolean } | null;
 }) {
   const [tab, setTab] = useState<"posts" | "events" | "about">("posts");
+  const [reportOpen, setReportOpen] = useState(false);
+  const phone = useSyncExternalStore(subscribePhone, isPhoneNow, serverSnapshot);
+  const canReport = !!reportable && !reportable.viewerIsOwner;
 
   return (
     <div className="vibe-org-content" data-tab={tab}>
@@ -87,8 +138,40 @@ export function OrgContent({
           style={{ display: "flex", flexDirection: "column", gap: 16, minWidth: 0 }}
         >
           {aboutColumn}
+          {canReport ? (
+            <button
+              type="button"
+              onClick={() => setReportOpen(true)}
+              style={{
+                alignSelf: "flex-start",
+                padding: "8px 0",
+                background: "transparent",
+                border: "none",
+                color: "rgba(255,255,255,0.55)",
+                fontFamily: "DM Sans, sans-serif",
+                fontSize: 12.5,
+                fontWeight: 600,
+                textDecoration: "underline",
+                cursor: "pointer",
+                WebkitTapHighlightColor: "transparent",
+              }}
+            >
+              Report this club
+            </button>
+          ) : null}
         </aside>
       </div>
+
+      {reportOpen && canReport && reportable ? (
+        // A club has no person behind it to block, so the sheet offers none.
+        // Bottom sheet on the phone, centered dialog on the desktop grid —
+        // the same split this component already makes for its own layout.
+        <ReportSheet
+          variant={phone ? "sheet" : "modal"}
+          target={{ type: "org", id: reportable.id, noun: "club" }}
+          onClose={() => setReportOpen(false)}
+        />
+      ) : null}
     </div>
   );
 }

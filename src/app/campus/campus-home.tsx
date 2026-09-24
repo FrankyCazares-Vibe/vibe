@@ -26,6 +26,7 @@ import {
   PostAudienceList,
   type PostAudienceUser,
 } from "@/components/posts/PostAudienceList";
+import { RemovedContentCard, ReportSheet } from "@/components/safety/ReportSheet";
 import { MouseSpotlight } from "@/components/ui/mouse-spotlight";
 import {
   bindMentionPicker,
@@ -5359,6 +5360,16 @@ export type FeedPost = {
   created_at: string;
   /** Set when the author edited the post after publishing (" · Edited"). */
   edited_at?: string | null;
+  /**
+   * A moderator took this down. OPTIONAL because no read route sends it yet:
+   * `/api/feed` and `/api/users/[handle]/posts` both select explicit column
+   * lists without `removed_at` / `removed_reason`, and neither file belongs to
+   * this batch. Until they do, the card below this type never renders — and a
+   * student's own removed post still arrives looking like a live one (the
+   * SELECT policy is `(removed_at is null AND …) OR user_id = auth.uid()`).
+   */
+  removed_at?: string | null;
+  removed_reason?: string | null;
   author: FeedAuthor | null;
   org: FeedOrg;
 };
@@ -6239,6 +6250,10 @@ function FeedRow({
   const [showMoreMenu, setShowMoreMenu] = useState(false);
   // "Send to chats" picker (in-app share to DMs/groups/channels).
   const [shareOpen, setShareOpen] = useState(false);
+  // The report dialog, opened from "Report post". Never offered on the
+  // viewer's own post: the route answers that with a 400 the student would
+  // only ever see as the caller's fallback line.
+  const [reportOpen, setReportOpen] = useState(false);
   // Owner-only "Who saw this" modal, opened from the Views chip below.
   const [showViewers, setShowViewers] = useState(false);
   const closeViewers = useCallback(() => setShowViewers(false), []);
@@ -6450,6 +6465,26 @@ function FeedRow({
     }
   }, [post.id, post.content]);
 
+  // A moderator took this down. Nobody but the author is served the row at
+  // all, so this card is theirs alone. It is unreachable today: `/api/feed`
+  // does not select `removed_at`, which is exactly why a removed post still
+  // shows its author an ordinary card (see the FeedPost type).
+  if (viewerOwnsPost && post.removed_at) {
+    return (
+      <article
+        id={`post-${post.id}`}
+        data-post-id={post.id}
+        style={{ padding: "16px 20px", borderBottom: hairline }}
+      >
+        <RemovedContentCard
+          kind="post"
+          removedAt={post.removed_at}
+          removedReason={post.removed_reason}
+        />
+      </article>
+    );
+  }
+
   return (
     <article
       ref={articleRef}
@@ -6564,18 +6599,9 @@ function FeedRow({
                 role="menuitem"
                 onClick={() => {
                   setShowMoreMenu(false);
-                  // The menu is gone, so the toast is the only receipt.
-                  void vibeRequest("/api/me/reports", {
-                    method: "POST",
-                    json: {
-                      target_type: "post",
-                      target_id: post.id,
-                      reason_code: "other",
-                      reason: "",
-                    },
-                    failure: "Couldn't report this post.",
-                    success: "Reported — thanks for letting us know.",
-                  });
+                  // Was a one-tap `reason_code: "other"` with no picker, which
+                  // filed everything as "Something else". Now the sheet asks.
+                  setReportOpen(true);
                 }}
                 style={feedRowMenuItemStyle("danger")}
                 onMouseEnter={(e) => {
@@ -7030,6 +7056,7 @@ function FeedRow({
         {showComments ? (
           <CommentsDrawer
             postId={post.id}
+            viewerId={viewerId}
             onCommentAdded={() => setCommentCount((c) => c + 1)}
           />
         ) : null}
@@ -7054,6 +7081,23 @@ function FeedRow({
           share one list. */}
       {showViewers ? (
         <PostViewersModal key={post.id} postId={post.id} onClose={closeViewers} />
+      ) : null}
+
+      {reportOpen ? (
+        <ReportSheet
+          target={{
+            type: "post",
+            id: post.id,
+            // An org post still attributes to the person who wrote it, so
+            // Block reaches the right account.
+            authorId: post.author?.id ?? null,
+            authorName:
+              post.author?.name ||
+              (post.author?.handle ? `@${post.author.handle}` : null),
+          }}
+          onClose={() => setReportOpen(false)}
+          onBlocked={onMutate}
+        />
       ) : null}
     </article>
   );
@@ -7494,6 +7538,10 @@ type FeedComment = {
   like_count: number;
   viewer_liked: boolean;
   replies?: FeedComment[];
+  /** Same story as FeedPost above: `/api/posts/[id]/comments` does not select
+   *  these two columns yet, so the removed card never renders today. */
+  removed_at?: string | null;
+  removed_reason?: string | null;
   author: {
     id: string;
     name: string | null;
@@ -7504,9 +7552,14 @@ type FeedComment = {
 
 function CommentsDrawer({
   postId,
+  viewerId,
   onCommentAdded,
 }: {
   postId: string;
+  /** Who is reading, so a comment's ⋯ menu never offers "Report" on their own
+   *  words — the route answers that with a 400 the student never sees as a
+   *  sentence. Null (the feed hasn't answered yet) hides the menu entirely. */
+  viewerId: string | null;
   onCommentAdded: () => void;
 }) {
   const [comments, setComments] = useState<FeedComment[] | null>(null);
@@ -7610,6 +7663,7 @@ function CommentsDrawer({
                 key={c.id}
                 comment={c}
                 postId={postId}
+                viewerId={viewerId}
                 onReplyAdded={handleNewComment}
               />
             ))
@@ -7664,11 +7718,13 @@ function CommentsDrawer({
 function CommentRow({
   comment,
   postId,
+  viewerId,
   onReplyAdded,
   isReply = false,
 }: {
   comment: FeedComment;
   postId: string;
+  viewerId: string | null;
   onReplyAdded: (c: FeedComment) => void;
   isReply?: boolean;
 }) {
@@ -7677,6 +7733,11 @@ function CommentRow({
   const [replyOpen, setReplyOpen] = useState(false);
   const [replyDraft, setReplyDraft] = useState("");
   const [replySubmitting, setReplySubmitting] = useState(false);
+  // Report lives behind a ⋯ that only appears on someone else's comment, and
+  // only once the feed has told us who the viewer is.
+  const [menuOpen, setMenuOpen] = useState(false);
+  const [reportOpen, setReportOpen] = useState(false);
+  const canReport = !!viewerId && comment.user_id !== viewerId;
 
   const name = comment.author?.name || comment.author?.handle || "Member";
   const initials = name
@@ -7768,6 +7829,54 @@ function CommentRow({
       setReplySubmitting(false);
     }
   }, [replyDraft, postId, comment.id, replySubmitting, onReplyAdded]);
+
+  // The thread under this comment, rendered the same whether the comment
+  // itself is still there or was taken down — losing the replies along with
+  // the comment would make it look to its author as though the people who
+  // answered them had vanished too.
+  const repliesBlock =
+    comment.replies && comment.replies.length > 0 ? (
+      <div
+        style={{
+          marginTop: 10,
+          paddingLeft: 10,
+          borderLeft: "2px solid rgba(28,28,30,0.06)",
+          display: "flex",
+          flexDirection: "column",
+          gap: 10,
+        }}
+      >
+        {comment.replies.map((r) => (
+          <CommentRow
+            key={r.id}
+            comment={r}
+            postId={postId}
+            viewerId={viewerId}
+            onReplyAdded={onReplyAdded}
+            isReply
+          />
+        ))}
+      </div>
+    ) : null;
+
+  // The author's own view of a comment a moderator took down. Unreachable
+  // today — `/api/posts/[id]/comments` selects an explicit column list with
+  // neither `removed_at` nor `removed_reason` in it.
+  if (!!viewerId && comment.user_id === viewerId && comment.removed_at) {
+    return (
+      <div style={{ display: "flex", gap: 8 }}>
+        <div style={{ flex: 1, minWidth: 0 }}>
+          <RemovedContentCard
+            kind="comment"
+            compact
+            removedAt={comment.removed_at}
+            removedReason={comment.removed_reason}
+          />
+          {repliesBlock}
+        </div>
+      </div>
+    );
+  }
 
   return (
     <div style={{ display: "flex", gap: 8 }}>
@@ -7861,7 +7970,97 @@ function CommentRow({
           >
             Reply
           </button>
+          {canReport ? (
+            <span style={{ position: "relative", marginLeft: "auto" }}>
+              <button
+                type="button"
+                onClick={() => setMenuOpen((v) => !v)}
+                aria-label={menuOpen ? "Close comment menu" : "Open comment menu"}
+                aria-expanded={menuOpen}
+                style={{
+                  background: "transparent",
+                  border: "none",
+                  // A hairline glyph needs a target around it; the negative
+                  // margin keeps the row's height where it was.
+                  padding: "6px 8px",
+                  margin: "-6px -8px",
+                  cursor: "pointer",
+                  color: "inherit",
+                  font: "inherit",
+                  fontSize: 13,
+                  lineHeight: 1,
+                }}
+              >
+                ⋯
+              </button>
+              {menuOpen ? (
+                <>
+                  {/* Click-away: any tap outside the menu closes it. */}
+                  <button
+                    type="button"
+                    aria-label="Dismiss menu"
+                    onClick={() => setMenuOpen(false)}
+                    style={{
+                      position: "fixed",
+                      inset: 0,
+                      background: "transparent",
+                      border: "none",
+                      cursor: "default",
+                      zIndex: 1,
+                    }}
+                  />
+                  <span
+                    role="menu"
+                    style={{
+                      position: "absolute",
+                      top: 18,
+                      right: 0,
+                      zIndex: 2,
+                      minWidth: 150,
+                      background: "white",
+                      border: "1px solid rgba(28,28,30,0.08)",
+                      borderRadius: 10,
+                      boxShadow: "0 12px 36px rgba(0,0,0,0.12)",
+                      padding: 4,
+                      display: "block",
+                      // `feedRowMenuItemStyle` is fontSize: "inherit", and
+                      // this menu hangs off the comment's action row at 11px
+                      // — the post menu it was copied from inherits the
+                      // card's 13. Set it here so the item reads the same
+                      // size as the ⋯ that opened it.
+                      fontSize: 13,
+                    }}
+                  >
+                    <button
+                      type="button"
+                      role="menuitem"
+                      onClick={() => {
+                        setMenuOpen(false);
+                        setReportOpen(true);
+                      }}
+                      style={feedRowMenuItemStyle("danger")}
+                    >
+                      Report comment
+                    </button>
+                  </span>
+                </>
+              ) : null}
+            </span>
+          ) : null}
         </div>
+        {reportOpen ? (
+          <ReportSheet
+            target={{
+              type: "comment",
+              id: comment.id,
+              authorId: comment.author?.id ?? comment.user_id,
+              authorName:
+                comment.author?.name ||
+                (comment.author?.handle ? `@${comment.author.handle}` : null),
+            }}
+            onClose={() => setReportOpen(false)}
+          />
+        ) : null}
         {replyOpen ? (
           <div style={{ display: "flex", gap: 6, marginTop: 8 }}>
             <input
@@ -7911,28 +8110,7 @@ function CommentRow({
             </button>
           </div>
         ) : null}
-        {comment.replies && comment.replies.length > 0 ? (
-          <div
-            style={{
-              marginTop: 10,
-              paddingLeft: 10,
-              borderLeft: "2px solid rgba(28,28,30,0.06)",
-              display: "flex",
-              flexDirection: "column",
-              gap: 10,
-            }}
-          >
-            {comment.replies.map((r) => (
-              <CommentRow
-                key={r.id}
-                comment={r}
-                postId={postId}
-                onReplyAdded={onReplyAdded}
-                isReply
-              />
-            ))}
-          </div>
-        ) : null}
+        {repliesBlock}
       </div>
     </div>
   );

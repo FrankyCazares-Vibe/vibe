@@ -5,6 +5,11 @@ import { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState } fr
 import { Drawer } from "vaul";
 
 import { asLoadFailure, LoadFailed, type LoadFailure } from "@/components/feedback/LoadFailed";
+import {
+  RemovedContentCard,
+  ReportSheet,
+  type ReportTargetRef,
+} from "@/components/safety/ReportSheet";
 import { vibeRequest } from "@/lib/feedback/request";
 import { toast } from "@/lib/feedback/toast";
 
@@ -146,6 +151,15 @@ type MessageRow = {
    *  SET NULL, so the stub quietly goes away). */
   parent_preview?: ParentPreview | null;
   reactions?: MessageReaction[];
+  /**
+   * A moderator took it down. OPTIONAL and never sent today:
+   * `/api/me/threads/[id]/messages` selects an explicit column list without
+   * `removed_at` or `removed_reason`, and that route is not this batch's. So
+   * the card below never renders, and a student's own removed message still
+   * sits in their thread looking sent.
+   */
+  removed_at?: string | null;
+  removed_reason?: string | null;
 };
 
 const REACTION_EMOJIS = ["❤️", "👍", "👎", "😂", "🔥", "😮", "😢"] as const;
@@ -946,6 +960,9 @@ export function ConversationView({
   const [draft, setDraft] = useState("");
   const [sending, setSending] = useState(false);
   const [meId, setMeId] = useState<string | null>(null);
+  // One message, reported from the long-press picker. A single message is a
+  // `message` target; the whole chat is handled by the ⋯ sheet.
+  const [reportMessage, setReportMessage] = useState<ReportTargetRef | null>(null);
   const [staged, setStaged] = useState<StagedMedia | null>(null);
   const [replyTo, setReplyTo] = useState<ReplyTarget | null>(null);
   // Where a message request stands once the viewer answers it here, so
@@ -1645,6 +1662,22 @@ export function ConversationView({
                   listScrolledAtRef={listScrolledAtRef}
                   parentIsMine={!!meId && m.parent_preview?.user_id === meId}
                   onReply={() => startReply(m)}
+                  // Never on their own message, and never before the thread
+                  // has told us who they are.
+                  onReport={
+                    meId && m.user_id !== meId
+                      ? () =>
+                          setReportMessage({
+                            type: "message",
+                            id: m.id,
+                            authorId: m.users?.id ?? m.user_id,
+                            authorName:
+                              m.users?.name ||
+                              (m.users?.handle ? `@${m.users.handle}` : null),
+                            noun: "message",
+                          })
+                      : undefined
+                  }
                 />
               );
             })}
@@ -2047,6 +2080,23 @@ export function ConversationView({
         />
       ) : null}
 
+      {/* One reported message. `nested` is about the drawer this sits INSIDE,
+          not the long-press picker it opens from: that picker is a plain
+          positioned element, but the conversation itself is a vaul drawer
+          (Drawer.Root above), and a plain root closing inside it runs vaul's
+          unlock and restores the body styles the conversation still needs —
+          the page behind becomes scrollable and the thread can jump its
+          scroll position. Same shape as PostViewerMobile's sheet inside its
+          own full-screen drawer. */}
+      {reportMessage ? (
+        <ReportSheet
+          variant="sheet"
+          nested
+          target={reportMessage}
+          onClose={() => setReportMessage(null)}
+        />
+      ) : null}
+
       {/* Group settings — photo, name, members list, add/remove,
           per-member mute, leave. Admin-only affordances gated by
           thread.viewer_role. */}
@@ -2098,6 +2148,11 @@ function ConversationActionSheet({
 }) {
   const [busy, setBusy] = useState(false);
   const [muteSheetOpen, setMuteSheetOpen] = useState(false);
+  // Report, stacked on this sheet. On a 1:1 it reports the PERSON, not the
+  // channel: a `channel` report has no owner column behind it, so it lands in
+  // the queue with nobody attached and no action a moderator can take. Only a
+  // GROUP is offered "Report this chat".
+  const [reportTarget, setReportTarget] = useState<ReportTargetRef | null>(null);
 
   const isDm = thread?.type === "dm";
   const isGroup = thread?.type === "group";
@@ -2359,6 +2414,35 @@ function ConversationActionSheet({
             ) : null}
             {isDm && peer ? (
               <SheetRow
+                label={`Report @${peer.handle ?? "user"}`}
+                danger
+                onClick={() =>
+                  setReportTarget({
+                    type: "user",
+                    id: peer.id,
+                    authorId: peer.id,
+                    authorName: peer.name || (peer.handle ? `@${peer.handle}` : null),
+                  })
+                }
+                disabled={busy}
+              />
+            ) : null}
+            {isGroup ? (
+              <SheetRow
+                label="Report this chat"
+                danger
+                onClick={() =>
+                  setReportTarget({
+                    type: "channel",
+                    id: threadId,
+                    noun: "chat",
+                  })
+                }
+                disabled={busy}
+              />
+            ) : null}
+            {isDm && peer ? (
+              <SheetRow
                 label={`Block @${peer.handle ?? "user"}`}
                 danger
                 onClick={() => void blockPeer()}
@@ -2378,6 +2462,18 @@ function ConversationActionSheet({
             <MuteDurationSheet
               onClose={() => setMuteSheetOpen(false)}
               onPick={(h) => void muteFor(h)}
+            />
+          ) : null}
+
+          {reportTarget ? (
+            <ReportSheet
+              variant="sheet"
+              nested
+              target={reportTarget}
+              onClose={() => setReportTarget(null)}
+              // Blocking from inside the sheet leaves this conversation
+              // pointless, so it closes with the same handler Block uses.
+              onBlocked={onLeftOrDeleted}
             />
           ) : null}
         </Drawer.Content>
@@ -3637,6 +3733,7 @@ function MessageBubble({
   listScrolledAtRef,
   parentIsMine = false,
   onReply,
+  onReport,
 }: {
   message: MessageRow;
   isMine: boolean;
@@ -3666,6 +3763,10 @@ function MessageBubble({
   parentIsMine?: boolean;
   /** "↩ Reply" in the long-press picker. */
   onReply?: () => void;
+  /** "⚑ Report" in the same picker. Never passed for the viewer's own
+   *  message: the route answers that with a 400 the student never reads as a
+   *  sentence. */
+  onReport?: () => void;
 }) {
   const sender = message.users ?? null;
   const senderName = sender?.name || sender?.handle || "Member";
@@ -4161,6 +4262,24 @@ function MessageBubble({
     </div>
   ) : null;
 
+  // A moderator took this message down. Only its sender is served the row at
+  // all, so this card is theirs. Unreachable today —
+  // `/api/me/threads/[id]/messages` does not select `removed_at`.
+  if (isMine && message.removed_at) {
+    return (
+      <div style={{ marginTop: topGap, display: "flex", justifyContent: "flex-end" }}>
+        <div style={{ maxWidth: "min(300px, 86%)" }}>
+          <RemovedContentCard
+            kind="message"
+            compact
+            removedAt={message.removed_at}
+            removedReason={message.removed_reason}
+          />
+        </div>
+      </div>
+    );
+  }
+
   return (
     <div
       style={{
@@ -4318,6 +4437,15 @@ function MessageBubble({
                   }
                 : undefined
             }
+            // Same temp_ guard: a row still sending has no id to report.
+            onReport={
+              onReport && !message.id.startsWith("temp_")
+                ? () => {
+                    setPickerOpen(false);
+                    onReport();
+                  }
+                : undefined
+            }
             onClose={() => setPickerOpen(false)}
           />
         ) : null}
@@ -4359,6 +4487,7 @@ function ReactionPicker({
   existing,
   onPick,
   onReply,
+  onReport,
   onClose,
 }: {
   darkMode: boolean;
@@ -4367,6 +4496,9 @@ function ReactionPicker({
   onPick: (emoji: string) => void;
   /** Adds "↩ Reply", on the emoji row's far side from the bubble. */
   onReply?: () => void;
+  /** Adds "Report", under Reply. Absent on the viewer's own message and on
+   *  one still sending. */
+  onReport?: () => void;
   onClose: () => void;
 }) {
   const pickerRef = useRef<HTMLDivElement | null>(null);
@@ -4438,10 +4570,10 @@ function ReactionPicker({
         // where they were before Reply), and Reply goes on the far side.
         flexDirection: below ? "column" : "column-reverse",
         padding: "6px 8px",
-        // A pill for the emoji row alone; a card once Reply joins it.
-        // Reply gets its own row because beside the emojis the picker
-        // ran past a phone's width and scrolled the list sideways.
-        borderRadius: onReply ? 20 : 999,
+        // A pill for the emoji row alone; a card once Reply (or Report)
+        // joins it. They get their own rows because beside the emojis the
+        // picker ran past a phone's width and scrolled the list sideways.
+        borderRadius: onReply || onReport ? 20 : 999,
         background: darkMode
           ? "rgba(20,16,28,0.92)"
           : "rgba(255,255,255,0.96)",
@@ -4491,7 +4623,7 @@ function ReactionPicker({
           );
         })}
       </div>
-      {onReply ? (
+      {onReply || onReport ? (
         <>
           <div
             aria-hidden
@@ -4502,35 +4634,56 @@ function ReactionPicker({
               background: darkMode ? "rgba(255,255,255,0.12)" : "rgba(28,28,30,0.08)",
             }}
           />
-          <button
-            type="button"
-            aria-label="Reply"
-            onClick={(e) => {
-              e.stopPropagation();
-              onReply();
-            }}
-            style={{
-              display: "flex",
-              alignItems: "center",
-              gap: 8,
-              height: 36,
-              padding: "0 8px",
-              borderRadius: 12,
-              border: "none",
-              background: "transparent",
-              color: darkMode ? "#fff" : "#1C1C1E",
-              fontFamily: "DM Sans, sans-serif",
-              fontSize: 14,
-              fontWeight: 700,
-              cursor: "pointer",
-              WebkitTapHighlightColor: "transparent",
-            }}
-          >
-            <span aria-hidden>↩</span>
-            Reply
-          </button>
+          {onReply ? (
+            <button
+              type="button"
+              aria-label="Reply"
+              onClick={(e) => {
+                e.stopPropagation();
+                onReply();
+              }}
+              style={pickerRowStyle(darkMode, false)}
+            >
+              <span aria-hidden>↩</span>
+              Reply
+            </button>
+          ) : null}
+          {onReport ? (
+            <button
+              type="button"
+              aria-label="Report this message"
+              onClick={(e) => {
+                e.stopPropagation();
+                onReport();
+              }}
+              style={pickerRowStyle(darkMode, true)}
+            >
+              <span aria-hidden>⚑</span>
+              Report
+            </button>
+          ) : null}
         </>
       ) : null}
     </div>
   );
+}
+
+/** Reply and Report, so the two rows in the long-press picker can't drift. */
+function pickerRowStyle(darkMode: boolean, danger: boolean): React.CSSProperties {
+  return {
+    display: "flex",
+    alignItems: "center",
+    gap: 8,
+    height: 36,
+    padding: "0 8px",
+    borderRadius: 12,
+    border: "none",
+    background: "transparent",
+    color: danger ? (darkMode ? "#FFAE9E" : "#C42B1C") : darkMode ? "#fff" : "#1C1C1E",
+    fontFamily: "DM Sans, sans-serif",
+    fontSize: 14,
+    fontWeight: 700,
+    cursor: "pointer",
+    WebkitTapHighlightColor: "transparent",
+  };
 }

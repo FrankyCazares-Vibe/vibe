@@ -24,6 +24,7 @@ import { PostViewerMobile } from "@/components/mobile/PostViewerMobile";
 import { SharePostSheet } from "@/components/mobile/SharePostSheet";
 import { useMobileTour } from "@/components/mobile/use-mobile-tour";
 import { OrgJoinControl } from "@/components/orgs/OrgJoinControl";
+import { RemovedContentCard, ReportSheet } from "@/components/safety/ReportSheet";
 import { vibeRequest } from "@/lib/feedback/request";
 import { toast } from "@/lib/feedback/toast";
 import { campusRowById } from "@/lib/iu/campuses";
@@ -681,6 +682,9 @@ export function CampusMobile() {
             onClearTag={() => setFeedTag(null)}
             viewerId={viewerId}
             onEdited={applyPostEdit}
+            // A block made from a card's ⋯ has to take their posts off the
+            // screen, or it reads as though nothing happened.
+            onBlocked={() => void refetchFeed("refresh")}
           />
         </section>
         <section style={paneStyle}>
@@ -772,11 +776,15 @@ export function CampusMobile() {
       {openPostId ? (
         <PostViewerMobile
           postId={openPostId}
+          viewerId={viewerId}
           onClose={() => setOpenPostId(null)}
           onDeleted={() => {
             void refetchFeed("refresh");
             setOpenPostId(null);
           }}
+          // Same reason as the card's ⋯ above: the viewer closes onto this
+          // feed, and the blocked person's posts have to be gone from it.
+          onBlocked={() => void refetchFeed("refresh")}
           // An edit made in the viewer updates the card under it.
           onEdited={applyPostEdit}
         />
@@ -898,6 +906,7 @@ function FeedPane({
   onClearTag,
   viewerId,
   onEdited,
+  onBlocked,
 }: {
   posts: FeedPost[] | null;
   /** Why `posts` is null once its load has failed; null while loading. */
@@ -911,6 +920,8 @@ function FeedPane({
   /** The signed-in viewer, from the feed answer; null until it lands. */
   viewerId: string | null;
   onEdited: (p: EditedPost) => void;
+  /** A block landed from a card's ⋯: reload so their posts go. */
+  onBlocked: () => void;
 }) {
   const chip = tag ? <FeedTagChip tag={tag} onClear={onClearTag} /> : null;
   if (posts === null) {
@@ -951,6 +962,7 @@ function FeedPane({
           // Owner means author, the same rule as the edit route and desktop.
           isOwner={!!viewerId && p.user_id === viewerId}
           onEdited={onEdited}
+          onBlocked={onBlocked}
         />
       ))}
     </>
@@ -1030,6 +1042,7 @@ function FeedCard({
   onPickTag,
   isOwner,
   onEdited,
+  onBlocked,
 }: {
   post: FeedPost;
   onOpen: () => void;
@@ -1039,6 +1052,8 @@ function FeedCard({
   isOwner: boolean;
   /** An edit saved from the card's ⋯ menu. */
   onEdited: (p: EditedPost) => void;
+  /** The author was blocked from the card's ⋯ menu. */
+  onBlocked: () => void;
 }) {
   const author = post.author;
   const initials = (author?.name ?? author?.handle ?? "?")
@@ -1159,6 +1174,20 @@ function FeedCard({
       tapTimerRef.current = null;
     }
   };
+
+  // A moderator took this down, and only its author is ever served the row.
+  // Not a button: there is nothing behind it to open. Unreachable today —
+  // `/api/feed` does not select `removed_at` (see the desktop FeedPost type),
+  // so a removed post still reaches its author looking live.
+  if (isOwner && post.removed_at) {
+    return (
+      <RemovedContentCard
+        kind="post"
+        removedAt={post.removed_at}
+        removedReason={post.removed_reason}
+      />
+    );
+  }
 
   return (
     <button
@@ -1647,6 +1676,7 @@ function FeedCard({
           postId={post.id}
           postTitle={post.content ?? ""}
           postPosterUrl={post.media_thumbnail_url ?? post.media_url ?? null}
+          authorId={post.author?.id ?? null}
           authorName={
             post.author?.name ||
             (post.author?.handle ? `@${post.author.handle}` : null)
@@ -1655,6 +1685,7 @@ function FeedCard({
           initialContent={post.content ?? ""}
           hasMedia={!!post.media_url}
           onEdited={onEdited}
+          onBlocked={onBlocked}
           onClose={() => setMenuOpen(false)}
         />
       ) : null}
@@ -3044,25 +3075,35 @@ function PostActionsSheet({
   postId,
   postTitle,
   postPosterUrl,
+  authorId,
   authorName,
   isOwner,
   initialContent,
   hasMedia,
   onEdited,
+  onBlocked,
   onClose,
 }: {
   postId: string;
   postTitle?: string;
   postPosterUrl?: string | null;
+  /** The author's user id, for "Block author". Absent → no block offered. */
+  authorId?: string | null;
   authorName?: string | null;
   /** The viewer wrote this post: Edit post replaces Report post. */
   isOwner: boolean;
   initialContent: string;
   hasMedia: boolean;
   onEdited: (p: EditedPost) => void;
+  /** Report → Block, or "Block author": the feed reloads without them. */
+  onBlocked: () => void;
   onClose: () => void;
 }) {
-  const [reporting, setReporting] = useState(false);
+  // The report sheet, stacked on this one. It replaced a raw `fetch` that
+  // sent `reason_code: "other"` with no picker and showed the server's own
+  // string in a local banner — so a 403 `terms_required` read as "Forbidden"
+  // and led nowhere. Everything now goes through vibeRequest.
+  const [reportOpen, setReportOpen] = useState(false);
   // Shadows the imported `toast` inside this sheet: add no `toast({…})` call
   // here (EditPostSheet toasts its own save).
   const [toast, setToast] = useState<string | null>(null);
@@ -3072,33 +3113,32 @@ function PostActionsSheet({
   const [shareOpen, setShareOpen] = useState(false);
   // "Edit post" opens EditPostSheet on top, the same way.
   const [editOpen, setEditOpen] = useState(false);
+  const [blocking, setBlocking] = useState(false);
 
-  const report = useCallback(
-    async (reasonCode: string) => {
-      if (reporting) return;
-      setReporting(true);
-      try {
-        const r = await fetch("/api/me/reports", {
-          method: "POST",
-          headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({
-            target_type: "post",
-            target_id: postId,
-            reason_code: reasonCode,
-            reason: "",
-          }),
-        });
-        const j = await r.json();
-        if (!r.ok || !j?.ok) throw new Error(j?.error ?? "Report failed");
-        setToast("Reported — thanks for letting us know.");
-        setTimeout(onClose, 900);
-      } catch (e) {
-        setToast(e instanceof Error ? e.message : "Couldn't report");
-        setReporting(false);
-      }
-    },
-    [postId, reporting, onClose],
-  );
+  // "Block author" — the phone feed card had Report and no way to stop seeing
+  // the person, which is the thing most students actually want.
+  const blockAuthor = useCallback(async () => {
+    if (!authorId || blocking) return;
+    const who = authorName || "this person";
+    if (
+      typeof window !== "undefined" &&
+      !window.confirm(
+        `Block ${who}?\n\nThey won't be able to message you, see your posts, or find you in search. You also won't see their content.`,
+      )
+    )
+      return;
+    setBlocking(true);
+    const r = await vibeRequest("/api/me/block", {
+      json: { target_id: authorId },
+      failure: `Couldn't block ${who}.`,
+    });
+    setBlocking(false);
+    // A refusal already said why in a toast; the sheet stays open.
+    if (!r.ok) return;
+    setToast(`Blocked ${who}.`);
+    onBlocked();
+    setTimeout(onClose, 900);
+  }, [authorId, authorName, blocking, onBlocked, onClose]);
 
   const copyLink = useCallback(async () => {
     try {
@@ -3202,12 +3242,21 @@ function PostActionsSheet({
           {isOwner ? (
             <ActionSheetRow label="Edit post" onClick={() => setEditOpen(true)} />
           ) : (
-            <ActionSheetRow
-              label="Report post"
-              tone="danger"
-              onClick={() => void report("other")}
-              disabled={reporting}
-            />
+            <>
+              <ActionSheetRow
+                label="Report post"
+                tone="danger"
+                onClick={() => setReportOpen(true)}
+              />
+              {authorId ? (
+                <ActionSheetRow
+                  label={blocking ? "Blocking…" : "Block author"}
+                  tone="danger"
+                  onClick={() => void blockAuthor()}
+                  disabled={blocking}
+                />
+              ) : null}
+            </>
           )}
           <ActionSheetRow
             label="Cancel"
@@ -3255,6 +3304,23 @@ function PostActionsSheet({
             onEdited(p);
             onClose();
           }}
+        />
+      ) : null}
+
+      {reportOpen ? (
+        // Nested for the same reason as the two sheets above: closing it must
+        // not tear down the scroll lock this one still needs.
+        <ReportSheet
+          variant="sheet"
+          nested
+          target={{
+            type: "post",
+            id: postId,
+            authorId: authorId ?? null,
+            authorName: authorName ?? null,
+          }}
+          onClose={() => setReportOpen(false)}
+          onBlocked={onBlocked}
         />
       ) : null}
     </Drawer.Root>

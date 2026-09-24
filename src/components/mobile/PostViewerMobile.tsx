@@ -9,6 +9,11 @@ import { EditPostSheet } from "@/components/mobile/EditPostSheet";
 import { PostAudienceSheet } from "@/components/mobile/PostAudienceSheet";
 import { SharePostSheet } from "@/components/mobile/SharePostSheet";
 import type { PostAudienceKind } from "@/components/posts/PostAudienceList";
+import {
+  RemovedContentCard,
+  ReportSheet,
+  type ReportTargetRef,
+} from "@/components/safety/ReportSheet";
 import { copyText, vibeRequest } from "@/lib/feedback/request";
 import { EDITED_LABEL, type EditedPost } from "@/lib/posts/edit";
 
@@ -68,6 +73,14 @@ type PostDetail = {
   /** Set when a published post's text was edited (stamped by the database);
    *  null or absent = never edited. Drives the " · Edited" marker. */
   edited_at?: string | null;
+  /**
+   * A moderator took it down. OPTIONAL and never sent today:
+   * `/api/posts/[id]` selects an explicit column list without `removed_at` or
+   * `removed_reason`, and that route is not this batch's. Until it is, a
+   * removed post still opens for its author as an ordinary one.
+   */
+  removed_at?: string | null;
+  removed_reason?: string | null;
   author: Author | null;
 };
 
@@ -76,6 +89,9 @@ type Comment = {
   user_id: string;
   content: string;
   created_at: string;
+  /** Same story as the post above: the comments route doesn't select these. */
+  removed_at?: string | null;
+  removed_reason?: string | null;
   author: { id: string; name: string | null; handle: string | null; avatar_url: string | null } | null;
 };
 
@@ -106,17 +122,29 @@ export function PostViewerMobile({
   postId,
   onClose,
   canDelete = false,
+  viewerId = null,
   onDeleted,
   onEdited,
+  onBlocked,
 }: {
   postId: string;
   onClose: () => void;
+  /** Who is reading, when the caller already knows (CampusMobile gets it off
+   *  every feed answer). `/api/posts/[id]` never sends it, so without this the
+   *  screen only learns the viewer from `is_owner` or from a comment they
+   *  post — and a comment's Report stays hidden until then. */
+  viewerId?: string | null;
   /** Show the kebab menu with a Delete action. Caller decides ownership;
    *  server still re-checks at /api/posts/[id] DELETE. */
   canDelete?: boolean;
   /** Fired after a successful delete; viewer auto-closes. Parent
    *  typically uses this to refresh its post grid. */
   onDeleted?: () => void;
+  /** Fired after a block lands, just before the viewer closes. The blocked
+   *  person's posts are still sitting in whatever list is underneath, so the
+   *  caller reloads it — otherwise the viewer closes onto a feed that looks
+   *  exactly as it did, which reads as the block not having worked. */
+  onBlocked?: () => void;
   /** Fired after a saved edit, with the post's new text, tags and
    *  `edited_at`. The viewer has already updated itself; the caller patches
    *  its own list in place. No caller passes it yet (wave 4: CM, PM). */
@@ -135,6 +163,17 @@ export function PostViewerMobile({
   // link the author was treated as a stranger. The owner-only audience sheets
   // hang off this, and the routes behind them re-check ownership themselves.
   const [isOwner, setIsOwner] = useState(false);
+  // What the report sheet is pointed at — the post, or one comment. One sheet
+  // serves both, so the reason list and the copy can't drift between them.
+  const [reportTarget, setReportTarget] = useState<ReportTargetRef | null>(null);
+  const [blocking, setBlocking] = useState(false);
+  // Who is reading. `/api/posts/[id]` answers `is_owner` but never a viewer
+  // id, so this is learned two honest ways: the author's own id when the
+  // server says the post is theirs, and the `user_id` on a comment they just
+  // posted. Null means "we don't know", and a comment's ⋯ stays hidden rather
+  // than offering a student Report on their own words (a 400 they'd only ever
+  // read as "Couldn't send your report.").
+  const [selfId, setSelfId] = useState<string | null>(null);
   // Which audience sheet is up, if any. Mounted only while open, so the
   // owner-only fetch never fires for a sheet nobody asked for.
   const [audienceKind, setAudienceKind] = useState<PostAudienceKind | null>(null);
@@ -255,6 +294,10 @@ export function PostViewerMobile({
       // Fails closed: anything but an explicit true leaves the owner-only
       // affordances off.
       setIsOwner(r.data.is_owner === true);
+      // The one place this screen can learn who is reading it.
+      if (r.data.is_owner === true && r.data.post.author?.id) {
+        setSelfId(r.data.post.author.id);
+      }
     })();
     return () => {
       cancelled = true;
@@ -377,6 +420,9 @@ export function PostViewerMobile({
       // Onto a loaded list only: alone in a list that never loaded, it would
       // read as the only comment. A failed load runs again and picks it up.
       if (posted) setComments((prev) => (prev ? [...prev, posted] : prev));
+      // Their own comment names them, which is how a stranger's post learns
+      // the viewer's id without a second request.
+      if (posted?.user_id) setSelfId(posted.user_id);
       setCommentsErr(null);
       setCounts((c) => ({ ...c, comments: c.comments + 1 }));
       setDraft("");
@@ -394,6 +440,38 @@ export function PostViewerMobile({
   // ProfileMobile's optimistic-removal path is untouched, and deleting still
   // fails closed server-side (DELETE /api/posts/[id] re-checks ownership).
   const owner = canDelete || isOwner;
+  // The caller's answer wins; `selfId` is what this screen worked out for
+  // itself. Either way, null means "we don't know" and the ⋯ stays away.
+  const me = viewerId ?? selfId;
+  const authorLabel =
+    author?.name || (author?.handle ? `@${author.handle}` : null);
+
+  // "Block author", next to Report in the ⋯ menu. The phone viewer offered a
+  // report and no way to stop seeing the person.
+  const blockAuthor = async () => {
+    const id = author?.id;
+    if (!id || blocking) return;
+    const who = authorLabel || "this person";
+    if (
+      typeof window !== "undefined" &&
+      !window.confirm(
+        `Block ${who}?\n\nThey won't be able to message you, see your posts, or find you in search. You also won't see their content.`,
+      )
+    )
+      return;
+    setBlocking(true);
+    const r = await vibeRequest("/api/me/block", {
+      json: { target_id: id },
+      failure: `Couldn't block ${who}.`,
+      success: `Blocked ${who}`,
+    });
+    setBlocking(false);
+    // A refusal said why in a toast; the viewer stays where it is.
+    if (!r.ok) return;
+    // Tell the list underneath before closing onto it.
+    onBlocked?.();
+    onClose();
+  };
   // media_url is a /api/posts/[id]/media proxy path, so a `clips/` sniff
   // would call every video an image — trust the server's media_kind.
   const isImage =
@@ -648,19 +726,24 @@ export function PostViewerMobile({
                     tone="danger"
                     onClick={() => {
                       setMenuOpen(false);
-                      // The menu just closes, so the toast is the only sign
-                      // the report landed (or was refused).
-                      void vibeRequest("/api/me/reports", {
-                        method: "POST",
-                        json: {
-                          target_type: "post",
-                          target_id: postId,
-                          reason_code: "other",
-                          reason: "",
-                        },
-                        failure: "Couldn't report this post.",
-                        success: "Reported. Thanks for letting us know.",
+                      // Was a one-tap `reason_code: "other"` with no picker.
+                      setReportTarget({
+                        type: "post",
+                        id: postId,
+                        authorId: author?.id ?? null,
+                        authorName: authorLabel,
                       });
+                    }}
+                  />
+                ) : null}
+                {!owner && author?.id ? (
+                  <ViewerMenuItem
+                    label={blocking ? "Blocking…" : "Block author"}
+                    tone="danger"
+                    disabled={blocking}
+                    onClick={() => {
+                      setMenuOpen(false);
+                      void blockAuthor();
                     }}
                   />
                 ) : null}
@@ -718,6 +801,21 @@ export function PostViewerMobile({
           </div>
         ) : !post ? (
           <PostViewerSkeleton />
+        ) : owner && post.removed_at ? (
+          // The author's own view, gated the same way the other four are
+          // (campus-home's feed card, CampusMobile's card, the CommentRow
+          // below, MessagesMobile's bubble). RLS already means only the
+          // author is served a removed post, but the card's own sentence is
+          // "Only you can see this post" — one service-client branch added to
+          // `/api/posts/[id]` and a stranger opening a shared link would be
+          // told a moderator removed it and that they alone can see it.
+          // Unreachable today either way: that route does not select
+          // `removed_at` (see the PostDetail type).
+          <RemovedContentCard
+            kind="post"
+            removedAt={post.removed_at}
+            removedReason={post.removed_reason}
+          />
         ) : (
           <>
             {isImage ? (
@@ -917,7 +1015,27 @@ export function PostViewerMobile({
                 ) : (
                   <div style={{ display: "flex", flexDirection: "column", gap: 12 }}>
                     {comments.map((c) => (
-                      <CommentRow key={c.id} c={c} />
+                      <CommentRow
+                        key={c.id}
+                        c={c}
+                        isMine={!!me && c.user_id === me}
+                        // Hidden while we don't know who is reading: the
+                        // route answers a report on your own comment with a
+                        // 400 the student never sees as a sentence.
+                        onReport={
+                          me && c.user_id !== me
+                            ? () =>
+                                setReportTarget({
+                                  type: "comment",
+                                  id: c.id,
+                                  authorId: c.author?.id ?? c.user_id,
+                                  authorName:
+                                    c.author?.name ||
+                                    (c.author?.handle ? `@${c.author.handle}` : null),
+                                })
+                            : undefined
+                        }
+                      />
                     ))}
                   </div>
                 )}
@@ -1052,6 +1170,20 @@ export function PostViewerMobile({
           onClose={() => setAudienceKind(null)}
         />
       ) : null}
+
+      {/* One report sheet for the post and for any comment. `nested` for the
+          same vaul body-lock reason as the share sheet. */}
+      {reportTarget ? (
+        <ReportSheet
+          variant="sheet"
+          nested
+          target={reportTarget}
+          onClose={() => setReportTarget(null)}
+          // Block offered after a report lands reaches the list underneath
+          // too, the same as the ⋯ menu's own Block author.
+          onBlocked={() => onBlocked?.()}
+        />
+      ) : null}
     </Drawer.Root>
   );
 }
@@ -1098,8 +1230,32 @@ function ViewerMenuItem({
   );
 }
 
-function CommentRow({ c }: { c: Comment }) {
+function CommentRow({
+  c,
+  isMine = false,
+  onReport,
+}: {
+  c: Comment;
+  /** The viewer wrote it — the only person the row is served to once it has
+   *  been removed, and the one person who is never offered Report. */
+  isMine?: boolean;
+  /** Absent when reporting doesn't apply (their own comment, or we can't
+   *  tell who is reading): no ⋯ is drawn at all. */
+  onReport?: () => void;
+}) {
   const a = c.author;
+  // Unreachable today: `/api/posts/[id]/comments` selects an explicit column
+  // list with neither `removed_at` nor `removed_reason`.
+  if (isMine && c.removed_at) {
+    return (
+      <RemovedContentCard
+        kind="comment"
+        compact
+        removedAt={c.removed_at}
+        removedReason={c.removed_reason}
+      />
+    );
+  }
   return (
     <div style={{ display: "flex", gap: 10 }}>
       <div
@@ -1133,6 +1289,30 @@ function CommentRow({ c }: { c: Comment }) {
           {relTime(c.created_at)}
         </div>
       </div>
+      {onReport ? (
+        <button
+          type="button"
+          onClick={onReport}
+          aria-label="Report this comment"
+          style={{
+            flexShrink: 0,
+            // 32px of thumb around a glyph that reads as a hairline.
+            width: 32,
+            height: 32,
+            marginTop: -4,
+            marginRight: -6,
+            background: "transparent",
+            border: "none",
+            color: "#8A8580",
+            fontSize: 15,
+            lineHeight: 1,
+            cursor: "pointer",
+            WebkitTapHighlightColor: "transparent",
+          }}
+        >
+          ⋯
+        </button>
+      ) : null}
     </div>
   );
 }
