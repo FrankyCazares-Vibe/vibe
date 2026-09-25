@@ -2,14 +2,31 @@
 
 import Link from "next/link";
 import { useRouter } from "next/navigation";
-import { useState } from "react";
+import { useEffect, useState } from "react";
 
 import { MIN_AGE, TERMS_VERSION } from "@/lib/legal/terms";
 import { openInBrowser } from "@/lib/native/bridge";
 import { appShellOnClient } from "@/lib/native/detect";
 import { clearDraft } from "@/lib/onboarding/draft";
+import { pushLogoutBody } from "@/lib/pwa/device-push";
+import { leaveDeviceClean } from "@/lib/pwa/leave-device-clean";
 
 const GENERIC_ERROR = "Couldn't save your agreement. Please try again.";
+
+/**
+ * leaveDeviceClean behind our own guard. It promises never to throw and to be
+ * done within ~3 s; this makes sure, so a push clean-up problem can't stop
+ * Sign out: any error is dropped, and after 4 s we move on whatever it's
+ * still doing.
+ */
+function leaveDeviceSafely(opts: { serverDelete: boolean }): Promise<void> {
+  return Promise.race([
+    Promise.resolve()
+      .then(() => leaveDeviceClean(opts))
+      .catch(() => {}),
+    new Promise<void>((resolve) => setTimeout(resolve, 4000)),
+  ]);
+}
 
 /**
  * The Terms and Privacy links open in a new tab so the student can read them
@@ -35,6 +52,17 @@ export function AcceptTermsForm({ next }: { next: string }) {
   const [agreed, setAgreed] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [loading, setLoading] = useState(false);
+  const [signingOut, setSigningOut] = useState(false);
+
+  // Sign out holds both buttons while the page navigates away; re-arm them if
+  // the browser restores this page from the back/forward cache.
+  useEffect(() => {
+    const onPageShow = (e: PageTransitionEvent) => {
+      if (e.persisted) setSigningOut(false);
+    };
+    window.addEventListener("pageshow", onPageShow);
+    return () => window.removeEventListener("pageshow", onPageShow);
+  }, []);
 
   async function onSubmit(e: React.FormEvent) {
     e.preventDefault();
@@ -78,14 +106,29 @@ export function AcceptTermsForm({ next }: { next: string }) {
   }
 
   async function onSignOut() {
+    if (signingOut) return;
+    setSigningOut(true);
+    let signedOut = false;
     try {
-      await fetch("/api/auth/logout", {
+      const res = await fetch("/api/auth/logout", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
+        // This device's push address, so the route drops its row too, even
+        // one another account left behind on this phone (plan §8 W7).
+        body: JSON.stringify(pushLogoutBody()),
       });
+      const data = (await res.json().catch(() => ({}))) as { ok?: boolean };
+      signedOut = res.ok && data.ok === true;
     } catch {
       // Best-effort; the login page copes with a lingering session.
     }
+    // Take this device off push, close what's still on screen and drop the
+    // account's cached data: the student thinks they've signed out either
+    // way. After a good logout the route already dropped every row, so no
+    // server delete (plan §8 W7). After a failed one the session is likely
+    // still alive, so delete this device's row ourselves (critic-w3 item 22).
+    // It can't throw or navigate and is over within 4 s.
+    await leaveDeviceSafely({ serverDelete: !signedOut });
     // Drop every onboarding draft on this browser (no id), same as the
     // Settings sign-out. Hard reload (same as Settings) so the cookie clear
     // is reflected everywhere and the next nav lands on /auth/login.
@@ -156,7 +199,7 @@ export function AcceptTermsForm({ next }: { next: string }) {
 
           <button
             type="submit"
-            disabled={loading || !agreed}
+            disabled={loading || signingOut || !agreed}
             className={`vibe-auth-submit${!agreed ? " vibe-auth-submit--locked" : ""}`}
           >
             {loading ? "Saving…" : "Continue"}
@@ -174,10 +217,16 @@ export function AcceptTermsForm({ next }: { next: string }) {
             delete your account
           </Link>{" "}
           instead, or{" "}
-          <button type="button" onClick={onSignOut} className="vibe-auth-link">
-            sign out
+          <button
+            type="button"
+            onClick={onSignOut}
+            disabled={signingOut}
+            aria-busy={signingOut}
+            className="vibe-auth-link"
+          >
+            {signingOut ? "signing out…" : "sign out"}
           </button>
-          .
+          {signingOut ? "" : "."}
         </p>
       </div>
     </div>

@@ -5,6 +5,7 @@ import type { SupabaseClient } from "@supabase/supabase-js";
 import { stripeKeyLivemode } from "@/lib/billing/config";
 import { billingCustomerForUser, forgetStripeCustomer } from "@/lib/billing/customers";
 import { getStripe, isStripeResourceMissing, logBillingError } from "@/lib/billing/stripe";
+import { isMissingPushSchema, warnMissingPushSchemaOnce } from "@/lib/push/config";
 import { createSupabaseServiceClient } from "@/lib/supabase/service";
 
 import { isRestrictionPepperConfigured, restrictionIdentityKey } from "./access";
@@ -241,6 +242,29 @@ async function clearAuthBan(service: SupabaseClient, userId: string): Promise<bo
 }
 
 /**
+ * Delete every `push_devices` row the restricted student has (wave 3′a batch
+ * D). The dispatcher already skips a restricted recipient
+ * (src/lib/push/dispatch.ts), so this is the second lock, not the first: no
+ * phone stays on file for an account that can't use Vibe. It runs for a
+ * suspension too, and `liftRestriction` needs nothing back — the student's
+ * devices register again the next time they open the app.
+ *
+ * Never throws and never fails the restriction: the row above is already
+ * written. A missing table (code ships before the migration) is nothing to
+ * delete; any other error is logged by code only, never with an address.
+ */
+async function forgetPushDevices(service: SupabaseClient, userId: string): Promise<void> {
+  try {
+    const { error } = await service.from("push_devices").delete().eq("user_id", userId);
+    if (!error) return;
+    if (isMissingPushSchema(error)) warnMissingPushSchemaOnce("moderation.actions");
+    else console.error(`${LOG} push devices`, error.code);
+  } catch (err) {
+    console.error(`${LOG} push devices`, err instanceof Error ? err.name : "unknown");
+  }
+}
+
+/**
  * A ban stops Vibe+ (Franky's decision 7, no refund). Same sequence as account
  * deletion (src/app/api/me/route.ts:184-217), INCLUDING the livemode guard:
  * deleting a customer cancels every subscription it has, and doing that
@@ -406,6 +430,10 @@ export async function restrictUser(args: RestrictArgs): Promise<RestrictResult> 
   // restricted properly, on top of a lockout nobody remembers. Unconditional
   // rather than clever: an account that has no ban costs one admin write.
   if (!(await clearAuthBan(service, args.userId))) incomplete.push("auth_ban");
+  // Forget the student's push devices. Not a RestrictionStep: it enforces
+  // nothing (the dispatcher already skips a restricted recipient) and never
+  // fails the restriction.
+  await forgetPushDevices(service, args.userId);
   // A ban stops the money and nothing else about the account: sign-in stays
   // open on purpose, so the row above plus the proxy are the whole enforcement.
   if (args.kind === "ban") {

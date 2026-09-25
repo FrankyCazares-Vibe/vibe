@@ -22,7 +22,7 @@
  *    every cache and unregisters itself. Its header has the drill.
  */
 
-const SW_VERSION = "2026-09-24-3";
+const SW_VERSION = "2026-09-25-2";
 
 const OFFLINE_URL = "/offline.html";
 const OFFLINE_CACHE = "vibe-offline-" + SW_VERSION;
@@ -140,10 +140,19 @@ border:0;border-radius:999px;background:#FF5C35;color:#FAF7F2">Try again</button
 // ── Push ─────────────────────────────────────────────────────────────────────
 // Payload (plan R13): {"web_push":8030,"notification":{"title","body",
 // "navigate","tag","app_badge"},"app_badge":N,"mutable":false}. iOS 18.4+
-// shows that itself and never runs this handler; Chrome, Firefox, Edge and
-// iOS 16.4–18.3 do. Every push shows something: a silent one gets the
-// permission revoked. Unreadable data (DevTools' plain-text test push
-// included) shows the default title and body.
+// shows that itself and never runs this handler (its chat pushes stack one
+// per message, which is fine); Chrome, Firefox, Edge and iOS 16.4–18.3 do.
+// Every push shows something: a silent one gets the permission revoked.
+// Unreadable data (DevTools' plain-text test push included) shows the
+// default title and body.
+//
+// Chat tags are one per MESSAGE, `dm:<channel>:<message>` (payload.ts), so
+// every new message alerts again: no browser re-alerts on a replaced tag
+// except Chromium with `renotify`, which Firefox and Safari lack. To keep one
+// notification per thread anyway (plan §8 W8), the thread's older ones are
+// closed first and the new one shown after. Never the other way round: two
+// pushes for one thread could then close each other and leave nothing up.
+// Two that race can leave the older message showing; that is accepted.
 
 self.addEventListener("push", (event) => {
   const payload = readPayload(event.data);
@@ -158,8 +167,9 @@ self.addEventListener("push", (event) => {
     badge: "/icons/badge-mono-96.png",
     data: { url: url || FALLBACK_URL },
   };
-  // The same tag replaces the earlier notification quietly (no renotify),
-  // so 40 likes on one post buzz once.
+  // A repeated tag (likes and comments on one post, follows) replaces the
+  // earlier notification quietly, so 40 likes on one post buzz once. Chat
+  // tags never repeat; see closeThread below.
   if (tag) options.tag = tag;
   // Safari may open `navigate` itself and skip notificationclick, so it only
   // ever carries an address already checked to be ours.
@@ -168,20 +178,64 @@ self.addEventListener("push", (event) => {
   const badge = payload ? readBadge(payload.app_badge, n.app_badge) : null;
   event.waitUntil(
     Promise.all([
-      self.registration
-        .showNotification(title || DEFAULT_TITLE, options)
-        // If a browser refuses these options, the plain default still counts
-        // as showing something; a push that shows nothing is a silent one.
-        .catch(() =>
-          self.registration.showNotification(DEFAULT_TITLE, {
-            body: DEFAULT_BODY,
-            data: { url: FALLBACK_URL },
-          }),
-        ),
+      closeThread(chatThreadPrefix(tag), tag).then(() =>
+        self.registration
+          .showNotification(title || DEFAULT_TITLE, options)
+          // If a browser refuses these options, the plain default still counts
+          // as showing something; a push that shows nothing is a silent one.
+          .catch(() =>
+            self.registration.showNotification(DEFAULT_TITLE, {
+              body: DEFAULT_BODY,
+              data: { url: FALLBACK_URL },
+            }),
+          ),
+      ),
       badge === null ? null : setBadge(badge),
     ]),
   );
 });
+
+// `dm:<channel>:<message>` → "dm:<channel>:", with its trailing colon so
+// channel "ab" never matches channel "abc". Anything else → null.
+function chatThreadPrefix(tag) {
+  const match = tag ? /^dm:([^:]+):[^:]+$/.exec(tag) : null;
+  return match ? "dm:" + match[1] + ":" : null;
+}
+
+// Closes this origin's shown notifications whose tag starts with `prefix`,
+// never `ownTag` (the one about to show). It never rejects and never holds
+// the new notification back for more than a second: the show after it is the
+// step that must always happen. A close that comes back later than that is
+// dropped, since by then it could close the notification just shown.
+function closeThread(prefix, ownTag) {
+  if (!prefix) return Promise.resolve();
+  return closeShown((tag) => tag.startsWith(prefix) && tag !== ownTag, 1000, true);
+}
+
+// Closes the shown notifications `matches` picks (by tag; untagged ones are
+// "") and resolves within `ms` whatever getNotifications does. With
+// `dropIfLate`, a list that arrives after `ms` closes nothing; without it
+// (SIGNED_OUT: privacy first) the close still happens late.
+function closeShown(matches, ms, dropIfLate) {
+  let late = false;
+  const work = Promise.resolve()
+    .then(() => self.registration.getNotifications())
+    .then((shown) => {
+      if (dropIfLate && late) return;
+      for (const notification of shown) {
+        const tag = typeof notification.tag === "string" ? notification.tag : "";
+        if (matches(tag)) notification.close();
+      }
+    })
+    .catch(() => {});
+  const cap = new Promise((resolve) =>
+    setTimeout(() => {
+      late = true;
+      resolve();
+    }, ms),
+  );
+  return Promise.race([work, cap]);
+}
 
 function readPayload(data) {
   try {
@@ -206,7 +260,8 @@ function readBadge(...candidates) {
 // push. setAppBadge(0) clears the badge.
 async function setBadge(count) {
   try {
-    if (self.navigator.setAppBadge) await self.navigator.setAppBadge(count);
+    if (count === 0 && self.navigator.clearAppBadge) await self.navigator.clearAppBadge();
+    else if (self.navigator.setAppBadge) await self.navigator.setAppBadge(count);
   } catch {
     // Not permitted here.
   }
@@ -265,12 +320,18 @@ async function topLevelWindows(includeUncontrolled) {
 }
 
 // ── Messages from the page ───────────────────────────────────────────────────
-// SIGNED_OUT comes from leaveDeviceClean (wave 3). Nothing personal is cached,
-// so this is a precaution.
+// SIGNED_OUT comes from src/lib/pwa/device-push.ts: at sign-out
+// (leaveDeviceClean) and when this browser's subscription turns out to be
+// another account's (a resync evict). A shared phone must not keep the last
+// student's words on the lock screen or their count on the icon (plan §8 W9),
+// so every shown notification closes and the badge clears. The cache sweep
+// is a precaution: nothing personal is cached.
 
 self.addEventListener("message", (event) => {
   if (isObject(event.data) && event.data.type === "SIGNED_OUT") {
-    event.waitUntil(deleteCachesExceptOffline());
+    event.waitUntil(
+      Promise.all([deleteCachesExceptOffline(), closeShown(() => true, 5000), setBadge(0)]),
+    );
   }
 });
 

@@ -115,7 +115,8 @@ Before every Archive (iOS) or bundle (Android):
 ```sh
 cd mobile
 npx cap sync            # WITHOUT CAP_DEV_URL
-npm run release:check   # fails on a dev URL, cleartext, a Team ID or a keystore password
+npm run release:check   # fails on a dev URL, cleartext, a Team ID, a keystore password,
+                        # or a missing, misplaced or committed Firebase file (see Push)
 ```
 
 ### Signing
@@ -154,11 +155,11 @@ are hand-made and stay as they are. It also doesn't make the Play feature graphi
 
 ## Plugins
 
-App, Browser, Filesystem, Haptics, Keyboard, Share, Splash Screen, Status Bar. The web
-code reaches them through `window.Capacitor.Plugins`, so the website bundle doesn't
-grow. Push (`@capacitor-firebase/messaging`) is installed in the push wave, with its
-wiring, not before. `CapacitorHttp` and `CapacitorCookies` stay off: on, they would
-replace `fetch` and `document.cookie` for the whole site.
+App, Browser, Filesystem, Haptics, Keyboard, Share, Splash Screen, Status Bar, and
+Firebase Messaging for push (see Push below). The web code reaches them through
+`window.Capacitor.Plugins`, so the website bundle doesn't grow. `CapacitorHttp` and
+`CapacitorCookies` stay off: on, they would replace `fetch` and `document.cookie` for
+the whole site.
 
 There is no `allowNavigation` list. On Android that's enough: any host other than
 `www.connectvibe.app` (Stripe included) opens in Chrome. On iOS it isn't: Capacitor only
@@ -169,3 +170,63 @@ plugins attached. The iOS project must close that itself, with a navigation guar
 ship an iOS build without it. Don't "fix" it with a trailing slash on
 `server.url`: Android would then open `//campus` and use a path as its bridge origin.
 Before the first TestFlight, check on a phone that such a link opens in Safari.
+
+## Push
+
+Push notifications go through Firebase Cloud Messaging, with
+`@capacitor-firebase/messaging` (pinned). The site talks to the plugin in
+`src/lib/native/push-native.ts`; the server sends through `src/lib/push/send-fcm.ts`.
+
+### The two Firebase files
+
+Download both from the Firebase console, for the apps registered as `app.connectvibe.vibe`:
+
+| File | Goes exactly here |
+|---|---|
+| `GoogleService-Info.plist` (iPhone) | `mobile/ios/App/App/GoogleService-Info.plist` |
+| `google-services.json` (Android) | `mobile/android/app/google-services.json` |
+
+- **Never commit them.** The root `.gitignore` covers both, and `release:check` fails if
+  either is tracked or staged.
+- **Never drag the plist into Xcode.** That adds it to the project as a resource, and
+  every clone without the file then fails to build. Instead, the Run Script phase "Copy
+  GoogleService-Info.plist" (after Copy Bundle Resources) copies it into the app when
+  it's there and prints a build warning when it isn't. That phase needs
+  `ENABLE_USER_SCRIPT_SANDBOXING = NO` on the App target, which is set. Android's
+  `app/build.gradle` applies the google-services plugin only when the JSON exists.
+- Without the files both apps build and run, but they can never get a push token; the
+  site reads that as "not available in this build". `release:check` fails a release
+  without them, or with a plist made for another bundle id (which Firebase would only log).
+- Console setup, not code: upload the APNs `.p8` key to Firebase (it stays in the
+  password manager, never here) and turn on Push Notifications for the App ID.
+
+### Firebase stays quiet until the first opt-in, not after
+
+- `FirebaseMessagingAutoInitEnabled` (Info.plist) and `firebase_messaging_auto_init_enabled`
+  (AndroidManifest) are false, so a fresh install makes no FCM token and doesn't contact
+  Firebase Messaging before a student turns notifications on.
+- **The first opt-in switches auto-init on for good.** The plugin's `getToken` turns it on
+  and has no way to turn it off again. From then on the Firebase SDK checks in at every
+  launch, even after Turn off or Sign out, and mints a fresh token at the next launch
+  after `deleteToken`. No server row learns that token without a new opt-in.
+- Once the plist is in the app, the iPhone plugin also registers with Apple (APNs) at
+  every launch. That never shows a prompt.
+- Nothing of ours imports Firebase or calls `FirebaseApp.configure()`: the plugin
+  configures it itself, only when the plist is in the app, so a build without it can't
+  crash at launch. `AppDelegate.swift` only forwards the APNs device token to the plugin.
+
+### Testing on a phone
+
+- **Debug builds have no push entitlement** (`CODE_SIGN_ENTITLEMENTS` is set for Release
+  only), so an iPhone Debug build never gets an APNs token. Test push with a Release
+  build or TestFlight, signed with the paid team.
+- **iPhone:** a push that arrives while the app is open still shows as a banner
+  (`presentationOptions` in `capacitor.config.ts`). **Android:** FCM shows nothing
+  while the app is open; the push only appears when the app is in the background.
+- **Android 12 and older always report notifications as allowed**, even when the student
+  switched them off in system settings, so "on" there doesn't prove anything will show.
+- **Taps:** `src/components/native/NativeBridge.tsx` listens on every page load, opens only
+  Vibe's own links, and ignores a tap it already handled (Android hands the tap that
+  launched the app over again whenever it re-creates the app's screen). A tap that
+  cold-starts the iPhone app hasn't been checked on a phone yet.
+- **No app icon count yet.** The plugin has no badge API, and pushes don't set one.

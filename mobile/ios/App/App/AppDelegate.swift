@@ -4,8 +4,14 @@ import Capacitor
 // The app is scene-based (Capacitor 8.5), so SceneDelegate builds the screen
 // and receives links that open the app. Don't add application(_:open:) or
 // application(_:continue:) handlers here: a scene app never gets those calls,
-// and SceneDelegate already forwards both to Capacitor. The push wave adds its
-// registration hooks here; nothing here touches Firebase yet.
+// and SceneDelegate already forwards both to Capacitor.
+//
+// Push: this file only forwards the APNs device-token callbacks (below).
+// Nothing here imports or configures Firebase. The push plugin
+// (@capacitor-firebase/messaging) configures it itself, and only when
+// GoogleService-Info.plist is in the app (its FirebaseMessaging.swift init),
+// so a build without that file runs normally, just without push. An unguarded
+// FirebaseApp.configure() here would crash that build at launch.
 @UIApplicationMain
 class AppDelegate: UIResponder, UIApplicationDelegate {
 
@@ -45,5 +51,22 @@ class AppDelegate: UIResponder, UIApplicationDelegate {
                                           sessionRole: connectingSceneSession.role)
         config.delegateClass = SceneDelegate.self
         return config
+    }
+
+    // The APNs device token, handed to the push plugin through Capacitor's own
+    // notification names (the plugin's README; CAPNotifications.swift). The
+    // plugin gives it to Firebase, which needs it before it can issue this
+    // phone's FCM token. The plugin doesn't observe the failure yet; it's
+    // posted anyway, as its README asks, and a failed registration shows up as
+    // a failed getToken. No didReceiveRemoteNotification hook: Vibe sends no
+    // silent pushes (w3-maps/3D-native.md, gotcha 8).
+    func application(_ application: UIApplication,
+                     didRegisterForRemoteNotificationsWithDeviceToken deviceToken: Data) {
+        NotificationCenter.default.post(name: .capacitorDidRegisterForRemoteNotifications, object: deviceToken)
+    }
+
+    func application(_ application: UIApplication,
+                     didFailToRegisterForRemoteNotificationsWithError error: Error) {
+        NotificationCenter.default.post(name: .capacitorDidFailToRegisterForRemoteNotifications, object: error)
     }
 }

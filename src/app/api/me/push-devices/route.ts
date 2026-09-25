@@ -1,11 +1,15 @@
+import { createHash } from "node:crypto";
+
 import { NextResponse } from "next/server";
 import type { SupabaseClient } from "@supabase/supabase-js";
 
 import { requireNotRestricted } from "@/lib/moderation/access";
 import {
+  fcmConfig,
   isMissingPushSchema,
   pushAllowedFor,
   pushSiteOrigin,
+  vapidConfig,
   warnMissingPushSchemaOnce,
 } from "@/lib/push/config";
 import {
@@ -19,14 +23,31 @@ import { createSupabaseServiceClient } from "@/lib/supabase/service";
 
 /**
  * This student's push devices: a browser's Web Push subscription or a store
- * app's FCM token (handoffs/wave-plan-pwa/plan.md §7 2B; critic-push.md items
- * 20-22). `push_devices` is service-role only, so both handlers write with the
- * service client, always filtered or stamped with the caller's own id.
+ * app's FCM token (handoffs/wave-plan-pwa/plan.md §7 2B and §8.2; critic-push.md
+ * items 20-22; critic-w3.md items 2 and 9). `push_devices` is service-role
+ * only, so every handler reads and writes with the service client.
+ *
+ * GET is what the client library (src/lib/pwa/device-push.ts) needs to show
+ * the Settings card and resync this device, and the only way the card learns
+ * whether to show at all, BEFORE any permission prompt:
+ * `{ ok, available, webpush_key, fcm, user, devices }`.
+ * `available` = push is on for this student AND the table exists (code ships
+ * before the migration). `devices` = the first 16 hex of sha256(address) for
+ * each of the caller's rows, listed whenever the table exists, whatever
+ * `available` says: with the kill switch or the allowlist off, a resync must
+ * still recognise the student's own device rather than evict it. The hashes
+ * are the caller's own, and 64 bits can't be turned back into an address.
+ * `user` is the caller's id; a client holding another account's device
+ * record evicts it (W5). No Origin or Content-Type check (a browser sends no
+ * Origin on a same-origin GET) and no Terms gate (it only reads). Never
+ * cached: a cached answer from the previous account would stop the evict.
+ * 401 · 429 (`push-devices-read:<uid>`, 120 an hour) · 500.
  *
  * POST `{ transport, address, keys?: { p256dh, auth }, platform, app_version? }`
- * registers this device, or refreshes it: the client re-sends it on every open,
- * which is what keeps `last_seen_at` fresh (devices unseen for 60 days are
- * dropped by the sender). Upserted by `address`, so a shared device that
+ * registers this device, or refreshes it: the client's resync re-sends it when
+ * the address changed, when the GET doesn't list it, or at least weekly, which
+ * is what keeps `last_seen_at` fresh (devices unseen for 60 days are dropped
+ * by the sender). Upserted by `address`, so a shared device that
  * changes hands follows whoever registered it last.
  * Refusals, in order: 403 `wrong_origin` (not JSON, or not from the one origin
  * pushes are sent for; always on Preview) · 401 · 400 · 429 · 403
@@ -34,11 +55,16 @@ import { createSupabaseServiceClient } from "@/lib/supabase/service";
  * or this student isn't on the allowlist yet) · 503 `push_unavailable` (the
  * tables aren't there yet: code ships before the migration).
  *
- * DELETE `{ address }` removes one of the caller's devices. Gated by nothing
+ * DELETE `{ address }` removes the device with that address, WHOEVER owns it
+ * (plan §8 W5, as the logout route already does): holding the endpoint or
+ * token is the capability, and a shared phone must be able to drop the last
+ * student's row when the next one opens it. A cross-site DELETE needs a CORS
+ * preflight we never answer, so no other site can send it. Gated by nothing
  * but sign-in and a rate limit, on purpose: a suspended student, or anyone
  * after push has been switched off, must still be able to stop notifications
- * (the proxy lets this one through for restricted accounts too). No table yet
- * means no row: `{ ok: true }`.
+ * (the proxy lets this one through for restricted accounts too). The answer
+ * is `{ ok: true }` whether or not a row was there, so it reveals nothing; no
+ * table yet means no row.
  *
  * NEVER LOG AN ADDRESS OR A KEY: an endpoint or token is a bearer capability to
  * reach this student's lock screen. Database errors are logged by code only,
@@ -46,6 +72,13 @@ import { createSupabaseServiceClient } from "@/lib/supabase/service";
  */
 const REGISTER_LIMIT = { limit: 20, windowSec: 3600 };
 const REMOVE_LIMIT = { limit: 30, windowSec: 3600 };
+/** Every open of the Settings card and every resync reads; 120 an hour is plenty. */
+const READ_LIMIT = { limit: 120, windowSec: 3600 };
+/** Hex characters of sha256(address) the client compares (device-push-logic.ts HASH_CHARS). */
+const HASH_CHARS = 16;
+/** More than MAX_DEVICES can exist for a moment before a trim; read a little past it. */
+const MAX_DEVICES_READ = 50;
+const NO_STORE = { "Cache-Control": "private, no-store" } as const;
 /** The newest this many devices per student are kept; older ones are dropped. */
 const MAX_DEVICES = 10;
 /** A real body is well under 3 KB (a token is at most 2048 characters). */
@@ -111,6 +144,58 @@ async function trimDevices(service: SupabaseClient, userId: string): Promise<voi
     .eq("user_id", userId)
     .in("id", ids);
   if (delError) console.error("[push-devices.POST] trim delete", delError.code);
+}
+
+/** Lowercase hex of sha256 over the address's UTF-8 bytes, first 16 (critic-w3.md item 9). */
+function deviceHash(address: string): string {
+  return createHash("sha256").update(address, "utf8").digest("hex").slice(0, HASH_CHARS);
+}
+
+export async function GET() {
+  const userId = await signedInUserId();
+  if (!userId) {
+    return NextResponse.json({ ok: false, error: "Unauthorized" }, { status: 401, headers: NO_STORE });
+  }
+
+  const rl = await rateLimit(`push-devices-read:${userId}`, READ_LIMIT);
+  if (!rl.allowed) {
+    const res = tooManyRequests(rl);
+    res.headers.set("Cache-Control", NO_STORE["Cache-Control"]);
+    return res;
+  }
+
+  // Only hashes leave this handler, never an address, not even to its owner.
+  const { data, error } = await createSupabaseServiceClient()
+    .from("push_devices")
+    .select("address")
+    .eq("user_id", userId)
+    .limit(MAX_DEVICES_READ);
+  let tableExists = true;
+  if (error) {
+    if (!isMissingPushSchema(error)) {
+      console.error("[push-devices.GET]", error.code);
+      return NextResponse.json({ ok: false, error: "Request failed" }, { status: 500, headers: NO_STORE });
+    }
+    warnMissingPushSchemaOnce("push-devices");
+    tableExists = false;
+  }
+  const devices = (data ?? [])
+    .map((row) => (row as { address: unknown }).address)
+    .filter((address): address is string => typeof address === "string" && address !== "")
+    .map(deviceHash);
+
+  return NextResponse.json(
+    {
+      ok: true,
+      // With no table a turn-on would only meet a 503 (critic-w3.md item 2).
+      available: tableExists && pushAllowedFor(userId, process.env),
+      webpush_key: vapidConfig(process.env)?.publicKey ?? null,
+      fcm: fcmConfig(process.env) !== null,
+      user: userId,
+      devices,
+    },
+    { headers: NO_STORE },
+  );
 }
 
 export async function POST(req: Request) {
@@ -194,12 +279,11 @@ export async function DELETE(req: Request) {
   const rl = await rateLimit(`push-devices-remove:${userId}`, REMOVE_LIMIT);
   if (!rl.allowed) return tooManyRequests(rl, "Too many notification changes. Try again later.");
 
-  // Only the caller's own row: an address someone else holds is left alone,
-  // and the answer is the same either way, so it reveals nothing.
+  // Whoever owns it (W5): the caller proved they hold the address. The answer
+  // is the same whether a row was there or not, so it reveals nothing.
   const { error } = await createSupabaseServiceClient()
     .from("push_devices")
     .delete()
-    .eq("user_id", userId)
     .eq("address", address);
   if (error) {
     if (isMissingPushSchema(error)) {

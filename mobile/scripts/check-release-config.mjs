@@ -13,6 +13,11 @@
  * It also checks each copy still carries the app's user-agent tag, since that
  * tag alone is what hides Vibe+ checkout inside the store apps.
  *
+ * Push: both Firebase config files must be in place (they're gitignored, and
+ * a build without them has no push at all), the synced copies must carry the
+ * push plugin's settings, the plist must not have been dragged into Xcode, and
+ * neither file may be in git. See mobile/README.md, "Push".
+ *
  * It also guards the public repo: Xcode writes the Apple Team ID into
  * project.pbxproj the moment anyone picks a team, and a keystore password in
  * build.gradle would be just as public. Nothing runs this at commit time, so
@@ -45,6 +50,11 @@ const ERROR_PATH = "offline.html";
 const CORDOVA_MANIFEST = "android/capacitor-cordova-android-plugins/src/main/AndroidManifest.xml";
 const PBXPROJ = "ios/App/App.xcodeproj/project.pbxproj";
 const APP_GRADLE = "android/app/build.gradle";
+const APP_ID = "app.connectvibe.vibe";
+// Where each app's build looks for its Firebase config: the Xcode Run Script
+// phase "Copy GoogleService-Info.plist", and android/app/build.gradle.
+const IOS_FIREBASE = "ios/App/App/GoogleService-Info.plist";
+const ANDROID_FIREBASE = "android/app/google-services.json";
 
 const problems = [];
 const where = (file) => relative(process.cwd(), resolve(MOBILE, file)) || file;
@@ -97,6 +107,13 @@ for (const { file, platform, userAgent } of GENERATED_CONFIGS) {
   if (server.errorPath !== ERROR_PATH) {
     problems.push(`${where(file)}: server.errorPath is ${JSON.stringify(server.errorPath)}, not "${ERROR_PATH}".`);
   }
+  // A copy synced before the push plugin was set up. The iPhone app reads
+  // presentationOptions from here to show pushes that arrive while it's open.
+  if (!Array.isArray(config.plugins?.FirebaseMessaging?.presentationOptions)) {
+    problems.push(
+      `${where(file)} has no plugins.FirebaseMessaging settings. Run \`npx cap sync\` again.`,
+    );
+  }
 }
 
 // iOS Capacitor exits at launch unless <bundle>/public + appStartPath exists
@@ -112,6 +129,43 @@ if (!existsSync(resolve(MOBILE, "ios/App/App/public", START_PATH.replace(/^\//, 
 const cordovaManifest = read(CORDOVA_MANIFEST);
 if (cordovaManifest && /usesCleartextTraffic\s*=\s*"true"/.test(cordovaManifest)) {
   problems.push(`${where(CORDOVA_MANIFEST)}: cleartext HTTP is on. Re-sync without CAP_DEV_URL.`);
+}
+
+// ---- push: the Firebase config files ---------------------------------------------
+
+// Both are gitignored, so a fresh clone has neither and still builds: the
+// iPhone build only warns, and Android skips the google-services plugin. That
+// build can never get a push token, which a store release must not ship.
+for (const [file, app] of [
+  [IOS_FIREBASE, "iPhone"],
+  [ANDROID_FIREBASE, "Android"],
+]) {
+  if (!existsSync(resolve(MOBILE, file))) {
+    problems.push(
+      `${where(file)} is missing, so the ${app} app would ship without push notifications. ` +
+        'Download it from the Firebase console (mobile/README.md, "Push").',
+    );
+  }
+}
+
+// A plist for another bundle id doesn't fail anything; Firebase only logs it,
+// and no push ever arrives. (Android's build already fails on a wrong package.)
+const firebasePlist = read(IOS_FIREBASE);
+if (firebasePlist !== null) {
+  const bundle = /<key>BUNDLE_ID<\/key>\s*<string>([^<]*)<\/string>/.exec(firebasePlist)?.[1] ?? null;
+  if (bundle !== APP_ID) {
+    problems.push(`${where(IOS_FIREBASE)} is for ${JSON.stringify(bundle)}, not "${APP_ID}". Download the iPhone app's own.`);
+  }
+}
+
+// Dragging the plist into Xcode adds it to the project as a resource, and then
+// every clone without the file fails to build. The Run Script phase copies it.
+const pbxproj = read(PBXPROJ);
+if (pbxproj && /path = "?GoogleService-Info\.plist"?;/.test(pbxproj)) {
+  problems.push(
+    `${where(PBXPROJ)} references GoogleService-Info.plist as a file (it was dragged into Xcode). ` +
+      "Remove the reference (not the file); the Run Script phase copies it into the app.",
+  );
 }
 
 // ---- secrets in committed files ------------------------------------------------
@@ -130,7 +184,7 @@ function teamIn(text, label) {
   }
 }
 
-teamIn(read(PBXPROJ), where(PBXPROJ));
+teamIn(pbxproj, where(PBXPROJ));
 // The staged copy too, in case the working copy was cleaned after `git add`.
 try {
   const staged = execFileSync("git", ["show", `:mobile/${PBXPROJ}`], {
@@ -153,6 +207,23 @@ if (gradle && /(?<!["'])\b(storePassword|keyPassword)(?:\s*=\s*|\s*\(\s*|\s+)["'
   );
 }
 
+// The Firebase files carry the project's API keys. .gitignore covers both, but
+// `git add -f` doesn't care; this lists them if they're tracked or staged.
+try {
+  const tracked = execFileSync("git", ["ls-files", "--", IOS_FIREBASE, ANDROID_FIREBASE], {
+    cwd: MOBILE,
+    encoding: "utf8",
+    stdio: ["ignore", "pipe", "ignore"],
+  }).trim();
+  for (const file of tracked ? tracked.split("\n") : []) {
+    problems.push(
+      `${file} is in git. The repo is public: \`git rm --cached\` it, and rotate its keys if it was ever pushed.`,
+    );
+  }
+} catch {
+  // No git here: nothing to check.
+}
+
 // ---- verdict -------------------------------------------------------------------
 
 if (problems.length > 0) {
@@ -160,7 +231,7 @@ if (problems.length > 0) {
   process.exitCode = 1;
 } else {
   console.log(
-    `ok    both apps load ${LIVE_URL} with their app tag, no cleartext, ` +
-      "no Team ID or keystore password in the project",
+    `ok    both apps load ${LIVE_URL} with their app tag, no cleartext, push is configured, ` +
+      "no Team ID, keystore password or Firebase file in the project",
   );
 }

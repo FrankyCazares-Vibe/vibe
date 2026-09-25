@@ -6,12 +6,28 @@ import { useRouter } from "next/navigation";
 import { useEffect, useRef, useState } from "react";
 
 import { sanitizeSchoolVerifyNextParam } from "@/lib/auth/login-next";
+import { leaveDeviceClean } from "@/lib/pwa/leave-device-clean";
 import { getSupabaseBrowserClient } from "@/lib/supabase/browser";
 
 const OFFLINE = "We couldn't reach Vibe. Check your connection and try again.";
 const INCOMPLETE =
   "This link is incomplete. Type the 8-digit code from the email on the Vibe page where you asked for it, or send a new one.";
 const LINK_FAILED = "We couldn't verify this link. Try again, or send a new code.";
+
+/**
+ * leaveDeviceClean behind our own guard. It promises never to throw and to be
+ * done within ~3 s; this makes sure, so a push clean-up problem can't stop
+ * the sign-out after it: any error is dropped, and after 4 s we move on
+ * whatever it's still doing.
+ */
+function leaveDeviceSafely(opts: { serverDelete: boolean }): Promise<void> {
+  return Promise.race([
+    Promise.resolve()
+      .then(() => leaveDeviceClean(opts))
+      .catch(() => {}),
+    new Promise<void>((resolve) => setTimeout(resolve, 4000)),
+  ]);
+}
 
 /**
  * The link's token (and next), per tab, once it's out of the address bar. A
@@ -232,6 +248,12 @@ function VerifySchoolInner() {
     setSignOutError(null);
     let leaving = false;
     try {
+      // Take this device off the wrong account's push first: delete its row,
+      // unsubscribe, clear the screen and the cached account data. BEFORE
+      // signOut, because the row delete needs the session signOut ends (plan
+      // §8 W7). If signOut then fails, the device just stays off push until
+      // it's turned back on. Can't throw or navigate; over within 4 s.
+      await leaveDeviceSafely({ serverDelete: true });
       const { error } = await getSupabaseBrowserClient().auth.signOut({
         scope: "local",
       });

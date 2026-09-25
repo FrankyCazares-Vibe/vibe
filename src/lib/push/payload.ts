@@ -494,9 +494,13 @@ export function apnsCollapseId(tag: string): string {
  * as `{message}` and adds the TTL and priority). `data` holds strings only.
  * No `android.collapse_key`: FCM ignores it on notification messages
  * (critic item 27); the notification `tag` does the replacing.
+ *
+ * No `aps.badge` either, until the apps can clear it (critic-w3.md item 6):
+ * the plugin has no badge call, so a pushed count would stay on the icon after
+ * the student reads everything, and after sign-out it would show the previous
+ * student's number. Wave 4 brings the count back with a way to clear it.
  */
 export function toFcm(m: PushMessage, token: string): FcmMessage {
-  const badge = validBadge(m.badge);
   return {
     token,
     notification: { title: m.title, body: m.body },
@@ -513,7 +517,6 @@ export function toFcm(m: PushMessage, token: string): FcmMessage {
       headers: { "apns-collapse-id": apnsCollapseId(m.tag) },
       payload: {
         aps: {
-          ...(badge !== null ? { badge } : {}),
           "thread-id": m.threadId ?? m.tag,
           sound: "default",
         },

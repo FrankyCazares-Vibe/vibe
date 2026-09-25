@@ -87,6 +87,13 @@ const config: CapacitorConfig = {
     // setBackgroundColor does nothing on Android 15+ anyway.
     StatusBar: { style: "LIGHT" },
     SystemBars: { style: "LIGHT" },
+    // Push (@capacitor-firebase/messaging). iPhone only: while the app is
+    // open, a push still shows as a banner, with its sound, instead of
+    // arriving silently. It's also the plugin's default, written out so it
+    // doesn't hang on one. Android ignores this, and FCM shows nothing while
+    // the app is open there (mobile/README.md, "Push"). `release:check`
+    // fails when the synced copies lack this block.
+    FirebaseMessaging: { presentationOptions: ["alert", "badge", "sound"] },
   },
 };
 

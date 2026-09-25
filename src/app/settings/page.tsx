@@ -2,9 +2,11 @@ import { redirect } from "next/navigation";
 
 import { CampusAppShell } from "@/components/campus-app-shell";
 import { SettingsClient } from "@/components/settings/SettingsClient";
+import type { NotificationPrefs } from "@/components/settings/notifications-card-view";
 import { isOttoOnboardingComplete } from "@/lib/auth/post-login";
 import { ownCampusFields } from "@/lib/profile/profile-campus-write";
 import type { SettingsCampusInput } from "@/lib/profile/settings-campus-card";
+import { parsePushPrefs } from "@/lib/push/payload";
 import { createSupabaseServerClient } from "@/lib/supabase/server";
 import { createSupabaseServiceClient } from "@/lib/supabase/service";
 
@@ -26,11 +28,12 @@ export default async function SettingsPage() {
   // goes through the service role scoped to the signed-in user's id. So do
   // campus_set_at and otto_answers (no `authenticated` SELECT grant): they
   // only feed the campus card's derived fields below and never reach the
-  // client raw.
+  // client raw. otto_settings (also private) only feeds the Notifications
+  // card's pushPrefs below, never the raw blob.
   const { data: profile, error: profileErr } = await createSupabaseServiceClient()
     .from("users")
     .select(
-      "id,email,name,handle,handle_changed_at,school,school_email,school_verified,school_system,campus_id,campus_set_at,otto_answers,year,major,created_at",
+      "id,email,name,handle,handle_changed_at,school,school_email,school_verified,school_system,campus_id,campus_set_at,otto_answers,otto_settings,year,major,created_at",
     )
     .eq("id", user.id)
     .maybeSingle();
@@ -57,6 +60,24 @@ export default async function SettingsPage() {
     };
   }
 
+  // Notifications card, "What to send" (plan §8 W3, critic-w3 item 5).
+  // Mentions have one key, mention_pings: parsePushPrefs folds it into `off`,
+  // so it comes back out here, and `off` never carries "mention" to the
+  // client (the card would otherwise save it into push.off). A stray
+  // "mention" already in push.off still reads as off, and the card's next
+  // Mentions-on save clears it. A failed read passes null: the card then
+  // hides its switches rather than show defaults it could save over the
+  // student's real choices (every kind save sends the full `off` list).
+  let pushPrefs: NotificationPrefs | null = null;
+  if (profile && !profileErr) {
+    const prefs = parsePushPrefs(profile.otto_settings);
+    pushPrefs = {
+      previews: prefs.previews,
+      off: [...prefs.off].filter((k) => k !== "mention"),
+      mentionPings: !prefs.off.has("mention"),
+    };
+  }
+
   // No consent gate here on purpose (S53 A4): someone who declines the
   // Terms must still be able to reach account deletion. The page's own
   // writes (handle change, deletion) are gated per-API instead.
@@ -78,6 +99,7 @@ export default async function SettingsPage() {
           created_at: (profile?.created_at as string | null) ?? null,
         }}
         campus={campus}
+        pushPrefs={pushPrefs}
       />
     </CampusAppShell>
   );

@@ -9,6 +9,8 @@ import {
   LoadFailed,
   type LoadFailure,
 } from "@/components/feedback/LoadFailed";
+import { NotificationsCard } from "@/components/settings/NotificationsCard";
+import type { NotificationPrefs } from "@/components/settings/notifications-card-view";
 import { vibeRequest } from "@/lib/feedback/request";
 import { clearDraft } from "@/lib/onboarding/draft";
 import {
@@ -20,6 +22,8 @@ import {
   settingsCampusCardView,
   type SettingsCampusInput,
 } from "@/lib/profile/settings-campus-card";
+import { pushLogoutBody } from "@/lib/pwa/device-push";
+import { leaveDeviceClean } from "@/lib/pwa/leave-device-clean";
 import { MOBILE_BREAKPOINT_PX } from "@/lib/use-is-mobile";
 
 type Profile = {
@@ -60,10 +64,13 @@ const CARD_GLASS: React.CSSProperties = {
 export function SettingsClient({
   profile,
   campus,
+  pushPrefs,
 }: {
   profile: Profile;
   /** Derived on the server (settings/page.tsx); null when the read failed. */
   campus: SettingsCampusInput | null;
+  /** "What to send" for the Notifications card (settings/page.tsx); null when the read failed. */
+  pushPrefs: NotificationPrefs | null;
 }) {
   return (
     <main
@@ -120,6 +127,12 @@ export function SettingsClient({
         handleChangedAt={profile.handle_changed_at}
       />
       <CampusTourCard handle={profile.handle} />
+      {/* Renders nothing unless push is available for this account (plan §8 W2). */}
+      <NotificationsCard
+        pushPrefs={pushPrefs}
+        cardStyle={CARD_GLASS}
+        title={<SectionTitle>Notifications</SectionTitle>}
+      />
       <BlockedUsersCard />
       <HelpAndSafetyCard />
       <SignOutCard />
@@ -1167,14 +1180,33 @@ function HandleCard({
   );
 }
 
+/**
+ * leaveDeviceClean behind our own guard (the suspended page's helper,
+ * src/app/account/suspended/suspended-actions.tsx). It promises never to
+ * throw and to be done within ~3 s; this makes sure, so a push clean-up
+ * problem can't strand a student on a busy Sign out or Delete button: any
+ * error is dropped, and after 4 s we move on whatever it's still doing.
+ */
+function leaveDeviceSafely(opts: { serverDelete: boolean }): Promise<void> {
+  return Promise.race([
+    Promise.resolve()
+      .then(() => leaveDeviceClean(opts))
+      .catch(() => {}),
+    new Promise<void>((resolve) => setTimeout(resolve, 4000)),
+  ]);
+}
+
 function SignOutCard() {
   const [busy, setBusy] = useState(false);
 
   const onSignOut = async () => {
     if (busy) return;
     setBusy(true);
+    // `push_address` names this device's notification address, so the route
+    // drops that row even when it was registered to someone else (plan §8 W7).
     const r = await vibeRequest("/api/auth/logout", {
       method: "POST",
+      json: pushLogoutBody(),
       failure: "Couldn't sign you out. Try again.",
     });
     if (!r.ok) {
@@ -1185,9 +1217,13 @@ function SignOutCard() {
     }
     // Drop every onboarding draft on this browser (no id: the next person
     // to sign in here must not inherit this one's half-typed answers).
+    clearDraft();
+    // Only after the logout succeeded (W7): unsubscribe this device, clear
+    // its shown notifications, badge and per-account storage. The route
+    // already deleted the rows, hence no server delete.
+    await leaveDeviceSafely({ serverDelete: false });
     // Hard reload so the cookie clear is reflected in any cached
     // bootstrap fetches and the next nav lands on /auth/login.
-    clearDraft();
     window.location.href = "/auth/login";
   };
 
@@ -1252,15 +1288,22 @@ function DangerZone({ handle }: { handle: string | null }) {
       if (!res.ok || !data?.ok) {
         throw new Error(data?.error || `HTTP ${res.status}`);
       }
-      // The account is gone: drop every onboarding draft on this browser,
-      // then land on sign-up rather than the marketing page, the same place
-      // the suspended and verify-your-campus screens send a deleted account.
-      clearDraft();
-      window.location.href = AFTER_DELETE;
     } catch (e) {
       setError(e instanceof Error ? e.message : "Could not delete account");
       setBusy(false);
+      return;
     }
+    // The account is gone, so nothing from here on may read as a failed
+    // delete (it sits outside the try on purpose). Drop every onboarding
+    // draft on this browser, then land on sign-up rather than the marketing
+    // page, the same place the suspended and verify-your-campus screens send
+    // a deleted account.
+    clearDraft();
+    // The rows went with the account (FK cascade); this device's own
+    // subscription or token, shown notifications and storage go here
+    // (plan §8 W7).
+    await leaveDeviceSafely({ serverDelete: false });
+    window.location.href = AFTER_DELETE;
   };
 
   return (

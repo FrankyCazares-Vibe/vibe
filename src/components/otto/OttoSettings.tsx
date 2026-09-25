@@ -18,17 +18,21 @@ const CHATTINESS: Array<{ value: OttoSettings["chattiness"]; label: string }> = 
 ];
 
 /**
- * Chattiness is a preset that bulk-sets every toggle below. Picking one is
+ * Chattiness is a preset that bulk-sets the toggles below. Picking one is
  * a shortcut — fine-tuning individual toggles after is still allowed, the
  * preset just stays selected as a "starting point" label. If the live
  * toggle pattern doesn't match any preset, no preset highlights.
+ *
+ * "Ping on mentions" is left out of every preset: `mention_pings` is also
+ * the one key behind the Mentions switch in Settings → Notifications (plan
+ * §8 W3), so picking "Quiet" must not quietly turn mention pushes back on.
+ * The "which preset is active" check ignores it for the same reason.
  */
 const PRESETS: Record<
   OttoSettings["chattiness"],
   Pick<
     OttoSettings,
     | "rsvp_day_before"
-    | "mention_pings"
     | "milestone_pings"
     | "daily_summary"
     | "unanswered_dm_pings"
@@ -36,21 +40,18 @@ const PRESETS: Record<
 > = {
   quiet: {
     rsvp_day_before: false,
-    mention_pings: true,
     milestone_pings: false,
     daily_summary: false,
     unanswered_dm_pings: false,
   },
   moderate: {
     rsvp_day_before: true,
-    mention_pings: true,
     milestone_pings: true,
     daily_summary: false,
     unanswered_dm_pings: false,
   },
   loud: {
     rsvp_day_before: true,
-    mention_pings: true,
     milestone_pings: true,
     daily_summary: true,
     unanswered_dm_pings: true,
@@ -72,7 +73,6 @@ function detectPreset(s: OttoSettings): OttoSettings["chattiness"] | null {
   >) {
     if (
       preset.rsvp_day_before === s.rsvp_day_before &&
-      preset.mention_pings === s.mention_pings &&
       preset.milestone_pings === s.milestone_pings &&
       preset.daily_summary === s.daily_summary &&
       preset.unanswered_dm_pings === s.unanswered_dm_pings
@@ -89,7 +89,7 @@ function detectPreset(s: OttoSettings): OttoSettings["chattiness"] | null {
  * trailing-edge PATCH fires 350ms after the last change so a user toggling
  * a few in a row only triggers one network roundtrip.
  *
- * One PATCH can carry several keys (a preset sets six), so a refused save
+ * One PATCH can carry several keys (a preset sets five), so a refused save
  * rolls the whole card back to the last settings the server confirmed and
  * shows one toast for that flush. Flushes never overlap: changes made while
  * one is in flight wait for it, so confirmations land in order. Shared by

@@ -11,9 +11,12 @@ import {
   NATIVE_BACK_EVENT,
   nativeLaunchUrl,
   openInBrowser,
+  pushTapPath,
   styleStatusBarForCream,
 } from "@/lib/native/bridge";
 import { appShellOnClient } from "@/lib/native/detect";
+import { drainUnusedPushEvents, onNativePushTap, onNativeTokenRefresh } from "@/lib/native/push-native";
+import { resyncDevicePush } from "@/lib/pwa/device-push";
 
 /** On `<html>` in the store apps only; globals.css paints cream behind the page with it. */
 const APP_CLASS = "vibe-app";
@@ -38,15 +41,76 @@ function currentPath(): string {
   return window.location.pathname + window.location.search + window.location.hash;
 }
 
-/** Opens a link handed over by the phone, if it's one of Vibe's own pages. */
-function openFromNative(url: string | null | undefined): void {
-  const target = appPathFromLink(url);
+/**
+ * Goes to one of Vibe's own pages, unless the app is already there or on its
+ * way there.
+ */
+function openPath(target: string | null): void {
   if (!target || target === currentPath() || target === pendingTarget) return;
   pendingTarget = target;
   window.location.assign(target);
   // A change of hash alone finishes at once without leaving the page, so
   // nothing is pending any more.
   if (currentPath() === target) pendingTarget = null;
+}
+
+/** Opens a link handed over by the phone, if it's one of Vibe's own pages. */
+function openFromNative(url: string | null | undefined): void {
+  openPath(appPathFromLink(url));
+}
+
+/**
+ * The last notification taps this phone acted on, by FCM message id (W12).
+ * Android hands the tap that launched the app over again whenever it re-creates
+ * the app's screen, a reopen from Recents included (w3-maps/3D-native.md §6),
+ * so a tap already seen is ignored. localStorage, because that replay can come
+ * after the app was closed. Sign-out keeps it (critic-w3.md item 15): it holds
+ * message ids only, and clearing it would replay the last student's tap.
+ */
+const PUSH_TAPS_KEY = "vibe_push_taps_v1";
+const MAX_PUSH_TAPS = 20;
+
+/**
+ * True the first time a tap id is seen; it's written down before anything
+ * navigates (critic-w3.md item 14). When storage is unavailable the answer is
+ * yes: unlike the launch link, a tap is handed over once and not on every
+ * load, so the worst case is one replayed tap, while no would mean a tap that
+ * goes nowhere.
+ */
+function claimPushTap(id: string): boolean {
+  let seen: string[] = [];
+  try {
+    const parsed: unknown = JSON.parse(window.localStorage.getItem(PUSH_TAPS_KEY) ?? "[]");
+    if (Array.isArray(parsed)) seen = parsed.filter((x): x is string => typeof x === "string");
+  } catch {
+    // Unreadable or blocked: start a fresh list.
+  }
+  if (seen.includes(id)) return false;
+  try {
+    window.localStorage.setItem(PUSH_TAPS_KEY, JSON.stringify([...seen, id].slice(-MAX_PUSH_TAPS)));
+  } catch {
+    // Full or blocked: still open it.
+  }
+  return true;
+}
+
+/** A tapped notification: its link, if it's Vibe's, through the same guards as any other. */
+function onPushTap(url: string, id: string | null): void {
+  const target = pushTapPath(url, window.location.origin);
+  if (!target) return;
+  if (id !== null && !claimPushTap(id)) return;
+  openPath(target);
+}
+
+/**
+ * Brings this device's push registration up to date; never prompts
+ * (device-push.ts). Started inside a promise chain, so not even a synchronous
+ * throw can stop the rest of this component's setup.
+ */
+function resyncPush(reason: "load" | "token"): void {
+  Promise.resolve()
+    .then(() => resyncDevicePush({ reason }))
+    .catch(() => {});
 }
 
 /**
@@ -119,8 +183,15 @@ function onBackButton(event: { canGoBack?: boolean } | undefined): void {
  * they exist), keeps new-window links inside the app, sends downloads to the
  * share sheet, and gives Android's back button the page's history.
  *
+ * Push (plan.md §8 W12; critic-w3.md items 13 and 14): it opens tapped
+ * notifications, hands a new FCM token to the device sync, runs that sync
+ * once per load, and drops the plugin events nobody reads.
+ *
  * The shell clears its plugin listeners whenever a page starts loading, and
  * every full page load mounts this again, so each page registers its own.
+ * The push plugin holds a tap that comes before any listener (a cold start
+ * from a notification) for the first one to attach, which is why the tap
+ * listener lives here, on every page, and not on the pages that use push.
  */
 export function NativeBridge(): null {
   useEffect(() => {
@@ -131,6 +202,16 @@ export function NativeBridge(): null {
     const root = document.documentElement;
     root.classList.add(APP_CLASS);
     styleStatusBarForCream(android);
+
+    const stopTaps = onNativePushTap(onPushTap);
+    const stopUnusedPush = drainUnusedPushEvents();
+    const stopTokens = onNativeTokenRefresh(() => resyncPush("token"));
+    // After `load`, like the service worker registrar, so the sync's request
+    // never competes with the page's first paint. device-push.ts runs it at
+    // most once per load anyway, and without a device record it does nothing.
+    const resyncOnLoad = () => resyncPush("load");
+    if (document.readyState === "complete") resyncOnLoad();
+    else window.addEventListener("load", resyncOnLoad, { once: true });
 
     const stopLinks = listenNative<{ url?: string }>("App", "appUrlOpen", (e) =>
       openFromNative(e?.url),
@@ -155,6 +236,10 @@ export function NativeBridge(): null {
       document.removeEventListener("click", onDocumentClick);
       stopBack();
       stopLinks();
+      window.removeEventListener("load", resyncOnLoad);
+      stopTokens();
+      stopUnusedPush();
+      stopTaps();
       root.classList.remove(APP_CLASS);
     };
   }, []);

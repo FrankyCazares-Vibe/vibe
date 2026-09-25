@@ -260,9 +260,9 @@ export function styleStatusBarForCream(android: boolean): void {
 const APP_HOST = "www.connectvibe.app";
 
 /**
- * Where a link handed over by the phone (a tapped email link today; a
- * notification later) should take the app: the path, query and hash of a
- * `https://www.connectvibe.app` URL, or null for anything else.
+ * Where a link handed over by the phone (a tapped email link; notification
+ * taps go through pushTapPath below) should take the app: the path, query and
+ * hash of a `https://www.connectvibe.app` URL, or null for anything else.
  *
  * A path, not a URL, so it opens on whatever the app is showing (the live
  * site, or `next dev` in a dev build). Leading slashes collapse to one: the
@@ -278,6 +278,34 @@ export function appPathFromLink(url: string | null | undefined): string | null {
     return null;
   }
   if (parsed.protocol !== "https:" || parsed.host !== APP_HOST) return null;
+  return parsed.pathname.replace(/^\/+/, "/") + parsed.search + parsed.hash;
+}
+
+/**
+ * Where a tapped notification should take the app (plan.md §8.2, W12): the
+ * path, query and hash of its link when that link is on
+ * `https://www.connectvibe.app` or on the page's own origin, else null.
+ * `url` is whatever the push carried, so anything that isn't a string is
+ * refused. `pageOrigin` is `window.location.origin`.
+ *
+ * The page's own origin is accepted because a dev build of the app runs on
+ * `next dev` (`http://localhost:3000`), and pushes sent from there link there
+ * (src/lib/push/config.ts). Only http(s) links count: a `javascript:` or
+ * `data:` URL reports the origin "null", which an opaque page origin would
+ * otherwise match. Leading slashes collapse to one, as in appPathFromLink.
+ */
+export function pushTapPath(url: unknown, pageOrigin: string): string | null {
+  if (typeof url !== "string" || !url) return null;
+  const onSite = appPathFromLink(url);
+  if (onSite) return onSite;
+  let parsed: URL;
+  try {
+    parsed = new URL(url);
+  } catch {
+    return null;
+  }
+  if (parsed.protocol !== "https:" && parsed.protocol !== "http:") return null;
+  if (parsed.origin !== pageOrigin) return null;
   return parsed.pathname.replace(/^\/+/, "/") + parsed.search + parsed.hash;
 }
 

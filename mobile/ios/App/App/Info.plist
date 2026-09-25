@@ -22,6 +22,11 @@
 	<string>$(MARKETING_VERSION)</string>
 	<key>CFBundleVersion</key>
 	<string>$(CURRENT_PROJECT_VERSION)</string>
+	<!-- No FCM token, and no Firebase Messaging contact, until a student turns
+	     notifications on. The plugin's getToken switches this on for good
+	     once they do (mobile/README.md, "Push"). -->
+	<key>FirebaseMessagingAutoInitEnabled</key>
+	<false/>
 	<!-- The only encryption is the HTTPS built into iOS, which is exempt, so
 	     App Store Connect doesn't ask about export compliance on each upload. -->
 	<key>ITSAppUsesNonExemptEncryption</key>

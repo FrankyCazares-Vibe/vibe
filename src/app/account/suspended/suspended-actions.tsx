@@ -4,6 +4,8 @@ import { useEffect, useState } from "react";
 
 import { clearDraft } from "@/lib/onboarding/draft";
 import { isTriggerDefaultHandle } from "@/lib/profile/onboarding-prefill";
+import { pushLogoutBody } from "@/lib/pwa/device-push";
+import { leaveDeviceClean } from "@/lib/pwa/leave-device-clean";
 import { getSupabaseBrowserClient } from "@/lib/supabase/browser";
 
 const DELETE_FAILED = "Couldn't delete your account. Try again in a minute.";
@@ -36,6 +38,21 @@ const DELETE_WORD = "delete";
  * describes — lands in the same place and the two can't drift apart.
  */
 export const AFTER_DELETE = "/auth/signup";
+
+/**
+ * leaveDeviceClean behind our own guard. It promises never to throw and to be
+ * done within ~3 s; this makes sure, so a push clean-up problem can't strand
+ * a student on a busy Sign out or Delete button: any error is dropped, and
+ * after 4 s we move on whatever it's still doing.
+ */
+function leaveDeviceSafely(opts: { serverDelete: boolean }): Promise<void> {
+  return Promise.race([
+    Promise.resolve()
+      .then(() => leaveDeviceClean(opts))
+      .catch(() => {}),
+    new Promise<void>((resolve) => setTimeout(resolve, 4000)),
+  ]);
+}
 
 /**
  * The signed-in student's own handle, read in the browser for the screens
@@ -162,6 +179,9 @@ export function useLeaveAccount(handle: string | null | undefined): LeaveAccount
       const res = await fetch("/api/auth/logout", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
+        // This device's push address, so the route drops its row too, even
+        // one another account left behind on this phone (plan §8 W7).
+        body: JSON.stringify(pushLogoutBody()),
       });
       const data = (await res.json().catch(() => ({}))) as { ok?: boolean };
       signedOut = res.ok && data.ok === true;
@@ -178,6 +198,13 @@ export function useLeaveAccount(handle: string | null | undefined): LeaveAccount
       setSigningOut(false);
       return;
     }
+    // Only now, with the logout done: take this device off push, close what's
+    // still on screen and drop the account's cached data, so the next person
+    // on a shared phone starts from nothing. No server delete, because the
+    // route already dropped every row and the session it would need is gone
+    // (plan §8 W7). It can't throw or navigate and is over within 4 s; Sign
+    // out stays busy meanwhile.
+    await leaveDeviceSafely({ serverDelete: false });
     // Same as the Settings sign-out: drop every onboarding draft on this
     // browser (no id: the next person to sign in here must not inherit this
     // one's half-typed answers), then hard-reload so the cleared cookie is
@@ -207,13 +234,19 @@ export function useLeaveAccount(handle: string | null | undefined): LeaveAccount
         setDeleting(false);
         return;
       }
-      // The account is gone: drop every onboarding draft on this browser.
-      clearDraft();
-      window.location.href = AFTER_DELETE;
     } catch {
       setError(DELETE_FAILED);
       setDeleting(false);
+      return;
     }
+    // The account is gone. Out here, after the try, on purpose: nothing that
+    // happens now may show the delete error for an account that's deleted.
+    // Its push rows went with it (the delete cascades), so only this device
+    // is left to clean: unsubscribe it and clear its screen and storage (plan
+    // §8 W7). Then drop every onboarding draft on this browser.
+    await leaveDeviceSafely({ serverDelete: false });
+    clearDraft();
+    window.location.href = AFTER_DELETE;
   }
 
   function reset() {

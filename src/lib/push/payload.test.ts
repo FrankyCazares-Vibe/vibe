@@ -135,7 +135,7 @@ test("navigate is absolute on the given origin, whatever the kind", () => {
 
 // ── The FCM message ─────────────────────────────────────────────────────────
 
-test("the FCM message: strings-only data, Android channel and icon, APNs thread and badge", () => {
+test("the FCM message: strings-only data, Android channel and icon, APNs thread, no badge", () => {
   const m = build({ kind: "dm", actor: MAYA, channelId: CHANNEL, messageId: MESSAGE, content: text("hi") });
   const f = P.toFcm(m, "device-token");
   assert.deepEqual(f, {
@@ -152,16 +152,19 @@ test("the FCM message: strings-only data, Android channel and icon, APNs thread 
     },
     apns: {
       headers: { "apns-collapse-id": P.apnsCollapseId(`dm:${CHANNEL}:${MESSAGE}`) },
-      payload: { aps: { badge: 3, "thread-id": `dm:${CHANNEL}`, sound: "default" } },
+      payload: { aps: { "thread-id": `dm:${CHANNEL}`, sound: "default" } },
     },
   });
   for (const v of Object.values(f.data)) assert.equal(typeof v, "string");
   assert.ok(!("collapse_key" in f.android), "FCM ignores collapse_key on notification messages");
 });
 
-test("the FCM message leaves aps.badge out when the count is unknown", () => {
+test("the FCM message never sets aps.badge, known count or not, until the apps can clear it", () => {
+  for (const badge of [null, 0, 3]) {
+    const f = P.toFcm(build({ kind: "follow", actor: MAYA }, { badge }), "t");
+    assert.ok(!("badge" in f.apns.payload.aps), `badge ${badge}`);
+  }
   const f = P.toFcm(build({ kind: "follow", actor: MAYA }, { badge: null }), "t");
-  assert.ok(!("badge" in f.apns.payload.aps));
   assert.equal(f.apns.payload.aps["thread-id"], "follows");
 });
 

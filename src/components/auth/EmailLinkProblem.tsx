@@ -16,6 +16,7 @@ import {
 } from "@/lib/auth/email-link-errors";
 import { clearPendingSignup } from "@/lib/auth/pending-signup";
 import { getPostLoginDestination } from "@/lib/auth/post-login";
+import { leaveDeviceClean } from "@/lib/pwa/leave-device-clean";
 import { getSupabaseBrowserClient } from "@/lib/supabase/browser";
 
 /** Outcomes where a fresh email or the typed code is the way forward. */
@@ -57,6 +58,21 @@ function WithEmail({ text, email }: { text: string; email: string }) {
 }
 
 /**
+ * leaveDeviceClean behind our own guard. It promises never to throw and to be
+ * done within ~3 s; this makes sure, so a push clean-up problem can't stop
+ * the sign-out after it: any error is dropped, and after 4 s we move on
+ * whatever it's still doing.
+ */
+function leaveDeviceSafely(opts: { serverDelete: boolean }): Promise<void> {
+  return Promise.race([
+    Promise.resolve()
+      .then(() => leaveDeviceClean(opts))
+      .catch(() => {}),
+    new Promise<void>((resolve) => setTimeout(resolve, 4000)),
+  ]);
+}
+
+/**
  * "Not you? Sign out" for a browser holding an account the student may not
  * own. Local scope: only this browser's session ends, not the account's
  * other devices. auth-js keeps the session when the logout call fails for
@@ -72,6 +88,12 @@ function useSignOutHere(onSignedOut: () => void) {
     setSignOutError(null);
     let ok = false;
     try {
+      // Take this device off this account's push first: delete its row,
+      // unsubscribe, clear the screen and the cached account data. BEFORE
+      // signOut, because the row delete needs the session signOut ends (plan
+      // §8 W7). The helper never navigates, so the card still flips in place.
+      // Can't throw; over within 4 s.
+      await leaveDeviceSafely({ serverDelete: true });
       const { error } = await getSupabaseBrowserClient().auth.signOut({
         scope: "local",
       });

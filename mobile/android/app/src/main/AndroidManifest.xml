@@ -75,11 +75,12 @@
             <meta-data android:name="android.support.FILE_PROVIDER_PATHS" android:resource="@xml/file_paths" />
         </provider>
 
-        <!-- Read by Firebase Messaging once the push wave installs it; ignored
-             until then. The small icon is Vibe's mark as white on transparent
-             (Android draws it from the alpha channel alone), tinted with the
-             site's orange. The fallback channel is "activity"; the push sender
-             is meant to name "messages" or "activity" on every push itself. -->
+        <!-- Read by Firebase Messaging (@capacitor-firebase/messaging). The
+             small icon is Vibe's mark as white on transparent (Android draws
+             it from the alpha channel alone), tinted with the site's orange.
+             The fallback channel is "activity"; the push sender names
+             "messages" or "activity" on every push itself
+             (src/lib/push/payload.ts toFcm). -->
         <meta-data
             android:name="com.google.firebase.messaging.default_notification_icon"
             android:resource="@drawable/ic_stat_vibe" />
@@ -89,6 +90,13 @@
         <meta-data
             android:name="com.google.firebase.messaging.default_notification_channel_id"
             android:value="activity" />
+
+        <!-- No FCM token, and no Firebase Messaging contact, until a student
+             turns notifications on. The plugin's getToken switches this on for
+             good once they do (mobile/README.md, "Push"). -->
+        <meta-data
+            android:name="firebase_messaging_auto_init_enabled"
+            android:value="false" />
     </application>
 
     <!-- Permissions -->
