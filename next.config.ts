@@ -2,6 +2,16 @@ import type { NextConfig } from "next";
 import { withSentryConfig } from "@sentry/nextjs";
 
 const nextConfig: NextConfig = {
+  experimental: {
+    // Next 16.3 turns Turbopack's build cache on by default and Vercel
+    // restores .next/cache between builds. In S65 that shipped a production
+    // build whose CSS was the PREVIOUS build's: a new globals.css rule never
+    // reached anyone, and because chunk names are content hashes the page
+    // kept pointing at the old, year-long-immutable stylesheet. A local
+    // build from the same commit had the rule. Every production build
+    // compiles from scratch instead — slower, but what ships is what's in git.
+    turbopackFileSystemCacheForBuild: false,
+  },
   // Server-side resume redaction (src/lib/profile/resume-redact.ts).
   // PDFium's Emscripten glue relies on createRequire / import.meta.url and
   // sharp is a native addon, so none of these may be bundled into route
