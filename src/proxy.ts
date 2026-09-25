@@ -158,9 +158,10 @@ function restrictedPageAllowed(pathname: string): boolean {
 
 /**
  * The few writes a restricted student keeps: leaving (sign out, delete the
- * account), stopping the money (the Vibe+ portal), and protecting themselves
- * (block, mute — being restricted doesn't mean someone else gets to harass
- * you). Everything else that writes is refused.
+ * account), stopping the money (the Vibe+ portal), stopping notifications
+ * (removing a push device — DELETE only; registering one stays refused), and
+ * protecting themselves (block, mute — being restricted doesn't mean someone
+ * else gets to harass you). Everything else that writes is refused.
  *
  * The portal line is a door with no handle on it in wave 1, and saying so here
  * is the point: /plus and /settings both come here like every other page, and
@@ -175,6 +176,7 @@ function restrictedApiAllowed(pathname: string, method: string): boolean {
   if (pathname === "/api/auth/logout") return true;
   if (pathname === "/api/me" && method === "DELETE") return true;
   if (pathname === "/api/billing/portal") return true;
+  if (pathname === "/api/me/push-devices" && method === "DELETE") return true;
   return pathname === "/api/me/block" || pathname === "/api/me/mute";
 }
 

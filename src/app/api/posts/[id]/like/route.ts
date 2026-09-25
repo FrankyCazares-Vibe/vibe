@@ -3,6 +3,7 @@ import { NextResponse } from "next/server";
 import { requireTermsAccepted } from "@/lib/legal/require-terms";
 import { orgContentAccess } from "@/lib/orgs/hidden-org-access";
 import { isUuid } from "@/lib/pgrest";
+import { kickPushDrain } from "@/lib/push/dispatch";
 import { rateLimit, tooManyRequests } from "@/lib/rate-limit";
 import { loadPairBlock } from "@/lib/safety/pair-block";
 import { createSupabaseServerClient } from "@/lib/supabase/server";
@@ -118,6 +119,10 @@ export async function POST(_req: Request, ctx: RouteContext) {
     console.error("[posts/:id/like POST]", error);
     return requestFailed();
   }
+  // trg_notify_on_like writes the like notification (once per liker and post,
+  // never on your own post), and the notifications trigger queues its push;
+  // drain it after the response. Returns at once and never throws.
+  kickPushDrain();
   return NextResponse.json({ ok: true });
 }
 

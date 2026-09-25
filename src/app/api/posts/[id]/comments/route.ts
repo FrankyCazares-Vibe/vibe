@@ -4,6 +4,7 @@ import { isMissingColumnError } from "@/lib/db/missing-column";
 import { contentBlockedResponse, requireCanPublish } from "@/lib/moderation/access";
 import { checkText } from "@/lib/moderation/text-filter";
 import { postAccessForCaller } from "@/lib/orgs/hidden-org-access";
+import { kickPushDrain } from "@/lib/push/dispatch";
 import { rateLimit, tooManyRequests } from "@/lib/rate-limit";
 import { loadHiddenUsers } from "@/lib/safety/hidden-users";
 import { loadPairBlock } from "@/lib/safety/pair-block";
@@ -421,6 +422,11 @@ export async function POST(req: Request, ctx: RouteContext) {
     console.error("[posts/:id/comments POST]", error);
     return requestFailed();
   }
+
+  // trg_notify_on_comment writes the post author's notification (none on your
+  // own post), and the notifications trigger queues its push; drain it after
+  // the response. Returns at once and never throws.
+  kickPushDrain();
 
   const inserted = row as unknown as CommentRow;
   return NextResponse.json({

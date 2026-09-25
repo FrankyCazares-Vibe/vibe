@@ -15,6 +15,7 @@ import { withPostMediaUrls } from "@/lib/post-media-url";
 import { addedHandles, checkPostEdit, extractPostTags } from "@/lib/posts/edit";
 import { loadPostEngagementCounts } from "@/lib/posts/engagement-counts";
 import { loadHonestViewRows } from "@/lib/posts/honest-views";
+import { kickPushDrain } from "@/lib/push/dispatch";
 import { rateLimit, tooManyRequests } from "@/lib/rate-limit";
 import { CLIP_KEY_PREFIX, getR2S3Client, isR2Configured } from "@/lib/r2";
 import { createSupabaseServerClient } from "@/lib/supabase/server";
@@ -639,12 +640,15 @@ export async function PATCH(req: Request, ctx: RouteContext) {
             if (!isSupabaseServiceConfigured()) {
               console.error("[posts/:id PATCH mentions] service role not configured");
             } else {
-              await insertMentionNotifications(createSupabaseServiceClient(), {
+              const mentioned = await insertMentionNotifications(createSupabaseServiceClient(), {
                 actorId: user.id,
                 targetUserIds: ids,
                 kind: "post",
                 postId: row.id,
               });
+              // The notifications trigger queued a push per mention row;
+              // drain them after the response. Returns at once, never throws.
+              if (mentioned.inserted > 0) kickPushDrain();
             }
           }
         } catch (e) {
@@ -687,12 +691,14 @@ export async function PATCH(req: Request, ctx: RouteContext) {
           );
           const fresh = ids.filter((uid) => !already.has(uid));
           if (fresh.length > 0) {
-            await insertMentionNotifications(service, {
+            const mentioned = await insertMentionNotifications(service, {
               actorId: user.id,
               targetUserIds: fresh,
               kind: "post",
               postId: row.id,
             });
+            // Same as the first-publish branch: drain the queued pushes.
+            if (mentioned.inserted > 0) kickPushDrain();
           }
         }
       }

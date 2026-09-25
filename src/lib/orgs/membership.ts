@@ -11,6 +11,7 @@ import {
   type OrgRole,
   type ViewerSystem,
 } from "@/lib/orgs/join-state";
+import { kickPushDrain } from "@/lib/push/dispatch";
 
 /**
  * The database side of org membership: what a viewer's standing with an org
@@ -406,7 +407,15 @@ export async function notifyOrg(
       type: row.type,
       org_id: row.orgId,
     });
-    if (!error) return;
+    if (!error) {
+      // The notifications trigger queued this row's push; drain it after the
+      // response. kickPushDrain uses after(), so it needs a request scope:
+      // both callers (the invites POST and the requests/[id] POST) are route
+      // handlers. It returns at once and never throws, so a push problem
+      // can't fail the invite or the approval either.
+      kickPushDrain();
+      return;
+    }
     if (isMissingColumnError(error, ["org_id"])) {
       console.error("[orgs/membership notifyOrg] skipped, notifications.org_id is not deployed", {
         type: row.type,

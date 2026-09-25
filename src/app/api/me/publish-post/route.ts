@@ -7,6 +7,7 @@ import {
 } from "@/lib/mentions";
 import { isSupabaseHttpsUrl } from "@/lib/org-asset-url";
 import { withPostMediaUrls } from "@/lib/post-media-url";
+import { kickPushDrain } from "@/lib/push/dispatch";
 import { CLIP_KEY_PREFIX } from "@/lib/r2";
 import { contentBlockedResponse, requireCanPublish } from "@/lib/moderation/access";
 import { checkText } from "@/lib/moderation/text-filter";
@@ -211,12 +212,15 @@ export async function POST(req: Request) {
           if (!isSupabaseServiceConfigured()) {
             console.error("[publish-post mentions] service role not configured");
           } else {
-            await insertMentionNotifications(createSupabaseServiceClient(), {
+            const mentioned = await insertMentionNotifications(createSupabaseServiceClient(), {
               actorId: user.id,
               targetUserIds: ids,
               kind: "post",
               postId: row.id as string,
             });
+            // The notifications trigger queued a push per mention row; drain
+            // them after the response. Returns at once and never throws.
+            if (mentioned.inserted > 0) kickPushDrain();
           }
         }
       } catch (e) {

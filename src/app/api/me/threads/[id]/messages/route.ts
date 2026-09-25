@@ -11,6 +11,7 @@ import {
   messageMediaProxyUrl,
 } from "@/lib/messages/channel-access";
 import { postMediaProxyUrl } from "@/lib/post-media-url";
+import { enqueueMessagePush, kickPushDrain } from "@/lib/push/dispatch";
 import { contentBlockedResponse, requireCanPublish } from "@/lib/moderation/access";
 import { checkText } from "@/lib/moderation/text-filter";
 import { rateLimit, tooManyRequests } from "@/lib/rate-limit";
@@ -556,6 +557,17 @@ export async function POST(req: Request, ctx: RouteCtx) {
     return NextResponse.json({ ok: false, error: "Request failed" }, { status: 500 });
   }
 
+  // Push: a DM or group message queues one push per other member and drains
+  // them in the same after() callback, so the drain can't run before the rows
+  // exist. It returns at once, never throws and does nothing while push is off,
+  // so the send never waits on push or fails because of it. Called right after
+  // the insert so a later step failing can't lose the push. Club channels
+  // skip this: they push only through their @mention rows, kicked below.
+  const insertedMessageId = (inserted as unknown as { id?: unknown }).id;
+  if (!member.isOrgChannel && typeof insertedMessageId === "string") {
+    enqueueMessagePush({ messageId: insertedMessageId, channelId, senderId: user.id });
+  }
+
   // DM/group housekeeping: implicit-accept on first reply, bump last_read_at.
   // Org channels skip both — they don't use channel_members.
   if (!member.isOrgChannel) {
@@ -611,12 +623,16 @@ export async function POST(req: Request, ctx: RouteCtx) {
             if (!isSupabaseServiceConfigured()) {
               console.error("[messages.POST mentions] service role not configured");
             } else {
-              await insertMentionNotifications(createSupabaseServiceClient(), {
+              const mentioned = await insertMentionNotifications(createSupabaseServiceClient(), {
                 actorId: user.id,
                 targetUserIds: validTargets,
                 kind: "message",
                 messageId: insertedRow.id,
               });
+              // A club chat pushes only through these rows (their trigger
+              // queued them), so drain once any were written. In a DM or
+              // group the message push above already covers the mention.
+              if (member.isOrgChannel && mentioned.inserted > 0) kickPushDrain();
             }
           }
         }

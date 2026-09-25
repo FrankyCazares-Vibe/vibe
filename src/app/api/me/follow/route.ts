@@ -1,6 +1,7 @@
 import { NextResponse } from "next/server";
 
 import { isUuid } from "@/lib/pgrest";
+import { kickPushDrain } from "@/lib/push/dispatch";
 import { rateLimit, tooManyRequests } from "@/lib/rate-limit";
 import { createSupabaseServerClient } from "@/lib/supabase/server";
 
@@ -100,6 +101,10 @@ export async function POST(req: Request) {
     return NextResponse.json({ ok: false, error: "Request failed" }, { status: 500 });
   }
 
+  // trg_notify_on_connection writes the follow notification (first follow of
+  // this pair only), and the notifications trigger queues its push; drain it
+  // after the response. Returns at once and never throws.
+  kickPushDrain();
   return NextResponse.json({ ok: true });
 }
 
