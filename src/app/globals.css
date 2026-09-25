@@ -2899,3 +2899,11 @@ html.vibe-app,
 html.vibe-app body {
   background-color: #FAF7F2;
 }
+
+/* The sign-in screens' "← back" goes to the landing page. Inside the store
+   apps there is no landing page ("/" sends the app to /campus, which sends a
+   signed-out student straight back to sign-in), so the pill only loops.
+   Seen in the first simulator run. */
+html.vibe-app .vibe-auth-back {
+  display: none;
+}
