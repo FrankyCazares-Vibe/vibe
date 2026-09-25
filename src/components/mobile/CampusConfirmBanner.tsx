@@ -1,7 +1,7 @@
 "use client";
 
 import Link from "next/link";
-import { useEffect, useState, type CSSProperties, type JSX } from "react";
+import { useEffect, useRef, useState, type CSSProperties, type JSX } from "react";
 
 import {
   CAMPUS_CONFIRM_DISMISSED_KEY,
@@ -30,9 +30,20 @@ import { toast } from "@/lib/feedback/toast";
  * - "Not now" hides it for this browser session.
  *
  * A failed load renders nothing: this is a nudge, never a blocker.
+ *
+ * `onVisibleChange` (wave 3′b) lets CampusMobile keep the push ask out of
+ * this slot while the card shows: it's called once the load settles (true
+ * or false, a failed load is false), then on every flip between a card and
+ * nothing, and with false on unmount if the card was showing.
  */
-export function CampusConfirmBanner(): JSX.Element | null {
+export function CampusConfirmBanner({
+  onVisibleChange,
+}: {
+  onVisibleChange?: (visible: boolean) => void;
+} = {}): JSX.Element | null {
   const [view, setView] = useState<CampusConfirmBannerView | null>(null);
+  // The onboarding-state read answered (ok or not); until then nothing is reported.
+  const [settled, setSettled] = useState(false);
   const [busy, setBusy] = useState(false);
 
   useEffect(() => {
@@ -43,11 +54,32 @@ export function CampusConfirmBanner(): JSX.Element | null {
         quiet: true,
         failure: "Couldn't load your campus.",
       });
-      if (cancelled || !r.ok) return;
-      setView(campusConfirmBannerView(r.data, readDismissed()));
+      if (cancelled) return;
+      if (r.ok) setView(campusConfirmBannerView(r.data, readDismissed()));
+      setSettled(true);
     })();
     return () => {
       cancelled = true;
+    };
+  }, []);
+
+  const visible = view !== null;
+  const onVisibleChangeRef = useRef(onVisibleChange);
+  // What the parent was last told: null = nothing yet.
+  const reportedRef = useRef<boolean | null>(null);
+  useEffect(() => {
+    onVisibleChangeRef.current = onVisibleChange;
+  }, [onVisibleChange]);
+  useEffect(() => {
+    if (!settled || reportedRef.current === visible) return;
+    reportedRef.current = visible;
+    onVisibleChangeRef.current?.(visible);
+  }, [settled, visible]);
+  useEffect(() => {
+    const reported = reportedRef;
+    const onChange = onVisibleChangeRef;
+    return () => {
+      if (reported.current === true) onChange.current?.(false);
     };
   }, []);
 

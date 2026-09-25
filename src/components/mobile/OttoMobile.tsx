@@ -16,6 +16,7 @@ import { OttoRequests } from "@/components/otto/OttoRequests";
 import { OttoSettings } from "@/components/otto/OttoSettings";
 import { OttoTellInput } from "@/components/otto/OttoTellInput";
 import { OttoUpcoming } from "@/components/otto/OttoUpcoming";
+import { PushAsk } from "@/components/push/PushAsk";
 import { OttoOrb } from "@/components/the-map/OttoOrb";
 import { vibeRequest } from "@/lib/feedback/request";
 
@@ -372,6 +373,7 @@ export function OttoMobile({ initial }: { initial: OttoPayload }) {
           <h2 id="otto-today-heading" style={visuallyHidden}>
             Today
           </h2>
+          <PushAsk placement="otto" />
           <OttoActivity rows={activity} failed={activityFailed} />
           <OttoUpcoming
             rows={upcoming}

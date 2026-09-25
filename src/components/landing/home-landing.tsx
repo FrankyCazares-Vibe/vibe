@@ -7,6 +7,7 @@ import { Fragment, useEffect, useMemo, useState, type CSSProperties } from "reac
 import { OttoOrb } from "@/components/the-map/OttoOrb";
 import { enabledSchoolSystems } from "@/lib/auth/school-email-domains";
 import { SYSTEM_LABEL } from "@/lib/iu/campuses";
+import { APP_STORE_URL, PLAY_STORE_URL } from "@/lib/native/store-links";
 import { isIosPlatform, type Platform } from "@/lib/pwa/display-mode";
 import { usePlatform } from "@/lib/pwa/use-standalone";
 import { useIsMobile } from "@/lib/use-is-mobile";
@@ -41,32 +42,10 @@ const HERO_SENTENCES_MOBILE = [
   "This is your campus, all in one place.",
 ];
 
-/**
- * A store listing URL from the build, or null. Only a real listing counts:
- * the value must start with the store's own origin, the same rule /get
- * applies (src/app/get/route.ts), so a typo or a half-filled env var renders
- * no link rather than a link to somewhere else. NEXT_PUBLIC_* is inlined at
- * build time, so each process.env read below has to stay spelled out.
- */
-function storeListingUrl(raw: string | undefined, prefix: string): string | null {
-  const value = (raw ?? "").trim();
-  if (!value.startsWith(prefix) || value.length === prefix.length) return null;
-  try {
-    return new URL(value).href;
-  } catch {
-    return null;
-  }
-}
-
-const APP_STORE_URL = storeListingUrl(
-  process.env.NEXT_PUBLIC_APP_STORE_URL,
-  "https://apps.apple.com/",
-);
-const PLAY_STORE_URL = storeListingUrl(
-  process.env.NEXT_PUBLIC_PLAY_STORE_URL,
-  "https://play.google.com/",
-);
-
+// The store listings (APP_STORE_URL / PLAY_STORE_URL) come from
+// src/lib/native/store-links.ts, shared with /get and Settings: null until
+// that store's env var holds a real listing for that store, so a typo or a
+// half-filled env var renders no link rather than a link to somewhere else.
 type StoreLink = { key: string; href: string; lead: string; store: string };
 
 const APP_STORE_LINK: StoreLink | null = APP_STORE_URL

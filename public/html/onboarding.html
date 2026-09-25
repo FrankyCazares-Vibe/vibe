@@ -372,10 +372,26 @@ input, textarea, [contenteditable="true"] { cursor:text!important; }
 .photo-initial { font-family: 'Fraunces', serif; font-size: 52px; font-weight: 900; color: rgba(255,255,255,.8); line-height: 1; }
 #onbPhotoError { text-align: center; margin-top: 14px; }
 
+/* Step 6 — "Get Vibe on your phone". The QR sits on a white tile (the SVG's
+   own white margin carries on into it): scanners want dark on light with a
+   quiet zone, and this page is dark. Hidden when the primary pointer is coarse. */
+.onb-getapp {
+  width: 100%; margin-top: 24px; padding: 16px; border-radius: 16px;
+  display: flex; align-items: center; gap: 18px; text-align: left;
+  background: rgba(255,255,255,.06); border: 0.5px solid rgba(255,255,255,.12);
+}
+.onb-getapp-qr { flex: none; padding: 8px; border-radius: 12px; background: #fff; }
+.onb-getapp-qr img { display: block; width: 132px; height: 132px; }
+.onb-getapp-title { font-family: 'Fraunces', serif; font-size: 18px; font-weight: 900; color: white; margin: 0 0 6px; }
+.onb-getapp-body { font-size: 13px; line-height: 1.5; color: rgba(255,255,255,.65); margin: 0 0 10px; }
+.onb-getapp-url { font-size: 13px; font-weight: 700; color: rgba(255,255,255,.85); letter-spacing: .2px; }
+.onb-touch .onb-getapp { display: none; }
+
 /* Responsive */
 @media (max-width: 540px) {
   .h1 { font-size: 30px; }
   .h2 { font-size: 24px; }
+  .onb-getapp { flex-direction: column; text-align: center; }
   .pf-form { max-width: 100%; }
   .progress-dots { padding: 6px 12px; }
   .progress-text { display: none; }
@@ -441,7 +457,8 @@ body.ott-warping .progress-dots {
 <div class="cursor-ring" id="cursorRing"></div>
 
 <!-- Every word below comes from the copy tables in the script: `data-copy` is a
-     dotted path into ONB_COPY, `data-local` into ONB_LOCAL_COPY (applyCopy). -->
+     dotted path into ONB_COPY, `data-local` into ONB_LOCAL_COPY,
+     `data-desktop-copy` into ONB_DESKTOP_COPY (applyCopy). -->
 <header class="onb-top">
   <button type="button" class="onb-back" id="onbBack"><span aria-hidden="true">←</span></button>
   <a href="/campus" class="onb-logo" id="onbLogo">vibe<span>.</span></a>
@@ -652,6 +669,19 @@ body.ott-warping .progress-dots {
         <p class="onb-empty-title" data-copy="people.emptyTitle"></p>
         <p class="sub-intro" id="onbPeopleEmptyBody"></p>
         <button type="button" class="btn-share onb-share" data-copy="people.share"></button>
+      </div>
+    </div>
+    <!-- Get Vibe on your phone (plan §8.7 F): a QR code for /get, which sends
+         a phone to its store listing. Computers only: hidden when the primary
+         pointer is coarse (html.onb-touch, set at boot), since an iPad gets this page too. -->
+    <div class="onb-getapp" id="onbGetApp">
+      <div class="onb-getapp-qr">
+        <img id="onbGetAppQr" src="/icons/get-qr.svg" alt="" width="132" height="132">
+      </div>
+      <div class="onb-getapp-text">
+        <p class="onb-getapp-title" data-desktop-copy="people.getApp"></p>
+        <p class="onb-getapp-body" data-desktop-copy="people.getAppBody"></p>
+        <p class="onb-getapp-url" data-desktop-copy="people.getAppUrl"></p>
       </div>
     </div>
     <div class="cta-row" style="margin-top: 28px;">
@@ -1959,6 +1989,19 @@ function firstName(full) {
 }
 /* ONB-PURE-MIRROR:END */
 
+// ── Desktop-only copy ─────────────────────────────────────────────────────
+// Words only this page says (the phone never shows a QR code), so they live
+// outside the mirror block: ONB_COPY there must stay JSON-equal to
+// onb-copy.ts. Bound by `data-desktop-copy` in applyCopy.
+const ONB_DESKTOP_COPY = Object.freeze({
+  people: Object.freeze({
+    getApp: "Get Vibe on your phone",
+    getAppBody: "Scan with your phone's camera to take Vibe with you.",
+    getAppUrl: "connectvibe.app/get",
+    getAppQrAlt: "QR code for connectvibe.app/get",
+  }),
+});
+
 // ── Page state ────────────────────────────────────────────────────────────
 const ONB_USER_ID = draftKey(ONB_BOOT.userId) ? ONB_BOOT.userId : null;
 
@@ -2069,6 +2112,12 @@ function applyCopy() {
     const t = copyAt(ONB_LOCAL_COPY, el.getAttribute('data-placeholder'));
     if (typeof t === 'string') el.placeholder = t;
   });
+  document.querySelectorAll('[data-desktop-copy]').forEach((el) => {
+    const t = copyAt(ONB_DESKTOP_COPY, el.getAttribute('data-desktop-copy'));
+    if (typeof t === 'string') el.textContent = t;
+  });
+  const getAppQr = document.getElementById('onbGetAppQr');
+  if (getAppQr) getAppQr.alt = ONB_DESKTOP_COPY.people.getAppQrAlt;
   $('onbBack').setAttribute('aria-label', ONB_COPY.header.back);
   $('onbPurdueEmail').placeholder = ONB_COPY.campus.switchPlaceholder;
   $('onbClubsSearch').placeholder = ONB_COPY.clubs.search;
@@ -3985,8 +4034,25 @@ function bindEvents() {
   });
 }
 
+/**
+ * Step 6's "Get Vibe on your phone" card is for computers: when the primary
+ * pointer is coarse (an iPad gets this page) the device is already in hand,
+ * so `html.onb-touch` hides it. A touchscreen laptop's primary pointer is
+ * fine, so it keeps the card. Never throws: no matchMedia keeps the card.
+ */
+function markTouchDevice() {
+  try {
+    if (window.matchMedia && window.matchMedia('(pointer: coarse)').matches) {
+      document.documentElement.classList.add('onb-touch');
+    }
+  } catch (e) {
+    // Keep the card.
+  }
+}
+
 // ── Boot ──────────────────────────────────────────────────────────────────
 (function bootOnboarding() {
+  markTouchDevice();
   applyCopy();
   writeFields(ONB_RESTORE.fields);
   renderCampusCards();

@@ -2,11 +2,10 @@
  * Where "get the app" goes: the App Store and Google Play listings, and which
  * one a given phone should be sent to (plan §8.2, wave 3′).
  *
- * Lifted from `src/app/get/route.ts` (storeListingUrl and the two prefixes),
- * so the Settings Notifications card can offer the App Store to an iPhone
- * browser tab (§8 W13). Wave 3′b moves `/get` and the landing page
- * (`src/components/landing/home-landing.tsx`) onto this file too; until then
- * they keep their own copies of the same rule.
+ * The one copy of this rule: `/get`, the landing page
+ * (`src/components/landing/home-landing.tsx`), the Settings Notifications card
+ * (an App Store link for an iPhone browser tab, §8 W13) and the "get the app"
+ * asks (§8.7) all read it from here.
  *
  * A store URL is used only when it starts with that store's own origin, so a
  * mistyped or hostile env value can never turn a "get the app" link into a

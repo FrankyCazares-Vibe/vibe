@@ -1,5 +1,6 @@
 import { NextResponse, type NextRequest } from "next/server";
 
+import { storeUrlFor } from "@/lib/native/store-links";
 import { detectPlatform, isIosPlatform } from "@/lib/pwa/display-mode";
 
 /**
@@ -18,29 +19,16 @@ import { detectPlatform, isIosPlatform } from "@/lib/pwa/display-mode";
  * (critic-s1 item 14).
  *
  * The destination is never read from the query string, so /get can't be
- * turned into an open redirect, and a store URL is used only when it starts
- * with the store's own origin (the landing's store links apply the same rule,
- * src/components/landing/home-landing.tsx). NEXT_PUBLIC_* values are inlined
- * at build time: changing one on Vercel needs a redeploy (.env.example).
+ * turned into an open redirect. Which listing a phone gets, and the rule that
+ * a store URL counts only when it starts with that store's own origin, live in
+ * src/lib/native/store-links.ts (shared with the landing's store links and
+ * Settings). NEXT_PUBLIC_* values are inlined at build time: changing one on
+ * Vercel needs a redeploy (.env.example).
  *
  * `private, no-store` + `Vary: User-Agent`, so no cache between here and the
  * phone can hand one device's redirect to another. Route handlers aren't
  * cached by default, and reading the request headers keeps this one dynamic.
  */
-
-const APP_STORE_PREFIX = "https://apps.apple.com/";
-const PLAY_STORE_PREFIX = "https://play.google.com/";
-
-/** The listing URL if it's a real one for that store, else null. */
-function storeListingUrl(raw: string | undefined, prefix: string): string | null {
-  const value = (raw ?? "").trim();
-  if (!value.startsWith(prefix) || value.length === prefix.length) return null;
-  try {
-    return new URL(value).href;
-  } catch {
-    return null;
-  }
-}
 
 export function GET(request: NextRequest) {
   const platform = detectPlatform({
@@ -53,12 +41,10 @@ export function GET(request: NextRequest) {
     // Already inside the store app: a /get link (a poster's QR code, a
     // shared "get the app" link) shouldn't send them out to a store listing.
     destination = "/campus";
-  } else if (isIosPlatform(platform)) {
-    destination =
-      storeListingUrl(process.env.NEXT_PUBLIC_APP_STORE_URL, APP_STORE_PREFIX) ?? "/campus";
-  } else if (platform.startsWith("android-")) {
-    destination =
-      storeListingUrl(process.env.NEXT_PUBLIC_PLAY_STORE_URL, PLAY_STORE_PREFIX) ?? "/campus";
+  } else if (isIosPlatform(platform) || platform.startsWith("android-")) {
+    // A phone's browser: its own store's listing (storeUrlFor), or the web
+    // app while that listing isn't set yet.
+    destination = storeUrlFor(platform) ?? "/campus";
   }
 
   const res = NextResponse.redirect(new URL(destination, request.url), 307);

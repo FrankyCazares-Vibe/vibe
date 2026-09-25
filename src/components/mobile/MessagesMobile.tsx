@@ -5,6 +5,7 @@ import { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState } fr
 import { Drawer } from "vaul";
 
 import { asLoadFailure, LoadFailed, type LoadFailure } from "@/components/feedback/LoadFailed";
+import { PushAsk } from "@/components/push/PushAsk";
 import {
   RemovedContentCard,
   ReportSheet,
@@ -301,6 +302,10 @@ function quotedBody(p: ParentPreview): string {
 
 // ---------- Component ----------
 
+// Coming back to the app re-syncs the thread list at most this often: iOS
+// fires visibilitychange for every glance at the lock screen.
+const LIST_RESYNC_MS = 30_000;
+
 export function MessagesMobile({
   initialHandle,
   initialChannelId,
@@ -318,7 +323,12 @@ export function MessagesMobile({
   const listSeqRef = useRef(0);
   const [openThreadId, setOpenThreadId] = useState<string | null>(null);
   const [composeOpen, setComposeOpen] = useState(false);
-  const initialHandleResolvedRef = useRef(false);
+  // The ?to= handle the page last opened, so a re-render doesn't open it
+  // again but a new one (a later link while mounted) does.
+  const lastHandledHandleRef = useRef<string | null>(null);
+  // Bumped by every deep link the page acts on (?channel= and ?to=), so a
+  // ?to= lookup still in flight knows a later link has taken over.
+  const deepLinkSeqRef = useRef(0);
 
   /** Resolve a handle → DM channel id, creating the thread if needed. */
   const openOrCreateDmFromHandle = useCallback(
@@ -354,22 +364,28 @@ export function MessagesMobile({
   // Stable handle to the refetcher so callbacks can refresh without a
   // dep-chain rewrite. Filled in below once `refetchThreads` exists.
   const refetchThreadsRef = useRef<
-    ((mode?: "first" | "refresh") => Promise<void>) | null
+    ((mode?: "first" | "refresh" | "quiet") => Promise<void>) | null
   >(null);
+  // When the list last started a load (Date.now()), so a return to the app
+  // doesn't reload a list that was just fetched.
+  const listFetchedAtRef = useRef(0);
 
   // "first" is the page's own load and its Retry: a failure shows in the
   // list's place, with no toast. "refresh" follows something the student
   // did (closing a thread, accepting a request): a failure keeps both
-  // lists on screen and toasts. Until one load has worked there are no
-  // rows to keep, so every failure is a first-load failure.
+  // lists on screen and toasts. "quiet" is a re-sync nobody asked for
+  // (coming back to the app): a failure keeps the rows and says nothing.
+  // Until one load has worked there are no rows to keep, so every failure
+  // is a first-load failure.
   const refetchThreads = useCallback(
-    async (mode: "first" | "refresh" = "refresh") => {
+    async (mode: "first" | "refresh" | "quiet" = "refresh") => {
       const seq = ++listSeqRef.current;
+      listFetchedAtRef.current = Date.now();
       const r = await vibeRequest<{ threads?: ThreadEntry[]; requests?: ThreadEntry[] }>(
         "/api/me/threads",
         {
           cache: "no-store",
-          quiet: mode === "first" || !listLoadedRef.current,
+          quiet: mode !== "refresh" || !listLoadedRef.current,
           failure: "Couldn't load your messages.",
         },
       );
@@ -397,16 +413,33 @@ export function MessagesMobile({
     void refetchThreads("first");
   }, [refetchThreads]);
 
+  // Coming back to the app (lock screen, another app, a notification)
+  // re-syncs the list quietly: messages may have landed while it was
+  // hidden. At most once every LIST_RESYNC_MS since the last load.
+  useEffect(() => {
+    const onVisible = () => {
+      if (document.visibilityState !== "visible") return;
+      if (Date.now() - listFetchedAtRef.current < LIST_RESYNC_MS) return;
+      void refetchThreadsRef.current?.("quiet");
+    };
+    document.addEventListener("visibilitychange", onVisible);
+    return () => document.removeEventListener("visibilitychange", onVisible);
+  }, []);
+
   // ?channel=<id> deep link — opens the conversation view on that
   // thread immediately. The ConversationView handles its own message
   // fetch via /api/me/threads/[id]/messages which works for org
   // channels via the can_view_org_channel RPC even if the thread
-  // isn't in the user's threads list yet.
-  const initialChannelResolvedRef = useRef(false);
+  // isn't in the user's threads list yet. A different id while the page
+  // is mounted (a notification tap that soft-navigates) opens that one;
+  // the same id on a re-render doesn't reopen it.
+  const lastHandledChannelRef = useRef<string | null>(null);
   useEffect(() => {
     if (!initialChannelId) return;
-    if (initialChannelResolvedRef.current) return;
-    initialChannelResolvedRef.current = true;
+    if (lastHandledChannelRef.current === initialChannelId) return;
+    lastHandledChannelRef.current = initialChannelId;
+    deepLinkSeqRef.current += 1;
+    setComposeOpen(false);
     setOpenThreadId(initialChannelId);
   }, [initialChannelId]);
 
@@ -415,13 +448,16 @@ export function MessagesMobile({
   // threads (peer.handle matches) and brand-new ones (POST to
   // /api/me/threads). A failed first load still resolves it through the
   // POST, which finds an existing DM too, so the link never waits on a
-  // Retry; the ref keeps a later successful load from posting again.
+  // Retry; the ref keeps a later successful load from posting again for
+  // the same handle, while a new handle opens its own conversation.
   useEffect(() => {
     if (!initialHandle) return;
     if (threads === null && !listErr) return; // wait for the first load to settle
-    if (initialHandleResolvedRef.current) return;
-    initialHandleResolvedRef.current = true;
     const lower = initialHandle.toLowerCase();
+    if (lastHandledHandleRef.current === lower) return;
+    lastHandledHandleRef.current = lower;
+    const seq = ++deepLinkSeqRef.current;
+    setComposeOpen(false);
     const existing = (threads ?? []).find(
       (t) => t.type === "dm" && t.peer?.handle?.toLowerCase() === lower,
     );
@@ -443,6 +479,9 @@ export function MessagesMobile({
         return;
       }
       await refetchThreads();
+      // A newer ?to= or ?channel= arrived while this one resolved: that
+      // one has opened (or will).
+      if (deepLinkSeqRef.current !== seq) return;
       setOpenThreadId(channelId);
     })();
   }, [initialHandle, threads, listErr, refetchThreads]);
@@ -603,8 +642,12 @@ export function MessagesMobile({
         )}
       </div>
 
+      {/* Keyed on the thread: a deep link that switches threads under an
+          open view mounts a fresh one, so no draft, menu, pin/mute mirror
+          or in-flight send of the old thread carries into the new one. */}
       {openThreadId ? (
         <ConversationView
+          key={openThreadId}
           threadId={openThreadId}
           thread={
             threads?.find((t) => t.id === openThreadId) ??
@@ -971,6 +1014,9 @@ export function ConversationView({
     "pending",
   );
   const [reqBusy, setReqBusy] = useState(false);
+  // A DM sent from this view: mounts the push ask above the composer for
+  // the rest of the view. PushAsk decides whether anything shows.
+  const [showPushAsk, setShowPushAsk] = useState(false);
   const [menuOpen, setMenuOpen] = useState(false);
   const [groupSettingsOpen, setGroupSettingsOpen] = useState(false);
   const [actionFeedback, setActionFeedback] = useState<string | null>(null);
@@ -982,10 +1028,11 @@ export function ConversationView({
   const [mutedUntil, setMutedUntil] = useState<string | null>(
     thread?.muted_until ?? null,
   );
-  // The messages, their load failure, the reply target, the staged file
-  // and the request bar all belong to one thread. If the thread changes
-  // under a mounted view, reset them here during render, before anything
-  // of the old thread paints (an effect would paint it first).
+  // The messages, their load failure, the reply target, the staged file,
+  // the request bar and the push ask all belong to one thread. If the
+  // thread changes under a mounted view, reset them here during render,
+  // before anything of the old thread paints (an effect would paint it
+  // first).
   const [shownThreadId, setShownThreadId] = useState(threadId);
   if (shownThreadId !== threadId) {
     setShownThreadId(threadId);
@@ -994,6 +1041,7 @@ export function ConversationView({
     setReplyTo(null);
     setStaged(null);
     setRequestState("pending");
+    setShowPushAsk(false);
   }
   const scrollRef = useRef<HTMLDivElement | null>(null);
   const inputRef = useRef<HTMLTextAreaElement | null>(null);
@@ -1090,6 +1138,9 @@ export function ConversationView({
   // A message request the viewer hasn't answered here yet. CampusMobile's
   // org entries carry no is_request, so the bar never shows there.
   const isRequest = thread?.is_request === true && requestState === "pending";
+  // One-to-one DMs only: CampusMobile reuses this view for club channels,
+  // and neither those nor group chats get the push ask.
+  const isDm = thread?.type === "dm";
 
   // Re-runs the load: Retry, and a send that couldn't be painted onto the
   // list (none loaded yet, or no row in the server's answer).
@@ -1197,6 +1248,9 @@ export function ConversationView({
         setRequestState("accepted");
         onThreadsChanged?.();
       }
+      // A DM went out: offer "Know when they reply" (once per device,
+      // PushAsk's call).
+      if (isDm) setShowPushAsk(true);
     } finally {
       setSending(false);
       inputRef.current?.focus();
@@ -1211,6 +1265,7 @@ export function ConversationView({
     messages,
     reload,
     isRequest,
+    isDm,
     onThreadsChanged,
   ]);
 
@@ -1752,6 +1807,15 @@ export function ConversationView({
               Decline
             </button>
           </div>
+        </div>
+      ) : null}
+
+      {/* After a DM sends: the "Know when they reply" push ask, above the
+          composer. PushAsk renders nothing unless it applies (and only
+          once per device); the wrapper keeps it from shrinking. */}
+      {showPushAsk && isDm ? (
+        <div style={{ flexShrink: 0 }}>
+          <PushAsk placement="dm" />
         </div>
       ) : null}
 

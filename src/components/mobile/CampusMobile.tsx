@@ -24,8 +24,9 @@ import { ConversationView } from "@/components/mobile/MessagesMobile";
 import { PostComposerMobile } from "@/components/mobile/PostComposerMobile";
 import { PostViewerMobile } from "@/components/mobile/PostViewerMobile";
 import { SharePostSheet } from "@/components/mobile/SharePostSheet";
-import { useMobileTour } from "@/components/mobile/use-mobile-tour";
+import { PENDING_KEY as TOUR_PENDING_KEY, useMobileTour } from "@/components/mobile/use-mobile-tour";
 import { OrgJoinControl } from "@/components/orgs/OrgJoinControl";
+import { PushAsk } from "@/components/push/PushAsk";
 import { RemovedContentCard, ReportSheet } from "@/components/safety/ReportSheet";
 import { vibeRequest } from "@/lib/feedback/request";
 import { toast } from "@/lib/feedback/toast";
@@ -147,6 +148,26 @@ export function CampusMobile() {
       ? t
       : "feed";
   });
+  // The banner slot shows one card at a time (wave 3′b): the push ask waits
+  // while the campus-confirm banner hasn't answered yet, for the rest of any
+  // visit where the banner showed (no two cards back to back), while the
+  // spotlight tour runs or is about to, and for the whole visit that landed
+  // on ?welcome=1 from onboarding. The tour strips that param, so it's read
+  // once here.
+  const [arrivedOnWelcome] = useState(() => searchParams.get("welcome") === "1");
+  const [confirmBannerVisible, setConfirmBannerVisible] = useState<boolean | null>(null);
+  // Set when the banner reports it's showing; never cleared while mounted.
+  const [confirmBannerShown, setConfirmBannerShown] = useState(false);
+  const onConfirmBannerVisible = useCallback((visible: boolean) => {
+    setConfirmBannerVisible(visible);
+    if (visible) setConfirmBannerShown(true);
+  }, []);
+  const tourActive = useCampusTourActive();
+  const pushAskSuppressed =
+    arrivedOnWelcome ||
+    confirmBannerShown ||
+    confirmBannerVisible !== false ||
+    tourActive;
   const [feed, setFeed] = useState<FeedPost[] | null>(null);
   // Who's signed in, echoed by /api/feed: your own cards offer Edit post.
   const [viewerId, setViewerId] = useState<string | null>(null);
@@ -655,9 +676,11 @@ export function CampusMobile() {
           has no padding, so a banner that renders nothing adds no height.
           Hidden on Map: the map's height assumes nothing sits between the
           campus banner and the tab strip, and the card would push its
-          Recenter button under the tab bar. */}
+          Recenter button under the tab bar. The push ask shares the slot
+          and stays suppressed once the banner has shown (see above). */}
       <div hidden={tab === "map"}>
-        <CampusConfirmBanner />
+        <CampusConfirmBanner onVisibleChange={onConfirmBannerVisible} />
+        <PushAsk placement="campus" suppressed={pushAskSuppressed} />
       </div>
 
       <header
@@ -820,6 +843,46 @@ export function CampusMobile() {
       ) : null}
     </main>
   );
+}
+
+// ---------- Push ask ----------
+
+const TOUR_POLL_MS = 500;
+/** Past the hook's own start window (script load + 8 s target poll). */
+const TOUR_PENDING_MAX_MS = 15_000;
+
+/**
+ * True while the campus spotlight tour runs or is queued to start. The tour
+ * engine fires no event when it ends, so this polls `OttoTour.isRunning()`
+ * and the pending flag until both are clear (the tour can't start again
+ * until a remount, so polling stops there). A flag that outlives the start
+ * window means the tour never found its target: it retries next visit, and
+ * this stays true until then. Starts true so nothing flashes before the
+ * first read; storage failure reads as no flag.
+ */
+function useCampusTourActive(): boolean {
+  const [active, setActive] = useState(true);
+  useEffect(() => {
+    const startedAt = Date.now();
+    let timer: number | undefined;
+    const tick = () => {
+      let pending = false;
+      try {
+        // The tour's pending flag: "campus" means that leg starts on this mount.
+        pending = localStorage.getItem(TOUR_PENDING_KEY) === "campus";
+      } catch {
+        pending = false;
+      }
+      const running = window.OttoTour?.isRunning?.() === true;
+      setActive(running || pending);
+      if (running || (pending && Date.now() - startedAt < TOUR_PENDING_MAX_MS)) {
+        timer = window.setTimeout(tick, TOUR_POLL_MS);
+      }
+    };
+    timer = window.setTimeout(tick, 0);
+    return () => window.clearTimeout(timer);
+  }, []);
+  return active;
 }
 
 // ---------- Sub-layout ----------

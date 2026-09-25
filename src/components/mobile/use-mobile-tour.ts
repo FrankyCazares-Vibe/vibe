@@ -63,7 +63,7 @@ type TourStep = {
 
 const SCRIPT_SRC = "/html/_otto-tour.js";
 
-const PENDING_KEY = "vibe_tour_pending";
+export const PENDING_KEY = "vibe_tour_pending";
 const SEEN_KEYS = {
   profile: "vibe_profile_tour_seen_v1",
   campus: "vibe_campus_tour_seen_v1",
