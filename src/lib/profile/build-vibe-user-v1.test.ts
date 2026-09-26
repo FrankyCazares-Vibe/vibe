@@ -99,7 +99,7 @@ test("a caller that blanks looking_for (a non-owner viewer, ruling H6) gets []",
   assert.deepEqual(buildVibeUserV1FromProfile(profile, { appShell: false }).lookingFor, []);
 });
 
-test("every other key is unchanged by P1", () => {
+test("every other key is unchanged by P1 (S67 wave 2 adds profileLayout, always present)", () => {
   const vibeUser = buildVibeUserV1FromProfile(normalizeProfileView(row()), { appShell: true });
   assert.deepEqual(Object.keys(vibeUser).sort(), [
     "_appShell",
@@ -111,6 +111,7 @@ test("every other key is unchanged by P1", () => {
     "location",
     "lookingFor",
     "name",
+    "profileLayout",
     "skills",
     "tagline",
     "vibeTags",
@@ -119,4 +120,33 @@ test("every other key is unchanged by P1", () => {
   assert.equal(vibeUser.headline, "Biology · Year 2");
   assert.equal(vibeUser.tagline, "Hello there");
   assert.deepEqual(vibeUser.vibeTags, [{ label: "film", color: "coral" }]);
+});
+
+test("profileLayout: the default when the row has none, the sanitized whole document when it does", () => {
+  const DEFAULT_ORDER = ["bio", "experience", "skills", "posts", "resume", "working_on"];
+  // No column in the row (a select that didn't ask, or the '{}' default).
+  const none = buildVibeUserV1FromProfile(normalizeProfileView(row()));
+  assert.deepEqual(none.profileLayout, { v: 1, order: DEFAULT_ORDER, hidden: [], bioSide: false });
+  const empty = buildVibeUserV1FromProfile(normalizeProfileView(row({ profile_layout: {} })));
+  assert.deepEqual(empty.profileLayout, none.profileLayout);
+  // A stored document: unknown ids gone, posts never hidden, missing ids appended.
+  const stored = buildVibeUserV1FromProfile(
+    normalizeProfileView(
+      row({ profile_layout: { order: ["posts", "bio", "calendar"], hidden: ["experience", "posts"], bioSide: true } }),
+    ),
+  );
+  assert.deepEqual(stored.profileLayout, {
+    v: 1,
+    order: ["posts", "bio", "experience", "skills", "resume", "working_on"],
+    hidden: ["experience"],
+    bioSide: true,
+  });
+  // Garbage in the column reads as the default, never as an error.
+  const junk = buildVibeUserV1FromProfile(normalizeProfileView(row({ profile_layout: "<script>" })));
+  assert.deepEqual(junk.profileLayout, none.profileLayout);
+  // The vibeUser carries its own arrays: reordering them leaves the profile alone.
+  const profile = normalizeProfileView(row());
+  const u = buildVibeUserV1FromProfile(profile);
+  (u.profileLayout as { order: string[] }).order.reverse();
+  assert.deepEqual(profile.profile_layout.order, DEFAULT_ORDER);
 });

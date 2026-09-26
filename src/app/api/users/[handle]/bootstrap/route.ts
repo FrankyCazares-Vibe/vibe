@@ -3,7 +3,7 @@ import type { SupabaseClient } from "@supabase/supabase-js";
 
 import { requirePlatformAdmin } from "@/lib/auth/require-platform-admin";
 import { getCountsFor, getFollowState, getMutualCount } from "@/lib/connections/queries";
-import { isMissingColumnError } from "@/lib/db/missing-column";
+import { M1_USER_COLUMNS, isMissingColumnError } from "@/lib/db/missing-column";
 import { getActiveRestriction } from "@/lib/moderation/access";
 import { buildVibeUserV1FromProfile } from "@/lib/profile/build-vibe-user-v1";
 import { normalizeProfileView } from "@/lib/profile/normalize-profile-view";
@@ -33,7 +33,11 @@ const BASE_PUBLIC_PROFILE_SELECT =
 // would silently lose its "IU Indianapolis" badge the moment B6 stopped
 // deriving it from the legacy `school` label. `campus_set_at` is NOT here —
 // when a student last changed campus is nobody else's business.
-const PUBLIC_PROFILE_SELECT = `${BASE_PUBLIC_PROFILE_SELECT},${PUBLIC_PROFILE_CAMPUS_COLUMNS}`;
+// `profile_layout` (S67 wave 2, migration 20260926100000) rides in the same
+// OPTIONAL tier: a visitor's page is drawn from the owner's order / hidden
+// set, which hold nothing but widget ids and one boolean. Never in BASE_*,
+// so the retry below still succeeds while either migration lags the deploy.
+const PUBLIC_PROFILE_SELECT = `${BASE_PUBLIC_PROFILE_SELECT},${PUBLIC_PROFILE_CAMPUS_COLUMNS},profile_layout`;
 
 type PublicProfileRead = {
   data: Record<string, unknown> | null;
@@ -92,15 +96,16 @@ export async function GET(_req: Request, ctx: RouteContext) {
   }
   const reader: SupabaseClient = viewer ? supabase : service;
 
-  // Before migration M1 the campus columns don't exist; a missing-column
-  // error (and only that) falls back to the legacy label, which still
-  // renders a badge.
+  // Before migration M1 the campus columns don't exist, and before
+  // 20260926100000 `profile_layout` doesn't; a missing-column error naming
+  // one of those (and only that) falls back to the legacy label, which still
+  // renders a badge, and to the default layout.
   let { data: row, error } = (await service
     .from("users")
     .select(PUBLIC_PROFILE_SELECT)
     .eq("handle", handle)
     .maybeSingle()) as PublicProfileRead;
-  if (error && isMissingColumnError(error)) {
+  if (error && isMissingColumnError(error, [...M1_USER_COLUMNS, "profile_layout"])) {
     ({ data: row, error } = (await service
       .from("users")
       .select(BASE_PUBLIC_PROFILE_SELECT)

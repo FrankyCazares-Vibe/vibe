@@ -1,7 +1,7 @@
 import { NextResponse } from "next/server";
 
 import { isOttoOnboardingComplete } from "@/lib/auth/post-login";
-import { isMissingColumnError } from "@/lib/db/missing-column";
+import { M1_USER_COLUMNS, isMissingColumnError } from "@/lib/db/missing-column";
 import { isSupabaseHttpsUrl } from "@/lib/org-asset-url";
 import { normalizeCoverThemeInput } from "@/lib/profile/cover-themes";
 import { sanitizeCurrentOn } from "@/lib/profile/current-on";
@@ -15,6 +15,7 @@ import {
   readCampusWriteRow,
   type CampusWriteDecision,
 } from "@/lib/profile/profile-campus-write";
+import { sanitizeProfileLayout } from "@/lib/profile/profile-layout";
 import { parseLookingForBody } from "@/lib/profile/looking-for";
 import { normalizeResumeRef, resumeKeyOwnerId } from "@/lib/profile/resume-doc-url";
 import { sanitizeResumeDocs } from "@/lib/profile/resume-docs";
@@ -420,6 +421,16 @@ export async function POST(req: Request) {
     patch.current_on = sanitizeCurrentOn(raw);
   }
 
+  // Widget layout (S67 wave 2): which cards show, in what order, bio docked
+  // or not. The desktop page sends the WHOLE document under `profile_layout`
+  // (contracts C3); the sanitizer drops unknown ids, never lets `posts` hide,
+  // and fills anything missing from the default, so a partial can't land and
+  // nothing a client typed reaches the column as-is. Ids only, no free text,
+  // so the word filter below has nothing to read here.
+  if ("profile_layout" in body) {
+    patch.profile_layout = sanitizeProfileLayout(body.profile_layout);
+  }
+
   // The word filter, on the free-text fields this save actually changes. It
   // sits below every one of them and above the first thing that writes
   // anything (the photo upload), so a refusal leaves nothing half-done. The
@@ -822,15 +833,17 @@ export async function POST(req: Request) {
   // the service role scoped to the caller's id. The campus columns are asked
   // for too, so the echoed `profile` reports the campus this request just
   // wrote instead of a flat null (normalizeProfileView always emits both
-  // fields); before migration M1 they don't exist, so a missing-column error
-  // — and only that — retries without them.
+  // fields), and so is `profile_layout` (S67 wave 2), so the echo carries the
+  // layout this save may have just written; before migration M1 / 20260926100000
+  // they don't exist, so a missing-column error naming one of them — and only
+  // that — retries without them. Never in SYNC_PROFILE_SELECT itself.
   const echoService = createSupabaseServiceClient();
   let { data: row, error: selErr } = (await echoService
     .from("users")
-    .select(`${SYNC_PROFILE_SELECT},${PUBLIC_PROFILE_CAMPUS_COLUMNS}`)
+    .select(`${SYNC_PROFILE_SELECT},${PUBLIC_PROFILE_CAMPUS_COLUMNS},profile_layout`)
     .eq("id", user.id)
     .single()) as ProfileRowRead;
-  if (selErr && isMissingColumnError(selErr)) {
+  if (selErr && isMissingColumnError(selErr, [...M1_USER_COLUMNS, "profile_layout"])) {
     ({ data: row, error: selErr } = (await echoService
       .from("users")
       .select(SYNC_PROFILE_SELECT)

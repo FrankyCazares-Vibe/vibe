@@ -163,5 +163,18 @@ export function buildVibeUserV1FromProfile(
     u.resumeRedactions = profile.resume_redactions.map((b) => ({ ...b }));
   }
 
+  // Widget layout (S67 wave 2): ALWAYS present, already sanitized by
+  // normalizeProfileView, so profile.html's applyProfileLayout and the
+  // phone's "Arrange your profile" sheet never see a partial document.
+  // camelCase like every other vibeUser key; the write key on both routes
+  // stays `profile_layout`. Copied so the page can't reach the profile's arrays.
+  const layout = profile.profile_layout;
+  u.profileLayout = {
+    v: layout.v,
+    order: layout.order.slice(),
+    hidden: layout.hidden.slice(),
+    bioSide: layout.bioSide,
+  };
+
   return u;
 }

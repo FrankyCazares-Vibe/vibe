@@ -13,7 +13,9 @@
  * it.
  *
  * It is exactly the union of the keys those two routes collect (the removed
- * professional snapshot is not one of them). Campus columns (written from
+ * professional snapshot is not one of them). `profile_layout` (S67 wave 2)
+ * is the widget-layout document both routes sanitize before writing, whole,
+ * never as a partial. Campus columns (written from
  * `campusDecision.patch`) and `handle` (written by `changeHandleForUser`) go
  * through their own statements and are deliberately NOT here. Adding a new
  * writable profile field means adding it here on purpose;
@@ -44,6 +46,7 @@ export const SELF_PROFILE_WRITE_COLUMNS = Object.freeze([
   "avatar_url",
   "banner_url",
   "banner_gradient",
+  "profile_layout",
 ] as const);
 
 export type SelfProfileWriteColumn = (typeof SELF_PROFILE_WRITE_COLUMNS)[number];

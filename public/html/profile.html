@@ -96,6 +96,20 @@ html.vibe-pre-paint .profile-cover { opacity: 0; }
   --shadow: 0 4px 24px rgba(0,0,0,0.06);
   --shadow-lg: 0 16px 56px rgba(0,0,0,0.12);
   --edit-ring: rgba(255,92,53,0.5);
+  /* Vibe's own tokens (S67 contracts C0, light values). The names avoid
+     --muted / --accent / --border, which the React UI kit shadows; new CSS
+     reads these so the night pass (wave 5) flips them in one place. */
+  --ink-2: #5C5853;
+  --ink-muted: #8A8580;
+  --paper: #FFFFFF;
+  --hairline: rgba(28,28,30,0.08);
+  --scrim-rgb: 28,28,30;
+  --glass: rgba(255,253,248,0.78);
+  --glass-border: rgba(255,255,255,0.70);
+  --coral: #FF5C35;
+  --tag-ink: #B83A1A;
+  --tag-bg: rgba(255,92,53,0.10);
+  --card-shadow: inset 0 1px 0 rgba(255,255,255,0.85), 0 4px 14px rgba(180,120,60,0.08);
 }
 
 * { margin:0; padding:0; box-sizing:border-box; }
@@ -553,6 +567,99 @@ body.edit-mode .current-item { padding-left: 26px; }
 }
 body.reordering { user-select: none; cursor: grabbing; }
 body.reordering * { user-select: none; }
+
+/* ── Profile widgets: arrange mode (S67) ──
+   The six widget cards carry data-widget="bio|experience|skills|posts|
+   resume|working_on". applyProfileLayout() orders them per
+   users.profile_layout and marks hidden ones with the `hidden` attribute +
+   .widget-hidden (never removed: the DOM is the save source). Each card's
+   first child is a 28px control strip, shown in edit mode only, gated
+   exactly like .card-add-btn. */
+.widget-controls {
+  display:none; align-items:center; gap:10px; height:28px;
+  margin:-8px 0 14px;
+}
+body.edit-mode .widget-controls { display:flex; }
+.widget-controls .drag-handle {
+  position:static; transform:none; width:26px; height:26px;
+  border-radius:8px; color:var(--coral); flex-shrink:0;
+}
+.widget-controls .drag-handle:hover { color:var(--tag-ink); }
+/* A docked bio always leads the side column (C3), so its grip has nothing
+   to do: visibility keeps the 26px slot (labels stay aligned with Resume's
+   strip) and takes the pointer events with it, so no drag starts. */
+.profile-right > [data-widget="bio"] > .widget-controls .drag-handle { visibility:hidden; }
+.widget-controls-label {
+  font-size:10.5px; font-weight:700; letter-spacing:.18em;
+  text-transform:uppercase; color:var(--ink-muted); white-space:nowrap;
+}
+.widget-controls-note {
+  font-family:'Fraunces',serif; font-style:italic; font-size:13px;
+  color:var(--ink-muted); white-space:nowrap;
+}
+.widget-hidden-note { display:none; }
+.widget-hidden .widget-hidden-note { display:inline; }
+.widget-controls-track {
+  flex:1 1 auto; height:1px; min-width:12px;
+  background:repeating-linear-gradient(90deg, rgba(var(--scrim-rgb),0.16) 0 2px, transparent 2px 8px) center / 100% 1px no-repeat;
+}
+.widget-side-btn {
+  height:26px; padding:0 10px; border-radius:999px; flex-shrink:0;
+  border:1px solid rgba(255,92,53,0.28); background:var(--tag-bg); color:var(--tag-ink);
+  font-family:inherit; font-size:11.5px; font-weight:700; cursor:none; white-space:nowrap;
+}
+.widget-side-btn:hover { border-color:var(--coral); }
+.widget-eye-btn {
+  width:26px; height:26px; border-radius:999px; flex-shrink:0; padding:0;
+  border:1px solid var(--hairline); background:rgba(255,255,255,0.6); color:var(--ink-2);
+  cursor:none; display:inline-flex; align-items:center; justify-content:center;
+}
+.widget-eye-btn:hover { border-color:var(--ink-2); }
+.widget-eye-btn svg { display:block; pointer-events:none; }
+.widget-eye-btn .eye-off { display:none; }
+.widget-hidden .widget-eye-btn { background:var(--charcoal); color:var(--cream); border-color:transparent; }
+.widget-hidden .widget-eye-btn .eye-on { display:none; }
+.widget-hidden .widget-eye-btn .eye-off { display:block; }
+.widget-side-btn:focus-visible, .widget-eye-btn:focus-visible,
+.widget-controls .drag-handle:focus-visible { outline:2px solid var(--coral); outline-offset:2px; }
+
+/* Hidden widgets: gone for everyone outside edit mode (the `hidden`
+   attribute), a dashed ghost the owner can un-hide while editing. The
+   working-on card's owner-mode force-show (.shared-section, below) needs
+   its own lines. The Otto tour reveals them all while it runs (its body
+   class, _otto-tour.js) so a spotlight never lands on a hidden .bio-text;
+   the class goes and they hide again. */
+body.owner-mode .shared-section[hidden] { display:none !important; }
+body.edit-mode [data-widget][hidden],
+body.owner-mode.edit-mode .shared-section[hidden] {
+  display:block !important; opacity:.72 !important;
+  border:1px dashed rgba(var(--scrim-rgb),0.18);
+  background:rgba(255,253,248,0.35);
+}
+body.otto-tour-active [data-widget][hidden] { display:block !important; }
+
+/* Empty widgets are not drawn for visitors (the phone's rule); the owner
+   keeps them so they know where things go. "View as visitor" flips the
+   same body class, so the preview matches. A pill whose section is off
+   hides with it (the subnav's own display rule beats the UA's [hidden]). */
+body.viewer-mode [data-widget].widget-empty { display:none !important; }
+.profile-subnav a[hidden] { display:none; }
+
+/* Dragging a card: the entry animation's fill would override the inline
+   translate, so it is dropped for the lift. */
+[data-widget].is-dragging {
+  animation:none; position:relative; z-index:5; opacity:.92;
+  box-shadow:0 16px 32px rgba(var(--scrim-rgb),0.16), 0 2px 6px rgba(var(--scrim-rgb),0.08);
+}
+
+/* The side column ends in a coral dashed drop slot, edit mode only. */
+.widget-drop-slot {
+  display:none; min-height:84px; padding:16px; border-radius:18px;
+  border:1px dashed rgba(255,92,53,0.45); background:rgba(255,92,53,0.04);
+  align-items:center; justify-content:center; text-align:center;
+  font-family:'Fraunces',serif; font-style:italic; font-size:14px; color:var(--tag-ink);
+}
+body.edit-mode .widget-drop-slot { display:flex; }
 .work-logo-wrap {
   width:48px;height:48px;border-radius:14px;
   background:var(--cream);border:1px solid var(--border);
@@ -3485,13 +3592,13 @@ body.empty-profile-mode #profileEmpty { display: flex !important; }
     <div class="profile-left">
 
       <!-- Bio -->
-      <div class="card fade-in personality-section" style="animation-delay:.1s">
+      <div class="card fade-in personality-section" data-widget="bio" style="animation-delay:.1s">
         <div class="card-title">About me</div>
         <p class="bio-text" data-edit="true" contenteditable="false"></p>
       </div>
 
       <!-- Experience -->
-      <div class="card fade-in" id="experience" style="animation-delay:.15s">
+      <div class="card fade-in" id="experience" data-widget="experience" style="animation-delay:.15s">
         <div class="card-title">
           Experience
           <button class="card-add-btn" onclick="openWorkModal()">+ Add role</button>
@@ -3500,7 +3607,7 @@ body.empty-profile-mode #profileEmpty { display: flex !important; }
       </div>
 
       <!-- Skills -->
-      <div class="card fade-in" id="skills" style="animation-delay:.2s">
+      <div class="card fade-in" id="skills" data-widget="skills" style="animation-delay:.2s">
         <div class="card-title">
           Skills
           <button class="card-add-btn" onclick="addSkill()">+ Add skill</button>
@@ -3511,7 +3618,7 @@ body.empty-profile-mode #profileEmpty { display: flex !important; }
       <!-- Posts — tabbed card (P1-011).
            Stats row lives at the top-right of the profile (above), aligned with
            the avatar. Tabs sit alone here. -->
-      <div class="card fade-in personality-section" id="vibes" style="animation-delay:.3s">
+      <div class="card fade-in personality-section" id="vibes" data-widget="posts" style="animation-delay:.3s">
 
         <!-- Post composer — own profile only (text + optional image).
              Sits above the tabs so it's always visible regardless of which
@@ -3601,7 +3708,7 @@ body.empty-profile-mode #profileEmpty { display: flex !important; }
 
     <!-- RIGHT -->
     <div class="profile-right">
-    <div class="resume-card fade-in" id="resumeCard" style="animation-delay:.06s;margin:0 0 16px 0;padding:18px;">
+    <div class="resume-card fade-in" id="resumeCard" data-widget="resume" style="animation-delay:.06s;margin:0 0 16px 0;padding:18px;">
       <div class="resume-card-top">
         <div>
           <div class="resume-card-title" style="font-size:15px;margin-bottom:6px">Resume / Portfolio</div>
@@ -3638,7 +3745,7 @@ body.empty-profile-mode #profileEmpty { display: flex !important; }
          the same surface. Connect lives in the avatar-row actions. -->
 
 
-<div class="stat-card fade-in shared-section" style="animation-delay:.15s">
+<div class="stat-card fade-in shared-section" data-widget="working_on" style="animation-delay:.15s">
   <div class="stat-card-title" style="display:flex;align-items:center;justify-content:space-between">
     Currently working on <button class="card-add-btn" onclick="openCurrentModal()" style="font-size:11px;padding:3px 10px">+ Add</button>
   </div>
@@ -3646,6 +3753,11 @@ body.empty-profile-mode #profileEmpty { display: flex !important; }
 </div>
 <!-- "People also viewed" removed — no real data source yet. Will return
      when there's a real recommendation API. -->
+
+<!-- Arrange mode (edit mode only): the side column ends here. A side card
+     dragged past the last one lands above this slot; the bio docks here
+     with its own strip button. applyProfileLayout keeps it last. -->
+<div class="widget-drop-slot" id="widgetDropSlot">drop a card here, or use → on your bio</div>
 
 
 
@@ -3914,6 +4026,9 @@ function toggleEdit(){
   if (window.viewingRealUser) return;
   editMode = !editMode;
   document.body.classList.toggle('edit-mode', editMode);
+  // Arrange mode moves widget cards around: drop their entry animation
+  // first, or every insertBefore during a drag would replay it.
+  if (editMode) document.querySelectorAll('[data-widget].fade-in').forEach(c => c.classList.remove('fade-in'));
   const btn = document.getElementById('editToggle');
   if (btn) btn.classList.toggle('active', editMode);
   btn.title = editMode ? 'Exit edit mode' : 'Edit profile';
@@ -4120,7 +4235,7 @@ function _adoptOwnProfileOnLoad(serverUser) {
   const view = { name: nu.name };
   if (!typing) {
     hydrateProfileFields(nu);
-    ['bio', 'vibeTags', 'skills', 'currentlyOn', 'workExperience', '_workOrderManual'].forEach(k => {
+    ['bio', 'vibeTags', 'skills', 'currentlyOn', 'workExperience', '_workOrderManual', 'profileLayout'].forEach(k => {
       if (k in nu) view[k] = nu[k];
     });
   }
@@ -5811,7 +5926,10 @@ function showToast(msg){
 
 // ── Section nav scrollspy ────────────────────────────────────────
 const sectionNavLinks = Array.from(document.querySelectorAll('.profile-subnav a'));
-const sectionIds = ['overview', 'experience', 'skills', 'vibes'];
+// let: _rebuildSectionNav() re-derives this from the widgets on show (a
+// hidden or, for visitors, empty Experience/Skills card loses its pill and
+// drops out of the bottom-of-page fallback below).
+let sectionIds = ['overview', 'experience', 'skills', 'vibes'];
 const sectionEls = sectionIds.map(id => document.getElementById(id)).filter(Boolean);
 function setActiveSection(id) {
   sectionNavLinks.forEach(link => {
@@ -6038,6 +6156,9 @@ function toggleViewerMode() {
   viewerMode = !viewerMode;
   document.body.classList.toggle('viewer-mode', viewerMode);
   document.body.classList.toggle('owner-mode', !viewerMode);
+  // Empty widgets hide in the preview as they do for visitors, and the
+  // subnav follows; read fresh, since the owner may have just added a skill.
+  if (typeof _refreshWidgetEmptyFlags === 'function') _refreshWidgetEmptyFlags();
   const btn = document.getElementById('viewerBtn');
   if (btn) btn.textContent = viewerMode ? 'Back to your profile' : 'View as visitor';
   if (viewerMode) {
@@ -7377,6 +7498,10 @@ document.addEventListener('DOMContentLoaded', function() {
     setupReorderable('#currentList', '.current-item', function() {
       if (typeof saveProfileToStorage === 'function') saveProfileToStorage({ edited: 'current' });
     });
+    // The widget cards themselves, one list per column (S67). A drag stays
+    // inside its column; the bio's strip button is the cross-column move.
+    setupReorderable('.profile-left',  '[data-widget]', _onProfileLayoutChanged);
+    setupReorderable('.profile-right', '[data-widget]', _onProfileLayoutChanged);
   }
 });
 // ══ END CALENDAR SYNC ════════════════════════════════════════════════════
@@ -7419,6 +7544,10 @@ function setupReorderable(listSelector, itemSelector, onChange) {
     const handle = e.target && e.target.closest && e.target.closest('.drag-handle');
     if (!handle) return;
     if (!document.body.classList.contains('edit-mode')) return;
+    // Lists nest now (#workList sits inside the .profile-left column): a
+    // handle belongs to the nearest reorderable list only, or one drag on
+    // a work row would start the column's reorder too.
+    if (handle.closest('[data-reorderable="1"]') !== list) return;
     const item = handle.closest(itemSelector);
     if (!item || item.parentElement !== list) return;
     e.preventDefault();
@@ -7474,6 +7603,208 @@ function _onReorderEnd() {
   }
   _reorderState = null;
 }
+
+// ══ PROFILE WIDGET LAYOUT (S67) ══════════════════════════════════════════
+// The six widget cards ([data-widget]) follow users.profile_layout:
+// {v:1, order, hidden, bioSide}. Columns are derived, never stored (C3):
+// LEFT = order minus resume/working_on (minus bio when bioSide); RIGHT =
+// (bio when bioSide) + resume, working_on in `order` order. Both bootstraps
+// hand it over as user.profileLayout; a missing or malformed document is
+// the default (today's markup order, nothing hidden).
+// Mirror of src/lib/profile/profile-layout.ts. Keep in sync.
+const _WIDGET_IDS = ['bio', 'experience', 'skills', 'posts', 'resume', 'working_on'];
+const _WIDGET_SIDE_IDS = ['resume', 'working_on'];
+const _WIDGET_LABELS = {
+  bio: 'About me', experience: 'Experience', skills: 'Skills',
+  posts: 'Posts', resume: 'Resume', working_on: 'Working on',
+};
+function _sanitizeProfileLayout(raw) {
+  const order = [];
+  const hidden = [];
+  if (raw && typeof raw === 'object' && !Array.isArray(raw)) {
+    (Array.isArray(raw.order) ? raw.order : []).forEach(id => {
+      if (_WIDGET_IDS.includes(id) && !order.includes(id)) order.push(id);
+    });
+    (Array.isArray(raw.hidden) ? raw.hidden : []).forEach(id => {
+      // Posts cannot be hidden: it is the profile.
+      if (_WIDGET_IDS.includes(id) && id !== 'posts' && !hidden.includes(id)) hidden.push(id);
+    });
+  }
+  _WIDGET_IDS.forEach(id => { if (!order.includes(id)) order.push(id); });
+  return { v: 1, order, hidden, bioSide: !!(raw && raw.bioSide === true) };
+}
+function _widgetCard(id) {
+  return document.querySelector('[data-widget="' + id + '"]');
+}
+// Set once the first layout has painted: later moves (a drag, a dock, the
+// server's copy arriving) drop .fade-in from the card they move, since
+// re-inserting a node replays its entry animation.
+let _profileLayoutApplied = false;
+function _placeWidgets(col, ids) {
+  ids.forEach((id, i) => {
+    const card = _widgetCard(id);
+    if (!card) return;
+    const at = col.children[i] || null;
+    if (at === card) return;
+    if (_profileLayoutApplied) card.classList.remove('fade-in');
+    col.insertBefore(card, at);
+  });
+}
+// Called at the end of renderUserSections (owner and visitor) and after
+// every arrange-mode change. DOM moves keep handlers and the columns'
+// dataset.reorderable; hidden cards stay in the DOM (saveProfileToStorage
+// reads their lists) behind the `hidden` attribute + .widget-hidden. While
+// the Otto tour runs, its body class (otto-tour-active) reveals hidden
+// cards in CSS, so nothing is skipped here and nothing stays revealed after.
+function applyProfileLayout(raw) {
+  const layout = _sanitizeProfileLayout(raw);
+  const left = document.querySelector('.profile-left');
+  const right = document.querySelector('.profile-right');
+  if (!left || !right) return;
+  const leftIds = layout.order.filter(id => !_WIDGET_SIDE_IDS.includes(id) && !(layout.bioSide && id === 'bio'));
+  const rightIds = (layout.bioSide ? ['bio'] : []).concat(layout.order.filter(id => _WIDGET_SIDE_IDS.includes(id)));
+  _placeWidgets(left, leftIds);
+  _placeWidgets(right, rightIds);
+  const slot = document.getElementById('widgetDropSlot');
+  if (slot && right.lastElementChild !== slot) right.appendChild(slot);
+  _WIDGET_IDS.forEach(id => {
+    const card = _widgetCard(id);
+    if (!card) return;
+    const hide = layout.hidden.includes(id);
+    card.hidden = hide;
+    card.classList.toggle('widget-hidden', hide);
+    _ensureWidgetControls(card);
+  });
+  _profileLayoutApplied = true;
+  _refreshWidgetEmptyFlags();
+}
+// The layout as the page shows it (the DOM is the desktop save source).
+function _readProfileLayoutFromDom() {
+  const ids = (sel) => Array.from(document.querySelectorAll(sel + ' > [data-widget]')).map(c => c.dataset.widget);
+  const leftIds = ids('.profile-left');
+  const rightIds = ids('.profile-right');
+  const bioSide = rightIds.includes('bio');
+  // A docked bio leads `order`: RIGHT puts it first whatever its slot.
+  const order = (bioSide ? ['bio'] : []).concat(leftIds, rightIds.filter(id => id !== 'bio'));
+  const hidden = Array.from(document.querySelectorAll('[data-widget].widget-hidden')).map(c => c.dataset.widget);
+  return _sanitizeProfileLayout({ v: 1, order, hidden, bioSide });
+}
+// Any arrange-mode change: re-apply the layout the DOM now encodes, then the
+// save. The re-apply is what keeps the page honest with the document — a
+// drag can put the docked bio under Resume (or Resume over it), but C3 says
+// RIGHT = bio first and _readProfileLayoutFromDom stores it that way, so
+// without this the new spot would stick until a reload snapped it back.
+// Idempotent: _placeWidgets only moves out-of-place cards, and it refreshes
+// the empty flags, subnav and control state itself. `layout` is the only
+// key marked — a move never re-sends work or current (their lists did not
+// change, and a stale cached list would overwrite a phone edit).
+function _onProfileLayoutChanged() {
+  applyProfileLayout(_readProfileLayoutFromDom());
+  if (typeof saveProfileToStorage === 'function') saveProfileToStorage({ edited: 'layout' });
+}
+const _WIDGET_GRIP_SVG = '<svg width="14" height="14" viewBox="0 0 24 24" fill="currentColor" aria-hidden="true"><circle cx="8" cy="5" r="2.2"/><circle cx="16" cy="5" r="2.2"/><circle cx="8" cy="12" r="2.2"/><circle cx="16" cy="12" r="2.2"/><circle cx="8" cy="19" r="2.2"/><circle cx="16" cy="19" r="2.2"/></svg>';
+const _WIDGET_EYE_SVG = '<svg class="eye-on" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M2 12s3.5-7 10-7 10 7 10 7-3.5 7-10 7S2 12 2 12Z"/><circle cx="12" cy="12" r="3"/></svg>'
+  + '<svg class="eye-off" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M3 3l18 18"/><path d="M10.6 10.6a3 3 0 0 0 4.2 4.2"/><path d="M9.9 5.2A10.4 10.4 0 0 1 12 5c6.5 0 10 7 10 7a17 17 0 0 1-3.2 4.1"/><path d="M6.6 6.6C3.7 8.6 2 12 2 12s3.5 7 10 7c1.5 0 2.8-.3 4-.8"/></svg>';
+// The 28px control strip, first child of every widget card (CSS shows it in
+// edit mode only). Inline onclick like the rest of the page; the grip is a
+// .drag-handle so the column's setupReorderable picks it up. Only the bio
+// switches columns — C3 derives the other five by id — and Posts has no eye.
+function _ensureWidgetControls(card) {
+  if (!card || card.querySelector(':scope > .widget-controls')) return;
+  const id = card.dataset.widget;
+  const label = _WIDGET_LABELS[id] || id;
+  const strip = document.createElement('div');
+  strip.className = 'widget-controls';
+  let html = '<button type="button" class="drag-handle" aria-label="Drag to move ' + _esc(label) + '" tabindex="-1">' + _WIDGET_GRIP_SVG + '</button>'
+    + '<span class="widget-controls-label">' + _esc(label) + '</span>'
+    + '<span class="widget-controls-note widget-hidden-note">hidden · only you can see this</span>'
+    + '<span class="widget-controls-track" aria-hidden="true"></span>';
+  if (id === 'bio') html += '<button type="button" class="widget-side-btn" onclick="widgetToggleBioSide(this)">Dock to side →</button>';
+  if (id === 'posts') html += '<span class="widget-controls-note">always shown</span>';
+  else html += '<button type="button" class="widget-eye-btn" aria-label="Hide ' + _esc(label) + '" onclick="widgetToggleHidden(this)">' + _WIDGET_EYE_SVG + '</button>';
+  strip.innerHTML = html;
+  card.insertBefore(strip, card.firstChild);
+}
+function _refreshWidgetControls() {
+  _WIDGET_IDS.forEach(id => {
+    const card = _widgetCard(id);
+    if (!card) return;
+    const label = _WIDGET_LABELS[id] || id;
+    const hidden = card.classList.contains('widget-hidden');
+    const eye = card.querySelector(':scope > .widget-controls .widget-eye-btn');
+    if (eye) {
+      eye.setAttribute('aria-label', (hidden ? 'Show ' : 'Hide ') + label);
+    }
+    const side = card.querySelector(':scope > .widget-controls .widget-side-btn');
+    if (side) side.textContent = card.closest('.profile-right') ? '← Back to main' : 'Dock to side →';
+  });
+}
+// Eye: hide or show this widget. Hidden = the `hidden` attribute (gone for
+// everyone outside edit mode) + .widget-hidden (the dashed ghost while editing).
+function widgetToggleHidden(btn) {
+  const card = btn && btn.closest('[data-widget]');
+  if (!card || card.dataset.widget === 'posts') return;
+  const hide = !card.classList.contains('widget-hidden');
+  card.hidden = hide;
+  card.classList.toggle('widget-hidden', hide);
+  _onProfileLayoutChanged();
+}
+// "Dock to side →" / "← Back to main": the bio card moves to the top of
+// the other column (bioSide in the document).
+function widgetToggleBioSide() {
+  const card = _widgetCard('bio');
+  const left = document.querySelector('.profile-left');
+  const right = document.querySelector('.profile-right');
+  if (!card || !left || !right) return;
+  const col = card.closest('.profile-right') ? left : right;
+  card.classList.remove('fade-in');
+  col.insertBefore(card, col.firstElementChild);
+  _onProfileLayoutChanged();
+}
+// Visitors don't see an empty widget (the phone's rule): .widget-empty is
+// recomputed from what each card shows and CSS hides it in body.viewer-mode,
+// which "View as visitor" shares. Posts keeps its own empty states.
+function _refreshWidgetEmptyFlags() {
+  const text = (sel) => ((document.querySelector(sel) || {}).textContent || '').trim();
+  const empty = {
+    bio: !text('.bio-text'),
+    experience: !document.querySelector('#workList .work-item'),
+    skills: !document.querySelector('#skillsWrap .skill-pill'),
+    resume: !(typeof resumePortfolio !== 'undefined' && Array.isArray(resumePortfolio) && resumePortfolio.length),
+    working_on: !document.querySelector('#currentList .current-item'),
+  };
+  Object.keys(empty).forEach(id => {
+    const card = _widgetCard(id);
+    if (card) card.classList.toggle('widget-empty', empty[id]);
+  });
+  _rebuildSectionNav();
+  _refreshWidgetControls();
+}
+// Subnav pills + the scroll-spy list follow the widgets on show, in the
+// main column's order. Overview (the identity block) always leads; Posts is
+// always shown. The pills are the same <a> nodes re-appended, so the click
+// handlers wired at load survive.
+function _rebuildSectionNav() {
+  const nav = document.getElementById('profileSectionsNav');
+  if (!nav || typeof sectionNavLinks === 'undefined') return;
+  const viewer = document.body.classList.contains('viewer-mode');
+  const shown = (card) => !card.classList.contains('widget-hidden') && !(viewer && card.classList.contains('widget-empty'));
+  const pillFor = { experience: 'experience', skills: 'skills', posts: 'vibes' };
+  const ids = ['overview'];
+  document.querySelectorAll('.profile-left > [data-widget]').forEach(card => {
+    const target = pillFor[card.dataset.widget];
+    if (target && shown(card)) ids.push(target);
+  });
+  sectionNavLinks.forEach(link => { link.hidden = !ids.includes((link.getAttribute('href') || '').slice(1)); });
+  ids.forEach(id => {
+    const link = sectionNavLinks.find(l => l.getAttribute('href') === '#' + id);
+    if (link) nav.appendChild(link);
+  });
+  sectionIds = ids;
+  const active = nav.querySelector('a.active');
+  if (!active || active.hidden) setActiveSection(ids[0]);
+}
+// ══ END PROFILE WIDGET LAYOUT ════════════════════════════════════════════
 
 // Mirror of src/lib/profile/work-experience.ts. Keep in sync.
 const _MONTHS_TO_IDX = {
@@ -8465,6 +8796,10 @@ function saveProfileToStorage(opts) {
   // Pinned id — which post or vibe is currently pinned (null if none)
   user.pinnedId = (typeof profilePinnedId !== 'undefined') ? profilePinnedId : null;
 
+  // Widget layout — read off the two columns and the hidden cards. Captured
+  // on every save like the rest; sent only when marked (edited: 'layout').
+  if (typeof _readProfileLayoutFromDom === 'function') user.profileLayout = _readProfileLayoutFromDom();
+
   vibeSave('vibe_user_v1', user);
   // localOnly: a cache refresh on this device, not an edit (no sync).
   if (!(opts && opts.localOnly)) scheduleProfileServerSync();
@@ -8600,6 +8935,10 @@ function buildProfileSyncPayload(server) {
   // shape matches the localStorage shape ({icon, text}); the server
   // sanitizer enforces caps + drops items missing text.
   if (edited.current) payload.current_on = Array.isArray(u.currentlyOn) ? u.currentlyOn : [];
+  // Widget layout (users.profile_layout): always the full document, never a
+  // partial; the server sanitizes it again. Marked only by an arrange-mode
+  // change on this page — a move never marks work or current.
+  if (edited.layout) payload.profile_layout = _sanitizeProfileLayout(u.profileLayout);
   // "Here for": only after a chip click on this page. A cached copy from
   // before the row existed has no lookingFor, and must not clear the answer.
   if (_lookingForDirty) payload.looking_for = Array.isArray(u.lookingFor) ? u.lookingFor.filter(v => LOOKING_FOR_VALUES.includes(v)) : [];
@@ -9889,6 +10228,10 @@ function renderUserSections(user, opts) {
   // sectionsOnly: the profile sections above, nothing below. The load-time
   // repaint from the server (_adoptOwnProfileOnLoad) must not re-render the
   // posts from this device's copy over the ones hydrated from the database.
+  // Widget layout last, so the empty flags read the cards just painted. A
+  // full render with no document paints the default; the load-time repaint
+  // (sectionsOnly) carries profileLayout only when it wasn't held back.
+  if (!(opts && opts.sectionsOnly) || 'profileLayout' in user) applyProfileLayout(user.profileLayout);
   if (opts && opts.sectionsOnly) return;
 
   // "Here for" chips (owner only; the visitor bootstrap sends []).

@@ -1,5 +1,6 @@
 import { isSchoolSystem, type SchoolSystem } from "@/lib/iu/campuses";
 import { sanitizeCurrentOn } from "@/lib/profile/current-on";
+import { sanitizeProfileLayout } from "@/lib/profile/profile-layout";
 import { normalizeResumeRef } from "@/lib/profile/resume-doc-url";
 import { sanitizeResumeDocs } from "@/lib/profile/resume-docs";
 import { sanitizeResumeRedactions } from "@/lib/profile/resume-redactions";
@@ -90,5 +91,10 @@ export function normalizeProfileView(row: Record<string, unknown>): ProfileViewW
     work_order_manual: row.work_order_manual === true,
     current_on: sanitizeCurrentOn(row.current_on),
     resume_redactions: sanitizeResumeRedactions(row.resume_redactions),
+    // Widget layout (S67 wave 2). Sanitized on READ as well as on write: the
+    // public bootstrap hands this to logged-out visitors and the legacy page
+    // matches the ids against a closed set, so a hand-written row can only
+    // ever come out as known ids. A select that didn't ask reads as default.
+    profile_layout: sanitizeProfileLayout(row.profile_layout),
   };
 }

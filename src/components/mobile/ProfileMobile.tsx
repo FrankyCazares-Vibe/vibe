@@ -2,7 +2,7 @@
 
 import Link from "next/link";
 import { useSearchParams } from "next/navigation";
-import { useCallback, useEffect, useRef, useState } from "react";
+import { Fragment, useCallback, useEffect, useRef, useState } from "react";
 import { Drawer } from "vaul";
 
 import { ImageCropperModal } from "@/components/ImageCropperModal";
@@ -33,6 +33,13 @@ import {
   lookingForForDisplay,
   type LookingFor,
 } from "@/lib/profile/looking-for";
+import {
+  DEFAULT_PROFILE_LAYOUT,
+  isDefaultLayout,
+  sanitizeProfileLayout,
+  type ProfileLayout,
+  type WidgetId,
+} from "@/lib/profile/profile-layout";
 import { campusPickStep, settingsCampusCardView } from "@/lib/profile/settings-campus-card";
 import { sortWorkExperienceByRecency } from "@/lib/profile/work-experience";
 
@@ -43,7 +50,12 @@ import { sortWorkExperienceByRecency } from "@/lib/profile/work-experience";
  * a tab strip with two panes:
  *
  *   - Posts      — feed posts as a 1:1 grid
- *   - Portfolio  — "Working on" (currentlyOn) + work experience + resume / portfolio file
+ *   - Portfolio  — "Working on" (currentlyOn), work experience, skills and
+ *                  the resume / portfolio files, in the order the student
+ *                  arranged them (users.profile_layout, see
+ *                  lib/profile/profile-layout.ts); hidden sections are
+ *                  skipped. The owner arranges them from the "Layout"
+ *                  pill in edit mode (ArrangeProfileSheet).
  *
  * A Clips tab used to sit between them; clips are backlogged, see
  * DOCS/BACKLOG_CLIPS.md.
@@ -122,6 +134,12 @@ type VibeUser = {
    *  its document by `docKey` (that doc's url); older bars only by
    *  `docIndex`. */
   resumeRedactions?: DocBar[];
+  /** Which profile widgets show and in what order (users.profile_layout),
+   *  the camelCase mirror build-vibe-user-v1 emits. Sanitized on read
+   *  here too (`sanitizeProfileLayout`): absent or malformed reads as
+   *  the default layout. Public by nature — it IS the page — so the
+   *  visitor bootstrap carries it as well. */
+  profileLayout?: ProfileLayout | null;
   counts?: {
     followers?: string | number;
     following?: string | number;
@@ -280,6 +298,89 @@ function readOwnCampus(d: Record<string, unknown> | null | undefined): OwnCampus
   };
 }
 
+// ---------------------------------------------------------------------------
+// Profile layout (users.profile_layout) on the phone
+// ---------------------------------------------------------------------------
+
+/** The Portfolio tab's movable sub-sections. Bio stays in the header at
+ *  375px (there is no side column, so `bioSide` means nothing here) and
+ *  Posts is its own tab, so of the six widget ids these four are the
+ *  ones `order` and `hidden` actually rearrange on the phone. */
+type PortfolioWidgetId = Extract<
+  WidgetId,
+  "working_on" | "experience" | "skills" | "resume"
+>;
+const PORTFOLIO_WIDGET_IDS: readonly PortfolioWidgetId[] = [
+  "working_on",
+  "experience",
+  "skills",
+  "resume",
+];
+
+/** `order` filtered to the Portfolio sub-sections, hidden ones dropped. */
+function portfolioWidgetOrder(layout: ProfileLayout): PortfolioWidgetId[] {
+  return layout.order.filter(
+    (id): id is PortfolioWidgetId =>
+      (PORTFOLIO_WIDGET_IDS as readonly string[]).includes(id) &&
+      !layout.hidden.includes(id),
+  );
+}
+
+/** Row names in the Arrange sheet. Product words, not column names. */
+const WIDGET_LABEL: Record<WidgetId, string> = {
+  bio: "Bio",
+  working_on: "Working on",
+  experience: "Experience",
+  skills: "Skills",
+  resume: "Resume",
+  posts: "Posts",
+};
+
+/** The 7px dot in front of each row. C0 tokens only, one ink per widget
+ *  so the six rows read apart at a glance; the two coral-family ones
+ *  are Bio (brick) and Posts (coral), the profile's own colour. */
+const WIDGET_DOT: Record<WidgetId, string> = {
+  bio: "var(--tag-ink)",
+  working_on: "var(--coral)",
+  experience: "var(--charcoal)",
+  skills: "var(--ink-2)",
+  resume: "var(--ink-muted)",
+  posts: "var(--coral)",
+};
+
+/** Swap `id` with its neighbour. No-op at the ends (the buttons are
+ *  disabled there anyway) and when `id` isn't in the order. */
+function moveWidget(order: WidgetId[], id: WidgetId, dir: -1 | 1): WidgetId[] {
+  const i = order.indexOf(id);
+  const j = i + dir;
+  if (i < 0 || j < 0 || j >= order.length) return order;
+  const next = order.slice();
+  const neighbour = next[j];
+  if (neighbour === undefined) return order;
+  next[j] = id;
+  next[i] = neighbour;
+  return next;
+}
+
+/** The one-line status under a row's name. `count` is how many things
+ *  the widget holds today (bio: 1 or 0). Posts can't be hidden — the
+ *  sanitizer strips it from `hidden` — so its line never changes. */
+function widgetStatusLine(id: WidgetId, hidden: boolean, count: number): string {
+  if (id === "posts") return "Always shown. It's the profile.";
+  if (hidden) return "hidden · only you see it";
+  if (id === "bio") return count > 0 ? "Shown up top" : "Nothing written yet";
+  // Empty widgets are skipped for visitors on both surfaces (plan A).
+  if (count === 0) return "Nothing yet · visitors skip it";
+  const noun: Record<PortfolioWidgetId, [string, string]> = {
+    working_on: ["thing", "things"],
+    experience: ["role", "roles"],
+    skills: ["skill", "skills"],
+    resume: ["file", "files"],
+  };
+  const [one, many] = noun[id];
+  return `${count} ${count === 1 ? one : many}`;
+}
+
 /** The small grey line under the edit-mode campus picker. */
 const campusHintStyle: React.CSSProperties = {
   fontFamily: "DM Sans, sans-serif",
@@ -344,6 +445,9 @@ export function ProfileMobile({ targetHandle }: Props = {}) {
   const [editingPortfolio, setEditingPortfolio] = useState<
     null | "experience" | "current-on"
   >(null);
+  // The "Arrange your profile." sheet (widget order + hidden), opened from
+  // the Layout pill in edit mode. Mounted only while open, like the rest.
+  const [arrangeOpen, setArrangeOpen] = useState(false);
   const resumeInputRef = useRef<HTMLInputElement | null>(null);
   const [uploadingResume, setUploadingResume] = useState(false);
   // Redaction-bar edits save one at a time, in order (see saveBarChange).
@@ -1332,7 +1436,18 @@ export function ProfileMobile({ targetHandle }: Props = {}) {
   const bio = pick(user.bio);
   const verified = user.studentVerification?.status === "verified";
   const school = pick(user.studentVerification?.school);
-  const skills = (user.skills ?? []).filter(Boolean).slice(0, 6);
+  // Widget order + hidden set. Sanitized here as well as on the server, so
+  // an old cached bootstrap without the key still renders the default.
+  const layout = sanitizeProfileLayout(user.profileLayout);
+  const bioHidden = layout.hidden.includes("bio");
+  // A hidden Skills widget must look never-filled everywhere — the header
+  // tag row included — so it matches the desktop, which drops them fully.
+  const skills = layout.hidden.includes("skills")
+    ? []
+    : (user.skills ?? []).filter(Boolean).slice(0, 6);
+  // The Skills sub-section shows them all; the tag row above keeps its cap.
+  // (Its own hiding is handled by portfolioWidgetOrder, not here.)
+  const allSkills = (user.skills ?? []).filter(Boolean);
   const lookingFor = lookingForForDisplay(user.lookingFor);
   const tagsFromVibeTags = (user.vibeTags ?? [])
     .map((t) => t?.label)
@@ -1534,6 +1649,19 @@ export function ProfileMobile({ targetHandle }: Props = {}) {
           ) : null}
           {isVisitor ? null : editMode ? (
             <>
+              {/* Widget order + hidden set live in their own sheet with
+                  their own Save (savePortfolioPatch, like the Portfolio
+                  editors), not in the identity draft: Cancel up here
+                  never has to undo a layout change and vice versa. */}
+              <button
+                type="button"
+                onClick={() => setArrangeOpen(true)}
+                disabled={savingEdit}
+                style={floatingActionTextStyle}
+                aria-label="Layout: arrange your profile"
+              >
+                Layout
+              </button>
               <button
                 type="button"
                 onClick={cancelEdit}
@@ -2093,10 +2221,13 @@ export function ProfileMobile({ targetHandle }: Props = {}) {
         ) : null}
       </div>
 
-      {/* Bio — stays in the header area, above the tab strip.
+      {/* Bio — stays in the header area, above the tab strip, whatever
+          `bioSide` says (that is a desktop column choice; there is no side
+          at 375px). Hidden by the layout → not painted outside edit mode;
+          the textarea stays so the words can still be edited.
           Textarea in edit mode (4000-char cap matches server). */}
       {editMode && effectiveDraft ? (
-        <Section title="Bio">
+        <Section title={bioHidden ? "Bio · hidden" : "Bio"}>
           <textarea
             value={effectiveDraft.bio}
             onChange={(e) => updateDraft({ bio: e.target.value.slice(0, 4000) })}
@@ -2117,7 +2248,7 @@ export function ProfileMobile({ targetHandle }: Props = {}) {
             }}
           />
         </Section>
-      ) : bio ? (
+      ) : bio && !bioHidden ? (
         <Section title="Bio">
           <p style={{ fontSize: 14, lineHeight: 1.6, color: "#3D3D3A", margin: 0 }}>
             {bio}
@@ -2215,7 +2346,9 @@ export function ProfileMobile({ targetHandle }: Props = {}) {
           <PortfolioPane
             currentProjects={currentProjects}
             workExperience={workExperience}
+            skills={allSkills}
             resumePortfolio={resumePortfolio}
+            order={portfolioWidgetOrder(layout)}
             onOpenDoc={(r, index) => setViewerItem({ item: r, index })}
             isVisitor={isVisitor}
             ownerName={name}
@@ -2336,6 +2469,32 @@ export function ProfileMobile({ targetHandle }: Props = {}) {
           onSave={async (items) => {
             const ok = await savePortfolioPatch({ current_on: items });
             if (ok) setEditingPortfolio(null);
+            return ok;
+          }}
+        />
+      ) : null}
+      {/* "Arrange your profile." — the whole layout document goes up in
+          one patch (the route sanitizes too and never takes a partial);
+          the re-bootstrap inside savePortfolioPatch refreshes
+          user.profileLayout, so the Portfolio tab re-orders itself. */}
+      {arrangeOpen && user ? (
+        <ArrangeProfileSheet
+          initial={layout}
+          counts={{
+            bio: bio ? 1 : 0,
+            working_on: currentProjects.length,
+            experience: workExperience.length,
+            skills: allSkills.length,
+            resume: resumePortfolio.length,
+            posts: posts?.length ?? 0,
+          }}
+          onClose={() => setArrangeOpen(false)}
+          onSave={async (next) => {
+            const ok = await savePortfolioPatch(
+              { profile_layout: next },
+              { failure: "Couldn't save your layout." },
+            );
+            if (ok) setArrangeOpen(false);
             return ok;
           }}
         />
@@ -3221,7 +3380,9 @@ function SubPaneEmpty({ title, body }: { title: string; body: string }) {
 function PortfolioPane({
   currentProjects,
   workExperience,
+  skills,
   resumePortfolio,
+  order,
   onOpenDoc,
   isVisitor,
   ownerName,
@@ -3238,7 +3399,13 @@ function PortfolioPane({
 }: {
   currentProjects: CurrentProject[];
   workExperience: WorkExp[];
+  /** The full skills list (users.skills). Edited on the desktop profile
+   *  today; the phone only shows them, as its own movable sub-section. */
+  skills: string[];
   resumePortfolio: ResumeItem[];
+  /** Which sub-sections to paint and in what order — `profile_layout.order`
+   *  filtered by `portfolioWidgetOrder` (hidden ones already dropped). */
+  order: PortfolioWidgetId[];
   /** Open this doc in the resume viewer. `index` is its position in
    *  resume_docs so the viewer can scope redaction bars to it. */
   onOpenDoc: (r: ResumeItem, index: number) => void;
@@ -3370,16 +3537,31 @@ function PortfolioPane({
   // Rendered slices — prefer the live draft while dragging.
   const expItems = expDraft ?? workExperience;
   const coItems = currentOnDraft ?? currentProjects;
-  const allEmpty =
-    currentProjects.length === 0 &&
-    workExperience.length === 0 &&
-    resumePortfolio.length === 0;
+  // Only the sections the layout shows count: a hidden Experience with
+  // three roles is still "nothing here" to a visitor.
+  const sectionCount: Record<PortfolioWidgetId, number> = {
+    working_on: currentProjects.length,
+    experience: workExperience.length,
+    skills: skills.length,
+    resume: resumePortfolio.length,
+  };
+  const allEmpty = order.every((id) => sectionCount[id] === 0);
   if (allEmpty) {
     if (isVisitor) {
       return (
         <EmptyTab
           title="Nothing here yet"
-          body={`${ownerName} hasn't added projects, experience, or a resume yet.`}
+          body={`${ownerName} hasn't added projects, experience, skills, or a resume yet.`}
+        />
+      );
+    }
+    if (order.length === 0) {
+      // Every Portfolio section is hidden. Say so instead of "add a
+      // resume", which would send the owner in circles.
+      return (
+        <EmptyTab
+          title="All tucked away"
+          body="You hid every Portfolio section. Tap the pencil, then Layout, to bring them back."
         />
       );
     }
@@ -3391,12 +3573,16 @@ function PortfolioPane({
       />
     );
   }
-  return (
-    <div style={{ display: "flex", flexDirection: "column", gap: 22 }}>
-      {/* Visitors only see subsections that have content — empty
-          subsections with owner-instruction copy ("Add roles…") would
-          be confusing on someone else's profile. */}
-      {currentProjects.length > 0 || !isVisitor ? (
+
+  // Each sub-section is built once here and painted in the arranged
+  // `order` at the bottom. A visitor-empty section is null, and a null
+  // inside a keyed Fragment leaves no gap in the column.
+  //
+  // Visitors only see subsections that have content — empty
+  // subsections with owner-instruction copy ("Add roles…") would
+  // be confusing on someone else's profile.
+  const workingOnSection =
+    currentProjects.length > 0 || !isVisitor ? (
         <PortfolioSubsection
           title="Working on"
           action={
@@ -3460,9 +3646,10 @@ function PortfolioPane({
             </div>
           )}
         </PortfolioSubsection>
-      ) : null}
+      ) : null;
 
-      {workExperience.length > 0 || !isVisitor ? (
+  const experienceSection =
+    workExperience.length > 0 || !isVisitor ? (
       <PortfolioSubsection
         title="Experience"
         action={
@@ -3551,9 +3738,10 @@ function PortfolioPane({
           </div>
         )}
       </PortfolioSubsection>
-      ) : null}
+      ) : null;
 
-      {resumePortfolio.length > 0 || !isVisitor ? (
+  const resumeSection =
+    resumePortfolio.length > 0 || !isVisitor ? (
       <PortfolioSubsection
         title="Resume"
         action={
@@ -3683,10 +3871,57 @@ function PortfolioPane({
           </div>
         )}
       </PortfolioSubsection>
-      ) : null}
+      ) : null;
+
+  // Skills used to live only in the header's tag row (merged with the
+  // interest tags, capped at 8). That row stays; this section is what
+  // lets `skills` be moved and hidden like the other three. No phone
+  // editor yet, so the owner's empty copy points at the desktop.
+  const skillsSection =
+    skills.length > 0 || !isVisitor ? (
+      <PortfolioSubsection title="Skills">
+        {skills.length === 0 ? (
+          <SubsectionEmpty body="Add skills from your profile on a computer — they show up here." />
+        ) : (
+          <div style={{ display: "flex", flexWrap: "wrap", gap: 6 }}>
+            {skills.map((s, i) => (
+              <span key={`${s}-${i}`} style={skillChipStyle}>
+                {s}
+              </span>
+            ))}
+          </div>
+        )}
+      </PortfolioSubsection>
+    ) : null;
+
+  const sections: Record<PortfolioWidgetId, React.ReactNode> = {
+    working_on: workingOnSection,
+    experience: experienceSection,
+    skills: skillsSection,
+    resume: resumeSection,
+  };
+  return (
+    <div style={{ display: "flex", flexDirection: "column", gap: 22 }}>
+      {order.map((id) => (
+        <Fragment key={id}>{sections[id]}</Fragment>
+      ))}
     </div>
   );
 }
+
+/** A skill in the Skills sub-section. Paper chip in the C0 inks — the
+ *  coral tag look is the header row's, and these sit under it. */
+const skillChipStyle: React.CSSProperties = {
+  fontFamily: "DM Sans, sans-serif",
+  fontSize: 12.5,
+  fontWeight: 600,
+  padding: "6px 12px",
+  borderRadius: 999,
+  background: "var(--paper)",
+  border: "1px solid var(--hairline)",
+  color: "var(--charcoal)",
+  boxShadow: "var(--card-shadow)",
+};
 
 function PortfolioSubsection({
   title,
@@ -4342,6 +4577,299 @@ function WorkingOnEditSheet({
   );
 }
 
+// ---------------------------------------------------------------------------
+// "Arrange your profile." — widget order + hidden set
+// ---------------------------------------------------------------------------
+
+/** The phone's arrange sheet (plan A, contracts C3). One row per widget
+ *  in `order`; ↑ ↓ swap neighbours, the eye toggles `hidden`, Posts is
+ *  locked (it's the profile). Save hands the parent the WHOLE document,
+ *  sanitized — the route never takes a partial — and the parent's
+ *  savePortfolioPatch re-bootstraps so the Portfolio tab follows.
+ *  `bioSide` rides along untouched: docking the bio is a desktop column
+ *  choice this sheet neither shows nor changes. */
+function ArrangeProfileSheet({
+  initial,
+  counts,
+  onClose,
+  onSave,
+}: {
+  initial: ProfileLayout;
+  /** How many things each widget holds today, for the status lines. */
+  counts: Record<WidgetId, number>;
+  onClose: () => void;
+  onSave: (layout: ProfileLayout) => Promise<boolean>;
+}) {
+  const [draft, setDraft] = useState<ProfileLayout>(() => ({
+    ...initial,
+    order: initial.order.slice(),
+    hidden: initial.hidden.slice(),
+  }));
+  const [saving, setSaving] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+
+  const move = (id: WidgetId, dir: -1 | 1) =>
+    setDraft((d) => ({ ...d, order: moveWidget(d.order, id, dir) }));
+  const toggleHidden = (id: WidgetId) =>
+    setDraft((d) => ({
+      ...d,
+      hidden: d.hidden.includes(id)
+        ? d.hidden.filter((x) => x !== id)
+        : [...d.hidden, id],
+    }));
+  // The whole default document, bioSide included: "default" means the
+  // profile as it ships, on both surfaces.
+  const reset = () =>
+    setDraft({
+      ...DEFAULT_PROFILE_LAYOUT,
+      order: DEFAULT_PROFILE_LAYOUT.order.slice(),
+      hidden: DEFAULT_PROFILE_LAYOUT.hidden.slice(),
+    });
+  const atDefault = isDefaultLayout(draft);
+
+  const handleSave = async () => {
+    if (saving) return;
+    setSaving(true);
+    setError(null);
+    const ok = await onSave(sanitizeProfileLayout(draft));
+    if (!ok) {
+      setError("Couldn't save — try again.");
+      setSaving(false);
+    }
+  };
+
+  return (
+    <PortfolioEditorShell
+      title="Arrange your profile."
+      onClose={onClose}
+      onSave={handleSave}
+      saving={saving}
+      error={error}
+      headerSave={false}
+      footer={
+        <div style={{ display: "flex", flexDirection: "column", gap: 2 }}>
+          <button
+            type="button"
+            onClick={handleSave}
+            disabled={saving}
+            className="vibe-arrange-btn"
+            style={{
+              height: 48,
+              borderRadius: 14,
+              border: "none",
+              background: saving ? "rgba(var(--scrim-rgb),0.25)" : "var(--coral)",
+              color: "#fff",
+              fontFamily: "DM Sans, sans-serif",
+              fontSize: 15,
+              fontWeight: 800,
+              cursor: saving ? "default" : "pointer",
+              WebkitTapHighlightColor: "transparent",
+            }}
+          >
+            {saving ? "Saving…" : "Save"}
+          </button>
+          <button
+            type="button"
+            onClick={reset}
+            disabled={saving || atDefault}
+            className="vibe-arrange-btn"
+            style={{
+              height: 44,
+              border: "none",
+              background: "transparent",
+              color: atDefault ? "var(--ink-muted)" : "var(--ink-2)",
+              fontFamily: "DM Sans, sans-serif",
+              fontSize: 13,
+              fontWeight: 700,
+              cursor: saving || atDefault ? "default" : "pointer",
+              WebkitTapHighlightColor: "transparent",
+            }}
+          >
+            Back to the default order
+          </button>
+        </div>
+      }
+    >
+      <style>{ARRANGE_CSS}</style>
+      <p
+        style={{
+          margin: "0 0 14px",
+          fontFamily: "DM Sans, sans-serif",
+          fontSize: 13,
+          lineHeight: 1.5,
+          color: "var(--ink-2)",
+        }}
+      >
+        Up and down set the order. The eye hides a section from everyone
+        but you.
+      </p>
+      <div role="list" style={{ display: "flex", flexDirection: "column", gap: 8 }}>
+        {draft.order.map((id, i) => {
+          const hidden = draft.hidden.includes(id);
+          return (
+            <ArrangeRow
+              key={id}
+              id={id}
+              hidden={hidden}
+              status={widgetStatusLine(id, hidden, counts[id])}
+              canUp={i > 0}
+              canDown={i < draft.order.length - 1}
+              onMove={(dir) => move(id, dir)}
+              onToggle={() => toggleHidden(id)}
+            />
+          );
+        })}
+      </div>
+    </PortfolioEditorShell>
+  );
+}
+
+/** One widget in the Arrange sheet: dot · name + status · ↑ ↓ · eye (a
+ *  lock on Posts). Hidden rows go dashed at 75%. Every control is a real
+ *  44px button; the eye is a toggle whose pressed state means "shown",
+ *  so its label never has to flip. */
+function ArrangeRow({
+  id,
+  hidden,
+  status,
+  canUp,
+  canDown,
+  onMove,
+  onToggle,
+}: {
+  id: WidgetId;
+  hidden: boolean;
+  status: string;
+  canUp: boolean;
+  canDown: boolean;
+  onMove: (dir: -1 | 1) => void;
+  onToggle: () => void;
+}) {
+  const label = WIDGET_LABEL[id];
+  const locked = id === "posts";
+  const glyphStyle: React.CSSProperties = {
+    width: 44,
+    height: 44,
+    display: "inline-flex",
+    alignItems: "center",
+    justifyContent: "center",
+    flexShrink: 0,
+  };
+  return (
+    <div
+      role="listitem"
+      style={{
+        display: "flex",
+        alignItems: "center",
+        gap: 4,
+        padding: "8px 8px 8px 12px",
+        borderRadius: 14,
+        background: "var(--paper)",
+        border: hidden
+          ? "1px dashed rgba(var(--scrim-rgb),0.22)"
+          : "1px solid var(--hairline)",
+        boxShadow: hidden ? "none" : "var(--card-shadow)",
+        opacity: hidden ? 0.75 : 1,
+      }}
+    >
+      <span
+        aria-hidden
+        style={{
+          width: 7,
+          height: 7,
+          borderRadius: 999,
+          background: WIDGET_DOT[id],
+          flexShrink: 0,
+          marginRight: 6,
+        }}
+      />
+      <div style={{ flex: 1, minWidth: 0, marginRight: 4 }}>
+        <div
+          style={{
+            fontFamily: "DM Sans, sans-serif",
+            fontSize: 14,
+            fontWeight: 700,
+            lineHeight: 1.3,
+            color: "var(--charcoal)",
+          }}
+        >
+          {label}
+        </div>
+        {/* One line on most phones; the Posts line ("Always shown. It's
+            the profile.") wraps to two at 375px rather than truncate. */}
+        <div
+          style={{
+            fontFamily: "DM Sans, sans-serif",
+            fontSize: 12,
+            lineHeight: 1.3,
+            color: "var(--ink-muted)",
+          }}
+        >
+          {status}
+        </div>
+      </div>
+      <ReorderButton
+        large
+        onClick={() => onMove(-1)}
+        disabled={!canUp}
+        label={`Move ${label} up`}
+        arrow="↑"
+      />
+      <ReorderButton
+        large
+        onClick={() => onMove(1)}
+        disabled={!canDown}
+        label={`Move ${label} down`}
+        arrow="↓"
+      />
+      {locked ? (
+        <span
+          role="img"
+          aria-label="Always shown"
+          title="Always shown"
+          style={{ ...glyphStyle, color: "var(--ink-muted)" }}
+        >
+          <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" aria-hidden>
+            <rect x="5" y="11" width="14" height="10" rx="2.5" />
+            <path d="M8 11V8a4 4 0 0 1 8 0v3" />
+          </svg>
+        </span>
+      ) : (
+        <button
+          type="button"
+          onClick={onToggle}
+          // The label names the action, like the desktop strip's eye.
+          aria-label={hidden ? `Show ${label}` : `Hide ${label}`}
+          className="vibe-arrange-btn"
+          style={{
+            ...glyphStyle,
+            padding: 0,
+            borderRadius: 999,
+            border: "1px solid rgba(var(--scrim-rgb),0.12)",
+            background: hidden ? "rgba(var(--scrim-rgb),0.04)" : "var(--paper)",
+            color: hidden ? "var(--ink-muted)" : "var(--charcoal)",
+            cursor: "pointer",
+            WebkitTapHighlightColor: "transparent",
+          }}
+        >
+          <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" aria-hidden>
+            <path d="M2.5 12s3.5-6.5 9.5-6.5 9.5 6.5 9.5 6.5-3.5 6.5-9.5 6.5S2.5 12 2.5 12z" />
+            <circle cx="12" cy="12" r="3" />
+            {hidden ? <path d="M4 4l16 16" /> : null}
+          </svg>
+        </button>
+      )}
+    </div>
+  );
+}
+
+/** Focus ring for the sheet's buttons (C0: coral outline). Inline styles
+ *  can't say :focus-visible, so a class does, the way RollingStrip's
+ *  STRIP_CSS does for its chips. */
+const ARRANGE_CSS = `
+.vibe-arrange-btn:focus-visible { outline: 2px solid var(--coral); outline-offset: 2px; }
+`;
+
 /** Shared chrome for portfolio editor sheets — vaul drawer with a
  *  cancel/save top bar and a scrolling body. Avoids reimplementing
  *  the shell in each editor. */
@@ -4352,6 +4880,8 @@ function PortfolioEditorShell({
   saving,
   error,
   children,
+  footer,
+  headerSave = true,
 }: {
   title: string;
   onClose: () => void;
@@ -4359,6 +4889,12 @@ function PortfolioEditorShell({
   saving: boolean;
   error: string | null;
   children: React.ReactNode;
+  /** Optional pinned strip under the scrolling body (the Arrange sheet
+   *  keeps its Save down there, thumb-reachable, with the reset link). */
+  footer?: React.ReactNode;
+  /** false = no Save pill in the top bar (the footer carries it instead);
+   *  a spacer keeps the title centred. */
+  headerSave?: boolean;
 }) {
   return (
     <Drawer.Root
@@ -4453,25 +4989,30 @@ function PortfolioEditorShell({
             >
               {title}
             </span>
-            <button
-              type="button"
-              onClick={onSave}
-              disabled={saving}
-              style={{
-                padding: "6px 14px",
-                borderRadius: 999,
-                border: "none",
-                background: saving ? "rgba(28,28,30,0.25)" : "#FF5C35",
-                color: "#fff",
-                fontFamily: "DM Sans, sans-serif",
-                fontSize: 13,
-                fontWeight: 800,
-                cursor: saving ? "default" : "pointer",
-                WebkitTapHighlightColor: "transparent",
-              }}
-            >
-              {saving ? "Saving…" : "Save"}
-            </button>
+            {headerSave ? (
+              <button
+                type="button"
+                onClick={onSave}
+                disabled={saving}
+                style={{
+                  padding: "6px 14px",
+                  borderRadius: 999,
+                  border: "none",
+                  background: saving ? "rgba(28,28,30,0.25)" : "#FF5C35",
+                  color: "#fff",
+                  fontFamily: "DM Sans, sans-serif",
+                  fontSize: 13,
+                  fontWeight: 800,
+                  cursor: saving ? "default" : "pointer",
+                  WebkitTapHighlightColor: "transparent",
+                }}
+              >
+                {saving ? "Saving…" : "Save"}
+              </button>
+            ) : (
+              // Same footprint as the Cancel pill, so the title stays centred.
+              <span aria-hidden style={{ display: "inline-block", minWidth: 66 }} />
+            )}
           </header>
 
           {error ? (
@@ -4516,6 +5057,18 @@ function PortfolioEditorShell({
           >
             {children}
           </div>
+          {footer ? (
+            <div
+              style={{
+                flexShrink: 0,
+                padding: "10px 14px calc(12px + env(safe-area-inset-bottom, 0px))",
+                borderTop: "1px solid var(--hairline)",
+                background: "var(--cream)",
+              }}
+            >
+              {footer}
+            </div>
+          ) : null}
         </Drawer.Content>
       </Drawer.Portal>
     </Drawer.Root>
@@ -4711,11 +5264,15 @@ function ReorderButton({
   disabled,
   label,
   arrow,
+  large = false,
 }: {
   onClick?: () => void;
   disabled: boolean;
   label: string;
   arrow: "↑" | "↓";
+  /** 44×44 thumb target (the Arrange sheet); default is the small pill
+   *  that sits in an ExperienceCard's title row. */
+  large?: boolean;
 }) {
   return (
     <button
@@ -4723,20 +5280,23 @@ function ReorderButton({
       onClick={disabled ? undefined : onClick}
       disabled={disabled}
       aria-label={label}
+      className={large ? "vibe-arrange-btn" : undefined}
       style={{
-        width: 26,
-        height: 22,
+        width: large ? 44 : 26,
+        height: large ? 44 : 22,
         padding: 0,
         borderRadius: 999,
-        border: "1px solid rgba(28,28,30,0.12)",
-        background: disabled ? "rgba(28,28,30,0.04)" : "rgba(255,255,255,0.7)",
-        color: disabled ? "rgba(28,28,30,0.32)" : "#1C1C1E",
+        // C0 tokens (the same light values as before; night mode follows).
+        border: "1px solid rgba(var(--scrim-rgb),0.12)",
+        background: disabled ? "rgba(var(--scrim-rgb),0.04)" : "var(--paper)",
+        color: disabled ? "rgba(var(--scrim-rgb),0.32)" : "var(--charcoal)",
         fontFamily: "DM Sans, sans-serif",
-        fontSize: 13,
+        fontSize: large ? 17 : 13,
         fontWeight: 800,
         lineHeight: 1,
         cursor: disabled ? "default" : "pointer",
         WebkitTapHighlightColor: "transparent",
+        flexShrink: 0,
       }}
     >
       {arrow}

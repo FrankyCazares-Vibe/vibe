@@ -1,4 +1,5 @@
 import type { CurrentOnItem } from "@/lib/profile/current-on";
+import type { ProfileLayout } from "@/lib/profile/profile-layout";
 import type { ResumeDocRow } from "@/lib/profile/resume-docs";
 import type { RedactionBar } from "@/lib/profile/resume-redactions";
 import type { WorkExperienceRow } from "@/lib/profile/work-experience";
@@ -39,4 +40,8 @@ export type ProfileView = {
   work_order_manual: boolean;
   current_on: CurrentOnItem[];
   resume_redactions: RedactionBar[];
+  /** Which widgets show, in what order, bio docked or not (S67 wave 2).
+   *  Always a FULL, sanitized document (lib/profile/profile-layout); the
+   *  column's `{}` default, or a select that didn't ask, reads as the default. */
+  profile_layout: ProfileLayout;
 };

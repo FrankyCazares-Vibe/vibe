@@ -31,7 +31,7 @@ const PROFILE_ROUTE = "src/app/api/me/profile/route.ts";
 const PROFILE_SYNC_ROUTE = "src/app/api/me/profile-sync/route.ts";
 const PINNED_ROUTE = "src/app/api/me/pinned/route.ts";
 
-test("the list: exactly the 21 columns, in order, frozen", () => {
+test("the list: exactly the 22 columns, in order, frozen", () => {
   assert.deepEqual(
     [...SELF_PROFILE_WRITE_COLUMNS],
     [
@@ -56,6 +56,7 @@ test("the list: exactly the 21 columns, in order, frozen", () => {
       "avatar_url",
       "banner_url",
       "banner_gradient",
+      "profile_layout",
     ],
   );
   assert.equal(Object.isFrozen(SELF_PROFILE_WRITE_COLUMNS), true);
@@ -134,13 +135,19 @@ test("the three routes: limits, Terms gate, closed-list guard", () => {
   assert.ok(sync.includes("unexpectedSelfWriteKeys("));
 
   // Each limiter runs before the Terms gate, the order onboarding-step uses.
+  // Since the moderation wave (f537aee) profile and profile-sync reach Terms
+  // through `requireNotRestricted(user.id)` (Terms + no restriction in force);
+  // pinned still calls `requireTermsAccepted(user.id)` directly. Either counts.
   for (const [name, src, key] of [
     ["profile", profile, "me-profile:"],
     ["profile-sync", sync, "profile-sync:"],
     ["pinned", pinned, "pinned:"],
   ] as const) {
     const limitAt = src.indexOf(key);
-    const termsAt = src.indexOf("requireTermsAccepted(user.id)");
+    const termsAt = Math.max(
+      src.indexOf("requireTermsAccepted(user.id)"),
+      src.indexOf("requireNotRestricted(user.id)"),
+    );
     assert.ok(limitAt > 0 && termsAt > limitAt, `${name}: limiter must run before the Terms gate`);
   }
 });

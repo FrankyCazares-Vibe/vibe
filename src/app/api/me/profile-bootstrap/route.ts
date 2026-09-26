@@ -1,7 +1,7 @@
 import { NextResponse } from "next/server";
 
 import { getCountsFor } from "@/lib/connections/queries";
-import { isMissingColumnError } from "@/lib/db/missing-column";
+import { M1_USER_COLUMNS, isMissingColumnError } from "@/lib/db/missing-column";
 import { termsRequiredResponse } from "@/lib/legal/require-terms";
 import { hasRecordedConsent } from "@/lib/legal/terms";
 import { buildVibeUserV1FromProfile } from "@/lib/profile/build-vibe-user-v1";
@@ -24,8 +24,13 @@ import { createSupabaseServiceClient } from "@/lib/supabase/service";
 const BASE_PROFILE_SELECT =
   "id,email,name,handle,handle_changed_at,school,school_verified,year,major,department,bio,tagline,website,headline,location_text,banner_gradient,avatar_url,banner_url,resume_url,resume_docs,interests,skills,looking_for,work_experience,work_order_manual,current_on,resume_redactions,terms_accepted_at,terms_version,age_attested_at";
 
-/** The campus columns arrive with migration M1 (plan §5.1). */
-const PROFILE_SELECT = `${BASE_PROFILE_SELECT},${PROFILE_CAMPUS_COLUMNS}`;
+/**
+ * The OPTIONAL first-tier columns: the campus columns arrive with migration
+ * M1 (plan §5.1), `profile_layout` with 20260926100000 (S67 wave 2). They
+ * join HERE, never BASE_PROFILE_SELECT, so the retry below still succeeds
+ * while either migration lags the deploy.
+ */
+const PROFILE_SELECT = `${BASE_PROFILE_SELECT},${PROFILE_CAMPUS_COLUMNS},profile_layout`;
 
 type ProfileRowRead = {
   data: Record<string, unknown> | null;
@@ -56,15 +61,16 @@ export async function GET() {
   // PROFILE_SELECT includes email and `campus_set_at`, which are private
   // columns (no RLS read). Self-read via the service role scoped to the
   // signed-in user's id. Before migration M1 the campus columns don't exist,
-  // and a 404 here would lock the user out of their own profile — so a
-  // missing-column error (and only that) retries without them.
+  // and before 20260926100000 `profile_layout` doesn't; a 404 here would lock
+  // the user out of their own profile — so a missing-column error naming one
+  // of those (and only that) retries without them.
   const service = createSupabaseServiceClient();
   let { data: row, error } = (await service
     .from("users")
     .select(PROFILE_SELECT)
     .eq("id", user.id)
     .single()) as ProfileRowRead;
-  if (error && isMissingColumnError(error)) {
+  if (error && isMissingColumnError(error, [...M1_USER_COLUMNS, "profile_layout"])) {
     ({ data: row, error } = (await service
       .from("users")
       .select(BASE_PROFILE_SELECT)

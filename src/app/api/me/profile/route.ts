@@ -16,6 +16,7 @@ import { contentBlockedResponse, requireNotRestricted } from "@/lib/moderation/a
 import { blockedProfileField } from "@/lib/moderation/profile-filter";
 import { checkText } from "@/lib/moderation/text-filter";
 import { parseLookingForBody } from "@/lib/profile/looking-for";
+import { sanitizeProfileLayout } from "@/lib/profile/profile-layout";
 import { normalizeResumeRef } from "@/lib/profile/resume-doc-url";
 import { unexpectedSelfWriteKeys } from "@/lib/profile/self-write-columns";
 import { sanitizeWorkExperience } from "@/lib/profile/work-experience";
@@ -163,6 +164,15 @@ export async function PATCH(req: Request) {
 
   if ("work_experience" in body) {
     patch.work_experience = sanitizeWorkExperience(body.work_experience);
+  }
+
+  // Widget layout (S67 wave 2): which cards show, in what order, bio docked
+  // or not. The phone sends the WHOLE document under `profile_layout`
+  // (contracts C3); the sanitizer drops unknown ids, never lets `posts` hide,
+  // and fills anything missing from the default, so a partial can't land.
+  // Ids only, no free text: the word filter below has nothing to read here.
+  if ("profile_layout" in body) {
+    patch.profile_layout = sanitizeProfileLayout(body.profile_layout);
   }
 
   // Every free-text field is parsed above this line so the word filter sees
