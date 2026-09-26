@@ -15,6 +15,8 @@ import {
 import { createPortal } from "react-dom";
 
 import { CampusAppShell } from "@/components/campus-app-shell";
+import { RollingStrip } from "@/components/campus/RollingStrip";
+import { useStripData } from "@/components/campus/strip-data";
 import { asLoadFailure, LoadFailed, type LoadFailure } from "@/components/feedback/LoadFailed";
 import { ImageCropperModal } from "@/components/ImageCropperModal";
 import { emitCalendarChanged } from "@/components/LeftNav";
@@ -310,11 +312,10 @@ export const BACKDROP_PRESETS: Record<BackdropKey, { label: string; css: string 
 
 const DEFAULT_BACKDROP: BackdropKey = "cream";
 
-// Cream paper backdrop for the Feed tab — warm, cozy, "community noticeboard"
-const FEED_BACKDROP =
-  "radial-gradient(120% 80% at 0% 0%, rgba(255,222,180,0.45) 0%, rgba(255,222,180,0) 60%), " +
-  "radial-gradient(110% 80% at 100% 100%, rgba(255,200,170,0.35) 0%, rgba(255,200,170,0) 60%), " +
-  "linear-gradient(180deg, #FAF7F2 0%, #F4EDE2 100%)";
+// Cream paper backdrop for the Feed tab — warm, cozy, "community noticeboard".
+// The gradient itself is the `--feed-backdrop` token in globals.css (light and
+// night values live there), so the page follows the theme without a re-render.
+const FEED_BACKDROP = "var(--feed-backdrop)";
 
 // Neutral dark backdrop for the chat tab chrome — banner, tabs, server rail,
 // channel rail. Each org's preset only paints its own ChannelMain pane so the
@@ -426,6 +427,21 @@ export function CampusHome({
     setTab("feed");
     setFeedTagFilter(tag);
   }, []);
+
+  // An RSVP'd event chip on the rolling strip: switch to Events and hand
+  // the id down so EventsTabBody can scroll to and flash that card. There
+  // is no event page, so the card IS the destination. Seeded once from
+  // `?event=` (the search bar's event rows link there) like ?tag=; the
+  // Events tab reports back through onHighlightDone and the id is cleared,
+  // so a later visit to Events never re-flashes a stale card.
+  const [pendingEventId, setPendingEventId] = useState<string | null>(
+    () => searchParams.get("event") || null,
+  );
+  const onPickEvent = useCallback((eventId: string) => {
+    setPendingEventId(eventId);
+    setTab("events");
+  }, []);
+  const onEventHighlighted = useCallback(() => setPendingEventId(null), []);
 
   // Hide the bottom-right OttoCorner orb while we're on the Chat tab —
   // it sits on top of the message composer's send button. Driven from
@@ -764,8 +780,26 @@ export function CampusHome({
           flexDirection: "column",
         }}
       >
-        <CampusBanner />
+        {/* Desktop search lives in its own row between the campus name and
+            the tab pills (Franky, 2026-09-26) on the four cream tabs; the
+            banner's own mount is switched off there and left alone for the
+            phone, which shares CampusBanner and collapses search into an
+            icon. Chat keeps the in-banner pill: its chrome is dark (a cream
+            pill would float on it) and the tab is locked to 100dvh, so an
+            extra 48px row would come straight out of the thread. */}
+        <CampusBanner search={tab === "chat"} />
         {needsCampusPick ? <PickCampusStrip /> : null}
+        {tab !== "chat" ? (
+          <div
+            style={{
+              padding: "10px 24px 0",
+              display: "flex",
+              justifyContent: "center",
+            }}
+          >
+            <CampusSearchBar variant="row" placeholder="Search people, clubs, events" />
+          </div>
+        ) : null}
         <CampusTabs active={tab} onChange={setTab} />
 
         {orgsLoadErr && tab === "chat" ? (
@@ -849,6 +883,9 @@ export function CampusHome({
               feedTagFilter={feedTagFilter}
               onClearTagFilter={() => setFeedTagFilter(null)}
               onPickTag={onPickTag}
+              onPickEvent={onPickEvent}
+              highlightEventId={pendingEventId}
+              onHighlightDone={onEventHighlighted}
             />
           </div>
         )}
@@ -4305,11 +4342,15 @@ function PickCampusStrip() {
 export function CampusBanner({
   compactSearch = false,
   onSearchTap,
+  search = true,
 }: {
   /** Mobile collapses the search bar into a single icon so the banner
    *  doesn't get bunched up. Tap fires `onSearchTap`. */
   compactSearch?: boolean;
   onSearchTap?: () => void;
+  /** `false` drops the banner's own search mount entirely. Desktop passes
+   *  it because its search bar sits in its own row under the banner. */
+  search?: boolean;
 } = {}) {
   // Whose campus this is: the title, the tile, the colour and the stats
   // label all follow the viewer's own campus (plan Q15). Until the first
@@ -4534,9 +4575,9 @@ export function CampusBanner({
             />
           </svg>
         </button>
-      ) : (
+      ) : search ? (
         <CampusSearchBar />
-      )}
+      ) : null}
     </header>
   );
 }
@@ -4622,7 +4663,16 @@ function initials(s: string): string {
     .toUpperCase();
 }
 
-function CampusSearchBar() {
+function CampusSearchBar({
+  variant = "banner",
+  placeholder = "Search students, orgs, events…",
+}: {
+  /** `banner`: the white-on-dark pill inside CampusBanner. `row`: the
+   *  desktop's own 38px cream pill, centered under the banner. */
+  variant?: "banner" | "row";
+  placeholder?: string;
+} = {}) {
+  const row = variant === "row";
   const wrapRef = useRef<HTMLDivElement | null>(null);
   const inputRef = useRef<HTMLInputElement | null>(null);
   const [value, setValue] = useState("");
@@ -4766,26 +4816,72 @@ function CampusSearchBar() {
 
   return (
     <>
+      {row ? (
+        <style>{`
+          #campus-search[data-variant="row"] input::placeholder { color: var(--ink-muted); opacity: 1; }
+          #campus-search[data-variant="row"]:focus-within { outline: 2px solid var(--coral); outline-offset: 2px; }
+        `}</style>
+      ) : null}
       <div
         ref={wrapRef}
         id="campus-search"
-        style={{
-          ...GLASS_SURFACE,
-          background: "rgba(255,255,255,0.12)",
-          borderRadius: 999,
-          padding: "6px 14px",
-          fontFamily: "DM Sans, sans-serif",
-          fontSize: 13,
-          color: "#fff",
-          minWidth: 280,
-          marginRight: 80,
-          display: "flex",
-          alignItems: "center",
-          gap: 8,
-          position: "relative",
-        }}
+        data-variant={variant}
+        style={
+          row
+            ? {
+                // The desktop row: a cream card pill the width of the feed
+                // cards, so the header reads banner → search → tabs. 672 =
+                // #campus-feed's 720 border-box minus its 24px side padding,
+                // so the pill's edges line up with the cards beneath it.
+                height: 38,
+                boxSizing: "border-box",
+                width: "100%",
+                maxWidth: 672,
+                borderRadius: 999,
+                padding: "0 16px",
+                background: "var(--glass)",
+                border: "1px solid var(--glass-border)",
+                boxShadow: "var(--card-shadow)",
+                fontFamily: "DM Sans, sans-serif",
+                fontSize: 13,
+                color: "var(--charcoal)",
+                display: "flex",
+                alignItems: "center",
+                gap: 8,
+                position: "relative",
+              }
+            : {
+                ...GLASS_SURFACE,
+                background: "rgba(255,255,255,0.12)",
+                borderRadius: 999,
+                padding: "6px 14px",
+                fontFamily: "DM Sans, sans-serif",
+                fontSize: 13,
+                color: "#fff",
+                minWidth: 280,
+                marginRight: 80,
+                display: "flex",
+                alignItems: "center",
+                gap: 8,
+                position: "relative",
+              }
+        }
       >
-        <span style={{ opacity: 0.7 }}>⌕</span>
+        {row ? (
+          <svg
+            width="16"
+            height="16"
+            viewBox="0 0 18 18"
+            fill="none"
+            aria-hidden
+            style={{ color: "var(--ink-muted)", flexShrink: 0 }}
+          >
+            <circle cx="8" cy="8" r="5.2" stroke="currentColor" strokeWidth="1.7" />
+            <path d="M12 12l4 4" stroke="currentColor" strokeWidth="1.7" strokeLinecap="round" />
+          </svg>
+        ) : (
+          <span style={{ opacity: 0.7 }}>⌕</span>
+        )}
         <input
           ref={inputRef}
           type="text"
@@ -4794,7 +4890,7 @@ function CampusSearchBar() {
           autoCorrect="off"
           autoCapitalize="off"
           spellCheck={false}
-          placeholder="Search students, orgs, events…"
+          placeholder={placeholder}
           value={value}
           onChange={(e) => setValue(e.target.value)}
           onFocus={() => setOpen(true)}
@@ -4804,7 +4900,7 @@ function CampusSearchBar() {
             background: "transparent",
             border: "none",
             outline: "none",
-            color: "#fff",
+            color: row ? "var(--charcoal)" : "#fff",
             fontFamily: "inherit",
             fontSize: 13,
             padding: 0,
@@ -5237,12 +5333,19 @@ function TabBody({
   feedTagFilter,
   onClearTagFilter,
   onPickTag,
+  onPickEvent,
+  highlightEventId,
+  onHighlightDone,
 }: {
   tab: CampusTab;
   onCreateOrg: () => void;
   feedTagFilter: string | null;
   onClearTagFilter: () => void;
   onPickTag: (tag: string) => void;
+  /** A strip event chip: switch to Events and flash that card. */
+  onPickEvent: (eventId: string) => void;
+  highlightEventId: string | null;
+  onHighlightDone: () => void;
 }) {
   if (tab === "feed")
     return (
@@ -5251,9 +5354,13 @@ function TabBody({
         tagFilter={feedTagFilter}
         onClearTagFilter={onClearTagFilter}
         onPickTag={onPickTag}
+        onPickEvent={onPickEvent}
       />
     );
-  if (tab === "events") return <EventsTabBody />;
+  if (tab === "events")
+    return (
+      <EventsTabBody highlightEventId={highlightEventId} onHighlightDone={onHighlightDone} />
+    );
   if (tab === "orgs") return <OrgsTabBody onCreateOrg={onCreateOrg} />;
   if (tab === "map") return <MapTabBody />;
   return null;
@@ -5483,14 +5590,30 @@ function relativeTime(iso: string): string {
   }
 }
 
+// The desktop post card: the phone's FeedCard surface (CampusMobile.tsx),
+// spelled in the C0 tokens so night mode is one CSS block away. Shared by
+// FeedRow, the composer (its `glass` prop) and the feed's loading / error /
+// empty card. No `overflow: hidden` (the kebab menu is absolutely positioned
+// inside the card and would clip on a one-line post) and no backdrop-filter
+// (fifty blur layers on integrated GPUs, and a blurred element becomes the
+// containing block for fixed-position descendants). Padding is per use.
+const FEED_CARD_SURFACE: React.CSSProperties = {
+  background: "var(--glass)",
+  border: "1px solid var(--glass-border)",
+  borderRadius: 18,
+  boxShadow: "var(--card-shadow)",
+};
+
 function FeedTabBody({
   tagFilter,
   onClearTagFilter,
   onPickTag,
+  onPickEvent,
 }: {
   tagFilter: string | null;
   onClearTagFilter: () => void;
   onPickTag: (tag: string) => void;
+  onPickEvent: (eventId: string) => void;
 }) {
   const [entries, setEntries] = useState<FeedEntry[] | null>(null);
   const [viewerId, setViewerId] = useState<string | null>(null);
@@ -5499,6 +5622,12 @@ function FeedTabBody({
   const [loadKey, setLoadKey] = useState(0);
 
   const { label: campusLabel } = useViewerCampus();
+
+  // The rolling strip's data (RSVP'd events in the next 14 days, then this
+  // week's trending tags). Owned here, not by the strip, so this tab knows
+  // when the strip has nothing to show. Read on every mount of this tab;
+  // the strip itself renders only when no tag filter is on.
+  const strip = useStripData({ upcomingLimit: 3, trendingLimit: 8, days: 14 });
 
   const feedUrl = tagFilter
     ? `/api/feed?limit=50&tag=${encodeURIComponent(tagFilter)}`
@@ -5609,35 +5738,22 @@ function FeedTabBody({
     return () => window.cancelAnimationFrame(raf);
   }, [entries]);
 
-  // Cream-tinted Liquid Glass — the whole feed is one frosted column with
-  // X-style hairline-separated rows.
-  const feedGlass: React.CSSProperties = {
-    background:
-      "linear-gradient(180deg, rgba(255,253,248,0.65) 0%, rgba(255,250,240,0.55) 100%)",
-    backdropFilter: "blur(28px) saturate(180%)",
-    WebkitBackdropFilter: "blur(28px) saturate(180%)",
-    border: "1px solid rgba(255,255,255,0.7)",
-    boxShadow: [
-      "inset 0 1px 0 rgba(255,255,255,0.85)",
-      "inset 0 -1px 0 rgba(28,28,30,0.04)",
-      "0 8px 32px rgba(180,120,60,0.08)",
-    ].join(", "),
-    borderRadius: 22,
-    overflow: "hidden",
-  };
-
-  const hairline = "1px solid rgba(28,28,30,0.06)";
-
   return (
+    // One centered reading column, 720px like the phone held sideways
+    // (Option A, Franky 2026-09-26): cream margins either side, one card
+    // per post below. Events and Map keep their own wider caps.
     <section
       id="campus-feed"
       style={{
         flex: 1,
-        padding: "28px 24px 28px 28px",
+        padding: "28px 24px",
         display: "flex",
         flexDirection: "column",
         gap: 14,
         width: "100%",
+        maxWidth: 720,
+        margin: "0 auto",
+        boxSizing: "border-box",
       }}
     >
       {tagFilter ? (
@@ -5648,31 +5764,30 @@ function FeedTabBody({
           tone="dark"
         />
       ) : (
-        /* Header + Otto strip in a row: header on the left, Heads-up /
-           Trending cards filling the dead space to its right. Flex-wraps
-           on narrower widths so the strip drops below the header instead
-           of squishing both. */
-        <div
-          style={{
-            display: "flex",
-            alignItems: "flex-start",
-            gap: 16,
-            flexWrap: "wrap",
-          }}
-        >
-          <div style={{ flex: "0 1 360px", minWidth: 240, maxWidth: 480 }}>
-            <SceneHeader
-              eyebrow={campusEyebrow("Feed", campusLabel)}
-              title="What’s on campus today"
-              subtitle="Posts from clubs, orgs, and your network."
-              tone="dark"
-            />
-          </div>
-          <div style={{ flex: "1 1 460px", minWidth: 280 }}>
-            <OttoFeedStrip onPickTag={onPickTag} />
-          </div>
-        </div>
+        <SceneHeader
+          eyebrow={campusEyebrow("Feed", campusLabel)}
+          title="What’s on campus today"
+          subtitle="Posts from clubs, orgs, and your network."
+          tone="dark"
+        />
       )}
+
+      {/* The rolling strip: RSVP'd events, then trending tags, one 40px row
+          the width of the column, directly above the composer. Feed tab
+          only, and only on the main feed (a tag filter hides it: the
+          "← Back" button below is the way out). Renders nothing while both
+          lists are empty, so the composer simply moves up. Because the strip
+          never shows under a filter here, no chip is ever "active" on the
+          desktop; C1's tap-again-to-clear is the phone's affordance. */}
+      {!tagFilter ? (
+        <RollingStrip
+          data={strip}
+          roll
+          onPickTag={onPickTag}
+          onPickEvent={onPickEvent}
+          activeTag={null}
+        />
+      ) : null}
 
       {tagFilter ? (
         <button
@@ -5700,65 +5815,68 @@ function FeedTabBody({
 
       {!tagFilter ? (
         <FeedComposer
-          glass={feedGlass}
+          glass={FEED_CARD_SURFACE}
           onPosted={() => {
             void refresh();
           }}
         />
       ) : null}
 
-      {/* Posts column — second glass surface stacked under the composer */}
-      <div style={feedGlass}>
-        {entries === null && loadErr ? (
-          <div style={{ padding: 24 }}>
-            <LoadFailed
-              failure={loadErr}
-              onRetry={() => {
-                setLoadErr(null);
-                setLoadKey((k) => k + 1);
-              }}
-            />
-          </div>
-        ) : entries === null ? (
-          <div
-            style={{
-              padding: "24px",
-              fontFamily: "DM Sans, sans-serif",
-              fontSize: 14,
-              color: COLORS.faint,
-              textAlign: "center",
+      {/* Posts: one card per post, 12px apart, like the phone. The loading /
+          error / empty states share a single card so the column never reads
+          as a bare gap under the composer. */}
+      {entries === null && loadErr ? (
+        <div style={{ ...FEED_CARD_SURFACE, padding: 24 }}>
+          <LoadFailed
+            failure={loadErr}
+            onRetry={() => {
+              setLoadErr(null);
+              setLoadKey((k) => k + 1);
             }}
-          >
-            Loading feed…
-          </div>
-        ) : entries.length === 0 ? (
-          <div
-            style={{
-              padding: "32px 24px",
-              fontFamily: "DM Sans, sans-serif",
-              fontSize: 14,
-              color: COLORS.faint,
-              textAlign: "center",
-              lineHeight: 1.5,
-            }}
-          >
-            No posts yet — orgs you follow and people from your school will
-            show up here once they post.
-          </div>
-        ) : (
-          entries.map((entry, idx) => (
+          />
+        </div>
+      ) : entries === null ? (
+        <div
+          style={{
+            ...FEED_CARD_SURFACE,
+            padding: "24px",
+            fontFamily: "DM Sans, sans-serif",
+            fontSize: 14,
+            color: COLORS.faint,
+            textAlign: "center",
+          }}
+        >
+          Loading feed…
+        </div>
+      ) : entries.length === 0 ? (
+        <div
+          style={{
+            ...FEED_CARD_SURFACE,
+            padding: "32px 24px",
+            fontFamily: "DM Sans, sans-serif",
+            fontSize: 14,
+            color: COLORS.faint,
+            textAlign: "center",
+            lineHeight: 1.5,
+          }}
+        >
+          No posts yet — orgs you follow and people from your school will
+          show up here once they post.
+        </div>
+      ) : (
+        <div style={{ display: "flex", flexDirection: "column", gap: 12 }}>
+          {entries.map((entry) => (
             <FeedRow
               key={entry.kind === "repost" ? `r:${entry.reposter.id}:${entry.post.id}` : `p:${entry.post.id}`}
               entry={entry}
-              hairline={idx < entries.length - 1 ? hairline : "none"}
               onMutate={refresh}
               onEdited={applyPostEdit}
               onPickTag={onPickTag}
               viewerId={viewerId}
             />
-          ))
-        )}
-      </div>
+          ))}
+        </div>
+      )}
     </section>
   );
 }
@@ -6278,14 +6396,12 @@ function renderPostContent(
 
 function FeedRow({
   entry,
-  hairline,
   onMutate,
   onEdited,
   onPickTag,
   viewerId,
 }: {
   entry: FeedEntry;
-  hairline: string;
   onMutate: () => void;
   /** A saved edit; the feed patches its own rows with it. */
   onEdited: (p: EditedPost) => void;
@@ -6569,7 +6685,7 @@ function FeedRow({
       <article
         id={`post-${post.id}`}
         data-post-id={post.id}
-        style={{ padding: "16px 20px", borderBottom: hairline }}
+        style={{ ...FEED_CARD_SURFACE, padding: "16px 18px" }}
       >
         <RemovedContentCard
           kind="post"
@@ -6586,10 +6702,12 @@ function FeedRow({
       id={`post-${post.id}`}
       data-post-id={post.id}
       style={{
+        // Its own card (no overflow clip: the kebab menu below hangs out of
+        // a short post). `background` is what the ?post= flash animates.
+        ...FEED_CARD_SURFACE,
         display: "flex",
         flexDirection: "column",
-        padding: "16px 20px",
-        borderBottom: hairline,
+        padding: "16px 18px",
         transition: "background 600ms ease",
         position: "relative",
       }}
@@ -6600,7 +6718,11 @@ function FeedRow({
           position: "absolute",
           top: 10,
           right: 12,
-          zIndex: 2,
+          // Every card is its own painted surface now, and a short post's
+          // open menu hangs into the next card, whose own kebab wrapper
+          // comes later in DOM order. Lift the wrapper only while open so
+          // the menu's bottom items paint over the neighbour.
+          zIndex: showMoreMenu ? 20 : 2,
         }}
       >
         <button
@@ -7226,15 +7348,15 @@ function FeedRow({
  * too. No body scroll lock — no other modal in this file takes one, and the
  * one that did would read as the page having frozen.
  *
- * PORTALLED TO <body>, and it has to be. The feed column (`feedGlass`) sets
- * `backdrop-filter`, and a computed backdrop-filter other than `none` makes
- * that element the containing block for fixed-position descendants — so an
- * inline `position: fixed; inset: 0` would resolve against the whole scroll
- * height of the posts column (and then be clipped by its `overflow: hidden`),
- * putting the surface thousands of pixels below the viewport. ImageCropperModal
- * escapes the same column the same way (src/components/ImageCropperModal.tsx).
- * AttendeesModal is NOT a safe template for that part: it mounts from an event
- * card outside this container.
+ * PORTALLED TO <body>, and keep it that way. The per-post card
+ * (`FEED_CARD_SURFACE`) has no `backdrop-filter` today, but the old frosted
+ * feed column did, and a computed backdrop-filter other than `none` makes that
+ * element the containing block for fixed-position descendants — an inline
+ * `position: fixed; inset: 0` then resolves against the card, not the viewport.
+ * Portalling means a future blur on the card can't put this surface thousands
+ * of pixels off screen again. ImageCropperModal escapes the same way
+ * (src/components/ImageCropperModal.tsx). AttendeesModal is NOT a safe template
+ * for that part: it mounts from an event card outside this container.
  */
 function PostViewersModal({
   postId,
@@ -8472,7 +8594,17 @@ export type CampusEvent = {
   } | null;
 };
 
-function EventsTabBody() {
+function EventsTabBody({
+  highlightEventId = null,
+  onHighlightDone,
+}: {
+  /** An event the student just tapped on the feed's rolling strip (or a
+   *  /campus?tab=events&event=<id> link): scrolled to and flashed once. */
+  highlightEventId?: string | null;
+  /** Fired once the highlight has been handled, found or not, so the
+   *  parent forgets the id and a later visit doesn't replay it. */
+  onHighlightDone?: () => void;
+} = {}) {
   const { label: campusLabel } = useViewerCampus();
   const [events, setEvents] = useState<CampusEvent[] | null>(null);
   // First-load failure only; a failed refresh keeps the events on screen.
@@ -8539,6 +8671,29 @@ function EventsTabBody() {
   }, []);
 
   const canCreate = eligibleOrgs.length > 0;
+
+  // The strip named one card: once the list is in, scroll to `#event-<id>`
+  // and flash a coral ring, the way the feed handles ?post=. The card is
+  // dark glass, so a ring reads where a background tint would not. Reports
+  // back whether or not the event is in this list (it may have scrolled
+  // past the 50-event window), so the id is never left to replay.
+  useEffect(() => {
+    if (!highlightEventId || events === null) return;
+    // requestAnimationFrame so layout has settled before we measure.
+    const raf = window.requestAnimationFrame(() => {
+      const el = document.getElementById(`event-${highlightEventId}`);
+      if (el) {
+        el.scrollIntoView({ behavior: "smooth", block: "center" });
+        const prevShadow = el.style.boxShadow;
+        el.style.boxShadow = "0 0 0 3px rgba(255,92,53,0.6)";
+        window.setTimeout(() => {
+          el.style.boxShadow = prevShadow;
+        }, 2200);
+      }
+      onHighlightDone?.();
+    });
+    return () => window.cancelAnimationFrame(raf);
+  }, [events, highlightEventId, onHighlightDone]);
 
   return (
     <section
@@ -8695,6 +8850,19 @@ export function EventCard({ ev, onMutate }: { ev: CampusEvent; onMutate: () => v
   const spotlightColor = hexToRgba(accent, 0.34);
 
   return (
+    // The anchor the rolling strip and the phone scroll to (contract C2).
+    // MouseSpotlight takes no id, so the card wraps itself; the wrapper
+    // carries the flash ring and clears the sticky campus header.
+    <div
+      id={`event-${ev.id}`}
+      style={{
+        // 140 clears the banner + tab header; env() adds the notch on an
+        // installed phone (it is 0px on the desktop and in Safari).
+        scrollMarginTop: "calc(env(safe-area-inset-top, 0px) + 140px)",
+        borderRadius: 18,
+        transition: "box-shadow 600ms ease",
+      }}
+    >
     <MouseSpotlight
       size={240}
       color={spotlightColor}
@@ -8857,6 +9025,7 @@ export function EventCard({ ev, onMutate }: { ev: CampusEvent; onMutate: () => v
       ) : null}
       </div>
     </MouseSpotlight>
+    </div>
   );
 }
 
@@ -9335,28 +9504,6 @@ function RsvpButton({
       {label}
     </button>
   );
-}
-
-function formatUpcomingChip(startIso: string): string {
-  // Compact chip for the Otto rail. "Today" and "Tmrw" are common-case
-  // shortcuts; everything else falls back to a short month/day.
-  try {
-    const start = new Date(startIso);
-    const now = new Date();
-    const startMid = new Date(start.getFullYear(), start.getMonth(), start.getDate());
-    const nowMid = new Date(now.getFullYear(), now.getMonth(), now.getDate());
-    const diffDays = Math.round(
-      (startMid.getTime() - nowMid.getTime()) / (24 * 60 * 60 * 1000),
-    );
-    if (diffDays === 0) return "Today";
-    if (diffDays === 1) return "Tmrw";
-    if (diffDays > 1 && diffDays < 7) {
-      return start.toLocaleDateString([], { weekday: "short" });
-    }
-    return start.toLocaleDateString([], { month: "short", day: "numeric" });
-  } catch {
-    return "";
-  }
 }
 
 function formatEventTime(startIso: string, endIso: string): string {
@@ -13263,437 +13410,6 @@ function hashString(s: string): number {
   for (let i = 0; i < s.length; i++) h = ((h * 31) + s.charCodeAt(i)) | 0;
   return Math.abs(h);
 }
-
-type StripTrend = { tag: string; count: number };
-type StripUpcoming = {
-  id: string;
-  title: string;
-  starts_at: string;
-  ends_at: string;
-  location: string;
-  viewer_status: "going" | "maybe";
-  org: { handle: string; name: string; verified: boolean } | null;
-};
-
-/**
- * Horizontal Otto strip — sits above the feed, replaces the old right-
- * column OttoPanel for the Feed tab. Two cards side by side:
- *   - Heads up    → events the viewer has RSVP'd to (max 3 inline)
- *   - Trending    → most-posted hashtags this week (clickable pills)
- * People-to-Connect is intentionally NOT on this strip — that lives on
- * /network where the user is already in discovery mode.
- *
- * Mobile (<900px) stacks the two cards vertically via grid auto-fit.
- */
-export function OttoFeedStrip({ onPickTag }: { onPickTag: (tag: string) => void }) {
-  const [trending, setTrending] = useState<StripTrend[] | null>(null);
-  const [upcoming, setUpcoming] = useState<StripUpcoming[] | null>(null);
-  // Each section loads, fails and retries on its own, so one outage never
-  // blanks the other or reads as "nothing here".
-  const [trendingErr, setTrendingErr] = useState<LoadFailure | null>(null);
-  const [upcomingErr, setUpcomingErr] = useState<LoadFailure | null>(null);
-  const [trendingKey, setTrendingKey] = useState(0);
-  const [upcomingKey, setUpcomingKey] = useState(0);
-  useEffect(() => {
-    let cancelled = false;
-    (async () => {
-      const r = await vibeRequest<{ trending?: StripTrend[] }>("/api/trending/hashtags?limit=8", {
-        cache: "no-store",
-        quiet: true,
-        failure: "Couldn't load trending tags.",
-      });
-      if (cancelled) return;
-      if (r.ok && Array.isArray(r.data.trending)) {
-        setTrendingErr(null);
-        setTrending(r.data.trending);
-      } else {
-        setTrendingErr(asLoadFailure(r, "Couldn't load trending tags."));
-      }
-    })();
-    return () => {
-      cancelled = true;
-    };
-  }, [trendingKey]);
-  useEffect(() => {
-    let cancelled = false;
-    (async () => {
-      const r = await vibeRequest<{ upcoming?: StripUpcoming[] }>("/api/me/upcoming-events?limit=3", {
-        cache: "no-store",
-        quiet: true,
-        failure: "Couldn't load your upcoming events.",
-      });
-      if (cancelled) return;
-      if (r.ok && Array.isArray(r.data.upcoming)) {
-        setUpcomingErr(null);
-        setUpcoming(r.data.upcoming);
-      } else {
-        setUpcomingErr(asLoadFailure(r, "Couldn't load your upcoming events."));
-      }
-    })();
-    return () => {
-      cancelled = true;
-    };
-  }, [upcomingKey]);
-
-  const subtle = "rgba(255,255,255,0.55)";
-  const divider = "rgba(255,255,255,0.06)";
-
-  // Single unified bubble — outer surface wraps both sections; the
-  // vertical separator in between is drawn by .otto-strip-divider so it
-  // can flip to a horizontal rule on narrow widths via media query.
-  // Outer halo + a tighter inner orange glow give the bubble a warm
-  // signature so it reads as "Otto" without a leading orb / nameplate.
-  const surface: React.CSSProperties = {
-    background:
-      "linear-gradient(180deg, rgba(255,140,90,0.10) 0%, rgba(255,92,53,0.04) 50%, rgba(20,8,16,0.0) 100%), rgba(12,8,14,0.78)",
-    backdropFilter: "blur(28px) saturate(180%)",
-    WebkitBackdropFilter: "blur(28px) saturate(180%)",
-    border: "1px solid rgba(255,140,90,0.45)",
-    boxShadow: [
-      "inset 0 1px 0 rgba(255,180,150,0.28)",
-      "inset 0 -1px 0 rgba(0,0,0,0.18)",
-      "0 0 0 1px rgba(255,140,90,0.18)",
-      "0 0 24px rgba(255,92,53,0.28)",
-      "0 0 56px rgba(255,92,53,0.18)",
-      "0 8px 28px rgba(80,12,8,0.32)",
-    ].join(", "),
-    color: "#fff",
-    borderRadius: 18,
-    overflow: "hidden",
-  };
-
-  const sectionPad: React.CSSProperties = {
-    padding: "14px 16px",
-    display: "flex",
-    flexDirection: "column",
-    minWidth: 0,
-    flex: "1 1 0",
-  };
-
-  return (
-    <div style={surface} className="otto-strip">
-      <style>{`
-        .otto-strip-inner {
-          display: flex;
-          flex-direction: row;
-          align-items: stretch;
-        }
-        .otto-strip-divider {
-          width: 1px;
-          align-self: stretch;
-          background: linear-gradient(
-            180deg,
-            rgba(255,180,150,0) 0%,
-            rgba(255,180,150,0.28) 20%,
-            rgba(255,180,150,0.28) 80%,
-            rgba(255,180,150,0) 100%
-          );
-          flex-shrink: 0;
-        }
-        @media (max-width: 560px) {
-          .otto-strip-inner { flex-direction: column; }
-          .otto-strip-divider {
-            width: auto;
-            height: 1px;
-            background: linear-gradient(
-              90deg,
-              rgba(255,180,150,0) 0%,
-              rgba(255,180,150,0.28) 20%,
-              rgba(255,180,150,0.28) 80%,
-              rgba(255,180,150,0) 100%
-            );
-          }
-        }
-      `}</style>
-      <div className="otto-strip-inner">
-        {/* Heads up */}
-        <div style={sectionPad}>
-          <StripHeader
-            icon={<TalkingHeadIcon />}
-            title="Heads up"
-            subtitle="Events you RSVP'd to"
-            subtle={subtle}
-          />
-          <div style={{ marginTop: 4, flex: 1 }}>
-            {upcoming === null && upcomingErr ? (
-              <LoadFailed
-                tone="dark"
-                compact
-                failure={upcomingErr}
-                onRetry={() => {
-                  setUpcomingErr(null);
-                  setUpcomingKey((k) => k + 1);
-                }}
-              />
-            ) : upcoming === null ? (
-              <div style={{ fontSize: 12, color: subtle, padding: "8px 0" }}>Loading…</div>
-            ) : upcoming.length === 0 ? (
-              <div style={{ fontSize: 12, color: subtle, padding: "8px 0", lineHeight: 1.5 }}>
-                No upcoming events on your radar — RSVP from the Events tab.
-              </div>
-            ) : (
-              upcoming.slice(0, 3).map((u, i) => {
-                const accent = u.viewer_status === "going" ? "#5BD18C" : "#FFB85A";
-                const chip = formatUpcomingChip(u.starts_at);
-                const isLast = i >= Math.min(upcoming.length, 3) - 1;
-                return (
-                  <div
-                    key={u.id}
-                    style={{
-                      display: "flex",
-                      alignItems: "center",
-                      gap: 8,
-                      padding: "6px 0",
-                      borderBottom: isLast ? "none" : `1px solid ${divider}`,
-                    }}
-                  >
-                    <span style={{ width: 5, height: 5, borderRadius: 3, background: accent, flexShrink: 0 }} />
-                    <span
-                      style={{
-                        flex: 1,
-                        minWidth: 0,
-                        fontFamily: "DM Sans, sans-serif",
-                        fontSize: 13,
-                        color: "#fff",
-                        overflow: "hidden",
-                        textOverflow: "ellipsis",
-                        whiteSpace: "nowrap",
-                      }}
-                    >
-                      {u.title}
-                    </span>
-                    <span style={{ fontSize: 11, fontWeight: 700, color: accent, whiteSpace: "nowrap" }}>
-                      {chip}
-                    </span>
-                  </div>
-                );
-              })
-            )}
-          </div>
-        </div>
-
-        {/* Vertical divider (horizontal on phone via media query) */}
-        <div className="otto-strip-divider" aria-hidden />
-
-        {/* Trending */}
-        <div style={sectionPad}>
-          <StripHeader
-            icon={<FireIcon />}
-            title="Trending on campus"
-            subtitle="Most-posted hashtags this week"
-            subtle={subtle}
-          />
-          <div
-            style={{
-              marginTop: 8,
-              display: "flex",
-              flexWrap: "wrap",
-              gap: 6,
-              alignContent: "flex-start",
-            }}
-          >
-            {trending === null && trendingErr ? (
-              <LoadFailed
-                tone="dark"
-                compact
-                failure={trendingErr}
-                onRetry={() => {
-                  setTrendingErr(null);
-                  setTrendingKey((k) => k + 1);
-                }}
-              />
-            ) : trending === null ? (
-              <div style={{ fontSize: 12, color: subtle }}>Loading…</div>
-            ) : trending.length === 0 ? (
-              <div style={{ fontSize: 12, color: subtle, lineHeight: 1.5 }}>
-                No trending tags yet — start one with a #hashtag in your post.
-              </div>
-            ) : (
-              trending.map((t) => (
-                <button
-                  key={t.tag}
-                  type="button"
-                  onClick={() => onPickTag(t.tag)}
-                  style={{
-                    display: "inline-flex",
-                    alignItems: "center",
-                    gap: 4,
-                    padding: "5px 10px",
-                    borderRadius: 999,
-                    background: "rgba(255,140,90,0.12)",
-                    border: "1px solid rgba(255,140,90,0.28)",
-                    color: "#FFB89C",
-                    fontFamily: "DM Sans, sans-serif",
-                    fontSize: 12,
-                    fontWeight: 700,
-                    cursor: "pointer",
-                    whiteSpace: "nowrap",
-                  }}
-                >
-                  <span>#{t.tag}</span>
-                  <span style={{ color: "rgba(255,255,255,0.45)", fontWeight: 500 }}>
-                    {t.count}
-                  </span>
-                </button>
-              ))
-            )}
-          </div>
-        </div>
-      </div>
-    </div>
-  );
-}
-
-// Megaphone for the "Heads up" header. Orange horn with a coral handle
-// and stacked sound arcs fanning out the wide end so it reads as an
-// announcement at glyph size. 20×20 with a 28-wide viewBox to fit the
-// horn + sound waves without clipping.
-function TalkingHeadIcon() {
-  return (
-    <svg
-      width="22"
-      height="20"
-      viewBox="0 0 28 24"
-      fill="none"
-      aria-hidden
-      style={{ display: "block" }}
-    >
-      <defs>
-        <linearGradient id="mphHorn" x1="0" y1="0" x2="0" y2="1">
-          <stop offset="0%" stopColor="#FF9A40" />
-          <stop offset="100%" stopColor="#E04918" />
-        </linearGradient>
-        <linearGradient id="mphRim" x1="0" y1="0" x2="0" y2="1">
-          <stop offset="0%" stopColor="#FFD37A" />
-          <stop offset="100%" stopColor="#FF7A2A" />
-        </linearGradient>
-        <linearGradient id="mphHandle" x1="0" y1="0" x2="0" y2="1">
-          <stop offset="0%" stopColor="#3A2418" />
-          <stop offset="100%" stopColor="#1F140C" />
-        </linearGradient>
-      </defs>
-      {/* Handle/grip on the back end (left side). */}
-      <rect x="2.2" y="10.2" width="3.8" height="3.6" rx="1.1" fill="url(#mphHandle)" />
-      {/* Trigger button on the handle. */}
-      <rect x="3.4" y="13.6" width="1.4" height="2.2" rx="0.5" fill="#1F140C" />
-      {/* Horn body — narrow back tapering to a wide mouth on the right. */}
-      <path
-        d="M5.8 9.2h2.6l9.6-3.4c.7-.3 1.5.2 1.5 1v10.4c0 .8-.8 1.3-1.5 1l-9.6-3.4H5.8c-.6 0-1-.4-1-1V10.2c0-.6.4-1 1-1Z"
-        fill="url(#mphHorn)"
-      />
-      {/* Brass rim at the bell — gives the megaphone its signature edge. */}
-      <path
-        d="M18.6 4.7c.7-.3 1.5.2 1.5 1v12.6c0 .8-.8 1.3-1.5 1l-1-.4V5.1l1-.4Z"
-        fill="url(#mphRim)"
-      />
-      {/* Three sound arcs broadcasting out the bell, fading outward. */}
-      <path d="M22 9.5c.7.6 1.1 1.6 1.1 2.7s-.4 2.1-1.1 2.7" stroke="#FFC04A" strokeWidth="1.5" strokeLinecap="round" />
-      <path d="M24.2 7.6c1.3.9 2.1 2.6 2.1 4.6s-.8 3.7-2.1 4.6" stroke="#FF8C42" strokeWidth="1.4" strokeLinecap="round" opacity="0.85" />
-      <path d="M26.2 5.8c1.7 1.2 2.8 3.5 2.8 6.4s-1.1 5.2-2.8 6.4" stroke="#FF5C35" strokeWidth="1.3" strokeLinecap="round" opacity="0.55" />
-    </svg>
-  );
-}
-
-// Layered flame for the "Trending" header. Hot yellow-white core nested
-// inside an orange body inside a red outer flame, with a separate flicker
-// detached above so the icon reads as live fire rather than a single drop.
-function FireIcon() {
-  return (
-    <svg
-      width="20"
-      height="20"
-      viewBox="0 0 24 24"
-      fill="none"
-      aria-hidden
-      style={{ display: "block" }}
-    >
-      <defs>
-        <linearGradient id="fireOuter" x1="0.5" y1="0" x2="0.5" y2="1">
-          <stop offset="0%" stopColor="#FF8A2A" />
-          <stop offset="55%" stopColor="#FF4D14" />
-          <stop offset="100%" stopColor="#C42F0A" />
-        </linearGradient>
-        <linearGradient id="fireMid" x1="0.5" y1="0" x2="0.5" y2="1">
-          <stop offset="0%" stopColor="#FFE066" />
-          <stop offset="60%" stopColor="#FF9A1F" />
-          <stop offset="100%" stopColor="#FF5C20" />
-        </linearGradient>
-        <radialGradient id="fireCore" cx="0.5" cy="0.65" r="0.55">
-          <stop offset="0%" stopColor="#FFF7C2" />
-          <stop offset="45%" stopColor="#FFE25C" />
-          <stop offset="100%" stopColor="#FFAE2E" stopOpacity="0" />
-        </radialGradient>
-      </defs>
-      {/* Outer flame — broad base with a hooked tip so it reads as fire,
-          not a teardrop. */}
-      <path
-        d="M12 2c.2 2.5-.8 4-2 5.6C8 10 5.5 12.4 5.5 15.6 5.5 19.1 8.4 22 12 22s6.5-2.9 6.5-6.4c0-2-1-3.8-2.3-5.4-1.5-1.8-2.2-3.4-2.2-5C13.3 4 12.7 2.8 12 2Z"
-        fill="url(#fireOuter)"
-      />
-      {/* Middle flame — narrower, slightly offset so the gradient stack
-          gives the body depth instead of flat shading. */}
-      <path
-        d="M12.4 8.4c.1 1.9-1 3-2 4.4-1 1.4-2.1 2.7-2.1 4.5 0 2.3 1.7 4.1 4 4.1s4-1.9 4-4.2c0-1.5-.7-2.8-1.7-4-.9-1.2-1.6-2.5-1.6-3.8 0-.4-.2-.8-.6-1Z"
-        fill="url(#fireMid)"
-      />
-      {/* Hot core ember — radial glow at the bottom. */}
-      <ellipse cx="12.1" cy="17.4" rx="2.6" ry="3.4" fill="url(#fireCore)" />
-      {/* Detached flicker above so the flame "leaves" the body. */}
-      <path
-        d="M14.3 4.5c.4.9.1 1.7-.5 2.4-.5.6-.7 1.2-.4 1.9-.9-.3-1.3-1-1.2-1.9.1-1 .8-1.8 2.1-2.4Z"
-        fill="#FFE25C"
-        opacity="0.95"
-      />
-    </svg>
-  );
-}
-
-function StripHeader({
-  icon,
-  title,
-  subtitle,
-  subtle,
-}: {
-  icon: React.ReactNode;
-  title: string;
-  subtitle: string;
-  subtle: string;
-}) {
-  return (
-    <div style={{ display: "flex", alignItems: "baseline", gap: 8, flexWrap: "wrap" }}>
-      <span
-        style={{ fontSize: 14, lineHeight: 1, display: "inline-flex", alignItems: "center" }}
-        aria-hidden
-      >
-        {icon}
-      </span>
-      <span
-        style={{
-          fontFamily: "DM Sans, sans-serif",
-          fontSize: 11,
-          fontWeight: 700,
-          letterSpacing: "0.12em",
-          textTransform: "uppercase",
-          color: "#fff",
-        }}
-      >
-        {title}
-      </span>
-      <span
-        style={{
-          fontFamily: "DM Sans, sans-serif",
-          fontSize: 11,
-          color: subtle,
-          fontStyle: "italic",
-        }}
-      >
-        {subtitle}
-      </span>
-    </div>
-  );
-}
-
-
 
 function ServerRail({
   orgs,

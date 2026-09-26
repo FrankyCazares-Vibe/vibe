@@ -3,7 +3,7 @@ import { NextResponse } from "next/server";
 import { isMissingColumnError } from "@/lib/db/missing-column";
 import { resolveCampusRequest, scopeViewerFromRow } from "@/lib/iu/campus-request";
 import { legacyLabel } from "@/lib/iu/campuses";
-import { feedLaneFor, feedLaneOrFilter } from "@/lib/iu/community-scope";
+import { campusScopeError, feedLaneFor, feedLaneOrFilter } from "@/lib/iu/community-scope";
 import { createSupabaseServerClient } from "@/lib/supabase/server";
 
 const DEFAULT_LIMIT = 6;
@@ -35,6 +35,15 @@ const POST_SCAN_LIMIT = 500;
  * A viewer with no campus gets every campus in their university plus their
  * own legacy posts, rather than an empty strip (critic A7's definition of
  * scope `none`).
+ *
+ * `?campus=<id>` (S67 wave 1, for wave 4's "view any campus"): the strip's
+ * trending follows the campus the student is looking at, resolved through
+ * `resolveCampusRequest` like the map, search and stats routes. A campus the
+ * viewer may not name answers `campusScopeError` (403 `campus_not_in_system`
+ * for a viewer with no university, 400 `unknown_campus`), the same body the
+ * other four routes send. No `?campus=` means the viewer's own campus, as
+ * before. The student's RSVP chips are not affected — they come from
+ * `/api/me/upcoming-events` and are theirs wherever they look.
  *
  * We do the aggregation in JS rather than via a Postgres array_agg /
  * unnest function to keep this dependency-free and easy to ship without a
@@ -75,7 +84,11 @@ export async function GET(req: Request) {
   }
 
   const viewer = scopeViewerFromRow(campusReady ? (me as Record<string, unknown> | null) : null);
-  const scope = campusReady ? resolveCampusRequest(null, viewer) : null;
+  const scope = campusReady ? resolveCampusRequest(url.searchParams.get("campus"), viewer) : null;
+  if (scope?.kind === "forbidden") {
+    const { status, body } = campusScopeError(scope);
+    return NextResponse.json(body, { status });
+  }
 
   const since = new Date(Date.now() - WINDOW_DAYS * 24 * 60 * 60 * 1000).toISOString();
 
@@ -86,9 +99,9 @@ export async function GET(req: Request) {
     .gte("created_at", since)
     .limit(POST_SCAN_LIMIT);
 
-  // `resolveCampusRequest(null, …)` can't be forbidden — there's no `?campus=`
-  // on the strip — but the type says it could, and narrowing is free.
-  if (scope && scope.kind !== "forbidden") {
+  // `forbidden` already answered above, so `scope` is a real lane here; null
+  // only when M1 is unapplied, which keeps the pre-campus global count.
+  if (scope) {
     const laneFilter = feedLaneOrFilter(feedLaneFor(scope, viewer));
     if (laneFilter) query = query.or(laneFilter);
   }

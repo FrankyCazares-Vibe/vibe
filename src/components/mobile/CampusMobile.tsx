@@ -12,10 +12,12 @@ import {
   CampusBanner,
   EventCard,
   type FeedPost as DesktopFeedPost,
-  OttoFeedStrip,
   useReportedPostIds,
   withoutReportedPosts,
 } from "@/app/campus/campus-home";
+import { RollingStrip } from "@/components/campus/RollingStrip";
+import { nextTagFilter } from "@/components/campus/rolling-strip-view";
+import { useStripData } from "@/components/campus/strip-data";
 import { asLoadFailure, LoadFailed, type LoadFailure } from "@/components/feedback/LoadFailed";
 import { CampusConfirmBanner } from "@/components/mobile/CampusConfirmBanner";
 import { EditPostSheet } from "@/components/mobile/EditPostSheet";
@@ -58,10 +60,13 @@ import type { EditedPost } from "@/lib/posts/edit";
  * stats. Composer FAB at the bottom-right opens the mobile post
  * composer on the Feed tab.
  *
- * Clips (vertical short-form video) are backlogged — see
- * DOCS/BACKLOG_CLIPS.md. Video still posts to the feed as a normal post.
+ * A separate surface for video posts (vertical short-form video) is
+ * backlogged — see DOCS/BACKLOG_CLIPS.md. Video still posts to the feed
+ * as a normal post.
  *
- * Sub-components shared with desktop: EventCard from campus-home.
+ * Sub-components shared with desktop: EventCard from campus-home, plus
+ * the RollingStrip (RSVP'd events + trending tags) at the top of the
+ * Feed pane, fed by `useStripData` owned here.
  * Everything else is mobile-tuned (lighter chrome, single column,
  * larger tap targets).
  */
@@ -202,8 +207,8 @@ export function CampusMobile() {
   // which scrolls + flashes the feed row). Stripped from the URL after
   // handling so a refresh doesn't keep re-opening the viewer.
   //
-  // Legacy `?clip=<id>` links land on the post viewer too — clips are
-  // backlogged, so there's no separate clip surface to route to.
+  // Legacy `?clip=<id>` links land on the post viewer too — a separate
+  // video-posts surface is backlogged, so there's nowhere else to route to.
   const initialPostId = searchParams.get("post") || searchParams.get("clip") || null;
   useEffect(() => {
     if (initialPostId) {
@@ -226,7 +231,7 @@ export function CampusMobile() {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
-  // #tag feed filter. Set by the Otto strip's trending chips, the #chips
+  // #tag feed filter. Set by the strip's trending chips, the #chips
   // on each feed card, or a ?tag= link — the post viewer's hashtags land
   // on /campus?tab=feed&tag=<t>, in-app when the viewer is open over this
   // page, so a new ?tag= also closes the viewer. Adjusted during render
@@ -234,10 +239,16 @@ export function CampusMobile() {
   const urlTag = normalizeFeedTag(searchParams.get("tag"));
   const [feedTag, setFeedTag] = useState<string | null>(urlTag);
   const [lastUrlTag, setLastUrlTag] = useState<string | null>(urlTag);
+  // Whether the active filter was picked from the strip's own chip. Only
+  // then is that highlighted chip surely on-screen (the student just tapped
+  // it); a ?tag= link or a post card's #tag may leave it scrolled out of
+  // view to the right, so the plain "#tag ×" chip stays as the way out.
+  const [tagFromStrip, setTagFromStrip] = useState(false);
   if (urlTag !== lastUrlTag) {
     setLastUrlTag(urlTag);
     if (urlTag) {
       setFeedTag(urlTag);
+      setTagFromStrip(false);
       setTab("feed");
       setOpenPostId(null);
     }
@@ -260,10 +271,52 @@ export function CampusMobile() {
     const t = normalizeFeedTag(raw);
     if (!t) return;
     setFeedTag(t);
+    setTagFromStrip(false);
     setTab("feed");
     // The chip and the first matches sit at the top of the feed; a card's
     // #chip can be far down it.
     window.scrollTo({ top: 0, behavior: "smooth" });
+  };
+
+  // The strip at the top of the Feed pane: the student's RSVP'd events in
+  // the next two weeks, then the campus's trending tags. The data lives
+  // here rather than in the strip so this page knows whether the strip is
+  // showing the active filter, and shows the plain "#tag ×" chip when it isn't.
+  const stripData = useStripData({ upcomingLimit: 3, trendingLimit: 8, days: 14 });
+  // The strip only highlights a tag that is among its (≤8) trending chips,
+  // and that highlighted chip is only surely visible when it was just tapped
+  // (a trending refresh can also drop the tag). Same strict compare the
+  // strip uses for `activeTag`, so the two never disagree. Everything else
+  // (strip hidden, tag not in it, filter from a post card or ?tag=) keeps
+  // the plain chip, so there is always a visible way to clear the filter.
+  const stripHasTag =
+    !!feedTag && (stripData.trending ?? []).some((t) => t.tag === feedTag);
+  const showTagChip = !(tagFromStrip && stripHasTag);
+  // A strip tag chip toggles: tapping the highlighted one clears the filter.
+  // Normalised first, the same as pickFeedTag, so the compare is like for like.
+  // `tagFromStrip` is set after pickFeedTag (which resets it) so the strip's
+  // pick wins.
+  const pickStripTag = (raw: string) => {
+    const t = normalizeFeedTag(raw);
+    if (!t) return;
+    if (nextTagFilter(feedTag, t) === null) {
+      setFeedTag(null);
+      return;
+    }
+    pickFeedTag(t);
+    setTagFromStrip(true);
+  };
+  // An event chip goes to its card on the Events tab. The pane switch is a
+  // state change, so the card is looked up on the next frame, once it's in
+  // the DOM; EventCard renders `id="event-<id>"` and its own scroll margin.
+  // Still loading → the tab switch alone is the fallback.
+  const pickEvent = (id: string) => {
+    setTab("events");
+    requestAnimationFrame(() => {
+      document
+        .getElementById(`event-${id}`)
+        ?.scrollIntoView({ block: "start", behavior: "smooth" });
+    });
   };
 
   // Discord-style drill-down state: tapping an org opens its channels
@@ -577,11 +630,6 @@ export function CampusMobile() {
     setComposerOpen(true);
   };
 
-  // Tabs that are dense / interactive enough that the Otto strip just
-  // steals scroll real estate. On these we collapse Otto with a swoop-
-  // down-into-the-tab-icon animation (see render below).
-  const ottoCollapsed = tab === "orgs" || tab === "chat" || tab === "map";
-
   // What the Feed pane shows. With a #tag: the complete list once
   // /api/feed?tag= answers (the loaded matches if its first answer failed;
   // a failed refresh keeps the list); until then the loaded feed's matches,
@@ -635,43 +683,6 @@ export function CampusMobile() {
         <CampusBanner compactSearch onSearchTap={() => setSearchOpen(true)} />
       </div>
 
-      {/* Otto horizontal strip — heads-up + trending. Tap a trending
-          tag → switch to Feed, filtered to that tag.
-          On orgs / chat / map we collapse it: the strip swoops down
-          and shrinks toward the bottom Otto tab icon (3rd of 5, hence
-          bottom-center as the transform-origin), freeing vertical
-          space for those denser layouts. Tapping back to a Otto-friendly
-          tab reverses the animation. */}
-      <div
-        style={{
-          overflow: "hidden",
-          maxHeight: ottoCollapsed ? 0 : 240,
-          paddingTop: ottoCollapsed ? 0 : 10,
-          paddingLeft: 12,
-          paddingRight: 12,
-          paddingBottom: 0,
-          transition:
-            "max-height 320ms cubic-bezier(.65,0,.35,1), padding-top 320ms cubic-bezier(.65,0,.35,1)",
-          pointerEvents: ottoCollapsed ? "none" : undefined,
-        }}
-        aria-hidden={ottoCollapsed}
-      >
-        <div
-          style={{
-            transformOrigin: "50% 100%",
-            transform: ottoCollapsed
-              ? "translateY(48vh) scale(0.04)"
-              : "translateY(0) scale(1)",
-            opacity: ottoCollapsed ? 0 : 1,
-            transition:
-              "transform 380ms cubic-bezier(.65,0,.35,1), opacity 240ms ease-out",
-            willChange: "transform, opacity",
-          }}
-        >
-          <OttoFeedStrip onPickTag={pickFeedTag} />
-        </div>
-      </div>
-
       {/* Mounted on every tab so its answer survives a swipe. The wrapper
           has no padding, so a banner that renders nothing adds no height.
           Hidden on Map: the map's height assumes nothing sits between the
@@ -689,11 +700,9 @@ export function CampusMobile() {
           padding: "10px 0 4px",
           background: "transparent",
           position: "sticky",
-          top: ottoCollapsed
-            ? "calc(env(safe-area-inset-top, 0px) + 56px)"
-            : "calc(env(safe-area-inset-top, 0px) + 64px)",
+          // Flush under the campus banner, which is a fixed 64px on every tab.
+          top: "calc(env(safe-area-inset-top, 0px) + 64px)",
           zIndex: 5,
-          transition: "top 320ms cubic-bezier(.65,0,.35,1)",
         }}
       >
         <TabStrip active={tab} onChange={setTab} />
@@ -724,11 +733,29 @@ export function CampusMobile() {
         }}
       >
         <section style={paneStyle}>
+          {/* First in the pane so it scrolls away with the feed and swipes
+              with the tab; the pane's gap separates it from the first card.
+              Bleeds past the pane's 16px side padding (-mx-4 px-4) so the
+              chips run edge to edge; it hides itself when both lists are
+              empty, so the first card just moves up. No auto-roll on the
+              phone: snap-scroll only. */}
+          <RollingStrip
+            data={stripData}
+            onPickTag={pickStripTag}
+            onPickEvent={pickEvent}
+            activeTag={feedTag}
+            className="vibe-no-scrollbar -mx-4 px-4"
+          />
           <FeedPane
             posts={visibleFeed}
             loadErr={feedFailure}
             onRetry={retryFeed}
             tag={feedTag}
+            // When the filter was just tapped on the strip, its highlighted
+            // chip is the filter's "×" (tap again to clear); the plain chip
+            // covers every other case (strip hidden, tag not one of its
+            // chips, filter from a post card or a ?tag= link).
+            showTagChip={showTagChip}
             onOpenPost={(id) => setOpenPostId(id)}
             onPickTag={pickFeedTag}
             onClearTag={() => setFeedTag(null)}
@@ -747,7 +774,11 @@ export function CampusMobile() {
               setEventsErr(null);
               void refetchEvents("first");
             }}
-            onMutate={() => void refetchEvents("refresh")}
+            onMutate={() => {
+              void refetchEvents("refresh");
+              // An RSVP is exactly what the strip's event chips show.
+              stripData.refresh();
+            }}
           />
         </section>
         <section style={paneStyle}>
@@ -993,6 +1024,7 @@ function FeedPane({
   loadErr,
   onRetry,
   tag,
+  showTagChip,
   onOpenPost,
   onPickTag,
   onClearTag,
@@ -1006,6 +1038,10 @@ function FeedPane({
   onRetry: () => void;
   /** Active #tag filter; `posts` is already filtered to it. */
   tag: string | null;
+  /** True unless the RollingStrip above is surely showing `tag` highlighted
+   *  (the filter was just tapped there): the "#tag ×" chip then stands in
+   *  as the visible way to clear the filter. */
+  showTagChip: boolean;
   onOpenPost: (id: string) => void;
   onPickTag: (tag: string) => void;
   onClearTag: () => void;
@@ -1015,7 +1051,7 @@ function FeedPane({
   /** A block landed from a card's ⋯: reload so their posts go. */
   onBlocked: () => void;
 }) {
-  const chip = tag ? <FeedTagChip tag={tag} onClear={onClearTag} /> : null;
+  const chip = tag && showTagChip ? <FeedTagChip tag={tag} onClear={onClearTag} /> : null;
   if (posts === null) {
     return (
       <>
@@ -1061,7 +1097,9 @@ function FeedPane({
   );
 }
 
-/** "#tag ×" above the feed while a tag filter is on; tap to clear it. */
+/** "#tag ×" above the feed while a tag filter is on, unless the RollingStrip's
+ *  own highlighted chip is surely in view (the filter was just tapped there,
+ *  so that chip plays this role); tap to clear. */
 function FeedTagChip({ tag, onClear }: { tag: string; onClear: () => void }) {
   return (
     <button
@@ -3509,8 +3547,9 @@ function relativeTime(iso: string): string {
 // ---------- Composer FAB ----------
 
 // Single-action FAB: taps straight through to the post composer. It used
-// to expand into a "New post" / "New clip" menu, but clips are backlogged
-// (DOCS/BACKLOG_CLIPS.md) and a one-item menu is just an extra tap.
+// to expand into a "New post" / "New video post" menu, but the separate
+// video-posts surface is backlogged (DOCS/BACKLOG_CLIPS.md) and a one-item
+// menu is just an extra tap.
 const ComposerFab = ({
   ref,
   onPost,

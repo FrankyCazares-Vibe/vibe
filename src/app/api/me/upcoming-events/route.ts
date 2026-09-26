@@ -4,6 +4,8 @@ import { createSupabaseServerClient } from "@/lib/supabase/server";
 
 const DEFAULT_LIMIT = 5;
 const MAX_LIMIT = 25;
+/** `?days=` ceiling: the strip asks for 14, nobody needs more than two months. */
+const MAX_DAYS = 60;
 
 type RsvpRow = {
   status: "going" | "maybe" | "no";
@@ -23,7 +25,13 @@ type RsvpRow = {
 
 /**
  * Events the viewer has RSVP'd to (Going + Interested) that haven't ended
- * yet. Drives Otto's "Coming up" panel — replaces the old hardcoded list.
+ * yet. Drives Otto's "Coming up" panel — replaces the old hardcoded list —
+ * and, since S67 wave 1, the Feed tab's rolling strip.
+ *
+ * `?days=<n>` (optional, 1–60) keeps only events that START within the next
+ * n days; the strip passes 14 so a far-off RSVP doesn't take one of its three
+ * slots. Absent, junk or non-positive means no horizon, which is what Otto's
+ * panel and every deployed caller get today.
  */
 export async function GET(req: Request) {
   const supabase = await createSupabaseServerClient();
@@ -41,9 +49,14 @@ export async function GET(req: Request) {
     Math.max(1, Number(url.searchParams.get("limit")) || DEFAULT_LIMIT),
   );
 
-  const nowIso = new Date().toISOString();
+  const now = Date.now();
+  const nowIso = new Date(now).toISOString();
+  const daysRaw = url.searchParams.get("days");
+  const daysNum = daysRaw === null ? NaN : Number(daysRaw);
+  const days = Number.isFinite(daysNum) && daysNum > 0 ? Math.min(MAX_DAYS, Math.ceil(daysNum)) : null;
+  const horizonIso = days === null ? null : new Date(now + days * 24 * 60 * 60 * 1000).toISOString();
 
-  const { data, error } = await supabase
+  let query = supabase
     .from("rsvps")
     .select(
       "status," +
@@ -53,7 +66,11 @@ export async function GET(req: Request) {
     )
     .eq("user_id", user.id)
     .in("status", ["going", "maybe"])
-    .gte("event.ends_at", nowIso)
+    .gte("event.ends_at", nowIso);
+  // Same embedded-column filter shape as the `ends_at` one above; the
+  // `!inner` join makes it drop the row rather than null the event.
+  if (horizonIso) query = query.lte("event.starts_at", horizonIso);
+  const { data, error } = await query
     .order("event(starts_at)", { ascending: true })
     .limit(limit);
 
