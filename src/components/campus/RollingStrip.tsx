@@ -399,7 +399,9 @@ const TAG_CHIP_ACTIVE: CSSProperties = {
   ...TAG_CHIP,
   background: "var(--charcoal)",
   color: "var(--cream)",
-  borderColor: "transparent",
+  // The full shorthand, not borderColor: React warns when a rerender swaps
+  // between `border` and `borderColor` on the same element.
+  border: "1px solid transparent",
 };
 
 const FAILED_CHIP: CSSProperties = {
