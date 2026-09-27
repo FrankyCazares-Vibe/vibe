@@ -13,7 +13,7 @@
  * TWO BODY SHAPES (critic A4: deployed phone and desktop bundles keep the old
  * shape for days after wave 2 ships)
  * - NEW: `campus_id`. An explicit choice. Full rules: allowed set, then the
- *   30-day rule (`campusChangeDecision`). Re-sending the current campus
+ *   45-day rule (`campusChangeDecision`). Re-sending the current campus
  *   before it was ever stamped is the "Confirm your campus" tap, so it stamps
  *   `campus_set_at`.
  * - LEGACY: `school` (or `campus`), a label or legacy id. Old bundles send it
@@ -122,7 +122,7 @@ export type CampusWriteDecision =
    * Write these columns with the service role, scoped to the caller.
    * `campus_set_at` is ABSENT on a repair write (an old bundle echoing the
    * label already on the row into a null `campus_id`): that fills the column
-   * in without arming the 30-day clock or marking the campus confirmed.
+   * in without arming the 45-day clock or marking the campus confirmed.
    */
   | {
       kind: "write";
@@ -181,7 +181,7 @@ export function campusChangeTooSoonCopy(availableAt: string): string {
  *    `campus_not_ready`); the student must be verified (403
  *    `school_unverified`) with a system (503 `system_missing`); the campus must
  *    be in that system's allowed set (400 `campus_not_in_system`).
- * 4. The 30-day rule (`campusChangeDecision` on `campus_set_at`): noop for the
+ * 4. The 45-day rule (`campusChangeDecision` on `campus_set_at`): noop for the
  *    same stamped campus, 429 `campus_change_too_soon` with `availableAt`, or
  *    write `campus_id` + `campus_set_at = now` + the dual-written label.
  *
@@ -193,7 +193,7 @@ export function campusChangeTooSoonCopy(availableAt: string): string {
  * label back on its next save. That echo is not a choice, so it must not stamp
  * `campus_set_at`: it fills `campus_id` in from the row's OWN label and leaves
  * the marker null, which keeps the one-time "Confirm your campus" card and
- * keeps the student's first real pick free of the 30-day rule.
+ * keeps the student's first real pick free of the 45-day rule.
  */
 export function decideProfileCampusWrite(input: CampusWriteInput): CampusWriteDecision {
   const intent = readCampusIntent(input.body);
@@ -240,7 +240,7 @@ export function decideProfileCampusWrite(input: CampusWriteInput): CampusWriteDe
 
   // A repair (see REPAIR above) writes the pair the row already implies and
   // leaves `campus_set_at` alone, so it can neither confirm a campus the
-  // student never picked nor start their 30-day cooldown.
+  // student never picked nor start their 45-day cooldown.
   if (repairFromRowLabel) {
     return { kind: "write", patch: { campus_id: nextId, school: legacyLabel(nextId, system) } };
   }
@@ -351,7 +351,7 @@ export function campusWriteFailed(
 }
 
 /**
- * When the student may next change campus: `campus_set_at` + 30 days while
+ * When the student may next change campus: `campus_set_at` + 45 days while
  * that is still in the future, else null (a change is allowed now, or the
  * campus was never chosen). Informational; the write path re-decides.
  */

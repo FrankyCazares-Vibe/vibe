@@ -312,7 +312,7 @@ export async function POST(req: Request) {
   // PATCH /api/me/profile (see the long comment there and critic A4).
   // profile.html and ProfileMobile send the legacy `school` label on EVERY
   // save, so re-sending the current campus (or "") must change nothing: it
-  // must never re-arm the 30-day clock, never confirm a backfilled campus,
+  // must never re-arm the 45-day clock, never confirm a backfilled campus,
   // and never fail the save. The write goes through the service role below.
   const campusTouched = readCampusIntent(body).kind !== "absent";
   let campusDecision: CampusWriteDecision = { kind: "absent" };

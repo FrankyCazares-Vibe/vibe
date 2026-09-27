@@ -7879,14 +7879,14 @@ function _sortWorkExperienceByRecency(rows) {
 // The student's university comes from their verified school email, and the
 // campus is chosen within it. The options, the university and the saved
 // campus all come from GET /api/campuses; this page keeps no static mirror.
-// Indianapolis is one community for IU and Purdue students. The 30-day
+// Indianapolis is one community for IU and Purdue students. The 45-day
 // cooldown comes from the own bootstrap (`campusChangeAvailableAt`), since
 // /api/campuses has none. A save sends `campus_id` only when the student
 // picked a DIFFERENT campus here: re-sending the current one would confirm a
-// backfilled campus and start the 30-day lock (profile-campus-write.ts).
+// backfilled campus and start the 45-day lock (profile-campus-write.ts).
 // Rules and copy match src/lib/profile/settings-campus-card.ts, which
 // Settings and the phone profile share, with ONE rule this page can't
-// evaluate: there the 30-day lock also needs `onboarded` (a campus picked
+// evaluate: there the 45-day lock also needs `onboarded` (a campus picked
 // mid-onboarding doesn't lock yet), and neither /api/campuses nor the own
 // bootstrap sends that flag. So this page never manufactures a lock — it
 // only shows the bootstrap's own `campusChangeAvailableAt` — and lets the
@@ -7909,7 +7909,7 @@ var _campusPick = null;
 
 // Settings' warning before a campus save (CAMPUS_SWITCH_LOCK_COPY in
 // settings-campus-card.ts).
-const _CAMPUS_SWITCH_LOCK_COPY = "You can't change your campus again for 30 days.";
+const _CAMPUS_SWITCH_LOCK_COPY = "You can't change your campus again for 45 days.";
 
 function _campusUser() {
   return ((typeof vibeLoad === 'function') ? vibeLoad('vibe_user_v1') : null) || {};
@@ -8091,7 +8091,7 @@ function _renderCampusPicker(user) {
   if (note) note.textContent = locked ? _campusTooSoonCopy(ctx.availableAt) : '';
 }
 
-// A pick from the select. Once saved, a campus locks for 30 days, so a
+// A pick from the select. Once saved, a campus locks for 45 days, so a
 // different campus asks first with Settings' prompt (campusPickStep):
 // "Switch to Fort Wayne?" / "Make Indianapolis your campus?". Cancel puts
 // the select back and saves nothing. The pick rides the next profile sync
@@ -8132,7 +8132,7 @@ function _afterCampusSync(sent, err) {
   } else if (_campusCtx) {
     _campusCtx.currentCampusId = sent;
     // The lock is NOT stamped here. nextAvailableAfterWrite() only starts the
-    // 30-day clock once onboarding is done, and this page has no `onboarded`
+    // 45-day clock once onboarding is done, and this page has no `onboarded`
     // flag to check (neither /api/campuses nor the own bootstrap sends one),
     // so a local stamp would disable the select for a student the server
     // would still let change campus. The bootstrap adoption below brings the
@@ -8977,7 +8977,7 @@ function buildProfileSyncPayload(server) {
   // Campus: `campus_id` goes out only when the student picked a DIFFERENT
   // campus from their university in this browser (the campus picker). The
   // legacy label key is never sent, and neither is the current id:
-  // re-sending an unconfirmed campus would confirm it and start the 30-day
+  // re-sending an unconfirmed campus would confirm it and start the 45-day
   // lock (profile-campus-write.ts). Absent, profile-sync leaves it alone.
   if (_campusPick && _campusCtx && _campusPick !== _campusCtx.currentCampusId && _campusCtx.campuses.some(c => c.id === _campusPick)) payload.campus_id = _campusPick;
 

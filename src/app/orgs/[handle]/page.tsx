@@ -7,6 +7,7 @@ import { LoadFailed } from "@/components/feedback/LoadFailed";
 import { MobileTabBar } from "@/components/mobile/MobileTabBar";
 import { OrgInviteBanner } from "@/components/orgs/OrgInviteBanner";
 import { isMissingColumnError } from "@/lib/db/missing-column";
+import { rsvpCampusDecision } from "@/lib/iu/campus-request";
 import { campusRowById, isSharedCampus } from "@/lib/iu/campuses";
 import { orgAssetProxyUrl } from "@/lib/org-asset-url";
 import { loadFollowerCount, loadViewerFollow } from "@/lib/orgs/following";
@@ -207,6 +208,30 @@ export default async function OrgProfilePage({ params }: Params) {
   const invite =
     relation?.state === "invited" && ctx?.pendingInvite ? ctx.pendingInvite : null;
 
+  // Away from home (S67 wave 4): the club's campus isn't the viewer's HOME
+  // campus. `ctx.viewer` is the users row `loadViewerOrgContext` already
+  // read, so this costs no query; `rsvpCampusDecision` is the RSVP route's
+  // own rule (both campuses known and different, the club visiting rule),
+  // so the cards turn RSVP off exactly where PUT /rsvp answers 403
+  // `campus_visiting`. Visiting, Back returns to the campus the student was
+  // browsing. A failed membership read counts as home: RSVP stays live and
+  // the route's refusal is what the card shows. A club with no campus leaves
+  // each event to its creator's campus, which only the route knows.
+  const awayFromHome =
+    !!ctx?.ok &&
+    rsvpCampusDecision({
+      orgCampusId: campusId,
+      creatorCampusId: null,
+      viewerCampusId: ctx.viewer.campus_id,
+    }) === "campus_visiting";
+  // Members keep their clubs wherever home is, so only a non-member's RSVP
+  // turns off (the route makes the same exemption).
+  const visiting = awayFromHome && !viewerRole;
+  const visitedCampusId = awayFromHome ? (campusRowById(campusId)?.id ?? null) : null;
+  const backHref = visitedCampusId
+    ? `/campus?${new URLSearchParams({ tab: "orgs", campus: visitedCampusId })}`
+    : "/campus?tab=orgs";
+
   // Recent posts. Always fetched, whatever the join policy: the public
   // profile is meant to give visitors the context they need to decide
   // whether to follow or join. Channel content stays members-only.
@@ -345,7 +370,7 @@ export default async function OrgProfilePage({ params }: Params) {
         className="vibe-org-shell"
         style={{ maxWidth: 1100, margin: "0 auto", padding: "0 24px 64px" }}
       >
-        <TopNav signedIn={!!user} />
+        <TopNav signedIn={!!user} backHref={backHref} />
 
         {isSettingsOfficer(viewerRole) ? (
           <OrgProfileAdminBar
@@ -410,6 +435,7 @@ export default async function OrgProfilePage({ params }: Params) {
               orgHandle={org.handle}
               orgVerified={org.verified}
               viewerRole={viewerRole}
+              rsvpAtHomeOnly={visiting}
             />
           }
           aboutColumn={
@@ -522,7 +548,7 @@ async function loadInviterFirstName(
   );
 }
 
-function TopNav({ signedIn }: { signedIn: boolean }) {
+function TopNav({ signedIn, backHref }: { signedIn: boolean; backHref: string }) {
   return (
     <nav
       style={{
@@ -549,7 +575,7 @@ function TopNav({ signedIn }: { signedIn: boolean }) {
       </Link>
       {signedIn ? (
         <Link
-          href="/campus?tab=orgs"
+          href={backHref}
           style={{
             color: "rgba(255,255,255,0.95)",
             textDecoration: "none",

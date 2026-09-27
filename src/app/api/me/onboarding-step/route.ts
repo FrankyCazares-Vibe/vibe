@@ -143,13 +143,13 @@ export async function POST(req: Request) {
 
 /**
  * Campus rules (plan §2.4): the pick must be in the student's allowed set.
- * The 30-day rule keys on `campus_set_at`, not on the current campus (see
+ * The 45-day rule keys on `campus_set_at`, not on the current campus (see
  * campusChangeDecision): a null stamp (first pick, backfill confirmation) and
  * any pick during onboarding are free; a student who has finished onboarding
- * and holds a stamp waits out 30 days to save a different campus, including
+ * and holds a stamp waits out 45 days to save a different campus, including
  * when a system change cleared `campus_id` but kept the stamp (critic B3).
  * Every write stamps `campus_set_at` (the chosen-and-confirmed marker and the
- * 30-day clock) and dual-writes the legacy `school` label for one release
+ * 45-day clock) and dual-writes the legacy `school` label for one release
  * (§5.5).
  */
 async function saveCampusStep(

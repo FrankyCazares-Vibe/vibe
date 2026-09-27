@@ -92,10 +92,16 @@ function toCount(value: unknown): number {
  * mis-filed any event an admin posted for a chapter on another campus.
  *
  * SCOPING IS ON `campus_id` NOW (plan §2.4, wave 2 B8), never the legacy
- * `school` label, and `?campus=<id>` must be a campus in the viewer's own
- * university (403 `campus_not_in_system`, 400 `unknown_campus`). A viewer with
- * no home campus sees every campus in their university rather than an empty
- * page. The old "a campus-less org shows in every campus view" rule is retired.
+ * `school` label. Since S67 `?campus=<id>` may be ANY known campus, either
+ * university: a verified student may look around anywhere (the rule and why
+ * are in the header of `src/lib/iu/campus-scope.ts`; do not restore the old
+ * own-university 403 here). Only a viewer with no university at all is
+ * refused (403 `campus_not_in_system`, the clamp in `resolveCampusRequest`);
+ * an unknown id is 400 `unknown_campus`. `?campus=all` is still the viewer's
+ * own university. A viewer with no home campus sees every campus in their
+ * university rather than an empty page. RSVPing is a separate question: it
+ * works at home only (`/api/events/[id]/rsvp`, 403 `campus_visiting`). The
+ * old "a campus-less org shows in every campus view" rule is retired.
  *
  * HIDDEN ORGS ARE DROPPED FROM EVERY LIST, members included (spec §3.4).
  *

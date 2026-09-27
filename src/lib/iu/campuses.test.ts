@@ -382,15 +382,14 @@ test("scope: explicit campus inside the allowed set", () => {
   assert.deepEqual(resolveScopeV2("fort-wayne", PURDUE_WL), { kind: "campus", campusId: "fort-wayne" });
 });
 
-test("scope: forbidden when the campus is outside the allowed set", () => {
+test("scope: S67 — a campus outside the viewer's university still resolves (reading is open)", () => {
   assert.deepEqual(resolveScopeV2("purdue-west-lafayette", IU_INDY), {
-    kind: "forbidden",
-    reason: "campus_not_in_system",
+    kind: "campus",
+    campusId: "purdue-west-lafayette",
   });
-  assert.deepEqual(resolveScopeV2("iu-kokomo", PURDUE_WL), {
-    kind: "forbidden",
-    reason: "campus_not_in_system",
-  });
+  assert.deepEqual(resolveScopeV2("iu-kokomo", PURDUE_WL), { kind: "campus", campusId: "iu-kokomo" });
+  // The HOME campus is still own-university: an out-of-system home is ignored.
+  assert.equal(resolveScopeV2(null, { campusId: "iu-kokomo", system: "purdue" }).kind, "none");
 });
 
 test("scope: forbidden for unknown ids, legacy ids and labels", () => {

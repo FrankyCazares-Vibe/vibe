@@ -126,8 +126,8 @@ function audienceExcludesOwnerMessage(system: SchoolSystem | null): string {
  *   first, member clubs included (a member follows automatically). Same row
  *   shape as discover, `org_follow_state` always "following". Never
  *   campus-scoped (a club you follow on another campus is still followed) and
- *   never filtered for dormancy or `INVITE_ONLY_ORGS_IN_DISCOVERY`, but a
- *   `?campus=` outside the viewer's university is still refused the same way.
+ *   never filtered for dormancy or `INVITE_ONLY_ORGS_IN_DISCOVERY`; a
+ *   `?campus=` is resolved the same way as discover (any known campus, S67).
  *   `q` narrows by handle/name. At most `FOLLOWING_FILTER_CAP` follow rows are
  *   read; `has_more: true` means more follow rows exist beyond them (hidden
  *   clubs count toward the cap and are then dropped, so a page can be shorter
@@ -150,8 +150,9 @@ function audienceExcludesOwnerMessage(system: SchoolSystem | null): string {
  * `orgs.school` label:
  *   - no `?campus=` → the viewer's home campus; with no home campus, every
  *     campus in their university (an empty club list reads as a broken app);
- *   - `?campus=<id>` → that campus, but only inside the viewer's own
- *     university: 403 `campus_not_in_system`, or 400 `unknown_campus`;
+ *   - `?campus=<id>` → that campus, any university (S67: any verified
+ *     student may look around); 403 `campus_not_in_system` only for a viewer
+ *     with no university, 400 `unknown_campus` for an id no build knows;
  *   - `?campus=all` → every campus in their university.
  * The legacy "an org with no campus shows in every campus view" rule is
  * retired (plan §2.4, §2.8 row 4): a campus-less org is reachable by link and

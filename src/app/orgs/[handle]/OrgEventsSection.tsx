@@ -23,6 +23,12 @@ import { toast } from "@/lib/feedback/toast";
  *
  * Admins / owners get a "+ Create event" button at the top that opens
  * the same CreateEventModal used on /campus, pre-scoped to this org.
+ *
+ * `rsvpAtHomeOnly` (S67 wave 4): the club is on a campus that isn't the
+ * viewer's home, so every card renders its RSVP off with "RSVP works at
+ * home" — the same state the campus Events tab shows while visiting. The
+ * RSVP route refuses it anyway (403 `campus_visiting`); the card turns that
+ * answer into "RSVP works on your home campus" if the page guessed wrong.
  */
 export function OrgEventsSection({
   orgId,
@@ -30,12 +36,14 @@ export function OrgEventsSection({
   orgHandle,
   orgVerified,
   viewerRole,
+  rsvpAtHomeOnly = false,
 }: {
   orgId: string;
   orgName: string;
   orgHandle: string;
   orgVerified: boolean;
   viewerRole: string | null;
+  rsvpAtHomeOnly?: boolean;
 }) {
   const [events, setEvents] = useState<CampusEvent[] | null>(null);
   // First-load failure only; a failed refresh keeps the events on screen.
@@ -162,7 +170,12 @@ export function OrgEventsSection({
       ) : (
         <div style={{ display: "flex", flexDirection: "column", gap: 12 }}>
           {events.map((ev) => (
-            <EventCard key={ev.id} ev={ev} onMutate={refresh} />
+            <EventCard
+              key={ev.id}
+              ev={ev}
+              onMutate={refresh}
+              visiting={rsvpAtHomeOnly}
+            />
           ))}
         </div>
       )}

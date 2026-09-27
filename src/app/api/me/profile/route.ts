@@ -256,7 +256,7 @@ export async function PATCH(req: Request) {
   // save. So a label naming the campus already on the row — and "" / null —
   // changes nothing: no write, no 400, no 429, no `campus_set_at` touch.
   // Only a DIFFERENT campus is a change, and goes through the allowed set
-  // (400 `campus_not_in_system`) and the 30-day rule (429
+  // (400 `campus_not_in_system`) and the 45-day rule (429
   // `campus_change_too_soon`). All of that is decided in
   // `decideProfileCampusWrite`.
   //
@@ -370,7 +370,7 @@ export async function PATCH(req: Request) {
     }
   }
 
-  // Campus, its 30-day stamp and the dual-written legacy label go together in
+  // Campus, its 45-day stamp and the dual-written legacy label go together in
   // one service-role statement so they can never half-apply against each
   // other. A rejection here is still only a campus failure (see below).
   if (campusDecision.kind === "write") {

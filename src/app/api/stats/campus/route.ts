@@ -34,9 +34,9 @@ import { createSupabaseServerClient } from "@/lib/supabase/server";
  * "we don't know yours" — which is the honest answer — instead of quietly
  * handing back the global number under a campus name.
  *
- * `?campus=<id>` is honored inside the viewer's allowed set (403
- * `campus_not_in_system` outside it, 400 for an id no build knows, and a
- * viewer with no university may not name a campus at all — Franky's Q2).
+ * `?campus=<id>` is honored for any known campus (S67: any verified student
+ * may look around; 400 for an id no build knows). A viewer with no
+ * university may not name a campus at all (403 `campus_not_in_system`).
  * `?campus=all` counts every campus in the viewer's own university, not every
  * account on Vibe.
  *

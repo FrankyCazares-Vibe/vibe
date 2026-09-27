@@ -132,26 +132,37 @@ export function campusOrFilter(column: string, label: string): string {
 // SCOPE V2: campus_id + school system (plan §2.4, contract C1, critic A1/A7)
 // ─────────────────────────────────────────────────────────────────────────
 //
-// WHAT CHANGED FROM THE LEGACY CONTRACT (plan §2.8 rows 2 and 4):
-// - The viewer's SYSTEM now limits what can be browsed. `?campus=<id>` must
-//   be in the viewer's allowed set (every campus whose `systems` includes the
-//   viewer's system; Indianapolis is in both). Anything else is "forbidden";
-//   routes answer 403 `campus_not_in_system` (or 400 for an unknown id).
-// - `?campus=all` means every campus in the viewer's university, not every
-//   campus.
+// WHAT CHANGED FROM THE LEGACY CONTRACT (plan §2.8 rows 2 and 4), and what
+// S67 changed again:
+// - ANY KNOWN CAMPUS CAN BE READ (S67 plan §E, Franky's "view other
+//   campuses"). `?campus=<id>` resolves for every campus in `CAMPUSES`, both
+//   universities, open or not; only an id no build knows is "forbidden" (400
+//   `unknown_campus`). Until S67 the viewer's system limited browsing (403
+//   `campus_not_in_system` for the other university); that read block is
+//   gone on purpose. Do not restore it here.
+// - "Verified only" is not this function's job: `resolveCampusRequest`
+//   (`campus-request.ts`) refuses a named campus to a viewer with no
+//   university, and every route reads through it.
+// - The viewer's SYSTEM still bounds everything that is not a named campus:
+//   `?campus=all` and the no-home "none" scope are the viewer's university,
+//   and the HOME campus stays own-system (the DB trigger enforces it, and
+//   every write checks `allowedCampusId`). Reading a campus is not joining
+//   it: RSVP refuses away from home (`campus_visiting`), posts land at home.
 // - Campus-less rows no longer appear in campus views; filter on the ids.
 // Still a relevance rule, not secrecy: RLS lets any signed-in user read
 // these rows directly (plan §2.4 honesty note).
 //
 // Query contract:
-//   ?campus=<id>   → { kind: "campus" } when allowed; else { kind: "forbidden" }
+//   ?campus=<id>   → { kind: "campus" } for any known campus; unknown →
+//                    { kind: "forbidden", reason: "unknown_campus" }
 //   ?campus=all    → { kind: "system", campusIds: allowed set }
 //   (absent)       → { kind: "campus" } on the viewer's home campus, or
 //                    { kind: "none", campusIds: allowed set } with no home
 //
 // Legacy ids (`bloomington`, `northwest`) and labels are NOT accepted as
-// params: no client has ever sent `?campus=` (plan §2.3), and accepting them
-// would keep the old ambiguity alive.
+// params: no client sent `?campus=` before S67 (plan §2.3), the S67 campus
+// viewer sends canonical ids only, and accepting them would keep the old
+// ambiguity alive.
 
 /** `?campus=` value meaning "every campus in the viewer's allowed set". */
 export const CAMPUS_PARAM_ALL = "all";
@@ -179,12 +190,18 @@ export type CampusScopeV2 =
 
 export type CampusScopeForbidden = {
   kind: "forbidden";
-  /** `unknown_campus` → 400; `campus_not_in_system` → 403 (plan §2.4). */
+  /**
+   * `unknown_campus` → 400; `campus_not_in_system` → 403. Since S67 only
+   * `resolveCampusRequest` produces the second (a viewer with no university
+   * naming a campus); `resolveScopeV2` itself answers `unknown_campus` only.
+   */
   reason: "unknown_campus" | "campus_not_in_system";
 };
 
 /**
- * The allowed set as ids, in picker order (fresh array).
+ * The allowed set as ids, in picker order (fresh array): the viewer's
+ * university, which is what `?campus=all` and the no-home "none" scope cover.
+ * A named `?campus=<id>` no longer has to be in it (S67).
  *
  * NULL SYSTEM → EVERY CAMPUS. A viewer without a system is unverified or a
  * legacy row the backfill didn't reach. Unverified viewers never get past
@@ -219,7 +236,8 @@ export function resolveScopeV2(
     }
     const row = campusRowById(param);
     if (!row) return { kind: "forbidden", reason: "unknown_campus" };
-    if (!allowed.includes(row.id)) return { kind: "forbidden", reason: "campus_not_in_system" };
+    // Any known campus, in or out of the viewer's university (S67): reading
+    // is open to every verified student. No `allowed` check here.
     return { kind: "campus", campusId: row.id };
   }
 

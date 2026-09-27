@@ -1,9 +1,9 @@
 import { NextResponse } from "next/server";
 
 import { isMissingColumnError } from "@/lib/db/missing-column";
-import { resolveCampusRequest, scopeViewerFromRow } from "@/lib/iu/campus-request";
+import { mapCampusClosed, resolveCampusRequest, scopeViewerFromRow } from "@/lib/iu/campus-request";
 import { scopeCampusIds } from "@/lib/iu/campus-scope";
-import { campusScopeError } from "@/lib/iu/community-scope";
+import { campusScopeError, homeCampusIdFor } from "@/lib/iu/community-scope";
 import { orgAssetProxyUrl } from "@/lib/org-asset-url";
 import { createSupabaseServerClient } from "@/lib/supabase/server";
 
@@ -21,13 +21,23 @@ import { createSupabaseServerClient } from "@/lib/supabase/server";
  *
  * SCOPE (plan wave 2 B10, §2.4). People and orgs are filtered on
  * `campus_id`, never on the legacy `users.school` label. The campus is the
- * viewer's home campus, or `?campus=<id>` when that id is in their allowed
- * set (every campus whose `systems` includes their `school_system`;
- * Indianapolis is in both, so IU and Purdue Indianapolis students see one
- * map). `?campus=all` covers every campus in their own university. A campus
- * outside it is 403 `campus_not_in_system`; an id no build knows is 400. A
- * viewer with no university at all can't name a campus either (Franky's Q2 —
- * the clamp lives in `resolveCampusRequest`, tested once).
+ * viewer's home campus, or `?campus=<id>` for any campus (S67: a verified
+ * student may look around any campus, either university; Indianapolis is one
+ * row, so IU and Purdue Indianapolis students see one map). `?campus=all`
+ * covers every campus in their own university. An id no build knows is 400;
+ * a viewer with no university at all can't name a campus (403
+ * `campus_not_in_system`; the clamp lives in `resolveCampusRequest`, tested
+ * once).
+ *
+ * A CAMPUS THAT ISN'T OPEN DRAWS NO MAP unless it's home (S67 R3,
+ * `mapCampusClosed`): its few sign-ups would be named by a two-person zone.
+ * The clients hide the Map tab there too; the answer here is the empty
+ * payload plus `reason: "campus_closed"` (additive; today's bundles render
+ * it as an empty map), so the API can't be used to get around the tab.
+ *
+ * A visited campus with nobody on it answers the usual empty arrays plus
+ * `empty_copy: "Nobody's here yet."` (additive). It is never the "pick your
+ * campus" answer: the viewer has a campus, it's home.
  *
  * A viewer with no campus keeps today's answer: empty arrays plus
  * `reason: "no_school"`, which both clients render as "pick your campus"
@@ -59,6 +69,9 @@ type MapYou = {
   major: string | null;
   avatar_url: string | null;
 };
+
+/** The empty line for a campus the viewer is only looking around (S67). */
+const VISITED_EMPTY_COPY = "Nobody's here yet.";
 
 /** Honest empty payload: no campus to draw, so the client prompts for one. */
 function pickYourCampus(you: MapYou) {
@@ -129,6 +142,18 @@ export async function GET(req: Request) {
   }
   if (scope.kind === "none") {
     return pickYourCampus(you);
+  }
+  // R3: a closed campus that isn't home answers empty before any read.
+  if (scope.kind === "campus" && mapCampusClosed(scope, viewer)) {
+    return NextResponse.json({
+      ok: true,
+      you,
+      majors: [],
+      orgs: [],
+      campus_id: scope.campusId,
+      campus_scope: scope.campusId,
+      reason: "campus_closed",
+    });
   }
   const campusIds = scopeCampusIds(scope);
 
@@ -263,7 +288,10 @@ export async function GET(req: Request) {
   }));
 
   // Real data only. A campus with no peers yet returns empty arrays and the
-  // client shows its "no zones yet" state instead of a fake roster.
+  // client shows its "no zones yet" state instead of a fake roster. On a
+  // campus the viewer is only visiting, the empty line says so plainly.
+  const visiting = scope.kind === "campus" && scope.campusId !== homeCampusIdFor(viewer);
+  const emptyVisit = visiting && majors.length === 0 && orgsOut.length === 0;
   return NextResponse.json({
     ok: true,
     you,
@@ -272,5 +300,6 @@ export async function GET(req: Request) {
     // Additive (plan §6 compatibility): deployed bundles ignore these.
     campus_id: scope.kind === "campus" ? scope.campusId : null,
     campus_scope: scope.kind === "campus" ? scope.campusId : "all",
+    ...(emptyVisit ? { empty_copy: VISITED_EMPTY_COPY } : {}),
   });
 }

@@ -87,7 +87,9 @@ export function StepClubs(p: {
     const failure = ONB_COPY.clubs.loadFailed;
     void (async () => {
       setState((s) => (s.status === "idle" ? { ...s, status: "loading", failure: null } : s));
-      // Never `q`: discover's search widens to the whole university.
+      // Never `q`: discover's search widens to the whole university. Never
+      // `?campus=` either (S67 wave 4): onboarding lists the clubs on the
+      // campus the student just picked as home, not a campus they might view.
       const r = await vibeRequest<{ orgs?: unknown }>("/api/orgs?filter=discover", {
         cache: "no-store",
         quiet: true,

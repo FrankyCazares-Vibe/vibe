@@ -19,9 +19,11 @@
  *    badges still say IU and Purdue. Same-university-different-campus is a
  *    weaker `same_system` signal, and other-system-other-campus people are
  *    not suggested at all (§2.4 "Never other-system people outside
- *    Indianapolis"). Profiles, search, follows and DMs stay global (Q2), so
- *    this is relevance, not secrecy — RLS lets any signed-in user read these
- *    rows directly (§2.4 honesty note).
+ *    Indianapolis"). That is who we SUGGEST, not who can be seen: profiles,
+ *    follows and DMs stay global (Q2), and since S67 any verified student can
+ *    look around any campus's feed, events, clubs and map. So this is
+ *    relevance, not secrecy — RLS lets any signed-in user read these rows
+ *    directly (§2.4 honesty note).
  *
  * 3. THE CAMPUS LANE. Posts whose `campus_id` is the viewer's home campus,
  *    PLUS the campus-less pile — legacy posts of the viewer's university, and
@@ -29,8 +31,10 @@
  *    otherwise be visible to every university forever, or to nobody) — PLUS
  *    posts by people the viewer follows wherever they are (follows are
  *    global, so their posts must be reachable). `?campus=<id>` switches to
- *    another campus in the viewer's allowed set — that browse view is that
- *    campus only.
+ *    any other campus, either university (S67: "look around"; only a viewer
+ *    with no university is refused, in `resolveCampusRequest`) — that browse
+ *    view is that campus only. Browsing never changes where the viewer's own
+ *    posts land (home, stamped by the DB).
  *
  * COMPATIBILITY (critic C4). `suggestionReasons` still emits today's legacy
  * `reason` strings — the deployed phone groups on the literal "same school"
@@ -338,12 +342,13 @@ export type FeedLane =
  *   + the viewer's university's campus-less legacy posts + followed authors.
  * - `?campus=all`, or no home campus at all ("none"): every campus in the
  *   allowed set, same extras.
- * - `?campus=<another allowed campus>`: that campus only. Browsing Bloomington
- *   should show Bloomington, not your Indianapolis friends and not the legacy
- *   pile, so the extras are off.
+ * - `?campus=<any other campus>` (either university since S67): that campus
+ *   only. Browsing Bloomington should show Bloomington, not your Indianapolis
+ *   friends and not the legacy pile, so the extras are off.
  * - no system: everything, because we have no university to scope to.
  *
- * Callers must handle `{ kind: "forbidden" }` from `resolveScopeV2` first.
+ * Callers must handle `{ kind: "forbidden" }` from `resolveCampusRequest`
+ * first.
  */
 export function feedLaneFor(scope: CampusScopeV2, viewer: ScopeViewer): FeedLane {
   const home = homeCampusIdFor(viewer);
@@ -438,7 +443,12 @@ export function postInFeedLane(
   );
 }
 
-/** HTTP answer for a `?campus=` value the viewer may not use (plan §2.4). */
+/**
+ * HTTP answer for a `?campus=` value the viewer may not use (plan §2.4).
+ * Since S67 the 403 only reaches a viewer with no university (every verified
+ * student may look around any campus), so its line asks for verification;
+ * the `code` is unchanged because the clients branch on it.
+ */
 export function campusScopeError(scope: CampusScopeForbidden): {
   status: number;
   body: { ok: false; code: string; error: string };
@@ -449,7 +459,7 @@ export function campusScopeError(scope: CampusScopeForbidden): {
         body: {
           ok: false,
           code: "campus_not_in_system",
-          error: "That campus isn't part of your university.",
+          error: "Verify your school email to look around other campuses.",
         },
       }
     : { status: 400, body: { ok: false, code: "unknown_campus", error: "Unknown campus." } };

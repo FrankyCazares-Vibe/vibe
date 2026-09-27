@@ -15,7 +15,7 @@
  * - set: chosen and stamped.
  *
  * A pick in the select never changes the mode by itself: the mode comes from
- * the saved row. Once onboarding is done, any campus save starts the 30-day
+ * the saved row. Once onboarding is done, any campus save starts the 45-day
  * rule, so a pick is only staged and the card asks first
  * ({@link campusPickStep}: "Switch to Fort Wayne?"). Before onboarding is
  * done the rule can't bite yet, so a pick saves straight away.
@@ -24,9 +24,10 @@
  * proved (`campusesForSystem`). Indianapolis is ONE community for IU and
  * Purdue students, listed first for both.
  *
- * THE 30-DAY RULE mirrors the server (`campusChangeDecision` in
+ * THE 45-DAY RULE mirrors the server (`campusChangeDecision` in
  * onboarding-prefill.ts): once onboarding is done, a stamped campus can't
- * change to a different one for 30 days. Writes before onboarding is done
+ * change to a different one for 45 days (30 until S67; the copy below is
+ * built from `CAMPUS_CHANGE_COOLDOWN_DAYS`). Writes before onboarding is done
  * are free, so `locked` needs `onboarded` and {@link nextAvailableAfterWrite}
  * returns null for them. The server is still the authority: a 429
  * `campus_change_too_soon` locks the card too ({@link campusSaveFailure}).
@@ -40,7 +41,7 @@ import {
   isSchoolSystem,
   type SchoolSystem,
 } from "@/lib/iu/campuses";
-import { CAMPUS_CHANGE_COOLDOWN_MS } from "@/lib/profile/onboarding-prefill";
+import { CAMPUS_CHANGE_COOLDOWN_DAYS, CAMPUS_CHANGE_COOLDOWN_MS } from "@/lib/profile/onboarding-prefill";
 import { campusChangeTooSoonCopy } from "@/lib/profile/profile-campus-write";
 
 export type SettingsCampusInput = {
@@ -48,7 +49,7 @@ export type SettingsCampusInput = {
   schoolSystem: SchoolSystem | null;
   campusId: string | null;
   campusConfirmed: boolean;
-  /** ISO. When the 30-day rule lets a DIFFERENT campus be saved again; null = no clock running. */
+  /** ISO. When the 45-day rule lets a DIFFERENT campus be saved again; null = no clock running. */
   campusChangeAvailableAt: string | null;
   /** `isOttoOnboardingComplete(otto_answers)`, computed on the server. */
   onboarded: boolean;
@@ -64,7 +65,7 @@ export type SettingsCampusView = {
   shortName: string | null;
   /** Sub-line under the select for the picked campus. */
   sub: string | null;
-  /** The 30-day rule is running: the select is disabled. */
+  /** The 45-day rule is running: the select is disabled. */
   locked: boolean;
   /** "You can change your campus again on October 15." while locked. */
   note: string | null;
@@ -72,17 +73,17 @@ export type SettingsCampusView = {
 
 /**
  * The line under the "Confirm your campus" callout (critic W3 L5): "Yes"
- * stamps `campus_set_at`, which starts the 30-day rule. The phone
+ * stamps `campus_set_at`, which starts the 45-day rule. The phone
  * `CampusConfirmBanner` (B14t) carries the same sentence verbatim.
  */
-export const CAMPUS_CONFIRM_LOCK_COPY = "Confirming locks your campus for 30 days.";
+export const CAMPUS_CONFIRM_LOCK_COPY = `Confirming locks your campus for ${CAMPUS_CHANGE_COOLDOWN_DAYS} days.`;
 
 /**
  * The second line of the "Switch to {shortName}?" prompt a pick shows before
  * it saves, once onboarding is done (review of B15: a pick used to start the
- * 30-day rule with no warning).
+ * 45-day rule with no warning).
  */
-export const CAMPUS_SWITCH_LOCK_COPY = "You can't change your campus again for 30 days.";
+export const CAMPUS_SWITCH_LOCK_COPY = `You can't change your campus again for ${CAMPUS_CHANGE_COOLDOWN_DAYS} days.`;
 
 /** Settings' one-line failure for a campus save (`vibeRequest` `failure`). */
 export const CAMPUS_SAVE_FAILURE_COPY = "Couldn't save your campus. Try again.";
@@ -129,7 +130,7 @@ export function settingsCampusCardView(
 }
 
 /**
- * After a successful campus write: when the 30-day rule next lets the student
+ * After a successful campus write: when the 45-day rule next lets the student
  * pick a different campus (ISO), or null when no clock started (still in
  * onboarding). `now` is epoch ms and defaults to `Date.now()`.
  */
@@ -143,18 +144,18 @@ export type CampusPickStep =
   | { kind: "ignore" }
   /** Picked the saved campus again: drop any staged pick. */
   | { kind: "unstage" }
-  /** Save now: onboarding isn't done, so the 30-day rule can't bite yet. */
+  /** Save now: onboarding isn't done, so the 45-day rule can't bite yet. */
   | { kind: "save" }
-  /** Stage the pick and ask first: saving starts the 30-day rule. */
+  /** Stage the pick and ask first: saving starts the 45-day rule. */
   | { kind: "stage"; title: string; body: string };
 
 /**
  * What picking `next` in the select does, given the card's SAVED view.
- * Once onboarding is done every campus save starts the 30-day rule
+ * Once onboarding is done every campus save starts the 45-day rule
  * (`decideProfileCampusWrite` stamps `campus_set_at` on any explicit write),
  * so the pick is staged behind "Switch to {shortName}?" (or "Make
  * {shortName} your campus?" when there is no campus yet) with Yes / Cancel.
- * A closed campus says so on the prompt too, since the student would wait 30
+ * A closed campus says so on the prompt too, since the student would wait 45
  * days to leave it.
  */
 export function campusPickStep(

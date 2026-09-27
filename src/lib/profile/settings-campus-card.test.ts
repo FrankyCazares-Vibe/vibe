@@ -50,6 +50,10 @@ const {
   settingsCampusCardView,
 } = await import("./settings-campus-card");
 const { campusesForSystem } = await import("../iu/campuses");
+const { CAMPUS_CHANGE_COOLDOWN_DAYS, CAMPUS_CHANGE_COOLDOWN_MS } = await import("./onboarding-prefill");
+
+/** The lock line as the student reads it, built from the one day count. */
+const SWITCH_LINE = `You can't change your campus again for ${CAMPUS_CHANGE_COOLDOWN_DAYS} days.`;
 
 const DAY = 24 * 60 * 60 * 1000;
 /** 2026-09-17, 8am in Indianapolis. */
@@ -119,7 +123,7 @@ test("set: sub-line for a single-system campus is its full name", () => {
   assert.equal(v.sub, "IU Bloomington");
 });
 
-// ── the 30-day rule ──────────────────────────────────────────────────────
+// ── the 45-day rule ──────────────────────────────────────────────────────
 
 test("set + locked: a future availableAt disables the select with the dated note", () => {
   const v = view({ campusChangeAvailableAt: "2026-10-15T16:00:00.000Z" });
@@ -173,23 +177,24 @@ test("campusOptionLabel marks closed campuses only", () => {
 
 // ── nextAvailableAfterWrite ──────────────────────────────────────────────
 
-test("nextAvailableAfterWrite: null before onboarding is done, now + 30 days after", () => {
+test("nextAvailableAfterWrite: null before onboarding is done, now + 45 days after", () => {
   assert.equal(nextAvailableAfterWrite(false), null);
   assert.equal(nextAvailableAfterWrite(false, NOW), null);
-  assert.equal(nextAvailableAfterWrite(true, NOW), new Date(NOW + 30 * DAY).toISOString());
+  assert.equal(nextAvailableAfterWrite(true, NOW), new Date(NOW + CAMPUS_CHANGE_COOLDOWN_MS).toISOString());
+  assert.equal(CAMPUS_CHANGE_COOLDOWN_MS, 45 * DAY);
   // A card fed the write's own availableAt locks straight away.
   const after = view({ campusChangeAvailableAt: nextAvailableAfterWrite(true, NOW) });
   assert.equal(after.locked, true);
-  assert.equal(after.note, "You can change your campus again on October 17.");
+  assert.equal(after.note, "You can change your campus again on November 1.");
 });
 
 // ── picking in the select ────────────────────────────────────────────────
 
-test("campusPickStep: onboarded + no campus yet stages 'Make … your campus?' with the 30-day line", () => {
+test("campusPickStep: onboarded + no campus yet stages 'Make … your campus?' with the 45-day line", () => {
   assert.deepEqual(campusPickStep(view({ campusId: null, campusConfirmed: false }), true, "indianapolis"), {
     kind: "stage",
     title: "Make Indianapolis your campus?",
-    body: "You can't change your campus again for 30 days.",
+    body: SWITCH_LINE,
   });
 });
 
@@ -197,7 +202,7 @@ test("campusPickStep: onboarded + a closed campus says it isn't open yet", () =>
   assert.deepEqual(campusPickStep(view(), true, "fort-wayne"), {
     kind: "stage",
     title: "Switch to Fort Wayne?",
-    body: "Fort Wayne isn't open yet. You can't change your campus again for 30 days.",
+    body: `Fort Wayne isn't open yet. ${SWITCH_LINE}`,
   });
   // pick mode, closed campus
   const pick = campusPickStep(view({ campusId: null, campusConfirmed: false }), true, "iu-bloomington");
@@ -285,7 +290,9 @@ test("campusSaveFailure: a Sign in / Review Terms action rides along; campus cod
   );
 });
 
-test("copy constants", () => {
-  assert.equal(CAMPUS_CONFIRM_LOCK_COPY, "Confirming locks your campus for 30 days.");
-  assert.equal(CAMPUS_SWITCH_LOCK_COPY, "You can't change your campus again for 30 days.");
+test("copy constants: the lock lines say 45 days (S67) and follow the constant", () => {
+  assert.equal(CAMPUS_CHANGE_COOLDOWN_DAYS, 45);
+  assert.equal(CAMPUS_CONFIRM_LOCK_COPY, "Confirming locks your campus for 45 days.");
+  assert.equal(CAMPUS_SWITCH_LOCK_COPY, "You can't change your campus again for 45 days.");
+  assert.equal(CAMPUS_SWITCH_LOCK_COPY, SWITCH_LINE);
 });

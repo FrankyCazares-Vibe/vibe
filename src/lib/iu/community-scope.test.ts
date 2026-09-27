@@ -62,6 +62,7 @@ const {
   suggestionReasons,
 } = await import("./community-scope");
 const { resolveScopeV2 } = await import("./campus-scope");
+const { resolveCampusRequest } = await import("./campus-request");
 
 const TRIGGER_HANDLE = "u0f1e2d3c4b5a69788796a5b4c3d2e1f0";
 const ONBOARDED = { done: true };
@@ -296,13 +297,25 @@ test("lane: ?campus= equal to home is still the home lane", () => {
   assert.deepEqual(laneFor("indianapolis", IU_INDY), laneFor(null, IU_INDY));
 });
 
-test("lane: browsing another allowed campus shows that campus only", () => {
+test("lane: browsing another campus of the viewer's university shows that campus only", () => {
   assert.deepEqual(laneFor("iu-bloomington", IU_INDY), {
     kind: "scoped",
     campusIds: ["iu-bloomington"],
     legacySystem: null,
     includeFollowed: false,
   });
+});
+
+test("lane: browsing the other university's campus (S67) is that campus only, no extras", () => {
+  const lane = laneFor("purdue-west-lafayette", IU_INDY);
+  assert.deepEqual(lane, {
+    kind: "scoped",
+    campusIds: ["purdue-west-lafayette"],
+    legacySystem: null,
+    includeFollowed: false,
+  });
+  // Neither IU's legacy pile nor the viewer's follows ride into a browse view.
+  assert.equal(feedLaneOrFilter(lane, [uuid(1)], [uuid(5)]), "campus_id.in.(purdue-west-lafayette)");
 });
 
 test("lane: no home campus means the whole allowed set (critic A7 'none')", () => {
@@ -547,12 +560,19 @@ test("lane predicate: the global lane keeps everything", () => {
 
 test("forbidden scopes map to the documented statuses", () => {
   const iuViewer = { campusId: "indianapolis", system: "iu" as const };
-  const notMine = resolveScopeV2("purdue-west-lafayette", iuViewer);
-  assert.equal(notMine.kind, "forbidden");
-  if (notMine.kind !== "forbidden") return;
-  const forbidden = campusScopeError(notMine);
+  // S67: the other university's campus is readable now; only a viewer with
+  // no university is refused a named campus (in `resolveCampusRequest`).
+  assert.deepEqual(resolveScopeV2("purdue-west-lafayette", iuViewer), {
+    kind: "campus",
+    campusId: "purdue-west-lafayette",
+  });
+  const noSystem = resolveCampusRequest("purdue-west-lafayette", { campusId: null, system: null });
+  assert.equal(noSystem.kind, "forbidden");
+  if (noSystem.kind !== "forbidden") return;
+  const forbidden = campusScopeError(noSystem);
   assert.equal(forbidden.status, 403);
   assert.equal(forbidden.body.code, "campus_not_in_system");
+  assert.equal(forbidden.body.ok, false);
 
   const junk = resolveScopeV2("atlantis", iuViewer);
   assert.equal(junk.kind, "forbidden");

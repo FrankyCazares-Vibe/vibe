@@ -535,13 +535,13 @@ function AccountCard({ profile }: { profile: Profile }) {
 // shared with the phone profile editor.
 //
 // Writes `campus_id` through PATCH /api/me/profile, which checks the
-// university's allowed set and the 30-day rule and stamps `campus_set_at`.
-// Once onboarding is done every save starts the 30-day rule, so a pick in the
+// university's allowed set and the 45-day rule and stamps `campus_set_at`.
+// Once onboarding is done every save starts the 45-day rule, so a pick in the
 // select is only staged behind "Switch to {campus}? You can't change your
-// campus again for 30 days." with Yes / Cancel (campusPickStep); before that
+// campus again for 45 days." with Yes / Cancel (campusPickStep); before that
 // a pick saves straight away. "Yes" on the confirm callout re-sends the
 // campus already on the row, which stamps it: that is the confirmation, and it
-// starts the 30-day rule (the callout says so).
+// starts the 45-day rule (the callout says so).
 //
 // The card's mode always comes from the SAVED row. A staged or in-flight pick
 // only changes what the select shows, so picking a campus never flips the

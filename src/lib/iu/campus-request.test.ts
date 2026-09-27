@@ -44,9 +44,17 @@ registerHooks({
   },
 });
 
-const { resolveCampusRequest, scopeViewerFromRow } = await import("./campus-request");
+const {
+  RSVP_CAMPUS_VISITING_COPY,
+  eventCampusIdFor,
+  mapCampusClosed,
+  resolveCampusRequest,
+  rsvpCampusDecision,
+  scopeViewerFromRow,
+} = await import("./campus-request");
 const { feedLaneFor, feedLaneOrFilter } = await import("./community-scope");
 const { scopeCampusIds } = await import("./campus-scope");
+const { CAMPUSES } = await import("./campuses");
 
 type Scope = ReturnType<typeof resolveCampusRequest>;
 
@@ -126,11 +134,42 @@ test("shared Indianapolis is reachable from both universities", () => {
   }
 });
 
-test("another university's campus is 403 campus_not_in_system", () => {
+test("S67: a verified IU viewer can read a Purdue campus", () => {
   assert.deepEqual(
     resolveCampusRequest("purdue-west-lafayette", { campusId: "indianapolis", system: "iu" }),
-    { kind: "forbidden", reason: "campus_not_in_system" },
+    { kind: "campus", campusId: "purdue-west-lafayette" },
   );
+  assert.deepEqual(
+    resolveCampusRequest(" Purdue-Northwest ", { campusId: "iu-bloomington", system: "iu" }),
+    { kind: "campus", campusId: "purdue-northwest" },
+  );
+});
+
+test("S67: a verified Purdue viewer can read an IU-only campus", () => {
+  assert.deepEqual(
+    resolveCampusRequest("iu-bloomington", { campusId: "purdue-west-lafayette", system: "purdue" }),
+    { kind: "campus", campusId: "iu-bloomington" },
+  );
+});
+
+test("S67: every known campus resolves for a viewer with a university", () => {
+  const ids = CAMPUSES.map((c) => c.id);
+  assert.equal(ids.length, 11, "all 11 campuses, both universities, open or not");
+  for (const system of ["iu", "purdue"] as const) {
+    for (const id of ids) {
+      const scope = resolveCampusRequest(id, { campusId: "indianapolis", system });
+      assert.deepEqual(scope, { kind: "campus", campusId: id }, `${system} → ${id}`);
+    }
+  }
+});
+
+test("S67: reading another campus never widens ?campus=all past the viewer's university", () => {
+  const viewer = { campusId: "indianapolis", system: "iu" } as const;
+  const all = resolveCampusRequest("all", viewer);
+  assert.equal(all.kind, "system");
+  const ids = scopeCampusIds(all as Exclude<Scope, { kind: "forbidden" }>);
+  assert.ok(!ids.includes("purdue-west-lafayette"));
+  assert.ok(!ids.includes("purdue-northwest"));
 });
 
 test("an id no build knows is 400 unknown_campus, whatever the viewer is", () => {
@@ -144,9 +183,10 @@ test("an id no build knows is 400 unknown_campus, whatever the viewer is", () =>
   });
 });
 
-test("NO UNIVERSITY, NO BROWSING: a system-less viewer can't name a campus", () => {
-  // Franky's Q2. `allowedCampusIdsFor(null)` is every campus, which is the
-  // right default for their own view but must not become a browse pass.
+test("NO UNIVERSITY, NO BROWSING: a system-less viewer gets campus_not_in_system", () => {
+  // Still true after S67: looking around is for verified students.
+  // `allowedCampusIdsFor(null)` is every campus, which is the right default
+  // for their own view but must not become a browse pass.
   for (const id of ["purdue-west-lafayette", "iu-bloomington", "indianapolis"]) {
     assert.deepEqual(resolveCampusRequest(id, { campusId: null, system: null }), {
       kind: "forbidden",
@@ -225,4 +265,149 @@ test("a campus-less student still gets their own university, never the other one
 
 test("a system-less straggler isn't filtered at all, exactly as today", () => {
   assert.equal(trendingFilter({ campus_id: null, school_system: null }), null);
+});
+
+// ── RSVP away from home (S67 E3) ───────────────────────────────────────────
+
+test("rsvp: a club event on the viewer's home campus is fine", () => {
+  assert.equal(
+    rsvpCampusDecision({ orgCampusId: "indianapolis", creatorCampusId: null, viewerCampusId: "indianapolis" }),
+    "ok",
+  );
+});
+
+test("rsvp: a club event on another campus is campus_visiting", () => {
+  assert.equal(
+    rsvpCampusDecision({ orgCampusId: "iu-bloomington", creatorCampusId: null, viewerCampusId: "indianapolis" }),
+    "campus_visiting",
+  );
+  // Either university: a Purdue campus from an IU home is the same answer.
+  assert.equal(
+    rsvpCampusDecision({
+      orgCampusId: "purdue-west-lafayette",
+      creatorCampusId: "purdue-west-lafayette",
+      viewerCampusId: "indianapolis",
+    }),
+    "campus_visiting",
+  );
+});
+
+test("rsvp: a member of the event's club RSVPs from any home campus", () => {
+  // Members keep their clubs wherever home is (a transfer after 45 days, or a
+  // visitor whose Request to join was approved).
+  assert.equal(
+    rsvpCampusDecision({
+      orgCampusId: "iu-bloomington",
+      creatorCampusId: null,
+      viewerCampusId: "indianapolis",
+      viewerIsClubMember: true,
+    }),
+    "ok",
+  );
+  assert.equal(
+    rsvpCampusDecision({
+      orgCampusId: "iu-bloomington",
+      creatorCampusId: null,
+      viewerCampusId: "indianapolis",
+      viewerIsClubMember: false,
+    }),
+    "campus_visiting",
+  );
+});
+
+test("rsvp: the club's campus wins over the creator's", () => {
+  assert.equal(
+    rsvpCampusDecision({ orgCampusId: "indianapolis", creatorCampusId: "iu-bloomington", viewerCampusId: "indianapolis" }),
+    "ok",
+  );
+  assert.equal(eventCampusIdFor("indianapolis", "iu-bloomington"), "indianapolis");
+});
+
+test("rsvp: an org-less event (or a campus-less club) takes the creator's campus", () => {
+  assert.equal(eventCampusIdFor(null, "iu-kokomo"), "iu-kokomo");
+  assert.equal(
+    rsvpCampusDecision({ orgCampusId: null, creatorCampusId: "iu-kokomo", viewerCampusId: "indianapolis" }),
+    "campus_visiting",
+  );
+  assert.equal(
+    rsvpCampusDecision({ orgCampusId: null, creatorCampusId: "indianapolis", viewerCampusId: "indianapolis" }),
+    "ok",
+  );
+});
+
+test("rsvp: nothing to compare is never refused", () => {
+  // No event campus at all.
+  assert.equal(rsvpCampusDecision({ orgCampusId: null, creatorCampusId: null, viewerCampusId: "indianapolis" }), "ok");
+  // A viewer with no home campus yet.
+  assert.equal(rsvpCampusDecision({ orgCampusId: "iu-bloomington", creatorCampusId: null, viewerCampusId: null }), "ok");
+  // Junk and unknown ids read as unknown, not as a different campus.
+  assert.equal(rsvpCampusDecision({ orgCampusId: "mars", creatorCampusId: 7, viewerCampusId: "indianapolis" }), "ok");
+  assert.equal(eventCampusIdFor(undefined, ""), null);
+});
+
+test("rsvp: stored ids are canonicalised before comparing", () => {
+  assert.equal(
+    rsvpCampusDecision({ orgCampusId: " INDIANAPOLIS ", creatorCampusId: null, viewerCampusId: "indianapolis" }),
+    "ok",
+  );
+});
+
+test("rsvp: shared Indianapolis is home for IU and Purdue Indy students alike", () => {
+  // Both universities' Indy students hold the one `indianapolis` row.
+  assert.equal(
+    rsvpCampusDecision({ orgCampusId: "indianapolis", creatorCampusId: "indianapolis", viewerCampusId: "indianapolis" }),
+    "ok",
+  );
+});
+
+test("rsvp: the refusal line is the one the clients show", () => {
+  assert.equal(RSVP_CAMPUS_VISITING_COPY, "RSVP works on your home campus.");
+});
+
+// ── The map of a campus that isn't open (S67 R3) ───────────────────────────
+
+const INDY_IU = { campusId: "indianapolis", system: "iu" as const };
+
+function mapClosed(raw: string | null, viewer: { campusId: string | null; system: "iu" | "purdue" | null }) {
+  return mapCampusClosed(resolveCampusRequest(raw, viewer), viewer);
+}
+
+test("map: a visited campus that isn't open draws nothing", () => {
+  // Bloomington, Kokomo and West Lafayette are closed today (isOpen false).
+  assert.equal(mapClosed("iu-bloomington", INDY_IU), true);
+  assert.equal(mapClosed("iu-kokomo", INDY_IU), true);
+  assert.equal(mapClosed("purdue-west-lafayette", INDY_IU), true);
+  // A campus-less student naming one: not home either, so the same answer.
+  assert.equal(mapClosed("iu-bloomington", { campusId: null, system: "iu" }), true);
+});
+
+test("map: every closed campus is held back, every open one drawn", () => {
+  for (const c of CAMPUSES) {
+    const viewer = { campusId: null, system: "iu" as const };
+    assert.equal(mapClosed(c.id, viewer), !c.isOpen, c.id);
+  }
+});
+
+test("map: home is always drawn, open or not", () => {
+  // Default view and home named explicitly, on an open home...
+  assert.equal(mapClosed(null, INDY_IU), false);
+  assert.equal(mapClosed("indianapolis", INDY_IU), false);
+  // ...and on a closed one: a Bloomington student sees their own map.
+  const bloomington = { campusId: "iu-bloomington", system: "iu" as const };
+  assert.equal(mapClosed(null, bloomington), false);
+  assert.equal(mapClosed("iu-bloomington", bloomington), false);
+  assert.equal(mapClosed(" IU-BLOOMINGTON ", bloomington), false);
+});
+
+test("map: an open campus that isn't home is drawn", () => {
+  // Indianapolis is the one open campus; a Bloomington student may view it.
+  assert.equal(mapClosed("indianapolis", { campusId: "iu-bloomington", system: "iu" }), false);
+});
+
+test("map: ?campus=all, no campus and refusals aren't this rule's business", () => {
+  assert.equal(mapClosed("all", INDY_IU), false);
+  assert.equal(mapClosed(null, { campusId: null, system: "iu" }), false);
+  // Forbidden scopes are answered by campusScopeError before this is asked.
+  assert.equal(mapClosed("mars", INDY_IU), false);
+  assert.equal(mapClosed("iu-bloomington", { campusId: null, system: null }), false);
 });

@@ -13,15 +13,27 @@ import {
   EventCard,
   type FeedPost as DesktopFeedPost,
   useReportedPostIds,
+  useViewerCampus,
   withoutReportedPosts,
 } from "@/app/campus/campus-home";
+import { CampusBrowsePicker } from "@/components/campus/CampusBrowsePicker";
 import { RollingStrip } from "@/components/campus/RollingStrip";
 import { nextTagFilter } from "@/components/campus/rolling-strip-view";
 import { useStripData } from "@/components/campus/strip-data";
+import {
+  campusViewName,
+  isOpenCampus,
+  useViewingCampus,
+  VISITING_COPY,
+  visitingComposerNote,
+  withCampus,
+} from "@/components/campus/viewing-campus";
+import { VisitingBanner } from "@/components/campus/VisitingBanner";
 import { asLoadFailure, LoadFailed, type LoadFailure } from "@/components/feedback/LoadFailed";
 import { CampusConfirmBanner } from "@/components/mobile/CampusConfirmBanner";
 import { EditPostSheet } from "@/components/mobile/EditPostSheet";
-import { MapMobile } from "@/components/mobile/MapMobile";
+// `campusLoadFailure`: a refused `?campus=` gets "Back home", not Retry.
+import { campusLoadFailure, MapMobile } from "@/components/mobile/MapMobile";
 import { ConversationView } from "@/components/mobile/MessagesMobile";
 import { PostComposerMobile } from "@/components/mobile/PostComposerMobile";
 import { PostViewerMobile } from "@/components/mobile/PostViewerMobile";
@@ -75,6 +87,8 @@ import type { EditedPost } from "@/lib/posts/edit";
 
 type Tab = "feed" | "events" | "orgs" | "chat" | "map";
 const TAB_ORDER: Tab[] = ["feed", "events", "orgs", "chat", "map"];
+/** Visiting a campus that isn't open: no Map (see `mapHidden`). */
+const VISITING_CLOSED_TAB_ORDER: Tab[] = TAB_ORDER.filter((t) => t !== "map");
 
 // Reuse the desktop FeedPost shape so shared card components accept our
 // posts without any mapping. `edited_at` drives the " · Edited" marker.
@@ -98,6 +112,9 @@ type Org = {
   join_reason: "policy" | "visiting" | null;
   pending_invite: { id: string; expires_at: string; invited_by_name: string | null } | null;
   org_follow_state?: "following" | "not_following";
+  /** The club's campus. Following is never campus-scoped on the server, so
+   *  the Orgs pane uses it to keep a visited campus's list to that campus. */
+  campus_id?: string | null;
 };
 
 /** One row of GET /api/me/org-invites. logo_url is the RAW stored key. */
@@ -153,6 +170,54 @@ export function CampusMobile() {
       ? t
       : "feed";
   });
+
+  // Which campus is on screen (S67 wave 4, contracts C5). `?campus=<id>` is
+  // the truth; home is the student's own campus, from the same cached read
+  // the banner uses. Every campus read below is built by `withCampus`, which
+  // hands back the bare URL at home (and before home is known), so a student
+  // at home asks exactly what they asked before. The loads key on those URL
+  // strings: they change only when the campus on screen does.
+  const homeId = useViewerCampus().campusId;
+  const { viewingId, isVisiting, setViewing } = useViewingCampus(homeId);
+  // The visited campus's everyday name ("Bloomington"); null at home.
+  const visitingName = isVisiting ? campusViewName(viewingId) : null;
+  // A campus that isn't open has too few students for a map that doesn't
+  // name them (a two-person zone would), so its Map tab and pane go. Chat
+  // stays: it lists the student's own clubs, wherever they're looking.
+  const mapHidden = isVisiting && !isOpenCampus(viewingId);
+  const tabOrder = mapHidden ? VISITING_CLOSED_TAB_ORDER : TAB_ORDER;
+  if (mapHidden && tab === "map") setTab("feed");
+  const [pickerOpen, setPickerOpen] = useState(false);
+  // The picker's home row says "you can change it on <date>" (the 45-day
+  // lock). Only the profile bootstrap carries that date, so it's read the
+  // first time the picker opens; a failed read leaves the row saying "Home".
+  const [homeChangeAt, setHomeChangeAt] = useState<string | null>(null);
+  const homeChangeAskedRef = useRef(false);
+  useEffect(() => {
+    if (!pickerOpen || homeChangeAskedRef.current) return;
+    homeChangeAskedRef.current = true;
+    void (async () => {
+      const r = await vibeRequest<{ campusChangeAvailableAt?: unknown }>(
+        "/api/me/profile-bootstrap",
+        { cache: "no-store", quiet: true, failure: "Couldn't load your campus." },
+      );
+      if (r.ok && typeof r.data.campusChangeAvailableAt === "string") {
+        setHomeChangeAt(r.data.campusChangeAvailableAt);
+      }
+    })();
+  }, [pickerOpen]);
+  // A pick (or Back home) swaps the whole page, so it starts at the top.
+  const lookAt = useCallback(
+    (id: string | null) => {
+      setViewing(id);
+      setPickerOpen(false);
+      window.scrollTo({ top: 0 });
+    },
+    [setViewing],
+  );
+  const feedUrl = withCampus("/api/feed?limit=50", viewingId, homeId);
+  const eventsUrl = withCampus("/api/events?limit=50", viewingId, homeId);
+  const discoverUrl = withCampus("/api/orgs?filter=discover", viewingId, homeId);
   // The banner slot shows one card at a time (wave 3′b): the push ask waits
   // while the campus-confirm banner hasn't answered yet, for the rest of any
   // visit where the banner showed (no two cards back to back), while the
@@ -172,7 +237,9 @@ export function CampusMobile() {
     arrivedOnWelcome ||
     confirmBannerShown ||
     confirmBannerVisible !== false ||
-    tourActive;
+    tourActive ||
+    // Its slot is the Viewing pill's while visiting (below).
+    isVisiting;
   const [feed, setFeed] = useState<FeedPost[] | null>(null);
   // Who's signed in, echoed by /api/feed: your own cards offer Edit post.
   const [viewerId, setViewerId] = useState<string | null>(null);
@@ -282,7 +349,14 @@ export function CampusMobile() {
   // the next two weeks, then the campus's trending tags. The data lives
   // here rather than in the strip so this page knows whether the strip is
   // showing the active filter, and shows the plain "#tag ×" chip when it isn't.
-  const stripData = useStripData({ upcomingLimit: 3, trendingLimit: 8, days: 14 });
+  // Visiting, trending follows the campus on screen; the RSVP chips stay the
+  // student's own (C1).
+  const stripData = useStripData({
+    upcomingLimit: 3,
+    trendingLimit: 8,
+    days: 14,
+    campusId: isVisiting ? viewingId : null,
+  });
   // The strip only highlights a tag that is among its (≤8) trending chips,
   // and that highlighted chip is only surely visible when it was just tapped
   // (a trending refresh can also drop the tag). Same strict compare the
@@ -310,7 +384,18 @@ export function CampusMobile() {
   // state change, so the card is looked up on the next frame, once it's in
   // the DOM; EventCard renders `id="event-<id>"` and its own scroll margin.
   // Still loading → the tab switch alone is the fallback.
+  //
+  // Visiting, the chips are still the student's own RSVPs, usually at home,
+  // so one the visited campus's list doesn't have takes them home first; the
+  // card is scrolled to once home's events have loaded (the effect below).
+  const pendingEventRef = useRef<string | null>(null);
   const pickEvent = (id: string) => {
+    if (isVisiting && !(events ?? []).some((e) => e.id === id)) {
+      pendingEventRef.current = id;
+      lookAt(null);
+      setTab("events");
+      return;
+    }
     setTab("events");
     requestAnimationFrame(() => {
       document
@@ -318,6 +403,16 @@ export function CampusMobile() {
         ?.scrollIntoView({ block: "start", behavior: "smooth" });
     });
   };
+  useEffect(() => {
+    const id = pendingEventRef.current;
+    if (!id || isVisiting || events === null) return;
+    pendingEventRef.current = null;
+    requestAnimationFrame(() => {
+      document
+        .getElementById(`event-${id}`)
+        ?.scrollIntoView({ block: "start", behavior: "smooth" });
+    });
+  }, [events, isVisiting]);
 
   // Discord-style drill-down state: tapping an org opens its channels
   // drawer, tapping a channel inside that drawer opens the conversation.
@@ -366,6 +461,23 @@ export function CampusMobile() {
   }, []);
   const reportedPostIdsRef = useReportedPostIds(dropReportedPost);
 
+  // Another campus on screen: every list starts again from the skeleton, so
+  // nothing from the last campus shows under the new name. Adjusted during
+  // render, like the ?tag= filter above, so the first paint is already right;
+  // the loads below run again because their URLs changed.
+  const [listsFor, setListsFor] = useState(feedUrl);
+  if (listsFor !== feedUrl) {
+    setListsFor(feedUrl);
+    setFeed(null);
+    setFeedErr(null);
+    setEvents(null);
+    setEventsErr(null);
+    setTagFeed(null);
+    setOrgLists(EMPTY_ORG_LISTS);
+    setOrgErrs(NO_ORG_ERRS);
+    setOrgLocal({});
+  }
+
   // ---------- Initial fetches ----------
   //
   // "first" is the mount load and its Retry: quiet, and a failure shows
@@ -377,7 +489,7 @@ export function CampusMobile() {
   const feedSeqRef = useRef(0);
   const refetchFeed = useCallback(async (mode: "first" | "refresh") => {
     const seq = ++feedSeqRef.current;
-    const r = await vibeRequest<FeedBody>("/api/feed?limit=50", {
+    const r = await vibeRequest<FeedBody>(feedUrl, {
       cache: "no-store",
       quiet: mode !== "refresh",
       failure: "Couldn't load the feed.",
@@ -392,18 +504,18 @@ export function CampusMobile() {
       setFeed(withoutReportedPosts(posts, reportedPostIdsRef.current, (p) => p.id));
       if (r.ok && typeof r.data.viewerId === "string") setViewerId(r.data.viewerId);
     } else if (!feedLoadedRef.current) {
-      setFeedErr(asLoadFailure(r, "Couldn't load the feed."));
+      setFeedErr(campusLoadFailure(r, "Couldn't load the feed."));
     } else if (r.ok && mode === "refresh") {
       // A 2xx without the list, which vibeRequest had no reason to toast.
       toast({ message: asLoadFailure(r, "Couldn't load the feed.").message, tone: "error" });
     }
-  }, [reportedPostIdsRef]);
+  }, [reportedPostIdsRef, feedUrl]);
 
   const eventsLoadedRef = useRef(false);
   const eventsSeqRef = useRef(0);
   const refetchEvents = useCallback(async (mode: "first" | "refresh") => {
     const seq = ++eventsSeqRef.current;
-    const r = await vibeRequest<{ events?: unknown }>("/api/events?limit=50", {
+    const r = await vibeRequest<{ events?: unknown }>(eventsUrl, {
       cache: "no-store",
       quiet: mode !== "refresh",
       failure: "Couldn't load events.",
@@ -414,11 +526,11 @@ export function CampusMobile() {
       setEventsErr(null);
       setEvents(r.data.events as CampusEvent[]);
     } else if (!eventsLoadedRef.current) {
-      setEventsErr(asLoadFailure(r, "Couldn't load events."));
+      setEventsErr(campusLoadFailure(r, "Couldn't load events."));
     } else if (r.ok && mode === "refresh") {
       toast({ message: asLoadFailure(r, "Couldn't load events.").message, tone: "error" });
     }
-  }, []);
+  }, [eventsUrl]);
 
   // Loads when the Orgs tab first opens (below), on Retry, and after a row's
   // Join / Request / Accept. A Follow or Unfollow reloads nothing; it repaints
@@ -433,8 +545,10 @@ export function CampusMobile() {
     // defaults to "mine", so every student who has not joined an org yet
     // saw an empty Orgs tab and concluded the app had no clubs. Desktop
     // has always asked for discover (campus-home.tsx).
+    // Only discover follows the campus on screen: following and invites are
+    // the student's own, wherever the club is (OrgsPane narrows them).
     const [d, f, i] = await Promise.all([
-      vibeRequest<{ orgs?: unknown; viewerCampusId?: unknown }>("/api/orgs?filter=discover", {
+      vibeRequest<{ orgs?: unknown; viewerCampusId?: unknown }>(discoverUrl, {
         cache: "no-store",
         quiet: mode !== "refresh",
         failure: "Couldn't load orgs.",
@@ -469,7 +583,7 @@ export function CampusMobile() {
       campusId: discover ? discoverCampusId : prev.campusId,
     }));
     setOrgErrs({
-      discover: loaded.discover ? null : asLoadFailure(d, "Couldn't load orgs."),
+      discover: loaded.discover ? null : campusLoadFailure(d, "Couldn't load orgs."),
       following: loaded.following ? null : asLoadFailure(f, "Couldn't load the clubs you follow."),
       invites: loaded.invites ? null : asLoadFailure(i, "Couldn't load your invites."),
     });
@@ -489,7 +603,7 @@ export function CampusMobile() {
         return kept;
       });
     }
-  }, []);
+  }, [discoverUrl]);
 
   // A row's control answered. Follow and Unfollow repaint that row only, so
   // it never jumps between sections under the thumb. Join, Request, Accept
@@ -507,20 +621,32 @@ export function CampusMobile() {
     [refetchOrgs],
   );
 
+  // On mount, and again when another campus comes on screen (the two loaders
+  // change only with their URLs): a new campus is a first load, so a failure
+  // shows LoadFailed rather than keeping the last campus's list.
   useEffect(() => {
+    feedLoadedRef.current = false;
+    eventsLoadedRef.current = false;
     void refetchFeed("first");
     void refetchEvents("first");
   }, [refetchFeed, refetchEvents]);
 
   // The Orgs lists load the first time the Orgs tab opens (a ?tab=orgs link
   // included), not on every /campus visit: three GETs, and the invites one
-  // also expires stale invites on the server.
-  const orgsRequestedRef = useRef(false);
+  // also expires stale invites on the server. Once per campus on screen:
+  // keyed by the discover URL, which changes only with the campus.
+  const orgsRequestedRef = useRef<string | null>(null);
+  // An Orgs load still out for the last campus can't paint over this one,
+  // even while the Orgs tab is closed and nothing new has been asked for.
   useEffect(() => {
-    if (tab !== "orgs" || orgsRequestedRef.current) return;
-    orgsRequestedRef.current = true;
+    orgsSeqRef.current += 1;
+  }, [discoverUrl]);
+  useEffect(() => {
+    if (tab !== "orgs" || orgsRequestedRef.current === discoverUrl) return;
+    orgsRequestedRef.current = discoverUrl;
+    orgsLoadedRef.current = { discover: false, following: false, invites: false };
     void refetchOrgs("first");
-  }, [tab, refetchOrgs]);
+  }, [tab, discoverUrl, refetchOrgs]);
 
   // The loaded feed is only the 50 top-ranked posts, so a tag's posts can
   // sit past it; /api/feed?tag= returns the newest 50 with that tag (what
@@ -565,8 +691,9 @@ export function CampusMobile() {
         ? `Couldn't load every post tagged #${feedTag}.`
         : `Couldn't load posts tagged #${feedTag}.`;
     void (async () => {
+      // `feedUrl` already carries `?limit=50` (and `campus=` when visiting).
       const r = await vibeRequest<FeedBody>(
-        `/api/feed?limit=50&tag=${encodeURIComponent(feedTag)}`,
+        `${feedUrl}&tag=${encodeURIComponent(feedTag)}`,
         {
           cache: "no-store",
           // With nothing on screen to keep, the pane says it instead.
@@ -590,7 +717,7 @@ export function CampusMobile() {
         // A 2xx without the list, which vibeRequest had no reason to toast.
         toast({ message: asLoadFailure(r, line).message, tone: "error" });
       }
-      const failure = hasLoadedMatches ? null : asLoadFailure(r, line);
+      const failure = hasLoadedMatches ? null : campusLoadFailure(r, line);
       // A list this tag already got stays on screen as it was.
       setTagFeed((prev) =>
         prev && prev.tag === feedTag && prev.posts
@@ -601,14 +728,14 @@ export function CampusMobile() {
     return () => {
       cancelled = true;
     };
-  }, [feedTag, feed, tagAttempt, reportedPostIdsRef]);
+  }, [feedTag, feed, tagAttempt, reportedPostIdsRef, feedUrl]);
 
   // ---------- Swipeable tab scroll sync ----------
 
   useEffect(() => {
     const el = tabScrollRef.current;
     if (!el) return;
-    const idx = TAB_ORDER.indexOf(tab);
+    const idx = tabOrder.indexOf(tab);
     if (idx < 0) return;
     const target = el.clientWidth * idx;
     if (Math.abs(el.scrollLeft - target) < 4) return;
@@ -618,7 +745,7 @@ export function CampusMobile() {
       isProgrammaticScrollRef.current = false;
     }, 420);
     return () => window.clearTimeout(t);
-  }, [tab]);
+  }, [tab, tabOrder]);
 
   // ---------- Composer FAB ----------
 
@@ -679,7 +806,13 @@ export function CampusMobile() {
           zIndex: 6,
         }}
       >
-        <CampusBanner compactSearch onSearchTap={() => setSearchOpen(true)} />
+        {/* The banner reads `?campus=` itself, so its title, tile and the
+            "IU · JUST LOOKING" eyebrow follow the campus on screen. */}
+        <CampusBanner
+          compactSearch
+          onSearchTap={() => setSearchOpen(true)}
+          onOpenCampuses={() => setPickerOpen(true)}
+        />
       </div>
 
       {/* Mounted on every tab so its answer survives a swipe. The wrapper
@@ -687,11 +820,21 @@ export function CampusMobile() {
           Hidden on Map: the map's height assumes nothing sits between the
           campus banner and the tab strip, and the card would push its
           Recenter button under the tab bar. The push ask shares the slot
-          and stays suppressed once the banner has shown (see above). */}
-      <div hidden={tab === "map"}>
+          and stays suppressed once the banner has shown (see above). While
+          visiting, the Viewing pill takes the slot: confirming home is a
+          question for home, and one card at a time. */}
+      <div hidden={tab === "map" || isVisiting}>
         <CampusConfirmBanner onVisibleChange={onConfirmBannerVisible} />
         <PushAsk placement="campus" suppressed={pushAskSuppressed} />
       </div>
+      {isVisiting && tab !== "map" ? (
+        <VisitingBanner
+          viewingId={viewingId}
+          homeId={homeId}
+          onBackHome={() => lookAt(null)}
+          style={{ margin: "10px 16px 0" }}
+        />
+      ) : null}
 
       <header
         id="otto-mobile-tour-tabs"
@@ -704,7 +847,7 @@ export function CampusMobile() {
           zIndex: 5,
         }}
       >
-        <TabStrip active={tab} onChange={setTab} />
+        <TabStrip active={tab} onChange={setTab} order={tabOrder} />
       </header>
 
       <div
@@ -716,7 +859,7 @@ export function CampusMobile() {
           const w = el.clientWidth;
           if (w === 0) return;
           const idx = Math.round(el.scrollLeft / w);
-          const next = TAB_ORDER[idx];
+          const next = tabOrder[idx];
           if (next && next !== tab) setTab(next);
         }}
         className="vibe-no-scrollbar"
@@ -743,8 +886,12 @@ export function CampusMobile() {
             onPickTag={pickStripTag}
             onPickEvent={pickEvent}
             activeTag={feedTag}
+            visiting={isVisiting}
             className="vibe-no-scrollbar -mx-4 px-4"
           />
+          {/* Visiting: the + is gone (a post always lands on the author's
+              home campus), and this line in its place says where one goes. */}
+          {isVisiting ? <VisitingComposerNote text={visitingComposerNote(homeId)} /> : null}
           <FeedPane
             posts={visibleFeed}
             loadErr={feedFailure}
@@ -763,6 +910,7 @@ export function CampusMobile() {
             // A block made from a card's ⋯ has to take their posts off the
             // screen, or it reads as though nothing happened.
             onBlocked={() => void refetchFeed("refresh")}
+            visitingName={visitingName}
           />
         </section>
         <section style={paneStyle}>
@@ -778,6 +926,7 @@ export function CampusMobile() {
               // An RSVP is exactly what the strip's event chips show.
               stripData.refresh();
             }}
+            visitingName={visitingName}
           />
         </section>
         <section style={paneStyle}>
@@ -790,22 +939,39 @@ export function CampusMobile() {
               void refetchOrgs("first");
             }}
             onChange={onOrgChange}
+            visiting={
+              isVisiting && viewingId
+                ? { id: viewingId, name: visitingName ?? viewingId }
+                : null
+            }
           />
         </section>
         <section style={paneStyle}>
           {/* Keyed so a club joined on the Orgs tab remounts it, and it
-              reloads its own club list. */}
+              reloads its own club list. Stays while visiting: it lists the
+              student's own clubs, not the campus on screen. */}
           <ChatPane key={chatKey} onSelectOrg={(o) => setSelectedOrgForChat(o)} />
         </section>
-        <section style={mapPaneStyle}>
-          <MapPane />
-        </section>
+        {mapHidden ? null : (
+          <section style={mapPaneStyle}>
+            {/* Keyed by its campus, so another campus starts a fresh map
+                (no pan, zoom or open zone carried over). Bare at home. */}
+            <MapPane
+              key={withCampus("/api/campus-map", viewingId, homeId)}
+              viewingId={viewingId}
+              homeId={homeId}
+            />
+          </section>
+        )}
       </div>
 
       {/* Composer FAB — Feed only. Events, Orgs, Chat, and Map have no
           composer flow, and on those tabs the orange + just covered
-          content (e.g. the chat send button or a map bubble). */}
-      {tab === "feed" ? <ComposerFab ref={composerFabRef} onPost={openComposer} /> : null}
+          content (e.g. the chat send button or a map bubble). Hidden while
+          visiting: a post can only land on home (see the note above). */}
+      {tab === "feed" && !isVisiting ? (
+        <ComposerFab ref={composerFabRef} onPost={openComposer} />
+      ) : null}
 
       {/* Composer */}
       {composerOpen ? (
@@ -819,11 +985,28 @@ export function CampusMobile() {
         />
       ) : null}
 
+      {/* "Look around." — every campus, both universities, for browsing.
+          It never changes home (that's Settings, own university only). */}
+      <CampusBrowsePicker
+        variant="sheet"
+        open={pickerOpen}
+        homeId={homeId}
+        viewingId={viewingId}
+        homeChangeAvailableAt={homeChangeAt}
+        onPick={lookAt}
+        onClose={() => setPickerOpen(false)}
+      />
+
       {/* Search overlay (mobile) — replaces the squished search bar
           in the banner. Tap the search icon → this slides in from the
-          top with a focused input + live results. */}
+          top with a focused input + live results. Follows the campus on
+          screen (C5). */}
       {searchOpen ? (
-        <CampusSearchOverlay onClose={() => setSearchOpen(false)} />
+        <CampusSearchOverlay
+          onClose={() => setSearchOpen(false)}
+          viewingId={viewingId}
+          homeId={homeId}
+        />
       ) : null}
 
       {/* Org channels drawer — Discord-style. Swipes in when an org
@@ -936,20 +1119,25 @@ const mapPaneStyle: React.CSSProperties = {
   overflow: "hidden",
 };
 
+const TAB_LABEL: Record<Tab, string> = {
+  feed: "Feed",
+  events: "Events",
+  orgs: "Orgs",
+  chat: "Chat",
+  map: "Map",
+};
+
 function TabStrip({
   active,
   onChange,
+  order,
 }: {
   active: Tab;
   onChange: (t: Tab) => void;
+  /** The tabs on screen, in order (Map drops out on a closed visited campus). */
+  order: readonly Tab[];
 }) {
-  const tabs: Array<{ id: Tab; label: string }> = [
-    { id: "feed", label: "Feed" },
-    { id: "events", label: "Events" },
-    { id: "orgs", label: "Orgs" },
-    { id: "chat", label: "Chat" },
-    { id: "map", label: "Map" },
-  ];
+  const tabs = order.map((id) => ({ id, label: TAB_LABEL[id] }));
   return (
     <div
       className="vibe-no-scrollbar"
@@ -1030,6 +1218,7 @@ function FeedPane({
   viewerId,
   onEdited,
   onBlocked,
+  visitingName,
 }: {
   posts: FeedPost[] | null;
   /** Why `posts` is null once its load has failed; null while loading. */
@@ -1049,6 +1238,9 @@ function FeedPane({
   onEdited: (p: EditedPost) => void;
   /** A block landed from a card's ⋯: reload so their posts go. */
   onBlocked: () => void;
+  /** The campus being looked at when it isn't home; null at home. Its empty
+   *  feed can't ask for a first post: the + isn't there and posts go home. */
+  visitingName: string | null;
 }) {
   const chip = tag && showTagChip ? <FeedTagChip tag={tag} onClear={onClearTag} /> : null;
   if (posts === null) {
@@ -1067,6 +1259,11 @@ function FeedPane({
           <EmptyTab
             title={`Nothing tagged #${tag} yet`}
             body="Posts with this hashtag will show up here."
+          />
+        ) : visitingName ? (
+          <EmptyTab
+            title={VISITING_COPY.emptyFeed}
+            body={`When students at ${visitingName} post, it shows up here.`}
           />
         ) : (
           <EmptyTab
@@ -1127,6 +1324,44 @@ function FeedTagChip({ tag, onClear }: { tag: string; onClear: () => void }) {
         ×
       </span>
     </button>
+  );
+}
+
+/** In the composer's place while visiting (the FAB is hidden): one dashed
+ *  line saying where a new post goes (C5, the canvas's "Viewing Bloomington"
+ *  board). Not a button: the way home is the Viewing pill's Back home. */
+function VisitingComposerNote({ text }: { text: string }) {
+  return (
+    <div
+      role="note"
+      style={{
+        display: "flex",
+        alignItems: "center",
+        gap: 10,
+        padding: "12px 14px",
+        borderRadius: 16,
+        border: "1px dashed rgba(var(--scrim-rgb),0.14)",
+        fontFamily: "DM Sans, sans-serif",
+        fontSize: 12.5,
+        lineHeight: 1.4,
+        color: "var(--ink-2)",
+      }}
+    >
+      <svg
+        width="16"
+        height="16"
+        viewBox="0 0 24 24"
+        fill="none"
+        stroke="var(--ink-muted)"
+        strokeWidth="2"
+        strokeLinecap="round"
+        aria-hidden
+        style={{ flexShrink: 0 }}
+      >
+        <path d="M12 20h9M16.5 3.5a2.1 2.1 0 0 1 3 3L7 19l-4 1 1-4z" />
+      </svg>
+      <span style={{ minWidth: 0 }}>{text}</span>
+    </div>
   );
 }
 
@@ -1831,17 +2066,26 @@ function EventsPane({
   loadErr,
   onRetry,
   onMutate,
+  visitingName,
 }: {
   events: CampusEvent[] | null;
   loadErr: LoadFailure | null;
   onRetry: () => void;
   onMutate: () => void;
+  /** The campus being looked at when it isn't home; null at home. RSVP is
+   *  refused there (403 `campus_visiting`), so the cards say so up front. */
+  visitingName: string | null;
 }) {
   if (events === null) {
     return loadErr ? <LoadFailed failure={loadErr} onRetry={onRetry} /> : <PaneSkeleton />;
   }
   if (events.length === 0) {
-    return (
+    return visitingName ? (
+      <EmptyTab
+        title={VISITING_COPY.emptyEvents}
+        body={`When clubs at ${visitingName} post events, they'll show up here.`}
+      />
+    ) : (
       <EmptyTab
         title="Nothing scheduled"
         body="When orgs or classmates create events, they'll surface here."
@@ -1851,7 +2095,10 @@ function EventsPane({
   return (
     <>
       {events.map((ev) => (
-        <EventCard key={ev.id} ev={ev} onMutate={onMutate} />
+        // Visiting: the card renders its RSVP off, titled "RSVP works on
+        // your home campus", with the italic "RSVP works at home" beside it
+        // (the desktop card, shared; the org page passes the same flag).
+        <EventCard key={ev.id} ev={ev} onMutate={onMutate} visiting={visitingName !== null} />
       ))}
     </>
   );
@@ -2662,11 +2909,13 @@ function DarkChannelRow({
 
 // ---------- Map pane ----------
 
-function MapPane() {
+function MapPane({ viewingId, homeId }: { viewingId: string | null; homeId: string | null }) {
   // Native rebuild — pinch-zoom, pan, vaul zone sheet. The desktop
   // MapTabBody embed has been retired here (was visually squished on
-  // phones); see MapMobile for the touch-first version.
-  return <MapMobile />;
+  // phones); see MapMobile for the touch-first version. It reads the
+  // campus on screen (C5); the pane is only mounted when that campus's
+  // map may show (home, or an open campus while visiting).
+  return <MapMobile viewingId={viewingId} homeId={homeId} />;
 }
 
 // ---------- Orgs pane ----------
@@ -2776,6 +3025,7 @@ function OrgsPane({
   local,
   onRetry,
   onChange,
+  visiting,
 }: {
   lists: OrgLists;
   errs: OrgErrs;
@@ -2783,6 +3033,11 @@ function OrgsPane({
   local: Record<string, OrgLocal>;
   onRetry: () => void;
   onChange: OrgChangeHandler;
+  /** The campus being looked at when it isn't home; null at home. Discover
+   *  is already that campus's; the pane keeps the student's own follows and
+   *  invites to the clubs there, so home clubs don't pose as the visited
+   *  campus's and an empty campus reads as one. */
+  visiting: { id: string; name: string } | null;
 }) {
   // The three loads settle together: all null with no error is loading, and
   // all null after a failure shows discover's line.
@@ -2790,10 +3045,20 @@ function OrgsPane({
     return errs.discover ? <LoadFailed failure={errs.discover} onRetry={onRetry} /> : <PaneSkeleton />;
   }
 
-  const inviteRows = acceptableInviteRows(lists.invites ?? [], lists.discover, lists.following);
+  // Visiting: only the clubs on the campus being looked at. Following carries
+  // each club's campus; an invite row doesn't, so it stays when its club is
+  // in one of those two lists.
+  const followingHere = visiting
+    ? (lists.following ?? []).filter((o) => o.campus_id === visiting.id)
+    : (lists.following ?? []);
+  const hereIds = new Set([...(lists.discover ?? []), ...followingHere].map((o) => o.id));
+  const invitesHere = visiting
+    ? (lists.invites ?? []).filter((r) => hereIds.has(r.org.id))
+    : (lists.invites ?? []);
+  const inviteRows = acceptableInviteRows(invitesHere, lists.discover, lists.following);
   const inviteIds = new Set(inviteRows.map((r) => r.org.id));
   // Newest follow first, as the server sends them. Never re-sorted.
-  const followingRows = (lists.following ?? []).filter((o) => !inviteIds.has(o.id));
+  const followingRows = followingHere.filter((o) => !inviteIds.has(o.id));
   const taken = new Set([...inviteIds, ...followingRows.map((o) => o.id)]);
   // If the following or invite list failed, those clubs stay here, still
   // with the right control and chip.
@@ -2814,7 +3079,7 @@ function OrgsPane({
     (lists.following === null && !errs.following) ||
     (lists.discover === null && !errs.discover);
 
-  const campus = campusRowById(lists.campusId)?.shortName ?? null;
+  const campus = visiting?.name ?? campusRowById(lists.campusId)?.shortName ?? null;
   const line = campus
     ? `Clubs are just getting started at ${campus}. Follow the ones you like — posts land in your feed.`
     : "Clubs are just getting started here. Follow the ones you like — posts land in your feed.";
@@ -2822,7 +3087,11 @@ function OrgsPane({
   // While any list has failed, or is still being retried, an empty pane is
   // not "no clubs".
   if (total === 0 && !failedAny) {
-    return retryingAny ? <PaneSkeleton /> : <EmptyTab title="No clubs here yet" body={line} />;
+    return retryingAny ? (
+      <PaneSkeleton />
+    ) : (
+      <EmptyTab title={visiting ? VISITING_COPY.emptyClubs : "No clubs here yet"} body={line} />
+    );
   }
 
   const blocks: React.ReactNode[] = [];
@@ -3621,7 +3890,17 @@ type SearchOrg = {
   audience?: OrgAudience;
 };
 
-export function CampusSearchOverlay({ onClose }: { onClose: () => void }) {
+export function CampusSearchOverlay({
+  onClose,
+  viewingId = null,
+  homeId = null,
+}: {
+  onClose: () => void;
+  /** The campus page's viewed and home campus (C5): search follows the
+   *  campus on screen. Omitted (the profile's search) → home, bare URL. */
+  viewingId?: string | null;
+  homeId?: string | null;
+}) {
   const [value, setValue] = useState("");
   const [debounced, setDebounced] = useState("");
   const [users, setUsers] = useState<SearchUser[]>([]);
@@ -3667,7 +3946,11 @@ export function CampusSearchOverlay({ onClose }: { onClose: () => void }) {
       setLoading(true);
       setSearchErr(null);
       const r = await vibeRequest<{ users?: unknown; orgs?: unknown }>(
-        `/api/search?q=${encodeURIComponent(debounced)}&limit=8&kinds=users,orgs`,
+        withCampus(
+          `/api/search?q=${encodeURIComponent(debounced)}&limit=8&kinds=users,orgs`,
+          viewingId,
+          homeId,
+        ),
         {
           credentials: "include",
           cache: "no-store",
@@ -3684,11 +3967,11 @@ export function CampusSearchOverlay({ onClose }: { onClose: () => void }) {
         // Not "No matches": the search didn't run.
         setUsers([]);
         setOrgs([]);
-        setSearchErr(asLoadFailure(r, "Couldn't run that search."));
+        setSearchErr(campusLoadFailure(r, "Couldn't run that search."));
       }
       setLoading(false);
     })();
-  }, [debounced, attempt]);
+  }, [debounced, attempt, viewingId, homeId]);
 
   const hasResults = users.length > 0 || orgs.length > 0;
 

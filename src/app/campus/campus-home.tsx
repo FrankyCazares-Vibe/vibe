@@ -4,8 +4,10 @@ import { motion } from "framer-motion";
 import Link from "next/link";
 import { useSearchParams } from "next/navigation";
 import {
+  createContext,
   Fragment,
   useCallback,
+  useContext,
   useEffect,
   useMemo,
   useRef,
@@ -15,8 +17,18 @@ import {
 import { createPortal } from "react-dom";
 
 import { CampusAppShell } from "@/components/campus-app-shell";
+import { CampusBrowsePicker } from "@/components/campus/CampusBrowsePicker";
 import { RollingStrip } from "@/components/campus/RollingStrip";
 import { useStripData } from "@/components/campus/strip-data";
+import {
+  isOpenCampus,
+  useViewingCampus,
+  VISITING_COPY,
+  visitingComposerNote,
+  visitingEyebrow,
+  withCampus,
+} from "@/components/campus/viewing-campus";
+import { VisitingBanner } from "@/components/campus/VisitingBanner";
 import { asLoadFailure, LoadFailed, type LoadFailure } from "@/components/feedback/LoadFailed";
 import { ImageCropperModal } from "@/components/ImageCropperModal";
 import { emitCalendarChanged } from "@/components/LeftNav";
@@ -40,7 +52,7 @@ import {
   capturePosterFrame,
   extractHashtags,
 } from "@/lib/composer/helpers";
-import { copyText, vibeRequest } from "@/lib/feedback/request";
+import { copyText, type VibeResult, vibeRequest } from "@/lib/feedback/request";
 import { toast } from "@/lib/feedback/toast";
 import {
   allowedCampusId,
@@ -356,6 +368,56 @@ const TABS: { key: CampusTab; label: string }[] = [
 /** A scene eyebrow: "Feed · Indianapolis", or just "Feed" with no campus. */
 function campusEyebrow(tab: string, label: string | null): string {
   return label ? `${tab} · ${label}` : tab;
+}
+
+/**
+ * The campus on screen (S67 wave 4, contracts C5). `?campus=<id>` is the
+ * truth (`useViewingCampus`); home is the viewer's own campus
+ * (`useViewerCampus`). `url()` builds every campus read through `withCampus`,
+ * so at home each URL is exactly the bare one it always was.
+ *
+ * CampusHome provides it. The default is "home, not provided", so the pieces
+ * the phone and the org page share (CampusBanner, EventCard) behave as they
+ * did unless something tells them otherwise.
+ */
+type CampusView = {
+  provided: boolean;
+  viewingId: string | null;
+  homeId: string | null;
+  isVisiting: boolean;
+  /** The campus on screen's full name, for eyebrows and hints ("IU Bloomington"). */
+  label: string | null;
+  url(path: string): string;
+};
+
+const HOME_CAMPUS_VIEW: CampusView = {
+  provided: false,
+  viewingId: null,
+  homeId: null,
+  isVisiting: false,
+  label: null,
+  url: (path) => path,
+};
+
+const CampusViewContext = createContext<CampusView>(HOME_CAMPUS_VIEW);
+
+function useCampusView(): CampusView {
+  return useContext(CampusViewContext);
+}
+
+// A campus read refused because of the campus itself: 400 `unknown_campus`
+// (a bad id in a shared link) or 403 `campus_not_in_system` (an account with
+// no verified university). A retry would only fail again, so the way out is
+// home: a full navigation to bare /campus, which drops `?campus=`.
+const CAMPUS_REFUSAL_CODES = new Set(["unknown_campus", "campus_not_in_system"]);
+const BACK_HOME_ACTION = { label: "Back home", href: "/campus" } as const;
+
+/** `asLoadFailure`, except a campus refusal gets "Back home" instead of Retry. */
+function campusLoadFailure(r: VibeResult<unknown>, line: string): LoadFailure {
+  if (!r.ok && r.code && CAMPUS_REFUSAL_CODES.has(r.code)) {
+    return { message: r.message, action: { ...BACK_HOME_ACTION } };
+  }
+  return asLoadFailure(r, line);
 }
 
 export function CampusHome({
@@ -751,16 +813,59 @@ export function CampusHome({
     [activeOrg]
   );
 
-  const showThreeColumn = tab === "chat" && !isEmpty && !isLoading;
-  const scene = getTabScene(tab);
   // A verified student with no campus yet gets the "Pick your campus" strip
   // under the banner (never inside it: the phone shares the banner).
   const viewerCampus = useViewerCampus();
   const needsCampusPick =
     viewerCampus.ready && viewerCampus.system !== null && viewerCampus.campusId === null;
 
+  // The campus on screen (C5). `?campus=` is the truth; at home it's absent
+  // and every read below stays the bare URL it was.
+  const viewing = useViewingCampus(viewerCampus.campusId);
+  const { viewingId, homeId, isVisiting, setViewing } = viewing;
+  const campusView = useMemo<CampusView>(
+    () => ({
+      provided: true,
+      viewingId,
+      homeId,
+      isVisiting,
+      label: isVisiting ? (campusRowById(viewingId)?.name ?? null) : viewerCampus.label,
+      url: (path: string) => withCampus(path, viewingId, homeId),
+    }),
+    [viewingId, homeId, isVisiting, viewerCampus.label],
+  );
+  const [browseOpen, setBrowseOpen] = useState(false);
+  // The picker's home row says when the 45-day lock lifts. The profile
+  // bootstrap carries that date; read it once, the first time the picker
+  // opens. Quiet: on a failure the row just says "Home".
+  const [homeLockAt, setHomeLockAt] = useState<string | null>(null);
+  const homeLockAskedRef = useRef(false);
+  useEffect(() => {
+    if (!browseOpen || homeLockAskedRef.current) return;
+    homeLockAskedRef.current = true;
+    void vibeRequest<{ campusChangeAvailableAt?: unknown }>("/api/me/profile-bootstrap", {
+      cache: "no-store",
+      quiet: true,
+      failure: "Couldn't load your campus.",
+    }).then((r) => {
+      if (r.ok && typeof r.data.campusChangeAvailableAt === "string") {
+        setHomeLockAt(r.data.campusChangeAvailableAt);
+      }
+    });
+  }, [browseOpen]);
+  // A campus that isn't open has only a handful of students, and its map
+  // would name them by major (R3), so the Map tab hides while visiting one.
+  // Derived, not stored: a Map tab left open falls back to Feed, and Back
+  // home brings the student's own tab back.
+  const mapHidden = isVisiting && !isOpenCampus(viewingId);
+  const shownTab: CampusTab = tab === "map" && mapHidden ? "feed" : tab;
+
+  const showThreeColumn = tab === "chat" && !isEmpty && !isLoading;
+  const scene = getTabScene(shownTab);
+
   return (
     <CampusAppShell>
+      <CampusViewContext.Provider value={campusView}>
       <style>{SHEEN_KEYFRAMES}</style>
       <div
         style={{
@@ -787,8 +892,21 @@ export function CampusHome({
             icon. Chat keeps the in-banner pill: its chrome is dark (a cream
             pill would float on it) and the tab is locked to 100dvh, so an
             extra 48px row would come straight out of the thread. */}
-        <CampusBanner search={tab === "chat"} />
+        <CampusBanner search={tab === "chat"} onOpenCampuses={() => setBrowseOpen(true)} />
         {needsCampusPick ? <PickCampusStrip /> : null}
+        {/* Away from home: "Viewing Bloomington · home is Indianapolis" with
+            Back home, on every tab (Chat too: it's still the student's own
+            clubs, and the pill says where the rest of the page is). */}
+        {isVisiting ? (
+          <div style={{ padding: "10px 24px 0", display: "flex", justifyContent: "center" }}>
+            <VisitingBanner
+              viewingId={viewingId}
+              homeId={homeId}
+              onBackHome={() => setViewing(null)}
+              style={{ maxWidth: 720 }}
+            />
+          </div>
+        ) : null}
         {tab !== "chat" ? (
           <div
             style={{
@@ -800,7 +918,7 @@ export function CampusHome({
             <CampusSearchBar variant="row" placeholder="Search people, clubs, events" />
           </div>
         ) : null}
-        <CampusTabs active={tab} onChange={setTab} />
+        <CampusTabs active={shownTab} onChange={setTab} hideMap={mapHidden} />
 
         {orgsLoadErr && tab === "chat" ? (
           <main
@@ -878,7 +996,10 @@ export function CampusHome({
             }}
           >
             <TabBody
-              tab={tab}
+              // A new campus is a new page: remount, so the last campus's
+              // rows never sit under the new campus's name while it loads.
+              key={isVisiting ? `visit:${viewingId}` : "home"}
+              tab={shownTab}
               onCreateOrg={() => setShowCreateOrg(true)}
               feedTagFilter={feedTagFilter}
               onClearTagFilter={() => setFeedTagFilter(null)}
@@ -956,7 +1077,23 @@ export function CampusHome({
               );
             })()
           : null}
+
+        {/* "Look around.": every campus, grouped Shared · IU · Purdue. Picking
+            one rewrites `?campus=`; picking home drops it. */}
+        <CampusBrowsePicker
+          variant="modal"
+          open={browseOpen}
+          homeId={homeId}
+          viewingId={viewingId}
+          homeChangeAvailableAt={homeLockAt}
+          onPick={(id) => {
+            setViewing(id);
+            setBrowseOpen(false);
+          }}
+          onClose={() => setBrowseOpen(false)}
+        />
       </div>
+      </CampusViewContext.Provider>
     </CampusAppShell>
   );
 }
@@ -4308,6 +4445,13 @@ function countOrNull(v: unknown): number | null {
   return typeof v === "number" && Number.isFinite(v) ? v : null;
 }
 
+// The banner's "Campuses" button: a lighter wash on hover and the coral
+// focus ring every new control gets (C0). Inline styles can't say either.
+const CAMPUSES_BUTTON_CSS = `
+  .vibe-campuses-btn:hover { background: rgba(255,255,255,0.22) !important; }
+  .vibe-campuses-btn:focus-visible { outline: 2px solid var(--coral); outline-offset: 2px; }
+`;
+
 /** Under the banner on /campus for a verified student with no campus yet. */
 function PickCampusStrip() {
   return (
@@ -4343,6 +4487,7 @@ export function CampusBanner({
   compactSearch = false,
   onSearchTap,
   search = true,
+  onOpenCampuses,
 }: {
   /** Mobile collapses the search bar into a single icon so the banner
    *  doesn't get bunched up. Tap fires `onSearchTap`. */
@@ -4351,18 +4496,36 @@ export function CampusBanner({
   /** `false` drops the banner's own search mount entirely. Desktop passes
    *  it because its search bar sits in its own row under the banner. */
   search?: boolean;
+  /** Shows the "Campuses" button (S67 wave 4), which opens the Look-around
+   *  picker. Omitted → no button, exactly as before. */
+  onOpenCampuses?: () => void;
 } = {}) {
   // Whose campus this is: the title, the tile, the colour and the stats
-  // label all follow the viewer's own campus (plan Q15). Until the first
+  // label all follow the campus ON SCREEN (C5): home, or the one `?campus=`
+  // names while visiting (plan Q15 colours either way). Until the first
   // answer the banner paints neutral and blank, so it never guesses a name;
   // after that it keeps the last answer while it re-reads.
   const viewer = useViewerCampus();
-  const { campus, label } = viewer;
+  // The desktop provides the view; the phone (which shares this banner and
+  // provides nothing) reads `?campus=` here itself. Both read the same URL.
+  const shared = useCampusView();
+  const own = useViewingCampus(viewer.campusId);
+  const viewingId = shared.provided ? shared.viewingId : own.viewingId;
+  const homeId = shared.provided ? shared.homeId : own.homeId;
+  const isVisiting = shared.provided ? shared.isVisiting : own.isVisiting;
+  const campus = isVisiting ? campusRowById(viewingId) : viewer.campus;
+  const label = isVisiting ? (campus?.name ?? null) : viewer.label;
+  const known = viewer.ready || isVisiting;
   const palette = bannerPalette(campus);
-  const title = viewer.ready ? (label ?? "Vibe") : "\u00A0";
-  const monogram = viewer.ready ? campusMonogram(campus?.shortName) : "";
-  const sharedSub =
-    campus && isSharedCampus(campus) ? "IU + Purdue · one community" : null;
+  const title = known ? (label ?? "Vibe") : "\u00A0";
+  const monogram = known ? campusMonogram(campus?.shortName) : "";
+  // "IU · JUST LOOKING" away from home; the shared-community line at home.
+  const sharedSub = isVisiting
+    ? visitingEyebrow(viewingId)
+    : campus && isSharedCampus(campus)
+      ? "IU + Purdue · one community"
+      : null;
+  const statsUrl = withCampus("/api/stats/campus", viewingId, homeId);
 
   // Live stats for the campus header line. The heartbeat updates the
   // viewer's `users.last_active_at` so the active-now count includes
@@ -4383,7 +4546,7 @@ export function CampusBanner({
     };
     const refresh = async () => {
       try {
-        const r = await fetch("/api/stats/campus", { cache: "no-store" });
+        const r = await fetch(statsUrl, { cache: "no-store" });
         const j = await r.json();
         if (cancelled) return;
         if (r.ok && j?.ok) {
@@ -4412,8 +4575,8 @@ export function CampusBanner({
       cancelled = true;
       window.clearInterval(tick);
     };
-  }, []);
-  const statsLine = viewer.ready ? bannerStatsLine(stats, label, viewer.campusId) : "";
+  }, [statsUrl]);
+  const statsLine = known ? bannerStatsLine(stats, label, campus?.id ?? null) : "";
 
   const ellipsis: React.CSSProperties = {
     minWidth: 0,
@@ -4428,6 +4591,7 @@ export function CampusBanner({
     fontWeight: 600,
     color: "rgba(255,255,255,0.62)",
     lineHeight: 1.2,
+    ...(isVisiting ? { letterSpacing: "0.05em" } : null),
   };
 
   return (
@@ -4505,6 +4669,76 @@ export function CampusBanner({
         ) : null}
       </div>
       <div style={{ flex: 1 }} />
+      {onOpenCampuses ? (
+        <>
+          <style>{CAMPUSES_BUTTON_CSS}</style>
+          <button
+            type="button"
+            className="vibe-campuses-btn"
+            onClick={onOpenCampuses}
+            aria-label="Look around other campuses"
+            aria-haspopup="dialog"
+            title="Look around other campuses"
+            style={{
+              display: "inline-flex",
+              alignItems: "center",
+              justifyContent: "center",
+              gap: 6,
+              // Phone: a 44px round icon like the search button beside it, so
+              // the campus title keeps its room at 375px. Desktop: the word.
+              height: compactSearch ? 44 : 38,
+              width: compactSearch ? 44 : undefined,
+              padding: compactSearch ? 0 : "0 14px",
+              borderRadius: 999,
+              background: "rgba(255,255,255,0.14)",
+              border: "1px solid rgba(255,255,255,0.18)",
+              color: "#fff",
+              fontFamily: "DM Sans, sans-serif",
+              fontSize: 12.5,
+              fontWeight: 700,
+              cursor: "pointer",
+              flexShrink: 0,
+              boxShadow: "inset 0 1px 0 rgba(255,255,255,0.18)",
+              transition: "background 140ms ease",
+              WebkitTapHighlightColor: "transparent",
+            }}
+          >
+            {compactSearch ? (
+              // A globe: look around other campuses.
+              <svg
+                width="18"
+                height="18"
+                viewBox="0 0 24 24"
+                fill="none"
+                stroke="currentColor"
+                strokeWidth="2"
+                strokeLinecap="round"
+                strokeLinejoin="round"
+                aria-hidden
+              >
+                <circle cx="12" cy="12" r="9" />
+                <path d="M3 12h18M12 3c2.5 2.6 3.8 5.6 3.8 9s-1.3 6.4-3.8 9c-2.5-2.6-3.8-5.6-3.8-9s1.3-6.4 3.8-9z" />
+              </svg>
+            ) : (
+              <>
+                Campuses
+                <svg
+                  width="12"
+                  height="12"
+                  viewBox="0 0 24 24"
+                  fill="none"
+                  stroke="currentColor"
+                  strokeWidth="2.4"
+                  strokeLinecap="round"
+                  aria-hidden
+                >
+                  <path d="M6 9l6 6 6-6" />
+                </svg>
+              </>
+            )}
+          </button>
+        </>
+      ) : null}
       {/* Phone-only quick-access to /messages — Instagram's DM-in-header
           pattern. Hidden on desktop because the desktop LeftNav already
           has a Messages link. Also hidden on the mobile shell because
@@ -4689,6 +4923,11 @@ function CampusSearchBar({
   const [recents, setRecents] = useState<RecentSearch[]>([]);
   const [coords, setCoords] = useState<{ right: number; top: number; width: number } | null>(null);
   const seqRef = useRef(0);
+  // Search follows the campus on screen (C5): bare at home, `?campus=` away.
+  const view = useCampusView();
+  const searchUrl = debounced
+    ? view.url(`/api/search?q=${encodeURIComponent(debounced)}&limit=6`)
+    : null;
 
   // Hydrate recents from localStorage after mount. Wrapped in an async
   // IIFE so the setState happens off the synchronous effect body —
@@ -4705,7 +4944,7 @@ function CampusSearchBar({
   }, [value]);
 
   useEffect(() => {
-    if (!debounced) {
+    if (!searchUrl) {
       // Render layer reads `showResults = !!debounced` and ignores the
       // results lists, so we don't need to clear them here. Stale
       // in-flight fetches are guarded by the seq counter below.
@@ -4718,7 +4957,7 @@ function CampusSearchBar({
         users?: SearchUser[];
         orgs?: SearchOrg[];
         events?: SearchEvent[];
-      }>(`/api/search?q=${encodeURIComponent(debounced)}&limit=6`, {
+      }>(searchUrl, {
         credentials: "include",
         quiet: true,
         failure: "Search failed.",
@@ -4737,10 +4976,10 @@ function CampusSearchBar({
         setOrgs(r.data.orgs);
         setEvents(r.data.events);
       } else {
-        setSearchErr(asLoadFailure(r, "Search failed."));
+        setSearchErr(campusLoadFailure(r, "Search failed."));
       }
     })();
-  }, [debounced, retryKey]);
+  }, [searchUrl, retryKey]);
 
   const updateCoords = useCallback(() => {
     const el = wrapRef.current;
@@ -4790,8 +5029,10 @@ function CampusSearchBar({
   const goOrg = (handle: string) => {
     if (handle) window.location.assign(`/orgs/${encodeURIComponent(handle)}`);
   };
+  // An event found while visiting lives on the campus on screen, so the
+  // Events tab it opens keeps `?campus=` (bare at home, as before).
   const goEvent = (id: string) => {
-    if (id) window.location.assign(`/campus?tab=events&event=${encodeURIComponent(id)}`);
+    if (id) window.location.assign(view.url(`/campus?tab=events&event=${encodeURIComponent(id)}`));
   };
 
   const removeRecent = (handle: string) => {
@@ -5278,10 +5519,14 @@ function EntityRow(props: {
 function CampusTabs({
   active,
   onChange,
+  hideMap = false,
 }: {
   active: CampusTab;
   onChange: (tab: CampusTab) => void;
+  /** Visiting a campus that isn't open (C5): no Map pill. Chat always stays. */
+  hideMap?: boolean;
 }) {
+  const tabs = hideMap ? TABS.filter((t) => t.key !== "map") : TABS;
   return (
     <nav
       id="campus-tabs"
@@ -5295,7 +5540,7 @@ function CampusTabs({
         WebkitBackdropFilter: "blur(20px) saturate(160%)",
       }}
     >
-      {TABS.map((t) => {
+      {tabs.map((t) => {
         const isActive = t.key === active;
         return (
           <button
@@ -5628,16 +5873,24 @@ function FeedTabBody({
   const [loadKey, setLoadKey] = useState(0);
 
   const { label: campusLabel } = useViewerCampus();
+  const view = useCampusView();
 
   // The rolling strip's data (RSVP'd events in the next 14 days, then this
   // week's trending tags). Owned here, not by the strip, so this tab knows
   // when the strip has nothing to show. Read on every mount of this tab;
-  // the strip itself renders only when no tag filter is on.
-  const strip = useStripData({ upcomingLimit: 3, trendingLimit: 8, days: 14 });
+  // the strip itself renders only when no tag filter is on. While visiting,
+  // trending follows the campus on screen; the RSVP chips stay the
+  // student's own (C1).
+  const strip = useStripData({
+    upcomingLimit: 3,
+    trendingLimit: 8,
+    days: 14,
+    campusId: view.isVisiting ? view.viewingId : null,
+  });
 
-  const feedUrl = tagFilter
-    ? `/api/feed?limit=50&tag=${encodeURIComponent(tagFilter)}`
-    : "/api/feed?limit=50";
+  const feedUrl = view.url(
+    tagFilter ? `/api/feed?limit=50&tag=${encodeURIComponent(tagFilter)}` : "/api/feed?limit=50",
+  );
 
   // A saved edit patches every row showing that post (the post itself and
   // any repost of it) in place, with no refetch.
@@ -5700,7 +5953,7 @@ function FeedTabBody({
         );
         if (typeof r.data.viewerId === "string") setViewerId(r.data.viewerId);
       } else {
-        setLoadErr(asLoadFailure(r, "Couldn't load the feed."));
+        setLoadErr(campusLoadFailure(r, "Couldn't load the feed."));
       }
     })();
     return () => {
@@ -5771,7 +6024,7 @@ function FeedTabBody({
         />
       ) : (
         <SceneHeader
-          eyebrow={campusEyebrow("Feed", campusLabel)}
+          eyebrow={campusEyebrow("Feed", view.isVisiting ? view.label : campusLabel)}
           title="What’s on campus today"
           subtitle="Posts from clubs, orgs, and your network."
           tone="dark"
@@ -5792,6 +6045,7 @@ function FeedTabBody({
           onPickTag={onPickTag}
           onPickEvent={onPickEvent}
           activeTag={null}
+          visiting={view.isVisiting}
         />
       ) : null}
 
@@ -5819,7 +6073,12 @@ function FeedTabBody({
         </button>
       ) : null}
 
-      {!tagFilter ? (
+      {/* Away from home the composer's slot says where a post would land
+          (R5: the trigger files every post on the author's home campus, so
+          a composer here would post somewhere other than the page shows). */}
+      {!tagFilter && view.isVisiting ? (
+        <VisitingComposerNote homeId={view.homeId} />
+      ) : !tagFilter ? (
         <FeedComposer
           glass={FEED_CARD_SURFACE}
           onPosted={() => {
@@ -5866,8 +6125,14 @@ function FeedTabBody({
             lineHeight: 1.5,
           }}
         >
-          No posts yet — orgs you follow and people from your school will
-          show up here once they post.
+          {view.isVisiting ? (
+            VISITING_COPY.emptyFeed
+          ) : (
+            <>
+              No posts yet — orgs you follow and people from your school will
+              show up here once they post.
+            </>
+          )}
         </div>
       ) : (
         <div style={{ display: "flex", flexDirection: "column", gap: 12 }}>
@@ -5884,6 +6149,46 @@ function FeedTabBody({
         </div>
       )}
     </section>
+  );
+}
+
+/**
+ * The composer's slot while visiting another campus (C5, the "Viewing
+ * Bloomington" board): one dashed line, "You're just looking. New posts go to
+ * Indianapolis." Tokens only, so it reads on cream and on Night's near-black.
+ */
+function VisitingComposerNote({ homeId }: { homeId: string | null }) {
+  return (
+    <div
+      style={{
+        display: "flex",
+        alignItems: "center",
+        gap: 10,
+        padding: "12px 14px",
+        borderRadius: 16,
+        border: "1px dashed rgba(var(--scrim-rgb),0.14)",
+        fontFamily: "DM Sans, sans-serif",
+        fontSize: 13,
+        lineHeight: 1.4,
+        color: "var(--ink-2)",
+      }}
+    >
+      <svg
+        width="16"
+        height="16"
+        viewBox="0 0 24 24"
+        fill="none"
+        stroke="var(--ink-muted)"
+        strokeWidth="2"
+        strokeLinecap="round"
+        strokeLinejoin="round"
+        aria-hidden
+        style={{ flexShrink: 0 }}
+      >
+        <path d="M12 20h9M16.5 3.5a2.1 2.1 0 0 1 3 3L7 19l-4 1 1-4z" />
+      </svg>
+      <span style={{ minWidth: 0 }}>{visitingComposerNote(homeId)}</span>
+    </div>
   );
 }
 
@@ -8620,6 +8925,9 @@ function EventsTabBody({
   onHighlightDone?: () => void;
 } = {}) {
   const { label: campusLabel } = useViewerCampus();
+  const view = useCampusView();
+  // Bare at home; `?campus=<id>` while visiting (C5).
+  const eventsUrl = view.url("/api/events?limit=50");
   const [events, setEvents] = useState<CampusEvent[] | null>(null);
   // First-load failure only; a failed refresh keeps the events on screen.
   const [loadErr, setLoadErr] = useState<LoadFailure | null>(null);
@@ -8630,7 +8938,7 @@ function EventsTabBody({
   // After an RSVP or a new event. The student started it, so a refusal
   // toasts (vibeRequest's, or ours for a bad body) and the list stays put.
   const refresh = useCallback(async () => {
-    const r = await vibeRequest<{ events?: CampusEvent[] }>("/api/events?limit=50", {
+    const r = await vibeRequest<{ events?: CampusEvent[] }>(eventsUrl, {
       cache: "no-store",
       failure: "Couldn't refresh events.",
     });
@@ -8640,14 +8948,14 @@ function EventsTabBody({
     } else if (r.ok) {
       toast({ message: "Couldn't refresh events. Try again.", tone: "error" });
     }
-  }, []);
+  }, [eventsUrl]);
 
   // Events and your orgs load separately, so a failed orgs call (it only
   // decides whether "+ Create event" shows) can't blank the events list.
   useEffect(() => {
     let cancelled = false;
     (async () => {
-      const r = await vibeRequest<{ events?: CampusEvent[] }>("/api/events?limit=50", {
+      const r = await vibeRequest<{ events?: CampusEvent[] }>(eventsUrl, {
         cache: "no-store",
         quiet: true,
         failure: "Couldn't load events.",
@@ -8657,13 +8965,13 @@ function EventsTabBody({
         setLoadErr(null);
         setEvents(r.data.events);
       } else {
-        setLoadErr(asLoadFailure(r, "Couldn't load events."));
+        setLoadErr(campusLoadFailure(r, "Couldn't load events."));
       }
     })();
     return () => {
       cancelled = true;
     };
-  }, [loadKey]);
+  }, [eventsUrl, loadKey]);
 
   useEffect(() => {
     let cancelled = false;
@@ -8684,7 +8992,9 @@ function EventsTabBody({
     };
   }, []);
 
-  const canCreate = eligibleOrgs.length > 0;
+  // Away from home an event would still be made for the student's own club,
+  // on their home campus, not the one on screen: the composer trap again (R5).
+  const canCreate = eligibleOrgs.length > 0 && !view.isVisiting;
 
   // The strip named one card: once the list is in, scroll to `#event-<id>`
   // and flash a coral ring, the way the feed handles ?post=. The card is
@@ -8723,7 +9033,7 @@ function EventsTabBody({
     >
       <div style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-end", gap: 12 }}>
         <SceneHeader
-          eyebrow={campusEyebrow("Events", campusLabel)}
+          eyebrow={campusEyebrow("Events", view.isVisiting ? view.label : campusLabel)}
           title="What's coming up"
           subtitle="RSVP early — events on campus, in space, and online."
           tone="dark"
@@ -8780,6 +9090,12 @@ function EventsTabBody({
         <div style={{ color: COLORS.glassMuted, fontFamily: "DM Sans, sans-serif", fontSize: 14, padding: "20px 0" }}>
           Loading events…
         </div>
+      ) : events.length === 0 && view.isVisiting ? (
+        <DarkGlassCard>
+          <div style={{ fontFamily: "Fraunces, serif", fontWeight: 800, fontSize: 16, color: "#fff", textAlign: "center", padding: "12px 8px" }}>
+            {VISITING_COPY.emptyEvents}
+          </div>
+        </DarkGlassCard>
       ) : events.length === 0 ? (
         <DarkGlassCard>
           <div style={{ fontFamily: "DM Sans, sans-serif", fontSize: 14, color: COLORS.glassMuted, lineHeight: 1.6, textAlign: "center", padding: "12px 8px" }}>
@@ -8817,15 +9133,36 @@ function EventsTabBody({
   );
 }
 
-export function EventCard({ ev, onMutate }: { ev: CampusEvent; onMutate: () => void }) {
+export function EventCard({
+  ev,
+  onMutate,
+  visiting,
+}: {
+  ev: CampusEvent;
+  onMutate: () => void;
+  /** The event is on a campus that isn't the viewer's home (C5): the RSVP
+   *  buttons are off, titled "RSVP works on your home campus", with "RSVP
+   *  works at home" beside them, except the one holding the student's own
+   *  RSVP, which stays live to take it off. Omitted → the campus page's own view decides
+   *  (never visiting on the phone or the org page unless they pass it). */
+  visiting?: boolean;
+}) {
   const accent = colorForOrg(ev.org?.id ?? ev.creator_id);
   const [status, setStatus] = useState<"going" | "maybe" | null>(ev.viewer_status);
   const [going, setGoing] = useState(ev.going_count);
   const [interested, setInterested] = useState(ev.interested_count);
   const [busy, setBusy] = useState(false);
+  // The route answered 403 `campus_visiting` (the page guessed "home"
+  // wrong): the card switches to its RSVP-at-home state for good.
+  const [refusedAway, setRefusedAway] = useState(false);
+  const view = useCampusView();
+  const rsvpAtHomeOnly = (visiting ?? view.isVisiting) || refusedAway;
 
   const setRsvp = async (next: "going" | "maybe" | null) => {
-    if (busy) return;
+    // Away from home only a NEW status is refused. Taking your name off
+    // stays open (the route keeps DELETE ungated, S67 E3), so a student who
+    // RSVP'd at home and later moved can still cancel.
+    if (busy || (rsvpAtHomeOnly && next !== null)) return;
     const prev = status;
     setBusy(true);
     // Optimistic counter math
@@ -8842,7 +9179,16 @@ export function EventCard({ ev, onMutate }: { ev: CampusEvent; onMutate: () => v
             body: JSON.stringify({ status: next }),
           })
         : await fetch(`/api/events/${ev.id}/rsvp`, { method: "DELETE" });
-      if (!res.ok) throw new Error(`rsvp ${res.status}`);
+      if (!res.ok) {
+        // Away from home the route refuses an RSVP (403 `campus_visiting`).
+        // Say so in the words the card uses, never a generic failure.
+        const body = (await res.json().catch(() => null)) as { code?: unknown } | null;
+        if (res.status === 403 && body?.code === "campus_visiting") {
+          setRefusedAway(true);
+          toast({ message: `${VISITING_COPY.rsvpTitle}.`, tone: "error" });
+        }
+        throw new Error(`rsvp ${res.status}`);
+      }
       onMutate();
       emitCalendarChanged();
     } catch (e) {
@@ -8987,13 +9333,15 @@ export function EventCard({ ev, onMutate }: { ev: CampusEvent; onMutate: () => v
           {ev.description}
         </div>
       ) : null}
-      <div style={{ display: "flex", gap: 8 }}>
+      <div style={{ display: "flex", gap: 8, alignItems: "center", flexWrap: "wrap" }}>
         <RsvpButton
           label="Going"
           active={status === "going"}
           accent={accent}
           onClick={() => setRsvp(status === "going" ? null : "going")}
           disabled={busy}
+          blockedTitle={rsvpAtHomeOnly && status !== "going" ? VISITING_COPY.rsvpTitle : undefined}
+          removeHint={rsvpAtHomeOnly && status === "going" ? RSVP_REMOVE_HINT : undefined}
         />
         <RsvpButton
           label={`Interested${interested > 0 ? ` · ${interested}` : ""}`}
@@ -9001,7 +9349,23 @@ export function EventCard({ ev, onMutate }: { ev: CampusEvent; onMutate: () => v
           accent={accent}
           onClick={() => setRsvp(status === "maybe" ? null : "maybe")}
           disabled={busy}
+          blockedTitle={rsvpAtHomeOnly && status !== "maybe" ? VISITING_COPY.rsvpTitle : undefined}
+          removeHint={rsvpAtHomeOnly && status === "maybe" ? RSVP_REMOVE_HINT : undefined}
         />
+        {rsvpAtHomeOnly ? (
+          <span
+            style={{
+              flexShrink: 0,
+              fontFamily: "Fraunces, serif",
+              fontStyle: "italic",
+              fontSize: 12.5,
+              color: COLORS.glassMuted,
+              whiteSpace: "nowrap",
+            }}
+          >
+            {VISITING_COPY.rsvpNote}
+          </span>
+        ) : null}
       </div>
       {(status || ev.viewer_can_manage || !ev.is_creator) ? (
         <div
@@ -9042,6 +9406,9 @@ export function EventCard({ ev, onMutate }: { ev: CampusEvent; onMutate: () => v
     </div>
   );
 }
+
+/** The live RSVP button's hint away from home (see RsvpButton `removeHint`). */
+const RSVP_REMOVE_HINT = "Tap to take your name off";
 
 const eventCardSubtleLink: React.CSSProperties = {
   display: "inline-flex",
@@ -9482,20 +9849,38 @@ function RsvpButton({
   accent,
   onClick,
   disabled,
+  blockedTitle,
+  removeHint,
 }: {
   label: string;
   active: boolean;
   accent: string;
   onClick: () => void;
   disabled?: boolean;
+  /** Set while RSVP can't happen here (visiting, C5): the button is off,
+   *  dimmed, and says why on hover. Omitted → the button as it always was. */
+  blockedTitle?: string;
+  /** Away from home, on the button holding the student's own RSVP: it stays
+   *  live, and a tap only takes their name off. Says so on hover and to a
+   *  screen reader so it never reads as a new RSVP. */
+  removeHint?: string;
 }) {
+  const blocked = blockedTitle !== undefined;
+  const away = blocked || removeHint !== undefined;
   return (
     <button
       type="button"
       onClick={onClick}
-      disabled={disabled}
+      disabled={disabled || blocked}
+      title={blockedTitle ?? removeHint}
+      aria-label={
+        blocked ? `${label}. ${blockedTitle}` : removeHint ? `${label}. ${removeHint}` : undefined
+      }
       style={{
-        flex: 1,
+        ...(blocked ? { opacity: 0.45 } : null),
+        // Away, the two buttons size to their words so the italic note fits
+        // beside them on a wide card and wraps under them on a narrow one.
+        flex: away ? "1 1 auto" : 1,
         padding: "8px 12px",
         borderRadius: 10,
         border: active
@@ -9508,7 +9893,7 @@ function RsvpButton({
         fontFamily: "DM Sans, sans-serif",
         fontWeight: 700,
         fontSize: 13,
-        cursor: disabled ? "default" : "pointer",
+        cursor: blocked ? "not-allowed" : disabled ? "default" : "pointer",
         boxShadow: active
           ? `inset 0 1px 0 rgba(255,255,255,0.22), 0 4px 14px ${hexToRgba(accent, 0.28)}`
           : "inset 0 1px 0 rgba(255,255,255,0.18)",
@@ -10008,6 +10393,10 @@ function orgFromInvite(inv: MeInvite): DiscoverOrg {
 
 function OrgsTabBody({ onCreateOrg }: { onCreateOrg: () => void }) {
   const { label: campusLabel } = useViewerCampus();
+  // Discover follows the campus on screen (C5); the following list and the
+  // invite inbox are the student's own and stay put.
+  const view = useCampusView();
+  const shownLabel = view.isVisiting ? view.label : campusLabel;
   const [results, setResults] = useState<DiscoverOrg[] | null>(null);
   const [searchInput, setSearchInput] = useState("");
   const [debouncedQ, setDebouncedQ] = useState("");
@@ -10053,23 +10442,30 @@ function OrgsTabBody({ onCreateOrg }: { onCreateOrg: () => void }) {
     return () => clearTimeout(t);
   }, [searchInput]);
 
+  // Built outside the effect so the effect keys on the finished string: it
+  // re-reads when the query, the dormant toggle or the campus on screen
+  // changes, and never when home's own id arrives (the string stays bare).
+  const discoverUrl = (() => {
+    const params = new URLSearchParams({ filter: "discover" });
+    if (debouncedQ) params.set("q", debouncedQ);
+    if (showDormant) params.set("include_dormant", "true");
+    return view.url(`/api/orgs?${params.toString()}`);
+  })();
+
   useEffect(() => {
     let cancelled = false;
     const seq = ++seqRef.current;
     (async () => {
-      const params = new URLSearchParams({ filter: "discover" });
-      if (debouncedQ) params.set("q", debouncedQ);
-      if (showDormant) params.set("include_dormant", "true");
       // Quiet even for a refetch: a query typed since owns the list, so any
       // toast waits for the cancelled check below.
-      const r = await vibeRequest<{ orgs?: DiscoverOrg[] }>(`/api/orgs?${params.toString()}`, {
+      const r = await vibeRequest<{ orgs?: DiscoverOrg[] }>(discoverUrl, {
         cache: "no-store",
         quiet: true,
         failure: "Couldn't load orgs.",
       });
       if (cancelled) return;
       if (!r.ok || !Array.isArray(r.data.orgs)) {
-        const failure = asLoadFailure(r, "Couldn't load orgs.");
+        const failure = campusLoadFailure(r, "Couldn't load orgs.");
         // Nothing shown yet: the failure takes the list's place. After a
         // new query or the dormant toggle, the results stay and it toasts.
         if (!loadedRef.current) setLoadErr(failure);
@@ -10085,7 +10481,7 @@ function OrgsTabBody({ onCreateOrg }: { onCreateOrg: () => void }) {
     return () => {
       cancelled = true;
     };
-  }, [debouncedQ, showDormant, loadKey]);
+  }, [discoverUrl, loadKey]);
 
   // The following list takes the query only under the Following chip. "Yours"
   // shows only with no query, so typing under All doesn't refetch it.
@@ -10224,7 +10620,9 @@ function OrgsTabBody({ onCreateOrg }: { onCreateOrg: () => void }) {
   const retryFollowing = () => setSideKey((k) => k + 1);
   const retryInvites = () => setSideKey((k) => k + 1);
 
-  const showSide = filter === "all" && !debouncedQ;
+  // "You're invited" and "Yours" are home things: away from home they'd sit
+  // above the visited campus's clubs and hide its "No clubs here yet."
+  const showSide = filter === "all" && !debouncedQ && !view.isVisiting;
   const followingRows = followingOrgs !== null && followingListQ === followingQ ? followingOrgs : null;
   // A failure only speaks while there is no list for its query on screen.
   const followingFailed =
@@ -10291,13 +10689,15 @@ function OrgsTabBody({ onCreateOrg }: { onCreateOrg: () => void }) {
       }}
     >
       <SceneHeader
-        eyebrow={campusEyebrow("Organizations", campusLabel)}
+        eyebrow={campusEyebrow("Organizations", shownLabel)}
         title="Find your communities"
         subtitle="Follow any club to get its posts. Join to get its chats."
         tone="dark"
       />
 
-      <CreateOrgBanner onClick={onCreateOrg} />
+      {/* A club is made on the student's home campus, not the one on
+          screen, so the banner waits for home (the composer trap, R5). */}
+      {view.isVisiting ? null : <CreateOrgBanner onClick={onCreateOrg} />}
 
       <DiscoverSearchBar value={searchInput} onChange={setSearchInput} />
       <div
@@ -10443,7 +10843,9 @@ function OrgsTabBody({ onCreateOrg }: { onCreateOrg: () => void }) {
                     ? "No clubs here take requests yet."
                     : filter === "invite"
                       ? "No invite-only clubs here yet."
-                      : "No orgs to discover yet — be the first to create one.",
+                      : view.isVisiting
+                        ? VISITING_COPY.emptyClubs
+                        : "No orgs to discover yet — be the first to create one.",
             );
           }
           return (
@@ -10501,8 +10903,8 @@ function OrgsTabBody({ onCreateOrg }: { onCreateOrg: () => void }) {
                 <DiscoverGroup
                   title="Verified"
                   hint={
-                    campusLabel
-                      ? `Officially recognized clubs at ${campusLabel}.`
+                    shownLabel
+                      ? `Officially recognized clubs at ${shownLabel}.`
                       : "Officially recognized clubs."
                   }
                   orgs={verifiedOrgs}
@@ -11278,6 +11680,16 @@ function DiscoverCard({
   const orgColor = colorForOrg(org.id);
   const view = orgRowView(relation, "card");
   const inviteLine = discoverInviteLine(org, relation);
+  // Visiting puts the other university's clubs on screen (R2). The card's
+  // control already drops Join for them (Follow only); say why in Join's
+  // place, "Purdue students only", instead of leaving a gap.
+  const { isVisiting } = useCampusView();
+  const audienceNote =
+    isVisiting && relation.state === "audience_blocked"
+      ? relation.audience === "purdue"
+        ? ORG_COPY.buttons.purdueStudentsOnly
+        : ORG_COPY.buttons.iuStudentsOnly
+      : null;
 
   return (
     <div
@@ -11455,6 +11867,30 @@ function DiscoverCard({
             onChange={(next) => onChange(relation, next)}
           />
         </div>
+        {audienceNote ? (
+          <span
+            title={fillCopy(
+              relation.audience === "purdue"
+                ? ORG_COPY.notices.audiencePurdue
+                : ORG_COPY.notices.audienceIu,
+              { org: org.name },
+            )}
+            style={{
+              display: "inline-flex",
+              alignItems: "center",
+              padding: "9px 12px",
+              borderRadius: 10,
+              border: "1px dashed rgba(255,255,255,0.2)",
+              color: "rgba(255,255,255,0.62)",
+              fontFamily: "DM Sans, sans-serif",
+              fontWeight: 600,
+              fontSize: 13,
+              whiteSpace: "nowrap",
+            }}
+          >
+            {audienceNote}
+          </span>
+        ) : null}
         <Link
           href={`/orgs/${org.handle}`}
           onClick={(e) => e.stopPropagation()}
@@ -11634,7 +12070,13 @@ function bubbleRadiusFor(total: number): number {
 export function MapTabBody() {
   // The viewer's university decides which taxonomy wins for a major both
   // Indianapolis universities teach (schoolForMajorIn).
-  const { label: campusLabel, system: viewerSystem } = useViewerCampus();
+  const { label: homeLabel, system: viewerSystem } = useViewerCampus();
+  // The map follows the campus on screen (C5). CampusHome hides this tab
+  // while visiting a campus that isn't open (R3), so away from home this is
+  // only ever an open campus's map.
+  const view = useCampusView();
+  const campusLabel = view.isVisiting ? view.label : homeLabel;
+  const mapUrl = view.url("/api/campus-map");
   const [data, setData] = useState<MapSummary | null>(null);
   // Set when the map fails to load; data stays null, never a fake summary.
   const [loadErr, setLoadErr] = useState<LoadFailure | null>(null);
@@ -11663,7 +12105,7 @@ export function MapTabBody() {
   useEffect(() => {
     let cancelled = false;
     (async () => {
-      const r = await vibeRequest<MapSummary>("/api/campus-map", {
+      const r = await vibeRequest<MapSummary>(mapUrl, {
         cache: "no-store",
         quiet: true,
         failure: "Couldn't load the map.",
@@ -11675,13 +12117,13 @@ export function MapTabBody() {
         setLoadErr(null);
         setData(r.data);
       } else {
-        setLoadErr(asLoadFailure(r, "Couldn't load the map."));
+        setLoadErr(campusLoadFailure(r, "Couldn't load the map."));
       }
     })();
     return () => {
       cancelled = true;
     };
-  }, [loadKey]);
+  }, [mapUrl, loadKey]);
 
   // School-grouped, ADAPTIVELY SPACED layout.
   //
@@ -13113,14 +13555,17 @@ function ZonePanel({
   const [tab, setTab] = useState<"discover" | "mutuals" | "connected">("discover");
   const [loadErr, setLoadErr] = useState<LoadFailure | null>(null);
   const [loadKey, setLoadKey] = useState(0);
+  // Same campus as the map behind it (C5): bare at home, `?campus=` away.
+  const view = useCampusView();
+  const base = view.url(
+    selection.kind === "major"
+      ? `/api/campus-map/zone?major=${encodeURIComponent(selection.key)}`
+      : `/api/campus-map/zone?org=${encodeURIComponent(selection.key)}`,
+  );
 
   useEffect(() => {
     let cancelled = false;
     (async () => {
-      const base =
-        selection.kind === "major"
-          ? `/api/campus-map/zone?major=${encodeURIComponent(selection.key)}`
-          : `/api/campus-map/zone?org=${encodeURIComponent(selection.key)}`;
       const r = await vibeRequest<{
         connected?: ZoneRow[];
         mutuals?: ZoneRow[];
@@ -13134,7 +13579,7 @@ function ZonePanel({
         !Array.isArray(r.data.discover)
       ) {
         // Never empty buckets: those read as "nobody here".
-        setLoadErr(asLoadFailure(r, "Couldn't load this zone."));
+        setLoadErr(campusLoadFailure(r, "Couldn't load this zone."));
         return;
       }
       const connected = r.data.connected;
@@ -13150,7 +13595,7 @@ function ZonePanel({
     return () => {
       cancelled = true;
     };
-  }, [selection, loadKey]);
+  }, [base, loadKey]);
 
   if (typeof document === "undefined") return null;
 

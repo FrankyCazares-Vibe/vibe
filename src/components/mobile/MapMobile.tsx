@@ -4,12 +4,13 @@ import Link from "next/link";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { Drawer } from "vaul";
 
+import { campusViewName, isVisitingCampus, withCampus } from "@/components/campus/viewing-campus";
 import {
   asLoadFailure,
   LoadFailed,
   type LoadFailure,
 } from "@/components/feedback/LoadFailed";
-import { vibeRequest } from "@/lib/feedback/request";
+import { type VibeResult, vibeRequest } from "@/lib/feedback/request";
 import { IU_SCHOOLS, schoolForMajorIn } from "@/lib/iu/majors";
 import { PURDUE_INDIANAPOLIS_SCHOOLS } from "@/lib/iu/majors-purdue-indianapolis";
 
@@ -33,7 +34,29 @@ import { PURDUE_INDIANAPOLIS_SCHOOLS } from "@/lib/iu/majors-purdue-indianapolis
  * The desktop component keeps its own elaborate version (school halos,
  * starfield, connection lines, search-to-jump). Those polishes can be
  * back-ported to mobile later; this is the v1 native rebuild.
+ *
+ * Campus (S67 wave 4, contracts C5): the map and its zones are the campus
+ * on screen. Both reads go through `withCampus`, bare at home. CampusMobile
+ * only mounts this for home or an OPEN visited campus (a closed one has too
+ * few students for a map that doesn't name them), and keys it by campus, so
+ * a new campus starts a fresh map.
  */
+
+// A campus read refused because of the campus itself: 400 `unknown_campus`
+// (a bad id in a shared link) or 403 `campus_not_in_system` (an account with
+// no verified university naming a campus). A retry would only fail again, so
+// the way out is home: LoadFailed navigates to bare /campus, which drops
+// `?campus=`. The phone shell's one copy (CampusMobile imports it from here);
+// the desktop twin lives in campus-home.tsx.
+const CAMPUS_REFUSAL_CODES: ReadonlySet<string> = new Set(["unknown_campus", "campus_not_in_system"]);
+
+/** `asLoadFailure`, except a campus refusal gets "Back home" instead of Retry. */
+export function campusLoadFailure(r: VibeResult<unknown>, line: string): LoadFailure {
+  if (!r.ok && r.code && CAMPUS_REFUSAL_CODES.has(r.code)) {
+    return { message: r.message, action: { label: "Back home", href: "/campus" } };
+  }
+  return asLoadFailure(r, line);
+}
 
 // ---------- Types (mirror campus-home so we can hit the same API) ----------
 
@@ -252,7 +275,17 @@ function clamp(v: number, lo: number, hi: number) {
   return Math.max(lo, Math.min(hi, v));
 }
 
-export function MapMobile() {
+export function MapMobile({
+  viewingId = null,
+  homeId = null,
+}: {
+  /** The campus on screen and the student's home (`useViewingCampus`). */
+  viewingId?: string | null;
+  homeId?: string | null;
+} = {}) {
+  const mapUrl = withCampus("/api/campus-map", viewingId, homeId);
+  // The visited campus's name for the empty copy; null at home.
+  const visitingName = isVisitingCampus(viewingId, homeId) ? campusViewName(viewingId) : null;
   const [data, setData] = useState<MapSummary | null>(null);
   const [loadErr, setLoadErr] = useState<LoadFailure | null>(null);
   const [loadKey, setLoadKey] = useState(0);
@@ -277,7 +310,7 @@ export function MapMobile() {
   useEffect(() => {
     let cancelled = false;
     (async () => {
-      const r = await vibeRequest<MapSummary>("/api/campus-map", {
+      const r = await vibeRequest<MapSummary>(mapUrl, {
         cache: "no-store",
         quiet: true,
         failure: "Couldn't load the map.",
@@ -287,13 +320,13 @@ export function MapMobile() {
         setLoadErr(null);
         setData(r.data);
       } else {
-        setLoadErr(asLoadFailure(r, "Couldn't load the map."));
+        setLoadErr(campusLoadFailure(r, "Couldn't load the map."));
       }
     })();
     return () => {
       cancelled = true;
     };
-  }, [loadKey]);
+  }, [loadKey, mapUrl]);
 
   const layout = useMemo(() => computeLayout(data), [data]);
   const hasData = !!data?.ok && (data.majors?.length ?? 0) > 0;
@@ -430,10 +463,12 @@ export function MapMobile() {
         ) : !hasData ? (
           <MapOverlay subtle>
             <div style={{ fontFamily: "Fraunces, serif", fontSize: 17, color: "#fff", marginBottom: 6 }}>
-              No zones yet
+              {visitingName ? "Nobody's here yet." : "No zones yet"}
             </div>
             <div style={{ color: "rgba(255,255,255,0.55)", fontSize: 13, maxWidth: 280, textAlign: "center", lineHeight: 1.55 }}>
-              You&apos;re the first here. Once other students pick this campus, their majors light up as zones.
+              {visitingName
+                ? `Once students pick ${visitingName}, their majors light up as zones.`
+                : "You're the first here. Once other students pick this campus, their majors light up as zones."}
             </div>
           </MapOverlay>
         ) : (
@@ -508,6 +543,8 @@ export function MapMobile() {
       {selection ? (
         <ZoneSheet
           selection={selection}
+          viewingId={viewingId}
+          homeId={homeId}
           onClose={() => setSelection(null)}
         />
       ) : null}
@@ -707,9 +744,14 @@ function MajorBubble({
 
 function ZoneSheet({
   selection,
+  viewingId,
+  homeId,
   onClose,
 }: {
   selection: ZoneSelection;
+  /** The map's campus (C5): the zone is read on the same one. */
+  viewingId: string | null;
+  homeId: string | null;
   onClose: () => void;
 }) {
   const [data, setData] = useState<{
@@ -725,13 +767,17 @@ function ZoneSheet({
     "discover",
   );
 
+  const zoneUrl = withCampus(
+    selection.kind === "major"
+      ? `/api/campus-map/zone?major=${encodeURIComponent(selection.key)}`
+      : `/api/campus-map/zone?org=${encodeURIComponent(selection.key)}`,
+    viewingId,
+    homeId,
+  );
   useEffect(() => {
     let cancelled = false;
     (async () => {
-      const base =
-        selection.kind === "major"
-          ? `/api/campus-map/zone?major=${encodeURIComponent(selection.key)}`
-          : `/api/campus-map/zone?org=${encodeURIComponent(selection.key)}`;
+      const base = zoneUrl;
       const r = await vibeRequest<{
         connected?: ZoneRow[];
         mutuals?: ZoneRow[];
@@ -756,13 +802,13 @@ function ZoneSheet({
         else if (discover.length > 0) setTab("discover");
         else if (connected.length > 0) setTab("connected");
       } else {
-        setLoadErr(asLoadFailure(r, "Couldn't load this zone."));
+        setLoadErr(campusLoadFailure(r, "Couldn't load this zone."));
       }
     })();
     return () => {
       cancelled = true;
     };
-  }, [selection, loadKey]);
+  }, [zoneUrl, loadKey]);
 
   const rows =
     data === null

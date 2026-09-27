@@ -13,7 +13,6 @@
 
 import test from "node:test";
 import assert from "node:assert/strict";
-import { readFileSync } from "node:fs";
 import * as nodeModule from "node:module";
 
 type NextResolve = (specifier: string, context?: unknown) => unknown;
@@ -47,6 +46,8 @@ const {
   CAMPUS_CONFIRM_LOCK_NOTE,
   campusConfirmBannerView,
 } = await import("./campus-confirm-banner-view");
+const { CAMPUS_CONFIRM_LOCK_COPY } = await import("../../lib/profile/settings-campus-card");
+const { CAMPUS_CHANGE_COOLDOWN_DAYS } = await import("../../lib/profile/onboarding-prefill");
 
 /** Franky today: verified IU, Indianapolis backfilled, never confirmed. */
 const unconfirmed = {
@@ -64,7 +65,7 @@ test("confirm: verified, campus set, not confirmed", () => {
     campusId: "indianapolis",
     title: "Confirm your campus",
     body: "Is Indianapolis still right?",
-    note: "Confirming locks your campus for 30 days.",
+    note: `Confirming locks your campus for ${CAMPUS_CHANGE_COOLDOWN_DAYS} days.`,
   });
 });
 
@@ -136,14 +137,8 @@ test("hidden: a failed load (no data)", () => {
   assert.equal(campusConfirmBannerView(undefined, false), null);
 });
 
-test("the lock line matches Settings (B15) word for word", () => {
-  assert.equal(CAMPUS_CONFIRM_LOCK_NOTE, "Confirming locks your campus for 30 days.");
-  const settings = readFileSync(
-    new URL("lib/profile/settings-campus-card.ts", SRC_ROOT),
-    "utf8",
-  );
-  assert.ok(
-    settings.includes(JSON.stringify(CAMPUS_CONFIRM_LOCK_NOTE)),
-    "settings-campus-card.ts should carry the same lock line",
-  );
+test("the lock line matches Settings (B15) word for word, and says 45 days (S67)", () => {
+  assert.equal(CAMPUS_CHANGE_COOLDOWN_DAYS, 45);
+  assert.equal(CAMPUS_CONFIRM_LOCK_NOTE, "Confirming locks your campus for 45 days.");
+  assert.equal(CAMPUS_CONFIRM_LOCK_NOTE, CAMPUS_CONFIRM_LOCK_COPY);
 });

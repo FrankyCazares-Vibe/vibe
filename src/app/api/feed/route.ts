@@ -3,7 +3,8 @@ import type { SupabaseClient } from "@supabase/supabase-js";
 
 import { isMissingColumnError } from "@/lib/db/missing-column";
 import { isSchoolSystem, legacyLabel, type SchoolSystem } from "@/lib/iu/campuses";
-import { resolveScopeV2, scopeCampusIds } from "@/lib/iu/campus-scope";
+import { resolveCampusRequest } from "@/lib/iu/campus-request";
+import { scopeCampusIds } from "@/lib/iu/campus-scope";
 import {
   FOLLOWED_ORG_FILTER_CAP,
   campusScopeError,
@@ -148,12 +149,14 @@ type EngagementCounts = {
  * S1B; the report sheet tells them so). The reports are read with the
  * service client: `reports` grants students nothing.
  *
- * `?campus=<id>` switches to another campus in the viewer's allowed set (403
- * `campus_not_in_system` otherwise, 400 for an id that isn't a campus at
- * all); that browse view is that campus only. A viewer with no home campus
- * sees their whole university, and one with no university at all still sees
- * everything — an empty app is the worse failure. The ×1.35 ranking boost
- * floats the home campus inside whatever the lane contains.
+ * `?campus=<id>` switches to any other campus, either university (S67: a
+ * verified student may look around; 400 for an id that isn't a campus at
+ * all, 403 `campus_not_in_system` only for a viewer with no university);
+ * that browse view is that campus only. A viewer with no home campus sees
+ * their whole university, and one with no university at all still sees
+ * everything on their own feed — an empty app is the worse failure. The
+ * ×1.35 ranking boost floats the home campus inside whatever the lane
+ * contains.
  *
  * Still relevance, not secrecy: `posts_select_authenticated` is
  * `status = 'published' OR mine`, so any signed-in user can read another
@@ -275,7 +278,10 @@ export async function GET(req: Request) {
   // correct for a Purdue student ("Purdue Indianapolis", not "IU …").
   const viewerCampus = legacyLabel(homeCampusId, viewer.system) || null;
 
-  const scope = resolveScopeV2(url.searchParams.get("campus"), viewer);
+  // Through `resolveCampusRequest`, like every other campus read, so the
+  // "no university, no named campus" clamp covers the feed too (S67 R10).
+  // Any other known campus resolves: a verified student may read any feed.
+  const scope = resolveCampusRequest(url.searchParams.get("campus"), viewer);
   if (scope.kind === "forbidden") {
     const { status, body } = campusScopeError(scope);
     return NextResponse.json(body, { status });

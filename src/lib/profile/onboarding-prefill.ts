@@ -391,13 +391,21 @@ export function sanitizeCampusStep(
   return { ok: true, value: { campusId } };
 }
 
-/** Settled 09-12 §3 (plan §2.4): a home campus changes at most once per 30 days. */
-export const CAMPUS_CHANGE_COOLDOWN_MS = 30 * 24 * 60 * 60 * 1000;
+/**
+ * A home campus changes at most once per 45 days (S67 plan §E, Franky's "1.5
+ * months"; 30 until S67, settled 09-12 §3). The clock is `campus_set_at`: it
+ * starts when onboarding finishes with a campus (the campus step stamps it)
+ * or on the "Confirm your campus" tap, and restarts on every change. Every
+ * "N days" line the student reads is built from the day count, so the copy
+ * can't drift from the rule.
+ */
+export const CAMPUS_CHANGE_COOLDOWN_DAYS = 45;
+export const CAMPUS_CHANGE_COOLDOWN_MS = CAMPUS_CHANGE_COOLDOWN_DAYS * 24 * 60 * 60 * 1000;
 
 export type CampusChangeInput = {
   /** `users.campus_id` now (null / "" = no campus, e.g. cleared by a system change). */
   currentId: string | null | undefined;
-  /** `users.campus_set_at` now: the 30-day clock. Null = never chosen. */
+  /** `users.campus_set_at` now: the 45-day clock. Null = never chosen. */
   setAt: string | null | undefined;
   /** The validated, canonical campus id being saved. */
   nextId: string;
@@ -416,12 +424,12 @@ export type CampusChangeDecision =
   | { kind: "too_soon"; availableAt: string };
 
 /**
- * The 30-day home-campus rule for a campus-step save (plan §2.4). Pure.
+ * The 45-day home-campus rule for a campus-step save (plan §2.4, S67 §E). Pure.
  *
  * The clock is `campus_set_at`, NOT the current campus. A null stamp is a
  * first pick (or the confirmation of a backfilled campus) and is free; a
  * student still in onboarding is never blocked. A student who has finished
- * onboarding and holds a stamp waits out 30 days before saving a DIFFERENT
+ * onboarding and holds a stamp waits out 45 days before saving a DIFFERENT
  * campus, including when `campus_id` is null because a system change cleared
  * it: the stamp survives a system change (critic B3, Franky's answer to
  * question 1), so bouncing between @iu.edu and @purdue.edu can't skip the

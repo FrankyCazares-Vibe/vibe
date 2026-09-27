@@ -2,8 +2,12 @@ import { NextResponse } from "next/server";
 
 import { isMissingColumnError } from "@/lib/db/missing-column";
 import { resolveCampusRequest, scopeViewerFromRow } from "@/lib/iu/campus-request";
-import { scopeCampusIds } from "@/lib/iu/campus-scope";
-import { DISCOVERABLE_USER_COLUMNS, isDiscoverableAccount } from "@/lib/iu/community-scope";
+import { scopeCampusIds, type CampusScopeForbidden } from "@/lib/iu/campus-scope";
+import {
+  DISCOVERABLE_USER_COLUMNS,
+  campusScopeError,
+  isDiscoverableAccount,
+} from "@/lib/iu/community-scope";
 import { orgAssetProxyUrl } from "@/lib/org-asset-url";
 import type { JoinPolicy, OrgAudience } from "@/lib/orgs/join-state";
 import { ilikeOrFilter, ilikePrefixOrFilter } from "@/lib/pgrest";
@@ -57,8 +61,12 @@ const FILTER_HEADROOM = 10;
  *   moves campus doesn't drag the club's events with them. Events with no
  *   org — and orgs with no campus, which is every live org until M1b —
  *   therefore match no campus and don't appear (plan §2.8 row 4). Past events
- *   are excluded. Search always uses the viewer's HOME campus; there is no
- *   `?campus=` switch on a typeahead.
+ *   are excluded. `?campus=<id>` scopes events to the campus the student is
+ *   looking around (S67 E2: the search bar stays on screen while visiting),
+ *   resolved like `/api/stats/campus`: 403 `campus_not_in_system` for a
+ *   viewer with no university, 400 `unknown_campus`. Absent = the HOME
+ *   campus. People and orgs ignore it (they are global). With `kinds=`
+ *   leaving out events the param isn't read at all.
  * - Orgs returned via service role so private orgs the viewer isn't a
  *   member of still surface (matches /api/orgs?filter=discover).
  */
@@ -102,6 +110,12 @@ export async function GET(req: Request) {
   }
 
   const service = createSupabaseServiceClient();
+  const campusParam = url.searchParams.get("campus");
+  // Set by the events branch when `?campus=` is refused; answered after the
+  // fan-out, the same 400/403 `/api/stats/campus` gives.
+  // (Asserted, not annotated, so TS doesn't narrow it to `null` across the
+  // closure that assigns it.)
+  let campusRefused = null as CampusScopeForbidden | null;
 
   /**
    * Events, campus-scoped through their org. Two reads have to land before
@@ -141,18 +155,20 @@ export async function GET(req: Request) {
     if (meErr) {
       if (!isMissingColumnError(meErr)) console.error("[search viewer]", meErr);
     } else {
-      const scope = resolveCampusRequest(null, scopeViewerFromRow(me as Record<string, unknown>));
-      if (scope.kind !== "forbidden") {
-        const { data: campusOrgs, error: orgErr } = await service
-          .from("orgs")
-          .select("id")
-          .in("campus_id", scopeCampusIds(scope))
-          .limit(MAX_CAMPUS_ORGS);
-        if (orgErr) {
-          if (!isMissingColumnError(orgErr)) console.error("[search campus orgs]", orgErr);
-        } else {
-          orgIds = (campusOrgs ?? []).map((o) => (o as { id: string }).id);
-        }
+      const scope = resolveCampusRequest(campusParam, scopeViewerFromRow(me as Record<string, unknown>));
+      if (scope.kind === "forbidden") {
+        campusRefused = scope;
+        return { data: [], error: null } as const;
+      }
+      const { data: campusOrgs, error: orgErr } = await service
+        .from("orgs")
+        .select("id")
+        .in("campus_id", scopeCampusIds(scope))
+        .limit(MAX_CAMPUS_ORGS);
+      if (orgErr) {
+        if (!isMissingColumnError(orgErr)) console.error("[search campus orgs]", orgErr);
+      } else {
+        orgIds = (campusOrgs ?? []).map((o) => (o as { id: string }).id);
       }
     }
     // No org on this campus yet (true for every campus until M1b): no event
@@ -219,6 +235,11 @@ export async function GET(req: Request) {
           .or(`blocker_id.eq.${user.id},blocked_id.eq.${user.id}`)
       : Promise.resolve({ data: [], error: null } as const),
   ]);
+
+  if (campusRefused) {
+    const { status, body } = campusScopeError(campusRefused);
+    return NextResponse.json(body, { status });
+  }
 
   // ── USERS ──────────────────────────────────────────────────────────
   type UserRow = {

@@ -1,7 +1,7 @@
 import { NextResponse } from "next/server";
 
 import { isMissingColumnError } from "@/lib/db/missing-column";
-import { resolveCampusRequest, scopeViewerFromRow } from "@/lib/iu/campus-request";
+import { mapCampusClosed, resolveCampusRequest, scopeViewerFromRow } from "@/lib/iu/campus-request";
 import { scopeCampusIds } from "@/lib/iu/campus-scope";
 import { campusScopeError } from "@/lib/iu/community-scope";
 import { loadHiddenUsers } from "@/lib/safety/hidden-users";
@@ -34,9 +34,15 @@ type UserRow = {
  * SCOPE (plan wave 2 B10, §2.4). The major zone is filtered on `campus_id`,
  * never on the legacy `users.school` label: same campus as `/api/campus-map`,
  * so a bubble's drill-in matches the bubble's count. `?campus=<id>` is honored
- * on the same terms as the summary (allowed set only, and only for a viewer
- * who has a university at all; 403 `campus_not_in_system` otherwise — the
- * clamp lives in `resolveCampusRequest`).
+ * on the same terms as the summary. Since S67 any KNOWN campus is readable,
+ * either university (see the header of `src/lib/iu/campus-scope.ts`); only a
+ * viewer with no university at all is refused (403 `campus_not_in_system`,
+ * the clamp in `resolveCampusRequest`), and an unknown id is 400.
+ *
+ * A CAMPUS THAT ISN'T OPEN LISTS NOBODY unless it's home (S67 R3,
+ * `mapCampusClosed`): this route names people, and a two-person zone on a
+ * closed campus would identify them. Empty buckets, same as the summary's
+ * empty map, for the major zone and the org zone alike.
  *
  * The ORG zone lists that org's members, which is not a campus question — an
  * org's members are its members. What IS checked is the org itself: an org on
@@ -95,15 +101,17 @@ export async function GET(req: Request) {
     return NextResponse.json({ ok: false, error: "Request failed" }, { status: 500 });
   }
 
-  const scope = resolveCampusRequest(
-    url.searchParams.get("campus"),
-    scopeViewerFromRow(me as Record<string, unknown> | null),
-  );
+  const viewer = scopeViewerFromRow(me as Record<string, unknown> | null);
+  const scope = resolveCampusRequest(url.searchParams.get("campus"), viewer);
   if (scope.kind === "forbidden") {
     const { status, body } = campusScopeError(scope);
     return NextResponse.json(body, { status });
   }
   if (scope.kind === "none") {
+    return emptyBuckets();
+  }
+  // R3: a closed campus that isn't home names nobody, before any read.
+  if (mapCampusClosed(scope, viewer)) {
     return emptyBuckets();
   }
   const campusIds = scopeCampusIds(scope);

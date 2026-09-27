@@ -48,6 +48,7 @@ registerHooks({
 });
 
 const {
+  CAMPUS_CHANGE_COOLDOWN_DAYS,
   CAMPUS_CHANGE_COOLDOWN_MS,
   ONBOARDING_STEP_ERROR_COPY,
   buildOnboardingPrefill,
@@ -236,11 +237,16 @@ test("campus step: missing, junk, or no system is campus_invalid", () => {
   }
 });
 
-// ── campusChangeDecision (the 30-day rule) ───────────────────────────────
+// ── campusChangeDecision (the 45-day rule) ───────────────────────────────
 
 const NOW = Date.UTC(2026, 8, 15, 12, 0, 0);
 const DAY_MS = 24 * 60 * 60 * 1000;
 const iso = (ms: number) => new Date(ms).toISOString();
+
+test("campus lock: 45 days (S67, Franky's 1.5 months), one constant for rule and copy", () => {
+  assert.equal(CAMPUS_CHANGE_COOLDOWN_DAYS, 45);
+  assert.equal(CAMPUS_CHANGE_COOLDOWN_MS, 45 * DAY_MS);
+});
 
 test("campus decision: a first pick (no stamp) is free, onboarded or not", () => {
   for (const onboarded of [false, true]) {
@@ -276,7 +282,7 @@ test("campus decision: any change mid-onboarding is free", () => {
   );
 });
 
-test("campus decision: an onboarded change waits out 30 days from the stamp", () => {
+test("campus decision: an onboarded change waits out 45 days from the stamp", () => {
   const setAt = iso(NOW - 10 * DAY_MS);
   assert.deepEqual(
     campusChangeDecision({ currentId: "indianapolis", setAt, nextId: "iu-bloomington", onboarded: true, now: NOW }),
@@ -285,7 +291,18 @@ test("campus decision: an onboarded change waits out 30 days from the stamp", ()
   assert.deepEqual(
     campusChangeDecision({
       currentId: "indianapolis",
-      setAt: iso(NOW - 31 * DAY_MS),
+      setAt: iso(NOW - 44 * DAY_MS),
+      nextId: "iu-bloomington",
+      onboarded: true,
+      now: NOW,
+    }),
+    { kind: "too_soon", availableAt: iso(NOW + DAY_MS) },
+    "day 44 is still inside the lock (it was free under the old 30-day rule)",
+  );
+  assert.deepEqual(
+    campusChangeDecision({
+      currentId: "indianapolis",
+      setAt: iso(NOW - 46 * DAY_MS),
       nextId: "iu-bloomington",
       onboarded: true,
       now: NOW,
@@ -301,7 +318,7 @@ test("campus decision: an onboarded change waits out 30 days from the stamp", ()
       now: NOW,
     }),
     { kind: "write" },
-    "exactly 30 days is allowed",
+    "exactly 45 days is allowed",
   );
 });
 
@@ -315,7 +332,7 @@ test("campus decision: a campus cleared by a system change keeps its clock (crit
   assert.deepEqual(
     campusChangeDecision({
       currentId: null,
-      setAt: iso(NOW - 40 * DAY_MS),
+      setAt: iso(NOW - 46 * DAY_MS),
       nextId: "purdue-west-lafayette",
       onboarded: true,
       now: NOW,
@@ -324,7 +341,7 @@ test("campus decision: a campus cleared by a system change keeps its clock (crit
   );
 });
 
-test("campus decision: re-saving the stamped campus is a no-op, even inside 30 days", () => {
+test("campus decision: re-saving the stamped campus is a no-op, even inside 45 days", () => {
   for (const onboarded of [false, true]) {
     assert.deepEqual(
       campusChangeDecision({

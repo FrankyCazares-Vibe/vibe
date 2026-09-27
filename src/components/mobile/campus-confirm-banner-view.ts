@@ -1,4 +1,5 @@
 import { campusRowById, isSchoolSystem } from "@/lib/iu/campuses";
+import { CAMPUS_CHANGE_COOLDOWN_DAYS } from "@/lib/profile/onboarding-prefill";
 
 /**
  * Pure state for `CampusConfirmBanner` (wave plan B14t), kept out of the
@@ -14,12 +15,12 @@ export const CAMPUS_CONFIRM_DISMISSED_KEY = "vibe_campus_confirm_dismissed";
 
 /**
  * Said under the confirm callout (critic W3 L5): "Yes" stamps
- * `campus_set_at`, which starts the 30-day campus lock for an onboarded
- * student. Copied verbatim from B15's `CAMPUS_CONFIRM_LOCK_COPY` in
- * `src/lib/profile/settings-campus-card.ts` (same wave, so no import); keep
- * the two identical — the test compares them.
+ * `campus_set_at`, which starts the 45-day campus lock for an onboarded
+ * student (30 until S67). The same sentence as B15's
+ * `CAMPUS_CONFIRM_LOCK_COPY` in `src/lib/profile/settings-campus-card.ts`,
+ * built from the same day count; the test compares the two.
  */
-export const CAMPUS_CONFIRM_LOCK_NOTE = "Confirming locks your campus for 30 days.";
+export const CAMPUS_CONFIRM_LOCK_NOTE = `Confirming locks your campus for ${CAMPUS_CHANGE_COOLDOWN_DAYS} days.`;
 
 /** The onboarding-state fields the banner reads. Values are untrusted JSON. */
 export type CampusConfirmState = {

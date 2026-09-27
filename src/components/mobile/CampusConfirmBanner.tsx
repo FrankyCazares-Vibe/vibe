@@ -25,7 +25,7 @@ import { toast } from "@/lib/feedback/toast";
  * `campus-confirm-banner-view.test.ts`).
  *
  * - confirm: "Yes" re-sends the current campus, which stamps it (and starts
- *   the 30-day lock, said under the buttons). "Change" goes to Settings.
+ *   the 45-day lock, said under the buttons). "Change" goes to Settings.
  * - pick: "Pick campus" goes to Settings; there's no campus to confirm.
  * - "Not now" hides it for this browser session.
  *

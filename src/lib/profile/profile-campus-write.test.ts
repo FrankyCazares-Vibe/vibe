@@ -49,11 +49,13 @@ const {
   ownCampusFields,
   readCampusIntent,
 } = await import("./profile-campus-write");
+const { CAMPUS_CHANGE_COOLDOWN_MS } = await import("./onboarding-prefill");
 
 const DAY = 24 * 60 * 60 * 1000;
 const NOW = Date.parse("2026-09-15T12:00:00.000Z");
 const RECENT = new Date(NOW - 5 * DAY).toISOString();
-const OLD = new Date(NOW - 40 * DAY).toISOString();
+/** Just past the lock (45 days since S67; 40 days would still be inside it). */
+const OLD = new Date(NOW - CAMPUS_CHANGE_COOLDOWN_MS - DAY).toISOString();
 
 /** An IU student at Indianapolis, campus chosen 5 days ago, onboarded. */
 const IU_INDY = {
@@ -93,7 +95,7 @@ test("legacy: '' and null are no-ops, with or without a campus", () => {
   }
 });
 
-test("legacy: the current campus's label is a no-op, even inside the 30 days and unstamped", () => {
+test("legacy: the current campus's label is a no-op, even inside the 45 days and unstamped", () => {
   for (const school of ["IU Indianapolis", "iu indianapolis", "indianapolis", "Purdue Indianapolis"]) {
     assert.deepEqual(decide({ school }, IU_INDY), { kind: "noop" });
     // Backfilled row: campus set, never confirmed. A bio save must NOT confirm it.
@@ -113,14 +115,15 @@ test("legacy: junk, non-strings and IU Online are campus_invalid", () => {
   }
 });
 
-test("legacy: a different campus inside 30 days → 429 with availableAt, no write", () => {
+test("legacy: a different campus inside 45 days → 429 with availableAt, no write", () => {
   const r = decide({ school: "IU Bloomington" }, IU_INDY);
   assert.equal(r.kind, "reject");
   if (r.kind === "reject") {
     assert.equal(r.rejection.status, 429);
     assert.equal(r.rejection.code, "campus_change_too_soon");
-    assert.equal(r.rejection.availableAt, new Date(Date.parse(RECENT) + 30 * DAY).toISOString());
-    assert.equal(r.rejection.error, "You can change your campus again on October 10.");
+    assert.equal(r.rejection.availableAt, new Date(Date.parse(RECENT) + CAMPUS_CHANGE_COOLDOWN_MS).toISOString());
+    // Stamped Sept 10 + 45 days (it read October 10 under the old 30-day rule).
+    assert.equal(r.rejection.error, "You can change your campus again on October 25.");
   }
 });
 
@@ -136,7 +139,7 @@ test("legacy: a first pick from no campus is free and dual-writes the label", ()
   });
 });
 
-test("legacy: a different campus after 30 days writes", () => {
+test("legacy: a different campus after 45 days writes", () => {
   const r = decide({ school: "bloomington" }, { ...IU_INDY, campus_set_at: OLD });
   assert.equal(r.kind, "write");
   if (r.kind === "write") assert.equal(r.patch.campus_id, "iu-bloomington");
@@ -180,7 +183,7 @@ test("explicit: the same stamped campus is a no-op", () => {
   assert.deepEqual(decide({ campus_id: "indianapolis" }, IU_INDY), { kind: "noop" });
 });
 
-test("explicit: a change inside 30 days → 429; still onboarding → free", () => {
+test("explicit: a change inside 45 days → 429; still onboarding → free", () => {
   const blocked = decide({ campus_id: "iu-kokomo" }, IU_INDY, true);
   assert.equal(blocked.kind, "reject");
   const free = decide({ campus_id: "iu-kokomo" }, IU_INDY, false);
@@ -223,7 +226,8 @@ test("copy: CAMPUS_WRITE_COPY carries the plan's campus_not_in_system line", () 
 // ── Read-outs ────────────────────────────────────────────────────────────
 
 test("campusChangeAvailableAt: future only", () => {
-  assert.equal(campusChangeAvailableAt(RECENT, NOW), new Date(Date.parse(RECENT) + 30 * DAY).toISOString());
+  assert.equal(CAMPUS_CHANGE_COOLDOWN_MS, 45 * DAY, "the S67 lock is 45 days");
+  assert.equal(campusChangeAvailableAt(RECENT, NOW), new Date(Date.parse(RECENT) + CAMPUS_CHANGE_COOLDOWN_MS).toISOString());
   assert.equal(campusChangeAvailableAt(OLD, NOW), null);
   assert.equal(campusChangeAvailableAt(null, NOW), null);
   assert.equal(campusChangeAvailableAt("garbage", NOW), null);
@@ -309,7 +313,7 @@ test("ownCampusFields: bootstrap shape", () => {
     schoolSystem: "iu",
     campusId: "indianapolis",
     campusBadge: "IU Indianapolis",
-    campusChangeAvailableAt: new Date(Date.parse(RECENT) + 30 * DAY).toISOString(),
+    campusChangeAvailableAt: new Date(Date.parse(RECENT) + CAMPUS_CHANGE_COOLDOWN_MS).toISOString(),
     campusConfirmed: true,
   });
   assert.deepEqual(ownCampusFields({ school_verified: true, school_system: "iu", campus_id: "indianapolis", campus_set_at: null }, NOW), {

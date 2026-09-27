@@ -1236,13 +1236,13 @@ export function ProfileMobile({ targetHandle }: Props = {}) {
     }
     // Only a DIFFERENT campus picked in this edit session goes out. Never ""
     // and never the current id: re-sending an unconfirmed campus confirms it
-    // and starts the 30-day lock (profile-campus-write.ts:14-18).
+    // and starts the 45-day lock (profile-campus-write.ts:14-18).
     const sentCampusId =
       snapshot.campus && snapshot.campus !== (ownCampus.campusId ?? "") ? snapshot.campus : null;
     if (sentCampusId) {
-      // Any campus save starts the 30-day rule, so ask first with Settings'
+      // Any campus save starts the 45-day rule, so ask first with Settings'
       // prompt ("Switch to Bloomington?" / "Make Indianapolis your campus?"
-      // over "You can't change your campus again for 30 days."):
+      // over "You can't change your campus again for 45 days."):
       // `campusPickStep` on the SAVED view. Cancel puts the picker back on
       // the saved campus and saves nothing; edit mode stays open.
       const step = campusPickStep(
@@ -1495,7 +1495,7 @@ export function ProfileMobile({ targetHandle }: Props = {}) {
   // Edit mode's campus and major pickers. Plain calls, not hooks; the JSX
   // reads them only inside `editMode && effectiveDraft`. `campusId` is the
   // draft pick, so the sub-line follows what the student just chose.
-  // `onboarded: true`: this editor is past onboarding, so the 30-day rule
+  // `onboarded: true`: this editor is past onboarding, so the 45-day rule
   // applies. A backfilled campus waiting on "Confirm your campus" ("confirm"
   // mode) edits like a set one; the confirm tap lives in Settings and on the
   // /campus banner.
