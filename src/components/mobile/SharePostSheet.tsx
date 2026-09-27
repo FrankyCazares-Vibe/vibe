@@ -231,7 +231,7 @@ export function SharePostSheet({
             left: 0,
             right: 0,
             maxHeight: "85dvh",
-            background: "#FAF7F2",
+            background: "var(--cream)",
             borderTopLeftRadius: 20,
             borderTopRightRadius: 20,
             paddingBottom: "env(safe-area-inset-bottom, 0px)",
@@ -250,7 +250,7 @@ export function SharePostSheet({
               width: 38,
               height: 4,
               borderRadius: 999,
-              background: "rgba(28,28,30,0.18)",
+              background: "rgba(var(--scrim-rgb),0.18)",
             }}
           />
           <Drawer.Title
@@ -259,7 +259,7 @@ export function SharePostSheet({
               fontFamily: "Fraunces, serif",
               fontSize: 17,
               fontWeight: 800,
-              color: "#1C1C1E",
+              color: "var(--charcoal)",
             }}
           >
             Send to
@@ -272,9 +272,9 @@ export function SharePostSheet({
               display: "flex",
               gap: 10,
               padding: "10px 16px",
-              borderTop: "1px solid rgba(28,28,30,0.06)",
-              borderBottom: "1px solid rgba(28,28,30,0.06)",
-              background: "rgba(255,253,248,0.78)",
+              borderTop: "1px solid rgba(var(--scrim-rgb),0.06)",
+              borderBottom: "1px solid rgba(var(--scrim-rgb),0.06)",
+              background: "var(--glass)",
             }}
           >
             <div
@@ -306,7 +306,7 @@ export function SharePostSheet({
                 style={{
                   fontFamily: "DM Sans, sans-serif",
                   fontSize: 13,
-                  color: "#1C1C1E",
+                  color: "var(--charcoal)",
                   fontWeight: 600,
                   lineHeight: 1.35,
                   display: "-webkit-box",
@@ -322,7 +322,7 @@ export function SharePostSheet({
                   style={{
                     marginTop: 2,
                     fontSize: 11.5,
-                    color: "#8A8580",
+                    color: "var(--ink-muted)",
                   }}
                 >
                   by {authorName}
@@ -335,7 +335,7 @@ export function SharePostSheet({
           <div
             style={{
               padding: "10px 14px",
-              borderBottom: "1px solid rgba(28,28,30,0.06)",
+              borderBottom: "1px solid rgba(var(--scrim-rgb),0.06)",
             }}
           >
             <input
@@ -347,7 +347,7 @@ export function SharePostSheet({
                 width: "100%",
                 padding: "9px 12px",
                 borderRadius: 10,
-                border: "1px solid rgba(28,28,30,0.10)",
+                border: "1px solid rgba(var(--scrim-rgb),0.10)",
                 background: "rgba(255,255,255,0.92)",
                 fontFamily: "DM Sans, sans-serif",
                 fontSize: 13.5,
@@ -381,7 +381,7 @@ export function SharePostSheet({
                 style={{
                   padding: "32px 16px",
                   textAlign: "center",
-                  color: "#8A8580",
+                  color: "var(--ink-muted)",
                   fontFamily: "DM Sans, sans-serif",
                   fontSize: 13,
                 }}
@@ -393,7 +393,7 @@ export function SharePostSheet({
                 style={{
                   padding: "32px 16px",
                   textAlign: "center",
-                  color: "#8A8580",
+                  color: "var(--ink-muted)",
                   fontFamily: "DM Sans, sans-serif",
                   fontSize: 13,
                 }}
@@ -419,8 +419,8 @@ export function SharePostSheet({
             style={{
               padding:
                 "10px 14px calc(12px + env(safe-area-inset-bottom, 0px))",
-              borderTop: "1px solid rgba(28,28,30,0.06)",
-              background: "rgba(250,247,242,0.96)",
+              borderTop: "1px solid rgba(var(--scrim-rgb),0.06)",
+              background: "var(--tabbar-bg)",
               backdropFilter: "blur(14px)",
               WebkitBackdropFilter: "blur(14px)",
               display: "flex",
@@ -436,7 +436,7 @@ export function SharePostSheet({
                   borderRadius: 12,
                   background: "rgba(192,57,43,0.08)",
                   border: "1px solid rgba(192,57,43,0.22)",
-                  color: "#B83A1A",
+                  color: "var(--tag-ink)",
                   fontFamily: "DM Sans, sans-serif",
                   fontSize: 12.5,
                   fontWeight: 600,
@@ -457,7 +457,7 @@ export function SharePostSheet({
                 maxHeight: 120,
                 padding: "9px 12px",
                 borderRadius: 10,
-                border: "1px solid rgba(28,28,30,0.10)",
+                border: "1px solid rgba(var(--scrim-rgb),0.10)",
                 background: "rgba(255,255,255,0.92)",
                 fontFamily: "DM Sans, sans-serif",
                 fontSize: 13.5,
@@ -477,7 +477,7 @@ export function SharePostSheet({
                 border: "none",
                 background:
                   selectedIds.size === 0 || sending
-                    ? "rgba(28,28,30,0.18)"
+                    ? "rgba(var(--scrim-rgb),0.18)"
                     : "#FF5C35",
                 color: "#fff",
                 fontFamily: "DM Sans, sans-serif",
@@ -536,7 +536,7 @@ function ThreadRow({
         padding: "10px 16px",
         background: selected ? "rgba(255,92,53,0.08)" : "transparent",
         border: "none",
-        borderBottom: "1px solid rgba(28,28,30,0.04)",
+        borderBottom: "1px solid rgba(var(--scrim-rgb),0.04)",
         cursor: "pointer",
         textAlign: "left",
         fontFamily: "inherit",
@@ -551,8 +551,8 @@ function ThreadRow({
           borderRadius: 6,
           border: selected
             ? "1.5px solid #FF5C35"
-            : "1.5px solid rgba(28,28,30,0.22)",
-          background: selected ? "#FF5C35" : "#fff",
+            : "1.5px solid rgba(var(--scrim-rgb),0.22)",
+          background: selected ? "#FF5C35" : "var(--paper)",
           color: "#fff",
           display: "inline-flex",
           alignItems: "center",
@@ -593,7 +593,7 @@ function ThreadRow({
             fontFamily: "DM Sans, sans-serif",
             fontSize: 13.5,
             fontWeight: 700,
-            color: "#1C1C1E",
+            color: "var(--charcoal)",
             whiteSpace: "nowrap",
             overflow: "hidden",
             textOverflow: "ellipsis",
@@ -607,7 +607,7 @@ function ThreadRow({
             marginTop: 1,
             fontFamily: "DM Sans, sans-serif",
             fontSize: 11.5,
-            color: "#8A8580",
+            color: "var(--ink-muted)",
             whiteSpace: "nowrap",
             overflow: "hidden",
             textOverflow: "ellipsis",

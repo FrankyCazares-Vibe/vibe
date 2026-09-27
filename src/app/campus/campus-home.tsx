@@ -220,12 +220,12 @@ function initialsForOrg(name: string): string {
 }
 
 const COLORS = {
-  bg: "#FAF7F2",
-  border: "rgba(28,28,30,0.08)",
-  borderStrong: "rgba(28,28,30,0.12)",
-  text: "#1C1C1E",
-  muted: "#5C5853",
-  faint: "#8A8580",
+  bg: "var(--cream)",
+  border: "var(--hairline)",
+  borderStrong: "rgba(var(--scrim-rgb),0.12)",
+  text: "var(--charcoal)",
+  muted: "var(--ink-2)",
+  faint: "var(--ink-muted)",
   accent: "#FF5C35",
   accentSand: "#7B5FE0",
 
@@ -5102,6 +5102,12 @@ const ddSectionLabel: React.CSSProperties = {
   padding: "12px 16px 6px",
 };
 
+// Search-dropdown row hover (PersonRow, ItemRow): --row-hover is #F2EFE9 in
+// Light and one step up from the near-black dropdown in Night.
+function searchRowHoverBg(): string {
+  return "var(--row-hover)";
+}
+
 function PersonRow(props: {
   name: string;
   role: string;
@@ -5123,7 +5129,7 @@ function PersonRow(props: {
         padding: "8px 16px",
         cursor: "pointer",
       }}
-      onMouseEnter={(e) => (e.currentTarget.style.background = "#F2EFE9")}
+      onMouseEnter={(e) => (e.currentTarget.style.background = searchRowHoverBg())}
       onMouseLeave={(e) => (e.currentTarget.style.background = "transparent")}
     >
       <div
@@ -5220,7 +5226,7 @@ function EntityRow(props: {
         padding: "8px 16px",
         cursor: "pointer",
       }}
-      onMouseEnter={(e) => (e.currentTarget.style.background = "#F2EFE9")}
+      onMouseEnter={(e) => (e.currentTarget.style.background = searchRowHoverBg())}
       onMouseLeave={(e) => (e.currentTarget.style.background = "transparent")}
     >
       <div
@@ -5719,7 +5725,7 @@ function FeedTabBody({
       if (!el) return;
       el.scrollIntoView({ behavior: "smooth", block: "center" });
       const prevBg = el.style.background;
-      el.style.background = "rgba(255,92,53,0.10)";
+      el.style.background = "var(--tag-bg)";
       window.setTimeout(() => {
         el.style.background = prevBg;
       }, 2200);
@@ -6135,7 +6141,7 @@ function FeedComposer({
             style={{
               borderRadius: 12,
               overflow: "hidden",
-              border: "1px solid rgba(28,28,30,0.06)",
+              border: "1px solid rgba(var(--scrim-rgb),0.06)",
               paddingTop: "56%",
               background: `url(${previewUrl}) center/cover`,
               position: "relative",
@@ -6157,7 +6163,7 @@ function FeedComposer({
               display: "flex",
               alignItems: "center",
               gap: 8,
-              border: "1px solid rgba(28,28,30,0.08)",
+              border: "1px solid var(--hairline)",
               borderRadius: 12,
               padding: "10px 14px",
               background: "rgba(123,95,224,0.08)",
@@ -6248,7 +6254,7 @@ function FeedComposer({
               padding: "8px 20px",
               borderRadius: 999,
               border: "none",
-              background: hasContent && !busy ? COLORS.accent : "rgba(28,28,30,0.18)",
+              background: hasContent && !busy ? COLORS.accent : "rgba(var(--scrim-rgb),0.18)",
               color: "#fff",
               fontFamily: "DM Sans, sans-serif",
               fontWeight: 700,
@@ -6745,7 +6751,7 @@ function FeedRow({
             padding: 0,
           }}
           onMouseEnter={(e) => {
-            e.currentTarget.style.background = "rgba(28,28,30,0.06)";
+            e.currentTarget.style.background = "rgba(var(--scrim-rgb),0.06)";
           }}
           onMouseLeave={(e) => {
             e.currentTarget.style.background = "transparent";
@@ -6761,8 +6767,8 @@ function FeedRow({
               top: 32,
               right: 0,
               minWidth: 180,
-              background: "white",
-              border: "1px solid rgba(28,28,30,0.08)",
+              background: "var(--paper)",
+              border: "1px solid var(--hairline)",
               borderRadius: 12,
               boxShadow: "0 12px 36px rgba(0,0,0,0.12)",
               padding: 4,
@@ -6780,7 +6786,7 @@ function FeedRow({
               }}
               style={feedRowMenuItemStyle()}
               onMouseEnter={(e) => {
-                e.currentTarget.style.background = "#FAF7F2";
+                e.currentTarget.style.background = "var(--cream)";
               }}
               onMouseLeave={(e) => {
                 e.currentTarget.style.background = "transparent";
@@ -6802,7 +6808,7 @@ function FeedRow({
               }}
               style={feedRowMenuItemStyle()}
               onMouseEnter={(e) => {
-                e.currentTarget.style.background = "#FAF7F2";
+                e.currentTarget.style.background = "var(--cream)";
               }}
               onMouseLeave={(e) => {
                 e.currentTarget.style.background = "transparent";
@@ -6822,7 +6828,7 @@ function FeedRow({
                 }}
                 style={feedRowMenuItemStyle("danger")}
                 onMouseEnter={(e) => {
-                  e.currentTarget.style.background = "#FAF7F2";
+                  e.currentTarget.style.background = "var(--cream)";
                 }}
                 onMouseLeave={(e) => {
                   e.currentTarget.style.background = "transparent";
@@ -6845,7 +6851,7 @@ function FeedRow({
                   }}
                   style={feedRowMenuItemStyle()}
                   onMouseEnter={(e) => {
-                    e.currentTarget.style.background = "#FAF7F2";
+                    e.currentTarget.style.background = "var(--cream)";
                   }}
                   onMouseLeave={(e) => {
                     e.currentTarget.style.background = "transparent";
@@ -6864,7 +6870,7 @@ function FeedRow({
                     cursor: deleting ? "default" : "pointer",
                   }}
                   onMouseEnter={(e) => {
-                    if (!deleting) e.currentTarget.style.background = "#FAF7F2";
+                    if (!deleting) e.currentTarget.style.background = "var(--cream)";
                   }}
                   onMouseLeave={(e) => {
                     e.currentTarget.style.background = "transparent";
@@ -7057,8 +7063,8 @@ function FeedRow({
                 margin: 0,
                 padding: "10px 12px",
                 borderRadius: 12,
-                border: "1px solid rgba(28,28,30,0.12)",
-                background: "#fff",
+                border: "1px solid rgba(var(--scrim-rgb),0.12)",
+                background: "var(--paper)",
                 color: COLORS.text,
                 fontFamily: "DM Sans, sans-serif",
                 fontSize: 15,
@@ -7085,7 +7091,7 @@ function FeedRow({
                     You can change the words. The photo or video stays.
                   </span>
                 ) : !editDraft.trim() ? (
-                  <span style={{ color: "#C0392B" }}>Your post can&apos;t be empty.</span>
+                  <span style={{ color: "var(--error-ink)" }}>Your post can&apos;t be empty.</span>
                 ) : null}
               </div>
               <button
@@ -7095,7 +7101,7 @@ function FeedRow({
                 style={{
                   padding: "7px 14px",
                   borderRadius: 999,
-                  border: "1px solid rgba(28,28,30,0.12)",
+                  border: "1px solid rgba(var(--scrim-rgb),0.12)",
                   background: "transparent",
                   color: COLORS.text,
                   fontFamily: "inherit",
@@ -7165,7 +7171,7 @@ function FeedRow({
               marginTop: 10,
               borderRadius: 12,
               overflow: "hidden",
-              border: "1px solid rgba(28,28,30,0.06)",
+              border: "1px solid rgba(var(--scrim-rgb),0.06)",
               paddingTop: "56%",
               background: `url(${post.media_url}) center/cover`,
               cursor: "pointer",
@@ -7182,7 +7188,7 @@ function FeedRow({
               width: "100%",
               marginTop: 10,
               borderRadius: 12,
-              border: "1px solid rgba(28,28,30,0.06)",
+              border: "1px solid rgba(var(--scrim-rgb),0.06)",
               background: "#000",
               maxHeight: 540,
             }}
@@ -7248,7 +7254,7 @@ function FeedRow({
             label={saved ? "Saved" : "Save"}
             onClick={toggleSave}
             active={saved}
-            activeColor="#1C1C1E"
+            activeColor="var(--charcoal)"
           />
           {showRepostMenu ? (
             <RepostMenu
@@ -7357,6 +7363,9 @@ function FeedRow({
  * of pixels off screen again. ImageCropperModal escapes the same way
  * (src/components/ImageCropperModal.tsx). AttendeesModal is NOT a safe template
  * for that part: it mounts from an event card outside this container.
+ *
+ * NIGHT (S67 wave 3): the surface is COLORS.bg and the list's light tone reads
+ * the C0 inks, so both flip together.
  */
 function PostViewersModal({
   postId,
@@ -7476,7 +7485,12 @@ function PostViewersModal({
             &times;
           </button>
         </div>
-        <PostAudienceList postId={postId} kind="viewers" renderRow={renderRow} />
+        <PostAudienceList
+          postId={postId}
+          kind="viewers"
+          renderRow={renderRow}
+          tone="light"
+        />
       </div>
     </div>,
     document.body,
@@ -7496,7 +7510,7 @@ function feedRowMenuItemStyle(
     borderRadius: 8,
     background: "transparent",
     border: "none",
-    color: tone === "danger" ? "#C0392B" : "#1C1C1E",
+    color: tone === "danger" ? "var(--error-ink)" : "var(--charcoal)",
     fontFamily: "inherit",
     fontSize: "inherit",
     fontWeight: 600,
@@ -7534,7 +7548,7 @@ function FriendRepostPill({ post }: { post: FeedPost }) {
         borderRadius: 999,
         background: "rgba(46,160,72,0.10)",
         border: "1px solid rgba(46,160,72,0.22)",
-        color: "#1F6B3A",
+        color: "var(--ok-ink-2)",
         fontFamily: "DM Sans, sans-serif",
         fontSize: 12,
         fontWeight: 700,
@@ -7552,7 +7566,7 @@ function FriendRepostPill({ post }: { post: FeedPost }) {
               background: u.avatar_url
                 ? `url(${u.avatar_url}) center/cover`
                 : "#FFD3C2",
-              border: "2px solid #FAF7F2",
+              border: "2px solid var(--cream)",
               marginLeft: i === 0 ? 0 : -7,
             }}
           />
@@ -7647,8 +7661,8 @@ function RepostMenu({
         left: 0,
         zIndex: 20,
         width: 320,
-        background: "#FFFFFF",
-        border: "1px solid rgba(28,28,30,0.08)",
+        background: "var(--paper)",
+        border: "1px solid var(--hairline)",
         borderRadius: 14,
         boxShadow: "0 12px 36px rgba(28,28,30,0.14)",
         padding: 14,
@@ -7675,7 +7689,7 @@ function RepostMenu({
           rows={3}
           style={{
             width: "100%",
-            border: "1px solid rgba(28,28,30,0.12)",
+            border: "1px solid rgba(var(--scrim-rgb),0.12)",
             borderRadius: 10,
             padding: "8px 10px",
             fontSize: 13,
@@ -7694,7 +7708,7 @@ function RepostMenu({
           style={{
             padding: "6px 12px",
             borderRadius: 999,
-            border: "1px solid rgba(28,28,30,0.12)",
+            border: "1px solid rgba(var(--scrim-rgb),0.12)",
             background: "transparent",
             fontSize: 12,
             fontWeight: 600,
@@ -7850,7 +7864,7 @@ function CommentsDrawer({
     <div
       style={{
         marginTop: 10,
-        borderTop: "1px solid rgba(28,28,30,0.06)",
+        borderTop: "1px solid rgba(var(--scrim-rgb),0.06)",
         paddingTop: 10,
         fontFamily: "DM Sans, sans-serif",
       }}
@@ -7898,14 +7912,14 @@ function CommentsDrawer({
               placeholder="Write a comment…"
               style={{
                 flex: 1,
-                border: "1px solid rgba(28,28,30,0.12)",
+                border: "1px solid rgba(var(--scrim-rgb),0.12)",
                 borderRadius: 999,
                 padding: "8px 14px",
                 fontSize: 13,
                 fontFamily: "DM Sans, sans-serif",
                 outline: "none",
                 color: COLORS.text,
-                background: "rgba(255,255,255,0.7)",
+                background: "var(--paper-70)",
               }}
             />
             <button
@@ -7916,7 +7930,7 @@ function CommentsDrawer({
                 padding: "8px 16px",
                 borderRadius: 999,
                 border: "none",
-                background: draft.trim() ? COLORS.accent : "rgba(28,28,30,0.18)",
+                background: draft.trim() ? COLORS.accent : "rgba(var(--scrim-rgb),0.18)",
                 color: "#fff",
                 fontSize: 12,
                 fontWeight: 700,
@@ -8057,7 +8071,7 @@ function CommentRow({
         style={{
           marginTop: 10,
           paddingLeft: 10,
-          borderLeft: "2px solid rgba(28,28,30,0.06)",
+          borderLeft: "2px solid rgba(var(--scrim-rgb),0.06)",
           display: "flex",
           flexDirection: "column",
           gap: 10,
@@ -8234,8 +8248,8 @@ function CommentRow({
                       right: 0,
                       zIndex: 2,
                       minWidth: 150,
-                      background: "white",
-                      border: "1px solid rgba(28,28,30,0.08)",
+                      background: "var(--paper)",
+                      border: "1px solid var(--hairline)",
                       borderRadius: 10,
                       boxShadow: "0 12px 36px rgba(0,0,0,0.12)",
                       padding: 4,
@@ -8297,14 +8311,14 @@ function CommentRow({
               placeholder="Write a reply…"
               style={{
                 flex: 1,
-                border: "1px solid rgba(28,28,30,0.12)",
+                border: "1px solid rgba(var(--scrim-rgb),0.12)",
                 borderRadius: 999,
                 padding: "6px 12px",
                 fontSize: 12.5,
                 fontFamily: "DM Sans, sans-serif",
                 outline: "none",
                 color: COLORS.text,
-                background: "rgba(255,255,255,0.7)",
+                background: "var(--paper-70)",
               }}
             />
             <button
@@ -8315,7 +8329,7 @@ function CommentRow({
                 padding: "6px 12px",
                 borderRadius: 999,
                 border: "none",
-                background: replyDraft.trim() ? COLORS.accent : "rgba(28,28,30,0.18)",
+                background: replyDraft.trim() ? COLORS.accent : "rgba(var(--scrim-rgb),0.18)",
                 color: "#fff",
                 fontSize: 11,
                 fontWeight: 700,
@@ -8532,7 +8546,7 @@ function SceneHeader({
           fontWeight: 700,
           letterSpacing: "0.18em",
           textTransform: "uppercase",
-          color: dark ? "#C84A20" : "#FFB89C",
+          color: dark ? "var(--eyebrow-ink)" : "#FFB89C",
           marginBottom: 6,
         }}
       >
@@ -9698,7 +9712,7 @@ export function CreateEventModal({
             style={eventModalInput}
           >
             {eligibleOrgs.map((o) => (
-              <option key={o.id} value={o.id} style={{ color: "#1C1C1E" }}>
+              <option key={o.id} value={o.id} style={{ color: "var(--charcoal)" }}>
                 {o.name}
               </option>
             ))}
@@ -10380,7 +10394,7 @@ function OrgsTabBody({ onCreateOrg }: { onCreateOrg: () => void }) {
                     marginTop: 10,
                     fontFamily: "DM Sans, sans-serif",
                     fontSize: 12,
-                    color: "rgba(28,28,30,0.55)",
+                    color: "rgba(var(--scrim-rgb),0.55)",
                   }}
                 >
                   Showing the 100 clubs you followed most recently.
@@ -10470,7 +10484,7 @@ function OrgsTabBody({ onCreateOrg }: { onCreateOrg: () => void }) {
                           padding: "6px 0",
                           border: "none",
                           background: "none",
-                          color: "#C84A20",
+                          color: "var(--eyebrow-ink)",
                           fontFamily: "DM Sans, sans-serif",
                           fontSize: 13,
                           fontWeight: 700,
@@ -11042,7 +11056,7 @@ function DiscoverGroup({
             fontFamily: "Fraunces, serif",
             fontWeight: 800,
             fontSize: 18,
-            color: "#1C1C1E",
+            color: "var(--charcoal)",
             letterSpacing: "-0.01em",
             ...titleStyle,
           }}
@@ -11054,11 +11068,11 @@ function DiscoverGroup({
                 marginLeft: 8,
                 fontSize: 13,
                 fontWeight: 500,
-                color: "rgba(28,28,30,0.55)",
+                color: "rgba(var(--scrim-rgb),0.55)",
                 // Reset any inherited gradient from the title.
                 background: "none",
                 WebkitBackgroundClip: "border-box",
-                WebkitTextFillColor: "rgba(28,28,30,0.55)",
+                WebkitTextFillColor: "rgba(var(--scrim-rgb),0.55)",
               }}
             >
               {badge}
@@ -11069,7 +11083,7 @@ function DiscoverGroup({
           style={{
             fontFamily: "DM Sans, sans-serif",
             fontSize: 12,
-            color: "rgba(28,28,30,0.55)",
+            color: "rgba(var(--scrim-rgb),0.55)",
           }}
         >
           {hint}
@@ -11093,7 +11107,7 @@ function DiscoverGroup({
             marginBottom: orgs.length > 0 ? 10 : 0,
             fontFamily: "DM Sans, sans-serif",
             fontSize: 13,
-            color: "rgba(28,28,30,0.55)",
+            color: "rgba(var(--scrim-rgb),0.55)",
           }}
         >
           Loading…

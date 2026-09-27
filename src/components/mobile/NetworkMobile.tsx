@@ -2,7 +2,7 @@
 
 import { AnimatePresence, motion } from "framer-motion";
 import Link from "next/link";
-import { useCallback, useEffect, useRef, useState } from "react";
+import { useCallback, useEffect, useRef, useState, useSyncExternalStore } from "react";
 
 import { asLoadFailure, LoadFailed, type LoadFailure } from "@/components/feedback/LoadFailed";
 import {
@@ -15,6 +15,7 @@ import {
 } from "@/components/mobile/people-suggestion-groups";
 import { useMobileTour } from "@/components/mobile/use-mobile-tour";
 import { vibeRequest } from "@/lib/feedback/request";
+import { currentTheme, THEME_EVENT } from "@/lib/theme/theme";
 
 /**
  * iOS-native mobile rebuild of the /network surface. Built around
@@ -95,11 +96,33 @@ const LOAD_FAILURE: Record<Tab, string> = {
 };
 const SEARCH_FAILURE = "Couldn't search people.";
 
+// Night (S67 wave 3): the sticky header and its search field are translucent
+// cream / white steps (.86, .78) with no token yet, so Light keeps today's
+// literal and Night takes the nearest existing step; a --cream-86 /
+// --paper-78 pair in globals.css would replace these ternaries. Same read as
+// MessagesMobile's useNightTheme: <html data-theme> is the truth and
+// applyTheme announces changes with THEME_EVENT. This screen mounts only
+// after hydration (NetworkSwitch gates on useIsMobile), so the first paint
+// already reads the real theme.
+function subscribeTheme(onChange: () => void): () => void {
+  window.addEventListener(THEME_EVENT, onChange);
+  return () => window.removeEventListener(THEME_EVENT, onChange);
+}
+
+function useNightTheme(): boolean {
+  return useSyncExternalStore(
+    subscribeTheme,
+    () => currentTheme() === "dark",
+    () => false,
+  );
+}
+
 export function NetworkMobile() {
   // Otto spotlight tour — fires on visit when Settings → Replay tour
   // sets the network pending flag. Final leg in the 3-leg flow.
   useMobileTour("network");
 
+  const night = useNightTheme();
   const [tab, setTab] = useState<Tab>("discover");
   const [query, setQuery] = useState("");
   const [debouncedQuery, setDebouncedQuery] = useState("");
@@ -326,10 +349,9 @@ export function NetworkMobile() {
   return (
     <main
       style={{
-        background:
-          "radial-gradient(120% 80% at 0% 0%, rgba(255,222,180,0.40) 0%, rgba(255,222,180,0) 60%), " +
-          "radial-gradient(110% 80% at 100% 100%, rgba(255,200,170,0.32) 0%, rgba(255,200,170,0) 60%), " +
-          "linear-gradient(180deg, #FAF7F2 0%, #F4EDE2 100%)",
+        // The campus Feed's backdrop (contracts C0): cream with a coral
+        // bloom in Light, near-black in Night.
+        background: "var(--feed-backdrop)",
         minHeight: "100dvh",
       }}
     >
@@ -338,13 +360,14 @@ export function NetworkMobile() {
         style={{
           padding:
             "calc(env(safe-area-inset-top, 0px) + 14px) 16px 6px",
-          background: "rgba(250, 247, 242, 0.86)",
+          // Cream at .86 (no --cream-86 yet): Night takes the tab bar's step.
+          background: night ? "var(--tabbar-bg)" : "rgba(250, 247, 242, 0.86)",
           backdropFilter: "saturate(160%) blur(14px)",
           WebkitBackdropFilter: "saturate(160%) blur(14px)",
           position: "sticky",
           top: 0,
           zIndex: 5,
-          borderBottom: "1px solid rgba(28,28,30,0.06)",
+          borderBottom: "1px solid rgba(var(--scrim-rgb),0.06)",
         }}
       >
         <h1
@@ -353,7 +376,7 @@ export function NetworkMobile() {
             fontSize: 28,
             fontWeight: 900,
             letterSpacing: "-0.8px",
-            color: "#1C1C1E",
+            color: "var(--charcoal)",
             margin: 0,
           }}
         >
@@ -440,6 +463,7 @@ function SearchInput({
   value: string;
   onChange: (v: string) => void;
 }) {
+  const night = useNightTheme();
   const ref = useRef<HTMLInputElement | null>(null);
   return (
     <div
@@ -456,7 +480,7 @@ function SearchInput({
           left: 14,
           top: "50%",
           transform: "translateY(-50%)",
-          color: "#8A8580",
+          color: "var(--ink-muted)",
           display: "inline-flex",
         }}
       >
@@ -478,13 +502,16 @@ function SearchInput({
           width: "100%",
           padding: "11px 38px 11px 38px",
           borderRadius: 14,
-          border: "1px solid rgba(28,28,30,0.10)",
-          background: "rgba(255,255,255,0.78)",
+          border: "1px solid rgba(var(--scrim-rgb),0.10)",
+          // White at .78 (no --paper-78 yet): Night takes --paper-70.
+          background: night ? "var(--paper-70)" : "rgba(255,255,255,0.78)",
           fontFamily: "DM Sans, sans-serif",
           fontSize: 15,
-          color: "#1C1C1E",
+          color: "var(--charcoal)",
           outline: "none",
-          boxShadow: "inset 0 1px 0 rgba(255,255,255,0.7)",
+          boxShadow: night
+            ? "inset 0 1px 0 rgba(255,255,255,0.04)"
+            : "inset 0 1px 0 rgba(255,255,255,0.7)",
         }}
       />
       {value ? (
@@ -501,8 +528,8 @@ function SearchInput({
             height: 24,
             borderRadius: 999,
             border: "none",
-            background: "rgba(28,28,30,0.08)",
-            color: "#5C5853",
+            background: "rgba(var(--scrim-rgb),0.08)",
+            color: "var(--ink-2)",
             fontSize: 14,
             cursor: "pointer",
             display: "inline-flex",
@@ -550,9 +577,9 @@ function TabStrip({
             style={{
               padding: "7px 14px",
               borderRadius: 999,
-              border: "1px solid rgba(28,28,30,0.10)",
-              background: isActive ? "#1C1C1E" : "rgba(255,255,255,0.7)",
-              color: isActive ? "#fff" : "#5C5853",
+              border: "1px solid rgba(var(--scrim-rgb),0.10)",
+              background: isActive ? "var(--charcoal)" : "var(--paper-70)",
+              color: isActive ? "var(--paper)" : "var(--ink-2)",
               fontFamily: "DM Sans, sans-serif",
               fontSize: 13,
               fontWeight: 700,
@@ -585,8 +612,14 @@ function ListPane({
   onStateChange: (id: string, next: FollowState) => void;
   onDismissSuggestion: (user: ListUser) => void;
 }) {
+  // Straight on the backdrop, which is near-black in Night.
+  const night = useNightTheme();
   // A failed load is never "No followers yet" (empty-states design §1).
-  if (failure) return <LoadFailed failure={failure} onRetry={onRetry} />;
+  if (failure) {
+    return (
+      <LoadFailed failure={failure} onRetry={onRetry} tone={night ? "dark" : "light"} />
+    );
+  }
   if (users === null) return <ListSkeleton />;
   if (users.length === 0) {
     return (
@@ -677,7 +710,7 @@ function SuggestionGroups({
                   fontFamily: "Fraunces, serif",
                   fontSize: 16,
                   fontWeight: 800,
-                  color: "#1C1C1E",
+                  color: "var(--charcoal)",
                   letterSpacing: "-0.2px",
                 }}
               >
@@ -687,7 +720,7 @@ function SuggestionGroups({
                 style={{
                   fontFamily: "DM Sans, sans-serif",
                   fontSize: 11.5,
-                  color: "#8A8580",
+                  color: "var(--ink-muted)",
                   letterSpacing: "0.01em",
                 }}
               >
@@ -765,9 +798,19 @@ function SearchPane({
   failure: LoadFailure | null;
   onRetry: () => void;
 }) {
+  const night = useNightTheme();
   // A failed search is never "No matches for …". Compact: one tight row
   // under the search field (empty-states design §2).
-  if (failure) return <LoadFailed failure={failure} onRetry={onRetry} compact />;
+  if (failure) {
+    return (
+      <LoadFailed
+        failure={failure}
+        onRetry={onRetry}
+        tone={night ? "dark" : "light"}
+        compact
+      />
+    );
+  }
   if (loading || results === null) return <ListSkeleton />;
   if (results.length === 0) {
     return (
@@ -876,8 +919,8 @@ export function UserRow({
             height: 22,
             borderRadius: 999,
             border: "none",
-            background: "rgba(28,28,30,0.08)",
-            color: "#5C5853",
+            background: "rgba(var(--scrim-rgb),0.08)",
+            color: "var(--ink-2)",
             fontSize: 12,
             lineHeight: 1,
             cursor: "pointer",
@@ -985,7 +1028,7 @@ function SuggestionReason({ user }: { user: ListUser }) {
         fontFamily: "DM Sans, sans-serif",
         fontSize: 11.5,
         fontWeight: 700,
-        color: "#1C1C1E",
+        color: "var(--charcoal)",
         letterSpacing: "0.01em",
       }}
     >
@@ -1086,7 +1129,7 @@ function UserNameLink({ user }: { user: ListUser | SearchUser }) {
         fontFamily: "Fraunces, serif",
         fontSize: 16,
         fontWeight: 800,
-        color: "#1C1C1E",
+        color: "var(--charcoal)",
         textDecoration: "none",
         whiteSpace: "nowrap",
         overflow: "hidden",
@@ -1114,7 +1157,7 @@ function ListSkeleton() {
               width: 48,
               height: 48,
               borderRadius: 999,
-              background: "rgba(28,28,30,0.06)",
+              background: "rgba(var(--scrim-rgb),0.06)",
               flexShrink: 0,
             }}
           />
@@ -1123,7 +1166,7 @@ function ListSkeleton() {
               style={{
                 width: "55%",
                 height: 14,
-                background: "rgba(28,28,30,0.08)",
+                background: "rgba(var(--scrim-rgb),0.08)",
                 borderRadius: 6,
                 marginBottom: 6,
               }}
@@ -1132,7 +1175,7 @@ function ListSkeleton() {
               style={{
                 width: "75%",
                 height: 11,
-                background: "rgba(28,28,30,0.05)",
+                background: "rgba(var(--scrim-rgb),0.05)",
                 borderRadius: 5,
               }}
             />
@@ -1196,16 +1239,16 @@ const rowItemStyle: React.CSSProperties = {
   alignItems: "center",
   gap: 12,
   padding: "10px 12px",
-  background: "rgba(255,253,248,0.78)",
-  border: "1px solid rgba(255,255,255,0.7)",
+  background: "var(--glass)",
+  border: "1px solid var(--glass-border)",
   borderRadius: 16,
-  boxShadow: "inset 0 1px 0 rgba(255,255,255,0.85), 0 4px 14px rgba(180,120,60,0.08)",
+  boxShadow: "var(--card-shadow)",
 };
 
 const metaLineStyle: React.CSSProperties = {
   fontFamily: "DM Sans, sans-serif",
   fontSize: 12,
-  color: "#8A8580",
+  color: "var(--ink-muted)",
   marginTop: 2,
   whiteSpace: "nowrap",
   overflow: "hidden",

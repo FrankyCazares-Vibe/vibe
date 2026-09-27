@@ -236,7 +236,7 @@ export default function LeftNav() {
       className="vibe-left-nav-aside"
       style={{
         padding: "20px 14px",
-        borderRight: "1px solid rgba(28,28,30,0.08)",
+        borderRight: "1px solid var(--hairline)",
         position: "sticky",
         top: 0,
         height: "100vh",
@@ -252,7 +252,7 @@ export default function LeftNav() {
         background: [
           "radial-gradient(440px circle at 0% 0%, rgba(255,92,53,0.32) 0%, rgba(255,140,90,0.18) 28%, rgba(255,92,53,0) 60%) no-repeat",
           "radial-gradient(420px circle at 100% 100%, rgba(255,140,90,0.30) 0%, rgba(255,92,53,0.14) 32%, rgba(255,92,53,0) 62%) no-repeat",
-          "#FAF7F2",
+          "var(--cream)",
         ].join(", "),
         // Stacking context so the cursor-glow's z-index:-1 stays inside
         // the sidebar instead of clipping behind page content.
@@ -281,7 +281,7 @@ export default function LeftNav() {
           fontFamily: "Fraunces, serif",
           fontSize: "22px",
           fontWeight: "900",
-          color: "#1C1C1E",
+          color: "var(--charcoal)",
           letterSpacing: "-1px",
           display: "block",
           marginBottom: "24px",
@@ -309,9 +309,9 @@ export default function LeftNav() {
                 borderRadius: "12px",
                 fontSize: "14px",
                 fontWeight: isActive ? "600" : "500",
-                color: isActive ? "#1C1C1E" : "#8A8580",
+                color: isActive ? "var(--charcoal)" : "var(--ink-muted)",
                 textDecoration: "none",
-                background: isActive ? "white" : "none",
+                background: isActive ? "var(--paper)" : "none",
                 boxShadow: isActive ? "0 4px 24px rgba(0,0,0,0.06)" : "none",
                 transition: "all 0.15s",
               }}
@@ -331,7 +331,7 @@ export default function LeftNav() {
               fontWeight: 700,
               letterSpacing: "0.16em",
               textTransform: "uppercase",
-              color: "#8A8580",
+              color: "var(--ink-muted)",
               padding: "12px 12px 6px",
               marginTop: 6,
             }}
@@ -348,7 +348,7 @@ export default function LeftNav() {
               borderRadius: 12,
               fontSize: 14,
               fontWeight: pathname.startsWith("/admin") ? 700 : 600,
-              color: pathname.startsWith("/admin") ? "#1C1C1E" : "#5C5853",
+              color: pathname.startsWith("/admin") ? "var(--charcoal)" : "var(--ink-2)",
               textDecoration: "none",
               background: pathname.startsWith("/admin")
                 ? "linear-gradient(180deg, rgba(240,200,74,0.32) 0%, rgba(240,200,74,0.14) 100%)"
@@ -369,7 +369,7 @@ export default function LeftNav() {
       <div
         style={{
           height: "1px",
-          background: "rgba(28,28,30,0.08)",
+          background: "var(--hairline)",
           margin: "12px 0",
         }}
       />
@@ -379,7 +379,7 @@ export default function LeftNav() {
       <div
         style={{
           height: "1px",
-          background: "rgba(28,28,30,0.08)",
+          background: "var(--hairline)",
           margin: "12px 0",
         }}
       />
@@ -554,7 +554,7 @@ export function CalendarWidget() {
             fontSize: 12,
             fontWeight: 700,
             letterSpacing: "-0.1px",
-            color: "#1C1C1E",
+            color: "var(--charcoal)",
           }}
           title="Open full calendar"
         >
@@ -602,7 +602,7 @@ export function CalendarWidget() {
             style={{
               fontSize: 11,
               fontWeight: 700,
-              color: "#1C1C1E",
+              color: "var(--charcoal)",
               fontFamily: "DM Sans, sans-serif",
               textAlign: "center",
               flex: 1,
@@ -642,7 +642,7 @@ export function CalendarWidget() {
                 style={{
                   fontSize: 8,
                   fontWeight: 800,
-                  color: "#8A8580",
+                  color: "var(--ink-muted)",
                   textAlign: "center",
                   padding: "2px 0",
                   textTransform: "uppercase",
@@ -656,8 +656,8 @@ export function CalendarWidget() {
             {cells.map((cell, i) => {
               const hasEvent = !!byDay[cell.key];
               const isToday = cell.key === todayKey;
-              const dayBg = isToday ? "#1C1C1E" : "transparent";
-              const dayColor = isToday ? "#fff" : cell.otherMonth ? "#8A8580" : "#1C1C1E";
+              const dayBg = isToday ? "var(--charcoal)" : "transparent";
+              const dayColor = isToday ? "var(--paper)" : cell.otherMonth ? "var(--ink-muted)" : "var(--charcoal)";
               const dayOpacity = cell.otherMonth ? 0.35 : 1;
               return (
                 <button
@@ -691,7 +691,7 @@ export function CalendarWidget() {
                         width: 4,
                         height: 4,
                         borderRadius: "50%",
-                        background: isToday ? "#fff" : "#FF5C35",
+                        background: isToday ? "var(--paper)" : "#FF5C35",
                         position: "absolute",
                         bottom: 2,
                       }}
@@ -805,7 +805,7 @@ function CalendarModal({
           width: "100%",
           maxWidth: 920,
           maxHeight: "90vh",
-          background: "#FFFFFF",
+          background: "var(--paper)",
           borderRadius: 22,
           boxShadow:
             "0 24px 60px rgba(0,0,0,0.18), 0 8px 24px rgba(0,0,0,0.10)",
@@ -822,7 +822,7 @@ function CalendarModal({
             alignItems: "center",
             gap: 12,
             padding: "16px 22px",
-            borderBottom: "1px solid rgba(28,28,30,0.08)",
+            borderBottom: "1px solid var(--hairline)",
           }}
         >
           <div
@@ -830,7 +830,7 @@ function CalendarModal({
               fontFamily: "Fraunces, serif",
               fontWeight: 800,
               fontSize: 22,
-              color: "#1C1C1E",
+              color: "var(--charcoal)",
               flex: 1,
             }}
           >
@@ -849,7 +849,7 @@ function CalendarModal({
               fontFamily: "Fraunces, serif",
               fontSize: 16,
               fontWeight: 700,
-              color: "#1C1C1E",
+              color: "var(--charcoal)",
               minWidth: 140,
               textAlign: "center",
             }}
@@ -876,9 +876,9 @@ function CalendarModal({
                 gap: 6,
                 padding: "8px 14px",
                 borderRadius: 999,
-                border: "1px solid rgba(28,28,30,0.12)",
-                background: exportOpen ? "rgba(28,28,30,0.06)" : "#FFFFFF",
-                color: "#1C1C1E",
+                border: "1px solid rgba(var(--scrim-rgb),0.12)",
+                background: exportOpen ? "rgba(var(--scrim-rgb),0.06)" : "var(--paper)",
+                color: "var(--charcoal)",
                 fontFamily: "DM Sans, sans-serif",
                 fontWeight: 700,
                 fontSize: 13,
@@ -980,7 +980,7 @@ function CalendarModal({
                     style={{
                       fontSize: 10,
                       fontWeight: 800,
-                      color: "#8A8580",
+                      color: "var(--ink-muted)",
                       textAlign: "center",
                       padding: "4px 0",
                       textTransform: "uppercase",
@@ -995,8 +995,8 @@ function CalendarModal({
                   const isToday = cell.key === todayKey;
                   const isSelected = cell.key === selected;
                   const cellBorder = isSelected
-                    ? "2px solid #1C1C1E"
-                    : "1px solid rgba(28,28,30,0.08)";
+                    ? "2px solid var(--charcoal)"
+                    : "1px solid var(--hairline)";
                   return (
                     <button
                       key={`mc-${i}`}
@@ -1009,7 +1009,7 @@ function CalendarModal({
                         display: "flex",
                         flexDirection: "column",
                         gap: 3,
-                        background: cell.otherMonth ? "rgba(28,28,30,0.02)" : "#FFFFFF",
+                        background: cell.otherMonth ? "rgba(var(--scrim-rgb),0.02)" : "var(--paper)",
                         border: cellBorder,
                         // Compensate for selected's heavier border so cells stay aligned.
                         margin: isSelected ? "-1px" : 0,
@@ -1026,8 +1026,8 @@ function CalendarModal({
                             width: 24,
                             height: 24,
                             borderRadius: "50%",
-                            background: "#1C1C1E",
-                            color: "#fff",
+                            background: "var(--charcoal)",
+                            color: "var(--paper)",
                             display: "flex",
                             alignItems: "center",
                             justifyContent: "center",
@@ -1045,7 +1045,7 @@ function CalendarModal({
                             fontFamily: "Fraunces, serif",
                             fontSize: 14,
                             fontWeight: 800,
-                            color: "#1C1C1E",
+                            color: "var(--charcoal)",
                             lineHeight: 1,
                             padding: "4px 0 0 2px",
                           }}
@@ -1078,7 +1078,7 @@ function CalendarModal({
                           style={{
                             fontSize: 9,
                             fontWeight: 700,
-                            color: "#8A8580",
+                            color: "var(--ink-muted)",
                           }}
                         >
                           +{dayEntries.length - 2} more
@@ -1093,10 +1093,10 @@ function CalendarModal({
             {/* Side panel: selected day details OR no-selection empty state. */}
             <div
               style={{
-                borderLeft: "1px solid rgba(28,28,30,0.08)",
+                borderLeft: "1px solid var(--hairline)",
                 padding: 18,
                 overflow: "auto",
-                background: "#FAF7F2",
+                background: "var(--cream)",
                 display: "flex",
                 flexDirection: "column",
               }}
@@ -1108,7 +1108,7 @@ function CalendarModal({
                       fontFamily: "Fraunces, serif",
                       fontWeight: 800,
                       fontSize: 18,
-                      color: "#1C1C1E",
+                      color: "var(--charcoal)",
                     }}
                   >
                     Events
@@ -1116,7 +1116,7 @@ function CalendarModal({
                   <div
                     style={{
                       fontSize: 12,
-                      color: "#8A8580",
+                      color: "var(--ink-muted)",
                       marginTop: 2,
                     }}
                   >
@@ -1130,7 +1130,7 @@ function CalendarModal({
                       alignItems: "center",
                       justifyContent: "center",
                       gap: 12,
-                      color: "#8A8580",
+                      color: "var(--ink-muted)",
                       fontSize: 13,
                       textAlign: "center",
                       padding: "20px 0",
@@ -1154,7 +1154,7 @@ function CalendarModal({
                       fontWeight: 800,
                       letterSpacing: "0.5px",
                       textTransform: "uppercase",
-                      color: "#8A8580",
+                      color: "var(--ink-muted)",
                     }}
                   >
                     {selectedDateLabel}
@@ -1163,7 +1163,7 @@ function CalendarModal({
                     <div
                       style={{
                         fontSize: 13,
-                        color: "#8A8580",
+                        color: "var(--ink-muted)",
                         lineHeight: 1.5,
                         padding: "20px 0",
                         textAlign: "center",
@@ -1252,19 +1252,19 @@ function ExportRow({
           width: 32,
           height: 32,
           borderRadius: 8,
-          background: "rgba(28,28,30,0.05)",
+          background: "rgba(var(--scrim-rgb),0.05)",
           display: "flex",
           alignItems: "center",
           justifyContent: "center",
           flexShrink: 0,
-          color: "#1C1C1E",
+          color: "var(--charcoal)",
         }}
       >
         {glyph}
       </div>
       <div style={{ flex: 1, minWidth: 0 }}>
-        <div style={{ fontSize: 13, fontWeight: 700, color: "#1C1C1E" }}>{title}</div>
-        <div style={{ fontSize: 11, color: "#8A8580" }}>{sub}</div>
+        <div style={{ fontSize: 13, fontWeight: 700, color: "var(--charcoal)" }}>{title}</div>
+        <div style={{ fontSize: 11, color: "var(--ink-muted)" }}>{sub}</div>
       </div>
     </button>
   );
@@ -1303,8 +1303,8 @@ function ExportPopover({ onClose }: { onClose: () => void }) {
         right: 0,
         zIndex: 20,
         width: 280,
-        background: "#FFFFFF",
-        border: "1px solid rgba(28,28,30,0.08)",
+        background: "var(--paper)",
+        border: "1px solid var(--hairline)",
         borderRadius: 14,
         boxShadow: "0 16px 40px rgba(0,0,0,0.16)",
         padding: 8,
@@ -1315,7 +1315,7 @@ function ExportPopover({ onClose }: { onClose: () => void }) {
         style={{
           fontSize: 11,
           fontWeight: 800,
-          color: "#8A8580",
+          color: "var(--ink-muted)",
           textTransform: "uppercase",
           letterSpacing: 0.4,
           padding: "6px 12px 4px",
@@ -1393,8 +1393,8 @@ function CalModalEventCard({
   return (
     <div
       style={{
-        background: "#fff",
-        border: "1px solid rgba(28,28,30,0.08)",
+        background: "var(--paper)",
+        border: "1px solid var(--hairline)",
         borderLeft: `4px solid ${entry.color}`,
         borderRadius: 10,
         padding: "10px 12px",
@@ -1408,17 +1408,17 @@ function CalModalEventCard({
           fontFamily: "Fraunces, serif",
           fontWeight: 800,
           fontSize: 14,
-          color: "#1C1C1E",
+          color: "var(--charcoal)",
         }}
       >
         {entry.title}
       </div>
-      <div style={{ fontSize: 11, color: "#8A8580", fontWeight: 600 }}>
+      <div style={{ fontSize: 11, color: "var(--ink-muted)", fontWeight: 600 }}>
         {time}
         {entry.location ? ` · ${entry.location}` : ""}
       </div>
       {entry.kind === "rsvp" && entry.org ? (
-        <div style={{ fontSize: 11, color: "#8A8580" }}>
+        <div style={{ fontSize: 11, color: "var(--ink-muted)" }}>
           {entry.org.name}
         </div>
       ) : null}
@@ -1426,7 +1426,7 @@ function CalModalEventCard({
         <div
           style={{
             fontSize: 12,
-            color: "#1C1C1E",
+            color: "var(--charcoal)",
             opacity: 0.7,
             marginTop: 2,
             whiteSpace: "pre-wrap",
@@ -1552,7 +1552,7 @@ function AddPersonalEventForm({
         style={{
           width: "100%",
           maxWidth: 420,
-          background: "#FFFFFF",
+          background: "var(--paper)",
           borderRadius: 18,
           padding: 22,
           boxShadow: "0 32px 96px rgba(0,0,0,0.4)",
@@ -1567,7 +1567,7 @@ function AddPersonalEventForm({
             fontFamily: "Fraunces, serif",
             fontWeight: 800,
             fontSize: 18,
-            color: "#1C1C1E",
+            color: "var(--charcoal)",
           }}
         >
           New event
@@ -1611,7 +1611,7 @@ function AddPersonalEventForm({
             style={{
               fontSize: 11,
               fontWeight: 700,
-              color: "#8A8580",
+              color: "var(--ink-muted)",
               textTransform: "uppercase",
               letterSpacing: 0.4,
             }}
@@ -1631,8 +1631,8 @@ function AddPersonalEventForm({
                 background: c,
                 border:
                   color === c
-                    ? "2px solid #1C1C1E"
-                    : "2px solid rgba(28,28,30,0.15)",
+                    ? "2px solid var(--charcoal)"
+                    : "2px solid rgba(var(--scrim-rgb),0.15)",
                 cursor: "pointer",
                 padding: 0,
               }}
@@ -1660,9 +1660,9 @@ function AddPersonalEventForm({
             style={{
               padding: "8px 14px",
               borderRadius: 999,
-              border: "1px solid rgba(28,28,30,0.12)",
+              border: "1px solid rgba(var(--scrim-rgb),0.12)",
               background: "transparent",
-              color: "#1C1C1E",
+              color: "var(--charcoal)",
               fontWeight: 600,
               fontSize: 12,
               fontFamily: "inherit",
@@ -1680,7 +1680,7 @@ function AddPersonalEventForm({
               borderRadius: 999,
               border: "none",
               background:
-                title.trim() && !busy ? "#FF5C35" : "rgba(28,28,30,0.18)",
+                title.trim() && !busy ? "#FF5C35" : "rgba(var(--scrim-rgb),0.18)",
               color: "#fff",
               fontWeight: 700,
               fontSize: 12,
@@ -1705,14 +1705,14 @@ const EVENT_COLOR_PRESETS = ["#FF5C35", "#5BD18C", "#5A9CFF", "#9B7BFF", "#FFB85
 
 const addEventInput: React.CSSProperties = {
   width: "100%",
-  border: "1px solid rgba(28,28,30,0.14)",
+  border: "1px solid rgba(var(--scrim-rgb),0.14)",
   borderRadius: 10,
   padding: "8px 12px",
   fontSize: 14,
   fontFamily: "inherit",
   outline: "none",
-  color: "#1C1C1E",
-  background: "#fff",
+  color: "var(--charcoal)",
+  background: "var(--paper)",
   boxSizing: "border-box",
 };
 
@@ -1723,7 +1723,7 @@ const calNavBtnStyle: React.CSSProperties = {
   background: "transparent",
   border: "none",
   cursor: "pointer",
-  color: "#8A8580",
+  color: "var(--ink-muted)",
   display: "flex",
   alignItems: "center",
   justifyContent: "center",
@@ -1736,10 +1736,10 @@ const calModalNavBtn: React.CSSProperties = {
   width: 32,
   height: 32,
   borderRadius: 8,
-  background: "rgba(28,28,30,0.04)",
+  background: "rgba(var(--scrim-rgb),0.04)",
   border: "none",
   cursor: "pointer",
-  color: "#1C1C1E",
+  color: "var(--charcoal)",
   display: "flex",
   alignItems: "center",
   justifyContent: "center",

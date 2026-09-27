@@ -386,7 +386,7 @@ const campusHintStyle: React.CSSProperties = {
   fontFamily: "DM Sans, sans-serif",
   fontSize: 11,
   lineHeight: 1.4,
-  color: "#8A8580",
+  color: "var(--ink-muted)",
   margin: "-2px 4px 0",
 };
 
@@ -1398,7 +1398,7 @@ export function ProfileMobile({ targetHandle }: Props = {}) {
       <div
         style={{
           minHeight: "100dvh",
-          background: "#FAF7F2",
+          background: "var(--cream)",
           padding: "calc(env(safe-area-inset-top, 0px) + 48px) 16px 24px",
         }}
       >
@@ -1517,7 +1517,7 @@ export function ProfileMobile({ targetHandle }: Props = {}) {
     : null;
 
   return (
-    <div style={{ minHeight: "100dvh", background: "#FAF7F2", color: "#1C1C1E" }}>
+    <div style={{ minHeight: "100dvh", background: "var(--cream)", color: "var(--charcoal)" }}>
       {/* Cover — full bleed, sits under the status bar (env() pads it).
           Tappable in edit mode to upload a new banner image. */}
       <div
@@ -1736,7 +1736,7 @@ export function ProfileMobile({ targetHandle }: Props = {}) {
               background: avatar
                 ? `url(${avatar}) center/cover`
                 : "#FFD3C2",
-              border: "3px solid #FAF7F2",
+              border: "3px solid var(--cream)",
               boxShadow: "0 8px 24px rgba(0,0,0,0.12)",
               display: "flex",
               alignItems: "center",
@@ -1764,7 +1764,7 @@ export function ProfileMobile({ targetHandle }: Props = {}) {
                     height: 30,
                     borderRadius: "50%",
                     background: "#FF5C35",
-                    border: "2.5px solid #FAF7F2",
+                    border: "2.5px solid var(--cream)",
                     color: "#fff",
                     fontSize: 14,
                     lineHeight: 1,
@@ -1847,7 +1847,7 @@ export function ProfileMobile({ targetHandle }: Props = {}) {
                 padding: "2px 0",
                 width: "100%",
                 outline: "none",
-                color: "#1C1C1E",
+                color: "var(--charcoal)",
               }}
             />
           ) : (
@@ -1875,7 +1875,7 @@ export function ProfileMobile({ targetHandle }: Props = {}) {
             style={{
               fontSize: 14,
               fontWeight: 600,
-              color: "#8A8580",
+              color: "var(--ink-muted)",
               marginBottom: 10,
             }}
           >
@@ -1893,7 +1893,7 @@ export function ProfileMobile({ targetHandle }: Props = {}) {
               fontFamily: "Fraunces, serif",
               fontStyle: "italic",
               fontSize: 16,
-              color: "#5C5853",
+              color: "var(--ink-2)",
               lineHeight: 1.45,
               background: "transparent",
               border: "none",
@@ -1911,7 +1911,7 @@ export function ProfileMobile({ targetHandle }: Props = {}) {
               fontFamily: "Fraunces, serif",
               fontStyle: "italic",
               fontSize: 16,
-              color: "#5C5853",
+              color: "var(--ink-2)",
               lineHeight: 1.45,
               margin: "0 0 12px",
             }}
@@ -1940,9 +1940,9 @@ export function ProfileMobile({ targetHandle }: Props = {}) {
               style={{
                 fontFamily: "DM Sans, sans-serif",
                 fontSize: 13,
-                color: "#1C1C1E",
-                background: "rgba(255,255,255,0.7)",
-                border: "1px solid rgba(28,28,30,0.10)",
+                color: "var(--charcoal)",
+                background: "var(--paper-70)",
+                border: "1px solid rgba(var(--scrim-rgb),0.10)",
                 borderRadius: 999,
                 padding: "8px 14px",
                 width: "100%",
@@ -1962,9 +1962,9 @@ export function ProfileMobile({ targetHandle }: Props = {}) {
                     flex: 1,
                     fontFamily: "DM Sans, sans-serif",
                     fontSize: 13,
-                    color: "#1C1C1E",
-                    background: "rgba(255,255,255,0.7)",
-                    border: "1px solid rgba(28,28,30,0.10)",
+                    color: "var(--charcoal)",
+                    background: "var(--paper-70)",
+                    border: "1px solid rgba(var(--scrim-rgb),0.10)",
                     borderRadius: 999,
                     padding: "8px 14px",
                     outline: "none",
@@ -1979,9 +1979,9 @@ export function ProfileMobile({ targetHandle }: Props = {}) {
                     flex: 1,
                     fontFamily: "DM Sans, sans-serif",
                     fontSize: 13,
-                    color: "#1C1C1E",
-                    background: "rgba(255,255,255,0.7)",
-                    border: "1px solid rgba(28,28,30,0.10)",
+                    color: "var(--charcoal)",
+                    background: "var(--paper-70)",
+                    border: "1px solid rgba(var(--scrim-rgb),0.10)",
                     borderRadius: 999,
                     padding: "8px 14px",
                     outline: "none",
@@ -2036,9 +2036,9 @@ export function ProfileMobile({ targetHandle }: Props = {}) {
                 style={{
                   fontFamily: "DM Sans, sans-serif",
                   fontSize: 13,
-                  color: "#1C1C1E",
-                  background: "rgba(255,255,255,0.7)",
-                  border: "1px solid rgba(28,28,30,0.10)",
+                  color: "var(--charcoal)",
+                  background: "var(--paper-70)",
+                  border: "1px solid rgba(var(--scrim-rgb),0.10)",
                   borderRadius: 999,
                   padding: "8px 14px",
                   outline: "none",
@@ -2065,7 +2065,7 @@ export function ProfileMobile({ targetHandle }: Props = {}) {
                   fontFamily: "DM Sans, sans-serif",
                   fontSize: 12,
                   lineHeight: 1.4,
-                  color: "#5C5853",
+                  color: "var(--ink-2)",
                   margin: "-2px 4px 0",
                 }}
               >
@@ -2086,9 +2086,9 @@ export function ProfileMobile({ targetHandle }: Props = {}) {
                 style={{
                   fontFamily: "DM Sans, sans-serif",
                   fontSize: 13,
-                  color: "#1C1C1E",
-                  background: "rgba(255,255,255,0.7)",
-                  border: "1px solid rgba(28,28,30,0.10)",
+                  color: "var(--charcoal)",
+                  background: "var(--paper-70)",
+                  border: "1px solid rgba(var(--scrim-rgb),0.10)",
                   borderRadius: 999,
                   padding: "8px 14px",
                   width: "100%",
@@ -2116,7 +2116,7 @@ export function ProfileMobile({ targetHandle }: Props = {}) {
               <p style={campusHintStyle}>{campusView.sub}</p>
             ) : null}
             {campusView && campusView.mode !== "unverified" && campusView.locked && campusView.note ? (
-              <p style={{ ...campusHintStyle, color: "#C0392B" }}>{campusView.note}</p>
+              <p style={{ ...campusHintStyle, color: "var(--error-ink)" }}>{campusView.note}</p>
             ) : null}
             <p style={campusHintStyle}>
               {"Your campus community: its clubs, events and map. Indianapolis is one community for IU and Purdue students."}
@@ -2176,7 +2176,7 @@ export function ProfileMobile({ targetHandle }: Props = {}) {
             style={{
               fontFamily: "DM Sans, sans-serif",
               fontSize: 12,
-              color: "#C0392B",
+              color: "var(--error-ink)",
               background: "rgba(192,57,43,0.08)",
               border: "1px solid rgba(192,57,43,0.18)",
               borderRadius: 10,
@@ -2206,7 +2206,7 @@ export function ProfileMobile({ targetHandle }: Props = {}) {
                 onClick={() => setMutualsOpen(true)}
                 style={mutualPillStyle}
               >
-                <span style={{ fontWeight: 800, color: "#1C1C1E" }}>
+                <span style={{ fontWeight: 800, color: "var(--charcoal)" }}>
                   {mutualShown}
                 </span>{" "}
                 you both follow
@@ -2238,9 +2238,9 @@ export function ProfileMobile({ targetHandle }: Props = {}) {
               fontFamily: "DM Sans, sans-serif",
               fontSize: 14,
               lineHeight: 1.6,
-              color: "#1C1C1E",
-              background: "rgba(255,255,255,0.7)",
-              border: "1px solid rgba(28,28,30,0.10)",
+              color: "var(--charcoal)",
+              background: "var(--paper-70)",
+              border: "1px solid rgba(var(--scrim-rgb),0.10)",
               borderRadius: 12,
               padding: "10px 12px",
               outline: "none",
@@ -2250,7 +2250,7 @@ export function ProfileMobile({ targetHandle }: Props = {}) {
         </Section>
       ) : bio && !bioHidden ? (
         <Section title="Bio">
-          <p style={{ fontSize: 14, lineHeight: 1.6, color: "#3D3D3A", margin: 0 }}>
+          <p style={{ fontSize: 14, lineHeight: 1.6, color: "var(--ink-bio)", margin: 0 }}>
             {bio}
           </p>
         </Section>
@@ -2656,9 +2656,9 @@ function ProfileTabs({
       style={{
         display: "grid",
         gridTemplateColumns: `repeat(${tabs.length}, 1fr)`,
-        borderTop: "1px solid rgba(28,28,30,0.08)",
-        borderBottom: "1px solid rgba(28,28,30,0.08)",
-        background: "#FAF7F2",
+        borderTop: "1px solid var(--hairline)",
+        borderBottom: "1px solid var(--hairline)",
+        background: "var(--cream)",
       }}
     >
       {tabs.map((t) => {
@@ -2679,7 +2679,7 @@ function ProfileTabs({
               padding: "12px 4px 10px",
               background: "transparent",
               border: "none",
-              color: isActive ? "#1C1C1E" : "#8A8580",
+              color: isActive ? "var(--charcoal)" : "var(--ink-muted)",
               fontFamily: "DM Sans, sans-serif",
               fontSize: 11,
               fontWeight: 700,
@@ -2702,7 +2702,7 @@ function ProfileTabs({
                   width: 34,
                   height: 2,
                   borderRadius: 2,
-                  background: "#1C1C1E",
+                  background: "var(--charcoal)",
                 }}
               />
             ) : null}
@@ -2824,20 +2824,21 @@ function PostFeedCard({
           // hairline (Vibe palette accent — #C8B8FF) instead of plain
           // charcoal, so the card has personality + ties back to the
           // brand color set. Drop shadow tints faintly lavender to
-          // match.
+          // match. Night: --card-hi/lo (globals.css) make it
+          // near-black glass, so the page's own ink reads on it.
           background:
-            "linear-gradient(180deg, rgba(255,255,255,0.55) 0%, rgba(255,253,248,0.38) 100%)",
+            "linear-gradient(180deg, var(--card-hi) 0%, var(--card-lo) 100%)",
           backdropFilter: "blur(20px) saturate(160%)",
           WebkitBackdropFilter: "blur(20px) saturate(160%)",
           border: "1px solid rgba(124,92,252,0.28)",
           boxShadow: [
-            "inset 0 1px 0 rgba(255,255,255,0.7)",
+            "inset 0 1px 0 var(--glass-border)",
             "0 6px 18px rgba(124,92,252,0.10)",
           ].join(", "),
           textAlign: "left",
           cursor: "pointer",
           fontFamily: "DM Sans, sans-serif",
-          color: "#1C1C1E",
+          color: "var(--charcoal)",
         }}
       >
         {post.content ? (
@@ -2866,14 +2867,14 @@ function PostFeedCard({
               overflow: "hidden",
               background: `url(${thumb}) center/cover, #EFEAE2`,
               aspectRatio: "1 / 1",
-              border: "1px solid rgba(28,28,30,0.06)",
+              border: "1px solid rgba(var(--scrim-rgb),0.06)",
             }}
           />
         ) : null}
         <div
           style={{
             fontSize: 11,
-            color: "#8A8580",
+            color: "var(--ink-muted)",
             letterSpacing: "0.04em",
           }}
         >
@@ -2912,9 +2913,9 @@ function PostFeedCard({
               width: 30,
               height: 30,
               borderRadius: 999,
-              border: "1px solid rgba(28,28,30,0.06)",
-              background: "rgba(255,255,255,0.62)",
-              color: "#5C5853",
+              border: "1px solid rgba(var(--scrim-rgb),0.06)",
+              background: "var(--paper-62)",
+              color: "var(--ink-2)",
               display: "inline-flex",
               alignItems: "center",
               justifyContent: "center",
@@ -3029,10 +3030,10 @@ function PostsSubTabs({
               padding: "6px 14px",
               borderRadius: 999,
               border: on
-                ? "1px solid rgba(28,28,30,0.85)"
-                : "1px solid rgba(28,28,30,0.12)",
-              background: on ? "#1C1C1E" : "rgba(255,255,255,0.62)",
-              color: on ? "#fff" : "#1C1C1E",
+                ? "1px solid rgba(var(--scrim-rgb),0.85)"
+                : "1px solid rgba(var(--scrim-rgb),0.12)",
+              background: on ? "var(--charcoal)" : "var(--paper-62)",
+              color: on ? "var(--paper)" : "var(--charcoal)",
               fontFamily: "DM Sans, sans-serif",
               fontSize: 12.5,
               fontWeight: 700,
@@ -3125,11 +3126,11 @@ function RepostRow({
         gap: 10,
         padding: 10,
         borderRadius: 14,
-        border: "1px solid rgba(255,255,255,0.7)",
-        background: "rgba(255,253,248,0.78)",
+        border: "1px solid var(--glass-border)",
+        background: "var(--glass)",
         cursor: "pointer",
         WebkitTapHighlightColor: "transparent",
-        boxShadow: "inset 0 1px 0 rgba(255,255,255,0.85)",
+        boxShadow: "inset 0 1px 0 var(--sheen)",
       }}
     >
       {thumb ? (
@@ -3148,12 +3149,12 @@ function RepostRow({
             width: 72,
             height: 72,
             borderRadius: 12,
-            background: "rgba(28,28,30,0.08)",
+            background: "rgba(var(--scrim-rgb),0.08)",
             flexShrink: 0,
             display: "inline-flex",
             alignItems: "center",
             justifyContent: "center",
-            color: "#8A8580",
+            color: "var(--ink-muted)",
             fontFamily: "Fraunces, serif",
             fontSize: 11,
             fontWeight: 700,
@@ -3170,7 +3171,7 @@ function RepostRow({
             display: "flex",
             alignItems: "center",
             gap: 6,
-            color: "#8A8580",
+            color: "var(--ink-muted)",
             fontFamily: "DM Sans, sans-serif",
             fontSize: 11.5,
             fontWeight: 700,
@@ -3213,7 +3214,7 @@ function RepostRow({
               fontFamily: "Fraunces, serif",
               fontSize: 13.5,
               fontWeight: 800,
-              color: "#1C1C1E",
+              color: "var(--charcoal)",
               whiteSpace: "nowrap",
               overflow: "hidden",
               textOverflow: "ellipsis",
@@ -3230,7 +3231,7 @@ function RepostRow({
               marginTop: 4,
               fontFamily: "DM Sans, sans-serif",
               fontSize: 13,
-              color: "#3C3A36",
+              color: "var(--ink-body)",
               lineHeight: 1.4,
               display: "-webkit-box",
               WebkitLineClamp: 2,
@@ -3300,7 +3301,7 @@ function SavedGrid({
               overflow: "hidden",
               background: thumb
                 ? `url(${thumb}) center/cover, #1C1C1E`
-                : "rgba(28,28,30,0.06)",
+                : "rgba(var(--scrim-rgb),0.06)",
               cursor: "pointer",
               WebkitTapHighlightColor: "transparent",
             }}
@@ -3313,7 +3314,7 @@ function SavedGrid({
                   padding: 8,
                   fontFamily: "DM Sans, sans-serif",
                   fontSize: 11.5,
-                  color: "#3C3A36",
+                  color: "var(--ink-body)",
                   textAlign: "left",
                   display: "-webkit-box",
                   WebkitLineClamp: 5,
@@ -3338,7 +3339,7 @@ function SubPaneSkeleton() {
       style={{
         padding: "32px 16px",
         textAlign: "center",
-        color: "#8A8580",
+        color: "var(--ink-muted)",
         fontFamily: "DM Sans, sans-serif",
         fontSize: 13,
       }}
@@ -3354,10 +3355,10 @@ function SubPaneEmpty({ title, body }: { title: string; body: string }) {
       style={{
         padding: "40px 18px",
         textAlign: "center",
-        color: "#5C5853",
+        color: "var(--ink-2)",
         fontFamily: "DM Sans, sans-serif",
-        background: "rgba(255,253,248,0.55)",
-        border: "1px solid rgba(255,255,255,0.7)",
+        background: "var(--glass-55)",
+        border: "1px solid var(--glass-border)",
         borderRadius: 14,
       }}
     >
@@ -3366,7 +3367,7 @@ function SubPaneEmpty({ title, body }: { title: string; body: string }) {
           fontFamily: "Fraunces, serif",
           fontWeight: 800,
           fontSize: 16,
-          color: "#1C1C1E",
+          color: "var(--charcoal)",
           marginBottom: 6,
         }}
       >
@@ -3676,10 +3677,10 @@ function PortfolioPane({
                   padding: showOwnerEdits ? 8 : 0,
                   borderRadius: showOwnerEdits ? 12 : 0,
                   background: showOwnerEdits
-                    ? "rgba(255,253,248,0.78)"
+                    ? "var(--glass)"
                     : "transparent",
                   border: showOwnerEdits
-                    ? "1px solid rgba(28,28,30,0.06)"
+                    ? "1px solid rgba(var(--scrim-rgb),0.06)"
                     : "none",
                   opacity: expDragIdx === i ? 0.7 : 1,
                   transform: expDragIdx === i ? "scale(1.01)" : "scale(1)",
@@ -3715,7 +3716,7 @@ function PortfolioPane({
                   <div style={{ fontSize: 14, fontWeight: 700 }}>
                     {w.title ?? "—"}
                   </div>
-                  <div style={{ fontSize: 12, color: "#8A8580" }}>
+                  <div style={{ fontSize: 12, color: "var(--ink-muted)" }}>
                     {[w.company, w.dates, w.location]
                       .filter(Boolean)
                       .join(" · ")}
@@ -3724,7 +3725,7 @@ function PortfolioPane({
                     <div
                       style={{
                         fontSize: 13,
-                        color: "#5C5853",
+                        color: "var(--ink-2)",
                         marginTop: 4,
                         lineHeight: 1.5,
                       }}
@@ -3774,10 +3775,10 @@ function PortfolioPane({
                   alignItems: "center",
                   gap: 12,
                   padding: "10px 12px 10px 14px",
-                  background: "#fff",
-                  border: "1px solid rgba(28,28,30,0.08)",
+                  background: "var(--paper)",
+                  border: "1px solid var(--hairline)",
                   borderRadius: 14,
-                  color: "#1C1C1E",
+                  color: "var(--charcoal)",
                 }}
               >
                 <button
@@ -3804,7 +3805,7 @@ function PortfolioPane({
                       width: 36,
                       height: 36,
                       borderRadius: 10,
-                      background: "rgba(255,92,53,0.10)",
+                      background: "var(--tag-bg)",
                       color: "#FF5C35",
                       display: "inline-flex",
                       alignItems: "center",
@@ -3819,14 +3820,14 @@ function PortfolioPane({
                     <div style={{ fontSize: 14, fontWeight: 700 }}>
                       {r.name ?? "Resume"}
                     </div>
-                    <div style={{ fontSize: 12, color: "#8A8580" }}>
+                    <div style={{ fontSize: 12, color: "var(--ink-muted)" }}>
                       {(r.type ?? "file").toUpperCase()} · tap to open in viewer
                     </div>
                   </div>
                   <span
                     aria-hidden
                     style={{
-                      color: "#8A8580",
+                      color: "var(--ink-muted)",
                       fontSize: 18,
                       lineHeight: 1,
                       flexShrink: 0,
@@ -3855,7 +3856,7 @@ function PortfolioPane({
                       borderRadius: 999,
                       border: "1px solid rgba(192,57,43,0.22)",
                       background: "rgba(192,57,43,0.06)",
-                      color: "#B83A1A",
+                      color: "var(--tag-ink)",
                       fontSize: 16,
                       lineHeight: 1,
                       cursor: "pointer",
@@ -3951,7 +3952,7 @@ function PortfolioSubsection({
             fontSize: 14,
             fontWeight: 800,
             letterSpacing: "-0.2px",
-            color: "#1C1C1E",
+            color: "var(--charcoal)",
           }}
         >
           {title}
@@ -3983,9 +3984,9 @@ function EditPill({
       style={{
         padding: "4px 10px",
         borderRadius: 999,
-        border: "1px solid rgba(28,28,30,0.12)",
-        background: disabled ? "rgba(28,28,30,0.05)" : "rgba(255,255,255,0.7)",
-        color: "#1C1C1E",
+        border: "1px solid rgba(var(--scrim-rgb),0.12)",
+        background: disabled ? "rgba(var(--scrim-rgb),0.05)" : "var(--paper-70)",
+        color: "var(--charcoal)",
         fontFamily: "DM Sans, sans-serif",
         fontSize: 11.5,
         fontWeight: 700,
@@ -4004,12 +4005,12 @@ function SubsectionEmpty({ body }: { body: string }) {
     <p
       style={{
         fontSize: 13,
-        color: "#8A8580",
+        color: "var(--ink-muted)",
         margin: 0,
         lineHeight: 1.5,
         padding: "12px 14px",
-        background: "rgba(255,253,248,0.7)",
-        border: "1px dashed rgba(28,28,30,0.12)",
+        background: "var(--glass-70)",
+        border: "1px dashed rgba(var(--scrim-rgb),0.12)",
         borderRadius: 12,
       }}
     >
@@ -4155,9 +4156,9 @@ function ExperienceEditSheet({
             style={{
               padding: "16px",
               borderRadius: 12,
-              background: "rgba(255,253,248,0.7)",
-              border: "1px dashed rgba(28,28,30,0.12)",
-              color: "#8A8580",
+              background: "var(--glass-70)",
+              border: "1px dashed rgba(var(--scrim-rgb),0.12)",
+              color: "var(--ink-muted)",
               fontFamily: "DM Sans, sans-serif",
               fontSize: 13.5,
               textAlign: "center",
@@ -4190,9 +4191,9 @@ function ExperienceEditSheet({
           style={{
             padding: "12px",
             borderRadius: 14,
-            border: "1px dashed rgba(28,28,30,0.22)",
-            background: "rgba(255,255,255,0.4)",
-            color: "#1C1C1E",
+            border: "1px dashed rgba(var(--scrim-rgb),0.22)",
+            background: "var(--paper-40)",
+            color: "var(--charcoal)",
             fontFamily: "DM Sans, sans-serif",
             fontSize: 14,
             fontWeight: 700,
@@ -4207,7 +4208,7 @@ function ExperienceEditSheet({
           <div
             style={{
               fontSize: 11.5,
-              color: "#8A8580",
+              color: "var(--ink-muted)",
               textAlign: "center",
             }}
           >
@@ -4455,9 +4456,9 @@ function WorkingOnEditSheet({
             style={{
               padding: "16px",
               borderRadius: 12,
-              background: "rgba(255,253,248,0.7)",
-              border: "1px dashed rgba(28,28,30,0.12)",
-              color: "#8A8580",
+              background: "var(--glass-70)",
+              border: "1px dashed rgba(var(--scrim-rgb),0.12)",
+              color: "var(--ink-muted)",
               fontFamily: "DM Sans, sans-serif",
               fontSize: 13.5,
               textAlign: "center",
@@ -4477,6 +4478,9 @@ function WorkingOnEditSheet({
                 borderRadius: 12,
                 background: "rgba(255,253,248,0.92)",
                 border: "1px solid rgba(28,28,30,0.06)",
+                // A light row in Night until a token exists for this glass;
+                // its inputs inherit, so pin the Light ink.
+                color: "#1C1C1E",
               }}
             >
               <input
@@ -4548,9 +4552,9 @@ function WorkingOnEditSheet({
           style={{
             padding: "10px",
             borderRadius: 12,
-            border: "1px dashed rgba(28,28,30,0.22)",
-            background: "rgba(255,255,255,0.4)",
-            color: "#1C1C1E",
+            border: "1px dashed rgba(var(--scrim-rgb),0.22)",
+            background: "var(--paper-40)",
+            color: "var(--charcoal)",
             fontFamily: "DM Sans, sans-serif",
             fontSize: 14,
             fontWeight: 700,
@@ -4565,7 +4569,7 @@ function WorkingOnEditSheet({
           <div
             style={{
               fontSize: 11.5,
-              color: "#8A8580",
+              color: "var(--ink-muted)",
               textAlign: "center",
             }}
           >
@@ -4922,7 +4926,7 @@ function PortfolioEditorShell({
             right: 0,
             bottom: 0,
             width: "100%",
-            background: "#FAF7F2",
+            background: "var(--cream)",
             display: "flex",
             flexDirection: "column",
             zIndex: 10001,
@@ -5024,7 +5028,7 @@ function PortfolioEditorShell({
                 borderRadius: 12,
                 background: "rgba(192,57,43,0.08)",
                 border: "1px solid rgba(192,57,43,0.22)",
-                color: "#B83A1A",
+                color: "var(--tag-ink)",
                 fontFamily: "DM Sans, sans-serif",
                 fontSize: 12.5,
                 fontWeight: 600,
@@ -5135,13 +5139,13 @@ function UploadableLogo({
           borderRadius: radius,
           background: logoUrl
             ? `url(${logoUrl}) center/cover`
-            : "#FAF7F2",
-          border: "1px solid rgba(28,28,30,0.08)",
+            : "var(--cream)",
+          border: "1px solid var(--hairline)",
           display: "inline-flex",
           alignItems: "center",
           justifyContent: "center",
           padding: 0,
-          color: "#1C1C1E",
+          color: "var(--charcoal)",
           fontFamily: "DM Sans, sans-serif",
           fontSize: Math.round(size * 0.45),
           cursor: editable && !uploading ? "pointer" : "default",
@@ -5173,7 +5177,7 @@ function UploadableLogo({
               height: Math.round(size * 0.5),
               borderRadius: 999,
               background: "#FF5C35",
-              border: "2px solid #FAF7F2",
+              border: "2px solid var(--cream)",
               color: "#fff",
               display: "inline-flex",
               alignItems: "center",
@@ -5229,9 +5233,9 @@ function DragHandleButton({
         padding: 0,
         marginRight: 2,
         borderRadius: 8,
-        border: "1px solid rgba(28,28,30,0.10)",
-        background: "rgba(255,255,255,0.7)",
-        color: "#5C5853",
+        border: "1px solid rgba(var(--scrim-rgb),0.10)",
+        background: "var(--paper-70)",
+        color: "var(--ink-2)",
         cursor: "grab",
         // Suppress native scroll/pan on the handle while the user
         // touches it so the gesture stays ours.
@@ -5411,10 +5415,10 @@ const projectItemStyle: React.CSSProperties = {
   alignItems: "center",
   gap: 12,
   padding: "10px 14px",
-  background: "#FAF7F2",
-  border: "1px solid rgba(28,28,30,0.06)",
+  background: "var(--cream)",
+  border: "1px solid rgba(var(--scrim-rgb),0.06)",
   borderRadius: 12,
-  color: "#3D3D3A",
+  color: "var(--ink-bio)",
 };
 const projectIconStyle: React.CSSProperties = {
   fontSize: 16,
@@ -5431,20 +5435,20 @@ function PostFeedSkeleton() {
             padding: 14,
             borderRadius: 16,
             background:
-              "linear-gradient(180deg, rgba(255,255,255,0.55) 0%, rgba(255,253,248,0.38) 100%)",
+              "linear-gradient(180deg, var(--card-hi) 0%, var(--card-lo) 100%)",
             backdropFilter: "blur(20px) saturate(160%)",
             WebkitBackdropFilter: "blur(20px) saturate(160%)",
             border: "1px solid rgba(124,92,252,0.28)",
             boxShadow:
-              "inset 0 1px 0 rgba(255,255,255,0.7), 0 6px 18px rgba(124,92,252,0.10)",
+              "inset 0 1px 0 var(--glass-border), 0 6px 18px rgba(124,92,252,0.10)",
             display: "flex",
             flexDirection: "column",
             gap: 10,
           }}
         >
-          <div style={{ height: 12, borderRadius: 6, background: "rgba(28,28,30,0.06)", width: "85%" }} />
-          <div style={{ height: 12, borderRadius: 6, background: "rgba(28,28,30,0.06)", width: "60%" }} />
-          <div style={{ height: 10, borderRadius: 6, background: "rgba(28,28,30,0.04)", width: 60, marginTop: 4 }} />
+          <div style={{ height: 12, borderRadius: 6, background: "rgba(var(--scrim-rgb),0.06)", width: "85%" }} />
+          <div style={{ height: 12, borderRadius: 6, background: "rgba(var(--scrim-rgb),0.06)", width: "60%" }} />
+          <div style={{ height: 10, borderRadius: 6, background: "rgba(var(--scrim-rgb),0.04)", width: 60, marginTop: 4 }} />
         </div>
       ))}
     </div>
@@ -5465,8 +5469,8 @@ function EmptyTab({
       style={{
         padding: "32px 18px",
         textAlign: "center",
-        background: "rgba(255,253,248,0.65)",
-        border: "1px dashed rgba(28,28,30,0.14)",
+        background: "var(--glass-65)",
+        border: "1px dashed rgba(var(--scrim-rgb),0.14)",
         borderRadius: 18,
       }}
     >
@@ -5475,13 +5479,13 @@ function EmptyTab({
           fontFamily: "Fraunces, serif",
           fontWeight: 800,
           fontSize: 16,
-          color: "#1C1C1E",
+          color: "var(--charcoal)",
           marginBottom: 6,
         }}
       >
         {title}
       </div>
-      <p style={{ fontSize: 13, color: "#8A8580", margin: 0, lineHeight: 1.5 }}>
+      <p style={{ fontSize: 13, color: "var(--ink-muted)", margin: 0, lineHeight: 1.5 }}>
         {body}
       </p>
       {cta ? (
@@ -5598,12 +5602,12 @@ function FollowButton({
         background: filled
           ? state === "followed_by"
             ? "#FF5C35"
-            : "#1C1C1E"
-          : "rgba(255,255,255,0.7)",
-        color: filled ? "#fff" : "#1C1C1E",
+            : "var(--charcoal)"
+          : "var(--paper-70)",
+        color: filled ? (state === "followed_by" ? "#fff" : "var(--paper)") : "var(--charcoal)",
         border: filled
           ? "1px solid rgba(0,0,0,0.06)"
-          : "1px solid rgba(28,28,30,0.18)",
+          : "1px solid rgba(var(--scrim-rgb),0.18)",
         fontFamily: "DM Sans, sans-serif",
         fontWeight: 700,
         fontSize: 14,
@@ -5662,8 +5666,8 @@ function BlockedByTargetView({ user }: { user: VibeUser }) {
     <div
       style={{
         minHeight: "100dvh",
-        background: "#FAF7F2",
-        color: "#1C1C1E",
+        background: "var(--cream)",
+        color: "var(--charcoal)",
         display: "flex",
         flexDirection: "column",
         alignItems: "center",
@@ -5699,14 +5703,14 @@ function BlockedByTargetView({ user }: { user: VibeUser }) {
         style={{
           fontFamily: "Fraunces, serif",
           fontSize: 24,
-          color: "#1C1C1E",
+          color: "var(--charcoal)",
           marginBottom: 2,
         }}
       >
         {name}
       </div>
       {handle ? (
-        <div style={{ fontSize: 13, color: "#8A8580", marginBottom: 28 }}>
+        <div style={{ fontSize: 13, color: "var(--ink-muted)", marginBottom: 28 }}>
           @{handle}
         </div>
       ) : (
@@ -5716,7 +5720,7 @@ function BlockedByTargetView({ user }: { user: VibeUser }) {
         style={{
           fontFamily: "Fraunces, serif",
           fontSize: 18,
-          color: "#1C1C1E",
+          color: "var(--charcoal)",
           marginBottom: 6,
         }}
       >
@@ -5725,7 +5729,7 @@ function BlockedByTargetView({ user }: { user: VibeUser }) {
       <p
         style={{
           fontSize: 14,
-          color: "#8A8580",
+          color: "var(--ink-muted)",
           lineHeight: 1.55,
           marginBottom: 28,
           maxWidth: 320,
@@ -5742,8 +5746,8 @@ function BlockedByTargetView({ user }: { user: VibeUser }) {
             display: "inline-block",
             padding: "11px 24px",
             borderRadius: 100,
-            background: "#1C1C1E",
-            color: "white",
+            background: "var(--charcoal)",
+            color: "var(--paper)",
             border: "none",
             fontSize: 13,
             fontWeight: 700,
@@ -5760,8 +5764,8 @@ function BlockedByTargetView({ user }: { user: VibeUser }) {
             display: "inline-block",
             padding: "10px 20px",
             borderRadius: 100,
-            background: "#1C1C1E",
-            color: "white",
+            background: "var(--charcoal)",
+            color: "var(--paper)",
             textDecoration: "none",
             fontSize: 13,
             fontWeight: 700,
@@ -6035,12 +6039,12 @@ function ReportUserSheet({
                       borderRadius: 10,
                       border: on
                         ? "1px solid #FF5C35"
-                        : "1px solid rgba(28,28,30,0.08)",
-                      background: on ? "rgba(255,92,53,0.06)" : "#fff",
+                        : "1px solid var(--hairline)",
+                      background: on ? "rgba(255,92,53,0.06)" : "var(--paper)",
                       fontFamily: "DM Sans, sans-serif",
                       fontSize: 14,
                       fontWeight: 600,
-                      color: "#1C1C1E",
+                      color: "var(--charcoal)",
                       textAlign: "left",
                       cursor: sending ? "default" : "pointer",
                       WebkitTapHighlightColor: "transparent",
@@ -6068,13 +6072,13 @@ function ReportUserSheet({
                   boxSizing: "border-box",
                   padding: "10px 12px",
                   borderRadius: 10,
-                  border: "1.5px solid rgba(28,28,30,0.08)",
-                  background: "#fff",
+                  border: "1.5px solid var(--hairline)",
+                  background: "var(--paper)",
                   fontFamily: "DM Sans, sans-serif",
                   // 16px keeps iOS Safari from zooming in on focus.
                   fontSize: 16,
                   lineHeight: 1.45,
-                  color: "#1C1C1E",
+                  color: "var(--charcoal)",
                   outline: "none",
                   resize: "none",
                 }}
@@ -6275,11 +6279,11 @@ function SafetySheetRow({
         padding: "14px 18px",
         background: "transparent",
         border: "none",
-        borderTop: "1px solid rgba(28,28,30,0.04)",
+        borderTop: "1px solid rgba(var(--scrim-rgb),0.04)",
         fontFamily: "DM Sans, sans-serif",
         fontSize: 15,
         fontWeight: bold ? 700 : 500,
-        color: danger ? "#C0392B" : "#1C1C1E",
+        color: danger ? "var(--error-ink)" : "var(--charcoal)",
         textAlign: "left",
         opacity: disabled ? 0.5 : 1,
         cursor: disabled ? "default" : "pointer",
@@ -6311,7 +6315,7 @@ const sheetContentStyle: React.CSSProperties = {
   bottom: 0,
   left: 0,
   right: 0,
-  background: "#FAF7F2",
+  background: "var(--cream)",
   borderTopLeftRadius: 20,
   borderTopRightRadius: 20,
   paddingBottom: "env(safe-area-inset-bottom, 0px)",
@@ -6325,7 +6329,7 @@ const sheetHandleStyle: React.CSSProperties = {
   width: 38,
   height: 4,
   borderRadius: 999,
-  background: "rgba(28,28,30,0.18)",
+  background: "rgba(var(--scrim-rgb),0.18)",
 };
 
 /** Screen-reader-only Drawer.Title for the menu, which has no heading. */
@@ -6347,7 +6351,7 @@ const sheetHeadingStyle: React.CSSProperties = {
   fontFamily: "Fraunces, serif",
   fontSize: 16,
   fontWeight: 800,
-  color: "#1C1C1E",
+  color: "var(--charcoal)",
 };
 
 const sheetNoteStyle: React.CSSProperties = {
@@ -6356,7 +6360,7 @@ const sheetNoteStyle: React.CSSProperties = {
   fontFamily: "DM Sans, sans-serif",
   fontSize: 12.5,
   lineHeight: 1.5,
-  color: "#8A8580",
+  color: "var(--ink-muted)",
 };
 
 /** Matches profile.html's .profile-mutual-pill: a quiet, lowercase count that
@@ -6372,15 +6376,15 @@ const mutualPillStyle: React.CSSProperties = {
   minHeight: 36,
   padding: "9px 14px",
   borderRadius: 999,
-  background: "rgba(28,28,30,0.05)",
-  border: "1px solid rgba(28,28,30,0.10)",
+  background: "rgba(var(--scrim-rgb),0.05)",
+  border: "1px solid rgba(var(--scrim-rgb),0.10)",
   fontFamily: "DM Sans, sans-serif",
   fontSize: 11,
   fontWeight: 600,
   letterSpacing: "0.2px",
   textTransform: "lowercase",
   whiteSpace: "nowrap",
-  color: "#8A8580",
+  color: "var(--ink-muted)",
   cursor: "pointer",
   WebkitTapHighlightColor: "transparent",
 };
@@ -6388,9 +6392,9 @@ const mutualPillStyle: React.CSSProperties = {
 const sheetGhostButtonStyle: React.CSSProperties = {
   padding: "9px 18px",
   borderRadius: 999,
-  border: "1px solid rgba(28,28,30,0.12)",
+  border: "1px solid rgba(var(--scrim-rgb),0.12)",
   background: "transparent",
-  color: "#1C1C1E",
+  color: "var(--charcoal)",
   fontFamily: "DM Sans, sans-serif",
   fontSize: 13,
   fontWeight: 700,
@@ -6432,7 +6436,7 @@ function StatTile({
           fontFamily: "Fraunces, serif",
           fontWeight: 800,
           fontSize: prominent ? 22 : 20,
-          color: prominent ? "#FF5C35" : "#1C1C1E",
+          color: prominent ? "#FF5C35" : "var(--charcoal)",
           lineHeight: 1,
         }}
       >
@@ -6442,7 +6446,7 @@ function StatTile({
         style={{
           fontSize: 10,
           fontWeight: 700,
-          color: "#8A8580",
+          color: "var(--ink-muted)",
           textTransform: "uppercase",
           letterSpacing: "0.5px",
         }}
@@ -6482,12 +6486,12 @@ function MetaChip({ label, icon }: { label: string; icon?: "pin" | "book" | "cal
         alignItems: "center",
         gap: 5,
         padding: "5px 10px",
-        background: "#fff",
-        border: "1px solid rgba(28,28,30,0.08)",
+        background: "var(--paper)",
+        border: "1px solid var(--hairline)",
         borderRadius: 999,
         fontSize: 12,
         fontWeight: 600,
-        color: "#5C5853",
+        color: "var(--ink-2)",
       }}
     >
       {icon === "pin" ? "📍" : icon === "book" ? "📚" : icon === "cal" ? "🗓" : null}
@@ -6598,8 +6602,8 @@ function HereForRow({
                     cursor: disabled ? "default" : "pointer",
                     opacity: disabled ? 0.6 : 1,
                     background: on ? "#FFF0EC" : "transparent",
-                    border: on ? "1px solid rgba(255,92,53,0.3)" : "1px dashed rgba(28,28,30,0.18)",
-                    color: on ? "#FF5C35" : "rgba(28,28,30,0.55)",
+                    border: on ? "1px solid rgba(255,92,53,0.3)" : "1px dashed rgba(var(--scrim-rgb),0.18)",
+                    color: on ? "#FF5C35" : "rgba(var(--scrim-rgb),0.55)",
                   }}
                 >
                   {LOOKING_FOR_PROFILE_COPY.labels[token]}
@@ -6626,7 +6630,7 @@ const hereForLabelStyle: React.CSSProperties = {
   fontFamily: "DM Sans, sans-serif",
   fontSize: 12,
   fontWeight: 600,
-  color: "rgba(28,28,30,0.5)",
+  color: "rgba(var(--scrim-rgb),0.5)",
 };
 
 const hereForChipStyle: React.CSSProperties = {
@@ -6635,16 +6639,16 @@ const hereForChipStyle: React.CSSProperties = {
   fontWeight: 600,
   padding: "5px 11px",
   borderRadius: 999,
-  background: "rgba(28,28,30,0.05)",
-  border: "1px solid rgba(28,28,30,0.08)",
-  color: "#1C1C1E",
+  background: "rgba(var(--scrim-rgb),0.05)",
+  border: "1px solid var(--hairline)",
+  color: "var(--charcoal)",
 };
 
 const hereForNoteStyle: React.CSSProperties = {
   fontFamily: "DM Sans, sans-serif",
   fontSize: 12,
   fontStyle: "italic",
-  color: "rgba(28,28,30,0.5)",
+  color: "rgba(var(--scrim-rgb),0.5)",
 };
 
 // Tag list editor — chip with × per tag + an "add" input at the end.
@@ -6679,8 +6683,8 @@ function EditableVibeTags({
         flexWrap: "wrap",
         gap: 6,
         marginBottom: 18,
-        background: "rgba(255,255,255,0.55)",
-        border: "1px solid rgba(28,28,30,0.10)",
+        background: "var(--paper-55)",
+        border: "1px solid rgba(var(--scrim-rgb),0.10)",
         borderRadius: 12,
         padding: 8,
       }}
@@ -6730,7 +6734,7 @@ function EditableVibeTags({
           background: "transparent",
           fontFamily: "DM Sans, sans-serif",
           fontSize: 13,
-          color: "#1C1C1E",
+          color: "var(--charcoal)",
           padding: "4px 6px",
         }}
       />
@@ -6744,10 +6748,13 @@ function Section({ title, children }: { title: string; children: React.ReactNode
       style={{
         margin: "16px",
         padding: "18px 16px",
-        background: "#fff",
+        // A white card in Light, --paper in Night; the bio's #3D3D3A reads
+        // --ink-bio (globals.css) so the whole card flips together.
+        background: "var(--paper)",
         borderRadius: 18,
-        border: "1px solid rgba(28,28,30,0.06)",
+        border: "1px solid rgba(var(--scrim-rgb),0.06)",
         boxShadow: "0 4px 18px rgba(0,0,0,0.04)",
+        color: "var(--charcoal)",
       }}
     >
       <div
@@ -6768,7 +6775,7 @@ function Section({ title, children }: { title: string; children: React.ReactNode
 
 function ProfileMobileSkeleton() {
   return (
-    <div style={{ minHeight: "100dvh", background: "#FAF7F2" }}>
+    <div style={{ minHeight: "100dvh", background: "var(--cream)" }}>
       <div
         style={{
           height: "calc(200px + env(safe-area-inset-top, 0px))",
@@ -6782,15 +6789,15 @@ function ProfileMobileSkeleton() {
             width: 88,
             height: 88,
             borderRadius: 22,
-            background: "rgba(28,28,30,0.08)",
-            border: "3px solid #FAF7F2",
+            background: "rgba(var(--scrim-rgb),0.08)",
+            border: "3px solid var(--cream)",
           }}
         />
         <div
           style={{
             width: 160,
             height: 28,
-            background: "rgba(28,28,30,0.08)",
+            background: "rgba(var(--scrim-rgb),0.08)",
             borderRadius: 8,
             marginTop: 14,
           }}
@@ -6799,7 +6806,7 @@ function ProfileMobileSkeleton() {
           style={{
             width: 100,
             height: 14,
-            background: "rgba(28,28,30,0.06)",
+            background: "rgba(var(--scrim-rgb),0.06)",
             borderRadius: 6,
             marginTop: 10,
           }}

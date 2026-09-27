@@ -9,7 +9,10 @@ import { createSupabaseServiceClient } from "@/lib/supabase/service";
  * PATCH /api/me/otto/settings
  * Body: partial OttoSettings — any subset of the known keys, plus
  * `push: {previews?: boolean, off?: PushKind[]}` from Settings →
- * Notifications (plan §8 W4).
+ * Notifications (plan §8 W4) and `theme: "light" | "dark" | "system"` from
+ * Settings → Appearance (S67 wave 3).
+ * Answer: `{ok, settings, savedAt}` (the saved blob, server ms after the
+ * write), or `{ok, settings: null, noop: true}` when nothing valid was sent.
  *
  * Partial JSON merge: read current `users.otto_settings`, lay the patch's
  * top-level keys over it (a shallow merge: a key the patch doesn't name is
@@ -26,6 +29,10 @@ import { createSupabaseServiceClient } from "@/lib/supabase/service";
  */
 
 const VALID_CHATTINESS = new Set(["quiet", "moderate", "loud"]);
+// Settings → Appearance (S67 wave 3, contracts C4): the code enum. "system"
+// is the product's Auto, "dark" its Night. The Settings page mirrors the
+// saved value into the device's localStorage.vibe_theme on its next visit.
+const VALID_THEMES = new Set(["light", "dark", "system"]);
 const TIME_RE = /^\d{2}:\d{2}$/;
 const SETTINGS_LIMIT = { limit: 120, windowSec: 600 };
 // Longer than any honest list (nine kinds today) but small enough to scan.
@@ -44,6 +51,7 @@ type PatchableSettings = {
   daily_summary?: boolean;
   summary_time?: string;
   unanswered_dm_pings?: boolean;
+  theme?: "light" | "dark" | "system";
   push?: PushPatch;
 };
 
@@ -91,6 +99,10 @@ function sanitizePatch(raw: unknown): PatchableSettings | { error: string } {
       case "summary_time":
         if (typeof v !== "string" || !TIME_RE.test(v)) return { error: "Invalid summary_time (HH:MM)" };
         out.summary_time = v;
+        break;
+      case "theme":
+        if (typeof v !== "string" || !VALID_THEMES.has(v)) return { error: "Invalid theme" };
+        out.theme = v as PatchableSettings["theme"];
         break;
       case "push": {
         const push = sanitizePush(v);
@@ -166,5 +178,9 @@ export async function PATCH(req: Request) {
     return NextResponse.json({ ok: false, error: "Could not save settings" }, { status: 500 });
   }
 
-  return NextResponse.json({ ok: true, settings: data.otto_settings });
+  // `savedAt` is the server's clock AFTER the write. The Appearance card
+  // keeps it as the device's last pick and compares it with the Settings
+  // page's own `renderedAt` (also server time, taken before its read), so a
+  // page Next reuses on Back can't mirror a value older than the pick.
+  return NextResponse.json({ ok: true, settings: data.otto_settings, savedAt: Date.now() });
 }

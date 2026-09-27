@@ -2,6 +2,7 @@
 <!-- Otto onboarding (static). Open via /onboarding from the Next app so query params are preserved. -->
 <html lang="en">
 <head>
+<script>(function(){try{var k="vibe_theme",p=null;try{p=localStorage.getItem(k)}catch(e){}if(p!=="light"&&p!=="dark"&&p!=="system")p="light";if(p==="system")p=window.matchMedia&&window.matchMedia("(prefers-color-scheme: dark)").matches?"dark":"light";document.documentElement.dataset.theme=p}catch(e){}})();</script>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <link rel="icon" href="/icon.png" type="image/png" sizes="192x192">
@@ -24,6 +25,12 @@
 <script src="/html/_imageCropper.js" defer></script>
 <style>
 :root { --cream:#FAF7F2; --charcoal:#1C1C1E; --accent:#FF5C35; --purple:#7C5CFC; --lavender:#C8B8FF; --green:#1A9E5B; }
+/* Night (S67 contracts C0). This page is dark chrome already: --charcoal is
+   its BACKGROUND (body, below) and the ink is white, so the night twin does
+   not swap the two. The background deepens to Night's paper so the page
+   matches the shell around its iframe; --cream (unused today) becomes Night's
+   ink for the wave 5 literal pass. Coral, purple, lavender, green unchanged. */
+:root[data-theme="dark"] { color-scheme:dark; --charcoal:#0C0B0B; --cream:#F6F1EA; }
 * { margin: 0; padding: 0; box-sizing: border-box; }
 html, body { height: 100%; }
 body {

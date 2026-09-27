@@ -22,7 +22,7 @@
  *    every cache and unregisters itself. Its header has the drill.
  */
 
-const SW_VERSION = "2026-09-25-2";
+const SW_VERSION = "2026-09-26-1";
 
 const OFFLINE_URL = "/offline.html";
 const OFFLINE_CACHE = "vibe-offline-" + SW_VERSION;

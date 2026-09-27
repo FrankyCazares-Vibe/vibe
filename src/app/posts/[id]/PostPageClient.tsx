@@ -13,11 +13,22 @@ import { PostViewerMobile } from "@/components/mobile/PostViewerMobile";
  */
 export function PostPageClient({ postId }: { postId: string }) {
   const router = useRouter();
+  // The page's own paint, so a share-link landing reads the theme's paper and
+  // ink under the viewer (it portals over this) instead of whatever the body
+  // happens to be.
   return (
-    <PostViewerMobile
-      postId={postId}
-      onClose={() => router.push("/campus")}
-      onDeleted={() => router.push("/campus")}
-    />
+    <div
+      style={{
+        minHeight: "100dvh",
+        background: "var(--cream)",
+        color: "var(--charcoal)",
+      }}
+    >
+      <PostViewerMobile
+        postId={postId}
+        onClose={() => router.push("/campus")}
+        onDeleted={() => router.push("/campus")}
+      />
+    </div>
   );
 }

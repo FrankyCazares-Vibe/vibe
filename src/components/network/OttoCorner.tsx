@@ -292,7 +292,8 @@ export function OttoCorner() {
               padding: "0 5px",
               borderRadius: 999,
               background: "#FF5C35",
-              border: "2px solid #FAF7F2",
+              // The ring is a cut-out in the page colour (cream / Night paper).
+              border: "2px solid var(--cream)",
               boxShadow:
                 "0 0 12px rgba(255,92,53,0.6), 0 2px 6px rgba(0,0,0,0.18)",
               color: "#FFF",

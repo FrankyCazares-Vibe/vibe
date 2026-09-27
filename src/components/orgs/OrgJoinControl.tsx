@@ -460,17 +460,19 @@ const CHARCOAL: Palette = {
 const CREAM: Palette = {
   base: { ...PILL, borderRadius: 999 },
   filled: { color: "#fff", background: "#FF5C35", border: "1px solid #FF5C35" },
+  // C0 tokens (S67 wave 3): the phone Orgs row card is var(--glass), which
+  // turns near-black in Night. Light values are unchanged.
   outline: {
-    color: "#1C1C1E",
+    color: "var(--charcoal)",
     background: "transparent",
-    border: "1px solid rgba(28,28,30,0.14)",
+    border: "1px solid rgba(var(--scrim-rgb),0.14)",
   },
   quiet: {
-    color: "#5C5853",
-    background: "rgba(28,28,30,0.05)",
-    border: "1px solid rgba(28,28,30,0.10)",
+    color: "var(--ink-2)",
+    background: "rgba(var(--scrim-rgb),0.05)",
+    border: "1px solid rgba(var(--scrim-rgb),0.10)",
   },
-  sub: { ...DARK_SUB, color: "#8A8580" },
+  sub: { ...DARK_SUB, color: "var(--ink-muted)" },
 };
 
 const PALETTES: Record<OrgJoinControlProps["variant"], Palette> = {

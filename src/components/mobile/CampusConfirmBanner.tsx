@@ -119,9 +119,9 @@ export function CampusConfirmBanner({
         style={{
           padding: 14,
           borderRadius: 18,
-          background: "rgba(255,253,248,0.78)",
-          border: "1px solid rgba(255,255,255,0.7)",
-          boxShadow: "inset 0 1px 0 rgba(255,255,255,0.85), 0 4px 14px rgba(180,120,60,0.08)",
+          background: "var(--glass)",
+          border: "1px solid var(--glass-border)",
+          boxShadow: "var(--card-shadow)",
         }}
       >
         <div
@@ -129,7 +129,7 @@ export function CampusConfirmBanner({
             fontFamily: "Fraunces, serif",
             fontSize: 16,
             fontWeight: 800,
-            color: "#1C1C1E",
+            color: "var(--charcoal)",
             letterSpacing: "-0.2px",
           }}
         >
@@ -141,7 +141,7 @@ export function CampusConfirmBanner({
             fontFamily: "DM Sans, sans-serif",
             fontSize: 13,
             lineHeight: 1.4,
-            color: "#5C5853",
+            color: "var(--ink-2)",
           }}
         >
           {view.body}
@@ -186,7 +186,7 @@ export function CampusConfirmBanner({
               fontFamily: "DM Sans, sans-serif",
               fontSize: 11.5,
               lineHeight: 1.4,
-              color: "#8A8580",
+              color: "var(--ink-muted)",
             }}
           >
             {view.note}
@@ -223,8 +223,8 @@ const buttonBase: CSSProperties = {
 
 const primaryButton: CSSProperties = {
   ...buttonBase,
-  background: "#1C1C1E",
-  color: "#fff",
+  background: "var(--charcoal)",
+  color: "var(--paper)",
   border: "1px solid rgba(0,0,0,0.06)",
 };
 
@@ -239,6 +239,6 @@ const textButton: CSSProperties = {
   ...buttonBase,
   padding: "0 10px",
   background: "transparent",
-  color: "#5C5853",
+  color: "var(--ink-2)",
   border: "none",
 };

@@ -30,7 +30,7 @@ export function MobileShell({ children }: Props) {
         // Reserve space for the bottom tab bar (64px + iOS home indicator)
         // so the last item of the page doesn't get covered.
         paddingBottom: "calc(64px + env(safe-area-inset-bottom, 0px))",
-        background: "#FAF7F2",
+        background: "var(--cream)",
       }}
     >
       {children}

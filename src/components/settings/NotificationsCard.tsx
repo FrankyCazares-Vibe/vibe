@@ -365,7 +365,7 @@ function SwitchRow({
         gap: 12,
         minHeight: 48,
         padding: "4px 0",
-        borderTop: divider ? "1px solid rgba(28,28,30,0.06)" : undefined,
+        borderTop: divider ? "1px solid rgba(var(--scrim-rgb),0.06)" : undefined,
       }}
     >
       <div style={{ flex: 1, minWidth: 0 }}>
@@ -437,7 +437,7 @@ function Switch({
           width: 44,
           height: 26,
           borderRadius: 999,
-          background: on ? "#FF5C35" : "rgba(28,28,30,0.28)",
+          background: on ? "#FF5C35" : "rgba(var(--scrim-rgb),0.28)",
           opacity: busy ? 0.6 : 1,
         }}
       >
@@ -475,22 +475,22 @@ const SWITCH_CSS = `
 const BOX: React.CSSProperties = {
   padding: "2px 10px 2px 12px",
   borderRadius: 12,
-  background: "rgba(255,255,255,0.55)",
-  border: "1px solid rgba(28,28,30,0.06)",
+  background: "var(--paper-55)",
+  border: "1px solid rgba(var(--scrim-rgb),0.06)",
 };
 
 const ROW_LABEL: React.CSSProperties = {
   fontFamily: "DM Sans, sans-serif",
   fontSize: 14,
   fontWeight: 700,
-  color: "#1C1C1E",
+  color: "var(--charcoal)",
   lineHeight: 1.3,
 };
 
 const ROW_HINT: React.CSSProperties = {
   fontFamily: "DM Sans, sans-serif",
   fontSize: 12.5,
-  color: "#8A8580",
+  color: "var(--ink-muted)",
   lineHeight: 1.4,
   marginTop: 2,
 };
@@ -498,7 +498,7 @@ const ROW_HINT: React.CSSProperties = {
 const NOTE: React.CSSProperties = {
   fontFamily: "DM Sans, sans-serif",
   fontSize: 13,
-  color: "#5C5853",
+  color: "var(--ink-2)",
   lineHeight: 1.5,
   margin: "2px 0 10px",
 };
@@ -506,7 +506,7 @@ const NOTE: React.CSSProperties = {
 const RESULT: React.CSSProperties = {
   fontFamily: "DM Sans, sans-serif",
   fontSize: 13,
-  color: "#5C5853",
+  color: "var(--ink-2)",
   lineHeight: 1.5,
   margin: "8px 2px 0",
 };
@@ -515,7 +515,7 @@ const SUBTITLE: React.CSSProperties = {
   fontFamily: "Fraunces, serif",
   fontSize: 17,
   fontWeight: 800,
-  color: "#1C1C1E",
+  color: "var(--charcoal)",
   letterSpacing: "-0.01em",
   margin: "18px 0 4px",
 };
@@ -523,7 +523,7 @@ const SUBTITLE: React.CSSProperties = {
 const DESCRIPTION: React.CSSProperties = {
   fontFamily: "DM Sans, sans-serif",
   fontSize: 13.5,
-  color: "#5C5853",
+  color: "var(--ink-2)",
   lineHeight: 1.5,
   margin: 0,
 };
@@ -534,7 +534,7 @@ const GROUP_TITLE: React.CSSProperties = {
   fontWeight: 700,
   letterSpacing: "0.06em",
   textTransform: "uppercase",
-  color: "#8A8580",
+  color: "var(--ink-muted)",
   margin: "0 0 6px 2px",
 };
 
@@ -544,7 +544,7 @@ const BLOCKED_PILL: React.CSSProperties = {
   borderRadius: 999,
   border: "1px solid rgba(184,48,48,0.25)",
   background: "rgba(184,48,48,0.06)",
-  color: "#B83030",
+  color: "var(--danger-ink)",
   fontFamily: "DM Sans, sans-serif",
   fontSize: 12,
   fontWeight: 700,

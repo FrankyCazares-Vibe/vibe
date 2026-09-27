@@ -12,7 +12,7 @@ import {
   nativeLaunchUrl,
   openInBrowser,
   pushTapPath,
-  styleStatusBarForCream,
+  styleStatusBarForTheme,
 } from "@/lib/native/bridge";
 import { appShellOnClient } from "@/lib/native/detect";
 import { drainUnusedPushEvents, onNativePushTap, onNativeTokenRefresh } from "@/lib/native/push-native";
@@ -178,8 +178,9 @@ function onBackButton(event: { canGoBack?: boolean } | undefined): void {
  * Mounted once in the root layout; renders nothing, and does nothing at all
  * in a browser, including an installed Home Screen app.
  *
- * In the app it marks `<html>` for the cream background, sets dark status-bar
- * text, opens links the phone hands over (Universal Links and App Links once
+ * In the app it marks `<html>` for the page background, styles the status-bar
+ * text for the theme (again whenever `data-theme` changes; S67 contracts C4),
+ * opens links the phone hands over (Universal Links and App Links once
  * they exist), keeps new-window links inside the app, sends downloads to the
  * share sheet, and gives Android's back button the page's history.
  *
@@ -201,7 +202,14 @@ export function NativeBridge(): null {
 
     const root = document.documentElement;
     root.classList.add(APP_CLASS);
-    styleStatusBarForCream(android);
+    // Light text over Night, dark text over cream. `data-theme` on <html> is
+    // the resolved theme (never "system"); applyTheme in src/lib/theme/theme.ts
+    // and the legacy pages' storage listener both rewrite it, so watching the
+    // attribute covers every way it can change.
+    const styleBar = () => styleStatusBarForTheme(android, root.dataset.theme === "dark");
+    styleBar();
+    const themeWatch = new MutationObserver(styleBar);
+    themeWatch.observe(root, { attributes: true, attributeFilter: ["data-theme"] });
 
     const stopTaps = onNativePushTap(onPushTap);
     const stopUnusedPush = drainUnusedPushEvents();
@@ -240,6 +248,7 @@ export function NativeBridge(): null {
       stopTokens();
       stopUnusedPush();
       stopTaps();
+      themeWatch.disconnect();
       root.classList.remove(APP_CLASS);
     };
   }, []);

@@ -245,15 +245,31 @@ export function exitApp(): void {
 }
 
 /**
- * Dark status-bar text over Vibe's cream. The background colour is Android
- * only, and Android 15+ ignores it (the page draws behind the bar there), so
- * nothing may depend on it.
+ * The page colour behind the status bar: `--cream` as the theme resolves it
+ * (cream in Light, near-black in Night; S67 contracts C0), or the light value
+ * when the page hasn't styled `<html>` yet.
  */
-export function styleStatusBarForCream(android: boolean): void {
+function pageColor(): string {
+  try {
+    const value = getComputedStyle(document.documentElement).getPropertyValue("--cream").trim();
+    return /^#[0-9a-f]{6}$/i.test(value) ? value : CREAM;
+  } catch {
+    return CREAM;
+  }
+}
+
+/**
+ * Status-bar text for the theme: light text over Night's near-black, dark
+ * text over cream. `dark` is `<html data-theme="dark">` (contracts C4); the
+ * caller re-runs this when that attribute changes. The background colour is
+ * Android only, and Android 15+ ignores it (the page draws behind the bar
+ * there), so nothing may depend on it.
+ */
+export function styleStatusBarForTheme(android: boolean, dark: boolean): void {
   const bar = getPlugin<StatusBarPlugin>("StatusBar");
   if (!bar) return;
-  void settle(() => bar.setStyle({ style: "LIGHT" }));
-  if (android) void settle(() => bar.setBackgroundColor({ color: CREAM }));
+  void settle(() => bar.setStyle({ style: dark ? "DARK" : "LIGHT" }));
+  if (android) void settle(() => bar.setBackgroundColor({ color: pageColor() }));
 }
 
 /** The one site a link from outside the app may open inside it. */

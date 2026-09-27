@@ -19,16 +19,31 @@
 -->
 <html lang="en">
 <head>
+<script>(function(){try{var k="vibe_theme",p=null;try{p=localStorage.getItem(k)}catch(e){}if(p!=="light"&&p!=="dark"&&p!=="system")p="light";if(p==="system")p=window.matchMedia&&window.matchMedia("(prefers-color-scheme: dark)").matches?"dark":"light";document.documentElement.dataset.theme=p}catch(e){}})();</script>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
 <meta name="theme-color" content="#FAF7F2">
 <meta name="robots" content="noindex">
 <title>Vibe · Offline</title>
 <style>
+  /* Vibe's tokens (S67 contracts C0): cream/ink in Light, the Night column
+     under data-theme="dark", which the head script sets before paint. */
+  :root {
+    --cream: #FAF7F2;
+    --charcoal: #1C1C1E;
+    --ink-2: #5C5853;
+    --coral: #FF5C35;
+  }
+  :root[data-theme="dark"] {
+    color-scheme: dark;
+    --cream: #0C0B0B;
+    --charcoal: #F6F1EA;
+    --ink-2: #CFC8BE;
+  }
   html, body {
     margin: 0;
-    background: #FAF7F2;
-    color: #1C1C1E;
+    background: var(--cream);
+    color: var(--charcoal);
   }
   body {
     min-height: 100vh;
@@ -65,7 +80,11 @@
     margin: 0 0 22px;
     font-size: 15px;
     line-height: 1.55;
-    color: #5C5853;
+    color: var(--ink-2);
+  }
+  /* The V of the mark: ink on the page, so it stays visible in Night. */
+  .mark .glyph {
+    fill: var(--charcoal);
   }
   button {
     appearance: none;
@@ -78,12 +97,12 @@
     letter-spacing: 0.08em;
     padding: 10px 18px;
     border-radius: 999px;
-    background: #FF5C35;
+    background: var(--coral);
     color: #FAF7F2;
     box-shadow: 0 6px 18px rgba(255, 92, 53, 0.35), inset 0 1px 0 rgba(255, 255, 255, 0.18);
   }
   button:focus-visible {
-    outline: 2px solid #1C1C1E;
+    outline: 2px solid var(--charcoal);
     outline-offset: 3px;
   }
 </style>
@@ -94,7 +113,7 @@
   <svg class="mark" viewBox="200 185 850 850" aria-hidden="true" focusable="false">
     <path d="M871 903.7 A383.5 383.5 0 1 1 977.7 759.9" fill="none" stroke="#FC6B2F" stroke-width="15" stroke-linecap="round"/>
     <circle cx="932.9" cy="838.1" r="53" fill="#FC6B2F"/>
-    <path fill="#1A1A1A" d="M426 432 H593 A16 16 0 0 1 609 448 V462 A16 16 0 0 1 593 478 H587 Q575.6 478 580.2 490 L657.2 690 Q660.3 698.1 663 690 L731 490 Q735.1 478 725 478 H709 A16 16 0 0 1 693 462 V448 A16 16 0 0 1 709 432 H827 A16 16 0 0 1 843 448 V462 A16 16 0 0 1 827 478 H821 Q810.3 478 805.8 490 L685.8 810 Q680.5 824 668 824 H590 Q577.8 824 572.4 810 L449.2 490 Q444.6 478 433 478 H426 A16 16 0 0 1 410 462 V448 A16 16 0 0 1 426 432 Z"/>
+    <path class="glyph" d="M426 432 H593 A16 16 0 0 1 609 448 V462 A16 16 0 0 1 593 478 H587 Q575.6 478 580.2 490 L657.2 690 Q660.3 698.1 663 690 L731 490 Q735.1 478 725 478 H709 A16 16 0 0 1 693 462 V448 A16 16 0 0 1 709 432 H827 A16 16 0 0 1 843 448 V462 A16 16 0 0 1 827 478 H821 Q810.3 478 805.8 490 L685.8 810 Q680.5 824 668 824 H590 Q577.8 824 572.4 810 L449.2 490 Q444.6 478 433 478 H426 A16 16 0 0 1 410 462 V448 A16 16 0 0 1 426 432 Z"/>
   </svg>
   <h1>You're offline</h1>
   <p>Vibe will reload when you're back.</p>

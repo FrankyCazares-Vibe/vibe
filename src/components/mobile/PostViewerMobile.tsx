@@ -524,10 +524,10 @@ export function PostViewerMobile({
             // so it's a sibling of this drawer and only z-index separates
             // them: it sits at 10400/10401 to land above this.
             zIndex: 10000,
-            background: "#FAF7F2",
+            background: "var(--cream)",
             display: "flex",
             flexDirection: "column",
-            color: "#1C1C1E",
+            color: "var(--charcoal)",
             outline: "none",
           }}
         >
@@ -847,7 +847,7 @@ export function PostViewerMobile({
                   background: `url(${post.media_url}) center/cover, #EFEAE2`,
                   width: "100%",
                   aspectRatio: "1 / 1",
-                  border: "1px solid rgba(28,28,30,0.06)",
+                  border: "1px solid rgba(var(--scrim-rgb),0.06)",
                 }}
               />
             ) : null}
@@ -866,7 +866,7 @@ export function PostViewerMobile({
                   width: "100%",
                   maxHeight: "70vh",
                   borderRadius: 14,
-                  border: "1px solid rgba(28,28,30,0.06)",
+                  border: "1px solid rgba(var(--scrim-rgb),0.06)",
                   background: "#000",
                 }}
               />
@@ -880,7 +880,7 @@ export function PostViewerMobile({
                   fontSize: 15,
                   lineHeight: 1.5,
                   whiteSpace: "pre-wrap",
-                  color: "#1C1C1E",
+                  color: "var(--charcoal)",
                 }}
               >
                 {renderInlineContent(post.content)}
@@ -896,7 +896,7 @@ export function PostViewerMobile({
                     style={{
                       padding: "5px 10px",
                       borderRadius: 999,
-                      background: "rgba(255,92,53,0.10)",
+                      background: "var(--tag-bg)",
                       border: "1px solid rgba(255,92,53,0.22)",
                       color: "#FF5C35",
                       fontFamily: "DM Sans, sans-serif",
@@ -926,7 +926,7 @@ export function PostViewerMobile({
                 columnGap: 12,
                 rowGap: 8,
                 paddingTop: 8,
-                borderTop: "1px solid rgba(28,28,30,0.06)",
+                borderTop: "1px solid rgba(var(--scrim-rgb),0.06)",
               }}
             >
               <EngagementButton
@@ -995,7 +995,7 @@ export function PostViewerMobile({
                   label=""
                   active={viewer.saved}
                   onTap={toggleSave}
-                  activeColor="#1C1C1E"
+                  activeColor="var(--charcoal)"
                   icon={<BookmarkIcon filled={viewer.saved} />}
                 />
               </div>
@@ -1003,7 +1003,7 @@ export function PostViewerMobile({
 
             {/* Comments drawer */}
             {commentsOpen ? (
-              <div style={{ borderTop: "1px solid rgba(28,28,30,0.06)", paddingTop: 10 }}>
+              <div style={{ borderTop: "1px solid rgba(var(--scrim-rgb),0.06)", paddingTop: 10 }}>
                 <div
                   style={{
                     fontFamily: "DM Sans, sans-serif",
@@ -1011,7 +1011,7 @@ export function PostViewerMobile({
                     fontWeight: 700,
                     letterSpacing: "0.16em",
                     textTransform: "uppercase",
-                    color: "#8A8580",
+                    color: "var(--ink-muted)",
                     marginBottom: 10,
                   }}
                 >
@@ -1025,12 +1025,12 @@ export function PostViewerMobile({
                       onRetry={() => setCommentsErr(null)}
                     />
                   ) : (
-                    <div style={{ color: "#8A8580", fontSize: 13, padding: "12px 0" }}>
+                    <div style={{ color: "var(--ink-muted)", fontSize: 13, padding: "12px 0" }}>
                       Loading…
                     </div>
                   )
                 ) : comments.length === 0 ? (
-                  <div style={{ color: "#8A8580", fontSize: 13, padding: "12px 0" }}>
+                  <div style={{ color: "var(--ink-muted)", fontSize: 13, padding: "12px 0" }}>
                     Be the first to comment.
                   </div>
                 ) : (
@@ -1286,8 +1286,8 @@ function CommentRow({
           borderRadius: "50%",
           background: a?.avatar_url
             ? `url(${a.avatar_url}) center/cover`
-            : "#1C1C1E",
-          color: "#fff",
+            : "var(--charcoal)",
+          color: "var(--paper)",
           display: "flex",
           alignItems: "center",
           justifyContent: "center",
@@ -1300,13 +1300,13 @@ function CommentRow({
         {!a?.avatar_url ? initialsOf(a?.name ?? a?.handle) : null}
       </div>
       <div style={{ flex: 1, minWidth: 0 }}>
-        <div style={{ fontSize: 12, color: "#1C1C1E", lineHeight: 1.4 }}>
+        <div style={{ fontSize: 12, color: "var(--charcoal)", lineHeight: 1.4 }}>
           <span style={{ fontWeight: 700 }}>
             {a?.name ?? (a?.handle ? `@${a.handle}` : "someone")}
           </span>{" "}
-          <span style={{ color: "#5C5853" }}>{c.content}</span>
+          <span style={{ color: "var(--ink-2)" }}>{c.content}</span>
         </div>
-        <div style={{ fontSize: 10, color: "#8A8580", marginTop: 2 }}>
+        <div style={{ fontSize: 10, color: "var(--ink-muted)", marginTop: 2 }}>
           {relTime(c.created_at)}
         </div>
       </div>
@@ -1324,7 +1324,7 @@ function CommentRow({
             marginRight: -6,
             background: "transparent",
             border: "none",
-            color: "#8A8580",
+            color: "var(--ink-muted)",
             fontSize: 15,
             lineHeight: 1,
             cursor: "pointer",
@@ -1380,7 +1380,7 @@ function EngagementButton({
       type="button"
       onClick={onTap}
       aria-label={ariaLabel}
-      style={engagementItemStyle(active && activeColor ? activeColor : "#5C5853", true)}
+      style={engagementItemStyle(active && activeColor ? activeColor : "var(--ink-2)", true)}
     >
       {icon}
       {label ? <span>{label}</span> : null}
@@ -1394,7 +1394,7 @@ function EngagementButton({
  *  the count. */
 function EngagementStat({ label, icon }: { label: string; icon: React.ReactNode }) {
   return (
-    <span style={engagementItemStyle("#5C5853", false)}>
+    <span style={engagementItemStyle("var(--ink-2)", false)}>
       {icon}
       {label ? <span>{label}</span> : null}
     </span>
@@ -1428,7 +1428,7 @@ function RepostIcon() {
 }
 function BookmarkIcon({ filled }: { filled?: boolean }) {
   return (
-    <svg width="18" height="18" viewBox="0 0 24 24" fill={filled ? "#1C1C1E" : "none"} stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" aria-hidden>
+    <svg width="18" height="18" viewBox="0 0 24 24" fill={filled ? "currentColor" : "none"} stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" aria-hidden>
       <path d="M19 21l-7-5-7 5V5a2 2 0 0 1 2-2h10a2 2 0 0 1 2 2z" />
     </svg>
   );
@@ -1462,9 +1462,9 @@ function ShareIcon() {
 function PostViewerSkeleton() {
   return (
     <>
-      <div style={{ aspectRatio: "1/1", borderRadius: 14, background: "rgba(28,28,30,0.06)" }} />
-      <div style={{ height: 14, borderRadius: 6, background: "rgba(28,28,30,0.06)", width: "85%" }} />
-      <div style={{ height: 14, borderRadius: 6, background: "rgba(28,28,30,0.06)", width: "60%" }} />
+      <div style={{ aspectRatio: "1/1", borderRadius: 14, background: "rgba(var(--scrim-rgb),0.06)" }} />
+      <div style={{ height: 14, borderRadius: 6, background: "rgba(var(--scrim-rgb),0.06)", width: "85%" }} />
+      <div style={{ height: 14, borderRadius: 6, background: "rgba(var(--scrim-rgb),0.06)", width: "60%" }} />
     </>
   );
 }

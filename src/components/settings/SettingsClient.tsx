@@ -9,6 +9,7 @@ import {
   LoadFailed,
   type LoadFailure,
 } from "@/components/feedback/LoadFailed";
+import { AppearanceCard } from "@/components/settings/AppearanceCard";
 import { NotificationsCard } from "@/components/settings/NotificationsCard";
 import type { NotificationPrefs } from "@/components/settings/notifications-card-view";
 import { vibeRequest } from "@/lib/feedback/request";
@@ -24,6 +25,7 @@ import {
 } from "@/lib/profile/settings-campus-card";
 import { pushLogoutBody } from "@/lib/pwa/device-push";
 import { leaveDeviceClean } from "@/lib/pwa/leave-device-clean";
+import type { ThemePref } from "@/lib/theme/theme";
 import { MOBILE_BREAKPOINT_PX } from "@/lib/use-is-mobile";
 
 type Profile = {
@@ -42,42 +44,46 @@ type Profile = {
   created_at: string | null;
 };
 
-const PAGE_BG =
-  "radial-gradient(120% 80% at 0% 0%, rgba(255,222,180,0.45) 0%, rgba(255,222,180,0) 60%), " +
-  "radial-gradient(110% 80% at 100% 100%, rgba(255,200,170,0.35) 0%, rgba(255,200,170,0) 60%), " +
-  "linear-gradient(180deg, #FAF7F2 0%, #F4EDE2 100%)";
+// The campus feed's backdrop (contracts C0): cream with a coral bloom in
+// Light, near-black with the bloom in Night. One token, so Settings and the
+// feed can't drift apart.
+const PAGE_BG = "var(--feed-backdrop)";
 
+// Glass cards read the C0 tokens so they flip with data-theme (S67 wave 3):
+// the white tint becomes Night's rgba(22,21,21,0.86), the bright rim and the
+// warm shadow their dark counterparts.
 const CARD_GLASS: React.CSSProperties = {
-  background:
-    "linear-gradient(180deg, rgba(255,253,248,0.78) 0%, rgba(255,250,240,0.66) 100%)",
+  background: "var(--glass)",
   backdropFilter: "blur(28px) saturate(180%)",
   WebkitBackdropFilter: "blur(28px) saturate(180%)",
-  border: "1px solid rgba(255,255,255,0.7)",
+  border: "1px solid var(--glass-border)",
   borderRadius: 18,
-  boxShadow: [
-    "inset 0 1px 0 rgba(255,255,255,0.85)",
-    "inset 0 -1px 0 rgba(28,28,30,0.04)",
-    "0 6px 22px rgba(180,120,60,0.08)",
-  ].join(", "),
+  boxShadow: "var(--card-shadow)",
 };
 
 export function SettingsClient({
   profile,
   campus,
   pushPrefs,
+  themePref,
+  renderedAt,
 }: {
   profile: Profile;
   /** Derived on the server (settings/page.tsx); null when the read failed. */
   campus: SettingsCampusInput | null;
   /** "What to send" for the Notifications card (settings/page.tsx); null when the read failed. */
   pushPrefs: NotificationPrefs | null;
+  /** The saved otto_settings.theme for the Appearance card (settings/page.tsx); null when the read failed. */
+  themePref: ThemePref | null;
+  /** Server ms taken before the page's read; lets the Appearance card spot a render reused on Back. */
+  renderedAt: number;
 }) {
   return (
     <main
       className="vibe-settings-main"
       style={{
         background: PAGE_BG,
-        borderRight: "1px solid rgba(28,28,30,0.08)",
+        borderRight: "1px solid var(--hairline)",
         padding: "32px 28px 80px",
         minWidth: 0,
       }}
@@ -90,7 +96,7 @@ export function SettingsClient({
             fontWeight: 700,
             letterSpacing: "0.18em",
             textTransform: "uppercase",
-            color: "#C84A20",
+            color: "var(--eyebrow-ink)",
             marginBottom: 6,
           }}
         >
@@ -101,7 +107,7 @@ export function SettingsClient({
             fontFamily: "Fraunces, serif",
             fontSize: "clamp(26px, 3vw, 32px)",
             fontWeight: 900,
-            color: "#1C1C1E",
+            color: "var(--charcoal)",
             letterSpacing: "-0.02em",
             margin: 0,
           }}
@@ -112,7 +118,7 @@ export function SettingsClient({
           style={{
             fontFamily: "DM Sans, sans-serif",
             fontSize: 14,
-            color: "#5C5853",
+            color: "var(--ink-2)",
             margin: "6px 0 0",
           }}
         >
@@ -121,6 +127,12 @@ export function SettingsClient({
       </header>
 
       <AccountCard profile={profile} />
+      <AppearanceCard
+        initial={themePref}
+        renderedAt={renderedAt}
+        cardStyle={CARD_GLASS}
+        title={<SectionTitle>How Vibe looks</SectionTitle>}
+      />
       <CampusCard initial={campus} />
       <HandleCard
         currentHandle={profile.handle}
@@ -173,7 +185,7 @@ function CampusTourCard({ handle }: { handle: string | null }) {
           margin: "8px 0 16px",
           fontFamily: "DM Sans, sans-serif",
           fontSize: 13.5,
-          color: "#5C5853",
+          color: "var(--ink-2)",
           lineHeight: 1.55,
         }}
       >
@@ -268,7 +280,7 @@ function BlockedUsersCard() {
         style={{
           fontFamily: "DM Sans, sans-serif",
           fontSize: 14,
-          color: "#5C5853",
+          color: "var(--ink-2)",
           margin: "0 0 14px",
           maxWidth: 520,
           lineHeight: 1.5,
@@ -291,7 +303,7 @@ function BlockedUsersCard() {
           style={{
             fontFamily: "DM Sans, sans-serif",
             fontSize: 13,
-            color: "#8A8580",
+            color: "var(--ink-muted)",
           }}
         >
           Loading…
@@ -301,11 +313,11 @@ function BlockedUsersCard() {
           style={{
             padding: "16px",
             borderRadius: 12,
-            background: "rgba(28,28,30,0.03)",
-            border: "1px dashed rgba(28,28,30,0.12)",
+            background: "rgba(var(--scrim-rgb),0.03)",
+            border: "1px dashed rgba(var(--scrim-rgb),0.12)",
             fontFamily: "DM Sans, sans-serif",
             fontSize: 13,
-            color: "#8A8580",
+            color: "var(--ink-muted)",
             textAlign: "center",
           }}
         >
@@ -356,8 +368,8 @@ function BlockedRow({
         gap: 12,
         padding: "10px 12px",
         borderRadius: 12,
-        background: "rgba(255,255,255,0.55)",
-        border: "1px solid rgba(28,28,30,0.06)",
+        background: "color-mix(in srgb, var(--paper) 55%, transparent)",
+        border: "1px solid rgba(var(--scrim-rgb),0.06)",
       }}
     >
       <div
@@ -387,7 +399,7 @@ function BlockedRow({
             fontFamily: "Fraunces, serif",
             fontSize: 14,
             fontWeight: 800,
-            color: "#1C1C1E",
+            color: "var(--charcoal)",
             overflow: "hidden",
             textOverflow: "ellipsis",
             whiteSpace: "nowrap",
@@ -400,7 +412,7 @@ function BlockedRow({
                 fontFamily: "DM Sans, sans-serif",
                 fontWeight: 500,
                 fontSize: 12,
-                color: "#8A8580",
+                color: "var(--ink-muted)",
                 marginLeft: 6,
               }}
             >
@@ -413,7 +425,7 @@ function BlockedRow({
             style={{
               fontFamily: "DM Sans, sans-serif",
               fontSize: 11.5,
-              color: "#5C5853",
+              color: "var(--ink-2)",
               marginTop: 2,
               overflow: "hidden",
               textOverflow: "ellipsis",
@@ -431,9 +443,9 @@ function BlockedRow({
         style={{
           padding: "7px 14px",
           borderRadius: 999,
-          border: "1px solid rgba(28,28,30,0.14)",
-          background: "rgba(28,28,30,0.04)",
-          color: "#1C1C1E",
+          border: "1px solid rgba(var(--scrim-rgb),0.14)",
+          background: "rgba(var(--scrim-rgb),0.04)",
+          color: "var(--charcoal)",
           fontFamily: "DM Sans, sans-serif",
           fontSize: 12,
           fontWeight: 700,
@@ -502,7 +514,7 @@ function AccountCard({ profile }: { profile: Profile }) {
         style={{
           marginTop: 16,
           fontSize: 12,
-          color: "#8A8580",
+          color: "var(--ink-muted)",
           fontFamily: "DM Sans, sans-serif",
         }}
       >
@@ -631,7 +643,7 @@ function CampusCard({ initial }: { initial: SettingsCampusInput | null }) {
   const hintStyle: React.CSSProperties = {
     fontFamily: "DM Sans, sans-serif",
     fontSize: 12,
-    color: "#8A8580",
+    color: "var(--ink-muted)",
     marginTop: 8,
     lineHeight: 1.5,
   };
@@ -655,9 +667,9 @@ function CampusCard({ initial }: { initial: SettingsCampusInput | null }) {
   };
   const secondaryStyle: React.CSSProperties = {
     ...pillStyle,
-    border: "1px solid rgba(28,28,30,0.14)",
-    background: "rgba(28,28,30,0.04)",
-    color: "#1C1C1E",
+    border: "1px solid rgba(var(--scrim-rgb),0.14)",
+    background: "rgba(var(--scrim-rgb),0.04)",
+    color: "var(--charcoal)",
     cursor: saving ? "default" : "pointer",
   };
   const calloutStyle: React.CSSProperties = {
@@ -674,7 +686,7 @@ function CampusCard({ initial }: { initial: SettingsCampusInput | null }) {
         style={{
           fontFamily: "DM Sans, sans-serif",
           fontSize: 13.5,
-          color: "#5C5853",
+          color: "var(--ink-2)",
           margin: "8px 0 14px",
           lineHeight: 1.55,
         }}
@@ -689,7 +701,7 @@ function CampusCard({ initial }: { initial: SettingsCampusInput | null }) {
           style={{
             fontFamily: "DM Sans, sans-serif",
             fontSize: 13.5,
-            color: "#1C1C1E",
+            color: "var(--charcoal)",
             margin: 0,
             lineHeight: 1.55,
           }}
@@ -715,7 +727,7 @@ function CampusCard({ initial }: { initial: SettingsCampusInput | null }) {
                   fontFamily: "Fraunces, serif",
                   fontSize: 15,
                   fontWeight: 800,
-                  color: "#1C1C1E",
+                  color: "var(--charcoal)",
                 }}
               >
                 Confirm your campus
@@ -724,7 +736,7 @@ function CampusCard({ initial }: { initial: SettingsCampusInput | null }) {
                 style={{
                   fontFamily: "DM Sans, sans-serif",
                   fontSize: 13.5,
-                  color: "#5C5853",
+                  color: "var(--ink-2)",
                   margin: "4px 0 12px",
                   lineHeight: 1.5,
                 }}
@@ -758,13 +770,13 @@ function CampusCard({ initial }: { initial: SettingsCampusInput | null }) {
               style={{
                 padding: "10px 12px",
                 borderRadius: 10,
-                border: "1px solid rgba(28,28,30,0.12)",
-                background: "#fff",
+                border: "1px solid rgba(var(--scrim-rgb),0.12)",
+                background: "var(--paper)",
                 outline: "none",
                 fontFamily: "DM Sans, sans-serif",
                 fontSize: 14,
                 fontWeight: 600,
-                color: "#1C1C1E",
+                color: "var(--charcoal)",
                 minWidth: 240,
                 maxWidth: "100%",
                 opacity: saving || locked ? 0.6 : 1,
@@ -783,9 +795,9 @@ function CampusCard({ initial }: { initial: SettingsCampusInput | null }) {
             </select>
             <span style={{ fontFamily: "DM Sans, sans-serif", fontSize: 12 }}>
               {saving ? (
-                <span style={{ color: "#8A8580" }}>Saving…</span>
+                <span style={{ color: "var(--ink-muted)" }}>Saving…</span>
               ) : saved ? (
-                <span style={{ color: "#1A9E5B", fontWeight: 700 }}>Saved ✓</span>
+                <span style={{ color: "var(--ok-ink)", fontWeight: 700 }}>Saved ✓</span>
               ) : null}
             </span>
           </div>
@@ -803,7 +815,7 @@ function CampusCard({ initial }: { initial: SettingsCampusInput | null }) {
                   fontFamily: "DM Sans, sans-serif",
                   fontSize: 14,
                   fontWeight: 700,
-                  color: "#1C1C1E",
+                  color: "var(--charcoal)",
                 }}
               >
                 {pending.title}
@@ -812,7 +824,7 @@ function CampusCard({ initial }: { initial: SettingsCampusInput | null }) {
                 style={{
                   fontFamily: "DM Sans, sans-serif",
                   fontSize: 13,
-                  color: "#5C5853",
+                  color: "var(--ink-2)",
                   margin: "4px 0 12px",
                   lineHeight: 1.5,
                 }}
@@ -851,7 +863,7 @@ function CampusCard({ initial }: { initial: SettingsCampusInput | null }) {
             marginTop: 10,
             fontFamily: "DM Sans, sans-serif",
             fontSize: 12,
-            color: "#C0392B",
+            color: "var(--error-ink)",
           }}
         >
           {error.text}
@@ -1032,13 +1044,13 @@ function HandleCard({
         style={{
           fontFamily: "DM Sans, sans-serif",
           fontSize: 13.5,
-          color: "#5C5853",
+          color: "var(--ink-2)",
           margin: "8px 0 14px",
           lineHeight: 1.55,
         }}
       >
         Your @handle is how people find you and tag you in posts.{" "}
-        <strong style={{ color: "#1C1C1E", fontWeight: 700 }}>
+        <strong style={{ color: "var(--charcoal)", fontWeight: 700 }}>
           You can change it once every 2 weeks
         </strong>
         , so pick something you&apos;ll want to keep.
@@ -1077,8 +1089,8 @@ function HandleCard({
             paddingLeft: 12,
             paddingRight: 4,
             borderRadius: 10,
-            border: "1px solid rgba(28,28,30,0.12)",
-            background: onCooldown ? "rgba(28,28,30,0.04)" : "#fff",
+            border: "1px solid rgba(var(--scrim-rgb),0.12)",
+            background: onCooldown ? "rgba(var(--scrim-rgb),0.04)" : "var(--paper)",
             flex: 1,
             opacity: onCooldown ? 0.55 : 1,
           }}
@@ -1087,7 +1099,7 @@ function HandleCard({
             style={{
               fontFamily: "DM Sans, sans-serif",
               fontSize: 14,
-              color: "#8A8580",
+              color: "var(--ink-muted)",
               fontWeight: 600,
               marginRight: 2,
             }}
@@ -1116,25 +1128,25 @@ function HandleCard({
               fontFamily: "DM Sans, sans-serif",
               fontSize: 14,
               fontWeight: 600,
-              color: "#1C1C1E",
+              color: "var(--charcoal)",
             }}
           />
           <span style={{ fontFamily: "DM Sans, sans-serif", fontSize: 12, padding: "0 10px" }}>
             {(() => {
               if (onCooldown || !value.trim() || value.trim().toLowerCase() === (savedHandle ?? "")) return null;
               if (check.state === "checking")
-                return <span style={{ color: "#8A8580" }}>Checking…</span>;
+                return <span style={{ color: "var(--ink-muted)" }}>Checking…</span>;
               if (check.state === "available")
-                return <span style={{ color: "#1A9E5B", fontWeight: 700 }}>Available ✓</span>;
+                return <span style={{ color: "var(--ok-ink)", fontWeight: 700 }}>Available ✓</span>;
               if (check.state === "taken")
                 return (
-                  <span style={{ color: "#C0392B", fontWeight: 700 }}>
+                  <span style={{ color: "var(--error-ink)", fontWeight: 700 }}>
                     {check.reason ?? "Taken"}
                   </span>
                 );
               if (check.state === "invalid")
                 return (
-                  <span style={{ color: "#C0392B", fontWeight: 700 }}>
+                  <span style={{ color: "var(--error-ink)", fontWeight: 700 }}>
                     {check.reason ?? "Invalid"}
                   </span>
                 );
@@ -1150,8 +1162,8 @@ function HandleCard({
             padding: "10px 18px",
             borderRadius: 10,
             border: "none",
-            background: canSave ? "#FF5C35" : "rgba(28,28,30,0.10)",
-            color: canSave ? "#fff" : "#8A8580",
+            background: canSave ? "#FF5C35" : "rgba(var(--scrim-rgb),0.10)",
+            color: canSave ? "#fff" : "var(--ink-muted)",
             fontFamily: "DM Sans, sans-serif",
             fontWeight: 700,
             fontSize: 13,
@@ -1170,7 +1182,7 @@ function HandleCard({
             marginTop: 10,
             fontFamily: "DM Sans, sans-serif",
             fontSize: 12,
-            color: "#C0392B",
+            color: "var(--error-ink)",
           }}
         >
           {error}
@@ -1234,7 +1246,7 @@ function SignOutCard() {
         style={{
           fontFamily: "DM Sans, sans-serif",
           fontSize: 14,
-          color: "#5C5853",
+          color: "var(--ink-2)",
           margin: "0 0 14px",
           maxWidth: 440,
           lineHeight: 1.5,
@@ -1249,9 +1261,9 @@ function SignOutCard() {
         style={{
           padding: "10px 18px",
           borderRadius: 999,
-          border: "1px solid rgba(28,28,30,0.14)",
-          background: "rgba(28,28,30,0.04)",
-          color: "#1C1C1E",
+          border: "1px solid rgba(var(--scrim-rgb),0.14)",
+          background: "rgba(var(--scrim-rgb),0.04)",
+          color: "var(--charcoal)",
           fontFamily: "DM Sans, sans-serif",
           fontSize: 14,
           fontWeight: 700,
@@ -1323,7 +1335,7 @@ function DangerZone({ handle }: { handle: string | null }) {
           fontWeight: 700,
           letterSpacing: "0.18em",
           textTransform: "uppercase",
-          color: "#B83030",
+          color: "var(--danger-ink)",
           marginBottom: 6,
         }}
       >
@@ -1334,7 +1346,7 @@ function DangerZone({ handle }: { handle: string | null }) {
           fontFamily: "Fraunces, serif",
           fontSize: 22,
           fontWeight: 800,
-          color: "#1C1C1E",
+          color: "var(--charcoal)",
           letterSpacing: "-0.01em",
           margin: "0 0 8px",
         }}
@@ -1345,7 +1357,7 @@ function DangerZone({ handle }: { handle: string | null }) {
         style={{
           fontFamily: "DM Sans, sans-serif",
           fontSize: 14,
-          color: "#5C5853",
+          color: "var(--ink-2)",
           margin: "0 0 16px",
           maxWidth: 520,
           lineHeight: 1.5,
@@ -1364,7 +1376,7 @@ function DangerZone({ handle }: { handle: string | null }) {
             borderRadius: 999,
             border: "1px solid rgba(220,60,60,0.45)",
             background: "rgba(220,60,60,0.10)",
-            color: "#B83030",
+            color: "var(--danger-ink)",
             fontFamily: "DM Sans, sans-serif",
             fontSize: 14,
             fontWeight: 700,
@@ -1386,12 +1398,12 @@ function DangerZone({ handle }: { handle: string | null }) {
             style={{
               fontFamily: "DM Sans, sans-serif",
               fontSize: 13,
-              color: "#5C5853",
+              color: "var(--ink-2)",
               margin: "0 0 10px",
             }}
           >
             Type your handle{" "}
-            <strong style={{ color: "#1C1C1E" }}>@{expected || "handle"}</strong> to
+            <strong style={{ color: "var(--charcoal)" }}>@{expected || "handle"}</strong> to
             confirm.
           </p>
           <input
@@ -1404,9 +1416,9 @@ function DangerZone({ handle }: { handle: string | null }) {
               width: "100%",
               padding: "10px 14px",
               borderRadius: 12,
-              border: "1px solid rgba(28,28,30,0.14)",
-              background: "rgba(255,255,255,0.7)",
-              color: "#1C1C1E",
+              border: "1px solid rgba(var(--scrim-rgb),0.14)",
+              background: "color-mix(in srgb, var(--paper) 70%, transparent)",
+              color: "var(--charcoal)",
               fontFamily: "DM Sans, sans-serif",
               fontSize: 14,
               outline: "none",
@@ -1417,7 +1429,7 @@ function DangerZone({ handle }: { handle: string | null }) {
             <div
               style={{
                 fontSize: 12,
-                color: "#B83030",
+                color: "var(--danger-ink)",
                 marginBottom: 10,
                 fontFamily: "DM Sans, sans-serif",
               }}
@@ -1438,7 +1450,7 @@ function DangerZone({ handle }: { handle: string | null }) {
                   matches && !busy
                     ? "linear-gradient(180deg, #E04848 0%, #B83030 100%)"
                     : "rgba(220,60,60,0.18)",
-                color: matches && !busy ? "#fff" : "#B83030",
+                color: matches && !busy ? "#fff" : "var(--danger-ink)",
                 fontFamily: "DM Sans, sans-serif",
                 fontSize: 14,
                 fontWeight: 700,
@@ -1463,9 +1475,9 @@ function DangerZone({ handle }: { handle: string | null }) {
               style={{
                 padding: "10px 18px",
                 borderRadius: 999,
-                border: "1px solid rgba(28,28,30,0.14)",
-                background: "rgba(255,255,255,0.7)",
-                color: "#1C1C1E",
+                border: "1px solid rgba(var(--scrim-rgb),0.14)",
+                background: "color-mix(in srgb, var(--paper) 70%, transparent)",
+                color: "var(--charcoal)",
                 fontFamily: "DM Sans, sans-serif",
                 fontSize: 14,
                 fontWeight: 700,
@@ -1498,7 +1510,7 @@ function HelpAndSafetyCard() {
         style={{
           fontFamily: "DM Sans, sans-serif",
           fontSize: 14,
-          color: "#5C5853",
+          color: "var(--ink-2)",
           margin: "0 0 14px",
           maxWidth: 440,
           lineHeight: 1.5,
@@ -1548,7 +1560,7 @@ function HelpLink({
           fontFamily: "DM Sans, sans-serif",
           fontSize: 14,
           fontWeight: 700,
-          color: "#1C1C1E",
+          color: "var(--charcoal)",
         }}
       >
         {label}
@@ -1557,7 +1569,7 @@ function HelpLink({
         style={{
           fontFamily: "DM Sans, sans-serif",
           fontSize: 13,
-          color: "#8A8580",
+          color: "var(--ink-muted)",
           lineHeight: 1.45,
         }}
       >
@@ -1570,8 +1582,8 @@ function HelpLink({
     gap: 2,
     padding: "10px 14px",
     borderRadius: 14,
-    border: "1px solid rgba(28,28,30,0.10)",
-    background: "rgba(255,255,255,0.55)",
+    border: "1px solid rgba(var(--scrim-rgb),0.10)",
+    background: "color-mix(in srgb, var(--paper) 55%, transparent)",
     textDecoration: "none",
   };
   if (external) {
@@ -1595,19 +1607,19 @@ function LegalFooter() {
         marginTop: 24,
         fontFamily: "DM Sans, sans-serif",
         fontSize: 13,
-        color: "#8A8580",
+        color: "var(--ink-muted)",
       }}
     >
       <Link
         href="/legal/terms"
-        style={{ color: "#5C5853", fontWeight: 700, textDecoration: "none" }}
+        style={{ color: "var(--ink-2)", fontWeight: 700, textDecoration: "none" }}
       >
         Terms of Service
       </Link>
       <span style={{ margin: "0 8px" }}>·</span>
       <Link
         href="/legal/privacy"
-        style={{ color: "#5C5853", fontWeight: 700, textDecoration: "none" }}
+        style={{ color: "var(--ink-2)", fontWeight: 700, textDecoration: "none" }}
       >
         Privacy Policy
       </Link>
@@ -1622,7 +1634,7 @@ function SectionTitle({ children }: { children: React.ReactNode }) {
         fontFamily: "Fraunces, serif",
         fontSize: 22,
         fontWeight: 800,
-        color: "#1C1C1E",
+        color: "var(--charcoal)",
         letterSpacing: "-0.01em",
         margin: "0 0 14px",
       }}
@@ -1650,7 +1662,7 @@ function Row({
           fontWeight: 700,
           letterSpacing: "0.06em",
           textTransform: "uppercase",
-          color: "#8A8580",
+          color: "var(--ink-muted)",
           paddingTop: 4,
         }}
       >
@@ -1661,7 +1673,7 @@ function Row({
           style={{
             fontFamily: "DM Sans, sans-serif",
             fontSize: 14,
-            color: "#1C1C1E",
+            color: "var(--charcoal)",
             wordBreak: "break-word",
           }}
         >
@@ -1672,7 +1684,7 @@ function Row({
             style={{
               fontFamily: "DM Sans, sans-serif",
               fontSize: 12,
-              color: "#8A8580",
+              color: "var(--ink-muted)",
               marginTop: 2,
             }}
           >

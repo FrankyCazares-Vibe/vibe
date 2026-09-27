@@ -359,11 +359,19 @@ export function NetworkPageClient() {
       style={{
         // Same warm radial cream wash the campus Feed uses — keeps the surface
         // continuous when bouncing between Campus → Network → Messages.
+        // Night (S67 wave 3): this page stays a cream island on purpose, with
+        // its inks pinned (color below). UserCard and the tabs / filters /
+        // empty islands are a `--glass → rgba(255,250,240,0.66)` gradient
+        // with no token yet (--glass-lo); on the near-black backdrop they'd
+        // turn to grey slabs with unreadable grey text. Move to
+        // var(--feed-backdrop) together with those surfaces.
         background: [
           "radial-gradient(120% 80% at 0% 0%, rgba(255,222,180,0.45) 0%, rgba(255,222,180,0) 60%)",
           "radial-gradient(110% 80% at 100% 100%, rgba(255,200,170,0.35) 0%, rgba(255,200,170,0) 60%)",
           "linear-gradient(180deg, #FAF7F2 0%, #F4EDE2 100%)",
         ].join(", "),
+        // Light inherits this same ink from <body>; Night's body ink is light.
+        color: "#1C1C1E",
         borderRight: "1px solid rgba(28,28,30,0.08)",
         padding: "32px 28px 80px",
         minWidth: 0,

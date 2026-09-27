@@ -6,6 +6,8 @@ import { CustomCursor } from "@/components/CustomCursor";
 import { ToastHost } from "@/components/feedback/ToastHost";
 import { NativeBridge } from "@/components/native/NativeBridge";
 import { ServiceWorkerRegistrar } from "@/components/pwa/ServiceWorkerRegistrar";
+import { THEME_BOOT_SCRIPT } from "@/lib/theme/theme";
+import { ThemeSync } from "@/lib/theme/ThemeSync";
 import { cn } from "@/lib/utils";
 
 const jetbrainsMono = JetBrains_Mono({subsets:['latin'],variable:'--font-mono'});
@@ -50,14 +52,37 @@ export default function RootLayout({
   children: React.ReactNode;
 }) {
   return (
-    <html lang="en" className={cn("font-mono", jetbrainsMono.variable)}>
+    // data-theme is the RESOLVED theme (light | dark, never "system"). The
+    // server can't know the student's device, so it ships "light" and the
+    // boot script below corrects the attribute before first paint; React
+    // then keeps whatever the DOM says (suppressHydrationWarning), the Next
+    // "preventing flash before hydration" recipe. Stays cream-first on
+    // purpose: DEFAULT_THEME_PREF is "light" until wave 5 (src/lib/theme).
+    <html
+      lang="en"
+      data-theme="light"
+      suppressHydrationWarning
+      className={cn("font-mono", jetbrainsMono.variable)}
+    >
       <head>
+        {/* FIRST child of <head>: reads localStorage.vibe_theme, resolves
+            "system" with matchMedia and sets data-theme. Nothing else; the
+            theme-color meta below is React's (viewport.themeColor) and
+            applyTheme repaints it after mount. The four static pages paste
+            this same string; theme.test.ts fails per file when it drifts. */}
+        <script dangerouslySetInnerHTML={{ __html: THEME_BOOT_SCRIPT }} />
         <link
           href="https://fonts.googleapis.com/css2?family=Fraunces:ital,wght@0,400;0,700;0,900;1,400&family=DM+Sans:wght@300;400;500;600;700&display=swap"
           rel="stylesheet"
         />
       </head>
       <body>
+        {/* The theme after first paint: the theme-color meta, Auto following
+            the phone live, other tabs and the legacy iframes. Renders
+            nothing. FIRST in <body> on purpose, so its mount effect runs
+            before any page's: the Settings card can then paint the account's
+            theme over it on a new device, never the other way round. */}
+        <ThemeSync />
         {children}
         {/* One toast for every React route; failed requests land here via
             vibeRequest (src/lib/feedback). Static pages have their own. */}

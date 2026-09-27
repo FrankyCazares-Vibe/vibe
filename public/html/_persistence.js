@@ -39,6 +39,73 @@ function vibeSave(key, val) {
 function vibeClear(key) { try { localStorage.removeItem(key); } catch(e) {} }
 function vibeClearAll() { Object.values(VIBE_KEYS).forEach(vibeClear); }
 
+// ── Theme (S67 wave 3, contracts C4) ──────────────────────────────────────
+// The first script in every legacy page's <head> is THEME_BOOT_SCRIPT from
+// src/lib/theme/theme.ts, so the first paint is already right. This keeps it
+// right afterwards: the messages and onboarding iframes share localStorage
+// with the React shell, so a toggle in Settings arrives here as a `storage`
+// event, and Auto follows the phone's own switch. Same rules as the boot
+// script: vibe_theme ∈ light | dark | system, anything else (or a blocked
+// store) is the default, and the element never says "system".
+// vibe_theme is a device key, deliberately NOT in VIBE_KEYS: ?clear=1 and
+// sign-out leave it alone.
+var VIBE_THEME_KEY = 'vibe_theme';
+// MUST equal DEFAULT_THEME_PREF in src/lib/theme/theme.ts, and the colours
+// THEME_META_COLORS. The flip to 'system' (wave 5) is: change the constant,
+// run `node --test src/lib/theme/theme.test.ts`, paste the boot script where
+// it fails, change THIS line, bump SW_VERSION. At load the page trusts what
+// the boot script set (below), so only a later storage/OS event reads this.
+var _VIBE_THEME_DEFAULT = 'light';
+var _VIBE_THEME_COLORS = { light: '#FAF7F2', dark: '#0C0B0B' };
+
+function _vibeThemePref() {
+  var p = null;
+  try { p = localStorage.getItem(VIBE_THEME_KEY); } catch (e) {}
+  return p === 'light' || p === 'dark' || p === 'system' ? p : _VIBE_THEME_DEFAULT;
+}
+
+/* Repaints the page's one theme-color meta (the markup keeps cream so
+   scripts/check-pwa.mjs passes; C4 lets the static pages rewrite it at
+   runtime). */
+function _vibeSyncThemeMeta(theme) {
+  var meta = document.querySelector('meta[name="theme-color"]');
+  if (meta) meta.setAttribute('content', _VIBE_THEME_COLORS[theme]);
+}
+
+/* Sets data-theme on <html> from the saved preference, plus the meta. */
+function vibeApplyTheme() {
+  try {
+    var pref = _vibeThemePref();
+    var dark = pref === 'dark' || (pref === 'system' && !!window.matchMedia &&
+      window.matchMedia('(prefers-color-scheme: dark)').matches);
+    var theme = dark ? 'dark' : 'light';
+    document.documentElement.dataset.theme = theme;
+    _vibeSyncThemeMeta(theme);
+  } catch (e) {}
+}
+
+// At load the boot script has already resolved the theme; keep its answer
+// (so this file's copy of the default can never contradict first paint) and
+// only bring the meta along, so a top-level profile.html opened in Night
+// gets dark browser chrome too.
+try {
+  var _vibeBootTheme = document.documentElement.dataset.theme;
+  if (_vibeBootTheme === 'light' || _vibeBootTheme === 'dark') _vibeSyncThemeMeta(_vibeBootTheme);
+  else vibeApplyTheme();
+} catch (e) {}
+window.addEventListener('storage', function (e) {
+  // key is null when the whole store was cleared (the default applies then).
+  if (e.key === null || e.key === VIBE_THEME_KEY) vibeApplyTheme();
+});
+try {
+  var _vibeDarkQuery = window.matchMedia('(prefers-color-scheme: dark)');
+  var _vibeOnSystemTheme = function () {
+    if (_vibeThemePref() === 'system') vibeApplyTheme();
+  };
+  if (_vibeDarkQuery.addEventListener) _vibeDarkQuery.addEventListener('change', _vibeOnSystemTheme);
+  else if (_vibeDarkQuery.addListener) _vibeDarkQuery.addListener(_vibeOnSystemTheme);
+} catch (e) {}
+
 // ── Per-page init entry point ─────────────────────────────────────────────
 // Handles ?clear=1 and ?embedded=1 URL params, returns the current user (or null).
 // Pages call this first, then run their own page-specific init logic.

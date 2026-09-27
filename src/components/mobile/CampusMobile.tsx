@@ -663,10 +663,9 @@ export function CampusMobile() {
   return (
     <main
       style={{
-        background:
-          "radial-gradient(120% 80% at 0% 0%, rgba(255,222,180,0.40) 0%, rgba(255,222,180,0) 60%), " +
-          "radial-gradient(110% 80% at 100% 100%, rgba(255,200,170,0.32) 0%, rgba(255,200,170,0) 60%), " +
-          "linear-gradient(180deg, #FAF7F2 0%, #F4EDE2 100%)",
+        // The campus backdrop, shared with the desktop campus page and
+        // Settings: cream with a coral bloom in Light, near-black in Night.
+        background: "var(--feed-backdrop)",
         minHeight: "100dvh",
         position: "relative",
       }}
@@ -974,9 +973,9 @@ function TabStrip({
             style={{
               padding: "7px 14px",
               borderRadius: 999,
-              border: "1px solid rgba(28,28,30,0.10)",
-              background: isActive ? "#1C1C1E" : "rgba(255,255,255,0.7)",
-              color: isActive ? "#fff" : "#5C5853",
+              border: "1px solid rgba(var(--scrim-rgb),0.10)",
+              background: isActive ? "var(--charcoal)" : "var(--paper-70)",
+              color: isActive ? "var(--paper)" : "var(--ink-2)",
               fontFamily: "DM Sans, sans-serif",
               fontSize: 13,
               fontWeight: 700,
@@ -1114,8 +1113,8 @@ function FeedTagChip({ tag, onClear }: { tag: string; onClear: () => void }) {
         padding: "6px 10px 6px 12px",
         borderRadius: 999,
         border: "1px solid rgba(255,92,53,0.22)",
-        background: "rgba(255,92,53,0.10)",
-        color: "#B83A1A",
+        background: "var(--tag-bg)",
+        color: "var(--tag-ink)",
         fontFamily: "DM Sans, sans-serif",
         fontSize: 13,
         fontWeight: 700,
@@ -1333,14 +1332,14 @@ function FeedCard({
       }}
       style={{
         width: "100%",
-        background: "rgba(255,253,248,0.78)",
-        border: "1px solid rgba(255,255,255,0.7)",
+        background: "var(--glass)",
+        border: "1px solid var(--glass-border)",
         borderRadius: 18,
         padding: 14,
         textAlign: "left",
         cursor: "pointer",
         WebkitTapHighlightColor: "transparent",
-        boxShadow: "inset 0 1px 0 rgba(255,255,255,0.85), 0 4px 14px rgba(180,120,60,0.08)",
+        boxShadow: "var(--card-shadow)",
         position: "relative",
         overflow: "hidden",
       }}
@@ -1380,7 +1379,7 @@ function FeedCard({
               fontFamily: "Fraunces, serif",
               fontSize: 14,
               fontWeight: 800,
-              color: "#1C1C1E",
+              color: "var(--charcoal)",
               whiteSpace: "nowrap",
               overflow: "hidden",
               textOverflow: "ellipsis",
@@ -1394,7 +1393,7 @@ function FeedCard({
             style={{
               fontFamily: "DM Sans, sans-serif",
               fontSize: 11.5,
-              color: "#8A8580",
+              color: "var(--ink-muted)",
               fontWeight: 600,
               letterSpacing: "0.02em",
             }}
@@ -1442,7 +1441,7 @@ function FeedCard({
             margin: "10px 0 0",
             fontFamily: "DM Sans, sans-serif",
             fontSize: 14,
-            color: "#1C1C1E",
+            color: "var(--charcoal)",
             lineHeight: 1.45,
             display: "-webkit-box",
             WebkitLineClamp: 4,
@@ -1518,8 +1517,8 @@ function FeedCard({
                 padding: "3px 9px",
                 borderRadius: 999,
                 border: "none",
-                background: "rgba(255,92,53,0.10)",
-                color: "#B83A1A",
+                background: "var(--tag-bg)",
+                color: "var(--tag-ink)",
                 fontFamily: "DM Sans, sans-serif",
                 fontSize: 11.5,
                 fontWeight: 700,
@@ -1547,7 +1546,9 @@ function FeedCard({
             borderRadius: 999,
             background: "rgba(46,160,72,0.10)",
             border: "1px solid rgba(46,160,72,0.22)",
-            color: "#1F6B3A",
+            // Deep green ink. Until globals.css defines --ok-ink-2 (a light
+            // green in Night), the fallback keeps today's Light colour.
+            color: "var(--ok-ink-2)",
             fontFamily: "DM Sans, sans-serif",
             fontSize: 11.5,
             fontWeight: 700,
@@ -1565,7 +1566,7 @@ function FeedCard({
                   background: u.avatar_url
                     ? `url(${u.avatar_url}) center/cover`
                     : "#FFD3C2",
-                  border: "1.5px solid #FAF7F2",
+                  border: "1.5px solid var(--cream)",
                   marginLeft: i === 0 ? 0 : -6,
                 }}
               />
@@ -1587,7 +1588,7 @@ function FeedCard({
           gap: 14,
           fontFamily: "DM Sans, sans-serif",
           fontSize: 12,
-          color: "#8A8580",
+          color: "var(--ink-muted)",
           fontWeight: 700,
           letterSpacing: "0.02em",
         }}
@@ -1606,9 +1607,9 @@ function FeedCard({
             gap: 6,
             padding: "4px 8px",
             borderRadius: 999,
-            border: "1px solid rgba(28,28,30,0.06)",
-            background: liked ? "rgba(255,92,53,0.10)" : "rgba(255,255,255,0.55)",
-            color: liked ? "#E04A26" : "#5C5853",
+            border: "1px solid rgba(var(--scrim-rgb),0.06)",
+            background: liked ? "rgba(255,92,53,0.10)" : "var(--paper-55)",
+            color: liked ? "#E04A26" : "var(--ink-2)",
             fontFamily: "inherit",
             fontWeight: 700,
             cursor: "pointer",
@@ -1656,9 +1657,9 @@ function FeedCard({
             gap: 6,
             padding: "4px 8px",
             borderRadius: 999,
-            border: "1px solid rgba(28,28,30,0.06)",
-            background: "rgba(255,255,255,0.55)",
-            color: "#5C5853",
+            border: "1px solid rgba(var(--scrim-rgb),0.06)",
+            background: "var(--paper-55)",
+            color: "var(--ink-2)",
             fontFamily: "inherit",
             fontWeight: 700,
             cursor: "pointer",
@@ -1695,11 +1696,11 @@ function FeedCard({
             gap: 6,
             padding: "4px 8px",
             borderRadius: 999,
-            border: "1px solid rgba(28,28,30,0.06)",
+            border: "1px solid rgba(var(--scrim-rgb),0.06)",
             background: reposted
               ? "rgba(46,160,72,0.12)"
-              : "rgba(255,255,255,0.55)",
-            color: reposted ? "#2E8242" : "#5C5853",
+              : "var(--paper-55)",
+            color: reposted ? "#2E8242" : "var(--ink-2)",
             fontFamily: "inherit",
             fontWeight: 700,
             cursor: "pointer",
@@ -1733,7 +1734,7 @@ function FeedCard({
               display: "inline-flex",
               alignItems: "center",
               gap: 4,
-              color: "#8A8580",
+              color: "var(--ink-muted)",
             }}
           >
             <svg
@@ -1774,11 +1775,11 @@ function FeedCard({
             width: 30,
             height: 30,
             borderRadius: 999,
-            border: "1px solid rgba(28,28,30,0.06)",
+            border: "1px solid rgba(var(--scrim-rgb),0.06)",
             background: saved
-              ? "rgba(28,28,30,0.10)"
-              : "rgba(255,255,255,0.55)",
-            color: saved ? "#1C1C1E" : "#5C5853",
+              ? "rgba(var(--scrim-rgb),0.10)"
+              : "var(--paper-55)",
+            color: saved ? "var(--charcoal)" : "var(--ink-2)",
             cursor: "pointer",
             WebkitTapHighlightColor: "transparent",
             transition: "transform 140ms ease, background 140ms ease",
@@ -2901,7 +2902,7 @@ function OrgsPane({
           margin: "6px 4px 0",
           fontFamily: "DM Sans, sans-serif",
           fontSize: 12.5,
-          color: "#8A8580",
+          color: "var(--ink-muted)",
           lineHeight: 1.45,
           textAlign: "center",
         }}
@@ -2921,7 +2922,7 @@ function OrgSectionHeader({ label }: { label: string }) {
         padding: "4px 4px 4px",
         fontFamily: "DM Sans, sans-serif",
         fontSize: 11.5,
-        color: "#8A8580",
+        color: "var(--ink-muted)",
         fontWeight: 800,
         letterSpacing: "0.08em",
         textTransform: "uppercase",
@@ -2985,9 +2986,9 @@ function OrgRow({
         gap: 10,
         padding: 14,
         borderRadius: 18,
-        background: "rgba(255,253,248,0.78)",
-        border: "1px solid rgba(255,255,255,0.7)",
-        boxShadow: "inset 0 1px 0 rgba(255,255,255,0.85), 0 4px 14px rgba(180,120,60,0.08)",
+        background: "var(--glass)",
+        border: "1px solid var(--glass-border)",
+        boxShadow: "var(--card-shadow)",
       }}
     >
       <div style={{ display: "flex", alignItems: "center", gap: 12 }}>
@@ -3044,7 +3045,7 @@ function OrgRow({
                   fontFamily: "Fraunces, serif",
                   fontSize: 16,
                   fontWeight: 800,
-                  color: "#1C1C1E",
+                  color: "var(--charcoal)",
                   whiteSpace: "nowrap",
                   overflow: "hidden",
                   textOverflow: "ellipsis",
@@ -3084,8 +3085,8 @@ function OrgRow({
                     fontWeight: 800,
                     whiteSpace: "nowrap",
                     background:
-                      view.chip === "Invited you" ? "rgba(255,92,53,0.12)" : "rgba(28,28,30,0.06)",
-                    color: view.chip === "Invited you" ? "#B83A1A" : "#5C5853",
+                      view.chip === "Invited you" ? "rgba(255,92,53,0.12)" : "rgba(var(--scrim-rgb),0.06)",
+                    color: view.chip === "Invited you" ? "var(--tag-ink)" : "var(--ink-2)",
                   }}
                 >
                   {view.chip}
@@ -3097,7 +3098,7 @@ function OrgRow({
                 marginTop: 2,
                 fontFamily: "DM Sans, sans-serif",
                 fontSize: 12,
-                color: "#8A8580",
+                color: "var(--ink-muted)",
                 fontWeight: 600,
                 letterSpacing: "0.02em",
                 whiteSpace: "nowrap",
@@ -3121,7 +3122,7 @@ function OrgRow({
             margin: 0,
             fontFamily: "DM Sans, sans-serif",
             fontSize: 11.5,
-            color: "#8A8580",
+            color: "var(--ink-muted)",
             lineHeight: 1.35,
             display: "-webkit-box",
             WebkitLineClamp: 2,
@@ -3313,7 +3314,7 @@ function PostActionsSheet({
             bottom: 0,
             left: 0,
             right: 0,
-            background: "#FAF7F2",
+            background: "var(--cream)",
             borderTopLeftRadius: 20,
             borderTopRightRadius: 20,
             paddingBottom: "env(safe-area-inset-bottom, 0px)",
@@ -3330,7 +3331,7 @@ function PostActionsSheet({
               width: 38,
               height: 4,
               borderRadius: 999,
-              background: "rgba(28,28,30,0.18)",
+              background: "rgba(var(--scrim-rgb),0.18)",
             }}
           />
           <Drawer.Title
@@ -3339,7 +3340,7 @@ function PostActionsSheet({
               fontFamily: "Fraunces, serif",
               fontSize: 14,
               fontWeight: 800,
-              color: "#1C1C1E",
+              color: "var(--charcoal)",
             }}
           >
             Post options
@@ -3353,7 +3354,8 @@ function PostActionsSheet({
                 borderRadius: 12,
                 background: "rgba(46,160,72,0.10)",
                 border: "1px solid rgba(46,160,72,0.22)",
-                color: "#1F6B3A",
+                // Same deep green as the friend-repost pill (--ok-ink-2).
+                color: "var(--ok-ink-2)",
                 fontFamily: "DM Sans, sans-serif",
                 fontSize: 12.5,
                 fontWeight: 700,
@@ -3495,8 +3497,8 @@ function ActionSheetRow({
         padding: "14px 16px",
         background: "transparent",
         border: "none",
-        borderTop: divider ? "1px solid rgba(28,28,30,0.08)" : "none",
-        color: tone === "danger" ? "#B83A1A" : "#1C1C1E",
+        borderTop: divider ? "1px solid var(--hairline)" : "none",
+        color: tone === "danger" ? "var(--tag-ink)" : "var(--charcoal)",
         fontFamily: "DM Sans, sans-serif",
         fontSize: 15,
         fontWeight: bold ? 800 : 600,
@@ -3699,7 +3701,7 @@ export function CampusSearchOverlay({ onClose }: { onClose: () => void }) {
         position: "fixed",
         inset: 0,
         zIndex: 1300,
-        background: "#FAF7F2",
+        background: "var(--cream)",
         display: "flex",
         flexDirection: "column",
       }}
@@ -3711,10 +3713,10 @@ export function CampusSearchOverlay({ onClose }: { onClose: () => void }) {
           alignItems: "center",
           gap: 8,
           padding: "calc(env(safe-area-inset-top, 0px) + 10px) 12px 10px",
-          background: "rgba(250,247,242,0.96)",
+          background: "var(--tabbar-bg)",
           backdropFilter: "saturate(160%) blur(14px)",
           WebkitBackdropFilter: "saturate(160%) blur(14px)",
-          borderBottom: "1px solid rgba(28,28,30,0.06)",
+          borderBottom: "1px solid rgba(var(--scrim-rgb),0.06)",
         }}
       >
         <button
@@ -3727,7 +3729,7 @@ export function CampusSearchOverlay({ onClose }: { onClose: () => void }) {
             borderRadius: 999,
             background: "transparent",
             border: "none",
-            color: "#1C1C1E",
+            color: "var(--charcoal)",
             cursor: "pointer",
             display: "inline-flex",
             alignItems: "center",
@@ -3753,7 +3755,7 @@ export function CampusSearchOverlay({ onClose }: { onClose: () => void }) {
               left: 14,
               top: "50%",
               transform: "translateY(-50%)",
-              color: "#8A8580",
+              color: "var(--ink-muted)",
               display: "inline-flex",
             }}
           >
@@ -3852,7 +3854,7 @@ function SearchSection({
           fontWeight: 800,
           letterSpacing: "0.08em",
           textTransform: "uppercase",
-          color: "#8A8580",
+          color: "var(--ink-muted)",
         }}
       >
         {label}
@@ -3898,7 +3900,7 @@ function SearchUserRow({ u, onPick }: { u: SearchUser; onPick: () => void }) {
         textAlign: "left",
         background: "transparent",
         border: "none",
-        borderBottom: "1px solid rgba(28,28,30,0.04)",
+        borderBottom: "1px solid rgba(var(--scrim-rgb),0.04)",
         color: "inherit",
         fontFamily: "inherit",
         cursor: u.handle ? "pointer" : "default",
@@ -3932,7 +3934,7 @@ function SearchUserRow({ u, onPick }: { u: SearchUser; onPick: () => void }) {
             fontFamily: "Fraunces, serif",
             fontSize: 15,
             fontWeight: 700,
-            color: "#1C1C1E",
+            color: "var(--charcoal)",
             whiteSpace: "nowrap",
             overflow: "hidden",
             textOverflow: "ellipsis",
@@ -3944,7 +3946,7 @@ function SearchUserRow({ u, onPick }: { u: SearchUser; onPick: () => void }) {
           style={{
             fontFamily: "DM Sans, sans-serif",
             fontSize: 12,
-            color: "#8A8580",
+            color: "var(--ink-muted)",
             fontWeight: 600,
             whiteSpace: "nowrap",
             overflow: "hidden",
@@ -3979,7 +3981,7 @@ function SearchOrgRow({ o, onPick }: { o: SearchOrg; onPick: () => void }) {
         textAlign: "left",
         background: "transparent",
         border: "none",
-        borderBottom: "1px solid rgba(28,28,30,0.04)",
+        borderBottom: "1px solid rgba(var(--scrim-rgb),0.04)",
         color: "inherit",
         fontFamily: "inherit",
         cursor: "pointer",
@@ -4007,7 +4009,7 @@ function SearchOrgRow({ o, onPick }: { o: SearchOrg; onPick: () => void }) {
             fontFamily: "Fraunces, serif",
             fontSize: 15,
             fontWeight: 700,
-            color: "#1C1C1E",
+            color: "var(--charcoal)",
           }}
         >
           <span
@@ -4043,7 +4045,7 @@ function SearchOrgRow({ o, onPick }: { o: SearchOrg; onPick: () => void }) {
           style={{
             fontFamily: "DM Sans, sans-serif",
             fontSize: 12,
-            color: "#8A8580",
+            color: "var(--ink-muted)",
             fontWeight: 600,
           }}
         >
@@ -4067,7 +4069,7 @@ function SearchHint() {
       style={{
         padding: "48px 24px",
         textAlign: "center",
-        color: "#5C5853",
+        color: "var(--ink-2)",
         fontFamily: "DM Sans, sans-serif",
         fontSize: 13.5,
         lineHeight: 1.55,
@@ -4086,7 +4088,7 @@ function SearchLoading() {
       style={{
         padding: "32px 24px",
         textAlign: "center",
-        color: "#8A8580",
+        color: "var(--ink-muted)",
         fontFamily: "DM Sans, sans-serif",
         fontSize: 13,
       }}

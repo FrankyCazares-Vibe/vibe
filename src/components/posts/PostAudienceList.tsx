@@ -226,8 +226,8 @@ export function PostAudienceList({
   }, [loadingMore, nextOffset, postId, kind, copy.moreFailure]);
 
   const dark = tone === "dark";
-  const faint = dark ? "rgba(250,247,242,0.62)" : "#8A8580";
-  const ink = dark ? "#FAF7F2" : "#1C1C1E";
+  const faint = dark ? "rgba(250,247,242,0.62)" : "var(--ink-muted)";
+  const ink = dark ? "#FAF7F2" : "var(--charcoal)";
 
   // A refused read is the only thing that outranks the rows: nothing below
   // this point may paint a number nobody counted.

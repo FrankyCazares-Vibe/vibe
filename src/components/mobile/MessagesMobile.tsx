@@ -1,7 +1,15 @@
 "use client";
 
 import Link from "next/link";
-import { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState } from "react";
+import {
+  useCallback,
+  useEffect,
+  useLayoutEffect,
+  useMemo,
+  useRef,
+  useState,
+  useSyncExternalStore,
+} from "react";
 import { Drawer } from "vaul";
 
 import { asLoadFailure, LoadFailed, type LoadFailure } from "@/components/feedback/LoadFailed";
@@ -13,6 +21,7 @@ import {
 } from "@/components/safety/ReportSheet";
 import { vibeRequest } from "@/lib/feedback/request";
 import { toast } from "@/lib/feedback/toast";
+import { currentTheme, THEME_EVENT } from "@/lib/theme/theme";
 
 /**
  * iOS-native /messages rebuild for mobile. Two screens, one component:
@@ -195,6 +204,24 @@ type Tab = "all" | "requests";
 // safe-area-aware bottom, drag handle). vaul owns the open/close
 // animation, drag-to-dismiss, focus trap, and scroll lock.
 
+// Night (S67 wave 3): the thread's chrome and bubbles already have a dark
+// palette for org backdrops, so in Night a cream-scene thread (a DM or a
+// group) wears that same palette on the near-black paper. `data-theme` on
+// <html> is the truth; applyTheme announces every change with THEME_EVENT.
+// Light has no event to miss: the boot script sets the attribute first.
+function subscribeTheme(onChange: () => void): () => void {
+  window.addEventListener(THEME_EVENT, onChange);
+  return () => window.removeEventListener(THEME_EVENT, onChange);
+}
+
+function useNightTheme(): boolean {
+  return useSyncExternalStore(
+    subscribeTheme,
+    () => currentTheme() === "dark",
+    () => false,
+  );
+}
+
 const vaulOverlayStyle: React.CSSProperties = {
   position: "fixed",
   inset: 0,
@@ -207,7 +234,7 @@ const vaulContentStyle: React.CSSProperties = {
   bottom: 0,
   left: 0,
   right: 0,
-  background: "#FAF7F2",
+  background: "var(--cream)",
   borderTopLeftRadius: 20,
   borderTopRightRadius: 20,
   paddingBottom: "env(safe-area-inset-bottom, 0px)",
@@ -221,7 +248,7 @@ const vaulHandleStyle: React.CSSProperties = {
   width: 38,
   height: 4,
   borderRadius: 999,
-  background: "rgba(28,28,30,0.18)",
+  background: "rgba(var(--scrim-rgb),0.18)",
 };
 
 // Screen-reader-only — used to satisfy vaul's a11y requirement on
@@ -313,6 +340,8 @@ export function MessagesMobile({
   initialHandle?: string;
   initialChannelId?: string;
 }) {
+  // The header's translucent cream has no Night token yet (see the header).
+  const night = useNightTheme();
   const [tab, setTab] = useState<Tab>("all");
   const [threads, setThreads] = useState<ThreadEntry[] | null>(null);
   const [requests, setRequests] = useState<ThreadEntry[] | null>(null);
@@ -507,22 +536,25 @@ export function MessagesMobile({
   return (
     <main
       style={{
-        background:
-          "radial-gradient(120% 80% at 0% 0%, rgba(255,222,180,0.30) 0%, rgba(255,222,180,0) 60%), " +
-          "linear-gradient(180deg, #FAF7F2 0%, #F4EDE2 100%)",
+        // The campus Feed's backdrop (contracts C0): cream with a coral
+        // bloom in Light, near-black in Night.
+        background: "var(--feed-backdrop)",
         minHeight: "100dvh",
       }}
     >
       <header
         style={{
           padding: "calc(env(safe-area-inset-top, 0px) + 14px) 16px 6px",
-          background: "rgba(250, 247, 242, 0.86)",
+          // Cream at .86 has no token yet (a --cream-86 step in globals.css
+          // would replace this ternary): Light keeps the literal, Night the
+          // nearest step, the tab bar's cream.
+          background: night ? "var(--tabbar-bg)" : "rgba(250, 247, 242, 0.86)",
           backdropFilter: "saturate(160%) blur(14px)",
           WebkitBackdropFilter: "saturate(160%) blur(14px)",
           position: "sticky",
           top: 0,
           zIndex: 5,
-          borderBottom: "1px solid rgba(28,28,30,0.06)",
+          borderBottom: "1px solid rgba(var(--scrim-rgb),0.06)",
         }}
       >
         <div
@@ -539,7 +571,7 @@ export function MessagesMobile({
               fontSize: 28,
               fontWeight: 900,
               letterSpacing: "-0.8px",
-              color: "#1C1C1E",
+              color: "var(--charcoal)",
               margin: 0,
             }}
           >
@@ -553,15 +585,18 @@ export function MessagesMobile({
               width: 40,
               height: 40,
               borderRadius: 999,
-              border: "1px solid rgba(28,28,30,0.10)",
-              background: "rgba(255,255,255,0.78)",
-              color: "#1C1C1E",
+              border: "1px solid rgba(var(--scrim-rgb),0.10)",
+              // White at .78: same no-token-yet story (--paper-78).
+              background: night ? "var(--paper-70)" : "rgba(255,255,255,0.78)",
+              color: "var(--charcoal)",
               cursor: "pointer",
               display: "inline-flex",
               alignItems: "center",
               justifyContent: "center",
               WebkitTapHighlightColor: "transparent",
-              boxShadow: "inset 0 1px 0 rgba(255,255,255,0.7)",
+              boxShadow: night
+                ? "inset 0 1px 0 rgba(255,255,255,0.04)"
+                : "inset 0 1px 0 rgba(255,255,255,0.7)",
             }}
           >
             <svg width="20" height="20" viewBox="0 0 22 22" fill="none" aria-hidden>
@@ -610,6 +645,7 @@ export function MessagesMobile({
             <div style={{ padding: "16px 16px 0" }}>
               <LoadFailed
                 failure={listErr}
+                tone={night ? "dark" : "light"}
                 onRetry={() => {
                   setListErr(null);
                   void refetchThreads("first");
@@ -692,9 +728,9 @@ function TabPill({
       style={{
         padding: "7px 14px",
         borderRadius: 999,
-        border: "1px solid rgba(28,28,30,0.10)",
-        background: active ? "#1C1C1E" : "rgba(255,255,255,0.7)",
-        color: active ? "#fff" : "#5C5853",
+        border: "1px solid rgba(var(--scrim-rgb),0.10)",
+        background: active ? "var(--charcoal)" : "var(--paper-70)",
+        color: active ? "var(--paper)" : "var(--ink-2)",
         fontFamily: "DM Sans, sans-serif",
         fontSize: 13,
         fontWeight: 700,
@@ -715,7 +751,9 @@ function TabPill({
             padding: "0 6px",
             borderRadius: 999,
             background: active ? "rgba(255,255,255,0.18)" : "#FF5C35",
-            color: "#fff",
+            // On the active pill it follows the pill's ink (the pill inverts
+            // in Night); on coral it stays white.
+            color: active ? "var(--paper)" : "#fff",
             fontSize: 11,
             fontWeight: 800,
             alignItems: "center",
@@ -770,7 +808,7 @@ function ThreadRow({
           padding: "12px 16px",
           background: "transparent",
           border: "none",
-          borderBottom: "1px solid rgba(28,28,30,0.04)",
+          borderBottom: "1px solid rgba(var(--scrim-rgb),0.04)",
           cursor: "pointer",
           textAlign: "left",
           WebkitTapHighlightColor: "transparent",
@@ -811,7 +849,7 @@ function ThreadRow({
                 fontFamily: "Fraunces, serif",
                 fontSize: 16,
                 fontWeight: unread ? 900 : 700,
-                color: "#1C1C1E",
+                color: "var(--charcoal)",
                 whiteSpace: "nowrap",
                 overflow: "hidden",
                 textOverflow: "ellipsis",
@@ -823,7 +861,7 @@ function ThreadRow({
               style={{
                 fontFamily: "DM Sans, sans-serif",
                 fontSize: 11.5,
-                color: unread ? "#FF5C35" : "#8A8580",
+                color: unread ? "#FF5C35" : "var(--ink-muted)",
                 fontWeight: unread ? 800 : 600,
                 flexShrink: 0,
               }}
@@ -844,7 +882,7 @@ function ThreadRow({
                 flex: 1,
                 fontFamily: "DM Sans, sans-serif",
                 fontSize: 13,
-                color: unread ? "#1C1C1E" : "#8A8580",
+                color: unread ? "var(--charcoal)" : "var(--ink-muted)",
                 fontWeight: unread ? 600 : 500,
                 whiteSpace: "nowrap",
                 overflow: "hidden",
@@ -882,7 +920,7 @@ function ListSkeleton() {
             display: "flex",
             gap: 12,
             padding: "12px 16px",
-            borderBottom: "1px solid rgba(28,28,30,0.04)",
+            borderBottom: "1px solid rgba(var(--scrim-rgb),0.04)",
           }}
         >
           <div
@@ -890,7 +928,7 @@ function ListSkeleton() {
               width: 50,
               height: 50,
               borderRadius: 999,
-              background: "rgba(28,28,30,0.06)",
+              background: "rgba(var(--scrim-rgb),0.06)",
               flexShrink: 0,
             }}
           />
@@ -899,7 +937,7 @@ function ListSkeleton() {
               style={{
                 width: "55%",
                 height: 14,
-                background: "rgba(28,28,30,0.08)",
+                background: "rgba(var(--scrim-rgb),0.08)",
                 borderRadius: 6,
                 marginBottom: 6,
               }}
@@ -908,7 +946,7 @@ function ListSkeleton() {
               style={{
                 width: "85%",
                 height: 11,
-                background: "rgba(28,28,30,0.05)",
+                background: "rgba(var(--scrim-rgb),0.05)",
                 borderRadius: 5,
               }}
             />
@@ -925,7 +963,7 @@ function EmptyState({ tab }: { tab: Tab }) {
       style={{
         padding: "48px 24px",
         textAlign: "center",
-        color: "#5C5853",
+        color: "var(--ink-2)",
         fontFamily: "DM Sans, sans-serif",
       }}
     >
@@ -934,7 +972,7 @@ function EmptyState({ tab }: { tab: Tab }) {
           fontFamily: "Fraunces, serif",
           fontSize: 18,
           fontWeight: 800,
-          color: "#1C1C1E",
+          color: "var(--charcoal)",
           marginBottom: 6,
         }}
       >
@@ -960,8 +998,8 @@ function EmptyState({ tab }: { tab: Tab }) {
             marginTop: 14,
             padding: "9px 18px",
             borderRadius: 999,
-            background: "#1C1C1E",
-            color: "#fff",
+            background: "var(--charcoal)",
+            color: "var(--paper)",
             textDecoration: "none",
             fontSize: 13,
             fontWeight: 700,
@@ -995,6 +1033,11 @@ export function ConversationView({
    *  feature instead of clashing with cream chrome. */
   backdropCss?: string | null;
 }) {
+  // The dark-glass chrome and bubbles: over a dark org backdrop, or on
+  // Night's near-black paper when there is none. Light with no backdrop
+  // keeps the cream chrome exactly as before.
+  const night = useNightTheme();
+  const onDark = !!backdropCss || night;
   const [messages, setMessages] = useState<MessageRow[] | null>(null);
   // Why the first load failed, shown in the list's place. Retry bumps
   // loadSeq, which re-runs the load.
@@ -1464,8 +1507,8 @@ export function ConversationView({
             width: "100%",
             // backdropCss carries the org's chosen gradient (set by
             // CampusMobile when opening an org channel). For DMs/groups
-            // it stays null → cream surface, same as before.
-            background: backdropCss ?? "#FAF7F2",
+            // it stays null → the page colour (cream; Night's near-black).
+            background: backdropCss ?? "var(--cream)",
             color: backdropCss ? "#fff" : undefined,
             display: "flex",
             flexDirection: "column",
@@ -1483,12 +1526,12 @@ export function ConversationView({
           gap: 10,
           padding:
             "calc(env(safe-area-inset-top, 0px) + 8px) 12px 8px",
-          background: backdropCss
+          background: onDark
             ? "rgba(14, 11, 22, 0.62)"
             : "rgba(250, 247, 242, 0.92)",
           backdropFilter: "saturate(160%) blur(14px)",
           WebkitBackdropFilter: "saturate(160%) blur(14px)",
-          borderBottom: backdropCss
+          borderBottom: onDark
             ? "1px solid rgba(255,255,255,0.08)"
             : "1px solid rgba(28,28,30,0.06)",
           flexShrink: 0,
@@ -1509,7 +1552,7 @@ export function ConversationView({
             borderRadius: 999,
             border: "none",
             background: "transparent",
-            color: backdropCss ? "#fff" : "#1C1C1E",
+            color: onDark ? "#fff" : "#1C1C1E",
             cursor: "pointer",
             display: "inline-flex",
             alignItems: "center",
@@ -1554,7 +1597,7 @@ export function ConversationView({
                 fontFamily: "Fraunces, serif",
                 fontSize: 16,
                 fontWeight: 800,
-                color: backdropCss ? "#fff" : "#1C1C1E",
+                color: onDark ? "#fff" : "#1C1C1E",
                 textDecoration: "none",
                 display: "block",
                 whiteSpace: "nowrap",
@@ -1570,7 +1613,7 @@ export function ConversationView({
                 fontFamily: "Fraunces, serif",
                 fontSize: 16,
                 fontWeight: 800,
-                color: backdropCss ? "#fff" : "#1C1C1E",
+                color: onDark ? "#fff" : "#1C1C1E",
                 whiteSpace: "nowrap",
                 overflow: "hidden",
                 textOverflow: "ellipsis",
@@ -1584,7 +1627,7 @@ export function ConversationView({
               style={{
                 fontFamily: "DM Sans, sans-serif",
                 fontSize: 11.5,
-                color: backdropCss ? "rgba(255,255,255,0.6)" : "#8A8580",
+                color: onDark ? "rgba(255,255,255,0.6)" : "#8A8580",
                 fontWeight: 600,
                 display: "block",
               }}
@@ -1601,20 +1644,20 @@ export function ConversationView({
             width: 40,
             height: 40,
             borderRadius: 999,
-            border: backdropCss
+            border: onDark
               ? "1px solid rgba(255,255,255,0.14)"
               : "1px solid rgba(28,28,30,0.10)",
-            background: backdropCss
+            background: onDark
               ? "rgba(20,16,28,0.55)"
               : "rgba(255,255,255,0.78)",
-            color: backdropCss ? "#fff" : "#1C1C1E",
+            color: onDark ? "#fff" : "#1C1C1E",
             cursor: "pointer",
             display: "inline-flex",
             alignItems: "center",
             justifyContent: "center",
             WebkitTapHighlightColor: "transparent",
             flexShrink: 0,
-            boxShadow: backdropCss
+            boxShadow: onDark
               ? "inset 0 1px 0 rgba(255,255,255,0.08)"
               : "inset 0 1px 0 rgba(255,255,255,0.7)",
           }}
@@ -1663,14 +1706,14 @@ export function ConversationView({
             <LoadFailed
               failure={loadErr}
               onRetry={reload}
-              tone={backdropCss ? "dark" : "light"}
+              tone={onDark ? "dark" : "light"}
             />
           ) : (
             <div
               style={{
                 padding: 24,
                 textAlign: "center",
-                color: backdropCss ? "rgba(255,255,255,0.6)" : "#8A8580",
+                color: onDark ? "rgba(255,255,255,0.6)" : "#8A8580",
                 fontFamily: "DM Sans, sans-serif",
                 fontSize: 13,
               }}
@@ -1683,7 +1726,7 @@ export function ConversationView({
             style={{
               padding: "48px 18px",
               textAlign: "center",
-              color: backdropCss ? "rgba(255,255,255,0.7)" : "#5C5853",
+              color: onDark ? "rgba(255,255,255,0.7)" : "#5C5853",
               fontFamily: "DM Sans, sans-serif",
               fontSize: 13.5,
               lineHeight: 1.5,
@@ -1711,7 +1754,7 @@ export function ConversationView({
                   topGap={showGap ? 8 : 0}
                   showSender={showSender}
                   groupMode={isMultiParty}
-                  darkMode={!!backdropCss}
+                  darkMode={onDark}
                   onToggleReaction={(emoji) => void toggleReaction(m.id, emoji)}
                   onMediaLoad={keepPinnedToBottom}
                   listScrolledAtRef={listScrolledAtRef}
@@ -1748,7 +1791,7 @@ export function ConversationView({
             flexShrink: 0,
             padding: "12px 16px",
             background: "rgba(255,92,53,0.06)",
-            borderTop: "1px solid rgba(28,28,30,0.08)",
+            borderTop: "1px solid var(--hairline)",
             fontFamily: "DM Sans, sans-serif",
           }}
         >
@@ -1757,7 +1800,7 @@ export function ConversationView({
               margin: "0 0 10px",
               fontSize: 13,
               lineHeight: 1.45,
-              color: "#5C5853",
+              color: "var(--ink-2)",
               textAlign: "center",
             }}
           >
@@ -1793,9 +1836,9 @@ export function ConversationView({
                 flex: 1,
                 height: 40,
                 borderRadius: 999,
-                border: "1px solid rgba(28,28,30,0.14)",
+                border: "1px solid rgba(var(--scrim-rgb),0.14)",
                 background: "transparent",
-                color: "#1C1C1E",
+                color: "var(--charcoal)",
                 fontFamily: "DM Sans, sans-serif",
                 fontSize: 14,
                 fontWeight: 700,
@@ -1829,14 +1872,14 @@ export function ConversationView({
             flexDirection: "column",
             gap: 8,
             padding: "8px 12px 0",
-            background: backdropCss
+            background: onDark
               ? "rgba(14, 11, 22, 0.72)"
               : "rgba(250, 247, 242, 0.96)",
-            borderTop: backdropCss
+            borderTop: onDark
               ? "1px solid rgba(255,255,255,0.08)"
               : "1px solid rgba(28,28,30,0.08)",
-            backdropFilter: backdropCss ? "blur(20px) saturate(160%)" : undefined,
-            WebkitBackdropFilter: backdropCss ? "blur(20px) saturate(160%)" : undefined,
+            backdropFilter: onDark ? "blur(20px) saturate(160%)" : undefined,
+            WebkitBackdropFilter: onDark ? "blur(20px) saturate(160%)" : undefined,
             fontFamily: "DM Sans, sans-serif",
           }}
         >
@@ -1854,7 +1897,7 @@ export function ConversationView({
                   style={{
                     fontSize: 12,
                     fontWeight: 700,
-                    color: backdropCss ? "rgba(255,180,150,0.95)" : "#FF5C35",
+                    color: onDark ? "rgba(255,180,150,0.95)" : "#FF5C35",
                     whiteSpace: "nowrap",
                     overflow: "hidden",
                     textOverflow: "ellipsis",
@@ -1865,7 +1908,7 @@ export function ConversationView({
                 <div
                   style={{
                     fontSize: 13,
-                    color: backdropCss ? "rgba(255,255,255,0.7)" : "#5C5853",
+                    color: onDark ? "rgba(255,255,255,0.7)" : "#5C5853",
                     whiteSpace: "nowrap",
                     overflow: "hidden",
                     textOverflow: "ellipsis",
@@ -1883,8 +1926,8 @@ export function ConversationView({
                   height: 34,
                   borderRadius: 999,
                   border: "none",
-                  background: backdropCss ? "rgba(255,255,255,0.10)" : "rgba(28,28,30,0.06)",
-                  color: backdropCss ? "#fff" : "#1C1C1E",
+                  background: onDark ? "rgba(255,255,255,0.10)" : "rgba(28,28,30,0.06)",
+                  color: onDark ? "#fff" : "#1C1C1E",
                   fontSize: 18,
                   lineHeight: 1,
                   cursor: "pointer",
@@ -1905,7 +1948,7 @@ export function ConversationView({
                   borderRadius: 10,
                   overflow: "hidden",
                   flexShrink: 0,
-                  background: staged.kind === "video" ? "#000" : "rgba(28,28,30,0.06)",
+                  background: staged.kind === "video" ? "#000" : "rgba(var(--scrim-rgb),0.06)",
                 }}
               >
                 {staged.kind === "image" ? (
@@ -1927,10 +1970,10 @@ export function ConversationView({
                 )}
               </div>
               <div style={{ flex: 1, minWidth: 0 }}>
-                <div style={{ fontSize: 13.5, fontWeight: 700, color: "#1C1C1E" }}>
+                <div style={{ fontSize: 13.5, fontWeight: 700, color: "var(--charcoal)" }}>
                   {staged.kind === "video" ? "Video" : "Photo"}
                 </div>
-                <div style={{ fontSize: 12, fontWeight: 600, color: "#8A8580" }}>
+                <div style={{ fontSize: 12, fontWeight: 600, color: "var(--ink-muted)" }}>
                   {sending
                     ? "Sending…"
                     : `${Math.max(1, Math.round(staged.file.size / 1024)).toLocaleString()} KB`}
@@ -1946,8 +1989,8 @@ export function ConversationView({
                   height: 34,
                   borderRadius: 999,
                   border: "none",
-                  background: "rgba(28,28,30,0.06)",
-                  color: "#1C1C1E",
+                  background: "rgba(var(--scrim-rgb),0.06)",
+                  color: "var(--charcoal)",
                   fontSize: 18,
                   lineHeight: 1,
                   cursor: sending ? "default" : "pointer",
@@ -1976,18 +2019,18 @@ export function ConversationView({
           gap: 8,
           padding:
             "8px 12px calc(env(safe-area-inset-bottom, 0px) + 10px)",
-          background: backdropCss
+          background: onDark
             ? "rgba(14, 11, 22, 0.72)"
             : "rgba(250, 247, 242, 0.96)",
           // The reply pill / staged chip above carries the top edge.
           borderTop:
             replyTo || staged
               ? "none"
-              : backdropCss
+              : onDark
                 ? "1px solid rgba(255,255,255,0.08)"
                 : "1px solid rgba(28,28,30,0.08)",
-          backdropFilter: backdropCss ? "blur(20px) saturate(160%)" : undefined,
-          WebkitBackdropFilter: backdropCss ? "blur(20px) saturate(160%)" : undefined,
+          backdropFilter: onDark ? "blur(20px) saturate(160%)" : undefined,
+          WebkitBackdropFilter: onDark ? "blur(20px) saturate(160%)" : undefined,
         }}
       >
         {canAttach ? (
@@ -2068,17 +2111,17 @@ export function ConversationView({
             // same height (about 42px on one line).
             padding: "9px 14px",
             borderRadius: 18,
-            border: backdropCss
+            border: onDark
               ? "1px solid rgba(255,255,255,0.12)"
               : "1px solid rgba(28,28,30,0.10)",
-            background: backdropCss
+            background: onDark
               ? "rgba(255,255,255,0.06)"
               : "rgba(255,255,255,0.92)",
             fontFamily: "DM Sans, sans-serif",
             // At least 16px: iOS Safari zooms the page into any field
             // under 16px when it's focused, and never zooms back out.
             fontSize: 16,
-            color: backdropCss ? "#fff" : "#1C1C1E",
+            color: onDark ? "#fff" : "#1C1C1E",
             outline: "none",
             lineHeight: 1.4,
           }}
@@ -2094,7 +2137,7 @@ export function ConversationView({
             borderRadius: 999,
             border: "none",
             background:
-              (!draft.trim() && !staged) || sending ? "rgba(28,28,30,0.18)" : "#FF5C35",
+              (!draft.trim() && !staged) || sending ? "rgba(var(--scrim-rgb),0.18)" : "#FF5C35",
             color: "#fff",
             cursor: (!draft.trim() && !staged) || sending ? "default" : "pointer",
             display: "inline-flex",
@@ -2423,10 +2466,10 @@ function ConversationActionSheet({
                 margin: "6px 16px 8px",
                 padding: "8px 12px",
                 borderRadius: 12,
-                background: "rgba(28,28,30,0.06)",
+                background: "rgba(var(--scrim-rgb),0.06)",
                 fontFamily: "DM Sans, sans-serif",
                 fontSize: 12.5,
-                color: "#1C1C1E",
+                color: "var(--charcoal)",
                 textAlign: "center",
               }}
             >
@@ -2578,11 +2621,11 @@ function SheetRow({
         fontFamily: "DM Sans, sans-serif",
         fontSize: 15,
         fontWeight: bold ? 700 : 500,
-        color: danger ? "#C0392B" : "#1C1C1E",
+        color: danger ? "var(--error-ink)" : "var(--charcoal)",
         textAlign: "left",
         opacity: disabled ? 0.5 : 1,
         cursor: disabled ? "default" : "pointer",
-        borderTop: "1px solid rgba(28,28,30,0.04)",
+        borderTop: "1px solid rgba(var(--scrim-rgb),0.04)",
         textDecoration: "none",
         WebkitTapHighlightColor: "transparent",
       }}
@@ -2648,7 +2691,7 @@ function MuteDurationSheet({
               fontFamily: "Fraunces, serif",
               fontSize: 16,
               fontWeight: 800,
-              color: "#1C1C1E",
+              color: "var(--charcoal)",
             }}
           >
             Mute this chat
@@ -2682,6 +2725,8 @@ function GroupSettingsView({
   onClose: () => void;
   onLeft: () => void;
 }) {
+  // Top bar + name field: translucent cream/white with no Night token yet.
+  const night = useNightTheme();
   const [name, setName] = useState(thread.name || "Group");
   const [editingName, setEditingName] = useState(false);
   const [draftName, setDraftName] = useState(thread.name || "");
@@ -2893,7 +2938,7 @@ function GroupSettingsView({
         position: "fixed",
         inset: 0,
         zIndex: 1250,
-        background: "#FAF7F2",
+        background: "var(--cream)",
         display: "flex",
         flexDirection: "column",
         overflowY: "auto",
@@ -2906,10 +2951,11 @@ function GroupSettingsView({
           alignItems: "center",
           gap: 10,
           padding: "calc(env(safe-area-inset-top, 0px) + 8px) 12px 8px",
-          background: "rgba(250, 247, 242, 0.94)",
+          // Cream at .94 (no --cream-94 yet): Night takes the tab bar's step.
+          background: night ? "var(--tabbar-bg)" : "rgba(250, 247, 242, 0.94)",
           backdropFilter: "saturate(160%) blur(14px)",
           WebkitBackdropFilter: "saturate(160%) blur(14px)",
-          borderBottom: "1px solid rgba(28,28,30,0.06)",
+          borderBottom: "1px solid rgba(var(--scrim-rgb),0.06)",
           position: "sticky",
           top: 0,
           zIndex: 2,
@@ -2925,7 +2971,7 @@ function GroupSettingsView({
             borderRadius: 999,
             border: "none",
             background: "transparent",
-            color: "#1C1C1E",
+            color: "var(--charcoal)",
             cursor: "pointer",
             display: "inline-flex",
             alignItems: "center",
@@ -2941,7 +2987,7 @@ function GroupSettingsView({
             fontFamily: "Fraunces, serif",
             fontSize: 17,
             fontWeight: 800,
-            color: "#1C1C1E",
+            color: "var(--charcoal)",
             flex: 1,
           }}
         >
@@ -2957,7 +3003,7 @@ function GroupSettingsView({
           flexDirection: "column",
           alignItems: "center",
           gap: 14,
-          borderBottom: "1px solid rgba(28,28,30,0.06)",
+          borderBottom: "1px solid rgba(var(--scrim-rgb),0.06)",
         }}
       >
         <div
@@ -2995,12 +3041,13 @@ function GroupSettingsView({
                 flex: 1,
                 padding: "10px 14px",
                 borderRadius: 14,
-                border: "1px solid rgba(28,28,30,0.10)",
-                background: "rgba(255,255,255,0.92)",
+                border: "1px solid rgba(var(--scrim-rgb),0.10)",
+                // White at .92 (no --paper-92 yet): Night takes the paper.
+                background: night ? "var(--paper)" : "rgba(255,255,255,0.92)",
                 fontFamily: "Fraunces, serif",
                 fontSize: 17,
                 fontWeight: 800,
-                color: "#1C1C1E",
+                color: "var(--charcoal)",
                 outline: "none",
                 textAlign: "center",
               }}
@@ -3048,7 +3095,7 @@ function GroupSettingsView({
                 fontFamily: "Fraunces, serif",
                 fontSize: 22,
                 fontWeight: 900,
-                color: "#1C1C1E",
+                color: "var(--charcoal)",
                 letterSpacing: "-0.4px",
               }}
             >
@@ -3065,7 +3112,7 @@ function GroupSettingsView({
           style={{
             fontFamily: "DM Sans, sans-serif",
             fontSize: 12,
-            color: "#8A8580",
+            color: "var(--ink-muted)",
             fontWeight: 600,
             letterSpacing: "0.02em",
           }}
@@ -3080,10 +3127,10 @@ function GroupSettingsView({
             margin: "10px 16px 0",
             padding: "8px 12px",
             borderRadius: 12,
-            background: "rgba(28,28,30,0.06)",
+            background: "rgba(var(--scrim-rgb),0.06)",
             fontFamily: "DM Sans, sans-serif",
             fontSize: 12.5,
-            color: "#1C1C1E",
+            color: "var(--charcoal)",
             textAlign: "center",
           }}
         >
@@ -3101,7 +3148,7 @@ function GroupSettingsView({
             fontWeight: 800,
             letterSpacing: "0.08em",
             textTransform: "uppercase",
-            color: "#8A8580",
+            color: "var(--ink-muted)",
             display: "flex",
             justifyContent: "space-between",
             alignItems: "center",
@@ -3195,6 +3242,7 @@ function MemberRow({
   muted: boolean;
   onOpenActions: () => void;
 }) {
+  const night = useNightTheme();
   const initials = initialsOf(member.name || member.handle);
   return (
     <li
@@ -3203,7 +3251,7 @@ function MemberRow({
         alignItems: "center",
         gap: 12,
         padding: "10px 18px",
-        borderTop: "1px solid rgba(28,28,30,0.04)",
+        borderTop: "1px solid rgba(var(--scrim-rgb),0.04)",
       }}
     >
       <div
@@ -3235,7 +3283,7 @@ function MemberRow({
               fontFamily: "Fraunces, serif",
               fontSize: 15,
               fontWeight: 700,
-              color: "#1C1C1E",
+              color: "var(--charcoal)",
               textDecoration: "none",
               display: "block",
               whiteSpace: "nowrap",
@@ -3251,7 +3299,7 @@ function MemberRow({
               fontFamily: "Fraunces, serif",
               fontSize: 15,
               fontWeight: 700,
-              color: "#1C1C1E",
+              color: "var(--charcoal)",
             }}
           >
             {member.name || "Member"}
@@ -3269,7 +3317,7 @@ function MemberRow({
             style={{
               fontFamily: "DM Sans, sans-serif",
               fontSize: 12,
-              color: "#8A8580",
+              color: "var(--ink-muted)",
               fontWeight: 600,
             }}
           >
@@ -3303,10 +3351,10 @@ function MemberRow({
                 fontFamily: "DM Sans, sans-serif",
                 fontSize: 10,
                 fontWeight: 800,
-                color: "#8A8580",
+                color: "var(--ink-muted)",
                 letterSpacing: "0.06em",
                 textTransform: "uppercase",
-                background: "rgba(28,28,30,0.08)",
+                background: "rgba(var(--scrim-rgb),0.08)",
                 padding: "2px 6px",
                 borderRadius: 999,
               }}
@@ -3328,9 +3376,10 @@ function MemberRow({
           width: 34,
           height: 34,
           borderRadius: 999,
-          border: "1px solid rgba(28,28,30,0.10)",
-          background: "rgba(255,255,255,0.78)",
-          color: "#1C1C1E",
+          border: "1px solid rgba(var(--scrim-rgb),0.10)",
+          // White at .78 (no --paper-78 yet): Night takes --paper-70.
+          background: night ? "var(--paper-70)" : "rgba(255,255,255,0.78)",
+          color: "var(--charcoal)",
           cursor: "pointer",
           display: "inline-flex",
           alignItems: "center",
@@ -3382,7 +3431,7 @@ function MemberActionSheet({
               fontFamily: "Fraunces, serif",
               fontSize: 16,
               fontWeight: 800,
-              color: "#1C1C1E",
+              color: "var(--charcoal)",
             }}
           >
             {member.name || (member.handle ? `@${member.handle}` : "Member")}
@@ -3439,6 +3488,8 @@ function ComposeOverlay({
   onCancel: () => void;
   onPick: (handle: string) => void;
 }) {
+  // Top bar + search strip: translucent cream/white with no Night token yet.
+  const night = useNightTheme();
   const [query, setQuery] = useState("");
   const [debounced, setDebounced] = useState("");
   const [suggested, setSuggested] = useState<SearchUser[] | null>(null);
@@ -3534,7 +3585,7 @@ function ComposeOverlay({
         position: "fixed",
         inset: 0,
         zIndex: 1200,
-        background: "#FAF7F2",
+        background: "var(--cream)",
         display: "flex",
         flexDirection: "column",
       }}
@@ -3545,10 +3596,11 @@ function ComposeOverlay({
           alignItems: "center",
           justifyContent: "space-between",
           padding: "calc(env(safe-area-inset-top, 0px) + 8px) 14px 8px",
-          background: "rgba(250, 247, 242, 0.94)",
+          // Cream at .94 (no --cream-94 yet): Night takes the tab bar's step.
+          background: night ? "var(--tabbar-bg)" : "rgba(250, 247, 242, 0.94)",
           backdropFilter: "saturate(160%) blur(14px)",
           WebkitBackdropFilter: "saturate(160%) blur(14px)",
-          borderBottom: "1px solid rgba(28,28,30,0.06)",
+          borderBottom: "1px solid rgba(var(--scrim-rgb),0.06)",
         }}
       >
         <button
@@ -3557,7 +3609,7 @@ function ComposeOverlay({
           style={{
             background: "transparent",
             border: "none",
-            color: "#1C1C1E",
+            color: "var(--charcoal)",
             fontFamily: "DM Sans, sans-serif",
             fontSize: 14,
             fontWeight: 600,
@@ -3573,7 +3625,7 @@ function ComposeOverlay({
             fontFamily: "Fraunces, serif",
             fontSize: 17,
             fontWeight: 800,
-            color: "#1C1C1E",
+            color: "var(--charcoal)",
           }}
         >
           New message
@@ -3585,8 +3637,8 @@ function ComposeOverlay({
       <div
         style={{
           padding: "12px 16px 8px",
-          background: "rgba(250, 247, 242, 0.94)",
-          borderBottom: "1px solid rgba(28,28,30,0.04)",
+          background: night ? "var(--tabbar-bg)" : "rgba(250, 247, 242, 0.94)",
+          borderBottom: "1px solid rgba(var(--scrim-rgb),0.04)",
         }}
       >
         <div style={{ position: "relative" }}>
@@ -3597,7 +3649,7 @@ function ComposeOverlay({
               left: 14,
               top: "50%",
               transform: "translateY(-50%)",
-              color: "#8A8580",
+              color: "var(--ink-muted)",
               display: "inline-flex",
             }}
           >
@@ -3624,13 +3676,14 @@ function ComposeOverlay({
               width: "100%",
               padding: "11px 14px 11px 38px",
               borderRadius: 14,
-              border: "1px solid rgba(28,28,30,0.10)",
-              background: "rgba(255,255,255,0.78)",
+              border: "1px solid rgba(var(--scrim-rgb),0.10)",
+              // White at .78 (no --paper-78 yet): Night takes --paper-70.
+              background: night ? "var(--paper-70)" : "rgba(255,255,255,0.78)",
               fontFamily: "DM Sans, sans-serif",
               // 16px: any smaller and iOS zooms in when the autofocus
               // above lands.
               fontSize: 16,
-              color: "#1C1C1E",
+              color: "var(--charcoal)",
               outline: "none",
             }}
           />
@@ -3654,6 +3707,7 @@ function ComposeOverlay({
           <div style={{ padding: "12px 16px" }}>
             <LoadFailed
               failure={searchErr}
+              tone={night ? "dark" : "light"}
               compact
               onRetry={() => setSearchSeq((n) => n + 1)}
             />
@@ -3663,7 +3717,7 @@ function ComposeOverlay({
             style={{
               padding: "48px 24px",
               textAlign: "center",
-              color: "#5C5853",
+              color: "var(--ink-2)",
               fontFamily: "DM Sans, sans-serif",
               fontSize: 13.5,
             }}
@@ -3689,7 +3743,7 @@ function ComposeOverlay({
                   fontWeight: 800,
                   letterSpacing: "0.08em",
                   textTransform: "uppercase",
-                  color: "#8A8580",
+                  color: "var(--ink-muted)",
                 }}
               >
                 Suggested
@@ -3763,7 +3817,7 @@ function ComposeUserRow({
               fontFamily: "Fraunces, serif",
               fontSize: 15,
               fontWeight: 700,
-              color: "#1C1C1E",
+              color: "var(--charcoal)",
               whiteSpace: "nowrap",
               overflow: "hidden",
               textOverflow: "ellipsis",
@@ -3775,7 +3829,7 @@ function ComposeUserRow({
             style={{
               fontFamily: "DM Sans, sans-serif",
               fontSize: 12,
-              color: "#8A8580",
+              color: "var(--ink-muted)",
               marginTop: 1,
               whiteSpace: "nowrap",
               overflow: "hidden",
@@ -3818,7 +3872,9 @@ function MessageBubble({
    *  message's avatar. No-op for DMs. */
   groupMode?: boolean;
   /** True when the chat backdrop is dark (any org backdrop except
-   *  cream) — flips sender name color and bubble style to white-on-glass. */
+   *  cream, or Night's paper with no backdrop: ConversationView's
+   *  `onDark`) — flips sender name color and bubble style to
+   *  white-on-glass. */
   darkMode?: boolean;
   /** Long-press a bubble fires the picker; tapping an emoji here calls
    *  this with the chosen emoji. Tapping an existing reaction chip

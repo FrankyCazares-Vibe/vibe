@@ -214,18 +214,18 @@ function ReportBody({
     const who = target.authorName || "this person";
     return (
       <div style={{ padding: "4px 18px 18px" }}>
-        <p style={{ margin: "0 0 6px", fontFamily: FONT, fontSize: 14, color: "#1C1C1E" }}>
+        <p style={{ margin: "0 0 6px", fontFamily: FONT, fontSize: 14, color: "var(--charcoal)" }}>
           {"Thanks — we're on it."}
         </p>
         {/* True from this moment: the feed route leaves a post its viewer has
             reported out of every load, and open lists drop it when this
             sheet closes (CONTENT_REPORTED_EVENT). Only posts are hidden. */}
         {target.type === "post" ? (
-          <p style={{ margin: "0 0 6px", fontFamily: FONT, fontSize: 12.5, lineHeight: 1.5, color: "#8A8580" }}>
+          <p style={{ margin: "0 0 6px", fontFamily: FONT, fontSize: 12.5, lineHeight: 1.5, color: "var(--ink-muted)" }}>
             {"We'll hide it from your feed."}
           </p>
         ) : null}
-        <p style={{ margin: 0, fontFamily: FONT, fontSize: 12.5, lineHeight: 1.5, color: "#8A8580" }}>
+        <p style={{ margin: 0, fontFamily: FONT, fontSize: 12.5, lineHeight: 1.5, color: "var(--ink-muted)" }}>
           {/* Admins DO see the reporter's handle in the queue, so this cannot
               promise anonymity from them — only from the person reported. */}
           {"An admin reads every report. The person you reported won't be told who sent it."}
@@ -251,7 +251,7 @@ function ReportBody({
 
   return (
     <div style={{ padding: "0 0 4px" }}>
-      <p style={{ margin: 0, padding: "0 18px 12px", fontFamily: FONT, fontSize: 12.5, lineHeight: 1.5, color: "#8A8580" }}>
+      <p style={{ margin: 0, padding: "0 18px 12px", fontFamily: FONT, fontSize: 12.5, lineHeight: 1.5, color: "var(--ink-muted)" }}>
         {"Reports go to Vibe admins only. The person you're reporting won't see this."}
       </p>
       <div
@@ -274,12 +274,12 @@ function ReportBody({
                 width: "100%",
                 padding: "11px 14px",
                 borderRadius: 10,
-                border: on ? "1px solid #FF5C35" : "1px solid rgba(28,28,30,0.08)",
-                background: on ? "rgba(255,92,53,0.06)" : "#fff",
+                border: on ? "1px solid #FF5C35" : "1px solid var(--hairline)",
+                background: on ? "rgba(255,92,53,0.06)" : "var(--paper)",
                 fontFamily: FONT,
                 fontSize: 14,
                 fontWeight: 600,
-                color: "#1C1C1E",
+                color: "var(--charcoal)",
                 textAlign: "left",
                 cursor: form.sending ? "default" : "pointer",
                 WebkitTapHighlightColor: "transparent",
@@ -307,13 +307,13 @@ function ReportBody({
             boxSizing: "border-box",
             padding: "10px 12px",
             borderRadius: 10,
-            border: "1.5px solid rgba(28,28,30,0.08)",
-            background: "#fff",
+            border: "1.5px solid var(--hairline)",
+            background: "var(--paper)",
             fontFamily: FONT,
             // 16px keeps iOS Safari from zooming in on focus.
             fontSize: 16,
             lineHeight: 1.45,
-            color: "#1C1C1E",
+            color: "var(--charcoal)",
             outline: "none",
             resize: "none",
           }}
@@ -331,7 +331,7 @@ function ReportBody({
             fontFamily: FONT,
             fontSize: 12.5,
             lineHeight: 1.5,
-            color: "#8E2317",
+            color: "var(--error-ink-deep)",
           }}
         >
           {form.problem.text}
@@ -340,7 +340,7 @@ function ReportBody({
               {" "}
               <a
                 href={form.problem.action.href}
-                style={{ color: "#8E2317", fontWeight: 700, textDecoration: "underline" }}
+                style={{ color: "var(--error-ink-deep)", fontWeight: 700, textDecoration: "underline" }}
               >
                 {form.problem.action.label}
               </a>
@@ -546,8 +546,8 @@ function ReportModal({
           width: "min(420px, calc(100vw - 32px))",
           maxHeight: "min(86vh, 720px)",
           overflowY: "auto",
-          background: "#FAF7F2",
-          border: "1px solid rgba(28,28,30,0.08)",
+          background: "var(--cream)",
+          border: "1px solid var(--hairline)",
           borderRadius: 16,
           boxShadow: "0 24px 64px rgba(0,0,0,0.22)",
         }}
@@ -587,7 +587,7 @@ const sheetStyle: React.CSSProperties = {
   bottom: 0,
   left: 0,
   right: 0,
-  background: "#FAF7F2",
+  background: "var(--cream)",
   borderTopLeftRadius: 20,
   borderTopRightRadius: 20,
   paddingBottom: "env(safe-area-inset-bottom, 0px)",
@@ -601,7 +601,7 @@ const handleStyle: React.CSSProperties = {
   width: 38,
   height: 4,
   borderRadius: 999,
-  background: "rgba(28,28,30,0.18)",
+  background: "rgba(var(--scrim-rgb),0.18)",
 };
 
 const headingStyle: React.CSSProperties = {
@@ -610,18 +610,18 @@ const headingStyle: React.CSSProperties = {
   fontFamily: SERIF,
   fontSize: 16,
   fontWeight: 800,
-  color: "#1C1C1E",
+  color: "var(--charcoal)",
 };
 
 const ghostButtonStyle: React.CSSProperties = {
   padding: "9px 18px",
   borderRadius: 999,
-  border: "1px solid rgba(28,28,30,0.12)",
+  border: "1px solid rgba(var(--scrim-rgb),0.12)",
   background: "transparent",
   fontFamily: FONT,
   fontSize: 13,
   fontWeight: 700,
-  color: "#1C1C1E",
+  color: "var(--charcoal)",
   cursor: "pointer",
   WebkitTapHighlightColor: "transparent",
 };
@@ -677,16 +677,16 @@ export function RemovedContentCard({
       style={{
         padding: compact ? "10px 12px" : "14px 16px",
         borderRadius: 12,
-        background: "rgba(28,28,30,0.04)",
-        border: "1px solid rgba(28,28,30,0.08)",
+        background: "rgba(var(--scrim-rgb),0.04)",
+        border: "1px solid var(--hairline)",
         fontFamily: FONT,
       }}
     >
-      <div style={{ fontSize: compact ? 12.5 : 13.5, fontWeight: 700, color: "#1C1C1E" }}>
+      <div style={{ fontSize: compact ? 12.5 : 13.5, fontWeight: 700, color: "var(--charcoal)" }}>
         Removed by Vibe moderators
       </div>
       {removedReason ? (
-        <div style={{ marginTop: 4, fontSize: 12.5, lineHeight: 1.5, color: "#5C5853" }}>
+        <div style={{ marginTop: 4, fontSize: 12.5, lineHeight: 1.5, color: "var(--ink-2)" }}>
           {removedReason}
         </div>
       ) : null}
@@ -695,9 +695,9 @@ export function RemovedContentCard({
           and the proxy lets a restricted student read it. The email is the
           same one the three static twins carry, so all four surfaces offer the
           author the same way to ask. */}
-      <div style={{ marginTop: 6, fontSize: 12, lineHeight: 1.5, color: "#8A8580" }}>
+      <div style={{ marginTop: 6, fontSize: 12, lineHeight: 1.5, color: "var(--ink-muted)" }}>
         {`Only you can see this ${kind}. Questions: help@connectvibe.app. `}
-        <a href="/legal/community" style={{ color: "#5C5853", textDecoration: "underline" }}>
+        <a href="/legal/community" style={{ color: "var(--ink-2)", textDecoration: "underline" }}>
           Community Guidelines
         </a>
       </div>

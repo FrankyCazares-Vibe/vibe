@@ -9,6 +9,7 @@ import type { SettingsCampusInput } from "@/lib/profile/settings-campus-card";
 import { parsePushPrefs } from "@/lib/push/payload";
 import { createSupabaseServerClient } from "@/lib/supabase/server";
 import { createSupabaseServiceClient } from "@/lib/supabase/service";
+import { DEFAULT_THEME_PREF, isThemePref, type ThemePref } from "@/lib/theme/theme";
 
 export const metadata = {
   title: "Settings · Vibe",
@@ -29,7 +30,15 @@ export default async function SettingsPage() {
   // campus_set_at and otto_answers (no `authenticated` SELECT grant): they
   // only feed the campus card's derived fields below and never reach the
   // client raw. otto_settings (also private) only feeds the Notifications
-  // card's pushPrefs below, never the raw blob.
+  // card's pushPrefs and the Appearance card's themePref below, never the
+  // raw blob.
+  //
+  // renderedAt is taken BEFORE the read, so "render newer than the save"
+  // (the route's savedAt, taken after its write) means this read saw it. The
+  // Appearance card uses it to tell a fresh render from one Next reuses on
+  // Back/Forward (see mountSync in appearance-card-view.ts). Server-rendered
+  // per request; intentional Date.now() read (the orgs page precedent).
+  const renderedAt = Date.now(); // eslint-disable-line react-hooks/purity
   const { data: profile, error: profileErr } = await createSupabaseServiceClient()
     .from("users")
     .select(
@@ -78,6 +87,18 @@ export default async function SettingsPage() {
     };
   }
 
+  // Appearance card, "How Vibe looks" (S67 wave 3, contracts C4). The saved
+  // otto_settings.theme, validated; an account that never picked reads as
+  // DEFAULT_THEME_PREF. The card mirrors this into the device's vibe_theme
+  // (the account wins on a new device). A failed read passes null: the card
+  // then keeps the device's own value and writes nothing over it.
+  let themePref: ThemePref | null = null;
+  if (profile && !profileErr) {
+    const settings = profile.otto_settings as Record<string, unknown> | null;
+    const saved = settings && typeof settings === "object" ? settings.theme : undefined;
+    themePref = isThemePref(saved) ? saved : DEFAULT_THEME_PREF;
+  }
+
   // No consent gate here on purpose (S53 A4): someone who declines the
   // Terms must still be able to reach account deletion. The page's own
   // writes (handle change, deletion) are gated per-API instead.
@@ -100,6 +121,8 @@ export default async function SettingsPage() {
         }}
         campus={campus}
         pushPrefs={pushPrefs}
+        themePref={themePref}
+        renderedAt={renderedAt}
       />
     </CampusAppShell>
   );

@@ -2,7 +2,10 @@
 @import "tw-animate-css";
 @import "shadcn/tailwind.css";
 
-@custom-variant dark (&:is(.dark *));
+/* Tailwind's `dark:` follows the <html data-theme="dark"> attribute (S67
+   wave 3, contracts C4), not a .dark class; the boot script in layout.tsx
+   sets it before first paint. */
+@custom-variant dark (&:where([data-theme=dark], [data-theme=dark] *));
 
 @layer base {
   :root {
@@ -47,9 +50,12 @@
 /* Vibe's own colour tokens (S67, contracts C0): the light values. Unlayered on
    purpose so this block wins over the @layer base copies of --cream and
    --charcoal above. The names avoid the UI kit's --muted / --accent / --border,
-   which its own unlayered :root below shadows. Wave 3 adds the
-   :root[data-theme="dark"] values. */
+   which its own unlayered :root below shadows. The Night column follows in
+   :root[data-theme="dark"], which beats this block on specificity wherever it
+   sits. `--background` / `--foreground` are set where the UI kit's :root
+   declares them (below), so the body paints cream for real. */
 :root {
+  color-scheme: light;
   --cream: #FAF7F2;
   --charcoal: #1C1C1E;
   --ink-2: #5C5853;
@@ -64,6 +70,119 @@
   --tag-bg: rgba(255,92,53,0.10);
   --card-shadow: inset 0 1px 0 rgba(255,255,255,0.85), 0 4px 14px rgba(180,120,60,0.08);
   --feed-backdrop: radial-gradient(620px 520px at 100% 0%, rgba(255,92,53,0.30), rgba(255,92,53,0.06) 45%, transparent 70%), radial-gradient(520px 420px at 0% 100%, rgba(255,92,53,0.16), transparent 65%), #FAF7F2;
+  /* Status inks (S67 wave 3): the error reds, the success green and the
+     coral-brown eyebrow, so they stay readable on Night paper. Light keeps
+     today's exact hex. */
+  --danger-ink: #B83030;
+  --error-ink: #C0392B;
+  --ok-ink: #1A9E5B;
+  --eyebrow-ink: #C84A20;
+  /* Translucent steps + deep inks hoisted from wave 3's per-file blocks
+     (ProfileMobile, ReportSheet, CampusMobile, the search dropdown). Light
+     values are today's literals exactly. */
+  --card-hi: rgba(255,255,255,0.55);
+  --card-lo: rgba(255,253,248,0.38);
+  --glass-55: rgba(255,253,248,0.55);
+  --glass-65: rgba(255,253,248,0.65);
+  --glass-70: rgba(255,253,248,0.70);
+  --paper-40: rgba(255,255,255,0.40);
+  --paper-62: rgba(255,255,255,0.62);
+  --sheen: rgba(255,255,255,0.85);
+  --ink-body: #3C3A36;
+  --ink-bio: #3D3D3A;
+  --error-ink-deep: #8E2317;
+  --ok-ink-2: #1F6B3A;
+  --row-hover: #F2EFE9;
+
+  /* Translucent steps of --cream / --paper, as plain rgba on purpose. A
+     `color-mix(..., var(--x) ...)` line can't fall back: anything holding
+     var() is only checked at computed-value time, so on iOS < 16.2 (the
+     store app targets 15.0) it wins the cascade and computes to transparent.
+     Keep each pair in step with its base token in both blocks. */
+  --tabbar-bg: rgba(250,247,242,0.96);
+  --paper-55: rgba(255,255,255,0.55);
+  --paper-70: rgba(255,255,255,0.70);
+}
+
+/* Night (S67 wave 3, contracts C4): the same fourteen tokens in their dark
+   column, near-black paper with a coral bloom in one corner, from Franky's
+   brand images. <html data-theme> is the RESOLVED theme (light | dark, never
+   "system"), set by the boot script in layout.tsx before first paint. The UI
+   kit's former `.dark` block is folded in below, values unchanged, so the
+   shadcn primitives and the `dark:` variant follow this one attribute. */
+:root[data-theme="dark"] {
+  color-scheme: dark;
+  --cream: #0C0B0B;
+  --charcoal: #F6F1EA;
+  --ink-2: #CFC8BE;
+  --ink-muted: #9C958C;
+  --paper: #161515;
+  --hairline: rgba(255,255,255,0.09);
+  --scrim-rgb: 255,255,255;
+  --glass: rgba(22,21,21,0.86);
+  --glass-border: rgba(255,255,255,0.07);
+  --coral: #FF5C35;
+  --tag-ink: #FF8A66;
+  --tag-bg: rgba(255,92,53,0.14);
+  --card-shadow: inset 0 1px 0 rgba(255,255,255,0.04), 0 6px 18px rgba(0,0,0,0.45);
+  --feed-backdrop: radial-gradient(720px 620px at 0% 100%, rgba(255,92,53,0.42), rgba(255,92,53,0.10) 40%, transparent 68%), radial-gradient(560px 420px at 100% 0%, rgba(255,92,53,0.20), transparent 60%), #0C0B0B;
+  --danger-ink: #FF7A6B;
+  --error-ink: #FF7A6B;
+  --ok-ink: #4FD08A;
+  --eyebrow-ink: #FF8A66;
+  --card-hi: rgba(22,21,21,0.86);
+  --card-lo: rgba(22,21,21,0.72);
+  --glass-55: rgba(22,21,21,0.55);
+  --glass-65: rgba(22,21,21,0.65);
+  --glass-70: rgba(22,21,21,0.70);
+  --paper-40: rgba(22,21,21,0.40);
+  --paper-62: rgba(22,21,21,0.62);
+  --sheen: rgba(255,255,255,0.04);
+  --ink-body: #E4DDD3;
+  --ink-bio: #E4DDD3;
+  --error-ink-deep: #FF9A8C;
+  --ok-ink-2: #6FDB9A;
+  --row-hover: #1F1D1C;
+
+  /* The translucent steps, from #0C0B0B / #161515 (see the light block). */
+  --tabbar-bg: rgba(12,11,11,0.96);
+  --paper-55: rgba(22,21,21,0.55);
+  --paper-70: rgba(22,21,21,0.70);
+
+  /* The body's real paint (the light pair sits in the UI kit's :root). */
+  --background: var(--cream);
+  --foreground: var(--charcoal);
+
+  /* The UI kit's .dark values, as they were. */
+  --card: oklch(0.205 0 0);
+  --card-foreground: oklch(0.985 0 0);
+  --popover: oklch(0.205 0 0);
+  --popover-foreground: oklch(0.985 0 0);
+  --primary: oklch(0.922 0 0);
+  --primary-foreground: oklch(0.205 0 0);
+  --secondary: oklch(0.269 0 0);
+  --secondary-foreground: oklch(0.985 0 0);
+  --muted: oklch(0.269 0 0);
+  --muted-foreground: oklch(0.708 0 0);
+  --accent: oklch(0.269 0 0);
+  --accent-foreground: oklch(0.985 0 0);
+  --destructive: oklch(0.704 0.191 22.216);
+  --border: oklch(1 0 0 / 10%);
+  --input: oklch(1 0 0 / 15%);
+  --ring: oklch(0.556 0 0);
+  --chart-1: oklch(0.87 0 0);
+  --chart-2: oklch(0.556 0 0);
+  --chart-3: oklch(0.439 0 0);
+  --chart-4: oklch(0.371 0 0);
+  --chart-5: oklch(0.269 0 0);
+  --sidebar: oklch(0.205 0 0);
+  --sidebar-foreground: oklch(0.985 0 0);
+  --sidebar-primary: oklch(0.488 0.243 264.376);
+  --sidebar-primary-foreground: oklch(0.985 0 0);
+  --sidebar-accent: oklch(0.269 0 0);
+  --sidebar-accent-foreground: oklch(0.985 0 0);
+  --sidebar-border: oklch(1 0 0 / 10%);
+  --sidebar-ring: oklch(0.556 0 0);
 }
 
 @theme inline {
@@ -155,8 +274,11 @@
 }
 
 :root {
-  --background: oklch(1 0 0);
-  --foreground: oklch(0.145 0 0);
+  /* Vibe's page and ink, not the kit's white: `@apply bg-background` on the
+     body used to repaint the cream white and every page painted its own
+     cream over it. Night overrides --cream/--charcoal, so these follow. */
+  --background: var(--cream);
+  --foreground: var(--charcoal);
   --card: oklch(1 0 0);
   --card-foreground: oklch(0.145 0 0);
   --popover: oklch(1 0 0);
@@ -258,39 +380,8 @@
   z-index: 2;
 }
 
-.dark {
-  --background: oklch(0.145 0 0);
-  --foreground: oklch(0.985 0 0);
-  --card: oklch(0.205 0 0);
-  --card-foreground: oklch(0.985 0 0);
-  --popover: oklch(0.205 0 0);
-  --popover-foreground: oklch(0.985 0 0);
-  --primary: oklch(0.922 0 0);
-  --primary-foreground: oklch(0.205 0 0);
-  --secondary: oklch(0.269 0 0);
-  --secondary-foreground: oklch(0.985 0 0);
-  --muted: oklch(0.269 0 0);
-  --muted-foreground: oklch(0.708 0 0);
-  --accent: oklch(0.269 0 0);
-  --accent-foreground: oklch(0.985 0 0);
-  --destructive: oklch(0.704 0.191 22.216);
-  --border: oklch(1 0 0 / 10%);
-  --input: oklch(1 0 0 / 15%);
-  --ring: oklch(0.556 0 0);
-  --chart-1: oklch(0.87 0 0);
-  --chart-2: oklch(0.556 0 0);
-  --chart-3: oklch(0.439 0 0);
-  --chart-4: oklch(0.371 0 0);
-  --chart-5: oklch(0.269 0 0);
-  --sidebar: oklch(0.205 0 0);
-  --sidebar-foreground: oklch(0.985 0 0);
-  --sidebar-primary: oklch(0.488 0.243 264.376);
-  --sidebar-primary-foreground: oklch(0.985 0 0);
-  --sidebar-accent: oklch(0.269 0 0);
-  --sidebar-accent-foreground: oklch(0.985 0 0);
-  --sidebar-border: oklch(1 0 0 / 10%);
-  --sidebar-ring: oklch(0.556 0 0);
-}
+/* The UI kit's `.dark` block used to sit here; it lives in
+   :root[data-theme="dark"] next to Vibe's own tokens now (S67 wave 3). */
 
 /* —— Otto orb shared keyframes (reused by campus-home + network corner) —— */
 @keyframes otto-core-pulse {
@@ -1747,7 +1838,7 @@ a.vibe-auth-secondary {
   width: 8px;
   height: 8px;
   border-radius: 50%;
-  background: #ff5c35;
+  background: var(--coral);
   box-shadow: 0 0 8px rgba(255, 92, 53, 0.55);
   transition: background 0.15s ease, box-shadow 0.15s ease;
 }
@@ -1762,11 +1853,13 @@ a.vibe-auth-secondary {
   width: 28px;
   height: 28px;
   border-radius: 50%;
+  /* Coral at 40%. --coral is the same in both themes, so a plain rgba (a
+     color-mix over var() computes to transparent on iOS < 16.2). */
   border: 1px solid rgba(255, 92, 53, 0.4);
   transition: border-color 0.18s ease;
 }
 .vibe-cursor--ring.hover {
-  border-color: #ff5c35;
+  border-color: var(--coral);
 }
 /* Set when the pointer leaves the parent document (e.g. enters an iframe
    like /messages or moves off-window) so we don't show a stuck cursor
@@ -2708,15 +2801,18 @@ html {
     z-index: 9988;
     display: grid;
     grid-template-columns: repeat(5, 1fr);
-    background: rgba(250, 247, 242, 0.96);
+    /* The page colour at 96%, so the feed shows through the blur in both
+       themes. An rgba token, not color-mix (iOS 15 would go see-through;
+       see --tabbar-bg). */
+    background: var(--tabbar-bg);
     backdrop-filter: saturate(160%) blur(14px);
     -webkit-backdrop-filter: saturate(160%) blur(14px);
-    border-top: 1px solid rgba(28, 28, 30, 0.08);
+    border-top: 1px solid var(--hairline);
     padding-bottom: env(safe-area-inset-bottom, 0px);
   }
   /* Hide the tabbar while either composer sheet is open. Both sheets
      set body.vibe-composer-open on mount so the bar doesn't paint
-     over the record button (clips) or the bottom of the photo
+     over the record button (video posts) or the bottom of the photo
      preview (posts). */
   body.vibe-composer-open .vibe-mobile-tabbar {
     display: none !important;
@@ -2806,7 +2902,7 @@ html {
   padding: 10px 4px 8px;
   background: transparent;
   border: none;
-  color: #8a8580;
+  color: var(--ink-muted);
   text-decoration: none;
   font-family: "DM Sans", sans-serif;
   font-size: 10px;
@@ -2818,7 +2914,7 @@ html {
   position: relative;
 }
 .vibe-mobile-tab--active {
-  color: #1c1c1e;
+  color: var(--charcoal);
 }
 .vibe-mobile-tab--active::before {
   content: "";
@@ -2829,7 +2925,7 @@ html {
   width: 24px;
   height: 2.5px;
   border-radius: 0 0 3px 3px;
-  background: #ff5c35;
+  background: var(--coral);
 }
 .vibe-mobile-tab-icon {
   width: 22px;
@@ -2897,9 +2993,10 @@ html {
   }
 }
 
-/* Installed app only (plan R17): cream behind the page, not white. The
-   `@apply bg-background` in the base layer paints html/body white, which
-   shows at the edges, on overscroll bounce and in the flash as the app
+/* Installed app only (plan R17): the page colour behind the page, not white
+   (cream, or Night's near-black: --cream follows data-theme). The
+   `@apply bg-background` in the base layer painted html/body white, which
+   showed at the edges, on overscroll bounce and in the flash as the app
    opens. Left unlayered so it beats `@layer base` wherever it sits. Both
    queries, because iOS reports an installed `standalone` app as
    `fullscreen` (WebKit bug 264218). A desktop tab in F11 or a full-screen
@@ -2908,18 +3005,18 @@ html {
 @media (display-mode: standalone), (display-mode: fullscreen) {
   html,
   body {
-    background-color: #FAF7F2;
+    background-color: var(--cream);
   }
 }
 
-/* The same cream inside the App Store and Google Play apps (plan §6 S2B).
+/* The same page colour inside the App Store and Google Play apps (plan §6 S2B).
    Their web view reports the browser display mode, so the rule above never
    matches there; NativeBridge puts `vibe-app` on <html> instead. It lands
    after hydration, so the shell's own cream background covers the first
    paint (mobile/capacitor.config.ts). */
 html.vibe-app,
 html.vibe-app body {
-  background-color: #FAF7F2;
+  background-color: var(--cream);
 }
 
 /* The sign-in screens' "← back" goes to the landing page. Inside the store
