@@ -1887,8 +1887,15 @@
     if (!rowsEl || !moreEl || !subEl) return;
     if (aud.rows.length === 0) {
       // A read that failed says so in the error box below; it must never
-      // render as "No one yet.", which is a claim we cannot make.
-      rowsEl.innerHTML = aud.failed ? "" : `<div class="vpv-aud-empty">No one yet.</div>`;
+      // render as "No one yet.", which is a claim we cannot make. Nor may a
+      // non-zero total: it counts people the list leaves out (muted/blocked,
+      // or no readable profile), so "1 person" over "No one yet." would
+      // contradict itself. Same copy as PostAudienceList.tsx; names no block.
+      rowsEl.innerHTML = aud.failed ? "" : (aud.total > 0
+        ? `<div class="vpv-aud-empty">${aud.hasMore
+            ? "No one on this page has a profile we can show."
+            : `We can't show ${aud.total === 1 ? "them" : "any of them"} right now.`}</div>`
+        : `<div class="vpv-aud-empty">No one yet.</div>`);
     } else {
       let html = "";
       let lastDay = null;
@@ -1903,9 +1910,10 @@
       rowsEl.innerHTML = html;
     }
     // People, not views: `total` is distinct people after the author's own
-    // rows and blocked/muted people come out, so it can sit below the number
-    // on the Views entry. The two answer different questions; this line never
-    // borrows the other one.
+    // rows come out (people you muted or blocked still count; only the Vibe+
+    // list leaves them out), so it can sit below the number on the Views
+    // entry. The two answer different questions; this line never borrows the
+    // other one.
     subEl.textContent = aud.total === null ? "" : audPeopleLine(aud.total);
     moreEl.innerHTML = (!aud.failed && aud.hasMore)
       ? `<button class="vpv-aud-more" onclick="window.__vpvAudMore()">Show more</button>`

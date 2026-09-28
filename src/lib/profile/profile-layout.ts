@@ -31,7 +31,14 @@ export type ProfileLayout = {
   v: 1;
   /** Every widget id exactly once; the surfaces derive columns and tabs from it. */
   order: WidgetId[];
-  /** Widgets the owner hid. Never `posts`. A view flag: hiding deletes nothing. */
+  /**
+   * Widgets the owner hid. Never `posts`. Hiding deletes nothing from the
+   * owner's row, but it is NOT only a view flag: every non-owner read blanks a
+   * hidden widget's fields on the server and gets `hidden: []` (lib/profile/
+   * hidden-fields.ts, S67 security wave 2), /api/resume refuses a hidden
+   * résumé to non-owners, and the direct data-API read of bio / skills /
+   * work_experience / current_on is revoked (migration 20260928160000).
+   */
   hidden: WidgetId[];
   /** Desktop only: the bio card sits at the top of the side column. The phone ignores it. */
   bioSide: boolean;

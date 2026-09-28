@@ -1,7 +1,7 @@
 import { NextResponse } from "next/server";
 
 import { isDiscoverableAccount } from "@/lib/iu/community-scope";
-import { requireTermsAccepted } from "@/lib/legal/require-terms";
+import { requireNotRestricted } from "@/lib/moderation/access";
 import {
   DECLINE_COOLDOWN_MS,
   canInvite,
@@ -17,6 +17,7 @@ import {
   type OrgRole,
 } from "@/lib/orgs/join-state";
 import { expireStaleInvites, loadViewerOrgContext, notifyOrg } from "@/lib/orgs/membership";
+import { loadInviteBlocks } from "@/lib/orgs/org-blocks";
 import { isUuid } from "@/lib/pgrest";
 import { isTriggerDefaultHandle } from "@/lib/profile/onboarding-prefill";
 import { rateLimit, tooManyRequests } from "@/lib/rate-limit";
@@ -34,9 +35,9 @@ import { createSupabaseServiceClient } from "@/lib/supabase/service";
  * WHO MAY SEND. {@link canInvite}, i.e. `INVITE_ROLES` in
  * `src/lib/orgs/join-state.ts` — owner and admin, NOT mod (critic C2). That
  * one array is also critic A8's fix: a mod could otherwise re-invite somebody
- * an owner had just removed or denied, and nothing records removals yet. Add
- * "mod" to `INVITE_ROLES` the day removals are recorded; nothing in this file
- * names a role.
+ * an owner had just removed or denied. Removals are recorded since S67 sec
+ * wave 2 (`org_removals`); letting mods invite is still Franky's call, made
+ * in `INVITE_ROLES` alone — nothing in this file names a role.
  *
  * WHY EVERY QUERY USES THE SERVICE ROLE. M1c revoked the writes from
  * `authenticated`: `org_invites` is read-only for them, `org_members` INSERT
@@ -268,6 +269,12 @@ async function loadPendingInvite(
  * (critic A7): an officer this viewer has blocked or muted is never named back
  * at them. Stale rows are flipped to `expired` before the read, so the list
  * shows what is actually live rather than what the clock has not caught up to.
+ *
+ * An invitee with a block EITHER WAY with this viewer is left out (in SQL,
+ * before the limit), like the requests list (product call 9). Since ruling 14
+ * an admin may invite someone who blocked the owner; the owner's list must
+ * not then name that person to them. A failed blocks read is a 500, never an
+ * unfiltered list.
  */
 export async function GET(_req: Request, { params }: Params) {
   const { slug } = await params;
@@ -283,35 +290,32 @@ export async function GET(_req: Request, { params }: Params) {
 
   await expireStaleInvites(service, { orgId: gate.org.id });
 
+  // Blocks/mutes first: the list leaves out invitees in a block pair with
+  // this viewer, and a failed read must not name them, so it fails closed.
+  const hiddenRes = await loadHiddenUsers(supabase, user.id);
+  if (!hiddenRes.ok) {
+    console.error("[orgs/[slug]/invites hidden-users]", hiddenRes.error);
+    return fail(500, "request_failed", "Failed to load invites");
+  }
+  const hidden: ReadonlySet<string> = new Set(hiddenRes.hidden.ids);
+  const blockedIds = Array.from(hiddenRes.hidden.blocked).filter(isUuid);
+
   const nowIso = new Date().toISOString();
-  const [listRes, hiddenRes] = await Promise.all([
-    service
-      .from("org_invites")
-      .select(INVITE_SELECT)
-      .eq("org_id", gate.org.id)
-      .eq("status", "pending")
-      .gt("expires_at", nowIso)
-      .order("created_at", { ascending: false })
-      .limit(LIST_LIMIT),
-    loadHiddenUsers(supabase, user.id),
-  ]);
+  let listQuery = service
+    .from("org_invites")
+    .select(INVITE_SELECT)
+    .eq("org_id", gate.org.id)
+    .eq("status", "pending")
+    .gt("expires_at", nowIso);
+  if (blockedIds.length > 0) listQuery = listQuery.notIn("invitee_id", blockedIds);
+  const listRes = await listQuery.order("created_at", { ascending: false }).limit(LIST_LIMIT);
   if (listRes.error) {
     console.error("[orgs/[slug]/invites GET]", listRes.error);
     return fail(500, "request_failed", "Failed to load invites");
   }
-  // A failed blocks/mutes read must not name somebody this officer blocked, so
-  // it falls back to hiding every inviter name rather than showing them all.
-  const hidden: ReadonlySet<string> = hiddenRes.ok
-    ? new Set(hiddenRes.hidden.ids)
-    : new Set<string>();
-  if (!hiddenRes.ok) {
-    console.error("[orgs/[slug]/invites hidden-users]", hiddenRes.error);
-  }
 
   const invites = ((listRes.data ?? []) as unknown as InviteRow[]).map((row) => {
-    const name = hiddenRes.ok
-      ? visibleInviterFirstName(row.inviter, hidden)
-      : null;
+    const name = visibleInviterFirstName(row.inviter, hidden);
     return {
       id: row.id,
       created_at: row.created_at,
@@ -343,14 +347,16 @@ export async function GET(_req: Request, { params }: Params) {
  * 200 `{ok:true, already:true, invite:{…}}` — a live invite was already there
  * 400 `invalid_body` · `self_invite`
  * 401 `unauthorized`
- * 403 `officers_only` · `audience_mismatch` (+`audience`) · `terms_required`
+ * 403 `officers_only` · `audience_mismatch` (+`audience`) · `terms_required` ·
+ *     `account_restricted`
  * 404 `not_found` (org) · `user_not_found`
  * 409 `org_hidden` · `org_unverified` · `already_member` ·
  *     `has_pending_request` (+`request_id`) · `recently_declined`
  *     (+`available_at`) · `invite_cap_reached` (+`available_at`)
  * 429 · 500 `request_failed`
  *
- * ORDER (spec §4 conventions): auth → per-officer rate limit → Terms → body →
+ * ORDER (spec §4 conventions): auth → per-officer rate limit → Terms and
+ * restriction (`requireNotRestricted`) → body →
  * service-role org load → officer check → hidden → verified → resolve the
  * person → blocks → their standing via {@link orgJoinState} → decline
  * cooldown and pair cap → per-org and per-invitee rate limits → insert →
@@ -375,8 +381,14 @@ export async function POST(req: Request, { params }: Params) {
     return tooManyRequests(perOfficer, "You've sent a lot of invites. Try again in an hour.");
   }
 
-  const termsGate = await requireTermsAccepted(user.id);
-  if (termsGate) return termsGate;
+  // Terms AND no suspension or ban in force (S67 sec wave 2 ruling 16). This
+  // route writes with the service role, which skips the database's
+  // is_restricted_now(); the proxy's restriction check is only the fast path
+  // (it reads the session's app_metadata and quietly skips on a GoTrue blip).
+  // Same `terms_required` 403 as requireTermsAccepted, plus
+  // `account_restricted`.
+  const accessGate = await requireNotRestricted(user.id);
+  if (accessGate) return accessGate;
 
   let body: Body;
   try {
@@ -415,9 +427,9 @@ export async function POST(req: Request, { params }: Params) {
   // ── Who are we inviting? ──────────────────────────────────────────────────
   //
   // ONE 404 for every "no". Not a real account, not verified, not onboarded, a
-  // stranded `u<32hex>` handle, or a block in either direction with the sender
-  // OR the owner (critic A7) — all `user_not_found`, so an officer can never
-  // use this endpoint to discover that somebody blocked them.
+  // stranded `u<32hex>` handle, or a block (below) — all `user_not_found`, so
+  // an officer can never use this endpoint to discover that somebody blocked
+  // them.
   const targetQuery = service.from("users").select(TARGET_COLUMNS);
   const { data: targetData, error: targetErr } = await (rawUserId
     ? targetQuery.eq("id", rawUserId)
@@ -436,9 +448,20 @@ export async function POST(req: Request, { params }: Params) {
     return fail(404, "user_not_found", "No student with that handle.");
   }
 
-  const blocked = await isBlockedWithOrg(service, target.id, [user.id, org.owner_id]);
-  if (blocked === "error") return fail(500, "request_failed", "Request failed");
-  if (blocked) return fail(404, "user_not_found", "No student with that handle.");
+  // Blocks (waveA-build ruling 14, `loadInviteBlocks`): refused when the
+  // SENDER and they are a block pair, either way, or when ANY officer (owner
+  // included) blocked them — the same people whose block keeps a student
+  // from joining, so an invite can't be a way around it. NOT refused because
+  // they blocked some other officer or the owner: a victim is never locked
+  // out of an invite-only club by their harasser. Fails closed.
+  const inviteBlocks = await loadInviteBlocks(service, org.id, user.id, target.id);
+  if (!inviteBlocks.ok) {
+    console.error("[orgs/[slug]/invites blocks]", inviteBlocks.error);
+    return fail(500, "request_failed", "Request failed");
+  }
+  if (inviteBlocks.refused) {
+    return fail(404, "user_not_found", "No student with that handle.");
+  }
 
   // ── Their standing, through the one shared decision ───────────────────────
   //
@@ -632,33 +655,5 @@ function publicTarget(target: {
   };
 }
 
-/**
- * Is there a block, in EITHER direction, between this person and anybody who
- * speaks for the org — the sending officer or the owner (critic A7)?
- *
- * The owner is in the list because the invite arrives under the ORG's name: an
- * officer other than the one they blocked must not be a way around it.
- *
- * FAILS CLOSED, and says so: a read error returns `"error"` (the caller sends
- * 500) rather than `false`, unlike `users/search/route.ts:195-197`, which
- * surfaces unfiltered results when the blocks table cannot be read. Search
- * showing an extra row is a nuisance; an invite is a notification delivered to
- * somebody who asked not to hear from this person.
- */
-async function isBlockedWithOrg(
-  service: ReturnType<typeof createSupabaseServiceClient>,
-  personId: string,
-  orgSideIds: Array<string | null>,
-): Promise<boolean | "error"> {
-  const others = orgSideIds.filter((id): id is string => isUuid(id) && id !== personId);
-  if (others.length === 0) return false;
-  const [theyBlocked, blockedThem] = await Promise.all([
-    service.from("blocks").select("blocked_id").eq("blocker_id", personId).in("blocked_id", others),
-    service.from("blocks").select("blocker_id").eq("blocked_id", personId).in("blocker_id", others),
-  ]);
-  if (theyBlocked.error || blockedThem.error) {
-    console.error("[orgs/[slug]/invites blocks]", theyBlocked.error ?? blockedThem.error);
-    return "error";
-  }
-  return (theyBlocked.data?.length ?? 0) > 0 || (blockedThem.data?.length ?? 0) > 0;
-}
+// `isBlockedWithOrg` moved to `src/lib/orgs/org-blocks.ts` (S67 sec wave 2).
+

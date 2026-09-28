@@ -35,6 +35,7 @@ import {
   type OrgAudience,
   type OrgRole,
 } from "@/lib/orgs/join-state";
+import { isMissingRemovalsTable, ORG_REMOVALS_TABLE } from "@/lib/orgs/removals";
 import { ilikeOrFilter } from "@/lib/pgrest";
 import { rateLimit, tooManyRequests } from "@/lib/rate-limit";
 import { loadHiddenUsers } from "@/lib/safety/hidden-users";
@@ -317,7 +318,7 @@ export async function GET(req: Request) {
     if (followingIds.length === 0) return followingResponse([], followingHasMore);
   }
 
-  const [myMembershipsRes, myPendingRes, myInvitesRes, discoverFollowsRes] = await Promise.all([
+  const [myMembershipsRes, myPendingRes, myInvitesRes, discoverFollowsRes, myRemovalsRes] = await Promise.all([
     supabase.from("org_members").select("org_id, role").eq("user_id", user.id),
     // Pending join requests block re-requesting; they render as "Requested".
     supabase
@@ -336,6 +337,12 @@ export async function GET(req: Request) {
     // Discover's Follow buttons (the user client may read the viewer's own
     // follow rows). Following doesn't need it: every row it returns is one.
     filter === "discover" ? loadViewerFollowedOrgIds(supabase, user.id) : null,
+    // Clubs an officer removed the viewer from and nobody let them back into
+    // (S67 sec wave 2 #15): an open one says "Request", never one-tap "Join".
+    // One read of the viewer's own rows covers every listed club (a person is
+    // removed from a handful at most). Service role: the table has no
+    // policies for anyone else.
+    service.from(ORG_REMOVALS_TABLE).select("org_id").eq("user_id", user.id),
   ]);
 
   // A failed read here doesn't empty the page, it mislabels buttons: a joined
@@ -355,6 +362,21 @@ export async function GET(req: Request) {
         ? discoverFollowsRes.ids
         : [],
   );
+
+  // A missing table (code deployed before the migration) is "nobody was
+  // removed", the truth; any other failure is logged like its neighbours: an
+  // open club then says "Join" and the join route files a request instead.
+  const removedOrgIds = new Set<string>();
+  if (myRemovalsRes.error) {
+    if (!isMissingRemovalsTable(myRemovalsRes.error)) {
+      console.error(`[orgs GET ${filter} removals]`, myRemovalsRes.error);
+    }
+  } else {
+    for (const r of myRemovalsRes.data ?? []) {
+      const orgId = (r as { org_id?: unknown }).org_id;
+      if (typeof orgId === "string") removedOrgIds.add(orgId);
+    }
+  }
 
   const roleByOrg = new Map<string, OrgRole>();
   for (const m of myMembershipsRes.data || []) {
@@ -518,6 +540,7 @@ export async function GET(req: Request) {
       role,
       pendingInvite: invite,
       pendingRequest: request,
+      removed: removedOrgIds.has(o.id),
     });
     // Following's rows are all in the set by construction.
     const orgFollowState: OrgFollowState = followedOrgIds.has(o.id)

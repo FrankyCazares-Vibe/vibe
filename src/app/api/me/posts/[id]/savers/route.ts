@@ -1,8 +1,7 @@
 import { NextResponse } from "next/server";
 
-import { assertPostOwner, loadPostSavers } from "@/lib/metrics/post-audience";
+import { assertPostOwner, countPostSavers } from "@/lib/metrics/post-audience";
 import { rateLimit, tooManyRequests } from "@/lib/rate-limit";
-import { loadHiddenUsers } from "@/lib/safety/hidden-users";
 import { createSupabaseServerClient } from "@/lib/supabase/server";
 
 /**
@@ -29,12 +28,15 @@ import { createSupabaseServerClient } from "@/lib/supabase/server";
  * The author's own bookmark is excluded, so "12 people saved this" means
  * twelve other people — the same honesty rule the view ledger got in b3f23df.
  *
- * PEOPLE, NOT ROWS. `total` is distinct PEOPLE, after the author's own save is
- * dropped AND after blocked or muted savers are filtered out — so it is
- * allowed to sit BELOW `counts.saves` from `GET /api/posts/[id]`, which drops
- * the author but hides nobody. A sheet opened from the saves count must read
- * its heading ("N people") off `total` and must not reuse the count it was
- * opened from. (Same distinction as /api/me/profile-views/route.ts:38-42.)
+ * EVERYONE COUNTS, WHOEVER YOU MUTED (security report 2026-09-27 #18).
+ * `total` is distinct PEOPLE minus the author's own save, and nobody else is
+ * taken out: not people the author blocked, not people they muted. It used to
+ * be taken after the block/mute filter, and that made it an oracle: mute a
+ * suspect, re-read the number, and a drop of one says they saved it. Muting is
+ * silent and unlimited, so bisecting named every saver. Now the number never
+ * moves when you mute someone, and it equals `counts.saves` from
+ * `GET /api/posts/[id]` (which also drops only the author). There is no list
+ * to filter, so this route no longer reads the block/mute set at all.
  *
  *   everyone → { ok, viewer_identities: "private", total }
  */
@@ -66,27 +68,21 @@ export async function GET(_req: Request, ctx: RouteContext) {
       : NextResponse.json({ ok: false, error: "Post not found" }, { status: 404 });
   }
 
-  // No hasPlus() here on purpose: the tier changes nothing about a save.
-  const hidden = await loadHiddenUsers(supabase, user.id);
-  if (!hidden.ok) {
-    console.error("[me/posts/:id/savers] hidden users", hidden.error);
-    return NextResponse.json({ ok: false, error: "Request failed" }, { status: 500 });
-  }
-
-  const audience = await loadPostSavers({
+  // No hasPlus() here on purpose: the tier changes nothing about a save. No
+  // loadHiddenUsers() either: a count is everyone (see #18 above).
+  const saves = await countPostSavers({
     postId: owner.postId,
     authorId: owner.authorId,
-    hiddenIds: hidden.hidden.ids,
   });
-  if (!audience.ok) {
+  if (!saves.ok) {
     return NextResponse.json({ ok: false, error: "Request failed" }, { status: 500 });
   }
 
-  // Ids were read to drop the author and the hidden set; they never leave
-  // this function, whatever the caller's plan.
+  // Ids were read only to drop the author; they never leave post-audience.ts,
+  // whatever the caller's plan.
   return NextResponse.json({
     ok: true,
     viewer_identities: "private",
-    total: audience.entries.length,
+    total: saves.total,
   });
 }

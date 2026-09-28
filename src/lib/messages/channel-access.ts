@@ -1,3 +1,4 @@
+import { isUuid } from "@/lib/pgrest";
 import { MESSAGE_MEDIA_KEY_PREFIX, MESSAGE_MEDIA_KEY_RE } from "@/lib/r2";
 import { isChannelMediaKey } from "@/lib/posts/media-ownership";
 import type { createSupabaseServerClient } from "@/lib/supabase/server";
@@ -34,20 +35,44 @@ export type ChannelAccess =
  *   the implicit-accept flow.
  * - Org channels (channels.org_id IS NOT NULL): defers to can_view_org_channel,
  *   which checks org_members + per-channel privacy.
+ * - A channel the caller can't read at all (no such id, or a club channel RLS
+ *   hides because they left or were removed): 403, before either branch.
+ *
+ * Also the gate for `/api/me/messages-upload-url` and the chat @mention
+ * search (`/api/users/search?channel_id=`), so minting an upload URL or
+ * reading a roster asks the same question as reading the messages.
  */
 export async function ensureMember(
   supabase: ServerClient,
   channelId: string,
   userId: string,
 ): Promise<ChannelAccess> {
-  // Quick lookup: does this channel belong to an org?
-  const { data: channel } = await supabase
+  // A malformed id can't name a channel; answer it like any other miss
+  // rather than letting the uuid cast surface as a 500.
+  if (!isUuid(channelId)) return { ok: false, status: 403 };
+
+  // Quick lookup: does this channel belong to an org? Read with the CALLER's
+  // client, so RLS answers "can you see this channel at all":
+  // channels_select_member (a DM/group you have a row in) or
+  // channels_select_org_member (can_view_org_channel).
+  const { data: channel, error: channelErr } = await supabase
     .from("channels")
     .select("org_id")
     .eq("id", channelId)
     .maybeSingle();
+  if (channelErr) {
+    console.error("[messages.ensureMember channel]", channelErr);
+    return { ok: false, status: 500 };
+  }
 
-  if (channel?.org_id) {
+  // UNREADABLE CHANNEL = NOT A MEMBER (security wave 2, report #14). An
+  // ex-member's club channel is hidden by channels RLS, so it used to read as
+  // "no org" and fall into the DM branch below, where a leftover
+  // channel_members row answered ok. Nobody who can't read the channel row
+  // gets past this line; a real DM/group member always can.
+  if (!channel) return { ok: false, status: 403 };
+
+  if (channel.org_id) {
     const { data: canView, error: rpcErr } = await supabase.rpc(
       "can_view_org_channel",
       { cid: channelId, uid: userId },

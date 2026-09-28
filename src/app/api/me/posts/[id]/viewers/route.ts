@@ -1,6 +1,7 @@
 import { NextResponse } from "next/server";
 
 import { hydrateUserCards } from "@/lib/connections/queries";
+import { pageAudience } from "@/lib/metrics/audience-split";
 import {
   assertPostOwner,
   loadPostViewers,
@@ -38,15 +39,23 @@ import { createSupabaseServerClient } from "@/lib/supabase/server";
  * the query failed.
  *
  * PEOPLE, NOT VIEWS — AND DELIBERATELY NOT `counts.views`. `total` here is
- * distinct PEOPLE, after the author's own rows are dropped AND after blocked
- * or muted viewers are filtered out. `GET /api/posts/[id]`'s `counts.views` is
- * unfiltered view ROWS — one per person per UTC day, nobody hidden. Alice
- * looking on Monday and again on Tuesday plus a muted Bob on Monday is
- * `counts.views` 3 and `total` 1, on the same post. Both numbers are correct
- * answers to different questions, so the client must NEVER substitute one for
- * the other: a sheet opened from the views chip has to say "N people" from
- * `total`, and must not reuse the chip's number as its heading. (The same
- * distinction is written up at /api/me/profile-views/route.ts:38-42.)
+ * distinct PEOPLE, after the author's own rows are dropped, and NOBODY ELSE
+ * is taken out. `GET /api/posts/[id]`'s `counts.views` is view ROWS — one per
+ * person per UTC day. Alice looking on Monday and again on Tuesday plus Bob
+ * on Monday is `counts.views` 3 and `total` 2, on the same post. Both numbers
+ * are correct answers to different questions, so the client must NEVER
+ * substitute one for the other: a sheet opened from the views chip has to say
+ * "N people" from `total`, and must not reuse the chip's number as its
+ * heading. (The same distinction is written up at
+ * /api/me/profile-views/route.ts.)
+ *
+ * THE COUNT IGNORES YOUR MUTES AND BLOCKS (security report 2026-09-27 #18).
+ * A free `total` taken after the block/mute filter was an oracle: mute a
+ * suspect, re-read the number, and a drop of one says they looked, which is
+ * the paid answer for free. So `total` is the same on both tiers and never
+ * moves when you mute someone; the free branch doesn't even read the
+ * block/mute set. Only the Vibe+ `users` LIST leaves hidden people out, so it
+ * can be shorter than `total`, and `has_more`/`next_offset` page that list.
  *
  * PAGING USES `next_offset`, NOT `users.length`. See the note above the
  * hydration below — hydrated rows can be fewer than the ids requested, so a
@@ -97,13 +106,33 @@ export async function GET(req: Request, ctx: RouteContext) {
   );
   const offset = Math.max(0, Number(url.searchParams.get("offset")) || 0);
 
-  // Blocked/muted people come out of the LIST, so the entitlement and the
-  // hidden set resolve together — both are needed before the shape is chosen,
-  // because `total` counts what is left after the filter on either branch.
-  const [plus, hidden] = await Promise.all([
-    hasPlus(user.id),
-    loadHiddenUsers(supabase, user.id),
-  ]);
+  // The entitlement decides whether a hidden set is needed at all: a number
+  // needs none (it counts everyone, #18), so the free branch skips the
+  // block/mute read and one 500 path with it.
+  const plus = await hasPlus(user.id);
+
+  if (!plus) {
+    const audience = await loadPostViewers({
+      postId: owner.postId,
+      authorId: owner.authorId,
+      // Nobody hidden: `total` would be identical with any set here.
+      hiddenIds: [],
+    });
+    if (!audience.ok) {
+      return NextResponse.json({ ok: false, error: "Request failed" }, { status: 500 });
+    }
+    // The ids were needed to dedupe per person and drop the author; they
+    // stay inside post-audience.ts. Only a number leaves.
+    return NextResponse.json({
+      ok: true,
+      premium: false,
+      viewer_identities: "locked",
+      total: audience.total,
+    });
+  }
+
+  // Vibe+: blocked/muted people come out of the LIST, never out of `total`.
+  const hidden = await loadHiddenUsers(supabase, user.id);
   if (!hidden.ok) {
     console.error("[me/posts/:id/viewers] hidden users", hidden.error);
     return NextResponse.json({ ok: false, error: "Request failed" }, { status: 500 });
@@ -118,20 +147,14 @@ export async function GET(req: Request, ctx: RouteContext) {
     return NextResponse.json({ ok: false, error: "Request failed" }, { status: 500 });
   }
 
-  const total = audience.entries.length;
-
-  if (!plus) {
-    // The ids were needed to dedupe per person and to drop blocked/muted
-    // viewers; they stay inside this function. Only a number leaves.
-    return NextResponse.json({
-      ok: true,
-      premium: false,
-      viewer_identities: "locked",
-      total,
-    });
-  }
-
-  const pageEntries = audience.entries.slice(offset, offset + limit);
+  // Page the LIST (hidden people already out), not `total`: with a muted
+  // viewer in the audience the list is shorter than `total`, and paging on
+  // `total` would leave "Show more" on forever.
+  const { page: pageEntries, has_more, next_offset } = pageAudience(
+    audience.entries,
+    offset,
+    limit,
+  );
   const cards = await hydrateUserCards(
     supabase,
     user.id,
@@ -140,11 +163,11 @@ export async function GET(req: Request, ctx: RouteContext) {
   // `hydrateUserCards` drops ids with no visible profile row (a deleted
   // account, say), so a page can come back shorter than it was sliced. That is
   // the right behaviour — a row with no person behind it is not a row — and it
-  // means `total` can overcount by the number dropped.
+  // means `total` can sit above the rows a client ends up with.
   //
-  // THAT IS WHY `next_offset` EXISTS. `has_more` is computed from the SLICE,
-  // but the server cannot make the CLIENT advance correctly: the in-repo idiom
-  // is `offset = rows.length` (public/html/profile.html:9960), and with three
+  // THAT IS WHY `next_offset` EXISTS. `has_more` is computed from the list
+  // and the slice, but the server cannot make the CLIENT advance correctly:
+  // the in-repo idiom is `offset = rows.length` (profile.html), and with three
   // ids dropped from a page of 25 that asks for offset 22 next and re-sends
   // three rows. A page whose ids are ALL invisible returns `users: []`, so a
   // rows.length client never advances at all and "Show more" appends nothing,
@@ -160,10 +183,10 @@ export async function GET(req: Request, ctx: RouteContext) {
     premium: true,
     viewer_identities: "visible",
     users,
-    total,
-    has_more: offset + pageEntries.length < total,
-    // Where the next page starts, counted in ENTRIES asked for — not in rows
-    // returned. Additive; the client pages on this.
-    next_offset: offset + pageEntries.length,
+    total: audience.total,
+    has_more,
+    // Where the next page starts, counted in LIST ENTRIES consumed — not in
+    // rows returned. Additive; the client pages on this.
+    next_offset,
   });
 }

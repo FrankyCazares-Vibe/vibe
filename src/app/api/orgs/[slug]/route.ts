@@ -8,7 +8,12 @@ import {
   type SchoolSystem,
 } from "@/lib/iu/campuses";
 import { campusScopeError } from "@/lib/iu/community-scope";
-import { contentBlockedResponse, requireCanPublish } from "@/lib/moderation/access";
+import { hasBlockedNewLinkLabel } from "@/lib/club-routes/link-labels";
+import {
+  contentBlockedResponse,
+  requireCanPublish,
+  requireNotRestricted,
+} from "@/lib/moderation/access";
 import { checkChangedText } from "@/lib/moderation/text-filter";
 import { normalizeOrgAssetInput, orgAssetProxyUrl } from "@/lib/org-asset-url";
 import {
@@ -20,13 +25,14 @@ import {
 import {
   isJoinPolicy,
   isOrgAudience,
-  isSettingsOfficer,
   isOrgRole,
   orgJoinState,
+  SETTINGS_ROLES,
   visibleInviterFirstName,
   type JoinPolicy,
   type OrgAudience,
 } from "@/lib/orgs/join-state";
+import { officerGate } from "@/lib/orgs/hidden-gate";
 import { loadViewerOrgContext } from "@/lib/orgs/membership";
 import { rateLimit, tooManyRequests } from "@/lib/rate-limit";
 import { loadHiddenUsers } from "@/lib/safety/hidden-users";
@@ -292,6 +298,9 @@ export async function GET(_req: Request, { params }: Params) {
     role: ctx.role,
     pendingInvite: ctx.pendingInvite,
     pendingRequest: ctx.pendingRequest,
+    // A removed member of an open club asks, never one-tap rejoins
+    // (S67 sec wave 2 #15; the join route decides the same way).
+    removed: ctx.removed,
   });
   if (decision.state === "not_found") {
     return fail(404, "not_found", "Not found");
@@ -395,10 +404,13 @@ export async function PATCH(req: Request, { params }: Params) {
   // restriction in force. `requireCanPublish` refuses on Terms first, so a
   // verified, unrestricted officer sees no change at all.
   //
-  // THIS ROUTE IS THE ENFORCEMENT, and unlike posts it is the ONLY enforcement:
-  // the wave's migration adds no AND for `public.orgs`, and `orgs_update`
-  // (supabase/migrations/20260903100000_security_hardening.sql:77) is
-  // officer-only with no consent and no publish check. The proxy's 403 on
+  // THIS ROUTE IS THE ENFORCEMENT, and unlike posts it is the ONLY enforcement.
+  // Since 20260928150000 it is also the only WRITER: authenticated lost its
+  // column UPDATE grants on orgs, so the direct PostgREST path that skipped
+  // this gate and the word filter is closed. `orgs_update`
+  // (supabase/migrations/20260903100000_security_hardening.sql:77) is still
+  // officer-only with no consent and no publish check, which is why the grants
+  // had to go. The proxy's 403 on
   // non-GET /api/* is the fast path, not the wall — its own comment says so —
   // and it leans on the app_metadata mirror having been written. So a banned
   // officer has to be stopped here.
@@ -415,9 +427,11 @@ export async function PATCH(req: Request, { params }: Params) {
   const service = createSupabaseServiceClient();
   const { data: orgRow, error: orgErr } = await service
     .from("orgs")
-    // `name` and `description` are read for the word filter below, which only
-    // judges text the officer actually changed.
-    .select("id, handle, owner_id, name, description, join_policy, audience, hidden_at, campus_id")
+    // `name`, `description`, `philanthropy` and `links` are read for the word
+    // filter below, which only judges text the officer actually changed.
+    .select(
+      "id, handle, owner_id, name, description, philanthropy, links, join_policy, audience, hidden_at, campus_id",
+    )
     .eq("handle", slug)
     .maybeSingle();
   if (orgErr) {
@@ -433,22 +447,39 @@ export async function PATCH(req: Request, { params }: Params) {
     owner_id: string | null;
     name: string | null;
     description: string | null;
+    philanthropy: string | null;
+    links: unknown;
     join_policy: JoinPolicy;
     audience: OrgAudience;
     hidden_at: string | null;
     campus_id: string | null;
   };
 
-  const { data: membership } = await service
-    .from("org_members")
-    .select("role")
-    .eq("org_id", org.id)
-    .eq("user_id", user.id)
-    .maybeSingle();
-  const roleValue = (membership as { role?: unknown } | null)?.role;
-  const role = isOrgRole(roleValue) ? roleValue : null;
-  if (org.owner_id !== user.id && !isSettingsOfficer(role)) {
-    return fail(403, "settings_officers_only", "Only owners and admins can change this.");
+  // Owner-by-owner_id stays its own branch (see above): no roster read. For
+  // anyone else, a stranger asking about a HIDDEN club gets the 404 a made-up
+  // handle gets, not a 403 that confirms it exists (security wave 2,
+  // `officerGate`); a failed roster read reads as "not a member", so it is
+  // that same 404 on a hidden club and a 500 anywhere else, never a guessed
+  // refusal.
+  if (org.owner_id !== user.id) {
+    const { data: membership, error: memberErr } = await service
+      .from("org_members")
+      .select("role")
+      .eq("org_id", org.id)
+      .eq("user_id", user.id)
+      .maybeSingle();
+    if (memberErr) console.error("[orgs/[slug] PATCH role]", memberErr);
+    const roleValue = memberErr ? null : (membership as { role?: unknown } | null)?.role;
+    const roleGate = officerGate({
+      hidden: org.hidden_at !== null,
+      role: isOrgRole(roleValue) ? roleValue : null,
+      allowed: SETTINGS_ROLES,
+    });
+    if (roleGate === "not_found") return fail(404, "not_found", "Not found");
+    if (memberErr) return fail(500, "load_failed", "Failed to update");
+    if (roleGate === "forbidden") {
+      return fail(403, "settings_officers_only", "Only owners and admins can change this.");
+    }
   }
 
   // Renaming a club republishes it everywhere its name appears, so the word
@@ -568,6 +599,10 @@ export async function PATCH(req: Request, { params }: Params) {
     if (sanitized === null) {
       return fail(400, "invalid_links", "links must be an array");
     }
+    // Link labels print on the club page like its description does, so they
+    // take the same word filter; only labels that aren't already stored are
+    // judged, because the form re-sends the whole list on every save.
+    if (hasBlockedNewLinkLabel(sanitized, org.links)) return contentBlockedResponse("links");
     patch.links = sanitized;
   }
 
@@ -621,7 +656,11 @@ export async function PATCH(req: Request, { params }: Params) {
   if (typeof body.philanthropy === "string") {
     // Cap at 500 so the section card stays readable on phone widths
     // without the user scrolling for a paragraph.
-    patch.philanthropy = body.philanthropy.trim().slice(0, 500);
+    const v = body.philanthropy.trim().slice(0, 500);
+    // Published on the club page; the same "only what changed" filter as the
+    // description above.
+    if (!checkChangedText(v, org.philanthropy).ok) return contentBlockedResponse("philanthropy");
+    patch.philanthropy = v;
   }
   patch.updated_at = new Date().toISOString();
 
@@ -657,7 +696,10 @@ export async function PATCH(req: Request, { params }: Params) {
 
 /**
  * DELETE /api/orgs/[slug] — owner-only deletion. Cascades to org_members,
- * channels, join requests and invites via FK ON DELETE CASCADE.
+ * channels, join requests, invites, followers, removals, club notifications,
+ * and events (and their RSVPs) via FK ON DELETE CASCADE (events since
+ * 20260928110000). NOT posts: `posts_org_id_fkey` is ON DELETE SET NULL, so a
+ * deleted club's posts stay up as their authors' own posts (wave B2 decides).
  */
 export async function DELETE(_req: Request, { params }: Params) {
   const { slug } = await params;
@@ -667,12 +709,18 @@ export async function DELETE(_req: Request, { params }: Params) {
     return fail(401, "unauthorized", "Unauthorized");
   }
 
+  // orgs_delete refuses a restricted owner (`NOT is_restricted_now()`), but
+  // this delete runs on the service role, so the route has to ask too
+  // (security wave 2). Terms is refused first, as everywhere.
+  const restrictedGate = await requireNotRestricted(user.id);
+  if (restrictedGate) return restrictedGate;
+
   // Resolve + authorize explicitly. An RLS-scoped delete silently affects 0
   // rows for non-owners and would still report success here.
   const service = createSupabaseServiceClient();
   const { data: org, error: fetchErr } = await service
     .from("orgs")
-    .select("id, owner_id")
+    .select("id, owner_id, hidden_at")
     .eq("handle", slug)
     .maybeSingle();
   if (fetchErr) {
@@ -683,6 +731,24 @@ export async function DELETE(_req: Request, { params }: Params) {
     return fail(404, "not_found", "Not found");
   }
   if (org.owner_id !== user.id) {
+    // Not the owner: a member hears "owner only"; a stranger asking about a
+    // HIDDEN club hears what a made-up handle hears (`officerGate` with an
+    // empty allow-list: nobody but the owner by owner_id gets through).
+    const { data: membership, error: memberErr } = await service
+      .from("org_members")
+      .select("role")
+      .eq("org_id", org.id)
+      .eq("user_id", user.id)
+      .maybeSingle();
+    if (memberErr) console.error("[orgs/[slug] DELETE role]", memberErr);
+    const roleValue = memberErr ? null : (membership as { role?: unknown } | null)?.role;
+    const gate = officerGate({
+      hidden: org.hidden_at !== null,
+      role: isOrgRole(roleValue) ? roleValue : null,
+      allowed: [],
+    });
+    if (gate === "not_found") return fail(404, "not_found", "Not found");
+    if (memberErr) return fail(500, "delete_failed", "Failed to delete");
     return fail(403, "owner_only", "Owner only");
   }
 

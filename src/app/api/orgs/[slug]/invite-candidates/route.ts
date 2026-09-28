@@ -12,10 +12,13 @@ import { collectFollowersPage, type FollowersReadResult } from "@/lib/orgs/invit
 import {
   DECLINE_COOLDOWN_MS,
   audienceAllows,
+  canApproveRequest,
   inviteIsLive,
   type OrgAudience,
+  type OrgRole,
 } from "@/lib/orgs/join-state";
-import { expireStaleInvites } from "@/lib/orgs/membership";
+import { expireStaleInvites, loadRemovedUserIds } from "@/lib/orgs/membership";
+import { inviteRefusedIds, loadOrgSideIds } from "@/lib/orgs/org-blocks";
 import { ilikeOrFilter, ilikePrefixOrFilter, isUuid } from "@/lib/pgrest";
 import { isTriggerDefaultHandle } from "@/lib/profile/onboarding-prefill";
 import { rateLimit, tooManyRequests } from "@/lib/rate-limit";
@@ -47,8 +50,12 @@ import {
  * chose is doing its job. The only people actually dropped are the ones an
  * officer must never learn about from this endpoint: strangers to the platform
  * (unverified, not onboarded, still on the trigger's `u<32hex>` handle) and
- * anybody with a block in either direction against the officer or the owner
- * (critic A7).
+ * anybody the invite POST would refuse over a block (waveA-build ruling 14,
+ * `inviteRefusedIds`): a block either way with the officer searching, or a
+ * block of them by ANY officer, owner included. Their own block of the owner
+ * or of another officer does NOT hide them: the send accepts them, and a
+ * picker that hid them would both keep a victim out of reach in the app and
+ * tell this officer about somebody else's block (reviewer F1).
  *
  * EVERY STATE THIS RETURNS MATCHES A BRANCH IN `../invites/route.ts`. The
  * decline cooldown, the 90-day pair cap and the verified-org gate are imported
@@ -64,8 +71,8 @@ import {
  * the officer asked for by name, so a muted person still comes back and a
  * member still shows "Member". The default list is a suggestion, so it leaves
  * out the officer themselves, members (there is nothing to invite them to),
- * anyone the officer blocked, was blocked by or muted, and anyone with a block
- * either way against the owner.
+ * anyone the officer blocked, was blocked by or muted, and anyone any officer
+ * (owner included) blocked.
  */
 
 type Params = { params: Promise<{ slug: string }> };
@@ -123,11 +130,23 @@ function fail(status: number, code: string, error: string): NextResponse {
 
 type ServiceClient = ReturnType<typeof createSupabaseServiceClient>;
 
+/**
+ * The people whose block of a candidate refuses an invite (ruling 14): the
+ * sender, the owner and every officer (`loadOrgSideIds` leaves the sender
+ * out, so they are added back here). UUIDs only, no duplicates.
+ */
+function inviteBlockerSide(senderId: string, ownerId: unknown, officerIds: string[]): string[] {
+  return Array.from(new Set([senderId, ownerId, ...officerIds].filter(isUuid)));
+}
+
 /** Which list a 200 is: the club's followers (default) or a typed search. */
 type CandidateSource = "followers" | "search";
 
 /** A follow row as the followers list reads it. */
 type FollowRow = { id: string; user_id: string; first_followed_at: string };
+
+/** One `blocks` row as the standings reads select it. */
+type BlockRow = { blocker_id: string; blocked_id: string };
 
 type InviteFact = {
   status: string;
@@ -146,20 +165,34 @@ type Standings = {
   requestByUser: Map<string, string>;
   invitesByUser: Map<string, InviteFact[]>;
   followsSinceByUser: Map<string, string>;
+  /** Of the people with a pending request, the ones an officer removed (lower case). */
+  removedIds: Set<string>;
 };
 
 /**
  * One round trip for everything that decides a row's button: membership,
- * invites in the pair window, pending requests, blocks either way against the
- * org side (the officer and the owner, critic A7) and, in search mode, when
- * each person first followed. Null when ANY read failed: the caller answers
- * 500, because without the blocks read we can't tell who asked not to hear
- * from this org.
+ * invites in the pair window, pending requests, the blocks that refuse an
+ * invite and, in search mode, when each person first followed.
+ *
+ * BLOCKS: `blocked` is EXACTLY the set the invites POST refuses
+ * (`loadInviteBlocks`, waveA-build ruling 14), folded by `inviteRefusedIds`:
+ *   - the candidate blocked the SENDER (only the sender: their block of the
+ *     owner or another officer doesn't count), read with `senderId`;
+ *   - anyone in `blockerSide` (the sender, the owner and every officer)
+ *     blocked the candidate.
+ * Hiding more than the send refuses is a block oracle (reviewer F1). Null
+ * when ANY read failed: the caller answers 500, because without the blocks
+ * read we can't tell who asked not to hear from this org.
+ *
+ * REMOVED BEFORE: of the people with a pending request, which ones an
+ * officer removed (`loadRemovedUserIds`, the requests list's read), for the
+ * requested row's `removed_before` / `can_approve`.
  */
 async function loadStandings(
   service: ServiceClient,
   orgId: string,
-  orgSide: string[],
+  senderId: string,
+  blockerSide: string[],
   ids: string[],
   withFollows: boolean,
 ): Promise<Standings | null> {
@@ -179,12 +212,18 @@ async function loadStandings(
         .eq("org_id", orgId)
         .in("user_id", ids)
         .eq("status", "pending"),
-      orgSide.length > 0
-        ? service.from("blocks").select("blocker_id").in("blocker_id", ids).in("blocked_id", orgSide)
-        : Promise.resolve({ data: [] as Array<{ blocker_id: string }>, error: null }),
-      orgSide.length > 0
-        ? service.from("blocks").select("blocked_id").in("blocked_id", ids).in("blocker_id", orgSide)
-        : Promise.resolve({ data: [] as Array<{ blocked_id: string }>, error: null }),
+      service
+        .from("blocks")
+        .select("blocker_id, blocked_id")
+        .in("blocker_id", ids)
+        .eq("blocked_id", senderId),
+      blockerSide.length > 0
+        ? service
+            .from("blocks")
+            .select("blocker_id, blocked_id")
+            .in("blocked_id", ids)
+            .in("blocker_id", blockerSide)
+        : Promise.resolve({ data: [] as BlockRow[], error: null }),
       withFollows
         ? service
             .from("org_followers")
@@ -212,13 +251,10 @@ async function loadStandings(
     return null;
   }
 
-  const blocked = new Set<string>();
-  for (const row of (theyBlockedRes.data ?? []) as Array<{ blocker_id: string }>) {
-    blocked.add(row.blocker_id);
-  }
-  for (const row of (blockedThemRes.data ?? []) as Array<{ blocked_id: string }>) {
-    blocked.add(row.blocked_id);
-  }
+  const blocked = inviteRefusedIds(senderId, blockerSide, [
+    ...((theyBlockedRes.data ?? []) as BlockRow[]),
+    ...((blockedThemRes.data ?? []) as BlockRow[]),
+  ]);
 
   const roleByUser = new Map<string, string>();
   for (const row of (membersRes.data ?? []) as Array<{ user_id: string; role: string }>) {
@@ -244,18 +280,45 @@ async function loadStandings(
     followsSinceByUser.set(row.user_id, row.first_followed_at);
   }
 
-  return { blocked, roleByUser, requestByUser, invitesByUser, followsSinceByUser };
+  // "Removed before" on a requested row (#15), read only when someone on
+  // this page asked to join. Fails closed like the requests list: without it
+  // the sheet can't tell whether this officer may let them back.
+  const removedRes = await loadRemovedUserIds(service, orgId, Array.from(requestByUser.keys()));
+  if (!removedRes.ok) {
+    console.error("[orgs/[slug]/invite-candidates removals]", removedRes.error);
+    return null;
+  }
+
+  return {
+    blocked,
+    roleByUser,
+    requestByUser,
+    invitesByUser,
+    followsSinceByUser,
+    removedIds: removedRes.ids,
+  };
 }
 
 /**
  * The row that goes on the wire for one candidate. Blocks are the caller's
  * job (a blocked person never gets this far). See the GET docblock for why
  * `state` and `eligible` are computed independently.
+ *
+ * A REQUESTED row also says `removed_before` and `can_approve`, the same two
+ * fields the requests list sends (this sheet is the phone's and the club
+ * page's only Approve). `can_approve` is what `POST requests/[id]` would say
+ * to THIS officer: `canApproveRequest` (letting back a removed person takes
+ * an owner or admin), and never when a block refuses it: `st.blocked` is
+ * `inviteRefusedIds`, i.e. a block either way with this officer (approve
+ * answers 404) or any officer's block of the requester (409
+ * `approve_unavailable`). Such a person is already dropped from the list, so
+ * that half is belt and braces.
  */
 function candidateView(
   c: CandidateRow,
   st: Standings,
   audience: OrgAudience,
+  role: OrgRole,
   now: Date,
   followsSince: string | null,
 ) {
@@ -274,6 +337,7 @@ function candidateView(
   let state: CandidateState = "none";
   let availableAt: string | null = null;
   let requestId: string | null = null;
+  let approval: { removed_before: boolean; can_approve: boolean } | null = null;
 
   if (st.roleByUser.has(c.id)) {
     state = "member";
@@ -287,6 +351,12 @@ function candidateView(
     // would have to guess, or fall back to an invite that must not admit.
     state = "requested";
     requestId = st.requestByUser.get(c.id) ?? null;
+    const id = c.id.toLowerCase();
+    const removedBefore = st.removedIds.has(id);
+    approval = {
+      removed_before: removedBefore,
+      can_approve: canApproveRequest(role, removedBefore) && !st.blocked.has(id),
+    };
   } else {
     const declinedAt = facts
       .filter((f) => f.status === "declined" && f.resolved_at)
@@ -321,6 +391,7 @@ function candidateView(
     reason,
     ...(availableAt ? { available_at: availableAt } : {}),
     ...(requestId ? { request_id: requestId } : {}),
+    ...(approval ?? {}),
     follows_since: followsSince,
   };
 }
@@ -355,8 +426,10 @@ function candidatesOk(
  *      (critic C5). Never `created_at`: an unfollow/refollow re-rolls that,
  *      and it would move a student back to the top (C15).
  *   4. In TypeScript: not a finished student account (same rule as search),
- *      a member (a follow-then-join keeps its own source), or a block either
- *      way against the owner → dropped.
+ *      a member (a follow-then-join keeps its own source), or anyone the
+ *      invite POST would refuse over a block (`loadStandings`: any officer,
+ *      owner included, blocked them) → dropped. Their own block of the owner
+ *      does not drop them (ruling 14).
  *   5. `followersPage` picks the 20 and the cursor (critic M-2).
  *   6. A read that keeps nobody but has more rows behind it is read again from
  *      its cursor, up to 4 reads (`collectFollowersPage`,
@@ -372,12 +445,13 @@ async function followersResponse(args: {
   supabase: Awaited<ReturnType<typeof createSupabaseServerClient>>;
   service: ServiceClient;
   viewerId: string;
+  role: OrgRole;
   org: InviteOrgRow;
   audience: OrgAudience;
   blockedReason: "org_hidden" | "org_unverified" | null;
   cursor: FollowCursor | null;
 }): Promise<NextResponse> {
-  const { supabase, service, viewerId, org, audience, blockedReason, cursor } = args;
+  const { supabase, service, viewerId, role, org, audience, blockedReason, cursor } = args;
 
   const hiddenRes = await loadHiddenUsers(supabase, viewerId);
   if (!hiddenRes.ok) {
@@ -441,9 +515,14 @@ async function followersResponse(args: {
 
     let standings: Standings | null = null;
     if (candidateById.size > 0) {
-      const orgSide = Array.from(new Set([viewerId, org.owner_id].filter(isUuid)));
+      const officers = await loadOrgSideIds(service, org.id, viewerId);
+      if (!officers.ok) {
+        console.error("[orgs/[slug]/invite-candidates officers]", officers.error);
+        return failed();
+      }
+      const blockerSide = inviteBlockerSide(viewerId, org.owner_id, officers.ids);
       const ids = Array.from(candidateById.keys());
-      standings = await loadStandings(service, org.id, orgSide, ids, false);
+      standings = await loadStandings(service, org.id, viewerId, blockerSide, ids, false);
       if (!standings) return failed();
     }
 
@@ -466,7 +545,7 @@ async function followersResponse(args: {
   const users = page.emitted.flatMap((row) => {
     const c = candidateById.get(row.user_id);
     if (!c || !standings) return [];
-    return [candidateView(c, standings, audience, now, row.first_followed_at)];
+    return [candidateView(c, standings, audience, role, now, row.first_followed_at)];
   });
 
   return candidatesOk(blockedReason, "followers", page.nextCursor, users);
@@ -487,7 +566,11 @@ async function followersResponse(args: {
  * 200 `{ok:true, can_invite:boolean, blocked_reason:"org_hidden"|"org_unverified"|null,
  *      source:"followers"|"search", next_cursor:string|null,
  *      users:[{id,name,handle,avatar_url,major,year, state, eligible, reason,
- *              available_at?, request_id?, follows_since:string|null}]}`
+ *              available_at?, request_id?, removed_before?, can_approve?,
+ *              follows_since:string|null}]}`
+ * `removed_before` / `can_approve` come only on `state:"requested"` rows (see
+ * `candidateView`): the sheet tags "Removed before" and hides Approve when
+ * `can_approve` is false.
  * Every 200 carries `source` and `next_cursor`, empty results included.
  * `follows_since` is the raw `first_followed_at` of this person's follow of
  * the club: always set in followers mode, null in search for a non-follower.
@@ -571,6 +654,7 @@ export async function GET(req: Request, { params }: Params) {
       supabase,
       service,
       viewerId: user.id,
+      role,
       org,
       audience,
       blockedReason,
@@ -629,12 +713,6 @@ export async function GET(req: Request, { params }: Params) {
   }
 
   const ids = candidates.map((c) => c.id);
-  // Blocks are checked against BOTH the searching officer and the owner
-  // (critic A7): the invite arrives under the org's name, so a second officer
-  // must not be a way around a block on the first. The owner stays in this
-  // list even when they are themselves a search hit — dropping them there
-  // would quietly stop checking the owner for everybody else in the page.
-  const orgSide = Array.from(new Set([user.id, org.owner_id].filter(isUuid)));
 
   // Stale invites become `expired` before anything is counted, so a row the
   // clock ended yesterday cannot show as "Invited" or eat a slot in the cap.
@@ -643,7 +721,18 @@ export async function GET(req: Request, { params }: Params) {
   // Search also reads each hit's follow of this club, for `follows_since`,
   // when the officer may see followers at all. Its error fails closed with
   // the rest.
-  const standings = await loadStandings(service, org.id, orgSide, ids, seesFollowers);
+  const officers = await loadOrgSideIds(service, org.id, user.id);
+  if (!officers.ok) {
+    console.error("[orgs/[slug]/invite-candidates officers]", officers.error);
+    return fail(500, "request_failed", "Request failed");
+  }
+  // Ruling 14, exactly as the send asks it (`loadStandings`): a block either
+  // way with THIS officer, or any officer's block of the candidate. The owner
+  // stays on the blocker side even when they are themselves a search hit —
+  // dropping them there would quietly stop checking the owner's blocks for
+  // everybody else in the page.
+  const blockerSide = inviteBlockerSide(user.id, org.owner_id, officers.ids);
+  const standings = await loadStandings(service, org.id, user.id, blockerSide, ids, seesFollowers);
   if (!standings) return fail(500, "request_failed", "Request failed");
 
   const now = new Date();
@@ -654,6 +743,7 @@ export async function GET(req: Request, { params }: Params) {
         c,
         standings,
         audience,
+        role,
         now,
         seesFollowers ? (standings.followsSinceByUser.get(c.id) ?? null) : null,
       ),

@@ -1,7 +1,9 @@
 import { NextResponse } from "next/server";
 
-import { requireTermsAccepted } from "@/lib/legal/require-terms";
+import { contentBlockedResponse, requireCanPublish } from "@/lib/moderation/access";
+import { checkText } from "@/lib/moderation/text-filter";
 import { isAllowedMediaUrl } from "@/lib/org-asset-url";
+import { officerGate } from "@/lib/orgs/hidden-gate";
 import { isOrgRole, type OrgRole } from "@/lib/orgs/join-state";
 import { withPostMediaUrls } from "@/lib/post-media-url";
 import { rateLimit, tooManyRequests } from "@/lib/rate-limit";
@@ -54,9 +56,17 @@ const POST_AS_ORG_ROLES: readonly OrgRole[] = Object.freeze(["owner", "admin"]);
  * A HIDDEN ORG CANNOT POST (spec §3.4). Hiding takes an org out of Discover,
  * search, the map, event lists and suggestions; letting its owner keep
  * publishing to the campus feed from behind that curtain would undo the whole
- * point. The check sits AFTER the role check on purpose, so a stranger poking
- * at the handle learns nothing about the org's state that a non-officer
- * would not already get from a plain 403.
+ * point. The check sits AFTER the role check on purpose, so only the club's
+ * own officers ever learn it is hidden. A stranger asking about a hidden club
+ * gets the 404 a made-up handle gets (security wave 2, `officerGate`).
+ *
+ * THE PUBLISHING GATE (security wave 2, report Low "the club-post route skips
+ * the restriction, school-verified and word-filter checks"). This route writes
+ * with the SERVICE role, so posts_insert_authenticated (consent +
+ * can_publish_now) never runs: the route is the only enforcement. It takes
+ * `requireCanPublish` (Terms, then no restriction in force, then a verified
+ * school email; the Terms refusal is the same body `requireTermsAccepted`
+ * sent) and runs the word filter on the text, like a personal post.
  */
 export async function POST(req: Request, { params }: Params) {
   const { slug } = await params;
@@ -84,30 +94,52 @@ export async function POST(req: Request, { params }: Params) {
     return tooManyRequests(limit, "You're posting too fast. Try again in a bit.");
   }
 
-  const termsGate = await requireTermsAccepted(user.id);
-  if (termsGate) return termsGate;
+  const publishGate = await requireCanPublish(user.id);
+  if (publishGate) return publishGate;
 
   const service = createSupabaseServiceClient();
-  const { data: org } = await service
+  const { data: org, error: orgErr } = await service
     .from("orgs")
     .select("id, hidden_at")
     .eq("handle", slug)
     .maybeSingle();
-  if (!org) {
-    return NextResponse.json(
+  const loadFailed = () =>
+    NextResponse.json(
+      { ok: false, error: "Request failed", code: "post_failed" },
+      { status: 500 },
+    );
+  const notFound = () =>
+    NextResponse.json(
       { ok: false, error: "Not found", code: "not_found" },
       { status: 404 },
     );
+  if (orgErr) {
+    console.error("[orgs/[slug]/posts POST org]", orgErr);
+    return loadFailed();
   }
+  if (!org) return notFound();
 
-  const { data: viewer } = await service
+  const { data: viewer, error: viewerErr } = await service
     .from("org_members")
     .select("role")
     .eq("org_id", org.id)
     .eq("user_id", user.id)
     .maybeSingle();
-  const viewerRole = viewer && isOrgRole(viewer.role) ? viewer.role : null;
-  if (!viewerRole || !POST_AS_ORG_ROLES.includes(viewerRole)) {
+  if (viewerErr) console.error("[orgs/[slug]/posts POST role]", viewerErr);
+  const viewerRole: OrgRole | null =
+    !viewerErr && viewer && isOrgRole(viewer.role) ? viewer.role : null;
+
+  // A failed membership read reads as "not a member": on a HIDDEN club that
+  // is the stranger's 404 (a 500 would confirm the club exists); anywhere
+  // else it is a 500, never a guessed "not allowed".
+  const gate = officerGate({
+    hidden: org.hidden_at !== null && org.hidden_at !== undefined,
+    role: viewerRole,
+    allowed: POST_AS_ORG_ROLES,
+  });
+  if (gate === "not_found") return notFound();
+  if (viewerErr) return loadFailed();
+  if (gate === "forbidden") {
     return NextResponse.json(
       {
         ok: false,
@@ -168,6 +200,9 @@ export async function POST(req: Request, { params }: Params) {
       { status: 400 },
     );
   }
+  // Length first, then the word filter, the order the personal publish route
+  // uses. The matched word is never echoed (contentBlockedResponse).
+  if (content && !checkText(content).ok) return contentBlockedResponse("content");
   const { data: row, error } = await service
     .from("posts")
     .insert({

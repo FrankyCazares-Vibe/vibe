@@ -1,7 +1,9 @@
 import { NextResponse } from "next/server";
 
+import { loadClubOfficer } from "@/lib/club-routes/officer-guard";
+import { contentBlockedResponse, requireNotRestricted } from "@/lib/moderation/access";
+import { checkChangedText } from "@/lib/moderation/text-filter";
 import { createSupabaseServerClient } from "@/lib/supabase/server";
-import { createSupabaseServiceClient } from "@/lib/supabase/service";
 
 const CHANNEL_NAME_RE = /^[a-z0-9][a-z0-9_-]{1,30}$/;
 const MIN_POSITION = 0;
@@ -16,35 +18,27 @@ type PatchBody = {
   pinned?: unknown;
 };
 
+/**
+ * Owner/admin of THIS club, and not restricted. The write runs on the service
+ * role, so the policies' `NOT is_restricted_now()` never runs: the route asks
+ * (security wave 2, A5b). `loadClubOfficer` answers a stranger asking about a
+ * hidden club with 404, not the old 403 "Admin only".
+ */
 async function requireStaff(slug: string, channelId: string, viewerId: string) {
-  const service = createSupabaseServiceClient();
-
-  const { data: org } = await service
-    .from("orgs")
-    .select("id")
-    .eq("handle", slug)
-    .maybeSingle();
-  if (!org) return { error: "Not found", status: 404 } as const;
-
-  const { data: channel } = await service
-    .from("channels")
-    .select("id, org_id, is_private")
-    .eq("id", channelId)
-    .maybeSingle();
-  if (!channel || channel.org_id !== org.id) {
-    return { error: "Channel not found", status: 404 } as const;
+  const restricted = await requireNotRestricted(viewerId);
+  if (restricted) return { response: restricted } as const;
+  const guard = await loadClubOfficer(slug, viewerId, { channelId });
+  if (!guard.ok) {
+    return {
+      response: NextResponse.json({ ok: false, error: guard.error }, { status: guard.status }),
+    } as const;
   }
-
-  const { data: viewer } = await service
-    .from("org_members")
-    .select("role")
-    .eq("org_id", org.id)
-    .eq("user_id", viewerId)
-    .maybeSingle();
-  if (!viewer || !["owner", "admin"].includes(viewer.role)) {
-    return { error: "Admin only", status: 403 } as const;
+  if (!guard.channel) {
+    return {
+      response: NextResponse.json({ ok: false, error: "Channel not found" }, { status: 404 }),
+    } as const;
   }
-  return { org, channel, service } as const;
+  return { org: guard.org, channel: guard.channel, service: guard.service } as const;
 }
 
 /**
@@ -63,9 +57,7 @@ export async function PATCH(req: Request, { params }: Params) {
   }
 
   const guard = await requireStaff(slug, channelId, user.id);
-  if ("error" in guard) {
-    return NextResponse.json({ ok: false, error: guard.error }, { status: guard.status });
-  }
+  if ("response" in guard) return guard.response;
 
   let body: PatchBody;
   try {
@@ -95,11 +87,16 @@ export async function PATCH(req: Request, { params }: Params) {
     if (clash) {
       return NextResponse.json({ ok: false, error: "Channel name already exists" }, { status: 409 });
     }
+    // Every member reads the name and topic; the word filter judges only
+    // what changed, so an old name never blocks a pin or a reorder.
+    if (!checkChangedText(v, guard.channel.name).ok) return contentBlockedResponse("name");
     patch.name = v;
   }
 
   if (typeof body.topic === "string" || body.topic === null) {
-    patch.topic = typeof body.topic === "string" ? body.topic.slice(0, 200) : null;
+    const topic = typeof body.topic === "string" ? body.topic.slice(0, 200) : null;
+    if (!checkChangedText(topic, guard.channel.topic).ok) return contentBlockedResponse("topic");
+    patch.topic = topic;
   }
   if (typeof body.is_private === "boolean") {
     patch.is_private = body.is_private;
@@ -169,9 +166,7 @@ export async function DELETE(_req: Request, { params }: Params) {
   }
 
   const guard = await requireStaff(slug, channelId, user.id);
-  if ("error" in guard) {
-    return NextResponse.json({ ok: false, error: guard.error }, { status: guard.status });
-  }
+  if ("response" in guard) return guard.response;
 
   const { error } = await guard.service.from("channels").delete().eq("id", channelId);
   if (error) {

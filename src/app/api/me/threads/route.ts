@@ -1,11 +1,18 @@
 import { NextResponse } from "next/server";
 
 import { getFollowState } from "@/lib/connections/queries";
+import {
+  GROUP_CREATE_REFUSED,
+  MAX_GROUP_MEMBERS,
+  groupSizeAllowed,
+} from "@/lib/messages/group-rules";
 import { contentBlockedResponse, requireCanPublish } from "@/lib/moderation/access";
 import { checkText } from "@/lib/moderation/text-filter";
+import { isUuid } from "@/lib/pgrest";
 import { GROUP_PHOTO_KEY_PREFIX, isR2Configured, signGroupPhotoGetUrl } from "@/lib/r2";
 import { rateLimit, tooManyRequests } from "@/lib/rate-limit";
 import { loadHiddenUsers } from "@/lib/safety/hidden-users";
+import { loadGroupBlockConflict } from "@/lib/safety/pair-block";
 import { createSupabaseServerClient } from "@/lib/supabase/server";
 import { createSupabaseServiceClient } from "@/lib/supabase/service";
 
@@ -22,15 +29,20 @@ type CreateBody = {
   members?: unknown;
 };
 
-const MAX_GROUP_MEMBERS = 50;
-
+/**
+ * The other person in a 1:1 thread. No `bio` (S67 security wave 2, A2): the
+ * inbox subtitle is the school, else blank (waveA-build.md product call 2),
+ * and A1's migration takes `bio` away from the data API, so a cookie-client
+ * embed naming it would fail the whole inbox. The group cap
+ * (MAX_GROUP_MEMBERS) lives in src/lib/messages/group-rules.ts, shared with
+ * the add route.
+ */
 type ThreadPeer = {
   id: string;
   handle: string | null;
   name: string | null;
   avatar_url: string | null;
   school: string | null;
-  bio: string | null;
 };
 
 /** Lightweight member info for group threads (avatars + names + role for the row). */
@@ -162,8 +174,12 @@ async function resolveMembers(
     if (typeof v !== "string") continue;
     const t = v.trim();
     if (!t) continue;
-    if (/^[0-9a-f]{8}-[0-9a-f]{4}-/i.test(t)) ids.add(t);
-    else handles.add(t.toLowerCase());
+    // A strict uuid in lower case, so one person can't be listed twice in two
+    // spellings (a duplicate member row) and every id is safe for the block
+    // filter; anything else is looked up as a handle.
+    const lower = t.toLowerCase();
+    if (isUuid(t)) ids.add(lower);
+    else handles.add(lower);
   }
   if (handles.size > 0) {
     const { data, error } = await supabase
@@ -233,7 +249,7 @@ export async function POST(req: Request) {
         { status: 400 },
       );
     }
-    if (memberIds.length + 1 > MAX_GROUP_MEMBERS) {
+    if (!groupSizeAllowed(memberIds.length)) {
       return NextResponse.json(
         { ok: false, error: `Max ${MAX_GROUP_MEMBERS} members per group` },
         { status: 400 },
@@ -263,7 +279,21 @@ export async function POST(req: Request) {
     // messages inside it.
     if (groupName && !checkText(groupName).ok) return contentBlockedResponse("name");
 
+    // Nobody in a block pair with anyone else in the new chat, either way,
+    // the creator included (S67 A2; group-rules.ts). One block inside a group
+    // stops both people in it from sending (messages_insert_member). SERVICE
+    // client: the pairs between two invitees are invisible to the creator's
+    // own client (loadGroupBlockConflict explains). The copy names nobody.
     const admin = createSupabaseServiceClient();
+    const conflict = await loadGroupBlockConflict(admin, memberIds, [user.id]);
+    if (!conflict.ok) {
+      console.error("[threads.POST group block-check]", conflict.error);
+      return NextResponse.json({ ok: false, error: "Request failed" }, { status: 500 });
+    }
+    if (conflict.blocked) {
+      return NextResponse.json({ ok: false, error: GROUP_CREATE_REFUSED }, { status: 403 });
+    }
+
     const { data: chan, error: chanErr } = await admin
       .from("channels")
       .insert({ type: "group", name: groupName })
@@ -462,7 +492,7 @@ export async function GET() {
   const { data: otherMembers, error: othersErr } = await supabase
     .from("channel_members")
     .select(
-      "channel_id, user_id, last_read_at, role, users:users!channel_members_user_id_fkey(id, handle, name, avatar_url, school, bio)",
+      "channel_id, user_id, last_read_at, role, users:users!channel_members_user_id_fkey(id, handle, name, avatar_url, school)",
     )
     .in("channel_id", channelIds)
     .neq("user_id", user.id);

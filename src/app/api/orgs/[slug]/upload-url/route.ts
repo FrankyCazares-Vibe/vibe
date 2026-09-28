@@ -8,6 +8,8 @@ import {
   signOrgAssetPutUrl,
 } from "@/lib/r2";
 import { requireTermsAccepted } from "@/lib/legal/require-terms";
+import { officerGate } from "@/lib/orgs/hidden-gate";
+import { SETTINGS_ROLES, isOrgRole } from "@/lib/orgs/join-state";
 import { rateLimit, tooManyRequests } from "@/lib/rate-limit";
 import { createSupabaseServerClient } from "@/lib/supabase/server";
 import { createSupabaseServiceClient } from "@/lib/supabase/service";
@@ -53,6 +55,8 @@ const VALID_KINDS = new Set<Kind>(["banner", "logo", "post-image", "post-video"]
  *
  * Permissions: owner / admin only. We check role directly here and via the
  * service client (RLS isn't sufficient since signed URLs aren't a row).
+ * A non-member asking about a HIDDEN club gets 404, never 403 (S67 sec wave
+ * 2, hidden-club Low).
  */
 export async function POST(req: Request, { params }: Params) {
   if (!isR2Configured()) {
@@ -83,7 +87,7 @@ export async function POST(req: Request, { params }: Params) {
   const service = createSupabaseServiceClient();
   const { data: org } = await service
     .from("orgs")
-    .select("id")
+    .select("id, hidden_at")
     .eq("handle", slug)
     .maybeSingle();
   if (!org) {
@@ -96,7 +100,16 @@ export async function POST(req: Request, { params }: Params) {
     .eq("org_id", org.id)
     .eq("user_id", user.id)
     .maybeSingle();
-  if (!viewer || !["owner", "admin"].includes(viewer.role)) {
+  const rawRole: unknown = viewer?.role;
+  const gate = officerGate({
+    hidden: !!org.hidden_at,
+    role: isOrgRole(rawRole) ? rawRole : null,
+    allowed: SETTINGS_ROLES,
+  });
+  if (gate === "not_found") {
+    return NextResponse.json({ ok: false, error: "Not found" }, { status: 404 });
+  }
+  if (gate === "forbidden") {
     return NextResponse.json({ ok: false, error: "Admin only" }, { status: 403 });
   }
 

@@ -6,6 +6,12 @@ import { getCountsFor, getFollowState, getMutualCount } from "@/lib/connections/
 import { M1_USER_COLUMNS, isMissingColumnError } from "@/lib/db/missing-column";
 import { getActiveRestriction } from "@/lib/moderation/access";
 import { buildVibeUserV1FromProfile } from "@/lib/profile/build-vibe-user-v1";
+import {
+  blankHiddenWidgets,
+  hasResume,
+  resumeVisibleToViewer,
+  stripResumeKeys,
+} from "@/lib/profile/hidden-fields";
 import { normalizeProfileView } from "@/lib/profile/normalize-profile-view";
 import { PUBLIC_PROFILE_CAMPUS_COLUMNS } from "@/lib/profile/profile-campus-write";
 import { parseResumeDocRef } from "@/lib/profile/resume-doc-url";
@@ -45,6 +51,25 @@ type PublicProfileRead = {
 };
 
 type RouteContext = { params: Promise<{ handle: string }> };
+
+/**
+ * Whether the signed-in viewer is school-verified, read with the service role
+ * scoped to their own id. A failed read counts as NOT verified: the only
+ * thing it decides is whether résumé keys go out, so failing closed costs a
+ * verified viewer one empty résumé card, never the whole profile.
+ */
+async function readViewerVerified(service: SupabaseClient, viewerId: string): Promise<boolean> {
+  const { data, error } = await service
+    .from("users")
+    .select("school_verified")
+    .eq("id", viewerId)
+    .maybeSingle();
+  if (error) {
+    console.error("[users/:handle/bootstrap viewer verified]", error.message);
+    return false;
+  }
+  return (data as { school_verified?: unknown } | null)?.school_verified === true;
+}
 
 /**
  * Public profile bootstrap by handle. Powers the static prototype's
@@ -100,12 +125,17 @@ export async function GET(_req: Request, ctx: RouteContext) {
   // 20260926100000 `profile_layout` doesn't; a missing-column error naming
   // one of those (and only that) falls back to the legacy label, which still
   // renders a badge, and to the default layout.
+  // `layoutRead` false = the retry below ran without `profile_layout`, so
+  // nothing says which widgets the owner hid: the résumé is then withheld
+  // from every non-owner (fail closed for the one that matters most).
+  let layoutRead = true;
   let { data: row, error } = (await service
     .from("users")
     .select(PUBLIC_PROFILE_SELECT)
     .eq("handle", handle)
     .maybeSingle()) as PublicProfileRead;
   if (error && isMissingColumnError(error, [...M1_USER_COLUMNS, "profile_layout"])) {
+    layoutRead = false;
     ({ data: row, error } = (await service
       .from("users")
       .select(BASE_PUBLIC_PROFILE_SELECT)
@@ -122,6 +152,10 @@ export async function GET(_req: Request, ctx: RouteContext) {
   }
 
   const targetIdRaw = (row as { id: string }).id;
+  const isOwner = !!viewer && viewer.id === targetIdRaw;
+  // Only a platform admin gets past a restriction below; the résumé stays
+  // withheld from them all the same (/api/resume has no admin exception).
+  let targetRestricted = false;
 
   // A suspended or banned student's profile is not visible to other students.
   // /account/suspended says that in as many words ("Your profile, posts and
@@ -152,12 +186,13 @@ export async function GET(_req: Request, ctx: RouteContext) {
   // A restriction read that FAILED is not "not restricted": it answers 500, the
   // same way the block read below does, because one bad minute on the database
   // must not put a banned student's profile back in front of the campus.
-  if (viewer?.id !== targetIdRaw) {
+  if (!isOwner) {
     const restriction = await getActiveRestriction(targetIdRaw);
     if (!restriction.ok) {
       return NextResponse.json({ ok: false, error: "Request failed" }, { status: 500 });
     }
     if (restriction.restriction) {
+      targetRestricted = true;
       const isAdmin = viewer ? (await requirePlatformAdmin()).ok : false;
       if (!isAdmin) {
         return NextResponse.json({ ok: false, error: "User not found" }, { status: 404 });
@@ -227,7 +262,31 @@ export async function GET(_req: Request, ctx: RouteContext) {
         looking_for: [],
       };
 
-  const profile = normalizeProfileView(rowForViewer);
+  // HIDDEN WIDGETS ARE BLANKED HERE, ON THE SERVER, for everyone but the
+  // owner (S67 security wave 2, A1; report #3). Hiding a widget used to stop
+  // only the drawing: its bio / experience / skills / working-on / résumé
+  // still shipped, next to the list of what was hidden. Now a non-owner gets
+  // the hidden widgets' fields empty AND `hidden: []`, so a hidden widget
+  // reads exactly like one never filled in (both surfaces skip an empty
+  // widget for visitors). It MUST run before buildVibeUserV1FromProfile: the
+  // builder fills an empty tagline from the bio's first line.
+  let profile = blankHiddenWidgets(normalizeProfileView(rowForViewer), { isOwner });
+
+  // Résumé keys go only to viewers the proxy will serve (report #5, product
+  // call 4): school-verified, the owner not restricted, the résumé not
+  // hidden. Otherwise the widget is simply empty, never a Download that 404s.
+  // The verification read runs only when there is a résumé left to hand out
+  // (a few rows), because this is the busiest read in the app.
+  if (!isOwner && hasResume(profile)) {
+    const viewerVerified = viewer ? await readViewerVerified(service, viewer.id) : false;
+    const open = resumeVisibleToViewer({
+      isOwner,
+      viewerVerified,
+      ownerRestricted: targetRestricted,
+      layoutHidesResume: !layoutRead,
+    });
+    if (!open) profile = stripResumeKeys(profile);
+  }
 
   // Signed-in NON-OWNER viewers: redaction bars are burned into the bytes
   // server-side (GET /api/resume/<key> signs a derivative), so the bar

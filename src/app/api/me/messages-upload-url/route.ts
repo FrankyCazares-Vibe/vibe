@@ -7,7 +7,8 @@ import {
   MESSAGE_MEDIA_KEY_PREFIX,
   signMessageMediaPutUrl,
 } from "@/lib/r2";
-import { requireTermsAccepted } from "@/lib/legal/require-terms";
+import { ensureMember } from "@/lib/messages/channel-access";
+import { requireCanPublish } from "@/lib/moderation/access";
 import { rateLimit, tooManyRequests } from "@/lib/rate-limit";
 import { createSupabaseServerClient } from "@/lib/supabase/server";
 
@@ -63,8 +64,13 @@ export async function POST(req: Request) {
   });
   if (!rl.allowed) return tooManyRequests(rl);
 
-  const termsGate = await requireTermsAccepted(user.id);
-  if (termsGate) return termsGate;
+  // The send path's gate (Terms, no restriction in force, a verified school
+  // email: messages POST uses requireCanPublish). An upload URL is only good
+  // for a message the sender could post, so a suspended or unverified account
+  // gets the same answer here instead of a paid-for upload it can't use.
+  // Terms is refused first with the same `terms_required` body as before.
+  const gate = await requireCanPublish(user.id);
+  if (gate) return gate;
 
   let body: Body;
   try {
@@ -78,19 +84,16 @@ export async function POST(req: Request) {
     return NextResponse.json({ ok: false, error: "Missing channelId" }, { status: 400 });
   }
 
-  // Membership gate.
-  const { data: membership, error: memErr } = await supabase
-    .from("channel_members")
-    .select("channel_id")
-    .eq("channel_id", channelId)
-    .eq("user_id", user.id)
-    .maybeSingle();
-  if (memErr) {
-    console.error("[messages-upload-url membership]", memErr);
-    return NextResponse.json({ ok: false, error: "Request failed" }, { status: 500 });
-  }
-  if (!membership) {
-    return NextResponse.json({ ok: false, error: "Not a member" }, { status: 403 });
+  // Membership gate: the SAME check the messages route uses to read and send
+  // (security wave 2, report #14). A bare channel_members row is not enough:
+  // an ex-member of a club kept theirs and could keep minting upload URLs at
+  // Vibe's cost. ensureMember refuses a channel the caller can't read, and a
+  // club channel unless can_view_org_channel says yes.
+  const member = await ensureMember(supabase, channelId, user.id);
+  if (!member.ok) {
+    return member.status === 500
+      ? NextResponse.json({ ok: false, error: "Request failed" }, { status: 500 })
+      : NextResponse.json({ ok: false, error: "Not a member" }, { status: 403 });
   }
 
   const contentType =

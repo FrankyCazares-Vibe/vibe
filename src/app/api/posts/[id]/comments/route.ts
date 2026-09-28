@@ -25,11 +25,26 @@ const requestFailed = () =>
   NextResponse.json({ ok: false, error: "Request failed" }, { status: 500 });
 const postNotFound = () =>
   NextResponse.json({ ok: false, error: "Post not found" }, { status: 404 });
+const parentNotFound = () =>
+  NextResponse.json({ ok: false, error: "Parent comment not found" }, { status: 400 });
 
 /** The insert hit `post_comments_post_id_fkey`: the post was deleted after
  *  the check. That is a missing post, and answers like one. */
 const isMissingPostFk = (e: { code?: string; message?: string } | null) =>
   e?.code === "23503" && /post_id_fkey/.test(e.message ?? "");
+
+/** The insert hit `post_comments_parent_comment_id_fkey`: the parent comment
+ *  was deleted after the check. The missing-parent answer, not a 500. */
+const isMissingParentFk = (e: { code?: string; message?: string } | null) =>
+  e?.code === "23503" && /parent_comment_id_fkey/.test(e.message ?? "");
+
+/** The insert was refused by RLS (42501). The checks above passed a moment
+ *  earlier, so the post or the reply's parent stopped being readable in
+ *  between: a block landed, it was removed or hidden, or its author was
+ *  restricted. post_comments_insert_own's `EXISTS (posts)` runs under the
+ *  caller's RLS, and post_comment_parent_ok asks the same of a reply's parent
+ *  (20260928120000_blocks_in_rls.sql). The missing-post answer, not a 500. */
+const isRlsRefusal = (e: { code?: string } | null) => e?.code === "42501";
 
 type RouteContext = { params: Promise<{ id: string }> };
 type CommentBody = { content?: unknown; parent_comment_id?: unknown };
@@ -121,8 +136,13 @@ type CommentRow = {
  * this route has to check the post itself.
  *
  * A BLOCKED PERSON'S COMMENTS aren't in the thread, whichever of the two did
- * the blocking (store wave S1B). RLS only hides removed comments, so this
- * route does it, in the query.
+ * the blocking (store wave S1B). This route leaves them out in the query, and
+ * since 20260928120000_blocks_in_rls.sql so does RLS
+ * (post_comments_select_authenticated), which also hides, from EVERYONE, a
+ * comment whose author and the post's author are a block pair (waveA-build.md
+ * product call 5: your comment section, your rule). Replies under a hidden
+ * comment drop with it by the orphan rule below. The card's comment count is
+ * the public RPC number, so it can be higher than the rows shown.
  */
 export async function GET(req: Request, ctx: RouteContext) {
   const { id } = await ctx.params;
@@ -308,6 +328,12 @@ export async function GET(req: Request, ctx: RouteContext) {
  * someone in a block pair with them. Anything else, including a post deleted
  * mid-request, is 404 "Post not found", so a comment can't confirm a hidden
  * post exists, land on one, or tell anyone they were blocked.
+ *
+ * A reply goes under the top-level comment of whatever was clicked, and both
+ * that comment and its root must be readable by the caller (RLS: not removed,
+ * not in a block pair with them, not hidden by the pair rule). Otherwise 400
+ * "Parent comment not found", the same answer as a parent that doesn't exist.
+ * The insert policy enforces the same rule (post_comment_parent_ok).
  */
 export async function POST(req: Request, ctx: RouteContext) {
   const { id } = await ctx.params;
@@ -388,12 +414,7 @@ export async function POST(req: Request, ctx: RouteContext) {
       .select("id,post_id,parent_comment_id")
       .eq("id", parentId)
       .maybeSingle();
-    if (parentErr || !parent) {
-      return NextResponse.json(
-        { ok: false, error: "Parent comment not found" },
-        { status: 400 },
-      );
-    }
+    if (parentErr || !parent) return parentNotFound();
     if (parent.post_id !== id) {
       return NextResponse.json(
         { ok: false, error: "Parent comment belongs to a different post" },
@@ -401,6 +422,26 @@ export async function POST(req: Request, ctx: RouteContext) {
       );
     }
     resolvedParentId = parent.parent_comment_id ?? parent.id;
+
+    // The reply lands under the ROOT, so the root is what must be readable. A
+    // reply you can see can sit under a comment you can't (its author and you
+    // are a block pair, or it was removed), and passing that reply must not
+    // put you in the hidden comment's thread. The insert policy refuses it too
+    // (post_comment_parent_ok); this answers it as a missing parent.
+    if (parent.parent_comment_id) {
+      const { data: root, error: rootErr } = await supabase
+        .from("post_comments")
+        .select("id,post_id,parent_comment_id")
+        .eq("id", parent.parent_comment_id)
+        .maybeSingle();
+      if (rootErr) {
+        console.error("[posts/:id/comments POST root]", rootErr);
+        return requestFailed();
+      }
+      if (!root || root.post_id !== id || root.parent_comment_id !== null) {
+        return parentNotFound();
+      }
+    }
   }
 
   const { data: row, error } = await supabase
@@ -417,7 +458,8 @@ export async function POST(req: Request, ctx: RouteContext) {
     )
     .single();
 
-  if (isMissingPostFk(error)) return postNotFound();
+  if (isMissingPostFk(error) || isRlsRefusal(error)) return postNotFound();
+  if (isMissingParentFk(error)) return parentNotFound();
   if (error || !row) {
     console.error("[posts/:id/comments POST]", error);
     return requestFailed();

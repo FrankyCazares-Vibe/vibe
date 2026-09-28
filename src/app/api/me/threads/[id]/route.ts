@@ -1,6 +1,7 @@
 import { NextResponse } from "next/server";
 
-import { requireTermsAccepted } from "@/lib/legal/require-terms";
+import { contentBlockedResponse, requireCanPublish } from "@/lib/moderation/access";
+import { checkText } from "@/lib/moderation/text-filter";
 import { GROUP_PHOTO_KEY_PREFIX } from "@/lib/r2";
 import { createSupabaseServerClient } from "@/lib/supabase/server";
 import { createSupabaseServiceClient } from "@/lib/supabase/service";
@@ -16,6 +17,12 @@ type Body = {
  * PATCH a channel — set group name or photo. Any member can change either
  * for v1 (matches the user's "anyone can upload" intent). 1:1 DMs reject
  * since they have no editable surface.
+ *
+ * Held to what group create holds (S67 security wave 2, A2; report Low
+ * "renaming a group chat skips the word filter"): the requireCanPublish gate
+ * (Terms, a verified school email, no restriction) and the word filter on the
+ * name, answered with the same 422 as create (contentBlockedResponse("name")).
+ * Everyone in the chat sees the name in their inbox, and they didn't choose it.
  */
 export async function PATCH(req: Request, ctx: RouteCtx) {
   const { id: channelId } = await ctx.params;
@@ -28,8 +35,8 @@ export async function PATCH(req: Request, ctx: RouteCtx) {
     return NextResponse.json({ ok: false, error: "Unauthorized" }, { status: 401 });
   }
 
-  const termsGate = await requireTermsAccepted(user.id);
-  if (termsGate) return termsGate;
+  const gate = await requireCanPublish(user.id);
+  if (gate) return gate;
 
   let body: Body;
   try {
@@ -71,6 +78,8 @@ export async function PATCH(req: Request, ctx: RouteCtx) {
   const update: Record<string, string | null> = {};
   if (typeof body.name === "string") {
     update.name = body.name.trim().slice(0, 80);
+    // An empty name clears it (the inbox falls back to the members' names).
+    if (update.name && !checkText(update.name).ok) return contentBlockedResponse("name");
   }
   if (typeof body.photo_url === "string") {
     const t = body.photo_url.trim();

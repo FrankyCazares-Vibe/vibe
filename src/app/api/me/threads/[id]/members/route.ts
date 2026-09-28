@@ -1,7 +1,16 @@
 import { NextResponse } from "next/server";
 
 import { getFollowState } from "@/lib/connections/queries";
-import { requireTermsAccepted } from "@/lib/legal/require-terms";
+import {
+  GROUP_ADD_REFUSED,
+  GROUP_FULL,
+  MAX_GROUP_MEMBERS,
+  groupAddDecision,
+} from "@/lib/messages/group-rules";
+import { requireCanPublish } from "@/lib/moderation/access";
+import { isUuid } from "@/lib/pgrest";
+import { rateLimit, tooManyRequests } from "@/lib/rate-limit";
+import { loadGroupBlockConflict } from "@/lib/safety/pair-block";
 import { createSupabaseServerClient } from "@/lib/supabase/server";
 import { createSupabaseServiceClient } from "@/lib/supabase/service";
 
@@ -16,6 +25,22 @@ type Body = {
  * mutually connected with the target — matches the user's "you can't add
  * anyone you're not connected with" rule. Idempotent: re-adding an
  * existing member returns `{ already: true }`.
+ *
+ * Adding someone is a publishing act, gated like group create
+ * (requireCanPublish: Terms, a verified school email, no restriction) and
+ * rate limited (`thread-member-add`, MAX_GROUP_MEMBERS per 10 minutes per
+ * adder, so one person can fill a group in one sitting, as create can).
+ *
+ * THE CHAT KEEPS ITS RULES (S67 security wave 2, A2; src/lib/messages/
+ * group-rules.ts): at most MAX_GROUP_MEMBERS people, the same cap group
+ * create uses (409 when full), and nobody comes in who has a block, either
+ * way, with anyone already in it (403, copy that names no block). The block
+ * read uses the SERVICE client: the pairs asked about are the newcomer's with
+ * other people, which the adder's own client can't see (loadGroupBlockConflict
+ * explains). One block inside a group stops both people in it from sending
+ * (messages_insert_member), so an add that let it in would mute them. The
+ * count-then-insert can overshoot the cap under two adds at the same instant;
+ * accepted (the largest live chat has 3 people).
  */
 export async function POST(req: Request, ctx: RouteCtx) {
   const { id: channelId } = await ctx.params;
@@ -28,8 +53,19 @@ export async function POST(req: Request, ctx: RouteCtx) {
     return NextResponse.json({ ok: false, error: "Unauthorized" }, { status: 401 });
   }
 
-  const termsGate = await requireTermsAccepted(user.id);
-  if (termsGate) return termsGate;
+  // Every add can put somebody into a chat and ping them, so it is paced per
+  // adder: MAX_GROUP_MEMBERS per 10 minutes, one POST per person, so filling
+  // one group from the add sheet never meets the brake (create takes the
+  // same 50 in one call under `thread-create`). Before the publish gate,
+  // like the sibling routes.
+  const rl = await rateLimit(`thread-member-add:${user.id}`, {
+    limit: MAX_GROUP_MEMBERS,
+    windowSec: 600,
+  });
+  if (!rl.allowed) return tooManyRequests(rl);
+
+  const gate = await requireCanPublish(user.id);
+  if (gate) return gate;
 
   let body: Body;
   try {
@@ -41,7 +77,11 @@ export async function POST(req: Request, ctx: RouteCtx) {
   // Resolve target id from handle/id.
   let targetId: string | null = null;
   if (typeof body.target_id === "string" && body.target_id.length > 0) {
-    targetId = body.target_id;
+    // Not a uuid is nobody: answered like a missing user, not a 500.
+    if (!isUuid(body.target_id)) {
+      return NextResponse.json({ ok: false, error: "User not found" }, { status: 404 });
+    }
+    targetId = body.target_id.toLowerCase();
   } else if (typeof body.handle === "string" && body.handle.length > 0) {
     const handle = body.handle.trim().toLowerCase();
     const { data: u } = await supabase
@@ -100,17 +140,44 @@ export async function POST(req: Request, ctx: RouteCtx) {
     );
   }
 
-  // Idempotent insert via service client (RLS blocks inserting another user's row).
+  // Who is in the chat now, read with the service client: RLS would show the
+  // adder the roster too, but the block read below needs the service client
+  // anyway, and one client keeps the two reads consistent.
   const admin = createSupabaseServiceClient();
-  const { data: existing } = await admin
+  const { data: roster, error: rosterErr } = await admin
     .from("channel_members")
-    .select("channel_id")
-    .eq("channel_id", channelId)
-    .eq("user_id", targetId)
-    .maybeSingle();
-  if (existing) {
-    return NextResponse.json({ ok: true, already: true });
+    .select("user_id")
+    .eq("channel_id", channelId);
+  if (rosterErr) {
+    console.error("[threads.members.POST roster]", rosterErr);
+    return NextResponse.json({ ok: false, error: "Request failed" }, { status: 500 });
   }
+  const memberIds = ((roster ?? []) as Array<{ user_id?: unknown }>)
+    .map((r) => (typeof r?.user_id === "string" ? r.user_id.toLowerCase() : ""))
+    .filter((id) => id.length > 0);
+  const targetIsMember = memberIds.includes(targetId);
+
+  // The block read only when it can change the answer (not already in, not full).
+  let blocked = false;
+  if (groupAddDecision({ memberCount: memberIds.length, targetIsMember, blocked: false }).kind === "add") {
+    const conflict = await loadGroupBlockConflict(admin, [targetId], memberIds);
+    if (!conflict.ok) {
+      console.error("[threads.members.POST block-check]", conflict.error);
+      return NextResponse.json({ ok: false, error: "Request failed" }, { status: 500 });
+    }
+    blocked = conflict.blocked;
+  }
+
+  const decision = groupAddDecision({ memberCount: memberIds.length, targetIsMember, blocked });
+  if (decision.kind === "already") return NextResponse.json({ ok: true, already: true });
+  if (decision.kind === "full") {
+    return NextResponse.json({ ok: false, error: GROUP_FULL }, { status: 409 });
+  }
+  if (decision.kind === "refused") {
+    return NextResponse.json({ ok: false, error: GROUP_ADD_REFUSED }, { status: 403 });
+  }
+
+  // Insert via service client (RLS blocks inserting another user's row).
   const { error: insErr } = await admin.from("channel_members").insert({
     channel_id: channelId,
     user_id: targetId,
@@ -118,6 +185,10 @@ export async function POST(req: Request, ctx: RouteCtx) {
     accepted_at: new Date().toISOString(),
   });
   if (insErr) {
+    // Added by someone else in the same instant: the idempotent answer.
+    if ((insErr as { code?: string }).code === "23505") {
+      return NextResponse.json({ ok: true, already: true });
+    }
     console.error("[threads.members.POST]", insErr);
     return NextResponse.json({ ok: false, error: "Request failed" }, { status: 500 });
   }

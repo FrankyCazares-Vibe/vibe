@@ -33,10 +33,11 @@ import { useAppShell } from "@/lib/native/use-app-shell";
  * some older server were to send one.
  *
  * `total` IS PEOPLE, AND IT IS NOT THE VIEWS CHIP. The route's `total` counts
- * distinct people after the author's own rows and blocked/muted viewers come
- * out, while `counts.views` on the post itself counts view rows (one per
- * person per UTC day, nobody hidden). They are different questions, so this
- * sheet says its own number and never echoes the chip it was opened from.
+ * distinct people after the author's own rows come out (people the author
+ * muted or blocked still count; only the Vibe+ list leaves them out), while
+ * `counts.views` on the post itself counts view rows (one per person per UTC
+ * day). They are different questions, so this sheet says its own number and
+ * never echoes the chip it was opened from.
  *
  * A REFUSED READ NEVER PAINTS A 0 (wave plan rule 3). A failed first page
  * renders <LoadFailed> with Retry in the list's place — not "No one yet.", not

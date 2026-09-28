@@ -2767,6 +2767,11 @@ type RequestRow = {
   // requester's verified school, as of now.
   eligible?: boolean;
   ineligible_reason?: "audience_iu" | "audience_purdue" | "unverified" | null;
+  // An officer removed them before and nobody let them back (S67 sec wave 2
+  // #15). Letting them back takes an owner or admin, so `can_approve` is
+  // false for a mod; they can still Deny.
+  removed_before?: boolean;
+  can_approve?: boolean;
 };
 
 const REQUEST_INELIGIBLE_LABEL: Record<"audience_iu" | "audience_purdue" | "unverified", string> = {
@@ -2828,8 +2833,17 @@ function SettingsRequests({ org }: { org: Org }) {
     );
     setBusyId(null);
     if (!r.ok) {
-      // The 429 body carries no `code` and may not be JSON.
-      setErr(r.status === 429 ? "Too many tries. Try again in a minute." : (r.error ?? r.message));
+      // The 429 body carries no `code` and may not be JSON. The club refusals
+      // (approve_unavailable, removed_needs_admin) get their plain line from
+      // `orgErrorCopy`; a request that's gone (404 request_not_found, which is
+      // also what a block pair with this officer answers) gets vibeRequest's
+      // "That's no longer available." rather than the raw server string.
+      setErr(
+        r.status === 429
+          ? "Too many tries. Try again in a minute."
+          : (orgErrorCopy(r.code) ??
+              (r.status === 404 ? r.message : (r.error ?? r.message))),
+      );
       // Re-read the list, so each row's eligibility is current (an approve
       // can be refused because the club or the student changed since).
       refresh();
@@ -2899,6 +2913,25 @@ function SettingsRequests({ org }: { org: Org }) {
               <div style={{ fontFamily: "DM Sans, sans-serif", fontSize: 12, color: COLORS.glassMuted }}>
                 @{r.handle ?? r.user_id.slice(0, 6)}
               </div>
+              {r.removed_before ? (
+                <span
+                  style={{
+                    display: "inline-block",
+                    marginTop: 4,
+                    padding: "2px 8px",
+                    borderRadius: 999,
+                    background: "var(--tag-bg)",
+                    // --coral, not --tag-ink: this modal is always dark, and
+                    // Light's --tag-ink is too dim on it.
+                    color: "var(--coral)",
+                    fontFamily: "DM Sans, sans-serif",
+                    fontSize: 11,
+                    fontWeight: 600,
+                  }}
+                >
+                  {ORG_COPY.meta.removedBefore}
+                </span>
+              ) : null}
               {r.message ? (
                 <div
                   style={{
@@ -2932,7 +2965,7 @@ function SettingsRequests({ org }: { org: Org }) {
               >
                 {REQUEST_INELIGIBLE_LABEL[r.ineligible_reason ?? "unverified"]}
               </span>
-            ) : (
+            ) : r.can_approve === false ? null : (
               <button
                 type="button"
                 disabled={busyId === r.id}

@@ -28,6 +28,7 @@ const {
   SETTINGS_ROLES,
   SIGNED_OUT,
   audienceAllows,
+  canApproveRequest,
   canInvite,
   checkConstraintName,
   firstNameOf,
@@ -56,6 +57,7 @@ function decide(over: {
   role?: Input["role"];
   pendingInvite?: Input["pendingInvite"];
   pendingRequest?: Input["pendingRequest"];
+  removed?: Input["removed"];
   now?: Date;
 }) {
   return orgJoinState({
@@ -75,6 +77,7 @@ function decide(over: {
     role: over.role ?? null,
     pendingInvite: over.pendingInvite ?? null,
     pendingRequest: over.pendingRequest ?? null,
+    ...(over.removed === undefined ? {} : { removed: over.removed }),
     now: over.now ?? NOW,
   });
 }
@@ -556,4 +559,63 @@ test("checkConstraintName returns null for anything that is not a CHECK violatio
   assert.equal(checkConstraintName({ code: "23514", message: null }), null);
   assert.equal(checkConstraintName(null), null);
   assert.equal(checkConstraintName(undefined), null);
+});
+
+// ── S67 security wave 2 #15: removals ───────────────────────────────────────
+
+test("removed: an open club at home asks instead of one-tap rejoin", () => {
+  assert.deepEqual(decide({ removed: true }), { state: "can_request", reason: "policy" });
+});
+
+test("removed: leaving the field out (or false) keeps today's one tap", () => {
+  assert.deepEqual(decide({}), { state: "can_join" });
+  assert.deepEqual(decide({ removed: false }), { state: "can_join" });
+});
+
+test("removed: a pending request on an open club reads as requested, not join", () => {
+  assert.deepEqual(decide({ removed: true, pendingRequest: { id: "req-1" } }), {
+    state: "requested",
+  });
+});
+
+test("removed: a live invite still admits them (an owner or admin chose to)", () => {
+  assert.deepEqual(decide({ removed: true, pendingInvite: LIVE_INVITE }), { state: "invited" });
+});
+
+test("removed: invite-only, request and visiting answers are unchanged", () => {
+  assert.deepEqual(decide({ removed: true, org: { join_policy: "invite" } }), {
+    state: "invite_only",
+  });
+  assert.deepEqual(decide({ removed: true, org: { join_policy: "request" } }), {
+    state: "can_request",
+    reason: "policy",
+  });
+  assert.deepEqual(
+    decide({ removed: true, viewer: { campus_id: "bloomington" } }),
+    { state: "can_request", reason: "visiting" },
+  );
+});
+
+test("removed: never outranks member, hidden, unverified or audience", () => {
+  assert.deepEqual(decide({ removed: true, role: "member" }), { state: "member" });
+  assert.deepEqual(decide({ removed: true, org: { hidden_at: "2026-09-01T00:00:00Z" } }), {
+    state: "not_found",
+  });
+  assert.deepEqual(decide({ removed: true, viewer: { school_system: null } }), {
+    state: "unverified",
+  });
+  assert.equal(decide({ removed: true, org: { audience: "purdue" } }).state, "audience_blocked");
+});
+
+test("canApproveRequest: any officer, but a removed person needs owner or admin", () => {
+  for (const role of ["owner", "admin", "mod"] as const) {
+    assert.equal(canApproveRequest(role, false), true, role);
+  }
+  assert.equal(canApproveRequest("member", false), false);
+  assert.equal(canApproveRequest(null, false), false);
+  assert.equal(canApproveRequest("owner", true), true);
+  assert.equal(canApproveRequest("admin", true), true);
+  assert.equal(canApproveRequest("mod", true), false);
+  assert.equal(canApproveRequest("member", true), false);
+  assert.equal(canApproveRequest(undefined, true), false);
 });

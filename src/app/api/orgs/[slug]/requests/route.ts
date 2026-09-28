@@ -1,14 +1,18 @@
 import { NextResponse } from "next/server";
 
 import { isSchoolSystem } from "@/lib/iu/campuses";
+import { officerGate } from "@/lib/orgs/hidden-gate";
 import {
+  OFFICER_ROLES,
   audienceAllows,
-  isOfficer,
+  canApproveRequest,
   isOrgAudience,
   isOrgRole,
   type OrgAudience,
   type ViewerSystem,
 } from "@/lib/orgs/join-state";
+import { loadRemovedUserIds } from "@/lib/orgs/membership";
+import { loadHiddenUsers } from "@/lib/safety/hidden-users";
 import { createSupabaseServerClient } from "@/lib/supabase/server";
 import { createSupabaseServiceClient } from "@/lib/supabase/service";
 
@@ -46,7 +50,21 @@ type IneligibleReason = "audience_iu" | "audience_purdue" | "unverified";
  *
  * A HIDDEN ORG STILL LISTS. Members keep direct access to a hidden org
  * (spec §3.4) and its officers may still read the queue; approving is what
- * the approve route blocks, with 409 `org_hidden`.
+ * the approve route blocks, with 409 `org_hidden`. A NON-member asking about
+ * a hidden club gets 404, never 403 (S67 sec wave 2, hidden-club Low).
+ *
+ * BLOCKS (S67 sec wave 2 #15, product call 9). A request from somebody in a
+ * block pair with THIS officer, either way, is left out of this officer's
+ * list (blocks only; mutes don't hide a request). That is how "the student
+ * blocked an officer" works: they may still ask, and that officer never
+ * sees it. Fails closed: a failed blocks read is a 500, never an unfiltered
+ * list.
+ *
+ * REMOVED BEFORE (#15). `removed_before: true` marks a request from somebody
+ * an officer removed; the UI shows "Removed before" (`ORG_COPY.meta.
+ * removedBefore`). `can_approve` is false when this officer's role can't let
+ * them back (a mod, for a removed person: `canApproveRequest`); the approve
+ * route answers 403 `removed_needs_admin` for the same case.
  */
 export async function GET(_req: Request, { params }: Params) {
   const { slug } = await params;
@@ -63,7 +81,7 @@ export async function GET(_req: Request, { params }: Params) {
 
   const { data: org } = await service
     .from("orgs")
-    .select("id, audience")
+    .select("id, audience, hidden_at")
     .eq("handle", slug)
     .maybeSingle();
   if (!org) {
@@ -84,7 +102,14 @@ export async function GET(_req: Request, { params }: Params) {
     .eq("user_id", user.id)
     .maybeSingle();
   const viewerRole = viewer && isOrgRole(viewer.role) ? viewer.role : null;
-  if (!isOfficer(viewerRole)) {
+  const gate = officerGate({ hidden: !!org.hidden_at, role: viewerRole, allowed: OFFICER_ROLES });
+  if (gate === "not_found") {
+    return NextResponse.json(
+      { ok: false, error: "Not found", code: "not_found" },
+      { status: 404 },
+    );
+  }
+  if (gate === "forbidden") {
     return NextResponse.json(
       { ok: false, error: "Staff only", code: "officers_only" },
       { status: 403 },
@@ -107,7 +132,18 @@ export async function GET(_req: Request, { params }: Params) {
     );
   }
 
-  const rows = data || [];
+  // Blocks either way with THIS officer hide the request from them. The
+  // officer's own client reads both directions (blocks_select_either).
+  const hiddenRes = await loadHiddenUsers(supabase, user.id);
+  if (!hiddenRes.ok) {
+    console.error("[orgs/[slug]/requests GET blocks]", hiddenRes.error);
+    return NextResponse.json(
+      { ok: false, error: "Failed to load requests", code: "load_failed" },
+      { status: 500 },
+    );
+  }
+  const blocked = hiddenRes.hidden.blocked;
+  const rows = (data || []).filter((r) => !blocked.has(r.user_id as string));
 
   // `school_system` is a private users column (service role only), so it is
   // read here in ONE query for the whole page rather than embedded in the
@@ -137,6 +173,15 @@ export async function GET(_req: Request, { params }: Params) {
     }
   }
 
+  const removedRes = await loadRemovedUserIds(service, org.id as string, requesterIds);
+  if (!removedRes.ok) {
+    console.error("[orgs/[slug]/requests GET removals]", removedRes.error);
+    return NextResponse.json(
+      { ok: false, error: "Failed to load requests", code: "load_failed" },
+      { status: 500 },
+    );
+  }
+
   const requests = rows.map((r) => {
     const u = r.users as unknown as {
       id: string;
@@ -146,6 +191,7 @@ export async function GET(_req: Request, { params }: Params) {
       school_verified: boolean | null;
     } | null;
     const system = systems.get(r.user_id as string) ?? null;
+    const removedBefore = removedRes.ids.has((r.user_id as string).toLowerCase());
     // Unverified comes first: it is the friendlier, fixable answer, and it is
     // also the decision order `orgJoinState` uses (spec §3.2 rows 3 then 4).
     let ineligibleReason: IneligibleReason | null = null;
@@ -165,6 +211,8 @@ export async function GET(_req: Request, { params }: Params) {
       school_verified: !!u?.school_verified,
       eligible: ineligibleReason === null,
       ineligible_reason: ineligibleReason,
+      removed_before: removedBefore,
+      can_approve: canApproveRequest(viewerRole, removedBefore),
     };
   });
 

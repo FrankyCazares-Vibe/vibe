@@ -1,8 +1,9 @@
 import { NextResponse } from "next/server";
 
+import { loadClubOfficer } from "@/lib/club-routes/officer-guard";
+import { requireNotRestricted } from "@/lib/moderation/access";
 import { isUuid } from "@/lib/pgrest";
 import { createSupabaseServerClient } from "@/lib/supabase/server";
-import { createSupabaseServiceClient } from "@/lib/supabase/service";
 
 type Params = { params: Promise<{ slug: string }> };
 type Body = { channel_ids?: unknown };
@@ -18,7 +19,9 @@ const MAX_IDS = 200;
  * order (e.g. only the visible/non-pinned section) without disturbing
  * everything else.
  *
- * Permissions: owner/admin only.
+ * Permissions: owner/admin only, not restricted (the write is service-role,
+ * so the route asks); a stranger asking about a hidden club gets 404
+ * (`loadClubOfficer`, security wave 2).
  */
 export async function POST(req: Request, { params }: Params) {
   const { slug } = await params;
@@ -60,34 +63,26 @@ export async function POST(req: Request, { params }: Params) {
     );
   }
 
-  const service = createSupabaseServiceClient();
+  const restricted = await requireNotRestricted(user.id);
+  if (restricted) return restricted;
 
-  const { data: org } = await service
-    .from("orgs")
-    .select("id")
-    .eq("handle", slug)
-    .maybeSingle();
-  if (!org) {
-    return NextResponse.json({ ok: false, error: "Not found" }, { status: 404 });
+  const guard = await loadClubOfficer(slug, user.id);
+  if (!guard.ok) {
+    return NextResponse.json({ ok: false, error: guard.error }, { status: guard.status });
   }
-
-  const { data: viewer } = await service
-    .from("org_members")
-    .select("role")
-    .eq("org_id", org.id)
-    .eq("user_id", user.id)
-    .maybeSingle();
-  if (!viewer || !["owner", "admin"].includes(viewer.role)) {
-    return NextResponse.json({ ok: false, error: "Admin only" }, { status: 403 });
-  }
+  const { org, service } = guard;
 
   // Reject any id that doesn't belong to this org — protects against
   // accidentally writing positions onto someone else's channels.
-  const { data: belongs } = await service
+  const { data: belongs, error: belongsErr } = await service
     .from("channels")
     .select("id")
     .eq("org_id", org.id)
     .in("id", channelIds);
+  if (belongsErr) {
+    console.error("[orgs/[slug]/channels/reorder]", belongsErr);
+    return NextResponse.json({ ok: false, error: "Request failed" }, { status: 500 });
+  }
   const valid = new Set((belongs || []).map((r) => r.id as string));
   const filtered = channelIds.filter((id) => valid.has(id));
   if (filtered.length !== channelIds.length) {

@@ -1,6 +1,8 @@
 import { NextResponse } from "next/server";
 
 import { DISCOVERABLE_USER_COLUMNS, isDiscoverableAccount } from "@/lib/iu/community-scope";
+import { ensureMember } from "@/lib/messages/channel-access";
+import { loadHiddenUsers } from "@/lib/safety/hidden-users";
 import { createSupabaseServerClient } from "@/lib/supabase/server";
 import { createSupabaseServiceClient, isSupabaseServiceConfigured } from "@/lib/supabase/service";
 import { ilikeOrFilter, ilikePrefixOrFilter, isUuid } from "@/lib/pgrest";
@@ -67,20 +69,27 @@ export async function GET(req: Request) {
 
   let allowedIds: Set<string> | null = null;
   if (scopeChannelId) {
-    const { data: viewerMember } = await supabase
-      .from("channel_members")
-      .select("channel_id")
-      .eq("channel_id", scopeChannelId)
-      .eq("user_id", user.id)
-      .maybeSingle();
-    if (!viewerMember) {
+    // The messages route's own gate (security wave 2, report #14): a leftover
+    // channel_members row no longer counts. An ex-member of a club, or anyone
+    // who can't read the channel, gets the same quiet empty list as before.
+    const member = await ensureMember(supabase, scopeChannelId, user.id);
+    if (!member.ok) {
+      if (member.status === 500) {
+        return NextResponse.json({ ok: false, error: "Request failed" }, { status: 500 });
+      }
       return NextResponse.json({ ok: true, users: [] });
     }
-    const { data: members } = await supabase
+    // RLS (channel_members_select_member) scopes this to rosters the viewer
+    // may read. A club member with no subscription row reads none: empty list.
+    const { data: members, error: membersErr } = await supabase
       .from("channel_members")
       .select("user_id")
       .eq("channel_id", scopeChannelId)
       .neq("user_id", user.id);
+    if (membersErr) {
+      console.error("[users/search channel roster]", membersErr);
+      return NextResponse.json({ ok: false, error: "Request failed" }, { status: 500 });
+    }
     allowedIds = new Set((members ?? []).map((m) => m.user_id as string));
     if (allowedIds.size === 0) {
       return NextResponse.json({ ok: true, users: [] });
@@ -175,25 +184,20 @@ export async function GET(req: Request) {
   }
 
   // Filter blocked-either-way users out of search results so neither
-  // party surfaces in the other's discovery flow.
+  // party surfaces in the other's discovery flow. FAILS CLOSED (security wave
+  // 2): a blocks read that errored used to be swallowed and the results went
+  // out unfiltered, putting a blocked person back in front of the person who
+  // blocked them. Now a failed read is a failed search. Mutes are not a
+  // search filter (the shared helper reads them too; only `blocked` is used).
   if (users.length > 0) {
-    try {
-      const { data: blockRows } = await supabase
-        .from("blocks")
-        .select("blocker_id, blocked_id")
-        .or(`blocker_id.eq.${user.id},blocked_id.eq.${user.id}`);
-      const hidden = new Set<string>();
-      for (const b of blockRows ?? []) {
-        const blocker = b.blocker_id as string;
-        const blocked = b.blocked_id as string;
-        if (blocker === user.id) hidden.add(blocked);
-        else if (blocked === user.id) hidden.add(blocker);
-      }
-      for (let i = users.length - 1; i >= 0; i--) {
-        if (hidden.has(users[i]!.id as string)) users.splice(i, 1);
-      }
-    } catch {
-      /* blocks table may not be migrated yet; surface unfiltered. */
+    const hiddenRes = await loadHiddenUsers(supabase, user.id);
+    if (!hiddenRes.ok) {
+      console.error("[users/search blocks]", hiddenRes.error);
+      return NextResponse.json({ ok: false, error: "Request failed" }, { status: 500 });
+    }
+    const blocked = hiddenRes.hidden.blocked;
+    for (let i = users.length - 1; i >= 0; i--) {
+      if (blocked.has(users[i]!.id as string)) users.splice(i, 1);
     }
   }
 

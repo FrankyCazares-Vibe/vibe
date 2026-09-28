@@ -2,7 +2,9 @@ import { NextResponse } from "next/server";
 import type { SupabaseClient } from "@supabase/supabase-js";
 
 import { isMissingColumnError } from "@/lib/db/missing-column";
+import { getActiveRestriction } from "@/lib/moderation/access";
 import { withPostMediaUrls } from "@/lib/post-media-url";
+import { loadPairBlock } from "@/lib/safety/pair-block";
 import { createSupabaseServerClient } from "@/lib/supabase/server";
 import { createSupabaseServiceClient } from "@/lib/supabase/service";
 
@@ -24,7 +26,9 @@ type RouteContext = { params: Promise<{ handle: string }> };
  *
  * Signed-in reads use the session client (RLS). Logged-out share-link
  * visits use the service-role client against the same published-only
- * filter — `posts` RLS is authenticated-only, same as profile bootstrap.
+ * filter — `posts` RLS is authenticated-only, same as profile bootstrap —
+ * so that branch restates the rules RLS would apply: a restricted author
+ * 404s and club posts are left out (S67 security wave 2, A1).
  */
 export async function GET(req: Request, ctx: RouteContext) {
   const { handle: rawHandle } = await ctx.params;
@@ -60,16 +64,33 @@ export async function GET(req: Request, ctx: RouteContext) {
     return NextResponse.json({ ok: false, error: "User not found" }, { status: 404 });
   }
 
+  // SIGNED OUT, the reads below use the service role, so no RLS stands
+  // behind them (S67 security wave 2, A1; report #6). A suspended or banned
+  // student's grid answers the same 404 an unknown handle gets, word for word,
+  // exactly as the profile bootstrap does; a failed restriction read is 500,
+  // never "not restricted". Signed in, users/posts RLS (user_visible) already
+  // hides a restricted author.
+  if (!user) {
+    const restriction = await getActiveRestriction(target.id);
+    if (!restriction.ok) {
+      return NextResponse.json({ ok: false, error: "Request failed" }, { status: 500 });
+    }
+    if (restriction.restriction) {
+      return NextResponse.json({ ok: false, error: "User not found" }, { status: 404 });
+    }
+  }
+
   // Blocks in either direction hide the grid, matching the bootstrap
   // route's "Profile unavailable" branch. Without this a blocked user could
-  // still read every post through this endpoint directly.
+  // still read every post through this endpoint directly. The one block-pair
+  // module (fails closed): a refused read is 500, not "not blocked".
   if (user && user.id !== target.id) {
-    const { data: blockRows } = await supabase
-      .from("blocks")
-      .select("blocker_id, blocked_id")
-      .in("blocker_id", [user.id, target.id])
-      .in("blocked_id", [user.id, target.id]);
-    if ((blockRows ?? []).length > 0) {
+    const pair = await loadPairBlock(supabase, user.id, target.id);
+    if (!pair.ok) {
+      console.error("[users/:handle/posts blocks]", pair.error);
+      return NextResponse.json({ ok: false, error: "Request failed" }, { status: 500 });
+    }
+    if (pair.blocked) {
       return NextResponse.json({ ok: true, posts: [], blocked: true });
     }
   }
@@ -105,6 +126,11 @@ export async function GET(req: Request, ctx: RouteContext) {
       .eq("type", "post")
       .eq("status", "published");
     if (moderation && !viewerIsAuthor) q = q.is("removed_at", null);
+    // Signed out: no club posts at all. That IS the database's own rule
+    // (org_content_visible() is false for the anon role for every club), and
+    // this service-role read is the one place it has to be restated, or a
+    // hidden club's posts reach a stranger through its officer's grid.
+    if (!user) q = q.is("org_id", null);
     return q.order("created_at", { ascending: false }).limit(limit);
   };
 

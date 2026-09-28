@@ -11,6 +11,7 @@ import {
   type OrgRole,
   type ViewerSystem,
 } from "@/lib/orgs/join-state";
+import { ORG_REMOVALS_TABLE, isMissingRemovalsTable, removedIdSet } from "@/lib/orgs/removals";
 import { kickPushDrain } from "@/lib/push/dispatch";
 
 /**
@@ -73,7 +74,14 @@ export type ViewerOrgContext = {
   pendingRequest: PendingRequest | null;
   viewer: ViewerRow;
   /**
-   * False when any of the four reads failed. The other four fields are then
+   * An officer removed them and nobody has let them back yet (an
+   * `org_removals` row; S67 security wave 2 #15). Pass it to `orgJoinState`
+   * as `removed` so an open club asks instead of offering one-tap rejoin.
+   * False when the table isn't deployed yet (nothing could be recorded).
+   */
+  removed: boolean;
+  /**
+   * False when any of the reads failed. The other four fields are then
    * the least-privileged answer (no role, no invite, no request, unverified),
    * which is safe to act on but WRONG to render: a real member would be told
    * to verify their school email. Routes check this and return 500 rather
@@ -109,7 +117,7 @@ export async function loadViewerOrgContext(
   orgId: string,
   userId: string,
 ): Promise<ViewerOrgContext> {
-  const [memberRes, inviteRes, requestRes, viewerRes] = await Promise.all([
+  const [memberRes, inviteRes, requestRes, viewerRes, removalRes] = await Promise.all([
     service
       .from("org_members")
       .select("role")
@@ -137,10 +145,27 @@ export async function loadViewerOrgContext(
       .select("school_system, campus_id, is_platform_admin")
       .eq("id", userId)
       .maybeSingle(),
+    service
+      .from(ORG_REMOVALS_TABLE)
+      .select("user_id")
+      .eq("org_id", orgId)
+      .eq("user_id", userId)
+      .maybeSingle(),
   ]);
 
+  // A build that finds no org_removals table reads "not removed" (see
+  // isMissingRemovalsTable); any other failure of this read fails closed.
+  const removalMissing = isMissingRemovalsTable(removalRes.error);
+  if (removalMissing) {
+    console.error("[orgs/membership loadViewerOrgContext] org_removals is not deployed");
+  }
   const failure =
-    memberRes.error ?? inviteRes.error ?? requestRes.error ?? viewerRes.error ?? null;
+    memberRes.error ??
+    inviteRes.error ??
+    requestRes.error ??
+    viewerRes.error ??
+    (removalMissing ? null : removalRes.error) ??
+    null;
   if (failure) console.error("[orgs/membership loadViewerOrgContext]", failure);
 
   const roleValue = (memberRes.data as { role?: unknown } | null)?.role;
@@ -167,6 +192,7 @@ export async function loadViewerOrgContext(
           is_platform_admin: viewerRow.is_platform_admin === true,
         }
       : NO_VIEWER,
+    removed: !failure && !removalMissing && removalRes.data != null,
     ok: !failure,
     error: failure,
   };
@@ -433,5 +459,99 @@ export async function notifyOrg(
     console.error("[orgs/membership notifyOrg]", { type: row.type, error });
   } catch (e) {
     console.error("[orgs/membership notifyOrg]", e);
+  }
+}
+
+// ── Removals (S67 security wave 2 #15) ──────────────────────────────────────
+
+/**
+ * Record that an officer removed `userId` from the org. Call it BEFORE the
+ * org_members delete: the AFTER DELETE trigger reads this row to tell a
+ * removal (drop their RSVPs to the club's events that haven't ended) from a
+ * voluntary leave (keep them), and a crash between the two steps then leaves
+ * a member with a stale removal (member state wins; the next removal simply
+ * re-stamps it), never a removed person with no record (a one-tap rejoin).
+ *
+ * `missing: true` when the table isn't deployed yet: the caller removes the
+ * member anyway, exactly as before this wave. Any other error is `ok: false`
+ * and the caller must NOT delete the membership.
+ */
+export async function recordOrgRemoval(
+  service: SupabaseClient,
+  args: { orgId: string; userId: string; removedBy: string },
+): Promise<{ ok: true; missing: boolean } | { ok: false }> {
+  try {
+    const { error } = await service.from(ORG_REMOVALS_TABLE).upsert(
+      {
+        org_id: args.orgId,
+        user_id: args.userId,
+        removed_by: args.removedBy,
+        removed_at: new Date().toISOString(),
+      },
+      { onConflict: "org_id,user_id" },
+    );
+    if (!error) return { ok: true, missing: false };
+    if (isMissingRemovalsTable(error)) {
+      console.error("[orgs/membership recordOrgRemoval] org_removals is not deployed");
+      return { ok: true, missing: true };
+    }
+    console.error("[orgs/membership recordOrgRemoval]", error);
+    return { ok: false };
+  } catch (e) {
+    console.error("[orgs/membership recordOrgRemoval]", e);
+    return { ok: false };
+  }
+}
+
+/**
+ * Undo {@link recordOrgRemoval} when the membership delete that followed it
+ * failed, so a member who is still in the club does not carry a removal that
+ * would make their next voluntary leave count as one. Best-effort, logged.
+ * (Re-admission clears the row in the database: the AFTER INSERT trigger
+ * `org_members_clear_removal_on_join`.)
+ */
+export async function forgetOrgRemoval(
+  service: SupabaseClient,
+  orgId: string,
+  userId: string,
+): Promise<void> {
+  try {
+    const { error } = await service
+      .from(ORG_REMOVALS_TABLE)
+      .delete()
+      .eq("org_id", orgId)
+      .eq("user_id", userId);
+    if (error && !isMissingRemovalsTable(error)) {
+      console.error("[orgs/membership forgetOrgRemoval]", error);
+    }
+  } catch (e) {
+    console.error("[orgs/membership forgetOrgRemoval]", e);
+  }
+}
+
+/**
+ * Which of these people were removed from the org and not let back yet (the
+ * requests list tags them "Removed before", and approving them takes an owner
+ * or admin). An empty list costs no query; a missing table is "nobody".
+ */
+export async function loadRemovedUserIds(
+  service: SupabaseClient,
+  orgId: string,
+  userIds: readonly string[],
+): Promise<{ ok: true; ids: Set<string> } | { ok: false; error: unknown }> {
+  if (userIds.length === 0) return { ok: true, ids: new Set() };
+  try {
+    const { data, error } = await service
+      .from(ORG_REMOVALS_TABLE)
+      .select("user_id")
+      .eq("org_id", orgId)
+      .in("user_id", [...userIds]);
+    if (error) {
+      if (isMissingRemovalsTable(error)) return { ok: true, ids: new Set() };
+      return { ok: false, error };
+    }
+    return { ok: true, ids: removedIdSet(userIds, data as Array<{ user_id?: unknown }>) };
+  } catch (error) {
+    return { ok: false, error };
   }
 }

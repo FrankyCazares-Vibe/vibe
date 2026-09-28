@@ -2,7 +2,12 @@ import { cache } from "react";
 import { notFound } from "next/navigation";
 import type { Metadata } from "next";
 
+import { requirePlatformAdmin } from "@/lib/auth/require-platform-admin";
 import { getSiteUrl } from "@/lib/auth/site-url";
+import { getActiveRestriction } from "@/lib/moderation/access";
+import { profilePreviewDescription } from "@/lib/profile/hidden-fields";
+import { sanitizeProfileLayout } from "@/lib/profile/profile-layout";
+import { createSupabaseServerClient } from "@/lib/supabase/server";
 import { createSupabaseServiceClient } from "@/lib/supabase/service";
 
 import { ProfileHandleSwitch } from "./ProfileHandleSwitch";
@@ -19,6 +24,8 @@ type PublicProfileRow = {
   tagline: string | null;
   bio: string | null;
   avatar_url: string | null;
+  /** Service-role only column; read so a hidden bio stays out of the preview. */
+  profile_layout: unknown;
 };
 
 /** Deduped across generateMetadata + the page so we don't hit Supabase twice. */
@@ -26,7 +33,7 @@ const loadPublicProfile = cache(async (handle: string) => {
   const service = createSupabaseServiceClient();
   const { data, error } = await service
     .from("users")
-    .select("id,name,handle,tagline,bio,avatar_url")
+    .select("id,name,handle,tagline,bio,avatar_url,profile_layout")
     .eq("handle", handle)
     .maybeSingle();
   // Throw on transport/RLS errors so callers can tell "Supabase is down"
@@ -34,6 +41,13 @@ const loadPublicProfile = cache(async (handle: string) => {
   if (error) throw error;
   return (data as PublicProfileRow | null) ?? null;
 });
+
+/**
+ * The target's restriction, shared by generateMetadata and the page (S67
+ * security wave 2, A1; report #2b). getActiveRestriction never throws: a
+ * failed read comes back `{ ok: false }`.
+ */
+const loadRestriction = cache(async (userId: string) => getActiveRestriction(userId));
 
 function ogAvatarUrl(raw: string | null | undefined): string | undefined {
   if (!raw) return undefined;
@@ -53,6 +67,12 @@ function ogAvatarUrl(raw: string | null | undefined): string | undefined {
  * unfurls, plus anyone (logged in or not) tapping the URL. OG meta is
  * built with the service-role client because `users` RLS is
  * authenticated-only; crawlers have no session.
+ *
+ * Because that read bypasses RLS, the rules are restated here (S67 security
+ * wave 2, A1; product call 3): a suspended or banned student — or one whose
+ * restriction can't be read — gets EXACTLY the unknown-handle preview, so an
+ * unfurl can't tell "restricted" from "no such user" and shows no name, bio
+ * or avatar; and a bio the student hid is left out of the description.
  */
 export async function generateMetadata({ params }: Props): Promise<Metadata> {
   const { handle: raw } = await params;
@@ -62,14 +82,18 @@ export async function generateMetadata({ params }: Props): Promise<Metadata> {
   try {
     const row = await loadPublicProfile(handle);
     if (!row) return { title: `@${handle} · Vibe` };
+    const restriction = await loadRestriction(row.id);
+    if (!restriction.ok || restriction.restriction) return { title: `@${handle} · Vibe` };
 
     const name = (row.name || "").trim() || `@${row.handle || handle}`;
     const at = row.handle || handle;
     const title = `${name} (@${at}) · Vibe`;
-    const description =
-      (row.tagline || "").trim() ||
-      (row.bio || "").trim().slice(0, 160) ||
-      `${name}'s profile on Vibe`;
+    const description = profilePreviewDescription({
+      name,
+      tagline: row.tagline,
+      bio: row.bio,
+      bioHidden: sanitizeProfileLayout(row.profile_layout).hidden.includes("bio"),
+    });
     const image = ogAvatarUrl(row.avatar_url);
     const url = `${getSiteUrl()}/profile/${encodeURIComponent(at)}`;
 
@@ -130,6 +154,25 @@ export default async function ProfileByHandlePage({
     // bootstrap fetch surface the error, rather than 500 the share link.
   }
   if (row === null) notFound();
+
+  // A suspended or banned student's page answers the same 404 as an unknown
+  // handle (S67 security wave 2, A1), matching the bootstrap and the preview
+  // above; otherwise "page 200, bootstrap 404" would tell anyone who a
+  // moderator acted on. The same two people the bootstrap lets through still
+  // get in: the student themselves, and a platform admin (the moderation
+  // screens link straight here). A restriction read that FAILED keeps the
+  // page mounted; the bootstrap then answers 500 and nothing is shown.
+  if (row) {
+    const restriction = await loadRestriction(row.id);
+    if (restriction.ok && restriction.restriction) {
+      const supabase = await createSupabaseServerClient();
+      const {
+        data: { user },
+      } = await supabase.auth.getUser();
+      const allowed = user?.id === row.id || (user ? (await requirePlatformAdmin()).ok : false);
+      if (!allowed) notFound();
+    }
+  }
 
   // The whole query goes down as a string; ProfileHandleSwitch carries only
   // the settings the static page reads (forwardedProfileParams). Reading it

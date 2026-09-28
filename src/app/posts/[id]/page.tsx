@@ -1,7 +1,10 @@
 import { notFound, redirect } from "next/navigation";
 import type { Metadata } from "next";
 
+import { getActiveRestriction } from "@/lib/moderation/access";
 import { withPostMediaUrls } from "@/lib/post-media-url";
+import { postPreviewIsPublic, type RestrictionState } from "@/lib/profile/hidden-fields";
+import { loadPairBlock } from "@/lib/safety/pair-block";
 import { createSupabaseServerClient } from "@/lib/supabase/server";
 import { createSupabaseServiceClient } from "@/lib/supabase/service";
 
@@ -22,25 +25,64 @@ type Params = { params: Promise<{ id: string }> };
  *
  * OG meta is built via `generateMetadata` so iMessage / Discord
  * previews render the post's author + content snippet + image. We
- * use the service-role Supabase client for the meta fetch (no viewer
- * context needed — author/content/media are public attributes for
- * any post that survived RLS at create time).
+ * use the service-role Supabase client for the meta fetch, so NO RLS
+ * stands behind it: this function restates the rules the database applies
+ * to signed-in students (S67 security wave 2, A1; report #7). A post a
+ * moderator removed, a hidden club's post, and a post whose author is
+ * suspended or banned (or whose restriction can't be read) all get the
+ * generic card below: no author, no text, no image. Public clubs' posts keep
+ * their preview (product call 3). Every failure falls back to generic.
  */
+const GENERIC_POST_METADATA: Metadata = { title: "Post · Vibe" };
+
 export async function generateMetadata({ params }: Params): Promise<Metadata> {
   const { id } = await params;
-  if (!id) return { title: "Post · Vibe" };
+  if (!id) return GENERIC_POST_METADATA;
 
   try {
     const service = createSupabaseServiceClient();
-    const { data: row } = await service
+    const { data: row, error } = await service
       .from("posts")
       .select(
-        "id,type,content,media_url,media_thumbnail_url,author:users!posts_user_id_fkey(name,handle)",
+        "id,type,content,media_url,media_thumbnail_url,user_id,org_id,removed_at," +
+          "author:users!posts_user_id_fkey(name,handle),org:orgs!posts_org_id_fkey(hidden_at)",
       )
       .eq("id", id)
       .eq("status", "published")
+      .is("removed_at", null)
       .maybeSingle();
-    if (!row) return { title: "Post · Vibe" };
+    if (error || !row) return GENERIC_POST_METADATA;
+    const gate = row as unknown as {
+      user_id: string;
+      org_id: string | null;
+      removed_at: string | null;
+      org: { hidden_at: string | null } | { hidden_at: string | null }[] | null;
+    };
+    const orgObj = Array.isArray(gate.org) ? gate.org[0] : gate.org;
+    const restriction = await getActiveRestriction(gate.user_id);
+    const author: RestrictionState = !restriction.ok
+      ? "unknown"
+      : restriction.restriction
+        ? "restricted"
+        : "none";
+    const isPublic = postPreviewIsPublic({
+      removedAt: gate.removed_at,
+      orgId: gate.org_id,
+      orgHiddenAt: orgObj ? orgObj.hidden_at : undefined,
+      author,
+    });
+    if (!isPublic) return GENERIC_POST_METADATA;
+    // A signed-in viewer in a block pair with the author gets the generic
+    // card too: otherwise the tab title shows them the words RLS now hides
+    // from them (S67 wave 2, A2). A failed block read is generic as well.
+    const viewerClient = await createSupabaseServerClient();
+    const {
+      data: { user: viewer },
+    } = await viewerClient.auth.getUser();
+    if (viewer && viewer.id !== gate.user_id) {
+      const pair = await loadPairBlock(service, viewer.id, gate.user_id);
+      if (!pair.ok || pair.blocked) return GENERIC_POST_METADATA;
+    }
     // PostgREST embed shape varies by FK config — author can come back
     // as a single object or a 1-element array. Cast through unknown
     // and normalize once below.
@@ -97,7 +139,7 @@ export async function generateMetadata({ params }: Params): Promise<Metadata> {
       },
     };
   } catch {
-    return { title: "Post · Vibe" };
+    return GENERIC_POST_METADATA;
   }
 }
 
@@ -105,23 +147,14 @@ export default async function PostPage({ params }: Params) {
   const { id } = await params;
   if (!id) notFound();
 
-  // Existence check on the server so we 404 cleanly instead of
-  // mounting the viewer and letting it 404 client-side. Uses the
-  // service client to skip RLS — the viewer's GET will still enforce
-  // auth + visibility once the page mounts.
-  const service = createSupabaseServiceClient();
-  const { data: row } = await service
-    .from("posts")
-    .select("id")
-    .eq("id", id)
-    .maybeSingle();
-  if (!row) notFound();
-
-  // Auth gate. OG meta (generateMetadata) renders without auth so
-  // share-link previews work for cold visitors, but actually clicking
-  // through requires a logged-in session — the viewer fetches via
-  // /api/posts/[id] which is auth-only. Send unauthed users to login
-  // with this URL as `next` so they bounce back after signing in.
+  // Auth gate FIRST (S67 security wave 2, A1). OG meta (generateMetadata)
+  // renders without auth so share-link previews work for cold visitors, but
+  // actually clicking through requires a logged-in session — the viewer
+  // fetches via /api/posts/[id] which is auth-only. Send unauthed users to
+  // login with this URL as `next` so they bounce back after signing in.
+  // Checked before the existence read so a signed-out visitor gets the same
+  // redirect for every id: a 404-vs-redirect split told strangers which post
+  // ids exist (removed ones included).
   const supabase = await createSupabaseServerClient();
   const {
     data: { user },
@@ -129,6 +162,20 @@ export default async function PostPage({ params }: Params) {
   if (!user) {
     redirect(`/auth/login?next=${encodeURIComponent(`/posts/${id}`)}`);
   }
+
+  // Existence check on the server so we 404 cleanly instead of
+  // mounting the viewer and letting it 404 client-side. Uses the
+  // service client to skip RLS — the viewer's GET will still enforce
+  // auth + visibility once the page mounts. Deliberately NO removed_at
+  // filter: GET /api/posts/[id] serves a removed post to its AUTHOR so they
+  // can read the removal notice here; filtering would 404 them first.
+  const service = createSupabaseServiceClient();
+  const { data: row } = await service
+    .from("posts")
+    .select("id")
+    .eq("id", id)
+    .maybeSingle();
+  if (!row) notFound();
 
   return <PostPageClient postId={id} />;
 }

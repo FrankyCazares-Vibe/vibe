@@ -1,14 +1,17 @@
 import { NextResponse } from "next/server";
 
+import { loadClubOfficer } from "@/lib/club-routes/officer-guard";
+import { requireNotRestricted } from "@/lib/moderation/access";
 import { createSupabaseServerClient } from "@/lib/supabase/server";
-import { createSupabaseServiceClient } from "@/lib/supabase/service";
 
 type Params = { params: Promise<{ slug: string; channelId: string; userId: string }> };
 
 /**
  * DELETE /api/orgs/[slug]/channels/[channelId]/members/[userId]
  * Removes a user from the per-channel allow list. Owner/admin only — mods
- * can't revoke channel access (matches the INSERT policy).
+ * can't revoke channel access (matches the INSERT policy). Not while
+ * restricted (the delete is service-role, so the route asks), and a stranger
+ * asking about a hidden club gets 404 (security wave 2, `loadClubOfficer`).
  */
 export async function DELETE(_req: Request, { params }: Params) {
   const { slug, channelId, userId } = await params;
@@ -18,35 +21,14 @@ export async function DELETE(_req: Request, { params }: Params) {
     return NextResponse.json({ ok: false, error: "Unauthorized" }, { status: 401 });
   }
 
-  const service = createSupabaseServiceClient();
+  const restricted = await requireNotRestricted(user.id);
+  if (restricted) return restricted;
 
-  const { data: org } = await service
-    .from("orgs")
-    .select("id")
-    .eq("handle", slug)
-    .maybeSingle();
-  if (!org) {
-    return NextResponse.json({ ok: false, error: "Not found" }, { status: 404 });
+  const guard = await loadClubOfficer(slug, user.id, { channelId });
+  if (!guard.ok) {
+    return NextResponse.json({ ok: false, error: guard.error }, { status: guard.status });
   }
-
-  const { data: channel } = await service
-    .from("channels")
-    .select("id, org_id")
-    .eq("id", channelId)
-    .maybeSingle();
-  if (!channel || channel.org_id !== org.id) {
-    return NextResponse.json({ ok: false, error: "Channel not found" }, { status: 404 });
-  }
-
-  const { data: viewer } = await service
-    .from("org_members")
-    .select("role")
-    .eq("org_id", org.id)
-    .eq("user_id", user.id)
-    .maybeSingle();
-  if (!viewer || !["owner", "admin"].includes(viewer.role)) {
-    return NextResponse.json({ ok: false, error: "Admin only" }, { status: 403 });
-  }
+  const { service } = guard;
 
   const { error } = await service
     .from("org_channel_members")

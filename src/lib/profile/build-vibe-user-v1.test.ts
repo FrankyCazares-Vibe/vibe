@@ -150,3 +150,39 @@ test("profileLayout: the default when the row has none, the sanitized whole docu
   (u.profileLayout as { order: string[] }).order.reverse();
   assert.deepEqual(profile.profile_layout.order, DEFAULT_ORDER);
 });
+
+// S67 security wave 2, A1: a non-owner's profile is blanked BEFORE the build.
+const { blankHiddenWidgets } = await import("./hidden-fields");
+
+test("a hidden bio never reaches a visitor, not even as the tagline the builder derives from it", () => {
+  const stored = row({ tagline: "", profile_layout: { hidden: ["bio", "skills"] } });
+  // The owner: bio kept, and the empty tagline still falls back to it.
+  const owner = buildVibeUserV1FromProfile(blankHiddenWidgets(normalizeProfileView(stored), { isOwner: true }));
+  assert.equal(owner.tagline, "Hello there");
+  assert.deepEqual((owner.profileLayout as { hidden: string[] }).hidden, ["bio", "skills"]);
+  // A visitor: no bio, no bio-derived tagline, no skills, and no hidden list.
+  const visitor = buildVibeUserV1FromProfile(blankHiddenWidgets(normalizeProfileView(stored), { isOwner: false }));
+  assert.equal(visitor.bio, "");
+  assert.equal(visitor.tagline, "");
+  assert.deepEqual(visitor.skills, []);
+  assert.deepEqual((visitor.profileLayout as { hidden: string[] }).hidden, []);
+  assert.equal(JSON.stringify(visitor).includes("Hello there"), false);
+  assert.equal(JSON.stringify(visitor).includes("sql"), false);
+});
+
+test("a hidden résumé, experience and working-on ship no keys to a visitor", () => {
+  const stored = row({
+    profile_layout: { hidden: ["resume", "experience", "working_on"] },
+    resume_url: "https://example.com/cv.pdf",
+    work_experience: [{ title: "Intern", company: "Acme" }],
+    work_order_manual: true,
+    current_on: [{ icon: "x", text: "a thesis" }],
+  });
+  const visitor = buildVibeUserV1FromProfile(blankHiddenWidgets(normalizeProfileView(stored), { isOwner: false }));
+  for (const key of ["resumePortfolio", "workExperience", "_workOrderManual", "currentlyOn", "resumeRedactions"]) {
+    assert.equal(Object.hasOwn(visitor, key), false, key);
+  }
+  const owner = buildVibeUserV1FromProfile(normalizeProfileView(stored));
+  assert.equal(Object.hasOwn(owner, "currentlyOn"), true);
+  assert.equal(Object.hasOwn(owner, "_workOrderManual"), true);
+});

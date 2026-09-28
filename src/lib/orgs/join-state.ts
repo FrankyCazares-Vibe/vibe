@@ -22,7 +22,7 @@
  *   3. no verified school system    → `unverified`
  *   4. audience excludes them       → `audience_blocked`
  *   5. live invite                  → `invited`
- *   6. open, and not visiting       → `can_join`
+ *   6. open, not visiting, not removed → `can_join`
  *   7. pending request              → `requested`
  *   8. invite-only                  → `invite_only`
  *   9. otherwise                    → `can_request` (`policy` | `visiting`)
@@ -130,6 +130,15 @@ export type OrgJoinStateInput = {
   pendingInvite: { id: string; expires_at: string } | null;
   /** The viewer's pending `org_join_requests` row, if any. */
   pendingRequest: { id: string } | null;
+  /**
+   * An officer removed them from this org and nobody has let them back yet
+   * (an `org_removals` row, S67 security wave 2 #15). OPTIONAL and additive:
+   * a caller that leaves it out gets today's answer. A removed viewer on an
+   * open club at home must ask (`can_request`) instead of rejoining with one
+   * tap; every other branch is unchanged, and a live invite still admits them
+   * (an owner or admin chose to let them back).
+   */
+  removed?: boolean;
   /** Injected in tests; defaults to `new Date()`. */
   now?: Date;
 };
@@ -148,8 +157,10 @@ export const OFFICER_ROLES: readonly OrgRole[] = Object.freeze(["owner", "admin"
 /**
  * Who may SEND and REVOKE invites. Owner and admin only — critic C2 overrides
  * the spec body's mod inclusion, because a mod could otherwise re-invite
- * somebody an owner had just removed or denied, and nothing records removals
- * yet (critic A8). Mods go back in once removals are recorded.
+ * somebody an owner had just removed or denied (critic A8). Removals are
+ * recorded since S67 security wave 2 (`org_removals`), and letting a removed
+ * person back takes these same roles ({@link canApproveRequest}); adding mods
+ * here is still Franky's call.
  *
  * PENDING DEFAULT (Franky, being asked 2026-09-16). To let mods invite, add
  * "mod" here — this array, and only this array, is the invite gate. Keep it
@@ -235,6 +246,20 @@ export function canInvite(role: OrgRole | null | undefined): boolean {
 /** Can this role change join policy and audience? */
 export function isSettingsOfficer(role: OrgRole | null | undefined): boolean {
   return role != null && SETTINGS_ROLES.includes(role);
+}
+
+/**
+ * Can this role approve a join request? Any officer, except that letting back
+ * somebody an officer REMOVED takes an owner or admin ({@link INVITE_ROLES}),
+ * the same people who can invite them back (S67 sec wave 2 #15). Otherwise a
+ * mod could quietly undo an admin's removal, which is the reason mods can't
+ * invite today. Denying stays open to every officer.
+ */
+export function canApproveRequest(
+  role: OrgRole | null | undefined,
+  removedBefore: boolean,
+): boolean {
+  return removedBefore ? canInvite(role) : isOfficer(role);
 }
 
 // ── Small rules ─────────────────────────────────────────────────────────────
@@ -410,8 +435,13 @@ export function orgJoinState(input: OrgJoinStateInput): OrgJoinDecision {
 
   // 6. Open, and at home → one tap. Deliberately ahead of a pending request so
   //    that flipping Request → Open does not strand the people who asked.
+  //    NOT for someone an officer removed (S67 sec wave 2 #15): they must ask,
+  //    so a removal can't be undone by tapping Join again. They fall through
+  //    to a pending request (7) or `can_request` (9, reason "policy").
   const visiting = isVisitingOrg(org.campus_id, viewer.campus_id);
-  if (org.join_policy === "open" && !visiting) return { state: "can_join" };
+  if (org.join_policy === "open" && !visiting && input.removed !== true) {
+    return { state: "can_join" };
+  }
 
   // 7. They already asked. Idempotent: POST /join returns the same row.
   //    Ahead of invite-only (critic A11) so the officer sheet offers "Approve
@@ -422,9 +452,11 @@ export function orgJoinState(input: OrgJoinStateInput): OrgJoinDecision {
   //    of the policy, and a silent queue of hopefuls is not a feature.
   if (org.join_policy === "invite") return { state: "invite_only" };
 
-  // 9. Request policy, or open-while-visiting (plan §2.6).
+  // 9. Request policy, or open-while-visiting (plan §2.6). An open club only
+  //    gets here at home when the viewer was removed (6), and that is not
+  //    "visiting": officers approve them the way a request club's are.
   return {
     state: "can_request",
-    reason: org.join_policy === "open" ? "visiting" : "policy",
+    reason: org.join_policy === "open" && visiting ? "visiting" : "policy",
   };
 }

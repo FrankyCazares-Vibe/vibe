@@ -1,5 +1,10 @@
 import { NextResponse } from "next/server";
 
+import { visibleClubPosts } from "@/lib/club-routes/club-posts";
+import {
+  loadRestrictedAuthors,
+  readClubPostsForViewer,
+} from "@/lib/club-routes/club-posts-read";
 import { orgAssetProxyUrl } from "@/lib/org-asset-url";
 import {
   loadFollowerCount,
@@ -115,6 +120,8 @@ export async function GET(_req: Request, { params }: Params) {
         role: ctx.role,
         pendingInvite: ctx.pendingInvite,
         pendingRequest: ctx.pendingRequest,
+        // A removed member of an open club asks, never one-tap rejoins.
+        removed: ctx.removed,
       })
     : null;
 
@@ -158,18 +165,28 @@ export async function GET(_req: Request, { params }: Params) {
   // The privacy boundary is on the channels (RLS), not on the org's
   // description/posts — visitors need that context to decide whether to ask
   // to join, or whether an invite is worth accepting.
-  const { data: posts } = await service
-    .from("posts")
-    .select(
-      "id, type, content, media_url, media_thumbnail_url, created_at, user:user_id(id, handle, name, avatar_url)"
-    )
-    .eq("org_id", org.id)
-    .order("created_at", { ascending: false })
-    .limit(24);
+  //
+  // THE SERVICE ROLE READS THESE POSTS, so no policy runs on them: this list
+  // applies the club page grid's filters by hand (`club-posts.ts` maps each
+  // one to its piece of `posts_select_authenticated`). Published, not
+  // removed, `type='post'` in the query; the hidden-club 404 above; then a
+  // restricted author, or one in a block pair with the viewer (ruling 13),
+  // comes off. Either author read failing shows NO posts rather than
+  // unfiltered ones ("unknown" fails closed); the rest of the profile still
+  // answers.
+  // Blocked authors come off inside the query, before the limit.
+  const { posts: postsRes, blocked: blockedAuthors } = await readClubPostsForViewer(
+    service,
+    supabase,
+    user?.id ?? null,
+    org.id as string,
+    "id, type, content, media_url, media_thumbnail_url, created_at, user:user_id(id, handle, name, avatar_url)",
+  );
+  if (postsRes.error) console.error("[orgs/[slug]/profile GET posts]", postsRes.error);
   // PostgREST infers the embedded `user` join as an array; the actual
   // shape at runtime is a single object (or null) since user_id is a 1:1
   // FK. The double-cast through `unknown` quiets the TS overlap check.
-  const allPosts = (posts || []) as unknown as Array<{
+  const allPosts = (postsRes.error ? [] : (postsRes.data ?? [])) as unknown as Array<{
     id: string;
     type: string;
     content: string;
@@ -178,9 +195,17 @@ export async function GET(_req: Request, { params }: Params) {
     created_at: string;
     user: { id: string; handle: string; name: string; avatar_url: string | null } | null;
   }>;
-  const signedAll = allPosts.map((p) => withPostMediaUrls(p));
-  // Clips are backlogged — only `type='post'` rows surface on org profiles.
-  const postRows = signedAll.filter((p) => p.type === "post").slice(0, 12);
+  const restrictedAuthors = await loadRestrictedAuthors(
+    service,
+    allPosts.map((p) => p.user?.id).filter((id): id is string => !!id),
+  );
+  const postRows =
+    restrictedAuthors.ok && blockedAuthors.ok
+      ? visibleClubPosts(allPosts, {
+          restricted: restrictedAuthors.ids,
+          hiddenAuthors: blockedAuthors.ids,
+        }).map((p) => withPostMediaUrls(p))
+      : [];
 
   // Listed field by field rather than spread, so a column added to the select
   // above (or to the table) can never ship to an anonymous caller by

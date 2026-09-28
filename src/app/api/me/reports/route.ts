@@ -1,16 +1,23 @@
 import { NextResponse } from "next/server";
 
 import { isMissingColumnError } from "@/lib/db/missing-column";
-import { requireNotRestricted } from "@/lib/moderation/access";
+import { getActiveRestriction, requireNotRestricted } from "@/lib/moderation/access";
 import { alertAdminsOfReport } from "@/lib/moderation/alerts";
+import {
+  blockSuspects,
+  crossBlockReportVerdict,
+  type PostFacts,
+  type ReportTargetFacts,
+} from "@/lib/moderation/report-visibility";
 import {
   isReportReasonCode,
   isReportTargetType,
   type ReportTargetType,
 } from "@/lib/moderation/reports";
-import { postAccessForCaller } from "@/lib/orgs/hidden-org-access";
+import { orgContentAccessAsService, postAccessForCaller } from "@/lib/orgs/hidden-org-access";
 import { isUuid } from "@/lib/pgrest";
 import { rateLimit, tooManyRequests } from "@/lib/rate-limit";
+import { loadPairBlock } from "@/lib/safety/pair-block";
 import { createSupabaseServerClient } from "@/lib/supabase/server";
 import { createSupabaseServiceClient } from "@/lib/supabase/service";
 
@@ -74,17 +81,206 @@ type Lookup =
   | { ok: true; target: Target }
   | { ok: false; reason: "not_found" | "error" };
 
+/** What a report keeps as evidence of a post or a comment (the snapshot). */
+const POST_SNAPSHOT_COLUMNS = "id,user_id,content,media_url,media_thumbnail_url,created_at,org_id";
+const COMMENT_SNAPSHOT_COLUMNS = "id,user_id,post_id,content,created_at";
+
+type ServerClient = Awaited<ReturnType<typeof createSupabaseServerClient>>;
+type ServiceClient = ReturnType<typeof createSupabaseServiceClient>;
+
+const pick = (row: Record<string, unknown>, columns: string): Record<string, unknown> =>
+  Object.fromEntries(columns.split(",").map((c) => [c, row[c] ?? null]));
+const textOrNull = (v: unknown): string | null => (typeof v === "string" ? v : null);
+
+/**
+ * The reporter's read of a post or a comment came back empty. Was a block why?
+ * (See readTarget.) Service-role reads, in this order, stopping as soon as the
+ * answer is known: the row (and, for a comment, its post); the reporter's
+ * block with the people blockSuspects names, read with the REPORTER's client
+ * (blocks_select_either shows them exactly their own pairs); only then the
+ * authors' restrictions and the club. crossBlockReportVerdict decides. Any
+ * failed read is "error" (a 500 that tells nothing); no service role is
+ * "not_found", the empty read's own answer.
+ */
+async function crossBlockFallback(
+  supabase: ServerClient,
+  type: "post" | "comment",
+  id: string,
+  viewerId: string,
+): Promise<Lookup> {
+  const notFound: Lookup = { ok: false, reason: "not_found" };
+  const failed: Lookup = { ok: false, reason: "error" };
+  let service: ServiceClient;
+  try {
+    service = createSupabaseServiceClient();
+  } catch (e) {
+    console.error(`${LOG} cross-block: no service role`, e);
+    return notFound;
+  }
+  const read = async (table: string, columns: string, rowId: string) => {
+    const { data, error } = await service.from(table).select(columns).eq("id", rowId).maybeSingle();
+    if (error) {
+      console.error(`${LOG} cross-block ${table} read`, error);
+      return "error" as const;
+    }
+    return (data as Record<string, unknown> | null) ?? null;
+  };
+
+  let commentRow: Record<string, unknown> | null = null;
+  let postRow: Record<string, unknown> | null;
+  if (type === "comment") {
+    const c = await read("post_comments", `${COMMENT_SNAPSHOT_COLUMNS},removed_at`, id);
+    if (c === "error") return failed;
+    if (!c || !asId(c.user_id)) return notFound;
+    commentRow = c;
+    const postId = asId(c.post_id);
+    const p = postId ? await read("posts", "id,user_id,org_id,status,removed_at", postId) : null;
+    if (p === "error") return failed;
+    postRow = p;
+  } else {
+    const p = await read("posts", `${POST_SNAPSHOT_COLUMNS},status,removed_at`, id);
+    if (p === "error") return failed;
+    if (!p) return notFound;
+    postRow = p;
+  }
+  if (postRow && !asId(postRow.user_id)) postRow = null;
+  if (type === "post" && !postRow) return notFound;
+
+  // Who could the block be with? Asked before any other read.
+  const skeletonPost = (row: Record<string, unknown>): PostFacts => ({
+    userId: asId(row.user_id) ?? "",
+    status: textOrNull(row.status),
+    removedAt: textOrNull(row.removed_at),
+    authorVisible: false,
+    clubAllowed: false,
+  });
+  const skeleton: ReportTargetFacts =
+    type === "post"
+      ? { kind: "post", post: skeletonPost(postRow!) }
+      : {
+          kind: "comment",
+          comment: {
+            userId: asId(commentRow!.user_id)!,
+            removedAt: textOrNull(commentRow!.removed_at),
+            authorVisible: false,
+            post: postRow ? skeletonPost(postRow) : null,
+          },
+        };
+  const blocked = new Set<string>();
+  for (const suspect of blockSuspects(viewerId, skeleton)) {
+    const pair = await loadPairBlock(supabase, viewerId, suspect);
+    if (!pair.ok) {
+      console.error(`${LOG} cross-block pair read`, pair.error);
+      return failed;
+    }
+    if (pair.blocked) blocked.add(suspect);
+  }
+  if (blocked.size === 0) return notFound;
+
+  // The rest of the rules, as the reporter's own read would have applied them.
+  const visibleById = new Map<string, boolean>();
+  const authorVisible = async (userId: string): Promise<boolean | "error"> => {
+    const known = visibleById.get(userId);
+    if (known !== undefined) return known;
+    const r = await getActiveRestriction(userId);
+    if (!r.ok) return "error";
+    visibleById.set(userId, r.restriction === null);
+    return r.restriction === null;
+  };
+  const postFacts = async (row: Record<string, unknown>): Promise<PostFacts | "error"> => {
+    const base = skeletonPost(row);
+    const visible = await authorVisible(base.userId);
+    if (visible === "error") return "error";
+    const orgId = asId(row.org_id);
+    const clubAllowed = orgId
+      ? (await orgContentAccessAsService(orgId, `${LOG} cross-block club`)).allowed
+      : true;
+    return { ...base, authorVisible: visible, clubAllowed };
+  };
+
+  let facts: ReportTargetFacts;
+  if (type === "post") {
+    const p = await postFacts(postRow!);
+    if (p === "error") return failed;
+    facts = { kind: "post", post: p };
+  } else {
+    const commenter = asId(commentRow!.user_id)!;
+    const visible = await authorVisible(commenter);
+    if (visible === "error") return failed;
+    let p: PostFacts | null = null;
+    if (postRow) {
+      const r = await postFacts(postRow);
+      if (r === "error") return failed;
+      p = r;
+    }
+    facts = {
+      kind: "comment",
+      comment: {
+        userId: commenter,
+        removedAt: textOrNull(commentRow!.removed_at),
+        authorVisible: visible,
+        post: p,
+      },
+    };
+  }
+  if (crossBlockReportVerdict(viewerId, facts, blocked) !== "allow") return notFound;
+
+  // The same evidence the reporter's own read would have kept.
+  const row = type === "post" ? postRow! : commentRow!;
+  const columns = type === "post" ? POST_SNAPSHOT_COLUMNS : COMMENT_SNAPSHOT_COLUMNS;
+  return { ok: true, target: { ownerId: asId(row.user_id), snapshot: pick(row, columns) } };
+}
+
+/**
+ * A reported person's bio, for the evidence snapshot only, read with the
+ * service role (A1's migration takes `bio` off the data API; the reporter's
+ * client would get 42501 and fail the whole report). Best effort: a report is
+ * never lost over a bio, so any failure is null, logged.
+ */
+async function userBioAsService(userId: string): Promise<string | null> {
+  try {
+    const { data, error } = await createSupabaseServiceClient()
+      .from("users")
+      .select("bio")
+      .eq("id", userId)
+      .maybeSingle();
+    if (error) {
+      console.error(`${LOG} user bio read`, error);
+      return null;
+    }
+    return textOrNull((data as { bio?: unknown } | null)?.bio);
+  } catch (e) {
+    console.error(`${LOG} user bio read`, e);
+    return null;
+  }
+}
+
 /**
  * Read the reported thing THROUGH THE REPORTER'S OWN CLIENT, so the row's RLS
  * answers "may this student see it": a deleted row, someone else's draft, a
  * hidden club's post, a chat they aren't in — all come back empty and the
  * report is refused.
  *
- * Deliberately NOT the service client, and deliberately no block or mute
- * check. Blocks hide content in BOTH directions, so judging visibility by the
- * feed's rules would mean a student who blocked a harasser — or who a
- * harasser blocked — could no longer report them. That is exactly backwards,
- * so this asks only about deletion, drafts, hidden clubs and chat membership.
+ * No block or mute check of its own. Blocks hide content in BOTH directions,
+ * so judging visibility by the feed's rules would mean a student who blocked
+ * a harasser — or who a harasser blocked — could no longer report them. That
+ * is exactly backwards, so this asks only about deletion, drafts, hidden clubs
+ * and chat membership.
+ *
+ * ACROSS A BLOCK (S67 security wave 2, A2). Since
+ * 20260928120000_blocks_in_rls.sql the posts and comments rules themselves
+ * refuse a block pair, so for a post or a comment the reporter's read can come
+ * back empty BECAUSE of a block. When it does, crossBlockFallback re-reads the
+ * row with the service role and lets the report through only when a block
+ * with the reporter is a possible reason (loadPairBlock, the reporter's own
+ * client) and the thing passes every other rule the read applied
+ * (src/lib/moderation/report-visibility.ts). Anything else keeps the empty
+ * read's answer. Users are unaffected: users_select_authenticated has no
+ * block clause.
+ *
+ * A reported person's `bio` is read with the service role (A1's migration
+ * takes it off the data API); the rest of the person still comes through the
+ * reporter's client, which is what decides they can be reported.
  */
 async function readTarget(
   supabase: Awaited<ReturnType<typeof createSupabaseServerClient>>,
@@ -108,16 +304,20 @@ async function readTarget(
     // The post rules already live here (draft, hidden club, author exemption);
     // asking anywhere else would let the two drift apart.
     const access = await postAccessForCaller(supabase, id, viewerId, `${LOG} post check`);
-    if (!access.ok) return { ok: false, reason: access.reason };
-    const row = await one("posts", "id,user_id,content,media_url,media_thumbnail_url,created_at,org_id");
+    if (!access.ok) {
+      return access.reason === "not_found"
+        ? crossBlockFallback(supabase, "post", id, viewerId)
+        : { ok: false, reason: access.reason };
+    }
+    const row = await one("posts", POST_SNAPSHOT_COLUMNS);
     if (row === "error") return { ok: false, reason: "error" };
-    if (!row) return { ok: false, reason: "not_found" };
+    if (!row) return crossBlockFallback(supabase, "post", id, viewerId);
     return { ok: true, target: { ownerId: asId(row.user_id), snapshot: row } };
   }
 
   const spec: Record<Exclude<TargetType, "post">, { table: string; columns: string; owner: string }> = {
-    user: { table: "users", columns: "id,handle,name,bio,tagline", owner: "id" },
-    comment: { table: "post_comments", columns: "id,user_id,post_id,content,created_at", owner: "user_id" },
+    user: { table: "users", columns: "id,handle,name,tagline", owner: "id" },
+    comment: { table: "post_comments", columns: COMMENT_SNAPSHOT_COLUMNS, owner: "user_id" },
     message: {
       table: "messages",
       columns: "id,user_id,channel_id,content,media_url,created_at",
@@ -134,8 +334,13 @@ async function readTarget(
   const { table, columns, owner } = spec[type];
   const row = await one(table, columns);
   if (row === "error") return { ok: false, reason: "error" };
-  if (!row) return { ok: false, reason: "not_found" };
-  return { ok: true, target: { ownerId: owner ? asId(row[owner]) : null, snapshot: row } };
+  if (!row) {
+    return type === "comment"
+      ? crossBlockFallback(supabase, "comment", id, viewerId)
+      : { ok: false, reason: "not_found" };
+  }
+  const snapshot = type === "user" ? { ...row, bio: await userBioAsService(id) } : row;
+  return { ok: true, target: { ownerId: owner ? asId(row[owner]) : null, snapshot } };
 }
 
 /**

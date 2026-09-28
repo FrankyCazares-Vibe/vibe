@@ -1,6 +1,7 @@
 import { NextResponse } from "next/server";
 
 import { requireTermsAccepted } from "@/lib/legal/require-terms";
+import { ORG_COPY } from "@/lib/orgs/join-copy";
 import {
   isUniqueViolation,
   orgJoinState,
@@ -8,6 +9,7 @@ import {
   type OrgAudience,
 } from "@/lib/orgs/join-state";
 import { admitMember, expireStaleInvites, loadViewerOrgContext } from "@/lib/orgs/membership";
+import { loadOrgBlocks } from "@/lib/orgs/org-blocks";
 import { rateLimit, tooManyRequests } from "@/lib/rate-limit";
 import { createSupabaseServerClient } from "@/lib/supabase/server";
 import { createSupabaseServiceClient } from "@/lib/supabase/service";
@@ -53,6 +55,8 @@ function fail(
  *   200 {ok, joined:true, role, already:true}          already a member
  *   200 {ok, pending:true, request, reason?}           request filed / already filed
  *   403 school_unverified | audience_mismatch (+audience) | invite_only | terms_required
+ *   403 join_unavailable   an owner or officer blocked them (S67 sec wave 2
+ *                          #15). The copy never names a block.
  *   404 not_found          the handle, or a hidden org to anybody but an admin
  *   409 org_hidden         a platform admin (or an officer) on a hidden org
  *   429                    30 attempts per 10 minutes, per user
@@ -124,7 +128,32 @@ export async function POST(req: Request, { params }: Params) {
     role: ctx.role,
     pendingInvite: ctx.pendingInvite,
     pendingRequest: ctx.pendingRequest,
+    // A removed member must ask to come back, even to an open club (#15).
+    removed: ctx.removed,
   });
+
+  // BLOCKS KEEP PEOPLE OUT, ONE WAY (S67 sec wave 2 #15, product call 9).
+  // Before anything is written — an admission (join, accepted invite) or a
+  // new request — ask whether the owner or any officer blocked this student.
+  // If so, a neutral 403 that never names the block. The other direction (the
+  // student blocked an officer) does not stop them: a victim is never locked
+  // out because their harasser is an officer, and their request is hidden
+  // from that officer instead. `member` and `requested` write nothing, so
+  // they skip the read. Fails closed: a failed read is a 500, never "in".
+  if (
+    decision.state === "invited" ||
+    decision.state === "can_join" ||
+    decision.state === "can_request"
+  ) {
+    const blocks = await loadOrgBlocks(service, org.id, user.id);
+    if (!blocks.ok) {
+      console.error("[orgs/[slug]/join blocks]", blocks.error);
+      return fail(500, "load_failed", "Failed to load org");
+    }
+    if (blocks.blockedByOfficer) {
+      return fail(403, "join_unavailable", ORG_COPY.errors.joinUnavailable);
+    }
+  }
 
   switch (decision.state) {
     // Idempotent: a second tap, or a second device, gets the same answer.
@@ -235,6 +264,11 @@ export async function POST(req: Request, { params }: Params) {
  * (spec §4.2): leaving a private or hidden org must not 404 on the lookup.
  * The DELETE itself stays on the viewer's own client — `org_members_delete`
  * is the boundary for removing your own row, and M1c left it alone.
+ *
+ * Leaving also drops the club's chat rows (channel_members and
+ * org_channel_members), in the database: the SECURITY DEFINER AFTER DELETE
+ * trigger `org_members_drop_club_access` (20260928100000). A voluntary leave
+ * keeps RSVPs; only a removal (members/[userId] DELETE) drops those.
  */
 export async function DELETE(_req: Request, { params }: Params) {
   const { slug } = await params;

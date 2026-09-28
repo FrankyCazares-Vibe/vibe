@@ -9,8 +9,11 @@ import type { SupabaseClient } from "@supabase/supabase-js";
  *
  *   one viewer, one target   pairBlockFilter / loadPairBlock
  *   one viewer, N peers      blockPairFilter / loadAnyPairBlock / dmSendBlocked
+ *   a group chat, newcomers  groupBlockFilter / loadGroupBlockConflict (S67 A2)
  *
- * Every read uses the VIEWER's client, never the service client. RLS
+ * Every read uses the VIEWER's client, never the service client, except the
+ * group shape at the bottom, which must use the service client (it explains
+ * why). RLS
  * `blocks_select_either` lets either party of a block read its row, which is
  * exactly the question asked here. Every reader fails closed: a read error or
  * a bad id comes back as `{ ok: false }`, and callers answer 500, never "not
@@ -167,4 +170,61 @@ export async function dmSendBlocked(
   }
   if (peerIds.length === 0) return { ok: true, blocked: false };
   return loadAnyPairBlock(supabase, viewerId, peerIds);
+}
+
+// ── a group chat: newcomers against everyone (SERVICE client) ──────────────
+//
+// The one exception to "the viewer's client only" above, and on purpose.
+// Adding someone to a group asks about pairs the viewer is NOT part of (the
+// newcomer and each person already in the chat). blocks_select_either hides
+// those rows from the viewer, and is_blocked_either_way answers false for
+// them, so the viewer's client would pass every add: it fails OPEN. The
+// caller passes the service client and uses only the yes/no, never the rows,
+// so nobody learns who blocked whom (waveA-build.md product call 6).
+//
+// Why it matters: messages_insert_member refuses a send when the sender is in
+// a block pair with ANY other member of a non-club channel, so one blocked pair
+// inside a group silences both people in it.
+
+/** Any block, either way, between a newcomer and anyone in the chat after the
+ *  add (the people already there and the other newcomers):
+ *  `and(blocker_id.in.(<new>),blocked_id.in.(<all>)),and(blocked_id.in.(<new>),blocker_id.in.(<all>))`
+ *  with all = new ∪ existing, deduped, first-seen order. A pair of two people
+ *  already in the chat is NOT asked about: they are there already, and one
+ *  more member doesn't change what they can send. Null when there is no
+ *  newcomer, or any id fails the strict UUID check. */
+export function groupBlockFilter(newIds: string[], existingIds: string[]): string | null {
+  if (newIds.length === 0) return null;
+  if (!newIds.every(isUuid) || !existingIds.every(isUuid)) return null;
+  const fresh = Array.from(new Set(newIds.map((id) => id.toLowerCase())));
+  const all = Array.from(new Set([...fresh, ...existingIds.map((id) => id.toLowerCase())]));
+  const n = fresh.join(",");
+  const a = all.join(",");
+  return (
+    `and(blocker_id.in.(${n}),blocked_id.in.(${a})),` +
+    `and(blocked_id.in.(${n}),blocker_id.in.(${a}))`
+  );
+}
+
+/** Would this group have a blocked pair in it once the newcomers are in?
+ *  SERVICE client only (see above). No newcomers → { ok: true, blocked:
+ *  false } with no query. A bad id → { ok: false, error: "bad id" }. A read
+ *  error → { ok: false, error }: callers answer 500, never "not blocked".
+ *  `blocks_check` (blocker_id <> blocked_id) means any row is a real pair, so
+ *  the read stops at one. */
+export async function loadGroupBlockConflict(
+  service: SupabaseClient,
+  newIds: string[],
+  existingIds: string[],
+): Promise<AnyPairBlock> {
+  if (newIds.length === 0) return { ok: true, blocked: false };
+  const filter = groupBlockFilter(newIds, existingIds);
+  if (filter === null) return { ok: false, error: "bad id" };
+  try {
+    const { data, error } = await service.from("blocks").select("blocker_id").or(filter).limit(1);
+    if (error) return { ok: false, error };
+    return { ok: true, blocked: (data ?? []).length > 0 };
+  } catch (error) {
+    return { ok: false, error };
+  }
 }

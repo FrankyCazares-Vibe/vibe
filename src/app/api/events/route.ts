@@ -4,19 +4,35 @@ import { resolveCampusRequest, scopeViewerFromRow } from "@/lib/iu/campus-reques
 import { scopeCampusIds } from "@/lib/iu/campus-scope";
 import { ALL_CAMPUSES, isSchoolSystem, legacyLabel, type SchoolSystem } from "@/lib/iu/campuses";
 import { campusScopeError, homeCampusIdFor } from "@/lib/iu/community-scope";
+import {
+  EVENT_MAX_DESCRIPTION as MAX_DESCRIPTION,
+  EVENT_MAX_LOCATION as MAX_LOCATION,
+  EVENT_MAX_TITLE as MAX_TITLE,
+  eventTimesProblem,
+  viewerCanManage,
+  withoutClubCreator,
+} from "@/lib/events/manage";
 import { contentBlockedResponse, requireCanPublish } from "@/lib/moderation/access";
 import { checkText } from "@/lib/moderation/text-filter";
 import { orgAssetProxyUrl } from "@/lib/org-asset-url";
 import { isUuid } from "@/lib/pgrest";
+import { rateLimit, tooManyRequests } from "@/lib/rate-limit";
 import { createSupabaseServerClient } from "@/lib/supabase/server";
 import { createSupabaseServiceClient } from "@/lib/supabase/service";
 
 const DEFAULT_LIMIT = 50;
 const MAX_LIMIT = 200;
 const WINDOW_DAYS = 60;
-const MAX_TITLE = 120;
-const MAX_DESCRIPTION = 2000;
-const MAX_LOCATION = 200;
+
+// The creator embed. A CLUB event ships no creator identity (the app shows the
+// club, not the officer who typed it), but keeps an id-only INNER join: under
+// users RLS that still drops a club event whose creator can't be seen (a
+// suspended or banned officer), which is today's behaviour and Franky's
+// product call 8 (security wave 2). An org-less event keeps the full card: the
+// campus filter reads creator.campus_id and the card shows "by @handle".
+const CLUB_CREATOR_EMBED = "creator:users!events_creator_id_fkey!inner(id)";
+const PERSONAL_CREATOR_EMBED =
+  "creator:users!events_creator_id_fkey!inner(id,name,handle,avatar_url,school,campus_id)";
 // Safety cap on the campus org-id list we feed into `org_id in (...)`.
 // Far above the real club count on any IU campus.
 const MAX_CAMPUS_ORGS = 1000;
@@ -35,6 +51,8 @@ type EventRow = {
   ends_at: string;
   location: string;
   created_at: string;
+  // Club rows come back with `{ id }` only (CLUB_CREATOR_EMBED) and leave this
+  // route with `creator: null` (withoutClubCreator); org-less rows, in full.
   creator: {
     id: string;
     name: string | null;
@@ -174,16 +192,17 @@ export async function GET(req: Request) {
     Date.now() + WINDOW_DAYS * 24 * 60 * 60 * 1000,
   ).toISOString();
 
-  // Inner-join the creator so the org-less fallback can filter on the
-  // creator's campus. Mirror /api/feed's embed pattern.
-  const baseQuery = () =>
+  // Inner-join the creator (see CLUB_CREATOR_EMBED / PERSONAL_CREATOR_EMBED):
+  // club queries take the id-only embed, the org-less fallback the full one so
+  // it can filter on the creator's campus. Mirror /api/feed's embed pattern.
+  const baseQuery = (creatorEmbed: string) =>
     supabase
       .from("events")
       .select(
         // No `org:orgs(...)`: under the viewer's client that embed is null for
         // every org they are not in. Attribution is joined in below.
         "id,org_id,creator_id,title,description,starts_at,ends_at,location,created_at," +
-          "creator:users!events_creator_id_fkey!inner(id,name,handle,avatar_url,school,campus_id)",
+          creatorEmbed,
       )
       .gte("ends_at", nowIso)
       .lte("starts_at", horizonIso)
@@ -238,7 +257,7 @@ export async function GET(req: Request) {
     if (!isUuid(orgIdFilter) || hiddenOrgIds.has(orgIdFilter)) {
       return answer([]);
     }
-    const { data, error } = await baseQuery().eq("org_id", orgIdFilter);
+    const { data, error } = await baseQuery(CLUB_CREATOR_EMBED).eq("org_id", orgIdFilter);
     if (error) {
       console.error("[events GET org-scoped]", error);
       return failed();
@@ -263,11 +282,18 @@ export async function GET(req: Request) {
     // silently shrink the campus list. `hidden_at is null` is applied in the
     // SAME query, so a hidden org never contributes an id. Only ids leave
     // this query; the events themselves are still read under the viewer's RLS.
+    //
+    // `verified` too (security report #11): only a verified club may put an
+    // event in front of a whole campus, and POST already refuses the rest. An
+    // unverified club's events (made before this rule, or a club whose badge
+    // was taken away) still show on that club's own page (the org-scoped
+    // branch above), just not in the campus-wide list.
     const { data: campusOrgs, error: orgErr } = await service
       .from("orgs")
       .select("id")
       .in("campus_id", campusIds)
       .is("hidden_at", null)
+      .eq("verified", true)
       .limit(MAX_CAMPUS_ORGS);
     if (orgErr) {
       console.error("[events GET campus orgs]", orgErr);
@@ -276,8 +302,8 @@ export async function GET(req: Request) {
     const orgIds = (campusOrgs ?? []).map((o) => (o as { id: string }).id);
 
     const [byOrg, byCreator] = await Promise.all([
-      orgIds.length > 0 ? baseQuery().in("org_id", orgIds) : null,
-      baseQuery()
+      orgIds.length > 0 ? baseQuery(CLUB_CREATOR_EMBED).in("org_id", orgIds) : null,
+      baseQuery(PERSONAL_CREATOR_EMBED)
         .is("org_id", null)
         // Campus ids come from our own frozen table, never from user text, so
         // embedding them in the filter grammar is safe.
@@ -328,8 +354,10 @@ export async function GET(req: Request) {
   const maybeByEvent = new Map<string, number>();
   const viewerStatusByEvent = new Map<string, "going" | "maybe">();
 
-  // Viewer's owner/admin org memberships — an org admin who didn't author
-  // the event still gets manage rights over attendees + messaging.
+  // Viewer's CURRENT owner/admin org memberships. A club event is managed by
+  // them, whoever made it; its creator gets nothing for having made it (a
+  // demoted officer would otherwise see "Manage attendees" and then a 403).
+  // Same rule as public.can_manage_event, via viewerCanManage.
   const myAdminOrgIds = new Set<string>();
   {
     const { data: mine } = await supabase
@@ -380,16 +408,23 @@ export async function GET(req: Request) {
   }
 
   const events = rows.map((row) => {
+    // `is_creator` only hides Report on your own event (the report route
+    // refuses its creator); it grants nothing.
     const isCreator = row.creator_id === user.id;
     const isOrgAdmin = !!row.org_id && myAdminOrgIds.has(row.org_id);
     const org = row.org_id ? orgById.get(row.org_id) ?? null : null;
     return {
-      ...row,
+      ...withoutClubCreator(row),
       going_count: goingByEvent.get(row.id) ?? 0,
       interested_count: maybeByEvent.get(row.id) ?? 0,
       viewer_status: viewerStatusByEvent.get(row.id) ?? null,
       is_creator: isCreator,
-      viewer_can_manage: isCreator || isOrgAdmin,
+      viewer_can_manage: viewerCanManage({
+        orgId: row.org_id,
+        creatorId: row.creator_id,
+        viewerId: user.id,
+        viewerIsOfficer: isOrgAdmin,
+      }),
       // Same shape the embed produced, so no client changes.
       org: org
         ? { ...org, logo_url: orgAssetProxyUrl(org.handle, org.logo_url, "logo") }
@@ -417,6 +452,11 @@ export async function POST(req: Request) {
     return fail(401, "unauthorized", "Unauthorized");
   }
 
+  // Ten an hour per account (security wave 2, #11). Same shape as org-create;
+  // an officer posting a week of rush events stays far under it.
+  const rl = await rateLimit(`event-create:${user.id}`, { limit: 10, windowSec: 3600 });
+  if (!rl.allowed) return tooManyRequests(rl);
+
   // Putting an event in front of a campus is publishing: Terms, a verified
   // school email, no restriction in force. Exactly where the Terms gate stood,
   // and `requireCanPublish` still refuses on Terms first, so nothing an
@@ -432,13 +472,16 @@ export async function POST(req: Request) {
   // until it runs `describeFailure` that 403 is a dead end with no "Verify"
   // action. THE COMPOSER FIX SHIPS BEFORE THIS DOES.
   //
-  // THIS ROUTE IS THE ENFORCEMENT, on purpose. The wave's migration
-  // deliberately left the `events` policies alone (see its DOES NOT /
-  // FOLLOW-UP notes, supabase/migrations/20260923090000_moderation_foundation.sql):
-  // the insert below runs on the CALLER's client, so an AND on
-  // `events_insert_authenticated` before this line existed would have turned
-  // "verify your school email" into a bare 500 with nothing a student could do
-  // about it. The one-line ALTER ships next, now that the friendly 403 is here.
+  // THIS ROUTE IS THE ONLY WAY TO CREATE AN EVENT (security wave 2, #11).
+  // The insert below runs with the SERVICE role, and
+  // 20260928130000_events_insert_service_only.sql revokes INSERT on events
+  // from signed-in clients, because the word filter only exists here: a direct
+  // PostgREST insert skipped it (and the verified-club, length and date
+  // checks). So every check below is the whole gate. What the database still
+  // enforces on every writer, this one included, are the CHECKs in
+  // 20260928110000_club_events_rules.sql (title 1..120, description <= 2000,
+  // location <= 200, at most 14 days long): the same numbers as
+  // src/lib/events/manage.ts, so a request that passes here never trips one.
   const gate = await requireCanPublish(user.id);
   if (gate) return gate;
 
@@ -487,16 +530,15 @@ export async function POST(req: Request) {
     if (!checkText(value).ok) return contentBlockedResponse(field);
   }
 
+  // Start and end: both real, end not before start, start not in the past
+  // (5 minutes' grace), at most 14 days long (the database's
+  // events_max_duration CHECK). An event ending in 2099 used to sit at the top
+  // of the campus list forever.
   const start = Date.parse(startsAt);
   const end = Date.parse(endsAt);
-  if (!Number.isFinite(start) || !Number.isFinite(end)) {
-    return fail(400, "invalid_times", "Start and end times are required");
-  }
-  if (end < start) {
-    return fail(400, "invalid_times", "End time must be after start");
-  }
-  if (start < Date.now() - 5 * 60 * 1000) {
-    return fail(400, "invalid_times", "Start time is in the past");
+  const timesProblem = eventTimesProblem(start, end, Date.now());
+  if (timesProblem) {
+    return fail(400, timesProblem.code, timesProblem.error);
   }
 
   // Events must be posted on behalf of a verified org. Verified status
@@ -539,7 +581,9 @@ export async function POST(req: Request) {
   }
   const orgId: string = rawOrgId;
 
-  const { data: row, error } = await supabase
+  // SERVICE role on purpose (see the top of this handler): every check has run,
+  // and creator_id is the signed-in user, never a value from the body.
+  const { data: row, error } = await service
     .from("events")
     .insert({
       creator_id: user.id,

@@ -23,6 +23,7 @@ import {
   pendingInviteText,
   type InviteCandidateState,
   type InviteIneligibleReason,
+  type InviteRowButton,
 } from "@/lib/orgs/join-copy";
 import type { OrgAudience } from "@/lib/orgs/join-state";
 
@@ -73,6 +74,14 @@ type Candidate = {
   reason: InviteIneligibleReason;
   available_at: string | null;
   request_id: string | null;
+  /** On a requested row: an officer removed them before (tagged "Removed before"). */
+  removed_before: boolean;
+  /**
+   * On a requested row: false when approving would be refused for THIS
+   * officer, so Approve is hidden. null = the server didn't say (an older
+   * build): Approve shows, and the approve route still decides.
+   */
+  can_approve: boolean | null;
   follows_since: string | null;
 };
 
@@ -88,7 +97,7 @@ type Page = {
 
 /** What a tap in this sheet learned about a row, newer than any page read before it. */
 type RowPatch = Partial<
-  Pick<Candidate, "state" | "eligible" | "reason" | "available_at" | "request_id">
+  Pick<Candidate, "state" | "eligible" | "reason" | "available_at" | "request_id" | "can_approve">
 > & { seq: number };
 
 type PendingInvite = {
@@ -157,6 +166,8 @@ function parseCandidates(raw: unknown): Candidate[] {
           : null,
       available_at: str(row.available_at),
       request_id: str(row.request_id),
+      removed_before: row.removed_before === true,
+      can_approve: typeof row.can_approve === "boolean" ? row.can_approve : null,
       follows_since: str(row.follows_since),
     });
   }
@@ -492,6 +503,13 @@ export function OrgInviteSheet({
         toastRefusal(r);
         reloadList();
         return;
+      case "removed_needs_admin":
+      case "approve_unavailable":
+        // The server's sentence says why (never naming a block); the row
+        // stops offering the button it just refused.
+        toastRefusal(r);
+        patchRow(c.id, { can_approve: false });
+        return;
       default:
         toastRefusal(r);
     }
@@ -544,6 +562,7 @@ export function OrgInviteSheet({
       ...(patch.reason !== undefined ? { reason: patch.reason } : null),
       ...(patch.available_at !== undefined ? { available_at: patch.available_at } : null),
       ...(patch.request_id !== undefined ? { request_id: patch.request_id } : null),
+      ...(patch.can_approve !== undefined ? { can_approve: patch.can_approve } : null),
     };
   };
 
@@ -576,12 +595,24 @@ export function OrgInviteSheet({
           {current.users.map((raw) => {
             const c = rowOf(raw);
             const sentId = sent[c.id] ?? null;
-            const button = inviteRowButton(c, {
-              orgName: name,
-              canInvite: current.canInvite,
-              blockedReason: current.blockedReason,
-              sent: sentId !== null,
-            });
+            const requested = c.state === "requested";
+            // A request this officer can't approve: no Approve, just where it
+            // stands and a line that never says why in terms of a block.
+            const button: InviteRowButton =
+              requested && c.can_approve === false
+                ? {
+                    kind: "status",
+                    label: ORG_COPY.buttons.requested,
+                    sub: ORG_COPY.errors.approveUnavailable,
+                    disabled: true,
+                    undo: false,
+                  }
+                : inviteRowButton(c, {
+                    orgName: name,
+                    canInvite: current.canInvite,
+                    blockedReason: current.blockedReason,
+                    sent: sentId !== null,
+                  });
             const sinceText = followersMode ? followsSinceText(c.follows_since) : null;
             const busy = busyId === c.id;
             return (
@@ -593,6 +624,9 @@ export function OrgInviteSheet({
                     {[c.handle ? `@${c.handle}` : null, c.major].filter(Boolean).join(" · ")}
                   </div>
                   {sinceText ? <div style={t.rowMeta}>{sinceText}</div> : null}
+                  {requested && c.removed_before ? (
+                    <span style={removedTagStyle}>{ORG_COPY.meta.removedBefore}</span>
+                  ) : null}
                   {button.sub ? <div style={t.rowSub}>{button.sub}</div> : null}
                 </div>
                 <div style={{ display: "flex", alignItems: "center", gap: 4, flexShrink: 0 }}>
@@ -1083,6 +1117,27 @@ const DARK: Theme = {
     color: "#fff",
   },
   skeleton: { background: "rgba(255,255,255,0.08)", borderRadius: 6 },
+};
+
+/**
+ * "Removed before" on a requested row. The sheet's own surfaces are fixed
+ * (cream sheet and modal, dark glass inline), so the tag brings its own:
+ * tag tint over paper, tag ink, hairline, all C0 tokens. Ink and paper flip
+ * together between Light and Night, so it reads on every surface in both.
+ */
+const removedTagStyle: CSSProperties = {
+  display: "inline-block",
+  marginTop: 4,
+  padding: "1px 8px",
+  borderRadius: 999,
+  background: "linear-gradient(var(--tag-bg), var(--tag-bg)), var(--paper)",
+  border: "1px solid var(--hairline)",
+  color: "var(--tag-ink)",
+  fontFamily: FONT,
+  fontSize: 11,
+  fontWeight: 700,
+  lineHeight: 1.6,
+  whiteSpace: "nowrap",
 };
 
 const listStyle: CSSProperties = {

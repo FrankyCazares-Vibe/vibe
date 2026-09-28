@@ -31,6 +31,15 @@ const MAX_LIMIT = 50;
  * service-role entitlements lookup; it is an identity list, which is the
  * enumeration surface the design doc requires a limiter on.
  *
+ * THIS ROUTE IS THE PAYWALL (security report 2026-09-27 #17). The ledger is
+ * server-only since 20260928140000 (no policy, no grant for any client role),
+ * so the loader reads it with the service role, scoped to `user.id`. That makes
+ * `requirePlus` above it the only thing between a free account and the names:
+ * keep it before `loadProfileViewers`, and never pass an id that did not come
+ * from `auth.getUser()`. `total` counts everyone who looked, including people
+ * you muted or blocked; only `users` leaves them out, and paging follows
+ * `users`' list (#18).
+ *
  * A refused read is a 500. `users: []` here would read as "nobody has looked
  * at you" to the one person paying to find out.
  */

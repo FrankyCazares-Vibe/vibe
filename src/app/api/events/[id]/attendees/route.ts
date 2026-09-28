@@ -1,5 +1,6 @@
 import { NextResponse } from "next/server";
 
+import { isUuid } from "@/lib/pgrest";
 import { createSupabaseServerClient } from "@/lib/supabase/server";
 
 type RouteContext = { params: Promise<{ id: string }> };
@@ -18,13 +19,20 @@ type RsvpRow = {
 };
 
 /**
- * Attendees on an event — gated to the event creator and (if the event is
- * scoped to an org) the org's owners/admins. Returns Going + Interested
- * lists separately so the caller can split the UI.
+ * Attendees on an event, for whoever manages it: a CLUB event's CURRENT
+ * owners/admins (never its creator as such, so a demoted or removed officer
+ * loses the list the moment their role changes), an org-less event's creator.
+ * Returns Going + Interested lists separately so the caller can split the UI.
+ *
+ * THE DATABASE DECIDES (security wave 2, #12): the gate is the same
+ * public.can_manage_event() that rsvps_select_own_or_manager uses to show
+ * these rows, so the route and the policy can't disagree. A TypeScript copy
+ * that let the creator in would have answered 200 with an empty list.
  */
 export async function GET(_req: Request, ctx: RouteContext) {
   const { id } = await ctx.params;
-  if (!id) {
+  // A malformed id would reach PostgREST as 22P02 and answer 500.
+  if (!id || !isUuid(id)) {
     return NextResponse.json({ ok: false, error: "Missing event id" }, { status: 400 });
   }
 
@@ -39,7 +47,7 @@ export async function GET(_req: Request, ctx: RouteContext) {
 
   const { data: ev, error: evErr } = await supabase
     .from("events")
-    .select("id,creator_id,org_id")
+    .select("id")
     .eq("id", id)
     .maybeSingle();
   if (evErr) {
@@ -50,17 +58,14 @@ export async function GET(_req: Request, ctx: RouteContext) {
     return NextResponse.json({ ok: false, error: "Event not found" }, { status: 404 });
   }
 
-  let allowed = ev.creator_id === user.id;
-  if (!allowed && ev.org_id) {
-    const { data: m } = await supabase
-      .from("org_members")
-      .select("role")
-      .eq("org_id", ev.org_id)
-      .eq("user_id", user.id)
-      .maybeSingle();
-    if (m?.role === "owner" || m?.role === "admin") allowed = true;
+  const { data: canManage, error: manageErr } = await supabase.rpc("can_manage_event", {
+    p_event_id: id,
+  });
+  if (manageErr) {
+    console.error("[events/:id/attendees can_manage_event]", manageErr);
+    return NextResponse.json({ ok: false, error: "Request failed" }, { status: 500 });
   }
-  if (!allowed) {
+  if (canManage !== true) {
     return NextResponse.json({ ok: false, error: "Forbidden" }, { status: 403 });
   }
 

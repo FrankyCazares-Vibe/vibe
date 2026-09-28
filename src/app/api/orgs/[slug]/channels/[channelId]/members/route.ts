@@ -1,40 +1,41 @@
 import { NextResponse } from "next/server";
 
+import { loadClubOfficer } from "@/lib/club-routes/officer-guard";
+import { requireNotRestricted } from "@/lib/moderation/access";
 import { createSupabaseServerClient } from "@/lib/supabase/server";
-import { createSupabaseServiceClient } from "@/lib/supabase/service";
 
 type Params = { params: Promise<{ slug: string; channelId: string }> };
 type PostBody = { user_id?: unknown; handle?: unknown };
 
-async function requireChannelStaff(slug: string, channelId: string, viewerId: string) {
-  const service = createSupabaseServiceClient();
-  const { data: org } = await service
-    .from("orgs")
-    .select("id")
-    .eq("handle", slug)
-    .maybeSingle();
-  if (!org) return { error: "Not found", status: 404 } as const;
-
-  const { data: channel } = await service
-    .from("channels")
-    .select("id, org_id, is_private")
-    .eq("id", channelId)
-    .maybeSingle();
-  if (!channel || channel.org_id !== org.id) {
-    return { error: "Channel not found", status: 404 } as const;
+/**
+ * Owner/admin of THIS club, and the channel is the club's. A stranger asking
+ * about a hidden club gets 404, not 403 (security wave 2, `loadClubOfficer`).
+ * Writes also refuse a restricted officer (`checkRestriction`): they run on
+ * the service role, so the allow-list policies' `NOT is_restricted_now()`
+ * never runs.
+ */
+async function requireChannelStaff(
+  slug: string,
+  channelId: string,
+  viewerId: string,
+  checkRestriction: boolean,
+) {
+  if (checkRestriction) {
+    const restricted = await requireNotRestricted(viewerId);
+    if (restricted) return { response: restricted } as const;
   }
-
-  const { data: viewer } = await service
-    .from("org_members")
-    .select("role")
-    .eq("org_id", org.id)
-    .eq("user_id", viewerId)
-    .maybeSingle();
-  if (!viewer || !["owner", "admin"].includes(viewer.role)) {
-    return { error: "Admin only", status: 403 } as const;
+  const guard = await loadClubOfficer(slug, viewerId, { channelId });
+  if (!guard.ok) {
+    return {
+      response: NextResponse.json({ ok: false, error: guard.error }, { status: guard.status }),
+    } as const;
   }
-
-  return { org, channel, service } as const;
+  if (!guard.channel) {
+    return {
+      response: NextResponse.json({ ok: false, error: "Channel not found" }, { status: 404 }),
+    } as const;
+  }
+  return { org: guard.org, channel: guard.channel, service: guard.service } as const;
 }
 
 /**
@@ -51,10 +52,8 @@ export async function GET(_req: Request, { params }: Params) {
     return NextResponse.json({ ok: false, error: "Unauthorized" }, { status: 401 });
   }
 
-  const guard = await requireChannelStaff(slug, channelId, user.id);
-  if ("error" in guard) {
-    return NextResponse.json({ ok: false, error: guard.error }, { status: guard.status });
-  }
+  const guard = await requireChannelStaff(slug, channelId, user.id, false);
+  if ("response" in guard) return guard.response;
 
   const { data, error } = await guard.service
     .from("org_channel_members")
@@ -111,10 +110,8 @@ export async function POST(req: Request, { params }: Params) {
     return NextResponse.json({ ok: false, error: "Unauthorized" }, { status: 401 });
   }
 
-  const guard = await requireChannelStaff(slug, channelId, user.id);
-  if ("error" in guard) {
-    return NextResponse.json({ ok: false, error: guard.error }, { status: guard.status });
-  }
+  const guard = await requireChannelStaff(slug, channelId, user.id, true);
+  if ("response" in guard) return guard.response;
 
   let body: PostBody;
   try {

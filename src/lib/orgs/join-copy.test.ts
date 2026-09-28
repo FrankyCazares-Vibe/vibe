@@ -547,3 +547,25 @@ test("join-copy.ts has no runtime imports: every import line is `import type`", 
   for (const line of imports) assert.ok(line.trimStart().startsWith("import type"), line);
   assert.ok(!/\brequire\(|\bimport\(/.test(source), "no dynamic imports either");
 });
+
+test("S67 sec wave 2: the club-refusal copy never names a block", () => {
+  const lines = [
+    ORG_COPY.errors.joinUnavailable,
+    ORG_COPY.errors.approveUnavailable,
+    ORG_COPY.errors.removedNeedsAdmin,
+    ORG_COPY.meta.removedBefore,
+  ];
+  for (const line of lines) {
+    assert.equal(typeof line, "string");
+    assert.ok(line.length > 0);
+    assert.ok(!/block/i.test(line), line);
+  }
+  assert.equal(ORG_COPY.errors.joinUnavailable, "You can't join this club right now.");
+  assert.ok(Object.isFrozen(ORG_COPY.errors));
+});
+
+test("S67 sec wave 2: the new refusal codes map to their neutral copy", () => {
+  assert.equal(orgErrorCopy("join_unavailable"), ORG_COPY.errors.joinUnavailable);
+  assert.equal(orgErrorCopy("approve_unavailable"), ORG_COPY.errors.approveUnavailable);
+  assert.equal(orgErrorCopy("removed_needs_admin"), ORG_COPY.errors.removedNeedsAdmin);
+});

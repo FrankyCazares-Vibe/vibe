@@ -166,6 +166,9 @@ export function buildVibeUserV1FromProfile(
   // Widget layout (S67 wave 2): ALWAYS present, already sanitized by
   // normalizeProfileView, so profile.html's applyProfileLayout and the
   // phone's "Arrange your profile" sheet never see a partial document.
+  // A route serving someone ELSE's profile runs blankHiddenWidgets
+  // (lib/profile/hidden-fields) on the profile before this, so `hidden` is
+  // [] there and the hidden widgets' fields are already empty.
   // camelCase like every other vibeUser key; the write key on both routes
   // stays `profile_layout`. Copied so the page can't reach the profile's arrays.
   const layout = profile.profile_layout;

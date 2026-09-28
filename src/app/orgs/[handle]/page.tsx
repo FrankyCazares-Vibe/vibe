@@ -6,7 +6,11 @@ import type { SupabaseClient } from "@supabase/supabase-js";
 import { LoadFailed } from "@/components/feedback/LoadFailed";
 import { MobileTabBar } from "@/components/mobile/MobileTabBar";
 import { OrgInviteBanner } from "@/components/orgs/OrgInviteBanner";
-import { isMissingColumnError } from "@/lib/db/missing-column";
+import { visibleClubPosts } from "@/lib/club-routes/club-posts";
+import {
+  loadRestrictedAuthors,
+  readClubPostsForViewer,
+} from "@/lib/club-routes/club-posts-read";
 import { rsvpCampusDecision } from "@/lib/iu/campus-request";
 import { campusRowById, isSharedCampus } from "@/lib/iu/campuses";
 import { orgAssetProxyUrl } from "@/lib/org-asset-url";
@@ -67,9 +71,6 @@ const BACKDROP_PRESETS: Record<string, string> = {
 };
 
 const DORMANT_MS = 60 * 24 * 60 * 60 * 1000;
-
-/** The moderation column this page filters on; it arrives with 20260923090000. */
-const MODERATION_POST_COLUMNS = ["removed_at"] as const;
 
 type OrgProfile = {
   id: string;
@@ -173,6 +174,8 @@ export default async function OrgProfilePage({ params }: Params) {
         role: ctx.role,
         pendingInvite: ctx.pendingInvite,
         pendingRequest: ctx.pendingRequest,
+        // Removed members see "Request to join", not "Join" (S67 sec wave 2).
+        removed: ctx.removed,
       })
     : null;
 
@@ -250,36 +253,29 @@ export default async function OrgProfilePage({ params }: Params) {
   // table. A removed post is dropped for its AUTHOR too: this grid has no
   // "Removed by Vibe moderators" notice to carry, and the author is told on
   // their own profile and in the feed, which do.
-  const readOrgPosts = (moderation: boolean) => {
-    let q = service
-      .from("posts")
-      .select(
-        "id, type, content, media_url, media_thumbnail_url, created_at, edited_at, user:user_id(id, handle, name, avatar_url)"
-      )
-      .eq("org_id", orgId)
-      .eq("type", "post")
-      .eq("status", "published");
-    if (moderation) q = q.is("removed_at", null);
-    return q.order("created_at", { ascending: false }).limit(24);
-  };
-  const [memberRes, followerCount, postsFirstRes, invitedByName] = await Promise.all([
+  const [memberRes, followerCount, clubPosts, invitedByName] = await Promise.all([
     service
       .from("org_members")
       .select("user_id", { count: "exact", head: true })
       .eq("org_id", orgId),
     loadFollowerCount(service, orgId),
-    readOrgPosts(true),
+    // A block hides the posts a person WROTE, club posts included (ruling 13):
+    // RLS does it on every cookie-client surface, so this service-role grid
+    // does it by hand, inside the query, before the limit (signed out,
+    // nobody). `removed_at` lands with the moderation migration; the read
+    // falls back to the old one on a deploy that doesn't have it yet.
+    readClubPostsForViewer(
+      service,
+      supabase,
+      user?.id ?? null,
+      orgId,
+      "id, type, content, media_url, media_thumbnail_url, created_at, edited_at, user:user_id(id, handle, name, avatar_url)",
+    ),
     user && invite?.invited_by
       ? loadInviterFirstName(service, supabase, invite.invited_by, user.id)
       : Promise.resolve(null),
   ]);
-  // `removed_at` lands with the moderation migration. A deploy that doesn't
-  // have it yet answers exactly as it did before — nothing can be removed
-  // there — instead of an empty club page.
-  const postsRes =
-    postsFirstRes.error && isMissingColumnError(postsFirstRes.error, MODERATION_POST_COLUMNS)
-      ? await readOrgPosts(false)
-      : postsFirstRes;
+  const { posts: postsRes, blocked: blockedAuthors } = clubPosts;
   if (memberRes.error) {
     console.error("[orgs/[handle] page member count]", memberRes.error);
   }
@@ -345,12 +341,16 @@ export default async function OrgProfilePage({ params }: Params) {
     service,
     allPostRows.map((p) => p.user?.id).filter((id): id is string => !!id),
   );
-  const postsErr = !!postsReadErr || !restrictedAuthors.ok;
-  const posts: PostRow[] = restrictedAuthors.ok
-    ? allPostRows
-        .filter((p) => !p.user || !restrictedAuthors.ids.has(p.user.id))
-        .slice(0, 12)
-    : [];
+  // Blocks (ruling 13) fail closed the same way: "block unknown" shows the
+  // failure line, never a blocked author's post.
+  const postsErr = !!postsReadErr || !restrictedAuthors.ok || !blockedAuthors.ok;
+  const posts: PostRow[] =
+    restrictedAuthors.ok && blockedAuthors.ok
+      ? visibleClubPosts(allPostRows, {
+          restricted: restrictedAuthors.ids,
+          hiddenAuthors: blockedAuthors.ids,
+        })
+      : [];
 
   const backdrop =
     BACKDROP_PRESETS[org.backdrop_preset] ?? BACKDROP_PRESETS["sand-purple"];
@@ -473,57 +473,6 @@ export default async function OrgProfilePage({ params }: Params) {
       {user ? <MobileTabBar /> : null}
     </main>
   );
-}
-
-/**
- * The ids, among `userIds`, whose account is paused or banned right now.
- *
- * This page reads its posts with the SERVICE role, so `user_visible(user_id)`
- * — the half of `posts_select_authenticated` that takes a restricted
- * student's posts off every other surface — never runs on them. This is that
- * check, done by hand, in one query.
- *
- * `ok: false` is a real failure and the caller must not render the posts:
- * "restriction unknown" fails closed, the way every write gate in
- * src/lib/moderation/access.ts does. A MISSING TABLE is not a failure —
- * between the code deploy and the migration `account_restrictions` does not
- * exist, and "no restriction store yet" is exactly "nobody is restricted".
- * The matcher is copied from src/lib/moderation/access.ts (which copies it
- * from src/lib/premium/require-plus.ts) because neither exports it.
- *
- * "In force" is the same read-time expiry every other check uses: not lifted,
- * started, and either permanent or not yet run out. No job clears a suspension.
- */
-async function loadRestrictedAuthors(
-  service: SupabaseClient,
-  userIds: string[],
-): Promise<{ ok: true; ids: Set<string> } | { ok: false; ids: null }> {
-  const ids = [...new Set(userIds)];
-  if (ids.length === 0) return { ok: true, ids: new Set() };
-  const nowIso = new Date().toISOString();
-  const { data, error } = await service
-    .from("account_restrictions")
-    .select("user_id")
-    .in("user_id", ids)
-    .is("lifted_at", null)
-    .lte("starts_at", nowIso)
-    .or(`ends_at.is.null,ends_at.gt.${nowIso}`);
-  if (error) {
-    const message = (error.message ?? "").toLowerCase();
-    const missingStore =
-      error.code === "42P01" ||
-      error.code === "PGRST205" ||
-      message.includes("could not find the table") ||
-      (message.includes("relation") && message.includes("does not exist"));
-    if (missingStore) return { ok: true, ids: new Set() };
-    console.error("[orgs/[handle] page restricted authors]", error);
-    return { ok: false, ids: null };
-  }
-  const rows = (data ?? []) as Array<{ user_id: string | null }>;
-  return {
-    ok: true,
-    ids: new Set(rows.map((r) => r.user_id).filter((id): id is string => !!id)),
-  };
 }
 
 /**

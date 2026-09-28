@@ -1,7 +1,14 @@
+import "server-only";
+
 import type { SupabaseClient } from "@supabase/supabase-js";
 
 import { hydrateUserCards, type UserCardData } from "@/lib/connections/queries";
+import { pageAudience, splitAudience } from "@/lib/metrics/audience-split";
 import { loadHiddenUsers } from "@/lib/safety/hidden-users";
+import {
+  createSupabaseServiceClient,
+  isSupabaseServiceConfigured,
+} from "@/lib/supabase/service";
 
 /**
  * "Who viewed you" — the one definition of the paid profile-viewer list.
@@ -14,12 +21,17 @@ import { loadHiddenUsers } from "@/lib/safety/hidden-users";
  * window and ordering written twice is how a "Show more" ends up repeating
  * or skipping a person, so there is one loader and both call it.
  *
- * OWNER-ONLY, ALWAYS. Every read here is scoped to `userId` and the caller is
- * responsible for having proved that is the signed-in person. RLS
- * `profile_views_owner_select` (supabase/migrations/20260513000000_profile_views_and_user_view_count.sql:47)
- * is the real backstop, which is also why the cookie client is enough and no
- * service role appears in this file: nothing here can read another account's
- * ledger even if a route's entitlement branch were wrong.
+ * SERVER-ONLY LEDGER, AND THE CALLER IS THE BOUNDARY (security report
+ * 2026-09-27 #17). The owner used to read their own `profile_views` rows
+ * through RLS `profile_views_owner_select`, which meant any signed-in student
+ * could skip the paywall and pull their full named viewer history straight
+ * from the data API. Migration 20260928140000_profile_views_server_only drops
+ * that policy and revokes the table from anon/authenticated, so the ledger is
+ * now read here with the SERVICE ROLE, always `.eq("profile_user_id",
+ * userId)`. The database no longer scopes it, so the caller must pass the
+ * signed-in id from `auth.getUser()` and must have run the entitlement check
+ * (`requirePlus` / `hasPlus`) before calling. Names still come from
+ * `hydrateUserCards` on the caller's cookie client.
  *
  * PEOPLE, NOT VIEWS. The ledger's primary key is
  * (profile_user_id, viewer_user_id, viewed_on), so one person who looked on
@@ -33,11 +45,12 @@ import { loadHiddenUsers } from "@/lib/safety/hidden-users";
  * ninety days of dates. Local-time math here would slide the edge by a day for
  * a student looking at 8pm Eastern.
  *
- * HIDDEN PEOPLE ARE FILTERED OUT OF THE LIST, NOT OUT OF THE COUNTS. Someone
+ * HIDDEN PEOPLE ARE FILTERED OUT OF THE LIST, NOT OUT OF ANY COUNT. Someone
  * the owner has blocked or muted should not turn up in a list of names; the
- * tiles keep counting them, because a count that quietly shrinks when you mute
- * someone is a number nobody can reconcile (and `users.profile_view_count`,
- * the all-time tile, cannot be filtered at all).
+ * tiles and this list's own `total` keep counting them, because a count that
+ * quietly shrinks when you mute someone is a number nobody can reconcile and,
+ * worse, an oracle (mute, re-read, see who drops out: #18). `total` is every
+ * distinct viewer in the window; `has_more`/`next_offset` page the list.
  *
  * A REFUSED READ RETURNS `null`, NEVER AN EMPTY PAGE. `{ users: [], total: 0 }`
  * reads as "nobody has looked at you", which is a lie a paying account would
@@ -131,9 +144,10 @@ function windowStartUtc(now: Date): string {
  * unreadable block/mute list — and the caller must 500 rather than paint a
  * zero. It never means "nobody".
  *
- * `supabase` must be the caller's own cookie client: `users` is readable by
- * any signed-in student and `profile_views` is owner-scoped by RLS, so nothing
- * here needs the service role.
+ * `supabase` must be the caller's own cookie client (used for the block/mute
+ * read and for the name cards). The ledger itself is read with the service
+ * role inside `scanLedger`, scoped to `userId`: pass the signed-in id, and
+ * only after the entitlement check. `null` also covers a missing service key.
  */
 export async function loadProfileViewers(
   supabase: SupabaseClient,
@@ -144,7 +158,7 @@ export async function loadProfileViewers(
   const since = windowStartUtc(now);
 
   const [scan, hiddenRes] = await Promise.all([
-    scanLedger(supabase, userId, since),
+    scanLedger(userId, since),
     loadHiddenUsers(supabase, userId),
   ]);
   if (scan === null) return null;
@@ -155,21 +169,29 @@ export async function loadProfileViewers(
     return null;
   }
 
-  const hidden = new Set(hiddenRes.hidden.ids);
   // Deduped per person, most recent look first — `scanLedger` already returns
   // the rows in `first_viewed_at desc` order, so the FIRST row seen for a
   // viewer is their latest.
   const seen = new Set<string>();
-  const people: LedgerRow[] = [];
+  const everyone: LedgerRow[] = [];
   for (const row of scan) {
     if (seen.has(row.viewer_user_id)) continue;
     seen.add(row.viewer_user_id);
-    if (hidden.has(row.viewer_user_id)) continue;
-    people.push(row);
+    everyone.push(row);
   }
 
-  const total = people.length;
-  const pageRows = people.slice(opts.offset, opts.offset + opts.limit);
+  // `total` is everyone who looked; only the list loses hidden people, and
+  // the page is cut from the list, so "Show more" ends where the list does.
+  const { total, listed: people } = splitAudience(
+    everyone,
+    hiddenRes.hidden.ids,
+    (r) => r.viewer_user_id,
+  );
+  const {
+    page: pageRows,
+    has_more,
+    next_offset,
+  } = pageAudience(people, opts.offset, opts.limit);
   const pageIds = pageRows.map((r) => r.viewer_user_id);
   const lookedOn = new Map(pageRows.map((r) => [r.viewer_user_id, r]));
 
@@ -180,9 +202,9 @@ export async function loadProfileViewers(
   // (src/app/api/me/followers/route.ts:66-73). Matching them beats fixing it
   // in one place and leaving the others inconsistent.
   //
-  // THE OFFSET IS COUNTED IN PEOPLE CONSUMED, NOT ROWS RENDERED. `has_more`
-  // below advances by `pageRows.length` (what this page consumed from the
-  // deduped list), which is what a client's next `offset` must be. When
+  // THE OFFSET IS COUNTED IN PEOPLE CONSUMED, NOT ROWS RENDERED.
+  // `next_offset` above advances by `pageRows.length` (what this page consumed
+  // from the visible list), which is what a client's next `offset` must be. When
   // hydration drops an id, `users.length < pageRows.length`, so a caller that
   // pages by `rows.length` of what it RENDERED would re-request a person it
   // already has. Every list route in the app pages this way and the drop needs
@@ -196,12 +218,7 @@ export async function loadProfileViewers(
     return row ? [{ ...card, viewed_on: row.viewed_on, first_viewed_at: row.first_viewed_at }] : [];
   });
 
-  return {
-    users,
-    total,
-    has_more: opts.offset + pageRows.length < total,
-    next_offset: opts.offset + pageRows.length,
-  };
+  return { users, total, has_more, next_offset };
 }
 
 /**
@@ -220,12 +237,21 @@ export async function loadProfileViewers(
  * be partial, so we return `null`. If it does not, a window of exactly
  * `LEDGER_SCAN_CAP` rows was read in full and deserves a real list — refusing
  * there would 500 both routes forever on complete, readable data.
+ *
+ * SERVICE ROLE, SCOPED BY HAND. After 20260928140000 no client role can read
+ * `profile_views` at all (no policy, no grant), so this is the only way in,
+ * and `.eq("profile_user_id", userId)` is the whole of the scoping. A missing
+ * service key is `null` (a 500), never an empty ledger that paints "nobody
+ * looked".
  */
-async function scanLedger(
-  supabase: SupabaseClient,
-  userId: string,
-  since: string,
-): Promise<LedgerRow[] | null> {
+async function scanLedger(userId: string, since: string): Promise<LedgerRow[] | null> {
+  if (!isSupabaseServiceConfigured()) {
+    console.error(
+      "[profile-viewers] SUPABASE_SERVICE_ROLE_KEY missing — the viewer ledger cannot be read",
+    );
+    return null;
+  }
+  const service = createSupabaseServiceClient();
   const rows: LedgerRow[] = [];
   let scanned = 0;
 
@@ -233,7 +259,7 @@ async function scanLedger(
     // Never ask for more than one row past the cap: that row is the evidence,
     // and there is no reason to pay for the rest of the page behind it.
     const end = Math.min(scanned + LEDGER_PAGE, LEDGER_SCAN_CAP + 1) - 1;
-    const { data, error } = await supabase
+    const { data, error } = await service
       .from("profile_views")
       .select("viewer_user_id,viewed_on,first_viewed_at")
       .eq("profile_user_id", userId)

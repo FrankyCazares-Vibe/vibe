@@ -2,23 +2,32 @@ import "server-only";
 
 import type { SupabaseClient } from "@supabase/supabase-js";
 
+import { splitAudience } from "@/lib/metrics/audience-split";
 import {
   createSupabaseServiceClient,
   isSupabaseServiceConfigured,
 } from "@/lib/supabase/service";
 
 /**
- * Who looked at a post, and who saved it — the owner-only, identity-bearing
- * half of post metrics.
+ * Who looked at a post, and how many saved it — the owner-only half of post
+ * metrics that has to read identities to answer.
  *
  * WHY THIS FILE EXISTS AT ALL. src/lib/posts/honest-views.ts reads the same
  * ledger, but it states an invariant in its own docblock (honest-views.ts:26-29):
  * `user_id` is used to drop the author's rows and is then thrown away, so no
  * viewer identity can escape through it. That guarantee is worth keeping, so
  * the identity read lives here instead of growing a back door there. Anything
- * that only needs a NUMBER should keep calling honest-views; this file is for
- * the two routes that are allowed to name people:
- * src/app/api/me/posts/[id]/viewers/route.ts and .../savers/route.ts.
+ * that only needs a NUMBER should keep calling honest-views; this file serves
+ * src/app/api/me/posts/[id]/viewers/route.ts (the one route allowed to name
+ * people, Vibe+ only) and .../savers/route.ts (a count on every tier; saves
+ * are private).
+ *
+ * COUNTS ARE NEVER FILTERED BY THE CALLER'S MUTES OR BLOCKS (security report
+ * 2026-09-27 #18). A total that drops when the author mutes someone is an
+ * oracle: mute a suspect, re-read the number, learn whether they saved or
+ * viewed. So every `total` here is everyone (minus the author), and the
+ * blocked/muted filter touches only the Vibe+ name list. See
+ * src/lib/metrics/audience-split.ts.
  *
  * WHY THE SERVICE ROLE, AND WHY `assertPostOwner` IS NOT OPTIONAL.
  * `post_views` has RLS enabled with ZERO select policies
@@ -78,18 +87,20 @@ export type PostViewerEntry = {
   viewed_on: string;
 };
 
-/** A person who saved the post, and when. */
-export type PostSaverEntry = {
-  user_id: string;
-  /** ISO timestamp — `bookmarks.created_at`, a real timestamptz. */
-  saved_at: string;
-};
-
 /**
  * `ok: false` means the read failed or ran away, NOT that the audience is
- * empty. An empty audience is `{ ok: true, entries: [] }`.
+ * empty. An empty audience is `{ ok: true, total: 0, entries: [] }`.
+ *
+ * `total` is distinct people, author excluded, NOBODY ELSE HIDDEN. `entries`
+ * is the name list: the same people minus the caller's blocked/muted set, so
+ * `entries.length` can sit below `total`. Page on `entries`, show `total`.
  */
-export type AudienceResult<T> = { ok: true; entries: T[] } | { ok: false };
+export type AudienceResult<T> =
+  | { ok: true; total: number; entries: T[] }
+  | { ok: false };
+
+/** A count with no identities behind it. Same `ok: false` contract. */
+export type AudienceCount = { ok: true; total: number } | { ok: false };
 
 /** One raw bookmark row, author's own saves already dropped. */
 export type PostSaveRow = {
@@ -155,9 +166,10 @@ export async function assertPostOwner(
  * would be the first thing in his own viewers list.
  *
  * `hiddenIds` is `loadHiddenUsers(...).hidden.ids` — blocked or muted people
- * are dropped from identity LISTS only. Counts elsewhere are unfiltered on
- * purpose; filtering them would make the list and the number on the same
- * screen disagree.
+ * are dropped from `entries` (the Vibe+ name list) and from nothing else.
+ * `total` counts every distinct viewer whatever `hiddenIds` holds, so a free
+ * owner can pass `[]` and skip the block/mute read entirely: the number they
+ * get is the same one a Vibe+ owner sees above the list (#18).
  */
 export async function loadPostViewers(opts: {
   postId: string;
@@ -221,21 +233,20 @@ export async function loadPostViewers(opts: {
     }
   }
 
-  const hidden = new Set(hiddenIds);
-  const entries: PostViewerEntry[] = [];
-  for (const [user_id, viewed_on] of lastSeen) {
-    if (hidden.has(user_id)) continue;
-    entries.push({ user_id, viewed_on });
-  }
+  const everyone: PostViewerEntry[] = [];
+  for (const [user_id, viewed_on] of lastSeen) everyone.push({ user_id, viewed_on });
   // Newest day first; user id breaks the tie because the ledger has no time of
   // day, and an arbitrary order would shuffle rows between two pages of the
   // same list.
-  entries.sort((a, b) =>
+  everyone.sort((a, b) =>
     a.viewed_on === b.viewed_on
       ? a.user_id.localeCompare(b.user_id)
       : b.viewed_on.localeCompare(a.viewed_on),
   );
-  return { ok: true, entries };
+  // One entry per person already (the map above), author already out in SQL,
+  // so `total` is distinct people and the hidden set only thins the list.
+  const { total, listed } = splitAudience(everyone, hiddenIds);
+  return { ok: true, total, entries: listed };
 }
 
 /**
@@ -313,27 +324,23 @@ export async function loadPostSaveRows(
 }
 
 /**
- * Everyone who saved one post, newest save first. Same exclusions as
- * `loadPostViewers`: the author's own bookmark never appears, and blocked or
- * muted people are dropped from the list.
+ * How many people saved one post. A number and nothing else, on every tier:
+ * saves are private (the Saved tab promises "Only you can see your saves").
+ *
+ * The author's own bookmark is excluded, and NOBODY ELSE IS. There is no
+ * `hiddenIds` parameter on purpose, so no caller can put the mute/block filter
+ * back: a count that drops by one when the author mutes a suspect names that
+ * suspect (security report 2026-09-27 #18). The result equals `counts.saves`
+ * from GET /api/posts/[id], which also drops only the author.
+ *
+ * `bookmarks` is UNIQUE (user_id, post_id), so rows are already people.
  */
-export async function loadPostSavers(opts: {
+export async function countPostSavers(opts: {
   postId: string;
   authorId: string;
-  hiddenIds: readonly string[];
-}): Promise<AudienceResult<PostSaverEntry>> {
-  const { postId, authorId, hiddenIds } = opts;
-
+}): Promise<AudienceCount> {
+  const { postId, authorId } = opts;
   const rows = await loadPostSaveRows([postId], new Map([[postId, authorId]]));
   if (rows === null) return { ok: false };
-
-  const hidden = new Set(hiddenIds);
-  const entries: PostSaverEntry[] = [];
-  for (const r of rows) {
-    if (hidden.has(r.user_id)) continue;
-    entries.push({ user_id: r.user_id, saved_at: r.created_at });
-  }
-  // Already ordered by the query (created_at desc, id asc); the filter above
-  // only removes rows, so the order survives.
-  return { ok: true, entries };
+  return { ok: true, total: rows.length };
 }

@@ -1,8 +1,14 @@
 import { NextResponse } from "next/server";
 
+import type { SupabaseClient } from "@supabase/supabase-js";
+
 import { loadProfileViewers, type ProfileViewersPage } from "@/lib/metrics/profile-viewers";
 import { hasPlus } from "@/lib/premium/require-plus";
 import { createSupabaseServerClient } from "@/lib/supabase/server";
+import {
+  createSupabaseServiceClient,
+  isSupabaseServiceConfigured,
+} from "@/lib/supabase/service";
 
 /**
  * GET /api/me/profile-views — how many people looked at your profile, and,
@@ -50,9 +56,19 @@ import { createSupabaseServerClient } from "@/lib/supabase/server";
  * errored is a number the data does not support, and all three clients
  * already render their own "couldn't load" line for a failed read.
  *
- * Owners only — RLS `profile_views_owner_select` scopes every read here to the
- * caller's own profile, so this route cannot leak someone else's viewers even
- * if the entitlement branch were wrong.
+ * THE LEDGER IS SERVER-ONLY (security report 2026-09-27 #17). No client role
+ * can read `profile_views` any more (20260928140000 drops
+ * `profile_views_owner_select` and revokes the table from anon/authenticated),
+ * because that owner-read let any student skip the paywall and pull their
+ * named viewer history from the data API. Every ledger read in this route uses
+ * the SERVICE ROLE and is scoped by hand to the `auth.getUser()` id, which is
+ * the only id this route ever passes. The free branch asks only for viewer ids
+ * inside the seven-day window, counts them and discards them. A missing service
+ * key is a 500, never four zero tiles.
+ *
+ * NOBODY IS FILTERED OUT OF A COUNT. The tiles and `locked_count` count people
+ * the owner muted or blocked too (#18: a number that drops when you mute
+ * someone names them). Only the Vibe+ `recent` list leaves them out.
  *
  * `recent` IS THE FIRST PAGE OF /api/me/profile-viewers, not a second opinion
  * about it. Both come from `loadProfileViewers`
@@ -103,6 +119,7 @@ type ViewerSlice =
 
 async function loadViewerSlice(
   supabase: Awaited<ReturnType<typeof createSupabaseServerClient>>,
+  service: SupabaseClient,
   userId: string,
   plus: boolean,
   sevenDaysAgo: string,
@@ -111,8 +128,9 @@ async function loadViewerSlice(
     // Same window as the `seven_days` tile, so the locked row and the tile
     // beside it can never contradict each other. No ordering: this is a count
     // over a window, not a "most recent N", and sorting rows that are about to
-    // collapse into a Set buys nothing.
-    const res = await supabase
+    // collapse into a Set buys nothing. Service role (the ledger is
+    // server-only); `userId` is the signed-in id.
+    const res = await service
       .from("profile_views")
       .select("viewer_user_id")
       .eq("profile_user_id", userId)
@@ -133,7 +151,8 @@ async function loadViewerSlice(
 
   // The paid list lives in one place so this route and
   // /api/me/profile-viewers cannot drift apart. `null` is "we could not read
-  // it", never "nobody" — see the 500 below.
+  // it", never "nobody" — see the 500 below. It reads the ledger with the
+  // service role itself; `supabase` is for the block/mute read and the cards.
   const page = await loadProfileViewers(supabase, userId, { limit: RECENT_LIMIT, offset: 0 });
   if (!page) return { ok: false };
   return { ok: true, locked: false, page };
@@ -148,6 +167,15 @@ export async function GET() {
   if (authErr || !user) {
     return NextResponse.json({ ok: false, error: "Unauthorized" }, { status: 401 });
   }
+
+  // The ledger is server-only (#17): every profile_views read below uses this
+  // client, scoped to `user.id`. Without the key there is no honest number to
+  // give, so say "couldn't load" rather than paint zeros.
+  if (!isSupabaseServiceConfigured()) {
+    console.error("[me/profile-views] SUPABASE_SERVICE_ROLE_KEY missing — counts cannot be read");
+    return NextResponse.json({ ok: false, error: "Request failed" }, { status: 500 });
+  }
+  const service = createSupabaseServiceClient();
 
   // The entitlement decides the shape of the read, so it has to resolve
   // first — run it alongside the all-time counter rather than before it.
@@ -168,23 +196,25 @@ export async function GET() {
   const sevenDaysAgo = iso(new Date(utcToday.getTime() - 6 * 86400000));
   const thirtyDaysAgo = iso(new Date(utcToday.getTime() - 29 * 86400000));
 
+  // Head counts: no rows come back, only the number. Service role, scoped to
+  // the signed-in id by hand (no client role can read the ledger).
   const [todayRes, sevenRes, thirtyRes, viewers] = await Promise.all([
-    supabase
+    service
       .from("profile_views")
       .select("viewer_user_id", { count: "exact", head: true })
       .eq("profile_user_id", user.id)
       .gte("viewed_on", todayDate),
-    supabase
+    service
       .from("profile_views")
       .select("viewer_user_id", { count: "exact", head: true })
       .eq("profile_user_id", user.id)
       .gte("viewed_on", sevenDaysAgo),
-    supabase
+    service
       .from("profile_views")
       .select("viewer_user_id", { count: "exact", head: true })
       .eq("profile_user_id", user.id)
       .gte("viewed_on", thirtyDaysAgo),
-    loadViewerSlice(supabase, user.id, plus, sevenDaysAgo),
+    loadViewerSlice(supabase, service, user.id, plus, sevenDaysAgo),
   ]);
 
   // A count that didn't come back is not a zero. Fail the read so the

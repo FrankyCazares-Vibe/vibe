@@ -1,5 +1,8 @@
 import { NextResponse } from "next/server";
 
+import { getActiveRestriction } from "@/lib/moderation/access";
+import { resumeVisibleToViewer } from "@/lib/profile/hidden-fields";
+import { sanitizeProfileLayout } from "@/lib/profile/profile-layout";
 import {
   RESUME_KEY_RE,
   resumeKeyOwnerId,
@@ -73,6 +76,40 @@ function unavailablePage(status: number, headers: Record<string, string>) {
 }
 
 /**
+ * The three A1 checks for a NON-OWNER, cheapest first: the layout hides the
+ * résumé (no read), the owner has a restriction in force, the viewer is not
+ * school-verified. A read that fails answers "error" (500), never "open".
+ */
+async function nonOwnerResumeGate(
+  ownerId: string,
+  viewerId: string,
+  rawLayout: unknown,
+): Promise<"open" | "refuse" | "error"> {
+  const layoutHidesResume = sanitizeProfileLayout(rawLayout).hidden.includes("resume");
+  if (layoutHidesResume) return "refuse";
+
+  const restriction = await getActiveRestriction(ownerId);
+  if (!restriction.ok) return "error";
+
+  const { data: viewerRow, error: viewerErr } = await createSupabaseServiceClient()
+    .from("users")
+    .select("school_verified")
+    .eq("id", viewerId)
+    .maybeSingle();
+  if (viewerErr) {
+    console.error("[resume GET] viewer verified", viewerErr.message);
+    return "error";
+  }
+  const open = resumeVisibleToViewer({
+    isOwner: false,
+    viewerVerified: (viewerRow as { school_verified?: unknown } | null)?.school_verified === true,
+    ownerRestricted: restriction.restriction !== null,
+    layoutHidesResume,
+  });
+  return open ? "open" : "refuse";
+}
+
+/**
  * GET /api/resume/<uid>/resume-<uuid>.<ext>[?json=1][&view=public]
  *
  * The only browser-facing read path for the PRIVATE `resumes` bucket.
@@ -88,7 +125,11 @@ function unavailablePage(status: number, headers: Record<string, string>) {
  *         or `resume_docs` — so a removed doc is unreachable to others
  *         immediately, and a row that points at someone else's key buys
  *         nothing;
- *      b. no `blocks` row exists in either direction.
+ *      b. no `blocks` row exists in either direction;
+ *      c. (S67 A1) the requester is school-verified, the owner has no
+ *         suspension or ban in force, and the owner's layout does not hide
+ *         the résumé (nonOwnerResumeGate). Not applied to the owner's own
+ *         `?view=public`.
  *
  *   4. for a NON-OWNER, the key that gets signed is whatever
  *      `resolveResumeKeyForViewer` returns: the original only when the
@@ -142,7 +183,7 @@ export async function GET(req: Request, ctx: RouteContext) {
   const service = createSupabaseServiceClient();
   const { data: row, error: rowErr } = await service
     .from("users")
-    .select("id, resume_url, resume_docs, resume_redactions")
+    .select("id, resume_url, resume_docs, resume_redactions, profile_layout")
     .eq("id", ownerId)
     .maybeSingle();
   if (rowErr) {
@@ -192,6 +233,25 @@ export async function GET(req: Request, ctx: RouteContext) {
         return NextResponse.json({ ok: false, error: "Request failed" }, { status: 500 });
       }
       if ((blockRows ?? []).length > 0) {
+        return NextResponse.json({ ok: false, error: "Not found" }, { status: 404 });
+      }
+
+      // S67 security wave 2, A1 (report #3, #5; product call 4). A résumé
+      // opens for someone else only when they are school-verified, the owner
+      // is not suspended or banned, and the owner has not hidden the résumé
+      // widget. Same uniform 404 as every other refusal here, and no admin
+      // exception. NON-OWNERS ONLY: the owner's own "view as others see it"
+      // (`?view=public`, the phone's Open button) must keep working on a
+      // résumé they hid.
+      const outcome = await nonOwnerResumeGate(
+        ownerId,
+        user.id,
+        (row as { profile_layout?: unknown }).profile_layout,
+      );
+      if (outcome === "error") {
+        return NextResponse.json({ ok: false, error: "Request failed" }, { status: 500 });
+      }
+      if (outcome === "refuse") {
         return NextResponse.json({ ok: false, error: "Not found" }, { status: 404 });
       }
     }

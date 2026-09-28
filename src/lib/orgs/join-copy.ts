@@ -169,6 +169,8 @@ export const ORG_COPY = freezeDeep({
     iuOnly: "IU only",
     purdueOnly: "Purdue only",
     hidden: "Hidden",
+    /** On a join request from someone an officer removed (S67 sec wave 2 #15). */
+    removedBefore: "Removed before",
   },
   policyChips: {
     open: "Open",
@@ -221,6 +223,10 @@ export const ORG_COPY = freezeDeep({
     memberFollows: "Members follow automatically.",
     orgHidden: "This org is hidden, so nobody new can join it.",
     inviteClosed: "This invite is no longer open.",
+    // S67 security wave 2 #15. Never names a block (waveA-build copy rule).
+    joinUnavailable: "You can't join this club right now.",
+    approveUnavailable: "You can't approve this request right now.",
+    removedNeedsAdmin: "Only the owner or an admin can let back someone who was removed.",
   },
   control: {
     followFailed: "Couldn't follow this club.",
@@ -768,6 +774,13 @@ export function orgErrorCopy(code: string | number | null | undefined): string |
     case "invite_not_found":
     case "invite_not_pending":
       return ORG_COPY.errors.inviteClosed;
+    // S67 security wave 2 #15 (join, approve).
+    case "join_unavailable":
+      return ORG_COPY.errors.joinUnavailable;
+    case "approve_unavailable":
+      return ORG_COPY.errors.approveUnavailable;
+    case "removed_needs_admin":
+      return ORG_COPY.errors.removedNeedsAdmin;
     default:
       return null;
   }

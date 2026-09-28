@@ -19,6 +19,7 @@ import { ownClipKeysToDelete } from "@/lib/posts/media-ownership";
 import { kickPushDrain } from "@/lib/push/dispatch";
 import { rateLimit, tooManyRequests } from "@/lib/rate-limit";
 import { CLIP_KEY_PREFIX, getR2S3Client, isR2Configured } from "@/lib/r2";
+import { loadPairBlock } from "@/lib/safety/pair-block";
 import { createSupabaseServerClient } from "@/lib/supabase/server";
 import {
   createSupabaseServiceClient,
@@ -104,6 +105,14 @@ type RouteContext = { params: Promise<{ id: string }> };
  * as missing, never a hidden one as visible. An answer that was allowed only
  * because the caller is in a hidden club carries `Cache-Control: private,
  * no-store`, like the media route's.
+ *
+ * A BLOCK EITHER WAY ROUND IS "NOT FOUND" too (S67 security wave 2, A2;
+ * report #4): the same 404 as a missing post, so nobody learns they were
+ * blocked. posts_select_authenticated refuses the row to a blocked pair once
+ * 20260928120000_blocks_in_rls.sql is applied; this check says the same thing
+ * before it, and stays as the belt to that brace. It fails closed (an
+ * unreadable block list is a 500, never the post). Your own post never reads
+ * `blocks`.
  */
 export async function GET(_req: Request, ctx: RouteContext) {
   const { id } = await ctx.params;
@@ -177,6 +186,17 @@ export async function GET(_req: Request, ctx: RouteContext) {
   // own words, even after leaving the club, so orgContentAccess (which knows
   // nothing about authors) is only asked about other people's club posts. It
   // fails closed: a failed read counts as hidden, and gets the same 404.
+  if (authorId !== user.id) {
+    const pair = await loadPairBlock(supabase, user.id, authorId);
+    if (!pair.ok) {
+      console.error("[posts/:id GET block-check]", pair.error);
+      return NextResponse.json({ ok: false, error: "Request failed" }, { status: 500 });
+    }
+    if (pair.blocked) {
+      return NextResponse.json({ ok: false, error: "Post not found" }, { status: 404 });
+    }
+  }
+
   let hiddenClub = false;
   if (orgId && authorId !== user.id) {
     const access = await orgContentAccessAsService(orgId, "[posts/:id GET club]");

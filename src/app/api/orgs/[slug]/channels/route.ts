@@ -1,6 +1,8 @@
 import { NextResponse } from "next/server";
 
-import { requireTermsAccepted } from "@/lib/legal/require-terms";
+import { loadClubOfficer } from "@/lib/club-routes/officer-guard";
+import { contentBlockedResponse, requireCanPublish } from "@/lib/moderation/access";
+import { checkText } from "@/lib/moderation/text-filter";
 import { createSupabaseServerClient } from "@/lib/supabase/server";
 import { createSupabaseServiceClient } from "@/lib/supabase/service";
 
@@ -105,6 +107,13 @@ export async function GET(_req: Request, { params }: Params) {
  *
  * `name` must be slug-shaped (lowercase, 2–31 chars, alphanumeric/_-) so it
  * renders cleanly as `#name`. Within an org, channel names must be unique.
+ *
+ * Security wave 2 (A5b): the insert runs on the service role, so
+ * channels_insert_authenticated (officer + consent + can_publish_now) never
+ * runs; the route takes the same gate (`requireCanPublish`, Terms refused
+ * first with the body `requireTermsAccepted` sent), runs the word filter on
+ * the name and topic every member reads, and answers a stranger asking about
+ * a hidden club with 404 (`loadClubOfficer`), not 403.
  */
 export async function POST(req: Request, { params }: Params) {
   const { slug } = await params;
@@ -114,8 +123,8 @@ export async function POST(req: Request, { params }: Params) {
     return NextResponse.json({ ok: false, error: "Unauthorized" }, { status: 401 });
   }
 
-  const termsGate = await requireTermsAccepted(user.id);
-  if (termsGate) return termsGate;
+  const publishGate = await requireCanPublish(user.id);
+  if (publishGate) return publishGate;
 
   let body: CreateBody;
   try {
@@ -136,26 +145,15 @@ export async function POST(req: Request, { params }: Params) {
     );
   }
 
-  const { data: org } = await supabase
-    .from("orgs")
-    .select("id")
-    .eq("handle", slug)
-    .maybeSingle();
-  if (!org) {
-    return NextResponse.json({ ok: false, error: "Not found" }, { status: 404 });
-  }
+  if (!checkText(name).ok) return contentBlockedResponse("name");
+  if (topic && !checkText(topic).ok) return contentBlockedResponse("topic");
 
-  // Permission check via the helper (admin/owner only for create).
-  const service = createSupabaseServiceClient();
-  const { data: roleRow } = await service
-    .from("org_members")
-    .select("role")
-    .eq("org_id", org.id)
-    .eq("user_id", user.id)
-    .maybeSingle();
-  if (!roleRow || !["owner", "admin"].includes(roleRow.role)) {
-    return NextResponse.json({ ok: false, error: "Admin only" }, { status: 403 });
+  // Owner/admin only for create; 404 to a stranger when the club is hidden.
+  const guard = await loadClubOfficer(slug, user.id);
+  if (!guard.ok) {
+    return NextResponse.json({ ok: false, error: guard.error }, { status: guard.status });
   }
+  const { org, service } = guard;
 
   // Check name uniqueness within the org.
   const { data: nameClash } = await service

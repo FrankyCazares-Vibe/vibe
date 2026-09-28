@@ -1,15 +1,19 @@
 import { NextResponse } from "next/server";
 
 import { isSchoolSystem } from "@/lib/iu/campuses";
-import { requireTermsAccepted } from "@/lib/legal/require-terms";
+import { requireNotRestricted } from "@/lib/moderation/access";
+import { officerGate } from "@/lib/orgs/hidden-gate";
+import { ORG_COPY } from "@/lib/orgs/join-copy";
 import {
+  OFFICER_ROLES,
   audienceAllows,
-  isOfficer,
+  canApproveRequest,
   isOrgAudience,
   isOrgRole,
   type OrgAudience,
 } from "@/lib/orgs/join-state";
-import { admitMember, notifyOrg } from "@/lib/orgs/membership";
+import { admitMember, loadRemovedUserIds, notifyOrg } from "@/lib/orgs/membership";
+import { isBlockedWithOrg, loadOrgBlocks } from "@/lib/orgs/org-blocks";
 import { rateLimit, tooManyRequests } from "@/lib/rate-limit";
 import { createSupabaseServerClient } from "@/lib/supabase/server";
 import { createSupabaseServiceClient } from "@/lib/supabase/service";
@@ -62,6 +66,19 @@ type Body = { action?: unknown };
  *      and resolved_at > now() - interval '30 days'
  *
  * Do not "clean up" denied rows, and do not null `resolved_at` on them.
+ *
+ * S67 SECURITY WAVE 2 (#15 and the hidden-club Low):
+ *   - a non-member asking about a HIDDEN club gets 404, never 403;
+ *   - a request from somebody in a block pair with THIS officer (either way)
+ *     is hidden from them in the list, so here it is 404
+ *     `request_not_found` for approve and deny alike;
+ *   - approve re-checks whether the owner or any officer has blocked the
+ *     requester since they asked: 409 `approve_unavailable`, copy that never
+ *     names the block (deny still works, so the queue can be cleared);
+ *   - letting back somebody an officer REMOVED takes an owner or admin
+ *     (`canApproveRequest`): 403 `removed_needs_admin` for a mod;
+ *   - a suspended or banned officer can neither approve nor deny: 403
+ *     `account_restricted` (`requireNotRestricted`, ruling 16).
  */
 export async function POST(req: Request, { params }: Params) {
   const { slug, id: requestId } = await params;
@@ -85,8 +102,13 @@ export async function POST(req: Request, { params }: Params) {
     return tooManyRequests(limit, "Too many requests handled at once. Try again shortly.");
   }
 
-  const termsGate = await requireTermsAccepted(user.id);
-  if (termsGate) return termsGate;
+  // Terms AND no suspension or ban in force, for approve and deny alike
+  // (waveA-build ruling 16). The writes below use the service role, which
+  // skips the database's is_restricted_now(), and the proxy's restriction
+  // check is only the fast path (session app_metadata; skipped on a GoTrue
+  // blip). Same `terms_required` 403 as before, plus `account_restricted`.
+  const accessGate = await requireNotRestricted(user.id);
+  if (accessGate) return accessGate;
 
   let body: Body;
   try {
@@ -127,7 +149,14 @@ export async function POST(req: Request, { params }: Params) {
     .eq("user_id", user.id)
     .maybeSingle();
   const viewerRole = viewer && isOrgRole(viewer.role) ? viewer.role : null;
-  if (!isOfficer(viewerRole)) {
+  const gate = officerGate({ hidden: !!org.hidden_at, role: viewerRole, allowed: OFFICER_ROLES });
+  if (gate === "not_found") {
+    return NextResponse.json(
+      { ok: false, error: "Not found", code: "not_found" },
+      { status: 404 },
+    );
+  }
+  if (gate === "forbidden") {
     return NextResponse.json(
       { ok: false, error: "Staff only", code: "officers_only" },
       { status: 403 },
@@ -141,6 +170,21 @@ export async function POST(req: Request, { params }: Params) {
     .eq("org_id", org.id)
     .maybeSingle();
   if (!reqRow) {
+    return NextResponse.json(
+      { ok: false, error: "Request not found", code: "request_not_found" },
+      { status: 404 },
+    );
+  }
+  // A block either way between this officer and the requester: the request
+  // is hidden from this officer (list route), so it doesn't exist for them.
+  const pairBlocked = await isBlockedWithOrg(service, reqRow.user_id as string, [user.id]);
+  if (pairBlocked === "error") {
+    return NextResponse.json(
+      { ok: false, error: "Request failed", code: "load_failed" },
+      { status: 500 },
+    );
+  }
+  if (pairBlocked) {
     return NextResponse.json(
       { ok: false, error: "Request not found", code: "request_not_found" },
       { status: 404 },
@@ -220,6 +264,34 @@ export async function POST(req: Request, { params }: Params) {
           audience,
         },
         { status: 409 },
+      );
+    }
+
+    // Blocks and removals, re-checked now: either can postdate the request.
+    const [blocks, removed] = await Promise.all([
+      loadOrgBlocks(service, org.id as string, reqRow.user_id as string),
+      loadRemovedUserIds(service, org.id as string, [reqRow.user_id as string]),
+    ]);
+    if (!blocks.ok || !removed.ok) {
+      console.error("[requests/[id] POST blocks/removals]", {
+        blocks: blocks.ok ? null : blocks.error,
+        removals: removed.ok ? null : removed.error,
+      });
+      return NextResponse.json(
+        { ok: false, error: "Request failed", code: "load_failed" },
+        { status: 500 },
+      );
+    }
+    if (blocks.blockedByOfficer) {
+      return NextResponse.json(
+        { ok: false, error: ORG_COPY.errors.approveUnavailable, code: "approve_unavailable" },
+        { status: 409 },
+      );
+    }
+    if (!canApproveRequest(viewerRole, removed.ids.size > 0)) {
+      return NextResponse.json(
+        { ok: false, error: ORG_COPY.errors.removedNeedsAdmin, code: "removed_needs_admin" },
+        { status: 403 },
       );
     }
 
