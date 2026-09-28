@@ -1,4 +1,5 @@
 import { MESSAGE_MEDIA_KEY_PREFIX, MESSAGE_MEDIA_KEY_RE } from "@/lib/r2";
+import { isChannelMediaKey } from "@/lib/posts/media-ownership";
 import type { createSupabaseServerClient } from "@/lib/supabase/server";
 
 /**
@@ -113,7 +114,10 @@ export async function ensureMember(
 export function isChannelMessageMediaKey(key: string, channelId: string): boolean {
   return (
     MESSAGE_MEDIA_KEY_RE.test(key) &&
-    key.startsWith(`${MESSAGE_MEDIA_KEY_PREFIX}${channelId}/`)
+    key.startsWith(`${MESSAGE_MEDIA_KEY_PREFIX}${channelId}/`) &&
+    // The database trigger (20260927120000) allows one safe file name only;
+    // checking the same rule here turns a crafted key into a 400, not a 500.
+    isChannelMediaKey(key, channelId)
   );
 }
 

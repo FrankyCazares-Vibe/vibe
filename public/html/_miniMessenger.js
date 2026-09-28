@@ -679,10 +679,38 @@
     });
   }
 
+  // One delegated click listener for every message button: the hover pill's
+  // emoji ("pick") and Reply, and the reaction chips ("chip"). Each button
+  // carries data-vmm-act / data-vmm-mid / data-vmm-emoji, which come back as
+  // plain strings, so a stored reaction can never become code the way an
+  // inline onclick="...('${...}')" string could (the browser decodes &#39;
+  // back into a quote before an inline handler runs). The pill's buttons
+  // stopped the click from bubbling and still do; the chips never did.
+  function installVmmMessageClicks(el) {
+    if (!el || el.dataset.clicksMounted === "1") return;
+    el.dataset.clicksMounted = "1";
+    el.addEventListener("click", (e) => {
+      const t = e.target;
+      const btn = t && t.closest ? t.closest("button[data-vmm-act]") : null;
+      if (!btn || !el.contains(btn)) return;
+      const act = btn.getAttribute("data-vmm-act");
+      const messageId = btn.getAttribute("data-vmm-mid") || "";
+      if (act === "pick" || act === "reply") e.stopPropagation();
+      if (!messageId) return;
+      if (act === "reply") {
+        window.__vmmStartReply(messageId);
+      } else if (act === "pick" || act === "chip") {
+        const emoji = btn.getAttribute("data-vmm-emoji") || "";
+        if (emoji) window.__vmmToggleReaction(messageId, emoji);
+      }
+    });
+  }
+
   function paintMessages() {
     const el = document.getElementById("vmmMsgs");
     if (!el) return;
     installVmmActionsHover(el);
+    installVmmMessageClicks(el);
     const wasAtBottom = (el.scrollHeight - el.scrollTop - el.clientHeight) < 80;
     // Capture position BEFORE innerHTML reset, so if the user was reading
     // older messages we restore where they were instead of yanking them
@@ -746,14 +774,19 @@
         const myEmos = new Set(
           (m.reactions || []).filter((r) => r.viewer_reacted).map((r) => r.emoji),
         );
+        // No inline onclick strings built from data: every button names its
+        // action, message id and emoji in data- attributes, and one listener
+        // on #vmmMsgs (installVmmMessageClicks) runs it. The chips below show
+        // other members' stored reactions, so their emoji is escaped too.
+        const mid = esc(m.id);
         const actBtns = emos.map((e) => {
           const cls = "vmm-act-emo" + (myEmos.has(e) ? " on" : "");
-          return `<button type="button" class="${cls}" onclick="event.stopPropagation();window.__vmmToggleReaction('${esc(m.id)}','${esc(e)}')" aria-label="React with ${esc(e)}">${e}</button>`;
+          return `<button type="button" class="${cls}" data-vmm-act="pick" data-vmm-mid="${mid}" data-vmm-emoji="${esc(e)}" aria-label="React with ${esc(e)}">${esc(e)}</button>`;
         }).join("");
-        const actions = `<div class="vmm-actions">${actBtns}<span class="vmm-act-sep"></span><button type="button" class="vmm-act-reply" onclick="event.stopPropagation();window.__vmmStartReply('${esc(m.id)}')" aria-label="Reply">↩ Reply</button></div>`;
+        const actions = `<div class="vmm-actions">${actBtns}<span class="vmm-act-sep"></span><button type="button" class="vmm-act-reply" data-vmm-act="reply" data-vmm-mid="${mid}" aria-label="Reply">↩ Reply</button></div>`;
         const chips = (m.reactions && m.reactions.length > 0)
           ? '<div class="vmm-rxs">' + m.reactions.map((r) =>
-              `<button type="button" class="vmm-rx${r.viewer_reacted ? " on" : ""}" onclick="window.__vmmToggleReaction('${esc(m.id)}','${esc(r.emoji)}')"><span>${r.emoji}</span><span>${r.count}</span></button>`
+              `<button type="button" class="vmm-rx${r.viewer_reacted ? " on" : ""}" data-vmm-act="chip" data-vmm-mid="${mid}" data-vmm-emoji="${esc(r.emoji)}"><span>${esc(r.emoji)}</span><span>${esc(r.count)}</span></button>`
             ).join("") + '</div>'
           : "";
         const wrap = `<div class="vmm-bubble-wrap"><div class="vmm-bubble">${esc(m.content)}</div>${actions}</div>`;
@@ -859,7 +892,7 @@
     void root;
   }
 
-  // ── Window-level handlers (called from message render onclicks) ──────
+  // ── Window-level handlers (called by installVmmMessageClicks) ────────
   window.__vmmToggleReaction = async function (messageId, emoji) {
     const cid = state.activeChannel;
     if (!cid || !messageId || !emoji) return;

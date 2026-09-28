@@ -7,6 +7,7 @@ import {
 } from "@/lib/mentions";
 import { isSupabaseHttpsUrl } from "@/lib/org-asset-url";
 import { withPostMediaUrls } from "@/lib/post-media-url";
+import { hasSafeMediaUrlShape, isOwnClipKey } from "@/lib/posts/media-ownership";
 import { kickPushDrain } from "@/lib/push/dispatch";
 import { CLIP_KEY_PREFIX } from "@/lib/r2";
 import { contentBlockedResponse, requireCanPublish } from "@/lib/moderation/access";
@@ -37,23 +38,17 @@ type PublishPostBody = {
 };
 
 const TAG_RE = /^[\p{L}\p{N}_]+$/u;
-const MAX_MEDIA_REF_LEN = 2048;
 
 /**
  * True when `value` is safe to store as a post media reference for `userId`:
- * an https URL (max 2048 chars) or an R2 key under clips/<userId>/.
+ * an https URL on our own Supabase host with a plain path (max 2048 chars),
+ * or an R2 key inside clips/<userId>/. The same rule the database trigger
+ * `posts_check_media_refs` enforces (migration 20260927120000), so a value
+ * this route accepts is never refused by the database as a 500.
  */
 function isOwnedMediaRef(value: string, userId: string): boolean {
-  if (value.length > MAX_MEDIA_REF_LEN || value.includes("..")) return false;
-  if (value.startsWith(CLIP_KEY_PREFIX)) {
-    return value.startsWith(`${CLIP_KEY_PREFIX}${userId}/`);
-  }
-  try {
-    const u = new URL(value);
-    return u.protocol === "https:" && isSupabaseHttpsUrl(value);
-  } catch {
-    return false;
-  }
+  if (value.startsWith(CLIP_KEY_PREFIX)) return isOwnClipKey(value, userId);
+  return hasSafeMediaUrlShape(value) && isSupabaseHttpsUrl(value);
 }
 
 function normalizeTags(input: unknown): string[] {
@@ -118,11 +113,10 @@ export async function POST(req: Request) {
   }
 
   // Validate video object key: must be in clips/<viewer.id>/ so a user
-  // can't publish another user's upload as their own post. Same gate as
-  // /api/me/publish-clip.
+  // can't publish another user's upload as their own post. The database
+  // refuses anything else too (posts_check_media_refs).
   if (videoObjectKey) {
-    const expectedPrefix = `${CLIP_KEY_PREFIX}${user.id}/`;
-    if (!videoObjectKey.startsWith(expectedPrefix) || videoObjectKey.includes("..")) {
+    if (!isOwnClipKey(videoObjectKey, user.id)) {
       return NextResponse.json(
         { ok: false, error: "Object key does not belong to this user" },
         { status: 400 },

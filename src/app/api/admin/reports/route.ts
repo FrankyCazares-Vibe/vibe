@@ -8,6 +8,11 @@ import {
 } from "@/lib/auth/require-platform-admin";
 import { type ActiveRestriction, getActiveRestriction } from "@/lib/moderation/access";
 import {
+  REPORT_PRIORITY_REASON_CODES,
+  orderReportTargetKeys,
+  reportTargetKey,
+} from "@/lib/moderation/reports";
+import {
   decodeFollowCursor,
   encodeFollowCursor,
   followKeysetOrFilter,
@@ -29,6 +34,16 @@ const REPORTS_PER_GROUP = 20;
 
 /** Ceiling on the sibling-report read, so one hot target can't drag the page. */
 const SIBLING_ROW_CAP = 600;
+
+/**
+ * Ceiling on the priority read (child-safety, self-harm, intimate-image and
+ * sexual-content reports lifted to the top of the open tab). The same size as
+ * a page, so the fan-out at most doubles.
+ */
+const PRIORITY_ROW_CAP = PAGE_MAX;
+
+const REPORT_COLUMNS =
+  "id, reporter_id, target_type, target_id, reason_code, reason, created_at, status, target_owner_id, target_snapshot";
 
 type ReportRow = {
   id: string;
@@ -64,6 +79,19 @@ type ReportRow = {
  * pages with the same `openCount` and the same list. The screen keys groups by
  * `${type}:${id}` and the second copy collapses into the first.
  *
+ * PRIORITY FIRST (S67 security wave, report #4 + repair round). Child sexual
+ * abuse or exploitation, self-harm, an intimate image shared without consent
+ * (a legal clock: removed within 48 hours of a valid request) and, as a
+ * stand-in for pickers without those choices, sexual content never wait
+ * behind spam (REPORT_PRIORITY_REASON_CODES, most urgent first). On the open
+ * tab's first page the open priority reports are read on their own, however
+ * old, one reason at a time in that order, so a pile of sexual-content reports
+ * can never push a child-safety report past the cap; the things they name go
+ * to the top. Inside any page a priority target also sorts first
+ * (`orderReportTargetKeys` in src/lib/moderation/reports.ts). The keyset is
+ * untouched, so a lifted target can come round again on a later page, and the
+ * screen collapses it the same way.
+ *
  * RESPONSES
  *   200 {ok, groups:[{target:{type,id,snapshot,
  *        live:{exists,removed,hidden,hiddenKnown}},
@@ -90,12 +118,7 @@ export async function GET(req: Request) {
 
   const service = createSupabaseServiceClient();
 
-  let query = service
-    .from("reports")
-    .select(
-      "id, reporter_id, target_type, target_id, reason_code, reason, created_at, status, target_owner_id, target_snapshot",
-    )
-    .eq("status", status);
+  let query = service.from("reports").select(REPORT_COLUMNS).eq("status", status);
   if (decoded.cursor) {
     query = query.or(followKeysetOrFilter("created_at", decoded.cursor));
   }
@@ -114,15 +137,41 @@ export async function GET(req: Request) {
   const next_cursor =
     rows.length > limit && last ? encodeFollowCursor(last.created_at, last.id) : null;
 
-  // The distinct targets on this page, in the order their newest report came.
-  const targetKeys: string[] = [];
-  const targetsByKey = new Map<string, { type: string; id: string }>();
-  for (const r of page) {
-    const key = `${r.target_type}:${r.target_id}`;
-    if (!targetsByKey.has(key)) {
-      targetsByKey.set(key, { type: r.target_type, id: r.target_id });
-      targetKeys.push(key);
+  // Open priority reports, however old, on the open tab's first page only.
+  // One small read per reason (in parallel), joined most urgent reason first
+  // and cut at the cap, so the cap always keeps the most urgent reports.
+  let priority: ReportRow[] = [];
+  if (status === "open" && !decoded.cursor) {
+    const reads = await Promise.all(
+      REPORT_PRIORITY_REASON_CODES.map((code) =>
+        service
+          .from("reports")
+          .select(REPORT_COLUMNS)
+          .eq("status", "open")
+          .eq("reason_code", code)
+          .order("created_at", { ascending: false })
+          .order("id", { ascending: false })
+          .limit(PRIORITY_ROW_CAP),
+      ),
+    );
+    for (const { data: priorityData, error: priorityErr } of reads) {
+      if (priorityErr) {
+        console.error("[admin/reports priority]", priorityErr.message);
+        return adminFail(500, "request_failed", "Request failed");
+      }
+      priority.push(...((priorityData ?? []) as ReportRow[]));
     }
+    priority = priority.slice(0, PRIORITY_ROW_CAP);
+  }
+
+  // The distinct targets on this page: anything with a priority report first,
+  // then the rest in the order their newest report came.
+  const shown = [...priority, ...page];
+  const targetKeys = orderReportTargetKeys(shown);
+  const targetsByKey = new Map<string, { type: string; id: string }>();
+  for (const r of shown) {
+    const key = reportTargetKey(r.target_type, r.target_id);
+    if (!targetsByKey.has(key)) targetsByKey.set(key, { type: r.target_type, id: r.target_id });
   }
   const targetIds = targetKeys.map((k) => targetsByKey.get(k)!.id);
 
@@ -136,9 +185,7 @@ export async function GET(req: Request) {
   const { data: siblingData, error: siblingErr } = targetIds.length
     ? await service
         .from("reports")
-        .select(
-          "id, reporter_id, target_type, target_id, reason_code, reason, created_at, status, target_owner_id, target_snapshot",
-        )
+        .select(REPORT_COLUMNS)
         .in("target_id", targetIds)
         .order("created_at", { ascending: false })
         .order("id", { ascending: false })
@@ -150,7 +197,16 @@ export async function GET(req: Request) {
   }
   const siblings = (siblingData ?? []) as ReportRow[];
 
-  return buildAnswer(service, { status, page, siblings, targetKeys, targetsByKey, next_cursor });
+  // `shown` rather than `page`: the priority rows must reach their group even
+  // when a truncated sibling read misses them.
+  return buildAnswer(service, {
+    status,
+    page: shown,
+    siblings,
+    targetKeys,
+    targetsByKey,
+    next_cursor,
+  });
 }
 
 function parseLimit(raw: string | null): number {
@@ -184,7 +240,7 @@ async function buildAnswer(service: SupabaseClient, args: BuildArgs) {
   const grouped = new Map<string, ReportRow[]>();
   const openCounts = new Map<string, number>();
   for (const r of all.values()) {
-    const key = `${r.target_type}:${r.target_id}`;
+    const key = reportTargetKey(r.target_type, r.target_id);
     if (!targetsByKey.has(key)) continue;
     const rowStatus = r.status ?? "open";
     if (rowStatus === "open") openCounts.set(key, (openCounts.get(key) ?? 0) + 1);

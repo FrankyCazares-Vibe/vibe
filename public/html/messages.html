@@ -1242,11 +1242,33 @@ function __dmInstallActionsHover() {
   });
 }
 
+// One delegated click listener for the reaction chips. Each chip carries its
+// message id and emoji in data- attributes, which come back as plain strings,
+// so a stored value can never turn into code the way an inline
+// onclick="...('${...}')" string could: the browser decodes &#39; back into a
+// real quote before an inline handler runs. Chips never stopped the click
+// from bubbling, and this doesn't either. Mounts once per #msgsArea.
+function __dmInstallReactionClicks() {
+  const area = document.getElementById('msgsArea');
+  if (!area || area.dataset.rxMounted === '1') return;
+  area.dataset.rxMounted = '1';
+  area.addEventListener('click', (e) => {
+    const t = e.target;
+    const btn = t && t.closest ? t.closest('button[data-rx-emoji]') : null;
+    if (!btn || !area.contains(btn)) return;
+    const messageId = btn.getAttribute('data-rx-msg') || '';
+    const emoji = btn.getAttribute('data-rx-emoji') || '';
+    if (!messageId || !emoji || typeof window.__dmToggleReaction !== 'function') return;
+    window.__dmToggleReaction(messageId, emoji);
+  });
+}
+
 function renderMsgs(msgs,d){
   const a=document.getElementById('msgsArea');
   if (!a) return;
   __dmInstallDrag();
   __dmInstallActionsHover();
+  __dmInstallReactionClicks();
   // Split rendering: bubbles only re-render when message ids change
   // (so server-signed media URLs being fresh-signed every poll doesn't
   // remount <img>/<video> and flicker), footer (typing + Read receipt)
@@ -1373,11 +1395,14 @@ function renderMsgs(msgs,d){
       '<a href="/legal/community" style="color:inherit;text-decoration:underline">Community Guidelines</a></div>' +
       '</div></div>';
   };
-  // Reaction chips below the bubble.
+  // Reaction chips below the bubble. The emoji is another member's stored
+  // value, so it is escaped where it shows and never built into an onclick
+  // string: the message id and emoji ride in data- attributes, and one
+  // listener on #msgsArea (__dmInstallReactionClicks) handles the tap.
   const chipsFor = (m) => {
     if (!m || !Array.isArray(m.reactions) || m.reactions.length === 0) return '';
     const inner = m.reactions.map((r) =>
-      `<button type="button" class="dm-rx${r.viewer_reacted ? ' on' : ''}" onclick="__dmToggleReaction('${__dmEsc(m.id)}','${__dmEsc(r.emoji)}')"><span class="dm-rx-emo">${r.emoji}</span><span>${r.count}</span></button>`
+      `<button type="button" class="dm-rx${r.viewer_reacted ? ' on' : ''}" data-rx-msg="${__dmEsc(m.id)}" data-rx-emoji="${__dmEsc(r.emoji)}"><span class="dm-rx-emo">${__dmEsc(r.emoji)}</span><span>${__dmEsc(r.count)}</span></button>`
     ).join('');
     return `<div class="dm-rxs">${inner}</div>`;
   };

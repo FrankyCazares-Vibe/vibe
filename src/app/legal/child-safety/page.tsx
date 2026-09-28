@@ -24,7 +24,7 @@ export default function ChildSafetyPage() {
     <LegalLayout
       eyebrow="Safety"
       title="Child Safety Standards"
-      effectiveDate="September 23, 2026"
+      effectiveDate="September 27, 2026"
     >
       <LegalP>
         Vibe is a social app for university students. You need a verified
@@ -83,8 +83,11 @@ export default function ChildSafetyPage() {
       <LegalP>
         <strong>Inside the app:</strong> open the <strong>⋯</strong> menu on
         the post, person or message and choose <strong>Report</strong>, then
-        pick <strong>Sexual content</strong>. Add whatever context you can in
-        your own words. You do not have to be the person affected to report.
+        pick <strong>Child sexual abuse or exploitation</strong>. If you
+        don&apos;t see that choice, pick <strong>Sexual content</strong> and
+        say so in the box. Either way it goes to the front of the queue. Add
+        whatever context you can in your own words. You do not have to be the
+        person affected to report.
       </LegalP>
       <LegalP>
         <strong>By email, any time:</strong>{" "}
@@ -108,11 +111,10 @@ export default function ChildSafetyPage() {
         Vibe, <strong>CONNECTVIBE. LLC</strong>, an Indiana limited liability
         company. We treat them as the most serious reports on Vibe.{" "}
         <strong>
-          Every report on Vibe is reviewed and acted on within 24 hours of
-          being filed
-        </strong>{" "}
-        — these go to the front of that queue, whether they come in through the
-        app or by email.
+          We aim to review reports within 24 hours; reports of child
+          exploitation or self-harm go first
+        </strong>
+        , whether they come in through the app or by email.
       </LegalP>
       <LegalUL>
         <li>We take the content down.</li>

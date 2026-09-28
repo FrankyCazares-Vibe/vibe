@@ -12,7 +12,7 @@
 // surface a "Sign in" toast instead of hitting the API.
 //
 // The engagement bar also carries the view count (free, everyone sees it) and,
-// for the author only, the way into "Who saw this" / "Who saved this" — the
+// for the author only, the way into "Who saw this" / "Saves" — the
 // paid audience sheet this file builds at the bottom. Counts are public,
 // identities are private (handoffs/2026-09-14-wave-plan-metrics-screens.md).
 // ══════════════════════════════════════════════════════════════════════════
@@ -256,7 +256,7 @@
   }
   .vpv-composer button[disabled] { opacity: .4; cursor: default; }
 
-  /* ── Audience sheet ("Who saw this" / "Who saved this") ─────────────
+  /* ── Audience sheet ("Who saw this" / "Saves") ─────────────
      Its own overlay rather than the post modal's, because it opens ON TOP of
      an already-open post: z 10000 sits above .vpv-overlay (9999) and below
      .vpv-toast (10001), so a failure line is still readable over it. */
@@ -450,10 +450,11 @@
           <!-- The author's saves number, a sibling of the Save button rather
                than a span inside it: a button inside a button is invalid
                markup and unreachable by keyboard, and this one has its own job
-               (open "Who saved this") while Save keeps toggling the author's
-               own bookmark. Hidden entirely when the count is unknown. -->
+               (open the "Saves" count sheet) while Save keeps toggling the
+               author's own bookmark. Hidden entirely when the count is unknown.
+               Saves are private: the sheet shows how many, never who. -->
           <button class="vpv-act vpv-act-count" id="vpvSaveCount" onclick="window.__vpvOpenSavers()"
-            title="Who saved this" aria-label="Who saved this" style="display:none"></button>
+            title="Saves" aria-label="Saves" style="display:none"></button>
         </div>
         <div class="vpv-comments" id="vpvComments"></div>
         <div class="vpv-composer">
@@ -1676,14 +1677,16 @@
   };
 
   // ══════════════════════════════════════════════════════════════════════
-  // Audience sheet — "Who saw this" / "Who saved this"
+  // Audience sheet — "Who saw this" / "Saves"
   //
   // Screen C of the metrics wave, static twin of the React sheet
   // (handoffs/2026-09-14-wave-plan-metrics-screens.md). The author opens it
   // from the Views entry or from the saves number; everyone else never sees a
-  // way in. Reads GET /api/me/posts/[id]/viewers and /savers, which answer a
-  // free owner with a count and NO names at all, and a Vibe+ owner with rows.
-  // So this file has two bodies: a lock over the number, or the people.
+  // way in. Reads GET /api/me/posts/[id]/viewers, which answers a free owner
+  // with a count and NO names at all and a Vibe+ owner with rows, and
+  // /savers, which answers everyone with a count only (saves are private).
+  // So this file has three bodies: a lock over the number, the people, or a
+  // plain saves count.
   //
   // Nothing here is a permission check. The routes 404 a post that is not
   // yours whatever this client believes.
@@ -1820,7 +1823,7 @@
     aud.failed = false;
     aud.seq++;
     document.getElementById("vpvAudTitle").textContent =
-      kind === "savers" ? "Who saved this" : "Who saw this";
+      kind === "savers" ? "Saves" : "Who saw this";
     document.getElementById("vpvAudSub").textContent = "";
     document.getElementById("vpvAudRows").innerHTML = `<div class="vpv-aud-loading">loading…</div>`;
     document.getElementById("vpvAudMore").innerHTML = "";
@@ -1949,6 +1952,29 @@
     </div>`;
   }
 
+  // Saves are private on every tier (security report 2026-09-27, register
+  // #15): /savers answers `viewer_identities: "private"` with a number and no
+  // names, so "Only you can see your saves" on the Saved tab stays true. The
+  // number, and why there is nothing under it — no lock, no Vibe+ pitch,
+  // because there is no paid list behind this one.
+  function paintAudienceCount(total) {
+    const rowsEl = document.getElementById("vpvAudRows");
+    const moreEl = document.getElementById("vpvAudMore");
+    const subEl  = document.getElementById("vpvAudSub");
+    if (!rowsEl || !moreEl || !subEl) return;
+    subEl.textContent = "";
+    moreEl.innerHTML = "";
+    if (total <= 0) {
+      rowsEl.innerHTML = `<div class="vpv-aud-empty">No one yet.</div>`;
+      return;
+    }
+    rowsEl.innerHTML = `<div class="vpv-aud-lock">
+      <div class="vpv-aud-lock-n">${esc(String(total))}</div>
+      <div class="vpv-aud-lock-label">${total === 1 ? "person saved this" : "people saved this"}</div>
+      <div class="vpv-aud-lock-line">Saves are private, so you see how many, never who.</div>
+    </div>`;
+  }
+
   // ── Load ──────────────────────────────────────────────────────────────
   // Quiet: a failure belongs in the sheet, next to the rows it is about, not
   // in a toast behind it. One vibeLoadFailed for the whole block, in its own
@@ -1958,7 +1984,7 @@
     const id = aud.postId;
     const kind = aud.kind;
     const line = kind === "savers"
-      ? "Couldn't load who saved this."
+      ? "Couldn't load your saves count."
       : "Couldn't load who saw this.";
     const errEl = document.getElementById("vpvAudErr");
     if (errEl) errEl.textContent = "";
@@ -1977,6 +2003,15 @@
     if (seq !== aud.seq || !aud.open) return;
 
     if (r.ok && r.data && r.data.ok) {
+      if (kind === "savers" || r.data.viewer_identities === "private") {
+        // Saves never show names, whatever the server sent.
+        aud.failed = false;
+        aud.rows = [];
+        aud.hasMore = false;
+        aud.total = Number(r.data.total) || 0;
+        paintAudienceCount(aud.total);
+        return;
+      }
       if (r.data.premium === false || r.data.viewer_identities === "locked") {
         // Free: a count and nothing else came back — there are no names in
         // this response to leak, and there is nothing to page through.

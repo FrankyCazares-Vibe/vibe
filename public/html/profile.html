@@ -5007,6 +5007,11 @@ async function _rasterizePdf(src) {
   const source = (typeof src === 'string' && src.startsWith('data:'))
     ? { data: _dataUrlToUint8(src) }
     : { url: await _resolveResumeDocUrl(src) };
+  // isEvalSupported:false — pdf.js 3.11.174 lets a crafted PDF run its own
+  // script through the font renderer's eval path (CVE-2024-4367). Switching
+  // eval off is the vendor's workaround; fonts still draw. Keep this in step
+  // with pdfDocumentParams in src/lib/pdfjs-cdn.ts (the mobile viewer).
+  source.isEvalSupported = false;
   const pdf = await pdfjsLib.getDocument(source).promise;
   const pages = [];
   for (let i = 1; i <= pdf.numPages; i++) {

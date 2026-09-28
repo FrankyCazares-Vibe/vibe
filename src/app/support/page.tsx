@@ -16,6 +16,10 @@ import {
 //
 // help@ is the one address on this page. The legal footer's Contact still
 // says hello@, which is LegalLayout's to change, not this page's.
+//
+// LAWYER MUST CONFIRM before launch: the intimate-image section below is our
+// reading of the TAKE IT DOWN Act (security report 2026-09-27, finding #4). It
+// is the short copy of /legal/community#intimate-images: change both together.
 export const metadata = {
   title: "Support · Vibe",
   description:
@@ -40,7 +44,7 @@ function HelpEmail() {
 
 export default function SupportPage() {
   return (
-    <LegalLayout eyebrow="Help" title="Support" effectiveDate="September 24, 2026">
+    <LegalLayout eyebrow="Help" title="Support" effectiveDate="September 27, 2026">
       <LegalP>
         Vibe is run by <strong>CONNECTVIBE. LLC</strong>, an Indiana limited
         liability company. The fastest way to reach a person is email:{" "}
@@ -57,20 +61,58 @@ export default function SupportPage() {
       </LegalP>
       <LegalP>
         <strong>
-          We review every report and act on it within 24 hours of it being
-          filed.
+          We aim to review reports within 24 hours; reports of child
+          exploitation or self-harm go first.
         </strong>{" "}
         You can also email <HelpEmail /> if you can&apos;t report in the app,
         or if the account is already gone.
       </LegalP>
       <LegalP>
-        Reports of child sexual abuse or exploitation go to the front of that
-        queue. Our{" "}
+        Our{" "}
         <Link href="/legal/child-safety" style={ACCENT_LINK}>
           Child Safety Standards
         </Link>{" "}
-        say how to report it. If someone is in immediate danger, call 911 or
-        campus police first.
+        say how to report child sexual abuse or exploitation. If someone is in
+        immediate danger, call 911 or campus police first.
+      </LegalP>
+
+      <LegalH2>An intimate image shared without consent</LegalH2>
+      <LegalP>
+        If a nude or sexual photo or video of you is on Vibe and you
+        didn&apos;t agree to it being shared, including one that&apos;s edited
+        or fake, ask us to take it down.{" "}
+        <strong>We remove it within 48 hours of a valid request.</strong> You
+        don&apos;t need a Vibe account to ask.
+      </LegalP>
+      <LegalUL>
+        <li>
+          <strong>In the app:</strong> <strong>⋯</strong> →{" "}
+          <strong>Report</strong> → <strong>An intimate image shared without
+          consent</strong>. If that choice isn&apos;t there, pick{" "}
+          <strong>Sexual content</strong> and say so in the box.
+        </li>
+        <li>
+          <strong>By email, no account needed:</strong>{" "}
+          <a
+            href={`mailto:${HELP_EMAIL}?subject=Intimate%20image%20removal`}
+            style={ACCENT_LINK}
+          >
+            {HELP_EMAIL}
+          </a>
+          , subject &ldquo;Intimate image removal.&rdquo;
+        </li>
+      </LegalUL>
+      <LegalP>
+        A valid request includes your signature (on paper or electronic; typing
+        your full name counts), where the image is on Vibe (a link, the
+        poster&apos;s handle or a description), a statement that you believe in
+        good faith it was shared without the consent of the person in it, and
+        how to reach you. Please don&apos;t send the image itself. The full
+        process, including asking for someone else, is in the{" "}
+        <Link href="/legal/community#intimate-images" style={ACCENT_LINK}>
+          Community Guidelines
+        </Link>
+        .
       </LegalP>
 
       <LegalH2>Block or mute someone</LegalH2>

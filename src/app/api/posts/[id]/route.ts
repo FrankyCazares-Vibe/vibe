@@ -15,6 +15,7 @@ import { withPostMediaUrls } from "@/lib/post-media-url";
 import { addedHandles, checkPostEdit, extractPostTags } from "@/lib/posts/edit";
 import { loadPostEngagementCounts } from "@/lib/posts/engagement-counts";
 import { loadHonestViewRows } from "@/lib/posts/honest-views";
+import { ownClipKeysToDelete } from "@/lib/posts/media-ownership";
 import { kickPushDrain } from "@/lib/push/dispatch";
 import { rateLimit, tooManyRequests } from "@/lib/rate-limit";
 import { CLIP_KEY_PREFIX, getR2S3Client, isR2Configured } from "@/lib/r2";
@@ -310,9 +311,13 @@ async function notYourPost(orgId: unknown, logTag: string): Promise<NextResponse
  * Side-effects:
  *  - post_likes / post_comments / bookmarks rows cascade automatically
  *    via ON DELETE CASCADE on their foreign keys.
- *  - Clip videos in R2 are deleted best-effort. Failures don't block the
- *    DB delete — orphaned R2 objects can be swept by a lifecycle policy
- *    later if needed.
+ *  - Clip videos (and a `clips/` poster frame) in R2 are deleted
+ *    best-effort, and only from the caller's own `clips/<caller id>/`
+ *    folder (S67 security wave). Failures don't block the DB delete —
+ *    orphaned R2 objects can be swept by a lifecycle policy later if needed.
+ *    Poster frames and photos in the Supabase `profiles` bucket are not
+ *    touched here (report finding "Deleted posts ... stay reachable").
+ *  - Rate limited: 30 deletes per 10 minutes per student.
  */
 export async function DELETE(_req: Request, ctx: RouteContext) {
   const { id } = await ctx.params;
@@ -329,6 +334,11 @@ export async function DELETE(_req: Request, ctx: RouteContext) {
     return NextResponse.json({ ok: false, error: "Unauthorized" }, { status: 401 });
   }
 
+  // Like every other write route. Deleting erases a stored file, so a script
+  // looping over this endpoint is exactly what the S67 audit feared.
+  const rl = await rateLimit(`post-delete:${user.id}`, { limit: 30, windowSec: 600 });
+  if (!rl.allowed) return tooManyRequests(rl);
+
   // Read first so we can also clean up R2 storage if it's a clip. The
   // SELECT respects RLS too, so a non-owner can't even see other users'
   // posts here — but the public read policy (posts_select_authenticated)
@@ -337,7 +347,7 @@ export async function DELETE(_req: Request, ctx: RouteContext) {
   // `org_id` is read only so a stranger to a hidden club gets "not found".
   const { data: row, error: readErr } = await supabase
     .from("posts")
-    .select("id,user_id,org_id,type,media_url")
+    .select("id,user_id,org_id,type,media_url,media_thumbnail_url")
     .eq("id", id)
     .maybeSingle();
   if (readErr) {
@@ -357,24 +367,38 @@ export async function DELETE(_req: Request, ctx: RouteContext) {
     return NextResponse.json({ ok: false, error: "Request failed" }, { status: 500 });
   }
 
-  // Best-effort R2 cleanup for any post whose media is an R2 video object.
-  // The `clips/` prefix is legacy naming — it backs regular video posts.
-  if (isR2Configured()) {
-    const key = String(row.media_url || "").trim();
-    if (key.startsWith(CLIP_KEY_PREFIX) && !key.includes("..")) {
-      try {
-        const { DeleteObjectCommand } = await import("@aws-sdk/client-s3");
-        const bucket = process.env.R2_BUCKET_NAME?.trim();
-        if (bucket) {
-          await getR2S3Client().send(
-            new DeleteObjectCommand({ Bucket: bucket, Key: key }),
-          );
+  // Best-effort R2 cleanup for the post's video and poster frame. The
+  // `clips/` prefix is legacy naming — it backs regular video posts.
+  //
+  // ONLY THE CALLER'S OWN FILES. The row's media columns can be written
+  // straight through PostgREST, so a post the caller owns could name someone
+  // else's video (S67 audit, [High] "Any student can permanently erase other
+  // students' videos"). A key is deleted only when it sits in
+  // `clips/<caller id>/`; anything else stays in storage, and a `clips/` key
+  // outside that folder is logged, because only a planted row carries one.
+  const keys = ownClipKeysToDelete([row.media_url, row.media_thumbnail_url], user.id);
+  for (const ref of [row.media_url, row.media_thumbnail_url]) {
+    if (typeof ref === "string" && ref.startsWith(CLIP_KEY_PREFIX) && !keys.includes(ref)) {
+      console.warn("[posts/:id DELETE r2] kept a clips/ key outside the caller's folder", {
+        postId: id,
+        userId: user.id,
+      });
+    }
+  }
+  if (keys.length > 0 && isR2Configured()) {
+    try {
+      const { DeleteObjectCommand } = await import("@aws-sdk/client-s3");
+      const bucket = process.env.R2_BUCKET_NAME?.trim();
+      if (bucket) {
+        const client = getR2S3Client();
+        for (const key of keys) {
+          await client.send(new DeleteObjectCommand({ Bucket: bucket, Key: key }));
         }
-      } catch (e) {
-        // Don't fail the request — DB delete already succeeded. Log it
-        // so we know if storage drifts from the DB.
-        console.error("[posts/:id DELETE r2]", e);
       }
+    } catch (e) {
+      // Don't fail the request — DB delete already succeeded. Log it
+      // so we know if storage drifts from the DB.
+      console.error("[posts/:id DELETE r2]", e);
     }
   }
 

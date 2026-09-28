@@ -15,7 +15,7 @@ import {
 } from "@/components/posts/PostAudienceList";
 
 /**
- * The phone's "Who saw this" / "Who saved this" sheet — Screen C (wave plan,
+ * The phone's "Who saw this" / "Saves" sheet — Screen C (wave plan,
  * handoffs/2026-09-14-wave-plan-metrics-screens.md).
  *
  * A bottom drawer over the post viewer, mounted only while it is open (see
@@ -42,9 +42,11 @@ import {
 const AUDIENCE_SHEET_OVERLAY_Z = 10400;
 const AUDIENCE_SHEET_CONTENT_Z = 10401;
 
+// Saves are a count only (saves are private; see PostAudienceList), so their
+// title names the number, not the people.
 const TITLE: Record<PostAudienceKind, string> = {
   viewers: "Who saw this",
-  savers: "Who saved this",
+  savers: "Saves",
 };
 
 export function PostAudienceSheet({

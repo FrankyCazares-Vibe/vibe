@@ -1,3 +1,5 @@
+import { hasSafeMediaUrlShape, isOrgAssetKey } from "./posts/media-ownership";
+
 /**
  * Build a stable proxy URL for an org banner / logo so the rest of the app
  * doesn't have to sign R2 GET URLs at every render. The asset route
@@ -56,35 +58,55 @@ export function isSupabaseHttpsUrl(url: string): boolean {
 
 const MAX_ASSET_LEN = 1024;
 
+/** The org id folder of an `orgs/<id>/…` key, or null. */
+const ORG_KEY_FOLDER_RE = /^orgs\/([0-9a-f-]{36})\//;
+
 /**
  * Validate a client-supplied org logo/banner value.
  *  - `null`      → clears the asset
- *  - `orgs/...`  → R2 object key (no `..` traversal segments)
- *  - `https://…` → must be on a Supabase host
+ *  - `orgs/...`  → R2 object key inside THIS club's folder, `orgs/<orgId>/`
+ *                  (S67 security wave: before, any club's folder passed, so an
+ *                  officer could point their club's logo at another club's
+ *                  file, including a hidden club's)
+ *  - `https://…` → must be on our Supabase host, with a plain path
  * Returns `undefined` when the value is invalid; the caller should 400.
+ *
+ * `orgId`:
+ *  - the club's id → only keys under `orgs/<orgId>/` pass;
+ *  - `null`        → the club doesn't exist yet (creation): no key can be
+ *                    its own, so every `orgs/` key is refused;
+ *  - omitted       → LEGACY, for callers not yet passing the id: any
+ *                    well-formed `orgs/<uuid>/…` key passes here, and the
+ *                    database trigger `orgs_check_asset_refs` (migration
+ *                    20260927120000) refuses a key outside the row's own
+ *                    folder. Pass the id so that is a 400, not a 500.
  */
-export function normalizeOrgAssetInput(v: unknown): string | null | undefined {
+export function normalizeOrgAssetInput(
+  v: unknown,
+  orgId?: string | null,
+): string | null | undefined {
   if (v === null) return null;
   if (typeof v !== "string") return undefined;
   const s = v.trim();
   if (!s) return null;
   if (s.length > MAX_ASSET_LEN) return undefined;
   if (s.startsWith("orgs/")) {
-    if (s.includes("..") || s.includes("\\") || /[\u0000-\u001f]/.test(s)) return undefined;
-    return s;
+    if (orgId === null) return undefined;
+    const owner = orgId === undefined ? ORG_KEY_FOLDER_RE.exec(s)?.[1] : orgId;
+    return owner && isOrgAssetKey(s, owner) ? s : undefined;
   }
-  if (s.startsWith("https://") && isSupabaseHttpsUrl(s)) return s;
+  if (hasSafeMediaUrlShape(s) && isSupabaseHttpsUrl(s)) return s;
   return undefined;
 }
 
 /**
  * Org post media must be scoped to the org's own R2 prefix
- * (`orgs/<orgId>/...`, no traversal) or live on a Supabase host. `clips/`
- * keys belong to individual users and are deliberately not accepted.
+ * (`orgs/<orgId>/...`, no traversal) or live on a Supabase host with a plain
+ * path. `clips/` keys belong to individual users and are deliberately not
+ * accepted. Same rule as the database trigger `posts_check_media_refs`.
  */
 export function isAllowedMediaUrl(v: string, orgId: string): boolean {
   if (!v || v.length > MAX_ASSET_LEN) return false;
-  if (v.includes("..") || v.includes("\\") || /[\u0000-\u001f]/.test(v)) return false;
-  if (v.startsWith(`orgs/${orgId}/`)) return true;
-  return v.startsWith("https://") && isSupabaseHttpsUrl(v);
+  if (v.startsWith("orgs/")) return isOrgAssetKey(v, orgId);
+  return hasSafeMediaUrlShape(v) && isSupabaseHttpsUrl(v);
 }

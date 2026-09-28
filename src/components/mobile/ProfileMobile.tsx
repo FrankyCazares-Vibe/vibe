@@ -5800,6 +5800,8 @@ const REPORT_REASONS: Array<{ code: string; label: string }> = [
   { code: "spam", label: "Spam" },
   { code: "harassment", label: "Harassment or bullying" },
   { code: "sexual", label: "Sexual content" },
+  { code: "intimate_image", label: "An intimate image shared without consent" },
+  { code: "child_safety", label: "Child sexual abuse or exploitation" },
   { code: "hate", label: "Hate speech" },
   { code: "self_harm", label: "Self-harm or violence" },
   { code: "other", label: "Other" },

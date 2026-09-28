@@ -665,10 +665,6 @@ export default async function PlusPage({
                     you.
                   </>,
                   <>
-                    <strong>Who saved your posts.</strong> The quietest signal
-                    there is, and usually the most useful one.
-                  </>,
-                  <>
                     <strong>More ways to make your profile yours</strong> — more
                     covers, an accent colour, and a mark next to your handle.
                     Still being built; nothing here is charged for until it

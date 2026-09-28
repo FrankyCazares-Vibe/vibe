@@ -13,8 +13,21 @@
 const PDFJS_VERSION = "3.11.174";
 const PDFJS_BASE = `https://cdnjs.cloudflare.com/ajax/libs/pdf.js/${PDFJS_VERSION}`;
 
+/**
+ * What we hand pdf.js's getDocument. `isEvalSupported` is ALWAYS false: pdf.js
+ * up to 4.1.392 (we pin 3.11.174) lets a crafted PDF run its own script
+ * through the font renderer's eval path (CVE-2024-4367). Turning eval off is
+ * the vendor's own workaround, and it costs us nothing visible — fonts still
+ * draw, just through the slower non-eval path.
+ */
+export type PdfDocumentParams = {
+  data?: Uint8Array;
+  url?: string;
+  isEvalSupported: false;
+};
+
 type PdfJs = {
-  getDocument: (params: { data?: Uint8Array; url?: string }) => {
+  getDocument: (params: PdfDocumentParams) => {
     promise: Promise<{
       numPages: number;
       getPage: (n: number) => Promise<PdfPage>;
@@ -80,21 +93,7 @@ export function loadPdfJs(): Promise<PdfJs> {
  */
 export async function rasterizePdf(input: string): Promise<string[]> {
   const lib = await loadPdfJs();
-  let source: { data?: Uint8Array; url?: string };
-  if (input.startsWith("data:")) {
-    // pdf.js wants raw bytes for data URLs; decode the base64 chunk.
-    const comma = input.indexOf(",");
-    const b64 = comma >= 0 ? input.slice(comma + 1) : "";
-    const bin = atob(b64);
-    const bytes = new Uint8Array(bin.length);
-    for (let i = 0; i < bin.length; i++) bytes[i] = bin.charCodeAt(i);
-    source = { data: bytes };
-  } else {
-    // pdf.js resolves relative URLs against the worker, not the page —
-    // always hand it an absolute URL.
-    source = { url: new URL(input, window.location.href).href };
-  }
-  const doc = await lib.getDocument(source).promise;
+  const doc = await lib.getDocument(pdfDocumentParams(input, window.location.href)).promise;
   const pages: string[] = [];
   for (let i = 1; i <= doc.numPages; i++) {
     const page = await doc.getPage(i);
@@ -108,4 +107,26 @@ export async function rasterizePdf(input: string): Promise<string[]> {
     pages.push(canvas.toDataURL("image/jpeg", 0.82));
   }
   return pages;
+}
+
+/**
+ * Build the getDocument params for one input: raw bytes for a `data:` URL,
+ * an absolute URL for anything else, and eval switched off either way (see
+ * PdfDocumentParams). Pure, so the eval switch is pinned by a test and can't
+ * quietly fall off the next time someone touches the loader.
+ *
+ * `pageHref` is the page's own address. pdf.js resolves relative URLs against
+ * the worker, not the page, so a relative input is made absolute here.
+ */
+export function pdfDocumentParams(input: string, pageHref: string): PdfDocumentParams {
+  if (input.startsWith("data:")) {
+    // pdf.js wants raw bytes for data URLs; decode the base64 chunk.
+    const comma = input.indexOf(",");
+    const b64 = comma >= 0 ? input.slice(comma + 1) : "";
+    const bin = atob(b64);
+    const bytes = new Uint8Array(bin.length);
+    for (let i = 0; i < bin.length; i++) bytes[i] = bin.charCodeAt(i);
+    return { data: bytes, isEvalSupported: false };
+  }
+  return { url: new URL(input, pageHref).href, isEvalSupported: false };
 }

@@ -492,14 +492,14 @@ export async function PATCH(req: Request, { params }: Params) {
     patch.backdrop_preset = body.backdrop_preset;
   }
   if (body.logo_url !== undefined) {
-    const v = normalizeOrgAssetInput(body.logo_url);
+    const v = normalizeOrgAssetInput(body.logo_url, org.id);
     if (v === undefined) {
       return fail(400, "invalid_asset", "Invalid logo_url");
     }
     patch.logo_url = v;
   }
   if (body.banner_url !== undefined) {
-    const v = normalizeOrgAssetInput(body.banner_url);
+    const v = normalizeOrgAssetInput(body.banner_url, org.id);
     if (v === undefined) {
       return fail(400, "invalid_asset", "Invalid banner_url");
     }

@@ -1,16 +1,7 @@
 import { NextResponse } from "next/server";
 
+import { isAllowedReactionEmoji } from "@/lib/messages/reaction-emoji";
 import { createSupabaseServerClient } from "@/lib/supabase/server";
-
-const ALLOWED_EMOJIS = new Set([
-  "❤️",
-  "👍",
-  "👎",
-  "😂",
-  "🔥",
-  "😮",
-  "😢",
-]);
 
 type RouteCtx = { params: Promise<{ id: string; messageId: string }> };
 type Body = { emoji?: unknown };
@@ -41,7 +32,9 @@ function parseEmoji(body: Body): { ok: true; emoji: string } | { ok: false; res:
       res: NextResponse.json({ ok: false, error: "emoji required" }, { status: 400 }),
     };
   }
-  if (!ALLOWED_EMOJIS.has(emoji)) {
+  // The same list the database CHECK enforces (message_reactions_emoji_check,
+  // migration 20260927110000), so a reaction the route takes always stores.
+  if (!isAllowedReactionEmoji(emoji)) {
     return {
       ok: false,
       res: NextResponse.json(

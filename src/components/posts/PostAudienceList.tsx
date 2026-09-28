@@ -10,7 +10,7 @@ import { dayLabelFromDate, dayLabelFromTimestamp } from "@/lib/metrics/day-label
 import { useAppShell } from "@/lib/native/use-app-shell";
 
 /**
- * "Who saw this" / "Who saved this" — the body of Screen C (wave plan,
+ * "Who saw this" / "Saves" — the body of Screen C (wave plan,
  * handoffs/2026-09-14-wave-plan-metrics-screens.md, contract C3).
  *
  * One component, two surfaces: the phone mounts it inside
@@ -24,6 +24,13 @@ import { useAppShell } from "@/lib/native/use-app-shell";
  * no identity here to hide (src/app/api/me/posts/[id]/viewers/route.ts). This
  * component renders the count and the lock; it never decides who may see a
  * name. Zero names free (wave plan rule 1).
+ *
+ * SAVES ARE A COUNT ON EVERY TIER. The Saved tab promises "Only you can see
+ * your saves", so /savers answers `viewer_identities: "private"` with a number
+ * and no `users` (security report 2026-09-27, register #15). This file shows
+ * that number with a line saying saves are private — no lock, no Vibe+ pitch,
+ * because Vibe+ does not sell saves — and never paints a saver row, even if
+ * some older server were to send one.
  *
  * `total` IS PEOPLE, AND IT IS NOT THE VIEWS CHIP. The route's `total` counts
  * distinct people after the author's own rows and blocked/muted viewers come
@@ -105,6 +112,8 @@ export function PostAudienceList({
 }) {
   const [rows, setRows] = useState<PostAudienceUser[]>([]);
   const [premium, setPremium] = useState(false);
+  // True when the answer is a count by design (saves), not a lock to upsell.
+  const [countOnly, setCountOnly] = useState(kind === "savers");
   // null until the first page lands: "we do not know yet" is not 0 people.
   const [total, setTotal] = useState<number | null>(null);
   const [hasMore, setHasMore] = useState(false);
@@ -148,6 +157,7 @@ export function PostAudienceList({
       // for a toast doesn't get one.
       const r = await vibeRequest<{
         premium?: boolean;
+        viewer_identities?: string;
         users?: PostAudienceUser[];
         total?: number;
         has_more?: boolean;
@@ -160,8 +170,10 @@ export function PostAudienceList({
       if (cancelled) return;
 
       const data = r.ok ? r.data : null;
-      const isPlus = data?.premium === true;
-      const users = Array.isArray(data?.users) ? data.users : null;
+      // Saves never show names, whatever the server sent (see the header).
+      const isCountOnly = kind === "savers" || data?.viewer_identities === "private";
+      const isPlus = !isCountOnly && data?.premium === true;
+      const users = !isCountOnly && Array.isArray(data?.users) ? data.users : null;
       // On the paid branch the route 500s rather than sending `users: []`, so
       // a `premium: true` payload WITHOUT the array is a broken shape, not an
       // empty list: it fails instead of saying "no one yet".
@@ -170,6 +182,7 @@ export function PostAudienceList({
         return;
       }
       setFirstErr(null);
+      setCountOnly(isCountOnly);
       setPremium(isPlus);
       setTotal(data.total);
       setRows(users ?? []);
@@ -260,6 +273,19 @@ export function PostAudienceList({
   // the sheet says what it is counting. The routes ask the client to print
   // this line (src/app/api/me/posts/[id]/viewers/route.ts).
   const peopleLine = `${total} ${total === 1 ? "person" : "people"} ${copy.verb}.`;
+
+  if (countOnly) {
+    // The number, and why there is nothing under it. No lock and no pitch:
+    // there is no paid list behind this one.
+    return (
+      <div style={{ display: "flex", flexDirection: "column", gap: 6 }}>
+        <p style={{ ...headlineStyle, color: ink }}>{peopleLine}</p>
+        <p style={{ ...noteStyle, color: faint }}>
+          Saves are private, so you see how many, never who.
+        </p>
+      </div>
+    );
+  }
 
   if (!premium) {
     // The count is free on every tier and in every shell; the line under it

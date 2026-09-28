@@ -972,7 +972,7 @@ export function PostViewerMobile({
               {isOwner && typeof counts.saves === "number" && counts.saves > 0 ? (
                 <EngagementButton
                   label={String(counts.saves)}
-                  ariaLabel={`${counts.saves} saves — see who saved this`}
+                  ariaLabel={`${counts.saves} saves`}
                   onTap={() => setAudienceKind("savers")}
                   icon={<BookmarkIcon />}
                 />

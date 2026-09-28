@@ -86,7 +86,7 @@ export function LegalLayout({
         >
           {children}
         </article>
-        {/* Five links now, not three. A row of `·` spacers inside a <p>
+        {/* Six links now, not three. A row of `·` spacers inside a <p>
             orphans a separator at the start of a wrapped line on a 375px
             phone, so the spacing is the layout's job: a flex-wrap row with
             real gaps, no separator characters to strand. */}
@@ -113,6 +113,11 @@ export function LegalLayout({
           </Link>
           <Link href="/legal/child-safety" style={LEGAL_LINK}>
             Child Safety
+          </Link>
+          {/* The published takedown process for an intimate image shared
+              without consent (TAKE IT DOWN Act; security report #4). */}
+          <Link href="/legal/community#intimate-images" style={LEGAL_LINK}>
+            Intimate image removal
           </Link>
           <a href="mailto:hello@connectvibe.app" style={LEGAL_LINK}>
             Contact

@@ -119,9 +119,15 @@ export async function GET() {
   // Platform-admin flag — surfaced so the LeftNav can render the Admin link
   // without a second roundtrip. Defensive: if the column is missing (a
   // pre-governance environment), treat as false so the field still resolves.
+  //
+  // Read with the SERVICE role, scoped to the signed-in user's own id: since
+  // 20260927141000 `authenticated` cannot select `is_platform_admin` at all
+  // (security report #38, "any signed-in user can list the admin accounts"),
+  // so the cookie client would silently read nothing and hide the Admin link.
+  // This route returns the caller's own flag and nobody else's.
   let isPlatformAdmin = false;
   try {
-    const { data: adminRow } = await supabase
+    const { data: adminRow } = await service
       .from("users")
       .select("is_platform_admin")
       .eq("id", user.id)

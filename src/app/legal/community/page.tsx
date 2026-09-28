@@ -1,3 +1,8 @@
+// LAWYER MUST CONFIRM before launch: the "Intimate images shared without
+// consent" section is our reading of the TAKE IT DOWN Act (notice, what a
+// valid request needs, removal within 48 hours); James takes it to the lawyer
+// (security report 2026-09-27, finding #4). /support carries the same process
+// in short: change both together.
 import Link from "next/link";
 
 import {
@@ -23,7 +28,7 @@ export default function CommunityGuidelinesPage() {
     <LegalLayout
       eyebrow="Safety"
       title="Community Guidelines"
-      effectiveDate="September 23, 2026"
+      effectiveDate="September 27, 2026"
     >
       <LegalP>
         Vibe is a campus app. Everyone here verified a school email, which
@@ -77,6 +82,16 @@ export default function CommunityGuidelinesPage() {
           .
         </li>
         <li>
+          <strong>Intimate images shared without consent.</strong> A nude or
+          sexual photo or video of someone who didn&apos;t agree to it being
+          shared, including one that&apos;s edited or fake. How to get one
+          taken down is{" "}
+          <a href="#intimate-images" style={ACCENT_LINK}>
+            below
+          </a>
+          .
+        </li>
+        <li>
           <strong>Spam.</strong> Bulk posting, engagement farming, bots,
           scams, phishing links, or dragging people off Vibe to something
           sketchy.
@@ -110,11 +125,12 @@ export default function CommunityGuidelinesPage() {
         choose <strong>Report</strong>. On a club page it&apos;s at the bottom
         of the About panel instead — on a phone, under the{" "}
         <strong>About</strong> tab. Pick the reason that fits — spam,
-        harassment, sexual content, hate, self-harm, or something else — and
-        add a sentence in your own words if there&apos;s context we&apos;d
-        miss. You can report a post, a comment, a message, a chat, a club or a
-        person, and you can block or mute anyone from their profile at the same
-        time.
+        harassment, sexual content, an intimate image shared without consent,
+        child sexual abuse or exploitation, hate, self-harm, or something else
+        — and add a sentence in your own
+        words if there&apos;s context we&apos;d miss. You can report a post, a
+        comment, a message, a chat, a club or a person, and you can block or
+        mute anyone from their profile at the same time.
       </LegalP>
       <LegalP>
         Reports are not public. The person you report is never told who
@@ -124,13 +140,18 @@ export default function CommunityGuidelinesPage() {
       <LegalH2>What happens after a report</LegalH2>
       <LegalP>
         <strong>
-          We review every report and act on it within 24 hours of it being
-          filed.
+          We aim to review reports within 24 hours; reports of child
+          exploitation or self-harm go first.
         </strong>{" "}
-        A report goes straight to the Vibe team, it lands in a queue, and
-        inside that day a person reads it against these guidelines and the
-        Terms and decides what happens. We look at the reported thing and the
-        account behind it, not just the words in the report.
+        A report goes straight to the Vibe team and lands in a queue, where a
+        person reads it against these guidelines and the Terms and decides what
+        happens. We look at the reported thing and the account behind it, not
+        just the words in the report. An intimate image shared without consent
+        has its own process and a 48-hour promise:{" "}
+        <a href="#intimate-images" style={ACCENT_LINK}>
+          see below
+        </a>
+        .
       </LegalP>
       <LegalP>Depending on what we find, one of these happens:</LegalP>
       <LegalUL>
@@ -161,6 +182,81 @@ export default function CommunityGuidelinesPage() {
         We don&apos;t send you a play-by-play of what happened to someone
         else&apos;s account — that&apos;s their business, not ours to hand out.
       </LegalP>
+
+      {/* The anchor the legal footer and /support link to. A wrapping
+          section carries the id so LegalH2 keeps its one shape. */}
+      <section id="intimate-images" style={{ scrollMarginTop: 24 }}>
+        <LegalH2>Intimate images shared without consent</LegalH2>
+        <LegalP>
+          If a nude or sexual photo or video of you is on Vibe and you
+          didn&apos;t agree to it being shared, including one that&apos;s
+          edited or fake, you can ask us to take it down. You don&apos;t need a
+          Vibe account to ask, and you can ask for someone else if they&apos;ve
+          asked you to act for them.
+        </LegalP>
+        <LegalP>
+          <strong>We remove it within 48 hours of a valid request</strong>,
+          along with any identical copies of it we find on Vibe. These
+          requests go to the front of the queue.
+        </LegalP>
+        <LegalP>There are two ways to ask:</LegalP>
+        <LegalUL>
+          <li>
+            <strong>In the app.</strong> Open the <strong>⋯</strong> menu on
+            the post, message or profile, choose <strong>Report</strong> and
+            pick <strong>An intimate image shared without consent</strong>. If
+            you don&apos;t see that choice, pick <strong>Sexual content</strong>{" "}
+            and say in the box that it&apos;s an intimate image shared without
+            consent.
+          </li>
+          <li>
+            <strong>By email, no account needed.</strong> Write to{" "}
+            <a
+              href="mailto:help@connectvibe.app?subject=Intimate%20image%20removal"
+              style={ACCENT_LINK}
+            >
+              help@connectvibe.app
+            </a>{" "}
+            with the subject &ldquo;Intimate image removal.&rdquo;
+          </li>
+        </LegalUL>
+        <LegalP>A valid request includes four things:</LegalP>
+        <LegalUL>
+          <li>
+            <strong>Your signature</strong>, on paper or electronic. Typing
+            your full name at the end of an email counts. If you&apos;re asking
+            for someone else, sign with your own name and say who you&apos;re
+            acting for.
+          </li>
+          <li>
+            <strong>Where the image is on Vibe.</strong> A link, the handle of
+            the account that posted it, or a description that lets us find it.
+          </li>
+          <li>
+            <strong>A good-faith statement</strong> that the image was shared
+            without the consent of the person in it. For example: &ldquo;I
+            believe in good faith that this image of me was shared without my
+            consent.&rdquo;
+          </li>
+          <li>
+            <strong>How to reach you.</strong> An email address works.
+          </li>
+        </LegalUL>
+        <LegalP>
+          A report in the app already tells us where the image is and how to
+          reach you. Put your name and the good-faith statement in the box.
+        </LegalP>
+        <LegalP>
+          Please don&apos;t send us the image itself. A link or a description is
+          enough. If we can&apos;t find it from what you sent, we&apos;ll write
+          back to ask. If the person in the image is under 18, follow our{" "}
+          <Link href="/legal/child-safety" style={ACCENT_LINK}>
+            Child Safety Standards
+          </Link>{" "}
+          as well. If someone is in immediate danger, call 911 or campus police
+          first.
+        </LegalP>
+      </section>
 
       <LegalH2>If we act on your account</LegalH2>
       <LegalP>

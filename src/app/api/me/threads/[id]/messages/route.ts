@@ -10,6 +10,11 @@ import {
   isChannelMessageMediaKey,
   messageMediaProxyUrl,
 } from "@/lib/messages/channel-access";
+import {
+  groupMessageReactions,
+  type ReactionGroup,
+  type ReactionRow,
+} from "@/lib/messages/reaction-emoji";
 import { postMediaProxyUrl } from "@/lib/post-media-url";
 import { enqueueMessagePush, kickPushDrain } from "@/lib/push/dispatch";
 import { contentBlockedResponse, requireCanPublish } from "@/lib/moderation/access";
@@ -78,12 +83,6 @@ type ParentPreview = {
   attachment_kind: "post" | "clip" | null;
 };
 
-type ReactionGroup = {
-  emoji: string;
-  count: number;
-  viewer_reacted: boolean;
-};
-
 /**
  * Batch-fetch reactions for the given messages and attach a grouped
  * `reactions: [{emoji, count, viewer_reacted}]` array to each row. Stale
@@ -106,37 +105,14 @@ async function hydrateReactions(
     }
     return;
   }
-  // groups[messageId][emoji] = { count, viewerReacted }
-  const groups = new Map<string, Map<string, { count: number; viewerReacted: boolean }>>();
-  for (const row of data ?? []) {
-    const r = row as { message_id: string; emoji: string; user_id: string };
-    let perMessage = groups.get(r.message_id);
-    if (!perMessage) {
-      perMessage = new Map();
-      groups.set(r.message_id, perMessage);
-    }
-    let entry = perMessage.get(r.emoji);
-    if (!entry) {
-      entry = { count: 0, viewerReacted: false };
-      perMessage.set(r.emoji, entry);
-    }
-    entry.count += 1;
-    if (r.user_id === viewerId) entry.viewerReacted = true;
-  }
+  // Grouped per message, most-used first. A stored emoji that isn't on the
+  // allow-list is dropped here, before anything is counted: the database
+  // refuses new ones (message_reactions_emoji_check), and this keeps any row
+  // written before that from ever reaching the chat screens, which show one
+  // member's reaction to everyone else in the thread.
+  const groups = groupMessageReactions((data ?? []) as ReactionRow[], viewerId);
   for (const m of rows) {
-    const perMessage = groups.get(m.id);
-    if (!perMessage || perMessage.size === 0) {
-      m.reactions = [];
-      continue;
-    }
-    m.reactions = Array.from(perMessage.entries())
-      .map(([emoji, { count, viewerReacted }]) => ({
-        emoji,
-        count,
-        viewer_reacted: viewerReacted,
-      }))
-      // Stable sort: most-used first, then by emoji codepoint for ties.
-      .sort((a, b) => b.count - a.count || (a.emoji < b.emoji ? -1 : 1));
+    m.reactions = groups.get(m.id) ?? [];
   }
 }
 
