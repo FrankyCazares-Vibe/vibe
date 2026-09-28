@@ -41,7 +41,9 @@ import type { OrgAudience } from "@/lib/orgs/join-state";
  * THE ROW BUTTON DECIDES BY `state` FIRST (`inviteRowButton` in join-copy.ts):
  * a member narrowed out of the audience still reads "Member", and somebody
  * who asked to join is approved through their REQUEST (critic A11) — this
- * sheet never sends an invite to a row that says "requested".
+ * sheet never sends an invite to a row that says "requested". The same row
+ * offers Deny (wave B, B5; the route's existing `{action:"deny"}`), and a
+ * row denied here reads "Denied" until the sheet closes.
  *
  * NOTHING HERE IS OPTIMISTIC. A row flips when the server answers, and a
  * refusal that names a state (already a member, asked to join, declined
@@ -263,7 +265,11 @@ export function OrgInviteSheet({
   const [patches, setPatches] = useState<Record<string, RowPatch>>({});
   /** Invites this sheet sent, by user id, so "Invited ✓" can offer Undo. */
   const [sent, setSent] = useState<Record<string, string>>({});
+  /** Requests this sheet denied, by user id: the row reads "Denied" while the sheet is open. */
+  const [denied, setDenied] = useState<Record<string, true>>({});
   const [busyId, setBusyId] = useState<string | null>(null);
+  /** The row whose Deny is in flight (busyId still locks every other button). */
+  const [denyingId, setDenyingId] = useState<string | null>(null);
 
   /** Orders page reads against row patches; only touched in effects and handlers. */
   const seqRef = useRef(0);
@@ -515,6 +521,34 @@ export function OrgInviteSheet({
     }
   };
 
+  // Deny (wave B, B5): one tap, no confirm, like the desktop Requests tab.
+  // The route takes deny even where it refuses approve (another officer's
+  // block, "Removed before" for a mod), so the queue can always be cleared.
+  // Afterwards the list reads "none" for them; the row shows "Denied" instead
+  // of an Invite pill, so the thumb that just denied can't invite by accident.
+  const deny = async (c: Candidate) => {
+    if (busyId || !c.request_id) return;
+    setBusyId(c.id);
+    setDenyingId(c.id);
+    const r = await vibeRequest(`${base}/requests/${encodeURIComponent(c.request_id)}`, {
+      method: "POST",
+      json: { action: "deny" },
+      quiet: true,
+      failure: COPY.denyFailed,
+    });
+    setBusyId(null);
+    setDenyingId(null);
+    if (r.ok) {
+      setDenied((prev) => ({ ...prev, [c.id]: true }));
+      patchRow(c.id, { state: "none", request_id: null, can_approve: null });
+      toast({ message: COPY.deniedToast, tone: "info" });
+      return;
+    }
+    toastRefusal(r);
+    // Someone else answered it first (or it's gone): show what's true now.
+    if (r.code === "request_not_pending" || r.code === "request_not_found") reloadList();
+  };
+
   const revoke = async (inv: PendingInvite) => {
     if (revokingId) return;
     setRevokingId(inv.id);
@@ -596,10 +630,17 @@ export function OrgInviteSheet({
             const c = rowOf(raw);
             const sentId = sent[c.id] ?? null;
             const requested = c.state === "requested";
+            // Deny shows on every pending request, the can't-approve row
+            // included: that's the row Deny exists to clear.
+            const canDeny = requested && Boolean(c.request_id);
+            // Denied from this sheet and still "none": a fresher read that
+            // says member / invited / requested again outranks it.
+            const wasDenied = denied[c.id] === true && c.state === "none";
             // A request this officer can't approve: no Approve, just where it
             // stands and a line that never says why in terms of a block.
-            const button: InviteRowButton =
-              requested && c.can_approve === false
+            const button: InviteRowButton = wasDenied
+              ? { kind: "status", label: COPY.denied, sub: null, disabled: true, undo: false }
+              : requested && c.can_approve === false
                 ? {
                     kind: "status",
                     label: ORG_COPY.buttons.requested,
@@ -614,11 +655,15 @@ export function OrgInviteSheet({
                     sent: sentId !== null,
                   });
             const sinceText = followersMode ? followsSinceText(c.follows_since) : null;
-            const busy = busyId === c.id;
+            const denying = denyingId === c.id;
+            const busy = busyId === c.id && !denying;
             return (
-              <li key={c.id} style={t.row}>
+              // A request row carries two buttons, so at 375 px it wraps
+              // (the pending-invite rows below do the same) instead of
+              // squeezing the name and the "Removed before" tag under them.
+              <li key={c.id} style={canDeny ? { ...t.row, flexWrap: "wrap" } : t.row}>
                 <Avatar name={c.name} handle={c.handle} url={c.avatar_url} />
-                <div style={{ flex: 1, minWidth: 0 }}>
+                <div style={{ flex: canDeny ? "1 1 140px" : 1, minWidth: 0 }}>
                   <div style={t.rowName}>{c.name || (c.handle ? `@${c.handle}` : "Student")}</div>
                   <div style={t.rowMeta}>
                     {[c.handle ? `@${c.handle}` : null, c.major].filter(Boolean).join(" · ")}
@@ -629,7 +674,27 @@ export function OrgInviteSheet({
                   ) : null}
                   {button.sub ? <div style={t.rowSub}>{button.sub}</div> : null}
                 </div>
-                <div style={{ display: "flex", alignItems: "center", gap: 4, flexShrink: 0 }}>
+                <div
+                  style={{
+                    display: "flex",
+                    alignItems: "center",
+                    gap: 4,
+                    flexShrink: 0,
+                    ...(canDeny ? { marginLeft: "auto" } : null),
+                  }}
+                >
+                  {canDeny ? (
+                    <button
+                      type="button"
+                      disabled={busyId !== null}
+                      aria-busy={denying || undefined}
+                      aria-label={denying ? COPY.deny : undefined}
+                      onClick={() => void deny(c)}
+                      style={{ ...t.linkButton, cursor: busyId !== null ? "default" : "pointer" }}
+                    >
+                      {denying ? ORG_COPY.buttons.busy : COPY.deny}
+                    </button>
+                  ) : null}
                   {button.undo && sentId ? (
                     <button
                       type="button"
@@ -948,8 +1013,13 @@ function RowsSkeleton({ t, count = 3 }: { t: Theme; count?: number }): JSX.Eleme
 
 // ── Looks ───────────────────────────────────────────────────────────────────
 //
-// The phone sheet and the desktop modal are cream (like MutualsSheet and the
-// ⋯ menus beside them); inline sits in desktop settings' dark glass.
+// The phone sheet and the desktop modal follow the theme (wave B, B5): cream
+// in Light, near-black in Night, all C0 tokens, the same map as wave 3's
+// SharePostSheet. Every LIGHT swap is exact in Light except the Undo/Deny
+// link (#C54323 → --eyebrow-ink #C84A20; #C54323 read 3.6:1 on Night paper).
+// Inline sits in desktop settings' dark glass in both themes: DARK overrides
+// every coloured key, so it doesn't move. PRIMARY and the avatar chip stay
+// literal: they read on both.
 
 type Theme = {
   title: CSSProperties;
@@ -995,7 +1065,7 @@ const ELLIPSIS: CSSProperties = {
 };
 
 const LIGHT: Theme = {
-  title: { margin: 0, fontFamily: "Fraunces, serif", fontSize: 18, fontWeight: 800, color: "#1C1C1E" },
+  title: { margin: 0, fontFamily: "Fraunces, serif", fontSize: 18, fontWeight: 800, color: "var(--charcoal)" },
   sectionLabel: {
     margin: 0,
     fontFamily: FONT,
@@ -1003,9 +1073,9 @@ const LIGHT: Theme = {
     fontWeight: 700,
     letterSpacing: "0.04em",
     textTransform: "uppercase",
-    color: "#8A8580",
+    color: "var(--ink-muted)",
   },
-  note: { margin: 0, padding: "6px 0", fontFamily: FONT, fontSize: 13, lineHeight: 1.5, color: "#8A8580" },
+  note: { margin: 0, padding: "6px 0", fontFamily: FONT, fontSize: 13, lineHeight: 1.5, color: "var(--ink-muted)" },
   banner: {
     margin: 0,
     padding: "10px 12px",
@@ -1015,7 +1085,7 @@ const LIGHT: Theme = {
     fontFamily: FONT,
     fontSize: 13,
     lineHeight: 1.45,
-    color: "#5C5853",
+    color: "var(--ink-2)",
   },
   input: {
     width: "100%",
@@ -1023,9 +1093,9 @@ const LIGHT: Theme = {
     minHeight: 44,
     padding: "0 14px",
     borderRadius: 12,
-    border: "1px solid rgba(28,28,30,0.12)",
-    background: "#fff",
-    color: "#1C1C1E",
+    border: "1px solid rgba(var(--scrim-rgb),0.12)",
+    background: "var(--paper)",
+    color: "var(--charcoal)",
     fontFamily: FONT,
     // 16px keeps iOS from zooming in on focus.
     fontSize: 16,
@@ -1037,25 +1107,25 @@ const LIGHT: Theme = {
     gap: 12,
     padding: "10px 12px",
     borderRadius: 16,
-    background: "rgba(255,253,248,0.78)",
-    border: "1px solid rgba(28,28,30,0.06)",
+    background: "var(--glass)",
+    border: "1px solid rgba(var(--scrim-rgb),0.06)",
   },
-  rowName: { ...ELLIPSIS, fontFamily: FONT, fontSize: 14, fontWeight: 700, color: "#1C1C1E" },
-  rowMeta: { ...ELLIPSIS, fontFamily: FONT, fontSize: 12.5, color: "#8A8580" },
-  rowSub: { fontFamily: FONT, fontSize: 12, lineHeight: 1.4, color: "#5C5853" },
+  rowName: { ...ELLIPSIS, fontFamily: FONT, fontSize: 14, fontWeight: 700, color: "var(--charcoal)" },
+  rowMeta: { ...ELLIPSIS, fontFamily: FONT, fontSize: 12.5, color: "var(--ink-muted)" },
+  rowSub: { fontFamily: FONT, fontSize: 12, lineHeight: 1.4, color: "var(--ink-2)" },
   rowButton: ROW_BUTTON,
   primaryButton: PRIMARY,
   statusButton: {
-    border: "1px solid rgba(28,28,30,0.10)",
-    background: "rgba(28,28,30,0.05)",
-    color: "#5C5853",
+    border: "1px solid rgba(var(--scrim-rgb),0.10)",
+    background: "rgba(var(--scrim-rgb),0.05)",
+    color: "var(--ink-2)",
   },
   linkButton: {
     minHeight: 40,
     padding: "0 8px",
     border: "none",
     background: "transparent",
-    color: "#C54323",
+    color: "var(--eyebrow-ink)",
     fontFamily: FONT,
     fontSize: 13,
     fontWeight: 700,
@@ -1067,15 +1137,15 @@ const LIGHT: Theme = {
     minHeight: 40,
     padding: "0 16px",
     borderRadius: 999,
-    border: "1px solid rgba(28,28,30,0.12)",
-    background: "rgba(255,255,255,0.7)",
-    color: "#1C1C1E",
+    border: "1px solid rgba(var(--scrim-rgb),0.12)",
+    background: "var(--paper-70)",
+    color: "var(--charcoal)",
     fontFamily: FONT,
     fontSize: 13,
     fontWeight: 700,
     cursor: "pointer",
   },
-  skeleton: { background: "rgba(28,28,30,0.07)", borderRadius: 6 },
+  skeleton: { background: "rgba(var(--scrim-rgb),0.07)", borderRadius: 6 },
 };
 
 const DARK: Theme = {
@@ -1120,10 +1190,10 @@ const DARK: Theme = {
 };
 
 /**
- * "Removed before" on a requested row. The sheet's own surfaces are fixed
- * (cream sheet and modal, dark glass inline), so the tag brings its own:
- * tag tint over paper, tag ink, hairline, all C0 tokens. Ink and paper flip
- * together between Light and Night, so it reads on every surface in both.
+ * "Removed before" on a requested row. The sheet and modal follow the theme
+ * and inline stays dark glass, so the tag brings its own surface: tag tint
+ * over paper, tag ink, hairline, all C0 tokens. Ink and paper flip together
+ * between Light and Night, so it reads on every surface in both.
  */
 const removedTagStyle: CSSProperties = {
   display: "inline-block",
@@ -1162,7 +1232,7 @@ const sheetContentStyle: CSSProperties = {
   bottom: 0,
   left: 0,
   right: 0,
-  background: "#FAF7F2",
+  background: "var(--cream)",
   borderTopLeftRadius: 20,
   borderTopRightRadius: 20,
   paddingBottom: "env(safe-area-inset-bottom, 0px)",
@@ -1176,7 +1246,7 @@ const sheetHandleStyle: CSSProperties = {
   width: 38,
   height: 4,
   borderRadius: 999,
-  background: "rgba(28,28,30,0.18)",
+  background: "rgba(var(--scrim-rgb),0.18)",
 };
 
 const modalOverlayStyle: CSSProperties = {
@@ -1198,7 +1268,7 @@ const modalCardStyle: CSSProperties = {
   maxHeight: "min(720px, calc(100dvh - 40px))",
   display: "flex",
   flexDirection: "column",
-  background: "#FAF7F2",
+  background: "var(--cream)",
   borderRadius: 20,
   boxShadow: "0 24px 64px rgba(0,0,0,0.35)",
   overflow: "hidden",
@@ -1210,8 +1280,8 @@ const closeButtonStyle: CSSProperties = {
   flexShrink: 0,
   borderRadius: 999,
   border: "none",
-  background: "rgba(28,28,30,0.06)",
-  color: "#1C1C1E",
+  background: "rgba(var(--scrim-rgb),0.06)",
+  color: "var(--charcoal)",
   fontSize: 22,
   lineHeight: 1,
   cursor: "pointer",

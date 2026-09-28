@@ -53,18 +53,33 @@ const MAX_REASON = 500;
  * in quarantine (`held`), or restoring one post would put the other post's
  * picture back online while that post is still down.
  *
+ * A POST FROM A DELETED CLUB STAYS DOWN (S67 wave B polish). Deleting a club
+ * keeps its moderator-removed posts as the record but detaches them
+ * (`org_id` goes null). Putting one back would republish the club's words as
+ * the author's personal post, campus-wide (a members-only post included),
+ * with media under a club folder that no longer serves. So when the post has
+ * no club now and its removal's log row names one (meta `org_id`, written by
+ * /remove) that no longer exists, the answer is 409 `club_deleted` and
+ * nothing changes. The write is pinned to the club the check saw, so a club
+ * deleted in between also ends in that 409, with the files still in
+ * quarantine. A log row from before `org_id` was recorded names no
+ * club, so that post restores as it always did. If the log or the clubs
+ * can't be read, it's a 500 and nothing changes (it can't tell).
+ *
  * IDEMPOTENT. Restoring something that is not removed is a success with
  * `changed: false`, so a double tap on a slow connection is not an error. For
  * a post it still moves the files back, which is how a restore whose move
  * failed is finished: press Restore again and only the move repeats.
  *
- * ORDER: gate → validate → rate limit → service-role write → one log row →
- * a post's files out of quarantine. If that last step fails, the answer is a
- * 500 that says the photo is still offline.
+ * ORDER: gate → validate → rate limit → (a post) the deleted-club check →
+ * service-role write → one log row → a post's files out of quarantine. If
+ * that last step fails, the answer is a 500 that says the photo is still
+ * offline.
  *
  * RESPONSES
  *   200 {ok, changed, logged, released, held}
  *   400 invalid_body · 401 · 403 · 404 not_found · 429 · 500 request_failed
+ *   409 club_deleted (a post whose club was deleted after it was removed)
  *   500 media_still_quarantined (restored, but its photo is still offline; retry)
  */
 export async function POST(req: Request) {
@@ -100,7 +115,7 @@ export async function POST(req: Request) {
     .from(table)
     .select(
       type === "post"
-        ? "id, user_id, removed_at, removed_reason, media_url, media_thumbnail_url"
+        ? "id, user_id, removed_at, removed_reason, media_url, media_thumbnail_url, org_id"
         : "id, user_id, removed_at, removed_reason",
     )
     .eq("id", id)
@@ -117,6 +132,7 @@ export async function POST(req: Request) {
     removed_reason: string | null;
     media_url?: string | null;
     media_thumbnail_url?: string | null;
+    org_id?: string | null;
   };
   if (!current.removed_at) {
     // Already live. For a post, finish any move back an earlier restore left
@@ -133,17 +149,49 @@ export async function POST(req: Request) {
     });
   }
 
-  const { data: updated, error: updErr } = await service
+  // A post removed from a club that has since been deleted stays down (see
+  // "A POST FROM A DELETED CLUB" above). Checked before anything changes.
+  if (type === "post") {
+    const clubGone = await clubDeletedSinceRemoval(service, id, current.org_id ?? null);
+    if (clubGone === null) return adminFail(500, "request_failed", "Request failed");
+    if (clubGone) {
+      return adminFail(409, "club_deleted", "This club was deleted, so the post can't be put back.");
+    }
+  }
+
+  let write = service
     .from(table)
     .update({ removed_at: null, removed_by: null, removed_reason: null })
     .eq("id", id)
-    .not("removed_at", "is", null)
-    .select("id");
+    .not("removed_at", "is", null);
+  // A post only goes live in the club the check above saw: a club deleted
+  // between that check and this write detaches the post, so 0 rows change.
+  if (type === "post") {
+    write = current.org_id ? write.eq("org_id", current.org_id) : write.is("org_id", null);
+  }
+  const { data: updated, error: updErr } = await write.select("id");
   if (updErr) {
     console.error("[admin/content/restore update]", type, updErr.message);
     return adminFail(500, "request_failed", "Request failed");
   }
   const changed = (updated ?? []).length > 0;
+  if (!changed && type === "post") {
+    // Another restore got there first (now live: finish as before), or the
+    // club went in that gap (still removed: refuse, and keep its files down).
+    const { data: again, error: againErr } = await service
+      .from("posts")
+      .select("removed_at")
+      .eq("id", id)
+      .maybeSingle();
+    if (againErr) {
+      console.error("[admin/content/restore reread]", againErr.message);
+      return adminFail(500, "request_failed", "Request failed");
+    }
+    if (!again) return adminFail(404, "not_found", "Not found");
+    if ((again as { removed_at: string | null }).removed_at) {
+      return adminFail(409, "club_deleted", "This club was deleted, so the post can't be put back.");
+    }
+  }
 
   let logged = true;
   if (changed) {
@@ -176,6 +224,60 @@ export async function POST(req: Request) {
     released: release.released,
     held: release.held,
   });
+}
+
+/**
+ * Whether a removed post came from a club that has since been deleted: true
+ * (refuse), false (restore as usual), null (couldn't read; refuse with a 500).
+ *
+ * A post still in a club answers false straight away: `posts.org_id` is a
+ * foreign key, so that club exists. Otherwise the post's `post_remove` log
+ * rows are read (all of them: a second removal after the delete records
+ * `org_id: null`, the first one still names the club), and any club they
+ * name that is gone means true. No club named (a personal post, or a row from
+ * before /remove recorded `org_id`) means false.
+ */
+async function clubDeletedSinceRemoval(
+  service: ReturnType<typeof createSupabaseServiceClient>,
+  id: string,
+  orgId: string | null,
+): Promise<boolean | null> {
+  if (orgId) return false;
+  try {
+    const { data: logs, error } = await service
+      .from("moderation_actions")
+      .select("meta")
+      .eq("action", "post_remove")
+      .eq("target_type", "post")
+      .eq("target_id", id)
+      .not("meta->>org_id", "is", null);
+    if (error) {
+      console.error("[admin/content/restore club read]", error.message);
+      return null;
+    }
+    const named = [
+      ...new Set(
+        ((logs ?? []) as Array<{ meta: { org_id?: unknown } | null }>)
+          .map((log) => log.meta?.org_id)
+          .filter(isUuid)
+          .map((value) => value.toLowerCase()),
+      ),
+    ];
+    if (named.length === 0) return false;
+    const { data: clubs, error: clubErr } = await service
+      .from("orgs")
+      .select("id")
+      .in("id", named);
+    if (clubErr) {
+      console.error("[admin/content/restore club read]", clubErr.message);
+      return null;
+    }
+    const alive = new Set(((clubs ?? []) as Array<{ id: string }>).map((c) => c.id.toLowerCase()));
+    return named.some((club) => !alive.has(club));
+  } catch (err) {
+    console.error("[admin/content/restore club read] unexpected", err);
+    return null;
+  }
 }
 
 /** The 500 a moderator sees when the post is back but its photo is not. */

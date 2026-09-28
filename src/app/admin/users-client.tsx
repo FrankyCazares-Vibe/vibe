@@ -37,6 +37,7 @@ import {
   Notice,
   shortId,
 } from "./admin-shell";
+import { ImageSlots } from "./image-slots";
 import { type ApiRestriction, restrictionUntil, restrictionWord } from "./reports-client";
 
 const RESTRICTION_OPTIONS = restrictionReasonOptions();
@@ -178,6 +179,8 @@ function UserCard({
   const [note, setNote] = useState("");
   const [said, setSaid] = useState<string | null>(null);
   const [failed, setFailed] = useState<string | null>(null);
+  // The photo panel loads on first open only: one GET per card someone opens.
+  const [photos, setPhotos] = useState(false);
 
   const inForce = user.restrictionKnown && user.restriction !== null;
   const working = busy !== null;
@@ -359,7 +362,15 @@ function UserCard({
         >
           Lift
         </ActionButton>
+        <ActionButton
+          title="See their profile photo, cover and logos, and take one down."
+          onClick={() => setPhotos((open) => !open)}
+        >
+          {photos ? "Hide photos" : "Photos"}
+        </ActionButton>
       </div>
+
+      {photos ? <ImageSlots targetType="user" targetId={user.id} onPause={onPause} /> : null}
 
       {form ? (
         <div

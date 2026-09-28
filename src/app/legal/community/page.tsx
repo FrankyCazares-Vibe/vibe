@@ -28,7 +28,7 @@ export default function CommunityGuidelinesPage() {
     <LegalLayout
       eyebrow="Safety"
       title="Community Guidelines"
-      effectiveDate="September 27, 2026"
+      effectiveDate="September 28, 2026"
     >
       <LegalP>
         Vibe is a campus app. Everyone here verified a school email, which
@@ -161,7 +161,11 @@ export default function CommunityGuidelinesPage() {
         </li>
         <li>
           <strong>The content is removed.</strong> It comes down: nobody else
-          sees it, and it stops counting toward likes, comments and views.
+          sees it, and it stops counting toward likes, comments and views. A
+          single photo can also be taken down on its own: a profile photo or
+          cover, the small logos on a profile&apos;s experience and
+          working-on entries, a club&apos;s logo or banner, or a group
+          chat&apos;s photo. The account or club can set a new one.
         </li>
         <li>
           <strong>The account is suspended.</strong> For a set number of days,

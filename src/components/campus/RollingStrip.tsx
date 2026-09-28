@@ -216,7 +216,7 @@ export function RollingStrip(props: {
           className="vibe-strip-chip"
           style={active ? TAG_CHIP_ACTIVE : TAG_CHIP}
           title={tagChipTitle(entry.count)}
-          // The name is the tag; the title alone would be read as "1 post this week".
+          // The name is the tag; the title alone would be read as "1 person this week".
           aria-label={`#${entry.tag}, ${tagChipTitle(entry.count)}`}
           aria-pressed={active}
           tabIndex={tab}

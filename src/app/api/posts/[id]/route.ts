@@ -1,7 +1,11 @@
 import { NextResponse } from "next/server";
 
 import { isMissingColumnError } from "@/lib/db/missing-column";
-import { contentBlockedResponse, requireCanPublish } from "@/lib/moderation/access";
+import {
+  contentBlockedResponse,
+  requireCanPublish,
+  requireNotRestricted,
+} from "@/lib/moderation/access";
 import { checkText } from "@/lib/moderation/text-filter";
 import {
   extractMentionHandles,
@@ -12,13 +16,13 @@ import { loadOrgRole } from "@/lib/orgs/following";
 import { orgContentAccessAsService } from "@/lib/orgs/hidden-org-access";
 import type { OrgRole } from "@/lib/orgs/join-state";
 import { withPostMediaUrls } from "@/lib/post-media-url";
+import { purgeDeletedPostMedia } from "@/lib/posts/delete-media-store";
 import { addedHandles, checkPostEdit, extractPostTags } from "@/lib/posts/edit";
 import { loadPostEngagementCounts } from "@/lib/posts/engagement-counts";
 import { loadHonestViewRows } from "@/lib/posts/honest-views";
-import { ownClipKeysToDelete } from "@/lib/posts/media-ownership";
+import { firstBlockedPostTag } from "@/lib/posts/post-tag-filter";
 import { kickPushDrain } from "@/lib/push/dispatch";
 import { rateLimit, tooManyRequests } from "@/lib/rate-limit";
-import { CLIP_KEY_PREFIX, getR2S3Client, isR2Configured } from "@/lib/r2";
 import { loadPairBlock } from "@/lib/safety/pair-block";
 import { createSupabaseServerClient } from "@/lib/supabase/server";
 import {
@@ -322,21 +326,45 @@ async function notYourPost(orgId: unknown, logTag: string): Promise<NextResponse
   return NextResponse.json({ ok: false, error: "Not your post" }, { status: 403 });
 }
 
+/** What a moderator-removed post answers to its author's Delete or Edit. */
+const REMOVED_POST_DELETE = "A moderator took this post down, so it can't be deleted.";
+const REMOVED_POST_EDIT = "A moderator took this post down, so it can't be edited.";
+
 /**
- * Delete a post or clip. RLS (`posts_delete_own`) enforces author-only, and
- * the route checks first: someone else's post answers 403 "Not your post",
- * except a hidden club's post the caller may not see, which answers the same
- * 404 as a missing post (notYourPost).
+ * Delete a post or video post (S67 security wave 2, B2; report #9).
  *
- * Side-effects:
- *  - post_likes / post_comments / bookmarks rows cascade automatically
- *    via ON DELETE CASCADE on their foreign keys.
- *  - Clip videos (and a `clips/` poster frame) in R2 are deleted
- *    best-effort, and only from the caller's own `clips/<caller id>/`
- *    folder (S67 security wave). Failures don't block the DB delete —
- *    orphaned R2 objects can be swept by a lifecycle policy later if needed.
- *    Poster frames and photos in the Supabase `profiles` bucket are not
- *    touched here (report finding "Deleted posts ... stay reachable").
+ * WHO. The author, always (an ex-officer included, for a club post they
+ * wrote: delete, never edit). For a club post, also a CURRENT owner / admin
+ * of that club who isn't suspended or banned (mods can't: they moderate chat,
+ * not content). Anyone else gets 403 "Not your post", except a hidden club's
+ * post they may not see, which answers the same 404 as a missing post
+ * (notYourPost). The database says the same: posts_delete_own and
+ * posts_delete_club_officer (migration 20260929110000_post_club_deletes.sql).
+ *
+ * A POST A MODERATOR REMOVED CAN'T BE DELETED: 409 `post_removed`, answered
+ * BEFORE the delete and before any file is touched. The row and its files
+ * are the record (and what an appeal restores).
+ *
+ * THE DELETE RUNS ON THE COOKIE CLIENT, so the policy stays the boundary. An
+ * RLS refusal is silent (no error, 0 rows), so the delete returns the row
+ * (`.select("id")`) and files are removed ONLY when exactly one row came back;
+ * 0 rows answers 404 and touches nothing. That is also what makes the new
+ * code safe on a database without the B2 migration: an officer's delete there
+ * gets 0 rows.
+ *
+ * Side-effects, after the row is gone:
+ *  - likes / comments / bookmarks / reposts / views / notifications cascade
+ *    via their foreign keys.
+ *  - The post's own files go: its photo and poster frame in the author's
+ *    `profiles/<author>/(posts|posters)/` folder, its video in
+ *    `clips/<author>/`, and a club post's `orgs/<club>/posts/` file. Never a
+ *    file another post, the author's avatar/cover or the club's logo/banner
+ *    still names, and never anyone else's (src/lib/posts/delete-media.ts).
+ *    While a report about the post is open, the photo moves to the private
+ *    quarantine bucket and the video stays, instead (evidence).
+ *    Best-effort: a storage failure is logged and never fails the answer.
+ *  - A copy of a public photo can stay in the CDN's cache for a few days
+ *    (the cache fix is deferred).
  *  - Rate limited: 30 deletes per 10 minutes per student.
  */
 export async function DELETE(_req: Request, ctx: RouteContext) {
@@ -359,15 +387,13 @@ export async function DELETE(_req: Request, ctx: RouteContext) {
   const rl = await rateLimit(`post-delete:${user.id}`, { limit: 30, windowSec: 600 });
   if (!rl.allowed) return tooManyRequests(rl);
 
-  // Read first so we can also clean up R2 storage if it's a clip. The
-  // SELECT respects RLS too, so a non-owner can't even see other users'
-  // posts here — but the public read policy (posts_select_authenticated)
-  // means any signed-in user CAN see them, so we re-check ownership
-  // explicitly before issuing the delete.
-  // `org_id` is read only so a stranger to a hidden club gets "not found".
+  // Read first: who may delete, whether a moderator removed it, and which
+  // files go with it. posts_select_authenticated lets any signed-in student
+  // read a published post, so who may delete is checked explicitly below.
+  // `org_id` also lets a stranger to a hidden club get "not found".
   const { data: row, error: readErr } = await supabase
     .from("posts")
-    .select("id,user_id,org_id,type,media_url,media_thumbnail_url")
+    .select("id,user_id,org_id,type,media_url,media_thumbnail_url,removed_at")
     .eq("id", id)
     .maybeSingle();
   if (readErr) {
@@ -377,49 +403,71 @@ export async function DELETE(_req: Request, ctx: RouteContext) {
   if (!row) {
     return NextResponse.json({ ok: false, error: "Post not found" }, { status: 404 });
   }
+
   if (row.user_id !== user.id) {
-    return notYourPost(row.org_id, "[posts/:id DELETE club]");
+    // Not the author: only a current owner / admin of the post's club, not
+    // suspended or banned (posts_delete_club_officer). The roster read needs
+    // the service role (RLS hides a club's members from non-members).
+    if (!row.org_id) return notYourPost(row.org_id, "[posts/:id DELETE club]");
+    if (!isSupabaseServiceConfigured()) {
+      console.error("[posts/:id DELETE role] service role not configured");
+      return NextResponse.json({ ok: false, error: "Request failed" }, { status: 500 });
+    }
+    const roleRes = await loadOrgRole(createSupabaseServiceClient(), row.org_id, user.id);
+    if (!roleRes.ok) {
+      return NextResponse.json({ ok: false, error: "Request failed" }, { status: 500 });
+    }
+    if (!roleRes.role || !EDIT_AS_ORG_ROLES.includes(roleRes.role)) {
+      return notYourPost(row.org_id, "[posts/:id DELETE club]");
+    }
+    const gate = await requireNotRestricted(user.id);
+    if (gate) return gate;
   }
 
-  const { error: delErr } = await supabase.from("posts").delete().eq("id", id);
+  // After the ownership step on purpose: a stranger still hears 403 / 404
+  // and learns nothing about a removal.
+  if (row.removed_at) {
+    return NextResponse.json(
+      { ok: false, code: "post_removed", error: REMOVED_POST_DELETE },
+      { status: 409 },
+    );
+  }
+
+  // Cookie client: the policy is the boundary. A silent RLS refusal returns
+  // 0 rows, which must never go on to erase files.
+  const { data: gone, error: delErr } = await supabase
+    .from("posts")
+    .delete()
+    .eq("id", id)
+    .select("id");
   if (delErr) {
     console.error("[posts/:id DELETE]", delErr);
     return NextResponse.json({ ok: false, error: "Request failed" }, { status: 500 });
   }
+  if (!gone || gone.length !== 1) {
+    return NextResponse.json({ ok: false, error: "Post not found" }, { status: 404 });
+  }
 
-  // Best-effort R2 cleanup for the post's video and poster frame. The
-  // `clips/` prefix is legacy naming — it backs regular video posts.
-  //
-  // ONLY THE CALLER'S OWN FILES. The row's media columns can be written
-  // straight through PostgREST, so a post the caller owns could name someone
-  // else's video (S67 audit, [High] "Any student can permanently erase other
-  // students' videos"). A key is deleted only when it sits in
-  // `clips/<caller id>/`; anything else stays in storage, and a `clips/` key
-  // outside that folder is logged, because only a planted row carries one.
-  const keys = ownClipKeysToDelete([row.media_url, row.media_thumbnail_url], user.id);
+  // A `clips/` key outside the author's folder is only ever a planted row:
+  // it stays in storage (delete-media.ts never offers it) and is logged.
   for (const ref of [row.media_url, row.media_thumbnail_url]) {
-    if (typeof ref === "string" && ref.startsWith(CLIP_KEY_PREFIX) && !keys.includes(ref)) {
-      console.warn("[posts/:id DELETE r2] kept a clips/ key outside the caller's folder", {
+    if (typeof ref === "string" && ref.startsWith("clips/") && !ref.startsWith(`clips/${row.user_id}/`)) {
+      console.warn("[posts/:id DELETE r2] kept a clips/ key outside the author's folder", {
         postId: id,
-        userId: user.id,
       });
     }
   }
-  if (keys.length > 0 && isR2Configured()) {
-    try {
-      const { DeleteObjectCommand } = await import("@aws-sdk/client-s3");
-      const bucket = process.env.R2_BUCKET_NAME?.trim();
-      if (bucket) {
-        const client = getR2S3Client();
-        for (const key of keys) {
-          await client.send(new DeleteObjectCommand({ Bucket: bucket, Key: key }));
-        }
-      }
-    } catch (e) {
-      // Don't fail the request — DB delete already succeeded. Log it
-      // so we know if storage drifts from the DB.
-      console.error("[posts/:id DELETE r2]", e);
-    }
+
+  if (isSupabaseServiceConfigured()) {
+    await purgeDeletedPostMedia(createSupabaseServiceClient(), {
+      id: row.id,
+      user_id: row.user_id,
+      org_id: row.org_id ?? null,
+      media_url: row.media_url ?? null,
+      media_thumbnail_url: row.media_thumbnail_url ?? null,
+    });
+  } else {
+    console.error("[posts/:id DELETE purge] service role not configured; files left in place");
   }
 
   return NextResponse.json({ ok: true });
@@ -455,6 +503,17 @@ type EditRow = {
  * nothing there caps the text at 2000 characters, checks tag format or rate
  * limits. An author writing to PostgREST directly skips this route's rules;
  * CHECK constraints would close that (follow-up).
+ *
+ * NEW TEXT IS WORD-FILTERED TWICE (S67 wave 2, B2): the caption with
+ * checkText, and each derived tag PLUS every #tag in the caption with
+ * firstBlockedPostTag (`_` read as a space, which checkText's word boundaries
+ * miss; the same check publish-post runs, so an 11th, non-ASCII or over-32
+ * tag can't slip in by editing). Either answers the ordinary 422
+ * `content_blocked` line, never naming the word.
+ *
+ * A POST A MODERATOR REMOVED CAN'T BE EDITED: 409 `post_removed` (and
+ * posts_update_own refuses it too, 20260929110000). A removal landing between
+ * the read and the write makes the UPDATE touch 0 rows: 404, not a 500.
  *
  * CLUB POSTS (`org_id` set). Being the author isn't enough: the caller must
  * still be an owner / admin of the club, the same roles orgs/[slug]/posts
@@ -549,9 +608,10 @@ export async function PATCH(req: Request, ctx: RouteContext) {
 
   // Read the row first: ownership, the prior status and text (for the mention
   // diff), and whether it has media (a media post may lose its caption).
+  // `removed_at` is read for the check below only and never sent back.
   const { data: priorRow, error: readErr } = await supabase
     .from("posts")
-    .select(EDIT_COLS)
+    .select(`${EDIT_COLS},removed_at`)
     .eq("id", id)
     .maybeSingle();
   if (readErr) {
@@ -561,9 +621,21 @@ export async function PATCH(req: Request, ctx: RouteContext) {
   if (!priorRow) {
     return NextResponse.json({ ok: false, error: "Post not found" }, { status: 404 });
   }
-  const prior = priorRow as unknown as EditRow;
+  const { removed_at: priorRemovedAt, ...priorCols } = priorRow as unknown as EditRow & {
+    removed_at: string | null;
+  };
+  const prior: EditRow = priorCols;
   if (prior.user_id !== user.id) {
     return notYourPost(prior.org_id, "[posts/:id PATCH club]");
+  }
+  // A post a moderator removed is the record of what was removed (and what an
+  // appeal restores): its author can't reword it. posts_update_own refuses it
+  // too (20260929110000); answering here keeps that a clean 409, not a 500.
+  if (priorRemovedAt) {
+    return NextResponse.json(
+      { ok: false, code: "post_removed", error: REMOVED_POST_EDIT },
+      { status: 409 },
+    );
   }
 
   // A club post speaks as the club, so writing it isn't enough: the author
@@ -608,6 +680,15 @@ export async function PATCH(req: Request, ctx: RouteContext) {
       if (c.content && !checkText(c.content).ok) return contentBlockedResponse("content");
       patch.content = c.content;
       patch.tags = extractPostTags(c.content);
+      // Each tag on its own too, with `_` read as a space: `\bterm\b` in
+      // checkText treats `_` as a word letter, so `#term_club` passes the
+      // text check (report #10; src/lib/posts/tags.ts). Over the stored tags
+      // AND every #tag in the caption, as publish-post does: the stored ones
+      // stop at 10, ASCII, 32 characters, so an 11th tag, a `#café_<term>`
+      // or a longer tag would otherwise get through an edit.
+      if (firstBlockedPostTag(patch.tags, c.content) !== null) {
+        return contentBlockedResponse("content");
+      }
     }
   }
 
@@ -651,10 +732,15 @@ export async function PATCH(req: Request, ctx: RouteContext) {
     .eq("id", id)
     .eq("user_id", user.id)
     .select(EDIT_COLS)
-    .single();
-  if (upErr || !updated) {
+    .maybeSingle();
+  if (upErr) {
     console.error("[posts/:id PATCH]", upErr);
     return NextResponse.json({ ok: false, error: "Request failed" }, { status: 500 });
+  }
+  if (!updated) {
+    // 0 rows: the policy refused it (a moderator removed the post, or the
+    // author lost their club role, between the read and the write).
+    return NextResponse.json({ ok: false, error: "Post not found" }, { status: 404 });
   }
   const row = updated as unknown as EditRow;
 

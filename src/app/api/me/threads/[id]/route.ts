@@ -1,5 +1,7 @@
 import { NextResponse } from "next/server";
 
+import { REMOVED_PICTURE_MESSAGE } from "@/app/api/admin/images/_lib/removed-picture";
+import { checkRemovedPicture } from "@/app/api/admin/images/_lib/removed-picture-store";
 import { contentBlockedResponse, requireCanPublish } from "@/lib/moderation/access";
 import { checkText } from "@/lib/moderation/text-filter";
 import { GROUP_PHOTO_KEY_PREFIX } from "@/lib/r2";
@@ -23,6 +25,11 @@ type Body = {
  * (Terms, a verified school email, no restriction) and the word filter on the
  * name, answered with the same 422 as create (contentBlockedResponse("name")).
  * Everyone in the chat sees the name in their inbox, and they didn't choose it.
+ *
+ * A group photo Vibe's moderators took down can't be set again (wave B
+ * follow-up P2): the takedown keeps the R2 object as evidence, so re-sending
+ * its key would put it back in every member's inbox. 422 picture_removed; a
+ * new upload (new random key) passes.
  */
 export async function PATCH(req: Request, ctx: RouteCtx) {
   const { id: channelId } = await ctx.params;
@@ -113,6 +120,18 @@ export async function PATCH(req: Request, ctx: RouteCtx) {
   // Use service client because `channels` has no UPDATE RLS policy in the
   // base schema. Membership has been verified above.
   const admin = createSupabaseServiceClient();
+  if (typeof update.photo_url === "string") {
+    const removed = await checkRemovedPicture(admin, "channel", channelId, [update.photo_url]);
+    if (removed === "error") {
+      return NextResponse.json({ ok: false, error: "Could not update thread" }, { status: 500 });
+    }
+    if (removed === "removed") {
+      return NextResponse.json(
+        { ok: false, error: REMOVED_PICTURE_MESSAGE, code: "picture_removed" },
+        { status: 422 },
+      );
+    }
+  }
   const { error: updErr } = await admin
     .from("channels")
     .update(update)

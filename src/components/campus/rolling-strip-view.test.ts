@@ -190,7 +190,8 @@ test("chip copy: tooltips and the aria-label", () => {
   assert.equal(eventChipTitle("maybe"), "You're interested");
   assert.equal(eventChipLabel("Rush night", "Tmrw", "going"), "Rush night, Tmrw, you're going");
   assert.equal(eventChipLabel("Rush night", "", "maybe"), "Rush night, you're interested");
-  assert.equal(tagChipTitle(4), "4 posts this week");
-  assert.equal(tagChipTitle(1), "1 post this week");
-  assert.equal(tagChipTitle(2.7), "2 posts this week");
+  assert.equal(tagChipTitle(4), "4 people this week");
+  assert.equal(tagChipTitle(1), "1 person this week");
+  assert.equal(tagChipTitle(2.7), "2 people this week");
+  assert.equal(tagChipTitle(-3), "0 people this week");
 });

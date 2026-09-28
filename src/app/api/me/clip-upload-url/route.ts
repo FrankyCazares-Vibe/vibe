@@ -3,7 +3,7 @@ import { randomUUID } from "node:crypto";
 import { NextResponse } from "next/server";
 
 import { CLIP_KEY_PREFIX, isR2Configured, signClipPutUrl } from "@/lib/r2";
-import { requireTermsAccepted } from "@/lib/legal/require-terms";
+import { requireCanPublish } from "@/lib/moderation/access";
 import { rateLimit, tooManyRequests } from "@/lib/rate-limit";
 import { createSupabaseServerClient } from "@/lib/supabase/server";
 
@@ -50,8 +50,10 @@ export async function POST(req: Request) {
   });
   if (!rl.allowed) return tooManyRequests(rl);
 
-  const termsGate = await requireTermsAccepted(user.id);
-  if (termsGate) return termsGate;
+  // Terms, no restriction and a verified school email: an upload key is only
+  // useful to publish-post, which needs all three (S67 wave B, B3).
+  const gate = await requireCanPublish(user.id);
+  if (gate) return gate;
 
   let body: Body;
   try {

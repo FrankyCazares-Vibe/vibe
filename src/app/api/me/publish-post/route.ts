@@ -7,7 +7,9 @@ import {
 } from "@/lib/mentions";
 import { isSupabaseHttpsUrl } from "@/lib/org-asset-url";
 import { withPostMediaUrls } from "@/lib/post-media-url";
+import { captionHashtags } from "@/lib/posts/caption-tags";
 import { hasSafeMediaUrlShape, isOwnClipKey } from "@/lib/posts/media-ownership";
+import { firstBlockedTag, normalizePostTags } from "@/lib/posts/tags";
 import { kickPushDrain } from "@/lib/push/dispatch";
 import { CLIP_KEY_PREFIX } from "@/lib/r2";
 import { contentBlockedResponse, requireCanPublish } from "@/lib/moderation/access";
@@ -20,8 +22,6 @@ import {
 } from "@/lib/supabase/service";
 
 const MAX_CONTENT_CHARS = 2000;
-const MAX_TAGS = 10;
-const MAX_TAG_LEN = 32;
 const MAX_VIDEO_POST_DURATION_SEC = 600; // 10 min cap for non-clip videos
 
 type PublishPostBody = {
@@ -37,8 +37,6 @@ type PublishPostBody = {
   duration_sec?: unknown;
 };
 
-const TAG_RE = /^[\p{L}\p{N}_]+$/u;
-
 /**
  * True when `value` is safe to store as a post media reference for `userId`:
  * an https URL on our own Supabase host with a plain path (max 2048 chars),
@@ -49,25 +47,6 @@ const TAG_RE = /^[\p{L}\p{N}_]+$/u;
 function isOwnedMediaRef(value: string, userId: string): boolean {
   if (value.startsWith(CLIP_KEY_PREFIX)) return isOwnClipKey(value, userId);
   return hasSafeMediaUrlShape(value) && isSupabaseHttpsUrl(value);
-}
-
-function normalizeTags(input: unknown): string[] {
-  if (!Array.isArray(input)) return [];
-  const seen = new Set<string>();
-  const out: string[] = [];
-  for (const raw of input) {
-    if (typeof raw !== "string") continue;
-    const t = raw.trim().toLowerCase().replace(/^#+/, "");
-    if (!t || t.length > MAX_TAG_LEN) continue;
-    // Hashtags are rendered unescaped in a few prototype templates; keep
-    // them to word characters so a tag can never carry markup.
-    if (!TAG_RE.test(t)) continue;
-    if (seen.has(t)) continue;
-    seen.add(t);
-    out.push(t);
-    if (out.length >= MAX_TAGS) break;
-  }
-  return out;
 }
 
 /** Publish a text/image post (P1-017). Returns the inserted row. */
@@ -166,7 +145,19 @@ export async function POST(req: Request) {
   }
   if (content && !checkText(content).ok) return contentBlockedResponse("content");
 
-  const tags = normalizeTags(body.tags);
+  // Tags (S67 security wave B, B4; report #10): the one rule in
+  // src/lib/posts/tags.ts, which the database trigger `posts_check_tags`
+  // mirrors, so a tag kept here is never refused there as a 500. A tag
+  // outside `a-z 0-9 _` (a desktop "#café") is dropped and the post still
+  // publishes. Then the tag word filter, over the stored tags AND every
+  // #tag in the caption: the caption's own filter misses a listed term
+  // glued on with `_`, and a direct caller can send a caption tag with
+  // `tags: []`. The 422 names "content": every composer derives tags from
+  // the caption.
+  const tags = normalizePostTags(body.tags);
+  if (firstBlockedTag([...tags, ...captionHashtags(content)])) {
+    return contentBlockedResponse("content");
+  }
 
   // For video posts: store the R2 key in media_url, the public poster
   // URL in media_thumbnail_url. Image posts: media_url holds the public

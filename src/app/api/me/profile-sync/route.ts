@@ -2,6 +2,17 @@ import { NextResponse } from "next/server";
 
 import { isOttoOnboardingComplete } from "@/lib/auth/post-login";
 import { M1_USER_COLUMNS, isMissingColumnError } from "@/lib/db/missing-column";
+import {
+  newProfilePhotoPaths,
+  ownProfilePhotoPath,
+  staleProfilePhotoPaths,
+  type ProfilePhotoColumns,
+} from "@/lib/media/profile-photo-replace";
+import {
+  firstMissingProfilePhoto,
+  readProfilePhotoColumns,
+  retireProfilePhotos,
+} from "@/lib/media/profile-photo-retire";
 import { isSupabaseHttpsUrl } from "@/lib/org-asset-url";
 import { normalizeCoverThemeInput } from "@/lib/profile/cover-themes";
 import { sanitizeCurrentOn } from "@/lib/profile/current-on";
@@ -475,11 +486,24 @@ export async function POST(req: Request) {
   // string sets the photo: inlineOrUploadProfileUrl answers null for null,
   // "", garbage AND a failed upload, and none of those may clear a real
   // photo. Clearing takes `remove: ["avatar"]` (see REMOVABLE_MEDIA).
+  //
+  // S67 wave B (B3): the value must also name the student's OWN photo/cover
+  // file (`<uid>/avatar-*` / `<uid>/banner-*`): a replace now retires the
+  // old file, so a column naming another student's file or the student's
+  // own post photo would make a save delete it. An upload in this request
+  // always resolves to such a file (and is remembered, so the "does it still
+  // exist" check below skips it).
+  const uploadedPhotos: string[] = [];
   if (isNonEmptyString(body.avatar_url)) {
     const avatar = await inlineOrUploadProfileUrl(user.id, body.avatar_url, "avatar");
-    if (typeof avatar !== "string" || !isSupabaseHttpsUrl(avatar)) {
+    if (
+      typeof avatar !== "string" ||
+      !isSupabaseHttpsUrl(avatar) ||
+      !ownProfilePhotoPath(avatar, user.id)
+    ) {
       return NextResponse.json({ ok: false, error: "Invalid avatar_url" }, { status: 400 });
     }
+    if (body.avatar_url.trim().startsWith("data:")) uploadedPhotos.push(avatar);
     mediaPatch.avatar_url = avatar;
   } else if (removing.has("avatar")) {
     mediaPatch.avatar_url = null;
@@ -634,9 +658,16 @@ export async function POST(req: Request) {
     // Same host pin as the avatar above: an uploaded photo resolves to our
     // own Supabase host, and an arbitrary http(s) link must not become a
     // CSS `url()` fetch on every viewer's screen.
-    if (resolved === undefined || resolved === null || !isSupabaseHttpsUrl(resolved)) {
+    // And the own-file rule (see the avatar block).
+    if (
+      resolved === undefined ||
+      resolved === null ||
+      !isSupabaseHttpsUrl(resolved) ||
+      !ownProfilePhotoPath(resolved, user.id)
+    ) {
       return NextResponse.json({ ok: false, error: "Invalid banner" }, { status: 400 });
     }
+    if (bu.trim().startsWith("data:")) uploadedPhotos.push(resolved);
     mediaPatch.banner_url = resolved;
     coverThemePatch = "";
   } else {
@@ -674,6 +705,30 @@ export async function POST(req: Request) {
   // never half-apply against each other. The service role passes every
   // grant, so the closed list in `self-write-columns.ts` stands in front of
   // it: a key outside the list is a coding slip and fails the save.
+  //
+  // Photo or cover changing (S67 wave B, B3): snapshot both columns so the
+  // file this save replaces or removes can be retired once the new value is
+  // stored, and refuse a file that no longer exists (a stale copy of the page
+  // re-sending a photo that was already replaced would set a broken image;
+  // the desktop puts the previous photo back on this 400). A file uploaded
+  // in this request was just written, so it isn't checked.
+  let photoBefore: ProfilePhotoColumns | null = null;
+  if ("avatar_url" in mediaPatch || "banner_url" in mediaPatch) {
+    const photoService = createSupabaseServiceClient();
+    photoBefore = await readProfilePhotoColumns(photoService, user.id);
+    const toCheck = newProfilePhotoPaths(photoBefore, mediaPatch, user.id).filter(
+      (path) => !uploadedPhotos.some((url) => ownProfilePhotoPath(url, user.id) === path),
+    );
+    const missing = await firstMissingProfilePhoto(photoService, toCheck);
+    if (missing) {
+      const error =
+        ownProfilePhotoPath(mediaPatch.avatar_url, user.id) === missing
+          ? "Invalid avatar_url"
+          : "Invalid banner";
+      return NextResponse.json({ ok: false, error }, { status: 400 });
+    }
+  }
+
   const buildWritePatch = (): Record<string, unknown> => {
     const w: Record<string, unknown> = { ...patch, ...mediaPatch };
     if (coverThemePatch !== undefined) w.banner_gradient = coverThemePatch;
@@ -788,6 +843,25 @@ export async function POST(req: Request) {
       }
     } catch (e) {
       console.error("[profile-sync] resume orphan cleanup", e);
+    }
+  }
+
+  // Replaced or removed photo/cover files (S67 wave B, B3): re-read the saved
+  // row and retire only own files it named before and names in neither
+  // column now (moved to quarantine instead while a report about this
+  // student is open). Best-effort, never fails the save; `remove` counts, so
+  // a removed photo leaves the public bucket too.
+  if (photoBefore) {
+    try {
+      const photoService = createSupabaseServiceClient();
+      const photoAfter = await readProfilePhotoColumns(photoService, user.id);
+      await retireProfilePhotos(
+        photoService,
+        user.id,
+        staleProfilePhotoPaths(photoBefore, photoAfter, user.id),
+      );
+    } catch (e) {
+      console.error("[profile-sync] photo cleanup", e);
     }
   }
 

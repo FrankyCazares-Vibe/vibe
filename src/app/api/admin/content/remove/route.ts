@@ -58,6 +58,14 @@ const MAX_IDS = 100;
  * the same steps for callers that aren't a route, and the two agree field for
  * field, `moderation_actions.meta` keys included. That table refuses UPDATE and
  * DELETE, so a log row the other half writes differently can never be fixed.
+ * (One known gap: `org_id` below is written here only; removeContent has no
+ * caller today and gets it with its owner's next change.)
+ *
+ * A CLUB POST'S CLUB IS RECORDED (S67 wave B polish). A post's log row carries
+ * `org_id` in its meta: the club it was posted in, or null for a personal
+ * post. Deleting a club keeps its moderator-removed posts but detaches them
+ * (`org_id` goes null), so this is how /restore later tells a post whose club
+ * is gone from an ordinary personal post, and refuses to put it back.
  *
  * REMOVING ALSO CLOSES THE REPORTS IT CAME FROM, as `actioned`: the named
  * `reportIds`, or every open report on this piece of content when the caller
@@ -110,10 +118,11 @@ export async function POST(req: Request) {
   const service = createSupabaseServiceClient();
 
   // Service role, and no `removed_at IS NULL` filter here: the queue has to be
-  // able to act on a row RLS would already be hiding.
+  // able to act on a row RLS would already be hiding. A post also brings its
+  // club (`org_id`), for the log row (see "A CLUB POST'S CLUB" above).
   const { data: row, error: readErr } = await service
     .from(table)
-    .select("id, user_id, removed_at")
+    .select(type === "post" ? "id, user_id, removed_at, org_id" : "id, user_id, removed_at")
     .eq("id", id)
     .maybeSingle();
   if (readErr) {
@@ -122,7 +131,13 @@ export async function POST(req: Request) {
   }
   if (!row) return adminFail(404, "not_found", "Not found");
 
-  const alreadyRemoved = !!(row as { removed_at: string | null }).removed_at;
+  // One shape for every table (the select string differs for posts).
+  const existing = row as unknown as {
+    user_id: string | null;
+    removed_at: string | null;
+    org_id?: string | null;
+  };
+  const alreadyRemoved = !!existing.removed_at;
   let changed = false;
   if (!alreadyRemoved) {
     const { data: updated, error: updErr } = await service
@@ -170,7 +185,9 @@ export async function POST(req: Request) {
         already_removed: alreadyRemoved,
         resolved_reports: resolvedReports,
         resolved_report_ids: closedIds,
-        author_id: (row as { user_id: string | null }).user_id ?? null,
+        author_id: existing.user_id ?? null,
+        // Posts only: the club it was posted in, null for a personal post.
+        ...(type === "post" ? { org_id: existing.org_id ?? null } : {}),
       },
     });
   }

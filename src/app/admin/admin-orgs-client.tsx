@@ -25,6 +25,8 @@
 import Link from "next/link";
 import { useMemo, useState } from "react";
 
+import { orgAssetProxyUrl } from "@/lib/org-asset-url";
+
 import {
   ActionButton,
   adminPost,
@@ -35,6 +37,7 @@ import {
   inputStyle,
   Notice,
 } from "./admin-shell";
+import { ImageSlots } from "./image-slots";
 
 export type AdminOrgRow = {
   id: string;
@@ -54,6 +57,82 @@ export type AdminOrgRow = {
 
 type RowNote = { tone: "error" | "good"; text: string };
 
+/** Up to two initials, for a club with no logo. */
+function initialsOf(name: string): string {
+  return name
+    .split(/\s+/)
+    .filter(Boolean)
+    .slice(0, 2)
+    .map((s) => s[0])
+    .join("")
+    .toUpperCase();
+}
+
+/**
+ * The club's logo, BLURRED until pressed, like every other preview on the
+ * admin desk (image-slots.tsx): a reported or hidden club's logo can be the
+ * very picture nobody should see by accident. Pressing the tile shows it,
+ * pressing again blurs it. The caller keys it by the stored logo key (the
+ * proxy address never changes), so a new logo starts blurred.
+ */
+function LogoTile({ url, name }: { url: string | null; name: string }) {
+  const [shown, setShown] = useState(false);
+  const box: React.CSSProperties = {
+    width: 44,
+    height: 44,
+    borderRadius: 12,
+    flexShrink: 0,
+    position: "relative",
+    overflow: "hidden",
+    background: "rgba(255,255,255,0.08)",
+    display: "flex",
+    alignItems: "center",
+    justifyContent: "center",
+    fontFamily: "Fraunces, serif",
+    fontWeight: 800,
+    fontSize: 15,
+    color: "#fff",
+  };
+  if (!url) return <div style={box}>{initialsOf(name)}</div>;
+  return (
+    <button
+      type="button"
+      onClick={() => setShown((s) => !s)}
+      aria-pressed={shown}
+      aria-label={shown ? `Blur ${name}'s logo` : `Show ${name}'s logo`}
+      title={shown ? "Blur the logo" : "Show the logo"}
+      style={{ ...box, padding: 0, border: `1px solid ${COLORS.border}`, cursor: "pointer" }}
+    >
+      <span
+        aria-hidden
+        style={{
+          position: "absolute",
+          inset: 0,
+          background: `url(${JSON.stringify(url)}) center/cover`,
+          filter: shown ? "none" : "blur(10px)",
+          transform: shown ? "none" : "scale(1.2)",
+        }}
+      />
+      {shown ? null : (
+        <span
+          aria-hidden
+          style={{
+            position: "relative",
+            fontFamily: "inherit",
+            fontSize: 10,
+            fontWeight: 700,
+            letterSpacing: "0.04em",
+            color: "#fff",
+            textShadow: "0 1px 2px rgba(0,0,0,0.8)",
+          }}
+        >
+          Show
+        </span>
+      )}
+    </button>
+  );
+}
+
 type FilterKey = "all" | "verified" | "community" | "dormant" | "hidden";
 
 const FILTERS: FilterKey[] = ["all", "verified", "community", "dormant", "hidden"];
@@ -67,6 +146,8 @@ export function AdminOrgsClient({ initialOrgs }: { initialOrgs: AdminOrgRow[] })
   const [notes, setNotes] = useState<Record<string, RowNote>>({});
   /** The club whose Hide is waiting on a second press. */
   const [confirming, setConfirming] = useState<string | null>(null);
+  /** Clubs whose photo panel is open (loads on first open only). */
+  const [photosOpen, setPhotosOpen] = useState<Record<string, boolean>>({});
 
   const filtered = useMemo(() => {
     const q = search.trim().toLowerCase();
@@ -204,151 +285,138 @@ export function AdminOrgsClient({ initialOrgs }: { initialOrgs: AdminOrgRow[] })
               : "No clubs match that search or filter."}
           </Empty>
         ) : (
-          filtered.map((o) => (
-            <div
-              key={o.id}
-              className="adm-card"
-              style={{ display: "flex", flexDirection: "column", gap: 10 }}
-            >
-              <div className="adm-split">
-                <div
-                  style={{
-                    width: 44,
-                    height: 44,
-                    borderRadius: 12,
-                    background: o.logo_url
-                      ? `url(${o.logo_url}) center/cover`
-                      : "rgba(255,255,255,0.08)",
-                    display: "flex",
-                    alignItems: "center",
-                    justifyContent: "center",
-                    fontFamily: "Fraunces, serif",
-                    fontWeight: 800,
-                    fontSize: 15,
-                    color: "#fff",
-                    flexShrink: 0,
-                  }}
-                >
-                  {!o.logo_url
-                    ? o.name
-                        .split(/\s+/)
-                        .filter(Boolean)
-                        .slice(0, 2)
-                        .map((s) => s[0])
-                        .join("")
-                        .toUpperCase()
-                    : null}
-                </div>
+          filtered.map((o) => {
+            // A club logo is a private R2 key (`orgs/<id>/logo/…`); painted
+            // as-is it resolved against /admin and never loaded. The asset
+            // proxy signs it (and lets a platform admin see a hidden club's).
+            const logo = orgAssetProxyUrl(o.handle, o.logo_url, "logo");
+            return (
+              <div
+                key={o.id}
+                className="adm-card"
+                style={{ display: "flex", flexDirection: "column", gap: 10 }}
+              >
+                <div className="adm-split">
+                  <LogoTile key={o.logo_url ?? "none"} url={logo} name={o.name} />
 
-                <div style={{ flex: 1, minWidth: 0 }}>
-                  <div style={{ display: "flex", alignItems: "center", gap: 8, flexWrap: "wrap" }}>
-                    <Link
-                      href={`/orgs/${o.handle}`}
+                  <div style={{ flex: 1, minWidth: 0 }}>
+                    <div style={{ display: "flex", alignItems: "center", gap: 8, flexWrap: "wrap" }}>
+                      <Link
+                        href={`/orgs/${o.handle}`}
+                        style={{
+                          fontFamily: "Fraunces, serif",
+                          fontWeight: 800,
+                          fontSize: 16,
+                          color: "#fff",
+                          textDecoration: "none",
+                        }}
+                      >
+                        {o.name}
+                      </Link>
+                      {o.verified ? <Badge color={COLORS.verified}>verified</Badge> : null}
+                      {o.hidden ? <Badge color={COLORS.warn}>hidden</Badge> : null}
+                      {!o.is_public ? <Badge color={COLORS.unknown}>private</Badge> : null}
+                      {o.dormant ? <Badge color={COLORS.warn}>dormant</Badge> : null}
+                    </div>
+                    <div
                       style={{
-                        fontFamily: "Fraunces, serif",
-                        fontWeight: 800,
-                        fontSize: 16,
-                        color: "#fff",
-                        textDecoration: "none",
+                        fontSize: 12,
+                        color: COLORS.muted,
+                        display: "flex",
+                        gap: 8,
+                        flexWrap: "wrap",
+                        marginTop: 2,
                       }}
                     >
-                      {o.name}
-                    </Link>
-                    {o.verified ? <Badge color={COLORS.verified}>verified</Badge> : null}
-                    {o.hidden ? <Badge color={COLORS.warn}>hidden</Badge> : null}
-                    {!o.is_public ? <Badge color={COLORS.unknown}>private</Badge> : null}
-                    {o.dormant ? <Badge color={COLORS.warn}>dormant</Badge> : null}
+                      <span>@{o.handle}</span>
+                      <span style={{ opacity: 0.4 }}>·</span>
+                      <span>
+                        {o.member_count} {o.member_count === 1 ? "member" : "members"}
+                      </span>
+                      <span style={{ opacity: 0.4 }}>·</span>
+                      <span>active {fmtRelative(o.last_activity_at)}</span>
+                      <span style={{ opacity: 0.4 }}>·</span>
+                      <span>created {fmtRelative(o.created_at)}</span>
+                    </div>
                   </div>
+
+                  <div className="adm-actions" style={{ flexShrink: 0 }}>
+                    <ActionButton
+                      busy={busy === o.handle}
+                      onClick={() => toggleVerified(o)}
+                      tone={o.verified ? "primary" : "plain"}
+                    >
+                      {o.verified ? "Unverify" : "Verify"}
+                    </ActionButton>
+                    <ActionButton
+                      busy={busy === o.handle}
+                      disabled={confirming === o.id}
+                      onClick={() => {
+                        // Unhide destroys nothing, so it goes straight through.
+                        // Hide asks once more first.
+                        if (o.hidden) void toggleHidden(o);
+                        else {
+                          say(o.id, null);
+                          setConfirming(o.id);
+                        }
+                      }}
+                      tone={o.hidden ? "plain" : "danger"}
+                      title={
+                        o.hidden
+                          ? "Put this club back in front of everyone."
+                          : "Take this club out of sight for everyone but its members, and revoke its pending invites."
+                      }
+                    >
+                      {o.hidden ? "Unhide" : "Hide"}
+                    </ActionButton>
+                    <ActionButton
+                      title="See the club's logo and banner, and take one down."
+                      onClick={() => setPhotosOpen((prev) => ({ ...prev, [o.id]: !prev[o.id] }))}
+                    >
+                      {photosOpen[o.id] ? "Hide photos" : "Photos"}
+                    </ActionButton>
+                  </div>
+                </div>
+
+                {photosOpen[o.id] ? <ImageSlots targetType="org" targetId={o.id} /> : null}
+
+                {confirming === o.id ? (
                   <div
                     style={{
-                      fontSize: 12,
-                      color: COLORS.muted,
                       display: "flex",
-                      gap: 8,
-                      flexWrap: "wrap",
-                      marginTop: 2,
+                      flexDirection: "column",
+                      gap: 10,
+                      padding: 12,
+                      borderRadius: 10,
+                      background: "rgba(255,255,255,0.03)",
+                      border: `1px solid ${COLORS.border}`,
                     }}
                   >
-                    <span>@{o.handle}</span>
-                    <span style={{ opacity: 0.4 }}>·</span>
-                    <span>
-                      {o.member_count} {o.member_count === 1 ? "member" : "members"}
-                    </span>
-                    <span style={{ opacity: 0.4 }}>·</span>
-                    <span>active {fmtRelative(o.last_activity_at)}</span>
-                    <span style={{ opacity: 0.4 }}>·</span>
-                    <span>created {fmtRelative(o.created_at)}</span>
+                    <div style={{ fontSize: 13, lineHeight: 1.5, color: COLORS.text }}>
+                      Hide {o.name}? Only its members will be able to see it, its pending
+                      invites are revoked, and unhiding doesn&apos;t bring them back.
+                    </div>
+                    <div className="adm-actions">
+                      <ActionButton
+                        tone="danger"
+                        busy={busy === o.handle}
+                        onClick={() => void toggleHidden(o)}
+                      >
+                        Hide it
+                      </ActionButton>
+                      <ActionButton disabled={busy === o.handle} onClick={() => setConfirming(null)}>
+                        Cancel
+                      </ActionButton>
+                    </div>
                   </div>
-                </div>
+                ) : null}
 
-                <div className="adm-actions" style={{ flexShrink: 0 }}>
-                  <ActionButton
-                    busy={busy === o.handle}
-                    onClick={() => toggleVerified(o)}
-                    tone={o.verified ? "primary" : "plain"}
-                  >
-                    {o.verified ? "Unverify" : "Verify"}
-                  </ActionButton>
-                  <ActionButton
-                    busy={busy === o.handle}
-                    disabled={confirming === o.id}
-                    onClick={() => {
-                      // Unhide destroys nothing, so it goes straight through.
-                      // Hide asks once more first.
-                      if (o.hidden) void toggleHidden(o);
-                      else {
-                        say(o.id, null);
-                        setConfirming(o.id);
-                      }
-                    }}
-                    tone={o.hidden ? "plain" : "danger"}
-                    title={
-                      o.hidden
-                        ? "Put this club back in front of everyone."
-                        : "Take this club out of sight for everyone but its members, and revoke its pending invites."
-                    }
-                  >
-                    {o.hidden ? "Unhide" : "Hide"}
-                  </ActionButton>
-                </div>
+                {notes[o.id] ? (
+                  <Notice tone={notes[o.id].tone}>{notes[o.id].text}</Notice>
+                ) : null}
               </div>
-
-              {confirming === o.id ? (
-                <div
-                  style={{
-                    display: "flex",
-                    flexDirection: "column",
-                    gap: 10,
-                    padding: 12,
-                    borderRadius: 10,
-                    background: "rgba(255,255,255,0.03)",
-                    border: `1px solid ${COLORS.border}`,
-                  }}
-                >
-                  <div style={{ fontSize: 13, lineHeight: 1.5, color: COLORS.text }}>
-                    Hide {o.name}? Only its members will be able to see it, its pending
-                    invites are revoked, and unhiding doesn&apos;t bring them back.
-                  </div>
-                  <div className="adm-actions">
-                    <ActionButton
-                      tone="danger"
-                      busy={busy === o.handle}
-                      onClick={() => void toggleHidden(o)}
-                    >
-                      Hide it
-                    </ActionButton>
-                    <ActionButton disabled={busy === o.handle} onClick={() => setConfirming(null)}>
-                      Cancel
-                    </ActionButton>
-                  </div>
-                </div>
-              ) : null}
-
-              {notes[o.id] ? (
-                <Notice tone={notes[o.id].tone}>{notes[o.id].text}</Notice>
-              ) : null}
-            </div>
-          ))
+            );
+          })
         )}
       </div>
     </div>

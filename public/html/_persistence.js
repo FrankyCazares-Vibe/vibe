@@ -175,7 +175,7 @@ function _vibeTopHere() {
 //     → Promise<{ ok: true, status, data } | { ok: false, status, code, error, message, action?, field? }>
 //     Never throws; branch on r.ok. `failure` is the caller's own line.
 //   window.vibeCopy(text, success) → Promise<boolean>
-//   window.vibeLoadFailure(r, line) → { message, action? }  (a failed first load's line)
+//   window.vibeLoadFailure(r, line) → { message, action?, retryable? }  (a failed first load's line)
 //   window.vibeLoadFailed(el, failure, onRetry, { tone: 'light'|'dark', compact })
 //     → the box it put in `el`, or null when `el` is missing
 // The toast renders inside this document even in an iframe (both iframes
@@ -187,6 +187,16 @@ function _vibeTopHere() {
   const GENERIC = ['unauthorized', 'forbidden', 'request failed', 'unavailable',
     'not found', 'invalid json', 'bad request', 'internal server error'];
   const PASS_400 = ['Comment is empty', 'Message too long', 'Empty message'];
+  // Statuses where loading again gets the same answer (bad request, refusal,
+  // gone, word filter): a failed first load shows its line without Retry.
+  // Same list as failure-copy.ts NO_RETRY_STATUSES (failure-copy.test.ts
+  // checks the two match).
+  const NO_RETRY = [400, 403, 404, 422];
+  // Twin of failure-copy.ts failureRetryable: a line that says "Try again"
+  // (a 403/422 whose body isn't our JSON) keeps its button.
+  function retryable(st, message) {
+    return NO_RETRY.indexOf(st) < 0 || /\bTry again\b/.test(String(message || ''));
+  }
   // Where a restricted student reads what happened and how to appeal, and the
   // address they write to (plan §5, S64). Same two values as failure-copy.ts.
   const SUSPENDED_PAGE = '/account/suspended';
@@ -460,7 +470,9 @@ function _vibeTopHere() {
   // hidden; with rows loaded, the rows stay.
   window.vibeLoadFailure = function(r, line) {
     if (r && r.ok === false && r.message) {
-      return r.action ? { message: r.message, action: r.action } : { message: r.message };
+      if (r.action) return { message: r.message, action: r.action };
+      // 400/403/404/422 answer the same on a second try: the line stands alone.
+      return retryable(r.status, r.message) ? { message: r.message } : { message: r.message, retryable: false };
     }
     // A 2xx whose body lacked the expected list. No copy rule maps a 2xx, so
     // this is the caller's line plus "Try again.", the same line a 5xx gets.
@@ -469,8 +481,9 @@ function _vibeTopHere() {
 
   // Empties `el` and puts one role=alert box in it: the message (textContent,
   // so no escaping) and one coral pill, the mapped action (Sign in / Review
-  // Terms) when there is one, else Retry. Elements are made per call, never
-  // at load: this file runs in <head>.
+  // Terms) when there is one, else Retry, unless retrying can't help
+  // (`retryable: false`: a gone or refused load), where the line stands
+  // alone. Elements are made per call, never at load: this file runs in <head>.
   window.vibeLoadFailed = function(el, failure, onRetry, opts) {
     if (!el || typeof el.appendChild !== 'function') return null;
     const o = opts || {};
@@ -523,7 +536,7 @@ function _vibeTopHere() {
       else if (typeof onRetry === 'function') onRetry();
       else location.reload();
     });
-    box.appendChild(btn);
+    if (action || f.retryable !== false) box.appendChild(btn);
 
     el.textContent = '';
     el.appendChild(box);

@@ -3,7 +3,9 @@ import { NextResponse } from "next/server";
 import { isOttoOnboardingComplete } from "@/lib/auth/post-login";
 import { isMissingColumnError } from "@/lib/db/missing-column";
 import { isSchoolSystem, legacyLabel } from "@/lib/iu/campuses";
-import { requireTermsAccepted } from "@/lib/legal/require-terms";
+import { contentBlockedResponse, requireNotRestricted } from "@/lib/moderation/access";
+import { blockedProfileField } from "@/lib/moderation/profile-filter";
+import { checkToken } from "@/lib/moderation/token-filter";
 import { changeHandleForUser } from "@/lib/profile/handle-change";
 import {
   ONBOARDING_STEP_ERROR_COPY,
@@ -72,7 +74,8 @@ function isCampusSchemaMissing(error: { code?: string | null; message?: string |
  * no campus column and works either way.
  *
  * Order: 401 → rate limit (30 / 10 min per user; it also bounds handle
- * squatting, since onboarding claims skip the cooldown) → Terms → service-role
+ * squatting, since onboarding claims skip the cooldown) → Terms + no
+ * restriction (`requireNotRestricted`) → service-role
  * read of the caller's row → 403 `school_unverified` → validate (a body that
  * isn't a JSON object is 400 `invalid_json` here, after the 403) → write.
  *
@@ -97,8 +100,10 @@ export async function POST(req: Request) {
   });
   if (!rl.allowed) return rateLimited(rl);
 
-  const termsGate = await requireTermsAccepted(user.id);
-  if (termsGate) return termsGate;
+  // Terms (the same 403 requireTermsAccepted sent) and no suspension or ban
+  // in force, read from the database (S67 security wave B, B4).
+  const gate = await requireNotRestricted(user.id);
+  if (gate) return gate;
 
   // Read the body now (it picks the columns to select), but only reject a bad
   // one after the verified check, in C3's order.
@@ -226,6 +231,15 @@ async function saveCampusStep(
  * skip the cooldown and leave `handle_changed_at` null until Finish); only
  * then write the other fields. A retry after a failed field write is safe:
  * re-claiming the same handle is a no-op.
+ *
+ * THE WORD FILTER (S67 security wave B, B4). This step writes name, bio,
+ * major, department, interests and skills with the service role, for any
+ * verified student, onboarded or not (a replay reaches it too), so it runs
+ * the same profile filter as PATCH /api/me/profile (`blockedProfileField`:
+ * only values that CHANGE are checked) and the token filter on the handle
+ * (`checkToken`: a listed term glued on with `_` is caught). Both run before
+ * the handle claim, so a refused save claims nothing. Like the profile
+ * filter, a handle the student already holds is never refused.
  */
 async function saveProfileStep(service: ServiceClient, userId: string, body: Record<string, unknown>) {
   const parsed = sanitizeProfileStep(body);
@@ -233,6 +247,12 @@ async function saveProfileStep(service: ServiceClient, userId: string, body: Rec
     return fail(400, parsed.code, parsed.error, parsed.field ? { field: parsed.field } : {});
   }
   const { handle, patch } = parsed.value;
+
+  if (!checkToken(handle).ok && (await storedHandle(service, userId)) !== handle) {
+    return contentBlockedResponse("handle");
+  }
+  const blocked = await blockedProfileField(service, userId, patch);
+  if (blocked) return contentBlockedResponse(blocked);
 
   const claim = await changeHandleForUser(userId, handle, { onboarding: true });
   if (!claim.ok) {
@@ -264,4 +284,19 @@ async function saveProfileStep(service: ServiceClient, userId: string, body: Rec
   }
 
   return NextResponse.json({ ok: true });
+}
+
+/**
+ * The handle on the caller's row, or null when it can't be read (then every
+ * handle counts as new, so the filter stays on). Read only when the submitted
+ * handle trips the filter, which is close to never.
+ */
+async function storedHandle(service: ServiceClient, userId: string): Promise<string | null> {
+  const { data, error } = await service.from("users").select("handle").eq("id", userId).maybeSingle();
+  if (error) {
+    console.error("[onboarding-step handle read]", error);
+    return null;
+  }
+  const handle = (data as { handle?: unknown } | null)?.handle;
+  return typeof handle === "string" ? handle : null;
 }

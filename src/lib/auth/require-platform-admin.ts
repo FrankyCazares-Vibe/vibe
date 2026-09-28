@@ -150,7 +150,10 @@ export type ModerationAction =
   | "org_unverify"
   | "user_suspend"
   | "user_ban"
-  | "user_lift";
+  | "user_lift"
+  // A photo taken down / put back (S67 wave B, B1; migration 20260929100000).
+  | "image_remove"
+  | "image_restore";
 
 export type ModerationLogEntry = {
   actorId: string;

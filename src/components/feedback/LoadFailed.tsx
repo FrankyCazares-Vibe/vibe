@@ -2,7 +2,7 @@
 
 import type { JSX } from "react";
 
-import { describeFailure, type ToastAction } from "@/lib/feedback/failure-copy";
+import { describeFailure, failureRetryable, type ToastAction } from "@/lib/feedback/failure-copy";
 import type { VibeResult } from "@/lib/feedback/request";
 
 /**
@@ -15,7 +15,16 @@ import type { VibeResult } from "@/lib/feedback/request";
  * Static pages use the twins in public/html/_persistence.js
  * (window.vibeLoadFailure, window.vibeLoadFailed).
  */
-export type LoadFailure = { message: string; action?: ToastAction };
+export type LoadFailure = {
+  message: string;
+  action?: ToastAction;
+  /**
+   * false when loading again can't change the answer (a gone post's 404, a
+   * refusal): the box shows the line alone. Absent means Retry shows, so a
+   * literal `{ message }` and every existing caller keep their button.
+   */
+  retryable?: boolean;
+};
 
 /**
  * A quiet vibeRequest failure keeps its mapped line and action. A 2xx with the
@@ -23,7 +32,14 @@ export type LoadFailure = { message: string; action?: ToastAction };
  * rest of this file: a server component passes a `failure` literal instead.
  */
 export function asLoadFailure(r: VibeResult<unknown>, line: string): LoadFailure {
-  if (!r.ok) return r.action ? { message: r.message, action: r.action } : { message: r.message };
+  if (!r.ok) {
+    if (r.action) return { message: r.message, action: r.action };
+    // 400/403/404/422 answer the same on a second try (failure-copy.ts
+    // NO_RETRY_STATUSES), so those lines stand alone.
+    return failureRetryable(r.status, r.message)
+      ? { message: r.message }
+      : { message: r.message, retryable: false };
+  }
   // No copy rule maps a 2xx, so this is the caller's line plus "Try again.",
   // the same line a 5xx gets.
   const { message } = describeFailure(
@@ -47,8 +63,10 @@ type LoadFailedProps = {
 /**
  * A role="alert" box with the message and one coral pill. The pill is the
  * failure's mapped action (Sign in / Review Terms) when it has one, since a
- * retry would only fail again; otherwise Retry. No margin or position of its
- * own, so it sits in the list's place inside the page's layout.
+ * retry would only fail again; otherwise Retry, unless retrying can't help
+ * (`retryable: false`: a gone or refused load), where the line stands alone.
+ * No margin or position of its own, so it sits in the list's place inside the
+ * page's layout.
  */
 export function LoadFailed({
   failure,
@@ -58,6 +76,7 @@ export function LoadFailed({
 }: LoadFailedProps): JSX.Element {
   const dark = tone === "dark";
   const action = failure.action;
+  const showButton = Boolean(action) || failure.retryable !== false;
 
   return (
     <div
@@ -83,38 +102,40 @@ export function LoadFailed({
       }}
     >
       <span style={{ minWidth: 0, overflowWrap: "anywhere" }}>{failure.message}</span>
-      <button
-        type="button"
-        onClick={(e) => {
-          // Kept from click-outside handlers: a retry can unmount this box
-          // before the click reaches document, and a detached target reads
-          // as "outside" to a dropdown's close check.
-          e.preventDefault();
-          e.stopPropagation();
-          // Full navigation, so the server-side gates on the target run.
-          if (action) window.location.assign(action.href);
-          else if (onRetry) onRetry();
-          else window.location.reload();
-        }}
-        style={{
-          flexShrink: 0,
-          margin: 0,
-          padding: compact ? "5px 12px" : "7px 16px",
-          borderRadius: 999,
-          border: "none",
-          background: "#FF5C35",
-          color: "#FAF7F2",
-          fontFamily: "DM Sans, sans-serif",
-          fontSize: compact ? 12 : 13,
-          fontWeight: 700,
-          letterSpacing: "0.02em",
-          lineHeight: 1.4,
-          whiteSpace: "nowrap",
-          cursor: "pointer",
-        }}
-      >
-        {action ? action.label : "Retry"}
-      </button>
+      {showButton ? (
+        <button
+          type="button"
+          onClick={(e) => {
+            // Kept from click-outside handlers: a retry can unmount this box
+            // before the click reaches document, and a detached target reads
+            // as "outside" to a dropdown's close check.
+            e.preventDefault();
+            e.stopPropagation();
+            // Full navigation, so the server-side gates on the target run.
+            if (action) window.location.assign(action.href);
+            else if (onRetry) onRetry();
+            else window.location.reload();
+          }}
+          style={{
+            flexShrink: 0,
+            margin: 0,
+            padding: compact ? "5px 12px" : "7px 16px",
+            borderRadius: 999,
+            border: "none",
+            background: "#FF5C35",
+            color: "#FAF7F2",
+            fontFamily: "DM Sans, sans-serif",
+            fontSize: compact ? 12 : 13,
+            fontWeight: 700,
+            letterSpacing: "0.02em",
+            lineHeight: 1.4,
+            whiteSpace: "nowrap",
+            cursor: "pointer",
+          }}
+        >
+          {action ? action.label : "Retry"}
+        </button>
+      ) : null}
     </div>
   );
 }

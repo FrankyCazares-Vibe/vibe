@@ -44,7 +44,7 @@ function HelpEmail() {
 
 export default function SupportPage() {
   return (
-    <LegalLayout eyebrow="Help" title="Support" effectiveDate="September 27, 2026">
+    <LegalLayout eyebrow="Help" title="Support" effectiveDate="September 28, 2026">
       <LegalP>
         Vibe is run by <strong>CONNECTVIBE. LLC</strong>, an Indiana limited
         liability company. The fastest way to reach a person is email:{" "}
@@ -83,6 +83,11 @@ export default function SupportPage() {
         or fake, ask us to take it down.{" "}
         <strong>We remove it within 48 hours of a valid request.</strong> You
         don&apos;t need a Vibe account to ask.
+      </LegalP>
+      <LegalP>
+        That covers more than posts and messages: our moderators can also take
+        down a profile photo or cover, the small logos on a profile, a
+        club&apos;s logo or banner, and a group chat&apos;s photo.
       </LegalP>
       <LegalUL>
         <li>

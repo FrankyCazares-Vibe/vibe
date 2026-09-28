@@ -415,6 +415,80 @@ export async function deleteR2Prefix(prefix: string): Promise<number> {
   return deleted;
 }
 
+/**
+ * The club folder shape `deleteR2FolderExcept` also accepts: `orgs/<uuid>/`
+ * (club logo, banner and club-post media; upload-url writes
+ * `orgs/<org_id>/<banner|logo|posts>/<uuid>.<ext>`). Same strict UUID form as
+ * CLIP_OWNER_PREFIX_RE.
+ */
+const ORG_FOLDER_PREFIX_RE =
+  /^orgs\/[0-9a-f]{8}-[0-9a-f]{4}-[1-8][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}\/$/;
+
+/**
+ * Delete every object under `prefix` EXCEPT the keys in `keep` (S67 security
+ * wave 2, B2). Two callers: account deletion sweeps `clips/<uid>/` but keeps
+ * the videos of the student's moderator-removed or reported posts (evidence);
+ * club deletion sweeps `orgs/<org_id>/` but keeps the files of removed or
+ * reported club posts and any logo/banner a moderator took down.
+ *
+ * Only `clips/<uuid>/` or `orgs/<uuid>/` prefixes; anything else throws before
+ * a request is made. Same list + DeleteObjects loop as deleteR2Prefix, and
+ * THROWS on any list / delete error (a retry is safe: a missing key deletes
+ * as a success). Returns how many keys were deleted and how many kept.
+ */
+export async function deleteR2FolderExcept(
+  prefix: string,
+  keep: ReadonlySet<string>,
+): Promise<{ deleted: number; kept: number }> {
+  if (!CLIP_OWNER_PREFIX_RE.test(prefix) && !ORG_FOLDER_PREFIX_RE.test(prefix)) {
+    throw new Error(
+      'deleteR2FolderExcept only purges "clips/<uuid>/" or "orgs/<uuid>/" prefixes',
+    );
+  }
+  const bucket = requireEnv("R2_BUCKET_NAME");
+  const client = getR2S3Client();
+
+  let deleted = 0;
+  let kept = 0;
+  let continuationToken: string | undefined;
+  do {
+    const page = await client.send(
+      new ListObjectsV2Command({
+        Bucket: bucket,
+        Prefix: prefix,
+        MaxKeys: R2_LIST_PAGE,
+        ContinuationToken: continuationToken,
+      }),
+    );
+    const listed = (page.Contents ?? [])
+      .map((o) => o.Key)
+      .filter((k): k is string => typeof k === "string" && k.startsWith(prefix));
+    const keys = listed.filter((k) => !keep.has(k));
+    kept += listed.length - keys.length;
+
+    for (let i = 0; i < keys.length; i += R2_DELETE_BATCH) {
+      const batch = keys.slice(i, i + R2_DELETE_BATCH);
+      const res = await client.send(
+        new DeleteObjectsCommand({
+          Bucket: bucket,
+          Delete: { Objects: batch.map((Key) => ({ Key })), Quiet: true },
+        }),
+      );
+      if (res.Errors && res.Errors.length > 0) {
+        const first = res.Errors[0];
+        throw new Error(
+          `R2 DeleteObjects failed for ${res.Errors.length} key(s): ${first.Code ?? "?"} ${first.Message ?? ""}`.trim(),
+        );
+      }
+      deleted += batch.length;
+    }
+
+    continuationToken = page.IsTruncated ? page.NextContinuationToken : undefined;
+  } while (continuationToken);
+
+  return { deleted, kept };
+}
+
 export async function probeR2Bucket(): Promise<
   { ok: true } | { ok: false; message: string }
 > {

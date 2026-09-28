@@ -9,6 +9,7 @@ import {
   capturePosterFrame,
   extractHashtags,
 } from "@/lib/composer/helpers";
+import { VIDEO_LOCATION_HINT } from "@/lib/media/copy";
 
 /**
  * Mobile composer sheet — text + photo + horizontal video posts.
@@ -593,6 +594,17 @@ export function PostComposerMobile({ onClose, onPosted, origin }: Props) {
                   {Math.round(videoMeta.duration)}s
                 </span>
               ) : null}
+            </span>
+            <span
+              style={{
+                fontFamily: "inherit",
+                fontSize: 12,
+                lineHeight: 1.4,
+                color: "var(--ink-muted)",
+                paddingRight: 28,
+              }}
+            >
+              {VIDEO_LOCATION_HINT}
             </span>
             <button
               type="button"

@@ -282,6 +282,12 @@ export const ORG_COPY = freezeDeep({
     revoke: "Revoke",
     revokeConfirm: "Revoke this invite?",
     keep: "Keep",
+    // Deny on a join request (wave B, B5): one tap, like the desktop Requests
+    // tab. The row then reads "Denied" for as long as the sheet is open.
+    deny: "Deny",
+    denied: "Denied",
+    denyFailed: "Couldn't deny the request.",
+    deniedToast: "Request denied.",
   },
 } as const);
 

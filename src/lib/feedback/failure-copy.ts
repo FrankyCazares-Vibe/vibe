@@ -218,3 +218,29 @@ export function describeFailure(
   // 5xx, a non-JSON body, a 2xx with ok:false, and anything unmapped.
   return { message: withTryAgain(fallback) };
 }
+
+/**
+ * Statuses where loading again gets the same answer: a bad request (400), a
+ * refusal (403), something that's gone (404), the word filter (422). A failed
+ * first load with one of these shows its line without a Retry button
+ * (wave B, B5: a deleted post said "That's no longer available." above a
+ * Retry that could only fail again). Everything else keeps Retry: offline,
+ * 408, 409, 429, 5xx, a 2xx with the wrong shape.
+ *
+ * public/html/_persistence.js keeps the same list as `NO_RETRY` in
+ * `vibeFeedbackInit` (failure-copy.test.ts checks the two match).
+ */
+export const NO_RETRY_STATUSES: readonly number[] = Object.freeze([400, 403, 404, 422]);
+
+/**
+ * Whether a Retry button can help after a failure with this status. Pass the
+ * student's line too: when it says "Try again" (a 403 or 422 whose body
+ * isn't our JSON falls through to the caller's line + " Try again."), the
+ * button stays, so the line and the button never disagree. Capital T on
+ * purpose: the word filter's "Edit it and try again." is about editing, not
+ * retrying. Additive only: `describeFailure`'s return shape is unchanged.
+ */
+export function failureRetryable(status: number, message = ""): boolean {
+  if (!NO_RETRY_STATUSES.includes(status)) return true;
+  return /\bTry again\b/.test(message);
+}

@@ -64,6 +64,7 @@ import {
 } from "@/lib/iu/campuses";
 import { IU_SCHOOLS, schoolForMajorIn } from "@/lib/iu/majors";
 import { PURDUE_INDIANAPOLIS_SCHOOLS } from "@/lib/iu/majors-purdue-indianapolis";
+import { VIDEO_LOCATION_HINT } from "@/lib/media/copy";
 import { orgAssetProxyUrl } from "@/lib/org-asset-url";
 import {
   AUDIENCE_HELP,
@@ -3016,7 +3017,7 @@ function SettingsDanger({
 
   const destroy = async () => {
     const confirmed = prompt(
-      `Type the handle "${org.handle}" to delete this org. This cannot be undone.`
+      `Type the handle "${org.handle}" to delete this club, its chats, its posts and its events. This cannot be undone.`
     );
     if (confirmed !== org.handle) {
       if (confirmed !== null) setErr("Handle didn't match — nothing deleted.");
@@ -3065,7 +3066,7 @@ function SettingsDanger({
       {isOwner ? (
         <DangerCard
           title="Delete this org"
-          desc="Removes the org, all its channels, all messages, and all members. This cannot be undone."
+          desc="Removes the club with all its chats, messages, members, posts and events. This cannot be undone."
           actionLabel={busy ? "Deleting…" : "Delete org"}
           onClick={destroy}
           disabled={busy}
@@ -6533,6 +6534,19 @@ function FeedComposer({
             >
               ×
             </button>
+          </div>
+        ) : null}
+        {videoFile ? (
+          <div
+            style={{
+              marginTop: -4,
+              fontFamily: "DM Sans, sans-serif",
+              fontSize: 12,
+              lineHeight: 1.4,
+              color: "var(--ink-muted)",
+            }}
+          >
+            {VIDEO_LOCATION_HINT}
           </div>
         ) : null}
         {error ? (

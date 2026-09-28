@@ -254,8 +254,9 @@ export function PostViewerMobile({
   }, []);
 
   // Fetch the single post + counts + viewer state in one roundtrip. A
-  // failure shows LoadFailed with Retry (a deleted post reads "That's no
-  // longer available.") where the raw server error used to sit.
+  // failure shows LoadFailed where the raw server error used to sit: Retry
+  // for a failed read; a gone post (404) reads "That's no longer
+  // available." with no button, since retrying can't bring it back.
   useEffect(() => {
     let cancelled = false;
     (async () => {

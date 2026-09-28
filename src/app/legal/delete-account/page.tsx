@@ -12,11 +12,21 @@ import {
 // to. Under /legal/ on purpose: the proxy's restrictedPageAllowed lets /legal/*
 // through, so a suspended or banned student can read it too.
 //
-// Every claim here was checked against the code on 2026-09-24. Keep it true
-// when these change:
+// Every claim here was checked against the code on 2026-09-24 (the
+// kept-files lines on 2026-09-28: they are true only with wave B's B1, B2 and
+// B3 storage changes deployed alongside). Keep it true when these change:
 //   - the flow: DELETE /api/me (src/app/api/me/route.ts): Stripe customer
 //     deleted first and fail closed, then purgeUserUploads, then
 //     auth.admin.deleteUser, whose cascade removes every users-keyed row;
+//     purgeUserUploads keeps every `quarantine/<uid>/**` file and, before it
+//     sweeps, moves into quarantine the files of removed posts, of posts with
+//     an open or actioned report, and the current photo/cover when a report
+//     about the account is open (storage-purge.ts loadEvidence). Quarantine
+//     also holds what a moderator took down (admin image routes, B1), a post
+//     deleted while a report on it was open (delete-media-store.ts, B2) and a
+//     photo/cover replaced or removed while a report about the account was
+//     open (B3). Kept up to a year, pending the lawyer. The "What we keep"
+//     bullet is notes-B2 "Requests"' sentence, widened to those cases;
 //   - the steps: SettingsClient.tsx DangerZone ("Delete account…", type the
 //     handle, "Permanently delete"), and "Delete account" on the Verify your
 //     campus screen and on the suspension notice (suspended-actions.tsx);
@@ -25,7 +35,9 @@ import {
 //     identity_key (src/lib/moderation/identity.ts); moderation_actions and
 //     billing_events carry no FK, and moderation_actions is append-only, with
 //     meta.handle on user_suspend, user_ban and user_lift (the admin restrict
-//     and lift routes); email_sends keeps recipient_domain and
+//     and lift routes) and on image_remove / image_restore (the admin image
+//     routes, with the removed photo's address in meta.previous);
+//     email_sends keeps recipient_domain and
 //     provider_message_id and drops recipient_hash (trigger
 //     email_sends_forget_recipient), while Resend keeps the address under that
 //     message id; orgs.owner_id is ON DELETE SET NULL;
@@ -69,7 +81,7 @@ export default function DeleteAccountPage() {
     <LegalLayout
       eyebrow="Your data"
       title="Delete your account"
-      effectiveDate="September 24, 2026"
+      effectiveDate="September 28, 2026"
     >
       <LegalP>
         This page is for <strong>Vibe</strong>, the campus app run by{" "}
@@ -144,7 +156,8 @@ export default function DeleteAccountPage() {
         </li>
         <li>
           <strong>Your files:</strong> every photo, video and document you
-          uploaded is erased from storage, not just hidden.
+          uploaded is erased from storage, not just hidden, except files kept
+          because of a report or a moderator&apos;s decision (see below).
         </li>
       </LegalUL>
       <LegalP>
@@ -174,8 +187,21 @@ export default function DeleteAccountPage() {
         <li>
           <strong>Our moderation log.</strong> If a moderator acted on your
           account or content, the record of what was done and why stays, with
-          that same internal ID and, for a suspension or ban (or lifting one),
-          your handle as it was then.
+          that same internal ID and, for a suspension or ban (or lifting one)
+          or a photo they took down, your handle as it was then.
+        </li>
+        <li>
+          <strong>Photos and videos a moderator took down, or that a report
+          is about.</strong> If a moderator removed something you posted or
+          one of your photos, or a report about one of your posts is still
+          open, that photo or video is kept privately, where nobody else can
+          see it, for up to a year for safety and legal reasons, as the record
+          of what happened. So is a post&apos;s photo or video after a
+          moderator acted on a report about it, and a post you deleted while a
+          report about it was open. While a report about your account is
+          open, the same goes for your current profile photo and cover, and
+          for a profile photo or cover you change or remove. Deleting your
+          account doesn&apos;t erase any of it.
         </li>
         <li>
           <strong>Suspensions and bans.</strong> If your account was suspended

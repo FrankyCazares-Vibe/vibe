@@ -2,15 +2,17 @@ import "server-only";
 
 import type { SupabaseClient } from "@supabase/supabase-js";
 
-import { QUARANTINE_BUCKET_ID } from "@/lib/moderation/media-quarantine";
+import { quarantineProfilesObjects } from "@/lib/moderation/media-quarantine-store";
 import { isUuid } from "@/lib/pgrest";
+import { evidenceToKeep, type PostMediaRow } from "@/lib/posts/delete-media";
 import { purgeableMessageMediaKeys } from "@/lib/posts/media-ownership";
 import { RESUME_BUCKET } from "@/lib/profile/resume-doc-url";
 import {
   CLIP_KEY_PREFIX,
+  deleteR2FolderExcept,
   deleteR2Keys,
-  deleteR2Prefix,
 } from "@/lib/r2";
+import { getSupabaseUrl } from "@/lib/supabase/env";
 import { createSupabaseServiceClient } from "@/lib/supabase/service";
 
 /**
@@ -30,14 +32,17 @@ import { createSupabaseServiceClient } from "@/lib/supabase/service";
  *   Supabase `profiles`: <uid>/avatar-*, <uid>/banner-*, <uid>/posts/*,
  *                        <uid>/posters/*, <uid>/logos/*
  *   Supabase `resumes`:  <uid>/resume-*, <uid>/redacted/*
- *   Supabase `quarantine` (private): <uid>/posts/*, <uid>/posters/* — the
- *                        photos and poster frames of the user's posts a
- *                        moderator removed, moved out of `profiles` at the
- *                        SAME path (src/lib/moderation/media-quarantine.ts).
- *                        They are still the user's uploads, and nothing in
- *                        "What we keep" on /legal/delete-account lists them,
- *                        so they go with the account (S67 security wave).
- *   R2 (R2_BUCKET_NAME): clips/<uid>/*
+ *   Supabase `quarantine` (private): <uid>/** — files a moderator took down
+ *                        (removed posts' photos and poster frames, and, from
+ *                        wave B, removed avatars/covers/logos), plus files
+ *                        moved there because a report was open. KEPT: this
+ *                        purge never touches the quarantine bucket. They are
+ *                        the record of what was removed, kept for up to a
+ *                        year until the lawyer says how long (S67 security
+ *                        wave 2, B2; waveB-build.md product call 3).
+ *   R2 (R2_BUCKET_NAME): clips/<uid>/* — except the videos of the user's
+ *                        moderator-removed posts and of posts with an open
+ *                        or actioned report, which stay (evidence).
  *   R2 message media:    messages/<channelId>/<uuid>.<ext> — keyed by the
  *                        CHANNEL, not the user, so there is no user prefix
  *                        to list. The purge instead reads every
@@ -48,6 +53,15 @@ import { createSupabaseServiceClient } from "@/lib/supabase/service";
  *                        only when each sits in its own message's chat
  *                        folder and no other member's message names it
  *                        (S67 security wave).
+ *
+ * EVIDENCE FIRST (B2). Before the `profiles` sweep, the files that are
+ * evidence are MOVED to quarantine (see loadEvidence): the photo / poster of
+ * a moderator-removed post whose earlier move didn't finish, the files of
+ * posts with an open or actioned report, and the current avatar/cover when a
+ * report about the user is open. A move that fails THROWS, so the account
+ * is not deleted while evidence could still be erased; the retry finishes
+ * it. The response's counts never say what was kept (that could reveal an
+ * open report); the server log does.
  *
  * Supabase `storage.list()` is NON-recursive: subfolders come back as
  * entries with `id === null` and no metadata, so `purgeStorageFolder`
@@ -66,9 +80,12 @@ export type PurgeResult = {
   profiles: number;
   /** Objects removed from the private `resumes` bucket (incl. redacted/). */
   resumes: number;
-  /** Removed-post files erased from the private `quarantine` bucket. */
+  /**
+   * Files erased from the private `quarantine` bucket: always 0 since B2
+   * (quarantined evidence survives the account). Kept for the response shape.
+   */
   quarantine: number;
-  /** Objects removed under `clips/<uid>/` in R2. */
+  /** Objects removed under `clips/<uid>/` in R2 (evidence videos excluded). */
   clips: number;
   /** Inline chat uploads (`messages/<channelId>/<file>` in R2) removed. */
   messageMedia: number;
@@ -239,27 +256,127 @@ async function listUserMessageMediaKeys(uid: string): Promise<string[]> {
   return keys;
 }
 
+const EVIDENCE_PAGE = 1000;
+
 /**
- * Remove everything a user uploaded: `profiles/<uid>/**`, `resumes/<uid>/**`,
- * `quarantine/<uid>/**`, R2 `clips/<uid>/*` and every R2
+ * What must survive this account deletion (B2, waveB-build.md call 3): the
+ * media rows of the user's moderator-removed posts and of report snapshots
+ * about their posts (open or actioned; a dismissed report keeps nothing), and
+ * the current avatar/cover when a report about the user is open. Service
+ * role; any read error THROWS (the deletion stops rather than risk erasing
+ * evidence). Report snapshots carry the post's media columns
+ * (me/reports POST_SNAPSHOT_COLUMNS), so a post deleted while a report was
+ * open still has its video kept.
+ */
+async function loadEvidence(
+  uid: string,
+): Promise<{ postRows: PostMediaRow[]; profileRefs: unknown[] }> {
+  const db = createSupabaseServiceClient();
+  const postRows: PostMediaRow[] = [];
+
+  let afterId: string | null = null;
+  for (;;) {
+    let query = db
+      .from("posts")
+      .select("id, user_id, media_url, media_thumbnail_url")
+      .eq("user_id", uid)
+      .not("removed_at", "is", null)
+      .order("id", { ascending: true })
+      .limit(EVIDENCE_PAGE);
+    if (afterId) query = query.gt("id", afterId);
+    const { data, error } = await query;
+    if (error) throw new Error(`removed posts lookup: ${error.message}`);
+    const page = (data ?? []) as Array<PostMediaRow & { id: string }>;
+    postRows.push(...page);
+    if (page.length < EVIDENCE_PAGE) break;
+    afterId = page[page.length - 1].id;
+  }
+
+  afterId = null;
+  for (;;) {
+    let query = db
+      .from("reports")
+      .select("id, target_snapshot")
+      .eq("target_type", "post")
+      .eq("target_owner_id", uid)
+      .in("status", ["open", "actioned"])
+      .order("id", { ascending: true })
+      .limit(EVIDENCE_PAGE);
+    if (afterId) query = query.gt("id", afterId);
+    const { data, error } = await query;
+    if (error) throw new Error(`post reports lookup: ${error.message}`);
+    const page = (data ?? []) as Array<{ id: string; target_snapshot: unknown }>;
+    for (const r of page) {
+      const snap = r.target_snapshot as Record<string, unknown> | null;
+      if (snap && typeof snap === "object") {
+        postRows.push({
+          user_id: snap.user_id,
+          media_url: snap.media_url,
+          media_thumbnail_url: snap.media_thumbnail_url,
+        });
+      }
+    }
+    if (page.length < EVIDENCE_PAGE) break;
+    afterId = page[page.length - 1].id;
+  }
+
+  const { count, error: userReportErr } = await db
+    .from("reports")
+    .select("id", { count: "exact", head: true })
+    .eq("target_type", "user")
+    .eq("target_id", uid)
+    .eq("status", "open");
+  if (userReportErr) throw new Error(`user reports lookup: ${userReportErr.message}`);
+  const profileRefs: unknown[] = [];
+  if ((count ?? 0) > 0) {
+    const { data, error } = await db
+      .from("users")
+      .select("avatar_url, banner_url")
+      .eq("id", uid)
+      .maybeSingle();
+    if (error) throw new Error(`reported user images lookup: ${error.message}`);
+    profileRefs.push(data?.avatar_url, data?.banner_url);
+  }
+  return { postRows, profileRefs };
+}
+
+/**
+ * Remove everything a user uploaded EXCEPT evidence: `profiles/<uid>/**`,
+ * `resumes/<uid>/**`, R2 `clips/<uid>/*` and every R2
  * `messages/<channelId>/<file>` object referenced by the user's own
- * messages. Throws on the first storage error;
- * nothing is rolled back (the purge is idempotent, so retrying finishes the
- * job). MUST run before `auth.admin.deleteUser` — the `messages` rows
- * cascade away with the user, taking the only record of those keys.
+ * messages. `quarantine/<uid>/**` is never touched, and evidence still in
+ * `profiles` is moved there first (see the file header). Throws on the first
+ * storage error; nothing is rolled back (the purge is idempotent, so retrying
+ * finishes the job). MUST run before `auth.admin.deleteUser` — the `messages`
+ * and `posts` rows cascade away with the user, taking the only record of
+ * those keys.
  */
 export async function purgeUserUploads(uid: string): Promise<PurgeResult> {
   if (!isUuid(uid)) {
     throw new Error("purgeUserUploads: uid must be a UUID");
   }
+  const { postRows, profileRefs } = await loadEvidence(uid);
+  const evidence = evidenceToKeep(postRows, profileRefs, uid, getSupabaseUrl());
+  if (evidence.profilesPaths.length > 0) {
+    const moved = await quarantineProfilesObjects(
+      createSupabaseServiceClient(),
+      evidence.profilesPaths,
+    );
+    if (moved.failed.length > 0) {
+      throw new Error(`evidence quarantine: ${moved.failed.length} file(s) still in profiles`);
+    }
+  }
   const profiles = await purgeStorageFolder(PROFILES_BUCKET, uid);
-  // After `profiles` on purpose: a moderator removal that moves a photo out of
-  // `profiles` while this runs lands it in quarantine before we sweep there.
-  // A missing bucket lists as empty (checked on the local stack), so this is 0
-  // until migration 20260927130000 creates `quarantine`, never an error.
-  const quarantine = await purgeStorageFolder(QUARANTINE_BUCKET_ID, uid);
   const resumes = await purgeStorageFolder(RESUME_BUCKET, uid);
-  const clips = await deleteR2Prefix(`${CLIP_KEY_PREFIX}${uid}/`);
+  const clips = await deleteR2FolderExcept(
+    `${CLIP_KEY_PREFIX}${uid}/`,
+    new Set(evidence.clipKeys),
+  );
   const messageMedia = await deleteR2Keys(await listUserMessageMediaKeys(uid));
-  return { profiles, resumes, quarantine, clips, messageMedia };
+  if (evidence.profilesPaths.length > 0 || clips.kept > 0) {
+    console.info(
+      `[purgeUserUploads] kept evidence: ${evidence.profilesPaths.length} photo(s) in quarantine, ${clips.kept} video file(s) in R2`,
+    );
+  }
+  return { profiles, resumes, quarantine: 0, clips: clips.deleted, messageMedia };
 }

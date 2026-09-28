@@ -54,9 +54,17 @@ import {
   Notice,
   shortId,
 } from "./admin-shell";
+import { ImageSlots } from "./image-slots";
 
 /** The three things POST /api/admin/content/remove will take. Nothing else gets a Remove. */
 const REMOVABLE = new Set(["post", "comment", "message"]);
+
+/**
+ * Reported things with photos a moderator can take down on their own
+ * (POST /api/admin/images/remove): a person's profile photo, cover and logos,
+ * a club's logo and banner, a group chat's photo.
+ */
+const PHOTO_TARGETS = new Set(["user", "org", "channel"]);
 
 export type QueueStatus = "open" | "actioned" | "dismissed";
 
@@ -502,6 +510,8 @@ function ReportGroup({
   const [reasonCode, setReasonCode] = useState<string>("");
   const [said, setSaid] = useState<string | null>(null);
   const [failed, setFailed] = useState<string | null>(null);
+  // The photo panel loads on first open only.
+  const [photos, setPhotos] = useState(false);
 
   const start = (kind: FormKind) => {
     setForm((prev) => (prev === kind ? null : kind));
@@ -529,7 +539,12 @@ function ReportGroup({
     setBusy("remove");
     setFailed(null);
     setSaid(null);
-    const r = await adminPost<{ changed?: boolean; resolvedReports?: number; logged?: boolean }>(
+    const r = await adminPost<{
+      changed?: boolean;
+      resolvedReports?: number;
+      logged?: boolean;
+      left_online_note?: string | null;
+    }>(
       "/api/admin/content/remove",
       { type: group.target.type, id: group.target.id, reason: text.slice(0, 500) },
       "Couldn't remove that."
@@ -547,7 +562,8 @@ function ReportGroup({
       }));
       setSaid(
         `${r.data.changed ? "Removed." : "It was already removed, so nothing changed."} ${closedLine(closed)}` +
-          (r.data.logged === false ? " The moderator log didn't record this one." : "")
+          (r.data.logged === false ? " The moderator log didn't record this one." : "") +
+          (r.data.left_online_note ? ` ${r.data.left_online_note}` : "")
       );
       setForm(null);
       setReason("");
@@ -790,12 +806,14 @@ function ReportGroup({
       {!REMOVABLE.has(t.type) ? (
         <div style={{ fontSize: 12, color: COLORS.faint, lineHeight: 1.5 }}>
           {t.type === "org"
-            ? "There's no takedown for a club here — hide it from the Clubs tab. The buttons below restrict the person who owns it, not the club."
+            ? "A club isn't taken down here (hide it from the Clubs tab), but its logo or banner can be: open Photos. Suspend and Ban restrict the person who owns it, not the club."
             : t.type === "event"
               ? "There's no takedown for an event here. The buttons below restrict whoever created it, not the event."
               : t.type === "user"
-                ? "A person isn't taken down. Suspend or ban the account."
-                : "There's no takedown for this one yet. Dismiss it, or act on whoever owns it."}
+                ? "A person isn't taken down, but their profile photo, cover and logos can be: open Photos. Or suspend or ban the account."
+                : t.type === "channel"
+                  ? "A chat isn't taken down here, but its photo can be: open Photos. A group chat has no owner to restrict."
+                  : "There's no takedown for this one yet. Dismiss it, or act on whoever owns it."}
         </div>
       ) : null}
 
@@ -812,6 +830,14 @@ function ReportGroup({
             onClick={() => start("remove")}
           >
             Remove
+          </ActionButton>
+        ) : null}
+        {PHOTO_TARGETS.has(t.type) && t.live.exists ? (
+          <ActionButton
+            title="See the photos on it and take one down. Closes the reports you tick."
+            onClick={() => setPhotos((open) => !open)}
+          >
+            {photos ? "Hide photos" : "Photos"}
           </ActionButton>
         ) : null}
         {canDismiss ? (
@@ -847,6 +873,26 @@ function ReportGroup({
           </>
         ) : null}
       </div>
+
+      {photos && PHOTO_TARGETS.has(t.type) ? (
+        <ImageSlots
+          targetType={t.type as "user" | "org" | "channel"}
+          targetId={t.id}
+          // Only the reports listed on this card, and only on the open tab.
+          // The panel lists them with tick boxes (intimate image, sexual and
+          // child safety start ticked) and closes only the ticked ones: a
+          // person's other open reports may be about something else.
+          reports={status === "open" ? group.reports.slice(0, 100) : []}
+          onReportsClosed={(closedIds) =>
+            onPatch(key, (g) => ({
+              ...g,
+              reports: g.reports.filter((x) => !closedIds.includes(x.id)),
+              openCount: Math.max(0, g.openCount - closedIds.length),
+            }))
+          }
+          onPause={onPause}
+        />
+      ) : null}
 
       {/* `reports[]` is capped at 20 and filtered to this tab, while
           `openCount` counts every open report on the target. Dismiss can only
@@ -905,6 +951,12 @@ function ReportGroup({
                   ? "The sender will be shown it once the removed-message notice ships."
                   : `The student reads it on the removed ${t.type === "comment" ? "comment" : "post"}, and nobody else does.`}
               </div>
+              {t.type === "post" ? (
+                <div style={{ fontSize: 12, color: COLORS.faint, lineHeight: 1.5, marginTop: 5 }}>
+                  If it has a photo, the file goes offline now, but a removed photo can take a few
+                  days to disappear from every cache.
+                </div>
+              ) : null}
             </div>
           ) : null}
 

@@ -5,6 +5,7 @@ import { resolveCampusRequest, scopeViewerFromRow } from "@/lib/iu/campus-reques
 import { legacyLabel } from "@/lib/iu/campuses";
 import { campusScopeError, feedLaneFor, feedLaneOrFilter } from "@/lib/iu/community-scope";
 import { createSupabaseServerClient } from "@/lib/supabase/server";
+import { TRENDING_MIN_AUTHORS, countTrendingTags, type TrendingRow } from "@/lib/trending/count-tags";
 
 const DEFAULT_LIMIT = 6;
 const MAX_LIMIT = 20;
@@ -44,6 +45,14 @@ const POST_SCAN_LIMIT = 500;
  * other four routes send. No `?campus=` means the viewer's own campus, as
  * before. The student's RSVP chips are not affected — they come from
  * `/api/me/upcoming-events` and are theirs wherever they look.
+ *
+ * THE COUNT IS PEOPLE (S67 security wave B, B4; report #10). `count` is how
+ * many different authors used the tag in the window (`countTrendingTags`),
+ * so a tag repeated in one post, or posted twenty times by one student,
+ * counts once; the chip says "N people this week". A tag that fails the
+ * stored-tag grammar or the tag word filter is never counted: `authenticated`
+ * can still write `posts.tags` directly, and the database can't run the word
+ * list. The response shape is unchanged.
  *
  * We do the aggregation in JS rather than via a Postgres array_agg /
  * unnest function to keep this dependency-free and easy to ship without a
@@ -92,11 +101,17 @@ export async function GET(req: Request) {
 
   const since = new Date(Date.now() - WINDOW_DAYS * 24 * 60 * 60 * 1000).toISOString();
 
+  // Published, not removed: the SELECT policy's `OR user_id = auth.uid()`
+  // branch would otherwise count the viewer's own drafts and removed posts in
+  // their own strip. Newest first, so the scan cap keeps the latest week.
   let query = supabase
     .from("posts")
-    .select("tags")
+    .select("tags,user_id")
     .eq("type", "post")
+    .eq("status", "published")
+    .is("removed_at", null)
     .gte("created_at", since)
+    .order("created_at", { ascending: false })
     .limit(POST_SCAN_LIMIT);
 
   // `forbidden` already answered above, so `scope` is a real lane here; null
@@ -112,21 +127,8 @@ export async function GET(req: Request) {
     return NextResponse.json({ ok: false, error: "Request failed" }, { status: 500 });
   }
 
-  const counts = new Map<string, number>();
-  for (const row of data ?? []) {
-    const tags = (row as unknown as { tags: string[] | null }).tags ?? [];
-    for (const raw of tags) {
-      if (typeof raw !== "string") continue;
-      const t = raw.trim().toLowerCase().replace(/^#+/, "");
-      if (!t) continue;
-      counts.set(t, (counts.get(t) ?? 0) + 1);
-    }
-  }
-
-  const trending = Array.from(counts.entries())
-    .sort((a, b) => b[1] - a[1] || a[0].localeCompare(b[0]))
-    .slice(0, limit)
-    .map(([tag, count]) => ({ tag, count }));
+  const rows = (data ?? []) as unknown as ReadonlyArray<TrendingRow>;
+  const trending = countTrendingTags(rows, { limit, minAuthors: TRENDING_MIN_AUTHORS });
 
   // `school` keeps its old meaning for deployed bundles: the campus label,
   // or "" when there's no campus. `campus_id` is the additive new field.

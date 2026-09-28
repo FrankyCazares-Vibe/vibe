@@ -1,5 +1,7 @@
 import { NextResponse } from "next/server";
 
+import { REMOVED_PICTURE_MESSAGE } from "@/app/api/admin/images/_lib/removed-picture";
+import { checkRemovedPicture } from "@/app/api/admin/images/_lib/removed-picture-store";
 import { contentBlockedResponse, requireCanPublish } from "@/lib/moderation/access";
 import { checkText } from "@/lib/moderation/text-filter";
 import { isAllowedMediaUrl } from "@/lib/org-asset-url";
@@ -203,6 +205,22 @@ export async function POST(req: Request, { params }: Params) {
   // Length first, then the word filter, the order the personal publish route
   // uses. The matched word is never echoed (contentBlockedResponse).
   if (content && !checkText(content).ok) return contentBlockedResponse("content");
+  // A club logo or banner Vibe's moderators took down can't come back as a
+  // club post (review-P2b must-fix). Both are `orgs/<orgId>/…` keys, so
+  // isAllowedMediaUrl (and the database's post_media_ref_ok) let the removed
+  // key through, and the feed reaches more people than the logo did. The
+  // takedown keeps the R2 object as evidence; a new upload has a new random
+  // key and passes. A failed log read refuses (fails closed).
+  if (mediaUrl || mediaThumb) {
+    const removed = await checkRemovedPicture(service, "org", org.id, [mediaUrl, mediaThumb]);
+    if (removed === "error") return loadFailed();
+    if (removed === "removed") {
+      return NextResponse.json(
+        { ok: false, error: REMOVED_PICTURE_MESSAGE, code: "picture_removed" },
+        { status: 422 },
+      );
+    }
+  }
   const { data: row, error } = await service
     .from("posts")
     .insert({

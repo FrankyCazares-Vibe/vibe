@@ -17,7 +17,7 @@ export default function PrivacyPage() {
     <LegalLayout
       eyebrow="Legal"
       title="Privacy Policy"
-      effectiveDate="May 7, 2026"
+      effectiveDate="September 28, 2026"
     >
       <LegalP>
         This Privacy Policy explains what information Vibe collects, how we
@@ -44,6 +44,13 @@ export default function PrivacyPage() {
         reactions, reposts, RSVPs, calendar events, direct messages and
         channel messages, attachments and media you upload, and the metadata
         attached to those (timestamps, edits, view counts).
+      </LegalP>
+      <LegalP>
+        <strong>Photo location.</strong> When you upload a photo to your
+        profile or a post, we remove its location details before it&apos;s
+        stored. Videos, photos sent in chats, club logos and banners, and
+        group chat pictures keep their original details, which can include
+        where they were taken or filmed.
       </LegalP>
       <LegalP>
         <strong>Connections.</strong> Who you follow, who follows you, mutuals,
@@ -145,6 +152,11 @@ export default function PrivacyPage() {
         legal obligations, resolve disputes, or enforce our Terms (for
         example, retaining a record of a banned account&apos;s identifier so
         the same actor can&apos;t simply re-register).
+      </LegalP>
+      <LegalP>
+        Content our moderators removed, and photos or videos kept while a
+        report about them was open, may be kept for up to a year for safety
+        and legal reasons, even after you delete your account.
       </LegalP>
 
       <LegalH2>6. Security</LegalH2>

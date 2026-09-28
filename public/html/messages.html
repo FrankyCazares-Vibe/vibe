@@ -22,6 +22,7 @@
 <script src="/html/_sharePicker.js" defer></script>
 <script src="/html/_safetyActions.js" defer></script>
 <script src="/html/_mentionPicker.js" defer></script>
+<script src="/html/_imageCropper.js" defer></script>
 <style>
 /* Embedded mode: when /messages renders us inside CampusAppShell via iframe,
    the React sidebar is provided by the parent. Suppress our own. */
@@ -3404,10 +3405,26 @@ async function __dmPanelDoAdd() {
 
 // ── Group photo upload ─────────────────────────────────────────────────
 async function __dmPanelPhotoChosen(ev) {
-  const file = ev.target.files?.[0];
+  const picked = ev.target.files?.[0];
   ev.target.value = ''; // reset so picking the same file again still fires
   const channelId = active;
-  if (!file || !channelId) return;
+  if (!picked || !channelId) return;
+  // Square crop first, like a profile photo (S67 wave B). The cropper redraws
+  // the pixels, so the photo's location details never leave this device.
+  // Never upload the raw file: without the cropper, stop here.
+  if (typeof window.openImageCropper !== 'function') {
+    alert("Couldn't open the photo editor. Reload the page and try again.");
+    return;
+  }
+  const cropped = await window.openImageCropper(picked, {
+    aspect: 1,
+    outputMaxSize: 1024,
+    title: 'Adjust group photo',
+    shape: 'circle',
+    onError: (message) => alert(message),
+  });
+  if (!cropped) return;
+  const file = new File([cropped], 'group-photo.jpg', { type: cropped.type || 'image/jpeg' });
   if (file.size > 10 * 1024 * 1024) {
     alert('Image too large (max 10MB).');
     return;

@@ -1,5 +1,7 @@
 import { NextResponse } from "next/server";
 
+import { REMOVED_PICTURE_MESSAGE } from "@/app/api/admin/images/_lib/removed-picture";
+import { checkRemovedPicture } from "@/app/api/admin/images/_lib/removed-picture-store";
 import {
   allowedCampusId,
   campusIdFromLegacyLabel,
@@ -34,6 +36,10 @@ import {
 } from "@/lib/orgs/join-state";
 import { officerGate } from "@/lib/orgs/hidden-gate";
 import { loadViewerOrgContext } from "@/lib/orgs/membership";
+import {
+  purgeDeletedClubMedia,
+  type DeletedPostRow,
+} from "@/lib/posts/delete-media-store";
 import { rateLimit, tooManyRequests } from "@/lib/rate-limit";
 import { loadHiddenUsers } from "@/lib/safety/hidden-users";
 import { createSupabaseServerClient } from "@/lib/supabase/server";
@@ -536,6 +542,16 @@ export async function PATCH(req: Request, { params }: Params) {
     }
     patch.banner_url = v;
   }
+  // A logo or banner Vibe's moderators took down stays down. The takedown
+  // clears the column but keeps the R2 object as evidence, so without this an
+  // officer could send the same key back and the picture would be live again
+  // (wave B follow-up P2). A new upload has a new random key and passes. The
+  // log is read with the service role; a failed read refuses (fails closed).
+  if (typeof patch.logo_url === "string" || typeof patch.banner_url === "string") {
+    const removed = await checkRemovedPicture(service, "org", org.id, [patch.logo_url, patch.banner_url]);
+    if (removed === "error") return fail(500, "load_failed", "Failed to update");
+    if (removed === "removed") return fail(422, "picture_removed", REMOVED_PICTURE_MESSAGE);
+  }
 
   // ── Join policy ──────────────────────────────────────────────────────────
   // New clients send `join_policy`; deployed ones send `is_public` on every
@@ -697,9 +713,30 @@ export async function PATCH(req: Request, { params }: Params) {
 /**
  * DELETE /api/orgs/[slug] — owner-only deletion. Cascades to org_members,
  * channels, join requests, invites, followers, removals, club notifications,
- * and events (and their RSVPs) via FK ON DELETE CASCADE (events since
- * 20260928110000). NOT posts: `posts_org_id_fkey` is ON DELETE SET NULL, so a
- * deleted club's posts stay up as their authors' own posts (wave B2 decides).
+ * events (and their RSVPs) and, since 20260929110000_post_club_deletes.sql,
+ * the club's POSTS (posts_org_id_fkey ON DELETE CASCADE; waveB-build call 1).
+ *
+ * S67 security wave 2, B2:
+ *  - A club moderators have hidden can't be deleted by its owner ("You can't
+ *    delete this club right now."): the cascade would erase its posts, chats
+ *    and events while it is under review.
+ *  - A post a moderator REMOVED is the record: the database detaches it from
+ *    the club inside the delete itself (BEFORE DELETE trigger
+ *    orgs_keep_removed_posts, same migration), so it survives the cascade,
+ *    stays removed (visible to its author and admins only) and keeps its
+ *    campus, even when the removal lands after this route read the club's
+ *    posts. posts_update_own / posts_delete_own stop its author editing or
+ *    deleting it.
+ *  - This route is the only way to delete a club: authenticated holds no
+ *    DELETE on orgs (same migration), so the checks below can't be skipped
+ *    through the data API.
+ *  - After the delete, the club's files go (best-effort, never fails the
+ *    answer): the own files of each post that really went, then the club's
+ *    R2 folder `orgs/<id>/` (logo, banner, post media, stale uploads),
+ *    keeping every surviving post's files, a logo/banner a moderator took
+ *    down, and anything an open report names
+ *    (src/lib/posts/delete-media-store.ts). On a database still at SET NULL
+ *    every post survives as a personal post and no file is touched.
  */
 export async function DELETE(_req: Request, { params }: Params) {
   const { slug } = await params;
@@ -709,14 +746,14 @@ export async function DELETE(_req: Request, { params }: Params) {
     return fail(401, "unauthorized", "Unauthorized");
   }
 
-  // orgs_delete refuses a restricted owner (`NOT is_restricted_now()`), but
-  // this delete runs on the service role, so the route has to ask too
-  // (security wave 2). Terms is refused first, as everywhere.
+  // The delete runs on the service role (authenticated holds no DELETE on
+  // orgs since 20260929110000_post_club_deletes.sql; orgs_delete is dormant),
+  // so every rule lives here: a restricted owner is refused first (terms
+  // first, as everywhere), then ownership, then the hidden-club refusal.
   const restrictedGate = await requireNotRestricted(user.id);
   if (restrictedGate) return restrictedGate;
 
-  // Resolve + authorize explicitly. An RLS-scoped delete silently affects 0
-  // rows for non-owners and would still report success here.
+  // Resolve + authorize explicitly: the service role would delete any club.
   const service = createSupabaseServiceClient();
   const { data: org, error: fetchErr } = await service
     .from("orgs")
@@ -752,10 +789,56 @@ export async function DELETE(_req: Request, { params }: Params) {
     return fail(403, "owner_only", "Owner only");
   }
 
+  // Hidden by moderators: under review, so its posts, chats and events stay.
+  if (org.hidden_at !== null) {
+    return fail(403, "club_hidden", "You can't delete this club right now.");
+  }
+
+  // The club's posts, read before the cascade takes them (their file refs).
+  const { data: postRows, error: postsErr } = await service
+    .from("posts")
+    .select("id, user_id, org_id, media_url, media_thumbnail_url, removed_at")
+    .eq("org_id", org.id);
+  if (postsErr) {
+    console.error("[orgs/[slug] DELETE posts read]", postsErr);
+    return fail(500, "delete_failed", "Failed to delete");
+  }
+  const clubPosts = (postRows ?? []) as Array<DeletedPostRow & { removed_at: string | null }>;
+  const removedPosts = clubPosts.filter((p) => p.removed_at !== null);
+  const livePosts = clubPosts.filter((p) => p.removed_at === null);
+
+  // Moderator-removed posts need no step here: the database detaches them
+  // inside this delete (trigger orgs_keep_removed_posts), before the cascade.
   const { error } = await service.from("orgs").delete().eq("id", org.id);
   if (error) {
     console.error("[orgs/[slug] DELETE]", error);
     return fail(500, "delete_failed", "Failed to delete");
+  }
+
+  // Files only for the posts that really went with the club (CASCADE). A post
+  // that is still there kept its files: under the old SET NULL that is every
+  // post (touch nothing), and under CASCADE it is one a moderator removed
+  // after the read above (the trigger kept it). A read error touches nothing.
+  const survivors: DeletedPostRow[] = [];
+  let checked = true;
+  for (let i = 0; i < livePosts.length; i += 100) {
+    const { data: left, error: leftErr } = await service
+      .from("posts")
+      .select("id, user_id, org_id, media_url, media_thumbnail_url")
+      .in("id", livePosts.slice(i, i + 100).map((p) => p.id));
+    if (leftErr) {
+      console.error("[orgs/[slug] DELETE posts check]", leftErr);
+      checked = false;
+      break;
+    }
+    survivors.push(...((left ?? []) as DeletedPostRow[]));
+  }
+  const survived = new Set(survivors.map((p) => p.id));
+  const gonePosts = livePosts.filter((p) => !survived.has(p.id));
+  if (checked && (livePosts.length === 0 || gonePosts.length > 0)) {
+    await purgeDeletedClubMedia(service, org.id, gonePosts, [...removedPosts, ...survivors]);
+  } else {
+    console.warn("[orgs/[slug] DELETE] club posts outlived the club; files left in place", org.id);
   }
   return NextResponse.json({ ok: true });
 }

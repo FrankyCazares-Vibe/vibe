@@ -186,8 +186,12 @@ export function eventChipLabel(title: string, when: string, status: "going" | "m
   return when ? `${title}, ${when}, ${state}` : `${title}, ${state}`;
 }
 
-/** Tooltip on a tag chip: how many posts carried it this week. */
+/**
+ * Tooltip on a tag chip: how many different people used it this week. The
+ * trending route counts each author once per tag (S67 security wave B, B4),
+ * so the number is people, not posts.
+ */
 export function tagChipTitle(count: number): string {
   const n = Math.max(0, Math.floor(count));
-  return `${n} ${n === 1 ? "post" : "posts"} this week`;
+  return `${n} ${n === 1 ? "person" : "people"} this week`;
 }

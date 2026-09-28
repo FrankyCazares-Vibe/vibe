@@ -1,6 +1,17 @@
 import { NextResponse } from "next/server";
 
 import { isOttoOnboardingComplete } from "@/lib/auth/post-login";
+import {
+  newProfilePhotoPaths,
+  ownProfilePhotoPath,
+  staleProfilePhotoPaths,
+  type ProfilePhotoColumns,
+} from "@/lib/media/profile-photo-replace";
+import {
+  firstMissingProfilePhoto,
+  readProfilePhotoColumns,
+  retireProfilePhotos,
+} from "@/lib/media/profile-photo-retire";
 import { isSupabaseHttpsUrl } from "@/lib/org-asset-url";
 import { normalizeCoverThemeInput } from "@/lib/profile/cover-themes";
 import {
@@ -63,15 +74,21 @@ function parseUrlField(val: unknown): string | null {
  * unset, which would 400 these two fields — an environment without that
  * variable cannot create a Supabase client at all, so the route is already
  * dead by then.
+ *
+ * S67 wave B (B3): the value must also name the student's OWN profile photo
+ * or cover file (`<uid>/avatar-*` / `<uid>/banner-*`, the plain public URL).
+ * Replacing a photo now retires the old file, so a column naming another
+ * student's file, or the student's own post photo, would turn a save into
+ * a way to delete it. Live: every stored value already complies.
  */
-function parseMediaUrlField(val: unknown): string | null {
+function parseMediaUrlField(val: unknown, userId: string): string | null {
   if (val === null) return null;
   if (typeof val !== "string") {
     throw new Error("invalid");
   }
   const t = val.trim();
   if (!t) return null;
-  if (t.length > 2048 || !isSupabaseHttpsUrl(t)) {
+  if (t.length > 2048 || !isSupabaseHttpsUrl(t) || !ownProfilePhotoPath(t, userId)) {
     throw new Error("invalid");
   }
   return t;
@@ -315,7 +332,7 @@ export async function PATCH(req: Request) {
 
   if ("avatar_url" in body) {
     try {
-      mediaPatch.avatar_url = parseMediaUrlField(body.avatar_url);
+      mediaPatch.avatar_url = parseMediaUrlField(body.avatar_url, user.id);
     } catch {
       return NextResponse.json({ ok: false, error: "Invalid avatar_url" }, { status: 400 });
     }
@@ -323,7 +340,7 @@ export async function PATCH(req: Request) {
 
   if ("banner_url" in body) {
     try {
-      mediaPatch.banner_url = parseMediaUrlField(body.banner_url);
+      mediaPatch.banner_url = parseMediaUrlField(body.banner_url, user.id);
     } catch {
       return NextResponse.json({ ok: false, error: "Invalid banner_url" }, { status: 400 });
     }
@@ -353,6 +370,27 @@ export async function PATCH(req: Request) {
   // a coding slip and fails the save instead of writing.
   const writePatch: Record<string, unknown> = { ...patch, ...mediaPatch };
   if (coverThemePatch !== undefined) writePatch.banner_gradient = coverThemePatch;
+
+  // Photo or cover changing (S67 wave B, B3): snapshot the two columns so
+  // the file this save replaces can be retired once the new value is stored,
+  // and refuse a file that no longer exists (a stale client re-sending a
+  // photo that was already replaced would otherwise set a broken image).
+  let photoBefore: ProfilePhotoColumns | null = null;
+  if ("avatar_url" in mediaPatch || "banner_url" in mediaPatch) {
+    const service = createSupabaseServiceClient();
+    photoBefore = await readProfilePhotoColumns(service, user.id);
+    const missing = await firstMissingProfilePhoto(
+      service,
+      newProfilePhotoPaths(photoBefore, mediaPatch, user.id),
+    );
+    if (missing) {
+      const error =
+        ownProfilePhotoPath(mediaPatch.avatar_url, user.id) === missing
+          ? "Invalid avatar_url"
+          : "Invalid banner_url";
+      return NextResponse.json({ ok: false, error }, { status: 400 });
+    }
+  }
 
   if (Object.keys(writePatch).length > 0) {
     const bad = unexpectedSelfWriteKeys(writePatch);
@@ -421,6 +459,18 @@ export async function PATCH(req: Request) {
 
   if (selErr || !row) {
     return NextResponse.json({ ok: true, profile: null, ...(campusError ? { campusError } : {}) });
+  }
+
+  // The saved row is the proof: retire only own photo/cover files the row
+  // named before this save and names in neither column now (quarantined
+  // instead while a report about this student is open). Best-effort; the
+  // save already succeeded.
+  if (photoBefore) {
+    await retireProfilePhotos(
+      createSupabaseServiceClient(),
+      user.id,
+      staleProfilePhotoPaths(photoBefore, row as ProfilePhotoColumns, user.id),
+    );
   }
 
   return NextResponse.json({

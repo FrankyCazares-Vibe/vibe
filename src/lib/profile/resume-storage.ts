@@ -2,6 +2,7 @@ import "server-only";
 
 import { createHash, randomUUID } from "node:crypto";
 
+import { sniffImageFormat, stripImage } from "@/lib/media/strip-image";
 import {
   RESUME_BUCKET,
   RESUME_KEY_RE,
@@ -118,6 +119,13 @@ export async function uploadResumeObject(
  * Upload a `data:<mime>;base64,…` payload (legacy desktop profile.html
  * sends `resume_url` this way). Returns the key, or null when the payload
  * is malformed / unsupported / too large / the upload fails.
+ *
+ * An image is re-encoded with no metadata first (S67 wave B, B3: the same
+ * strip the phone's /api/me/profile-upload kind=resume path runs), so a
+ * portfolio photo never reaches viewers with its EXIF/GPS. Full size is kept
+ * (legibility; redaction bars are percentages of the upright page). A file
+ * declared as a PDF whose bytes are really an image is treated as the image.
+ * A real PDF is stored as sent.
  */
 export async function uploadResumeDataUrl(
   userId: string,
@@ -125,7 +133,7 @@ export async function uploadResumeDataUrl(
 ): Promise<string | null> {
   const m = dataUrl.trim().match(/^data:([\w/+.-]+);base64,(.+)$/i);
   if (!m) return null;
-  const contentType = normalizeContentType(m[1]);
+  let contentType = normalizeContentType(m[1]);
   if (!MIME_EXT[contentType]) return null;
   let buf: Buffer;
   try {
@@ -134,6 +142,19 @@ export async function uploadResumeDataUrl(
     return null;
   }
   if (buf.length === 0 || buf.length > MAX_RESUME_BYTES) return null;
+  if (contentType !== "application/pdf" || sniffImageFormat(buf)) {
+    let out: Awaited<ReturnType<typeof stripImage>>;
+    try {
+      out = await stripImage(buf, { maxEdge: null });
+    } catch (e) {
+      console.error("[resume-storage] data-url re-encode failed", e);
+      return null;
+    }
+    // The bytes decide the type now (a "JPEG" that is really a GIF is out).
+    if (!out.ok || !MIME_EXT[out.contentType]) return null;
+    buf = out.bytes;
+    contentType = out.contentType;
+  }
   try {
     return await uploadResumeObject(userId, buf, contentType);
   } catch (e) {
