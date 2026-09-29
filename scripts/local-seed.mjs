@@ -7,6 +7,32 @@
 // natural key) and updated in place, so a second run changes nothing but
 // resets the seeded fields back to their seeded values.
 //
+// CLUB CHAT (S69, migration 20261001100000_chat_v2_rooms): the script detects
+// channels.kind. Column absent = the database before the migration: rooms are
+// looked up by name and two extra clubs are seeded in the shape production
+// has today (`sae` and `chat_seed_club`), so the migration's backfill has
+// something real to work on. Column present = "already migrated": rooms are
+// looked up by kind, inserts send kind, and the pre-migration shape is
+// skipped (the private `general`, the member-written Board message); every
+// seeded club is then passed to chat_repair_club, which changes nothing when
+// nothing is missing.
+// Before the migration the three members of chat_seed_club hold NO room rows:
+// that is what every production club but SAE looks like, so the backfill has
+// members without rows to work on. (Rows an earlier version of this seed
+// wrote for them are removed by the run that finds them.)
+// After a ROLLBACK of the migration (kind is gone, the names board / lounge /
+// officers stay) the script refuses to run: restore the local backup first.
+//
+// THE CLOCK. Event dates are computed from today on every run, in whole UTC
+// days: two runs on the same UTC day write the same dates, a run on a later
+// day moves every seeded event forward. Against the 7 days an event chat
+// stays open: `Chat Seed Cookout` ended 3 to 4 days ago and `Invite Club
+// Welcome Mixer` 4 to 5 days ago (inside), `Chat Seed Callout` 10 to 11 days
+// ago (outside). They stay on that side of the line only as long as the seed
+// is run again: run it on the same UTC day as the rehearsal and as the apply
+// of the migration, or the rooms the migration creates will not be the rooms
+// its header counts.
+//
 // SAFETY: the URL and keys come ONLY from `supabase status -o env` (the local
 // CLI stack). No .env file is read. The script refuses to run unless the API
 // host is 127.0.0.1 or localhost, so it can never write to production.
@@ -68,6 +94,20 @@ const { createClient } = await import("@supabase/supabase-js");
 
 const CLIENT_OPTS = { auth: { persistSession: false, autoRefreshToken: false } };
 const admin = createClient(API_URL, SERVICE_KEY, CLIENT_OPTS);
+
+// ---------------------------------------------------------------------------
+// Has migration A (20261001100000_chat_v2_rooms) been applied here? It adds
+// channels.kind. 42703 = Postgres "column does not exist"; PGRST204 = the
+// same answer from PostgREST's schema cache. Anything else stops the run.
+// ---------------------------------------------------------------------------
+async function detectRoomKinds() {
+  const { error } = await admin.from("channels").select("kind").limit(1);
+  if (!error) return true;
+  if (error.code === "42703" || error.code === "PGRST204") return false;
+  console.error("\nFailed: detect channels.kind\n", error);
+  process.exit(1);
+}
+const HAS_KIND = await detectRoomKinds();
 
 // ---------------------------------------------------------------------------
 // Shared constants and helpers.
@@ -256,10 +296,56 @@ const CLUBS = [
     verified: false, hidden: true, description: "Hidden by a platform admin; members only." },
 ];
 
+// Before migration A a club starts with two rooms found by NAME. After it,
+// rooms are found by KIND, carry their kind's name, and every club also has
+// its Officers room (what chat_repair_club gives a new club).
 const DEFAULT_CHANNELS = [
-  { name: "general", position: 0, is_private: false },
-  { name: "announcements", position: 1, is_private: false },
+  { name: "general", kind: "lounge", position: 0, is_private: false },
+  { name: "announcements", kind: "board", position: 1, is_private: false },
 ];
+const OFFICERS_ROOM = { name: "officers", kind: "officers", position: 2, is_private: true };
+const CORE_KINDS = ["board", "lounge", "officers"];
+
+/** The rooms a club spec asks for, in the shape of THIS database. */
+function roomsFor(spec) {
+  const listed = spec.channels ?? DEFAULT_CHANNELS;
+  if (!HAS_KIND) return listed;
+  const rooms = listed.map((ch) =>
+    CORE_KINDS.includes(ch.kind)
+      ? { ...ch, name: ch.kind, is_private: ch.kind === "officers" }
+      : ch,
+  );
+  if (!rooms.some((r) => r.kind === "officers")) rooms.push(OFFICERS_ROOM);
+  return rooms;
+}
+
+/** One room of a club: by kind after migration A, by name before it. */
+async function findRoom(orgId, room) {
+  let q = admin.from("channels").select("id").eq("org_id", orgId).eq("type", "org_channel");
+  if (HAS_KIND) {
+    q = q.eq("kind", room.kind);
+    if (!CORE_KINDS.includes(room.kind)) q = q.eq("name", room.name);
+  } else {
+    q = q.eq("name", room.name);
+  }
+  const found = must(await q.order("created_at").limit(1), `look up room ${room.name}`);
+  return found[0]?.id ?? null;
+}
+
+async function ensureRoom(orgId, room, handle) {
+  const existing = await findRoom(orgId, room);
+  if (existing) return existing;
+  const row = {
+    org_id: orgId, type: "org_channel",
+    name: room.name, position: room.position, is_private: room.is_private,
+  };
+  if (HAS_KIND) row.kind = room.kind;
+  const made = must(
+    await admin.from("channels").insert(row).select("id").single(),
+    `create room ${room.name} in ${handle}`,
+  );
+  return made.id;
+}
 
 async function ensureClub(spec, users, systems) {
   const ownerId = users[spec.owner];
@@ -299,24 +385,7 @@ async function ensureClub(spec, users, systems) {
     `owner membership ${spec.handle}`,
   );
 
-  for (const ch of DEFAULT_CHANNELS) {
-    const found = must(
-      await admin
-        .from("channels")
-        .select("id")
-        .eq("org_id", orgId)
-        .eq("type", "org_channel")
-        .eq("name", ch.name)
-        .limit(1),
-      `look up #${ch.name} in ${spec.handle}`,
-    );
-    if (found.length === 0) {
-      must(
-        await admin.from("channels").insert({ org_id: orgId, type: "org_channel", ...ch }),
-        `create #${ch.name} in ${spec.handle}`,
-      );
-    }
-  }
+  for (const room of roomsFor(spec)) await ensureRoom(orgId, room, spec.handle);
   return orgId;
 }
 
@@ -348,6 +417,34 @@ async function ensureMember(orgId, userId, role) {
   );
 }
 
+/**
+ * A member of chat_seed_club BEFORE migration A: the membership row and no
+ * room rows, the way every production club but SAE looks today (asis 11.5:
+ * their members hold 0 subscription rows). The migration's backfill is what
+ * gives these people their rows. Room rows an earlier version of this seed
+ * wrote for them are removed; on a second run there is nothing to remove.
+ */
+async function ensureBareMember(orgId, userId, role) {
+  must(
+    await admin
+      .from("org_members")
+      .upsert({ org_id: orgId, user_id: userId, role }, { onConflict: "org_id,user_id" }),
+    `membership ${role}`,
+  );
+  const rooms = must(await admin.from("channels").select("id").eq("org_id", orgId), "rooms of the club");
+  if (rooms.length === 0) return;
+  const gone = must(
+    await admin
+      .from("channel_members")
+      .delete()
+      .in("channel_id", rooms.map((r) => r.id))
+      .eq("user_id", userId)
+      .select("id"),
+    "room rows of a member without rows",
+  );
+  if (gone.length > 0) console.log(`  removed ${gone.length} room rows an earlier seed wrote (${role})`);
+}
+
 /** A deliberate follow (not membership). first_followed_at is left to the trigger. */
 async function ensureOrgFollow(orgId, userId, source) {
   must(
@@ -356,6 +453,181 @@ async function ensureOrgFollow(orgId, userId, source) {
       .upsert({ org_id: orgId, user_id: userId, source }, { onConflict: "org_id,user_id", ignoreDuplicates: true }),
     `org follow (${source})`,
   );
+}
+
+// ---------------------------------------------------------------------------
+// Club chat (contract handoffs/chat-redesign/wave-1-contracts.md, section 8).
+// Two clubs in the shapes production has today, so migration A's backfill
+// runs locally against what it will meet there:
+//   sae            = production's SAE: ONE member (its owner), a PRIVATE
+//                    `general` holding 3 messages by the owner, public
+//                    `announcements` and `events`, private `exec`. The owner
+//                    holds a row on the two public rooms only.
+//   chat_seed_club = every other club: public `general` (3 messages and 1
+//                    reply) and `announcements` (one message written by a
+//                    plain member), the owner + an admin, a mod and a member
+//                    (none of them holds a room row before the migration),
+//                    a `going` and a `maybe` RSVP to an upcoming event, one
+//                    event that ended 3 days ago and one that ended 10.
+// On a migrated database the same rows are found by room kind and the
+// pre-migration shape (room names, the private `general`) is skipped.
+// A local club named `sae` is safe: no code names that handle.
+// ---------------------------------------------------------------------------
+const CHAT_CLUBS = [
+  { handle: "sae", name: "SAE (local copy)", owner: "A", join_policy: "invite",
+    verified: true, hidden: false, description: "Production's SAE, copied in shape only.",
+    channels: [
+      { name: "general", kind: "lounge", position: 0, is_private: true },
+      { name: "announcements", kind: "board", position: 1, is_private: false },
+      { name: "events", kind: "room", position: 2, is_private: false },
+      { name: "exec", kind: "officers", position: 3, is_private: true },
+    ] },
+  { handle: "chat_seed_club", name: "Chat Seed Club", owner: "A", join_policy: "open",
+    verified: true, hidden: false, description: "A club with members, RSVPs and chat history." },
+];
+
+const CHAT_MEMBERS = [
+  { club: "chat_seed_club", user: "E", role: "admin" },
+  { club: "chat_seed_club", user: "C", role: "mod" },
+  { club: "chat_seed_club", user: "B", role: "member" },
+];
+
+// The owner's two rows production's SAE has (asis 11.5).
+const CHAT_OWNER_ROWS = [
+  { club: "sae", user: "A", room: { name: "announcements", kind: "board" } },
+  { club: "sae", user: "A", room: { name: "events", kind: "room" } },
+];
+
+const LOUNGE = { name: "general", kind: "lounge" };
+const BOARD = { name: "announcements", kind: "board" };
+
+// `key` names a message so a reply can point at it (parent_message_id).
+const CHAT_MESSAGES = [
+  { club: "sae", room: LOUNGE, author: "A", content: "Welcome to the chapter chat." },
+  { club: "sae", room: LOUNGE, author: "A", content: "Chapter meeting is Sunday at 7." },
+  { club: "sae", room: LOUNGE, author: "A", content: "Dues are due by the end of the month." },
+  { club: "chat_seed_club", room: LOUNGE, author: "A", content: "Welcome to Chat Seed Club!" },
+  { club: "chat_seed_club", room: LOUNGE, author: "B", key: "ride",
+    content: "Is anyone driving to game night?" },
+  { club: "chat_seed_club", room: LOUNGE, author: "E", content: "Sign-in sheet is at the door." },
+  { club: "chat_seed_club", room: LOUNGE, author: "C", replyTo: "ride",
+    content: "I can take three people." },
+  // Written by a plain member: after the backfill it is a member's top-level
+  // Board post, the case the contract leaves in place (section 12, point 12).
+  // `before`: part of the pre-migration shape. On a migrated database it is
+  // the one thing the Board rule forbids, so it is never written there.
+  { club: "chat_seed_club", room: BOARD, author: "B", before: true,
+    content: "Which room is the first meeting in?" },
+];
+
+const CHAT_EVENTS = [
+  { club: "chat_seed_club", creator: "A", title: "Chat Seed Game Night", inDays: 5,
+    location: "Campus Center 148", description: "Upcoming, with a going and a maybe RSVP." },
+  { club: "chat_seed_club", creator: "E", title: "Chat Seed Cookout", endedDaysAgo: 3,
+    location: "Campus Center lawn", description: "Ended 3 days ago: its chat is still open." },
+  { club: "chat_seed_club", creator: "A", title: "Chat Seed Callout", endedDaysAgo: 10,
+    location: "Campus Center 305", description: "Ended 10 days ago: past the 7 days." },
+];
+
+const CHAT_RSVPS = [
+  { club: "chat_seed_club", title: "Chat Seed Game Night", user: "B", status: "going" },
+  { club: "chat_seed_club", title: "Chat Seed Game Night", user: "C", status: "maybe" },
+];
+
+/** One subscription row, the shape admitMember() writes. Never overwrites. */
+async function ensureRoomRow(channelId, userId) {
+  must(
+    await admin.from("channel_members").upsert(
+      { channel_id: channelId, user_id: userId, role: "member", accepted_at: new Date().toISOString() },
+      { onConflict: "channel_id,user_id", ignoreDuplicates: true },
+    ),
+    "room row",
+  );
+}
+
+/** Keyed on (room, author, content): an existing message is left untouched. */
+async function ensureMessage(channelId, userId, content, parentId) {
+  const found = must(
+    await admin
+      .from("messages")
+      .select("id")
+      .eq("channel_id", channelId)
+      .eq("user_id", userId)
+      .eq("content", content)
+      .order("created_at")
+      .limit(1),
+    `look up message "${content}"`,
+  );
+  if (found.length > 0) return found[0].id;
+  const row = { channel_id: channelId, user_id: userId, content };
+  if (parentId) row.parent_message_id = parentId;
+  if (HAS_KIND) row.kind = "text";
+  const made = must(
+    await admin.from("messages").insert(row).select("id").single(),
+    `insert message "${content}"`,
+  );
+  return made.id;
+}
+
+/** Keyed on (event, user): written only when missing or when the status differs. */
+async function ensureRsvp(eventId, userId, status) {
+  const found = must(
+    await admin.from("rsvps").select("id, status").eq("event_id", eventId).eq("user_id", userId).limit(1),
+    "look up rsvp",
+  );
+  if (found.length === 0) {
+    must(
+      await admin.from("rsvps").insert({ event_id: eventId, user_id: userId, status }),
+      `insert rsvp (${status})`,
+    );
+  } else if (found[0].status !== status) {
+    must(await admin.from("rsvps").update({ status }).eq("id", found[0].id), `update rsvp (${status})`);
+  }
+}
+
+async function seedClubChat(users, systems, clubs) {
+  console.log(
+    HAS_KIND
+      ? "Club chat: already migrated (channels.kind is there). Rooms are looked up by kind; the pre-migration shape is skipped."
+      : "Club chat: channels.kind is absent. Seeding sae and chat_seed_club in the pre-migration shape.",
+  );
+  for (const spec of CHAT_CLUBS) clubs[spec.handle] = await ensureClub(spec, users, systems);
+  for (const m of CHAT_MEMBERS) {
+    if (HAS_KIND) await ensureMember(clubs[m.club], users[m.user], m.role);
+    else await ensureBareMember(clubs[m.club], users[m.user], m.role);
+  }
+
+  for (const r of CHAT_OWNER_ROWS) {
+    const roomId = await findRoom(clubs[r.club], r.room);
+    if (roomId) await ensureRoomRow(roomId, users[r.user]);
+  }
+
+  const byKey = {};
+  for (const msg of CHAT_MESSAGES) {
+    if (HAS_KIND && msg.before) continue;
+    const roomId = await findRoom(clubs[msg.club], msg.room);
+    if (!roomId) {
+      console.error(`\nFailed: ${msg.club} has no ${msg.room.kind} room to put a message in`);
+      process.exit(1);
+    }
+    const id = await ensureMessage(roomId, users[msg.author], msg.content, msg.replyTo ? byKey[msg.replyTo] : null);
+    if (msg.key) byKey[msg.key] = id;
+  }
+
+  const events = {};
+  for (const spec of CHAT_EVENTS) events[`${spec.club}/${spec.title}`] = await ensureEvent(spec, users, clubs);
+  for (const r of CHAT_RSVPS) await ensureRsvp(events[`${r.club}/${r.title}`], users[r.user], r.status);
+
+  // Migrated database: make every seeded club whole. The seed re-dates its
+  // events on every run with an UPDATE that names no title, so
+  // chat_events_room does not fire: an ended event can move back inside its 7
+  // days without a room. chat_repair_club creates that room and its rows, and
+  // changes nothing when nothing is missing.
+  if (HAS_KIND) {
+    for (const [handle, id] of Object.entries(clubs)) {
+      must(await admin.rpc("chat_repair_club", { p_org: id }), `chat_repair_club for ${handle}`);
+    }
+  }
 }
 
 // ---------------------------------------------------------------------------
@@ -397,7 +669,9 @@ const EVENTS = [
     location: "Campus Center 305", description: "First meeting of the semester." },
   { club: "test_open_club", creator: "A", title: "Open Club Study Night", inDays: 10,
     location: "University Library, 2nd floor", description: "Bring your problem sets." },
-  { club: "test_invite_club", creator: "E", title: "Invite Club Welcome Mixer", inDays: -7,
+  // 5 days back, not 7: it ended 4 to 5 days ago on every run, so it never
+  // sits an hour from the end of the 7 days an event chat stays open.
+  { club: "test_invite_club", creator: "E", title: "Invite Club Welcome Mixer", inDays: -5,
     location: "Campus Center Atrium", description: "A past event, for history views." },
 ];
 
@@ -408,13 +682,20 @@ function eventWindow(days) {
   return { starts_at: start.toISOString(), ends_at: new Date(start.getTime() + 2 * 3_600_000).toISOString() };
 }
 
+/** Two hours that ended at 00:00 UTC `days` days ago (so between `days` and `days` + 1 days ago). */
+function endedWindow(days) {
+  const end = daysFromNow(-days);
+  end.setUTCHours(0, 0, 0, 0);
+  return { starts_at: new Date(end.getTime() - 2 * 3_600_000).toISOString(), ends_at: end.toISOString() };
+}
+
 async function ensureEvent(spec, users, clubs) {
   const orgId = clubs[spec.club];
   const fields = {
     creator_id: users[spec.creator],
     description: spec.description,
     location: spec.location,
-    ...eventWindow(spec.inDays),
+    ...(spec.endedDaysAgo != null ? endedWindow(spec.endedDaysAgo) : eventWindow(spec.inDays)),
   };
   const found = must(
     await admin.from("events").select("id").eq("org_id", orgId).eq("title", spec.title).limit(1),
@@ -497,7 +778,7 @@ async function printSummary(users, clubs) {
     "summary: orgs",
   );
   const clubTable = [];
-  for (const spec of CLUBS) {
+  for (const spec of [...CLUBS, ...CHAT_CLUBS]) {
     const o = orgRows.find((x) => x.handle === spec.handle);
     clubTable.push({
       handle: o.handle,
@@ -524,12 +805,38 @@ async function printSummary(users, clubs) {
     "people follows": await count("connections", (q) => q.in("follower_id", ids).in("following_id", ids)),
   });
 
+  // The rooms of the two chat clubs, as this database holds them.
+  const roomTable = [];
+  for (const spec of CHAT_CLUBS) {
+    const rooms = must(
+      await admin
+        .from("channels")
+        .select(HAS_KIND ? "id, name, is_private, position, kind" : "id, name, is_private, position")
+        .eq("org_id", clubs[spec.handle])
+        .order("position"),
+      `summary: rooms of ${spec.handle}`,
+    );
+    for (const r of rooms) {
+      roomTable.push({
+        club: spec.handle,
+        room: r.name,
+        kind: HAS_KIND ? r.kind : "(no column)",
+        private: r.is_private,
+        messages: await count("messages", (q) => q.eq("channel_id", r.id)),
+        replies: await count("messages", (q) => q.eq("channel_id", r.id).not("parent_message_id", "is", null)),
+        rows: await count("channel_members", (q) => q.eq("channel_id", r.id)),
+      });
+    }
+  }
+  console.log(`\nClub chat rooms (${HAS_KIND ? "already migrated" : "before migration A"})`);
+  console.table(roomTable);
+
   // Whole-database totals: identical across runs when the seed is idempotent.
   console.log("\nTable totals (whole local database)");
   const totals = {};
   for (const t of [
     "users", "terms_acceptances", "orgs", "org_members", "org_followers", "channels",
-    "channel_members", "posts", "events", "connections", "notifications",
+    "channel_members", "messages", "posts", "events", "rsvps", "connections", "notifications",
   ]) {
     totals[t] = await count(t);
   }
@@ -578,6 +885,22 @@ async function signInCheck() {
 async function main() {
   console.log(`Seeding the LOCAL stack at ${API_URL} (Terms version ${TERMS_VERSION})`);
 
+  // After a ROLLBACK of migration A the column is gone but its renames stay.
+  // Seeding then would look for `general` / `announcements` / `exec`, find
+  // none, and give every club a second set of rooms and messages.
+  if (!HAS_KIND) {
+    const renamed = await count("channels", (q) =>
+      q.eq("type", "org_channel").in("name", ["board", "lounge", "officers"]),
+    );
+    if (renamed > 0) {
+      console.error(
+        "Refusing to seed: channels.kind is absent but club rooms are already named board, lounge or officers " +
+          "(migration A was rolled back and its renames stay). Restore the local backup first.",
+      );
+      process.exit(1);
+    }
+  }
+
   const users = {};
   const systems = {};
   for (const spec of ACCOUNTS) {
@@ -595,6 +918,7 @@ async function main() {
 
   for (const spec of POSTS) await ensurePost(spec, users, clubs);
   for (const spec of EVENTS) await ensureEvent(spec, users, clubs);
+  await seedClubChat(users, systems, clubs);
   for (const [from, to] of PERSON_FOLLOWS) await ensurePersonFollow(users[from], users[to]);
 
   await printSummary(users, clubs);
