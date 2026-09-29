@@ -14,7 +14,11 @@
 import test from "node:test";
 import assert from "node:assert/strict";
 
-import { parseReminder } from "./parse-reminder";
+// The specifier goes through a variable because tsc refuses a literal ".ts"
+// specifier, and plain `node --test` cannot resolve one without it (the
+// push/config.test.ts pattern).
+const specifier = "./parse-reminder.ts";
+const { parseReminder } = (await import(specifier)) as typeof import("./parse-reminder");
 
 // Frozen reference: Monday 2026-05-11 12:00:00 local. The handoff stamps
 // today's date as 2026-05-11; using that keeps the assertions readable.
