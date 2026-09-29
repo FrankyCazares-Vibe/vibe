@@ -65,6 +65,7 @@ import {
 } from "@/lib/iu/campuses";
 import { IU_SCHOOLS, schoolForMajorIn } from "@/lib/iu/majors";
 import {
+  IU_CREAM,
   PURDUE_BLACK,
   PURDUE_GOLD,
   SCHOOL_ZONE_PALETTES,
@@ -4954,8 +4955,11 @@ const TOPBAR_ELLIPSIS: React.CSSProperties = {
  * instead of banner + search row + tabs row. Left zone: the campus name,
  * Campuses and search. Right zone: the tab pills. The skin follows the
  * campus ON SCREEN, the same rule as the banner (useCampusHeader):
- * - shared (Indianapolis, Fort Wayne): a crimson bar whose tab zone sits on
- *   Purdue black behind a "/" seam lined in gold;
+ * - shared (Indianapolis, Fort Wayne): the VIEWER's own school leads (S68,
+ *   Franky): an IU student (or one with no school yet) gets a crimson bar
+ *   whose tab zone sits on Purdue black behind a "/" seam lined in gold; a
+ *   Purdue student gets the mirror, a black-and-gold bar whose tabs sit on
+ *   IU crimson behind a seam lined in cream. Both schools always show;
  * - IU: all crimson; Purdue: all black with a gold bottom hairline;
  * - none (before the first campus answer, or no campus): neutral ink.
  * The phone keeps CampusBanner; each page mounts exactly one of the two.
@@ -4973,11 +4977,20 @@ function CampusTopBar({
   onOpenCampuses: () => void;
 }) {
   const { campus, known, isVisiting, title, sharedSub, statsLine } = useCampusHeader();
+  // The viewer's own school (the same cached request useCampusHeader reads),
+  // so a shared campus leads with it. Visiting another shared campus keeps
+  // the viewer's school in front too.
+  const { system: viewerSystem } = useViewerCampus();
   const skin = known ? schoolSkinFor(campus) : "none";
   const shared = skin === "shared";
-  const leftZone = skin === "purdue" ? "purdue" : skin === "none" ? "none" : "iu";
+  const purdueLeads = shared && viewerSystem === "purdue";
+  const leftZone =
+    skin === "purdue" || purdueLeads ? "purdue" : skin === "none" ? "none" : "iu";
   const left = SCHOOL_ZONE_PALETTES[leftZone];
-  const right = SCHOOL_ZONE_PALETTES[shared ? "purdue" : leftZone];
+  const right = SCHOOL_ZONE_PALETTES[shared ? (purdueLeads ? "iu" : "purdue") : leftZone];
+  // The seam's edge line is the tab zone's own accent: gold beside Purdue
+  // black, cream beside IU crimson.
+  const seamLine = purdueLeads ? IU_CREAM : PURDUE_GOLD;
   // Clear room between the search pill and the seam, whose gold edge
   // reaches 33px into this zone at the bottom.
   const leftPadRight = shared ? 44 : 16;
@@ -5193,9 +5206,10 @@ function CampusTopBar({
         {shared ? (
           <>
             {/* The "/" seam, drawn from this zone's left edge so nothing is
-                measured: Purdue black starts 14px left of it at the top and
-                30px left at the bottom, over a gold twin 3px further left
-                (the gold line). Both run on under the bar's right padding. */}
+                measured: the tab zone's colour starts 14px left of it at the
+                top and 30px left at the bottom, over a twin 3px further left
+                in `seamLine` (gold, or cream when Purdue leads). Both run on
+                under the bar's right padding. */}
             <div
               aria-hidden
               style={{
@@ -5204,7 +5218,7 @@ function CampusTopBar({
                 bottom: 0,
                 left: -33,
                 right: -20,
-                background: PURDUE_GOLD,
+                background: seamLine,
                 clipPath: TOPBAR_SEAM_CLIP,
               }}
             />
