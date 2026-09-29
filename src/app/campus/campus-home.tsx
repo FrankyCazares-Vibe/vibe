@@ -63,6 +63,13 @@ import {
   type SchoolSystem,
 } from "@/lib/iu/campuses";
 import { IU_SCHOOLS, schoolForMajorIn } from "@/lib/iu/majors";
+import {
+  PURDUE_BLACK,
+  PURDUE_GOLD,
+  SCHOOL_ZONE_PALETTES,
+  type SchoolZonePalette,
+  schoolSkinFor,
+} from "@/lib/iu/school-colors";
 import { PURDUE_INDIANAPOLIS_SCHOOLS } from "@/lib/iu/majors-purdue-indianapolis";
 import { VIDEO_LOCATION_HINT } from "@/lib/media/copy";
 import { orgAssetProxyUrl } from "@/lib/org-asset-url";
@@ -354,12 +361,14 @@ function getTabScene(tab: CampusTab): { css: string; tone: Tone } {
 
 type CampusTab = "feed" | "events" | "orgs" | "chat" | "map";
 
-const TABS: { key: CampusTab; label: string }[] = [
-  { key: "feed", label: "Feed" },
-  { key: "events", label: "Events" },
-  { key: "orgs", label: "Organizations" },
-  { key: "chat", label: "Chat" },
-  { key: "map", label: "Campus Map" },
+// `short` is the pill in the desktop top bar, which has no room for the
+// long names; `label` is the full name.
+const TABS: { key: CampusTab; label: string; short: string }[] = [
+  { key: "feed", label: "Feed", short: "Feed" },
+  { key: "events", label: "Events", short: "Events" },
+  { key: "orgs", label: "Organizations", short: "Orgs" },
+  { key: "chat", label: "Chat", short: "Chat" },
+  { key: "map", label: "Campus Map", short: "Map" },
 ];
 
 // The campus banner's identity (title, monogram, colour) comes from the
@@ -586,7 +595,11 @@ export function CampusHome({
             body: "Feed, Events, Orgs, Map — same Otto, different angle on what's happening.",
           },
           {
-            selector: "#campus-search",
+            // Below 1024px the top bar folds search into its round button
+            // (#campus-search-toggle); point at what's actually on screen.
+            selector: window.matchMedia(TOPBAR_SEARCH_COLLAPSED_QUERY).matches
+              ? "#campus-search-toggle"
+              : "#campus-search",
             title: "Find your <span class=\"accent\">people</span>.",
             body: "Search students, clubs, or events. Otto threads the right matches in.",
             endLabel: "Got it",
@@ -886,14 +899,17 @@ export function CampusHome({
           flexDirection: "column",
         }}
       >
-        {/* Desktop search lives in its own row between the campus name and
-            the tab pills (Franky, 2026-09-26) on the four cream tabs; the
-            banner's own mount is switched off there and left alone for the
-            phone, which shares CampusBanner and collapses search into an
-            icon. Chat keeps the in-banner pill: its chrome is dark (a cream
-            pill would float on it) and the tab is locked to 100dvh, so an
-            extra 48px row would come straight out of the thread. */}
-        <CampusBanner search={tab === "chat"} onOpenCampuses={() => setBrowseOpen(true)} />
+        {/* One desktop top bar (S68, Franky's "diagonal" pick): the campus
+            name, Campuses and search on the left, the tab pills on the
+            right, in the school's colours. It replaces the old banner +
+            search row + tabs row on every tab (Chat gains that height). The
+            phone keeps CampusBanner (CampusMobile). */}
+        <CampusTopBar
+          active={shownTab}
+          onTabChange={setTab}
+          hideMap={mapHidden}
+          onOpenCampuses={() => setBrowseOpen(true)}
+        />
         {needsCampusPick ? <PickCampusStrip /> : null}
         {/* Away from home: "Viewing Bloomington · home is Indianapolis" with
             Back home, on every tab (Chat too: it's still the student's own
@@ -908,18 +924,6 @@ export function CampusHome({
             />
           </div>
         ) : null}
-        {tab !== "chat" ? (
-          <div
-            style={{
-              padding: "10px 24px 0",
-              display: "flex",
-              justifyContent: "center",
-            }}
-          >
-            <CampusSearchBar variant="row" placeholder="Search people, clubs, events" />
-          </div>
-        ) : null}
-        <CampusTabs active={shownTab} onChange={setTab} hideMap={mapHidden} />
 
         {orgsLoadErr && tab === "chat" ? (
           <main
@@ -4430,11 +4434,11 @@ function bannerPalette(campus: Campus | null): BannerPalette {
   }
   if (only === "purdue") {
     return {
-      background: "linear-gradient(135deg, #2A2A2A 0%, #141414 50%, #000000 100%)",
+      background: `linear-gradient(135deg, #2A2A2A 0%, #141414 50%, ${PURDUE_BLACK} 100%)`,
       border: "1px solid rgba(207,185,145,0.45)",
       shadow: "0 8px 24px rgba(0,0,0,0.3)",
-      tileBg: "#CFB991",
-      tileInk: "#000000",
+      tileBg: PURDUE_GOLD,
+      tileInk: PURDUE_BLACK,
     };
   }
   return {
@@ -4517,31 +4521,36 @@ function PickCampusStrip() {
   );
 }
 
-export function CampusBanner({
-  compactSearch = false,
-  onSearchTap,
-  search = true,
-  onOpenCampuses,
-}: {
-  /** Mobile collapses the search bar into a single icon so the banner
-   *  doesn't get bunched up. Tap fires `onSearchTap`. */
-  compactSearch?: boolean;
-  onSearchTap?: () => void;
-  /** `false` drops the banner's own search mount entirely. Desktop passes
-   *  it because its search bar sits in its own row under the banner. */
-  search?: boolean;
-  /** Shows the "Campuses" button (S67 wave 4), which opens the Look-around
-   *  picker. Omitted → no button, exactly as before. */
-  onOpenCampuses?: () => void;
-} = {}) {
+/** What the campus header says: the phone's CampusBanner and the desktop
+ *  CampusTopBar both read it, so they never disagree. */
+type CampusHeader = {
+  /** The campus on screen: the visited one while visiting, else home. */
+  campus: Campus | null;
+  /** False until the first campus answer; nothing guesses a school before it. */
+  known: boolean;
+  isVisiting: boolean;
+  title: string;
+  monogram: string;
+  /** "IU + Purdue · one community" at home, "IU · JUST LOOKING" away. */
+  sharedSub: string | null;
+  statsLine: string;
+};
+
+/**
+ * The campus header's identity, heartbeat and live stats line (lifted out
+ * of CampusBanner in S68 so the desktop top bar behaves identically). Each
+ * page mounts exactly one header (the phone: CampusBanner; the desktop:
+ * CampusTopBar), so there is exactly one heartbeat per page.
+ */
+function useCampusHeader(): CampusHeader {
   // Whose campus this is: the title, the tile, the colour and the stats
   // label all follow the campus ON SCREEN (C5): home, or the one `?campus=`
   // names while visiting (plan Q15 colours either way). Until the first
   // answer the banner paints neutral and blank, so it never guesses a name;
   // after that it keeps the last answer while it re-reads.
   const viewer = useViewerCampus();
-  // The desktop provides the view; the phone (which shares this banner and
-  // provides nothing) reads `?campus=` here itself. Both read the same URL.
+  // The desktop provides the view; the phone (CampusBanner, which provides
+  // nothing) reads `?campus=` here itself. Both read the same URL.
   const shared = useCampusView();
   const own = useViewingCampus(viewer.campusId);
   const viewingId = shared.provided ? shared.viewingId : own.viewingId;
@@ -4550,7 +4559,6 @@ export function CampusBanner({
   const campus = isVisiting ? campusRowById(viewingId) : viewer.campus;
   const label = isVisiting ? (campus?.name ?? null) : viewer.label;
   const known = viewer.ready || isVisiting;
-  const palette = bannerPalette(campus);
   const title = known ? (label ?? "Vibe") : "\u00A0";
   const monogram = known ? campusMonogram(campus?.shortName) : "";
   // "IU · JUST LOOKING" away from home; the shared-community line at home.
@@ -4611,6 +4619,30 @@ export function CampusBanner({
     };
   }, [statsUrl]);
   const statsLine = known ? bannerStatsLine(stats, label, campus?.id ?? null) : "";
+  return { campus, known, isVisiting, title, monogram, sharedSub, statsLine };
+}
+
+export function CampusBanner({
+  compactSearch = false,
+  onSearchTap,
+  search = true,
+  onOpenCampuses,
+}: {
+  /** Mobile collapses the search bar into a single icon so the banner
+   *  doesn't get bunched up. Tap fires `onSearchTap`. */
+  compactSearch?: boolean;
+  onSearchTap?: () => void;
+  /** `false` drops the banner's own search mount entirely (non-compact
+   *  only). The desktop no longer mounts this banner: it has CampusTopBar. */
+  search?: boolean;
+  /** Shows the "Campuses" button (S67 wave 4), which opens the Look-around
+   *  picker. Omitted → no button, exactly as before. */
+  onOpenCampuses?: () => void;
+} = {}) {
+  // Title, sub-line and stats come from the shared header hook (the
+  // desktop top bar reads the same one); the colours are the banner's own.
+  const { campus, isVisiting, title, monogram, sharedSub, statsLine } = useCampusHeader();
+  const palette = bannerPalette(campus);
 
   const ellipsis: React.CSSProperties = {
     minWidth: 0,
@@ -4850,6 +4882,352 @@ export function CampusBanner({
   );
 }
 
+/** Below this width the top bar folds search into a round button. */
+const TOPBAR_SEARCH_COLLAPSED_QUERY = "(max-width: 1023px)";
+
+// The desktop top bar's hovers, focus rings and breakpoints, which inline
+// styles can't say. Zone colours arrive as custom properties set inline on
+// each zone (--tb-*), so one sheet serves every school. Anything a media
+// query toggles (display, padding, width) lives only here, never inline.
+// Desktop starts at 900px beside a 200px LeftNav, so the bar can be ~700px:
+// - under 1180px the stats line hides and Campuses shrinks to its globe;
+// - under 1024px search folds into a round button whose field opens as an
+//   overlay over the left zone.
+const TOPBAR_CSS = `
+  .vibe-campus-topbar .vibe-topbar-btn {
+    display: inline-flex; align-items: center; justify-content: center; gap: 6px;
+    box-sizing: border-box; height: 36px; padding: 0 14px; flex-shrink: 0;
+    border-radius: 999px; border: 1px solid var(--tb-btn-border);
+    background: var(--tb-btn-bg); color: var(--tb-ink);
+    font-family: "DM Sans", sans-serif; font-size: 12.5px; font-weight: 700;
+    cursor: pointer; transition: background 140ms ease;
+    -webkit-tap-highlight-color: transparent;
+  }
+  .vibe-campus-topbar .vibe-topbar-btn:hover { background: var(--tb-hover); }
+  .vibe-campus-topbar .vibe-topbar-tab { background: transparent; }
+  .vibe-campus-topbar .vibe-topbar-tab:not([aria-current]):hover { background: var(--tb-hover); }
+  .vibe-campus-topbar .vibe-topbar-btn:focus-visible,
+  .vibe-campus-topbar .vibe-topbar-tab:focus-visible {
+    outline: 2px solid var(--tb-ink); outline-offset: 2px;
+  }
+  .vibe-campus-topbar .vibe-topbar-word { display: inline-flex; align-items: center; gap: 6px; }
+  .vibe-campus-topbar .vibe-topbar-globe { display: none; }
+  .vibe-campus-topbar .vibe-topbar-search-btn { display: none; width: 36px; padding: 0; }
+  .vibe-campus-topbar .vibe-topbar-search {
+    display: flex; align-items: center; flex: 1 1 220px; min-width: 150px; max-width: 440px;
+  }
+  @media (max-width: 1179px) {
+    .vibe-campus-topbar .vibe-topbar-stats { display: none; }
+    .vibe-campus-topbar .vibe-topbar-sub { display: none; }
+    .vibe-campus-topbar .vibe-topbar-campuses { width: 36px; padding: 0; }
+    .vibe-campus-topbar .vibe-topbar-word { display: none; }
+    .vibe-campus-topbar .vibe-topbar-globe { display: inline-flex; }
+  }
+  @media (max-width: 1023px) {
+    .vibe-campus-topbar .vibe-topbar-search-btn { display: inline-flex; }
+    .vibe-campus-topbar .vibe-topbar-search { display: none; }
+    /* No z-index: it would make a stacking context that caps the fixed
+       dropdown inside it (z 1000) at 3, under the Map tab's controls (z 4-6).
+       The overlay only covers unpositioned siblings, so auto paints on top. */
+    .vibe-campus-topbar .vibe-topbar-search[data-open="true"] {
+      display: flex; position: absolute;
+      top: 0; bottom: 0; left: 0; right: var(--tb-overlay-right);
+      min-width: 0; max-width: none;
+      background: var(--tb-bg); box-shadow: var(--tb-shadow);
+    }
+  }
+`;
+
+/** The "/" seam's shape: 16px further right at the top than at the bottom. */
+const TOPBAR_SEAM_CLIP = "polygon(16px 0, 100% 0, 100% 100%, 0 100%)";
+
+const TOPBAR_ELLIPSIS: React.CSSProperties = {
+  minWidth: 0,
+  overflow: "hidden",
+  textOverflow: "ellipsis",
+  whiteSpace: "nowrap",
+};
+
+/**
+ * The desktop /campus top bar (S68, Franky's "diagonal" pick): one 64px bar
+ * instead of banner + search row + tabs row. Left zone: the campus name,
+ * Campuses and search. Right zone: the tab pills. The skin follows the
+ * campus ON SCREEN, the same rule as the banner (useCampusHeader):
+ * - shared (Indianapolis, Fort Wayne): a crimson bar whose tab zone sits on
+ *   Purdue black behind a "/" seam lined in gold;
+ * - IU: all crimson; Purdue: all black with a gold bottom hairline;
+ * - none (before the first campus answer, or no campus): neutral ink.
+ * The phone keeps CampusBanner; each page mounts exactly one of the two.
+ */
+function CampusTopBar({
+  active,
+  onTabChange,
+  hideMap,
+  onOpenCampuses,
+}: {
+  active: CampusTab;
+  onTabChange: (tab: CampusTab) => void;
+  /** Visiting a campus that isn't open: no Map pill (see CampusTabs). */
+  hideMap: boolean;
+  onOpenCampuses: () => void;
+}) {
+  const { campus, known, isVisiting, title, sharedSub, statsLine } = useCampusHeader();
+  const skin = known ? schoolSkinFor(campus) : "none";
+  const shared = skin === "shared";
+  const leftZone = skin === "purdue" ? "purdue" : skin === "none" ? "none" : "iu";
+  const left = SCHOOL_ZONE_PALETTES[leftZone];
+  const right = SCHOOL_ZONE_PALETTES[shared ? "purdue" : leftZone];
+  // Clear room between the search pill and the seam, whose gold edge
+  // reaches 33px into this zone at the bottom.
+  const leftPadRight = shared ? 44 : 16;
+
+  // Under 1024px search is a round button; pressing it opens the field over
+  // the left zone, focused. Escape, or leaving it empty, folds it back.
+  // Above that the field always shows and this state changes nothing.
+  const [searchOpen, setSearchOpen] = useState(false);
+  const [focusKey, setFocusKey] = useState(0);
+  const toggleRef = useRef<HTMLButtonElement | null>(null);
+  const openSearch = () => {
+    setSearchOpen(true);
+    setFocusKey((k) => k + 1);
+  };
+  const dismissSearch = useCallback((how: "escape" | "blur") => {
+    setSearchOpen(false);
+    // Escape hands focus back to the button, when it's the one on screen.
+    if (how === "escape" && window.matchMedia(TOPBAR_SEARCH_COLLAPSED_QUERY).matches) {
+      window.requestAnimationFrame(() => toggleRef.current?.focus());
+    }
+  }, []);
+
+  const leftVars = {
+    "--tb-ink": left.ink,
+    "--tb-btn-bg": left.searchBg,
+    "--tb-btn-border": left.searchBorder,
+    "--tb-hover": left.hover,
+    "--tb-bg": left.background,
+    "--tb-shadow": left.shadow ?? "none",
+    "--tb-overlay-right": `${leftPadRight}px`,
+  } as React.CSSProperties;
+  const rightVars = { "--tb-ink": right.ink, "--tb-hover": right.hover } as React.CSSProperties;
+
+  return (
+    <header
+      className="vibe-campus-topbar"
+      data-skin={skin}
+      style={{
+        position: "relative",
+        flexShrink: 0,
+        boxSizing: "border-box",
+        height: 64,
+        display: "flex",
+        alignItems: "center",
+        padding: "0 20px 0 24px",
+        background: left.background,
+        boxShadow: left.shadow ?? undefined,
+        overflow: "hidden",
+        // The bar's nowrap name, sub-line and pills add up to more than a
+        // 700px column (900px viewport): without this their min-content
+        // would widen LeftNav's `1fr` grid track and scroll the page
+        // sideways. The bar takes the column's width and ellipsizes instead.
+        contain: "inline-size",
+      }}
+    >
+      <style>{TOPBAR_CSS}</style>
+      <div
+        className="vibe-topbar-left"
+        style={{
+          ...leftVars,
+          position: "relative",
+          flex: "1 1 auto",
+          minWidth: 0,
+          alignSelf: "stretch",
+          display: "flex",
+          alignItems: "center",
+          gap: 12,
+          paddingRight: leftPadRight,
+        }}
+      >
+        <div
+          style={{
+            flex: "0 1 auto",
+            minWidth: 0,
+            display: "flex",
+            flexDirection: "column",
+            gap: 1,
+          }}
+        >
+          <div style={{ display: "flex", alignItems: "baseline", gap: 8, minWidth: 0 }}>
+            <div
+              title={known ? title : undefined}
+              style={{
+                ...TOPBAR_ELLIPSIS,
+                flex: "0 1 auto",
+                fontFamily: "Fraunces, serif",
+                fontWeight: 800,
+                fontSize: 18,
+                color: left.ink,
+                letterSpacing: "-0.01em",
+                lineHeight: 1.1,
+              }}
+            >
+              {title}
+            </div>
+            {sharedSub ? (
+              <div
+                className="vibe-topbar-sub"
+                style={{
+                  ...TOPBAR_ELLIPSIS,
+                  // Gives way long before the campus name does, and hides
+                  // under 1180px (TOPBAR_CSS): the colours already say
+                  // IU + Purdue, and the visiting pill below says "visiting".
+                  flex: "0 10 auto",
+                  fontFamily: "DM Sans, sans-serif",
+                  fontSize: 11,
+                  fontWeight: 600,
+                  color: left.secondary,
+                  lineHeight: 1.2,
+                  ...(isVisiting ? { letterSpacing: "0.05em" } : null),
+                }}
+              >
+                {sharedSub}
+              </div>
+            ) : null}
+          </div>
+          {statsLine ? (
+            <div
+              className="vibe-topbar-stats"
+              style={{
+                ...TOPBAR_ELLIPSIS,
+                fontFamily: "DM Sans, sans-serif",
+                fontSize: 12,
+                color: left.secondary,
+                lineHeight: 1.2,
+              }}
+            >
+              {statsLine}
+            </div>
+          ) : null}
+        </div>
+        <button
+          type="button"
+          className="vibe-topbar-btn vibe-topbar-campuses"
+          onClick={onOpenCampuses}
+          aria-label="Look around other campuses"
+          aria-haspopup="dialog"
+          title="Look around other campuses"
+        >
+          <span className="vibe-topbar-word">
+            Campuses
+            <svg
+              width="12"
+              height="12"
+              viewBox="0 0 24 24"
+              fill="none"
+              stroke="currentColor"
+              strokeWidth="2.4"
+              strokeLinecap="round"
+              aria-hidden
+            >
+              <path d="M6 9l6 6 6-6" />
+            </svg>
+          </span>
+          {/* Under 1180px: the globe the phone banner uses. */}
+          <span className="vibe-topbar-globe">
+            <svg
+              width="18"
+              height="18"
+              viewBox="0 0 24 24"
+              fill="none"
+              stroke="currentColor"
+              strokeWidth="2"
+              strokeLinecap="round"
+              strokeLinejoin="round"
+              aria-hidden
+            >
+              <circle cx="12" cy="12" r="9" />
+              <path d="M3 12h18M12 3c2.5 2.6 3.8 5.6 3.8 9s-1.3 6.4-3.8 9c-2.5-2.6-3.8-5.6-3.8-9s1.3-6.4 3.8-9z" />
+            </svg>
+          </span>
+        </button>
+        <button
+          ref={toggleRef}
+          type="button"
+          id="campus-search-toggle"
+          className="vibe-topbar-btn vibe-topbar-search-btn"
+          onClick={openSearch}
+          aria-label="Search campus"
+          aria-expanded={searchOpen}
+          aria-controls="campus-search"
+          title="Search"
+        >
+          <svg width="18" height="18" viewBox="0 0 18 18" fill="none" aria-hidden>
+            <circle cx="8" cy="8" r="5.2" stroke="currentColor" strokeWidth="1.7" />
+            <path d="M12 12l4 4" stroke="currentColor" strokeWidth="1.7" strokeLinecap="round" />
+          </svg>
+        </button>
+        {/* One search mount at every width, so #campus-search is always the
+            field: inline from 1024px, an overlay behind the button below. */}
+        <div className="vibe-topbar-search" data-open={searchOpen ? "true" : "false"}>
+          <CampusSearchBar
+            variant="bar"
+            palette={left}
+            placeholder="Search people, clubs, events"
+            focusKey={focusKey}
+            onDismiss={dismissSearch}
+          />
+        </div>
+      </div>
+      <div
+        className="vibe-topbar-right"
+        style={{
+          ...rightVars,
+          position: "relative",
+          flexShrink: 0,
+          alignSelf: "stretch",
+          display: "flex",
+          alignItems: "center",
+          isolation: "isolate",
+        }}
+      >
+        {shared ? (
+          <>
+            {/* The "/" seam, drawn from this zone's left edge so nothing is
+                measured: Purdue black starts 14px left of it at the top and
+                30px left at the bottom, over a gold twin 3px further left
+                (the gold line). Both run on under the bar's right padding. */}
+            <div
+              aria-hidden
+              style={{
+                position: "absolute",
+                top: 0,
+                bottom: 0,
+                left: -33,
+                right: -20,
+                background: PURDUE_GOLD,
+                clipPath: TOPBAR_SEAM_CLIP,
+              }}
+            />
+            <div
+              aria-hidden
+              style={{
+                position: "absolute",
+                top: 0,
+                bottom: 0,
+                left: -30,
+                right: -20,
+                background: right.background,
+                boxShadow: right.shadow ?? undefined,
+                clipPath: TOPBAR_SEAM_CLIP,
+              }}
+            />
+          </>
+        ) : null}
+        <CampusTabs active={active} onChange={onTabChange} hideMap={hideMap} palette={right} />
+      </div>
+    </header>
+  );
+}
+
 // Unified typeahead used in the campus banner. Hits /api/search and
 // renders people / clubs / events under one dropdown. The dropdown is
 // rendered as `position: fixed` because the parent header sets
@@ -4934,15 +5312,31 @@ function initials(s: string): string {
 function CampusSearchBar({
   variant = "banner",
   placeholder = "Search students, orgs, events…",
+  palette,
+  focusKey = 0,
+  onDismiss,
 }: {
-  /** `banner`: the white-on-dark pill inside CampusBanner. `row`: the
-   *  desktop's own 38px cream pill, centered under the banner. */
-  variant?: "banner" | "row";
+  /** `banner`: the white-on-dark pill inside a non-compact CampusBanner.
+   *  `bar`: the desktop top bar's 36px pill, in its zone's school colours. */
+  variant?: "banner" | "bar";
   placeholder?: string;
+  /** The top bar zone the `bar` pill sits in (neutral if omitted). */
+  palette?: SchoolZonePalette;
+  /** Bump to focus the field (the top bar's collapsed search button). */
+  focusKey?: number;
+  /** Escape, or the field losing focus while empty: the top bar folds its
+   *  narrow-width overlay. Presses inside the dropdown don't count. */
+  onDismiss?: (how: "escape" | "blur") => void;
 } = {}) {
-  const row = variant === "row";
+  const bar = variant === "bar" ? (palette ?? SCHOOL_ZONE_PALETTES.none) : null;
   const wrapRef = useRef<HTMLDivElement | null>(null);
   const inputRef = useRef<HTMLInputElement | null>(null);
+  // Set for the moment a press lands in the dropdown, so the blur it causes
+  // doesn't fold the overlay out from under the row being clicked.
+  const dropdownPressRef = useRef(false);
+  useEffect(() => {
+    if (focusKey > 0) inputRef.current?.focus();
+  }, [focusKey]);
   const [value, setValue] = useState("");
   const [debounced, setDebounced] = useState("");
   const [open, setOpen] = useState(false);
@@ -5017,7 +5411,10 @@ function CampusSearchBar({
 
   const updateCoords = useCallback(() => {
     const el = wrapRef.current;
-    if (!el) return;
+    // Folded away (the top bar's overlay, display:none): a scroll measured
+    // now would read all zeros and park the dropdown off-screen for the
+    // next open. Keep the last real position; focusing re-measures.
+    if (!el || el.getClientRects().length === 0) return;
     const r = el.getBoundingClientRect();
     // Right-anchor: pin the dropdown's right edge to the input's right
     // edge so it grows leftward and never clips the viewport.
@@ -5048,10 +5445,17 @@ function CampusSearchBar({
       const dd = document.getElementById("campus-search-dropdown");
       if (dd && t && dd.contains(t)) return;
       setOpen(false);
+      // A press in the dropdown (Clear, a recent's remove) already took
+      // focus off the field without a blur we act on; fold the top bar's
+      // overlay on this outside press instead of leaving it stuck open.
+      const input = inputRef.current;
+      if (input && document.activeElement !== input && !input.value.trim()) {
+        onDismiss?.("blur");
+      }
     };
     document.addEventListener("mousedown", onDown);
     return () => document.removeEventListener("mousedown", onDown);
-  }, [open]);
+  }, [open, onDismiss]);
 
   const goPerson = (handle: string, row?: RecentSearch) => {
     if (row) {
@@ -5079,6 +5483,18 @@ function CampusSearchBar({
     setRecents([]);
   };
 
+  // Focus left the search (field or dropdown) with nothing typed: the top
+  // bar folds its narrow-width overlay. Moving between the field and the
+  // dropdown (a click, or Tab onto a recent / Clear) doesn't count: the
+  // overlay hides the dropdown too, so folding there strands the focus.
+  const onFieldFocusOut = (e: React.FocusEvent) => {
+    if (dropdownPressRef.current) return;
+    const next = e.relatedTarget instanceof Node ? e.relatedTarget : null;
+    if (next && wrapRef.current?.contains(next)) return;
+    if (next && document.getElementById("campus-search-dropdown")?.contains(next)) return;
+    if (!inputRef.current?.value.trim()) onDismiss?.("blur");
+  };
+
   const showResults = !!debounced;
   // A failed search is never "No results"; its failure line renders instead.
   const empty =
@@ -5091,10 +5507,10 @@ function CampusSearchBar({
 
   return (
     <>
-      {row ? (
+      {bar ? (
         <style>{`
-          #campus-search[data-variant="row"] input::placeholder { color: var(--ink-muted); opacity: 1; }
-          #campus-search[data-variant="row"]:focus-within { outline: 2px solid var(--coral); outline-offset: 2px; }
+          #campus-search[data-variant="bar"] input::placeholder { color: var(--campus-search-ink); opacity: 1; }
+          #campus-search[data-variant="bar"]:focus-within { outline: 2px solid var(--campus-search-ring); outline-offset: 2px; }
         `}</style>
       ) : null}
       <div
@@ -5102,29 +5518,29 @@ function CampusSearchBar({
         id="campus-search"
         data-variant={variant}
         style={
-          row
-            ? {
-                // The desktop row: a cream card pill the width of the feed
-                // cards, so the header reads banner → search → tabs. 672 =
-                // #campus-feed's 720 border-box minus its 24px side padding,
-                // so the pill's edges line up with the cards beneath it.
-                height: 38,
+          bar
+            ? ({
+                // The top bar's pill, in its zone's school colours. The focus
+                // ring is the zone's ink: coral fails contrast on crimson.
+                "--campus-search-ink": bar.searchInk,
+                "--campus-search-ring": bar.ink,
+                height: 36,
                 boxSizing: "border-box",
-                width: "100%",
-                maxWidth: 672,
+                flex: 1,
+                minWidth: 0,
+                maxWidth: 440,
                 borderRadius: 999,
-                padding: "0 16px",
-                background: "var(--glass)",
-                border: "1px solid var(--glass-border)",
-                boxShadow: "var(--card-shadow)",
+                padding: "0 14px",
+                background: bar.searchBg,
+                border: `1px solid ${bar.searchBorder}`,
                 fontFamily: "DM Sans, sans-serif",
                 fontSize: 13,
-                color: "var(--charcoal)",
+                color: bar.searchInk,
                 display: "flex",
                 alignItems: "center",
                 gap: 8,
                 position: "relative",
-              }
+              } as React.CSSProperties)
             : {
                 ...GLASS_SURFACE,
                 background: "rgba(255,255,255,0.12)",
@@ -5142,14 +5558,14 @@ function CampusSearchBar({
               }
         }
       >
-        {row ? (
+        {bar ? (
           <svg
             width="16"
             height="16"
             viewBox="0 0 18 18"
             fill="none"
             aria-hidden
-            style={{ color: "var(--ink-muted)", flexShrink: 0 }}
+            style={{ color: bar.searchInk, flexShrink: 0 }}
           >
             <circle cx="8" cy="8" r="5.2" stroke="currentColor" strokeWidth="1.7" />
             <path d="M12 12l4 4" stroke="currentColor" strokeWidth="1.7" strokeLinecap="round" />
@@ -5168,14 +5584,23 @@ function CampusSearchBar({
           placeholder={placeholder}
           value={value}
           onChange={(e) => setValue(e.target.value)}
-          onFocus={() => setOpen(true)}
+          onFocus={() => {
+            setOpen(true);
+            // Re-measure: the dropdown may already be "open" from before the
+            // top bar's overlay folded, so the [open] effect won't re-run.
+            updateCoords();
+          }}
+          onKeyDown={(e) => {
+            if (e.key === "Escape" && !e.nativeEvent.isComposing) onDismiss?.("escape");
+          }}
+          onBlur={onFieldFocusOut}
           aria-label="Search Vibe"
           style={{
             flex: 1,
             background: "transparent",
             border: "none",
             outline: "none",
-            color: row ? "var(--charcoal)" : "#fff",
+            color: bar ? bar.searchInk : "#fff",
             fontFamily: "inherit",
             fontSize: 13,
             padding: 0,
@@ -5186,6 +5611,13 @@ function CampusSearchBar({
       {open && coords ? (
         <div
           id="campus-search-dropdown"
+          onMouseDown={() => {
+            dropdownPressRef.current = true;
+            window.setTimeout(() => {
+              dropdownPressRef.current = false;
+            }, 0);
+          }}
+          onBlur={onFieldFocusOut}
           style={{
             position: "fixed",
             right: coords.right,
@@ -5554,24 +5986,32 @@ function CampusTabs({
   active,
   onChange,
   hideMap = false,
+  palette,
 }: {
   active: CampusTab;
   onChange: (tab: CampusTab) => void;
   /** Visiting a campus that isn't open (C5): no Map pill. Chat always stays. */
   hideMap?: boolean;
+  /** The top bar zone the pills sit in (CampusTopBar's right zone). */
+  palette: SchoolZonePalette;
 }) {
   const tabs = hideMap ? TABS.filter((t) => t.key !== "map") : TABS;
+  // The pills live in the top bar's right zone (S68). #campus-tabs stays the
+  // tour's target. Hover and focus come from TOPBAR_CSS (.vibe-topbar-tab).
   return (
     <nav
       id="campus-tabs"
+      aria-label="Campus sections"
       style={{
-        padding: "10px 24px",
+        position: "relative",
+        zIndex: 1,
+        flexShrink: 0,
         display: "flex",
-        gap: 6,
-        borderBottom: `1px solid ${COLORS.glassBorder}`,
-        background: "rgba(15,10,28,0.32)",
-        backdropFilter: "blur(20px) saturate(160%)",
-        WebkitBackdropFilter: "blur(20px) saturate(160%)",
+        alignItems: "center",
+        gap: 2,
+        padding: 3,
+        borderRadius: 999,
+        background: palette.tabsTrack,
       }}
     >
       {tabs.map((t) => {
@@ -5580,31 +6020,27 @@ function CampusTabs({
           <button
             key={t.key}
             type="button"
+            className="vibe-topbar-tab"
+            aria-current={isActive ? "page" : undefined}
+            title={t.short === t.label ? undefined : t.label}
             onClick={() => onChange(t.key)}
             style={{
-              position: "relative",
-              padding: "8px 16px",
+              height: 30,
+              padding: "0 12px",
               borderRadius: 999,
-              border: isActive
-                ? "1px solid rgba(255,180,150,0.55)"
-                : "1px solid rgba(255,255,255,0.1)",
-              background: isActive
-                ? "linear-gradient(180deg, rgba(255,92,53,0.45) 0%, rgba(255,92,53,0.18) 100%)"
-                : "rgba(255,255,255,0.04)",
-              color: isActive ? "#fff" : "rgba(255,255,255,0.7)",
+              border: "none",
+              // Inactive pills take their (hover) paint from TOPBAR_CSS.
+              ...(isActive ? { background: palette.activeBg } : null),
+              color: isActive ? palette.activeInk : palette.inactiveInk,
               fontFamily: "DM Sans, sans-serif",
               fontSize: 13,
               fontWeight: isActive ? 700 : 500,
+              whiteSpace: "nowrap",
               cursor: "pointer",
-              backdropFilter: "blur(20px) saturate(180%)",
-              WebkitBackdropFilter: "blur(20px) saturate(180%)",
-              boxShadow: isActive
-                ? "inset 0 1px 0 rgba(255,255,255,0.3), 0 4px 16px rgba(255,92,53,0.18)"
-                : "inset 0 1px 0 rgba(255,255,255,0.08)",
-              transition: "all 200ms ease",
+              transition: "background 160ms ease, color 160ms ease",
             }}
           >
-            {t.label}
+            {t.short}
           </button>
         );
       })}
@@ -9263,9 +9699,13 @@ export function EventCard({
     <div
       id={`event-${ev.id}`}
       style={{
-        // 140 clears the banner + tab header; env() adds the notch on an
-        // installed phone (it is 0px on the desktop and in Safari).
-        scrollMarginTop: "calc(env(safe-area-inset-top, 0px) + 140px)",
+        // Desktop /campus (the only place that provides the view): the top
+        // bar scrolls away with the page, so 32px of air is enough. Phone
+        // and org page: 140 clears the phone's sticky banner + tab strip;
+        // env() adds the notch on an installed phone.
+        scrollMarginTop: view.provided
+          ? 32
+          : "calc(env(safe-area-inset-top, 0px) + 140px)",
         borderRadius: 18,
         transition: "box-shadow 600ms ease",
       }}

@@ -93,6 +93,8 @@
   --error-ink-deep: #8E2317;
   --ok-ink-2: #1F6B3A;
   --row-hover: #F2EFE9;
+  /* The LeftNav profile card's banner before a cover is set (S68). */
+  --chip-banner-fallback: linear-gradient(135deg, #EDE9E2 0%, #D8D2C8 45%, #C9C2B8 100%);
 
   /* Translucent steps of --cream / --paper, as plain rgba on purpose. A
      `color-mix(..., var(--x) ...)` line can't fall back: anything holding
@@ -143,6 +145,7 @@
   --error-ink-deep: #FF9A8C;
   --ok-ink-2: #6FDB9A;
   --row-hover: #1F1D1C;
+  --chip-banner-fallback: linear-gradient(135deg, #2E2B29 0%, #252321 45%, #1D1B1A 100%);
 
   /* The translucent steps, from #0C0B0B / #161515 (see the light block). */
   --tabbar-bg: rgba(12,11,11,0.96);

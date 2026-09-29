@@ -3,6 +3,8 @@
 import Link from "next/link";
 import { useEffect, useState } from "react";
 
+import { campusRowById } from "@/lib/iu/campuses";
+import { schoolStripBackground } from "@/lib/iu/school-colors";
 import { resolveCoverThemeCss } from "@/lib/profile/cover-themes";
 
 const BANNER_PREVIEW_H = 48;
@@ -18,6 +20,8 @@ type ChipState =
       avatarUrl: string | null;
       initials: string;
       bannerCss: string | null;
+      /** The home campus's school strip paint; null when no campus. */
+      strip: string | null;
     };
 
 function initialsFromName(name: string): string {
@@ -55,17 +59,43 @@ function bannerCssFromVibeUser(u: Record<string, unknown>): string | null {
   return resolveCoverThemeCss(u.coverGradient);
 }
 
+// Theme tokens (globals.css), so the card follows Light and Night: paper
+// body, charcoal name, muted subtitle, hairline border.
 const cardShell: React.CSSProperties = {
   display: "block",
+  position: "relative",
   borderRadius: 12,
   overflow: "hidden",
   textDecoration: "none",
-  border: "1px solid rgba(28, 28, 30, 0.08)",
+  background: "var(--paper)",
+  border: "1px solid var(--hairline)",
   boxShadow: "0 4px 16px rgba(0, 0, 0, 0.05)",
 };
 
-const bannerFallback =
-  "linear-gradient(135deg, #EDE9E2 0%, #D8D2C8 45%, #C9C2B8 100%)";
+const bannerFallback = "var(--chip-banner-fallback)";
+
+/**
+ * A 3px strip across the card's top edge in the viewer's HOME campus's
+ * school colours (crimson, gold, or half and half for a shared campus). It's
+ * an identity card, so it follows home, never a campus being visited.
+ */
+function SchoolStrip({ paint }: { paint: string | null }) {
+  if (!paint) return null;
+  return (
+    <div
+      aria-hidden
+      style={{
+        position: "absolute",
+        top: 0,
+        left: 0,
+        right: 0,
+        height: 3,
+        background: paint,
+        zIndex: 1,
+      }}
+    />
+  );
+}
 
 /**
  * Sidebar “you” card: banner preview + avatar + name (from profile-bootstrap).
@@ -88,6 +118,8 @@ export function NavIdentityChip() {
         const d = (await r.json()) as {
           ok?: boolean;
           vibeUser?: Record<string, unknown>;
+          /** Home campus, validated against the school system (top level). */
+          campusId?: unknown;
         };
         if (!d?.ok || !d.vibeUser) {
           setChip({ status: "idle" });
@@ -108,6 +140,10 @@ export function NavIdentityChip() {
           avatarUrl: avatarUrlFromVibeUser(u),
           initials: initialsFromName(name),
           bannerCss: bannerCssFromVibeUser(u),
+          // Same response, no extra request: `campusId` is the viewer's home.
+          strip: schoolStripBackground(
+            campusRowById(typeof d.campusId === "string" ? d.campusId : null),
+          ),
         });
       } catch {
         if (!cancelled) setChip({ status: "idle" });
@@ -124,7 +160,7 @@ export function NavIdentityChip() {
         <div
           style={{
             height: BANNER_PREVIEW_H,
-            background: "#E4E0D8",
+            background: "var(--hairline)",
           }}
         />
         <div
@@ -133,7 +169,7 @@ export function NavIdentityChip() {
             alignItems: "flex-start",
             gap: 10,
             padding: "10px 10px 12px",
-            background: "white",
+            background: "var(--paper)",
           }}
         >
           <div
@@ -141,7 +177,7 @@ export function NavIdentityChip() {
               width: AVATAR_SZ,
               height: AVATAR_SZ,
               borderRadius: 10,
-              background: "#E4E0D8",
+              background: "var(--hairline)",
               flexShrink: 0,
             }}
           />
@@ -150,7 +186,7 @@ export function NavIdentityChip() {
               style={{
                 height: 12,
                 borderRadius: 4,
-                background: "#E4E0D8",
+                background: "var(--hairline)",
                 marginBottom: 6,
                 width: "72%",
               }}
@@ -159,7 +195,7 @@ export function NavIdentityChip() {
               style={{
                 height: 9,
                 borderRadius: 4,
-                background: "#EFECE6",
+                background: "var(--row-hover)",
                 width: "48%",
               }}
             />
@@ -184,7 +220,7 @@ export function NavIdentityChip() {
             alignItems: "flex-start",
             gap: 10,
             padding: "10px 10px 12px",
-            background: "white",
+            background: "var(--paper)",
           }}
         >
           <div
@@ -207,18 +243,18 @@ export function NavIdentityChip() {
           </div>
           <div style={{ minWidth: 0, flex: 1, paddingTop: 1 }}>
             <div
-              style={{ fontSize: "12.5px", fontWeight: "600", color: "#1C1C1E" }}
+              style={{ fontSize: "12.5px", fontWeight: "600", color: "var(--charcoal)" }}
             >
               You
             </div>
-            <div style={{ fontSize: "11px", color: "#8A8580" }}>My profile</div>
+            <div style={{ fontSize: "11px", color: "var(--ink-muted)" }}>My profile</div>
           </div>
         </div>
       </Link>
     );
   }
 
-  const { name, subtitle, avatarUrl, initials, bannerCss } = chip;
+  const { name, subtitle, avatarUrl, initials, bannerCss, strip } = chip;
 
   return (
     <Link
@@ -227,6 +263,7 @@ export function NavIdentityChip() {
       style={cardShell}
       title={`${name} — ${subtitle}`}
     >
+      <SchoolStrip paint={strip} />
       <div
         aria-hidden
         style={{
@@ -241,7 +278,7 @@ export function NavIdentityChip() {
           alignItems: "flex-start",
           gap: 10,
           padding: "10px 10px 12px",
-          background: "white",
+          background: "var(--paper)",
         }}
       >
         <div
@@ -283,7 +320,7 @@ export function NavIdentityChip() {
               fontFamily: "'DM Sans', system-ui, sans-serif",
               fontSize: "12.5px",
               fontWeight: "600",
-              color: "#1C1C1E",
+              color: "var(--charcoal)",
               lineHeight: 1.38,
               letterSpacing: "-0.01em",
               overflowWrap: "anywhere",
@@ -296,7 +333,7 @@ export function NavIdentityChip() {
             style={{
               fontFamily: "'DM Sans', system-ui, sans-serif",
               fontSize: "11px",
-              color: "#8A8580",
+              color: "var(--ink-muted)",
               lineHeight: 1.4,
               marginTop: 4,
               overflowWrap: "anywhere",
