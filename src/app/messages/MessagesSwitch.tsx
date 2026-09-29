@@ -51,7 +51,16 @@ export function MessagesSwitch({
           height: "100vh",
           border: "none",
           display: "block",
-          background: "#FAF7F2",
+          // The page's own cream (#FAF7F2 in Light, #0C0B0B in Night) shows
+          // while messages.html loads; a hardcoded cream flashed in Night.
+          background: "var(--cream)",
+          // Chrome paints an OPAQUE canvas (white, for a light document)
+          // behind an iframe whose document's color-scheme differs from the
+          // iframe element's. In Night the element inherits `dark` while the
+          // blank document it starts on is `normal`, so every open flashed
+          // white. `normal` here matches that blank document; once
+          // messages.html (dark) paints, it covers its canvas itself.
+          colorScheme: "normal",
         }}
       />
     </CampusAppShell>
