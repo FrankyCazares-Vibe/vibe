@@ -285,11 +285,12 @@ export type ThreadRoom = {
  * schema.
  *
  * On a database WITHOUT it (contract 3.10: local before the apply, a Vercel
- * Preview, after a rollback) the route sends today's response: no `room`, no
- * `viewer`, and messages without the wave-1 fields. The type cannot say so
- * (section 6.1 pins these fields as always there), so screens read them
- * defensively, `data.viewer?.can_post`, and with `viewer` missing they behave
- * as today (section 10, point 1).
+ * Preview, after a rollback) the route still sends every field, at its
+ * default: `room: null`, `viewer: { role: null, can_post: true,
+ * can_reply: false, can_moderate: false }`, and each message's wave-1 fields
+ * at their defaults. An OLDER server (a deploy from before wave 1) sends none
+ * of them, so the plain-JavaScript screens still read `data.viewer?.can_post`
+ * and behave as today when it is missing (section 10, point 1).
  */
 export type ThreadMessagesResponse = {
   ok: true;
