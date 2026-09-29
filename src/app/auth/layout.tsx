@@ -3,7 +3,7 @@ export default function AuthLayout({ children }: { children: React.ReactNode }) 
     <div
       style={{
         minHeight: "100vh",
-        background: "#FAF7F2",
+        background: "var(--cream)",
         // Inside the App Store app the web view runs under the status bar
         // (viewport-fit=cover, Capacitor contentInset "never"), so the top
         // and bottom insets are real there; in a browser tab they're 0.

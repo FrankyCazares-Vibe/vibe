@@ -51,11 +51,11 @@ function vibeClearAll() { Object.values(VIBE_KEYS).forEach(vibeClear); }
 // sign-out leave it alone.
 var VIBE_THEME_KEY = 'vibe_theme';
 // MUST equal DEFAULT_THEME_PREF in src/lib/theme/theme.ts, and the colours
-// THEME_META_COLORS. The flip to 'system' (wave 5) is: change the constant,
-// run `node --test src/lib/theme/theme.test.ts`, paste the boot script where
-// it fails, change THIS line, bump SW_VERSION. At load the page trusts what
+// THEME_META_COLORS. 'system' (Auto) since S68 wave 5. Changing it: the
+// constant, `node --test src/lib/theme/theme.test.ts`, paste the boot script
+// where it fails, THIS line, bump SW_VERSION. At load the page trusts what
 // the boot script set (below), so only a later storage/OS event reads this.
-var _VIBE_THEME_DEFAULT = 'light';
+var _VIBE_THEME_DEFAULT = 'system';
 var _VIBE_THEME_COLORS = { light: '#FAF7F2', dark: '#0C0B0B' };
 
 function _vibeThemePref() {

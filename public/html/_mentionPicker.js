@@ -43,17 +43,22 @@
        is JS-bumped to 200000 while the popover is open so the user sees
        it tracking over the suggestions. cursor:none inherited from body
        keeps the system cursor suppressed (we don't want a double cursor). */
-    .vmp-popover{position:fixed;background:white;border:1px solid rgba(28,28,30,.08);border-radius:12px;box-shadow:0 14px 40px rgba(0,0,0,.18);min-width:240px;max-width:320px;max-height:280px;overflow-y:auto;z-index:100000;display:none;font-family:'DM Sans',system-ui,sans-serif;}
+    .vmp-popover{position:fixed;background:var(--paper,white);border:1px solid var(--hairline,rgba(28,28,30,.08));border-radius:12px;box-shadow:0 14px 40px rgba(0,0,0,.18);min-width:240px;max-width:320px;max-height:280px;overflow-y:auto;z-index:100000;display:none;font-family:'DM Sans',system-ui,sans-serif;}
     .vmp-popover.show{display:block;}
-    .vmp-row{display:flex;align-items:center;gap:9px;padding:8px 12px;border-bottom:1px solid rgba(28,28,30,.04);}
+    .vmp-row{display:flex;align-items:center;gap:9px;padding:8px 12px;border-bottom:1px solid rgba(var(--scrim-rgb,28,28,30),.04);}
     .vmp-row:last-child{border-bottom:none;}
-    .vmp-row.active,.vmp-row:hover{background:#FAF7F2;}
+    .vmp-row.active,.vmp-row:hover{background:var(--cream,#FAF7F2);}
     .vmp-av{width:30px;height:30px;border-radius:9px;background:#1C1C1E;color:white;display:flex;align-items:center;justify-content:center;font-family:'Fraunces',serif;font-size:11px;font-weight:700;flex-shrink:0;overflow:hidden;}
     .vmp-av img{width:100%;height:100%;object-fit:cover;display:block;}
     .vmp-info{flex:1;min-width:0;}
-    .vmp-name{font-size:13px;font-weight:600;color:#1C1C1E;}
-    .vmp-handle{font-size:11px;color:#8A8580;}
-    .vmp-empty{padding:16px 14px;color:#8A8580;font-size:12px;text-align:center;}
+    .vmp-name{font-size:13px;font-weight:600;color:var(--charcoal,#1C1C1E);}
+    .vmp-handle{font-size:11px;color:var(--ink-muted,#8A8580);}
+    .vmp-empty{padding:16px 14px;color:var(--ink-muted,#8A8580);font-size:12px;text-align:center;}
+    /* Night (S68 wave 5): the popover's own copy of the Night tokens it
+       reads, scoped to it, so it paints Night on any host (messages.html has
+       no --ink-muted / --hairline). Light sets nothing here: each var()
+       above falls back to the literal it replaced. The avatar stays dark. */
+    html[data-theme="dark"] .vmp-popover{--paper:#161515;--cream:#0C0B0B;--charcoal:#F6F1EA;--ink-muted:#9C958C;--hairline:rgba(255,255,255,0.09);--scrim-rgb:255,255,255;}
   `;
   document.head.appendChild(style);
 

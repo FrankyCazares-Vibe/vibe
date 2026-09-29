@@ -104,6 +104,37 @@
   --tabbar-bg: rgba(250,247,242,0.96);
   --paper-55: rgba(255,255,255,0.55);
   --paper-70: rgba(255,255,255,0.70);
+
+  /* The pages that painted their own cream until wave 5 (S68): auth,
+     /account/suspended, the legal pages + /support, /plus, /feed. Light
+     values are their literals exactly. */
+  --paper-50: rgba(255,255,255,0.50);
+  --paper-72: rgba(255,255,255,0.72);
+  --paper-78: rgba(255,255,255,0.78);
+  --cream-92: rgba(250,247,242,0.92);
+  --ink-sub: #5A564F;
+  --ink-2-alt: #5C5956;
+  --ink-faint: #A8A39C;
+  --ink-info: #3D3A35;
+  --ink-prose: #2A2620;
+  --error-ink-2: #B42318;
+  --ok-ink-3: #1C5C2E;
+  --auth-glow: rgba(255,229,219,0.5);
+  --auth-card-shadow: 0 32px 80px rgba(28,28,30,0.08), 0 0 0 1px rgba(255,255,255,0.5) inset;
+  --warm-backdrop: radial-gradient(120% 80% at 0% 0%, rgba(255,222,180,0.45) 0%, rgba(255,222,180,0) 60%), radial-gradient(110% 80% at 100% 100%, rgba(255,200,170,0.35) 0%, rgba(255,200,170,0) 60%), linear-gradient(180deg, #FAF7F2 0%, #F4EDE2 100%);
+  /* S68 wave 5 (B5e): translucent steps /network, UserCard and the phone
+     campus panes still used as literals. */
+  --glass-45: rgba(255,253,248,0.45);
+  --glass-60: rgba(255,253,248,0.60);
+  --glass-warm-40: rgba(255,250,240,0.40);
+  --glass-warm-50: rgba(255,250,240,0.50);
+  --glass-warm-66: rgba(255,250,240,0.66);
+  --glass-warm-68: rgba(255,250,240,0.68);
+  --glass-peach-66: rgba(255,243,228,0.66);
+  --glass-border-60: rgba(255,255,255,0.60);
+  --paper-92: rgba(255,255,255,0.92);
+  --gold-ink: #A06410;
+  --network-backdrop: radial-gradient(120% 80% at 0% 0%, rgba(255,222,180,0.45) 0%, rgba(255,222,180,0) 60%), radial-gradient(110% 80% at 100% 100%, rgba(255,200,170,0.35) 0%, rgba(255,200,170,0) 60%), linear-gradient(180deg, #FAF7F2 0%, #F4EDE2 100%);
 }
 
 /* Night (S67 wave 3, contracts C4): the same fourteen tokens in their dark
@@ -152,6 +183,22 @@
   --paper-55: rgba(22,21,21,0.55);
   --paper-70: rgba(22,21,21,0.70);
 
+  /* Auth, suspended, legal, /plus, /feed (S68 wave 5; see the light block). */
+  --paper-50: rgba(22,21,21,0.50);
+  --paper-72: rgba(22,21,21,0.72);
+  --paper-78: rgba(22,21,21,0.78);
+  --cream-92: rgba(12,11,11,0.92);
+  --ink-sub: #CFC8BE;
+  --ink-2-alt: #CFC8BE;
+  --ink-faint: #7A746C;
+  --ink-info: #E4DDD3;
+  --ink-prose: #E4DDD3;
+  --error-ink-2: #FF7A6B;
+  --ok-ink-3: #6FDB9A;
+  --auth-glow: rgba(255,92,53,0.06);
+  --auth-card-shadow: 0 32px 80px rgba(0,0,0,0.45), 0 0 0 1px rgba(255,255,255,0.04) inset;
+  --warm-backdrop: radial-gradient(120% 80% at 0% 0%, rgba(255,92,53,0.16) 0%, rgba(255,92,53,0) 60%), radial-gradient(110% 80% at 100% 100%, rgba(255,92,53,0.08) 0%, rgba(255,92,53,0) 60%), linear-gradient(180deg, #0C0B0B 0%, #0C0B0B 100%);
+
   /* The body's real paint (the light pair sits in the UI kit's :root). */
   --background: var(--cream);
   --foreground: var(--charcoal);
@@ -186,6 +233,19 @@
   --sidebar-accent-foreground: oklch(0.985 0 0);
   --sidebar-border: oklch(1 0 0 / 10%);
   --sidebar-ring: oklch(0.556 0 0);
+  /* S68 wave 5 (B5e): the same steps on #161515 paper; the network page
+     takes the campus feed's bloom. */
+  --glass-45: rgba(22,21,21,0.45);
+  --glass-60: rgba(22,21,21,0.60);
+  --glass-warm-40: rgba(22,21,21,0.40);
+  --glass-warm-50: rgba(22,21,21,0.50);
+  --glass-warm-66: rgba(22,21,21,0.78);
+  --glass-warm-68: rgba(22,21,21,0.78);
+  --glass-peach-66: rgba(22,21,21,0.78);
+  --glass-border-60: rgba(255,255,255,0.07);
+  --paper-92: rgba(22,21,21,0.92);
+  --gold-ink: #F0B45A;
+  --network-backdrop: radial-gradient(720px 620px at 0% 100%, rgba(255,92,53,0.42), rgba(255,92,53,0.10) 40%, transparent 68%), radial-gradient(560px 420px at 100% 0%, rgba(255,92,53,0.20), transparent 60%), #0C0B0B;
 }
 
 @theme inline {
@@ -1195,7 +1255,7 @@
   background:
     radial-gradient(circle at 22% 0%, rgba(255, 92, 53, 0.1), transparent 55%),
     radial-gradient(circle at 78% 100%, rgba(123, 95, 224, 0.08), transparent 55%),
-    radial-gradient(circle at 50% 50%, rgba(255, 229, 219, 0.5), transparent 70%);
+    radial-gradient(circle at 50% 50%, var(--auth-glow), transparent 70%);
   pointer-events: none;
   z-index: 0;
 }
@@ -1204,7 +1264,7 @@
   position: absolute;
   inset: 0;
   background-image:
-    radial-gradient(rgba(28, 28, 30, 0.06) 1px, transparent 1px);
+    radial-gradient(rgba(var(--scrim-rgb), 0.06) 1px, transparent 1px);
   background-size: 24px 24px;
   opacity: 0.4;
   pointer-events: none;
@@ -1225,9 +1285,9 @@
   font-weight: 600;
   letter-spacing: 0.16em;
   text-transform: uppercase;
-  color: #8a8580;
-  background: rgba(255, 255, 255, 0.5);
-  border: 1px solid rgba(28, 28, 30, 0.08);
+  color: var(--ink-muted);
+  background: var(--paper-50);
+  border: 1px solid var(--hairline);
   border-radius: 999px;
   text-decoration: none;
   backdrop-filter: blur(10px);
@@ -1245,8 +1305,8 @@
   inset: -10px -6px;
 }
 .vibe-auth-back:hover {
-  color: #1c1c1e;
-  border-color: rgba(28, 28, 30, 0.25);
+  color: var(--charcoal);
+  border-color: rgba(var(--scrim-rgb), 0.25);
   transform: translateX(-2px);
 }
 
@@ -1255,12 +1315,10 @@
   width: 100%;
   max-width: 440px;
   padding: 44px 38px 36px;
-  background: rgba(255, 255, 255, 0.78);
+  background: var(--paper-78);
   border-radius: 24px;
-  border: 1px solid rgba(28, 28, 30, 0.06);
-  box-shadow:
-    0 32px 80px rgba(28, 28, 30, 0.08),
-    0 0 0 1px rgba(255, 255, 255, 0.5) inset;
+  border: 1px solid rgba(var(--scrim-rgb), 0.06);
+  box-shadow: var(--auth-card-shadow);
   backdrop-filter: blur(20px) saturate(140%);
   -webkit-backdrop-filter: blur(20px) saturate(140%);
   z-index: 1;
@@ -1272,11 +1330,11 @@
   font-family: "Fraunces", serif;
   font-size: 18px;
   font-weight: 800;
-  color: #1c1c1e;
+  color: var(--charcoal);
   letter-spacing: -0.5px;
   margin-bottom: 22px;
   padding: 4px 10px;
-  background: rgba(28, 28, 30, 0.04);
+  background: rgba(var(--scrim-rgb), 0.04);
   border-radius: 999px;
 }
 .vibe-auth-dot {
@@ -1288,18 +1346,18 @@
   font-size: 38px;
   font-weight: 700;
   letter-spacing: -1.2px;
-  color: #1c1c1e;
+  color: var(--charcoal);
   margin: 0 0 14px;
   line-height: 1.05;
 }
 .vibe-auth-sub {
   font-size: 14.5px;
   line-height: 1.55;
-  color: #5a564f;
+  color: var(--ink-sub);
   margin: 0 0 26px;
 }
 .vibe-auth-sub strong {
-  color: #1c1c1e;
+  color: var(--charcoal);
   font-weight: 700;
 }
 .vibe-auth-code {
@@ -1324,7 +1382,7 @@
   overflow-wrap: anywhere;
 }
 .vibe-auth-banner--success {
-  color: #1c5c2e;
+  color: var(--ok-ink-3);
   background: rgba(46, 125, 50, 0.08);
   border: 1px solid rgba(46, 125, 50, 0.25);
 }
@@ -1348,7 +1406,7 @@
 .vibe-auth-label {
   font-size: 13px;
   font-weight: 600;
-  color: #1c1c1e;
+  color: var(--charcoal);
   letter-spacing: 0.01em;
 }
 .vibe-auth-label-hint {
@@ -1373,32 +1431,32 @@
   width: 100%;
   padding: 14px 16px;
   border-radius: 12px;
-  border: 1px solid rgba(28, 28, 30, 0.12);
+  border: 1px solid rgba(var(--scrim-rgb), 0.12);
   font-family: "DM Sans", sans-serif;
   /* 16px minimum: iOS Safari (and in-app browsers) zoom the page on focus
      for anything smaller. */
   font-size: 16px;
-  background: #fff;
-  color: #1c1c1e;
+  background: var(--paper);
+  color: var(--charcoal);
   transition:
     border-color 200ms ease,
     box-shadow 200ms ease,
     background 200ms ease;
 }
 .vibe-auth-input::placeholder {
-  color: #a8a39c;
+  color: var(--ink-faint);
 }
 .vibe-auth-input:focus {
   outline: none;
   border-color: #ff5c35;
-  background: #fff;
+  background: var(--paper);
   box-shadow: 0 0 0 4px rgba(255, 92, 53, 0.14);
 }
 
 .vibe-auth-error {
   font-size: 13px;
   line-height: 1.45;
-  color: #b42318;
+  color: var(--error-ink-2);
   margin: 0;
   padding: 10px 12px;
   background: rgba(180, 35, 24, 0.07);
@@ -1446,7 +1504,7 @@
   margin: 24px 0 0;
   text-align: center;
   font-size: 13.5px;
-  color: #8a8580;
+  color: var(--ink-muted);
 }
 .vibe-auth-link {
   color: #ff5c35;
@@ -1461,7 +1519,7 @@
 }
 
 .vibe-auth-loading {
-  color: #8a8580;
+  color: var(--ink-muted);
   font-size: 14px;
   text-align: center;
 }
@@ -1490,8 +1548,8 @@
   gap: 6px;
   margin: 0 0 24px;
   padding: 12px 14px;
-  background: rgba(28, 28, 30, 0.03);
-  border: 1px solid rgba(28, 28, 30, 0.06);
+  background: rgba(var(--scrim-rgb), 0.03);
+  border: 1px solid rgba(var(--scrim-rgb), 0.06);
   border-radius: 14px;
 }
 .vibe-auth-step {
@@ -1524,8 +1582,8 @@
   border-radius: 50%;
   font-size: 10px;
   font-weight: 700;
-  background: rgba(28, 28, 30, 0.08);
-  color: #8a8580;
+  background: rgba(var(--scrim-rgb), 0.08);
+  color: var(--ink-muted);
   letter-spacing: 0;
 }
 .vibe-auth-step--active .vibe-auth-step-num {
@@ -1543,7 +1601,7 @@
 .vibe-auth-step-label {
   font-size: 12px;
   font-weight: 600;
-  color: #1c1c1e;
+  color: var(--charcoal);
   white-space: nowrap;
   overflow: hidden;
   text-overflow: ellipsis;
@@ -1554,7 +1612,7 @@
   font-weight: 600;
   letter-spacing: 0.12em;
   text-transform: uppercase;
-  color: #a8a39c;
+  color: var(--ink-faint);
 }
 .vibe-auth-step--active .vibe-auth-step-meta {
   color: #ff5c35;
@@ -1565,7 +1623,7 @@
 .vibe-auth-step-divider {
   width: 14px;
   height: 1px;
-  background: rgba(28, 28, 30, 0.18);
+  background: rgba(var(--scrim-rgb), 0.18);
   flex-shrink: 0;
 }
 
@@ -1586,19 +1644,19 @@
   align-items: flex-start;
   gap: 12px;
   padding: 12px 14px;
-  background: rgba(28, 28, 30, 0.03);
-  border: 1px solid rgba(28, 28, 30, 0.08);
+  background: rgba(var(--scrim-rgb), 0.03);
+  border: 1px solid var(--hairline);
   border-radius: 12px;
   font-size: 13px;
   line-height: 1.5;
-  color: #5a564f;
+  color: var(--ink-sub);
   cursor: pointer;
   transition:
     border-color 200ms ease,
     background 200ms ease;
 }
 .vibe-auth-consent:hover {
-  border-color: rgba(28, 28, 30, 0.18);
+  border-color: rgba(var(--scrim-rgb), 0.18);
 }
 .vibe-auth-consent--checked {
   background: rgba(255, 92, 53, 0.06);
@@ -1618,7 +1676,7 @@
   border-radius: 4px;
 }
 .vibe-auth-consent strong {
-  color: #1c1c1e;
+  color: var(--charcoal);
   font-weight: 600;
 }
 .vibe-auth-consent-note {
@@ -1626,7 +1684,7 @@
   padding: 0 2px;
   font-size: 12px;
   line-height: 1.4;
-  color: #8a8580;
+  color: var(--ink-muted);
 }
 /* Unchecked consent locks the submit; that's a "not yet", not a "busy". */
 .vibe-auth-submit--locked:disabled {
@@ -1647,12 +1705,12 @@ button.vibe-auth-link {
    typed code). Shared by EmailLinkProblemCard, ResendConfirmation and
    ConfirmCodeForm, plus the signup / login surfaces that embed them. —— */
 .vibe-auth-banner--info {
-  color: #3d3a35;
-  background: rgba(28, 28, 30, 0.04);
-  border: 1px solid rgba(28, 28, 30, 0.12);
+  color: var(--ink-info);
+  background: rgba(var(--scrim-rgb), 0.04);
+  border: 1px solid rgba(var(--scrim-rgb), 0.12);
 }
 .vibe-auth-banner--info strong {
-  color: #1c1c1e;
+  color: var(--charcoal);
 }
 /* Banners inside the embedded resend / code stacks take their spacing from
    the stack's gap. Scoped to those components so the banners in the
@@ -1692,9 +1750,9 @@ a.vibe-auth-secondary {
   min-height: 48px;
   padding: 12px 20px;
   border-radius: 12px;
-  border: 1px solid rgba(28, 28, 30, 0.18);
-  background: #fff;
-  color: #1c1c1e;
+  border: 1px solid rgba(var(--scrim-rgb), 0.18);
+  background: var(--paper);
+  color: var(--charcoal);
   font-family: "DM Sans", sans-serif;
   font-size: 15px;
   font-weight: 600;
@@ -1731,11 +1789,11 @@ a.vibe-auth-secondary {
   margin: 0;
   font-size: 13px;
   line-height: 1.5;
-  color: #8a8580;
+  color: var(--ink-muted);
   overflow-wrap: anywhere;
 }
 .vibe-auth-tip strong {
-  color: #1c1c1e;
+  color: var(--charcoal);
   font-weight: 600;
 }
 .vibe-auth-disclosure {
@@ -1773,7 +1831,7 @@ a.vibe-auth-secondary {
   gap: 14px;
   margin-top: 24px;
   padding-top: 20px;
-  border-top: 1px solid rgba(28, 28, 30, 0.08);
+  border-top: 1px solid var(--hairline);
 }
 
 @media (max-width: 540px) {

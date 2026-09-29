@@ -989,11 +989,11 @@ function ReportGroup({
                   onChange={(e) => setReasonCode(e.target.value)}
                   style={inputStyle}
                 >
-                  <option value="" style={{ color: "#111" }}>
+                  <option value="" className="adm-option">
                     Pick the reason they&apos;ll read…
                   </option>
                   {RESTRICTION_OPTIONS.map((o) => (
-                    <option key={o.code} value={o.code} style={{ color: "#111" }}>
+                    <option key={o.code} value={o.code} className="adm-option">
                       {o.line}
                     </option>
                   ))}

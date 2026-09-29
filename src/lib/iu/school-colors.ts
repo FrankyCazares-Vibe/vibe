@@ -117,3 +117,46 @@ export const SCHOOL_ZONE_PALETTES: Readonly<Record<SchoolZone, SchoolZonePalette
     inactiveInk: "rgba(255,255,255,0.78)",
   }),
 });
+
+/**
+ * Which zone leads and which follows (S68 wave 5, the phone campus banner;
+ * the same rule CampusTopBar spells out inline on desktop):
+ * - shared campus: the VIEWER's own school leads (Purdue for a Purdue
+ *   student; IU for an IU student or one with no school yet), and the other
+ *   school follows behind a "/" seam lined in the follower's accent: gold
+ *   beside Purdue black, cream beside IU crimson;
+ * - a single-school campus: that school in both zones, no seam;
+ * - none: neutral in both zones, no seam.
+ */
+export type SchoolZones = {
+  lead: SchoolZone;
+  follow: SchoolZone;
+  /** The seam's edge line, or null when there is no seam (not shared). */
+  seamLine: string | null;
+};
+
+export function schoolZonesFor(
+  skin: SchoolSkin,
+  viewerSystem: "iu" | "purdue" | null | undefined,
+): SchoolZones {
+  if (skin === "shared") {
+    return viewerSystem === "purdue"
+      ? { lead: "purdue", follow: "iu", seamLine: IU_CREAM }
+      : { lead: "iu", follow: "purdue", seamLine: PURDUE_GOLD };
+  }
+  const only: SchoolZone = skin === "iu" || skin === "purdue" ? skin : "none";
+  return { lead: only, follow: only, seamLine: null };
+}
+
+/**
+ * The phone banner's monogram tile, in the leading school's colours swapped
+ * (S68 wave 5): IU crimson letters on a cream tile, Purdue black letters on a
+ * gold tile, and before a campus is known the neutral ink-on-white tile the
+ * banner always had. Contrast: 7.6:1 (IU), 11:1 (Purdue).
+ */
+export const SCHOOL_TILES: Readonly<Record<SchoolZone, { background: string; ink: string }>> =
+  Object.freeze({
+    iu: Object.freeze({ background: IU_CREAM, ink: IU_CRIMSON }),
+    purdue: Object.freeze({ background: PURDUE_GOLD, ink: PURDUE_BLACK }),
+    none: Object.freeze({ background: "rgba(255,255,255,0.95)", ink: "#1C1C1E" }),
+  });

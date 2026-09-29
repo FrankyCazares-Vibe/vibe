@@ -17,11 +17,12 @@ export const THEME_PREFS = ["light", "dark", "system"] as const;
 export type ThemePref = (typeof THEME_PREFS)[number];
 export type ResolvedTheme = "light" | "dark";
 
-/** Light until wave 5 lands: with Auto as the default every student whose
- *  phone is dark would get the legacy desktop pages half-dark. The flip to
- *  "system" is this line, then `node --test src/lib/theme/theme.test.ts`,
- *  paste the new script where the drift test fails, bump SW_VERSION. */
-export const DEFAULT_THEME_PREF: ThemePref = "light";
+/** Auto since S68 wave 5 (2026-09-29): the legacy desktop pages are fully
+ *  dark now, so a student whose phone or laptop is dark gets Night from the
+ *  first visit. Changing it again: this line, then
+ *  `node --test src/lib/theme/theme.test.ts`, paste the new script where the
+ *  drift test fails, `_VIBE_THEME_DEFAULT` in _persistence.js, bump SW_VERSION. */
+export const DEFAULT_THEME_PREF: ThemePref = "system";
 
 /** Device key. Survives sign-out on purpose (not in ACCOUNT_KEYS): the phone
  *  stays Night through a re-login; the account value catches up on the next

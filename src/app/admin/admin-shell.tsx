@@ -367,6 +367,19 @@ export function Empty({ children }: { children: React.ReactNode }) {
  * the tabs reach them by class name.
  */
 const CSS = `
+/* The desk is dark in both themes, so the page behind it is too (S68 wave
+   5). The wrapper's own gradient used to end where the page did not: below
+   it, on overscroll and in the installed apps (which repaint html/body cream)
+   the page showed through, cream in Light and near-black in Night. This
+   paints the canvas the #0F0D17 the wrapper's gradient ends on, for as long
+   as the desk is mounted; !important because the installed-app rules in
+   globals.css outrank a plain html/body selector. */
+html, body { background-color: #0F0D17 !important; }
+/* The restriction reason <select>'s list is the browser's own popup, which
+   follows the page's color-scheme: white in Light (dark ink, as before) and
+   dark in Night, where that ink vanished. */
+.adm-option { color: #111; }
+:root[data-theme="dark"] .adm-option { color: ${COLORS.text}; background-color: ${COLORS.bg}; }
 .adm-wrap { padding: 32px 24px; }
 .adm-inner { max-width: 1100px; margin: 0 auto; }
 .adm-card {

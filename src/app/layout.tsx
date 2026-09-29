@@ -77,8 +77,8 @@ export default function RootLayout({
     // server can't know the student's device, so it ships "light" and the
     // boot script below corrects the attribute before first paint; React
     // then keeps whatever the DOM says (suppressHydrationWarning), the Next
-    // "preventing flash before hydration" recipe. Stays cream-first on
-    // purpose: DEFAULT_THEME_PREF is "light" until wave 5 (src/lib/theme).
+    // "preventing flash before hydration" recipe. DEFAULT_THEME_PREF is
+    // "system" (Auto) since S68 wave 5, so a dark device gets Night here.
     <html
       lang="en"
       data-theme="light"

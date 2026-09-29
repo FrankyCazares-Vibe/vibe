@@ -186,10 +186,10 @@
     .msg-profile-attach {
       display: block; width: 280px; max-width: 100%;
       border-radius: 14px; overflow: hidden;
-      background: white;
-      border: 1px solid rgba(28,28,30,.08);
+      background: var(--paper, white);
+      border: 1px solid var(--hairline, rgba(28,28,30,.08));
       box-shadow: 0 1px 3px rgba(0,0,0,.04);
-      text-decoration: none; color: #1C1C1E;
+      text-decoration: none; color: var(--charcoal, #1C1C1E);
       transition: transform .15s, box-shadow .15s;
     }
     .msg-profile-attach:hover {
@@ -212,7 +212,7 @@
       color: #7A3A18;
       display: flex; align-items: center; justify-content: center;
       font-family: 'Fraunces', serif; font-weight: 800; font-size: 14px;
-      border: 2.5px solid white;
+      border: 2.5px solid var(--paper, white);
       box-shadow: 0 2px 6px rgba(0,0,0,.08);
     }
     .msg-profile-text {
@@ -220,12 +220,12 @@
     }
     .msg-profile-name {
       font-family: 'Fraunces', serif; font-weight: 800; font-size: 15px;
-      color: #1C1C1E; line-height: 1.2;
+      color: var(--charcoal, #1C1C1E); line-height: 1.2;
       overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
     }
     .msg-profile-meta {
       font-family: 'DM Sans', sans-serif; font-size: 11.5px;
-      color: #8A8580; margin-top: 2px;
+      color: var(--ink-muted, #8A8580); margin-top: 2px;
       overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
     }
     /* Dark variant — used inside "mine" bubbles in messages.html so the
@@ -238,6 +238,16 @@
     .msg-profile-attach--dark .msg-profile-name { color: #fff; }
     .msg-profile-attach--dark .msg-profile-meta { color: rgba(255,255,255,.65); }
     .msg-profile-attach--dark .msg-profile-av { border-color: #262528; }
+    /* Night (S68 wave 5): the light card's own copy of the Night tokens it
+       reads, scoped to it, so it paints Night on any host (messages.html has
+       no --ink-muted / --hairline). Light sets nothing here: each var()
+       above falls back to the literal it replaced. The --dark variant is
+       deliberate dark chrome and keeps its literals in both themes; the
+       banner gradient and the avatar stay as they are. */
+    html[data-theme="dark"] .msg-profile-attach {
+      --paper: #161515; --charcoal: #F6F1EA; --ink-muted: #9C958C;
+      --hairline: rgba(255,255,255,0.09);
+    }
   `;
   document.head.appendChild(style);
 })();

@@ -79,10 +79,8 @@ export const metadata = {
   description: "What Vibe+ includes, what it costs, and how to subscribe or cancel.",
 };
 
-const PAGE_BG =
-  "radial-gradient(120% 80% at 0% 0%, rgba(255,222,180,0.45) 0%, rgba(255,222,180,0) 60%), " +
-  "radial-gradient(110% 80% at 100% 100%, rgba(255,200,170,0.35) 0%, rgba(255,200,170,0) 60%), " +
-  "linear-gradient(180deg, #FAF7F2 0%, #F4EDE2 100%)";
+// The warm cream wash in Light, a coral bloom on Night paper (globals.css).
+const PAGE_BG = "var(--warm-backdrop)";
 
 const SANS = "DM Sans, sans-serif";
 const SERIF = "Fraunces, serif";
@@ -113,7 +111,7 @@ function Section({ title, children }: { title: string; children: ReactNode }) {
           fontFamily: SERIF,
           fontSize: 21,
           fontWeight: 800,
-          color: "#1C1C1E",
+          color: "var(--charcoal)",
           letterSpacing: "-0.01em",
           margin: "0 0 10px",
         }}
@@ -141,14 +139,14 @@ function Banner({ tone, children }: { tone: "coral" | "calm"; children: ReactNod
   return (
     <div
       style={{
-        border: coral ? `1px solid ${CORAL}` : "1px solid rgba(28,28,30,0.12)",
-        background: coral ? "rgba(255,92,53,0.07)" : "rgba(255,255,255,0.72)",
+        border: coral ? `1px solid ${CORAL}` : "1px solid rgba(var(--scrim-rgb),0.12)",
+        background: coral ? "rgba(255,92,53,0.07)" : "var(--paper-72)",
         borderRadius: 16,
         padding: "16px 18px",
         fontFamily: SANS,
         fontSize: 14.5,
         lineHeight: 1.6,
-        color: "#2A2620",
+        color: "var(--ink-prose)",
       }}
     >
       {children}
@@ -369,8 +367,8 @@ function statusFor(e: Entitlement, manage: boolean, inApp: boolean): Status {
   return { tone: "line", body: "You're on the free plan." };
 }
 
-const LINE_STYLE: CSSProperties = { fontFamily: SANS, fontSize: 13.5, color: "#5C5853", margin: "0 2px" };
-const LINK_STYLE: CSSProperties = { color: "#5C5853", fontWeight: 700, textDecoration: "none" };
+const LINE_STYLE: CSSProperties = { fontFamily: SANS, fontSize: 13.5, color: "var(--ink-2)", margin: "0 2px" };
+const LINK_STYLE: CSSProperties = { color: "var(--ink-2)", fontWeight: 700, textDecoration: "none" };
 
 export default async function PlusPage({
   searchParams,
@@ -485,7 +483,7 @@ export default async function PlusPage({
   ];
 
   const priceNote = (
-    <p style={{ margin: 0, color: "#5C5853", fontSize: 14 }}>
+    <p style={{ margin: 0, color: "var(--ink-2)", fontSize: 14 }}>
       One subscription, one tier. No add-ons to buy separately, and no
       trial — the free tier is the trial, and the counts on it are free
       for good.
@@ -503,7 +501,7 @@ export default async function PlusPage({
         <p style={{ marginBottom: 24 }}>
           <Link
             href={back ?? "/campus"}
-            style={{ fontFamily: SANS, fontSize: 13, fontWeight: 700, color: "#5C5853", textDecoration: "none" }}
+            style={{ fontFamily: SANS, fontSize: 13, fontWeight: 700, color: "var(--ink-2)", textDecoration: "none" }}
           >
             ← Back
           </Link>
@@ -520,7 +518,7 @@ export default async function PlusPage({
                 fontWeight: 700,
                 letterSpacing: "0.18em",
                 textTransform: "uppercase",
-                color: "#C84A20",
+                color: "var(--eyebrow-ink)",
                 marginBottom: 6,
               }}
             >
@@ -532,7 +530,7 @@ export default async function PlusPage({
               fontFamily: SERIF,
               fontSize: "clamp(30px, 4vw, 42px)",
               fontWeight: 900,
-              color: "#1C1C1E",
+              color: "var(--charcoal)",
               letterSpacing: "-0.02em",
               margin: "0 0 8px",
               lineHeight: 1.1,
@@ -541,7 +539,7 @@ export default async function PlusPage({
             {inApp ? "Vibe+" : <>See who&apos;s looking.</>}
           </h1>
           {inApp ? null : (
-            <p style={{ fontFamily: SANS, fontSize: 15, lineHeight: 1.6, color: "#5C5853", margin: 0 }}>
+            <p style={{ fontFamily: SANS, fontSize: 15, lineHeight: 1.6, color: "var(--ink-2)", margin: 0 }}>
               Vibe shows everyone how many people viewed their profile and their
               posts. Vibe+ is how you find out <em>who</em>.
             </p>
@@ -605,7 +603,7 @@ export default async function PlusPage({
             it renders in the store apps: the price is the thing SD1 rules
             out, and the rest is the pitch for it. */}
         {inApp ? null : (
-          <article style={{ fontFamily: SANS, fontSize: 15, lineHeight: 1.7, color: "#2A2620" }}>
+          <article style={{ fontFamily: SANS, fontSize: 15, lineHeight: 1.7, color: "var(--ink-prose)" }}>
             <Section title="The price">
               {showPlans ? (
                 <div style={{ display: "grid", gap: 14 }}>
@@ -617,7 +615,7 @@ export default async function PlusPage({
                   >
                     {/* The disclosure sits right under the buttons it applies
                         to, in plain words, before anyone taps. */}
-                    <p style={{ margin: 0, fontSize: 13, lineHeight: 1.6, color: "#5C5853" }}>
+                    <p style={{ margin: 0, fontSize: 13, lineHeight: 1.6, color: "var(--ink-2)" }}>
                       Cancel anytime from Manage subscription on this page and
                       you keep Vibe+ to the end of the period you&apos;ve paid
                       for. Deleting your Vibe account cancels it right away, with
@@ -634,11 +632,11 @@ export default async function PlusPage({
               ) : (
                 <>
                   <p style={{ margin: "0 0 8px" }}>
-                    <strong style={{ fontFamily: SERIF, fontSize: 26, fontWeight: 900, color: "#1C1C1E" }}>
+                    <strong style={{ fontFamily: SERIF, fontSize: 26, fontWeight: 900, color: "var(--charcoal)" }}>
                       {PLUS_PRICE_LABEL.monthly}
                     </strong>{" "}
                     {PLUS_PERIOD_LABEL.monthly}, or{" "}
-                    <strong style={{ fontFamily: SERIF, fontSize: 26, fontWeight: 900, color: "#1C1C1E" }}>
+                    <strong style={{ fontFamily: SERIF, fontSize: 26, fontWeight: 900, color: "var(--charcoal)" }}>
                       {PLUS_PRICE_LABEL.yearly}
                     </strong>{" "}
                     {PLUS_PERIOD_LABEL.yearly}.
@@ -649,7 +647,7 @@ export default async function PlusPage({
             </Section>
 
             <Section title="What Vibe+ unlocks">
-              <p style={{ margin: "0 0 10px", color: "#5C5853", fontSize: 14 }}>
+              <p style={{ margin: "0 0 10px", color: "var(--ink-2)", fontSize: 14 }}>
                 Three things the database already keeps private from everyone,
                 including from us on the free tier:
               </p>
@@ -700,7 +698,7 @@ export default async function PlusPage({
             </Section>
 
             <Section title="What Vibe+ will never include">
-              <p style={{ margin: "0 0 10px", color: "#5C5853", fontSize: 14 }}>
+              <p style={{ margin: "0 0 10px", color: "var(--ink-2)", fontSize: 14 }}>
                 This is where paid tiers on other apps go wrong, so it is written
                 down before there is money on the table:
               </p>
@@ -734,7 +732,7 @@ export default async function PlusPage({
           </article>
         )}
 
-        <p style={{ marginTop: 40, fontFamily: SANS, fontSize: 13, color: "#8A8580" }}>
+        <p style={{ marginTop: 40, fontFamily: SANS, fontSize: 13, color: "var(--ink-muted)" }}>
           <Link href="/legal/terms" style={LINK_STYLE}>
             Terms of Service
           </Link>

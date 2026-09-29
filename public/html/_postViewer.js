@@ -38,7 +38,7 @@
   html.vpv-iframe .vpv-card { box-shadow: 0 28px 80px rgba(0,0,0,.32), 0 6px 20px rgba(0,0,0,.12); }
   .vpv-overlay.show { display: flex; opacity: 1; }
   .vpv-card {
-    background: #FAF7F2; color: #1C1C1E;
+    background: var(--cream, #FAF7F2); color: var(--charcoal, #1C1C1E);
     border-radius: 18px; box-shadow: 0 20px 60px rgba(0,0,0,.35);
     width: min(680px, 100%); max-height: calc(100vh - 48px);
     display: flex; flex-direction: column;
@@ -64,7 +64,7 @@
   .vpv-more.show { display: flex; }
   .vpv-menu {
     position: absolute; top: 56px; right: 22px;
-    background: white; color: #1C1C1E;
+    background: var(--paper, white); color: var(--charcoal, #1C1C1E);
     border-radius: 12px; box-shadow: 0 8px 24px rgba(0,0,0,.18);
     padding: 6px; min-width: 160px;
     display: none; z-index: 1;
@@ -76,10 +76,10 @@
     background: transparent; border: none;
     padding: 8px 12px; border-radius: 8px;
     font-family: inherit; font-size: 13px; font-weight: 600;
-    color: #1C1C1E; cursor: none;
+    color: var(--charcoal, #1C1C1E); cursor: none;
   }
-  .vpv-menu button:hover { background: rgba(28,28,30,.06); }
-  .vpv-menu button.danger { color: #C54323; }
+  .vpv-menu button:hover { background: rgba(var(--scrim-rgb, 28,28,30),.06); }
+  .vpv-menu button.danger { color: var(--vpv-danger, #C54323); }
   .vpv-menu button.danger:hover { background: rgba(197,67,35,.08); }
   .vpv-header {
     display: flex; align-items: center; gap: 12px;
@@ -95,8 +95,8 @@
   .vpv-avatar img { width: 100%; height: 100%; object-fit: cover; display: block; }
   .vpv-meta { flex: 1; min-width: 0; }
   .vpv-meta .vpv-name { font-weight: 700; font-size: 14px; line-height: 1.2; }
-  .vpv-meta .vpv-sub  { font-size: 12px; color: #8A8580; margin-top: 2px; line-height: 1.2; }
-  .vpv-meta .vpv-sub strong { color: #1C1C1E; font-weight: 600; }
+  .vpv-meta .vpv-sub  { font-size: 12px; color: var(--ink-muted, #8A8580); margin-top: 2px; line-height: 1.2; }
+  .vpv-meta .vpv-sub strong { color: var(--charcoal, #1C1C1E); font-weight: 600; }
 
   .vpv-body {
     padding: 6px 22px 18px;
@@ -111,25 +111,25 @@
     padding: 11px 14px;
     border: 1px solid rgba(192,57,43,.22);
     border-radius: 12px;
-    background: #FDF4F2;
+    background: var(--vpv-removed-bg, #FDF4F2);
   }
   .vpv-removed-t {
-    font-size: 13px; font-weight: 700; color: #1C1C1E;
+    font-size: 13px; font-weight: 700; color: var(--charcoal, #1C1C1E);
   }
   .vpv-removed-d {
-    font-size: 12.5px; line-height: 1.5; color: #8A8580; margin-top: 3px;
+    font-size: 12.5px; line-height: 1.5; color: var(--ink-muted, #8A8580); margin-top: 3px;
   }
   .vpv-comment .vpv-removed {
     margin: 6px 0 0; padding: 8px 11px;
   }
   .vpv-text {
-    font-size: 15px; line-height: 1.55; color: #1C1C1E;
+    font-size: 15px; line-height: 1.55; color: var(--charcoal, #1C1C1E);
     white-space: pre-wrap; word-wrap: break-word;
   }
   .vpv-image {
     display: block; width: 100%; max-height: 540px; object-fit: cover;
     border-radius: 12px; margin-top: 12px;
-    background: #EFEAE2;
+    background: var(--vpv-media-bg, #EFEAE2);
   }
   .vpv-video {
     display: block; width: 100%; max-height: 540px; object-fit: contain;
@@ -149,7 +149,7 @@
     font-size: 11px; font-weight: 600; color: #FF5C35;
     background: rgba(255,92,53,.08); padding: 3px 8px; border-radius: 999px;
   }
-  .vpv-mention { color: #7B5FE0; font-weight: 600; text-decoration: none; }
+  .vpv-mention { color: var(--vpv-mention, #7B5FE0); font-weight: 600; text-decoration: none; }
   .vpv-mention:hover { text-decoration: underline; }
 
   /* Six items now live on this row (the author sees all of them), and the
@@ -158,20 +158,20 @@
      instead of squeezing the buttons into each other. */
   .vpv-actions {
     display: flex; flex-wrap: wrap; align-items: center; gap: 4px;
-    padding: 10px 14px; border-top: 1px solid rgba(28,28,30,.08);
+    padding: 10px 14px; border-top: 1px solid var(--hairline, rgba(28,28,30,.08));
   }
   .vpv-act {
     background: transparent; border: none; flex-shrink: 0;
     font-family: inherit; font-size: 13px; font-weight: 600;
-    color: #1C1C1E; padding: 8px 12px; border-radius: 999px;
+    color: var(--charcoal, #1C1C1E); padding: 8px 12px; border-radius: 999px;
     cursor: none; display: inline-flex; align-items: center; gap: 6px;
     transition: background .12s, color .12s, transform .08s;
   }
-  .vpv-act:hover { background: rgba(28,28,30,.06); }
+  .vpv-act:hover { background: rgba(var(--scrim-rgb, 28,28,30),.06); }
   .vpv-act:active { transform: scale(.97); }
   .vpv-act.on { color: #FF5C35; }
   .vpv-act.on .vpv-heart { fill: #FF5C35; stroke: #FF5C35; }
-  .vpv-act.on .vpv-bookmark { fill: #1C1C1E; stroke: #1C1C1E; }
+  .vpv-act.on .vpv-bookmark { fill: var(--charcoal, #1C1C1E); stroke: var(--charcoal, #1C1C1E); }
   .vpv-act svg { display: block; }
   /* A count nobody can act on is a label, not a button: the Views entry is
      disabled for everyone but the author, so it must stop pretending. */
@@ -183,26 +183,26 @@
   .vpv-spacer { flex: 1; }
 
   .vpv-comments {
-    border-top: 1px solid rgba(28,28,30,.08);
+    border-top: 1px solid var(--hairline, rgba(28,28,30,.08));
     padding: 14px 22px 0;
   }
   .vpv-comments-empty {
     padding: 20px 0 18px;
-    text-align: center; color: #8A8580; font-size: 13px;
+    text-align: center; color: var(--ink-muted, #8A8580); font-size: 13px;
   }
   .vpv-comment {
     display: flex; gap: 10px; padding: 10px 0;
   }
-  .vpv-comment + .vpv-comment { border-top: 1px solid rgba(28,28,30,.05); }
+  .vpv-comment + .vpv-comment { border-top: 1px solid rgba(var(--scrim-rgb, 28,28,30),.05); }
   .vpv-comment .vpv-avatar { width: 30px; height: 30px; font-size: 11px; }
   .vpv-cw { flex: 1; min-width: 0; }
-  .vpv-cw .vpv-cn { font-size: 13px; font-weight: 700; color: #1C1C1E; }
-  .vpv-cw .vpv-cn .vpv-ch { color: #8A8580; font-weight: 500; margin-left: 6px; font-size: 12px; }
-  .vpv-cw .vpv-ct { font-size: 13.5px; line-height: 1.45; color: #1C1C1E; margin-top: 2px; word-wrap: break-word; }
-  .vpv-cw .vpv-cd { font-size: 11px; color: #8A8580; margin-top: 4px; }
+  .vpv-cw .vpv-cn { font-size: 13px; font-weight: 700; color: var(--charcoal, #1C1C1E); }
+  .vpv-cw .vpv-cn .vpv-ch { color: var(--ink-muted, #8A8580); font-weight: 500; margin-left: 6px; font-size: 12px; }
+  .vpv-cw .vpv-ct { font-size: 13.5px; line-height: 1.45; color: var(--charcoal, #1C1C1E); margin-top: 2px; word-wrap: break-word; }
+  .vpv-cw .vpv-cd { font-size: 11px; color: var(--ink-muted, #8A8580); margin-top: 4px; }
   .vpv-cmeta {
     display: flex; align-items: center; gap: 14px;
-    margin-top: 6px; font-size: 11px; color: #8A8580;
+    margin-top: 6px; font-size: 11px; color: var(--ink-muted, #8A8580);
     font-family: 'DM Sans', system-ui, sans-serif;
   }
   .vpv-cact {
@@ -218,20 +218,20 @@
     display: flex; gap: 6px; margin-top: 8px;
   }
   .vpv-creply-form input {
-    flex: 1; border: 1px solid rgba(28,28,30,.14);
+    flex: 1; border: 1px solid rgba(var(--scrim-rgb, 28,28,30),.14);
     border-radius: 999px; padding: 6px 12px;
     font-family: inherit; font-size: 12.5px;
-    background: white; color: #1C1C1E; outline: none;
+    background: var(--paper, white); color: var(--charcoal, #1C1C1E); outline: none;
   }
   .vpv-creply-form button {
-    background: #1C1C1E; color: white; border: none;
+    background: var(--charcoal, #1C1C1E); color: var(--on-ink, white); border: none;
     font-family: inherit; font-size: 11px; font-weight: 700;
     padding: 6px 12px; border-radius: 999px; cursor: none;
   }
   .vpv-creply-form button[disabled] { opacity: .4; }
   .vpv-creplies {
     margin-top: 10px; padding-left: 10px;
-    border-left: 2px solid rgba(28,28,30,.06);
+    border-left: 2px solid rgba(var(--scrim-rgb, 28,28,30),.06);
     display: flex; flex-direction: column; gap: 8px;
   }
   .vpv-creplies .vpv-comment { padding: 6px 0; border-top: none !important; }
@@ -240,17 +240,17 @@
   .vpv-composer {
     display: flex; align-items: center; gap: 8px;
     padding: 10px 18px 14px;
-    border-top: 1px solid rgba(28,28,30,.08);
+    border-top: 1px solid var(--hairline, rgba(28,28,30,.08));
   }
   .vpv-composer textarea {
     flex: 1; resize: none; min-height: 36px; max-height: 120px;
-    border: 1px solid rgba(28,28,30,.14); border-radius: 18px;
+    border: 1px solid rgba(var(--scrim-rgb, 28,28,30),.14); border-radius: 18px;
     padding: 8px 14px; font-family: inherit; font-size: 13.5px;
-    background: white; color: #1C1C1E; outline: none;
+    background: var(--paper, white); color: var(--charcoal, #1C1C1E); outline: none;
   }
-  .vpv-composer textarea:focus { border-color: rgba(28,28,30,.35); }
+  .vpv-composer textarea:focus { border-color: rgba(var(--scrim-rgb, 28,28,30),.35); }
   .vpv-composer button {
-    background: #1C1C1E; color: white; border: none;
+    background: var(--charcoal, #1C1C1E); color: var(--on-ink, white); border: none;
     font-family: inherit; font-size: 12px; font-weight: 700;
     padding: 8px 16px; border-radius: 999px; cursor: none;
   }
@@ -270,7 +270,7 @@
   html.vpv-iframe .vpv-aud-overlay { background: rgba(28,28,30,.32); }
   .vpv-aud-overlay.show { display: flex; opacity: 1; }
   .vpv-aud-card {
-    background: #FAF7F2; color: #1C1C1E;
+    background: var(--cream, #FAF7F2); color: var(--charcoal, #1C1C1E);
     border-radius: 18px; box-shadow: 0 20px 60px rgba(0,0,0,.35);
     width: min(420px, 100%); max-height: min(560px, calc(100vh - 48px));
     display: flex; flex-direction: column; overflow: hidden;
@@ -278,19 +278,19 @@
   }
   .vpv-aud-head {
     display: flex; align-items: flex-start; gap: 12px;
-    padding: 18px 20px 12px; border-bottom: 1px solid rgba(28,28,30,.08);
+    padding: 18px 20px 12px; border-bottom: 1px solid var(--hairline, rgba(28,28,30,.08));
   }
   .vpv-aud-headtext { flex: 1; min-width: 0; }
   .vpv-aud-title { font-size: 15px; font-weight: 700; line-height: 1.2; }
-  .vpv-aud-sub { font-size: 12px; color: #8A8580; margin-top: 3px; line-height: 1.2; }
+  .vpv-aud-sub { font-size: 12px; color: var(--ink-muted, #8A8580); margin-top: 3px; line-height: 1.2; }
   .vpv-aud-close {
     background: transparent; border: none; padding: 0 2px;
-    font-size: 20px; line-height: 1; color: #8A8580; cursor: none;
+    font-size: 20px; line-height: 1; color: var(--ink-muted, #8A8580); cursor: none;
   }
   .vpv-aud-body { flex: 1; overflow-y: auto; padding: 4px 20px 18px; }
   .vpv-aud-day {
     font-size: 11px; font-weight: 700; letter-spacing: .06em;
-    text-transform: uppercase; color: #8A8580; padding: 12px 0 4px;
+    text-transform: uppercase; color: var(--ink-muted, #8A8580); padding: 12px 0 4px;
   }
   .vpv-aud-row {
     display: flex; align-items: center; gap: 10px;
@@ -308,24 +308,24 @@
     font-size: 13.5px; font-weight: 700; line-height: 1.25;
     white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
   }
-  .vpv-aud-h { color: #8A8580; font-weight: 500; font-size: 12px; margin-left: 6px; }
+  .vpv-aud-h { color: var(--ink-muted, #8A8580); font-weight: 500; font-size: 12px; margin-left: 6px; }
   .vpv-aud-meta {
-    font-size: 11.5px; color: #8A8580; margin-top: 2px;
+    font-size: 11.5px; color: var(--ink-muted, #8A8580); margin-top: 2px;
     white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
   }
   .vpv-aud-empty, .vpv-aud-loading {
-    padding: 26px 0; text-align: center; color: #8A8580; font-size: 13px;
+    padding: 26px 0; text-align: center; color: var(--ink-muted, #8A8580); font-size: 13px;
   }
   .vpv-aud-more {
     display: block; width: 100%; margin-top: 12px;
-    background: transparent; border: 1px solid rgba(28,28,30,.14);
+    background: transparent; border: 1px solid rgba(var(--scrim-rgb, 28,28,30),.14);
     border-radius: 999px; padding: 8px 0;
     font-family: inherit; font-size: 12.5px; font-weight: 700;
-    color: #1C1C1E; cursor: none;
+    color: var(--charcoal, #1C1C1E); cursor: none;
   }
   .vpv-aud-lock { padding: 28px 6px 12px; text-align: center; }
   .vpv-aud-lock-n { font-size: 34px; font-weight: 800; line-height: 1; }
-  .vpv-aud-lock-label { font-size: 13px; color: #8A8580; margin-top: 6px; }
+  .vpv-aud-lock-label { font-size: 13px; color: var(--ink-muted, #8A8580); margin-top: 6px; }
   .vpv-aud-lock-line { font-size: 14px; font-weight: 600; margin-top: 16px; }
   .vpv-aud-cta {
     display: inline-block; margin-top: 14px;
@@ -340,34 +340,63 @@
   .vpv-edit {
     display: block; width: 100%; box-sizing: border-box;
     min-height: 120px; max-height: 360px; resize: vertical;
-    border: 1px solid rgba(28,28,30,.14); border-radius: 12px;
+    border: 1px solid rgba(var(--scrim-rgb, 28,28,30),.14); border-radius: 12px;
     padding: 10px 12px; font-family: inherit; font-size: 15px; line-height: 1.55;
-    background: white; color: #1C1C1E; outline: none;
+    background: var(--paper, white); color: var(--charcoal, #1C1C1E); outline: none;
   }
-  .vpv-edit:focus { border-color: rgba(28,28,30,.35); }
+  .vpv-edit:focus { border-color: rgba(var(--scrim-rgb, 28,28,30),.35); }
   .vpv-edit-row {
     display: flex; align-items: center; justify-content: space-between;
     gap: 8px; margin-top: 8px;
   }
-  .vpv-edit-hint { font-size: 12px; color: #8A8580; min-width: 0; }
+  .vpv-edit-hint { font-size: 12px; color: var(--ink-muted, #8A8580); min-width: 0; }
   .vpv-edit-actions { display: flex; gap: 6px; flex-shrink: 0; }
   .vpv-edit-btn {
-    background: transparent; color: #1C1C1E; border: 1px solid rgba(28,28,30,.14);
+    background: transparent; color: var(--charcoal, #1C1C1E); border: 1px solid rgba(var(--scrim-rgb, 28,28,30),.14);
     font-family: inherit; font-size: 12px; font-weight: 700;
     padding: 7px 14px; border-radius: 999px; cursor: none;
   }
-  .vpv-edit-btn.primary { background: #1C1C1E; color: white; border-color: #1C1C1E; }
+  .vpv-edit-btn.primary { background: var(--charcoal, #1C1C1E); color: var(--on-ink, white); border-color: var(--charcoal, #1C1C1E); }
   .vpv-edit-btn[disabled] { opacity: .4; cursor: default; }
 
   .vpv-toast {
     position: fixed; left: 50%; bottom: 32px; transform: translateX(-50%) translateY(20px);
-    background: #1C1C1E; color: white;
+    background: var(--charcoal, #1C1C1E); color: var(--on-ink, white);
     padding: 10px 18px; border-radius: 999px;
     font-family: 'DM Sans', system-ui, sans-serif; font-size: 12.5px; font-weight: 600;
     z-index: 10001; opacity: 0; transition: opacity .18s, transform .18s;
     pointer-events: none;
   }
   .vpv-toast.show { opacity: 1; transform: translateX(-50%) translateY(0); }
+
+  /* The action-row icons carry stroke="#1C1C1E" in the markup; this lets
+     them follow the ink. Lower specificity than the .on rules above, so a
+     liked heart stays coral. */
+  .vpv-act svg [stroke="#1C1C1E"] { stroke: var(--charcoal, #1C1C1E); }
+
+  /* Night (S68 wave 5): the viewer's own copy of the Night tokens it reads,
+     scoped to its two overlays, so it paints Night on any host
+     (messages.html has no --ink-muted / --hairline). Light sets nothing
+     here: each var() above falls back to the literal it replaced, and the
+     four --vpv-* tokens exist only for literals no shared token matches.
+     Charcoal buttons and the toast turn cream with dark text (--on-ink).
+     Deliberate dark chrome stays: the dim backdrops, the round close / ⋯
+     buttons on them, avatars, the video letterbox, coral and the like pink. */
+  html[data-theme="dark"] .vpv-overlay,
+  html[data-theme="dark"] .vpv-aud-overlay {
+    --cream: #0C0B0B; --charcoal: #F6F1EA; --paper: #161515;
+    --ink-muted: #9C958C; --hairline: rgba(255,255,255,0.09);
+    --scrim-rgb: 255,255,255; --on-ink: #0C0B0B;
+    --vpv-danger: #FF7A6B; --vpv-removed-bg: rgba(255,122,107,0.08);
+    --vpv-media-bg: #1F1D1C; --vpv-mention: #A590FF;
+  }
+  html[data-theme="dark"] .vpv-overlay ::placeholder { color: var(--ink-muted, #8A8580); }
+  /* A near-black card on a near-black page (the iframe drops the dim) needs
+     an edge: a hairline ring, drawn as a shadow so nothing moves. */
+  html[data-theme="dark"] .vpv-card,
+  html[data-theme="dark"] .vpv-aud-card {
+    box-shadow: 0 0 0 1px rgba(255,255,255,0.09), 0 20px 60px rgba(0,0,0,.5);
+  }
   `;
 
   const styleEl = document.createElement("style");
@@ -1169,7 +1198,7 @@
           </button>
           <button class="vpv-cact" onclick="__vpvOpenReply('${esc(c.id)}', '${esc(a.handle || "")}')">Reply</button>
           ${reportBtn}
-          <span style="margin-left:auto;color:#8A8580">${esc(relTime(c.created_at))}</span>
+          <span style="margin-left:auto;color:var(--ink-muted, #8A8580)">${esc(relTime(c.created_at))}</span>
         </div>
         ${removedHtml}
         <div class="vpv-creply-form" id="vpv-reply-${esc(c.id)}" style="display:none">

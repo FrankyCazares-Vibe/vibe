@@ -1632,7 +1632,7 @@ function FeedCard({
               fontWeight: 800,
               fontSize: 13,
               flexShrink: 0,
-              border: "1px solid rgba(255,255,255,0.6)",
+              border: "1px solid var(--glass-border-60, rgba(255,255,255,0.6))",
             }}
           >
             {!author?.avatar_url ? initials || "?" : null}
@@ -1681,9 +1681,9 @@ function FeedCard({
             width: 30,
             height: 30,
             borderRadius: 999,
-            border: "1px solid rgba(28,28,30,0.06)",
-            background: "rgba(255,255,255,0.62)",
-            color: "#5C5853",
+            border: "1px solid rgba(var(--scrim-rgb),0.06)",
+            background: "var(--paper-62)",
+            color: "var(--ink-2)",
             display: "inline-flex",
             alignItems: "center",
             justifyContent: "center",
@@ -3333,7 +3333,7 @@ function OrgRow({
               fontWeight: 800,
               fontSize: 18,
               flexShrink: 0,
-              border: "1px solid rgba(255,255,255,0.6)",
+              border: "1px solid var(--glass-border-60, rgba(255,255,255,0.6))",
             }}
           >
             {!logoUrl
@@ -3461,8 +3461,8 @@ function PaneSkeleton() {
           style={{
             height: 110,
             borderRadius: 18,
-            background: "rgba(255,253,248,0.45)",
-            border: "1px solid rgba(255,255,255,0.6)",
+            background: "var(--glass-45, rgba(255,253,248,0.45))",
+            border: "1px solid var(--glass-border-60, rgba(255,255,255,0.6))",
           }}
         />
       ))}
@@ -3476,8 +3476,8 @@ function EmptyTab({ title, body }: { title: string; body: string }) {
       style={{
         padding: "48px 24px",
         textAlign: "center",
-        background: "rgba(255,253,248,0.6)",
-        border: "1px dashed rgba(28,28,30,0.14)",
+        background: "var(--glass-60, rgba(255,253,248,0.6))",
+        border: "1px dashed rgba(var(--scrim-rgb),0.14)",
         borderRadius: 18,
         marginTop: 8,
       }}
@@ -3487,7 +3487,7 @@ function EmptyTab({ title, body }: { title: string; body: string }) {
           fontFamily: "Fraunces, serif",
           fontWeight: 800,
           fontSize: 17,
-          color: "#1C1C1E",
+          color: "var(--charcoal)",
           marginBottom: 6,
         }}
       >
@@ -3497,7 +3497,7 @@ function EmptyTab({ title, body }: { title: string; body: string }) {
         style={{
           fontFamily: "DM Sans, sans-serif",
           fontSize: 13.5,
-          color: "#5C5853",
+          color: "var(--ink-2)",
           lineHeight: 1.5,
           margin: 0,
         }}
@@ -4111,11 +4111,11 @@ export function CampusSearchOverlay({
               width: "100%",
               padding: "11px 14px 11px 38px",
               borderRadius: 14,
-              border: "1px solid rgba(28,28,30,0.10)",
-              background: "rgba(255,255,255,0.92)",
+              border: "1px solid rgba(var(--scrim-rgb),0.10)",
+              background: "var(--paper-92, rgba(255,255,255,0.92))",
               fontFamily: "DM Sans, sans-serif",
               fontSize: 15,
-              color: "#1C1C1E",
+              color: "var(--charcoal)",
               outline: "none",
             }}
           />
@@ -4257,7 +4257,7 @@ function SearchUserRow({ u, onPick }: { u: SearchUser; onPick: () => void }) {
           fontWeight: 800,
           fontSize: 15,
           flexShrink: 0,
-          border: "1px solid rgba(255,255,255,0.6)",
+          border: "1px solid var(--glass-border-60, rgba(255,255,255,0.6))",
         }}
       >
         {!u.avatar_url ? initials : null}
@@ -4331,7 +4331,7 @@ function SearchOrgRow({ o, onPick }: { o: SearchOrg; onPick: () => void }) {
             ? `url(${o.logo_url}) center/cover`
             : "linear-gradient(135deg,#FFD3C2 0%,#FF9D7E 100%)",
           flexShrink: 0,
-          border: "1px solid rgba(255,255,255,0.6)",
+          border: "1px solid var(--glass-border-60, rgba(255,255,255,0.6))",
         }}
       />
       <div style={{ flex: 1, minWidth: 0 }}>

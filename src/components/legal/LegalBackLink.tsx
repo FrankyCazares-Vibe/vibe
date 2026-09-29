@@ -22,7 +22,7 @@ export function LegalBackLink() {
         fontFamily: "DM Sans, sans-serif",
         fontSize: 13,
         fontWeight: 700,
-        color: "#5C5853",
+        color: "var(--ink-2)",
         textDecoration: "none",
       }}
     >

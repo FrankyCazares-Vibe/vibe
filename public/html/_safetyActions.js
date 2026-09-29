@@ -38,7 +38,7 @@
       toast = document.createElement("div");
       toast.id = "vsa-toast";
       toast.style.cssText =
-        "position:fixed;bottom:32px;left:50%;transform:translateX(-50%);background:#1C1C1E;color:white;padding:11px 18px;border-radius:100px;font-family:'DM Sans',sans-serif;font-size:13px;font-weight:600;z-index:11500;box-shadow:0 12px 36px rgba(0,0,0,.18);transition:opacity .25s;";
+        "position:fixed;bottom:32px;left:50%;transform:translateX(-50%);background:var(--charcoal,#1C1C1E);color:var(--on-ink,white);padding:11px 18px;border-radius:100px;font-family:'DM Sans',sans-serif;font-size:13px;font-weight:600;z-index:11500;box-shadow:0 12px 36px rgba(0,0,0,.18);transition:opacity .25s;";
       document.body.appendChild(toast);
     }
     toast.textContent = msg;
@@ -57,34 +57,45 @@
        card's strong shadow + border carries enough modal weight. */
     .vsa-overlay{position:fixed;inset:0;background:transparent;z-index:11000;display:none;align-items:center;justify-content:center;padding:24px;}
     .vsa-overlay.show{display:flex;}
-    .vsa-card{width:min(420px,92vw);background:white;border-radius:16px;border:1px solid rgba(28,28,30,.08);box-shadow:0 28px 80px rgba(0,0,0,.28),0 4px 16px rgba(0,0,0,.08);overflow:hidden;display:flex;flex-direction:column;font-family:'DM Sans',system-ui,sans-serif;}
-    .vsa-hdr{padding:16px 20px 12px;display:flex;align-items:center;gap:10px;border-bottom:1px solid rgba(28,28,30,.08);}
-    .vsa-title{font-family:'Fraunces',serif;font-size:17px;font-weight:800;flex:1;color:#1C1C1E;}
-    .vsa-x{background:none;border:none;color:#8A8580;cursor:pointer;font-size:18px;line-height:1;padding:4px 6px;}
+    .vsa-card{width:min(420px,92vw);background:var(--paper,white);border-radius:16px;border:1px solid var(--hairline,rgba(28,28,30,.08));box-shadow:0 28px 80px rgba(0,0,0,.28),0 4px 16px rgba(0,0,0,.08);overflow:hidden;display:flex;flex-direction:column;font-family:'DM Sans',system-ui,sans-serif;}
+    .vsa-hdr{padding:16px 20px 12px;display:flex;align-items:center;gap:10px;border-bottom:1px solid var(--hairline,rgba(28,28,30,.08));}
+    .vsa-title{font-family:'Fraunces',serif;font-size:17px;font-weight:800;flex:1;color:var(--charcoal,#1C1C1E);}
+    .vsa-x{background:none;border:none;color:var(--ink-muted,#8A8580);cursor:pointer;font-size:18px;line-height:1;padding:4px 6px;}
     .vsa-body{padding:14px 20px 18px;}
-    .vsa-row{display:flex;align-items:center;justify-content:space-between;padding:11px 14px;border-radius:10px;border:1px solid rgba(28,28,30,.08);cursor:pointer;font-size:13.5px;font-weight:600;color:#1C1C1E;margin-bottom:8px;background:white;transition:background .12s,border-color .12s;}
-    .vsa-row:hover{background:#FAF7F2;border-color:rgba(28,28,30,.18);}
-    .vsa-row.danger{color:#C0392B;}
-    .vsa-row.selected{background:rgba(255,92,53,.06);border-color:#FF5C35;color:#1C1C1E;}
-    .vsa-row .vsa-row-sub{display:block;font-size:11px;color:#8A8580;font-weight:500;margin-top:2px;}
-    .vsa-text{width:100%;border:1.5px solid rgba(28,28,30,.08);border-radius:10px;padding:10px 12px;font-family:inherit;font-size:13px;outline:none;resize:vertical;min-height:80px;margin-top:8px;}
-    .vsa-text:focus{border-color:rgba(28,28,30,.2);}
-    .vsa-foot{padding:14px 20px;display:flex;gap:10px;justify-content:flex-end;border-top:1px solid rgba(28,28,30,.08);}
+    .vsa-row{display:flex;align-items:center;justify-content:space-between;padding:11px 14px;border-radius:10px;border:1px solid var(--hairline,rgba(28,28,30,.08));cursor:pointer;font-size:13.5px;font-weight:600;color:var(--charcoal,#1C1C1E);margin-bottom:8px;background:var(--paper,white);transition:background .12s,border-color .12s;}
+    .vsa-row:hover{background:var(--cream,#FAF7F2);border-color:rgba(var(--scrim-rgb,28,28,30),.18);}
+    .vsa-row.danger{color:var(--error-ink,#C0392B);}
+    .vsa-row.selected{background:rgba(255,92,53,.06);border-color:#FF5C35;color:var(--charcoal,#1C1C1E);}
+    .vsa-row .vsa-row-sub{display:block;font-size:11px;color:var(--ink-muted,#8A8580);font-weight:500;margin-top:2px;}
+    .vsa-text{width:100%;border:1.5px solid var(--hairline,rgba(28,28,30,.08));border-radius:10px;padding:10px 12px;font-family:inherit;font-size:13px;outline:none;resize:vertical;min-height:80px;margin-top:8px;}
+    .vsa-text:focus{border-color:rgba(var(--scrim-rgb,28,28,30),.2);}
+    .vsa-foot{padding:14px 20px;display:flex;gap:10px;justify-content:flex-end;border-top:1px solid var(--hairline,rgba(28,28,30,.08));}
     .vsa-btn{padding:8px 18px;border-radius:100px;font-family:'DM Sans',sans-serif;font-size:13px;font-weight:700;cursor:pointer;border:none;}
-    .vsa-btn.ghost{background:none;border:1px solid rgba(28,28,30,.12);color:#1C1C1E;}
-    .vsa-btn.ghost:hover{background:#FAF7F2;}
+    .vsa-btn.ghost{background:none;border:1px solid rgba(var(--scrim-rgb,28,28,30),.12);color:var(--charcoal,#1C1C1E);}
+    .vsa-btn.ghost:hover{background:var(--cream,#FAF7F2);}
     .vsa-btn.primary{background:#FF5C35;color:white;}
     .vsa-btn.primary:hover{filter:brightness(1.05);}
     .vsa-btn.primary:disabled{opacity:.45;cursor:not-allowed;}
     .vsa-btn.danger{background:#C0392B;color:white;}
     .vsa-btn.danger:hover{filter:brightness(1.05);}
-    .vsa-note{font-size:12.5px;color:#8A8580;line-height:1.5;}
+    .vsa-note{font-size:12.5px;color:var(--ink-muted,#8A8580);line-height:1.5;}
     /* A refusal the shared copy table can't speak for (see vibeOpenReportSheet
        below): it belongs beside the button that was just pressed, not in a
        toast that slides away while the sheet is still open. */
-    .vsa-error{margin-top:10px;font-size:12.5px;line-height:1.45;color:#C0392B;}
+    .vsa-error{margin-top:10px;font-size:12.5px;line-height:1.45;color:var(--error-ink,#C0392B);}
     .vsa-error-act{display:inline-block;margin-left:6px;padding:0;border:none;background:none;
-      font-family:inherit;font-size:12.5px;font-weight:700;color:#C0392B;text-decoration:underline;cursor:pointer;}
+      font-family:inherit;font-size:12.5px;font-weight:700;color:var(--error-ink,#C0392B);text-decoration:underline;cursor:pointer;}
+    /* Night (S68 wave 5): the sheet's own copy of the Night tokens it reads,
+       scoped to its overlay and the fallback toast, so it paints Night on any
+       host (messages.html has no --ink-muted / --hairline / --error-ink).
+       Light sets nothing here: each var() above falls back to the literal it
+       replaced. The toast's charcoal fill turns cream with dark text, the
+       --on-ink pattern. The note textarea had no colour of its own (browser
+       field), so Night alone gives it one. Red and coral fills stay. */
+    html[data-theme="dark"] .vsa-overlay,html[data-theme="dark"] #vsa-toast{--paper:#161515;--cream:#0C0B0B;--charcoal:#F6F1EA;--ink-muted:#9C958C;--hairline:rgba(255,255,255,0.09);--scrim-rgb:255,255,255;--error-ink:#FF7A6B;--on-ink:#0C0B0B;}
+    html[data-theme="dark"] .vsa-card{color:var(--charcoal,#1C1C1E);}
+    html[data-theme="dark"] .vsa-text{background:var(--paper,white);color:var(--charcoal,#1C1C1E);}
+    html[data-theme="dark"] .vsa-text::placeholder{color:var(--ink-muted,#8A8580);}
   `;
   document.head.appendChild(styleEl);
 

@@ -359,20 +359,18 @@ export function NetworkPageClient() {
       style={{
         // Same warm radial cream wash the campus Feed uses — keeps the surface
         // continuous when bouncing between Campus → Network → Messages.
-        // Night (S67 wave 3): this page stays a cream island on purpose, with
-        // its inks pinned (color below). UserCard and the tabs / filters /
-        // empty islands are a `--glass → rgba(255,250,240,0.66)` gradient
-        // with no token yet (--glass-lo); on the near-black backdrop they'd
-        // turn to grey slabs with unreadable grey text. Move to
-        // var(--feed-backdrop) together with those surfaces.
-        background: [
+        // Night (S68 wave 5): the wash is --network-backdrop (Light: today's
+        // three layers exactly; Night: the campus feed's near-black bloom),
+        // and UserCard, the tabs, filters, search and empty islands read the
+        // C0 glass steps, so the page follows the theme. Each new token's
+        // fallback is today's Light literal, so Light can't drift.
+        background: `var(--network-backdrop, ${[
           "radial-gradient(120% 80% at 0% 0%, rgba(255,222,180,0.45) 0%, rgba(255,222,180,0) 60%)",
           "radial-gradient(110% 80% at 100% 100%, rgba(255,200,170,0.35) 0%, rgba(255,200,170,0) 60%)",
           "linear-gradient(180deg, #FAF7F2 0%, #F4EDE2 100%)",
-        ].join(", "),
-        // Light inherits this same ink from <body>; Night's body ink is light.
-        color: "#1C1C1E",
-        borderRight: "1px solid rgba(28,28,30,0.08)",
+        ].join(", ")})`,
+        color: "var(--charcoal)",
+        borderRight: "1px solid var(--hairline)",
         padding: "32px 28px 80px",
         minWidth: 0,
       }}
@@ -385,7 +383,7 @@ export function NetworkPageClient() {
             fontWeight: 700,
             letterSpacing: "0.18em",
             textTransform: "uppercase",
-            color: "#C84A20",
+            color: "var(--eyebrow-ink)",
             marginBottom: 6,
           }}
         >
@@ -396,7 +394,7 @@ export function NetworkPageClient() {
             fontFamily: "Fraunces, serif",
             fontSize: "clamp(26px, 3vw, 32px)",
             fontWeight: 900,
-            color: "#1C1C1E",
+            color: "var(--charcoal)",
             letterSpacing: "-0.02em",
             margin: 0,
           }}
@@ -407,7 +405,7 @@ export function NetworkPageClient() {
           style={{
             fontFamily: "DM Sans, sans-serif",
             fontSize: 14,
-            color: "#5C5853",
+            color: "var(--ink-2)",
             margin: "6px 0 0",
           }}
         >
@@ -516,11 +514,11 @@ function NetworkTabs({
               borderRadius: 999,
               border: active
                 ? "1px solid rgba(200,74,32,0.4)"
-                : "1px solid rgba(28,28,30,0.10)",
+                : "1px solid rgba(var(--scrim-rgb),0.10)",
               background: active
                 ? "linear-gradient(180deg, #FF7B4A 0%, #FF5C35 100%)"
-                : "linear-gradient(180deg, rgba(255,253,248,0.78) 0%, rgba(255,250,240,0.68) 100%)",
-              color: active ? "#fff" : "#1C1C1E",
+                : "linear-gradient(180deg, var(--glass) 0%, var(--glass-warm-68, rgba(255,250,240,0.68)) 100%)",
+              color: active ? "#fff" : "var(--charcoal)",
               fontFamily: "DM Sans, sans-serif",
               fontSize: 13,
               fontWeight: 700,
@@ -529,7 +527,7 @@ function NetworkTabs({
               WebkitBackdropFilter: "blur(12px) saturate(160%)",
               boxShadow: active
                 ? "inset 0 1px 0 rgba(255,255,255,0.32), 0 4px 12px rgba(255,92,53,0.22)"
-                : "inset 0 1px 0 rgba(255,255,255,0.85)",
+                : "inset 0 1px 0 var(--sheen)",
               transition: "background 120ms ease, color 120ms ease",
             }}
           >
@@ -539,7 +537,7 @@ function NetworkTabs({
                 style={{
                   marginLeft: 6,
                   fontWeight: 700,
-                  color: active ? "rgba(255,255,255,0.78)" : "#8A8580",
+                  color: active ? "rgba(255,255,255,0.78)" : "var(--ink-muted)",
                 }}
               >
                 {count}
@@ -571,13 +569,13 @@ function SearchBar({
           width: "100%",
           padding: "11px 16px",
           borderRadius: 999,
-          border: "1px solid rgba(28,28,30,0.10)",
+          border: "1px solid rgba(var(--scrim-rgb),0.10)",
           background:
-            "linear-gradient(180deg, rgba(255,253,248,0.78) 0%, rgba(255,250,240,0.68) 100%)",
+            "linear-gradient(180deg, var(--glass) 0%, var(--glass-warm-68, rgba(255,250,240,0.68)) 100%)",
           backdropFilter: "blur(12px) saturate(160%)",
           WebkitBackdropFilter: "blur(12px) saturate(160%)",
-          boxShadow: "inset 0 1px 0 rgba(255,255,255,0.85)",
-          color: "#1C1C1E",
+          boxShadow: "inset 0 1px 0 var(--sheen)",
+          color: "var(--charcoal)",
           fontFamily: "DM Sans, sans-serif",
           fontSize: 14,
           outline: "none",
@@ -614,11 +612,11 @@ function SuggestionFilters({
               borderRadius: 999,
               border: active
                 ? "1px solid rgba(200,74,32,0.4)"
-                : "1px solid rgba(28,28,30,0.10)",
+                : "1px solid rgba(var(--scrim-rgb),0.10)",
               background: active
                 ? "rgba(255,140,90,0.20)"
-                : "linear-gradient(180deg, rgba(255,253,248,0.78) 0%, rgba(255,250,240,0.68) 100%)",
-              color: active ? "#C84A20" : "#5C5853",
+                : "linear-gradient(180deg, var(--glass) 0%, var(--glass-warm-68, rgba(255,250,240,0.68)) 100%)",
+              color: active ? "var(--eyebrow-ink)" : "var(--ink-2)",
               fontFamily: "DM Sans, sans-serif",
               fontSize: 12,
               fontWeight: 700,
@@ -685,13 +683,13 @@ function ListBody({
             margin: "10px auto 0",
             padding: "10px 18px",
             borderRadius: 999,
-            border: "1px solid rgba(28,28,30,0.10)",
+            border: "1px solid rgba(var(--scrim-rgb),0.10)",
             background:
-              "linear-gradient(180deg, rgba(255,253,248,0.78) 0%, rgba(255,250,240,0.68) 100%)",
+              "linear-gradient(180deg, var(--glass) 0%, var(--glass-warm-68, rgba(255,250,240,0.68)) 100%)",
             backdropFilter: "blur(12px) saturate(160%)",
             WebkitBackdropFilter: "blur(12px) saturate(160%)",
-            boxShadow: "inset 0 1px 0 rgba(255,255,255,0.85)",
-            color: "#1C1C1E",
+            boxShadow: "inset 0 1px 0 var(--sheen)",
+            color: "var(--charcoal)",
             fontFamily: "DM Sans, sans-serif",
             fontSize: 13,
             fontWeight: 700,
@@ -756,8 +754,8 @@ function SkeletonList() {
             height: 88,
             borderRadius: 18,
             background:
-              "linear-gradient(180deg, rgba(255,253,248,0.55) 0%, rgba(255,250,240,0.4) 100%)",
-            border: "1px solid rgba(255,255,255,0.6)",
+              "linear-gradient(180deg, var(--glass-55) 0%, var(--glass-warm-40, rgba(255,250,240,0.4)) 100%)",
+            border: "1px solid var(--glass-border-60, rgba(255,255,255,0.6))",
             boxShadow: "inset 0 1px 0 rgba(255,255,255,0.8)",
             opacity: 0.7,
           }}
@@ -781,11 +779,11 @@ function EmptyState({
           padding: "28px 18px",
           borderRadius: 18,
           background:
-            "linear-gradient(180deg, rgba(255,253,248,0.6) 0%, rgba(255,250,240,0.5) 100%)",
-          border: "1px dashed rgba(28,28,30,0.14)",
+            "linear-gradient(180deg, var(--glass-60, rgba(255,253,248,0.6)) 0%, var(--glass-warm-50, rgba(255,250,240,0.5)) 100%)",
+          border: "1px dashed rgba(var(--scrim-rgb),0.14)",
           textAlign: "center",
           fontFamily: "DM Sans, sans-serif",
-          color: "#5C5853",
+          color: "var(--ink-2)",
           fontSize: 14,
         }}
       >
@@ -822,14 +820,14 @@ function EmptyState({
         padding: "36px 24px",
         borderRadius: 22,
         background:
-          "linear-gradient(180deg, rgba(255,253,248,0.78) 0%, rgba(255,243,228,0.66) 100%)",
-        border: "1px solid rgba(255,255,255,0.7)",
+          "linear-gradient(180deg, var(--glass) 0%, var(--glass-peach-66, rgba(255,243,228,0.66)) 100%)",
+        border: "1px solid var(--glass-border)",
         boxShadow: [
-          "inset 0 1px 0 rgba(255,255,255,0.85)",
+          "inset 0 1px 0 var(--sheen)",
           "inset 0 -1px 0 rgba(28,28,30,0.04)",
           "0 8px 28px rgba(180,120,60,0.10)",
         ].join(", "),
-        color: "#1C1C1E",
+        color: "var(--charcoal)",
         textAlign: "center",
       }}
     >
@@ -838,7 +836,7 @@ function EmptyState({
           fontFamily: "Fraunces, serif",
           fontSize: 22,
           fontWeight: 900,
-          color: "#1C1C1E",
+          color: "var(--charcoal)",
           letterSpacing: "-0.01em",
           marginBottom: 6,
         }}
@@ -849,7 +847,7 @@ function EmptyState({
         style={{
           fontFamily: "DM Sans, sans-serif",
           fontSize: 14,
-          color: "#5C5853",
+          color: "var(--ink-2)",
           margin: "0 auto 16px",
           maxWidth: 440,
           lineHeight: 1.5,

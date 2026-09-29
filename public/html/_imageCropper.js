@@ -25,7 +25,7 @@
         backdrop-filter: blur(8px); -webkit-backdrop-filter: blur(8px);
         z-index: 11000; display: flex; align-items: center; justify-content: center;
         padding: 20px; font-family: 'DM Sans', system-ui, sans-serif; }
-      .vc-modal { width: 100%; max-width: 620px; background: #fff; border-radius: 18px;
+      .vc-modal { width: 100%; max-width: 620px; background: var(--paper, #fff); border-radius: 18px;
         padding: 18px; box-shadow: 0 24px 80px rgba(0,0,0,0.4);
         display: flex; flex-direction: column; gap: 14px;
         /* A tall card used to run off a short screen with Save unreachable.
@@ -33,22 +33,30 @@
            fallback for browsers without dvh (Safari < 15.4). */
         max-height: calc(100vh - 40px);
         max-height: calc(100dvh - 40px); overflow-y: auto; }
-      .vc-title { font-family: 'Fraunces', serif; font-weight: 800; font-size: 18px; color: #1C1C1E; }
+      .vc-title { font-family: 'Fraunces', serif; font-weight: 800; font-size: 18px; color: var(--charcoal, #1C1C1E); }
       .vc-stage { position: relative; margin: 0 auto; background: #000; overflow: hidden;
         border-radius: 12px; touch-action: none; user-select: none; cursor: grab; }
       .vc-stage.grabbing { cursor: grabbing; }
       .vc-img { position: absolute; left: 0; top: 0; max-width: none; pointer-events: none; }
       .vc-zoom { display: flex; align-items: center; gap: 10px; }
-      .vc-zoom-label { font-size: 11px; font-weight: 700; color: #8A8580;
+      .vc-zoom-label { font-size: 11px; font-weight: 700; color: var(--ink-muted, #8A8580);
         letter-spacing: 0.4px; text-transform: uppercase; }
       .vc-zoom-slider { flex: 1; accent-color: #FF5C35; }
       .vc-actions { display: flex; justify-content: flex-end; gap: 8px; }
       .vc-btn { padding: 8px 14px; min-height: 44px; border-radius: 999px; font-family: inherit;
-        font-size: 12px; font-weight: 700; cursor: pointer; border: 1px solid rgba(28,28,30,0.12);
-        background: transparent; color: #1C1C1E; }
+        font-size: 12px; font-weight: 700; cursor: pointer; border: 1px solid rgba(var(--scrim-rgb, 28,28,30),0.12);
+        background: transparent; color: var(--charcoal, #1C1C1E); }
       .vc-btn-primary { padding: 8px 18px; border: none; background: #FF5C35; color: #fff;
         box-shadow: 0 4px 14px rgba(255,92,53,0.32); }
       .vc-btn[disabled] { opacity: 0.5; cursor: default; box-shadow: none; }
+      /* Night (S68 wave 5): the cropper's own copy of the Night tokens it
+         reads, scoped to its backdrop. It must not borrow the host's: on
+         onboarding.html --charcoal is the page BACKGROUND (dark in Night),
+         so the card sets its own ink. Light sets nothing here; each var()
+         falls back to the literal it replaced. The black stage, the dim
+         backdrop and the coral Save stay as they are. */
+      html[data-theme="dark"] .vc-back { --paper: #161515; --charcoal: #F6F1EA;
+        --ink-muted: #9C958C; --scrim-rgb: 255,255,255; --vc-legend-ink: #CFC8BE; }
     `;
     const tag = document.createElement("style");
     tag.id = "vibe-cropper-styles";
@@ -171,7 +179,7 @@
           legend.style.gap = "14px";
           legend.style.fontFamily = "'DM Sans', sans-serif";
           legend.style.fontSize = "11px";
-          legend.style.color = "#5C5852";
+          legend.style.color = "var(--vc-legend-ink, #5C5852)";
           legend.style.lineHeight = "1.4";
           for (let i = 0; i < safeAreaGuides.length; i++) {
             const g = safeAreaGuides[i];
@@ -190,7 +198,7 @@
             label.style.fontWeight = "700";
             const suffix = document.createElement("span");
             suffix.textContent = "visible area";
-            suffix.style.color = "#8A8580";
+            suffix.style.color = "var(--ink-muted, #8A8580)";
             row.appendChild(swatch);
             row.appendChild(label);
             row.appendChild(suffix);

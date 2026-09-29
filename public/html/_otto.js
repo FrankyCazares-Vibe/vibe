@@ -43,11 +43,15 @@
     #ottoCorner .otto-notif {
       position: absolute; top: -2px; right: -2px;
       width: 11px; height: 11px; border-radius: 50%;
-      background: #FF5C35; border: 2px solid #FAF7F2;
+      background: #FF5C35; border: 2px solid var(--cream, #FAF7F2);
       z-index: 2; box-shadow: 0 0 8px rgba(255,92,53,.5);
       display: none;
     }
     #ottoCorner.has-unread .otto-notif { display: block; }
+    /* Night (S68 wave 5): the dot's ring is the page colour, so it reads the
+       host's --cream (near-black in Night on both host pages). Everything
+       else Otto paints (the 52px shell, the slide-out panels, the ask bubble,
+       the toast) is dark chrome in Light too and stays as it is. */
     #ottoCorner .otto-shell {
       width: 52px; height: 52px; border-radius: 50%;
       background: #1C1C1E; border: 0.5px solid rgba(255,92,53,.3);

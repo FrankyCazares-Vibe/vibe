@@ -213,12 +213,12 @@ export function UserCard(props: UserCardProps) {
         gap: compact ? 10 : 14,
         padding: compact ? "10px 12px" : "12px 16px",
         background:
-          "linear-gradient(180deg, rgba(255,253,248,0.78) 0%, rgba(255,250,240,0.66) 100%)",
+          "linear-gradient(180deg, var(--glass) 0%, var(--glass-warm-66, rgba(255,250,240,0.66)) 100%)",
         backdropFilter: "blur(28px) saturate(180%)",
         WebkitBackdropFilter: "blur(28px) saturate(180%)",
         border: hovered
           ? "1px solid rgba(255,180,150,0.55)"
-          : "1px solid rgba(255,255,255,0.7)",
+          : "1px solid var(--glass-border)",
         borderRadius: compact ? 14 : 18,
         minWidth: 0,
         boxShadow: hovered
@@ -228,11 +228,11 @@ export function UserCard(props: UserCardProps) {
               "0 14px 36px rgba(180,120,60,0.16)",
             ].join(", ")
           : [
-              "inset 0 1px 0 rgba(255,255,255,0.85)",
+              "inset 0 1px 0 var(--sheen)",
               "inset 0 -1px 0 rgba(28,28,30,0.04)",
               "0 6px 22px rgba(180,120,60,0.08)",
             ].join(", "),
-        color: "#1C1C1E",
+        color: "var(--charcoal)",
         transform: hovered ? "translateY(-1px)" : "translateY(0)",
         transition:
           "transform 160ms ease, box-shadow 160ms ease, border-color 160ms ease",
@@ -249,8 +249,8 @@ export function UserCard(props: UserCardProps) {
           background: avatar_url
             ? `url(${avatar_url}) center/cover`
             : tint.bg,
-          border: "1px solid rgba(255,255,255,0.92)",
-          boxShadow: `0 2px 10px ${tint.ring}, 0 0 0 3px rgba(255,255,255,0.6)`,
+          border: "1px solid var(--paper-92, rgba(255,255,255,0.92))",
+          boxShadow: `0 2px 10px ${tint.ring}, 0 0 0 3px var(--glass-border-60, rgba(255,255,255,0.6))`,
           color: tint.text,
           flexShrink: 0,
           textDecoration: "none",
@@ -278,7 +278,7 @@ export function UserCard(props: UserCardProps) {
               fontFamily: "Fraunces, serif",
               fontSize: compact ? 14.5 : 16,
               fontWeight: 800,
-              color: "#1C1C1E",
+              color: "var(--charcoal)",
               letterSpacing: "-0.01em",
               overflow: "hidden",
               textOverflow: "ellipsis",
@@ -292,7 +292,7 @@ export function UserCard(props: UserCardProps) {
                   fontFamily: "DM Sans, sans-serif",
                   fontWeight: 500,
                   fontSize: 13,
-                  color: "#8A8580",
+                  color: "var(--ink-muted)",
                   marginLeft: 8,
                 }}
               >
@@ -305,7 +305,7 @@ export function UserCard(props: UserCardProps) {
               style={{
                 fontFamily: "DM Sans, sans-serif",
                 fontSize: 12,
-                color: "#5C5853",
+                color: "var(--ink-2)",
                 marginTop: 2,
                 overflow: "hidden",
                 textOverflow: "ellipsis",
@@ -328,7 +328,7 @@ export function UserCard(props: UserCardProps) {
               fontFamily: "DM Sans, sans-serif",
               fontSize: 11.5,
               fontWeight: 600,
-              color: "#8A8580",
+              color: "var(--ink-muted)",
               marginTop: 2,
               overflow: "hidden",
               textOverflow: "ellipsis",
@@ -356,7 +356,7 @@ export function UserCard(props: UserCardProps) {
             borderRadius: 14,
             flexShrink: 0,
             ...bannerStyle,
-            border: "1px solid rgba(255,255,255,0.7)",
+            border: "1px solid var(--glass-border)",
             boxShadow:
               "inset 0 1px 0 rgba(255,255,255,0.4), 0 2px 8px rgba(28,28,30,0.08)",
           }}
@@ -371,7 +371,7 @@ export function UserCard(props: UserCardProps) {
             fontFamily: "DM Sans, sans-serif",
             fontSize: 11.5,
             fontWeight: 600,
-            color: "#8A8580",
+            color: "var(--ink-muted)",
             whiteSpace: "nowrap",
           }}
         >
@@ -465,17 +465,17 @@ function ActionButton({
   };
   const GOLD_OUTLINE: React.CSSProperties = {
     background: "rgba(255,200,90,0.16)",
-    color: "#A06410",
+    color: "var(--gold-ink, #A06410)",
     border: "1px solid rgba(200,140,30,0.45)",
   };
   const GHOST: React.CSSProperties = {
-    background: "rgba(28,28,30,0.04)",
-    color: "#1C1C1E",
-    border: "1px solid rgba(28,28,30,0.14)",
+    background: "rgba(var(--scrim-rgb),0.04)",
+    color: "var(--charcoal)",
+    border: "1px solid rgba(var(--scrim-rgb),0.14)",
   };
   const DANGER: React.CSSProperties = {
     background: "rgba(220,60,60,0.10)",
-    color: "#B83030",
+    color: "var(--danger-ink)",
     border: "1px solid rgba(220,60,60,0.35)",
   };
 

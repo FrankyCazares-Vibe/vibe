@@ -174,7 +174,7 @@ async function loadHandle(
  */
 function LiftedNotice() {
   return (
-    <div className="vibe-auth-page" style={{ background: "#FAF7F2" }}>
+    <div className="vibe-auth-page" style={{ background: "var(--cream)" }}>
       <div className="vibe-auth-card">
         <div className="vibe-auth-brand" aria-hidden>
           vibe<span className="vibe-auth-dot">.</span>
@@ -252,7 +252,7 @@ export default async function SuspendedPage() {
   // paints the background, and this page is deliberately outside /auth. The
   // class itself only lays the card out and paints the ambient wash.
   return (
-    <div className="vibe-auth-page" style={{ background: "#FAF7F2" }}>
+    <div className="vibe-auth-page" style={{ background: "var(--cream)" }}>
       <div className="vibe-auth-card">
         <div className="vibe-auth-brand" aria-hidden>
           vibe<span className="vibe-auth-dot">.</span>

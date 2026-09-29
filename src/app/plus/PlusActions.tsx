@@ -96,13 +96,13 @@ const CARD: CSSProperties = {
   display: "flex",
   flexDirection: "column",
   gap: 8,
-  border: "1px solid rgba(28,28,30,0.12)",
-  background: "rgba(255,255,255,0.72)",
+  border: "1px solid rgba(var(--scrim-rgb),0.12)",
+  background: "var(--paper-72)",
   borderRadius: 16,
   padding: "16px 18px",
 };
 
-const SMALL: CSSProperties = { fontSize: 13, lineHeight: 1.55, color: "#5C5853" };
+const SMALL: CSSProperties = { fontSize: 13, lineHeight: 1.55, color: "var(--ink-2)" };
 
 function buttonStyle(primary: boolean, disabled: boolean): CSSProperties {
   return {
@@ -110,9 +110,9 @@ function buttonStyle(primary: boolean, disabled: boolean): CSSProperties {
     minHeight: 44,
     padding: "11px 18px",
     borderRadius: 999,
-    border: primary ? `1px solid ${CORAL}` : "1px solid #1C1C1E",
+    border: primary ? `1px solid ${CORAL}` : "1px solid var(--charcoal)",
     background: primary ? CORAL : "transparent",
-    color: primary ? "#FFFFFF" : "#1C1C1E",
+    color: primary ? "#FFFFFF" : "var(--charcoal)",
     fontFamily: SANS,
     fontSize: 14.5,
     fontWeight: 700,
@@ -216,7 +216,7 @@ export function PlusActions({
   const busy = pending !== null;
 
   return (
-    <div style={{ display: "grid", gap: 14, fontFamily: SANS, color: "#2A2620" }}>
+    <div style={{ display: "grid", gap: 14, fontFamily: SANS, color: "var(--ink-prose)" }}>
       {cards.length > 0 ? (
         <div style={GRID}>
           {cards.map((p) => (
@@ -227,13 +227,13 @@ export function PlusActions({
                   fontWeight: 700,
                   letterSpacing: "0.12em",
                   textTransform: "uppercase",
-                  color: "#C84A20",
+                  color: "var(--eyebrow-ink)",
                 }}
               >
                 {p.name}
               </div>
               <div style={{ fontSize: 15, lineHeight: 1.4 }}>
-                <strong style={{ fontFamily: SERIF, fontSize: 26, fontWeight: 900, color: "#1C1C1E" }}>
+                <strong style={{ fontFamily: SERIF, fontSize: 26, fontWeight: 900, color: "var(--charcoal)" }}>
                   {p.price}
                 </strong>{" "}
                 {p.period}

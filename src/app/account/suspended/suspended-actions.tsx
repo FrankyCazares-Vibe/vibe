@@ -322,7 +322,7 @@ export function SuspendedActions({ handle }: { handle: string | null | undefined
             type="button"
             onClick={() => setOpen(true)}
             className="vibe-auth-link"
-            style={{ color: "#B83030" }}
+            style={{ color: "var(--danger-ink)" }}
           >
             Delete account
           </button>{" "}
@@ -350,23 +350,23 @@ export function SuspendedActions({ handle }: { handle: string | null | undefined
             which ends the subscription with no refund.
           */}
           {leave.loading ? (
-            <p style={{ fontSize: 13, color: "#5a564f", margin: "0 0 10px" }}>
+            <p style={{ fontSize: 13, color: "var(--ink-sub)", margin: "0 0 10px" }}>
               Loading…
             </p>
           ) : leave.canConfirm ? (
             <>
-              <p style={{ fontSize: 13, color: "#5a564f", margin: "0 0 10px" }}>
+              <p style={{ fontSize: 13, color: "var(--ink-sub)", margin: "0 0 10px" }}>
                 This can&apos;t be undone, and if you still have Vibe+ it&apos;s
                 canceled right away — no refund.{" "}
                 {leave.byWord ? (
                   <>
-                    Type <strong style={{ color: "#1c1c1e" }}>{expected}</strong>{" "}
+                    Type <strong style={{ color: "var(--charcoal)" }}>{expected}</strong>{" "}
                     to confirm.
                   </>
                 ) : (
                   <>
                     Type your handle{" "}
-                    <strong style={{ color: "#1c1c1e" }}>@{expected}</strong> to
+                    <strong style={{ color: "var(--charcoal)" }}>@{expected}</strong> to
                     confirm.
                   </>
                 )}
@@ -386,7 +386,7 @@ export function SuspendedActions({ handle }: { handle: string | null | undefined
               />
             </>
           ) : (
-            <p style={{ fontSize: 13, color: "#5a564f", margin: "0 0 10px" }}>
+            <p style={{ fontSize: 13, color: "var(--ink-sub)", margin: "0 0 10px" }}>
               We couldn&apos;t load your handle, so we can&apos;t take the
               confirmation here. Email{" "}
               <a href={`mailto:${SUPPORT_EMAIL}`} className="vibe-auth-link">
@@ -415,7 +415,7 @@ export function SuspendedActions({ handle }: { handle: string | null | undefined
                     matches && !deleting
                       ? "linear-gradient(180deg, #E04848 0%, #B83030 100%)"
                       : "rgba(220,60,60,0.18)",
-                  color: matches && !deleting ? "#fff" : "#B83030",
+                  color: matches && !deleting ? "#fff" : "var(--danger-ink)",
                   fontFamily: "DM Sans, sans-serif",
                   fontSize: 14,
                   fontWeight: 700,

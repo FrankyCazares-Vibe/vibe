@@ -3,13 +3,11 @@ import type { CSSProperties, ReactNode } from "react";
 
 import { LegalBackLink } from "@/components/legal/LegalBackLink";
 
-const PAGE_BG =
-  "radial-gradient(120% 80% at 0% 0%, rgba(255,222,180,0.45) 0%, rgba(255,222,180,0) 60%), " +
-  "radial-gradient(110% 80% at 100% 100%, rgba(255,200,170,0.35) 0%, rgba(255,200,170,0) 60%), " +
-  "linear-gradient(180deg, #FAF7F2 0%, #F4EDE2 100%)";
+// The warm cream wash in Light, a coral bloom on Night paper (globals.css).
+const PAGE_BG = "var(--warm-backdrop)";
 
 const LEGAL_LINK: CSSProperties = {
-  color: "#5C5853",
+  color: "var(--ink-2)",
   fontWeight: 700,
   textDecoration: "none",
   whiteSpace: "nowrap",
@@ -47,7 +45,7 @@ export function LegalLayout({
               fontWeight: 700,
               letterSpacing: "0.18em",
               textTransform: "uppercase",
-              color: "#C84A20",
+              color: "var(--eyebrow-ink)",
               marginBottom: 6,
             }}
           >
@@ -58,7 +56,7 @@ export function LegalLayout({
               fontFamily: "Fraunces, serif",
               fontSize: "clamp(30px, 4vw, 42px)",
               fontWeight: 900,
-              color: "#1C1C1E",
+              color: "var(--charcoal)",
               letterSpacing: "-0.02em",
               margin: "0 0 6px",
               lineHeight: 1.1,
@@ -70,7 +68,7 @@ export function LegalLayout({
             style={{
               fontFamily: "DM Sans, sans-serif",
               fontSize: 13,
-              color: "#8A8580",
+              color: "var(--ink-muted)",
             }}
           >
             Effective {effectiveDate}
@@ -81,7 +79,7 @@ export function LegalLayout({
             fontFamily: "DM Sans, sans-serif",
             fontSize: 15,
             lineHeight: 1.7,
-            color: "#2A2620",
+            color: "var(--ink-prose)",
           }}
         >
           {children}
@@ -99,7 +97,7 @@ export function LegalLayout({
             gap: "10px 24px",
             fontFamily: "DM Sans, sans-serif",
             fontSize: 13,
-            color: "#8A8580",
+            color: "var(--ink-muted)",
           }}
         >
           <Link href="/legal/terms" style={LEGAL_LINK}>
@@ -135,7 +133,7 @@ export function LegalH2({ children }: { children: ReactNode }) {
         fontFamily: "Fraunces, serif",
         fontSize: 22,
         fontWeight: 800,
-        color: "#1C1C1E",
+        color: "var(--charcoal)",
         letterSpacing: "-0.01em",
         margin: "32px 0 10px",
       }}

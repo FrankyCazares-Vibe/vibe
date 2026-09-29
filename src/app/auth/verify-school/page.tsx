@@ -277,7 +277,7 @@ function VerifySchoolInner() {
 
   if (status === "working" || status === "idle") {
     return (
-      <p style={{ textAlign: "center", marginTop: 48, color: "#8A8580" }}>
+      <p style={{ textAlign: "center", marginTop: 48, color: "var(--ink-muted)" }}>
         Verifying your school email…
       </p>
     );
@@ -401,19 +401,19 @@ function VerifySchoolInner() {
           fontFamily: "Fraunces, serif",
           fontSize: 32,
           fontWeight: 900,
-          color: "#1C5C2E",
+          color: "var(--ok-ink-3)",
           marginBottom: 16,
         }}
       >
         You&apos;re verified
       </h1>
-      <p style={{ color: "#8A8580", marginBottom: verifiedFor ? 8 : 24 }}>
+      <p style={{ color: "var(--ink-muted)", marginBottom: verifiedFor ? 8 : 24 }}>
         {message}
       </p>
       {verifiedFor ? (
         <p
           style={{
-            color: "#5C5956",
+            color: "var(--ink-2-alt)",
             fontSize: 14,
             marginBottom: 24,
             overflowWrap: "anywhere",
@@ -422,14 +422,14 @@ function VerifySchoolInner() {
           Added to the Vibe account <strong>{verifiedFor}</strong>.
         </p>
       ) : null}
-      <p style={{ color: "#5C5956", fontSize: 14, marginBottom: 20 }}>
+      <p style={{ color: "var(--ink-2-alt)", fontSize: 14, marginBottom: 20 }}>
         {nextPath === "/profile"
           ? "Taking you to your profile…"
           : "Taking you to meet Otto — or sign in if this browser isn’t logged in yet."}
       </p>
       <p
         style={{
-          color: "#8A8580",
+          color: "var(--ink-muted)",
           fontSize: 13,
           lineHeight: 1.55,
           marginBottom: 20,

@@ -66,11 +66,14 @@ import {
 import { IU_SCHOOLS, schoolForMajorIn } from "@/lib/iu/majors";
 import {
   IU_CREAM,
-  PURDUE_BLACK,
   PURDUE_GOLD,
+  SCHOOL_TILES,
   SCHOOL_ZONE_PALETTES,
+  type SchoolSkin,
+  type SchoolZone,
   type SchoolZonePalette,
   schoolSkinFor,
+  schoolZonesFor,
 } from "@/lib/iu/school-colors";
 import { PURDUE_INDIANAPOLIS_SCHOOLS } from "@/lib/iu/majors-purdue-indianapolis";
 import { VIDEO_LOCATION_HINT } from "@/lib/media/copy";
@@ -4411,44 +4414,49 @@ function campusMonogram(shortName: string | null | undefined): string {
 }
 
 type BannerPalette = {
-  background: string;
-  border: string;
-  shadow: string;
-  tileBg: string;
-  tileInk: string;
+  skin: SchoolSkin;
+  /** The tile, name and lines: the leading school (the header's own paint). */
+  lead: SchoolZonePalette;
+  /** The globe and search cluster: the other school on a shared campus,
+   *  else the same zone as `lead`. */
+  follow: SchoolZonePalette;
+  /** The "/" seam's edge line (gold beside Purdue black, cream beside IU
+   *  crimson), or null when there is no seam. */
+  seamLine: string | null;
+  tile: { background: string; ink: string };
+  /** The lift under the sticky banner, tinted by the leading school. */
+  dropShadow: string;
+};
+
+/** The banner's lift over the feed, per leading zone (the old per-school lifts). */
+const BANNER_DROP_SHADOW: Record<SchoolZone, string> = {
+  iu: "0 8px 24px rgba(80,5,15,0.25)",
+  purdue: "0 8px 24px rgba(0,0,0,0.3)",
+  none: "0 8px 24px rgba(0,0,0,0.22)",
 };
 
 /**
- * Plan Q15: IU crimson only for an IU-only campus, black and gold for a
- * Purdue-only campus, and neutral Vibe ink for a shared campus (Indianapolis
- * is one community for both) or no campus at all.
+ * The phone banner in school colours (S68 wave 5, Franky: "match desktop"),
+ * the same rule as CampusTopBar: the skin follows the campus ON SCREEN; on a
+ * shared campus (Indianapolis, Fort Wayne) the viewer's own school leads and
+ * the other one sits behind a "/" seam under the globe and search buttons;
+ * a single-school campus wears only its school; nothing known → neutral.
+ * School colours are the schools', so Light and Night paint the same.
  */
-function bannerPalette(campus: Campus | null): BannerPalette {
-  const only = campus && campus.systems.length === 1 ? campus.systems[0] : null;
-  if (only === "iu") {
-    return {
-      background: "linear-gradient(135deg, #8B0E18 0%, #6A0A12 50%, #3F050B 100%)",
-      border: "1px solid rgba(255,255,255,0.12)",
-      shadow: "0 8px 24px rgba(80,5,15,0.25)",
-      tileBg: "rgba(255,255,255,0.95)",
-      tileInk: "#7A0E0E",
-    };
-  }
-  if (only === "purdue") {
-    return {
-      background: `linear-gradient(135deg, #2A2A2A 0%, #141414 50%, ${PURDUE_BLACK} 100%)`,
-      border: "1px solid rgba(207,185,145,0.45)",
-      shadow: "0 8px 24px rgba(0,0,0,0.3)",
-      tileBg: PURDUE_GOLD,
-      tileInk: PURDUE_BLACK,
-    };
-  }
+function bannerPalette(
+  campus: Campus | null,
+  known: boolean,
+  viewerSystem: SchoolSystem | null,
+): BannerPalette {
+  const skin = known ? schoolSkinFor(campus) : "none";
+  const zones = schoolZonesFor(skin, viewerSystem);
   return {
-    background: "linear-gradient(135deg, #2E2E32 0%, #1C1C1E 50%, #0E0E10 100%)",
-    border: "1px solid rgba(255,255,255,0.12)",
-    shadow: "0 8px 24px rgba(0,0,0,0.22)",
-    tileBg: "rgba(255,255,255,0.95)",
-    tileInk: "#1C1C1E",
+    skin,
+    lead: SCHOOL_ZONE_PALETTES[zones.lead],
+    follow: SCHOOL_ZONE_PALETTES[zones.follow],
+    seamLine: zones.seamLine,
+    tile: SCHOOL_TILES[zones.lead],
+    dropShadow: BANNER_DROP_SHADOW[zones.lead],
   };
 }
 
@@ -4485,11 +4493,19 @@ function countOrNull(v: unknown): number | null {
   return typeof v === "number" && Number.isFinite(v) ? v : null;
 }
 
-// The banner's "Campuses" button: a lighter wash on hover and the coral
-// focus ring every new control gets (C0). Inline styles can't say either.
-const CAMPUSES_BUTTON_CSS = `
-  .vibe-campuses-btn:hover { background: rgba(255,255,255,0.22) !important; }
-  .vibe-campuses-btn:focus-visible { outline: 2px solid var(--coral); outline-offset: 2px; }
+// The banner's buttons: the button zone's hover wash and a focus ring in the
+// zone's own ink (coral vanishes on crimson; the desktop top bar does the
+// same). Zone colours arrive as --bn-* set inline on the button cluster.
+// On a phone the banner pads itself down by the safe-area inset, so the seam
+// layers reach up through that padding too, or the status-bar strip would
+// be the leading school's colour all the way across. Inline styles can't say
+// any of this.
+const BANNER_CSS = `
+  .vibe-campus-banner .vibe-banner-btn:hover { background: var(--bn-hover) !important; }
+  .vibe-campus-banner .vibe-banner-btn:focus-visible { outline: 2px solid var(--bn-ink); outline-offset: 2px; }
+  @media (max-width: 899px) {
+    .vibe-campus-banner .vibe-banner-seam { top: calc(-1 * env(safe-area-inset-top, 0px)) !important; }
+  }
 `;
 
 /** Under the banner on /campus for a verified student with no campus yet. */
@@ -4642,9 +4658,15 @@ export function CampusBanner({
   onOpenCampuses?: () => void;
 } = {}) {
   // Title, sub-line and stats come from the shared header hook (the
-  // desktop top bar reads the same one); the colours are the banner's own.
-  const { campus, isVisiting, title, monogram, sharedSub, statsLine } = useCampusHeader();
-  const palette = bannerPalette(campus);
+  // desktop top bar reads the same one); the colours follow the same rule
+  // as the desktop top bar, from the viewer's own school (the same cached
+  // request useCampusHeader reads).
+  const { campus, known, isVisiting, title, monogram, sharedSub, statsLine } =
+    useCampusHeader();
+  const { system: viewerSystem } = useViewerCampus();
+  const palette = bannerPalette(campus, known, viewerSystem);
+  const { lead, follow, seamLine } = palette;
+  const shared = seamLine !== null;
 
   const ellipsis: React.CSSProperties = {
     minWidth: 0,
@@ -4657,14 +4679,26 @@ export function CampusBanner({
     fontFamily: "DM Sans, sans-serif",
     fontSize: 11,
     fontWeight: 600,
-    color: "rgba(255,255,255,0.62)",
+    color: lead.secondary,
     lineHeight: 1.2,
     ...(isVisiting ? { letterSpacing: "0.05em" } : null),
   };
+  // The globe / search / Messages buttons wear the button zone (C0 rule:
+  // hover and focus by class, colours by custom property).
+  const buttonColors: React.CSSProperties = {
+    background: follow.searchBg,
+    border: `1px solid ${follow.searchBorder}`,
+    color: follow.ink,
+  };
+  const clusterVars = {
+    "--bn-hover": follow.hover,
+    "--bn-ink": follow.ink,
+  } as React.CSSProperties;
 
   return (
     <header
       className="vibe-campus-banner"
+      data-skin={palette.skin}
       style={{
         position: "relative",
         height: 64,
@@ -4672,16 +4706,14 @@ export function CampusBanner({
         alignItems: "center",
         gap: 14,
         padding: "0 24px",
-        // Solid campus colour — reads identical on every tab regardless of backdrop
-        background: palette.background,
-        borderBottom: palette.border,
-        boxShadow: [
-          "inset 0 1px 0 rgba(255,255,255,0.16)",
-          palette.shadow,
-        ].join(", "),
+        // Solid school colour: reads the same on every tab, in Light and
+        // Night. Purdue adds its gold bottom hairline (as on desktop).
+        background: lead.background,
+        boxShadow: [lead.shadow, palette.dropShadow].filter(Boolean).join(", "),
         overflow: "hidden",
       }}
     >
+      <style>{BANNER_CSS}</style>
       <div
         aria-hidden
         style={{
@@ -4689,8 +4721,8 @@ export function CampusBanner({
           height: 44,
           flexShrink: 0,
           borderRadius: 12,
-          background: palette.tileBg,
-          color: palette.tileInk,
+          background: palette.tile.background,
+          color: palette.tile.ink,
           display: "flex",
           alignItems: "center",
           justifyContent: "center",
@@ -4711,7 +4743,7 @@ export function CampusBanner({
               fontFamily: "Fraunces, serif",
               fontWeight: 800,
               fontSize: 18,
-              color: "#fff",
+              color: lead.ink,
               letterSpacing: "-0.01em",
               lineHeight: 1.1,
             }}
@@ -4728,7 +4760,7 @@ export function CampusBanner({
               ...ellipsis,
               fontFamily: "DM Sans, sans-serif",
               fontSize: 12,
-              color: "rgba(255,255,255,0.7)",
+              color: lead.secondary,
               lineHeight: 1.2,
             }}
           >
@@ -4737,149 +4769,199 @@ export function CampusBanner({
         ) : null}
       </div>
       <div style={{ flex: 1 }} />
-      {onOpenCampuses ? (
-        <>
-          <style>{CAMPUSES_BUTTON_CSS}</style>
-          <button
-            type="button"
-            className="vibe-campuses-btn"
-            onClick={onOpenCampuses}
-            aria-label="Look around other campuses"
-            aria-haspopup="dialog"
-            title="Look around other campuses"
-            style={{
-              display: "inline-flex",
-              alignItems: "center",
-              justifyContent: "center",
-              gap: 6,
-              // Phone: a 44px round icon like the search button beside it, so
-              // the campus title keeps its room at 375px. Desktop: the word.
-              height: compactSearch ? 44 : 38,
-              width: compactSearch ? 44 : undefined,
-              padding: compactSearch ? 0 : "0 14px",
-              borderRadius: 999,
-              background: "rgba(255,255,255,0.14)",
-              border: "1px solid rgba(255,255,255,0.18)",
-              color: "#fff",
-              fontFamily: "DM Sans, sans-serif",
-              fontSize: 12.5,
-              fontWeight: 700,
-              cursor: "pointer",
-              flexShrink: 0,
-              boxShadow: "inset 0 1px 0 rgba(255,255,255,0.18)",
-              transition: "background 140ms ease",
-              WebkitTapHighlightColor: "transparent",
-            }}
-          >
-            {compactSearch ? (
-              // A globe: look around other campuses.
-              <svg
-                width="18"
-                height="18"
-                viewBox="0 0 24 24"
-                fill="none"
-                stroke="currentColor"
-                strokeWidth="2"
-                strokeLinecap="round"
-                strokeLinejoin="round"
-                aria-hidden
-              >
-                <circle cx="12" cy="12" r="9" />
-                <path d="M3 12h18M12 3c2.5 2.6 3.8 5.6 3.8 9s-1.3 6.4-3.8 9c-2.5-2.6-3.8-5.6-3.8-9s1.3-6.4 3.8-9z" />
-              </svg>
-            ) : (
-              <>
-                Campuses
+      {/* The button cluster. On a shared campus it sits on the other school
+          behind the desktop top bar's "/" seam, drawn from this cluster's
+          left edge so nothing is measured: the zone's colour starts 14px left
+          of it at the top and 30px left at the bottom, over a twin 3px
+          further left in the seam line. Both run on under the banner's 24px
+          right padding (the header clips them). The extra 12px margin keeps
+          the stats line clear of the line where it leans furthest left. */}
+      <div
+        style={{
+          ...clusterVars,
+          position: "relative",
+          alignSelf: "stretch",
+          display: "flex",
+          alignItems: "center",
+          gap: 14,
+          flexShrink: 0,
+          marginLeft: shared ? 12 : 0,
+          isolation: "isolate",
+        }}
+      >
+        {shared ? (
+          <>
+            <div
+              aria-hidden
+              className="vibe-banner-seam"
+              style={{
+                position: "absolute",
+                top: 0,
+                bottom: 0,
+                left: -33,
+                right: -24,
+                background: seamLine,
+                clipPath: TOPBAR_SEAM_CLIP,
+              }}
+            />
+            <div
+              aria-hidden
+              className="vibe-banner-seam"
+              style={{
+                position: "absolute",
+                top: 0,
+                bottom: 0,
+                left: -30,
+                right: -24,
+                background: follow.background,
+                boxShadow: follow.shadow ?? undefined,
+                clipPath: TOPBAR_SEAM_CLIP,
+              }}
+            />
+          </>
+        ) : null}
+        {onOpenCampuses ? (
+          <>
+            <button
+              type="button"
+              className="vibe-campuses-btn vibe-banner-btn"
+              onClick={onOpenCampuses}
+              aria-label="Look around other campuses"
+              aria-haspopup="dialog"
+              title="Look around other campuses"
+              style={{
+                display: "inline-flex",
+                alignItems: "center",
+                justifyContent: "center",
+                gap: 6,
+                // Phone: a 44px round icon like the search button beside it, so
+                // the campus title keeps its room at 375px. Desktop: the word.
+                height: compactSearch ? 44 : 38,
+                width: compactSearch ? 44 : undefined,
+                padding: compactSearch ? 0 : "0 14px",
+                borderRadius: 999,
+                // Positioned so it paints over the seam layers before it.
+                position: "relative",
+                ...buttonColors,
+                fontFamily: "DM Sans, sans-serif",
+                fontSize: 12.5,
+                fontWeight: 700,
+                cursor: "pointer",
+                flexShrink: 0,
+                transition: "background 140ms ease",
+                WebkitTapHighlightColor: "transparent",
+              }}
+            >
+              {compactSearch ? (
+                // A globe: look around other campuses.
                 <svg
-                  width="12"
-                  height="12"
+                  width="18"
+                  height="18"
                   viewBox="0 0 24 24"
                   fill="none"
                   stroke="currentColor"
-                  strokeWidth="2.4"
+                  strokeWidth="2"
                   strokeLinecap="round"
+                  strokeLinejoin="round"
                   aria-hidden
                 >
-                  <path d="M6 9l6 6 6-6" />
+                  <circle cx="12" cy="12" r="9" />
+                  <path d="M3 12h18M12 3c2.5 2.6 3.8 5.6 3.8 9s-1.3 6.4-3.8 9c-2.5-2.6-3.8-5.6-3.8-9s1.3-6.4 3.8-9z" />
                 </svg>
-              </>
-            )}
-          </button>
-        </>
-      ) : null}
-      {/* Phone-only quick-access to /messages — Instagram's DM-in-header
-          pattern. Hidden on desktop because the desktop LeftNav already
-          has a Messages link. Also hidden on the mobile shell because
-          the bottom tab bar there already has a Messages tab.
-          CSS gate lives in globals.css. */}
-      {compactSearch ? null : (
-      <Link
-        href="/messages"
-        aria-label="Messages"
-        title="Messages"
-        className="vibe-campus-messages-btn"
-        style={{
-          alignItems: "center",
-          justifyContent: "center",
-          width: 38,
-          height: 38,
-          borderRadius: 12,
-          background: "rgba(255,255,255,0.14)",
-          border: "1px solid rgba(255,255,255,0.18)",
-          color: "#fff",
-          textDecoration: "none",
-          flexShrink: 0,
-          boxShadow: "inset 0 1px 0 rgba(255,255,255,0.18)",
-          transition: "background 140ms ease, transform 140ms ease",
-        }}
-      >
-        <svg width="18" height="18" viewBox="0 0 22 22" fill="none" aria-hidden>
-          <path
-            d="M2 4A1.6 1.6 0 0 1 3.6 2.4h14.8A1.6 1.6 0 0 1 20 4v10A1.6 1.6 0 0 1 18.4 15.6H6.5L2 19V4z"
-            stroke="currentColor"
-            strokeWidth="1.7"
-            fill="none"
-            strokeLinejoin="round"
-          />
-        </svg>
-      </Link>
-      )}
-      {compactSearch ? (
-        <button
-          type="button"
-          onClick={() => onSearchTap?.()}
-          aria-label="Search campus"
-          title="Search"
+              ) : (
+                <>
+                  Campuses
+                  <svg
+                    width="12"
+                    height="12"
+                    viewBox="0 0 24 24"
+                    fill="none"
+                    stroke="currentColor"
+                    strokeWidth="2.4"
+                    strokeLinecap="round"
+                    aria-hidden
+                  >
+                    <path d="M6 9l6 6 6-6" />
+                  </svg>
+                </>
+              )}
+            </button>
+          </>
+        ) : null}
+        {/* Phone-only quick-access to /messages — Instagram's DM-in-header
+            pattern. Hidden on desktop because the desktop LeftNav already
+            has a Messages link. Also hidden on the mobile shell because
+            the bottom tab bar there already has a Messages tab.
+            CSS gate lives in globals.css. */}
+        {compactSearch ? null : (
+        <Link
+          href="/messages"
+          aria-label="Messages"
+          title="Messages"
+          className="vibe-campus-messages-btn vibe-banner-btn"
           style={{
-            display: "inline-flex",
             alignItems: "center",
             justifyContent: "center",
             width: 38,
             height: 38,
             borderRadius: 12,
-            background: "rgba(255,255,255,0.14)",
-            border: "1px solid rgba(255,255,255,0.18)",
-            color: "#fff",
-            cursor: "pointer",
+            position: "relative",
+            ...buttonColors,
+            textDecoration: "none",
             flexShrink: 0,
-            boxShadow: "inset 0 1px 0 rgba(255,255,255,0.18)",
             transition: "background 140ms ease, transform 140ms ease",
-            WebkitTapHighlightColor: "transparent",
           }}
         >
-          <svg width="18" height="18" viewBox="0 0 18 18" fill="none" aria-hidden>
-            <circle cx="8" cy="8" r="5.2" stroke="currentColor" strokeWidth="1.7" />
+          <svg width="18" height="18" viewBox="0 0 22 22" fill="none" aria-hidden>
             <path
-              d="M12 12l4 4"
+              d="M2 4A1.6 1.6 0 0 1 3.6 2.4h14.8A1.6 1.6 0 0 1 20 4v10A1.6 1.6 0 0 1 18.4 15.6H6.5L2 19V4z"
               stroke="currentColor"
               strokeWidth="1.7"
-              strokeLinecap="round"
+              fill="none"
+              strokeLinejoin="round"
             />
           </svg>
-        </button>
-      ) : search ? (
-        <CampusSearchBar />
-      ) : null}
+        </Link>
+        )}
+        {compactSearch ? (
+          <button
+            type="button"
+            className="vibe-banner-btn"
+            onClick={() => onSearchTap?.()}
+            aria-label="Search campus"
+            title="Search"
+            style={{
+              display: "inline-flex",
+              alignItems: "center",
+              justifyContent: "center",
+              width: 38,
+              height: 38,
+              borderRadius: 12,
+              position: "relative",
+              ...buttonColors,
+              cursor: "pointer",
+              flexShrink: 0,
+              transition: "background 140ms ease, transform 140ms ease",
+              WebkitTapHighlightColor: "transparent",
+            }}
+          >
+            <svg width="18" height="18" viewBox="0 0 18 18" fill="none" aria-hidden>
+              <circle cx="8" cy="8" r="5.2" stroke="currentColor" strokeWidth="1.7" />
+              <path
+                d="M12 12l4 4"
+                stroke="currentColor"
+                strokeWidth="1.7"
+                strokeLinecap="round"
+              />
+            </svg>
+          </button>
+        ) : search ? (
+          // Unmounted today (only the phone renders this banner, compact).
+          <div style={{ position: "relative" }}>
+            <CampusSearchBar />
+          </div>
+        ) : null}
+      </div>
     </header>
   );
 }

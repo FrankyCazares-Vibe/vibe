@@ -2,7 +2,7 @@
 <!-- Otto onboarding (static). Open via /onboarding from the Next app so query params are preserved. -->
 <html lang="en">
 <head>
-<script>(function(){try{var k="vibe_theme",p=null;try{p=localStorage.getItem(k)}catch(e){}if(p!=="light"&&p!=="dark"&&p!=="system")p="light";if(p==="system")p=window.matchMedia&&window.matchMedia("(prefers-color-scheme: dark)").matches?"dark":"light";document.documentElement.dataset.theme=p}catch(e){}})();</script>
+<script>(function(){try{var k="vibe_theme",p=null;try{p=localStorage.getItem(k)}catch(e){}if(p!=="light"&&p!=="dark"&&p!=="system")p="system";if(p==="system")p=window.matchMedia&&window.matchMedia("(prefers-color-scheme: dark)").matches?"dark":"light";document.documentElement.dataset.theme=p}catch(e){}})();</script>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <link rel="icon" href="/icon.png" type="image/png" sizes="192x192">
@@ -24,13 +24,21 @@
      profile.html). Read at tap time, never at load. -->
 <script src="/html/_imageCropper.js" defer></script>
 <style>
-:root { --cream:#FAF7F2; --charcoal:#1C1C1E; --accent:#FF5C35; --purple:#7C5CFC; --lavender:#C8B8FF; --green:#1A9E5B; }
-/* Night (S67 contracts C0). This page is dark chrome already: --charcoal is
-   its BACKGROUND (body, below) and the ink is white, so the night twin does
-   not swap the two. The background deepens to Night's paper so the page
-   matches the shell around its iframe; --cream (unused today) becomes Night's
-   ink for the wave 5 literal pass. Coral, purple, lavender, green unchanged. */
-:root[data-theme="dark"] { color-scheme:dark; --charcoal:#0C0B0B; --cream:#F6F1EA; }
+:root { --cream:#FAF7F2; --charcoal:#1C1C1E; --accent:#FF5C35; --purple:#7C5CFC; --lavender:#C8B8FF; --green:#1A9E5B;
+  /* S68 wave 5: the pieces cut from the page colour follow it into Night.
+     --bg-rgb is --charcoal as channels (the top bar's fade); --surface and
+     --surface-2 are the confirm card and the club/person logo disc;
+     --option-ink is the year picker's native option list. */
+  --bg-rgb:28,28,30; --surface:#1f1f22; --surface-2:#26252A; --option-ink:#1C1C1E; }
+/* Night (S67 contracts C0). This page is dark chrome in BOTH themes:
+   --charcoal is its BACKGROUND (body, below) and the ink stays white, so the
+   night twin does not swap the two. The background deepens to Night's page
+   colour so it matches the shell around its iframe, the cut pieces above
+   follow it, and the option list turns light because color-scheme:dark
+   paints the native popup dark. --cream is unused. Coral, purple, lavender,
+   green unchanged. */
+:root[data-theme="dark"] { color-scheme:dark; --charcoal:#0C0B0B; --cream:#F6F1EA;
+  --bg-rgb:12,11,11; --surface:#161515; --surface-2:#1F1D1C; --option-ink:#F6F1EA; }
 * { margin: 0; padding: 0; box-sizing: border-box; }
 html, body { height: 100%; }
 body {
@@ -57,7 +65,7 @@ input, textarea, [contenteditable="true"] { cursor:text!important; }
 .onb-top {
   position: fixed; top: 0; left: 0; right: 0; z-index: 10;
   padding: 22px 24px 18px;
-  background: linear-gradient(to bottom, rgba(28,28,30,.96) 60%, rgba(28,28,30,0));
+  background: linear-gradient(to bottom, rgba(var(--bg-rgb),.96) 60%, rgba(var(--bg-rgb),0));
   display: grid; grid-template-columns: 44px auto 1fr auto; align-items: center; gap: 8px;
 }
 .onb-back {
@@ -208,7 +216,7 @@ input, textarea, [contenteditable="true"] { cursor:text!important; }
 .pf-textarea { min-height: 72px; resize: vertical; }
 /* min-height: a 44 px tap target for the year picker. */
 .pf-select { cursor: pointer; min-height: 44px; }
-.pf-select option { color: #1C1C1E; }
+.pf-select option { color: var(--option-ink); }
 .pf-handle-box {
   display: flex; align-items: center; gap: 8px; min-height: 44px;
   background: rgba(255,255,255,.07); border: 0.5px solid rgba(255,255,255,.12);
@@ -244,7 +252,7 @@ input, textarea, [contenteditable="true"] { cursor:text!important; }
 }
 .confirm-overlay.open { display: flex; }
 .confirm-card {
-  background: #1f1f22; border: 0.5px solid rgba(255,255,255,.1);
+  background: var(--surface); border: 0.5px solid rgba(255,255,255,.1);
   border-radius: 16px; padding: 24px 28px; max-width: 360px; text-align: center;
   box-shadow: 0 24px 64px rgba(0,0,0,.5);
 }
@@ -314,7 +322,7 @@ input, textarea, [contenteditable="true"] { cursor:text!important; }
 .pick-logo {
   width: 40px; height: 40px; border-radius: 50%; flex-shrink: 0; overflow: hidden;
   display: flex; align-items: center; justify-content: center;
-  background: #26252A; border: 1px solid rgba(255,255,255,.10); color: rgba(255,255,255,.85);
+  background: var(--surface-2); border: 1px solid rgba(255,255,255,.10); color: rgba(255,255,255,.85);
   font-family: 'Fraunces', serif; font-size: 17px; font-weight: 800;
 }
 .pick-logo img { width: 100%; height: 100%; object-fit: cover; display: block; }

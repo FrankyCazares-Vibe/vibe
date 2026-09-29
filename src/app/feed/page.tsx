@@ -19,17 +19,17 @@ export default async function FeedPage() {
     <CampusAppShell>
       <main
         style={{
-          borderRight: "1px solid rgba(28,28,30,0.08)",
-          background: "#FAF7F2",
+          borderRight: "1px solid var(--hairline)",
+          background: "var(--cream)",
         }}
       >
         <div
           style={{
             padding: "0 20px",
-            borderBottom: "1px solid rgba(28,28,30,0.08)",
+            borderBottom: "1px solid var(--hairline)",
             position: "sticky",
             top: 0,
-            background: "rgba(250,247,242,0.92)",
+            background: "var(--cream-92)",
             backdropFilter: "blur(14px)",
             zIndex: 50,
             display: "flex",
@@ -42,7 +42,7 @@ export default async function FeedPage() {
               style={{
                 fontSize: "14px",
                 fontWeight: "600",
-                color: i === 0 ? "#1C1C1E" : "#8A8580",
+                color: i === 0 ? "var(--charcoal)" : "var(--ink-muted)",
                 padding: "16px 18px",
                 border: "none",
                 background: "none",
@@ -69,7 +69,7 @@ export default async function FeedPage() {
               fontFamily: "Fraunces, serif",
               fontSize: 22,
               fontWeight: 800,
-              color: "#1C1C1E",
+              color: "var(--charcoal)",
               marginBottom: 12,
             }}
           >
@@ -80,7 +80,7 @@ export default async function FeedPage() {
               fontFamily: "DM Sans, sans-serif",
               fontSize: 15,
               lineHeight: 1.6,
-              color: "#8A8580",
+              color: "var(--ink-muted)",
               marginBottom: 24,
             }}
           >
