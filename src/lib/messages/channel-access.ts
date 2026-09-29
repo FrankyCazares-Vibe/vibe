@@ -1,3 +1,5 @@
+import { isRoomKind } from "@/lib/chat/room-rules";
+import { isMissingChatSchema, warnMissingChatSchemaOnce } from "@/lib/chat/schema";
 import type { RoomKind } from "@/lib/chat/types";
 import { isUuid } from "@/lib/pgrest";
 import { MESSAGE_MEDIA_KEY_PREFIX, MESSAGE_MEDIA_KEY_RE } from "@/lib/r2";
@@ -60,15 +62,34 @@ export async function ensureMember(
   // client, so RLS answers "can you see this channel at all":
   // channels_select_member (a DM/group you have a row in) or
   // channels_select_org_member (can_view_org_channel).
-  const { data: channel, error: channelErr } = await supabase
-    .from("channels")
-    .select("org_id")
-    .eq("id", channelId)
-    .maybeSingle();
+  //
+  // `kind` and `event_id` ride on the same read (chat rooms, wave 1), so the
+  // routes know which room this is without asking twice. On a database
+  // without the two columns the read is repeated with `org_id` alone and both
+  // answer null: today's behaviour, never a 500 (contract section 3.10).
+  async function readRow(withRoomColumns: boolean) {
+    return supabase
+      .from("channels")
+      .select(withRoomColumns ? "org_id, kind, event_id" : "org_id")
+      .eq("id", channelId)
+      .maybeSingle();
+  }
+  let { data: found, error: channelErr } = await readRow(true);
+  if (channelErr && isMissingChatSchema(channelErr)) {
+    warnMissingChatSchemaOnce("messages.ensureMember");
+    const bare = await readRow(false);
+    found = bare.data;
+    channelErr = bare.error;
+  }
   if (channelErr) {
     console.error("[messages.ensureMember channel]", channelErr);
     return { ok: false, status: 500 };
   }
+  const channel = found as unknown as {
+    org_id: string | null;
+    kind?: unknown;
+    event_id?: unknown;
+  } | null;
 
   // UNREADABLE CHANNEL = NOT A MEMBER (security wave 2, report #14). An
   // ex-member's club channel is hidden by channels RLS, so it used to read as
@@ -90,9 +111,12 @@ export async function ensureMember(
     return {
       ok: true,
       isOrgChannel: true,
-      orgId: channel.org_id as string,
+      orgId: channel.org_id,
       accepted_at: null,
       cleared_at: null,
+      // Null on a database without the columns (the bare read above).
+      kind: isRoomKind(channel.kind) ? channel.kind : null,
+      eventId: typeof channel.event_id === "string" && channel.event_id !== "" ? channel.event_id : null,
     };
   }
 
