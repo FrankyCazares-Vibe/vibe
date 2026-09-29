@@ -4,6 +4,8 @@ import type { SupabaseClient } from "@supabase/supabase-js";
 
 import { loadHiddenUsers, type HiddenUsers } from "@/lib/safety/hidden-users";
 
+import { visibleActorFilter } from "./event-notice";
+
 /**
  * THE unread number on the app icon (plan §7 2D; critic-push.md item 14).
  * One helper, read by `GET /api/me/badge` and by every push the dispatcher
@@ -13,7 +15,9 @@ import { loadHiddenUsers, type HiddenUsers } from "@/lib/safety/hidden-users";
  *
  * NOTIFICATIONS: the count route's rule exactly
  * (src/app/api/me/notifications/count/route.ts): unread rows for the student,
- * leaving out actors blocked either way or muted right now. That route also
+ * leaving out actors blocked either way or muted right now, except a club's
+ * cancelled-event notice, which counts whoever sent it (ruling 14,
+ * event-notice.ts). That route also
  * counts the dead `connection` kind; so does this, or the Otto dot and the
  * icon would disagree (critic item 14, out-of-scope note).
  *
@@ -77,7 +81,7 @@ export async function loadBadgeCounts(
       .select("id", { count: "exact", head: true })
       .eq("user_id", userId)
       .is("read_at", null);
-    if (hiddenIds.length > 0) unreadQuery = unreadQuery.notIn("actor_id", hiddenIds);
+    if (hiddenIds.length > 0) unreadQuery = unreadQuery.or(visibleActorFilter(hiddenIds));
 
     const [unreadRes, membersRes] = await Promise.all([
       unreadQuery,

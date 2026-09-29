@@ -5,16 +5,14 @@ import { scopeCampusIds } from "@/lib/iu/campus-scope";
 import { ALL_CAMPUSES, isSchoolSystem, legacyLabel, type SchoolSystem } from "@/lib/iu/campuses";
 import { campusScopeError, homeCampusIdFor } from "@/lib/iu/community-scope";
 import {
-  EVENT_MAX_DESCRIPTION as MAX_DESCRIPTION,
-  EVENT_MAX_LOCATION as MAX_LOCATION,
-  EVENT_MAX_TITLE as MAX_TITLE,
-  eventTimesProblem,
-  viewerCanManage,
-  withoutClubCreator,
-} from "@/lib/events/manage";
+  EVENT_ROW_COLUMNS,
+  toCount,
+  toEventListItem,
+  type EventListRow,
+  type EventOrgCard,
+} from "@/lib/events/event-item";
+import { checkEventFields, readEventFields } from "@/lib/events/validate";
 import { contentBlockedResponse, requireCanPublish } from "@/lib/moderation/access";
-import { checkText } from "@/lib/moderation/text-filter";
-import { orgAssetProxyUrl } from "@/lib/org-asset-url";
 import { isUuid } from "@/lib/pgrest";
 import { rateLimit, tooManyRequests } from "@/lib/rate-limit";
 import { createSupabaseServerClient } from "@/lib/supabase/server";
@@ -41,55 +39,15 @@ const MAX_CAMPUS_ORGS = 1000;
 // orgs' events. Four rows today. The two caps move independently on purpose.
 const MAX_HIDDEN_ORGS = 1000;
 
-type EventRow = {
-  id: string;
-  org_id: string | null;
-  creator_id: string;
-  title: string;
-  description: string;
-  starts_at: string;
-  ends_at: string;
-  location: string;
-  created_at: string;
-  // Club rows come back with `{ id }` only (CLUB_CREATOR_EMBED) and leave this
-  // route with `creator: null` (withoutClubCreator); org-less rows, in full.
-  creator: {
-    id: string;
-    name: string | null;
-    handle: string | null;
-    avatar_url: string | null;
-    school: string | null;
-    campus_id: string | null;
-  } | null;
-};
-
+// The row and item shapes live in src/lib/events/event-item.ts, shared with
+// PATCH /api/events/[id] (which answers with one item of this list).
+type EventRow = EventListRow;
 /** Org attribution, resolved with the service role (see the GET docblock). */
-type OrgCard = {
-  id: string;
-  handle: string;
-  name: string;
-  logo_url: string | null;
-  verified: boolean;
-};
-
-type CreateEventBody = {
-  title?: unknown;
-  description?: unknown;
-  starts_at?: unknown;
-  ends_at?: unknown;
-  location?: unknown;
-  org_id?: unknown;
-};
+type OrgCard = EventOrgCard;
 
 /** The error shape the org routes speak; events now carry a `code` too. */
 function fail(status: number, code: string, error: string) {
   return NextResponse.json({ ok: false, error, code }, { status });
-}
-
-/** A count from an RPC row as a whole number: NaN, negatives or missing → 0. */
-function toCount(value: unknown): number {
-  const n = Number(value);
-  return Number.isFinite(n) && n > 0 ? Math.trunc(n) : 0;
 }
 
 /**
@@ -201,8 +159,7 @@ export async function GET(req: Request) {
       .select(
         // No `org:orgs(...)`: under the viewer's client that embed is null for
         // every org they are not in. Attribution is joined in below.
-        "id,org_id,creator_id,title,description,starts_at,ends_at,location,created_at," +
-          creatorEmbed,
+        `${EVENT_ROW_COLUMNS},${creatorEmbed}`,
       )
       .gte("ends_at", nowIso)
       .lte("starts_at", horizonIso)
@@ -407,30 +364,17 @@ export async function GET(req: Request) {
     }
   }
 
-  const events = rows.map((row) => {
-    // `is_creator` only hides Report on your own event (the report route
-    // refuses its creator); it grants nothing.
-    const isCreator = row.creator_id === user.id;
-    const isOrgAdmin = !!row.org_id && myAdminOrgIds.has(row.org_id);
-    const org = row.org_id ? orgById.get(row.org_id) ?? null : null;
-    return {
-      ...withoutClubCreator(row),
-      going_count: goingByEvent.get(row.id) ?? 0,
-      interested_count: maybeByEvent.get(row.id) ?? 0,
-      viewer_status: viewerStatusByEvent.get(row.id) ?? null,
-      is_creator: isCreator,
-      viewer_can_manage: viewerCanManage({
-        orgId: row.org_id,
-        creatorId: row.creator_id,
-        viewerId: user.id,
-        viewerIsOfficer: isOrgAdmin,
-      }),
-      // Same shape the embed produced, so no client changes.
-      org: org
-        ? { ...org, logo_url: orgAssetProxyUrl(org.handle, org.logo_url, "logo") }
-        : null,
-    };
-  });
+  // One item per row, built by the same function PATCH /api/events/[id] uses.
+  const events = rows.map((row) =>
+    toEventListItem(row, {
+      viewerId: user.id,
+      viewerIsOfficer: !!row.org_id && myAdminOrgIds.has(row.org_id),
+      org: row.org_id ? orgById.get(row.org_id) ?? null : null,
+      goingCount: goingByEvent.get(row.id) ?? 0,
+      interestedCount: maybeByEvent.get(row.id) ?? 0,
+      viewerStatus: viewerStatusByEvent.get(row.id) ?? null,
+    }),
+  );
 
   return answer(events);
 }
@@ -485,61 +429,39 @@ export async function POST(req: Request) {
   const gate = await requireCanPublish(user.id);
   if (gate) return gate;
 
-  let body: CreateEventBody;
+  let parsed: unknown;
   try {
-    body = (await req.json()) as CreateEventBody;
+    parsed = await req.json();
   } catch {
     return fail(400, "invalid_json", "Invalid JSON");
   }
+  // JSON that parses to null, a number or an array is no body at all (it
+  // used to throw on `body.title` and answer a bare 500).
+  if (!parsed || typeof parsed !== "object" || Array.isArray(parsed)) {
+    return fail(400, "invalid_json", "Invalid JSON");
+  }
+  const body = parsed as Record<string, unknown>;
 
-  const title = typeof body.title === "string" ? body.title.trim() : "";
-  const description =
-    typeof body.description === "string" ? body.description.trim() : "";
-  const location = typeof body.location === "string" ? body.location.trim() : "";
-  const startsAt = typeof body.starts_at === "string" ? body.starts_at.trim() : "";
-  const endsAt = typeof body.ends_at === "string" ? body.ends_at.trim() : "";
-
-  if (!title) {
-    return fail(400, "title_required", "Title is required");
+  // Title, lengths, the word filter, then the times: one function shared with
+  // PATCH /api/events/[id] (src/lib/events/validate.ts), so an edit can never
+  // pass something a create refuses. Same codes and sentences as before.
+  //  - The word filter, same as posts, comments and club profiles. An event
+  //    is the most public thing a club writes: it lands in the campus feed,
+  //    in Otto's "Heads up" panel and in a calendar file. Every value here is
+  //    new (no stored event), so each is checked whole. `field` names the
+  //    input for the composer to point at.
+  //  - Start and end: both real, end not before start, start not in the past
+  //    (5 minutes' grace), at most 14 days long (the database's
+  //    events_max_duration CHECK). An event ending in 2099 used to sit at the
+  //    top of the campus list forever.
+  const checked = checkEventFields(readEventFields(body), Date.now());
+  if (!checked.ok) {
+    const p = checked.problem;
+    return p.kind === "content_blocked"
+      ? contentBlockedResponse(p.field)
+      : fail(p.status, p.code, p.error);
   }
-  if (title.length > MAX_TITLE) {
-    return fail(400, "title_too_long", `Title exceeds ${MAX_TITLE} characters`);
-  }
-  if (description.length > MAX_DESCRIPTION) {
-    return fail(
-      400,
-      "description_too_long",
-      `Description exceeds ${MAX_DESCRIPTION} characters`,
-    );
-  }
-  if (location.length > MAX_LOCATION) {
-    return fail(400, "location_too_long", `Location exceeds ${MAX_LOCATION} characters`);
-  }
-
-  // The word filter, same as posts, comments and club profiles. An event is
-  // the most public thing a club writes — it lands in the campus feed, in
-  // Otto's "Heads up" panel and in a calendar file — and it had no filter at
-  // all. Every value here is new (this route only creates), so it is the
-  // whole-value `checkText`, not the "only what changed" rule the profile
-  // forms need. `field` names the input for the composer to point at.
-  for (const [field, value] of [
-    ["title", title],
-    ["description", description],
-    ["location", location],
-  ] as const) {
-    if (!checkText(value).ok) return contentBlockedResponse(field);
-  }
-
-  // Start and end: both real, end not before start, start not in the past
-  // (5 minutes' grace), at most 14 days long (the database's
-  // events_max_duration CHECK). An event ending in 2099 used to sit at the top
-  // of the campus list forever.
-  const start = Date.parse(startsAt);
-  const end = Date.parse(endsAt);
-  const timesProblem = eventTimesProblem(start, end, Date.now());
-  if (timesProblem) {
-    return fail(400, timesProblem.code, timesProblem.error);
-  }
+  const fields = checked.value;
 
   // Events must be posted on behalf of a verified org. Verified status
   // is platform-admin-controlled (see /admin) so this gates spam without
@@ -588,15 +510,13 @@ export async function POST(req: Request) {
     .insert({
       creator_id: user.id,
       org_id: orgId,
-      title,
-      description,
-      location,
-      starts_at: new Date(start).toISOString(),
-      ends_at: new Date(end).toISOString(),
+      title: fields.title,
+      description: fields.description,
+      location: fields.location,
+      starts_at: fields.starts_at,
+      ends_at: fields.ends_at,
     })
-    .select(
-      "id,org_id,creator_id,title,description,starts_at,ends_at,location,created_at",
-    )
+    .select(EVENT_ROW_COLUMNS)
     .single();
 
   if (error || !row) {

@@ -15,6 +15,7 @@ import {
   postInFeedLane,
   scoreFeedRow,
 } from "@/lib/iu/community-scope";
+import { requireNotRestricted } from "@/lib/moderation/access";
 import { orgAssetProxyUrl } from "@/lib/org-asset-url";
 import {
   loadViewerFollowedOrgIds,
@@ -25,6 +26,11 @@ import { isUuid } from "@/lib/pgrest";
 import { withPostMediaUrls } from "@/lib/post-media-url";
 import { loadPostEngagementCounts } from "@/lib/posts/engagement-counts";
 import { loadHonestViewRows, tallyViews } from "@/lib/posts/honest-views";
+import {
+  CLUB_POST_DELETE_ROLES,
+  isModeratorRemoved,
+  viewerCanDeletePost,
+} from "@/lib/posts/viewer-can-delete";
 import { loadHiddenUsers } from "@/lib/safety/hidden-users";
 import { createSupabaseServerClient } from "@/lib/supabase/server";
 import {
@@ -411,12 +417,13 @@ export async function GET(req: Request) {
   const attrIds = Array.from(
     new Set(postRows.map((p) => p.org_id).filter((id): id is string => typeof id === "string")),
   );
-  const [engagement, viewRows, attribution] = await Promise.all([
+  const [engagement, viewRows, attribution, officerOrgIds] = await Promise.all([
     loadEngagement(supabase, renderedPostIds, user.id),
     loadHonestViewRows(renderedPostIds, authorByPostId),
     attrIds.length > 0
       ? loadVisibleOrgCards(service(), attrIds)
       : Promise.resolve({ ok: true as const, byId: new Map<string, OrgCard>() }),
+    loadClubDeleteOrgIds(service, user.id, attrIds),
   ]);
   if (!attribution.ok) {
     console.error("[feed org attribution]", attribution.error);
@@ -497,6 +504,14 @@ export async function GET(req: Request) {
       // doesn't either (critic Low 3). `edited_at` rides the spread, and so do
       // `removed_at` / `removed_reason` on the author's own removed post.
       org_id: card ? row.org_id : null,
+      // Who gets a Delete on this card (S68 officer tools, C3): the shared
+      // rule, from the REAL `row.org_id` (the one above is nulled for a
+      // hidden club, whose officers may still delete its posts).
+      viewer_can_delete: viewerCanDeletePost({
+        removed: isModeratorRemoved(row.removed_at),
+        isAuthor: row.user_id === user.id,
+        clubOfficer: !!row.org_id && officerOrgIds.has(row.org_id),
+      }),
       // `honestViews === null` means the ledger was unreadable, not that
       // nobody looked — hence the stored-counter fallback noted above.
       view_count: honestViews ? (honestViews.get(row.id) ?? 0) : (row.view_count ?? 0),
@@ -713,6 +728,62 @@ async function loadHiddenClubAccess(
     ok: true,
     orgIds: new Set((memberRes.data ?? []).map((r) => (r as { org_id: string }).org_id)),
   };
+}
+
+/**
+ * The clubs on this page whose posts the viewer may delete as an officer
+ * (S68 officer tools, C3): the ones they are a CURRENT owner / admin of
+ * (CLUB_POST_DELETE_ROLES: mods can't), and none at all while a suspension or
+ * ban is in force. Feeds `viewer_can_delete` with the same rule
+ * `clubOfficerMayDelete` applies in `src/app/api/posts/[id]/route.ts`, so the
+ * card and DELETE agree.
+ *
+ * ONCE PER REQUEST, never per post: one roster read (service role, filtered
+ * to the viewer and to the clubs on the page) when the page holds any club
+ * post, then ONE restriction check (`requireNotRestricted`: Terms, then
+ * suspension / ban), only when that roster read found a club. A page with no
+ * club post costs nothing.
+ *
+ * FAILS CLOSED TO "NO BUTTON", not to a failed feed: any read error or a
+ * missing service key is an empty set. The flag only paints a button; the
+ * DELETE route and posts_delete_club_officer are the boundary.
+ */
+async function loadClubDeleteOrgIds(
+  service: () => SupabaseClient,
+  viewerId: string,
+  orgIds: string[],
+): Promise<ReadonlySet<string>> {
+  const none: ReadonlySet<string> = new Set();
+  if (orgIds.length === 0) return none;
+  if (!isSupabaseServiceConfigured()) {
+    console.error("[feed club-delete roles] service role not configured");
+    return none;
+  }
+  try {
+    const { data, error } = await service()
+      .from("org_members")
+      .select("org_id")
+      .eq("user_id", viewerId)
+      .in("role", [...CLUB_POST_DELETE_ROLES])
+      .in("org_id", orgIds);
+    if (error) {
+      console.error("[feed club-delete roles]", error);
+      return none;
+    }
+    const ids = new Set<string>();
+    for (const row of data ?? []) {
+      const id = (row as { org_id?: unknown }).org_id;
+      if (typeof id === "string") ids.add(id);
+    }
+    if (ids.size === 0) return none;
+    // Null = may proceed. Anything else (Terms, a restriction, a failed read)
+    // means no officer Delete on this page.
+    const gate = await requireNotRestricted(viewerId);
+    return gate ? none : ids;
+  } catch (error) {
+    console.error("[feed club-delete roles]", error);
+    return none;
+  }
 }
 
 /**

@@ -9536,6 +9536,8 @@ function savePostsToStorage() {
     // on every load, and a removed post read as an ordinary live one until
     // the API answered — or for good, if that hydrate failed silently.
     removedHTML:       card.querySelector('.ppost-removed')?.outerHTML || '',
+    // A moderator-removed post keeps its "no delete control" across the cache.
+    removed:           card.dataset.postRemoved === '1',
     bodyHTML:          card.querySelector('.ppost-body')?.innerHTML || '',
     tagsHTML:          card.querySelector('.ppost-tags')?.innerHTML || '',
     platformStatsHTML: card.querySelector('.op-platform-stats')?.innerHTML || '',
@@ -9749,6 +9751,9 @@ function _profileMapDbRow(row) {
     // swap it without touching the media under it.
     bodyHTML: '<span class="ppost-text">' + bodyText + '</span>' + mediaHTML,
     removedHTML: _profileRemovedNoticeHTML(row.removed_at, row.removed_reason),
+    // GET /api/me/posts sends removed_at (S68 officer tools, C3): a post a
+    // moderator took down gets no delete control (the route 409s it anyway).
+    removed: !!row.removed_at,
     ottoBadgeHTML: '',
     tagsHTML: tags,
     platformStatsHTML: '',
@@ -10005,6 +10010,13 @@ function _renderPostCard(p) {
   card.className = 'profile-post-card';
   card.dataset.postId = p.id || '';
   if (p.ottoType) card.dataset.postOtto = p.ottoType;
+  // A moderator-removed post shows no × (S68 officer tools, C3). An older
+  // cache entry has no `removed` flag but still carries the notice.
+  const removed = p.removed === true || !!p.removedHTML;
+  if (removed) card.dataset.postRemoved = '1';
+  const deleteBtn = removed
+    ? ''
+    : `<button class="ppost-delete owner-only" onclick="deleteProfilePost(this)" title="Delete post">&times;</button>`;
   const headerExtras = p.ottoBadgeHTML || '';
   const tagsBlock = p.tagsHTML ? `<div class="ppost-tags">${p.tagsHTML}</div>` : '';
   const platformBlock = p.platformStatsHTML ? `<div class="op-platform-stats">${p.platformStatsHTML}</div>` : '';
@@ -10013,7 +10025,7 @@ function _renderPostCard(p) {
   // it actually overflows and reveals the Read more button.
   card.innerHTML = `
     <button class="ppost-pin owner-only" onclick="pinFromProfile('${card.dataset.postId}',this)" title="Pin to profile">Pin</button>
-    <button class="ppost-delete owner-only" onclick="deleteProfilePost(this)" title="Delete post">&times;</button>
+    ${deleteBtn}
     <div class="ppost-header-row">
       <div class="ppost-date" style="font-size:11px;font-weight:700;color:var(--muted);text-transform:uppercase;letter-spacing:.5px;">${_esc(p.date || 'Just now')}</div>
       ${headerExtras}
@@ -10065,6 +10077,8 @@ window.addEventListener('resize', () => requestAnimationFrame(_measureAllReadMor
 async function deleteProfilePost(btn) {
   const card = btn.closest('.profile-post-card');
   if (!card || btn.disabled) return;
+  // Never a moderator-removed post (no × is drawn on one; this is the belt).
+  if (card.dataset.postRemoved === '1') return;
   const id = card.dataset.postId;
   if (!window.confirm("Delete this post? This can't be undone.")) return;
   let alreadyGone = false;

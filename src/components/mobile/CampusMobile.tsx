@@ -926,6 +926,21 @@ export function CampusMobile() {
               // An RSVP is exactly what the strip's event chips show.
               stripData.refresh();
             }}
+            onRemoved={(id) => {
+              // A list read already in flight predates the delete: drop it,
+              // or it would put the event back.
+              eventsSeqRef.current += 1;
+              setEvents((prev) => (prev ? prev.filter((e) => e.id !== id) : prev));
+              // The strip's chips are RSVP'd events, this one maybe among them.
+              stripData.refresh();
+            }}
+            onUpdated={(next) => {
+              eventsSeqRef.current += 1;
+              setEvents((prev) =>
+                prev ? prev.map((e) => (e.id === next.id ? next : e)) : prev,
+              );
+              stripData.refresh();
+            }}
             visitingName={visitingName}
           />
         </section>
@@ -1042,8 +1057,23 @@ export function CampusMobile() {
         <PostViewerMobile
           postId={openPostId}
           viewerId={viewerId}
+          // Names the club in an officer's Delete confirm (S68 C5).
+          // (The #tag list too: a post opened from there isn't always in the feed.)
+          clubName={
+            (
+              feed?.find((p) => p.id === openPostId) ??
+              tagFeed?.posts?.find((p) => p.id === openPostId)
+            )?.org?.name ?? null
+          }
           onClose={() => setOpenPostId(null)}
           onDeleted={() => {
+            // The post leaves both lists at once (S68 C5), then the feed
+            // refetches as before (a delete can shift the ranked page).
+            const gone = openPostId;
+            setFeed((prev) => (prev ? prev.filter((p) => p.id !== gone) : prev));
+            setTagFeed((prev) =>
+              prev?.posts ? { ...prev, posts: prev.posts.filter((p) => p.id !== gone) } : prev,
+            );
             void refetchFeed("refresh");
             setOpenPostId(null);
           }}
@@ -2048,6 +2078,7 @@ function FeedCard({
             (post.author?.handle ? `@${post.author.handle}` : null)
           }
           isOwner={isOwner}
+          removed={!!post.removed_at}
           initialContent={post.content ?? ""}
           hasMedia={!!post.media_url}
           onEdited={onEdited}
@@ -2066,12 +2097,18 @@ function EventsPane({
   loadErr,
   onRetry,
   onMutate,
+  onRemoved,
+  onUpdated,
   visitingName,
 }: {
   events: CampusEvent[] | null;
   loadErr: LoadFailure | null;
   onRetry: () => void;
   onMutate: () => void;
+  /** An officer cancelled or deleted an event (S68): drop it now. */
+  onRemoved: (id: string) => void;
+  /** An officer saved an edit: swap in the event PATCH answered with. */
+  onUpdated: (next: CampusEvent) => void;
   /** The campus being looked at when it isn't home; null at home. RSVP is
    *  refused there (403 `campus_visiting`), so the cards say so up front. */
   visitingName: string | null;
@@ -2098,7 +2135,14 @@ function EventsPane({
         // Visiting: the card renders its RSVP off, titled "RSVP works on
         // your home campus", with the italic "RSVP works at home" beside it
         // (the desktop card, shared; the org page passes the same flag).
-        <EventCard key={ev.id} ev={ev} onMutate={onMutate} visiting={visitingName !== null} />
+        <EventCard
+          key={ev.id}
+          ev={ev}
+          onMutate={onMutate}
+          onRemoved={onRemoved}
+          onUpdated={onUpdated}
+          visiting={visitingName !== null}
+        />
       ))}
     </>
   );
@@ -3478,6 +3522,7 @@ function PostActionsSheet({
   authorId,
   authorName,
   isOwner,
+  removed = false,
   initialContent,
   hasMedia,
   onEdited,
@@ -3492,6 +3537,9 @@ function PostActionsSheet({
   authorName?: string | null;
   /** The viewer wrote this post: Edit post replaces Report post. */
   isOwner: boolean;
+  /** A moderator took it down (`removed_at` set): no Edit (S68 C3). The card
+   *  shows RemovedContentCard instead of opening this sheet; the belt. */
+  removed?: boolean;
   initialContent: string;
   hasMedia: boolean;
   onEdited: (p: EditedPost) => void;
@@ -3641,7 +3689,9 @@ function PostActionsSheet({
           />
           <ActionSheetRow label="Copy link" onClick={copyLink} />
           {isOwner ? (
-            <ActionSheetRow label="Edit post" onClick={() => setEditOpen(true)} />
+            removed ? null : (
+              <ActionSheetRow label="Edit post" onClick={() => setEditOpen(true)} />
+            )
           ) : (
             <>
               <ActionSheetRow
@@ -3698,6 +3748,7 @@ function PostActionsSheet({
           postId={postId}
           initialContent={initialContent}
           hasMedia={hasMedia}
+          removed={removed}
           onClose={() => setEditOpen(false)}
           // EditPostSheet toasts "Post updated" itself; closing this sheet
           // too takes both down in the same tick.

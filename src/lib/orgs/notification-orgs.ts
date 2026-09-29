@@ -5,9 +5,10 @@ import type { SupabaseClient } from "@supabase/supabase-js";
 import { orgAssetProxyUrl } from "@/lib/org-asset-url";
 
 /**
- * The club an `org_invite` / `org_request_approved` notification is about,
- * resolved for the two notification readers (`/api/me/notifications`, which
- * feeds both Otto panels, and `/api/me/otto`, the phone Otto tab).
+ * The club an `org_invite` / `org_request_approved` / `event_cancelled`
+ * notification is about, resolved for the two notification readers
+ * (`/api/me/notifications`, which feeds both Otto panels, and `/api/me/otto`,
+ * the phone Otto tab).
  *
  * SERVICE ROLE, ON PURPOSE. M1c (`20260916103000_org_join_policy_invites.sql`,
  * the A4 contract paragraph) kept `orgs_select` narrow, so a student invited to
@@ -22,7 +23,13 @@ import { orgAssetProxyUrl } from "@/lib/org-asset-url";
  * row with `org: null`, so the panels fall back to "a club" instead of losing
  * an invite. Nothing here throws.
  *
- * Only the two club types are looked at. Any signed-in user can insert a
+ * A cancelled-event notice (S68, src/lib/push/event-notice.ts) renders from
+ * the club, so it needs the club too, and follows the same rule: a club that
+ * is admin-hidden or gone drops the notice. A club the student can't see
+ * because of its audience or join policy still resolves (service role), so
+ * the student who RSVP'd still reads its name.
+ *
+ * Only the club types are looked at. Any signed-in user can insert a
  * `mention` row for someone else, `org_id` included, so a drop keyed on
  * `org_id` alone would let them point rows at a hidden club and silently
  * empty that person's panel. Every other type gets `org: null` and is never
@@ -43,7 +50,7 @@ type OrgRow = {
   hidden_at: string | null;
 };
 
-const CLUB_TYPES = new Set(["org_invite", "org_request_approved"]);
+const CLUB_TYPES = new Set(["org_invite", "org_request_approved", "event_cancelled"]);
 
 function isClubRow(r: { type?: string }): boolean {
   return typeof r.type === "string" && CLUB_TYPES.has(r.type);

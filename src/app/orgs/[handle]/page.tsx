@@ -13,6 +13,7 @@ import {
 } from "@/lib/club-routes/club-posts-read";
 import { rsvpCampusDecision } from "@/lib/iu/campus-request";
 import { campusRowById, isSharedCampus } from "@/lib/iu/campuses";
+import { requireNotRestricted } from "@/lib/moderation/access";
 import { orgAssetProxyUrl } from "@/lib/org-asset-url";
 import { loadFollowerCount, loadViewerFollow } from "@/lib/orgs/following";
 import {
@@ -38,6 +39,7 @@ import {
 } from "@/lib/orgs/join-state";
 import { loadViewerOrgContext } from "@/lib/orgs/membership";
 import { withPostMediaUrls } from "@/lib/post-media-url";
+import { isClubPostDeleteRole } from "@/lib/posts/viewer-can-delete";
 import { loadHiddenUsers } from "@/lib/safety/hidden-users";
 import { createSupabaseServerClient } from "@/lib/supabase/server";
 import { createSupabaseServiceClient } from "@/lib/supabase/service";
@@ -253,7 +255,13 @@ export default async function OrgProfilePage({ params }: Params) {
   // table. A removed post is dropped for its AUTHOR too: this grid has no
   // "Removed by Vibe moderators" notice to carry, and the author is told on
   // their own profile and in the feed, which do.
-  const [memberRes, followerCount, clubPosts, invitedByName] = await Promise.all([
+  //
+  // Owners and admins get "Delete post" on every one of the club's posts
+  // (S68 officer tools, C3/C5), unless a suspension or ban is in force: the
+  // same role rule and restriction check DELETE /api/posts/[id] makes
+  // (clubOfficerMayDelete), so the button and the route agree. Only an owner
+  // or admin pays for the read; a failed one shows no button.
+  const [memberRes, followerCount, clubPosts, invitedByName, officerMayDeletePosts] = await Promise.all([
     service
       .from("org_members")
       .select("user_id", { count: "exact", head: true })
@@ -274,6 +282,12 @@ export default async function OrgProfilePage({ params }: Params) {
     user && invite?.invited_by
       ? loadInviterFirstName(service, supabase, invite.invited_by, user.id)
       : Promise.resolve(null),
+    user && isClubPostDeleteRole(viewerRole)
+      ? requireNotRestricted(user.id).then(
+          (gate) => gate === null,
+          () => false,
+        )
+      : Promise.resolve(false),
   ]);
   const { posts: postsRes, blocked: blockedAuthors } = clubPosts;
   if (memberRes.error) {
@@ -422,7 +436,12 @@ export default async function OrgProfilePage({ params }: Params) {
               {postsErr ? (
                 <PostsFailed />
               ) : posts.length > 0 ? (
-                <PostsSection posts={posts} org={org} viewerId={user?.id ?? null} />
+                <PostsSection
+                  posts={posts}
+                  org={org}
+                  viewerId={user?.id ?? null}
+                  officerMayDelete={officerMayDeletePosts}
+                />
               ) : (
                 <EmptyContent />
               )}
@@ -923,10 +942,13 @@ function PostsSection({
   posts,
   org,
   viewerId,
+  officerMayDelete,
 }: {
   posts: PostRow[];
   org: OrgProfile;
   viewerId: string | null;
+  /** A current owner / admin with no restriction: Delete on every post. */
+  officerMayDelete: boolean;
 }) {
   const items: OrgPostItem[] = posts.map((p) => ({
     id: p.id,
@@ -943,6 +965,7 @@ function PostsSection({
         orgName={org.name}
         orgLogoUrl={org.logo_url}
         viewerId={viewerId}
+        officerMayDelete={officerMayDelete}
       />
     </SectionCard>
   );

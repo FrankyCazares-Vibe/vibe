@@ -1,6 +1,6 @@
 "use client";
 
-import { useCallback, useEffect, useState } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 
 import {
   type CampusEvent,
@@ -52,14 +52,20 @@ export function OrgEventsSection({
   const [createOpen, setCreateOpen] = useState(false);
 
   const canManage = viewerRole === "owner" || viewerRole === "admin";
+  // Only the newest refresh lands. An officer's cancel / delete / edit bumps
+  // it too: a read already out predates the change and would put the old
+  // card back.
+  const eventsSeqRef = useRef(0);
 
   // After an RSVP or a new event. The student started it, so a refusal
   // toasts (vibeRequest's, or ours for a bad body) and the list stays put.
   const refresh = useCallback(async () => {
+    const seq = ++eventsSeqRef.current;
     const r = await vibeRequest<{ events?: CampusEvent[] }>(
       `/api/events?org_id=${encodeURIComponent(orgId)}&limit=50`,
       { cache: "no-store", failure: "Couldn't refresh events." },
     );
+    if (seq !== eventsSeqRef.current) return;
     if (r.ok && Array.isArray(r.data.events)) {
       setLoadErr(null);
       setEvents(r.data.events);
@@ -174,6 +180,18 @@ export function OrgEventsSection({
               key={ev.id}
               ev={ev}
               onMutate={refresh}
+              // An officer's Cancel / Delete / Edit (S68): the list changes
+              // at once, no refetch.
+              onRemoved={(id) => {
+                eventsSeqRef.current += 1;
+                setEvents((prev) => (prev ? prev.filter((e) => e.id !== id) : prev));
+              }}
+              onUpdated={(next) => {
+                eventsSeqRef.current += 1;
+                setEvents((prev) =>
+                  prev ? prev.map((e) => (e.id === next.id ? next : e)) : prev,
+                );
+              }}
               visiting={rsvpAtHomeOnly}
             />
           ))}

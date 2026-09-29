@@ -519,6 +519,11 @@
     // author's saves affordance hides instead of showing a zero.
     saves:  null,
     isOwner: false,         // the SERVER's is_owner, not a localStorage guess
+    // The SERVER's viewer_can_delete (S68 officer tools, C3): the author, or a
+    // current owner / admin of the post's club; never on a removed post.
+    canDelete: false,
+    removed: false,         // removed_at set: no Edit and no Delete anywhere
+    clubName: "",           // the prefill's club name, for an officer's confirm
     inflight: false,        // any toggle/post in progress
     // The owner's inline editor. editSaving is its OWN flag, never inflight:
     // a like still in flight would otherwise make Save return silently. It
@@ -653,6 +658,12 @@
     // and, worse, its owner affordances until the server answered.
     if (aud.open) closeAudience();
     state.isOwner = false;
+    state.canDelete = false;
+    state.removed = false;
+    // Only a feed row carries its club ({org: {name}}); anywhere else an
+    // officer's confirm says "the club".
+    state.clubName = (prefill && prefill.org && typeof prefill.org.name === "string")
+      ? prefill.org.name : "";
     state.editing = false;
     // The editor that owned this flag is gone, so the next one starts live.
     // A save still on its way lands either way (it only repaints the editor
@@ -802,6 +813,8 @@
     // next answer, so the bar's owner-only affordances go back to their closed
     // state and the view count goes back to showing nothing at all.
     state.isOwner = false;
+    state.canDelete = false;
+    state.removed = false;
     state.views = null;
     state.saves = null;
     paintOwnerAffordances();
@@ -900,20 +913,34 @@
     // and would offer B a Delete on A's post (or hide it from the real
     // author). The routes re-check ownership either way.
     state.isOwner = j.is_owner === true;
+    // Delete keys on the server's viewer_can_delete (C3), which is already
+    // false on a removed post; `removed` is the belt, and gates Edit too.
+    state.removed = !!p.removed_at;
+    state.canDelete = j.viewer_can_delete === true && !state.removed;
     document.getElementById("vpvLikeCount").textContent = String(state.likes);
     document.getElementById("vpvCommentCount").textContent = String(state.comments);
     document.getElementById("vpvLike").classList.toggle("on", state.liked);
     document.getElementById("vpvSave").classList.toggle("on", state.saved);
     paintOwnerAffordances();
 
-    // "..." menu — owner sees Edit + Delete; everyone else sees Report/Mute/Block.
+    // "..." menu — the owner sees Edit + Delete; everyone else sees
+    // Report/Mute/Block, plus Delete for a current officer of the post's club
+    // (S68 officer tools). Edit keys on is_owner and Delete on the server's
+    // viewer_can_delete; a moderator-removed post offers neither, and an
+    // owner's removed post has nothing left in the menu, so no "...".
     const isOwner = state.isOwner;
     const more = document.getElementById("vpvMore");
     const menu = document.getElementById("vpvMenu");
-    if (more) more.classList.add("show");
+    const deleteBtn = state.canDelete
+      ? `<button type="button" class="danger" onclick="window.__vpvDeletePost()">Delete post</button>`
+      : "";
+    if (more) more.classList.toggle("show", !(isOwner && state.removed));
     if (menu) {
       if (isOwner) {
-        menu.innerHTML = `<button type="button" onclick="window.__vpvCloseMenu();window.__vpvStartEdit()">Edit post</button><button type="button" class="danger" onclick="window.__vpvDeletePost()">Delete post</button>`;
+        const editBtn = state.removed
+          ? ""
+          : `<button type="button" onclick="window.__vpvCloseMenu();window.__vpvStartEdit()">Edit post</button>`;
+        menu.innerHTML = editBtn + deleteBtn;
       } else {
         // Attribute-safe JS literals: JSON.stringify builds the JS string,
         // esc() makes it safe inside onclick="..." (decoded before eval).
@@ -927,6 +954,7 @@
           <button type="button" onclick="window.__vpvCloseMenu();window.__vpvReport('post',${safeId})">Report post</button>
           ${authorId ? `<button type="button" onclick="window.__vpvCloseMenu();window.vibeOpenMuteSheet(${safeAuthor},${safeName})">Mute ${firstName}</button>` : ''}
           ${authorId ? `<button type="button" class="danger" onclick="window.__vpvCloseMenu();window.vibeBlock(${safeAuthor},${safeName}, () => window.__vpvClose())">Block ${firstName}</button>` : ''}
+          ${deleteBtn}
         `;
       }
     }
@@ -1278,7 +1306,8 @@
   // #vpvOverlay for an edit (compare _vpvScrubPostFromPage for delete).
   window.__vpvStartEdit = function () {
     if (!state.openId || state.editing) return;
-    if (!state.isOwner) return;
+    // Author only, and never a moderator-removed post (the PATCH 409s it).
+    if (!state.isOwner || state.removed) return;
     if (!isAppShell()) { toast("Sign in to edit"); return; }
     if (!isRealPostId(state.openId)) { toast("This post can't be edited"); return; }
     const body = document.getElementById("vpvBody");
@@ -1495,8 +1524,16 @@
     if (!state.openId) return;
     if (!isAppShell()) { toast("Sign in to delete"); return; }
     if (!isRealPostId(state.openId)) { toast("This post can't be deleted"); return; }
-    // Quick confirm — destructive action, can't undo.
-    if (!window.confirm("Delete this post? This can't be undone.")) return;
+    // The server's viewer_can_delete; the menu only offers Delete when it's
+    // true, so this only catches a stale click. DELETE re-checks it anyway.
+    if (!state.canDelete) return;
+    // Quick confirm — destructive action, can't undo. An officer deleting a
+    // club post someone else wrote is told whose post it is (S68 C5).
+    const asOfficer = !state.isOwner;
+    const prompt = asOfficer
+      ? "Delete this post from " + (state.clubName.trim() || "the club") + "? This can't be undone."
+      : "Delete this post? This can't be undone.";
+    if (!window.confirm(prompt)) return;
     const menu = document.getElementById("vpvMenu");
     if (menu) menu.classList.remove("show");
     if (state.inflight) return;
@@ -1510,7 +1547,7 @@
       // Remove from any visible grid/feed on the current page so the user
       // doesn't see a ghost card after the modal closes.
       _vpvScrubPostFromPage(state.openId);
-      toast("Deleted");
+      toast(asOfficer ? "Post deleted" : "Deleted");
       closeViewer();
     } catch (e) {
       toast(e && e.message ? e.message : "Could not delete");

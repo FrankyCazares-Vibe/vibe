@@ -9,6 +9,7 @@ import {
   useCallback,
   useContext,
   useEffect,
+  useId,
   useMemo,
   useRef,
   useState,
@@ -52,8 +53,8 @@ import {
   capturePosterFrame,
   extractHashtags,
 } from "@/lib/composer/helpers";
-import { copyText, type VibeResult, vibeRequest } from "@/lib/feedback/request";
-import { toast } from "@/lib/feedback/toast";
+import { copyText, type VibeFailure, type VibeResult, vibeRequest } from "@/lib/feedback/request";
+import { toast, type ToastInput } from "@/lib/feedback/toast";
 import {
   allowedCampusId,
   type Campus,
@@ -6195,15 +6196,21 @@ export type FeedPost = {
   /** Set when the author edited the post after publishing (" · Edited"). */
   edited_at?: string | null;
   /**
-   * A moderator took this down. OPTIONAL because no read route sends it yet:
-   * `/api/feed` and `/api/users/[handle]/posts` both select explicit column
-   * lists without `removed_at` / `removed_reason`, and neither file belongs to
-   * this batch. Until they do, the card below this type never renders — and a
-   * student's own removed post still arrives looking like a live one (the
-   * SELECT policy is `(removed_at is null AND …) OR user_id = auth.uid()`).
+   * A moderator took this down. `/api/feed` sends both on the author's own
+   * removed post (RLS serves a removed row to its author and nobody else), and
+   * FeedRow turns it into the "Removed by Vibe moderators" card. OPTIONAL: a
+   * deploy without the moderation migration sends neither.
    */
   removed_at?: string | null;
   removed_reason?: string | null;
+  /**
+   * The server's answer to "may this viewer delete it?" (S68 officer tools,
+   * C3; src/lib/posts/viewer-can-delete.ts): the author, or a current owner /
+   * admin of the post's club with no restriction; never a removed post.
+   * FeedRow reads it only for the officer who ISN'T the author; the author's
+   * own menu is unchanged. Missing (an older payload) = no officer Delete.
+   */
+  viewer_can_delete?: boolean;
   author: FeedAuthor | null;
   org: FeedOrg;
 };
@@ -6388,6 +6395,14 @@ function FeedTabBody({
     [],
   );
   const reportedPostIdsRef = useReportedPostIds(dropReportedPost);
+
+  // An officer deleted a club post: the same drop, at once (no sheet to wait
+  // for; FeedRow's confirm is the browser's own).
+  const dropDeletedPost = useCallback(
+    (postId: string) =>
+      setEntries((prev) => (prev ? prev.filter((e) => e.post.id !== postId) : prev)),
+    [],
+  );
 
   // After a post or a row change. The student started it, so a refusal
   // toasts (vibeRequest's, or ours for a bad body) and the feed stays put.
@@ -6612,6 +6627,7 @@ function FeedTabBody({
               entry={entry}
               onMutate={refresh}
               onEdited={applyPostEdit}
+              onDeleted={dropDeletedPost}
               onPickTag={onPickTag}
               viewerId={viewerId}
             />
@@ -7192,6 +7208,7 @@ function FeedRow({
   entry,
   onMutate,
   onEdited,
+  onDeleted,
   onPickTag,
   viewerId,
 }: {
@@ -7199,6 +7216,8 @@ function FeedRow({
   onMutate: () => void;
   /** A saved edit; the feed patches its own rows with it. */
   onEdited: (p: EditedPost) => void;
+  /** An officer deleted this club post: the feed drops every row showing it. */
+  onDeleted: (postId: string) => void;
   onPickTag: (tag: string) => void;
   viewerId: string | null;
 }) {
@@ -7208,6 +7227,11 @@ function FeedRow({
   // back to the user too, so we treat author === viewer as ownership
   // regardless of whether the post is org- or person-attributed.
   const viewerOwnsPost = !!viewerId && post.user_id === viewerId;
+  // A club post someone else wrote, and the viewer is a current owner /
+  // admin of that club (S68 officer tools, C3/C5). The server decides
+  // (`viewer_can_delete`); a removed post never qualifies.
+  const officerCanDelete =
+    !viewerOwnsPost && post.viewer_can_delete === true && !post.removed_at;
   const displayName =
     (fromOrg ? post.org?.name : post.author?.name) ||
     post.author?.handle ||
@@ -7351,6 +7375,35 @@ function FeedRow({
     onMutate();
   }, [deleting, post.id, onMutate]);
 
+  // An officer deleting someone else's club post (C5). The row leaves the
+  // feed at once rather than on a refetch, and the toast says it went.
+  const onOfficerDeletePost = useCallback(async () => {
+    if (deleting) return;
+    const club = post.org?.name;
+    if (
+      typeof window !== "undefined" &&
+      !window.confirm(
+        club
+          ? `Delete this post from ${club}? This can't be undone.`
+          : "Delete this post? This can't be undone.",
+      )
+    ) {
+      return;
+    }
+    setDeleting(true);
+    const r = await vibeRequest(`/api/posts/${post.id}`, {
+      method: "DELETE",
+      failure: "Couldn't delete this post.",
+    });
+    if (!r.ok) {
+      setDeleting(false);
+      return;
+    }
+    setShowMoreMenu(false);
+    toast({ message: "Post deleted", tone: "info" });
+    onDeleted(post.id);
+  }, [deleting, post.id, post.org?.name, onDeleted]);
+
   // Click-outside dismiss for the more menu — only attaches when open
   // so we don't burn document listeners on every row.
   useEffect(() => {
@@ -7471,9 +7524,9 @@ function FeedRow({
   }, [post.id, post.content]);
 
   // A moderator took this down. Nobody but the author is served the row at
-  // all, so this card is theirs alone. It is unreachable today: `/api/feed`
-  // does not select `removed_at`, which is exactly why a removed post still
-  // shows its author an ordinary card (see the FeedPost type).
+  // all (`/api/feed` sends `removed_at` on their own removed post only), so
+  // this card is theirs alone. It has no ⋯ menu: nobody edits or deletes a
+  // removed post (the route answers 409 `post_removed`).
   if (viewerOwnsPost && post.removed_at) {
     return (
       <article
@@ -7623,6 +7676,27 @@ function FeedRow({
                 }}
               >
                 Report post
+              </button>
+            ) : null}
+            {officerCanDelete ? (
+              <button
+                type="button"
+                role="menuitem"
+                onClick={onOfficerDeletePost}
+                disabled={deleting}
+                style={{
+                  ...feedRowMenuItemStyle("danger"),
+                  opacity: deleting ? 0.6 : 1,
+                  cursor: deleting ? "default" : "pointer",
+                }}
+                onMouseEnter={(e) => {
+                  if (!deleting) e.currentTarget.style.background = "var(--cream)";
+                }}
+                onMouseLeave={(e) => {
+                  e.currentTarget.style.background = "transparent";
+                }}
+              >
+                {deleting ? "Deleting…" : "Delete post"}
               </button>
             ) : null}
             {viewerOwnsPost ? (
@@ -8557,8 +8631,9 @@ type FeedComment = {
   like_count: number;
   viewer_liked: boolean;
   replies?: FeedComment[];
-  /** Same story as FeedPost above: `/api/posts/[id]/comments` does not select
-   *  these two columns yet, so the removed card never renders today. */
+  /** Same story as FeedPost above: `/api/posts/[id]/comments` sends these on
+   *  the author's own removed comment (optional on a deploy without the
+   *  moderation migration). */
   removed_at?: string | null;
   removed_reason?: string | null;
   author: {
@@ -9417,14 +9492,28 @@ function EventsTabBody({
   const [loadKey, setLoadKey] = useState(0);
   const [showCreate, setShowCreate] = useState(false);
   const [eligibleOrgs, setEligibleOrgs] = useState<EligibleOrg[]>([]);
+  // Only the newest refresh lands. An officer's cancel / delete / edit bumps
+  // it too (the phone's eventsSeqRef): a read already out predates the
+  // change and would put the old card back.
+  const eventsSeqRef = useRef(0);
+  const dropEvent = useCallback((id: string) => {
+    eventsSeqRef.current += 1;
+    setEvents((prev) => (prev ? prev.filter((e) => e.id !== id) : prev));
+  }, []);
+  const swapEvent = useCallback((next: CampusEvent) => {
+    eventsSeqRef.current += 1;
+    setEvents((prev) => (prev ? prev.map((e) => (e.id === next.id ? next : e)) : prev));
+  }, []);
 
   // After an RSVP or a new event. The student started it, so a refusal
   // toasts (vibeRequest's, or ours for a bad body) and the list stays put.
   const refresh = useCallback(async () => {
+    const seq = ++eventsSeqRef.current;
     const r = await vibeRequest<{ events?: CampusEvent[] }>(eventsUrl, {
       cache: "no-store",
       failure: "Couldn't refresh events.",
     });
+    if (seq !== eventsSeqRef.current) return;
     if (r.ok && Array.isArray(r.data.events)) {
       setLoadErr(null);
       setEvents(r.data.events);
@@ -9597,7 +9686,13 @@ function EventsTabBody({
           }}
         >
           {events.map((ev) => (
-            <EventCard key={ev.id} ev={ev} onMutate={refresh} />
+            <EventCard
+              key={ev.id}
+              ev={ev}
+              onMutate={refresh}
+              onRemoved={dropEvent}
+              onUpdated={swapEvent}
+            />
           ))}
         </div>
       )}
@@ -9619,10 +9714,20 @@ function EventsTabBody({
 export function EventCard({
   ev,
   onMutate,
+  onRemoved,
+  onUpdated,
   visiting,
 }: {
   ev: CampusEvent;
   onMutate: () => void;
+  /** An officer cancelled or deleted this event (S68 officer tools): the
+   *  list drops it at once. Required, so every list that renders a card
+   *  says how it leaves. */
+  onRemoved: (id: string) => void;
+  /** An officer saved an edit: the list swaps in the event PATCH answered
+   *  with. Omitted (or an edit that saved but couldn't be read back) →
+   *  `onMutate`, which refetches. */
+  onUpdated?: (next: CampusEvent) => void;
   /** The event is on a campus that isn't the viewer's home (C5): the RSVP
    *  buttons are off, titled "RSVP works on your home campus", with "RSVP
    *  works at home" beside them, except the one holding the student's own
@@ -9879,12 +9984,29 @@ export function EventCard({
               eventTitle={ev.title}
             />
           ) : null}
+          {/* Edit / Cancel (or Delete, once it has ended) for a CURRENT
+              owner / admin of the club (S68 officer tools, C5). Club events
+              only: DELETE and PATCH /api/events/[id] answer 404 for a legacy
+              event with no club, whose creator `viewer_can_manage` still
+              names. */}
+          {ev.viewer_can_manage && ev.org_id ? (
+            <EventOfficerActions
+              ev={ev}
+              rsvpCount={rsvpNoticeCount(going, interested, status)}
+              onRemoved={onRemoved}
+              onUpdated={(next) => {
+                if (next && onUpdated) onUpdated(next);
+                else onMutate();
+              }}
+            />
+          ) : null}
           {/* Never on an event you made: the route refuses its creator
               ("You can't report something of your own"), and every other
               surface keeps Report off your own things rather than letting
               the route say no. A club officer who didn't create it still
-              gets it — there is no way to take an event down from the app,
-              so a report is how a bad one reaches anybody who can. */}
+              gets it: they can take the event down themselves now (Cancel
+              beside it), but Report is how a bad one reaches Vibe's
+              moderators, whoever else runs the club. */}
           {!ev.is_creator ? <EventReportAction eventId={ev.id} /> : null}
         </div>
       ) : null}
@@ -9992,6 +10114,358 @@ function ManageAttendeesAction({
   );
 }
 
+/**
+ * How many people a cancel would notify, from the card's own live counts:
+ * everyone RSVP'd going or maybe, minus the viewer (the route never notifies
+ * the officer who cancels). Null when the counts aren't numbers.
+ */
+function rsvpNoticeCount(
+  going: number,
+  interested: number,
+  viewerStatus: "going" | "maybe" | null,
+): number | null {
+  if (!Number.isFinite(going) || !Number.isFinite(interested)) return null;
+  return Math.max(0, Math.trunc(going) + Math.trunc(interested) - (viewerStatus ? 1 : 0));
+}
+
+/** The event's end has passed (an unparseable time counts as not ended). */
+function eventHasEnded(endsAt: string): boolean {
+  const end = Date.parse(endsAt);
+  return Number.isFinite(end) && end <= Date.now();
+}
+
+/**
+ * Whether the event has ended, flipping on its own when the end passes while
+ * the card is on screen (GET /api/events lists only events that haven't
+ * ended, so a card can only cross over while it's open).
+ */
+function useEventEnded(endsAt: string): boolean {
+  const [endedFor, setEndedFor] = useState<string | null>(() =>
+    eventHasEnded(endsAt) ? endsAt : null,
+  );
+  useEffect(() => {
+    const ms = Date.parse(endsAt) - Date.now();
+    // setTimeout's ceiling is ~24.8 days and GET lists events up to 60 days
+    // out: past the ceiling a clamped timer would flip the card to "ended"
+    // early, so no timer at all (nobody keeps a card open that long).
+    if (!Number.isFinite(ms) || ms > 2_000_000_000) return;
+    const t = window.setTimeout(() => setEndedFor(endsAt), Math.max(0, ms));
+    return () => window.clearTimeout(t);
+  }, [endsAt]);
+  return endedFor === endsAt;
+}
+
+/** The C5 confirm line for Cancel (upcoming) or Delete (ended). */
+function eventRemoveConfirmText(title: string, ended: boolean, rsvpCount: number | null): string {
+  if (ended) return `Delete ${title}? This can't be undone.`;
+  const lead = `Cancel ${title}? It's removed for everyone`;
+  if (rsvpCount === null) return `${lead}, and everyone who RSVP'd gets a notice.`;
+  if (rsvpCount === 0) return `${lead}.`;
+  if (rsvpCount === 1) return `${lead}, and the 1 person who RSVP'd gets a notice.`;
+  return `${lead}, and the ${rsvpCount} people who RSVP'd get a notice.`;
+}
+
+/**
+ * The toast after DELETE /api/events/[id] answered ok. The server's answer
+ * decides "cancelled" over the card's clock: any notice sent (or tried) means
+ * it hadn't ended.
+ */
+function eventRemovedToast(
+  ended: boolean,
+  data: { notified?: unknown; notify_failed?: unknown },
+): ToastInput {
+  if (data.notify_failed === true) {
+    return { message: "Event cancelled, but the notices didn't send", tone: "error" };
+  }
+  const n =
+    typeof data.notified === "number" && data.notified > 0 ? Math.trunc(data.notified) : 0;
+  if (n > 0) return { message: `Event cancelled · ${n} notified`, tone: "info" };
+  return { message: ended ? "Event deleted" : "Event cancelled", tone: "info" };
+}
+
+const eventCardDangerLink: React.CSSProperties = {
+  ...eventCardSubtleLink,
+  border: "1px solid rgba(255,138,122,0.38)",
+  color: "#FFB1A8",
+  background: "rgba(196,43,28,0.14)",
+};
+
+/**
+ * "Edit event" and "Cancel event" on an upcoming club event, "Delete event"
+ * once it has ended (S68 officer tools, C5). Rendered by EventCard for a
+ * CURRENT owner / admin (`viewer_can_manage`) of the event's club, on the
+ * desktop Events tab, the phone Events pane and the club page alike.
+ *
+ * Real buttons in the card's action row, beside "Manage attendees", rather
+ * than a ⋯ menu: the card's surface clips anything that hangs out of it, and
+ * two buttons need no arrow-key menu to reach. The confirm and the edit
+ * dialog are portalled to <body> for the same reason (the card's tilt layer
+ * would otherwise trap a fixed overlay inside it). Escape closes either one
+ * and focus goes back to the button that opened it.
+ *
+ * Cancel and Delete are one call, DELETE /api/events/[id]: "Cancel = gone",
+ * and the route itself decides whether notices go out (only before the end).
+ */
+function EventOfficerActions({
+  ev,
+  rsvpCount,
+  onRemoved,
+  onUpdated,
+}: {
+  ev: CampusEvent;
+  /** People a cancel would notify (rsvpNoticeCount); null when unknown. */
+  rsvpCount: number | null;
+  onRemoved: (id: string) => void;
+  /** The event PATCH answered with, or null to refetch. */
+  onUpdated: (next: CampusEvent | null) => void;
+}) {
+  const ended = useEventEnded(ev.ends_at);
+  // `ended` is read again at the click, so the confirm matches the moment.
+  const [confirm, setConfirm] = useState<{ ended: boolean } | null>(null);
+  const [removing, setRemoving] = useState(false);
+  const [editOpen, setEditOpen] = useState(false);
+  const editRef = useRef<HTMLButtonElement | null>(null);
+  const removeRef = useRef<HTMLButtonElement | null>(null);
+
+  const closeConfirm = useCallback(() => {
+    setConfirm(null);
+    removeRef.current?.focus();
+  }, []);
+
+  // Synchronous twin of `removing`: a second click before the re-render
+  // would otherwise send a second DELETE (whose 404 toasts "no longer
+  // available" over the success).
+  const removingRef = useRef(false);
+
+  const remove = useCallback(async () => {
+    if (!confirm || removingRef.current) return;
+    removingRef.current = true;
+    setRemoving(true);
+    const r = await vibeRequest<{ notified?: unknown; notify_failed?: unknown }>(
+      `/api/events/${encodeURIComponent(ev.id)}`,
+      {
+        method: "DELETE",
+        failure: confirm.ended ? "Couldn't delete this event." : "Couldn't cancel this event.",
+      },
+    );
+    removingRef.current = false;
+    setRemoving(false);
+    setConfirm(null);
+    if (!r.ok) {
+      // vibeRequest has toasted why (the route's own sentence where it has
+      // one, e.g. 403 `org_hidden`: "You can't change this club's events
+      // right now."). Only 404 `not_found` means the event is already gone
+      // (another officer got there first), so only then does it leave this
+      // list; every other refusal keeps the card.
+      if (r.status === 404 && r.code === "not_found") onRemoved(ev.id);
+      else removeRef.current?.focus();
+      return;
+    }
+    toast(eventRemovedToast(confirm.ended, r.data));
+    onRemoved(ev.id);
+    // The officer's own RSVP'd event may be on the sidebar calendar.
+    emitCalendarChanged();
+  }, [confirm, ev.id, onRemoved]);
+
+  return (
+    <>
+      {!ended ? (
+        <button
+          ref={editRef}
+          type="button"
+          onClick={() => setEditOpen(true)}
+          aria-haspopup="dialog"
+          style={eventCardSubtleLink}
+        >
+          Edit event
+        </button>
+      ) : null}
+      <button
+        ref={removeRef}
+        type="button"
+        onClick={() => setConfirm({ ended: eventHasEnded(ev.ends_at) })}
+        aria-haspopup="dialog"
+        style={eventCardDangerLink}
+      >
+        {ended ? "Delete event" : "Cancel event"}
+      </button>
+      {confirm ? (
+        <ConfirmDialog
+          message={eventRemoveConfirmText(ev.title, confirm.ended, rsvpCount)}
+          confirmLabel={confirm.ended ? "Delete event" : "Cancel event"}
+          busyLabel={confirm.ended ? "Deleting…" : "Cancelling…"}
+          cancelLabel="Keep it"
+          busy={removing}
+          onConfirm={() => void remove()}
+          onCancel={closeConfirm}
+        />
+      ) : null}
+      {editOpen ? (
+        <CreateEventModal
+          editing={ev}
+          eligibleOrgs={[]}
+          onClose={() => {
+            setEditOpen(false);
+            editRef.current?.focus();
+          }}
+          onSaved={(next) => {
+            setEditOpen(false);
+            toast({ message: "Event updated", tone: "info" });
+            onUpdated(next);
+            // A moved time moves the sidebar calendar's copy too.
+            emitCalendarChanged();
+            editRef.current?.focus();
+          }}
+        />
+      ) : null}
+    </>
+  );
+}
+
+/**
+ * A small "are you sure?" for the officer tools (S68, C5): the event card's
+ * Cancel / Delete and the club page's Delete post. One sentence, a safe
+ * button (focused first) and a destructive one.
+ *
+ * Portalled to <body> so no card's transform or overflow can trap it, and
+ * centered with a 16px gutter so it fits a 375px phone. Escape or a tap on
+ * the backdrop is "Keep it" (not while the request is out); Tab stays on the
+ * two buttons. The caller puts focus back on whatever opened it.
+ * Pointer moves stop here: React bubbles them through the portal to the
+ * card's MouseSpotlight, which would tilt the card behind the dialog.
+ */
+export function ConfirmDialog({
+  message,
+  confirmLabel,
+  busyLabel,
+  cancelLabel,
+  busy,
+  onConfirm,
+  onCancel,
+}: {
+  message: string;
+  confirmLabel: string;
+  busyLabel: string;
+  cancelLabel: string;
+  busy: boolean;
+  onConfirm: () => void;
+  onCancel: () => void;
+}) {
+  const messageId = useId();
+  const cancelRef = useRef<HTMLButtonElement | null>(null);
+  const confirmRef = useRef<HTMLButtonElement | null>(null);
+
+  useEffect(() => {
+    cancelRef.current?.focus();
+  }, []);
+
+  useEffect(() => {
+    const onKey = (e: KeyboardEvent) => {
+      if (e.key !== "Escape" || busy) return;
+      e.preventDefault();
+      onCancel();
+    };
+    document.addEventListener("keydown", onKey);
+    return () => document.removeEventListener("keydown", onKey);
+  }, [busy, onCancel]);
+
+  if (typeof document === "undefined") return null;
+
+  const buttonBase: React.CSSProperties = {
+    padding: "9px 16px",
+    borderRadius: 999,
+    fontFamily: "DM Sans, sans-serif",
+    fontWeight: 700,
+    fontSize: 13,
+    cursor: busy ? "default" : "pointer",
+    WebkitTapHighlightColor: "transparent",
+  };
+
+  return createPortal(
+    <div
+      role="presentation"
+      onClick={busy ? undefined : onCancel}
+      onPointerMove={(e) => e.stopPropagation()}
+      style={{
+        position: "fixed",
+        inset: 0,
+        background: "rgba(8,6,12,0.55)",
+        backdropFilter: "blur(8px)",
+        WebkitBackdropFilter: "blur(8px)",
+        zIndex: 1100,
+        display: "flex",
+        alignItems: "center",
+        justifyContent: "center",
+        padding: 16,
+      }}
+    >
+      <div
+        role="alertdialog"
+        aria-modal="true"
+        aria-labelledby={messageId}
+        onClick={(e) => e.stopPropagation()}
+        onKeyDown={(e) => {
+          if (e.key !== "Tab") return;
+          // Two buttons: Tab and Shift+Tab swap between them.
+          const next =
+            document.activeElement === cancelRef.current ? confirmRef.current : cancelRef.current;
+          if (next && !next.disabled) {
+            e.preventDefault();
+            next.focus();
+          }
+        }}
+        style={{ ...eventModalSurface, maxWidth: 400, gap: 16 }}
+      >
+        <p
+          id={messageId}
+          style={{
+            margin: 0,
+            fontFamily: "Fraunces, serif",
+            fontWeight: 700,
+            fontSize: 17,
+            lineHeight: 1.4,
+            color: "#fff",
+            overflowWrap: "anywhere",
+          }}
+        >
+          {message}
+        </p>
+        <div style={{ display: "flex", justifyContent: "flex-end", gap: 8, flexWrap: "wrap" }}>
+          <button
+            ref={cancelRef}
+            type="button"
+            onClick={onCancel}
+            disabled={busy}
+            style={{
+              ...buttonBase,
+              border: "1px solid rgba(255,255,255,0.18)",
+              background: "transparent",
+              color: "rgba(255,255,255,0.85)",
+            }}
+          >
+            {cancelLabel}
+          </button>
+          <button
+            ref={confirmRef}
+            type="button"
+            onClick={onConfirm}
+            disabled={busy}
+            style={{
+              ...buttonBase,
+              border: "none",
+              background: busy ? "rgba(255,255,255,0.18)" : "#D93A24",
+              color: "#fff",
+            }}
+          >
+            {busy ? busyLabel : confirmLabel}
+          </button>
+        </div>
+      </div>
+    </div>,
+    document.body,
+  );
+}
+
 type Attendee = {
   status: "going" | "maybe";
   user: {
@@ -10091,11 +10565,17 @@ function AttendeesModal({
   const goingCount = going?.length ?? 0;
   const interestedCount = interested?.length ?? 0;
 
-  return (
+  // Portalled: the card that opens this (EventCard) paints on MouseSpotlight's
+  // tilt layer, whose transform, backdrop filter and overflow would otherwise
+  // trap this fixed overlay inside the card on a desktop pointer.
+  if (typeof document === "undefined") return null;
+
+  return createPortal(
     <div
       role="dialog"
       aria-modal="true"
       onClick={onClose}
+      onPointerMove={(e) => e.stopPropagation()}
       style={{
         position: "fixed",
         inset: 0,
@@ -10201,7 +10681,8 @@ function AttendeesModal({
           </button>
         </div>
       </div>
-    </div>
+    </div>,
+    document.body,
   );
 }
 
@@ -10424,67 +10905,172 @@ function formatEventTime(startIso: string, endIso: string): string {
 
 export type EligibleOrg = { id: string; name: string; handle: string; verified: boolean; role: string };
 
-export function CreateEventModal({
-  eligibleOrgs,
-  onClose,
-  onCreated,
-}: {
+type CreateEventModalProps = {
   eligibleOrgs: EligibleOrg[];
   onClose: () => void;
-  onCreated: () => void;
-}) {
-  const [title, setTitle] = useState("");
-  const [description, setDescription] = useState("");
-  const [location, setLocation] = useState("");
-  const [startsAt, setStartsAt] = useState(defaultStartIsoLocal());
-  const [endsAt, setEndsAt] = useState(defaultEndIsoLocal());
-  const [orgId, setOrgId] = useState<string>(eligibleOrgs[0]?.id ?? "");
+} & (
+  | { editing?: undefined; onCreated: () => void; onSaved?: undefined }
+  | {
+      /** EDIT MODE (S68 officer tools, C2/C5): prefilled from this event and
+       *  saved with PATCH /api/events/[id], sending only what changed. The
+       *  club can't change, so `eligibleOrgs` is unused. */
+      editing: CampusEvent;
+      /** The saved event as one GET /api/events item, or null when it saved
+       *  but couldn't be read back (the caller refetches). */
+      onSaved: (next: CampusEvent | null) => void;
+      onCreated?: undefined;
+    }
+);
+
+/** The inputs a refusal can point at; "times" is both date pickers. */
+type EventFormField = "title" | "description" | "location" | "times";
+
+/**
+ * The line and the input for a refused create or edit. The events routes'
+ * 400s carry their own sentence ("End time must be after start"), which
+ * describeFailure only keeps for a few routes, so it is read here; anything
+ * else is describeFailure's line. `field` comes from the word filter's
+ * `field` and from the code for the length and time checks.
+ */
+function eventFormFailure(r: VibeFailure): { message: string; field: EventFormField | null } {
+  const field: EventFormField | null =
+    r.code === "content_blocked"
+      ? r.field === "title" || r.field === "description" || r.field === "location"
+        ? r.field
+        : null
+      : r.code === "invalid_times"
+        ? "times"
+        : r.code === "title_required" || r.code === "title_too_long"
+          ? "title"
+          : r.code === "description_too_long"
+            ? "description"
+            : r.code === "location_too_long"
+              ? "location"
+              : null;
+  const serverLine = r.status === 400 && r.code !== "invalid_json" ? r.error?.trim() : "";
+  const message = serverLine
+    ? /[.!?]$/.test(serverLine)
+      ? serverLine
+      : `${serverLine}.`
+    : r.message;
+  return { message, field };
+}
+
+export function CreateEventModal(props: CreateEventModalProps) {
+  const { eligibleOrgs, onClose, editing } = props;
+  // Edit mode starts from the event; the pickers show it in local time.
+  const [initial] = useState(() => ({
+    title: editing?.title ?? "",
+    description: editing?.description ?? "",
+    location: editing?.location ?? "",
+    startsAt: editing ? toLocalDateTimeInputValue(new Date(editing.starts_at)) : defaultStartIsoLocal(),
+    endsAt: editing ? toLocalDateTimeInputValue(new Date(editing.ends_at)) : defaultEndIsoLocal(),
+  }));
+  const [title, setTitle] = useState(initial.title);
+  const [description, setDescription] = useState(initial.description);
+  const [location, setLocation] = useState(initial.location);
+  const [startsAt, setStartsAt] = useState(initial.startsAt);
+  const [endsAt, setEndsAt] = useState(initial.endsAt);
+  const [orgId, setOrgId] = useState<string>(editing?.org_id ?? eligibleOrgs[0]?.id ?? "");
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [badField, setBadField] = useState<EventFormField | null>(null);
+  const errorId = useId();
+
+  // What an edit would send: only the fields that changed. A picker compares
+  // as the string it shows, so an untouched start (which may be in the past
+  // for an event under way) is never re-sent and re-checked.
+  const changes: Record<string, string> = {};
+  if (title.trim() !== initial.title.trim()) changes.title = title.trim();
+  if (description.trim() !== initial.description.trim()) changes.description = description.trim();
+  if (location.trim() !== initial.location.trim()) changes.location = location.trim();
+  const startMs = Date.parse(startsAt);
+  const endMs = Date.parse(endsAt);
+  if (startsAt !== initial.startsAt && Number.isFinite(startMs)) {
+    changes.starts_at = new Date(startMs).toISOString();
+  }
+  if (endsAt !== initial.endsAt && Number.isFinite(endMs)) {
+    changes.ends_at = new Date(endMs).toISOString();
+  }
+  const dirty = !editing || Object.keys(changes).length > 0;
+  const canSubmit = !busy && !!title.trim() && !!startsAt && !!endsAt && !!orgId && dirty;
+
+  useEffect(() => {
+    const onKey = (e: KeyboardEvent) => {
+      if (e.key === "Escape" && !busy) onClose();
+    };
+    document.addEventListener("keydown", onKey);
+    return () => document.removeEventListener("keydown", onKey);
+  }, [busy, onClose]);
 
   const submit = async () => {
-    if (busy) return;
+    if (!canSubmit) return;
     setError(null);
+    setBadField(null);
     if (!orgId) {
       setError("Pick which verified org this event is for.");
       return;
     }
+    if (!Number.isFinite(startMs) || !Number.isFinite(endMs)) {
+      setError("Pick valid start and end times.");
+      setBadField("times");
+      return;
+    }
     setBusy(true);
-    try {
-      const startMs = Date.parse(startsAt);
-      const endMs = Date.parse(endsAt);
-      if (!Number.isFinite(startMs) || !Number.isFinite(endMs)) {
-        throw new Error("Pick valid start and end times");
-      }
-      const res = await fetch("/api/events", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          title: title.trim(),
-          description: description.trim(),
-          location: location.trim(),
-          starts_at: new Date(startMs).toISOString(),
-          ends_at: new Date(endMs).toISOString(),
-          org_id: orgId,
-        }),
-      });
-      const data = await res.json();
-      if (!res.ok || !data?.ok) {
-        throw new Error(data?.error || `HTTP ${res.status}`);
-      }
-      onCreated();
-    } catch (e) {
-      setError(e instanceof Error ? e.message : "Could not create event");
-    } finally {
-      setBusy(false);
+    const r = editing
+      ? await vibeRequest<{ event?: CampusEvent | null }>(
+          `/api/events/${encodeURIComponent(editing.id)}`,
+          { method: "PATCH", json: changes, quiet: true, failure: "Couldn't save your changes." },
+        )
+      : await vibeRequest<{ event?: unknown }>("/api/events", {
+          method: "POST",
+          json: {
+            title: title.trim(),
+            description: description.trim(),
+            location: location.trim(),
+            starts_at: new Date(startMs).toISOString(),
+            ends_at: new Date(endMs).toISOString(),
+            org_id: orgId,
+          },
+          quiet: true,
+          failure: "Couldn't create the event.",
+        });
+    setBusy(false);
+    if (!r.ok) {
+      const { message, field } = eventFormFailure(r);
+      setError(message);
+      setBadField(field);
+      // Signed out, Terms, a restriction: the fix is a page, so the toast
+      // carries the button the inline line can't.
+      if (r.action) toast({ message: r.message, tone: "error", action: r.action });
+      return;
+    }
+    if (props.editing) {
+      const next = r.data.event;
+      props.onSaved(next && typeof next === "object" ? (next as CampusEvent) : null);
+    } else {
+      props.onCreated();
     }
   };
 
-  return (
+  // The browser has no document on the server; the modal only ever opens
+  // after a click, so this never hides a first render.
+  if (typeof document === "undefined") return null;
+
+  const fieldStyle = (f: EventFormField): React.CSSProperties =>
+    badField === f ? { ...eventModalInput, border: "1px solid #FF8A7A" } : eventModalInput;
+  const fieldA11y = (f: EventFormField) =>
+    badField === f ? { "aria-invalid": true as const, "aria-describedby": errorId } : {};
+
+  return createPortal(
     <div
       role="dialog"
       aria-modal="true"
-      onClick={onClose}
+      aria-label={editing ? "Edit event" : "Create event"}
+      onClick={busy ? undefined : onClose}
+      // A portal still bubbles React events to the card that opened it; its
+      // MouseSpotlight would tilt under the dialog.
+      onPointerMove={(e) => e.stopPropagation()}
       style={{
         position: "fixed",
         inset: 0,
@@ -10500,7 +11086,13 @@ export function CreateEventModal({
     >
       <div
         onClick={(e) => e.stopPropagation()}
-        style={eventModalSurface}
+        style={{
+          ...eventModalSurface,
+          // A phone with the keyboard up is shorter than the form: scroll
+          // inside the panel rather than off the screen.
+          maxHeight: "calc(100dvh - 40px)",
+          overflowY: "auto",
+        }}
       >
         <div
           style={{
@@ -10510,7 +11102,7 @@ export function CreateEventModal({
             color: "#fff",
           }}
         >
-          Create event
+          {editing ? "Edit event" : "Create event"}
         </div>
         <div
           style={{
@@ -10521,27 +11113,44 @@ export function CreateEventModal({
             marginBottom: 4,
           }}
         >
-          Posted on behalf of a verified org. Attendees will see your org name.
+          {editing
+            ? `For ${editing.org?.name ?? "your club"}. Changes show for everyone right away.`
+            : "Posted on behalf of a verified org. Attendees will see your org name."}
         </div>
         <input
           autoFocus
           value={title}
-          onChange={(e) => setTitle(e.target.value.slice(0, 120))}
+          onChange={(e) => {
+            setTitle(e.target.value.slice(0, 120));
+            if (badField === "title") setBadField(null);
+          }}
           placeholder="Event title"
-          style={eventModalInput}
+          aria-label="Event title"
+          style={fieldStyle("title")}
+          {...fieldA11y("title")}
         />
         <textarea
           value={description}
-          onChange={(e) => setDescription(e.target.value.slice(0, 2000))}
+          onChange={(e) => {
+            setDescription(e.target.value.slice(0, 2000));
+            if (badField === "description") setBadField(null);
+          }}
           placeholder="What's this about? (optional)"
+          aria-label="Description"
           rows={3}
-          style={{ ...eventModalInput, resize: "vertical", minHeight: 70 }}
+          style={{ ...fieldStyle("description"), resize: "vertical", minHeight: 70 }}
+          {...fieldA11y("description")}
         />
         <input
           value={location}
-          onChange={(e) => setLocation(e.target.value.slice(0, 200))}
+          onChange={(e) => {
+            setLocation(e.target.value.slice(0, 200));
+            if (badField === "location") setBadField(null);
+          }}
           placeholder="Location (e.g. Memorial Stadium, Zoom)"
-          style={eventModalInput}
+          aria-label="Location"
+          style={fieldStyle("location")}
+          {...fieldA11y("location")}
         />
         {/* `auto-fit, minmax(220px, 1fr)` lets the two date pickers sit
             side-by-side when the modal is wide enough, and collapse to
@@ -10562,8 +11171,12 @@ export function CreateEventModal({
             <input
               type="datetime-local"
               value={startsAt}
-              onChange={(e) => setStartsAt(e.target.value)}
-              style={{ ...eventModalInput, minWidth: 0 }}
+              onChange={(e) => {
+                setStartsAt(e.target.value);
+                if (badField === "times") setBadField(null);
+              }}
+              style={{ ...fieldStyle("times"), minWidth: 0 }}
+              {...fieldA11y("times")}
             />
           </label>
           <label style={eventModalLabel}>
@@ -10571,27 +11184,38 @@ export function CreateEventModal({
             <input
               type="datetime-local"
               value={endsAt}
-              onChange={(e) => setEndsAt(e.target.value)}
-              style={{ ...eventModalInput, minWidth: 0 }}
+              onChange={(e) => {
+                setEndsAt(e.target.value);
+                if (badField === "times") setBadField(null);
+              }}
+              style={{ ...fieldStyle("times"), minWidth: 0 }}
+              {...fieldA11y("times")}
             />
           </label>
         </div>
-        <label style={eventModalLabel}>
-          Posting on behalf of
-          <select
-            value={orgId}
-            onChange={(e) => setOrgId(e.target.value)}
-            style={eventModalInput}
-          >
-            {eligibleOrgs.map((o) => (
-              <option key={o.id} value={o.id} style={{ color: "var(--charcoal)" }}>
-                {o.name}
-              </option>
-            ))}
-          </select>
-        </label>
+        {/* The club can't change on an edit (the route answers 400
+            `org_cannot_change`), so edit mode names it in the line above
+            instead of offering a picker. */}
+        {!editing ? (
+          <label style={eventModalLabel}>
+            Posting on behalf of
+            <select
+              value={orgId}
+              onChange={(e) => setOrgId(e.target.value)}
+              style={eventModalInput}
+            >
+              {eligibleOrgs.map((o) => (
+                <option key={o.id} value={o.id} style={{ color: "var(--charcoal)" }}>
+                  {o.name}
+                </option>
+              ))}
+            </select>
+          </label>
+        ) : null}
         {error ? (
           <div
+            id={errorId}
+            role="alert"
             style={{
               fontFamily: "DM Sans, sans-serif",
               fontSize: 12,
@@ -10621,36 +11245,39 @@ export function CreateEventModal({
               cursor: busy ? "default" : "pointer",
             }}
           >
-            Cancel
+            {/* Not "Cancel" on an edit: beside an event that has a "Cancel
+                event" button, it would read as that. */}
+            {editing ? "Close" : "Cancel"}
           </button>
           <button
             type="button"
             onClick={submit}
-            disabled={busy || !title.trim() || !startsAt || !endsAt || !orgId}
+            disabled={!canSubmit}
             style={{
               padding: "8px 18px",
               borderRadius: 999,
               border: "none",
-              background:
-                title.trim() && orgId && !busy
-                  ? COLORS.accent
-                  : "rgba(255,255,255,0.18)",
+              background: canSubmit ? COLORS.accent : "rgba(255,255,255,0.18)",
               color: "#fff",
               fontFamily: "DM Sans, sans-serif",
               fontWeight: 700,
               fontSize: 12,
-              cursor: busy || !title.trim() || !orgId ? "default" : "pointer",
-              boxShadow:
-                title.trim() && orgId && !busy
-                  ? "0 4px 16px rgba(255,92,53,0.32)"
-                  : "none",
+              cursor: canSubmit ? "pointer" : "default",
+              boxShadow: canSubmit ? "0 4px 16px rgba(255,92,53,0.32)" : "none",
             }}
           >
-            {busy ? "Creating…" : "Create event"}
+            {editing
+              ? busy
+                ? "Saving…"
+                : "Save changes"
+              : busy
+                ? "Creating…"
+                : "Create event"}
           </button>
         </div>
       </div>
-    </div>
+    </div>,
+    document.body,
   );
 }
 

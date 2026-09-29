@@ -768,7 +768,43 @@
     bindCursorOn(wrap);
   }
 
+  // A cancelled-event notice's start, in campus time: "Fri, Oct 3, 7:00 PM"
+  // (src/lib/push/event-notice.ts eventWhenText). '' for a bad date.
+  function _ottoEventWhen(iso) {
+    const d = iso ? new Date(iso) : null;
+    if (!d || !isFinite(d.getTime())) return '';
+    return d.toLocaleString('en-US', {
+      weekday: 'short', month: 'short', day: 'numeric',
+      hour: 'numeric', minute: '2-digit', timeZone: 'America/Indiana/Indianapolis',
+    });
+  }
+
+  // A club's cancelled-event notice (S68). It's from the club: the club's
+  // picture, name and link, never the officer who cancelled (the route sends
+  // no actor for it). Club name and event title are officer text, escaped.
+  function _ottoRenderClubNoticeRow(n) {
+    const org = n.org || {};
+    const clubName = String(org.name || '').trim() || 'A club';
+    const initials = clubName.split(/\s+/).filter(Boolean).slice(0, 2)
+      .map(p => Array.from(p)[0] || '').join('').toUpperCase() || '?';
+    const av = org.logo_url
+      ? `<div class="otto-notif-av"><img src="${_ottoEsc(org.logo_url)}" alt=""></div>`
+      : `<div class="otto-notif-av">${_ottoEsc(initials)}</div>`;
+    const title = String(n.event_title || '').replace(/\s+/g, ' ').trim() || 'an event';
+    const when = _ottoEventWhen(n.event_starts_at);
+    const click = ` onclick="window.__ottoOpenNotif('${_ottoEsc(n.id)}')"`;
+    const cls = 'otto-notif-row' + (n.read_at ? '' : ' unread');
+    return `<div class="${cls}"${click} data-notif-id="${_ottoEsc(n.id)}">
+      ${av}
+      <div class="otto-notif-body">
+        <div><span class="otto-notif-actor">${_ottoEsc(clubName)}</span> <span class="otto-notif-text">cancelled <strong style="color:white;font-weight:600">${_ottoEsc(title)}</strong>${when ? ' · ' + _ottoEsc(when) : ''}</span></div>
+        <div class="otto-notif-time">${_ottoEsc(_ottoRelTime(n.created_at))}</div>
+      </div>
+    </div>`;
+  }
+
   function _ottoRenderNotifRow(n) {
+    if (n.type === 'event_cancelled') return _ottoRenderClubNoticeRow(n);
     const a = n.actor || {};
     const initials = (a.name || a.handle || '?').split(/\s+/)
       .map(p => p[0]).filter(Boolean).join('').slice(0,2).toUpperCase();
@@ -829,7 +865,7 @@
     closeOttoPanel();
     // Club rows open the club, not the officer who sent them. Without the
     // club (it couldn't be read) the Orgs tab is the closest place.
-    if (n.type === 'org_invite' || n.type === 'org_request_approved') {
+    if (n.type === 'org_invite' || n.type === 'org_request_approved' || n.type === 'event_cancelled') {
       window.location.href = (n.org && n.org.handle)
         ? '/orgs/' + encodeURIComponent(n.org.handle)
         : '/campus?tab=orgs';

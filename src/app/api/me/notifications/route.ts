@@ -2,6 +2,7 @@ import { NextResponse } from "next/server";
 
 import { attachNotificationOrgs } from "@/lib/orgs/notification-orgs";
 import { withPostMediaUrls } from "@/lib/post-media-url";
+import { visibleActorFilter, withEventNotices } from "@/lib/push/event-notice";
 import { loadHiddenUsers } from "@/lib/safety/hidden-users";
 import { createSupabaseServerClient } from "@/lib/supabase/server";
 import { createSupabaseServiceClient } from "@/lib/supabase/service";
@@ -62,6 +63,9 @@ export async function GET(req: Request) {
   // actor is the right column: every type's post is either the viewer's own
   // (like, comment) or the actor's (mention), so a hidden person can't
   // reach the viewer through another actor's row. Fail closed on error.
+  // The one exception is a club's cancelled-event notice (ruling 14): it's
+  // from the club, so blocking or muting the officer who sent it never
+  // hides it (visibleActorFilter).
   // ./count (the unread badge) must exclude the same people: OttoCorner
   // peeks `?limit=1` when that count rises, and a count that includes a
   // hidden row makes the peek return an older, visible row instead.
@@ -76,7 +80,7 @@ export async function GET(req: Request) {
     .from("notifications")
     .select(FULL_SELECT)
     .eq("user_id", user.id);
-  if (hiddenIds.length > 0) fullQuery = fullQuery.notIn("actor_id", hiddenIds);
+  if (hiddenIds.length > 0) fullQuery = fullQuery.or(visibleActorFilter(hiddenIds));
   let { data, error } = await fullQuery
     .order("created_at", { ascending: false })
     .limit(limit);
@@ -85,7 +89,7 @@ export async function GET(req: Request) {
       .from("notifications")
       .select(FALLBACK_SELECT)
       .eq("user_id", user.id);
-    if (hiddenIds.length > 0) fbQuery = fbQuery.notIn("actor_id", hiddenIds);
+    if (hiddenIds.length > 0) fbQuery = fbQuery.or(visibleActorFilter(hiddenIds));
     const fb = await fbQuery
       .order("created_at", { ascending: false })
       .limit(limit);
@@ -98,18 +102,25 @@ export async function GET(req: Request) {
     return NextResponse.json({ ok: false, error: "Request failed" }, { status: 500 });
   }
 
-  // Every row gains `org` ({handle, name, logo_url} or null). Invites and
-  // approvals for a club that has since been hidden or deleted drop here;
-  // no other type ever drops. The fallback
+  // Every row gains `org` ({handle, name, logo_url} or null). Invites,
+  // approvals and cancelled-event notices for a club that has since been
+  // hidden or deleted drop here; no other type ever drops. The fallback
   // select has no org_id, so its rows all come back with `org: null`.
+  // Then every row gains `event_title` / `event_starts_at` (null except on a
+  // cancelled-event notice), and those notices lose their actor: the officer
+  // who cancelled is never sent to the client (withEventNotices).
   type NotificationRow = Record<string, unknown> & {
+    id: string;
     type?: string;
     org_id?: string | null;
     post?: { id: string } | null;
   };
-  const withOrgs = await attachNotificationOrgs(
-    createSupabaseServiceClient(),
-    (data ?? []) as unknown as NotificationRow[],
+  const withOrgs = await withEventNotices(
+    supabase,
+    await attachNotificationOrgs(
+      createSupabaseServiceClient(),
+      (data ?? []) as unknown as NotificationRow[],
+    ),
   );
 
   // The embedded post's thumbnail goes out as a proxy URL, never a raw

@@ -1,9 +1,11 @@
 "use client";
 
-import { useCallback, useState, useSyncExternalStore } from "react";
+import { useCallback, useRef, useState, useSyncExternalStore } from "react";
 
-import { useReportedPostIds } from "@/app/campus/campus-home";
+import { ConfirmDialog, useReportedPostIds } from "@/app/campus/campus-home";
 import { ReportSheet } from "@/components/safety/ReportSheet";
+import { vibeRequest } from "@/lib/feedback/request";
+import { toast } from "@/lib/feedback/toast";
 
 /**
  * A club's "Recent posts" on /orgs/<handle>, with Report on each post.
@@ -19,6 +21,13 @@ import { ReportSheet } from "@/components/safety/ReportSheet";
  * closed, for this visit only. The page reads posts with the service role and
  * no report filter, so a reload brings it back; the campus feed is where
  * hiding a reported post for good matters (critic-s1 item 3, accepted).
+ *
+ * DELETE (S68 officer tools, C3/C5). A current owner / admin with no
+ * restriction (`officerMayDelete`, decided by the server page with the same
+ * rule DELETE /api/posts/[id] applies) gets "Delete post" on every post here,
+ * and anyone gets it on a post they wrote. A moderator-removed post is never
+ * listed, so there is none to guard against. A deleted post leaves the list
+ * at once and a reload doesn't bring it back: it's gone from the database.
  */
 
 /** This page's own phone breakpoint, copied from OrgContent.tsx (not exported
@@ -66,12 +75,15 @@ export function OrgPostsList({
   orgName,
   orgLogoUrl,
   viewerId,
+  officerMayDelete,
 }: {
   posts: OrgPostItem[];
   orgName: string;
   orgLogoUrl: string | null;
   /** The signed-in viewer; null for a signed-out visitor, who gets no Report. */
   viewerId: string | null;
+  /** A current owner / admin of the club with no restriction in force. */
+  officerMayDelete: boolean;
 }) {
   const phone = useSyncExternalStore(subscribePhone, isPhoneNow, serverSnapshot);
   // Posts reported on this visit, and officers blocked from a report's
@@ -82,6 +94,36 @@ export function OrgPostsList({
   // One sheet for the whole list, outside the rows: dropping the reported row
   // can never unmount the sheet that reported it.
   const [reportFor, setReportFor] = useState<OrgPostItem | null>(null);
+  // Deleted on this visit; the confirm open for a post, and whether its
+  // DELETE is out. Focus goes back to the button that opened the confirm.
+  const [deleted, setDeleted] = useState<ReadonlySet<string>>(() => new Set());
+  const [deleteFor, setDeleteFor] = useState<OrgPostItem | null>(null);
+  const [deleting, setDeleting] = useState(false);
+  const deleteTriggerRef = useRef<HTMLButtonElement | null>(null);
+
+  const closeDelete = useCallback(() => {
+    setDeleteFor(null);
+    deleteTriggerRef.current?.focus();
+  }, []);
+
+  const confirmDelete = useCallback(async () => {
+    if (!deleteFor || deleting) return;
+    const postId = deleteFor.id;
+    setDeleting(true);
+    const r = await vibeRequest(`/api/posts/${encodeURIComponent(postId)}`, {
+      method: "DELETE",
+      failure: "Couldn't delete this post.",
+    });
+    setDeleting(false);
+    if (!r.ok) {
+      // vibeRequest has said why; the post stays.
+      closeDelete();
+      return;
+    }
+    setDeleteFor(null);
+    setDeleted((prev) => new Set(prev).add(postId));
+    toast({ message: "Post deleted", tone: "info" });
+  }, [deleteFor, deleting, closeDelete]);
 
   const dropReportedPost = useCallback(
     (postId: string) => setReported((prev) => new Set(prev).add(postId)),
@@ -97,7 +139,8 @@ export function OrgPostsList({
     .join("")
     .toUpperCase();
   const visible = posts.filter(
-    (p) => !reported.has(p.id) && !(p.author && blocked.has(p.author.id)),
+    (p) =>
+      !reported.has(p.id) && !deleted.has(p.id) && !(p.author && blocked.has(p.author.id)),
   );
 
   return (
@@ -178,27 +221,34 @@ export function OrgPostsList({
             {/* Signed out there is nobody to file a report as. On your own
                 post the route answers 400 "You can't report something of
                 your own", and every other surface keeps Report off your own
-                things rather than letting the route say no. */}
-            {viewerId && p.author?.id !== viewerId ? (
-              <div style={{ display: "flex", justifyContent: "flex-end", marginTop: 8 }}>
-                <button
-                  type="button"
-                  onClick={() => setReportFor(p)}
-                  style={{
-                    padding: "6px 0",
-                    background: "transparent",
-                    border: "none",
-                    color: "rgba(255,255,255,0.55)",
-                    fontFamily: "DM Sans, sans-serif",
-                    fontSize: 12,
-                    fontWeight: 600,
-                    textDecoration: "underline",
-                    cursor: "pointer",
-                    WebkitTapHighlightColor: "transparent",
-                  }}
-                >
-                  Report post
-                </button>
+                things rather than letting the route say no. Delete: an owner
+                or admin on any post here, anyone on their own (C5). */}
+            {viewerId ? (
+              <div
+                style={{ display: "flex", justifyContent: "flex-end", gap: 16, marginTop: 8 }}
+              >
+                {p.author?.id !== viewerId ? (
+                  <button
+                    type="button"
+                    onClick={() => setReportFor(p)}
+                    style={postActionStyle("rgba(255,255,255,0.55)")}
+                  >
+                    Report post
+                  </button>
+                ) : null}
+                {officerMayDelete || p.author?.id === viewerId ? (
+                  <button
+                    type="button"
+                    aria-haspopup="dialog"
+                    onClick={(e) => {
+                      deleteTriggerRef.current = e.currentTarget;
+                      setDeleteFor(p);
+                    }}
+                    style={postActionStyle("#FFB1A8")}
+                  >
+                    Delete post
+                  </button>
+                ) : null}
               </div>
             ) : null}
           </article>
@@ -231,6 +281,38 @@ export function OrgPostsList({
           onBlocked={(userId) => setBlocked((prev) => new Set(prev).add(userId))}
         />
       ) : null}
+
+      {deleteFor ? (
+        <ConfirmDialog
+          message={
+            deleteFor.author?.id === viewerId
+              ? "Delete this post? This can't be undone."
+              : `Delete this post from ${orgName}? This can't be undone.`
+          }
+          confirmLabel="Delete post"
+          busyLabel="Deleting…"
+          cancelLabel="Keep it"
+          busy={deleting}
+          onConfirm={() => void confirmDelete()}
+          onCancel={closeDelete}
+        />
+      ) : null}
     </>
   );
+}
+
+/** The quiet underlined text buttons under a post (Report, Delete). */
+function postActionStyle(color: string): React.CSSProperties {
+  return {
+    padding: "6px 0",
+    background: "transparent",
+    border: "none",
+    color,
+    fontFamily: "DM Sans, sans-serif",
+    fontSize: 12,
+    fontWeight: 600,
+    textDecoration: "underline",
+    cursor: "pointer",
+    WebkitTapHighlightColor: "transparent",
+  };
 }

@@ -4,6 +4,7 @@ import Link from "next/link";
 
 import type { ActivityRow } from "@/app/api/me/otto/route";
 import { LoadFailed } from "@/components/feedback/LoadFailed";
+import { cancelledLine, clubNameText } from "@/lib/push/event-notice";
 
 import { OttoSection } from "./OttoSection";
 
@@ -31,6 +32,10 @@ function relative(t: string): string {
  * unrecognized types fall back to "did something" so we never crash.
  */
 function describe(n: ActivityRow): string {
+  // From the club, never the officer who cancelled (the route sends no actor).
+  if (n.type === "event_cancelled") {
+    return `${clubNameText(n.org)} ${cancelledLine(n.event_title, n.event_starts_at)}`;
+  }
   const actor = n.actor?.name?.split(" ")[0] || n.actor?.handle || "someone";
   switch (n.type) {
     case "like":
@@ -74,7 +79,7 @@ function describe(n: ActivityRow): string {
  * the desktop Otto panel sends it. Every other row stays a plain line.
  */
 function hrefFor(n: ActivityRow): string | null {
-  if (n.type === "org_invite" || n.type === "org_request_approved") {
+  if (n.type === "org_invite" || n.type === "org_request_approved" || n.type === "event_cancelled") {
     return n.org ? `/orgs/${encodeURIComponent(n.org.handle)}` : "/campus?tab=orgs";
   }
   if (n.post_id) return `/posts/${encodeURIComponent(n.post_id)}`;

@@ -4,6 +4,12 @@ import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 
 import { asLoadFailure, LoadFailed, type LoadFailure } from "@/components/feedback/LoadFailed";
 import { vibeRequest } from "@/lib/feedback/request";
+import {
+  clubInitials,
+  clubNameText,
+  eventTitleText,
+  eventWhenText,
+} from "@/lib/push/event-notice";
 
 type NotifType =
   | "follow"
@@ -12,7 +18,8 @@ type NotifType =
   | "comment"
   | "mention"
   | "org_invite"
-  | "org_request_approved";
+  | "org_request_approved"
+  | "event_cancelled";
 
 type NotifActor = {
   id: string;
@@ -48,10 +55,15 @@ type NotifRow = {
   actor: NotifActor;
   post: NotifPost;
   comment: NotifComment;
-  // The club behind an invite or an approval. The notifications GET reads it
-  // with the service client; null when it couldn't, so the copy says "a club".
+  // The club behind an invite, an approval or a cancelled event. The
+  // notifications GET reads it with the service client; null when it
+  // couldn't, so the copy says "a club".
   org_id?: string | null;
   org?: { handle: string; name: string; logo_url: string | null } | null;
+  // A cancelled-event notice's copy of the event; null on other types. That
+  // row's `actor` is always null: it's from the club (event-notice.ts).
+  event_title?: string | null;
+  event_starts_at?: string | null;
 };
 
 type CountPayload = {
@@ -865,6 +877,7 @@ function verbFor(n: NotifRow): string {
     case "org_request_approved":
       return `approved your request to join ${n.org?.name ?? "a club"}`;
     default:
+      // event_cancelled renders its own line (NotifRowView, fromClub).
       return "";
   }
 }
@@ -894,15 +907,26 @@ function relTime(iso: string): string {
 
 function NotifRowView({ n, onClose }: { n: NotifRow; onClose: () => void }) {
   const a = n.actor;
-  const initials = (a?.name ?? a?.handle ?? "?")
-    .split(/\s+/)
-    .filter(Boolean)
-    .slice(0, 2)
-    .map((s) => s[0])
-    .join("")
-    .toUpperCase();
-  const display = a?.name ?? (a?.handle ? `@${a.handle}` : "someone");
+  // A cancelled-event notice is from the club: its face, name and link are
+  // the club's, and the officer who cancelled is never shown (ruling 14).
+  const fromClub = n.type === "event_cancelled";
+  const clubHref = n.org ? `/orgs/${encodeURIComponent(n.org.handle)}` : "/campus?tab=orgs";
+  const initials = fromClub
+    ? clubInitials(n.org)
+    : (a?.name ?? a?.handle ?? "?")
+        .split(/\s+/)
+        .filter(Boolean)
+        .slice(0, 2)
+        .map((s) => s[0])
+        .join("")
+        .toUpperCase();
+  const display = fromClub
+    ? clubNameText(n.org)
+    : a?.name ?? (a?.handle ? `@${a.handle}` : "someone");
+  const picture = fromClub ? n.org?.logo_url ?? null : a?.avatar_url ?? null;
+  const canOpenFace = fromClub || Boolean(a?.handle);
   const verb = verbFor(n);
+  const eventWhen = fromClub ? eventWhenText(n.event_starts_at) : null;
   const snippet = snippetFor(n);
 
   // Two click targets per row:
@@ -916,6 +940,11 @@ function NotifRowView({ n, onClose }: { n: NotifRow; onClose: () => void }) {
   // /campus?post= deep link silently failed for posts outside the
   // 50-row feed window). Mention-in-chat still goes to /messages.
   const openActor = () => {
+    if (fromClub) {
+      window.location.href = clubHref;
+      onClose();
+      return;
+    }
     if (!a?.handle) return;
     window.location.href = `/profile/${encodeURIComponent(a.handle)}`;
     onClose();
@@ -923,8 +952,8 @@ function NotifRowView({ n, onClose }: { n: NotifRow; onClose: () => void }) {
   const openRow = () => {
     // Club rows open the club, not the officer who sent them. Without the
     // club (it couldn't be read) the Orgs tab is the closest place.
-    if (n.type === "org_invite" || n.type === "org_request_approved") {
-      window.location.href = n.org ? `/orgs/${encodeURIComponent(n.org.handle)}` : "/campus?tab=orgs";
+    if (n.type === "org_invite" || n.type === "org_request_approved" || fromClub) {
+      window.location.href = clubHref;
       onClose();
       return;
     }
@@ -984,7 +1013,7 @@ function NotifRowView({ n, onClose }: { n: NotifRow; onClose: () => void }) {
     >
       <button
         type="button"
-        aria-label={`Open ${display}'s profile`}
+        aria-label={fromClub ? `Open ${display}` : `Open ${display}'s profile`}
         onClick={(e) => {
           e.stopPropagation();
           openActor();
@@ -993,8 +1022,8 @@ function NotifRowView({ n, onClose }: { n: NotifRow; onClose: () => void }) {
           width: 32,
           height: 32,
           borderRadius: 999,
-          background: a?.avatar_url
-            ? `url(${a.avatar_url}) center/cover`
+          background: picture
+            ? `url(${JSON.stringify(picture)}) center/cover`
             : "rgba(255,255,255,0.08)",
           flexShrink: 0,
           display: "flex",
@@ -1006,17 +1035,17 @@ function NotifRowView({ n, onClose }: { n: NotifRow; onClose: () => void }) {
           fontSize: 12,
           padding: 0,
           border: "none",
-          cursor: a?.handle ? "pointer" : "default",
+          cursor: canOpenFace ? "pointer" : "default",
         }}
       >
-        {!a?.avatar_url ? initials : null}
+        {!picture ? initials : null}
       </button>
       <div style={{ flex: 1, minWidth: 0 }}>
         <div style={{ fontSize: 13, lineHeight: 1.3 }}>
           {/* Actor name is its own click target — same /profile destination
               as the avatar, with stopPropagation so the row's post-route
               doesn't also fire. */}
-          {a?.handle ? (
+          {canOpenFace ? (
             <button
               type="button"
               onClick={(e) => {
@@ -1040,7 +1069,17 @@ function NotifRowView({ n, onClose }: { n: NotifRow; onClose: () => void }) {
           ) : (
             <span style={{ fontWeight: 700 }}>{display}</span>
           )}{" "}
-          <span style={{ color: "rgba(255,255,255,0.65)" }}>{verb}</span>
+          {fromClub ? (
+            <span style={{ color: "rgba(255,255,255,0.65)" }}>
+              cancelled{" "}
+              <span style={{ color: "white", fontWeight: 700 }}>
+                {eventTitleText(n.event_title)}
+              </span>
+              {eventWhen ? ` · ${eventWhen}` : null}
+            </span>
+          ) : (
+            <span style={{ color: "rgba(255,255,255,0.65)" }}>{verb}</span>
+          )}
         </div>
         {snippet ? (
           <div

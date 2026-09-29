@@ -21,6 +21,11 @@ import { addedHandles, checkPostEdit, extractPostTags } from "@/lib/posts/edit";
 import { loadPostEngagementCounts } from "@/lib/posts/engagement-counts";
 import { loadHonestViewRows } from "@/lib/posts/honest-views";
 import { firstBlockedPostTag } from "@/lib/posts/post-tag-filter";
+import {
+  isClubPostDeleteRole,
+  isModeratorRemoved,
+  viewerCanDeletePost,
+} from "@/lib/posts/viewer-can-delete";
 import { kickPushDrain } from "@/lib/push/dispatch";
 import { rateLimit, tooManyRequests } from "@/lib/rate-limit";
 import { loadPairBlock } from "@/lib/safety/pair-block";
@@ -67,6 +72,12 @@ type RouteContext = { params: Promise<{ id: string }> };
  * saw this") cannot be built on a flag the caller forgets to pass, so the
  * server that already knows says so.
  *
+ * `viewer_can_delete` (S68 officer tools, contract C3) is the same idea for
+ * Delete: false on a moderator-removed post; true for the author, or for a
+ * current owner / admin of the post's club who isn't suspended or banned —
+ * DELETE's own check (clubOfficerMayDelete), so the two can't disagree. Edit
+ * stays author-only and keys off `is_owner` (and `removed_at`).
+ *
  * WHY `counts.views` IS NOT `posts.view_count`. The stored counter includes
  * the author refreshing their own post (`record_post_view` had no self-view
  * guard until 20260912100500; 71 of 149 live ledger rows were self-views), so
@@ -99,8 +110,9 @@ type RouteContext = { params: Promise<{ id: string }> };
  * included, so the club's hidden status is checked here with the service role:
  * members of the club and platform admins still get the post, and so does its
  * author; everyone else gets the same 404 as a missing post. `org_id` is read
- * for that check only and never sent. `/api/feed` leaves the same posts out
- * for the same people, so no feed card opens to this 404.
+ * for that check and `viewer_can_delete` only, and never sent. `/api/feed`
+ * leaves the same posts out for the same people, so no feed card opens to
+ * this 404.
  *
  * The check is `orgContentAccess` (src/lib/orgs/hidden-org-access.ts), the
  * same one the like, comment and media routes ask. It fails CLOSED: when the
@@ -145,7 +157,8 @@ export async function GET(_req: Request, ctx: RouteContext) {
         // `view_count` is read only as the fallback below and is stripped off
         // the post before it ships — nothing should render the inflated counter.
         // `edited_at` (null = never edited) drives the "Edited" marker.
-        // `org_id` is read only for the hidden-club check and stripped too.
+        // `org_id` is read only for the hidden-club check and
+        // `viewer_can_delete`, and stripped too.
         "id,user_id,org_id,type,content,tags,media_url,media_thumbnail_url,view_count,created_at,edited_at," +
           (moderation ? "removed_at,removed_reason," : "") +
           // Explicit FK name disambiguates the posts→users embed; see /api/feed for context.
@@ -210,6 +223,23 @@ export async function GET(_req: Request, ctx: RouteContext) {
     hiddenClub = access.hidden;
   }
 
+  // `viewer_can_delete` (S68 officer tools, C3): never on a removed post; the
+  // author always; otherwise a current officer of the post's club, asked with
+  // DELETE's own check (clubOfficerMayDelete) so the two can't disagree. It
+  // fails closed: a check that can't be made is no Delete, never a 500.
+  const removed = isModeratorRemoved(post.removed_at);
+  const isAuthor = authorId === user.id;
+  const officerCheck: Promise<boolean> =
+    !removed && !isAuthor && orgId
+      ? clubOfficerMayDelete(orgId, user.id, "[posts/:id GET role]").then(
+          (r) => r.ok,
+          (e: unknown) => {
+            console.error("[posts/:id GET role]", e);
+            return false;
+          },
+        )
+      : Promise.resolve(false);
+
   // Counts + viewer state in parallel — small queries, cheap to fan out.
   // Likes and reposts come from the count RPC (see the docblock): the viewer
   // is `auth.uid()` there, so this must stay the cookie client.
@@ -220,6 +250,7 @@ export async function GET(_req: Request, ctx: RouteContext) {
     viewerSaveRes,
     viewRows,
     saveCount,
+    clubOfficer,
   ] = await Promise.all([
     loadPostEngagementCounts(supabase, [id]),
     supabase
@@ -239,6 +270,7 @@ export async function GET(_req: Request, ctx: RouteContext) {
     // Honest views: the ledger, with this post's author's own rows dropped.
     loadHonestViewRows([id], new Map([[id, authorId]])),
     loadSaveCount(id, authorId),
+    officerCheck,
   ]);
 
   // `null` from the ledger means "we could not read it", not "nobody looked".
@@ -260,7 +292,8 @@ export async function GET(_req: Request, ctx: RouteContext) {
   const res = NextResponse.json({
     ok: true,
     post: withPostMediaUrls(post),
-    is_owner: authorId === user.id,
+    is_owner: isAuthor,
+    viewer_can_delete: viewerCanDeletePost({ removed, isAuthor, clubOfficer }),
     counts: {
       likes:    postCounts.likes,
       comments: commentCountRes.count ?? 0,
@@ -324,6 +357,45 @@ async function notYourPost(orgId: unknown, logTag: string): Promise<NextResponse
     }
   }
   return NextResponse.json({ ok: false, error: "Not your post" }, { status: 403 });
+}
+
+/** What {@link clubOfficerMayDelete} found. */
+type ClubOfficerDelete =
+  | { ok: true }
+  | { ok: false; reason: "error" }
+  | { ok: false; reason: "not_officer" }
+  | { ok: false; reason: "restricted"; response: NextResponse };
+
+/**
+ * May `userId` delete a post in club `orgId` that someone else wrote? Only a
+ * CURRENT owner / admin (isClubPostDeleteRole: mods can't) with no suspension
+ * or ban in force, as posts_delete_club_officer says.
+ *
+ * ONE CHECK FOR BOTH HANDLERS (S68 officer tools, C3): DELETE refuses on it
+ * and GET's `viewer_can_delete` reports it, so the button a client paints and
+ * the answer the route gives can never disagree. "error" means the role could
+ * not be read (or the service role isn't configured): DELETE answers 500 and
+ * GET shows no Delete. "restricted" carries requireNotRestricted's own answer
+ * (terms or restriction), which DELETE sends as-is.
+ *
+ * The roster read needs the service role (RLS hides a club's members from
+ * non-members).
+ */
+async function clubOfficerMayDelete(
+  orgId: string,
+  userId: string,
+  logTag: string,
+): Promise<ClubOfficerDelete> {
+  if (!isSupabaseServiceConfigured()) {
+    console.error(`${logTag} service role not configured`);
+    return { ok: false, reason: "error" };
+  }
+  const roleRes = await loadOrgRole(createSupabaseServiceClient(), orgId, userId);
+  if (!roleRes.ok) return { ok: false, reason: "error" };
+  if (!isClubPostDeleteRole(roleRes.role)) return { ok: false, reason: "not_officer" };
+  const gate = await requireNotRestricted(userId);
+  if (gate) return { ok: false, reason: "restricted", response: gate };
+  return { ok: true };
 }
 
 /** What a moderator-removed post answers to its author's Delete or Edit. */
@@ -408,20 +480,18 @@ export async function DELETE(_req: Request, ctx: RouteContext) {
     // Not the author: only a current owner / admin of the post's club, not
     // suspended or banned (posts_delete_club_officer). The roster read needs
     // the service role (RLS hides a club's members from non-members).
+    // The same check GET's `viewer_can_delete` asks (clubOfficerMayDelete).
     if (!row.org_id) return notYourPost(row.org_id, "[posts/:id DELETE club]");
-    if (!isSupabaseServiceConfigured()) {
-      console.error("[posts/:id DELETE role] service role not configured");
-      return NextResponse.json({ ok: false, error: "Request failed" }, { status: 500 });
+    const officer = await clubOfficerMayDelete(row.org_id, user.id, "[posts/:id DELETE role]");
+    if (!officer.ok) {
+      if (officer.reason === "error") {
+        return NextResponse.json({ ok: false, error: "Request failed" }, { status: 500 });
+      }
+      if (officer.reason === "not_officer") {
+        return notYourPost(row.org_id, "[posts/:id DELETE club]");
+      }
+      return officer.response;
     }
-    const roleRes = await loadOrgRole(createSupabaseServiceClient(), row.org_id, user.id);
-    if (!roleRes.ok) {
-      return NextResponse.json({ ok: false, error: "Request failed" }, { status: 500 });
-    }
-    if (!roleRes.role || !EDIT_AS_ORG_ROLES.includes(roleRes.role)) {
-      return notYourPost(row.org_id, "[posts/:id DELETE club]");
-    }
-    const gate = await requireNotRestricted(user.id);
-    if (gate) return gate;
   }
 
   // After the ownership step on purpose: a stranger still hears 403 / 404

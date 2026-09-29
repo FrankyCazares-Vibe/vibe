@@ -45,7 +45,13 @@ export type SettingsPatch = {
 /** One tap on a "What to send" switch. */
 export type PrefFlip = { kind: PushKind; on: boolean } | { previews: boolean };
 
-/** Every kind that can push, in the card's order. Same set as PUSH_KINDS (tested). */
+/**
+ * Every kind a student can switch off, in the card's order. Same set as
+ * PUSH_KINDS (tested). A club's cancelled-event notice has no switch on
+ * purpose (ALWAYS_ON_PUSH_KINDS in payload.ts): it only reaches students who
+ * RSVP'd, and turning it off would only mean walking to an event that isn't
+ * happening. It still obeys the device switch and "Show message previews".
+ */
 export const CARD_KINDS: readonly PushKind[] = [
   "dm",
   "group_message",

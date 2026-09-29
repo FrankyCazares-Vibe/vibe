@@ -185,6 +185,10 @@ type PostRow = {
   tags?: string[] | null;
   /** Stamped by the database on every edit; the card adds " · Edited". */
   edited_at?: string | null;
+  /** A moderator took it down (only its author is ever served the row). The
+   *  card then offers no Edit or Delete (S68 officer tools, C3); the routes
+   *  answer 409 `post_removed` anyway. */
+  removed_at?: string | null;
 };
 
 type ProfileTab = "posts" | "portfolio";
@@ -2797,6 +2801,9 @@ function PostFeedCard({
   onDeleted: () => void;
 }) {
   const [actionsOpen, setActionsOpen] = useState(false);
+  // The ⋯ holds only Edit and Delete, and a moderator-removed post may have
+  // neither (C3), so a removed post gets no ⋯ at all.
+  const showActions = isOwner && !post.removed_at;
   const thumb = post.media_thumbnail_url || post.media_url || "";
   const isImage = !!thumb;
   // The ⋯ is a SIBLING of the card button, never inside it (a button in a
@@ -2854,7 +2861,7 @@ function PostFeedCard({
               WebkitBoxOrient: "vertical",
               overflow: "hidden",
               // Keeps the text clear of the ⋯ in the top-right corner.
-              paddingRight: isOwner ? 34 : undefined,
+              paddingRight: showActions ? 34 : undefined,
             }}
           >
             {renderInlineContentInline(post.content)}
@@ -2883,7 +2890,7 @@ function PostFeedCard({
             : ""}
         </div>
       </button>
-      {isOwner ? (
+      {showActions ? (
         <button
           type="button"
           aria-label="Post actions"
@@ -2929,7 +2936,7 @@ function PostFeedCard({
           </span>
         </button>
       ) : null}
-      {actionsOpen ? (
+      {actionsOpen && showActions ? (
         <OwnPostActionsSheet
           postId={post.id}
           content={post.content ?? ""}

@@ -64,6 +64,12 @@ import { editedPostFrom, POST_MAX_CHARS, type EditedPost } from "@/lib/posts/edi
  * sheet. Known limit: the dialog's scroll lock still blocks scrolling the
  * suggestion list itself, so a long list is narrowed by typing more.
  *
+ * A POST A MODERATOR REMOVED CAN'T BE EDITED (S68 officer tools, C3). Hosts
+ * hide Edit on a removed post; this sheet is the belt to that brace. Opened
+ * with `removed`, or told `post_removed` (409) by the PATCH route mid-edit, it
+ * shows {@link REMOVED_COPY} where the text box was, never saves, and closes
+ * without "Discard your changes?" (there is nothing it could keep).
+ *
  * NOT YET WIRED TO THE CARDS (critic W3 L9). Until wave 4 (CM, PM) passes
  * PostViewerMobile's `onEdited`, an edit made in the phone viewer updates the
  * viewer only: the feed or profile card underneath shows the old text until
@@ -75,6 +81,10 @@ const EDIT_SHEET_OVERLAY_Z = 10400;
 const EDIT_SHEET_CONTENT_Z = 10401;
 
 const SAVE_FAILURE = "Couldn't save your changes.";
+
+/** Shown in place of the editor on a moderator-removed post (the route's own
+ *  409 sentence, so the toast and the sheet say the same thing). */
+const REMOVED_COPY = "A moderator took this post down, so it can't be edited.";
 
 /**
  * The PATCH still out for each post (lowercased id), so a second save of the
@@ -108,11 +118,14 @@ export function EditPostSheet({
   postId,
   initialContent,
   hasMedia,
+  removed = false,
   nested = false,
   onClose,
   onSaved,
 }: {
   postId: string;
+  /** The post's `removed_at` is set: the sheet shows why it can't edit. */
+  removed?: boolean;
   /** The post's current text (`content ?? ""`). */
   initialContent: string;
   /** The post has a photo or video, so its caption may be cleared. */
@@ -131,12 +144,14 @@ export function EditPostSheet({
   // False once this sheet is gone (Cancel mid-save), so a save that lands
   // afterwards doesn't call `onClose` and shut a sheet opened since.
   const aliveRef = useRef(true);
-  const { dirty, empty, canSave, dismissible } = editSheetState(
-    draft,
-    initialContent,
-    hasMedia,
-    saving,
-  );
+  // The PATCH route answered 409 `post_removed`: a moderator took the post
+  // down after this sheet opened.
+  const [serverRemoved, setServerRemoved] = useState(false);
+  const isRemoved = removed || serverRemoved;
+  const state = editSheetState(draft, initialContent, hasMedia, saving);
+  const { dirty, empty } = state;
+  const canSave = state.canSave && !isRemoved;
+  const dismissible = state.dismissible || (isRemoved && !saving);
 
   // A callback ref, not a mount effect: the textarea sits inside vaul's
   // portal, which renders a beat after this component mounts, so a ref read
@@ -157,7 +172,9 @@ export function EditPostSheet({
 
   const cancel = () => {
     // Mid-save: close without asking; the save carries on (see DISMISSING).
-    if (!savingRef.current && dirty && !window.confirm("Discard your changes?")) return;
+    if (!savingRef.current && dirty && !isRemoved && !window.confirm("Discard your changes?")) {
+      return;
+    }
     onClose();
   };
 
@@ -186,9 +203,11 @@ export function EditPostSheet({
       if (aliveRef.current) onClose();
       return;
     }
-    // A refusal was already toasted by vibeRequest. A 2xx without a usable
-    // post for this id wasn't, and it still isn't a save we can show.
+    // A refusal was already toasted by vibeRequest (a 409 `post_removed`
+    // carries the route's own sentence). A 2xx without a usable post for this
+    // id wasn't, and it still isn't a save we can show.
     if (r.ok) toast({ message: SAVE_FAILURE, tone: "error" });
+    else if (r.code === "post_removed") setServerRemoved(true);
     savingRef.current = false;
     setSaving(false);
   };
@@ -273,7 +292,7 @@ export function EditPostSheet({
                 cursor: "pointer",
               }}
             >
-              Cancel
+              {isRemoved ? "Close" : "Cancel"}
             </button>
             <Drawer.Title
               style={{
@@ -316,62 +335,80 @@ export function EditPostSheet({
               gap: 8,
             }}
           >
-            <textarea
-              ref={bindTextarea}
-              autoFocus
-              value={draft}
-              onChange={(e) => setDraft(e.target.value.slice(0, POST_MAX_CHARS))}
-              placeholder={hasMedia ? "Write a caption…" : "Say something…"}
-              aria-label="Post text"
-              readOnly={saving}
-              // Selecting text by dragging shouldn't drag a clean sheet shut.
-              data-vaul-no-drag
-              style={{
-                width: "100%",
-                boxSizing: "border-box",
-                minHeight: 160,
-                padding: "12px 14px",
-                borderRadius: 14,
-                border: "1px solid rgba(28,28,30,0.10)",
-                background: "#fff",
-                fontFamily: "DM Sans, sans-serif",
-                // 16px keeps iOS Safari from zooming in on focus.
-                fontSize: 16,
-                lineHeight: 1.5,
-                color: "#1C1C1E",
-                outline: "none",
-                resize: "none",
-              }}
-            />
-            <div
-              style={{
-                display: "flex",
-                alignItems: "flex-start",
-                gap: 10,
-                fontFamily: "DM Sans, sans-serif",
-                fontSize: 12,
-                lineHeight: 1.4,
-              }}
-            >
-              <div
-                aria-live="polite"
-                style={{ flex: 1, minWidth: 0, display: "flex", flexDirection: "column", gap: 4 }}
+            {isRemoved ? (
+              <p
+                role="status"
+                style={{
+                  margin: 0,
+                  padding: "12px 2px",
+                  fontFamily: "DM Sans, sans-serif",
+                  fontSize: 15,
+                  lineHeight: 1.5,
+                  color: "#1C1C1E",
+                }}
               >
-                {hasMedia ? (
-                  <span style={{ color: "#8A8580" }}>
-                    You can change the words. The photo or video stays.
+                {REMOVED_COPY}
+              </p>
+            ) : (
+              <>
+                <textarea
+                  ref={bindTextarea}
+                  autoFocus
+                  value={draft}
+                  onChange={(e) => setDraft(e.target.value.slice(0, POST_MAX_CHARS))}
+                  placeholder={hasMedia ? "Write a caption…" : "Say something…"}
+                  aria-label="Post text"
+                  readOnly={saving}
+                  // Selecting text by dragging shouldn't drag a clean sheet shut.
+                  data-vaul-no-drag
+                  style={{
+                    width: "100%",
+                    boxSizing: "border-box",
+                    minHeight: 160,
+                    padding: "12px 14px",
+                    borderRadius: 14,
+                    border: "1px solid rgba(28,28,30,0.10)",
+                    background: "#fff",
+                    fontFamily: "DM Sans, sans-serif",
+                    // 16px keeps iOS Safari from zooming in on focus.
+                    fontSize: 16,
+                    lineHeight: 1.5,
+                    color: "#1C1C1E",
+                    outline: "none",
+                    resize: "none",
+                  }}
+                />
+                <div
+                  style={{
+                    display: "flex",
+                    alignItems: "flex-start",
+                    gap: 10,
+                    fontFamily: "DM Sans, sans-serif",
+                    fontSize: 12,
+                    lineHeight: 1.4,
+                  }}
+                >
+                  <div
+                    aria-live="polite"
+                    style={{ flex: 1, minWidth: 0, display: "flex", flexDirection: "column", gap: 4 }}
+                  >
+                    {hasMedia ? (
+                      <span style={{ color: "#8A8580" }}>
+                        You can change the words. The photo or video stays.
+                      </span>
+                    ) : null}
+                    {empty ? (
+                      <span style={{ color: "#B83A1A", fontWeight: 600 }}>
+                        Your post can&apos;t be empty.
+                      </span>
+                    ) : null}
+                  </div>
+                  <span style={{ marginLeft: "auto", fontSize: 11, color: "#8A8580", flexShrink: 0 }}>
+                    {draft.length}/{POST_MAX_CHARS}
                   </span>
-                ) : null}
-                {empty ? (
-                  <span style={{ color: "#B83A1A", fontWeight: 600 }}>
-                    Your post can&apos;t be empty.
-                  </span>
-                ) : null}
-              </div>
-              <span style={{ marginLeft: "auto", fontSize: 11, color: "#8A8580", flexShrink: 0 }}>
-                {draft.length}/{POST_MAX_CHARS}
-              </span>
-            </div>
+                </div>
+              </>
+            )}
           </div>
         </Drawer.Content>
       </Drawer.Portal>

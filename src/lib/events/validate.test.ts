@@ -1,0 +1,184 @@
+/**
+ * Tests for the shared event validation (`validate.ts`), S68 officer tools B1.
+ * POST /api/events and PATCH /api/events/[id] both run checkEventFields, so
+ * these pin what a create refuses AND what an edit may keep.
+ *
+ * Run with:
+ *   node --test --experimental-strip-types src/lib/events/validate.test.ts
+ *
+ * The resolve hook lets validate.ts import "./manage" and
+ * "../moderation/text-filter" extensionless (same pattern as manage.test.ts).
+ */
+
+import assert from "node:assert/strict";
+import * as nodeModule from "node:module";
+import test from "node:test";
+
+type NextResolve = (specifier: string, context?: unknown) => unknown;
+const { registerHooks } = nodeModule as unknown as {
+  registerHooks?: (hooks: {
+    resolve: (specifier: string, context: unknown, nextResolve: NextResolve) => unknown;
+  }) => void;
+};
+if (typeof registerHooks !== "function") {
+  throw new Error("validate.test.ts needs Node >= 22.15 (module.registerHooks)");
+}
+registerHooks({
+  resolve(specifier, context, nextResolve) {
+    try {
+      return nextResolve(specifier, context);
+    } catch (err) {
+      if (specifier.startsWith(".") && !/\.[cm]?[jt]sx?$/.test(specifier)) {
+        return nextResolve(`${specifier}.ts`, context);
+      }
+      throw err;
+    }
+  },
+});
+
+const { checkEventFields, readEventFields } = await import("./validate");
+const { EVENT_MAX_DESCRIPTION, EVENT_MAX_LOCATION, EVENT_MAX_TITLE, EVENT_MAX_DURATION_MS } =
+  await import("./manage");
+const { filterTerms } = await import("../moderation/text-filter-list");
+
+const HOUR = 3_600_000;
+const DAY = 24 * HOUR;
+const NOW = Date.parse("2026-10-01T12:00:00.000Z");
+const iso = (ms: number) => new Date(ms).toISOString();
+/** A listed word, taken from the list itself (never spelled out here). */
+const BLOCKED = filterTerms()[0].term;
+
+const good = {
+  title: "  Rush night  ",
+  description: "Pizza and meet the chapter",
+  location: "Union 201",
+  starts_at: iso(NOW + DAY),
+  ends_at: iso(NOW + DAY + 2 * HOUR),
+};
+
+/** A stored event, as the database hands it back (+00:00, not Z). */
+const stored = {
+  title: "Rush night",
+  description: "Pizza",
+  location: "Union 201",
+  starts_at: "2026-10-01T11:00:00+00:00", // started an hour ago: under way
+  ends_at: "2026-10-01T15:00:00+00:00",
+};
+
+function problemOf(result: ReturnType<typeof checkEventFields>) {
+  return result.ok ? null : result.problem;
+}
+
+test("create: a normal event passes, trimmed, with ISO times", () => {
+  const r = checkEventFields(readEventFields(good), NOW);
+  assert.ok(r.ok);
+  assert.deepEqual(r.value, {
+    title: "Rush night",
+    description: "Pizza and meet the chapter",
+    location: "Union 201",
+    starts_at: iso(NOW + DAY),
+    ends_at: iso(NOW + DAY + 2 * HOUR),
+  });
+});
+
+test("create: POST's refusals, codes and sentences, in POST's order", () => {
+  const check = (patch: Record<string, unknown>) =>
+    problemOf(checkEventFields(readEventFields({ ...good, ...patch }), NOW));
+  assert.deepEqual(check({ title: "   " }), {
+    kind: "invalid", status: 400, code: "title_required", error: "Title is required",
+  });
+  // A non-string reads as "" (as POST always did), not as "unchanged".
+  assert.deepEqual(check({ title: 5 }), check({ title: "" }));
+  assert.equal(
+    (check({ title: "x".repeat(EVENT_MAX_TITLE + 1) }) as { error: string }).error,
+    "Title exceeds 120 characters",
+  );
+  assert.equal(check({ title: "x".repeat(EVENT_MAX_TITLE) }), null);
+  assert.equal(
+    (check({ description: "x".repeat(EVENT_MAX_DESCRIPTION + 1) }) as { code: string }).code,
+    "description_too_long",
+  );
+  assert.equal(
+    (check({ location: "x".repeat(EVENT_MAX_LOCATION + 1) }) as { code: string }).code,
+    "location_too_long",
+  );
+  // Length is checked before the word filter, the filter before the times.
+  assert.equal(
+    (check({ title: "x".repeat(EVENT_MAX_TITLE + 1), location: BLOCKED }) as { code: string }).code,
+    "title_too_long",
+  );
+  assert.deepEqual(check({ location: `meet at ${BLOCKED}`, starts_at: "nope" }), {
+    kind: "content_blocked", status: 422, field: "location",
+  });
+  assert.deepEqual(check({ description: BLOCKED }), {
+    kind: "content_blocked", status: 422, field: "description",
+  });
+});
+
+test("create: the time rules (required, order, past start, 14 days)", () => {
+  const check = (patch: Record<string, unknown>) =>
+    problemOf(checkEventFields(readEventFields({ ...good, ...patch }), NOW));
+  assert.match((check({ starts_at: undefined }) as { error: string }).error, /required/);
+  assert.match((check({ ends_at: iso(NOW + HOUR) }) as { error: string }).error, /after start/);
+  assert.match((check({ starts_at: iso(NOW - HOUR) }) as { error: string }).error, /in the past/);
+  const long = check({ starts_at: iso(NOW + HOUR), ends_at: iso(NOW + HOUR + EVENT_MAX_DURATION_MS + 1) });
+  assert.equal((long as { error: string }).error, "An event can last at most 14 days");
+  assert.equal((long as { code: string }).code, "invalid_times");
+});
+
+test("edit: a field left out keeps its stored value; one sent replaces it", () => {
+  const f = readEventFields({ location: " Union 305 " }, stored);
+  assert.deepEqual(f, {
+    title: "Rush night",
+    description: "Pizza",
+    location: "Union 305",
+    startsAt: stored.starts_at,
+    endsAt: stored.ends_at,
+  });
+  // Sent but not a string: "" (so `null` clears a description, as POST reads it).
+  assert.equal(readEventFields({ description: null }, stored).description, "");
+});
+
+test("edit: an event under way can be fixed without moving its past start", () => {
+  const r = checkEventFields(readEventFields({ location: "Union 305" }, stored), NOW, stored);
+  assert.ok(r.ok);
+  assert.equal(r.value.starts_at, "2026-10-01T11:00:00.000Z");
+  assert.equal(r.value.location, "Union 305");
+  // The same start written differently (Z vs +00:00) is still "kept".
+  const same = checkEventFields(
+    readEventFields({ starts_at: "2026-10-01T11:00:00.000Z" }, stored), NOW, stored);
+  assert.ok(same.ok);
+});
+
+test("edit: a MOVED start can't be in the past, and the end must stay in the future", () => {
+  const moved = checkEventFields(
+    readEventFields({ starts_at: iso(NOW - 2 * HOUR) }, stored), NOW, stored);
+  assert.match((problemOf(moved) as { error: string }).error, /Start time is in the past/);
+  const endedEarly = checkEventFields(
+    readEventFields({ ends_at: iso(NOW - 10 * 60_000) }, stored), NOW, stored);
+  assert.deepEqual(problemOf(endedEarly), {
+    kind: "invalid", status: 400, code: "invalid_times", error: "End time is in the past",
+  });
+  // A create has no such rule to trip: its start already can't be in the past.
+  const tooLong = checkEventFields(
+    readEventFields({ ends_at: iso(Date.parse(stored.starts_at) + EVENT_MAX_DURATION_MS + 1) }, stored),
+    NOW, stored);
+  assert.equal((problemOf(tooLong) as { code: string }).code, "invalid_times");
+});
+
+test("edit: the word filter checks only what changed", () => {
+  const legacy = { ...stored, description: `old text ${BLOCKED}` };
+  // Stored before the list grew: editing the room still works.
+  const keep = checkEventFields(readEventFields({ location: "Union 305" }, legacy), NOW, legacy);
+  assert.ok(keep.ok);
+  // Re-sending the same stored text (the edit form sends every field) too.
+  const resend = checkEventFields(
+    readEventFields({ ...legacy, location: "Union 305" }, legacy), NOW, legacy);
+  assert.ok(resend.ok);
+  // New text is checked.
+  const fresh = checkEventFields(readEventFields({ title: `${BLOCKED} party` }, stored), NOW, stored);
+  assert.deepEqual(problemOf(fresh), { kind: "content_blocked", status: 422, field: "title" });
+  // The same word is refused on a create (no stored value to compare with).
+  const create = checkEventFields(readEventFields({ ...good, description: legacy.description }), NOW);
+  assert.deepEqual(problemOf(create), { kind: "content_blocked", status: 422, field: "description" });
+});

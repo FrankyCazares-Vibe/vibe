@@ -10,6 +10,7 @@ import { loadHiddenUsers, type HiddenUsers } from "@/lib/safety/hidden-users";
 import { createSupabaseServiceClient, isSupabaseServiceConfigured } from "@/lib/supabase/service";
 
 import { loadBadgeCounts } from "./badge";
+import { EVENT_CANCELLED, isClubNotice, type EventNoticeFields } from "./event-notice";
 import {
   isMissingPushSchema,
   pushAllowedFor,
@@ -55,7 +56,10 @@ import type { SendResult } from "./types";
  * blocks either way, person mutes, chat mutes, one-person-in-a-group mutes,
  * hidden clubs, removed posts / comments / messages, restricted actor or
  * recipient, Terms consent, already read, older than 30 minutes, the kind
- * switched off, the allowlist. When a check can't run, nothing is sent: the
+ * switched off, the allowlist. A club's cancelled-event notice skips the
+ * checks about its actor (blocks, mutes, a restricted officer): it's from the
+ * club, and it always reaches the student who RSVP'd (ruling 14,
+ * event-notice.ts). When a check can't run, nothing is sent: the
  * row is tried again on a later claim, and ends as "check_failed" on its last.
  *
  * EVERY ROW FINISHES: `sent_at` when any device took it, or a `skipped_reason`
@@ -396,6 +400,8 @@ type Batch = {
   chatMutes: ChatMuteRow[];
   /** `${follower}:${following}`, for recipients following actors. */
   follows: Set<string>;
+  /** A cancelled-event notice's event_title / event_starts_at, by notification id. */
+  eventNotices: Map<string, EventNoticeFields>;
 };
 
 const byId = <T extends { id: string }>(rows: T[]) => new Map(rows.map((r) => [r.id, r]));
@@ -453,7 +459,7 @@ async function loadBatch(service: SupabaseClient, rows: OutboxRow[]): Promise<Ba
   const nowIso = new Date().toISOString();
   const none = <T>() => Promise.resolve([] as T[]);
 
-  const [mentionMsgs, posts, comments, users, restrictions, follows, members, chatMutes] = await Promise.all([
+  const [mentionMsgs, posts, comments, users, restrictions, follows, members, chatMutes, eventNotices] = await Promise.all([
     readIn<MessageRow>(
       service,
       "messages",
@@ -505,6 +511,16 @@ async function loadBatch(service: SupabaseClient, rows: OutboxRow[]): Promise<Ba
             .in("channel_id", chatChannels)
             .in("muter_id", recipients),
         ),
+    // A cancelled-event notice's copy of the event. Its own read, only for
+    // those rows: they exist only once 20260930100000 added the columns, so
+    // a database that's behind is never asked for them.
+    readIn<{ id: string } & EventNoticeFields>(
+      service,
+      "notifications",
+      "id, event_title, event_starts_at",
+      "id",
+      unique(notifs.filter((n) => isClubNotice(n.type)).map((n) => n.id)),
+    ),
   ]);
 
   const messages = [...sourceMsgs, ...mentionMsgs];
@@ -538,6 +554,7 @@ async function loadBatch(service: SupabaseClient, rows: OutboxRow[]): Promise<Ba
     members: new Map(members.map((m) => [`${m.channel_id}:${m.user_id}`, m])),
     chatMutes,
     follows: new Set(follows.map((f) => `${f.follower_id}:${f.following_id}`)),
+    eventNotices: new Map(eventNotices.map((e) => [e.id, e])),
   };
 }
 
@@ -561,7 +578,7 @@ const unsure = (row: OutboxRow): Stop =>
   (row.attempts ?? 1) >= MAX_ATTEMPTS ? skip("check_failed") : { go: false, outcome: { kind: "retry" } };
 
 const NOTIFICATION_KINDS: ReadonlySet<string> = new Set([
-  "follow", "like", "comment", "mention", "org_invite", "org_request_approved",
+  "follow", "like", "comment", "mention", "org_invite", "org_request_approved", EVENT_CANCELLED,
 ]);
 
 type Memo = {
@@ -596,6 +613,9 @@ async function decide(
   }
   const actorId = notif ? notif.actor_id : msg!.user_id;
   const createdAt = time(notif ? notif.created_at : msg!.created_at);
+  // A cancelled-event notice is from the club: who pressed Cancel doesn't
+  // decide whether it arrives (ruling 14). Its actor is never read below.
+  const fromClub = isClubNotice(notif?.type);
 
   // 2. The checks every kind shares.
   if (!(now - createdAt <= STALE_MS)) return skip("stale");
@@ -603,17 +623,19 @@ async function decide(
   if (actorId === recipientId) return skip("self");
   const recipient = b.users.get(recipientId);
   const actor = b.users.get(actorId);
-  if (!recipient || !actor) return skip("source_gone");
+  if (!recipient || (!actor && !fromClub)) return skip("source_gone");
   if (!hasRecordedConsent(recipient)) return skip("no_consent");
   if (b.restricted.has(recipientId)) return skip("recipient_restricted");
-  if (b.restricted.has(actorId)) return skip("actor_restricted");
-  const hidden = await hiddenFor(service, memo, recipientId);
-  if (!hidden) return unsure(row);
-  if (hidden.blocked.has(actorId)) return skip("blocked");
-  if (hidden.muted.has(actorId)) return skip("muted");
+  if (!fromClub) {
+    if (b.restricted.has(actorId)) return skip("actor_restricted");
+    const hidden = await hiddenFor(service, memo, recipientId);
+    if (!hidden) return unsure(row);
+    if (hidden.blocked.has(actorId)) return skip("blocked");
+    if (hidden.muted.has(actorId)) return skip("muted");
+  }
 
   // 3. The kind, with its own checks.
-  const who = { name: actor.name, handle: actor.handle };
+  const who = { name: actor?.name ?? null, handle: actor?.handle ?? null };
   const follows = b.follows.has(`${recipientId}:${actorId}`);
   const prefs = parsePushPrefs(recipient.otto_settings);
   const ready = (kind: PushKind, event: PushEvent, channelId?: string): Go | Stop =>
@@ -641,6 +663,21 @@ async function decide(
     }
     case "mention":
       return decideMention(service, row, b, n, who, follows, ready);
+    case EVENT_CANCELLED: {
+      // The org_invite rule: a club that's gone or admin-hidden sends nothing.
+      const org = n.org_id ? b.orgs.get(n.org_id) : undefined;
+      if (!org) return skip("source_gone");
+      if (org.hidden_at) return skip("hidden_club");
+      const ev = b.eventNotices.get(n.id);
+      return ready("event_cancelled", {
+        kind: "event_cancelled",
+        noticeId: n.id,
+        orgId: org.id,
+        club: org,
+        eventTitle: ev?.event_title ?? null,
+        eventStartsAt: ev?.event_starts_at ?? null,
+      });
+    }
     default: {
       // org_invite / org_request_approved
       const org = n.org_id ? b.orgs.get(n.org_id) : undefined;

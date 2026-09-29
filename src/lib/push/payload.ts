@@ -3,10 +3,10 @@
  * items 6–13 and 26–27, which override the plan where they differ).
  *
  * PURE: no `server-only`, no `@/` import, and the only runtime imports are
- * `node:crypto` and the word filter (itself pure), so payload.test.ts can load
- * this file with `node --test`. The dispatcher (dispatch.ts) reads the
- * database, decides WHETHER a push goes out, and hands this file plain facts;
- * this file decides WHAT the lock screen shows.
+ * `node:crypto`, the word filter and event-notice.ts (both pure), so
+ * payload.test.ts can load this file with `node --test`. The dispatcher
+ * (dispatch.ts) reads the database, decides WHETHER a push goes out, and
+ * hands this file plain facts; this file decides WHAT the lock screen shows.
  *
  * A LOCK SCREEN IS READABLE BY ANYONE HOLDING THE PHONE, and a push can't be
  * taken back once it lands. So every rule here leans towards showing less:
@@ -16,6 +16,9 @@
  *   follows the sender (critic items 7 and D2). Otherwise a plain line.
  * - A club is named only when anyone could find it anyway (clubMayBeNamed).
  *   A club chat is never named at all (critic item 6).
+ * - A club's cancelled-event notice is from the club: it never names the
+ *   officer who cancelled, and it names the club and the event only when
+ *   the club may be named and previews are on.
  * - A shared post reads "shared a post", a photo "sent a photo". Never the
  *   shared post's text, never the picture.
  * - Titles are at most 60 characters and never empty; bodies at most 100.
@@ -40,12 +43,20 @@
 import { createHash } from "node:crypto";
 
 import { checkText } from "../moderation/text-filter";
+import { eventShortDate } from "./event-notice";
 import type { FcmMessage } from "./types";
 
 // ── Kinds and the message ───────────────────────────────────────────────────
 
-/** Every kind that can push. The dead `connection` kind never does. */
-export type PushKind =
+/**
+ * Every kind that can push. The dead `connection` kind never does.
+ * `event_cancelled` (a club's cancelled-event notice, S68) always pushes: it
+ * has no Settings switch (ALWAYS_ON_PUSH_KINDS).
+ */
+export type PushKind = SwitchablePushKind | "event_cancelled";
+
+/** The kinds a student can switch off in Settings → Notifications. */
+export type SwitchablePushKind =
   | "follow"
   | "like"
   | "comment"
@@ -56,7 +67,14 @@ export type PushKind =
   | "group_message"
   | "message_request";
 
-export const PUSH_KINDS: readonly PushKind[] = [
+/**
+ * The kinds a student can switch off, which is every kind but the always-on
+ * ones. PATCH /api/me/otto/settings stores only these in `push.off`, and
+ * parsePushPrefs reads only these back, so no saved list can switch a
+ * cancelled-event notice off. The Settings card shows one switch per entry
+ * (notifications-card-view.test.ts holds CARD_KINDS to this list).
+ */
+export const PUSH_KINDS: readonly SwitchablePushKind[] = [
   "follow",
   "like",
   "comment",
@@ -67,6 +85,13 @@ export const PUSH_KINDS: readonly PushKind[] = [
   "group_message",
   "message_request",
 ];
+
+/**
+ * Kinds that push whatever the student's switches say. A cancelled event the
+ * student RSVP'd to is a notice they need, like a receipt: switching it off
+ * would only mean walking to an event that isn't happening.
+ */
+export const ALWAYS_ON_PUSH_KINDS: readonly PushKind[] = ["event_cancelled"];
 
 export type PushMessage = {
   kind: PushKind;
@@ -195,6 +220,17 @@ export type PushEvent =
       orgId: string;
       club: PushClub;
     }
+  | {
+      // From the club: no actor at all, so no line can name the officer.
+      kind: "event_cancelled";
+      /** The notification row's id: one notice per student per event. */
+      noticeId: string;
+      orgId: string;
+      club: PushClub;
+      /** The notice's own copy of the event (the event row is gone). */
+      eventTitle: string | null;
+      eventStartsAt: string | null;
+    }
   | { kind: "dm"; actor: PushActor; channelId: string; messageId: string; content: PushChatContent }
   | {
       kind: "group_message";
@@ -265,6 +301,7 @@ export function parsePushPrefs(ottoSettings: unknown): PushPrefs {
 }
 
 export function pushKindOn(prefs: PushPrefs, kind: PushKind): boolean {
+  if (ALWAYS_ON_PUSH_KINDS.includes(kind)) return true;
   return !prefs.off.has(kind);
 }
 
@@ -315,11 +352,13 @@ function groupLine(name: string, content: PushChatContent): string {
 /**
  * The one message for this event. Every push is titled with the person who
  * did it (never empty, at most 60 characters) except a group chat with
- * previews on, which is titled with the group. Wording follows the in-app
- * rows (OttoSidePanel verbFor), minus anything D2 keeps off a lock screen.
+ * previews on, which is titled with the group, and a club's cancelled-event
+ * notice, which is titled "Event cancelled" and names no person at all.
+ * Wording follows the in-app rows (OttoSidePanel verbFor), minus anything D2
+ * keeps off a lock screen.
  */
 export function buildPushMessage(event: PushEvent, ctx: PushBuildContext): PushMessage {
-  const name = displayName(event.actor);
+  const name = displayName("actor" in event ? event.actor : null);
   const url = (path: string) => siteUrl(ctx.origin, path);
   const base = { kind: event.kind, badge: validBadge(ctx.badge), chat: false };
   // Comments, post mentions and requests carry text only from someone the
@@ -387,6 +426,15 @@ export function buildPushMessage(event: PushEvent, ctx: PushBuildContext): PushM
       };
       break;
     }
+    case "event_cancelled":
+      m = {
+        ...base,
+        title: "Event cancelled",
+        body: cancelledBody(event, ctx.previews),
+        url: url(clubPath(event.club.handle)),
+        tag: `event_cancelled:${event.noticeId}`,
+      };
+      break;
     case "dm":
       m = {
         ...base,
@@ -431,6 +479,24 @@ export function buildPushMessage(event: PushEvent, ctx: PushBuildContext): PushM
   return { ...m, title: capText(oneLine(m.title), TITLE_MAX) || FALLBACK_TITLE, body: capText(m.body, BODY_MAX) };
 }
 
+/**
+ * "Chess Club cancelled Game Night (Fri, Oct 3)", contract C4. The club and
+ * the event's title only when the club may be named and previews are on: an
+ * event's title can say as much as the club's name. The title is officer
+ * text, so it passes the word filter and is cut to fit, never the date.
+ * Otherwise "An event you RSVP'd to was cancelled (Fri, Oct 3)".
+ */
+function cancelledBody(event: Extract<PushEvent, { kind: "event_cancelled" }>, previews: boolean): string {
+  const date = eventShortDate(event.eventStartsAt);
+  const tail = date ? ` (${date})` : "";
+  const club = previews && clubMayBeNamed(event.club) ? previewText(event.club.name, 40) : null;
+  if (!club) return `An event you RSVP'd to was cancelled${tail}`;
+  const prefix = `${club} cancelled `;
+  const room = BODY_MAX - Array.from(prefix).length - Array.from(tail).length;
+  const title = room >= 10 ? previewText(event.eventTitle, room) : null;
+  return `${prefix}${title ?? "an event"}${tail}`;
+}
+
 /** A whole, non-negative count, or null. Never a negative, never NaN. */
 function validBadge(badge: number | null | undefined): number | null {
   return typeof badge === "number" && Number.isInteger(badge) && badge >= 0 ? badge : null;
@@ -449,6 +515,8 @@ export function deliveryFor(kind: PushKind): PushDelivery {
     return { ttlSec: 86_400, urgency: "high" };
   }
   if (kind === "like" || kind === "follow") return { ttlSec: 3_600, urgency: "low" };
+  // The event may be hours away and the student on their way: wake the phone.
+  if (kind === "event_cancelled") return { ttlSec: 86_400, urgency: "high" };
   return { ttlSec: 86_400, urgency: "normal" };
 }
 

@@ -1,6 +1,7 @@
 import { NextResponse } from "next/server";
 
 import { attachNotificationOrgs, type NotificationOrg } from "@/lib/orgs/notification-orgs";
+import { visibleActorFilter, withEventNotices } from "@/lib/push/event-notice";
 import { loadHiddenUsers } from "@/lib/safety/hidden-users";
 import { createSupabaseServerClient } from "@/lib/supabase/server";
 import { createSupabaseServiceClient } from "@/lib/supabase/service";
@@ -62,11 +63,19 @@ export type ActivityRow = {
   post_excerpt: string | null;
   comment_excerpt: string | null;
   /**
-   * The club behind an `org_invite` / `org_request_approved` row, resolved
-   * with the service client; null for every other type, and for a club row
-   * whose club couldn't be read (it renders "a club").
+   * The club behind an `org_invite` / `org_request_approved` /
+   * `event_cancelled` row, resolved with the service client; null for every
+   * other type, and for a club row whose club couldn't be read (it renders
+   * "a club").
    */
   org: NotificationOrg | null;
+  /**
+   * A cancelled-event notice's copy of the event (the event itself is gone);
+   * null on every other type. That notice's `actor` is always null: it's from
+   * the club, and the officer who cancelled is never sent.
+   */
+  event_title: string | null;
+  event_starts_at: string | null;
 };
 
 export type UpcomingEvent = {
@@ -190,7 +199,9 @@ export async function GET() {
   // skips their messages, so Mute's and Block's "you won't get
   // notifications from them" holds on the phone Otto tab too. Fail closed
   // as the notifications route does: without the list there's no way to
-  // tell which rows to drop.
+  // tell which rows to drop. A club's cancelled-event notice is the one
+  // exception (ruling 14): blocking or muting the officer who sent it never
+  // hides it (visibleActorFilter).
   const hiddenRes = await loadHiddenUsers(supabase, user.id);
   if (!hiddenRes.ok) {
     console.error("[api/me/otto hidden-users]", hiddenRes.error);
@@ -211,7 +222,7 @@ export async function GET() {
     .from("notifications")
     .select(ACTIVITY_SELECT)
     .eq("user_id", user.id);
-  if (hiddenIds.length > 0) activityQuery = activityQuery.notIn("actor_id", hiddenIds);
+  if (hiddenIds.length > 0) activityQuery = activityQuery.or(visibleActorFilter(hiddenIds));
   const activityRes = await activityQuery
     .order("created_at", { ascending: false })
     .limit(ACTIVITY_LIMIT);
@@ -233,9 +244,14 @@ export async function GET() {
   };
   // Club rows gain their club here; a row about a club that has since been
   // hidden or deleted drops, so it neither renders nor counts as a nudge.
-  const activityRows = await attachNotificationOrgs(
-    createSupabaseServiceClient(),
-    (activityRes.data ?? []) as unknown as RawActivity[],
+  // Cancelled-event notices then gain the event's title and start, and lose
+  // their actor (withEventNotices).
+  const activityRows = await withEventNotices(
+    supabase,
+    await attachNotificationOrgs(
+      createSupabaseServiceClient(),
+      (activityRes.data ?? []) as unknown as RawActivity[],
+    ),
   );
   const activity: ActivityRow[] = activityRows.map((n) => ({
     id: n.id,
@@ -246,6 +262,8 @@ export async function GET() {
     post_excerpt: n.post?.content?.slice(0, 120) ?? null,
     comment_excerpt: n.comment?.content?.slice(0, 120) ?? null,
     org: n.org,
+    event_title: n.event_title,
+    event_starts_at: n.event_starts_at,
   }));
 
   const unreadActivityCount = activityRows.filter((n) => n.read_at === null).length;

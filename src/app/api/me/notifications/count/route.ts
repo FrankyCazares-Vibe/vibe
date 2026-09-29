@@ -1,5 +1,6 @@
 import { NextResponse } from "next/server";
 
+import { visibleActorFilter } from "@/lib/push/event-notice";
 import { loadHiddenUsers } from "@/lib/safety/hidden-users";
 import { createSupabaseServerClient } from "@/lib/supabase/server";
 
@@ -32,6 +33,8 @@ export async function GET() {
   // counted here would land that peek on an older, visible notification.
   // The 30-day totals sit beside the list in the side panel, so they
   // leave the same people out. Fail closed on error, as the list does.
+  // A club's cancelled-event notice counts whoever sent it (ruling 14), as
+  // the list shows it (visibleActorFilter).
   const hiddenRes = await loadHiddenUsers(supabase, user.id);
   if (!hiddenRes.ok) {
     console.error("[me/notifications/count hidden-users]", hiddenRes.error);
@@ -45,7 +48,7 @@ export async function GET() {
       .from("notifications")
       .select("id", { count: "exact", head: true })
       .eq("user_id", user.id);
-    return hiddenIds.length > 0 ? q.notIn("actor_id", hiddenIds) : q;
+    return hiddenIds.length > 0 ? q.or(visibleActorFilter(hiddenIds)) : q;
   };
 
   const since = new Date(Date.now() - 30 * 24 * 60 * 60 * 1000).toISOString();

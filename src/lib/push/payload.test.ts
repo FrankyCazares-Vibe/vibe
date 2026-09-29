@@ -499,3 +499,74 @@ test("finished failures: config beats gone, gone only when every device has gone
   assert.deepEqual(P.rowOutcome([fail({ config: true }), fail({ gone: true })], 1), { kind: "skip", reason: "config" });
   assert.deepEqual(P.rowOutcome([fail({})], 1), { kind: "skip", reason: "failed" });
 });
+
+// ── A club's cancelled-event notice (S68, contract C4, ruling 14) ───────────
+
+const NOTICE = "55555555-5555-4555-8555-555555555555";
+// Sat Oct 3 2026, 7:00 PM in Indianapolis.
+const STARTS = "2026-10-03T23:00:00Z";
+const cancelled = (over: Partial<Extract<PushEvent, { kind: "event_cancelled" }>> = {}): PushEvent => ({
+  kind: "event_cancelled",
+  noticeId: NOTICE,
+  orgId: ORG,
+  club: PUBLIC_CLUB,
+  eventTitle: "Game Night",
+  eventStartsAt: STARTS,
+  ...over,
+});
+
+test("a cancelled event is from the club: its name, the event and a short date", () => {
+  const m = build(cancelled());
+  assert.equal(m.kind, "event_cancelled");
+  assert.equal(m.title, "Event cancelled");
+  assert.equal(m.body, "Chess Club cancelled Game Night (Sat, Oct 3)");
+  assert.equal(m.url, `${ORIGIN}/orgs/chess`);
+  assert.equal(m.tag, `event_cancelled:${NOTICE}`);
+  assert.equal(m.chat, false);
+  assert.equal(build(cancelled({ club: { ...PUBLIC_CLUB, handle: null } })).url, `${ORIGIN}/campus?tab=orgs`);
+});
+
+test("a cancelled event names neither club nor event unless the club may be named and previews are on", () => {
+  const generic = "An event you RSVP'd to was cancelled (Sat, Oct 3)";
+  const secret: PushClub[] = [
+    { ...PUBLIC_CLUB, join_policy: "invite" },
+    { ...PUBLIC_CLUB, audience: "iu" },
+    { ...PUBLIC_CLUB, is_public: false },
+    { ...PUBLIC_CLUB, hidden_at: "2026-09-01T00:00:00Z" },
+  ];
+  for (const club of secret) {
+    const m = build(cancelled({ club }));
+    assert.deepEqual([m.title, m.body], ["Event cancelled", generic], JSON.stringify(club));
+  }
+  assert.equal(build(cancelled(), { previews: false }).body, generic);
+});
+
+test("a cancelled event's title passes the filter and is cut, never the date", () => {
+  assert.equal(build(cancelled({ eventTitle: BLOCKED })).body, "Chess Club cancelled an event (Sat, Oct 3)");
+  assert.equal(build(cancelled({ eventTitle: null })).body, "Chess Club cancelled an event (Sat, Oct 3)");
+  const long = build(cancelled({ eventTitle: "Very long night ".repeat(12) })).body;
+  assert.ok(Array.from(long).length <= P.BODY_MAX, long);
+  assert.ok(long.endsWith("… (Sat, Oct 3)"), long);
+  assert.equal(build(cancelled({ eventStartsAt: null })).body, "Chess Club cancelled Game Night");
+  assert.equal(build(cancelled({ eventStartsAt: "nope" }), { previews: false }).body, "An event you RSVP'd to was cancelled");
+});
+
+test("a cancelled event always pushes: no switch can turn it off, and it wakes the phone", () => {
+  assert.ok(!(P.PUSH_KINDS as readonly string[]).includes("event_cancelled"), "not a Settings switch");
+  assert.deepEqual(P.ALWAYS_ON_PUSH_KINDS, ["event_cancelled"]);
+  const prefs = P.parsePushPrefs({ push: { off: ["event_cancelled", "like"] } });
+  assert.equal(prefs.off.has("event_cancelled" as never), false, "a saved 'off' is ignored");
+  assert.equal(P.pushKindOn(prefs, "event_cancelled"), true);
+  assert.equal(P.pushKindOn(prefs, "like"), false);
+  assert.equal(P.pushKindOn({ previews: true, off: new Set(["event_cancelled"]) } as never, "event_cancelled"), true);
+  assert.deepEqual(P.deliveryFor("event_cancelled"), { ttlSec: 86_400, urgency: "high" });
+});
+
+test("a cancelled event's wire shapes carry the club's tap target", () => {
+  const m = build(cancelled());
+  const web = JSON.parse(P.toWebPush(m)).notification;
+  assert.deepEqual([web.title, web.navigate, web.tag], ["Event cancelled", `${ORIGIN}/orgs/chess`, `event_cancelled:${NOTICE}`]);
+  const fcm = P.toFcm(m, "token");
+  assert.deepEqual(fcm.data, { url: `${ORIGIN}/orgs/chess`, tag: `event_cancelled:${NOTICE}`, kind: "event_cancelled" });
+  assert.equal(fcm.android?.notification?.channel_id, "activity");
+});

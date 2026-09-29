@@ -40,8 +40,11 @@ import { EDITED_LABEL, type EditedPost } from "@/lib/posts/edit";
  *     flattened into the same list (v1 — no nesting).
  *   - Owner ⋯ menu: Send to chats, Copy link (plus "Share to other apps"
  *     in the store apps, the system share sheet), Edit post (EditPostSheet,
- *     plan §8 E2; shown only when the server says `is_owner`), Delete
- *     post. A saved edit patches the body, the #tag chips and the
+ *     plan §8 E2; shown only when the server says `is_owner` and the post
+ *     isn't moderator-removed), Delete post (shown only when the server says
+ *     `viewer_can_delete`: the author, or a current owner / admin of the
+ *     post's club — S68 officer tools, C3). A removed post offers neither.
+ *     A saved edit patches the body, the #tag chips and the
  *     " · Edited" marker here, then tells the caller through `onEdited`.
  *     Until wave 4 wires `onEdited` into CampusMobile and ProfileMobile,
  *     the card underneath keeps its old text until the next load (critic
@@ -77,10 +80,9 @@ type PostDetail = {
    *  null or absent = never edited. Drives the " · Edited" marker. */
   edited_at?: string | null;
   /**
-   * A moderator took it down. OPTIONAL and never sent today:
-   * `/api/posts/[id]` selects an explicit column list without `removed_at` or
-   * `removed_reason`, and that route is not this batch's. Until it is, a
-   * removed post still opens for its author as an ordinary one.
+   * A moderator took it down. `/api/posts/[id]` sends both (and RLS serves a
+   * removed post to its author alone); OPTIONAL because a deploy without the
+   * moderation columns omits them.
    */
   removed_at?: string | null;
   removed_reason?: string | null;
@@ -126,6 +128,7 @@ export function PostViewerMobile({
   onClose,
   canDelete = false,
   viewerId = null,
+  clubName = null,
   onDeleted,
   onEdited,
   onBlocked,
@@ -137,8 +140,11 @@ export function PostViewerMobile({
    *  screen only learns the viewer from `is_owner` or from a comment they
    *  post — and a comment's Report stays hidden until then. */
   viewerId?: string | null;
-  /** Show the kebab menu with a Delete action. Caller decides ownership;
-   *  server still re-checks at /api/posts/[id] DELETE. */
+  /** The post's club name, when the caller knows it (the feed does). Only
+   *  used in an officer's Delete confirm ("Delete this post from {club}?"). */
+  clubName?: string | null;
+  /** The caller says this is the viewer's own post (ProfileMobile). It keeps
+   *  Report / Block away; Delete and Edit key on the server's flags only. */
   canDelete?: boolean;
   /** Fired after a successful delete; viewer auto-closes. Parent
    *  typically uses this to refresh its post grid. */
@@ -166,6 +172,10 @@ export function PostViewerMobile({
   // link the author was treated as a stranger. The owner-only audience sheets
   // hang off this, and the routes behind them re-check ownership themselves.
   const [isOwner, setIsOwner] = useState(false);
+  // Server-computed too (`viewer_can_delete`, S68 C3): the author, or a
+  // current owner / admin of the post's club, and never on a removed post.
+  // DELETE /api/posts/[id] asks the same check, so the two can't disagree.
+  const [viewerCanDelete, setViewerCanDelete] = useState(false);
   // What the report sheet is pointed at — the post, or one comment. One sheet
   // serves both, so the reason list and the copy can't drift between them.
   const [reportTarget, setReportTarget] = useState<ReportTargetRef | null>(null);
@@ -207,7 +217,14 @@ export function PostViewerMobile({
 
   const handleDelete = async () => {
     if (deleting) return;
-    if (typeof window !== "undefined" && !window.confirm("Delete this post?")) {
+    // An officer deleting a club post someone else wrote is told whose post
+    // it is (C5); the author keeps the old prompt.
+    const asOfficer = viewerCanDelete && !isOwner;
+    const club = clubName?.trim() || "the club";
+    const prompt = asOfficer
+      ? `Delete this post from ${club}? This can't be undone.`
+      : "Delete this post?";
+    if (typeof window !== "undefined" && !window.confirm(prompt)) {
       return;
     }
     setDeleting(true);
@@ -217,6 +234,7 @@ export function PostViewerMobile({
       method: "DELETE",
       credentials: "include",
       failure: "Couldn't delete this post.",
+      ...(asOfficer ? { success: "Post deleted" } : {}),
     });
     if (!r.ok) {
       setDeleting(false);
@@ -265,6 +283,7 @@ export function PostViewerMobile({
         counts?: Counts;
         viewer?: Viewer;
         is_owner?: boolean;
+        viewer_can_delete?: boolean;
       }>(`/api/posts/${postId}`, {
         cache: "no-store",
         quiet: true,
@@ -300,6 +319,7 @@ export function PostViewerMobile({
       // Fails closed: anything but an explicit true leaves the owner-only
       // affordances off.
       setIsOwner(r.data.is_owner === true);
+      setViewerCanDelete(r.data.viewer_can_delete === true);
       // The one place this screen can learn who is reading it.
       if (r.data.is_owner === true && r.data.post.author?.id) {
         setSelfId(r.data.post.author.id);
@@ -450,8 +470,10 @@ export function PostViewerMobile({
   // `canDelete` alone would offer the author "Report post" on their own post
   // while the bar right above it shows them their own viewers — CampusMobile
   // and PostPageClient both omit the prop. `canDelete` stays in the OR so
-  // ProfileMobile's optimistic-removal path is untouched, and deleting still
-  // fails closed server-side (DELETE /api/posts/[id] re-checks ownership).
+  // ProfileMobile's optimistic-removal path is untouched. It hides Report /
+  // Block and gates the removed card; Delete keys on the server's
+  // `viewer_can_delete` and Edit on `is_owner` (S68 officer tools), and the
+  // DELETE / PATCH routes re-check both anyway.
   const owner = canDelete || isOwner;
   // The caller's answer wins; `selfId` is what this screen worked out for
   // itself. Either way, null means "we don't know" and the ⋯ stays away.
@@ -771,8 +793,9 @@ export function PostViewerMobile({
                 ) : null}
                 {/* The server's `is_owner` only, never `canDelete`: ProfileMobile
                     passes canDelete on your own profile, where the Saved and
-                    Reposts tabs open OTHER people's posts in this viewer. */}
-                {isOwner ? (
+                    Reposts tabs open OTHER people's posts in this viewer.
+                    Never on a moderator-removed post (the route 409s it). */}
+                {isOwner && post && !post.removed_at ? (
                   <ViewerMenuItem
                     label="Edit post"
                     disabled={!post}
@@ -782,7 +805,10 @@ export function PostViewerMobile({
                     }}
                   />
                 ) : null}
-                {owner ? (
+                {/* The server's `viewer_can_delete` only (C3): the author, or a
+                    current owner / admin of the post's club. It is already
+                    false on a removed post; the second check is the belt. */}
+                {viewerCanDelete && post && !post.removed_at ? (
                   <ViewerMenuItem
                     label={deleting ? "Deleting…" : "Delete post"}
                     tone="danger"
@@ -831,8 +857,6 @@ export function PostViewerMobile({
           // "Only you can see this post" — one service-client branch added to
           // `/api/posts/[id]` and a stranger opening a shared link would be
           // told a moderator removed it and that they alone can see it.
-          // Unreachable today either way: that route does not select
-          // `removed_at` (see the PostDetail type).
           <RemovedContentCard
             kind="post"
             removedAt={post.removed_at}
@@ -1169,6 +1193,7 @@ export function PostViewerMobile({
           postId={postId}
           initialContent={post.content ?? ""}
           hasMedia={!!post.media_url}
+          removed={!!post.removed_at}
           onClose={() => setEditOpen(false)}
           onSaved={(p) => {
             setPost((prev) =>

@@ -29,15 +29,24 @@ export type EventTimesProblem = { code: "invalid_times"; error: string };
  * Checks a new event's start and end (epoch ms, from Date.parse). Returns
  * null when they are fine, or the 400 to send. Order matters only for which
  * message a student sees first.
+ *
+ * `allowPastStart` is for an EDIT that keeps the stored start (S68,
+ * src/lib/events/validate.ts): an event already under way can still have its
+ * room or its end time fixed. A new or moved start must not be in the past.
  */
-export function eventTimesProblem(start: number, end: number, nowMs: number): EventTimesProblem | null {
+export function eventTimesProblem(
+  start: number,
+  end: number,
+  nowMs: number,
+  opts?: { allowPastStart?: boolean },
+): EventTimesProblem | null {
   if (!Number.isFinite(start) || !Number.isFinite(end)) {
     return { code: "invalid_times", error: "Start and end times are required" };
   }
   if (end < start) {
     return { code: "invalid_times", error: "End time must be after start" };
   }
-  if (start < nowMs - EVENT_START_GRACE_MS) {
+  if (!opts?.allowPastStart && start < nowMs - EVENT_START_GRACE_MS) {
     return { code: "invalid_times", error: "Start time is in the past" };
   }
   if (end - start > EVENT_MAX_DURATION_MS) {

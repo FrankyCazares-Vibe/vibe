@@ -36,7 +36,10 @@ export async function GET(req: Request) {
     .from("posts")
     .select(
       // `edited_at` (null = never edited) drives the "Edited" marker.
-      "id,user_id,type,content,tags,media_url,media_thumbnail_url,created_at,edited_at",
+      // `removed_at` (set = a moderator took it down) hides Edit and Delete on
+      // the profile grid (S68 officer tools, C3). posts_select_authenticated
+      // serves a removed row to its author alone, which is who this route is.
+      "id,user_id,type,content,tags,media_url,media_thumbnail_url,created_at,edited_at,removed_at",
     )
     .eq("user_id", user.id)
     .eq("type", "post")
