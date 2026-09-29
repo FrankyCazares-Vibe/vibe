@@ -12,9 +12,30 @@ import { cn } from "@/lib/utils";
 
 const jetbrainsMono = JetBrains_Mono({subsets:['latin'],variable:'--font-mono'});
 
+const SITE_TITLE = "Vibe · Your campus. Your people. Yourself.";
+const SITE_TAGLINE = "Your campus. Your people. Yourself.";
+
 export const metadata: Metadata = {
-  title: "Vibe",
-  description: "Your campus, your career, one profile.",
+  // The canonical host (the apex 301s to www), so preview image URLs are
+  // absolute and never go through that redirect.
+  metadataBase: new URL("https://www.connectvibe.app"),
+  title: SITE_TITLE,
+  description: SITE_TAGLINE,
+  // Link previews (iMessage, Instagram, X, LinkedIn). The picture is
+  // src/app/opengraph-image.tsx + twitter-image.tsx; no `images` key here on
+  // purpose, since one would override those files.
+  openGraph: {
+    type: "website",
+    siteName: "Vibe",
+    title: SITE_TITLE,
+    description: SITE_TAGLINE,
+    locale: "en_US",
+  },
+  twitter: {
+    card: "summary_large_image",
+    title: SITE_TITLE,
+    description: SITE_TAGLINE,
+  },
   icons: {
     icon: [
       // Google Search does not use SVG. It wants a square ICO/PNG >48px

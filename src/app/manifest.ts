@@ -54,7 +54,7 @@ export default function manifest(): MetadataRoute.Manifest {
     name: "Vibe",
     short_name: "Vibe",
     // Same line as the root layout's metadata description.
-    description: "Your campus, your career, one profile.",
+    description: "Your campus. Your people. Yourself.",
     start_url: "/campus",
     scope: "/",
     display: "standalone",

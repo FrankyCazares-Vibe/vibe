@@ -67,6 +67,9 @@ next-env.d.ts
 /RESEARCH/
 /handoffs/
 /otto_mockups/
+# The product journal is private (S68): it lives on this Mac only and never
+# goes back into git or public/.
+/journal/
 .gstack/
 
 # Supabase CLI local branch metadata (created by `supabase start`)

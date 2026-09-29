@@ -244,7 +244,7 @@ export function HomeLanding() {
         </div>
 
         <p className="vibe-landing-cta-foot">
-          Sign up with your school email. Your campus, your career, one profile.
+          Sign up with your school email. Your campus. Your people. Yourself.
         </p>
 
         {/* Both doors are always visible: a new student should never have to

@@ -22,7 +22,7 @@ rsync -a "$REPO/public/html/" "$HUB/ACTIVE/"
 rsync -a "$REPO/brand/" "$HUB/BRAND/"
 [ -d "$REPO/DOCS" ] && rsync -a "$REPO/DOCS/" "$HUB/DOCS/"
 [ -d "$REPO/handoffs" ] && rsync -a "$REPO/handoffs/" "$HUB/SESSIONS/handoffs/"
-[ -d "$REPO/public/journal" ] && rsync -a "$REPO/public/journal/" "$HUB/SESSIONS/journal/"
+[ -d "$REPO/journal" ] && rsync -a "$REPO/journal/" "$HUB/SESSIONS/journal/"
 [ -d "$REPO/otto_mockups" ] && rsync -a "$REPO/otto_mockups/" "$HUB/otto_mockups/"
 
 if [ -f "$HOME/vault/Reference/Brand.md" ]; then

@@ -9,7 +9,7 @@ Public URLs, dashboards, and entry points for Vibe.
 - **Canonical URL:** https://www.connectvibe.app
 - **Apex:** https://connectvibe.app → 301 to `www`
 - **Vercel alias (don't share this):** https://vibe-mocha-iota.vercel.app
-- **Product journal:** https://www.connectvibe.app/journal/vibe_journal.html
+- **Product journal:** private since Sept 28, 2026: not deployed and not in git; it lives only on Franky's Mac at `journal/vibe_journal.html` (gitignored)
 
 ## Demo entry points (for James + Rylan to share)
 

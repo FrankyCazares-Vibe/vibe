@@ -11,7 +11,7 @@ Code lives in `~/vibe`. Franky also wants a Files-visible copy at:
 
 Do **not** treat that folder as a second codebase. Do **not** write app code there.
 
-After a session that changed any of: `brand/`, `public/html/`, `public/journal/`, `DOCS/`, `handoffs/`, `otto_mockups/`, or the Obsidian brand note — run:
+After a session that changed any of: `brand/`, `public/html/`, `journal/`, `DOCS/`, `handoffs/`, `otto_mockups/`, or the Obsidian brand note — run:
 
 ```bash
 bash ~/vibe/scripts/sync-vibe-hub.sh

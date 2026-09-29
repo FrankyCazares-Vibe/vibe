@@ -1034,34 +1034,9 @@ function Closing() {
           None of us alone can take this where it&apos;s going. Together, we
           actually can.
         </p>
-        <div style={{ marginTop: 48 }}>
-          <a
-            href="/journal/vibe_journal.html"
-            style={{
-              display: "inline-flex",
-              alignItems: "center",
-              gap: 8,
-              padding: "10px 16px",
-              borderRadius: 999,
-              border: "1px solid rgba(28,28,30,0.12)",
-              fontFamily: "DM Sans, sans-serif",
-              fontSize: 13,
-              letterSpacing: "0.04em",
-              color: "#1C1C1E",
-              textDecoration: "none",
-              background: "rgba(255,255,255,0.6)",
-              transition: "all 200ms ease",
-            }}
-          >
-            companion: the product journal
-            <span style={{ fontSize: 16, lineHeight: 1, color: "#FF5C35" }}>
-              ›
-            </span>
-          </a>
-        </div>
         <div
           style={{
-            marginTop: 40,
+            marginTop: 48,
             paddingTop: 32,
             borderTop: "1px solid rgba(28,28,30,0.08)",
             fontFamily: fontDisplay,
