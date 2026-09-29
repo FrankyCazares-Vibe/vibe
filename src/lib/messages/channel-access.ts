@@ -1,3 +1,4 @@
+import type { RoomKind } from "@/lib/chat/types";
 import { isUuid } from "@/lib/pgrest";
 import { MESSAGE_MEDIA_KEY_PREFIX, MESSAGE_MEDIA_KEY_RE } from "@/lib/r2";
 import { isChannelMediaKey } from "@/lib/posts/media-ownership";
@@ -26,6 +27,10 @@ export type ChannelAccess =
       orgId: string;
       accepted_at: null;
       cleared_at: null;
+      /** `channels.kind`; null or absent on a database without the column. */
+      kind?: RoomKind | null;
+      /** `channels.event_id`, set on an event's chat only. */
+      eventId?: string | null;
     }
   | { ok: false; status: number };
 
