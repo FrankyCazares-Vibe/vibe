@@ -141,3 +141,4 @@ split-check: 51 declarations in 507d6b4:src/components/mobile/MessagesMobile.tsx
   ADDED     palette (src/components/mobile/messages/v2-tokens.ts:122)
 ```
 - 2026-09-30T08:00:28Z build exit 0; STOPPED written (5 entries); S2-gate.md part 1 written; committing
+- 2026-09-30T08:00:53Z COMMITTED 3bf4695 feat(chat): club space shell, room polling hook, page merge, Remove row (W2-S2 first commit). First-commit prelude done; the main S2 builder continues from here (the space read, UpNext, RoomChips, BoardStrip, BoardView/BoardPost, RoomThread/RoomComposer, EventChat/EventAbout, RsvpSheet, ClubEmpty; the officer remove flow through onRemove; the STOPPED entries above are its first reading).
