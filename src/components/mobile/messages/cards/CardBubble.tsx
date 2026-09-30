@@ -20,8 +20,11 @@ import { SignupCardView } from "./SignupCardView";
  * avatar and the left-tail radius, mine right-aligned with no avatar, the
  * header line `<Name> · Poll | Sign-up | Event` (`You` when mine, `Someone`
  * when `users` is null, SCREENS-L11), and its OWN 500 ms long-press that
- * opens `ReactionPicker` with Report and Remove (`MessageBubble`'s gesture
- * is not reused).
+ * opens `ReactionPicker` with the emoji row, Reply, Report and Remove
+ * (`MessageBubble`'s gesture is not reused; the handlers are the text
+ * bubble's, `onToggleReaction` / `onReply`, INT-ADJUDICATE-2), the reaction
+ * chips under the card. `layout="post"` is the Board's full-width card
+ * inside a post (11.4; INT-ADJUDICATE-3).
  *
  * `card !== null` is routed by `card.type` to `PollCardView`,
  * `SignupCardView` or `EventCardView`; the bubble owns the box (its
@@ -51,6 +54,24 @@ export type CardBubbleProps = {
   onRemove?: () => void;
   /** `Report` in the long-press picker; never passed for the viewer's own. */
   onReport?: () => void;
+  /**
+   * An emoji picked in the long-press picker, and a tap on a chip under the
+   * card: the text bubble's `onToggleReaction` (today's reaction flow,
+   * club/reactions.ts). Absent → a pick only closes the picker
+   * (INT-ADJUDICATE-2; 11.8 "the same picker as a text bubble").
+   */
+  onToggleReaction?: (emoji: string) => void;
+  /** `Reply` in the long-press picker (the text bubble's `onReply`); absent → no Reply row. */
+  onReply?: () => void;
+  /**
+   * `"bubble"` (default): the 292px card in a room's list — theirs with the
+   * 28px avatar and the tail radius, mine right-aligned with no avatar.
+   * `"post"`: inside a Board post (11.4 "full width inside the post";
+   * INT-ADJUDICATE-3): no avatar column, no header line (the post's byline
+   * is the header), the card `width: 100%`, radius 14, no tail; the press,
+   * the picker, the chips and the live region as in a bubble.
+   */
+  layout?: "bubble" | "post";
 };
 
 function HeaderIcon({ word, stroke }: { word: CardWord; stroke: string }) {
@@ -93,7 +114,40 @@ function HeaderLine({ word, author, night }: { word: CardWord; author: string; n
   );
 }
 
-export function CardBubble({ message, roomId, room, isMine, night, onCard, onRefresh, onOpenEventChat, onRemove, onReport }: CardBubbleProps) {
+/** The reaction chips under a card: the text bubble's own look (`MessageBubble`), tappable to toggle. */
+function ReactionChips({ reactions, night, onToggle }: { reactions: ChatMessage["reactions"]; night: boolean; onToggle?: (emoji: string) => void }) {
+  return (
+    <div style={{ display: "flex", flexWrap: "wrap", gap: 4, marginTop: 4 }}>
+      {reactions.map((r) => (
+        <button
+          key={r.emoji}
+          type="button"
+          onClick={() => onToggle?.(r.emoji)}
+          style={{
+            display: "inline-flex",
+            alignItems: "center",
+            gap: 4,
+            padding: "2px 8px",
+            borderRadius: 999,
+            background: r.viewer_reacted ? "rgba(255,140,90,0.22)" : night ? "rgba(20,16,28,0.55)" : "rgba(255,255,255,0.78)",
+            border: r.viewer_reacted ? "1px solid rgba(255,180,150,0.55)" : night ? "1px solid rgba(255,255,255,0.10)" : "1px solid rgba(28,28,30,0.08)",
+            color: r.viewer_reacted ? "#FFD0BF" : night ? "rgba(255,255,255,0.85)" : "#1C1C1E",
+            fontFamily: FONT,
+            fontSize: 12,
+            fontWeight: 700,
+            cursor: "pointer",
+            WebkitTapHighlightColor: "transparent",
+          }}
+        >
+          <span style={{ fontSize: 13 }}>{r.emoji}</span>
+          {r.count}
+        </button>
+      ))}
+    </div>
+  );
+}
+
+export function CardBubble({ message, roomId, room, isMine, night, onCard, onRefresh, onOpenEventChat, onRemove, onReport, onToggleReaction, onReply, layout = "bubble" }: CardBubbleProps) {
   const t = palette(night);
   const [pickerOpen, setPickerOpen] = useState(false);
   // The one polite region per card (11.8 "Announcements"). `n` counts the
@@ -185,7 +239,9 @@ export function CardBubble({ message, roomId, room, isMine, night, onCard, onRef
   // A row still sending has no id to report or remove (the text bubble's guard).
   const temp = message.id.startsWith("temp_");
   const card = message.card;
-  const header = <HeaderLine word={word} author={author} night={night} />;
+  // A Board post's byline is the header; the card draws none (11.4).
+  const post = layout === "post";
+  const header = post ? null : <HeaderLine word={word} author={author} night={night} />;
   const closed = card !== null && card.type !== "event" && card.closed;
 
   let body: React.ReactNode;
@@ -204,92 +260,115 @@ export function CardBubble({ message, roomId, room, isMine, night, onCard, onRef
     body = <PollCardView card={card} roomId={roomId} messageId={message.id} createdAt={message.created_at} author={authorForLabel} isMine={isMine} night={night} header={header} onCard={onCard} onRefresh={onRefresh} onAnnounce={onAnnounce} />;
   }
 
+  // Theirs in a bubble: the avatar column, the card, the chips under the
+  // card (past the avatar). Mine: right-aligned. A post: full width, left.
+  const theirs = !isMine && !post;
+  const chips = message.reactions ?? [];
+
   return (
-    <div
-      style={{
-        position: "relative",
-        display: "flex",
-        alignItems: "flex-end",
-        justifyContent: isMine ? "flex-end" : "flex-start",
-        gap: 8,
-        fontFamily: FONT,
-      }}
-    >
-      {!isMine ? (
-        <span
-          aria-hidden
-          style={{
-            width: 28,
-            height: 28,
-            flexShrink: 0,
-            borderRadius: 999,
-            background: sender?.avatar_url ? `url(${sender.avatar_url}) center/cover` : disc.bg,
-            color: disc.ink,
-            display: "flex",
-            alignItems: "center",
-            justifyContent: "center",
-            fontSize: 10,
-            fontWeight: 700,
-          }}
-        >
-          {!sender?.avatar_url ? initialsOf(sender?.name || sender?.handle || "?") : null}
-        </span>
-      ) : null}
+    <div style={{ display: "flex", flexDirection: "column", alignItems: theirs || post ? "flex-start" : "flex-end", maxWidth: "100%", fontFamily: FONT }}>
       <div
-        {...pressHandlers}
         style={{
-          width: 292,
+          // The picker's `offsetParent`: it opens above or below this row.
+          position: "relative",
+          width: post ? "100%" : undefined,
           maxWidth: "100%",
-          boxSizing: "border-box",
-          // The Event card's band is full-bleed (no padding, the box clips it).
-          padding: card?.type === "event" ? 0 : "10px 12px 9px",
-          overflow: card?.type === "event" ? "hidden" : undefined,
-          borderRadius: isMine ? "18px 18px 6px 18px" : "18px 18px 18px 6px",
-          border: `1px solid ${t.hairline}`,
-          background: t.surface,
-          color: t.ink,
-          // A closed poll or sign-up: the whole card at 70 %, no taps (11.8).
-          opacity: closed ? 0.7 : 1,
-          cursor: "pointer",
-          WebkitTouchCallout: "none",
-          WebkitUserSelect: "none",
-          userSelect: "none",
-          transition: "transform 120ms ease",
-          transform: pickerOpen ? "scale(0.97)" : "scale(1)",
+          display: "flex",
+          alignItems: "flex-end",
+          justifyContent: "flex-start",
+          gap: 8,
         }}
       >
-        {body}
+        {theirs ? (
+          <span
+            aria-hidden
+            style={{
+              width: 28,
+              height: 28,
+              flexShrink: 0,
+              borderRadius: 999,
+              background: sender?.avatar_url ? `url(${sender.avatar_url}) center/cover` : disc.bg,
+              color: disc.ink,
+              display: "flex",
+              alignItems: "center",
+              justifyContent: "center",
+              fontSize: 10,
+              fontWeight: 700,
+            }}
+          >
+            {!sender?.avatar_url ? initialsOf(sender?.name || sender?.handle || "?") : null}
+          </span>
+        ) : null}
+        <div
+          {...pressHandlers}
+          style={{
+            width: post ? "100%" : 292,
+            maxWidth: "100%",
+            boxSizing: "border-box",
+            // The Event card's band is full-bleed (no padding, the box clips it).
+            padding: card?.type === "event" ? 0 : "10px 12px 9px",
+            overflow: card?.type === "event" ? "hidden" : undefined,
+            borderRadius: post ? 14 : isMine ? "18px 18px 6px 18px" : "18px 18px 18px 6px",
+            border: `1px solid ${t.hairline}`,
+            background: t.surface,
+            color: t.ink,
+            // A closed poll or sign-up: the whole card at 70 %, no taps (11.8).
+            opacity: closed ? 0.7 : 1,
+            cursor: "pointer",
+            WebkitTouchCallout: "none",
+            WebkitUserSelect: "none",
+            userSelect: "none",
+            transition: "transform 120ms ease",
+            transform: pickerOpen ? "scale(0.97)" : "scale(1)",
+          }}
+        >
+          {body}
+        </div>
+        <span aria-live="polite" style={visuallyHiddenStyle}>
+          {announce.text}
+          {announce.n % 2 === 1 ? "​" : ""}
+        </span>
+        {pickerOpen ? (
+          <ReactionPicker
+            darkMode={night}
+            isMine={isMine}
+            existing={chips}
+            onPick={(emoji) => {
+              setPickerOpen(false);
+              onToggleReaction?.(emoji);
+            }}
+            onReply={
+              onReply && !temp
+                ? () => {
+                    setPickerOpen(false);
+                    onReply();
+                  }
+                : undefined
+            }
+            onReport={
+              onReport && !temp
+                ? () => {
+                    setPickerOpen(false);
+                    onReport();
+                  }
+                : undefined
+            }
+            onRemove={
+              onRemove && !temp
+                ? () => {
+                    setPickerOpen(false);
+                    onRemove();
+                  }
+                : undefined
+            }
+            onClose={() => setPickerOpen(false)}
+          />
+        ) : null}
       </div>
-      <span aria-live="polite" style={visuallyHiddenStyle}>
-        {announce.text}
-        {announce.n % 2 === 1 ? "\u200B" : ""}
-      </span>
-      {pickerOpen ? (
-        <ReactionPicker
-          darkMode={night}
-          isMine={isMine}
-          existing={message.reactions ?? []}
-          // S3-notes STOPPED 1: the pinned props carry no reaction handler,
-          // so a pick only closes the picker.
-          onPick={() => setPickerOpen(false)}
-          onReport={
-            onReport && !temp
-              ? () => {
-                  setPickerOpen(false);
-                  onReport();
-                }
-              : undefined
-          }
-          onRemove={
-            onRemove && !temp
-              ? () => {
-                  setPickerOpen(false);
-                  onRemove();
-                }
-              : undefined
-          }
-          onClose={() => setPickerOpen(false)}
-        />
+      {chips.length > 0 ? (
+        <div style={{ marginLeft: theirs ? 36 : 0 }}>
+          <ReactionChips reactions={chips} night={night} onToggle={onToggleReaction} />
+        </div>
       ) : null}
     </div>
   );

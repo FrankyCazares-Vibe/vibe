@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 
 import { asLoadFailure, LoadFailed, type LoadFailure } from "@/components/feedback/LoadFailed";
 import { RemovedContentCard } from "@/components/safety/ReportSheet";
@@ -37,6 +37,12 @@ import { authorName, postAriaLabel, repliesToggleLabel, repliesToggleText, roleW
  * 200 → the returned message appended; `board_post_missing` → the toast and
  * the post is dropped (`onMissing`). No per-post `New` mark (14.17), no
  * repliers' avatars folded (14.18).
+ *
+ * A card post mounts `CardBubble` with `layout="post"` (full width, no
+ * second avatar or header; INT-ADJUDICATE-3) and hands its picker the
+ * Board's handlers: an emoji → `onToggleReaction` (the chips under the card
+ * follow), `Reply` → the fold opens with the reply field focused (a Board
+ * reply is never a quote; INT-ADJUDICATE-2).
  */
 export type BoardPostProps = {
   post: ChatMessage;
@@ -53,6 +59,8 @@ export type BoardPostProps = {
   onOpenEventChat: (roomId: string) => void;
   onRemove?: () => void;
   onReport?: () => void;
+  /** An emoji picked on a card post (its picker or its chips): today's reaction flow (reactions.ts). */
+  onToggleReaction?: (emoji: string) => void;
   /** A reply went in: the list re-reads the post (its server `reply_count`). */
   onReplied: () => void;
   /** `board_post_missing`: the post is gone; the list drops it. */
@@ -106,13 +114,20 @@ function BellOff() {
   );
 }
 
-export function BoardPost({ post, roomId, room, viewer, viewerId, night, now, refreshToken, onCard, onRefresh, onOpenEventChat, onRemove, onReport, onReplied, onMissing }: BoardPostProps) {
+export function BoardPost({ post, roomId, room, viewer, viewerId, night, now, refreshToken, onCard, onRefresh, onOpenEventChat, onRemove, onReport, onToggleReaction, onReplied, onMissing }: BoardPostProps) {
   const t = palette(night);
   const [open, setOpen] = useState(false);
   const [replies, setReplies] = useState<Replies>({ rows: null, failure: null });
   const [retryToken, setRetryToken] = useState(0);
   const [draft, setDraft] = useState("");
   const [sending, setSending] = useState(false);
+  // `Reply` from a card post's picker: the fold opens and the field takes
+  // focus once it is mounted (the token counts the asks).
+  const replyRef = useRef<HTMLInputElement | null>(null);
+  const [focusReply, setFocusReply] = useState(0);
+  useEffect(() => {
+    if (open && focusReply > 0) replyRef.current?.focus();
+  }, [open, focusReply]);
 
   const postId = post.id;
   const temp = postId.startsWith("temp_");
@@ -195,7 +210,29 @@ export function BoardPost({ post, roomId, room, viewer, viewerId, night, now, re
       </div>
       {post.kind !== "text" ? (
         <div style={{ marginTop: 8 }}>
-          <CardBubble message={post} roomId={roomId} room={room} viewerId={viewerId ?? ""} isMine={isMine} night={night} onCard={onCard} onRefresh={onRefresh} onOpenEventChat={onOpenEventChat} onRemove={onRemove} onReport={onReport} />
+          <CardBubble
+            message={post}
+            roomId={roomId}
+            room={room}
+            viewerId={viewerId ?? ""}
+            isMine={isMine}
+            night={night}
+            layout="post"
+            onCard={onCard}
+            onRefresh={onRefresh}
+            onOpenEventChat={onOpenEventChat}
+            onRemove={onRemove}
+            onReport={onReport}
+            onToggleReaction={onToggleReaction}
+            onReply={
+              canReply
+                ? () => {
+                    setOpen(true);
+                    setFocusReply((n) => n + 1);
+                  }
+                : undefined
+            }
+          />
         </div>
       ) : (
         <p style={{ margin: "6px 0 0", fontSize: 15, fontWeight: 500, lineHeight: 1.35, textWrap: "pretty", whiteSpace: "pre-wrap", overflowWrap: "anywhere" }}>{post.content}</p>
@@ -254,6 +291,7 @@ export function BoardPost({ post, roomId, room, viewer, viewerId, night, now, re
               style={{ margin: "8px 0 0 10px", height: 44, boxSizing: "border-box", padding: "0 0 0 14px", borderRadius: 999, border: night ? "1px solid rgba(255,255,255,0.10)" : `1px solid ${t.hairline}`, background: "rgba(var(--scrim-rgb),0.04)", display: "flex", alignItems: "center" }}
             >
               <input
+                ref={replyRef}
                 type="text"
                 value={draft}
                 onChange={(e) => setDraft(e.target.value)}

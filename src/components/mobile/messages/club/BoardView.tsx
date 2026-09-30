@@ -12,6 +12,7 @@ import { toastSendFailure } from "../send-failure";
 import { FONT, palette } from "../v2-tokens";
 import { BoardPost } from "./BoardPost";
 import { isEmptyRoom } from "./helpers";
+import { toggleReactionOn } from "./reactions";
 import { RemoveConfirm } from "./RoomThread";
 
 /**
@@ -164,6 +165,7 @@ export function BoardView({ poll, roomId, night, now, onOpenEventChat, scrollTok
                 }
                 onReplied={() => void poll.refreshOne(post.created_at)}
                 onMissing={() => poll.remove(post.id)}
+                onToggleReaction={(emoji) => void toggleReactionOn(poll, roomId, post, emoji)}
               />
             );
           })

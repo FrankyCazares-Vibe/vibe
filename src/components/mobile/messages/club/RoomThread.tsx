@@ -14,6 +14,7 @@ import { toastSendFailure } from "../send-failure";
 import type { MessageRow } from "../types";
 import { FONT, palette } from "../v2-tokens";
 import { emptyLine, isEmptyRoom, separatorIds, sepLabel } from "./helpers";
+import { toggleReactionOn } from "./reactions";
 import type { ReplyTarget } from "./RoomComposer";
 
 /**
@@ -26,12 +27,14 @@ import type { ReplyTarget } from "./RoomComposer";
  * computed over the rows that are not stubs (helpers.ts `separatorIds`);
  * text rows reuse `MessageBubble` (its palette unchanged in v1, 14.24) with
  * `groupMode` and `showSender` on the first row of a sender's run, today's
- * reaction flow moved as is (`toggleReaction`), Reply (a quote), Report, and
+ * reaction flow moved as is (`toggleReactionOn`, reactions.ts), Reply (a quote), Report, and
  * the new `onRemove` when `viewer.can_moderate && m.user_id !== viewerId`
  * (the confirm of 1.2 → `DELETE …/messages/<mid>` → the row is dropped;
  * `report_open` / `not_allowed` → the toast); a card row → `CardBubble`
  * (11.8) with `onCard` → `replaceCard`, `onRefresh` → `refreshOne`; `removed
  * !== null` → `RemovedContentCard by={removed.by}`; a stub renders nothing.
+ * A card's picker gets the same `onToggleReaction` / `onReply` as a text
+ * bubble (11.8; INT-ADJUDICATE-2).
  * `Earlier messages` (44px, quiet) above the first row while the last earlier
  * page was full (SCREENS-L7). Empty (no rows, or only stubs): `Say hi to
  * <club>.` / `Say hi to everyone going.` (or the officer's `ClubEmpty`).
@@ -227,35 +230,9 @@ export function RoomThread({ poll, roomId, roomKind, clubName, night, now, ancho
     el.scrollTop = el.scrollHeight;
   }, [scrollToken]);
 
-  const toggleReaction = async (m: ChatMessage, emoji: string) => {
-    // Today's flow (ConversationView `toggleReaction`), moved as is: an
-    // optimistic count, a raw fetch, a rollback when the fetch throws.
-    const existing = m.reactions ?? [];
-    const found = existing.find((r) => r.emoji === emoji);
-    const willAdd = !found?.viewer_reacted;
-    const apply = (row: ChatMessage, add: boolean) => {
-      const list = row.reactions ?? [];
-      const cur = list.find((r) => r.emoji === emoji);
-      if (cur) {
-        const next = list
-          .map((r) => (r.emoji === emoji ? { ...r, count: add ? cur.count + 1 : cur.count - 1, viewer_reacted: add } : r))
-          .filter((r) => r.count > 0);
-        return { ...row, reactions: next };
-      }
-      return add ? { ...row, reactions: [...list, { emoji, count: 1, viewer_reacted: true }] } : row;
-    };
-    const optimistic = apply(m, willAdd);
-    poll.replace(m.id, optimistic);
-    try {
-      await fetch(`/api/me/threads/${encodeURIComponent(roomId)}/messages/${encodeURIComponent(m.id)}/react`, {
-        method: willAdd ? "POST" : "DELETE",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ emoji }),
-      });
-    } catch {
-      poll.replace(m.id, apply(optimistic, !willAdd));
-    }
-  };
+  // Today's flow (ConversationView `toggleReaction`), moved as is into
+  // reactions.ts so the Board's card posts share it.
+  const toggleReaction = (m: ChatMessage, emoji: string) => toggleReactionOn(poll, roomId, m, emoji);
 
   const confirmRemove = async () => {
     const target = removeTarget;
@@ -363,6 +340,8 @@ export function RoomThread({ poll, roomId, roomKind, clubName, night, now, ancho
                       onOpenEventChat={onOpenEventChat}
                       onRemove={remove}
                       onReport={report}
+                      onToggleReaction={(emoji) => void toggleReaction(m, emoji)}
+                      onReply={canReply ? () => onReply(replyTargetOf(m, isMine)) : undefined}
                     />
                   </div>
                 );
