@@ -116,3 +116,126 @@ commit)`.
 - 2026-09-30T08:06:55Z cards/CardBubble.tsx parts 2 (press) and 3 (render) written; ComposeSheets typed as a const (no unused param); running typecheck + eslint
 - 2026-09-30T08:08:06Z gates: typecheck 0, npm test 1590/1590, build 0, eslint 0 (no warnings); S3-gate.md part 1 written; committing
 - 2026-09-30T08:08:28Z COMMITTED 36a1ccd feat(chat): CardBubble fallback bubble (W2-S3 first commit). First-commit prelude done; the main S3 builder continues from here (CardSheet + NewPollSheet / NewSignupSheet / ShareEventSheet inside ComposeSheets; PollCardView / SignupCardView / EventCardView routed from CardBubble when card !== null; the aria-live announcements; the STOPPED entries above are its first reading).
+
+## Part 2 — the main batch (cards, the sheet chrome, the three sheets)
+
+Continues from `36a1ccd` (+ `24ca304`, the notes line). Three batches run side by
+side on this tree; W2-S3 edits ONLY `messages/cards/*` and `messages/compose/*`.
+The siblings' mounts on the branch (kept, name for name): `RoomComposer`
+imports `CardTray`, `CardTrayKind`, `ComposeSheets`; `RoomThread` and
+`BoardPost` mount `CardBubble` with the 11.8 props.
+
+### Plan (in build order; one commit per step)
+
+1. `cards/card-rules.ts` + `cards/card-rules.test.ts` — pure (no React, no
+   DOM): `pollBarWidth`, `votesWord`, `optionAriaLabel` (1.2's three-way
+   rule), `pollFooter`, `pollCardLabel`, `signupTwoLine` (14.34: any label
+   > 12 characters), `signupCounts`, `signupProgress` (min(Σ capacity, 12)
+   segments, else continuous), `openWord`, `takeSpotLabel`, `visibleTakers`
+   (3 + `+N`), `signupCardLabel`, `fallbackEventTitle` (between `Event: `
+   and ` · `), `eventCardLabel`, `whenParts` (the Share-an-event tile from
+   `eventWhen`'s text), `announceVotes` / `announceFilled` / `announceRsvp`.
+2. `compose/sheet-rules.ts` + test — `sheetRoomLine` (`<club> · the Lounge`
+   …), `shareCta` (`Share to …`), `charCount` (code points, as the route),
+   `counterLabel` (`<n> of 200 characters`), `spotsWord`, `pollValid`,
+   `signupValid`, `eventValid`.
+3. `cards/PollCardView.tsx`, `cards/SignupCardView.tsx`,
+   `cards/EventCardView.tsx`; `cards/CardBubble.tsx` dispatches by
+   `card.type`, owns the card box (padding per type, the event card's
+   `overflow: hidden` and no padding, the 70 % opacity of a closed poll /
+   sign-up), the header line (passed to the views as `header`), the ONE
+   `aria-live="polite"` span (`visuallyHiddenStyle`) whose text the views set
+   through `onAnnounce(text)` after each answer.
+4. `compose/CardSheet.tsx` — the shared chrome (a vaul `Drawer.NestedRoot`:
+   the composer always sits inside `ClubSpace`'s or `EventChat`'s
+   `Drawer.Root`, and a plain root closing inside another drawer runs vaul's
+   unlock — ConversationView's note, RsvpSheet's precedent; it is the same
+   vaul root with `nested`), `useHideTabBar()`, focus back to
+   `returnFocusTo` on unmount, and `useCardPost()` — the one POST with 1.2's
+   refusal table (content_blocked / invalid_card outline the named field;
+   board_officers_only / room_closed / not_found close; try_again closes +
+   `onReload()`; 201 → `onPosted(message)`; a sheet never re-submits after a
+   503 because it closes).
+5. `compose/NewPollSheet.tsx`, `compose/NewSignupSheet.tsx`,
+   `compose/ShareEventSheet.tsx`; `compose/ComposeSheets.tsx` mounts them by
+   `kind`.
+6. Gates (13.3), `S3-gate.md` part 2, this file's log.
+
+### Props defined for the siblings (unchanged from part 1, plus one optional)
+
+- `CardTray { roomKind, roomName, clubName, open, onClose(), onPick(kind) }`,
+  `CardTrayKind = "poll" | "signup" | "event"`.
+- `ComposeSheets { kind: CardTrayKind | null, roomId, roomKind, roomName,
+  clubName, orgHandle, onClose(), onPosted(message), onReload(),
+  returnFocusTo?, orgId? }` — `orgId` is NEW and optional: the 14px club dot
+  on the sheet's `<club> · <room>` line (`clubGradient(orgId)`, the same
+  colour as the club's avatar) draws only when it is passed (REQUESTS 1).
+- `CardBubble`: exactly 11.8's props.
+
+### Decisions read from the contract (not changes)
+
+- The card's own `aria-label` (1.2 gives one example per side): theirs
+  `Poll from <Name>: <q>. N voted, names shown | anonymous`; mine `Your
+  anonymous poll: <q>. N voted` / `Your poll: <q>. N voted, names shown`;
+  closed replaces the count clause with the footer's own words, `Closed, N
+  voted`. Sign-up: `Sign-up from <Name>: <title>, K of M spots filled` /
+  `Your sign-up: …`. Event: `Event shared by <Name>: …` / `Event you shared:
+  …`; cancelled: `… : <fallback title>. This event was cancelled.`
+- The vote spinner is a 36 px element with −9 px margins so it takes the
+  18 px mark's slot without moving the label (11.8 "a 36px spinner in the
+  mark's place"); drawn with SVG SMIL (`animateTransform`), since no
+  `className` and no stylesheet keyframe is allowed (11.0).
+- The date line of the Event card and the Share-an-event tile use
+  `eventWhen(starts_at, deviceZone())` (1.4: "the screens format in the
+  device's zone"; the stored fallback text keeps the campus zone).
+- A closed event (`state === "closed"`): pills hidden, `Open event chat`
+  kept, and the `You'll appear in the event chat.` line hidden too (there is
+  nothing to join; 14.41's condition is about the pills' state).
+- `Remove <label>` on a blank option reads `Remove Option <i>` (the
+  pinned input name); `Spots for <slot>` on a blank slot reads `Spots for
+  Slot <i>`.
+- The RSVP pills' refusals (`campus_visiting`, `terms_required`, the
+  events route's own `not_found` sentence) go through `toastSendFailure`
+  as every other refusal (11.0): the chat codes' sentences, else the mapped
+  line.
+
+### STOPPED (part 2)
+
+3. **The `content_blocked` toast line.** 1.2 pins the toast as `That
+   includes words that aren't allowed on Vibe` (the server's own `error`,
+   `moderation/access.ts:138`); 11.0 says every refusal toast goes through
+   `toastSendFailure`, whose line for a 422 `content_blocked` is
+   `failure-copy.ts:198`'s `That includes words that aren't allowed on Vibe.
+   Edit it and try again.` (the code is not in `REFUSAL_SENTENCES`, so
+   `chatRefusalLine` answers null and the mapped line shows). Built: the
+   sheet shows 1.2's exact sentence (`r.error`, the server's) through
+   `toast()` for `content_blocked` alone; every other code goes through
+   `toastSendFailure`. The integration review picks one (either add
+   `content_blocked` handling to `chatRefusalLine`, or accept the mapped
+   line).
+
+### REQUESTS
+
+1. `RoomComposer` (W2-S2): pass `orgId={room.org.id}` (or the space's
+   `org.id`) to `ComposeSheets` so the sheet's club dot draws in the club's
+   colour. Without it the dot is simply absent (no wrong colour).
+2. Contract 11.8 / `RoomThread`: `onToggleReaction?` / `onReply?` on
+   `CardBubble` (STOPPED 1 of part 1 stands: a reaction picked on a card
+   still only closes the picker).
+
+### Log (part 2)
+- 2026-09-30T08:47:17Z part 2 plan written; starting cards/card-rules.ts
+- 2026-09-30T08:48:36Z cards/card-rules.ts part 1 (poll, sign-up) written
+- 2026-09-30T08:49:16Z cards/card-rules.ts part 2 (event, announcements, share rows) written; writing its test
+- 2026-09-30T08:49:16Z compose/sheet-rules.ts written
+- 2026-09-30T08:50:26Z cards/card-rules.test.ts written
+- 2026-09-30T08:50:26Z compose/sheet-rules.test.ts written; running the two tests
+- 2026-09-30T08:51:06Z card-rules: endSentence for names/questions ending in punctuation; both tests green
+- 2026-09-30T08:53:26Z cards/card-parts.tsx written (castVote, discs, marks, SMIL spinners, footer icons); starting PollCardView
+- 2026-09-30T08:53:55Z cards/PollCardView.tsx written; starting SignupCardView
+- 2026-09-30T08:54:30Z cards/SignupCardView.tsx part 1 written
+- 2026-09-30T08:55:22Z cards/SignupCardView.tsx part 2 written; starting EventCardView
+- 2026-09-30T08:55:22Z cards/EventCardView.tsx written; rewriting CardBubble with the dispatch
+- 2026-09-30T08:55:50Z cards/CardBubble.tsx part 1 (props, helpers, HeaderLine) rewritten
+- 2026-09-30T08:56:21Z cards/CardBubble.tsx part 2 (dispatch, aria-live span, the box per type) written; typecheck + eslint on the cards files
+- 2026-09-30T08:57:40Z renderers: typecheck 0, eslint 0, npm test 1637/1637; committing

@@ -7,7 +7,11 @@ import type { Card, ChatMessage, ThreadRoom } from "@/lib/chat/types";
 import { personColor } from "../avatar";
 import { initialsOf } from "../format";
 import { ReactionPicker } from "../ReactionPicker";
+import { visuallyHiddenStyle } from "../sheet-styles";
 import { FONT, palette } from "../v2-tokens";
+import { EventCardView } from "./EventCardView";
+import { PollCardView } from "./PollCardView";
+import { SignupCardView } from "./SignupCardView";
 
 /**
  * The card row in a club room (wave-2 contract 11.8; mockup W0_Cards,
@@ -18,12 +22,15 @@ import { FONT, palette } from "../v2-tokens";
  * opens `ReactionPicker` with Report and Remove (`MessageBubble`'s gesture
  * is not reused).
  *
- * W2-S3's first commit renders exactly the fallback: `message.content` (the
- * stored text, `cards/fallback.ts`) as a plain bubble under the header line.
- * That is also what a card whose `card` is null shows for good (a stale
- * cached answer; 9.1's 503 keeps a fresh read from producing one). The main
- * W2-S3 batch routes `card !== null` to `PollCardView` / `SignupCardView` /
- * `EventCardView` in the same frame.
+ * `card !== null` is routed by `card.type` to `PollCardView`,
+ * `SignupCardView` or `EventCardView`; the bubble owns the box (its
+ * padding per type, the event card's full-bleed band, the 70 % opacity of a
+ * closed poll or sign-up) and the ONE `aria-live="polite"` span per card
+ * (1.2: `<N> voted` · `<taken> of <total> filled` · `You're going` / `You
+ * said maybe` / `RSVP removed`), set by the views after each answer.
+ * `card === null` on a card kind (a stale cached answer; 9.1's 503 keeps a
+ * fresh read from producing one) shows `message.content`, the stored
+ * fallback text (cards/fallback.ts), as a plain bubble.
  */
 
 export type CardBubbleProps = {
@@ -93,9 +100,26 @@ function HeaderIcon({ word, stroke }: { word: CardWord; stroke: string }) {
   );
 }
 
-export function CardBubble({ message, isMine, night, onRemove, onReport }: CardBubbleProps) {
+/** The `<Name> · Poll | Sign-up | Event` line: 11.5px/600 muted, the name 700 secondary, one line. */
+function HeaderLine({ word, author, night }: { word: CardWord; author: string; night: boolean }) {
+  const t = palette(night);
+  return (
+    <div style={{ display: "flex", alignItems: "center", gap: 6, fontSize: 11.5, fontWeight: 600, lineHeight: "15px", color: t.muted, whiteSpace: "nowrap", overflow: "hidden" }}>
+      <HeaderIcon word={word} stroke={t.secondary} />
+      <span style={{ overflow: "hidden", textOverflow: "ellipsis" }}>
+        <span style={{ fontWeight: 700, color: t.secondary }}>{author}</span>
+        {" · "}
+        {word}
+      </span>
+    </div>
+  );
+}
+
+export function CardBubble({ message, roomId, room, isMine, night, onCard, onRefresh, onOpenEventChat, onRemove, onReport }: CardBubbleProps) {
   const t = palette(night);
   const [pickerOpen, setPickerOpen] = useState(false);
+  // The one polite region per card (11.8 "Announcements").
+  const [announce, setAnnounce] = useState("");
   const longPressTimer = useRef<number | null>(null);
   const longPressFired = useRef(false);
   const pressStart = useRef<{ x: number; y: number } | null>(null);
@@ -151,7 +175,7 @@ export function CardBubble({ message, isMine, night, onRemove, onReport }: CardB
       e.preventDefault();
     },
     // The click that ends a fired press must not also tap what is under
-    // the finger (a vote, a Take a spot, once the renderers land).
+    // the finger (a vote, a Take a spot, an RSVP pill).
     onClickCapture: (e: React.MouseEvent) => {
       if (!longPressFired.current) return;
       longPressFired.current = false;
@@ -162,11 +186,32 @@ export function CardBubble({ message, isMine, night, onRemove, onReport }: CardB
 
   const word = cardWord(message);
   const author = cardAuthorName(message, isMine);
+  // The card's own label says `someone` for an author the viewer cannot read (1.2).
+  const authorForLabel = message.users ? cardAuthorName(message, false) : null;
   const sender = message.users;
   const disc = personColor(sender?.id || message.user_id);
   // A row still sending has no id to report or remove (the text bubble's guard).
   const temp = message.id.startsWith("temp_");
   const cardBorder = night ? "1px solid rgba(255,255,255,0.08)" : "1px solid rgba(20,20,22,0.08)";
+  const card = message.card;
+  const header = <HeaderLine word={word} author={author} night={night} />;
+  const closed = card !== null && card.type !== "event" && card.closed;
+
+  let body: React.ReactNode;
+  if (card === null) {
+    body = (
+      <>
+        {header}
+        <div style={{ marginTop: 4, fontSize: 14.5, lineHeight: 1.35, whiteSpace: "pre-wrap", overflowWrap: "anywhere" }}>{message.content}</div>
+      </>
+    );
+  } else if (card.type === "event") {
+    body = <EventCardView card={card} content={message.content} room={room} createdAt={message.created_at} author={authorForLabel} isMine={isMine} night={night} header={header} onRefresh={onRefresh} onOpenEventChat={onOpenEventChat} onAnnounce={setAnnounce} />;
+  } else if (card.type === "signup") {
+    body = <SignupCardView card={card} roomId={roomId} messageId={message.id} createdAt={message.created_at} author={authorForLabel} isMine={isMine} night={night} header={header} onCard={onCard} onRefresh={onRefresh} onAnnounce={setAnnounce} />;
+  } else {
+    body = <PollCardView card={card} roomId={roomId} messageId={message.id} createdAt={message.created_at} author={authorForLabel} isMine={isMine} night={night} header={header} onCard={onCard} onRefresh={onRefresh} onAnnounce={setAnnounce} />;
+  }
 
   return (
     <div
@@ -205,11 +250,15 @@ export function CardBubble({ message, isMine, night, onRemove, onReport }: CardB
           width: 292,
           maxWidth: "100%",
           boxSizing: "border-box",
-          padding: "10px 12px 9px",
+          // The Event card's band is full-bleed (no padding, the box clips it).
+          padding: card?.type === "event" ? 0 : "10px 12px 9px",
+          overflow: card?.type === "event" ? "hidden" : undefined,
           borderRadius: isMine ? "18px 18px 6px 18px" : "18px 18px 18px 6px",
           border: cardBorder,
           background: t.surface,
           color: t.ink,
+          // A closed poll or sign-up: the whole card at 70 %, no taps (11.8).
+          opacity: closed ? 0.7 : 1,
           cursor: "pointer",
           WebkitTouchCallout: "none",
           WebkitUserSelect: "none",
@@ -218,45 +267,18 @@ export function CardBubble({ message, isMine, night, onRemove, onReport }: CardB
           transform: pickerOpen ? "scale(0.97)" : "scale(1)",
         }}
       >
-        <div
-          style={{
-            display: "flex",
-            alignItems: "center",
-            gap: 6,
-            fontSize: 11.5,
-            fontWeight: 600,
-            lineHeight: "15px",
-            color: t.muted,
-            whiteSpace: "nowrap",
-            overflow: "hidden",
-          }}
-        >
-          <HeaderIcon word={word} stroke={t.secondary} />
-          <span style={{ overflow: "hidden", textOverflow: "ellipsis" }}>
-            <span style={{ fontWeight: 700, color: t.secondary }}>{author}</span>
-            {" · "}
-            {word}
-          </span>
-        </div>
-        <div
-          style={{
-            marginTop: 4,
-            fontSize: 14.5,
-            lineHeight: 1.35,
-            whiteSpace: "pre-wrap",
-            overflowWrap: "anywhere",
-          }}
-        >
-          {message.content}
-        </div>
+        {body}
       </div>
+      <span aria-live="polite" style={visuallyHiddenStyle}>
+        {announce}
+      </span>
       {pickerOpen ? (
         <ReactionPicker
           darkMode={night}
           isMine={isMine}
           existing={message.reactions ?? []}
           // S3-notes STOPPED 1: the pinned props carry no reaction handler,
-          // so a pick only closes the picker in this commit.
+          // so a pick only closes the picker.
           onPick={() => setPickerOpen(false)}
           onReport={
             onReport && !temp
