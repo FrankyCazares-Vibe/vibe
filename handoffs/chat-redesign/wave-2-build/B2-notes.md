@@ -146,3 +146,12 @@ Decisions where the contract is silent (main):
 - cards/_lib/rpc-refusal.ts (the 3.2 table as one async function; P0C21 reads the role lazily; POST_REFUSAL_STATUS mirrored from messages/route.ts:64-69) + src/lib/chat/cards/rpc-refusal.test.ts (7 tests green: every code, both cases, the missing-function 404, the 503 rest).
 - cards/route.ts (POST, the 13 gates of 4.1 in order; invalid_card with field; 422 with field in the contract's order; cards_club_rooms_only; roomOf's three answers; the events read for an Event card; the two RPCs; the read-back tried twice; 201 CreateCardResponse) and cards/[messageId]/vote/route.ts (PUT, 4.3: 2b non-uuid → 404; card-vote bucket; requireNotRestricted; option_id / on fields; the cookie re-read with .limit(1) and removed_at, 42703 → 404; blockedIdsFor → 503; chat_cast_vote; hydrateCards on that row → 200 VoteResponse). tsc repo-wide clean; eslint exit 0.
 - tools/validate-thread.mjs (5.4: `<file> --role --room [--types]`; every field of ChatMessage / PollCard / PollCardOption / EventCard / EventRef / ThreadRoom / ViewerInRoom / OrgRef / Person / RemovedInfo; the stub's 17 pinned values; the key sets read from types.ts itself; room and viewer against the flags; exit 0 / 1 / 2) + validate-thread.test.mjs (17 tests green) + fixtures/ (board, lounge, event, dm, stub, poll, signup, event-card; all eight validate). eslint exit 0 on both .mjs files.
+- Gates (13.3): typecheck exit 0; npm test 1475/1475; build exit 0 (the two card routes in the manifest); eslint exit 0 on all 26 files; validate-thread.test.mjs 17/17. B2-gate.md (main section) written. Closing commit.
+
+## REQUESTS
+
+- None. Nothing outside the batch's files was needed.
+
+## SIBLING
+
+- None: the repo-wide typecheck and the build passed with the siblings' files in the tree at gate time (B1's migration file and notes were untracked / modified in the shared tree; nothing of theirs failed).
