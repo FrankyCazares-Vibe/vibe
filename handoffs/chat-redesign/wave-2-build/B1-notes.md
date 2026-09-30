@@ -48,3 +48,5 @@ Facts: `wave-2-asis/database-map.md` (DM), migration A `supabase/migrations/2026
 - 2026-09-30T06:08:09Z migration B complete: 1,690 lines; parse gate exit 0 (47 statements, 5 plpgsql functions, 5 DO blocks); the six contract SQL blocks verified verbatim by a node diff
 - 2026-09-30T06:08:10Z commit 2: bc19a18 migration B
 - 2026-09-30T06:12:20Z seed addition spliced into scripts/local-seed.mjs (113 lines: detectCards 42P01/PGRST205, findCard by kind + content, seedClubCards; called after seedClubChat); node --check ok; eslint exit 0
+- 2026-09-30T06:12:20Z commit 3: b885119 seed addition
+- 2026-09-30T06:16:17Z scripts/sql/chat-v2-cards-check.sql written (842 lines: fixtures, A creates, B refusals, C votes, D students, E delete paths, F reply counts, G catalog + for-update x2); parse gate with --strip-psql exit 0 (25 statements, 4 plpgsql functions, 11 DO blocks); typecheck exit 0; npm test 1475 pass
