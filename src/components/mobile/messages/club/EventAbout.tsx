@@ -98,7 +98,7 @@ export function EventAbout({ event, night, now, onRsvp }: EventAboutProps) {
     padding: "0 12px",
     borderRadius: 16,
     border: `1px solid ${t.hairline}`,
-    background: night ? "rgba(22,21,21,0.86)" : t.surface,
+    background: t.raisedSurface,
     color: t.ink,
     boxShadow: night ? "inset 0 1px 0 rgba(255,255,255,0.04)" : "0 1px 2px rgba(20,20,22,0.04)",
   };

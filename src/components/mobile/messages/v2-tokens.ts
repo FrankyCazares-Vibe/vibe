@@ -56,6 +56,18 @@ export type Palette = {
   bloom: string;
   /** The scrim under the "+" tray and the sheets (11.7). */
   scrim: string;
+  /**
+   * The border of a field, a header circle, the "+", the reply field, the
+   * tray and a sheet's top edge (MK:0.2 `rgba(255,255,255,0.10)` in Night;
+   * `--hairline` in Light; S2-DESIGN-6 / INT-ADJUDICATE-7).
+   */
+  fieldBorder: string;
+  /** An inactive room chip's border (MK:0.2 `rgba(255,255,255,0.12)`; the Light mockup's `rgba(20,20,22,0.12)`). */
+  chipBorder: string;
+  /** The dashed `Add your first event` button's border (MK:16.10 `rgba(255,255,255,0.22)`; Light `rgba(20,20,22,0.22)`). */
+  dashedBorder: string;
+  /** A raised circle or tile over the page (the header circles, the Plans tiles): MK:0.2 `rgba(22,21,21,0.86)` in Night; `--paper` in Light. */
+  raisedSurface: string;
 };
 
 const CORAL = "#FF5C35";
@@ -87,6 +99,10 @@ const NIGHT: Palette = {
   unpickedOption: { border: "rgba(255,255,255,0.10)", bar: "rgba(255,255,255,0.07)", bg: "rgba(255,255,255,0.04)" },
   bloom: "radial-gradient(closest-side, rgba(255,92,53,0.36) 0%, rgba(255,92,53,0.13) 52%, rgba(255,92,53,0) 100%)",
   scrim: "rgba(8,7,7,0.5)",
+  fieldBorder: "rgba(255,255,255,0.10)",
+  chipBorder: "rgba(255,255,255,0.12)",
+  dashedBorder: "rgba(255,255,255,0.22)",
+  raisedSurface: "rgba(22,21,21,0.86)",
 };
 
 const LIGHT: Palette = {
@@ -116,6 +132,10 @@ const LIGHT: Palette = {
   unpickedOption: { border: "rgba(20,20,22,0.10)", bar: "rgba(20,20,22,0.06)", bg: "rgba(20,20,22,0.02)" },
   bloom: "radial-gradient(closest-side, rgba(255,92,53,0.22) 0%, rgba(255,92,53,0.08) 52%, rgba(255,92,53,0) 100%)",
   scrim: "rgba(20,20,22,0.35)",
+  fieldBorder: "var(--hairline)",
+  chipBorder: "rgba(20,20,22,0.12)",
+  dashedBorder: "rgba(20,20,22,0.22)",
+  raisedSurface: "var(--paper)",
 };
 
 /** The tokens of one theme (`useNightTheme()` says which). */

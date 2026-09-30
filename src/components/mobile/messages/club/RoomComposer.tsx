@@ -297,11 +297,11 @@ export function RoomComposer({
             aria-label={trayOpen ? "Close the tray" : "Add a poll, sign-up or event"}
             aria-expanded={trayOpen}
             onClick={() => setTrayOpen((o) => !o)}
-            style={{ ...circle, border: night ? "1px solid rgba(255,255,255,0.10)" : `1px solid ${t.hairline}`, background: t.surface, color: t.ink, transition: "transform 160ms ease", transform: trayOpen ? "rotate(45deg)" : "none" }}
+            style={{ ...circle, border: `1px solid ${t.fieldBorder}`, background: t.surface, color: t.ink, transition: "transform 160ms ease", transform: trayOpen ? "rotate(45deg)" : "none" }}
           >
             <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.4" strokeLinecap="round" aria-hidden="true"><path d="M12 5v14M5 12h14" /></svg>
           </button>
-          <label style={{ flexGrow: 1, minWidth: 0, height: 44, boxSizing: "border-box", padding: "0 16px", display: "flex", alignItems: "center", borderRadius: 999, border: night ? "1px solid rgba(255,255,255,0.10)" : `1px solid ${t.hairline}`, background: t.surface }}>
+          <label style={{ flexGrow: 1, minWidth: 0, height: 44, boxSizing: "border-box", padding: "0 16px", display: "flex", alignItems: "center", borderRadius: 999, border: `1px solid ${t.fieldBorder}`, background: t.surface }}>
             <input
               ref={inputRef}
               type="text"

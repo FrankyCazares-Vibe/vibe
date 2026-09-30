@@ -49,7 +49,7 @@ function CalendarIcon() {
 
 export function RoomChips({ clubName, rooms, activeRoomId, night, now, onPick }: RoomChipsProps) {
   const t = palette(night);
-  const inactiveBorder = night ? "1px solid rgba(255,255,255,0.12)" : "1px solid rgba(20,20,22,0.12)";
+  const inactiveBorder = `1px solid ${t.chipBorder}`;
   return (
     <nav
       aria-label={`Rooms in ${clubName}`}

@@ -125,7 +125,7 @@ export function EventChat({ orgHandle, club, roomId, initialPage, boardLatest, b
               type="button"
               aria-label={`Back to ${club.name}`}
               onClick={onClose}
-              style={{ width: 44, height: 44, flexShrink: 0, boxSizing: "border-box", borderRadius: 999, border: night ? "1px solid rgba(255,255,255,0.10)" : `1px solid ${t.hairline}`, background: night ? "rgba(22,21,21,0.86)" : t.surface, color: t.secondary, display: "flex", alignItems: "center", justifyContent: "center", padding: 0, cursor: "pointer", WebkitTapHighlightColor: "transparent" }}
+              style={{ width: 44, height: 44, flexShrink: 0, boxSizing: "border-box", borderRadius: 999, border: `1px solid ${t.fieldBorder}`, background: t.raisedSurface, color: t.secondary, display: "flex", alignItems: "center", justifyContent: "center", padding: 0, cursor: "pointer", WebkitTapHighlightColor: "transparent" }}
             >
               <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.4" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true"><path d="M15 5l-7 7 7 7" /></svg>
             </button>

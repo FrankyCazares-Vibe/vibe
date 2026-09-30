@@ -69,7 +69,7 @@ export function UpNext({ clubName, events, night, now, officerEmpty, onOpenEvent
             boxSizing: "border-box",
             padding: "0 14px 0 12px",
             borderRadius: 18,
-            border: night ? "1px dashed rgba(255,255,255,0.22)" : "1px dashed rgba(20,20,22,0.22)",
+            border: `1px dashed ${t.dashedBorder}`,
             background: "rgba(var(--scrim-rgb),0.03)",
             color: t.ink,
             fontSize: 14.5,

@@ -85,7 +85,7 @@ export function CardTray({ roomKind, roomName, open, onClose, onPick }: CardTray
   // The raised surface: the mockup's `#1C1A1A` in Night; Light is not drawn
   // (MK:8), so the app's paper and hairline stand in.
   const trayBg = night ? "#1C1A1A" : t.surface;
-  const trayBorder = night ? "1px solid rgba(255,255,255,0.10)" : `1px solid ${t.hairline}`;
+  const trayBorder = `1px solid ${t.fieldBorder}`;
   const trayShadow = night ? "0 -10px 30px rgba(0,0,0,0.55)" : "0 -10px 30px rgba(20,20,22,0.18)";
   // A tint that is white on Night's paper and ink on Light's (`--scrim-rgb`).
   const rowBg = "rgba(var(--scrim-rgb),0.04)";

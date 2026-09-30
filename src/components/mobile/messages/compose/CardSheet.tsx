@@ -172,7 +172,7 @@ export function CardSheet({ title, roomLine, orgId, night, cta, ctaDisabled, pos
             background: t.surface,
             borderTopLeftRadius: 28,
             borderTopRightRadius: 28,
-            borderTop: night ? "1px solid rgba(255,255,255,0.10)" : `1px solid ${t.hairline}`,
+            borderTop: `1px solid ${t.fieldBorder}`,
             boxShadow: night ? "0 -18px 44px rgba(0,0,0,0.6)" : "0 -18px 44px rgba(20,20,22,0.18)",
             maxHeight: "92dvh",
             display: "flex",

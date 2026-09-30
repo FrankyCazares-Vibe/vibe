@@ -288,7 +288,7 @@ export function BoardPost({ post, roomId, room, viewer, viewerId, night, now, re
                 e.preventDefault();
                 void sendReply();
               }}
-              style={{ margin: "8px 0 0 10px", height: 44, boxSizing: "border-box", padding: "0 0 0 14px", borderRadius: 999, border: night ? "1px solid rgba(255,255,255,0.10)" : `1px solid ${t.hairline}`, background: "rgba(var(--scrim-rgb),0.04)", display: "flex", alignItems: "center" }}
+              style={{ margin: "8px 0 0 10px", height: 44, boxSizing: "border-box", padding: "0 0 0 14px", borderRadius: 999, border: `1px solid ${t.fieldBorder}`, background: "rgba(var(--scrim-rgb),0.04)", display: "flex", alignItems: "center" }}
             >
               <input
                 ref={replyRef}
