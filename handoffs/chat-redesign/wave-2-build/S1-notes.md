@@ -201,3 +201,76 @@ part-2 notes (its REQUESTS R1–R4 to S1) were read before this plan.
 
 - None: `npm run typecheck` exit 0 repo-wide on the first run.
 - 2026-09-30T08:40:19Z build exit 0 (no warning naming an S1 file); S1-gate.md part 2 written; STOPPED 10-17, REQUESTS, SIBLING written; last commit
+
+## Part 3 — the repair after review (one pass; S1-review-{contract,security,behaviour,design}.md)
+
+Resumed on `e8435f9`. Every finding verified against the tree, the contract
+and the mockup before a decision; the table is in `S1-repair.md`.
+
+### Plan (S1 files only)
+
+1. `home/YourWeek.tsx`: drop the `className` (CONTRACT-1 / BEHAVIOUR-3 /
+   DESIGN-1); the card's line 1 truncates the time first, the RSVP mark and
+   its word never shrink (DESIGN-5).
+2. `home/HomeEmpty.tsx`: `you&#39;re` (CONTRACT-3 / DESIGN-2); `flexGrow: 1`
+   in place of `minHeight: 380`, with the list section a flex column and the
+   main's `minHeight` minus the tab bar (DESIGN-4).
+3. `home/ClubRow.tsx`: the time brightens on an unread Board post only
+   (DESIGN-3, the mockup's rule).
+4. `home/home-rules.ts` + test: `You:` only when provable (BEHAVIOUR-2).
+5. `home/MessagesHome.tsx`: the list timer counts 30 s from the last read;
+   the calendar reads on mount and on return to visible only (CONTRACT-2 /
+   SECURITY-1 / BEHAVIOUR-6); the Requests count pill on the active chip is
+   the chip's own ink at .12 (DESIGN-6); the list section a flex column.
+6. `MessagesMobile.tsx`: `noBackRef` decided when the deep link opens
+   (BEHAVIOUR-1, HIGH); the seq bumped by every open / close (BEHAVIOUR-4);
+   a forward `popstate` onto a stale layer entry with nothing open resets
+   the URL (SECURITY-3).
+7. `CampusMobile.tsx`: the redirect keys on `chatWanted` (SECURITY-2); the
+   chat section stays (as a skeleton) while `tab === "chat"` so the pane
+   under the strip is not the Map's for a frame (BEHAVIOUR-5).
+8. `S1-contrast.md`: the active Requests pill row recomputed.
+9. Gates, `S1-gate.md` part 3, `S1-repair.md`, the commit.
+
+### Decisions (part 3)
+
+- **`palette().scrim` in Light** (CONTRACT-4): `rgba(20,20,22,0.35)` is S1's
+  own choice (the Light ink at .35; no Light tray / sheet mockup exists);
+  Night's `rgba(8,7,7,0.5)` is MK:0.1's. The token is additive to 11.0's list.
+- **`You:` in a group** (BEHAVIOUR-2): `GET /api/me/threads` sends no viewer
+  id and `members` omits anyone who left, so an author outside `members` is
+  me OR a departed member; the preview shows the text alone then (today's
+  `ThreadRow` shows no prefix either). In a dm `You:` is provable when `peer`
+  exists; a dm with `peer: null` shows the text alone. See STOPPED 18.
+- **The Requests count on the active chip** (DESIGN-6): no mockup draws it;
+  the pill is the active chip's own ink at .12, the same rule the inactive
+  pill uses with the page's ink (`rgba(var(--scrim-rgb),0.12)`).
+
+### Log
+- 2026-09-30T09:59:48Z part-3 plan written; starting YourWeek.tsx
+- 2026-09-30T10:01:44Z code edits done: YourWeek, HomeEmpty, ClubRow, home-rules (+test), MessagesHome, MessagesMobile, CampusMobile; running the pure tests and eslint
+- 2026-09-30T10:02:52Z pure tests 22/22, eslint = the baseline six only (MessagesMobile :523 :576, CampusMobile :316 :468 :664 :4030), typecheck exit 0; S1-contrast.md row updated; build running in the background; npm test next
+- (see the timestamps above) typecheck exit 0; npm test 1637/1637; npm run build exit 0 (no warning naming an S1 file); eslint parity exact
+
+### STOPPED (part 3)
+
+18. **1.2 "the preview `You: …`" on a GROUP row vs the list's payload.**
+    `GET /api/me/threads` sends no viewer id, and `members` holds the current
+    members other than me (`threads/route.ts:584-592`, `.neq("user_id",
+    user.id)`), so an author outside `members` is either me or a member who
+    left: `You:` cannot be proven for a group (S1-BEHAVIOUR-2). Built: `You:`
+    in a dm when `peer` exists and the author is not `peer`; the text alone
+    for a group author outside `members` and for a dm with `peer: null`
+    (today's `ThreadRow` shows no prefix at all). A `viewer_id` (or a
+    `last_message.mine` flag) on the list would restore `You:` for groups —
+    a W2-B4 / integration-review question, not S1's file.
+
+### REQUESTS (part 3)
+
+- To W2-S2 (S1-BEHAVIOUR-7): after the event layer closes (its `popstate`
+  close and `closeEvent`), `ClubSpace` should `replaceRoomHistory(pickedRoomId
+  ?? initialRoomId)` once `pickedRoomId` is known, so a space reached through
+  a week card or an event-room deep link is not left under
+  `/messages?channel=<event room>` (a reload there re-opens the layer). The
+  shell cannot do it: the calendar entry carries no Lounge id.
+- 2026-09-30T10:04:26Z S1-gate.md part 3, S1-repair.md, STOPPED 18, REQUESTS written; committing

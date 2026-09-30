@@ -155,7 +155,6 @@ export function YourWeek({
           ref={rowRef}
           role="group"
           aria-label="Event rooms you RSVP'd to this week"
-          className="vibe-no-scrollbar"
           style={{
             position: "relative",
             margin: "0 0 -10px",
@@ -228,19 +227,19 @@ function WeekCard({
         {live ? (
           <span aria-hidden="true" style={{ width: 7, height: 7, flexShrink: 0, borderRadius: 999, background: t.coral, boxShadow: `0 0 0 3px rgba(255,92,53,0.25), 0 0 8px ${t.coral}` }} />
         ) : null}
-        {line.text}
-        <span aria-hidden="true" style={{ color: t.muted }}>
+        <span style={{ minWidth: 0, overflow: "hidden", textOverflow: "ellipsis" }}>{line.text}</span>
+        <span aria-hidden="true" style={{ flexShrink: 0, color: t.muted }}>
           ·
         </span>
         {entry.viewer_status === "going" ? (
           // On the tinted live chrome the Going check is the coral MARK (11.0:
           // "the Going check … on a tinted surface"; #C8401E on #FFE9E0 is 4.3:1).
-          <span style={{ display: "inline-flex", alignItems: "center", gap: 3, fontWeight: 700, color: live ? t.coralMark : t.coralText }}>
+          <span style={{ flexShrink: 0, display: "inline-flex", alignItems: "center", gap: 3, fontWeight: 700, color: live ? t.coralMark : t.coralText }}>
             <CheckIcon size={11} />
             Going
           </span>
         ) : (
-          <span style={{ display: "inline-flex", alignItems: "center", gap: 4, fontWeight: 700, color: t.secondary }}>
+          <span style={{ flexShrink: 0, display: "inline-flex", alignItems: "center", gap: 4, fontWeight: 700, color: t.secondary }}>
             <span aria-hidden="true" style={{ width: 6, height: 6, borderRadius: 999, background: t.muted }} />
             Maybe
           </span>

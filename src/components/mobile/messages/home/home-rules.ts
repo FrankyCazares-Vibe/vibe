@@ -205,11 +205,15 @@ const threadTitleOf = (t: ThreadEntry): string =>
   t.type === "dm" ? t.peer?.name || (t.peer?.handle ? `@${t.peer.handle}` : "Direct message") : t.name || "Group";
 
 /**
- * 1.2 person / group row preview: `You: …` for my own last message (in a dm
- * the author is not `peer`; in a group the author is not among `members`,
- * which hold every member but me, `threads/route.ts:68`), `<Name>: …` for
- * another member of a group, the text alone for the dm peer. Empty content
- * says what was sent, as today's row does.
+ * 1.2 person / group row preview: `You: …` for my own last message, `<Name>:
+ * …` for another member of a group, the text alone for the dm peer. Empty
+ * content says what was sent, as today's row does.
+ *
+ * `You:` only when it is provable: the list sends no viewer id, and
+ * `members` holds the CURRENT members but me (`threads/route.ts:68`), so in
+ * a group an author outside `members` is me or someone who left — the text
+ * alone then (today's row shows no prefix either). In a dm the author who is
+ * not `peer` is me; with `peer: null` (a removed account) the text alone.
  */
 export function personPreview(t: ThreadEntry): string {
   const lm = t.last_message;
@@ -225,10 +229,10 @@ export function personPreview(t: ThreadEntry): string {
           : lm.attachment_kind === "post"
             ? "Shared a post"
             : "Attachment");
-  if (t.type === "dm") return lm.user_id === t.peer?.id ? body : `You: ${body}`;
+  if (t.type === "dm") return !t.peer || lm.user_id === t.peer.id ? body : `You: ${body}`;
   const member = (t.members ?? []).find((m) => m.id === lm.user_id);
   if (member) return `${member.name || (member.handle ? `@${member.handle}` : "Someone")}: ${body}`;
-  return `You: ${body}`;
+  return body;
 }
 
 /** 1.2 person / group row `aria-label`: `<name>, <spoken time>[, unread][, pinned]`. */

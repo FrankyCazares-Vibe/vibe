@@ -39,3 +39,18 @@ Commits `22d920e`, `92a0810`, `005020d`, `048cb1f`, `b47a72b` (+ the notes/gate 
 | every other S1 file | new file | 0 problems | — |
 
 Pure tests: `node --test src/lib/chat/week.test.ts` (7 pass), `node --test src/components/mobile/messages/home/home-rules.test.ts` (10 pass; the `when.test.ts` resolve-hook pattern for the `@/` alias).
+
+## Part 3 (the repair after review; `S1-repair.md` holds the finding table)
+
+Files changed: `src/components/mobile/MessagesMobile.tsx`, `src/components/mobile/CampusMobile.tsx`,
+`src/components/mobile/messages/home/{MessagesHome.tsx,YourWeek.tsx,HomeEmpty.tsx,ClubRow.tsx,home-rules.ts,home-rules.test.ts}`,
+`handoffs/chat-redesign/wave-2-build/S1-contrast.md` (+ the three records).
+
+| gate | command | result |
+|---|---|---|
+| typecheck | `npm run typecheck` | exit 0, no output (repo-wide, first run; no SIBLING entry) |
+| tests | `npm test` | 1637 tests, 1637 pass, 0 fail (`home-rules.test.ts` gained three asserts inside `personPreview`'s test) |
+| pure tests | `node --test src/lib/chat/week.test.ts src/components/mobile/messages/home/home-rules.test.ts src/components/mobile/messages/avatar.test.ts` | 22 pass, 0 fail |
+| build | `npm run build` | exit 0 after the last code edit, first run (`○ (Static)` / `ƒ (Dynamic)` summary; nothing naming an S1 file, no `useSearchParams` / `server-only` complaint) |
+| eslint, new files | `npx eslint src/components/mobile/messages/home src/components/mobile/messages/v2-tokens.ts src/components/mobile/messages/avatar.ts src/components/mobile/messages/avatar.test.ts src/lib/chat/use-chat-v2.ts src/lib/chat/use-hide-tabbar.ts src/lib/chat/week.ts src/lib/chat/week.test.ts src/app/layout.tsx` | exit 0; 0 errors, the one pre-existing `no-page-custom-font` warning at `layout.tsx:95` |
+| eslint parity | `npx eslint src/components/mobile/MessagesMobile.tsx src/components/mobile/CampusMobile.tsx` vs `git show a9355d1:<path> \| npx eslint --stdin --stdin-filename <path>` | 6 errors = the baseline six: `MessagesMobile.tsx` immutability 151→523, set-state-in-effect 204→576 (both in `MessagesMobileV1`); `CampusMobile.tsx` set-state-in-effect 282→316, 434→468, 630→664, 3990→4030. 0 new. |

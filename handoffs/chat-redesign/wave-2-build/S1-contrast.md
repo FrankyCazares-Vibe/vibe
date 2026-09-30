@@ -49,7 +49,7 @@ chip's `rgba(255,92,53,0.14)` tint is 4.01:1 in Light). Both now use
 | Filter pill, inactive | 13px/700 | 4.5:1 | #CFC8BE on #0C0B0B | 11.85 | #5C5853 on #FAF7F2 | 6.60 | yes |
 | All badge (#140806 on coral) | 11.5px/800 | 4.5:1 | #140806 on #FF5C35 | 6.40 | #140806 on #FF5C35 | 6.40 | yes |
 | Requests count, inactive pill | 11.5px/800 | 4.5:1 | #F6F1EA on #292828 | 13.04 | #1C1C1E on #DFDDD9 | 12.53 | yes |
-| Requests count, active pill | 11.5px/800 | 4.5:1 | #0C0B0B on #F7F3ED | 17.79 | #FAF7F2 on #151517 | 17.05 | yes |
+| Requests count, active pill (the chip's own ink at .12: Night `rgba(12,11,11,0.12)` on #F6F1EA, Light `rgba(250,247,242,0.12)` on #141416; repair, S1-DESIGN-6) | 11.5px/800 | 4.5:1 | #0C0B0B on #DAD5CF | 13.48 | #FAF7F2 on #302F30 | 12.48 | yes (the pill itself is a tint, 1.30 / 1.38 against the chip — a container, not a mark) |
 | Row name (person 15px, club 16.5px) | 15px/700 | 4.5:1 | #F6F1EA on #0C0B0B | 17.49 | #1C1C1E on #FAF7F2 | 15.92 | yes |
 | Row time, unread | 12px/600 | 4.5:1 | #CFC8BE on #0C0B0B | 11.85 | #5C5853 on #FAF7F2 | 6.60 | yes |
 | Row time, read | 12px/600 | 4.5:1 | #9C958C on #0C0B0B | 6.64 | #5A564F on #FAF7F2 | 6.83 | yes |

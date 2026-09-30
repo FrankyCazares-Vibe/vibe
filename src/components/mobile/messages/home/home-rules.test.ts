@@ -206,7 +206,7 @@ test("clubRowLabel: 1.2's clauses, each only when true, the spoken time last", (
   assert.equal(rules.clubRowTime(club({ name: "X" }), NOW), "");
 });
 
-test("personPreview: You: for my own message, <Name>: for another group member, the dm peer's text alone, media fallbacks", () => {
+test("personPreview: You: only when provable (a dm with a peer), <Name>: for a current group member, the text alone otherwise, media fallbacks", () => {
   const lm = (user_id: string, content = "hey") => ({ content, created_at: iso(local(2026, 9, 8, 20, 12)), user_id });
   assert.equal(rules.personPreview(thread({ id: "a", last_message: lm("peer-1") })), "hey");
   assert.equal(rules.personPreview(thread({ id: "a", last_message: lm("me") })), "You: hey");
@@ -221,7 +221,11 @@ test("personPreview: You: for my own message, <Name>: for another group member, 
     ],
   });
   assert.equal(rules.personPreview({ ...group, last_message: lm("u-jonah", "practice set is up") }), "Jonah K.: practice set is up");
-  assert.equal(rules.personPreview({ ...group, last_message: lm("me", "on it") }), "You: on it");
+  // The list sends no viewer id: my own group message and a departed member's both read as the text alone.
+  assert.equal(rules.personPreview({ ...group, last_message: lm("me", "on it") }), "on it");
+  assert.equal(rules.personPreview({ ...group, last_message: lm("u-gone", "bye all") }), "bye all");
+  // A dm whose peer is gone (a removed account): never `You:` by elimination.
+  assert.equal(rules.personPreview(thread({ id: "a", peer: null, last_message: lm("someone", "hey") })), "hey");
   assert.equal(rules.personPreview(thread({ id: "a", last_message: { ...lm("peer-1", ""), media_kind: "image" } })), "Photo");
   assert.equal(rules.personPreview(thread({ id: "a", last_message: { ...lm("me", ""), attachment_kind: "post" } })), "You: Shared a post");
   assert.equal(rules.personPreview(thread({ id: "a" })), "No messages yet");

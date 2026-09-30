@@ -7,7 +7,7 @@ import { initialsOf } from "../format";
 import { useNightTheme } from "../theme";
 import { FONT, palette, SERIF } from "../v2-tokens";
 
-import { clubChip, clubHasUnread, clubPreview, clubRowLabel, clubRowTime, newCountText } from "./home-rules";
+import { clubChip, clubPreview, clubRowLabel, clubRowTime, newCountText } from "./home-rules";
 import { PinIcon } from "./PersonRow";
 
 /**
@@ -34,7 +34,6 @@ export function ClubRow({
   const preview = clubPreview(club);
   const chip = clubChip(club, now);
   const newText = newCountText(club.lounge.unread_count);
-  const unread = clubHasUnread(club);
   const openBoard = club.board.unread && club.lounge.unread_count === 0;
 
   return (
@@ -115,7 +114,9 @@ export function ClubRow({
                 flexShrink: 0,
                 fontSize: 12,
                 fontWeight: 600,
-                color: unread ? t.secondary : t.muted,
+                // The mockup brightens the time for an unread Board post only
+                // (`W0_Home:101,126` vs `:141`); `N new` carries its own pill.
+                color: club.board.unread ? t.secondary : t.muted,
               }}
             >
               {clubRowTime(club, now)}

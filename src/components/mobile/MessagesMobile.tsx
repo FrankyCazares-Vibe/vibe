@@ -173,9 +173,16 @@ function MessagesMobileV2({ initialHandle, initialChannelId }: { initialHandle?:
   const filterRef = useRef(filter);
   const openRef = useRef<OpenView | null>(null);
   const listsRef = useRef(lists);
-  // Bumped by every deep link the page acts on, so a lookup still in flight
-  // knows a later link has taken over.
+  // Bumped by every deep link the page acts on and by every open or close
+  // the user makes, so a lookup still in flight knows a later owner has
+  // taken over and drops its answer.
   const deepLinkSeqRef = useRef(0);
+  // True while the open depth-1 layer sits on a deep link's entry with no
+  // entry behind it (a fresh tab from a push tap): `history.back()` would be
+  // a no-op there, so Back closes in place. `history.length` cannot tell at
+  // Back time — it counts forward entries too, and the event layer's Back
+  // leaves one.
+  const noBackRef = useRef(false);
 
   const setFilter = useCallback((f: HomeFilter) => {
     filterRef.current = f;
@@ -187,10 +194,14 @@ function MessagesMobileV2({ initialHandle, initialChannelId }: { initialHandle?:
 
   /** A layer opened from the home: one entry at depth 1 (a swap when one is already open). */
   const openView = useCallback((view: OpenView) => {
+    deepLinkSeqRef.current += 1;
     const id = view.kind === "club" ? view.roomId : view.threadId;
     const mark = { vibeChat: id, depth: 1 };
     if (openRef.current) window.history.replaceState(mark, "", channelUrl(id));
-    else window.history.pushState(mark, "", channelUrl(id));
+    else {
+      window.history.pushState(mark, "", channelUrl(id));
+      noBackRef.current = false;
+    }
     openRef.current = view;
     setComposeOpen(false);
     setOpen(view);
@@ -198,6 +209,8 @@ function MessagesMobileV2({ initialHandle, initialChannelId }: { initialHandle?:
 
   /** The home again with nothing open; the URL back to the home's. */
   const closeInPlace = useCallback(() => {
+    deepLinkSeqRef.current += 1;
+    noBackRef.current = false;
     openRef.current = null;
     setOpen(null);
     setRefreshKey((k) => k + 1);
@@ -206,16 +219,23 @@ function MessagesMobileV2({ initialHandle, initialChannelId }: { initialHandle?:
 
   /** Back / the swipe on a depth-1 layer: `history.back()`; `popstate` closes (2.3). */
   const closeLayer = useCallback(() => {
-    // A fresh tab (a push tap with no earlier entry) has nowhere to go back
-    // to: close in place instead of leaving the view stuck.
-    if (depthOf(window.history.state) >= 1 && window.history.length > 1) window.history.back();
+    // A deep link in a fresh tab has nowhere to go back to (`noBackRef`):
+    // close in place instead of leaving the view stuck.
+    if (depthOf(window.history.state) >= 1 && !noBackRef.current) window.history.back();
     else closeInPlace();
   }, [closeInPlace]);
 
   useEffect(() => {
     const onPop = (e: PopStateEvent) => {
-      if (depthOf(e.state) >= 1) return; // the event chat layer's Back: ClubSpace's (R1)
+      if (depthOf(e.state) >= 1) {
+        // Forward onto a layer's entry with nothing open (the layer was
+        // closed by Back): the entry is stale, the URL goes back to the
+        // home's. Otherwise the event chat layer's Back: ClubSpace's (R1).
+        if (!openRef.current) window.history.replaceState(null, "", homeUrl(filterRef.current));
+        return;
+      }
       if (!openRef.current) return;
+      deepLinkSeqRef.current += 1;
       openRef.current = null;
       setOpen(null);
       setRefreshKey((k) => k + 1);
@@ -289,7 +309,9 @@ function MessagesMobileV2({ initialHandle, initialChannelId }: { initialHandle?:
         return;
       }
       const room = r.data.room;
-      // The layer opens on the entry the browser already holds (2.3).
+      // The layer opens on the entry the browser already holds (2.3); with
+      // no entry behind it, Back closes in place (`closeLayer`).
+      noBackRef.current = window.history.length <= 1;
       window.history.replaceState({ vibeChat: id, depth: 1 }, "", channelUrl(id));
       if (room && room.kind === "event") {
         // The space on its Lounge underneath, the event chat layer on top

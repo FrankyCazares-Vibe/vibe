@@ -296,11 +296,13 @@ export function CampusMobile() {
   // Flag on and on the chat tab (from `?tab=chat` or `?channel=`): one
   // `router.replace` to /messages with the room; `?org=` is dropped (2.3).
   const chatRedirectedRef = useRef(false);
+  // Decided from the URL (`chatWanted`), not from `tab`: the track's scroll
+  // handler may move `tab` off "chat" when the chat pane leaves the order.
   useEffect(() => {
-    if (chatV2 !== true || tab !== "chat" || chatRedirectedRef.current) return;
+    if (chatV2 !== true || !chatWanted || chatRedirectedRef.current) return;
     chatRedirectedRef.current = true;
     router.replace("/messages" + (initialChannelId ? "?channel=" + encodeURIComponent(initialChannelId) : ""));
-  }, [chatV2, tab, initialChannelId, router]);
+  }, [chatV2, chatWanted, initialChannelId, router]);
   // ?post=<id> deep link — used by Copy Link share targets + Otto
   // mention notifications. Mobile opens the viewer directly (vs desktop
   // which scrolls + flashes the feed row). Stripped from the URL after
@@ -993,13 +995,15 @@ export function CampusMobile() {
             }
           />
         </section>
-        {chatV2 === true ? null : (
+        {chatV2 === true && tab !== "chat" ? null : (
           <section style={paneStyle}>
             {/* Keyed so a club joined on the Orgs tab remounts it, and it
                 reloads its own club list. Stays while visiting: it lists the
                 student's own clubs, not the campus on screen. Gated by the
                 flag (2.2): a skeleton until it answers when the URL asks for
-                this tab. */}
+                this tab, and the skeleton still (the pane keeps its place
+                under the strip) for the moment between the flag's `true`
+                and the redirect's landing. */}
             {oldChatMounts ? <ChatPane key={chatKey} onSelectOrg={(o) => setSelectedOrgForChat(o)} /> : <ListSkeleton />}
           </section>
         )}

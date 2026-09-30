@@ -27,10 +27,11 @@ import { YourWeek } from "./YourWeek";
  *
  * Reads on mount, in parallel: `GET /api/me/threads?scope=chats`,
  * `GET /api/me/inbox`, `GET /api/me/calendar?from=<Monday>&to=<Sunday>` (the
- * device week, `weekRange`). The first two again every 30 s while visible and
- * on return to visible at most once per 30 s (`LIST_RESYNC_MS`); the calendar
- * on mount and on return to visible at most once per 5 min; the first two
- * again when `refreshKey` changes (after a view closed, 11.10).
+ * device week, `weekRange`). The first two again every 30 s while visible
+ * (a timer that counts from the LAST list read, whatever started it) and on
+ * return to visible at most once per 30 s (`LIST_RESYNC_MS`); the calendar on
+ * mount and on return to visible at most once per 5 min, never on the timer;
+ * the first two again when `refreshKey` changes (after a view closed, 11.10).
  *
  * States: the skeleton until BOTH threads and inbox answered (the week has
  * its own); `inbox` failing alone → `Couldn't load your clubs.` in the list's
@@ -96,11 +97,25 @@ function useHomeData(refreshKey: number, onThreads: MessagesHomeProps["onThreads
   const weekSeqRef = useRef(0);
   const listAtRef = useRef(0);
   const weekAtRef = useRef(0);
+  // The 30-s list timer (11.1 "every 30 s while visible"), re-armed by every
+  // list read so the 30 s count from the last read: a close's refetch, a
+  // Retry or a return to visible does not double up with the timer's read.
+  const listTimerRef = useRef<number | null>(null);
+  const readListsRef = useRef<(() => Promise<void>) | null>(null);
+  const armListTimer = useCallback(() => {
+    if (listTimerRef.current !== null) window.clearTimeout(listTimerRef.current);
+    listTimerRef.current = window.setTimeout(() => {
+      listTimerRef.current = null;
+      // Hidden: nothing now; the return to visible reads (at most once per 30 s).
+      if (document.visibilityState === "visible") void readListsRef.current?.();
+    }, LIST_RESYNC_MS);
+  }, []);
   // `onThreads` is the shell's stable callback (a useCallback with no deps),
   // so `readLists` keeps one identity and the mount effect runs once.
   const readLists = useCallback(async () => {
     const seq = ++listSeqRef.current;
     listAtRef.current = Date.now();
+    armListTimer();
     const [tr, ir] = await Promise.all([
       vibeRequest<{ threads?: ThreadEntry[]; requests?: ThreadEntry[] }>("/api/me/threads?scope=chats", {
         cache: "no-store",
@@ -128,7 +143,18 @@ function useHomeData(refreshKey: number, onThreads: MessagesHomeProps["onThreads
     } else if (!clubsLoadedRef.current) {
       setClubsErr(asLoadFailure(ir, "Couldn't load your clubs."));
     }
-  }, [onThreads]);
+  }, [onThreads, armListTimer]);
+  useEffect(() => {
+    readListsRef.current = readLists;
+  }, [readLists]);
+  // The timer dies with the screen.
+  useEffect(
+    () => () => {
+      if (listTimerRef.current !== null) window.clearTimeout(listTimerRef.current);
+      listTimerRef.current = null;
+    },
+    [],
+  );
 
   const readWeek = useCallback(async () => {
     const seq = ++weekSeqRef.current;
@@ -166,18 +192,17 @@ function useHomeData(refreshKey: number, onThreads: MessagesHomeProps["onThreads
     void run();
   }, [readWeek]);
 
+  // Return to visible: the lists at most once per 30 s, the week at most
+  // once per 5 min (11.1). The timer above is the only other list reader;
+  // nothing else reads the week.
   useEffect(() => {
-    const tick = () => {
+    const onVisible = () => {
       if (document.visibilityState !== "visible") return;
       if (Date.now() - listAtRef.current >= LIST_RESYNC_MS) void readLists();
       if (Date.now() - weekAtRef.current >= WEEK_RESYNC_MS) void readWeek();
     };
-    const timer = window.setInterval(tick, LIST_RESYNC_MS);
-    document.addEventListener("visibilitychange", tick);
-    return () => {
-      window.clearInterval(timer);
-      document.removeEventListener("visibilitychange", tick);
-    };
+    document.addEventListener("visibilitychange", onVisible);
+    return () => document.removeEventListener("visibilitychange", onVisible);
   }, [readLists, readWeek]);
 
   const retryLists = useCallback(() => {
@@ -279,8 +304,10 @@ export function MessagesHome({ filter, onFilter, refreshKey, onThreads, onOpenCl
     );
   }
 
+  // The tab bar (64px + the safe area, fixed) is outside the column, so the
+  // list area — and the no-clubs block centred in it — ends above it.
   return (
-    <main style={{ background: t.page, color: t.ink, minHeight: "100dvh", fontFamily: FONT, display: "flex", flexDirection: "column" }}>
+    <main style={{ background: t.page, color: t.ink, minHeight: "calc(100dvh - 64px - env(safe-area-inset-bottom, 0px))", fontFamily: FONT, display: "flex", flexDirection: "column" }}>
       <header
         style={{
           flexShrink: 0,
@@ -368,8 +395,10 @@ export function MessagesHome({ filter, onFilter, refreshKey, onThreads, onOpenCl
                       borderRadius: 999,
                       // The All badge as today: coral, with the mockup's
                       // #140806 ink (`W0_Home:76`; white on coral is 3.0:1).
-                      // Requests: the tinted count pill of `W0_Home:62`.
-                      background: f === "all" ? t.coral : active ? "rgba(var(--scrim-rgb),0.14)" : "rgba(var(--scrim-rgb),0.12)",
+                      // Requests: the tinted count pill of `W0_Home:62` (the
+                      // page's ink at .12); on the active chip, which no mockup
+                      // draws, the chip's own ink at .12 by the same rule.
+                      background: f === "all" ? t.coral : active ? (night ? "rgba(12,11,11,0.12)" : "rgba(250,247,242,0.12)") : "rgba(var(--scrim-rgb),0.12)",
                       color: f === "all" ? "#140806" : active ? t.activeChip.ink : t.ink,
                       fontSize: 11.5,
                       fontWeight: 800,
@@ -388,7 +417,7 @@ export function MessagesHome({ filter, onFilter, refreshKey, onThreads, onOpenCl
         })}
       </div>
 
-      <section aria-label={LIST_LABEL[filter]} style={{ flexGrow: 1, minHeight: 0, paddingTop: 2, paddingBottom: 24 }}>
+      <section aria-label={LIST_LABEL[filter]} style={{ flexGrow: 1, minHeight: 0, paddingTop: 2, paddingBottom: 24, display: "flex", flexDirection: "column" }}>
         {list}
       </section>
 

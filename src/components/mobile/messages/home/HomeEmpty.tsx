@@ -23,7 +23,9 @@ export function HomeEmpty() {
       aria-labelledby="no-clubs-heading"
       style={{
         boxSizing: "border-box",
-        minHeight: 380,
+        // Fills the list area under the filter row, as the mockup's
+        // `flex-grow: 1` does (the list section is a flex column).
+        flexGrow: 1,
         padding: "0 32px 36px",
         display: "flex",
         flexDirection: "column",
@@ -59,7 +61,7 @@ export function HomeEmpty() {
           textWrap: "pretty",
         }}
       >
-        Join a club to get its Board, its Lounge and a chat for every event you&rsquo;re going to.
+        Join a club to get its Board, its Lounge and a chat for every event you&#39;re going to.
       </p>
       <Link
         href="/campus?tab=orgs"
