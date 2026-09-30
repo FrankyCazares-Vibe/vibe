@@ -45,3 +45,19 @@ step 2 feeds the real answers through `validate-thread.mjs`.
 
 STOPPED (in B2-notes.md): 9.4's parenthetical "(the caller answers 503, as
 today)" contradicts the code; built as today (`reply_count: null`, 200).
+
+## Repair (one pass after the three reviews; commit 39ea044)
+
+Files: `src/lib/chat/message-read.ts` + `message-read.test.ts`,
+`cards/hydrate.ts` + `hydrate.test.ts`, `cards/routes.test.ts` (new, 34 tests),
+`src/app/api/me/reports/route.ts` (the 5.3 hunk moved), `tools/validate-thread.mjs`
++ `validate-thread.test.mjs`. See `B2-repair.md` for finding → verdict.
+
+| gate | command | result |
+|---|---|---|
+| tests | `npm test` | 1560 tests, 1560 pass, 0 fail (1523 at review time + 37: routes 34, hydrate 1, message-read 1, and B3's own additions in the tree) |
+| stub harness (13.3) | `node --test src/lib/chat/cards/routes.test.ts` | 34/34: the routes' own 3.10 rows (PGRST202 / 42883 → 404 from the RPC; 42703 on the vote's re-read → 404) and every SQLSTATE of 3.2 through the routes, in 4.1 / 4.3's order |
+| eslint | `npx eslint` over the eight files above | exit 0, no output; none is on the old-errors list |
+| the batch's own gate | `node --test handoffs/chat-redesign/wave-2-build/tools/validate-thread.test.mjs` | 18 tests, 18 pass (one new: a removed own card row is not a 3.10 row) |
+| typecheck | `npm run typecheck` | exit 0 on the second 60-s retry (the first runs were red in `src/lib/chat/members-guard.test.ts:142,220,221`, B3's untracked file mid-edit; none of W2-B2's files ever appeared) |
+| build | `npm run build` | first run: "Compiled successfully in 16.5s", then "Failed to type check" on the same sibling file only; the 90-s retry loop was still in flight when this record closed (no verdict yet); the sibling's file is fixed (typecheck green), so the integration review's build is the proof |

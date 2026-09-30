@@ -139,14 +139,14 @@ Decisions where the contract is silent (main):
 - message-read.ts: 9.1 (the stub decision by isHiddenFrom with the page's roles, asStub replaces the row whole, hydrateCards in the Promise.all over the card rows, card from the map, parent_preview nulled when its user_id is blocked and whenever the block set could not be read (the send's answer; said once), null from hydrate → complete:false), 9.2 (`refusal(code, status)` beside postMissing / tryAgain; `invalid_after`), 9.4 (chat_reply_counts per chunk of 100; the wave-1 walk kept as `walkReplyCounts`, taken on isMissingChatSchema, warned once; other errors null), describeRoom(client, room, viewerId, blocked) → readRoomEvent → readGoing with the per-step filter; readThreadRoom reads the set itself.
 - messages/route.ts: `invalid_after` at its own check; the one block read after roomOf (null → 503 try_again) handed to readChatMessages and describeRoom; POST untouched.
 - message-read.test.ts: 12 tests green (a fake cookie client for blocks / page / parents / people, a fake service for roles / rpc / side tables). tsc repo-wide clean; eslint exit 0 on the three files.
-
-## STOPPED
-
-- **9.4 vs the code, `readReplyCounts` null.** 9.4 says "any other error → null (the caller answers 503, as today)". Today the caller does NOT answer 503 for it: `buildChatMessages` sets `reply_count: null` on every Board post when the map is null and `complete` covers the roles (and, from wave 2, the block set and the cards) only — `message-read.ts` "Null when the count could not be read, so a screen never shows a wrong number" (RM:3, `:388`). The parenthetical contradicts the code it cites. Built: the helper answers null on any other error (the sentence's main clause), and the caller keeps today's behaviour (`reply_count: null`, the page 200). The test `any other error of chat_reply_counts` pins that. If the 503 is what is meant, it is one line in `buildChatMessages`'s `complete` (`&& (postIds.length === 0 || replyCounts !== null)`) plus that test's expectation.
 - cards/_lib/rpc-refusal.ts (the 3.2 table as one async function; P0C21 reads the role lazily; POST_REFUSAL_STATUS mirrored from messages/route.ts:64-69) + src/lib/chat/cards/rpc-refusal.test.ts (7 tests green: every code, both cases, the missing-function 404, the 503 rest).
 - cards/route.ts (POST, the 13 gates of 4.1 in order; invalid_card with field; 422 with field in the contract's order; cards_club_rooms_only; roomOf's three answers; the events read for an Event card; the two RPCs; the read-back tried twice; 201 CreateCardResponse) and cards/[messageId]/vote/route.ts (PUT, 4.3: 2b non-uuid → 404; card-vote bucket; requireNotRestricted; option_id / on fields; the cookie re-read with .limit(1) and removed_at, 42703 → 404; blockedIdsFor → 503; chat_cast_vote; hydrateCards on that row → 200 VoteResponse). tsc repo-wide clean; eslint exit 0.
 - tools/validate-thread.mjs (5.4: `<file> --role --room [--types]`; every field of ChatMessage / PollCard / PollCardOption / EventCard / EventRef / ThreadRoom / ViewerInRoom / OrgRef / Person / RemovedInfo; the stub's 17 pinned values; the key sets read from types.ts itself; room and viewer against the flags; exit 0 / 1 / 2) + validate-thread.test.mjs (17 tests green) + fixtures/ (board, lounge, event, dm, stub, poll, signup, event-card; all eight validate). eslint exit 0 on both .mjs files.
 - Gates (13.3): typecheck exit 0; npm test 1475/1475; build exit 0 (the two card routes in the manifest); eslint exit 0 on all 26 files; validate-thread.test.mjs 17/17. B2-gate.md (main section) written. Closing commit.
+
+## STOPPED
+
+- **9.4 vs the code, `readReplyCounts` null.** 9.4 says "any other error → null (the caller answers 503, as today)". Today the caller does NOT answer 503 for it: `buildChatMessages` sets `reply_count: null` on every Board post when the map is null and `complete` covers the roles (and, from wave 2, the block set and the cards) only — `message-read.ts` "Null when the count could not be read, so a screen never shows a wrong number" (RM:3, `:388`). The parenthetical contradicts the code it cites. Built: the helper answers null on any other error (the sentence's main clause), and the caller keeps today's behaviour (`reply_count: null`, the page 200). The test `any other error of chat_reply_counts` pins that. If the 503 is what is meant, it is one line in `buildChatMessages`'s `complete` (`&& (postIds.length === 0 || replyCounts !== null)`) plus that test's expectation.
 
 ## REQUESTS
 
@@ -155,3 +155,42 @@ Decisions where the contract is silent (main):
 ## SIBLING
 
 - None: the repo-wide typecheck and the build passed with the siblings' files in the tree at gate time (B1's migration file and notes were untracked / modified in the shared tree; nothing of theirs failed).
+
+## Repair plan (one pass after the three reviews; 2026-09-30)
+
+Read: B2-review-contract.md, B2-review-security.md, B2-review-behaviour.md;
+contract 4, 5.2, 5.3, 5.4, 6.2 (`:715`: a removed message's "card is not
+hydrated (5.2)"), 8, 9, 13.3; `remove-route.test.ts` (B3's route-test
+pattern through the resolve hook and a relative import across `[id]`).
+Nine findings, three of them one and the same (the routes untested).
+
+| finding | verdict | what |
+|---|---|---|
+| CONTRACT-1 = SECURITY-1 = BEHAVIOUR-1 (MEDIUM) | FIX | `src/lib/chat/cards/routes.test.ts`: POST's 13 gates and PUT's 12 in order, against fakes of the two clients and the five gates; the real `rpc-refusal`, `body`, `fallback`, `blocks`, `schema`, `pgrest`. |
+| CONTRACT-2 (LOW) | FIX | `blocked` is `NO_BLOCKS` whenever `room === null`, whatever a caller passed; the dm test passes a set and asserts the quote stays. |
+| CONTRACT-3 (LOW) | FIX (the comment) | `&& blocksRead` stays: hydrating with an empty set on a failed block read would name a blocked voter on a guess (the contract's own rule for the quote); the comment now says what is true. |
+| CONTRACT-4 = SECURITY-2 = BEHAVIOUR-3 (LOW) | FIX | `cardRows` drops `removed_at` rows (6.2 `:715` confirms 5.2's sentence); a test; the validator no longer counts a removed own row's `card: null` as 3.10. |
+| SECURITY-3 (LOW) | FIXED | the four log bullets moved above `## STOPPED` (done first, above). |
+| BEHAVIOUR-2 (MEDIUM) | FIX | hydrate tests: a live event room (`closed: false`), a multi poll with two of the viewer's picks. |
+| BEHAVIOUR-4 (LOW) | FIX | the voters read skips the votes of anonymous polls (nothing of it is sent); the anonymous test asserts no `users` read. |
+| BEHAVIOUR-5 (LOW) | FIX | the `card` hunk moves below `alreadyOpen`, still after `readTarget` (5.3 holds: after the reporter's own read, never returned). |
+| BEHAVIOUR-6 (LOW) | FIX | `Built.blocked` dropped. |
+
+The STOPPED item (9.4's parenthetical) stays as it is: all three reviews
+judged the reading right; nothing of the batch changes for it.
+
+## Repair log
+- Notes: the four bullets moved out of STOPPED (SECURITY-3); this plan written before the first code edit.
+- message-read.ts: `blocked` is `NO_BLOCKS` whenever `room === null` (CONTRACT-2); `cardRows` drops `removed_at` rows (CONTRACT-4 / SECURITY-2 / BEHAVIOUR-3); the `&& blocksRead` comment says what is true (CONTRACT-3); `Built.blocked` dropped (BEHAVIOUR-6).
+- hydrate.ts: the voters read skips the votes of anonymous polls (BEHAVIOUR-4).
+- reports/route.ts: the `card` hunk moved below `alreadyOpen`, above `withOwnerHandle`; still after `readTarget` (BEHAVIOUR-5).
+- validate-thread.mjs: a removed own row with `card: null` is not counted as 3.10 (the consequence of CONTRACT-4); validate-thread.test.mjs pins it (18/18).
+- hydrate.test.ts: the anonymous test asserts no `users` read; a live event room `closed: false` (two cases); a multi poll with two of the viewer's picks (BEHAVIOUR-2). 22/22.
+- message-read.test.ts: the dm test hands a set down and the quote stays; the viewer's own removed poll (`removed` set, `card: null`, not asked of `chat_polls`). 13/13.
+- cards/routes.test.ts (669 lines, 34 tests): POST's 13 gates and PUT's 12 in the contract's order — every status, code, sentence and `field`; the `events` read's five columns; the RPC argument names of 3.3 / 3.4; P0C21-P0C26 through the real `rpcRefusal`; the missing-function 404; the read-back twice; PUT's re-read (the five columns, `eq id`, `eq channel_id`, `limit 1`, no `maybeSingle`), 42703 → 404, the real `blockedIdsFor` before the RPC, `hydrateCards` given the re-read row, the room and the block set (CONTRACT-1 / SECURITY-1 / BEHAVIOUR-1). `checkText` is replaced by a marker-word filter: the order is the route's, the filter has its own tests.
+- Gates: eslint exit 0 on the eight files; npm test 1560/1560 (1523 at review time + 37 new: routes 34, hydrate 1, message-read 1, and validate-thread 18/18 outside the glob); typecheck RED in `src/lib/chat/members-guard.test.ts:142` (untracked, B3's, mid-edit) — retried every 60 s (see SIBLING); build started.
+- Typecheck green on retry 2 (B3 fixed members-guard.test.ts). Build: compiled, type-check step red on that same file at first; retry loop in flight (no verdict yet). Committed 39ea044 (code); B2-repair.md and B2-gate.md (repair section) written; docs commit next.
+
+## SIBLING (repair)
+
+- `src/lib/chat/members-guard.test.ts:142,220,221` (TS18048, B3's untracked file, mid-edit) made `npm run typecheck` and the build's type-check step red during the repair's gates; gone by the second 60-s retry. Nothing of W2-B2's.
