@@ -36,3 +36,16 @@ Commit plan: (1) the remove route + test; (2) `RemovedContentCard.by`; (3) the b
 - Step 3 done: the by-name guard in `members/route.ts` POST right after `requireChannelStaff` (`board` / `lounge` / `event` → 409 `refusalBody("room_locked")`; `officers`, `room`, null as today; the DELETE untouched). eslint 0, typecheck 0.
 - Step 4 done: the 12.1 filters — `ConversationView.tsx` (`const shown = (messages ?? []).filter((m) => !m.hidden)` + `shown.map` + `shown[i - 1]`), `messages/types.ts` (`hidden?: boolean`), `messages.html` (`hidden: m.hidden === true` on the built object, `if (m.hidden) return;` first in `msgs.forEach`), `_miniMessenger.js` (the same two lines), `campus-home.tsx` (`messages.filter(...).map((m, idx, shown)` with `prev` from `shown`). No skip in `MessageBubble`. typecheck 0; eslint exit 0; campus-home.tsx warnings 6 = base 6 (4 no-location-assign-relative-destination, 2 no-unused-vars), errors 0 = 0; `_miniMessenger.js` warnings 4 = base 4.
 - Step 5 done: 12.4 in `threads/route.ts` — `loadHiddenUsers` moved above the `lastByChannel` fill; a club room's row whose `user_id` is in `hiddenRes.hidden.blocked` is skipped (`continue`) so the newest visible row of the window wins, none → `last_message: null`; dms and groups untouched (the skip is guarded by `clubRoomIds.has(cid)`); `unread` follows the chosen row as today. typecheck 0, eslint 0.
+- Gates run (13.3): typecheck 0; `npm test` 1511/1511; build exit 0 (first attempt); eslint exit 0 on the owned files with rule-by-rule parity for `campus-home.tsx` and `_miniMessenger.js`; `B3-gate.md` written.
+
+## STOPPED
+
+Nothing. No contradiction between the contract and the code was met in 6.1, 6.2, 6.3, 12.1 or 12.4 (the two small mechanics — the skipped cookie read for a non-uuid `[id]`, and `messages ?? []` in `ConversationView` — are written under "Implementation notes" above; both land on the contract's stated outcome).
+
+## SIBLING
+
+Nothing standing. One transient typecheck error and one transient test failure came from a sibling's half-written `src/lib/chat/reads.ts` / `reads.test.ts` (W2-B4) and cleared on the re-run within a minute.
+
+## REQUESTS
+
+None.
