@@ -9,7 +9,9 @@
 // chat open N more days", "Yesterday", "Tue" all appear.
 //
 // `makeFixtures(NOW)` → { answer(method, url, variant), ids, dump() }.
-// `variant` flags: clubsEmpty, weekEmpty, inbox500, inboxDelayMs, shareEmpty.
+// `variant` flags: clubsEmpty, weekEmpty, inbox500, inboxDelayMs, shareEmpty,
+// and (run 2) threadsEmpty, calendar500, featuresDelayMs, space500, shareEvents500,
+// thread500 (a room id whose first read answers 500).
 
 export const ZONE = "America/Indiana/Indianapolis";
 
@@ -448,10 +450,10 @@ export function makeFixtures(NOW) {
     const q = url.searchParams;
     let m;
 
-    if (p === "/api/me/features" && method === "GET") return json(200, { ok: true, chat_v2: true });
+    if (p === "/api/me/features" && method === "GET") return json(200, { ok: true, chat_v2: true }, variant.featuresDelayMs ?? 0);
 
     if (p === "/api/me/threads" && method === "GET") {
-      if (q.get("scope") === "chats") return json(200, { ok: true, threads, requests });
+      if (variant.threadsEmpty) return json(200, { ok: true, threads: [], requests: [] });
       return json(200, { ok: true, threads, requests });
     }
     if (p === "/api/me/threads" && method === "POST") return json(200, { ok: true, channel_id: rooms.dmDana });
@@ -461,11 +463,16 @@ export function makeFixtures(NOW) {
       return json(200, { ok: true, clubs: variant.clubsEmpty ? [] : clubs }, variant.inboxDelayMs ?? 0);
     }
 
-    if (p === "/api/me/calendar" && method === "GET") return json(200, { ok: true, entries: variant.weekEmpty ? [] : calendar });
+    if (p === "/api/me/calendar" && method === "GET") {
+      if (variant.calendar500) return json(500, { ok: false, error: "Internal error" });
+      return json(200, { ok: true, entries: variant.weekEmpty ? [] : calendar });
+    }
 
     if ((m = p.match(/^\/api\/orgs\/([^/]+)\/space$/)) && method === "GET") {
       const space = spaces[decodeURIComponent(m[1])];
       if (!space) return json(404, { ok: false, error: "That's not there anymore.", code: "not_found" });
+      if (q.get("events") === "1" && variant.shareEvents500) return json(500, { ok: false, error: "Internal error" });
+      if (variant.space500) return json(500, { ok: false, error: "Internal error" });
       if (q.get("events") === "1") {
         const upcoming = variant.shareEmpty ? [] : space.up_next;
         return json(200, { ...space, upcoming });
@@ -477,6 +484,7 @@ export function makeFixtures(NOW) {
       const t = threadsById[decodeURIComponent(m[1])];
       if (!t) return notFound(p);
       if (method === "GET") {
+        if (variant.thread500 && decodeURIComponent(m[1]) === variant.thread500 && !q.get("after")) return json(500, { ok: false, error: "Internal error" });
         if (q.get("root")) return json(200, threadPage(t, (t.replies ?? {})[q.get("root")] ?? []));
         if (q.get("after") || q.get("before")) return json(200, threadPage(t, []));
         return json(200, threadPage(t, t.messages));

@@ -43,28 +43,45 @@ const MOCKUP_FOR = {
   "22-empty-club": ["W0_EmptyClub"],
   "23-load-failed": [],
   "24-skeleton": [],
+  // run 2: the states the reviews listed as not shot
+  "25-new-signup-empty": ["W0_NewSignup"],
+  "26-remove-confirm": [],
+  "27-member-board": ["W0_Board"],
+  "28-member-lounge-picker": ["W0_Club"],
+  "29-event-empty-soon": ["W0_Room"],
+  "30-home-chats-empty": [],
+  "31-home-requests-empty": [],
+  "32-week-failed": [],
+  "33-club-failed": [],
+  "34-board-failed": [],
+  "35-share-events-failed": ["W0_ShareEvent"],
+  "36-flag-pending": [],
 };
 
+/** The layout viewport a shot was taken at: innerWidth/scrollWidth, `(clip)` when --clip-week was on. */
+const layoutOf = (s) => (s?.layout ? `${s.layout.innerWidth}/${s.layout.scrollWidth}${s.clipWeek ? " (clip)" : ""}` : "");
 const byState = new Map();
 for (const s of shots) {
   if (s.theme === "mockup") continue;
-  const row = byState.get(s.state) ?? { state: s.state, light: null, night: null, notes: [] };
+  const row = byState.get(s.state) ?? { state: s.state, light: null, night: null, notes: [], layout: {} };
   if (s.file) row[s.theme] = s.file;
+  if (s.file) row.layout[s.theme] = layoutOf(s);
   else row.notes.push(`${s.theme}: ${s.note}`);
   if (s.note && s.file && !row.notes.includes(s.note)) row.notes.push(s.note);
   byState.set(s.state, row);
 }
 const link = (f) => (f ? `[${f}](./${f})` : "—");
 const lines = [];
-lines.push("| # | state | app · Light | app · Night | mockup | notes |");
-lines.push("|---|---|---|---|---|---|");
+lines.push("| # | state | app · Light | app · Night | layout L / N | mockup | notes |");
+lines.push("|---|---|---|---|---|---|---|");
 for (const name of Object.keys(MOCKUP_FOR)) {
   const row = byState.get(name) ?? { state: name, light: null, night: null, notes: ["not shot"] };
   const mocks = MOCKUP_FOR[name].map((m) => `[${m}](./mockup-${m}.png)`).join(", ") || "—";
   const num = name.slice(0, 2);
   const label = name.slice(3);
   const note = [...new Set(row.notes)].join(" · ").replace(/\|/g, "\\|");
-  lines.push(`| ${num} | \`${label}\` | ${link(row.light)} | ${link(row.night)} | ${mocks} | ${note} |`);
+  const lay = row.layout ? [row.layout.light, row.layout.night].filter(Boolean).join(" · ") : "";
+  lines.push(`| ${num} | \`${label}\` | ${link(row.light)} | ${link(row.night)} | ${lay} | ${mocks} | ${note} |`);
 }
 const table = lines.join("\n");
 

@@ -11,7 +11,12 @@
 //   node fake-supabase.mjs &
 //   NEXT_PUBLIC_SUPABASE_URL=http://localhost:54321 NEXT_PUBLIC_SUPABASE_ANON_KEY=x \
 //     SUPABASE_SERVICE_ROLE_KEY=x npx next dev -p 3111 &
-//   OUT_DIR=../out node shoot.mjs [--real-time] [--only=<substring>] [--themes=light|night] [--no-mockups]
+//   OUT_DIR=../out node shoot.mjs [--real-time] [--only=<substring>] [--themes=light|night] [--no-mockups] [--clip-week]
+//
+// --clip-week injects one harness-side style, `section[aria-labelledby="your-week-heading"]{overflow-x:clip}`
+// (S2-notes REQUEST R8: the home's week bloom widens the mobile layout viewport past 375 until
+// that clip lands in src/). Every shot records the layout viewport it was taken at
+// (`layout: { innerWidth, scrollWidth }` in shots.json), so an overflow is visible in the record.
 //
 // Playwright is resolved from this folder's node_modules (never the repo's);
 // Chromium from PLAYWRIGHT_CHROMIUM (default /opt/pw-browsers/chromium).
@@ -35,6 +40,7 @@ const REAL_TIME = flag("real-time");
 const ONLY = opt("only", "");
 const THEMES = opt("themes", "light,night").split(",").filter(Boolean);
 const NO_MOCKUPS = flag("no-mockups");
+const CLIP_WEEK = flag("clip-week");
 const APP = process.env.APP_URL || "http://localhost:3111";
 const SUPABASE_URL = process.env.NEXT_PUBLIC_SUPABASE_URL || "http://localhost:54321";
 const OUT = path.resolve(process.env.OUT_DIR || path.join(HERE, "out"));
@@ -123,6 +129,21 @@ async function newPage(context) {
       }
     }, 30);
   });
+  if (CLIP_WEEK) {
+    await page.addInitScript(() => {
+      const add = () => {
+        if (document.getElementById("harness-clip-week") || !document.head) return;
+        const s = document.createElement("style");
+        s.id = "harness-clip-week";
+        s.textContent = 'section[aria-labelledby="your-week-heading"]{overflow-x:clip}';
+        document.head.appendChild(s);
+      };
+      const tick = setInterval(() => {
+        add();
+        if (document.head) clearInterval(tick);
+      }, 30);
+    });
+  }
   await routeFonts(page);
   await routeApi(page);
   page.on("pageerror", (e) => {
@@ -147,8 +168,10 @@ async function shot(page, name, theme, note = "", opts = {}) {
   // The Next dev-tools badge (a <nextjs-portal> host) is not the app: drop it before the shot.
   await page.evaluate(() => document.querySelectorAll("nextjs-portal").forEach((n) => n.remove()));
   await page.screenshot({ path: path.join(OUT, file), fullPage: false, ...opts });
-  shots.push({ file, state: name, theme, note });
-  console.log(`  shot ${file}${note ? `  (${note})` : ""}`);
+  // The layout viewport at the shot: mobile Chromium widens it to the widest content (S2-notes R8).
+  const layout = await page.evaluate(() => ({ innerWidth: window.innerWidth, scrollWidth: document.documentElement.scrollWidth }));
+  shots.push({ file, state: name, theme, note, layout, clipWeek: CLIP_WEEK });
+  console.log(`  shot ${file}${note ? `  (${note})` : ""}  [layout ${layout.innerWidth}/${layout.scrollWidth}]`);
 }
 async function gotoHome(page, query = "") {
   await page.goto(`${APP}/messages${query}`, { waitUntil: "load" });
@@ -169,6 +192,17 @@ const tallShot = async (page, name, theme, note) => {
   await settle(page, 400);
 };
 const tray = (page) => page.getByRole("button", { name: "Add a poll, sign-up or event" });
+async function longPress(page, text) {
+  const bubble = page.getByText(text).first();
+  await bubble.scrollIntoViewIfNeeded();
+  await sleep(1200);
+  const box = await bubble.boundingBox();
+  if (!box) throw new Error("bubble not visible");
+  await page.mouse.move(box.x + box.width / 2, box.y + box.height / 2);
+  await page.mouse.down();
+  await sleep(750);
+  await page.mouse.up();
+}
 const trayRow = (page, title) => page.getByRole("navigation", { name: /^Add to / }).getByRole("button", { name: new RegExp(`^${title}`) });
 
 // ── the states ───────────────────────────────────────────────────────────────
@@ -365,6 +399,142 @@ const STATES = [
       await p.waitForSelector('[role="tablist"]', { timeout: 60_000 });
       await sleep(1000);
       await shot(p, "24-skeleton", t);
+    },
+  },
+  // ── run 2: the states the three reviews listed as "not shot" and reachable ──
+  {
+    name: "25-new-signup-empty",
+    note: "run 2 (review-S3): New sign-up untouched — one slot, no X, the CTA disabled",
+    run: async (p, t) => {
+      await openSpace(p, rooms.salsaLounge, 'button[aria-label="Add a poll, sign-up or event"]');
+      await tray(p).click();
+      await trayRow(p, "Sign-up").click();
+      await p.waitForSelector('[role="dialog"]', { timeout: 20_000 });
+      await settle(p, 900);
+      await shot(p, "25-new-signup-empty", t);
+    },
+  },
+  {
+    name: "26-remove-confirm",
+    note: "run 2 (review-S2): the long press on Sam's bubble, then Remove — the RemoveConfirm alert dialog",
+    run: async (p, t) => {
+      await openSpace(p, rooms.salsaLounge, 'button[aria-label="Add a poll, sign-up or event"]');
+      await longPress(p, "Yes!! bringing the good one");
+      await p.getByRole("button", { name: "Remove" }).waitFor({ timeout: 10_000 });
+      await p.getByRole("button", { name: "Remove" }).click();
+      await p.waitForSelector('[role="alertdialog"]', { timeout: 10_000 });
+      await settle(p, 500);
+      await shot(p, "26-remove-confirm", t);
+    },
+  },
+  {
+    name: "27-member-board",
+    note: "run 2 (review-S2): a member's Board (Chess Club): Nothing on the Board yet. + the Only officers post tile",
+    run: async (p, t) => {
+      await openSpace(p, rooms.chessBoard, "text=Nothing on the Board yet.");
+      await shot(p, "27-member-board", t);
+    },
+  },
+  {
+    name: "28-member-lounge-picker",
+    note: "run 2 (review-S2): a member's Lounge (Chess Club) with the picker on Priya's bubble (its Message actions button) — Reply / Report, no Remove",
+    run: async (p, t) => {
+      await openSpace(p, rooms.chessLounge, "text=Anyone up for blitz tonight?");
+      // The 700 ms press does not open the picker on this two-row Lounge in the harness
+      // (it does on Salsa's, state 21); the bubble's "Message actions" button opens the same picker.
+      await p.getByRole("button", { name: "Message actions" }).first().click();
+      await p.getByRole("button", { name: "Report this message" }).waitFor({ timeout: 10_000 });
+      await settle(p, 400);
+      await shot(p, "28-member-lounge-picker", t);
+    },
+  },
+  {
+    name: "29-event-empty-soon",
+    note: "run 2 (review-S2): an empty event chat that starts tonight (Late Night Social): the Soon pill, Say hi to everyone going., the Maybe pill",
+    run: async (p, t) => {
+      await openSpace(p, rooms.lateNight, "text=Say hi to everyone going.");
+      await shot(p, "29-event-empty-soon", t);
+    },
+  },
+  {
+    name: "30-home-chats-empty",
+    note: "run 2 (review-S1): Chats with no threads (EmptyState tab=all)",
+    run: async (p, t) => {
+      variant = { threadsEmpty: true };
+      await gotoHome(p, "?tab=chats");
+      await p.getByText("No conversations yet").waitFor({ timeout: 20_000 });
+      await settle(p, 400);
+      await shot(p, "30-home-chats-empty", t);
+    },
+  },
+  {
+    name: "31-home-requests-empty",
+    note: "run 2 (review-S1): Requests with none waiting (EmptyState tab=requests)",
+    run: async (p, t) => {
+      variant = { threadsEmpty: true };
+      await gotoHome(p, "?tab=requests");
+      await p.getByText("No message requests").waitFor({ timeout: 20_000 });
+      await settle(p, 400);
+      await shot(p, "31-home-requests-empty", t);
+    },
+  },
+  {
+    name: "32-week-failed",
+    note: "run 2 (review-S1): /api/me/calendar → 500: Couldn't load your week. in the week's row",
+    run: async (p, t) => {
+      variant = { calendar500: true };
+      await gotoHome(p);
+      await p.getByText("Couldn't load your week.").waitFor({ timeout: 20_000 });
+      await settle(p, 400);
+      await shot(p, "32-week-failed", t);
+    },
+  },
+  {
+    name: "33-club-failed",
+    note: "run 2 (review-S2): /api/orgs/salsa-club/space → 500: Couldn't load this club. in the club layer",
+    run: async (p, t) => {
+      variant = { space500: true };
+      await openSpace(p, rooms.salsaLounge, "text=Couldn't load this club.");
+      await shot(p, "33-club-failed", t);
+    },
+  },
+  {
+    name: "34-board-failed",
+    note: "run 2 (review-S2): the Board chip tapped from the Lounge with the Board's read → 500: Couldn't load the Board.",
+    run: async (p, t) => {
+      // The ?channel= deep link resolves the room through the same thread GET, so a 500 there
+      // never opens the club: open the Lounge and tap the Board chip instead.
+      variant = { thread500: rooms.salsaBoard };
+      await openSpace(p, rooms.salsaLounge, 'button[aria-label="Add a poll, sign-up or event"]');
+      await p.getByRole("navigation", { name: /^Rooms in / }).getByRole("button", { name: /^Board/ }).click();
+      await p.getByText("Couldn't load the Board.").waitFor({ timeout: 20_000 });
+      await settle(p, 700);
+      await shot(p, "34-board-failed", t);
+    },
+  },
+  {
+    name: "35-share-events-failed",
+    note: "run 2 (review-S3): Share an event with the list failing (space?events=1 → 500): Couldn't load your events.",
+    run: async (p, t) => {
+      variant = { shareEvents500: true };
+      await openSpace(p, rooms.salsaLounge, 'button[aria-label="Add a poll, sign-up or event"]');
+      await tray(p).click();
+      await trayRow(p, "Event").click();
+      await p.waitForSelector('[role="dialog"]', { timeout: 20_000 });
+      await p.getByText("Couldn't load your events.").waitFor({ timeout: 20_000 });
+      await settle(p, 900);
+      await shot(p, "35-share-events-failed", t);
+    },
+  },
+  {
+    name: "36-flag-pending",
+    note: "run 2 (review-S1): /api/me/features delayed 10 s, shot ~1 s after load: the FlagPending header (no pills) over the list skeleton",
+    run: async (p, t) => {
+      variant = { featuresDelayMs: 10_000 };
+      await p.goto(`${APP}/messages`, { waitUntil: "load" });
+      await p.getByRole("button", { name: "New message" }).waitFor({ timeout: 60_000 });
+      await sleep(1000);
+      await shot(p, "36-flag-pending", t);
     },
   },
 ];

@@ -1,0 +1,104 @@
+{
+  "ok": true,
+  "messages": [
+    {
+      "id": "eeeeeeee-0018-4000-8000-000000000018",
+      "content": "Cash or card?",
+      "created_at": "2026-10-08T21:37:00.000Z",
+      "user_id": "aaaaaaaa-0003-4000-8000-000000000003",
+      "attachment_id": null,
+      "attachment_kind": null,
+      "media_url": null,
+      "media_kind": null,
+      "parent_message_id": null,
+      "users": {
+        "id": "aaaaaaaa-0003-4000-8000-000000000003",
+        "handle": "jay",
+        "name": "Jay Kim",
+        "avatar_url": null
+      },
+      "attachment": null,
+      "parent_preview": null,
+      "reactions": [],
+      "kind": "text",
+      "thread_root_id": "eeeeeeee-0017-4000-8000-000000000017",
+      "card": null,
+      "reply_count": null,
+      "author_role": "member",
+      "hidden": false,
+      "removed": null
+    },
+    {
+      "id": "eeeeeeee-0019-4000-8000-000000000019",
+      "content": "",
+      "created_at": "2026-10-08T21:42:00.000Z",
+      "user_id": "",
+      "attachment_id": null,
+      "attachment_kind": null,
+      "media_url": null,
+      "media_kind": null,
+      "parent_message_id": null,
+      "users": null,
+      "attachment": null,
+      "parent_preview": null,
+      "reactions": [],
+      "kind": "text",
+      "thread_root_id": null,
+      "card": null,
+      "reply_count": null,
+      "author_role": null,
+      "hidden": true,
+      "removed": null
+    },
+    {
+      "id": "eeeeeeee-0020-4000-8000-000000000020",
+      "content": "Both work, I'll be at the table from 6:30",
+      "created_at": "2026-10-08T21:47:00.000Z",
+      "user_id": "aaaaaaaa-0004-4000-8000-000000000004",
+      "attachment_id": null,
+      "attachment_kind": null,
+      "media_url": null,
+      "media_kind": null,
+      "parent_message_id": null,
+      "users": {
+        "id": "aaaaaaaa-0004-4000-8000-000000000004",
+        "handle": "maya",
+        "name": "Maya Reyes",
+        "avatar_url": null
+      },
+      "attachment": null,
+      "parent_preview": null,
+      "reactions": [],
+      "kind": "text",
+      "thread_root_id": "eeeeeeee-0017-4000-8000-000000000017",
+      "card": null,
+      "reply_count": null,
+      "author_role": "member",
+      "hidden": false,
+      "removed": null
+    }
+  ],
+  "viewer_id": "11111111-1111-4111-8111-111111111111",
+  "peer_last_read_at": null,
+  "peer_typing": [],
+  "room": {
+    "id": "cccccccc-0002-4000-8000-000000000002",
+    "kind": "board",
+    "name": "Board",
+    "org": {
+      "id": "bbbbbbbb-0001-4000-8000-000000000001",
+      "handle": "salsa-club",
+      "name": "Salsa Club",
+      "logo_url": null,
+      "banner_url": null,
+      "verified": true
+    },
+    "event": null
+  },
+  "viewer": {
+    "role": "admin",
+    "can_post": true,
+    "can_reply": true,
+    "can_moderate": true
+  }
+}

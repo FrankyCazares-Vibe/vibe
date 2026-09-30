@@ -184,3 +184,28 @@ every run.
   to that `tools/` folder; `MOCKUPS_DIR` / `SHARP_DIR` override them.
 - `git status` after `next dev`: only the new `visual/` folder; nothing under
   `src/`, and `AGENTS.md` unchanged (its `next dev` block was already committed).
+
+## Step 6 — run 2, after the three repairs (HEAD `4066fd1`)
+
+- Same harness, fixtures and frozen clock; the tools copied to the scratchpad
+  again (Playwright there), `next dev -p 3111` against the fake on 54321, the
+  real `/messages` behind the real gates (200, no redirect).
+- The first full pass at HEAD measured `window.innerWidth` = `scrollWidth` = 409
+  on 30 of 36 states: the week bloom, now centred on the live card (VIS-S1-2),
+  reaches past the week section and mobile Chromium widens the layout viewport
+  (S2-notes R8 / S3-notes REQUEST 5, not landed). The composer's "+" then sits
+  off the 375 visual viewport and Playwright's click times out: 14 (15, 16),
+  17, 18, 19, 25, 35 FAILED. Every shot now records `layout` so the number is
+  in the record, and `--clip-week` injects the one-line R8 clip harness-side so
+  a second pass (`run2/clip/`) shows every state at 375. Both are kept.
+- Twelve states added from the reviews' "not shot" lists (25–36) with six new
+  fixture variants. Two needed a second try: `34-board-failed` — a 500 on the
+  `?channel=` deep link's thread GET never opens the club (`MessagesMobile`
+  resolves the room through it), so the state opens the Lounge and taps the
+  Board chip; `28-member-lounge-picker` — the picker's Report button is
+  `aria-label="Report this message"`, and the 700 ms `page.mouse` press did not
+  open the picker on Chess's two-row Lounge (it does on Salsa's, 21), so the
+  bubble's `Message actions` button opens it instead.
+- `build-readme.mjs` gained a "layout" column (and a TDZ bug on the way: the
+  helper was declared after its first use; fixed).
+- Records: `run2/` 81 PNGs (56 app shots, 12 FAILED, 13 mockups) + 3 records, `run2/clip/` 72 app shots + 3 records; `unmocked.json` `[]` in both.
