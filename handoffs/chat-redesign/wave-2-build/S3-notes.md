@@ -115,3 +115,4 @@ commit)`.
 - 2026-09-30T08:05:57Z compose/ComposeSheets.tsx written (renders null); cards/CardBubble.tsx part 1 (props, cardWord, cardAuthorName, HeaderIcon) written
 - 2026-09-30T08:06:55Z cards/CardBubble.tsx parts 2 (press) and 3 (render) written; ComposeSheets typed as a const (no unused param); running typecheck + eslint
 - 2026-09-30T08:08:06Z gates: typecheck 0, npm test 1590/1590, build 0, eslint 0 (no warnings); S3-gate.md part 1 written; committing
+- 2026-09-30T08:08:28Z COMMITTED 36a1ccd feat(chat): CardBubble fallback bubble (W2-S3 first commit). First-commit prelude done; the main S3 builder continues from here (CardSheet + NewPollSheet / NewSignupSheet / ShareEventSheet inside ComposeSheets; PollCardView / SignupCardView / EventCardView routed from CardBubble when card !== null; the aria-live announcements; the STOPPED entries above are its first reading).
