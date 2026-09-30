@@ -10,7 +10,9 @@ import { chipAriaLabel, chipLabel } from "./helpers";
  * 11.3, 1.2; mockup `W0_Club:52-57`, MK:0.2): a 45px `<nav aria-label="Rooms
  * in <club>">` holding `rooms` in the server's order (lounge, board, officers
  * when I may enter, event rooms, then rooms), each chip a 44px hit area around
- * a 30px pill.
+ * a 30px pill (11px sides, 5px gaps: one pixel under the mockup's each, so
+ * Lounge · Board · Officers · <event> fit at 375 without a cut chip; more
+ * chips scroll; VIS-S2-4).
  *
  * `aria-current="page"` marks the open Board / Lounge / `room`. An event chip
  * NEVER becomes the active chip: it opens the event chat layer (SCREENS-M1).
@@ -58,7 +60,7 @@ export function RoomChips({ clubName, rooms, activeRoomId, night, now, onPick }:
         padding: "0 12px",
         display: "flex",
         alignItems: "center",
-        gap: 6,
+        gap: 5,
         borderTop: `1px solid ${t.hairline}`,
         overflowX: "auto",
         overflowY: "hidden",
@@ -96,7 +98,7 @@ export function RoomChips({ clubName, rooms, activeRoomId, night, now, onPick }:
               style={{
                 height: 30,
                 boxSizing: "border-box",
-                padding: icon ? "0 12px 0 10px" : dot ? "0 10px 0 12px" : "0 12px",
+                padding: icon ? "0 11px 0 9px" : dot ? "0 9px 0 11px" : "0 11px",
                 borderRadius: 999,
                 border: active ? "1px solid transparent" : inactiveBorder,
                 background: active ? t.activeChip.bg : "transparent",

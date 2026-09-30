@@ -493,9 +493,9 @@ function ClubHeader({ night, onClose, orgHandle, space }: { night: boolean; onCl
 function ClubBodySkeleton() {
   return (
     <div aria-hidden="true" style={{ flexGrow: 1, minWidth: 0 }}>
-      <div style={{ height: 45, boxSizing: "border-box", padding: "5px 12px 4px", display: "flex", gap: 8 }}>
-        {[88, 72, 84].map((w, i) => (
-          <div key={i} style={{ width: w, height: 36, borderRadius: 999, background: SKELETON_DISC }} />
+      <div style={{ height: 45, boxSizing: "border-box", padding: "7px 12px 8px", display: "flex", gap: 5 }}>
+        {[70, 74, 90].map((w, i) => (
+          <div key={i} style={{ width: w, height: 30, borderRadius: 999, background: SKELETON_DISC }} />
         ))}
       </div>
       <div style={{ padding: "8px 12px 0", display: "flex", flexDirection: "column", gap: 10 }}>

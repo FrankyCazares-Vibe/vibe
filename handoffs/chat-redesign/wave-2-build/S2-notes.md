@@ -371,3 +371,69 @@ evidence are in `S2-repair.md`.
 - 2026-09-30 refinement from the diff read: the `Earlier messages` anchor carries the first id and the read's lifetime, so a read that brings nothing does not leave it armed; gates pass 2: typecheck 0, npm test 1637/1637, build exit 0, eslint 0 + both baselines 0
 - 2026-09-30 S2-repair.md (33 findings: 25 FIXED, 3 REJECTED, 5 DEFERRED — B7 counted FIXED, its space-read half rejected; REQUESTS R4-R6; STOPPED 10-12) and S2-gate.md part 3 written; committing
 - 2026-09-30 COMMITTED 7477f8e fix(chat): W2-S2 repair after review (9 code files, S2-repair.md, S2-gate.md part 3, these notes). Repair pass done; open for the integration review: R4 (initialPage), R5 (CardBubble layout), R6 (four border / surface tokens), STOPPED 10-12.
+
+## Part 4 — the repair after the visual pass (`visual/review-S2.md`)
+
+Resumed on `6adce71` (S1's visual repair over `b81aa29`). Review read: 0 HIGH,
+3 MEDIUM, 4 LOW. Every finding verified against its shot, the mockup and the
+contract before a line changed; the verdicts, the measurements and the evidence
+are in `visual/repair-S2.md`, the re-shots in `visual/repair-S2/`.
+
+### Plan (only S2-owned files)
+
+1. `UpNext.tsx`: line 1 at 11.5/600 −0.15 with 3px gaps, the card `7px 8px`;
+   the RSVP word never cut (the time yields) — VIS-S2-1, closes STOPPED 10.
+2. `ClubEmpty.tsx`: `16px 4px 4px` inside RoomThread's `8px 12px 8px` — VIS-S2-3.
+3. `RoomChips.tsx`: gap 5, 11px pill sides — VIS-S2-4.
+4. `EventAbout.tsx`: the RSVP pill inert on `closed` — VIS-S2-5.
+5. `ClubSpace.tsx`: the skeleton's 30px pills in the same 45px row — VIS-S2-6.
+6. VIS-S2-2 deferred (R7 below); VIS-S2-7 kept as is.
+
+### Readings (not stops)
+
+- **The club screens drew 409px wide on the re-shoot** (before any S2 edit):
+  S1's `6adce71` places the week bloom at `left: bloomLeft` (69 for the live
+  card) + 340 = 409 inside a `<section>` nothing clips; with the club space
+  open `window.innerWidth` and `document.scrollWidth` are 409 at a 375
+  viewport in mobile Chromium, and every fixed layer (1100 / 1102 / the
+  sheets) takes that width. Measured, not guessed (`measure.mjs` in the
+  scratchpad harness copy: the one element past 375 is that absolute 340px
+  div at 69–409). Harness-side workaround for S2's re-shoot only: an injected
+  `overflow: hidden` on the week section — `innerWidth` back to 375. Nothing
+  in S1's files touched; REQUEST R8.
+- **A corrupt `.next/dev/types/routes.d.ts`** (interleaved writes from two
+  `next dev` servers at 11:15) failed `tsc` on the whole tree; moved to the
+  scratchpad. `.next/types/routes.d.ts` (the build's) declares the same
+  globals; the next `next dev` or build rewrites the dev copy.
+- STOPPED 10 (the Up next line) is closed: measured in the loaded DM Sans, the
+  mockup's 12px set-up needs ≈160px in the 146px line; 11.5/600 −0.15, 3px
+  gaps and 8px card sides hold `Tonight · 9:30 PM · ● Maybe` (148.7 in 150);
+  the overlong case ellipsises the time, never the word.
+
+### REQUESTS (for the integration review)
+
+- R7 (to W2-S3; R5 restated with the exact change). `CardBubble` takes
+  `layout?: "bubble" | "post"` (default `"bubble"`): for `"post"` no avatar
+  column, the card `width: "100%"`, `borderRadius: 14`, no tail, the header
+  line kept (`Priya Shah · Event` is the card's own, 1.2), the press / picker
+  as now. Then S2's one line: `BoardPost.tsx` ≈198 passes `layout="post"`
+  (the wrapper `div` stays: `marginTop: 8`). Until then a card post is the
+  Lounge bubble inside the article (VIS-S2-2, MEDIUM, on screen).
+- R8 (to W2-S1; HIGH). `home/YourWeek.tsx`: the bloom `div` (`left: bloomLeft`,
+  340 wide) must not reach past the section — `overflowX: "clip"` on the
+  `<section>` (keeps the halo's top and bottom; `overflow: hidden` also
+  works, the halo's bottom then clips at the section's edge), or clamp the
+  bloom's box with `clipPath`. Symptom without it: with any fixed layer open
+  (the club space, the event chat, a sheet) the layout viewport in mobile
+  Chromium grows to `document.scrollWidth` 409 and the layer draws 409 wide
+  at 375 — the header's right button, the Up next's second card, the strip's
+  chevron and the composer's send off the phone. Evidence: `visual/repair-S2.md`
+  (VIS-X-1); reproduced on `6adce71` before any S2 edit, gone with the section
+  clipped.
+
+### Log
+- 2026-09-30 review-S2.md read; the seven findings verified against the shots 07 / 09 / 12 / 22, the mockups and 11.3 / 11.4 / 11.6 / 11.8 / 11.9.3 / 1.2
+- 2026-09-30 edits: UpNext.tsx, ClubEmpty.tsx, RoomChips.tsx, EventAbout.tsx, ClubSpace.tsx; tsc 0, eslint 0
+- 2026-09-30 re-shoot 1 against the running 3111 (S1's server, then gone): every club screen 409 wide → measured → S1's week bloom (R8); harness copy patched to clip the section; own fake on 54321 + next dev 3121
+- 2026-09-30 re-shoot 2 at 375: 22, 12, 09 / 10 as planned; 07 still `Tonight · 9:30 …` at the review's 11.5/−0.15/gap 4 (149.7 in 146, measured) → 3px gaps + `7px 8px` (148.7 in 150) → re-shoot 3: whole
+- 2026-09-30 gates: typecheck 0 (the corrupt dev routes.d.ts moved aside), npm test 1639/1639, eslint 0; repair-S2.md + repair-S2/ (8 shots) written; committing `fix(chat): W2-S2 visual repairs`

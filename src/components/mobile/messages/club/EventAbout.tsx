@@ -85,6 +85,8 @@ function StatePill({ event, now }: { event: EventAboutProps["event"]; now: Date 
 export function EventAbout({ event, night, now, onRsvp }: EventAboutProps) {
   const t = palette(night);
   const live = event.state === "live";
+  // A closed chat: the pill still reads the RSVP but opens nothing (11.8 hides a closed card's pills; VIS-S2-5).
+  const closed = event.state === "closed";
   const tile: React.CSSProperties = {
     display: "flex",
     flexDirection: "column",
@@ -145,7 +147,7 @@ export function EventAbout({ event, night, now, onRsvp }: EventAboutProps) {
         <span style={{ minWidth: 0, fontSize: 14, fontWeight: 700, whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>
           {event.going_count} going <span style={{ fontSize: 13, fontWeight: 600, color: t.muted }}>· {event.maybe_count} maybe</span>
         </span>
-        <button type="button" aria-label={pill.label} onClick={onRsvp} style={{ marginLeft: "auto", flexShrink: 0, height: 44, padding: 0, border: "none", background: "transparent", fontFamily: "inherit", cursor: "pointer", display: "flex", alignItems: "center", WebkitTapHighlightColor: "transparent" }}>
+        <button type="button" aria-label={pill.label} aria-disabled={closed || undefined} onClick={closed ? undefined : onRsvp} style={{ marginLeft: "auto", flexShrink: 0, height: 44, padding: 0, border: "none", background: "transparent", fontFamily: "inherit", cursor: closed ? "default" : "pointer", display: "flex", alignItems: "center", WebkitTapHighlightColor: "transparent" }}>
           <span style={{ height: 34, boxSizing: "border-box", padding: event.viewer_status ? "0 12px 0 8px" : "0 14px", borderRadius: 999, border: event.viewer_status === "going" ? "1px solid rgba(255,92,53,0.50)" : `1px solid ${t.hairline}`, background: event.viewer_status === "going" ? "rgba(255,92,53,0.16)" : t.surface, color: t.ink, fontSize: 13, fontWeight: 700, display: "inline-flex", alignItems: "center", gap: 6 }}>
             {event.viewer_status === "going" ? (
               <span aria-hidden="true" style={{ width: 18, height: 18, flexShrink: 0, borderRadius: 999, background: t.coral, color: "#140806", display: "flex", alignItems: "center", justifyContent: "center" }}>

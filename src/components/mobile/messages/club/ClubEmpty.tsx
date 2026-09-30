@@ -14,6 +14,10 @@ import { FONT, palette, SERIF } from "../v2-tokens";
  * event` (→ `/campus?tab=events`), 3 `Invite your members` (→
  * `/orgs/<handle>`). The header stays the one of every club screen (11.3;
  * MK:16.10), the Up next block shows its dashed button (UpNext.tsx).
+ *
+ * Rendered as `RoomThread`'s `emptyBlock`, inside its list box (`8px 12px 8px`),
+ * so the section adds 4px: 16px from the edge and 12px at the bottom, the
+ * mockup's `0 16px 12px` (VIS-S2-3).
  */
 export type ClubEmptyProps = {
   orgHandle: string;
@@ -67,7 +71,7 @@ export function ClubEmpty({ orgHandle, night, onPostWelcome }: ClubEmptyProps) {
     textOverflow: "ellipsis",
   };
   return (
-    <section aria-labelledby="lounge-start-heading" style={{ boxSizing: "border-box", padding: "16px 16px 12px", display: "flex", flexDirection: "column", fontFamily: FONT }}>
+    <section aria-labelledby="lounge-start-heading" style={{ boxSizing: "border-box", padding: "16px 4px 4px", display: "flex", flexDirection: "column", fontFamily: FONT }}>
       <h2 id="lounge-start-heading" style={{ margin: 0, fontFamily: SERIF, fontWeight: 700, fontSize: 22, lineHeight: 1.15, letterSpacing: -0.4, color: t.ink }}>
         It&rsquo;s just you so far.
       </h2>

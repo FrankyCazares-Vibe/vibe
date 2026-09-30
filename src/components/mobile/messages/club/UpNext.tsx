@@ -14,9 +14,14 @@ import { isHot, rsvpWord, upNextAriaLabel, upNextLine } from "./helpers";
  *
  * `up_next.slice(0, 2)` in a 2-column grid of 50px cards (the third event is
  * reachable by its chip; SCREENS-L6): line 1 `eventTime` (`Live now` when
- * live) + the RSVP mark when the viewer RSVP'd, line 2 the title; at 375px
- * the time stays whole and the RSVP mark yields (the check keeps the shape,
- * the `aria-label` the word; S2-notes.md STOPPED 10). The live
+ * live) + ` · ` + the RSVP mark when the viewer RSVP'd, line 2 the title.
+ * At 375 a card is 167.5px outside; the mockup's 12px line with 5px gaps in
+ * `7px 10px` does not hold `Tonight · 9:30 PM · ● Maybe` (≈160 in 146), so
+ * line 1 is 11.5px/600 at -0.15 tracking with 3px gaps in `7px 8px` (150
+ * inside; measured 148.7 in DM Sans; VIS-S2-1), and the RSVP word is never
+ * cut: the separator, the mark and the word keep their width, the time span
+ * ellipsises in the rare overlong case (`Tomorrow · 7:30 P… · ● Maybe`); the
+ * `aria-label` carries the whole line either way. The live
  * chrome only on `state === "live"` or `isSoon` (SCREENS-M2); the `Soon`
  * ring only when `isSoon`; every other card the quiet chrome. The bloom
  * behind the block only when a DRAWN card is hot. A tap opens the event chat
@@ -104,14 +109,14 @@ export function UpNext({ clubName, events, night, now, officerEmpty, onOpenEvent
           const tappable = e.room_id !== null;
           const inner = (
             <>
-              <span style={{ display: "flex", alignItems: "center", gap: 5, fontSize: 12, fontWeight: 600, lineHeight: "15px", color: t.secondary, whiteSpace: "nowrap", overflow: "hidden" }}>
-                <span style={{ flexShrink: 0 }}>{upNextLine(e, now)}</span>
+              <span style={{ display: "flex", alignItems: "center", gap: 3, fontSize: 11.5, fontWeight: 600, lineHeight: "15px", letterSpacing: -0.15, color: t.secondary, whiteSpace: "nowrap", overflow: "hidden" }}>
+                <span style={{ minWidth: 0, overflow: "hidden", textOverflow: "ellipsis" }}>{upNextLine(e, now)}</span>
                 {word ? (
                   <>
                     <span aria-hidden="true" style={{ flexShrink: 0, color: t.muted }}>·</span>
-                    <span style={{ display: "inline-flex", alignItems: "center", gap: word === "Going" ? 3 : 4, fontWeight: 700, color: word === "Going" ? t.coralMark : t.secondary, minWidth: 0, overflow: "hidden" }}>
+                    <span style={{ flexShrink: 0, display: "inline-flex", alignItems: "center", gap: word === "Going" ? 3 : 4, fontWeight: 700, color: word === "Going" ? t.coralMark : t.secondary }}>
                       <span style={{ flexShrink: 0, display: "inline-flex" }}>{word === "Going" ? <Check color={t.coralMark} /> : <span aria-hidden="true" style={{ width: 6, height: 6, borderRadius: 999, background: t.muted }} />}</span>
-                      <span style={{ minWidth: 0, overflow: "hidden", textOverflow: "ellipsis" }}>{word}</span>
+                      <span>{word}</span>
                     </span>
                   </>
                 ) : null}
@@ -131,7 +136,7 @@ export function UpNext({ clubName, events, night, now, officerEmpty, onOpenEvent
             height: 50,
             minWidth: 0,
             boxSizing: "border-box",
-            padding: "7px 10px",
+            padding: "7px 8px",
             borderRadius: 18,
             border: `1px solid ${chrome.border}`,
             background: chrome.bg,
