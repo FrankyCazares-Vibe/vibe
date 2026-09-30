@@ -88,7 +88,8 @@ export function SignupCardView({ card, roomId, messageId, createdAt, author, isM
     else if (r.code === "poll_closed") setClosedLocally(true);
   };
 
-  const pill = (text: string, coral: boolean, spinning: boolean): React.CSSProperties => ({
+  const pill = (coral: boolean): React.CSSProperties => ({
+    position: "relative",
     height: 32,
     boxSizing: "border-box",
     padding: "0 14px",
@@ -101,7 +102,6 @@ export function SignupCardView({ card, roomId, messageId, createdAt, author, isM
     display: "flex",
     alignItems: "center",
     justifyContent: "center",
-    minWidth: spinning ? `${text.length * 7 + 28}px` : undefined,
   });
 
   const actionButton = (option: PollCardOption, kind: "take" | "leave", open: number, coral: boolean) => {
@@ -116,7 +116,14 @@ export function SignupCardView({ card, roomId, messageId, createdAt, author, isM
         onClick={() => void act(option, kind === "take")}
         style={{ marginLeft: "auto", flexShrink: 0, height: 44, padding: 0, border: "none", background: "transparent", fontFamily: "inherit", cursor: blocked ? "default" : "pointer", display: "flex", alignItems: "center", WebkitTapHighlightColor: "transparent" }}
       >
-        <span style={pill(text, coral, spinning)}>{spinning ? <PillSpinner color={coral ? t.coralButton.ink : t.ink} /> : text}</span>
+        <span style={pill(coral)}>
+          <span style={{ visibility: spinning ? "hidden" : "visible" }}>{text}</span>
+          {spinning ? (
+            <span style={{ position: "absolute", inset: 0, display: "flex", alignItems: "center", justifyContent: "center" }}>
+              <PillSpinner color={coral ? t.coralButton.ink : t.ink} />
+            </span>
+          ) : null}
+        </span>
       </button>
     );
   };

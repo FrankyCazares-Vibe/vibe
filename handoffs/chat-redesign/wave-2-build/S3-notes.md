@@ -239,3 +239,12 @@ imports `CardTray`, `CardTrayKind`, `ComposeSheets`; `RoomThread` and
 - 2026-09-30T08:55:50Z cards/CardBubble.tsx part 1 (props, helpers, HeaderLine) rewritten
 - 2026-09-30T08:56:21Z cards/CardBubble.tsx part 2 (dispatch, aria-live span, the box per type) written; typecheck + eslint on the cards files
 - 2026-09-30T08:57:40Z renderers: typecheck 0, eslint 0, npm test 1637/1637; committing
+- 2026-09-30T08:59:27Z COMMITTED 65c38ed feat(chat): the three card renderers and the card rules (wave 2, W2-S3); starting compose/CardSheet.tsx
+- 2026-09-30T08:59:27Z compose/CardSheet.tsx part 1 (useCardPost, props) written
+- 2026-09-30T09:00:07Z compose/CardSheet.tsx part 2 (the chrome, icons, fieldStyle, FieldLabel, Counter) written
+- 2026-09-30T09:00:50Z compose/CardSheet.tsx part 3 (AddButton, RemoveButton, Switch) written; starting NewPollSheet
+- 2026-09-30T09:00:51Z compose/NewPollSheet.tsx written
+- 2026-09-30T09:02:08Z compose/NewSignupSheet.tsx written
+- 2026-09-30T09:02:08Z compose/ShareEventSheet.tsx written
+- 2026-09-30T09:02:08Z compose/ComposeSheets.tsx filled (mounts the three sheets by kind); typecheck + eslint
+- 2026-09-30T09:03:35Z sheets: typecheck 0, eslint 0 (no warnings after copying the + ref at mount), npm test 1637/1637; committing
