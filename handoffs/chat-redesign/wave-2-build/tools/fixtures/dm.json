@@ -1,0 +1,69 @@
+{
+  "ok": true,
+  "messages": [
+    {
+      "id": "bbbbbbbb-0000-4000-8000-000000000001",
+      "content": "Message 1",
+      "created_at": "2026-10-08T20:01:00.123456+00:00",
+      "user_id": "aaaaaaaa-0000-4000-8000-000000000002",
+      "attachment_id": null,
+      "attachment_kind": null,
+      "media_url": null,
+      "media_kind": null,
+      "parent_message_id": null,
+      "users": {
+        "id": "aaaaaaaa-0000-4000-8000-000000000002",
+        "handle": "blake",
+        "name": "Blake",
+        "avatar_url": null
+      },
+      "attachment": null,
+      "parent_preview": null,
+      "reactions": [],
+      "kind": "text",
+      "thread_root_id": null,
+      "card": null,
+      "reply_count": null,
+      "author_role": null,
+      "hidden": false,
+      "removed": null
+    },
+    {
+      "id": "bbbbbbbb-0000-4000-8000-000000000002",
+      "content": "Message 2",
+      "created_at": "2026-10-08T20:02:00.123456+00:00",
+      "user_id": "aaaaaaaa-0000-4000-8000-000000000001",
+      "attachment_id": null,
+      "attachment_kind": null,
+      "media_url": "/api/me/threads/cccccccc-0000-4000-8000-000000000004/messages/bbbbbbbb-0000-4000-8000-000000000002/media",
+      "media_kind": "image",
+      "parent_message_id": null,
+      "users": {
+        "id": "aaaaaaaa-0000-4000-8000-000000000001",
+        "handle": "viewer",
+        "name": "Viewer",
+        "avatar_url": null
+      },
+      "attachment": null,
+      "parent_preview": null,
+      "reactions": [],
+      "kind": "text",
+      "thread_root_id": null,
+      "card": null,
+      "reply_count": null,
+      "author_role": null,
+      "hidden": false,
+      "removed": null
+    }
+  ],
+  "viewer_id": "aaaaaaaa-0000-4000-8000-000000000001",
+  "peer_last_read_at": "2026-10-08T20:03:00.123456+00:00",
+  "peer_typing": [],
+  "room": null,
+  "viewer": {
+    "role": null,
+    "can_post": true,
+    "can_reply": false,
+    "can_moderate": false
+  }
+}
