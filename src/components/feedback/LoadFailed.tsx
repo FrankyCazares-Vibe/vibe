@@ -123,7 +123,10 @@ export function LoadFailed({
             borderRadius: 999,
             border: "none",
             background: "#FF5C35",
-            color: "#FAF7F2",
+            // The app's coral-button ink (wave-2 contract 11.0): 6.4:1 on the
+            // coral at 13px / 12px; the cream it replaced was 2.9:1 (VIS-S1-3,
+            // INT-ADJUDICATE-10). App-wide: every Retry pill, both tones.
+            color: "#140806",
             fontFamily: "DM Sans, sans-serif",
             fontSize: compact ? 12 : 13,
             fontWeight: 700,

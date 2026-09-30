@@ -100,7 +100,11 @@ chip's `rgba(255,92,53,0.14)` tint is 4.01:1 in Light). Both now use
 - The skeleton bars (`rgba(var(--scrim-rgb),0.06/0.08/0.05)`), the bottom
   fade and the bloom carry no text.
 - `LoadFailed` draws its own tones (`tone={night ? "dark" : "light"}`); its
-  pairs are that component's, unchanged here.
+  pairs are that component's. One changed at integration (VIS-S1-3,
+  INT-ADJUDICATE-10): the coral Retry pill's ink is `#140806` (the app's
+  coral-button ink, 11.0), 13px / 12px compact, need 4.5:1 — `#140806` on
+  `#FF5C35` = **6.40** in both tones (the cream `#FAF7F2` it replaced was
+  2.88). App-wide: every `LoadFailed` Retry pill, the old screens' too.
 - The old list (`MessagesMobileV1`) and the bare header while the flag is
   unknown (`FlagPending`, 28px/900 `--charcoal` on today's translucent cream)
   are today's pairs, untouched.
