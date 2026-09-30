@@ -292,3 +292,4 @@ Where a reviewer should look first: `compose/CardSheet.tsx` `useCardPost`
 STOPPED entries above (1: reactions on cards have no handler in the pinned
 props; 2: the Officers caption; 3: the `content_blocked` toast line).
 - 2026-09-30T09:04:42Z build exit 0 (attempt 1); S3-gate.md part 2 and the Built summary written; committing the docs
+- 2026-09-30T09:04:59Z COMMITTED db5cb2c docs(chat): S3 gate record part 2, notes, STOPPED and REQUESTS (wave 2, W2-S3). W2-S3 main batch done: commits 65c38ed, 177974d, db5cb2c on top of 36a1ccd / 24ca304.
