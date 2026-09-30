@@ -32,3 +32,4 @@ Commit plan: (1) the remove route + test; (2) `RemovedContentCard.by`; (3) the b
 
 ## Log
 - Step 1 done: the remove route rewritten to 6.1's ten steps (187 lines); `src/lib/chat/remove-route.test.ts` (27 cases, the decision table against fakes; it lives under `src/lib/chat` because `node --test` reads a `[id]` path as a glob and never finds a test placed next to the route). typecheck 0 errors, eslint 0 on both, 27/27.
+- Step 2 done: `RemovedContentCard.by` (default "moderator"); officer copy `Removed by a club officer.` / `Only you can see this message.`, no reason line, no email, no link; moderator branch byte-identical; the four callers untouched. eslint 0, typecheck 0.

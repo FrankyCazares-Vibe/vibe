@@ -660,6 +660,7 @@ export function RemovedContentCard({
   removedAt,
   removedReason,
   compact = false,
+  by = "moderator",
 }: {
   /** What was removed, for the sentence. */
   kind: "post" | "comment" | "message";
@@ -670,8 +671,17 @@ export function RemovedContentCard({
    *  the text filter — the API never sends one. */
   removedReason?: string | null;
   compact?: boolean;
+  /**
+   * Who removed it (wave-2 contract 6.2). "officer": a club officer or mod
+   * over the remove route — the card says so, shows no reason (an officer's
+   * is null) and offers no email and no Community Guidelines link (a club's
+   * own moderation has no appeal path). Absent or "moderator": today's copy,
+   * unchanged, so every caller that passes nothing keeps it.
+   */
+  by?: "officer" | "moderator";
 }): React.ReactElement | null {
   if (!removedAt) return null;
+  const officer = by === "officer";
   return (
     <div
       style={{
@@ -683,9 +693,9 @@ export function RemovedContentCard({
       }}
     >
       <div style={{ fontSize: compact ? 12.5 : 13.5, fontWeight: 700, color: "var(--charcoal)" }}>
-        Removed by Vibe moderators
+        {officer ? "Removed by a club officer." : "Removed by Vibe moderators"}
       </div>
-      {removedReason ? (
+      {!officer && removedReason ? (
         <div style={{ marginTop: 4, fontSize: 12.5, lineHeight: 1.5, color: "var(--ink-2)" }}>
           {removedReason}
         </div>
@@ -695,12 +705,18 @@ export function RemovedContentCard({
           and the proxy lets a restricted student read it. The email is the
           same one the three static twins carry, so all four surfaces offer the
           author the same way to ask. */}
-      <div style={{ marginTop: 6, fontSize: 12, lineHeight: 1.5, color: "var(--ink-muted)" }}>
-        {`Only you can see this ${kind}. Questions: help@connectvibe.app. `}
-        <a href="/legal/community" style={{ color: "var(--ink-2)", textDecoration: "underline" }}>
-          Community Guidelines
-        </a>
-      </div>
+      {officer ? (
+        <div style={{ marginTop: 6, fontSize: 12, lineHeight: 1.5, color: "var(--ink-muted)" }}>
+          Only you can see this message.
+        </div>
+      ) : (
+        <div style={{ marginTop: 6, fontSize: 12, lineHeight: 1.5, color: "var(--ink-muted)" }}>
+          {`Only you can see this ${kind}. Questions: help@connectvibe.app. `}
+          <a href="/legal/community" style={{ color: "var(--ink-2)", textDecoration: "underline" }}>
+            Community Guidelines
+          </a>
+        </div>
+      )}
     </div>
   );
 }
