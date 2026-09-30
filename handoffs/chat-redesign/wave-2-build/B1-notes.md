@@ -43,3 +43,6 @@ Facts: `wave-2-asis/database-map.md` (DM), migration A `supabase/migrations/2026
 ## Log
 - 2026-09-30T05:50:49Z notes written; no file edited yet
 - 2026-09-30T05:51:43Z tools/sql-parse.mjs written (79 lines); calibrated: A = 60 statements, 6 plpgsql functions, 6 DO blocks parse; rooms-check with --strip-psql parses; two broken files exit 1 with the line
+- 2026-09-30T05:51:44Z commit 1: 637f20e tool + notes
+- 2026-09-30T06:00:04Z migration B: header, PRE-FLIGHT, steps 1, 3, 4, 5 written (909 lines); parses
+- 2026-09-30T06:08:09Z migration B complete: 1,690 lines; parse gate exit 0 (47 statements, 5 plpgsql functions, 5 DO blocks); the six contract SQL blocks verified verbatim by a node diff
