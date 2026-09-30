@@ -768,7 +768,7 @@
       if (m.created_at) lastIsoForSep = m.created_at;
       const gb = m.senderId !== lastSender;
       const showAv = !m.mine && (gb || i === 0);
-      const gc = gb && i > 0 ? " gt" : "";
+      const gc = gb && lastSender !== null ? " gt" : "";
       let av;
       if (m.senderAvatar) {
         av = `<div class="vmm-msg-av${showAv ? "" : " h"}" style="background:${avBg(m.senderHandle || m.senderId)}"><img src="${esc(m.senderAvatar)}" alt=""></div>`;

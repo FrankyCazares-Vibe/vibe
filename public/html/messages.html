@@ -1437,7 +1437,7 @@ function renderMsgs(msgs,d){
     // In groups, break on sender change; in 1:1s, break on side change.
     const senderKey = mine ? '__me' : (m.senderName || (isGroup ? 'unknown' : '__peer'));
     const gb = isGroup ? (senderKey !== lastSenderId) : (last !== mine);
-    const showAv=!mine&&(gb||i===0);const gc=gb&&i>0?' gt':'';
+    const showAv=!mine&&(gb||i===0);const gc=gb&&lastSenderId!==null?' gt':'';
     // Group + sender break + not mine → render a small "Name" header above the bubble.
     if (isGroup && !mine && gb && m.senderName) {
       h += '<div style="font-size:10.5px;color:var(--muted);font-weight:600;margin:0 0 2px 50px;">' + __dmEsc(m.senderName) + '</div>';
