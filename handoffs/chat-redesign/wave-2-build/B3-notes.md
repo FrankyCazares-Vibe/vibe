@@ -23,10 +23,10 @@ Commit plan: (1) the remove route + test; (2) `RemovedContentCard.by`; (3) the b
 
 ## Implementation notes (decisions a reviewer should see)
 
-- 6.1 step 1b/2: a non-uuid `[id]` — the contract says the cookie read answers 0 rows; PostgREST answers `22P02` for a non-uuid in an `eq` on a uuid column, which today's code turns into a 500. To land on the contract's outcome (`ensureMember` → 403 "Not a member") the cookie read is skipped when `[id]` is not a uuid (`msg = null`), the same 0-row result with one fewer failing query. No name, code or sentence changed.
 - 6.1 step 9: a failed `reports` read (not the missing-column case) is not in the contract; the route fails closed with 503 `try_again` (it never removes over an unread report; it never says `report_open` for a read that failed).
 - 6.1 step 7 / 10: a service read or update that fails answers 503 `try_again`; `isMissingChatSchema` there cannot happen after step 5 (a room was found), so it is folded into the same 503.
-- 12.1 `ConversationView`: `messages` is `MessageRow[] | null` state, so the const reads `(messages ?? []).filter((m) => !m.hidden)`; the JSX branch that maps is only reached with a non-null, non-empty array, so `shown` is exactly the filtered array there. The "Say hi" emptiness still reads `messages` (the old screens: "nothing else").
+- 6.1 step 8 (B3-SECURITY-2 / B3-CONTRACT-3, contract-inherited): `clubRole` reads a failed author-role read as rank 0 (it answers null both for "left" and for a failed `org_members` read, `rooms.ts:339-348`), so on a transient failure of the AUTHOR's read `outranks` is fail-open on rank (the CALLER's read at step 6 fails closed: null → 403). Not exploitable from outside; the contract pins `clubRole` for both reads and "null when they left", and `rooms.ts` is not this batch's. A `{ role, failed }` answer would close it — see REQUESTS.
+- 6.1 step 7 (B3-SECURITY-3): mod on the Officers room, or any room the caller cannot view: 403 `Not a member` from `ensureMember` (same as a channel that does not exist), because `channels_select_org_member` is the same `can_view_org_channel` predicate as `messages_select_org_member`; the step-7 404 ("a live row the caller cannot read") is reached only when the channel is readable and the live row is not (a race between the two reads). The Mac's HTTP row for "mod + Officers room" expects 403, not 404.
 - 12.1 `campus-home.tsx`: the local `ChatMessage` type has no `hidden`; the filter widens the element type inline (`(m: ChatMessage & { hidden?: boolean })`) so the file gets exactly the one hunk the contract names.
 - 12.4: no helper is exported from `threads/route.ts` (a non-handler export from a route file is a build error in Next 16), so the selection rule is documented as manual cases in `B3-gate.md`.
 
@@ -40,7 +40,14 @@ Commit plan: (1) the remove route + test; (2) `RemovedContentCard.by`; (3) the b
 
 ## STOPPED
 
-Nothing. No contradiction between the contract and the code was met in 6.1, 6.2, 6.3, 12.1 or 12.4 (the two small mechanics — the skipped cookie read for a non-uuid `[id]`, and `messages ?? []` in `ConversationView` — are written under "Implementation notes" above; both land on the contract's stated outcome).
+No name, code, sentence, status or column of the contract was changed. The four entries below are contract-level: two places where the contract's mechanism contradicts the code (built to the contract's stated outcome; for the integration review to ratify — moved here from "Implementation notes" after B3-CONTRACT-1), one wording gap and one amendment request.
+
+1. Contract mechanism contradicts the code; built to the contract's stated outcome; for the integration review to ratify (6.1 step 1b/2):
+   - 6.1 step 1b/2: a non-uuid `[id]` — the contract says the cookie read answers 0 rows; PostgREST answers `22P02` for a non-uuid in an `eq` on a uuid column, which today's code turns into a 500. To land on the contract's outcome (`ensureMember` → 403 "Not a member") the cookie read is skipped when `[id]` is not a uuid (`msg = null`), the same 0-row result with one fewer failing query. No name, code or sentence changed.
+2. Contract mechanism contradicts the code; built to the contract's stated outcome; for the integration review to ratify (12.1, the pinned literal `const shown = messages.filter((m) => !m.hidden);` does not typecheck):
+   - 12.1 `ConversationView`: `messages` is `MessageRow[] | null` state, so the const reads `(messages ?? []).filter((m) => !m.hidden)`; the JSX branch that maps is only reached with a non-null, non-empty array, so `shown` is exactly the filtered array there. The "Say hi" emptiness still reads `messages` (the old screens: "nothing else").
+3. B3-CONTRACT-4 (wording gap, section 0 row 4 vs 6.1 step 3): with the flag off a caller who is NOT a member of a dm / group (RLS hides the row; today 404 "Message not found") now reads 403 "Not a member" from `ensureMember`, and so does a caller whose `[id]` cannot be read at all. Row 4 names only "a dm/group non-sender reads 403 `not_allowed`". The code is what 6.1 says; DEFERRED to the integration review: row 4 should gain "; a caller who is not a member of the dm / group reads 403 \"Not a member\" (was 404)". No code change.
+4. B3-BEHAVIOUR-1 (cosmetic, needs 12.1 amended): in `messages.html:1440` (`const gc=gb&&i>0?' gt':'';`) and `_miniMessenger.js:771` (`const gc = gb && i > 0 ? " gt" : "";`) `i` indexes the UNFILTERED array, so when the page's oldest row is a stub the first visible bubble carries the `gt` group-top margin (24 px / 14 px) it never carries otherwise. Verified real. The fix is a third changed line in each file (`gb&&lastSenderId!==null` / `gb && lastSender !== null`), which 12.1 forbids ("two lines"; "No other change to those files"). DEFERRED: the integration review amends 12.1 to three lines for these two files or accepts the margin. `ChannelChat` and `ConversationView` index the filtered array and are right.
 
 ## SIBLING
 
@@ -48,4 +55,12 @@ Nothing standing. One transient typecheck error and one transient test failure c
 
 ## REQUESTS
 
-None.
+- To the integration review / the after-launch list (B3-CONTRACT-3 / B3-SECURITY-2; `src/lib/chat/rooms.ts`, not this batch's): give `clubRole` a `{ role, failed }` answer (or a sibling `clubRoleOrFailed`) so 6.1 step 8 can answer 503 `try_again` on a failed author-role read, the way step 5 does for `roomOf`. Until then a failed `org_members` read is logged once (`logFailureOnce`) and ranks the author 0 — accepted for v1 by both reviewers.
+
+## Repair after review (one pass; the three reviews `B3-review-{contract,security,behaviour}.md`)
+
+Plan: (1) verify each of the eight findings against the tree and the contract; (2) FIX B3-CONTRACT-2 (MEDIUM) with `src/lib/chat/members-guard.test.ts`, the 6.3 harness on the remove-route resolve-hook pattern; (3) FIX the documentation findings (B3-CONTRACT-1 placement, B3-SECURITY-1 gate wording, B3-SECURITY-2 / -3 notes lines); (4) DEFER B3-CONTRACT-3 / -4 and B3-BEHAVIOUR-1 (each needs `rooms.ts` or a contract amendment); (5) gates; (6) commit `fix(chat): W2-B3 repair after review`; (7) `B3-repair.md`.
+- Repair step 1 done: the eight findings verified (all real as described; none rejected). B3-BEHAVIOUR-1 confirmed by reading `messages.html:1440` / `_miniMessenger.js:771` (`i` is the unfiltered index); B3-CONTRACT-2 confirmed (`grep -rn room_locked src --include=*.test.ts` names only `room-rules.test.ts`).
+- Repair step 2 done: `src/lib/chat/members-guard.test.ts` (16 cases, the 6.3 decision table against a faked `loadClubOfficer` / `requireNotRestricted` / cookie client; `node --test` 16/16).
+- Repair step 3 done: the two contradiction paragraphs moved under STOPPED (B3-CONTRACT-1), the SECURITY-2 and SECURITY-3 lines under Implementation notes, the CONTRACT-3 request under REQUESTS, the CONTRACT-4 and BEHAVIOUR-1 deferrals under STOPPED; `B3-gate.md` 12.4 window sentence reworded (B3-SECURITY-1) and the 6.3 harness row added.
+- Repair gates: typecheck 0; `npm test` 1575/1575; build exit 0 (first attempt); eslint exit 0 on the owned files + the new test, parity held for `campus-home.tsx` (0 E / 6 W) and `_miniMessenger.js` (0 E / 4 W). `B3-repair.md` written. Committing `fix(chat): W2-B3 repair after review`.
