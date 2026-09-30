@@ -46,3 +46,5 @@ Facts: `wave-2-asis/database-map.md` (DM), migration A `supabase/migrations/2026
 - 2026-09-30T05:51:44Z commit 1: 637f20e tool + notes
 - 2026-09-30T06:00:04Z migration B: header, PRE-FLIGHT, steps 1, 3, 4, 5 written (909 lines); parses
 - 2026-09-30T06:08:09Z migration B complete: 1,690 lines; parse gate exit 0 (47 statements, 5 plpgsql functions, 5 DO blocks); the six contract SQL blocks verified verbatim by a node diff
+- 2026-09-30T06:08:10Z commit 2: bc19a18 migration B
+- 2026-09-30T06:12:20Z seed addition spliced into scripts/local-seed.mjs (113 lines: detectCards 42P01/PGRST205, findCard by kind + content, seedClubCards; called after seedClubChat); node --check ok; eslint exit 0

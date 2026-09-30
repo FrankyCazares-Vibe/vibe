@@ -631,6 +631,118 @@ async function seedClubChat(users, systems, clubs) {
 }
 
 // ---------------------------------------------------------------------------
+// Club chat cards (wave 2, migration 20261001110000_chat_v2_cards; contract
+// handoffs/chat-redesign/wave-2-contracts.md 13.2, DATABASE-L9): one poll,
+// one sign-up and one Event card in chat_seed_club's Lounge, written through
+// the migration's functions the way the card route does (the service role,
+// after the route's gates: the seed's accounts pass can_publish_now() and
+// has_recorded_consent(), which the functions do not check, contract 3.3.1).
+// Migration B is detected by reading chat_polls: 42P01 (no such table) or
+// PGRST205 (PostgREST does not know it) = not applied, skip. Each card is
+// looked up by messages.kind + content in the Lounge before its call and
+// never re-created, so a re-run changes nothing (same UTC day: the Event
+// card's content carries the event's date, and the seed re-dates its
+// events daily).
+// ---------------------------------------------------------------------------
+const CARD_ZONE = "America/Indiana/Indianapolis"; // CAMPUS_TIME_ZONE, src/lib/push/event-notice.ts
+
+/** `Thu Oct 8, 7:30 PM` in the campus zone: eventWhen of src/lib/chat/when.ts, as cardFallbackContent stores it. */
+function eventWhenLabel(iso) {
+  const parts = new Intl.DateTimeFormat("en-US", {
+    timeZone: CARD_ZONE, weekday: "short", month: "short", day: "numeric",
+    hour: "numeric", minute: "numeric", hourCycle: "h23",
+  }).formatToParts(new Date(iso));
+  const get = (type) => parts.find((p) => p.type === type)?.value ?? "";
+  const hour = Number(get("hour"));
+  const minute = Number(get("minute"));
+  const h12 = hour % 12 || 12;
+  const period = hour < 12 ? "AM" : "PM";
+  const clock = minute === 0 ? `${h12} ${period}` : `${h12}:${String(minute).padStart(2, "0")} ${period}`;
+  return `${get("weekday")} ${get("month")} ${get("day")}, ${clock}`;
+}
+
+/** The stored fallback text (src/lib/chat/cards/fallback.ts): whitespace collapsed, at most 300 characters. */
+function cardContent(text) {
+  const chars = Array.from(text.replace(/\s+/g, " ").trim());
+  return chars.length <= 300 ? chars.join("") : `${chars.slice(0, 299).join("")}…`;
+}
+
+const SEED_CARDS = [
+  { type: "poll", author: "B", question: "Pizza or tacos for the cookout?",
+    options: [{ label: "Pizza" }, { label: "Tacos" }], anonymous: false, multi: false },
+  { type: "signup", author: "E", question: "Bring something to Game Night",
+    options: [{ label: "Snacks", capacity: 3 }, { label: "Drinks", capacity: 2 }, { label: "Board games", capacity: 4 }] },
+  { type: "event", author: "A", title: "Chat Seed Game Night", note: "Rides leave from the union at 6:30." },
+];
+
+/** Has migration B (20261001110000_chat_v2_cards) been applied here? */
+async function detectCards() {
+  const { error } = await admin.from("chat_polls").select("message_id").limit(1);
+  if (!error) return true;
+  if (error.code === "42P01" || error.code === "PGRST205") return false;
+  console.error("\nFailed: detect chat_polls\n", error);
+  process.exit(1);
+}
+
+/** A card of the Lounge by kind + content: an existing one is left untouched. */
+async function findCard(channelId, kind, content) {
+  const found = must(
+    await admin.from("messages").select("id").eq("channel_id", channelId).eq("kind", kind).eq("content", content)
+      .order("created_at").limit(1),
+    `look up card "${content}"`,
+  );
+  return found.length > 0 ? found[0].id : null;
+}
+
+async function seedClubCards(users, clubs) {
+  if (!HAS_KIND) return; // migration B needs A
+  if (!(await detectCards())) {
+    console.log("Club chat cards: migration B is not applied (chat_polls is missing). Skipped.");
+    return;
+  }
+  const loungeId = await findRoom(clubs.chat_seed_club, LOUNGE);
+  if (!loungeId) {
+    console.error("\nFailed: chat_seed_club has no lounge room to put the cards in");
+    process.exit(1);
+  }
+  const made = {};
+  for (const card of SEED_CARDS) {
+    if (card.type === "event") {
+      const found = must(
+        await admin.from("events").select("id, title, starts_at").eq("org_id", clubs.chat_seed_club).eq("title", card.title).limit(1),
+        `look up event ${card.title}`,
+      );
+      if (found.length === 0) {
+        console.error(`\nFailed: chat_seed_club has no event titled "${card.title}" for the Event card`);
+        process.exit(1);
+      }
+      const content = cardContent(`Event: ${found[0].title} · ${eventWhenLabel(found[0].starts_at)} — ${card.note}`);
+      made["event card"] =
+        (await findCard(loungeId, "event_card", content)) ??
+        must(
+          await admin.rpc("chat_create_event_card", {
+            p_channel: loungeId, p_user: users[card.author], p_event: found[0].id, p_note: card.note, p_content: content,
+          }),
+          `chat_create_event_card "${card.title}"`,
+        );
+      continue;
+    }
+    const content = cardContent(`${card.type === "poll" ? "Poll" : "Sign-up"}: ${card.question}`);
+    made[card.type === "poll" ? "poll" : "sign-up"] =
+      (await findCard(loungeId, "poll", content)) ??
+      must(
+        await admin.rpc("chat_create_poll", {
+          p_channel: loungeId, p_user: users[card.author], p_mode: card.type, p_question: card.question,
+          p_options: card.options, p_anonymous: card.anonymous ?? false, p_multi: card.multi ?? card.type === "signup",
+          p_closes_at: null, p_content: content,
+        }),
+        `chat_create_poll "${card.question}"`,
+      );
+  }
+  console.log("Club chat cards in chat_seed_club's Lounge:", JSON.stringify(made));
+}
+
+// ---------------------------------------------------------------------------
 // Posts. Keyed on (author, content): an existing post is left untouched so
 // the posts_stamp_edited trigger never marks it edited. The campus and
 // school_system columns are stamped by the posts_stamp_campus trigger.
@@ -919,6 +1031,7 @@ async function main() {
   for (const spec of POSTS) await ensurePost(spec, users, clubs);
   for (const spec of EVENTS) await ensureEvent(spec, users, clubs);
   await seedClubChat(users, systems, clubs);
+  await seedClubCards(users, clubs);
   for (const [from, to] of PERSON_FOLLOWS) await ensurePersonFollow(users[from], users[to]);
 
   await printSummary(users, clubs);
