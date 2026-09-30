@@ -1,0 +1,9 @@
+{
+  "name": "wave-2-visual-tools",
+  "private": true,
+  "type": "module",
+  "description": "The visual pass harness for the wave-2 chat screens: a fake Supabase, fixtures and the Playwright shooter. Install here, never in the repo.",
+  "dependencies": {
+    "playwright": "1.55.1"
+  }
+}

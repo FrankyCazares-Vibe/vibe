@@ -1,0 +1,131 @@
+{
+  "ok": true,
+  "card": {
+    "type": "poll",
+    "question": "Playlist for tonight?",
+    "anonymous": false,
+    "multi": false,
+    "closes_at": null,
+    "closed": false,
+    "total_voters": 14,
+    "options": [
+      {
+        "id": "o-bachata",
+        "label": "Bachata-heavy",
+        "count": 5,
+        "capacity": null,
+        "full": false,
+        "mine": false,
+        "voters": [
+          {
+            "id": "aaaaaaaa-0003-4000-8000-000000000003",
+            "handle": "jay",
+            "name": "Jay Kim",
+            "avatar_url": null
+          },
+          {
+            "id": "aaaaaaaa-0004-4000-8000-000000000004",
+            "handle": "maya",
+            "name": "Maya Reyes",
+            "avatar_url": null
+          },
+          {
+            "id": "aaaaaaaa-0005-4000-8000-000000000005",
+            "handle": "sam",
+            "name": "Sam Torres",
+            "avatar_url": null
+          },
+          {
+            "id": "aaaaaaaa-0006-4000-8000-000000000006",
+            "handle": "ava",
+            "name": "Ava Lee",
+            "avatar_url": null
+          },
+          {
+            "id": "aaaaaaaa-0002-4000-8000-000000000002",
+            "handle": "priya",
+            "name": "Priya Shah",
+            "avatar_url": null
+          }
+        ],
+        "voters_more": 0
+      },
+      {
+        "id": "o-classic",
+        "label": "Classic salsa",
+        "count": 7,
+        "capacity": null,
+        "full": false,
+        "mine": true,
+        "voters": [
+          {
+            "id": "11111111-1111-4111-8111-111111111111",
+            "handle": "harness",
+            "name": "Harness Student",
+            "avatar_url": null
+          },
+          {
+            "id": "aaaaaaaa-0001-4000-8000-000000000001",
+            "handle": "dana",
+            "name": "Dana Ortiz",
+            "avatar_url": null
+          },
+          {
+            "id": "aaaaaaaa-0002-4000-8000-000000000002",
+            "handle": "priya",
+            "name": "Priya Shah",
+            "avatar_url": null
+          },
+          {
+            "id": "aaaaaaaa-0003-4000-8000-000000000003",
+            "handle": "jay",
+            "name": "Jay Kim",
+            "avatar_url": null
+          },
+          {
+            "id": "aaaaaaaa-0004-4000-8000-000000000004",
+            "handle": "maya",
+            "name": "Maya Reyes",
+            "avatar_url": null
+          },
+          {
+            "id": "aaaaaaaa-0005-4000-8000-000000000005",
+            "handle": "sam",
+            "name": "Sam Torres",
+            "avatar_url": null
+          },
+          {
+            "id": "aaaaaaaa-0006-4000-8000-000000000006",
+            "handle": "ava",
+            "name": "Ava Lee",
+            "avatar_url": null
+          }
+        ],
+        "voters_more": 0
+      },
+      {
+        "id": "o-mix",
+        "label": "Mix it up",
+        "count": 2,
+        "capacity": null,
+        "full": false,
+        "mine": false,
+        "voters": [
+          {
+            "id": "aaaaaaaa-0004-4000-8000-000000000004",
+            "handle": "maya",
+            "name": "Maya Reyes",
+            "avatar_url": null
+          },
+          {
+            "id": "aaaaaaaa-0006-4000-8000-000000000006",
+            "handle": "ava",
+            "name": "Ava Lee",
+            "avatar_url": null
+          }
+        ],
+        "voters_more": 0
+      }
+    ]
+  }
+}

@@ -1,0 +1,70 @@
+{
+  "ok": true,
+  "message": {
+    "id": "eeeeeeee-0036-4000-8000-000000000036",
+    "content": "Poll: (from the harness)",
+    "created_at": "2026-09-30T10:45:40.685Z",
+    "user_id": "11111111-1111-4111-8111-111111111111",
+    "attachment_id": null,
+    "attachment_kind": null,
+    "media_url": null,
+    "media_kind": null,
+    "parent_message_id": null,
+    "users": {
+      "id": "11111111-1111-4111-8111-111111111111",
+      "handle": "harness",
+      "name": "Harness Student",
+      "avatar_url": null
+    },
+    "attachment": null,
+    "parent_preview": null,
+    "reactions": [],
+    "kind": "poll",
+    "thread_root_id": null,
+    "card": {
+      "type": "poll",
+      "question": "Harness poll",
+      "anonymous": false,
+      "multi": false,
+      "closes_at": null,
+      "closed": false,
+      "total_voters": 0,
+      "options": [
+        {
+          "id": "o-bachata",
+          "label": "Bachata-heavy",
+          "count": 0,
+          "capacity": null,
+          "full": false,
+          "mine": false,
+          "voters": [],
+          "voters_more": 0
+        },
+        {
+          "id": "o-classic",
+          "label": "Classic salsa",
+          "count": 0,
+          "capacity": null,
+          "full": false,
+          "mine": false,
+          "voters": [],
+          "voters_more": 0
+        },
+        {
+          "id": "o-mix",
+          "label": "Mix it up",
+          "count": 0,
+          "capacity": null,
+          "full": false,
+          "mine": false,
+          "voters": [],
+          "voters_more": 0
+        }
+      ]
+    },
+    "reply_count": null,
+    "author_role": "admin",
+    "hidden": false,
+    "removed": null
+  }
+}

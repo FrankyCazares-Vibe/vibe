@@ -1,0 +1,59 @@
+{
+  "ok": true,
+  "entries": [
+    {
+      "kind": "rsvp",
+      "id": "dddddddd-0004-4000-8000-000000000004",
+      "title": "Open Practice",
+      "starts_at": "2026-10-06T23:00:00.000Z",
+      "ends_at": "2026-10-07T00:30:00.000Z",
+      "location": "Studio B",
+      "color": "#FF5C35",
+      "viewer_status": "going",
+      "org": {
+        "handle": "salsa-club",
+        "name": "Salsa Club",
+        "verified": true
+      },
+      "org_id": "bbbbbbbb-0001-4000-8000-000000000001",
+      "room_id": "cccccccc-0005-4000-8000-000000000005",
+      "room_state": "after"
+    },
+    {
+      "kind": "rsvp",
+      "id": "dddddddd-0001-4000-8000-000000000001",
+      "title": "Fall Formal",
+      "starts_at": "2026-10-08T21:42:00.000Z",
+      "ends_at": "2026-10-09T00:42:00.000Z",
+      "location": "Alumni Hall",
+      "color": "#FF5C35",
+      "viewer_status": "going",
+      "org": {
+        "handle": "salsa-club",
+        "name": "Salsa Club",
+        "verified": true
+      },
+      "org_id": "bbbbbbbb-0001-4000-8000-000000000001",
+      "room_id": "cccccccc-0004-4000-8000-000000000004",
+      "room_state": "live"
+    },
+    {
+      "kind": "rsvp",
+      "id": "dddddddd-0002-4000-8000-000000000002",
+      "title": "Late Night Social",
+      "starts_at": "2026-10-09T01:30:00.000Z",
+      "ends_at": "2026-10-09T03:30:00.000Z",
+      "location": "Union Basement",
+      "color": "#FF5C35",
+      "viewer_status": "maybe",
+      "org": {
+        "handle": "salsa-club",
+        "name": "Salsa Club",
+        "verified": true
+      },
+      "org_id": "bbbbbbbb-0001-4000-8000-000000000001",
+      "room_id": "cccccccc-0006-4000-8000-000000000006",
+      "room_state": "soon"
+    }
+  ]
+}

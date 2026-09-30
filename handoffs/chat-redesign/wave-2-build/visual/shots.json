@@ -1,0 +1,372 @@
+{
+  "now": "2026-10-08T22:12:00.000Z",
+  "realTime": false,
+  "shots": [
+    {
+      "file": "01-home-all-light.png",
+      "state": "01-home-all",
+      "theme": "light",
+      "note": ""
+    },
+    {
+      "file": "01-home-all-night.png",
+      "state": "01-home-all",
+      "theme": "night",
+      "note": ""
+    },
+    {
+      "file": "02-home-chats-light.png",
+      "state": "02-home-chats",
+      "theme": "light",
+      "note": ""
+    },
+    {
+      "file": "02-home-chats-night.png",
+      "state": "02-home-chats",
+      "theme": "night",
+      "note": ""
+    },
+    {
+      "file": "03-home-clubs-light.png",
+      "state": "03-home-clubs",
+      "theme": "light",
+      "note": ""
+    },
+    {
+      "file": "03-home-clubs-night.png",
+      "state": "03-home-clubs",
+      "theme": "night",
+      "note": ""
+    },
+    {
+      "file": "04-home-requests-light.png",
+      "state": "04-home-requests",
+      "theme": "light",
+      "note": ""
+    },
+    {
+      "file": "04-home-requests-night.png",
+      "state": "04-home-requests",
+      "theme": "night",
+      "note": ""
+    },
+    {
+      "file": "05-home-no-clubs-light.png",
+      "state": "05-home-no-clubs",
+      "theme": "light",
+      "note": ""
+    },
+    {
+      "file": "05-home-no-clubs-night.png",
+      "state": "05-home-no-clubs",
+      "theme": "night",
+      "note": ""
+    },
+    {
+      "file": "06-home-empty-week-light.png",
+      "state": "06-home-empty-week",
+      "theme": "light",
+      "note": ""
+    },
+    {
+      "file": "06-home-empty-week-night.png",
+      "state": "06-home-empty-week",
+      "theme": "night",
+      "note": ""
+    },
+    {
+      "file": "07-club-lounge-light.png",
+      "state": "07-club-lounge",
+      "theme": "light",
+      "note": ""
+    },
+    {
+      "file": "07-club-lounge-night.png",
+      "state": "07-club-lounge",
+      "theme": "night",
+      "note": ""
+    },
+    {
+      "file": "08-club-lounge-full-light.png",
+      "state": "08-club-lounge-full",
+      "theme": "light",
+      "note": "the same, 375×2300 so every Lounge row shows: text runs, poll, closed anonymous poll, sign-up, event card, cancelled card, removed own message, quote"
+    },
+    {
+      "file": "08-club-lounge-full-night.png",
+      "state": "08-club-lounge-full",
+      "theme": "night",
+      "note": "the same, 375×2300 so every Lounge row shows: text runs, poll, closed anonymous poll, sign-up, event card, cancelled card, removed own message, quote"
+    },
+    {
+      "file": "09-board-light.png",
+      "state": "09-board",
+      "theme": "light",
+      "note": ""
+    },
+    {
+      "file": "09-board-night.png",
+      "state": "09-board",
+      "theme": "night",
+      "note": ""
+    },
+    {
+      "file": "10-board-fold-open-light.png",
+      "state": "10-board-fold-open",
+      "theme": "light",
+      "note": "the newest post's fold open: 2 replies + a stub, the Reply quietly field"
+    },
+    {
+      "file": "10-board-fold-open-night.png",
+      "state": "10-board-fold-open",
+      "theme": "night",
+      "note": "the newest post's fold open: 2 replies + a stub, the Reply quietly field"
+    },
+    {
+      "file": "11-event-live-light.png",
+      "state": "11-event-live",
+      "theme": "light",
+      "note": ""
+    },
+    {
+      "file": "11-event-live-night.png",
+      "state": "11-event-live",
+      "theme": "night",
+      "note": ""
+    },
+    {
+      "file": "12-event-closed-light.png",
+      "state": "12-event-closed",
+      "theme": "light",
+      "note": ""
+    },
+    {
+      "file": "12-event-closed-night.png",
+      "state": "12-event-closed",
+      "theme": "night",
+      "note": ""
+    },
+    {
+      "file": "13-event-after-light.png",
+      "state": "13-event-after",
+      "theme": "light",
+      "note": ""
+    },
+    {
+      "file": "13-event-after-night.png",
+      "state": "13-event-after",
+      "theme": "night",
+      "note": ""
+    },
+    {
+      "file": "14-tray-light.png",
+      "state": "14-tray",
+      "theme": "light",
+      "note": ""
+    },
+    {
+      "file": "14-tray-night.png",
+      "state": "14-tray",
+      "theme": "night",
+      "note": ""
+    },
+    {
+      "file": "15-new-poll-empty-light.png",
+      "state": "15-new-poll-empty",
+      "theme": "light",
+      "note": "New poll, empty (CTA disabled)"
+    },
+    {
+      "file": "15-new-poll-empty-night.png",
+      "state": "15-new-poll-empty",
+      "theme": "night",
+      "note": "New poll, empty (CTA disabled)"
+    },
+    {
+      "file": "16-new-poll-filled-light.png",
+      "state": "16-new-poll-filled",
+      "theme": "light",
+      "note": "New poll filled: 3 options, Anonymous on, CTA enabled"
+    },
+    {
+      "file": "16-new-poll-filled-night.png",
+      "state": "16-new-poll-filled",
+      "theme": "night",
+      "note": "New poll filled: 3 options, Anonymous on, CTA enabled"
+    },
+    {
+      "file": "17-new-signup-light.png",
+      "state": "17-new-signup",
+      "theme": "light",
+      "note": ""
+    },
+    {
+      "file": "17-new-signup-night.png",
+      "state": "17-new-signup",
+      "theme": "night",
+      "note": ""
+    },
+    {
+      "file": "18-share-event-light.png",
+      "state": "18-share-event",
+      "theme": "light",
+      "note": ""
+    },
+    {
+      "file": "18-share-event-night.png",
+      "state": "18-share-event",
+      "theme": "night",
+      "note": ""
+    },
+    {
+      "file": "19-share-event-empty-light.png",
+      "state": "19-share-event-empty",
+      "theme": "light",
+      "note": ""
+    },
+    {
+      "file": "19-share-event-empty-night.png",
+      "state": "19-share-event-empty",
+      "theme": "night",
+      "note": ""
+    },
+    {
+      "file": "20-rsvp-sheet-light.png",
+      "state": "20-rsvp-sheet",
+      "theme": "light",
+      "note": "the RSVP sheet over the live event chat"
+    },
+    {
+      "file": "20-rsvp-sheet-night.png",
+      "state": "20-rsvp-sheet",
+      "theme": "night",
+      "note": "the RSVP sheet over the live event chat"
+    },
+    {
+      "file": "21-long-press-remove-light.png",
+      "state": "21-long-press-remove",
+      "theme": "light",
+      "note": ""
+    },
+    {
+      "file": "21-long-press-remove-night.png",
+      "state": "21-long-press-remove",
+      "theme": "night",
+      "note": ""
+    },
+    {
+      "file": "22-empty-club-light.png",
+      "state": "22-empty-club",
+      "theme": "light",
+      "note": ""
+    },
+    {
+      "file": "22-empty-club-night.png",
+      "state": "22-empty-club",
+      "theme": "night",
+      "note": ""
+    },
+    {
+      "file": "23-load-failed-light.png",
+      "state": "23-load-failed",
+      "theme": "light",
+      "note": ""
+    },
+    {
+      "file": "23-load-failed-night.png",
+      "state": "23-load-failed",
+      "theme": "night",
+      "note": ""
+    },
+    {
+      "file": "24-skeleton-light.png",
+      "state": "24-skeleton",
+      "theme": "light",
+      "note": ""
+    },
+    {
+      "file": "24-skeleton-night.png",
+      "state": "24-skeleton",
+      "theme": "night",
+      "note": ""
+    },
+    {
+      "file": "mockup-W0_Board.png",
+      "state": "W0_Board",
+      "theme": "mockup",
+      "note": "the design, 390 wide, full page"
+    },
+    {
+      "file": "mockup-W0_Cards.png",
+      "state": "W0_Cards",
+      "theme": "mockup",
+      "note": "the design, 390 wide, full page"
+    },
+    {
+      "file": "mockup-W0_Club_Light.png",
+      "state": "W0_Club_Light",
+      "theme": "mockup",
+      "note": "the design, 390 wide, full page"
+    },
+    {
+      "file": "mockup-W0_Club.png",
+      "state": "W0_Club",
+      "theme": "mockup",
+      "note": "the design, 390 wide, full page"
+    },
+    {
+      "file": "mockup-W0_EmptyClub.png",
+      "state": "W0_EmptyClub",
+      "theme": "mockup",
+      "note": "the design, 390 wide, full page"
+    },
+    {
+      "file": "mockup-W0_EmptyClubs.png",
+      "state": "W0_EmptyClubs",
+      "theme": "mockup",
+      "note": "the design, 390 wide, full page"
+    },
+    {
+      "file": "mockup-W0_EmptyWeek.png",
+      "state": "W0_EmptyWeek",
+      "theme": "mockup",
+      "note": "the design, 390 wide, full page"
+    },
+    {
+      "file": "mockup-W0_Home.png",
+      "state": "W0_Home",
+      "theme": "mockup",
+      "note": "the design, 390 wide, full page"
+    },
+    {
+      "file": "mockup-W0_NewPoll.png",
+      "state": "W0_NewPoll",
+      "theme": "mockup",
+      "note": "the design, 390 wide, full page"
+    },
+    {
+      "file": "mockup-W0_NewSignup.png",
+      "state": "W0_NewSignup",
+      "theme": "mockup",
+      "note": "the design, 390 wide, full page"
+    },
+    {
+      "file": "mockup-W0_Room.png",
+      "state": "W0_Room",
+      "theme": "mockup",
+      "note": "the design, 390 wide, full page"
+    },
+    {
+      "file": "mockup-W0_ShareEvent.png",
+      "state": "W0_ShareEvent",
+      "theme": "mockup",
+      "note": "the design, 390 wide, full page"
+    },
+    {
+      "file": "mockup-W0_Tray.png",
+      "state": "W0_Tray",
+      "theme": "mockup",
+      "note": "the design, 390 wide, full page"
+    }
+  ]
+}

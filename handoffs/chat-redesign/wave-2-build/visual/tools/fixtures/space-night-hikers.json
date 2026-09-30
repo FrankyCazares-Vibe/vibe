@@ -1,0 +1,44 @@
+{
+  "ok": true,
+  "org": {
+    "id": "bbbbbbbb-0003-4000-8000-000000000003",
+    "handle": "night-hikers",
+    "name": "Night Hikers",
+    "logo_url": null,
+    "banner_url": null,
+    "verified": false,
+    "member_count": 1
+  },
+  "viewer": {
+    "role": "owner",
+    "can_moderate": true
+  },
+  "rooms": [
+    {
+      "id": "cccccccc-0021-4000-8000-000000000021",
+      "kind": "lounge",
+      "name": "Lounge",
+      "unread": false,
+      "can_post": true,
+      "event": null
+    },
+    {
+      "id": "cccccccc-0022-4000-8000-000000000022",
+      "kind": "board",
+      "name": "Board",
+      "unread": false,
+      "can_post": true,
+      "event": null
+    },
+    {
+      "id": "cccccccc-0023-4000-8000-000000000023",
+      "kind": "officers",
+      "name": "Officers",
+      "unread": false,
+      "can_post": true,
+      "event": null
+    }
+  ],
+  "board_latest": null,
+  "up_next": []
+}
