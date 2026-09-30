@@ -233,7 +233,9 @@ function WeekCard({
           ·
         </span>
         {entry.viewer_status === "going" ? (
-          <span style={{ display: "inline-flex", alignItems: "center", gap: 3, fontWeight: 700, color: t.coralText }}>
+          // On the tinted live chrome the Going check is the coral MARK (11.0:
+          // "the Going check … on a tinted surface"; #C8401E on #FFE9E0 is 4.3:1).
+          <span style={{ display: "inline-flex", alignItems: "center", gap: 3, fontWeight: 700, color: live ? t.coralMark : t.coralText }}>
             <CheckIcon size={11} />
             Going
           </span>

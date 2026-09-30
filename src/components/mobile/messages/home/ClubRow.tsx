@@ -163,7 +163,9 @@ export function ClubRow({
                     borderRadius: 999,
                     border: chip.live ? "1px solid rgba(255,92,53,0.50)" : "1px solid rgba(var(--scrim-rgb),0.10)",
                     background: chip.live ? "rgba(255,92,53,0.14)" : "rgba(var(--scrim-rgb),0.05)",
-                    color: chip.live ? t.coralText : t.secondary,
+                    // The live chip is a coral-tinted surface: the coral MARK
+                    // (11.0), since coral TEXT on it is 4.0:1 in Light.
+                    color: chip.live ? t.coralMark : t.secondary,
                     fontSize: 12,
                     fontWeight: chip.live ? 700 : 600,
                     display: "inline-flex",
