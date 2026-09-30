@@ -1,0 +1,104 @@
+/**
+ * The one answer every officer-only club route gives (security wave 2, A5b):
+ * the club chat routes (`/api/orgs/[slug]/channels/**`), the club-post route
+ * (`/api/orgs/[slug]/posts`) and the club settings route
+ * (`/api/orgs/[slug]` PATCH / DELETE).
+ *
+ * THE RULE: a HIDDEN club does not exist to anyone outside it. A non-member
+ * asking an officer-only route about a hidden club gets the same 404 a
+ * made-up handle gets, never the 403 that says "this club is real, you just
+ * aren't allowed". Members who aren't officers keep their plain 403: they
+ * can already see the club. Report Low: "Officer-only club routes answer 403
+ * (not 404) for a hidden club, confirming the club exists."
+ *
+ * FAILED READS. A failed club read is a 500. A failed membership read on a
+ * hidden club is a 404 (a 500 there would tell a stranger the club exists —
+ * the same call GET /api/orgs/[slug] makes); on any other club it is a 500,
+ * never a guessed "not allowed".
+ *
+ * PURE ON PURPOSE: no Next, no Supabase, so `node --test` loads it. Each
+ * route keeps its own 403 wording and code; this only decides WHICH answer.
+ * The only runtime import is the word filter, which is pure as well.
+ *
+ * (A5a is building the same 404 rule for the other officer routes in
+ * `src/lib/orgs/`, which A5b may not import in wave A. Fold the two together
+ * once both land.)
+ */
+
+import type { OrgRole } from "../orgs/join-state";
+import { checkChangedText, checkText } from "../moderation/text-filter";
+
+export type ClubGateInput = {
+  /** The club as the SERVICE role read it; null when no club has the handle. */
+  org: { hidden_at: string | null } | null;
+  /** The club read itself errored. */
+  orgReadFailed?: boolean;
+  /** The caller's `org_members.role`, or null when they aren't a member. */
+  role: OrgRole | null;
+  /** The membership read errored. */
+  roleReadFailed?: boolean;
+  /** Roles this route serves. */
+  allowed: readonly OrgRole[];
+  /**
+   * The caller is the club's owner by `orgs.owner_id`. The settings route
+   * keeps that as its own branch (an owner with a missing `org_members` row
+   * can still edit their club), so it counts as allowed AND as inside.
+   */
+  ownerById?: boolean;
+};
+
+export type ClubGateDecision =
+  | { ok: true }
+  | { ok: false; status: 404; reason: "not_found" }
+  | { ok: false; status: 403; reason: "not_allowed" }
+  | { ok: false; status: 500; reason: "load_failed" };
+
+const NOT_FOUND = { ok: false, status: 404, reason: "not_found" } as const;
+const NOT_ALLOWED = { ok: false, status: 403, reason: "not_allowed" } as const;
+const LOAD_FAILED = { ok: false, status: 500, reason: "load_failed" } as const;
+
+export function clubRouteGate(input: ClubGateInput): ClubGateDecision {
+  if (input.orgReadFailed) return LOAD_FAILED;
+  if (!input.org) return NOT_FOUND;
+
+  const hidden = input.org.hidden_at !== null && input.org.hidden_at !== undefined;
+  if (input.roleReadFailed && !input.ownerById) return hidden ? NOT_FOUND : LOAD_FAILED;
+
+  const inside = input.ownerById === true || input.role !== null;
+  if (!inside && hidden) return NOT_FOUND;
+
+  if (input.ownerById) return { ok: true };
+  if (input.role !== null && input.allowed.includes(input.role)) return { ok: true };
+  return NOT_ALLOWED;
+}
+
+/** A club profile link as `sanitizeLinks` in `/api/orgs/[slug]` keeps it. */
+export type ClubLink = { label: string; url: string };
+
+/**
+ * The labels an officer typed, run through the word filter the way every
+ * other re-sent field is: ONLY WHAT CHANGED. The settings form re-sends the
+ * whole links list on every save, so a label that is already stored passes
+ * (text-filter.ts, "ONLY CHECK WHAT CHANGED") — otherwise one old label that
+ * trips a later list change would block every future settings save.
+ *
+ * `stored` is the raw `orgs.links` jsonb; anything that isn't a list of
+ * `{ label }` objects just means "nothing stored". Returns true when a NEW
+ * label is refused.
+ */
+export function hasBlockedNewLinkLabel(next: readonly ClubLink[], stored: unknown): boolean {
+  const storedLabels: string[] = [];
+  if (Array.isArray(stored)) {
+    for (const raw of stored) {
+      if (raw && typeof raw === "object" && typeof (raw as { label?: unknown }).label === "string") {
+        storedLabels.push((raw as { label: string }).label);
+      }
+    }
+  }
+  for (const link of next) {
+    if (checkText(link.label).ok) continue;
+    if (storedLabels.some((s) => checkChangedText(link.label, s).ok)) continue;
+    return true;
+  }
+  return false;
+}

@@ -1,0 +1,135 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<title>Messages, events tab, phone, night</title>
+<script src="./support.js"></script>
+</head>
+<body>
+<x-dc>
+<helmet>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Fraunces:ital,opsz,wght,SOFT@0,9..144,300..900,0..100;1,9..144,300..900,0..100&family=DM+Sans:wght@400;500;600;700;800&display=swap">
+<style>body{margin:0;font-family:"DM Sans",system-ui,sans-serif;background:#0C0B0B;color:#F6F1EA}a{color:#FF8A66}a:hover{color:#FF5C35}</style>
+</helmet>
+<div style="width: 390px; height: 844px; box-sizing: border-box; position: relative; isolation: isolate; display: flex; flex-direction: column; overflow: hidden; background: #0C0B0B; color: #F6F1EA">
+  <header style="height: 56px; flex-shrink: 0; box-sizing: border-box; padding: 6px 10px 0 16px; display: flex; align-items: center; gap: 6px">
+    <h1 style="margin: 0; margin-right: auto; font-family: Fraunces, Georgia, serif; font-weight: 800; font-size: 30px; line-height: 1; letter-spacing: -0.8px; font-variation-settings: 'SOFT' 100">Messages</h1>
+    <button type="button" aria-label="Search messages" style="width: 44px; height: 44px; flex-shrink: 0; border-radius: 999px; border: 1px solid rgba(255,255,255,0.10); background: rgba(22,21,21,0.86); color: #CFC8BE; display: flex; align-items: center; justify-content: center; cursor: pointer"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" aria-hidden="true"><circle cx="11" cy="11" r="7"/><path d="M20 20l-3.5-3.5"/></svg></button>
+    <button type="button" aria-label="New message" style="width: 44px; height: 44px; flex-shrink: 0; border-radius: 999px; border: 1px solid rgba(255,255,255,0.10); background: rgba(22,21,21,0.86); color: #CFC8BE; display: flex; align-items: center; justify-content: center; cursor: pointer"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.1" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M12 20h8"/><path d="M16.5 3.5a2.1 2.1 0 0 1 3 3L7.5 18.5 3 20l1.5-4.5z"/></svg></button>
+  </header>
+
+  <nav aria-label="Message types" style="flex-shrink: 0; margin: 8px 16px 10px; height: 46px; box-sizing: border-box; padding: 0 4px; display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); border-radius: 999px; border: 1px solid rgba(255,255,255,0.08); background: rgba(22,21,21,0.86)">
+    <a href="R2_Chats.dc.html" aria-label="Chats, people and group chats" style="height: 44px; display: flex; align-items: center; justify-content: center; text-decoration: none; color: #CFC8BE; font-size: 13.5px; font-weight: 700">Chats</a>
+    <a href="R2_Clubs.dc.html" aria-label="Clubs, new Board post" style="height: 44px; display: flex; align-items: center; justify-content: center; gap: 6px; text-decoration: none; color: #CFC8BE; font-size: 13.5px; font-weight: 700">Clubs<span aria-hidden="true" style="width: 6px; height: 6px; border-radius: 999px; background: #FF5C35"></span></a>
+    <a href="R2_Events.dc.html" aria-current="page" aria-label="Events, one live now" style="height: 44px; display: flex; align-items: center; justify-content: center; text-decoration: none; color: #0C0B0B"><span style="width: 100%; height: 34px; border-radius: 999px; background: #F6F1EA; color: #0C0B0B; font-size: 13.5px; font-weight: 700; display: flex; align-items: center; justify-content: center; gap: 7px">Events<span aria-hidden="true" style="width: 6px; height: 6px; border-radius: 999px; background: #FF5C35; box-shadow: 0 0 0 3px rgba(255,92,53,0.22)"></span></span></a>
+  </nav>
+
+  <section aria-label="Your RSVPs this week" style="flex-shrink: 0; box-sizing: border-box; padding: 0 12px; margin-bottom: 2px">
+    <div style="height: 12px; padding: 0 6px; display: flex; align-items: center; gap: 10px; font-size: 11px; line-height: 12px; font-weight: 600; color: #9C958C">
+      <span style="margin-right: auto">Your RSVPs</span>
+      <span style="display: inline-flex; align-items: center; gap: 4px"><span aria-hidden="true" style="width: 5px; height: 5px; border-radius: 999px; background: #FF5C35"></span>Going</span>
+      <span style="display: inline-flex; align-items: center; gap: 4px"><span aria-hidden="true" style="width: 5px; height: 5px; border-radius: 999px; background: #9C958C"></span>Maybe</span>
+    </div>
+    <div style="margin-top: 2px; display: grid; grid-template-columns: repeat(7, minmax(0, 1fr)); gap: 4px">
+      <button type="button" aria-label="Monday, October 5, past" style="height: 44px; padding: 0; border: none; border-radius: 14px; background: transparent; font-family: inherit; display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 2px; cursor: pointer"><span style="font-size: 10.5px; line-height: 12px; font-weight: 600; color: #9C958C">Mon</span><span style="font-size: 14px; line-height: 16px; font-weight: 700; color: #9C958C">5</span><span aria-hidden="true" style="width: 5px; height: 5px; border-radius: 999px; background: transparent"></span></button>
+      <button type="button" aria-label="Tuesday, October 6, past" style="height: 44px; padding: 0; border: none; border-radius: 14px; background: transparent; font-family: inherit; display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 2px; cursor: pointer"><span style="font-size: 10.5px; line-height: 12px; font-weight: 600; color: #9C958C">Tue</span><span style="font-size: 14px; line-height: 16px; font-weight: 700; color: #9C958C">6</span><span aria-hidden="true" style="width: 5px; height: 5px; border-radius: 999px; background: transparent"></span></button>
+      <button type="button" aria-label="Wednesday, October 7, past" style="height: 44px; padding: 0; border: none; border-radius: 14px; background: transparent; font-family: inherit; display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 2px; cursor: pointer"><span style="font-size: 10.5px; line-height: 12px; font-weight: 600; color: #9C958C">Wed</span><span style="font-size: 14px; line-height: 16px; font-weight: 700; color: #9C958C">7</span><span aria-hidden="true" style="width: 5px; height: 5px; border-radius: 999px; background: transparent"></span></button>
+      <button type="button" aria-current="date" aria-label="Thursday, October 8, today, 2 events you're going to, 1 live now" style="height: 44px; padding: 0; border: none; border-radius: 14px; background: #F6F1EA; font-family: inherit; display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 2px; cursor: pointer; box-shadow: 0 6px 16px rgba(0,0,0,0.45)"><span style="font-size: 10.5px; line-height: 12px; font-weight: 700; color: #4A4541">Thu</span><span style="font-size: 14px; line-height: 16px; font-weight: 800; color: #0C0B0B">8</span><span aria-hidden="true" style="width: 5px; height: 5px; border-radius: 999px; background: #FF5C35"></span></button>
+      <button type="button" aria-label="Friday, October 9, 1 event you're going to" style="height: 44px; padding: 0; border: none; border-radius: 14px; background: transparent; font-family: inherit; display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 2px; cursor: pointer"><span style="font-size: 10.5px; line-height: 12px; font-weight: 600; color: #CFC8BE">Fri</span><span style="font-size: 14px; line-height: 16px; font-weight: 700; color: #F6F1EA">9</span><span aria-hidden="true" style="width: 5px; height: 5px; border-radius: 999px; background: #FF5C35"></span></button>
+      <button type="button" aria-label="Saturday, October 10, 1 event you said maybe to" style="height: 44px; padding: 0; border: none; border-radius: 14px; background: transparent; font-family: inherit; display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 2px; cursor: pointer"><span style="font-size: 10.5px; line-height: 12px; font-weight: 600; color: #CFC8BE">Sat</span><span style="font-size: 14px; line-height: 16px; font-weight: 700; color: #F6F1EA">10</span><span aria-hidden="true" style="width: 5px; height: 5px; border-radius: 999px; background: #9C958C"></span></button>
+      <button type="button" aria-label="Sunday, October 11, nothing yet" style="height: 44px; padding: 0; border: none; border-radius: 14px; background: transparent; font-family: inherit; display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 2px; cursor: pointer"><span style="font-size: 10.5px; line-height: 12px; font-weight: 600; color: #CFC8BE">Sun</span><span style="font-size: 14px; line-height: 16px; font-weight: 700; color: #F6F1EA">11</span><span aria-hidden="true" style="width: 5px; height: 5px; border-radius: 999px; background: transparent"></span></button>
+    </div>
+  </section>
+
+  <main aria-label="Event rooms" style="flex-grow: 1; min-height: 0; overflow: hidden; position: relative; box-sizing: border-box; padding: 12px 16px 0; display: flex; flex-direction: column">
+    <section aria-label="Live now" style="position: relative; flex-shrink: 0">
+      <div style="height: 24px; display: flex; align-items: center; gap: 9px">
+        <span aria-hidden="true" style="width: 8px; height: 8px; border-radius: 999px; background: #FF5C35; box-shadow: 0 0 0 4px rgba(255,92,53,0.22), 0 0 12px rgba(255,92,53,0.8)"></span>
+        <h2 style="margin: 0; font-family: Fraunces, Georgia, serif; font-weight: 800; font-size: 18px; letter-spacing: -0.3px; line-height: 1.1">Live now</h2>
+      </div>
+      <div style="position: relative; margin-top: 10px">
+        <div aria-hidden="true" style="position: absolute; left: -48px; right: -48px; top: -30px; bottom: -38px; pointer-events: none; background: radial-gradient(closest-side, rgba(255,92,53,0.46) 0%, rgba(255,92,53,0.16) 55%, rgba(255,92,53,0) 100%)"></div>
+        <article style="position: relative; height: 100px; box-sizing: border-box; padding: 11px 12px 11px 11px; display: flex; align-items: center; gap: 10px; border-radius: 22px; border: 1px solid rgba(255,92,53,0.42); background: rgba(22,21,21,0.90); box-shadow: 0 0 0 4px rgba(255,92,53,0.06), 0 14px 36px rgba(255,92,53,0.20), inset 0 1px 0 rgba(255,255,255,0.06)">
+          <a href="#fall-formal" aria-label="Open Fall Formal room, Salsa Club, 23 here, 4 new" style="flex-grow: 1; min-width: 0; height: 76px; display: flex; align-items: center; gap: 12px; text-decoration: none; color: #F6F1EA">
+            <span aria-hidden="true" style="position: relative; width: 76px; height: 76px; flex-shrink: 0; border-radius: 16px; overflow: hidden; box-shadow: inset 0 0 0 1px rgba(255,255,255,0.12); background: linear-gradient(0deg, rgba(12,11,11,0.55) 0%, rgba(12,11,11,0) 55%), radial-gradient(60px 44px at 88% 8%, rgba(255,210,150,0.95) 0%, rgba(255,210,150,0) 70%), radial-gradient(70px 56px at 8% 26%, rgba(110,24,60,0.95) 0%, rgba(110,24,60,0) 72%), linear-gradient(118deg, #3B1026 0%, #A4282F 44%, #F05A33 74%, #FF9A5C 100%)">
+              <span style="position: absolute; left: 6px; bottom: 6px; height: 18px; padding: 0 7px 0 6px; border-radius: 999px; background: #FF5C35; color: #140806; font-size: 10.5px; font-weight: 800; display: inline-flex; align-items: center; gap: 4px"><span style="width: 5px; height: 5px; border-radius: 999px; background: #140806"></span>Live</span>
+            </span>
+            <span style="min-width: 0; display: flex; flex-direction: column; gap: 2px">
+              <span style="font-family: Fraunces, Georgia, serif; font-weight: 700; font-size: 13.5px; line-height: 1.2; color: #CFC8BE; white-space: nowrap">Salsa Club</span>
+              <span style="font-family: Fraunces, Georgia, serif; font-weight: 800; font-size: 23px; line-height: 1.05; letter-spacing: -0.6px; font-variation-settings: 'SOFT' 100; color: #FAF7F2; white-space: nowrap">Fall Formal</span>
+              <span style="font-size: 12.5px; line-height: 1.35; font-weight: 600; color: #CFC8BE; white-space: nowrap">23 here · <span style="font-weight: 700; color: #FF8A66">4 new</span></span>
+            </span>
+          </a>
+          <a href="#fall-formal" aria-label="Join the Fall Formal room" style="flex-shrink: 0; height: 44px; padding: 0 18px; border-radius: 999px; background: linear-gradient(180deg, #FF7B4A, #FF5C35); color: #140806; font-size: 14.5px; font-weight: 800; display: inline-flex; align-items: center; text-decoration: none; box-shadow: 0 8px 22px rgba(255,92,53,0.36)">Join</a>
+        </article>
+      </div>
+    </section>
+
+    <section aria-label="Tonight" style="flex-shrink: 0; margin-top: 24px">
+      <h2 style="margin: 0; font-family: Fraunces, Georgia, serif; font-weight: 800; font-size: 17px; letter-spacing: -0.3px; line-height: 22px">Tonight</h2>
+      <a href="#build-night" aria-label="Build Night room, Jag Robotics, 8 PM tonight, you're going, 5 new" style="height: 64px; display: flex; align-items: center; gap: 12px; text-decoration: none; color: #F6F1EA">
+        <span aria-hidden="true" style="width: 44px; height: 44px; flex-shrink: 0; border-radius: 12px; box-shadow: inset 0 0 0 1px rgba(255,255,255,0.10); background: radial-gradient(40px 30px at 80% 15%, rgba(160,220,235,0.70), rgba(160,220,235,0) 70%), linear-gradient(140deg, #0F2533 0%, #1F5673 55%, #3F8FA8 100%)"></span>
+        <span style="flex-grow: 1; min-width: 0; display: flex; flex-direction: column; gap: 2px">
+          <span style="font-family: Fraunces, Georgia, serif; font-weight: 700; font-size: 16.5px; letter-spacing: -0.2px; line-height: 1.2; white-space: nowrap; overflow: hidden; text-overflow: ellipsis">Build Night</span>
+          <span style="font-size: 12.5px; font-weight: 500; line-height: 1.35; color: #9C958C; white-space: nowrap; overflow: hidden; text-overflow: ellipsis">Jag Robotics · 8 PM</span>
+        </span>
+        <span style="flex-shrink: 0; display: flex; flex-direction: column; align-items: flex-end; gap: 5px">
+          <span style="height: 22px; box-sizing: border-box; padding: 0 8px 0 7px; border-radius: 999px; border: 1px solid rgba(255,92,53,0.60); color: #FF8A66; font-size: 11.5px; font-weight: 700; display: inline-flex; align-items: center; gap: 4px"><svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M5 12.5l4.5 4.5L19 7.5"/></svg>Going</span>
+          <span style="height: 18px; box-sizing: border-box; padding: 0 7px; border-radius: 999px; background: rgba(255,255,255,0.08); color: #CFC8BE; font-size: 11px; font-weight: 700; display: inline-flex; align-items: center">5 new</span>
+        </span>
+      </a>
+    </section>
+
+    <section aria-label="Tomorrow" style="flex-shrink: 0; margin-top: 18px">
+      <h2 style="margin: 0; font-family: Fraunces, Georgia, serif; font-weight: 800; font-size: 17px; letter-spacing: -0.3px; line-height: 22px">Tomorrow</h2>
+      <a href="ChatB_Room.dc.html" aria-label="Fright Night room, Film Society, Friday 7 PM, you're going, 2 new" style="height: 64px; display: flex; align-items: center; gap: 12px; text-decoration: none; color: #F6F1EA">
+        <span aria-hidden="true" style="width: 44px; height: 44px; flex-shrink: 0; border-radius: 12px; box-shadow: inset 0 0 0 1px rgba(255,255,255,0.10); background: radial-gradient(40px 30px at 80% 0%, rgba(255,170,110,0.60), rgba(255,170,110,0) 70%), linear-gradient(165deg, #3E1228 0%, #6E1F33 70%, #8E2E30 100%)"></span>
+        <span style="flex-grow: 1; min-width: 0; display: flex; flex-direction: column; gap: 2px">
+          <span style="font-family: Fraunces, Georgia, serif; font-weight: 700; font-size: 16.5px; letter-spacing: -0.2px; line-height: 1.2; white-space: nowrap; overflow: hidden; text-overflow: ellipsis">Fright Night</span>
+          <span style="font-size: 12.5px; font-weight: 500; line-height: 1.35; color: #9C958C; white-space: nowrap; overflow: hidden; text-overflow: ellipsis">Film Society · Fri 7 PM</span>
+        </span>
+        <span style="flex-shrink: 0; display: flex; flex-direction: column; align-items: flex-end; gap: 5px">
+          <span style="height: 22px; box-sizing: border-box; padding: 0 8px 0 7px; border-radius: 999px; border: 1px solid rgba(255,92,53,0.60); color: #FF8A66; font-size: 11.5px; font-weight: 700; display: inline-flex; align-items: center; gap: 4px"><svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M5 12.5l4.5 4.5L19 7.5"/></svg>Going</span>
+          <span style="height: 18px; box-sizing: border-box; padding: 0 7px; border-radius: 999px; background: rgba(255,255,255,0.08); color: #CFC8BE; font-size: 11px; font-weight: 700; display: inline-flex; align-items: center">2 new</span>
+        </span>
+      </a>
+    </section>
+
+    <section aria-label="This week" style="flex-shrink: 0; margin-top: 18px">
+      <h2 style="margin: 0; font-family: Fraunces, Georgia, serif; font-weight: 800; font-size: 17px; letter-spacing: -0.3px; line-height: 22px">This week</h2>
+      <a href="#scrimmage" aria-label="Scrimmage room, Jag Robotics, Saturday 10 AM, you said maybe" style="height: 64px; display: flex; align-items: center; gap: 12px; text-decoration: none; color: #F6F1EA">
+        <span aria-hidden="true" style="width: 44px; height: 44px; flex-shrink: 0; border-radius: 12px; box-shadow: inset 0 0 0 1px rgba(255,255,255,0.10); background: radial-gradient(40px 30px at 80% 0%, rgba(160,220,235,0.45), rgba(160,220,235,0) 70%), linear-gradient(165deg, #0F2533 0%, #1F4F6A 70%, #2A6380 100%)"></span>
+        <span style="flex-grow: 1; min-width: 0; display: flex; flex-direction: column; gap: 2px">
+          <span style="font-family: Fraunces, Georgia, serif; font-weight: 700; font-size: 16.5px; letter-spacing: -0.2px; line-height: 1.2; white-space: nowrap; overflow: hidden; text-overflow: ellipsis">Scrimmage</span>
+          <span style="font-size: 12.5px; font-weight: 500; line-height: 1.35; color: #9C958C; white-space: nowrap; overflow: hidden; text-overflow: ellipsis">Jag Robotics · Sat 10 AM</span>
+        </span>
+        <span style="flex-shrink: 0; display: flex; flex-direction: column; align-items: flex-end; gap: 5px">
+          <span style="height: 22px; box-sizing: border-box; padding: 0 9px; border-radius: 999px; border: 1px solid rgba(255,255,255,0.16); color: #CFC8BE; font-size: 11.5px; font-weight: 700; display: inline-flex; align-items: center">Maybe</span>
+        </span>
+      </a>
+    </section>
+
+    <button type="button" aria-expanded="false" aria-label="Past rooms, 3 albums" style="flex-shrink: 0; margin-top: 16px; height: 52px; width: 100%; box-sizing: border-box; padding: 0 4px 0 2px; border: none; border-top: 1px solid rgba(255,255,255,0.08); background: transparent; color: #CFC8BE; font-family: inherit; display: flex; align-items: center; gap: 12px; cursor: pointer; text-align: left">
+      <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="#9C958C" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect x="7" y="7" width="14" height="13" rx="2.5"/><path d="M17 4H5.5A2.5 2.5 0 0 0 3 6.5V16"/><circle cx="11.5" cy="11.5" r="1.5"/><path d="M21 17l-4-4-6.5 7"/></svg>
+      <span style="font-size: 14.5px; font-weight: 700; color: #F6F1EA">Past rooms</span>
+      <span style="font-size: 13px; font-weight: 500; color: #9C958C">3 albums</span>
+      <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="#9C958C" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true" style="margin-left: auto; flex-shrink: 0"><path d="M6 9l6 6 6-6"/></svg>
+    </button>
+  </main>
+
+  <nav aria-label="Tabs" style="height: 64px; flex-shrink: 0; box-sizing: border-box; padding: 6px 8px 0; display: flex; justify-content: space-around; align-items: flex-start; background: rgba(12,11,11,0.96); border-top: 1px solid rgba(255,255,255,0.08)">
+    <a href="#campus" style="min-width: 56px; min-height: 48px; display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 4px; text-decoration: none; color: #9C958C; font-size: 10px; font-weight: 700; letter-spacing: 0.04em"><span style="width: 22px; height: 22px; border-radius: 999px; border: 2px solid #9C958C; display: block; box-sizing: border-box"></span>CAMPUS</a>
+    <a href="#network" style="min-width: 56px; min-height: 48px; display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 4px; text-decoration: none; color: #9C958C; font-size: 10px; font-weight: 700; letter-spacing: 0.04em"><span style="width: 22px; height: 22px; border-radius: 999px; border: 2px solid #9C958C; display: block; box-sizing: border-box"></span>NETWORK</a>
+    <a href="#otto" style="min-width: 56px; min-height: 48px; display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 4px; text-decoration: none; color: #9C958C; font-size: 10px; font-weight: 700; letter-spacing: 0.04em"><svg width="22" height="22" viewBox="0 0 24 24" fill="none" aria-hidden="true"><path d="M20.5 14.5A9 9 0 1 1 15 3.5" stroke="#9C958C" stroke-width="2.2" stroke-linecap="round"/><circle cx="19" cy="18" r="3" fill="#9C958C"/></svg>OTTO</a>
+    <a href="R2_Chats.dc.html" aria-current="page" style="min-width: 56px; min-height: 48px; display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 4px; text-decoration: none; color: #F6F1EA; font-size: 10px; font-weight: 700; letter-spacing: 0.04em"><svg width="22" height="22" viewBox="0 0 24 24" aria-hidden="true"><path d="M21 11.5a8.5 8.5 0 0 1-12.6 7.45L3 20.5l1.6-5A8.5 8.5 0 1 1 21 11.5z" fill="#F6F1EA"/></svg>MESSAGES</a>
+    <a href="#profile" style="min-width: 56px; min-height: 48px; display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 4px; text-decoration: none; color: #9C958C; font-size: 10px; font-weight: 700; letter-spacing: 0.04em"><span style="width: 22px; height: 22px; border-radius: 999px; background: #5A3A2E; display: block"></span>PROFILE</a>
+  </nav>
+</div>
+</x-dc>
+<script type="text/x-dc" data-dc-script data-props='{"$preview":{"width":390,"height":844}}'>
+class Component extends DCLogic {
+  renderVals() { return {}; }
+}
+</script>
+</body>
+</html>

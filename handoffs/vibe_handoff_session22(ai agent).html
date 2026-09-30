@@ -1,0 +1,483 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Vibe — Handoff · End of Session 22</title>
+<link href="https://fonts.googleapis.com/css2?family=Fraunces:ital,wght@0,400;0,700;0,900;1,400;1,700&family=DM+Sans:wght@300;400;500;600;700&display=swap" rel="stylesheet">
+<style>
+* { margin: 0; padding: 0; box-sizing: border-box; }
+body {
+  font-family: 'DM Sans', sans-serif;
+  background: #FAF7F2;
+  color: #1C1C1E;
+  padding: 60px 40px;
+  line-height: 1.6;
+}
+.container { max-width: 760px; margin: 0 auto; }
+
+.hero {
+  background: #1C1C1E;
+  border-radius: 18px;
+  padding: 44px 44px 36px;
+  position: relative;
+  overflow: hidden;
+  margin-bottom: 32px;
+  color: white;
+}
+.hero::before {
+  content: '';
+  position: absolute;
+  top: -80px; right: -80px;
+  width: 320px; height: 320px;
+  border-radius: 50%;
+  background: radial-gradient(circle, rgba(255,92,53,.18) 0%, transparent 70%);
+}
+.hero-eyebrow {
+  font-size: 11px;
+  font-weight: 500;
+  letter-spacing: 1.5px;
+  text-transform: uppercase;
+  color: rgba(255,255,255,.5);
+  margin-bottom: 14px;
+  position: relative;
+  z-index: 1;
+}
+.hero-title {
+  font-family: 'Fraunces', serif;
+  font-size: 44px;
+  font-weight: 900;
+  letter-spacing: -1.5px;
+  line-height: 1;
+  margin-bottom: 16px;
+  position: relative;
+  z-index: 1;
+}
+.hero-title em { color: #FF5C35; font-style: italic; }
+.hero-desc {
+  font-family: 'Fraunces', serif;
+  font-style: italic;
+  font-size: 15px;
+  line-height: 1.6;
+  color: rgba(255,255,255,.75);
+  max-width: 540px;
+  position: relative;
+  z-index: 1;
+}
+.hero-meta {
+  display: flex;
+  gap: 24px;
+  margin-top: 24px;
+  position: relative;
+  z-index: 1;
+}
+.meta-item { display: flex; flex-direction: column; gap: 3px; }
+.meta-label {
+  font-size: 10px;
+  font-weight: 700;
+  letter-spacing: 1px;
+  text-transform: uppercase;
+  color: rgba(255,255,255,.3);
+}
+.meta-val {
+  font-size: 13px;
+  font-weight: 600;
+  color: white;
+}
+
+.section { margin-bottom: 32px; }
+.section-eyebrow {
+  font-size: 11px;
+  font-weight: 700;
+  letter-spacing: 1.5px;
+  text-transform: uppercase;
+  color: #FF5C35;
+  margin-bottom: 8px;
+}
+.section-title {
+  font-family: 'Fraunces', serif;
+  font-size: 26px;
+  font-weight: 900;
+  letter-spacing: -.8px;
+  margin-bottom: 16px;
+  color: #1C1C1E;
+}
+.section-title em { color: #FF5C35; font-style: italic; }
+
+.card {
+  background: white;
+  border-radius: 14px;
+  border: 0.5px solid rgba(28,28,30,.08);
+  padding: 22px 26px;
+  margin-bottom: 14px;
+  box-shadow: 0 4px 20px rgba(0,0,0,.04);
+}
+.card.coral {
+  border-color: rgba(255,92,53,.2);
+  box-shadow: 0 0 0 4px rgba(255,92,53,.04), 0 4px 20px rgba(0,0,0,.04);
+}
+.card.dark { background: #1C1C1E; color: rgba(255,255,255,.85); }
+.card-label {
+  font-size: 10px;
+  font-weight: 700;
+  letter-spacing: 1.5px;
+  text-transform: uppercase;
+  color: #8A8580;
+  margin-bottom: 8px;
+}
+.card.coral .card-label { color: #FF5C35; }
+.card.dark .card-label { color: #FF8B6B; }
+.card-title {
+  font-family: 'Fraunces', serif;
+  font-size: 18px;
+  font-weight: 700;
+  letter-spacing: -.3px;
+  margin-bottom: 10px;
+  color: #1C1C1E;
+}
+.card.dark .card-title { color: white; }
+.card-body { font-size: 14px; line-height: 1.75; color: #3D3D3A; }
+.card.dark .card-body { color: rgba(255,255,255,.75); }
+.card-body strong { color: #1C1C1E; font-weight: 700; }
+.card.dark .card-body strong { color: white; }
+
+ul.list {
+  list-style: none;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  margin-top: 4px;
+}
+ul.list li {
+  display: flex;
+  gap: 10px;
+  font-size: 14px;
+  line-height: 1.7;
+  padding: 10px 14px;
+  background: #FAF7F2;
+  border-radius: 8px;
+}
+ul.list li::before {
+  content: '';
+  width: 5px; height: 5px;
+  border-radius: 50%;
+  background: #FF5C35;
+  flex-shrink: 0;
+  margin-top: 9px;
+}
+.card.dark ul.list li {
+  background: rgba(255,255,255,.04);
+  color: rgba(255,255,255,.85);
+}
+
+code {
+  font-family: ui-monospace, SFMono-Regular, Monaco, monospace;
+  font-size: 12px;
+  background: rgba(28,28,30,.06);
+  padding: 2px 7px;
+  border-radius: 4px;
+  color: #1C1C1E;
+}
+.card.dark code { background: rgba(255,255,255,.08); color: white; }
+
+.next-cta {
+  background: linear-gradient(135deg, #FF5C35 0%, #FF8B6B 100%);
+  border-radius: 16px;
+  padding: 28px 32px;
+  color: white;
+  margin-top: 36px;
+}
+.next-cta-eyebrow {
+  font-size: 11px;
+  font-weight: 700;
+  letter-spacing: 1.5px;
+  text-transform: uppercase;
+  color: rgba(255,255,255,.85);
+  margin-bottom: 8px;
+}
+.next-cta-title {
+  font-family: 'Fraunces', serif;
+  font-size: 22px;
+  font-weight: 900;
+  letter-spacing: -.5px;
+  margin-bottom: 12px;
+}
+.next-cta-body {
+  font-size: 14px;
+  line-height: 1.7;
+  color: rgba(255,255,255,.92);
+}
+.next-cta-body strong { color: white; font-weight: 700; }
+
+.footer-quote {
+  background: #1C1C1E;
+  border-radius: 14px;
+  padding: 22px 26px;
+  margin-top: 28px;
+  display: flex;
+  gap: 14px;
+  align-items: flex-start;
+  color: rgba(255,255,255,.85);
+}
+.footer-otto {
+  width: 24px; height: 24px;
+  border-radius: 50%;
+  background: #FF5C35;
+  box-shadow: 0 0 12px rgba(255,92,53,.5);
+  flex-shrink: 0;
+  margin-top: 4px;
+}
+.footer-text {
+  font-family: 'Fraunces', serif;
+  font-style: italic;
+  font-size: 14px;
+  line-height: 1.7;
+}
+
+.kicker {
+  font-family: 'Fraunces', serif;
+  font-style: italic;
+  font-size: 16px;
+  color: #FF5C35;
+  margin-bottom: 22px;
+}
+</style>
+</head>
+<body>
+
+<div class="container">
+
+  <!-- HERO -->
+  <div class="hero">
+    <div class="hero-eyebrow">Handoff Document · Session 22 · End-of-day</div>
+    <div class="hero-title">Pick up <em>here.</em></div>
+    <div class="hero-desc">Everything Claude (or future-Franky) needs to walk into Session 23 cold and not waste an hour figuring out where things stand.</div>
+    <div class="hero-meta">
+      <div class="meta-item">
+        <span class="meta-label">Last version</span>
+        <span class="meta-val">v3.4</span>
+      </div>
+      <div class="meta-item">
+        <span class="meta-label">Sessions logged</span>
+        <span class="meta-val">22</span>
+      </div>
+      <div class="meta-item">
+        <span class="meta-label">Status</span>
+        <span class="meta-val" style="color: #2ECC71;">● On track</span>
+      </div>
+      <div class="meta-item">
+        <span class="meta-label">Next phase</span>
+        <span class="meta-val" style="color: #FF8B6B;">Empty states</span>
+      </div>
+    </div>
+  </div>
+
+  <div class="kicker">"the design's done. now it has to ship."</div>
+
+  <!-- WHERE THINGS STAND -->
+  <div class="section">
+    <div class="section-eyebrow">State of play</div>
+    <div class="section-title">Where Vibe <em>actually is</em></div>
+
+    <div class="card">
+      <div class="card-label">The product</div>
+      <div class="card-title">Six pages, one calendar, one designed AI agent</div>
+      <div class="card-body"><strong>Six fully-built HTML pages</strong> living in <code>~/vibe/public/html/</code> and served at <code>localhost:3000/html/&lt;page&gt;.html</code>: feed, profile, network, campus, opportunities, messages. They share a left nav (except profile) and a synced left-nav calendar widget. All seeded with realistic mock data — no empty states yet.</div>
+      <div class="card-body" style="margin-top: 10px;"><strong>Otto exists as design only</strong> — 8 standalone mockup files with live animations. Not yet built into the prototype.</div>
+    </div>
+
+    <div class="card coral">
+      <div class="card-label">The big strategic shift this session</div>
+      <div class="card-title">Vibe is no longer just a "warm professional network"</div>
+      <div class="card-body">Vibe is now positioned as <strong>"the network where your AI agent lives."</strong> Otto became the flagship feature in v3.3 and the defensibility argument in v3.4. Other social networks can copy the UI; they cannot easily copy a per-user trained AI agent that manages cross-platform posting and shows users who's looking at them. This reframing should drive every product, marketing, and pitch decision going forward.</div>
+    </div>
+
+    <div class="card">
+      <div class="card-label">Documentation</div>
+      <div class="card-title">Journal v3.4 is current and accurate</div>
+      <div class="card-body">Vision, Features, Strategy, Design Language all rewritten in Session 22. Otto has its own dedicated section. IU meeting questions still live in their own section. Next steps and open questions cleaned of resolved items. Session log icons fixed (uniform coral dots, no more text labels).</div>
+    </div>
+  </div>
+
+  <!-- FILE INVENTORY -->
+  <div class="section">
+    <div class="section-eyebrow">File inventory</div>
+    <div class="section-title">What lives <em>where</em></div>
+
+    <div class="card">
+      <div class="card-label">The codebase</div>
+      <div class="card-title"><code>~/vibe/</code> — the running app</div>
+      <div class="card-body">Next.js 16.2.4. Dev server runs <code>npm run dev</code> in Terminal tab 1. The six HTML files live in <code>public/html/</code>. <strong>Claude Code edits this folder directly when building.</strong></div>
+    </div>
+
+    <div class="card">
+      <div class="card-label">The reference folder</div>
+      <div class="card-title"><code>~/Desktop/Vibe Hub/</code> — staging + reference</div>
+      <div class="card-body">Where downloaded HTML files go before syncing into the prototype. Sync command: <code>cp -f ~/Desktop/Vibe\ Hub/*.html ~/vibe/public/html/</code>. Subfolders inside this directory <em>do not get synced</em>, which is what you want for reference materials.</div>
+    </div>
+
+    <div class="card">
+      <div class="card-label">Active reference subfolder</div>
+      <div class="card-title"><code>~/Desktop/Vibe Hub/otto_mockups/</code></div>
+      <div class="card-body">8 standalone HTML mockup files for Otto:</div>
+      <ul class="list">
+        <li><code>index.html</code> — landing page with thumbnails to the rest</li>
+        <li><code>01_otto_states.html</code> — four canonical states side-by-side</li>
+        <li><code>02_otto_idle_corner.html</code> — Otto in the bottom-right of a Vibe page</li>
+        <li><code>03_otto_slideout_panel.html</code> — drafts, opinions, activity</li>
+        <li><code>04_otto_profile_page.html</code> — Otto status card + per-post badges</li>
+        <li><code>05_otto_agent_tab.html</code> — the big one. Reference this most for the build.</li>
+        <li><code>06_otto_post_publish_flow.html</code> — 5-frame storyboard</li>
+        <li><code>07_otto_onboarding.html</code> — 6-step storyboard</li>
+      </ul>
+    </div>
+
+    <div class="card">
+      <div class="card-label">The journal</div>
+      <div class="card-title"><code>vibe_journal.html</code> — keep separate from sync</div>
+      <div class="card-body">Lives wherever you put it (recommend a <code>journal/</code> subfolder inside Vibe Hub). <strong>Do not sync this into the codebase.</strong> It's reference, not product.</div>
+    </div>
+  </div>
+
+  <!-- DECISIONS LOCKED -->
+  <div class="section">
+    <div class="section-eyebrow">Locked decisions</div>
+    <div class="section-title">Don't <em>relitigate</em> these</div>
+
+    <div class="card">
+      <div class="card-label">Product decisions</div>
+      <ul class="list">
+        <li><strong>Feed layout</strong> — Layout B. Posts as editorial center column, Vibes thumbnails as right sidebar strip.</li>
+        <li><strong>Comment depth</strong> — One level of nested replies. No Reddit-style infinite threading.</li>
+        <li><strong>DM model</strong> — Three-column thread list. Non-connected users land in a request queue with Accept / Decline before they enter the inbox.</li>
+        <li><strong>Connection vs Follow</strong> — Hybrid. Follow is one-way for content. Connect is mutual and requires acceptance. Four-state machine across the app.</li>
+        <li><strong>Profile layout</strong> — Horizontal top nav (different from the rest of the app). Intentional, do not "fix" this.</li>
+      </ul>
+    </div>
+
+    <div class="card">
+      <div class="card-label">Otto decisions</div>
+      <ul class="list">
+        <li><strong>Otto's character</strong> — Jarvis lane (sleek, dry, opinionated). NOT Wall-E lane (cute helper bot). Voice is short, slightly dry, opinionated, lowercase-leaning, italic Fraunces in the UI.</li>
+        <li><strong>Visual language</strong> — Coral core + orbiting nodes + breathing rings. Four states: idle, thinking, briefing (sound bars), alert. Coral = action, deep purple = intelligence.</li>
+        <li><strong>Agent tab structure</strong> — 5 sub-tabs: Today, Metrics, Insights, Customize, Platforms.</li>
+        <li><strong>API reality</strong> — LinkedIn analytics scraping is not feasible. Pivoted to Vibe Recruiter Intel (first-party data on Vibe profile views) as the killer free-tier feature.</li>
+        <li><strong>Onboarding</strong> — 6 steps in ~3 minutes. Ends with Otto generating a real draft from voice samples.</li>
+        <li><strong>Default Otto leash</strong> — "Ask first." Users graduate to Full auto over weeks.</li>
+      </ul>
+    </div>
+
+    <div class="card">
+      <div class="card-label">Design decisions</div>
+      <ul class="list">
+        <li><strong>No-emoji policy in chrome</strong> — buttons, nav, badges, callouts all use custom SVG icons. Emoji are permitted only inside user-generated content (post bodies, comments, message bubbles).</li>
+        <li><strong>Typography</strong> — Fraunces (serif, display) + DM Sans (geometric sans). Otto always speaks in italic Fraunces.</li>
+        <li><strong>Cursor</strong> — orange dot (instant, zero lerp) + trailing ring (lerp 0.28). cursor:none on every element.</li>
+        <li><strong>Mobile</strong> — separate codebase eventually, not media queries on desktop files. Out of scope right now.</li>
+        <li><strong>Backend</strong> — out of scope until front-end is fully built. Mock data for now.</li>
+      </ul>
+    </div>
+  </div>
+
+  <!-- TRAPS -->
+  <div class="section">
+    <div class="section-eyebrow">Bug traps</div>
+    <div class="section-title">Things that <em>silently break</em></div>
+
+    <div class="card">
+      <div class="card-label">JavaScript</div>
+      <ul class="list">
+        <li><strong>Apostrophes in single-quoted JS strings crash silently.</strong> Always validate with <code>node --check</code> after editing data. Use double-quoted strings for content with apostrophes. Cost an entire debugging session in v3.3.</li>
+        <li><strong>Cursor init must use center coords.</strong> <code>let mx=window.innerWidth/2,my=window.innerHeight/2,rx=mx,ry=my</code> — never (0,0). Cursor IIFE must expose <code>cur</code> and <code>ring</code> to <code>window</code> so external hover handlers work.</li>
+        <li><strong>Cursor must use event delegation</strong> for hover state. Static <code>querySelectorAll</code> patterns freeze on dynamic content.</li>
+      </ul>
+    </div>
+
+    <div class="card">
+      <div class="card-label">CSS</div>
+      <ul class="list">
+        <li><strong>backdrop-filter on modal backdrops</strong> creates GPU compositing layers that swallow fixed-position children. Do not use on <code>.cal-modal-backdrop</code> etc.</li>
+        <li><strong>Inline <code>display:none</code></strong> cannot be overridden by CSS class. Use CSS-only visibility control.</li>
+        <li><strong><code>cursor:none</code></strong> appears 25-80x per file. Stripping it brings back the Mac cursor. Keep it everywhere.</li>
+        <li><strong>DevTools open</strong> disables <code>cursor:none</code> by browser design. Not a bug.</li>
+      </ul>
+    </div>
+
+    <div class="card">
+      <div class="card-label">Workflow</div>
+      <ul class="list">
+        <li><strong>Browser cache is aggressive.</strong> When something looks unchanged, hard refresh first (Cmd+Shift+R). If still no change → DevTools → Application → Storage → Clear site data. Or test in Incognito.</li>
+        <li><strong>All hrefs use absolute paths</strong> starting with <code>/html/</code> (e.g., <code>/html/feed.html</code>).</li>
+        <li><strong>Next.js routing</strong> — folder names must be lowercase. Page files must be <code>page.tsx</code> lowercase.</li>
+      </ul>
+    </div>
+  </div>
+
+  <!-- THE PATH FORWARD -->
+  <div class="section">
+    <div class="section-eyebrow">The path forward</div>
+    <div class="section-title">What comes <em>next</em></div>
+
+    <div class="card coral">
+      <div class="card-label">Session 23 — pick this up first</div>
+      <div class="card-title">Empty states across all 7 pages</div>
+      <div class="card-body">Every page is currently seeded with mock data. A real new user would see populated content that isn't theirs, which is broken UX. Each page needs an empty state with Otto as the next-action invitation.</div>
+      <div class="card-body" style="margin-top: 12px;"><strong>Pages that need empty states:</strong></div>
+      <ul class="list">
+        <li><strong>Feed</strong> — "no posts yet · post your first thing"</li>
+        <li><strong>Profile</strong> — "your profile is empty · let's fill it in"</li>
+        <li><strong>Network</strong> — "no connections yet · find people"</li>
+        <li><strong>Campus</strong> — "verify your .edu to unlock"</li>
+        <li><strong>Opportunities</strong> — "no matches yet · finish your profile to see opportunities"</li>
+        <li><strong>Messages</strong> — "no messages yet · DMs unlock when you connect with someone"</li>
+        <li><strong>Agent</strong> — "let's set otto up · 3 minutes to your first draft"</li>
+      </ul>
+    </div>
+
+    <div class="card">
+      <div class="card-label">Then — Session 24 onward</div>
+      <div class="card-title">Otto v1 build via Claude Code</div>
+      <div class="card-body">2-3 sessions of focused work. Build the front-end of the Agent tab, corner ring across all pages, slide-out panel, post-publish flow. Use the mockups as visual reference, follow existing page patterns for the sidebar and chrome. Seeded data only — backend is a separate phase.</div>
+    </div>
+
+    <div class="card">
+      <div class="card-label">After that</div>
+      <div class="card-title">Onboarding flow + .edu verification + backend</div>
+      <div class="card-body">Otto onboarding is the gateway for new users (6 steps, ~3 min). .edu verification gates the Campus tab. Real backend (voice training pipeline, platform OAuth, posting queue) is the largest remaining phase and requires real infrastructure decisions.</div>
+    </div>
+  </div>
+
+  <!-- HOW TO USE THIS DOC -->
+  <div class="section">
+    <div class="section-eyebrow">For Claude (next session)</div>
+    <div class="section-title">How to <em>use this</em></div>
+
+    <div class="card dark">
+      <div class="card-body">If a future Claude is reading this at the start of a new session, here's the move:</div>
+      <ul class="list">
+        <li>Skim this handoff first. Don't ask Franky to re-explain the project — it's all here.</li>
+        <li>Open <code>vibe_journal.html</code> in a browser if more context is needed. The Otto section and the Features section are most useful for the upcoming work.</li>
+        <li>For visual reference, the Otto mockups are the source of truth. The big one is <code>05_otto_agent_tab.html</code>.</li>
+        <li>Franky's communication style: casual, no preamble, no over-apologizing, one task per message. Match the energy.</li>
+        <li>Don't waste tokens being polite. Don't waste his time being slow. Just do the thing.</li>
+      </ul>
+    </div>
+  </div>
+
+  <!-- NEXT CTA -->
+  <div class="next-cta">
+    <div class="next-cta-eyebrow">When you come back</div>
+    <div class="next-cta-title">Just say "let's do empty states"</div>
+    <div class="next-cta-body">Claude has everything needed in this doc + the journal + the mockups. No re-onboarding needed. Walk in, say what you want to work on, and go.</div>
+  </div>
+
+  <!-- FOOTER QUOTE -->
+  <div class="footer-quote">
+    <div class="footer-otto"></div>
+    <div class="footer-text">"good handoff. you've got this. i'll be here when you get back."</div>
+  </div>
+
+</div>
+
+</body>
+</html>

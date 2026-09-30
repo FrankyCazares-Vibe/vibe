@@ -1,0 +1,38 @@
+/* B5e (S68 wave 5) — paste into src/app/globals.css.
+   1) the LIGHT block goes at the end of the unlayered `:root { ... }` (~line 106),
+   2) the NIGHT block at the end of `:root[data-theme="dark"] { ... }`.
+   Each Light value is the exact literal it replaces; the code already carries
+   it as the var() fallback, so Light is identical with or without this block.
+   Night needs it: without it /network, UserCard (also in the post-viewers modal
+   and Otto stats), the phone EmptyTab/skeletons and the phone search field keep
+   their cream surfaces under Night's light ink. */
+
+/* ---- LIGHT (inside :root) ---- */
+  /* S68 wave 5 (B5e): translucent steps /network, UserCard and the phone
+     campus panes still used as literals. */
+  --glass-45: rgba(255,253,248,0.45);
+  --glass-60: rgba(255,253,248,0.60);
+  --glass-warm-40: rgba(255,250,240,0.40);
+  --glass-warm-50: rgba(255,250,240,0.50);
+  --glass-warm-66: rgba(255,250,240,0.66);
+  --glass-warm-68: rgba(255,250,240,0.68);
+  --glass-peach-66: rgba(255,243,228,0.66);
+  --glass-border-60: rgba(255,255,255,0.60);
+  --paper-92: rgba(255,255,255,0.92);
+  --gold-ink: #A06410;
+  --network-backdrop: radial-gradient(120% 80% at 0% 0%, rgba(255,222,180,0.45) 0%, rgba(255,222,180,0) 60%), radial-gradient(110% 80% at 100% 100%, rgba(255,200,170,0.35) 0%, rgba(255,200,170,0) 60%), linear-gradient(180deg, #FAF7F2 0%, #F4EDE2 100%);
+
+/* ---- NIGHT (inside :root[data-theme="dark"]) ---- */
+  /* S68 wave 5 (B5e): the same steps on #161515 paper; the network page
+     takes the campus feed's bloom. */
+  --glass-45: rgba(22,21,21,0.45);
+  --glass-60: rgba(22,21,21,0.60);
+  --glass-warm-40: rgba(22,21,21,0.40);
+  --glass-warm-50: rgba(22,21,21,0.50);
+  --glass-warm-66: rgba(22,21,21,0.78);
+  --glass-warm-68: rgba(22,21,21,0.78);
+  --glass-peach-66: rgba(22,21,21,0.78);
+  --glass-border-60: rgba(255,255,255,0.07);
+  --paper-92: rgba(22,21,21,0.92);
+  --gold-ink: #F0B45A;
+  --network-backdrop: radial-gradient(720px 620px at 0% 100%, rgba(255,92,53,0.42), rgba(255,92,53,0.10) 40%, transparent 68%), radial-gradient(560px 420px at 100% 0%, rgba(255,92,53,0.20), transparent 60%), #0C0B0B;

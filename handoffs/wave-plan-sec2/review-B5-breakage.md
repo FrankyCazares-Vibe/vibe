@@ -1,0 +1,21 @@
+# Review B5 — breakage lens (does anything break?)
+
+Reviewer, READ-ONLY on repo files. Appended in small chunks.
+
+## Progress
+- Read plan.md, waveA-build.md, plan-waveB.md, waveB-build.md, critique-B5.md, notes-B5.md.
+- Diffs read: failure-copy.ts (+NO_RETRY_STATUSES, +failureRetryable; describeFailure untouched), LoadFailed.tsx (optional retryable, pill hidden only when !action && retryable===false), _persistence.js twin (NO_RETRY + retryable() inside vibeFeedbackInit IIFE; vibeLoadFailure + vibeLoadFailed), join-copy.ts (4 additive keys), PostViewerMobile.tsx (comment only), OrgInviteSheet.tsx (deny + denied map + denyingId + wrap + LIGHT/shell tokens).
+- Tokens used by the LIGHT swap all exist in globals.css for Light (:59-104) and Night (:113-150): --cream, --charcoal, --ink-2, --ink-muted, --paper, --scrim-rgb (triple, "28,28,30" / "255,255,255"), --glass, --eyebrow-ink, --paper-70. No literal colour left inside the render JSX; DARK (inline) overrides every coloured key, incl. linkButton (#FF9D7E) so Deny reads in inline too.
+- toast(): extra `retryable` key from `{...asLoadFailure(r), tone}` (OrgInviteSheet :348) is ignored (toast.ts:51-68 reads message/tone/action/durationMs only).
+- Deny route (unchanged, requests/[id]/route.ts): 404 request_not_found (incl. pair block), 409 request_not_pending, 500 update_failed, 403 via requireNotRestricted. Sheet handles not_found/not_pending with reloadList; others toast.
+- Gates re-run by reviewer: B5 tests 70/70; tsc exit 0; npm test 1227/1228 (only parse-reminder).
+- (a) callers: 26 React files use LoadFailed/asLoadFailure; 27 static call sites. retryable only set by asLoadFailure / vibeLoadFailure on !ok, no action, status in [400,403,404,422], line without "Try again". Literal {message} callers (profile.html :9823/:9954, onboarding fallbacks) keep Retry. campusLoadFailure/MapMobile wrappers unchanged (their two campus codes carry "Back home"). Static `failed()` puts status on r (:383), so retryable() sees it. No other `retryable` identifier in public/html or src. node --check ok; git diff --check ok.
+- (a) dead-end scan: routes that turn a transient DB error into 400/403/404 on a first-load path. Only hit: /api/me/profile-bootstrap (:81-86, `if (error || !row) → 404`). ProfileMobile (own profile) → "That's no longer available." with NO Retry on a DB blip; MobileShell tab bar is the way out. Pre-existing mis-status, route not owned by B5 → shouldFix (route should 500 on `error`). ensureMember returns 500 on read errors (OK). users/[handle]/bootstrap 404 only on a real miss (static profile paints NOT_FOUND_HTML on 404 anyway).
+- (b) Deny: route unchanged (service role; owner/admin/mod; sheet only shown to owner/admin). Handler shares busyId lock; denyingId only changes the label. ok → denied map + patchRow(state none) → disabled "Denied" status (never an Invite pill under the thumb); 404/409 → toast + reloadList; 403 restricted → toast with See details; 429/500 → toast. invite-candidates drops viewer-pair-blocked requesters (:74, :431), so the 404-loop case isn't reachable. RowPatch seq logic unchanged. join-copy additive keys; join-copy tests green. Local DB clean (0 join requests, 0 removals).
+- (c) Night: every LIGHT/shell swap exact in Light except Undo/Deny link (#C54323 → --eyebrow-ink #C84A20, AA 4.6). No literal colour left in render JSX; LoadFailed light tone already tokenised; DARK (inline) untouched. 375 px wrap: text basis 140 + avatar + gaps + (Deny + Approve ≈185) > 315 px inner → buttons wrap to line 2, right-aligned; desktop modal fits one line.
+- Pre-existing, noted only: deny/approve UPDATE in requests/[id] has no `.eq("status","pending")` guard (two officers racing can leave a member's request row "denied"); phone adds a second Deny surface. Low.
+- eslint on owned files: 0 errors (pre-existing ShareIcon warning).
+
+## Verdict: ship (no mustFix)
+shouldFix: profile-bootstrap 404-on-DB-error (own profile loses Retry on a blip) + the `data: org`-ignores-error lookups in orgs/[slug]/** (follow-up: 500 on `error`); walk the can_approve===false Deny row once; builder's leftovers (stale 30-day comment, desktop gone-post comments box); pending-guard on the requests/[id] UPDATE.
+Done 2026-09-28. Nothing edited outside this file.

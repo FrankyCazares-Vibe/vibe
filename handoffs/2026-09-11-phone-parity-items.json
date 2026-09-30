@@ -1,0 +1,188 @@
+{
+ "items": [
+  {
+   "id": "F1",
+   "area": "(f) decline: database policy",
+   "location": "new supabase/migrations/20260911100000_channel_members_delete_own_pending.sql; live pg_policies on public.channel_members",
+   "current": "channel_members has row security on and only a SELECT policy and an UPDATE policy. authenticated holds table-level DELETE (relacl authenticated=rdDxtm) and cannot bypass row security, so the decline route's delete matches 0 rows and returns no error.",
+   "fix": "Add a DELETE policy, channel_members_delete_own_pending, TO authenticated USING (auth.uid() = user_id AND accepted_at IS NULL), plus a supabase_migrations.schema_migrations row. The exact SQL is in the design. No GRANT change is needed. Apply it before the F2 and B2 deploys.",
+   "batch": "B1-server-dm",
+   "size": "S"
+  },
+  {
+   "id": "F2",
+   "area": "(f) decline: stop claiming success when nothing was deleted",
+   "location": "src/app/api/me/threads/[id]/decline/route.ts:23-33",
+   "current": "It runs delete().eq(channel_id).eq(user_id) and returns {ok:true} whenever there's no error, even when 0 rows were deleted. That's the S54 silent failure.",
+   "fix": "Add .is('accepted_at', null) and .select('channel_id'). If 0 rows came back, re-read the membership row: none means {ok:true, already:true}; accepted means 409 'You already accepted this conversation.'; still pending means console.error plus a 500. The code is in the design.",
+   "batch": "B1-server-dm",
+   "size": "S"
+  },
+  {
+   "id": "D1",
+   "area": "(d) thread-list preview: server",
+   "location": "src/app/api/me/threads/route.ts:52 (type), :493-498 (select), :505-515 (reducer)",
+   "current": "last_message selects only channel_id, content, created_at and user_id, so a photo-only last message has empty content and no kind.",
+   "fix": "Add media_kind and attachment_kind to the select, the reducer and ThreadEntry.last_message. After deploy, verify that previews still render and a request thread still appears. lastErr is swallowed at :500-503, and a failure there would also hide every request through the guard at :557-561.",
+   "batch": "B1-server-dm",
+   "size": "S"
+  },
+  {
+   "id": "C2",
+   "area": "(c) quote stub label for a media parent (optional)",
+   "location": "src/app/api/me/threads/[id]/messages/route.ts:65-70, :152-157",
+   "current": "parent_preview has content, but no media or attachment kind, so a stub for a photo parent can only say 'Attachment' ('(media)' on desktop).",
+   "fix": "Add media_kind and attachment_kind to the hydrateParentPreviews select and to the ParentPreview type. The helper swallows its error in production (:158-163), so check stubs live after deploy.",
+   "batch": "B1-server-dm",
+   "size": "S"
+  },
+  {
+   "id": "A1",
+   "area": "(a) phone DM composer: attach a photo or video",
+   "location": "src/components/mobile/MessagesMobile.tsx:817-834 (state), :892-934 (send), :1270-1354 (input bar)",
+   "current": "The composer is text-only. send() returns early without text (:893-894), and Send is disabled unless there is text (:1326).",
+   "fix": "Add a hidden file input with desktop's accept list, a photo button and a staged chip (preview, size, ×), hidden when thread.type is 'org'. Check type and size on the client (15 MB images, 200 MB videos) with a toast. Then use vibeRequest for all three steps: POST /api/me/messages-upload-url, the PUT to uploadUrl, and the messages POST with media_url set to objectKey and media_kind set to kind. Media sends are non-optimistic, and on failure the staged file and draft are kept. Failure lines: \"Couldn't upload your photo.\", \"Couldn't upload your video.\", \"Couldn't send your message.\"",
+   "batch": "B2-messages-mobile",
+   "size": "L"
+  },
+  {
+   "id": "A2",
+   "area": "(a) text send through vibeRequest; implicit accept",
+   "location": "src/components/mobile/MessagesMobile.tsx:909-929, :1251-1267",
+   "current": "Send uses a raw fetch and an inline error banner showing the server's raw error, so a Terms or 401 refusal gets no action button.",
+   "fix": "Use vibeRequest with failure \"Couldn't send your message.\", keeping the temp-row removal and draft restore, and retire the banner. After a successful send in a request thread, mark the request resolved and call onThreadsChanged, because the server implicitly accepts (messages/route.ts:553-564).",
+   "batch": "B2-messages-mobile",
+   "size": "S"
+  },
+  {
+   "id": "B1",
+   "area": "(b) Accept / Decline on phone message requests",
+   "location": "src/components/mobile/MessagesMobile.tsx:48-70 (ThreadEntry, no is_request), :229 and :449-454 (Requests state and tab), :484-497 (thread passed to ConversationView), :802-816 (props), :1181-1270 (spot for the bar)",
+   "current": "The phone has no Accept or Decline control anywhere. Requests can only be accepted implicitly, by replying.",
+   "fix": "Add is_request to ThreadEntry and an optional onThreadsChanged prop to ConversationView (MessagesMobile passes refetchThreads). Render a request bar above the composer when thread.is_request === true, with desktop's sentence. Accept calls vibeRequest POST .../accept with failure \"Couldn't accept this request.\"; on ok the bar hides and threads are refetched. Decline confirms, then calls vibeRequest POST .../decline with failure \"Couldn't decline this request.\"; on ok threads are refetched and the view closes. Both buttons are disabled while busy. CampusMobile's org entries omit is_request, so the bar never shows there.",
+   "batch": "B2-messages-mobile",
+   "size": "M"
+  },
+  {
+   "id": "C1",
+   "area": "(c) quote-reply stubs and a Reply action",
+   "location": "src/components/mobile/MessagesMobile.tsx:95-118 (MessageRow), :2946-3567 (MessageBubble, stack at :3484-3497), :3569-3673 (ReactionPicker), :892-934 (send)",
+   "current": "The server returns parent_preview, but the phone neither types it nor renders it. There is no Reply action, and send never includes parent_message_id.",
+   "fix": "Type parent_preview, and render a desktop-style .dm-quote stub (↩ author, one-line body) above every kind of bubble. Add '↩ Reply' to the long-press ReactionPicker, hidden on temp_ rows. Show a reply pill above the composer with ×. send adds parent_message_id, and the optimistic row carries the preview. Clear the target on success and when the thread changes.",
+   "batch": "B2-messages-mobile",
+   "size": "M"
+  },
+  {
+   "id": "D2",
+   "area": "(d) thread-list preview: client label",
+   "location": "src/components/mobile/MessagesMobile.tsx:54-58, :575-579",
+   "current": "The preview falls back to 'Attachment' for any empty content.",
+   "fix": "Widen last_message with media_kind and attachment_kind. The label becomes content, else Photo, Video, Shared a clip or Shared a post, else Attachment.",
+   "batch": "B2-messages-mobile",
+   "size": "S"
+  },
+  {
+   "id": "E1",
+   "area": "(e) phone visitor ⋯ menu shell",
+   "location": "src/components/mobile/ProfileMobile.tsx:1081-1108 (visitor floating actions: Search only), :4629-4644 (floatingActionStyle), :949-951 (blocked early return)",
+   "current": "A visitor's header has only Search. There is no Block, Mute or Report anywhere on a phone profile, which an app-store review requires.",
+   "fix": "Add a ⋯ button when isVisitor, user.id is set, and the follow state isn't 'self'. It opens a vaul Drawer and quietly fetches /api/me/relationships (vibeRequest quiet, failure \"Couldn't check your mute setting.\"). Rows: Report {first}, Mute {first}… or Unmute {first}, Block {first} (danger), Cancel.",
+   "batch": "B3-profile-mobile-safety",
+   "size": "M"
+  },
+  {
+   "id": "E2",
+   "area": "(e) Report sheet",
+   "location": "ProfileMobile.tsx (new nested sheet); mirrors public/html/_safetyActions.js:256-321",
+   "current": "There is no user report anywhere on a phone.",
+   "fix": "A nested Drawer with 6 reasons, an optional note (maxLength 1000) and desktop's note text. Submit stays disabled until a reason is picked. It calls vibeRequest POST /api/me/reports with {target_type:'user', target_id:user.id, reason_code, reason}, failure \"Couldn't send your report.\", and success 'Report submitted. Thanks for telling us.' On failure the sheet stays open with its choices.",
+   "batch": "B3-profile-mobile-safety",
+   "size": "M"
+  },
+  {
+   "id": "E3",
+   "area": "(e) Mute sheet",
+   "location": "ProfileMobile.tsx (new nested sheet); mirrors _safetyActions.js:171-253; server mute/route.ts:12, :41-126",
+   "current": "There is no user mute on a phone.",
+   "fix": "A nested sheet with 1h, 8h, 24h, 7 days and Until I unmute. Mute calls vibeRequest POST /api/me/mute with {target_id, duration_hours} and failure \"Couldn't mute {first}.\" Unmute calls vibeRequest DELETE with failure \"Couldn't unmute {first}.\" Both show success toasts. See the open question: mute has no effect on the server today.",
+   "batch": "B3-profile-mobile-safety",
+   "size": "S"
+  },
+  {
+   "id": "E4",
+   "area": "(e) Block flow and what happens after",
+   "location": "ProfileMobile.tsx (menu row); mirrors _safetyActions.js:114-148; the post-block view is BlockedByTargetView at :4388-4539",
+   "current": "There is no block on a phone profile. Only the DM action sheet can block, with a raw fetch (MessagesMobile.tsx:1594-1618).",
+   "fix": "Confirm with desktop's text, then call vibeRequest POST /api/me/block with {target_id:user.id} and failure \"Couldn't block {first}.\" On ok: toast 'Blocked {name}', or 'Blocked {name} — connection removed' when removed_connection. Then setFollowState('none') and setUser to add _viewerHasBlocked: true, which renders BlockedByTargetView with Unblock. Don't reload, so the toast survives.",
+   "batch": "B3-profile-mobile-safety",
+   "size": "S"
+  },
+  {
+   "id": "D3",
+   "area": "(d) desktop and static previews (optional)",
+   "location": "public/html/messages.html:1911; public/html/_miniMessenger.js:448; public/html/_sharePicker.js:151-152",
+   "current": "A photo-only last message reads 'No messages yet' or 'New message request', or shows no preview line.",
+   "fix": "Use the same label fallback as D2, from last_message.media_kind and attachment_kind (needs D1).",
+   "batch": "B4-desktop-preview",
+   "size": "S"
+  }
+ ],
+ "batches": [
+  {
+   "name": "B1-server-dm",
+   "files": [
+    "supabase/migrations/20260911100000_channel_members_delete_own_pending.sql",
+    "src/app/api/me/threads/[id]/decline/route.ts",
+    "src/app/api/me/threads/route.ts",
+    "src/app/api/me/threads/[id]/messages/route.ts"
+   ],
+   "item_ids": [
+    "F1",
+    "F2",
+    "D1",
+    "C2"
+   ],
+   "risk": "The migration must be applied before the F2 route deploy; applied first, it is safe with the current code. If F2 ships first, Decline returns an honest 500 until the migration lands. D1 and C2 add columns to selects whose errors are swallowed (threads/route.ts:500-503; messages/route.ts:158-163). A typo would silently blank previews, hide every request (through the guard at :557-561), or remove every quote stub, so verify both live after deploy. Once decline really deletes, the sender's DM becomes peerless (shown as 'Direct message'), and a new message from the sender's profile opens a fresh request. The migration was not applied or executed here: SET ROLE was denied, and there are 0 pending rows in production."
+  },
+  {
+   "name": "B2-messages-mobile",
+   "files": [
+    "src/components/mobile/MessagesMobile.tsx"
+   ],
+   "item_ids": [
+    "A1",
+    "A2",
+    "B1",
+    "C1",
+    "D2"
+   ],
+   "risk": "ConversationView is shared with CampusMobile's org channels (CampusMobile.tsx:493, 1670-1682). Attach must be hidden for type 'org' (upload-url 403s there), the request bar must key on is_request === true, and onThreadsChanged must stay optional. There are 5 items in one large file (3673 lines), so keep diffs local. These are untested on a device: iOS HEIC (does the specific accept list make iOS hand over JPEG?), an empty file.type from some Android pickers (caught by the client check), R2 CORS for a PUT from a phone (desktop uses the same origin), the presigned lifetime on slow 200 MB uploads (DEFAULT_SIGN_EXPIRES_SEC not read), and HEVC .mov playback on Android. Decline only truly works after B1's migration. Out of scope and left untouched: toggleReaction's raw fetch (:967-975), and the action sheet's raw fetches (:1440-1618)."
+  },
+  {
+   "name": "B3-profile-mobile-safety",
+   "files": [
+    "src/components/mobile/ProfileMobile.tsx"
+   ],
+   "item_ids": [
+    "E1",
+    "E2",
+    "E3",
+    "E4"
+   ],
+   "risk": "The server-side effects are weaker than the copy. Mute has no effect anywhere, because nothing reads the mutes table and is_muting_now has no callers. Block does not filter the campus feed (src/app/api/feed/route.ts) or notifications (src/app/api/me/notifications/route.ts). Block's reverse-follow teardown is silently stopped by connections_delete_follower. An app-store reviewer can see a blocked user's posts in the feed. Reports need the target UUID, which the visitor payload has (build-vibe-user-v1.ts:88); hide ⋯ if it's missing. Reports are rate-limited to 10 per hour and Terms-gated, and the mapped toasts handle both."
+  },
+  {
+   "name": "B4-desktop-preview",
+   "files": [
+    "public/html/messages.html",
+    "public/html/_miniMessenger.js",
+    "public/html/_sharePicker.js"
+   ],
+   "item_ids": [
+    "D3"
+   ],
+   "risk": "Optional. It depends on D1 being deployed. These are static pages with no build step: parse every inline script and run node --check on the .js files. Low risk otherwise."
+  }
+ ],
+ "open_questions": "1. **Mute and Block don't do what their copy says.** This is the app-store-relevant one.\n   - Mute is a no-op on the server: nothing reads the `mutes` table.\n   - Block doesn't filter the campus feed or notifications.\n   - Should B3 ship Mute with honest copy, ship it only after a filter lands, or leave it out? Apple guideline 1.2 needs Report and Block, not Mute.\n   - Should a separate batch add block (and mute) filtering to `src/app/api/feed/route.ts` and `src/app/api/me/notifications/route.ts` before submission? No batch here owns those files.\n\n2. **The sender's side once decline really works.** The sender keeps a DM with no other member, titled \"Direct message\" on a phone and blank on desktop. Their later messages go nowhere, and messaging again from the profile creates a new request. The options:\n   - accept it (Instagram-like: the sender is never told)\n   - hide dead DMs from the sender in the threads route (a B1 change)\n   - label it (which reveals the decline)\n\n3. **Phone Decline confirm.** Desktop has no confirm. This spec adds `window.confirm` on the phone because a mis-tap is easy there. Keep it or drop it?\n\n4. **Who reviews reports?** Reports are insert-only through the user client, and I found no reviewer surface or notification in this pass (not searched exhaustively). Apple 1.2 expects timely action on reports; is there a process?\n\n5. **Pending group rows.** I didn't check whether add-to-group creates pending rows (`accepted_at` null) for new members. If it does, the new DELETE policy would let those members remove themselves before accepting, which looks harmless.\n\n6. **Things not verified at all:**\n   - executing or EXPLAINing the DELETE as `authenticated` (SET ROLE was denied)\n   - DELETE…RETURNING against the SELECT policy (reasoned only)\n   - iOS HEIC conversion and R2 CORS for a PUT from a phone\n   - `DEFAULT_SIGN_EXPIRES_SEC`\n   - any live multi-account request round trip (there are 0 pending requests in production today)"
+}

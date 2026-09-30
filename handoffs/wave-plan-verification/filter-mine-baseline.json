@@ -1,0 +1,38 @@
+{
+ "captured_at_sha": "15062bd",
+ "status": 200,
+ "ids": [
+  "6ca4ec6e-a8a8-4964-96c3-e02ef8610dca",
+  "6e881851-bfa4-4e88-9524-49823583a0c8",
+  "923896fb-c21e-4727-a164-037ba4e3d606",
+  "a73bee3e-84d1-490b-9103-cb16201971d2",
+  "f7ae4129-3228-4f8e-9022-c93874a42369"
+ ],
+ "handles": [
+  "sae",
+  "test-6ca4ec6e",
+  "test-6e881851",
+  "test-a73bee3e",
+  "test-f7ae4129"
+ ],
+ "keys": [
+  "audience",
+  "backdrop_preset",
+  "banner_url",
+  "campus_id",
+  "description",
+  "handle",
+  "hidden",
+  "id",
+  "is_public",
+  "join_policy",
+  "last_activity_at",
+  "links",
+  "logo_url",
+  "name",
+  "philanthropy",
+  "role",
+  "school",
+  "verified"
+ ]
+}

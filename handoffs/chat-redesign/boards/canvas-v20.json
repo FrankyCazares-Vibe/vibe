@@ -1,0 +1,482 @@
+{
+  "v": 3,
+  "attachments": {},
+  "boards": {
+    "Appearance.dc.html": {
+      "h": 520,
+      "title": "Settings · Appearance",
+      "w": 390,
+      "x": 1830,
+      "y": 2224
+    },
+    "Brand.dc.html": {
+      "h": 400,
+      "title": "The wordmark, night and light",
+      "w": 1280,
+      "x": 0,
+      "y": 0
+    },
+    "CampusPickerPhone.dc.html": {
+      "h": 844,
+      "title": "Campus · look around",
+      "w": 390,
+      "x": 0,
+      "y": 4728
+    },
+    "ChatA_Club.dc.html": {
+      "h": 844,
+      "is_interactive": true,
+      "title": "A · Inside a club",
+      "w": 390,
+      "x": 470,
+      "y": 5960
+    },
+    "ChatA_Inbox.dc.html": {
+      "h": 844,
+      "is_interactive": true,
+      "title": "A · Front Desk + Lounge · your chats",
+      "w": 390,
+      "x": 0,
+      "y": 5960
+    },
+    "ChatB_Room.dc.html": {
+      "h": 844,
+      "is_interactive": true,
+      "title": "B · Inside an event room",
+      "w": 390,
+      "x": 1530,
+      "y": 5960
+    },
+    "ChatB_Tonight.dc.html": {
+      "h": 844,
+      "is_interactive": true,
+      "title": "B · Tonight · the timeline",
+      "w": 390,
+      "x": 1060,
+      "y": 5960
+    },
+    "ChatC_Circle.dc.html": {
+      "h": 844,
+      "title": "C · A circle, opened",
+      "w": 390,
+      "x": 2590,
+      "y": 5960
+    },
+    "ChatC_Quad.dc.html": {
+      "h": 844,
+      "title": "C · The Quad · campus conversation",
+      "w": 390,
+      "x": 2120,
+      "y": 5960
+    },
+    "FeedDesktopB.dc.html": {
+      "h": 820,
+      "title": "Feed · Option B · wide paper (idea)",
+      "w": 1280,
+      "x": 1360,
+      "y": 980
+    },
+    "FeedDesktopNight.dc.html": {
+      "h": 820,
+      "title": "Night · desktop (Option A)",
+      "w": 1280,
+      "x": 0,
+      "y": 2224
+    },
+    "FeedPhone.dc.html": {
+      "h": 844,
+      "title": "Feed · phone",
+      "w": 390,
+      "x": 2720,
+      "y": 980
+    },
+    "FeedPhoneNight.dc.html": {
+      "h": 844,
+      "title": "Night · phone",
+      "w": 390,
+      "x": 1360,
+      "y": 2224
+    },
+    "Main.dc.html": {
+      "h": 820,
+      "title": "Feed · Option A · reading column (chosen)",
+      "w": 1280,
+      "x": 0,
+      "y": 980
+    },
+    "Palette.dc.html": {
+      "h": 420,
+      "title": "Tokens · light and night",
+      "w": 880,
+      "x": 2300,
+      "y": 2224
+    },
+    "ProfileArrangeDesktop.dc.html": {
+      "h": 900,
+      "title": "Profile · desktop · arranging",
+      "w": 1280,
+      "x": 0,
+      "y": 3448
+    },
+    "ProfileArrangePhone.dc.html": {
+      "h": 844,
+      "title": "Profile · phone · arrange sheet",
+      "w": 390,
+      "x": 1360,
+      "y": 3448
+    },
+    "R2_CampusChat.dc.html": {
+      "h": 844,
+      "is_interactive": true,
+      "title": "Option 2 · Campus › Chat › Events",
+      "w": 390,
+      "x": 1530,
+      "y": 7440
+    },
+    "R2_Chats.dc.html": {
+      "h": 844,
+      "is_interactive": true,
+      "title": "Option 1 · Messages › Chats (DMs + groups)",
+      "w": 390,
+      "x": 0,
+      "y": 7440
+    },
+    "R2_Clubs.dc.html": {
+      "h": 844,
+      "is_interactive": true,
+      "title": "Option 1 · Messages › Clubs",
+      "w": 390,
+      "x": 470,
+      "y": 7440
+    },
+    "R2_Events.dc.html": {
+      "h": 844,
+      "is_interactive": true,
+      "title": "Option 1 · Messages › Events (your RSVPs)",
+      "w": 390,
+      "x": 940,
+      "y": 7440
+    },
+    "R2_Mix.dc.html": {
+      "h": 844,
+      "is_interactive": true,
+      "title": "Option 3 · A + B mix · one inbox + your week",
+      "w": 390,
+      "x": 2120,
+      "y": 7440
+    },
+    "R3_Month.dc.html": {
+      "h": 844,
+      "is_interactive": true,
+      "title": "Option 3 · tap 'Your week' → your month",
+      "w": 390,
+      "x": 3060,
+      "y": 7440
+    },
+    "R3_NextWeek.dc.html": {
+      "h": 844,
+      "is_interactive": true,
+      "title": "Option 3 · swipe to next week",
+      "w": 390,
+      "x": 2590,
+      "y": 7440
+    },
+    "VisitingPhone.dc.html": {
+      "h": 844,
+      "title": "Campus · viewing Bloomington",
+      "w": 390,
+      "x": 470,
+      "y": 4728
+    },
+    "W0_Board.dc.html": {
+      "h": 844,
+      "is_interactive": true,
+      "title": "Inside a club · the Board (replies fold, stay quiet)",
+      "w": 390,
+      "x": 470,
+      "y": 8904
+    },
+    "W0_Cards.dc.html": {
+      "h": 1100,
+      "is_interactive": true,
+      "title": "The cards in the chat",
+      "w": 390,
+      "x": 3880,
+      "y": 8904
+    },
+    "W0_Club.dc.html": {
+      "h": 844,
+      "is_interactive": true,
+      "title": "Inside a club · the Lounge",
+      "w": 390,
+      "x": 0,
+      "y": 8904
+    },
+    "W0_Club_Light.dc.html": {
+      "h": 844,
+      "is_interactive": true,
+      "title": "Inside a club · Light",
+      "w": 390,
+      "x": 1410,
+      "y": 8904
+    },
+    "W0_EmptyClub.dc.html": {
+      "h": 844,
+      "is_interactive": true,
+      "title": "Empty · a brand new club (officer)",
+      "w": 390,
+      "x": 5880,
+      "y": 8904
+    },
+    "W0_EmptyClubs.dc.html": {
+      "h": 844,
+      "title": "Empty · no clubs yet",
+      "w": 390,
+      "x": 5410,
+      "y": 8904
+    },
+    "W0_EmptyWeek.dc.html": {
+      "h": 844,
+      "title": "Empty · nothing on your week yet",
+      "w": 390,
+      "x": 4940,
+      "y": 8904
+    },
+    "W0_Home.dc.html": {
+      "h": 844,
+      "is_interactive": true,
+      "title": "Messages home · v1 (All, Chats, Clubs, Requests)",
+      "w": 390,
+      "x": 4470,
+      "y": 8904
+    },
+    "W0_NewPoll.dc.html": {
+      "h": 844,
+      "is_interactive": true,
+      "title": "New poll (Anonymous switch works)",
+      "w": 390,
+      "x": 2470,
+      "y": 8904
+    },
+    "W0_NewSignup.dc.html": {
+      "h": 844,
+      "is_interactive": true,
+      "title": "New sign-up",
+      "w": 390,
+      "x": 2940,
+      "y": 8904
+    },
+    "W0_ShareEvent.dc.html": {
+      "h": 844,
+      "is_interactive": true,
+      "title": "Share an event",
+      "w": 390,
+      "x": 3410,
+      "y": 8904
+    },
+    "W0_Tray.dc.html": {
+      "h": 844,
+      "is_interactive": true,
+      "title": "The + tray · Poll, Sign-up, Event",
+      "w": 390,
+      "x": 2000,
+      "y": 8904
+    },
+    "W0_Room.dc.html": {
+      "x": 940,
+      "y": 8904,
+      "w": 390,
+      "h": 844,
+      "is_interactive": true,
+      "title": "An event chat · v1 (Tweaks: soon, live, after, closed)"
+    }
+  },
+  "createdOnFiles": {
+    "at": "2026-09-26T16:20:24.184Z",
+    "v": 1
+  },
+  "designSystems": [],
+  "launch": {
+    "view": "canvas"
+  },
+  "notes": {
+    "chatA": {
+      "fill": "orange",
+      "size": 24,
+      "text": "A · Front Desk + Lounge (familiar, but better). Clubs and DMs in one inbox. Each club has a Board only officers post on (replies stay quiet), a Lounge where members talk, and room chips for events. Easiest to build.",
+      "w": 860,
+      "x": 0,
+      "y": 6860
+    },
+    "chatB": {
+      "fill": "pink",
+      "size": 24,
+      "text": "B · Tonight (fresh). Chat is organised by time: live and upcoming event rooms first, each club's Lounge as a Hangout. Rooms open before an event, glow when live, become an album after.",
+      "w": 860,
+      "x": 1060,
+      "y": 6860
+    },
+    "chatC": {
+      "fill": "purple",
+      "size": 24,
+      "text": "C · The Quad (bold). One named, verified campus conversation lit by the bloom, with your clubs as circles on top. Most 'all together', but needs many clubs and more moderation.",
+      "w": 860,
+      "x": 2120,
+      "y": 6860
+    },
+    "r2opt1": {
+      "fill": "orange",
+      "size": 24,
+      "text": "Option 1 · Everything in Messages, three tabs: Chats (DMs + group chats only), Clubs, Events. The RSVP week strip lives on Events. Click the tabs to switch.",
+      "w": 1330,
+      "x": 0,
+      "y": 8324
+    },
+    "r2opt2": {
+      "fill": "pink",
+      "size": 24,
+      "text": "Option 2 · Club + event chat stays in Campus › Chat. Messages stays DMs + group chats.",
+      "w": 390,
+      "x": 1530,
+      "y": 8324
+    },
+    "r2opt3": {
+      "fill": "green",
+      "size": 24,
+      "text": "Option 3 · your pick · A + B mix: one Messages inbox with a compact 'Your week' on top. Beyond this week: swipe the strip week by week ('This week' jumps back), or tap 'Your week' for the month of your RSVPs. The inbox never moves.",
+      "w": 1330,
+      "x": 2120,
+      "y": 8324
+    },
+    "row0": {
+      "kind": "title1",
+      "maxW": 3110,
+      "text": "0 · The brand, from your images",
+      "w": 240,
+      "x": 0,
+      "y": -260
+    },
+    "row1": {
+      "kind": "title1",
+      "maxW": 3110,
+      "text": "1 · The feed and the rolling newsletter",
+      "w": 240,
+      "x": 0,
+      "y": 720
+    },
+    "row2": {
+      "kind": "title1",
+      "maxW": 3110,
+      "text": "2 · Night mode",
+      "w": 240,
+      "x": 0,
+      "y": 1964
+    },
+    "row3": {
+      "kind": "title1",
+      "maxW": 3110,
+      "text": "3 · Arrange your profile",
+      "w": 240,
+      "x": 0,
+      "y": 3188
+    },
+    "row4": {
+      "kind": "title1",
+      "maxW": 3110,
+      "text": "4 · Look around other campuses",
+      "w": 240,
+      "x": 0,
+      "y": 4468
+    },
+    "row5": {
+      "kind": "title1",
+      "maxW": 2980,
+      "text": "5 · Club chat · three directions",
+      "w": 240,
+      "x": 0,
+      "y": 5700
+    },
+    "row6": {
+      "kind": "title1",
+      "maxW": 3450,
+      "text": "6 · Round 2 · where chat lives",
+      "w": 240,
+      "x": 0,
+      "y": 7180
+    },
+    "row7": {
+      "kind": "title1",
+      "maxW": 6270,
+      "text": "7 · Club chat v1 · the build set",
+      "w": 240,
+      "x": 0,
+      "y": 8644
+    },
+    "w0club": {
+      "fill": "orange",
+      "size": 24,
+      "text": "Inside a club, restyled to Option 3. The Lounge is where members talk; the Board is where officers post and replies fold under the post. Room chips: Lounge, Board, Officers, plus one chip per event you're going to. An event chat has Where and When, who's going, and the same + tray. 'Your hat' shows your role in v1 (Owner, Officer, Mod, Member); custom titles come after launch. Tweaks: on the Board switch officer / member; on the event chat switch soon, live, after, closed.",
+      "w": 1800,
+      "x": 0,
+      "y": 9804
+    },
+    "w0empty": {
+      "fill": "green",
+      "size": 24,
+      "text": "Messages home as it ships in v1 (Requests stays; this week only), and the three empty states for launch, when there are few clubs and events. Each has one next step.",
+      "w": 1800,
+      "x": 4470,
+      "y": 9804
+    },
+    "w0tray": {
+      "fill": "pink",
+      "size": 24,
+      "text": "The + tray has three things in v1: Poll, Sign-up, Event. Polls show names unless you switch on Anonymous. Sign-ups always show names. The Event card's Going and Maybe are your real RSVP. Press Play on the tray to walk the flow.",
+      "w": 2000,
+      "x": 2000,
+      "y": 10060
+    }
+  },
+  "order": [
+    "Brand.dc.html",
+    "Main.dc.html",
+    "FeedDesktopB.dc.html",
+    "FeedPhone.dc.html",
+    "FeedDesktopNight.dc.html",
+    "FeedPhoneNight.dc.html",
+    "Appearance.dc.html",
+    "Palette.dc.html",
+    "ProfileArrangeDesktop.dc.html",
+    "ProfileArrangePhone.dc.html",
+    "CampusPickerPhone.dc.html",
+    "VisitingPhone.dc.html",
+    "ChatA_Inbox.dc.html",
+    "ChatA_Club.dc.html",
+    "ChatB_Tonight.dc.html",
+    "ChatB_Room.dc.html",
+    "ChatC_Quad.dc.html",
+    "ChatC_Circle.dc.html",
+    "R2_Chats.dc.html",
+    "R2_Clubs.dc.html",
+    "R2_Events.dc.html",
+    "R2_CampusChat.dc.html",
+    "R2_Mix.dc.html",
+    "R3_NextWeek.dc.html",
+    "R3_Month.dc.html",
+    "W0_Club.dc.html",
+    "W0_Board.dc.html",
+    "W0_Room.dc.html",
+    "W0_Club_Light.dc.html",
+    "W0_Tray.dc.html",
+    "W0_NewPoll.dc.html",
+    "W0_NewSignup.dc.html",
+    "W0_ShareEvent.dc.html",
+    "W0_Cards.dc.html",
+    "W0_Home.dc.html",
+    "W0_EmptyWeek.dc.html",
+    "W0_EmptyClubs.dc.html",
+    "W0_EmptyClub.dc.html"
+  ],
+  "pages": [],
+  "title": "Vibe S67 Design Directions"
+}

@@ -1,0 +1,122 @@
+@@ -39 +39 @@
+-Vibe · Indianapolis · Launch roadmap after the September 26 founders' meeting · Updated Monday September 28, 2026</span
++Vibe · Indianapolis · Launch roadmap after the September 26 founders' meeting · Updated Tuesday September 29, 2026</span
+@@ -90,2 +90,2 @@
+-<span class="n" data-count="33"
+-33</span
++<span class="n" data-count="32"
++32</span
+@@ -157 +157 @@
+- The project is set up; the first step is installing Android Studio.</li
++ The project is set up and Android Studio, the tool that builds it, is installed (Sept 29); the first build comes next.</li
+@@ -175 +175 @@
+-Since the Sept 26 meeting · Updated Mon Sep 28</span
++Since the Sept 26 meeting · Updated Tue Sep 29</span
+@@ -193,0 +194,4 @@
++
+          <li
++<b
++The website is ready for our first post</b
++ (done Sept 28): the product journal is off the public site, link previews show the new tagline, and there's a share image.</li
+@@ -199 +203,5 @@
+- the "coming up + trending" strip on the campus feed; move and hide profile sections, bio to the side (planned for November, done now); and look around any campus, view only (your home campus locks for 45 days, and RSVPs stay on it). Night mode is live too; everyone starts in Light for now.</li
++ the "coming up + trending" strip on the campus feed; move and hide profile sections, bio to the side (planned for November, done now); and look around any campus, view only (your home campus locks for 45 days, and RSVPs stay on it).</li
++
+          <li
++<b
++New Sept 28–29, all live:</b
++ club officers can delete a club post, and edit or cancel a club event; everyone who RSVP'd gets a notice from the club. Night mode is on every page, and the app now follows your phone's own light or dark setting. On a computer, Vibe has one top bar, in school colors.</li
+@@ -207 +215 @@
+- moving and hiding profile sections is free; the extras are Vibe+. Franky picked two tagline finalists (Chapter 2).</li
++ moving and hiding profile sections is free; the extras are Vibe+. The tagline is picked: "Your campus. Your people. Yourself." (Chapter 2).</li
+@@ -218 +226 @@
+- the app, the paperwork, and getting the campus on it. Next in the app: Night mode on the older pages, and officer tools for clubs (delete a club post; edit, cancel or delete an event).</p
++ the app, the paperwork, and getting the campus on it. Night mode and the officer tools are done. Next in the app: the club chat redesign (Chapter 4).</p
+@@ -250,2 +258,2 @@
+-Tagline, two finalists (Franky, Sept 26):</b
+- "Your campus. Your people. Yourself." and "Your campus. Your profile. Yourself." Recommendation: "people" for the main account and launch posts, "profile" for posts about making your page your own. Franky picks by Fri Oct 2, before the link preview changes (task f10).</p
++Tagline, picked (Franky, Sept 28):</b
++ "Your campus. Your people. Yourself." It already shows in link previews and on the share image.</p
+@@ -327 +335 @@
+-Thirty-three days, four dates that don't move<span class="dot"
++Thirty-two days, four dates that don't move<span class="dot"
+@@ -586 +594 @@
+-In your area you hear the other two once, then you decide. These lists were drafted for the Sept 26 meeting and updated Sept 28: change what's in your own area. Cleared tasks come off the page and get one line in Chapter 1. Checkmarks save only on your own phone.</p
++In your area you hear the other two once, then you decide. These lists were drafted for the Sept 26 meeting and updated Sept 29: change what's in your own area. Cleared tasks come off the page and get one line in Chapter 1. Checkmarks save only on your own phone.</p
+@@ -668 +676 @@
+- It has never been built. First step: install Android Studio on the Mac</label
++ It has never been built. Android Studio is installed on the Mac (Sept 29); next is its first-time setup, then the first build</label
+@@ -672,8 +680,16 @@
+-
+            <div class="task"
+-<input type="checkbox" id="t-f10" data-id="f10"
+-<label for="t-f10"
+-<b
+-Get the website ready for our first post:</b
+- take the product journal off the public site, swap the old "your campus, your career" line that shows in link previews for the new tagline, and add a share image</label
+-<span class="when"
+-Sat Oct 3</span
++
+            <div class="task new" style="background:linear-gradient(90deg,var(--f-soft),transparent 85%)"
++<input type="checkbox" id="t-f12" data-id="f12"
++<label for="t-f12"
++<span class="flag-new" style="color:var(--f)"
++New</span
++<b
++Rebuild club chat so it feels like Vibe, not Discord.</b
++ Each club gets a Board (officers post news) and a Lounge (members talk), every event gets its own chat for the club members who RSVP'd, and polls, sign-ups and RSVPs work inside the chat. It lives in Messages, with "Your week" (the events you RSVP'd to) on top. <b
++Week of Oct 5–9:</b
++ on for the three of us and SAE, so demo days can show it on SAE. <b
++Oct 10–14:</b
++ event chats and polls. <b
++No chat changes after Thu Oct 15,</b
++ so Apple's reviewer sees one steady app when we submit Oct 16. On for everyone Mon Oct 26, when doors open. On a computer, chat stays as it is today until after launch</label
++<span class="when" style="color:var(--f)"
++By Thu Oct 15</span
+@@ -973,0 +990,4 @@
++<b
++New club chat on for the three of us and SAE</b
++ (Board, Lounge, "Your week" in Messages), so demo days can show it on SAE</li
++<li
+@@ -1037,0 +1058,4 @@
++Event chats and polls done by Wed Oct 14. <b
++No chat changes after Thu Oct 15,</b
++ so Apple's reviewer sees one steady app</li
++<li
+@@ -1144,0 +1169,2 @@
++<li
++New club chat switched on for everyone Mon Oct 26, when doors open</li
+@@ -1403 +1429 @@
+- no account or post is recorded yet. Before the first post, Franky takes the product journal off the public site and fixes the link preview (task f10).</p
++ no account or post is recorded yet. The website is ready for the first post: the product journal is off the public site and link previews show the new tagline.</p
+@@ -1776 +1802 @@
+-No paid ads. No hiring, no paid campus reps. No second campus before the test passes, never two at once. No big new features before launch beyond the club asks in Chapter 12; video posts stay on hold. No deals with the universities: be useful to clubs first.</p
++No paid ads. No hiring, no paid campus reps. No second campus before the test passes, never two at once. No big new features before launch beyond the club chat redesign and the club asks in Chapter 12; video posts stay on hold. No deals with the universities: be useful to clubs first.</p
+@@ -1788 +1814 @@
+-Two product calls, then twelve quick ones<span class="dot"
++Two product calls, then eleven quick ones<span class="dot"
+@@ -1821 +1847 @@
+- after the officer tools already next in line, the member list, roles and handover come first, because "what happens when I graduate?" comes up at every club meeting. Then club badges. Both before the Oct 23 check if they fit; if not, badges move to November. <b
++ after the club chat redesign (Chapter 4), the member list, roles and handover come first, because "what happens when I graduate?" comes up at every club meeting. Then club badges. Both before the Oct 23 check if they fit; if not, badges move to November. <b
+@@ -1862,14 +1887,0 @@
+-The tagline</b
+- (Franky's two finalists, Chapter 2)</td
+-<td
+-Franky picks by Fri Oct 2 (recommendation: "Your campus. Your people. Yourself.") so f10 can put it in the link preview Sat Oct 3. The "profile" version stays for posts about making your page your own.</td
+-</tr
+-
+          <tr
+-<td
+-<span class="who"
+-<i class="i"
+-</i
+-Franky</span
+-</td
+-<td
+-<b
+@@ -1907 +1919 @@
+-Yes, now. It closes the photo takedown gap (task f11) and stops people signing up with passwords already leaked online.</td
++Not yet (Franky, Sept 28); f11 waits on this call.</td
+@@ -2024 +2036 @@
+-Counts come from Vibe's live database. Paperwork facts come from Apple, Google, the IRS, Indiana and the banks' own pages; campus rules from IU's and Purdue's published policies. Most things we act on were checked twice against the original page. Still open, and marked as questions here: the Texas law, Indiana's tax return, and the fall-break dates. Answered since: Google Play needs the D-U-N-S number too. The long version, with every link, is in our shared folder. This replaces the September 21 roadmap at the same link. Updated Monday September 28, evening: every count on the cover and in Chapter 6 was recounted from the live database (the only changes are our own test events on Sept 26 and 28, and two of us, not one, coming back this week), plus the D-U-N-S request, the state filing, James's Oct 3 amendment, what shipped since the meeting, the phone apps' real state, and the meeting's product and marketing asks. What the meeting decided isn't written down, so those calls stay open in Chapter 12.</p
++Counts come from Vibe's live database. Paperwork facts come from Apple, Google, the IRS, Indiana and the banks' own pages; campus rules from IU's and Purdue's published policies. Most things we act on were checked twice against the original page. Still open, and marked as questions here: the Texas law, Indiana's tax return, and the fall-break dates. Answered since: Google Play needs the D-U-N-S number too. The long version, with every link, is in our shared folder. This replaces the September 21 roadmap at the same link. Updated Monday September 28, evening: every count on the cover and in Chapter 6 was recounted from the live database (the only changes are our own test events on Sept 26 and 28, and two of us, not one, coming back this week), plus the D-U-N-S request, the state filing, James's Oct 3 amendment, what shipped since the meeting, the phone apps' real state, and the meeting's product and marketing asks. What the meeting decided isn't written down, so those calls stay open in Chapter 12. Updated Tuesday September 29: what shipped Sept 28–29, the tagline, and the club chat redesign with its dates. The counts are still the Sept 28 ones; only "days to launch" moved.</p

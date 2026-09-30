@@ -1,0 +1,32 @@
+# integration pass notes (started Tue Sep 29 19:44:09 EDT 2026)
+- read contract 0,1,6,8,10-16
+- helpers: q.sh (psql read), c.sh who METHOD path [body]
+- 1a: created event 0a622d3e-d2e9-4ec3-b249-bf2af1304b93 (w1test integration event) as avery: 200
+- 1b: blake going->row, maybe->row kept, DELETE->row gone; re-RSVP blake going, casey maybe, drew going (non-member, 200, no row)
+- event room GET validated for blake/casey/avery/emery: OK (get-event-*.json); drew GET 403 Not a member
+- 1c: avery DELETE event: 200 notified 3; event/room/rows/messages/rsvps all 0
+- s15: nulled blake lounge accepted_at via PostgREST (orig 2026-09-29 20:41:06.394978+00)
+- setup: avery Board post 9f68f1a3-9ace-4bee-9ccf-043eebced64b 'w1test int Board post to remove' removed via admin route (restore later)
+- 6.2 matrix: 59/59 MATCH (out-62.tsv)
+- 6.1 GETs validated (board/lounge/officers/game/cook/closed/sae room/sae officers/dm x roles) all OK; ?root/?after/before/limit OK; out-root.tsv 10/10 MATCH
+- restored removed post via admin restore
+- DM blake->emery f128f961-df2c-4fe3-99df-50ed8f627547 created (w1test)
+- avery followed casey (to undo); group  'w1test int group' created
+- group not possible: blake blocks casey (seed), only avery<->blake/casey connected; avery unfollowed casey again
+- leftover: follow notification 98336998 for casey from avery (local)
+- 8a: list/create matrix; 16 MATCH, 2 expectation corrections (drew publish gate 403 school_email_required = HEAD; event-title clash unreachable with spaced seed titles). room w1test-int-room b2c80711 created (201, kind room, 4 rows)
+- 8b/8c: PATCH/DELETE/reorder 56 cases MATCH; mixed refused PATCH writes nothing (checked); topics restored to null; w1test-int-room created+deleted; snapshot identical, rows 17
+- club w1test_int_club 59789fa5-9fee-4855-874d-92607e58152d created by emery
+- after-deploy: 0 findings in 0 clubs; 12 clubs, 45 rooms
+- rooms-check: all 200 cases passed, ROLLBACK
+- typecheck exit 0; npm test 1374/1374
+- 6.6 23/23 MATCH (incl. DM request decline + DM self-leave); decline club rooms 400 x4 roles; drew decline = 200 already (non-member, today's)
+- 6.7 16/16 MATCH; DM upload 503 locally (R2 blank in .env.development.local)
+- 8: 8a 16+2 corrected, 8b 28, 8c 28, 8d 4 MATCH; club w1test_int_club created by emery (3 rooms, owner rows on lounge+board)
+- officer-style removal -> removed {by officer, reason null}; restored
+- lint: route/lib files 0 errors; MessagesMobile/campus-home same errors as HEAD
+- writing report next
+- report: header + sections 1-2 written, matrix appended
+- report section 3 written
+- report sections 4-6 + notes written
+- report complete

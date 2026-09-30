@@ -1,0 +1,14 @@
+{
+ "id": "E5-phone-profile-card (FOLD INTO B16 ProfileMobile owner)",
+ "files": [
+  "src/components/mobile/ProfileMobile.tsx"
+ ],
+ "contract": "OWNED BY onboarding B16 (ProfileMobile + profile.html); fold in.\n\nTypes and in-place update:\n- PostRow (:141-148): add `tags?: string[] | null; edited_at?: string | null;`\n- `const applyPostEdit = useCallback((p: EditedPost) => { setPosts(prev => prev ? prev.map(x => x.id === p.id ? { ...x, content: p.content, tags: p.tags, edited_at: p.edited_at } : x) : prev); setSavedPosts(prev => prev ? prev.map(x => x.id === p.id ? { ...x, content: p.content, tags: p.tags } : x) : prev); setReposts(prev => prev ? prev.map(r => r.post.id === p.id ? { ...r, post: { ...r.post, content: p.content, tags: p.tags } } : r) : prev); }, []);` (state :251, :295, :296)\n- PostViewerMobile mount (:1990-1995): add `onEdited={applyPostEdit}`. Keep `canDelete={!isVisitor}`.\n- PostsGrid (:2202): new props `onEdited` and `onDeleted: () => void` (wired to refetchPosts). PostFeedCard (:2252) gets `isOwner={!isVisitor}`, `onEdited`, `onDeleted`.\n\nPostFeedCard (:2258):\n- Wrap the existing root `<button>` (:2268-2270) in `<div style={{ position: \"relative\" }}>`. When isOwner, render a SIBLING (not nested) \u22ef button: `aria-label=\"Post actions\"`, absolute top 8 right 8, 30x30, styled like CampusMobile.tsx:1053-1080.\n- It opens a local `OwnPostActionsSheet` built on the sheet chrome consts at :5199+ (sheetOverlayStyle, sheetContentStyle z 10000/10001, handle, hidden title \"Post options\").\n- Rows: \"Edit post\", \"Delete post\" (danger), \"Cancel\" (bold). See open question on Delete.\n- Edit opens `<EditPostSheet nested \u2026 onSaved={(p)=>{ onEdited(p); close both }} />` inside that sheet's Drawer.Root.\n- Delete: `window.confirm(\"Delete this post?\")`, then `vibeRequest(`/api/posts/${id}`, { method: \"DELETE\", credentials: \"include\", failure: \"Couldn't delete this post.\" })`, then onDeleted(). Same flow as PostViewerMobile.tsx:144-165.\n- Content <p>: add paddingRight 34 when isOwner so text clears the \u22ef.\n- Timestamp (:2337): `relTimeForCard(post.created_at) + (post.edited_at ? \" \u00b7 Edited\" : \"\")`.\n\nVisitors see no \u22ef on cards. Their viewer menu is unchanged.\n\nDEPENDS ON E1 and E2.",
+ "acceptance": [
+  "375x812 own /profile, Posts tab: each card has a \u22ef. Tapping it does NOT open the viewer. The sheet shows Edit post / Delete post / Cancel.",
+  "Edit from the card: Save updates the card text in place and adds \" \u00b7 Edited\". Opening the viewer afterwards shows the new text and #chips.",
+  "Edit from the viewer opened from a card: after closing, the card shows the new text (no refetch). Saved and Reposts tabs show the new text for the same post.",
+  "Visited profile (/profile/<other>): no \u22ef on cards.",
+  "No nested <button> inside <button> in the rendered DOM for the card (check read_page / DOM)."
+ ]
+}

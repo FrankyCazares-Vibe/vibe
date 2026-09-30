@@ -1,0 +1,691 @@
+{
+ "items": [
+  {
+   "id": "S1",
+   "area": "shared-react",
+   "location": "src/components/feedback/LoadFailed.tsx (new)",
+   "current": "No inline load-failure component exists; src/components/feedback/ holds only ToastHost.tsx.",
+   "fix": "Add the \"use client\" LoadFailed component and the asLoadFailure helper (design §2).",
+   "batch": "B0",
+   "size": "S"
+  },
+  {
+   "id": "S2",
+   "area": "shared-static",
+   "location": "public/html/_persistence.js:102-330 (vibeFeedbackInit)",
+   "current": "Static pages hand-roll the pattern (profile.html:9316-9328, :9551-9557).",
+   "fix": "Add window.vibeLoadFailure and window.vibeLoadFailed inside vibeFeedbackInit; actions go through __vibeTopNav (design §3).",
+   "batch": "B0",
+   "size": "S"
+  },
+  {
+   "id": "C1",
+   "area": "feed (desktop)",
+   "location": "src/app/campus/campus-home.tsx:4265-4302 (load), :4452-4465 (render)",
+   "current": "Non-ok or throw → setEntries([]) → \"No posts yet — orgs you follow…\". refresh() after a post or row mutate (:4433, :4472) replaces a loaded feed with that copy. S54 row 11.",
+   "fix": "First load: vibeRequest quiet → LoadFailed light inside feedGlass. Refresh: non-quiet (\"Couldn't refresh the feed.\"), keep entries.",
+   "batch": "B1",
+   "size": "M"
+  },
+  {
+   "id": "C2",
+   "area": "events tab (desktop)",
+   "location": "campus-home.tsx:6592-6629, render :6697-6704",
+   "current": "Same collapse → \"No upcoming events on campus. Be the first to post one\". refresh (:6715, :6726) wipes the list. The Promise.all with .then(r=>r.json()) (:6609-6612) means an HTML 500 on the orgs call blanks events too. S54 row 44.",
+   "fix": "Split the two calls; events via vibeRequest; LoadFailed dark; refresh keeps the list.",
+   "batch": "B1",
+   "size": "M"
+  },
+  {
+   "id": "C3",
+   "area": "orgs discover (desktop)",
+   "location": "campus-home.tsx:7773-7803, render :7943-7951",
+   "current": "Failure → setResults([]) → \"No orgs to discover yet — be the first to create one.\"",
+   "fix": "loadErr → LoadFailed dark. A refetch on query or dormant toggle keeps results and toasts.",
+   "batch": "B1",
+   "size": "S"
+  },
+  {
+   "id": "C4",
+   "area": "orgs mine / Chat tab (desktop)",
+   "location": "campus-home.tsx:450-486, isEmpty :543, render :686-691",
+   "current": "Failure → setOrgs([]) → the \"create or browse orgs\" EmptyState onboarding card.",
+   "fix": "A loadErr branch before isEmpty; LoadFailed dark in the chat column.",
+   "batch": "B1",
+   "size": "S"
+  },
+  {
+   "id": "C5",
+   "area": "org channel rail (desktop)",
+   "location": "campus-home.tsx:500-531 (guard :501), :490",
+   "current": "Non-ok caches [] for the org forever. A throw caches nothing and shows nothing. The main pane reads \"Pick a channel to start chatting.\" (:11734).",
+   "fix": "Never cache on failure; keep a per-org failure map; compact dark LoadFailed in the rail; Retry clears the entry.",
+   "batch": "B1",
+   "size": "S"
+  },
+  {
+   "id": "C6",
+   "area": "org channel chat (desktop)",
+   "location": "campus-home.tsx:11956-12000, render :12248-12260",
+   "current": "First fetch fails → loaded=true with [] → \"No messages yet — be the first to say hi in #x.\" Polls already keep messages.",
+   "fix": "A first-load failure → LoadFailed dark. Polls stay quiet and keep.",
+   "batch": "B1",
+   "size": "S"
+  },
+  {
+   "id": "C7",
+   "area": "feed comments (desktop)",
+   "location": "campus-home.tsx:5939-5957, render :6013-6016",
+   "current": "Failure → \"No comments yet — be the first.\"",
+   "fix": "Compact LoadFailed light.",
+   "batch": "B1",
+   "size": "S"
+  },
+  {
+   "id": "C8",
+   "area": "search (desktop campus)",
+   "location": "campus-home.tsx:3533-3559, :3625-3627, render :3749-3752",
+   "current": "Non-ok or throw → empty arrays → \"No results for “q”\".",
+   "fix": "A failure state → compact LoadFailed; Retry reruns the query.",
+   "batch": "B1",
+   "size": "S"
+  },
+  {
+   "id": "C9",
+   "area": "Otto feed strip (Trending, Heads up)",
+   "location": "campus-home.tsx:10791-10811, render :10894-10898 and :10961-10966",
+   "current": "One Promise.all: either failure → \"No upcoming events on your radar\" and \"No trending tags yet\".",
+   "fix": "Two independent quiet loads; compact dark LoadFailed per section.",
+   "batch": "B1",
+   "size": "S"
+  },
+  {
+   "id": "C10",
+   "area": "map zone sheet (desktop)",
+   "location": "campus-home.tsx:10472-10499, render :10653-10666",
+   "current": "Failure → empty buckets → \"Nobody else at your campus has this major…\" or \"No new faces here yet.\"",
+   "fix": "Compact dark LoadFailed.",
+   "batch": "B1",
+   "size": "S"
+  },
+  {
+   "id": "C11",
+   "area": "map overview (desktop)",
+   "location": "campus-home.tsx:9043-9058, render :9407-9411",
+   "current": "Honest \"Couldn't load the map · Reload to try again.\", but no control, and 401 is not mapped.",
+   "fix": "LoadFailed dark with Retry.",
+   "batch": "B1",
+   "size": "S"
+  },
+  {
+   "id": "C12",
+   "area": "org admin members/requests modals",
+   "location": "campus-home.tsx:1729-1748 (+:1799), :1939-1958 (+:1990-1992)",
+   "current": "The raw server string (\"Unauthorized\", \"Network error\") shows in modalErrorStyle. The requests modal also says \"No pending requests.\" under the error.",
+   "fix": "asLoadFailure line plus Retry via the existing reloadKey; no empty copy while failed.",
+   "batch": "B1",
+   "size": "S"
+  },
+  {
+   "id": "M1",
+   "area": "feed (mobile)",
+   "location": "src/components/mobile/CampusMobile.tsx:194-213, FeedPane :628-641, refetch :463-464, :511",
+   "current": "Non-ok or throw → setFeed([]) → \"The feed is quiet — Be the first to drop a post\"; a refetch after posting wipes the loaded feed. It reads j.entries, which /api/feed never sends (route.ts:306-319), and works only via the legacy posts fallback. S54 row 11.",
+   "fix": "vibeRequest; read data.feed (map .post) with the posts fallback; first failure → LoadFailed light; refetch keeps and toasts.",
+   "batch": "B2",
+   "size": "M"
+  },
+  {
+   "id": "M2",
+   "area": "feed #tag (mobile), adjacent contract bug",
+   "location": "CampusMobile.tsx:256-276, :316-325",
+   "current": "Reads r.data.entries, which is never sent, so every successful tag answer becomes posts:null and only the loaded matches show, silently. The full tag list is never used.",
+   "fix": "Read r.data.feed. Keep the current behaviour for a real failure, since vibeRequest already toasts.",
+   "batch": "B2",
+   "size": "S"
+  },
+  {
+   "id": "M3",
+   "area": "events (mobile)",
+   "location": "CampusMobile.tsx:215-223, EventsPane :1360-1366, onMutate :440",
+   "current": "Failure → \"Nothing scheduled\"; an RSVP refetch wipes the loaded list. S54 row 44.",
+   "fix": "Standard pattern (keep on refetch).",
+   "batch": "B2",
+   "size": "S"
+  },
+  {
+   "id": "M4",
+   "area": "orgs directory (mobile)",
+   "location": "CampusMobile.tsx:225-237, OrgsPane :2159-2166",
+   "current": "Failure → \"No orgs here yet\".",
+   "fix": "Standard pattern.",
+   "batch": "B2",
+   "size": "S"
+  },
+  {
+   "id": "M5",
+   "area": "chat pane joined orgs (mobile)",
+   "location": "CampusMobile.tsx:1392-1409, render :1492-1510",
+   "current": "Failure → \"No org chats yet. Join an org to get its channels.\"",
+   "fix": "LoadFailed dark.",
+   "batch": "B2",
+   "size": "S"
+  },
+  {
+   "id": "M6",
+   "area": "org channels drawer (mobile)",
+   "location": "CampusMobile.tsx:1719-1737, render :1950-1964",
+   "current": "Failure → \"No channels yet\".",
+   "fix": "LoadFailed dark.",
+   "batch": "B2",
+   "size": "S"
+  },
+  {
+   "id": "M7",
+   "area": "search overlay (mobile)",
+   "location": "CampusMobile.tsx:2766-2799, render :2914",
+   "current": "Failure → \"No matches for “q”\".",
+   "fix": "Compact LoadFailed.",
+   "batch": "B2",
+   "size": "S"
+  },
+  {
+   "id": "MM1",
+   "area": "thread list (mobile)",
+   "location": "src/components/mobile/MessagesMobile.tsx:270-285, render :459-462, EmptyState :764, refetch :255, :331, :494",
+   "current": "Non-ok or throw sets threads and requests to [], so one failed refetch turns an already-loaded list into \"No conversations yet\" (every conversation close refetches). S54 row 14.",
+   "fix": "First load quiet → LoadFailed. A refetch failure keeps both arrays and toasts.",
+   "batch": "B3",
+   "size": "S"
+  },
+  {
+   "id": "MM2",
+   "area": "conversation (mobile + CampusMobile org chat)",
+   "location": "MessagesMobile.tsx:845-866, render :1196-1219",
+   "current": "Failure → setMessages([]) → \"Say hi to {name}.\"",
+   "fix": "LoadFailed in the message area; keep the composer.",
+   "batch": "B3",
+   "size": "S"
+  },
+  {
+   "id": "MM3",
+   "area": "compose search (mobile)",
+   "location": "MessagesMobile.tsx:2664-2688, render :2812-2825",
+   "current": "Failure → \"No matches for “q”\".",
+   "fix": "Compact LoadFailed.",
+   "batch": "B3",
+   "size": "S"
+  },
+  {
+   "id": "N1",
+   "area": "network lists (desktop)",
+   "location": "src/components/network/NetworkPageClient.tsx:222-277, :628-633, :686-691, copy :754-775",
+   "current": "Every failure → [] → \"No followers yet… your graph fills in once you show up\", \"Nothing to suggest yet\" or \"Nothing matches that search.\" S54 row 13.",
+   "fix": "loadErr state; LoadFailed light instead of EmptyState; keep the skeleton on tab switch.",
+   "batch": "B4",
+   "size": "S"
+  },
+  {
+   "id": "N2",
+   "area": "network tabs + Discover (mobile)",
+   "location": "src/components/mobile/NetworkMobile.tsx:102-123, :128-156 (cache guard :131), ListPane :503-520",
+   "current": "Failure caches [] in usersByTab, so the tab reads \"No followers yet\" for the rest of the session and is never refetched.",
+   "fix": "A per-tab failure map; never cache []; LoadFailed; Retry clears the entry.",
+   "batch": "B4",
+   "size": "S"
+  },
+  {
+   "id": "N3",
+   "area": "people search (mobile)",
+   "location": "NetworkMobile.tsx:178-207, render :700",
+   "current": "Failure → \"No matches for “q”\".",
+   "fix": "Compact LoadFailed.",
+   "batch": "B4",
+   "size": "S"
+  },
+  {
+   "id": "P1",
+   "area": "profile posts (mobile)",
+   "location": "src/components/mobile/ProfileMobile.tsx:356-395, PostsGrid :2017-2027, refetch :1807, :1918",
+   "current": "Failure → \"No posts yet\"; a refetch after publish or delete wipes the grid.",
+   "fix": "Standard pattern; a refetch keeps and toasts.",
+   "batch": "B5",
+   "size": "S"
+  },
+  {
+   "id": "P2",
+   "area": "profile reposts (mobile)",
+   "location": "ProfileMobile.tsx:400-424, render :2255-2267",
+   "current": "Failure → \"No reposts yet\".",
+   "fix": "Standard pattern.",
+   "batch": "B5",
+   "size": "S"
+  },
+  {
+   "id": "P3",
+   "area": "saved posts (mobile)",
+   "location": "ProfileMobile.tsx:428-451, SavedGrid :2437-2443",
+   "current": "Failure → \"Nothing saved yet\".",
+   "fix": "Standard pattern.",
+   "batch": "B5",
+   "size": "S"
+  },
+  {
+   "id": "P4",
+   "area": "profile bootstrap (mobile)",
+   "location": "ProfileMobile.tsx:321-350, render :939-944",
+   "current": "Plain \"Could not load profile\" with no Retry; 401 and terms are not mapped (S54 row 33).",
+   "fix": "LoadFailed with the mapped action.",
+   "batch": "B5",
+   "size": "S"
+  },
+  {
+   "id": "PV1",
+   "area": "post viewer + /posts/[id]",
+   "location": "src/components/mobile/PostViewerMobile.tsx:156-176, render :581-584 (/posts/[id] renders it via src/app/posts/[id]/PostPageClient.tsx:15-22)",
+   "current": "Shows the raw server error (\"Unauthorized\", \"Request failed\") in red, with no Retry.",
+   "fix": "vibeRequest quiet → LoadFailed light (404 → \"That's no longer available.\").",
+   "batch": "B6",
+   "size": "S"
+  },
+  {
+   "id": "PV2",
+   "area": "post viewer comments",
+   "location": "PostViewerMobile.tsx:180-209, render :714-722",
+   "current": "Non-ok leaves comments null → \"Loading…\" forever; a throw → \"Be the first to comment.\"",
+   "fix": "Compact LoadFailed.",
+   "batch": "B6",
+   "size": "S"
+  },
+  {
+   "id": "O1",
+   "area": "Otto side panel (desktop React)",
+   "location": "src/components/network/OttoSidePanel.tsx:104-172, briefing :159-171, metrics :556-568, list :718-733",
+   "current": "List failure → \"no activity yet — go say hi to someone.\" Count failure → \"loading your activity…\" forever. Metrics failure → \"metrics not available yet…\". An HTML body throws in .json() and blanks the whole panel.",
+   "fix": "A quiet load per section; compact dark LoadFailed; a reopen keeps the prior list.",
+   "batch": "B7",
+   "size": "M"
+  },
+  {
+   "id": "O2",
+   "area": "Otto Stats metrics (both viewports)",
+   "location": "src/components/otto/OttoMetrics.tsx:64-89, render :104-141",
+   "current": "Failures → tiles 0/0/0/0 and \"no profile views yet.\"",
+   "fix": "LoadFailed per half.",
+   "batch": "B7",
+   "size": "S"
+  },
+  {
+   "id": "O3",
+   "area": "/otto payload (server)",
+   "location": "src/app/api/me/otto/route.ts:150-355 (each sub-query read as .data ?? []; the only .error check is auth at :133) → OttoActivity.tsx:67, OttoUpcoming.tsx:40, OttoRequests.tsx:28",
+   "current": "A DB error reads as \"nothing new on campus yet.\", \"nothing on the horizon. quiet week.\" or \"no one's waiting on you right now.\"",
+   "fix": "The route adds failed: (\"activity\"|\"upcoming\"|\"asking\")[]; each section renders LoadFailed (reload); OttoPageClient.tsx and OttoMobile.tsx pass it through.",
+   "batch": "B7",
+   "size": "M"
+  },
+  {
+   "id": "G1",
+   "area": "org page posts (server)",
+   "location": "src/app/orgs/[handle]/page.tsx:161-173, EmptyContent :722-733",
+   "current": "The query error is ignored → \"Nothing posted to the org yet.\"",
+   "fix": "Read error; render <LoadFailed tone=\"dark\" failure={{message:\"Couldn't load this org's posts. Try again.\"}} /> (reload).",
+   "batch": "B8",
+   "size": "S"
+  },
+  {
+   "id": "G2",
+   "area": "org page events",
+   "location": "src/app/orgs/[handle]/OrgEventsSection.tsx:38-55, render :113-126, refetch :151",
+   "current": "Failure → \"No events scheduled yet…\"; an RSVP refetch wipes the list.",
+   "fix": "Standard pattern.",
+   "batch": "B8",
+   "size": "S"
+  },
+  {
+   "id": "G3",
+   "area": "org page channels",
+   "location": "src/app/orgs/[handle]/ChannelsSection.tsx:40-60, render :172-183",
+   "current": "Failure → \"No channels here yet.\"",
+   "fix": "Standard pattern.",
+   "batch": "B8",
+   "size": "S"
+  },
+  {
+   "id": "X1",
+   "area": "share-post sheet (mobile)",
+   "location": "src/components/mobile/SharePostSheet.tsx:70-94, list :318-345, pill :370-384",
+   "current": "An error pill (raw j.error) sits above a list that says \"No chats yet — start a DM to share things.\"",
+   "fix": "LoadFailed in the list; keep the pill for send errors only.",
+   "batch": "B9",
+   "size": "S"
+  },
+  {
+   "id": "X2",
+   "area": "Settings blocked users",
+   "location": "src/components/settings/SettingsClient.tsx:185-205, render :243-266",
+   "current": "Failure → \"You haven't blocked anyone.\"",
+   "fix": "LoadFailed light.",
+   "batch": "B9",
+   "size": "S"
+  },
+  {
+   "id": "X3",
+   "area": "left-nav calendar",
+   "location": "src/components/LeftNav.tsx:455-487, reload listener :489-495, count :507-562",
+   "current": "Failure → entries []. A CALENDAR_CHANGED_EVENT reload wipes loaded entries, and the count badge disappears.",
+   "fix": "Keep on refetch (quiet); a first failure shows a compact LoadFailed.",
+   "batch": "B9",
+   "size": "S"
+  },
+  {
+   "id": "X4",
+   "area": "map (mobile)",
+   "location": "src/components/mobile/MapMobile.tsx zone :700-727 render :900-921; overview :266-279 render :385-390",
+   "current": "Zone failure → \"Nobody else at your campus…\" or \"Nobody to discover here right now.\" The overview is honest but has no Retry control.",
+   "fix": "LoadFailed dark for both.",
+   "batch": "B9",
+   "size": "S"
+  },
+  {
+   "id": "H1",
+   "area": "own posts (desktop profile)",
+   "location": "public/html/profile.html:8137-8162; empty states :3587-3602 via :5705-5716",
+   "current": "Silent return. With an empty cache the pane shows \"Nothing here yet\"; with a cache, stale localStorage cards stay with no signal.",
+   "fix": "window.vibeRequest quiet. With no cards, vibeLoadFailed in #profilePostsList and hide the empty states; with cards, keep them and vibeToast.",
+   "batch": "B10",
+   "size": "S"
+  },
+  {
+   "id": "H2",
+   "area": "visited profile posts",
+   "location": "profile.html:8168-8193",
+   "current": "Failure → \"They haven't posted anything yet.\"",
+   "fix": "vibeLoadFailed.",
+   "batch": "B10",
+   "size": "S"
+  },
+  {
+   "id": "H3",
+   "area": "visited profile bootstrap",
+   "location": "profile.html:7044-7100",
+   "current": "Any failure (401, 500, network) → \"User not found · No one with that handle on Vibe yet.\"",
+   "fix": "Only a 404 or a missing vibeUser means not found; anything else gets vibeLoadFailed with Retry or Sign in.",
+   "batch": "B10",
+   "size": "S"
+  },
+  {
+   "id": "H4",
+   "area": "reposts pane (desktop)",
+   "location": "profile.html:8241-8275",
+   "current": "Paints the raw server error (\"Unauthorized\", \"Request failed\"), no Retry.",
+   "fix": "vibeLoadFailed.",
+   "batch": "B10",
+   "size": "S"
+  },
+  {
+   "id": "H5",
+   "area": "saved pane (desktop)",
+   "location": "profile.html:8355-8387",
+   "current": "Same as H4.",
+   "fix": "vibeLoadFailed.",
+   "batch": "B10",
+   "size": "S"
+  },
+  {
+   "id": "H6",
+   "area": "profile search dropdown",
+   "location": "profile.html:6208-6237",
+   "current": "Non-ok → \"No results for “q”\"; a network error → \"Search failed. Try again.\" with no control.",
+   "fix": "Compact vibeLoadFailed.",
+   "batch": "B10",
+   "size": "S"
+  },
+  {
+   "id": "T1",
+   "area": "thread list (desktop)",
+   "location": "public/html/messages.html:2093-2121",
+   "current": "S54 row 12 is mostly fixed: a Retry state (:2113-2118), 401/terms redirects (:2099-2106), and refetches keep the list. What's left: it always says \"Check your connection\", even for a 500.",
+   "fix": "window.vibeRequest quiet + vibeLoadFailed; keep the redirects (open question).",
+   "batch": "B11",
+   "size": "S"
+  },
+  {
+   "id": "T2",
+   "area": "opening a thread (desktop)",
+   "location": "messages.html __dmOpenChannel :2206-2285, __dmLoadMessages catch :2203",
+   "current": "A first-load failure only logs. #msgsArea isn't cleared, so the previous thread's bubbles stay under the new header.",
+   "fix": "The first failed load for a channel → vibeLoadFailed in #msgsArea; polls stay quiet.",
+   "batch": "B11",
+   "size": "S"
+  },
+  {
+   "id": "SO1",
+   "area": "Otto panel (static)",
+   "location": "public/html/_otto.js notifications :578-583 → :679-690 (caller :452-456); metrics :588-611; count :629-642",
+   "current": "Non-ok → [] → \"no activity yet — go say hi to someone.\"; a throw leaves \"loading…\"; metrics → \"metrics not available yet…\"; a count failure leaves \"loading your activity…\".",
+   "fix": "A quiet vibeRequest per section; compact dark vibeLoadFailed.",
+   "batch": "B12",
+   "size": "S"
+  },
+  {
+   "id": "SO2",
+   "area": "mini messenger",
+   "location": "public/html/_miniMessenger.js list :398-421 (painted empty by showListView :376-390 before load); chat :508, :517, :540-545",
+   "current": "A first list failure → \"No conversations yet. Start one\". A chat-open failure → \"Loading…\" forever. Refetches keep (correct).",
+   "fix": "vibeLoadFailed in #vmmList and #vmmMsgs.",
+   "batch": "B12",
+   "size": "S"
+  },
+  {
+   "id": "SO3",
+   "area": "share picker (static)",
+   "location": "public/html/_sharePicker.js:184-199",
+   "current": "\"Could not load threads.\" with no Retry; 401 is not mapped.",
+   "fix": "vibeLoadFailed.",
+   "batch": "B12",
+   "size": "S"
+  },
+  {
+   "id": "SO4",
+   "area": "post viewer (static)",
+   "location": "public/html/_postViewer.js:410-426",
+   "current": "A post failure toasts the raw server error. A comments failure leaves the list blank (it is cleared at :461).",
+   "fix": "vibeRequest (mapped toast) for the post; compact vibeLoadFailed for comments.",
+   "batch": "B12",
+   "size": "S"
+  }
+ ],
+ "batches": [
+  {
+   "name": "B0 shared piece (first, blocking)",
+   "files": [
+    "src/components/feedback/LoadFailed.tsx",
+    "public/html/_persistence.js"
+   ],
+   "item_ids": [
+    "S1",
+    "S2"
+   ],
+   "risk": "Low. _persistence.js runs in <head> on all three static pages: create elements lazily, and actions must use __vibeTopNav."
+  },
+  {
+   "name": "B1 desktop campus",
+   "files": [
+    "src/app/campus/campus-home.tsx"
+   ],
+   "item_ids": [
+    "C1",
+    "C2",
+    "C3",
+    "C4",
+    "C5",
+    "C6",
+    "C7",
+    "C8",
+    "C9",
+    "C10",
+    "C11",
+    "C12"
+   ],
+   "risk": "High churn in a 12.6k-line file with many similar loaders. C5 changes the channelsByOrg cache guard; C6 must not add toasts to the 2 s poll."
+  },
+  {
+   "name": "B2 mobile campus",
+   "files": [
+    "src/components/mobile/CampusMobile.tsx"
+   ],
+   "item_ids": [
+    "M1",
+    "M2",
+    "M3",
+    "M4",
+    "M5",
+    "M6",
+    "M7"
+   ],
+   "risk": "M1/M2 change which response key is read (feed vs posts vs entries). Verify that reposts and the #tag view still render."
+  },
+  {
+   "name": "B3 mobile messages",
+   "files": [
+    "src/components/mobile/MessagesMobile.tsx"
+   ],
+   "item_ids": [
+    "MM1",
+    "MM2",
+    "MM3"
+   ],
+   "risk": "The ?to= effect waits on threads !== null (:310); a first-load failure must not leave it hanging or double-POST."
+  },
+  {
+   "name": "B4 network",
+   "files": [
+    "src/components/network/NetworkPageClient.tsx",
+    "src/components/mobile/NetworkMobile.tsx"
+   ],
+   "item_ids": [
+    "N1",
+    "N2",
+    "N3"
+   ],
+   "risk": "Low. The per-tab cache semantics change in NetworkMobile."
+  },
+  {
+   "name": "B5 mobile profile",
+   "files": [
+    "src/components/mobile/ProfileMobile.tsx"
+   ],
+   "item_ids": [
+    "P1",
+    "P2",
+    "P3",
+    "P4"
+   ],
+   "risk": "Low-medium. The file also has S57 leftovers (savePortfolioPatch); stay inside the load effects."
+  },
+  {
+   "name": "B6 post viewer",
+   "files": [
+    "src/components/mobile/PostViewerMobile.tsx"
+   ],
+   "item_ids": [
+    "PV1",
+    "PV2"
+   ],
+   "risk": "Low. It renders inside a Radix drawer and is also the /posts/[id] page."
+  },
+  {
+   "name": "B7 Otto",
+   "files": [
+    "src/components/network/OttoSidePanel.tsx",
+    "src/components/otto/OttoMetrics.tsx",
+    "src/app/api/me/otto/route.ts",
+    "src/components/otto/OttoActivity.tsx",
+    "src/components/otto/OttoUpcoming.tsx",
+    "src/components/otto/OttoRequests.tsx",
+    "src/components/otto/OttoPageClient.tsx",
+    "src/components/mobile/OttoMobile.tsx"
+   ],
+   "item_ids": [
+    "O1",
+    "O2",
+    "O3"
+   ],
+   "risk": "Medium. O3 changes the /api/me/otto contract (an additive optional field) and is a server route."
+  },
+  {
+   "name": "B8 org page",
+   "files": [
+    "src/app/orgs/[handle]/page.tsx",
+    "src/app/orgs/[handle]/OrgEventsSection.tsx",
+    "src/app/orgs/[handle]/ChannelsSection.tsx"
+   ],
+   "item_ids": [
+    "G1",
+    "G2",
+    "G3"
+   ],
+   "risk": "page.tsx is a server component. It may pass only serializable props to LoadFailed (no onRetry)."
+  },
+  {
+   "name": "B9 small React surfaces",
+   "files": [
+    "src/components/mobile/SharePostSheet.tsx",
+    "src/components/settings/SettingsClient.tsx",
+    "src/components/LeftNav.tsx",
+    "src/components/mobile/MapMobile.tsx"
+   ],
+   "item_ids": [
+    "X1",
+    "X2",
+    "X3",
+    "X4"
+   ],
+   "risk": "Low. LeftNav renders on every desktop page."
+  },
+  {
+   "name": "B10 profile.html",
+   "files": [
+    "public/html/profile.html"
+   ],
+   "item_ids": [
+    "H1",
+    "H2",
+    "H3",
+    "H4",
+    "H5",
+    "H6"
+   ],
+   "risk": "Medium. H1 interacts with the localStorage cache and pin restore; H3 must still send block and self paths where they go today."
+  },
+  {
+   "name": "B11 messages.html",
+   "files": [
+    "public/html/messages.html"
+   ],
+   "item_ids": [
+    "T1",
+    "T2"
+   ],
+   "risk": "It runs in an iframe (toast inside, navigation via __vibeTopNav). T2 must not fight renderMsgs' channel-keyed diffing."
+  },
+  {
+   "name": "B12 static shared scripts",
+   "files": [
+    "public/html/_otto.js",
+    "public/html/_miniMessenger.js",
+    "public/html/_sharePicker.js",
+    "public/html/_postViewer.js"
+   ],
+   "item_ids": [
+    "SO1",
+    "SO2",
+    "SO3",
+    "SO4"
+   ],
+   "risk": "These load on multiple static pages; parse-check each with node --check."
+  }
+ ],
+ "open_questions": "1. **messages.html 401/terms on the thread list.** It auto-redirects today (`:2099-2106`). Should that stay (recommended: the whole page is useless signed out), or switch to the mapped Sign in / Review Terms button like every other load?\n2. **User-initiated refetch failures** (after a post, an RSVP, closing a thread). I recommend keeping the rows and showing a toast; polls stay silent. Confirm the toast is wanted, not a silent keep.\n3. **O3 shape.** Should `/api/me/otto` report per-section `failed` flags (recommended: partial data still shows), or return 500 when any core query fails (which lands on \"otto's offline\")?\n4. **M2 is outside §4-1 strictly speaking.** It is a success read as a failure, not an empty-state lie. I put it in B2 because it is the same file and a one-key fix.\n5. **Events are empty in prod today:** 0 of 8 events are in the future. The empty copy is truthful now; the fix only separates an outage from it.\n\n**Not verified:**\n- Nothing was run, clicked or type-checked. Lines are at HEAD `48aa5b8`.\n- The event-attendees modal (`campus-home.tsx:7022-7035`) sets a raw error plus empty lists; I didn't read its render, so it isn't counted.\n- The LeftNav calendar modal's empty copy wasn't read.\n- I didn't check whether MapMobile really supports the \"pull to refresh\" its copy promises.\n- `src/app/feed/page.tsx` redirects to /campus in prod (flag off) and wasn't swept."
+}

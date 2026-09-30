@@ -1,0 +1,38 @@
+# B5 review — lens: COVERAGE (reviewer log, read-only on the batch's files)
+
+- Start: read contract 0, 1, 6.0, 6.1, 6.2, 6.4, 6.6, 6.7, 10, 11, 14, 15, 16 and the builder's notes (B5-notes.md).
+- Next: git diff of the six files, one at a time.
+- Read the MessagesMobile.tsx diff (12 hunks). Local GET /api/me/threads (blake): club rooms arrive as type "org_channel" with room_kind / can_post / org; thread GET carries room + viewer.
+  - Phone, items 1, 2, 3 present in the diff (quiet bar 2074-2101, toastSendFailure 353-357 on the three requests, canAttach 1434, action sheet 2363 + 2657).
+  - To check further: what the quiet bar says when roomKind is not board and not event; the phone list (ThreadRow); CampusMobile's use of ConversationView.
+- Next: campus-home.tsx diff.
+- Read the campus-home.tsx diff. ChannelChat items 1, 2 present (quiet line 16628-16652, send toast by code 16066-16070); Going line 10080-10094; room_locked in CreateChannelModal 1457, ChannelOverview.save 3362, ChannelDanger 3768.
+  - NOT covered: ChannelEditorRow (campus-home.tsx:2042, PATCH 2069 and DELETE 2097) still shows `data?.error || "Failed to save"` (works only because the server sends a sentence; not matched on code). Not one of the two modals the contract names, low.
+  - can_post_org_channel (local DB) says no only for a Board (non-officer) and a closed event chat, so the two-sentence choice in the quiet line is complete.
+  - Going line is drawn for every club event, also for a non-member of the club (contract 9: a non-member's RSVP writes no room row) -> the sentence is untrue for them. Contract question, not a builder miss.
+- Next: messages.html diff.
+- Read the messages.html diff. Items 1, 2, 3 present: #compQuiet + __dmPaintComposer (2341-2355), send refusals by code (__dmSendError 2672, catch 2655-2666), info panel hides photo edit 3011, rename 3017, + Add 3041, Leave group 3106, Delete conversation 3114, attach via .comp.club-room (423).
+  - The handlers behind the hidden buttons (__dmPanelLeave, __dmDeleteCurrent, __dmPanelSaveName, __dmPanelPhotoChosen) have no roomKind guard; only __dmPanelOpenAdd has one. Buttons are the only callers, so low.
+  - The panel's per-member "Remove" (cp-mem-kick) is still drawn when viewerRole === 'admin'; on a club room every channel_members row is 'member' locally, to verify in SQL.
+- Next: _miniMessenger.js diff.
+- Read _miniMessenger.js, _sharePicker.js, SharePostSheet.tsx diffs. Items 1, 2 (mini) and 4 + refusal sentence (pickers) present.
+  - Pickers: the refusal sentence only shows when EVERY send failed; a mixed result keeps "Sent to 1 of 2 chats. Try the other one again." (low).
+- HTTP (local, avery, test write then reverted): PATCH Board {"name":"board","topic":"w1test B5 review topic","is_private":false,"pinned":false} -> 200; same with topic null -> 200 (reverted); PATCH name "w1test-news" -> 409 {"code":"room_locked","error":"This room can't be renamed, hidden or deleted."}. So the old modal (sends every field) can still save a core room's topic.
+- Next: phone thread list rows, header, MessageBubble; then the mini messenger's Expand link; then gates (typecheck, eslint, node --check).
+
+## Resumed run (19:11)
+- Files unchanged since the first review pass (last builder write 18:53). Re-reading each diff to confirm the earlier notes, then finishing the list at the bottom.
+- Re-read MessagesMobile / campus-home / messages.html / mini diffs: matches the notes above.
+  - FINDING (medium) campus-home.tsx:1998-2110: the club settings modal's "Channels" tab (SettingsChannels -> ChannelEditorRow, shown for canManage at :1593/:1673) is a THIRD room editor. It offers rename, the private switch and Delete on Board / Lounge / Officers, and shows `data?.error` (not matched on code) at :2076 and :2097. The orchestrator decision for the two modals (no rename / private / Delete on core rooms, chatRefusalLine) leaves this surface out. `type Channel` (:212) has no `kind`.
+  - FINDING (low) MessagesMobile.tsx:1927 + 1336: a send refused with board_officers_only / room_closed sets canPost false but keeps replyTo / staged, so "Replying to X" with its × sits above the quiet bar. ChannelChat gates it (`replyTo && canPost`), messages.html hides it by CSS (.comp.no-post .dm-reply-pill); the phone and the mini messenger (pill is a sibling of .vmm-comp, _miniMessenger.js:931-942) do not.
+  - Going line: EventCard is the only RSVP site and is shared by CampusMobile.tsx:2138 and OrgEventsSection.tsx:179 (not B5's files), so the member-only repair has to get the answer inside campus-home (EventCard / module cache), not by a prop from CampusHome's page.
+  - Checked: vibeToast exists on the only page that loads the mini messenger (profile.html:22 _persistence.js); club-room channel_members rows are all role 'member' locally (SQL: board 14, event 15, lounge 14, room 1), so the panel's "Remove" never shows.
+- More findings:
+  - FINDING (low) MessagesMobile.tsx:2261 `clubRoom={!!roomKind}`: CampusMobile.tsx:2459-2471 synthesizes the thread as type "org" with no room_kind, so on phone Campus > Chat the ... sheet draws "Delete conversation" on a club room until the read answers, and for good when the read fails (loadErr keeps roomKind null). Fix: `clubRoom={!!roomKind || (!!thread && thread.type !== "dm" && thread.type !== "group")}` (ThreadType is "dm" | "group" | "org"; the list sends "org_channel").
+  - FINDING (low) pickers, mixed result: _sharePicker.js:361-368 and SharePostSheet.tsx:202-209 show the chat sentence only when EVERY send failed; one sent + one refused with a chat code says "Try the other one again." Only a race now that Boards are filtered.
+- Coverage table (all eight items): see the final answer. Checked with no finding: vibeRequest failure carries code + error (request.ts:37-42, _persistence.js vibeRequest); no attach / paste / drop path in a club room on any screen; GroupSettingsView (rename, photo, + Add, Leave) is reached only through "Group info" (isGroup) on the phone; messages.html opens only list threads (event rooms never reach it); ChannelChat is keyed on channel.id (campus-home.tsx:15826).
+- Gates (19:20): npm run typecheck exit 0; eslint campus-home 0 err / 6 warn, MessagesMobile 3 err / 1 warn (470, 523, 3650: the same three old rules, moved lines), SharePostSheet 0 / 0; node --check _miniMessenger.js, _sharePicker.js and both messages.html inline blocks OK.
+- HTTP (blake, read-only): list entries Board room_kind board can_post false, Lounge lounge true; thread GET Board viewer.can_post false, room.kind board, message keys include kind/thread_root_id/card/reply_count/author_role/hidden/removed, no removed_at. Upload-url for the Lounge still 503 "Media storage not configured" (B4's repair moves the guard; not B5).
+- Done. No test rows written in this run.
+- Coverage map (where each item is built): 1 quiet line — phone MessagesMobile 2074-2100, desktop ChannelChat campus-home 16628-16652, messages.html #compQuiet 1105 + __dmPaintComposer 2342, mini #vmmQuiet 275 + paintComposer 860. 2 refusals by code — phone toastSendFailure 354 (1269/1293/1327), ChannelChat 16068, messages.html __dmSendError 2673, mini 904, pickers. 3 club rooms — phone attach 1434, sheet 2363/2657; messages.html 3011/3017/3041/3106/3114 + .comp.club-room; mini has none of the six. 4 pickers — SharePostSheet 138, _sharePicker 239. 5 Going line — EventCard 10080-10094. 6 modals — 1458, 3364, 3768 (ChannelEditorRow missing). 7 — no renderer reads the new fields. 8 — tokens in every new style; not walked in a browser.
+- Final answer returned (4 findings: 1 medium, 3 low, + 1 low repair note on the Going line).

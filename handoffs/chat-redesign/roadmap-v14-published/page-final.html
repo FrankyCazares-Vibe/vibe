@@ -1,0 +1,980 @@
+
+<title>Vibe Launch Gates</title>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Fraunces:opsz,wght@9..144,400;9..144,700;9..144,900&amp;family=DM+Sans:wght@400;500;700&amp;family=DM+Mono:wght@400;500&amp;display=swap">
+<style id="page-style">
+  :root {
+    --ground:#FAF7F2; --surface:#FFFFFF; --rule:#E6DFD4; --ink:#141416; --body:#3A3733; --muted:#8A8580;
+    --accent:#FF5C35; --accent-soft:#FFEDE7;
+    --f:#FF5C35; --f-soft:#FFEDE7;
+    --j:#2F6BB0; --j-soft:#E4EDF8;
+    --r:#2E7D52; --r-soft:#E3F1E8;
+    --wait:#9A6B00; --wait-soft:#FFF4D6;
+    --serif:'Fraunces', Georgia, 'Times New Roman', serif;
+    --sans:'DM Sans', -apple-system, BlinkMacSystemFont, 'Segoe UI', Helvetica, Arial, sans-serif;
+    --mono:'DM Mono', ui-monospace, 'SF Mono', Menlo, monospace;
+  }
+  @media (prefers-color-scheme: dark) {
+    :root:not([data-theme="light"]) {
+      color-scheme: dark;
+      --ground:#141416; --surface:#1C1C1E; --rule:#302E2B; --ink:#F5F1EA; --body:#D8D2C8; --muted:#97918A;
+      --accent:#FF7A55; --accent-soft:#2A1A14; --f:#FF7A55; --f-soft:#2A1A14;
+      --j:#7FA8E0; --j-soft:#172433; --r:#6FCB97; --r-soft:#14261C; --wait:#E4B44C; --wait-soft:#2A2410;
+    }
+  }
+  :root[data-theme="dark"] {
+    color-scheme: dark;
+    --ground:#141416; --surface:#1C1C1E; --rule:#302E2B; --ink:#F5F1EA; --body:#D8D2C8; --muted:#97918A;
+    --accent:#FF7A55; --accent-soft:#2A1A14; --f:#FF7A55; --f-soft:#2A1A14;
+    --j:#7FA8E0; --j-soft:#172433; --r:#6FCB97; --r-soft:#14261C; --wait:#E4B44C; --wait-soft:#2A2410;
+  }
+  * { box-sizing: border-box; }
+  html { scroll-behavior: smooth; }
+  body { background: var(--ground); color: var(--body); font-family: var(--sans); font-size: 16px; line-height: 1.55; -webkit-font-smoothing: antialiased; padding-bottom: 72px; }
+  .wrap { max-width: 1080px; margin: 0 auto; padding: 0 24px; }
+  @media (max-width: 640px) { .wrap { padding: 0 16px; } }
+  h1, h2, h3, h4 { font-family: var(--serif); color: var(--ink); text-wrap: balance; margin: 0; font-weight: 700; }
+  p { margin: 0; }
+  a { color: var(--accent); }
+  strong, b { color: var(--ink); font-weight: 700; }
+  code { font-family: var(--mono); font-size: .92em; }
+  ul { margin: 0; padding-left: 18px; }
+  li { margin: 0; }
+  .eyebrow { font-family: var(--mono); font-size: 11.5px; letter-spacing: .14em; text-transform: uppercase; color: var(--muted); }
+  .prose { max-width: 66ch; display: flex; flex-direction: column; gap: 12px; }
+  .prose p { font-size: 16.5px; }
+  .sub { color: var(--muted); max-width: 68ch; font-size: 16px; }
+  .dot { color: var(--accent); }
+
+  /* chapters */
+  .chapter { padding-block: 56px; border-top: 1px solid var(--rule); }
+  .chapter:first-of-type { border-top: 0; padding-top: 40px; }
+  .chapter > .wrap > .head { display: flex; flex-direction: column; gap: 8px; margin-bottom: 24px; }
+  .chapter h2 { font-size: clamp(26px, 3.2vw, 36px); letter-spacing: -.01em; line-height: 1.1; }
+  body.present .chapter { min-height: 100dvh; display: flex; flex-direction: column; justify-content: center; scroll-snap-align: start; border-top: 0; padding-block: 72px 96px; }
+  body.present { scroll-snap-type: y proximity; }
+  body.present .readonly { display: none; }
+
+  /* owner chips */
+  .who { display: inline-flex; align-items: center; gap: 6px; font-family: var(--mono); font-size: 10.5px; letter-spacing: .08em; text-transform: uppercase; border-radius: 999px; padding: 3px 9px; white-space: nowrap; color: var(--f); background: var(--f-soft); }
+  .who.j { color: var(--j); background: var(--j-soft); }
+  .who.r { color: var(--r); background: var(--r-soft); }
+  .who.all { color: var(--ink); background: var(--rule); }
+  .who .i { width: 7px; height: 7px; border-radius: 999px; background: currentColor; }
+
+  /* numbers band */
+  .band { display: grid; grid-template-columns: repeat(auto-fit, minmax(128px, 1fr)); gap: 1px; background: var(--rule); border: 1px solid var(--rule); }
+  .cell { background: var(--surface); padding: 14px 16px 16px; display: flex; flex-direction: column; gap: 3px; }
+  .cell .n { font-family: var(--serif); font-size: 32px; font-weight: 700; color: var(--ink); font-variant-numeric: tabular-nums; line-height: 1.05; }
+  .cell .k { font-family: var(--mono); font-size: 11px; letter-spacing: .06em; text-transform: uppercase; color: var(--muted); }
+  .cell .t { font-size: 12.5px; color: var(--muted); }
+  .cell.flag .n { color: var(--accent); }
+  .cell.goal .n { color: var(--r); }
+
+  /* three founders */
+  .trio { display: grid; grid-template-columns: repeat(auto-fit, minmax(260px, 1fr)); gap: 1px; background: var(--rule); border: 1px solid var(--rule); }
+  .person { background: var(--surface); padding: 22px 20px 24px; display: flex; flex-direction: column; gap: 14px; border-top: 3px solid var(--f); }
+  .person.j { border-top-color: var(--j); } .person.r { border-top-color: var(--r); }
+  .person h3 { font-size: 22px; }
+  .person .result { font-family: var(--serif); font-size: 17px; line-height: 1.3; color: var(--ink); padding: 12px 14px; background: var(--f-soft); border-radius: 6px; }
+  .person.j .result { background: var(--j-soft); } .person.r .result { background: var(--r-soft); }
+  .person .lbl { font-family: var(--mono); font-size: 10.5px; letter-spacing: .08em; text-transform: uppercase; color: var(--muted); }
+  .person ul { display: flex; flex-direction: column; gap: 6px; }
+  .person li { font-size: 14.5px; }
+
+  /* tasks with private ticks */
+  .tasks { display: flex; flex-direction: column; }
+  .task { display: grid; grid-template-columns: 22px minmax(0, 1fr) auto; gap: 12px; align-items: start; padding: 10px 0; border-top: 1px dotted var(--rule); font-size: 15px; }
+  .task label, .person li, .callout li, .lane li, .row > span, td { min-width: 0; overflow-wrap: anywhere; }
+  .person, .callout, .lane { min-width: 0; }
+  .task:first-child { border-top: 0; }
+  .task input { margin: 4px 0 0; width: 16px; height: 16px; accent-color: var(--accent); cursor: pointer; }
+  .task .when { font-family: var(--mono); font-size: 10.5px; letter-spacing: .06em; text-transform: uppercase; color: var(--muted); padding-top: 4px; white-space: nowrap; }
+  .task.done label { color: var(--muted); text-decoration: line-through; text-decoration-color: var(--rule); }
+  .task label { cursor: pointer; }
+  .task label b { color: var(--ink); }
+  .task.done label b { color: inherit; }
+  .task.new { background: linear-gradient(90deg, var(--j-soft), transparent 85%); margin-inline: -8px; padding-inline: 8px; border-radius: 4px; }
+  .task.new .when { color: var(--j); font-weight: 500; }
+  .flag-new { font-family: var(--mono); font-size: 9.5px; letter-spacing: .08em; text-transform: uppercase; color: var(--j); margin-right: 4px; }
+
+  /* weeks */
+  .week { display: grid; grid-template-columns: 124px 1fr; border-top: 1px solid var(--rule); }
+  .week:last-child { border-bottom: 1px solid var(--rule); }
+  .week .when { padding: 22px 16px 26px 0; border-right: 1px solid var(--rule); display: flex; flex-direction: column; gap: 3px; }
+  .week .when .w { font-family: var(--serif); font-size: 19px; color: var(--ink); line-height: 1.1; }
+  .week .when .d { font-family: var(--mono); font-size: 11px; letter-spacing: .06em; color: var(--muted); text-transform: uppercase; }
+  .week .when .goal { font-size: 13px; color: var(--accent); margin-top: 6px; line-height: 1.35; }
+  .week .when .note { font-size: 12px; color: var(--wait); margin-top: 6px; line-height: 1.35; }
+  .lanes { padding: 22px 0 26px 22px; display: grid; grid-template-columns: repeat(auto-fit, minmax(220px, 1fr)); gap: 20px; }
+  .lane { display: flex; flex-direction: column; gap: 8px; }
+  .lane ul { display: flex; flex-direction: column; gap: 6px; }
+  .lane li { font-size: 14.5px; }
+  @media (max-width: 620px) {
+    .week { grid-template-columns: 1fr; }
+    .week .when { border-right: 0; padding-bottom: 8px; }
+    .lanes { padding-left: 0; padding-top: 8px; }
+  }
+
+  /* tables, rows, callouts */
+  .tablewrap { overflow-x: auto; border: 1px solid var(--rule); background: var(--surface); }
+  table { border-collapse: collapse; width: 100%; min-width: 560px; }
+  th, td { text-align: left; padding: 11px 14px; border-bottom: 1px solid var(--rule); font-size: 14.5px; vertical-align: top; }
+  th { font-family: var(--mono); font-size: 10.5px; letter-spacing: .08em; text-transform: uppercase; color: var(--muted); font-weight: 500; background: var(--ground); }
+  tr:last-child td { border-bottom: 0; }
+  .callout { border: 1px solid var(--rule); border-left: 3px solid var(--accent); background: var(--surface); padding: 18px 20px; display: flex; flex-direction: column; gap: 10px; max-width: 78ch; }
+  .callout h4 { font-size: 17px; }
+  .callout.wait { border-left-color: var(--wait); }
+  .grid2 { display: grid; grid-template-columns: repeat(auto-fit, minmax(280px, 1fr)); gap: 20px; }
+  .rows { display: flex; flex-direction: column; max-width: 78ch; }
+  .row { display: grid; grid-template-columns: auto 1fr; gap: 12px; align-items: start; padding: 11px 0; border-top: 1px dotted var(--rule); font-size: 15px; }
+  .row:first-child { border-top: 0; }
+  .days { display: grid; grid-template-columns: repeat(auto-fit, minmax(150px, 1fr)); gap: 1px; background: var(--rule); border: 1px solid var(--rule); }
+  .day { background: var(--surface); padding: 14px 14px 16px; display: flex; flex-direction: column; gap: 6px; }
+  .day .d { font-family: var(--mono); font-size: 10.5px; letter-spacing: .08em; text-transform: uppercase; color: var(--accent); }
+  .day h4 { font-size: 16px; }
+  .day p { font-size: 13.5px; }
+  .charter { counter-reset: line; display: flex; flex-direction: column; max-width: 78ch; }
+  .charter .line { display: grid; grid-template-columns: 38px 1fr; gap: 12px; padding: 14px 0; border-top: 1px solid var(--rule); }
+  .charter .line::before { counter-increment: line; content: counter(line); font-family: var(--serif); font-size: 26px; color: var(--accent); line-height: 1; }
+  .charter .line b { display: block; font-size: 16.5px; margin-bottom: 3px; }
+  .charter .line p { font-size: 14.5px; }
+  figure { margin: 0; display: flex; flex-direction: column; gap: 10px; }
+  figure svg { width: 100%; height: auto; display: block; }
+  figcaption { font-size: 13.5px; color: var(--muted); max-width: 78ch; }
+
+  /* animations: at rest everything is visible; .in plays them forward once */
+  .in .rise { animation: rise .7s cubic-bezier(.2,.7,.2,1) both; }
+  .in .rise:nth-child(2) { animation-delay: .12s; } .in .rise:nth-child(3) { animation-delay: .24s; } .in .rise:nth-child(4) { animation-delay: .36s; } .in .rise:nth-child(5) { animation-delay: .48s; }
+  @keyframes rise { from { opacity: 0; transform: translateY(14px); } to { opacity: 1; transform: none; } }
+  .in .draw { stroke-dasharray: 1000; animation: draw 2.4s ease-out both; }
+  @keyframes draw { from { stroke-dashoffset: 1000; } to { stroke-dashoffset: 0; } }
+  .in .pop { animation: pop .5s cubic-bezier(.2,.8,.3,1.4) both; transform-box: fill-box; transform-origin: center; }
+  @keyframes pop { from { opacity: 0; transform: scale(.2); } to { opacity: 1; transform: none; } }
+  .in .light { animation: light .6s ease-out both; }
+  @keyframes light { from { opacity: .25; } to { opacity: 1; } }
+  .bar { height: 12px; border-radius: 999px; background: var(--rule); position: relative; overflow: hidden; }
+  .bar i { position: absolute; inset: 0 auto 0 0; border-radius: 999px; background: var(--accent); width: var(--w); }
+  .bar i.today { background: var(--ink); }
+  .in .bar i { animation: grow 1.4s cubic-bezier(.2,.7,.2,1) both; }
+  @keyframes grow { from { width: 0; } }
+  @media (prefers-reduced-motion: reduce) { *, .in * { animation: none !important; transition: none !important; } html { scroll-behavior: auto; } }
+
+  /* presenter bar */
+  .bar-ui { position: fixed; left: 0; right: 0; bottom: 0; padding: 8px 12px calc(8px + env(safe-area-inset-bottom, 0px)); background: color-mix(in srgb, var(--surface) 92%, transparent); backdrop-filter: blur(10px); border-top: 1px solid var(--rule); display: flex; align-items: center; gap: 10px; z-index: 20; }
+  .bar-ui button { font: 500 12.5px var(--sans); color: var(--ink); background: var(--ground); border: 1px solid var(--rule); border-radius: 999px; padding: 7px 12px; cursor: pointer; }
+  .bar-ui button:hover { border-color: var(--muted); }
+  .bar-ui button.on { background: var(--ink); color: var(--ground); border-color: var(--ink); }
+  .bar-ui .pos { font-family: var(--mono); font-size: 11px; color: var(--muted); letter-spacing: .06em; margin-left: auto; white-space: nowrap; }
+  .bar-ui .dots { display: flex; gap: 5px; overflow: hidden; }
+  .bar-ui .dots a { width: 7px; height: 7px; border-radius: 999px; background: var(--rule); display: block; }
+  .bar-ui .dots a.on { background: var(--accent); }
+  @media (max-width: 640px) { .bar-ui .dots { display: none; } .bar-ui .hint { display: none; } }
+  :focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
+  .tick-note { font-size: 12.5px; color: var(--muted); }
+  body.present .bar-ui .hint::after { content: " Some detail shows only when reading."; }
+  html:has(body.present){scroll-snap-type:y proximity}
+  /* page frame, so a self-published copy looks the same as the first publish */
+  :root { padding-top: env(safe-area-inset-top, 0px); padding-bottom: env(safe-area-inset-bottom, 0px); }
+  body { margin: 0; }
+  [hidden]:not([hidden=until-found i]) { display: none !important; }
+
+  /* edit mode */
+  .bar-ui button.primary { background: var(--accent); color: #FFFFFF; border-color: var(--accent); }
+  .bar-ui button:disabled { opacity: .5; cursor: default; }
+  .bar-ui #editStatus { color: var(--body); min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+  .bar-ui .restore { font: 500 12.5px var(--sans); color: var(--accent); background: none; border: 0; padding: 7px 4px; text-decoration: underline; cursor: pointer; }
+  body.editing .bar-ui .hint, body.editing #presentBtn, body.editing #prevBtn, body.editing #nextBtn, body.editing .bar-ui .dots { display: none; }
+  body.editing [data-editable] { outline: 1px dashed color-mix(in srgb, var(--accent) 45%, transparent); outline-offset: 3px; border-radius: 3px; cursor: text; }
+  body.editing [data-editable]:hover { outline-color: var(--accent); }
+  body.editing [data-editable]:focus { outline: 2px solid var(--accent); background: var(--accent-soft); }
+  body.editing [data-editable][data-dirty] { outline: 2px solid var(--r); }
+  body.editing .rise, body.editing .pop, body.editing .draw, body.editing .light, body.editing .bar i { animation: none !important; }
+</style>
+<div id="doc"><nav class="bar-ui" aria-label="Presenter">
+  <button id="presentBtn" type="button">Present</button>
+  <button id="prevBtn" type="button" aria-label="Previous chapter">←</button>
+  <button id="nextBtn" type="button" aria-label="Next chapter">→</button>
+  <button id="editBtn" type="button" hidden="">Edit</button>
+  <button id="saveBtn" class="primary" type="button" hidden="" disabled="">Save</button>
+  <button id="discardBtn" type="button" hidden="">Discard</button>
+  <span id="editStatus" class="tick-note" role="status" aria-live="polite"></span>
+  <span class="hint tick-note">Arrow keys move between chapters in Present.</span>
+  <span class="dots" id="dots"></span>
+  <span class="pos" id="pos">1 / 14</span>
+</nav>
+<main id="page">
+
+<!-- 1 · Cover -->
+<section class="chapter" id="cover">
+  <div class="wrap">
+    <div class="rise" style="display:flex;align-items:center;gap:12px;margin-bottom:22px">
+      <svg width="44" height="44" viewBox="0 0 1254 1254" role="img" aria-label="Vibe">
+        <rect width="1254" height="1254" rx="260" fill="#FFFFFF"></rect>
+        <path d="M871 903.7 A383.5 383.5 0 1 1 977.7 759.9" fill="none" stroke="#FC6B2F" stroke-width="30" stroke-linecap="round"></path>
+        <circle cx="932.9" cy="838.1" r="53" fill="#FC6B2F"></circle>
+        <path fill="#1A1A1A" d="M426 432 H593 A16 16 0 0 1 609 448 V462 A16 16 0 0 1 593 478 H587 Q575.6 478 580.2 490 L657.2 690 Q660.3 698.1 663 690 L731 490 Q735.1 478 725 478 H709 A16 16 0 0 1 693 462 V448 A16 16 0 0 1 709 432 H827 A16 16 0 0 1 843 448 V462 A16 16 0 0 1 827 478 H821 Q810.3 478 805.8 490 L685.8 810 Q680.5 824 668 824 H590 Q577.8 824 572.4 810 L449.2 490 Q444.6 478 433 478 H426 A16 16 0 0 1 410 462 V448 A16 16 0 0 1 426 432 Z"></path>
+      </svg>
+      <span class="eyebrow">Vibe · Indianapolis · Launch roadmap after the September 26 founders' meeting · Updated Tuesday September 29, 2026</span>
+    </div>
+    <h1 class="rise" style="font-size:clamp(40px,7vw,72px);line-height:.96;font-weight:900;letter-spacing:-.02em;margin-bottom:22px">Five weeks to<br>October 31<span class="dot">.</span></h1>
+    <p class="rise" style="font-size:19px;line-height:1.5;max-width:60ch;margin-bottom:34px">The website is built, the iPhone app runs on Franky's computer, and Android is next. The next five weeks are clubs, students, the two stores and the paperwork. Every task has one name and one date.</p>
+    <div class="band rise">
+      <div class="cell"><span class="n" data-count="20">20</span><span class="k">Accounts</span><span class="t">us, friends, testers</span></div>
+      <div class="cell"><span class="n" data-count="14">14</span><span class="k">Verified school emails</span><span class="t">us included · all IU · 0 Purdue</span></div>
+      <div class="cell flag"><span class="n" data-count="0">0</span><span class="k">Clubs signed</span><span class="t">SAE is Franky's test page</span></div>
+      <div class="cell flag"><span class="n" data-count="0">0</span><span class="k">Upcoming events</span><span class="t">last one Sept 28, our own test</span></div>
+      <div class="cell flag"><span class="n" data-count="0">0</span><span class="k">Sign-ups, last 7 days</span><span class="t">last one Sept 17</span></div>
+      <div class="cell goal"><span class="n" data-count="32">32</span><span class="k">Days to launch</span><span class="t">Saturday, October 31</span></div>
+    </div>
+    <p class="tick-note rise readonly" style="margin-top:10px">Recounted from the live database on Monday September 28, 7 pm. The same as September 25 apart from our own test events (Sept 26 and 28): no clubs yet, and no new sign-ups since September 17.</p>
+  </div>
+</section>
+
+<!-- 2 · Where we are -->
+<section class="chapter" id="since">
+  <div class="wrap">
+    <div class="head">
+      <span class="eyebrow">Chapter 1 · Where we are</span>
+      <h2>Safety tools are live, the iPhone app runs, and both stores wait on one number<span class="dot">.</span></h2>
+      <p class="sub">One change of plan: we now aim to be in the App Store and Google Play by launch. If Apple's company account isn't approved by Oct 9, we launch without it.</p>
+    </div>
+    <div class="grid2">
+      <div class="callout rise">
+        <h4>Safety, live</h4>
+        <ul style="display:flex;flex-direction:column;gap:6px;font-size:14.5px">
+          <li>Students can <b>report</b> any post, comment, message, event or club.</li>
+          <li>We can <b>remove posts, suspend and ban</b>. A banned student can't come back with the same school email.</li>
+          <li>A <b>verified school email</b> is needed to post. A word filter runs everywhere.</li>
+          <li>Our safety pages promise we <b>review every report within 24 hours</b>. The Terms still say "no guarantee": the lawyer fixes that.</li>
+          <li><b>One gap left:</b> our legal pages promise a photo we take down is gone within 48 hours, but today it can keep loading for a few days. Franky fixes it before students arrive (Chapter 12).</li>
+        </ul>
+      </div>
+      <div class="callout rise">
+        <h4>The phone app</h4>
+        <ul style="display:flex;flex-direction:column;gap:6px;font-size:14.5px">
+          <li>Vibe <b>installs to a home screen</b> from the website today.</li>
+          <li>The <b>real iPhone app runs</b> on a test iPhone on Franky's computer (since Sept 25). It goes on a real phone once Apple approves our account.</li>
+          <li><b>Android has never been built.</b> The project is set up and Android Studio, the tool that builds it, is installed (Sept 29); the first build comes next.</li>
+          <li>The website is <b>ready for Apple's and Google's reviewers</b>.</li>
+          <li><b>Phone notifications are built, switched off.</b> Turning them on takes four setup steps, not more code (Week 3). <b>Vibe+</b> (our $3.99/month upgrade) <b>is built, switched off</b>, and hidden inside the apps.</li>
+        </ul>
+      </div>
+    </div>
+    <div class="callout rise" style="margin-top:20px;max-width:none;border-left-color:var(--r)">
+      <span class="eyebrow">Since the Sept 26 meeting · Updated Tue Sep 29</span>
+      <div class="grid2" style="gap:16px">
+        <ul style="display:flex;flex-direction:column;gap:6px;font-size:14.5px">
+          <li><b>D-U-N-S number requested</b> Mon Sep 28. It's due by about Oct 5, and Apple sees it about Oct 7. When it arrives, check that Dun &amp; Bradstreet (D&amp;B, the company that issues the number) spells our name exactly <code>CONNECTVIBE. LLC</code>.</li>
+          <li><b>The state filing, read:</b> the legal name is <code>CONNECTVIBE. LLC</code>, it's run by managers, and James is the only person named. There's no business address yet. James amends it by Sat Oct 3 to add Franky and Rylan as co-founders ("governing persons") and set Franky's address as the principal office (Chapter 4).</li>
+          <li><b>Cleared:</b> the phone side of notifications is built; only setup is left. Google Play needs the D-U-N-S number too, so both stores open once it arrives. The security check of everything built up to Sept 27 came early: done Sept 27, fixes live Sept 27–28.</li>
+          <li><b>The website is ready for our first post</b> (done Sept 28): the product journal is off the public site, link previews show the new tagline, and there's a share image.</li>
+        </ul>
+        <ul style="display:flex;flex-direction:column;gap:6px;font-size:14.5px">
+          <li><b>Live in the app, three of them asked for at the meeting:</b> the "coming up + trending" strip on the campus feed; move and hide profile sections, bio to the side (planned for November, done now); and look around any campus, view only (your home campus locks for 45 days, and RSVPs stay on it).</li>
+          <li><b>New Sept 28–29, all live:</b> club officers can delete a club post, and edit or cancel a club event; everyone who RSVP'd gets a notice from the club. Night mode is on every page, and the app now follows your phone's own light or dark setting. On a computer, Vibe has one top bar, in school colors.</li>
+          <li><b>Safety, tightened:</b> blocks now hold everywhere, hidden profile sections are truly hidden, moderators can take down any photo, and uploaded photos lose their location data.</li>
+          <li><b>Settled:</b> moving and hiding profile sections is free; the extras are Vibe+. The tagline is picked: "Your campus. Your people. Yourself." (Chapter 2).</li>
+          <li><b>Asked for, not built yet:</b> club member lists with roles and passing a club down, and club badges on profiles (Chapter 12).</li>
+        </ul>
+      </div>
+    </div>
+    <p class="sub" style="margin-top:20px"><b>Main focus now:</b> the app, the paperwork, and getting the campus on it. Night mode and the officer tools are done. Next in the app: the club chat redesign (Chapter 4).</p>
+  </div>
+</section>
+
+<!-- 3 · What we say -->
+<section class="chapter" id="belief">
+  <div class="wrap">
+    <div class="head">
+      <span class="eyebrow">Chapter 2 · What we all say</span>
+      <h2>One sentence, one kind of club, three phrases<span class="dot">.</span></h2>
+      <p class="sub">Three different stories means clubs hear about three different apps. Main focus now: write down the one pitch all three of us say, then repeat it until we're sick of it.</p>
+    </div>
+    <div class="grid2">
+      <div class="callout rise">
+        <span class="eyebrow">The sentence</span>
+        <p style="font-family:var(--serif);font-size:24px;line-height:1.25;color:var(--ink)">Vibe is where IU Indy and Purdue Indy students find their clubs, their events, and each other, all in one place.</p>
+        <p style="font-size:14px;color:var(--muted)">Short: <b>"Your campus, all in one place."</b> We track each part: clubs (students following 3+ clubs), events (RSVPs), each other (friends and messages). <span class="who r"><i class="i"></i>Rylan</span> tests it on five students by Sun Oct 4.</p>
+        <p style="font-size:14px;color:var(--muted)"><b>Tagline, picked (Franky, Sept 28):</b> "Your campus. Your people. Yourself." It already shows in link previews and on the share image.</p>
+      </div>
+      <div class="callout rise">
+        <span class="eyebrow">The first club: three yes/no traits</span>
+        <ul style="display:flex;flex-direction:column;gap:6px;font-size:15px">
+          <li><b>An event at least every two weeks.</b></li>
+          <li><b>Recruiting this fall.</b></li>
+          <li><b>Already posts on Instagram</b>, so "nobody sees our posts" is real to them.</li>
+        </ul>
+        <p style="font-size:14px;color:var(--muted)">Start with clubs that say yes to all three, whatever kind. At least 3 of the first 10 are Purdue. "Replace Instagram" is our goal, never our pitch: officers say yes to lose a problem, not to join a dream.</p>
+      </div>
+    </div>
+    <div class="rise" style="margin-top:20px">
+      <span class="eyebrow">Three phrases we always use</span>
+      <p style="font-size:16px;margin-top:6px"><b>"Clubs first, then students."</b> · <b>"We build your page in front of you."</b> · <b>"We only claim what's live."</b></p>
+    </div>
+    <div class="callout rise" style="margin-top:22px;max-width:none">
+      <span class="eyebrow">The pitch workshop, 25 minutes · planned for Sept 26, result not written down yet</span>
+      <p style="font-size:14.5px"><b>The goal:</b> one pitch all three of us can say word for word. <b>Recommendation:</b> if we wrote it on Sept 26, put it here before the first demo day; if not, run these 25 minutes at the first Sunday meeting, Oct 4.</p>
+      <ul style="display:flex;flex-direction:column;gap:8px;font-size:14.5px">
+        <li><b>5 min, alone, phones down.</b> Each of us writes three sentences answering a club president who asks: "What is Vibe, and why should we bother?"</li>
+        <li><b>5 min, read them out.</b> Underline every phrase that shows up twice. Those are the keepers.</li>
+        <li><b>10 min, build it from the parts.</b> The three problems we fix (empty events, posts nobody sees, the account mess when officers graduate). What we do in the room (build your page and load your events in 15 minutes). What it costs (nothing, and nobody quits Instagram). The sentence last.</li>
+        <li><b>5 min, stress-test it.</b> Rylan says it to Franky playing a doubtful club president, who asks: Who can see our member list? Can someone fake being a student? What if someone posts something awful? Can we remove a follower? What happens when I graduate? Whatever stumbles gets rewritten on the spot.</li>
+      </ul>
+      <p style="font-size:14.5px"><b>Then, at every real club meeting, we ask before we show.</b> Five questions, the same every time: How do members hear about events now? What went wrong at your last event? Who decides which apps the club uses? What happens to your accounts when officers graduate? Would the club ever pay for anything here? The answers go in the scoreboard's "what we heard" tab.</p>
+    </div>
+  </div>
+</section>
+<!-- 4 · The path -->
+<section class="chapter" id="path">
+  <div class="wrap">
+    <div class="head">
+      <span class="eyebrow">Chapter 3 · The path</span>
+      <h2>Thirty-two days, four dates that don't move<span class="dot">.</span></h2>
+      <p class="sub">Oct 9: we decide whether the store apps make launch. Oct 16: last safe day to submit. Oct 23: full launch or smaller launch. Oct 31: launch. Everything else can move.</p>
+    </div>
+    <figure>
+      <svg viewBox="0 0 1000 236" role="img" aria-label="A timeline from September 25 to October 31 with the milestones: founders met Sept 26 (done), D-U-N-S requested Sept 28 (done), first scoreboard Oct 2, first Sunday meeting Oct 4, D-U-N-S number due about Oct 5 and Apple sees it about Oct 7, Apple decision day Oct 9, club playbook Oct 11, Terms live Oct 14, last store submission Oct 16, full or smaller launch decided Oct 23, doors open Oct 26, launch night Oct 29, launch Oct 31. Purdue fall break Oct 12 to 13 and IU Indy fall break Oct 19 to 20 are marked." style="color:var(--body)">
+        <defs><marker id="tl-arrow" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="8" markerHeight="8" orient="auto"><path d="M0 0L10 5 0 10z" fill="currentColor"></path></marker></defs>
+        <g font-family="DM Mono, ui-monospace, Menlo, monospace" font-size="10" fill="var(--muted)" text-anchor="middle">
+          <rect x="116.5" y="18" width="153" height="18" rx="3" fill="var(--rule)" opacity=".7"></rect><text x="193" y="31">WEEK 1</text>
+          <rect x="295" y="18" width="153" height="18" rx="3" fill="var(--rule)" opacity=".7"></rect><text x="371.5" y="31">WEEK 2</text>
+          <rect x="473.5" y="18" width="153" height="18" rx="3" fill="var(--rule)" opacity=".7"></rect><text x="550" y="31">WEEK 3</text>
+          <rect x="652" y="18" width="153" height="18" rx="3" fill="var(--rule)" opacity=".7"></rect><text x="728.5" y="31">WEEK 4</text>
+          <rect x="830.5" y="18" width="127.5" height="18" rx="3" fill="var(--rule)" opacity=".7"></rect><text x="894" y="31">LAUNCH WEEK</text>
+        </g>
+        <line x1="40" y1="124" x2="958" y2="124" stroke="var(--rule)" stroke-width="2"></line>
+        <line class="draw" pathLength="1000" x1="40" y1="124" x2="958" y2="124" stroke="var(--accent)" stroke-width="3" stroke-linecap="round" marker-end="url(#tl-arrow)" style="color:var(--accent)"></line>
+        <g fill="var(--wait)" opacity=".85"><rect x="473.5" y="131" width="25.5" height="7" rx="2"></rect><rect x="652" y="131" width="25.5" height="7" rx="2"></rect></g>
+        <g font-family="DM Mono, ui-monospace, Menlo, monospace" font-size="9.5" fill="var(--wait)" text-anchor="middle">
+          <text x="486" y="204">Purdue break Oct 12–13</text><text x="665" y="220">IU Indy break Oct 19–20</text>
+        </g>
+        <g fill="var(--surface)" stroke="var(--accent)" stroke-width="2.5">
+          <circle class="pop" cx="65.5" cy="124" r="6" style="animation-delay:.07s"></circle>
+          <circle class="pop" cx="116.5" cy="124" r="6" style="animation-delay:.2s"></circle>
+          <circle class="pop" cx="218.5" cy="124" r="6" style="animation-delay:.47s"></circle>
+          <circle class="pop" cx="269.5" cy="124" r="6" style="animation-delay:.6s"></circle>
+          <circle class="pop" cx="346" cy="124" r="6" style="animation-delay:.8s"></circle>
+          <circle class="pop" cx="397" cy="124" r="9" fill="var(--accent)" style="animation-delay:.93s"></circle>
+          <circle class="pop" cx="448" cy="124" r="6" style="animation-delay:1.07s"></circle>
+          <circle class="pop" cx="524.5" cy="124" r="6" style="animation-delay:1.27s"></circle>
+          <circle class="pop" cx="575.5" cy="124" r="9" fill="var(--accent)" style="animation-delay:1.4s"></circle>
+          <circle class="pop" cx="754" cy="124" r="9" fill="var(--accent)" style="animation-delay:1.87s"></circle>
+          <circle class="pop" cx="830.5" cy="124" r="6" style="animation-delay:2.07s"></circle>
+          <circle class="pop" cx="907" cy="124" r="6" style="animation-delay:2.27s"></circle>
+          <circle class="pop" cx="958" cy="124" r="11" fill="var(--accent)" style="animation-delay:2.4s"></circle>
+        </g>
+        <g font-family="DM Sans, -apple-system, sans-serif" font-size="11.5" fill="var(--ink)" text-anchor="middle" font-weight="700">
+          <text x="65.5" y="96">Founders met</text><text x="218.5" y="96">First scoreboard</text><text x="346" y="96">D-U-N-S to Apple</text><text x="448" y="96">Club playbook</text><text x="575.5" y="96">Last day to submit</text><text x="754" y="96">Full or smaller launch</text><text x="907" y="96">Launch night</text>
+          <text x="116.5" y="162">D-U-N-S requested</text><text x="269.5" y="162">First Sunday meeting</text><text x="397" y="162">Apple decision day</text><text x="524.5" y="162">Terms live</text><text x="830.5" y="162">Doors open</text><text x="958" y="162">Launch</text>
+        </g>
+        <g font-family="DM Mono, ui-monospace, Menlo, monospace" font-size="9.5" fill="var(--muted)" text-anchor="middle">
+          <text x="65.5" y="82">SAT SEP 26 ✓</text><text x="218.5" y="82">FRI OCT 2</text><text x="346" y="82">~OCT 7</text><text x="448" y="82">SUN OCT 11</text><text x="575.5" y="82">FRI OCT 16</text><text x="754" y="82">FRI OCT 23</text><text x="907" y="82">THU OCT 29</text>
+          <text x="116.5" y="176">MON SEP 28 ✓</text><text x="269.5" y="176">SUN OCT 4</text><text x="397" y="176">FRI OCT 9</text><text x="524.5" y="176">~OCT 14</text><text x="830.5" y="176">MON OCT 26</text><text x="958" y="176">SAT OCT 31</text>
+        </g>
+      </svg>
+      <figcaption>The big dots don't move. The amber marks are fall breaks: Purdue's lands in the week we most need Purdue clubs.</figcaption>
+    </figure>
+    <div class="head" style="margin-top:40px">
+      <h3 style="font-size:22px">The paperwork chain</h3>
+      <p class="sub">Each step waits on the one before. Franky requested the <b>D-U-N-S number</b> (a free company ID number Apple and Google require) on Mon Sep 28; it's due about Oct 5, and Apple sees it about Oct 7. Apple also needs an enroller who can sign for the LLC, and today the state filing names only James, so <b>James amends it by Sat Oct 3</b> to add Franky and Rylan as co-founders ("governing persons") and give the LLC its address.</p>
+    </div>
+    <figure>
+      <svg viewBox="0 0 1010 120" role="img" aria-label="Seven linked steps: James amends the LLC filing by Sat Oct 3; Franky requested the D-U-N-S number Sept 28 (done) and it's due about Oct 5; Franky enrolls with Apple and Google by Oct 9; the legal pages go live with the lawyer by about Oct 14; Franky submits to both stores by Oct 16; app links go live by Oct 23; launch Oct 31." style="color:var(--body)">
+        <defs><marker id="ch-arrow" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto"><path d="M0 0L10 5 0 10z" fill="var(--muted)"></path></marker></defs>
+        <g stroke="var(--muted)" stroke-width="1.5" marker-end="url(#ch-arrow)">
+          <line x1="128" y1="58" x2="150" y2="58"></line><line x1="274" y1="58" x2="296" y2="58"></line><line x1="420" y1="58" x2="442" y2="58"></line><line x1="566" y1="58" x2="588" y2="58"></line><line x1="712" y1="58" x2="734" y2="58"></line><line x1="858" y1="58" x2="880" y2="58"></line>
+        </g>
+        <g font-family="DM Sans, -apple-system, sans-serif" font-size="12" text-anchor="middle">
+          <g class="light" style="animation-delay:.1s"><rect x="6" y="20" width="122" height="76" rx="8" fill="var(--j-soft)" stroke="var(--j)" stroke-width="1.5"></rect><text x="67" y="44" fill="var(--ink)" font-weight="700">LLC facts</text><text x="67" y="61" fill="var(--body)" font-size="11">amend the filing</text><text x="67" y="80" fill="var(--j)" font-family="DM Mono, monospace" font-size="8.5">JAMES · BY SAT OCT 3</text></g>
+          <g class="light" style="animation-delay:.5s"><rect x="152" y="20" width="122" height="76" rx="8" fill="var(--f-soft)" stroke="var(--f)" stroke-width="1.5"></rect><text x="213" y="44" fill="var(--ink)" font-weight="700">D-U-N-S number</text><text x="213" y="61" fill="var(--r)" font-size="11" font-weight="700">requested Sep 28 ✓</text><text x="213" y="80" fill="var(--f)" font-family="DM Mono, monospace" font-size="8.5">FRANKY · DUE ~OCT 5</text></g>
+          <g class="light" style="animation-delay:.9s"><rect x="298" y="20" width="122" height="76" rx="8" fill="var(--f-soft)" stroke="var(--f)" stroke-width="1.5"></rect><text x="359" y="44" fill="var(--ink)" font-weight="700">Apple + Google</text><text x="359" y="61" fill="var(--body)" font-size="11">$99/yr + $25 once</text><text x="359" y="80" fill="var(--f)" font-family="DM Mono, monospace" font-size="8.5">FRANKY · OCT 7–9</text></g>
+          <g class="light" style="animation-delay:1.3s"><rect x="444" y="20" width="122" height="76" rx="8" fill="var(--j-soft)" stroke="var(--j)" stroke-width="1.5"></rect><text x="505" y="44" fill="var(--ink)" font-weight="700">Legal pages live</text><text x="505" y="61" fill="var(--body)" font-size="11">with the lawyer</text><text x="505" y="80" fill="var(--j)" font-family="DM Mono, monospace" font-size="8.5">JAMES · ~OCT 14</text></g>
+          <g class="light" style="animation-delay:1.7s"><rect x="590" y="20" width="122" height="76" rx="8" fill="var(--f-soft)" stroke="var(--f)" stroke-width="1.5"></rect><text x="651" y="44" fill="var(--ink)" font-weight="700">Submit to stores</text><text x="651" y="61" fill="var(--body)" font-size="11">last safe day</text><text x="651" y="80" fill="var(--f)" font-family="DM Mono, monospace" font-size="8.5">FRANKY · FRI OCT 16</text></g>
+          <g class="light" style="animation-delay:2.1s"><rect x="736" y="20" width="122" height="76" rx="8" fill="var(--f-soft)" stroke="var(--f)" stroke-width="1.5"></rect><text x="797" y="44" fill="var(--ink)" font-weight="700">App links live</text><text x="797" y="61" fill="var(--body)" font-size="11">Vibe links open the app</text><text x="797" y="80" fill="var(--f)" font-family="DM Mono, monospace" font-size="8.5">FRANKY · BY OCT 23</text></g>
+          <g class="light" style="animation-delay:2.5s"><rect x="882" y="20" width="122" height="76" rx="8" fill="var(--accent)" stroke="var(--accent)"></rect><text x="943" y="50" fill="#FFFFFF" font-weight="700" font-size="15">Launch</text><text x="943" y="76" fill="#FFFFFF" font-family="DM Mono, monospace" font-size="8.5">ALL · SAT OCT 31</text></g>
+        </g>
+      </svg>
+      <figcaption>If Apple hasn't approved our company account by Friday Oct 9, iPhones get the home-screen version on launch day and the App Store listing follows in November. No extensions.</figcaption>
+    </figure>
+  </div>
+</section>
+<!-- 5 · Who leads what -->
+<section class="chapter" id="owners">
+  <div class="wrap">
+    <div class="head">
+      <span class="eyebrow">Chapter 4 · Who leads what</span>
+      <h2>One result each, and the calls that are yours<span class="dot">.</span></h2>
+      <p class="sub">In your area you hear the other two once, then you decide. These lists were drafted for the Sept 26 meeting and updated Sept 29: change what's in your own area. Cleared tasks come off the page and get one line in Chapter 1. Checkmarks save only on your own phone.</p>
+    </div>
+    <div class="trio">
+      <div class="person rise">
+        <div><span class="who"><i class="i"></i>Franky</span><h3 style="margin-top:8px">Builds the product. Leads.</h3></div>
+        <p class="result">Vibe in students' hands on October 31: the store apps, or the home-screen version if Apple is late.</p>
+        <div><span class="lbl">Decides</span><ul style="margin-top:6px"><li>What's in the app and what ships</li><li>The Oct 9 store call</li><li>Tie-breaks between two areas, in writing</li></ul></div>
+        <div><span class="lbl">To do</span>
+          <div class="tasks">
+            <div class="task"><input type="checkbox" id="t-f2" data-id="f2"><label for="t-f2"><b>A working @connectvibe.app email.</b> help@connectvibe.app, our support inbox, already forwards to Franky: send one real test to prove it arrives. Apple and Google also want an address that can send as @connectvibe.app, so set one up before enrolling</label><span class="when">By Sun Oct 4</span></div>
+            <div class="task"><input type="checkbox" id="t-f3" data-id="f3"><label for="t-f3"><b>Company Google account and Firebase</b> (Google's tool for phone notifications) now: neither needs the D-U-N-S number. <b>The Google Play developer account ($25)</b> does need it, so open it the day the number arrives (about Oct 5)</label><span class="when">By Oct 9</span></div>
+            <div class="task"><input type="checkbox" id="t-f4" data-id="f4"><label for="t-f4"><b>45-minute product walkthrough</b> for James and Rylan, plus a one-page "tough questions" sheet</label><span class="when">Wk 1</span></div>
+            <div class="task"><input type="checkbox" id="t-f5" data-id="f5"><label for="t-f5"><b>Time how long a club takes</b>, on a phone, from "yes" to a live page with an event. Goal: under 15 minutes</label><span class="when">Wk 1</span></div>
+            <div class="task"><input type="checkbox" id="t-f6" data-id="f6"><label for="t-f6"><b>3-line note every weekday morning.</b> Run the Sunday meeting</label><span class="when">Mon Sep 28</span></div>
+            <div class="task"><input type="checkbox" id="t-f9" data-id="f9"><label for="t-f9"><b>Build the Android app once.</b> It has never been built. Android Studio is installed on the Mac (Sept 29); next is its first-time setup, then the first build</label><span class="when">By Fri Oct 9</span></div>
+            <div class="task new" style="background:linear-gradient(90deg,var(--f-soft),transparent 85%)"><input type="checkbox" id="t-f12" data-id="f12"><label for="t-f12"><span class="flag-new" style="color:var(--f)">New</span><b>Rebuild club chat so it feels like Vibe, not Discord.</b> Each club gets a Board (officers post news) and a Lounge (members talk), every event gets its own chat for the club members who RSVP'd, and polls, sign-ups and RSVPs work inside the chat. It lives in Messages, with "Your week" (the events you RSVP'd to) on top. <b>Week of Oct 5–9:</b> on for the three of us and SAE, so demo days can show it on SAE. <b>Oct 10–14:</b> event chats and polls. <b>No chat changes after Thu Oct 15,</b> so Apple's reviewer sees one steady app when we submit Oct 16. On for everyone Mon Oct 26, when doors open. On a computer, chat stays as it is today until after launch</label><span class="when" style="color:var(--f)">By Thu Oct 15</span></div>
+            <div class="task"><input type="checkbox" id="t-f11" data-id="f11"><label for="t-f11"><b>Make taken-down photos disappear within 48 hours,</b> as our legal pages promise. Today they can keep loading for a few days. Recommended fix: Supabase Pro (the paid plan of the company that hosts our database), about $25 a month and half a day of work (Chapter 12)</label><span class="when">By Sun Oct 18</span></div>
+            <div class="task"><input type="checkbox" id="t-f8" data-id="f8"><label for="t-f8"><b>One demo day a week</b> (we sit with a club's officers and build their page with them), listening. Rylan leads</label><span class="when">Weekly</span></div>
+          </div>
+        </div>
+      </div>
+      <div class="person j rise">
+        <div><span class="who j"><i class="i"></i>James</span><h3 style="margin-top:8px">Runs the paperwork.</h3></div>
+        <p class="result">The lawyer's final Terms and Privacy to Franky by Oct 12 (live about Oct 14), and the bank account open.</p>
+        <div><span class="lbl">Decides</span><ul style="margin-top:6px"><li>Which lawyer; the list we send (who's on the LLC is all three of us)</li><li>Which bank; the Stripe setup (how Vibe+ payments reach it)</li><li>The scoreboard; the budget and every receipt</li></ul></div>
+        <div><span class="lbl">To do</span>
+          <div class="tasks">
+            <div class="task new"><input type="checkbox" id="t-j8" data-id="j8"><label for="t-j8"><span class="flag-new">New</span><b>Amend the LLC filing on INBiz</b> so it matches how we run Vibe: add <b>Francisco Cazares</b> and <b>Rylan Conaway</b> as co-founders ("governing persons") next to James, and set the principal office address to <b>4741 SR 32, Anderson, IN 46011</b> for now (Franky's address, the same one on the D-U-N-S request; spell it exactly as D&amp;B does once the number arrives). Apple, Google and the bank all check that these match. The lawyer confirms it if one is on board by then. Also tell us whether a written operating agreement exists, and who it names</label><span class="when">Sat Oct 3</span></div>
+            <div class="task"><input type="checkbox" id="t-j2" data-id="j2"><label for="t-j2"><b>Get the EIN</b> (the company's free tax ID number) at irs.gov once the Oct 3 amendment is in, so the IRS form, the bank and Stripe all name the same people. The "responsible party" is the person who actually runs the LLC, not whoever filed it; their SSN goes on the form. 15 minutes. Type <code>CONNECTVIBE LLC</code>, no period. Save the PDF to the shared folder. If we're not sure, it waits for the lawyer</label><span class="when">After Sat Oct 3</span></div>
+            <div class="task"><input type="checkbox" id="t-j4" data-id="j4"><label for="t-j4"><b>One list to the lawyer.</b> First, on a call with all three of us: who's named on the LLC and its written rulebook (the "operating agreement"). By Oct 9: the Terms changes (zero tolerance for abuse, reports reviewed within 24 hours, 18+ only, subscriptions, Texas's new app-store age law) and a Privacy page naming every outside service that handles user data. Then: the yearly tax return, saying "IU Indy" in our posts, a giveaway, photo permission, students promoting us for perks. New from the Sept 27 safety check: our 48-hour photo takedown promise, how long we keep removed posts (the site says up to a year), 17-year-old students (the Terms say 18+), telling students that Vibe+ members can see who visited them. From the meeting's marketing ideas: how ambassadors mark their posts as ads</label><span class="when">Mon Sep 28</span></div>
+            <div class="task"><input type="checkbox" id="t-j5" data-id="j5"><label for="t-j5"><b>Pick the bank</b> (Mercury, an online bank, is the suggestion) <b>and apply once the Oct 3 amendment and the EIN are done.</b> The form asks who is on the LLC and who runs it, and it must match the IRS form. Everyone the bank asks for verifies ID the same day; all three of us get access</label><span class="when">After the EIN</span></div>
+            <div class="task"><input type="checkbox" id="t-j6" data-id="j6"><label for="t-j6"><b>Build the scoreboard:</b> one sheet, four tabs (club pipeline, app numbers, what we heard, targets)</label><span class="when">Fri Oct 2</span></div>
+            <div class="task"><input type="checkbox" id="t-j7" data-id="j7"><label for="t-j7"><b>First responder on help@.</b> Every message answered within 24 hours</label><span class="when">From the day it works</span></div>
+            <div class="task"><input type="checkbox" id="t-j9" data-id="j9"><label for="t-j9"><b>Register our copyright agent</b> (the "DMCA agent") at copyright.gov, $6. It protects Vibe when a student posts someone else's photo, as long as we take it down when asked. Ask the lawyer if one is on board</label><span class="when">By Oct 14</span></div>
+          </div>
+        </div>
+      </div>
+      <div class="person r rise">
+        <div><span class="who r"><i class="i"></i>Rylan</span><h3 style="margin-top:8px">Runs the campus.</h3></div>
+        <p class="result">Ten clubs live on Vibe with upcoming events by the Oct 23 check, at least three of them Purdue.</p>
+        <div><span class="lbl">Decides</span><ul style="margin-top:6px"><li>Which clubs, in what order; how demo days run</li><li>What the teasers say and when they post</li><li>Who's in the Campus 10</li></ul></div>
+        <div><span class="lbl">To do</span>
+          <div class="tasks">
+            <div class="task"><input type="checkbox" id="t-r1" data-id="r1"><label for="t-r1"><b>Email the campus offices</b> (campcntr@iu.edu, stuact@iu.edu, StudentLifeIndy@purdue.edu): can we present at club meetings, table, put up flyers, and who gives the written OK?</label><span class="when">Mon Sep 28</span></div>
+            <div class="task"><input type="checkbox" id="t-r2" data-id="r2"><label for="t-r2"><b>A list of 25 clubs to approach,</b> each checked against the three traits, with enough Purdue clubs (about a third) to sign 3</label><span class="when">Wk 1</span></div>
+            <div class="task"><input type="checkbox" id="t-r3" data-id="r3"><label for="t-r3"><b>Finish the one pitch</b> (the workshop in Chapter 2) and the five questions we ask before the phone comes out. Run it once with Franky before the first demo</label><span class="when">Wk 1</span></div>
+            <div class="task"><input type="checkbox" id="t-r4" data-id="r4"><label for="t-r4"><b>20 to 30 two-minute student interviews</b>, same three questions, plus the sentence test. They become the three facts that open every demo</label><span class="when">Wk 1</span></div>
+            <div class="task"><input type="checkbox" id="t-r5" data-id="r5"><label for="t-r5"><b>Sign SAE for real</b> (Franky's own chapter; today it's only a test page): the officers say yes, real posts, two upcoming events. The example every other club sees</label><span class="when">Wk 1</span></div>
+            <div class="task"><input type="checkbox" id="t-r6" data-id="r6"><label for="t-r6"><b>Five demo days booked for week 2.</b> First two "Building Vibe" posts. Two backup store names with Franky</label><span class="when">By Sun Oct 4</span></div>
+            <div class="task"><input type="checkbox" id="t-r7" data-id="r7"><label for="t-r7"><b>The first five Campus 10 names:</b> the most involved students you know</label><span class="when">By Sun Oct 4</span></div>
+            <div class="task"><input type="checkbox" id="t-r8" data-id="r8"><label for="t-r8"><b>Set up our two Instagram accounts</b> from the meeting: a professional main account for teasers, and a behind-the-scenes founders' account. Save the same names on TikTok, plus the two campus account names (Chapter 7). Logins go in a shared password manager (Chapter 12)</label><span class="when">Sat Oct 3</span></div>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+</section>
+
+<!-- 6 · Week by week -->
+<section class="chapter" id="weeks">
+  <div class="wrap">
+    <div class="head">
+      <span class="eyebrow">Chapter 5 · Week by week</span>
+      <h2>Five weeks, three lanes<span class="dot">.</span></h2>
+      <p class="sub">If a week slips, we catch up the next week. The order and Oct 31 don't move.</p>
+    </div>
+    <div class="week rise">
+      <div class="when"><span class="w">Week 1</span><span class="d">Sep 28 – Oct 4</span><span class="goal">Pitch written · LLC filing amended · first club signed</span></div>
+      <div class="lanes"><div class="lane"><span class="who all"><i class="i"></i>All three</span><ul><li>Week 1 is every task in Chapter 4 due by Sun Oct 4.</li><li>First Sunday meeting Oct 4.</li></ul></div></div>
+    </div>
+    <div class="week rise">
+      <div class="when"><span class="w">Week 2</span><span class="d">Oct 5 – 11</span><span class="goal">5 clubs signed · Apple decision Fri Oct 9</span></div>
+      <div class="lanes">
+        <div class="lane"><span class="who"><i class="i"></i>Franky</span><ul><li>D-U-N-S number due about Oct 5: check it reads <code>CONNECTVIBE. LLC</code>, open Google Play that day, and enroll with Apple once it sees the number (about Oct 7)</li><li><b>Fri Oct 9: the store call.</b> Android built for the first time by then</li><li><b>New club chat on for the three of us and SAE</b> (Board, Lounge, "Your week" in Messages), so demo days can show it on SAE</li><li>Go through every screen a new student sees: keep it or hide it</li><li>First Campus 10 ideas session</li></ul></div>
+        <div class="lane"><span class="who j"><i class="i"></i>James</span><ul><li>EIN, then the bank opened; Franky connects Stripe</li><li>Lawyer's first answers back</li><li>Scoreboard updated Friday for Sunday</li></ul></div>
+        <div class="lane"><span class="who r"><i class="i"></i>Rylan</span><ul><li>Five demo days. Ask first, show second</li><li>Every club gets a decision date; a maybe past it is a no</li><li><b>Club playbook by Sun Oct 11:</b> our step-by-step for signing a club</li></ul></div>
+      </div>
+    </div>
+    <div class="week rise">
+      <div class="when"><span class="w">Week 3</span><span class="d">Oct 12 – 18</span><span class="goal">10 clubs, 3 events each · submit both stores Fri Oct 16</span><span class="note">Purdue fall break Oct 12–13</span></div>
+      <div class="lanes">
+        <div class="lane"><span class="who"><i class="i"></i>Franky</span><ul><li>Speed test on a borrowed mid-range phone</li><li>Last safety fixes before students arrive: taken-down photos gone within 48 hours, and a tag trends only once two different people use it</li><li>Security check of what's built since Sept 27, before we submit Oct 16</li><li>Notifications switched on for the three of us first: four setup steps, and Apple's key needs the Apple account</li><li>Event chats and polls done by Wed Oct 14. <b>No chat changes after Thu Oct 15,</b> so Apple's reviewer sees one steady app</li><li><b>Submit to both stores by Fri Oct 16</b></li></ul></div>
+        <div class="lane"><span class="who j"><i class="i"></i>James</span><ul><li><b>Terms and Privacy to Franky by Oct 12</b>, live about Oct 14</li></ul></div>
+        <div class="lane"><span class="who r"><i class="i"></i>Rylan</span><ul><li>Ten clubs, three events each</li><li>Five minutes at a student government meeting; launch-night venue booked</li><li>Club kit: how to post and invite members, plus the Oct 26 graphic</li></ul></div>
+      </div>
+    </div>
+    <div class="week rise">
+      <div class="when"><span class="w">Week 4</span><span class="d">Oct 19 – 25</span><span class="goal">Countdown · full or smaller launch decided Fri Oct 23</span><span class="note">IU Indy fall break Oct 19–20</span></div>
+      <div class="lanes">
+        <div class="lane"><span class="who"><i class="i"></i>Franky</span><ul><li>Vibe links open straight in the app by Oct 23</li><li>Walk the whole app as a brand-new student</li><li>Officers' complaints fixed within 48 hours</li></ul></div>
+        <div class="lane"><span class="who j"><i class="i"></i>James</span><ul><li>help@ first responder; reports shared by all three, none past 24 hours</li><li>Runs the Oct 23 check (Chapter 6)</li></ul></div>
+        <div class="lane"><span class="who r"><i class="i"></i>Rylan</span><ul><li>Countdown sticker on every story</li><li>Club kit to every club; flyers only where allowed</li><li>Three club meetings lined up for Tue Oct 27</li></ul></div>
+      </div>
+    </div>
+    <div class="week rise">
+      <div class="when"><span class="w">Week 5</span><span class="d">Oct 26 – 31</span><span class="goal">Launch</span></div>
+      <div class="lanes">
+        <div class="lane"><span class="who"><i class="i"></i>Franky</span><ul><li>Fixes only from Sun Oct 25; watch errors and sign-ups daily</li><li>Store badge goes up the day a listing is live</li><li>New club chat switched on for everyone Mon Oct 26, when doors open</li></ul></div>
+        <div class="lane"><span class="who j"><i class="i"></i>James</span><ul><li>Inbox all week; launch night budget, rules, permissions</li><li>Numbers ready for the Sun Nov 1 look-back</li></ul></div>
+        <div class="lane"><span class="who r"><i class="i"></i>Rylan</span><ul><li>Mon doors open · Tue three club meetings · Wed Halloween guide · <b>Thu Oct 29 launch night</b> · Fri recap</li></ul></div>
+      </div>
+    </div>
+  </div>
+</section>
+<!-- 7 · How a student arrives -->
+<section class="chapter" id="funnel">
+  <div class="wrap">
+    <div class="head">
+      <span class="eyebrow">Chapter 6 · How a student arrives</span>
+      <h2>Clubs, then events, then students, then students who come back<span class="dot">.</span></h2>
+      <p class="sub">An empty step starves everything below it. The long bar is the Oct 31 target, the thin bar is today (recounted Sept 28). The targets are starting guesses; we reset them Nov 1.</p>
+    </div>
+    <div class="rows" style="max-width:none">
+      <div class="row rise" style="grid-template-columns:minmax(150px,220px) 1fr 90px;gap:16px;align-items:center">
+        <div><b>Clubs signed</b><br><span class="tick-note">page built with them, in the room</span></div>
+        <div style="display:flex;flex-direction:column;gap:5px"><div class="bar"><i style="--w:100%"></i></div><div class="bar" style="height:6px"><i class="today" style="--w:2px"></i></div></div>
+        <div style="font-family:var(--mono);font-size:12px;text-align:right"><b style="font-size:16px">10</b><br><span class="tick-note">today 0</span></div>
+      </div>
+      <div class="row rise" style="grid-template-columns:minmax(150px,220px) 1fr 90px;gap:16px;align-items:center">
+        <div><b>Upcoming events</b><br><span class="tick-note">three per club, copied with them from the school's club website</span></div>
+        <div style="display:flex;flex-direction:column;gap:5px"><div class="bar"><i style="--w:100%"></i></div><div class="bar" style="height:6px"><i class="today" style="--w:2px"></i></div></div>
+        <div style="font-family:var(--mono);font-size:12px;text-align:right"><b style="font-size:16px">30</b><br><span class="tick-note">today 0</span></div>
+      </div>
+      <div class="row rise" style="grid-template-columns:minmax(150px,220px) 1fr 90px;gap:16px;align-items:center">
+        <div><b>Verified students</b><br><span class="tick-note">through a club, a friend, or a post</span></div>
+        <div style="display:flex;flex-direction:column;gap:5px"><div class="bar"><i style="--w:100%"></i></div><div class="bar" style="height:6px"><i class="today" style="--w:7%"></i></div></div>
+        <div style="font-family:var(--mono);font-size:12px;text-align:right"><b style="font-size:16px">200</b><br><span class="tick-note">today 14</span></div>
+      </div>
+      <div class="row rise" style="grid-template-columns:minmax(150px,220px) 1fr 90px;gap:16px;align-items:center">
+        <div><b>Came back this week</b><br><span class="tick-note"><b>the number that matters</b> · today's two are both founders</span></div>
+        <div style="display:flex;flex-direction:column;gap:5px"><div class="bar"><i style="--w:100%"></i></div><div class="bar" style="height:6px"><i class="today" style="--w:2px"></i></div></div>
+        <div style="font-family:var(--mono);font-size:12px;text-align:right"><b style="font-size:16px">120</b><br><span class="tick-note">today 2</span></div>
+      </div>
+    </div>
+    <div class="callout wait" style="margin-top:22px">
+      <h4>The check, Friday October 23</h4>
+      <p style="font-size:14.5px">Ten clubs live, thirty upcoming events, help@ answered, Terms live. Any no, and we still open Oct 26, but only promote to members of the clubs that are live. No filler, no fake accounts, ever.</p>
+    </div>
+  </div>
+</section>
+
+<!-- 8 · Marketing -->
+<section class="chapter" id="marketing">
+  <div class="wrap">
+    <div class="head">
+      <span class="eyebrow">Chapter 7 · Marketing</span>
+      <h2>Teasers before launch, so the invite lands on people who've seen the name<span class="dot">.</span></h2>
+      <p class="sub">Rylan runs it; this is a starting plan he can change. No paid ads: an ad sends students to an app that still feels empty.</p>
+    </div>
+    <div class="grid2">
+      <div class="callout rise">
+        <h4>Three posts a week, Instagram and TikTok</h4>
+        <ul style="display:flex;flex-direction:column;gap:7px;font-size:14.5px">
+          <li><b>Monday: "This week on campus."</b> The five best events on Vibe, clubs tagged.</li>
+          <li><b>Wednesday: "Meet the club."</b> 30 seconds with an officer, then their page. They share it.</li>
+          <li><b>Friday: "Building Vibe."</b> Founders on camera, one real feature in 20 seconds.</li>
+          <li><b>From Oct 19,</b> a countdown sticker on every story, set to Mon Oct 26.</li>
+        </ul>
+      </div>
+      <div class="callout rise">
+        <h4>Five rules</h4>
+        <ul style="display:flex;flex-direction:column;gap:7px;font-size:14.5px">
+          <li><b>Only claim what's live.</b> No "get notified," no store badge, no Vibe+ until they're real.</li>
+          <li><b>Real people, real events, real numbers.</b></li>
+          <li><b>A clear yes</b> before anyone's face or page goes in a video.</li>
+          <li><b>One link everywhere: connectvibe.app/get.</b> It sends each phone to the right place.</li>
+          <li><b>No IU or Purdue logos.</b> "Not affiliated" on the landing page and flyers.</li>
+        </ul>
+      </div>
+    </div>
+    <p class="sub" style="margin-top:18px"><b>The biggest risk:</b> IU and Purdue ban company flyers, chalk and handouts on campus without approval. Until an office says yes in writing, print goes off campus or to partner clubs' own meetings. Posts and DMs have no such limit.</p>
+    <div class="callout rise" style="margin-top:22px;max-width:none">
+      <span class="eyebrow">From the Sept 26 meeting: four marketing asks</span>
+      <ul style="display:flex;flex-direction:column;gap:7px;font-size:14.5px">
+        <li><b>A professional main Instagram</b> for the teasers. <b>Recommendation:</b> set it up this week; the Monday and Wednesday posts go here (Rylan, task r8).</li>
+        <li><b>A behind-the-scenes founders' account</b> for our story as we build. <b>Recommendation:</b> the Friday "Building Vibe" posts go here.</li>
+        <li><b>Campus ambassadors</b> posting on their stories, TikTok and Instagram. <b>Recommendation:</b> this is the Campus 10's "reach" job (Chapter 8). It starts only after the lawyer answers and each one signs a one-page agreement.</li>
+        <li><b>Weekly "most RSVP'd" accounts, one per campus.</b> <b>Recommendation:</b> start after the Oct 23 check, once clubs are live. Name them the way students say their school (IU Indy, Purdue Indy), not with the short codes in the notes; Rylan checks with students and saves the two names when he sets up our main accounts (task r8, Sat Oct 3). A Butler account waits until Butler students can sign up.</li>
+      </ul>
+      <p style="font-size:14.5px"><b>Where it stands:</b> no account or post is recorded yet. The website is ready for the first post: the product journal is off the public site and link previews show the new tagline.</p>
+    </div>
+    <div class="head" style="margin-top:32px"><h3 style="font-size:22px">Launch week</h3><p class="sub">Vibe opens to everyone Mon Oct 26. The party is Thu Oct 29. Sat Oct 31 is the deadline we measure everything against.</p></div>
+    <div class="days">
+      <div class="day rise"><span class="d">Sun Oct 25</span><h4>Quiet prep</h4><p>Posts scheduled. Fixes only from here.</p></div>
+      <div class="day rise"><span class="d">Mon Oct 26</span><h4>Doors open</h4><p>"Vibe is live." Every partner club shares the graphic. We text our friends.</p></div>
+      <div class="day rise"><span class="d">Tue Oct 27</span><h4>Club day</h4><p>Three club meetings. Members sign up in the room and RSVP.</p></div>
+      <div class="day rise"><span class="d">Wed Oct 28</span><h4>Halloween guide</h4><p>Every Halloween event on campus, from real Vibe events.</p></div>
+      <div class="day rise"><span class="d">Thu Oct 29</span><h4>Launch night</h4><p>With a partner club. RSVP on Vibe, profile at the door. No alcohol at anything we host.</p></div>
+      <div class="day rise"><span class="d">Fri Oct 30</span><h4>Recap</h4><p>Launch-night video. Top bugs fixed.</p></div>
+      <div class="day rise"><span class="d">Sat Oct 31</span><h4>Deadline day</h4><p>One story. Sunday: the three of us, 30 minutes, the numbers.</p></div>
+    </div>
+  </div>
+</section>
+<!-- 9 · The Campus 10 -->
+<section class="chapter" id="ambassadors">
+  <div class="wrap">
+    <div class="head">
+      <span class="eyebrow">Chapter 8 · The Campus 10</span>
+      <h2>The ten most involved students on campus, for their ideas first and their reach second<span class="dot">.</span></h2>
+      <p class="sub">Rylan runs it. Students others already listen to: brand ambassadors for other companies, student government, orientation leaders (as regular students, never through their school role), Greek and cultural leaders, and officers of clubs we sign. Invite them personally; never post it like a job.</p>
+    </div>
+    <div class="grid2">
+      <div class="callout rise">
+        <h4>Two ways they help</h4>
+        <ul style="display:flex;flex-direction:column;gap:7px;font-size:14.5px">
+          <li><b>Ideas, from now.</b> A 30-minute session with Franky once a month, first look at every new feature, a real say in what we build, and telling us what's broken. Rylan names the first five by Sun Oct 4; Franky runs the first session in week 2. Until the lawyer answers, it's a conversation, not a task, and no perks are attached.</li>
+          <li><b>Reach, once the lawyer says how.</b> One honest post a week that says up front they're with Vibe, an intro to one more club leader, getting their own club onto Vibe. A company can't use unpaid "volunteers," so James asks the lawyer whether perks for posts are allowed and whether free Vibe+ counts as pay.</li>
+        </ul>
+      </div>
+      <div class="callout rise">
+        <h4>Thank-yous, never cash</h4>
+        <ul style="display:flex;flex-direction:column;gap:7px;font-size:14.5px">
+          <li><b>Free Vibe+</b> (Franky checks it shows in the live app first) and <b>first access</b> to the phone apps</li>
+          <li><b>"You asked, we built it"</b> shout-outs when their idea ships</li>
+          <li><b>A resume line and a written reference</b> from all three of us, with real numbers</li>
+          <li><b>Their club featured</b> on launch day</li>
+          <li>Stickers or a pizza night if the budget allows; suggested cap $150</li>
+        </ul>
+      </div>
+    </div>
+    <div class="grid2 readonly" style="margin-top:20px">
+      <div class="rise">
+        <span class="eyebrow">The Promise, agreed in writing</span>
+        <p style="font-size:14.5px;margin-top:6px">Say only what's true, and never that IU or Purdue backs Vibe. Say you're with Vibe, at the start of the caption. No spam, no fake accounts, no pressure, no screenshots of anyone's posts. No flyers or tables without the school's written OK. Anything unsafe goes to a founder the same day.</p>
+      </div>
+      <div class="rise">
+        <span class="eyebrow">What we track, one private sheet</span>
+        <p style="font-size:14.5px;margin-top:6px"><b>Ideas:</b> what they told us, and which of it shipped. <b>Reach, once allowed:</b> clubs they bring on with an upcoming event, verified students who joined through them (a guess to test: 100–200), and <b>how many of those came back a week later</b>. These count toward the main goals of 10 clubs and 200 students. Usernames only, no emails or phone numbers.</p>
+      </div>
+    </div>
+  </div>
+</section>
+
+<!-- 10 · The paperwork -->
+<section class="chapter" id="company">
+  <div class="wrap">
+    <div class="head">
+      <span class="eyebrow">Chapter 9 · The paperwork</span>
+      <h2>A tax ID (the EIN), a bank account, a lawyer, two store accounts<span class="dot">.</span></h2>
+      <p class="sub">James runs the tax ID, the bank and the lawyer. Franky runs the store accounts. No bank, no Vibe+ sales. No lawyer-checked Terms, no store review. No store accounts, no apps.</p>
+    </div>
+    <div class="grid2">
+      <div class="callout rise" style="border-left-color:var(--j)">
+        <h4>The bank: Mercury first</h4>
+        <ul style="display:flex;flex-direction:column;gap:7px;font-size:14.5px">
+          <li><b>$0 a month,</b> no minimum, opened online, usually approved within two business days. All three of us get access; Franky gets an admin role to connect Stripe.</li>
+          <li>Needs the EIN letter, the founding papers, a real street address (a home address is fine, no PO box), and a photo ID from everyone named on the LLC.</li>
+          <li><b>Backup:</b> Indiana Members Credit Union. Free checking, a branch on the IU Indy campus, $50 to open plus a $21.42 certificate from the state, probably in person.</li>
+          <li><b>Stripe pays out</b> to either. The first payout takes 7–14 days and can't be sped up.</li>
+        </ul>
+      </div>
+      <div class="callout rise" style="border-left-color:var(--j)">
+        <h4>What not to do</h4>
+        <ul style="display:flex;flex-direction:column;gap:7px;font-size:14.5px">
+          <li><b>Never pay for an EIN or a "BOI report."</b> The EIN is free at irs.gov, and US companies no longer file BOI reports. Anyone charging is a scam.</li>
+          <li><b>No Vibe money in a personal account,</b> Venmo or Cash App, ever. Mixing money can make us personally responsible for Vibe's debts.</li>
+          <li><b>Don't put anyone's name on a form</b> until the three of us and the lawyer agree. The IRS, the bank and Stripe must all match.</li>
+          <li><b>No logins in group chats.</b> Add people as users.</li>
+        </ul>
+      </div>
+    </div>
+    <div class="grid2 readonly" style="margin-top:20px">
+      <div class="rise">
+        <span class="eyebrow">Two things nobody had mentioned</span>
+        <p style="font-size:14.5px;margin-top:6px"><b>If two or more people are named on the LLC, it files a tax return every year, even at $0 revenue:</b> federal by March 15, 2027, Indiana by April 15. Late costs about $260 per person per month. <b>The EIN's "responsible party" is whoever actually runs the LLC</b>, not whoever filed it, and changing it later means another form within 60 days. Both are on the lawyer's list.</p>
+      </div>
+      <div class="rise">
+        <span class="eyebrow">The store accounts</span>
+        <p style="font-size:14.5px;margin-top:6px"><b>Apple, as a company: $99 a year.</b> Needs the D-U-N-S number, a work email on connectvibe.app, a public site naming the company, and an enroller who can sign for the LLC. Franky enrolls. The state filing names only James today, so James amends it by Sat Oct 3 to add Franky and Rylan as co-founders ("governing persons"), or the lawyer puts Franky's authority in writing before Oct 7. Apple approvals have taken days to a month this year, which is why Oct 9 is a decision day. <b>Google Play: $25, once.</b> It needs the D-U-N-S number too. Our running costs (hosting, tools, the domain) are about $125 a month, or about $150 with Supabase Pro (recommended, Chapter 12).</p>
+      </div>
+    </div>
+  </div>
+</section>
+<!-- 11 · How we work -->
+<section class="chapter" id="charter">
+  <div class="wrap">
+    <div class="head">
+      <span class="eyebrow">Chapter 10 · How we work</span>
+      <h2>Seven lines for how we work<span class="dot">.</span></h2>
+      <p class="sub">Drafted for the Sept 26 meeting. Whether we agreed them isn't written down, so we confirm them at the first Sunday meeting, Oct 4. Lines 1, 2 and 4 are what make this one team with a lead, not three people with a group chat.</p>
+    </div>
+    <div class="charter">
+      <div class="line rise"><div><b>Every Sunday, 30 minutes, same agenda.</b><p>Check the scoreboard. What went wrong signing clubs, and who fixes it by next Sunday. Decisions still waiting. Each of us names next week's goal and thanks the others for one thing. Franky runs it and sends notes that night. First one: Oct 4.</p></div></div>
+      <div class="line rise"><div><b>Franky posts a 3-line note every weekday morning.</b><p>His priority today, what he needs from whom, what's blocked. When a date breaks, he re-plans that day.</p></div></div>
+      <div class="line rise"><div><b>We own results, not to-do lists.</b><p>James: Terms live and the bank open. Rylan: ten clubs live with events by Oct 23. Franky: Vibe in students' hands Oct 31. How you get there is your call.</p></div></div>
+      <div class="line rise"><div><b>One owner decides.</b><p>Hear the other two once, then decide. We back the call in public; disagreements stay in the founders' chat. Stuck for 24 hours across two areas: Franky decides and writes down why.</p></div></div>
+      <div class="line rise"><div><b>Ask early and be specific.</b><p>"I need X from Y by Z." Raising a problem early is never a failure. A surprise on the deadline is.</p></div></div>
+      <div class="line rise"><div><b>Done means someone outside the three of us can see it.</b><p>Live on the site, a club page with a real event, a form submitted, a number on the scoreboard. "Almost" isn't done.</p></div></div>
+      <div class="line rise"><div><b>More responsibility, not more hours.</b><p>Deliver, and your area grows. Classes come first. Nobody burns out for Oct 31.</p></div></div>
+    </div>
+    <p class="sub" style="margin-top:20px">These come from two Lenny's Podcast episodes: <a href="https://www.youtube.com/watch?v=RmnWHz8HD74">Jeanne DeWitt Grosser</a> (built Stripe's early sales team) and <a href="https://www.youtube.com/watch?v=97LRJUUPy_w">Peter Sellis</a> (Snapchat's first product manager, later Discord's head of product). Five ideas we're taking: clubs join to lose a problem, not to chase a dream. Growth comes from the people already here. One sentence, one number, cut the rest. Signing clubs is a process we write down and improve weekly. One owner decides, so nobody waits on anybody.</p>
+  </div>
+</section>
+
+<!-- 12 · After launch -->
+<section class="chapter" id="after">
+  <div class="wrap">
+    <div class="head">
+      <span class="eyebrow">Chapter 11 · After launch</span>
+      <h2>Fill up Indianapolis first. Add one campus when the numbers say so<span class="dot">.</span></h2>
+      <p class="sub">Facebook stayed at Harvard for a month. Tinder stayed at USC. Yik Yak spread faster than it could keep people safe; bullying and falling use shut it down.</p>
+    </div>
+    <div class="rows">
+      <div class="row rise"><span class="eyebrow" style="padding-top:3px;white-space:nowrap">Nov</span><span><b>Indy only.</b> Clubs from 10 to 25. Store apps go live whenever Apple and Google approve them. <b>Moving and hiding profile sections already shipped</b> (Sept 26, ahead of plan), so November's build time goes to what clubs ask for after launch, plus any meeting ask that misses Oct 31 (Chapter 12). Clubs pay nothing this semester. Week of Nov 9, James adds a money tab to the scoreboard: paying students versus clubs and local businesses paying to promote events.</span></div>
+      <div class="row rise"><span class="eyebrow" style="padding-top:3px;white-space:nowrap">Dec</span><span><b>Finals, then quiet.</b> Rylan turns the club playbook into a one-page guide for campus two. Vibe+ goes on sale only when four things are true: the bank and Stripe are connected; the Terms cover subscriptions; two calm weeks have passed since launch; and about 300 students come back each week. With fewer, "who viewed you" looks empty.</span></div>
+      <div class="row rise"><span class="eyebrow" style="padding-top:3px;white-space:nowrap">Jan</span><span><b>Spring start (about Jan 11) is Indy's second launch moment.</b> Push to 50 active clubs. Decide the money model with real numbers.</span></div>
+      <div class="row rise"><span class="eyebrow" style="padding-top:3px;white-space:nowrap">Feb–Mar</span><span><b>The test for campus two,</b> all six true four weeks in a row: 50 active clubs · 1,000 students back each week · 1 in 3 of last month's joiners still here · half of club posts made by officers, not us · every report inside 24 hours · 150+ sign-ups from the next campus and a student there willing to lead. Pass, and start with 5–10 clubs there. Fail, and keep going on Indy.</span></div>
+      <div class="row rise"><span class="eyebrow" style="padding-top:3px;white-space:nowrap">Aug 2027</span><span><b>Campus two, welcome week.</b> Likely IU Bloomington (same @iu.edu sign-in, majors list already built); Purdue West Lafayette is the close second. Go in through one group, never the whole campus. Sign-up already lets students pick a campus marked "not open yet": that's our waiting list.</span></div>
+    </div>
+    <div class="grid2" style="margin-top:22px">
+      <div class="callout rise">
+        <h4>Five numbers every Sunday</h4>
+        <p style="font-size:14.5px">Clubs live with an upcoming event · upcoming events · new verified students · students who came back this week · reports open past 24 hours (should be zero). Only Franky can open the database, so he sends a screenshot. One fix first: today a visit only counts when a student opens the Campus screen, on phone or desktop, and we keep only their latest visit. Franky makes every screen count, and counts days per week, before launch.</p>
+      </div>
+      <div class="callout rise">
+        <h4>Not yet</h4>
+        <p style="font-size:14.5px">No paid ads. No hiring, no paid campus reps. No second campus before the test passes, never two at once. No big new features before launch beyond the club chat redesign and the club asks in Chapter 12; video posts stay on hold. No deals with the universities: be useful to clubs first.</p>
+      </div>
+    </div>
+  </div>
+</section>
+
+<!-- 13 · Still to decide -->
+<section class="chapter" id="decide">
+  <div class="wrap">
+    <div class="head">
+      <span class="eyebrow">Chapter 12 · Still to decide</span>
+      <h2>Two product calls, then eleven quick ones<span class="dot">.</span></h2>
+      <p class="sub">Each carries a recommendation. What the Sept 26 meeting said about these isn't written down yet, so we confirm each one at the first Sunday meeting, Oct 4, and take it off the page once it's settled. Everything else on this page is a draft: each owner changes what's in their own area.</p>
+    </div>
+    <div class="grid2">
+      <div class="callout rise">
+        <h4>How does a club get its page?</h4>
+        <p style="font-size:14.5px"><b>Today:</b> a student makes the club page from their own account and runs it. <b>Recommendation: keep that, and add the club's official email.</b> An officer makes the page from their own verified account, so every post has a real person behind it. At least two officers run it, and it passes to new officers at graduation. The club's school email earns a "verified club" badge and recovers the page if every officer leaves. No shared passwords.</p>
+      </div>
+      <div class="callout rise">
+        <h4>Asked for at the meeting, not built yet</h4>
+        <ul style="display:flex;flex-direction:column;gap:6px;font-size:14.5px">
+          <li><b>Club member list, roles, and passing a club down.</b> A member list on the club's page, roles like admin and moderator, and handing the club to new officers so it survives graduation. The basic roles exist; who can give them and how a handover is accepted aren't designed yet.</li>
+          <li><b>Club badges on profiles.</b> Not built yet.</li>
+        </ul>
+        <p style="font-size:14.5px"><b>Recommended order:</b> after the club chat redesign (Chapter 4), the member list, roles and handover come first, because "what happens when I graduate?" comes up at every club meeting. Then club badges. Both before the Oct 23 check if they fit; if not, badges move to November. <b>Built differently:</b> the meeting asked to see nearby campuses, view only; what shipped Sept 27 opens all 11 IU and Purdue campuses. Recommendation: keep all 11 unless Franky wants only nearby ones.</p>
+      </div>
+    </div>
+    <div class="tablewrap rise" style="margin-top:20px">
+      <table>
+        <thead><tr><th style="width:100px">Whose</th><th style="width:36%">The call</th><th>Recommendation</th></tr></thead>
+        <tbody>
+          <tr><td><span class="who all"><i class="i"></i>All</span></td><td><b>The pitch (the workshop, Chapter 2) and the seven lines (Chapter 10)</b></td><td>Write the pitch down, or run the 25 minutes at the first Sunday meeting, Oct 4, and confirm the seven lines the same day. Rylan tests the sentence on five students by Sun Oct 4.</td></tr>
+          <tr><td><span class="who"><i class="i"></i>Franky</span></td><td><b>What does a student open Vibe for on a day with no event?</b></td><td>Friends' posts, messages, "tonight on campus," with notifications on at launch. Whatever we answer has to be great on Oct 31.</td></tr>
+          <tr><td><span class="who"><i class="i"></i>Franky</span></td><td><b>Oct 9: no extensions</b></td><td>Agree now. Apple late means iPhones get the home-screen version on launch day.</td></tr>
+          <tr><td><span class="who"><i class="i"></i>Franky</span></td><td><b>Supabase Pro (our database host's paid plan), about $25 a month</b></td><td>Not yet (Franky, Sept 28); f11 waits on this call.</td></tr>
+          <tr><td><span class="who r"><i class="i"></i>Rylan</span></td><td><b>Sign-up before Oct 26: open, or club members only?</b></td><td>Open, but we don't advertise until Oct 26.</td></tr>
+          <tr><td><span class="who r"><i class="i"></i>Rylan</span></td><td><b>Launch night: venue, budget, co-host</b></td><td>A partner club co-hosts, or off campus. James sets a cap.</td></tr>
+          <tr><td><span class="who r"><i class="i"></i>Rylan</span></td><td><b>Who's on camera; the social logins</b></td><td>Franky Fridays, Rylan weekly, James when he wants. Logins in a shared password manager.</td></tr>
+          <tr><td><span class="who r"><i class="i"></i>Rylan</span></td><td><b>Free Vibe+ for the Campus 10 and club officers?</b></td><td>Yes, once James gets the lawyer's answer on perks.</td></tr>
+          <tr><td><span class="who"><i class="i"></i>Franky</span></td><td><b>A backup name for the stores</b></td><td>"Vibe" is probably taken in the App Store. Two backups with Rylan by Sun Oct 4.</td></tr>
+          <tr><td><span class="who"><i class="i"></i>Franky</span></td><td><b>The Sunday numbers</b></td><td>A screenshot of the five numbers every Sunday night. Counts only, never names.</td></tr>
+          <tr><td><span class="who all"><i class="i"></i>All</span></td><td><b>The six targets for campus two</b></td><td>Argue them at a Sunday meeting, then lock them by the Nov 1 look-back.</td></tr>
+        </tbody>
+      </table>
+    </div>
+  </div>
+</section>
+
+<!-- 14 · Sources -->
+<section class="chapter" id="sources">
+  <div class="wrap">
+    <div class="head"><span class="eyebrow">Where the numbers came from</span><h2>Read on September 25, recounted September 28, 2026<span class="dot">.</span></h2></div>
+    <p style="font-size:14.5px;color:var(--muted);max-width:70ch">Counts come from Vibe's live database. Paperwork facts come from Apple, Google, the IRS, Indiana and the banks' own pages; campus rules from IU's and Purdue's published policies. Most things we act on were checked twice against the original page. Still open, and marked as questions here: the Texas law, Indiana's tax return, and the fall-break dates. Answered since: Google Play needs the D-U-N-S number too. The long version, with every link, is in our shared folder. This replaces the September 21 roadmap at the same link. Updated Monday September 28, evening: every count on the cover and in Chapter 6 was recounted from the live database (the only changes are our own test events on Sept 26 and 28, and two of us, not one, coming back this week), plus the D-U-N-S request, the state filing, James's Oct 3 amendment, what shipped since the meeting, the phone apps' real state, and the meeting's product and marketing asks. What the meeting decided isn't written down, so those calls stay open in Chapter 12. Updated Tuesday September 29: what shipped Sept 28–29, the tagline, and the club chat redesign with its dates. The counts are still the Sept 28 ones; only "days to launch" moved.</p>
+  </div>
+</section>
+</main>
+</div>
+<script type="application/json" id="page-source">{"v": 1, "page": "\u003cnav class=\"bar-ui\" aria-label=\"Presenter\">\n  \u003cbutton id=\"presentBtn\" type=\"button\">Present\u003c/button>\n  \u003cbutton id=\"prevBtn\" type=\"button\" aria-label=\"Previous chapter\">←\u003c/button>\n  \u003cbutton id=\"nextBtn\" type=\"button\" aria-label=\"Next chapter\">→\u003c/button>\n  \u003cbutton id=\"editBtn\" type=\"button\" hidden=\"\">Edit\u003c/button>\n  \u003cbutton id=\"saveBtn\" class=\"primary\" type=\"button\" hidden=\"\" disabled=\"\">Save\u003c/button>\n  \u003cbutton id=\"discardBtn\" type=\"button\" hidden=\"\">Discard\u003c/button>\n  \u003cspan id=\"editStatus\" class=\"tick-note\" role=\"status\" aria-live=\"polite\">\u003c/span>\n  \u003cspan class=\"hint tick-note\">Arrow keys move between chapters in Present.\u003c/span>\n  \u003cspan class=\"dots\" id=\"dots\">\u003c/span>\n  \u003cspan class=\"pos\" id=\"pos\">1 / 14\u003c/span>\n\u003c/nav>\n\u003cmain id=\"page\">\n\n\u003c!-- 1 · Cover -->\n\u003csection class=\"chapter\" id=\"cover\">\n  \u003cdiv class=\"wrap\">\n    \u003cdiv class=\"rise\" style=\"display:flex;align-items:center;gap:12px;margin-bottom:22px\">\n      \u003csvg width=\"44\" height=\"44\" viewBox=\"0 0 1254 1254\" role=\"img\" aria-label=\"Vibe\">\n        \u003crect width=\"1254\" height=\"1254\" rx=\"260\" fill=\"#FFFFFF\">\u003c/rect>\n        \u003cpath d=\"M871 903.7 A383.5 383.5 0 1 1 977.7 759.9\" fill=\"none\" stroke=\"#FC6B2F\" stroke-width=\"30\" stroke-linecap=\"round\">\u003c/path>\n        \u003ccircle cx=\"932.9\" cy=\"838.1\" r=\"53\" fill=\"#FC6B2F\">\u003c/circle>\n        \u003cpath fill=\"#1A1A1A\" d=\"M426 432 H593 A16 16 0 0 1 609 448 V462 A16 16 0 0 1 593 478 H587 Q575.6 478 580.2 490 L657.2 690 Q660.3 698.1 663 690 L731 490 Q735.1 478 725 478 H709 A16 16 0 0 1 693 462 V448 A16 16 0 0 1 709 432 H827 A16 16 0 0 1 843 448 V462 A16 16 0 0 1 827 478 H821 Q810.3 478 805.8 490 L685.8 810 Q680.5 824 668 824 H590 Q577.8 824 572.4 810 L449.2 490 Q444.6 478 433 478 H426 A16 16 0 0 1 410 462 V448 A16 16 0 0 1 426 432 Z\">\u003c/path>\n      \u003c/svg>\n      \u003cspan class=\"eyebrow\">Vibe · Indianapolis · Launch roadmap after the September 26 founders' meeting · Updated Tuesday September 29, 2026\u003c/span>\n    \u003c/div>\n    \u003ch1 class=\"rise\" style=\"font-size:clamp(40px,7vw,72px);line-height:.96;font-weight:900;letter-spacing:-.02em;margin-bottom:22px\">Five weeks to\u003cbr>October 31\u003cspan class=\"dot\">.\u003c/span>\u003c/h1>\n    \u003cp class=\"rise\" style=\"font-size:19px;line-height:1.5;max-width:60ch;margin-bottom:34px\">The website is built, the iPhone app runs on Franky's computer, and Android is next. The next five weeks are clubs, students, the two stores and the paperwork. Every task has one name and one date.\u003c/p>\n    \u003cdiv class=\"band rise\">\n      \u003cdiv class=\"cell\">\u003cspan class=\"n\" data-count=\"20\">20\u003c/span>\u003cspan class=\"k\">Accounts\u003c/span>\u003cspan class=\"t\">us, friends, testers\u003c/span>\u003c/div>\n      \u003cdiv class=\"cell\">\u003cspan class=\"n\" data-count=\"14\">14\u003c/span>\u003cspan class=\"k\">Verified school emails\u003c/span>\u003cspan class=\"t\">us included · all IU · 0 Purdue\u003c/span>\u003c/div>\n      \u003cdiv class=\"cell flag\">\u003cspan class=\"n\" data-count=\"0\">0\u003c/span>\u003cspan class=\"k\">Clubs signed\u003c/span>\u003cspan class=\"t\">SAE is Franky's test page\u003c/span>\u003c/div>\n      \u003cdiv class=\"cell flag\">\u003cspan class=\"n\" data-count=\"0\">0\u003c/span>\u003cspan class=\"k\">Upcoming events\u003c/span>\u003cspan class=\"t\">last one Sept 28, our own test\u003c/span>\u003c/div>\n      \u003cdiv class=\"cell flag\">\u003cspan class=\"n\" data-count=\"0\">0\u003c/span>\u003cspan class=\"k\">Sign-ups, last 7 days\u003c/span>\u003cspan class=\"t\">last one Sept 17\u003c/span>\u003c/div>\n      \u003cdiv class=\"cell goal\">\u003cspan class=\"n\" data-count=\"32\">32\u003c/span>\u003cspan class=\"k\">Days to launch\u003c/span>\u003cspan class=\"t\">Saturday, October 31\u003c/span>\u003c/div>\n    \u003c/div>\n    \u003cp class=\"tick-note rise readonly\" style=\"margin-top:10px\">Recounted from the live database on Monday September 28, 7 pm. The same as September 25 apart from our own test events (Sept 26 and 28): no clubs yet, and no new sign-ups since September 17.\u003c/p>\n  \u003c/div>\n\u003c/section>\n\n\u003c!-- 2 · Where we are -->\n\u003csection class=\"chapter\" id=\"since\">\n  \u003cdiv class=\"wrap\">\n    \u003cdiv class=\"head\">\n      \u003cspan class=\"eyebrow\">Chapter 1 · Where we are\u003c/span>\n      \u003ch2>Safety tools are live, the iPhone app runs, and both stores wait on one number\u003cspan class=\"dot\">.\u003c/span>\u003c/h2>\n      \u003cp class=\"sub\">One change of plan: we now aim to be in the App Store and Google Play by launch. If Apple's company account isn't approved by Oct 9, we launch without it.\u003c/p>\n    \u003c/div>\n    \u003cdiv class=\"grid2\">\n      \u003cdiv class=\"callout rise\">\n        \u003ch4>Safety, live\u003c/h4>\n        \u003cul style=\"display:flex;flex-direction:column;gap:6px;font-size:14.5px\">\n          \u003cli>Students can \u003cb>report\u003c/b> any post, comment, message, event or club.\u003c/li>\n          \u003cli>We can \u003cb>remove posts, suspend and ban\u003c/b>. A banned student can't come back with the same school email.\u003c/li>\n          \u003cli>A \u003cb>verified school email\u003c/b> is needed to post. A word filter runs everywhere.\u003c/li>\n          \u003cli>Our safety pages promise we \u003cb>review every report within 24 hours\u003c/b>. The Terms still say \"no guarantee\": the lawyer fixes that.\u003c/li>\n          \u003cli>\u003cb>One gap left:\u003c/b> our legal pages promise a photo we take down is gone within 48 hours, but today it can keep loading for a few days. Franky fixes it before students arrive (Chapter 12).\u003c/li>\n        \u003c/ul>\n      \u003c/div>\n      \u003cdiv class=\"callout rise\">\n        \u003ch4>The phone app\u003c/h4>\n        \u003cul style=\"display:flex;flex-direction:column;gap:6px;font-size:14.5px\">\n          \u003cli>Vibe \u003cb>installs to a home screen\u003c/b> from the website today.\u003c/li>\n          \u003cli>The \u003cb>real iPhone app runs\u003c/b> on a test iPhone on Franky's computer (since Sept 25). It goes on a real phone once Apple approves our account.\u003c/li>\n          \u003cli>\u003cb>Android has never been built.\u003c/b> The project is set up and Android Studio, the tool that builds it, is installed (Sept 29); the first build comes next.\u003c/li>\n          \u003cli>The website is \u003cb>ready for Apple's and Google's reviewers\u003c/b>.\u003c/li>\n          \u003cli>\u003cb>Phone notifications are built, switched off.\u003c/b> Turning them on takes four setup steps, not more code (Week 3). \u003cb>Vibe+\u003c/b> (our $3.99/month upgrade) \u003cb>is built, switched off\u003c/b>, and hidden inside the apps.\u003c/li>\n        \u003c/ul>\n      \u003c/div>\n    \u003c/div>\n    \u003cdiv class=\"callout rise\" style=\"margin-top:20px;max-width:none;border-left-color:var(--r)\">\n      \u003cspan class=\"eyebrow\">Since the Sept 26 meeting · Updated Tue Sep 29\u003c/span>\n      \u003cdiv class=\"grid2\" style=\"gap:16px\">\n        \u003cul style=\"display:flex;flex-direction:column;gap:6px;font-size:14.5px\">\n          \u003cli>\u003cb>D-U-N-S number requested\u003c/b> Mon Sep 28. It's due by about Oct 5, and Apple sees it about Oct 7. When it arrives, check that Dun &amp; Bradstreet (D&amp;B, the company that issues the number) spells our name exactly \u003ccode>CONNECTVIBE. LLC\u003c/code>.\u003c/li>\n          \u003cli>\u003cb>The state filing, read:\u003c/b> the legal name is \u003ccode>CONNECTVIBE. LLC\u003c/code>, it's run by managers, and James is the only person named. There's no business address yet. James amends it by Sat Oct 3 to add Franky and Rylan as co-founders (\"governing persons\") and set Franky's address as the principal office (Chapter 4).\u003c/li>\n          \u003cli>\u003cb>Cleared:\u003c/b> the phone side of notifications is built; only setup is left. Google Play needs the D-U-N-S number too, so both stores open once it arrives. The security check of everything built up to Sept 27 came early: done Sept 27, fixes live Sept 27–28.\u003c/li>\n          \u003cli>\u003cb>The website is ready for our first post\u003c/b> (done Sept 28): the product journal is off the public site, link previews show the new tagline, and there's a share image.\u003c/li>\n        \u003c/ul>\n        \u003cul style=\"display:flex;flex-direction:column;gap:6px;font-size:14.5px\">\n          \u003cli>\u003cb>Live in the app, three of them asked for at the meeting:\u003c/b> the \"coming up + trending\" strip on the campus feed; move and hide profile sections, bio to the side (planned for November, done now); and look around any campus, view only (your home campus locks for 45 days, and RSVPs stay on it).\u003c/li>\n          \u003cli>\u003cb>New Sept 28–29, all live:\u003c/b> club officers can delete a club post, and edit or cancel a club event; everyone who RSVP'd gets a notice from the club. Night mode is on every page, and the app now follows your phone's own light or dark setting. On a computer, Vibe has one top bar, in school colors.\u003c/li>\n          \u003cli>\u003cb>Safety, tightened:\u003c/b> blocks now hold everywhere, hidden profile sections are truly hidden, moderators can take down any photo, and uploaded photos lose their location data.\u003c/li>\n          \u003cli>\u003cb>Settled:\u003c/b> moving and hiding profile sections is free; the extras are Vibe+. The tagline is picked: \"Your campus. Your people. Yourself.\" (Chapter 2).\u003c/li>\n          \u003cli>\u003cb>Asked for, not built yet:\u003c/b> club member lists with roles and passing a club down, and club badges on profiles (Chapter 12).\u003c/li>\n        \u003c/ul>\n      \u003c/div>\n    \u003c/div>\n    \u003cp class=\"sub\" style=\"margin-top:20px\">\u003cb>Main focus now:\u003c/b> the app, the paperwork, and getting the campus on it. Night mode and the officer tools are done. Next in the app: the club chat redesign (Chapter 4).\u003c/p>\n  \u003c/div>\n\u003c/section>\n\n\u003c!-- 3 · What we say -->\n\u003csection class=\"chapter\" id=\"belief\">\n  \u003cdiv class=\"wrap\">\n    \u003cdiv class=\"head\">\n      \u003cspan class=\"eyebrow\">Chapter 2 · What we all say\u003c/span>\n      \u003ch2>One sentence, one kind of club, three phrases\u003cspan class=\"dot\">.\u003c/span>\u003c/h2>\n      \u003cp class=\"sub\">Three different stories means clubs hear about three different apps. Main focus now: write down the one pitch all three of us say, then repeat it until we're sick of it.\u003c/p>\n    \u003c/div>\n    \u003cdiv class=\"grid2\">\n      \u003cdiv class=\"callout rise\">\n        \u003cspan class=\"eyebrow\">The sentence\u003c/span>\n        \u003cp style=\"font-family:var(--serif);font-size:24px;line-height:1.25;color:var(--ink)\">Vibe is where IU Indy and Purdue Indy students find their clubs, their events, and each other, all in one place.\u003c/p>\n        \u003cp style=\"font-size:14px;color:var(--muted)\">Short: \u003cb>\"Your campus, all in one place.\"\u003c/b> We track each part: clubs (students following 3+ clubs), events (RSVPs), each other (friends and messages). \u003cspan class=\"who r\">\u003ci class=\"i\">\u003c/i>Rylan\u003c/span> tests it on five students by Sun Oct 4.\u003c/p>\n        \u003cp style=\"font-size:14px;color:var(--muted)\">\u003cb>Tagline, picked (Franky, Sept 28):\u003c/b> \"Your campus. Your people. Yourself.\" It already shows in link previews and on the share image.\u003c/p>\n      \u003c/div>\n      \u003cdiv class=\"callout rise\">\n        \u003cspan class=\"eyebrow\">The first club: three yes/no traits\u003c/span>\n        \u003cul style=\"display:flex;flex-direction:column;gap:6px;font-size:15px\">\n          \u003cli>\u003cb>An event at least every two weeks.\u003c/b>\u003c/li>\n          \u003cli>\u003cb>Recruiting this fall.\u003c/b>\u003c/li>\n          \u003cli>\u003cb>Already posts on Instagram\u003c/b>, so \"nobody sees our posts\" is real to them.\u003c/li>\n        \u003c/ul>\n        \u003cp style=\"font-size:14px;color:var(--muted)\">Start with clubs that say yes to all three, whatever kind. At least 3 of the first 10 are Purdue. \"Replace Instagram\" is our goal, never our pitch: officers say yes to lose a problem, not to join a dream.\u003c/p>\n      \u003c/div>\n    \u003c/div>\n    \u003cdiv class=\"rise\" style=\"margin-top:20px\">\n      \u003cspan class=\"eyebrow\">Three phrases we always use\u003c/span>\n      \u003cp style=\"font-size:16px;margin-top:6px\">\u003cb>\"Clubs first, then students.\"\u003c/b> · \u003cb>\"We build your page in front of you.\"\u003c/b> · \u003cb>\"We only claim what's live.\"\u003c/b>\u003c/p>\n    \u003c/div>\n    \u003cdiv class=\"callout rise\" style=\"margin-top:22px;max-width:none\">\n      \u003cspan class=\"eyebrow\">The pitch workshop, 25 minutes · planned for Sept 26, result not written down yet\u003c/span>\n      \u003cp style=\"font-size:14.5px\">\u003cb>The goal:\u003c/b> one pitch all three of us can say word for word. \u003cb>Recommendation:\u003c/b> if we wrote it on Sept 26, put it here before the first demo day; if not, run these 25 minutes at the first Sunday meeting, Oct 4.\u003c/p>\n      \u003cul style=\"display:flex;flex-direction:column;gap:8px;font-size:14.5px\">\n        \u003cli>\u003cb>5 min, alone, phones down.\u003c/b> Each of us writes three sentences answering a club president who asks: \"What is Vibe, and why should we bother?\"\u003c/li>\n        \u003cli>\u003cb>5 min, read them out.\u003c/b> Underline every phrase that shows up twice. Those are the keepers.\u003c/li>\n        \u003cli>\u003cb>10 min, build it from the parts.\u003c/b> The three problems we fix (empty events, posts nobody sees, the account mess when officers graduate). What we do in the room (build your page and load your events in 15 minutes). What it costs (nothing, and nobody quits Instagram). The sentence last.\u003c/li>\n        \u003cli>\u003cb>5 min, stress-test it.\u003c/b> Rylan says it to Franky playing a doubtful club president, who asks: Who can see our member list? Can someone fake being a student? What if someone posts something awful? Can we remove a follower? What happens when I graduate? Whatever stumbles gets rewritten on the spot.\u003c/li>\n      \u003c/ul>\n      \u003cp style=\"font-size:14.5px\">\u003cb>Then, at every real club meeting, we ask before we show.\u003c/b> Five questions, the same every time: How do members hear about events now? What went wrong at your last event? Who decides which apps the club uses? What happens to your accounts when officers graduate? Would the club ever pay for anything here? The answers go in the scoreboard's \"what we heard\" tab.\u003c/p>\n    \u003c/div>\n  \u003c/div>\n\u003c/section>\n\u003c!-- 4 · The path -->\n\u003csection class=\"chapter\" id=\"path\">\n  \u003cdiv class=\"wrap\">\n    \u003cdiv class=\"head\">\n      \u003cspan class=\"eyebrow\">Chapter 3 · The path\u003c/span>\n      \u003ch2>Thirty-two days, four dates that don't move\u003cspan class=\"dot\">.\u003c/span>\u003c/h2>\n      \u003cp class=\"sub\">Oct 9: we decide whether the store apps make launch. Oct 16: last safe day to submit. Oct 23: full launch or smaller launch. Oct 31: launch. Everything else can move.\u003c/p>\n    \u003c/div>\n    \u003cfigure>\n      \u003csvg viewBox=\"0 0 1000 236\" role=\"img\" aria-label=\"A timeline from September 25 to October 31 with the milestones: founders met Sept 26 (done), D-U-N-S requested Sept 28 (done), first scoreboard Oct 2, first Sunday meeting Oct 4, D-U-N-S number due about Oct 5 and Apple sees it about Oct 7, Apple decision day Oct 9, club playbook Oct 11, Terms live Oct 14, last store submission Oct 16, full or smaller launch decided Oct 23, doors open Oct 26, launch night Oct 29, launch Oct 31. Purdue fall break Oct 12 to 13 and IU Indy fall break Oct 19 to 20 are marked.\" style=\"color:var(--body)\">\n        \u003cdefs>\u003cmarker id=\"tl-arrow\" viewBox=\"0 0 10 10\" refX=\"9\" refY=\"5\" markerWidth=\"8\" markerHeight=\"8\" orient=\"auto\">\u003cpath d=\"M0 0L10 5 0 10z\" fill=\"currentColor\">\u003c/path>\u003c/marker>\u003c/defs>\n        \u003cg font-family=\"DM Mono, ui-monospace, Menlo, monospace\" font-size=\"10\" fill=\"var(--muted)\" text-anchor=\"middle\">\n          \u003crect x=\"116.5\" y=\"18\" width=\"153\" height=\"18\" rx=\"3\" fill=\"var(--rule)\" opacity=\".7\">\u003c/rect>\u003ctext x=\"193\" y=\"31\">WEEK 1\u003c/text>\n          \u003crect x=\"295\" y=\"18\" width=\"153\" height=\"18\" rx=\"3\" fill=\"var(--rule)\" opacity=\".7\">\u003c/rect>\u003ctext x=\"371.5\" y=\"31\">WEEK 2\u003c/text>\n          \u003crect x=\"473.5\" y=\"18\" width=\"153\" height=\"18\" rx=\"3\" fill=\"var(--rule)\" opacity=\".7\">\u003c/rect>\u003ctext x=\"550\" y=\"31\">WEEK 3\u003c/text>\n          \u003crect x=\"652\" y=\"18\" width=\"153\" height=\"18\" rx=\"3\" fill=\"var(--rule)\" opacity=\".7\">\u003c/rect>\u003ctext x=\"728.5\" y=\"31\">WEEK 4\u003c/text>\n          \u003crect x=\"830.5\" y=\"18\" width=\"127.5\" height=\"18\" rx=\"3\" fill=\"var(--rule)\" opacity=\".7\">\u003c/rect>\u003ctext x=\"894\" y=\"31\">LAUNCH WEEK\u003c/text>\n        \u003c/g>\n        \u003cline x1=\"40\" y1=\"124\" x2=\"958\" y2=\"124\" stroke=\"var(--rule)\" stroke-width=\"2\">\u003c/line>\n        \u003cline class=\"draw\" pathLength=\"1000\" x1=\"40\" y1=\"124\" x2=\"958\" y2=\"124\" stroke=\"var(--accent)\" stroke-width=\"3\" stroke-linecap=\"round\" marker-end=\"url(#tl-arrow)\" style=\"color:var(--accent)\">\u003c/line>\n        \u003cg fill=\"var(--wait)\" opacity=\".85\">\u003crect x=\"473.5\" y=\"131\" width=\"25.5\" height=\"7\" rx=\"2\">\u003c/rect>\u003crect x=\"652\" y=\"131\" width=\"25.5\" height=\"7\" rx=\"2\">\u003c/rect>\u003c/g>\n        \u003cg font-family=\"DM Mono, ui-monospace, Menlo, monospace\" font-size=\"9.5\" fill=\"var(--wait)\" text-anchor=\"middle\">\n          \u003ctext x=\"486\" y=\"204\">Purdue break Oct 12–13\u003c/text>\u003ctext x=\"665\" y=\"220\">IU Indy break Oct 19–20\u003c/text>\n        \u003c/g>\n        \u003cg fill=\"var(--surface)\" stroke=\"var(--accent)\" stroke-width=\"2.5\">\n          \u003ccircle class=\"pop\" cx=\"65.5\" cy=\"124\" r=\"6\" style=\"animation-delay:.07s\">\u003c/circle>\n          \u003ccircle class=\"pop\" cx=\"116.5\" cy=\"124\" r=\"6\" style=\"animation-delay:.2s\">\u003c/circle>\n          \u003ccircle class=\"pop\" cx=\"218.5\" cy=\"124\" r=\"6\" style=\"animation-delay:.47s\">\u003c/circle>\n          \u003ccircle class=\"pop\" cx=\"269.5\" cy=\"124\" r=\"6\" style=\"animation-delay:.6s\">\u003c/circle>\n          \u003ccircle class=\"pop\" cx=\"346\" cy=\"124\" r=\"6\" style=\"animation-delay:.8s\">\u003c/circle>\n          \u003ccircle class=\"pop\" cx=\"397\" cy=\"124\" r=\"9\" fill=\"var(--accent)\" style=\"animation-delay:.93s\">\u003c/circle>\n          \u003ccircle class=\"pop\" cx=\"448\" cy=\"124\" r=\"6\" style=\"animation-delay:1.07s\">\u003c/circle>\n          \u003ccircle class=\"pop\" cx=\"524.5\" cy=\"124\" r=\"6\" style=\"animation-delay:1.27s\">\u003c/circle>\n          \u003ccircle class=\"pop\" cx=\"575.5\" cy=\"124\" r=\"9\" fill=\"var(--accent)\" style=\"animation-delay:1.4s\">\u003c/circle>\n          \u003ccircle class=\"pop\" cx=\"754\" cy=\"124\" r=\"9\" fill=\"var(--accent)\" style=\"animation-delay:1.87s\">\u003c/circle>\n          \u003ccircle class=\"pop\" cx=\"830.5\" cy=\"124\" r=\"6\" style=\"animation-delay:2.07s\">\u003c/circle>\n          \u003ccircle class=\"pop\" cx=\"907\" cy=\"124\" r=\"6\" style=\"animation-delay:2.27s\">\u003c/circle>\n          \u003ccircle class=\"pop\" cx=\"958\" cy=\"124\" r=\"11\" fill=\"var(--accent)\" style=\"animation-delay:2.4s\">\u003c/circle>\n        \u003c/g>\n        \u003cg font-family=\"DM Sans, -apple-system, sans-serif\" font-size=\"11.5\" fill=\"var(--ink)\" text-anchor=\"middle\" font-weight=\"700\">\n          \u003ctext x=\"65.5\" y=\"96\">Founders met\u003c/text>\u003ctext x=\"218.5\" y=\"96\">First scoreboard\u003c/text>\u003ctext x=\"346\" y=\"96\">D-U-N-S to Apple\u003c/text>\u003ctext x=\"448\" y=\"96\">Club playbook\u003c/text>\u003ctext x=\"575.5\" y=\"96\">Last day to submit\u003c/text>\u003ctext x=\"754\" y=\"96\">Full or smaller launch\u003c/text>\u003ctext x=\"907\" y=\"96\">Launch night\u003c/text>\n          \u003ctext x=\"116.5\" y=\"162\">D-U-N-S requested\u003c/text>\u003ctext x=\"269.5\" y=\"162\">First Sunday meeting\u003c/text>\u003ctext x=\"397\" y=\"162\">Apple decision day\u003c/text>\u003ctext x=\"524.5\" y=\"162\">Terms live\u003c/text>\u003ctext x=\"830.5\" y=\"162\">Doors open\u003c/text>\u003ctext x=\"958\" y=\"162\">Launch\u003c/text>\n        \u003c/g>\n        \u003cg font-family=\"DM Mono, ui-monospace, Menlo, monospace\" font-size=\"9.5\" fill=\"var(--muted)\" text-anchor=\"middle\">\n          \u003ctext x=\"65.5\" y=\"82\">SAT SEP 26 ✓\u003c/text>\u003ctext x=\"218.5\" y=\"82\">FRI OCT 2\u003c/text>\u003ctext x=\"346\" y=\"82\">~OCT 7\u003c/text>\u003ctext x=\"448\" y=\"82\">SUN OCT 11\u003c/text>\u003ctext x=\"575.5\" y=\"82\">FRI OCT 16\u003c/text>\u003ctext x=\"754\" y=\"82\">FRI OCT 23\u003c/text>\u003ctext x=\"907\" y=\"82\">THU OCT 29\u003c/text>\n          \u003ctext x=\"116.5\" y=\"176\">MON SEP 28 ✓\u003c/text>\u003ctext x=\"269.5\" y=\"176\">SUN OCT 4\u003c/text>\u003ctext x=\"397\" y=\"176\">FRI OCT 9\u003c/text>\u003ctext x=\"524.5\" y=\"176\">~OCT 14\u003c/text>\u003ctext x=\"830.5\" y=\"176\">MON OCT 26\u003c/text>\u003ctext x=\"958\" y=\"176\">SAT OCT 31\u003c/text>\n        \u003c/g>\n      \u003c/svg>\n      \u003cfigcaption>The big dots don't move. The amber marks are fall breaks: Purdue's lands in the week we most need Purdue clubs.\u003c/figcaption>\n    \u003c/figure>\n    \u003cdiv class=\"head\" style=\"margin-top:40px\">\n      \u003ch3 style=\"font-size:22px\">The paperwork chain\u003c/h3>\n      \u003cp class=\"sub\">Each step waits on the one before. Franky requested the \u003cb>D-U-N-S number\u003c/b> (a free company ID number Apple and Google require) on Mon Sep 28; it's due about Oct 5, and Apple sees it about Oct 7. Apple also needs an enroller who can sign for the LLC, and today the state filing names only James, so \u003cb>James amends it by Sat Oct 3\u003c/b> to add Franky and Rylan as co-founders (\"governing persons\") and give the LLC its address.\u003c/p>\n    \u003c/div>\n    \u003cfigure>\n      \u003csvg viewBox=\"0 0 1010 120\" role=\"img\" aria-label=\"Seven linked steps: James amends the LLC filing by Sat Oct 3; Franky requested the D-U-N-S number Sept 28 (done) and it's due about Oct 5; Franky enrolls with Apple and Google by Oct 9; the legal pages go live with the lawyer by about Oct 14; Franky submits to both stores by Oct 16; app links go live by Oct 23; launch Oct 31.\" style=\"color:var(--body)\">\n        \u003cdefs>\u003cmarker id=\"ch-arrow\" viewBox=\"0 0 10 10\" refX=\"9\" refY=\"5\" markerWidth=\"7\" markerHeight=\"7\" orient=\"auto\">\u003cpath d=\"M0 0L10 5 0 10z\" fill=\"var(--muted)\">\u003c/path>\u003c/marker>\u003c/defs>\n        \u003cg stroke=\"var(--muted)\" stroke-width=\"1.5\" marker-end=\"url(#ch-arrow)\">\n          \u003cline x1=\"128\" y1=\"58\" x2=\"150\" y2=\"58\">\u003c/line>\u003cline x1=\"274\" y1=\"58\" x2=\"296\" y2=\"58\">\u003c/line>\u003cline x1=\"420\" y1=\"58\" x2=\"442\" y2=\"58\">\u003c/line>\u003cline x1=\"566\" y1=\"58\" x2=\"588\" y2=\"58\">\u003c/line>\u003cline x1=\"712\" y1=\"58\" x2=\"734\" y2=\"58\">\u003c/line>\u003cline x1=\"858\" y1=\"58\" x2=\"880\" y2=\"58\">\u003c/line>\n        \u003c/g>\n        \u003cg font-family=\"DM Sans, -apple-system, sans-serif\" font-size=\"12\" text-anchor=\"middle\">\n          \u003cg class=\"light\" style=\"animation-delay:.1s\">\u003crect x=\"6\" y=\"20\" width=\"122\" height=\"76\" rx=\"8\" fill=\"var(--j-soft)\" stroke=\"var(--j)\" stroke-width=\"1.5\">\u003c/rect>\u003ctext x=\"67\" y=\"44\" fill=\"var(--ink)\" font-weight=\"700\">LLC facts\u003c/text>\u003ctext x=\"67\" y=\"61\" fill=\"var(--body)\" font-size=\"11\">amend the filing\u003c/text>\u003ctext x=\"67\" y=\"80\" fill=\"var(--j)\" font-family=\"DM Mono, monospace\" font-size=\"8.5\">JAMES · BY SAT OCT 3\u003c/text>\u003c/g>\n          \u003cg class=\"light\" style=\"animation-delay:.5s\">\u003crect x=\"152\" y=\"20\" width=\"122\" height=\"76\" rx=\"8\" fill=\"var(--f-soft)\" stroke=\"var(--f)\" stroke-width=\"1.5\">\u003c/rect>\u003ctext x=\"213\" y=\"44\" fill=\"var(--ink)\" font-weight=\"700\">D-U-N-S number\u003c/text>\u003ctext x=\"213\" y=\"61\" fill=\"var(--r)\" font-size=\"11\" font-weight=\"700\">requested Sep 28 ✓\u003c/text>\u003ctext x=\"213\" y=\"80\" fill=\"var(--f)\" font-family=\"DM Mono, monospace\" font-size=\"8.5\">FRANKY · DUE ~OCT 5\u003c/text>\u003c/g>\n          \u003cg class=\"light\" style=\"animation-delay:.9s\">\u003crect x=\"298\" y=\"20\" width=\"122\" height=\"76\" rx=\"8\" fill=\"var(--f-soft)\" stroke=\"var(--f)\" stroke-width=\"1.5\">\u003c/rect>\u003ctext x=\"359\" y=\"44\" fill=\"var(--ink)\" font-weight=\"700\">Apple + Google\u003c/text>\u003ctext x=\"359\" y=\"61\" fill=\"var(--body)\" font-size=\"11\">$99/yr + $25 once\u003c/text>\u003ctext x=\"359\" y=\"80\" fill=\"var(--f)\" font-family=\"DM Mono, monospace\" font-size=\"8.5\">FRANKY · OCT 7–9\u003c/text>\u003c/g>\n          \u003cg class=\"light\" style=\"animation-delay:1.3s\">\u003crect x=\"444\" y=\"20\" width=\"122\" height=\"76\" rx=\"8\" fill=\"var(--j-soft)\" stroke=\"var(--j)\" stroke-width=\"1.5\">\u003c/rect>\u003ctext x=\"505\" y=\"44\" fill=\"var(--ink)\" font-weight=\"700\">Legal pages live\u003c/text>\u003ctext x=\"505\" y=\"61\" fill=\"var(--body)\" font-size=\"11\">with the lawyer\u003c/text>\u003ctext x=\"505\" y=\"80\" fill=\"var(--j)\" font-family=\"DM Mono, monospace\" font-size=\"8.5\">JAMES · ~OCT 14\u003c/text>\u003c/g>\n          \u003cg class=\"light\" style=\"animation-delay:1.7s\">\u003crect x=\"590\" y=\"20\" width=\"122\" height=\"76\" rx=\"8\" fill=\"var(--f-soft)\" stroke=\"var(--f)\" stroke-width=\"1.5\">\u003c/rect>\u003ctext x=\"651\" y=\"44\" fill=\"var(--ink)\" font-weight=\"700\">Submit to stores\u003c/text>\u003ctext x=\"651\" y=\"61\" fill=\"var(--body)\" font-size=\"11\">last safe day\u003c/text>\u003ctext x=\"651\" y=\"80\" fill=\"var(--f)\" font-family=\"DM Mono, monospace\" font-size=\"8.5\">FRANKY · FRI OCT 16\u003c/text>\u003c/g>\n          \u003cg class=\"light\" style=\"animation-delay:2.1s\">\u003crect x=\"736\" y=\"20\" width=\"122\" height=\"76\" rx=\"8\" fill=\"var(--f-soft)\" stroke=\"var(--f)\" stroke-width=\"1.5\">\u003c/rect>\u003ctext x=\"797\" y=\"44\" fill=\"var(--ink)\" font-weight=\"700\">App links live\u003c/text>\u003ctext x=\"797\" y=\"61\" fill=\"var(--body)\" font-size=\"11\">Vibe links open the app\u003c/text>\u003ctext x=\"797\" y=\"80\" fill=\"var(--f)\" font-family=\"DM Mono, monospace\" font-size=\"8.5\">FRANKY · BY OCT 23\u003c/text>\u003c/g>\n          \u003cg class=\"light\" style=\"animation-delay:2.5s\">\u003crect x=\"882\" y=\"20\" width=\"122\" height=\"76\" rx=\"8\" fill=\"var(--accent)\" stroke=\"var(--accent)\">\u003c/rect>\u003ctext x=\"943\" y=\"50\" fill=\"#FFFFFF\" font-weight=\"700\" font-size=\"15\">Launch\u003c/text>\u003ctext x=\"943\" y=\"76\" fill=\"#FFFFFF\" font-family=\"DM Mono, monospace\" font-size=\"8.5\">ALL · SAT OCT 31\u003c/text>\u003c/g>\n        \u003c/g>\n      \u003c/svg>\n      \u003cfigcaption>If Apple hasn't approved our company account by Friday Oct 9, iPhones get the home-screen version on launch day and the App Store listing follows in November. No extensions.\u003c/figcaption>\n    \u003c/figure>\n  \u003c/div>\n\u003c/section>\n\u003c!-- 5 · Who leads what -->\n\u003csection class=\"chapter\" id=\"owners\">\n  \u003cdiv class=\"wrap\">\n    \u003cdiv class=\"head\">\n      \u003cspan class=\"eyebrow\">Chapter 4 · Who leads what\u003c/span>\n      \u003ch2>One result each, and the calls that are yours\u003cspan class=\"dot\">.\u003c/span>\u003c/h2>\n      \u003cp class=\"sub\">In your area you hear the other two once, then you decide. These lists were drafted for the Sept 26 meeting and updated Sept 29: change what's in your own area. Cleared tasks come off the page and get one line in Chapter 1. Checkmarks save only on your own phone.\u003c/p>\n    \u003c/div>\n    \u003cdiv class=\"trio\">\n      \u003cdiv class=\"person rise\">\n        \u003cdiv>\u003cspan class=\"who\">\u003ci class=\"i\">\u003c/i>Franky\u003c/span>\u003ch3 style=\"margin-top:8px\">Builds the product. Leads.\u003c/h3>\u003c/div>\n        \u003cp class=\"result\">Vibe in students' hands on October 31: the store apps, or the home-screen version if Apple is late.\u003c/p>\n        \u003cdiv>\u003cspan class=\"lbl\">Decides\u003c/span>\u003cul style=\"margin-top:6px\">\u003cli>What's in the app and what ships\u003c/li>\u003cli>The Oct 9 store call\u003c/li>\u003cli>Tie-breaks between two areas, in writing\u003c/li>\u003c/ul>\u003c/div>\n        \u003cdiv>\u003cspan class=\"lbl\">To do\u003c/span>\n          \u003cdiv class=\"tasks\">\n            \u003cdiv class=\"task\">\u003cinput type=\"checkbox\" id=\"t-f2\" data-id=\"f2\">\u003clabel for=\"t-f2\">\u003cb>A working @connectvibe.app email.\u003c/b> help@connectvibe.app, our support inbox, already forwards to Franky: send one real test to prove it arrives. Apple and Google also want an address that can send as @connectvibe.app, so set one up before enrolling\u003c/label>\u003cspan class=\"when\">By Sun Oct 4\u003c/span>\u003c/div>\n            \u003cdiv class=\"task\">\u003cinput type=\"checkbox\" id=\"t-f3\" data-id=\"f3\">\u003clabel for=\"t-f3\">\u003cb>Company Google account and Firebase\u003c/b> (Google's tool for phone notifications) now: neither needs the D-U-N-S number. \u003cb>The Google Play developer account ($25)\u003c/b> does need it, so open it the day the number arrives (about Oct 5)\u003c/label>\u003cspan class=\"when\">By Oct 9\u003c/span>\u003c/div>\n            \u003cdiv class=\"task\">\u003cinput type=\"checkbox\" id=\"t-f4\" data-id=\"f4\">\u003clabel for=\"t-f4\">\u003cb>45-minute product walkthrough\u003c/b> for James and Rylan, plus a one-page \"tough questions\" sheet\u003c/label>\u003cspan class=\"when\">Wk 1\u003c/span>\u003c/div>\n            \u003cdiv class=\"task\">\u003cinput type=\"checkbox\" id=\"t-f5\" data-id=\"f5\">\u003clabel for=\"t-f5\">\u003cb>Time how long a club takes\u003c/b>, on a phone, from \"yes\" to a live page with an event. Goal: under 15 minutes\u003c/label>\u003cspan class=\"when\">Wk 1\u003c/span>\u003c/div>\n            \u003cdiv class=\"task\">\u003cinput type=\"checkbox\" id=\"t-f6\" data-id=\"f6\">\u003clabel for=\"t-f6\">\u003cb>3-line note every weekday morning.\u003c/b> Run the Sunday meeting\u003c/label>\u003cspan class=\"when\">Mon Sep 28\u003c/span>\u003c/div>\n            \u003cdiv class=\"task\">\u003cinput type=\"checkbox\" id=\"t-f9\" data-id=\"f9\">\u003clabel for=\"t-f9\">\u003cb>Build the Android app once.\u003c/b> It has never been built. Android Studio is installed on the Mac (Sept 29); next is its first-time setup, then the first build\u003c/label>\u003cspan class=\"when\">By Fri Oct 9\u003c/span>\u003c/div>\n            \u003cdiv class=\"task new\" style=\"background:linear-gradient(90deg,var(--f-soft),transparent 85%)\">\u003cinput type=\"checkbox\" id=\"t-f12\" data-id=\"f12\">\u003clabel for=\"t-f12\">\u003cspan class=\"flag-new\" style=\"color:var(--f)\">New\u003c/span>\u003cb>Rebuild club chat so it feels like Vibe, not Discord.\u003c/b> Each club gets a Board (officers post news) and a Lounge (members talk), every event gets its own chat for the club members who RSVP'd, and polls, sign-ups and RSVPs work inside the chat. It lives in Messages, with \"Your week\" (the events you RSVP'd to) on top. \u003cb>Week of Oct 5–9:\u003c/b> on for the three of us and SAE, so demo days can show it on SAE. \u003cb>Oct 10–14:\u003c/b> event chats and polls. \u003cb>No chat changes after Thu Oct 15,\u003c/b> so Apple's reviewer sees one steady app when we submit Oct 16. On for everyone Mon Oct 26, when doors open. On a computer, chat stays as it is today until after launch\u003c/label>\u003cspan class=\"when\" style=\"color:var(--f)\">By Thu Oct 15\u003c/span>\u003c/div>\n            \u003cdiv class=\"task\">\u003cinput type=\"checkbox\" id=\"t-f11\" data-id=\"f11\">\u003clabel for=\"t-f11\">\u003cb>Make taken-down photos disappear within 48 hours,\u003c/b> as our legal pages promise. Today they can keep loading for a few days. Recommended fix: Supabase Pro (the paid plan of the company that hosts our database), about $25 a month and half a day of work (Chapter 12)\u003c/label>\u003cspan class=\"when\">By Sun Oct 18\u003c/span>\u003c/div>\n            \u003cdiv class=\"task\">\u003cinput type=\"checkbox\" id=\"t-f8\" data-id=\"f8\">\u003clabel for=\"t-f8\">\u003cb>One demo day a week\u003c/b> (we sit with a club's officers and build their page with them), listening. Rylan leads\u003c/label>\u003cspan class=\"when\">Weekly\u003c/span>\u003c/div>\n          \u003c/div>\n        \u003c/div>\n      \u003c/div>\n      \u003cdiv class=\"person j rise\">\n        \u003cdiv>\u003cspan class=\"who j\">\u003ci class=\"i\">\u003c/i>James\u003c/span>\u003ch3 style=\"margin-top:8px\">Runs the paperwork.\u003c/h3>\u003c/div>\n        \u003cp class=\"result\">The lawyer's final Terms and Privacy to Franky by Oct 12 (live about Oct 14), and the bank account open.\u003c/p>\n        \u003cdiv>\u003cspan class=\"lbl\">Decides\u003c/span>\u003cul style=\"margin-top:6px\">\u003cli>Which lawyer; the list we send (who's on the LLC is all three of us)\u003c/li>\u003cli>Which bank; the Stripe setup (how Vibe+ payments reach it)\u003c/li>\u003cli>The scoreboard; the budget and every receipt\u003c/li>\u003c/ul>\u003c/div>\n        \u003cdiv>\u003cspan class=\"lbl\">To do\u003c/span>\n          \u003cdiv class=\"tasks\">\n            \u003cdiv class=\"task new\">\u003cinput type=\"checkbox\" id=\"t-j8\" data-id=\"j8\">\u003clabel for=\"t-j8\">\u003cspan class=\"flag-new\">New\u003c/span>\u003cb>Amend the LLC filing on INBiz\u003c/b> so it matches how we run Vibe: add \u003cb>Francisco Cazares\u003c/b> and \u003cb>Rylan Conaway\u003c/b> as co-founders (\"governing persons\") next to James, and set the principal office address to \u003cb>4741 SR 32, Anderson, IN 46011\u003c/b> for now (Franky's address, the same one on the D-U-N-S request; spell it exactly as D&amp;B does once the number arrives). Apple, Google and the bank all check that these match. The lawyer confirms it if one is on board by then. Also tell us whether a written operating agreement exists, and who it names\u003c/label>\u003cspan class=\"when\">Sat Oct 3\u003c/span>\u003c/div>\n            \u003cdiv class=\"task\">\u003cinput type=\"checkbox\" id=\"t-j2\" data-id=\"j2\">\u003clabel for=\"t-j2\">\u003cb>Get the EIN\u003c/b> (the company's free tax ID number) at irs.gov once the Oct 3 amendment is in, so the IRS form, the bank and Stripe all name the same people. The \"responsible party\" is the person who actually runs the LLC, not whoever filed it; their SSN goes on the form. 15 minutes. Type \u003ccode>CONNECTVIBE LLC\u003c/code>, no period. Save the PDF to the shared folder. If we're not sure, it waits for the lawyer\u003c/label>\u003cspan class=\"when\">After Sat Oct 3\u003c/span>\u003c/div>\n            \u003cdiv class=\"task\">\u003cinput type=\"checkbox\" id=\"t-j4\" data-id=\"j4\">\u003clabel for=\"t-j4\">\u003cb>One list to the lawyer.\u003c/b> First, on a call with all three of us: who's named on the LLC and its written rulebook (the \"operating agreement\"). By Oct 9: the Terms changes (zero tolerance for abuse, reports reviewed within 24 hours, 18+ only, subscriptions, Texas's new app-store age law) and a Privacy page naming every outside service that handles user data. Then: the yearly tax return, saying \"IU Indy\" in our posts, a giveaway, photo permission, students promoting us for perks. New from the Sept 27 safety check: our 48-hour photo takedown promise, how long we keep removed posts (the site says up to a year), 17-year-old students (the Terms say 18+), telling students that Vibe+ members can see who visited them. From the meeting's marketing ideas: how ambassadors mark their posts as ads\u003c/label>\u003cspan class=\"when\">Mon Sep 28\u003c/span>\u003c/div>\n            \u003cdiv class=\"task\">\u003cinput type=\"checkbox\" id=\"t-j5\" data-id=\"j5\">\u003clabel for=\"t-j5\">\u003cb>Pick the bank\u003c/b> (Mercury, an online bank, is the suggestion) \u003cb>and apply once the Oct 3 amendment and the EIN are done.\u003c/b> The form asks who is on the LLC and who runs it, and it must match the IRS form. Everyone the bank asks for verifies ID the same day; all three of us get access\u003c/label>\u003cspan class=\"when\">After the EIN\u003c/span>\u003c/div>\n            \u003cdiv class=\"task\">\u003cinput type=\"checkbox\" id=\"t-j6\" data-id=\"j6\">\u003clabel for=\"t-j6\">\u003cb>Build the scoreboard:\u003c/b> one sheet, four tabs (club pipeline, app numbers, what we heard, targets)\u003c/label>\u003cspan class=\"when\">Fri Oct 2\u003c/span>\u003c/div>\n            \u003cdiv class=\"task\">\u003cinput type=\"checkbox\" id=\"t-j7\" data-id=\"j7\">\u003clabel for=\"t-j7\">\u003cb>First responder on help@.\u003c/b> Every message answered within 24 hours\u003c/label>\u003cspan class=\"when\">From the day it works\u003c/span>\u003c/div>\n            \u003cdiv class=\"task\">\u003cinput type=\"checkbox\" id=\"t-j9\" data-id=\"j9\">\u003clabel for=\"t-j9\">\u003cb>Register our copyright agent\u003c/b> (the \"DMCA agent\") at copyright.gov, $6. It protects Vibe when a student posts someone else's photo, as long as we take it down when asked. Ask the lawyer if one is on board\u003c/label>\u003cspan class=\"when\">By Oct 14\u003c/span>\u003c/div>\n          \u003c/div>\n        \u003c/div>\n      \u003c/div>\n      \u003cdiv class=\"person r rise\">\n        \u003cdiv>\u003cspan class=\"who r\">\u003ci class=\"i\">\u003c/i>Rylan\u003c/span>\u003ch3 style=\"margin-top:8px\">Runs the campus.\u003c/h3>\u003c/div>\n        \u003cp class=\"result\">Ten clubs live on Vibe with upcoming events by the Oct 23 check, at least three of them Purdue.\u003c/p>\n        \u003cdiv>\u003cspan class=\"lbl\">Decides\u003c/span>\u003cul style=\"margin-top:6px\">\u003cli>Which clubs, in what order; how demo days run\u003c/li>\u003cli>What the teasers say and when they post\u003c/li>\u003cli>Who's in the Campus 10\u003c/li>\u003c/ul>\u003c/div>\n        \u003cdiv>\u003cspan class=\"lbl\">To do\u003c/span>\n          \u003cdiv class=\"tasks\">\n            \u003cdiv class=\"task\">\u003cinput type=\"checkbox\" id=\"t-r1\" data-id=\"r1\">\u003clabel for=\"t-r1\">\u003cb>Email the campus offices\u003c/b> (campcntr@iu.edu, stuact@iu.edu, StudentLifeIndy@purdue.edu): can we present at club meetings, table, put up flyers, and who gives the written OK?\u003c/label>\u003cspan class=\"when\">Mon Sep 28\u003c/span>\u003c/div>\n            \u003cdiv class=\"task\">\u003cinput type=\"checkbox\" id=\"t-r2\" data-id=\"r2\">\u003clabel for=\"t-r2\">\u003cb>A list of 25 clubs to approach,\u003c/b> each checked against the three traits, with enough Purdue clubs (about a third) to sign 3\u003c/label>\u003cspan class=\"when\">Wk 1\u003c/span>\u003c/div>\n            \u003cdiv class=\"task\">\u003cinput type=\"checkbox\" id=\"t-r3\" data-id=\"r3\">\u003clabel for=\"t-r3\">\u003cb>Finish the one pitch\u003c/b> (the workshop in Chapter 2) and the five questions we ask before the phone comes out. Run it once with Franky before the first demo\u003c/label>\u003cspan class=\"when\">Wk 1\u003c/span>\u003c/div>\n            \u003cdiv class=\"task\">\u003cinput type=\"checkbox\" id=\"t-r4\" data-id=\"r4\">\u003clabel for=\"t-r4\">\u003cb>20 to 30 two-minute student interviews\u003c/b>, same three questions, plus the sentence test. They become the three facts that open every demo\u003c/label>\u003cspan class=\"when\">Wk 1\u003c/span>\u003c/div>\n            \u003cdiv class=\"task\">\u003cinput type=\"checkbox\" id=\"t-r5\" data-id=\"r5\">\u003clabel for=\"t-r5\">\u003cb>Sign SAE for real\u003c/b> (Franky's own chapter; today it's only a test page): the officers say yes, real posts, two upcoming events. The example every other club sees\u003c/label>\u003cspan class=\"when\">Wk 1\u003c/span>\u003c/div>\n            \u003cdiv class=\"task\">\u003cinput type=\"checkbox\" id=\"t-r6\" data-id=\"r6\">\u003clabel for=\"t-r6\">\u003cb>Five demo days booked for week 2.\u003c/b> First two \"Building Vibe\" posts. Two backup store names with Franky\u003c/label>\u003cspan class=\"when\">By Sun Oct 4\u003c/span>\u003c/div>\n            \u003cdiv class=\"task\">\u003cinput type=\"checkbox\" id=\"t-r7\" data-id=\"r7\">\u003clabel for=\"t-r7\">\u003cb>The first five Campus 10 names:\u003c/b> the most involved students you know\u003c/label>\u003cspan class=\"when\">By Sun Oct 4\u003c/span>\u003c/div>\n            \u003cdiv class=\"task\">\u003cinput type=\"checkbox\" id=\"t-r8\" data-id=\"r8\">\u003clabel for=\"t-r8\">\u003cb>Set up our two Instagram accounts\u003c/b> from the meeting: a professional main account for teasers, and a behind-the-scenes founders' account. Save the same names on TikTok, plus the two campus account names (Chapter 7). Logins go in a shared password manager (Chapter 12)\u003c/label>\u003cspan class=\"when\">Sat Oct 3\u003c/span>\u003c/div>\n          \u003c/div>\n        \u003c/div>\n      \u003c/div>\n    \u003c/div>\n  \u003c/div>\n\u003c/section>\n\n\u003c!-- 6 · Week by week -->\n\u003csection class=\"chapter\" id=\"weeks\">\n  \u003cdiv class=\"wrap\">\n    \u003cdiv class=\"head\">\n      \u003cspan class=\"eyebrow\">Chapter 5 · Week by week\u003c/span>\n      \u003ch2>Five weeks, three lanes\u003cspan class=\"dot\">.\u003c/span>\u003c/h2>\n      \u003cp class=\"sub\">If a week slips, we catch up the next week. The order and Oct 31 don't move.\u003c/p>\n    \u003c/div>\n    \u003cdiv class=\"week rise\">\n      \u003cdiv class=\"when\">\u003cspan class=\"w\">Week 1\u003c/span>\u003cspan class=\"d\">Sep 28 – Oct 4\u003c/span>\u003cspan class=\"goal\">Pitch written · LLC filing amended · first club signed\u003c/span>\u003c/div>\n      \u003cdiv class=\"lanes\">\u003cdiv class=\"lane\">\u003cspan class=\"who all\">\u003ci class=\"i\">\u003c/i>All three\u003c/span>\u003cul>\u003cli>Week 1 is every task in Chapter 4 due by Sun Oct 4.\u003c/li>\u003cli>First Sunday meeting Oct 4.\u003c/li>\u003c/ul>\u003c/div>\u003c/div>\n    \u003c/div>\n    \u003cdiv class=\"week rise\">\n      \u003cdiv class=\"when\">\u003cspan class=\"w\">Week 2\u003c/span>\u003cspan class=\"d\">Oct 5 – 11\u003c/span>\u003cspan class=\"goal\">5 clubs signed · Apple decision Fri Oct 9\u003c/span>\u003c/div>\n      \u003cdiv class=\"lanes\">\n        \u003cdiv class=\"lane\">\u003cspan class=\"who\">\u003ci class=\"i\">\u003c/i>Franky\u003c/span>\u003cul>\u003cli>D-U-N-S number due about Oct 5: check it reads \u003ccode>CONNECTVIBE. LLC\u003c/code>, open Google Play that day, and enroll with Apple once it sees the number (about Oct 7)\u003c/li>\u003cli>\u003cb>Fri Oct 9: the store call.\u003c/b> Android built for the first time by then\u003c/li>\u003cli>\u003cb>New club chat on for the three of us and SAE\u003c/b> (Board, Lounge, \"Your week\" in Messages), so demo days can show it on SAE\u003c/li>\u003cli>Go through every screen a new student sees: keep it or hide it\u003c/li>\u003cli>First Campus 10 ideas session\u003c/li>\u003c/ul>\u003c/div>\n        \u003cdiv class=\"lane\">\u003cspan class=\"who j\">\u003ci class=\"i\">\u003c/i>James\u003c/span>\u003cul>\u003cli>EIN, then the bank opened; Franky connects Stripe\u003c/li>\u003cli>Lawyer's first answers back\u003c/li>\u003cli>Scoreboard updated Friday for Sunday\u003c/li>\u003c/ul>\u003c/div>\n        \u003cdiv class=\"lane\">\u003cspan class=\"who r\">\u003ci class=\"i\">\u003c/i>Rylan\u003c/span>\u003cul>\u003cli>Five demo days. Ask first, show second\u003c/li>\u003cli>Every club gets a decision date; a maybe past it is a no\u003c/li>\u003cli>\u003cb>Club playbook by Sun Oct 11:\u003c/b> our step-by-step for signing a club\u003c/li>\u003c/ul>\u003c/div>\n      \u003c/div>\n    \u003c/div>\n    \u003cdiv class=\"week rise\">\n      \u003cdiv class=\"when\">\u003cspan class=\"w\">Week 3\u003c/span>\u003cspan class=\"d\">Oct 12 – 18\u003c/span>\u003cspan class=\"goal\">10 clubs, 3 events each · submit both stores Fri Oct 16\u003c/span>\u003cspan class=\"note\">Purdue fall break Oct 12–13\u003c/span>\u003c/div>\n      \u003cdiv class=\"lanes\">\n        \u003cdiv class=\"lane\">\u003cspan class=\"who\">\u003ci class=\"i\">\u003c/i>Franky\u003c/span>\u003cul>\u003cli>Speed test on a borrowed mid-range phone\u003c/li>\u003cli>Last safety fixes before students arrive: taken-down photos gone within 48 hours, and a tag trends only once two different people use it\u003c/li>\u003cli>Security check of what's built since Sept 27, before we submit Oct 16\u003c/li>\u003cli>Notifications switched on for the three of us first: four setup steps, and Apple's key needs the Apple account\u003c/li>\u003cli>Event chats and polls done by Wed Oct 14. \u003cb>No chat changes after Thu Oct 15,\u003c/b> so Apple's reviewer sees one steady app\u003c/li>\u003cli>\u003cb>Submit to both stores by Fri Oct 16\u003c/b>\u003c/li>\u003c/ul>\u003c/div>\n        \u003cdiv class=\"lane\">\u003cspan class=\"who j\">\u003ci class=\"i\">\u003c/i>James\u003c/span>\u003cul>\u003cli>\u003cb>Terms and Privacy to Franky by Oct 12\u003c/b>, live about Oct 14\u003c/li>\u003c/ul>\u003c/div>\n        \u003cdiv class=\"lane\">\u003cspan class=\"who r\">\u003ci class=\"i\">\u003c/i>Rylan\u003c/span>\u003cul>\u003cli>Ten clubs, three events each\u003c/li>\u003cli>Five minutes at a student government meeting; launch-night venue booked\u003c/li>\u003cli>Club kit: how to post and invite members, plus the Oct 26 graphic\u003c/li>\u003c/ul>\u003c/div>\n      \u003c/div>\n    \u003c/div>\n    \u003cdiv class=\"week rise\">\n      \u003cdiv class=\"when\">\u003cspan class=\"w\">Week 4\u003c/span>\u003cspan class=\"d\">Oct 19 – 25\u003c/span>\u003cspan class=\"goal\">Countdown · full or smaller launch decided Fri Oct 23\u003c/span>\u003cspan class=\"note\">IU Indy fall break Oct 19–20\u003c/span>\u003c/div>\n      \u003cdiv class=\"lanes\">\n        \u003cdiv class=\"lane\">\u003cspan class=\"who\">\u003ci class=\"i\">\u003c/i>Franky\u003c/span>\u003cul>\u003cli>Vibe links open straight in the app by Oct 23\u003c/li>\u003cli>Walk the whole app as a brand-new student\u003c/li>\u003cli>Officers' complaints fixed within 48 hours\u003c/li>\u003c/ul>\u003c/div>\n        \u003cdiv class=\"lane\">\u003cspan class=\"who j\">\u003ci class=\"i\">\u003c/i>James\u003c/span>\u003cul>\u003cli>help@ first responder; reports shared by all three, none past 24 hours\u003c/li>\u003cli>Runs the Oct 23 check (Chapter 6)\u003c/li>\u003c/ul>\u003c/div>\n        \u003cdiv class=\"lane\">\u003cspan class=\"who r\">\u003ci class=\"i\">\u003c/i>Rylan\u003c/span>\u003cul>\u003cli>Countdown sticker on every story\u003c/li>\u003cli>Club kit to every club; flyers only where allowed\u003c/li>\u003cli>Three club meetings lined up for Tue Oct 27\u003c/li>\u003c/ul>\u003c/div>\n      \u003c/div>\n    \u003c/div>\n    \u003cdiv class=\"week rise\">\n      \u003cdiv class=\"when\">\u003cspan class=\"w\">Week 5\u003c/span>\u003cspan class=\"d\">Oct 26 – 31\u003c/span>\u003cspan class=\"goal\">Launch\u003c/span>\u003c/div>\n      \u003cdiv class=\"lanes\">\n        \u003cdiv class=\"lane\">\u003cspan class=\"who\">\u003ci class=\"i\">\u003c/i>Franky\u003c/span>\u003cul>\u003cli>Fixes only from Sun Oct 25; watch errors and sign-ups daily\u003c/li>\u003cli>Store badge goes up the day a listing is live\u003c/li>\u003cli>New club chat switched on for everyone Mon Oct 26, when doors open\u003c/li>\u003c/ul>\u003c/div>\n        \u003cdiv class=\"lane\">\u003cspan class=\"who j\">\u003ci class=\"i\">\u003c/i>James\u003c/span>\u003cul>\u003cli>Inbox all week; launch night budget, rules, permissions\u003c/li>\u003cli>Numbers ready for the Sun Nov 1 look-back\u003c/li>\u003c/ul>\u003c/div>\n        \u003cdiv class=\"lane\">\u003cspan class=\"who r\">\u003ci class=\"i\">\u003c/i>Rylan\u003c/span>\u003cul>\u003cli>Mon doors open · Tue three club meetings · Wed Halloween guide · \u003cb>Thu Oct 29 launch night\u003c/b> · Fri recap\u003c/li>\u003c/ul>\u003c/div>\n      \u003c/div>\n    \u003c/div>\n  \u003c/div>\n\u003c/section>\n\u003c!-- 7 · How a student arrives -->\n\u003csection class=\"chapter\" id=\"funnel\">\n  \u003cdiv class=\"wrap\">\n    \u003cdiv class=\"head\">\n      \u003cspan class=\"eyebrow\">Chapter 6 · How a student arrives\u003c/span>\n      \u003ch2>Clubs, then events, then students, then students who come back\u003cspan class=\"dot\">.\u003c/span>\u003c/h2>\n      \u003cp class=\"sub\">An empty step starves everything below it. The long bar is the Oct 31 target, the thin bar is today (recounted Sept 28). The targets are starting guesses; we reset them Nov 1.\u003c/p>\n    \u003c/div>\n    \u003cdiv class=\"rows\" style=\"max-width:none\">\n      \u003cdiv class=\"row rise\" style=\"grid-template-columns:minmax(150px,220px) 1fr 90px;gap:16px;align-items:center\">\n        \u003cdiv>\u003cb>Clubs signed\u003c/b>\u003cbr>\u003cspan class=\"tick-note\">page built with them, in the room\u003c/span>\u003c/div>\n        \u003cdiv style=\"display:flex;flex-direction:column;gap:5px\">\u003cdiv class=\"bar\">\u003ci style=\"--w:100%\">\u003c/i>\u003c/div>\u003cdiv class=\"bar\" style=\"height:6px\">\u003ci class=\"today\" style=\"--w:2px\">\u003c/i>\u003c/div>\u003c/div>\n        \u003cdiv style=\"font-family:var(--mono);font-size:12px;text-align:right\">\u003cb style=\"font-size:16px\">10\u003c/b>\u003cbr>\u003cspan class=\"tick-note\">today 0\u003c/span>\u003c/div>\n      \u003c/div>\n      \u003cdiv class=\"row rise\" style=\"grid-template-columns:minmax(150px,220px) 1fr 90px;gap:16px;align-items:center\">\n        \u003cdiv>\u003cb>Upcoming events\u003c/b>\u003cbr>\u003cspan class=\"tick-note\">three per club, copied with them from the school's club website\u003c/span>\u003c/div>\n        \u003cdiv style=\"display:flex;flex-direction:column;gap:5px\">\u003cdiv class=\"bar\">\u003ci style=\"--w:100%\">\u003c/i>\u003c/div>\u003cdiv class=\"bar\" style=\"height:6px\">\u003ci class=\"today\" style=\"--w:2px\">\u003c/i>\u003c/div>\u003c/div>\n        \u003cdiv style=\"font-family:var(--mono);font-size:12px;text-align:right\">\u003cb style=\"font-size:16px\">30\u003c/b>\u003cbr>\u003cspan class=\"tick-note\">today 0\u003c/span>\u003c/div>\n      \u003c/div>\n      \u003cdiv class=\"row rise\" style=\"grid-template-columns:minmax(150px,220px) 1fr 90px;gap:16px;align-items:center\">\n        \u003cdiv>\u003cb>Verified students\u003c/b>\u003cbr>\u003cspan class=\"tick-note\">through a club, a friend, or a post\u003c/span>\u003c/div>\n        \u003cdiv style=\"display:flex;flex-direction:column;gap:5px\">\u003cdiv class=\"bar\">\u003ci style=\"--w:100%\">\u003c/i>\u003c/div>\u003cdiv class=\"bar\" style=\"height:6px\">\u003ci class=\"today\" style=\"--w:7%\">\u003c/i>\u003c/div>\u003c/div>\n        \u003cdiv style=\"font-family:var(--mono);font-size:12px;text-align:right\">\u003cb style=\"font-size:16px\">200\u003c/b>\u003cbr>\u003cspan class=\"tick-note\">today 14\u003c/span>\u003c/div>\n      \u003c/div>\n      \u003cdiv class=\"row rise\" style=\"grid-template-columns:minmax(150px,220px) 1fr 90px;gap:16px;align-items:center\">\n        \u003cdiv>\u003cb>Came back this week\u003c/b>\u003cbr>\u003cspan class=\"tick-note\">\u003cb>the number that matters\u003c/b> · today's two are both founders\u003c/span>\u003c/div>\n        \u003cdiv style=\"display:flex;flex-direction:column;gap:5px\">\u003cdiv class=\"bar\">\u003ci style=\"--w:100%\">\u003c/i>\u003c/div>\u003cdiv class=\"bar\" style=\"height:6px\">\u003ci class=\"today\" style=\"--w:2px\">\u003c/i>\u003c/div>\u003c/div>\n        \u003cdiv style=\"font-family:var(--mono);font-size:12px;text-align:right\">\u003cb style=\"font-size:16px\">120\u003c/b>\u003cbr>\u003cspan class=\"tick-note\">today 2\u003c/span>\u003c/div>\n      \u003c/div>\n    \u003c/div>\n    \u003cdiv class=\"callout wait\" style=\"margin-top:22px\">\n      \u003ch4>The check, Friday October 23\u003c/h4>\n      \u003cp style=\"font-size:14.5px\">Ten clubs live, thirty upcoming events, help@ answered, Terms live. Any no, and we still open Oct 26, but only promote to members of the clubs that are live. No filler, no fake accounts, ever.\u003c/p>\n    \u003c/div>\n  \u003c/div>\n\u003c/section>\n\n\u003c!-- 8 · Marketing -->\n\u003csection class=\"chapter\" id=\"marketing\">\n  \u003cdiv class=\"wrap\">\n    \u003cdiv class=\"head\">\n      \u003cspan class=\"eyebrow\">Chapter 7 · Marketing\u003c/span>\n      \u003ch2>Teasers before launch, so the invite lands on people who've seen the name\u003cspan class=\"dot\">.\u003c/span>\u003c/h2>\n      \u003cp class=\"sub\">Rylan runs it; this is a starting plan he can change. No paid ads: an ad sends students to an app that still feels empty.\u003c/p>\n    \u003c/div>\n    \u003cdiv class=\"grid2\">\n      \u003cdiv class=\"callout rise\">\n        \u003ch4>Three posts a week, Instagram and TikTok\u003c/h4>\n        \u003cul style=\"display:flex;flex-direction:column;gap:7px;font-size:14.5px\">\n          \u003cli>\u003cb>Monday: \"This week on campus.\"\u003c/b> The five best events on Vibe, clubs tagged.\u003c/li>\n          \u003cli>\u003cb>Wednesday: \"Meet the club.\"\u003c/b> 30 seconds with an officer, then their page. They share it.\u003c/li>\n          \u003cli>\u003cb>Friday: \"Building Vibe.\"\u003c/b> Founders on camera, one real feature in 20 seconds.\u003c/li>\n          \u003cli>\u003cb>From Oct 19,\u003c/b> a countdown sticker on every story, set to Mon Oct 26.\u003c/li>\n        \u003c/ul>\n      \u003c/div>\n      \u003cdiv class=\"callout rise\">\n        \u003ch4>Five rules\u003c/h4>\n        \u003cul style=\"display:flex;flex-direction:column;gap:7px;font-size:14.5px\">\n          \u003cli>\u003cb>Only claim what's live.\u003c/b> No \"get notified,\" no store badge, no Vibe+ until they're real.\u003c/li>\n          \u003cli>\u003cb>Real people, real events, real numbers.\u003c/b>\u003c/li>\n          \u003cli>\u003cb>A clear yes\u003c/b> before anyone's face or page goes in a video.\u003c/li>\n          \u003cli>\u003cb>One link everywhere: connectvibe.app/get.\u003c/b> It sends each phone to the right place.\u003c/li>\n          \u003cli>\u003cb>No IU or Purdue logos.\u003c/b> \"Not affiliated\" on the landing page and flyers.\u003c/li>\n        \u003c/ul>\n      \u003c/div>\n    \u003c/div>\n    \u003cp class=\"sub\" style=\"margin-top:18px\">\u003cb>The biggest risk:\u003c/b> IU and Purdue ban company flyers, chalk and handouts on campus without approval. Until an office says yes in writing, print goes off campus or to partner clubs' own meetings. Posts and DMs have no such limit.\u003c/p>\n    \u003cdiv class=\"callout rise\" style=\"margin-top:22px;max-width:none\">\n      \u003cspan class=\"eyebrow\">From the Sept 26 meeting: four marketing asks\u003c/span>\n      \u003cul style=\"display:flex;flex-direction:column;gap:7px;font-size:14.5px\">\n        \u003cli>\u003cb>A professional main Instagram\u003c/b> for the teasers. \u003cb>Recommendation:\u003c/b> set it up this week; the Monday and Wednesday posts go here (Rylan, task r8).\u003c/li>\n        \u003cli>\u003cb>A behind-the-scenes founders' account\u003c/b> for our story as we build. \u003cb>Recommendation:\u003c/b> the Friday \"Building Vibe\" posts go here.\u003c/li>\n        \u003cli>\u003cb>Campus ambassadors\u003c/b> posting on their stories, TikTok and Instagram. \u003cb>Recommendation:\u003c/b> this is the Campus 10's \"reach\" job (Chapter 8). It starts only after the lawyer answers and each one signs a one-page agreement.\u003c/li>\n        \u003cli>\u003cb>Weekly \"most RSVP'd\" accounts, one per campus.\u003c/b> \u003cb>Recommendation:\u003c/b> start after the Oct 23 check, once clubs are live. Name them the way students say their school (IU Indy, Purdue Indy), not with the short codes in the notes; Rylan checks with students and saves the two names when he sets up our main accounts (task r8, Sat Oct 3). A Butler account waits until Butler students can sign up.\u003c/li>\n      \u003c/ul>\n      \u003cp style=\"font-size:14.5px\">\u003cb>Where it stands:\u003c/b> no account or post is recorded yet. The website is ready for the first post: the product journal is off the public site and link previews show the new tagline.\u003c/p>\n    \u003c/div>\n    \u003cdiv class=\"head\" style=\"margin-top:32px\">\u003ch3 style=\"font-size:22px\">Launch week\u003c/h3>\u003cp class=\"sub\">Vibe opens to everyone Mon Oct 26. The party is Thu Oct 29. Sat Oct 31 is the deadline we measure everything against.\u003c/p>\u003c/div>\n    \u003cdiv class=\"days\">\n      \u003cdiv class=\"day rise\">\u003cspan class=\"d\">Sun Oct 25\u003c/span>\u003ch4>Quiet prep\u003c/h4>\u003cp>Posts scheduled. Fixes only from here.\u003c/p>\u003c/div>\n      \u003cdiv class=\"day rise\">\u003cspan class=\"d\">Mon Oct 26\u003c/span>\u003ch4>Doors open\u003c/h4>\u003cp>\"Vibe is live.\" Every partner club shares the graphic. We text our friends.\u003c/p>\u003c/div>\n      \u003cdiv class=\"day rise\">\u003cspan class=\"d\">Tue Oct 27\u003c/span>\u003ch4>Club day\u003c/h4>\u003cp>Three club meetings. Members sign up in the room and RSVP.\u003c/p>\u003c/div>\n      \u003cdiv class=\"day rise\">\u003cspan class=\"d\">Wed Oct 28\u003c/span>\u003ch4>Halloween guide\u003c/h4>\u003cp>Every Halloween event on campus, from real Vibe events.\u003c/p>\u003c/div>\n      \u003cdiv class=\"day rise\">\u003cspan class=\"d\">Thu Oct 29\u003c/span>\u003ch4>Launch night\u003c/h4>\u003cp>With a partner club. RSVP on Vibe, profile at the door. No alcohol at anything we host.\u003c/p>\u003c/div>\n      \u003cdiv class=\"day rise\">\u003cspan class=\"d\">Fri Oct 30\u003c/span>\u003ch4>Recap\u003c/h4>\u003cp>Launch-night video. Top bugs fixed.\u003c/p>\u003c/div>\n      \u003cdiv class=\"day rise\">\u003cspan class=\"d\">Sat Oct 31\u003c/span>\u003ch4>Deadline day\u003c/h4>\u003cp>One story. Sunday: the three of us, 30 minutes, the numbers.\u003c/p>\u003c/div>\n    \u003c/div>\n  \u003c/div>\n\u003c/section>\n\u003c!-- 9 · The Campus 10 -->\n\u003csection class=\"chapter\" id=\"ambassadors\">\n  \u003cdiv class=\"wrap\">\n    \u003cdiv class=\"head\">\n      \u003cspan class=\"eyebrow\">Chapter 8 · The Campus 10\u003c/span>\n      \u003ch2>The ten most involved students on campus, for their ideas first and their reach second\u003cspan class=\"dot\">.\u003c/span>\u003c/h2>\n      \u003cp class=\"sub\">Rylan runs it. Students others already listen to: brand ambassadors for other companies, student government, orientation leaders (as regular students, never through their school role), Greek and cultural leaders, and officers of clubs we sign. Invite them personally; never post it like a job.\u003c/p>\n    \u003c/div>\n    \u003cdiv class=\"grid2\">\n      \u003cdiv class=\"callout rise\">\n        \u003ch4>Two ways they help\u003c/h4>\n        \u003cul style=\"display:flex;flex-direction:column;gap:7px;font-size:14.5px\">\n          \u003cli>\u003cb>Ideas, from now.\u003c/b> A 30-minute session with Franky once a month, first look at every new feature, a real say in what we build, and telling us what's broken. Rylan names the first five by Sun Oct 4; Franky runs the first session in week 2. Until the lawyer answers, it's a conversation, not a task, and no perks are attached.\u003c/li>\n          \u003cli>\u003cb>Reach, once the lawyer says how.\u003c/b> One honest post a week that says up front they're with Vibe, an intro to one more club leader, getting their own club onto Vibe. A company can't use unpaid \"volunteers,\" so James asks the lawyer whether perks for posts are allowed and whether free Vibe+ counts as pay.\u003c/li>\n        \u003c/ul>\n      \u003c/div>\n      \u003cdiv class=\"callout rise\">\n        \u003ch4>Thank-yous, never cash\u003c/h4>\n        \u003cul style=\"display:flex;flex-direction:column;gap:7px;font-size:14.5px\">\n          \u003cli>\u003cb>Free Vibe+\u003c/b> (Franky checks it shows in the live app first) and \u003cb>first access\u003c/b> to the phone apps\u003c/li>\n          \u003cli>\u003cb>\"You asked, we built it\"\u003c/b> shout-outs when their idea ships\u003c/li>\n          \u003cli>\u003cb>A resume line and a written reference\u003c/b> from all three of us, with real numbers\u003c/li>\n          \u003cli>\u003cb>Their club featured\u003c/b> on launch day\u003c/li>\n          \u003cli>Stickers or a pizza night if the budget allows; suggested cap $150\u003c/li>\n        \u003c/ul>\n      \u003c/div>\n    \u003c/div>\n    \u003cdiv class=\"grid2 readonly\" style=\"margin-top:20px\">\n      \u003cdiv class=\"rise\">\n        \u003cspan class=\"eyebrow\">The Promise, agreed in writing\u003c/span>\n        \u003cp style=\"font-size:14.5px;margin-top:6px\">Say only what's true, and never that IU or Purdue backs Vibe. Say you're with Vibe, at the start of the caption. No spam, no fake accounts, no pressure, no screenshots of anyone's posts. No flyers or tables without the school's written OK. Anything unsafe goes to a founder the same day.\u003c/p>\n      \u003c/div>\n      \u003cdiv class=\"rise\">\n        \u003cspan class=\"eyebrow\">What we track, one private sheet\u003c/span>\n        \u003cp style=\"font-size:14.5px;margin-top:6px\">\u003cb>Ideas:\u003c/b> what they told us, and which of it shipped. \u003cb>Reach, once allowed:\u003c/b> clubs they bring on with an upcoming event, verified students who joined through them (a guess to test: 100–200), and \u003cb>how many of those came back a week later\u003c/b>. These count toward the main goals of 10 clubs and 200 students. Usernames only, no emails or phone numbers.\u003c/p>\n      \u003c/div>\n    \u003c/div>\n  \u003c/div>\n\u003c/section>\n\n\u003c!-- 10 · The paperwork -->\n\u003csection class=\"chapter\" id=\"company\">\n  \u003cdiv class=\"wrap\">\n    \u003cdiv class=\"head\">\n      \u003cspan class=\"eyebrow\">Chapter 9 · The paperwork\u003c/span>\n      \u003ch2>A tax ID (the EIN), a bank account, a lawyer, two store accounts\u003cspan class=\"dot\">.\u003c/span>\u003c/h2>\n      \u003cp class=\"sub\">James runs the tax ID, the bank and the lawyer. Franky runs the store accounts. No bank, no Vibe+ sales. No lawyer-checked Terms, no store review. No store accounts, no apps.\u003c/p>\n    \u003c/div>\n    \u003cdiv class=\"grid2\">\n      \u003cdiv class=\"callout rise\" style=\"border-left-color:var(--j)\">\n        \u003ch4>The bank: Mercury first\u003c/h4>\n        \u003cul style=\"display:flex;flex-direction:column;gap:7px;font-size:14.5px\">\n          \u003cli>\u003cb>$0 a month,\u003c/b> no minimum, opened online, usually approved within two business days. All three of us get access; Franky gets an admin role to connect Stripe.\u003c/li>\n          \u003cli>Needs the EIN letter, the founding papers, a real street address (a home address is fine, no PO box), and a photo ID from everyone named on the LLC.\u003c/li>\n          \u003cli>\u003cb>Backup:\u003c/b> Indiana Members Credit Union. Free checking, a branch on the IU Indy campus, $50 to open plus a $21.42 certificate from the state, probably in person.\u003c/li>\n          \u003cli>\u003cb>Stripe pays out\u003c/b> to either. The first payout takes 7–14 days and can't be sped up.\u003c/li>\n        \u003c/ul>\n      \u003c/div>\n      \u003cdiv class=\"callout rise\" style=\"border-left-color:var(--j)\">\n        \u003ch4>What not to do\u003c/h4>\n        \u003cul style=\"display:flex;flex-direction:column;gap:7px;font-size:14.5px\">\n          \u003cli>\u003cb>Never pay for an EIN or a \"BOI report.\"\u003c/b> The EIN is free at irs.gov, and US companies no longer file BOI reports. Anyone charging is a scam.\u003c/li>\n          \u003cli>\u003cb>No Vibe money in a personal account,\u003c/b> Venmo or Cash App, ever. Mixing money can make us personally responsible for Vibe's debts.\u003c/li>\n          \u003cli>\u003cb>Don't put anyone's name on a form\u003c/b> until the three of us and the lawyer agree. The IRS, the bank and Stripe must all match.\u003c/li>\n          \u003cli>\u003cb>No logins in group chats.\u003c/b> Add people as users.\u003c/li>\n        \u003c/ul>\n      \u003c/div>\n    \u003c/div>\n    \u003cdiv class=\"grid2 readonly\" style=\"margin-top:20px\">\n      \u003cdiv class=\"rise\">\n        \u003cspan class=\"eyebrow\">Two things nobody had mentioned\u003c/span>\n        \u003cp style=\"font-size:14.5px;margin-top:6px\">\u003cb>If two or more people are named on the LLC, it files a tax return every year, even at $0 revenue:\u003c/b> federal by March 15, 2027, Indiana by April 15. Late costs about $260 per person per month. \u003cb>The EIN's \"responsible party\" is whoever actually runs the LLC\u003c/b>, not whoever filed it, and changing it later means another form within 60 days. Both are on the lawyer's list.\u003c/p>\n      \u003c/div>\n      \u003cdiv class=\"rise\">\n        \u003cspan class=\"eyebrow\">The store accounts\u003c/span>\n        \u003cp style=\"font-size:14.5px;margin-top:6px\">\u003cb>Apple, as a company: $99 a year.\u003c/b> Needs the D-U-N-S number, a work email on connectvibe.app, a public site naming the company, and an enroller who can sign for the LLC. Franky enrolls. The state filing names only James today, so James amends it by Sat Oct 3 to add Franky and Rylan as co-founders (\"governing persons\"), or the lawyer puts Franky's authority in writing before Oct 7. Apple approvals have taken days to a month this year, which is why Oct 9 is a decision day. \u003cb>Google Play: $25, once.\u003c/b> It needs the D-U-N-S number too. Our running costs (hosting, tools, the domain) are about $125 a month, or about $150 with Supabase Pro (recommended, Chapter 12).\u003c/p>\n      \u003c/div>\n    \u003c/div>\n  \u003c/div>\n\u003c/section>\n\u003c!-- 11 · How we work -->\n\u003csection class=\"chapter\" id=\"charter\">\n  \u003cdiv class=\"wrap\">\n    \u003cdiv class=\"head\">\n      \u003cspan class=\"eyebrow\">Chapter 10 · How we work\u003c/span>\n      \u003ch2>Seven lines for how we work\u003cspan class=\"dot\">.\u003c/span>\u003c/h2>\n      \u003cp class=\"sub\">Drafted for the Sept 26 meeting. Whether we agreed them isn't written down, so we confirm them at the first Sunday meeting, Oct 4. Lines 1, 2 and 4 are what make this one team with a lead, not three people with a group chat.\u003c/p>\n    \u003c/div>\n    \u003cdiv class=\"charter\">\n      \u003cdiv class=\"line rise\">\u003cdiv>\u003cb>Every Sunday, 30 minutes, same agenda.\u003c/b>\u003cp>Check the scoreboard. What went wrong signing clubs, and who fixes it by next Sunday. Decisions still waiting. Each of us names next week's goal and thanks the others for one thing. Franky runs it and sends notes that night. First one: Oct 4.\u003c/p>\u003c/div>\u003c/div>\n      \u003cdiv class=\"line rise\">\u003cdiv>\u003cb>Franky posts a 3-line note every weekday morning.\u003c/b>\u003cp>His priority today, what he needs from whom, what's blocked. When a date breaks, he re-plans that day.\u003c/p>\u003c/div>\u003c/div>\n      \u003cdiv class=\"line rise\">\u003cdiv>\u003cb>We own results, not to-do lists.\u003c/b>\u003cp>James: Terms live and the bank open. Rylan: ten clubs live with events by Oct 23. Franky: Vibe in students' hands Oct 31. How you get there is your call.\u003c/p>\u003c/div>\u003c/div>\n      \u003cdiv class=\"line rise\">\u003cdiv>\u003cb>One owner decides.\u003c/b>\u003cp>Hear the other two once, then decide. We back the call in public; disagreements stay in the founders' chat. Stuck for 24 hours across two areas: Franky decides and writes down why.\u003c/p>\u003c/div>\u003c/div>\n      \u003cdiv class=\"line rise\">\u003cdiv>\u003cb>Ask early and be specific.\u003c/b>\u003cp>\"I need X from Y by Z.\" Raising a problem early is never a failure. A surprise on the deadline is.\u003c/p>\u003c/div>\u003c/div>\n      \u003cdiv class=\"line rise\">\u003cdiv>\u003cb>Done means someone outside the three of us can see it.\u003c/b>\u003cp>Live on the site, a club page with a real event, a form submitted, a number on the scoreboard. \"Almost\" isn't done.\u003c/p>\u003c/div>\u003c/div>\n      \u003cdiv class=\"line rise\">\u003cdiv>\u003cb>More responsibility, not more hours.\u003c/b>\u003cp>Deliver, and your area grows. Classes come first. Nobody burns out for Oct 31.\u003c/p>\u003c/div>\u003c/div>\n    \u003c/div>\n    \u003cp class=\"sub\" style=\"margin-top:20px\">These come from two Lenny's Podcast episodes: \u003ca href=\"https://www.youtube.com/watch?v=RmnWHz8HD74\">Jeanne DeWitt Grosser\u003c/a> (built Stripe's early sales team) and \u003ca href=\"https://www.youtube.com/watch?v=97LRJUUPy_w\">Peter Sellis\u003c/a> (Snapchat's first product manager, later Discord's head of product). Five ideas we're taking: clubs join to lose a problem, not to chase a dream. Growth comes from the people already here. One sentence, one number, cut the rest. Signing clubs is a process we write down and improve weekly. One owner decides, so nobody waits on anybody.\u003c/p>\n  \u003c/div>\n\u003c/section>\n\n\u003c!-- 12 · After launch -->\n\u003csection class=\"chapter\" id=\"after\">\n  \u003cdiv class=\"wrap\">\n    \u003cdiv class=\"head\">\n      \u003cspan class=\"eyebrow\">Chapter 11 · After launch\u003c/span>\n      \u003ch2>Fill up Indianapolis first. Add one campus when the numbers say so\u003cspan class=\"dot\">.\u003c/span>\u003c/h2>\n      \u003cp class=\"sub\">Facebook stayed at Harvard for a month. Tinder stayed at USC. Yik Yak spread faster than it could keep people safe; bullying and falling use shut it down.\u003c/p>\n    \u003c/div>\n    \u003cdiv class=\"rows\">\n      \u003cdiv class=\"row rise\">\u003cspan class=\"eyebrow\" style=\"padding-top:3px;white-space:nowrap\">Nov\u003c/span>\u003cspan>\u003cb>Indy only.\u003c/b> Clubs from 10 to 25. Store apps go live whenever Apple and Google approve them. \u003cb>Moving and hiding profile sections already shipped\u003c/b> (Sept 26, ahead of plan), so November's build time goes to what clubs ask for after launch, plus any meeting ask that misses Oct 31 (Chapter 12). Clubs pay nothing this semester. Week of Nov 9, James adds a money tab to the scoreboard: paying students versus clubs and local businesses paying to promote events.\u003c/span>\u003c/div>\n      \u003cdiv class=\"row rise\">\u003cspan class=\"eyebrow\" style=\"padding-top:3px;white-space:nowrap\">Dec\u003c/span>\u003cspan>\u003cb>Finals, then quiet.\u003c/b> Rylan turns the club playbook into a one-page guide for campus two. Vibe+ goes on sale only when four things are true: the bank and Stripe are connected; the Terms cover subscriptions; two calm weeks have passed since launch; and about 300 students come back each week. With fewer, \"who viewed you\" looks empty.\u003c/span>\u003c/div>\n      \u003cdiv class=\"row rise\">\u003cspan class=\"eyebrow\" style=\"padding-top:3px;white-space:nowrap\">Jan\u003c/span>\u003cspan>\u003cb>Spring start (about Jan 11) is Indy's second launch moment.\u003c/b> Push to 50 active clubs. Decide the money model with real numbers.\u003c/span>\u003c/div>\n      \u003cdiv class=\"row rise\">\u003cspan class=\"eyebrow\" style=\"padding-top:3px;white-space:nowrap\">Feb–Mar\u003c/span>\u003cspan>\u003cb>The test for campus two,\u003c/b> all six true four weeks in a row: 50 active clubs · 1,000 students back each week · 1 in 3 of last month's joiners still here · half of club posts made by officers, not us · every report inside 24 hours · 150+ sign-ups from the next campus and a student there willing to lead. Pass, and start with 5–10 clubs there. Fail, and keep going on Indy.\u003c/span>\u003c/div>\n      \u003cdiv class=\"row rise\">\u003cspan class=\"eyebrow\" style=\"padding-top:3px;white-space:nowrap\">Aug 2027\u003c/span>\u003cspan>\u003cb>Campus two, welcome week.\u003c/b> Likely IU Bloomington (same @iu.edu sign-in, majors list already built); Purdue West Lafayette is the close second. Go in through one group, never the whole campus. Sign-up already lets students pick a campus marked \"not open yet\": that's our waiting list.\u003c/span>\u003c/div>\n    \u003c/div>\n    \u003cdiv class=\"grid2\" style=\"margin-top:22px\">\n      \u003cdiv class=\"callout rise\">\n        \u003ch4>Five numbers every Sunday\u003c/h4>\n        \u003cp style=\"font-size:14.5px\">Clubs live with an upcoming event · upcoming events · new verified students · students who came back this week · reports open past 24 hours (should be zero). Only Franky can open the database, so he sends a screenshot. One fix first: today a visit only counts when a student opens the Campus screen, on phone or desktop, and we keep only their latest visit. Franky makes every screen count, and counts days per week, before launch.\u003c/p>\n      \u003c/div>\n      \u003cdiv class=\"callout rise\">\n        \u003ch4>Not yet\u003c/h4>\n        \u003cp style=\"font-size:14.5px\">No paid ads. No hiring, no paid campus reps. No second campus before the test passes, never two at once. No big new features before launch beyond the club chat redesign and the club asks in Chapter 12; video posts stay on hold. No deals with the universities: be useful to clubs first.\u003c/p>\n      \u003c/div>\n    \u003c/div>\n  \u003c/div>\n\u003c/section>\n\n\u003c!-- 13 · Still to decide -->\n\u003csection class=\"chapter\" id=\"decide\">\n  \u003cdiv class=\"wrap\">\n    \u003cdiv class=\"head\">\n      \u003cspan class=\"eyebrow\">Chapter 12 · Still to decide\u003c/span>\n      \u003ch2>Two product calls, then eleven quick ones\u003cspan class=\"dot\">.\u003c/span>\u003c/h2>\n      \u003cp class=\"sub\">Each carries a recommendation. What the Sept 26 meeting said about these isn't written down yet, so we confirm each one at the first Sunday meeting, Oct 4, and take it off the page once it's settled. Everything else on this page is a draft: each owner changes what's in their own area.\u003c/p>\n    \u003c/div>\n    \u003cdiv class=\"grid2\">\n      \u003cdiv class=\"callout rise\">\n        \u003ch4>How does a club get its page?\u003c/h4>\n        \u003cp style=\"font-size:14.5px\">\u003cb>Today:\u003c/b> a student makes the club page from their own account and runs it. \u003cb>Recommendation: keep that, and add the club's official email.\u003c/b> An officer makes the page from their own verified account, so every post has a real person behind it. At least two officers run it, and it passes to new officers at graduation. The club's school email earns a \"verified club\" badge and recovers the page if every officer leaves. No shared passwords.\u003c/p>\n      \u003c/div>\n      \u003cdiv class=\"callout rise\">\n        \u003ch4>Asked for at the meeting, not built yet\u003c/h4>\n        \u003cul style=\"display:flex;flex-direction:column;gap:6px;font-size:14.5px\">\n          \u003cli>\u003cb>Club member list, roles, and passing a club down.\u003c/b> A member list on the club's page, roles like admin and moderator, and handing the club to new officers so it survives graduation. The basic roles exist; who can give them and how a handover is accepted aren't designed yet.\u003c/li>\n          \u003cli>\u003cb>Club badges on profiles.\u003c/b> Not built yet.\u003c/li>\n        \u003c/ul>\n        \u003cp style=\"font-size:14.5px\">\u003cb>Recommended order:\u003c/b> after the club chat redesign (Chapter 4), the member list, roles and handover come first, because \"what happens when I graduate?\" comes up at every club meeting. Then club badges. Both before the Oct 23 check if they fit; if not, badges move to November. \u003cb>Built differently:\u003c/b> the meeting asked to see nearby campuses, view only; what shipped Sept 27 opens all 11 IU and Purdue campuses. Recommendation: keep all 11 unless Franky wants only nearby ones.\u003c/p>\n      \u003c/div>\n    \u003c/div>\n    \u003cdiv class=\"tablewrap rise\" style=\"margin-top:20px\">\n      \u003ctable>\n        \u003cthead>\u003ctr>\u003cth style=\"width:100px\">Whose\u003c/th>\u003cth style=\"width:36%\">The call\u003c/th>\u003cth>Recommendation\u003c/th>\u003c/tr>\u003c/thead>\n        \u003ctbody>\n          \u003ctr>\u003ctd>\u003cspan class=\"who all\">\u003ci class=\"i\">\u003c/i>All\u003c/span>\u003c/td>\u003ctd>\u003cb>The pitch (the workshop, Chapter 2) and the seven lines (Chapter 10)\u003c/b>\u003c/td>\u003ctd>Write the pitch down, or run the 25 minutes at the first Sunday meeting, Oct 4, and confirm the seven lines the same day. Rylan tests the sentence on five students by Sun Oct 4.\u003c/td>\u003c/tr>\n          \u003ctr>\u003ctd>\u003cspan class=\"who\">\u003ci class=\"i\">\u003c/i>Franky\u003c/span>\u003c/td>\u003ctd>\u003cb>What does a student open Vibe for on a day with no event?\u003c/b>\u003c/td>\u003ctd>Friends' posts, messages, \"tonight on campus,\" with notifications on at launch. Whatever we answer has to be great on Oct 31.\u003c/td>\u003c/tr>\n          \u003ctr>\u003ctd>\u003cspan class=\"who\">\u003ci class=\"i\">\u003c/i>Franky\u003c/span>\u003c/td>\u003ctd>\u003cb>Oct 9: no extensions\u003c/b>\u003c/td>\u003ctd>Agree now. Apple late means iPhones get the home-screen version on launch day.\u003c/td>\u003c/tr>\n          \u003ctr>\u003ctd>\u003cspan class=\"who\">\u003ci class=\"i\">\u003c/i>Franky\u003c/span>\u003c/td>\u003ctd>\u003cb>Supabase Pro (our database host's paid plan), about $25 a month\u003c/b>\u003c/td>\u003ctd>Not yet (Franky, Sept 28); f11 waits on this call.\u003c/td>\u003c/tr>\n          \u003ctr>\u003ctd>\u003cspan class=\"who r\">\u003ci class=\"i\">\u003c/i>Rylan\u003c/span>\u003c/td>\u003ctd>\u003cb>Sign-up before Oct 26: open, or club members only?\u003c/b>\u003c/td>\u003ctd>Open, but we don't advertise until Oct 26.\u003c/td>\u003c/tr>\n          \u003ctr>\u003ctd>\u003cspan class=\"who r\">\u003ci class=\"i\">\u003c/i>Rylan\u003c/span>\u003c/td>\u003ctd>\u003cb>Launch night: venue, budget, co-host\u003c/b>\u003c/td>\u003ctd>A partner club co-hosts, or off campus. James sets a cap.\u003c/td>\u003c/tr>\n          \u003ctr>\u003ctd>\u003cspan class=\"who r\">\u003ci class=\"i\">\u003c/i>Rylan\u003c/span>\u003c/td>\u003ctd>\u003cb>Who's on camera; the social logins\u003c/b>\u003c/td>\u003ctd>Franky Fridays, Rylan weekly, James when he wants. Logins in a shared password manager.\u003c/td>\u003c/tr>\n          \u003ctr>\u003ctd>\u003cspan class=\"who r\">\u003ci class=\"i\">\u003c/i>Rylan\u003c/span>\u003c/td>\u003ctd>\u003cb>Free Vibe+ for the Campus 10 and club officers?\u003c/b>\u003c/td>\u003ctd>Yes, once James gets the lawyer's answer on perks.\u003c/td>\u003c/tr>\n          \u003ctr>\u003ctd>\u003cspan class=\"who\">\u003ci class=\"i\">\u003c/i>Franky\u003c/span>\u003c/td>\u003ctd>\u003cb>A backup name for the stores\u003c/b>\u003c/td>\u003ctd>\"Vibe\" is probably taken in the App Store. Two backups with Rylan by Sun Oct 4.\u003c/td>\u003c/tr>\n          \u003ctr>\u003ctd>\u003cspan class=\"who\">\u003ci class=\"i\">\u003c/i>Franky\u003c/span>\u003c/td>\u003ctd>\u003cb>The Sunday numbers\u003c/b>\u003c/td>\u003ctd>A screenshot of the five numbers every Sunday night. Counts only, never names.\u003c/td>\u003c/tr>\n          \u003ctr>\u003ctd>\u003cspan class=\"who all\">\u003ci class=\"i\">\u003c/i>All\u003c/span>\u003c/td>\u003ctd>\u003cb>The six targets for campus two\u003c/b>\u003c/td>\u003ctd>Argue them at a Sunday meeting, then lock them by the Nov 1 look-back.\u003c/td>\u003c/tr>\n        \u003c/tbody>\n      \u003c/table>\n    \u003c/div>\n  \u003c/div>\n\u003c/section>\n\n\u003c!-- 14 · Sources -->\n\u003csection class=\"chapter\" id=\"sources\">\n  \u003cdiv class=\"wrap\">\n    \u003cdiv class=\"head\">\u003cspan class=\"eyebrow\">Where the numbers came from\u003c/span>\u003ch2>Read on September 25, recounted September 28, 2026\u003cspan class=\"dot\">.\u003c/span>\u003c/h2>\u003c/div>\n    \u003cp style=\"font-size:14.5px;color:var(--muted);max-width:70ch\">Counts come from Vibe's live database. Paperwork facts come from Apple, Google, the IRS, Indiana and the banks' own pages; campus rules from IU's and Purdue's published policies. Most things we act on were checked twice against the original page. Still open, and marked as questions here: the Texas law, Indiana's tax return, and the fall-break dates. Answered since: Google Play needs the D-U-N-S number too. The long version, with every link, is in our shared folder. This replaces the September 21 roadmap at the same link. Updated Monday September 28, evening: every count on the cover and in Chapter 6 was recounted from the live database (the only changes are our own test events on Sept 26 and 28, and two of us, not one, coming back this week), plus the D-U-N-S request, the state filing, James's Oct 3 amendment, what shipped since the meeting, the phone apps' real state, and the meeting's product and marketing asks. What the meeting decided isn't written down, so those calls stay open in Chapter 12. Updated Tuesday September 29: what shipped Sept 28–29, the tagline, and the club chat redesign with its dates. The counts are still the Sept 28 ones; only \"days to launch\" moved.\u003c/p>\n  \u003c/div>\n\u003c/section>\n\u003c/main>\n"}</script>
+<script id="page-app">
+(function(){
+  var chapters=[].slice.call(document.querySelectorAll('.chapter'));
+  var dots=document.getElementById('dots'), pos=document.getElementById('pos'), btn=document.getElementById('presentBtn');
+  var reduce=window.matchMedia('(prefers-reduced-motion: reduce)').matches;
+  var active=0;
+  chapters.forEach(function(c,i){var a=document.createElement('a');a.href='#'+c.id;a.setAttribute('aria-label','Chapter '+(i+1));dots.appendChild(a);});
+  function setActive(i){active=i;pos.textContent=(i+1)+' / '+chapters.length;[].forEach.call(dots.children,function(d,k){d.classList.toggle('on',k===i);});}
+  var seenAway={};
+  var io=new IntersectionObserver(function(es){es.forEach(function(e){
+    var i=chapters.indexOf(e.target);
+    if(e.isIntersecting){
+      if(i!==0||seenAway[0]){e.target.classList.add('in');if(i===0&&seenAway[0])countUp();}
+      if(e.intersectionRatio>=.35)setActive(i);
+    } else { seenAway[i]=true; if(i===0)e.target.classList.remove('in'); }
+  });},{threshold:[0,.35]});
+  chapters.forEach(function(c){io.observe(c);});
+  function countUp(){
+    if(reduce||document.body.classList.contains('editing'))return;
+    [].forEach.call(document.querySelectorAll('[data-count]'),function(el){
+      var to=+el.getAttribute('data-count'), t0=null;
+      function step(t){if(t0===null)t0=t;var p=Math.min(1,(t-t0)/1200);el.textContent=Math.round(to*(1-Math.pow(1-p,3)));if(p<1)requestAnimationFrame(step);}
+      requestAnimationFrame(step);
+    });
+  }
+  function go(i){i=Math.max(0,Math.min(chapters.length-1,i));chapters[i].scrollIntoView({behavior:reduce?'auto':'smooth',block:'start'});setActive(i);}
+  function setPresent(on){
+    if(on&&document.body.classList.contains('editing'))return;
+    document.body.classList.toggle('present',on);btn.classList.toggle('on',on);btn.textContent=on?'Exit':'Present';
+    try{localStorage.setItem('vibe-roadmap-present',on?'1':'0');}catch(e){}
+    if(on)setTimeout(function(){go(active);},60);
+  }
+  btn.addEventListener('click',function(){setPresent(!document.body.classList.contains('present'));});
+  document.getElementById('prevBtn').addEventListener('click',function(){go(active-1);});
+  document.getElementById('nextBtn').addEventListener('click',function(){go(active+1);});
+  document.addEventListener('keydown',function(e){
+    if(!document.body.classList.contains('present'))return;
+    if(e.target&&e.target.matches&&e.target.matches('input,textarea,select'))return;
+    if(e.key==='ArrowRight'||e.key==='ArrowDown'||e.key==='PageDown'||e.key===' '){e.preventDefault();go(active+1);}
+    else if(e.key==='ArrowLeft'||e.key==='ArrowUp'||e.key==='PageUp'){e.preventDefault();go(active-1);}
+    else if(e.key==='Escape'){setPresent(false);}
+  });
+  try{if(localStorage.getItem('vibe-roadmap-present')==='1')setPresent(true);}catch(e){}
+  var done={};try{done=JSON.parse(localStorage.getItem('vibe-roadmap-done')||'{}')||{};}catch(e){done={};}
+  [].forEach.call(document.querySelectorAll('.task input'),function(cb){
+    var id=cb.getAttribute('data-id');
+    if(done[id]){cb.checked=true;cb.closest('.task').classList.add('done');}
+    cb.addEventListener('change',function(){done[id]=cb.checked;cb.closest('.task').classList.toggle('done',cb.checked);try{localStorage.setItem('vibe-roadmap-done',JSON.stringify(done));}catch(e){}});
+  });
+  setActive(0);
+})();
+/* Edit mode: change the wording in place, then Save publishes a new version of this page for everyone.
+   The page never saves what's on screen; it rebuilds from its own clean copy (#page-source) plus the edits. */
+(function(){
+  var SEL = 'h1,h2,h3,h4,p,li,label,td,th,figcaption,.eyebrow,.lbl,.cell .n,.cell .k,.cell .t,.week .when .w,.week .when .d,.week .when .goal,.week .when .note,.task .when,.row > span,.row > div,.day .d';
+  var TITLE = 'Vibe Launch Gates';
+  var FONTS = 'https://fonts.googleapis.com/css2?family=Fraunces:opsz,wght@9..144,400;9..144,700;9..144,900&family=DM+Sans:wght@400;500;700&family=DM+Mono:wght@400;500&display=swap';
+  var STASH = 'vibe-roadmap-unsaved';
+  var editBtn = document.getElementById('editBtn'), saveBtn = document.getElementById('saveBtn');
+  var discardBtn = document.getElementById('discardBtn'), status = document.getElementById('editStatus');
+  var main = document.getElementById('page');
+  var art = null, editing = false, list = [], originals = [];
+  var plain = (function(){ try { var d = document.createElement('div'); d.contentEditable = 'plaintext-only'; return d.contentEditable === 'plaintext-only'; } catch (e) { return false; } })();
+
+  function editablesIn(root){
+    var all = [].slice.call(root.querySelectorAll(SEL)).filter(function(el){ return !el.closest('svg'); });
+    return all.filter(function(el){ return !all.some(function(o){ return o !== el && el.contains(o); }); });
+  }
+  function norm(s){ return String(s).replace(/\s+/g, ' ').trim(); }
+  function textOf(html){ var d = document.createElement('div'); d.innerHTML = html; return norm(d.textContent); }
+  function say(t){ status.textContent = t; }
+  function dirty(){ return list.filter(function(el){ return el.hasAttribute('data-dirty'); }); }
+  function refresh(){
+    var n = dirty().length;
+    saveBtn.disabled = n === 0;
+    saveBtn.textContent = n ? 'Save ' + n + (n === 1 ? ' change' : ' changes') : 'Save';
+    if (!n) say('Click any text to change it.');
+  }
+  function enterEdit(){
+    if (document.body.classList.contains('present')) document.getElementById('presentBtn').click();
+    editing = true; document.body.classList.add('editing');
+    list = editablesIn(main); originals = list.map(function(el){ return el.innerHTML; });
+    list.forEach(function(el){ el.setAttribute('data-editable', ''); el.setAttribute('contenteditable', plain ? 'plaintext-only' : 'true'); });
+    editBtn.textContent = 'Done'; saveBtn.hidden = false; discardBtn.hidden = false; discardBtn.disabled = false; refresh();
+  }
+  function leaveEdit(){
+    list.forEach(function(el){ el.removeAttribute('contenteditable'); el.removeAttribute('data-editable'); el.removeAttribute('data-dirty'); });
+    editing = false; document.body.classList.remove('editing');
+    editBtn.textContent = 'Edit'; saveBtn.hidden = true; discardBtn.hidden = true; say('');
+  }
+  function discard(){
+    list.forEach(function(el, i){ if (el.hasAttribute('data-dirty')) el.innerHTML = originals[i]; });
+    leaveEdit();
+  }
+
+  editBtn.addEventListener('click', function(){
+    if (!editing) return enterEdit();
+    var n = dirty().length;
+    if (n) say('You have ' + n + ' unsaved ' + (n === 1 ? 'change' : 'changes') + '. Save or Discard first.');
+    else leaveEdit();
+  });
+  discardBtn.addEventListener('click', discard);
+  saveBtn.addEventListener('click', save);
+
+  main.addEventListener('input', function(e){
+    var el = e.target.closest && e.target.closest('[data-editable]'); if (!el) return;
+    var i = list.indexOf(el); if (i < 0) return;
+    if (norm(el.textContent) !== textOf(originals[i]) || el.innerHTML !== originals[i]) el.setAttribute('data-dirty', ''); else el.removeAttribute('data-dirty');
+    refresh();
+  });
+  main.addEventListener('keydown', function(e){
+    if (!editing) return;
+    var el = e.target.closest && e.target.closest('[data-editable]'); if (!el) return;
+    if (e.key === 'Enter' || e.key === 'Escape') { e.preventDefault(); el.blur(); }
+  }, true);
+  document.addEventListener('click', function(e){
+    if (!editing || !e.target.closest) return;
+    if (e.target.closest('#page') && (e.target.closest('label') || e.target.closest('a'))) e.preventDefault();
+  }, true);
+  if (!plain) main.addEventListener('paste', function(e){
+    if (!editing || !(e.target.closest && e.target.closest('[data-editable]'))) return;
+    e.preventDefault();
+    var t = (e.clipboardData && e.clipboardData.getData('text/plain')) || '';
+    document.execCommand('insertText', false, t.replace(/\s*\n\s*/g, ' '));
+  });
+
+  function buildDoc(pageHtml){
+    var styleText = document.getElementById('page-style').textContent;
+    var appText = document.getElementById('page-app').textContent;
+    var json = JSON.stringify({ v: 1, page: pageHtml }).replace(/</g, '\\u003c');
+    var end = '</scr' + 'ipt>';
+    return '<!doctype html>\n<html lang="en">\n<head>\n<meta charset="utf-8">\n' +
+      '<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">\n' +
+      '<title>' + TITLE + '</title>\n<link rel="stylesheet" href="' + FONTS.replace(/&/g, '&amp;') + '">\n' +
+      '<style id="page-style">' + styleText + '</style>\n</head>\n<body>\n<div id="doc">' + pageHtml + '</div>\n' +
+      '<script type="application/json" id="page-source">' + json + end + '\n' +
+      '<script id="page-app">' + appText + end + '\n</body>\n</html>\n';
+  }
+
+  function save(){
+    var changed = dirty(); if (!changed.length || !art) return;
+    var src;
+    try { src = JSON.parse(document.getElementById('page-source').textContent); } catch (e) { say("Couldn't read the page's saved copy. Reload and try again."); return; }
+    var tpl = document.createElement('template'); tpl.innerHTML = src.page;
+    var tlist = editablesIn(tpl.content.querySelector('#page'));
+    if (tlist.length !== list.length) { say('This page changed since it loaded. Reload, then make your edits again.'); return; }
+    var stash = {};
+    list.forEach(function(el, i){
+      if (!el.hasAttribute('data-dirty')) return;
+      var h = el.innerHTML.replace(/&nbsp;/g, ' ').replace(/<br\s*\/?>\s*$/i, '');
+      tlist[i].innerHTML = h; stash[i] = h;
+      if (el.hasAttribute('data-count')) { var v = parseInt(el.textContent.replace(/[^0-9-]/g, ''), 10); if (isFinite(v)) tlist[i].setAttribute('data-count', String(v)); }
+    });
+    var html = buildDoc(tpl.innerHTML);
+    try { sessionStorage.setItem(STASH, JSON.stringify({ n: list.length, edits: stash })); } catch (e) {}
+    saveBtn.disabled = true; discardBtn.disabled = true; editBtn.disabled = true; say('Saving…');
+    art.publish(html).then(function(){ say('Saved. Loading the new version…'); }, function(err){
+      var code = err && err.code;
+      editBtn.disabled = false;
+      if (code === 'conflict') { say('Someone saved a newer version first. Loading it; your edits will be offered back.'); return; }
+      if (['not_writer', 'not_granted', 'consent_required', 'capability_disabled', 'capability_removed', 'not_declared'].indexOf(code) >= 0) {
+        try { sessionStorage.removeItem(STASH); } catch (e) {}
+        discard(); editBtn.hidden = true; say('This view is read-only, so edits can’t be saved here.'); return;
+      }
+      saveBtn.disabled = false; discardBtn.disabled = false;
+      if (code === 'rate_limited') say('Saving too often. Wait a minute, then press Save again.');
+      else if (code === 'too_large') say('The page got too large to save. Shorten some text and try again.');
+      else say('Couldn’t save just now. Your edits are still here; press Save to try again.');
+    });
+  }
+
+  function offerRestore(){
+    var s = null; try { s = JSON.parse(sessionStorage.getItem(STASH) || 'null'); } catch (e) {}
+    if (!s || !s.edits) return;
+    var now = editablesIn(main);
+    var keys = Object.keys(s.edits);
+    var landed = s.n === now.length && keys.every(function(k){ return now[k] && norm(now[k].textContent) === textOf(s.edits[k]); });
+    if (landed || s.n !== now.length) { try { sessionStorage.removeItem(STASH); } catch (e) {} return; }
+    say(keys.length + (keys.length === 1 ? ' edit' : ' edits') + " didn't save.");
+    var b = document.createElement('button'); b.type = 'button'; b.className = 'restore'; b.textContent = 'Bring them back';
+    status.hidden = false; document.body.classList.add('editing-offer');
+    status.after(b);
+    b.addEventListener('click', function(){
+      b.remove(); enterEdit();
+      keys.forEach(function(k){ var el = list[k]; if (el) { el.innerHTML = s.edits[k]; el.setAttribute('data-dirty', ''); } });
+      try { sessionStorage.removeItem(STASH); } catch (e) {}
+      refresh(); say('Your edits are back. Check them, then Save.');
+    });
+  }
+
+  if (window.claude && typeof window.claude.use === 'function') {
+    Promise.all([window.claude.use('artifact'), window.claude.use('user')]).then(function(r){
+      art = r[0]; if (!art) return;
+      return (r[1] ? r[1].canEdit() : Promise.resolve(true)).then(function(ok){ if (ok) { editBtn.hidden = false; offerRestore(); } });
+    }).catch(function(){});
+  }
+})();
+</script>
+

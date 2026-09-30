@@ -1,0 +1,344 @@
+BEGIN
+SET
+DO
+ALTER TABLE
+ALTER TABLE
+CREATE INDEX
+CREATE INDEX
+CREATE INDEX
+CREATE INDEX
+CREATE INDEX
+CREATE INDEX
+COMMENT
+COMMENT
+COMMENT
+COMMENT
+COMMENT
+UPDATE 1
+UPDATE 1
+UPDATE 1
+UPDATE 1
+UPDATE 5
+UPDATE 5
+UPDATE 0
+UPDATE 0
+UPDATE 13
+DO
+ALTER TABLE
+ALTER TABLE
+CREATE FUNCTION
+COMMENT
+CREATE FUNCTION
+COMMENT
+CREATE FUNCTION
+COMMENT
+CREATE FUNCTION
+COMMENT
+CREATE FUNCTION
+COMMENT
+CREATE TRIGGER
+CREATE TRIGGER
+CREATE TRIGGER
+CREATE TRIGGER
+CREATE TRIGGER
+CREATE FUNCTION
+COMMENT
+GRANT
+CREATE FUNCTION
+GRANT
+CREATE FUNCTION
+COMMENT
+GRANT
+ALTER POLICY
+ALTER POLICY
+ALTER POLICY
+NOTICE:  chat-rooms: step 7 created 15 rooms and 25 rows
+DO
+DO
+NOTICE:  chat-rooms: behaviour check passed: officer_board=accepted;member_reply=accepted;member_lounge=accepted;member_board=42501;poll=42501;forged_removal=42501;media=42501;missing_root=42501;root_in_lounge=42501;
+DO
+NOTIFY
+===== COST FIXTURES (gate 3): 41 accounts, 5 clubs x 41 members, 2 open event rooms per club, 200 messages per Lounge and per event room
+DO
+ANALYZE
+ANALYZE
+ANALYZE
+ANALYZE
+ANALYZE
+ messages | club_rooms | room_rows | p_rows 
+----------+------------+-----------+--------
+     3010 |         54 |       677 |     20
+(1 row)
+
+                                 set_config                                 
+----------------------------------------------------------------------------
+ {"sub" : "1728303c-7517-4371-ac05-703b84e899f2", "role" : "authenticated"}
+(1 row)
+
+SET
+===== 1. message read, EVENT room, 200 messages, limit 200 (the route MAX_LIMIT), as the member
+                                                                                                                                                                                                                                                                           QUERY PLAN                                                                                                                                                                                                                                                                            
+-----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------
+ Limit (actual time=4.290..4.333 rows=200 loops=1)
+   Buffers: shared hit=733
+   InitPlan 1
+     ->  Result (never executed)
+   ->  Index Scan using idx_messages_channel_created on messages (actual time=4.289..4.322 rows=200 loops=1)
+         Index Cond: (channel_id = (current_setting('cost.room'::text))::uuid)
+         Filter: (((removed_at IS NULL) OR (user_id = (InitPlan 1).col1)) AND ((ANY (channel_id = (hashed SubPlan 7).col1)) OR (ANY (channel_id = (hashed SubPlan 13).col1))))
+         Buffers: shared hit=733
+         SubPlan 7
+           ->  Bitmap Heap Scan on channels c (actual time=1.723..4.274 rows=20 loops=1)
+                 Recheck Cond: (org_id IS NOT NULL)
+                 Filter: ((((org_id IS NOT NULL) AND can_view_org_channel(id, (COALESCE(NULLIF(current_setting('request.jwt.claim.sub'::text, true), ''::text), ((NULLIF(current_setting('request.jwt.claims'::text, true), ''::text))::jsonb ->> 'sub'::text)))::uuid)) OR ((org_id IS NULL) AND (ANY (id = (hashed SubPlan 6).col1)))) AND can_view_org_channel(id, (COALESCE(NULLIF(current_setting('request.jwt.claim.sub'::text, true), ''::text), ((NULLIF(current_setting('request.jwt.claims'::text, true), ''::text))::jsonb ->> 'sub'::text)))::uuid))
+                 Rows Removed by Filter: 34
+                 Heap Blocks: exact=38
+                 Buffers: shared hit=726
+                 ->  Bitmap Index Scan on channels_org_id_idx (actual time=0.027..0.027 rows=2178 loops=1)
+                       Index Cond: (org_id IS NOT NULL)
+                       Buffers: shared hit=4
+                 SubPlan 6
+                   ->  Seq Scan on channel_members cm (never executed)
+                         Filter: (is_channel_member(channel_id) AND can_read_channel_roster(channel_id) AND (user_id = (COALESCE(NULLIF(current_setting('request.jwt.claim.sub'::text, true), ''::text), ((NULLIF(current_setting('request.jwt.claims'::text, true), ''::text))::jsonb ->> 'sub'::text)))::uuid))
+         SubPlan 13
+           ->  Nested Loop (never executed)
+                 ->  Index Scan using channels_org_pinned_position_idx on channels c_1 (never executed)
+                       Index Cond: (org_id IS NULL)
+                       Filter: (((org_id IS NOT NULL) AND can_view_org_channel(id, (COALESCE(NULLIF(current_setting('request.jwt.claim.sub'::text, true), ''::text), ((NULLIF(current_setting('request.jwt.claims'::text, true), ''::text))::jsonb ->> 'sub'::text)))::uuid)) OR ((org_id IS NULL) AND EXISTS(SubPlan 11)))
+                       SubPlan 11
+                         ->  Bitmap Heap Scan on channel_members cm_1 (never executed)
+                               Recheck Cond: (channel_id = c_1.id)
+                               Filter: (is_channel_member(channel_id) AND can_read_channel_roster(channel_id) AND (user_id = (COALESCE(NULLIF(current_setting('request.jwt.claim.sub'::text, true), ''::text), ((NULLIF(current_setting('request.jwt.claims'::text, true), ''::text))::jsonb ->> 'sub'::text)))::uuid))
+                               ->  Bitmap Index Scan on channel_members_channel_id_user_id_key (never executed)
+                                     Index Cond: (channel_id = c_1.id)
+                 ->  Bitmap Heap Scan on channel_members cm_2 (never executed)
+                       Recheck Cond: (c_1.id = channel_id)
+                       Filter: (is_channel_member(channel_id) AND can_read_channel_roster(channel_id) AND (user_id = (COALESCE(NULLIF(current_setting('request.jwt.claim.sub'::text, true), ''::text), ((NULLIF(current_setting('request.jwt.claims'::text, true), ''::text))::jsonb ->> 'sub'::text)))::uuid))
+                       ->  Bitmap Index Scan on channel_members_channel_id_user_id_key (never executed)
+                             Index Cond: (channel_id = c_1.id)
+ Planning:
+   Buffers: shared hit=213
+ Planning Time: 0.911 ms
+ Execution Time: 4.381 ms
+(41 rows)
+
+===== 2. the same, limit 50 (the route default)
+                                                                                                                                                                                                                                                                           QUERY PLAN                                                                                                                                                                                                                                                                            
+-----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------
+ Limit (actual time=3.973..3.984 rows=50 loops=1)
+   Buffers: shared hit=670
+   InitPlan 1
+     ->  Result (never executed)
+   ->  Index Scan using idx_messages_channel_created on messages (actual time=3.973..3.981 rows=50 loops=1)
+         Index Cond: (channel_id = (current_setting('cost.room'::text))::uuid)
+         Filter: (((removed_at IS NULL) OR (user_id = (InitPlan 1).col1)) AND ((ANY (channel_id = (hashed SubPlan 7).col1)) OR (ANY (channel_id = (hashed SubPlan 13).col1))))
+         Buffers: shared hit=670
+         SubPlan 7
+           ->  Bitmap Heap Scan on channels c (actual time=1.473..3.964 rows=20 loops=1)
+                 Recheck Cond: (org_id IS NOT NULL)
+                 Filter: ((((org_id IS NOT NULL) AND can_view_org_channel(id, (COALESCE(NULLIF(current_setting('request.jwt.claim.sub'::text, true), ''::text), ((NULLIF(current_setting('request.jwt.claims'::text, true), ''::text))::jsonb ->> 'sub'::text)))::uuid)) OR ((org_id IS NULL) AND (ANY (id = (hashed SubPlan 6).col1)))) AND can_view_org_channel(id, (COALESCE(NULLIF(current_setting('request.jwt.claim.sub'::text, true), ''::text), ((NULLIF(current_setting('request.jwt.claims'::text, true), ''::text))::jsonb ->> 'sub'::text)))::uuid))
+                 Rows Removed by Filter: 34
+                 Heap Blocks: exact=38
+                 Buffers: shared hit=666
+                 ->  Bitmap Index Scan on channels_org_id_idx (actual time=0.022..0.022 rows=2178 loops=1)
+                       Index Cond: (org_id IS NOT NULL)
+                       Buffers: shared hit=4
+                 SubPlan 6
+                   ->  Seq Scan on channel_members cm (never executed)
+                         Filter: (is_channel_member(channel_id) AND can_read_channel_roster(channel_id) AND (user_id = (COALESCE(NULLIF(current_setting('request.jwt.claim.sub'::text, true), ''::text), ((NULLIF(current_setting('request.jwt.claims'::text, true), ''::text))::jsonb ->> 'sub'::text)))::uuid))
+         SubPlan 13
+           ->  Nested Loop (never executed)
+                 ->  Index Scan using channels_org_pinned_position_idx on channels c_1 (never executed)
+                       Index Cond: (org_id IS NULL)
+                       Filter: (((org_id IS NOT NULL) AND can_view_org_channel(id, (COALESCE(NULLIF(current_setting('request.jwt.claim.sub'::text, true), ''::text), ((NULLIF(current_setting('request.jwt.claims'::text, true), ''::text))::jsonb ->> 'sub'::text)))::uuid)) OR ((org_id IS NULL) AND EXISTS(SubPlan 11)))
+                       SubPlan 11
+                         ->  Bitmap Heap Scan on channel_members cm_1 (never executed)
+                               Recheck Cond: (channel_id = c_1.id)
+                               Filter: (is_channel_member(channel_id) AND can_read_channel_roster(channel_id) AND (user_id = (COALESCE(NULLIF(current_setting('request.jwt.claim.sub'::text, true), ''::text), ((NULLIF(current_setting('request.jwt.claims'::text, true), ''::text))::jsonb ->> 'sub'::text)))::uuid))
+                               ->  Bitmap Index Scan on channel_members_channel_id_user_id_key (never executed)
+                                     Index Cond: (channel_id = c_1.id)
+                 ->  Bitmap Heap Scan on channel_members cm_2 (never executed)
+                       Recheck Cond: (c_1.id = channel_id)
+                       Filter: (is_channel_member(channel_id) AND can_read_channel_roster(channel_id) AND (user_id = (COALESCE(NULLIF(current_setting('request.jwt.claim.sub'::text, true), ''::text), ((NULLIF(current_setting('request.jwt.claims'::text, true), ''::text))::jsonb ->> 'sub'::text)))::uuid))
+                       ->  Bitmap Index Scan on channel_members_channel_id_user_id_key (never executed)
+                             Index Cond: (channel_id = c_1.id)
+ Planning:
+   Buffers: shared hit=28
+ Planning Time: 0.492 ms
+ Execution Time: 4.019 ms
+(41 rows)
+
+===== 3. for comparison: the LOUNGE (the public arm, unchanged by this file), limit 200
+                                                                                                                                                                                                                                                                           QUERY PLAN                                                                                                                                                                                                                                                                            
+-----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------
+ Limit (actual time=3.981..4.024 rows=200 loops=1)
+   Buffers: shared hit=673
+   InitPlan 1
+     ->  Result (never executed)
+   ->  Index Scan using idx_messages_channel_created on messages (actual time=3.981..4.015 rows=200 loops=1)
+         Index Cond: (channel_id = (current_setting('cost.lounge'::text))::uuid)
+         Filter: (((removed_at IS NULL) OR (user_id = (InitPlan 1).col1)) AND ((ANY (channel_id = (hashed SubPlan 7).col1)) OR (ANY (channel_id = (hashed SubPlan 13).col1))))
+         Buffers: shared hit=673
+         SubPlan 7
+           ->  Bitmap Heap Scan on channels c (actual time=1.440..3.972 rows=20 loops=1)
+                 Recheck Cond: (org_id IS NOT NULL)
+                 Filter: ((((org_id IS NOT NULL) AND can_view_org_channel(id, (COALESCE(NULLIF(current_setting('request.jwt.claim.sub'::text, true), ''::text), ((NULLIF(current_setting('request.jwt.claims'::text, true), ''::text))::jsonb ->> 'sub'::text)))::uuid)) OR ((org_id IS NULL) AND (ANY (id = (hashed SubPlan 6).col1)))) AND can_view_org_channel(id, (COALESCE(NULLIF(current_setting('request.jwt.claim.sub'::text, true), ''::text), ((NULLIF(current_setting('request.jwt.claims'::text, true), ''::text))::jsonb ->> 'sub'::text)))::uuid))
+                 Rows Removed by Filter: 34
+                 Heap Blocks: exact=38
+                 Buffers: shared hit=666
+                 ->  Bitmap Index Scan on channels_org_id_idx (actual time=0.021..0.021 rows=2178 loops=1)
+                       Index Cond: (org_id IS NOT NULL)
+                       Buffers: shared hit=4
+                 SubPlan 6
+                   ->  Seq Scan on channel_members cm (never executed)
+                         Filter: (is_channel_member(channel_id) AND can_read_channel_roster(channel_id) AND (user_id = (COALESCE(NULLIF(current_setting('request.jwt.claim.sub'::text, true), ''::text), ((NULLIF(current_setting('request.jwt.claims'::text, true), ''::text))::jsonb ->> 'sub'::text)))::uuid))
+         SubPlan 13
+           ->  Nested Loop (never executed)
+                 ->  Index Scan using channels_org_pinned_position_idx on channels c_1 (never executed)
+                       Index Cond: (org_id IS NULL)
+                       Filter: (((org_id IS NOT NULL) AND can_view_org_channel(id, (COALESCE(NULLIF(current_setting('request.jwt.claim.sub'::text, true), ''::text), ((NULLIF(current_setting('request.jwt.claims'::text, true), ''::text))::jsonb ->> 'sub'::text)))::uuid)) OR ((org_id IS NULL) AND EXISTS(SubPlan 11)))
+                       SubPlan 11
+                         ->  Bitmap Heap Scan on channel_members cm_1 (never executed)
+                               Recheck Cond: (channel_id = c_1.id)
+                               Filter: (is_channel_member(channel_id) AND can_read_channel_roster(channel_id) AND (user_id = (COALESCE(NULLIF(current_setting('request.jwt.claim.sub'::text, true), ''::text), ((NULLIF(current_setting('request.jwt.claims'::text, true), ''::text))::jsonb ->> 'sub'::text)))::uuid))
+                               ->  Bitmap Index Scan on channel_members_channel_id_user_id_key (never executed)
+                                     Index Cond: (channel_id = c_1.id)
+                 ->  Bitmap Heap Scan on channel_members cm_2 (never executed)
+                       Recheck Cond: (c_1.id = channel_id)
+                       Filter: (is_channel_member(channel_id) AND can_read_channel_roster(channel_id) AND (user_id = (COALESCE(NULLIF(current_setting('request.jwt.claim.sub'::text, true), ''::text), ((NULLIF(current_setting('request.jwt.claims'::text, true), ''::text))::jsonb ->> 'sub'::text)))::uuid))
+                       ->  Bitmap Index Scan on channel_members_channel_id_user_id_key (never executed)
+                             Index Cond: (channel_id = c_1.id)
+ Planning:
+   Buffers: shared hit=28
+ Planning Time: 0.465 ms
+ Execution Time: 4.062 ms
+(41 rows)
+
+===== 4. /api/me/threads for a member of 5 clubs: (a) the list source
+                                                                                                                                                    QUERY PLAN                                                                                                                                                     
+-------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------
+ Nested Loop (actual time=0.625..4.471 rows=20 loops=1)
+   Buffers: shared hit=713
+   ->  Bitmap Heap Scan on channel_members cm (actual time=0.482..3.112 rows=20 loops=1)
+         Recheck Cond: (user_id = (current_setting('cost.p'::text))::uuid)
+         Filter: (is_channel_member(channel_id) AND can_read_channel_roster(channel_id))
+         Heap Blocks: exact=10
+         Buffers: shared hit=442
+         ->  Bitmap Index Scan on channel_members_channel_id_user_id_key (actual time=0.169..0.169 rows=20 loops=1)
+               Index Cond: (user_id = (current_setting('cost.p'::text))::uuid)
+               Buffers: shared hit=61
+   ->  Memoize (actual time=0.067..0.067 rows=1 loops=20)
+         Cache Key: cm.channel_id
+         Cache Mode: logical
+         Hits: 0  Misses: 20  Evictions: 0  Overflows: 0  Memory Usage: 3kB
+         Buffers: shared hit=271
+         ->  Index Scan using channels_pkey on channels c (actual time=0.067..0.067 rows=1 loops=20)
+               Index Cond: (id = cm.channel_id)
+               Filter: (((org_id IS NOT NULL) AND can_view_org_channel(id, (COALESCE(NULLIF(current_setting('request.jwt.claim.sub'::text, true), ''::text), ((NULLIF(current_setting('request.jwt.claims'::text, true), ''::text))::jsonb ->> 'sub'::text)))::uuid)) OR ((org_id IS NULL) AND EXISTS(SubPlan 1)))
+               Buffers: shared hit=271
+               SubPlan 1
+                 ->  Bitmap Heap Scan on channel_members cm_1 (never executed)
+                       Recheck Cond: (channel_id = c.id)
+                       Filter: (is_channel_member(channel_id) AND can_read_channel_roster(channel_id) AND (user_id = (COALESCE(NULLIF(current_setting('request.jwt.claim.sub'::text, true), ''::text), ((NULLIF(current_setting('request.jwt.claims'::text, true), ''::text))::jsonb ->> 'sub'::text)))::uuid))
+                       ->  Bitmap Index Scan on channel_members_channel_id_user_id_key (never executed)
+                             Index Cond: (channel_id = c.id)
+ Planning:
+   Buffers: shared hit=37
+ Planning Time: 0.242 ms
+ Execution Time: 4.495 ms
+(29 rows)
+
+===== 4 (b) the peers read (every co-member row of every room in the list)
+                                                                       QUERY PLAN                                                                       
+--------------------------------------------------------------------------------------------------------------------------------------------------------
+ Nested Loop (actual time=0.681..80.216 rows=620 loops=1)
+   Buffers: shared hit=13212
+   InitPlan 1
+     ->  Result (actual time=0.001..0.001 rows=1 loops=1)
+   ->  Nested Loop (actual time=0.627..77.587 rows=620 loops=1)
+         Buffers: shared hit=11352
+         ->  Bitmap Heap Scan on channel_members (actual time=0.409..2.910 rows=20 loops=1)
+               Recheck Cond: (user_id = (current_setting('cost.p'::text))::uuid)
+               Filter: (is_channel_member(channel_id) AND can_read_channel_roster(channel_id))
+               Heap Blocks: exact=10
+               Buffers: shared hit=442
+               ->  Bitmap Index Scan on channel_members_channel_id_user_id_key (actual time=0.130..0.130 rows=20 loops=1)
+                     Index Cond: (user_id = (current_setting('cost.p'::text))::uuid)
+                     Buffers: shared hit=61
+         ->  Bitmap Heap Scan on channel_members cm (actual time=0.136..3.729 rows=31 loops=20)
+               Recheck Cond: (channel_id = channel_members.channel_id)
+               Filter: ((user_id <> (current_setting('cost.p'::text))::uuid) AND is_channel_member(channel_id) AND can_read_channel_roster(channel_id))
+               Rows Removed by Filter: 1
+               Heap Blocks: exact=29
+               Buffers: shared hit=10910
+               ->  Bitmap Index Scan on channel_members_channel_id_user_id_key (actual time=0.001..0.001 rows=32 loops=20)
+                     Index Cond: (channel_id = channel_members.channel_id)
+                     Buffers: shared hit=40
+   ->  Index Scan using users_pkey on users u (actual time=0.004..0.004 rows=1 loops=620)
+         Index Cond: (id = cm.user_id)
+         Filter: ((id = (InitPlan 1).col1) OR user_visible(id))
+         Buffers: shared hit=1860
+ Planning:
+   Buffers: shared hit=50
+ Planning Time: 0.219 ms
+ Execution Time: 80.275 ms
+(31 rows)
+
+===== 4 (c) the last messages read (limit = rooms x 5)
+                                                                                                                                                                                                                                                                                 QUERY PLAN                                                                                                                                                                                                                                                                                  
+-----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------
+ Limit (actual time=8.136..8.145 rows=100 loops=1)
+   Buffers: shared hit=1269
+   InitPlan 1
+     ->  Result (never executed)
+   ->  Sort (actual time=8.136..8.139 rows=100 loops=1)
+         Sort Key: m.created_at DESC
+         Sort Method: top-N heapsort  Memory: 38kB
+         Buffers: shared hit=1269
+         ->  Nested Loop (actual time=4.411..7.852 rows=3000 loops=1)
+               Buffers: shared hit=1269
+               ->  Seq Scan on channel_members (actual time=0.369..2.939 rows=20 loops=1)
+                     Filter: ((user_id = (current_setting('cost.p'::text))::uuid) AND is_channel_member(channel_id) AND can_read_channel_roster(channel_id))
+                     Rows Removed by Filter: 657
+                     Buffers: shared hit=486
+               ->  Index Scan using idx_messages_channel_created on messages m (actual time=0.205..0.237 rows=150 loops=20)
+                     Index Cond: (channel_id = channel_members.channel_id)
+                     Filter: (((removed_at IS NULL) OR (user_id = (InitPlan 1).col1)) AND ((ANY (channel_id = (hashed SubPlan 7).col1)) OR (ANY (channel_id = (hashed SubPlan 13).col1))))
+                     Buffers: shared hit=783
+                     SubPlan 7
+                       ->  Bitmap Heap Scan on channels c (actual time=1.505..4.028 rows=20 loops=1)
+                             Recheck Cond: (org_id IS NOT NULL)
+                             Filter: ((((org_id IS NOT NULL) AND can_view_org_channel(id, (COALESCE(NULLIF(current_setting('request.jwt.claim.sub'::text, true), ''::text), ((NULLIF(current_setting('request.jwt.claims'::text, true), ''::text))::jsonb ->> 'sub'::text)))::uuid)) OR ((org_id IS NULL) AND (ANY (id = (hashed SubPlan 6).col1)))) AND can_view_org_channel(id, (COALESCE(NULLIF(current_setting('request.jwt.claim.sub'::text, true), ''::text), ((NULLIF(current_setting('request.jwt.claims'::text, true), ''::text))::jsonb ->> 'sub'::text)))::uuid))
+                             Rows Removed by Filter: 34
+                             Heap Blocks: exact=38
+                             Buffers: shared hit=666
+                             ->  Bitmap Index Scan on channels_org_id_idx (actual time=0.023..0.023 rows=2178 loops=1)
+                                   Index Cond: (org_id IS NOT NULL)
+                                   Buffers: shared hit=4
+                             SubPlan 6
+                               ->  Seq Scan on channel_members cm (never executed)
+                                     Filter: (is_channel_member(channel_id) AND can_read_channel_roster(channel_id) AND (user_id = (COALESCE(NULLIF(current_setting('request.jwt.claim.sub'::text, true), ''::text), ((NULLIF(current_setting('request.jwt.claims'::text, true), ''::text))::jsonb ->> 'sub'::text)))::uuid))
+                     SubPlan 13
+                       ->  Nested Loop (never executed)
+                             ->  Index Scan using channels_org_pinned_position_idx on channels c_1 (never executed)
+                                   Index Cond: (org_id IS NULL)
+                                   Filter: (((org_id IS NOT NULL) AND can_view_org_channel(id, (COALESCE(NULLIF(current_setting('request.jwt.claim.sub'::text, true), ''::text), ((NULLIF(current_setting('request.jwt.claims'::text, true), ''::text))::jsonb ->> 'sub'::text)))::uuid)) OR ((org_id IS NULL) AND EXISTS(SubPlan 11)))
+                                   SubPlan 11
+                                     ->  Bitmap Heap Scan on channel_members cm_1 (never executed)
+                                           Recheck Cond: (channel_id = c_1.id)
+                                           Filter: (is_channel_member(channel_id) AND can_read_channel_roster(channel_id) AND (user_id = (COALESCE(NULLIF(current_setting('request.jwt.claim.sub'::text, true), ''::text), ((NULLIF(current_setting('request.jwt.claims'::text, true), ''::text))::jsonb ->> 'sub'::text)))::uuid))
+                                           ->  Bitmap Index Scan on channel_members_channel_id_user_id_key (never executed)
+                                                 Index Cond: (channel_id = c_1.id)
+                             ->  Bitmap Heap Scan on channel_members cm_2 (never executed)
+                                   Recheck Cond: (c_1.id = channel_id)
+                                   Filter: (is_channel_member(channel_id) AND can_read_channel_roster(channel_id) AND (user_id = (COALESCE(NULLIF(current_setting('request.jwt.claim.sub'::text, true), ''::text), ((NULLIF(current_setting('request.jwt.claims'::text, true), ''::text))::jsonb ->> 'sub'::text)))::uuid))
+                                   ->  Bitmap Index Scan on channel_members_channel_id_user_id_key (never executed)
+                                         Index Cond: (channel_id = c_1.id)
+ Planning:
+   Buffers: shared hit=44
+ Planning Time: 0.624 ms
+ Execution Time: 8.201 ms
+(51 rows)
+
+RESET
+ROLLBACK

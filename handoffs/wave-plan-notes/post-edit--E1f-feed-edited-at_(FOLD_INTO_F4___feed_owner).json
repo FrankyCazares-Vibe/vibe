@@ -1,0 +1,11 @@
+{
+ "id": "E1f-feed-edited-at (FOLD INTO F4 / feed owner)",
+ "files": [
+  "src/app/api/feed/route.ts"
+ ],
+ "contract": "OWNED BY org-following F4 (handoffs/2026-09-16-org-following-spec.md:767; B9 already landed). Fold this in there and do not run it in parallel.\n- PostRow type (:44-61): add `edited_at?: string | null;`\n- Select strings: add `edited_at` after `created_at` in the posts select (:218) and in the reposts embed (:252). RepostRow.post shares PostRow, so both need it.\n- No other change: renderPost spreads `withPostMediaUrls(row)`, so every feed post carries `edited_at` to CampusMobile and campus-home.\nRespect org-following critic C1: the diversity cap key at :417 is `entry.post.org_id ?? entry.post.user_id`, never org_id alone. DEPENDS ON E0 applied.",
+ "acceptance": [
+  "GET /api/feed?limit=50 (signed-in, localhost) returns `feed[i].post.edited_at` (null or ISO) and still returns viewerId.",
+  "Feed still returns more than 3 posts (C1 guard) and 200 before and after the change."
+ ]
+}

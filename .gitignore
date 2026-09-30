@@ -65,8 +65,11 @@ next-env.d.ts
 /IU MEETING/
 /PITCH/
 /RESEARCH/
-/handoffs/
 /otto_mockups/
+# Session handoffs ARE in git since S69 (the repo is private) so cloud
+# sessions can read them. Local database backups stay on this Mac.
+/handoffs/**/local-db-backups/
+/handoffs/**/*.dump
 # The product journal is private (S68): it lives on this Mac only and never
 # goes back into git or public/.
 /journal/

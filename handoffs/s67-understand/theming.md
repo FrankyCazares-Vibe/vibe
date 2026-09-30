@@ -1,0 +1,117 @@
+I have everything needed. The Write tool blocked the report file ("Subagents should return findings as text"), so the full report follows here as text, and the structured output flags that the file was not written.
+
+# REPORT — theming (change C: dark mode)
+
+Intended path: `/Users/franciscocazares/vibe/handoffs/s67-understand/REPORT_theming.md` (not written; the Write tool refuses report files from subagents — the parent should save this text there). All paths below are relative to `/Users/franciscocazares/vibe`. Read-only survey; no app code touched.
+
+## Summary
+
+- No theme mechanism exists. Nothing sets `.dark`/`data-theme`, nothing reads `prefers-color-scheme` for the app (only the PDF viewer, `src/app/api/resume/[...path]/route.ts:62`). `next-themes` is not installed; stack is tailwindcss ^4 + shadcn ^4.6.0 (package.json).
+- globals.css has half the plumbing already: Vibe tokens in `:root` (`src/app/globals.css:9-30`), shadcn oklch tokens (135-168), a shadcn `.dark` block (239-271), `@custom-variant dark (&:is(.dark *))` (5). The `.dark` block never touches `--cream/--charcoal/--muted/--border/--shadow` and no code toggles the class — dead today.
+- Product UI does not read tokens. 2,266 `style={{` vs 674 `className=` across src; 1,570 hex literals in 98 of 492 .ts/.tsx files; the 15 largest .tsx files hold 990 hex + 1,375 `rgba(` and reference `var(--` once in total. Only shadcn `src/components/ui/{button,badge,card}.tsx` use token classes; only 5 ui files use `dark:`.
+- Already dark: landing (`.vibe-landing-root` 367-376), `/otto` room (`.otto-room` 1784-1797), campus Chat-tab chrome (`CHAT_CHROME_BACKDROP`, `src/app/campus/campus-home.tsx:322-325`), all five org backdrops (`src/app/orgs/[handle]/page.tsx:49-60`, default `sand-purple` = `#1B1530…`), Otto side panel glass. Cream: campus Feed/Events/Orgs/Map (`FEED_BACKDROP` 314-318), profile (ProfileMobile.tsx:1405 + profile.html), messages (MessagesMobile.tsx:210 + messages.html:39), settings (`PAGE_BG` SettingsClient.tsx:45-49, white `CARD_GLASS` 50-60), network, LeftNav (`#fff` LeftNav.tsx:1715), auth CSS (1065-1700, 100 literals), phone tab bar (`rgba(250,247,242,0.96)`), onboarding, offline.
+- Desktop profile/messages/onboarding are separate static documents: `public/html/profile.html` (11,122 lines, 244 hex/240 rgba, 451 `var(--`), `messages.html` (3,610; 69/85; 254 var), `onboarding.html` (4,099; 27/79; 44 var), each with its own `:root` (profile.html:85-98, messages.html:36, onboarding.html:26) and a static `<meta name="theme-color" content="#FAF7F2">` (profile.html:17, messages.html:13, onboarding.html:13, public/offline.html:24). The server can't inject into them; they all load `/html/_persistence.js` synchronously in `<head>` (profile.html:21, messages.html:17, onboarding.html:17), which is the natural pre-paint hook.
+- Persistence pattern to copy: settings/page.tsx selects `users.otto_settings` server-side (35-36) → NotificationsCard PATCHes `/api/me/otto/settings` via `vibeRequest` (NotificationsCard.tsx:265-273) → route sanitizes an allowlist (`src/app/api/me/otto/settings/route.ts:20-29, 54-108`), read-merge-write (142-162), returns settings (169). Column: `supabase/migrations/20260512000000_otto_reminders_and_settings.sql:17`, private (security_hardening.sql:40,57).
+- Recommendation (one mechanism): `data-theme="light|dark"` on `<html>` set by a ~10-line inline `<script>` in `layout.tsx` `<head>` + `suppressHydrationWarning` (exactly the recipe in `node_modules/next/dist/docs/01-app/02-guides/preventing-flash-before-hydration.md:246-268`), reading localStorage `vibe_theme` (light|dark|system) and `matchMedia`; a `[data-theme="dark"]` token block in globals.css; `theme` saved as one more `otto_settings` key so it follows the account; same script pasted into the 3 legacy heads + offline.html; theme-color meta rewritten by the script; manifest stays cream.
+- Honest size: tokens alone flip ~0 React surfaces; dark mode is a literal-by-literal campaign (~1,100 literals in ~15 files + ~440 in legacy) after a small mechanism step. No CSP today (next.config.ts:51 comment), so the inline script needs no nonce.
+
+## Files
+
+| Path | Lines | Role |
+|---|---|---|
+| src/app/globals.css | 5 | `@custom-variant dark (&:is(.dark *))` — class-based, unused |
+| src/app/globals.css | 7-45 | `@layer base`: Vibe `:root` tokens (9-30: `--cream #FAF7F2, --charcoal #1C1C1E, --muted #8A8580, --accent #FF5C35, --green, --border rgba(28,28,30,.08), --shadow`, `--vibe-*` night/lavender/purple/gold); `body { background: var(--cream); color: var(--charcoal); @apply bg-background text-foreground }` (35-41) |
+| src/app/globals.css | 47-133 | `@theme inline` mapping shadcn `--color-*` → `--background/--card/…`; radius/animation tokens |
+| src/app/globals.css | 135-168 | shadcn light tokens (`--background: oklch(1 0 0)` = white) |
+| src/app/globals.css | 239-271 | shadcn `.dark` block (oklch greys), never activated |
+| src/app/globals.css | 367-1060 | landing: dark by literals (52 literals) |
+| src/app/globals.css | 1065-1700 | auth pages: light by literals (100 literals; white glass card 1142) |
+| src/app/globals.css | 1706-1760 | custom cursor (coral/white literals) |
+| src/app/globals.css | 1774-2580 | `/otto` room + otto-metrics: dark by literals (119) |
+| src/app/globals.css | 2598-2660, 2677+ | app-shell grid, `.vibe-mobile-tabbar` (cream rgba bg, charcoal border) |
+| src/app/globals.css | 2887-2901 | `@media (display-mode: standalone/fullscreen)` and `html.vibe-app` force `background-color: #FAF7F2` — unlayered, beats `@layer base` |
+| src/app/layout.tsx | 40-45, 53-60 | `viewport.themeColor: "#FAF7F2"` (static); `<html lang="en" className="font-mono …">`, `<head>` holds only the Google Fonts link; no inline script, no `suppressHydrationWarning` (none anywhere in src) |
+| src/app/manifest.ts | 42, 61-62 | `CREAM` for `background_color` and `theme_color` |
+| public/html/profile.html | 16-29, 85-98, 104, 3055 | manifest link, theme-color meta, head scripts (`_persistence.js` sync, others `defer`), own `:root`, body, `</head>` |
+| public/html/messages.html | 12-21, 36, 39, 947 | same shape; one-line `:root`; `body{background:var(--cream);color:var(--charcoal)}` |
+| public/html/onboarding.html | 12-24, 26, 29, 453 | same shape; 6-token `:root` |
+| public/html/_persistence.js | 1-30 | shared, loaded first on every legacy page; `VIBE_KEYS` localStorage convention `vibe_*` |
+| public/offline.html | 24, 28-33 | theme-color meta; `html,body{background:#FAF7F2;color:#1C1C1E}`; cached by public/sw.js:27-62 (bump `SW_VERSION`, sw.js:6) |
+| src/app/campus/campus-home.tsx | 261-338 | `BACKDROP_PRESETS`, `DEFAULT_BACKDROP="cream"`, `FEED_BACKDROP` (cream gradient), `CHAT_CHROME_BACKDROP` (dark), `type Tone`, `getTabScene()`; 9662 `colorScheme:"dark"` on a chat input |
+| src/components/settings/SettingsClient.tsx | 45-60, 123-138 | `PAGE_BG` (same cream gradient as feed), `CARD_GLASS` (white glass); card list Account/Campus/Handle/CampusTour/Notifications/Blocked/Help/SignOut |
+| src/components/settings/NotificationsCard.tsx | 234-290 | optimistic queue → `vibeRequest("/api/me/otto/settings", PATCH)`; `prefsFromSettings` in notifications-card-view.ts:177 |
+| src/app/settings/page.tsx | 31-36, 71-77, 86-104 | server select incl. `otto_settings`, derives `pushPrefs`, renders `CampusAppShell` + `SettingsClient` |
+| src/app/api/me/otto/settings/route.ts | 20-29, 54-108, 110-169 | `PatchableSettings` allowlist, `sanitizePatch` switch, PATCH read/merge/write, `noop` when nothing valid (131) |
+| src/app/api/me/otto/route.ts | 171-179 | GET merges `otto_settings` (used by src/app/otto/page.tsx:36 only) |
+| src/lib/native/bridge.ts | 252-257 | `styleStatusBarForCream(android)`: StatusBar `LIGHT` + Android bg `CREAM`; called from src/components/native/NativeBridge.tsx:204 |
+| mobile/capacitor.config.ts | 35, 81, 87-89 | `backgroundColor: "#FAF7F2"`, StatusBar/SystemBars `LIGHT` |
+| src/components/feedback/LoadFailed.tsx | 41-59 | `tone: "light"|"dark"` — dark = on glass/Otto/map |
+| src/components/posts/PostAudienceList.tsx | 103-104, 228 | same tone prop |
+| src/components/mobile/MessagesMobile.tsx | 1666, 1714, 3801-3958 | `darkMode` derived from org backdrop; bubble palette flips |
+| src/app/profile/profile-html-bridge.tsx | 34, 47-100 | desktop `/profile` → `window.location.replace("/html/profile.html?…")` (full navigation) |
+| src/app/messages/MessagesSwitch.tsx | 11, 42-46 | desktop messages = `<iframe src="/html/messages.html?app=1&embedded=1">` inside `CampusAppShell` |
+| src/app/onboarding/OnboardingSwitch.tsx, classic/route.ts | 57-68, 34 | desktop onboarding = iframe of `/onboarding/classic` → onboarding.html |
+| src/components/campus-app-shell.tsx | 33-50 | client shell: `LeftNav` + children + `MobileTabBar` + `OttoCorner`; paints no background |
+| node_modules/next/dist/docs/01-app/02-guides/preventing-flash-before-hydration.md | 60-61, 109-122, 242, 246-268 | the sanctioned recipe; `suppressHydrationWarning`; CSP note; theme example |
+| node_modules/next/dist/docs/01-app/03-api-reference/04-functions/generate-viewport.md | 101-112 | `themeColor` media array form |
+
+## How it works today
+
+**Token layers.** `:root` Vibe tokens live inside `@layer base` (globals.css:8-30). Because `body` declares `background: var(--cream)` (37) and then `@apply bg-background text-foreground` (40), the later `background-color: var(--color-background)` wins: the body is actually white (`oklch(1 0 0)`, 136) in a browser tab, and every page paints its own cream over it (campus `FEED_BACKDROP`, settings `PAGE_BG`, ProfileMobile 1405, MessagesMobile 210, the-map/page.tsx:39). Installed/standalone and the store apps force cream on html/body with unlayered rules (2887-2901). If someone added `class="dark"` to `<html>` today, shadcn tokens would flip (body near-black, 240-241) while every product surface stayed cream — proof that the existing `.dark` block is not a dark mode.
+
+**Who reads tokens.** Tailwind token classes appear in 3 files (`src/components/ui/card.tsx`, `badge.tsx`, `button.tsx`); the `dark:` variant in 5 ui files. Product screens are inline style objects: campus-home.tsx 269 hex / 562 rgba / 1 `var(--`; ProfileMobile 157/147/0; MessagesMobile 120/139/0; CampusMobile 88/85/0; LeftNav 74/41/0; SettingsClient 77/48/0; PostViewerMobile 38/23/0; NetworkMobile 29/31/0; orgs page 31/54/0; OrgInviteSheet 25/33/0; LyraConstellation 43/72/0; admin-actions 8/43/0; OttoSidePanel 10/44/0; MapMobile 20/40/0; OnboardingMobile 1/13/0. Most frequent literals across src: `#1c1c1e` ×278, `#fff` ×260, `#ff5c35` ×170, `#8a8580` ×142, `#faf7f2` ×90, `#5c5853` ×81 — six values cover ~65% of all hex, which is what makes a mechanical pass tractable. `rgba(28,28,30,x)` borders/scrims and `rgba(255,255,255,x)` glass are the other big families.
+
+**Legacy pages.** Each is a standalone document with its own `:root` (profile.html:85-98 has 13 tokens incl. `--warm-white`, `--sky`, `--edit-ring`; messages.html:36 has 9; onboarding.html:26 has 6) and heavy partial token use (451/254/44 `var(--`) alongside literals (244/69/27 hex). Scripts: `_sw.js defer`, then `_persistence.js` **without defer** (profile.html:21) so it runs before `</head>` (3055) and before first paint. `_otto.js` (85 hex/115 rgba), `_postViewer.js` (63/28), `_miniMessenger.js` (34/50) paint their own UI. Messages desktop is an iframe (same origin → shared localStorage + `storage` events); profile desktop is a full navigation; onboarding desktop is an iframe via `/onboarding/classic`.
+
+**theme-color / native chrome.** Static cream everywhere: `layout.tsx:44`, `manifest.ts:61-62`, four `<meta name="theme-color">` in public. In the store apps `NativeBridge.tsx:204` calls `styleStatusBarForCream(android)` (bridge.ts:252-257: style `LIGHT`, Android bg `CREAM`); capacitor.config.ts pins `backgroundColor: "#FAF7F2"` (35, 81) and `StatusBar/SystemBars: LIGHT` (88-89).
+
+**Existing "tone" patterns (a trap).** `LoadFailed`/`PostAudienceList` `tone="dark"` means *dark surface* (light text). campus-home's `Tone` (327) means *text tone*: `getTabScene` returns `tone: "dark"` for the cream `FEED_BACKDROP` and `"light"` for the dark chat chrome (331-338), and the eyebrow helper at 8403 uses `dark` = dark text. MessagesMobile's `darkMode` (3801-3958) is "the org backdrop is dark", not "the user chose dark". A global theme must not be confused with any of these.
+
+**Preference persistence (the pattern).** Server page reads private column with service role (settings/page.tsx:35-36), derives a typed view (73-77), passes it down (87). Client edits go through `vibeRequest` (src/lib/feedback/request.ts:138) as `PATCH /api/me/otto/settings` with an optimistic queue (NotificationsCard.tsx:257-290). The route rate-limits (135), sanitizes to an allowlist (54-108; unknown keys dropped → `noop` at 131), reads `otto_settings` (142-143), shallow-merges, writes (159-162) and returns the saved blob (169). No shelled page fetches `otto_settings` at boot today (only `/otto` via otto/page.tsx:36).
+
+## Change points
+
+| # | What | Where | Approach | Size |
+|---|---|---|---|---|
+| 1 | No-flash theme bootstrap | src/app/layout.tsx:53-59 | Add `data-theme="light"` + `suppressHydrationWarning` on `<html>`; first child of `<head>` an inline `<script dangerouslySetInnerHTML>`: read `localStorage.vibe_theme` (light/dark/system, default system), resolve system via `matchMedia("(prefers-color-scheme: dark)")`, set `documentElement.dataset.theme`, rewrite `meta[name=theme-color]` content (`#FAF7F2` / dark bg). Wrap in try/catch (private mode). Recipe: preventing-flash-before-hydration.md:246-268; wrap the tag per :122-142 to silence the dev `<script>` warning. No CSP today (next.config.ts:51). | S |
+| 2 | Dark token block | src/app/globals.css:5, 9-30, 35-41, 239-271, 2887-2901 | Add `:root[data-theme="dark"] { --cream: #14131A-ish; --charcoal: #F3EFE8; --muted: #9A948C; --border: rgba(255,255,255,.10); --shadow: 0 4px 24px rgba(0,0,0,.5); }` plus 3-4 new tokens the literals need: `--paper` (card white → `#1E1D24`), `--ink-2` (#5C5853 → light grey), `--scrim` (`rgba(28,28,30,x)` family), `--glass` (`rgba(255,255,255,x)` family), `--feed-backdrop` (gradient). Fold the shadcn `.dark` values into the same selector and change line 5 to `@custom-variant dark (&:where([data-theme=dark], [data-theme=dark] *))`. Fix body (35-41) so cream is the real background (set `--background: var(--cream); --foreground: var(--charcoal)` or drop the `@apply`). Change 2889 and 2900 to `var(--cream)`. Add `color-scheme: dark` for native form controls/scrollbars. | S |
+| 3 | Store the preference | src/app/api/me/otto/settings/route.ts:20-29, 54-75; src/app/settings/page.tsx:36, 71-87; src/components/settings/SettingsClient.tsx:123-138 | Add `theme?: "light"\|"dark"\|"system"` to `PatchableSettings` + a `case "theme"` in `sanitizePatch`. Settings page already selects `otto_settings`; pass `theme` to `SettingsClient`; new `AppearanceCard` (three-segment control reusing `.otto-room-segmented` look or NotificationsCard's toggle row) that on change: writes `localStorage.vibe_theme`, sets `data-theme` + meta, and PATCHes like NotificationsCard.tsx:265-273. Boot sync: the settings page (and, if wanted, `/api/me/profile-bootstrap` used by profile-html-bridge.tsx:57) mirrors the server value into localStorage when it differs, so a new device picks the account's choice after first visit. Add `matchMedia` change listener for "system". | S-M |
+| 4 | theme-color + manifest | src/app/layout.tsx:44; src/app/manifest.ts:61-62 | Keep `viewport.themeColor` static (SSR default) and let the #1 script overwrite the meta; do NOT use the media-array form (generate-viewport.md:101-112) because it would ignore a manual light/dark choice. Manifest is read at install and cannot follow a per-user toggle: keep cream `background_color`/`theme_color`; note the cream splash/title bar as a known limit. | S |
+| 5 | Native status bar | src/lib/native/bridge.ts:252-257; src/components/native/NativeBridge.tsx:204; mobile/capacitor.config.ts:35, 81 | Rename to `styleStatusBarForTheme(android, dark)`: `setStyle({ style: dark ? "DARK" : "LIGHT" })`, Android bg = current `--cream`. Call on load and on every theme change (observe `data-theme` via MutationObserver or a tiny event). `capacitor.config.ts` first-paint colour stays cream (JS hasn't run yet) unless the shell is rebuilt; Android 15+ ignores `setBackgroundColor` anyway (87). | S |
+| 6 | Legacy pages follow the theme | public/html/profile.html:16-17, 85-98; messages.html:12-13, 36; onboarding.html:12-13, 26; public/offline.html:24-33; public/html/_persistence.js top | Paste the same inline script as the first `<head>` child of all four pages (offline.html has no shared JS, so inline only; bump `SW_VERSION` in public/sw.js:6). Add a `:root[data-theme="dark"]` override next to each page's `:root`. In `_persistence.js` add a `storage` listener that re-applies `vibe_theme` (covers the messages/onboarding iframes when the parent toggles). Then literal passes: profile.html 244 hex/240 rgba (L), `_otto.js` 85/115 (M), messages.html 69/85 (M), `_postViewer.js` 63/28 (M), `_miniMessenger.js` 34/50 (S), onboarding.html 27/79 (S), rest <25 each. | L |
+| 7 | Campus desktop | src/app/campus/campus-home.tsx:314-318, 322-325, whole file (269 hex/562 rgba) | Replace `FEED_BACKDROP` with `var(--feed-backdrop)` defined per theme in globals.css (no JS re-render). Leave `CHAT_CHROME_BACKDROP` and `BACKDROP_PRESETS` as-is (already dark). Mechanical pass per style object: `#1C1C1E→var(--charcoal)`, `#fff→var(--paper)`, `#8A8580→var(--muted)`, `#5C5853→var(--ink-2)`, `#FAF7F2→var(--cream)`, `rgba(28,28,30,x)→rgba(var(--scrim-rgb),x)`. Anything inside chat/org/Otto glass (tone "light" text) is skipped. Verify at 375px and desktop. | L |
+| 8 | Campus phone | src/components/mobile/CampusMobile.tsx (88/85; bg 3278, 3663) | Same pass; strip / rolling-newsletter work (change D) should be built token-first. | M |
+| 9 | Profile | src/components/mobile/ProfileMobile.tsx (157/147; 1297, 1405, 2502); public/html/profile.html (via #6) | ProfileMobile pass (L). Desktop profile is the legacy document; widget work (change A) touches the same file — sequence dark mode after or alongside it. | L |
+| 10 | Messages | src/components/mobile/MessagesMobile.tsx (120/139; 210, 2896, 3537, 3801-3958); public/html/messages.html (via #6) | Pass on MessagesMobile; make bubble palette read `theme || orgBackdropDark` (3937-3958). Desktop = iframe pass in #6. | M |
+| 11 | Settings + shell | src/components/settings/SettingsClient.tsx:45-60 + 77 hex/48 rgba; src/components/settings/NotificationsCard.tsx; src/components/LeftNav.tsx (74/41; 1029, 1099, 1396, 1715); globals.css `.vibe-mobile-tabbar`, `.vibe-cursor--ring` | `PAGE_BG` → `var(--feed-backdrop)`; `CARD_GLASS` white-tint → `var(--glass)`; LeftNav `#fff` aside/inputs → `var(--paper)`; tab bar rgba → token. | M |
+| 12 | Everything else | NetworkPageClient (21/42), UserCard (39/29), OttoCorner (23/28), NetworkMobile (29/31), PostViewerMobile (38/23), SharePostSheet (20), ReportSheet (21), OrgInviteSheet (25/33), orgs page (31/54, bg already dark), admin-actions (8/43), MapMobile (20/40), auth CSS block (100 literals, 1065-1700), the-map/page.tsx (51/23, marketing) | Card/text tokens only; org and Otto surfaces mostly need no change. Landing (52) and `/otto` (119) are already dark: skip. | M |
+
+Order recommended: 1→2→3→4→5 (mechanism, one PR, S-M total), then 7+8 (campus), 9 (profile), 10 (messages), 11 (settings/shell), 6 (legacy literal passes, can run in parallel with 7-11 since they are separate files), 12 last.
+
+Literal budget by wave: mechanism 0; campus 357 hex + 647 rgba; profile 157+147 (+244+240 legacy); messages 120+139 (+69+85 legacy); settings/shell 151+89; rest ~330 hex. Files that go dark **via tokens alone**: none of the React product files (0/15); shadcn `ui/` button/badge/card only. Legacy pages go **partially** dark via their `:root` override (451/254/44 var uses) but keep 244/69/27 hex + 240/85/79 rgba to edit.
+
+## Risks
+
+- Hydration: mutating `<html>` before hydrate without `suppressHydrationWarning` makes React client-render from the root and drops the fix (docs:109-116); today nothing in src uses it. The inline `<script>` also triggers a dev warning unless wrapped (docs:122).
+- The `.dark` shadcn block + `@custom-variant dark` (globals.css:5) are class-based; switching to `data-theme` without updating line 5 leaves `dark:` classes in `ui/` unreactive. Conversely keeping `.dark` means the legacy pages and the script must add a class, not an attribute — pick one and use it everywhere.
+- body is white today via `@apply bg-background` (globals.css:40); surfaces that don't paint their own background (auth pages rely on `.vibe-auth-page::before`; CampusAppShell paints nothing) will show whatever `--background` becomes — verify every route, not just the big five.
+- Unlayered cream overrides (2887-2901) will flash cream around a dark installed app until changed; `capacitor.config.ts` first paint stays cream regardless.
+- Inverted `tone` semantics (campus-home `Tone` = text tone vs LoadFailed = surface) and org-backdrop `darkMode` in MessagesMobile make a blind find-and-replace dangerous; dark chat chrome/org presets/Otto glass must be excluded from the pass.
+- Glass cards (`CARD_GLASS` rgba(255,253,248,.78), `.vibe-auth-card` rgba(255,255,255,.78)) are white tints with `backdrop-filter`; they need designed dark tints, not a token swap.
+- Legacy iframes share localStorage but not the DOM: without the `storage` listener the messages iframe stays light until reload. profile.html is a hard navigation, so it re-runs the script.
+- `otto_settings` PATCH is read-merge-write, non-atomic (route.ts comment 24-25): fine for one key, but an older deployed route drops unknown keys and answers `noop` (131) — NotificationsCard treats that as failure (271-279); the AppearanceCard must too.
+- sw.js caches only /offline.html; forgetting the `SW_VERSION` bump ships the old cream offline page.
+- Manifest `theme_color`/`background_color` cannot follow the toggle; the Android splash and desktop PWA title bar stay cream for dark users.
+- Volume: campus-home.tsx is 15,705 lines; edits must stay in ~150-line chunks (workflow-waves rule) and be browser-checked at 375px as a non-admin (browser-pass rule).
+
+## Open questions for Franky
+
+1. Three-way (Light / Dark / Match system) or a plain toggle — and is the default for new students "match system"?
+2. Per-device (localStorage) or follow the account (`users.otto_settings.theme`)? I recommend both; confirm it's acceptable that the desktop legacy pages learn the account choice only after one visit to a React page.
+3. Is the desktop profile page (`public/html/profile.html`, 244 hex) in scope for dark mode now, or does dark mode ship phone-first with desktop following when the widget work (change A) rewrites that page anyway?
+4. Palette direction: neutral charcoal (`#1C1C1E` paper / `#FAF7F2` ink, closest to the existing tokens) or the violet-night world of the landing and Otto (`#07060f` / `#0A0E1F`, which would make org presets and chat chrome read as one world)?
+5. Accept the known limits: installed-app splash and manifest stay cream, store-app first paint is cream until the bridge flips the status bar?
+
+## Copy suggestions
+
+Not asked; none.

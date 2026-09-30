@@ -1,0 +1,29 @@
+# Review B3 (uploads) — bypass lens ("does it close the gap?")
+
+Reviewer, read-only. 2026-09-28. Read: plan.md, waveA-build.md, plan-waveB.md, waveB-build.md, critique-B3.md, critique-Bcross.md (B3 lines), notes-B3.md.
+
+## Progress
+- docs read; starting code read (strip-image, profile-photo-replace/retire, profile-upload, storage-upload, me/profile, profile-sync, clip-upload-url, messages.html, count script).
+- read: strip-image.ts, profile-image-key.ts (B0), profile-photo-replace.ts, profile-photo-retire.ts, profile-upload route, storage-upload.ts, me/profile + profile-sync diffs.
+- Deletion safety: every retired path is parsed with ownerId = caller (B0 parser, slot avatar|banner only), so a crafted column can't make a save delete another student's file or the student's own post photo. namedElsewhere keeps files another users/orgs row shows. Retire never touches `quarantine`. OK.
+- CANDIDATE GAP 1: desktop image résumé. profile.html:5056 reads the RAW file as a data: URL -> profile-sync resume_url -> resume-storage.ts uploadResumeDataUrl -> uploadResumeObject stores RAW; /api/resume serves the ORIGINAL to verified viewers when there are no bars (route.ts:197-199). B3 stripped résumé images only on the phone/multipart path. Product call 5 names "the desktop data-URL path".
+- PROBE strip-image (scratchpad script, repo sharp 0.35.4 / vips 8.18.6): JPEG EXIF GPS + XMP (GPS in XMP) + COM segment; PNG tEXt + iTXt XMP + withExif; WebP EXIF+XMP; GIF comment extension; résumé path (maxEdge null): output carries NO exif/xmp/iptc/icc and the marker string is gone in every case. #8 strip itself is sound.
+- PROBE storage RLS as blake (local, rolled back): sees only own profiles objects; INSERT -> "new row violates row-level security"; UPDATE 0 rows; DELETE blocked by storage.protect_delete. Storage REST can't bypass the route. users.avatar_url/banner_url + orgs.logo_url/banner_url: authenticated has SELECT/REFERENCES only (no UPDATE). OK.
+- Gates: profile-upload requireNotRestricted all kinds + requireCanPublish post/poster; clip-upload-url requireCanPublish. group-photo/org upload-url stay Terms-only BUT the column setters (threads PATCH, orgs PATCH) are requireCanPublish, so a suspended user only mints a private orphan. OK.
+- Video hint in both composers that call clip-upload-url (grep: only campus-home + PostComposerMobile). Token --ink-muted is C0 (globals.css:62/118). messages.html cropper: canvas redraw, refuses raw upload when cropper missing. OK.
+- B1 privacy copy (privacy/page.tsx): "When you upload a photo to your profile or a post, we remove its location details" -> overclaims while GAP 1 (desktop résumé/portfolio image) stays raw.
+- GAP 2 (evidence visibility): user-report snapshot still `id,handle,name,tagline` (me/reports/route.ts:319); B3's quarantine-on-replace writes no log row and B1's panel only shows quarantined files from its own log, so a moderator can't find the swapped-out file in-app. File IS kept (call 3 as written). Follow-up, not mustFix.
+- GAP 3 (pinning): orgs PATCH normalizeOrgAssetInput accepts any our-host https URL, so a club officer can set a club logo to a student's avatar URL; B3's namedElsewhere then keeps that file public after the student removes/replaces it. Harasser could re-host anyway; follow-up on orgs asset input.
+- Checked: posts can't name a root avatar/banner file (post_media_ref_ok local def pins `<uid>/(posts|posters)/`), so retire skipping a posts check is sound. Suspended users can't reach profile-sync/me/profile at all (requireNotRestricted at :252/:138), so they can't swap reported evidence either.
+- Stale re-send of a moderator-quarantined avatar URL: exists() false -> 400. B3 blocks "put the removed photo back by URL". Good.
+- Product calls vs code: call 5 (strip, replace retires, video hint exact wording, restricted no uploads, unverified no post photos, desktop group cropper, R2 out of scope) and call 3 (quarantine on open report) implemented as written, not backwards; call 1 delete prompt string done. Exception: GAP 1 (desktop data-URL résumé image).
+- Gates: node --test src/lib/media/*.test.ts 23/23; npx tsc --noEmit -p . clean.
+
+## Verdict: fix-first (one must-fix)
+MUST FIX 1 — desktop résumé/portfolio image stored with EXIF/GPS. `src/lib/profile/resume-storage.ts` uploadResumeDataUrl (reached from profile-sync resume_url, desktop profile.html:5056 sends the RAW file as a data: URL) uploads the raw bytes; /api/resume serves that original to every verified viewer when there are no bars. B1's privacy copy now says photos uploaded "to your profile" lose their location. Fix (additive, signature unchanged): in uploadResumeDataUrl, after the size check, when contentType !== "application/pdf" run `stripImage(buf, { maxEdge: null })`; `!ok` or output type not in MIME_EXT -> return null (profile-sync already answers 400 "Invalid resume_url"); upload `out.bytes` with `out.contentType`. Ownership: unowned in wave B; orchestrator assigns to B3 at repair. If it can't be assigned, B1 narrows the privacy sentence instead.
+
+## Should fix / follow-ups
+- Moderator can't find the swapped-out reported photo: user-report snapshot (me/reports/route.ts:319) records no avatar_url/banner_url and a replace-quarantine writes no log row; add both columns to the snapshot (or a log row) so B1's panel can show it.
+- orgs PATCH `normalizeOrgAssetInput` accepts any our-host https URL: a club officer can point a club logo at a student's avatar file, and B3 then keeps that file public after the student replaces/removes it. Refuse `.../profiles/<uid>/...` URLs for org assets (R2 keys only).
+- profile-upload kind=resume declared application/pdf is stored without checking `%PDF-` magic (self-only; hardening).
+- Work-logo replace leaves the old `logos/` file (JSON columns; #9b was scoped to avatar/banner; orphan count covers it).

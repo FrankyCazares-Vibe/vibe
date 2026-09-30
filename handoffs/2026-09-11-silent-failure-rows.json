@@ -1,0 +1,824 @@
+{
+ "rows": [
+  {
+   "n": 1,
+   "section": "Campus (desktop)",
+   "control": "Calendar Export → Apple Calendar",
+   "current_location": "src/components/LeftNav.tsx:1219-1239 (trigger), :1270-1279 (row)",
+   "classification": "pattern",
+   "batch": "B3-react-routes",
+   "note": "Clicks a synthetic <a download> for /api/me/calendar/ics. A 401 JSON body gets saved as vibe-calendar.ics and nothing is shown. Replace with downloadFile(url, 'vibe-calendar.ics', {failure:\"Couldn't export your calendar.\", success}). One call site, shared by rows 1-3."
+  },
+  {
+   "n": 2,
+   "section": "Campus (desktop)",
+   "control": "Calendar Export → Google Calendar",
+   "current_location": "src/components/LeftNav.tsx:1231-1238, :1280-1292",
+   "classification": "pattern",
+   "batch": "B3-react-routes",
+   "note": "Same trigger as row 1, so no extra call site. Call window.open synchronously before awaiting the download, or popup blockers will eat it. The 'export URL' sub-claim is probably wrong: /r/settings/export is Google's combined Import & export page. Not verified live."
+  },
+  {
+   "n": 3,
+   "section": "Campus (desktop)",
+   "control": "Calendar Export → Outlook",
+   "current_location": "src/components/LeftNav.tsx:1224-1230, :1293-1303",
+   "classification": "pattern",
+   "batch": "B3-react-routes",
+   "note": "Same trigger as row 1. No extra call site."
+  },
+  {
+   "n": 4,
+   "section": "Campus (desktop)",
+   "control": "Calendar day panel → Delete personal event",
+   "current_location": "src/components/LeftNav.tsx:1323-1338 (remove), :1401-1417 (button)",
+   "classification": "pattern",
+   "batch": "B3-react-routes",
+   "note": "A non-ok response only reaches console.error. Switch to vibeRequest DELETE with failure \"Couldn't delete that event.\" Keep the confirm. No optimistic removal, so nothing to roll back."
+  },
+  {
+   "n": 5,
+   "section": "Campus (desktop)",
+   "control": "Feed repost menu → Repost / Undo repost",
+   "current_location": "src/app/campus/campus-home.tsx:5769-5793 (submit), :5864/:5882 (buttons), onDone :5599-5612",
+   "classification": "pattern",
+   "batch": "B1-campus-home",
+   "note": "The repost route is terms-gated, so this is a live failure for the un-consented accounts. State flips only on success, so there is nothing to roll back. Add the failure toast and keep onDone('noop')."
+  },
+  {
+   "n": 6,
+   "section": "Campus (desktop)",
+   "control": "Post 3-dot menu → Copy link",
+   "current_location": "src/app/campus/campus-home.tsx:5264-5289",
+   "classification": "pattern",
+   "batch": "B1-campus-home",
+   "note": "Clipboard variant. The catch is empty. Use copyText(url): 'Link copied' on success, \"Couldn't copy the link.\" on failure."
+  },
+  {
+   "n": 7,
+   "section": "Campus (desktop)",
+   "control": "Post 3-dot menu → Report post",
+   "current_location": "src/app/campus/campus-home.tsx:5290-5321",
+   "classification": "pattern",
+   "batch": "B1-campus-home",
+   "note": "Fire-and-forget. The route is rate-limited and terms-gated (src/app/api/me/reports/route.ts:41,43). Add a success toast ('Reported — thanks for letting us know.') and a failure toast. The hardcoded reason_code 'other' is a separate product gap; CampusMobile.tsx:2199-2222 already has a report(reasonCode)."
+  },
+  {
+   "n": 8,
+   "section": "Campus (desktop)",
+   "control": "Post 3-dot menu → Delete (own post)",
+   "current_location": "src/app/campus/campus-home.tsx:5049-5069 (onDeletePost), :5322-5339 (button)",
+   "classification": "pattern",
+   "batch": "B1-campus-home",
+   "note": "Keep the confirm. On failure, show \"Couldn't delete your post.\" The code already re-enables the button and the menu stays open."
+  },
+  {
+   "n": 9,
+   "section": "Campus (desktop)",
+   "control": "Comments drawer → 'Write a comment…' (Enter)",
+   "current_location": "src/app/campus/campus-home.tsx:5969-5989 (submit), :6022-6028 (Enter/input)",
+   "classification": "pattern",
+   "batch": "B1-campus-home",
+   "note": "The case proven live on Sept 10. !data.ok is ignored, and res.json() throws on a non-JSON body. The draft stays in the box, which is correct. Add the failure toast with the Terms action."
+  },
+  {
+   "n": 10,
+   "section": "Campus (desktop)",
+   "control": "Comments drawer → Post button",
+   "current_location": "src/app/campus/campus-home.tsx:6042-6044",
+   "classification": "pattern",
+   "batch": "B1-campus-home",
+   "note": "Same submit as row 9. No extra call site."
+  },
+  {
+   "n": 11,
+   "section": "Campus (desktop)",
+   "control": "Comment row → Reply submit",
+   "current_location": "src/app/campus/campus-home.tsx:6114-6135 (submitReply), :6271 (button)",
+   "classification": "pattern",
+   "batch": "B1-campus-home",
+   "note": "Same shape as row 9. On failure, keep the reply box open with its text and show the toast."
+  },
+  {
+   "n": 12,
+   "section": "Campus (desktop)",
+   "control": "Orgs Discover card → Join / Request to join",
+   "current_location": "src/app/campus/campus-home.tsx:7781-7801 (handleJoin), :8858-8862 (card button)",
+   "classification": "pattern",
+   "batch": "B1-campus-home",
+   "note": "!data.ok is ignored. The join route is not terms-gated; its failures are 401, 404 or 500."
+  },
+  {
+   "n": 13,
+   "section": "Campus (desktop)",
+   "control": "Org quick-view modal → Join CTA",
+   "current_location": "src/app/campus/campus-home.tsx:7983 (onJoin={() => handleJoin(previewOrg)}), label :8011",
+   "classification": "pattern",
+   "batch": "B1-campus-home",
+   "note": "Same handleJoin as row 12. No extra call site."
+  },
+  {
+   "n": 14,
+   "section": "Campus (desktop)",
+   "control": "Channel settings → ↑ Up / ↓ Down",
+   "current_location": "src/app/campus/campus-home.tsx:2423-2440 (move), :2519-2533 (buttons)",
+   "classification": "pattern",
+   "batch": "B1-campus-home",
+   "note": "Optimistic, needs rollback. onChannelsReordered runs before the POST, and res.ok is never checked. Snapshot regular.map(c=>c.id) before the swap; on failure, call onChannelsReordered(prevIds) and show the toast."
+  },
+  {
+   "n": 15,
+   "section": "Campus (desktop)",
+   "control": "Chat tab → Send",
+   "current_location": "src/app/campus/campus-home.tsx:12011-12042 (send), :12588-12592 (Enter), :12612 (button)",
+   "classification": "pattern",
+   "batch": "B1-campus-home",
+   "note": "The draft and the reply target are already restored on failure; only the toast is missing. Another agent is editing the threads/[id]/messages route right now. Its error strings may change, but the helper doesn't depend on them."
+  },
+  {
+   "n": 16,
+   "section": "Mobile app",
+   "control": "Landing (/) → any click after the warp starts",
+   "current_location": "src/components/landing/home-landing.tsx:69-91 (guard :71, router.push :87)",
+   "classification": "not-pattern",
+   "batch": "none",
+   "note": "No request is involved. It needs a watchdog: if still warping about 4 s after router.push, call window.location.assign(dest) or setWarping(false)."
+  },
+  {
+   "n": 17,
+   "section": "Mobile app",
+   "control": "/auth/signup → Create account",
+   "current_location": "src/app/auth/signup/page.tsx:45-76",
+   "classification": "not-pattern",
+   "batch": "none",
+   "note": "signUp errors already render through setError (:65-68). The silent case is Supabase's obfuscated reply for an email that already has an account: no error and no session, so the page says 'Check this inbox'. The fix is a data.user?.identities?.length === 0 check, not the helper. Not verified live."
+  },
+  {
+   "n": 18,
+   "section": "Mobile app",
+   "control": "/auth/forgot-password → Send reset link",
+   "current_location": "src/app/auth/forgot-password/page.tsx:12-38; src/app/api/auth/password-reset/route.ts",
+   "classification": "misdescribed",
+   "batch": "none",
+   "note": "The page does check !res.ok || !data.ok and shows errors (:28-34). The route returns the same ok:true for every outcome on purpose, to stop account enumeration. Nothing to fix."
+  },
+  {
+   "n": 19,
+   "section": "Mobile app",
+   "control": "Onboarding desktop step 2 → handle field live status",
+   "current_location": "public/html/onboarding.html:386 (input), :783-803 (onHandleInput)",
+   "classification": "pattern",
+   "batch": "B6-static-onboarding-shared",
+   "note": "Inline-status variant, quiet:true. A 401 or 500 returns ok:false with no reason, so the field paints '✗ taken'; a network error blanks it. On failure, paint \"couldn't check\" in grey instead. Nothing reserves the handle; it is claimed at Finish (row 53)."
+  },
+  {
+   "n": 20,
+   "section": "Mobile app",
+   "control": "Onboarding step 4 → 'Or paste a link'",
+   "current_location": "public/html/onboarding.html:509, :897-910 (maybePreviewResumeLink), saved at :926-928",
+   "classification": "not-pattern",
+   "batch": "none",
+   "note": "No request is involved. The link IS saved as resume_url on Finish; only the preview skips links that aren't direct files (Drive, Notion). Fix with an inline hint: 'Saved — preview works for direct PDF/image links.'"
+  },
+  {
+   "n": 21,
+   "section": "Mobile app",
+   "control": "Onboarding desktop step 4 → Finish & open my profile",
+   "current_location": "public/html/onboarding.html:514 (button), :915-998 (completeOnboarding; fall-through :997)",
+   "classification": "pattern",
+   "batch": "B6-static-onboarding-shared",
+   "note": "Any failure other than terms (500, ok:false, network) sends a signed-in student to /auth/login?next=/onboarding. Switch to vibeRequest; on failure, show the toast and stay on the page. Route every navigation through window.__vibeTopNav: OnboardingSwitch.tsx:24-38 iframes this page, so today the terms redirect (:970-972) and the success warp both load inside the iframe."
+  },
+  {
+   "n": 22,
+   "section": "Mobile app",
+   "control": "Onboarding mobile step 4 → Finish & open my profile",
+   "current_location": "src/components/mobile/OnboardingMobile.tsx:359-414 (setWarping :359, silent handle claim :389-402, login fallback :411-413), button :845-852",
+   "classification": "pattern",
+   "batch": "B2-mobile",
+   "note": "The warp animation starts before the request. Move setWarping after success. On failure, show the toast, setSubmitting(false), and stay. If the handle claim fails (409 'That handle is taken'), say so before leaving. Two requests."
+  },
+  {
+   "n": 23,
+   "section": "Mobile app",
+   "control": "Post viewer → Repost",
+   "current_location": "src/components/mobile/PostViewerMobile.tsx:218-230 (repost), :644 (onTap)",
+   "classification": "pattern",
+   "batch": "B2b-postviewer",
+   "note": "Empty catch, and there is no local state to roll back. Minimal fix: vibeRequest plus a success toast 'Reposted'. The route is terms-gated. Another agent is editing this file right now (lines moved +3 during this read)."
+  },
+  {
+   "n": 24,
+   "section": "Mobile app",
+   "control": "Post viewer 3-dot → Copy link",
+   "current_location": "src/components/mobile/PostViewerMobile.tsx:~496-506 (writeText :502)",
+   "classification": "pattern",
+   "batch": "B2b-postviewer",
+   "note": "Clipboard variant: copyText(url)."
+  },
+  {
+   "n": 25,
+   "section": "Mobile app",
+   "control": "Post viewer 3-dot → Report post",
+   "current_location": "src/components/mobile/PostViewerMobile.tsx:~508-529 (fetch :515)",
+   "classification": "pattern",
+   "batch": "B2b-postviewer",
+   "note": "The response is discarded. Add success and failure toasts. The hardcoded reason 'other' is a separate gap."
+  },
+  {
+   "n": 26,
+   "section": "Mobile app",
+   "control": "Post viewer comments → input + Post (Enter)",
+   "current_location": "src/components/mobile/PostViewerMobile.tsx:247-268 (submitComment), :719 (Enter), :737 (button)",
+   "classification": "pattern",
+   "batch": "B2b-postviewer",
+   "note": "r.ok is checked, but the failure branch does nothing. Add the toast and keep the draft."
+  },
+  {
+   "n": 27,
+   "section": "Mobile app",
+   "control": "otto → reminder Done / Dismiss",
+   "current_location": "src/components/mobile/OttoMobile.tsx:65-83 (dismissReminder, actReminder)",
+   "classification": "pattern",
+   "batch": "B2-mobile",
+   "note": "Optimistic, needs rollback. Rows are removed first and the status is never read. Snapshot upcoming and asking before filtering; on failure, restore both and show the toast. Two call sites. Mirrors OttoPageClient (row 41)."
+  },
+  {
+   "n": 28,
+   "section": "Mobile app",
+   "control": "otto → Connect (follow back)",
+   "current_location": "src/components/mobile/OttoMobile.tsx:85-98 (followBack)",
+   "classification": "pattern",
+   "batch": "B2-mobile",
+   "note": "Restore the follower row on failure. /api/me/follow is rate-limited (429) but NOT terms-gated."
+  },
+  {
+   "n": 29,
+   "section": "Mobile app",
+   "control": "otto → Pass on follower row",
+   "current_location": "src/components/mobile/OttoMobile.tsx:100-104 (passFollower)",
+   "classification": "not-pattern",
+   "batch": "none",
+   "note": "No request at all. It is local-only by design (see the comment in OttoPageClient.tsx: 'Pass is local-only at v1'). It needs a persisted pass list, not the helper."
+  },
+  {
+   "n": 30,
+   "section": "Mobile app",
+   "control": "otto → chattiness segments + 5 checkboxes",
+   "current_location": "src/components/otto/OttoSettings.tsx:103-127 (queuePatch/setKey/applyPreset); rendered by OttoMobile.tsx:325",
+   "classification": "pattern",
+   "batch": "B3-react-routes",
+   "note": "Debounced write, needs rollback. This is the same component as rows 44 and 45; the fix lives in OttoSettings.tsx, which B3 owns. Keep a lastConfirmedRef; on failure, revert the state and show one toast per flush."
+  },
+  {
+   "n": 31,
+   "section": "Mobile app",
+   "control": "Profile → Portfolio logo slot (owner)",
+   "current_location": "src/components/mobile/ProfileMobile.tsx:731-770 (handlePortfolioLogoUpload); editError rendered only at :1516-1531",
+   "classification": "pattern",
+   "batch": "B2-mobile",
+   "note": "The failure IS caught, but it goes to a banner about two screens above the slot. Also call toast(message, error), or replace setEditError in these handlers."
+  },
+  {
+   "n": 32,
+   "section": "Mobile app",
+   "control": "Profile → Resume Upload / Add pill (owner)",
+   "current_location": "src/components/mobile/ProfileMobile.tsx:673-724 (handleResumeUpload), pill label :2848",
+   "classification": "pattern",
+   "batch": "B2-mobile",
+   "note": "Same off-screen editError problem as row 31. Also route the max-3-documents guard (:677-680) through the toast."
+  },
+  {
+   "n": 33,
+   "section": "Mobile app",
+   "control": "Profile (blocked) → Unblock",
+   "current_location": "src/components/mobile/ProfileMobile.tsx:4364-4384 (onUnblock), :4463-4478 (button)",
+   "classification": "pattern",
+   "batch": "B2-mobile",
+   "note": "A failed DELETE /api/me/block just re-enables the button. Add the toast."
+  },
+  {
+   "n": 34,
+   "section": "Mobile app",
+   "control": "Onboarding (mobile) step 4 → Finish (second listing)",
+   "current_location": "src/components/mobile/OnboardingMobile.tsx:845-852",
+   "classification": "duplicate",
+   "batch": "B2-mobile",
+   "note": "Same control and code path as row 22."
+  },
+  {
+   "n": 35,
+   "section": "Other React routes",
+   "control": "Network → Load more (N left)",
+   "current_location": "src/components/network/NetworkPageClient.tsx:277-297 (loadMore, try/finally, no catch), :640-663 (button)",
+   "classification": "pattern",
+   "batch": "B3-react-routes",
+   "note": "res.json() on a 500 HTML page throws an unhandled rejection. Use a vibeRequest GET with failure \"Couldn't load more people.\""
+  },
+  {
+   "n": 36,
+   "section": "Other React routes",
+   "control": "User card → Connect",
+   "current_location": "src/components/network/UserCard.tsx:333-350 (follow), :427-431 (mapping)",
+   "classification": "pattern",
+   "batch": "B3-react-routes",
+   "note": "!ok is ignored. State flips only on success, so a toast is all it needs."
+  },
+  {
+   "n": 37,
+   "section": "Other React routes",
+   "control": "User card → Connect back",
+   "current_location": "src/components/network/UserCard.tsx:423-426 → follow()",
+   "classification": "pattern",
+   "batch": "B3-react-routes",
+   "note": "Same follow() as row 36. No extra call site."
+  },
+  {
+   "n": 38,
+   "section": "Other React routes",
+   "control": "User card → Following / Unfollow",
+   "current_location": "src/components/network/UserCard.tsx:352-369 (unfollow), :419-422",
+   "classification": "pattern",
+   "batch": "B3-react-routes",
+   "note": "Show the toast on failure. Nothing to roll back."
+  },
+  {
+   "n": 39,
+   "section": "Other React routes",
+   "control": "User card → Message",
+   "current_location": "src/components/network/UserCard.tsx:371-387 (message), :415-418",
+   "classification": "pattern",
+   "batch": "B3-react-routes",
+   "note": "POST /api/me/threads is terms-gated, so this fails silently today for un-consented accounts. The toast with the Terms action fixes it."
+  },
+  {
+   "n": 40,
+   "section": "Other React routes",
+   "control": "Otto side panel open → implicit mark-all-read",
+   "current_location": "src/components/network/OttoSidePanel.tsx:91-101 (markAllRead), called :128-130",
+   "classification": "not-pattern",
+   "batch": "none",
+   "note": "Background housekeeping. A failure leaves the badge truthfully unread, so a toast would just be noise. Optionally use vibeRequest({quiet:true}) for logging."
+  },
+  {
+   "n": 41,
+   "section": "Other React routes",
+   "control": "Otto's Room → Coming up Done / Dismiss",
+   "current_location": "src/components/otto/OttoPageClient.tsx:75-93 (dismissReminder, actReminder)",
+   "classification": "pattern",
+   "batch": "B3-react-routes",
+   "note": "Optimistic, needs rollback: snapshot and restore upcoming and asking, then show the toast. Two call sites."
+  },
+  {
+   "n": 42,
+   "section": "Other React routes",
+   "control": "Otto's Room → Connect on follower row",
+   "current_location": "src/components/otto/OttoPageClient.tsx:95-104 (followBack)",
+   "classification": "pattern",
+   "batch": "B3-react-routes",
+   "note": "Optimistic, needs rollback: restore the row on failure."
+  },
+  {
+   "n": 43,
+   "section": "Other React routes",
+   "control": "Otto's Room → Done / Pass on undated reminder",
+   "current_location": "src/components/otto/OttoRequests.tsx:110-122 (onActReminder/onDismissReminder props)",
+   "classification": "pattern",
+   "batch": "B3-react-routes",
+   "note": "The handlers come from OttoPageClient on desktop (row 41) and OttoMobile on mobile (row 27). Fixing those fixes this; OttoRequests.tsx itself needs no edit."
+  },
+  {
+   "n": 44,
+   "section": "Other React routes",
+   "control": "Otto's Room → Chattiness segmented control",
+   "current_location": "src/components/otto/OttoSettings.tsx:122-127, :136-151",
+   "classification": "duplicate",
+   "batch": "B3-react-routes",
+   "note": "Same component and queuePatch as row 30."
+  },
+  {
+   "n": 45,
+   "section": "Other React routes",
+   "control": "Otto's Room → five notification checkboxes",
+   "current_location": "src/components/otto/OttoSettings.tsx:157-173",
+   "classification": "duplicate",
+   "batch": "B3-react-routes",
+   "note": "Same as row 30. Separate issue: no code sends these notifications yet (not built)."
+  },
+  {
+   "n": 46,
+   "section": "Other React routes",
+   "control": "Settings → Sign out",
+   "current_location": "src/components/settings/SettingsClient.tsx:888-902 (onSignOut), :936 (label)",
+   "classification": "pattern",
+   "batch": "B3-react-routes",
+   "note": "Navigates to /auth/login even on a non-2xx response, which can leave a live session. Check r.ok; on failure, show \"Couldn't sign you out. Try again.\" and stay."
+  },
+  {
+   "n": 47,
+   "section": "Other React routes",
+   "control": "/posts/[id] ⋯ → Copy link",
+   "current_location": "src/components/mobile/PostViewerMobile.tsx:~502",
+   "classification": "duplicate",
+   "batch": "B2b-postviewer",
+   "note": "/posts/[id] renders PostViewerMobile (PostPageClient.tsx:17). Same control as row 24."
+  },
+  {
+   "n": 48,
+   "section": "Other React routes",
+   "control": "/posts/[id] ⋯ → Report post",
+   "current_location": "src/components/mobile/PostViewerMobile.tsx:~515",
+   "classification": "duplicate",
+   "batch": "B2b-postviewer",
+   "note": "Same control as row 25."
+  },
+  {
+   "n": 49,
+   "section": "Other React routes",
+   "control": "/posts/[id] → Repost",
+   "current_location": "src/components/mobile/PostViewerMobile.tsx:644",
+   "classification": "duplicate",
+   "batch": "B2b-postviewer",
+   "note": "Same control as row 23."
+  },
+  {
+   "n": 50,
+   "section": "Other React routes",
+   "control": "/posts/[id] → comment field + Post",
+   "current_location": "src/components/mobile/PostViewerMobile.tsx:247-268, :737",
+   "classification": "duplicate",
+   "batch": "B2b-postviewer",
+   "note": "Same control as row 26."
+  },
+  {
+   "n": 51,
+   "section": "Other React routes",
+   "control": "/orgs/[handle] → Request to join",
+   "current_location": "src/app/orgs/[handle]/join-button.tsx:94-116 (join), err render ~:134-135",
+   "classification": "not-pattern",
+   "batch": "none",
+   "note": "The response IS checked and errors render via setErr. The real gap is on the server: /api/orgs/[slug]/join creates no notification for org staff."
+  },
+  {
+   "n": 52,
+   "section": "Static desktop pages",
+   "control": "Onboarding step 4 → Finish (static listing)",
+   "current_location": "public/html/onboarding.html:514, :915-998",
+   "classification": "duplicate",
+   "batch": "B6-static-onboarding-shared",
+   "note": "Same control and code as row 21, including the problem of navigating inside the iframe."
+  },
+  {
+   "n": 53,
+   "section": "Static desktop pages",
+   "control": "Onboarding step 4 → handle claim (part of Finish)",
+   "current_location": "public/html/onboarding.html:977-986",
+   "classification": "pattern",
+   "batch": "B6-static-onboarding-shared",
+   "note": "Empty catch, and the status is never read. Check the result; on 409 or 429, show the server's line (for example 'That handle is taken') and stop before the warp so the student can pick another."
+  },
+  {
+   "n": 54,
+   "section": "Static desktop pages",
+   "control": "Profile nav → unread dot",
+   "current_location": "public/html/profile.html:3172 (hardcoded has-unread), CSS :2067; public/html/_miniMessenger.js:311-317 (paintBadge)",
+   "classification": "not-pattern",
+   "batch": "none",
+   "note": "The unread dot is hardcoded. Remove the class from the markup and let paintBadge set it."
+  },
+  {
+   "n": 55,
+   "section": "Static desktop pages",
+   "control": "Profile share modal → search connections",
+   "current_location": "public/html/profile.html:9096-9116 (loadRecipients), empty state :9066-9070",
+   "classification": "pattern",
+   "batch": "B4-profile-html",
+   "note": "Read-failure variant, quiet and inline. A network error or 500 renders 'No connections to send to yet.' Paint \"Couldn't load your connections.\" with a Retry link instead."
+  },
+  {
+   "n": 56,
+   "section": "Static desktop pages",
+   "control": "Profile cover → Upload photo",
+   "current_location": "public/html/profile.html:4117-4151 (toast :4149 before the save at :4150)",
+   "classification": "not-pattern",
+   "batch": "none",
+   "note": "The success toast fires before the save. The debounced sync does report failure later (profile.html:7847-7849, 'Could not save to server'), which contradicts it. Fix: show success only on the sync result."
+  },
+  {
+   "n": 57,
+   "section": "Static desktop pages",
+   "control": "Choose-a-cover modal → drag-drop image + Apply",
+   "current_location": "public/html/profile.html:4179-4193 (createObjectURL :4189), save allowlist :7407",
+   "classification": "not-pattern",
+   "batch": "none",
+   "note": "The blob: URL is never saved. Convert the file with _fileToDataURL, as handleCoverUpload does."
+  },
+  {
+   "n": 58,
+   "section": "Static desktop pages",
+   "control": "Profile avatar → Upload a photo / preview thumbnails",
+   "current_location": "public/html/profile.html:4023-4059 (toast :4058 before the save at :4059)",
+   "classification": "not-pattern",
+   "batch": "none",
+   "note": "Toast fires before the save. Same defect as row 56."
+  },
+  {
+   "n": 59,
+   "section": "Static desktop pages",
+   "control": "Connections modal → tabs, search, Load more",
+   "current_location": "public/html/profile.html:9391-9408 (load), :9325-9333 (empty), :9232-9234 (tabs)",
+   "classification": "pattern",
+   "batch": "B4-profile-html",
+   "note": "Read-failure variant. The catch sets activeUsers to [] and paints 'No one here yet.' Paint an error state with Retry instead."
+  },
+  {
+   "n": 60,
+   "section": "Static desktop pages",
+   "control": "Connections modal → Connect / Connect back / Following / Message pill",
+   "current_location": "public/html/profile.html:9349-9389 (handleAction)",
+   "classification": "pattern",
+   "batch": "B4-profile-html",
+   "note": "Two requests: POST /api/me/threads for Message, and POST or DELETE /api/me/follow. The row repaints only on success, so a toast on failure is enough. The threads POST is terms-gated."
+  },
+  {
+   "n": 61,
+   "section": "Static desktop pages",
+   "control": "Visited profile header → Connect",
+   "current_location": "public/html/profile.html:6024-6086 (handleVibConnect), fake timer :6077-6085",
+   "classification": "not-pattern",
+   "batch": "none",
+   "note": "The real-user path already rolls back and toasts (:6040-6071). The remaining defect is the fake-accept timer in the local-only fallback. Delete it."
+  },
+  {
+   "n": 62,
+   "section": "Static desktop pages",
+   "control": "Visited profile header → Follow instead pill",
+   "current_location": "public/html/profile.html:6088-6118 (handleSoftFollow), visibility :5885-5890, :5906-5911",
+   "classification": "pattern",
+   "batch": "B4-profile-html",
+   "note": "Optimistic, needs rollback. The label flips and the toast fires before the request, and the status is never read. Switch to confirm-then-paint and toast after the result. Separately, the pill only shows in the pending and following states, so a click unfollows while the main button still reads Pending."
+  },
+  {
+   "n": 63,
+   "section": "Static desktop pages",
+   "control": "Kebab → Report → Submit report",
+   "current_location": "public/html/_safetyActions.js:290-319 (fetch chain has no .catch)",
+   "classification": "pattern",
+   "batch": "B6-static-onboarding-shared",
+   "note": "On a network drop or a non-JSON response, the button stays on 'Sending…' forever. Switch to vibeRequest; on failure, restore 'Submit report' and re-enable it."
+  },
+  {
+   "n": 64,
+   "section": "Static desktop pages",
+   "control": "Profile nav → Edit pencil (exit edit mode)",
+   "current_location": "public/html/profile.html:3944-3968 (unconditional toast :3965)",
+   "classification": "not-pattern",
+   "batch": "none",
+   "note": "Toast with no save behind it. Drop it, or show the pending sync's result."
+  },
+  {
+   "n": 65,
+   "section": "Static desktop pages",
+   "control": "Floating edit toolbar → B / I / U / Clear",
+   "current_location": "public/html/profile.html:3113-3121, execCmd :3995, textContent read at saveProfileToStorage :7354-7362",
+   "classification": "not-pattern",
+   "batch": "none",
+   "note": "No request is involved. Formatting is thrown away because only plain text is stored. Remove the buttons or store rich text."
+  },
+  {
+   "n": 66,
+   "section": "Static desktop pages",
+   "control": "Profile post card → × Delete post",
+   "current_location": "public/html/profile.html:8265 (button), :8309-8325 (deleteProfilePost)",
+   "classification": "not-pattern",
+   "batch": "none",
+   "note": "The delete never calls the API. Reuse the working DELETE path in _postViewer.js:712."
+  },
+  {
+   "n": 67,
+   "section": "Static desktop pages",
+   "control": "Profile post card → Pin / Pinned / Unpin",
+   "current_location": "public/html/profile.html:8264, pinFromProfile :5395-5462, _syncPinToServer :5469-5477",
+   "classification": "pattern",
+   "batch": "B4-profile-html",
+   "note": "Optimistic, needs rollback. Snapshot the previous profilePinnedId; on failure, restore it by calling pinFromProfile(prev) without a btn (which skips the re-sync) and show the toast. Remove the comment saying failures shouldn't undo the pin."
+  },
+  {
+   "n": 68,
+   "section": "Static desktop pages",
+   "control": "Share picker opened from /messages → Send / Send to N",
+   "current_location": "public/html/_sharePicker.js:270-296",
+   "classification": "pattern",
+   "batch": "B6-static-onboarding-shared",
+   "note": "B0's default window.showToast alone makes the summary toast appear on /messages. B6 switches the send loop to vibeRequest({quiet:true}) and shows the Terms toast when any failure is terms_required."
+  },
+  {
+   "n": 69,
+   "section": "Static desktop pages",
+   "control": "Messages → Message requests banner",
+   "current_location": "public/html/messages.html:986-990 (markup), :1925-1934 (onclick opens requests[0])",
+   "classification": "not-pattern",
+   "batch": "none",
+   "note": "The banner always opens the first request. It needs a requests list or filter."
+  },
+  {
+   "n": 70,
+   "section": "Static desktop pages",
+   "control": "Messages request bar → Accept / Decline",
+   "current_location": "public/html/messages.html:1036 (bar), accReq/decReq :1477-1478, __dmAccept :2286-2295, __dmDecline :2297-2308",
+   "classification": "pattern",
+   "batch": "B5-messages-html",
+   "note": "The bar hides, and on Decline the thread is deleted locally, before the fetch, with no status check. Switch to confirm-then-paint: disable the buttons and apply the change only on success. Two call sites. Another agent is editing this file."
+  },
+  {
+   "n": 71,
+   "section": "Static desktop pages",
+   "control": "Message bubble → emoji reactions, Reply, Delete",
+   "current_location": "public/html/messages.html:1665-1703 (reaction, silent refetch :1700-1702), __dmStartReply :1705+, __dmDeleteMessage :2789-2815",
+   "classification": "pattern",
+   "batch": "B5-messages-html",
+   "note": "Only the reactions are silent: they are optimistic and the refetch reverts them without a word. Add the toast in the catch. Reply is local-only. Delete already alerts and refetches."
+  },
+  {
+   "n": 72,
+   "section": "Static desktop pages",
+   "control": "Chat info panel (groups) → per-member Mute",
+   "current_location": "public/html/messages.html:2571 (button), :2669 (guarded toast)",
+   "classification": "pattern",
+   "batch": "B0-helpers",
+   "note": "Fixed without touching messages.html: B0's default window.showToast makes the guarded confirmation fire. Failures already alert (:2672)."
+  },
+  {
+   "n": 73,
+   "section": "Static desktop pages",
+   "control": "Chat info panel → + Add → Add to group",
+   "current_location": "public/html/messages.html:2557 (+ Add), __dmPanelDoAdd :2961-2994",
+   "classification": "pattern",
+   "batch": "B5-messages-html",
+   "note": "Count every non-ok response and show one summary toast ('Added N of M, K couldn't be added'), folding in the existing not-connected alert. The members route is terms-gated, so a terms failure gets the Terms toast."
+  },
+  {
+   "n": 74,
+   "section": "Static desktop pages",
+   "control": "Deep link /messages?to=<handle>",
+   "current_location": "public/html/messages.html:3048-3060 (__dmEnsureFromHandle), :3099-3113 (no else branch), compare :3116-3125",
+   "classification": "pattern",
+   "batch": "B5-messages-html",
+   "note": "Use vibeRequest (quiet) and return the failure. Add an else branch that paints the same \"Couldn't open that conversation\" empty state plus the mapped toast (with the Terms action). Update the compose caller at :2448-2449 so it doesn't show both an alert and a toast."
+  }
+ ],
+ "batches": [
+  {
+   "name": "B0-helpers",
+   "files": [
+    "src/lib/feedback/failure-copy.ts (new)",
+    "src/lib/feedback/toast.ts (new)",
+    "src/lib/feedback/request.ts (new)",
+    "src/components/feedback/ToastHost.tsx (new)",
+    "src/app/layout.tsx",
+    "public/html/_persistence.js"
+   ],
+   "row_numbers": [
+    72
+   ],
+   "call_sites": 0,
+   "risk": "Blocks every other batch. _persistence.js runs in <head> before <body> exists, so create the toast element lazily. Assign the default window.showToast by plain assignment so profile.html's later function declaration can override it. Keep request.ts and toast.ts SSR-safe (no window access at import time). Host z-index 12000; mobile offset clears the 9988 tab bar."
+  },
+  {
+   "name": "B1-campus-home",
+   "files": [
+    "src/app/campus/campus-home.tsx"
+   ],
+   "row_numbers": [
+    5,
+    6,
+    7,
+    8,
+    9,
+    10,
+    11,
+    12,
+    13,
+    14,
+    15
+   ],
+   "call_sites": 9,
+   "risk": "The file is 12.6k lines with many similarly named submit/send functions, so it is easy to edit the wrong one. The reorder rollback must reuse the ids captured before the swap. Another agent is editing the messages route behind Send right now."
+  },
+  {
+   "name": "B2-mobile",
+   "files": [
+    "src/components/mobile/OttoMobile.tsx",
+    "src/components/mobile/ProfileMobile.tsx",
+    "src/components/mobile/OnboardingMobile.tsx"
+   ],
+   "row_numbers": [
+    22,
+    27,
+    28,
+    31,
+    32,
+    33,
+    34
+   ],
+   "call_sites": 8,
+   "risk": "OnboardingMobile's Finish is the first-run path: move setWarping after success and drop the /auth/login fallback without stranding a genuinely signed-out user (401 should go to Sign in). OttoMobile rollbacks must reinsert rows at their original index."
+  },
+  {
+   "name": "B2b-postviewer",
+   "files": [
+    "src/components/mobile/PostViewerMobile.tsx"
+   ],
+   "row_numbers": [
+    23,
+    24,
+    25,
+    26,
+    47,
+    48,
+    49,
+    50
+   ],
+   "call_sites": 4,
+   "risk": "Another agent is editing this file right now (git shows it modified; lines moved +3 during this read). Start only after that edit lands, and re-grep the line numbers first."
+  },
+  {
+   "name": "B3-react-routes",
+   "files": [
+    "src/components/LeftNav.tsx",
+    "src/components/network/NetworkPageClient.tsx",
+    "src/components/network/UserCard.tsx",
+    "src/components/otto/OttoPageClient.tsx",
+    "src/components/otto/OttoSettings.tsx",
+    "src/components/settings/SettingsClient.tsx"
+   ],
+   "row_numbers": [
+    1,
+    2,
+    3,
+    4,
+    30,
+    35,
+    36,
+    37,
+    38,
+    39,
+    41,
+    42,
+    43,
+    44,
+    45,
+    46
+   ],
+   "call_sites": 11,
+   "risk": "OttoSettings is shared by desktop and mobile, and one debounced PATCH merges several keys, so rollback must restore the whole last-confirmed object. In the Google export, call window.open before any await. Changing Sign-out to stay put on failure changes current behaviour."
+  },
+  {
+   "name": "B4-profile-html",
+   "files": [
+    "public/html/profile.html"
+   ],
+   "row_numbers": [
+    55,
+    59,
+    60,
+    62,
+    67
+   ],
+   "call_sites": 7,
+   "risk": "Pin rollback: pinFromProfile moves DOM and writes localStorage, so restore by calling it without a btn to avoid a re-sync loop. handleSoftFollow shares state with the main Connect button. Leave the not-pattern rows in this file (54, 56-58, 61, 64-66) alone."
+  },
+  {
+   "name": "B5-messages-html",
+   "files": [
+    "public/html/messages.html"
+   ],
+   "row_numbers": [
+    70,
+    71,
+    73,
+    74
+   ],
+   "call_sites": 5,
+   "risk": "Another agent is editing this file right now; start after it lands. Switching Decline to confirm-then-paint changes when __realDM.T and active are cleared. The deep-link change also touches the compose caller at :2448-2449, so avoid showing both an alert and a toast."
+  },
+  {
+   "name": "B6-static-onboarding-shared",
+   "files": [
+    "public/html/onboarding.html",
+    "public/html/_safetyActions.js",
+    "public/html/_sharePicker.js"
+   ],
+   "row_numbers": [
+    19,
+    21,
+    52,
+    53,
+    63,
+    68
+   ],
+   "call_sites": 5,
+   "risk": "Highest risk of all batches: the desktop onboarding Finish. Remove the /auth/login fall-through (:997) and route every navigation (terms, success warp, sign-in) through window.__vibeTopNav, because the page is iframed full-viewport. Test replay mode, the terms path, and a 409 on the handle claim. _safetyActions.js and _sharePicker.js load on both profile.html and messages.html."
+  }
+ ]
+}

@@ -1,0 +1,139 @@
+/**
+ * Tests for `gate.ts`: the 404/403/500 answer of the officer-only club routes
+ * and the "only new link labels" word-filter rule (security wave 2, A5b).
+ *
+ * Run with:
+ *   node --test --experimental-strip-types src/lib/club-routes/gate.test.ts
+ *
+ * WHY THE RESOLVE HOOK: gate.ts imports "../moderation/text-filter"
+ * extensionless, which is what Next and tsc expect; Node's type stripping adds
+ * no extension. Same pattern as src/lib/moderation/text-filter.test.ts.
+ */
+
+import assert from "node:assert/strict";
+import * as nodeModule from "node:module";
+import test from "node:test";
+
+type NextResolve = (specifier: string, context?: unknown) => unknown;
+const { registerHooks } = nodeModule as unknown as {
+  registerHooks?: (hooks: {
+    resolve: (specifier: string, context: unknown, nextResolve: NextResolve) => unknown;
+  }) => void;
+};
+if (typeof registerHooks !== "function") {
+  throw new Error("gate.test.ts needs Node >= 22.15 (module.registerHooks)");
+}
+registerHooks({
+  resolve(specifier, context, nextResolve) {
+    try {
+      return nextResolve(specifier, context);
+    } catch (err) {
+      if (specifier.startsWith(".") && !/\.[cm]?[jt]sx?$/.test(specifier)) {
+        return nextResolve(`${specifier}.ts`, context);
+      }
+      throw err;
+    }
+  },
+});
+
+const { clubRouteGate, hasBlockedNewLinkLabel } = await import("./gate");
+const { filterTerms } = await import("../moderation/text-filter-list");
+
+const OFFICERS = ["owner", "admin"] as const;
+const VISIBLE = { hidden_at: null };
+const HIDDEN = { hidden_at: "2026-09-01T00:00:00Z" };
+
+test("a missing club is 404 and a failed club read is 500", () => {
+  assert.deepEqual(clubRouteGate({ org: null, role: null, allowed: OFFICERS }), {
+    ok: false, status: 404, reason: "not_found",
+  });
+  assert.equal(
+    clubRouteGate({ org: null, orgReadFailed: true, role: null, allowed: OFFICERS }).ok,
+    false,
+  );
+  assert.equal(
+    (clubRouteGate({ org: null, orgReadFailed: true, role: null, allowed: OFFICERS }) as { status: number }).status,
+    500,
+  );
+});
+
+test("a hidden club is 404 to a stranger, exactly like a made-up handle", () => {
+  const stranger = clubRouteGate({ org: HIDDEN, role: null, allowed: OFFICERS });
+  const madeUp = clubRouteGate({ org: null, role: null, allowed: OFFICERS });
+  assert.deepEqual(stranger, madeUp);
+});
+
+test("a visible club is 403 to a stranger (the club page is public anyway)", () => {
+  assert.deepEqual(clubRouteGate({ org: VISIBLE, role: null, allowed: OFFICERS }), {
+    ok: false, status: 403, reason: "not_allowed",
+  });
+});
+
+test("members who aren't officers get 403 on hidden and visible clubs alike", () => {
+  for (const org of [VISIBLE, HIDDEN]) {
+    for (const role of ["member", "mod"] as const) {
+      assert.equal(
+        (clubRouteGate({ org, role, allowed: OFFICERS }) as { status: number }).status,
+        403,
+        `${role} on ${org.hidden_at ? "hidden" : "visible"}`,
+      );
+    }
+  }
+});
+
+test("owners and admins pass, on hidden clubs too (the route decides what hidden blocks)", () => {
+  for (const org of [VISIBLE, HIDDEN]) {
+    for (const role of OFFICERS) {
+      assert.deepEqual(clubRouteGate({ org, role, allowed: OFFICERS }), { ok: true });
+    }
+  }
+});
+
+test("a membership read that failed is 404 on a hidden club and 500 otherwise", () => {
+  assert.equal(
+    (clubRouteGate({ org: HIDDEN, role: null, roleReadFailed: true, allowed: OFFICERS }) as { status: number }).status,
+    404,
+  );
+  assert.equal(
+    (clubRouteGate({ org: VISIBLE, role: null, roleReadFailed: true, allowed: OFFICERS }) as { status: number }).status,
+    500,
+  );
+});
+
+test("owner-by-owner_id passes without a member row, even when that read failed", () => {
+  assert.deepEqual(
+    clubRouteGate({ org: HIDDEN, role: null, ownerById: true, allowed: [] }),
+    { ok: true },
+  );
+  assert.deepEqual(
+    clubRouteGate({ org: VISIBLE, role: null, roleReadFailed: true, ownerById: true, allowed: [] }),
+    { ok: true },
+  );
+  // An owner-only route (allowed: []) refuses an admin with a plain 403.
+  assert.equal(
+    (clubRouteGate({ org: HIDDEN, role: "admin", allowed: [] }) as { status: number }).status,
+    403,
+  );
+});
+
+test("link labels: clean labels pass, a new blocked label is refused", () => {
+  const term = filterTerms()[0]!.term;
+  assert.equal(hasBlockedNewLinkLabel([{ label: "Instagram", url: "https://x.test/a" }], []), false);
+  assert.equal(hasBlockedNewLinkLabel([], null), false);
+  assert.equal(
+    hasBlockedNewLinkLabel(
+      [{ label: "Site", url: "https://x.test" }, { label: `the ${term}`, url: "https://x.test/b" }],
+      [{ label: "Site", url: "https://x.test" }],
+    ),
+    true,
+  );
+});
+
+test("link labels: a label already stored passes, so old data never blocks a save", () => {
+  const term = filterTerms()[0]!.term;
+  const stored = [{ label: `the ${term}`, url: "https://x.test/b" }];
+  assert.equal(hasBlockedNewLinkLabel([{ label: `the ${term}`, url: "https://x.test/b" }], stored), false);
+  // Junk in the stored column is "nothing stored", not a crash.
+  assert.equal(hasBlockedNewLinkLabel([{ label: `the ${term}`, url: "https://x" }], "oops"), true);
+  assert.equal(hasBlockedNewLinkLabel([{ label: `the ${term}`, url: "https://x" }], [null, 3, { label: 7 }]), true);
+});

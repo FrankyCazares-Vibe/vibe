@@ -1,0 +1,177 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<title>Club chat, phone, night</title>
+<script src="./support.js"></script>
+</head>
+<body>
+<x-dc>
+<helmet>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Fraunces:ital,opsz,wght,SOFT@0,9..144,300..900,0..100;1,9..144,300..900,0..100&family=DM+Sans:wght@400;500;600;700&display=swap">
+<style>body{margin:0;font-family:"DM Sans",system-ui,sans-serif;background:#0C0B0B;color:#F6F1EA}a{color:#FF8A66}a:hover{color:#FF5C35}input::placeholder{color:#9C958C}</style>
+</helmet>
+<div style="width: 390px; height: 844px; box-sizing: border-box; position: relative; isolation: isolate; display: flex; flex-direction: column; overflow: hidden; background: #0C0B0B; color: #F6F1EA">
+  <div aria-hidden="true" style="position: absolute; z-index: -1; left: 170px; top: 78px; width: 280px; height: 130px; pointer-events: none; background: radial-gradient(closest-side, rgba(255,92,53,0.42), rgba(255,92,53,0.12) 55%, rgba(255,92,53,0) 100%)"></div>
+
+  <header style="height: 54px; flex-shrink: 0; box-sizing: border-box; padding: 0 12px 0 4px; display: flex; align-items: center; gap: 4px; background: linear-gradient(90deg, #151012 0%, #1E1416 60%, #241618 100%)">
+    <a href="ChatA_Inbox.dc.html" aria-label="Back to Chat" style="width: 44px; height: 44px; flex-shrink: 0; border-radius: 999px; display: flex; align-items: center; justify-content: center; color: #F6F1EA"><svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M15 5l-7 7 7 7"/></svg></a>
+    <button type="button" aria-label="Salsa Club, switch club" style="height: 44px; min-width: 0; padding: 0; border: none; background: transparent; color: #F6F1EA; font-family: inherit; text-align: left; display: flex; align-items: center; gap: 10px; cursor: pointer">
+      <span aria-hidden="true" style="width: 38px; height: 38px; flex-shrink: 0; border-radius: 999px; background: linear-gradient(145deg, #C23A72, #962858); box-shadow: inset 0 0 0 1px rgba(255,255,255,0.16); display: flex; align-items: center; justify-content: center; font-family: Fraunces, Georgia, serif; font-weight: 800; font-size: 15px; color: #FAF7F2">SC</span>
+      <span style="display: flex; flex-direction: column; gap: 3px; min-width: 0">
+        <span style="display: flex; align-items: center; gap: 4px; font-family: Fraunces, Georgia, serif; font-weight: 800; font-size: 17.5px; line-height: 1.1; letter-spacing: -0.3px">Salsa Club<svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="#9C958C" stroke-width="2.6" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M6 9l6 6 6-6"/></svg></span>
+        <span style="align-self: flex-start; height: 19px; box-sizing: border-box; padding: 0 7px 0 5px; border-radius: 999px; border: 1px solid rgba(255,255,255,0.10); background: rgba(255,255,255,0.06); color: #CFC8BE; font-size: 11px; font-weight: 700; display: inline-flex; align-items: center; gap: 4px; white-space: nowrap"><svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M7.5 15.5V6.5a1.5 1.5 0 0 1 1.5-1.5h6a1.5 1.5 0 0 1 1.5 1.5v9"/><path d="M3 16h18"/><path d="M7.5 12h9"/></svg>Your hat: Treasurer</span>
+      </span>
+    </button>
+    <button type="button" aria-label="People in Salsa Club, 48 members" style="margin-left: auto; height: 44px; flex-shrink: 0; padding: 0 2px; border: none; background: transparent; color: #CFC8BE; font-family: inherit; display: flex; align-items: center; gap: 6px; cursor: pointer">
+      <span aria-hidden="true" style="display: inline-flex">
+        <span style="width: 24px; height: 24px; border-radius: 999px; background: #5A3A2E; box-shadow: 0 0 0 2px #221517; display: block"></span>
+        <span style="width: 24px; height: 24px; margin-left: -7px; border-radius: 999px; background: #2E4A5A; box-shadow: 0 0 0 2px #221517; display: block"></span>
+        <span style="width: 24px; height: 24px; margin-left: -7px; border-radius: 999px; background: #4A3A5E; box-shadow: 0 0 0 2px #221517; display: block"></span>
+      </span>
+      <span style="font-size: 12.5px; font-weight: 700">48</span>
+    </button>
+  </header>
+  <div aria-hidden="true" style="height: 3px; flex-shrink: 0; background: linear-gradient(90deg, #C23A72 0%, rgba(194,58,114,0.55) 55%, rgba(194,58,114,0) 100%)"></div>
+
+  <section aria-label="Up next" style="flex-shrink: 0; box-sizing: border-box; padding: 6px 16px 4px; display: flex; align-items: center; gap: 8px">
+    <h2 style="margin: 0; width: 44px; flex-shrink: 0; font-family: Fraunces, Georgia, serif; font-style: italic; font-weight: 600; font-size: 15px; line-height: 1.05; color: #CFC8BE"><span style="display: block">Up</span><span style="display: block">next</span></h2>
+    <div style="flex-grow: 1; min-width: 0; display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 8px">
+      <button type="button" aria-label="Open Practice, Tuesday 7 PM, you're going" style="height: 48px; min-width: 0; box-sizing: border-box; padding: 4px 10px; border-radius: 14px; border: 1px solid rgba(255,255,255,0.08); background: rgba(22,21,21,0.92); color: #F6F1EA; font-family: inherit; text-align: left; display: flex; flex-direction: column; justify-content: center; gap: 2px; cursor: pointer">
+        <span style="max-width: 100%; font-family: Fraunces, Georgia, serif; font-weight: 700; font-size: 13.5px; line-height: 1.2; white-space: nowrap; overflow: hidden; text-overflow: ellipsis">Open Practice</span>
+        <span style="width: 100%; display: flex; align-items: center; gap: 6px; font-size: 11.5px; font-weight: 600; color: #9C958C; white-space: nowrap">Tue 7 PM<span style="margin-left: auto; height: 18px; box-sizing: border-box; padding: 0 7px 0 5px; border-radius: 999px; background: rgba(255,92,53,0.16); color: #FF8A66; font-size: 11px; font-weight: 700; display: inline-flex; align-items: center; gap: 3px"><svg width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3.4" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M5 12.5l4.5 4.5L19 7.5"/></svg>Going</span></span>
+      </button>
+      <button type="button" aria-label="Mass Ave Social, Saturday 8 PM, you said maybe" style="height: 48px; min-width: 0; box-sizing: border-box; padding: 4px 10px; border-radius: 14px; border: 1px solid rgba(255,255,255,0.08); background: rgba(22,21,21,0.92); color: #F6F1EA; font-family: inherit; text-align: left; display: flex; flex-direction: column; justify-content: center; gap: 2px; cursor: pointer">
+        <span style="max-width: 100%; font-family: Fraunces, Georgia, serif; font-weight: 700; font-size: 13.5px; line-height: 1.2; white-space: nowrap; overflow: hidden; text-overflow: ellipsis">Mass Ave Social</span>
+        <span style="width: 100%; display: flex; align-items: center; gap: 6px; font-size: 11.5px; font-weight: 600; color: #9C958C; white-space: nowrap">Sat 8 PM<span style="margin-left: auto; height: 18px; box-sizing: border-box; padding: 0 7px; border-radius: 999px; background: rgba(255,255,255,0.08); color: #CFC8BE; font-size: 11px; font-weight: 700; display: inline-flex; align-items: center">Maybe</span></span>
+      </button>
+    </div>
+  </section>
+
+  <div role="tablist" aria-label="Rooms" style="flex-shrink: 0; height: 44px; box-sizing: border-box; padding: 0 16px; display: flex; align-items: center; gap: 6px">
+    <button type="button" role="tab" aria-selected="true" style="height: 44px; padding: 0; border: none; background: transparent; font-family: inherit; cursor: pointer; display: flex; align-items: center"><span style="height: 32px; box-sizing: border-box; padding: 0 12px; border-radius: 999px; background: #F6F1EA; color: #0C0B0B; font-size: 12.5px; font-weight: 700; display: inline-flex; align-items: center">Lounge</span></button>
+    <button type="button" role="tab" aria-selected="false" style="height: 44px; padding: 0; border: none; background: transparent; font-family: inherit; cursor: pointer; display: flex; align-items: center"><span style="height: 32px; box-sizing: border-box; padding: 0 12px; border-radius: 999px; border: 1px solid rgba(255,255,255,0.10); background: rgba(22,21,21,0.86); color: #CFC8BE; font-size: 12.5px; font-weight: 700; display: inline-flex; align-items: center">Board</span></button>
+    <button type="button" role="tab" aria-selected="false" aria-label="Officers, private" style="height: 44px; padding: 0; border: none; background: transparent; font-family: inherit; cursor: pointer; display: flex; align-items: center"><span style="height: 32px; box-sizing: border-box; padding: 0 12px 0 10px; border-radius: 999px; border: 1px solid rgba(255,255,255,0.10); background: rgba(22,21,21,0.86); color: #CFC8BE; font-size: 12.5px; font-weight: 700; display: inline-flex; align-items: center; gap: 5px"><svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect x="5" y="11" width="14" height="10" rx="2.5"/><path d="M8 11V8a4 4 0 0 1 8 0v3"/></svg>Officers</span></button>
+    <button type="button" role="tab" aria-selected="false" aria-label="Formal, live now" style="height: 44px; padding: 0; border: none; background: transparent; font-family: inherit; cursor: pointer; display: flex; align-items: center"><span style="height: 32px; box-sizing: border-box; padding: 0 12px 0 10px; border-radius: 999px; border: 1px solid rgba(255,92,53,0.60); background: rgba(255,92,53,0.18); color: #FF8A66; font-size: 12.5px; font-weight: 700; display: inline-flex; align-items: center; gap: 6px; white-space: nowrap; box-shadow: 0 0 18px rgba(255,92,53,0.45)"><span aria-hidden="true" style="width: 7px; height: 7px; border-radius: 999px; background: #FF5C35; box-shadow: 0 0 0 3px rgba(255,92,53,0.25), 0 0 8px #FF5C35"></span>Formal · live</span></button>
+  </div>
+
+  <article aria-label="Newest Board post" style="flex-shrink: 0; margin: 0 12px 2px; box-sizing: border-box; padding: 10px 12px 0; border-radius: 16px; border: 1px solid rgba(255,255,255,0.09); background: #161515; box-shadow: inset 0 1px 0 rgba(255,255,255,0.04), 0 10px 24px rgba(0,0,0,0.5)">
+    <div style="display: flex; align-items: center; gap: 6px; font-size: 11.5px; font-weight: 600; color: #9C958C; white-space: nowrap">
+      <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="#CFC8BE" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M4 10v4a1 1 0 0 0 1 1h2l6 4V5L7 9H5a1 1 0 0 0-1 1z"/><path d="M17 9a4 4 0 0 1 0 6"/></svg>
+      <span style="font-weight: 700; color: #CFC8BE">Board</span><span aria-hidden="true">·</span><span style="color: #CFC8BE">Maya R.</span><span>President</span>
+      <span style="margin-left: auto; display: inline-flex; align-items: center; gap: 6px"><span aria-label="Unread" style="width: 7px; height: 7px; border-radius: 999px; background: #FF5C35; display: block"></span>6:12 PM</span>
+    </div>
+    <h3 style="margin: 5px 0 0; font-family: Fraunces, Georgia, serif; font-weight: 700; font-size: 17px; line-height: 1.25; letter-spacing: -0.2px; color: #F6F1EA">Formal tonight: doors at 7:30</h3>
+    <p style="margin: 2px 0 0; font-size: 13px; line-height: 1.35; color: #CFC8BE; white-space: nowrap; overflow: hidden; text-overflow: ellipsis">Campus Center 450. Rides leave Riverwalk at 7:10.</p>
+    <button type="button" aria-expanded="false" aria-label="Show 3 replies. Replies don't notify anyone." style="width: 100%; height: 44px; margin-top: 2px; padding: 0; border: none; border-top: 1px solid rgba(255,255,255,0.07); background: transparent; color: #F6F1EA; font-family: inherit; display: flex; align-items: center; gap: 8px; cursor: pointer">
+      <span aria-hidden="true" style="display: inline-flex">
+        <span style="width: 18px; height: 18px; border-radius: 999px; background: #4A3A5E; box-shadow: 0 0 0 2px #161515; display: block"></span>
+        <span style="width: 18px; height: 18px; margin-left: -6px; border-radius: 999px; background: #3E4A2E; box-shadow: 0 0 0 2px #161515; display: block"></span>
+      </span>
+      <span style="font-size: 12.5px; font-weight: 700">3 replies</span>
+      <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="#CFC8BE" stroke-width="2.6" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M6 9l6 6 6-6"/></svg>
+      <span style="margin-left: auto; display: inline-flex; align-items: center; gap: 5px; font-size: 11.5px; font-weight: 600; color: #9C958C"><svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M8.7 3.9A6 6 0 0 1 18 9c0 4 1 6 2 7H9"/><path d="M6.3 6.6A6 6 0 0 0 6 9c0 4-1 6-2 7h1"/><path d="M10.3 20a2 2 0 0 0 3.4 0"/><path d="M3 3l18 18"/></svg>Replies stay quiet</span>
+    </button>
+  </article>
+
+  <section aria-label="Lounge messages" style="flex-grow: 1; min-height: 0; position: relative; overflow: hidden; box-sizing: border-box; padding: 0 12px 6px; display: flex; flex-direction: column; justify-content: flex-end; gap: 6px">
+    <div aria-hidden="true" style="position: absolute; z-index: 2; top: 0; left: 0; right: 0; height: 14px; pointer-events: none; background: linear-gradient(180deg, #0C0B0B 0%, rgba(12,11,11,0) 100%)"></div>
+
+    <div style="flex-shrink: 0; display: flex; align-items: flex-end; gap: 8px">
+      <div aria-hidden="true" style="width: 28px; height: 28px; flex-shrink: 0; border-radius: 999px; background: #2E4A5A; display: flex; align-items: center; justify-content: center; font-size: 10px; font-weight: 700; color: #CFE6F2">DO</div>
+      <div role="group" aria-label="Poll from Devin O.: Theme for fall formal? 12 voted" style="width: 292px; box-sizing: border-box; padding: 10px 12px 4px; border-radius: 18px 18px 18px 6px; border: 1px solid rgba(255,255,255,0.08); background: #161515">
+        <div style="display: flex; align-items: center; gap: 6px; font-size: 11.5px; font-weight: 600; color: #9C958C; white-space: nowrap"><span style="font-weight: 700; color: #CFC8BE">Devin O.</span><span>Social chair</span><span style="margin-left: auto; display: inline-flex; align-items: center; gap: 4px"><svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.6" stroke-linecap="round" aria-hidden="true"><path d="M4 6h10M4 12h16M4 18h7"/></svg>Poll · 12 voted</span></div>
+        <div style="margin-top: 4px; font-size: 15px; font-weight: 700; line-height: 1.3">Theme for fall formal?</div>
+        <div style="margin-top: 2px; display: flex; flex-direction: column">
+          <button type="button" aria-pressed="true" aria-label="Havana Nights, your vote, 7 votes" style="width: 100%; height: 44px; padding: 4px 0; border: none; background: transparent; font-family: inherit; cursor: pointer; display: block">
+            <span style="position: relative; height: 36px; box-sizing: border-box; padding: 0 10px; border-radius: 10px; overflow: hidden; border: 1px solid rgba(255,92,53,0.50); background: rgba(255,255,255,0.03); display: flex; align-items: center; gap: 6px">
+              <span aria-hidden="true" style="position: absolute; left: 0; top: 0; bottom: 0; width: 58%; background: rgba(255,92,53,0.24)"></span>
+              <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="#FF8A66" stroke-width="3.2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true" style="position: relative"><path d="M5 12.5l4.5 4.5L19 7.5"/></svg>
+              <span style="position: relative; font-size: 13.5px; font-weight: 700; color: #F6F1EA">Havana Nights</span>
+              <span style="position: relative; margin-left: auto; font-size: 12.5px; font-weight: 700; color: #F6F1EA">7</span>
+            </span>
+          </button>
+          <button type="button" aria-pressed="false" aria-label="Masquerade, 3 votes" style="width: 100%; height: 44px; padding: 4px 0; border: none; background: transparent; font-family: inherit; cursor: pointer; display: block">
+            <span style="position: relative; height: 36px; box-sizing: border-box; padding: 0 10px; border-radius: 10px; overflow: hidden; border: 1px solid rgba(255,255,255,0.08); background: rgba(255,255,255,0.03); display: flex; align-items: center; gap: 6px">
+              <span aria-hidden="true" style="position: absolute; left: 0; top: 0; bottom: 0; width: 25%; background: rgba(255,255,255,0.10)"></span>
+              <span style="position: relative; font-size: 13.5px; font-weight: 600; color: #F6F1EA">Masquerade</span>
+              <span style="position: relative; margin-left: auto; font-size: 12.5px; font-weight: 700; color: #CFC8BE">3</span>
+            </span>
+          </button>
+          <button type="button" aria-pressed="false" aria-label="Old Hollywood, 2 votes" style="width: 100%; height: 44px; padding: 4px 0; border: none; background: transparent; font-family: inherit; cursor: pointer; display: block">
+            <span style="position: relative; height: 36px; box-sizing: border-box; padding: 0 10px; border-radius: 10px; overflow: hidden; border: 1px solid rgba(255,255,255,0.08); background: rgba(255,255,255,0.03); display: flex; align-items: center; gap: 6px">
+              <span aria-hidden="true" style="position: absolute; left: 0; top: 0; bottom: 0; width: 17%; background: rgba(255,255,255,0.10)"></span>
+              <span style="position: relative; font-size: 13.5px; font-weight: 600; color: #F6F1EA">Old Hollywood</span>
+              <span style="position: relative; margin-left: auto; font-size: 12.5px; font-weight: 700; color: #CFC8BE">2</span>
+            </span>
+          </button>
+        </div>
+      </div>
+    </div>
+
+    <div style="flex-shrink: 0; display: flex; align-items: flex-end; gap: 8px">
+      <div aria-hidden="true" style="width: 28px; height: 28px; flex-shrink: 0; border-radius: 999px; background: #4A3A5E; display: flex; align-items: center; justify-content: center; font-size: 10px; font-weight: 700; color: #E6D8F5">PS</div>
+      <div style="display: flex; flex-direction: column; align-items: flex-start; gap: 3px; max-width: 256px">
+        <span style="padding-left: 12px; font-size: 11.5px; font-weight: 600; color: #9C958C">Priya S.</span>
+        <div style="box-sizing: border-box; padding: 8px 13px; border-radius: 18px 18px 18px 6px; border: 1px solid rgba(255,255,255,0.08); background: #161515; font-size: 14px; line-height: 1.35; color: #F6F1EA">Havana Nights. Obviously.</div>
+      </div>
+    </div>
+
+    <div style="flex-shrink: 0; display: flex; align-items: flex-end; gap: 8px">
+      <div aria-hidden="true" style="width: 28px; height: 28px; flex-shrink: 0; border-radius: 999px; background: #3E4A2E; display: flex; align-items: center; justify-content: center; font-size: 10px; font-weight: 700; color: #DDEBC8">JK</div>
+      <div role="group" aria-label="Sign-up from Jonah K.: Tabling shifts, 3 of 6 filled" style="width: 292px; box-sizing: border-box; padding: 10px 12px 2px; border-radius: 18px 18px 18px 6px; border: 1px solid rgba(255,255,255,0.08); background: #161515">
+        <div style="display: flex; align-items: center; gap: 6px; font-size: 11.5px; font-weight: 600; color: #9C958C; white-space: nowrap"><span style="font-weight: 700; color: #CFC8BE">Jonah K.</span><span>Outreach</span><span style="margin-left: auto; display: inline-flex; align-items: center; gap: 4px"><svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect x="5" y="4" width="14" height="17" rx="2.5"/><path d="M9 4.5V3h6v1.5"/><path d="M9 12l2 2 4-4"/></svg>Sign-up</span></div>
+        <div style="margin-top: 4px; display: flex; align-items: center; gap: 8px">
+          <span style="font-size: 15px; font-weight: 700; line-height: 1.3">Tabling shifts</span>
+          <span style="margin-left: auto; display: inline-flex; align-items: center; gap: 6px; font-size: 12px; font-weight: 600; color: #CFC8BE; white-space: nowrap">
+            <span aria-hidden="true" style="display: inline-flex">
+              <span style="width: 16px; height: 16px; border-radius: 999px; background: #5A3A2E; box-shadow: 0 0 0 2px #161515; display: block"></span>
+              <span style="width: 16px; height: 16px; margin-left: -5px; border-radius: 999px; background: #4A3A5E; box-shadow: 0 0 0 2px #161515; display: block"></span>
+              <span style="width: 16px; height: 16px; margin-left: -5px; border-radius: 999px; background: #3E4A2E; box-shadow: 0 0 0 2px #161515; display: block"></span>
+            </span>3 of 6 filled</span>
+        </div>
+        <div aria-hidden="true" style="margin-top: 8px; display: grid; grid-template-columns: repeat(6, minmax(0, 1fr)); gap: 3px">
+          <span style="height: 5px; border-radius: 999px; background: #CFC8BE; display: block"></span>
+          <span style="height: 5px; border-radius: 999px; background: #CFC8BE; display: block"></span>
+          <span style="height: 5px; border-radius: 999px; background: #CFC8BE; display: block"></span>
+          <span style="height: 5px; border-radius: 999px; background: rgba(255,255,255,0.10); display: block"></span>
+          <span style="height: 5px; border-radius: 999px; background: rgba(255,255,255,0.10); display: block"></span>
+          <span style="height: 5px; border-radius: 999px; background: rgba(255,255,255,0.10); display: block"></span>
+        </div>
+        <div style="margin-top: 4px; display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 6px">
+          <button type="button" aria-label="Take the Monday 11 to 12 shift" style="height: 44px; padding: 4px 0; border: none; background: transparent; font-family: inherit; cursor: pointer; display: block"><span style="height: 36px; border-radius: 10px; border: 1px dashed rgba(255,255,255,0.22); background: rgba(255,255,255,0.03); color: #F6F1EA; font-size: 12.5px; font-weight: 700; display: flex; align-items: center; justify-content: center; gap: 4px; white-space: nowrap"><svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="#CFC8BE" stroke-width="3" stroke-linecap="round" aria-hidden="true"><path d="M12 5v14M5 12h14"/></svg>Mon 11–12</span></button>
+          <button type="button" aria-label="Take the Tuesday 12 to 1 shift" style="height: 44px; padding: 4px 0; border: none; background: transparent; font-family: inherit; cursor: pointer; display: block"><span style="height: 36px; border-radius: 10px; border: 1px dashed rgba(255,255,255,0.22); background: rgba(255,255,255,0.03); color: #F6F1EA; font-size: 12.5px; font-weight: 700; display: flex; align-items: center; justify-content: center; gap: 4px; white-space: nowrap"><svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="#CFC8BE" stroke-width="3" stroke-linecap="round" aria-hidden="true"><path d="M12 5v14M5 12h14"/></svg>Tue 12–1</span></button>
+          <button type="button" aria-label="Take the Wednesday 2 to 3 shift" style="height: 44px; padding: 4px 0; border: none; background: transparent; font-family: inherit; cursor: pointer; display: block"><span style="height: 36px; border-radius: 10px; border: 1px dashed rgba(255,255,255,0.22); background: rgba(255,255,255,0.03); color: #F6F1EA; font-size: 12.5px; font-weight: 700; display: flex; align-items: center; justify-content: center; gap: 4px; white-space: nowrap"><svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="#CFC8BE" stroke-width="3" stroke-linecap="round" aria-hidden="true"><path d="M12 5v14M5 12h14"/></svg>Wed 2–3</span></button>
+        </div>
+      </div>
+    </div>
+
+    <div style="flex-shrink: 0; display: flex; justify-content: flex-end">
+      <div style="max-width: 256px; box-sizing: border-box; padding: 8px 13px; border-radius: 18px 18px 6px 18px; background: #FF5C35; color: #1A0A05; font-size: 14px; line-height: 1.35; font-weight: 500">I'll bring the dues box Monday</div>
+    </div>
+  </section>
+
+  <div role="group" aria-label="Add to the Lounge" style="flex-shrink: 0; position: relative; margin: 0 10px 8px; box-sizing: border-box; padding: 7px; border-radius: 20px; border: 1px solid rgba(255,255,255,0.10); background: #1C1A1A; box-shadow: 0 -10px 30px rgba(0,0,0,0.55); display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 8px">
+    <button type="button" style="height: 58px; border-radius: 14px; border: 1px solid rgba(255,255,255,0.07); background: rgba(255,255,255,0.04); color: #F6F1EA; font-family: inherit; display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 5px; cursor: pointer"><span aria-hidden="true" style="width: 28px; height: 28px; border-radius: 999px; background: rgba(255,255,255,0.07); display: flex; align-items: center; justify-content: center"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" aria-hidden="true"><path d="M4 6h10M4 12h16M4 18h7"/></svg></span><span style="font-size: 12px; font-weight: 700; color: #CFC8BE">Poll</span></button>
+    <button type="button" style="height: 58px; border-radius: 14px; border: 1px solid rgba(255,255,255,0.07); background: rgba(255,255,255,0.04); color: #F6F1EA; font-family: inherit; display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 5px; cursor: pointer"><span aria-hidden="true" style="width: 28px; height: 28px; border-radius: 999px; background: rgba(255,255,255,0.07); display: flex; align-items: center; justify-content: center"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect x="5" y="4" width="14" height="17" rx="2.5"/><path d="M9 4.5V3h6v1.5"/><path d="M9 12l2 2 4-4"/></svg></span><span style="font-size: 12px; font-weight: 700; color: #CFC8BE">Sign-up</span></button>
+    <button type="button" style="height: 58px; border-radius: 14px; border: 1px solid rgba(255,255,255,0.07); background: rgba(255,255,255,0.04); color: #F6F1EA; font-family: inherit; display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 5px; cursor: pointer"><span aria-hidden="true" style="width: 28px; height: 28px; border-radius: 999px; background: rgba(255,255,255,0.07); display: flex; align-items: center; justify-content: center"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect x="3" y="5" width="18" height="16" rx="3"/><path d="M8 3v4M16 3v4M3 10h18"/><path d="M9 15l2 2 4-4"/></svg></span><span style="font-size: 12px; font-weight: 700; color: #CFC8BE">RSVP</span></button>
+    <button type="button" style="height: 58px; border-radius: 14px; border: 1px solid rgba(255,255,255,0.07); background: rgba(255,255,255,0.04); color: #F6F1EA; font-family: inherit; display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 5px; cursor: pointer"><span aria-hidden="true" style="width: 28px; height: 28px; border-radius: 999px; background: rgba(255,255,255,0.07); display: flex; align-items: center; justify-content: center"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="9" cy="8" r="3.2"/><path d="M3.5 19a5.5 5.5 0 0 1 11 0"/><path d="M18 8v6M15 11h6"/></svg></span><span style="font-size: 12px; font-weight: 700; color: #CFC8BE">Headcount</span></button>
+    <span aria-hidden="true" style="position: absolute; left: 22px; bottom: -7px; width: 12px; height: 12px; transform: rotate(45deg); background: #1C1A1A; border-right: 1px solid rgba(255,255,255,0.10); border-bottom: 1px solid rgba(255,255,255,0.10)"></span>
+  </div>
+
+  <div style="flex-shrink: 0; box-sizing: border-box; padding: 0 10px 10px; display: flex; align-items: center; gap: 8px">
+    <button type="button" aria-label="Close the + tray" aria-expanded="true" style="width: 44px; height: 44px; flex-shrink: 0; border-radius: 999px; border: none; background: #F6F1EA; color: #0C0B0B; display: flex; align-items: center; justify-content: center; cursor: pointer"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.6" stroke-linecap="round" aria-hidden="true"><path d="M6.5 6.5l11 11M17.5 6.5l-11 11"/></svg></button>
+    <label style="flex-grow: 1; min-width: 0; height: 44px; box-sizing: border-box; padding: 0 16px; display: flex; align-items: center; border-radius: 999px; border: 1px solid rgba(255,255,255,0.10); background: rgba(22,21,21,0.92)">
+      <input type="text" aria-label="Message the Lounge" placeholder="Say something to the Lounge" style="flex-grow: 1; min-width: 0; height: 40px; padding: 0; border: none; outline: none; background: transparent; color: #F6F1EA; font-family: inherit; font-size: 14.5px" />
+    </label>
+    <button type="button" aria-label="Send" aria-disabled="true" style="width: 44px; height: 44px; flex-shrink: 0; border-radius: 999px; border: none; background: rgba(255,255,255,0.07); color: #9C958C; display: flex; align-items: center; justify-content: center"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M12 19V5M6 11l6-6 6 6"/></svg></button>
+  </div>
+</div>
+</x-dc>
+<script type="text/x-dc" data-dc-script data-props='{"$preview":{"width":390,"height":844}}'>
+class Component extends DCLogic {
+  renderVals() { return {}; }
+}
+</script>
+</body>
+</html>

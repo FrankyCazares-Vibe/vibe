@@ -1,0 +1,13 @@
+{
+ "id": "E7-desktop-profile-sync (FOLD INTO B16 profile.html owner)",
+ "files": [
+  "public/html/profile.html"
+ ],
+ "contract": "OWNED BY onboarding B16; the org-following static search (:6395-6412) also edits this file. Fold in.\nThe desktop profile CARD gets no Edit control of its own: cards open the viewer (click delegation :5850-5862), where E6 puts Edit.\n\nWrap post text so it can be swapped:\n- In `_profileMapDbRow` (:8430-8452) and `_publishProfilePostLocal` (:5998-6016), build the body as `<span class=\"ppost-text\">${bodyText}</span>` + media.\n- In `_profileMapDbRow`, date becomes `_formatRelativeDate(row.created_at) + (row.edited_at ? ' \u00b7 Edited' : '')`.\n\nNEW listener (next to `_profilePrefillFromCard` :5768): `window.addEventListener('vibe:post-edited', (ev) => { \u2026 })`. For each `#profilePostsList .profile-post-card[data-post-id=\"<CSS.escape(id)>\"]`:\n- `.ppost-body .ppost-text` innerHTML becomes `_esc(content).replace(/\\n/g,'<br>')`. For a legacy cached card with no `.ppost-text`, rebuild the body as that span plus the outerHTML of existing direct img/video children.\n- Set `.ppost-tags` innerHTML from `tags.map(t => '<span class=\"ppost-tag\">#' + _esc(t) + '</span>')`; create the `.ppost-tags` div after the readmore button if missing, or remove it when there are no tags.\n- Append ' \u00b7 Edited' to `.ppost-date` if it isn't already there.\n- Call `_measureReadMore(card)`.\nThen:\n- `populateAllGrid()` (:5806; it rebuilds the All feed from list clones)\n- if `id === profilePinnedId`: `profilePinnedId = null; pinFromProfile(id)` (programmatic restore, no btn; :5559)\n- `savePostsToStorage()` (:8262; a no-op in viewer mode)\n\nAll content goes through `_esc`; never insert detail.content as HTML.\n\nDEPENDS ON E6 (the event) and E1 (edited_at in /api/me/posts).",
+ "acceptance": [
+  "Desktop own /profile: edit a post in the viewer, close it. The card in Posts and the clone in All show the new text, tags and \" \u00b7 Edited\" with no reload; the pinned slot updates if that post is pinned.",
+  "Reload: the card still shows the new text (from /api/me/posts) and \" \u00b7 Edited\".",
+  "Extract the inline scripts and run `node --check` on them (same method as the plan's messages.html check).",
+  "A post whose new content contains <img src=x onerror=alert(1)> renders as text on the card."
+ ]
+}
