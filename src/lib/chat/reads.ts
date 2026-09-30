@@ -180,25 +180,31 @@ export function spaceCanPost(kind: RoomKind, role: ClubRole | null, state: RoomS
 
 const KIND_RANK: Readonly<Record<RoomKind, number>> = Object.freeze({ lounge: 0, board: 1, officers: 2, event: 3, room: 4 });
 
-/** A room of the space with its sort key from `channels.position`. */
-export type SpaceRoomWithPosition = SpaceRoom & { position: number | null };
+/**
+ * A room of the space with its sort keys: `channels.position`, and for an
+ * event room its state and start — from the `EventRef` when it was built,
+ * else from the event row the route read (`roomState`, pure); null when
+ * neither is known.
+ */
+export type SpaceRoomWithPosition = SpaceRoom & { position: number | null; state: RoomState | null; starts_at: string | null };
 
 /**
  * 7.2.3's order: `lounge`, `board`, `officers`, event rooms with
  * `state !== "closed"` by `starts_at` asc, then `room`s by `position` then
- * `name`; closed event rooms are left out (reachable by URL, no chip). An
- * event room whose `EventRef` could not be built keeps its chip after the
- * dated ones (an unknown state is not "closed"). Two rooms of one core kind
- * (never, after A) stay in name order.
+ * `name`; closed event rooms are left out (reachable by URL, no chip). The
+ * state and the start come from the ref or from the event row (the route
+ * fills `state` / `starts_at` either way); an event room with neither
+ * keeps its chip after the dated ones (an unknown state is not "closed").
+ * Two rooms of one core kind (never, after A) stay in name order.
  */
 export function orderSpaceRooms(rooms: SpaceRoomWithPosition[]): SpaceRoom[] {
-  const kept = rooms.filter((room) => !(room.kind === "event" && room.event?.state === "closed"));
+  const kept = rooms.filter((room) => !(room.kind === "event" && room.state === "closed"));
   kept.sort((a, b) => {
     const rank = KIND_RANK[a.kind] - KIND_RANK[b.kind];
     if (rank !== 0) return rank;
     if (a.kind === "event") {
-      const startA = a.event ? instant(a.event.starts_at) : Number.POSITIVE_INFINITY;
-      const startB = b.event ? instant(b.event.starts_at) : Number.POSITIVE_INFINITY;
+      const startA = a.starts_at === null ? Number.POSITIVE_INFINITY : instant(a.starts_at);
+      const startB = b.starts_at === null ? Number.POSITIVE_INFINITY : instant(b.starts_at);
       if (startA !== startB) return startA < startB ? -1 : 1;
       return a.name.localeCompare(b.name);
     }

@@ -7,6 +7,7 @@ import { chatV2For } from "@/lib/chat/flag-server";
 import { readChatMessages } from "@/lib/chat/message-read";
 import { lastShown, orderSpaceRooms, readSince, refOfRoom, spaceCanPost, type SpaceRoomWithPosition } from "@/lib/chat/reads";
 import { canModerate, isClubRole, isRoomKind } from "@/lib/chat/room-rules";
+import { roomState } from "@/lib/chat/room-state";
 import { loadRoom } from "@/lib/chat/rooms";
 import { isMissingChatSchema, warnMissingChatSchemaOnce } from "@/lib/chat/schema";
 import { refusalBody, type ChatMessage, type EventRef, type SpaceResponse } from "@/lib/chat/types";
@@ -232,17 +233,26 @@ export async function GET(req: Request, { params }: Params) {
     boardLatest = lastShown(boardRead.messages);
   }
 
+  // An event room's state and start: from its `EventRef`; when the refs
+  // could not be built, from the event row read above (`roomState` is pure),
+  // so a room whose event is over is still left out and `can_post` false.
+  const now = new Date();
+  const eventById = new Map(roomEvents.map((ev) => [ev.id, ev]));
   const rooms: SpaceRoomWithPosition[] = channels.map((row, i) => {
     const kind = row.kind as SpaceRoomWithPosition["kind"];
     const event = kind === "event" ? refOfRoom(row.event_id, refs) : null;
+    const known = kind === "event" && row.event_id !== null ? (eventById.get(row.event_id) ?? null) : null;
+    const state = event?.state ?? (known ? roomState(known.starts_at, known.ends_at, now) : null);
     return {
       id: row.id,
       kind,
       name: typeof row.name === "string" ? row.name : "",
       unread: unreadFlags[i],
-      can_post: spaceCanPost(kind, role, event?.state ?? null),
+      can_post: spaceCanPost(kind, role, state),
       event,
       position: typeof row.position === "number" ? row.position : null,
+      state,
+      starts_at: event?.starts_at ?? known?.starts_at ?? null,
     };
   });
   const refsOf = (list: EventRow[]): EventRef[] =>

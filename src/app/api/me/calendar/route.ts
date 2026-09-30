@@ -120,7 +120,13 @@ export async function GET(req: Request) {
       const ev = row.event as NonNullable<RsvpRow["event"]>;
       return { id: ev.id, title: ev.title, starts_at: ev.starts_at, ends_at: ev.ends_at, location: ev.location, org_id: ev.org_id ?? null };
     });
-    refs = await eventRefsFor(events, user.id, { counts: false });
+    try {
+      refs = await eventRefsFor(events, user.id, { counts: false });
+    } catch (err) {
+      // The calendar never answers 500 for the three fields (7.3).
+      refs = null;
+      console.error("[me/calendar rooms]", err instanceof Error ? err.message : err);
+    }
     if (refs === null) console.error("[me/calendar rooms] event refs could not be built; the room fields are null");
   }
 

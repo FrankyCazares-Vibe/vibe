@@ -162,24 +162,34 @@ function ref(id: string, starts_at: string, state: EventRef["state"]): EventRef 
   return { id, title: id, starts_at, ends_at: starts_at, location: "", state, room_id: null, viewer_status: null, going_count: 0, maybe_count: 0 };
 }
 function sroom(over: Partial<SpaceRoomWithPosition> & { kind: SpaceRoomWithPosition["kind"] }): SpaceRoomWithPosition {
-  return { id: over.kind, name: over.kind, unread: false, can_post: true, event: null, position: null, ...over };
+  return { id: over.kind, name: over.kind, unread: false, can_post: true, event: null, position: null, state: null, starts_at: null, ...over };
+}
+/** An event room as the route fills it: `state` and `starts_at` from the ref, or from the event row when the ref is missing. */
+function eroom(id: string, name: string, event: EventRef | null, state: SpaceRoomWithPosition["state"], starts_at: string | null): SpaceRoomWithPosition {
+  return sroom({ kind: "event", id, name, event, state, starts_at });
 }
 
 test("orderSpaceRooms: lounge, board, officers, open event rooms by starts_at, rooms by position then name; closed event rooms out", () => {
+  const T2b = "2026-10-02T12:00:00+00:00";
   const ordered = orderSpaceRooms([
     sroom({ kind: "room", id: "r2", name: "zeta", position: 1 }),
-    sroom({ kind: "event", id: "e-late", name: "late", event: ref("e-late", T3, "soon") }),
+    eroom("e-late", "late", ref("e-late", T3, "soon"), "soon", T3),
     sroom({ kind: "room", id: "r1", name: "alpha", position: 1 }),
-    sroom({ kind: "event", id: "e-closed", name: "closed", event: ref("e-closed", T1, "closed") }),
+    eroom("e-closed", "closed", ref("e-closed", T1, "closed"), "closed", T1),
     sroom({ kind: "board", id: "b" }),
     sroom({ kind: "room", id: "r0", name: "first", position: 0 }),
-    sroom({ kind: "event", id: "e-noref", name: "noref", event: null }),
-    sroom({ kind: "event", id: "e-early", name: "early", event: ref("e-early", T2, "live") }),
+    eroom("e-noref", "noref", null, null, null),
+    eroom("e-rowclosed", "rowclosed", null, "closed", T1), // no ref; the event row says closed → out
+    eroom("e-rowsoon", "rowsoon", null, "soon", T2b), // no ref; the event row says soon → in its place by starts_at
+    eroom("e-early", "early", ref("e-early", T2, "live"), "live", T2),
     sroom({ kind: "officers", id: "o" }),
     sroom({ kind: "lounge", id: "l" }),
   ]);
-  assert.deepEqual(ordered.map((r) => r.id), ["l", "b", "o", "e-early", "e-late", "e-noref", "r0", "r1", "r2"]);
+  assert.deepEqual(ordered.map((r) => r.id), ["l", "b", "o", "e-early", "e-rowsoon", "e-late", "e-noref", "r0", "r1", "r2"]);
   assert.equal("position" in ordered[0], false);
+  assert.equal("state" in ordered[3], false);
+  assert.equal("starts_at" in ordered[3], false);
+  assert.equal(ordered[4].event, null);
 });
 
 test("lastShown: the last non-hidden of an oldest-first page; refOfRoom", () => {

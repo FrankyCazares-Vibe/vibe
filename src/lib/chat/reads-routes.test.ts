@@ -379,6 +379,10 @@ test("inbox: a failed preview window, a failed count, failed events or no servic
   assert.equal(salsaNoService.next_event, null);
   assert.equal(salsaNoService.board.latest?.id, "m-b1-old", "no service role: the officer exception cannot be checked, the next row is the preview");
   assert.equal(salsaNoService.lounge.latest?.id, "m-l1");
+  install({ cookie: inboxCookie, service: (t, c, n) => (t === "org_members" ? { error: { code: "XX000", message: "boom" } } : inboxService(t, c, n)) });
+  const rolesFailed = await inbox.GET(req(), ctx());
+  assert.equal(rolesFailed.status, 200);
+  assert.equal((rolesFailed.body.clubs as InboxClub[])[1].board.latest?.id, "m-b1-old", "the officer-role read failed: the blocked author's row stays hidden, the next row is the preview");
   inboxWorld();
   g.__vibeEventRefsFor = async () => null;
   const refsFailed = await inbox.GET(req(), ctx());
@@ -533,11 +537,23 @@ test("space: no Board → board_latest null (200); the Board room unreadable →
   assert.deepEqual(await space.GET(req(), ctx()), { status: 503, body: { ok: false, error: "Try again in a moment.", code: "try_again" } });
   spaceWorld({ read: async () => ({ ok: false, status: 503, body: { ok: false, error: "Try again in a moment.", code: "try_again" } }) });
   assert.equal((await space.GET(req(), ctx())).status, 503);
-  spaceWorld({ refs: async () => null });
+  // No refs: the state comes from the event row the route read (roomState,
+  // the real clock): an event over years ago is closed and out, one years
+  // away is soon and kept without its ref; a room whose event row was not
+  // read either is kept (an unknown state is not closed).
+  const farEvent = (id: string, year: number) => ({ id, title: id, starts_at: `${year}-06-01T10:00:00+00:00`, ends_at: `${year}-06-01T12:00:00+00:00`, location: null, org_id: ORG1 });
+  spaceWorld({
+    refs: async () => null,
+    service: (t, c, n) => (t === "events" && arg(c, "in", "id") ? { data: [farEvent("ev-open", 2099), farEvent("ev-closed", 2020)] } : spaceService()(t, c, n)),
+  });
   const noRefs = await space.GET(req(), ctx());
   assert.equal(noRefs.status, 200);
   assert.deepEqual(noRefs.body.up_next, []);
-  assert.deepEqual((noRefs.body.rooms as SpaceRoom[]).filter((r) => r.kind === "event").map((r) => [r.id, r.event, r.can_post]), [[SP.open, null, true], [SP.closed, null, true]], "no ref: an unknown state is not closed; by name");
+  assert.deepEqual((noRefs.body.rooms as SpaceRoom[]).filter((r) => r.kind === "event").map((r) => [r.id, r.event, r.can_post]), [[SP.open, null, true]], "no ref: the closed room (by its row's dates) is out, the open one kept without its ref");
+  spaceWorld({ refs: async () => null, service: (t, c, n) => (t === "events" ? { error: { code: "XX000", message: "boom" } } : spaceService()(t, c, n)) });
+  const noRows = await space.GET(req(), ctx());
+  assert.equal(noRows.status, 200);
+  assert.deepEqual((noRows.body.rooms as SpaceRoom[]).filter((r) => r.kind === "event").map((r) => [r.id, r.event, r.can_post]), [[SP.open, null, true], [SP.closed, null, true]], "no ref and no event row: an unknown state is not closed; by name");
   spaceWorld({ service: spaceService("owner") });
   const owner = await space.GET(req(), ctx());
   assert.deepEqual(owner.body.viewer, { role: "owner", can_moderate: true });
