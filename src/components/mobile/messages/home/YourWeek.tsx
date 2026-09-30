@@ -84,10 +84,16 @@ export function YourWeek({
     row.scrollTo({ left: Math.max(0, el.offsetLeft - 16), behavior: "smooth" });
   };
 
+  // `overflowX: "clip"`: the 340px bloom (absolute, `left` ≈ 69 with a live
+  // card) ends past 375, and a mobile browser widens the layout viewport to
+  // the document's scroll width, so every fixed layer over the home drew 409
+  // wide and the composer's "+" sat off the phone (11.0 "no horizontal
+  // scroll"; visual/README.md run 2, VIS-X-1; INT-ADJUDICATE-1). `clip` on the
+  // x axis alone keeps the y axis visible (the halo's bottom is not cut).
   return (
     <section
       aria-labelledby="your-week-heading"
-      style={{ flexShrink: 0, position: "relative", isolation: "isolate", boxSizing: "border-box", padding: "6px 0 8px", display: "flex", flexDirection: "column", fontFamily: FONT, color: t.ink }}
+      style={{ flexShrink: 0, position: "relative", isolation: "isolate", boxSizing: "border-box", padding: "6px 0 8px", overflowX: "clip", display: "flex", flexDirection: "column", fontFamily: FONT, color: t.ink }}
     >
       {liveId && bloomLeft !== null ? (
         <div aria-hidden="true" style={{ position: "absolute", zIndex: -1, left: bloomLeft, top: 54, width: 340, height: 118, pointerEvents: "none", background: t.bloom }} />
