@@ -13,6 +13,11 @@
  * message fields (`toChatMessages`) and the room of a thread read
  * (`readThreadRoom`). Section 6.1 is the contract for all of it.
  *
+ * Wave 2 (W2-B2; handoffs/chat-redesign/wave-2-contracts.md section 9)
+ * added, here too: the viewer's block set and the stubs of section 8
+ * (`buildChatMessages`, `readGoing`), the cards (`hydrateCards`, 5.2), the
+ * `invalid_after` code (9.2) and the grouped reply count (9.4).
+ *
  * WHICH CLIENT READS WHAT. The messages, their reactions, the quoted parents
  * and the people are read on the client the caller hands over. The routes
  * hand it the viewer's cookie client, so RLS decides which rows come back.
@@ -41,18 +46,22 @@ import type { createSupabaseServerClient } from "@/lib/supabase/server";
 import { createSupabaseServiceClient, isSupabaseServiceConfigured } from "@/lib/supabase/service";
 
 import { blockedIdsFor } from "./blocks";
+import { hydrateCards, type CardRow } from "./cards/hydrate";
 import { OFFICER_REMOVED_REASON, canModerate, isClubRole } from "./room-rules";
 import { roomState } from "./room-state";
 import { canPostAnswer, clubRole, loadRoom } from "./rooms";
 import { isMissingChatSchema, warnMissingChatSchemaOnce } from "./schema";
+import { asStub, isHiddenFrom } from "./stub";
 import {
   refusalBody,
+  type Card,
   type ChatMessage,
   type ClubRole,
   type MessageKind,
   type OrgRef,
   type Person,
   type Refusal,
+  type RefusalCode,
   type RemovedInfo,
   type Room,
   type ThreadRoom,
@@ -386,7 +395,12 @@ async function readRoles(orgId: string, userIds: string[]): Promise<Map<string, 
  * through (REPLY_PAGES_MAX pages per 100 posts). The first page carries the
  * exact total, and the walk stops when it has seen that many rows, so a
  * server that hands back shorter pages than asked is still counted whole.
- * Wave 2: a grouped count in the database replaces the walk.
+ *
+ * Wave 2 (contract 9.4): `chat_reply_counts` (migration B) answers the
+ * grouped count per chunk of 100 post ids, the same numbers; a root with no
+ * live reply returns no row, so every post starts at 0. On a database
+ * without the function (`isMissingChatSchema`) the wave-1 walk below is the
+ * fallback, warned once; any other error is null (the caller answers 503).
  */
 async function readReplyCounts(
   channelId: string,
@@ -398,6 +412,36 @@ async function readReplyCounts(
   if (ids.length === 0) return counts;
   const service = serviceOrNull("chat/message-read.replyCounts");
   if (!service) return null;
+  for (const id of ids) counts.set(id, 0);
+  for (const chunk of inChunks(ids, IDS_PER_READ)) {
+    const { data, error } = await service.rpc("chat_reply_counts", {
+      p_channel: channelId,
+      p_roots: chunk,
+      p_viewer: viewerId,
+    });
+    if (error) {
+      if (isMissingChatSchema(error)) {
+        warnMissingChatSchemaOnce("chat/message-read.replyCounts");
+        return walkReplyCounts(service, channelId, ids, viewerId);
+      }
+      console.error("[chat/message-read.replyCounts]", error.code, error.message);
+      return null;
+    }
+    for (const row of (data ?? []) as { root: unknown; n: unknown }[]) {
+      if (typeof row.root === "string" && counts.has(row.root) && typeof row.n === "number") counts.set(row.root, row.n);
+    }
+  }
+  return counts;
+}
+
+/** The wave-1 reply count, kept as it was: the walk over `messages` (contract 3.10, the `readReplyCounts` row). */
+async function walkReplyCounts(
+  service: ServiceClient,
+  channelId: string,
+  ids: string[],
+  viewerId: string,
+): Promise<Map<string, number> | null> {
+  const counts = new Map<string, number>();
   for (const id of ids) counts.set(id, 0);
   // The viewer's id comes from auth, a uuid, so it is safe inside the filter.
   const openable = isUuid(viewerId) ? `removed_at.is.null,user_id.eq.${viewerId}` : null;
@@ -536,16 +580,27 @@ export async function toChatMessages(
   return (await buildChatMessages(client, rows, ctx)).messages;
 }
 
-/** `toChatMessages`, saying also whether every club fact could be read, and the roles it read. */
+/**
+ * `toChatMessages`, saying also whether every club fact could be read, and
+ * the roles it read.
+ *
+ * Blocking in club rooms (wave-2 contract 8.3, 9.1). With the roles in
+ * hand, a row by someone in the viewer's block set is replaced whole by the
+ * stub of 8.1 (`isHiddenFrom`: a dm or a group never; a top-level Board post
+ * by a current officer never), its card dropped with it. The quote under a
+ * visible message (`parent_preview`) is nulled when its author is in the
+ * set — no Board exception — and `parent_message_id` stays as sent.
+ */
 async function buildChatMessages(client: ServerClient, rows: MessageRow[], ctx: MessageContext): Promise<Built> {
   const { channelId, viewerId, room } = ctx;
   const shown = rows.filter((row) => !row.removed_at || row.user_id === viewerId);
 
   // The viewer's block set (wave-2 contract 9.1): the empty set for a dm or
   // a group, no read made; in a club room, read here FIRST only when no
-  // caller passed it. A failed read is `complete: false` (a read answers 503
+  // caller passed it. A failed read is `complete: false`: a read answers 503
   // `try_again`; the send's answer, through `toChatMessages`, keeps its own
-  // row). The stub decision itself (8.2, `asStub`) lands with 9.1.
+  // row with nothing hidden and no quote (never quote a blocked person on a
+  // guess), said once in the log.
   let blocked: ReadonlySet<string> = ctx.blocked ?? NO_BLOCKS;
   let blocksRead = true;
   if (room !== null && ctx.blocked === undefined) {
@@ -553,6 +608,7 @@ async function buildChatMessages(client: ServerClient, rows: MessageRow[], ctx: 
     if (read) blocked = read;
     else blocksRead = false;
   }
+  if (!blocksRead) warnBlocksUnreadOnce();
 
   const board = room !== null && room.kind === "board";
   const postIds = board && !ctx.skipReplyCounts
@@ -560,9 +616,18 @@ async function buildChatMessages(client: ServerClient, rows: MessageRow[], ctx: 
     : [];
   const roleIds = shown.map((row) => row.user_id);
   if (ctx.alsoRoleOf) roleIds.push(ctx.alsoRoleOf);
-  const [roles, replyCounts] = await Promise.all([
+  // The cards of the page (wave-2 contract 5.2, 9.1): `shown` is a
+  // viewer-scoped read, so its side tables may be read with the service
+  // role. Not when the block set is unknown: nothing built then is sent.
+  const cardRows: CardRow[] = shown
+    .filter((row) => messageKind(row.kind) !== "text")
+    .map((row) => ({ id: row.id, kind: messageKind(row.kind), user_id: row.user_id, card_event_id: row.card_event_id ?? null }));
+  const [roles, replyCounts, cards] = await Promise.all([
     room ? readRoles(room.org_id, roleIds) : Promise.resolve(null),
     postIds.length > 0 ? readReplyCounts(channelId, postIds, viewerId) : Promise.resolve(new Map<string, number>()),
+    cardRows.length > 0 && blocksRead
+      ? hydrateCards(client, cardRows, viewerId, { room, blocked })
+      : Promise.resolve(new Map<string, Card>()),
     ctx.skipReactions ? Promise.resolve() : hydrateReactions(client, shown, viewerId),
     hydrateParentPreviews(client, shown),
   ]);
@@ -570,12 +635,16 @@ async function buildChatMessages(client: ServerClient, rows: MessageRow[], ctx: 
   prepareForClient(shown, channelId);
 
   const messages = shown.map((row): ChatMessage => {
+    const authorRole = roles ? (roles.get(row.user_id) ?? null) : null;
+    if (isHiddenFrom(row, blocked, room, authorRole)) return asStub(row);
     const topLevel = !row.thread_root_id;
     let replyCount: number | null = null;
     if (board && topLevel) {
       if (ctx.skipReplyCounts) replyCount = 0;
       else replyCount = replyCounts ? (replyCounts.get(row.id) ?? 0) : null;
     }
+    const preview = row.parent_preview ?? null;
+    const quoteShown = blocksRead && (preview === null || !blocked.has(preview.user_id));
     return {
       id: row.id,
       content: row.content,
@@ -588,24 +657,36 @@ async function buildChatMessages(client: ServerClient, rows: MessageRow[], ctx: 
       parent_message_id: row.parent_message_id ?? null,
       users: toPerson(row.users),
       attachment: row.attachment ?? null,
-      parent_preview: row.parent_preview ?? null,
+      parent_preview: quoteShown ? preview : null,
       reactions: row.reactions ?? [],
       kind: messageKind(row.kind),
       thread_root_id: row.thread_root_id ?? null,
-      // Cards are wave 2.
-      card: null,
+      card: cards ? (cards.get(row.id) ?? null) : null,
       reply_count: replyCount,
-      author_role: roles ? (roles.get(row.user_id) ?? null) : null,
-      // Reserved for blocking inside club rooms (section 12, point 2).
+      author_role: authorRole,
       hidden: false,
       removed: removedInfo(row, viewerId),
     };
   });
-  return { messages, complete: (room === null || roles !== null) && blocksRead, roles, blocked };
+  return {
+    messages,
+    complete: (room === null || roles !== null) && blocksRead && cards !== null,
+    roles,
+    blocked,
+  };
 }
 
 /** The block set of a dm or a group: nothing, and nothing read. */
 const NO_BLOCKS: ReadonlySet<string> = new Set<string>();
+
+let warnedBlocksUnread = false;
+
+/** Said once per server instance: the send's answer went out with no quote because the block set could not be read (9.1). */
+function warnBlocksUnreadOnce(): void {
+  if (warnedBlocksUnread) return;
+  warnedBlocksUnread = true;
+  console.warn("[chat/message-read] the block set could not be read; the answer hides nothing and quotes nothing (a read answers 503 instead)");
+}
 
 /** `before` and `limit` as today; `after` and `root` as section 6.1 writes them. */
 export type ReadOptions = { before?: string; after?: string; root?: string; limit: number };
@@ -656,8 +737,9 @@ export type ReadMessagesResult =
   | ReadFailure;
 
 const failed = (status: number, error: string): ReadFailure => ({ ok: false, status, body: { ok: false, error } });
-const postMissing = (): ReadFailure => ({ ok: false, status: 404, body: refusalBody("board_post_missing") });
-const tryAgain = (): ReadFailure => ({ ok: false, status: 503, body: refusalBody("try_again") });
+const refusal = (code: RefusalCode, status: number): ReadFailure => ({ ok: false, status, body: refusalBody(code) });
+const postMissing = (): ReadFailure => refusal("board_post_missing", 404);
+const tryAgain = (): ReadFailure => refusal("try_again", 503);
 
 async function viewerOf(client: ServerClient, known?: ReadKnown): Promise<string | null> {
   if (known?.viewerId) return known.viewerId;
@@ -725,7 +807,7 @@ async function rootState(
  *
  * `limit` is clamped here (1 to 200) and `after` checked here, whoever calls:
  * an `after` that is not a timestamp the server could have sent answers 400
- * "Invalid after" and never reaches the database.
+ * `invalid_after` (wave-2 contract 9.2) and never reaches the database.
  */
 export async function readChatMessages(
   client: ServerClient,
@@ -738,7 +820,7 @@ export async function readChatMessages(
   let after: string | undefined;
   if (opts.after) {
     const cleaned = cleanAfterParam(opts.after);
-    if (!cleaned) return failed(400, "Invalid after");
+    if (!cleaned) return refusal("invalid_after", 400);
     after = cleaned;
   }
   const before = opts.before || undefined;
@@ -911,14 +993,16 @@ async function readOrgRef(client: ServerClient, orgId: string): Promise<OrgRef |
  * is not named in it. `goingIds` are the going RSVPs, oldest first. The
  * room's rows are read with the service role, the people on the viewer's
  * client, a step at a time: a person the viewer cannot read (a restricted
- * account) is left out AND the next room member going takes their place.
- * Null when a read failed (never a list with holes in it).
+ * account) or in the viewer's block set (wave-2 contract 8.3, `blocked`) is
+ * left out AND the next room member going takes their place: still "the
+ * first 8 visible". Null when a read failed (never a list with holes in it).
  */
 async function readGoing(
   client: ServerClient,
   service: ServiceClient,
   room: Room,
   goingIds: string[],
+  blocked: ReadonlySet<string>,
 ): Promise<Person[] | null> {
   const going: Person[] = [];
   for (const step of inChunks(goingIds, IDS_PER_READ)) {
@@ -932,7 +1016,7 @@ async function readGoing(
       return null;
     }
     const members = new Set(((inRoom ?? []) as { user_id: string }[]).map((r) => r.user_id));
-    const candidates = step.filter((id) => members.has(id));
+    const candidates = step.filter((id) => members.has(id) && !blocked.has(id));
     if (candidates.length === 0) continue;
 
     const { data: people, error: peopleError } = await client
@@ -957,11 +1041,12 @@ async function readGoing(
   return going;
 }
 
-/** An event's chat: where, how many, the viewer's own answer, and the first people going. */
+/** An event's chat: where, how many, the viewer's own answer, and the first people going (the block set handed down, 8.3). */
 async function readRoomEvent(
   client: ServerClient,
   room: Room,
   viewerId: string,
+  blocked: ReadonlySet<string>,
 ): Promise<ThreadRoom["event"] | "failed"> {
   const event = room.event;
   if (room.kind !== "event" || !event) return null;
@@ -1016,7 +1101,7 @@ async function readRoomEvent(
     status = (mine.data as { status?: unknown } | null)?.status;
   }
 
-  const people = await readGoing(client, service, room, goingIds);
+  const people = await readGoing(client, service, room, goingIds, blocked);
   if (!people) return "failed";
   const location = (place.data as { location?: unknown } | null)?.location;
   return {
@@ -1057,17 +1142,20 @@ export type RoomDescription = {
  *
  * The viewer's role is not read here: the thread read gets it in the same
  * `org_members` read as the authors' roles (`readChatMessages`,
- * `viewerRole`), one read fewer on every poll.
+ * `viewerRole`), one read fewer on every poll. `blocked` is the viewer's
+ * block set, read once by the route (`blockedIdsFor`, wave-2 contract 9.1)
+ * and handed down to `readGoing` (8.3).
  */
 export async function describeRoom(
   client: ServerClient,
   room: Room,
   viewerId: string,
+  blocked: ReadonlySet<string>,
 ): Promise<RoomDescription | null> {
   const [org, mayPost, event] = await Promise.all([
     readOrgRef(client, room.org_id),
     canPostAnswer(client, room.id, viewerId, null),
-    readRoomEvent(client, room, viewerId),
+    readRoomEvent(client, room, viewerId, blocked),
   ]);
   if (!org || event === "failed" || mayPost === "failed") return null;
   return {
@@ -1096,16 +1184,19 @@ export function viewerInRoom(room: Room, role: ClubRole | null, mayPost: boolean
 
 /**
  * `room` and `viewer` together, for a caller that has not read the viewer's
- * role (the thread GET gets it with the page instead). Null when either
- * cannot be read: 503 `try_again`.
+ * role (the thread GET gets it with the page instead). It reads the block
+ * set itself (wave-2 contract 9.1). Null when anything cannot be read: 503
+ * `try_again`.
  */
 export async function readThreadRoom(
   client: ServerClient,
   room: Room,
   viewerId: string,
 ): Promise<{ room: ThreadRoom; viewer: ViewerInRoom } | null> {
+  const blocked = await blockedIdsFor(client, viewerId);
+  if (!blocked) return null;
   const [described, role] = await Promise.all([
-    describeRoom(client, room, viewerId),
+    describeRoom(client, room, viewerId, blocked),
     clubRole(room.org_id, viewerId),
   ]);
   if (!described) return null;

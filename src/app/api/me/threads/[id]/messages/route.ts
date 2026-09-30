@@ -1,5 +1,6 @@
 import { NextResponse } from "next/server";
 
+import { blockedIdsFor } from "@/lib/chat/blocks";
 import {
   MESSAGE_SELECT,
   MESSAGE_SELECT_BEFORE_ROOMS,
@@ -79,6 +80,12 @@ const POST_REFUSAL_STATUS: Record<PostRefusalCode, number> = {
  *   - In a club room, without `root`, replies are never listed as posts.
  *   - `room` and `viewer` on every answer; `viewer_id` for club rooms too.
  * The read itself lives in src/lib/chat/message-read.ts.
+ *
+ * Wave 2 (handoffs/chat-redesign/wave-2-contracts.md 9.1, 9.2): in a club
+ * room the viewer's block set is read ONCE here and handed to the page read
+ * and to the room's description (the stubs of section 8, the quotes, the
+ * people going); an `after` that is not a timestamp answers 400
+ * `invalid_after`.
  */
 export async function GET(req: Request, ctx: RouteCtx) {
   const { id: channelId } = await ctx.params;
@@ -107,13 +114,11 @@ export async function GET(req: Request, ctx: RouteCtx) {
   const limit = clampReadLimit(limitParam === null ? undefined : Number(limitParam), root !== undefined);
 
   // `after` is a `created_at` string this route sent, echoed unchanged.
-  // Anything else never reaches the database.
+  // Anything else never reaches the database (contract 9.2).
   let after: string | undefined;
   if (afterRaw) {
     const cleaned = cleanAfterParam(afterRaw);
-    if (!cleaned) {
-      return NextResponse.json({ ok: false, error: "Invalid after" }, { status: 400 });
-    }
+    if (!cleaned) return refuse("invalid_after", 400);
     after = cleaned;
   }
 
@@ -121,6 +126,12 @@ export async function GET(req: Request, ctx: RouteCtx) {
   // read: the read failed. Never answered as a dm, never with the defaults.
   const found = await roomOf(channelId, member);
   if (found.failed) return refuse("try_again", 503);
+
+  // The viewer's block set, read once for the whole request in a club room
+  // (contract 9.1; a dm or a group never reads it). A failed read is a read
+  // that failed: never a page that shows a blocked person's messages.
+  const blocked = found.room ? await blockedIdsFor(supabase, user.id) : new Set<string>();
+  if (!blocked) return refuse("try_again", 503);
 
   // The page and the room's description side by side. The read keeps the
   // viewer's "Clear chat" line for a dm or a group, and in a club room lists
@@ -132,9 +143,9 @@ export async function GET(req: Request, ctx: RouteCtx) {
       supabase,
       channelId,
       { before, after, root, limit },
-      { viewerId: user.id, access: member, room: found.room },
+      { viewerId: user.id, access: member, room: found.room, blocked },
     ),
-    found.room ? describeRoom(supabase, found.room, user.id) : Promise.resolve(null),
+    found.room ? describeRoom(supabase, found.room, user.id, blocked) : Promise.resolve(null),
   ]);
   if (!read.ok) return NextResponse.json(read.body, { status: read.status });
 
