@@ -131,6 +131,12 @@ export function ClubSpace({ orgHandle, initialRoomId, initialRoomKind, onClose }
   // in the read's callback. And a guard so the close runs once.
   const hadDataRef = useRef(false);
   const closedRef = useRef(false);
+  // The latest `onClose`, so an inline arrow from the parent never re-arms
+  // the space read's effect (written in an effect, react-hooks/refs).
+  const onCloseRef = useRef(onClose);
+  useEffect(() => {
+    onCloseRef.current = onClose;
+  }, [onClose]);
 
   const rooms = space.data?.rooms ?? [];
   const lounge = rooms.find((r) => r.kind === "lounge") ?? null;
@@ -165,7 +171,7 @@ export function ClubSpace({ orgHandle, initialRoomId, initialRoomKind, onClose }
           // A club I left while the space was open (11.3 States).
           closedRef.current = true;
           toastSendFailure(r);
-          onClose();
+          onCloseRef.current();
         }
         return;
       }
@@ -185,7 +191,7 @@ export function ClubSpace({ orgHandle, initialRoomId, initialRoomKind, onClose }
       window.clearInterval(timer);
       document.removeEventListener("visibilitychange", onVisibility);
     };
-  }, [orgHandle, onClose, retryToken]);
+  }, [orgHandle, retryToken]);
 
   // The labels' clock.
   useEffect(() => {
@@ -226,6 +232,7 @@ export function ClubSpace({ orgHandle, initialRoomId, initialRoomKind, onClose }
       }
       setPickedRoomId(room.id);
       setReplyTo(null);
+      setFocusToken(0);
       replaceRoomHistory(room.id);
     },
     [openEvent],

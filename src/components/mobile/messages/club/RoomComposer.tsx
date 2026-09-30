@@ -145,9 +145,12 @@ export function RoomComposer({
   const inputRef = useRef<HTMLInputElement | null>(null);
   const plusRef = useRef<HTMLButtonElement | null>(null);
 
+  // The input exists only once `viewer` answered with `can_post`: the focus
+  // waits for that, and a plain chip tap resets the token to 0 (ClubSpace).
+  const ready = viewer !== null && viewer.can_post;
   useEffect(() => {
-    if (focusToken > 0) inputRef.current?.focus();
-  }, [focusToken]);
+    if (focusToken > 0 && ready) inputRef.current?.focus();
+  }, [focusToken, ready]);
 
   if (viewer === null) return null;
   const canPost = viewer.can_post && refusedViewer !== viewer;
