@@ -119,3 +119,85 @@ part-2 notes (its REQUESTS R1–R4 to S1) were read before this plan.
 ### Log
 - 2026-09-30T08:24:00Z part-2 plan written; starting week.ts
 - 2026-09-30T08:24:29Z week.ts + week.test.ts (7 pass), home/home-rules.ts + home-rules.test.ts (10 pass) written; committing step 1
+- 2026-09-30T08:24:30Z COMMITTED 22d920e feat(chat): week range and the home's pure rules (wave 2, W2-S1); starting home/HomeEmpty.tsx, PersonRow.tsx, ClubRow.tsx
+- 2026-09-30T08:32:40Z home/HomeEmpty, PersonRow, ClubRow, YourWeek, MessagesHome written; tsc (filtered) clean, eslint clean on home/ after wrapping the effect reads in a local async (the compiler rule flags a useCallback that sets state when called from an effect body directly). Baselines at a9355d1: CampusMobile 4 errors (set-state-in-effect 282, 434, 630, 3990), MessagesMobile 2 errors (immutability 151, set-state-in-effect 204). Starting MessagesMobile.tsx
+- 2026-09-30T08:34:50Z COMMITTED 92a0810 feat(chat): Messages home, Your week, club and person rows, no-clubs state (wave 2, W2-S1)
+- 2026-09-30T08:34:50Z COMMITTED 005020d feat(chat): the flag fork, deep links and history on /messages (wave 2, W2-S1); MessagesMobile.tsx eslint = the two old errors only (immutability, set-state-in-effect, both inside MessagesMobileV1); starting CampusMobile.tsx (2.2)
+- 2026-09-30T08:35:47Z COMMITTED 048cb1f feat(chat): CampusMobile with the flag on (wave 2, W2-S1); eslint = the four old set-state-in-effect errors only (282→314, 434→466, 630→662, 3990→4026, +32 lines); starting S1-contrast.md and the gates
+- 2026-09-30T08:50:00Z COMMITTED b47a72b feat(chat): coral mark on the live surfaces, the S1 contrast table (wave 2, W2-S1). typecheck exit 0; npm test 1614/1614; eslint over every S1 file = the baseline set only; build running
+
+### STOPPED (part 2; each a contradiction between the contract and the code on the branch, or inside the contract; built as written here, nothing improvised beyond it)
+
+10. **2.3 / 11.10 "the ONE `popstate` handler" and "the resolving read's body
+    is handed to `useRoomPoll` as `initialPage`" vs 11.3's pinned `ClubSpace`
+    props** (`{ orgHandle; initialRoomId; initialRoomKind; onClose }`, no
+    history callback, no `initialPage`; S2's first commit, which S1 builds
+    against). The shell cannot reach the event chat layer inside `ClubSpace`
+    nor hand it the page. Built as S2-notes.md R1–R3: the shell's handler
+    closes the depth-1 layer on `depth < 1` and ignores `depth >= 1`;
+    `ClubSpace` pushes / pops depth 2 itself; for an event-room deep link the
+    shell writes `replaceState` depth 1 + `pushState` depth 2 before mounting.
+    The deep-linked room is read twice (the shell's resolving GET, then the
+    hook's first read) until an `initialPage?` prop exists (REQUESTS).
+11. **1.2 "the unread pill" on a person / group row.** `GET /api/me/threads`
+    sends `unread: boolean` and no count (`threads/route.ts:76`, the
+    `ThreadEntry` type); the mockup's `2` has no source. Built: the pill
+    (coral, 20px) with no number; the row's label says `unread`.
+12. **11.1's chip text `<Sat> · <title>` "with `eventTimeShort`"** —
+    `eventTimeShort` answers `Sat 2 PM` (1.4), never `Sat` as the mockup
+    draws (`W0_Home:130`), and for a TOMORROW event it answers `7 PM` alone
+    (1.4 drops the `Tomorrow` prefix), so the chip then reads `7 PM · Fright
+    Night` with no day. Built with the pinned function; the row label's
+    event clause is `<title> <spoken time>` (`Build Night Saturday 2 PM`; the
+    1.2 example `Build Night Saturday` names a day the function does not
+    give alone).
+13. **1.2's club row labels** give examples without a time clause and then
+    say "the row's time is spoken with `rowTimeSpoken`". Built: the spoken
+    time as the LAST clause, after `pinned` (`Salsa Club, unread Board post,
+    Fall Formal is live now, you're going, 8:41 PM`); the examples' clauses
+    are unchanged.
+14. **Contrast (11.0) vs the coral text token on tinted surfaces.** Coral
+    TEXT (`#C8401E`) on the live week card's `#FFE9E0` is 4.27:1 and on the
+    live chip's `rgba(255,92,53,0.14)` tint 4.01:1 in Light. 11.0's own
+    coral MARK token is "for a tinted surface", so those two texts use
+    `coralMark` (`#B5381A`, 5.07 / 4.76). The coral dots on cream (a mark, not
+    text) are 2.88:1 against 3:1; each sits beside its word or label.
+    S1-contrast.md holds every pair.
+15. **2.1's bare header "and the pencil"** while the flag is unknown: the
+    compose overlay belongs to a list that does not exist yet. Built: the
+    same pencil, `role="button" aria-disabled="true"`, no handler, for the
+    one request's worth of time the flag takes.
+16. **Not a stop, a reading:** `page.tsx` passes `to` and `channel` only, so
+    `?tab=` (2.3) is read on the client with `useSearchParams()` in the
+    flag-on shell (the page is dynamic; the build gate proves no Suspense
+    bailout). `page.tsx` is not S1's.
+17. **11.1's failure placement.** "`inbox` failing alone → `LoadFailed`
+    (`Couldn't load your clubs.`) in the list's club position while threads
+    still list": with `All` active clubs interleave with threads, so the box
+    sits at the top of the list; threads failing alone (not written) mirrors
+    it (`Couldn't load your messages.` at the top, clubs still listed); both
+    failing → the one box.
+
+### REQUESTS (to the integration review / W2-S2)
+
+- To W2-S2: `initialPage?: ThreadMessagesResponse` on `ClubSpace` (S2's own R4
+  / STOPPED 6). `MessagesMobileV2` holds the resolving read's body at the
+  point it mounts `ClubSpace` (`run()` in the `?channel=` effect) and will
+  pass it in one line when the prop exists.
+- To W2-S2 (confirming R1–R3 are honoured here): the shell never closes on a
+  `popstate` whose `depth >= 1`; for an event-room deep link it writes
+  `{ vibeChat: <room>, depth: 1 }` then `{ vibeChat: <room>, depth: 2 }` on
+  the same URL before mounting, so `ClubSpace` must read `history.state` and
+  not push a second depth-2 entry; the space's `onClose` is the shell's
+  `history.back()` (or an in-place close in a fresh tab).
+- To the integration review: the props S1 defined for the siblings are
+  unchanged from the first commit (`palette`, `SERIF`, `FONT`,
+  `clubGradient`, `personColor`, `useChatV2`, `useHideTabBar`); the new
+  `home/*` exports are consumed by `MessagesMobile` only. `MessagesHome`'s
+  props: `{ filter, onFilter, refreshKey, onThreads, onOpenClub, onOpenThread,
+  onOpenRoom, onCompose }`.
+
+### SIBLING
+
+- None: `npm run typecheck` exit 0 repo-wide on the first run.
+- 2026-09-30T08:40:19Z build exit 0 (no warning naming an S1 file); S1-gate.md part 2 written; STOPPED 10-17, REQUESTS, SIBLING written; last commit
