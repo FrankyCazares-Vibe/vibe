@@ -248,3 +248,47 @@ imports `CardTray`, `CardTrayKind`, `ComposeSheets`; `RoomThread` and
 - 2026-09-30T09:02:08Z compose/ShareEventSheet.tsx written
 - 2026-09-30T09:02:08Z compose/ComposeSheets.tsx filled (mounts the three sheets by kind); typecheck + eslint
 - 2026-09-30T09:03:35Z sheets: typecheck 0, eslint 0 (no warnings after copying the + ref at mount), npm test 1637/1637; committing
+- 2026-09-30T09:03:42Z COMMITTED 177974d feat(chat): card sheet chrome and the three sheets (wave 2, W2-S3); running npm run build
+
+### Built (part 2, for the reviewer)
+
+- `cards/CardBubble.tsx` routes `card.type` → `PollCardView` /
+  `SignupCardView` / `EventCardView`; owns the box (padding per type, the
+  Event card full-bleed, 70 % when closed), the header line, the one
+  `aria-live` span; `card === null` keeps the fallback bubble; the 500 ms
+  press → `ReactionPicker` (Report, Remove) is unchanged from part 1.
+- `cards/PollCardView.tsx`: radiogroup / checkboxes, 44px hits around 36px
+  rows, bar `count / max(total_voters, 1)`, the mark, `Your pick`, two 20px
+  voters (none when anonymous), the count; footer variants; `PUT …/vote {
+  option_id, on: !mine }` with the 36px spinner in the mark's slot and NO
+  optimistic change; `poll_closed` closes locally, `not_found` →
+  `onRefresh`.
+- `cards/SignupCardView.tsx`: one-line vs two-line (any label > 12
+  characters), chips + `+N` over 3 visible, `Leave` when mine else `Full`
+  else `<K> open` + `Take a spot` (first open row coral), the footer
+  segments (≤ 12) or bar, `<taken> of <total> filled`; `slot_full` /
+  `not_found` → toast + `onRefresh`.
+- `cards/EventCardView.tsx`: the 48px band, title 19/700 Fraunces, `<place>
+  · <eventWhen>`, the note, `Your RSVP` group with `aria-pressed` pills →
+  `PUT` / `DELETE /api/events/<id>/rsvp` then `onRefresh(created_at)`, the
+  appear line, `<N> going`, `Open event chat`; `event === null` → the
+  fallback title + `This event was cancelled.`; closed → pills hidden.
+- `compose/CardSheet.tsx`: the shared chrome and `useCardPost` (the
+  refusal table of 1.2; never a re-submit after a 503).
+- `compose/NewPollSheet.tsx`, `NewSignupSheet.tsx`, `ShareEventSheet.tsx`:
+  every field, counter, stepper, switch, limit, helper line and label of
+  1.2 / 11.7; the bodies exactly as 11.7 sends them; the Share sheet reads
+  `GET /api/orgs/<handle>/space?events=1` on open with skeleton / empty /
+  `LoadFailed compact` states and the CTA disabled until a pick.
+- Fallback `failure` lines for non-refusals (not contract copy; only a
+  network failure or a 5xx shows them): `Couldn't save your vote.`,
+  `Couldn't post your poll.`, `Couldn't post your sign-up.`, `Couldn't share
+  this event.`, and RsvpSheet's two RSVP lines reused on the Event card.
+
+Where a reviewer should look first: `compose/CardSheet.tsx` `useCardPost`
+(the refusal table and the no-re-submit guard), `cards/PollCardView.tsx`
+`vote` (no optimistic change; the 36px spinner), `cards/card-rules.ts`
+`optionAriaLabel` / `signupProgress` / `fallbackEventTitle`, and the
+STOPPED entries above (1: reactions on cards have no handler in the pinned
+props; 2: the Officers caption; 3: the `content_blocked` toast line).
+- 2026-09-30T09:04:42Z build exit 0 (attempt 1); S3-gate.md part 2 and the Built summary written; committing the docs
