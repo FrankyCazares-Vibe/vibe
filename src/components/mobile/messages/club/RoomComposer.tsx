@@ -297,7 +297,15 @@ export function RoomComposer({
             aria-label={trayOpen ? "Close the tray" : "Add a poll, sign-up or event"}
             aria-expanded={trayOpen}
             onClick={() => setTrayOpen((o) => !o)}
-            style={{ ...circle, border: `1px solid ${t.fieldBorder}`, background: t.surface, color: t.ink, transition: "transform 160ms ease", transform: trayOpen ? "rotate(45deg)" : "none" }}
+            // Open: the disc inverts (the active chip's pair, `W0_Tray:93`) and the plus turns into the X (VIS-S3-3; INT-ADJUDICATE-6).
+            style={{
+              ...circle,
+              border: `1px solid ${trayOpen ? t.activeChip.bg : t.fieldBorder}`,
+              background: trayOpen ? t.activeChip.bg : t.surface,
+              color: trayOpen ? t.activeChip.ink : t.ink,
+              transition: "transform 160ms ease, background 160ms ease, color 160ms ease",
+              transform: trayOpen ? "rotate(45deg)" : "none",
+            }}
           >
             <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.4" strokeLinecap="round" aria-hidden="true"><path d="M12 5v14M5 12h14" /></svg>
           </button>
