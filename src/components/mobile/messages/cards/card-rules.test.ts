@@ -169,3 +169,26 @@ test("personName", () => {
   assert.equal(r.personName({ name: "", handle: "mayar" }), "mayar");
   assert.equal(r.personName({ name: " ", handle: " " }), "Someone");
 });
+
+test("cardWord: card.type first, then the kind, then the fallback text's prefix", () => {
+  const poll = { type: "poll" } as unknown as import("@/lib/chat/types").Card;
+  const signup = { type: "signup" } as unknown as import("@/lib/chat/types").Card;
+  const event = { type: "event" } as unknown as import("@/lib/chat/types").Card;
+  assert.equal(r.cardWord({ kind: "poll", card: poll, content: "Sign-up: Bake sale" }), "Poll");
+  assert.equal(r.cardWord({ kind: "poll", card: signup, content: "Poll: Which day?" }), "Sign-up");
+  assert.equal(r.cardWord({ kind: "event_card", card: event, content: "" }), "Event");
+  // A null card: the kind, and for `poll` the stored fallback's prefix.
+  assert.equal(r.cardWord({ kind: "event_card", card: null, content: "Event: Fall Formal · Thu Oct 8, 7:30 PM" }), "Event");
+  assert.equal(r.cardWord({ kind: "poll", card: null, content: "Sign-up: Bake sale shifts" }), "Sign-up");
+  assert.equal(r.cardWord({ kind: "poll", card: null, content: "Poll: Which day?" }), "Poll");
+  assert.equal(r.cardWord({ kind: "poll", card: null, content: "" }), "Poll");
+});
+
+test("cardAuthorName: You when mine, the name, the handle, Someone", () => {
+  assert.equal(r.cardAuthorName({ users: person("Maya R.") }, true), "You");
+  assert.equal(r.cardAuthorName({ users: null }, true), "You");
+  assert.equal(r.cardAuthorName({ users: person("Maya R.") }, false), "Maya R.");
+  assert.equal(r.cardAuthorName({ users: { ...person("", "mayar"), name: "  " } }, false), "mayar");
+  assert.equal(r.cardAuthorName({ users: null }, false), "Someone");
+  assert.equal(r.cardAuthorName({ users: { ...person("", ""), name: " " } }, false), "Someone");
+});

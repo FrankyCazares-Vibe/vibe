@@ -1,6 +1,6 @@
 "use client";
 
-import { useRef, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 
 import type { Card, ChatMessage, ThreadRoom } from "@/lib/chat/types";
 
@@ -9,6 +9,7 @@ import { initialsOf } from "../format";
 import { ReactionPicker } from "../ReactionPicker";
 import { visuallyHiddenStyle } from "../sheet-styles";
 import { FONT, palette } from "../v2-tokens";
+import { cardAuthorName, cardWord, type CardWord } from "./card-rules";
 import { EventCardView } from "./EventCardView";
 import { PollCardView } from "./PollCardView";
 import { SignupCardView } from "./SignupCardView";
@@ -51,29 +52,6 @@ export type CardBubbleProps = {
   /** `Report` in the long-press picker; never passed for the viewer's own. */
   onReport?: () => void;
 };
-
-export type CardWord = "Poll" | "Sign-up" | "Event";
-
-/**
- * The word after the dot. `card.type` when hydrated; else the message's
- * kind, and for `kind: "poll"` (which covers sign-ups too) the fallback
- * text's prefix (`Sign-up: …`, cards/fallback.ts).
- */
-export function cardWord(message: Pick<ChatMessage, "kind" | "card" | "content">): CardWord {
-  const type = message.card?.type;
-  if (type === "signup") return "Sign-up";
-  if (type === "event") return "Event";
-  if (type === "poll") return "Poll";
-  if (message.kind === "event_card") return "Event";
-  return message.content.startsWith("Sign-up:") ? "Sign-up" : "Poll";
-}
-
-/** `You` when mine, the author's name, `Someone` when `users` is null. */
-export function cardAuthorName(message: Pick<ChatMessage, "users">, isMine: boolean): string {
-  if (isMine) return "You";
-  const name = message.users?.name?.trim() || message.users?.handle?.trim();
-  return name || "Someone";
-}
 
 function HeaderIcon({ word, stroke }: { word: CardWord; stroke: string }) {
   if (word === "Poll") {
@@ -118,11 +96,25 @@ function HeaderLine({ word, author, night }: { word: CardWord; author: string; n
 export function CardBubble({ message, roomId, room, isMine, night, onCard, onRefresh, onOpenEventChat, onRemove, onReport }: CardBubbleProps) {
   const t = palette(night);
   const [pickerOpen, setPickerOpen] = useState(false);
-  // The one polite region per card (11.8 "Announcements").
-  const [announce, setAnnounce] = useState("");
+  // The one polite region per card (11.8 "Announcements"). `n` counts the
+  // answers: the span's text ends in a zero-width space on every other one,
+  // so an identical text (`12 voted` after a switched pick, the same
+  // `K of M filled` after Leave then Take) is still a DOM change the
+  // reader speaks (S3-BEHAVIOUR-4).
+  const [announce, setAnnounce] = useState<{ text: string; n: number }>({ text: "", n: 0 });
+  const onAnnounce = (text: string) => setAnnounce((a) => ({ text, n: a.n + 1 }));
   const longPressTimer = useRef<number | null>(null);
   const longPressFired = useRef(false);
   const pressStart = useRef<{ x: number; y: number } | null>(null);
+
+  // A card that unmounts inside the 500 ms window (a merge dropping it, the
+  // layer closing under the finger) must not fire the picker afterwards.
+  useEffect(
+    () => () => {
+      if (longPressTimer.current) window.clearTimeout(longPressTimer.current);
+    },
+    [],
+  );
 
   const clearLongPress = () => {
     if (longPressTimer.current) {
@@ -192,7 +184,6 @@ export function CardBubble({ message, roomId, room, isMine, night, onCard, onRef
   const disc = personColor(sender?.id || message.user_id);
   // A row still sending has no id to report or remove (the text bubble's guard).
   const temp = message.id.startsWith("temp_");
-  const cardBorder = night ? "1px solid rgba(255,255,255,0.08)" : "1px solid rgba(20,20,22,0.08)";
   const card = message.card;
   const header = <HeaderLine word={word} author={author} night={night} />;
   const closed = card !== null && card.type !== "event" && card.closed;
@@ -206,11 +197,11 @@ export function CardBubble({ message, roomId, room, isMine, night, onCard, onRef
       </>
     );
   } else if (card.type === "event") {
-    body = <EventCardView card={card} content={message.content} room={room} createdAt={message.created_at} author={authorForLabel} isMine={isMine} night={night} header={header} onRefresh={onRefresh} onOpenEventChat={onOpenEventChat} onAnnounce={setAnnounce} />;
+    body = <EventCardView card={card} content={message.content} room={room} createdAt={message.created_at} author={authorForLabel} isMine={isMine} night={night} header={header} onRefresh={onRefresh} onOpenEventChat={onOpenEventChat} onAnnounce={onAnnounce} />;
   } else if (card.type === "signup") {
-    body = <SignupCardView card={card} roomId={roomId} messageId={message.id} createdAt={message.created_at} author={authorForLabel} isMine={isMine} night={night} header={header} onCard={onCard} onRefresh={onRefresh} onAnnounce={setAnnounce} />;
+    body = <SignupCardView card={card} roomId={roomId} messageId={message.id} createdAt={message.created_at} author={authorForLabel} isMine={isMine} night={night} header={header} onCard={onCard} onRefresh={onRefresh} onAnnounce={onAnnounce} />;
   } else {
-    body = <PollCardView card={card} roomId={roomId} messageId={message.id} createdAt={message.created_at} author={authorForLabel} isMine={isMine} night={night} header={header} onCard={onCard} onRefresh={onRefresh} onAnnounce={setAnnounce} />;
+    body = <PollCardView card={card} roomId={roomId} messageId={message.id} createdAt={message.created_at} author={authorForLabel} isMine={isMine} night={night} header={header} onCard={onCard} onRefresh={onRefresh} onAnnounce={onAnnounce} />;
   }
 
   return (
@@ -254,7 +245,7 @@ export function CardBubble({ message, roomId, room, isMine, night, onCard, onRef
           padding: card?.type === "event" ? 0 : "10px 12px 9px",
           overflow: card?.type === "event" ? "hidden" : undefined,
           borderRadius: isMine ? "18px 18px 6px 18px" : "18px 18px 18px 6px",
-          border: cardBorder,
+          border: `1px solid ${t.hairline}`,
           background: t.surface,
           color: t.ink,
           // A closed poll or sign-up: the whole card at 70 %, no taps (11.8).
@@ -270,7 +261,8 @@ export function CardBubble({ message, roomId, room, isMine, night, onCard, onRef
         {body}
       </div>
       <span aria-live="polite" style={visuallyHiddenStyle}>
-        {announce}
+        {announce.text}
+        {announce.n % 2 === 1 ? "\u200B" : ""}
       </span>
       {pickerOpen ? (
         <ReactionPicker

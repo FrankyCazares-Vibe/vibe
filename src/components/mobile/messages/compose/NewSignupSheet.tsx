@@ -4,6 +4,7 @@ import { useId, useRef, useState } from "react";
 
 import type { ChatMessage, RoomKind } from "@/lib/chat/types";
 
+import { visuallyHiddenStyle } from "../sheet-styles";
 import { palette } from "../v2-tokens";
 import { AddButton, CardSheet, Counter, FieldLabel, fieldStyle, MinusIcon, PlusIcon, RemoveButton, useCardPost } from "./CardSheet";
 import {
@@ -32,8 +33,10 @@ import {
  * show to everyone in this room.`, the CTA `Post sign-up` → `POST …/cards
  * { type: "signup", question: title, options: [{ label, capacity }] }`.
  * The stepper is `role="group" aria-label="Spots for <slot>"` with `One
- * less spot` / `One more spot` around the number (`aria-label="<n>
- * spots"`). A refused `question` (the title) / `options.<n>` is outlined.
+ * less spot` / `One more spot` around the number, spoken as `<n> spots`
+ * from a visually hidden span (an `aria-label` on a plain span is not read;
+ * S3-BEHAVIOUR-5). A refused `question` (the title) / `options.<n>` is
+ * outlined. No `maxLength` on the inputs (S3-SECURITY-2, as the poll sheet).
  */
 export type NewSignupSheetProps = {
   roomId: string;
@@ -111,7 +114,6 @@ export function NewSignupSheet({ roomId, roomKind, roomName, clubName, orgId, ni
           id={titleId}
           type="text"
           value={title}
-          maxLength={QUESTION_MAX}
           autoComplete="off"
           aria-invalid={field === "question" || undefined}
           onChange={(e) => {
@@ -142,15 +144,15 @@ export function NewSignupSheet({ roomId, roomKind, roomName, clubName, orgId, ni
                 aria-label={name}
                 aria-invalid={invalid || undefined}
                 value={row.label}
-                maxLength={80}
                 autoComplete="off"
                 onChange={(e) => update(row.key, { label: e.target.value })}
                 style={{ ...fieldStyle(night, invalid), flexGrow: 1, minWidth: 0, width: undefined }}
               />
               <div role="group" aria-label={spotsForLabel(row.label, name)} style={{ width: 118, height: 48, flexShrink: 0, boxSizing: "border-box", padding: "0 1px", borderRadius: 999, border: "1px solid rgba(var(--scrim-rgb),0.10)", background: "rgba(var(--scrim-rgb),0.04)", display: "flex", alignItems: "center", justifyContent: "space-between" }}>
                 {arm("One less spot", row.capacity <= CAPACITY_MIN, () => update(row.key, { capacity: stepCapacity(row.capacity, -1) }), <MinusIcon size={16} />, t.secondary)}
-                <span aria-label={spotsWord(row.capacity)} style={{ minWidth: 20, textAlign: "center", fontSize: 15.5, fontWeight: 800, color: t.ink }}>
-                  {row.capacity}
+                <span style={{ minWidth: 20, textAlign: "center", fontSize: 15.5, fontWeight: 800, color: t.ink }}>
+                  <span aria-hidden>{row.capacity}</span>
+                  <span style={visuallyHiddenStyle}>{spotsWord(row.capacity)}</span>
                 </span>
                 {arm("One more spot", row.capacity >= CAPACITY_MAX, () => update(row.key, { capacity: stepCapacity(row.capacity, 1) }), <PlusIcon size={16} />, t.ink)}
               </div>

@@ -20,9 +20,11 @@ import { castVote, CoralDisc, Eye, EyeOff, PersonDisc, Ring, VoteSpinner } from 
  * A tap → `PUT …/vote { option_id, on: !mine }`, with NO optimistic change:
  * the tapped option shows the spinner in the mark's place until the
  * answer's `card` replaces this one through `onCard`. Refusals per 1.3:
- * the toast; `poll_closed` also marks the card closed here; `not_found` →
- * `onRefresh(created_at)`. A closed card takes no taps (the bubble draws it
- * at 70 %).
+ * the toast; `poll_closed` also marks the card closed locally — through
+ * `onCard(messageId, { ...card, closed: true })`, the same path a vote's
+ * answer takes, so the footer, the label, the taps and the bubble's 70 %
+ * all read `card.closed` (S3-CONTRACT-2); `not_found` →
+ * `onRefresh(created_at)`. A closed card takes no taps.
  */
 export type PollCardViewProps = {
   card: PollCard;
@@ -44,9 +46,7 @@ export type PollCardViewProps = {
 export function PollCardView({ card, roomId, messageId, createdAt, author, isMine, night, header, onCard, onRefresh, onAnnounce }: PollCardViewProps) {
   const t = palette(night);
   const [busy, setBusy] = useState<string | null>(null);
-  const [closedLocally, setClosedLocally] = useState(false);
-  const closed = card.closed || closedLocally;
-  const footer = { ...card, closed };
+  const closed = card.closed;
 
   const vote = async (option: PollCardOption) => {
     if (closed || busy !== null) return;
@@ -64,12 +64,12 @@ export function PollCardView({ card, roomId, messageId, createdAt, author, isMin
       return;
     }
     toastSendFailure(r);
-    if (r.code === "poll_closed") setClosedLocally(true);
+    if (r.code === "poll_closed") onCard(messageId, { ...card, closed: true });
     else if (r.code === "not_found") onRefresh(createdAt);
   };
 
   return (
-    <div role="group" aria-label={pollCardLabel(footer, author, isMine)}>
+    <div role="group" aria-label={pollCardLabel(card, author, isMine)}>
       {header}
       <div style={{ marginTop: 4, fontSize: 15, fontWeight: 700, lineHeight: 1.3, overflowWrap: "anywhere" }}>{card.question}</div>
       <div role={card.multi ? "group" : "radiogroup"} aria-label={card.question} style={{ marginTop: 2, display: "flex", flexDirection: "column" }}>
@@ -108,7 +108,7 @@ export function PollCardView({ card, roomId, messageId, createdAt, author, isMin
                 {spinning ? <VoteSpinner color={t.coralText} /> : option.mine ? <CoralDisc /> : <Ring color={t.ringGrey} />}
                 <span style={{ position: "relative", minWidth: 0, flexShrink: 1, display: "flex", flexDirection: "column", alignItems: "flex-start", overflow: "hidden" }}>
                   <span style={{ maxWidth: "100%", fontSize: 14, fontWeight: 700, lineHeight: "16px", whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>{option.label}</span>
-                  {option.mine ? <span style={{ fontSize: 10.5, fontWeight: 700, lineHeight: "12px", color: t.coralText, whiteSpace: "nowrap" }}>{YOUR_PICK}</span> : null}
+                  {option.mine ? <span style={{ fontSize: 10.5, fontWeight: 700, lineHeight: "12px", color: t.coralMark, whiteSpace: "nowrap" }}>{YOUR_PICK}</span> : null}
                 </span>
                 {voters.length > 0 ? (
                   <span aria-hidden style={{ position: "relative", marginLeft: "auto", flexShrink: 0, display: "flex", gap: 3 }}>
@@ -117,7 +117,7 @@ export function PollCardView({ card, roomId, messageId, createdAt, author, isMin
                     ))}
                   </span>
                 ) : null}
-                <span style={{ position: "relative", marginLeft: voters.length > 0 ? 0 : "auto", flexShrink: 0, minWidth: 10, textAlign: "right", fontSize: 13, fontWeight: 800, color: option.mine ? t.coralText : t.secondary }}>{option.count}</span>
+                <span style={{ position: "relative", marginLeft: voters.length > 0 ? 0 : "auto", flexShrink: 0, minWidth: 10, textAlign: "right", fontSize: 13, fontWeight: 800, color: option.mine ? t.coralMark : t.secondary }}>{option.count}</span>
               </span>
             </button>
           );
@@ -125,7 +125,7 @@ export function PollCardView({ card, roomId, messageId, createdAt, author, isMin
       </div>
       <div style={{ marginTop: 4, display: "flex", alignItems: "center", gap: 5, fontSize: 12, fontWeight: 600, lineHeight: "16px", color: t.muted }}>
         {card.anonymous ? <EyeOff color={t.muted} /> : <Eye color={t.muted} />}
-        {pollFooter(footer)}
+        {pollFooter(card)}
       </div>
     </div>
   );

@@ -179,7 +179,6 @@ export function ShareEventSheet({ roomId, roomKind, roomName, clubName, orgHandl
           placeholder="Add a line (optional)"
           aria-invalid={field === "note" || undefined}
           value={note}
-          maxLength={NOTE_MAX}
           autoComplete="off"
           onChange={(e) => {
             clearField();

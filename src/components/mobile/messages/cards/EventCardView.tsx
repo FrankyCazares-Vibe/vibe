@@ -85,7 +85,8 @@ export function EventCardView({ card, content, room, createdAt, author, isMine, 
   const band = org ? (
     <div style={{ height: 48, boxSizing: "border-box", padding: "0 12px", display: "flex", alignItems: "center", gap: 7, background: BAND_BG }}>
       <ClubDisc org={org} size={22} fontSize={9} ring="1.5px solid rgba(250,247,242,0.7)" />
-      <span style={{ minWidth: 0, fontFamily: SERIF, fontWeight: 700, fontSize: 14, color: "#FAF7F2", whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>{org.name}</span>
+      {/* The name ends by x ≈ 197px: past ~205px the band's gradient (with the peach radial tint) drops #FAF7F2 under 4.5:1 (11.0; S3-DESIGN-3). */}
+      <span style={{ minWidth: 0, maxWidth: 156, fontFamily: SERIF, fontWeight: 700, fontSize: 14, color: "#FAF7F2", whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>{org.name}</span>
     </div>
   ) : null;
 

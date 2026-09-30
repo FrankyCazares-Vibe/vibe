@@ -38,7 +38,10 @@ import { castVote, PersonDisc, PillSpinner, Ring } from "./card-parts";
  *
  * `Take a spot` → `PUT …/vote { option_id, on: true }`, `Leave` → `on:
  * false`, no optimistic change; `slot_full` → the toast and `onRefresh`;
- * `not_found` → `onRefresh`; `poll_closed` marks the card closed here.
+ * `not_found` → `onRefresh`; `poll_closed` marks the card closed through
+ * `onCard(messageId, { ...card, closed: true })` (S3-CONTRACT-2). The chip
+ * row clips at a chip's edge (whole chips, never mid-name): a row that
+ * cannot hold every chip beside the pill hides the rest (S3-DESIGN-7).
  */
 export type SignupCardViewProps = {
   card: PollCard;
@@ -56,11 +59,13 @@ export type SignupCardViewProps = {
 
 const ROW_LINE = "1px solid rgba(var(--scrim-rgb),0.07)";
 
+/** One 20px line of chips; chips past the row's width wrap to a hidden second line, so nothing is cut mid-name. */
+const CHIP_LINE: React.CSSProperties = { display: "flex", flexWrap: "wrap", alignItems: "center", alignContent: "flex-start", gap: "24px 8px", height: 20, overflow: "hidden" };
+
 export function SignupCardView({ card, roomId, messageId, createdAt, author, isMine, night, header, onCard, onRefresh, onAnnounce }: SignupCardViewProps) {
   const t = palette(night);
   const [busy, setBusy] = useState<string | null>(null);
-  const [closedLocally, setClosedLocally] = useState(false);
-  const closed = card.closed || closedLocally;
+  const closed = card.closed;
   const twoLine = signupTwoLine(card.options.map((o) => o.label));
   const { taken, total } = signupCounts(card.options);
   const progress = signupProgress(total, taken);
@@ -85,7 +90,7 @@ export function SignupCardView({ card, roomId, messageId, createdAt, author, isM
     }
     toastSendFailure(r);
     if (r.code === "slot_full" || r.code === "not_found") onRefresh(createdAt);
-    else if (r.code === "poll_closed") setClosedLocally(true);
+    else if (r.code === "poll_closed") onCard(messageId, { ...card, closed: true });
   };
 
   const pill = (coral: boolean): React.CSSProperties => ({
@@ -168,7 +173,7 @@ export function SignupCardView({ card, roomId, messageId, createdAt, author, isM
               <div key={option.id} style={{ minHeight: 56, boxSizing: "border-box", padding: "6px 0", borderTop: ROW_LINE, display: "flex", alignItems: "center", gap: 8, whiteSpace: "nowrap" }}>
                 <div style={{ flexGrow: 1, minWidth: 0, display: "flex", flexDirection: "column", gap: 5 }}>
                   <span style={{ fontSize: 12.5, fontWeight: 700, lineHeight: "16px", overflow: "hidden", textOverflow: "ellipsis" }}>{option.label}</span>
-                  <div style={{ display: "flex", alignItems: "center", gap: 8, overflow: "hidden" }}>{chips(option, open, kind === "take")}</div>
+                  <div style={CHIP_LINE}>{chips(option, open, kind === "take")}</div>
                 </div>
                 {right}
               </div>
@@ -177,7 +182,7 @@ export function SignupCardView({ card, roomId, messageId, createdAt, author, isM
           return (
             <div key={option.id} style={{ height: kind === "full" ? 36 : 44, boxSizing: "border-box", borderTop: ROW_LINE, display: "flex", alignItems: "center", gap: 8, whiteSpace: "nowrap" }}>
               <span style={{ width: 62, flexShrink: 0, fontSize: 12.5, fontWeight: 700, overflow: "hidden", textOverflow: "ellipsis" }}>{option.label}</span>
-              <span style={{ flex: "1 1 auto", minWidth: 0, display: "flex", alignItems: "center", gap: 8, overflow: "hidden" }}>{chips(option, open, kind === "take")}</span>
+              <span style={{ ...CHIP_LINE, flex: "1 1 auto", minWidth: 0 }}>{chips(option, open, kind === "take")}</span>
               {right}
             </div>
           );

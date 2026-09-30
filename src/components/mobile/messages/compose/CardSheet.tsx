@@ -20,8 +20,9 @@ import { FONT, palette, SERIF } from "../v2-tokens";
  * composer always sits inside `ClubSpace`'s or `EventChat`'s `Drawer.Root`
  * and a plain root closing inside another drawer runs vaul's unlock —
  * ConversationView's note, RsvpSheet's precedent; it is the same vaul root
- * with `nested`), `role="dialog" aria-modal aria-labelledby` from vaul's
- * dialog and its `Title`, the 40×5 handle, the 25px/800 title, the
+ * with `nested`), `role="dialog"` and `aria-labelledby` from vaul's dialog
+ * and its `Title` plus `aria-modal="true"` set here (Radix never writes it;
+ * S3-CONTRACT-1), the 40×5 handle, the 25px/800 title, the
  * `<club> · <room>` line, the 44px close (`aria-label="Close"`), the 50px
  * gradient CTA (`aria-disabled` while the body is invalid, `Posting…` in
  * flight). `var(--paper)` surface, radius 28 on top. It calls
@@ -33,10 +34,13 @@ import { FONT, palette, SERIF } from "../v2-tokens";
  * outlined (S3-notes STOPPED 3); `invalid_card` → its sentence and the field
  * outlined; `board_officers_only` / `room_closed` / `not_found` → the
  * sentence and the sheet closes; `try_again` (503, from anywhere in the
- * POST) → the sentence and the room's `reload()` (the row may exist; the
- * sheet closes with it and never re-submits, N8); a 201 → `onPosted(message)`.
- * Any other failure (401, 403 "Not a member", 429, a 5xx, the network)
- * shows its mapped line and the sheet stays.
+ * POST) → the sentence, the sheet closes (`onClose`, the hook's own) and
+ * the room's `reload()` (the row may exist; never a re-submit, N8); a 201 →
+ * `onPosted(message)`. Any other failure (401, 403 "Not a member", 429, a
+ * 5xx, the network) shows its mapped line and the sheet stays. While a
+ * POST is in flight the sheet ignores the X, the scrim and the drag: a
+ * sheet closed mid-request could be followed by a second one posting a
+ * second card (S3-SECURITY-1).
  */
 
 /** 1.2's exact toast line for a 422 `content_blocked` (the server's own `error`). */
@@ -102,6 +106,7 @@ export function useCardPost(args: {
       case "try_again":
         toastSendFailure(r);
         doneRef.current = true;
+        onClose();
         onReload();
         return;
       default:
@@ -127,13 +132,19 @@ export type CardSheetProps = {
   onSubmit: () => void;
   onClose: () => void;
   returnFocusTo?: React.RefObject<HTMLElement | null>;
+  /** The gap above the CTA: 14 (W0_NewSignup, W0_ShareEvent); the poll sheet's 10 (W0_NewPoll:156). */
+  ctaGap?: number;
   children: React.ReactNode;
 };
 
-export function CardSheet({ title, roomLine, orgId, night, cta, ctaDisabled, posting, onSubmit, onClose, returnFocusTo, children }: CardSheetProps) {
+export function CardSheet({ title, roomLine, orgId, night, cta, ctaDisabled, posting, onSubmit, onClose, returnFocusTo, ctaGap = 14, children }: CardSheetProps) {
   useHideTabBar();
   const t = palette(night);
   const disabled = ctaDisabled || posting;
+  // No close while the POST is in flight (S3-SECURITY-1).
+  const close = () => {
+    if (!posting) onClose();
+  };
 
   // Focus back to the composer's "+" once the sheet is gone (11.0), after
   // vaul has finished its own unmount work.
@@ -149,7 +160,7 @@ export function CardSheet({ title, roomLine, orgId, night, cta, ctaDisabled, pos
     <Drawer.NestedRoot
       open
       onOpenChange={(open) => {
-        if (!open) onClose();
+        if (!open) close();
       }}
     >
       <Drawer.Portal>
@@ -169,6 +180,7 @@ export function CardSheet({ title, roomLine, orgId, night, cta, ctaDisabled, pos
             fontFamily: FONT,
             color: t.ink,
           }}
+          aria-modal="true"
           aria-describedby={undefined}
           onCloseAutoFocus={(e) => e.preventDefault()}
         >
@@ -185,7 +197,8 @@ export function CardSheet({ title, roomLine, orgId, night, cta, ctaDisabled, pos
               <button
                 type="button"
                 aria-label="Close"
-                onClick={onClose}
+                aria-disabled={posting || undefined}
+                onClick={close}
                 style={{ width: 44, height: 44, flexShrink: 0, marginRight: -6, boxSizing: "border-box", borderRadius: 999, border: "1px solid rgba(var(--scrim-rgb),0.10)", background: "rgba(var(--scrim-rgb),0.04)", color: t.secondary, display: "flex", alignItems: "center", justifyContent: "center", padding: 0, cursor: "pointer", WebkitTapHighlightColor: "transparent" }}
               >
                 <CloseX size={18} />
@@ -199,7 +212,7 @@ export function CardSheet({ title, roomLine, orgId, night, cta, ctaDisabled, pos
                 if (!disabled) onSubmit();
               }}
               style={{
-                marginTop: 14,
+                marginTop: ctaGap,
                 height: 50,
                 flexShrink: 0,
                 boxSizing: "border-box",

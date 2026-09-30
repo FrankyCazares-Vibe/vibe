@@ -16,7 +16,10 @@ import { cleanText, charCount, OPTIONS_MAX, optionName, POLL_OPTIONS_MIN, pollVa
  * CTA `Post poll` — enabled once the question is 1–200 and every label is
  * non-blank and ≤ 80 → `POST …/cards { type: "poll", question, options:
  * [{ label }], anonymous, multi }` (no `closes_at` in v1). A refused
- * `question` / `options.<n>` is outlined (`useCardPost`).
+ * `question` / `options.<n>` is outlined (`useCardPost`). No `maxLength`
+ * on the inputs: it counts UTF-16 units while the counter and the route
+ * count code points, so the counter (coral past the limit) and `pollValid`
+ * carry the limit (S3-SECURITY-2).
  */
 export type NewPollSheetProps = {
   roomId: string;
@@ -78,7 +81,7 @@ export function NewPollSheet({ roomId, roomKind, roomName, clubName, orgId, nigh
   };
 
   return (
-    <CardSheet title="New poll" roomLine={sheetRoomLine(clubName, roomKind, roomName)} orgId={orgId} night={night} cta="Post poll" ctaDisabled={!valid} posting={posting} onSubmit={submit} onClose={onClose} returnFocusTo={returnFocusTo}>
+    <CardSheet title="New poll" roomLine={sheetRoomLine(clubName, roomKind, roomName)} orgId={orgId} night={night} cta="Post poll" ctaDisabled={!valid} posting={posting} onSubmit={submit} onClose={onClose} returnFocusTo={returnFocusTo} ctaGap={10}>
       <div style={{ marginTop: 14, display: "flex", flexDirection: "column", gap: 6 }}>
         <div style={{ display: "flex", alignItems: "baseline", gap: 8 }}>
           <FieldLabel htmlFor={questionId} night={night}>
@@ -90,7 +93,6 @@ export function NewPollSheet({ roomId, roomKind, roomName, clubName, orgId, nigh
           id={questionId}
           type="text"
           value={question}
-          maxLength={QUESTION_MAX}
           autoComplete="off"
           aria-invalid={field === "question" || undefined}
           onChange={(e) => {
@@ -117,7 +119,6 @@ export function NewPollSheet({ roomId, roomKind, roomName, clubName, orgId, nigh
                   aria-label={name}
                   aria-invalid={invalid || undefined}
                   value={row.label}
-                  maxLength={80}
                   autoComplete="off"
                   onChange={(e) => setLabel(row.key, e.target.value)}
                   style={{ flexGrow: 1, minWidth: 0, height: 44, padding: 0, border: "none", outline: "none", background: "transparent", color: t.ink, fontFamily: "inherit", fontSize: 16, fontWeight: 600 }}

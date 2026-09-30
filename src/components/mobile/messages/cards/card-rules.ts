@@ -9,7 +9,7 @@
  * (1.2: `Poll from someone: …`).
  */
 
-import type { EventRef, Person, PollCard, PollCardOption } from "@/lib/chat/types";
+import type { ChatMessage, EventRef, Person, PollCard, PollCardOption } from "@/lib/chat/types";
 
 export const EVENT_CANCELLED_LINE = "This event was cancelled.";
 export const APPEAR_LINE = "You'll appear in the event chat.";
@@ -26,6 +26,31 @@ export function personName(p: Pick<Person, "name" | "handle">): string {
 /** Ends a spoken clause with one full stop: none is added after a name's own `.` (`Priya S.`) or a question's `?`. */
 export function endSentence(text: string): string {
   return /[.?!…]$/.test(text) ? text : `${text}.`;
+}
+
+// ── The header line (11.8: `<Name> · Poll | Sign-up | Event`) ───────────────
+
+export type CardWord = "Poll" | "Sign-up" | "Event";
+
+/**
+ * The word after the dot. `card.type` when hydrated; else the message's
+ * kind, and for `kind: "poll"` (which covers sign-ups too) the fallback
+ * text's prefix (`Sign-up: …`, cards/fallback.ts).
+ */
+export function cardWord(message: Pick<ChatMessage, "kind" | "card" | "content">): CardWord {
+  const type = message.card?.type;
+  if (type === "signup") return "Sign-up";
+  if (type === "event") return "Event";
+  if (type === "poll") return "Poll";
+  if (message.kind === "event_card") return "Event";
+  return message.content.startsWith("Sign-up:") ? "Sign-up" : "Poll";
+}
+
+/** `You` when mine, the author's name (else the handle), `Someone` when `users` is null (SCREENS-L11). */
+export function cardAuthorName(message: Pick<ChatMessage, "users">, isMine: boolean): string {
+  if (isMine) return "You";
+  const name = message.users?.name?.trim() || message.users?.handle?.trim();
+  return name || "Someone";
 }
 
 // ── Poll ─────────────────────────────────────────────────────────────────────

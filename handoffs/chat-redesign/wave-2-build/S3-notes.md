@@ -293,3 +293,58 @@ STOPPED entries above (1: reactions on cards have no handler in the pinned
 props; 2: the Officers caption; 3: the `content_blocked` toast line).
 - 2026-09-30T09:04:42Z build exit 0 (attempt 1); S3-gate.md part 2 and the Built summary written; committing the docs
 - 2026-09-30T09:04:59Z COMMITTED db5cb2c docs(chat): S3 gate record part 2, notes, STOPPED and REQUESTS (wave 2, W2-S3). W2-S3 main batch done: commits 65c38ed, 177974d, db5cb2c on top of 36a1ccd / 24ca304.
+
+## Part 3 — the repair after the four reviews (one pass)
+
+Continues from `e8435f9` on the shared tree. Reads `S3-review-contract.md`,
+`S3-review-security.md`, `S3-review-behaviour.md`, `S3-review-design.md`;
+every finding verified against the tree, the contract and the mockups; the
+verdicts and the gates go to `S3-repair.md`. Edits ONLY `messages/cards/*`
+and `messages/compose/*` (13.2).
+
+### Plan
+
+1. `cards/CardBubble.tsx`: clear the 500 ms timer on unmount (B2); the
+   announcement re-reads an identical text (a zero-width toggle in the one
+   span, B4 / D5); the border from `t.hairline` (D6); `cardWord` /
+   `cardAuthorName` move to `card-rules.ts` with tests (B7).
+2. `cards/PollCardView.tsx`, `cards/SignupCardView.tsx`: `poll_closed` →
+   `onCard(messageId, { ...card, closed: true })`, no local flag (C2 / B1);
+   `Your pick` and the picked count in `t.coralMark` (D1); chips clip at a
+   chip's edge, never mid-name (D7, no rule change).
+3. `cards/EventCardView.tsx`: the band name's `maxWidth` (D3; 156, not the
+   review's 176: the peach radial tint lowers the ratio further).
+4. `compose/CardSheet.tsx`: `aria-modal="true"` (C1 / D2); no close while a
+   POST is in flight (SEC1); `try_again` closes then reloads (C4); `ctaGap`
+   (D8).
+5. The three sheets: no `maxLength` (SEC2 / B6: the counter and the validity
+   rules carry the code-point limit); `<n> spots` spoken from a visually
+   hidden span (B5).
+6. Gates, `S3-repair.md`, this log.
+
+### STOPPED (part 3)
+
+4. **`You'll appear in the event chat.` on a closed event.** 1.2 / 11.8 /
+   14.41 pin the line's condition as `viewer_status === null && room_id ===
+   null`; 11.8 also hides the pills when `state === "closed"` and places the
+   line "under the pills". Built (part 2, kept here): the line is hidden too
+   when `state === "closed"` (`showAppearLine`, a third clause). Part 2 filed
+   it under "Decisions read from the contract"; S3-CONTRACT-3 is right that
+   it is a change to a pinned rule: the integration review keeps the clause
+   (and 14.41 gains it) or drops it.
+
+### REQUESTS (part 3)
+
+3. Integration review (S3-DESIGN-7): at 292px a single-line sign-up row holds
+   about two chips beside the pill; 11.8 pins `+N` past 3 visible takers.
+   Built: chips now clip at a chip's edge (whole chips, never mid-name), the
+   count rule untouched. If a `+N` after two chips is wanted on the
+   single-line row, 11.8's "3" changes.
+
+### Log (part 3)
+- 2026-09-30T10:09:18Z part 3 plan written; reviews read, D1/D3 contrast recomputed (D3 needs maxWidth 156, not 176); starting card-rules.ts (cardWord / cardAuthorName)
+- 2026-09-30T10:10:23Z card-rules.ts (cardWord / cardAuthorName moved in), CardBubble.tsx (timer cleanup, announce toggle, hairline border) written; starting the tests and the three views
+- 2026-09-30T10:11:02Z card-rules.test.ts (+2 tests, 16/16), PollCardView / SignupCardView (closed through onCard, coralMark, chip line), EventCardView (band name maxWidth 156) written; starting compose/*
+- 2026-09-30T10:11:11Z compose/CardSheet (aria-modal, close guard, try_again onClose, ctaGap), NewPollSheet / NewSignupSheet / ShareEventSheet (no maxLength, spoken spots, ctaGap 10) written; running typecheck + eslint + rule tests
+- 2026-09-30T10:11:44Z gates: typecheck 0, eslint 0 (max-warnings 0), npm test 1639/1639; running npm run build
+- 2026-09-30T10:13:15Z build exit 0 (attempt 1); S3-repair.md and S3-gate.md part 3 written; committing the code and the docs

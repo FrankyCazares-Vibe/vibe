@@ -37,3 +37,20 @@ No moved file was edited (10.2 rule 5), so no rule-by-rule baseline compare
 against `a9355d1` was needed (`MessagesMobile.tsx` / `CampusMobile.tsx`
 untouched). No new npm dependency (vaul was already a dependency; the
 spinners are SVG SMIL, no stylesheet).
+
+## Part 3 — the repair after review (`fix(chat): W2-S3 repair after review`)
+
+Files: `cards/CardBubble.tsx`, `cards/PollCardView.tsx`, `cards/SignupCardView.tsx`,
+`cards/EventCardView.tsx`, `cards/card-rules.ts`, `cards/card-rules.test.ts`,
+`compose/CardSheet.tsx`, `compose/NewPollSheet.tsx`, `compose/NewSignupSheet.tsx`,
+`compose/ShareEventSheet.tsx` (all under W2-S3's ownership, 13.2).
+
+| gate | command | result |
+|---|---|---|
+| typecheck | `npm run typecheck` (repo-wide) | exit 0 |
+| tests | `npm test` | 1639 tests, 1639 pass, 0 fail (2 new: `cardWord`, `cardAuthorName`) |
+| build | `npm run build` | exit 0, first attempt, no collision |
+| eslint | `npx eslint --max-warnings 0 src/components/mobile/messages/cards/ src/components/mobile/messages/compose/` | exit 0, 0 errors, 0 warnings |
+
+No moved file was edited (10.2 rule 5); no new npm dependency. Verdicts per
+finding in `S3-repair.md`.
