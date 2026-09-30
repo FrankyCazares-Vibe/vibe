@@ -1,30 +1,62 @@
 "use client";
 
+import Link from "next/link";
+import { useCallback, useEffect, useRef, useState } from "react";
 import { Drawer } from "vaul";
 
-import type { RoomKind } from "@/lib/chat/types";
+import { asLoadFailure, LoadFailed, type LoadFailure } from "@/components/feedback/LoadFailed";
+import type { RoomKind, SpaceResponse, SpaceRoom } from "@/lib/chat/types";
 import { useHideTabBar } from "@/lib/chat/use-hide-tabbar";
+import { ROOM_FULL_READ_EVERY, ROOM_POLL_MS, useRoomPoll } from "@/lib/chat/use-room-poll";
+import { vibeRequest } from "@/lib/feedback/request";
 
+import { clubGradient } from "../avatar";
+import { initialsOf } from "../format";
+import { toastSendFailure } from "../send-failure";
 import { vaulOverlayStyle, visuallyHiddenStyle } from "../sheet-styles";
 import { useNightTheme } from "../theme";
-import { FONT, palette } from "../v2-tokens";
+import { FONT, palette, SERIF } from "../v2-tokens";
+import { BoardStrip } from "./BoardStrip";
+import { BoardView } from "./BoardView";
+import { ClubEmpty } from "./ClubEmpty";
+import { EventChat } from "./EventChat";
+import { hatLine, isEmptyRoom, isOfficer } from "./helpers";
+import { RoomChips } from "./RoomChips";
+import { RoomComposer, type ReplyTarget } from "./RoomComposer";
+import { RoomThread } from "./RoomThread";
+import { UpNext } from "./UpNext";
 
 /**
- * The club space (handoffs/chat-redesign/wave-2-contracts.md 11.3; W2-S2) —
- * W0_Club, W0_Club_Light. Opened by a club row tap, `?channel=<id>` (2.3), or
- * underneath an event chat layer.
+ * The club space (handoffs/chat-redesign/wave-2-contracts.md 11.3, 1.2;
+ * mockups W0_Club, W0_Club_Light, W0_Board, W0_EmptyClub; MK:4, 5, 12; W2-S2).
+ * Opened by a club row tap, `?channel=<id>` (2.3), or underneath an event
+ * chat layer. Props are exactly 11.3's.
  *
- * W2-S2's first commit (13.1): the shell with the 11.3 props, so W2-S1's
- * `MessagesMobile` imports it from its first line. It renders the drawer
- * chrome of `ConversationView` (a `Drawer.Root direction="right"`, overlay
- * 1099 / content 1100), hides the tab bar through the counted
- * `useHideTabBar()` (SCREENS-H1; nothing comes "free" from the drawer), and
- * draws only the 11.3 skeleton: the header (52px + the safe area), the chips
- * row and three bars. The space read, Up next, the chips, the Board strip,
- * the room and the composer follow in the batch's later commits.
- *
- * `initialRoomKind === "event"` will mean: the space on its Lounge with
- * `EventChat` (11.6) mounted on top for `initialRoomId`.
+ * - A full-screen view above the home: `Drawer.Root direction="right"`
+ *   (overlay 1099 / content 1100) like `ConversationView`; the tab bar is
+ *   hidden by the counted `useHideTabBar()` (SCREENS-H1).
+ * - Reads: `GET /api/orgs/<handle>/space` on open, on return to visible, and
+ *   every 20 s while visible (= 5 ticks of the room's 4-s poll, 9.3); the
+ *   open room through `useRoomPoll` (11.5), keyed by the room's id, paused
+ *   while the event chat layer is open (the layer polls its own room). A
+ *   deep link with a room id starts the room's read at once (the space read
+ *   follows); `initialRoomKind === "event"` → the space on its Lounge with
+ *   `EventChat` on top (11.6).
+ * - Layout: the 52px header + safe area (Back, the 40px avatar, the name,
+ *   `Your hat: … · N members`, the club-page link), Up next, the chips, the
+ *   Board strip (every room but the Board), the room (BoardView / RoomThread),
+ *   the composer (RoomComposer: nothing while `viewer` is null).
+ * - History (2.3): a chip tap `replaceState`s the room's id at the current
+ *   depth; opening the layer `pushState`s depth 2 (unless the deep link's
+ *   entry is already there); the layer's Back is `history.back()`; a
+ *   `popstate` below depth 2 closes the layer. The space's own Back and swipe
+ *   call `onClose` (S2-notes.md REQUESTS R1-R3).
+ * - States: the header + chips + three bars skeleton until the space read
+ *   answers; the read failing → `LoadFailed` (`Couldn't load this club.`,
+ *   non-retryable on 403 `members_only` / 404) with Back working; a LATER
+ *   403 closes the view with the toast `Members only.`.
+ * - The officer's brand new club (11.9.3): `ClubEmpty` in the Lounge's place
+ *   and the dashed `Add your first event` in Up next.
  */
 export type ClubSpaceProps = {
   orgHandle: string;
@@ -33,22 +65,178 @@ export type ClubSpaceProps = {
   onClose: () => void;
 };
 
+const SPACE_LINE = "Couldn't load this club.";
+const BOARD_LINE = "Couldn't load the Board.";
+const SPACE_REREAD_MS = ROOM_POLL_MS * ROOM_FULL_READ_EVERY;
+
 const SKELETON_DISC = "rgba(var(--scrim-rgb),0.06)";
 const SKELETON_BAR = "rgba(var(--scrim-rgb),0.08)";
 const SKELETON_BAR_SOFT = "rgba(var(--scrim-rgb),0.05)";
 
+type SpaceState = { data: SpaceResponse | null; failure: LoadFailure | null };
+
+type HistoryState = { vibeChat?: unknown; depth?: unknown } | null;
+
+function historyState(): HistoryState {
+  try {
+    return typeof window === "undefined" ? null : (window.history.state as HistoryState);
+  } catch {
+    return null;
+  }
+}
+
+function roomUrl(id: string): string {
+  return `/messages?channel=${encodeURIComponent(id)}`;
+}
+
+/** A chip tap: the same depth, the room's id (2.3). */
+function replaceRoomHistory(id: string): void {
+  try {
+    const s = historyState();
+    const depth = typeof s?.depth === "number" ? s.depth : 1;
+    window.history.replaceState({ vibeChat: id, depth }, "", roomUrl(id));
+  } catch {
+    /* history unavailable */
+  }
+}
+
+/** The event chat layer's open: depth 2, unless a deep link already pushed it (R2). */
+function pushLayerHistory(id: string): void {
+  try {
+    const s = historyState();
+    if (s && s.depth === 2 && s.vibeChat === id) return;
+    window.history.pushState({ vibeChat: id, depth: 2 }, "", roomUrl(id));
+  } catch {
+    /* history unavailable */
+  }
+}
+
+function isVisible(): boolean {
+  return typeof document === "undefined" || document.visibilityState === "visible";
+}
+
 export function ClubSpace({ orgHandle, initialRoomId, initialRoomKind, onClose }: ClubSpaceProps) {
-  // Hooks first, always (react-hooks/rules-of-hooks): the tab bar count and
-  // the theme.
+  // Hooks first, always (react-hooks/rules-of-hooks).
   useHideTabBar();
   const night = useNightTheme();
   const t = palette(night);
+  const [space, setSpace] = useState<SpaceState>({ data: null, failure: null });
+  const [now, setNow] = useState<Date>(() => new Date());
+  const [pickedRoomId, setPickedRoomId] = useState<string | null>(initialRoomKind === "event" ? null : initialRoomId);
+  const [eventRoomId, setEventRoomId] = useState<string | null>(initialRoomKind === "event" ? initialRoomId : null);
+  const [replyTo, setReplyTo] = useState<ReplyTarget | null>(null);
+  const [scrollToken, setScrollToken] = useState(0);
+  const [focusToken, setFocusToken] = useState(0);
+  // Whether a space read has answered, for the later-403 rule; written only
+  // in the read's callback. And a guard so the close runs once.
+  const hadDataRef = useRef(false);
+  const closedRef = useRef(false);
 
-  // Read in the later commits (the space read, the initial room, the event
-  // chat layer); named here so the shell's props are the 11.3 props exactly.
-  void orgHandle;
-  void initialRoomId;
-  void initialRoomKind;
+  const rooms = space.data?.rooms ?? [];
+  const lounge = rooms.find((r) => r.kind === "lounge") ?? null;
+  const board = rooms.find((r) => r.kind === "board") ?? null;
+  const picked = pickedRoomId ? (rooms.find((r) => r.id === pickedRoomId && r.kind !== "event") ?? null) : null;
+  const activeRoom: SpaceRoom | null = picked ?? lounge ?? rooms.find((r) => r.kind !== "event") ?? null;
+  // Before the space answers, a deep link's room reads at once (11.3 Reads).
+  const hookRoomId = activeRoom?.id ?? (initialRoomKind !== "event" ? initialRoomId : null);
+  const hookRoomKind: RoomKind | null = activeRoom?.kind ?? (initialRoomKind !== "event" ? initialRoomKind : null);
+  const poll = useRoomPoll(hookRoomId, {
+    enabled: eventRoomId === null && hookRoomId !== null,
+    line: hookRoomKind === "board" ? BOARD_LINE : undefined,
+  });
+
+  // The space read: on open (and on Retry, through `retryToken`), every 20 s
+  // while visible, on return to visible. The state is set in the read's
+  // callback after the answer, never in the effect's body.
+  const [retryToken, setRetryToken] = useState(0);
+  useEffect(() => {
+    let live = true;
+    const read = async () => {
+      const r = await vibeRequest<SpaceResponse>(`/api/orgs/${encodeURIComponent(orgHandle)}/space`, {
+        quiet: true,
+        failure: SPACE_LINE,
+        cache: "no-store",
+      });
+      if (!live || closedRef.current) return;
+      if (!r.ok || !Array.isArray(r.data?.rooms)) {
+        if (!hadDataRef.current) {
+          setSpace({ data: null, failure: asLoadFailure(r, SPACE_LINE) });
+        } else if (!r.ok && r.status === 403) {
+          // A club I left while the space was open (11.3 States).
+          closedRef.current = true;
+          toastSendFailure(r);
+          onClose();
+        }
+        return;
+      }
+      hadDataRef.current = true;
+      setSpace({ data: r.data, failure: null });
+    };
+    void read();
+    const timer = window.setInterval(() => {
+      if (isVisible()) void read();
+    }, SPACE_REREAD_MS);
+    const onVisibility = () => {
+      if (isVisible()) void read();
+    };
+    document.addEventListener("visibilitychange", onVisibility);
+    return () => {
+      live = false;
+      window.clearInterval(timer);
+      document.removeEventListener("visibilitychange", onVisibility);
+    };
+  }, [orgHandle, onClose, retryToken]);
+
+  // The labels' clock.
+  useEffect(() => {
+    const id = window.setInterval(() => setNow(new Date()), 60_000);
+    return () => window.clearInterval(id);
+  }, []);
+
+  // History (2.3): a deep-linked event layer gets its depth-2 entry unless
+  // MessagesMobile pushed it already; a popstate below depth 2 closes the
+  // layer (the one closer for it).
+  useEffect(() => {
+    if (initialRoomKind === "event" && initialRoomId) pushLayerHistory(initialRoomId);
+  }, [initialRoomKind, initialRoomId]);
+  useEffect(() => {
+    const onPop = (e: PopStateEvent) => {
+      const s = e.state as HistoryState;
+      const depth = typeof s?.depth === "number" ? s.depth : 0;
+      if (depth < 2) setEventRoomId(null);
+    };
+    window.addEventListener("popstate", onPop);
+    return () => window.removeEventListener("popstate", onPop);
+  }, []);
+
+  const openEvent = useCallback((roomId: string) => {
+    setEventRoomId(roomId);
+    pushLayerHistory(roomId);
+  }, []);
+  const closeEvent = useCallback(() => {
+    const s = historyState();
+    if (s && s.depth === 2 && s.vibeChat) window.history.back();
+    else setEventRoomId(null);
+  }, []);
+  const pickRoom = useCallback(
+    (room: SpaceRoom) => {
+      if (room.kind === "event") {
+        openEvent(room.id);
+        return;
+      }
+      setPickedRoomId(room.id);
+      setReplyTo(null);
+      replaceRoomHistory(room.id);
+    },
+    [openEvent],
+  );
+
+  const org = space.data?.org ?? null;
+  const spaceViewer = space.data?.viewer ?? null;
+  const officerEmpty = !!org && !!spaceViewer && isOfficer(spaceViewer.role) && org.member_count === 1 && (space.data?.up_next.length ?? 0) === 0;
+  const loungeEmpty = officerEmpty && activeRoom?.kind === "lounge" && isEmptyRoom(poll.messages);
+  const boardUnread = board?.unread ?? false;
+  const boardLatest = space.data?.board_latest ?? null;
 
   return (
     <Drawer.Root
@@ -62,25 +250,95 @@ export function ClubSpace({ orgHandle, initialRoomId, initialRoomKind, onClose }
       <Drawer.Portal>
         <Drawer.Overlay style={{ ...vaulOverlayStyle, zIndex: 1099 }} />
         <Drawer.Content
-          style={{
-            position: "fixed",
-            top: 0,
-            right: 0,
-            bottom: 0,
-            width: "100%",
-            background: t.page,
-            color: t.ink,
-            display: "flex",
-            flexDirection: "column",
-            zIndex: 1100,
-            outline: "none",
-            fontFamily: FONT,
-          }}
+          style={{ position: "fixed", top: 0, right: 0, bottom: 0, width: "100%", background: t.page, color: t.ink, display: "flex", flexDirection: "column", zIndex: 1100, outline: "none", fontFamily: FONT }}
           aria-describedby={undefined}
         >
-          <Drawer.Title style={visuallyHiddenStyle}>Club space</Drawer.Title>
-          <ClubHeaderSkeleton night={night} onClose={onClose} />
-          <ClubBodySkeleton />
+          <Drawer.Title style={visuallyHiddenStyle}>{org ? org.name : "Club space"}</Drawer.Title>
+          <ClubHeader night={night} onClose={onClose} orgHandle={orgHandle} space={space.data} />
+          {space.failure ? (
+            <div style={{ flexGrow: 1, minHeight: 0, boxSizing: "border-box", padding: "16px 12px" }}>
+              <LoadFailed
+                failure={space.failure}
+                tone={night ? "dark" : "light"}
+                onRetry={() => {
+                  setSpace({ data: null, failure: null });
+                  setRetryToken((n) => n + 1);
+                }}
+              />
+            </div>
+          ) : !space.data || !org || !spaceViewer ? (
+            <ClubBodySkeleton />
+          ) : (
+            <>
+              <UpNext clubName={org.name} events={space.data.up_next} night={night} now={now} officerEmpty={officerEmpty} onOpenEvent={openEvent} />
+              <RoomChips clubName={org.name} rooms={rooms} activeRoomId={activeRoom?.id ?? null} night={night} now={now} onPick={pickRoom} />
+              {activeRoom?.kind !== "board" && boardLatest && board ? (
+                <BoardStrip latest={boardLatest} unread={boardUnread} night={night} onOpen={() => pickRoom(board)} />
+              ) : null}
+              {activeRoom ? (
+                <div key={activeRoom.id} style={{ flexGrow: 1, minHeight: 0, position: "relative", display: "flex", flexDirection: "column" }}>
+                  {activeRoom.kind === "board" ? (
+                    <BoardView poll={poll} roomId={activeRoom.id} night={night} now={now} onOpenEventChat={openEvent} scrollToken={scrollToken} />
+                  ) : (
+                    <RoomThread
+                      poll={poll}
+                      roomId={activeRoom.id}
+                      roomKind={activeRoom.kind}
+                      clubName={org.name}
+                      night={night}
+                      now={now}
+                      anchor="bottom"
+                      onReply={setReplyTo}
+                      onOpenEventChat={openEvent}
+                      scrollToken={scrollToken}
+                      emptyBlock={
+                        loungeEmpty ? (
+                          <ClubEmpty
+                            orgHandle={orgHandle}
+                            night={night}
+                            onPostWelcome={() => {
+                              if (board) pickRoom(board);
+                              setFocusToken((n) => n + 1);
+                            }}
+                          />
+                        ) : undefined
+                      }
+                    />
+                  )}
+                  <RoomComposer
+                    roomId={activeRoom.id}
+                    roomKind={activeRoom.kind}
+                    roomName={activeRoom.name}
+                    clubName={org.name}
+                    orgHandle={orgHandle}
+                    viewer={poll.viewer}
+                    viewerId={poll.viewerId}
+                    night={night}
+                    poll={poll}
+                    replyTo={replyTo}
+                    onCancelReply={() => setReplyTo(null)}
+                    onSent={() => setScrollToken((n) => n + 1)}
+                    officerLine={activeRoom.kind === "board" && !!poll.viewer?.can_post}
+                    focusToken={focusToken}
+                  />
+                </div>
+              ) : null}
+            </>
+          )}
+          {eventRoomId && org ? (
+            <EventChat
+              orgHandle={orgHandle}
+              club={{ id: org.id, name: org.name, logo_url: org.logo_url }}
+              roomId={eventRoomId}
+              boardLatest={boardLatest}
+              boardUnread={boardUnread}
+              onOpenBoard={() => {
+                if (board) setPickedRoomId(board.id);
+                closeEvent();
+              }}
+              onClose={closeEvent}
+            />
+          ) : null}
         </Drawer.Content>
       </Drawer.Portal>
     </Drawer.Root>
@@ -88,72 +346,65 @@ export function ClubSpace({ orgHandle, initialRoomId, initialRoomKind, onClose }
 }
 
 /**
- * The 11.3 header, 52px + `env(safe-area-inset-top)`, while the space read is
- * out: Back (44px circle, `aria-label="Back to Messages"`, working), the 40px
- * avatar disc, the name and the `Your hat` line as bars, the right button's
- * disc. Mockup chrome from `W0_Club:15-27` (MK:0.2).
+ * The 11.3 header, 52px + `env(safe-area-inset-top)`: Back (44px circle,
+ * `aria-label="Back to Messages"`), the 40px club avatar (the logo, or
+ * initials on `clubGradient`), the `<h1>` name 20px/800 Fraunces on one line,
+ * `Your hat: … · N members`, and the club-page link (`aria-label="Open
+ * <club>'s page"` → `/orgs/<handle>`; 14.15). Bars and discs while the space
+ * read is out. Mockup chrome from `W0_Club:15-27` (MK:0.2).
  */
-function ClubHeaderSkeleton({ night, onClose }: { night: boolean; onClose: () => void }) {
+function ClubHeader({ night, onClose, orgHandle, space }: { night: boolean; onClose: () => void; orgHandle: string; space: SpaceResponse | null }) {
   const t = palette(night);
+  const circle: React.CSSProperties = {
+    width: 44,
+    height: 44,
+    flexShrink: 0,
+    boxSizing: "border-box",
+    borderRadius: 999,
+    border: night ? "1px solid rgba(255,255,255,0.10)" : `1px solid ${t.hairline}`,
+    background: night ? "rgba(22,21,21,0.86)" : t.surface,
+    color: t.secondary,
+    display: "flex",
+    alignItems: "center",
+    justifyContent: "center",
+    padding: 0,
+    cursor: "pointer",
+    textDecoration: "none",
+    WebkitTapHighlightColor: "transparent",
+  };
+  const org = space?.org ?? null;
   return (
-    <header
-      style={{
-        flexShrink: 0,
-        boxSizing: "border-box",
-        height: "calc(52px + env(safe-area-inset-top, 0px))",
-        padding: "calc(env(safe-area-inset-top, 0px) + 4px) 10px 0 10px",
-        display: "flex",
-        alignItems: "center",
-        gap: 8,
-      }}
-    >
-      <button
-        type="button"
-        aria-label="Back to Messages"
-        onClick={onClose}
-        style={{
-          width: 44,
-          height: 44,
-          flexShrink: 0,
-          boxSizing: "border-box",
-          borderRadius: 999,
-          border: night ? "1px solid rgba(255,255,255,0.10)" : `1px solid ${t.hairline}`,
-          background: night ? "rgba(22,21,21,0.86)" : t.surface,
-          color: t.secondary,
-          display: "flex",
-          alignItems: "center",
-          justifyContent: "center",
-          padding: 0,
-          cursor: "pointer",
-          WebkitTapHighlightColor: "transparent",
-        }}
-      >
-        <svg
-          width="18"
-          height="18"
-          viewBox="0 0 24 24"
-          fill="none"
-          stroke="currentColor"
-          strokeWidth="2.4"
-          strokeLinecap="round"
-          strokeLinejoin="round"
-          aria-hidden="true"
-        >
-          <path d="M15 5l-7 7 7 7" />
-        </svg>
+    <header style={{ flexShrink: 0, boxSizing: "border-box", height: "calc(52px + env(safe-area-inset-top, 0px))", padding: "calc(env(safe-area-inset-top, 0px) + 4px) 10px 0 10px", display: "flex", alignItems: "center", gap: 8 }}>
+      <button type="button" aria-label="Back to Messages" onClick={onClose} style={circle}>
+        <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.4" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true"><path d="M15 5l-7 7 7 7" /></svg>
       </button>
-      <span
-        aria-hidden="true"
-        style={{ width: 40, height: 40, flexShrink: 0, borderRadius: 999, background: SKELETON_DISC }}
-      />
-      <div style={{ flexGrow: 1, minWidth: 0, display: "flex", flexDirection: "column", gap: 6 }}>
-        <div style={{ width: "55%", height: 18, borderRadius: 6, background: SKELETON_BAR }} />
-        <div style={{ width: "40%", height: 11, borderRadius: 5, background: SKELETON_BAR_SOFT }} />
+      {org ? (
+        <span aria-hidden="true" style={{ width: 40, height: 40, flexShrink: 0, borderRadius: 999, background: org.logo_url ? `url(${org.logo_url}) center/cover` : clubGradient(org.id), boxShadow: "inset 0 0 0 1px rgba(255,255,255,0.16)", display: "flex", alignItems: "center", justifyContent: "center", fontFamily: SERIF, fontWeight: 800, fontSize: 15.5, color: "#FAF7F2" }}>
+          {org.logo_url ? null : initialsOf(org.name)}
+        </span>
+      ) : (
+        <span aria-hidden="true" style={{ width: 40, height: 40, flexShrink: 0, borderRadius: 999, background: SKELETON_DISC }} />
+      )}
+      <div style={{ flexGrow: 1, minWidth: 0, display: "flex", flexDirection: "column", gap: space ? 3 : 6 }}>
+        {space && org ? (
+          <>
+            <h1 style={{ margin: 0, fontFamily: SERIF, fontWeight: 800, fontSize: 20, lineHeight: 1.1, letterSpacing: -0.4, whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis", color: t.ink }}>{org.name}</h1>
+            <div style={{ fontSize: 12, fontWeight: 600, lineHeight: "15px", whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis", color: t.secondary }}>{hatLine(space.viewer.role, org.member_count)}</div>
+          </>
+        ) : (
+          <>
+            <div style={{ width: "55%", height: 18, borderRadius: 6, background: SKELETON_BAR }} />
+            <div style={{ width: "40%", height: 11, borderRadius: 5, background: SKELETON_BAR_SOFT }} />
+          </>
+        )}
       </div>
-      <span
-        aria-hidden="true"
-        style={{ width: 44, height: 44, flexShrink: 0, borderRadius: 999, background: SKELETON_DISC }}
-      />
+      {org ? (
+        <Link href={`/orgs/${encodeURIComponent(orgHandle)}`} aria-label={`Open ${org.name}'s page`} style={circle}>
+          <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.4" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true"><path d="M7 17L17 7M9 7h8v8" /></svg>
+        </Link>
+      ) : (
+        <span aria-hidden="true" style={{ width: 44, height: 44, flexShrink: 0, borderRadius: 999, background: SKELETON_DISC }} />
+      )}
     </header>
   );
 }
@@ -169,15 +420,7 @@ function ClubBodySkeleton() {
       </div>
       <div style={{ padding: "8px 12px 0", display: "flex", flexDirection: "column", gap: 10 }}>
         {[0, 1, 2].map((i) => (
-          <div
-            key={i}
-            style={{
-              width: ["85%", "60%", "72%"][i],
-              height: 14,
-              borderRadius: 6,
-              background: i === 1 ? SKELETON_BAR_SOFT : SKELETON_BAR,
-            }}
-          />
+          <div key={i} style={{ width: ["85%", "60%", "72%"][i], height: 14, borderRadius: 6, background: i === 1 ? SKELETON_BAR_SOFT : SKELETON_BAR }} />
         ))}
       </div>
     </div>
