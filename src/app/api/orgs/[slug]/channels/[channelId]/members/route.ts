@@ -1,5 +1,6 @@
 import { NextResponse } from "next/server";
 
+import { refusalBody } from "@/lib/chat/types";
 import { loadClubOfficer } from "@/lib/club-routes/officer-guard";
 import { requireNotRestricted } from "@/lib/moderation/access";
 import { createSupabaseServerClient } from "@/lib/supabase/server";
@@ -112,6 +113,16 @@ export async function POST(req: Request, { params }: Params) {
 
   const guard = await requireChannelStaff(slug, channelId, user.id, true);
   if ("response" in guard) return guard.response;
+
+  // A Board, a Lounge or an event chat is open to every member by the
+  // database's rule (`can_view_org_channel`), so a by-name allow-list row
+  // on one is meaningless and is refused (wave-2 contract 6.3, D8). The
+  // Officers room, an extra room and a database without `channels.kind`
+  // (`kind` null) go on as before.
+  const { kind } = guard.channel;
+  if (kind === "board" || kind === "lounge" || kind === "event") {
+    return NextResponse.json(refusalBody("room_locked"), { status: 409 });
+  }
 
   let body: PostBody;
   try {
