@@ -662,6 +662,7 @@
         senderHandle: m.users && m.users.handle,
         reactions: Array.isArray(m.reactions) ? m.reactions : [],
         parentPreview: m.parent_preview || null,
+        hidden: m.hidden === true,
       }));
       paintMessages();
     } catch (e) { console.error("[mini.loadMessages]", e); }
@@ -759,6 +760,7 @@
     let lastSender = null;
     let lastIsoForSep = null;
     state.msgs.forEach((m, i) => {
+      if (m.hidden) return;
       // Date+time separator: first row, day change, or >1h gap.
       if (m.created_at && shouldShowSep(lastIsoForSep, m.created_at)) {
         h += '<div class="vmm-date-sep">' + esc(fmtChatDate(m.created_at)) + '</div>';

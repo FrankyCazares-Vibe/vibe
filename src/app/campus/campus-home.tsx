@@ -16388,8 +16388,8 @@ function ChannelChat({
             No messages yet — be the first to say hi in #{channelName}.
           </div>
         ) : (
-          messages.map((m, idx) => {
-            const prev = idx > 0 ? messages[idx - 1] : null;
+          messages.filter((m: ChatMessage & { hidden?: boolean }) => !m.hidden).map((m, idx, shown) => {
+            const prev = idx > 0 ? shown[idx - 1] : null;
             const sameAuthor = prev?.user_id === m.user_id;
             // iMessage-style separator — emit on the first message, on
             // day change, or after a >1h gap.

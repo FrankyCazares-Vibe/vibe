@@ -130,6 +130,12 @@ export type MessageRow = {
    */
   removed_at?: string | null;
   removed_reason?: string | null;
+  /**
+   * A stub: a message hidden from the viewer by a block in a club room
+   * (wave-2 contract 8.1). The screens filter these out of the array before
+   * grouping (12.1); never sent for a dm or a group.
+   */
+  hidden?: boolean;
 };
 
 export type Tab = "all" | "requests";

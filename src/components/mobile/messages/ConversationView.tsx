@@ -542,6 +542,10 @@ export function ConversationView({
   const peer = thread?.peer;
   const title = thread ? threadTitle(thread) : "Conversation";
   const avatar = thread ? threadAvatar(thread) : { url: null, initials: "?" };
+  // A stub (a message hidden by a block, wave-2 contract 8.1) leaves the
+  // array before grouping, never inside MessageBubble (12.1): a stub between
+  // two rows by one person would split their run.
+  const shown = (messages ?? []).filter((m) => !m.hidden);
 
   // handleOnly: vaul lets a side drawer drag from anywhere, so a
   // sideways drift while scrolling slid the chat or closed it. No
@@ -802,9 +806,9 @@ export function ConversationView({
           </div>
         ) : (
           <div style={{ display: "flex", flexDirection: "column", gap: 6 }}>
-            {messages.map((m, i) => {
+            {shown.map((m, i) => {
               const isMine = m.user_id === meId;
-              const prev = messages[i - 1];
+              const prev = shown[i - 1];
               const showGap = !prev || prev.user_id !== m.user_id;
               // For multi-party threads (groups + org channels), show the
               // sender's avatar + name at the start of each run of their

@@ -1427,6 +1427,7 @@ function renderMsgs(msgs,d){
     return `<div class="dm-rxs">${inner}</div>`;
   };
   msgs.forEach((m,i)=>{
+    if (m.hidden) return;
     const mine=m.m===1;
     // Date+time separator: emit when the day changes OR after a >1h gap.
     if (m.created_at && __dmShouldShowSep(lastIsoForSep, m.created_at)) {
@@ -2470,6 +2471,7 @@ async function __dmLoadMessages(channelId, opts) {
         // a taken-down message reading as an ordinary one.
         removedAt: m.removed_at || null,
         removedReason: typeof m.removed_reason === 'string' ? m.removed_reason : '',
+        hidden: m.hidden === true,
       };
     });
     __realDM.peerLastReadByChannel[channelId] = j.peer_last_read_at || null;
