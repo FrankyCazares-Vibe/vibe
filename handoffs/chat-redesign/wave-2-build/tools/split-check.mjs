@@ -20,7 +20,8 @@
  *   - DUPLICATE: a name declared in two split files.
  * Import declarations, `export { … } from`, `export *`, and bare `"use client"`
  * directives are not compared (the split rewrites those by design).
- * Exit 0 only when MISSING, CHANGED and DUPLICATE are all empty.
+ * Exit 0 only when MISSING, CHANGED, DUPLICATE and ADDED are all empty.
+ * --dir is walked flat (no subdirectories).
  */
 import { execFileSync } from "node:child_process";
 import { readFileSync, readdirSync, statSync } from "node:fs";
@@ -78,8 +79,10 @@ function listFiles(dir) {
   try {
     for (const e of readdirSync(dir)) {
       const p = join(dir, e);
-      if (statSync(p).isDirectory()) files = files.concat(listFiles(p));
-      else if (/\.tsx?$/.test(e) && !/\.test\.tsx?$/.test(e)) files.push(p);
+      // Flat files only: the split creates no subdirectory, and the later
+      // screens (messages/home, club, cards, compose) never enter the comparison.
+      if (statSync(p).isDirectory()) continue;
+      if (/\.tsx?$/.test(e) && !/\.test\.tsx?$/.test(e)) files.push(p);
     }
   } catch {
     /* no dir yet */
@@ -125,4 +128,4 @@ for (const c of changed) {
 }
 for (const a of added) console.log(`  ADDED     ${a.name} (${a.file}:${a.line})`);
 for (const d of duplicates) console.log(`  DUPLICATE ${d.name} (${d.a.file}:${d.a.line} and ${d.b.file}:${d.b.line})`);
-process.exit(missing.length || changed.length || duplicates.length ? 1 : 0);
+process.exit(missing.length || changed.length || duplicates.length || added.length ? 1 : 0);
