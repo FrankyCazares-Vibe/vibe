@@ -218,10 +218,14 @@ export function orderSpaceRooms(rooms: SpaceRoomWithPosition[]): SpaceRoom[] {
   return kept.map(({ id, kind, name, unread, can_post, event }) => ({ id, kind, name, unread, can_post, event }));
 }
 
-/** 7.2.4: the last message of an oldest-first page that is not `hidden`; none → null. */
-export function lastShown<T extends { hidden: boolean }>(messages: T[]): T | null {
+/**
+ * 7.2.4: the last message of an oldest-first page that is not `hidden` and
+ * whose `removed` is null (RLS shows an author their own removed row; the
+ * Board strip never previews it: INT-ADJUDICATE-9); none → null.
+ */
+export function lastShown<T extends { hidden: boolean; removed: unknown }>(messages: T[]): T | null {
   for (let i = messages.length - 1; i >= 0; i -= 1) {
-    if (!messages[i].hidden) return messages[i];
+    if (!messages[i].hidden && messages[i].removed === null) return messages[i];
   }
   return null;
 }

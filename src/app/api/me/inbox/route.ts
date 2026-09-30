@@ -150,8 +150,10 @@ export async function GET() {
   }
 
   // 4. Previews (cookie): two reads, one per room kind, each its own window
-  // of 5 rows per room, newest first, top-level only. The thread list's
-  // pattern: a failed window leaves those rooms without a preview, logged.
+  // of 5 rows per room, newest first, top-level only and never a removed
+  // row (RLS shows an author their own removed message; it is not a
+  // preview: 7.1.4, INT-ADJUDICATE-9). The thread list's pattern: a failed
+  // window leaves those rooms without a preview, logged.
   const boardIds = clubs.map((club) => club.board.channel_id);
   const loungeIds = clubs.map((club) => club.lounge.channel_id);
   const readPreviews = async (ids: string[], what: string): Promise<PreviewRow[]> => {
@@ -161,6 +163,7 @@ export async function GET() {
       .select(PREVIEW_SELECT)
       .in("channel_id", ids)
       .is("thread_root_id", null)
+      .is("removed_at", null)
       .order("created_at", { ascending: false })
       .limit(ids.length * 5);
     if (error) {
@@ -236,7 +239,7 @@ export async function GET() {
   };
 
   // 7. The event rooms I hold a row on (cookie): the newest top-level message
-  // per room, for `last_activity_at`.
+  // per room that is not removed, for `last_activity_at` (7.1.7).
   const eventRoomIds = clubs.flatMap((club) => club.eventRooms.map((row) => row.channel_id));
   const readEventActivity = async (): Promise<Map<string, string>> => {
     const newest = new Map<string, string>();
@@ -246,6 +249,7 @@ export async function GET() {
       .select("channel_id, created_at")
       .in("channel_id", eventRoomIds)
       .is("thread_root_id", null)
+      .is("removed_at", null)
       .order("created_at", { ascending: false })
       .limit(eventRoomIds.length * 3);
     if (error) {

@@ -192,9 +192,12 @@ test("orderSpaceRooms: lounge, board, officers, open event rooms by starts_at, r
   assert.equal(ordered[4].event, null);
 });
 
-test("lastShown: the last non-hidden of an oldest-first page; refOfRoom", () => {
-  assert.equal(lastShown([{ id: 1, hidden: false }, { id: 2, hidden: false }, { id: 3, hidden: true }])?.id, 2);
-  assert.equal(lastShown([{ hidden: true }]), null);
+test("lastShown: the last non-hidden, non-removed of an oldest-first page; refOfRoom", () => {
+  assert.equal(lastShown([{ id: 1, hidden: false, removed: null }, { id: 2, hidden: false, removed: null }, { id: 3, hidden: true, removed: null }])?.id, 2);
+  // 7.2.4: the viewer's own removed row (RLS shows it to its author) is never `board_latest` (INT-ADJUDICATE-9).
+  assert.equal(lastShown([{ id: 1, hidden: false, removed: null }, { id: 2, hidden: false, removed: { by: "officer", at: T1, reason: null } }])?.id, 1);
+  assert.equal(lastShown([{ hidden: true, removed: null }]), null);
+  assert.equal(lastShown([{ hidden: false, removed: { by: "moderator", at: T1, reason: null } }]), null);
   assert.equal(lastShown([]), null);
   const refs = new Map([["e", ref("e", T1, "soon")]]);
   assert.equal(refOfRoom("e", refs)?.id, "e");

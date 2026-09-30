@@ -319,7 +319,7 @@ test("inbox: the happy path, field by field (7.1.2-7.1.9)", async () => {
   assert.equal(previews.length, 3);
   for (const window of previews.slice(0, 2)) {
     assert.equal(selectOf(window.calls), "id, channel_id, content, created_at, user_id, kind, thread_root_id, users:users!messages_user_id_fkey(name)");
-    assert.deepEqual(window.calls.find((c) => c[0] === "is"), ["is", "thread_root_id", null]);
+    assert.deepEqual(window.calls.filter((c) => c[0] === "is"), [["is", "thread_root_id", null], ["is", "removed_at", null]], "top-level, and never the viewer's own removed row (7.1.4)");
     assert.deepEqual(window.calls.find((c) => c[0] === "order"), ["order", "created_at", { ascending: false }]);
     assert.equal(arg(window.calls, "limit"), 10);
   }
@@ -327,6 +327,7 @@ test("inbox: the happy path, field by field (7.1.2-7.1.9)", async () => {
   assert.deepEqual(arg(previews[1].calls, "in", "channel_id"), [L1, L2]);
   assert.equal(selectOf(previews[2].calls), "channel_id, created_at");
   assert.deepEqual(arg(previews[2].calls, "in", "channel_id"), [E1]);
+  assert.deepEqual(previews[2].calls.filter((c) => c[0] === "is"), [["is", "thread_root_id", null], ["is", "removed_at", null]], "the event-activity read skips removed rows too (7.1.7)");
   assert.equal(arg(previews[2].calls, "limit"), 3);
 
   const officers = reads(serviceLog, "org_members");
@@ -439,7 +440,18 @@ const spaceRefs = async (events: EventRow[]) => {
   return refs;
 };
 const BOARD_ROOM = { id: SP.board, kind: "board", name: "Board", org_id: ORG1, event: null };
-const boardPage = async () => ({ ok: true, messages: [{ id: "p1", hidden: false }, { id: "p2", hidden: false }, { id: "p3", hidden: true }], room: BOARD_ROOM, viewerRole: "member" });
+// Oldest first: p3 is a stub, p4 the viewer's own removed post (RLS shows it to its author) — neither is `board_latest` (7.2.4).
+const boardPage = async () => ({
+  ok: true,
+  messages: [
+    { id: "p1", hidden: false, removed: null },
+    { id: "p2", hidden: false, removed: null },
+    { id: "p3", hidden: true, removed: null },
+    { id: "p4", hidden: false, removed: { by: "officer", at: "2026-10-05T00:00:00.000Z", reason: null } },
+  ],
+  room: BOARD_ROOM,
+  viewerRole: "member",
+});
 
 function spaceWorld(over: Partial<World> = {}) {
   return install({ cookie: spaceCookie, service: spaceService(), refs: spaceRefs, loadRoom: async () => BOARD_ROOM, read: boardPage, ...over });
@@ -495,7 +507,7 @@ test("space: the happy path, field by field (7.2.1-7.2.5), and ?events=1 (7.2.6)
   assert.equal(body.rooms[3].event?.state, "live");
   assert.equal(body.rooms[0].event, null);
   assert.deepEqual(Object.keys(body.rooms[0]).sort(), ["can_post", "event", "id", "kind", "name", "unread"]);
-  assert.equal(body.board_latest?.id, "p2", "the last non-hidden of the oldest-first page");
+  assert.equal(body.board_latest?.id, "p2", "the last non-hidden, non-removed of the oldest-first page");
   assert.deepEqual(body.up_next.map((e) => e.id), ["ev-open", "ev-x", "ev-y"]);
   assert.equal("upcoming" in body, false);
   assert.deepEqual(reading, [[SP.board, { limit: 6 }, {
