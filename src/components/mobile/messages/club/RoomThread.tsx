@@ -120,7 +120,7 @@ export function ThreadSkeleton() {
 }
 
 /** The 1.2 confirm before an officer's remove: `Remove this message for everyone in the room?` with `Remove` / `Cancel`. */
-function RemoveConfirm({ night, busy, onConfirm, onCancel }: { night: boolean; busy: boolean; onConfirm: () => void; onCancel: () => void }) {
+export function RemoveConfirm({ night, busy, onConfirm, onCancel }: { night: boolean; busy: boolean; onConfirm: () => void; onCancel: () => void }) {
   const t = palette(night);
   const cancelRef = useRef<HTMLButtonElement | null>(null);
   useEffect(() => {
