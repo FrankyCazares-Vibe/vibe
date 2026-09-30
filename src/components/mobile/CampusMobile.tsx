@@ -291,13 +291,19 @@ export function CampusMobile() {
   // never. A `?channel=` never opens the old `# name` view before the flag
   // is known (its thread GET is 9–13 PostgREST calls; its title is a Discord
   // tell, 1.1).
-  const chatWanted = tab === "chat" || initialChannelId !== null;
-  const oldChatMounts = chatV2 === false || (chatV2 === null && !chatWanted);
+  // What the URL asks for. The mount decision reads the URL alone: a tap to
+  // Chat on a plain /campus while the flag is unknown keeps today's pane
+  // mounted instead of swapping it for a skeleton until the flag answers
+  // (INT-FLAG-OFF-4).
+  const urlChatWanted = searchParams.get("tab") === "chat" || initialChannelId !== null;
+  const chatWanted = tab === "chat" || urlChatWanted;
+  const oldChatMounts = chatV2 === false || (chatV2 === null && !urlChatWanted);
   // Flag on and on the chat tab (from `?tab=chat` or `?channel=`): one
   // `router.replace` to /messages with the room; `?org=` is dropped (2.3).
   const chatRedirectedRef = useRef(false);
-  // Decided from the URL (`chatWanted`), not from `tab`: the track's scroll
-  // handler may move `tab` off "chat" when the chat pane leaves the order.
+  // Decided from the URL as well as `tab` (`chatWanted`): the track's scroll
+  // handler may move `tab` off "chat" when the chat pane leaves the order,
+  // and the URL still says chat.
   useEffect(() => {
     if (chatV2 !== true || !chatWanted || chatRedirectedRef.current) return;
     chatRedirectedRef.current = true;
