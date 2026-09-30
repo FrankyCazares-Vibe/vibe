@@ -52,6 +52,8 @@ export type RoomComposerProps = {
   roomName: string;
   clubName: string;
   orgHandle: string;
+  /** The club's id: the 14px club dot beside `<club> · <room>` on every sheet (the mockups draw it; INT-ADJUDICATE-4). */
+  orgId?: string | null;
   viewer: ViewerInRoom | null;
   viewerId: string | null;
   night: boolean;
@@ -128,6 +130,7 @@ export function RoomComposer({
   roomName,
   clubName,
   orgHandle,
+  orgId = null,
   viewer,
   viewerId,
   night,
@@ -328,6 +331,7 @@ export function RoomComposer({
         roomName={roomName}
         clubName={clubName}
         orgHandle={orgHandle}
+        orgId={orgId}
         onClose={() => setSheet(null)}
         onPosted={(message) => {
           setSheet(null);

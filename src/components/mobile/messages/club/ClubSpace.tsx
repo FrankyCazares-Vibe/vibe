@@ -388,6 +388,7 @@ export function ClubSpace({ orgHandle, initialRoomId, initialRoomKind, onClose }
                     roomName={activeRoom.name}
                     clubName={org.name}
                     orgHandle={orgHandle}
+                    orgId={org.id}
                     viewer={poll.viewer}
                     viewerId={poll.viewerId}
                     night={night}

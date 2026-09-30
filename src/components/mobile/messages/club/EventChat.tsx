@@ -167,6 +167,7 @@ export function EventChat({ orgHandle, club, roomId, boardLatest, boardUnread, o
                 roomName={title}
                 clubName={club.name}
                 orgHandle={orgHandle}
+                orgId={club.id}
                 viewer={viewer}
                 viewerId={viewerId}
                 night={night}
