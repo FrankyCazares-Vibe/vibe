@@ -28,9 +28,16 @@ import type { Card, ChatMessage, ThreadMessagesResponse, ThreadRoom, ViewerInRoo
  * - only the full reads update `room` / `viewer` / `viewerId`;
  * - a tick that fails is silent; the first read failing → `failure`
  *   (`LoadFailed` with `Couldn't load this chat.`, 1.2, N5; Retry = `reload`);
- * - mark-read after a full read that brought new rows (on a room with no row
- *   for me the update matches nothing and answers `{ ok: true }`; the screen
- *   does not special-case it).
+ * - mark-read on mount and after a LATER full read that brought new rows (the
+ *   mount's own first read is the mount's call; on a room with no row for me
+ *   the update matches nothing and answers `{ ok: true }`; the screen does not
+ *   special-case it);
+ * - a tick that answers 403 / 404 sets `lostAccess` once and the ticks stop
+ *   asking (a room the viewer lost answers the same every 4 s; S2-repair.md
+ *   SEC2) until `reload()` reads it again;
+ * - a read still "in flight" after four ticks counts as settled (a request the
+ *   OS dropped without a rejection must not stop the polling for good;
+ *   S2-repair.md B5).
  *
  * `messages` is oldest first, as the route sends it (the Board view reverses
  * for display). Stubs (8.1) stay in the array; the screens render nothing for
@@ -182,6 +189,7 @@ export function useRoomPoll(roomId: string | null, options: RoomPollOptions): Ro
   const genRef = useRef(0);
   const tickRef = useRef(0);
   const inFlightRef = useRef(false);
+  const inFlightSinceRef = useRef(0);
   const lineRef = useRef(line);
   useEffect(() => {
     lineRef.current = line;
@@ -213,13 +221,15 @@ export function useRoomPoll(roomId: string | null, options: RoomPollOptions): Ro
       if (genRef.current !== gen) return;
       if (!r.ok || !Array.isArray(r.data?.messages)) {
         if (first) commit({ ...EMPTY, roomId: id, failure: asLoadFailure(r, lineRef.current) });
-        else if (!r.ok && lostStatus(r.status)) commit({ ...stateRef.current, lostAccess: true });
+        else if (!r.ok && lostStatus(r.status) && !stateRef.current.lostAccess) commit({ ...stateRef.current, lostAccess: true });
         return;
       }
       const page = r.data;
       const prev = stateRef.current.roomId === id ? stateRef.current : { ...EMPTY, roomId: id };
       const known = new Set((prev.messages ?? []).map((m) => m.id));
-      const brought = page.messages.some((m) => !known.has(m.id));
+      // "Brought new rows" against a page the state already holds; the first
+      // page is the mount's read, which the schedule effect marks read once.
+      const brought = prev.messages !== null && page.messages.some((m) => !known.has(m.id));
       commit({
         roomId: id,
         messages: mergeFullPage(prev.messages ?? [], page.messages),
@@ -244,7 +254,7 @@ export function useRoomPoll(roomId: string | null, options: RoomPollOptions): Ro
       );
       if (genRef.current !== gen) return;
       if (!r.ok && lostStatus(r.status) && stateRef.current.roomId === id) {
-        commit({ ...stateRef.current, lostAccess: true });
+        if (!stateRef.current.lostAccess) commit({ ...stateRef.current, lostAccess: true });
         return;
       }
       if (!r.ok || !Array.isArray(r.data?.messages)) return;
@@ -253,7 +263,11 @@ export function useRoomPoll(roomId: string | null, options: RoomPollOptions): Ro
       const known = new Set(prev.messages.map((m) => m.id));
       const fresh = r.data.messages.filter((m) => !known.has(m.id));
       if (fresh.length === 0) return;
-      commit({ ...prev, messages: [...prev.messages, ...fresh] });
+      // Oldest first, as `mergeFullPage` leaves it: a row that landed between
+      // the cursor and my own send sorts above my `temp_` row (its clock is
+      // the client's, later); the sort is stable.
+      const merged = [...prev.messages, ...fresh].sort((a, b) => (a.created_at < b.created_at ? -1 : a.created_at > b.created_at ? 1 : 0));
+      commit({ ...prev, messages: merged });
     },
     [commit],
   );
@@ -269,8 +283,9 @@ export function useRoomPoll(roomId: string | null, options: RoomPollOptions): Ro
     inFlightRef.current = false;
 
     const run = async (full: boolean, cursor: string | null) => {
-      if (inFlightRef.current) return;
+      if (inFlightRef.current && performance.now() - inFlightSinceRef.current < ROOM_POLL_MS * 4) return;
       inFlightRef.current = true;
+      inFlightSinceRef.current = performance.now();
       try {
         if (full || cursor === null) await readFull(id, gen);
         else await readAfter(id, gen, cursor);
@@ -294,9 +309,15 @@ export function useRoomPoll(roomId: string | null, options: RoomPollOptions): Ro
       stop();
       timer = window.setInterval(() => {
         if (!isVisible()) return;
+        const cur = stateRef.current;
+        // The viewer lost this room: no more asking until `reload()`.
+        if (cur.roomId === id && cur.lostAccess) return;
+        // A tick skipped for a read still in flight does not count, so the
+        // every-5th full read is never the one skipped (9.3).
+        if (inFlightRef.current && performance.now() - inFlightSinceRef.current < ROOM_POLL_MS * 4) return;
         tickRef.current += 1;
         const full = tickRef.current % ROOM_FULL_READ_EVERY === 0;
-        void run(full, cursorOf(stateRef.current.roomId === id ? stateRef.current.messages : null));
+        void run(full, cursorOf(cur.roomId === id ? cur.messages : null));
       }, ROOM_POLL_MS);
     };
     const onVisibility = () => {

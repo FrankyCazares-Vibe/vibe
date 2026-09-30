@@ -307,3 +307,66 @@ review (the 11.3 props are pinned; not improvised).
   `hasEarlier`, `replace`, `remove`, `lostAccess` (additive, STOPPED 1-3, 7).
 - `MessageBubble` / `ReactionPicker`: `onRemove?: () => void` (the first commit).
 - 2026-09-30T08:42:04Z closing notes written; committing the gate record and notes (the last commit)
+
+## Part 3 — the repair after the four reviews (one pass)
+
+Resumed on `e8435f9`. Reviews read: S2-review-contract.md (1 MEDIUM, 6 LOW),
+S2-review-security.md (1 HIGH, 3 MEDIUM, 4 LOW), S2-review-behaviour.md (2 MEDIUM,
+7 LOW), S2-review-design.md (3 MEDIUM, 6 LOW). Every finding verified against the
+tree, the contract and the mockups before a line changed; the verdicts and the
+evidence are in `S2-repair.md`.
+
+### Plan (files, in order; only S2-owned files)
+
+1. `use-room-poll.ts`: count only the ticks that run (C3); a lost room stops asking
+   and `lostAccess` is committed once (SEC2); mark-read once on mount (B3); an
+   in-flight read older than 4 ticks counts as settled (B5); the `?after=` rows
+   are sorted in by `created_at` (B6).
+2. `ClubSpace.tsx`: the space read's 403 / 404 line through `chatRefusalLine` (C1);
+   a later 403 / 404 clears the space, closes the layer first and then the space
+   (SEC3, B2); the layer's Board strip `replaceState`s the Board after the pop
+   (SEC7, B1); `paused` to `BoardView` under the layer (SEC4, B7); the clock ticks
+   only while visible (SEC8); the hat line's count in muted (D5).
+3. `BoardView.tsx`: a removed post is `RemovedContentCard` alone (SEC1); `paused`;
+   a reply re-reads the post (B4). `BoardPost.tsx`: a removed reply is the compact
+   card (SEC1); the folded padding (D7).
+4. `RoomThread.tsx`: `RemoveConfirm` returns focus and cycles Tab (D2); `Earlier
+   messages` keeps the reader's row in place (B8).
+5. `RoomComposer.tsx`: `Cancel reply` 44px (D3); the closed tile's footer off the
+   Board (D8). `UpNext.tsx`: the time stays whole, the RSVP mark yields (D1).
+   `RsvpSheet.tsx`: the title visually hidden (C2 / D4). `EventChat.tsx`: the
+   clock while visible (SEC8).
+6. Gates; `S2-repair.md`; `S2-gate.md` part 3; STOPPED 8 moved to Readings and two
+   STOPPED entries added (D1, SEC5); one commit `fix(chat): W2-S2 repair after review`.
+
+### Readings (not stops)
+
+- STOPPED 8 (16px input) was never a stop: 11.0 resolves it in so many words
+  (S2-DESIGN-9). Moved here.
+
+### STOPPED (part 3)
+
+10. **Up next line 1 does not fit its card.** 1.2 pins line 1 as `eventTime`
+    (`Tonight · 7:30 PM`) + ` · ` + the RSVP mark; 11.3 pins the 2-column 50px card,
+    147.5px inside at 375px. `Tonight · 7:30 PM` (≈100px) + the dot (≈14px) + the
+    check and `Going` (≈48px) ≈ 162px. The mockup fits because it writes `Tonight
+    7:30` (`W0_Club:39`). Built: the time stays whole and the RSVP mark yields (the
+    check keeps the shape; the `aria-label` carries the word). `eventTimeShort`
+    (`7:30 PM`, `Tue 7 PM`) would fit — for Franky.
+11. **A text Board post has no picker** (S2-SECURITY-5). 11.4 lists a post's parts
+    without one; 11.5 gives every text row in a thread Reply / Report / Remove
+    through `MessageBubble`. So on the Board a mod or an officer cannot remove
+    another officer's TEXT post from the phone and a member cannot report one
+    (a card post has both through `CardBubble`, 11.8). Not built: no press or
+    picker is pinned for an `<article>`; the integration review decides.
+12. **A later 404 on the space read** (S2-SECURITY-3c). 11.3 names the later 403
+    only. Built: a later 404 (the club hidden or gone) closes the view the same
+    way, with the code's toast (`That's not there anymore.`); to keep it silent,
+    drop `r.status === 404` from the later-read branch in `ClubSpace.tsx`.
+
+### Log
+- 2026-09-30T09:20:00Z part-3 plan written; starting use-room-poll.ts
+- 2026-09-30T10:03:06Z edits applied to use-room-poll.ts, ClubSpace.tsx, BoardView.tsx, BoardPost.tsx, RoomThread.tsx, RoomComposer.tsx, UpNext.tsx, RsvpSheet.tsx, EventChat.tsx; running tsc + eslint
+- 2026-09-30 gates pass 1: typecheck 0, eslint 0 (club/ + lib + the two moved files), 17/17 pure tests, npm test 1637/1637, build exit 0
+- 2026-09-30 refinement from the diff read: the `Earlier messages` anchor carries the first id and the read's lifetime, so a read that brings nothing does not leave it armed; gates pass 2: typecheck 0, npm test 1637/1637, build exit 0, eslint 0 + both baselines 0
+- 2026-09-30 S2-repair.md (33 findings: 25 FIXED, 3 REJECTED, 5 DEFERRED — B7 counted FIXED, its space-read half rejected; REQUESTS R4-R6; STOPPED 10-12) and S2-gate.md part 3 written; committing

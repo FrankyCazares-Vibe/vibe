@@ -84,7 +84,9 @@ export function EventChat({ orgHandle, club, roomId, boardLatest, boardUnread, o
 
   // The labels' clock: a minute is enough for `Tonight`, `Soon`, `N more days`.
   useEffect(() => {
-    const id = window.setInterval(() => setNow(new Date()), 60_000);
+    const id = window.setInterval(() => {
+      if (document.visibilityState === "visible") setNow(new Date());
+    }, 60_000);
     return () => window.clearInterval(id);
   }, []);
 

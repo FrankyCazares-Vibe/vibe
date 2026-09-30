@@ -8,11 +8,11 @@ import { asLoadFailure, LoadFailed, type LoadFailure } from "@/components/feedba
 import type { RoomKind, SpaceResponse, SpaceRoom } from "@/lib/chat/types";
 import { useHideTabBar } from "@/lib/chat/use-hide-tabbar";
 import { ROOM_FULL_READ_EVERY, ROOM_POLL_MS, useRoomPoll } from "@/lib/chat/use-room-poll";
-import { vibeRequest } from "@/lib/feedback/request";
+import { vibeRequest, type VibeResult } from "@/lib/feedback/request";
 
 import { clubGradient } from "../avatar";
 import { initialsOf } from "../format";
-import { toastSendFailure } from "../send-failure";
+import { chatRefusalLine, toastSendFailure } from "../send-failure";
 import { vaulOverlayStyle, visuallyHiddenStyle } from "../sheet-styles";
 import { useNightTheme } from "../theme";
 import { FONT, palette, SERIF } from "../v2-tokens";
@@ -20,7 +20,7 @@ import { BoardStrip } from "./BoardStrip";
 import { BoardView } from "./BoardView";
 import { ClubEmpty } from "./ClubEmpty";
 import { EventChat } from "./EventChat";
-import { hatLine, isEmptyRoom, isOfficer } from "./helpers";
+import { countWord, isEmptyRoom, isOfficer, roleWord } from "./helpers";
 import { RoomChips } from "./RoomChips";
 import { RoomComposer, type ReplyTarget } from "./RoomComposer";
 import { RoomThread } from "./RoomThread";
@@ -53,8 +53,10 @@ import { UpNext } from "./UpNext";
  *   call `onClose` (S2-notes.md REQUESTS R1-R3).
  * - States: the header + chips + three bars skeleton until the space read
  *   answers; the read failing → `LoadFailed` (`Couldn't load this club.`,
- *   non-retryable on 403 `members_only` / 404) with Back working; a LATER
- *   403 closes the view with the toast `Members only.`.
+ *   non-retryable on 403 `members_only` / 404, the code's sentence) with Back
+ *   working; a LATER 403 (or 404: the club hidden or gone) clears the space,
+ *   closes the event chat layer when one is open, then the view, with the
+ *   code's toast (`Members only.`; S2-repair.md SEC3 / B2).
  * - The officer's brand new club (11.9.3): `ClubEmpty` in the Lounge's place
  *   and the dashed `Add your first event` in Up next.
  */
@@ -115,6 +117,20 @@ function isVisible(): boolean {
   return typeof document === "undefined" || document.visibilityState === "visible";
 }
 
+/**
+ * The space read's `LoadFailure`: 403 `members_only` / 404 `not_found` show
+ * the code's sentence (1.3) without Retry (11.3 States); `describeFailure`
+ * would map them to its generic lines (S2-repair.md C1). Anything else is
+ * `asLoadFailure`'s (a 5xx keeps `Couldn't load this club. Try again.`).
+ */
+function spaceFailure(r: VibeResult<SpaceResponse>): LoadFailure {
+  if (!r.ok && (r.status === 403 || r.status === 404)) {
+    const line = chatRefusalLine(r);
+    if (line) return { message: line, retryable: false };
+  }
+  return asLoadFailure(r, SPACE_LINE);
+}
+
 export function ClubSpace({ orgHandle, initialRoomId, initialRoomKind, onClose }: ClubSpaceProps) {
   // Hooks first, always (react-hooks/rules-of-hooks).
   useHideTabBar();
@@ -131,6 +147,18 @@ export function ClubSpace({ orgHandle, initialRoomId, initialRoomKind, onClose }
   // in the read's callback. And a guard so the close runs once.
   const hadDataRef = useRef(false);
   const closedRef = useRef(false);
+  // The same as `closedRef`, for the hook's option (no ref read in render).
+  const [closedSpace, setClosedSpace] = useState(false);
+  // The layer's room, for the close that must peel it first (written in an effect).
+  const eventRoomIdRef = useRef(eventRoomId);
+  useEffect(() => {
+    eventRoomIdRef.current = eventRoomId;
+  }, [eventRoomId]);
+  // Set before a `history.back()` that pops the layer: the popstate handler
+  // then `replaceState`s that room (the layer's Board strip, 2.3) and / or
+  // closes the space (the later 403 with the layer open).
+  const pendingRoomRef = useRef<string | null>(null);
+  const pendingCloseRef = useRef(false);
   // The latest `onClose`, so an inline arrow from the parent never re-arms
   // the space read's effect (written in an effect, react-hooks/refs).
   const onCloseRef = useRef(onClose);
@@ -147,7 +175,7 @@ export function ClubSpace({ orgHandle, initialRoomId, initialRoomKind, onClose }
   const hookRoomId = activeRoom?.id ?? (initialRoomKind !== "event" ? initialRoomId : null);
   const hookRoomKind: RoomKind | null = activeRoom?.kind ?? (initialRoomKind !== "event" ? initialRoomKind : null);
   const poll = useRoomPoll(hookRoomId, {
-    enabled: eventRoomId === null && hookRoomId !== null,
+    enabled: eventRoomId === null && hookRoomId !== null && !closedSpace,
     line: hookRoomKind === "board" ? BOARD_LINE : undefined,
   });
 
@@ -158,6 +186,7 @@ export function ClubSpace({ orgHandle, initialRoomId, initialRoomKind, onClose }
   useEffect(() => {
     let live = true;
     const read = async () => {
+      if (closedRef.current) return;
       const r = await vibeRequest<SpaceResponse>(`/api/orgs/${encodeURIComponent(orgHandle)}/space`, {
         quiet: true,
         failure: SPACE_LINE,
@@ -166,12 +195,24 @@ export function ClubSpace({ orgHandle, initialRoomId, initialRoomKind, onClose }
       if (!live || closedRef.current) return;
       if (!r.ok || !Array.isArray(r.data?.rooms)) {
         if (!hadDataRef.current) {
-          setSpace({ data: null, failure: asLoadFailure(r, SPACE_LINE) });
-        } else if (!r.ok && r.status === 403) {
-          // A club I left while the space was open (11.3 States).
+          setSpace({ data: null, failure: spaceFailure(r) });
+        } else if (!r.ok && (r.status === 403 || r.status === 404)) {
+          // A club I left while the space was open (11.3 States), or one
+          // hidden or gone since: nothing of it stays on screen (the box
+          // with the sentence, no Retry), the layer is popped first when
+          // one is open (its depth-2 entry), then the view closes.
           closedRef.current = true;
+          setClosedSpace(true);
+          setSpace({ data: null, failure: spaceFailure(r) });
+          setEventRoomId(null);
           toastSendFailure(r);
-          onCloseRef.current();
+          const s = historyState();
+          if (eventRoomIdRef.current !== null && s && s.depth === 2 && s.vibeChat) {
+            pendingCloseRef.current = true;
+            window.history.back();
+          } else {
+            onCloseRef.current();
+          }
         }
         return;
       }
@@ -195,7 +236,9 @@ export function ClubSpace({ orgHandle, initialRoomId, initialRoomKind, onClose }
 
   // The labels' clock.
   useEffect(() => {
-    const id = window.setInterval(() => setNow(new Date()), 60_000);
+    const id = window.setInterval(() => {
+      if (isVisible()) setNow(new Date());
+    }, 60_000);
     return () => window.clearInterval(id);
   }, []);
 
@@ -209,7 +252,20 @@ export function ClubSpace({ orgHandle, initialRoomId, initialRoomKind, onClose }
     const onPop = (e: PopStateEvent) => {
       const s = e.state as HistoryState;
       const depth = typeof s?.depth === "number" ? s.depth : 0;
-      if (depth < 2) setEventRoomId(null);
+      if (depth >= 2) return;
+      setEventRoomId(null);
+      // The pop landed on the depth-1 entry: the room picked from inside the
+      // layer is written on it now (never before the pop, which would
+      // rewrite the depth-2 entry).
+      const room = pendingRoomRef.current;
+      if (room !== null) {
+        pendingRoomRef.current = null;
+        replaceRoomHistory(room);
+      }
+      if (pendingCloseRef.current) {
+        pendingCloseRef.current = false;
+        onCloseRef.current();
+      }
     };
     window.addEventListener("popstate", onPop);
     return () => window.removeEventListener("popstate", onPop);
@@ -223,6 +279,20 @@ export function ClubSpace({ orgHandle, initialRoomId, initialRoomKind, onClose }
     const s = historyState();
     if (s && s.depth === 2 && s.vibeChat) window.history.back();
     else setEventRoomId(null);
+  }, []);
+  /** The Board strip inside the layer: the Board picked, the layer popped, the Board `replaceState`d after the pop (2.3). */
+  const openBoardFromLayer = useCallback((boardId: string) => {
+    setPickedRoomId(boardId);
+    setReplyTo(null);
+    setFocusToken(0);
+    const s = historyState();
+    if (s && s.depth === 2 && s.vibeChat) {
+      pendingRoomRef.current = boardId;
+      window.history.back();
+    } else {
+      setEventRoomId(null);
+      replaceRoomHistory(boardId);
+    }
   }, []);
   const pickRoom = useCallback(
     (room: SpaceRoom) => {
@@ -285,7 +355,7 @@ export function ClubSpace({ orgHandle, initialRoomId, initialRoomKind, onClose }
               {activeRoom ? (
                 <div key={activeRoom.id} style={{ flexGrow: 1, minHeight: 0, position: "relative", display: "flex", flexDirection: "column" }}>
                   {activeRoom.kind === "board" ? (
-                    <BoardView poll={poll} roomId={activeRoom.id} night={night} now={now} onOpenEventChat={openEvent} scrollToken={scrollToken} />
+                    <BoardView poll={poll} roomId={activeRoom.id} night={night} now={now} onOpenEventChat={openEvent} scrollToken={scrollToken} paused={eventRoomId !== null} />
                   ) : (
                     <RoomThread
                       poll={poll}
@@ -340,8 +410,8 @@ export function ClubSpace({ orgHandle, initialRoomId, initialRoomKind, onClose }
               boardLatest={boardLatest}
               boardUnread={boardUnread}
               onOpenBoard={() => {
-                if (board) setPickedRoomId(board.id);
-                closeEvent();
+                if (board) openBoardFromLayer(board.id);
+                else closeEvent();
               }}
               onClose={closeEvent}
             />
@@ -396,7 +466,10 @@ function ClubHeader({ night, onClose, orgHandle, space }: { night: boolean; onCl
         {space && org ? (
           <>
             <h1 style={{ margin: 0, fontFamily: SERIF, fontWeight: 800, fontSize: 20, lineHeight: 1.1, letterSpacing: -0.4, whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis", color: t.ink }}>{org.name}</h1>
-            <div style={{ fontSize: 12, fontWeight: 600, lineHeight: "15px", whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis", color: t.secondary }}>{hatLine(space.viewer.role, org.member_count)}</div>
+            <div style={{ fontSize: 12, fontWeight: 600, lineHeight: "15px", whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis", color: t.secondary }}>
+              {`Your hat: ${roleWord(space.viewer.role)}`}
+              <span style={{ color: t.muted }}>{` · ${countWord(org.member_count, "member")}`}</span>
+            </div>
           </>
         ) : (
           <>

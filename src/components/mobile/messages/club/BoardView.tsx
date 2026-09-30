@@ -3,7 +3,7 @@
 import { useEffect, useRef, useState } from "react";
 
 import { LoadFailed } from "@/components/feedback/LoadFailed";
-import { ReportSheet, type ReportTargetRef } from "@/components/safety/ReportSheet";
+import { RemovedContentCard, ReportSheet, type ReportTargetRef } from "@/components/safety/ReportSheet";
 import type { ChatMessage, RemoveMessageResponse } from "@/lib/chat/types";
 import { ROOM_FULL_READ_EVERY, ROOM_POLL_MS, type RoomPoll } from "@/lib/chat/use-room-poll";
 import { vibeRequest } from "@/lib/feedback/request";
@@ -23,10 +23,15 @@ import { RemoveConfirm } from "./RoomThread";
  * end of the hook's state, so at the top here, with `Reply` (`reply_count`
  * 0; SCREENS-L14). `Earlier messages` sits under the last post (SCREENS-L7).
  *
- * Every 5th tick (20 s while visible) `refreshToken` bumps and every open
- * fold re-reads its replies. States: the skeleton (three post-shaped
- * blocks), `Nothing on the Board yet.`, `LoadFailed` (`Couldn't load the
- * Board.`, the hook's `line` set by the space).
+ * Every 5th tick (20 s while visible, and not while `paused`: the event chat
+ * layer over the space pauses the room's hook, so the folds pause too)
+ * `refreshToken` bumps and every open fold re-reads its replies. The
+ * viewer's own removed post (`removed !== null`, the only removed row the
+ * read sends) is `RemovedContentCard` alone: no byline, no text, no toggle,
+ * no field (1.2 "Removed message (own)"; S2-repair.md SEC1). States: the
+ * skeleton (three post-shaped blocks), `Nothing on the Board yet.`,
+ * `LoadFailed` (`Couldn't load the Board.`, the hook's `line` set by the
+ * space).
  */
 export type BoardViewProps = {
   poll: RoomPoll;
@@ -36,6 +41,8 @@ export type BoardViewProps = {
   onOpenEventChat: (roomId: string) => void;
   /** Bumped after a send or a posted card: the list scrolls to the top (the newest). */
   scrollToken: number;
+  /** True while the event chat layer is open over the space: no fold re-read. */
+  paused?: boolean;
 };
 
 const SKELETON_DISC = "rgba(var(--scrim-rgb),0.06)";
@@ -59,7 +66,7 @@ function BoardSkeleton({ night }: { night: boolean }) {
   );
 }
 
-export function BoardView({ poll, roomId, night, now, onOpenEventChat, scrollToken }: BoardViewProps) {
+export function BoardView({ poll, roomId, night, now, onOpenEventChat, scrollToken, paused = false }: BoardViewProps) {
   const t = palette(night);
   const { messages, room, viewer, viewerId, failure } = poll;
   const [refreshToken, setRefreshToken] = useState(0);
@@ -71,12 +78,13 @@ export function BoardView({ poll, roomId, night, now, onOpenEventChat, scrollTok
   // The every-5th-tick re-read of the open folds (11.4): the same period as
   // the hook's full read, counted here while the page is visible.
   useEffect(() => {
+    if (paused) return;
     const id = window.setInterval(() => {
       if (typeof document !== "undefined" && document.visibilityState !== "visible") return;
       setRefreshToken((n) => n + 1);
     }, ROOM_POLL_MS * ROOM_FULL_READ_EVERY);
     return () => window.clearInterval(id);
-  }, []);
+  }, [paused]);
 
   useEffect(() => {
     const el = scrollRef.current;
@@ -123,6 +131,13 @@ export function BoardView({ poll, roomId, night, now, onOpenEventChat, scrollTok
           <div style={{ padding: "48px 18px", textAlign: "center", color: t.secondary, fontSize: 13.5, lineHeight: 1.5 }}>Nothing on the Board yet.</div>
         ) : (
           posts.map((post) => {
+            if (post.removed !== null) {
+              return (
+                <div key={post.id} style={{ flexShrink: 0, alignSelf: "flex-end", maxWidth: "min(300px, 86%)" }}>
+                  <RemovedContentCard kind="message" compact by={post.removed.by} removedAt={post.removed.at} removedReason={post.removed.reason} />
+                </div>
+              );
+            }
             const isMine = viewerId !== null && post.user_id === viewerId;
             const temp = post.id.startsWith("temp_");
             const canRemove = !!viewer?.can_moderate && !isMine && !temp;
@@ -147,7 +162,7 @@ export function BoardView({ poll, roomId, night, now, onOpenEventChat, scrollTok
                     ? () => setReportMessage({ type: "message", id: post.id, authorId: post.users?.id ?? post.user_id, authorName: post.users?.name || (post.users?.handle ? `@${post.users.handle}` : null), noun: "message" })
                     : undefined
                 }
-                onReplied={() => poll.replace(post.id, { ...post, reply_count: (post.reply_count ?? 0) + 1 })}
+                onReplied={() => void poll.refreshOne(post.created_at)}
                 onMissing={() => poll.remove(post.id)}
               />
             );

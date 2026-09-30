@@ -3,6 +3,7 @@
 import { useEffect, useState } from "react";
 
 import { asLoadFailure, LoadFailed, type LoadFailure } from "@/components/feedback/LoadFailed";
+import { RemovedContentCard } from "@/components/safety/ReportSheet";
 import type { ChatMessage, ThreadMessagesResponse, ThreadRoom, ViewerInRoom } from "@/lib/chat/types";
 import type { RoomPoll } from "@/lib/chat/use-room-poll";
 import { rowTime, rowTimeSpoken } from "@/lib/chat/when";
@@ -28,7 +29,9 @@ import { authorName, postAriaLabel, repliesToggleLabel, repliesToggleText, roleW
  * again on every 5th tick while open (`refreshToken`) and on Retry; the read
  * failing → `LoadFailed compact` (`Couldn't load replies.`) under the toggle
  * (SCREENS-L9); a stub renders nothing; a fold whose rows are all stubs shows
- * the reply field only (PRIVACY-L5). Under the rows the reply field when
+ * the reply field only (PRIVACY-L5); the viewer's own removed reply is the
+ * compact `RemovedContentCard` in its place (1.2; S2-repair.md SEC1). Under
+ * the rows the reply field when
  * `viewer.can_reply` (`Reply quietly`, `aria-label="Reply quietly to <Name>'s
  * post"`, send `Send reply`): `POST …/messages { content, thread_root_id }`;
  * 200 → the returned message appended; `board_post_missing` → the toast and
@@ -50,7 +53,7 @@ export type BoardPostProps = {
   onOpenEventChat: (roomId: string) => void;
   onRemove?: () => void;
   onReport?: () => void;
-  /** A reply went in: the post's `reply_count` grows by one in the list. */
+  /** A reply went in: the list re-reads the post (its server `reply_count`). */
   onReplied: () => void;
   /** `board_post_missing`: the post is gone; the list drops it. */
   onMissing: () => void;
@@ -173,7 +176,8 @@ export function BoardPost({ post, roomId, room, viewer, viewerId, night, now, re
       style={{
         flexShrink: 0,
         boxSizing: "border-box",
-        padding: "10px 12px 10px",
+        // Folded, the 44px toggle sits flush at the card's bottom edge (`W0_Board:95`, MK:5).
+        padding: open ? "10px 12px 10px" : "10px 12px 0",
         borderRadius: 16,
         border: `1px solid ${t.hairline}`,
         background: t.surface,
@@ -225,14 +229,20 @@ export function BoardPost({ post, roomId, room, viewer, viewerId, night, now, re
             </div>
           ) : visibleReplies.length > 0 ? (
             <div role="group" aria-label="Replies" style={{ boxSizing: "border-box", paddingLeft: 10, display: "flex", flexDirection: "column", gap: 6 }}>
-              {visibleReplies.map((m) => (
-                <div key={m.id} style={{ display: "flex", alignItems: "flex-start", gap: 8 }}>
-                  <Avatar person={m.users} fallbackId={m.user_id} size={22} fontSize={8.5} />
-                  <p style={{ margin: 0, paddingTop: 2, fontSize: 13, lineHeight: "18px", color: t.secondary, overflowWrap: "anywhere" }}>
-                    <span style={{ fontWeight: 700, color: t.ink }}>{viewerId !== null && m.user_id === viewerId && !m.users ? "You" : authorName(m.users)}</span> {m.content}
-                  </p>
-                </div>
-              ))}
+              {visibleReplies.map((m) =>
+                m.removed !== null ? (
+                  <div key={m.id} style={{ alignSelf: "flex-end", maxWidth: "min(300px, 86%)" }}>
+                    <RemovedContentCard kind="message" compact by={m.removed.by} removedAt={m.removed.at} removedReason={m.removed.reason} />
+                  </div>
+                ) : (
+                  <div key={m.id} style={{ display: "flex", alignItems: "flex-start", gap: 8 }}>
+                    <Avatar person={m.users} fallbackId={m.user_id} size={22} fontSize={8.5} />
+                    <p style={{ margin: 0, paddingTop: 2, fontSize: 13, lineHeight: "18px", color: t.secondary, overflowWrap: "anywhere" }}>
+                      <span style={{ fontWeight: 700, color: t.ink }}>{viewerId !== null && m.user_id === viewerId && !m.users ? "You" : authorName(m.users)}</span> {m.content}
+                    </p>
+                  </div>
+                ),
+              )}
             </div>
           ) : null}
           {canReply ? (

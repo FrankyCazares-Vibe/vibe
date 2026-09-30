@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useRef, useState } from "react";
+import { useEffect, useLayoutEffect, useRef, useState } from "react";
 
 import { LoadFailed } from "@/components/feedback/LoadFailed";
 import { RemovedContentCard, ReportSheet, type ReportTargetRef } from "@/components/safety/ReportSheet";
@@ -119,12 +119,22 @@ export function ThreadSkeleton() {
   );
 }
 
-/** The 1.2 confirm before an officer's remove: `Remove this message for everyone in the room?` with `Remove` / `Cancel`. */
+/**
+ * The 1.2 confirm before an officer's remove: `Remove this message for
+ * everyone in the room?` with `Remove` / `Cancel`. Focus lands on Cancel,
+ * Tab cycles the two buttons, Escape cancels, and focus returns to the
+ * element that had it on close (11.0 Accessibility; S2-repair.md D2).
+ */
 export function RemoveConfirm({ night, busy, onConfirm, onCancel }: { night: boolean; busy: boolean; onConfirm: () => void; onCancel: () => void }) {
   const t = palette(night);
   const cancelRef = useRef<HTMLButtonElement | null>(null);
+  const confirmRef = useRef<HTMLButtonElement | null>(null);
   useEffect(() => {
+    const returnTo = document.activeElement instanceof HTMLElement ? document.activeElement : null;
     cancelRef.current?.focus();
+    return () => {
+      if (returnTo && returnTo.isConnected) returnTo.focus();
+    };
   }, []);
   const button: React.CSSProperties = {
     flex: 1,
@@ -150,6 +160,10 @@ export function RemoveConfirm({ night, busy, onConfirm, onCancel }: { night: boo
         onClick={(e) => e.stopPropagation()}
         onKeyDown={(e) => {
           if (e.key === "Escape") onCancel();
+          if (e.key === "Tab") {
+            e.preventDefault();
+            (document.activeElement === cancelRef.current ? confirmRef.current : cancelRef.current)?.focus();
+          }
         }}
         style={{ width: "100%", maxWidth: 320, boxSizing: "border-box", padding: 18, borderRadius: 20, border: `1px solid ${t.hairline}`, background: t.surface, color: t.ink, fontFamily: FONT, display: "flex", flexDirection: "column", gap: 14 }}
       >
@@ -160,7 +174,7 @@ export function RemoveConfirm({ night, busy, onConfirm, onCancel }: { night: boo
           <button ref={cancelRef} type="button" onClick={onCancel} style={{ ...button, background: "rgba(var(--scrim-rgb),0.07)", color: t.ink }}>
             Cancel
           </button>
-          <button type="button" onClick={onConfirm} aria-disabled={busy} style={{ ...button, background: t.coralButton.bg, color: t.coralButton.ink, opacity: busy ? 0.6 : 1 }}>
+          <button ref={confirmRef} type="button" onClick={onConfirm} aria-disabled={busy} style={{ ...button, background: t.coralButton.bg, color: t.coralButton.ink, opacity: busy ? 0.6 : 1 }}>
             Remove
           </button>
         </div>
@@ -180,7 +194,25 @@ export function RoomThread({ poll, roomId, roomKind, clubName, night, now, ancho
   const [reportMessage, setReportMessage] = useState<ReportTargetRef | null>(null);
 
   const lastId = messages && messages.length > 0 ? messages[messages.length - 1].id : null;
+  const firstId = messages && messages.length > 0 ? messages[0].id : null;
   const rowCount = messages?.length ?? 0;
+  // `Earlier messages`: the scroll position before the prepend, so the row
+  // the reader was on stays where it is once the older rows are above it.
+  // The anchor is consumed by the prepend (a new first row), or by the first
+  // state change after the read settled (it brought nothing).
+  const earlierAnchorRef = useRef<{ top: number; height: number; firstId: string | null } | null>(null);
+  const loadingEarlierRef = useRef(false);
+  useLayoutEffect(() => {
+    const anchor = earlierAnchorRef.current;
+    if (!anchor || messages === null) return;
+    if (anchor.firstId !== firstId) {
+      earlierAnchorRef.current = null;
+      const el = scrollRef.current;
+      if (el) el.scrollTop = anchor.top + (el.scrollHeight - anchor.height);
+    } else if (!loadingEarlierRef.current) {
+      earlierAnchorRef.current = null;
+    }
+  }, [messages, firstId]);
   // Keep the newest row in view: on the first page, on a new last row while
   // the reader sits at the bottom, and after a send (`scrollToken`).
   useEffect(() => {
@@ -272,7 +304,16 @@ export function RoomThread({ poll, roomId, roomKind, clubName, night, now, ancho
           {poll.hasEarlier ? (
             <button
               type="button"
-              onClick={() => void poll.loadEarlier()}
+              onClick={() => {
+                const el = scrollRef.current;
+                if (!el || loadingEarlierRef.current) return;
+                earlierAnchorRef.current = { top: el.scrollTop, height: el.scrollHeight, firstId: messages[0]?.id ?? null };
+                loadingEarlierRef.current = true;
+                pinnedRef.current = false;
+                void poll.loadEarlier().finally(() => {
+                  loadingEarlierRef.current = false;
+                });
+              }}
               style={{ alignSelf: "center", height: 44, padding: "0 16px", border: "none", background: "transparent", color: t.secondary, fontFamily: FONT, fontSize: 13, fontWeight: 600, cursor: "pointer", WebkitTapHighlightColor: "transparent" }}
             >
               Earlier messages

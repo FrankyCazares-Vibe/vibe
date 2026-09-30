@@ -87,17 +87,21 @@ function Lock({ color }: { color: string }) {
   );
 }
 
-/** The quiet tile in the composer's place (11.3, 11.6). */
+/**
+ * The quiet tile in the composer's place (11.3, 11.6): the Board's member
+ * tile grows with its two sentences (`W0_Board:148-149`, footer `10px 12px
+ * 14px`); the closed chat's is a fixed 44px in an `8px 12px 12px` footer
+ * (`W0_Room:168`, MK:6).
+ */
 export function ClosedTile({ text, night, board = false }: { text: string; night: boolean; board?: boolean }) {
   const t = palette(night);
   return (
-    <footer style={{ flexShrink: 0, boxSizing: "border-box", padding: "10px 12px calc(env(safe-area-inset-bottom, 0px) + 14px)", background: t.page, borderTop: `1px solid ${t.hairline}`, fontFamily: FONT }}>
+    <footer style={{ flexShrink: 0, boxSizing: "border-box", padding: board ? "10px 12px calc(env(safe-area-inset-bottom, 0px) + 14px)" : "8px 12px calc(env(safe-area-inset-bottom, 0px) + 12px)", background: t.page, borderTop: `1px solid ${t.hairline}`, fontFamily: FONT }}>
       <div
         role="note"
         style={{
-          minHeight: 44,
+          ...(board ? { minHeight: 44, padding: "10px 14px" } : { height: 44, padding: "0 14px" }),
           boxSizing: "border-box",
-          padding: "10px 14px",
           borderRadius: 16,
           border: `1px solid ${t.hairline}`,
           background: t.surface,
@@ -267,12 +271,12 @@ export function RoomComposer({
           </div>
         ) : null}
         {replyTo ? (
-          <div style={{ boxSizing: "border-box", padding: "6px 10px 6px 12px", borderRadius: 14, border: `1px solid ${t.hairline}`, background: t.surface, display: "flex", alignItems: "center", gap: 8 }}>
+          <div style={{ boxSizing: "border-box", padding: "2px 6px 2px 12px", borderRadius: 14, border: `1px solid ${t.hairline}`, background: t.surface, display: "flex", alignItems: "center", gap: 8 }}>
             <span style={{ flexGrow: 1, minWidth: 0, display: "flex", flexDirection: "column", gap: 2 }}>
               <span style={{ fontSize: 11.5, fontWeight: 700, color: t.secondary }}>Replying to {replyTo.authorName}</span>
               <span style={{ fontSize: 12.5, color: t.muted, whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>{quotedBody(replyTo.parent)}</span>
             </span>
-            <button type="button" aria-label="Cancel reply" onClick={onCancelReply} style={{ ...circle, width: 36, height: 36, border: "none", background: "transparent", color: t.muted }}>
+            <button type="button" aria-label="Cancel reply" onClick={onCancelReply} style={{ ...circle, border: "none", background: "transparent", color: t.muted }}>
               <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.4" strokeLinecap="round" aria-hidden="true"><path d="M6 6l12 12M18 6L6 18" /></svg>
             </button>
           </div>

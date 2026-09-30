@@ -14,7 +14,9 @@ import { isHot, rsvpWord, upNextAriaLabel, upNextLine } from "./helpers";
  *
  * `up_next.slice(0, 2)` in a 2-column grid of 50px cards (the third event is
  * reachable by its chip; SCREENS-L6): line 1 `eventTime` (`Live now` when
- * live) + the RSVP mark when the viewer RSVP'd, line 2 the title. The live
+ * live) + the RSVP mark when the viewer RSVP'd, line 2 the title; at 375px
+ * the time stays whole and the RSVP mark yields (the check keeps the shape,
+ * the `aria-label` the word; S2-notes.md STOPPED 10). The live
  * chrome only on `state === "live"` or `isSoon` (SCREENS-M2); the `Soon`
  * ring only when `isSoon`; every other card the quiet chrome. The bloom
  * behind the block only when a DRAWN card is hot. A tap opens the event chat
@@ -103,13 +105,13 @@ export function UpNext({ clubName, events, night, now, officerEmpty, onOpenEvent
           const inner = (
             <>
               <span style={{ display: "flex", alignItems: "center", gap: 5, fontSize: 12, fontWeight: 600, lineHeight: "15px", color: t.secondary, whiteSpace: "nowrap", overflow: "hidden" }}>
-                <span style={{ overflow: "hidden", textOverflow: "ellipsis" }}>{upNextLine(e, now)}</span>
+                <span style={{ flexShrink: 0 }}>{upNextLine(e, now)}</span>
                 {word ? (
                   <>
-                    <span aria-hidden="true" style={{ color: t.muted }}>·</span>
-                    <span style={{ display: "inline-flex", alignItems: "center", gap: word === "Going" ? 3 : 4, fontWeight: 700, color: word === "Going" ? t.coralMark : t.secondary, flexShrink: 0 }}>
-                      {word === "Going" ? <Check color={t.coralMark} /> : <span aria-hidden="true" style={{ width: 6, height: 6, borderRadius: 999, background: t.muted }} />}
-                      {word}
+                    <span aria-hidden="true" style={{ flexShrink: 0, color: t.muted }}>·</span>
+                    <span style={{ display: "inline-flex", alignItems: "center", gap: word === "Going" ? 3 : 4, fontWeight: 700, color: word === "Going" ? t.coralMark : t.secondary, minWidth: 0, overflow: "hidden" }}>
+                      <span style={{ flexShrink: 0, display: "inline-flex" }}>{word === "Going" ? <Check color={t.coralMark} /> : <span aria-hidden="true" style={{ width: 6, height: 6, borderRadius: 999, background: t.muted }} />}</span>
+                      <span style={{ minWidth: 0, overflow: "hidden", textOverflow: "ellipsis" }}>{word}</span>
                     </span>
                   </>
                 ) : null}

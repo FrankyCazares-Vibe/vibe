@@ -7,15 +7,17 @@ import type { EventRef } from "@/lib/chat/types";
 import { useHideTabBar } from "@/lib/chat/use-hide-tabbar";
 import { vibeRequest } from "@/lib/feedback/request";
 
-import { vaulContentStyle, vaulHandleStyle, vaulOverlayStyle } from "../sheet-styles";
-import { FONT, palette, SERIF } from "../v2-tokens";
+import { vaulContentStyle, vaulHandleStyle, vaulOverlayStyle, visuallyHiddenStyle } from "../sheet-styles";
+import { FONT, palette } from "../v2-tokens";
 
 /**
  * The RSVP sheet of the event chat layer (handoffs/chat-redesign/wave-2-contracts.md
  * 11.6, 1.2): a vaul sheet nested in the layer's drawer (a plain root closing
  * inside another drawer runs vaul's unlock, ConversationView's note), rows
  * `Going`, `Maybe`, `Not going`, the line `You'll appear in the event chat.`
- * under the first two. `Going` / `Maybe` → `PUT /api/events/<id>/rsvp
+ * under the first two (the dialog's name, `Your RSVP`, is the card group's
+ * label of 1.2 and is not drawn: section 1 pins no sheet title; S2-repair.md
+ * C2). `Going` / `Maybe` → `PUT /api/events/<id>/rsvp
  * { status }`; `Not going` → `DELETE`; 200 → `onChanged()` (the room's
  * `reload()`) and the sheet closes; a refusal (`campus_visiting`,
  * `terms_required`, a 404) → the toast `vibeRequest` maps for it (not quiet).
@@ -69,7 +71,7 @@ export function RsvpSheet({ eventId, current, night, onClose, onChanged }: RsvpS
         <Drawer.Content style={{ ...vaulContentStyle, zIndex: 1211, background: t.surface, borderTopLeftRadius: 28, borderTopRightRadius: 28, fontFamily: FONT, color: t.ink }} aria-describedby={undefined}>
           <Drawer.Handle style={{ ...vaulHandleStyle, width: 40, height: 5, background: "rgba(var(--scrim-rgb),0.24)" }} />
           <div style={{ boxSizing: "border-box", padding: "8px 16px 12px", display: "flex", flexDirection: "column", gap: 8 }}>
-            <Drawer.Title style={{ margin: "0 0 4px", fontFamily: SERIF, fontWeight: 800, fontSize: 22, lineHeight: 1.15, letterSpacing: -0.4 }}>Your RSVP</Drawer.Title>
+            <Drawer.Title style={visuallyHiddenStyle}>Your RSVP</Drawer.Title>
             {ROWS.map((row) => {
               const active = (current ?? "no") === row.choice;
               return (

@@ -36,3 +36,24 @@ sets state in the read's callback; Retry bumps a token), `immutability` once
 (the Board's scroll element is a ref, not state), one unused import, one
 unused prop. `new Date()` in render is allowed by the rules (probed), so the
 screens hold `now` in state ticked by a 60-s interval.
+
+# W2-S2 gate record — part 3 (the repair after the four reviews)
+
+Head before the repair: `e8435f9`. Files changed: `club/ClubSpace.tsx`,
+`club/BoardView.tsx`, `club/BoardPost.tsx`, `club/RoomThread.tsx`,
+`club/RoomComposer.tsx`, `club/UpNext.tsx`, `club/RsvpSheet.tsx`,
+`club/EventChat.tsx`, `src/lib/chat/use-room-poll.ts` (all S2-owned, 13.2);
+the verdict per finding is in `S2-repair.md`.
+
+| gate | command | result |
+|---|---|---|
+| typecheck | `npm run typecheck` | exit 0 (repo-wide) |
+| tests | `npm test` | 1637 tests, 1637 pass, 0 fail |
+| build | `npm run build` | exit 0 (one attempt each time; run after the first pass and again after the last edit) |
+| eslint | `npx eslint src/components/mobile/messages/club/ src/lib/chat/use-room-poll.ts src/lib/chat/page-merge.ts src/lib/chat/page-merge.test.ts src/components/mobile/messages/ReactionPicker.tsx src/components/mobile/messages/MessageBubble.tsx` | exit 0, 0 problems |
+| eslint baseline | `git show a9355d1:src/components/mobile/messages/ReactionPicker.tsx \| npx eslint --stdin --stdin-filename <path>` and the same for `MessageBubble.tsx` | exit 0 each (untouched by the repair) |
+
+Nothing had to be fixed while gating: the first typecheck / eslint / test / build
+pass after the edits was green; the `Earlier messages` anchor was refined from
+the diff read (a stale anchor after a read that brought nothing), then every
+gate was run again.
