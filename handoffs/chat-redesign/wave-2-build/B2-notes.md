@@ -133,3 +133,4 @@ Decisions where the contract is silent (main):
 
 ## Main log
 - event-refs.ts written (5.5: rsvps with count exact per chunk of 100 events and the per-event reads past 500, channels, org_members, channel_members; room_id = a row on the room OR owner/admin; counts:false; null on any failed read, a missing schema warned once). event-refs.test.ts: 12 tests green (the fake service client through the resolve hook). eslint exit 0.
+- cards/hydrate.ts written (5.2: the four side tables + events with the service role in one Promise.all, chunks of 100; the voters on the viewer's client; the hidden-voter rule; every PollCard field per the table; Event cards via eventRefsFor; null on failure; empty map + warn once on isMissingChatSchema). hydrate.test.ts: 21 tests green. eslint exit 0.
