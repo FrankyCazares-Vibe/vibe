@@ -1,0 +1,282 @@
+"use client";
+
+import { useRef, useState } from "react";
+
+import type { Card, ChatMessage, ThreadRoom } from "@/lib/chat/types";
+
+import { personColor } from "../avatar";
+import { initialsOf } from "../format";
+import { ReactionPicker } from "../ReactionPicker";
+import { FONT, palette } from "../v2-tokens";
+
+/**
+ * The card row in a club room (wave-2 contract 11.8; mockup W0_Cards,
+ * MK:0.2 "Cards in the list", MK:7): the 292px card, theirs with the 28px
+ * avatar and the left-tail radius, mine right-aligned with no avatar, the
+ * header line `<Name> · Poll | Sign-up | Event` (`You` when mine, `Someone`
+ * when `users` is null, SCREENS-L11), and its OWN 500 ms long-press that
+ * opens `ReactionPicker` with Report and Remove (`MessageBubble`'s gesture
+ * is not reused).
+ *
+ * W2-S3's first commit renders exactly the fallback: `message.content` (the
+ * stored text, `cards/fallback.ts`) as a plain bubble under the header line.
+ * That is also what a card whose `card` is null shows for good (a stale
+ * cached answer; 9.1's 503 keeps a fresh read from producing one). The main
+ * W2-S3 batch routes `card !== null` to `PollCardView` / `SignupCardView` /
+ * `EventCardView` in the same frame.
+ */
+
+export type CardBubbleProps = {
+  message: ChatMessage;
+  roomId: string;
+  room: ThreadRoom | null;
+  viewerId: string;
+  isMine: boolean;
+  night: boolean;
+  /** A vote's answer: the card that replaces this message's (`replaceCard`). */
+  onCard: (id: string, card: Card) => void;
+  /** Re-read this one message (`refreshOne(createdAt)`): after an RSVP, a 404. */
+  onRefresh: (createdAt: string) => void;
+  /** `Open event chat` → the event chat layer over the space (11.6). */
+  onOpenEventChat: (roomId: string) => void;
+  /** `Remove` in the long-press picker: an officer's or a mod's removal. */
+  onRemove?: () => void;
+  /** `Report` in the long-press picker; never passed for the viewer's own. */
+  onReport?: () => void;
+};
+
+export type CardWord = "Poll" | "Sign-up" | "Event";
+
+/**
+ * The word after the dot. `card.type` when hydrated; else the message's
+ * kind, and for `kind: "poll"` (which covers sign-ups too) the fallback
+ * text's prefix (`Sign-up: …`, cards/fallback.ts).
+ */
+export function cardWord(message: Pick<ChatMessage, "kind" | "card" | "content">): CardWord {
+  const type = message.card?.type;
+  if (type === "signup") return "Sign-up";
+  if (type === "event") return "Event";
+  if (type === "poll") return "Poll";
+  if (message.kind === "event_card") return "Event";
+  return message.content.startsWith("Sign-up:") ? "Sign-up" : "Poll";
+}
+
+/** `You` when mine, the author's name, `Someone` when `users` is null. */
+export function cardAuthorName(message: Pick<ChatMessage, "users">, isMine: boolean): string {
+  if (isMine) return "You";
+  const name = message.users?.name?.trim() || message.users?.handle?.trim();
+  return name || "Someone";
+}
+
+function HeaderIcon({ word, stroke }: { word: CardWord; stroke: string }) {
+  if (word === "Poll") {
+    return (
+      <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke={stroke} strokeWidth="2.6" strokeLinecap="round" aria-hidden>
+        <path d="M6 20V11M12 20V5M18 20v-6" />
+      </svg>
+    );
+  }
+  if (word === "Sign-up") {
+    return (
+      <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke={stroke} strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round" aria-hidden>
+        <rect x="5.5" y="4.5" width="13" height="16" rx="2" />
+        <path d="M9 3.5h6v3H9z" />
+        <path d="M9 13.5l2 2 4-4" />
+      </svg>
+    );
+  }
+  return (
+    <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke={stroke} strokeWidth="2.2" strokeLinecap="round" aria-hidden>
+      <rect x="3" y="5" width="18" height="16" rx="3" />
+      <path d="M8 3v4M16 3v4M3 10h18" />
+    </svg>
+  );
+}
+
+export function CardBubble({ message, isMine, night, onRemove, onReport }: CardBubbleProps) {
+  const t = palette(night);
+  const [pickerOpen, setPickerOpen] = useState(false);
+  const longPressTimer = useRef<number | null>(null);
+  const longPressFired = useRef(false);
+  const pressStart = useRef<{ x: number; y: number } | null>(null);
+
+  const clearLongPress = () => {
+    if (longPressTimer.current) {
+      window.clearTimeout(longPressTimer.current);
+      longPressTimer.current = null;
+    }
+    pressStart.current = null;
+  };
+  const startLongPress = (x: number, y: number) => {
+    longPressFired.current = false;
+    pressStart.current = { x, y };
+    if (longPressTimer.current) window.clearTimeout(longPressTimer.current);
+    // 500 ms, iOS's own long-press (the text bubble's timing, 11.8).
+    longPressTimer.current = window.setTimeout(() => {
+      longPressTimer.current = null;
+      longPressFired.current = true;
+      if (navigator.vibrate) {
+        try {
+          navigator.vibrate(8);
+        } catch {
+          /* unsupported */
+        }
+      }
+      setPickerOpen(true);
+    }, 500);
+  };
+  // A finger that drifts more than ~10px is scrolling, not holding.
+  const onPressMove = (x: number, y: number) => {
+    if (!pressStart.current) return;
+    const dx = x - pressStart.current.x;
+    const dy = y - pressStart.current.y;
+    if (dx * dx + dy * dy > 100) clearLongPress();
+  };
+  const pressHandlers = {
+    onPointerDown: (e: React.PointerEvent) => {
+      // Only the first finger's primary press arms it; a second finger
+      // (a pinch) cancels one that is pending.
+      if (!e.isPrimary || e.button !== 0) {
+        clearLongPress();
+        return;
+      }
+      startLongPress(e.clientX, e.clientY);
+    },
+    onPointerMove: (e: React.PointerEvent) => onPressMove(e.clientX, e.clientY),
+    onPointerUp: () => clearLongPress(),
+    onPointerCancel: () => clearLongPress(),
+    onPointerLeave: () => clearLongPress(),
+    onContextMenu: (e: React.MouseEvent) => {
+      // Mobile Safari's own long-press menu: we own the gesture.
+      e.preventDefault();
+    },
+    // The click that ends a fired press must not also tap what is under
+    // the finger (a vote, a Take a spot, once the renderers land).
+    onClickCapture: (e: React.MouseEvent) => {
+      if (!longPressFired.current) return;
+      longPressFired.current = false;
+      e.preventDefault();
+      e.stopPropagation();
+    },
+  };
+
+  const word = cardWord(message);
+  const author = cardAuthorName(message, isMine);
+  const sender = message.users;
+  const disc = personColor(sender?.id || message.user_id);
+  // A row still sending has no id to report or remove (the text bubble's guard).
+  const temp = message.id.startsWith("temp_");
+  const cardBorder = night ? "1px solid rgba(255,255,255,0.08)" : "1px solid rgba(20,20,22,0.08)";
+
+  return (
+    <div
+      style={{
+        position: "relative",
+        display: "flex",
+        alignItems: "flex-end",
+        justifyContent: isMine ? "flex-end" : "flex-start",
+        gap: 8,
+        fontFamily: FONT,
+      }}
+    >
+      {!isMine ? (
+        <span
+          aria-hidden
+          style={{
+            width: 28,
+            height: 28,
+            flexShrink: 0,
+            borderRadius: 999,
+            background: sender?.avatar_url ? `url(${sender.avatar_url}) center/cover` : disc.bg,
+            color: disc.ink,
+            display: "flex",
+            alignItems: "center",
+            justifyContent: "center",
+            fontSize: 10,
+            fontWeight: 700,
+          }}
+        >
+          {!sender?.avatar_url ? initialsOf(sender?.name || sender?.handle || "?") : null}
+        </span>
+      ) : null}
+      <div
+        {...pressHandlers}
+        style={{
+          width: 292,
+          maxWidth: "100%",
+          boxSizing: "border-box",
+          padding: "10px 12px 9px",
+          borderRadius: isMine ? "18px 18px 6px 18px" : "18px 18px 18px 6px",
+          border: cardBorder,
+          background: t.surface,
+          color: t.ink,
+          cursor: "pointer",
+          WebkitTouchCallout: "none",
+          WebkitUserSelect: "none",
+          userSelect: "none",
+          transition: "transform 120ms ease",
+          transform: pickerOpen ? "scale(0.97)" : "scale(1)",
+        }}
+      >
+        <div
+          style={{
+            display: "flex",
+            alignItems: "center",
+            gap: 6,
+            fontSize: 11.5,
+            fontWeight: 600,
+            lineHeight: "15px",
+            color: t.muted,
+            whiteSpace: "nowrap",
+            overflow: "hidden",
+          }}
+        >
+          <HeaderIcon word={word} stroke={t.secondary} />
+          <span style={{ overflow: "hidden", textOverflow: "ellipsis" }}>
+            <span style={{ fontWeight: 700, color: t.secondary }}>{author}</span>
+            {" · "}
+            {word}
+          </span>
+        </div>
+        <div
+          style={{
+            marginTop: 4,
+            fontSize: 14.5,
+            lineHeight: 1.35,
+            whiteSpace: "pre-wrap",
+            overflowWrap: "anywhere",
+          }}
+        >
+          {message.content}
+        </div>
+      </div>
+      {pickerOpen ? (
+        <ReactionPicker
+          darkMode={night}
+          isMine={isMine}
+          existing={message.reactions ?? []}
+          // S3-notes STOPPED 1: the pinned props carry no reaction handler,
+          // so a pick only closes the picker in this commit.
+          onPick={() => setPickerOpen(false)}
+          onReport={
+            onReport && !temp
+              ? () => {
+                  setPickerOpen(false);
+                  onReport();
+                }
+              : undefined
+          }
+          onRemove={
+            onRemove && !temp
+              ? () => {
+                  setPickerOpen(false);
+                  onRemove();
+                }
+              : undefined
+          }
+          onClose={() => setPickerOpen(false)}
+        />
+      ) : null}
+    </div>
+  );
+}
