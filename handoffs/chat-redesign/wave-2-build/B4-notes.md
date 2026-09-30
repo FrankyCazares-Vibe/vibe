@@ -45,3 +45,48 @@ Owned files (13.2): `src/app/api/me/inbox/route.ts` (NEW), `src/app/api/orgs/[sl
 - inbox/route.ts written (7.1 steps 1-9; steps 5/6/7 run side by side, the fields are the same).
 - space/route.ts written (7.2: the copied sweep, org+member_count, viewer, rooms, board_latest, up_next, ?events=1 upcoming; one eventRefsFor over the rooms' events + up_next + upcoming, the same per-event refs).
 - calendar/route.ts edited (7.3: org_id in the select, chatV2For after the rows, eventRefsFor counts:false, nulls on flag off / failure; personal entries untouched).
+- Committed: reads.ts + test + notes; inbox route; space route; calendar fields (four commits). tsc repo-wide exit 0; eslint exit 0 on the five files; reads.test.ts 9/9.
+- reads-routes.test.ts written and committed (12 tests: the decision tables of the three routes against fake cookie/service clients; the fixed expectations were mine, not the routes').
+- Gates run (13.3): typecheck exit 0; npm test 1523/1523; build exit 0 (three routes in the manifest); eslint exit 0 on the six files. B4-gate.md written.
+
+## STOPPED (the contract against itself; built as noted, nothing improvised beyond the one column each)
+
+1. **7.1.4 preview select has no `channel_id`.** The select it pins (`id, content, created_at, user_id, kind, thread_root_id,
+   users:users!messages_user_id_fkey(name)`) is read ONCE over `channel_id in (<the Board ids>)` and must then give
+   "per room, the newest row"; without `channel_id` in the answer the rows cannot be put back on their rooms. The thread
+   list's read it copies (`threads/route.ts:669`, "the thread list's own pattern") selects `channel_id`. Built: the pinned
+   select plus `channel_id` (`PREVIEW_SELECT` in `inbox/route.ts`). If the column must not be there, the previews cannot
+   be built as one read per kind.
+2. **7.2.3 my `channel_members` read names `channel_id, last_read_at` only,** while section 7's opening rule ("a null
+   `last_read_at` is read as the row's `created_at`") and 7.1.5's count (`created_at > <my last_read_at ?? my row's
+   created_at>`, which 7.2.3 reuses) need `created_at`. Built: `channel_id, last_read_at, created_at`. Without it a
+   legacy row with a null `last_read_at` would count every message as unread.
+
+## Decisions a reviewer should know (not contradictions)
+
+- Every 404 of the space route (flag off, missing handle, hidden club to a non-member, schema missing) is
+  `refusalBody("not_found")` ("That's not there anymore."): 1.3 keeps the old sentences for WAVE-1 routes only, and the
+  space route is new. `unauthorized` and `load_failed` keep the copied sweep's shape (7.2, N20), with "Couldn't load
+  this club." as 7.2 says.
+- Space `eventRefsFor`: ONE call over the rooms' events + up_next + upcoming rows (the function is per-event
+  deterministic for one viewer and one `now`, so the refs are the same as three calls would give); a null answer empties
+  all three, logged.
+- Inbox steps 5, 6, 7 and the two preview windows run side by side (Promise.all); the fields are the contract's.
+- Space: a failed cookie `channel_members` read (my rows) → every room `unread: false`, logged (it decides a dot, not
+  visibility). A failed preview window in the inbox → `latest: null` for those rooms, logged (the thread list's soft-fail).
+- `viewer.role` in the space route must be a `ClubRole` (`isClubRole`); an unknown role string reads as "no role".
+
+## REQUESTS
+
+- None. Nothing outside the batch's files was needed; `types.ts` already carried every shape (InboxClub, SpaceResponse
+  with `upcoming?`, CalendarRoomFields).
+
+## SIBLING
+
+- None: typecheck and build passed with the siblings' files present.
+
+## Files (W2-B4)
+
+- `src/app/api/me/inbox/route.ts` (new), `src/app/api/orgs/[slug]/space/route.ts` (new), `src/app/api/me/calendar/route.ts` (edited)
+- `src/lib/chat/reads.ts` + `reads.test.ts` (new, pure; the task brief's allowance), `src/lib/chat/reads-routes.test.ts` (new, the stub harness)
+- `handoffs/chat-redesign/wave-2-build/B4-notes.md`, `B4-gate.md`
