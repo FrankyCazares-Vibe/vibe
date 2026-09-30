@@ -370,3 +370,4 @@ evidence are in `S2-repair.md`.
 - 2026-09-30 gates pass 1: typecheck 0, eslint 0 (club/ + lib + the two moved files), 17/17 pure tests, npm test 1637/1637, build exit 0
 - 2026-09-30 refinement from the diff read: the `Earlier messages` anchor carries the first id and the read's lifetime, so a read that brings nothing does not leave it armed; gates pass 2: typecheck 0, npm test 1637/1637, build exit 0, eslint 0 + both baselines 0
 - 2026-09-30 S2-repair.md (33 findings: 25 FIXED, 3 REJECTED, 5 DEFERRED — B7 counted FIXED, its space-read half rejected; REQUESTS R4-R6; STOPPED 10-12) and S2-gate.md part 3 written; committing
+- 2026-09-30 COMMITTED 7477f8e fix(chat): W2-S2 repair after review (9 code files, S2-repair.md, S2-gate.md part 3, these notes). Repair pass done; open for the integration review: R4 (initialPage), R5 (CardBubble layout), R6 (four border / surface tokens), STOPPED 10-12.
