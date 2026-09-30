@@ -124,7 +124,12 @@ export function NewPollSheet({ roomId, roomKind, roomName, clubName, orgId, nigh
                   style={{ flexGrow: 1, minWidth: 0, height: 44, padding: 0, border: "none", outline: "none", background: "transparent", color: t.ink, fontFamily: "inherit", fontSize: 16, fontWeight: 600 }}
                 />
               </label>
-              {options.length > POLL_OPTIONS_MIN ? <RemoveButton label={removeLabel(row.label, name)} night={night} onClick={() => removeOption(row.key)} /> : null}
+              {options.length > POLL_OPTIONS_MIN ? (
+                <RemoveButton label={removeLabel(row.label, name)} night={night} onClick={() => removeOption(row.key)} />
+              ) : (
+                // The column stays reserved at the minimum so the pills keep their width when a third option arrives (VIS-S3-5).
+                <span aria-hidden style={{ width: 36, flexShrink: 0 }} />
+              )}
             </div>
           );
         })}

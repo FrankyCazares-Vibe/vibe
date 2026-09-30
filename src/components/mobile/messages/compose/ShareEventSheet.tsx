@@ -170,22 +170,25 @@ export function ShareEventSheet({ roomId, roomKind, roomName, clubName, orgHandl
       </div>
 
       <div style={{ marginTop: 12, boxSizing: "border-box", paddingTop: 12, borderTop: "1px solid rgba(var(--scrim-rgb),0.07)", display: "flex", flexDirection: "column", gap: 8 }}>
-        <div style={{ display: "flex", alignItems: "baseline", gap: 8 }}>
-          <Counter n={charCount(note)} max={NOTE_MAX} night={night} />
+        {/* The note has no label word (1.2), so its counter sits inside the field's right end instead of alone on a row (VIS-S3-4). */}
+        <div style={{ position: "relative" }}>
+          <input
+            type="text"
+            aria-label="Add a line, optional"
+            placeholder="Add a line (optional)"
+            aria-invalid={field === "note" || undefined}
+            value={note}
+            autoComplete="off"
+            onChange={(e) => {
+              clearField();
+              setNote(e.target.value);
+            }}
+            style={{ ...fieldStyle(night, field === "note"), fontWeight: 500, paddingRight: 72 }}
+          />
+          <span aria-hidden style={{ position: "absolute", top: 0, right: 14, height: 48, display: "flex", alignItems: "center", pointerEvents: "none" }}>
+            <Counter n={charCount(note)} max={NOTE_MAX} night={night} />
+          </span>
         </div>
-        <input
-          type="text"
-          aria-label="Add a line, optional"
-          placeholder="Add a line (optional)"
-          aria-invalid={field === "note" || undefined}
-          value={note}
-          autoComplete="off"
-          onChange={(e) => {
-            clearField();
-            setNote(e.target.value);
-          }}
-          style={{ ...fieldStyle(night, field === "note"), fontWeight: 500 }}
-        />
         <p style={{ margin: 0, fontSize: 12.5, lineHeight: 1.35, fontWeight: 500, color: t.secondary }}>Members who tap Going or Maybe join the event chat.</p>
       </div>
     </CardSheet>

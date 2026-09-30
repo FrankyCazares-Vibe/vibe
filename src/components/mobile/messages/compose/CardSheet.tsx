@@ -328,15 +328,20 @@ export function AddButton({ text, disabled, night, onClick }: { text: string; di
   );
 }
 
-/** The 44×44 transparent X: `Remove <label>` / `Remove <slot>`. */
-export function RemoveButton({ label, night, onClick }: { label: string; night: boolean; onClick: () => void }) {
+/**
+ * The 44×44 transparent X: `Remove <label>` / `Remove <slot>`. `into` is how far
+ * it reaches into the sheet's 16px gutter (−8 as the mockup; the sign-up sheet
+ * uses −12 so its slot input keeps ≥ 165px of text beside the stepper, VIS-S3-2).
+ * The hit stays 44×44 (11.0).
+ */
+export function RemoveButton({ label, night, into = -8, onClick }: { label: string; night: boolean; into?: number; onClick: () => void }) {
   const t = palette(night);
   return (
     <button
       type="button"
       aria-label={label}
       onClick={onClick}
-      style={{ width: 44, height: 44, flexShrink: 0, marginRight: -8, borderRadius: 999, border: "none", background: "transparent", color: t.muted, display: "flex", alignItems: "center", justifyContent: "center", padding: 0, cursor: "pointer", WebkitTapHighlightColor: "transparent" }}
+      style={{ width: 44, height: 44, flexShrink: 0, marginRight: into, borderRadius: 999, border: "none", background: "transparent", color: t.muted, display: "flex", alignItems: "center", justifyContent: "center", padding: 0, cursor: "pointer", WebkitTapHighlightColor: "transparent" }}
     >
       <CloseX size={16} />
     </button>

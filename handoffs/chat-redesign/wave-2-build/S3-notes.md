@@ -222,6 +222,30 @@ imports `CardTray`, `CardTrayKind`, `ComposeSheets`; `RoomThread` and
 2. Contract 11.8 / `RoomThread`: `onToggleReaction?` / `onReply?` on
    `CardBubble` (STOPPED 1 of part 1 stands: a reaction picked on a card
    still only closes the picker).
+3. (visual repair, VIS-S3-1) `RoomComposer` still passes no `orgId` to
+   `ComposeSheets` after the S2 repair, so the sheets' `<club> · <room>`
+   line has no club dot in 15–19: REQUESTS 1 stands. `RoomComposer` takes
+   `orgId: string` beside `orgHandle`, passes `orgId={orgId}` at its
+   `<ComposeSheets …>`; `ClubSpace` passes `org.id`, `EventChat` `club.id`.
+4. (visual repair, VIS-S3-3, LOW) `RoomComposer.tsx` the "+" while the tray
+   is open: `W0_Tray:93` inverts the disc (`background: t.activeChip.bg`,
+   `color: t.activeChip.ink`, `border: 1px solid t.activeChip.bg`); the app
+   keeps the surface disc and only rotates the plus. Keep the rotation.
+5. (found while re-shooting, W2-S1's `home/YourWeek.tsx:93`, HIGH) the S1
+   repair's bloom (`position: absolute; left: bloomLeft; width: 340`) lands
+   at `left: 70` with the fixtures (the live card is the second card after
+   the sort), so its right edge is 410 > 375 and the `section` around it is
+   `overflow: visible`: `document.scrollWidth` is 410 on the home. Under
+   mobile emulation (Playwright `isMobile`, and Safari on a phone with
+   `width=device-width`) the layout viewport widens to 410×888 and every
+   screen renders scaled: the club space's header disc is cut, the "+" sits
+   at y 832 (below 812, the harness's click times out), the sheets with it.
+   Fix in S1's file: `overflowX: "clip"` (or `hidden`) on the week
+   `section` that positions the bloom (the row inside already scrolls), or
+   clamp `bloomLeft` to `[-92, 375 − 340 + 92]`. Measured with
+   `elementFromPoint` / `getBoundingClientRect` on the worktree at HEAD; the
+   S3 evidence shots were taken with that one file at `5d0e424` in a scratch
+   worktree (nothing in the tree changed for it).
 
 ### Log (part 2)
 - 2026-09-30T08:47:17Z part 2 plan written; starting cards/card-rules.ts

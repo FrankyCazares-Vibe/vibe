@@ -55,6 +55,21 @@ type SlotRow = { key: number; label: string; capacity: number };
 
 const POST_FAILURE = "Couldn't post your sign-up.";
 
+/**
+ * The slot row at 375 (VIS-S3-2): 343 − 6 − 106 − 6 − 32 = 193px for the label
+ * input (165px of text: `Leaving from Union` at 16px/600 fits whole). The
+ * mockup's 118px stepper had no Remove column beside it; the contract adds
+ * one, so the stepper drops its 1px paddings and 12px of slack around the
+ * number (the arms stay 44×44), the gaps go 8 → 6, and the 44×44 X reaches
+ * −12 into the gutter. The header (`Spots`, the spacer) mirrors the row, and
+ * the column is reserved at the minimum of one slot so nothing jumps when
+ * the second slot arrives (as the poll sheet, VIS-S3-5).
+ */
+const STEPPER_WIDTH = 106;
+const ROW_GAP = 6;
+const REMOVE_INTO = -12;
+const REMOVE_COLUMN = 44 + REMOVE_INTO;
+
 export function NewSignupSheet({ roomId, roomKind, roomName, clubName, orgId, night, onClose, onPosted, onReload, returnFocusTo }: NewSignupSheetProps) {
   const t = palette(night);
   const ids = useId();
@@ -125,20 +140,20 @@ export function NewSignupSheet({ roomId, roomKind, roomName, clubName, orgId, ni
       </div>
 
       <div role="group" aria-labelledby={slotsLabelId} style={{ marginTop: 14, display: "flex", flexDirection: "column", gap: 6 }}>
-        <div style={{ display: "flex", alignItems: "baseline", gap: 8 }}>
+        <div style={{ display: "flex", alignItems: "baseline", gap: ROW_GAP }}>
           <FieldLabel id={slotsLabelId} night={night}>
             Slots
           </FieldLabel>
-          <span aria-hidden style={{ marginLeft: "auto", width: 118, textAlign: "center", fontSize: 12.5, fontWeight: 700, color: t.secondary }}>
+          <span aria-hidden style={{ marginLeft: "auto", width: STEPPER_WIDTH, textAlign: "center", fontSize: 12.5, fontWeight: 700, color: t.secondary }}>
             Spots
           </span>
-          {slots.length > SIGNUP_SLOTS_MIN ? <span aria-hidden style={{ width: 36, flexShrink: 0 }} /> : null}
+          <span aria-hidden style={{ width: REMOVE_COLUMN, flexShrink: 0 }} />
         </div>
         {slots.map((row, i) => {
           const name = slotName(i + 1);
           const invalid = field === `options.${i}`;
           return (
-            <div key={row.key} style={{ display: "flex", alignItems: "center", gap: 8 }}>
+            <div key={row.key} style={{ display: "flex", alignItems: "center", gap: ROW_GAP }}>
               <input
                 type="text"
                 aria-label={name}
@@ -148,15 +163,19 @@ export function NewSignupSheet({ roomId, roomKind, roomName, clubName, orgId, ni
                 onChange={(e) => update(row.key, { label: e.target.value })}
                 style={{ ...fieldStyle(night, invalid), flexGrow: 1, minWidth: 0, width: undefined }}
               />
-              <div role="group" aria-label={spotsForLabel(row.label, name)} style={{ width: 118, height: 48, flexShrink: 0, boxSizing: "border-box", padding: "0 1px", borderRadius: 999, border: "1px solid rgba(var(--scrim-rgb),0.10)", background: "rgba(var(--scrim-rgb),0.04)", display: "flex", alignItems: "center", justifyContent: "space-between" }}>
+              <div role="group" aria-label={spotsForLabel(row.label, name)} style={{ width: STEPPER_WIDTH, height: 48, flexShrink: 0, boxSizing: "border-box", padding: 0, borderRadius: 999, border: "1px solid rgba(var(--scrim-rgb),0.10)", background: "rgba(var(--scrim-rgb),0.04)", display: "flex", alignItems: "center", justifyContent: "space-between" }}>
                 {arm("One less spot", row.capacity <= CAPACITY_MIN, () => update(row.key, { capacity: stepCapacity(row.capacity, -1) }), <MinusIcon size={16} />, t.secondary)}
-                <span style={{ minWidth: 20, textAlign: "center", fontSize: 15.5, fontWeight: 800, color: t.ink }}>
+                <span style={{ minWidth: 18, textAlign: "center", fontSize: 15.5, fontWeight: 800, color: t.ink }}>
                   <span aria-hidden>{row.capacity}</span>
                   <span style={visuallyHiddenStyle}>{spotsWord(row.capacity)}</span>
                 </span>
                 {arm("One more spot", row.capacity >= CAPACITY_MAX, () => update(row.key, { capacity: stepCapacity(row.capacity, 1) }), <PlusIcon size={16} />, t.ink)}
               </div>
-              {slots.length > SIGNUP_SLOTS_MIN ? <RemoveButton label={removeLabel(row.label, name)} night={night} onClick={() => removeSlot(row.key)} /> : null}
+              {slots.length > SIGNUP_SLOTS_MIN ? (
+                <RemoveButton label={removeLabel(row.label, name)} night={night} into={REMOVE_INTO} onClick={() => removeSlot(row.key)} />
+              ) : (
+                <span aria-hidden style={{ width: REMOVE_COLUMN, flexShrink: 0 }} />
+              )}
             </div>
           );
         })}
