@@ -119,6 +119,10 @@ export async function POST(req: Request, { params }: Params) {
   } catch {
     return NextResponse.json({ ok: false, error: "Invalid JSON" }, { status: 400 });
   }
+  // `null`, a number or an array parse fine but are not a body: same answer.
+  if (!body || typeof body !== "object" || Array.isArray(body)) {
+    return NextResponse.json({ ok: false, error: "Invalid JSON" }, { status: 400 });
+  }
 
   let targetUserId: string | null = null;
   if (typeof body.user_id === "string") {

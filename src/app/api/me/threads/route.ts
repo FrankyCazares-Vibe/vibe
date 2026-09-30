@@ -1,5 +1,8 @@
 import { NextResponse } from "next/server";
 
+import { BOARD_POSTER_ROLES, clubRoomLabel, isClubRole, isRoomKind } from "@/lib/chat/room-rules";
+import { isMissingChatSchema, warnMissingChatSchemaOnce } from "@/lib/chat/schema";
+import type { ClubRole, OrgRef, RoomKind, ThreadEntryRoomFields } from "@/lib/chat/types";
 import { getFollowState } from "@/lib/connections/queries";
 import {
   GROUP_CREATE_REFUSED,
@@ -8,6 +11,7 @@ import {
 } from "@/lib/messages/group-rules";
 import { contentBlockedResponse, requireCanPublish } from "@/lib/moderation/access";
 import { checkText } from "@/lib/moderation/text-filter";
+import { orgAssetProxyUrl } from "@/lib/org-asset-url";
 import { isUuid } from "@/lib/pgrest";
 import { GROUP_PHOTO_KEY_PREFIX, isR2Configured, signGroupPhotoGetUrl } from "@/lib/r2";
 import { rateLimit, tooManyRequests } from "@/lib/rate-limit";
@@ -82,7 +86,10 @@ type ThreadEntry = {
   viewer_role: "admin" | "member";
   /** Muted until this timestamp (null = not muted). Drives unread-badge silence. */
   muted_until: string | null;
-};
+} & Partial<ThreadEntryRoomFields>;
+// The three club-room fields (`org`, `room_kind`, `can_post`) are on club
+// rooms only, and only on a database that has the chat rooms schema
+// (contract 6.4 and 3.10). A dm or a group never carries them.
 
 async function resolveTargetId(
   supabase: Awaited<ReturnType<typeof createSupabaseServerClient>>,
@@ -395,8 +402,18 @@ export async function POST(req: Request) {
 /**
  * GET: list the viewer's threads + pending requests.
  * Each entry includes peer info (for 1:1), last message, and unread flag.
+ *
+ * Club rooms (chat rooms, wave 1, contract 6.4):
+ *   - `?scope=chats` lists dms and groups only, and still `requests`.
+ *   - With no param: event rooms are left out; a club room's `name` is
+ *     "<club> · <Board | Lounge | Officers | the room's name>"; its preview
+ *     ignores replies under a Board post; it carries `org`, `room_kind` and
+ *     `can_post`.
+ *   - A club room is never a message request, whatever `accepted_at` says.
+ * On a database without the chat rooms schema the answer is today's: club
+ * rooms keep their plain name and carry none of the three fields (3.10).
  */
-export async function GET() {
+export async function GET(req: Request) {
   const supabase = await createSupabaseServerClient();
   const {
     data: { user },
@@ -406,17 +423,32 @@ export async function GET() {
     return NextResponse.json({ ok: false, error: "Unauthorized" }, { status: 401 });
   }
 
+  const chatsOnly = new URL(req.url).searchParams.get("scope") === "chats";
+
   // All channels the viewer is a member of (incl. pending requests).
   // pinned_at, hidden_at, photo_url are selected separately below so any
   // missing-column situation (migration not yet applied) can't take the
   // whole route down. accepted_at/last_read_at landed in the first DM
   // migration; if those are missing, DMs aren't usable at all anyway.
-  const { data: myMemberships, error: memErr } = await supabase
-    .from("channel_members")
-    .select(
-      "channel_id, accepted_at, last_read_at, role, channels!inner(id, type, name)",
-    )
-    .eq("user_id", user.id);
+  //
+  // `kind` rides on the same read. A database without the column answers the
+  // read again without it (`roomsReady` false): today's list.
+  const readMemberships = (withKind: boolean) =>
+    supabase
+      .from("channel_members")
+      .select(
+        withKind
+          ? "channel_id, accepted_at, last_read_at, role, channels!inner(id, type, name, org_id, kind)"
+          : "channel_id, accepted_at, last_read_at, role, channels!inner(id, type, name, org_id)",
+      )
+      .eq("user_id", user.id);
+  let roomsReady = true;
+  let { data: myMemberships, error: memErr } = await readMemberships(true);
+  if (memErr && isMissingChatSchema(memErr)) {
+    warnMissingChatSchemaOnce("threads.GET");
+    roomsReady = false;
+    ({ data: myMemberships, error: memErr } = await readMemberships(false));
+  }
 
   if (memErr) {
     console.error("[threads.GET memberships]", memErr);
@@ -435,16 +467,78 @@ export async function GET() {
       id: string;
       type: ThreadEntry["type"];
       name: string;
+      /** Set on a club's room, null on a dm or a group. */
+      org_id?: string | null;
+      /** `channels.kind`; absent on a database without the column. */
+      kind?: unknown;
     };
   };
-  const rows: Membership[] = ((myMemberships ?? []) as unknown as Membership[]).map(
-    (r) => ({ ...r, hidden_at: null, pinned_at: null, muted_until: null }),
-  );
+  /** A club's room: it belongs to a club. A dm or a group never does. */
+  const isClubRoom = (r: Membership): boolean =>
+    (typeof r.channels.org_id === "string" && r.channels.org_id !== "") ||
+    r.channels.type === "org_channel" ||
+    r.channels.type === "org_subchannel";
+  const rows: Membership[] = ((myMemberships ?? []) as unknown as Membership[])
+    .map((r) => ({ ...r, hidden_at: null, pinned_at: null, muted_until: null }))
+    // `?scope=chats`: dms and groups only. Otherwise every thread but the
+    // event chats, which the old screens never list. Dropped here, before
+    // any other read, so neither their rosters nor their messages are loaded.
+    .filter((r) => (chatsOnly ? !isClubRoom(r) : r.channels.kind !== "event"));
   if (rows.length === 0) {
     return NextResponse.json({ ok: true, threads: [], requests: [] });
   }
 
   const channelIds = rows.map((r) => r.channel_id);
+
+  // Club rooms: the club behind each room and the viewer's role in it. One
+  // read each for all the viewer's clubs, on the viewer's own client (a
+  // member reads their club and their own membership rows). Soft-fail: a
+  // read that fails leaves the rooms with today's plain entries.
+  const orgById = new Map<string, OrgRef>();
+  const roleByOrg = new Map<string, ClubRole>();
+  const clubIds = Array.from(
+    new Set(
+      rows
+        .filter((r) => roomsReady && isClubRoom(r) && isRoomKind(r.channels.kind))
+        .map((r) => r.channels.org_id)
+        .filter((id): id is string => typeof id === "string" && id !== ""),
+    ),
+  );
+  if (clubIds.length > 0) {
+    const [orgsRes, rolesRes] = await Promise.all([
+      supabase.from("orgs").select("id, handle, name, logo_url, banner_url, verified").in("id", clubIds),
+      supabase.from("org_members").select("org_id, role").eq("user_id", user.id).in("org_id", clubIds),
+    ]);
+    // Fails closed, like the co-member and hidden-user reads below: a club
+    // room without its club would go out under its bare name with none of
+    // its fields, and a Board without the viewer's role would tell an officer
+    // they may not post there (the share pickers drop such rows).
+    if (orgsRes.error || rolesRes.error) {
+      console.error("[threads.GET clubs]", orgsRes.error ?? rolesRes.error);
+      return NextResponse.json({ ok: false, error: "Request failed" }, { status: 500 });
+    }
+    type OrgRow = {
+      id: string;
+      handle: string;
+      name: string;
+      logo_url: string | null;
+      banner_url: string | null;
+      verified: boolean | null;
+    };
+    for (const o of (orgsRes.data ?? []) as unknown as OrgRow[]) {
+      orgById.set(o.id, {
+        id: o.id,
+        handle: o.handle,
+        name: o.name,
+        logo_url: orgAssetProxyUrl(o.handle, o.logo_url, "logo"),
+        banner_url: orgAssetProxyUrl(o.handle, o.banner_url, "banner"),
+        verified: o.verified === true,
+      });
+    }
+    for (const m of (rolesRes.data ?? []) as unknown as { org_id: string; role: unknown }[]) {
+      if (isClubRole(m.role)) roleByOrg.set(m.org_id, m.role);
+    }
+  }
 
   // Optional columns fetched separately so a migration-lag situation
   // (column missing) doesn't take the whole route down.
@@ -542,27 +636,19 @@ export async function GET() {
   // phantom-request guard below needs `last`: with no last message, every
   // pending thread is hidden. So if the wider select ever errors, retry with
   // the base columns rather than lose every preview and every request.
-  const lastMsgsQuery = (select: string) =>
-    supabase
-      .from("messages")
-      .select(select)
-      .in("channel_id", channelIds)
-      .order("created_at", { ascending: false })
-      .limit(channelIds.length * 5);
-  let { data: lastMsgs, error: lastErr } = await lastMsgsQuery(
-    "channel_id, content, created_at, user_id, media_kind, attachment_kind",
-  );
-  if (lastErr) {
-    console.error("[threads.GET lastMsgs]", lastErr);
-    ({ data: lastMsgs, error: lastErr } = await lastMsgsQuery(
-      "channel_id, content, created_at, user_id",
-    ));
-    if (lastErr) {
-      console.error("[threads.GET lastMsgs fallback]", lastErr);
-      // Soft-fail: still render the list without previews.
-    }
-  }
-
+  //
+  // A reply under a Board post is never a room's preview (`thread_root_id is
+  // null`): it would put a member's reply where the officers' post belongs
+  // and flip `unread`. A dm or a group has no replies of that kind, so the
+  // filter changes nothing for them. On a database without the column the
+  // read is repeated without the filter: today's previews.
+  //
+  // Two reads, each newest first with its own window of 5 rows per channel:
+  // the dms and groups, and the club rooms. Every member now lists every
+  // Board and Lounge of their clubs; in one shared window busy club rooms
+  // could push a dm's last message out of it (no preview, no unread, a
+  // request dropped, a hidden dm not coming back). A dm competes only with
+  // dms and groups, as before club rooms were listed.
   type LastMsgRow = {
     channel_id: string;
     content: string;
@@ -572,8 +658,42 @@ export async function GET() {
     media_kind?: "image" | "video" | null;
     attachment_kind?: "post" | "clip" | null;
   };
+  const readLastMessages = async (ids: string[]): Promise<LastMsgRow[]> => {
+    if (ids.length === 0) return [];
+    const query = (select: string, topLevelOnly: boolean) => {
+      const q = supabase.from("messages").select(select).in("channel_id", ids);
+      return (topLevelOnly ? q.is("thread_root_id", null) : q)
+        .order("created_at", { ascending: false })
+        .limit(ids.length * 5);
+    };
+    const wide = "channel_id, content, created_at, user_id, media_kind, attachment_kind";
+    let topLevelOnly = roomsReady;
+    let { data, error } = await query(wide, topLevelOnly);
+    if (error && topLevelOnly && isMissingChatSchema(error)) {
+      warnMissingChatSchemaOnce("threads.GET lastMsgs");
+      topLevelOnly = false;
+      ({ data, error } = await query(wide, topLevelOnly));
+    }
+    if (error) {
+      console.error("[threads.GET lastMsgs]", error);
+      ({ data, error } = await query("channel_id, content, created_at, user_id", topLevelOnly));
+      if (error) {
+        console.error("[threads.GET lastMsgs fallback]", error);
+        // Soft-fail: still render the list without previews.
+        return [];
+      }
+    }
+    return (data ?? []) as unknown as LastMsgRow[];
+  };
+  const clubRoomIds = new Set(rows.filter(isClubRoom).map((r) => r.channel_id));
+  const [chatLast, roomLast] = await Promise.all([
+    readLastMessages(channelIds.filter((id) => !clubRoomIds.has(id))),
+    readLastMessages(channelIds.filter((id) => clubRoomIds.has(id))),
+  ]);
+  const lastMsgs = [...chatLast, ...roomLast];
+
   const lastByChannel = new Map<string, ThreadEntry["last_message"]>();
-  for (const m of (lastMsgs ?? []) as unknown as LastMsgRow[]) {
+  for (const m of lastMsgs) {
     const cid = m.channel_id as string;
     if (!lastByChannel.has(cid)) {
       lastByChannel.set(cid, {
@@ -622,7 +742,12 @@ export async function GET() {
     // legacy noise (the pre-RLS-fix duplicate-channel bug created stub
     // channels where the viewer was added with accepted_at = NULL but
     // no message ever followed). Hide those.
-    const isRequestState = r.accepted_at === null;
+    //
+    // A club's room is never a request, whatever `accepted_at` says (a
+    // member can null their own through the data API): it is listed as the
+    // room it is, with or without messages.
+    const clubRoom = isClubRoom(r);
+    const isRequestState = r.accepted_at === null && !clubRoom;
     if (isRequestState) {
       const hasInbound = !!last && last.user_id !== user.id;
       if (!hasInbound) continue;
@@ -657,6 +782,26 @@ export async function GET() {
       }
     }
 
+    // A club's room goes by its club: "Salsa Club · Lounge". Every old list
+    // then shows a usable label with no change of its own. Only with the
+    // chat rooms schema and a club the viewer can read; otherwise the entry
+    // stays today's.
+    let roomFields: ThreadEntryRoomFields | null = null;
+    const roomKind: RoomKind | null =
+      roomsReady && clubRoom && isRoomKind(r.channels.kind) ? r.channels.kind : null;
+    const org = roomKind && r.channels.org_id ? orgById.get(r.channels.org_id) ?? null : null;
+    if (roomKind && org) {
+      displayName = clubRoomLabel(org.name, roomKind, r.channels.name ?? "");
+      const role = roleByOrg.get(org.id) ?? null;
+      roomFields = {
+        org,
+        room_kind: roomKind,
+        // A new top-level message. On a Board that is the officers' alone;
+        // the database decides again at the send.
+        can_post: roomKind === "board" ? role !== null && BOARD_POSTER_ROLES.includes(role) : true,
+      };
+    }
+
     const entry: ThreadEntry = {
       id: r.channel_id,
       type: r.channels.type,
@@ -667,11 +812,12 @@ export async function GET() {
       last_message: last,
       unread,
       accepted_at: r.accepted_at,
-      is_request: r.accepted_at === null,
+      is_request: isRequestState,
       peer_last_read_at: peerLastReadByChannel.get(r.channel_id) ?? null,
       pinned_at: r.pinned_at,
       viewer_role: r.role,
       muted_until: r.muted_until,
+      ...(roomFields ?? {}),
     };
 
     if (entry.is_request) requests.push(entry);

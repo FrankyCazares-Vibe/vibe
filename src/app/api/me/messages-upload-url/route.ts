@@ -7,6 +7,7 @@ import {
   MESSAGE_MEDIA_KEY_PREFIX,
   signMessageMediaPutUrl,
 } from "@/lib/r2";
+import { refusalBody } from "@/lib/chat/types";
 import { ensureMember } from "@/lib/messages/channel-access";
 import { requireCanPublish } from "@/lib/moderation/access";
 import { rateLimit, tooManyRequests } from "@/lib/rate-limit";
@@ -42,13 +43,6 @@ type Body = {
  * with `/api/me/threads/[id]/messages`.
  */
 export async function POST(req: Request) {
-  if (!isR2Configured()) {
-    return NextResponse.json(
-      { ok: false, error: "Media storage not configured" },
-      { status: 503 },
-    );
-  }
-
   const supabase = await createSupabaseServerClient();
   const {
     data: { user },
@@ -94,6 +88,22 @@ export async function POST(req: Request) {
     return member.status === 500
       ? NextResponse.json({ ok: false, error: "Request failed" }, { status: 500 })
       : NextResponse.json({ ok: false, error: "Not a member" }, { status: 403 });
+  }
+
+  // No photos or videos in club rooms in v1 (chat rooms, wave 1, contract
+  // 6.7). The send refuses them too, and so does the insert policy; refusing
+  // here keeps anyone from paying for an upload that can never be sent.
+  if (member.isOrgChannel) {
+    return NextResponse.json(refusalBody("club_media_off"), { status: 403 });
+  }
+
+  // After the club rooms' rule (chat rooms, wave 1), so a club room gets the
+  // same answer on every server, with or without media storage set up.
+  if (!isR2Configured()) {
+    return NextResponse.json(
+      { ok: false, error: "Media storage not configured" },
+      { status: 503 },
+    );
   }
 
   const contentType =

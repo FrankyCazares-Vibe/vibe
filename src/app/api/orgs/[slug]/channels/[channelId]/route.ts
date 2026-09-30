@@ -1,6 +1,7 @@
 import { NextResponse } from "next/server";
 
-import { loadClubOfficer } from "@/lib/club-routes/officer-guard";
+import { refusalBody } from "@/lib/chat/types";
+import { isCoreRoomKind, isCoreRoomName, loadClubOfficer } from "@/lib/club-routes/officer-guard";
 import { contentBlockedResponse, requireNotRestricted } from "@/lib/moderation/access";
 import { checkChangedText } from "@/lib/moderation/text-filter";
 import { createSupabaseServerClient } from "@/lib/supabase/server";
@@ -41,12 +42,30 @@ async function requireStaff(slug: string, channelId: string, viewerId: string) {
   return { org: guard.org, channel: guard.channel, service: guard.service } as const;
 }
 
+/** 409 `room_locked`: "This room can't be renamed, hidden or deleted." */
+function roomLocked() {
+  return NextResponse.json(refusalBody("room_locked"), { status: 409 });
+}
+
 /**
  * PATCH /api/orgs/[slug]/channels/[channelId]
  * Body: { name?, topic?, is_private?, position? }
  * Permissions: owner/admin only.
  *
  * Renames must stay slug-shaped + unique within the org.
+ *
+ * Chat rooms, wave 1 (wave-1-contracts.md section 8), by the room's `kind`:
+ *   - board, lounge, officers: a new name or a new `is_private` is refused,
+ *     409 `room_locked`; `topic`, `position` and `pinned` are allowed. A
+ *     `name` or `is_private` equal to what the room already has changes
+ *     nothing and is not a refusal: the settings screen sends all three
+ *     fields on every save, and the topic must stay editable.
+ *   - event: everything is refused, 409 `room_locked` (its name follows the
+ *     event's title).
+ *   - room: renaming it to `board`, `lounge` or `officers` (any case) is
+ *     refused, 409 `room_locked`.
+ *   - kind unreadable (a database without `channels.kind`): what this route
+ *     did before, its own row purge included (section 3.10).
  */
 export async function PATCH(req: Request, { params }: Params) {
   const { slug, channelId } = await params;
@@ -59,16 +78,33 @@ export async function PATCH(req: Request, { params }: Params) {
   const guard = await requireStaff(slug, channelId, user.id);
   if ("response" in guard) return guard.response;
 
+  const kind = guard.channel.kind;
+  const coreRoom = isCoreRoomKind(kind);
+  // Whatever the body says.
+  if (kind === "event") return roomLocked();
+
   let body: PatchBody;
   try {
     body = (await req.json()) as PatchBody;
   } catch {
     return NextResponse.json({ ok: false, error: "Invalid JSON" }, { status: 400 });
   }
+  // `null`, a number or an array parse fine but are not a body: same answer.
+  if (!body || typeof body !== "object" || Array.isArray(body)) {
+    return NextResponse.json({ ok: false, error: "Invalid JSON" }, { status: 400 });
+  }
 
   const patch: Record<string, unknown> = {};
 
-  if (typeof body.name === "string") {
+  const sentName = typeof body.name === "string" ? body.name.trim().toLowerCase() : null;
+  const renamed = sentName !== null && sentName !== guard.channel.name.trim().toLowerCase();
+  if (renamed && kind !== null && (coreRoom || isCoreRoomName(sentName))) return roomLocked();
+  if (coreRoom && typeof body.is_private === "boolean" && body.is_private !== guard.channel.is_private) {
+    return roomLocked();
+  }
+
+  // A core room's name can only arrive here unchanged: not written.
+  if (typeof body.name === "string" && !coreRoom) {
     const v = body.name.trim().toLowerCase();
     if (!CHANNEL_NAME_RE.test(v)) {
       return NextResponse.json(
@@ -76,15 +112,23 @@ export async function PATCH(req: Request, { params }: Params) {
         { status: 400 }
       );
     }
-    // Uniqueness within the org (excluding self).
-    const { data: clash } = await guard.service
+    // Uniqueness within the org (excluding self). `limit(1)`, not
+    // `maybeSingle()`: names are not unique in the table (an event's chat is
+    // named after its title), and `maybeSingle()` answers "no row" with an
+    // error when two rows match, which read as "no clash".
+    const { data: clash, error: clashErr } = await guard.service
       .from("channels")
       .select("id")
       .eq("org_id", guard.org.id)
       .eq("name", v)
       .neq("id", channelId)
-      .maybeSingle();
-    if (clash) {
+      .limit(1);
+    if (clashErr) {
+      // Unknown whether the name is free: never write on a guess.
+      console.error("[orgs/[slug]/channels/[channelId] PATCH name clash]", clashErr);
+      return NextResponse.json({ ok: false, error: "Failed to update channel" }, { status: 500 });
+    }
+    if ((clash ?? []).length > 0) {
       return NextResponse.json({ ok: false, error: "Channel name already exists" }, { status: 409 });
     }
     // Every member reads the name and topic; the word filter judges only
@@ -98,7 +142,8 @@ export async function PATCH(req: Request, { params }: Params) {
     if (!checkChangedText(topic, guard.channel.topic).ok) return contentBlockedResponse("topic");
     patch.topic = topic;
   }
-  if (typeof body.is_private === "boolean") {
+  // A core room's `is_private` can only arrive here unchanged: not written.
+  if (typeof body.is_private === "boolean" && !coreRoom) {
     patch.is_private = body.is_private;
   }
   if (body.position !== undefined) {
@@ -140,7 +185,11 @@ export async function PATCH(req: Request, { params }: Params) {
   // leaving them would keep read access through older policies. Owner /
   // admin still auto-pass via can_view_org_channel; everyone else must be
   // re-added to the explicit allow list.
-  if (patch.is_private === true && guard.channel.is_private === false) {
+  //
+  // Where `kind` can be read the database does this itself
+  // (`chat_channels_subscribe`, in the same statement as the flip), so the
+  // purge here runs only on a database without the column.
+  if (patch.is_private === true && guard.channel.is_private === false && kind === null) {
     const { error: purgeErr } = await guard.service
       .from("channel_members")
       .delete()
@@ -156,6 +205,11 @@ export async function PATCH(req: Request, { params }: Params) {
  * DELETE /api/orgs/[slug]/channels/[channelId]
  * Permissions: owner/admin only. Cascades to messages (FK ON DELETE CASCADE
  * on messages.channel_id, set up in the original Phase 1 schema).
+ *
+ * Chat rooms, wave 1: only an extra room (`kind = 'room'`) can be deleted. A
+ * Board, a Lounge, an Officers room and an event's chat answer 409
+ * `room_locked` (an event's chat goes when its event is cancelled). On a
+ * database without `channels.kind` every channel can be deleted, as before.
  */
 export async function DELETE(_req: Request, { params }: Params) {
   const { slug, channelId } = await params;
@@ -167,6 +221,9 @@ export async function DELETE(_req: Request, { params }: Params) {
 
   const guard = await requireStaff(slug, channelId, user.id);
   if ("response" in guard) return guard.response;
+
+  const kind = guard.channel.kind;
+  if (kind !== null && kind !== "room") return roomLocked();
 
   const { error } = await guard.service.from("channels").delete().eq("id", channelId);
   if (error) {

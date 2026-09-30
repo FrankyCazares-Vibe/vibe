@@ -1,5 +1,7 @@
 import { NextResponse } from "next/server";
 
+import { refusalBody } from "@/lib/chat/types";
+import { isUuid } from "@/lib/pgrest";
 import { createSupabaseServerClient } from "@/lib/supabase/server";
 
 type RouteCtx = { params: Promise<{ id: string }> };
@@ -16,6 +18,11 @@ type RouteCtx = { params: Promise<{ id: string }> };
  * it matched zero rows without an error, this route answered ok:true, and
  * the request came straight back on the next reload. Now zero rows removed
  * means re-reading the row and answering with what actually happened.
+ *
+ * A CLUB'S ROOM IS NEVER A REQUEST (chat rooms, wave 1, contract section 15):
+ * a member can null their own `accepted_at` through the data API, and the
+ * old inbox would then offer "Decline" on the club's room. A club room
+ * answers 400 `club_room` before anything is deleted.
  */
 export async function POST(_req: Request, ctx: RouteCtx) {
   const { id: channelId } = await ctx.params;
@@ -26,6 +33,24 @@ export async function POST(_req: Request, ctx: RouteCtx) {
   } = await supabase.auth.getUser();
   if (authErr || !user) {
     return NextResponse.json({ ok: false, error: "Unauthorized" }, { status: 401 });
+  }
+
+  // The club-room guard. Read on the viewer's client: a room they hold a row
+  // on is a room they can read. An id that is not a uuid names no room and
+  // goes on to today's answer.
+  if (isUuid(channelId)) {
+    const { data: room, error: roomErr } = await supabase
+      .from("channels")
+      .select("org_id")
+      .eq("id", channelId)
+      .maybeSingle();
+    if (roomErr) {
+      console.error("[threads.decline room]", roomErr);
+      return NextResponse.json({ ok: false, error: "Request failed" }, { status: 500 });
+    }
+    if (room?.org_id) {
+      return NextResponse.json(refusalBody("club_room"), { status: 400 });
+    }
   }
 
   const { data: removed, error } = await supabase

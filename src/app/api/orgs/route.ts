@@ -14,6 +14,7 @@ import {
   legacyLabel,
   type SchoolSystem,
 } from "@/lib/iu/campuses";
+import { isMissingChatSchema, warnMissingChatSchemaOnce } from "@/lib/chat/schema";
 import { campusScopeError, homeCampusIdFor } from "@/lib/iu/community-scope";
 import { contentBlockedResponse, requireCanPublish } from "@/lib/moderation/access";
 import { checkText } from "@/lib/moderation/text-filter";
@@ -650,8 +651,10 @@ export async function GET(req: Request) {
  * for a campus-less org gets `campus_id: null` back in the 201 and knows what
  * it made.
  *
- * On success: the org row, an `org_members` row with role='owner', and
- * default channels `#general` + `#announcements`.
+ * On success: the org row, an `org_members` row with role='owner', and the
+ * club's three rooms (Lounge, Board, Officers) with the owner's rows on them,
+ * made by `chat_repair_club`. A club whose rooms cannot be made is not kept:
+ * it is deleted again and the answer is 500 `create_failed`.
  */
 export async function POST(req: Request) {
   const supabase = await createSupabaseServerClient();
@@ -876,27 +879,72 @@ export async function POST(req: Request) {
   });
   if (memberErr) {
     console.error("[orgs POST insert owner member]", memberErr);
+    // Undo the club row too: a club with no owner and no rooms can't be run
+    // or repaired by anyone (same rule as the rooms failure below).
+    const { error: undoErr } = await service.from("orgs").delete().eq("id", org.id);
+    if (undoErr) console.error("[orgs POST undo after owner failure]", undoErr);
     return fail(500, "create_failed", "Failed to add owner row");
   }
 
-  // Auto-create default channels: #general (position 0) and #announcements (position 1).
-  // Both public so all members can see/post by default.
-  const defaults = [
-    { name: "general", position: 0, is_private: false },
-    { name: "announcements", position: 1, is_private: false },
-  ];
-  const { error: channelsErr } = await service.from("channels").insert(
-    defaults.map((d) => ({
-      org_id: org.id,
-      type: "org_channel" as const,
-      name: d.name,
-      position: d.position,
-      is_private: d.is_private,
-    }))
-  );
-  if (channelsErr) {
-    console.error("[orgs POST insert default channels]", channelsErr);
-    // Non-fatal — the org exists, admins can create channels manually.
+  // The club's rooms (chat rooms, wave 1; wave-1-contracts.md section 8):
+  // `chat_repair_club` makes the Lounge, the Board and the Officers room and
+  // gives the owner their rows. It runs after the owner's membership row, so
+  // there is a member to give rows to.
+  let roomsErr: unknown = null;
+  try {
+    const { error } = await service.rpc("chat_repair_club", { p_org: org.id });
+    roomsErr = error;
+  } catch (err) {
+    roomsErr = err ?? new Error("chat_repair_club threw");
+  }
+
+  // "Missing schema" for this call means the function itself is missing (a
+  // database without the rooms migration): PGRST202, or 42883 when
+  // PostgREST's cache is stale. Both are `isMissingChatSchema` codes. A
+  // 42703 or 42P01 can only come from inside a function that exists (its body
+  // met a missing column or table): that club would get Lounge and Board from
+  // the fallback below but no Officers room, so it is "any other failure".
+  // An error without a code is judged by its message, as `isMissingChatSchema`
+  // does, and only a missing FUNCTION counts.
+  const roomsInfo = (roomsErr ?? {}) as { code?: unknown; message?: unknown };
+  const roomsCode = typeof roomsInfo.code === "string" ? roomsInfo.code.trim().toUpperCase() : "";
+  const roomsText = typeof roomsInfo.message === "string" ? roomsInfo.message.toLowerCase() : "";
+  const noRepairFunction =
+    isMissingChatSchema(roomsErr) &&
+    (roomsCode === "PGRST202" ||
+      roomsCode === "42883" ||
+      (roomsCode === "" && roomsText.includes("function")));
+  if (roomsErr && noRepairFunction) {
+    // A database without the rooms migration (section 3.10): the two
+    // channels this route made before it. Not fatal, as before.
+    warnMissingChatSchemaOnce("orgs POST default rooms");
+    const defaults = [
+      { name: "general", position: 0, is_private: false },
+      { name: "announcements", position: 1, is_private: false },
+    ];
+    const { error: channelsErr } = await service.from("channels").insert(
+      defaults.map((d) => ({
+        org_id: org.id,
+        type: "org_channel" as const,
+        name: d.name,
+        position: d.position,
+        is_private: d.is_private,
+      }))
+    );
+    if (channelsErr) {
+      console.error("[orgs POST insert default channels]", channelsErr);
+      // Non-fatal — the org exists, admins can create channels manually.
+    }
+  } else if (roomsErr) {
+    // A club without its rooms is not kept: nobody could post in it and the
+    // owner would hold a handle they cannot use. Its rows go with it
+    // (membership and any room cascade from the club).
+    console.error("[orgs POST default rooms]", roomsErr);
+    const { error: undoErr } = await service.from("orgs").delete().eq("id", org.id);
+    if (undoErr) {
+      console.error("[orgs POST default rooms] the club could not be deleted again", org.id, undoErr);
+    }
+    return fail(500, "create_failed", "Failed to create org");
   }
 
   return NextResponse.json({ ok: true, org }, { status: 201 });

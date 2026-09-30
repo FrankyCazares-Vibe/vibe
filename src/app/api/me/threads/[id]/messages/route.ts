@@ -2,11 +2,28 @@ import { NextResponse } from "next/server";
 
 import {
   MESSAGE_SELECT,
-  hydrateParentPreviews,
-  hydrateReactions,
-  prepareForClient,
+  MESSAGE_SELECT_BEFORE_ROOMS,
+  VIEWER_OUTSIDE_ROOMS,
+  cleanAfterParam,
+  clampReadLimit,
+  describeRoom,
+  readChatMessages,
+  roomOf,
+  toChatMessages,
+  viewerInRoom,
   type MessageRow,
 } from "@/lib/chat/message-read";
+import { postRefusal } from "@/lib/chat/room-rules";
+import { canPostAnswer, clubRole, filterRoomReaders } from "@/lib/chat/rooms";
+import { isMissingChatSchema, warnMissingChatSchemaOnce } from "@/lib/chat/schema";
+import {
+  refusalBody,
+  type PostRefusalCode,
+  type RefusalCode,
+  type ThreadMessagesResponse,
+  type ThreadRoom,
+  type ViewerInRoom,
+} from "@/lib/chat/types";
 import {
   extractMentionHandles,
   insertMentionNotifications,
@@ -25,8 +42,6 @@ import {
 } from "@/lib/supabase/service";
 
 const MAX_CONTENT = 4000;
-const DEFAULT_LIMIT = 50;
-const MAX_LIMIT = 200;
 
 type SendBody = {
   content?: unknown;
@@ -35,13 +50,35 @@ type SendBody = {
   media_url?: unknown;        // R2 object key (messages/<channel>/<uuid>.ext)
   media_kind?: unknown;       // 'image' | 'video'
   parent_message_id?: unknown; // quote-reply parent
+  thread_root_id?: unknown;    // the Board post a reply stands under (club chat, wave 1)
 };
 
 type RouteCtx = { params: Promise<{ id: string }> };
 
+/** A refusal from the contract's table (section 6.0): the sentence and its code. */
+function refuse(code: RefusalCode, status: number) {
+  return NextResponse.json(refusalBody(code), { status });
+}
+
+/** The status each send refusal answers with (contract 6.2). */
+const POST_REFUSAL_STATUS: Record<PostRefusalCode, number> = {
+  board_officers_only: 403,
+  board_post_missing: 409,
+  thread_root_not_allowed: 400,
+  room_closed: 403,
+};
+
 /**
  * GET: list messages in a channel, oldest-first.
  * `?before=<iso>` paginates older messages; `?limit=<n>` caps results.
+ *
+ * Club chat, wave 1 (contract 6.1), all of it additive:
+ *   - `?after=<a created_at the server sent, unchanged>`: the messages from
+ *     that moment on, oldest first.
+ *   - `?root=<messageId>`: the replies under one Board post, oldest first.
+ *   - In a club room, without `root`, replies are never listed as posts.
+ *   - `room` and `viewer` on every answer; `viewer_id` for club rooms too.
+ * The read itself lives in src/lib/chat/message-read.ts.
  */
 export async function GET(req: Request, ctx: RouteCtx) {
   const { id: channelId } = await ctx.params;
@@ -60,59 +97,70 @@ export async function GET(req: Request, ctx: RouteCtx) {
   }
 
   const url = new URL(req.url);
-  const before = url.searchParams.get("before");
-  const rawLimit = Number(url.searchParams.get("limit") ?? DEFAULT_LIMIT);
-  const limit = Math.min(MAX_LIMIT, Math.max(1, Number.isFinite(rawLimit) ? rawLimit : DEFAULT_LIMIT));
+  // A blank param is a param that was not sent, as `before` has always been.
+  const before = url.searchParams.get("before") || undefined;
+  const afterRaw = (url.searchParams.get("after") ?? "").trim();
+  const root = (url.searchParams.get("root") ?? "").trim() || undefined;
+  // 1 to 200. The replies under one post come whole (at most 200) unless a
+  // limit is sent.
+  const limitParam = url.searchParams.get("limit");
+  const limit = clampReadLimit(limitParam === null ? undefined : Number(limitParam), root !== undefined);
 
-  // Try the join-rich select first; if attachment columns/FK aren't in
-  // the DB yet, retry with the simpler select so the page still renders.
-  // cleared_at filters out everything older than the viewer's last
-  // "Clear chat" call — viewer-side soft-delete; peer's view is intact.
-  const clearedAt = !member.isOrgChannel ? member.cleared_at : null;
-  async function runQuery(select: string) {
-    let q = supabase
-      .from("messages")
-      .select(select)
-      .eq("channel_id", channelId)
-      .order("created_at", { ascending: false })
-      .limit(limit);
-    if (before) q = q.lt("created_at", before);
-    if (clearedAt) q = q.gt("created_at", clearedAt);
-    return q;
-  }
-  let { data, error } = await runQuery(MESSAGE_SELECT);
-  if (error) {
-    if (/attachment|media|relationship|column|fkey/i.test(error.message)) {
-      const fallback = await runQuery(
-        "id, content, created_at, user_id, users:users!messages_user_id_fkey(id, handle, name, avatar_url)",
-      );
-      data = fallback.data;
-      error = fallback.error;
+  // `after` is a `created_at` string this route sent, echoed unchanged.
+  // Anything else never reaches the database.
+  let after: string | undefined;
+  if (afterRaw) {
+    const cleaned = cleanAfterParam(afterRaw);
+    if (!cleaned) {
+      return NextResponse.json({ ok: false, error: "Invalid after" }, { status: 400 });
     }
+    after = cleaned;
   }
-  if (error) {
-    console.error("[messages.GET]", error);
-    return NextResponse.json({ ok: false, error: "Request failed" }, { status: 500 });
-  }
-  const messageRows = (data ?? []) as unknown as MessageRow[];
-  await Promise.all([
-    hydrateReactions(supabase, messageRows, user.id),
-    hydrateParentPreviews(supabase, messageRows),
-  ]);
-  // After hydration, so the empty defaults only fill what hydration left.
-  prepareForClient(messageRows, channelId);
 
-  // Org channels don't have channel_members rows — skip the peer/typing query
-  // entirely. (Org-channel read state + typing indicators are out of scope
-  // for v1; can be added later via a separate org_channel_reads table.)
+  // Which room this is. `ensureMember` named a kind and the room cannot be
+  // read: the read failed. Never answered as a dm, never with the defaults.
+  const found = await roomOf(channelId, member);
+  if (found.failed) return refuse("try_again", 503);
+
+  // The page and the room's description side by side. The read keeps the
+  // viewer's "Clear chat" line for a dm or a group, and in a club room lists
+  // top-level messages only unless `root` asks for the replies under a post.
+  // The viewer's role comes with the page (the same `org_members` read as the
+  // authors' roles), not with the description.
+  const [read, described] = await Promise.all([
+    readChatMessages(
+      supabase,
+      channelId,
+      { before, after, root, limit },
+      { viewerId: user.id, access: member, room: found.room },
+    ),
+    found.room ? describeRoom(supabase, found.room, user.id) : Promise.resolve(null),
+  ]);
+  if (!read.ok) return NextResponse.json(read.body, { status: read.status });
+
+  // A club's room. `peer_last_read_at` and `peer_typing` stay empty there
+  // (read state and typing in club rooms are not in v1). On a database
+  // without the chat rooms schema there is no room to describe: the answer is
+  // today's data with every new field at its default (contract 3.10).
   if (member.isOrgChannel) {
-    const messages = (data ?? []).slice().reverse();
-    return NextResponse.json({
+    let room: ThreadRoom | null = null;
+    let viewer: ViewerInRoom = VIEWER_OUTSIDE_ROOMS;
+    if (found.room) {
+      const inRoom = described ? viewerInRoom(found.room, read.viewerRole, described.mayPost) : null;
+      if (!described || !inRoom) return refuse("try_again", 503);
+      room = described.room;
+      viewer = inRoom;
+    }
+    const body: ThreadMessagesResponse = {
       ok: true,
-      messages,
+      messages: read.messages,
+      viewer_id: user.id,
       peer_last_read_at: null,
       peer_typing: [],
-    });
+      room,
+      viewer,
+    };
+    return NextResponse.json(body);
   }
 
   // Peer last_read_at + typing — both come from the same query so we only
@@ -166,15 +214,19 @@ export async function GET(req: Request, ctx: RouteCtx) {
       avatar_url: o.users!.avatar_url,
     }));
 
-  // Return oldest-first so the UI can append straight to the bottom.
-  const messages = (data ?? []).slice().reverse();
-  return NextResponse.json({
+  // Oldest-first (the read's order) so the UI can append straight to the
+  // bottom. A dm or a group is not a room: `room` null, and the viewer may
+  // always write a new message as far as rooms go.
+  const body: ThreadMessagesResponse = {
     ok: true,
-    messages,
+    messages: read.messages,
     viewer_id: user.id,
     peer_last_read_at: peerLastReadAt,
     peer_typing: peerTyping,
-  });
+    room: null,
+    viewer: VIEWER_OUTSIDE_ROOMS,
+  };
+  return NextResponse.json(body);
 }
 
 /**
@@ -240,20 +292,21 @@ export async function POST(req: Request, ctx: RouteCtx) {
   let mediaUrl: string | null = null;
   let mediaKind: "image" | "video" | null = null;
   if (mediaUrlRaw) {
-    if (!isChannelMessageMediaKey(mediaUrlRaw, channelId)) {
+    const badKey = !isChannelMessageMediaKey(mediaUrlRaw, channelId);
+    const badKind = mediaKindRaw !== "image" && mediaKindRaw !== "video";
+    if (badKey || badKind) {
+      // ANY media sent to a club room answers with the club rooms' rule
+      // (contract 6.2), a key this route would refuse anyway included. Asked
+      // only on this path, so a dm or a group answers as it always has.
+      const room = await ensureMember(supabase, channelId, user.id);
+      if (room.ok && room.isOrgChannel) return refuse("club_media_off", 400);
       return NextResponse.json(
-        { ok: false, error: "Invalid media key" },
-        { status: 400 },
-      );
-    }
-    if (mediaKindRaw !== "image" && mediaKindRaw !== "video") {
-      return NextResponse.json(
-        { ok: false, error: "Invalid media_kind" },
+        { ok: false, error: badKey ? "Invalid media key" : "Invalid media_kind" },
         { status: 400 },
       );
     }
     mediaUrl = mediaUrlRaw;
-    mediaKind = mediaKindRaw;
+    mediaKind = mediaKindRaw === "video" ? "video" : "image";
   }
 
   // Verify the attachment exists and is visible to the sender (RLS gates
@@ -293,11 +346,54 @@ export async function POST(req: Request, ctx: RouteCtx) {
     return NextResponse.json({ ok: false, error: "Not a member" }, { status: member.status });
   }
 
+  // ── The club rooms gate (contract 6.2), before anything is written ────────
+  // The database decides (`can_post_org_channel`, asked as the sender); this
+  // route only turns its no into the contract's code and sentence. The insert
+  // policy below is the second wall.
+
+  // No photos or videos in club rooms in v1.
+  if (member.isOrgChannel && mediaUrlRaw) return refuse("club_media_off", 400);
+
+  // `thread_root_id`, cleaned ONCE: the same value goes to the gate, to
+  // `postRefusal` and to the insert. Blank is no root. There but not text
+  // (a number, a list) is a root that can never name a post.
+  const rootRaw = body.thread_root_id;
+  if (rootRaw !== undefined && rootRaw !== null && typeof rootRaw !== "string") {
+    return refuse("thread_root_not_allowed", 400);
+  }
+  const rootId = typeof rootRaw === "string" && rootRaw.trim() !== "" ? rootRaw.trim() : null;
+
+  // A dm or a group has no Board: a root sent there is refused, and nothing
+  // else about them changes.
+  if (!member.isOrgChannel && rootId) {
+    const code = postRefusal(null, rootId, null);
+    return refuse(code, POST_REFUSAL_STATUS[code]);
+  }
+
+  // A club room. `room` stays null on a database without the chat rooms
+  // schema (`kind` null): there the gate answers "allowed", today's rule.
+  const found = await roomOf(channelId, member);
+  if (found.failed) return refuse("try_again", 503);
+  const room = found.room;
+  if (member.isOrgChannel) {
+    const answer = await canPostAnswer(supabase, channelId, user.id, rootId);
+    // The question could not be asked: nobody was refused.
+    if (answer === "failed") return refuse("try_again", 503);
+    if (answer === "no") {
+      const role = await clubRole(member.orgId, user.id);
+      const code = postRefusal(room, rootId, role);
+      return refuse(code, POST_REFUSAL_STATUS[code]);
+    }
+  }
+  const inBoard = room !== null && room.kind === "board";
+
   // Verify the parent message (if any) belongs to this channel — prevents
   // cross-channel quote-replies. Stale deploys without the column degrade
   // silently to a non-reply.
+  // In a Board `parent_message_id` is ignored and stored null: a reply there
+  // stands under its post (`thread_root_id`), it quotes nothing.
   let parentMessageId: string | null = null;
-  if (parentMessageIdRaw) {
+  if (parentMessageIdRaw && !inBoard) {
     const { data: parent, error: parentErr } = await supabase
       .from("messages")
       .select("id, channel_id")
@@ -348,14 +444,38 @@ export async function POST(req: Request, ctx: RouteCtx) {
     media_kind: mediaKind,
     parent_message_id: parentMessageId,
   };
-  // Defensive for migration lag — if either pair of optional columns is
-  // missing, retry with the bare minimum so the message still goes through.
+  // Only a reply carries the column: every other send writes the same row
+  // it always has. `kind` is never written here (this route sends text, the
+  // column's default).
+  if (rootId) insertRow.thread_root_id = rootId;
+
+  // The insert stays on the sender's own client: the policies are the wall.
   let insertResult = await supabase
     .from("messages")
     .insert(insertRow)
     .select(MESSAGE_SELECT)
     .single();
+  // A database without the chat rooms columns (contract 3.10). A reply cannot
+  // be stored there, and is never sent as something else. Any other message
+  // is sent again whole, read back with the columns the database has.
+  if (insertResult.error && isMissingChatSchema(insertResult.error)) {
+    warnMissingChatSchemaOnce("messages.POST");
+    if (rootId) return refuse("try_again", 503);
+    insertResult = await supabase
+      .from("messages")
+      .insert(insertRow)
+      .select(MESSAGE_SELECT_BEFORE_ROOMS)
+      .single();
+  }
+  // Defensive for migration lag — if either pair of optional columns is
+  // missing, retry with the bare minimum so the message still goes through.
+  // Never for a reply: the bare row has no `thread_root_id`, and the reply
+  // would land on the Board as a post.
   if (insertResult.error && /attachment|media|column/i.test(insertResult.error.message)) {
+    if (rootId) {
+      console.error("[messages.POST insert] reply not sent", insertResult.error);
+      return refuse("try_again", 503);
+    }
     insertResult = await supabase
       .from("messages")
       .insert({ channel_id: channelId, user_id: user.id, content })
@@ -367,6 +487,25 @@ export async function POST(req: Request, ctx: RouteCtx) {
   const { data: inserted, error: insErr } = insertResult;
 
   if (insErr || !inserted) {
+    if (member.isOrgChannel && insErr?.code === "42501") {
+      // The gate said yes and the policy said no. Asked once more: the world
+      // may have moved in between (the event's week ended, the Board post was
+      // deleted, the sender left the club), and then the send is refused with
+      // the code of what changed.
+      const again = await canPostAnswer(supabase, channelId, user.id, rootId);
+      if (again === "no") {
+        const role = await clubRole(member.orgId, user.id);
+        const code = postRefusal(room, rootId, role);
+        return refuse(code, POST_REFUSAL_STATUS[code]);
+      }
+      // The gate still says yes (or cannot be asked) while the policy says
+      // no: the two disagree, which the contract calls a bug (6.2). A 500,
+      // and said in the log.
+      console.error(
+        "[messages.POST insert] CONTRACT BUG: can_post_org_channel allowed a send the insert policy refused",
+        { channelId, kind: room?.kind ?? null, reply: rootId !== null, gateAgain: again },
+      );
+    }
     console.error("[messages.POST insert]", insErr);
     return NextResponse.json({ ok: false, error: "Request failed" }, { status: 500 });
   }
@@ -405,8 +544,12 @@ export async function POST(req: Request, ctx: RouteCtx) {
 
   // @mention fan-out — only notifies people who can actually see this
   // channel, so a stray @somebody outside the chat doesn't ping strangers.
-  // For DM/group: members come from channel_members. For org: from
-  // org_members on the channel's org. Best-effort; failures don't block the send.
+  // For DM/group: members come from channel_members. For a club's room: the
+  // people who can read THAT room (`can_view_org_channel`, one by one), so a
+  // mention in Officers or in an event's chat never reaches a member who
+  // cannot open it. A mention inside a Board reply notifies that one person
+  // like any other; nothing else is written for Board posts or replies.
+  // Best-effort; failures don't block the send.
   if (content) {
     const handles = extractMentionHandles(content);
     if (handles.length > 0) {
@@ -415,12 +558,7 @@ export async function POST(req: Request, ctx: RouteCtx) {
         if (ids.length > 0) {
           let validTargets: string[] = [];
           if (member.isOrgChannel) {
-            const { data: orgMembers } = await supabase
-              .from("org_members")
-              .select("user_id")
-              .eq("org_id", member.orgId)
-              .in("user_id", ids);
-            validTargets = (orgMembers ?? []).map((m) => m.user_id as string);
+            validTargets = await filterRoomReaders(channelId, ids);
           } else {
             const { data: chMembers } = await supabase
               .from("channel_members")
@@ -456,13 +594,16 @@ export async function POST(req: Request, ctx: RouteCtx) {
     }
   }
 
-  if (inserted) {
-    const insertedRows = [inserted as unknown as MessageRow];
-    // New row has no reactions yet, but if it's a reply we want to embed
-    // the parent preview so the optimistic-render quote stub is correct.
-    await hydrateParentPreviews(supabase, insertedRows);
-    // Same client shape as the GET: proxy media URLs, reactions: [].
-    prepareForClient(insertedRows, channelId);
-  }
-  return NextResponse.json({ ok: true, message: inserted });
+  // Same client shape as the GET (`ChatMessage`): proxy media URLs, the
+  // parent preview so the optimistic-render quote stub is correct, the new
+  // fields, and none of the columns that are only read. A new row has no
+  // reactions and no replies yet, so neither is looked up.
+  const [message] = await toChatMessages(supabase, [inserted as unknown as MessageRow], {
+    channelId,
+    viewerId: user.id,
+    room,
+    skipReplyCounts: true,
+    skipReactions: true,
+  });
+  return NextResponse.json({ ok: true, message: message ?? null });
 }

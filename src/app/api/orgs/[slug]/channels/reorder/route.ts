@@ -1,5 +1,7 @@
 import { NextResponse } from "next/server";
 
+import { isMissingChatSchema, warnMissingChatSchemaOnce } from "@/lib/chat/schema";
+import { refusalBody } from "@/lib/chat/types";
 import { loadClubOfficer } from "@/lib/club-routes/officer-guard";
 import { requireNotRestricted } from "@/lib/moderation/access";
 import { isUuid } from "@/lib/pgrest";
@@ -22,6 +24,11 @@ const MAX_IDS = 200;
  * Permissions: owner/admin only, not restricted (the write is service-role,
  * so the route asks); a stranger asking about a hidden club gets 404
  * (`loadClubOfficer`, security wave 2).
+ *
+ * Chat rooms, wave 1 (wave-1-contracts.md section 8): an event's chat is not
+ * in the list this orders, so an id of `kind = 'event'` answers 409
+ * `room_locked` and nothing is written. On a database without
+ * `channels.kind` the route does what it did before (section 3.10).
  */
 export async function POST(req: Request, { params }: Params) {
   const { slug } = await params;
@@ -35,6 +42,10 @@ export async function POST(req: Request, { params }: Params) {
   try {
     body = (await req.json()) as Body;
   } catch {
+    return NextResponse.json({ ok: false, error: "Invalid JSON" }, { status: 400 });
+  }
+  // `null`, a number or an array parse fine but are not a body: same answer.
+  if (!body || typeof body !== "object" || Array.isArray(body)) {
     return NextResponse.json({ ok: false, error: "Invalid JSON" }, { status: 400 });
   }
   if (
@@ -74,22 +85,35 @@ export async function POST(req: Request, { params }: Params) {
 
   // Reject any id that doesn't belong to this org — protects against
   // accidentally writing positions onto someone else's channels.
-  const { data: belongs, error: belongsErr } = await service
-    .from("channels")
-    .select("id")
-    .eq("org_id", org.id)
-    .in("id", channelIds);
+  async function readBelonging(withKind: boolean) {
+    return service
+      .from("channels")
+      .select(withKind ? "id, kind" : "id")
+      .eq("org_id", org.id)
+      .in("id", channelIds);
+  }
+  let { data: found, error: belongsErr } = await readBelonging(true);
+  if (belongsErr && isMissingChatSchema(belongsErr)) {
+    warnMissingChatSchemaOnce("orgs/[slug]/channels/reorder");
+    const bare = await readBelonging(false);
+    found = bare.data;
+    belongsErr = bare.error;
+  }
   if (belongsErr) {
     console.error("[orgs/[slug]/channels/reorder]", belongsErr);
     return NextResponse.json({ ok: false, error: "Request failed" }, { status: 500 });
   }
-  const valid = new Set((belongs || []).map((r) => r.id as string));
+  const belongs = (found || []) as unknown as { id: string; kind?: unknown }[];
+  const valid = new Set(belongs.map((r) => r.id));
   const filtered = channelIds.filter((id) => valid.has(id));
   if (filtered.length !== channelIds.length) {
     return NextResponse.json(
       { ok: false, error: "One or more channel ids don't belong to this org" },
       { status: 400 }
     );
+  }
+  if (belongs.some((r) => r.kind === "event")) {
+    return NextResponse.json(refusalBody("room_locked"), { status: 409 });
   }
 
   // No bulk-update-with-different-values shortcut in the JS client, so issue
