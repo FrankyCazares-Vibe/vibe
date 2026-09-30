@@ -208,7 +208,7 @@
 -- the messages rows of kind poll / event_card stay (A's messages_kind_check
 -- allows them; the old screens show their fallback text; their replies stay
 -- under them). With Franky's yes, BEFORE the tables are dropped:
---   --   DELETE FROM public.messages WHERE kind <> 'text';   -- their replies go by cascade
+--   --   delete from public.messages where kind <> 'text';   -- their replies go by cascade
 -- Without that DELETE this file cannot be applied again: PRE-FLIGHT h refuses
 -- card rows that have no side tables. Locally: run it. On production:
 -- Franky's yes, or apply again with h answered by hand,
@@ -974,7 +974,8 @@ begin
   end if;
   select count(*) into n from pg_constraint c
    where c.conrelid in ('public.chat_polls'::regclass, 'public.chat_poll_options'::regclass,
-                        'public.chat_poll_votes'::regclass, 'public.chat_event_cards'::regclass);
+                        'public.chat_poll_votes'::regclass, 'public.chat_event_cards'::regclass)
+     and c.contype in ('p', 'u', 'f', 'c');   -- Postgres 18 lists NOT NULL rows ('n') here too
   if n <> 21 then
     raise exception 'chat-cards: the four tables carry % constraints, not 21', n;
   end if;
@@ -1071,6 +1072,18 @@ begin
      or has_table_privilege('anon', 'public.messages', 'SELECT') then
     raise exception 'chat-cards: grants on messages, channels or channel_members are not as this file found them';
   end if;
+  for f in
+    select * from (values
+      ('public.can_view_org_channel(uuid,uuid)'),
+      ('public.can_post_org_channel(uuid,uuid,uuid)')
+    ) as t (sig)
+  loop
+    if not (has_function_privilege('anon', f.sig, 'execute')
+        and has_function_privilege('authenticated', f.sig, 'execute')
+        and has_function_privilege('service_role', f.sig, 'execute')) then
+      raise exception 'chat-cards: % is no longer executable by anon, authenticated and service_role', f.sig;
+    end if;
+  end loop;
   select string_agg(t.tgrelid::regclass::text || '.' || t.tgname, ', ') into bad
     from pg_trigger t
    where not t.tgisinternal
@@ -1357,12 +1370,13 @@ begin
    where e.org_id is not null and e.org_id <> v_org order by e.created_at desc, e.id limit 1;
   select u.id into v_outsider from public.users u
    where not exists (select 1 from public.org_members m where m.org_id = v_org and m.user_id = u.id)
+   order by (exists (select 1 from public.org_members x where x.user_id = u.id)) desc, u.id
    limit 1;
   select c.id, o.user_id into v_closed, v_closed_officer
     from public.channels c
     join public.events e on e.id = c.event_id
     join public.org_members o on o.org_id = c.org_id and o.role in ('owner', 'admin')
-   where c.kind = 'event' and e.ends_at + interval '7 days' <= now()
+   where c.kind = 'event' and e.ends_at + interval '168 hours' <= now()   -- A's 7 days, computed in UTC
    order by e.ends_at desc, (o.role = 'owner') desc, o.joined_at, o.user_id
    limit 1;
   left_out := concat_ws(', ',

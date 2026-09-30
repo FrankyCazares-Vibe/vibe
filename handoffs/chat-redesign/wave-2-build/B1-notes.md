@@ -53,3 +53,15 @@ Facts: `wave-2-asis/database-map.md` (DM), migration A `supabase/migrations/2026
 - 2026-09-30T06:16:17Z commit 4: 666f683 check script
 - 2026-09-30T06:17:49Z gates: typecheck 0, test 1475/1475, build 0, eslint 0 (tool + seed; base parity trivial), parse gate 0 on both files; B1-gate.md written
 - 2026-09-30T06:17:49Z commit 5: 632c1a4 gate + notes (last)
+
+## Repair pass (after B1-review-sql.md and B1-review-security.md)
+
+Repairer: cloud session, one pass. Plan: verify each of the seven findings against the file and the contract;
+fix the real ones inside 13.2's W2-B1 files (SQL-1 MEDIUM: 7.1.e re-reads the function half of 3.0.5; SQL-2: the
+ROLLBACK comment's DELETE in 3.10's lower case; SQL-3: the probe's closed-chat fixture in `168 hours`; SQL-4: the
+outsider fixture prefers a member of another club; SECURITY-1: the 21-count restricted to `contype in ('p','u','f','c')`;
+SECURITY-2: one sentence in the Mac paragraph about the Event card on a later day); SQL-5 asks nothing. Re-run every
+gate; commit `fix(chat): W2-B1 repair after review`; write B1-repair.md.
+- REPAIR: plan written; no file edited yet
+- REPAIR: 2026-09-30T07:26:47Z migration edited (SQL-1 loop after 7.1.e, SQL-2 lower case, SQL-3 168 hours, SQL-4 order by, SECURITY-1 contype filter); parse gate exit 0 on both files (47/5/5, 25/4/11)
+- REPAIR: 2026-09-30T07:28:13Z gates re-run: typecheck 0, test 1523/1523, build 0, eslint 0 (+ base parity), node --check ok, six blocks verbatim; B1-gate.md gains the Mac sentence (SECURITY-2) and the repair table

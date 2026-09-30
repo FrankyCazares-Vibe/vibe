@@ -71,4 +71,30 @@ the first run).
 - Then the real local apply, `chat-v2-rooms-check.sql` 200/200, `chat-v2-after-deploy.sql` 0
   findings, `chat-v2-cards-check.sql` all green (its last NOTICE line:
   `chat-cards-check: all N cases passed`; any `WARNING` line = a failed run), the seed twice
-  (the second run changes nothing the same UTC day), the COST section.
+  (the second run changes nothing the same UTC day), the COST section. A seed run on a LATER
+  UTC day adds one more Event card to the Lounge (its content carries the event's date, which
+  the seed re-dates daily, and 13.2 pins the lookup by `messages.kind` + `content`); the poll
+  and the sign-up are found and left alone. Two Event cards for the same event after two days
+  are the seed's doing, not a `hydrateCards` bug.
+
+## Repair pass (after B1-review-sql.md and B1-review-security.md; B1-repair.md has the verdicts)
+
+Code changed in `supabase/migrations/20261001110000_chat_v2_cards.sql` only (five edits: 7.1.e re-reads the
+function half of 3.0.5; the ROLLBACK comment's DELETE in 3.10's lower case; the 21-count filtered to
+`contype in ('p','u','f','c')`; the probe's closed-chat fixture in `168 hours`; the outsider fixture prefers a
+member of another club). Every gate re-run after the edits:
+
+| command | result |
+|---|---|
+| `node …/tools/sql-parse.mjs --lib $LIB supabase/migrations/20261001110000_chat_v2_cards.sql` | exit 0: `47 statements, 5 plpgsql functions, 5 DO blocks: all parse` |
+| `node …/tools/sql-parse.mjs --lib $LIB --strip-psql scripts/sql/chat-v2-cards-check.sql` | exit 0: `25 statements, 4 plpgsql functions, 11 DO blocks: all parse` |
+| the six contract SQL blocks (3.1, 3.3, 3.4 x2, 3.5 x2) by node `includes` | all six VERBATIM |
+| `npm run typecheck` | exit 0 |
+| `npm test` | 1523 tests, 1523 pass, 0 fail (sibling batches added tests since 1475) |
+| `npm run build` | exit 0 (one run; no collision) |
+| `npx eslint handoffs/chat-redesign/wave-2-build/tools/sql-parse.mjs scripts/local-seed.mjs` | exit 0 |
+| `git show 75500e3:scripts/local-seed.mjs \| npx eslint --stdin --stdin-filename scripts/local-seed.mjs` | exit 0 (parity holds) |
+| `node --check` on the tool and the seed | ok |
+
+The check script and the seed were not changed (the check script's event fixtures sit 1 and 10 days from the
+7-day boundary and it carries no bare constraint count; the seed's lookup is 13.2's).
