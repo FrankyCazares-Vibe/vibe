@@ -387,4 +387,10 @@ export type SpaceResponse = {
   board_latest: ChatMessage | null;
   /** Not ended, soonest first, max 3. */
   up_next: EventRef[];
+  /**
+   * Only with `?events=1` (the Share-an-event sheet's list, wave-2 contract
+   * 7.2.6): the club's not-ended events, soonest first, max 50. Absent
+   * otherwise.
+   */
+  upcoming?: EventRef[];
 };
