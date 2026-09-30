@@ -126,7 +126,8 @@ function FlagPending() {
 
 /** 11.10: the open view above the home. The event chat layer's id lives inside `ClubSpace`. */
 type OpenView =
-  | { kind: "club"; orgHandle: string; roomId: string; roomKind: RoomKind }
+  /** `initialPage`: a resolving read's body (2.3), so the deep-linked room is read once (INT-ADJUDICATE-5). */
+  | { kind: "club"; orgHandle: string; roomId: string; roomKind: RoomKind; initialPage?: ThreadMessagesResponse }
   | { kind: "thread"; threadId: string };
 
 type HistoryMark = { vibeChat?: unknown; depth?: unknown };
@@ -319,7 +320,7 @@ function MessagesMobileV2({ initialHandle, initialChannelId }: { initialHandle?:
         window.history.pushState({ vibeChat: id, depth: 2 }, "", channelUrl(id));
       }
       const view: OpenView = room
-        ? { kind: "club", orgHandle: room.org.handle, roomId: id, roomKind: room.kind }
+        ? { kind: "club", orgHandle: room.org.handle, roomId: id, roomKind: room.kind, initialPage: r.data }
         : { kind: "thread", threadId: id };
       openRef.current = view;
       setComposeOpen(false);
@@ -349,7 +350,8 @@ function MessagesMobileV2({ initialHandle, initialChannelId }: { initialHandle?:
           return;
         }
         const room = r.data.room;
-        openView(room ? { kind: "club", orgHandle: room.org.handle, roomId, roomKind: room.kind } : { kind: "thread", threadId: roomId });
+        const page = Array.isArray(r.data.messages) ? r.data : undefined;
+        openView(room ? { kind: "club", orgHandle: room.org.handle, roomId, roomKind: room.kind, initialPage: page } : { kind: "thread", threadId: roomId });
       };
       void run();
     },
@@ -383,6 +385,7 @@ function MessagesMobileV2({ initialHandle, initialChannelId }: { initialHandle?:
           orgHandle={open.orgHandle}
           initialRoomId={open.roomId}
           initialRoomKind={open.roomKind}
+          initialPage={open.initialPage}
           onClose={closeLayer}
         />
       ) : null}

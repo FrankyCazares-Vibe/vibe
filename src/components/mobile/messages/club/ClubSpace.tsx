@@ -5,7 +5,7 @@ import { useCallback, useEffect, useRef, useState } from "react";
 import { Drawer } from "vaul";
 
 import { asLoadFailure, LoadFailed, type LoadFailure } from "@/components/feedback/LoadFailed";
-import type { RoomKind, SpaceResponse, SpaceRoom } from "@/lib/chat/types";
+import type { RoomKind, SpaceResponse, SpaceRoom, ThreadMessagesResponse } from "@/lib/chat/types";
 import { useHideTabBar } from "@/lib/chat/use-hide-tabbar";
 import { ROOM_FULL_READ_EVERY, ROOM_POLL_MS, useRoomPoll } from "@/lib/chat/use-room-poll";
 import { vibeRequest, type VibeResult } from "@/lib/feedback/request";
@@ -64,6 +64,13 @@ export type ClubSpaceProps = {
   orgHandle: string;
   initialRoomId: string | null;
   initialRoomKind: RoomKind | null;
+  /**
+   * The resolving thread GET's body (a `?channel=` deep link, a week card
+   * without a club handle; 2.3): the first page of `initialRoomId`'s hook,
+   * so the room is read once on arrival (9.3, SCREENS-L10; INT-ADJUDICATE-5).
+   * For an event room it is the layer's first page (once).
+   */
+  initialPage?: ThreadMessagesResponse;
   onClose: () => void;
 };
 
@@ -131,7 +138,7 @@ function spaceFailure(r: VibeResult<SpaceResponse>): LoadFailure {
   return asLoadFailure(r, SPACE_LINE);
 }
 
-export function ClubSpace({ orgHandle, initialRoomId, initialRoomKind, onClose }: ClubSpaceProps) {
+export function ClubSpace({ orgHandle, initialRoomId, initialRoomKind, initialPage, onClose }: ClubSpaceProps) {
   // Hooks first, always (react-hooks/rules-of-hooks).
   useHideTabBar();
   const night = useNightTheme();
@@ -177,6 +184,9 @@ export function ClubSpace({ orgHandle, initialRoomId, initialRoomKind, onClose }
   const poll = useRoomPoll(hookRoomId, {
     enabled: eventRoomId === null && hookRoomId !== null && !closedSpace,
     line: hookRoomKind === "board" ? BOARD_LINE : undefined,
+    // The deep link's page for the deep-linked room only (the hook reads it
+    // once, at its mount); a chip tap keys a fresh read.
+    initialPage: hookRoomId !== null && hookRoomId === initialRoomId ? initialPage : undefined,
   });
 
   // The space read: on open (and on Retry, through `retryToken`), every 20 s
@@ -271,8 +281,13 @@ export function ClubSpace({ orgHandle, initialRoomId, initialRoomKind, onClose }
     return () => window.removeEventListener("popstate", onPop);
   }, []);
 
+  // The deep link's resolving read is the event layer's first page ONCE (a
+  // deep-linked event room, 2.3); every open from inside the space
+  // (`openEvent`, counted) reads afresh.
+  const [eventOpens, setEventOpens] = useState(0);
   const openEvent = useCallback((roomId: string) => {
     setEventRoomId(roomId);
+    setEventOpens((n) => n + 1);
     pushLayerHistory(roomId);
   }, []);
   const closeEvent = useCallback(() => {
@@ -408,6 +423,7 @@ export function ClubSpace({ orgHandle, initialRoomId, initialRoomKind, onClose }
               orgHandle={orgHandle}
               club={{ id: org.id, name: org.name, logo_url: org.logo_url }}
               roomId={eventRoomId}
+              initialPage={eventOpens === 0 && eventRoomId === initialRoomId ? initialPage : undefined}
               boardLatest={boardLatest}
               boardUnread={boardUnread}
               onOpenBoard={() => {

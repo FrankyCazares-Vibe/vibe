@@ -4,7 +4,7 @@ import { useEffect, useState } from "react";
 import { Drawer } from "vaul";
 
 import { LoadFailed } from "@/components/feedback/LoadFailed";
-import type { ChatMessage } from "@/lib/chat/types";
+import type { ChatMessage, ThreadMessagesResponse } from "@/lib/chat/types";
 import { useHideTabBar } from "@/lib/chat/use-hide-tabbar";
 import { useRoomPoll } from "@/lib/chat/use-room-poll";
 import { toast } from "@/lib/feedback/toast";
@@ -44,6 +44,8 @@ export type EventChatProps = {
   orgHandle: string;
   club: { id: string; name: string; logo_url: string | null };
   roomId: string;
+  /** A deep-linked event room's resolving read (2.3): the hook's first page, so the room is read once (INT-ADJUDICATE-5). */
+  initialPage?: ThreadMessagesResponse;
   boardLatest: ChatMessage | null;
   boardUnread: boolean;
   onOpenBoard: () => void;
@@ -72,11 +74,11 @@ function EventSkeleton() {
   );
 }
 
-export function EventChat({ orgHandle, club, roomId, boardLatest, boardUnread, onOpenBoard, onClose }: EventChatProps) {
+export function EventChat({ orgHandle, club, roomId, initialPage, boardLatest, boardUnread, onOpenBoard, onClose }: EventChatProps) {
   useHideTabBar();
   const night = useNightTheme();
   const t = palette(night);
-  const poll = useRoomPoll(roomId, { enabled: true, line: EVENT_LINE });
+  const poll = useRoomPoll(roomId, { enabled: true, line: EVENT_LINE, initialPage });
   const [now, setNow] = useState<Date>(() => new Date());
   const [replyTo, setReplyTo] = useState<ReplyTarget | null>(null);
   const [scrollToken, setScrollToken] = useState(0);
