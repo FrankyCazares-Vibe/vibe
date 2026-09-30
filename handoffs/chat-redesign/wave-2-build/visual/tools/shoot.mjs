@@ -13,6 +13,9 @@
 //     SUPABASE_SERVICE_ROLE_KEY=x npx next dev -p 3111 &
 //   OUT_DIR=../out node shoot.mjs [--real-time] [--only=<substring>] [--themes=light|night] [--no-mockups] [--clip-week]
 //
+// Records in OUT_DIR: shots.json, unmocked.json, console.json and (run 3) viewport.json —
+// every state's innerWidth / scrollWidth at 375, in one place.
+//
 // --clip-week injects one harness-side style, `section[aria-labelledby="your-week-heading"]{overflow-x:clip}`
 // (S2-notes REQUEST R8: the home's week bloom widens the mobile layout viewport past 375 until
 // that clip lands in src/). Every shot records the layout viewport it was taken at
@@ -661,6 +664,15 @@ async function main() {
   fs.writeFileSync(path.join(OUT, "unmocked.json"), JSON.stringify([...new Set([...prevUnmocked, ...unmocked])], null, 2));
   fs.writeFileSync(path.join(OUT, "console.json"), JSON.stringify([...prevConsole, ...consoleLog], null, 2));
   fs.writeFileSync(path.join(OUT, "shots.json"), JSON.stringify({ now: NOW.toISOString(), realTime: REAL_TIME, shots: mergedShots }, null, 2));
+  // viewport.json (run 3): per state and theme, window.innerWidth / document.documentElement.scrollWidth
+  // at the 375 viewport — both must read 375 once the week bloom is clipped in src/ (INT-ADJUDICATE-1).
+  // A FAILED shot has no measurement and carries its note instead.
+  const viewport = {};
+  for (const s of mergedShots) {
+    if (s.theme === "mockup") continue;
+    (viewport[s.state] ??= {})[s.theme] = s.layout ?? { failed: s.note };
+  }
+  fs.writeFileSync(path.join(OUT, "viewport.json"), JSON.stringify({ viewport: VIEWPORT.width, now: NOW.toISOString(), clipWeek: CLIP_WEEK, states: viewport }, null, 2));
   console.log(`done: ${shots.filter((s) => s.file).length} files, ${unmocked.length} unmocked call(s)`);
 }
 

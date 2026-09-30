@@ -209,3 +209,31 @@ every run.
 - `build-readme.mjs` gained a "layout" column (and a TDZ bug on the way: the
   helper was declared after its first use; fixed).
 - Records: `run2/` 81 PNGs (56 app shots, 12 FAILED, 13 mockups) + 3 records, `run2/clip/` 72 app shots + 3 records; `unmocked.json` `[]` in both.
+
+## Step 7 — run 3, the integrated head, no clip (HEAD `2cdcfbe`)
+
+- `npm run build` first: exit 0 (no env; the Supabase env is read lazily).
+  Then the same setup as run 2: the tools copied to the scratchpad (Playwright
+  installed there, never in the repo), `node fake-supabase.mjs` on 54321,
+  `next dev -p 3111` against it, `/messages` 200 behind the real gates.
+- One pass, `OUT_DIR=../run3 node shoot.mjs --no-mockups` — no `--clip-week`,
+  no other workaround. 72 shots, 0 FAILED, 0 unmocked; `window.innerWidth` =
+  `scrollWidth` = 375 on all 72 measurements. The clip is in the app now
+  (`home/YourWeek.tsx:96`, INT-ADJUDICATE-1), so the composer's "+" is on the
+  visual viewport and the eight click-blocked states of run 2's HEAD pass shoot
+  without help.
+- `shoot.mjs` now also writes `viewport.json` (per state and theme, the two
+  widths; a FAILED shot would carry its note instead) so the number the repair
+  is judged by is one file, not a column inside `shots.json`.
+- Pixel-compared `run3/` against `run2/clip/` (a scratchpad script over the
+  repo's sharp, 8-level threshold): 44 of 72 identical; the 28 that differ are
+  the other integration repairs (the Board's post layout on 09/10, the inverted
+  "+" on 14, the club dot on the sheets 15–19/25, the Retry pill's ink on
+  23/32–35) plus quantization noise on two Night PNGs. Nothing from the clip.
+- The Monitor filter on the shoot log first matched `Error` in React's
+  hydration stack (`RedirectErrorBoundary`); re-armed on `FAILED` / a layout
+  other than `375/375` / the exit line. `pkill -f "next dev"` matched the shell
+  running it (exit 144); `pkill -f "[n]ext dev"` does not.
+- `git status` after: `run3/`, `README.md`, this file and `tools/shoot.mjs`;
+  nothing under `src/`, `AGENTS.md` unchanged.
+

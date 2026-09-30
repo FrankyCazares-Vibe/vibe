@@ -17,6 +17,117 @@ Club (48 members), a member of Chess Club (muted), the owner of Night Hikers
 (1 member, nothing yet).
 
 
+## Run 3 — the integrated head, no harness clip (2026-09-30, HEAD `2cdcfbe`)
+
+The same harness, fixtures and frozen clock, re-run on the branch after the ten
+integration repairs (`6db5cc1` … `ebf6c3a`) with **no harness-side clip and no
+workaround**: `OUT_DIR=../run3 node shoot.mjs --no-mockups`. Everything lands
+under [`run3/`](./run3/) with the run-2 names, both themes; the 13 mockups are
+not re-shot (unchanged since run 1; the links below point at `run2/`).
+`npm run build` before the run: exit 0. Still no source change from the harness
+(`git status` shows nothing under `src/`).
+
+**The viewport.** `run3/viewport.json` records, per state and theme,
+`window.innerWidth` and `document.documentElement.scrollWidth` at the 375
+viewport (the same numbers as `layout` in `shots.json`, in one place):
+**72 of 72 measurements read 375 / 375** — every state, both themes, without
+`--clip-week` (`clipWeek: false` in the record). The week bloom is clipped by
+the app itself now (`home/YourWeek.tsx:96`, `overflowX: "clip"` on the week
+section, INT-ADJUDICATE-1 / S2-notes R8), so mobile Chromium no longer widens
+the layout viewport past 375 and nothing is a harness fiction any more. Run 2's
+30 states at 409/409 are all 375/375 here; the six that were 375 at run 2 (06,
+32, 36 and the ones with no live card) stay 375.
+
+**Whole at the right edge now** (run 2's `run2/` cut them at 375 of 409): the
+header's right disc (the pencil on the home, the share arrow in the club space),
+the second Up next card and the `Soon` ring, the fifth chip's edge, the
+composer's send button, the RSVP / remove / tray / new-card sheets' right edge,
+and the alert dialog centred — on every one of 01–05, 07–31, 33–35. Checked by
+eye on 01, 07, 09 and 14 in both themes and by the pixel diff below on the rest.
+
+**Every state was shot** — none FAILED. The composer's "+" is back on the visual
+viewport, so the eight states whose click timed out at run 2's HEAD pass (14
+with 15 and 16, 17, 18, 19, 25, 35) open the tray and the three sheets without
+help. `unmocked.json` is `[]`. **No state still fails.**
+
+**Against run 2's clipped pass** (`run3/` vs `run2/clip/`, a per-pixel
+compare, same names, both themes): 44 of 72 shots are identical to the pixel,
+and the 28 that differ differ exactly where the other integration repairs
+landed — none of it is the clip:
+
+- 09 / 10 `board`, `board-fold-open` (13.6% / 9.2%, the Event post's area): the
+  Board's post layout — the shared event card now fills the post under the
+  author line, no second `PS` disc, no 292px Lounge card (INT-ADJUDICATE-3; the
+  VIS-S2-2 / R7 picture is gone).
+- 14 `tray` (0.5%, the 44px disc at the composer's left): the "+" is drawn
+  inverted — an ink disc with an X — while the tray is open (INT-ADJUDICATE-6;
+  VIS-S3-3 is gone).
+- 15, 16, 17, 18, 19, 25 (0.3%, the room line under the sheet's title): the
+  club dot before `Salsa Club · the Lounge` (INT-ADJUDICATE-4; VIS-S3-1 is gone).
+- 23, 32, 33, 34, 35 (0.06–0.35%, the `Retry` pill): the pill's ink is the
+  coral button's ink (INT-ADJUDICATE-10; VIS-S1-3's 2.9:1 is gone).
+- 08 night (0.8%), 21 night (0.75%), 07 / 26 night (a few pixels): spread over
+  the whole frame under the 8-level threshold — sharp's palette quantization of
+  the over-300 KB Night PNGs (08 and 21 are shrunk in both runs) and the tokens
+  INT-ADJUDICATE-7 moved onto Palette; nothing a reader can see.
+
+### run3/ — HEAD `2cdcfbe`, no clip (375px everywhere)
+
+| # | state | app · Light | app · Night | layout L / N | mockup | notes |
+|---|---|---|---|---|---|---|
+| 01 | `home-all` | [01-home-all-light.png](./run3/01-home-all-light.png) | [01-home-all-night.png](./run3/01-home-all-night.png) | 375/375 · 375/375 | [W0_Home](./run2/mockup-W0_Home.png) |  |
+| 02 | `home-chats` | [02-home-chats-light.png](./run3/02-home-chats-light.png) | [02-home-chats-night.png](./run3/02-home-chats-night.png) | 375/375 · 375/375 | [W0_Home](./run2/mockup-W0_Home.png) |  |
+| 03 | `home-clubs` | [03-home-clubs-light.png](./run3/03-home-clubs-light.png) | [03-home-clubs-night.png](./run3/03-home-clubs-night.png) | 375/375 · 375/375 | [W0_Home](./run2/mockup-W0_Home.png) |  |
+| 04 | `home-requests` | [04-home-requests-light.png](./run3/04-home-requests-light.png) | [04-home-requests-night.png](./run3/04-home-requests-night.png) | 375/375 · 375/375 | — |  |
+| 05 | `home-no-clubs` | [05-home-no-clubs-light.png](./run3/05-home-no-clubs-light.png) | [05-home-no-clubs-night.png](./run3/05-home-no-clubs-night.png) | 375/375 · 375/375 | [W0_EmptyClubs](./run2/mockup-W0_EmptyClubs.png) |  |
+| 06 | `home-empty-week` | [06-home-empty-week-light.png](./run3/06-home-empty-week-light.png) | [06-home-empty-week-night.png](./run3/06-home-empty-week-night.png) | 375/375 · 375/375 | [W0_EmptyWeek](./run2/mockup-W0_EmptyWeek.png) |  |
+| 07 | `club-lounge` | [07-club-lounge-light.png](./run3/07-club-lounge-light.png) | [07-club-lounge-night.png](./run3/07-club-lounge-night.png) | 375/375 · 375/375 | [W0_Club](./run2/mockup-W0_Club.png), [W0_Club_Light](./run2/mockup-W0_Club_Light.png) |  |
+| 08 | `club-lounge-full` | [08-club-lounge-full-light.png](./run3/08-club-lounge-full-light.png) | [08-club-lounge-full-night.png](./run3/08-club-lounge-full-night.png) | 375/375 · 375/375 | [W0_Club](./run2/mockup-W0_Club.png), [W0_Cards](./run2/mockup-W0_Cards.png) | the same, 375×2300 so every Lounge row shows: text runs, poll, closed anonymous poll, sign-up, event card, cancelled card, removed own message, quote |
+| 09 | `board` | [09-board-light.png](./run3/09-board-light.png) | [09-board-night.png](./run3/09-board-night.png) | 375/375 · 375/375 | [W0_Board](./run2/mockup-W0_Board.png) |  |
+| 10 | `board-fold-open` | [10-board-fold-open-light.png](./run3/10-board-fold-open-light.png) | [10-board-fold-open-night.png](./run3/10-board-fold-open-night.png) | 375/375 · 375/375 | [W0_Board](./run2/mockup-W0_Board.png) | the newest post's fold open: 2 replies + a stub, the Reply quietly field |
+| 11 | `event-live` | [11-event-live-light.png](./run3/11-event-live-light.png) | [11-event-live-night.png](./run3/11-event-live-night.png) | 375/375 · 375/375 | [W0_Room](./run2/mockup-W0_Room.png) |  |
+| 12 | `event-closed` | [12-event-closed-light.png](./run3/12-event-closed-light.png) | [12-event-closed-night.png](./run3/12-event-closed-night.png) | 375/375 · 375/375 | [W0_Room](./run2/mockup-W0_Room.png) |  |
+| 13 | `event-after` | [13-event-after-light.png](./run3/13-event-after-light.png) | [13-event-after-night.png](./run3/13-event-after-night.png) | 375/375 · 375/375 | [W0_Room](./run2/mockup-W0_Room.png) |  |
+| 14 | `tray` | [14-tray-light.png](./run3/14-tray-light.png) | [14-tray-night.png](./run3/14-tray-night.png) | 375/375 · 375/375 | [W0_Tray](./run2/mockup-W0_Tray.png) |  |
+| 15 | `new-poll-empty` | [15-new-poll-empty-light.png](./run3/15-new-poll-empty-light.png) | [15-new-poll-empty-night.png](./run3/15-new-poll-empty-night.png) | 375/375 · 375/375 | [W0_NewPoll](./run2/mockup-W0_NewPoll.png) | New poll, empty (CTA disabled) |
+| 16 | `new-poll-filled` | [16-new-poll-filled-light.png](./run3/16-new-poll-filled-light.png) | [16-new-poll-filled-night.png](./run3/16-new-poll-filled-night.png) | 375/375 · 375/375 | [W0_NewPoll](./run2/mockup-W0_NewPoll.png) | New poll filled: 3 options, Anonymous on, CTA enabled |
+| 17 | `new-signup` | [17-new-signup-light.png](./run3/17-new-signup-light.png) | [17-new-signup-night.png](./run3/17-new-signup-night.png) | 375/375 · 375/375 | [W0_NewSignup](./run2/mockup-W0_NewSignup.png) |  |
+| 18 | `share-event` | [18-share-event-light.png](./run3/18-share-event-light.png) | [18-share-event-night.png](./run3/18-share-event-night.png) | 375/375 · 375/375 | [W0_ShareEvent](./run2/mockup-W0_ShareEvent.png) |  |
+| 19 | `share-event-empty` | [19-share-event-empty-light.png](./run3/19-share-event-empty-light.png) | [19-share-event-empty-night.png](./run3/19-share-event-empty-night.png) | 375/375 · 375/375 | [W0_ShareEvent](./run2/mockup-W0_ShareEvent.png) |  |
+| 20 | `rsvp-sheet` | [20-rsvp-sheet-light.png](./run3/20-rsvp-sheet-light.png) | [20-rsvp-sheet-night.png](./run3/20-rsvp-sheet-night.png) | 375/375 · 375/375 | — | the RSVP sheet over the live event chat |
+| 21 | `long-press-remove` | [21-long-press-remove-light.png](./run3/21-long-press-remove-light.png) | [21-long-press-remove-night.png](./run3/21-long-press-remove-night.png) | 375/375 · 375/375 | — |  |
+| 22 | `empty-club` | [22-empty-club-light.png](./run3/22-empty-club-light.png) | [22-empty-club-night.png](./run3/22-empty-club-night.png) | 375/375 · 375/375 | [W0_EmptyClub](./run2/mockup-W0_EmptyClub.png) |  |
+| 23 | `load-failed` | [23-load-failed-light.png](./run3/23-load-failed-light.png) | [23-load-failed-night.png](./run3/23-load-failed-night.png) | 375/375 · 375/375 | — |  |
+| 24 | `skeleton` | [24-skeleton-light.png](./run3/24-skeleton-light.png) | [24-skeleton-night.png](./run3/24-skeleton-night.png) | 375/375 · 375/375 | — |  |
+| 25 | `new-signup-empty` | [25-new-signup-empty-light.png](./run3/25-new-signup-empty-light.png) | [25-new-signup-empty-night.png](./run3/25-new-signup-empty-night.png) | 375/375 · 375/375 | [W0_NewSignup](./run2/mockup-W0_NewSignup.png) |  |
+| 26 | `remove-confirm` | [26-remove-confirm-light.png](./run3/26-remove-confirm-light.png) | [26-remove-confirm-night.png](./run3/26-remove-confirm-night.png) | 375/375 · 375/375 | — |  |
+| 27 | `member-board` | [27-member-board-light.png](./run3/27-member-board-light.png) | [27-member-board-night.png](./run3/27-member-board-night.png) | 375/375 · 375/375 | [W0_Board](./run2/mockup-W0_Board.png) |  |
+| 28 | `member-lounge-picker` | [28-member-lounge-picker-light.png](./run3/28-member-lounge-picker-light.png) | [28-member-lounge-picker-night.png](./run3/28-member-lounge-picker-night.png) | 375/375 · 375/375 | [W0_Club](./run2/mockup-W0_Club.png) |  |
+| 29 | `event-empty-soon` | [29-event-empty-soon-light.png](./run3/29-event-empty-soon-light.png) | [29-event-empty-soon-night.png](./run3/29-event-empty-soon-night.png) | 375/375 · 375/375 | [W0_Room](./run2/mockup-W0_Room.png) |  |
+| 30 | `home-chats-empty` | [30-home-chats-empty-light.png](./run3/30-home-chats-empty-light.png) | [30-home-chats-empty-night.png](./run3/30-home-chats-empty-night.png) | 375/375 · 375/375 | — |  |
+| 31 | `home-requests-empty` | [31-home-requests-empty-light.png](./run3/31-home-requests-empty-light.png) | [31-home-requests-empty-night.png](./run3/31-home-requests-empty-night.png) | 375/375 · 375/375 | — |  |
+| 32 | `week-failed` | [32-week-failed-light.png](./run3/32-week-failed-light.png) | [32-week-failed-night.png](./run3/32-week-failed-night.png) | 375/375 · 375/375 | — |  |
+| 33 | `club-failed` | [33-club-failed-light.png](./run3/33-club-failed-light.png) | [33-club-failed-night.png](./run3/33-club-failed-night.png) | 375/375 · 375/375 | — |  |
+| 34 | `board-failed` | [34-board-failed-light.png](./run3/34-board-failed-light.png) | [34-board-failed-night.png](./run3/34-board-failed-night.png) | 375/375 · 375/375 | — |  |
+| 35 | `share-events-failed` | [35-share-events-failed-light.png](./run3/35-share-events-failed-light.png) | [35-share-events-failed-night.png](./run3/35-share-events-failed-night.png) | 375/375 · 375/375 | [W0_ShareEvent](./run2/mockup-W0_ShareEvent.png) |  |
+
+Unmocked calls: none — every call the screens made was in the fixture table.
+
+Console (`run3/console.json`, 146 entries): the harness's two hydration lines
+per state (64× each, the frozen clock — see "Console while shooting") and 18×
+`500` across the ten failure states / warm-ups that ask for one (23, 32, 33,
+34, 35 in both themes). Nothing new.
+
+### Records in run3/
+
+`shots.json`, `unmocked.json`, `console.json` as before (each shot with
+`layout` and `clipWeek: false`), plus **`viewport.json`** — `{ viewport: 375,
+now, clipWeek, states: { <state>: { light: { innerWidth, scrollWidth },
+night: … } } }`, written by `shoot.mjs` at the end of every run from now on
+(a FAILED shot would carry `{ failed: <note> }` in place of the numbers; none
+did). `fixtures/` is the same dump. 72 PNGs, all under 300 KB (the same four
+Night / tall shots palette-quantized as in run 2). No `*-FAILED.png`.
+
 ## Run 2 — after the three repairs (2026-09-30, HEAD `4066fd1`)
 
 The same harness, the same fixtures, the same frozen clock, re-run on the branch
@@ -298,10 +409,15 @@ node fake-supabase.mjs &
 OUT_DIR=.. node shoot.mjs                 # every state, both themes, the 13 mockups
 OUT_DIR=.. node shoot.mjs --only=14-tray --themes=night --no-mockups   # one state; merges into the records
 OUT_DIR=.. node shoot.mjs --real-time     # the wall clock instead of the frozen one
+OUT_DIR=../run3 node shoot.mjs --no-mockups   # run 3: every state, both themes, no mockups, no clip
 
 # 4. the table above
 OUT_DIR=.. node build-readme.mjs > table.md
 ```
+
+Every run also writes `viewport.json` beside the other records: per state and
+theme, `window.innerWidth` / `document.documentElement.scrollWidth` at 375
+(both must be 375; a 409 means something widened the mobile layout viewport).
 
 Env knobs: `APP_URL` (default `http://localhost:3111`), `NEXT_PUBLIC_SUPABASE_URL`
 (the cookie's name follows it; default `http://localhost:54321`),

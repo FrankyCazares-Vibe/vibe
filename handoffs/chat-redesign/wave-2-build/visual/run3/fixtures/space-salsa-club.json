@@ -1,0 +1,145 @@
+{
+  "ok": true,
+  "org": {
+    "id": "bbbbbbbb-0001-4000-8000-000000000001",
+    "handle": "salsa-club",
+    "name": "Salsa Club",
+    "logo_url": null,
+    "banner_url": null,
+    "verified": true,
+    "member_count": 48
+  },
+  "viewer": {
+    "role": "admin",
+    "can_moderate": true
+  },
+  "rooms": [
+    {
+      "id": "cccccccc-0001-4000-8000-000000000001",
+      "kind": "lounge",
+      "name": "Lounge",
+      "unread": false,
+      "can_post": true,
+      "event": null
+    },
+    {
+      "id": "cccccccc-0002-4000-8000-000000000002",
+      "kind": "board",
+      "name": "Board",
+      "unread": true,
+      "can_post": true,
+      "event": null
+    },
+    {
+      "id": "cccccccc-0003-4000-8000-000000000003",
+      "kind": "officers",
+      "name": "Officers",
+      "unread": false,
+      "can_post": true,
+      "event": null
+    },
+    {
+      "id": "cccccccc-0004-4000-8000-000000000004",
+      "kind": "event",
+      "name": "Fall Formal",
+      "unread": false,
+      "can_post": true,
+      "event": {
+        "id": "dddddddd-0001-4000-8000-000000000001",
+        "title": "Fall Formal",
+        "starts_at": "2026-10-08T21:42:00.000Z",
+        "ends_at": "2026-10-09T00:42:00.000Z",
+        "location": "Alumni Hall",
+        "state": "live",
+        "room_id": "cccccccc-0004-4000-8000-000000000004",
+        "viewer_status": "going",
+        "going_count": 18,
+        "maybe_count": 6
+      }
+    },
+    {
+      "id": "cccccccc-0006-4000-8000-000000000006",
+      "kind": "event",
+      "name": "Late Night Social",
+      "unread": false,
+      "can_post": true,
+      "event": {
+        "id": "dddddddd-0002-4000-8000-000000000002",
+        "title": "Late Night Social",
+        "starts_at": "2026-10-09T01:30:00.000Z",
+        "ends_at": "2026-10-09T03:30:00.000Z",
+        "location": "Union Basement",
+        "state": "soon",
+        "room_id": "cccccccc-0006-4000-8000-000000000006",
+        "viewer_status": "maybe",
+        "going_count": 9,
+        "maybe_count": 4
+      }
+    }
+  ],
+  "board_latest": {
+    "id": "eeeeeeee-0017-4000-8000-000000000017",
+    "content": "Formal tickets are at the door tonight — bring your ID.",
+    "created_at": "2026-10-08T21:32:00.000Z",
+    "user_id": "aaaaaaaa-0001-4000-8000-000000000001",
+    "attachment_id": null,
+    "attachment_kind": null,
+    "media_url": null,
+    "media_kind": null,
+    "parent_message_id": null,
+    "users": {
+      "id": "aaaaaaaa-0001-4000-8000-000000000001",
+      "handle": "dana",
+      "name": "Dana Ortiz",
+      "avatar_url": null
+    },
+    "attachment": null,
+    "parent_preview": null,
+    "reactions": [],
+    "kind": "text",
+    "thread_root_id": null,
+    "card": null,
+    "reply_count": 3,
+    "author_role": "owner",
+    "hidden": false,
+    "removed": null
+  },
+  "up_next": [
+    {
+      "id": "dddddddd-0001-4000-8000-000000000001",
+      "title": "Fall Formal",
+      "starts_at": "2026-10-08T21:42:00.000Z",
+      "ends_at": "2026-10-09T00:42:00.000Z",
+      "location": "Alumni Hall",
+      "state": "live",
+      "room_id": "cccccccc-0004-4000-8000-000000000004",
+      "viewer_status": "going",
+      "going_count": 18,
+      "maybe_count": 6
+    },
+    {
+      "id": "dddddddd-0002-4000-8000-000000000002",
+      "title": "Late Night Social",
+      "starts_at": "2026-10-09T01:30:00.000Z",
+      "ends_at": "2026-10-09T03:30:00.000Z",
+      "location": "Union Basement",
+      "state": "soon",
+      "room_id": "cccccccc-0006-4000-8000-000000000006",
+      "viewer_status": "maybe",
+      "going_count": 9,
+      "maybe_count": 4
+    },
+    {
+      "id": "dddddddd-0003-4000-8000-000000000003",
+      "title": "Beginner Lesson",
+      "starts_at": "2026-10-13T23:00:00.000Z",
+      "ends_at": "2026-10-14T00:30:00.000Z",
+      "location": "Studio B",
+      "state": "soon",
+      "room_id": null,
+      "viewer_status": null,
+      "going_count": 7,
+      "maybe_count": 2
+    }
+  ]
+}

@@ -1,0 +1,367 @@
+{
+  "viewport": 375,
+  "now": "2026-10-08T22:12:00.000Z",
+  "clipWeek": false,
+  "states": {
+    "01-home-all": {
+      "light": {
+        "innerWidth": 375,
+        "scrollWidth": 375
+      },
+      "night": {
+        "innerWidth": 375,
+        "scrollWidth": 375
+      }
+    },
+    "02-home-chats": {
+      "light": {
+        "innerWidth": 375,
+        "scrollWidth": 375
+      },
+      "night": {
+        "innerWidth": 375,
+        "scrollWidth": 375
+      }
+    },
+    "03-home-clubs": {
+      "light": {
+        "innerWidth": 375,
+        "scrollWidth": 375
+      },
+      "night": {
+        "innerWidth": 375,
+        "scrollWidth": 375
+      }
+    },
+    "04-home-requests": {
+      "light": {
+        "innerWidth": 375,
+        "scrollWidth": 375
+      },
+      "night": {
+        "innerWidth": 375,
+        "scrollWidth": 375
+      }
+    },
+    "05-home-no-clubs": {
+      "light": {
+        "innerWidth": 375,
+        "scrollWidth": 375
+      },
+      "night": {
+        "innerWidth": 375,
+        "scrollWidth": 375
+      }
+    },
+    "06-home-empty-week": {
+      "light": {
+        "innerWidth": 375,
+        "scrollWidth": 375
+      },
+      "night": {
+        "innerWidth": 375,
+        "scrollWidth": 375
+      }
+    },
+    "07-club-lounge": {
+      "light": {
+        "innerWidth": 375,
+        "scrollWidth": 375
+      },
+      "night": {
+        "innerWidth": 375,
+        "scrollWidth": 375
+      }
+    },
+    "08-club-lounge-full": {
+      "light": {
+        "innerWidth": 375,
+        "scrollWidth": 375
+      },
+      "night": {
+        "innerWidth": 375,
+        "scrollWidth": 375
+      }
+    },
+    "09-board": {
+      "light": {
+        "innerWidth": 375,
+        "scrollWidth": 375
+      },
+      "night": {
+        "innerWidth": 375,
+        "scrollWidth": 375
+      }
+    },
+    "10-board-fold-open": {
+      "light": {
+        "innerWidth": 375,
+        "scrollWidth": 375
+      },
+      "night": {
+        "innerWidth": 375,
+        "scrollWidth": 375
+      }
+    },
+    "11-event-live": {
+      "light": {
+        "innerWidth": 375,
+        "scrollWidth": 375
+      },
+      "night": {
+        "innerWidth": 375,
+        "scrollWidth": 375
+      }
+    },
+    "12-event-closed": {
+      "light": {
+        "innerWidth": 375,
+        "scrollWidth": 375
+      },
+      "night": {
+        "innerWidth": 375,
+        "scrollWidth": 375
+      }
+    },
+    "13-event-after": {
+      "light": {
+        "innerWidth": 375,
+        "scrollWidth": 375
+      },
+      "night": {
+        "innerWidth": 375,
+        "scrollWidth": 375
+      }
+    },
+    "14-tray": {
+      "light": {
+        "innerWidth": 375,
+        "scrollWidth": 375
+      },
+      "night": {
+        "innerWidth": 375,
+        "scrollWidth": 375
+      }
+    },
+    "15-new-poll-empty": {
+      "light": {
+        "innerWidth": 375,
+        "scrollWidth": 375
+      },
+      "night": {
+        "innerWidth": 375,
+        "scrollWidth": 375
+      }
+    },
+    "16-new-poll-filled": {
+      "light": {
+        "innerWidth": 375,
+        "scrollWidth": 375
+      },
+      "night": {
+        "innerWidth": 375,
+        "scrollWidth": 375
+      }
+    },
+    "17-new-signup": {
+      "light": {
+        "innerWidth": 375,
+        "scrollWidth": 375
+      },
+      "night": {
+        "innerWidth": 375,
+        "scrollWidth": 375
+      }
+    },
+    "18-share-event": {
+      "light": {
+        "innerWidth": 375,
+        "scrollWidth": 375
+      },
+      "night": {
+        "innerWidth": 375,
+        "scrollWidth": 375
+      }
+    },
+    "19-share-event-empty": {
+      "light": {
+        "innerWidth": 375,
+        "scrollWidth": 375
+      },
+      "night": {
+        "innerWidth": 375,
+        "scrollWidth": 375
+      }
+    },
+    "20-rsvp-sheet": {
+      "light": {
+        "innerWidth": 375,
+        "scrollWidth": 375
+      },
+      "night": {
+        "innerWidth": 375,
+        "scrollWidth": 375
+      }
+    },
+    "21-long-press-remove": {
+      "light": {
+        "innerWidth": 375,
+        "scrollWidth": 375
+      },
+      "night": {
+        "innerWidth": 375,
+        "scrollWidth": 375
+      }
+    },
+    "22-empty-club": {
+      "light": {
+        "innerWidth": 375,
+        "scrollWidth": 375
+      },
+      "night": {
+        "innerWidth": 375,
+        "scrollWidth": 375
+      }
+    },
+    "23-load-failed": {
+      "light": {
+        "innerWidth": 375,
+        "scrollWidth": 375
+      },
+      "night": {
+        "innerWidth": 375,
+        "scrollWidth": 375
+      }
+    },
+    "24-skeleton": {
+      "light": {
+        "innerWidth": 375,
+        "scrollWidth": 375
+      },
+      "night": {
+        "innerWidth": 375,
+        "scrollWidth": 375
+      }
+    },
+    "25-new-signup-empty": {
+      "light": {
+        "innerWidth": 375,
+        "scrollWidth": 375
+      },
+      "night": {
+        "innerWidth": 375,
+        "scrollWidth": 375
+      }
+    },
+    "26-remove-confirm": {
+      "light": {
+        "innerWidth": 375,
+        "scrollWidth": 375
+      },
+      "night": {
+        "innerWidth": 375,
+        "scrollWidth": 375
+      }
+    },
+    "27-member-board": {
+      "light": {
+        "innerWidth": 375,
+        "scrollWidth": 375
+      },
+      "night": {
+        "innerWidth": 375,
+        "scrollWidth": 375
+      }
+    },
+    "28-member-lounge-picker": {
+      "light": {
+        "innerWidth": 375,
+        "scrollWidth": 375
+      },
+      "night": {
+        "innerWidth": 375,
+        "scrollWidth": 375
+      }
+    },
+    "29-event-empty-soon": {
+      "light": {
+        "innerWidth": 375,
+        "scrollWidth": 375
+      },
+      "night": {
+        "innerWidth": 375,
+        "scrollWidth": 375
+      }
+    },
+    "30-home-chats-empty": {
+      "light": {
+        "innerWidth": 375,
+        "scrollWidth": 375
+      },
+      "night": {
+        "innerWidth": 375,
+        "scrollWidth": 375
+      }
+    },
+    "31-home-requests-empty": {
+      "light": {
+        "innerWidth": 375,
+        "scrollWidth": 375
+      },
+      "night": {
+        "innerWidth": 375,
+        "scrollWidth": 375
+      }
+    },
+    "32-week-failed": {
+      "light": {
+        "innerWidth": 375,
+        "scrollWidth": 375
+      },
+      "night": {
+        "innerWidth": 375,
+        "scrollWidth": 375
+      }
+    },
+    "33-club-failed": {
+      "light": {
+        "innerWidth": 375,
+        "scrollWidth": 375
+      },
+      "night": {
+        "innerWidth": 375,
+        "scrollWidth": 375
+      }
+    },
+    "34-board-failed": {
+      "light": {
+        "innerWidth": 375,
+        "scrollWidth": 375
+      },
+      "night": {
+        "innerWidth": 375,
+        "scrollWidth": 375
+      }
+    },
+    "35-share-events-failed": {
+      "light": {
+        "innerWidth": 375,
+        "scrollWidth": 375
+      },
+      "night": {
+        "innerWidth": 375,
+        "scrollWidth": 375
+      }
+    },
+    "36-flag-pending": {
+      "light": {
+        "innerWidth": 375,
+        "scrollWidth": 375
+      },
+      "night": {
+        "innerWidth": 375,
+        "scrollWidth": 375
+      }
+    }
+  }
+}

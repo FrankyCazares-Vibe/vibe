@@ -1,0 +1,233 @@
+{
+  "ok": true,
+  "messages": [
+    {
+      "id": "eeeeeeee-0021-4000-8000-000000000021",
+      "content": "Doors are open!",
+      "created_at": "2026-10-08T21:44:00.000Z",
+      "user_id": "aaaaaaaa-0001-4000-8000-000000000001",
+      "attachment_id": null,
+      "attachment_kind": null,
+      "media_url": null,
+      "media_kind": null,
+      "parent_message_id": null,
+      "users": {
+        "id": "aaaaaaaa-0001-4000-8000-000000000001",
+        "handle": "dana",
+        "name": "Dana Ortiz",
+        "avatar_url": null
+      },
+      "attachment": null,
+      "parent_preview": null,
+      "reactions": [],
+      "kind": "text",
+      "thread_root_id": null,
+      "card": null,
+      "reply_count": null,
+      "author_role": "owner",
+      "hidden": false,
+      "removed": null
+    },
+    {
+      "id": "eeeeeeee-0022-4000-8000-000000000022",
+      "content": "Line is moving fast",
+      "created_at": "2026-10-08T21:48:00.000Z",
+      "user_id": "aaaaaaaa-0003-4000-8000-000000000003",
+      "attachment_id": null,
+      "attachment_kind": null,
+      "media_url": null,
+      "media_kind": null,
+      "parent_message_id": null,
+      "users": {
+        "id": "aaaaaaaa-0003-4000-8000-000000000003",
+        "handle": "jay",
+        "name": "Jay Kim",
+        "avatar_url": null
+      },
+      "attachment": null,
+      "parent_preview": null,
+      "reactions": [],
+      "kind": "text",
+      "thread_root_id": null,
+      "card": null,
+      "reply_count": null,
+      "author_role": "member",
+      "hidden": false,
+      "removed": null
+    },
+    {
+      "id": "eeeeeeee-0023-4000-8000-000000000023",
+      "content": "Save me a spot near the DJ",
+      "created_at": "2026-10-08T21:52:00.000Z",
+      "user_id": "aaaaaaaa-0004-4000-8000-000000000004",
+      "attachment_id": null,
+      "attachment_kind": null,
+      "media_url": null,
+      "media_kind": null,
+      "parent_message_id": null,
+      "users": {
+        "id": "aaaaaaaa-0004-4000-8000-000000000004",
+        "handle": "maya",
+        "name": "Maya Reyes",
+        "avatar_url": null
+      },
+      "attachment": null,
+      "parent_preview": null,
+      "reactions": [],
+      "kind": "text",
+      "thread_root_id": null,
+      "card": null,
+      "reply_count": null,
+      "author_role": "member",
+      "hidden": false,
+      "removed": null
+    },
+    {
+      "id": "eeeeeeee-0024-4000-8000-000000000024",
+      "content": "Walking over now",
+      "created_at": "2026-10-08T21:57:00.000Z",
+      "user_id": "11111111-1111-4111-8111-111111111111",
+      "attachment_id": null,
+      "attachment_kind": null,
+      "media_url": null,
+      "media_kind": null,
+      "parent_message_id": null,
+      "users": {
+        "id": "11111111-1111-4111-8111-111111111111",
+        "handle": "harness",
+        "name": "Harness Student",
+        "avatar_url": null
+      },
+      "attachment": null,
+      "parent_preview": null,
+      "reactions": [],
+      "kind": "text",
+      "thread_root_id": null,
+      "card": null,
+      "reply_count": null,
+      "author_role": "admin",
+      "hidden": false,
+      "removed": null
+    },
+    {
+      "id": "eeeeeeee-0025-4000-8000-000000000025",
+      "content": "Coat check is on the left when you come in",
+      "created_at": "2026-10-08T22:03:00.000Z",
+      "user_id": "aaaaaaaa-0002-4000-8000-000000000002",
+      "attachment_id": null,
+      "attachment_kind": null,
+      "media_url": null,
+      "media_kind": null,
+      "parent_message_id": null,
+      "users": {
+        "id": "aaaaaaaa-0002-4000-8000-000000000002",
+        "handle": "priya",
+        "name": "Priya Shah",
+        "avatar_url": null
+      },
+      "attachment": null,
+      "parent_preview": null,
+      "reactions": [],
+      "kind": "text",
+      "thread_root_id": null,
+      "card": null,
+      "reply_count": null,
+      "author_role": "admin",
+      "hidden": false,
+      "removed": null
+    },
+    {
+      "id": "eeeeeeee-0026-4000-8000-000000000026",
+      "content": "🔥🔥🔥",
+      "created_at": "2026-10-08T22:10:00.000Z",
+      "user_id": "aaaaaaaa-0005-4000-8000-000000000005",
+      "attachment_id": null,
+      "attachment_kind": null,
+      "media_url": null,
+      "media_kind": null,
+      "parent_message_id": null,
+      "users": {
+        "id": "aaaaaaaa-0005-4000-8000-000000000005",
+        "handle": "sam",
+        "name": "Sam Torres",
+        "avatar_url": null
+      },
+      "attachment": null,
+      "parent_preview": null,
+      "reactions": [],
+      "kind": "text",
+      "thread_root_id": null,
+      "card": null,
+      "reply_count": null,
+      "author_role": "member",
+      "hidden": false,
+      "removed": null
+    }
+  ],
+  "viewer_id": "11111111-1111-4111-8111-111111111111",
+  "peer_last_read_at": null,
+  "peer_typing": [],
+  "room": {
+    "id": "cccccccc-0004-4000-8000-000000000004",
+    "kind": "event",
+    "name": "Fall Formal",
+    "org": {
+      "id": "bbbbbbbb-0001-4000-8000-000000000001",
+      "handle": "salsa-club",
+      "name": "Salsa Club",
+      "logo_url": null,
+      "banner_url": null,
+      "verified": true
+    },
+    "event": {
+      "id": "dddddddd-0001-4000-8000-000000000001",
+      "title": "Fall Formal",
+      "starts_at": "2026-10-08T21:42:00.000Z",
+      "ends_at": "2026-10-09T00:42:00.000Z",
+      "location": "Alumni Hall",
+      "state": "live",
+      "room_id": "cccccccc-0004-4000-8000-000000000004",
+      "viewer_status": "going",
+      "going_count": 18,
+      "maybe_count": 6,
+      "going": [
+        {
+          "id": "aaaaaaaa-0001-4000-8000-000000000001",
+          "handle": "dana",
+          "name": "Dana Ortiz",
+          "avatar_url": null
+        },
+        {
+          "id": "aaaaaaaa-0002-4000-8000-000000000002",
+          "handle": "priya",
+          "name": "Priya Shah",
+          "avatar_url": null
+        },
+        {
+          "id": "aaaaaaaa-0003-4000-8000-000000000003",
+          "handle": "jay",
+          "name": "Jay Kim",
+          "avatar_url": null
+        },
+        {
+          "id": "aaaaaaaa-0004-4000-8000-000000000004",
+          "handle": "maya",
+          "name": "Maya Reyes",
+          "avatar_url": null
+        },
+        {
+          "id": "aaaaaaaa-0005-4000-8000-000000000005",
+          "handle": "sam",
+          "name": "Sam Torres",
+          "avatar_url": null
+        }
+      ]
+    }
+  },
+  "viewer": {
+    "role": "admin",
+    "can_post": true,
+    "can_reply": false,
+    "can_moderate": true
+  }
+}
