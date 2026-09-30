@@ -255,3 +255,55 @@ end; `S2-gate.md` part 2.
 - 2026-09-30T08:34:17Z EventAbout.tsx (hero, state pill, Plans, Who's going, RSVP pill) and EventChat.tsx (the 1101/1102 layer, its own hook, lostAccess → You left the event chat.) written; tsc + eslint 0; committing
 - 2026-09-30T08:36:47Z ClubSpace.tsx rewritten in full (space read on open/visible/20 s, deep-link order, header, Up next, chips, strip, room, composer, the event layer, history writes of 2.3, the states, ClubEmpty); tsc + eslint 0; committing
 - 2026-09-30T08:38:48Z self-review fixes: the welcome-row focus waits for the composer's input (ready dep, token reset on a chip tap); onClose held in a ref so the space read's effect never re-arms on an inline arrow; gates so far: typecheck 0, npm test 1614/1614, eslint 0 on every owned file, baselines 0; committing, then the build
+- 2026-09-30 build: attempt 1 `Another next build process is already running` (a sibling's build) → 90 s → attempt 2 exit 0. S2-gate.md part 2 written.
+
+### Closing (part 2)
+
+**Built** (every file `"use client"`, inline styles, `palette(night)`, `SERIF` / `FONT`,
+`useNightTheme()`; 375px, Light and Night; 44px targets; 16px inputs):
+`club/helpers.ts` (+ test), `RoomChips.tsx`, `UpNext.tsx`, `BoardStrip.tsx`,
+`RoomComposer.tsx`, `RoomThread.tsx`, `BoardPost.tsx`, `BoardView.tsx`,
+`EventAbout.tsx`, `EventChat.tsx`, `RsvpSheet.tsx`, `ClubEmpty.tsx`,
+`ClubSpace.tsx` (rewritten in full); `use-room-poll.ts` gained `lostAccess`
+(STOPPED 7). S1's `MessagesMobile` (005020d) honours R1–R3 exactly: its
+`popstate` ignores `depth >= 1`, it writes `replaceState` 1 + `pushState` 2
+for an event deep link (my `pushLayerHistory` guard then skips), and it asks
+for the same `initialPage?` prop as STOPPED 6 / R4 — left to the integration
+review (the 11.3 props are pinned; not improvised).
+
+**What a reviewer should look at first**
+1. `ClubSpace.tsx`: the space read effect (open / 20 s / visible; a later 403 →
+   `Members only.` + close), `hookRoomId` (a deep link's room reads before the
+   space answers), the history helpers and the `popstate` listener (2.3).
+2. `RoomThread.tsx`: `toMessageRow`, the separators over non-stub rows, the
+   Remove confirm → `DELETE`, the reaction flow (today's, moved), `CardBubble`
+   / `RemovedContentCard by=` branches.
+3. `BoardPost.tsx`: the `?root=` effect (open / Retry / every 5th tick; the
+   all-stubs fold shows the field only), the reply POST with `thread_root_id`,
+   `board_post_missing` → drop.
+4. `RoomComposer.tsx`: the optimistic `temp_` row → `replace` / `remove`; the
+   refused-send memory against the `viewer` object; the tray + `ComposeSheets`.
+5. `EventChat.tsx` / `EventAbout.tsx` / `RsvpSheet.tsx`: `lostAccess` → `You left
+   the event chat.`; the state pill; PUT / DELETE rsvp → `reload()`.
+
+**Readings a reviewer may want to strike**
+- A card post on the Board renders `CardBubble` as it is (292px wide, its own
+  avatar), inside the post's padding — "full width" is not reachable without
+  a `CardBubble` prop (S3's file).
+- `repliesToggleLabel(0, …)` reads `Reply. Replies don't notify anyone.` (1.2
+  gives the N form only).
+- `Open event chat` on a card INSIDE the event chat layer does nothing (one
+  layer level, depth 2, exists).
+- The `officerEmpty` Up next button needs `isOfficer && member_count === 1 &&
+  up_next: []`; the Lounge block additionally needs the Lounge's page empty.
+- `EventChat` mounts once the space read answered (it needs the club's name
+  for `Back to <club>`); a deep-linked event chat shows the space skeleton for
+  that one read.
+
+**Props defined for the siblings** (S1 mounts `ClubSpace` only; S3's `CardTray`,
+`ComposeSheets`, `CardBubble` are consumed with their pinned props unchanged):
+- `ClubSpace` — exactly 11.3: `{ orgHandle; initialRoomId; initialRoomKind; onClose }`.
+- `useRoomPoll(roomId, { enabled, initialPage?, line? })` → the 11.5 shape +
+  `hasEarlier`, `replace`, `remove`, `lostAccess` (additive, STOPPED 1-3, 7).
+- `MessageBubble` / `ReactionPicker`: `onRemove?: () => void` (the first commit).
+- 2026-09-30T08:42:04Z closing notes written; committing the gate record and notes (the last commit)
