@@ -348,3 +348,4 @@ and `messages/compose/*` (13.2).
 - 2026-09-30T10:11:11Z compose/CardSheet (aria-modal, close guard, try_again onClose, ctaGap), NewPollSheet / NewSignupSheet / ShareEventSheet (no maxLength, spoken spots, ctaGap 10) written; running typecheck + eslint + rule tests
 - 2026-09-30T10:11:44Z gates: typecheck 0, eslint 0 (max-warnings 0), npm test 1639/1639; running npm run build
 - 2026-09-30T10:13:15Z build exit 0 (attempt 1); S3-repair.md and S3-gate.md part 3 written; committing the code and the docs
+- 2026-09-30T10:13:24Z COMMITTED 673c25b fix(chat): W2-S3 repair after review (10 files + S3-repair.md, S3-gate.md part 3, this file). Repair done: 15 FIXED (one docs-only), 0 REJECTED, 4 DEFERRED (B3 = STOPPED 1, D4 accepted on both sheets, D7's count rule = REQUESTS 3, D9 = REQUESTS 1); gates typecheck 0 / test 1639 / build 0 / eslint 0.
