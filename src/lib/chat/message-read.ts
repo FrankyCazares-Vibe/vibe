@@ -40,6 +40,7 @@ import { postMediaProxyUrl } from "@/lib/post-media-url";
 import type { createSupabaseServerClient } from "@/lib/supabase/server";
 import { createSupabaseServiceClient, isSupabaseServiceConfigured } from "@/lib/supabase/service";
 
+import { blockedIdsFor } from "./blocks";
 import { OFFICER_REMOVED_REASON, canModerate, isClubRole } from "./room-rules";
 import { roomState } from "./room-state";
 import { canPostAnswer, clubRole, loadRoom } from "./rooms";
@@ -455,6 +456,12 @@ export type MessageContext = {
    * same `org_members` read as the authors'. Club rooms only.
    */
   alsoRoleOf?: string;
+  /**
+   * The viewer's block set (wave-2 contract 9.1, `blockedIdsFor`), when the
+   * caller read it already. Absent in a club room: `buildChatMessages` reads
+   * it itself, once. Never read for a dm or a group.
+   */
+  blocked?: ReadonlySet<string>;
 };
 
 /** What `buildChatMessages` read. */
@@ -468,6 +475,8 @@ type Built = {
   complete: boolean;
   /** The roles that were read (authors and `alsoRoleOf`); null for a dm, a group, or a read that failed. */
   roles: Map<string, ClubRole> | null;
+  /** The block set the page was built with (wave-2 9.1); empty for a dm, a group, or a read that failed. */
+  blocked: ReadonlySet<string>;
 };
 
 function messageKind(value: unknown): MessageKind {
@@ -532,6 +541,19 @@ async function buildChatMessages(client: ServerClient, rows: MessageRow[], ctx: 
   const { channelId, viewerId, room } = ctx;
   const shown = rows.filter((row) => !row.removed_at || row.user_id === viewerId);
 
+  // The viewer's block set (wave-2 contract 9.1): the empty set for a dm or
+  // a group, no read made; in a club room, read here FIRST only when no
+  // caller passed it. A failed read is `complete: false` (a read answers 503
+  // `try_again`; the send's answer, through `toChatMessages`, keeps its own
+  // row). The stub decision itself (8.2, `asStub`) lands with 9.1.
+  let blocked: ReadonlySet<string> = ctx.blocked ?? NO_BLOCKS;
+  let blocksRead = true;
+  if (room !== null && ctx.blocked === undefined) {
+    const read = await blockedIdsFor(client, viewerId);
+    if (read) blocked = read;
+    else blocksRead = false;
+  }
+
   const board = room !== null && room.kind === "board";
   const postIds = board && !ctx.skipReplyCounts
     ? shown.filter((row) => !row.thread_root_id).map((row) => row.id)
@@ -579,8 +601,11 @@ async function buildChatMessages(client: ServerClient, rows: MessageRow[], ctx: 
       removed: removedInfo(row, viewerId),
     };
   });
-  return { messages, complete: room === null || roles !== null, roles };
+  return { messages, complete: (room === null || roles !== null) && blocksRead, roles, blocked };
 }
+
+/** The block set of a dm or a group: nothing, and nothing read. */
+const NO_BLOCKS: ReadonlySet<string> = new Set<string>();
 
 /** `before` and `limit` as today; `after` and `root` as section 6.1 writes them. */
 export type ReadOptions = { before?: string; after?: string; root?: string; limit: number };
@@ -601,6 +626,11 @@ export type ReadKnown = {
    * does not ask again.
    */
   room?: Room | null;
+  /**
+   * The viewer's block set, read once by the route (wave-2 contract 9.1,
+   * `blockedIdsFor`). Absent: the read gets it itself in a club room.
+   */
+  blocked?: ReadonlySet<string>;
 };
 
 export type ReadFailure = {
@@ -775,6 +805,7 @@ export async function readChatMessages(
     room: readRoom,
     skipReplyCounts: root !== undefined,
     alsoRoleOf: viewerId,
+    blocked: known?.blocked,
   });
   // A club room whose authors' roles could not be read: never a page that
   // says everyone left the club.
@@ -825,7 +856,12 @@ export async function readChatMessage(
     const access = known?.access ?? (await ensureMember(client, row.channel_id, viewerId));
     if (!access.ok || (access.isOrgChannel && access.kind)) return null;
   }
-  const built = await buildChatMessages(client, [row], { channelId: row.channel_id, viewerId, room });
+  const built = await buildChatMessages(client, [row], {
+    channelId: row.channel_id,
+    viewerId,
+    room,
+    blocked: known?.blocked,
+  });
   // The author's role could not be read: a read that failed, not "left the club".
   if (!built.complete) return null;
   return built.messages[0] ?? null;

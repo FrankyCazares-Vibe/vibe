@@ -74,7 +74,12 @@ export type ViewerInRoom = {
 
 // ── 6.0 Refusals ─────────────────────────────────────────────────────────────
 
-/** The codes of section 6.0, each with its plain sentence below. */
+/**
+ * The codes of wave-1 section 6.0 and wave-2 section 1.3
+ * (handoffs/chat-redesign/wave-2-contracts.md), each with its plain sentence
+ * below. Wave 2 gave a sentence to every code wave 1 left without one and
+ * added one, `invalid_after`.
+ */
 export type RefusalCode =
   | "board_officers_only"
   | "room_closed"
@@ -83,7 +88,19 @@ export type RefusalCode =
   | "thread_root_not_allowed"
   | "club_room"
   | "room_locked"
-  | "try_again";
+  | "try_again"
+  // Wave 2, section 1.3.
+  | "not_found" // 404: a gated route with the flag off or the schema missing; a vote on a message that is not a live poll of this room; the remove route; a non-uuid [messageId]
+  | "not_allowed" // 403: the remove route (not the sender in a dm or group; below mod; outranked)
+  | "report_open" // 409: the remove route
+  | "invalid_card" // 400: a card with a bad shape, from the route or the RPC's P0C22; the body carries `field`
+  | "event_not_found" // 404: an Event card for a missing, foreign or ended event
+  | "poll_closed" // 409: a vote past closes_at, or in a closed event chat
+  | "slot_full" // 409: a sign-up slot at capacity
+  | "cards_club_rooms_only" // 400: a card sent to a dm or a group
+  | "members_only" // 403: GET /api/orgs/[slug]/space by a non-member of a visible club
+  | "create_failed" // 500: club creation (the wave-1 route keeps its own text)
+  | "invalid_after"; // 400: ?after= that is not a timestamp the server could have sent
 
 /** The four codes `postRefusal` (room-rules.ts) picks from, section 6.2. */
 export type PostRefusalCode =
@@ -93,21 +110,11 @@ export type PostRefusalCode =
   | "room_closed";
 
 /**
- * Every other code the contract names, with the section that names it. The
- * contract pins no sentence for these: each route writes its own.
+ * The one code whose sentence is not in the table: the word filter's, with
+ * `field`, from `contentBlockedResponse` (moderation/access.ts). Every
+ * other code moved into `RefusalCode` in wave 2 (section 1.3).
  */
-export type ChatRouteCode =
-  | "not_found" // 2, 3.10, 4.2: a gated route with the flag off, a missing schema, a vote on nothing
-  | "not_allowed" // 6.3: the remove route's role and rank check
-  | "report_open" // 6.3: an open report on the message
-  | "invalid_card" // 4.2: a card with a bad shape
-  | "event_not_found" // 4.2: an Event card for a missing, foreign or ended event
-  | "poll_closed" // 4.2: a vote past closes_at
-  | "slot_full" // 4.2: a sign-up slot at capacity
-  | "cards_club_rooms_only" // 4.4: a card sent to a dm or a group
-  | "content_blocked" // 4.4: the word filter, with `field`
-  | "members_only" // 7: the club space, asked by a non-member of a visible club
-  | "create_failed"; // 8: club creation failing on its rooms
+export type ChatRouteCode = "content_blocked"; // 4.1.7: the word filter, with `field`
 
 /** Every code in the contract. Screens match on `code`, never on the status or the sentence. */
 export type ChatErrorCode = RefusalCode | ChatRouteCode;
@@ -122,6 +129,18 @@ export const REFUSAL_SENTENCES: Readonly<Record<RefusalCode, string>> = Object.f
   club_room: "You can't leave a club's chat. Leave the club instead.",
   room_locked: "This room can't be renamed, hidden or deleted.",
   try_again: "Try again in a moment.",
+  // Wave 2, section 1.3.
+  not_found: "That's not there anymore.",
+  not_allowed: "You can't remove this message.",
+  report_open: "This message has an open report. Vibe's moderators will handle it.",
+  invalid_card: "Check the card and try again.",
+  event_not_found: "That event isn't available.",
+  poll_closed: "This one is closed.",
+  slot_full: "That spot just filled.",
+  cards_club_rooms_only: "Polls, sign-ups and events only work in club chats.",
+  members_only: "Members only.",
+  create_failed: "Couldn't create the club. Try again.",
+  invalid_after: "Reload to catch up.",
 });
 
 /** Every refusal: `{ ok: false, error: <plain sentence>, code }`. */
@@ -142,6 +161,15 @@ export function refusalBody<Code extends RefusalCode>(code: Code): Refusal<Code>
   const error = known ? REFUSAL_SENTENCES[code] : REFUSAL_SENTENCES.try_again;
   return { ok: false, error, code };
 }
+
+/**
+ * The 400 of the card routes (wave-2 contract 1.3, 4.1.6, 4.3.5): the only
+ * refusal with a `field` besides `content_blocked`. `field` is one of
+ * `type`, `question`, `options`, `options.<n>`, `event_id`, `note`,
+ * `closes_at` (the create route) or `option_id`, `on` (the vote route).
+ * The sheet reads it through `VibeFailure.field`.
+ */
+export type InvalidCardRefusal = Refusal<"invalid_card"> & { field: string };
 
 // ── 2 The flag ───────────────────────────────────────────────────────────────
 
@@ -210,6 +238,23 @@ export type EventCard = { type: "event"; note: string | null; event: EventRef | 
 
 export type Card = PollCard | EventCard;
 
+/**
+ * What `snapshotCard` (cards/snapshot.ts, wave-2 contract 5.3) writes into a
+ * report's message snapshot: the card as the reporter saw it, with no voter
+ * names and no ids of people. Null for a text message, a missing card row,
+ * or a database without migration B.
+ */
+export type CardSnapshot =
+  | {
+      type: "poll" | "signup";
+      question: string;
+      anonymous: boolean;
+      multi: boolean;
+      closes_at: string | null;
+      options: { label: string; capacity: number | null; count: number }[];
+    }
+  | { type: "event"; event_id: string | null; title: string | null; starts_at: string | null; note: string | null };
+
 // ── 6.1 The thread read ──────────────────────────────────────────────────────
 
 export type MessageKind = "text" | "poll" | "event_card";
@@ -248,24 +293,24 @@ export type ChatMessage = {
   // New in wave 1.
   kind: MessageKind;
   thread_root_id: string | null;
-  /** Always null in wave 1. */
+  /** Null on a text message and on a stub; hydrated by `hydrateCards` (wave 2) on a card. */
   card: Card | null;
   /** Board top-level posts only, else null. */
   reply_count: number | null;
   /** Club rooms; null = no longer a member, and null in a dm or a group. */
   author_role: ClubRole | null;
   /**
-   * Reserved for blocking in club rooms, both ways (section 12, point 2):
-   * when either person blocked the other, the message arrives as a stub with
-   * no content, author or card. Always false in wave 1.
+   * Blocking in club rooms, both ways (wave-2 contract section 8): when
+   * either person blocked the other, the message arrives as a stub, the
+   * exact shape of 8.1 (`asStub` in stub.ts): `hidden: true`, `kind:
+   * "text"`, `content: ""`, `user_id: ""`, `users: null`, `card: null`,
+   * every other field at its empty default, and `id`, `created_at`,
+   * `thread_root_id` unchanged so keys and paging hold. The rule is 8.2
+   * (`isHiddenFrom`). Always false in a dm or a group.
    *
    * One exception, confirmed by Franky on Sept 29 (he picked the option
-   * that names it): a top-level Board post by an officer shows to every
-   * member, so nobody misses club news.
-   *
-   * NOT PINNED YET, for the wave that builds the rooms' screens: what
-   * `content`, `user_id` and `users` hold on a stub (this type asks for all
-   * three today).
+   * that names it): a top-level Board post by a current officer shows to
+   * every member, so nobody misses club news.
    */
   hidden: boolean;
   removed: RemovedInfo | null;

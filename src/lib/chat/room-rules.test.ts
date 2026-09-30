@@ -277,6 +277,18 @@ test("the refusal sentences are the contract's, word for word", () => {
       club_room: "You can't leave a club's chat. Leave the club instead.",
       room_locked: "This room can't be renamed, hidden or deleted.",
       try_again: "Try again in a moment.",
+      // Wave 2 (wave-2-contracts.md 1.3): the ten wave-1 codes without a sentence, and invalid_after.
+      not_found: "That's not there anymore.",
+      not_allowed: "You can't remove this message.",
+      report_open: "This message has an open report. Vibe's moderators will handle it.",
+      invalid_card: "Check the card and try again.",
+      event_not_found: "That event isn't available.",
+      poll_closed: "This one is closed.",
+      slot_full: "That spot just filled.",
+      cards_club_rooms_only: "Polls, sign-ups and events only work in club chats.",
+      members_only: "Members only.",
+      create_failed: "Couldn't create the club. Try again.",
+      invalid_after: "Reload to catch up.",
     },
   );
 });
@@ -312,9 +324,10 @@ test("every code of the table gets its own sentence in the body", () => {
 
 test("a code with no sentence still sends one, and keeps its code", () => {
   type Known = Parameters<typeof refusalBody>[0];
-  // A code from the contract that has no sentence in the table, a made-up
-  // one, and names every object carries ("constructor" is a function there).
-  for (const code of ["not_found", "report_open", "nonsense", "", "constructor", "toString", "__proto__"]) {
+  // The one code of the contract with no sentence in the table (wave 2 gave
+  // the others theirs), a made-up one, and names every object carries
+  // ("constructor" is a function there).
+  for (const code of ["content_blocked", "nonsense", "", "constructor", "toString", "__proto__"]) {
     const body = refusalBody(odd<Known>(code));
     assert.deepEqual(body, { ok: false, error: "Try again in a moment.", code }, `code=${code}`);
     assert.equal(JSON.parse(JSON.stringify(body)).error, "Try again in a moment.", `code=${code}, as JSON`);
