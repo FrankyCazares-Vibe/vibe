@@ -233,7 +233,10 @@
       return;
     }
     // Combine threads + accepted requests; user can share into either.
-    state.threads = [...r.data.threads, ...(r.data.requests || [])];
+    // Club chat v1: never into a Board the viewer can't write on
+    // (can_post is false there; absent on a dm, a group, an older server).
+    state.threads = [...r.data.threads, ...(r.data.requests || [])]
+      .filter((t) => t.can_post !== false);
     state.filtered = state.threads.slice();
     renderList();
   }
@@ -289,6 +292,23 @@
     search.oninput = () => applyFilter(search.value);
   };
 
+  // Club chat v1: a refused send is matched on its `code`, never on the
+  // status or the sentence, and shows the sentence the server sent. "" for
+  // any other failure, which keeps vibeRequest's line. The same words as
+  // REFUSAL_SENTENCES in src/lib/chat/types.ts.
+  const CHAT_REFUSALS = {
+    board_officers_only: "Only officers post here.",
+    room_closed: "This chat is closed.",
+    club_media_off: "Photos and videos are off in club chats for now.",
+    board_post_missing: "That post is no longer there.",
+    try_again: "Try again in a moment.",
+  };
+  function chatRefusalLine(r) {
+    if (!r || typeof r.code !== "string") return "";
+    if (!Object.prototype.hasOwnProperty.call(CHAT_REFUSALS, r.code)) return "";
+    return (typeof r.error === "string" && r.error.trim()) || CHAT_REFUSALS[r.code];
+  }
+
   window.closeSharePicker = function() {
     state.open = false;
     state.post = null;
@@ -338,7 +358,13 @@
       renderCta();
     }
     const left = ids.length - sent.length;
-    if (sent.length === 0 || refusal.code === "terms_required") {
+    const chatLine = chatRefusalLine(refusal);
+    if (sent.length === 0 && chatLine) {
+      window.vibeToast(chatLine, { tone: "error" });
+    } else if (chatLine) {
+      // A club chat's refusal won't change on a retry: say why instead.
+      window.vibeToast(`Sent to ${sent.length} of ${ids.length} chats. ${chatLine}`, { tone: "error" });
+    } else if (sent.length === 0 || refusal.code === "terms_required") {
       window.vibeToast(refusal.message, { tone: "error", action: refusal.action });
     } else {
       window.vibeToast(`Sent to ${sent.length} of ${ids.length} chats. Try the other ${left === 1 ? "one" : left} again.`,

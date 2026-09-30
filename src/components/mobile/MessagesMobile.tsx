@@ -19,7 +19,13 @@ import {
   ReportSheet,
   type ReportTargetRef,
 } from "@/components/safety/ReportSheet";
-import { vibeRequest } from "@/lib/feedback/request";
+import {
+  REFUSAL_SENTENCES,
+  type RefusalCode,
+  type RoomKind,
+  type ThreadMessagesResponse,
+} from "@/lib/chat/types";
+import { type VibeFailure, vibeRequest } from "@/lib/feedback/request";
 import { toast } from "@/lib/feedback/toast";
 import { currentTheme, THEME_EVENT } from "@/lib/theme/theme";
 
@@ -93,6 +99,12 @@ type ThreadEntry = {
   muted_until?: string | null;
   members?: ThreadMember[];
   viewer_role?: "admin" | "member";
+  /** Club chat v1: set on a club's room only ("Salsa Club · Lounge"). Such
+   *  a thread can't be left, deleted from the inbox or sent photos. Absent
+   *  on a dm, a group, and from a server without the chat schema. */
+  room_kind?: RoomKind;
+  /** Club chat v1: false on a Board for anyone who isn't an officer. */
+  can_post?: boolean;
 };
 
 type MessageReaction = {
@@ -325,6 +337,34 @@ function quotedBody(p: ParentPreview): string {
             ? "Shared post"
             : "Attachment")
   );
+}
+
+/**
+ * Club chat v1: a refusal is matched on its `code`, never on the status or
+ * the sentence, and the line shown is the one the server sent ("Only
+ * officers post here."). Null for any other failure, which keeps the line
+ * vibeRequest mapped for it.
+ */
+function chatRefusalLine(r: VibeFailure): string | null {
+  if (!r.code || !Object.prototype.hasOwnProperty.call(REFUSAL_SENTENCES, r.code)) return null;
+  return r.error?.trim() || REFUSAL_SENTENCES[r.code as RefusalCode];
+}
+
+/** The toast of a send that was refused (the requests themselves are quiet). */
+function toastSendFailure(r: VibeFailure) {
+  const line = chatRefusalLine(r);
+  toast({ message: line ?? r.message, tone: "error", action: line ? undefined : r.action });
+}
+
+/**
+ * Club chat v1: whether the viewer may post here, as far as the list entry
+ * knows. Null for a club's room whose entry doesn't say (Campus > Chat hands
+ * one over without `can_post`): unknown until the thread read answers.
+ */
+function entryCanPost(thread: ThreadEntry | null): boolean | null {
+  if (typeof thread?.can_post === "boolean") return thread.can_post;
+  if (!thread || thread.type === "dm" || thread.type === "group") return true;
+  return null;
 }
 
 // ---------- Component ----------
@@ -1046,6 +1086,12 @@ export function ConversationView({
   const [draft, setDraft] = useState("");
   const [sending, setSending] = useState(false);
   const [meId, setMeId] = useState<string | null>(null);
+  // Club chat v1: which kind of club room this is (null on a dm or a
+  // group) and whether the viewer may post here. Seeded from the list
+  // entry, then set by the thread read. A server that sends neither
+  // leaves both as they were before club chat.
+  const [roomKind, setRoomKind] = useState<RoomKind | null>(thread?.room_kind ?? null);
+  const [canPost, setCanPost] = useState<boolean | null>(entryCanPost(thread));
   // One message, reported from the long-press picker. A single message is a
   // `message` target; the whole chat is handled by the ⋯ sheet.
   const [reportMessage, setReportMessage] = useState<ReportTargetRef | null>(null);
@@ -1085,6 +1131,8 @@ export function ConversationView({
     setStaged(null);
     setRequestState("pending");
     setShowPushAsk(false);
+    setRoomKind(thread?.room_kind ?? null);
+    setCanPost(entryCanPost(thread));
   }
   const scrollRef = useRef<HTMLDivElement | null>(null);
   const inputRef = useRef<HTMLTextAreaElement | null>(null);
@@ -1117,7 +1165,11 @@ export function ConversationView({
   useEffect(() => {
     let cancelled = false;
     (async () => {
-      const r = await vibeRequest<{ messages?: MessageRow[]; viewer_id?: string }>(
+      const r = await vibeRequest<
+        { messages?: MessageRow[]; viewer_id?: string } & Partial<
+          Pick<ThreadMessagesResponse, "room" | "viewer">
+        >
+      >(
         `/api/me/threads/${encodeURIComponent(threadId)}/messages?limit=50`,
         { cache: "no-store", quiet: true, failure: "Couldn't load this conversation." },
       );
@@ -1129,9 +1181,16 @@ export function ConversationView({
         setLoadErr(null);
         setMessages(r.data.messages);
         if (typeof r.data.viewer_id === "string") setMeId(r.data.viewer_id);
+        // Club chat v1. No `viewer` or `room` in the answer: keep what
+        // the list entry said.
+        const viewer = r.data.viewer;
+        setCanPost((prev) => (viewer ? viewer.can_post !== false : (prev ?? true)));
+        if (r.data.room?.kind) setRoomKind(r.data.room.kind);
         return;
       }
       setLoadErr(asLoadFailure(r, "Couldn't load this conversation."));
+      // Still unknown: the composer stays, as before club chat.
+      setCanPost((prev) => prev ?? true);
     })();
     return () => {
       cancelled = true;
@@ -1218,8 +1277,12 @@ export function ConversationView({
         }>("/api/me/messages-upload-url", {
           json: { channelId: threadId, contentType: media.contentType, sizeBytes: media.file.size },
           failure,
+          quiet: true,
         });
-        if (!sign.ok) return;
+        if (!sign.ok) {
+          toastSendFailure(sign);
+          return;
+        }
         const { uploadUrl, objectKey } = sign.data;
         if (!uploadUrl || !objectKey) {
           toast({ message: `${failure} Try again.`, tone: "error" });
@@ -1238,8 +1301,12 @@ export function ConversationView({
         const r = await vibeRequest<{ message?: MessageRow }>(url, {
           json: { ...body, media_url: objectKey, media_kind: sign.data.kind ?? media.kind },
           failure: "Couldn't send your message.",
+          quiet: true,
         });
-        if (!r.ok) return;
+        if (!r.ok) {
+          toastSendFailure(r);
+          return;
+        }
         row = r.data.message;
         const sent = row;
         setMessages((prev) => (prev && sent ? [...prev, sent] : prev));
@@ -1268,10 +1335,16 @@ export function ConversationView({
         const r = await vibeRequest<{ message?: MessageRow }>(url, {
           json: body,
           failure: "Couldn't send your message.",
+          quiet: true,
         });
         if (!r.ok) {
+          toastSendFailure(r);
           setMessages((prev) => (prev ? prev.filter((m) => m.id !== tempId) : prev));
           setDraft(text);
+          // The room stopped taking the viewer's posts after it was opened
+          // (no longer an officer, or the event chat closed): the quiet
+          // line replaces the composer, as on the next open.
+          if (r.code === "board_officers_only" || r.code === "room_closed") setCanPost(false);
           return;
         }
         row = r.data.message;
@@ -1371,7 +1444,8 @@ export function ConversationView({
 
   // Photos and videos attach in DMs and groups only: the upload route
   // checks channel_members, which org channels don't have, so it 403s there.
-  const canAttach = thread?.type === "dm" || thread?.type === "group";
+  // Never in a club's room, whatever its type says (club chat v1).
+  const canAttach = (thread?.type === "dm" || thread?.type === "group") && !roomKind;
 
   // A picked photo or video, checked against the upload route's rules
   // before anything is sent. A new pick replaces the staged one.
@@ -1759,7 +1833,8 @@ export function ConversationView({
                   onMediaLoad={keepPinnedToBottom}
                   listScrolledAtRef={listScrolledAtRef}
                   parentIsMine={!!meId && m.parent_preview?.user_id === meId}
-                  onReply={() => startReply(m)}
+                  // No composer to reply in when the viewer can't post here.
+                  onReply={canPost ? () => startReply(m) : undefined}
                   // Never on their own message, and never before the thread
                   // has told us who they are.
                   onReport={
@@ -1864,7 +1939,7 @@ export function ConversationView({
 
       {/* Reply pill and staged photo/video, on the composer's surface
           (desktop's reply pill and compStaged). */}
-      {replyTo || staged ? (
+      {(replyTo || staged) && canPost ? (
         <div
           style={{
             flexShrink: 0,
@@ -2006,7 +2081,41 @@ export function ConversationView({
         </div>
       ) : null}
 
-      {/* Input bar */}
+      {/* Input bar. Club chat v1: in a room the viewer can't post in (a
+          Board for anyone but its officers, an event chat that has closed)
+          a quiet line takes its place. Tokens on the page's own paper; over
+          a club's wallpaper, the dark glass the composer wears there. Empty
+          while it isn't known yet, so no composer flashes in a Board. */}
+      {canPost !== true ? (
+        <div
+          role={canPost === false ? "note" : undefined}
+          style={{
+            flexShrink: 0,
+            minHeight: 44,
+            display: "flex",
+            alignItems: "center",
+            justifyContent: "center",
+            padding: "8px 16px calc(env(safe-area-inset-bottom, 0px) + 10px)",
+            background: backdropCss ? "rgba(14, 11, 22, 0.72)" : "var(--cream)",
+            borderTop: backdropCss
+              ? "1px solid rgba(255,255,255,0.08)"
+              : "1px solid var(--hairline)",
+            backdropFilter: backdropCss ? "blur(20px) saturate(160%)" : undefined,
+            WebkitBackdropFilter: backdropCss ? "blur(20px) saturate(160%)" : undefined,
+            color: backdropCss ? "rgba(255,255,255,0.7)" : "var(--ink-2)",
+            fontFamily: "DM Sans, sans-serif",
+            fontSize: 13.5,
+            fontWeight: 600,
+            textAlign: "center",
+          }}
+        >
+          {canPost === null
+            ? null
+            : roomKind === "board"
+              ? REFUSAL_SENTENCES.board_officers_only
+              : REFUSAL_SENTENCES.room_closed}
+        </div>
+      ) : (
       <form
         onSubmit={(e) => {
           e.preventDefault();
@@ -2158,6 +2267,7 @@ export function ConversationView({
           </svg>
         </button>
       </form>
+      )}
 
       {/* Action sheet — pinned/muted toggles, view profile, clear,
           block, leave group, delete. Mirrors the desktop kebab menu. */}
@@ -2165,6 +2275,9 @@ export function ConversationView({
         <ConversationActionSheet
           threadId={threadId}
           thread={thread}
+          // Campus > Chat hands over a club room as type "org" with no
+          // room_kind; the inbox sends "org_channel". Neither is a dm or group.
+          clubRoom={!!roomKind || (!!thread && thread.type !== "dm" && thread.type !== "group")}
           pinned={!!pinnedAt}
           muted={!!mutedUntil && new Date(mutedUntil) > new Date()}
           feedback={actionFeedback}
@@ -2229,6 +2342,7 @@ export function ConversationView({
 function ConversationActionSheet({
   threadId,
   thread,
+  clubRoom,
   pinned,
   muted,
   feedback,
@@ -2242,6 +2356,9 @@ function ConversationActionSheet({
 }: {
   threadId: string;
   thread: ThreadEntry | null;
+  /** A club's room (club chat v1): it can't be left or deleted from the
+   *  inbox, so neither row is drawn. */
+  clubRoom: boolean;
   pinned: boolean;
   muted: boolean;
   feedback: string | null;
@@ -2262,7 +2379,7 @@ function ConversationActionSheet({
   const [reportTarget, setReportTarget] = useState<ReportTargetRef | null>(null);
 
   const isDm = thread?.type === "dm";
-  const isGroup = thread?.type === "group";
+  const isGroup = thread?.type === "group" && !clubRoom;
   const peer = thread?.peer ?? null;
 
   const togglePin = useCallback(async () => {
@@ -2556,12 +2673,14 @@ function ConversationActionSheet({
                 disabled={busy}
               />
             ) : null}
-            <SheetRow
-              label="Delete conversation"
-              danger
-              onClick={() => void hideConversation()}
-              disabled={busy}
-            />
+            {clubRoom ? null : (
+              <SheetRow
+                label="Delete conversation"
+                danger
+                onClick={() => void hideConversation()}
+                disabled={busy}
+              />
+            )}
             <SheetRow label="Cancel" onClick={onClose} bold />
           </div>
 

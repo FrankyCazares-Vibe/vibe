@@ -8,6 +8,7 @@ import {
   LoadFailed,
   type LoadFailure,
 } from "@/components/feedback/LoadFailed";
+import { REFUSAL_SENTENCES, type RefusalCode, type RoomKind } from "@/lib/chat/types";
 import { vibeRequest } from "@/lib/feedback/request";
 
 /**
@@ -41,7 +42,27 @@ type ThreadEntry = {
     avatar_url: string | null;
   } | null;
   is_request: boolean;
+  /** Club chat v1: false on a club's Board for anyone who isn't one of its
+   *  officers. Absent on a dm, a group, and from an older server. */
+  can_post?: boolean;
+  /** Club chat v1: set on a club's room only; its `name` is then the full
+   *  label the server built ("Salsa Club · Lounge"). */
+  room_kind?: RoomKind;
 };
+
+/**
+ * Club chat v1: the sentence of a refused send ("Only officers post
+ * here."), matched on the body's `code`, never on the status or the
+ * sentence. Null for any other failure.
+ */
+async function chatRefusalLine(res: Response): Promise<string | null> {
+  const body = (await res.json().catch(() => null)) as { code?: unknown; error?: unknown } | null;
+  const code = body?.code;
+  if (typeof code !== "string") return null;
+  if (!Object.prototype.hasOwnProperty.call(REFUSAL_SENTENCES, code)) return null;
+  const sent = typeof body?.error === "string" ? body.error.trim() : "";
+  return sent || REFUSAL_SENTENCES[code as RefusalCode];
+}
 
 /**
  * Layers. This sheet opens on top of surfaces that are themselves high in
@@ -114,9 +135,10 @@ export function SharePostSheet({
       if (cancelled) return;
       if (r.ok && Array.isArray(r.data.threads)) {
         setLoadErr(null);
+        // Nor into a Board the viewer can't write on (club chat v1).
         setThreads(
           [...r.data.threads, ...(r.data.requests ?? [])].filter(
-            (t) => !t.is_request,
+            (t) => !t.is_request && t.can_post !== false,
           ),
         );
       } else {
@@ -176,12 +198,19 @@ export function SharePostSheet({
           ),
         ),
       );
-      const failures = results.filter((r) => !r.ok).length;
+      const failed = results.filter((r) => !r.ok);
+      const failures = failed.length;
       if (failures > 0) {
+        // A club chat's refusal says why in its own words; it won't change
+        // on a retry, so it shows when some chats did get the post too.
+        const line = await chatRefusalLine(failed[0]);
+        const sentCount = results.length - failures;
         throw new Error(
-          failures === results.length
-            ? "Couldn't send to any chats"
-            : `Sent to ${results.length - failures} of ${results.length}`,
+          sentCount === 0
+            ? (line ?? "Couldn't send to any chats")
+            : line
+              ? `Sent to ${sentCount} of ${results.length}. ${line}`
+              : `Sent to ${sentCount} of ${results.length}`,
         );
       }
       onSent?.(results.length);
@@ -599,8 +628,11 @@ function ThreadRow({
             textOverflow: "ellipsis",
           }}
         >
-          {isChannel ? `# ${thread.name}` : thread.name || "Direct message"}
+          {isChannel && !thread.room_kind ? `# ${thread.name}` : thread.name || "Direct message"}
         </span>
+        {/* A club's room has no second line: its name already says the
+            club and the room (club chat v1). */}
+        {thread.room_kind ? null : (
         <span
           style={{
             display: "block",
@@ -621,6 +653,7 @@ function ThreadRow({
               ? "Group"
               : "Channel"}
         </span>
+        )}
       </span>
     </button>
   );

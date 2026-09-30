@@ -48,6 +48,13 @@ import {
   ReportSheet,
 } from "@/components/safety/ReportSheet";
 import { MouseSpotlight } from "@/components/ui/mouse-spotlight";
+import { BOARD_POSTER_ROLES } from "@/lib/chat/room-rules";
+import {
+  REFUSAL_SENTENCES,
+  type RefusalCode,
+  type RoomKind,
+  type ThreadMessagesResponse,
+} from "@/lib/chat/types";
 import {
   bindMentionPicker,
   capturePosterFrame,
@@ -212,6 +219,9 @@ type Channel = {
   pinned: boolean;
   position: number;
   created_at: string;
+  /** Club chat v1: sent by the list. A row without it (a create or save
+   *  answer, a server without the chat schema) is a plain "room". */
+  kind?: RoomKind;
 };
 
 // Color palette for org icons — deterministic per-id so colors stay stable
@@ -1406,6 +1416,31 @@ function CreateOrgModal({
   );
 }
 
+/**
+ * Club chat v1: a refusal is matched on its `code`, never on the status or
+ * the sentence, and the line shown is the one the server sent ("This room
+ * can't be renamed, hidden or deleted."). Null for any other failure, which
+ * keeps the line it had.
+ */
+function chatRefusalLine(code: unknown, error: unknown): string | null {
+  if (typeof code !== "string") return null;
+  if (!Object.prototype.hasOwnProperty.call(REFUSAL_SENTENCES, code)) return null;
+  return (typeof error === "string" && error.trim()) || REFUSAL_SENTENCES[code as RefusalCode];
+}
+
+/**
+ * Club chat v1: the Board, the Lounge and Officers keep their name, their
+ * privacy and their place in the club (the server answers room_locked);
+ * their topic, pin and position still change. A row without `kind` is a
+ * plain room.
+ */
+function isCoreRoom(channel: Channel): boolean {
+  return channel.kind === "board" || channel.kind === "lounge" || channel.kind === "officers";
+}
+
+/** Club chat v1: all an event's chat offers in the room editors. */
+const EVENT_ROOM_NOTE = "This event chat follows its event.";
+
 function CreateChannelModal({
   org,
   onClose,
@@ -1437,7 +1472,9 @@ function CreateChannelModal({
       });
       const data = await res.json();
       if (!data?.ok) {
-        setError(data?.error || "Failed to create channel");
+        setError(
+          chatRefusalLine(data?.code, data?.error) ?? (data?.error || "Failed to create channel"),
+        );
         return;
       }
       onCreated(data.channel as Channel);
@@ -2037,6 +2074,9 @@ function ChannelEditorRow({
   const [isPrivate, setIsPrivate] = useState(channel.is_private);
   const [busy, setBusy] = useState(false);
   const [err, setErr] = useState<string | null>(null);
+  // Club chat v1: no rename, privacy or Delete on the club's own rooms;
+  // nothing to edit on an event's chat.
+  const core = isCoreRoom(channel);
 
   const dirty =
     name.trim() !== channel.name ||
@@ -2058,7 +2098,7 @@ function ChannelEditorRow({
       });
       const data = await res.json();
       if (!data?.ok) {
-        setErr(data?.error || "Failed to save");
+        setErr(chatRefusalLine(data?.code, data?.error) ?? (data?.error || "Failed to save"));
         return;
       }
       onUpdated(data.channel as Channel);
@@ -2080,7 +2120,7 @@ function ChannelEditorRow({
       });
       const data = await res.json();
       if (!data?.ok) {
-        setErr(data?.error || "Failed to delete");
+        setErr(chatRefusalLine(data?.code, data?.error) ?? (data?.error || "Failed to delete"));
         return;
       }
       onRemoved(channel.id);
@@ -2126,8 +2166,13 @@ function ChannelEditorRow({
         <span style={{ color: COLORS.glassMuted, fontSize: 12 }}>{open ? "Hide" : "Edit"}</span>
       </button>
 
-      {open ? (
+      {open && channel.kind === "event" ? (
+        <p style={{ ...modalSubtitleStyle, marginTop: 10 }}>{EVENT_ROOM_NOTE}</p>
+      ) : open ? (
         <div style={{ display: "flex", flexDirection: "column", gap: 10, marginTop: 10 }}>
+          {core ? (
+            <ReadOnlyRow label="Name" value={channel.name} />
+          ) : (
           <Field label="Name">
             <input
               type="text"
@@ -2137,6 +2182,7 @@ function ChannelEditorRow({
               style={inputStyle}
             />
           </Field>
+          )}
           <Field label="Topic">
             <input
               type="text"
@@ -2146,6 +2192,7 @@ function ChannelEditorRow({
               style={inputStyle}
             />
           </Field>
+          {core ? null : (
           <Field label="Privacy">
             <div style={{ display: "flex", gap: 8 }}>
               {[
@@ -2163,11 +2210,16 @@ function ChannelEditorRow({
               ))}
             </div>
           </Field>
+          )}
           {err ? <div style={modalErrorStyle}>{err}</div> : null}
           <div style={{ display: "flex", gap: 8, justifyContent: "space-between" }}>
+            {core ? (
+              <span />
+            ) : (
             <button type="button" onClick={remove} disabled={busy} style={modalDangerStyle}>
               Delete channel
             </button>
+            )}
             <div style={{ display: "flex", gap: 8 }}>
               <button type="button" onClick={() => setOpen(false)} style={modalCancelStyle}>
                 Cancel
@@ -3186,11 +3238,14 @@ function ChannelSettingsModal({
   onChannelsReordered: (orderedIds: string[]) => void;
 }) {
   const canManage = org.role === "owner" || org.role === "admin";
+  // Club chat v1: the club's own rooms can't be deleted, and an event's
+  // chat follows its event (the Overview tab says so and offers nothing).
+  const eventRoom = channel.kind === "event";
 
   const tabs: { key: ChannelSettingsTab; label: string; show: boolean }[] = [
     { key: "overview", label: "Overview", show: true },
-    { key: "access", label: "Access", show: channel.is_private && canManage },
-    { key: "danger", label: "Danger", show: canManage },
+    { key: "access", label: "Access", show: channel.is_private && canManage && !eventRoom },
+    { key: "danger", label: "Danger", show: canManage && !eventRoom && !isCoreRoom(channel) },
   ];
   const visibleTabs = tabs.filter((t) => t.show);
   const [tab, setTab] = useState<ChannelSettingsTab>(visibleTabs[0].key);
@@ -3277,10 +3332,10 @@ function ChannelSettingsModal({
               onChannelsReordered={onChannelsReordered}
             />
           ) : null}
-          {tab === "access" && channel.is_private && canManage ? (
+          {tab === "access" && visibleTabs.some((t) => t.key === "access") ? (
             <ChannelAccess org={org} channel={channel} />
           ) : null}
-          {tab === "danger" && canManage ? (
+          {tab === "danger" && visibleTabs.some((t) => t.key === "danger") ? (
             <ChannelDanger
               org={org}
               channel={channel}
@@ -3340,7 +3395,10 @@ function ChannelOverview({
       });
       const data = await res.json();
       if (!data?.ok) {
-        setMsg({ tone: "err", text: data?.error || "Failed to save" });
+        setMsg({
+          tone: "err",
+          text: chatRefusalLine(data?.code, data?.error) ?? (data?.error || "Failed to save"),
+        });
         return;
       }
       onChannelUpdated(data.channel as Channel);
@@ -3378,6 +3436,13 @@ function ChannelOverview({
     if (!r.ok) onChannelsReordered(prevIds);
   };
 
+  // Club chat v1: an event's chat offers nothing here; the club's own rooms
+  // keep their name and privacy (topic, pin and position still change).
+  if (channel.kind === "event") {
+    return <p style={modalSubtitleStyle}>{EVENT_ROOM_NOTE}</p>;
+  }
+  const core = isCoreRoom(channel);
+
   if (!canManage) {
     return (
       <div style={{ display: "flex", flexDirection: "column", gap: 14, color: "#fff" }}>
@@ -3393,6 +3458,9 @@ function ChannelOverview({
 
   return (
     <div style={{ display: "flex", flexDirection: "column", gap: 14 }}>
+      {core ? (
+        <ReadOnlyRow label="Name" value={channel.name} />
+      ) : (
       <Field label="Name" hint="Lowercase, 2–31 chars.">
         <input
           type="text"
@@ -3402,6 +3470,7 @@ function ChannelOverview({
           style={inputStyle}
         />
       </Field>
+      )}
       <Field label="Topic">
         <input
           type="text"
@@ -3412,6 +3481,7 @@ function ChannelOverview({
           style={inputStyle}
         />
       </Field>
+      {core ? null : (
       <Field label="Visibility">
         <div style={{ display: "flex", gap: 8 }}>
           {[
@@ -3432,6 +3502,7 @@ function ChannelOverview({
           ))}
         </div>
       </Field>
+      )}
       <Field label="Pin to top" hint="Pinned channels sit above the rest in the rail.">
         <button
           type="button"
@@ -3743,7 +3814,7 @@ function ChannelDanger({
       });
       const data = await res.json();
       if (!data?.ok) {
-        setErr(data?.error || "Failed to delete");
+        setErr(chatRefusalLine(data?.code, data?.error) ?? (data?.error || "Failed to delete"));
         return;
       }
       onChannelRemoved(channel.id);
@@ -9807,6 +9878,50 @@ function EventsTabBody({
   );
 }
 
+/**
+ * Club chat v1: the ids of the viewer's clubs, for the Going line. One read
+ * of `/api/orgs?filter=mine` per page, shared by every event card (the
+ * phone's Events tab and the club page render EventCard too, and neither
+ * can hand it a list). A failed read is forgotten, so a later card asks
+ * again; a club joined or left on this page shows after a reload.
+ */
+let myClubIdsRead: Promise<ReadonlySet<string> | null> | null = null;
+function readMyClubIds(): Promise<ReadonlySet<string> | null> {
+  if (!myClubIdsRead) {
+    const read: Promise<ReadonlySet<string> | null> = vibeRequest<{
+      orgs?: Array<{ id?: unknown }>;
+    }>("/api/orgs?filter=mine", {
+      cache: "no-store",
+      quiet: true,
+      failure: "Couldn't load your orgs.",
+    }).then((r) => {
+      if (r.ok && Array.isArray(r.data.orgs)) {
+        return new Set(r.data.orgs.flatMap((o) => (typeof o?.id === "string" ? [o.id] : [])));
+      }
+      if (myClubIdsRead === read) myClubIdsRead = null;
+      return null;
+    });
+    myClubIdsRead = read;
+  }
+  return myClubIdsRead;
+}
+
+/** Club chat v1: whether the viewer is a member of the club `orgId`; null while unknown. */
+function useIsMyClub(orgId: string | null): boolean | null {
+  const [clubIds, setClubIds] = useState<ReadonlySet<string> | null>(null);
+  useEffect(() => {
+    if (!orgId) return;
+    let live = true;
+    void readMyClubIds().then((ids) => {
+      if (live) setClubIds(ids);
+    });
+    return () => {
+      live = false;
+    };
+  }, [orgId]);
+  return orgId && clubIds ? clubIds.has(orgId) : null;
+}
+
 export function EventCard({
   ev,
   onMutate,
@@ -9841,6 +9956,9 @@ export function EventCard({
   const [refusedAway, setRefusedAway] = useState(false);
   const view = useCampusView();
   const rsvpAtHomeOnly = (visiting ?? view.isVisiting) || refusedAway;
+  // Club chat v1: only the club's members join its event chat, so only
+  // they get the Going line. Null (hidden) until the answer is known.
+  const inEventClub = useIsMyClub(ev.org_id);
 
   const setRsvp = async (next: "going" | "maybe" | null) => {
     // Away from home only a NEW status is refused. Taking your name off
@@ -10055,6 +10173,21 @@ export function EventCard({
           </span>
         ) : null}
       </div>
+      {/* A club's event, for its members only, and not where the buttons
+          are off (away from home with no RSVP to take back). */}
+      {ev.org_id && inEventClub === true && (!rsvpAtHomeOnly || status) ? (
+        <div
+          style={{
+            marginTop: 8,
+            fontFamily: "DM Sans, sans-serif",
+            fontSize: 12,
+            lineHeight: 1.4,
+            color: COLORS.glassMuted,
+          }}
+        >
+          {EVENT_CHAT_LINE}
+        </div>
+      ) : null}
       {(status || ev.viewer_can_manage || !ev.is_creator) ? (
         <div
           style={{
@@ -10114,6 +10247,10 @@ export function EventCard({
 
 /** The live RSVP button's hint away from home (see RsvpButton `removeHint`). */
 const RSVP_REMOVE_HINT = "Tap to take your name off";
+
+/** Under Going / Interested on a club's event (club chat v1): an RSVP puts
+ *  the student in the event's chat, where the people in it see their name. */
+const EVENT_CHAT_LINE = "You'll appear in the event chat.";
 
 const eventCardSubtleLink: React.CSSProperties = {
   display: "inline-flex",
@@ -15786,6 +15923,8 @@ function ChannelMain({
         channelId={channel.id}
         channelName={channel.name}
         isCream={isCream}
+        roomKind={channel.kind ?? null}
+        seedCanPost={channel.kind !== "board" || BOARD_POSTER_ROLES.includes(org.role)}
       />
     </main>
   );
@@ -15814,14 +15953,25 @@ type ChatMessage = {
 
 const REACTION_EMOJIS = ["❤️", "👍", "👎", "😂", "🔥"] as const;
 
+/** The two club chat fields of the thread read; both absent from a server
+ *  without the chat schema. */
+type RoomRules = Partial<Pick<ThreadMessagesResponse, "room" | "viewer">>;
+
 function ChannelChat({
   channelId,
   channelName,
   isCream,
+  roomKind,
+  seedCanPost,
 }: {
   channelId: string;
   channelName: string;
   isCream: boolean;
+  /** Club chat v1: the room's kind from the list (null without the schema). */
+  roomKind: RoomKind | null;
+  /** Club chat v1: what the room's kind and the viewer's club role say,
+   *  until the thread read answers (so no composer flashes in a Board). */
+  seedCanPost: boolean;
 }) {
   // Cream backdrop palette swap: dark text + dark glass message bubbles
   // so messages don't render as white-on-cream (invisible). Other backdrops
@@ -15859,6 +16009,11 @@ function ChannelChat({
   const [messages, setMessages] = useState<ChatMessage[]>([]);
   const [draft, setDraft] = useState("");
   const [sending, setSending] = useState(false);
+  // Club chat v1: what the thread read says about this room, kept fresh by
+  // the 2s poll. Until it has answered, and from a server that sends no
+  // `viewer`, the seed decides (true there: the composer, as before).
+  const [roomRules, setRoomRules] = useState<RoomRules | null>(null);
+  const canPost = roomRules?.viewer ? roomRules.viewer.can_post !== false : seedCanPost;
   // True after the first successful fetch. Until then a failure shows in
   // place of the list; after it, a failed poll just keeps the messages.
   const [loaded, setLoaded] = useState(false);
@@ -15909,13 +16064,14 @@ function ChannelChat({
   // POST), and for Retry after a failed first load. Quiet like the poll:
   // with messages on screen, a failure keeps them.
   const refetchMessages = useCallback(async () => {
-    const r = await vibeRequest<{ messages?: ChatMessage[] }>(
+    const r = await vibeRequest<{ messages?: ChatMessage[] } & RoomRules>(
       `/api/me/threads/${channelId}/messages?limit=80`,
       { cache: "no-store", quiet: true, failure: "Couldn't load messages." },
     );
     if (r.ok && Array.isArray(r.data.messages)) {
       loadedRef.current = true;
       setMessages(r.data.messages);
+      setRoomRules({ room: r.data.room, viewer: r.data.viewer });
       setLoadErr(null);
       setLoaded(true);
     } else if (!loadedRef.current) {
@@ -15932,7 +16088,7 @@ function ChannelChat({
     let cancelled = false;
     const fetchOnce = async () => {
       if (pendingReactionsRef.current > 0) return;
-      const r = await vibeRequest<{ messages?: ChatMessage[] }>(
+      const r = await vibeRequest<{ messages?: ChatMessage[] } & RoomRules>(
         `/api/me/threads/${channelId}/messages?limit=80`,
         { cache: "no-store", quiet: true, failure: "Couldn't load messages." },
       );
@@ -15941,6 +16097,7 @@ function ChannelChat({
       if (r.ok && Array.isArray(r.data.messages)) {
         loadedRef.current = true;
         setMessages(r.data.messages);
+        setRoomRules({ room: r.data.room, viewer: r.data.viewer });
         setLoadErr(null);
         setLoaded(true);
       } else if (!loadedRef.current) {
@@ -16008,8 +16165,14 @@ function ChannelChat({
           method: "POST",
           json: { content, parent_message_id: parent?.id },
           failure: "Couldn't send your message.",
+          quiet: true,
         },
       );
+      if (!r.ok) {
+        // Quiet above, so a club chat refusal shows its own sentence.
+        const line = chatRefusalLine(r.code, r.error);
+        toast({ message: line ?? r.message, tone: "error", action: line ? undefined : r.action });
+      }
       const sent = r.ok ? r.data.message : undefined;
       if (sent) {
         // Optimistic — append immediately so it doesn't take 2s to show.
@@ -16394,6 +16557,10 @@ function ChannelChat({
                             </button>
                           );
                         })}
+                        {/* No Reply where the viewer can't post: there is
+                            no composer to reply in (club chat v1). */}
+                        {canPost ? (
+                        <>
                         <div
                           style={{
                             width: 1,
@@ -16424,6 +16591,8 @@ function ChannelChat({
                         >
                           ↩ Reply
                         </button>
+                        </>
+                        ) : null}
                       </div>
                     ) : null}
                   </div>
@@ -16502,7 +16671,7 @@ function ChannelChat({
       </section>
 
       <div style={{ padding: "0 24px 20px" }}>
-        {replyTo ? (
+        {replyTo && canPost ? (
           <div
             style={{
               ...composerStyle,
@@ -16561,6 +16730,32 @@ function ChannelChat({
             </button>
           </div>
         ) : null}
+        {/* Club chat v1: in a room the viewer can't post in (a Board for
+            anyone but its officers, an event chat that has closed) a quiet
+            line takes the composer's place, on the same glass. */}
+        {!canPost ? (
+          <div
+            role="note"
+            style={{
+              ...composerStyle,
+              borderRadius: 16,
+              padding: "12px 14px",
+              minHeight: 44,
+              display: "flex",
+              alignItems: "center",
+              justifyContent: "center",
+              textAlign: "center",
+              color: COLORS.glassMuted,
+              fontFamily: "DM Sans, sans-serif",
+              fontSize: 13,
+              fontWeight: 600,
+            }}
+          >
+            {(roomRules?.room?.kind ?? roomKind) === "board"
+              ? REFUSAL_SENTENCES.board_officers_only
+              : REFUSAL_SENTENCES.room_closed}
+          </div>
+        ) : (
         <div
           style={{
             ...composerStyle,
@@ -16621,6 +16816,7 @@ function ChannelChat({
             Send
           </button>
         </div>
+        )}
       </div>
     </>
   );

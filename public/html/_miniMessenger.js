@@ -127,6 +127,21 @@
       return u && u.id ? u.id : null;
     } catch (_) { return null; }
   }
+  // Club chat v1: a refusal is matched on its `code`, never on the status
+  // or the sentence, and shows the sentence the server sent. The same words
+  // as REFUSAL_SENTENCES in src/lib/chat/types.ts.
+  const CHAT_REFUSALS = {
+    board_officers_only: "Only officers post here.",
+    room_closed: "This chat is closed.",
+    club_media_off: "Photos and videos are off in club chats for now.",
+    board_post_missing: "That post is no longer there.",
+    try_again: "Try again in a moment.",
+  };
+  function chatRefusalLine(body) {
+    if (!body || typeof body.code !== "string") return "";
+    if (!Object.prototype.hasOwnProperty.call(CHAT_REFUSALS, body.code)) return "";
+    return (typeof body.error === "string" && body.error.trim()) || CHAT_REFUSALS[body.code];
+  }
 
   // ── CSS (self-injected) ───────────────────────────────────────────────
   const style = document.createElement("style");
@@ -226,6 +241,9 @@
     .vmm-send{background:#FF5C35;color:white;border:none;width:32px;height:32px;border-radius:50%;display:flex;align-items:center;justify-content:center;cursor:pointer;flex-shrink:0;transition:filter .15s,transform .15s;}
     .vmm-send:hover{filter:brightness(1.05);}
     .vmm-send:disabled{background:rgba(var(--scrim-rgb, 28,28,30),.12);cursor:not-allowed;}
+    /* Club chat v1: the quiet line that stands in for the composer in a room
+       the viewer can't post in. The composer's own surface and tokens. */
+    .vmm-quiet{padding:14px 16px;min-height:44px;box-sizing:border-box;border-top:1px solid rgba(var(--scrim-rgb, 28,28,30),.08);background:var(--paper, white);color:var(--ink-2, #5C5853);font-size:12.5px;font-weight:600;line-height:1.3;text-align:center;flex-shrink:0;}
     .vmm-typing{display:inline-flex;gap:4px;padding:8px 12px;background:var(--paper, white);border-radius:14px;border-bottom-left-radius:4px;align-items:center;align-self:flex-start;margin-top:4px;}
     .vmm-typing-dot{width:5px;height:5px;border-radius:50%;background:var(--ink-muted, #8A8580);opacity:.7;animation:vmmBounce 1.2s infinite;}
     .vmm-typing-dot:nth-child(2){animation-delay:.16s;}
@@ -254,6 +272,7 @@
         </svg>
       </button>
     </div>
+    <div class="vmm-quiet" id="vmmQuiet" role="note" style="display:none"></div>
   `;
 
   // ── State (declared before any function that touches it is invoked) ───
@@ -274,6 +293,12 @@
     listFailure: null,
 
     peerInfo: null,
+    // Club chat v1, for the open chat: the kind of club room it is (null on
+    // a dm or a group) and whether the viewer may post in it. From the list
+    // entry first, then from the thread read. A server that sends neither
+    // leaves the composer as it always was.
+    roomKind: null,
+    canPost: true,
     listPollTimer: null,
     chatPollTimer: null,
     bgPollTimer: null,
@@ -414,6 +439,7 @@
     document.getElementById("vmmList").style.display = "";
     document.getElementById("vmmMsgs").style.display = "none";
     document.getElementById("vmmComp").style.display = "none";
+    document.getElementById("vmmQuiet").style.display = "none";
     paintList();
   }
 
@@ -524,6 +550,8 @@
     const peer = t ? (t.peer || {}) : {};
     const isGroup = t ? t.type === "group" : false;
     const name = (t && t.name) || peer.name || "Chat";
+    state.roomKind = (t && t.room_kind) || null;
+    state.canPost = !(t && t.can_post === false);
     state.peerInfo = {
       name,
       avatar_url: !isGroup ? peer.avatar_url : null,
@@ -557,7 +585,7 @@
     document.getElementById("vmmList").style.display = "none";
     document.getElementById("vmmMsgs").style.display = "";
     document.getElementById("vmmMsgs").innerHTML = `<div class="vmm-loading">Loading…</div>`;
-    document.getElementById("vmmComp").style.display = "";
+    paintComposer();
     document.getElementById("vmmInput").value = "";
     document.getElementById("vmmInput").focus();
     autoSize();
@@ -614,6 +642,13 @@
     state.chatLoaded[cid] = true;
     try {
       const j = r.data;
+      // Club chat v1. No `viewer` or `room` in the answer: keep what the
+      // list entry said. Only for the chat still on screen.
+      if (state.activeChannel === cid) {
+        if (j.viewer) state.canPost = j.viewer.can_post !== false;
+        if (j.room && j.room.kind) state.roomKind = j.room.kind;
+        paintComposer();
+      }
       state.msgs = (j.messages || []).map((m) => ({
         id: m.id,
         mine: m.user_id === meId(),
@@ -783,7 +818,12 @@
           const cls = "vmm-act-emo" + (myEmos.has(e) ? " on" : "");
           return `<button type="button" class="${cls}" data-vmm-act="pick" data-vmm-mid="${mid}" data-vmm-emoji="${esc(e)}" aria-label="React with ${esc(e)}">${esc(e)}</button>`;
         }).join("");
-        const actions = `<div class="vmm-actions">${actBtns}<span class="vmm-act-sep"></span><button type="button" class="vmm-act-reply" data-vmm-act="reply" data-vmm-mid="${mid}" aria-label="Reply">↩ Reply</button></div>`;
+        // No Reply where the viewer can't post: there is no composer to
+        // reply in (club chat v1).
+        const replyBtn = state.canPost
+          ? `<span class="vmm-act-sep"></span><button type="button" class="vmm-act-reply" data-vmm-act="reply" data-vmm-mid="${mid}" aria-label="Reply">↩ Reply</button>`
+          : "";
+        const actions = `<div class="vmm-actions">${actBtns}${replyBtn}</div>`;
         const chips = (m.reactions && m.reactions.length > 0)
           ? '<div class="vmm-rxs">' + m.reactions.map((r) =>
               `<button type="button" class="vmm-rx${r.viewer_reacted ? " on" : ""}" data-vmm-act="chip" data-vmm-mid="${mid}" data-vmm-emoji="${esc(r.emoji)}"><span>${esc(r.emoji)}</span><span>${esc(r.count)}</span></button>`
@@ -815,6 +855,24 @@
   }
 
   // ── Composer ───────────────────────────────────────────────────────────
+  // The composer, or in a room the viewer can't post in (a Board for anyone
+  // but its officers, an event chat that has closed) the quiet line.
+  function paintComposer() {
+    if (state.view !== "chat") return;
+    const comp = document.getElementById("vmmComp");
+    const quiet = document.getElementById("vmmQuiet");
+    if (!comp || !quiet) return;
+    comp.style.display = state.canPost ? "" : "none";
+    quiet.style.display = state.canPost ? "none" : "";
+    // The reply pill sits outside the composer: drop a picked reply too.
+    if (!state.canPost && state.replyTo) {
+      state.replyTo = null;
+      renderReplyPill();
+    }
+    quiet.textContent = state.roomKind === "board"
+      ? CHAT_REFUSALS.board_officers_only
+      : CHAT_REFUSALS.room_closed;
+  }
   function autoSize() {
     const t = document.getElementById("vmmInput");
     if (!t) return;
@@ -848,6 +906,13 @@
         }),
       });
       const j = await r.json();
+      const refused = j && !j.ok ? chatRefusalLine(j) : "";
+      if (refused) {
+        // Its own plain sentence, and the text stays in the box. The 2s
+        // poll's thread read decides whether the composer stays.
+        window.vibeToast(refused, { tone: "error" });
+        return;
+      }
       if (!j || !j.ok) throw new Error((j && j.error) || "Send failed");
       t.value = "";
       autoSize();
@@ -938,7 +1003,7 @@
 
   window.__vmmStartReply = function (messageId) {
     const cid = state.activeChannel;
-    if (!cid || !messageId) return;
+    if (!cid || !messageId || !state.canPost) return;
     const msg = state.msgs.find((x) => x.id === messageId);
     if (!msg) return;
     state.replyTo = {

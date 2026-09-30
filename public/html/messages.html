@@ -415,6 +415,13 @@ body{font-family:'DM Sans',sans-serif;background:var(--cream);color:var(--charco
 .snd-btn{width:32px;height:32px;border-radius:50%;background:var(--accent);border:none;cursor:none;display:flex;align-items:center;justify-content:center;flex-shrink:0;transition:all .2s;align-self:flex-end;}
 .snd-btn:hover{background:#ff7055;transform:scale(1.08);}
 .snd-btn:disabled{background:var(--border);transform:none;}
+/* Club chat v1: the quiet line that stands in for the composer in a room the
+   viewer can't post in, on the composer's own surface and tokens. A club's
+   room has no attach button. Both classes are set by __dmPaintComposer. */
+.comp-quiet{display:none;align-items:center;justify-content:center;min-height:44px;padding:8px 14px;background:var(--cream);border:1.5px solid var(--border);border-radius:18px;color:var(--soft);font-size:13px;font-weight:600;line-height:1.4;text-align:center;}
+.comp.no-post .comp-quiet{display:flex;}
+.comp.no-post .comp-inner,.comp.no-post .comp-staged,.comp.no-post .dm-reply-pill{display:none;}
+.comp.club-room .comp-attach-btn{display:none;}
 
 /* Composer paperclip + staged-attachment chip */
 .comp-attach-btn{width:34px;height:34px;border-radius:50%;background:none;border:none;cursor:none;display:flex;align-items:center;justify-content:center;color:var(--muted);transition:background .15s,color .15s;flex-shrink:0;align-self:flex-end;}
@@ -1085,7 +1092,7 @@ input,textarea,[contenteditable="true"]{cursor:text!important;}
       <input type="file" id="cPanelPhotoInput" accept="image/jpeg,image/png,image/webp" style="display:none" onchange="__dmPanelPhotoChosen(event)">
       <div class="req-bar" id="reqBar"><p id="reqBarTxt"></p><div class="req-btns"><button class="btn-acc" onclick="accReq()">Accept</button><button class="btn-dec" onclick="decReq()">Decline</button></div></div>
       <div class="msgs" id="msgsArea"></div>
-      <div class="comp">
+      <div class="comp" id="compBox">
         <div class="comp-staged" id="compStaged" style="display:none"></div>
         <div class="comp-inner">
         <button class="comp-attach-btn" type="button" onclick="document.getElementById('compMediaInput').click()" title="Attach photo or video">
@@ -1094,7 +1101,9 @@ input,textarea,[contenteditable="true"]{cursor:text!important;}
         <input type="file" id="compMediaInput" accept="image/jpeg,image/png,image/webp,image/gif,video/mp4,video/quicktime,video/webm" style="display:none" onchange="__dmComposeMediaChosen(event)">
         <textarea class="comp-txt" id="msgIn" placeholder="Message…" rows="1" oninput="this.style.height='auto';this.style.height=Math.min(this.scrollHeight,110)+'px';upd()" onkeydown="if(event.key==='Enter'&&!event.shiftKey){event.preventDefault();snd();}"></textarea>
         <button class="snd-btn" id="sndBtn" onclick="snd()" disabled><svg width="14" height="14" viewBox="0 0 14 14" fill="none"><path d="M13 1L1 6l5 2 2 5 5-12z" fill="white" stroke="white" stroke-width=".3" stroke-linejoin="round"/></svg></button>
-      </div></div>
+      </div>
+      <div class="comp-quiet" id="compQuiet" role="note"></div>
+      </div>
     </div>
   </div>
 </div>
@@ -1292,7 +1301,7 @@ function renderMsgs(msgs,d){
       ? m.reactions.map((r) => r.emoji + ':' + r.count + (r.viewer_reacted ? '*' : '')).join('|')
       : '';
     return (m.id || ('__noid' + Math.random())) + '#' + rs;
-  }).join(',');
+  }).join(',') + (d && d.canPost === false ? ';no-post' : ''); // Reply comes and goes with it
   const sigChanged = sig !== a.dataset.sig;
 
   const wasAtBottom = isThreadSwitch ||
@@ -1383,7 +1392,12 @@ function renderMsgs(msgs,d){
           <svg width="13" height="13" viewBox="0 0 13 13" fill="none"><path d="M2.5 3.5h8M5 3.5V2.2c0-.4.3-.7.7-.7h1.6c.4 0 .7.3.7.7v1.3M3.7 3.5l.6 7c0 .4.4.7.8.7h3.8c.4 0 .8-.3.8-.7l.6-7" stroke="currentColor" stroke-width="1.3" stroke-linecap="round" stroke-linejoin="round"/></svg>
         </button>`
       : '';
-    return `<div class="dm-actions">${buttons}<span class="dm-act-sep"></span><button type="button" class="dm-act-reply" onclick="event.stopPropagation();__dmStartReply('${__dmEsc(m.id)}')" aria-label="Reply">↩ Reply</button>${reportBtnFor(m)}${deleteBtn}</div>`;
+    // No Reply where the viewer can't post: there is no composer to reply
+    // in (club chat v1).
+    const replyBtn = d && d.canPost === false
+      ? ''
+      : `<button type="button" class="dm-act-reply" onclick="event.stopPropagation();__dmStartReply('${__dmEsc(m.id)}')" aria-label="Reply">↩ Reply</button>`;
+    return `<div class="dm-actions">${buttons}<span class="dm-act-sep"></span>${replyBtn}${reportBtnFor(m)}${deleteBtn}</div>`;
   };
   // The author's own notice on a message a moderator took down. Built from an
   // OPTIONAL field: GET /api/me/threads/[id]/messages selects an explicit
@@ -1872,6 +1886,7 @@ window.__dmStartReply = function (messageId) {
   if (!channelId || !messageId) return;
   const thread = __realDM.T[channelId];
   if (!thread || !Array.isArray(thread.msgs)) return;
+  if (thread.canPost === false) return; // no composer to reply in (club chat v1)
   const msg = thread.msgs.find((m) => m.id === messageId);
   if (!msg) return;
   __realDM.replyTo = {
@@ -2003,6 +2018,7 @@ function __dmThreadRecord(thread, isRequest) {
   const peer = thread.peer || {};
   const members = thread.members || [];
   const name = thread.name || peer.name || 'Unknown';
+  const prev = __realDM.T[thread.id];
   const seedKey = isGroup
     ? thread.id
     : (peer.id || peer.handle || name);
@@ -2029,6 +2045,11 @@ function __dmThreadRecord(thread, isRequest) {
     unread: !!thread.unread,
     pinnedAt: thread.pinned_at || null,
     mutedUntil: thread.muted_until || null,
+    // Club chat v1: the kind of club room this is (null on a dm or a group)
+    // and whether the viewer may post in it. The thread read sets both too
+    // (__dmLoadMessages), so a list entry without them keeps what it said.
+    roomKind: thread.room_kind || (prev && prev.roomKind) || null,
+    canPost: typeof thread.can_post === 'boolean' ? thread.can_post : !(prev && prev.canPost === false),
   };
 }
 
@@ -2298,6 +2319,41 @@ async function __dmLoadList() {
   return null;
 }
 
+// Club chat v1: a refusal is matched on its `code`, never on the status or
+// the sentence, and shows the sentence the server sent. '' for any other
+// failure. The same words as REFUSAL_SENTENCES in src/lib/chat/types.ts.
+const __DM_CHAT_REFUSALS = {
+  board_officers_only: 'Only officers post here.',
+  room_closed: 'This chat is closed.',
+  club_media_off: 'Photos and videos are off in club chats for now.',
+  board_post_missing: 'That post is no longer there.',
+  try_again: 'Try again in a moment.',
+};
+function __dmChatRefusalLine(body) {
+  if (!body || typeof body.code !== 'string') return '';
+  if (!Object.prototype.hasOwnProperty.call(__DM_CHAT_REFUSALS, body.code)) return '';
+  return (typeof body.error === 'string' && body.error.trim()) || __DM_CHAT_REFUSALS[body.code];
+}
+
+// Club chat v1: the composer of the open thread. In a room the viewer can't
+// post in (a Board for anyone but its officers, an event chat that has
+// closed) the quiet line stands in for it, and a club's room has no attach
+// button. A dm, a group and a server without the chat schema: as before.
+function __dmPaintComposer(d) {
+  const comp = document.getElementById('compBox');
+  const quiet = document.getElementById('compQuiet');
+  if (!comp || !quiet) return;
+  const canPost = !d || d.canPost !== false;
+  const clubRoom = !!(d && d.roomKind);
+  comp.classList.toggle('no-post', !canPost);
+  comp.classList.toggle('club-room', clubRoom);
+  quiet.textContent = canPost ? '' : (d.roomKind === 'board'
+    ? __DM_CHAT_REFUSALS.board_officers_only
+    : __DM_CHAT_REFUSALS.room_closed);
+  // A photo picked in another chat doesn't follow the student into a club's.
+  if (clubRoom && __realDM.stagedMedia) __dmComposeMediaClear();
+}
+
 async function __dmLoadMessages(channelId, opts) {
   // Reaction-pending guard: skip polling while a toggle is in flight so a
   // stale poll can't overwrite the optimistic chip. Direct calls (post-
@@ -2419,6 +2475,13 @@ async function __dmLoadMessages(channelId, opts) {
     __realDM.peerLastReadByChannel[channelId] = j.peer_last_read_at || null;
     __realDM.peerTypingByChannel[channelId] = j.peer_typing || [];
     if (__realDM.T[channelId]) __realDM.T[channelId].msgs = msgs;
+    // Club chat v1. No `viewer` or `room` in the answer: keep what the list
+    // entry said.
+    if (__realDM.T[channelId]) {
+      if (j.viewer) __realDM.T[channelId].canPost = j.viewer.can_post !== false;
+      if (j.room && j.room.kind) __realDM.T[channelId].roomKind = j.room.kind;
+      if (active === channelId) __dmPaintComposer(__realDM.T[channelId]);
+    }
     if (active === channelId && __realDM.T[channelId]) {
       renderMsgs(msgs, __realDM.T[channelId]);
     }
@@ -2502,6 +2565,7 @@ async function __dmOpenChannel(channelId) {
   }
   const inp = document.getElementById('msgIn');
   if (inp) inp.placeholder = 'Message ' + (d.n.split(' ')[0] || '') + '…';
+  __dmPaintComposer(d);
 
   await __dmLoadMessages(channelId);
   fetch('/api/me/threads/' + encodeURIComponent(channelId) + '/read', { method:'POST', credentials:'include' }).catch(()=>{});
@@ -2535,7 +2599,7 @@ async function __dmSend(text) {
         }),
       });
       const signJson = await signRes.json();
-      if (!signJson.ok) throw new Error(signJson.error || 'upload sign failed');
+      if (!signJson.ok) throw __dmSendError(signJson, 'upload sign failed');
       // 2. PUT the bytes (XHR for progress reporting).
       const bar = document.getElementById('compStagedProgressBar');
       await new Promise((resolve, reject) => {
@@ -2571,7 +2635,7 @@ async function __dmSend(text) {
       }),
     });
     const j = await r.json();
-    if (!j.ok) throw new Error(j.error || 'send failed');
+    if (!j.ok) throw __dmSendError(j, 'send failed');
     if (__realDM.T[channelId]) __realDM.T[channelId].isRequest = false;
     document.getElementById('reqBar').classList.remove('show');
     __dmComposeMediaClear();
@@ -2588,9 +2652,29 @@ async function __dmSend(text) {
     return true;
   } catch (e) {
     console.error('[dm.send]', e);
+    if (e && e.chatLine) {
+      // Club chat v1: its own plain sentence; the text stays in the box.
+      window.vibeToast(e.chatLine, { tone: 'error' });
+      // The room stopped taking the viewer's posts after it was opened: the
+      // quiet line replaces the composer, as on the next open.
+      const d = __realDM.T[channelId];
+      if (d && (e.chatCode === 'board_officers_only' || e.chatCode === 'room_closed')) {
+        d.canPost = false;
+        if (active === channelId) __dmPaintComposer(d);
+      }
+      return false;
+    }
     alert('Could not send: ' + e.message);
     return false;
   }
+}
+// The error of a refused send. A club chat refusal (matched on `code`)
+// carries its sentence, so the catch above can show it instead of an alert.
+function __dmSendError(body, fallback) {
+  const e = new Error((body && body.error) || fallback);
+  e.chatLine = __dmChatRefusalLine(body);
+  e.chatCode = e.chatLine ? body.code : null;
+  return e;
 }
 
 // ── Composer media (paperclip) ─────────────────────────────────────────
@@ -2904,6 +2988,9 @@ function __dmPanelRender() {
   const titleEl = document.getElementById('cpTitle');
   if (!d || !body) return;
   titleEl.textContent = d.isGroup ? 'Group info' : 'Chat info';
+  // Club chat v1: a club's room can't be left, renamed, added to, given a
+  // photo or deleted from the inbox, so none of those five is drawn for it.
+  const clubRoom = !!d.roomKind;
 
   const photoBlock = (() => {
     let inner;
@@ -2921,13 +3008,13 @@ function __dmPanelRender() {
     } else {
       inner = __dmEsc(d.av);
     }
-    const editBtn = d.isGroup
+    const editBtn = d.isGroup && !clubRoom
       ? '<button class="cp-photo-edit" title="Change photo" onclick="document.getElementById(\'cPanelPhotoInput\').click()">+</button>'
       : '';
     return '<div class="cp-photo" style="background:' + d.bg + '">' + inner + editBtn + '</div>';
   })();
 
-  const nameBlock = d.isGroup
+  const nameBlock = d.isGroup && !clubRoom
     ? '<div class="cp-name"><input id="cpNameInput" value="' + __dmEsc(d.n) + '" placeholder="Group name" onblur="__dmPanelSaveName(this.value)"></div>'
     : '<div class="cp-name">' + __dmEsc(d.n) + '</div>';
 
@@ -2951,7 +3038,7 @@ function __dmPanelRender() {
       '<div class="cp-section">' +
         '<div class="cp-section-hdr">' +
           '<div class="cp-section-title">Members · ' + allMembers.length + '</div>' +
-          '<button class="cp-add-btn" onclick="__dmPanelOpenAdd()">+ Add</button>' +
+          (clubRoom ? '' : '<button class="cp-add-btn" onclick="__dmPanelOpenAdd()">+ Add</button>') +
         '</div>' +
         allMembers.map((m) => {
           const initials = String(m.name || m.handle || '?').split(/\s+/).slice(0,2).map(s => s[0] || '').join('').toUpperCase();
@@ -3016,7 +3103,7 @@ function __dmPanelRender() {
       '<button class="cp-action danger" onclick="window.vibeBlock(' + peerArg + ',' + nameArg + ', () => { __dmPanelClose(); active = null; if (typeof __dmLoadList === \'function\') __dmLoadList(); document.getElementById(\'cContent\').style.display=\'none\'; document.getElementById(\'emptyState\').style.display=\'flex\'; })">Block ' + __dmEsc(d.n) + '</button>';
   }
 
-  const leaveAction = d.isGroup
+  const leaveAction = d.isGroup && !clubRoom
     ? '<button class="cp-action danger" onclick="__dmPanelLeave()">Leave group</button>'
     : '';
 
@@ -3024,7 +3111,9 @@ function __dmPanelRender() {
   // additionally hides the thread from the inbox. Both are non-
   // destructive for the peer (they keep their own copy).
   const clearAction = '<button class="cp-action" onclick="__dmClearHistory()">Clear chat history</button>';
-  const deleteAction = '<button class="cp-action danger" onclick="__dmDeleteCurrent()">Delete conversation</button>';
+  const deleteAction = clubRoom
+    ? ''
+    : '<button class="cp-action danger" onclick="__dmDeleteCurrent()">Delete conversation</button>';
 
   body.innerHTML =
     '<div class="cp-photo-wrap">' + photoBlock + '</div>' +
@@ -3337,7 +3426,7 @@ async function __dmPanelSaveName(value) {
 
 // ── Add-member flow: reuses the compose overlay's group multi-select ───
 function __dmPanelOpenAdd() {
-  if (!active || !__realDM.T[active]?.isGroup) return;
+  if (!active || !__realDM.T[active]?.isGroup || __realDM.T[active].roomKind) return;
   __realDM.composeAddingToChannel = active;
   document.getElementById('composeOverlay').classList.add('show');
   document.getElementById('composeTitle').textContent = 'Add people to group';
