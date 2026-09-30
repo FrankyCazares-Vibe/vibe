@@ -22,6 +22,7 @@ export function MessageBubble({
   parentIsMine = false,
   onReply,
   onReport,
+  onRemove,
 }: {
   message: MessageRow;
   isMine: boolean;
@@ -57,6 +58,9 @@ export function MessageBubble({
    *  message: the route answers that with a 400 the student never reads as a
    *  sentence. */
   onReport?: () => void;
+  /** "Remove" in the same picker: an officer's or a mod's removal of someone
+   *  else's message in a club room (wave-2 contract 11.5). A pass-through. */
+  onRemove?: () => void;
 }) {
   const sender = message.users ?? null;
   const senderName = sender?.name || sender?.handle || "Member";
@@ -783,6 +787,15 @@ export function MessageBubble({
                 ? () => {
                     setPickerOpen(false);
                     onReport();
+                  }
+                : undefined
+            }
+            // The same guard: a row still sending has no id to remove.
+            onRemove={
+              onRemove && !message.id.startsWith("temp_")
+                ? () => {
+                    setPickerOpen(false);
+                    onRemove();
                   }
                 : undefined
             }

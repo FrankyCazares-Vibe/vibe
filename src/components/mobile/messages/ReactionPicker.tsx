@@ -40,6 +40,7 @@ export function ReactionPicker({
   onPick,
   onReply,
   onReport,
+  onRemove,
   onClose,
 }: {
   darkMode: boolean;
@@ -51,6 +52,9 @@ export function ReactionPicker({
   /** Adds "Report", under Reply. Absent on the viewer's own message and on
    *  one still sending. */
   onReport?: () => void;
+  /** Adds "Remove", under Report: an officer's or a mod's removal of
+   *  someone else's message in a club room (wave-2 contract 11.5). */
+  onRemove?: () => void;
   onClose: () => void;
 }) {
   const pickerRef = useRef<HTMLDivElement | null>(null);
@@ -125,7 +129,7 @@ export function ReactionPicker({
         // A pill for the emoji row alone; a card once Reply (or Report)
         // joins it. They get their own rows because beside the emojis the
         // picker ran past a phone's width and scrolled the list sideways.
-        borderRadius: onReply || onReport ? 20 : 999,
+        borderRadius: onReply || onReport || onRemove ? 20 : 999,
         background: darkMode
           ? "rgba(20,16,28,0.92)"
           : "rgba(255,255,255,0.96)",
@@ -175,7 +179,7 @@ export function ReactionPicker({
           );
         })}
       </div>
-      {onReply || onReport ? (
+      {onReply || onReport || onRemove ? (
         <>
           <div
             aria-hidden
@@ -212,6 +216,19 @@ export function ReactionPicker({
             >
               <span aria-hidden>⚑</span>
               Report
+            </button>
+          ) : null}
+          {onRemove ? (
+            <button
+              type="button"
+              onClick={(e) => {
+                e.stopPropagation();
+                onRemove();
+              }}
+              style={pickerRowStyle(darkMode, true)}
+            >
+              <span aria-hidden>✕</span>
+              Remove
             </button>
           ) : null}
         </>
