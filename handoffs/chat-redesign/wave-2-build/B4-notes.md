@@ -90,3 +90,37 @@ Owned files (13.2): `src/app/api/me/inbox/route.ts` (NEW), `src/app/api/orgs/[sl
 - `src/app/api/me/inbox/route.ts` (new), `src/app/api/orgs/[slug]/space/route.ts` (new), `src/app/api/me/calendar/route.ts` (edited)
 - `src/lib/chat/reads.ts` + `reads.test.ts` (new, pure; the task brief's allowance), `src/lib/chat/reads-routes.test.ts` (new, the stub harness)
 - `handoffs/chat-redesign/wave-2-build/B4-notes.md`, `B4-gate.md`
+
+## Repair after review (one pass; the three reviews B4-review-{contract,security,behaviour}.md)
+
+Repairer: Claude (cloud). Start HEAD 377ae3c. Owned: the three route files; `reads.ts` and the two test files are
+B4's own (created by 35554ab / 208effe, no other author, `git log --all` on them), so the repair edits them too.
+
+Plan (finding → action):
+- B4-BEHAVIOUR-1 (MEDIUM) FIX: an event room without an `EventRef` takes its state from the event row the route
+  already read (`roomState(starts_at, ends_at)`, pure); `orderSpaceRooms` filters on `state === "closed"` and sorts
+  event rooms by a `starts_at` that comes from the ref or the row. A room whose event row was not read either stays
+  as built (kept, `state` null, after the dated ones). Flip the harness expectation, add a pure case.
+- B4-BEHAVIOUR-2 (LOW) FIX: one harness case, the officer-exception read failing alone → rows stay hidden.
+- B4-SECURITY-2 (LOW) FIX: try/catch around the calendar's `eventRefsFor` (a throw → the three nulls, 200).
+- B4-CONTRACT-1, -2 (LOW) REJECT: 7.1.4 names the pattern that soft-fails (`me/threads/route.ts:682`); a failed
+  window or a failed my-rows read shows less, never more; neither read decides visibility. No change.
+- B4-CONTRACT-3, B4-SECURITY-3 (LOW) DEFER: 13.2's row is the integration review's to amend; no code.
+- B4-SECURITY-1, B4-BEHAVIOUR-3 (LOW) DEFER: the own-removed-row preview is the pinned 7.1.4 / 7.2.4 read; a
+  batch may not add a filter (see STOPPED, repair).
+
+### Log (repair)
+- reads.ts (state/starts_at on the sort type, filter+sort on them), space/route.ts (roomState fallback from the event row), calendar/route.ts (try/catch), reads.test.ts (+2 row-only event rooms), reads-routes.test.ts (no-ref case flipped with far dates; officer-read failure case) edited; node --test on the two B4 files 21/21.
+- Gates after the edits: typecheck exit 0; eslint exit 0 on the six files; npm test 1575/1575; build exit 0.
+- Committed 580fff3 `fix(chat): W2-B4 repair after review` (reads.ts, reads.test.ts, reads-routes.test.ts, space/route.ts, calendar/route.ts; added by path).
+- B4-repair.md written; B4-gate.md gains the re-run; this log closed.
+
+### STOPPED (repair): contract-level notes for the integration review, no contradiction, nothing improvised
+- 13.2's W2-B4 row lacks `src/lib/chat/reads.ts` (+ `reads.test.ts`, `reads-routes.test.ts`), B4's own pure helper
+  and tests (B4-CONTRACT-3, B4-SECURITY-3): amend the row.
+- The viewer's OWN removed row can be a preview / `board_latest` because 7.1.4 pins the windows as
+  `thread_root_id is null` only and 7.2.4 takes the last non-`hidden` message (B4-SECURITY-1, B4-BEHAVIOUR-3):
+  if unwanted, the contract gains `.is("removed_at", null)` on the two preview windows and the event-activity read,
+  and "not `hidden` and `removed === null`" in 7.2.4. Not a leak (own text). Left as pinned.
+- 7.1.4's preview windows and 7.2.3's my-rows read soft-fail (B4-CONTRACT-1, -2): the pattern 7.1.4 names
+  (`me/threads/route.ts:682`) soft-fails; neither read decides visibility. A footnote would close it.
