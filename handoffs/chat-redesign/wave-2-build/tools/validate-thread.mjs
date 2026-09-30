@@ -290,6 +290,8 @@ function checkMessage(p, path, m, ctx) {
     p.check(`${path}.card`, m.card === null, "a text message has no card");
   } else if (ctx.room === "dm") {
     p.add(`${path}.kind`, "a card in a dm or a group");
+  } else if (m.card === null && m.removed !== null) {
+    // The viewer's own removed card: never hydrated (5.2, 6.2), so no card.
   } else if (m.card === null) {
     // A database without migration B (3.10): allowed, counted.
     ctx.cardless += 1;

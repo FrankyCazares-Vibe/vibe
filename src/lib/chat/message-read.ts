@@ -519,8 +519,6 @@ type Built = {
   complete: boolean;
   /** The roles that were read (authors and `alsoRoleOf`); null for a dm, a group, or a read that failed. */
   roles: Map<string, ClubRole> | null;
-  /** The block set the page was built with (wave-2 9.1); empty for a dm, a group, or a read that failed. */
-  blocked: ReadonlySet<string>;
 };
 
 function messageKind(value: unknown): MessageKind {
@@ -601,7 +599,7 @@ async function buildChatMessages(client: ServerClient, rows: MessageRow[], ctx: 
   // `try_again`; the send's answer, through `toChatMessages`, keeps its own
   // row with nothing hidden and no quote (never quote a blocked person on a
   // guess), said once in the log.
-  let blocked: ReadonlySet<string> = ctx.blocked ?? NO_BLOCKS;
+  let blocked: ReadonlySet<string> = room === null ? NO_BLOCKS : (ctx.blocked ?? NO_BLOCKS);
   let blocksRead = true;
   if (room !== null && ctx.blocked === undefined) {
     const read = await blockedIdsFor(client, viewerId);
@@ -618,9 +616,14 @@ async function buildChatMessages(client: ServerClient, rows: MessageRow[], ctx: 
   if (ctx.alsoRoleOf) roleIds.push(ctx.alsoRoleOf);
   // The cards of the page (wave-2 contract 5.2, 9.1): `shown` is a
   // viewer-scoped read, so its side tables may be read with the service
-  // role. Not when the block set is unknown: nothing built then is sent.
+  // role. A removed message is never given to it (5.2, 6.2): the viewer's
+  // own removed poll goes out with `removed` set and `card: null`. Not when
+  // the block set is unknown either: the page is 503 then, and the send's
+  // answer (`toChatMessages`) carries the sender's own text row, which has
+  // no card — hydrating with an empty set would name a blocked voter on a
+  // guess.
   const cardRows: CardRow[] = shown
-    .filter((row) => messageKind(row.kind) !== "text")
+    .filter((row) => !row.removed_at && messageKind(row.kind) !== "text")
     .map((row) => ({ id: row.id, kind: messageKind(row.kind), user_id: row.user_id, card_event_id: row.card_event_id ?? null }));
   const [roles, replyCounts, cards] = await Promise.all([
     room ? readRoles(room.org_id, roleIds) : Promise.resolve(null),
@@ -672,7 +675,6 @@ async function buildChatMessages(client: ServerClient, rows: MessageRow[], ctx: 
     messages,
     complete: (room === null || roles !== null) && blocksRead && cards !== null,
     roles,
-    blocked,
   };
 }
 

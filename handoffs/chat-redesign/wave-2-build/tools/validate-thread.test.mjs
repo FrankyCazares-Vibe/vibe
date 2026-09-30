@@ -81,6 +81,19 @@ test("a stub in a dm, a card in a dm, and a hidden false stub-shaped row are ref
   assert.ok(run(card, "member", "dm").problems.some((p) => p === "messages[0].kind: a card in a dm or a group"));
 });
 
+test("the viewer's own removed card row carries no card and is not a 3.10 row (5.2, 6.2)", () => {
+  const body = clone(fixture("poll"));
+  body.messages[0].user_id = body.viewer_id;
+  body.messages[0].removed = { by: "officer", at: "2026-10-08T21:00:00+00:00", reason: null };
+  body.messages[0].card = null;
+  const { problems, summary } = run(body, "member", "lounge");
+  assert.deepEqual(problems, []);
+  assert.match(summary, /1 message\(s\), 0 card\(s\), 0 card row\(s\) without a card/);
+  // The same row live: a card row without a card is the 3.10 count.
+  body.messages[0].removed = null;
+  assert.match(run(body, "member", "lounge").summary, /1 card row\(s\) without a card/);
+});
+
 test("a PollCard bent in one place fails there (5.2's rules)", () => {
   const cases = [
     ["options.1.full", true, "messages[0].card.options[1].full"],

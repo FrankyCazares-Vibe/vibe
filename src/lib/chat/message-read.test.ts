@@ -49,6 +49,8 @@ const specifier = "./message-read.ts";
 const { describeRoom, readChatMessages, toChatMessages } = (await import(specifier)) as typeof import("./message-read");
 const stubModule = "./stub.ts";
 const { asStub } = (await import(stubModule)) as typeof import("./stub");
+const rulesModule = "./room-rules.ts";
+const { OFFICER_REMOVED_REASON } = (await import(rulesModule)) as typeof import("./room-rules");
 type MessageRow = import("./message-read").MessageRow;
 type ReadKnown = import("./message-read").ReadKnown;
 type Room = import("./types").Room;
@@ -224,6 +226,21 @@ test("a club room page: the block set read once when no caller passed it; stubs,
   assert.deepEqual((arg(service.log.find((l) => l.table === "chat_polls")!.calls, "in", "message_id") as string[]).sort(), [R5.id, R6.id]);
 });
 
+test("the viewer's own removed poll: removed set, card null, never given to hydrateCards (5.2, 6.2)", async () => {
+  const service = installService(serviceAnswers);
+  const removed = row(7, VIEWER, { kind: "poll", removed_at: at(30), removed_reason: OFFICER_REMOVED_REASON });
+  const read = await readChatMessages(cookieClient([R1, removed, R6]).client as unknown as Client, CHANNEL, { limit: 50 }, known());
+  assert.ok(read.ok);
+  const mine = read.messages[1];
+  assert.equal(mine.id, removed.id);
+  assert.equal(mine.kind, "poll");
+  assert.deepEqual(mine.removed, { by: "officer", at: at(30), reason: null });
+  assert.equal(mine.card, null);
+  assert.equal(mine.hidden, false);
+  assert.equal((read.messages[2].card as PollCard).type, "poll", "the live poll beside it carries its card");
+  assert.deepEqual(arg(service.log.find((l) => l.table === "chat_polls")!.calls, "in", "message_id"), [R6.id], "the removed row is not asked for");
+});
+
 test("a block set handed down is used and never read again", async () => {
   installService(serviceAnswers);
   const cookie = cookieClient(PAGE);
@@ -234,14 +251,14 @@ test("a block set handed down is used and never read again", async () => {
   assert.equal(read.messages[2].hidden, true, "FRIEND is");
 });
 
-test("a dm or a group: nothing hidden, no blocks read, no cards read", async () => {
+test("a dm or a group: nothing hidden, no blocks read, no cards read, a set handed down ignored (8.5)", async () => {
   const service = installService(serviceAnswers);
   const cookie = cookieClient([R1, R2, R3]);
-  const read = await readChatMessages(cookie.client as unknown as Client, CHANNEL, { limit: 50 }, { viewerId: VIEWER, access: DM_ACCESS, room: null });
+  const read = await readChatMessages(cookie.client as unknown as Client, CHANNEL, { limit: 50 }, { viewerId: VIEWER, access: DM_ACCESS, room: null, blocked: new Set([OTHER]) });
   assert.ok(read.ok);
   assert.equal(cookie.log.filter((l) => l.table === "blocks").length, 0);
   assert.ok(read.messages.every((m) => m.hidden === false));
-  assert.equal(read.messages[2].parent_preview?.user_id, OTHER);
+  assert.equal(read.messages[2].parent_preview?.user_id, OTHER, "the quote of a blocked member stays in a group");
   assert.equal(service.log.length, 0, "no roles, no cards for a dm");
 });
 

@@ -271,14 +271,16 @@ test("a sign-up: capacity, full, names always, all of the visible voters", async
   assert.equal(signup.total_voters, 2);
 });
 
-test("anonymous: no voters and no voters_more for anyone, the counts kept", async () => {
+test("anonymous: no voters and no voters_more for anyone, the counts kept, and no users read for it", async () => {
   installService((table, calls) => {
     if (table === "chat_polls") return { data: [{ ...pollRow, anonymous: true }] };
     return sideTables(table, calls);
   });
-  const cards = await hydrateCards(viewerClient().client as unknown as Client, [rows[1]], VIEWER, { room: LOUNGE, blocked: new Set(), now: NOW });
+  const cookie = viewerClient();
+  const cards = await hydrateCards(cookie.client as unknown as Client, [rows[1]], VIEWER, { room: LOUNGE, blocked: new Set(), now: NOW });
   const poll = cards!.get(POLL) as PollCard;
   assert.equal(poll.anonymous, true);
+  assert.equal(cookie.log.length, 0, "an anonymous poll names nobody, so its voters are not asked for");
   assert.equal(poll.options[0].count, 4);
   assert.equal(poll.options[0].mine, true, "the viewer's own pick is always returned");
   for (const option of poll.options) {
@@ -310,10 +312,31 @@ test("a poll names the first 12 visible voters and counts the rest; a sign-up na
   assert.equal(signup.options[0].full, true, "15 >= 2");
 });
 
+test("a multi poll: mine on every option the viewer picked, one voter", async () => {
+  installService((table, calls) => {
+    if (table === "chat_polls") return { data: [{ ...pollRow, multi: true }] };
+    if (table === "chat_poll_votes") {
+      return { data: [{ option_id: OPT(1), poll_id: POLL, user_id: VIEWER }, { option_id: OPT(2), poll_id: POLL, user_id: VIEWER }] };
+    }
+    return sideTables(table, calls);
+  });
+  const cards = await hydrateCards(viewerClient().client as unknown as Client, [rows[1]], VIEWER, { room: LOUNGE, blocked: new Set(), now: NOW });
+  const poll = cards!.get(POLL) as PollCard;
+  assert.equal(poll.multi, true);
+  assert.deepEqual(poll.options.map((o) => o.mine), [true, true, false]);
+  assert.deepEqual(poll.options.map((o) => o.count), [1, 1, 0]);
+  assert.equal(poll.total_voters, 1, "one person, two picks");
+  assert.deepEqual(poll.options[1].voters.map((p) => p.id), [VIEWER]);
+});
+
 test("closed: past closes_at, or an event room closed by roomState; never for a Board", async () => {
   const closedRoom: Room = {
     id: uuid(8, "f"), kind: "event", name: "Bake sale", org_id: ORG,
     event: { id: EVENT, title: "Bake sale", starts_at: "2026-09-01T15:00:00+00:00", ends_at: "2026-09-01T18:00:00+00:00" },
+  };
+  const liveRoom: Room = {
+    ...closedRoom,
+    event: { id: EVENT, title: "Bake sale", starts_at: "2026-10-08T19:00:00+00:00", ends_at: "2026-10-08T22:00:00+00:00" },
   };
   const board: Room = { ...LOUNGE, kind: "board" };
   const cases: [string | null, Room, boolean][] = [
@@ -322,6 +345,8 @@ test("closed: past closes_at, or an event room closed by roomState; never for a 
     ["2026-10-08T20:00:01+00:00", LOUNGE, false],
     [null, closedRoom, true],
     ["2026-12-01T00:00:00+00:00", closedRoom, true],
+    [null, liveRoom, false],
+    ["2026-12-01T00:00:00+00:00", liveRoom, false],
     [null, board, false],
     [null, null as unknown as Room, false],
   ];

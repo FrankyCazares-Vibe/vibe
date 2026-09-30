@@ -255,8 +255,10 @@ export async function hydrateCards(
   }
 
   // The voters, on the viewer's client (a person the viewer cannot read is
-  // left out), and the Event cards' events, side by side.
-  const voterIds = Array.from(new Set(votes.map((vote) => vote.user_id)));
+  // left out), and the Event cards' events, side by side. An anonymous
+  // poll names nobody, so its voters are not asked for.
+  const anonymousPolls = new Set(polls.filter((poll) => poll.anonymous === true).map((poll) => poll.message_id));
+  const voterIds = Array.from(new Set(votes.filter((vote) => !anonymousPolls.has(vote.poll_id)).map((vote) => vote.user_id)));
   const [people, refs] = await Promise.all([
     readAll<unknown>("voters", voterIds, (chunk) =>
       client.from("users").select("id, handle, name, avatar_url").in("id", chunk),

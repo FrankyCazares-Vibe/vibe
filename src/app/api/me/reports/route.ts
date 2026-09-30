@@ -524,9 +524,19 @@ export async function POST(req: Request) {
       ? NextResponse.json({ ok: false, error: "Request failed" }, { status: 500 })
       : NextResponse.json({ ok: false, error: "That's not there anymore" }, { status: 404 });
   }
+  if (found.target.ownerId === user.id) {
+    return bad("You can't report something of your own");
+  }
+
+  const service = createSupabaseServiceClient();
+  if (await alreadyOpen(service, user.id, targetType, targetId)) return ok();
+
   // A reported card (chat contract 5.3): the snapshot gains the card as the
   // reporter saw it, read with the service role and never returned to them;
   // a text message, or a message read without `kind`, carries `card: null`.
+  // After `readTarget` (the reporter's own read proved they can see it) and
+  // after the two refusals above, so a refused or repeated report never
+  // pays the side-table reads.
   if (targetType === "message") {
     const kind = found.target.snapshot.kind;
     found.target.snapshot = {
@@ -534,12 +544,6 @@ export async function POST(req: Request) {
       card: typeof kind === "string" && kind !== "text" ? await snapshotCard(targetId) : null,
     };
   }
-  if (found.target.ownerId === user.id) {
-    return bad("You can't report something of your own");
-  }
-
-  const service = createSupabaseServiceClient();
-  if (await alreadyOpen(service, user.id, targetType, targetId)) return ok();
 
   const snapshot = await withOwnerHandle(supabase, targetType, found.target);
   const row = {
