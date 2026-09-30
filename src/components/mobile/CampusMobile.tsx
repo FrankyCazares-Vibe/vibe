@@ -35,6 +35,7 @@ import { EditPostSheet } from "@/components/mobile/EditPostSheet";
 // `campusLoadFailure`: a refused `?campus=` gets "Back home", not Retry.
 import { campusLoadFailure, MapMobile } from "@/components/mobile/MapMobile";
 import { ConversationView } from "@/components/mobile/MessagesMobile";
+import { ListSkeleton } from "@/components/mobile/messages/ThreadList";
 import { PostComposerMobile } from "@/components/mobile/PostComposerMobile";
 import { PostViewerMobile } from "@/components/mobile/PostViewerMobile";
 import { SharePostSheet } from "@/components/mobile/SharePostSheet";
@@ -42,6 +43,7 @@ import { PENDING_KEY as TOUR_PENDING_KEY, useMobileTour } from "@/components/mob
 import { OrgJoinControl } from "@/components/orgs/OrgJoinControl";
 import { PushAsk } from "@/components/push/PushAsk";
 import { RemovedContentCard, ReportSheet } from "@/components/safety/ReportSheet";
+import { useChatV2 } from "@/lib/chat/use-chat-v2";
 import { vibeRequest } from "@/lib/feedback/request";
 import { toast } from "@/lib/feedback/toast";
 import { campusRowById } from "@/lib/iu/campuses";
@@ -89,6 +91,9 @@ type Tab = "feed" | "events" | "orgs" | "chat" | "map";
 const TAB_ORDER: Tab[] = ["feed", "events", "orgs", "chat", "map"];
 /** Visiting a campus that isn't open: no Map (see `mapHidden`). */
 const VISITING_CLOSED_TAB_ORDER: Tab[] = TAB_ORDER.filter((t) => t !== "map");
+/** Club chat, wave 2 (contract 2.2, D5): with the flag on the Chat tab lives on /messages. */
+const CHAT_V2_TAB_ORDER: Tab[] = TAB_ORDER.filter((t) => t !== "chat");
+const CHAT_V2_VISITING_CLOSED_TAB_ORDER: Tab[] = VISITING_CLOSED_TAB_ORDER.filter((t) => t !== "chat");
 
 // Reuse the desktop FeedPost shape so shared card components accept our
 // posts without any mapping. `edited_at` drives the " · Edited" marker.
@@ -185,7 +190,19 @@ export function CampusMobile() {
   // name them (a two-person zone would), so its Map tab and pane go. Chat
   // stays: it lists the student's own clubs, wherever they're looking.
   const mapHidden = isVisiting && !isOpenCampus(viewingId);
-  const tabOrder = mapHidden ? VISITING_CLOSED_TAB_ORDER : TAB_ORDER;
+  // Club chat, wave 2 (handoffs/chat-redesign/wave-2-contracts.md 2.2, D5):
+  // `null` until the flag answers; `true` drops the Chat tab and sends a
+  // `?tab=chat` / `?channel=` to /messages; `false` is today's page.
+  const chatV2 = useChatV2();
+  const router = useRouter();
+  const tabOrder =
+    chatV2 === true
+      ? mapHidden
+        ? CHAT_V2_VISITING_CLOSED_TAB_ORDER
+        : CHAT_V2_TAB_ORDER
+      : mapHidden
+        ? VISITING_CLOSED_TAB_ORDER
+        : TAB_ORDER;
   if (mapHidden && tab === "map") setTab("feed");
   const [pickerOpen, setPickerOpen] = useState(false);
   // The picker's home row says "you can change it on <date>" (the 45-day
@@ -269,6 +286,21 @@ export function CampusMobile() {
   // can_view_org_channel even if the channel isn't in the user's
   // pre-fetched threads list yet.
   const initialChannelId = searchParams.get("channel") || null;
+  // 2.2: while the flag is unknown and the URL asks for the chat tab, nothing
+  // of the old chat mounts (a skeleton in the pane's place); with the flag on,
+  // never. A `?channel=` never opens the old `# name` view before the flag
+  // is known (its thread GET is 9–13 PostgREST calls; its title is a Discord
+  // tell, 1.1).
+  const chatWanted = tab === "chat" || initialChannelId !== null;
+  const oldChatMounts = chatV2 === false || (chatV2 === null && !chatWanted);
+  // Flag on and on the chat tab (from `?tab=chat` or `?channel=`): one
+  // `router.replace` to /messages with the room; `?org=` is dropped (2.3).
+  const chatRedirectedRef = useRef(false);
+  useEffect(() => {
+    if (chatV2 !== true || tab !== "chat" || chatRedirectedRef.current) return;
+    chatRedirectedRef.current = true;
+    router.replace("/messages" + (initialChannelId ? "?channel=" + encodeURIComponent(initialChannelId) : ""));
+  }, [chatV2, tab, initialChannelId, router]);
   // ?post=<id> deep link — used by Copy Link share targets + Otto
   // mention notifications. Mobile opens the viewer directly (vs desktop
   // which scrolls + flashes the feed row). Stripped from the URL after
@@ -961,12 +993,16 @@ export function CampusMobile() {
             }
           />
         </section>
-        <section style={paneStyle}>
-          {/* Keyed so a club joined on the Orgs tab remounts it, and it
-              reloads its own club list. Stays while visiting: it lists the
-              student's own clubs, not the campus on screen. */}
-          <ChatPane key={chatKey} onSelectOrg={(o) => setSelectedOrgForChat(o)} />
-        </section>
+        {chatV2 === true ? null : (
+          <section style={paneStyle}>
+            {/* Keyed so a club joined on the Orgs tab remounts it, and it
+                reloads its own club list. Stays while visiting: it lists the
+                student's own clubs, not the campus on screen. Gated by the
+                flag (2.2): a skeleton until it answers when the URL asks for
+                this tab. */}
+            {oldChatMounts ? <ChatPane key={chatKey} onSelectOrg={(o) => setSelectedOrgForChat(o)} /> : <ListSkeleton />}
+          </section>
+        )}
         {mapHidden ? null : (
           <section style={mapPaneStyle}>
             {/* Keyed by its campus, so another campus starts a fresh map
@@ -1027,7 +1063,7 @@ export function CampusMobile() {
       {/* Org channels drawer — Discord-style. Swipes in when an org
           is tapped on the Chat tab. Holds the channel list + back +
           search; tapping a channel mounts ConversationView below. */}
-      {selectedOrgForChat ? (
+      {selectedOrgForChat && oldChatMounts ? (
         <OrgChannelsDrawer
           org={selectedOrgForChat}
           onClose={() => setSelectedOrgForChat(null)}
@@ -1039,7 +1075,7 @@ export function CampusMobile() {
           a /campus?tab=chat&channel=<id> deep link. Reuses
           MessagesMobile's ConversationView so the chat UX, send flow,
           and 3-dot menu all behave identically. */}
-      {openChannel ? (
+      {openChannel && oldChatMounts ? (
         <ConversationView
           threadId={openChannel.id}
           thread={synthesizeChannelThread(openChannel)}
