@@ -274,3 +274,4 @@ and the mockup before a decision; the table is in `S1-repair.md`.
   `/messages?channel=<event room>` (a reload there re-opens the layer). The
   shell cannot do it: the calendar entry carries no Lounge id.
 - 2026-09-30T10:04:26Z S1-gate.md part 3, S1-repair.md, STOPPED 18, REQUESTS written; committing
+- 2026-09-30T10:04:46Z COMMITTED bcf72aa fix(chat): W2-S1 repair after review. Repair pass closed.
