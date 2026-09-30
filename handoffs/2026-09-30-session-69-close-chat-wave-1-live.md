@@ -15,6 +15,16 @@ Full detail of S69 is in `2026-09-29-session-69-chat-wave-0.md` (decisions, mock
 4. **Dated items alongside (Franky's hands):** **f2** sending @connectvibe.app mailbox by **Sun Oct 4** (Resend key in Gmail "Send mail as"); **f9** Android build by **Fri Oct 9**: Android Studio is installed, its SDK is NOT (`~/Library/Android/sdk` missing): Franky opens it once, runs the setup wizard, accepts the licenses; then the first build. Demo days week of Oct 5; App Store submission Oct 16.
 5. **Still open from before:** paperwork (James's Oct 3 LLC amendment, EIN, D-U-N-S ~Oct 5, the Sept 26 meeting outcomes); wave 6 journal entry (private file) + feature sentinel; f11 parked (no Supabase Pro); push still dark on production (its migration needs renumbering).
 
+## If this is a CLOUD session (no Mac)
+
+Franky runs some sessions in the cloud to use cloud credits. A cloud session has the repo and these handoffs, but NOT the memory notes, the local Supabase stack (Docker), the seed accounts, the signed-in gstack browser, Android Studio, or `.env.local` (no production access key). So:
+
+- **Do in the cloud:** the wave 2 contract + plan critic (docs); the `MessagesMobile.tsx` split with no behaviour change; new screens, card renderers and pure logic built against `src/lib/chat/types.ts`; route code; migration B's SQL **written** but not run. Gates: `npm install`, `npm run typecheck`, `npm test`, `npx eslint <changed files>`.
+- **Leave for the Mac:** running or rehearsing any migration, HTTP tests against a database, browser walks, the production apply, the merge to `main`.
+- **Work on a branch** (e.g. `chat-v2-wave-2`), push it, and **never merge to `main`** from the cloud: `main` deploys to production, and code that needs migration B must not go live before migration B is applied.
+- A Vercel Preview of the branch will not show the new screens: the `chat_v2` switch is off on Preview builds by design (Preview uses the production database).
+- End the cloud session by updating this handoff (or a new one) with what was built, what is left for the Mac, and the branch name; commit and push it.
+
 ## What wave 1 changed for everyone (live since Sept 30, 00:13 UTC)
 
 - Only owners/admins post top-level on a club's **Board**; members see "Only officers post here." Replies (`thread_root_id`) exist in the API but no screen sends them yet.
