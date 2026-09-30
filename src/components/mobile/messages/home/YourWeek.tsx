@@ -1,7 +1,7 @@
 "use client";
 
 import Link from "next/link";
-import { useRef } from "react";
+import { useLayoutEffect, useRef, useState } from "react";
 
 import { LoadFailed, type LoadFailure } from "@/components/feedback/LoadFailed";
 import { isSameLocalDay, type WeekRange, weekDays } from "@/lib/chat/week";
@@ -23,6 +23,10 @@ import { dayDot, dayLabel, entriesOn, weekCardLabel, weekCardLine, type WeekEntr
  * null`; `Ended` after), the empty line + `Find events`, the failure line.
  *
  * 150px with cards, 126px empty (MK:1.2, MK:2): 6 + 18 + 2 + 44 + 72 + 8.
+ *
+ * The bloom (340×118, `top: 54`) is centred on the LIVE card wherever the
+ * sort puts it and follows the row's scroll (the mockup's `left: -92` is
+ * the first-card case, `W0_Home:22`; VIS-S1-2).
  */
 export function YourWeek({
   entries,
@@ -47,8 +51,30 @@ export function YourWeek({
   const cardRefs = useRef<Map<string, HTMLElement>>(new Map());
   const days = weekDays(range.start);
   const sorted = entries ? [...entries].sort((a, b) => new Date(a.starts_at).getTime() - new Date(b.starts_at).getTime()) : null;
-  const hasLive = !!sorted?.some((e) => e.room_state === "live");
+  const liveId = sorted?.find((e) => e.room_state === "live")?.id ?? null;
   const todayIndex = days.findIndex((d) => isSameLocalDay(now, d));
+  // The bloom's left edge: the live card's centre − 170, less the row's
+  // scroll. Measured after layout, on the row's scroll, once the fonts are in
+  // (the cards size to their first line, VIS-S1-1) and whenever the cards change.
+  const [bloomLeft, setBloomLeft] = useState<number | null>(null);
+  const cardKey = sorted?.map((e) => e.id).join("|") ?? "";
+  useLayoutEffect(() => {
+    const row = rowRef.current;
+    const place = () => {
+      const el = liveId ? cardRefs.current.get(liveId) : undefined;
+      setBloomLeft(row && el ? Math.round(el.offsetLeft + el.offsetWidth / 2 - 170 - row.scrollLeft) : null);
+    };
+    place();
+    let on = true;
+    void document.fonts?.ready.then(() => {
+      if (on) place();
+    });
+    row?.addEventListener("scroll", place, { passive: true });
+    return () => {
+      on = false;
+      row?.removeEventListener("scroll", place);
+    };
+  }, [liveId, cardKey]);
 
   const scrollToDay = (day: Date) => {
     const first = sorted ? entriesOn(day, sorted)[0] : undefined;
@@ -63,8 +89,8 @@ export function YourWeek({
       aria-labelledby="your-week-heading"
       style={{ flexShrink: 0, position: "relative", isolation: "isolate", boxSizing: "border-box", padding: "6px 0 8px", display: "flex", flexDirection: "column", fontFamily: FONT, color: t.ink }}
     >
-      {hasLive ? (
-        <div aria-hidden="true" style={{ position: "absolute", zIndex: -1, left: -92, top: 54, width: 340, height: 118, pointerEvents: "none", background: t.bloom }} />
+      {liveId && bloomLeft !== null ? (
+        <div aria-hidden="true" style={{ position: "absolute", zIndex: -1, left: bloomLeft, top: 54, width: 340, height: 118, pointerEvents: "none", background: t.bloom }} />
       ) : null}
       <div style={{ height: 18, boxSizing: "border-box", padding: "0 16px", display: "flex", alignItems: "center", gap: 8 }}>
         <h2 id="your-week-heading" style={{ margin: 0, fontFamily: SERIF, fontWeight: 700, fontSize: 16, lineHeight: 1, letterSpacing: "-0.2px", color: t.ink }}>
@@ -185,6 +211,13 @@ export function YourWeek({
  * Maybe: shape and word, never colour alone); line 2 the title; line 3 the
  * club dot + name (none when `org` is null). A link to the room when
  * `room_id` is set, else a plain tile with the same text.
+ *
+ * Width: 142 is the floor, not a fixed size (VIS-S1-1). The mockup's 142 was
+ * drawn for `Fri 7 PM · Going`; the pinned `● Live now · ✓ Going` needs ~134px
+ * of text at 12px/700 and 142 − 20 leaves 120, so line 1 alone sizes the card
+ * between 142 and 184 (`Wed 11:30 PM · ● Maybe` → ~161). The title and the
+ * club line are `contain: inline-size` so they never widen it and keep their
+ * ellipsis; line 1 keeps its own ellipsis as the guard past 184.
  */
 function WeekCard({
   entry,
@@ -205,7 +238,9 @@ function WeekCard({
   const chrome = live ? t.liveCard : t.quietCard;
   const label = weekCardLabel(entry, now);
   const style: React.CSSProperties = {
-    width: 142,
+    width: "max-content",
+    minWidth: 142,
+    maxWidth: 184,
     height: 64,
     flexShrink: 0,
     boxSizing: "border-box",
@@ -245,9 +280,9 @@ function WeekCard({
           </span>
         )}
       </span>
-      <span style={{ fontFamily: SERIF, fontWeight: 700, fontSize: 15.5, lineHeight: "17px", letterSpacing: "-0.2px", whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>{entry.title}</span>
+      <span style={{ contain: "inline-size", fontFamily: SERIF, fontWeight: 700, fontSize: 15.5, lineHeight: "17px", letterSpacing: "-0.2px", whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>{entry.title}</span>
       {entry.org ? (
-        <span style={{ display: "flex", alignItems: "center", gap: 5, fontSize: 12, fontWeight: 500, lineHeight: "14px", color: live ? t.secondary : t.muted, whiteSpace: "nowrap", overflow: "hidden" }}>
+        <span style={{ contain: "inline-size", display: "flex", alignItems: "center", gap: 5, fontSize: 12, fontWeight: 500, lineHeight: "14px", color: live ? t.secondary : t.muted, whiteSpace: "nowrap", overflow: "hidden" }}>
           <span aria-hidden="true" style={{ width: 14, height: 14, flexShrink: 0, borderRadius: 999, background: clubGradient(entry.org_id ?? entry.org.handle) }} />
           <span style={{ minWidth: 0, overflow: "hidden", textOverflow: "ellipsis" }}>{entry.org.name}</span>
         </span>

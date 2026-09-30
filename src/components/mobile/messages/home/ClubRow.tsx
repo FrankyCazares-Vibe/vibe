@@ -35,6 +35,29 @@ export function ClubRow({
   const chip = clubChip(club, now);
   const newText = newCountText(club.lounge.unread_count);
   const openBoard = club.board.unread && club.lounge.unread_count === 0;
+  // `N new` with no event chip sits at the right of the preview line, not
+  // alone on a third line (VIS-S1-4): the row stays 66px like its neighbours.
+  const pillOnPreview = !chip && !!newText && !!preview;
+  const pill = newText ? (
+    <span
+      style={{
+        marginLeft: "auto",
+        height: 20,
+        flexShrink: 0,
+        boxSizing: "border-box",
+        padding: "0 8px",
+        borderRadius: 999,
+        background: "rgba(var(--scrim-rgb),0.08)",
+        color: t.secondary,
+        fontSize: 11.5,
+        fontWeight: 700,
+        display: "inline-flex",
+        alignItems: "center",
+      }}
+    >
+      {newText}
+    </span>
+  ) : null;
 
   return (
     <li style={{ listStyle: "none" }}>
@@ -123,36 +146,41 @@ export function ClubRow({
             </span>
           </span>
           {preview ? (
-            <span
-              style={{
-                fontSize: 13.5,
-                lineHeight: 1.35,
-                color: club.board.unread ? t.ink : t.secondary,
-                whiteSpace: "nowrap",
-                overflow: "hidden",
-                textOverflow: "ellipsis",
-              }}
-            >
-              {preview.dot ? (
-                <span
-                  aria-hidden="true"
-                  style={{
-                    display: "inline-block",
-                    width: 8,
-                    height: 8,
-                    marginRight: 7,
-                    borderRadius: 999,
-                    background: t.coral,
-                    verticalAlign: 1,
-                  }}
-                />
-              ) : null}
-              {preview.prefix ? <b style={{ fontWeight: 700 }}>{preview.prefix}</b> : null}
-              {preview.prefix ? " " : null}
-              {preview.text}
+            <span style={{ display: "flex", alignItems: "center", gap: 10, minWidth: 0 }}>
+              <span
+                style={{
+                  flexGrow: 1,
+                  minWidth: 0,
+                  fontSize: 13.5,
+                  lineHeight: 1.35,
+                  color: club.board.unread ? t.ink : t.secondary,
+                  whiteSpace: "nowrap",
+                  overflow: "hidden",
+                  textOverflow: "ellipsis",
+                }}
+              >
+                {preview.dot ? (
+                  <span
+                    aria-hidden="true"
+                    style={{
+                      display: "inline-block",
+                      width: 8,
+                      height: 8,
+                      marginRight: 7,
+                      borderRadius: 999,
+                      background: t.coral,
+                      verticalAlign: 1,
+                    }}
+                  />
+                ) : null}
+                {preview.prefix ? <b style={{ fontWeight: 700 }}>{preview.prefix}</b> : null}
+                {preview.prefix ? " " : null}
+                {preview.text}
+              </span>
+              {pillOnPreview ? pill : null}
             </span>
           ) : null}
-          {chip || newText ? (
+          {chip || (newText && !pillOnPreview) ? (
             <span style={{ display: "flex", alignItems: "center", gap: 8, marginTop: 1, minWidth: 0 }}>
               {chip ? (
                 <span
@@ -195,26 +223,7 @@ export function ClubRow({
                   Maybe
                 </span>
               ) : null}
-              {newText ? (
-                <span
-                  style={{
-                    marginLeft: "auto",
-                    height: 20,
-                    flexShrink: 0,
-                    boxSizing: "border-box",
-                    padding: "0 8px",
-                    borderRadius: 999,
-                    background: "rgba(var(--scrim-rgb),0.08)",
-                    color: t.secondary,
-                    fontSize: 11.5,
-                    fontWeight: 700,
-                    display: "inline-flex",
-                    alignItems: "center",
-                  }}
-                >
-                  {newText}
-                </span>
-              ) : null}
+              {pill}
             </span>
           ) : null}
         </span>

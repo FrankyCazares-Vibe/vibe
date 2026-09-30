@@ -8,7 +8,7 @@ import { weekRange, type WeekRange } from "@/lib/chat/week";
 import { vibeRequest } from "@/lib/feedback/request";
 
 import { useNightTheme } from "../theme";
-import { EmptyState, ListSkeleton, ThreadRow } from "../ThreadList";
+import { EmptyState, ThreadRow } from "../ThreadList";
 import type { ThreadEntry } from "../types";
 import { FONT, palette, SERIF } from "../v2-tokens";
 
@@ -218,6 +218,28 @@ function useHomeData(refreshKey: number, onThreads: MessagesHomeProps["onThreads
   return { threads, requests, threadsErr, clubs, clubsErr, week, weekErr, now, range, retryLists, retryWeek };
 }
 
+/**
+ * The list's skeleton: `ListSkeleton`'s shape (discs + bars in the 11.0
+ * scrims) at the home's own row height — a 44px disc in `11px 16px` = 66px,
+ * the person row it resolves into (`ListSkeleton`'s 50px disc makes 74px
+ * rows and a visible jump on resolve; VIS-S1-6).
+ */
+function HomeSkeleton() {
+  return (
+    <ul aria-hidden="true" style={{ listStyle: "none", padding: 0, margin: 0 }}>
+      {[0, 1, 2, 3, 4].map((i) => (
+        <li key={i} style={{ display: "flex", alignItems: "center", gap: 12, padding: "11px 16px", borderBottom: "1px solid rgba(var(--scrim-rgb),0.04)" }}>
+          <div style={{ width: 44, height: 44, borderRadius: 999, background: "rgba(var(--scrim-rgb),0.06)", flexShrink: 0 }} />
+          <div style={{ flex: 1 }}>
+            <div style={{ width: "55%", height: 14, background: "rgba(var(--scrim-rgb),0.08)", borderRadius: 6, marginBottom: 6 }} />
+            <div style={{ width: "85%", height: 11, background: "rgba(var(--scrim-rgb),0.05)", borderRadius: 5 }} />
+          </div>
+        </li>
+      ))}
+    </ul>
+  );
+}
+
 const FILTER_LABEL: Record<HomeFilter, string> = { all: "All", chats: "Chats", clubs: "Clubs", requests: "Requests" };
 const LIST_LABEL: Record<HomeFilter, string> = { all: "All chats, pinned first", chats: "Chats", clubs: "Clubs", requests: "Requests" };
 
@@ -239,7 +261,7 @@ export function MessagesHome({ filter, onFilter, refreshKey, onThreads, onOpenCl
 
   let list: React.ReactNode;
   if (pending) {
-    list = <ListSkeleton />;
+    list = <HomeSkeleton />;
   } else if (bothFailed) {
     list = failedBox(d.threadsErr as LoadFailure);
   } else if (filter === "requests") {

@@ -275,3 +275,35 @@ and the mockup before a decision; the table is in `S1-repair.md`.
   shell cannot do it: the calendar entry carries no Lounge id.
 - 2026-09-30T10:04:26Z S1-gate.md part 3, S1-repair.md, STOPPED 18, REQUESTS written; committing
 - 2026-09-30T10:04:46Z COMMITTED bcf72aa fix(chat): W2-S1 repair after review. Repair pass closed.
+
+## Part 4 — the repair after the visual pass (`visual/review-S1.md`)
+
+Resumed on `b81aa29` + the three visual reviews. Every finding checked against
+the shot, the mockup and the contract; the table is in
+`visual/repair-S1.md`. Fixed in S1's files: VIS-S1-1 (the week card sizes to
+its first line, 142 floor / 184 cap), VIS-S1-2 (the bloom centred on the live
+card and following the row's scroll), VIS-S1-4 (`N new` on the preview line
+when there is no chip), VIS-S1-6 (a 66px home skeleton). Rejected as
+conformant: VIS-S1-5 (11.1 pins today's `ThreadRow` for Requests), VIS-S1-7
+(11.0 pins MK:0.1's bloom). Re-shot with the harness copied to the scratchpad
+(Playwright installed there, never in the tree): the numbers are in
+`visual/repair-S1.md`, the shots in `visual/repair-S1/`.
+
+### REQUESTS (to the owner of `src/components/feedback/LoadFailed.tsx` / the integration review)
+
+- VIS-S1-3 (MEDIUM, shared file, not S1's by 13.2): the `Retry` pill's ink
+  `#FAF7F2` on `#FF5C35` (`LoadFailed.tsx:125-126`) is 2.9:1 at 13px / 12px
+  compact; 11.0 asks ≥ 4.5:1 for every text under 18px on the new screens.
+  One line: `color: "#FAF7F2"` → `color: "#140806"` (the coral button ink of
+  `v2-tokens.ts` `coralButton.ink`, ≈ 9.6:1; the same pill the no-clubs CTA
+  already draws). Every `LoadFailed` the new screens mount inherits it
+  (`Couldn't load your clubs.` / `… your week.` / `… this club.` / `… the
+  Board.` / `… replies.` / `… your events.`), and so does the old list's.
+  S1 did not touch the file. If the change is declined, `S1-contrast.md`
+  needs a `Retry` row recording the 2.9:1 as an accepted inheritance.
+
+### Log
+- 2026-09-30T11:00Z review-S1.md read; the eight shots and W0_Home viewed; fixes planned for 1, 2, 4, 6
+- 2026-09-30T11:05Z YourWeek.tsx (VIS-S1-1, VIS-S1-2), ClubRow.tsx (VIS-S1-4), MessagesHome.tsx (VIS-S1-6) edited; a prettier pass reflowed two files and was reverted (the repo has no prettier config); the bloom placement moved from a `useCallback` into the layout effect (the React Compiler lint refused the manual memo)
+- 2026-09-30T11:10Z harness copied to the scratchpad, fake Supabase + next dev on 3111, `--only=home` and `--only=24-skeleton` re-shot; measure.mjs: live card 146.5px with no overflow, bloom centre = live card centre before and after a 103px scroll, Chess Club row 66px, skeleton rows 67px
+- 2026-09-30T11:12Z gates: typecheck 0, npm test 1639/1639, eslint 0 on the three files; committing
