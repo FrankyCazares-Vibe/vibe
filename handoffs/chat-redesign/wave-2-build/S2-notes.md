@@ -142,3 +142,110 @@ split-check: 51 declarations in 507d6b4:src/components/mobile/MessagesMobile.tsx
 ```
 - 2026-09-30T08:00:28Z build exit 0; STOPPED written (5 entries); S2-gate.md part 1 written; committing
 - 2026-09-30T08:00:53Z COMMITTED 3bf4695 feat(chat): club space shell, room polling hook, page merge, Remove row (W2-S2 first commit). First-commit prelude done; the main S2 builder continues from here (the space read, UpNext, RoomChips, BoardStrip, BoardView/BoardPost, RoomThread/RoomComposer, EventChat/EventAbout, RsvpSheet, ClubEmpty; the officer remove flow through onRemove; the STOPPED entries above are its first reading).
+
+## Part 2 — the club space (the main S2 batch, after the three first commits)
+
+Resumed on `24ca304` (S3's first commit + notes on top of `3bf4695`). Nothing of
+part 2 was on the branch; `git status` showed only S1's notes modified.
+
+### Plan (files, in build order; every file `"use client"`, inline styles, `palette(night)`)
+
+1. `club/helpers.ts` (PURE, no React; imports `@/lib/chat/when`, `@/lib/chat/types`
+   as types, `@/lib/chat/room-state`) + `club/helpers.test.ts`: `roleWord(role)`,
+   `chipStateWord(event, now)` (1.2's event-chip state word), `chipAriaLabel(room, now)`,
+   `upNextLabel(event, now)`, `isHot(event, now)` (live or isSoon), `shouldShowSep`
+   (`shouldShowChatSep`'s rule, campus-home.tsx:17098) + `sepLabel(iso, now)`
+   (`Today` / `Yesterday` / `Wed` / `Oct 5`), `separatorIndexes(rows)` over non-stub
+   rows, `repliesToggleText(n)` / `repliesToggleLabel(n, open)`, `statePill(event, now)`,
+   `whoIsGoingLabel`, `composerPlaceholder(kind, name)`, `emptyLine(kind, club)`,
+   `boardStripLabel`, `rsvpPillLabel`, `postAriaLabel`. The tests cover the
+   separators rule and the chip state word (as the task asks) plus the labels.
+2. `club/RoomChips.tsx` — `<nav aria-label="Rooms in <club>">`, the server's order,
+   `aria-current="page"`, the Board dot, 44px hits, event chips open the layer.
+3. `club/UpNext.tsx` — `slice(0, 2)`, the Soon ring + live chrome only when hot, the
+   bloom only when a drawn card is hot, the officer's dashed button (11.9.3).
+4. `club/BoardStrip.tsx` — 44px, `Board · <Author> · <text>`, the dot, the chevron.
+5. `club/RoomComposer.tsx` — 64px: "+" (only when `can_post`; mounts `CardTray` +
+   `ComposeSheets`), the 16px input, the gradient send; nothing while `viewer` is
+   null; the quiet tile on `can_post === false`; the send (temp_ row → POST →
+   `replace` / `remove`), the reply pill.
+6. `club/RoomThread.tsx` — oldest first, bottom- or top-anchored, separators over
+   non-stub rows, `MessageBubble` (groupMode, showSender, reactions as today, Reply,
+   Report, Remove with the confirm), `CardBubble`, `RemovedContentCard by=`, the
+   `toMessageRow` adapter, `Earlier messages` above, the empty line.
+7. `club/BoardPost.tsx` + `club/BoardView.tsx` — newest first, articles, the replies
+   fold (`?root=` read, re-read every 5th tick, LoadFailed compact), the reply field,
+   `Earlier messages` under the last post, the officer line / the member tile.
+8. `club/EventAbout.tsx` + `club/RsvpSheet.tsx` + `club/EventChat.tsx` — the layer
+   at 1101/1102, its own hook, the hero, the pill, Plans, Who's going, the RSVP sheet
+   (a `Drawer.NestedRoot`), the Board strip, the thread top-anchored, the closed tile.
+9. `club/ClubEmpty.tsx` — the officer's three rows.
+10. `club/ClubSpace.tsx` — rewritten in full: the space read (open / visible / every
+    20 s = 5 ticks of 4 s), the deep-link order, the header, everything above, the
+    history writes of 2.3, the event layer, the states.
+
+Commits: one per step or two, `feat(chat): <what> (wave 2, W2-S2)`; gates at the
+end; `S2-gate.md` part 2.
+
+### Decisions taken where the branch has no callback (REQUESTS to W2-S1 below)
+
+- **History (2.3, 11.10).** `MessagesMobile` on the branch does not mount `ClubSpace`
+  yet and defines no replaceState / pushState callback; the 11.3 props are pinned
+  (`{ orgHandle; initialRoomId; initialRoomKind; onClose }`). So `ClubSpace` writes
+  history itself on 2.3's exact state shape `{ vibeChat: <id>, depth: n }`: a chip
+  tap → `history.replaceState({ vibeChat: roomId, depth: history.state?.depth ?? 1 },
+  "", "/messages?channel=<roomId>")`; opening the event chat layer →
+  `history.pushState({ vibeChat: eventRoomId, depth: 2 }, "", "/messages?channel=<id>")`
+  unless `history.state` already is `{ depth: 2, vibeChat: <that id> }` (a deep link
+  where `MessagesMobile` pushed it first, 2.3); the layer's Back / swipe →
+  `history.back()` when `history.state?.depth === 2`, else a direct close; a
+  `popstate` whose `state?.depth ?? 0` is below 2 closes the layer (the one closer
+  for the layer). The space's own Back / swipe calls `onClose()` only (S1's
+  `MessagesMobile` owns that `history.back()`).
+- **Every 5th tick (11.3 Reads).** The hook's option object is pinned; the space read
+  runs on its own 20-s timer while visible (`ROOM_POLL_MS × ROOM_FULL_READ_EVERY`),
+  the same period as the room's every-5th full read, plus on `visibilitychange` →
+  visible and on open. No hook shape change for it.
+- **The room under the layer** pauses its polling while the event chat layer is open
+  (`enabled: eventRoomId === null`): 9.3 polls "the open room"; the layer's hook
+  polls the event room. The state is kept, so Back shows the room at once.
+- **`ClubEmpty` = officer** means `viewer.role` is `owner` or `admin` (1.1's "officer";
+  a mod is not one).
+
+### STOPPED (part 2)
+
+6. **A deep link's `initialPage` cannot reach the hook.** 11.3 / 2.3 / SCREENS-L10:
+   "the resolving thread GET's body is the hook's `initialPage`, so the room is read
+   once on arrival". The 11.3 props carry no such field (`{ orgHandle; initialRoomId;
+   initialRoomKind; onClose }`), so `ClubSpace` cannot receive it. Built: the room is
+   read on mount by the hook (one more thread GET on a deep link). A fifth optional
+   prop `initialPage?: ThreadMessagesResponse` is the fix; not added (the props are
+   pinned and W2-S1 builds against them).
+7. **A later 403 on the event room needs a signal from the hook.** 11.6: the next read
+   answering 403 "Not a member" closes the layer with `You left the event chat.`; the
+   hook's later reads are silent by 11.5 ("a tick that fails is silent"). Built,
+   additively: `lostAccess: boolean` on the hook's return, true once a read after the
+   first answered 403 or 404; `EventChat` closes on it. `ClubSpace` uses the space
+   read's own 403 for `Members only.` (11.3) and does not read `lostAccess`.
+8. **The composer's font size.** 11.0 says inputs are 16px (the iOS zoom guard),
+   MK:0.2 says 15px; built at 16px as 11.0 says (11.0 wins over the mockup).
+9. **`ReactionPicker` draws no Remove for a card in this commit set beyond `onRemove`**
+   (S3's STOPPED 1: no reaction / reply handler on `CardBubble`): `RoomThread` passes
+   `onRemove` and `onReport` to `CardBubble`, nothing else can be passed.
+
+### REQUESTS (to W2-S1, for the integration review)
+
+- R1. `MessagesMobile`'s `popstate` handler must NOT close the club space on a
+  `popstate` whose `state.depth` is 1 (that is the event chat layer's Back; the
+  layer closes itself). It closes the space on depth 0 / no `vibeChat` state.
+- R2. For an event-room deep link, `MessagesMobile` may `replaceState` depth 1 and
+  `pushState` depth 2 as 2.3 says, or only the first: `ClubSpace` pushes depth 2 for
+  the layer unless `history.state` already reads `{ depth: 2, vibeChat: <room> }`.
+- R3. `onClose` of `ClubSpace` is called for the space's Back and its swipe; 2.3's
+  `history.back()` for those belongs to `MessagesMobile`.
+- R4. STOPPED 6: an optional `initialPage` prop, if the integration review wants
+  the deep link's room read once.
+
+### Log
+- 2026-09-30T08:18:12Z part-2 plan, decisions, STOPPED 6-9 and REQUESTS written; starting club/helpers.ts
+- 2026-09-30T08:21:49Z club/helpers.ts + helpers.test.ts written (7 tests green; eslint 0); lostAccess added to use-room-poll.ts (STOPPED 7); committing

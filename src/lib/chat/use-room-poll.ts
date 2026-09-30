@@ -90,6 +90,13 @@ export type RoomPoll = {
   replace: (id: string, message: ChatMessage) => void;
   /** A removed row, or an optimistic row whose send failed (S2-notes.md STOPPED 3). */
   remove: (id: string) => void;
+  /**
+   * True once a read AFTER the first answered 403 or 404: the viewer lost the
+   * room (an RSVP change, a membership gone). The event chat layer closes on
+   * it with `You left the event chat.` (11.6; S2-notes.md STOPPED 7). The
+   * first read's refusal is `failure` instead.
+   */
+  lostAccess: boolean;
 };
 
 type RoomState = {
@@ -100,6 +107,7 @@ type RoomState = {
   viewerId: string | null;
   failure: LoadFailure | null;
   hasEarlier: boolean;
+  lostAccess: boolean;
 };
 
 const EMPTY: RoomState = {
@@ -110,6 +118,7 @@ const EMPTY: RoomState = {
   viewerId: null,
   failure: null,
   hasEarlier: false,
+  lostAccess: false,
 };
 
 function fromPage(roomId: string, page: ThreadMessagesResponse): RoomState {
@@ -121,6 +130,7 @@ function fromPage(roomId: string, page: ThreadMessagesResponse): RoomState {
     viewerId: page.viewer_id,
     failure: null,
     hasEarlier: page.messages.length >= ROOM_PAGE_LIMIT,
+    lostAccess: false,
   };
 }
 
@@ -146,6 +156,11 @@ function oldestOf(messages: ChatMessage[] | null): string | null {
     if (oldest === null || m.created_at < oldest) oldest = m.created_at;
   }
   return oldest;
+}
+
+/** A refusal a second try cannot change: the viewer is out of the room. */
+function lostStatus(status: number): boolean {
+  return status === 403 || status === 404;
 }
 
 function isVisible(): boolean {
@@ -198,6 +213,7 @@ export function useRoomPoll(roomId: string | null, options: RoomPollOptions): Ro
       if (genRef.current !== gen) return;
       if (!r.ok || !Array.isArray(r.data?.messages)) {
         if (first) commit({ ...EMPTY, roomId: id, failure: asLoadFailure(r, lineRef.current) });
+        else if (!r.ok && lostStatus(r.status)) commit({ ...stateRef.current, lostAccess: true });
         return;
       }
       const page = r.data;
@@ -212,6 +228,7 @@ export function useRoomPoll(roomId: string | null, options: RoomPollOptions): Ro
         viewerId: page.viewer_id,
         failure: null,
         hasEarlier: prev.messages === null ? page.messages.length >= ROOM_PAGE_LIMIT : prev.hasEarlier,
+        lostAccess: false,
       });
       if (brought) markRead(id);
     },
@@ -226,6 +243,10 @@ export function useRoomPoll(roomId: string | null, options: RoomPollOptions): Ro
         { quiet: true, failure: lineRef.current },
       );
       if (genRef.current !== gen) return;
+      if (!r.ok && lostStatus(r.status) && stateRef.current.roomId === id) {
+        commit({ ...stateRef.current, lostAccess: true });
+        return;
+      }
       if (!r.ok || !Array.isArray(r.data?.messages)) return;
       const prev = stateRef.current;
       if (prev.roomId !== id || prev.messages === null) return;
@@ -405,6 +426,7 @@ export function useRoomPoll(roomId: string | null, options: RoomPollOptions): Ro
     viewerId: mine ? state.viewerId : null,
     failure: mine ? state.failure : null,
     hasEarlier: mine ? state.hasEarlier : false,
+    lostAccess: mine ? state.lostAccess : false,
     loadEarlier,
     refreshOne,
     append,
