@@ -250,3 +250,4 @@ end; `S2-gate.md` part 2.
 - 2026-09-30T08:18:12Z part-2 plan, decisions, STOPPED 6-9 and REQUESTS written; starting club/helpers.ts
 - 2026-09-30T08:21:49Z club/helpers.ts + helpers.test.ts written (7 tests green; eslint 0); lostAccess added to use-room-poll.ts (STOPPED 7); committing
 - 2026-09-30T08:24:18Z RoomChips.tsx, UpNext.tsx, BoardStrip.tsx written (tsc + eslint 0); committing
+- 2026-09-30T08:27:35Z RoomComposer.tsx (send flow, tray + sheets mount, the quiet tile) and RoomThread.tsx (toMessageRow, separators, bubbles, cards, removed rows, Remove confirm, Report, reactions) written; tsc + eslint 0; committing
