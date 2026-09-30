@@ -52,3 +52,4 @@ Facts: `wave-2-asis/database-map.md` (DM), migration A `supabase/migrations/2026
 - 2026-09-30T06:16:17Z scripts/sql/chat-v2-cards-check.sql written (842 lines: fixtures, A creates, B refusals, C votes, D students, E delete paths, F reply counts, G catalog + for-update x2); parse gate with --strip-psql exit 0 (25 statements, 4 plpgsql functions, 11 DO blocks); typecheck exit 0; npm test 1475 pass
 - 2026-09-30T06:16:17Z commit 4: 666f683 check script
 - 2026-09-30T06:17:49Z gates: typecheck 0, test 1475/1475, build 0, eslint 0 (tool + seed; base parity trivial), parse gate 0 on both files; B1-gate.md written
+- 2026-09-30T06:17:49Z commit 5: 632c1a4 gate + notes (last)
