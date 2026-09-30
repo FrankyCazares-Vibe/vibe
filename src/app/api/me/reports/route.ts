@@ -1,5 +1,7 @@
 import { NextResponse } from "next/server";
 
+import { snapshotCard } from "@/lib/chat/cards/snapshot";
+import { isMissingChatSchema, warnMissingChatSchemaOnce } from "@/lib/chat/schema";
 import { isMissingColumnError } from "@/lib/db/missing-column";
 import { getActiveRestriction, requireNotRestricted } from "@/lib/moderation/access";
 import { alertAdminsOfReport } from "@/lib/moderation/alerts";
@@ -58,6 +60,10 @@ type Body = {
 type TargetType = ReportTargetType;
 
 const MAX_REASON = 1000;
+
+/** A reported message's snapshot columns (chat contract 5.3), and the six of before the chat rooms migration. */
+const MESSAGE_SNAPSHOT_COLUMNS = "id,user_id,channel_id,content,media_url,created_at,kind,thread_root_id";
+const MESSAGE_SNAPSHOT_COLUMNS_BEFORE_ROOMS = "id,user_id,channel_id,content,media_url,created_at";
 const LOG = "[reports.POST]";
 
 /** The columns this route adds to a report once the moderation migration is applied. */
@@ -288,13 +294,17 @@ async function readTarget(
   id: string,
   viewerId: string,
 ): Promise<Lookup> {
+  let lastError: unknown = null;
   const one = async (
     table: string,
     columns: string,
   ): Promise<Record<string, unknown> | null | "error"> => {
     const { data, error } = await supabase.from(table).select(columns).eq("id", id).maybeSingle();
     if (error) {
-      console.error(`${LOG} ${table} read`, error);
+      lastError = error;
+      // A message read on a database without the chat rooms columns is
+      // read again below with today's columns (said once there, not here).
+      if (!(table === "messages" && isMissingChatSchema(error))) console.error(`${LOG} ${table} read`, error);
       return "error";
     }
     return (data as Record<string, unknown> | null) ?? null;
@@ -320,7 +330,10 @@ async function readTarget(
     comment: { table: "post_comments", columns: COMMENT_SNAPSHOT_COLUMNS, owner: "user_id" },
     message: {
       table: "messages",
-      columns: "id,user_id,channel_id,content,media_url,created_at",
+      // Wave 2 (chat contract 5.3): `kind` and `thread_root_id` ride on
+      // the snapshot; `card` is added in POST once the read proved the
+      // reporter can see the message.
+      columns: MESSAGE_SNAPSHOT_COLUMNS,
       owner: "user_id",
     },
     channel: { table: "channels", columns: "id,type,name,org_id,created_at", owner: "" },
@@ -332,7 +345,13 @@ async function readTarget(
     },
   };
   const { table, columns, owner } = spec[type];
-  const row = await one(table, columns);
+  let row = await one(table, columns);
+  // A database without the chat rooms migration (chat contract 3.10): the
+  // message is read again with today's six columns; its `card` stays null.
+  if (row === "error" && type === "message" && isMissingChatSchema(lastError)) {
+    warnMissingChatSchemaOnce("reports.readTarget");
+    row = await one(table, MESSAGE_SNAPSHOT_COLUMNS_BEFORE_ROOMS);
+  }
   if (row === "error") return { ok: false, reason: "error" };
   if (!row) {
     return type === "comment"
@@ -504,6 +523,16 @@ export async function POST(req: Request) {
     return found.reason === "error"
       ? NextResponse.json({ ok: false, error: "Request failed" }, { status: 500 })
       : NextResponse.json({ ok: false, error: "That's not there anymore" }, { status: 404 });
+  }
+  // A reported card (chat contract 5.3): the snapshot gains the card as the
+  // reporter saw it, read with the service role and never returned to them;
+  // a text message, or a message read without `kind`, carries `card: null`.
+  if (targetType === "message") {
+    const kind = found.target.snapshot.kind;
+    found.target.snapshot = {
+      ...found.target.snapshot,
+      card: typeof kind === "string" && kind !== "text" ? await snapshotCard(targetId) : null,
+    };
   }
   if (found.target.ownerId === user.id) {
     return bad("You can't report something of your own");
