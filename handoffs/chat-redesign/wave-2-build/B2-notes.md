@@ -58,3 +58,4 @@ Decisions where the contract is silent (prelude):
 - typecheck green (after narrowing the body test's helpers); eslint on the 15 prelude files exit 0.
 - npm test: 1409/1409 green (1,374 + 35 new: when 12, fallback 6, body 11, stub 6).
 - build exit 0. B2-gate.md (prelude section) written. Committing.
+- Committed 30fcc07 "feat(chat): wave-2 pure modules, sentences and signature stubs (W2-B2 first commit)". Prelude done; the main W2-B2 builder continues from here (4.1, 4.3, 5.2, 5.3, 5.5, 9.1 stub decision + hydrate + parent_preview, 9.2, 9.4, describeRoom/readRoomEvent/readGoing signatures, the report snapshot hunk, validate-thread.mjs + fixtures).
