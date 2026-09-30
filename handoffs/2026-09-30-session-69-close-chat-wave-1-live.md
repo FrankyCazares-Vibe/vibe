@@ -1,3 +1,5 @@
+> **Superseded for starting session 71:** read `2026-09-30-session-70-chat-wave-2-cloud.md` first. This file is the state at the end of S69 and the brief that S70 (cloud) worked from.
+
 # Session 69 close (2026-09-30): club chat wave 1 is LIVE; next = wave 2
 
 Full detail of S69 is in `2026-09-29-session-69-chat-wave-0.md` (decisions, mockups, the build, the go-live record). This file is the short state and where to start. **`main` = `e4f8916`, deployed (Vercel success), migration `20261001100000_chat_v2_rooms` applied on production and recorded. Working tree clean.**
