@@ -692,20 +692,6 @@ export async function GET(req: Request) {
   ]);
   const lastMsgs = [...chatLast, ...roomLast];
 
-  const lastByChannel = new Map<string, ThreadEntry["last_message"]>();
-  for (const m of lastMsgs) {
-    const cid = m.channel_id as string;
-    if (!lastByChannel.has(cid)) {
-      lastByChannel.set(cid, {
-        content: m.content as string,
-        created_at: m.created_at as string,
-        user_id: m.user_id as string,
-        media_kind: m.media_kind ?? null,
-        attachment_kind: m.attachment_kind ?? null,
-      });
-    }
-  }
-
   // Block filter: hide any 1:1 thread where the peer is blocked-either-way.
   // Through the shared helper, and failing closed like /api/feed and
   // /api/me/notifications: this used to read `blocks` itself and keep only
@@ -719,6 +705,27 @@ export async function GET(req: Request) {
     return NextResponse.json({ ok: false, error: "Request failed" }, { status: 500 });
   }
   const blockedPeerIds = hiddenRes.hidden.blocked;
+
+  // A club room's preview is the newest row of its 5-row window by someone
+  // the viewer is not in a block pair with (wave-2 contract 12.4, 8.3): the
+  // thread stubs those rows, so the list never previews what the thread
+  // hides. No Board exception here (this list reads no roles; the officer's
+  // post still opens in the thread). None visible in the window: no preview
+  // ("No messages yet"). A dm or a group is untouched.
+  const lastByChannel = new Map<string, ThreadEntry["last_message"]>();
+  for (const m of lastMsgs) {
+    const cid = m.channel_id as string;
+    if (clubRoomIds.has(cid) && blockedPeerIds.has(m.user_id as string)) continue;
+    if (!lastByChannel.has(cid)) {
+      lastByChannel.set(cid, {
+        content: m.content as string,
+        created_at: m.created_at as string,
+        user_id: m.user_id as string,
+        media_kind: m.media_kind ?? null,
+        attachment_kind: m.attachment_kind ?? null,
+      });
+    }
+  }
 
   const threads: ThreadEntry[] = [];
   const requests: ThreadEntry[] = [];
