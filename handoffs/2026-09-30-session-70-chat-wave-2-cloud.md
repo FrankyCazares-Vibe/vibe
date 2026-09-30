@@ -2,6 +2,21 @@
 
 This session ran in the cloud (no Mac, no database, no browser walk). Everything of wave 2 that a cloud session may build (S69 close, "If this is a CLOUD session") is built, reviewed, gated and pushed on **branch `claude/relaxed-davinci-9d11h3`, head `b497c2d` (code; this handoff file is the commit on top of it)**, Vercel Preview of the last code change (`2cdcfbe`) **https://vibe-p0z6622vm-fracazar-1988s-projects.vercel.app** (READY; the later docs-only pushes build their own; it shows nothing behind the flag by design, and section 0's flag-OFF rows run there on production data). **`main` is untouched at `5c68da1`. Production is untouched: migration B is NOT applied, the `chat_v2` env vars are NOT set.** The branch is never merged from the cloud.
 
+## THE CLOUD SESSION IS CLOSED (Sept 30). Session 71 MUST be on the Mac and MUST finish what the cloud could not
+
+The cloud session ended with every cloud-side deliverable done. **Nothing below was done, and none of it can be done from a cloud session** (no database, no seed accounts, no real browser, no production access). Session 71 does not build new features until every box is ticked; each line names where the detail lives.
+
+- [ ] **Decide the three calls** (5 minutes, Franky): contract 17.3 row 10 (the fonts line: keep the true 800 weight app-wide, or restore `src/app/layout.tsx:96` to `5c68da1`'s string); 17.3 row 11 (the Retry pill's dark ink, app-wide); whether to squash the ~40 MB of screenshot commits before the merge (`run3/` is the final state).
+- [ ] **Rehearse and apply migration B locally** (step 2 below; contract 13.3 step 1, 3.9): two rehearsals, the 27 constants pasted, the real local apply, the three check scripts green, the seed re-run idempotent, the COST section filled, the constants commit pushed. **The cloud only parsed the file.**
+- [ ] **HTTP pass against the local database** (step 3; contract 13.3 step 2 and 17.5's "Step 2" lines): every wave-2 route case, every saved thread answer through `validate-thread.mjs`. **The cloud proved the routes by reading and by fake-client tests only.**
+- [ ] **The flag locally** (step 4).
+- [ ] **Browser walk on a real phone size, flag ON and flag OFF** (step 5; contract 13.3 step 4 and 17.5's "Step 4" lines, including the App Store Block walk). **The cloud's screenshots (`wave-2-build/visual/run3/`) used a mocked API and a fake auth endpoint: they prove layout, not data flow.** Check in Safari, not only Chromium, that the layout viewport stays 375 with a live week card.
+- [ ] **Production**: PRE-CHECK queries → Franky's yes → apply B and record it → merge `claude/relaxed-davinci-9d11h3` to `main` (fast-forward) → the after-deploy check → the Production-only env flag for the founders + SAE → redeploy → the first phone test on real data (steps 6–8).
+- [ ] **Before Oct 26**: contract 17.2 L3 (Report / Remove on a text Board post and on replies: amend 11.4, build, walk).
+- [ ] **Window 2 (Oct 12–14)**: repairs, the flag-off walk repeated, the submission build; Oct 15 freeze; Oct 26 `CHAT_V2_ALLOWLIST=*`.
+
+If session 71 turns out to be a cloud session after all: it may only do 17.2 L3 and repairs raised by the Mac; it must not touch the Mac list, and it must say so in its own handoff.
+
 ## START HERE — session 71 (the Mac, window 1: Oct 5–6)
 
 Read, in order: `handoffs/chat-redesign/wave-2-contracts.md` sections 0, 13.3, 13.4 and **17** (the amendments after the build; where 17 and an older section disagree, 17 wins) → `handoffs/chat-redesign/wave-2-build/integration-*.md` (the six integration lenses, the repair, the gates) → `wave-2-build/visual/README.md` (the screenshots, both themes). Then the Mac list of contract 13.3, in this order:
