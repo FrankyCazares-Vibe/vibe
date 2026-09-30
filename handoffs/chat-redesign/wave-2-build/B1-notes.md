@@ -65,3 +65,4 @@ gate; commit `fix(chat): W2-B1 repair after review`; write B1-repair.md.
 - REPAIR: plan written; no file edited yet
 - REPAIR: 2026-09-30T07:26:47Z migration edited (SQL-1 loop after 7.1.e, SQL-2 lower case, SQL-3 168 hours, SQL-4 order by, SECURITY-1 contype filter); parse gate exit 0 on both files (47/5/5, 25/4/11)
 - REPAIR: 2026-09-30T07:28:13Z gates re-run: typecheck 0, test 1523/1523, build 0, eslint 0 (+ base parity), node --check ok, six blocks verbatim; B1-gate.md gains the Mac sentence (SECURITY-2) and the repair table
+- REPAIR: 2026-09-30T07:28:52Z commit f4c0c95 fix(chat): W2-B1 repair after review; B1-repair.md written (5 FIXED in code, 1 FIXED in docs, 1 REJECTED, 0 DEFERRED)
