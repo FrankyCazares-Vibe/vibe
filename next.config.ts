@@ -1,7 +1,25 @@
 import type { NextConfig } from "next";
 import { withSentryConfig } from "@sentry/nextjs";
 
+import { pickPublicSupabaseKey } from "./src/lib/supabase/key-guard";
+
+// The key every visitor's browser receives. Next.js copies any NEXT_PUBLIC_*
+// variable the code mentions into the downloaded files, so the choice is made
+// here, at build time, and a build that would ship a SECRET key stops
+// (src/lib/supabase/key-guard.ts). In S71 Vercel Production held the
+// service_role key in NEXT_PUBLIC_SUPABASE_ANON_KEY and the login page
+// carried it for months. `env` below replaces whatever the variable holds with
+// the publishable / anon key, in the browser files and the server files alike.
+const publicKey = pickPublicSupabaseKey(process.env);
+if (publicKey.ignoredSecretInAnonSlot) {
+  console.warn(
+    "[supabase-key-guard] NEXT_PUBLIC_SUPABASE_ANON_KEY holds a SECRET Supabase key: ignored. " +
+      `Using ${publicKey.source}. Fix the variable in Vercel (Settings → Environment Variables).`,
+  );
+}
+
 const nextConfig: NextConfig = {
+  env: publicKey.key ? { NEXT_PUBLIC_SUPABASE_ANON_KEY: publicKey.key } : {},
   experimental: {
     // Next 16.3 turns Turbopack's build cache on by default and Vercel
     // restores .next/cache between builds. In S65 that shipped a production
