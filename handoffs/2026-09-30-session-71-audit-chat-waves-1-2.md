@@ -5,9 +5,9 @@
 - **Wave 1** (live since Sept 30): 9 lenses plus 4 gap probes, 35 agents; 89 findings kept, 1 refuted.
 - **Wave 2** (the cloud branch, never run against a database): 8 lenses plus 4 gap probes, 34 agents; 93 findings kept, 0 refuted.
 
-The audits changed no app code; the key fix in Part 1 was written afterwards (uncommitted until Franky says yes). Nothing was written to production. Migration B was run on the LOCAL database only, inside transactions that rolled back; afterwards there were 0 card tables and 0 card functions. `main` = `d48ade0`. The branch is untouched at `da22efa`. The S70 Mac checklist is still entirely open.
+The audits changed no app code; the key fix in Part 1 was written afterwards (pushed as `a85b750`). Nothing was written to production. Migration B was run on the LOCAL database only, inside transactions that rolled back; afterwards there were 0 card tables and 0 card functions. `main` = `d48ade0`. The branch is untouched at `da22efa`. The S70 Mac checklist is still entirely open.
 
-## Part 1. URGENT, not chat: the live site ships the database master key
+## Part 1. FIXED the same evening: the live site shipped the database master key
 
 The code for `https://www.connectvibe.app/auth/login` (chunk `2szoa-o94f9it.js`) inlines a Supabase JWT with `role: service_role` for project `rqopjkimxbjkwdkpkbfq`, in the slot for `NEXT_PUBLIC_SUPABASE_ANON_KEY`. Its sha256 matches `SUPABASE_SERVICE_ROLE_KEY` in the Mac's `.env.local`, so it is the real, working master key. Anyone can copy it and read or change every row: emails, DMs, club messages, resumes, private fields.
 
@@ -20,12 +20,21 @@ The code for `https://www.connectvibe.app/auth/login` (chunk `2szoa-o94f9it.js`)
   - **Proof:** a real `next build` with a fake master key planted in the bad variable. Control (today's code): the fake key is in 1 browser file and 7 server files. Patched: 0 and 0, and the publishable key is in 1 and 7. Only-secret-set refuses to build; nothing set still builds. `npm test` 1383/1383 (9 new), typecheck and eslint clean.
   - **Local compatibility test** (`scratchpad/keytest.mjs`, local stack): supabase-js 2.105 and @supabase/ssr 0.6.1 pass 10/10 checks with `sb_publishable_` and `sb_secret_` (anon read, password sign-in, session cookie getUser, RLS read, service read, `auth.admin.listUsers`, `storage.listBuckets`), identical to the legacy keys. Not tested: the hosted gateway itself.
   - **Known consequence:** Preview builds (non-`main` branches) will REFUSE to build until their `NEXT_PUBLIC_SUPABASE_ANON_KEY` is fixed or a Preview `NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY` exists (the integration's one is Production-only). That is the fail-closed direction.
-- **Part B still needed (Franky's hands):** the leaked key stays valid until Supabase's legacy JWT keys are disabled. Before that, `SUPABASE_SERVICE_ROLE_KEY` in Vercel must hold an `sb_secret_` key (server-only variable: Secret type is right), then redeploy, then Supabase → API Keys → Legacy → Disable JWT-based API keys. Also update the Mac's `.env.local`.
-- **Status:** awaiting Franky's yes to commit and push the code fix.
+- **DONE (Sept 30, evening):**
+  1. `a85b750` pushed and deployed (Vercel success). The live login page's code carries no JWT-shaped key and no real `sb_secret_` key, only a `sb_publishable_` one. The hosted Supabase gateway accepted that publishable key in both header forms (200).
+  2. Franky made a new Supabase secret key `vercel`, put it in the Vercel row `SUPABASE_SERVICE_ROLE_KEY` (server-only), redeployed, and walked the app signed in and signed out: working.
+  3. Franky disabled Supabase's legacy JWT API keys. **Disabled at 2026-10-01T02:50:30 UTC.** Verified from outside: the leaked service_role key now gets HTTP 401 "Legacy API keys are disabled" on `/auth/v1/settings` and `/rest/v1/`. Live pages `/`, `/auth/login`, `/legal/privacy`, `/support` return 200.
+- **Still to do (small):**
+  - Franky's Mac `.env.local`: replace `NEXT_PUBLIC_SUPABASE_ANON_KEY` with a publishable key and `SUPABASE_SERVICE_ROLE_KEY` with a secret key (a `mac` one is best). Until then, anything run against production from the Mac (scripts) fails with 401. `.env.development.local` (local stack) is unaffected.
+  - Vercel row `NEXT_PUBLIC_SUPABASE_ANON_KEY` (Secret type, Production + Preview) still holds the old, now-dead master key; the build ignores it and logs a warning. Delete it and recreate it as type **Config** with the publishable key, for Production and Preview. Until then Preview builds (non-`main` branches) REFUSE to build, because the integration's `NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY` is Production-only.
+  - Vercel integration rows `SUPABASE_ANON_KEY` and `SUPABASE_JWT_SECRET` (and the Postgres rows) are unused by the code. The two legacy ones are now dead keys; remove them when tidying.
+  - **Exposure window and disclosure:** the wrong value was added Apr 30; the leak ran until the Sept 30 deploy and was killed at 02:50 UTC Oct 1. Only 24 h of Supabase logs existed (no outside use seen). Franky and James decide whether this counts as a possible data exposure for the Terms / privacy page and for anyone who must be told.
+  - **After the fix**, signed-out server requests run as the real anon role (before, as service_role). The signed-out walk found nothing broken; watch for any public page that quietly relied on the old power.
+  - The reviewer agents for the fix stalled (no result); the fix rests on the real-build proof, the local key test and the live checks above, not on an independent code review. A reviewer pass over `key-guard.ts` and the `next.config.ts` `env` swap would still be worth one slot.
 
 ## The short list: what to do, in order
 
-**Before anything else:** Part 1.
+**Part 1 is done** (the leaked key was killed Sept 30 at 02:50 UTC Oct 1; small clean-ups remain, listed there).
 
 **Wave 1 fixes worth shipping now** (small; details in Part 2):
 - M3: the old inboxes treat a club room as a DM with a random member. The server sends `peer` for every channel type; send it only for DMs.
