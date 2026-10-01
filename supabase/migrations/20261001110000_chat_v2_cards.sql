@@ -133,13 +133,16 @@
 --     row (A:51-52: nothing writes another kind before this file).
 --   * None of the names this file adds exists in any migration.
 --   * The constants of step 7 (want_select, the 25 want_con_*, the five
---     want_fn_*) are EMPTY in this commit: the first Mac rehearsal prints
+--     want_fn_*) were PASTED in S71 (2026-10-01) from the Mac rehearsal 1 on
+--     the local stack (17.6, the same build as production). Before that they were EMPTY: the first Mac rehearsal prints
 --     them as NOTICE lines and refuses the file ("constants are empty"); the
 --     paste is one edit; the second rehearsal is green (contract 13.3, Mac
 --     step 1); the constants commit lands on the branch before the apply. No
 --     real apply runs with an empty constant.
 --   * select version() on the local stack (PRE-CHECK 5), recorded by the Mac
---     rehearsal: <filled by the Mac rehearsal>
+--     rehearsal (S71, 2026-10-01): PostgreSQL 17.6 on aarch64-unknown-linux-gnu,
+--     compiled by gcc (GCC) 15.2.0, 64-bit (production read the same build on
+--     Sept 30, S71 audit).
 --
 -- PRE-CHECK (read-only, on production, on the apply day, in a UTC session:
 -- the Supabase MCP and psql default). RAISE NOTICE lines do not come back
@@ -235,7 +238,13 @@
 -- the local Postgres 17.6 in S71; the apply itself only takes SHARE ROW
 -- EXCLUSIVE): every read of those tables waits while it runs, so run it at a
 -- quiet hour; the 5 s lock_timeout makes it fail instead of queueing, then
--- retry. Dropping chat_removals deletes the only record of WHO removed each
+-- retry. On Supabase the DROP TRIGGER also makes supautils
+-- (supautils.drop_trigger_grants) take ACCESS EXCLUSIVE until COMMIT on 23
+-- auth / storage / realtime tables (auth.users, auth.sessions,
+-- auth.refresh_tokens, auth.identities, storage.objects, storage.buckets,
+-- realtime.*; measured locally in S71): sign-ins, token refreshes, uploads and
+-- realtime wait while it runs. Read `show supautils.drop_trigger_grants` on
+-- production before relying on a rollback. Dropping chat_removals deletes the only record of WHO removed each
 -- club-chat message (officer removals leave messages.removed_by null): if
 -- that history is wanted, keep a copy first,
 --   create table public.chat_removals_keep as select * from public.chat_removals;
@@ -252,7 +261,7 @@
 --   notify pgrst, 'reload schema';
 --   COMMIT;
 --
--- COST (contract 3.9; the Mac fills it from the local rehearsal: fixtures
+-- COST, filled 2026-10-01 (S71), PostgreSQL 17.6 local stack (contract 3.9; the Mac fills it from the local rehearsal: fixtures
 -- built with generate_series inside BEGIN ... ROLLBACK after this file's
 -- body; the Postgres version and the date on the first line when filled).
 --   1. EXPLAIN (ANALYZE, BUFFERS) of the reply-count SELECT of step 5 as a
@@ -261,18 +270,29 @@
 --      execute` with a $1 array (the generic shape, what plpgsql runs), with
 --      and without the `thread_root_id is not null` term (the partial index
 --      idx_messages_thread_root must apply under the generic plan too):
---        <filled by the Mac rehearsal>
+--        As postgres (the definer; RLS bypassed as in the function); messages 2,166 rows / 38 pages, stats as found.
+--        Chosen plan, all four shapes: Seq Scan, 38 buffers (literal HashAggregate 0.46 ms, generic Sort + GroupAggregate 0.75 ms).
+--        seqscan off: generic takes idx_messages_channel_created (0.73-0.80 ms), literal idx_messages_thread_root (0.51-0.59 ms).
+--        Channel index dropped in-txn: generic uses idx_messages_thread_root WITH and WITHOUT the term (0.59-0.76 ms); call 0.6-0.9 ms.
 --   2. `select count(*) from chat_poll_votes where option_id = ?` and
 --      `delete from chat_poll_votes where poll_id = ? and user_id = ?` on a
 --      poll with 500 votes:
---        <filled by the Mac rehearsal>
+--        500-vote sign-up (10 x 50) + 500-vote poll (400/100): 4 real members + placeholder ids (7 local users; RI off for that INSERT only).
+--        count, a full 50-vote slot: Bitmap Index Scan on chat_poll_votes_pkey, 0.02-0.03 ms, 8 buffers; a 400-vote option 0.06-0.07 ms.
+--        delete, 1 row of the 500-vote poll: Index Scan using idx_chat_poll_votes_poll_user, 0.01-0.04 ms, 4 buffers; same plans generic.
 --   3. The trigger's `delete ... using chat_polls` for one row:
---        <filled by the Mac rehearsal>
+--        As written (a member's 11 votes, 4 Lounge polls): Hash Join over Bitmap Index Scans on idx_chat_poll_votes_user and
+--        idx_chat_polls_channel, 0.04-0.05 ms, 18 buffers. One channel_members DELETE: Trigger chat_votes_drop_access 0.27 ms,
+--        the whole DELETE 0.26-0.29 ms (\timing); an officer's row returns early, trigger 0.08 ms.
 --   4. The wall time of one chat_cast_vote call (\timing):
---        <filled by the Mac rehearsal>
+--        As service_role (set local role; the guard refuses only anon/authenticated), psql in the container, no HTTP: 1.5 ms
+--        cold (first call in the session); 0.45-0.66 ms switching a vote on the 500-vote poll; 0.34-0.50 ms off/on a sign-up slot.
 --   5. The wall time of the whole file, rehearsal 2 (the lock window,
 --      DATABASE-M1), and the lock modes read from pg_locks during it:
---        <filled by the Mac rehearsal>
+--        51 statements (+ begin/commit): 88 / 92 / 132 ms over 3 runs (probe 31-34, pre-flight 18-25); SHARE ROW EXCLUSIVE window ~70 ms.
+--        Clean read (B's objects renamed away, not dropped): SHARE ROW EXCLUSIVE + ACCESS SHARE on messages, channels, users,
+--        channel_members; ACCESS SHARE on org_members, events, orgs, blocks, account_restrictions; rsvps none; no ACCESS EXCLUSIVE.
+--        ROLLBACK's DROP TRIGGER also takes ACCESS EXCLUSIVE on 23 auth/storage/realtime tables (supautils.drop_trigger_grants).
 -- ---------------------------------------------------------------------------
 
 begin;
@@ -313,7 +333,9 @@ declare
   -- RECORD, and step 7 refuses the file until it is pasted. An empty value
   -- is written as two single quotes on purpose: an empty dollar-quoted
   -- string would put two dollar signs in a row and end this block early.
-  want_select constant text := '';
+  want_select constant text := $w$(((removed_at IS NULL) OR (user_id = ( SELECT auth.uid() AS uid))) AND (EXISTS ( SELECT 1
+   FROM channels c
+  WHERE ((c.id = messages.channel_id) AND (c.org_id IS NOT NULL) AND can_view_org_channel(c.id, auth.uid())))))$w$;
   fp  text;
   got text;
   bad text;
@@ -1203,37 +1225,37 @@ do $$
 declare
   want_select text := coalesce(current_setting('chat_cards.want_select', true), '');
   -- pg_get_constraintdef of the 25 constraints of step 1, in DDL order.
-  want_con_chat_polls_pkey                     constant text := '';
-  want_con_chat_polls_message_id_fkey          constant text := '';
-  want_con_chat_polls_channel_id_fkey          constant text := '';
-  want_con_chat_polls_mode_check               constant text := '';
-  want_con_chat_polls_question_check           constant text := '';
-  want_con_chat_polls_created_by_fkey          constant text := '';
-  want_con_chat_polls_signup_shape             constant text := '';
-  want_con_chat_poll_options_pkey              constant text := '';
-  want_con_chat_poll_options_poll_id_fkey      constant text := '';
-  want_con_chat_poll_options_position_check    constant text := '';
-  want_con_chat_poll_options_label_check       constant text := '';
-  want_con_chat_poll_options_capacity_check    constant text := '';
-  want_con_chat_poll_options_poll_id_position_key constant text := '';
-  want_con_chat_poll_options_id_poll_id_key    constant text := '';
-  want_con_chat_poll_votes_poll_id_fkey        constant text := '';
-  want_con_chat_poll_votes_user_id_fkey        constant text := '';
-  want_con_chat_poll_votes_pkey                constant text := '';
-  want_con_chat_poll_votes_option_fkey         constant text := '';
-  want_con_chat_event_cards_pkey               constant text := '';
-  want_con_chat_event_cards_message_id_fkey    constant text := '';
-  want_con_chat_event_cards_note_check         constant text := '';
-  want_con_chat_removals_pkey                  constant text := '';
-  want_con_chat_removals_message_id_fkey       constant text := '';
-  want_con_chat_removals_removed_by_fkey       constant text := '';
-  want_con_chat_removals_removed_role_check    constant text := '';
+  want_con_chat_polls_pkey                     constant text := $w$PRIMARY KEY (message_id)$w$;
+  want_con_chat_polls_message_id_fkey          constant text := $w$FOREIGN KEY (message_id) REFERENCES messages(id) ON DELETE CASCADE$w$;
+  want_con_chat_polls_channel_id_fkey          constant text := $w$FOREIGN KEY (channel_id) REFERENCES channels(id) ON DELETE CASCADE$w$;
+  want_con_chat_polls_mode_check               constant text := $w$CHECK ((mode = ANY (ARRAY['poll'::text, 'signup'::text])))$w$;
+  want_con_chat_polls_question_check           constant text := $w$CHECK (((char_length(btrim(question)) >= 1) AND (char_length(btrim(question)) <= 200)))$w$;
+  want_con_chat_polls_created_by_fkey          constant text := $w$FOREIGN KEY (created_by) REFERENCES users(id) ON DELETE CASCADE$w$;
+  want_con_chat_polls_signup_shape             constant text := $w$CHECK (((mode = 'poll'::text) OR ((anonymous = false) AND (multi = true))))$w$;
+  want_con_chat_poll_options_pkey              constant text := $w$PRIMARY KEY (id)$w$;
+  want_con_chat_poll_options_poll_id_fkey      constant text := $w$FOREIGN KEY (poll_id) REFERENCES chat_polls(message_id) ON DELETE CASCADE$w$;
+  want_con_chat_poll_options_position_check    constant text := $w$CHECK ((("position" >= 0) AND ("position" <= 9)))$w$;
+  want_con_chat_poll_options_label_check       constant text := $w$CHECK (((char_length(btrim(label)) >= 1) AND (char_length(btrim(label)) <= 80)))$w$;
+  want_con_chat_poll_options_capacity_check    constant text := $w$CHECK (((capacity IS NULL) OR ((capacity >= 1) AND (capacity <= 50))))$w$;
+  want_con_chat_poll_options_poll_id_position_key constant text := $w$UNIQUE (poll_id, "position")$w$;
+  want_con_chat_poll_options_id_poll_id_key    constant text := $w$UNIQUE (id, poll_id)$w$;
+  want_con_chat_poll_votes_poll_id_fkey        constant text := $w$FOREIGN KEY (poll_id) REFERENCES chat_polls(message_id) ON DELETE CASCADE$w$;
+  want_con_chat_poll_votes_user_id_fkey        constant text := $w$FOREIGN KEY (user_id) REFERENCES users(id) ON DELETE CASCADE$w$;
+  want_con_chat_poll_votes_pkey                constant text := $w$PRIMARY KEY (option_id, user_id)$w$;
+  want_con_chat_poll_votes_option_fkey         constant text := $w$FOREIGN KEY (option_id, poll_id) REFERENCES chat_poll_options(id, poll_id) ON DELETE CASCADE$w$;
+  want_con_chat_event_cards_pkey               constant text := $w$PRIMARY KEY (message_id)$w$;
+  want_con_chat_event_cards_message_id_fkey    constant text := $w$FOREIGN KEY (message_id) REFERENCES messages(id) ON DELETE CASCADE$w$;
+  want_con_chat_event_cards_note_check         constant text := $w$CHECK (((note IS NULL) OR ((char_length(btrim(note)) >= 1) AND (char_length(btrim(note)) <= 200))))$w$;
+  want_con_chat_removals_pkey                  constant text := $w$PRIMARY KEY (message_id)$w$;
+  want_con_chat_removals_message_id_fkey       constant text := $w$FOREIGN KEY (message_id) REFERENCES messages(id) ON DELETE CASCADE$w$;
+  want_con_chat_removals_removed_by_fkey       constant text := $w$FOREIGN KEY (removed_by) REFERENCES users(id) ON DELETE SET NULL$w$;
+  want_con_chat_removals_removed_role_check    constant text := $w$CHECK ((removed_role = ANY (ARRAY['owner'::text, 'admin'::text, 'mod'::text])))$w$;
   -- md5(pg_get_functiondef) of the five functions as this file leaves them.
-  want_fn_chat_create_poll        constant text := '';
-  want_fn_chat_create_event_card  constant text := '';
-  want_fn_chat_cast_vote          constant text := '';
-  want_fn_chat_reply_counts       constant text := '';
-  want_fn_chat_votes_drop_access  constant text := '';
+  want_fn_chat_create_poll        constant text := 'f3f1bbba6cb12f90f2d28d01c4c01609';
+  want_fn_chat_create_event_card  constant text := '83f3ce787d5a60fc95cab476ed51f78c';
+  want_fn_chat_cast_vote          constant text := 'a8f2efe48f8c892b609a188deb132551';
+  want_fn_chat_reply_counts       constant text := 'a93d0b729058480add63680869c16498';
+  want_fn_chat_votes_drop_access  constant text := '1f917d425bdaa9e3ae2d5e9dba8d957b';
   got_select text;
   got        text;
   f          record;
