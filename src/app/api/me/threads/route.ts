@@ -1,5 +1,6 @@
 import { NextResponse } from "next/server";
 
+import { readLatestPerRoom } from "@/lib/chat/latest-per-room";
 import { BOARD_POSTER_ROLES, clubRoomLabel, isClubRole, isRoomKind } from "@/lib/chat/room-rules";
 import { isMissingChatSchema, warnMissingChatSchemaOnce } from "@/lib/chat/schema";
 import type { ClubRole, OrgRef, RoomKind, ThreadEntryRoomFields } from "@/lib/chat/types";
@@ -643,12 +644,13 @@ export async function GET(req: Request) {
   // filter changes nothing for them. On a database without the column the
   // read is repeated without the filter: today's previews.
   //
-  // Two reads, each newest first with its own window of 5 rows per channel:
-  // the dms and groups, and the club rooms. Every member now lists every
-  // Board and Lounge of their clubs; in one shared window busy club rooms
-  // could push a dm's last message out of it (no preview, no unread, a
-  // request dropped, a hidden dm not coming back). A dm competes only with
-  // dms and groups, as before club rooms were listed.
+  // The newest 5 rows of EACH channel, through `chat_latest_per_channel`
+  // (S71 amendment 2; src/lib/chat/latest-per-room.ts), on the viewer's own
+  // client: one busy channel can no longer push another channel's last
+  // message out (no preview, no unread, a request dropped, a hidden dm not
+  // coming back). Two reads still, the dms and groups and the club rooms, so
+  // a database without migration C falls back to today's two shared windows
+  // of `ids.length * 5` rows, where a dm competes only with dms and groups.
   type LastMsgRow = {
     channel_id: string;
     content: string;
@@ -660,12 +662,19 @@ export async function GET(req: Request) {
   };
   const readLastMessages = async (ids: string[]): Promise<LastMsgRow[]> => {
     if (ids.length === 0) return [];
-    const query = (select: string, topLevelOnly: boolean) => {
+    // Today's read, unchanged: the fallback for a database without migration C.
+    const sharedWindow = (select: string, topLevelOnly: boolean) => {
       const q = supabase.from("messages").select(select).in("channel_id", ids);
       return (topLevelOnly ? q.is("thread_root_id", null) : q)
         .order("created_at", { ascending: false })
         .limit(ids.length * 5);
     };
+    const query = (select: string, topLevelOnly: boolean) =>
+      readLatestPerRoom(
+        supabase,
+        { ids, per: 5, topLevelOnly, liveOnly: false, select, tag: "threads.GET lastMsgs chat_latest_per_channel" },
+        () => sharedWindow(select, topLevelOnly),
+      );
     const wide = "channel_id, content, created_at, user_id, media_kind, attachment_kind";
     let topLevelOnly = roomsReady;
     let { data, error } = await query(wide, topLevelOnly);

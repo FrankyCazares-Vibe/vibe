@@ -62,8 +62,10 @@ const STUBS: Record<string, string> = {
       "export function contentBlockedResponse(field) { return json({ ok: false, error: \"That includes words that aren't allowed on Vibe\", " +
       "code: 'content_blocked', ...(field ? { field } : {}) }, 422); }",
   ),
+  // body.ts reads the real `INVISIBLE` class (S71 amendment 2, section 4): re-exported, never copied.
   "@/lib/moderation/text-filter": stub(
-    "export function checkText(text) { return typeof text === 'string' && /zzblocked/i.test(text) ? { ok: false, category: 'test' } : { ok: true }; }",
+    "export function checkText(text) { return typeof text === 'string' && /zzblocked/i.test(text) ? { ok: false, category: 'test' } : { ok: true }; }\n" +
+      `export { INVISIBLE } from ${JSON.stringify(new URL("lib/moderation/text-filter.ts", SRC_ROOT).href)};`,
   ),
   "@/lib/messages/channel-access": stub(
     "export async function ensureMember(client, channelId, userId) { globalThis.__b2.log.push(['ensureMember', channelId, userId]); return globalThis.__b2.member; }",

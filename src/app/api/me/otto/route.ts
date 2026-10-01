@@ -1,5 +1,6 @@
 import { NextResponse } from "next/server";
 
+import { readLatestPerRoom } from "@/lib/chat/latest-per-room";
 import { attachNotificationOrgs, type NotificationOrg } from "@/lib/orgs/notification-orgs";
 import { visibleActorFilter, withEventNotices } from "@/lib/push/event-notice";
 import { loadHiddenUsers } from "@/lib/safety/hidden-users";
@@ -439,12 +440,22 @@ export async function GET() {
     );
     if (dms.length > 0) {
       const channelIds = dms.map((r) => r.channel_id);
-      const { data: lastMsgs, error: msgsErr } = await supabase
-        .from("messages")
-        .select("channel_id,user_id,created_at")
-        .in("channel_id", channelIds)
-        .order("created_at", { ascending: false })
-        .limit(channelIds.length * 3);
+      // The newest 3 rows of EACH dm through `chat_latest_per_channel`
+      // (S71 amendment 2): a busy dm can no longer push a quiet dm's newest
+      // message out and drop it from the count. A database without migration
+      // C reads today's window of `channelIds.length * 3` rows shared by all.
+      const select = "channel_id,user_id,created_at";
+      const { data: lastMsgs, error: msgsErr } = await readLatestPerRoom(
+        supabase,
+        { ids: channelIds, per: 3, topLevelOnly: false, liveOnly: false, select, tag: "api/me/otto unread-dms chat_latest_per_channel" },
+        () =>
+          supabase
+            .from("messages")
+            .select(select)
+            .in("channel_id", channelIds)
+            .order("created_at", { ascending: false })
+            .limit(channelIds.length * 3),
+      );
       if (msgsErr) throw msgsErr;
       const latestByChannel = new Map<string, { user_id: string; created_at: string }>();
       type MsgRow = { channel_id: string; user_id: string; created_at: string };

@@ -165,8 +165,9 @@ export function refusalBody<Code extends RefusalCode>(code: Code): Refusal<Code>
 /**
  * The 400 of the card routes (wave-2 contract 1.3, 4.1.6, 4.3.5): the only
  * refusal with a `field` besides `content_blocked`. `field` is one of
- * `type`, `question`, `options`, `options.<n>`, `event_id`, `note`,
- * `closes_at` (the create route) or `option_id`, `on` (the vote route).
+ * `type`, `question`, `options`, `options.<n>`, `anonymous`, `multi`,
+ * `event_id`, `note`, `closes_at` (the create route) or `option_id`, `on`
+ * (the vote route).
  * The sheet reads it through `VibeFailure.field`.
  */
 export type InvalidCardRefusal = Refusal<"invalid_card"> & { field: string };

@@ -79,8 +79,12 @@ function mapLeet(text: string): string {
   return chars.join("");
 }
 
-/** Zero-width and invisible characters, the cheapest way to break a match. */
-const INVISIBLE = /[­​-‏⁠﻿]/g;
+/**
+ * Zero-width and invisible characters, the cheapest way to break a match.
+ * Exported for the card body's "visibly blank" rule (cards/body.ts). It
+ * carries the `g` flag: use it with `replace`, never with `test`.
+ */
+export const INVISIBLE = /[­​-‏⁠﻿]/g;
 
 /**
  * Lowercase, accent-folded, leet-mapped, de-stuttered text with single

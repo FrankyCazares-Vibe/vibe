@@ -89,7 +89,10 @@ type Answerer = (table: string, calls: Call[], nth: number) => Answer;
 
 const METHODS = ["select", "eq", "in", "is", "or", "not", "order", "limit", "neq", "gte", "lte", "lt", "gt"] as const;
 
-/** Each `from()` starts a fresh chain; awaiting it asks `answer(table, calls, nth)` — `nth` counts the reads of that table. */
+/**
+ * Each `from()` starts a fresh chain; awaiting it asks `answer(table, calls, nth)` — `nth` counts the reads of that table.
+ * `rpc(fn, args)` is logged and answered as the table `rpc:<fn>`, its first call `["rpc", args]` (the event-refs.test.ts idiom).
+ */
 function fakeClient(answer: Answerer, userId: string | null) {
   const log: Logged[] = [];
   const seen = new Map<string, number>();
@@ -124,12 +127,26 @@ function fakeClient(answer: Answerer, userId: string | null) {
       log.push({ table, calls });
       return chain(table, calls, nth);
     },
+    rpc(fn: string, args: unknown) {
+      const table = `rpc:${fn}`;
+      const nth = seen.get(table) ?? 0;
+      seen.set(table, nth + 1);
+      const calls: Call[] = [["rpc", args]];
+      log.push({ table, calls });
+      return chain(table, calls, nth);
+    },
   };
   return { client, log };
 }
 
 type World = {
   cookie?: Answerer;
+  /**
+   * The cookie client's `rpc:<fn>` answers. Absent: every function is missing
+   * (`PGRST202`, a database without migration C), so the per-room reads fall
+   * back to today's shared windows and the older cases read as they always did.
+   */
+  rpc?: Answerer;
   service?: Answerer | null;
   user?: string | null;
   flag?: boolean;
@@ -154,7 +171,12 @@ const g = globalThis as unknown as Record<string, unknown>;
 
 /** Install the fakes; returns the two logs. */
 function install(world: World) {
-  const cookie = fakeClient(world.cookie ?? (() => ({ data: [] })), world.user === undefined ? VIEWER : world.user);
+  const cookieAnswer = world.cookie ?? (() => ({ data: [] }));
+  const rpcAnswer = world.rpc ?? (() => ({ error: MISSING_FN }));
+  const cookie = fakeClient(
+    (table, calls, nth) => (table.startsWith("rpc:") ? rpcAnswer(table, calls, nth) : cookieAnswer(table, calls, nth)),
+    world.user === undefined ? VIEWER : world.user,
+  );
   const service = world.service === null ? null : fakeClient(world.service ?? (() => ({ data: [] })), null);
   g.__vibeCookie = cookie.client;
   g.__vibeService = service ? service.client : undefined;
@@ -178,6 +200,7 @@ const OTHER = "33333333-3333-4333-8333-333333333333";
 const ORG1 = "aaaaaaaa-0000-4000-8000-000000000001";
 const ORG2 = "aaaaaaaa-0000-4000-8000-000000000002";
 const MISSING_KIND = { code: "42703", message: "column channels.kind does not exist" };
+const MISSING_FN = { code: "PGRST202", message: "Could not find the function public.chat_latest_per_channel(p_channels, p_live_only, p_per, p_top_level_only) in the schema cache" };
 const req = (url = "http://localhost/api/x") => new Request(url);
 const ctx = (slug = "salsa") => ({ params: Promise.resolve({ slug }) });
 
@@ -390,6 +413,148 @@ test("inbox: a failed preview window, a failed count, failed events or no servic
   assert.equal(refsFailed.status, 200);
   assert.equal((refsFailed.body.clubs as InboxClub[])[1].next_event, null);
   assert.equal((refsFailed.body.clubs as InboxClub[])[1].board.latest?.id, "m-b1-new");
+});
+
+// ── GET /api/me/inbox, the per-room reads (S71 amendment 2) ─────────────────
+
+type StoredMsg = {
+  id: string; channel_id: string; content: string; created_at: string; user_id: string; kind: string;
+  thread_root_id: string | null; removed_at: string | null; users: { name: string } | null;
+};
+type LatestArgs = { p_channels: string[]; p_per: number; p_top_level_only: boolean; p_live_only: boolean };
+
+/**
+ * A small `messages` table that answers both reads as the database does:
+ * today's shared window (`in` + `is null` + newest first + `limit`, ONE window
+ * for all the rooms) and `chat_latest_per_channel` (the newest `p_per` rows
+ * of EACH room, clamped to 1..20, the first 500 ids, newest first overall).
+ */
+function messagesTable(rows: StoredMsg[]) {
+  const newestFirst = [...rows].sort((a, b) => b.created_at.localeCompare(a.created_at));
+  const isNull = (row: StoredMsg, column: unknown) => (row as unknown as Record<string, unknown>)[String(column)] === null;
+  return {
+    window(calls: Call[]): Answer {
+      const ids = arg(calls, "in", "channel_id") as string[];
+      const nulls = calls.filter((c) => c[0] === "is").map((c) => c[1]);
+      const hits = newestFirst.filter((row) => ids.includes(row.channel_id) && nulls.every((column) => isNull(row, column)));
+      return { data: hits.slice(0, arg(calls, "limit") as number) };
+    },
+    perRoom(calls: Call[]): Answer {
+      const a = calls[0][1] as LatestArgs;
+      const per = Math.min(Math.max(a.p_per ?? 1, 1), 20);
+      const hits = a.p_channels.slice(0, 500).flatMap((id) =>
+        newestFirst
+          .filter((row) => row.channel_id === id && (!a.p_top_level_only || row.thread_root_id === null) && (!a.p_live_only || row.removed_at === null))
+          .slice(0, per),
+      );
+      return { data: hits.sort((x, y) => y.created_at.localeCompare(x.created_at)) };
+    },
+  };
+}
+
+const E2 = "e2";
+const msg = (id: string, channel_id: string, created_at: string, over: Partial<StoredMsg> = {}): StoredMsg => ({
+  id, channel_id, content: id, created_at, user_id: OTHER, kind: "text", thread_root_id: null, removed_at: null, users: { name: "Ann" }, ...over,
+});
+/** Busy rooms beside quiet ones: in one shared window the busy room of each kind fills every slot. */
+const busyRows = (): StoredMsg[] => [
+  msg("b1-only", B1, T(5)),
+  ...Array.from({ length: 12 }, (_, h) => msg(`b2-${h}`, B2, T(21, h))),
+  ...Array.from({ length: 12 }, (_, h) => msg(`l1-${h}`, L1, T(20, h))),
+  msg("l2-live", L2, T(10)),
+  msg("l2-reply", L2, T(19), { thread_root_id: "l2-live" }),
+  msg("l2-removed", L2, T(18), { removed_at: T(18, 1), user_id: VIEWER }),
+  ...Array.from({ length: 7 }, (_, h) => msg(`e1-${h}`, E1, T(22, h))),
+  msg("e2-only", E2, T(3)),
+];
+const busyCookie = (table: ReturnType<typeof messagesTable>): Answerer => (t, calls) => {
+  if (t === "channel_members") {
+    return { data: [
+      membership(B1, ORG1, "board"), membership(L1, ORG1, "lounge"), membership(E1, ORG1, "event"),
+      membership(B2, ORG2, "board"), membership(L2, ORG2, "lounge"), membership(E2, ORG2, "event"),
+    ] };
+  }
+  if (t === "orgs") return { data: [orgRow(ORG1, "Salsa"), orgRow(ORG2, "Chess")] };
+  if (t === "org_members") return { data: [{ org_id: ORG1, role: "member" }, { org_id: ORG2, role: "member" }] };
+  if (t === "messages") return table.window(calls);
+  return { data: [] };
+};
+const busyService: Answerer = (t) => (t === "messages" ? { count: 0 } : { data: [] });
+const busyWorld = (rpc: boolean) => {
+  const table = messagesTable(busyRows());
+  return install({
+    cookie: busyCookie(table),
+    rpc: rpc ? (t, calls) => (t === "rpc:chat_latest_per_channel" ? table.perRoom(calls) : { error: MISSING_FN }) : undefined,
+    service: busyService,
+  });
+};
+const latestIds = (clubs: InboxClub[]) =>
+  clubs.map((c) => ({ club: c.org.name, board: c.board.latest?.id ?? null, lounge: c.lounge.latest?.id ?? null, last: c.last_activity_at }));
+
+test("inbox, per room: one call per read on the cookie client, k rows of EACH room, today's filters; no shared window", async () => {
+  const { cookieLog, serviceLog } = busyWorld(true);
+  const res = await inbox.GET(req(), ctx());
+  assert.equal(res.status, 200);
+  const calls = reads(cookieLog, "rpc:chat_latest_per_channel");
+  assert.equal(calls.length, 3);
+  const [board, lounge, events] = calls.map((c) => c.calls);
+  assert.deepEqual(board[0], ["rpc", { p_channels: [B1, B2], p_per: 5, p_top_level_only: true, p_live_only: true }]);
+  assert.deepEqual(lounge[0], ["rpc", { p_channels: [L1, L2], p_per: 5, p_top_level_only: true, p_live_only: true }]);
+  assert.deepEqual(events[0], ["rpc", { p_channels: [E1, E2], p_per: 1, p_top_level_only: true, p_live_only: true }]);
+  for (const preview of [board, lounge]) {
+    assert.equal(selectOf(preview), "id, channel_id, content, created_at, user_id, kind, thread_root_id, users:users!messages_user_id_fkey(name)", "the same select list, the users embed included");
+  }
+  assert.equal(selectOf(events), "channel_id, created_at");
+  for (const c of [board, lounge, events]) assert.deepEqual(c.find((x) => x[0] === "order"), ["order", "created_at", { ascending: false }]);
+  assert.equal(reads(cookieLog, "messages").length, 0, "no shared window once the function answers");
+  assert.equal(serviceLog.filter((entry) => entry.table.startsWith("rpc:")).length, 0, "never the service role for these reads");
+
+  assert.deepEqual(latestIds(res.body.clubs as InboxClub[]), [
+    { club: "Salsa", board: "b1-only", lounge: "l1-11", last: T(22, 6) },
+    { club: "Chess", board: "b2-11", lounge: "l2-live", last: T(21, 11) },
+  ], "the quiet Board, the quiet Lounge (not its reply, not my removed row) and the quiet event room all count");
+  const salsa = (res.body.clubs as InboxClub[])[0];
+  assert.deepEqual(salsa.board.latest, { id: "b1-only", text: "b1-only", author_name: "Ann", created_at: T(5), kind: "text" }, "the embed's name on the function's rows");
+});
+
+test("inbox, no migration C: the function is missing, today's shared windows answer (and starve the quiet rooms, the bug C fixes)", async () => {
+  const { cookieLog } = busyWorld(false);
+  const res = await inbox.GET(req(), ctx());
+  assert.equal(res.status, 200);
+  assert.equal(reads(cookieLog, "rpc:chat_latest_per_channel").length, 3, "the function is tried first");
+  const windows = reads(cookieLog, "messages");
+  assert.deepEqual(windows.map((w) => arg(w.calls, "limit")), [10, 10, 6], "then today's reads, unchanged");
+  assert.deepEqual(latestIds(res.body.clubs as InboxClub[]), [
+    { club: "Salsa", board: null, lounge: "l1-11", last: T(22, 6) },
+    { club: "Chess", board: "b2-11", lounge: null, last: T(21, 11) },
+  ]);
+});
+
+test("inbox, per room: any other error from the function falls back to today's shared window for the PREVIEWS (an old preview beats none); the event-room read keeps today's soft fail", async (t) => {
+  const errors = t.mock.method(console, "error", () => {});
+  const { cookieLog } = install({
+    cookie: busyCookie(messagesTable(busyRows())),
+    rpc: () => ({ error: { code: "XX000", message: "boom" } }),
+    service: busyService,
+  });
+  const res = await inbox.GET(req(), ctx());
+  assert.equal(res.status, 200);
+  assert.equal(reads(cookieLog, "rpc:chat_latest_per_channel").length, 3, "the function is tried first");
+  // Board and Lounge previews: today's shared window, read once each (S71b repair: `fallbackOnAnyError`).
+  const windows = reads(cookieLog, "messages");
+  assert.deepEqual(windows.map((w) => arg(w.calls, "limit")), [10, 10], "the two preview windows; no event-room window");
+  // Exactly today's answer for the previews (the shared window still starves the quiet rooms): never blank.
+  const latest = latestIds(res.body.clubs as InboxClub[]);
+  // (Chess sorts first here: with the event-room read failed, Salsa's event activity does not count.)
+  assert.deepEqual(latest.map((c) => ({ club: c.club, board: c.board, lounge: c.lounge })), [
+    { club: "Chess", board: "b2-11", lounge: null },
+    { club: "Salsa", board: null, lounge: "l1-11" },
+  ]);
+  const logged = errors.mock.calls.map((c) => String(c.arguments[0]));
+  const refused = logged.filter((line) => line.startsWith("[me/inbox chat_latest_per_channel] the function refused this read"));
+  assert.equal(refused.length, 2, logged.join(" | "));
+  assert.ok(logged.includes("[me/inbox event rooms]"), logged.join(" | "));
+  assert.ok(!logged.includes("[me/inbox board previews]") && !logged.includes("[me/inbox lounge previews]"), "the previews did not fail: they fell back");
 });
 
 // ── GET /api/orgs/[slug]/space (7.2) ────────────────────────────────────────

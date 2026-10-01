@@ -5,6 +5,7 @@ import type { SupabaseClient } from "@supabase/supabase-js";
 import { blockedIdsFor } from "@/lib/chat/blocks";
 import { eventRefsFor, type EventRow } from "@/lib/chat/event-refs";
 import { chatV2For } from "@/lib/chat/flag-server";
+import { readLatestPerRoom } from "@/lib/chat/latest-per-room";
 import {
   firstPerClub,
   groupClubRooms,
@@ -24,6 +25,9 @@ import { createSupabaseServerClient } from "@/lib/supabase/server";
 import { createSupabaseServiceClient, isSupabaseServiceConfigured } from "@/lib/supabase/service";
 
 const TAG = "me/inbox";
+
+/** The one-time "migration C is not in this database yet" line of the three per-room reads. */
+const LATEST_TAG = `${TAG} chat_latest_per_channel`;
 
 /** The viewer's own rows with their rooms (7.1.1); `kind` is dropped on a database without migration A. */
 const MEMBERSHIP_COLUMNS = "channel_id, created_at, last_read_at, pinned_at, muted_until";
@@ -149,23 +153,34 @@ export async function GET() {
     roomById.set(club.lounge.channel_id, { id: club.lounge.channel_id, kind: "lounge", name: club.lounge.channels?.name ?? "", org_id: club.orgId, event: null });
   }
 
-  // 4. Previews (cookie): two reads, one per room kind, each its own window
-  // of 5 rows per room, newest first, top-level only and never a removed
-  // row (RLS shows an author their own removed message; it is not a
-  // preview: 7.1.4, INT-ADJUDICATE-9). The thread list's pattern: a failed
-  // window leaves those rooms without a preview, logged.
+  // 4. Previews (cookie): two reads, one per room kind, the newest 5 rows of
+  // EACH room through `chat_latest_per_channel` (S71 amendment 2), newest
+  // first, top-level only and never a removed row (RLS shows an author their
+  // own removed message; it is not a preview: 7.1.4, INT-ADJUDICATE-9). A
+  // database without migration C reads today's window of `ids.length * 5`
+  // rows shared by the rooms; so does a function that answers any other
+  // error (`fallbackOnAnyError`: this select carries the `users` embed, and
+  // an embed PostgREST refused on the function would otherwise blank every
+  // preview of the Messages home). The thread list's pattern: when that
+  // window fails too, those rooms have no preview, logged.
   const boardIds = clubs.map((club) => club.board.channel_id);
   const loungeIds = clubs.map((club) => club.lounge.channel_id);
   const readPreviews = async (ids: string[], what: string): Promise<PreviewRow[]> => {
     if (ids.length === 0) return [];
-    const { data, error } = await supabase
-      .from("messages")
-      .select(PREVIEW_SELECT)
-      .in("channel_id", ids)
-      .is("thread_root_id", null)
-      .is("removed_at", null)
-      .order("created_at", { ascending: false })
-      .limit(ids.length * 5);
+    const sharedWindow = () =>
+      supabase
+        .from("messages")
+        .select(PREVIEW_SELECT)
+        .in("channel_id", ids)
+        .is("thread_root_id", null)
+        .is("removed_at", null)
+        .order("created_at", { ascending: false })
+        .limit(ids.length * 5);
+    const { data, error } = await readLatestPerRoom(
+      supabase,
+      { ids, per: 5, topLevelOnly: true, liveOnly: true, select: PREVIEW_SELECT, tag: LATEST_TAG, fallbackOnAnyError: true },
+      sharedWindow,
+    );
     if (error) {
       console.error(`[${TAG} ${what} previews]`, error.code, error.message);
       return [];
@@ -239,19 +254,28 @@ export async function GET() {
   };
 
   // 7. The event rooms I hold a row on (cookie): the newest top-level message
-  // per room that is not removed, for `last_activity_at` (7.1.7).
+  // per room that is not removed, for `last_activity_at` (7.1.7). One row of
+  // EACH room through `chat_latest_per_channel`; a database without
+  // migration C reads today's window of `eventRoomIds.length * 3` rows.
   const eventRoomIds = clubs.flatMap((club) => club.eventRooms.map((row) => row.channel_id));
   const readEventActivity = async (): Promise<Map<string, string>> => {
     const newest = new Map<string, string>();
     if (eventRoomIds.length === 0) return newest;
-    const { data, error } = await supabase
-      .from("messages")
-      .select("channel_id, created_at")
-      .in("channel_id", eventRoomIds)
-      .is("thread_root_id", null)
-      .is("removed_at", null)
-      .order("created_at", { ascending: false })
-      .limit(eventRoomIds.length * 3);
+    const select = "channel_id, created_at";
+    const sharedWindow = () =>
+      supabase
+        .from("messages")
+        .select(select)
+        .in("channel_id", eventRoomIds)
+        .is("thread_root_id", null)
+        .is("removed_at", null)
+        .order("created_at", { ascending: false })
+        .limit(eventRoomIds.length * 3);
+    const { data, error } = await readLatestPerRoom(
+      supabase,
+      { ids: eventRoomIds, per: 1, topLevelOnly: true, liveOnly: true, select, tag: LATEST_TAG },
+      sharedWindow,
+    );
     if (error) {
       console.error(`[${TAG} event rooms]`, error.code, error.message);
       return newest;

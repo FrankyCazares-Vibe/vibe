@@ -2,6 +2,7 @@ import "server-only";
 
 import type { SupabaseClient } from "@supabase/supabase-js";
 
+import { readLatestPerRoom } from "@/lib/chat/latest-per-room";
 import { loadHiddenUsers, type HiddenUsers } from "@/lib/safety/hidden-users";
 
 import { visibleActorFilter } from "./event-notice";
@@ -39,7 +40,9 @@ import { visibleActorFilter } from "./event-notice";
  * what RLS does for the student's own client.
  *
  * AT MOST FOUR ROUND TRIPS (loadHiddenUsers is two reads in parallel, skipped
- * when the caller already has it). Any failure answers `{ ok: false }`; the
+ * when the caller already has it); one more on a database without migration
+ * C, where the missing function is followed by today's read (more than 500
+ * threads: one call per 500, in parallel). Any failure answers `{ ok: false }`; the
  * dispatcher then leaves the badge out of the push rather than guess.
  */
 
@@ -105,13 +108,25 @@ export async function loadBadgeCounts(
     let messages = 0;
     if (members.length > 0) {
       const channelIds = members.map((m) => m.channel_id);
-      const latestRes = await client
-        .from("messages")
-        .select("channel_id, user_id, created_at")
-        .in("channel_id", channelIds)
-        .is("removed_at", null)
-        .order("created_at", { ascending: false })
-        .limit(channelIds.length * MESSAGES_PER_CHANNEL);
+      // The newest rows of EACH thread through `chat_latest_per_channel`
+      // (S71 amendment 2), on the client given (the function runs with its
+      // RLS; the service role reads as today): a busy thread can no longer
+      // push a quiet one's newest message out of a shared window and off the
+      // icon. A database without migration C reads today's window of
+      // `channelIds.length * MESSAGES_PER_CHANNEL` rows shared by all.
+      const select = "channel_id, user_id, created_at";
+      const latestRes = await readLatestPerRoom(
+        client,
+        { ids: channelIds, per: MESSAGES_PER_CHANNEL, topLevelOnly: false, liveOnly: true, select, tag: "push/badge chat_latest_per_channel" },
+        () =>
+          client
+            .from("messages")
+            .select(select)
+            .in("channel_id", channelIds)
+            .is("removed_at", null)
+            .order("created_at", { ascending: false })
+            .limit(channelIds.length * MESSAGES_PER_CHANNEL),
+      );
       if (latestRes.error) return { ok: false, error: latestRes.error };
 
       const latest = new Map<string, LatestRow>();

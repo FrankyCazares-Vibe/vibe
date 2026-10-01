@@ -33,7 +33,7 @@ registerHooks({
 });
 
 const specifier = "./body.ts";
-const { readCreateCardBody } = (await import(specifier)) as typeof import("./body");
+const { readCreateCardBody, isVisiblyBlank } = (await import(specifier)) as typeof import("./body");
 
 const NOW = new Date("2026-10-08T21:00:00Z");
 const EVENT = "0f5c2a0e-3b7d-4c8e-9a1b-2c3d4e5f6a7b";
@@ -187,4 +187,95 @@ test("the first bad field wins, in the rules' order", () => {
   field(poll({ options: "x", anonymous: "x", closes_at: "x" }), "options");
   field(poll({ anonymous: "x", closes_at: "x" }), "anonymous");
   field(poll({ multi: "x", closes_at: "x" }), "multi");
+});
+
+// ── S71 amendment 2, section 4: NUL and visibly blank text ───────────────────
+
+/** Every character the visibly-blank rule removes: whitespace, text-filter's INVISIBLE, the Hangul fillers and the Braille blank. */
+const INVISIBLES = ["\u00AD", "\u200B", "\u200C", "\u200D", "\u200E", "\u200F", "\u2060", "\uFEFF"];
+const BLANK_LETTERS = ["\u115F", "\u1160", "\u3164", "\uFFA0", "\u2800"];
+
+test("NUL anywhere in the question, a label or the note is that field's 400, never a 503 later", () => {
+  field(poll({ question: "Pizza\u0000?" }), "question");
+  field(poll({ question: "\u0000" }), "question");
+  field(poll({ question: "  \u0000  " }), "question");
+  field(signup({ question: "Bring\u0000 a dish" }), "question");
+  field(poll({ options: [{ label: "Pizza" }, { label: "Ta\u0000cos" }] }), "options.1");
+  field(poll({ options: [{ label: "\u0000Pizza" }, { label: "Tacos" }] }), "options.0");
+  field(signup({ options: [{ label: "Salad", capacity: 3 }, { label: "Bread\u0000", capacity: 2 }] }), "options.1");
+  field({ type: "event", event_id: EVENT, note: "Wear red\u0000" }, "note");
+  field({ type: "event", event_id: EVENT, note: "\u0000" }, "note");
+  field({ type: "event", event_id: EVENT, note: "   \u0000   " }, "note");
+  // The first bad field still wins in the rules' order.
+  field(poll({ question: "Q\u0000", options: [{ label: "\u0000" }] }), "question");
+});
+
+test("isVisiblyBlank: empty once whitespace, the invisible class and the blank letters are gone", () => {
+  assert.equal(isVisiblyBlank(""), true);
+  assert.equal(isVisiblyBlank(" \t\n\u00A0\u3000"), true);
+  for (const c of [...INVISIBLES, ...BLANK_LETTERS]) {
+    assert.equal(isVisiblyBlank(c), true, `U+${c.codePointAt(0)?.toString(16)}`);
+    assert.equal(isVisiblyBlank(` ${c}${c} `), true);
+    assert.equal(isVisiblyBlank(`a${c}`), false);
+  }
+  assert.equal(isVisiblyBlank(INVISIBLES.join("") + BLANK_LETTERS.join(" ")), true);
+  assert.equal(isVisiblyBlank("."), false);
+  assert.equal(isVisiblyBlank("\u3165"), false, "a real Hangul letter is visible");
+  assert.equal(isVisiblyBlank("\u2801"), false, "a Braille dot is visible");
+  // The g flag of the shared class never leaks state between calls.
+  assert.equal(isVisiblyBlank("\u200B"), true);
+  assert.equal(isVisiblyBlank("\u200B"), true);
+});
+
+test("a visibly blank question or label is refused like an empty one", () => {
+  for (const c of [...INVISIBLES, ...BLANK_LETTERS]) {
+    field(poll({ question: c }), "question");
+    field(poll({ question: ` ${c} ${c} ` }), "question");
+    field(signup({ question: c.repeat(3) }), "question");
+    field(poll({ options: [{ label: "Pizza" }, { label: c }] }), "options.1");
+    field(poll({ options: [{ label: ` ${c}\t${c} ` }, { label: "Tacos" }] }), "options.0");
+    field(signup({ options: [{ label: c, capacity: 3 }] }), "options.0");
+  }
+  field(poll({ question: "\u3164\u200B\u2800\u00AD" }), "question");
+});
+
+test("a visibly blank note is stored as null, at any length; NUL is still refused", () => {
+  for (const c of [...INVISIBLES, ...BLANK_LETTERS]) {
+    assert.equal(okEvent({ type: "event", event_id: EVENT, note: ` ${c} ` }).note, null, `U+${c.codePointAt(0)?.toString(16)}`);
+  }
+  assert.equal(okEvent({ type: "event", event_id: EVENT, note: "\u3164".repeat(300) }).note, null, "over the 200 cap but blank: no note, not a 400");
+  assert.equal(okEvent({ type: "event", event_id: EVENT, note: " ".repeat(300) }).note, null, "a long blank note, as today");
+  field({ type: "event", event_id: EVENT, note: `x${"\u3164".repeat(200)}` }, "note");
+});
+
+test("text with something visible keeps its invisible characters: nothing is stripped", () => {
+  assert.equal(okPoll(poll({ question: " Pizza\u200B? " })).question, "Pizza\u200B?");
+  assert.equal(okPoll(poll({ question: "\u3164Pizza" })).question, "\u3164Pizza");
+  assert.deepEqual(okPoll(poll({ options: [{ label: "Ta\u00ADcos" }, { label: "\u2800 Pizza" }] })).options, [{ label: "Ta\u00ADcos" }, { label: "\u2800 Pizza" }]);
+  assert.equal(okEvent({ type: "event", event_id: EVENT, note: " Wear\u2060 red " }).note, "Wear\u2060 red");
+});
+
+test("S71b review: text Postgres cannot store is a 400 on its field (closes_at with a NUL; half a surrogate pair)", () => {
+  // V8's Date.parse tolerates a trailing NUL, so closes_at needs its own check.
+  field(poll({ closes_at: "2026-10-20T00:00:00Z\u0000" }), "closes_at");
+  field(signup({ closes_at: "2026-10-20T00:00:00Z\u0000" }), "closes_at");
+  // A lone surrogate is not valid UTF-8 once encoded: the insert could only answer "try again".
+  field(poll({ question: "lone \ud800 high" }), "question");
+  field(poll({ question: "lone \udc00 low" }), "question");
+  field(poll({ options: [{ label: "ok" }, { label: "bad \ud83d" }] }), "options.1");
+  field({ type: "event", event_id: EVENT, note: "note \udfff" }, "note");
+  // A real pair (an emoji) is text like any other.
+  const v = ok(poll({ question: "Pizza 🍕?", options: [{ label: "🍕" }, { label: "🌮" }] }));
+  assert.equal(v.type === "poll" ? v.question : "", "Pizza 🍕?");
+});
+
+test("S71b review: visibly blank also covers format, control, separator and mark characters; emoji and real text are not blank", () => {
+  for (const ch of ["⁡", "᠎", "͏", "️", "‮", "⁦", "\u{E0020}", "឵", "؜", "\u0085", "\u001F", "\u007F"]) {
+    assert.equal(isVisiblyBlank(ch), true, `U+${ch.codePointAt(0)!.toString(16)}`);
+    assert.equal(isVisiblyBlank(`${ch}${ch} ${ch}`), true);
+    field(poll({ question: `${ch}${ch}` }), "question");
+  }
+  for (const text of ["a", "🍕", "é", "​x​", "❤️", "ي", "한"]) {
+    assert.equal(isVisiblyBlank(text), false, JSON.stringify(text));
+  }
 });
