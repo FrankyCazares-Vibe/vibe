@@ -67,6 +67,18 @@ Branch head `ef40404` (pushed). Details: contract **section 17.8**.
 
 **Next:** step 4, the browser walk at 375px, flag ON (blake, avery) and OFF (casey), Light and Night (contract 13.3 step 4, 17.5 items 13-29); then production.
 
+## Step 4, first pass DONE (Oct 1): the browser walk at phone size
+
+Branch head `5f19643`. Details: contract **section 17.9**. Screenshots on the Mac: `handoffs/chat-redesign/s71-walk/` (not committed).
+- **Right on real data:** Messages home (Night + Light), the club space, the Board as a member (no composer, the officer sentence), an event chat and back out one layer at a time, the "+" tray, a poll typed, posted and voted through the screen, the owner's Board composer, an officer Remove through the message menu (database: `removed_by` NULL + the `chat_removals` row), the author's "Removed by a club officer" card, the blocked pair hidden both ways, and with the flag OFF the old list, old thread and Campus › Chat unchanged. No sideways overflow anywhere; no console error from the new screens.
+- **Confirmed bug (audit F06):** Back with a sheet open closes the whole club space and loses the draft. Not fixed yet.
+- **Not walked yet:** long-press on cards, Take a spot, the RSVP / sign-up / share-event sheets, Board replies, the Officers room, Light inside the club, the keyboard, Safari, the store apps, a real phone; audit F05 and F07–F10 not re-tested.
+
+**Next, in order:**
+1. Fix the screen bugs the audit found and the walk confirmed (F06 first; then F05, F07, F08, F09, F10), then walk the "not walked" list.
+2. Production, with **Franky's yes**: the read-only PRE-CHECK → apply **B, then C** at a quiet hour (Management API; the md5 of the pushed file for B) → record both in `schema_migrations` → merge the branch to `main` → the after-deploy check → the Production-only flag env for the three founders + SAE → redeploy → create an upcoming event on production → the first real phone test.
+3. Small Vercel leftover: none (the ANON row is recreated as Config; Preview builds succeed).
+
 ## The short list: what to do, in order
 
 **Part 1 is done** (the leaked key was killed Sept 30 at 02:50 UTC Oct 1; small clean-ups remain, listed there).
