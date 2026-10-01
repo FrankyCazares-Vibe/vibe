@@ -349,13 +349,13 @@ begin
     pg_temp.chat_get(format(
       'select concat_ws(''/'', m.kind, m.content, coalesce(m.thread_root_id::text, ''null''),
               coalesce(m.card_event_id::text, ''null''), coalesce(m.media_url, ''null''),
-              coalesce(m.removed_at::text, ''null''), m.user_id = %L, m.channel_id = %L)
+              coalesce(m.removed_at::text, ''null''), (m.user_id = %L)::text, (m.channel_id = %L)::text)
          from public.messages m where m.id = %L', v_member, v_lounge, got)),
     'poll/Poll: Pizza or tacos?/null/null/null/null/true/true');
   perform pg_temp.chat_ok('A3 its poll row: mode poll, question trimmed, names shown, single choice, no close, by the member',
     pg_temp.chat_get(format(
-      'select concat_ws(''/'', p.mode, p.question, p.anonymous, p.multi, coalesce(p.closes_at::text, ''null''),
-              p.created_by = %L, p.channel_id = %L) from public.chat_polls p where p.message_id = %L',
+      'select concat_ws(''/'', p.mode, p.question, p.anonymous::text, p.multi::text, coalesce(p.closes_at::text, ''null''),
+              (p.created_by = %L)::text, (p.channel_id = %L)::text) from public.chat_polls p where p.message_id = %L',
       v_member, v_lounge, got)),
     'poll/Pizza or tacos?/false/false/null/true/true');
   perform pg_temp.chat_ok('A4 its options: positions 0 and 1, labels trimmed, no capacity',
@@ -370,7 +370,7 @@ begin
   perform pg_temp.chat_keep('signup', got::uuid);
   perform pg_temp.chat_ok('A6 a sign-up always shows names and allows several slots, whatever was sent',
     pg_temp.chat_get(format(
-      'select concat_ws(''/'', p.mode, p.anonymous, p.multi,
+      'select concat_ws(''/'', p.mode, p.anonymous::text, p.multi::text,
               (select string_agg(o.position || '':'' || o.capacity, '','' order by o.position)
                  from public.chat_poll_options o where o.poll_id = p.message_id))
          from public.chat_polls p where p.message_id = %L', got)),
@@ -412,7 +412,7 @@ begin
   perform pg_temp.chat_keep('card', got::uuid);
   perform pg_temp.chat_ok('A17 its messages row: kind event_card, the event, no root; the note trimmed in chat_event_cards',
     pg_temp.chat_get(format(
-      'select concat_ws(''/'', m.kind, m.card_event_id = %L, coalesce(m.thread_root_id::text, ''null''),
+      'select concat_ws(''/'', m.kind, (m.card_event_id = %L)::text, coalesce(m.thread_root_id::text, ''null''),
               (select e.note from public.chat_event_cards e where e.message_id = m.id))
          from public.messages m where m.id = %L', v_upcoming, got)),
     'event_card/true/null/ride?');
@@ -800,13 +800,13 @@ begin
   loop
     perform pg_temp.chat_ok('G2 ' || f.rel || ': RLS on, no policy, no client privilege, service_role without truncate',
       concat_ws('/',
-        (select c.relrowsecurity from pg_class c where c.oid = f.rel::regclass),
+        (select c.relrowsecurity from pg_class c where c.oid = f.rel::regclass)::text,
         (select count(*) from pg_policies p where p.schemaname = 'public' and p.tablename = split_part(f.rel, '.', 2)),
-        has_table_privilege('anon', f.rel, 'SELECT') or has_table_privilege('authenticated', f.rel, 'SELECT')
-          or has_table_privilege('anon', f.rel, 'INSERT') or has_table_privilege('authenticated', f.rel, 'INSERT'),
-        has_table_privilege('service_role', f.rel, 'SELECT') and has_table_privilege('service_role', f.rel, 'INSERT')
-          and has_table_privilege('service_role', f.rel, 'UPDATE') and has_table_privilege('service_role', f.rel, 'DELETE'),
-        has_table_privilege('service_role', f.rel, 'TRUNCATE')),
+        (has_table_privilege('anon', f.rel, 'SELECT') or has_table_privilege('authenticated', f.rel, 'SELECT')
+          or has_table_privilege('anon', f.rel, 'INSERT') or has_table_privilege('authenticated', f.rel, 'INSERT'))::text,
+        (has_table_privilege('service_role', f.rel, 'SELECT') and has_table_privilege('service_role', f.rel, 'INSERT')
+          and has_table_privilege('service_role', f.rel, 'UPDATE') and has_table_privilege('service_role', f.rel, 'DELETE'))::text,
+        has_table_privilege('service_role', f.rel, 'TRUNCATE')::text),
       'true/0/false/true/false');
   end loop;
   perform pg_temp.chat_ok('G3 the trigger is the enabled AFTER DELETE row trigger on channel_members',

@@ -1412,7 +1412,7 @@ begin
     exception when others then got := sqlstate; end;
     res := res || 'signup_lounge_member=' || got || ';';
     want := want || 'signup_lounge_member=accepted;';
-    select concat_ws('/', p.mode, p.anonymous, p.multi,
+    select concat_ws('/', p.mode, p.anonymous::text, p.multi::text,
                      (select string_agg(o.position || ':' || coalesce(o.capacity::text, 'null'), ',' order by o.position)
                         from public.chat_poll_options o where o.poll_id = p.message_id))
       into got from public.chat_polls p where p.message_id = v_signup;
