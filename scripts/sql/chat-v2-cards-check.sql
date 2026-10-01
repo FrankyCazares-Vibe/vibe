@@ -5,7 +5,8 @@
 -- LOCAL ONLY. Run it AFTER the migration has been applied to the local stack:
 --   docker exec -i supabase_db_vibe psql -U postgres -d postgres -v ON_ERROR_STOP=1 < scripts/sql/chat-v2-cards-check.sql
 -- Never on production: it writes (and rolls back) users, clubs, events,
--- messages and votes, and for a moment it creates functions in pg_temp.
+-- messages, votes and removal records, and for a moment it creates functions
+-- in pg_temp.
 -- It refuses any connection that is not the local unix socket (docker exec),
 -- and its first line is a psql command, so the Management API and the MCP
 -- refuse the file before anything runs.
@@ -20,8 +21,10 @@
 -- the migration cannot reach with real rows: a dm, the Officers room, the
 -- event chat of an upcoming event, a leave and a removal through
 -- org_members_drop_club_access, an RSVP withdrawn, an event cancelled, the
--- 200-id limit of chat_reply_counts, the catalog facts (RLS on, no policy,
--- no client grant) and the "for update" x2 assertion on chat_cast_vote. It
+-- 200-id limit of chat_reply_counts, the catalog facts of the five tables
+-- (RLS on, no policy, no client grant) and the "for update" x2 assertion on
+-- chat_cast_vote, and (section H, the S71 amendment) the fifth table
+-- chat_removals: who removed a message, readable by the service role only. It
 -- raises on the first expectation that fails ("chat-cards-check FAILED: ...")
 -- and prints one NOTICE per case that passes ("chat-cards-check ok: ...").
 --
@@ -66,6 +69,9 @@ begin
   end if;
   if to_regclass('public.chat_polls') is null then
     raise exception 'chat-cards-check: chat_polls is missing. Apply 20261001110000_chat_v2_cards.sql to the local stack first';
+  end if;
+  if to_regclass('public.chat_removals') is null then
+    raise exception 'chat-cards-check: chat_removals is missing. The local stack has an older copy of migration B (it lacks the S71 fifth table); roll it back and apply 20261001110000_chat_v2_cards.sql again';
   end if;
 end $$;
 
@@ -796,7 +802,8 @@ begin
     ((length(def) - length(replace(def, 'for update', ''))) / length('for update'))::text, '2');
   for f in
     select * from (values ('public.chat_polls'), ('public.chat_poll_options'),
-                          ('public.chat_poll_votes'), ('public.chat_event_cards')) as t (rel)
+                          ('public.chat_poll_votes'), ('public.chat_event_cards'),
+                          ('public.chat_removals')) as t (rel)
   loop
     perform pg_temp.chat_ok('G2 ' || f.rel || ': RLS on, no policy, no client privilege, service_role without truncate',
       concat_ws('/',
@@ -832,6 +839,95 @@ begin
                          'public.chat_create_event_card(uuid,uuid,uuid,text,text)',
                          'public.chat_cast_vote(uuid,uuid,uuid,boolean)',
                          'public.chat_reply_counts(uuid,uuid[],uuid)']) as s (sig)), 'true');
+end $$;
+
+-- H. chat_removals: who removed a message, for the service role only (S71) ----
+-- The officer's remove route marks the message (removed_at, removed_reason,
+-- removed_by NULL) and writes who removed it HERE, with the service key. An
+-- author can read their own removed row (messages_select_org_member) and so
+-- must find no remover on it and no way into this table: no policy, no client
+-- grant. The message_id key cascades; the remover's key sets null. A removal
+-- after a restore upserts the record whole, removed_at included (H15, H16).
+do $$
+declare
+  v_owner    uuid := pg_temp.chat_id('owner');
+  v_admin    uuid := pg_temp.chat_id('admin');
+  v_member   uuid := pg_temp.chat_id('member');
+  v_outsider uuid := pg_temp.chat_id('outsider');
+  v_lounge   uuid := pg_temp.chat_id('lounge');
+  v_msg      uuid := gen_random_uuid();
+  v_msg2     uuid := gen_random_uuid();
+  ins constant text := 'insert into public.chat_removals (message_id, removed_by, removed_role) values (%L, %L, %L)';
+  -- The statement PostgREST builds for the route's upsert
+  -- (.upsert({ message_id, removed_by, removed_role, removed_at }, { onConflict: 'message_id' })):
+  -- ON CONFLICT DO UPDATE sets only the columns the payload carries.
+  ups constant text := 'insert into public.chat_removals (message_id, removed_by, removed_role, removed_at) values (%L, %L, %L, %L)
+    on conflict (message_id) do update set message_id = excluded.message_id, removed_by = excluded.removed_by,
+      removed_role = excluded.removed_role, removed_at = excluded.removed_at';
+  rel constant text := 'select count(*) from public.chat_removals';
+begin
+  -- Two messages of the member, the first one marked removed the way the
+  -- route marks it (written as postgres: no student has UPDATE on messages).
+  insert into public.messages (id, channel_id, user_id, content) values
+    (v_msg,  v_lounge, v_member, 'chat-cards-check: removal target'),
+    (v_msg2, v_lounge, v_member, 'chat-cards-check: removal target 2');
+  update public.messages
+     set removed_at = now(), removed_by = null, removed_reason = 'chat-cards-check'
+   where id = v_msg;
+
+  perform pg_temp.chat_ok('H1 the service role writes the record of a real message',
+    pg_temp.chat_service(format(ins, v_msg, v_owner, 'owner')), 'ok 1');
+  perform pg_temp.chat_ok('H2 the service role reads it back',
+    pg_temp.chat_service(format('select 1 from public.chat_removals where message_id = %L', v_msg)), 'ok 1');
+  perform pg_temp.chat_ok('H3 it holds the remover, the role and a time',
+    pg_temp.chat_get(format(
+      'select concat_ws(''/'', (removed_by = %L)::text, removed_role, (removed_at is not null)::text)
+         from public.chat_removals where message_id = %L', v_owner, v_msg)),
+    'true/owner/true');
+  perform pg_temp.chat_ok('H4 the author reads their own removed row and finds no remover on it',
+    pg_temp.chat_read(v_member, format(
+      'select concat_ws(''/'', (m.removed_at is not null)::text, coalesce(m.removed_by::text, ''null''))
+         from public.messages m where m.id = %L', v_msg)),
+    'true/null');
+  perform pg_temp.chat_ok('H5 the author cannot read chat_removals', pg_temp.chat_as(v_member, rel), '42501');
+  perform pg_temp.chat_ok('H6 nor can the remover (a student, whatever their club role)', pg_temp.chat_as(v_owner, rel), '42501');
+  perform pg_temp.chat_ok('H7 anon cannot read it', pg_temp.chat_run('anon', null, rel), '42501');
+  perform pg_temp.chat_ok('H8 a student cannot write it', pg_temp.chat_as(v_owner, format(ins, v_msg2, v_owner, 'owner')), '42501');
+  perform pg_temp.chat_ok('H9 anon cannot write it', pg_temp.chat_run('anon', null, format(ins, v_msg2, v_owner, 'owner')), '42501');
+  perform pg_temp.chat_ok('H10 a removed_role of member is refused (a CHECK)',
+    pg_temp.chat_service(format(ins, v_msg2, v_owner, 'member')), '23514');
+  perform pg_temp.chat_ok('H11 a second record for the same message is refused (the primary key)',
+    pg_temp.chat_service(format(ins, v_msg, v_owner, 'admin')), '23505');
+
+  -- The remover's account goes: the record stays, with removed_by null.
+  perform pg_temp.chat_ok('H12 a record of a mod removal for the second message is written',
+    pg_temp.chat_service(format(ins, v_msg2, v_outsider, 'mod')), 'ok 1');
+  delete from public.users where id = v_outsider;
+  perform pg_temp.chat_ok('H13 the remover''s account is deleted: the record stays with removed_by null',
+    pg_temp.chat_get(format(
+      'select concat_ws(''/'', count(*), count(removed_by), min(removed_role))
+         from public.chat_removals where message_id = %L', v_msg2)),
+    '1/0/mod');
+
+  -- The message goes: its record goes with it.
+  delete from public.messages where id = v_msg;
+  perform pg_temp.chat_ok('H14 deleting the message deletes its record',
+    pg_temp.chat_get(format('select count(*)::text from public.chat_removals where message_id = %L', v_msg)), '0');
+
+  -- A removal after a restore: the route upserts the whole record, removed_at
+  -- included (without it in the payload the column default now() applies to
+  -- the first insert only, and the time of the first removal would stay).
+  -- The second message's record (H12, its remover gone in H13) is aged, then
+  -- a new removal by the admin arrives.
+  update public.chat_removals set removed_at = timestamptz '2026-01-01 00:00:00+00' where message_id = v_msg2;
+  perform pg_temp.chat_ok('H15 the service role runs the route''s upsert over an existing record (the DO UPDATE path)',
+    pg_temp.chat_service(format(ups, v_msg2, v_admin, 'admin', '2026-10-01T12:00:00.000Z')), 'ok 1');
+  perform pg_temp.chat_ok('H16 a later removal overwrites the record whole: the new remover, the new role AND the new time',
+    pg_temp.chat_get(format(
+      'select concat_ws(''/'', (removed_by = %L)::text, removed_role, (removed_at = timestamptz ''2026-10-01 12:00:00+00'')::text,
+              (select count(*) from public.chat_removals where message_id = %L)::text)
+         from public.chat_removals where message_id = %L', v_admin, v_msg2, v_msg2)),
+    'true/admin/true/1');
 end $$;
 
 do $$

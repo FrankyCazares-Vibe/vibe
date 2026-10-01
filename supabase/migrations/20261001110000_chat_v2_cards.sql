@@ -1,5 +1,5 @@
 -- S70 club chat, wave 2, batch W2-B1 (contract: section 3 of
--- handoffs/chat-redesign/wave-2-contracts.md): the cards. Migration B: four
+-- handoffs/chat-redesign/wave-2-contracts.md): the cards. Migration B: five
 -- tables, four callable functions, one trigger. Migration A is
 -- 20261001100000_chat_v2_rooms.sql (the rooms); this file needs it.
 --
@@ -21,10 +21,10 @@
 --      the three fingerprints, the two INSERT policy texts (and the SELECT
 --      policy once it is pinned), the grants as found, every name free, the
 --      trigger sets traced, no card row yet, the standing rule.
---   1. Tables chat_polls, chat_poll_options, chat_poll_votes and
---      chat_event_cards with 21 named constraints and 3 indexes; RLS on with
---      NO policy; revoke all from the three roles, service_role gets select,
---      insert, update, delete; a comment each.
+--   1. Tables chat_polls, chat_poll_options, chat_poll_votes,
+--      chat_event_cards and chat_removals with 25 named constraints and 4
+--      indexes; RLS on with NO policy; revoke all from the three roles,
+--      service_role gets select, insert, update, delete; a comment each.
 --   2. (No statement: the SQLSTATE -> route-code table, below.)
 --   3. chat_create_poll (a poll or a sign-up, with its options).
 --   4. chat_create_event_card and chat_cast_vote.
@@ -35,7 +35,7 @@
 --      after each function; the trigger function gets no grant statement.)
 --   7. POST-CHECK by reading, in the same transaction. Its LAST block
 --      compares the constants the Mac rehearsal pastes in (the SELECT policy
---      text, the 21 constraint texts, the five function md5s) and prints
+--      text, the 25 constraint texts, the five function md5s) and prints
 --      them all when any is empty: one place, one raise.
 --   8. POST-CHECK BY BEHAVIOUR in a nested block that raises P0C29 so it
 --      rolls itself back; SKIPPED with a recorded reason when no fixture can
@@ -91,6 +91,21 @@
 -- characters); (e) chat_poll_votes carries the composite foreign key
 -- (option_id, poll_id), so an option can never be counted under another poll.
 --
+-- AMENDED IN S71 (handoffs/chat-redesign/wave-2-build/S71-amendment.md, Part
+-- A; audit finding F02, before this file was ever applied): (f) a fifth table
+-- chat_removals holds who removed a club-chat message and in which role
+-- (owner, admin or mod). The officer's remove route no longer writes
+-- messages.removed_by (RLS shows an author their own removed row, and the
+-- data API would hand them the remover with it); it writes the record here,
+-- through the service role. No new function and no trigger: the table is
+-- written by the route alone. The record is history: a restore leaves it, the
+-- next removal overwrites it (remover, role AND removed_at: the route upserts
+-- all four columns, with the instant it also wrote to messages.removed_at,
+-- because an upsert only overwrites the columns it is sent and the column
+-- default now() is for the first insert only; check case H15 pins that
+-- statement). removed_by is ON DELETE SET NULL (the record outlives the
+-- remover's account), the message_id key cascades.
+--
 -- LIVE STATE (what this file was written against: A's header and POST-CHECK
 -- and the wave-2 database map, read in a CLOUD session on 2026-09-30, nothing
 -- run; production = local for all of it, A:66-70; the S69 close says A is
@@ -117,7 +132,7 @@
 --   * messages.kind is 'text' on every row and card_event_id is null on every
 --     row (A:51-52: nothing writes another kind before this file).
 --   * None of the names this file adds exists in any migration.
---   * The constants of step 7 (want_select, the 21 want_con_*, the five
+--   * The constants of step 7 (want_select, the 25 want_con_*, the five
 --     want_fn_*) are EMPTY in this commit: the first Mac rehearsal prints
 --     them as NOTICE lines and refuses the file ("constants are empty"); the
 --     paste is one edit; the second rehearsal is green (contract 13.3, Mac
@@ -160,7 +175,7 @@
 -- every client write stays kind = 'text', and the old reads already select
 -- kind, thread_root_id and card_event_id. New code on a database without
 -- this file answers 404 not_found on the card routes (isMissingChatSchema).
--- Needs Franky's yes, at a quiet hour. LOCKS: the five REFERENCES of step 1
+-- Needs Franky's yes, at a quiet hour. LOCKS: the seven REFERENCES of step 1
 -- hold SHARE ROW EXCLUSIVE on messages, channels and users from step 1 to
 -- COMMIT (chat sends, the users.last_active_at heartbeat write and a
 -- sign-up's users row queue behind it; reads and RI checks proceed); CREATE
@@ -190,7 +205,7 @@
 --
 -- CHECK AFTER APPLYING (read-only, a UTC session):
 --   1. The APPLY RECORD, the last sentence of the comment of chat_create_poll:
---      when it ran, tables 4 / functions 5 / trigger 1, the file md5, whether
+--      when it ran, tables 5 / functions 5 / trigger 1, the file md5, whether
 --      the behaviour probe passed or was skipped (and why), the notes.
 --     select obj_description('public.chat_create_poll(uuid,uuid,text,text,jsonb,boolean,boolean,timestamptz,text)'::regprocedure, 'pg_proc') as apply_record;
 --   2. No card yet. Expected: 0 on the apply day.
@@ -215,9 +230,15 @@
 --   select set_config('chat_cards.allow_orphans', 'yes', false);
 -- in the same session before the file (under the Management API "the same
 -- session" is the same request: the line is prepended to the request body,
--- never sent apart), never by editing the guard. The DROP TABLE takes locks
--- of the same class on messages, channels and users as the CREATE did (the
--- exact mode is read from pg_locks during the Mac rehearsal).
+-- never sent apart), never by editing the guard. The DROPs take ACCESS
+-- EXCLUSIVE on messages, channels, users and channel_members (measured on
+-- the local Postgres 17.6 in S71; the apply itself only takes SHARE ROW
+-- EXCLUSIVE): every read of those tables waits while it runs, so run it at a
+-- quiet hour; the 5 s lock_timeout makes it fail instead of queueing, then
+-- retry. Dropping chat_removals deletes the only record of WHO removed each
+-- club-chat message (officer removals leave messages.removed_by null): if
+-- that history is wanted, keep a copy first,
+--   create table public.chat_removals_keep as select * from public.chat_removals;
 --   BEGIN;
 --   SET LOCAL lock_timeout = '5s';
 --   drop trigger chat_votes_drop_access on public.channel_members;
@@ -226,7 +247,7 @@
 --   drop function public.chat_cast_vote(uuid,uuid,uuid,boolean);
 --   drop function public.chat_create_event_card(uuid,uuid,uuid,text,text);
 --   drop function public.chat_create_poll(uuid,uuid,text,text,jsonb,boolean,boolean,timestamptz,text);
---   drop table public.chat_poll_votes, public.chat_poll_options, public.chat_polls, public.chat_event_cards;
+--   drop table public.chat_removals, public.chat_poll_votes, public.chat_poll_options, public.chat_polls, public.chat_event_cards;
 --   delete from supabase_migrations.schema_migrations where version = '20261001110000';
 --   notify pgrst, 'reload schema';
 --   COMMIT;
@@ -256,7 +277,7 @@
 
 begin;
 
--- The five REFERENCES of step 1 hold SHARE ROW EXCLUSIVE on messages,
+-- The seven REFERENCES of step 1 hold SHARE ROW EXCLUSIVE on messages,
 -- channels and users until COMMIT; CREATE TRIGGER takes the same class on
 -- channel_members. Give up after 5 seconds rather than queue behind a long
 -- read.
@@ -419,13 +440,14 @@ begin
     end if;
   end loop;
 
-  -- f. Every name this file adds is free: the four tables, the 21
-  --    constraints, the nine relations (three indexes and the six
+  -- f. Every name this file adds is free: the five tables, the 25
+  --    constraints, the eleven relations (four indexes and the seven
   --    constraint-backed ones: a primary key or a unique constraint is a
   --    relation too), the five functions, the trigger.
   select string_agg(w.t, ', ') into bad
     from (values ('public.chat_polls'), ('public.chat_poll_options'),
-                 ('public.chat_poll_votes'), ('public.chat_event_cards')) as w (t)
+                 ('public.chat_poll_votes'), ('public.chat_event_cards'),
+                 ('public.chat_removals')) as w (t)
    where to_regclass(w.t) is not null;
   if bad is not null then
     raise exception 'chat-cards: a table this file adds already exists: %', bad;
@@ -444,17 +466,20 @@ begin
                        'chat_poll_votes_poll_id_fkey', 'chat_poll_votes_user_id_fkey',
                        'chat_poll_votes_pkey', 'chat_poll_votes_option_fkey',
                        'chat_event_cards_pkey', 'chat_event_cards_message_id_fkey',
-                       'chat_event_cards_note_check');
+                       'chat_event_cards_note_check',
+                       'chat_removals_pkey', 'chat_removals_message_id_fkey',
+                       'chat_removals_removed_by_fkey', 'chat_removals_removed_role_check');
   if bad is not null then
     raise exception 'chat-cards: a constraint name this file adds is taken: %', bad;
   end if;
   select string_agg(c.relname, ', ') into bad from pg_class c
    where c.relnamespace = 'public'::regnamespace
      and c.relname in ('idx_chat_polls_channel', 'idx_chat_poll_votes_poll_user',
-                       'idx_chat_poll_votes_user', 'chat_polls_pkey',
+                       'idx_chat_poll_votes_user', 'idx_chat_removals_removed_by',
+                       'chat_polls_pkey',
                        'chat_poll_options_pkey', 'chat_poll_options_poll_id_position_key',
                        'chat_poll_options_id_poll_id_key', 'chat_poll_votes_pkey',
-                       'chat_event_cards_pkey');
+                       'chat_event_cards_pkey', 'chat_removals_pkey');
   if bad is not null then
     raise exception 'chat-cards: an index name this file adds is taken: %', bad;
   end if;
@@ -596,9 +621,21 @@ create table public.chat_event_cards (
   note        text constraint chat_event_cards_note_check check (note is null or char_length(btrim(note)) between 1 and 200),
   created_at  timestamptz not null default now()
 );
+-- S71 amendment (audit F02): who removed a message, and in which role, kept
+-- off messages.removed_by. One row per removed message; the message's key
+-- cascades, the remover's key sets null (the record outlives the account).
+create table public.chat_removals (
+  message_id   uuid constraint chat_removals_pkey primary key
+               constraint chat_removals_message_id_fkey references public.messages(id) on delete cascade,
+  removed_by   uuid constraint chat_removals_removed_by_fkey references public.users(id) on delete set null,
+  removed_role text not null
+               constraint chat_removals_removed_role_check check (removed_role in ('owner','admin','mod')),
+  removed_at   timestamptz not null default now()
+);
 create index idx_chat_polls_channel        on public.chat_polls (channel_id);
 create index idx_chat_poll_votes_poll_user on public.chat_poll_votes (poll_id, user_id);
 create index idx_chat_poll_votes_user      on public.chat_poll_votes (user_id);
+create index idx_chat_removals_removed_by  on public.chat_removals (removed_by);
 
 -- RLS on with NO policy, and no grant for the client roles: the default ACL
 -- would hand anon the table (the pattern of 20260923090000:1935-1936). Only
@@ -608,14 +645,17 @@ alter table public.chat_polls       enable row level security;
 alter table public.chat_poll_options enable row level security;
 alter table public.chat_poll_votes  enable row level security;
 alter table public.chat_event_cards enable row level security;
+alter table public.chat_removals    enable row level security;
 revoke all on table public.chat_polls        from anon, authenticated, service_role;
 revoke all on table public.chat_poll_options from anon, authenticated, service_role;
 revoke all on table public.chat_poll_votes   from anon, authenticated, service_role;
 revoke all on table public.chat_event_cards  from anon, authenticated, service_role;
+revoke all on table public.chat_removals     from anon, authenticated, service_role;
 grant select, insert, update, delete on table public.chat_polls        to service_role;
 grant select, insert, update, delete on table public.chat_poll_options to service_role;
 grant select, insert, update, delete on table public.chat_poll_votes   to service_role;
 grant select, insert, update, delete on table public.chat_event_cards  to service_role;
+grant select, insert, update, delete on table public.chat_removals     to service_role;
 
 comment on table public.chat_polls is
   'A poll (mode poll) or a sign-up (mode signup) shown as the card of the messages row message_id (kind poll, content = the fallback text); wave-2 contract 3.1. Service role only: no policy, no client grant.';
@@ -625,6 +665,8 @@ comment on table public.chat_poll_votes is
   'One row per (option, person); the composite key (option_id, poll_id) keeps a vote under its own poll; wave-2 contract 3.1. Service role only: voter names never leak by a direct read.';
 comment on table public.chat_event_cards is
   'The note of an Event card (the messages row message_id, kind event_card, card_event_id = the event); wave-2 contract 3.1. Service role only.';
+comment on table public.chat_removals is
+  'Who removed a club-chat message and in which role (owner, admin, mod), kept off messages.removed_by so the author of a removed message cannot read the remover; S71 amendment (audit F02). One row per message, written by the remove route with the service role. Service role only: no policy, no client grant.';
 
 -- 3. chat_create_poll (contract 3.3, exact body) --------------------------------
 -- The messages insert runs as the function's owner (postgres, the table
@@ -919,11 +961,12 @@ declare
   got text;
   f   record;
 begin
-  -- a. The four tables: there, RLS on, no policy, no client privilege,
+  -- a. The five tables: there, RLS on, no policy, no client privilege,
   --    service_role select/insert/update/delete and NOT truncate.
   for f in
     select * from (values ('public.chat_polls'), ('public.chat_poll_options'),
-                          ('public.chat_poll_votes'), ('public.chat_event_cards')) as t (rel)
+                          ('public.chat_poll_votes'), ('public.chat_event_cards'),
+                          ('public.chat_removals')) as t (rel)
   loop
     if to_regclass(f.rel) is null then
       raise exception 'chat-cards: % was not created', f.rel;
@@ -951,7 +994,9 @@ begin
     end if;
   end loop;
 
-  -- b. The 21 constraints, each on its table; every foreign key cascades.
+  -- b. The 25 constraints, each on its table; every foreign key of the four
+  --    card tables cascades, and chat_removals' two keys are pinned apart
+  --    (the message's cascades, the remover's sets null).
   select string_agg(w.rel || '.' || w.con, ', ') into bad
     from (values
       ('public.chat_polls', 'chat_polls_pkey'), ('public.chat_polls', 'chat_polls_message_id_fkey'),
@@ -965,7 +1010,9 @@ begin
       ('public.chat_poll_votes', 'chat_poll_votes_poll_id_fkey'), ('public.chat_poll_votes', 'chat_poll_votes_user_id_fkey'),
       ('public.chat_poll_votes', 'chat_poll_votes_pkey'), ('public.chat_poll_votes', 'chat_poll_votes_option_fkey'),
       ('public.chat_event_cards', 'chat_event_cards_pkey'), ('public.chat_event_cards', 'chat_event_cards_message_id_fkey'),
-      ('public.chat_event_cards', 'chat_event_cards_note_check')
+      ('public.chat_event_cards', 'chat_event_cards_note_check'),
+      ('public.chat_removals', 'chat_removals_pkey'), ('public.chat_removals', 'chat_removals_message_id_fkey'),
+      ('public.chat_removals', 'chat_removals_removed_by_fkey'), ('public.chat_removals', 'chat_removals_removed_role_check')
     ) as w (rel, con)
    where not exists (select 1 from pg_constraint c
                       where c.conrelid = w.rel::regclass and c.conname = w.con);
@@ -974,10 +1021,11 @@ begin
   end if;
   select count(*) into n from pg_constraint c
    where c.conrelid in ('public.chat_polls'::regclass, 'public.chat_poll_options'::regclass,
-                        'public.chat_poll_votes'::regclass, 'public.chat_event_cards'::regclass)
+                        'public.chat_poll_votes'::regclass, 'public.chat_event_cards'::regclass,
+                        'public.chat_removals'::regclass)
      and c.contype in ('p', 'u', 'f', 'c');   -- Postgres 18 lists NOT NULL rows ('n') here too
-  if n <> 21 then
-    raise exception 'chat-cards: the four tables carry % constraints, not 21', n;
+  if n <> 25 then
+    raise exception 'chat-cards: the five tables carry % constraints, not 25', n;
   end if;
   select string_agg(c.conname, ', ') into bad from pg_constraint c
    where c.conrelid in ('public.chat_polls'::regclass, 'public.chat_poll_options'::regclass,
@@ -985,6 +1033,15 @@ begin
      and c.contype = 'f' and c.confdeltype <> 'c';
   if bad is not null then
     raise exception 'chat-cards: a foreign key does not cascade on delete: %', bad;
+  end if;
+  -- chat_removals (S71, F02): the record goes with its message ('c' cascade)
+  -- and outlives the remover's account with removed_by null ('n' set null).
+  select string_agg(c.conname, ', ') into bad from pg_constraint c
+   where c.conrelid = 'public.chat_removals'::regclass and c.contype = 'f'
+     and (c.conname::text, c.confdeltype::text) not in
+         (('chat_removals_message_id_fkey', 'c'), ('chat_removals_removed_by_fkey', 'n'));
+  if bad is not null then
+    raise exception 'chat-cards: a foreign key of chat_removals has the wrong delete rule: %', bad;
   end if;
 
   -- c. The five functions: SECURITY DEFINER, the volatility, search_path and
@@ -1134,7 +1191,7 @@ end $$;
 -- 7.2 The constants block, LAST (contract 3.7, DATABASE-M2): one place, one
 --     raise. Every constant below is copied from the catalog after the Mac
 --     rehearsal, never typed by hand: the first rehearsal prints them ALL as
---     NOTICE lines in paste order (want_select first, then the 21 want_con_*,
+--     NOTICE lines in paste order (want_select first, then the 25 want_con_*,
 --     then the five want_fn_*) and raises "constants are empty"; the paste
 --     is one edit (want_select goes into the PRE-FLIGHT, the rest here); the
 --     second rehearsal is green. No real apply runs with an empty constant.
@@ -1145,7 +1202,7 @@ end $$;
 do $$
 declare
   want_select text := coalesce(current_setting('chat_cards.want_select', true), '');
-  -- pg_get_constraintdef of the 21 constraints of step 1, in DDL order.
+  -- pg_get_constraintdef of the 25 constraints of step 1, in DDL order.
   want_con_chat_polls_pkey                     constant text := '';
   want_con_chat_polls_message_id_fkey          constant text := '';
   want_con_chat_polls_channel_id_fkey          constant text := '';
@@ -1167,6 +1224,10 @@ declare
   want_con_chat_event_cards_pkey               constant text := '';
   want_con_chat_event_cards_message_id_fkey    constant text := '';
   want_con_chat_event_cards_note_check         constant text := '';
+  want_con_chat_removals_pkey                  constant text := '';
+  want_con_chat_removals_message_id_fkey       constant text := '';
+  want_con_chat_removals_removed_by_fkey       constant text := '';
+  want_con_chat_removals_removed_role_check    constant text := '';
   -- md5(pg_get_functiondef) of the five functions as this file leaves them.
   want_fn_chat_create_poll        constant text := '';
   want_fn_chat_create_event_card  constant text := '';
@@ -1209,11 +1270,15 @@ begin
       (19, 'con', 'chat_event_cards_pkey',                  'public.chat_event_cards',  want_con_chat_event_cards_pkey),
       (20, 'con', 'chat_event_cards_message_id_fkey',       'public.chat_event_cards',  want_con_chat_event_cards_message_id_fkey),
       (21, 'con', 'chat_event_cards_note_check',            'public.chat_event_cards',  want_con_chat_event_cards_note_check),
-      (22, 'fn',  'chat_create_poll',       'public.chat_create_poll(uuid,uuid,text,text,jsonb,boolean,boolean,timestamptz,text)', want_fn_chat_create_poll),
-      (23, 'fn',  'chat_create_event_card', 'public.chat_create_event_card(uuid,uuid,uuid,text,text)',                              want_fn_chat_create_event_card),
-      (24, 'fn',  'chat_cast_vote',         'public.chat_cast_vote(uuid,uuid,uuid,boolean)',                                        want_fn_chat_cast_vote),
-      (25, 'fn',  'chat_reply_counts',      'public.chat_reply_counts(uuid,uuid[],uuid)',                                           want_fn_chat_reply_counts),
-      (26, 'fn',  'chat_votes_drop_access', 'public.chat_votes_drop_access()',                                                      want_fn_chat_votes_drop_access)
+      (22, 'con', 'chat_removals_pkey',                     'public.chat_removals',     want_con_chat_removals_pkey),
+      (23, 'con', 'chat_removals_message_id_fkey',          'public.chat_removals',     want_con_chat_removals_message_id_fkey),
+      (24, 'con', 'chat_removals_removed_by_fkey',          'public.chat_removals',     want_con_chat_removals_removed_by_fkey),
+      (25, 'con', 'chat_removals_removed_role_check',       'public.chat_removals',     want_con_chat_removals_removed_role_check),
+      (26, 'fn',  'chat_create_poll',       'public.chat_create_poll(uuid,uuid,text,text,jsonb,boolean,boolean,timestamptz,text)', want_fn_chat_create_poll),
+      (27, 'fn',  'chat_create_event_card', 'public.chat_create_event_card(uuid,uuid,uuid,text,text)',                              want_fn_chat_create_event_card),
+      (28, 'fn',  'chat_cast_vote',         'public.chat_cast_vote(uuid,uuid,uuid,boolean)',                                        want_fn_chat_cast_vote),
+      (29, 'fn',  'chat_reply_counts',      'public.chat_reply_counts(uuid,uuid[],uuid)',                                           want_fn_chat_reply_counts),
+      (30, 'fn',  'chat_votes_drop_access', 'public.chat_votes_drop_access()',                                                      want_fn_chat_votes_drop_access)
     ) as t (ord, kind, name, sig, want)
     order by t.ord
   loop
@@ -1663,6 +1728,8 @@ begin
   if exists (select 1 from public.messages where content like 'chat-cards probe:%') then
     raise exception 'chat-cards: a probe row survived the post-check';
   end if;
+  -- (chat_removals is not listed: no function of this file and no probe above
+  -- writes it; the route alone does, after the apply.)
   if exists (select 1 from public.chat_polls) or exists (select 1 from public.chat_event_cards) then
     raise exception 'chat-cards: a probe side row survived the post-check';
   end if;
@@ -1686,7 +1753,7 @@ declare
 begin
   rec := 'APPLY RECORD '
       || to_char(now() at time zone 'UTC', 'YYYY-MM-DD HH24:MI') || ' UTC: '
-      || 'tables 4, functions 5, trigger 1; file md5 '
+      || 'tables 5, functions 5, trigger 1; file md5 '
       || coalesce(nullif(current_setting('chat_cards.file_md5', true), ''), 'NOT GIVEN')
       || '; probe: '
       || coalesce(nullif(current_setting('chat_cards.probe', true), ''), 'skipped: the behaviour check left no record')

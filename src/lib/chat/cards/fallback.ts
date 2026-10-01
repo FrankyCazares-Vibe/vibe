@@ -6,6 +6,12 @@
  *   Poll: <question>
  *   Sign-up: <title>
  *   Event: <title> · <Thu Oct 8, 7:30 PM>[ — <note>]
+ *   Event cancelled: <title>
+ *
+ * The last shape is never written at creation. It replaces an Event card's
+ * text when its event is cancelled (S71 amendment B1), and `Event: ...` is
+ * written again, with the new title and time, when an officer edits the event
+ * (`refresh-event-cards.ts`), so the old screens never keep a stale day.
  *
  * PURE: imports only `../when` (the campus zone and `eventWhen`), so
  * `node --test` loads it (fallback.test.ts). The route builds it from the
@@ -20,7 +26,8 @@ import { CAMPUS_TIME_ZONE, eventWhen } from "../when";
 export type FallbackInput =
   | { type: "poll"; question: string }
   | { type: "signup"; question: string }
-  | { type: "event"; title: string; starts_at: string; note: string | null };
+  | { type: "event"; title: string; starts_at: string; note: string | null }
+  | { type: "event_cancelled"; title: string };
 
 /** The most characters stored; the 300th becomes `…` when the text is cut. */
 export const FALLBACK_MAX = 300;
@@ -36,6 +43,8 @@ export function cardFallbackContent(input: FallbackInput, zone: string = CAMPUS_
     text = `Poll: ${input.question}`;
   } else if (input.type === "signup") {
     text = `Sign-up: ${input.question}`;
+  } else if (input.type === "event_cancelled") {
+    text = `Event cancelled: ${input.title}`;
   } else {
     const when = eventWhen(input.starts_at, zone);
     text = `Event: ${input.title} · ${when}`;

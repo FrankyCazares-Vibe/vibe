@@ -264,7 +264,8 @@ export type MessageKind = "text" | "poll" | "event_card";
  * else). `by` is "officer" when the stored reason equals
  * `OFFICER_REMOVED_REASON`, else "moderator"; `reason` is null for an
  * officer's removal. `removed_at`, `removed_by` and `removed_reason` never
- * appear in the JSON.
+ * appear in the JSON. An officer's removal leaves `removed_by` null (S71 F02);
+ * who did it lives in the service-only `chat_removals` table.
  */
 export type RemovedInfo = { by: "officer" | "moderator"; at: string; reason: string | null };
 

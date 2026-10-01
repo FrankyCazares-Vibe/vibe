@@ -3,7 +3,9 @@
  * (handoffs/chat-redesign/wave-2-contracts.md 6.1, the ten gates in order)
  * against fakes: the cookie and service clients, the rate limit, the
  * restriction gate, `ensureMember`, `roomOf` and `clubRole` all answer from
- * one `state` object, so every row of the table is one small case.
+ * one `state` object, so every row of the table is one small case. The
+ * S71 amendment (F02) adds the last step: the mark writes `removed_by: null`
+ * and the remover goes to the service-only `chat_removals` table.
  *
  * Run with:
  *   node --test src/lib/chat/remove-route.test.ts
@@ -83,12 +85,12 @@ const { OFFICER_REMOVED_REASON } = (await import(rulesSpecifier)) as typeof impo
 
 type Call = [string, ...unknown[]];
 type Answer = { data?: unknown; error?: { code?: string; message?: string } | null };
-type Query = { table: string; calls: Call[] };
+type Query = { table: string; calls: Call[]; who: "cookie" | "service" };
 
-function fakeClient(answer: (q: Query) => Answer, queries: Query[]) {
+function fakeClient(answer: (q: Query) => Answer, queries: Query[], who: Query["who"]) {
   return {
     from(table: string) {
-      const q: Query = { table, calls: [] };
+      const q: Query = { table, calls: [], who };
       queries.push(q);
       const builder: Record<string, unknown> = {
         then(resolve: (value: Answer) => unknown, reject?: (reason: unknown) => unknown) {
@@ -97,7 +99,7 @@ function fakeClient(answer: (q: Query) => Answer, queries: Query[]) {
             .then(resolve, reject);
         },
       };
-      for (const method of ["select", "eq", "is", "limit", "maybeSingle", "delete", "update"]) {
+      for (const method of ["select", "eq", "is", "limit", "maybeSingle", "delete", "update", "upsert"]) {
         builder[method] = (...args: unknown[]) => {
           q.calls.push([method, ...args]);
           return builder;
@@ -146,6 +148,10 @@ type Setup = {
   reports?: "none" | "open" | "missing-status" | "fail";
   updateRows?: { id: string }[];
   updateError?: { code: string; message: string };
+  /** The `chat_removals` upsert fails with this error (a missing table included). */
+  removalsError?: { code: string; message: string };
+  /** The `chat_removals` upsert throws instead of answering. */
+  removalsThrows?: boolean;
 };
 
 function setup(s: Setup) {
@@ -157,7 +163,7 @@ function setup(s: Setup) {
       if (q.table === "messages" && method === "delete") return { data: null, error: s.deleteError ?? null };
       if (q.table === "messages") return s.cookieError ? { data: null, error: s.cookieError } : { data: s.cookieRow ?? null, error: null };
       throw new Error(`unexpected cookie read of ${q.table}`);
-    }, queries),
+    }, queries, "cookie"),
     { auth: { getUser: async () => ({ data: { user: s.user === undefined ? { id: ME } : s.user }, error: null }) } },
   );
   const service =
@@ -167,6 +173,10 @@ function setup(s: Setup) {
           const method = q.calls[0]?.[0];
           if (q.table === "messages" && method === "update") return { data: s.updateRows ?? [{ id: MESSAGE }], error: s.updateError ?? null };
           if (q.table === "messages") return s.serviceReadError ? { data: null, error: s.serviceReadError } : { data: s.serviceRow ?? null, error: null };
+          if (q.table === "chat_removals") {
+            if (s.removalsThrows) throw new Error("socket hang up");
+            return { data: null, error: s.removalsError ?? null };
+          }
           if (q.table === "reports") {
             reportReads += 1;
             const mode = s.reports ?? "none";
@@ -178,7 +188,7 @@ function setup(s: Setup) {
             return { data: mode === "open" ? [{ id: "r1" }] : [], error: null };
           }
           throw new Error(`unexpected service read of ${q.table}`);
-        }, queries);
+        }, queries, "service");
   const state: State = {
     user: s.user === undefined ? { id: ME } : s.user,
     cookie,
@@ -408,7 +418,7 @@ test("10: the mark: service update with the officer marker where removed_at is n
   const update = queries.find((q) => q.calls[0]?.[0] === "update");
   assert.ok(update);
   const [[, payload], ...rest] = update.calls as [[string, Record<string, unknown>], ...Call[]];
-  assert.equal(payload.removed_by, ME);
+  assert.equal(payload.removed_by, null, "who removed it is never written on the message (S71 F02)");
   assert.equal(payload.removed_reason, OFFICER_REMOVED_REASON);
   assert.equal(payload.removed_reason, "Removed by a club officer.");
   assert.ok(typeof payload.removed_at === "string" && !Number.isNaN(Date.parse(payload.removed_at)));
@@ -427,6 +437,142 @@ test("10: an update that fails → 503 try_again", async () => {
 });
 
 test("the order of the gates for a stranger's row: ensureMember, rateLimit, requireNotRestricted, roomOf, clubRole x2", async () => {
+  const { state } = setup({ cookieRow: OTHERS_ROW });
+  await call();
+  assert.deepEqual(names(state.log), ["ensureMember", "rateLimit", "requireNotRestricted", "roomOf", "clubRole", "clubRole"]);
+});
+
+// ── 11: who removed it, `chat_removals` (S71 amendment A3 / A5) ─────────────
+
+const removalUpserts = (queries: Query[]) => queries.filter((q) => q.table === "chat_removals");
+const messageUpdates = (queries: Query[]) => queries.filter((q) => q.table === "messages" && q.calls[0]?.[0] === "update");
+
+test("11: a removal that marked one row upserts chat_removals with the caller's id and club role, on message_id", async () => {
+  const roleCases: [string, string][] = [
+    ["mod", "member"],
+    ["admin", "mod"],
+    ["owner", "admin"],
+  ];
+  for (const [role, authorRole] of roleCases) {
+    const { queries } = setup({ cookieRow: OTHERS_ROW, roles: { [ME]: role, [AUTHOR]: authorRole } });
+    assert.deepEqual(await call(), { status: 200, body: { ok: true, removed: true } }, role);
+    const upserts = removalUpserts(queries);
+    assert.equal(upserts.length, 1, `${role}: exactly one upsert`);
+    // the instant of the mark: the same string goes to both writes (see the next test)
+    const [[, markPayload]] = messageUpdates(queries)[0].calls as [[string, { removed_at: string }]];
+    assert.deepEqual(
+      upserts[0].calls,
+      [
+        [
+          "upsert",
+          { message_id: MESSAGE, removed_by: ME, removed_role: role, removed_at: markPayload.removed_at },
+          { onConflict: "message_id" },
+        ],
+      ],
+      role,
+    );
+  }
+});
+
+test("11: removed_at is in the upsert payload and is the very string the mark wrote (a re-removal must not keep the first time)", async () => {
+  // PostgREST's ON CONFLICT DO UPDATE sets only the columns it is sent; without removed_at here
+  // a second removal (after a restore) would overwrite who and which role but keep the old time.
+  const { queries } = setup({ cookieRow: OTHERS_ROW, roles: { [ME]: "owner", [AUTHOR]: "member" } });
+  await call();
+  const [[, markPayload]] = messageUpdates(queries)[0].calls as [[string, { removed_at: unknown }]];
+  const [[, upsertPayload]] = removalUpserts(queries)[0].calls as [[string, { removed_at: unknown }]];
+  assert.equal(typeof markPayload.removed_at, "string");
+  assert.ok(!Number.isNaN(Date.parse(markPayload.removed_at as string)));
+  assert.equal(upsertPayload.removed_at, markPayload.removed_at, "one instant, sent to both writes");
+});
+
+test("11: the upsert comes after the mark, on the service client (the cookie client never sees chat_removals)", async () => {
+  const { queries } = setup({ cookieRow: OTHERS_ROW, roles: { [ME]: "admin", [AUTHOR]: "member" } });
+  await call();
+  const order = queries.map((q) => `${q.table}:${String(q.calls[0]?.[0])}`);
+  assert.deepEqual(order.slice(-2), ["messages:update", "chat_removals:upsert"]);
+  assert.deepEqual(removalUpserts(queries).map((q) => q.who), ["service"], "never on the viewer's client");
+});
+
+test("11: the mark never carries the caller's id; only chat_removals does", async () => {
+  const { queries } = setup({ cookieRow: OTHERS_ROW, roles: { [ME]: "mod", [AUTHOR]: "member" } });
+  await call();
+  const [update] = messageUpdates(queries);
+  assert.ok(!JSON.stringify(update.calls).includes(ME), "no caller id anywhere in the message update");
+});
+
+test("11: an upsert that fails still answers the success answer, and logs the code and message but not the caller's id", async (t) => {
+  const errors: unknown[][] = [];
+  t.mock.method(console, "error", (...args: unknown[]) => void errors.push(args));
+  const { queries } = setup({
+    cookieRow: OTHERS_ROW,
+    roles: { [ME]: "mod", [AUTHOR]: "member" },
+    removalsError: { code: "XX000", message: "boom" },
+  });
+  assert.deepEqual(await call(), { status: 200, body: { ok: true, removed: true } });
+  assert.equal(messageUpdates(queries).length, 1, "the message is removed either way");
+  assert.equal(removalUpserts(queries).length, 1);
+  assert.equal(errors.length, 1);
+  assert.ok(String(errors[0][0]).includes("chat_removals"));
+  assert.deepEqual(errors[0].slice(1), ["XX000", "boom"]);
+  assert.ok(!JSON.stringify(errors).includes(ME), "the log never names the caller");
+});
+
+test("11: a missing table (a database without migration B) is tolerated: the same answer", async (t) => {
+  for (const code of ["42P01", "PGRST205"]) {
+    const errors: unknown[][] = [];
+    t.mock.method(console, "error", (...args: unknown[]) => void errors.push(args));
+    setup({
+      cookieRow: OTHERS_ROW,
+      roles: { [ME]: "admin", [AUTHOR]: "member" },
+      removalsError: { code, message: `relation "public.chat_removals" does not exist` },
+    });
+    assert.deepEqual(await call(), { status: 200, body: { ok: true, removed: true } }, code);
+    assert.equal(errors.length, 1, code);
+    assert.ok(String(errors[0][0]).includes("not in this database yet"), code);
+    assert.equal(errors[0][1], code);
+    t.mock.restoreAll();
+  }
+});
+
+test("11: an upsert that throws is swallowed too: the same answer", async (t) => {
+  const errors: unknown[][] = [];
+  t.mock.method(console, "error", (...args: unknown[]) => void errors.push(args));
+  setup({ cookieRow: OTHERS_ROW, roles: { [ME]: "mod", [AUTHOR]: "member" }, removalsThrows: true });
+  assert.deepEqual(await call(), { status: 200, body: { ok: true, removed: true } });
+  assert.equal(errors.length, 1);
+  assert.ok(!JSON.stringify(errors).includes(ME));
+});
+
+test("11: the mark touched 0 rows (removed a moment ago) → the 'already' answer and no chat_removals write", async () => {
+  const { queries } = setup({ cookieRow: OTHERS_ROW, updateRows: [] });
+  assert.deepEqual(await call(), { status: 200, body: { ok: true, removed: true, already: true } });
+  assert.equal(removalUpserts(queries).length, 0);
+});
+
+test("11: an update that fails (503) writes no chat_removals row", async () => {
+  const { queries } = setup({ cookieRow: OTHERS_ROW, updateError: { code: "XX000", message: "boom" } });
+  assert.equal((await call()).body.code, "try_again");
+  assert.equal(removalUpserts(queries).length, 0);
+});
+
+test("11: every refusal and the 'removed already' answer write no chat_removals row", async () => {
+  const runs: [string, Setup][] = [
+    ["outranked", { cookieRow: OTHERS_ROW, roles: { [ME]: "mod", [AUTHOR]: "admin" } }],
+    ["a member", { cookieRow: OTHERS_ROW, roles: { [ME]: "member" } }],
+    ["an open report", { cookieRow: OTHERS_ROW, reports: "open" }],
+    ["a dm", { cookieRow: OTHERS_ROW, member: DM_MEMBER }],
+    ["removed already", { cookieRow: null, serviceRow: { id: MESSAGE, user_id: AUTHOR, removed_at: "2026-09-30T00:00:00+00:00" } }],
+    ["the sender's own delete", { cookieRow: MY_ROW }],
+  ];
+  for (const [what, s] of runs) {
+    const { queries } = setup(s);
+    await call();
+    assert.equal(removalUpserts(queries).length, 0, what);
+  }
+});
+
+test("11: the order of the gates is unchanged by the new write (no extra gate before the mark)", async () => {
   const { state } = setup({ cookieRow: OTHERS_ROW });
   await call();
   assert.deepEqual(names(state.log), ["ensureMember", "rateLimit", "requireNotRestricted", "roomOf", "clubRole", "clubRole"]);

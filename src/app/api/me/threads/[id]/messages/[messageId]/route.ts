@@ -3,7 +3,8 @@ import { NextResponse } from "next/server";
 import { roomOf } from "@/lib/chat/message-read";
 import { OFFICER_REMOVED_REASON, ROOM_MODERATOR_ROLES, outranks } from "@/lib/chat/room-rules";
 import { clubRole } from "@/lib/chat/rooms";
-import { refusalBody, type RefusalCode, type RemoveMessageResponse } from "@/lib/chat/types";
+import { isMissingChatSchema } from "@/lib/chat/schema";
+import { refusalBody, type ClubRole, type RefusalCode, type RemoveMessageResponse } from "@/lib/chat/types";
 import { isMissingColumnError } from "@/lib/db/missing-column";
 import { ensureMember } from "@/lib/messages/channel-access";
 import { requireNotRestricted } from "@/lib/moderation/access";
@@ -37,12 +38,21 @@ function removed(already: boolean) {
  *
  * AN OFFICER OR A MOD OF THE CLUB (wave-2 contract 6.1, the gates in its
  * order): someone else's message in a club room is not deleted but marked
- * `removed_at` / `removed_by` / `removed_reason = OFFICER_REMOVED_REASON`
- * with the service role, so its author still reads it (with
- * `removed: { by: "officer" }`) and everyone else stops seeing it. The
- * caller must be at least a mod, must not be outranked by the author, and
- * the message must carry no open report (Vibe's moderators handle those).
- * Never a hard delete, no `moderation_actions` row, no report closed.
+ * `removed_at` / `removed_reason = OFFICER_REMOVED_REASON` with the service
+ * role, so its author still reads it (with `removed: { by: "officer" }`) and
+ * everyone else stops seeing it. The caller must be at least a mod, must not
+ * be outranked by the author, and the message must carry no open report
+ * (Vibe's moderators handle those). Never a hard delete, no
+ * `moderation_actions` row, no report closed.
+ *
+ * WHO REMOVED IT is not on the message (S71 amendment, F02): the author
+ * reads their own removed row through the data API, so `removed_by` stays
+ * null here. The remover and their club role go to `chat_removals`
+ * (service role only, migration B), written after the mark; a failed write
+ * is logged and never changes the answer. A removal after a restore
+ * overwrites the old record whole, `removed_at` included: the same instant
+ * is sent to the mark and to the upsert, because an upsert only overwrites
+ * the columns it sends (the column default is for the first insert only).
  *
  * A dm or a group has no officers: only the sender deletes there.
  */
@@ -172,9 +182,13 @@ export async function DELETE(_req: Request, ctx: RouteCtx) {
 
   // 10. the mark, with the service role, only on a row nobody removed yet.
   // 0 rows: removed a moment ago (by someone else, or twice).
+  // `removed_by` stays null (S71 F02): the author reads their own removed
+  // row, so who removed it goes to `chat_removals` below, with the SAME
+  // instant (`removedAt`: one string for both writes).
+  const removedAt = new Date().toISOString();
   const { data: marked, error: updateErr } = await service
     .from("messages")
-    .update({ removed_at: new Date().toISOString(), removed_by: user.id, removed_reason: OFFICER_REMOVED_REASON })
+    .update({ removed_at: removedAt, removed_by: null, removed_reason: OFFICER_REMOVED_REASON })
     .eq("id", messageId)
     .eq("channel_id", channelId)
     .is("removed_at", null)
@@ -183,5 +197,45 @@ export async function DELETE(_req: Request, ctx: RouteCtx) {
     console.error(`[${LOG} update]`, updateErr.code, updateErr.message);
     return refuse("try_again", 503);
   }
-  return removed((marked ?? []).length === 0);
+  const markedRows = (marked ?? []).length;
+
+  // 11. who removed it, for the officers' eyes only: the service-only
+  // `chat_removals` row. Only when this call did the removal (0 rows: a
+  // moment ago, by someone else, whose row stands).
+  if (markedRows === 1) await recordRemoval(service, messageId, user.id, callerRole, removedAt);
+  return removed(markedRows === 0);
+}
+
+/**
+ * The `chat_removals` upsert (S71 amendment A3): the remover, their club
+ * role and the instant, one row per message (`onConflict: "message_id"`: a
+ * later removal overwrites what a restore left behind). `removed_at` is in
+ * the payload on purpose: PostgREST's ON CONFLICT DO UPDATE sets only the
+ * columns it is sent, so without it a re-removal would keep the first
+ * removal's time (the column default now() applies to the first insert
+ * only). A failure, a missing table (a database without migration B) and a
+ * throw included, is logged and swallowed: the message is removed either way
+ * and the answer does not change. The log carries the code and message only,
+ * never the caller's id.
+ */
+async function recordRemoval(
+  service: ReturnType<typeof createSupabaseServiceClient>,
+  messageId: string,
+  removerId: string,
+  removerRole: ClubRole,
+  removedAt: string,
+): Promise<void> {
+  try {
+    const { error } = await service
+      .from("chat_removals")
+      .upsert(
+        { message_id: messageId, removed_by: removerId, removed_role: removerRole, removed_at: removedAt },
+        { onConflict: "message_id" },
+      );
+    if (!error) return;
+    const why = isMissingChatSchema(error) ? "chat_removals is not in this database yet" : "upsert failed";
+    console.error(`[${LOG} chat_removals] ${why}`, error.code, error.message);
+  } catch (err) {
+    console.error(`[${LOG} chat_removals] upsert threw`, err instanceof Error ? err.message : "unknown error");
+  }
 }

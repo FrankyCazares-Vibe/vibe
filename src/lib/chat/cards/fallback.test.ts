@@ -35,7 +35,7 @@ registerHooks({
 const specifier = "./fallback.ts";
 const { FALLBACK_MAX, cardFallbackContent } = (await import(specifier)) as typeof import("./fallback");
 
-test("the three shapes", () => {
+test("the four shapes", () => {
   assert.equal(cardFallbackContent({ type: "poll", question: "Pizza or tacos?" }), "Poll: Pizza or tacos?");
   assert.equal(cardFallbackContent({ type: "signup", question: "Bring a dish" }), "Sign-up: Bring a dish");
   assert.equal(
@@ -45,6 +45,29 @@ test("the three shapes", () => {
   assert.equal(
     cardFallbackContent({ type: "event", title: "Fall Formal", starts_at: "2026-10-08T23:00:00Z", note: "Wear red" }),
     "Event: Fall Formal · Thu Oct 8, 7 PM — Wear red",
+  );
+  assert.equal(cardFallbackContent({ type: "event_cancelled", title: "Fall Formal" }), "Event cancelled: Fall Formal");
+});
+
+test("a cancelled event: whitespace collapsed, the 300-character cut, an astral title, never empty", () => {
+  assert.equal(cardFallbackContent({ type: "event_cancelled", title: " Fall\n\n Formal\t" }), "Event cancelled: Fall Formal");
+  const exact = cardFallbackContent({ type: "event_cancelled", title: "x".repeat(283) });
+  assert.equal(exact.length, 300);
+  assert.equal(exact.endsWith("x"), true, "300 is kept whole");
+  const over = cardFallbackContent({ type: "event_cancelled", title: "x".repeat(284) });
+  assert.equal(over.length, 300);
+  assert.equal(over.endsWith("x…"), true);
+  assert.equal(over.slice(0, 299), `Event cancelled: ${"x".repeat(282)}`);
+  const emoji = cardFallbackContent({ type: "event_cancelled", title: "🎉".repeat(300) });
+  assert.equal(Array.from(emoji).length, 300);
+  assert.equal(emoji.endsWith("🎉…"), true);
+  assert.equal(cardFallbackContent({ type: "event_cancelled", title: "" }), "Event cancelled:");
+});
+
+test("a cancelled event has no time: the zone plays no part", () => {
+  assert.equal(
+    cardFallbackContent({ type: "event_cancelled", title: "Fall Formal" }, "Mars/Olympus"),
+    "Event cancelled: Fall Formal",
   );
 });
 

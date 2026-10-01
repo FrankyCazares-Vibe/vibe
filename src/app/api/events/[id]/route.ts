@@ -1,5 +1,10 @@
 import { NextResponse } from "next/server";
 
+import {
+  loadEventCardMessages,
+  refreshEventCardTexts,
+  rewriteEventCardTexts,
+} from "@/lib/chat/cards/refresh-event-cards";
 import { cancelSendsNotices } from "@/lib/events/cancel-notice";
 import {
   EVENT_ROW_COLUMNS,
@@ -130,11 +135,17 @@ async function loadForOfficer(id: string, userId: string, logTag: string): Promi
  *
  * ORDER: collect the RSVP'd ids (rsvps cascade with the event, so this is
  * the last moment anyone can know them; a failed read stops here, nothing
- * deleted) -> delete with the caller's OWN client, so events_delete_manager
- * stays the boundary, and require exactly one row (an RLS refusal is a
- * silent 0) -> insert the notices with the service role and kick the push
- * drain. A failed send never undoes the delete: it is logged and the answer
- * is { ok: true, notified: 0, notify_failed: true }.
+ * deleted) -> load the event's chat cards (only when notices go out: the FK
+ * `messages.card_event_id` nulls itself with the event, so this is the last
+ * moment anyone can find them; S71 F03) -> delete with the caller's OWN
+ * client, so events_delete_manager stays the boundary, and require exactly
+ * one row (an RLS refusal is a silent 0) -> rewrite the cards' stored text
+ * to "Event cancelled: <title>" -> insert the notices with the service role
+ * and kick the push drain. A failed send never undoes the delete: it is
+ * logged and the answer is { ok: true, notified: 0, notify_failed: true }.
+ * A failed card read or rewrite is logged by the helper and changes nothing:
+ * not the answer, not the notices. An event that had ended deletes quietly
+ * and its cards keep their history text.
  *
  * Errors: 401 unauthorized · 429 (tooManyRequests) · 404 not_found ·
  * 403 org_role_required / org_hidden · 403 account_restricted / terms_required
@@ -173,6 +184,11 @@ export async function DELETE(_req: Request, ctx: RouteContext) {
     recipientIds = collected.ids;
   }
 
+  // The event's chat cards, BEFORE the delete: the FK nulls their
+  // `card_event_id` afterwards (S71 F03). Null = the read failed (logged by
+  // the helper); the delete goes on and the cards keep their old text.
+  const cards = notify ? await loadEventCardMessages(service, event.id) : null;
+
   const { data: gone, error: delErr } = await supabase
     .from("events")
     .delete()
@@ -183,6 +199,19 @@ export async function DELETE(_req: Request, ctx: RouteContext) {
     return fail(500, "request_failed", FAILED);
   }
   if (!gone || gone.length !== 1) return fail(404, "not_found", GONE);
+
+  // Only after the confirmed delete: the old screens say "Event cancelled",
+  // not the old day and time. The result is only logged.
+  if (cards && cards.ids.length > 0) {
+    const rewritten = await rewriteEventCardTexts(service, cards, { kind: "cancel", title: event.title });
+    if (!rewritten.ok) {
+      console.error("[events/:id DELETE cards] some event cards kept their old text", {
+        eventId: event.id,
+        cards: cards.ids.length,
+        updated: rewritten.updated,
+      });
+    }
+  }
 
   if (!notify || recipientIds.length === 0) {
     return NextResponse.json({ ok: true, notified: 0 });
@@ -258,6 +287,11 @@ async function itemFor(
  * event to be the same club's and not ended, so a delete or the end landing
  * in between answers 404, never a stale edit. No notice goes out on an edit
  * (v1). `event` is null only if the edit saved but couldn't be read back.
+ * When the title or the start changed, the stored text of the event's chat
+ * cards follows (S71 F03: `refreshEventCardTexts`, awaited, its result only
+ * logged; a failure there never changes this answer). The refresh is bounded
+ * (at most 50 update statements, 10 at a time, none started after 5 s: S71
+ * repair R2), so a room full of Event cards cannot hold this request.
  *
  * Gate: requireCanPublish, like POST (editing is publishing: Terms, a
  * verified school email, no restriction), then a current owner / admin.
@@ -319,7 +353,8 @@ export async function PATCH(req: Request, ctx: RouteContext) {
       : fail(p.status, p.code, p.error);
   }
 
-  const { data: updated, error: updErr } = await createSupabaseServiceClient()
+  const service = createSupabaseServiceClient();
+  const { data: updated, error: updErr } = await service
     .from("events")
     .update(checked.value)
     .eq("id", event.id)
@@ -333,6 +368,24 @@ export async function PATCH(req: Request, ctx: RouteContext) {
   }
   if (!updated) return fail(404, "not_found", GONE);
 
-  const item = await itemFor(supabase, updated as EventRecord, org, user.id);
+  // The Event cards' stored text carries the title and the day and time, so
+  // it follows an edit of either (S71 F03). Awaited, never throws, result
+  // only logged: the answer below is the same whatever happens here.
+  const saved = updated as EventRecord;
+  if (saved.title !== event.title || Date.parse(saved.starts_at) !== Date.parse(event.starts_at)) {
+    const refreshed = await refreshEventCardTexts(service, event.id, {
+      kind: "update",
+      title: saved.title,
+      starts_at: saved.starts_at,
+    });
+    if (!refreshed.ok) {
+      console.error("[events/:id PATCH cards] some event cards kept their old text", {
+        eventId: event.id,
+        updated: refreshed.updated,
+      });
+    }
+  }
+
+  const item = await itemFor(supabase, saved, org, user.id);
   return NextResponse.json({ ok: true, event: item });
 }
