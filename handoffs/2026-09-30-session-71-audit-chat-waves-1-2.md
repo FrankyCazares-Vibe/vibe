@@ -54,6 +54,19 @@ On branch `claude/relaxed-davinci-9d11h3` (head `49ee404`, pushed):
 
 **Next, in order:** (3) the HTTP pass against the local database with a local `next dev` and the seed accounts (contract 13.3 step 2 + 17.5 + 17.7's new rows); (4) `GET /api/me/features` with the flag on locally; (5) the browser walk at 375px, flag ON and OFF, Light and Night, as blake and avery; then production: the read-only PRE-CHECK → **Franky's yes** → apply B at a quiet hour (Management API; md5 of the pushed file) → record it → merge the branch to `main` → the after-deploy check → the Production-only flag env for the three founders + SAE → redeploy → first phone test (create an upcoming event first: none exists on production).
 
+## Step 3 DONE (Oct 1): the HTTP pass, and what it found
+
+Branch head `ef40404` (pushed). Details: contract **section 17.8**.
+- **First real run of the cloud's routes**, local `next dev` + local database, flag on for avery / blake / emery, off for casey / drew: remove route + `chat_removals` 18/18; inbox / space / calendar / Event card refresh 20/21; regression 27/28; cards / votes / blocking 29/33; a verifier re-ran every non-pass and 10 extra checklist cases.
+- **Bug found and fixed: shared preview windows.** One busy room pushed other rooms' newest message out of the Messages lists (also in the old list that is LIVE: a DM request can leave Requests while other DMs are busy). Fix = **migration C** `20261001120000_chat_latest_per_room.sql` (one function, the newest k rows per room, caller's RLS) + one helper used by the thread list, the Messages home, Otto and the badge; a database without C keeps today's query. Applied to the LOCAL database; live proof: the blank previews are back.
+- **Bug found and fixed:** a NUL / broken character in a card answered "try again" forever; invisible-only questions and options were accepted. Now clear 400s.
+- **My mistake, caught by the builder:** the first order for C revoked the function from `anon`, which breaks the standing rule (a refused function crashes this Postgres image; it crashed the LOCAL database once, a second of recovery). Corrected before review: anon keeps EXECUTE and is refused at the table.
+- Gates: tsc clean, `npm test` 1,736/1,736, eslint clean, `chat-latest-check` 44/44, the three older SQL checks unchanged.
+- **The production apply list is now B then C** (both need Franky's yes).
+- The local test server (`vibe-wave2` in `.claude/launch.json`, port 3101, a local-only `.env.development.local` in the scratch worktree) is stopped by the app when the Mac idles: restart it with `preview_start`.
+
+**Next:** step 4, the browser walk at 375px, flag ON (blake, avery) and OFF (casey), Light and Night (contract 13.3 step 4, 17.5 items 13-29); then production.
+
 ## The short list: what to do, in order
 
 **Part 1 is done** (the leaked key was killed Sept 30 at 02:50 UTC Oct 1; small clean-ups remain, listed there).
