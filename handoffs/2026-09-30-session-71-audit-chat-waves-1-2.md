@@ -40,6 +40,20 @@ The code for `https://www.connectvibe.app/auth/login` (chunk `2szoa-o94f9it.js`)
 - Verified by the orchestrator at `ac731f0`: tsc clean, 1,700/1,700 tests, fresh rehearsal 1 = 31 constants, full rolled-back run passes with 181 cases, local database identical before and after.
 - **Next (step 2 of the Mac checklist):** merge `origin/main` into the branch (conflict-free; fixes the handoff's `--ff-only`), pg_dump the local database, re-run `node scripts/local-seed.mjs` the same UTC day (its fixture event ends 2026-10-05 01:00 UTC), rehearsal 1 → paste the 31 constants → rehearsal 2 → the real LOCAL apply (`docker exec … psql`; psql is not installed on the Mac) → the three check scripts → commit the constants. Production stays untouched until Franky's yes.
 
+## Step 2 DONE (Oct 1): migration B applied to the LOCAL database
+
+On branch `claude/relaxed-davinci-9d11h3` (head `49ee404`, pushed):
+- `5205a4a` merged `main` into the branch (conflict-free), so the handoff's later `--ff-only` merge works.
+- Local database dumped first (`scratchpad/step2/local-before-B.dump`, session-only); seed re-run the same UTC day.
+- Rehearsal 1 printed 31 constants and stopped as designed; they and the version (`PostgreSQL 17.6 … gcc 15.2.0`, the same build as production) are pasted and committed (`49ee404`), with the COST section filled from rolled-back fixtures (reply count 0.5-0.8 ms on 100 posts / 2,000 replies; one vote 0.5 ms; the whole file ~90 ms; locks SHARE ROW EXCLUSIVE on messages, channels, users, channel_members, no ACCESS EXCLUSIVE on a live table).
+- Rehearsal 2 green; the real LOCAL apply committed (APPLY RECORD `tables 5, functions 5, trigger 1`, probe passed, md5 `d5a05bb3…` of the pre-COST file).
+- Checks on the migrated local database: `chat-v2-rooms-check` 200/200; `chat-v2-after-deploy` 0 findings (12 clubs, 45 rooms); `chat-v2-cards-check` all 181 passed, no warnings; the seed added its 3 cards once and changed nothing the second time.
+- Code: `tsc` clean; `npm test` 1,709/1,709; a local `next build` of the branch compiles cleanly with a proper public key (the 4 new routes in the output).
+- New fact for the rollback text: on Supabase a `DROP TRIGGER` makes supautils lock 23 auth/storage/realtime tables (sign-ins wait); written into B's ROLLBACK paragraph.
+- **The branch's Vercel Preview builds now FAIL on purpose**: the key guard (from main) refuses Preview's `NEXT_PUBLIC_SUPABASE_ANON_KEY`, which still holds the dead service key, and the integration's publishable key is Production-only. Reproduced locally (same refusal). Fix = the Vercel clean-up in Part 1 (recreate the row as Config with the publishable key for Production AND Preview). Production builds are unaffected.
+
+**Next, in order:** (3) the HTTP pass against the local database with a local `next dev` and the seed accounts (contract 13.3 step 2 + 17.5 + 17.7's new rows); (4) `GET /api/me/features` with the flag on locally; (5) the browser walk at 375px, flag ON and OFF, Light and Night, as blake and avery; then production: the read-only PRE-CHECK → **Franky's yes** → apply B at a quiet hour (Management API; md5 of the pushed file) → record it → merge the branch to `main` → the after-deploy check → the Production-only flag env for the three founders + SAE → redeploy → first phone test (create an upcoming event first: none exists on production).
+
 ## The short list: what to do, in order
 
 **Part 1 is done** (the leaked key was killed Sept 30 at 02:50 UTC Oct 1; small clean-ups remain, listed there).
