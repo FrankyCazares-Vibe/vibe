@@ -32,6 +32,14 @@ The code for `https://www.connectvibe.app/auth/login` (chunk `2szoa-o94f9it.js`)
   - **After the fix**, signed-out server requests run as the real anon role (before, as service_role). The signed-out walk found nothing broken; watch for any public page that quietly relied on the old power.
   - The reviewer agents for the fix stalled (no result); the fix rests on the real-build proof, the local key test and the live checks above, not on an independent code review. A reviewer pass over `key-guard.ts` and the `next.config.ts` `env` swap would still be worth one slot.
 
+## Done since the audit (Oct 1), on the wave 2 branch `claude/relaxed-davinci-9d11h3`
+
+- `00e3f00` F01: migration B's step-8 self-test and the check script compared booleans as `true/false` (Postgres prints `t/f`); fixed.
+- `ac731f0` F02 + F03 (Franky: "both"): migration B gains a fifth service-role-only table `chat_removals`; the officer/mod remove route writes `removed_by = null` and records the remover there. Event edits (title/time) and cancels rewrite the Event card's stored text ("Event cancelled: <title>"). Contract **section 17.7** has the details, the new flag-off rows, the superseded counts and two open points (a per-event cap on Event cards; pin two more things in 7.1).
+- **Numbers the Mac practice run must expect now** (they supersede the S70 handoff's 27 / 1,704 / 4 tables / ~130): migration B 1,770 lines; **31** pinned constants (want_select + 25 want_con_* + 5 want_fn_*), all still EMPTY in the file; rehearsal 1 prints 31 NOTICE lines and stops with `chat-cards: constants are empty`; APPLY RECORD `tables 5, functions 5, trigger 1`; check script `all 181 cases passed`; `npm test` 1,700.
+- Verified by the orchestrator at `ac731f0`: tsc clean, 1,700/1,700 tests, fresh rehearsal 1 = 31 constants, full rolled-back run passes with 181 cases, local database identical before and after.
+- **Next (step 2 of the Mac checklist):** merge `origin/main` into the branch (conflict-free; fixes the handoff's `--ff-only`), pg_dump the local database, re-run `node scripts/local-seed.mjs` the same UTC day (its fixture event ends 2026-10-05 01:00 UTC), rehearsal 1 → paste the 31 constants → rehearsal 2 → the real LOCAL apply (`docker exec … psql`; psql is not installed on the Mac) → the three check scripts → commit the constants. Production stays untouched until Franky's yes.
+
 ## The short list: what to do, in order
 
 **Part 1 is done** (the leaked key was killed Sept 30 at 02:50 UTC Oct 1; small clean-ups remain, listed there).
