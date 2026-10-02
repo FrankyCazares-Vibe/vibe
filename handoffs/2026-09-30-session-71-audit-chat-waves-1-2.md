@@ -1,3 +1,5 @@
+> **Session 72 starts at `2026-10-02-session-71-close-and-next-up.md`** (the short state and what is owed). This file is the full record of S71.
+
 # Session 71 (2026-09-30, Mac): audit of chat waves 1 and 2, and a live key leak
 
 **Read this before the S70 cloud handoff's Mac checklist.** This session read the four latest handoffs on `main`, then found the real newest one on the cloud branch (`git show origin/claude/relaxed-davinci-9d11h3:handoffs/2026-09-30-session-70-chat-wave-2-cloud.md`). It then ran two read-only audits, each finding checked by an independent skeptic:
