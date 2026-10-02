@@ -1,0 +1,107 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Vibe landing: three directions</title>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Fraunces:ital,opsz,wght,SOFT@0,9..144,400..900,100;1,9..144,400,100&family=Inter:wght@400;600;700&display=swap">
+<style>
+  :root { --ink:#0C0B0B; --cream:#F4EDE4; --coral:#FF5C35; --muted:rgba(244,237,228,.58); --line:rgba(244,237,228,.14); --card:#171514; }
+  * { box-sizing:border-box; }
+  body { margin:0; background:#050505; color:var(--cream); font-family:Inter,system-ui,sans-serif; padding:24px 16px 48px; }
+  h1 { font:600 15px Inter,sans-serif; margin:0 0 4px; }
+  .note { color:var(--muted); font-size:13px; margin:0 0 24px; max-width:720px; line-height:1.5; }
+  .row { display:flex; gap:28px; flex-wrap:wrap; align-items:flex-start; }
+  .col { width:320px; }
+  .label { font:700 13px Inter,sans-serif; margin:0 0 4px; }
+  .from { color:var(--muted); font-size:12px; margin:0 0 12px; line-height:1.45; min-height:52px; }
+  .phone { position:relative; width:320px; height:640px; border-radius:34px; border:1px solid var(--line); background:var(--ink); overflow:hidden; }
+  .bar { display:flex; justify-content:space-between; align-items:center; padding:18px 20px 0; font-size:12px; color:var(--muted); position:relative; z-index:2; }
+  .wm { font:900 22px Fraunces,serif; font-variation-settings:"SOFT" 100; color:var(--cream); letter-spacing:-.02em; }
+  .wm i { color:var(--coral); font-style:normal; }
+  .bloom { position:absolute; width:420px; height:420px; border-radius:50%; background:radial-gradient(circle, rgba(255,92,53,.42), rgba(255,92,53,0) 65%); pointer-events:none; }
+  .h { font-family:Fraunces,serif; font-variation-settings:"SOFT" 100; font-weight:800; letter-spacing:-.03em; line-height:.98; margin:0; position:relative; z-index:2; }
+  .h em { color:var(--coral); font-style:normal; }
+  .sub { color:var(--muted); font-size:13.5px; line-height:1.5; margin:12px 0 0; position:relative; z-index:2; }
+  .btn { display:inline-flex; align-items:center; height:44px; padding:0 20px; border-radius:999px; background:var(--coral); color:#140A06; font-weight:700; font-size:14px; }
+  .ghost { display:inline-flex; align-items:center; height:44px; padding:0 16px; border-radius:999px; border:1px solid var(--line); font-weight:600; font-size:14px; }
+  .pill { position:absolute; left:50%; bottom:16px; transform:translateX(-50%); display:flex; gap:6px; align-items:center; padding:6px; border-radius:999px; background:rgba(30,27,25,.86); border:1px solid var(--line); z-index:5; white-space:nowrap; }
+  .pill span { font-size:12px; color:var(--muted); padding:0 10px; }
+  .pill .btn { height:34px; padding:0 14px; font-size:12.5px; }
+  .screen { border-radius:18px; border:1px solid var(--line); background:linear-gradient(180deg,#221E1C,#141211); display:flex; align-items:flex-end; padding:10px; font-size:10.5px; color:var(--muted); }
+  /* A */
+  .a .hero { padding:44px 20px 0; }
+  .folder { position:absolute; left:12px; right:12px; border-radius:20px 20px 0 0; background:var(--card); border:1px solid var(--line); border-bottom:none; padding:14px 16px; }
+  .folder b { font:800 19px Fraunces,serif; font-variation-settings:"SOFT" 100; display:block; }
+  .folder small { color:var(--muted); font-size:12px; }
+  .tab { position:absolute; top:-19px; left:16px; height:20px; padding:0 12px; border-radius:10px 10px 0 0; background:var(--card); border:1px solid var(--line); border-bottom:none; font:700 9.5px Inter,sans-serif; letter-spacing:.12em; color:var(--coral); display:flex; align-items:center; }
+  /* B */
+  .b .giant { font-size:92px; padding:60px 0 0 16px; white-space:nowrap; }
+  .b .giant span { display:block; }
+  .b .drift { position:absolute; z-index:3; box-shadow:0 20px 50px rgba(0,0,0,.6); }
+  .ticker { position:absolute; left:0; right:0; bottom:70px; border-top:1px dashed var(--line); border-bottom:1px dashed var(--line); padding:9px 0; font:600 10.5px ui-monospace,Menlo,monospace; letter-spacing:.1em; color:var(--muted); white-space:nowrap; z-index:4; background:var(--ink); }
+  /* C */
+  .c .star { position:absolute; width:2px; height:2px; border-radius:50%; background:var(--cream); opacity:.5; }
+  .c .dot { position:absolute; width:12px; height:12px; border-radius:50%; background:var(--coral); box-shadow:0 0 18px 6px rgba(255,92,53,.45); z-index:2; }
+  .c .tag { position:absolute; font:600 10.5px Inter,sans-serif; color:var(--cream); z-index:2; }
+  .c .hero { position:absolute; left:20px; right:20px; bottom:92px; z-index:3; }
+</style>
+</head>
+<body>
+<h1>Vibe landing page: three directions (first screen on a phone)</h1>
+<p class="note">Sketches, not designs. Grey boxes stand for real app screenshots. All three are always Night, use the soft wordmark, and say what Vibe is before anything moves. Notes on the six reference sites are in <code>landing-references.md</code>.</p>
+<div class="row">
+
+  <div class="col a">
+    <p class="label">A. Stacked cards</p>
+    <p class="from">From Elena's folder stack and Marcus's bottom pill. Clearest. About 2 days.</p>
+    <div class="phone">
+      <div class="bloom" style="top:-210px; right:-190px;"></div>
+      <div class="bar"><span class="wm">vibe<i>.</i></span><span>Log in</span></div>
+      <div class="hero">
+        <p class="h" style="font-size:40px;">The social app for the <em>Indianapolis</em> campus.</p>
+        <p class="sub">Where IU Indy and Purdue Indy students find their clubs, their events, and each other. Free with your school email.</p>
+      </div>
+      <div class="folder" style="top:372px; height:300px;"><span class="tab">01 CLUBS</span><b>Find your clubs.</b><small>Follow, join, and chat in one place.</small>
+        <div class="screen" style="height:120px; margin-top:12px;">real screen: a club page</div></div>
+      <div class="folder" style="top:520px; height:200px; background:#1D1A18;"><span class="tab" style="background:#1D1A18;">02 EVENTS</span><b>See what's on.</b></div>
+      <div class="folder" style="top:588px; height:120px; background:#24201D;"><span class="tab" style="background:#24201D;">03 EACH OTHER</span></div>
+      <div class="pill"><span>Clubs</span><span>Students</span><span class="btn">Sign up</span></div>
+    </div>
+  </div>
+
+  <div class="col b">
+    <p class="label">B. Big type, screens drifting through</p>
+    <p class="from">From Marcus's banded headline and gertix's ticker. Most "designed". About 3 days.</p>
+    <div class="phone">
+      <div class="bloom" style="bottom:-160px; left:-200px;"></div>
+      <div class="bar"><span class="wm">vibe<i>.</i></span><span>Log in</span></div>
+      <p class="h giant"><span>Your</span><span style="margin-left:-34px;"><em>campus</em></span><span>has a</span><span style="margin-left:-12px;">feed now.</span></p>
+      <div class="screen drift" style="width:132px; height:250px; right:14px; top:150px; transform:rotate(5deg);">real screen: feed</div>
+      <div class="screen drift" style="width:112px; height:200px; left:22px; top:392px; transform:rotate(-6deg);">real screen: club chat</div>
+      <div class="ticker">CLUBS &nbsp;→&nbsp; EVENTS &nbsp;×&nbsp; EACH OTHER &nbsp;*&nbsp; IU INDY &nbsp;→&nbsp; PURDUE INDY &nbsp;×&nbsp; FREE WITH YOUR SCHOOL EMAIL</div>
+      <div class="pill"><span>What is Vibe</span><span class="btn">Sign up</span></div>
+    </div>
+  </div>
+
+  <div class="col c">
+    <p class="label">C. The campus at night</p>
+    <p class="from">From Behfar's particle sky and Pesselev's small world. Most memorable, slowest to explain. About 4 to 5 days.</p>
+    <div class="phone">
+      <div class="bloom" style="top:60px; left:-50px; opacity:.7;"></div>
+      <div class="bar"><span class="wm">vibe<i>.</i></span><span>Log in</span></div>
+      <i class="star" style="top:90px; left:60px;"></i><i class="star" style="top:140px; left:250px;"></i><i class="star" style="top:210px; left:30px;"></i><i class="star" style="top:300px; left:290px;"></i><i class="star" style="top:70px; left:190px;"></i><i class="star" style="top:350px; left:120px;"></i><i class="star" style="top:260px; left:170px;"></i>
+      <i class="dot" style="top:150px; left:80px;"></i><span class="tag" style="top:170px; left:62px;">Film club</span>
+      <i class="dot" style="top:230px; left:216px;"></i><span class="tag" style="top:250px; left:184px;">Tonight, 7 pm</span>
+      <i class="dot" style="top:320px; left:120px; width:8px; height:8px;"></i><span class="tag" style="top:336px; left:96px;">Study group</span>
+      <div class="hero">
+        <p class="h" style="font-size:34px;">Your campus is <em>already out there.</em></p>
+        <p class="sub">Tap a light. Vibe is the social app for IU Indy and Purdue Indy students.</p>
+        <p style="margin:14px 0 0; display:flex; gap:8px;"><span class="btn">Sign up</span><span class="ghost">Bring your club</span></p>
+      </div>
+    </div>
+  </div>
+
+</div>
+</body>
+</html>
