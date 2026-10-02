@@ -11,9 +11,12 @@
 //
 // Re-runnable: every row is looked up first (by email, handle, or a stable
 // natural key) and updated in place, so a second run changes nothing but
-// resets the seeded fields back to their seeded values. It deletes nothing,
-// ever, and writes no row it did not create, with ONE exception: the club
-// `sae` (see SAE below).
+// resets the seeded fields back to their seeded values. It deletes only its
+// own posts, and only to write them again (a new wording, a new author, a
+// picture taken off) and a line the lead sent James in an earlier take of
+// the video. It writes no row it did not create, with TWO exceptions: the
+// club `sae` (see SAE below), and any other club on the cast's campus, which
+// it HIDES for the shoot (see HIDDEN FOR THE SHOOT below).
 //
 // THE LEAD is Franky Cazares (LEAD below): the video is filmed from his own
 // account, franky@example.test. His feed, events, inbox and RSVP are what the
@@ -31,35 +34,56 @@
 // moves a post. The summary ends with a list of every off-cast row that
 // would reach the lead's screens, on CAMPUS and on the other candidates.
 //
-// PHOTOS. Five posts carry one of Franky's own pictures. The files are read
-// at run time from PHOTOS_DIR (~/vibe-demo-photos/web, or the DEMO_PHOTOS_DIR
-// env var) and are NEVER copied into this repository, which is public. With
+// PHOTOS. Nine posts carry one of Franky's own pictures, SAE's banner and
+// logo are cut from one of them and Franky's cover photo from another. The
+// files are read at run time from PHOTOS_DIR (~/vibe-demo-photos/web, or the
+// DEMO_PHOTOS_DIR env var) and are NEVER copied into this repository, which
+// is public; the cuts are made with ffmpeg in a temp folder outside it. With
 // the folder or a file missing the post stays a text post and the run says
 // so. How a picture is stored on the local stack is at POST PHOTOS below.
 //
 // SAE. local-seed.mjs owns a club with the handle `sae` ("SAE (local copy)",
 // owned by Avery Owner, on indianapolis). Handles are unique, so the demo
 // reuses that row instead of making a second SAE: it sets the name, the
-// description and the campus, and leaves the owner, the join policy, the
-// rooms and Avery's messages alone. The founders join as an officer and two
-// members. Running local-seed.mjs again puts the name and the campus back
-// (and this script must then be run again before filming).
+// description, the campus, the backdrop, the banner and the logo, and leaves
+// the owner, the join policy, the rooms and Avery's messages alone. James
+// joins as its officer and Franky as a plain member. Running local-seed.mjs
+// again puts the name and the campus back (and this script must then be run
+// again before filming).
+//
+// HIDDEN FOR THE SHOOT. A visible club on the cast's campus that is not one
+// of the five is listed under the lead's own clubs on the Orgs tab, in a
+// "Verified" or "All clubs" section. On iu-bloomington that is one test club,
+// `test_bloomington_cycling`, which no seed script owns. The run sets its
+// `hidden_at` (the app's own "hidden" state: the row, its members and its
+// events stay) and prints the one statement that shows it again. With more
+// than HIDE_AT_MOST such clubs (the cast moved to indianapolis, where the
+// other sessions' test clubs live) it hides none and says so.
 //
 // THE CLOCK. Event dates are computed from today on every run, in whole
 // CAMPUS days (America/Indiana/Indianapolis), not UTC days as local-seed
 // does: "Blitz Night" has to be TODAY at 7 pm on the wall clock of whoever
 // is filming, also after 8 pm, when the UTC date is already tomorrow. Two
-// runs on the same campus day write the same dates. Posts and messages get
-// their time ("3 hours ago") once, when they are first written: run the
-// seed on the day of the shoot so the feed reads as this week.
+// runs on the same campus day write the same dates. Posts and Chess Club's
+// chat keep the time they were written with ("3 hours ago") for SHOOT_HOURS;
+// a run after that, or after their times were changed in this file, dates
+// all of them again (see POSTS and CHESS CLUB'S CHAT). SAE's three Lounge
+// lines are always yesterday evening. The other messages get their time
+// once. Run the seed on the day of the shoot.
+//
+// OPEN BROWSERS STAY SIGNED IN. The password is set only when an account is
+// made, and the two sign-ins at the end close their own session alone, so a
+// run does not sign the cast out of a browser that is open (a take in
+// progress). An account whose password was changed by hand has to be set
+// back by hand.
 //
 // SAFETY: the URL and keys come ONLY from `supabase status -o env` (the local
 // CLI stack). No .env file is read. The script refuses to run unless the API
 // host is 127.0.0.1 or localhost, so it can never write to production.
 
 import { spawnSync } from "node:child_process";
-import { existsSync, readFileSync } from "node:fs";
-import { homedir } from "node:os";
+import { existsSync, mkdtempSync, readFileSync, rmSync } from "node:fs";
+import { homedir, tmpdir } from "node:os";
 import { dirname, join } from "node:path";
 import { fileURLToPath } from "node:url";
 
@@ -128,8 +152,9 @@ const LEAD = "franky"; // whose phone the video is filmed from (ACCOUNTS key)
 // text for an IU student there, which is also what the profile badge says
 // (legacyLabel, src/lib/iu/campuses.ts); `name` is what a header calls it.
 //   Oct 2 leak check: fort-wayne is clean. iu-bloomington carries ONE test
-//   row, the club `test_bloomington_cycling` (verified, visible), which
-//   shows in the club directory there. indianapolis carries all the rest.
+//   row, the club `test_bloomington_cycling` (verified), which the run hides
+//   (HIDDEN FOR THE SHOOT). indianapolis carries all the rest, far more
+//   clubs than the run agrees to hide (HIDE_AT_MOST).
 const CAMPUSES = {
   "fort-wayne": { name: "Fort Wayne", systems: ["iu", "purdue"], label: { iu: "IU Fort Wayne", purdue: "Purdue Fort Wayne" } },
   indianapolis: { name: "Indianapolis", systems: ["iu", "purdue"], label: { iu: "IU Indianapolis", purdue: "Purdue Indianapolis" } },
@@ -182,6 +207,16 @@ function schoolLabel(system) {
 
 const hoursAgo = (h) => new Date(Date.now() - h * 3_600_000).toISOString();
 
+// How long posts and Chess Club's chat keep the times they were written
+// with. Inside it a second run changes no time; past it (the next day's
+// shoot) they are all dated again, together, so they keep their order.
+const SHOOT_HOURS = 10;
+
+/** Is a row of this age (in hours) still where `wanted` hours ago put it? */
+function keepsItsTime(ageHours, wanted) {
+  return ageHours >= wanted - 0.02 && ageHours <= wanted + SHOOT_HOURS;
+}
+
 /** The calendar date and wall clock of an instant, read in the campus zone. */
 function zoneParts(date) {
   const parts = new Intl.DateTimeFormat("en-US", {
@@ -190,6 +225,12 @@ function zoneParts(date) {
   }).formatToParts(date);
   const get = (type) => Number(parts.find((p) => p.type === type)?.value);
   return { year: get("year"), month: get("month"), day: get("day"), hour: get("hour"), minute: get("minute") };
+}
+
+/** `2026-10-2`: the campus day an instant falls on. */
+function campusDay(date) {
+  const p = zoneParts(new Date(date));
+  return `${p.year}-${p.month}-${p.day}`;
 }
 
 /**
@@ -245,48 +286,62 @@ function campusTime(days, hour) {
 // nothing is ever sent to them: the seed writes the verified state directly.
 // The whole cast is IU, so it can live on an IU-only campus too.
 // The three founders appear as themselves: nothing about them is invented.
-// Franky's year, major and bio are his own words (Oct 2). James and Rylan
-// are `real: true`: their year and major are never written, and a bio
-// already on the row (typed in the app) is kept.
+// Franky's year, major, tagline and bio are his own words (Oct 2). James and
+// Rylan are `real: true`: their year and major are never written, and a
+// tagline or bio already on the row (typed in the app) is kept.
+//
+// THE PROFILE HEADER. `tagline` is the italic line under the name; with none
+// the app shows the first line of the bio there, so the bio reads twice.
+// James and Rylan carry one line, as their tagline, and no bio (the Bio card
+// is not drawn for an empty one). `gradient` is the cover theme
+// (users.banner_gradient, one of the app's eight keys): everyone but Franky
+// gets one of the four dark ones, so a profile in Night does not open on
+// the pale default. `cover` is a cover PHOTO, cut from one of
+// Franky's pictures (see PROFILE AND CLUB PICTURES); a photo wins over a
+// theme. Nobody gets an avatar: there is no portrait to use, initials stay.
 // ---------------------------------------------------------------------------
 const ACCOUNTS = [
   { key: "maya", email: "maya@example.test", handle: "mayaokafor", name: "Maya Okafor",
-    system: "iu", year: 2, major: "Media Arts",
+    system: "iu", year: 2, major: "Media Arts", gradient: "orchid",
     bio: "Media arts. New here this semester, still finding the good coffee." },
   { key: "theo", email: "theo@example.test", handle: "theolindqvist", name: "Theo Lindqvist",
-    system: "iu", year: 1, major: "Exploratory",
+    system: "iu", year: 1, major: "Exploratory", gradient: "deep-sea",
     bio: "Freshman. Undecided and fine with it." },
   { key: "priya", email: "priya@example.test", handle: "priyaraman", name: "Priya Raman",
-    system: "iu", year: 4, major: "Informatics",
+    system: "iu", year: 4, major: "Informatics", gradient: "pine",
     bio: "Informatics senior. I run Chess Club and I will teach you an opening." },
   { key: "jonah", email: "jonah@example.test", handle: "jonahreyes", name: "Jonah Reyes",
-    system: "iu", year: 3, major: "Mechanical Engineering",
+    system: "iu", year: 3, major: "Mechanical Engineering", gradient: "ember-night",
     bio: "Mechanical engineering. Finance Club officer." },
   { key: "amara", email: "amara@example.test", handle: "amaradiallo", name: "Amara Diallo",
-    system: "iu", year: 3, major: "Nursing",
+    system: "iu", year: 3, major: "Nursing", gradient: "orchid",
     bio: "Nursing junior. RA on Tower Floor 3, my door is open." },
   { key: "lucas", email: "lucas@example.test", handle: "lucasferreira", name: "Lucas Ferreira",
-    system: "iu", year: 2, major: "Music Technology",
+    system: "iu", year: 2, major: "Music Technology", gradient: "deep-sea",
     bio: "Music technology. Usually in a practice room in North Hall." },
   { key: "hana", email: "hana@example.test", handle: "hanasato", name: "Hana Sato",
-    system: "iu", year: 4, major: "Computer Graphics",
+    system: "iu", year: 4, major: "Computer Graphics", gradient: "ember-night",
     bio: "Computer graphics senior. Always has a camera." },
   { key: "devon", email: "devon@example.test", handle: "devonbrooks", name: "Devon Brooks",
-    system: "iu", year: 3, major: "Sports Management",
+    system: "iu", year: 3, major: "Sports Management", gradient: "pine",
     bio: "Sports management. Intramurals most nights." },
   { key: "noor", email: "noor@example.test", handle: "noorhaddad", name: "Noor Haddad",
-    system: "iu", year: 2, major: "Biology",
+    system: "iu", year: 2, major: "Biology", gradient: "orchid",
     bio: "Biology sophomore. Learning chess the hard way." },
   { key: "eli", email: "eli@example.test", handle: "elicarter", name: "Eli Carter",
-    system: "iu", year: 1, major: "Computer Science",
+    system: "iu", year: 1, major: "Computer Science", gradient: "deep-sea",
     bio: "CS freshman. Tower Floor 3." },
   // The founders, as themselves.
   { key: "franky", email: "franky@example.test", handle: "franky", name: "Franky Cazares",
-    system: "iu", year: 3, major: "Marketing", bio: "vibin" },
+    system: "iu", year: 3, major: "Marketing", tagline: "vibin",
+    bio: "Marketing junior at IU. SAE. Building Vibe with James and Rylan.",
+    cover: { file: "dunes.jpg", cut: "crop=1600:800:0:150" } },
+  // A cover theme is a look, not a fact about them: Rylan's is the profile
+  // the video visits, and it would open on the pale default.
   { key: "james", email: "james@example.test", handle: "jamesandres", name: "James Andres",
-    system: "iu", real: true, bio: "Vibe team." },
+    system: "iu", real: true, tagline: "Vibe team.", bio: "", gradient: "deep-sea" },
   { key: "rylan", email: "rylan@example.test", handle: "rylanconaway", name: "Rylan Conaway",
-    system: "iu", real: true, bio: "Vibe team." },
+    system: "iu", real: true, tagline: "Vibe team.", bio: "", gradient: "ember-night" },
 ];
 
 /** `maya@example.test` + iu -> `maya.demo@iu.edu`: unique, and plainly not a real address. */
@@ -314,14 +369,12 @@ async function ensureAccount(spec) {
   // it into the consent columns and a 'signup' terms_acceptances row.
   const meta = { full_name: spec.name, terms_version: TERMS_VERSION, age_attested: true };
 
+  // The password is sent only for a new account: setting it again on every
+  // run would end the sessions of every browser the cast is signed in on.
   let authUser = await findAuthUserByEmail(spec.email);
   if (authUser) {
     must(
-      await admin.auth.admin.updateUserById(authUser.id, {
-        password: PASSWORD,
-        email_confirm: true,
-        user_metadata: meta,
-      }),
+      await admin.auth.admin.updateUserById(authUser.id, { email_confirm: true, user_metadata: meta }),
       `update auth user ${spec.email}`,
     );
   } else {
@@ -342,7 +395,7 @@ async function ensureAccount(spec) {
     await admin
       .from("users")
       .select(
-        "terms_version, terms_accepted_at, age_attested_at, campus_set_at, handle_changed_at, otto_answers, bio",
+        "terms_version, terms_accepted_at, age_attested_at, campus_set_at, handle_changed_at, otto_answers, bio, tagline",
       )
       .eq("id", id)
       .single(),
@@ -353,10 +406,14 @@ async function ensureAccount(spec) {
   const patch = {
     handle: spec.handle,
     name: spec.name,
-    // A founder's year and major are theirs to fill in; their bio is
-    // written only while the row has none.
+    // A founder's year and major are theirs to fill in; their tagline and
+    // bio are written only while the row has none. One bio is taken back:
+    // one that only repeats the tagline (what this script wrote before it
+    // wrote taglines), which would put the same line on the profile twice.
     ...(spec.real ? {} : { major: spec.major, year: spec.year }),
-    bio: spec.real && current.bio ? current.bio : spec.bio,
+    ...(spec.tagline ? { tagline: spec.real && current.tagline ? current.tagline : spec.tagline } : {}),
+    bio: spec.real && current.bio && current.bio !== spec.tagline ? current.bio : spec.bio,
+    ...(spec.gradient ? { banner_gradient: spec.gradient } : {}),
     school_email: schoolEmail(spec),
     school_verified: true,
     school_system: spec.system,
@@ -402,13 +459,21 @@ async function ensureAccount(spec) {
 // what puts it in the directory (GET /api/orgs?filter=discover).
 //
 // `shared: true` marks the one club this script did not create (see SAE in
-// the header). When the row exists only its name, description and campus are
-// written, and what they were is printed. When it does not exist (a local
-// stack that never ran local-seed.mjs) it is created like the others.
+// the header). When the row exists only its name, description, campus and
+// backdrop are written, and what they were is printed. When it does not
+// exist (a local stack that never ran local-seed.mjs) it is created like the
+// others, with James as its owner.
+//
+// `backdrop` is the club page's own theme (orgs.backdrop_preset); `midnight`
+// is the one closest to the app's Night. `art` gives a club a banner and a
+// logo, both cut from one of Franky's pictures and kept in the folder of
+// `holder`, an officer of the club (see PROFILE AND CLUB PICTURES).
 // ---------------------------------------------------------------------------
 const CLUBS = [
-  { handle: "sae", name: "SAE", owner: "franky", join_policy: "invite", shared: true,
+  { handle: "sae", name: "SAE", owner: "james", join_policy: "invite", shared: true,
     backdrop: "midnight",
+    art: { file: "sae-letters.jpg", holder: "james",
+      banner: "crop=1279:426:0:505", logo: "crop=500:500:0:500,scale=512:512" },
     description: "Sigma Alpha Epsilon. Brotherhood, service and a good cookout." },
   { handle: "chess_club", name: "Chess Club", owner: "priya", join_policy: "open",
     backdrop: "forest",
@@ -428,14 +493,16 @@ const CLUBS = [
 async function ensureClub(spec, users, systems, owners) {
   const ownerId = users[spec.owner];
   const existing = must(
-    await admin.from("orgs").select("id, name, description, campus_id, owner_id, verified").eq("handle", spec.handle).maybeSingle(),
+    await admin.from("orgs").select("id, name, description, campus_id, owner_id, verified, backdrop_preset").eq("handle", spec.handle).maybeSingle(),
     `look up org ${spec.handle}`,
   );
 
-  // The club local-seed.mjs owns: three fields and the verified flag (it is
+  // The club local-seed.mjs owns: four fields and the verified flag (it is
   // already true there; an unverified club's events are not listed).
   if (existing && spec.shared) {
-    const fields = { name: spec.name, description: spec.description, campus_id: CAMPUS, verified: true };
+    const fields = {
+      name: spec.name, description: spec.description, campus_id: CAMPUS, verified: true, backdrop_preset: spec.backdrop,
+    };
     const changed = Object.keys(fields).filter((k) => existing[k] !== fields[k]);
     if (changed.length > 0) {
       must(await admin.from("orgs").update(fields).eq("id", existing.id), `update shared org ${spec.handle}`);
@@ -484,19 +551,50 @@ async function ensureClub(spec, users, systems, owners) {
   return orgId;
 }
 
+// How many clubs the run agrees to hide (see HIDDEN FOR THE SHOOT at the top).
+const HIDE_AT_MOST = 3;
+
+/**
+ * Hide every visible club on the cast's campus that is not the cast's. The
+ * Orgs tab lists visible clubs only (GET /api/orgs: `hidden_at is null`) and
+ * draws its "Verified" header only over a non-empty list, so the section
+ * goes with its last row. A second run finds nothing left to hide.
+ */
+async function hideStrayClubs(clubs) {
+  const stray = must(
+    await admin.from("orgs").select("id, handle").eq("campus_id", CAMPUS).is("hidden_at", null),
+    "look up the other clubs on the campus",
+  ).filter((o) => !Object.values(clubs).includes(o.id));
+  if (stray.length > HIDE_AT_MOST) {
+    console.log(`  NOT hidden: ${stray.length} clubs on ${CAMPUS} are not the cast's (${stray.map((o) => o.handle).join(", ")}). They show on the Orgs tab.`);
+    return;
+  }
+  for (const o of stray) {
+    must(await admin.from("orgs").update({ hidden_at: new Date().toISOString() }).eq("id", o.id), `hide ${o.handle}`);
+    console.log(`  hidden for the shoot: ${o.handle} (to show it again: update public.orgs set hidden_at = null where handle = '${o.handle}')`);
+  }
+}
+
 // Who is in which club, besides its owner. Posting AS a club and creating
 // its events take an owner or an admin (/api/orgs/[slug]/posts, POST
 // /api/events), so the person who posts for a club is one of those.
-//   SAE: Franky and James ONLY. Rylan Conaway is not in SAE (Franky, Oct 2):
+//   SAE: James and Franky ONLY. Rylan Conaway is not in SAE (Franky, Oct 2):
 //   he is in the cast as himself, with no SAE membership, post or event.
-//   Maya is in no club: she is new, she FOLLOWS all five (ORG_FOLLOWS).
-//   Franky is in SAE only; he follows the other four.
+//   JAMES is SAE's officer and Franky a plain member, so the club page the
+//   video opens as Franky has no "Officer tools" bar and no Delete, Edit or
+//   Cancel controls. The rows are upserts: a run moves a role both ways.
+//   Chess Club: Franky, Theo and Maya are members too. Only a member has a
+//   club in Messages, and the video opens Chess Club's chat as Franky; Theo
+//   and Maya speak and vote there. Franky follows the other three clubs.
 const MEMBERS = [
-  { club: "sae", user: "franky", role: "admin" },
-  { club: "sae", user: "james", role: "member" },
+  { club: "sae", user: "james", role: "admin" },
+  { club: "sae", user: "franky", role: "member" },
   { club: "chess_club", user: "noor", role: "member" },
   { club: "chess_club", user: "eli", role: "member" },
   { club: "chess_club", user: "lucas", role: "member" },
+  { club: "chess_club", user: "franky", role: "member" },
+  { club: "chess_club", user: "theo", role: "member" },
+  { club: "chess_club", user: "maya", role: "member" },
   { club: "finance_club", user: "devon", role: "member" },
   { club: "finance_club", user: "noor", role: "member" },
   { club: "tower_floor_3", user: "eli", role: "member" },
@@ -537,8 +635,9 @@ async function ensureMember(orgId, userId, role, ownerId) {
 
 // Deliberate follows (not membership): anyone can follow a visible club, and
 // a followed club's posts ride into the follower's feed from any campus.
-// Franky (the lead) follows all five: SAE through his membership, the other
-// four here. Maya follows all five too. So both feeds carry every club.
+// Franky (the lead) follows all five: SAE and Chess Club through his
+// membership, and here (his Chess Club follow is older than his joining; the
+// row stays). Maya follows all five too. So both feeds carry every club.
 const ORG_FOLLOWS = [
   { club: "chess_club", user: "franky", source: "discover" },
   { club: "finance_club", user: "franky", source: "discover" },
@@ -581,62 +680,98 @@ async function ensureOrgFollow(orgId, userId, source) {
 // admin, a personal post the author's.
 //
 // `club` = posted as that club (the author must be its owner or admin).
-// `hoursAgo` is used once, when the post is first written.
+// `hoursAgo` is how old the post is when the seed dates it (see below).
 // `image` is the photo's file name in PHOTOS_DIR, or null for a text post
-// (see POST PHOTOS below).
+// (see POST PHOTOS below). A post that holds a picture while this list says
+// null is deleted and written again as a text post.
 // `was` lists earlier wordings of the same post. A post is keyed on its
 // text, so a reworded one would otherwise stay next to the new one: the
 // rows this script wrote under the old wording are deleted first. (Deleting
 // and writing again, not an UPDATE, so the post never reads "Edited".)
 // `wasBy` lists cast members this same post was first seeded under: their
-// personal post with this text is deleted, so a post moved to another author
-// does not stay behind on the first one's profile.
+// copy with this text (personal, or made as the same club) is deleted, so a
+// post moved to another author does not stay behind on the first one's
+// profile.
+// `likes`, `liked`, `comments`: see ENGAGEMENT below.
+//
+// THE ORDER OF THE LEAD'S FEED is set here, by the ages and the numbers
+// together. The feed ranks by (1 + likes + comments) / (age in hours + 2)^1.5
+// (scoreFeedRow, src/lib/iu/community-scope.ts), and Franky follows the
+// whole cast on one campus, so nothing else tells two posts apart. The video
+// wants, from the top: Priya's Blitz Night post, a picture by an invented
+// student (Hana), Rylan's kitchen picture, another picture (Maya), then
+// SAE's letters. With every count between 2 and 9 a fresh text post beats an
+// older picture whatever it is given, so the four at the top are the four
+// newest and each has more likes than the next: that order holds however
+// long after the seed the film is made. Every text post is older than those
+// four and has fewer likes. The summary prints the order.
+//
+// DATING. A post is written `hoursAgo` old. A later run leaves its time
+// alone while that still reads right (keepsItsTime: not younger than
+// `hoursAgo`, not more than SHOOT_HOURS older). When ANY post is outside
+// that, on the next day's shoot or after an age was changed here, ALL of
+// them are dated again in one pass (retimePosts), so the order above never
+// rests on a mix of two days. That is an UPDATE of created_at alone: it
+// keeps the post's likes and comments and does not mark it "Edited"
+// (posts_stamp_edited looks at the text and the tags only).
 // ---------------------------------------------------------------------------
 const POSTS = [
-  { author: "priya", club: "chess_club", hoursAgo: 2, tags: [], image: null,
-    content: "Blitz Night is tonight at 7 in the Campus Center. Five minute games, every level welcome. We have extra boards, so just show up." },
-  { author: "theo", hoursAgo: 4, tags: [], image: null,
-    content: "Does anyone know where the good study spots are? Asking as a freshman who has sat in the same chair for three days." },
-  { author: "amara", club: "tower_floor_3", hoursAgo: 7, tags: [], image: null,
-    content: "Floor 3, movie night is coming up. Put your picks in the chat and I will bring the popcorn." },
-  { author: "hana", hoursAgo: 13, tags: [], image: "campus-night.jpg",
+  { author: "priya", club: "chess_club", hoursAgo: 2, tags: [], image: null, likes: 9, liked: true,
+    comments: [["noor", 25, "bringing a friend who has never played"], ["eli", 50, "see you there"],
+      ["maya", 80, "first one for me. I'm in"]],
+    was: ["Blitz Night is tonight at 7 in the Campus Center. Five minute games, every level welcome. We have extra boards, so just show up."],
+    content: "Blitz Night is tonight at 7 in the Campus Center. Five-minute games, every level welcome. We have extra boards, so just show up." },
+  { author: "hana", hoursAgo: 13, tags: [], image: "campus-night.jpg", likes: 8, liked: true,
     was: ["Took my camera out at sunset with no plan. Best hour of my week."],
+    comments: [["maya", 35, "ok these are really good"], ["lucas", 140, "teach me your ways"]],
     content: "Took my camera out after dark with no plan. Best hour of my week." },
-  { author: "maya", hoursAgo: 19, tags: [], image: "campus-fog.jpg",
+  { author: "maya", hoursAgo: 19, tags: [], image: "campus-fog.jpg", likes: 6,
+    comments: [["theo", 45, "which stairwell?? asking for a friend (me)"]],
     content: "First week here and I already know which stairwell is the fast one. Small wins." },
-  { author: "jonah", club: "finance_club", hoursAgo: 25, tags: [], image: null,
+  { author: "jonah", club: "finance_club", hoursAgo: 25, tags: [], image: null, likes: 2,
     content: "Resume Review Night is this week. Bring a draft, even a rough one. Rough is what we are there for." },
-  { author: "lucas", club: "north_hall", hoursAgo: 29, tags: [], image: null,
+  { author: "theo", hoursAgo: 26, tags: [], image: null, likes: 3,
+    content: "Does anyone know where the good study spots are? Asking as a freshman who has sat in the same chair for three days." },
+  { author: "lucas", club: "north_hall", hoursAgo: 29, tags: [], image: null, likes: 2,
     content: "The first floor lounge has new whiteboards. Midterm Study Jam is this week if you want company while you study." },
-  { author: "devon", hoursAgo: 33, tags: [], image: null,
-    content: "Intramural sign ups close Friday. We need two more for flag football, no experience needed." },
-  { author: "franky", club: "sae", hoursAgo: 38, tags: [], image: "sae-letters.jpg",
-    was: ["Cookout on the Lawn is this week. Burgers, veggie burgers and yard games. Everyone is welcome, bring a friend."],
-    content: "Letters are up on the lawn. Cookout is this week: burgers, veggie burgers and yard games. Everyone is welcome, bring a friend." },
-  { author: "noor", hoursAgo: 44, tags: [], image: null,
-    content: "Lost three games in a row at Chess Club and still had a great night. See you at the next one." },
-  { author: "eli", hoursAgo: 50, tags: [], image: null,
-    content: "Floor dinner was a good idea. Whoever suggested it, thank you." },
-  { author: "james", hoursAgo: 56, tags: [], image: null,
-    content: "Good chapter meeting tonight. Proud of this group." },
-  { author: "rylan", hoursAgo: 62, tags: [], image: "lawn-event.jpg",
+  { author: "amara", club: "tower_floor_3", hoursAgo: 30, tags: [], image: null, likes: 2,
+    content: "Floor 3, movie night is coming up. Put your picks in the chat and I will bring the popcorn." },
+  // A text post again: lawn-event.jpg shows a vendor's banner with a phone
+  // number on it. A day before Rylan's line to Franky about it (DM_MESSAGES).
+  { author: "rylan", hoursAgo: 31, tags: [], image: null, likes: 3,
     content: "Tabling outside the Campus Center this afternoon. Come say hi." },
+  { author: "devon", hoursAgo: 33, tags: [], image: null, likes: 4,
+    content: "Intramural sign ups close Friday. We need two more for flag football, no experience needed." },
+  // James posts for SAE: he is its officer (MEMBERS). First seeded under Franky.
+  // "Next Tuesday": the cookout is four days after the shoot (EVENTS), a Tuesday when the shoot is on a Friday.
+  { author: "james", club: "sae", hoursAgo: 38, tags: [], image: "sae-letters.jpg", wasBy: ["franky"], likes: 6,
+    comments: [["devon", 90, "I'll be there. Save me a burger."]],
+    was: ["Letters are up on the lawn. Cookout is this week: burgers, veggie burgers and yard games. Everyone is welcome, bring a friend."],
+    content: "Letters are up on the lawn. Cookout is next Tuesday: burgers, veggie burgers and yard games. Everyone is welcome, bring a friend." },
+  { author: "noor", hoursAgo: 44, tags: [], image: null, likes: 3,
+    content: "Lost three games in a row at Chess Club and still had a great night. See you at the next one." },
+  { author: "eli", hoursAgo: 50, tags: [], image: null, likes: 2,
+    content: "Floor dinner was a good idea. Whoever suggested it, thank you." },
+  { author: "james", hoursAgo: 56, tags: [], image: null, likes: 4,
+    content: "Good chapter meeting tonight. Proud of this group." },
   // Franky's pictures of real people go on the post of the founder who is
   // in them (Franky, Oct 2: the kitchen and the gorilla statue are Rylan,
   // the kitten is James, the sand dunes are Franky), never on an invented
-  // student's. All older than the top of the feed, which still opens on
-  // Priya's Blitz Night post.
-  { author: "rylan", hoursAgo: 48, tags: [], image: "kitchen.jpg", wasBy: ["franky"],
+  // student's. The kitchen is last night's dinner and third in the feed: it
+  // is the post the video taps to visit Rylan's profile. The rest are older
+  // than everything above.
+  { author: "rylan", hoursAgo: 18, tags: [], image: "kitchen.jpg", wasBy: ["franky"], likes: 7, liked: true,
+    comments: [["james", 30, "saved me a plate, right?"], ["devon", 75, "looks so good"]],
     content: "Family dinner at the house." },
-  { author: "franky", hoursAgo: 72, tags: [], image: "turtle.jpg",
+  { author: "franky", hoursAgo: 72, tags: [], image: "turtle.jpg", likes: 5,
     content: "Already missing summer." },
-  { author: "rylan", hoursAgo: 96, tags: [], image: "gorilla.jpg", wasBy: ["franky"],
+  { author: "rylan", hoursAgo: 96, tags: [], image: "gorilla.jpg", wasBy: ["franky"], likes: 4,
     content: "Found a quiet spot to think." },
-  { author: "franky", hoursAgo: 144, tags: [], image: "field-night.jpg",
+  { author: "franky", hoursAgo: 144, tags: [], image: "field-night.jpg", likes: 6,
     content: "Friday night lights." },
-  { author: "james", hoursAgo: 192, tags: [], image: "kitten.jpg", wasBy: ["franky"],
+  { author: "james", hoursAgo: 192, tags: [], image: "kitten.jpg", wasBy: ["franky"], likes: 7,
     content: "New roommate." },
-  { author: "franky", hoursAgo: 264, tags: [], image: "dunes.jpg",
+  { author: "franky", hoursAgo: 264, tags: [], image: "dunes.jpg", likes: 8,
     content: "Sand in everything. Worth it." },
 ];
 
@@ -671,8 +806,12 @@ const DB_CONTAINER = (() => {
   return m ? `supabase_db_${m[1]}` : null;
 })();
 
-/** Write a local URL into posts.media_url past the host-pinning trigger. False when it could not. */
-function setLocalMediaUrl(postId, userId, url) {
+/**
+ * Run ONE statement in the local database container with triggers off for
+ * that one transaction. `vars` are psql variables (`:'name'` in the
+ * statement). False when it could not.
+ */
+function psqlPastTriggers(statement, vars) {
   let dbHost = "";
   try {
     dbHost = new URL(STATUS.DB_URL ?? "").hostname;
@@ -683,19 +822,39 @@ function setLocalMediaUrl(postId, userId, url) {
   const res = spawnSync(
     "docker",
     ["exec", "-i", DB_CONTAINER, "psql", "-U", "postgres", "-d", "postgres", "-q", "-v", "ON_ERROR_STOP=1",
-      "-v", `id=${postId}`, "-v", `uid=${userId}`, "-v", `url=${url}`],
-    {
-      encoding: "utf8",
-      input:
-        "begin;\nset local session_replication_role = replica;\n" +
-        "update public.posts set media_url = :'url' where id = :'id'::uuid and user_id = :'uid'::uuid;\ncommit;\n",
-    },
+      ...Object.entries(vars).flatMap(([name, value]) => ["-v", `${name}=${value}`])],
+    { encoding: "utf8", input: `begin;\nset local session_replication_role = replica;\n${statement};\ncommit;\n` },
   );
   if (res.error || res.status !== 0) {
     if (res.stderr) console.error(res.stderr.trim());
     return false;
   }
   return true;
+}
+
+/** Write a local URL into posts.media_url past the host-pinning trigger. False when it could not. */
+function setLocalMediaUrl(postId, userId, url) {
+  return psqlPastTriggers(
+    "update public.posts set media_url = :'url' where id = :'id'::uuid and user_id = :'uid'::uuid",
+    { id: postId, uid: userId, url },
+  );
+}
+
+/**
+ * Put a picture in the local `profiles` bucket and return its public URL.
+ * Uploaded only when missing or when it changed size: a re-run with the same
+ * picture writes nothing.
+ */
+async function putLocalPicture(folder, name, bytes) {
+  const listed = must(await admin.storage.from("profiles").list(folder, { search: name }), `list ${name}`);
+  const there = listed.find((o) => o.name === name);
+  if (!there || there.metadata?.size !== bytes.length) {
+    must(
+      await admin.storage.from("profiles").upload(`${folder}/${name}`, bytes, { contentType: "image/jpeg", upsert: true }),
+      `upload ${name}`,
+    );
+  }
+  return `${API_URL}/storage/v1/object/public/profiles/${folder}/${name}`;
 }
 
 /** Upload one picture to the author's post folder and point the post at it. */
@@ -705,20 +864,8 @@ async function ensurePostPhoto(postId, userId, file, currentUrl) {
     photoNotes.push(`${file}: not in ${PHOTOS_DIR}; its post is text only`);
     return;
   }
-  const bytes = readFileSync(src);
   const name = `demo-${file}`;
-  const folder = `${userId}/posts`;
-  const listed = must(await admin.storage.from("profiles").list(folder, { search: name }), `list ${name}`);
-  const there = listed.find((o) => o.name === name);
-  // Uploaded only when missing or when the file changed size: a re-run with
-  // the same picture writes nothing.
-  if (!there || there.metadata?.size !== bytes.length) {
-    must(
-      await admin.storage.from("profiles").upload(`${folder}/${name}`, bytes, { contentType: "image/jpeg", upsert: true }),
-      `upload ${name}`,
-    );
-  }
-  const url = `${API_URL}/storage/v1/object/public/profiles/${folder}/${name}`;
+  const url = await putLocalPicture(`${userId}/posts`, name, readFileSync(src));
   if (currentUrl === url) return;
   const ok = setLocalMediaUrl(postId, userId, url);
   const now = ok
@@ -727,7 +874,88 @@ async function ensurePostPhoto(postId, userId, file, currentUrl) {
   if (now !== url) photoNotes.push(`${file}: uploaded, but media_url could not be written (docker exec ${DB_CONTAINER}); its post is text only`);
 }
 
-async function ensurePost(spec, users, clubs) {
+// ---------------------------------------------------------------------------
+// PROFILE AND CLUB PICTURES: Franky's cover photo, SAE's banner and logo.
+//   Each is a CUT of one of Franky's pictures, made at run time by ffmpeg
+//   (`cut` / `banner` / `logo` are ffmpeg -vf filters, written for the size
+//   the picture has today) into a temp folder outside the repository, which
+//   the run removes at the end. Without ffmpeg, or with the picture missing,
+//   the profile keeps its theme and the club its initials, and the run says
+//   so. The cut goes to the same local `profiles` bucket as the post photos.
+//   A cover photo (users.banner_url) is the file `banner-demo.jpg` at the
+//   root of the student's own folder, the shape the app's own upload uses,
+//   and a plain service-role UPDATE: `users` has no trigger on that column
+//   (the app's host rule lives in /api/me/profile-sync, which the seed does
+//   not go through).
+//   A club's banner and logo (orgs.banner_url, orgs.logo_url) are R2 keys in
+//   the app, and local R2 is blank; every screen passes an http(s) value
+//   through as it is (orgAssetProxyUrl). The orgs_check_asset_refs trigger
+//   pins the production host like the posts one, so both columns are written
+//   in ONE UPDATE past it, the way setLocalMediaUrl does it.
+//   The phone draws a cover 390 x 200 (about 2:1) and a club banner 3:1. The
+//   SAE picture is 1279 wide, so its 3:1 cut is 426 tall: the upper half of
+//   the letters (they stand 825 tall), not all of them. The logo is the
+//   starred top of the first letter alone: the whole picture, shrunk to a
+//   small tile, was the banner and the club's post a third time.
+// ---------------------------------------------------------------------------
+let cutDir = null;
+
+/** One picture cut from `file` with an ffmpeg filter. The bytes, or null (and a note) when it could not. */
+function cutPicture(file, filter, name) {
+  const src = join(PHOTOS_DIR, file);
+  if (!existsSync(src)) {
+    photoNotes.push(`${file}: not in ${PHOTOS_DIR}; ${name} is not set`);
+    return null;
+  }
+  cutDir ??= mkdtempSync(join(tmpdir(), "vibe-demo-cuts-"));
+  const out = join(cutDir, name);
+  const res = spawnSync(
+    "ffmpeg",
+    ["-v", "error", "-y", "-i", src, "-vf", filter, "-frames:v", "1", "-update", "1", "-q:v", "3",
+      "-map_metadata", "-1", "-bitexact", out],
+    { encoding: "utf8" },
+  );
+  if (res.error || res.status !== 0 || !existsSync(out)) {
+    photoNotes.push(`${name}: ffmpeg could not cut it from ${file}${res.stderr ? ` (${res.stderr.trim().split("\n").at(-1)})` : ""}`);
+    return null;
+  }
+  return readFileSync(out);
+}
+
+/** A student's cover photo. */
+async function ensureCover(userId, cover) {
+  const bytes = cutPicture(cover.file, cover.cut, "banner-demo.jpg");
+  if (!bytes) return;
+  const url = await putLocalPicture(userId, "banner-demo.jpg", bytes);
+  const row = must(await admin.from("users").select("banner_url").eq("id", userId).single(), "read the cover");
+  if (row.banner_url !== url) must(await admin.from("users").update({ banner_url: url }).eq("id", userId), "set the cover");
+}
+
+/** A club's banner and logo, kept in the folder of one of its officers. */
+async function ensureClubArt(orgId, handle, holderId, art) {
+  const banner = cutPicture(art.file, art.banner, `demo-${handle}-banner.jpg`);
+  const logo = cutPicture(art.file, art.logo, `demo-${handle}-logo.jpg`);
+  if (!banner || !logo) return;
+  const folder = `${holderId}/orgs`;
+  const urls = {
+    banner: await putLocalPicture(folder, `demo-${handle}-banner.jpg`, banner),
+    logo: await putLocalPicture(folder, `demo-${handle}-logo.jpg`, logo),
+  };
+  const read = async () => must(await admin.from("orgs").select("banner_url, logo_url").eq("id", orgId).single(), `read the art of ${handle}`);
+  let row = await read();
+  if (row.banner_url === urls.banner && row.logo_url === urls.logo) return;
+  const ok = psqlPastTriggers(
+    "update public.orgs set banner_url = :'banner', logo_url = :'logo' where id = :'id'::uuid",
+    { id: orgId, ...urls },
+  );
+  if (ok) row = await read();
+  if (row.banner_url !== urls.banner || row.logo_url !== urls.logo) {
+    photoNotes.push(`${handle}: banner and logo uploaded, but could not be written to the club (docker exec ${DB_CONTAINER})`);
+  }
+}
+
+/** Returns the post's id. `withPhotos` is false when PHOTOS_DIR is missing: no picture is put on, none is taken off. */
+async function ensurePost(spec, users, clubs, withPhotos) {
   const userId = users[spec.author];
   const orgId = spec.club ? clubs[spec.club] : null;
   const mine = (columns) => {
@@ -745,8 +973,9 @@ async function ensurePost(spec, users, clubs) {
 
   // The same post, first seeded under another cast member: gone.
   for (const who of spec.wasBy ?? []) {
+    const theirs = admin.from("posts").select("id").eq("user_id", users[who]).eq("content", spec.content);
     const stale = must(
-      await admin.from("posts").select("id").eq("user_id", users[who]).is("org_id", null).eq("content", spec.content),
+      await (orgId ? theirs.eq("org_id", orgId) : theirs.is("org_id", null)),
       `look up ${who}'s copy of a post now by ${spec.author}`,
     );
     if (stale.length === 0) continue;
@@ -768,6 +997,13 @@ async function ensurePost(spec, users, clubs) {
     console.log(`  moved to ${CAMPUS}: ${spec.author}'s "${spec.content.slice(0, 40)}..."`);
     found = [];
   }
+  // A picture taken off this post in POSTS: deleted and written again as a
+  // text post, the way a reworded one is (see `was`).
+  if (found.length > 0 && withPhotos && !spec.image && found[0].media_url) {
+    must(await admin.from("posts").delete().eq("id", found[0].id), `delete the picture post by ${spec.author}`);
+    console.log(`  picture taken off: ${spec.author}'s "${spec.content.slice(0, 40)}..." is a text post again`);
+    found = [];
+  }
 
   const post = found[0] ?? must(
     await admin
@@ -780,8 +1016,90 @@ async function ensurePost(spec, users, clubs) {
       .single(),
     `insert post by ${spec.author}`,
   );
-  if (spec.image) await ensurePostPhoto(post.id, userId, spec.image, post.media_url);
+  if (spec.image && withPhotos) await ensurePostPhoto(post.id, userId, spec.image, post.media_url);
   return post.id;
+}
+
+/**
+ * Date the posts again when any of them no longer reads as written for
+ * today (see DATING above POSTS): all of them, each to its own `hoursAgo`.
+ * `written` is [{ spec, id }] in POSTS order. Returns how many it moved.
+ */
+async function retimePosts(written) {
+  const rows = must(
+    await admin.from("posts").select("id, created_at").in("id", written.map((w) => w.id)),
+    "read the posts' times",
+  );
+  const age = (id) => (Date.now() - new Date(rows.find((r) => r.id === id).created_at).getTime()) / 3_600_000;
+  if (written.every((w) => keepsItsTime(age(w.id), w.spec.hoursAgo))) return 0;
+  for (const w of written) {
+    must(
+      await admin.from("posts").update({ created_at: hoursAgo(w.spec.hoursAgo) }).eq("id", w.id),
+      `date the post by ${w.spec.author}`,
+    );
+  }
+  return written.length;
+}
+
+// ---------------------------------------------------------------------------
+// ENGAGEMENT: likes, comments and views, so no card in the feed reads 0 0 0.
+// Written AFTER the posts on every run, because a post that is deleted and
+// written again loses all three (the foreign keys cascade). Every row is
+// looked up first: a second run adds nothing. No reposts: one by anybody
+// Franky follows lifts a post over everything else and puts a "reposted
+// this" pill on its card.
+//
+// In POSTS, `likes` is how many cast members like the post (2 to 9: there
+// are thirteen accounts). They are the next ones in ACCOUNTS order after a
+// start that moves with the post's place in the list, never the author and
+// never the lead: `liked: true` makes Franky one of them, which fills the
+// heart on that card on his phone. `comments` is [who, minutes after the
+// post, text]; a comment is keyed on (post, who, text) and follows its post
+// when that is dated again. Views are post_views rows from the same people
+// plus two to four more, one each (the feed counts that ledger minus the
+// author's own; the stored posts.view_count is set to the same number).
+//
+// A like and a comment each write a `notifications` row for the post's
+// author (trg_notify_on_like, trg_notify_on_comment), so the otto tab of
+// whoever is filmed lists "... liked your post". Nothing is pushed: no cast
+// account has a device.
+// ---------------------------------------------------------------------------
+async function seedEngagement(written, users) {
+  const keys = ACCOUNTS.map((a) => a.key);
+  for (const [i, { spec, id }] of written.entries()) {
+    const pool = keys.filter((k) => k !== spec.author && k !== LEAD);
+    const turned = [...pool.slice(i % pool.length), ...pool.slice(0, i % pool.length)];
+    const likers = [...(spec.liked ? [LEAD] : []), ...turned].slice(0, spec.likes ?? 0);
+    const viewers = turned.slice(0, Math.min(pool.length, (spec.likes ?? 0) + 2 + (i % 3)));
+
+    const liked = must(await admin.from("post_likes").select("user_id").eq("post_id", id), "look up likes");
+    const newLikes = likers.filter((k) => !liked.some((r) => r.user_id === users[k]));
+    if (newLikes.length > 0) {
+      must(await admin.from("post_likes").insert(newLikes.map((k) => ({ post_id: id, user_id: users[k] }))), "insert likes");
+    }
+
+    const post = must(await admin.from("posts").select("user_id, created_at, view_count").eq("id", id).single(), "read a post");
+    const said = must(await admin.from("post_comments").select("id, user_id, content, created_at").eq("post_id", id), "look up comments");
+    for (const [who, minutes, content] of spec.comments ?? []) {
+      const at = new Date(new Date(post.created_at).getTime() + minutes * 60_000).toISOString();
+      const there = said.find((c) => c.user_id === users[who] && c.content === content);
+      if (!there) {
+        must(await admin.from("post_comments").insert({ post_id: id, user_id: users[who], content, created_at: at }), `insert comment by ${who}`);
+      } else if (new Date(there.created_at).getTime() !== new Date(at).getTime()) {
+        must(await admin.from("post_comments").update({ created_at: at }).eq("id", there.id), `date the comment by ${who}`);
+      }
+    }
+
+    const seen = must(await admin.from("post_views").select("user_id").eq("post_id", id), "look up views");
+    const newViews = viewers.filter((k) => !seen.some((r) => r.user_id === users[k]));
+    if (newViews.length > 0) {
+      must(await admin.from("post_views").insert(newViews.map((k) => ({ post_id: id, user_id: users[k] }))), "insert views");
+    }
+    const honest = seen.filter((r) => r.user_id !== post.user_id).length + newViews.length;
+    if (post.view_count !== honest) {
+      must(await admin.from("posts").update({ view_count: honest }).eq("id", id), "set view_count");
+    }
+  }
 }
 
 // ---------------------------------------------------------------------------
@@ -797,14 +1115,14 @@ async function ensurePost(spec, users, clubs) {
 const EVENTS = [
   { club: "chess_club", creator: "priya", title: "Blitz Night", inDays: 0, hour: 19, hours: 3,
     location: "Campus Center, Room 148",
-    description: "Five minute games, every level welcome. Boards and clocks are provided, just bring yourself." },
+    description: "Five-minute games, every level welcome. Boards and clocks are provided, just bring yourself." },
   { club: "finance_club", creator: "jonah", title: "Resume Review Night", inDays: 2, hour: 18, hours: 2,
     location: "Campus Center, Room 305",
     description: "Bring a printed resume or a laptop. Juniors and seniors will read it with you and mark it up." },
   { club: "tower_floor_3", creator: "amara", title: "Floor Movie Night", inDays: 3, hour: 20, hours: 2,
     location: "Tower, third floor lounge",
     description: "We vote on the movie in the floor chat. Popcorn is covered." },
-  { club: "sae", creator: "franky", title: "Cookout on the Lawn", inDays: 4, hour: 17, hours: 2,
+  { club: "sae", creator: "james", title: "Cookout on the Lawn", inDays: 4, hour: 17, hours: 2,
     location: "The lawn behind the Campus Center",
     description: "Burgers, veggie burgers and yard games. Open to everyone, bring a friend." },
   { club: "north_hall", creator: "lucas", title: "Midterm Study Jam", inDays: 5, hour: 14, hours: 3,
@@ -878,7 +1196,9 @@ async function ensureRsvp(eventId, userId, status) {
 // lead) follows the whole cast and most follow him back, so his feed is full
 // and his profile shows followers; Maya keeps hers. Everyone Franky has a DM
 // with follows him and is followed by him: a DM between two people who
-// follow each other is a chat, not a message request.
+// follow each other is a chat, not a message request. Rylan's is the
+// profile the video visits: five of the invented students follow him and he
+// follows three back, so its two numbers are not 2 and 2.
 // ---------------------------------------------------------------------------
 const PERSON_FOLLOWS = [
   ["franky", "maya"], ["franky", "theo"], ["franky", "priya"], ["franky", "hana"], ["franky", "amara"],
@@ -893,6 +1213,8 @@ const PERSON_FOLLOWS = [
   ["devon", "jonah"], ["jonah", "devon"], ["amara", "eli"], ["amara", "theo"],
   ["franky", "james"], ["james", "franky"], ["franky", "rylan"], ["rylan", "franky"],
   ["james", "rylan"], ["rylan", "james"],
+  ["hana", "rylan"], ["rylan", "hana"], ["devon", "rylan"], ["rylan", "devon"],
+  ["maya", "rylan"], ["rylan", "maya"], ["theo", "rylan"], ["priya", "rylan"],
 ];
 
 async function ensurePersonFollow(followerId, followingId) {
@@ -911,9 +1233,8 @@ async function ensurePersonFollow(followerId, followingId) {
 // Messages.
 //   The lead's inbox: four DMs, each a few friendly lines, all read.
 //     Franky <-> James is the one the video uses. On camera Franky opens
-//     Priya's "Blitz Night is tonight" post, "Send to chats", James, then
-//     types "hey are you going to this event tonight?". NEITHER the shared
-//     post NOR that line is seeded: the thread ends on James's last line.
+//     it and types "hey are you going to blitz night tonight?". That line
+//     is NOT seeded: the thread ends on James's last line.
 //     Franky <-> Rylan, Franky <-> Maya and Franky <-> Theo fill the list.
 //   Maya <-> Theo stays from the first version (Maya's own inbox).
 //   AN EVENT CANNOT BE SHARED INTO A DM. Event cards are club rooms only
@@ -922,19 +1243,28 @@ async function ensurePersonFollow(followerId, followingId) {
 //   feed card: attachment_kind 'post'). Priya's Chess Club post about Blitz
 //   Night is in POSTS for exactly that.
 //
-//   Club chat: a few lines in Chess Club's Lounge, and a few in SAE's. SAE
-//   is local-seed's club and its rooms open with Avery Owner's test lines;
-//   Franky is an SAE officer, so those rooms are in HIS inbox. The cast's
-//   lines are newer, so the inbox previews show the cast. Opening SAE's
-//   Lounge still shows Avery's three lines above them: do not film it.
-//   `room` names a room by kind and name (default: the Lounge); a room the
-//   club does not have is skipped (SAE's `events` room exists only on
-//   local-seed's copy).
+//   Club chat: Chess Club's is the one the video opens and has its own
+//   section, CHESS CLUB'S CHAT, below. CLUB_MESSAGES holds a few lines in
+//   SAE's rooms. SAE is local-seed's club and its rooms open with Avery
+//   Owner's test lines; Franky is an SAE member, so those rooms are in HIS
+//   inbox. The cast's lines are newer, so the inbox previews show the cast.
+//   Opening SAE's Lounge still shows Avery's three lines above them: do not
+//   film it. `room` names a room by kind and name (default: the Lounge); a
+//   room the club does not have is skipped (SAE's `events` room exists only
+//   on local-seed's copy).
 //
 // A DM is made the way POST /api/me/threads makes one: a `dm` channel with
 // no name and two channel_members rows (the one who started it is `admin`),
 // both accepted, both read. A message is keyed on (room, author, content);
-// `hoursAgo` is used once, when it is first written.
+// `hoursAgo` is used once, when it is first written. `lastNight` is used on
+// every run instead: minutes after 8 pm yesterday on the campus clock, so
+// SAE's row on the Messages home reads "Yesterday" whenever the seed ran
+// (hours back from a morning run put a chat about a grill at 5 am).
+//
+// TAKES. The line Franky types to James on camera is a real message, and a
+// take that stops half way leaves it in the thread: the next take would open
+// on it. So every line by the lead in that one thread that is not in
+// DM_MESSAGES is deleted, and the run says how many.
 // ---------------------------------------------------------------------------
 const DMS = [
   { key: "franky_james", from: "james", to: "franky" },
@@ -945,6 +1275,26 @@ const DMS = [
 ];
 
 const DM_MESSAGES = [
+  // The thread the video types into. Eight older lines so it fills the phone
+  // and the line sent on camera lands near the field, not in an empty screen.
+  // They are older than the three below: James's row on the Messages home
+  // still previews "nice, let's get food after the meeting".
+  { dm: "franky_james", author: "franky", hoursAgo: 44.3,
+    content: "how was the exam?" },
+  { dm: "franky_james", author: "james", hoursAgo: 44.2,
+    content: "survived. barely" },
+  { dm: "franky_james", author: "james", hoursAgo: 44,
+    content: "are you coming to chapter on Thursday?" },
+  { dm: "franky_james", author: "franky", hoursAgo: 43.9,
+    content: "yeah I'll be there" },
+  { dm: "franky_james", author: "james", hoursAgo: 43.8,
+    content: "good. we need to sort out the cookout" },
+  { dm: "franky_james", author: "franky", hoursAgo: 43.7,
+    content: "I can bring the grill" },
+  { dm: "franky_james", author: "james", hoursAgo: 43.6,
+    content: "perfect. I'll get the food" },
+  { dm: "franky_james", author: "franky", hoursAgo: 43.5,
+    content: "send me the list and I'll split it with you" },
   { dm: "franky_james", author: "james", hoursAgo: 20,
     content: "you around this week?" },
   { dm: "franky_james", author: "franky", hoursAgo: 19.8,
@@ -974,19 +1324,11 @@ const DM_MESSAGES = [
 ];
 
 const CLUB_MESSAGES = [
-  { club: "chess_club", author: "priya", hoursAgo: 6,
-    content: "Boards are booked for tonight. Doors open at 6:45." },
-  { club: "chess_club", author: "noor", hoursAgo: 5.5,
-    content: "I'll be there. Is it ok if I bring a friend who has never played?" },
-  { club: "chess_club", author: "priya", hoursAgo: 5.4,
-    content: "Always. Beginners get the comfy table." },
-  { club: "chess_club", author: "eli", hoursAgo: 3,
-    content: "Can someone teach me what a fork is before I embarrass myself" },
-  { club: "sae", author: "james", hoursAgo: 9,
+  { club: "sae", author: "james", lastNight: 0,
     content: "Who has the grill for the cookout?" },
-  { club: "sae", author: "franky", hoursAgo: 8.8,
+  { club: "sae", author: "franky", lastNight: 6,
     content: "I've got it. Need two people to help set up at 4." },
-  { club: "sae", author: "james", hoursAgo: 8.6,
+  { club: "sae", author: "james", lastNight: 12,
     content: "I'm in." },
   { club: "sae", author: "franky", hoursAgo: 30, room: { kind: "room", name: "events" },
     content: "Cookout on the Lawn is on the calendar. RSVP so we know how much food to get." },
@@ -1080,9 +1422,251 @@ async function seedMessages(users, clubs) {
   for (const m of DM_MESSAGES) await ensureMessage(dms[m.dm], users[m.author], m.content, hoursAgo(m.hoursAgo));
   for (const m of CLUB_MESSAGES) {
     const roomId = m.room ? await findNamedRoom(clubs[m.club], m.room) : await findLounge(clubs[m.club], m.club);
-    if (roomId) await ensureMessage(roomId, users[m.author], m.content, hoursAgo(m.hoursAgo));
+    if (!roomId) continue;
+    if (m.lastNight === undefined) {
+      await ensureMessage(roomId, users[m.author], m.content, hoursAgo(m.hoursAgo));
+      continue;
+    }
+    // Yesterday evening, on every run: moved when it is more than a minute off.
+    const at = new Date(campusTime(-1, 20).getTime() + m.lastNight * 60_000);
+    const id = await ensureMessage(roomId, users[m.author], m.content, at.toISOString());
+    const row = must(await admin.from("messages").select("created_at").eq("id", id).single(), "read a club line's time");
+    if (Math.abs(new Date(row.created_at).getTime() - at.getTime()) > 60_000) {
+      must(await admin.from("messages").update({ created_at: at.toISOString() }).eq("id", id), "date a club line");
+    }
+  }
+
+  // A line left by an earlier take (see TAKES above).
+  const thread = dms[`${LEAD}_james`];
+  const seeded = DM_MESSAGES.filter((m) => m.dm === `${LEAD}_james`).map((m) => m.content);
+  const left = !thread ? [] : must(
+    await admin.from("messages").select("id, content").eq("channel_id", thread).eq("user_id", users[LEAD]),
+    "look up the lead's lines to james",
+  ).filter((m) => !seeded.includes(m.content));
+  if (left.length > 0) {
+    must(await admin.from("messages").delete().in("id", left.map((m) => m.id)), "delete the lines of an earlier take");
+    console.log(`  removed from the DM with James: ${left.length} line(s) an earlier take left (${left.map((m) => JSON.stringify(m.content)).join(", ")})`);
   }
   return dms;
+}
+
+// ---------------------------------------------------------------------------
+// CHESS CLUB'S CHAT: the club chat the video opens, as Franky sees it.
+//   The Board: one post by Priya (only an owner or officer posts there; the
+//   database does not enforce that, the app does).
+//   The Lounge, oldest first: ten lines, a poll with six votes and, second
+//   from the bottom, the Blitz Night event card. The two cards are made by the app's own functions
+//   (chat_create_event_card, chat_create_poll, chat_cast_vote, service role
+//   only): a hand-written card row has no side table and draws as a plain
+//   bubble. A card is looked up first: the event card by (room, event), not
+//   by its text, which carries a date that changes every day; the poll by
+//   its text. A vote is cast only when it is not there. Voters are members.
+//   chat_create_event_card refuses an event that has ended: after 10 pm the
+//   card is not made and the run says so.
+//
+// TIME. `minsAgo` is how old a row is when the seed dates it. The room
+// draws a day line ("Today") before the first row and again after any gap
+// over an hour, so the whole Lounge sits inside one hour: one "Today". The
+// rows keep their time like the posts do (keepsItsTime), and are all dated
+// again together when one is new, was moved in the list, is out of that
+// window, or sits on another campus day than it should. The newest row is a plain line, not a card: it
+// is what the Messages home previews, and a card previews as "Poll: ...".
+//
+// FRANKY'S READ MARKERS, set on every run because opening a room as Franky
+// (a take, anybody's walk) moves them to now. The Lounge marker goes just
+// before its CHESS_NEW newest rows, so the Chess Club row on the Messages
+// home reads "3 new". The Board marker is never left older than the Board
+// post: with an unread Board post the row previews "Board: ..." instead of
+// the Lounge's last line (and with nothing new in the Lounge it would open
+// on the Board).
+// ---------------------------------------------------------------------------
+const CHESS_BOARD = [
+  { author: "priya", minsAgo: 150,
+    content: "Blitz Night is tonight at 7, Campus Center Room 148. Doors at 6:45. New players, find me and I will pair you up." },
+];
+
+const CHESS_LOUNGE = [
+  { author: "priya", minsAgo: 56, content: "Boards are booked for tonight. Doors open at 6:45." },
+  { author: "noor", minsAgo: 51, content: "I'll be there. Is it ok if I bring a friend who has never played?" },
+  { author: "priya", minsAgo: 50, content: "Always. Beginners get the comfy table." },
+  { author: "eli", minsAgo: 44, content: "Can someone teach me what a fork is before I embarrass myself" },
+  { author: "noor", minsAgo: 41, content: "One piece attacking two things at once. I learned it by losing to it." },
+  { author: "franky", minsAgo: 36, content: "first time coming tonight. go easy on me" },
+  { author: "maya", minsAgo: 33, content: "same here, I barely know how the knight moves" },
+  { author: "priya", minsAgo: 30, poll: "What should we play next week?",
+    options: ["Blitz again", "Rapid, 15 min", "Team chess"], // short: a row cuts a long label to fit the voters
+    votes: { noor: 1, eli: 0, theo: 0, maya: 1, lucas: 0, priya: 2 } },
+  { author: "theo", minsAgo: 24, content: "voted blitz. the clock stops me from overthinking" },
+  { author: "noor", minsAgo: 20, content: "rapid, please. five minutes is not enough time to panic properly" },
+  // The card sits second from the bottom: the room opens at its newest row,
+  // so the card is on the first screen and the poll a short scroll above it.
+  { author: "priya", minsAgo: 12, event: "Blitz Night", note: "Doors at 6:45. Bring a friend." },
+  { author: "priya", minsAgo: 6, content: "See you all at 7. New players, come find me and I'll get you a board." },
+];
+const CHESS_NEW = 3; // how many of the newest Lounge rows Franky has not read
+
+/** `Fri Oct 2, 7 PM` in the campus zone: eventWhen of src/lib/chat/when.ts, as a card's stored text has it. */
+function eventWhenLabel(iso) {
+  const names = new Intl.DateTimeFormat("en-US", { timeZone: ZONE, weekday: "short", month: "short" }).formatToParts(new Date(iso));
+  const name = (type) => names.find((p) => p.type === type)?.value ?? "";
+  const p = zoneParts(new Date(iso));
+  const clock = `${p.hour % 12 || 12}${p.minute === 0 ? "" : `:${String(p.minute).padStart(2, "0")}`} ${p.hour < 12 ? "AM" : "PM"}`;
+  return `${name("weekday")} ${name("month")} ${p.day}, ${clock}`;
+}
+
+/** A club's core room (board, lounge, officers) by kind. */
+async function findCoreRoom(orgId, kind) {
+  const found = must(
+    await admin.from("channels").select("id").eq("org_id", orgId).eq("type", "org_channel").eq("kind", kind).limit(1),
+    `look up the ${kind} room`,
+  );
+  if (found.length === 0) {
+    console.error(`\nFailed: the club has no ${kind} room`);
+    process.exit(1);
+  }
+  return found[0].id;
+}
+
+const chatNotes = [];
+
+/** A room's card for an event, keyed on (room, event). Null, and a note, when there is none and the event has ended. */
+async function ensureEventCard(roomId, userId, eventId, note) {
+  const event = must(
+    await admin.from("events").select("title, starts_at, ends_at").eq("id", eventId).single(),
+    "read the card's event",
+  );
+  // The stored text (src/lib/chat/cards/fallback.ts): what a preview shows.
+  const content = `Event: ${event.title} · ${eventWhenLabel(event.starts_at)} — ${note}`;
+  const found = must(
+    await admin.from("messages").select("id, content").eq("channel_id", roomId).eq("kind", "event_card")
+      .eq("card_event_id", eventId).order("created_at").limit(1),
+    "look up the event card",
+  );
+  if (found.length > 0) {
+    // The card draws the event's own time; only this text would keep yesterday's date.
+    if (found[0].content !== content) {
+      must(await admin.from("messages").update({ content }).eq("id", found[0].id), "refresh the event card's text");
+    }
+    return found[0].id;
+  }
+  if (new Date(event.ends_at).getTime() <= Date.now()) {
+    chatNotes.push(`${event.title} has ended: its event card could not be made (run again tomorrow, before 10 pm)`);
+    return null;
+  }
+  return must(
+    await admin.rpc("chat_create_event_card", {
+      p_channel: roomId, p_user: userId, p_event: eventId, p_note: note, p_content: content,
+    }),
+    `chat_create_event_card "${event.title}"`,
+  );
+}
+
+/** A room's poll, keyed on its text, and the votes it should hold. `votes` is { who: place of the option }. */
+async function ensurePoll(roomId, row, users) {
+  const content = `Poll: ${row.poll}`;
+  const found = must(
+    await admin.from("messages").select("id").eq("channel_id", roomId).eq("kind", "poll").eq("content", content)
+      .order("created_at").limit(1),
+    "look up the poll",
+  );
+  const pollId = found[0]?.id ?? must(
+    await admin.rpc("chat_create_poll", {
+      p_channel: roomId, p_user: users[row.author], p_mode: "poll", p_question: row.poll,
+      p_options: row.options.map((label) => ({ label })), p_anonymous: false, p_multi: false,
+      p_closes_at: null, p_content: content,
+    }),
+    `chat_create_poll "${row.poll}"`,
+  );
+  const options = must(await admin.from("chat_poll_options").select("id, position, label").eq("poll_id", pollId), "read the poll's options");
+  // The poll is keyed on its question; a label reworded here is written through.
+  for (const o of options) {
+    const label = row.options[o.position];
+    if (label && label !== o.label) {
+      must(await admin.from("chat_poll_options").update({ label }).eq("id", o.id), `reword option ${o.position}`);
+    }
+  }
+  const cast = must(await admin.from("chat_poll_votes").select("option_id, user_id").eq("poll_id", pollId), "read the poll's votes");
+  for (const [who, place] of Object.entries(row.votes)) {
+    const option = options.find((o) => o.position === place);
+    if (cast.some((v) => v.user_id === users[who] && v.option_id === option.id)) continue;
+    must(
+      await admin.rpc("chat_cast_vote", { p_poll: pollId, p_option: option.id, p_user: users[who], p_on: true }),
+      `the vote of ${who}`,
+    );
+  }
+  return pollId;
+}
+
+/**
+ * Write a room's rows, then date them (see TIME above). Returns
+ * [{ id, author, at }], oldest first, without a card that could not be made.
+ */
+async function seedChessRoom(roomId, rows, users, events) {
+  const now = Date.now();
+  const at = (minsAgo) => new Date(now - minsAgo * 60_000).toISOString();
+  const made = [];
+  for (const row of rows) {
+    let id;
+    if (row.event) id = await ensureEventCard(roomId, users[row.author], events[row.event], row.note);
+    else if (row.poll) id = await ensurePoll(roomId, row, users);
+    else id = await ensureMessage(roomId, users[row.author], row.content, at(row.minsAgo));
+    if (id) made.push({ id, author: row.author, minsAgo: row.minsAgo });
+  }
+  const times = must(
+    await admin.from("messages").select("id, created_at").in("id", made.map((m) => m.id)),
+    "read the room's times",
+  );
+  for (const m of made) m.at = times.find((t) => t.id === m.id).created_at;
+  // In place = each row reads right for today AND the rows were dated in one
+  // pass (as far from the first row as this list puts them). The second
+  // half is what catches a row that was moved in the list: it can still read
+  // right on its own and yet sit where the old order had it.
+  const first = new Date(made[0].at).getTime();
+  const inPlace = made.every((m) => {
+    const written = new Date(m.at).getTime();
+    return keepsItsTime((now - written) / 3_600_000, m.minsAgo / 60) && campusDay(written) === campusDay(now - m.minsAgo * 60_000)
+      && Math.abs(written - first - (made[0].minsAgo - m.minsAgo) * 60_000) < 60_000;
+  });
+  if (!inPlace) {
+    for (const m of made) {
+      m.at = at(m.minsAgo);
+      must(await admin.from("messages").update({ created_at: m.at }).eq("id", m.id), "date a chat row");
+    }
+  }
+  return made;
+}
+
+/** Chess Club's Board and Lounge, and where Franky has read them to. */
+async function seedChessChat(users, clubs, events) {
+  const boardId = await findCoreRoom(clubs.chess_club, "board");
+  const loungeId = await findCoreRoom(clubs.chess_club, "lounge");
+  const board = await seedChessRoom(boardId, CHESS_BOARD, users, events);
+  const lounge = await seedChessRoom(loungeId, CHESS_LOUNGE, users, events);
+
+  const setMarker = async (roomId, pick) => {
+    const mine = must(
+      await admin.from("channel_members").select("last_read_at").eq("channel_id", roomId).eq("user_id", users[LEAD]).maybeSingle(),
+      "read the lead's read marker",
+    );
+    if (!mine) {
+      chatNotes.push(`${LEAD} holds no row on a Chess Club room: its read marker is not set`);
+      return;
+    }
+    const wanted = pick(mine.last_read_at ? new Date(mine.last_read_at).getTime() : null);
+    if (wanted === null) return;
+    must(
+      await admin.from("channel_members").update({ last_read_at: new Date(wanted).toISOString() })
+        .eq("channel_id", roomId).eq("user_id", users[LEAD]),
+      "set the lead's read marker",
+    );
+  };
+  // The Lounge: one second before the oldest of the rows left unread.
+  const firstNew = new Date(lounge.at(-CHESS_NEW).at).getTime() - 1000;
+  await setMarker(loungeId, (now) => (now === firstNew ? null : firstNew));
+  // The Board: read, whenever it is not already.
+  const posted = new Date(board.at(-1).at).getTime();
+  await setMarker(boardId, (now) => (now !== null && now > posted ? null : posted + 1000));
+  return { loungeId, boardId };
 }
 
 // ---------------------------------------------------------------------------
@@ -1191,8 +1775,24 @@ async function printSummary(users, clubs, dms) {
     "dm threads": dmIds.length,
     "dm messages": await count("messages", (q) => q.in("channel_id", dmIds)),
     "posts with a picture": await count("posts", (q) => q.in("user_id", ids).not("media_url", "is", null)),
-    "chess club lounge messages": await count("messages", (q) => q.eq("channel_id", lounge).in("user_id", ids)),
+    "likes by the cast": await count("post_likes", (q) => q.in("user_id", ids)),
+    "comments by the cast": await count("post_comments", (q) => q.in("user_id", ids)),
+    "views by the cast": await count("post_views", (q) => q.in("user_id", ids)),
+    "chess club lounge rows": await count("messages", (q) => q.eq("channel_id", lounge).in("user_id", ids)),
+    "chess club lounge cards": await count("messages", (q) => q.eq("channel_id", lounge).in("kind", ["poll", "event_card"])),
+    "poll votes by the cast": await count("chat_poll_votes", (q) => q.in("user_id", ids)),
   });
+
+  // What the lead's phone shows for Chess Club on the Messages home.
+  const marker = must(
+    await admin.from("channel_members").select("last_read_at").eq("channel_id", lounge).eq("user_id", users[LEAD]).maybeSingle(),
+    "summary: the lead's lounge marker",
+  );
+  if (marker?.last_read_at) {
+    const fresh = await count("messages", (q) => q.eq("channel_id", lounge).is("thread_root_id", null).is("removed_at", null)
+      .neq("user_id", users[LEAD]).gt("created_at", marker.last_read_at));
+    console.log(`\nChess Club on ${LEAD}'s Messages home: ${fresh} new in the Lounge.`);
+  }
 
   const blitz = events.find((e) => e.title === "Blitz Night");
   if (blitz && new Date(blitz.ends_at).getTime() <= Date.now()) {
@@ -1328,7 +1928,92 @@ async function signInCheck(users, clubs, dms) {
   console.log("  clubs he follows    :", myClubFollows.length);
   console.log("  dm threads          :", myDms.length, `(${myDms.filter((d) => d.accepted_at).length} accepted)`);
   console.log("  dm with james       :", dmMessages.length, "messages, last:", JSON.stringify(dmMessages.at(-1)?.content));
-  await anon.auth.signOut();
+  // This session alone: the default ("global") signs the lead out of every browser.
+  await anon.auth.signOut({ scope: "local" });
+}
+
+// ---------------------------------------------------------------------------
+// The lead's feed, top to bottom: the first eight cards. Reckoned here by
+// the feed's own rule (GET /api/feed: scoreFeedRow, then at most three posts
+// per author, or per club for a club post) from the counts the route reads,
+// so the order can be checked with no dev server running. The cast's posts
+// only: the off-cast check above says whether anything else would be in it.
+// With DEMO_APP_URL set to a LOCAL dev server (http://localhost:3102) the
+// app itself is asked too, signed in as the lead, and its order is printed.
+// ---------------------------------------------------------------------------
+async function printLeadFeed(users, clubs, written) {
+  const ids = written.map((w) => w.id);
+  const lead = users[LEAD];
+  const posts = must(await admin.from("posts").select("id, user_id, org_id, created_at, media_url, campus_id").in("id", ids), "feed: posts");
+  const tally = async (table, narrow = (q) => q) => {
+    const rows = must(await narrow(admin.from(table).select("post_id, user_id").in("post_id", ids)), `feed: ${table}`);
+    return (post) => rows.filter((r) => r.post_id === post.id && (table !== "post_views" || r.user_id !== post.user_id)).length;
+  };
+  const likes = await tally("post_likes");
+  const comments = await tally("post_comments", (q) => q.is("removed_at", null));
+  const reposts = await tally("post_reposts");
+  const views = await tally("post_views");
+  const people = must(await admin.from("connections").select("following_id").eq("follower_id", lead), "feed: follows").map((r) => r.following_id);
+  const orgs = must(await admin.from("org_followers").select("org_id").eq("user_id", lead), "feed: club follows").map((r) => r.org_id);
+
+  const handleOf = (id) => ACCOUNTS.find((a) => users[a.key] === id)?.handle;
+  const clubOf = (id) => Object.keys(clubs).find((h) => clubs[h] === id);
+  const now = Date.now();
+  const ranked = posts
+    .map((p) => {
+      const age = Math.max(0, (now - new Date(p.created_at).getTime()) / 3_600_000);
+      let score = (1 + likes(p) + 2 * reposts(p) + comments(p)) / Math.pow(age + 2, 1.5);
+      if (people.includes(p.user_id) || (p.org_id && orgs.includes(p.org_id))) score *= 1.6;
+      if (p.campus_id === CAMPUS) score *= 1.35;
+      return { p, age, score };
+    })
+    .sort((a, b) => b.score - a.score);
+  const perBucket = {};
+  const shown = ranked.filter(({ p }) => {
+    const bucket = p.org_id ? `org:${p.org_id}` : `user:${p.user_id}`;
+    perBucket[bucket] = (perBucket[bucket] ?? 0) + 1;
+    return perBucket[bucket] <= 3;
+  }).slice(0, 8);
+
+  console.log(`\n${LEAD}'s feed, the first eight (by the feed's rule)`);
+  console.table(shown.map(({ p, age }) => ({
+    by: handleOf(p.user_id) + (p.org_id ? ` as ${clubOf(p.org_id)}` : ""),
+    age: age < 24 ? `${Math.floor(age)}h` : `${Math.floor(age / 24)}d`,
+    likes: likes(p), comments: comments(p), views: views(p),
+    picture: p.media_url ? "yes" : "-",
+    text: written.find((w) => w.id === p.id).spec.content.slice(0, 34),
+  })));
+
+  const app = process.env.DEMO_APP_URL;
+  if (!app) return;
+  if (!/^http:\/\/(localhost|127\.0\.0\.1):\d+\/?$/.test(app)) {
+    console.log(`  DEMO_APP_URL is "${app}": not a local dev server, the app was not asked.`);
+    return;
+  }
+  // The cookie @supabase/ssr reads: the session as base64url, in 3180-character pieces.
+  const anon = createClient(API_URL, ANON_KEY, CLIENT_OPTS);
+  const email = ACCOUNTS.find((a) => a.key === LEAD).email;
+  const { session } = must(await anon.auth.signInWithPassword({ email, password: PASSWORD }), `sign in as ${email}`);
+  const value = "base64-" + Buffer.from(JSON.stringify(session)).toString("base64url");
+  const name = `sb-${new URL(API_URL).hostname.split(".")[0]}-auth-token`;
+  const pieces = [];
+  for (let i = 0; i < value.length; i += 3180) pieces.push(value.slice(i, i + 3180));
+  const cookie = pieces.length === 1 ? `${name}=${value}` : pieces.map((v, n) => `${name}.${n}=${v}`).join("; ");
+  const res = await fetch(`${app.replace(/\/$/, "")}/api/feed?limit=8`, { headers: { cookie } }).catch(() => null);
+  const body = res?.ok ? await res.json().catch(() => null) : null;
+  await anon.auth.signOut({ scope: "local" });
+  if (!body?.feed) {
+    console.log(`  The app at ${app} did not answer /api/feed (${res ? res.status : "no answer"}).`);
+    return;
+  }
+  const theirs = body.feed.map((e) => e.post.id);
+  const same = theirs.length === shown.length && theirs.every((id, i) => id === shown[i].p.id);
+  console.log(`  The app at ${app} gives ${same ? "the same eight, in the same order." : "ANOTHER order:"}`);
+  if (!same) {
+    for (const [i, e] of body.feed.entries()) {
+      console.log(`    ${i + 1}. ${e.post.author?.handle}${e.post.org ? ` as ${e.post.org.handle}` : ""}: ${e.post.content.slice(0, 34)}`);
+    }
+  }
 }
 
 // ---------------------------------------------------------------------------
@@ -1356,6 +2041,7 @@ async function main() {
   const clubs = {};
   const owners = {};
   for (const spec of CLUBS) clubs[spec.handle] = await ensureClub(spec, users, systems, owners);
+  await hideStrayClubs(clubs);
   // The rooms first (a new club has none until chat_repair_club runs), so a
   // member added next gets their room rows.
   for (const [handle, id] of Object.entries(clubs)) {
@@ -1365,7 +2051,19 @@ async function main() {
   for (const f of ORG_FOLLOWS) await ensureOrgFollow(clubs[f.club], users[f.user], f.source);
 
   const haveFolder = existsSync(PHOTOS_DIR);
-  for (const spec of POSTS) await ensurePost(haveFolder ? spec : { ...spec, image: null }, users, clubs);
+  if (haveFolder) {
+    for (const spec of ACCOUNTS) if (spec.cover) await ensureCover(users[spec.key], spec.cover);
+    for (const spec of CLUBS) {
+      if (spec.art) await ensureClubArt(clubs[spec.handle], spec.handle, users[spec.art.holder], spec.art);
+    }
+  }
+  // The posts, then their times, then what people did with them: a post
+  // written again in this run has lost its likes and comments.
+  const written = [];
+  for (const spec of POSTS) written.push({ spec, id: await ensurePost(spec, users, clubs, haveFolder) });
+  const moved = await retimePosts(written);
+  if (moved > 0) console.log(`  dated again: all ${moved} posts (one was out of place, see DATING)`);
+  await seedEngagement(written, users);
 
   const events = {};
   for (const spec of EVENTS) events[spec.title] = await ensureEvent(spec, users, clubs);
@@ -1373,6 +2071,9 @@ async function main() {
 
   for (const [from, to] of PERSON_FOLLOWS) await ensurePersonFollow(users[from], users[to]);
   const dms = await seedMessages(users, clubs);
+  // After the members (only a member may speak or vote) and the events (the
+  // card needs Blitz Night's id).
+  await seedChessChat(users, clubs, events);
 
   // Make every club whole again: each event got its event room from the
   // chat_events_room trigger, and chat_repair_club gives the officers and
@@ -1384,10 +2085,13 @@ async function main() {
 
   await printSummary(users, clubs, dms);
   if (photoNotes.length > 0) console.log("\nPhotos\n  " + photoNotes.join("\n  "));
+  if (chatNotes.length > 0) console.log("\nChess Club's chat\n  " + chatNotes.join("\n  "));
   for (const campus of [CAMPUS, ...Object.keys(CAMPUSES).filter((c) => c !== CAMPUS)]) {
     await offCastCheck(users, clubs, campus);
   }
   await signInCheck(users, clubs, dms);
+  await printLeadFeed(users, clubs, written);
+  if (cutDir) rmSync(cutDir, { recursive: true, force: true });
   console.log("\nDone.");
 }
 
