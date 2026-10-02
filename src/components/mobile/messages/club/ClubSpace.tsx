@@ -5,8 +5,10 @@ import { useCallback, useEffect, useRef, useState } from "react";
 import { Drawer } from "vaul";
 
 import { asLoadFailure, LoadFailed, type LoadFailure } from "@/components/feedback/LoadFailed";
+import { spaceEntryAfterLayer, spaceEntryNamesLayer } from "@/lib/chat/layer-stack";
 import type { RoomKind, SpaceResponse, SpaceRoom, ThreadMessagesResponse } from "@/lib/chat/types";
 import { useHideTabBar } from "@/lib/chat/use-hide-tabbar";
+import { clearLayersInto, clearLayersThen, isLayerPop } from "@/lib/chat/use-layer-history";
 import { ROOM_FULL_READ_EVERY, ROOM_POLL_MS, useRoomPoll } from "@/lib/chat/use-room-poll";
 import { vibeRequest, type VibeResult } from "@/lib/feedback/request";
 
@@ -50,7 +52,21 @@ import { UpNext } from "./UpNext";
  *   depth; opening the layer `pushState`s depth 2 (unless the deep link's
  *   entry is already there); the layer's Back is `history.back()`; a
  *   `popstate` below depth 2 closes the layer. The space's own Back and swipe
- *   call `onClose` (S2-notes.md REQUESTS R1-R3).
+ *   call `onClose` (S2-notes.md REQUESTS R1-R3). A sheet, the "+" tray or a
+ *   confirm has its own entry on top (`use-layer-history.ts`; S71 amendment
+ *   3, A): a `popstate` that was one of those closing is not this handler's
+ *   (`isLayerPop`), and every history write or `history.back()` here goes
+ *   through `clearLayersThen`, which closes whatever sheet is on top first
+ *   (so a chip tapped with the tray open, or the space closing under a sheet,
+ *   leaves no entry behind). Forward onto the layer's entry with the layer
+ *   closed opens it again (amendment 3, B: the screen follows the entry).
+ *   The repair of that amendment's review: the layer opened with the tray up
+ *   takes the tray's entry (`clearLayersInto`: `replaceState`, no step back
+ *   then push); and when the layer closes onto a space entry that still
+ *   names the EVENT room (a space entered through a Your-week card or an
+ *   event deep link), the entry is rewritten to the room on screen, so the
+ *   way back from a club page or a profile opens that room and not the
+ *   event chat again (`spaceEntryAfterLayer`).
  * - States: the header + chips + three bars skeleton until the space read
  *   answers; the read failing → `LoadFailed` (`Couldn't load this club.`,
  *   non-retryable on 403 `members_only` / 404, the code's sentence) with Back
@@ -120,6 +136,19 @@ function pushLayerHistory(id: string): void {
   }
 }
 
+/**
+ * The event chat opened with the tray up: the tray's entry (the live one)
+ * becomes the layer's. Same state and address as `pushLayerHistory` writes,
+ * with no step back and no new entry (`clearLayersInto`).
+ */
+function replaceLayerHistory(id: string): void {
+  try {
+    window.history.replaceState({ vibeChat: id, depth: 2 }, "", roomUrl(id));
+  } catch {
+    /* history unavailable */
+  }
+}
+
 function isVisible(): boolean {
   return typeof document === "undefined" || document.visibilityState === "visible";
 }
@@ -166,6 +195,10 @@ export function ClubSpace({ orgHandle, initialRoomId, initialRoomKind, initialPa
   // closes the space (the later 403 with the layer open).
   const pendingRoomRef = useRef<string | null>(null);
   const pendingCloseRef = useRef(false);
+  // The event room whose id is still on the space's own entry because the
+  // layer was closed before the space answered (no room to name yet); the
+  // effect below rewrites the entry once the room on screen is known.
+  const staleEntryRef = useRef<string | null>(null);
   // The latest `onClose`, so an inline arrow from the parent never re-arms
   // the space read's effect (written in an effect, react-hooks/refs).
   const onCloseRef = useRef(onClose);
@@ -181,6 +214,20 @@ export function ClubSpace({ orgHandle, initialRoomId, initialRoomKind, initialPa
   // Before the space answers, a deep link's room reads at once (11.3 Reads).
   const hookRoomId = activeRoom?.id ?? (initialRoomKind !== "event" ? initialRoomId : null);
   const hookRoomKind: RoomKind | null = activeRoom?.kind ?? (initialRoomKind !== "event" ? initialRoomKind : null);
+  // The room on screen, for the `popstate` handler (written in an effect).
+  const activeRoomId = activeRoom?.id ?? null;
+  const activeRoomIdRef = useRef<string | null>(activeRoomId);
+  useEffect(() => {
+    activeRoomIdRef.current = activeRoomId;
+    // The event chat was closed before the space answered: its id is still
+    // on the space's entry. Written now, and only while that entry is the
+    // live one (`spaceEntryAfterLayer` reads the live state).
+    const stale = staleEntryRef.current;
+    if (stale === null || activeRoomId === null || eventRoomId !== null) return;
+    staleEntryRef.current = null;
+    const next = spaceEntryAfterLayer(historyState(), stale, activeRoomId);
+    if (next !== null) replaceRoomHistory(next);
+  }, [activeRoomId, eventRoomId]);
   const poll = useRoomPoll(hookRoomId, {
     enabled: eventRoomId === null && hookRoomId !== null && !closedSpace,
     line: hookRoomKind === "board" ? BOARD_LINE : undefined,
@@ -216,13 +263,18 @@ export function ClubSpace({ orgHandle, initialRoomId, initialRoomKind, initialPa
           setSpace({ data: null, failure: spaceFailure(r) });
           setEventRoomId(null);
           toastSendFailure(r);
-          const s = historyState();
-          if (eventRoomIdRef.current !== null && s && s.depth === 2 && s.vibeChat) {
-            pendingCloseRef.current = true;
-            window.history.back();
-          } else {
-            onCloseRef.current();
-          }
+          // Read before the state above lands; a sheet open on top (its own
+          // entry) is closed first, so nothing of it is left in history.
+          const hadLayer = eventRoomIdRef.current !== null;
+          clearLayersThen(() => {
+            const s = historyState();
+            if (hadLayer && s && s.depth === 2 && s.vibeChat) {
+              pendingCloseRef.current = true;
+              window.history.back();
+            } else {
+              onCloseRef.current();
+            }
+          });
         }
         return;
       }
@@ -252,17 +304,35 @@ export function ClubSpace({ orgHandle, initialRoomId, initialRoomKind, initialPa
     return () => window.clearInterval(id);
   }, []);
 
+  // The deep link's resolving read is the event layer's first page ONCE (a
+  // deep-linked event room, 2.3); every open from inside the space
+  // (`openEvent`, counted) reads afresh. So does a layer re-opened by Forward.
+  const [eventOpens, setEventOpens] = useState(0);
+
   // History (2.3): a deep-linked event layer gets its depth-2 entry unless
   // MessagesMobile pushed it already; a popstate below depth 2 closes the
   // layer (the one closer for it).
   useEffect(() => {
-    if (initialRoomKind === "event" && initialRoomId) pushLayerHistory(initialRoomId);
+    if (initialRoomKind !== "event" || !initialRoomId) return;
+    const id = initialRoomId;
+    clearLayersThen(() => pushLayerHistory(id));
   }, [initialRoomKind, initialRoomId]);
   useEffect(() => {
     const onPop = (e: PopStateEvent) => {
+      // A sheet, the tray or a confirm closing: not a room-level move.
+      if (isLayerPop(e)) return;
       const s = e.state as HistoryState;
       const depth = typeof s?.depth === "number" ? s.depth : 0;
-      if (depth >= 2) return;
+      if (depth >= 2) {
+        // Forward onto the layer's entry with the layer closed: the entry
+        // says the event chat is open, so it is (no history write).
+        if (eventRoomIdRef.current === null && !closedRef.current && typeof s?.vibeChat === "string") {
+          setEventRoomId(s.vibeChat);
+          setEventOpens((n) => n + 1);
+        }
+        return;
+      }
+      const layerId = eventRoomIdRef.current;
       setEventRoomId(null);
       // The pop landed on the depth-1 entry: the room picked from inside the
       // layer is written on it now (never before the pop, which would
@@ -271,6 +341,15 @@ export function ClubSpace({ orgHandle, initialRoomId, initialRoomKind, initialPa
       if (room !== null) {
         pendingRoomRef.current = null;
         replaceRoomHistory(room);
+      } else if (!pendingCloseRef.current && layerId !== null) {
+        // A space entered through an event card or an event deep link has
+        // the EVENT's id on this entry: it names the room on screen from now
+        // on, so the way back from a club page or a profile opens the space
+        // on that room and not the event chat again (`spaceEntryAfterLayer`).
+        const active = activeRoomIdRef.current;
+        const next = spaceEntryAfterLayer(e.state, layerId, active);
+        if (next !== null) replaceRoomHistory(next);
+        else if (active === null && spaceEntryNamesLayer(e.state, layerId)) staleEntryRef.current = layerId;
       }
       if (pendingCloseRef.current) {
         pendingCloseRef.current = false;
@@ -281,33 +360,35 @@ export function ClubSpace({ orgHandle, initialRoomId, initialRoomKind, initialPa
     return () => window.removeEventListener("popstate", onPop);
   }, []);
 
-  // The deep link's resolving read is the event layer's first page ONCE (a
-  // deep-linked event room, 2.3); every open from inside the space
-  // (`openEvent`, counted) reads afresh.
-  const [eventOpens, setEventOpens] = useState(0);
   const openEvent = useCallback((roomId: string) => {
     setEventRoomId(roomId);
     setEventOpens((n) => n + 1);
-    pushLayerHistory(roomId);
+    // With the tray open its entry is the live one: it becomes the layer's
+    // (`replaceState`). No sheet open: the layer's entry is pushed, as before.
+    clearLayersInto((mode) => (mode === "replace" ? replaceLayerHistory(roomId) : pushLayerHistory(roomId)));
   }, []);
   const closeEvent = useCallback(() => {
-    const s = historyState();
-    if (s && s.depth === 2 && s.vibeChat) window.history.back();
-    else setEventRoomId(null);
+    clearLayersThen(() => {
+      const s = historyState();
+      if (s && s.depth === 2 && s.vibeChat) window.history.back();
+      else setEventRoomId(null);
+    });
   }, []);
   /** The Board strip inside the layer: the Board picked, the layer popped, the Board `replaceState`d after the pop (2.3). */
   const openBoardFromLayer = useCallback((boardId: string) => {
     setPickedRoomId(boardId);
     setReplyTo(null);
     setFocusToken(0);
-    const s = historyState();
-    if (s && s.depth === 2 && s.vibeChat) {
-      pendingRoomRef.current = boardId;
-      window.history.back();
-    } else {
-      setEventRoomId(null);
-      replaceRoomHistory(boardId);
-    }
+    clearLayersThen(() => {
+      const s = historyState();
+      if (s && s.depth === 2 && s.vibeChat) {
+        pendingRoomRef.current = boardId;
+        window.history.back();
+      } else {
+        setEventRoomId(null);
+        replaceRoomHistory(boardId);
+      }
+    });
   }, []);
   const pickRoom = useCallback(
     (room: SpaceRoom) => {
@@ -318,7 +399,9 @@ export function ClubSpace({ orgHandle, initialRoomId, initialRoomKind, initialPa
       setPickedRoomId(room.id);
       setReplyTo(null);
       setFocusToken(0);
-      replaceRoomHistory(room.id);
+      // With the tray open its entry is the live one: it goes first, then
+      // the room's id is written on the space's own entry.
+      clearLayersThen(() => replaceRoomHistory(room.id));
     },
     [openEvent],
   );

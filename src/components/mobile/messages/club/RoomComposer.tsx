@@ -3,6 +3,7 @@
 import { useEffect, useRef, useState } from "react";
 
 import type { ChatMessage, RoomKind, ViewerInRoom } from "@/lib/chat/types";
+import { useLayerHistory } from "@/lib/chat/use-layer-history";
 import type { RoomPoll } from "@/lib/chat/use-room-poll";
 import { vibeRequest } from "@/lib/feedback/request";
 
@@ -36,6 +37,11 @@ import { composerPlaceholder, sendLabel } from "./helpers";
  * - The officer's `Everyone in <club> sees this` line above the row on the
  *   Board (`officerLine`); the reply pill (a quote) above the row when the
  *   thread picked a message to reply to.
+ *
+ * - History (S71 amendment 3, A): the tray has its own entry while it is open
+ *   (`useLayerHistory`), and each sheet takes its own inside `CardSheet`, so
+ *   Back closes the tray or the sheet and nothing under it. A pick closes the
+ *   tray and opens the sheet in one commit; the stack orders the two.
  *
  * The tray's scrim is absolute over the room column: the room mounts this
  * inside a `position: relative` box; the footer sits at z-index 2 over it.
@@ -159,8 +165,12 @@ export function RoomComposer({
     if (focusToken > 0 && ready) inputRef.current?.focus();
   }, [focusToken, ready]);
 
+  const canPost = viewer !== null && viewer.can_post && refusedViewer !== viewer;
+  // The tray's own history entry, only while it is drawn (it is not once the
+  // composer turns into the closed tile).
+  useLayerHistory(trayOpen && canPost, () => setTrayOpen(false));
+
   if (viewer === null) return null;
-  const canPost = viewer.can_post && refusedViewer !== viewer;
   if (!canPost) {
     return roomKind === "board" ? (
       <ClosedTile night={night} board text="Only officers post on the Board. You can reply to any post." />

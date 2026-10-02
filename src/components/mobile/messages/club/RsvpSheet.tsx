@@ -5,6 +5,7 @@ import { Drawer } from "vaul";
 
 import type { EventRef } from "@/lib/chat/types";
 import { useHideTabBar } from "@/lib/chat/use-hide-tabbar";
+import { useLayerHistory } from "@/lib/chat/use-layer-history";
 import { vibeRequest } from "@/lib/feedback/request";
 
 import { vaulContentStyle, vaulHandleStyle, vaulOverlayStyle, visuallyHiddenStyle } from "../sheet-styles";
@@ -23,6 +24,8 @@ import { FONT, palette } from "../v2-tokens";
  * `terms_required`, a 404) → the toast `vibeRequest` maps for it (not quiet).
  * It calls `useHideTabBar()` (11.0, SCREENS-H1). Focus lands in the sheet
  * (vaul's trap) and returns to the pill on close (vaul's own restore).
+ * Its own history entry while open (`useLayerHistory`; S71 amendment 3, A):
+ * Back closes the sheet and leaves the event chat open under it.
  */
 export type RsvpSheetProps = {
   eventId: string;
@@ -42,6 +45,7 @@ const ROWS: { choice: Choice; text: string; line: string | null }[] = [
 
 export function RsvpSheet({ eventId, current, night, onClose, onChanged }: RsvpSheetProps) {
   useHideTabBar();
+  useLayerHistory(true, onClose);
   const t = palette(night);
   const [busy, setBusy] = useState<Choice | null>(null);
 

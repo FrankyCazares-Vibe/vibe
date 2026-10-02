@@ -18,6 +18,11 @@ import { chipAriaLabel, chipLabel } from "./helpers";
  * NEVER becomes the active chip: it opens the event chat layer (SCREENS-M1).
  * The Board's dot comes from `rooms[board].unread`; the Officers chip carries
  * no dot in v1 (7.2.3). Labels and `aria-label`s are 1.2's (helpers.ts).
+ *
+ * The chip of the room being shown NEVER draws the unread dot and never says
+ * `1 unread post` (S71 amendment 3, C; audit F05): the space read is 20 s
+ * behind the thread, so a post I am looking at would light the dot on the
+ * chip I am on until the next space read.
  */
 export type RoomChipsProps = {
   clubName: string;
@@ -70,9 +75,11 @@ export function RoomChips({ clubName, rooms, activeRoomId, night, now, onPick }:
     >
       {rooms.map((room) => {
         const active = room.kind !== "event" && room.id === activeRoomId;
-        const label = chipAriaLabel(room, now);
+        // The open room is read by being on screen: no dot, no "unread" word.
+        const unread = room.unread && !active;
+        const label = chipAriaLabel(unread === room.unread ? room : { ...room, unread }, now);
         const icon = room.kind === "officers" ? <LockIcon /> : room.kind === "event" ? <CalendarIcon /> : null;
-        const dot = room.kind === "board" && room.unread;
+        const dot = room.kind === "board" && unread;
         return (
           <button
             key={room.id}

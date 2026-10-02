@@ -10,8 +10,10 @@ import {
 } from "react";
 
 import { asLoadFailure, LoadFailed, type LoadFailure } from "@/components/feedback/LoadFailed";
+import { arrivalWrites, channelOfEntry } from "@/lib/chat/layer-stack";
 import type { RoomKind, ThreadMessagesResponse } from "@/lib/chat/types";
 import { useChatV2 } from "@/lib/chat/use-chat-v2";
+import { adoptLayerEntry, clearLayersThen, isLayerPop } from "@/lib/chat/use-layer-history";
 import { vibeRequest } from "@/lib/feedback/request";
 import { toast } from "@/lib/feedback/toast";
 
@@ -143,6 +145,36 @@ function depthOf(state: unknown): number {
 const channelUrl = (id: string) => `/messages?channel=${encodeURIComponent(id)}`;
 
 /**
+ * What the LIVE entry says is open (S71 amendment 3, B): `?channel=<id>` in
+ * the address, else a `{ vibeChat, depth >= 1 }` state. Never the server
+ * prop: after a link out and Back, Next hands back the page it rendered for
+ * the first address, while the address and the state are the room's.
+ * `undefined` when the address cannot be read at all.
+ */
+function liveChannel(state: unknown): string | null | undefined {
+  let search: string;
+  try {
+    search = window.location.search;
+  } catch {
+    return undefined;
+  }
+  return channelOfEntry(search, state);
+}
+
+/** False only when the browser says there is no entry behind this one (the Navigation API; absent → unknown → true). */
+function canGoBack(): boolean {
+  try {
+    const nav = (window as unknown as { navigation?: { canGoBack?: boolean } }).navigation;
+    return nav?.canGoBack !== false;
+  } catch {
+    return true;
+  }
+}
+
+/** How long a header Back waits for its `popstate` before closing in place (nothing was behind the entry). */
+const BACK_FALLBACK_MS = 600;
+
+/**
  * The flag-on shell (2.1 `true`; 2.3; 11.10). Keeps the open view, the
  * compose overlay, the deep links and the history; `MessagesHome` keeps the
  * reads and the list and reports the dm/group lists up for `?to=` and the
@@ -158,7 +190,25 @@ const channelUrl = (id: string) => `/messages?channel=${encodeURIComponent(id)}`
  * opens on the entry the browser already holds (`replaceState` depth 1; for
  * an event room a `pushState` depth 2 follows), so Back from a deep-linked
  * space leaves `/messages`, Back from a deep-linked event chat lands on the
- * space. `initialChannelId` and `initialHandle` are read once, on mount.
+ * space.
+ *
+ * S71 amendment 3 (audit F06, F07):
+ * - A sheet, the "+" tray or a confirm on the new screens has its own entry
+ *   on top of the room's (`src/lib/chat/use-layer-history.ts`): Back closes
+ *   it alone. A `popstate` that was one of those closing is not this
+ *   handler's (`isLayerPop`), and every history write or `history.back()`
+ *   here goes through `clearLayersThen`, so a sheet still open is closed
+ *   first and leaves no entry behind.
+ * - What is open follows the LIVE entry, not the server prop: on mount (the
+ *   first load, and Next restoring this page after a link out to a club
+ *   page, a profile or a post) and on a `popstate` with nothing open, the
+ *   room named by `?channel=<id>` or by a `{ vibeChat, depth >= 1 }` state
+ *   is opened again (`openFromEntry`); an event room's depth-2 entry opens
+ *   the space with the event chat on top and writes nothing. `initialHandle`
+ *   counts only while the address still carries `?to=`; `initialChannelId`
+ *   only when the address cannot be read.
+ * - A header Back whose `history.back()` brings no `popstate` (nothing was
+ *   behind the entry) closes in place after BACK_FALLBACK_MS.
  */
 function MessagesMobileV2({ initialHandle, initialChannelId }: { initialHandle?: string; initialChannelId?: string }) {
   const searchParams = useSearchParams();
@@ -168,7 +218,8 @@ function MessagesMobileV2({ initialHandle, initialChannelId }: { initialHandle?:
   // Bumped after a view closes: the home reads its lists again (11.10).
   const [refreshKey, setRefreshKey] = useState(0);
   const [lists, setLists] = useState<{ threads: ThreadEntry[] | null; requests: ThreadEntry[] | null }>({ threads: null, requests: null });
-  // Read once, on mount (2.3): a later render of the page never re-opens them.
+  // Read once, on mount (2.3): a later render of the page never re-opens
+  // them. The channel is the fallback only; the live entry decides (B).
   const [firstChannelId] = useState(initialChannelId ?? null);
   const pendingHandleRef = useRef<string | null>(initialHandle ? initialHandle.toLowerCase() : null);
   const filterRef = useRef(filter);
@@ -184,6 +235,18 @@ function MessagesMobileV2({ initialHandle, initialChannelId }: { initialHandle?:
   // Back time — it counts forward entries too, and the event layer's Back
   // leaves one.
   const noBackRef = useRef(false);
+  // This page's own path while the shell is mounted. A `popstate` that
+  // leaves `/messages` still reaches the handler below before Next unmounts
+  // the page, and a lookup can answer after it: neither may open a room or
+  // write on another page's history entry.
+  const pagePathRef = useRef<string | null>(null);
+  useEffect(() => {
+    pagePathRef.current = window.location.pathname;
+    return () => {
+      pagePathRef.current = null;
+    };
+  }, []);
+  const onThisPage = useCallback(() => pagePathRef.current !== null && window.location.pathname === pagePathRef.current, []);
 
   const setFilter = useCallback((f: HomeFilter) => {
     filterRef.current = f;
@@ -198,44 +261,148 @@ function MessagesMobileV2({ initialHandle, initialChannelId }: { initialHandle?:
     deepLinkSeqRef.current += 1;
     const id = view.kind === "club" ? view.roomId : view.threadId;
     const mark = { vibeChat: id, depth: 1 };
-    if (openRef.current) window.history.replaceState(mark, "", channelUrl(id));
-    else {
-      window.history.pushState(mark, "", channelUrl(id));
-      noBackRef.current = false;
-    }
+    const swap = openRef.current !== null;
+    // A sheet of the view being swapped out has its own entry on top: it
+    // goes first (`clearLayersThen` runs at once when there is none).
+    clearLayersThen(() => {
+      if (swap) window.history.replaceState(mark, "", channelUrl(id));
+      else {
+        window.history.pushState(mark, "", channelUrl(id));
+        noBackRef.current = false;
+      }
+    });
     openRef.current = view;
     setComposeOpen(false);
     setOpen(view);
   }, []);
 
+  // Armed by a header Back that called `history.back()`; any `popstate`
+  // disarms it. Still armed after BACK_FALLBACK_MS = nothing was behind the
+  // entry (a reload or a restore of a fresh tab's deep link): close in place.
+  const backTimerRef = useRef<number | null>(null);
+  const clearBackTimer = useCallback(() => {
+    if (backTimerRef.current === null) return;
+    window.clearTimeout(backTimerRef.current);
+    backTimerRef.current = null;
+  }, []);
+  useEffect(() => clearBackTimer, [clearBackTimer]);
+
   /** The home again with nothing open; the URL back to the home's. */
   const closeInPlace = useCallback(() => {
+    clearBackTimer();
     deepLinkSeqRef.current += 1;
     noBackRef.current = false;
     openRef.current = null;
     setOpen(null);
     setRefreshKey((k) => k + 1);
     window.history.replaceState(null, "", homeUrl(filterRef.current));
-  }, []);
+  }, [clearBackTimer]);
 
   /** Back / the swipe on a depth-1 layer: `history.back()`; `popstate` closes (2.3). */
   const closeLayer = useCallback(() => {
-    // A deep link in a fresh tab has nowhere to go back to (`noBackRef`):
-    // close in place instead of leaving the view stuck.
-    if (depthOf(window.history.state) >= 1 && !noBackRef.current) window.history.back();
-    else closeInPlace();
-  }, [closeInPlace]);
+    // A sheet or the tray still open on top (its own entry) closes first.
+    clearLayersThen(() => {
+      // One Back at a time: a second tap before the first one's `popstate`
+      // would step back twice.
+      if (backTimerRef.current !== null || openRef.current === null) return;
+      // A deep link in a fresh tab has nowhere to go back to (`noBackRef`,
+      // or the browser saying so): close in place instead of leaving the
+      // view stuck.
+      if (depthOf(window.history.state) < 1 || noBackRef.current || !canGoBack()) {
+        closeInPlace();
+        return;
+      }
+      const view = openRef.current;
+      window.history.back();
+      backTimerRef.current = window.setTimeout(() => {
+        backTimerRef.current = null;
+        if (view !== null && openRef.current === view && onThisPage()) closeInPlace();
+      }, BACK_FALLBACK_MS);
+    });
+  }, [closeInPlace, onThisPage]);
+
+  /**
+   * Open what the live entry names (2.3, 11.10; S71 amendment 3, B): on
+   * arrival, and on a restored entry with nothing open. The thread GET
+   * decides the view; the home is not needed for it to open. The read
+   * failing (any non-200): the home on All, the URL `/messages`, the toast
+   * (N6).
+   */
+  const openFromEntry = useCallback((id: string) => {
+    const seq = ++deepLinkSeqRef.current;
+    // Still this lookup's to answer: no later open, close or pop took over,
+    // the page is this one, and the LIVE entry still names this room. A Back
+    // pressed while the read was out lands on another entry (the home's):
+    // opening there would write the room onto that entry and lose the home.
+    const stillMine = () => {
+      if (deepLinkSeqRef.current !== seq || !onThisPage()) return false;
+      const live = liveChannel(window.history.state);
+      return live === undefined || live === id;
+    };
+    const run = async () => {
+      const r = await vibeRequest<ThreadMessagesResponse>(`/api/me/threads/${encodeURIComponent(id)}/messages?limit=50`, {
+        cache: "no-store",
+        quiet: true,
+        failure: "Couldn't open this chat.",
+      });
+      if (!stillMine()) return;
+      if (!r.ok || !r.data || typeof r.data !== "object" || !Array.isArray(r.data.messages)) {
+        filterRef.current = "all";
+        setFilterState("all");
+        clearLayersThen(() => {
+          if (stillMine()) window.history.replaceState(null, "", "/messages");
+        });
+        toast({ message: asLoadFailure(r, "Couldn't open this chat.").message, tone: "error" });
+        return;
+      }
+      const room = r.data.room;
+      const view: OpenView = room
+        ? { kind: "club", orgHandle: room.org.handle, roomId: id, roomKind: room.kind, initialPage: r.data }
+        : { kind: "thread", threadId: id };
+      clearLayersThen(() => {
+        if (!stillMine()) return;
+        // The layer opens on the entry the browser already holds (2.3); with
+        // no entry behind it, Back closes in place (`closeLayer`).
+        noBackRef.current = window.history.length <= 1;
+        // An event room's own depth-2 entry, already the live one (back
+        // from a profile, a reload inside the event chat), has the space's
+        // entry under it: nothing is written and Back peels as before.
+        const writes = arrivalWrites(window.history.state, id, !!room && room.kind === "event");
+        if (writes !== "none") window.history.replaceState({ vibeChat: id, depth: 1 }, "", channelUrl(id));
+        if (writes === "space+layer") {
+          // The space on its Lounge underneath, the event chat layer on top
+          // (S2-notes.md R2: ClubSpace pushes depth 2 only when this is absent).
+          window.history.pushState({ vibeChat: id, depth: 2 }, "", channelUrl(id));
+        }
+        openRef.current = view;
+        setComposeOpen(false);
+        setOpen(view);
+      });
+    };
+    void run();
+  }, [onThisPage]);
 
   useEffect(() => {
     const onPop = (e: PopStateEvent) => {
-      if (depthOf(e.state) >= 1) {
-        // Forward onto a layer's entry with nothing open (the layer was
-        // closed by Back): the entry is stale, the URL goes back to the
-        // home's. Otherwise the event chat layer's Back: ClubSpace's (R1).
-        if (!openRef.current) window.history.replaceState(null, "", homeUrl(filterRef.current));
+      // A sheet, the "+" tray or a confirm closing (each has its own entry,
+      // `use-layer-history.ts`): not a room-level move, nothing closes here.
+      if (isLayerPop(e)) return;
+      clearBackTimer();
+      if (!openRef.current) {
+        // A restored entry with nothing open (Forward after a close; the
+        // landing after a leftover sheet entry was stepped off): the screen
+        // follows the entry (B). Only an entry of this page: a pop that
+        // leaves `/messages` passes here too. A lookup still out for the
+        // entry that was just left (Back pressed again while a restored room
+        // was loading) is dropped first: its answer must not open that room
+        // on this entry.
+        deepLinkSeqRef.current += 1;
+        const id = onThisPage() ? liveChannel(e.state) : null;
+        if (id) openFromEntry(id);
         return;
       }
-      if (!openRef.current) return;
+      // The event chat layer's Back (or Forward onto it): ClubSpace's (R1).
+      if (depthOf(e.state) >= 1) return;
       deepLinkSeqRef.current += 1;
       openRef.current = null;
       setOpen(null);
@@ -243,7 +410,7 @@ function MessagesMobileV2({ initialHandle, initialChannelId }: { initialHandle?:
     };
     window.addEventListener("popstate", onPop);
     return () => window.removeEventListener("popstate", onPop);
-  }, []);
+  }, [clearBackTimer, onThisPage, openFromEntry]);
 
   /** Resolve a handle → a dm's id (an existing thread, else `POST /api/me/threads`) and open it. */
   const openDmByHandle = useCallback(
@@ -287,47 +454,26 @@ function MessagesMobileV2({ initialHandle, initialChannelId }: { initialHandle?:
     [openDmByHandle],
   );
 
-  // ?channel=<id> on arrival (2.3, 11.10): the thread GET decides the view
-  // once the flag answered true (this component exists only then). The
-  // home is not needed for the view to open. The read failing (any
-  // non-200): the home on All, the URL `/messages`, the toast (N6).
+  // On arrival, and when Next restores this page (back from a club page, a
+  // profile or a post): open what the LIVE entry says (B), once the flag
+  // answered true (this component exists only then). The server prop is
+  // only the fallback for an address that cannot be read.
   useEffect(() => {
-    if (!firstChannelId) return;
-    const id = firstChannelId;
-    const seq = ++deepLinkSeqRef.current;
-    const run = async () => {
-      const r = await vibeRequest<ThreadMessagesResponse>(`/api/me/threads/${encodeURIComponent(id)}/messages?limit=50`, {
-        cache: "no-store",
-        quiet: true,
-        failure: "Couldn't open this chat.",
-      });
-      if (deepLinkSeqRef.current !== seq) return;
-      if (!r.ok || !r.data || typeof r.data !== "object" || !Array.isArray(r.data.messages)) {
-        filterRef.current = "all";
-        setFilterState("all");
-        window.history.replaceState(null, "", "/messages");
-        toast({ message: asLoadFailure(r, "Couldn't open this chat.").message, tone: "error" });
-        return;
-      }
-      const room = r.data.room;
-      // The layer opens on the entry the browser already holds (2.3); with
-      // no entry behind it, Back closes in place (`closeLayer`).
-      noBackRef.current = window.history.length <= 1;
-      window.history.replaceState({ vibeChat: id, depth: 1 }, "", channelUrl(id));
-      if (room && room.kind === "event") {
-        // The space on its Lounge underneath, the event chat layer on top
-        // (S2-notes.md R2: ClubSpace pushes depth 2 only when this is absent).
-        window.history.pushState({ vibeChat: id, depth: 2 }, "", channelUrl(id));
-      }
-      const view: OpenView = room
-        ? { kind: "club", orgHandle: room.org.handle, roomId: id, roomKind: room.kind, initialPage: r.data }
-        : { kind: "thread", threadId: id };
-      openRef.current = view;
-      setComposeOpen(false);
-      setOpen(view);
-    };
-    void run();
-  }, [firstChannelId]);
+    try {
+      // A restored page's props are the first address's: `?to=` counts only
+      // while the live address still carries it.
+      if (!new URLSearchParams(window.location.search).has("to")) pendingHandleRef.current = null;
+    } catch {
+      /* keep the prop */
+    }
+    // An entry left by a sheet (a reload with one open; back from a page
+    // reached with the tray open) is stepped off first: its landing is a
+    // `popstate` with nothing open, which opens the room (`onPop`).
+    if (adoptLayerEntry()) return;
+    const live = liveChannel(window.history.state);
+    const id = live === undefined ? firstChannelId : live;
+    if (id) openFromEntry(id);
+  }, [firstChannelId, openFromEntry]);
 
   // A week card or a club row names the room and, when it can, the club.
   // Without a handle the room resolves as a deep link does (one read).

@@ -32,9 +32,14 @@ import { RsvpSheet } from "./RsvpSheet";
  * `EventRef & { going }`), read through `useRoomPoll` (`Couldn't load this
  * event chat.`), refreshed on the every-5th full read and at once after an
  * RSVP change (`reload()`). Header: `Back to <club>`, no avatar, the event
- * title, `<club> · event chat`, no right button. Then About (EventAbout.tsx),
- * the Board strip (from the space read underneath), the thread top-anchored,
- * the composer `Message the event chat` or the closed tile. A later 403 on
+ * title, `<club> · event chat`, no right button; it stays fixed. Under it ONE
+ * scroller (`RoomThread`'s, through its `header`): About (EventAbout.tsx), the
+ * Board strip (from the space read underneath), then the rows. About and the
+ * strip scroll away with the messages, so the thread keeps its height when
+ * the keyboard is up, and the chat opens on its newest message and follows
+ * new ones (S71 amendment 3, E = audit F09); a short chat still starts under
+ * About (`anchor="top"`, 11.6). Then the composer `Message the event chat` or
+ * the closed tile. A later 403 on
  * the thread (an RSVP change removed the viewer, 14.25) → the layer closes
  * with the toast `You left the event chat.`. States: the skeleton (the 96px
  * hero block + two 50px tiles + three bars), `LoadFailed` in the About +
@@ -149,8 +154,6 @@ export function EventChat({ orgHandle, club, roomId, initialPage, boardLatest, b
             <EventSkeleton />
           ) : (
             <div style={{ flexGrow: 1, minHeight: 0, position: "relative", display: "flex", flexDirection: "column" }}>
-              {event ? <EventAbout event={event} night={night} now={now} onRsvp={() => setRsvpOpen(true)} /> : null}
-              {boardLatest ? <BoardStrip latest={boardLatest} unread={boardUnread} night={night} margin="4px 12px 0" onOpen={onOpenBoard} /> : null}
               <RoomThread
                 poll={poll}
                 roomId={roomId}
@@ -159,6 +162,12 @@ export function EventChat({ orgHandle, club, roomId, initialPage, boardLatest, b
                 night={night}
                 now={now}
                 anchor="top"
+                header={
+                  <>
+                    {event ? <EventAbout event={event} night={night} now={now} onRsvp={() => setRsvpOpen(true)} /> : null}
+                    {boardLatest ? <BoardStrip latest={boardLatest} unread={boardUnread} night={night} margin="4px 12px 0" onOpen={onOpenBoard} /> : null}
+                  </>
+                }
                 onReply={setReplyTo}
                 onOpenEventChat={() => undefined}
                 scrollToken={scrollToken}

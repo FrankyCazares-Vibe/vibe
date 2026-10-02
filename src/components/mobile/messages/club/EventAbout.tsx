@@ -19,6 +19,9 @@ import { pillState, rsvpPill, statePillText, whoIsGoingLabel } from "./helpers";
  * up to five stacked 30px avatars from `going` (the first 8 visible people,
  * 8.3), `<N> going`, `· <M> maybe` (the counts, blocked people included), and
  * the RSVP pill (`Going` check / `Maybe` dot / `RSVP`) that opens the sheet.
+ * Drawn INSIDE the event chat's scroller, above the rows (`EventChat` hands it
+ * to `RoomThread` as `header`; S71 amendment 3, E): it scrolls away with the
+ * messages.
  */
 export type EventAboutProps = {
   event: EventRef & { going: Person[] };

@@ -5,6 +5,7 @@ import { Drawer } from "vaul";
 
 import type { ChatMessage, CreateCardBody, CreateCardResponse } from "@/lib/chat/types";
 import { useHideTabBar } from "@/lib/chat/use-hide-tabbar";
+import { useLayerHistory } from "@/lib/chat/use-layer-history";
 import { vibeRequest } from "@/lib/feedback/request";
 import { toast } from "@/lib/feedback/toast";
 
@@ -28,6 +29,9 @@ import { FONT, palette, SERIF } from "../v2-tokens";
  * flight). `var(--paper)` surface, radius 28 on top. It calls
  * `useHideTabBar()`; focus lands in the sheet (vaul's trap) and goes back to
  * the composer's "+" (`returnFocusTo`) when it unmounts.
+ * The sheet has its own history entry (`useLayerHistory`; S71 amendment 3,
+ * A): Back closes the sheet and nothing under it; the X, the scrim, the drag
+ * and a posted card step back off that entry.
  *
  * `useCardPost` is the ONE `POST …/cards` of the three sheets with 1.2's
  * refusal table: `content_blocked` → 1.2's line and the named field
@@ -40,7 +44,8 @@ import { FONT, palette, SERIF } from "../v2-tokens";
  * 5xx, the network) shows its mapped line and the sheet stays. While a
  * POST is in flight the sheet ignores the X, the scrim and the drag: a
  * sheet closed mid-request could be followed by a second one posting a
- * second card (S3-SECURITY-1).
+ * second card (S3-SECURITY-1). Back is the same: while posting, the history
+ * steps forward onto the sheet's entry again and the sheet stays (`canPop`).
  */
 
 /** 1.2's exact toast line for a 422 `content_blocked` (the server's own `error`). */
@@ -145,6 +150,8 @@ export function CardSheet({ title, roomLine, orgId, night, cta, ctaDisabled, pos
   const close = () => {
     if (!posting) onClose();
   };
+  // Its own history entry while it is on screen (it is mounted only then).
+  useLayerHistory(true, onClose, () => !posting);
 
   // Focus back to the composer's "+" once the sheet is gone (11.0), after
   // vaul has finished its own unmount work.

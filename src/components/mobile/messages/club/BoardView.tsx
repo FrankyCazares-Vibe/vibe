@@ -5,6 +5,7 @@ import { useEffect, useRef, useState } from "react";
 import { LoadFailed } from "@/components/feedback/LoadFailed";
 import { RemovedContentCard, ReportSheet, type ReportTargetRef } from "@/components/safety/ReportSheet";
 import type { ChatMessage, RemoveMessageResponse } from "@/lib/chat/types";
+import { useLayerHistory } from "@/lib/chat/use-layer-history";
 import { ROOM_FULL_READ_EVERY, ROOM_POLL_MS, type RoomPoll } from "@/lib/chat/use-room-poll";
 import { vibeRequest } from "@/lib/feedback/request";
 
@@ -74,6 +75,9 @@ export function BoardView({ poll, roomId, night, now, onOpenEventChat, scrollTok
   const [removeTarget, setRemoveTarget] = useState<ChatMessage | null>(null);
   const [removing, setRemoving] = useState(false);
   const [reportMessage, setReportMessage] = useState<ReportTargetRef | null>(null);
+  // The Report sheet's own history entry (S71 amendment 3, A): Back closes it
+  // alone. The remove confirm takes its own inside `RemoveConfirm`.
+  useLayerHistory(reportMessage !== null, () => setReportMessage(null));
   const scrollRef = useRef<HTMLElement | null>(null);
 
   // The every-5th-tick re-read of the open folds (11.4): the same period as

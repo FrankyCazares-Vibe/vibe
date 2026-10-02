@@ -1530,3 +1530,33 @@ The orchestrator's own walk in the app's browser pane at 375x812, local `next de
 **Confirmed bug (audit F06, was predicted by reading): Back with a sheet open closes the whole club space.** With the New poll sheet open inside the Lounge (`history.state.depth` 1), ONE `history.back()` lands on `/messages` (the home): the sheet and the space both close and the draft is lost. 17.5 item 19 says back peels one layer (the sheet first). Not fixed yet.
 
 **Not walked in this pass (still owed before production or before Oct 26):** long-press on a card (the picker on a poll / sign-up / Event card: the pane's clicks are mouse clicks); `Take a spot` on a sign-up; the RSVP sheet; New sign-up and Share an event sheets; opening a Board post's replies and posting a reply; the Officers room; the club space and sheets in Light; the flag-pending skeleton; the keyboard on a phone; Safari; the store apps (Capacitor); a real phone. The audit's other screen findings (F05 unread after reading live, F07 back from the club page, F08 a locked phone skipping messages, F09 the event chat opening at its oldest message, F10 the store-app keyboard) were NOT re-tested here. Tooling note: in the pane, the first click after a navigation is swallowed (it focuses the tab); a second click works.
+
+### 17.10 S71 amendment 3 (Mac, 2026-10-01): the screen bugs of the new chat (audit F05–F09)
+
+Source: `wave-2-build/S71-amendment-3.md` (the order; Franky: "fix first"), `S71c-poll-notes.md`, `S71c-nav-notes.md`, `S71c-repair-notes.md` (two builders, two reviewers, one repair). Phone screens behind `chat_v2` only; no route, SQL or migration change; `MessagesMobileV1`, `ConversationView`, `CampusMobile`, `ReportSheet` and `public/` are byte-identical to before. **Where 17.10 and an earlier section differ, 17.10 wins.**
+
+**A. Back closes one layer (F06, confirmed live in 17.9, now fixed).** Every sheet, the "+" tray, the RSVP sheet, Report from the new screens and the Remove confirm own a history entry: the room entry's marks plus `sheet: n` (`{ vibeChat, depth, sheet }`; the `{ vibeChat, depth }` room entries are unchanged). Pure core `src/lib/chat/layer-stack.ts`, hook `src/lib/chat/use-layer-history.ts`; the two existing `popstate` owners ask `isLayerPop` first. A sheet opened from the tray TAKES OVER the tray's entry (no back-then-push: Chrome does not honour entries added after a script-driven back without a new tap, which would have let Back skip the space; reviewer's high finding, fixed by design). While a card is posting, Back steps forward onto the same entry instead of re-pushing (this replaces amendment 3's "re-push" wording). A leftover sheet entry (reload, link out, Forward) is stepped off, so the first Back is never a dead press. 17.5 item 19 now holds.
+
+**B. Back from a link out returns to the room (F07).** The V2 shell opens what the LIVE entry says, on mount and on a restored entry: `?channel=<id>`, else a `{ vibeChat, depth >= 1 }` state. When the event chat closes onto a space entry that still names the event room, the entry is rewritten to the room on screen, so a later link out and Back returns to that room, not to the event chat.
+
+**C. What you watched arrive is read (F05).** `use-room-poll.ts`: a 4-second check that appends a row by someone else marks the room read (once per check); nothing is marked while the page is hidden (the mark is owed and sent on return or on the way out); the chip of the room on screen never draws the unread dot. 11.5's mark-read sentence reads accordingly.
+
+**D. No silent skip after a locked phone (F08).** The hook keeps a READ FRONTIER (the newest `created_at` a read delivered; never moved by an optimistic row). A full page whose oldest row is newer than the frontier REPLACES the list (unsent `temp_` rows kept) and sets `hasEarlier`; otherwise today's merge. The quick check asks `?after=<frontier>` (so a message that landed just before my own send appears within about 4 s, not 20: a defect that predates this amendment); a late answer after a replace is dropped (list epoch). 9.3 reads accordingly.
+
+**E. The event chat opens at the newest message and follows (F09).** `RoomThread` pins to the newest row for both anchors, follows new rows while the reader is near the end, never yanks a reader who scrolled up, re-pins when its box shrinks; the event's About block and the Board strip are inside the scroller.
+
+**F. NOT done: F10** (a chat drawer keeping its keyboard-open height inside the store apps). Needs a real device first (the Android build f9, the iPhone pass).
+
+**Gates at the head.** `npx tsc --noEmit` exit 0; `npm test` 1,814 / 1,814 (78 new: the layer stack, the gap and frontier rules, the mark-read decision, wiring tests); `npx eslint` on the changed files: only the two legacy `MessagesMobile.tsx` errors of 17.6, on moved lines.
+
+**The orchestrator's walk (375px, local stack, real clicks and the browser's REAL Back via the pane's back navigation):**
+- Lounge → "+" (history length +1, `sheet: 1`) → Poll (length unchanged: the sheet took the tray's entry) → Back: ONLY the sheet closes, the space stays → Back: the home. (The exact sequence that failed in 17.9.)
+- "+" → Poll → ✕ → Back: the home (no dead press).
+- Space → the header's club-page button (`/orgs/chat_seed_club`) → Back: the SPACE (was the home).
+- An event chat with 43 messages opens scrolled to the end (0 px from the bottom, the last message on screen, About inside the scroller); a message sent by another account while it is open arrives and is on screen; Back → the space on the Lounge → Back → the home.
+- Blake watches three Lounge messages by avery arrive, presses Back: `lounge.unread_count` 0 and the club row's label has no "N new" (was "3 new").
+- Flag OFF (casey): today's list, no `vibeChat` state written, nothing new in the console.
+
+**Not walked (need two live sessions, a throttle, or a device):** the posting guard (Back while `Posting…`), a space closed under an open sheet (403 / 404), Back again while a restored room is still loading, the gap replace after a hidden page with 60+ new messages, the keyboard, Android's system Back, the iPhone edge swipe. The lists are in `S71c-repair-notes.md` (R1–R9, P5–P8).
+
+**Open (small):** after leaving the Board, its chip can show the dot for up to 20 s if a post arrived while you were on it (the space read's age); a short thread that overflows slightly cannot be un-pinned; `refreshOne` has no epoch check (it only swaps a row by id).
