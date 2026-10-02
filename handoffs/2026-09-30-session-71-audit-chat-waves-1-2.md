@@ -79,6 +79,16 @@ Branch head `5f19643`. Details: contract **section 17.9**. Screenshots on the Ma
 2. Production, with **Franky's yes**: the read-only PRE-CHECK → apply **B, then C** at a quiet hour (Management API; the md5 of the pushed file for B) → record both in `schema_migrations` → merge the branch to `main` → the after-deploy check → the Production-only flag env for the three founders + SAE → redeploy → create an upcoming event on production → the first real phone test.
 3. Small Vercel leftover: none (the ANON row is recreated as Config; Preview builds succeed).
 
+## Screen bugs FIXED (Oct 1): F05, F06, F07, F08, F09
+
+Branch head `6d79e20` (pushed). Details: contract **section 17.10**.
+- **F06** Back with a sheet open now closes only the sheet (then the event chat, the space, the home). **F07** Back from the club page / a profile returns to the room. **F05** messages you watched arrive are read (0 new, was 3 new). **F08** no silently skipped messages after a locked phone. **F09** the event chat opens at the newest message and follows.
+- Proof: tsc clean, `npm test` 1,814/1,814, no new lint error; walked by the orchestrator with real clicks and the browser's real Back (the sequence that failed before now passes).
+- **F10 not done** (the keyboard height inside the store apps): needs a real device.
+- **Still to walk** (two live sessions, a throttle, or a phone): Back while a poll is posting, a space closed under an open sheet, the 60-message gap after a hidden page, the keyboard, Android's system Back, the iPhone edge swipe; plus long-press on cards, Take a spot, the RSVP / sign-up / share-event sheets, Board replies, the Officers room, Light inside the club.
+
+**Next:** production, with **Franky's yes**: read-only PRE-CHECK → apply **B, then C** at a quiet hour → record both → merge the branch to `main` → the after-deploy check → the Production-only flag env for the three founders + SAE → redeploy → create an upcoming event on production → the first real phone test (which is also where the list above gets walked on a real phone).
+
 ## The short list: what to do, in order
 
 **Part 1 is done** (the leaked key was killed Sept 30 at 02:50 UTC Oct 1; small clean-ups remain, listed there).
