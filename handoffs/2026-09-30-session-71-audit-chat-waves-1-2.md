@@ -23,6 +23,17 @@ The audits changed no app code; the key fix in Part 1 was written afterwards (pu
 
 **Still owed after go-live:** the real-phone walk (long-press on cards, the sheets, Board replies, Back while posting, the keyboard, Android Back, the iPhone swipe: contract 17.9 / 17.10 lists); F10 on a device; the wave-1 fixes M2–M5 and the Support page's Block wording (M1 / F04: with this merge blocked people ARE hidden from each other in club rooms, except an officer's Board post); the per-event Event-card cap; Report / Remove on text Board posts and replies before Oct 26 (17.2 L3); Terms v3 inputs.
 
+## OCT 2, LATER: the week swipes, and a month calendar (amendment 4; Franky's first phone test)
+
+Franky tried the new chat on his phone: "everything seems to work", and asked for two things that were in his Option 3 pick and had been cut from wave 2: swipe the week strip to see next week, and tap a day to open the whole calendar "kind of like a modal". Built the same day (one builder, two reviewers, one repair, then the orchestrator's browser walk), commit `00257b5` on `main`. Contract **17.11**; the order is `handoffs/chat-redesign/wave-2-build/S71-amendment-4.md`, notes `S71d-build-notes.md` / `S71d-repair-notes.md`.
+
+- **The week strip:** swipe left = next week, right = the week before (4 weeks back to 26 ahead). The title stays centred and alone: `Your week` / `Next week` / `Last week` / `Oct 12 – 18`. A `This week` pill appears only when you are on another week. Two faint chevrons at the strip's edges say it moves (one line to turn off: `EDGE_HINTS_AT_REST` in `YourWeek.tsx`). On another week a card says the weekday (`Sun 7 PM`).
+- **The month sheet:** tap the title or any day. Dots on days with RSVPs, today ringed, the picked day's plans listed, a plan opens its event chat, `Today` pill, month arrows or a swipe on the grid. Back closes only the sheet. Closing on a day of another week moves the strip to that week. It is a bottom sheet like the app's others; the mockup (`R3_Month`) hung it from the top.
+- **Scope:** phone only, behind `chat_v2`. No route, no SQL, no migration (the calendar route already takes any range). Nothing a flag-off user reaches changed.
+- **Gates:** `tsc` exit 0; `npm test` 1,839 / 1,839 (25 new); eslint clean on the changed files. Walked at 375px on the local stack in Light and Night with real drags and the real Back (the list is in 17.11); flag-off account unchanged.
+- **Production:** `main` fast-forwarded `c0e4db2` → `00257b5`, pushed, Vercel deploy success at 14:42 UTC. Checked live as Franky at 375px (reads only): the title `Your week`, the two edge chevrons, `Next week` → `Next week, October 5 to 11` with the `This week` pill, a day tap opens the sheet (`October 2026 … Tue, Oct 6 · No plans`, history `sheet: 1`), Back closes only the sheet, `scrollWidth` 375.
+- **Not walked (needs Franky's phone):** a real finger: the swipe next to the iPhone's edge-back gesture, the sheet's drag-to-close against the grid's swipe, a 320px-wide phone.
+
 ## Part 1. FIXED the same evening: the live site shipped the database master key
 
 The code for `https://www.connectvibe.app/auth/login` (chunk `2szoa-o94f9it.js`) inlines a Supabase JWT with `role: service_role` for project `rqopjkimxbjkwdkpkbfq`, in the slot for `NEXT_PUBLIC_SUPABASE_ANON_KEY`. Its sha256 matches `SUPABASE_SERVICE_ROLE_KEY` in the Mac's `.env.local`, so it is the real, working master key. Anyone can copy it and read or change every row: emails, DMs, club messages, resumes, private fields.
