@@ -12,7 +12,7 @@
   min-height: 100vh;
   color: var(--cream);
   font-family: "DM Sans", sans-serif;
-  background: radial-gradient(900px 700px at 0% 0%, rgba(255, 92, 53, 0.13), transparent 62%), var(--ink);
+  background: radial-gradient(900px 700px at 0% 0%, rgba(255, 92, 53, 0.13), transparent 62%), linear-gradient(rgba(255, 255, 255, 0.022) 1px, transparent 1px) 0 0 / 56px 56px, linear-gradient(90deg, rgba(255, 255, 255, 0.022) 1px, transparent 1px) 0 0 / 56px 56px, var(--ink);
   overflow-x: clip;
 }
 .vln-root h1, .vln-root h2, .vln-wordmark, .vln-pop strong {
@@ -61,24 +61,30 @@
 
 /* Below the hero */
 /* Emerging with the scroll: home-landing sets --p (0 to 1) on each .vln-rise. */
-.vln-rise { --p: 0; --from: 0px; opacity: var(--p); transform: translate3d(calc((1 - var(--p)) * var(--from)), calc((1 - var(--p)) * 80px), 0) scale(calc(0.84 + 0.16 * var(--p))); will-change: transform, opacity; }
-.vln-kind:nth-child(odd) { --from: -64px; }
-.vln-kind:nth-child(even) { --from: 64px; }
+.vln-rise { --p: 0; opacity: var(--p); transform: translate3d(0, calc((1 - var(--p)) * 56px), 0); will-change: transform, opacity; }
 
-.vln-kinds { display: grid; gap: 14px; padding: 56px 20px 0; max-width: 1120px; margin: 0 auto; }
-.vln-kind, .vln-door { position: relative; padding: 24px 22px 26px; border-radius: 22px; background: radial-gradient(120% 90% at 100% 0%, rgba(var(--rgb), 0.2), transparent 60%), linear-gradient(180deg, rgba(var(--rgb), 0.08), rgba(22, 21, 21, 0.72) 60%); border: 1px solid rgba(var(--rgb), 0.3); box-shadow: 0 30px 80px -34px rgba(var(--rgb), calc(0.55 * var(--p))), inset 0 1px 0 rgba(255, 255, 255, 0.06); scroll-margin-top: 24px; }
-.vln-kind { padding-top: 92px; }
-/* Each card's planet: a lit sphere in its colour, an orbit behind it, one moon going round. */
-.vln-planet { position: absolute; top: 22px; left: 22px; width: 52px; height: 52px; border-radius: 50%; background: radial-gradient(circle at 32% 28%, #FFFAF4 0%, rgb(var(--rgb)) 30%, rgba(var(--rgb), 0.45) 60%, #141211 100%); box-shadow: 0 0 44px 6px rgba(var(--rgb), 0.38); transform: scale(calc(0.3 + 0.7 * var(--p))); transform-origin: 50% 50%; }
-.vln-planet i { position: absolute; z-index: -1; left: -30px; top: 8px; width: 112px; height: 36px; border-radius: 50%; border: 1px solid rgba(var(--rgb), 0.5); transform: rotate(-16deg); }
-.vln-planet b { position: absolute; left: -30px; top: 8px; width: 7px; height: 7px; border-radius: 50%; background: #FFFAF4; box-shadow: 0 0 10px 3px rgba(var(--rgb), 0.8); offset-path: path("M 2.17 33.44 A 56 18 -16 1 1 109.83 2.56 A 56 18 -16 1 1 2.17 33.44"); offset-rotate: 0deg; animation: vln-orbit 7s linear infinite; }
-.vln-kind:nth-child(2) .vln-planet b { animation-duration: 9.5s; animation-delay: -3s; }
-.vln-kind:nth-child(3) .vln-planet b { animation-duration: 12s; animation-delay: -6s; }
-.vln-kind h2, .vln-door h2 { margin-top: 10px; font-size: 34px; font-weight: 800; line-height: 1.05; }
-.vln-kind p, .vln-door p { margin: 10px 0 0; font-size: 15px; line-height: 1.55; color: #CFC8BE; }
+/* A labelled hairline between parts of the page; the line draws itself in. */
+.vln-rule { display: flex; align-items: center; gap: 14px; max-width: 1120px; margin: 0 auto; padding: 64px 20px 0; font: 500 10.5px/1 var(--font-mono), monospace; letter-spacing: 0.16em; text-transform: uppercase; color: var(--muted); }
+.vln-rule i { flex: 1; height: 1px; background: rgba(255, 255, 255, 0.16); transform: scaleX(var(--p)); transform-origin: 0 50%; }
+
+/* Panels (S72, after sibaldesign.com and bleibtgleich.dev): flat, hairline
+   border, a small labelled strip on top, corner ticks in the kind's colour.
+   They switch on with the scroll: wiped in from the left, top line first. */
+.vln-kinds, .vln-doors { display: grid; gap: 14px; padding: 18px 20px 0; max-width: 1120px; margin: 0 auto; scroll-margin-top: 24px; }
+.vln-panel { position: relative; padding: 0 20px 26px; border-radius: 4px; background: linear-gradient(180deg, rgba(255, 255, 255, 0.035), rgba(255, 255, 255, 0.012)); border: 1px solid rgba(255, 255, 255, 0.11); clip-path: inset(0 calc((1 - var(--p)) * 100%) 0 0); scroll-margin-top: 24px; transition: border-color 0.25s ease, background 0.25s ease; }
+.vln-panel:hover { border-color: rgba(var(--rgb), 0.55); background: linear-gradient(180deg, rgba(var(--rgb), 0.07), rgba(255, 255, 255, 0.012)); }
+.vln-panel::before, .vln-panel::after { content: ""; position: absolute; width: 10px; height: 10px; border: solid rgb(var(--rgb)); pointer-events: none; }
+.vln-panel::before { top: -1px; left: -1px; border-width: 1px 0 0 1px; }
+.vln-panel::after { bottom: -1px; right: -1px; border-width: 0 1px 1px 0; }
+.vln-panel-head { display: flex; align-items: center; gap: 10px; height: 40px; margin: 0 -20px 26px; padding: 0 20px; border-bottom: 1px solid rgba(255, 255, 255, 0.09); font: 500 10.5px/1 var(--font-mono), monospace; letter-spacing: 0.14em; text-transform: uppercase; color: var(--cream); }
+.vln-panel-head b { font-weight: 500; color: rgb(var(--rgb)); }
+.vln-panel-head b, .vln-panel-head span { flex: none; white-space: nowrap; }
+.vln-panel-head b::after { content: ""; display: inline-block; width: 5px; height: 5px; margin-left: 10px; border-radius: 50%; background: rgb(var(--rgb)); box-shadow: 0 0 10px 2px rgba(var(--rgb), 0.7); vertical-align: 1px; }
+.vln-panel-head em { margin-left: auto; min-width: 0; font-style: normal; letter-spacing: 0.08em; color: var(--muted); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.vln-panel h2 { font-size: clamp(34px, 9vw, 44px); font-weight: 800; line-height: 1; }
+.vln-panel p { margin: 14px 0 0; max-width: 34em; font-size: 15px; line-height: 1.55; color: #CFC8BE; }
 .vln-screen { display: block; width: 100%; max-width: 280px; margin: 22px auto 0; border-radius: 26px; border: 1px solid var(--line); }
 
-.vln-doors { display: grid; gap: 14px; padding: 14px 20px 0; max-width: 1120px; margin: 0 auto; scroll-margin-top: 24px; }
 .vln-door .vln-btn { margin-top: 20px; }
 
 .vln-orbits { position: absolute; left: 50%; top: 150px; width: 0; height: 0; }
@@ -114,10 +120,11 @@
   .vln-hero-copy { left: 40px; right: auto; bottom: auto; top: 50%; width: min(560px, 44vw); transform: translateY(-46%); animation-name: vln-fade-only; }
   .vln-hero-copy h1 { font-size: clamp(48px, 6.2vw, 84px); }
   .vln-hero-copy p { font-size: 17px; }
-  .vln-kinds { grid-template-columns: repeat(3, 1fr); gap: 18px; padding: 72px 40px 0; }
-  .vln-kind:nth-child(n) { --from: 0px; }
+  .vln-rule { padding: 88px 40px 0; }
+  .vln-kind h2 { font-size: clamp(28px, 2.9vw, 36px); }
+  .vln-kinds { grid-template-columns: repeat(3, 1fr); gap: 18px; padding: 22px 40px 0; }
   .vln-orbits { top: 190px; }
-  .vln-doors { grid-template-columns: repeat(2, 1fr); gap: 18px; padding: 18px 40px 0; }
+  .vln-doors { grid-template-columns: repeat(2, 1fr); gap: 18px; padding: 22px 40px 0; }
   .vln-footer { padding: 20px 40px 24px; }
 }
 @keyframes vln-fade-only { from { opacity: 0; } }
@@ -126,6 +133,7 @@
   .vln-hero-copy, .vln-pop { animation: none; }
   .vln-light-label { animation: none; opacity: 1; }
   .vln-rise { opacity: 1; transform: none; }
-  .vln-planet b, .vln-orbits b { animation: none; }
+  .vln-panel { clip-path: none; }
+  .vln-orbits b { animation: none; }
   .vln-btn { transition: none; }
 }

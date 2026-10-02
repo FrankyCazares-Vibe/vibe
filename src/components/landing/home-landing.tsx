@@ -184,11 +184,15 @@ export function HomeLanding() {
         </div>
       </section>
 
+      <div className="vln-rule vln-rise"><span>What&apos;s out there</span><i aria-hidden="true" /><span aria-hidden="true">01 — 03</span></div>
       <section className="vln-kinds" aria-label="What you can do on Vibe">
         {KIND_ORDER.map((k, i) => (
-          <article key={k} id={`vln-${k}`} className="vln-kind vln-rise" data-lag={i} style={{ "--rgb": KINDS[k].rgb } as CSSProperties}>
-            <span className="vln-planet" aria-hidden="true"><i /><b /></span>
-            <span className="vln-eyebrow">{KINDS[k].eyebrow}</span>
+          <article key={k} id={`vln-${k}`} className="vln-kind vln-panel vln-rise" data-lag={i} style={{ "--rgb": KINDS[k].rgb } as CSSProperties}>
+            <header className="vln-panel-head">
+              <b>0{i + 1}</b>
+              <span>{KINDS[k].eyebrow}</span>
+              <em>{LIGHTS.filter((l) => l.kind === k).map((l) => l.label).join(" · ")}</em>
+            </header>
             <h2>{KINDS[k].title}</h2>
             <p>{KINDS[k].body}</p>
             {/* eslint-disable-next-line @next/next/no-img-element -- a still of the app, added once the demo cast exists */}
@@ -197,15 +201,16 @@ export function HomeLanding() {
         ))}
       </section>
 
+      <div className="vln-rule vln-rise"><span>Two ways in</span><i aria-hidden="true" /><span aria-hidden="true">04 — 05</span></div>
       <section id="vln-doors" className="vln-doors">
-        <div className="vln-door vln-rise">
-          <span className="vln-eyebrow">For students</span>
+        <div className="vln-door vln-panel vln-rise">
+          <header className="vln-panel-head"><b>04</b><span>For students</span><em>Free</em></header>
           <h2>Step inside.</h2>
           <p>Sign up with your school email. It&apos;s free, and only students can join.</p>
           <a href={SIGNUP_HREF} data-warp-trigger className="vln-btn">Create your account</a>
         </div>
-        <div className="vln-door vln-rise" data-lag={1} style={{ "--rgb": KINDS.events.rgb } as CSSProperties}>
-          <span className="vln-eyebrow">For clubs</span>
+        <div className="vln-door vln-panel vln-rise" data-lag={1} style={{ "--rgb": KINDS.events.rgb } as CSSProperties}>
+          <header className="vln-panel-head"><b>05</b><span>For clubs</span><em>help@connectvibe.app</em></header>
           <h2>Bring your club.</h2>
           <p>A page, your events, and a chat your members will open. Write to us and we&apos;ll set it up with you.</p>
           <a href={CLUB_HREF} className="vln-btn vln-btn-ghost">Email us</a>
