@@ -43,7 +43,7 @@
 .vln-hero::after { content: ""; position: absolute; left: 0; right: 0; bottom: 0; height: 30%; background: linear-gradient(180deg, transparent, var(--ink)); pointer-events: none; }
 
 .vln-light { position: absolute; z-index: 2; left: calc(var(--mx) * 100%); top: calc(var(--my) * 100%); width: 48px; height: 48px; margin: -24px 0 0 -24px; padding: 0; border: none; border-radius: 50%; background: transparent; cursor: pointer; -webkit-tap-highlight-color: transparent; }
-.vln-light-label { position: absolute; left: 50%; top: calc(100% - 6px); transform: translateX(-50%); white-space: nowrap; font: 600 11px/1 "DM Sans", sans-serif; letter-spacing: 0.02em; color: rgba(246, 241, 234, 0.72); opacity: 0; animation: vln-fade 0.7s ease forwards; animation-delay: calc(0.9s + var(--i) * 0.17s); transition: color 0.2s ease; }
+.vln-light-label { position: absolute; left: 50%; top: calc(100% + 2px); transform: translateX(-50%); white-space: nowrap; font: 600 11px/1 "DM Sans", sans-serif; letter-spacing: 0.02em; color: rgba(246, 241, 234, 0.72); opacity: 0; animation: vln-fade 0.7s ease forwards; animation-delay: calc(0.9s + var(--i) * 0.17s); transition: color 0.2s ease; }
 .vln-light:hover .vln-light-label, .vln-light[aria-expanded="true"] .vln-light-label { color: rgb(var(--rgb)); }
 
 .vln-pop { position: absolute; z-index: 4; width: 244px; left: clamp(12px, calc(var(--mx) * 100% - 122px), calc(100% - 256px)); top: calc(var(--my) * 100% + 40px); padding: 14px 16px 12px; border-radius: 16px; background: rgba(22, 21, 21, 0.86); border: 1px solid rgba(var(--rgb), 0.28); box-shadow: 0 24px 60px rgba(0, 0, 0, 0.55); -webkit-backdrop-filter: blur(14px); backdrop-filter: blur(14px); animation: vln-pop 0.22s ease both; }
@@ -60,20 +60,32 @@
 .vln-hint { display: block; margin-top: 16px; font-size: 12px; color: var(--muted); }
 
 /* Below the hero */
-.vln-rise { opacity: 0; transform: translateY(18px); transition: opacity 0.7s ease, transform 0.7s ease; }
-.vln-rise.is-in { opacity: 1; transform: none; }
+/* Emerging with the scroll: home-landing sets --p (0 to 1) on each .vln-rise. */
+.vln-rise { --p: 0; --from: 0px; opacity: var(--p); transform: translate3d(calc((1 - var(--p)) * var(--from)), calc((1 - var(--p)) * 80px), 0) scale(calc(0.84 + 0.16 * var(--p))); will-change: transform, opacity; }
+.vln-kind:nth-child(odd) { --from: -64px; }
+.vln-kind:nth-child(even) { --from: 64px; }
 
 .vln-kinds { display: grid; gap: 14px; padding: 56px 20px 0; max-width: 1120px; margin: 0 auto; }
-.vln-kind, .vln-door { position: relative; padding: 24px 22px 26px; border-radius: 22px; background: linear-gradient(180deg, rgba(var(--rgb), 0.07), rgba(22, 21, 21, 0.6) 55%); border: 1px solid var(--line); scroll-margin-top: 24px; }
-.vln-dot { display: block; width: 9px; height: 9px; margin-bottom: 18px; border-radius: 50%; background: #FFFAF4; box-shadow: 0 0 0 3px rgba(var(--rgb), 0.55), 0 0 22px 8px rgba(var(--rgb), 0.45); }
-.vln-kind h2, .vln-door h2 { margin-top: 10px; font-size: 30px; font-weight: 800; line-height: 1.05; }
+.vln-kind, .vln-door { position: relative; padding: 24px 22px 26px; border-radius: 22px; background: radial-gradient(120% 90% at 100% 0%, rgba(var(--rgb), 0.2), transparent 60%), linear-gradient(180deg, rgba(var(--rgb), 0.08), rgba(22, 21, 21, 0.72) 60%); border: 1px solid rgba(var(--rgb), 0.3); box-shadow: 0 30px 80px -34px rgba(var(--rgb), calc(0.55 * var(--p))), inset 0 1px 0 rgba(255, 255, 255, 0.06); scroll-margin-top: 24px; }
+.vln-kind { padding-top: 92px; }
+/* Each card's planet: a lit sphere in its colour, an orbit behind it, one moon going round. */
+.vln-planet { position: absolute; top: 22px; left: 22px; width: 52px; height: 52px; border-radius: 50%; background: radial-gradient(circle at 32% 28%, #FFFAF4 0%, rgb(var(--rgb)) 30%, rgba(var(--rgb), 0.45) 60%, #141211 100%); box-shadow: 0 0 44px 6px rgba(var(--rgb), 0.38); transform: scale(calc(0.3 + 0.7 * var(--p))); transform-origin: 50% 50%; }
+.vln-planet i { position: absolute; z-index: -1; left: -30px; top: 8px; width: 112px; height: 36px; border-radius: 50%; border: 1px solid rgba(var(--rgb), 0.5); transform: rotate(-16deg); }
+.vln-planet b { position: absolute; left: -30px; top: 8px; width: 7px; height: 7px; border-radius: 50%; background: #FFFAF4; box-shadow: 0 0 10px 3px rgba(var(--rgb), 0.8); offset-path: path("M 2.17 33.44 A 56 18 -16 1 1 109.83 2.56 A 56 18 -16 1 1 2.17 33.44"); offset-rotate: 0deg; animation: vln-orbit 7s linear infinite; }
+.vln-kind:nth-child(2) .vln-planet b { animation-duration: 9.5s; animation-delay: -3s; }
+.vln-kind:nth-child(3) .vln-planet b { animation-duration: 12s; animation-delay: -6s; }
+.vln-kind h2, .vln-door h2 { margin-top: 10px; font-size: 34px; font-weight: 800; line-height: 1.05; }
 .vln-kind p, .vln-door p { margin: 10px 0 0; font-size: 15px; line-height: 1.55; color: #CFC8BE; }
 .vln-screen { display: block; width: 100%; max-width: 280px; margin: 22px auto 0; border-radius: 26px; border: 1px solid var(--line); }
 
 .vln-doors { display: grid; gap: 14px; padding: 14px 20px 0; max-width: 1120px; margin: 0 auto; scroll-margin-top: 24px; }
 .vln-door .vln-btn { margin-top: 20px; }
 
-.vln-close { display: flex; flex-direction: column; align-items: center; gap: 14px; padding: 96px 20px 72px; text-align: center; background: radial-gradient(620px 420px at 50% 100%, rgba(255, 92, 53, 0.2), transparent 70%); }
+.vln-orbits { position: absolute; left: 50%; top: 150px; width: 0; height: 0; }
+.vln-orbits span { position: absolute; left: 0; top: 0; translate: -50% -50%; rotate: -8deg; border-radius: 50%; border: 1px solid rgba(255, 255, 255, 0.08); }
+.vln-orbits b { position: absolute; left: 0; top: 0; width: 9px; height: 9px; border-radius: 50%; background: rgb(var(--rgb)); box-shadow: 0 0 16px 5px rgba(var(--rgb), 0.6); offset-rotate: 0deg; animation: vln-orbit linear infinite; }
+.vln-close > :not(.vln-orbits) { position: relative; z-index: 1; }
+.vln-close { position: relative; overflow: hidden; display: flex; flex-direction: column; align-items: center; gap: 14px; padding: 96px 20px 72px; text-align: center; background: radial-gradient(620px 420px at 50% 100%, rgba(255, 92, 53, 0.2), transparent 70%); }
 .vln-wordmark-xl { font-size: clamp(88px, 26vw, 176px); }
 .vln-tagline { margin: 0 0 12px; font: italic 400 19px/1.3 "Fraunces", serif; color: #E4DDD3; }
 .vln-schools { margin-top: 8px; font: 600 11px/1 "DM Sans", sans-serif; letter-spacing: 0.18em; text-transform: uppercase; color: var(--muted); }
@@ -89,6 +101,7 @@
 /* Leaving for sign-up: the page lets go while the sky streaks. */
 .vln-root.is-warping .vln-hero-copy, .vln-root.is-warping .vln-light, .vln-root.is-warping .vln-pop, .vln-root.is-warping .vln-bar { opacity: 0; transition: opacity 0.4s ease; animation: none; }
 
+@keyframes vln-orbit { from { offset-distance: 0%; } to { offset-distance: 100%; } }
 @keyframes vln-fade { to { opacity: 1; } }
 @keyframes vln-rise { from { opacity: 0; transform: translateY(14px); } }
 @keyframes vln-pop { from { opacity: 0; transform: translateY(6px) scale(0.98); } }
@@ -102,6 +115,8 @@
   .vln-hero-copy h1 { font-size: clamp(48px, 6.2vw, 84px); }
   .vln-hero-copy p { font-size: 17px; }
   .vln-kinds { grid-template-columns: repeat(3, 1fr); gap: 18px; padding: 72px 40px 0; }
+  .vln-kind:nth-child(n) { --from: 0px; }
+  .vln-orbits { top: 190px; }
   .vln-doors { grid-template-columns: repeat(2, 1fr); gap: 18px; padding: 18px 40px 0; }
   .vln-footer { padding: 20px 40px 24px; }
 }
@@ -110,6 +125,7 @@
 @media (prefers-reduced-motion: reduce) {
   .vln-hero-copy, .vln-pop { animation: none; }
   .vln-light-label { animation: none; opacity: 1; }
-  .vln-rise { opacity: 1; transform: none; transition: none; }
+  .vln-rise { opacity: 1; transform: none; }
+  .vln-planet b, .vln-orbits b { animation: none; }
   .vln-btn { transition: none; }
 }

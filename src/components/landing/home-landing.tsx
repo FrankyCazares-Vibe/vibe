@@ -106,13 +106,35 @@ export function HomeLanding() {
     return () => window.removeEventListener("keydown", onKey);
   }, [active]);
 
-  // Sections below the hero rise in once, the first time they are seen.
+  // Everything below the hero emerges with the scroll: each .vln-rise gets
+  // --p, 0 below the fold to 1 once it is well into view, and landing.css
+  // turns that into the slide, the scale and the glow. offsetTop, not
+  // getBoundingClientRect: the transform must not feed back into its own input.
   useEffect(() => {
-    const seen = new IntersectionObserver((entries) => {
-      for (const e of entries) if (e.isIntersecting) { e.target.classList.add("is-in"); seen.unobserve(e.target); }
-    }, { threshold: 0.2 });
-    document.querySelectorAll(".vln-rise").forEach((el) => seen.observe(el));
-    return () => seen.disconnect();
+    const els = Array.from(document.querySelectorAll<HTMLElement>(".vln-rise"));
+    if (window.matchMedia("(prefers-reduced-motion: reduce)").matches) {
+      els.forEach((el) => el.style.setProperty("--p", "1"));
+      return;
+    }
+    let raf = 0;
+    const run = () => {
+      raf = 0;
+      const vh = window.innerHeight;
+      for (const el of els) {
+        const lag = Number(el.dataset.lag ?? 0) * vh * 0.07;
+        const u = Math.min(1, Math.max(0, (vh * 0.98 - (el.offsetTop - window.scrollY) - lag) / (vh * 0.42)));
+        el.style.setProperty("--p", (1 - Math.pow(1 - u, 3)).toFixed(3));
+      }
+    };
+    const ask = () => { if (!raf) raf = requestAnimationFrame(run); };
+    run();
+    window.addEventListener("scroll", ask, { passive: true });
+    window.addEventListener("resize", ask);
+    return () => {
+      cancelAnimationFrame(raf);
+      window.removeEventListener("scroll", ask);
+      window.removeEventListener("resize", ask);
+    };
   }, []);
 
   return (
@@ -163,9 +185,9 @@ export function HomeLanding() {
       </section>
 
       <section className="vln-kinds" aria-label="What you can do on Vibe">
-        {KIND_ORDER.map((k) => (
-          <article key={k} id={`vln-${k}`} className="vln-kind vln-rise" style={{ "--rgb": KINDS[k].rgb } as CSSProperties}>
-            <span className="vln-dot" aria-hidden="true" />
+        {KIND_ORDER.map((k, i) => (
+          <article key={k} id={`vln-${k}`} className="vln-kind vln-rise" data-lag={i} style={{ "--rgb": KINDS[k].rgb } as CSSProperties}>
+            <span className="vln-planet" aria-hidden="true"><i /><b /></span>
             <span className="vln-eyebrow">{KINDS[k].eyebrow}</span>
             <h2>{KINDS[k].title}</h2>
             <p>{KINDS[k].body}</p>
@@ -182,7 +204,7 @@ export function HomeLanding() {
           <p>Sign up with your school email. It&apos;s free, and only students can join.</p>
           <a href={SIGNUP_HREF} data-warp-trigger className="vln-btn">Create your account</a>
         </div>
-        <div className="vln-door vln-rise" style={{ "--rgb": KINDS.events.rgb } as CSSProperties}>
+        <div className="vln-door vln-rise" data-lag={1} style={{ "--rgb": KINDS.events.rgb } as CSSProperties}>
           <span className="vln-eyebrow">For clubs</span>
           <h2>Bring your club.</h2>
           <p>A page, your events, and a chat your members will open. Write to us and we&apos;ll set it up with you.</p>
@@ -191,6 +213,14 @@ export function HomeLanding() {
       </section>
 
       <section className="vln-close vln-rise">
+        {/* The wordmark as a sun: three orbits, one small planet per kind. */}
+        <div className="vln-orbits" aria-hidden="true">
+          {KIND_ORDER.map((k, i) => {
+            const w = 340 + i * 190, h = Math.round(w * 0.34);
+            const path = `path("M 0 ${h / 2} A ${w / 2} ${h / 2} 0 1 1 ${w} ${h / 2} A ${w / 2} ${h / 2} 0 1 1 0 ${h / 2}")`;
+            return <span key={k} style={{ width: w, height: h, "--rgb": KINDS[k].rgb } as CSSProperties}><b style={{ offsetPath: path, animationDuration: `${14 + i * 9}s`, animationDelay: `${-i * 5}s` }} /></span>;
+          })}
+        </div>
         <span className="vln-wordmark vln-wordmark-xl">vibe<i>.</i></span>
         <p className="vln-tagline">Your campus. Your people. Yourself.</p>
         <a href={SIGNUP_HREF} data-warp-trigger className="vln-btn">Sign up</a>

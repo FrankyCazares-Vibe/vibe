@@ -26,8 +26,9 @@ const ease = (u: number) => (u <= 0 ? 0 : u >= 1 ? 1 : 1 - Math.pow(1 - u, 3));
 
 /**
  * The landing hero's sky, drawn on one canvas: drifting dust, the lights
- * (each its own colour), the thin lines between them, and a spark that
- * travels a line now and then. `warping` streaks the dust outward on the way
+ * (each its own colour, with an orbit and a moon), the thin lines between
+ * them, sparks that travel the lines, two slow clouds of colour and a shooting
+ * star now and then. `warping` streaks the dust outward on the way
  * to sign-up. With reduced motion it draws one still frame and stops.
  * Decorative only: the lights' buttons and labels are real DOM in home-landing.
  */
@@ -52,6 +53,7 @@ export function NightSky({ lights, links, activeId, warping }: { lights: SkyLigh
     const t0 = performance.now();
     let w = 0, h = 0, dpr = 1, raf = 0, onScreen = true, nextSpark = 2200;
     let px = 0, py = 0, tx = 0, ty = 0;
+    let shot: { at: number; x: number; y: number; dir: number } | null = null, nextShot = 3800;
 
     const at = (l: SkyLight, t: number): [number, number] => {
       const [fx, fy] = w < SKY_WIDE_PX ? l.m : l.d;
@@ -103,6 +105,30 @@ export function NightSky({ lights, links, activeId, warping }: { lights: SkyLigh
       ctx.globalAlpha = 1;
       ctx.globalCompositeOperation = "lighter";
 
+      // Two slow clouds of colour behind everything, so the black is never flat.
+      const far = Math.max(w, h) * 0.6;
+      glow(w * (0.74 + 0.07 * Math.sin(t / 9000)), h * (0.28 + 0.06 * Math.cos(t / 11000)), far, "120,112,255", 0.075 * (1 - warp));
+      glow(w * (0.18 + 0.06 * Math.cos(t / 10000)), h * (0.6 + 0.06 * Math.sin(t / 8000)), far, "255,92,53", 0.085 * (1 - warp));
+
+      // A shooting star now and then, across the top of the sky.
+      if (!still && !shot && t > nextShot) shot = { at: t, x: w * (0.15 + rand() * 0.7), y: h * (0.04 + rand() * 0.26), dir: rand() < 0.5 ? 1 : -1 };
+      if (shot) {
+        const u = (t - shot.at) / 850;
+        if (u >= 1) { shot = null; nextShot = t + 4200 + rand() * 5200; }
+        else {
+          const hx = shot.x + shot.dir * 230 * u, hy = shot.y + 96 * u, tail = 96 * Math.sin(u * Math.PI);
+          const streak = ctx.createLinearGradient(hx - shot.dir * tail, hy - tail * 0.42, hx, hy);
+          streak.addColorStop(0, "rgba(255,250,244,0)");
+          streak.addColorStop(1, `rgba(255,250,244,${0.85 * Math.sin(u * Math.PI) * (1 - warp)})`);
+          ctx.strokeStyle = streak;
+          ctx.lineWidth = 1.2;
+          ctx.beginPath();
+          ctx.moveTo(hx - shot.dir * tail, hy - tail * 0.42);
+          ctx.lineTo(hx, hy);
+          ctx.stroke();
+        }
+      }
+
       const lit = lights.map((_, i) => (still ? 1 : ease((t - 350 - i * 170) / 700)) * (1 - warp));
       const spot = lights.map((l) => at(l, t));
       const hotId = live.current.activeId;
@@ -125,26 +151,46 @@ export function NightSky({ lights, links, activeId, warping }: { lights: SkyLigh
 
       if (!still && t > nextSpark && links.length > 0) {
         sparks.push({ link: Math.floor(rand() * links.length), at: t, flip: rand() < 0.5 });
-        nextSpark = t + 900 + rand() * 1700;
+        nextSpark = t + 450 + rand() * 900;
       }
       for (let i = sparks.length - 1; i >= 0; i--) {
         const s = sparks[i], u = (t - s.at) / 1700;
         if (u >= 1) { sparks.splice(i, 1); continue; }
         const [a, b] = s.flip ? [links[s.link][1], links[s.link][0]] : links[s.link];
-        const e = u * u * (3 - 2 * u);
-        glow(spot[a][0] + (spot[b][0] - spot[a][0]) * e, spot[a][1] + (spot[b][1] - spot[a][1]) * e, 9, u < 0.5 ? lights[a].rgb : lights[b].rgb, Math.sin(u * Math.PI) * 0.9 * (1 - warp));
+        // The head and a short tail behind it.
+        for (let k = 0; k < 4; k++) {
+          const v = Math.max(0, u - k * 0.035), e = v * v * (3 - 2 * v);
+          glow(spot[a][0] + (spot[b][0] - spot[a][0]) * e, spot[a][1] + (spot[b][1] - spot[a][1]) * e, 10 - k * 2, u < 0.5 ? lights[a].rgb : lights[b].rgb, Math.sin(u * Math.PI) * (0.95 - k * 0.22) * (1 - warp));
+        }
       }
 
       lights.forEach((l, i) => {
         if (lit[i] <= 0) return;
         const [x, y] = spot[i];
-        const r = l.size * (w < SKY_WIDE_PX ? 1 : 1.45) * lit[i] * (still ? 1 : 1 + 0.1 * Math.sin(t / 1400 + i * 1.7)) * (l.id === hotId ? 1.45 : 1);
-        glow(x, y, r * 6, l.rgb, 0.16 * lit[i]);
+        const r = l.size * (w < SKY_WIDE_PX ? 1 : 1.45) * lit[i] * (still ? 1 : 1 + 0.16 * Math.sin(t / 1400 + i * 1.7)) * (l.id === hotId ? 1.45 : 1);
+        glow(x, y, r * 7, l.rgb, 0.22 * lit[i]);
         glow(x, y, r * 2, l.rgb, 0.9 * lit[i]);
         ctx.fillStyle = `rgba(255,250,244,${0.95 * lit[i]})`;
         ctx.beginPath();
         ctx.arc(x, y, 1.2 + l.size * 0.13, 0, 6.2832);
         ctx.fill();
+
+        // Each light is a small system: a tilted orbit and one moon going round it.
+        const hot = l.id === hotId, tilt = -0.5 + i * 0.37, rx = r * 3 + 8, ry = rx * 0.36;
+        ctx.strokeStyle = `rgba(${l.rgb},${(hot ? 0.55 : 0.24) * lit[i]})`;
+        ctx.lineWidth = 0.7;
+        ctx.beginPath();
+        ctx.ellipse(x, y, rx, ry, tilt, 0, 6.2832);
+        ctx.stroke();
+        const turn = (still ? 0 : t / (1500 + i * 260)) + i * 2.1, ox = Math.cos(turn) * rx, oy = Math.sin(turn) * ry;
+        glow(x + ox * Math.cos(tilt) - oy * Math.sin(tilt), y + ox * Math.sin(tilt) + oy * Math.cos(tilt), 4.5, l.rgb, lit[i]);
+        if (hot && !still) {
+          const ring = (t % 1400) / 1400;
+          ctx.strokeStyle = `rgba(${l.rgb},${0.45 * (1 - ring)})`;
+          ctx.beginPath();
+          ctx.arc(x, y, r * 2 + ring * 46, 0, 6.2832);
+          ctx.stroke();
+        }
       });
     };
 
