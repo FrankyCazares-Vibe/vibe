@@ -1,59 +1,62 @@
-# The invented cast for screenshots and the demo video (S72 draft, 2026-10-02)
+# The invented cast for screenshots and the demo video (S72, 2026-10-02)
 
-A first draft for Franky to change. Nothing is built yet. The cast lives ONLY in the practice database on this Mac (a new `scripts/demo-seed.mjs`, same safety gate as `scripts/local-seed.mjs`: it refuses any database that is not 127.0.0.1). Nothing invented ever goes into production.
+Franky answered the five questions on Oct 2; this is the cast with his answers in. It lives ONLY in the practice database on this Mac (`scripts/demo-seed.mjs`, same safety gate as `scripts/local-seed.mjs`: it refuses any database that is not 127.0.0.1). Nothing invented ever goes into production.
 
-Rules it follows: no real student, no real club name, no school colours or logos, no numbers that suggest Vibe is bigger than it is.
+## Franky's answers (Oct 2)
+
+1. **Feel:** calm and clear. Someone waking up, opening the main feed, scrolling to see what people posted, then going to Events to see an event they RSVP'd for that is today.
+2. **Story:** a new student's first week. They sign up, check the feed and the events, look at an org profile and its posts, then go to Messages and send a friend the event: "hey are you going to this event tonight?"
+3. **Photos:** free-licence stock photos, no faces needed. Franky can also send his own pictures.
+4. **Orgs:** SAE (use it), and the kinds of groups students really have: fraternities, sororities, RA floors ("Tower Floor 3"), North Hall, chess club, finance club.
+5. **Founders:** yes, Franky, James and Rylan appear as themselves.
+
+**Held back, with the reason:** Franky also named dsig and fiji. They are real chapters that are not on Vibe, so showing them in a public video would say they are. SAE is the one real org on Vibe, so SAE is in. The others are left out until a chapter says yes; generic groups (Chess Club, Finance Club, a floor, a hall) fill the feed. Before the video is published, James and Rylan each confirm they are fine being shown.
 
 ## The lead (whose phone we are looking at)
 
-**Maya Okafor**, sophomore, Media Arts. New on campus this semester. The video follows her first week: she opens Vibe, finds a club, RSVPs, lands in the club chat, fixes up her profile, gets a DM.
+**Maya Okafor**, sophomore, Media Arts. New on campus this semester.
 
-## Students (10)
+## Students
 
 | Name | Year, major | Role in the story |
 |---|---|---|
 | Maya Okafor | Sophomore, Media Arts | The lead |
-| Jonah Reyes | Junior, Mechanical Engineering | Runs Night Shift Robotics; sends Maya the DM |
-| Priya Raman | Senior, Informatics | President of Reel Club; posts the event |
-| Theo Lindqvist | Freshman, Exploratory | Joins the same week as Maya; chatty in the club room |
-| Amara Diallo | Junior, Nursing | Organises the study group |
-| Lucas Ferreira | Sophomore, Music Technology | Hosts the open mic |
+| Theo Lindqvist | Freshman, Exploratory | Maya's friend; she sends him the event |
+| Priya Raman | Senior, Informatics | Runs Chess Club; posts the event |
+| Jonah Reyes | Junior, Mechanical Engineering | Finance Club officer |
+| Amara Diallo | Junior, Nursing | RA of Tower Floor 3 |
+| Lucas Ferreira | Sophomore, Music Technology | Posts from North Hall |
 | Hana Sato | Senior, Computer Graphics | Posts photos; follows Maya back |
-| Devon Brooks | Junior, Sports Management | Intramural captain |
-| Noor Haddad | Sophomore, Biology | Votes in the poll, takes a sign-up spot |
-| Eli Carter | Freshman, Computer Science | Asks the question the Board answers |
+| Devon Brooks | Junior, Sports Management | Posts in the feed |
+| Noor Haddad | Sophomore, Biology | Chess Club member |
+| Eli Carter | Freshman, Computer Science | Tower Floor 3 resident |
+| Franky Cazares, James Andres, Rylan Conaway | themselves | SAE; one post each at most |
 
-## Clubs (5)
+## Orgs (5)
 
-| Club | What it is | Used for |
+| Org | What it is | Used for |
 |---|---|---|
-| Reel Club | Film nights and student shorts | The club page and the chat shot |
-| Night Shift Robotics | Builds and competitions | A second club in the feed |
-| Canal Run Crew | Morning runs downtown | An event with a time and place |
-| Open Mic Collective | Music and spoken word, Fridays | The "tonight" event |
-| First-Gen Study Hall | Study groups before exams | The "each other" side |
+| SAE | The fraternity (real, already on Vibe) | The org profile Maya looks through |
+| Chess Club | Weekly games, open to beginners | The event that is today |
+| Finance Club | Markets, careers, resume nights | A second club in the feed |
+| Tower Floor 3 | An RA floor | The "your floor" feeling; a small event |
+| North Hall | A residence hall | Posts and a study event |
 
-## Events this week (6)
+## Events this week
 
-Reel Club: "Short Film Night" (Thu 7 pm) · Open Mic Collective: "Friday Open Mic" (Fri 8 pm) · Canal Run Crew: "Sunrise 5K" (Sat 7 am) · Night Shift Robotics: "Build Night" (Wed 6 pm) · First-Gen Study Hall: "Midterm Study Jam" (Sun 2 pm) · Reel Club: "Pitch Your Short" (next Tue).
+Chess Club: "Blitz Night" (TODAY, 7 pm; Maya has RSVP'd; this is the one she sends Theo) · Finance Club: "Resume Review Night" (in 2 days, 6 pm) · Tower Floor 3: "Floor Movie Night" (in 3 days, 8 pm) · SAE: "Cookout on the Lawn" (in 4 days, 5 pm) · North Hall: "Midterm Study Jam" (in 5 days, 2 pm).
 
-## The video, 8 shots (25 to 35 seconds, phone, Night)
+## The video (25 to 35 seconds, phone, Night, calm)
 
 1. Title card: the wordmark and "The social app for your campus."
-2. The feed, scrolling: three posts from the cast.
-3. Reel Club's page: Maya taps Follow, then Join.
-4. Short Film Night: Maya taps RSVP.
-5. The club chat: the Board, a poll, Theo and Priya talking.
-6. Maya's profile: she changes how it looks.
-7. A DM from Jonah: "you coming Thursday?"
-8. End card: "Your campus. Your people. Yourself." and the sign-up address.
+2. Morning: the feed, scrolling slowly past three or four posts.
+3. Events: "Blitz Night" is today, marked as going.
+4. An org profile (SAE): the header, then its posts.
+5. Messages: Maya sends Theo the event: "hey are you going to this event tonight?"
+6. End card: "Your campus. Your people. Yourself." and the sign-up address.
 
-The longer walkthrough (60 to 90 seconds) uses the same shots, held longer, with one caption each.
+Sign-up is its own short clip (school email, verify, pick a campus) so it can open the longer walkthrough (60 to 90 seconds), which holds each shot longer with one caption each.
 
-## What I need from Franky
+## Photos
 
-1. **The vision.** What should the video feel like: fast cuts with music, or calm and clear? What is the one thing a viewer must remember?
-2. **The lead.** Is "a new student's first week" the right story, or should it be a club officer setting up their club (the clubs-first plan)?
-3. **Photos.** Posts and profile pictures need images. Options: (a) photos you or the founders took and own, (b) free-licence stock photos with no recognisable faces, (c) abstract covers and initials only, no photos. Recommended: (b) for posts, initials or illustrated avatars for people.
-4. **Names.** Change any name or club above. None may match a real IU or Purdue club.
-5. **Founders on camera.** Do you, James and Rylan want to appear as yourselves in the cast? Each has to say yes.
+Posts carry free-licence stock photos with no recognisable faces (campus, a chess board, a film screen, a grill, a study table), or Franky's own pictures when he sends them. People get initials or a plain avatar. Until photos are chosen the seed writes text posts and leaves the picture slots empty.
