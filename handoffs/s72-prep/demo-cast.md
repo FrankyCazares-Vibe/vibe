@@ -10,7 +10,7 @@ Franky answered the five questions on Oct 2; this is the cast with his answers i
 4. **Orgs:** SAE (use it), and the kinds of groups students really have: fraternities, sororities, RA floors ("Tower Floor 3"), North Hall, chess club, finance club.
 5. **Founders:** yes, Franky, James and Rylan appear as themselves.
 
-**Held back, with the reason:** Franky also named dsig and fiji. They are real chapters that are not on Vibe, so showing them in a public video would say they are. SAE is the one real org on Vibe, so SAE is in. The others are left out until a chapter says yes; generic groups (Chess Club, Finance Club, a floor, a hall) fill the feed. Before the video is published, James and Rylan each confirm they are fine being shown.
+**Held back, with the reason:** Franky also named dsig and fiji. They are real chapters that are not on Vibe, so showing them in a public video would say they are. SAE is the one real org on Vibe, so SAE is in. The others are left out until a chapter says yes; generic groups (Chess Club, Finance Club, a floor, a hall) fill the feed. James and Rylan have confirmed they are fine being shown (Franky, Oct 2). Rylan is not in SAE; only Franky and James are.
 
 ## The lead (whose phone we are looking at)
 
@@ -30,7 +30,8 @@ Franky answered the five questions on Oct 2; this is the cast with his answers i
 | Devon Brooks | Junior, Sports Management | Posts in the feed |
 | Noor Haddad | Sophomore, Biology | Chess Club member |
 | Eli Carter | Freshman, Computer Science | Tower Floor 3 resident |
-| Franky Cazares, James Andres, Rylan Conaway | themselves | SAE; one post each at most |
+| Franky Cazares, James Andres | themselves | SAE members; one post each at most |
+| Rylan Conaway | himself | Not in SAE; one personal post at most |
 
 ## Orgs (5)
 
@@ -59,4 +60,4 @@ Sign-up is its own short clip (school email, verify, pick a campus) so it can op
 
 ## Photos
 
-Posts carry free-licence stock photos with no recognisable faces (campus, a chess board, a film screen, a grill, a study table), or Franky's own pictures when he sends them. People get initials or a plain avatar. Until photos are chosen the seed writes text posts and leaves the picture slots empty.
+Posts carry free-licence stock photos with no recognisable faces (campus, a chess board, a film screen, a grill, a study table), or Franky's own pictures. Franky chose his own pictures (Oct 2): they go in `~/vibe-demo-photos` on this Mac, outside the repo, because the repo is public. People get initials or a plain avatar. Until photos are chosen the seed writes text posts and leaves the picture slots empty.
