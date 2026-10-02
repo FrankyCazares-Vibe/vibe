@@ -245,8 +245,8 @@ export function YourWeek({
                 aria-label={`Back to this week, ${weekRangeAt(now, 0).spoken}`}
                 style={{ height: 38, minWidth: 44, padding: 0, border: "none", background: "transparent", color: t.ink, fontFamily: "inherit", display: "flex", alignItems: "center", cursor: "pointer", WebkitTapHighlightColor: "transparent" }}
               >
-                <span style={{ height: 26, boxSizing: "border-box", padding: "0 10px 0 6px", borderRadius: 999, border: "1px solid rgba(var(--scrim-rgb),0.14)", background: "rgba(var(--scrim-rgb),0.08)", fontSize: 12, fontWeight: 700, lineHeight: 1, display: "inline-flex", alignItems: "center", gap: 3, whiteSpace: "nowrap" }}>
-                  <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.6" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
+                <span style={{ height: 22, boxSizing: "border-box", padding: "0 8px 0 5px", borderRadius: 999, border: "1px solid rgba(var(--scrim-rgb),0.14)", background: "rgba(var(--scrim-rgb),0.08)", fontSize: 11, fontWeight: 700, lineHeight: 1, display: "inline-flex", alignItems: "center", gap: 3, whiteSpace: "nowrap" }}>
+                  <svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.6" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
                     <path d="M15 5l-7 7 7 7" />
                   </svg>
                   This week
