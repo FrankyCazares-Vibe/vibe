@@ -40,6 +40,55 @@ The code for `https://www.connectvibe.app/auth/login` (chunk `2szoa-o94f9it.js`)
 - Verified by the orchestrator at `ac731f0`: tsc clean, 1,700/1,700 tests, fresh rehearsal 1 = 31 constants, full rolled-back run passes with 181 cases, local database identical before and after.
 - **Next (step 2 of the Mac checklist):** merge `origin/main` into the branch (conflict-free; fixes the handoff's `--ff-only`), pg_dump the local database, re-run `node scripts/local-seed.mjs` the same UTC day (its fixture event ends 2026-10-05 01:00 UTC), rehearsal 1 → paste the 31 constants → rehearsal 2 → the real LOCAL apply (`docker exec … psql`; psql is not installed on the Mac) → the three check scripts → commit the constants. Production stays untouched until Franky's yes.
 
+## Step 2 DONE (Oct 1): migration B applied to the LOCAL database
+
+On branch `claude/relaxed-davinci-9d11h3` (head `49ee404`, pushed):
+- `5205a4a` merged `main` into the branch (conflict-free), so the handoff's later `--ff-only` merge works.
+- Local database dumped first (`scratchpad/step2/local-before-B.dump`, session-only); seed re-run the same UTC day.
+- Rehearsal 1 printed 31 constants and stopped as designed; they and the version (`PostgreSQL 17.6 … gcc 15.2.0`, the same build as production) are pasted and committed (`49ee404`), with the COST section filled from rolled-back fixtures (reply count 0.5-0.8 ms on 100 posts / 2,000 replies; one vote 0.5 ms; the whole file ~90 ms; locks SHARE ROW EXCLUSIVE on messages, channels, users, channel_members, no ACCESS EXCLUSIVE on a live table).
+- Rehearsal 2 green; the real LOCAL apply committed (APPLY RECORD `tables 5, functions 5, trigger 1`, probe passed, md5 `d5a05bb3…` of the pre-COST file).
+- Checks on the migrated local database: `chat-v2-rooms-check` 200/200; `chat-v2-after-deploy` 0 findings (12 clubs, 45 rooms); `chat-v2-cards-check` all 181 passed, no warnings; the seed added its 3 cards once and changed nothing the second time.
+- Code: `tsc` clean; `npm test` 1,709/1,709; a local `next build` of the branch compiles cleanly with a proper public key (the 4 new routes in the output).
+- New fact for the rollback text: on Supabase a `DROP TRIGGER` makes supautils lock 23 auth/storage/realtime tables (sign-ins wait); written into B's ROLLBACK paragraph.
+- **The branch's Vercel Preview builds now FAIL on purpose**: the key guard (from main) refuses Preview's `NEXT_PUBLIC_SUPABASE_ANON_KEY`, which still holds the dead service key, and the integration's publishable key is Production-only. Reproduced locally (same refusal). Fix = the Vercel clean-up in Part 1 (recreate the row as Config with the publishable key for Production AND Preview). Production builds are unaffected.
+
+**Next, in order:** (3) the HTTP pass against the local database with a local `next dev` and the seed accounts (contract 13.3 step 2 + 17.5 + 17.7's new rows); (4) `GET /api/me/features` with the flag on locally; (5) the browser walk at 375px, flag ON and OFF, Light and Night, as blake and avery; then production: the read-only PRE-CHECK → **Franky's yes** → apply B at a quiet hour (Management API; md5 of the pushed file) → record it → merge the branch to `main` → the after-deploy check → the Production-only flag env for the three founders + SAE → redeploy → first phone test (create an upcoming event first: none exists on production).
+
+## Step 3 DONE (Oct 1): the HTTP pass, and what it found
+
+Branch head `ef40404` (pushed). Details: contract **section 17.8**.
+- **First real run of the cloud's routes**, local `next dev` + local database, flag on for avery / blake / emery, off for casey / drew: remove route + `chat_removals` 18/18; inbox / space / calendar / Event card refresh 20/21; regression 27/28; cards / votes / blocking 29/33; a verifier re-ran every non-pass and 10 extra checklist cases.
+- **Bug found and fixed: shared preview windows.** One busy room pushed other rooms' newest message out of the Messages lists (also in the old list that is LIVE: a DM request can leave Requests while other DMs are busy). Fix = **migration C** `20261001120000_chat_latest_per_room.sql` (one function, the newest k rows per room, caller's RLS) + one helper used by the thread list, the Messages home, Otto and the badge; a database without C keeps today's query. Applied to the LOCAL database; live proof: the blank previews are back.
+- **Bug found and fixed:** a NUL / broken character in a card answered "try again" forever; invisible-only questions and options were accepted. Now clear 400s.
+- **My mistake, caught by the builder:** the first order for C revoked the function from `anon`, which breaks the standing rule (a refused function crashes this Postgres image; it crashed the LOCAL database once, a second of recovery). Corrected before review: anon keeps EXECUTE and is refused at the table.
+- Gates: tsc clean, `npm test` 1,736/1,736, eslint clean, `chat-latest-check` 44/44, the three older SQL checks unchanged.
+- **The production apply list is now B then C** (both need Franky's yes).
+- The local test server (`vibe-wave2` in `.claude/launch.json`, port 3101, a local-only `.env.development.local` in the scratch worktree) is stopped by the app when the Mac idles: restart it with `preview_start`.
+
+**Next:** step 4, the browser walk at 375px, flag ON (blake, avery) and OFF (casey), Light and Night (contract 13.3 step 4, 17.5 items 13-29); then production.
+
+## Step 4, first pass DONE (Oct 1): the browser walk at phone size
+
+Branch head `5f19643`. Details: contract **section 17.9**. Screenshots on the Mac: `handoffs/chat-redesign/s71-walk/` (not committed).
+- **Right on real data:** Messages home (Night + Light), the club space, the Board as a member (no composer, the officer sentence), an event chat and back out one layer at a time, the "+" tray, a poll typed, posted and voted through the screen, the owner's Board composer, an officer Remove through the message menu (database: `removed_by` NULL + the `chat_removals` row), the author's "Removed by a club officer" card, the blocked pair hidden both ways, and with the flag OFF the old list, old thread and Campus › Chat unchanged. No sideways overflow anywhere; no console error from the new screens.
+- **Confirmed bug (audit F06):** Back with a sheet open closes the whole club space and loses the draft. Not fixed yet.
+- **Not walked yet:** long-press on cards, Take a spot, the RSVP / sign-up / share-event sheets, Board replies, the Officers room, Light inside the club, the keyboard, Safari, the store apps, a real phone; audit F05 and F07–F10 not re-tested.
+
+**Next, in order:**
+1. Fix the screen bugs the audit found and the walk confirmed (F06 first; then F05, F07, F08, F09, F10), then walk the "not walked" list.
+2. Production, with **Franky's yes**: the read-only PRE-CHECK → apply **B, then C** at a quiet hour (Management API; the md5 of the pushed file for B) → record both in `schema_migrations` → merge the branch to `main` → the after-deploy check → the Production-only flag env for the three founders + SAE → redeploy → create an upcoming event on production → the first real phone test.
+3. Small Vercel leftover: none (the ANON row is recreated as Config; Preview builds succeed).
+
+## Screen bugs FIXED (Oct 1): F05, F06, F07, F08, F09
+
+Branch head `6d79e20` (pushed). Details: contract **section 17.10**.
+- **F06** Back with a sheet open now closes only the sheet (then the event chat, the space, the home). **F07** Back from the club page / a profile returns to the room. **F05** messages you watched arrive are read (0 new, was 3 new). **F08** no silently skipped messages after a locked phone. **F09** the event chat opens at the newest message and follows.
+- Proof: tsc clean, `npm test` 1,814/1,814, no new lint error; walked by the orchestrator with real clicks and the browser's real Back (the sequence that failed before now passes).
+- **F10 not done** (the keyboard height inside the store apps): needs a real device.
+- **Still to walk** (two live sessions, a throttle, or a phone): Back while a poll is posting, a space closed under an open sheet, the 60-message gap after a hidden page, the keyboard, Android's system Back, the iPhone edge swipe; plus long-press on cards, Take a spot, the RSVP / sign-up / share-event sheets, Board replies, the Officers room, Light inside the club.
+
+**Next:** production, with **Franky's yes**: read-only PRE-CHECK → apply **B, then C** at a quiet hour → record both → merge the branch to `main` → the after-deploy check → the Production-only flag env for the three founders + SAE → redeploy → create an upcoming event on production → the first real phone test (which is also where the list above gets walked on a real phone).
+
 ## The short list: what to do, in order
 
 **Part 1 is done** (the leaked key was killed Sept 30 at 02:50 UTC Oct 1; small clean-ups remain, listed there).
