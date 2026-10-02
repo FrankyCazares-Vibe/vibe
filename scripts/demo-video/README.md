@@ -113,9 +113,9 @@ seed, which removes it.
 
 ## Film-only dressing
 
-Thirteen small things are changed in the film and NOT in the app. Most hide a flaw the app still has on a 390 px
-phone in Night, so each is also a thing to look at in the app. 1 to 5 are style rules in `shim.mjs` (`pageDot`),
-the rest are in `storyboard.mjs`.
+Eighteen small things are changed in the film and NOT in the app. Most hide a flaw the app still has on a 390 px
+phone in Night, so each is also a thing to look at in the app. 1 to 5 and 14 to 17 are in `shim.mjs` (`pageDot`,
+its rules 1 to 9), the rest are in `storyboard.mjs`.
 
 1. Campus header: the count line ("13 at IU Bloomington · 1 active now") is left out; on screen for nine seconds
    it told a new student the app is nearly empty. The campus name stays.
@@ -135,6 +135,21 @@ the rest are in `storyboard.mjs`.
 12. Orgs list: a handle line that wraps breaks after the handle ("@tower_floor_3" / "By request · 3 members"),
     instead of leaving a "·" at the end of the first line.
 13. Profiles (Rylan's and Franky's): the round "+" (New post) is hidden; it sat on the first post's "⋯".
+14. The small counts that read as "nearly empty" are left out (the marketing rule: no number that makes Vibe look
+    bigger or smaller than it is), each with its own "·", so nothing dangles and nothing leaves a gap: the Orgs
+    list's "· 3 members" ("@sae · Invite only": the handle and the join mode stay), SAE's page's
+    "· 6 followers · 3 members" ("@sae"), the "4 going" on the event cards (Events and the Lounge's card; hidden,
+    its room kept), "Interested · 1" ("Interested"), and the Lounge header's "· 7 members" ("Your hat: Member").
+    The profile header's FOLLOWERS / CONNECTIONS numbers are not touched. `shim.mjs` rule 6, an observer; the
+    storyboard fails the take if a count is still in sight on Events, the Orgs list or SAE's page.
+15. Messages home, the "Live now" room card: the red dot's halo was cut flat on its left and top (its line is
+    `overflow: hidden`); the line is let overflow. `shim.mjs` rule 7.
+16. Feed, the "today." strip: only its first chip ("Blitz Night  Today"); the second ran off the screen edge.
+    `shim.mjs` rule 8.
+17. The DM and the Lounge: the round "⋯" (Message actions) beside each bubble is hidden, its room kept.
+    `shim.mjs` rule 9.
+18. Rylan's profile: the tab bar does not light the Profile tab there (it read as Franky's own profile). Taken off
+    again before Franky's own profile, where Profile is lit (`storyboard.mjs`, `visiting`).
 
 ## Known limits
 

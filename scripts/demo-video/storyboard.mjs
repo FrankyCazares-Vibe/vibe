@@ -24,12 +24,14 @@ export const FADE_MS = 250;
 export const T = {
   openAt: 950, // the sky's own clock when the film starts (shim.mjs): two lights coming up, four to follow
   open: 1850, // the hero; the last label is lit 1500 ms in, before the dip to black into the feed
-  feed: { hold: 800, scroll: 2300, rest: 390 },
+  feed: { hold: 800, scroll: 1900, rest: 390 },
   visit: { hold: 1250, scroll: 1300, rest: 290 }, // Rylan's profile
-  events: { before: 290, hold: 1590 },
-  orgs: { list: 1490, page: 950, scroll: 900, rest: 190 },
-  messages: { home: 1140, lounge: 900, scroll: 900, poll: 740, homeAgain: 140, dm: 240, typed: 90, sent: 940, homeAfter: 340 },
-  own: { hold: 1050, scroll: 1400, rest: 900 },
+  events: { before: 290, hold: 2000 },
+  orgs: { list: 1490, page: 690, scroll: 900, rest: 450 }, // a beat on SAE's page after its scroll
+  // homeAgain and homeAfter: with the tap's 330 ms they are on screen about 0.7 and 0.9 s, long enough to read
+  // James's row coming to the top with the line just sent.
+  messages: { home: 1080, lounge: 860, scroll: 900, poll: 580, homeAgain: 350, dm: 240, typed: 90, sent: 940, homeAfter: 550 },
+  own: { hold: 800, scroll: 1650, rest: 780 },
   close: 1850, // the wordmark (the first 250 ms come up from black)
   key: 50, // per typed character: three frames, about twenty characters a second
 };
@@ -109,11 +111,17 @@ export async function close(take) {
  * Film-only, on a profile: the round "+" (New post) sat on the first post's "⋯" through the whole header hold.
  * It lives in the app's frame, not in the page, so it is put back (on = true) before the feed is filmed again.
  */
-const newPost = (p, on) => p.evaluate((on) => {
-  let css = document.getElementById("demo-no-new-post");
-  if (!on && !css) { css = document.createElement("style"); css.id = "demo-no-new-post"; css.textContent = 'button[aria-label="New post"]{visibility:hidden!important}'; document.head.appendChild(css); }
-  if (on && css) css.remove();
-}, on);
+const filmStyle = (p, id, rules, on) => p.evaluate(([id, rules, on]) => {
+  let css = document.getElementById(id);
+  if (on && !css) { css = document.createElement("style"); css.id = id; css.textContent = rules; document.head.appendChild(css); }
+  if (!on && css) css.remove();
+}, [id, rules, on]);
+const newPost = (p, on) => filmStyle(p, "demo-no-new-post", 'button[aria-label="New post"]{visibility:hidden!important}', !on);
+/**
+ * Film-only, on a profile that is NOT Franky's (Rylan's): the tab bar lit the Profile tab, which read as Franky's
+ * own profile. There no tab is lit. Taken off (on = false) before Franky's own profile, where Profile is lit.
+ */
+const visiting = (p, on) => filmStyle(p, "demo-visiting", 'nav[aria-label="Primary"] a[href="/profile"].vibe-mobile-tab--active{color:var(--ink-muted)!important}nav[aria-label="Primary"] a[href="/profile"].vibe-mobile-tab--active::before{display:none!important}', on);
 
 /** Reel b, first half: feed, a visit to Rylan's profile, events, orgs. Returns the session for the second half. */
 export async function campus(take, ids) {
@@ -129,6 +137,16 @@ export async function campus(take, ids) {
     const r = el.getBoundingClientRect();
     return r.width > 0 && r.left >= 0 && r.right <= innerWidth && r.top >= top && r.top <= bottom;
   }), [text, top, bottom]);
+  // shim.mjs, dressing rule 6: no member, follower or "going" count left in sight.
+  const noCounts = async (where) => {
+    const left = await p.evaluate(() => [...document.querySelectorAll("span,div,button")].filter((el) => {
+      if (el.children.length !== 0) return false;
+      const r = el.getBoundingClientRect(), cs = getComputedStyle(el);
+      if (r.width === 0 || r.right <= 0 || r.left >= innerWidth || r.bottom <= 0 || r.top >= innerHeight || cs.visibility === "hidden") return false;
+      return /\d+ (members?|followers?|going)\b|(Interested|Going|Maybe) · \d/.test(el.textContent);
+    }).map((el) => el.textContent.trim()));
+    if (left.length) throw new TakeError(`a count is still on screen on ${where} (${left.join(" | ")}): shim.mjs, dressing rule 6`);
+  };
   // The feed is up, all three panes hold their rows, the chips are the four of the new app (no "Chat"), the
   // header's count line is out of the picture (shim.mjs, dressing rule 1), and we are at the top.
   const campusReady = () => p.evaluate(() => {
@@ -199,6 +217,8 @@ export async function campus(take, ids) {
     for (const chip of document.querySelectorAll("span")) if (school && chip.children.length === 0 && chip.textContent === `📚${school}`) chip.style.display = "none";
   });
   await newPost(p, false);
+  await visiting(p, true);
+  if (await p.evaluate(() => { const t = document.querySelector('nav[aria-label="Primary"] a[href="/profile"]'); return t.classList.contains("vibe-mobile-tab--active") && getComputedStyle(t, "::before").display !== "none"; })) throw new TakeError("the Profile tab is still lit on Rylan's profile (storyboard.mjs, visiting)");
   await m.preload(900);
   s.record(true);
   take.mark("2 visiting a profile");
@@ -210,6 +230,7 @@ export async function campus(take, ids) {
   // 3. Events: from the top of the feed (the panes share one scroll position), the Events chip, Blitz Night marked Going.
   await s.settle("the feed again", campusReady);
   await newPost(p, true);
+  await visiting(p, false);
   await dressCampus();
   s.record(true);
   take.mark("3 events");
@@ -217,6 +238,7 @@ export async function campus(take, ids) {
   await m.tap(() => chip("Events"), { what: "the Events chip", expect: slid(0) });
   await s.hold(T.events.hold);
   if (!(await shows("Blitz Night", [110, 500])) || !(await shows("Going", [110, 600]))) throw new TakeError('the Events pane did not end on "Blitz Night" marked Going');
+  await noCounts("the Events pane");
 
   // 4. Orgs: the list, then SAE's page.
   take.mark("4 orgs");
@@ -226,8 +248,10 @@ export async function campus(take, ids) {
   const clipped = await p.evaluate(() => [...document.querySelectorAll('a[href^="/orgs/"]')].filter((a) => a.children.length === 2 && a.getBoundingClientRect().left >= 0 && a.getBoundingClientRect().right <= innerWidth)
     .flatMap((a) => [a.children[1].children[0]?.children[0], a.children[1].children[1]]).filter((el) => el && el.scrollWidth > el.clientWidth + 1).map((el) => el.textContent));
   if (clipped.length) throw new TakeError(`cut-off text in the Orgs list (${clipped.join(" | ")}): shim.mjs, dressing rule 4`);
+  await noCounts("the Orgs list");
   await m.tap(() => m.onScreen(p.locator('a[href="/orgs/sae"]'), [130, 780]), { what: "SAE in the list", cut: true, expect: async () => p.url().endsWith("/orgs/sae") });
   await s.settle("SAE's page", async () => (await p.getByText("Return to Organizations").first().isVisible()) && (await p.getByText("Letters are up on the lawn").count()) > 0);
+  await noCounts("SAE's page");
   await m.preload(700);
   s.record(true);
   await s.hold(T.orgs.page);

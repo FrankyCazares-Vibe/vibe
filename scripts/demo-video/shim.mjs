@@ -167,10 +167,10 @@ export function pageShim() {
  * On camera, a soft dot where a finger lands: __demoDot(x, y) puts it down, __demoLift() lets it fade,
  * __demoClear() takes every dot away at once (a hard cut must not carry a fading dot onto the next screen).
  *
- * DRESSING. Five rules that exist ONLY in the film. Each one covers a flaw the app still has on a 390 px phone
- * in Night (or, for rule 1, a line that undersells it); the app itself is not changed, so each is also a thing to
- * look at in the app (the README lists them). The app styles these elements inline and without class names, so
- * the rules go by structure.
+ * DRESSING. Rules that exist ONLY in the film. Each one covers a flaw the app still has on a 390 px phone in
+ * Night (or, for rules 1 and 6, numbers that undersell it); the app itself is not changed, so each is also a thing
+ * to look at in the app (the README lists them). The app styles these elements inline and without class names, so
+ * the rules go by structure. 1 to 5 and 7 to 9 are style rules; 6 changes text, so it is an observer.
  */
 export function pageDot() {
   const night = "rgb(12,11,11)"; // the Night page colour
@@ -192,6 +192,15 @@ export function pageDot() {
     'a[href^="/orgs/"]+div button{padding:0 10px!important}',
     // 5. The DM field's picture button is a light grey disc in Night: give it the colours of the idle Send button.
     'button[aria-label="Attach a photo or video"]{background:rgba(var(--scrim-rgb),.18)!important;border-color:transparent!important;color:#fff!important}',
+    // 7. Messages home, the "Live now" room card: the red dot's halo was cut flat on its left and top (its line is
+    //    overflow:hidden). The line fits its card, so letting it overflow changes nothing else.
+    '[role="group"][aria-label^="Event rooms"]>a>span:first-child{overflow:visible!important}',
+    // 8. Feed, the "today." strip: the second chip ("Cookout on the Lawn  Tue") ran off the screen edge. Only the
+    //    first chip is shown; the strip's dotted line runs on to the edge as it does after the last chip.
+    ".vibe-strip-track .vibe-strip-chip~.vibe-strip-chip{display:none!important}",
+    // 9. The DM and the Lounge: the round "⋯" (Message actions) beside every bubble. Hidden, its room kept, so no
+    //    bubble moves.
+    'button[aria-label="Message actions"]{visibility:hidden!important}',
     ".demo-dot{position:fixed;z-index:2147483646;width:46px;height:46px;margin:-23px 0 0 -23px;border-radius:50%;pointer-events:none;",
     "background:rgba(255,255,255,.24);border:1px solid rgba(255,255,255,.5);box-shadow:0 0 18px rgba(255,255,255,.16);",
     "animation:demo-dot-in .14s ease-out both}",
@@ -202,6 +211,40 @@ export function pageDot() {
   const add = () => document.head && !css.isConnected && document.head.appendChild(css);
   document.addEventListener("DOMContentLoaded", add);
   add();
+  // 6. The small counts that read as "nearly empty" (the marketing rule: no number that makes Vibe look bigger or
+  //    smaller than it is) are left out, each with its own "·" so no separator dangles and nothing leaves a gap:
+  //    - Orgs list: "@sae · Invite only · 3 members" -> "@sae · Invite only" (the handle and the join mode stay);
+  //    - an org's page: "@sae · 6 followers · 3 members" -> "@sae";
+  //    - event cards (Events, the Lounge's card): the "4 going" pill or line is hidden (its room kept), and
+  //      "Interested · 1" -> "Interested" (the buttons stay);
+  //    - a club room's header: "Your hat: Member · 7 members" -> "Your hat: Member".
+  //    The app draws these again whenever it re-renders, so this is an observer; each change is made only when the
+  //    text still holds a count, so its own changes do not set it off again. It runs before storyboard.mjs's
+  //    observer (it is made first), so the Orgs list's line-break fix measures the line without its count.
+  const counts = () => {
+    for (const line of document.querySelectorAll('a[href^="/orgs/"]>div:nth-child(2)>div:nth-child(2)')) {
+      for (const n of line.childNodes) if (n.nodeType === 3 && /(\s|\n)·?\s*\d+ members?$/.test(n.data) && n.data.startsWith("@")) n.data = n.data.replace(/(?: · |\n)\d+ members?$/, "");
+    }
+    for (const el of document.querySelectorAll("span,div,button")) {
+      if (el.children.length !== 0) continue;
+      const t = el.textContent;
+      if (/^\d+ going$/.test(t.trim())) { if (el.style.visibility !== "hidden") el.style.visibility = "hidden"; continue; }
+      if (/^ · \d+ members?$/.test(t)) { if (el.style.display !== "none") el.style.display = "none"; continue; }
+      if (el.tagName === "BUTTON" && /^(Interested|Going|Maybe) · \d+$/.test(t.trim())) {
+        const word = t.trim().split(" · ")[0];
+        const texts = [...el.childNodes].filter((n) => n.nodeType === 3);
+        texts.forEach((n, i) => { n.data = i === 0 ? word : ""; });
+        continue;
+      }
+      // An org's page: <span>·</span><span>6 followers</span> inside one wrapper; the wrapper goes, its dot with it.
+      if (el.tagName === "SPAN" && /^\d+ (followers?|members?)$/.test(t.trim())) {
+        const wrap = el.parentElement;
+        if (wrap && wrap.children.length === 2 && wrap.children[0].textContent.trim() === "·" && wrap.style.display !== "none") wrap.style.display = "none";
+      }
+    }
+  };
+  new MutationObserver(counts).observe(document, { childList: true, subtree: true, characterData: true });
+  window.__demoCounts = counts;
   window.__demoDot = (x, y) => {
     add();
     const d = document.createElement("div");
